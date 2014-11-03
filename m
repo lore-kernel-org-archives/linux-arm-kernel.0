@@ -1,208 +1,246 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 3 Nov 2014 12:15:52 +0100
-Subject: [PATCH v4 12/58] dmaengine: hdmac: Split device_control
-In-Reply-To: <1414531573-18807-13-git-send-email-maxime.ripard@free-electrons.com>
-References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
- <1414531573-18807-13-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <545763E8.9050204@atmel.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 3 Nov 2014 11:23:09 +0000
+Subject: [RFC PATCH 2/2] arm: pcibios: move to generic PCI domains
+In-Reply-To: <003401cff704$09755cd0$1c601670$%han@samsung.com>
+References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1414669490-1217-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <003401cff704$09755cd0$1c601670$%han@samsung.com>
+Message-ID: <20141103112309.GB24433@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/10/2014 22:25, Maxime Ripard :
-> Split the device_control callback of the Atmel HDMAC driver to make use
-> of the newly introduced callbacks, that will eventually be used to retrieve
-> slave capabilities.
+On Mon, Nov 03, 2014 at 01:18:12AM +0000, Jingoo Han wrote:
+> On Thursday, October 30, 2014 8:45 PM, Lorenzo Pieralisi wrote:
+> >
+> > Most if not all ARM PCI host controller device drivers either ignore the
+> > domain field in the pci_sys_data structure or just increment it every
+> > time a host controller is probed, using it as a domain counter.
+> >
+> > Therefore, instead of relying on pci_sys_data to stash the domain number
+> > in a standard location, ARM pcibios code can be moved to the newly
+> > introduced generic PCI domains code, implemented in commits:
+> >
+> > commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
+> > ("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
+> >
+> > commit 670ba0c8883b576d0aec28bd7a838358a4be1
+> > ("PCI: Add generic domain handling")
+> >
+> > In order to assign a domain number dynamically, the ARM pcibios defines
+> > the function, called by core PCI code:
+> >
+> > void pci_bus_assign_domain_nr(...)
+> >
+> > that relies on a DT property to define the domain number or falls back to
+> > a counter; its usage replaces the current domain assignment code in PCI
+> > host controllers present in the kernel.
+> >
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Phil Edworthy <phil.edworthy@renesas.com>
+> > Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> > Cc: Jingoo Han <jg1.han@samsung.com>
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Mohit Kumar <mohit.kumar@st.com>
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-It seems okay:
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Thanks.
-
-> ---
->  drivers/dma/at_hdmac.c | 121 +++++++++++++++++++++++++++++--------------------
->  1 file changed, 73 insertions(+), 48 deletions(-)
+> (+CC Richard Zhu, Lucas Stach, Kishon Vijay Abraham I, Murali Karicheri)
 > 
-> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-> index ca9dd2613283..86450b3442f2 100644
-> --- a/drivers/dma/at_hdmac.c
-> +++ b/drivers/dma/at_hdmac.c
-> @@ -972,11 +972,13 @@ err_out:
->  	return NULL;
->  }
->  
-> -static int set_runtime_config(struct dma_chan *chan,
-> -			      struct dma_slave_config *sconfig)
-> +static int atc_config(struct dma_chan *chan,
-> +		      struct dma_slave_config *sconfig)
->  {
->  	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
->  
-> +	dev_vdbg(chan2dev(chan), "%s\n", __func__);
-> +
->  	/* Check if it is chan is configured for slave transfers */
->  	if (!chan->private)
->  		return -EINVAL;
-> @@ -989,9 +991,28 @@ static int set_runtime_config(struct dma_chan *chan,
->  	return 0;
->  }
->  
-> +static int atc_pause(struct dma_chan *chan)
-> +{
-> +	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
-> +	struct at_dma		*atdma = to_at_dma(chan->device);
-> +	int			chan_id = atchan->chan_common.chan_id;
-> +	unsigned long		flags;
->  
-> -static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-> -		       unsigned long arg)
-> +	LIST_HEAD(list);
-> +
-> +	dev_vdbg(chan2dev(chan), "%s\n", __func__);
-> +
-> +	spin_lock_irqsave(&atchan->lock, flags);
-> +
-> +	dma_writel(atdma, CHER, AT_DMA_SUSP(chan_id));
-> +	set_bit(ATC_IS_PAUSED, &atchan->status);
-> +
-> +	spin_unlock_irqrestore(&atchan->lock, flags);
-> +
-> +	return 0;
-> +}
-> +
-> +static int atc_resume(struct dma_chan *chan)
->  {
->  	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
->  	struct at_dma		*atdma = to_at_dma(chan->device);
-> @@ -1000,60 +1021,61 @@ static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
->  
->  	LIST_HEAD(list);
->  
-> -	dev_vdbg(chan2dev(chan), "atc_control (%d)\n", cmd);
-> +	dev_vdbg(chan2dev(chan), "%s\n", __func__);
->  
-> -	if (cmd == DMA_PAUSE) {
-> -		spin_lock_irqsave(&atchan->lock, flags);
-> +	if (!atc_chan_is_paused(atchan))
-> +		return 0;
->  
-> -		dma_writel(atdma, CHER, AT_DMA_SUSP(chan_id));
-> -		set_bit(ATC_IS_PAUSED, &atchan->status);
-> +	spin_lock_irqsave(&atchan->lock, flags);
->  
-> -		spin_unlock_irqrestore(&atchan->lock, flags);
-> -	} else if (cmd == DMA_RESUME) {
-> -		if (!atc_chan_is_paused(atchan))
-> -			return 0;
-> +	dma_writel(atdma, CHDR, AT_DMA_RES(chan_id));
-> +	clear_bit(ATC_IS_PAUSED, &atchan->status);
->  
-> -		spin_lock_irqsave(&atchan->lock, flags);
-> +	spin_unlock_irqrestore(&atchan->lock, flags);
->  
-> -		dma_writel(atdma, CHDR, AT_DMA_RES(chan_id));
-> -		clear_bit(ATC_IS_PAUSED, &atchan->status);
-> +	return 0;
-> +}
->  
-> -		spin_unlock_irqrestore(&atchan->lock, flags);
-> -	} else if (cmd == DMA_TERMINATE_ALL) {
-> -		struct at_desc	*desc, *_desc;
-> -		/*
-> -		 * This is only called when something went wrong elsewhere, so
-> -		 * we don't really care about the data. Just disable the
-> -		 * channel. We still have to poll the channel enable bit due
-> -		 * to AHB/HSB limitations.
-> -		 */
-> -		spin_lock_irqsave(&atchan->lock, flags);
-> +static int atc_terminate_all(struct dma_chan *chan)
-> +{
-> +	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
-> +	struct at_dma		*atdma = to_at_dma(chan->device);
-> +	int			chan_id = atchan->chan_common.chan_id;
-> +	struct at_desc		*desc, *_desc;
-> +	unsigned long		flags;
->  
-> -		/* disabling channel: must also remove suspend state */
-> -		dma_writel(atdma, CHDR, AT_DMA_RES(chan_id) | atchan->mask);
-> +	LIST_HEAD(list);
->  
-> -		/* confirm that this channel is disabled */
-> -		while (dma_readl(atdma, CHSR) & atchan->mask)
-> -			cpu_relax();
-> +	dev_vdbg(chan2dev(chan), "%s\n", __func__);
->  
-> -		/* active_list entries will end up before queued entries */
-> -		list_splice_init(&atchan->queue, &list);
-> -		list_splice_init(&atchan->active_list, &list);
-> +	/*
-> +	 * This is only called when something went wrong elsewhere, so
-> +	 * we don't really care about the data. Just disable the
-> +	 * channel. We still have to poll the channel enable bit due
-> +	 * to AHB/HSB limitations.
-> +	 */
-> +	spin_lock_irqsave(&atchan->lock, flags);
->  
-> -		/* Flush all pending and queued descriptors */
-> -		list_for_each_entry_safe(desc, _desc, &list, desc_node)
-> -			atc_chain_complete(atchan, desc);
-> +	/* disabling channel: must also remove suspend state */
-> +	dma_writel(atdma, CHDR, AT_DMA_RES(chan_id) | atchan->mask);
->  
-> -		clear_bit(ATC_IS_PAUSED, &atchan->status);
-> -		/* if channel dedicated to cyclic operations, free it */
-> -		clear_bit(ATC_IS_CYCLIC, &atchan->status);
-> +	/* confirm that this channel is disabled */
-> +	while (dma_readl(atdma, CHSR) & atchan->mask)
-> +		cpu_relax();
->  
-> -		spin_unlock_irqrestore(&atchan->lock, flags);
-> -	} else if (cmd == DMA_SLAVE_CONFIG) {
-> -		return set_runtime_config(chan, (struct dma_slave_config *)arg);
-> -	} else {
-> -		return -ENXIO;
-> -	}
-> +	/* active_list entries will end up before queued entries */
-> +	list_splice_init(&atchan->queue, &list);
-> +	list_splice_init(&atchan->active_list, &list);
-> +
-> +	/* Flush all pending and queued descriptors */
-> +	list_for_each_entry_safe(desc, _desc, &list, desc_node)
-> +		atc_chain_complete(atchan, desc);
-> +
-> +	clear_bit(ATC_IS_PAUSED, &atchan->status);
-> +	/* if channel dedicated to cyclic operations, free it */
-> +	clear_bit(ATC_IS_CYCLIC, &atchan->status);
-> +
-> +	spin_unlock_irqrestore(&atchan->lock, flags);
->  
->  	return 0;
->  }
-> @@ -1505,7 +1527,10 @@ static int __init at_dma_probe(struct platform_device *pdev)
->  		/* controller can do slave DMA: can trigger cyclic transfers */
->  		dma_cap_set(DMA_CYCLIC, atdma->dma_common.cap_mask);
->  		atdma->dma_common.device_prep_dma_cyclic = atc_prep_dma_cyclic;
-> -		atdma->dma_common.device_control = atc_control;
-> +		atdma->dma_common.device_config = atc_config;
-> +		atdma->dma_common.device_pause = atc_pause;
-> +		atdma->dma_common.device_resume = atc_resume;
-> +		atdma->dma_common.device_terminate_all = atc_terminate_all;
->  	}
->  
->  	dma_writel(atdma, EN, AT_DMA_ENABLE);
-> @@ -1622,7 +1647,7 @@ static void atc_suspend_cyclic(struct at_dma_chan *atchan)
->  	if (!atc_chan_is_paused(atchan)) {
->  		dev_warn(chan2dev(chan),
->  		"cyclic channel not paused, should be done by channel user\n");
-> -		atc_control(chan, DMA_PAUSE, 0);
-> +		atc_pause(chan);
->  	}
->  
->  	/* now preserve additional data for cyclic operations */
+> Acked-by: Jingoo Han <jg1.han@samsung.com>
+
+Thank you Jingoo.
+
+> For a long time, I have wanted the patch like this. Personally,
+> I want to increase the build coverage and keep the same binary
+> regardless of config options as possible; thus, I don't like
+> #ifdef guards such as '#ifdef CONFIG_PCI_DOMAINS'. When I submitted
+> the first patch for 'pcie-designware.c', I was not able to find
+> a way to remove '#ifdef CONFIG_PCI_DOMAINS' from 'pcie-designware.c'.
 > 
+> This patch looks good and I think that this patch will not make
+> the problem. However, I didn't test this patch with Exynos platform,
+> due to some reasons. So, I hope that other engineers test this patch
+> on other SoC platforms related to designware PCIe.
+> 
+> To Mohit Kumar (ST SPEAR13XX), Richard Zhu/Lucas Stach (IMX6)
+>     Kishon Vijay Abraham I (TI DRA7XX), Murali Karicheri (TI KEYSTONE)
+> 
+> Would you test this patch and share the result?
+> It would be very helpful. Thank you.
 
+I am happy to wait for a week or two before asking to add this code to -next,
+it would be definitely great to get more coverage on pcie-designware.
 
--- 
-Nicolas Ferre
+Thanks,
+Lorenzo
+
+> Best regards,
+> Jingoo Han
+> 
+> > ---
+> >  arch/arm/Kconfig                   |  3 +++
+> >  arch/arm/include/asm/mach/pci.h    |  3 ---
+> >  arch/arm/include/asm/pci.h         |  7 -------
+> >  arch/arm/kernel/bios32.c           | 26 +++++++++++++++++++++++---
+> >  drivers/pci/host/pci-mvebu.c       | 10 ++--------
+> >  drivers/pci/host/pcie-designware.c |  3 ---
+> >  drivers/pci/host/pcie-rcar.c       |  3 ---
+> >  7 files changed, 28 insertions(+), 27 deletions(-)
+> >
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 89c4b5c..29544f0 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -1292,6 +1292,9 @@ config PCI_DOMAINS
+> >       bool
+> >       depends on PCI
+> >
+> > +config PCI_DOMAINS_GENERIC
+> > +     def_bool PCI_DOMAINS
+> > +
+> >  config PCI_NANOENGINE
+> >       bool "BSE nanoEngine PCI support"
+> >       depends on SA1100_NANOENGINE
+> > diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+> > index 7fc4278..f19f627 100644
+> > --- a/arch/arm/include/asm/mach/pci.h
+> > +++ b/arch/arm/include/asm/mach/pci.h
+> > @@ -44,9 +44,6 @@ struct hw_pci {
+> >   * Per-controller structure
+> >   */
+> >  struct pci_sys_data {
+> > -#ifdef CONFIG_PCI_DOMAINS
+> > -     int             domain;
+> > -#endif
+> >       struct list_head node;
+> >       int             busnr;          /* primary bus number                   */
+> >       u64             mem_offset;     /* bus->cpu memory mapping offset       */
+> > diff --git a/arch/arm/include/asm/pci.h b/arch/arm/include/asm/pci.h
+> > index 7e95d85..585dc33 100644
+> > --- a/arch/arm/include/asm/pci.h
+> > +++ b/arch/arm/include/asm/pci.h
+> > @@ -18,13 +18,6 @@ static inline int pcibios_assign_all_busses(void)
+> >  }
+> >
+> >  #ifdef CONFIG_PCI_DOMAINS
+> > -static inline int pci_domain_nr(struct pci_bus *bus)
+> > -{
+> > -     struct pci_sys_data *root = bus->sysdata;
+> > -
+> > -     return root->domain;
+> > -}
+> > -
+> >  static inline int pci_proc_domain(struct pci_bus *bus)
+> >  {
+> >       return pci_domain_nr(bus);
+> > diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> > index 17a26c1..d8c2b4e 100644
+> > --- a/arch/arm/kernel/bios32.c
+> > +++ b/arch/arm/kernel/bios32.c
+> > @@ -11,6 +11,8 @@
+> >  #include <linux/slab.h>
+> >  #include <linux/init.h>
+> >  #include <linux/io.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_pci.h>
+> >
+> >  #include <asm/mach-types.h>
+> >  #include <asm/mach/map.h>
+> > @@ -468,9 +470,6 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+> >               if (!sys)
+> >                       panic("PCI: unable to allocate sys data!");
+> >
+> > -#ifdef CONFIG_PCI_DOMAINS
+> > -             sys->domain  = hw->domain;
+> > -#endif
+> >               sys->busnr   = busnr;
+> >               sys->swizzle = hw->swizzle;
+> >               sys->map_irq = hw->map_irq;
+> > @@ -511,6 +510,27 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+> >       }
+> >  }
+> >
+> > +#ifdef CONFIG_PCI_DOMAINS_GENERIC
+> > +static bool dt_domain_found;
+> > +
+> > +void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+> > +{
+> > +     int domain = of_get_pci_domain_nr(parent->of_node);
+> > +
+> > +     if (domain >= 0) {
+> > +             dt_domain_found = true;
+> > +     } else if (dt_domain_found == true) {
+> > +             dev_err(parent, "Node %s is missing \"linux,pci-domain\" property in DT\n",
+> > +                     parent->of_node->full_name);
+> > +             return;
+> > +     } else {
+> > +             domain = pci_get_new_domain_nr();
+> > +     }
+> > +
+> > +     bus->domain_nr = domain;
+> > +}
+> > +#endif
+> > +
+> >  void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
+> >  {
+> >       struct pci_sys_data *sys;
+> > diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> > index b1315e1..2b4c1f2 100644
+> > --- a/drivers/pci/host/pci-mvebu.c
+> > +++ b/drivers/pci/host/pci-mvebu.c
+> > @@ -722,17 +722,11 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+> >  {
+> >       struct mvebu_pcie *pcie = sys_to_pcie(sys);
+> >       int i;
+> > -     int domain = 0;
+> >
+> > -#ifdef CONFIG_PCI_DOMAINS
+> > -     domain = sys->domain;
+> > -#endif
+> > -
+> > -     snprintf(pcie->mem_name, sizeof(pcie->mem_name), "PCI MEM %04x",
+> > -              domain);
+> > +     snprintf(pcie->mem_name, sizeof(pcie->mem_name), "PCI MEM %04x", nr);
+> >       pcie->mem.name = pcie->mem_name;
+> >
+> > -     snprintf(pcie->io_name, sizeof(pcie->io_name), "PCI I/O %04x", domain);
+> > +     snprintf(pcie->io_name, sizeof(pcie->io_name), "PCI I/O %04x", nr);
+> >       pcie->realio.name = pcie->io_name;
+> >
+> >       if (request_resource(&iomem_resource, &pcie->mem))
+> > diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> > index dfed00a..6790b87 100644
+> > --- a/drivers/pci/host/pcie-designware.c
+> > +++ b/drivers/pci/host/pcie-designware.c
+> > @@ -502,9 +502,6 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+> >       dw_pci.private_data = (void **)&pp;
+> >
+> >       pci_common_init_dev(pp->dev, &dw_pci);
+> > -#ifdef CONFIG_PCI_DOMAINS
+> > -     dw_pci.domain++;
+> > -#endif
+> >
+> >       return 0;
+> >  }
+> > diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
+> > index 61158e0..b6b859e 100644
+> > --- a/drivers/pci/host/pcie-rcar.c
+> > +++ b/drivers/pci/host/pcie-rcar.c
+> > @@ -404,9 +404,6 @@ static void rcar_pcie_enable(struct rcar_pcie *pcie)
+> >       rcar_pci.private_data = (void **)&pcie;
+> >
+> >       pci_common_init_dev(&pdev->dev, &rcar_pci);
+> > -#ifdef CONFIG_PCI_DOMAINS
+> > -     rcar_pci.domain++;
+> > -#endif
+> >  }
+> >
+> >  static int phy_wait_for_ack(struct rcar_pcie *pcie)
+> > --
+> > 2.1.2
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
