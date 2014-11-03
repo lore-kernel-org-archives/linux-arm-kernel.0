@@ -1,54 +1,31 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 03 Nov 2014 08:15:53 +0100
-Subject: [Regression Resend] mmc: mx28: sd card detection broken since
- 3.18-rc1
-In-Reply-To: <5456B7B3.60401@gmail.com>
-References: <1747777414.897866.1414878004147.JavaMail.open-xchange@oxbsltgw09.schlund.de>
- <5456B7B3.60401@gmail.com>
-Message-ID: <54572BA9.1090305@i2se.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 03 Nov 2014 08:32:57 +0100
+Subject: [PATCH v2 0/4] Add support for pxa27x device-tree machine
+In-Reply-To: <1830013.l3PUsHBfsL@wuerfel> (Arnd Bergmann's message of "Thu, 30
+ Oct 2014 08:07:52 +0100")
+References: <1413127731-1187-1-git-send-email-robert.jarzmik@free.fr>
+ <87k33i6o7f.fsf@free.fr> <1830013.l3PUsHBfsL@wuerfel>
+Message-ID: <87a94891sm.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kristina,
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Am 03.11.2014 um 00:01 schrieb Kristina Mart?enko:
-> [...]
-> I ran into this issue as well. Seems that a card-detect flag 
-> (MMC_CAP2_CD_ACTIVE_HIGH) can currently be set based on an 
-> uninitialized variable, which can lead to the card being reported as 
-> not present. This patch fixes it for me:
+> On Thursday 30 October 2014 07:55:48 Robert Jarzmik wrote:
+> Whole series
 >
-> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-> index 03c53b72a2d6..f0e187682d3b 100644
-> --- a/drivers/mmc/core/host.c
-> +++ b/drivers/mmc/core/host.c
-> @@ -311,7 +311,7 @@ int mmc_of_parse(struct mmc_host *host)
->  	struct device_node *np;
->  	u32 bus_width;
->  	int len, ret;
-> -	bool cap_invert, gpio_invert;
-> +	bool cap_invert, gpio_invert = false;
->  
->  	if (!host->parent || !host->parent->of_node)
->  		return 0;
-> @@ -401,6 +401,7 @@ int mmc_of_parse(struct mmc_host *host)
->  	else
->  		cap_invert = false;
->  
-> +	gpio_invert = false;
->  	ret = mmc_gpiod_request_ro(host, "wp", 0, false, 0, &gpio_invert);
->  	if (ret) {
->  		if (ret == -EPROBE_DEFER)
->
-> Let me know if this also fixes it for you, and I'll send in a proper 
-> patch.
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+Thanks Arnd.
 
-the patch works for me too. You can also add:
+Unfortunately my checkers caught a flaw in the non-device tree case :
+ - pxa27x_dt_init_irq() is defined, even if unused
+ - it calls pxa_dt_irq_init(), which is conditionaly defined on CONFIG_OF
+   => breaks non DT builds
 
-Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+So I'll have to enclose this function in a #if defined(CONFIG_OF), and respin
+patch 1.
 
-> Thanks,
-> Kristina
+Cheers.
 
-Thanks a lot
-Stefan
+-- 
+Robert
