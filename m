@@ -1,41 +1,107 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 03 Nov 2014 21:49:38 +0100
-Subject: [PATCH 1/7] can: m_can: fix possible sleep in napi poll
-In-Reply-To: <5457CB6B.3080002@hartkopp.net>
-References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
- <5457B517.8030805@pengutronix.de> <5457CB6B.3080002@hartkopp.net>
-Message-ID: <5457EA62.5040906@pengutronix.de>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Mon, 3 Nov 2014 21:54:53 +0100
+Subject: [PATCH 1/3] media: rc: add driver for Amlogic Meson IR remote
+ receiver
+In-Reply-To: <20141103111410.6b1147a0.m.chehab@samsung.com>
+References: <1413144115-23188-1-git-send-email-b.galvani@gmail.com>
+ <1413144115-23188-2-git-send-email-b.galvani@gmail.com>
+ <20141103111410.6b1147a0.m.chehab@samsung.com>
+Message-ID: <20141103205453.GA18529@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/2014 07:37 PM, Oliver Hartkopp wrote:
-> you can omit the 'stable' tag as this driver just emerged in 3.18 - which is
-> currently in 3.18-rc3 state.
+On Mon, Nov 03, 2014 at 11:14:10AM -0200, Mauro Carvalho Chehab wrote:
+> Em Sun, 12 Oct 2014 22:01:53 +0200
+> Beniamino Galvani <b.galvani@gmail.com> escreveu:
+> 
+> > Amlogic Meson SoCs include a infrared remote control receiver that can
+> > operate in two modes: in "NEC" mode the hardware can decode frames
+> > using the NEC IR protocol, while in "general" mode the receiver simply
+> > reports the duration of pulses and spaces for software decoding.
+> > 
+> > This is a driver for the IR receiver that uses software decoding of
+> > received frames.
+> 
+> There are a few checkpatch warnings there:
+> 
+> WARNING: added, moved or deleted file(s), does MAINTAINERS need updating?
+> #71: 
+> new file mode 100644
+> 
+> WARNING: Missing a blank line after declarations
+> #151: FILE: drivers/media/rc/meson-ir.c:76:
+> +	u32 duration;
+> +	DEFINE_IR_RAW_EVENT(rawir);
 
-Thanks! fixed.
+Here the macro is actually a variable definition and so it makes sense
+to group it with the other definitions without blank lines. I checked
+other rc drivers and many of them have a similar pattern. Could we
+consider the warning as a false positive?
 
-> If possible I would suggest to push all 7 patches via can/master as it is
-> pretty bad to say "M_CAN was introduced in 3.18 but M_CAN with CAN FD is
-> working since 3.19".
+> 
+> WARNING: DT compatible string "amlogic,meson6-ir" appears un-documented -- check ./Documentation/devicetree/bindings/
+> #272: FILE: drivers/media/rc/meson-ir.c:197:
+> +	{ .compatible = "amlogic,meson6-ir" },
+> 
+> total: 0 errors, 3 warnings, 238 lines checked
+> 
+> patches/lmml_26418_1_3_media_rc_add_driver_for_amlogic_meson_ir_remote_receiver.patch has style problems, please review.
+> 
+> I'm seeing that the DT patches are there, after this one. The best
+> would be to add them before in the series.
+> 
+> Please add also an entry at the MAINTAINERS file.
 
-Sorry, probably not, as CAN FD is a new feature. However we may talk to
-David, as the m_can driver was introduced in 3.18 anyways, so it's
-unlikely to break anything with this patch.
+I'll reorder the patches and add the maintainer entry.
 
-> This will produce confusion as the M_CAN core has built-in CAN FD support.
+> 
+> 
+> > 
+> > Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+> > ---
+> >  drivers/media/rc/Kconfig    |  11 +++
+> >  drivers/media/rc/Makefile   |   1 +
+> >  drivers/media/rc/meson-ir.c | 214 ++++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 226 insertions(+)
+> >  create mode 100644 drivers/media/rc/meson-ir.c
+> > 
+> > diff --git a/drivers/media/rc/Kconfig b/drivers/media/rc/Kconfig
+> > index 8ce0810..2d742e2 100644
+> > --- a/drivers/media/rc/Kconfig
+> > +++ b/drivers/media/rc/Kconfig
+> > @@ -223,6 +223,17 @@ config IR_FINTEK
+> >  	   To compile this driver as a module, choose M here: the
+> >  	   module will be called fintek-cir.
+> >  
+> > +config IR_MESON
+> > +	tristate "Amlogic Meson IR remote receiver"
+> > +	depends on RC_CORE
+> > +	depends on ARCH_MESON
+> 
+> Please add COMPILE_TEST too, as we want to be able to compile it on
+> x86 and other archs, in order to check if the driver builds fine and
+> to enable the static analyzers to look into this code.
 
-Marc
+Ok.
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+[...]
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141103/999f18e9/attachment.sig>
+> > +
+> > +	ir->rc->priv = ir;
+> > +	ir->rc->input_name = DRIVER_NAME;
+> > +	ir->rc->input_phys = DRIVER_NAME "/input0";
+> > +	ir->rc->input_id.bustype = BUS_HOST;
+> 
+> > +	ir->rc->input_id.vendor = 0x0001;
+> > +	ir->rc->input_id.product = 0x0001;
+> > +	ir->rc->input_id.version = 0x0100;
+> 
+> I don't like very much the idea of filling it like that. From where those
+> numbers came? Could you add a define for them somewhere?
+
+I've seen that other drivers as gpio-ir-recv and sunxi-cir assign
+those numbers to the fields of input_id but I couldn't find a
+documentation of the meaning. If the assignments are not needed I will
+drop them in the next version.
+
+Beniamino
