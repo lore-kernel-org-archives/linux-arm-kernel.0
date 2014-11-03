@@ -1,114 +1,105 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 3 Nov 2014 15:05:26 +0000
-Subject: [PATCH 2/4] input: touchscreen: ti_am335x_tsc: Remove udelay in
- interrupt handler
-In-Reply-To: <1414408111-2631-3-git-send-email-vigneshr@ti.com>
-References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
- <1414408111-2631-3-git-send-email-vigneshr@ti.com>
-Message-ID: <20141103150526.GI4538@x1>
+From: yogesh.tillu@linaro.org (Yogesh Tillu)
+Date: Mon,  3 Nov 2014 20:34:00 +0530
+Subject: [RFC] ARM64: Accessing perf counters from userspace
+Message-ID: <1415027045-6573-1-git-send-email-yogesh.tillu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Oct 2014, Vignesh R wrote:
-> From: Brad Griffis <bgriffis@ti.com>
-> 
-> TSC interrupt handler had udelay to avoid reporting of false pen-up
-> interrupt to user space. This patch implements workaround suggesting in
-> Advisory 1.0.31 of silicon errata for am335x, thus eliminating udelay
-> and touchscreen lag. This also improves performance of touchscreen and
-> eliminates sudden jump of cursor at touch release.
-> 
-> IDLECONFIG and CHARGECONFIG registers are to be configured
-> with same values in order to eliminate false pen-up events. This
-> workaround may result in false pen-down to be detected, hence considerable
-> charge step delay needs to be added. The charge delay is set to 0xB000
-> (in terms of ADC clock cycles) by default.
-> 
-> TSC steps are disabled at the end of every sampling cycle and EOS bit is
-> set. Once the EOS bit is set, the TSC steps need to be re-enabled to begin
-> next sampling cycle.
-> 
-> In one shot mode, sequencer automatically disables all enabled steps at
-> the end of each cycle. (both ADC steps and TSC steps) Hence these steps
-> need not be saved in reg_se_cache for clearing these steps at a later
-> stage.
-> 
-> Signed-off-by: Brad Griffis <bgriffis@ti.com>
-> [vigneshr at ti.com: Ported patch from v3.12 to v3.18rc2]
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> ---
->  drivers/input/touchscreen/ti_am335x_tsc.c | 56 ++++++++++++-------------------
->  drivers/mfd/ti_am335x_tscadc.c            |  7 ++--
->  include/linux/mfd/ti_am335x_tscadc.h      |  4 ++-
->  3 files changed, 30 insertions(+), 37 deletions(-)
+We have tried to implement some changes to allow perf counters to be accessed
+from user space. Benchmarking so far has show that these are 100s of times 
+faster than using syscall(perf_event_open). This would be useful for many use
+cases like networking(critical to fast path code), benchmark executionpath with
+low budget of cpu cycles etc.
 
-[...]
+Benchmark figures on ArmV8, "reading perf cycle counter" with below approaches
+1) Reading perf cycle counter through perf_event_open syscall 
+Result[cpu cycles]: 2000 (For Armv7[Arndale] 5407)
+2) Direct access of perf counters from userspace through asm
+Result[cpu cycles]: 2 (For Armv7[Arndale] 16)
+3) Reading perf cycle counter through vDSO path
+Result[cpu cycles]: ~20
 
-> diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
-> index d877e777cce6..94ef8992f46b 100644
-> --- a/drivers/mfd/ti_am335x_tscadc.c
-> +++ b/drivers/mfd/ti_am335x_tscadc.c
-> @@ -86,8 +86,12 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
->  		spin_lock_irq(&tsadc->reg_lock);
->  		finish_wait(&tsadc->reg_se_wait, &wait);
->  
-> +		/*
-> +		 * Sequencer should either be idle or
-> +		 * busy applying the charge step.
-> +		 */
->  		reg = tscadc_readl(tsadc, REG_ADCFSM);
-> -		WARN_ON(reg & SEQ_STATUS);
-> +		WARN_ON(reg & SEQ_STATUS & (!CHARGE_STEP));
->  		tsadc->adc_waiting = false;
->  	}
->  	tsadc->adc_in_use = true;
-> @@ -96,7 +100,6 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
->  void am335x_tsc_se_set_once(struct ti_tscadc_dev *tsadc, u32 val)
->  {
->  	spin_lock_irq(&tsadc->reg_lock);
-> -	tsadc->reg_se_cache |= val;
->  	am335x_tscadc_need_adc(tsadc);
->  
->  	tscadc_writel(tsadc, REG_SE, val);
 
-I believe all of these changes can, and therefor should live in a
-separate patch.
+Could you please let me know your comments/review. Below are the details about
+setup and patchset. 
 
-> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
-> index e2e70053470e..fcce182e4a35 100644
-> --- a/include/linux/mfd/ti_am335x_tscadc.h
-> +++ b/include/linux/mfd/ti_am335x_tscadc.h
-> @@ -52,6 +52,7 @@
->  
->  /* IRQ enable */
->  #define IRQENB_HW_PEN		BIT(0)
-> +#define IRQENB_EOS		BIT(1)
->  #define IRQENB_FIFO0THRES	BIT(2)
->  #define IRQENB_FIFO0OVRRUN	BIT(3)
->  #define IRQENB_FIFO0UNDRFLW	BIT(4)
-> @@ -107,7 +108,7 @@
->  /* Charge delay */
->  #define CHARGEDLY_OPEN_MASK	(0x3FFFF << 0)
->  #define CHARGEDLY_OPEN(val)	((val) << 0)
-> -#define CHARGEDLY_OPENDLY	CHARGEDLY_OPEN(1)
-> +#define CHARGEDLY_OPENDLY	CHARGEDLY_OPEN(0xB000)
->  
->  /* Control register */
->  #define CNTRLREG_TSCSSENB	BIT(0)
-> @@ -127,6 +128,7 @@
->  
->  /* Sequencer Status */
->  #define SEQ_STATUS BIT(5)
-> +#define CHARGE_STEP		0x11
->  
->  #define ADC_CLK			3000000
->  #define TOTAL_STEPS		16
+** Setup details **
+Architecture: ArmV8
+Board       : Juno Board
+Linux kernel: 3.16.0+
+Kernel Repo : git://git.linaro.org/kernel/linux-linaro-tracking.git
+(Branch:linux-linaro)
+Rootfs      : Linaro Ubuntu rootfs
+Toolchain   : gcc version 4.9.1 20140529 (prerelease)
+(crosstool-NG linaro-1.13.1-4.9-2014.06-02 - Linaro GCC 4.9-2014.06)
 
-The header changes should be split between the two Input and MFD
-patches.
+1) Reading perf cycle counter through perf_event_open syscall 
+*Application to read counter using perf_event_open syscall.
+[PATCH] Application reads perf cycle counter using perf_event_open
+syscall, and prints Benchmark results.
+
+Signed-off-by: Yogesh Tillu <yogesh.tillu@linaro.org>
+---
+ app_readcounter.c |   83 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 83 insertions(+)
+ create mode 100644 app_readcounter.c
+
+
+2) Direct access of perf counters from userspace using asm
+This setup contains kernel module + header file with implemented asm to access
+perf counters + Application uses api provided in header file to access counter.
+
+* Kernel Module: To enable access of counters from userspace
+Yogesh Tillu (1):
+  Kernel module to Enable userspace access to PMU counters for
+    ArmV8
+
+ ARMv8_Module/Makefile         |    8 ++++
+ ARMv8_Module/README           |    1 +
+ ARMv8_Module/enable_arm_pmu.c |   96 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 105 insertions(+)
+ create mode 100644 ARMv8_Module/Makefile
+ create mode 100644 ARMv8_Module/README
+ create mode 100644 ARMv8_Module/enable_arm_pmu.c
+
+* Application:
+[PATCH] Added test for Direct access of perf counter from userspace
+ using asm.
+
+Signed-off-by: Yogesh Tillu <yogesh.tillu@linaro.org>
+---
+ README.directaccess |    8 ++++
+ direct_access.c     |   65 ++++++++++++++++++++++++++++
+ direct_access.h     |  117 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 190 insertions(+)
+ create mode 100644 README.directaccess
+ create mode 100644 direct_access.c
+ create mode 100644 direct_access.h
+
+3) Reading perf cycle counter through vDSO path
+* Kernel Module: To enable access of counters from userspace ( Same as setup (2) )
+* Kernel vDSO implementation: vDSO implementation for reading of perf cycle counter
+[PATCH] provide open/read function through vDSO for PMU counters
+Yogesh Tillu (1):
+  To read PMU cycle counter through vDSO Path
+
+ arch/arm64/kernel/vdso/Makefile     |    6 +++---
+ arch/arm64/kernel/vdso/vdso.lds.S   |    5 +++++
+ arch/arm64/kernel/vdso/vdso_perfc.c |   20 ++++++++++++++++++++
+ 3 files changed, 28 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm64/kernel/vdso/vdso_perfc.c
+
+* application  : To read perf counter through api(implemented through vDSO)
+[PATCH] Test Application: access PMU counter through vDSO
+Yogesh Tillu (1):
+  Test application to read PMU counter through vdso     
+
+ vdso_userspace_perf.c |   58 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
+ create mode 100644 vdso_userspace_perf.c
+
+NOTE: This codebase mainly for POC of "Access perf counters from userspace",
+not much concentration towards api standard forms.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.9.5
