@@ -1,63 +1,49 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 3 Nov 2014 18:58:46 +0100
-Subject: [PATCH v4 4/8] ARM: mediatek: add dts for MT8135 evaluation board.
-In-Reply-To: <1413973797-17619-5-git-send-email-yingjoe.chen@mediatek.com>
-References: <1413973797-17619-1-git-send-email-yingjoe.chen@mediatek.com>
- <1413973797-17619-5-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <CABuKBeJR+iCw_gZeq_SbZB2CtESJ5FX3jOZ1OwzELRcBH+jn9A@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 3 Nov 2014 17:59:45 +0000
+Subject: [PATCH 7/7] mfd: ab8500: Decrement the power supply's device
+ reference counter
+In-Reply-To: <1413290117-13082-8-git-send-email-k.kozlowski@samsung.com>
+References: <1413290117-13082-1-git-send-email-k.kozlowski@samsung.com>
+ <1413290117-13082-8-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20141103175945.GV12011@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-10-22 12:29 GMT+02:00 Joe.C <yingjoe.chen@mediatek.com>:
-> From: "Joe.C" <yingjoe.chen@mediatek.com>
->
-> Evbp1 is a tablet evaluation board based on MT8135 SoC.
->
-> Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
+On Tue, 14 Oct 2014, Krzysztof Kozlowski wrote:
+
+> Use power_supply_put() to decrement the power supply's device reference
+> counter.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
->  arch/arm/boot/dts/mt8135-evbp1.dts | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
->  create mode 100644 arch/arm/boot/dts/mt8135-evbp1.dts
->
-> diff --git a/arch/arm/boot/dts/mt8135-evbp1.dts b/arch/arm/boot/dts/mt8135-evbp1.dts
-> new file mode 100644
-> index 0000000..cba80b8
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/mt8135-evbp1.dts
-> @@ -0,0 +1,24 @@
-> +/*
-> + * Copyright (c) 2014 MediaTek Inc.
-> + * Author: Joe.C <yingjoe.chen@mediatek.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +/dts-v1/;
-> +#include "mt8135.dtsi"
-> +
-> +/ {
-> +       model = "mediatek,mt8135-evbp1", "mediatek,mt8135";
+>  drivers/mfd/ab8500-sysctrl.c | 2 ++
+>  1 file changed, 2 insertions(+)
 
-Same here, you switched model and compatible property. Please provide
-both of them.
+Applied, thanks.
 
-> +
-> +       memory {
-> +               reg = <0 0x80000000 0 0x40000000>;
-> +       };
-> +};
-> --
-> 1.8.1.1.dirty
->
-
-
+> diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
+> index 93b2d2c32ca3..d05a5719cfc4 100644
+> --- a/drivers/mfd/ab8500-sysctrl.c
+> +++ b/drivers/mfd/ab8500-sysctrl.c
+> @@ -51,6 +51,7 @@ static void ab8500_power_off(void)
+>  
+>  		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE,
+>  				&val);
+> +		power_supply_put(psy);
+>  
+>  		if (!ret && val.intval) {
+>  			charger_present = true;
+> @@ -73,6 +74,7 @@ static void ab8500_power_off(void)
+>  			       pss[i]);
+>  			machine_restart("charging");
+>  		}
+> +		power_supply_put(psy);
+>  	}
+>  
+>  shutdown:
 
 -- 
-motzblog.wordpress.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
