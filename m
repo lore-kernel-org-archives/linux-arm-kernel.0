@@ -1,128 +1,50 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 03 Nov 2014 10:44:12 -0800
-Subject: [PATCH v12 2/6] KVM: Add generic support for dirty page logging
-In-Reply-To: <20141101101208.GE12801@jhogan-linux.le.imgtec.org>
-References: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
- <1414017251-5772-3-git-send-email-m.smarduch@samsung.com>
- <20141101101208.GE12801@jhogan-linux.le.imgtec.org>
-Message-ID: <5457CCFC.50005@samsung.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Mon, 03 Nov 2014 13:45:57 -0500
+Subject: [PATCH 1/2] [usb] make xhci platform driver use 64 bit or 32
+ bit DMA
+In-Reply-To: <7145110.be3vG56Rvi@wuerfel>
+References: <1414692989-23128-1-git-send-email-mlangsdo@redhat.com>
+ <13596133.Pde5jAKbQO@wuerfel> <1415024151.3641.18.camel@deneb.redhat.com>
+ <7145110.be3vG56Rvi@wuerfel>
+Message-ID: <1415040357.3641.42.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/2014 03:12 AM, James Hogan wrote:
-> Hi Mario,
+On Mon, 2014-11-03 at 18:14 +0100, Arnd Bergmann wrote:
+> On Monday 03 November 2014 09:15:51 Mark Salter wrote:
+> > On Thu, 2014-10-30 at 22:05 +0100, Arnd Bergmann wrote:
+> > > You should definitely make sure that this also works with DT, as
+> > > I don't think it's possible to support X-Gene with ACPI. I know
+> > > that Al Stone has experimented with it in the past, but he never
+> > > came back with any results, so I assume the experiment failed.
+> > > 
+> > > Note that the discussions about merging ACPI support on ARM64
+> > > are based on the assumption that we'd only ever support SBSA-like
+> > > platforms, not something like X-Gene that looks more like an
+> > > embedded SoC. Your XHCI patches still obviously make sense for
+> > > other platforms, so that's not a show-stopper.
+> > 
+> > But for some misconfiguration, the arm64 kernels in fedora arm
+> > koji would boot using ACPI on Mustang, the Foundation model,
+> > and AMD Seattle platforms. All very much a work in progress,
+> > but the tree from which the fedora patches are taken is the
+> > devel branch of:
+> > 
+> >   git.fedorahosted.org/git/kernel-arm64.git
+> > 
+> > The configuration will be fixed this week and then you can
+> > just grab an arm64 fedora kernel and boot with acpi=force.
 > 
-> On Wed, Oct 22, 2014 at 03:34:07PM -0700, Mario Smarduch wrote:
->> +/**
->> + * kvm_vm_ioctl_get_dirty_log - get and clear the log of dirty pages in a slot
->> + * @kvm: kvm instance
->> + * @log: slot id and address to which we copy the log
->> + *
->> + * We need to keep it in mind that VCPU threads can write to the bitmap
->> + * concurrently.  So, to avoid losing data, we keep the following order for
->> + * each bit:
->> + *
->> + *   1. Take a snapshot of the bit and clear it if needed.
->> + *   2. Write protect the corresponding page.
->> + *   3. Flush TLB's if needed.
->> + *   4. Copy the snapshot to the userspace.
->> + *
->> + * Between 2 and 3, the guest may write to the page using the remaining TLB
->> + * entry.  This is not a problem because the page will be reported dirty at
->> + * step 4 using the snapshot taken before and step 3 ensures that successive
->> + * writes will be logged for the next call.
->> + */
->> +int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
->> +{
->> +	int r;
->> +	struct kvm_memory_slot *memslot;
->> +	unsigned long n, i;
->> +	unsigned long *dirty_bitmap;
->> +	unsigned long *dirty_bitmap_buffer;
->> +	bool is_dirty = false;
->> +
->> +	mutex_lock(&kvm->slots_lock);
->> +
->> +	r = -EINVAL;
->> +	if (log->slot >= KVM_USER_MEM_SLOTS)
->> +		goto out;
->> +
->> +	memslot = id_to_memslot(kvm->memslots, log->slot);
->> +
->> +	dirty_bitmap = memslot->dirty_bitmap;
->> +	r = -ENOENT;
->> +	if (!dirty_bitmap)
->> +		goto out;
->> +
->> +	n = kvm_dirty_bitmap_bytes(memslot);
->> +
->> +	dirty_bitmap_buffer = dirty_bitmap + n / sizeof(long);
->> +	memset(dirty_bitmap_buffer, 0, n);
->> +
->> +	spin_lock(&kvm->mmu_lock);
->> +
->> +	for (i = 0; i < n / sizeof(long); i++) {
->> +		unsigned long mask;
->> +		gfn_t offset;
->> +
->> +		if (!dirty_bitmap[i])
->> +			continue;
->> +
->> +		is_dirty = true;
->> +
->> +		mask = xchg(&dirty_bitmap[i], 0);
->> +		dirty_bitmap_buffer[i] = mask;
->> +
->> +		offset = i * BITS_PER_LONG;
->> +		kvm_mmu_write_protect_pt_masked(kvm, memslot, offset, mask);
->> +	}
->> +
->> +	spin_unlock(&kvm->mmu_lock);
->> +
->> +	/* See the comments in kvm_mmu_slot_remove_write_access(). */
->> +	lockdep_assert_held(&kvm->slots_lock);
->> +
->> +	/*
->> +	 * All the TLBs can be flushed out of mmu lock, see the comments in
->> +	 * kvm_mmu_slot_remove_write_access().
->> +	 */
->> +	if (is_dirty)
->> +		kvm_flush_remote_tlbs(kvm);
->> +
->> +	r = -EFAULT;
->> +	if (copy_to_user(log->dirty_bitmap, dirty_bitmap_buffer, n))
->> +		goto out;
-> 
-> AFAICT all of the arch implementations of kvm_vm_ioctl_get_dirty_log()
-> except x86 and ppc hv (i.e. ia60, mips, ppc pv, s390) already make use
-> of the existing generic function kvm_get_dirty_log() to help implement
-> their kvm_vm_ioctl_get_dirty_log functions, which all look pretty
-> similar now except for TLB flushing.
-> 
-> Would they not be a better base for a generic
-> kvm_vm_ioctl_get_dirty_log()?
+> It's not as bad as I had feared, but it still does a lot of
+> the things that in previous discussions were said that ACPI
+> would avoid doing, and that were used as arguments against
+> just using DT on all arm64 servers:
 
-But kvm_get_dirty_log() is just a helper for handling dirty bitmap, after
-dirty page logging updates based on arch. implementation. There is not
-much to reuse here other then add arm sync version and then call
-kvm_get_dirty_log.  But the sync would pretty much be identical to our current
-kvm_vm_ioctl_get_dirty_log. The purpose of these patches is to reuse some of
-dirty page logging logic.
-> 
-> It feels a bit wrong to add a generic higher level function which
-> doesn't make use of the existing generic lower level abstraction.
-> 
-> (Appologies if this has already been brought up in previous versions of
-> the patchset, I haven't been tracking them).
-
-Yeah there is no MAINTAINER entry for mips kvm, per my earlier email.
-> 
-> Cheers
-> James
-> 
->> +
->> +	r = 0;
->> +out:
->> +	mutex_unlock(&kvm->slots_lock);
->> +	return r;
->> +}
+As I said, this is very much a work in progress. The point of the
+fedorahosted tree is to have *something* that will boot with ACPI
+and have working disk and network as a minimum for the few existing
+early platforms. It is certainly not an example of what an ACPI/SBSA
+server should look like. At least not yet. And it isn't a big secret.
+Linaro, Arm, and other folk are aware of that fedorahosted tree. I
+wouldn't read too much into any given patch in that tree as it stands
+right now.
