@@ -1,134 +1,42 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 3 Nov 2014 21:04:55 +0100
-Subject: [PATCH v3 10/19] arm/arm64: KVM: make the value of ICC_SRE_EL1 a
- per-VM variable
-In-Reply-To: <1414776414-13426-11-git-send-email-andre.przywara@arm.com>
-References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
- <1414776414-13426-11-git-send-email-andre.przywara@arm.com>
-Message-ID: <20141103200455.GI16132@cbox>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 3 Nov 2014 20:05:16 +0000
+Subject: [PATCH 09/10] arm64/kexec: Enable kexec in the arm64 defconfig
+In-Reply-To: <1414799415.23621.52.camel@smoke>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <9570f274b9649430b34e5c7e15b63679b94c2c50.1414099246.git.geoff@infradead.org>
+ <20141024103150.GC24265@leverpostej>
+ <1414799415.23621.52.camel@smoke>
+Message-ID: <20141103200516.GC30366@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 05:26:45PM +0000, Andre Przywara wrote:
-> ICC_SRE_EL1 is a system register allowing msr/mrs accesses to the
-> GIC CPU interface for EL1 (guests). Currently we force it to 0, but
-> for proper GICv3 support we have to allow guests to use it (depending
-> on their selected virtual GIC model).
-> So add ICC_SRE_EL1 to the list of saved/restored registers on a
-> world switch, but actually disallow a guest to change it by only
-> restoring a fixed, once-initialized value.
-> This value depends on the GIC model userland has chosen for a guest.
+On Fri, Oct 31, 2014 at 11:50:15PM +0000, Geoff Levand wrote:
+> On Fri, 2014-10-24 at 11:31 +0100, Mark Rutland wrote:
+> > On Fri, Oct 24, 2014 at 12:10:59AM +0100, Geoff Levand wrote:
+> > > Signed-off-by: Geoff Levand <geoff@infradead.org>
+> > > ---
+> > >  arch/arm64/configs/defconfig | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > > 
+> > > diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> > > index d92ef3c..ebf8b3f 100644
+> > > --- a/arch/arm64/configs/defconfig
+> > > +++ b/arch/arm64/configs/defconfig
+> > > @@ -39,6 +39,7 @@ CONFIG_PREEMPT=y
+> > >  CONFIG_KSM=y
+> > >  CONFIG_TRANSPARENT_HUGEPAGE=y
+> > >  CONFIG_CMA=y
+> > > +CONFIG_KEXEC=y
+> > 
+> > Given this is going to be incompatible with KVM, and KVM is already in
+> > defconfig, I don't think we can add this until that incompatibility is
+> > fixed (or at the very least detected and handled gracefully).
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm64/kernel/asm-offsets.c |    1 +
->  arch/arm64/kvm/vgic-v3-switch.S |   14 +++++++++-----
->  include/kvm/arm_vgic.h          |    1 +
->  virt/kvm/arm/vgic-v3.c          |    9 +++++++--
->  4 files changed, 18 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> index 9a9fce0..9d34486 100644
-> --- a/arch/arm64/kernel/asm-offsets.c
-> +++ b/arch/arm64/kernel/asm-offsets.c
-> @@ -140,6 +140,7 @@ int main(void)
->    DEFINE(VGIC_V2_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_v2.vgic_elrsr));
->    DEFINE(VGIC_V2_CPU_APR,	offsetof(struct vgic_cpu, vgic_v2.vgic_apr));
->    DEFINE(VGIC_V2_CPU_LR,	offsetof(struct vgic_cpu, vgic_v2.vgic_lr));
-> +  DEFINE(VGIC_V3_CPU_SRE,	offsetof(struct vgic_cpu, vgic_v3.vgic_sre));
->    DEFINE(VGIC_V3_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_hcr));
->    DEFINE(VGIC_V3_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_vmcr));
->    DEFINE(VGIC_V3_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v3.vgic_misr));
-> diff --git a/arch/arm64/kvm/vgic-v3-switch.S b/arch/arm64/kvm/vgic-v3-switch.S
-> index d160469..617a012 100644
-> --- a/arch/arm64/kvm/vgic-v3-switch.S
-> +++ b/arch/arm64/kvm/vgic-v3-switch.S
-> @@ -148,17 +148,18 @@
->   * x0: Register pointing to VCPU struct
->   */
->  .macro	restore_vgic_v3_state
-> -	// Disable SRE_EL1 access. Necessary, otherwise
-> -	// ICH_VMCR_EL2.VFIQEn becomes one, and FIQ happens...
-> -	msr_s	ICC_SRE_EL1, xzr
-> -	isb
-> -
+> Sure, I can put in a workaround to print out a message and fail the
+> kexec_load sys call if KVM is configured.
 
-I know I reviewed this once, but now I'm forgetting how it works with
-this comment above.  First, I don't fully understand the comment.
-Second, now we're restoring a value that may potentially have SRE_EL1
-access enabled, but FIQ doesn't happen.  Can you clarify this for me?
+What would be the plan for fixing up kexec to work with kvm were we to
+do that?
 
 Thanks,
--Christoffer
-
->  	// Compute the address of struct vgic_cpu
->  	add	x3, x0, #VCPU_VGIC_CPU
->  
->  	// Restore all interesting registers
->  	ldr	w4, [x3, #VGIC_V3_CPU_HCR]
->  	ldr	w5, [x3, #VGIC_V3_CPU_VMCR]
-> +	ldr	w25, [x3, #VGIC_V3_CPU_SRE]
-> +
-> +	msr_s	ICC_SRE_EL1, x25
-> +
-> +	// make sure SRE is valid before writing the other registers
-> +	isb
->  
->  	msr_s	ICH_HCR_EL2, x4
->  	msr_s	ICH_VMCR_EL2, x5
-> @@ -244,9 +245,12 @@
->  	dsb	sy
->  
->  	// Prevent the guest from touching the GIC system registers
-> +	// if SRE isn't enabled for GICv3 emulation
-> +	cbnz	x25, 1f
->  	mrs_s	x5, ICC_SRE_EL2
->  	and	x5, x5, #~ICC_SRE_EL2_ENABLE
->  	msr_s	ICC_SRE_EL2, x5
-> +1:
->  .endm
->  
->  ENTRY(__save_vgic_v3_state)
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index a6d41f1..8827bc7 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -243,6 +243,7 @@ struct vgic_v3_cpu_if {
->  #ifdef CONFIG_ARM_GIC_V3
->  	u32		vgic_hcr;
->  	u32		vgic_vmcr;
-> +	u32		vgic_sre;	/* Restored only, change ignored */
->  	u32		vgic_misr;	/* Saved only */
->  	u32		vgic_eisr;	/* Saved only */
->  	u32		vgic_elrsr;	/* Saved only */
-> diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-> index fc4d628..ce50918 100644
-> --- a/virt/kvm/arm/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic-v3.c
-> @@ -145,15 +145,20 @@ static void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
->  
->  static void vgic_v3_enable(struct kvm_vcpu *vcpu)
->  {
-> +	struct vgic_v3_cpu_if *vgic_v3;
-> +
-> +	vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
->  	/*
->  	 * By forcing VMCR to zero, the GIC will restore the binary
->  	 * points to their reset values. Anything else resets to zero
->  	 * anyway.
->  	 */
-> -	vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr = 0;
-> +	vgic_v3->vgic_vmcr = 0;
-> +
-> +	vgic_v3->vgic_sre = 0;
->  
->  	/* Get the show on the road... */
-> -	vcpu->arch.vgic_cpu.vgic_v3.vgic_hcr = ICH_HCR_EN;
-> +	vgic_v3->vgic_hcr = ICH_HCR_EN;
->  }
->  
->  static const struct vgic_ops vgic_v3_ops = {
-> -- 
-> 1.7.9.5
-> 
+Mark.
