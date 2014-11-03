@@ -1,24 +1,26 @@
-From: eddie.huang@mediatek.com (eddie huang)
-Date: Mon, 3 Nov 2014 10:27:11 +0800
-Subject: [PATCH RESEND] tty: serial: 8250_mtk: Fix quot calculation
-In-Reply-To: <9001280.dDNTE2ykLV@wuerfel>
-References: <1414773395-9916-1-git-send-email-matthias.brugger@bq.com>
- <9001280.dDNTE2ykLV@wuerfel>
-Message-ID: <1414981632.23623.4.camel@mtksdaap41>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Mon, 3 Nov 2014 10:28:11 +0800
+Subject: [PATCH] pinctrl: Fix path error in documentation
+Message-ID: <1414981691-14087-1-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-10-31 at 17:48 +0100, Arnd Bergmann wrote:
-> On Friday 31 October 2014 17:36:35 Matthias Brugger wrote:
-> > -               quot = DIV_ROUND_CLOSEST(port->uartclk, 256 * baud);
-> > +               quot = (port->uartclk / (256 * baud)) + 1;
-> 
-> Should this be DIV_ROUND_UP then?
-> 
-> 	Arnd
-> 
+Fix pinconfig include file path.
 
-I think DIV_ROUND_UP is more suitable in this case, and I already do
-this and test OK on my MTK platform
+Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+---
+ Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296149.html
+diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+index 98eb94d..47d84b6 100644
+--- a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
++++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+@@ -216,4 +216,4 @@ arguments are described below.
+   or 0 to disable debouncing
+ 
+ More in-depth documentation on these parameters can be found in
+-<include/linux/pinctrl/pinconfig-generic.h>
++<include/linux/pinctrl/pinconf-generic.h>
+-- 
+1.8.1.1.dirty
