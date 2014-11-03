@@ -1,39 +1,36 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 03 Nov 2014 18:38:10 +0100
-Subject: [PATCH 04/17] irqchip: irq-armada-370-xp: suspend/resume support
-In-Reply-To: <1414151970-6626-5-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1414151970-6626-5-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5457BD82.3090309@free-electrons.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 3 Nov 2014 10:41:22 -0700
+Subject: PCIe host controller without IO port access.
+In-Reply-To: <5456C024.4060103@hauke-m.de>
+References: <5456C024.4060103@hauke-m.de>
+Message-ID: <CAErSpo5wxRyfpfaTM-MqwMYqzV4tYzz5uZKV5kRWwi5Y7-CiqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+[+cc Rob (author of 3c5d1699887b), Arnd]
 
-On 24/10/2014 13:59, Thomas Petazzoni wrote:
-> This commit adds suspend/resume support to the irqchip driver used on
-> Armada XP platforms (amongst others). It does so by adding a set of
-> suspend/resume syscore_ops, that will respectively save and restore
-> the necessary registers to ensure interrupts continue to work after
-> resume.
-> 
-> It is worth mentioning that the affinity is lost during a
-> suspend/resume cycle, because when a secondary CPU is brought
-> off-line, all interrupts that are assigned to this CPU in terms of
-> affinity gets re-assigned to a still running CPU. Therefore, right
-> before entering suspend, all interrupts are assigned to the boot CPU.
+On Sun, Nov 2, 2014 at 4:37 PM, Hauke Mehrtens <hauke@hauke-m.de> wrote:
+> Hi,
+>
+> I am currently writing a driver for a PCIe host controller which does
+> not support IO port access.
+>
+> My plan was to only provide IORESOURCE_MEM to pci_sys_data->resources,
+> but then it allocates some generic IORESOURCE_IO memory in
+> arch/arm/kernel/bios32.c:pcibios_init_resources(). This will work for
+> the fist PCIe controller, but when the second controller gets registered
+> I am getting this: "unable to allocate I/O port region (-16)".
+>
+> Is there an example for an arm driver for a PCIe controller which does
+> not support IO port access?
+>
+> Should I change arch/arm/kernel/bios32.c in a way so that it would
+> ignore the io port mem?
 
-So what about /proc/irq/*/smp_affinity ?
+I think this is a case of "all current platforms support an I/O space,
+so we'll set it up in the ARM PCI core."  But I/O space is not (as far
+as I know) a required feature of PCI host bridges on ARM, so I suspect
+you should change arch/arm/kernel/bios32.c in some way to accomodate
+controllers with no I/O port space at all.
 
-Do this files still represent accurate information?
-
-Thanks,
-
-Gregory
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Bjorn
