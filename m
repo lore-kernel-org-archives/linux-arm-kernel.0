@@ -1,178 +1,35 @@
-From: addy.ke@rock-chips.com (addy ke)
-Date: Mon, 03 Nov 2014 18:23:47 +0800
-Subject: [PATCH v3] mmc: dw_mmc: add support for the other bit of sdio
- interrupt
-In-Reply-To: <5457440E.3070002@samsung.com>
-References: <1414666240-16782-1-git-send-email-addy.ke@rock-chips.com>
- <1414977633-3196-1-git-send-email-addy.ke@rock-chips.com>
- <5457440E.3070002@samsung.com>
-Message-ID: <545757B3.30208@rock-chips.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 3 Nov 2014 11:32:34 +0100
+Subject: [PATCH v4 1/1] ARM: at91/dt: sam9x5: Add CAN device nodes
+In-Reply-To: <1963737.sgbgq0RFOC@ws-stein>
+References: <1412682710-14219-1-git-send-email-alexander.stein@systec-electronic.com>
+ <544692A6.9030509@atmel.com> <1963737.sgbgq0RFOC@ws-stein>
+Message-ID: <545759C2.3050706@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Jaehoo
+On 28/10/2014 09:27, Alexander Stein :
+> Hello Nicolas,
+> 
+> On Tuesday 21 October 2014 19:06:46, Nicolas Ferre wrote:
+>> On 07/10/2014 13:51, Alexander Stein :
+>>> Add the missing CAN devices node including their pin muxing to the shared
+>>> .dtsi for at91sam9x5. Actually include this file.
+>>> While at it, fix white spaces of can1_clk.
+>>
+>> Well, no: I split the patch in two to separate these whitespace
+>> modifications and the addition of nodes. But now worries, I did it and
+>> stacked the 2 patches on top of my WIP at91-3.19-dt branch.
+> 
+> It seems this branch is not public, yet. At least I could not find it on git.kernel.org.
 
-On 2014/11/3 16:59, Jaehoon Chung wrote:
-> Hi, Addy.
-> 
-> On 11/03/2014 10:20 AM, Addy Ke wrote:
->> The bit of sdio interrupt is 16 in designware implementation,
->> but it is 24 on Rockchip SoCs.This patch add sdio_id0 for the
->> number of slot0 in the SDIO interrupt registers.
->>
->> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
->> ---
->> Changes in v2:
->> - rebase on http://git.linaro.org/git/people/ulf.hansson/mmc.git, next branch
->> Changes in v3:
->> - Remove dts for sdio_id0, just replace this with 8, suggested by Doug
->> - Change to support all Rockchip Socs, suggested by Heiko
->>
->>  drivers/mmc/host/dw_mmc-rockchip.c | 10 ++++++++++
->>  drivers/mmc/host/dw_mmc.c          | 12 +++++++-----
->>  drivers/mmc/host/dw_mmc.h          |  2 ++
->>  include/linux/mmc/dw_mmc.h         |  3 +++
->>  4 files changed, 22 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
->> index bbb4ec3..b997c8f 100644
->> --- a/drivers/mmc/host/dw_mmc-rockchip.c
->> +++ b/drivers/mmc/host/dw_mmc-rockchip.c
->> @@ -68,14 +68,24 @@ static void dw_mci_rk3288_set_ios(struct dw_mci *host, struct mmc_ios *ios)
->>  	}
->>  }
->>  
->> +static int dw_mci_rockchip_parse_dt(struct dw_mci *host)
->> +{
->> +	/* It is slot 8 on Rockchip SoCs */
->> +	host->sdio_id0 = 8;
->> +
->> +	return 0;
->> +}
-> 
-> Well, function is "__parse_dt__", but this function don't parse anything.
-> If All rockchip soc is supported, i think that it can be located to other place.
-> 
-Can add it in "init" function? like this:
-int dw_mci_rockchip_init(struct dw_mci *host)
-{
-	/* It is slot 8 on Rockchip SoCs */
-	host->sdio_id0 = 8;
-
-	return 0;
-}
-static const struct dw_mci_drv_data xxxx {
-    ....
-    .init = dw_mci_rockchip_init,
-};
+It is now:
 
 
-> Best Regards,
-> Jaehoon Chung
-> 
->> +
->>  static const struct dw_mci_drv_data rk2928_drv_data = {
->>  	.prepare_command        = dw_mci_rockchip_prepare_command,
->> +	.parse_dt	= dw_mci_rockchip_parse_dt,
->>  };
->>  
->>  static const struct dw_mci_drv_data rk3288_drv_data = {
->>  	.prepare_command        = dw_mci_rockchip_prepare_command,
->>  	.set_ios		= dw_mci_rk3288_set_ios,
->>  	.setup_clock    = dw_mci_rk3288_setup_clock,
->> +	.parse_dt	= dw_mci_rockchip_parse_dt,
->>  };
->>  
->>  static const struct of_device_id dw_mci_rockchip_match[] = {
->> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->> index bb46b1b..a633b58 100644
->> --- a/drivers/mmc/host/dw_mmc.c
->> +++ b/drivers/mmc/host/dw_mmc.c
->> @@ -823,7 +823,7 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
->>  
->>  		/* enable clock; only low power if no SDIO */
->>  		clk_en_a = SDMMC_CLKEN_ENABLE << slot->id;
->> -		if (!(mci_readl(host, INTMASK) & SDMMC_INT_SDIO(slot->id)))
->> +		if (!(mci_readl(host, INTMASK) & SDMMC_INT_SDIO(slot->sdio_id)))
->>  			clk_en_a |= SDMMC_CLKEN_LOW_PWR << slot->id;
->>  		mci_writel(host, CLKENA, clk_en_a);
->>  
->> @@ -1184,10 +1184,10 @@ static void dw_mci_enable_sdio_irq(struct mmc_host *mmc, int enb)
->>  		dw_mci_disable_low_power(slot);
->>  
->>  		mci_writel(host, INTMASK,
->> -			   (int_mask | SDMMC_INT_SDIO(slot->id)));
->> +			   (int_mask | SDMMC_INT_SDIO(slot->sdio_id)));
->>  	} else {
->>  		mci_writel(host, INTMASK,
->> -			   (int_mask & ~SDMMC_INT_SDIO(slot->id)));
->> +			   (int_mask & ~SDMMC_INT_SDIO(slot->sdio_id)));
->>  	}
->>  }
->>  
->> @@ -2056,8 +2056,9 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
->>  		/* Handle SDIO Interrupts */
->>  		for (i = 0; i < host->num_slots; i++) {
->>  			struct dw_mci_slot *slot = host->slot[i];
->> -			if (pending & SDMMC_INT_SDIO(i)) {
->> -				mci_writel(host, RINTSTS, SDMMC_INT_SDIO(i));
->> +			if (pending & SDMMC_INT_SDIO(slot->sdio_id)) {
->> +				mci_writel(host, RINTSTS,
->> +					   SDMMC_INT_SDIO(slot->sdio_id));
->>  				mmc_signal_sdio_irq(slot->mmc);
->>  			}
->>  		}
->> @@ -2145,6 +2146,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
->>  
->>  	slot = mmc_priv(mmc);
->>  	slot->id = id;
->> +	slot->sdio_id = host->sdio_id0 + id;
->>  	slot->mmc = mmc;
->>  	slot->host = host;
->>  	host->slot[id] = slot;
->> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
->> index 71d4995..0562f10 100644
->> --- a/drivers/mmc/host/dw_mmc.h
->> +++ b/drivers/mmc/host/dw_mmc.h
->> @@ -214,6 +214,7 @@ extern int dw_mci_resume(struct dw_mci *host);
->>   *	with CONFIG_MMC_CLKGATE.
->>   * @flags: Random state bits associated with the slot.
->>   * @id: Number of this slot.
->> + * @sdio_id: Number of this slot in the SDIO interrupt registers.
->>   */
->>  struct dw_mci_slot {
->>  	struct mmc_host		*mmc;
->> @@ -233,6 +234,7 @@ struct dw_mci_slot {
->>  #define DW_MMC_CARD_PRESENT	0
->>  #define DW_MMC_CARD_NEED_INIT	1
->>  	int			id;
->> +	int			sdio_id;
->>  };
->>  
->>  struct dw_mci_tuning_data {
->> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
->> index 69d0814..72c319f 100644
->> --- a/include/linux/mmc/dw_mmc.h
->> +++ b/include/linux/mmc/dw_mmc.h
->> @@ -96,6 +96,7 @@ struct mmc_data;
->>   * @quirks: Set of quirks that apply to specific versions of the IP.
->>   * @irq_flags: The flags to be passed to request_irq.
->>   * @irq: The irq value to be passed to request_irq.
->> + * @sdio_id0: Number of slot0 in the SDIO interrupt registers.
->>   *
->>   * Locking
->>   * =======
->> @@ -191,6 +192,8 @@ struct dw_mci {
->>  	bool			vqmmc_enabled;
->>  	unsigned long		irq_flags; /* IRQ flags */
->>  	int			irq;
->> +
->> +	int			sdio_id0;
->>  };
->>  
->>  /* DMA ops for Internal/External DMAC interface */
->>
-> 
-> 
-> 
-> 
+> Did you also pick "ARM: at91/dt: sam9263: Add CAN device nodes"? (https://www.mail-archive.com/devicetree at vger.kernel.org/msg44970.html)
+
+I've just done it. Thanks for the "heads-up" ;-)
+
+Bye,
+-- 
+Nicolas Ferre
