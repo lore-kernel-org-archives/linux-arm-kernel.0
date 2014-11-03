@@ -1,33 +1,61 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Mon, 3 Nov 2014 11:01:49 +0000
-Subject: [Xen-devel] [PATCH v7 7/8] xen/arm/arm64: introduce
- xen_arch_need_swiotlb
-In-Reply-To: <alpine.DEB.2.02.1411031044480.22875@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>	<1414422568-19103-7-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1411031044480.22875@kaball.uk.xensource.com>
-Message-ID: <5457609D.2000200@citrix.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 3 Nov 2014 11:06:41 +0000
+Subject: [RFC PATCH 2/2] arm: pcibios: move to generic PCI domains
+In-Reply-To: <b095e031880c44f0b79c8c42bc8d7bd5@SIXPR06MB0639.apcprd06.prod.outlook.com>
+References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1414669490-1217-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <b095e031880c44f0b79c8c42bc8d7bd5@SIXPR06MB0639.apcprd06.prod.outlook.com>
+Message-ID: <20141103110641.GA24433@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/14 10:45, Stefano Stabellini wrote:
-> On Mon, 27 Oct 2014, Stefano Stabellini wrote:
->> Introduce an arch specific function to find out whether a particular dma
->> mapping operation needs to bounce on the swiotlb buffer.
->>
->> On ARM and ARM64, if the page involved is a foreign page and the device
->> is not coherent, we need to bounce because at unmap time we cannot
->> execute any required cache maintenance operations (we don't know how to
->> find the pfn from the mfn).
->>
->> No change of behaviour for x86.
->>
->> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->> Acked-by: Ian Campbell <ian.campbell@citrix.com>
+Hi Phil,
+
+On Fri, Oct 31, 2014 at 01:43:49PM +0000, Phil Edworthy wrote:
+> Hi Lorenzo,
 > 
-> Konrad, David, are you OK with the swiotlb-xen changes?
+> On 30 October 2014 11:45, Lorenzo wrote:
+> > Most if not all ARM PCI host controller device drivers either ignore the
+> > domain field in the pci_sys_data structure or just increment it every
+> > time a host controller is probed, using it as a domain counter.
+> > 
+> > Therefore, instead of relying on pci_sys_data to stash the domain number
+> > in a standard location, ARM pcibios code can be moved to the newly
+> > introduced generic PCI domains code, implemented in commits:
+> > 
+> > commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
+> > ("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
+> > 
+> > commit 670ba0c8883b576d0aec28bd7a838358a4be1
+> > ("PCI: Add generic domain handling")
+> > 
+> > In order to assign a domain number dynamically, the ARM pcibios defines
+> > the function, called by core PCI code:
+> > 
+> > void pci_bus_assign_domain_nr(...)
+> > 
+> > that relies on a DT property to define the domain number or falls back to
+> > a counter; its usage replaces the current domain assignment code in PCI
+> > host controllers present in the kernel.
+> > 
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Phil Edworthy <phil.edworthy@renesas.com>
+> > Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> > Cc: Jingoo Han <jg1.han@samsung.com>
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Mohit Kumar <mohit.kumar@st.com>
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> 
+> This patch fixes a current problem with R-Car devices where there is an
+> internal PCI bridge and an external PCIe bridge on the devices. Both drivers
+> work independently but need to be on different domains. Just needed to enable
+> PCI_DOMAINS along with this.
+> I've done basic testing that the internal PCI and external PCIe work at the
+> same time.
+> 
+> Acked-by: Phil Edworthy <phil.edworthy@renesas.com>
 
-Reviewed-by: David Vrabel <david.vrabel@citrix.com>
+Thank you very much.
 
-But swiotlb is Konrad's responsibility.
-
-David
+Lorenzo
