@@ -1,26 +1,37 @@
-From: schwab@linux-m68k.org (Andreas Schwab)
-Date: Mon, 03 Nov 2014 19:15:04 +0100
-Subject: [PATCH v4 1/9] PM / Domains: Change prototype for the
- ->attach_dev() callback
-In-Reply-To: <1415028896-9005-2-git-send-email-geert+renesas@glider.be> (Geert
- Uytterhoeven's message of "Mon, 3 Nov 2014 16:34:48 +0100")
-References: <1415028896-9005-1-git-send-email-geert+renesas@glider.be>
- <1415028896-9005-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <8761ewduc7.fsf@igel.home>
+From: stephen@networkplumber.org (Stephen Hemminger)
+Date: Mon, 3 Nov 2014 10:16:51 -0800
+Subject: [PATCH] VNIC: Adding support for Cavium ThunderX network
+ controller
+In-Reply-To: <CA+sq2CfV-90CRvo-FCizkzoxHq-AsfOEDW2Z5pXtnNLNXCfTUg@mail.gmail.com>
+References: <20141030165434.GW20170@rric.localhost>
+ <20141030195458.2958d88a@urahara>
+ <CA+sq2CfV-90CRvo-FCizkzoxHq-AsfOEDW2Z5pXtnNLNXCfTUg@mail.gmail.com>
+Message-ID: <20141103101651.1d664cc3@urahara>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Geert Uytterhoeven <geert+renesas@glider.be> writes:
+On Fri, 31 Oct 2014 22:44:11 +0530
+Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
 
-> From: Ulf Hansson <ulf.hansson@linaro.org>
->
-> Convert the prototype to return and int. This is just an initial step,
+> On Fri, Oct 31, 2014 at 8:24 AM, Stephen Hemminger
+> <stephen@networkplumber.org> wrote:
+> > On Thu, 30 Oct 2014 17:54:34 +0100
+> > Robert Richter <rric@kernel.org> wrote:
+> >
+> >> +#ifdef       VNIC_RSS_SUPPORT
+> >> +static int rss_config = RSS_IP_HASH_ENA | RSS_TCP_HASH_ENA | RSS_UDP_HASH_ENA;
+> >> +module_param(rss_config, int, S_IRUGO);
+> >> +MODULE_PARM_DESC(rss_config,
+> >> +              "RSS hash config [bits 8:0] (Bit0:L2 extended, 1:IP, 2:TCP, 3:TCP SYN, 4:UDP, 5:L4 extended, 6:ROCE 7:L3 bi-directional, 8:L4 bi-directional)");
+> >> +#endif
+> >
+> > This should managed  be via ethtool ETHTOOL_GRXFH rather than a module parameter.
+> Thanks, i will add setting hash options via ETHTOOL_SRXFH as well.
+> The idea here is to have a choice of hash while module load (through
+> module params) and if it needs to be changed runtime then
+> via Ethtool.
+> 
+> Sunil.
 
-s/and/an/
-
-Andreas.
-
--- 
-Andreas Schwab, schwab at linux-m68k.org
-GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
-"And now for something completely different."
+Network developers do not like vendor unique module parameters.
+Anything device specific doesn't work in a generic distro environment.
