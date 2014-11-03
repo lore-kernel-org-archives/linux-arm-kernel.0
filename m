@@ -1,32 +1,38 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Mon, 3 Nov 2014 18:35:28 +0800
-Subject: [PATCH v5 4/4] crypto: Add Allwinner Security System crypto
- accelerator
-In-Reply-To: <20141103093446.GG11263@lukather>
-References: <1413728182-13569-5-git-send-email-clabbe.montjoie@gmail.com>
- <20141021191149.GQ21108@lukather> <544A9FEA.6020304@gmail.com>
- <20141030171933.GR21251@lukather>
- <20141031072030.GA7563@gondor.apana.org.au>
- <20141031081323.GS21251@lukather>
- <20141031081803.GA8012@gondor.apana.org.au>
- <20141031095706.GA8054@lukather>
- <20141031100522.GA8655@gondor.apana.org.au>
- <20141103093446.GG11263@lukather>
-Message-ID: <20141103103528.GA30154@gondor.apana.org.au>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 3 Nov 2014 10:49:50 +0000
+Subject: [RFC PATCH 2/2] arm: pcibios: move to generic PCI domains
+In-Reply-To: <5456FB07.40002@huawei.com>
+References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1414669490-1217-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <5456FB07.40002@huawei.com>
+Message-ID: <20141103104950.GA30519@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 03, 2014 at 10:34:46AM +0100, Maxime Ripard wrote:
-> What I mean is that since you are saying that drivers should do the
-> kmap themselves, then *all* of the drivers are broken if they are not
-> using it. And all of them are missing this kmap.
+On Mon, Nov 03, 2014 at 03:48:23AM +0000, Yijing Wang wrote:
+> On 2014/10/30 19:44, Lorenzo Pieralisi wrote:
 
-kmap is used by the software implementations to map the input/output
-into virtual address space.  Drivers typically use DMA and operate
-on physical addresses so they don't need kmap.
+[...]
 
-Cheers,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+> > diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+> > index 7fc4278..f19f627 100644
+> > --- a/arch/arm/include/asm/mach/pci.h
+> > +++ b/arch/arm/include/asm/mach/pci.h
+> > @@ -44,9 +44,6 @@ struct hw_pci {
+> >   * Per-controller structure
+> >   */
+> 
+> domain in hw_pci also should be clean up, right ?
+> 
+> 
+> struct hw_pci {
+> #ifdef CONFIG_PCI_DOMAINS
+> 	int		domain;
+> #endif
+> 	struct pci_ops	*ops;
+> 	int		nr_controllers;
+> 	void		**private_data;
+
+Yes, thanks for spotting that.
+
+Lorenzo
