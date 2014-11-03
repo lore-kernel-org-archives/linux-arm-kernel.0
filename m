@@ -1,37 +1,43 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 3 Nov 2014 17:51:21 +0100
-Subject: [PATCH v3 02/19] arm/arm64: KVM: pass down user space provided
- GIC type into vGIC code
-In-Reply-To: <54578237.3080900@arm.com>
-References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
- <1414776414-13426-3-git-send-email-andre.przywara@arm.com>
- <20141103131425.GC16132@cbox> <54578237.3080900@arm.com>
-Message-ID: <20141103165121.GH16132@cbox>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 03 Nov 2014 17:51:05 +0100
+Subject: [PATCH v2 3/4] clocksource: armada-370-xp: Use the reference
+ clock on A375 SoC
+In-Reply-To: <1414248522-16055-4-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1414248522-16055-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1414248522-16055-4-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <5457B279.5060106@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 03, 2014 at 01:25:11PM +0000, Andre Przywara wrote:
-> Hi Christoffer,
-> 
-> On 03/11/14 13:14, Christoffer Dall wrote:
-> > On Fri, Oct 31, 2014 at 05:26:37PM +0000, Andre Przywara wrote:
-> >> With the introduction of a second emulated GIC model we need to let
-> >> userspace specify the GIC model to use for each VM. Pass the
-> >> userspace provided value down into the vGIC code and store it there
-> >> to differentiate later.
-> >>
-> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> > 
-> > Did you change anything since v2?
-> 
-> Yes (and that's why I dropped your ack):
-> I moved the line that stores the vgic_model from the "introduce
-> per-VM-ops" patch into here (plus the declaration of it):
-> 
-> 	kvm->arch.vgic.vgic_model = type;
-> 
-> That was part of the split-up to make that bigger patch more readable.
-> 
-ok, it fits perfectly her:
+Hi Ezequiel,
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+On 25/10/2014 16:48, Ezequiel Garcia wrote:
+> The 25 MHz reference clock has better stability so its use is preferred over the
+> core clock.
+> 
+> This commit takes advantage of the already introduced Armada 375 devicetree
+> compatible string and adds a new timer initialization. If available, the timer
+> will use the reference clock (named as 'fixed'). Otherwise, it falls back to the
+> previous behavior.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  .../bindings/timer/marvell,armada-370-xp-timer.txt |  9 ++++---
+>  drivers/clocksource/time-armada-370-xp.c           | 28 ++++++++++++++++++++++
+>  2 files changed, 34 insertions(+), 3 deletions(-)
+> 
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+
+Thanks,
+
+Gregory
+
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
