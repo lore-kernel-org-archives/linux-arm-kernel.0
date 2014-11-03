@@ -1,85 +1,57 @@
 From: marek@goldelico.com (Marek Belisko)
-Date: Mon,  3 Nov 2014 22:59:27 +0100
-Subject: [PATCH 3/4] arm: dts: omap3-gta04: Add handling for tv output
+Date: Mon,  3 Nov 2014 22:59:28 +0100
+Subject: [PATCH 4/4] arm: dts: omap3-gta04: Add static configuration for
+ devconf1 register
 In-Reply-To: <1415051968-4878-1-git-send-email-marek@goldelico.com>
 References: <1415051968-4878-1-git-send-email-marek@goldelico.com>
-Message-ID: <1415051968-4878-4-git-send-email-marek@goldelico.com>
+Message-ID: <1415051968-4878-5-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add handling for gta04 tv out chain:
-venc -> opa362 -> svideo
+gta04 board need for tvout enabled 2 bits in devconf1 register (tvbypass and acbias).
+Add single pinmux entry and enable it.
 
 Signed-off-by: Marek Belisko <marek@goldelico.com>
 ---
- arch/arm/boot/dts/omap3-gta04.dtsi | 48 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+ arch/arm/boot/dts/omap3-gta04.dtsi | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
 diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
-index fd34f91..e4d05f0 100644
+index e4d05f0..a456d37 100644
 --- a/arch/arm/boot/dts/omap3-gta04.dtsi
 +++ b/arch/arm/boot/dts/omap3-gta04.dtsi
-@@ -83,6 +83,41 @@
- 		compatible = "usb-nop-xceiv";
- 		reset-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
+@@ -118,6 +118,17 @@
+ 			};
+ 		};
  	};
 +
-+	tv0: connector at 1 {
-+		compatible = "svideo-connector";
-+		label = "tv";
-+
-+		port {
-+			tv_connector_in: endpoint {
-+				remote-endpoint = <&opa_out>;
-+			};
-+		};
-+	};
-+
-+	tv_amp: opa362 {
-+		compatible = "ti,opa362";
-+		gpios = <&gpio1 23 0>;
-+
-+		label = "opa362";
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			port at 0 {
-+				reg = <0>;
-+				opa_in: endpoint at 0 {
-+					remote-endpoint = <&venc_out>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				opa_out: endpoint at 0 {
-+					remote-endpoint = <&tv_connector_in>;
-+				};
-+			};
-+		};
++	/* pinmux for devconf1 */
++	control_devconf1: pinmux at 480022d8 {
++		compatible = "pinctrl-single";
++		reg = <0x480022d8 4>;	/* single register */
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-single,bit-per-mux;
++		pinctrl-single,register-width = <32>;
++		pinctrl-single,function-mask = <0xfc0bd5>;
 +	};
  };
  
  &omap3_pmx_core {
-@@ -396,6 +431,19 @@
+@@ -497,3 +508,14 @@
+ 		};
  	};
  };
- 
-+&venc {
-+	status = "okay";
 +
-+	vdda-supply = <&vdac>;
++&control_devconf1 {
++	pinctrl-name = "default";
++	pinctrl-0 = < &tv_acbias_pins>;
 +
-+	port {
-+		venc_out: endpoint {
-+			remote-endpoint = <&opa_in>;
-+			ti,channels = <2>;
-+		};
++	tv_acbias_pins: pinmux_tv_acbias_pins {
++		pinctrl-single,bits = <
++			0 0x40800 0x40800
++		>;
 +	};
 +};
-+
- &gpmc {
- 	ranges = <0 0 0x30000000 0x04>; /* CS0: NAND */
- 
 -- 
 1.9.1
