@@ -1,135 +1,204 @@
-From: xudong.chen@mediatek.com (xudong chen)
-Date: Mon, 3 Nov 2014 13:44:30 +0800
-Subject: [PATCH 3/3] I2C: mediatek: Add driver for MediaTek I2C controller
-In-Reply-To: <CABuKBeJ2NxcVn=yapcvNs1xLU+eye4JWESBwdcWoeqO=-vMBKw@mail.gmail.com>
-References: <1414561058-23803-1-git-send-email-xudong.chen@mediatek.com>
- <1414561058-23803-4-git-send-email-xudong.chen@mediatek.com>
- <CABuKBe+RXboBEZD7Bu_kSbVwiapJJcAuuw_wo=xw67osJWJ20w@mail.gmail.com>
- <1414737101.32208.18.camel@mhfsdcap03>
- <CABuKBeK1O2q37RMVE0Yjp2=QgkzXZfh=vxXiZrw-JMiYMxb-QQ@mail.gmail.com>
- <1414766288.5833.46.camel@mtksdaap41>
- <CABuKBeJ2NxcVn=yapcvNs1xLU+eye4JWESBwdcWoeqO=-vMBKw@mail.gmail.com>
-Message-ID: <1414993470.10276.19.camel@mhfsdcap03>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 3 Nov 2014 14:14:13 +0800
+Subject: [PATCH v5 2/3] ARM: dts: pbab01: enable I2S audio on
+ phyFLEX-i.MX6 boards
+In-Reply-To: <1414590424-25585-3-git-send-email-d.lavnikevich@sam-solutions.com>
+References: <1414590424-25585-1-git-send-email-d.lavnikevich@sam-solutions.com>
+ <1414590424-25585-3-git-send-email-d.lavnikevich@sam-solutions.com>
+Message-ID: <20141103061408.GA21210@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-10-31 at 17:10 +0100, Matthias Brugger wrote:
-> 2014-10-31 15:38 GMT+01:00 Yingjoe Chen <yingjoe.chen@mediatek.com>:
-> > On Fri, 2014-10-31 at 11:48 +0100, Matthias Brugger wrote:
-> >> 2014-10-31 7:31 GMT+01:00 xudong chen <xudong.chen@mediatek.com>:
-> >> > On Thu, 2014-10-30 at 14:16 +0100, Matthias Brugger wrote:
-> >> >> 2014-10-29 6:37 GMT+01:00 Xudong Chen <xudong.chen@mediatek.com>:
-> >> >> > The mediatek SoCs have I2C controller that handle I2C transfer.
-> >> >> > This patch include common I2C bus driver.
-> >> >> > This driver is compatible with I2C controller on mt65xx/mt81xx.
-> >> >> >
-> >> >> > Signed-off-by: Xudong Chen <xudong.chen@mediatek.com>
-> >> >> > Change-Id: Icc17e326b9df46a226d536956e103f17b0382b6e
-> >> >> > ---
-> >> >> >  drivers/i2c/busses/Kconfig      |   9 +
-> >> >> >  drivers/i2c/busses/Makefile     |   1 +
-> >> >> >  drivers/i2c/busses/i2c-mt65xx.c | 728 ++++++++++++++++++++++++++++++++++++++++
-> >> >> >  3 files changed, 738 insertions(+)
-> >> >> >  create mode 100644 drivers/i2c/busses/i2c-mt65xx.c
-> >> >> >
-> >> >> > diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> >> >> > index 917c358..0d7d0a4 100644
-> >> >> > --- a/drivers/i2c/busses/Kconfig
-> >> >> > +++ b/drivers/i2c/busses/Kconfig
-> >> >> > @@ -564,6 +564,15 @@ config I2C_MPC
-> >> >> >           This driver can also be built as a module.  If so, the module
-> >> >> >           will be called i2c-mpc.
-> >> >> >
-> >> >> > +config I2C_MT65XX
-> >> >> > +       tristate "MediaTek I2C adapter"
-> >> >> > +       depends on ARCH_MEDIATEK
-> >> >> > +       help
-> >> >> > +         This selects the MediaTek(R) Integrated Inter Circuit bus driver
-> >> >> > +         for MT65xx and MT81xx.
-> >> >> > +         If you want to use MediaTek(R) I2C interface, say Y or M here.
-> >> >> > +         If unsure, say N.
-> >> >> > +
-> >> >> >  config I2C_MV64XXX
-> >> >> >         tristate "Marvell mv64xxx I2C Controller"
-> >> >> >         depends on MV64X60 || PLAT_ORION || ARCH_SUNXI
-> >> >> > diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
-> >> >> > index 78d56c5..7a9f0f3 100644
-> >> >> > --- a/drivers/i2c/busses/Makefile
-> >> >> > +++ b/drivers/i2c/busses/Makefile
-> >> >> > @@ -54,6 +54,7 @@ obj-$(CONFIG_I2C_IMX)         += i2c-imx.o
-> >> >> >  obj-$(CONFIG_I2C_IOP3XX)       += i2c-iop3xx.o
-> >> >> >  obj-$(CONFIG_I2C_KEMPLD)       += i2c-kempld.o
-> >> >> >  obj-$(CONFIG_I2C_MPC)          += i2c-mpc.o
-> >> >> > +obj-$(CONFIG_I2C_MT65XX)       += i2c-mt65xx.o
-> >> >> > +
-> >> >> > +static int mt_i2c_do_transfer(struct mt_i2c *i2c)
-> >> >> > +{
-> >> >> > +       u16 addr_reg;
-> >> >> > +       u16 control_reg;
-> >> >> > +       int tmo = i2c->adap.timeout;
-> >> >> > +
-> >> >> > +       i2c->trans_stop = false;
-> >> >> > +       i2c->irq_stat = 0;
-> >> >> > +
-> >> >> > +       /* If use i2c pin from PMIC mt6397 side, need set PATH_DIR first */
-> >> >> > +       if (i2c->have_pmic)
-> >> >> > +               i2c_writew(I2C_CONTROL_WRAPPER, i2c, OFFSET_PATH_DIR);
-> >> >>
-> >> >> So this is some sort of multiplexer bit, right?
-> >> >> I think in this case we need to build a multi function device (mfd)
-> >> >> where the pmic driver will set this bit.
-> >> >>
-> >> > Hi,
-> >> >
-> >> > This feature means the chip can use I2C pins from PMIC(mt6397).
-> >> > In this case,
-> >> > 1. We actually control the register on mt8135 and the DMA/Control Logic
-> >> > is on mt8135, only use pins from mt6397. If set register OFFSET_PATH_DIR
-> >> > bit0 to 1, the I2C data will go/from PMIC pins.
-> >>
-> >> Sorry but I'm a bit puzzled. mt6397 is the PMIC, right?
-> >> So from the mt6589 datasheet it says:
-> >> "PATH_DIR Decides transmission direction
-> >> If set, the I2C data will go/from PMIC; otherwise, the I2C data will
-> >> go/from main die."
-> >>
-> >> From my understanding the I2C bus will be multiplexed depending on
-> >> this bit. The bit decides if it the data will be send to the PMIC or
-> >> to some other I2C peripheral.
-> >>
-> >> So we need a mfd and the PMIC device driver sets/unsets the PATH_DIR register.
-> >
-> > Yes, mt6397 is the PMIC work with mt8135 or mt8127.
-> >
-> > I think the datasheet is a little misleading here. AFAIK, on 8135 even
-> > if your clear the bit for I2C4, there are no corresponding pins for this
-> > i2c port on 8135. So it is not really multiplexed. Base on my
-> > understanding this is more like "Set this bit if this a PMIC I2C port".
+On Wed, Oct 29, 2014 at 04:47:03PM +0300, Dmitry Lavnikevich wrote:
+> Audio on phyFLEX boards is presented by tlv320aic3007 codec connected
+> over SSI interface.
 > 
-> I had a look at mt6589. The SoC has seven i2c controller. Looking at
-> the source code all controller with an ID bigger then 3 can be set to
-> pmic wrapper state.
-
-I have checked the mt8135 and mt6589 GPIO datasheet, there are pins on
-mt8135 or mt6589 for i2c4~i2c6, we also can use i2c4~i2c6 modules on
-mt8135 or mt6589 after set pinmux. Sorry about the misunderstand before.
-I will add i2c4~i2c6 nodes to the mt8135.dtsi in next patch.
-
-> So I would say that the PATH_DIR bit is not always bound to i2c4. We
-> should implement a driver which will work on all possible
-> configurations. We don't know if apart from mt6589 and mt8135 some
-> other SoC in the future will use this i2c controller.
+> Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi | 100 ++++++++++++++++++++++++++-
+>  arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi |  15 ++++
+>  2 files changed, 113 insertions(+), 2 deletions(-)
 > 
-Because the mt6397 HW limitation, it's i2c module cannot be used when
-apart from mt6589 or mt8135.
-Take mt6589 for example:
-If we want to use mt6397 i2c pins, it must work together with mt6589,
-also we need to set the i2c control register on mt6589(DIR_PATH and the
-other registers) and then the HW will auto handle the communication
-between mt6397 and mt6589 internal(do not need any SW control), so data
-can go/from mt6397 pins. In this case the i2c pins on mt6397 will work
-just like the i2c pins is from mt6589.
+> diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
+> index f1bdcae5b97d..cb8f1b6ec083 100644
+> --- a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
+> @@ -9,10 +9,73 @@
+>   * http://www.gnu.org/copyleft/gpl.html
+>   */
+>  
+> +#include <dt-bindings/sound/fsl-imx-audmux.h>
+> +
+>  / {
+>  	chosen {
+>  		linux,stdout-path = &uart4;
+>  	};
+> +
+> +	regulators {
+> +		sound_1v8: regulator at 2 {
+> +			compatible = "regulator-fixed";
+> +			reg = <2>;
+> +			regulator-name = "i2s-audio-1v8";
+> +			regulator-min-microvolt = <1800000>;
+> +			regulator-max-microvolt = <1800000>;
+> +		};
+> +
+> +		sound_3v3: regulator at 3 {
+> +			compatible = "regulator-fixed";
+> +			reg = <3>;
+> +			regulator-name = "i2s-audio-3v3";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +		};
+> +	};
+> +
+> +	tlv320_mclk: oscillator {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <19200000>;
+> +		clock-output-names = "tlv320-mclk";
+> +	};
+> +
+> +	sound {
+> +		compatible = "simple-audio-card";
+> +		simple-audio-card,name = "OnboardTLV320AIC3007";
+> +		simple-audio-card,format = "i2s";
+> +		simple-audio-card,bitclock-master = <&dailink_master>;
+> +		simple-audio-card,frame-master = <&dailink_master>;
+> +		simple-audio-card,widgets =
+> +			"Microphone", "Mic Jack",
+> +			"Line", "Line In",
+> +			"Line", "Line Out",
+> +			"Speaker", "Speaker",
+> +			"Headphone", "Headphone Jack";
+> +		simple-audio-card,routing =
+> +			"Line Out", "LLOUT",
+> +			"Line Out", "RLOUT",
+> +			"Speaker", "SPOP",
+> +			"Speaker", "SPOM",
+> +			"Headphone Jack", "HPLOUT",
+> +			"Headphone Jack", "HPROUT",
+> +			"MIC3L", "Mic Jack",
+> +			"MIC3R", "Mic Jack",
+> +			"Mic Jack", "Mic Bias",
+> +			"LINE1L", "Line In",
+> +			"LINE1R", "Line In";
+> +
+> +		simple-audio-card,cpu {
+> +			sound-dai = <&ssi2>;
+> +		};
+> +
+> +		dailink_master: simple-audio-card,codec {
+> +			sound-dai = <&codec>;
+> +			clocks = <&tlv320_mclk>;
+> +		};
+> +	};
+> +
+>  };
+>  
+>  &fec {
+> @@ -27,12 +90,45 @@
+>  	status = "okay";
+>  };
+>  
+> +&ssi2 {
+> +	status = "okay";
+> +};
+> +
+> +&audmux {
 
-> Maybe you can check with the HW guys how this is implemented to shed
-> some light on the issue.
+Please sort the nodes alphabetically in label name.
+
+> +	status = "okay";
+> +
+> +	ssi2 {
+> +		fsl,audmux-port = <1>;
+> +		fsl,port-config = <
+> +			(IMX_AUDMUX_V2_PTCR_TFSDIR |
+> +			IMX_AUDMUX_V2_PTCR_TFSEL(4) |
+> +			IMX_AUDMUX_V2_PTCR_TCLKDIR |
+> +			IMX_AUDMUX_V2_PTCR_TCSEL(4))
+> +	                IMX_AUDMUX_V2_PDCR_RXDSEL(4)
+> +		>;
+> +	};
+> +	pins5 {
+
+Have a new line between nodes.
+
+> +		fsl,audmux-port = <4>;
+> +		fsl,port-config = <
+> +			0x00000000
+> +			IMX_AUDMUX_V2_PDCR_RXDSEL(1)
+> +		>;
+> +	};
+> +};
+> +
+>  &i2c2 {
+>  	status = "okay";
+>  
+> -	tlv320 at 18 {
+> -		compatible = "ti,tlv320aic3x";
+> +	codec: tlv320 at 18 {
+> +		compatible = "ti,tlv320aic3007";
+
+Both compatible strings are documented in
+Documentation/devicetree/bindings/sound/tlv320aic3x.txt.  But I hope
+this change will not cause any DT compatible issues.
+
+> +		#sound-dai-cells = <0>;
+>  		reg = <0x18>;
+> +		ai3x-micbias-vg = <2>;
+> +
+> +		AVDD-supply = <&sound_3v3>;
+> +		IOVDD-supply = <&sound_3v3>;
+> +		DRVDD-supply = <&sound_3v3>;
+> +		DVDD-supply = <&sound_1v8>;
+>  	};
+>  
+>  	stmpe at 41 {
+> diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+> index aa2275671d2c..d7f34664e008 100644
+> --- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+> @@ -58,6 +58,12 @@
+>  	};
+>  };
+>  
+> +&audmux {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_audmux>;
+> +	status = "disabled";
+> +};
+> +
+>  &ecspi3 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_ecspi3>;
+> @@ -319,6 +325,15 @@
+>  				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000
+>  			>;
+>  		};
+> +
+> +		pinctrl_audmux: audmuxgrp {
+
+Please sort the pinctrl entries alphabetically.
+
+Shawn
+
+> +			fsl,pins = <
+> +				MX6QDL_PAD_DISP0_DAT16__AUD5_TXC	0x130b0
+> +				MX6QDL_PAD_DISP0_DAT18__AUD5_TXFS	0x130b0
+> +				MX6QDL_PAD_DISP0_DAT17__AUD5_TXD	0x110b0
+> +				MX6QDL_PAD_DISP0_DAT19__AUD5_RXD	0x130b0
+> +			>;
+> +		};
+>  	};
+>  };
+>  
+> -- 
+> 2.1.2
 > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
