@@ -1,40 +1,31 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Mon, 3 Nov 2014 11:45:44 -0800
-Subject: [PATCH v1 1/2] dtb: xgene: fix: Disable 10GbE and SGMII based
- 1GbE by default
-In-Reply-To: <1991367.DGHysZpQVP@wuerfel>
-References: <1414630580-24640-1-git-send-email-isubramanian@apm.com>
- <1414630580-24640-2-git-send-email-isubramanian@apm.com>
- <1991367.DGHysZpQVP@wuerfel>
-Message-ID: <CAKh23FkVrPdCuR6dn1S4RvW14_f4Xq8MWaChUh9DyVp44kVtSg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 3 Nov 2014 19:46:34 +0000
+Subject: [PATCH 00/10] arm64 kexec kernel patches V5
+In-Reply-To: <20141031075209.GH3290@darkstar.nay.redhat.com>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <20141031075209.GH3290@darkstar.nay.redhat.com>
+Message-ID: <20141103194634.GA30366@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Fri, Oct 31, 2014 at 07:52:09AM +0000, Dave Young wrote:
+> Hi Geoff
+> 
+> I tested your patches. The macihne is using spin-table cpu enable method
+> so I tried maxcpus=1 as you suggested.
+> 
+> There's below issues for me, thoughts?
+> 
+> 1. For acpi booting there's no /proc/device-tree so kexec can not find dtb
+> to use.
 
-On Thu, Oct 30, 2014 at 3:13 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 29 October 2014 17:56:19 Iyappan Subramanian wrote:
->> @@ -621,7 +621,7 @@
->>                         };
->>                 };
->>
->> -               sgenet0: ethernet at 1f210000 {
->> +               sgenet0: sgenet at 1f210000 {
->>                         compatible = "apm,xgene-enet";
->>                         status = "disabled";
->>                         reg = <0x0 0x1f210000 0x0 0x10000>,
->>
->
-> This looks like you accidentally reverted a bug fix made earlier.
-> Network devices should always have the name 'ethernet at ...'.
+Are you absolutely certain of this?
 
-Thanks for the review.  Since our firmware was patching the dtb, based
-on the node-name, we thought by changing node-name, we can avoid the
-patching and maintain backward compatibility.
+To use ACPI, you must have booted via EFI, as the only mechanism for
+finding the ACPI tables is via EFI. If booted via EFI, the stub will
+have created a stub DTB if there is no provided DTB, to pass the command
+line and pointers to EFI data structures. This stub DTB should be
+present in the usual place.
 
-Now we know that network devices should have 'ethernet at ...', we will
-handle the backward compatibility in a different way and will post the
-patch v2 shortly.
-
->
->         Arnd
+Thanks,
+Mark.
