@@ -1,97 +1,82 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 03 Nov 2014 18:53:29 +0100
-Subject: [PATCH 06/17] gpio: mvebu: add suspend/resume support
-In-Reply-To: <1414151970-6626-7-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1414151970-6626-7-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5457C119.90809@free-electrons.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 3 Nov 2014 18:54:47 +0100
+Subject: [GIT PULL] at91: cleanup for 3.19 #1
+Message-ID: <1415037288-4332-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/10/2014 13:59, Thomas Petazzoni wrote:
-> This commit adds the implementation of ->suspend() and ->resume()
-> platform_driver hooks in order to save and restore the state of the
-> GPIO configuration. In order to achieve that, additional fields are
-> added to the mvebu_gpio_chip structure.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Alexandre Courbot <gnurou@gmail.com>
-> Cc: linux-gpio at vger.kernel.org
-> ---
->  drivers/gpio/gpio-mvebu.c | 99 +++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 99 insertions(+)
-> 
-> diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
-> index 418e386..dd5545c 100644
-> --- a/drivers/gpio/gpio-mvebu.c
-> +++ b/drivers/gpio/gpio-mvebu.c
-> @@ -83,6 +83,14 @@ struct mvebu_gpio_chip {
->  	int		   irqbase;
->  	struct irq_domain *domain;
->  	int                soc_variant;
-> +
-> +	/* Used to preserve GPIO registers accross suspend/resume */
-                                           across
+Arnd, Olof, Kevin,
 
-> +	u32                out_reg;
-> +	u32                io_conf_reg;
-> +	u32                blink_en_reg;
-> +	u32                in_pol_reg;
-> +	u32                edge_mask_regs[4];
-> +	u32                level_mask_regs[4];
->  };
->  
->  /*
-> @@ -554,6 +562,93 @@ static const struct of_device_id mvebu_gpio_of_match[] = {
->  };
->  MODULE_DEVICE_TABLE(of, mvebu_gpio_of_match);
->  
-> +static int mvebu_gpio_suspend(struct platform_device *pdev, pm_message_t state)
-> +{
-> +	struct mvebu_gpio_chip *mvchip = platform_get_drvdata(pdev);
-> +	int i;
-> +
-> +	mvchip->out_reg = readl(mvebu_gpioreg_out(mvchip));
-> +	mvchip->io_conf_reg = readl(mvebu_gpioreg_io_conf(mvchip));
-> +	mvchip->blink_en_reg = readl(mvebu_gpioreg_blink(mvchip));
-> +	mvchip->in_pol_reg = readl(mvebu_gpioreg_in_pol(mvchip));
-> +
-> +	switch (mvchip->soc_variant) {
-> +	case MVEBU_GPIO_SOC_VARIANT_ORION:
-> +		mvchip->edge_mask_regs[0] =
-> +			readl(mvchip->membase + GPIO_EDGE_MASK_OFF);
-> +		mvchip->level_mask_regs[0] =
-> +			readl(mvchip->membase + GPIO_LEVEL_MASK_OFF);
-> +		break;
-> +	case MVEBU_GPIO_SOC_VARIANT_MV78200:
-> +		for (i = 0; i < 2; i++) {
-> +			mvchip->edge_mask_regs[i] =
-> +				readl(mvchip->membase +
-> +				      GPIO_EDGE_MASK_MV78200_OFF(i));
-> +			mvchip->level_mask_regs[i] =
-> +				readl(mvchip->membase +
-> +				      GPIO_LEVEL_MASK_MV78200_OFF(i));
-> +		}
-> +		break;
+The pull-request that was sent late for 3.18. It was removing the old
+!MMU at91x40 and 2 board files plus the whole code in at91sam9g45 & at91sam9rl
+files for implementing this deprecated method. For these particular ones, the
+EK were the only one to use this code.
+We can use these boards with DT right now.
 
-I don't know if the suspend is supported on this platform but as we were
-on the road to remove this platform I don't know it it worth testing it unless
-some interested users show up.
+More code removal like that is shedulle for 3.19, so this is just a first set.
 
-I didn't tested it on a mv782xx platform but the patch looks correct:
+Thanks, best regards,
 
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
 
+  Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
 
-Thanks,
+are available in the git repository at:
 
-Gregory
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-cleanup
 
+for you to fetch changes up to bcf8c7e7703bb2bbde66bec26a81fed4be9cd1d4:
 
+  ARM: at91: remove at91sam9rl legacy board support (2014-11-03 18:48:02 +0100)
+
+----------------------------------------------------------------
+First batch of cleanup/SoC for 3.19:
+- removal of old at91x40 !MMU ARM7TDMI support which was kind of rusty
+- removal of board-sam9m10g45ek.c and board-sam9rlek.c from mach-at91
+  and the code related to these board C files + defconfigs. Use DT for them
+  now!
+
+----------------------------------------------------------------
+Nicolas Ferre (3):
+      ARM: at91: remove no-MMU at91x40 support
+      ARM: at91: remove at91sam9g45/9m10 legacy board support
+      ARM: at91: remove at91sam9rl legacy board support
+
+ arch/arm/configs/at91sam9g45_defconfig       |  175 ---
+ arch/arm/configs/at91sam9rl_defconfig        |   92 --
+ arch/arm/configs/at91x40_defconfig           |   48 -
+ arch/arm/mach-at91/Kconfig                   |   20 +-
+ arch/arm/mach-at91/Kconfig.non_dt            |   58 -
+ arch/arm/mach-at91/Makefile                  |   12 -
+ arch/arm/mach-at91/at91sam9g45.c             |  448 ------
+ arch/arm/mach-at91/at91sam9g45_devices.c     | 1915 --------------------------
+ arch/arm/mach-at91/at91sam9rl.c              |  371 -----
+ arch/arm/mach-at91/at91sam9rl_devices.c      | 1260 -----------------
+ arch/arm/mach-at91/at91x40.c                 |   93 --
+ arch/arm/mach-at91/at91x40_time.c            |   85 --
+ arch/arm/mach-at91/board-eb01.c              |   52 -
+ arch/arm/mach-at91/board-sam9m10g45ek.c      |  527 -------
+ arch/arm/mach-at91/board-sam9rlek.c          |  333 -----
+ arch/arm/mach-at91/generic.h                 |    3 -
+ arch/arm/mach-at91/include/mach/at91_dbgu.h  |    3 -
+ arch/arm/mach-at91/include/mach/at91x40.h    |   60 -
+ arch/arm/mach-at91/include/mach/cpu.h        |    1 -
+ arch/arm/mach-at91/include/mach/hardware.h   |    5 -
+ arch/arm/mach-at91/include/mach/uncompress.h |    7 -
+ arch/arm/mach-at91/setup.c                   |    2 +-
+ drivers/rtc/Kconfig                          |    2 +-
+ 23 files changed, 5 insertions(+), 5567 deletions(-)
+ delete mode 100644 arch/arm/configs/at91sam9g45_defconfig
+ delete mode 100644 arch/arm/configs/at91sam9rl_defconfig
+ delete mode 100644 arch/arm/configs/at91x40_defconfig
+ delete mode 100644 arch/arm/mach-at91/at91sam9g45_devices.c
+ delete mode 100644 arch/arm/mach-at91/at91sam9rl_devices.c
+ delete mode 100644 arch/arm/mach-at91/at91x40.c
+ delete mode 100644 arch/arm/mach-at91/at91x40_time.c
+ delete mode 100644 arch/arm/mach-at91/board-eb01.c
+ delete mode 100644 arch/arm/mach-at91/board-sam9m10g45ek.c
+ delete mode 100644 arch/arm/mach-at91/board-sam9rlek.c
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91x40.h
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Nicolas Ferre
