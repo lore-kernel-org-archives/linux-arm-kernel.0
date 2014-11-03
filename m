@@ -1,48 +1,59 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 3 Nov 2014 09:07:36 -0800
-Subject: [PATCH v4] clk: rockchip: disable unused clocks
-In-Reply-To: <1414845873-26351-1-git-send-email-kever.yang@rock-chips.com>
-References: <1414845873-26351-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <CAD=FV=WrtDYaQqRsx7tfhfvvZzewFmhqRPt0vAF-i0vke5ZaFQ@mail.gmail.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Mon, 3 Nov 2014 11:08:03 -0600
+Subject: [PATCH] tracing/syscalls: ignore numbers outside NR_syscalls'
+ range
+In-Reply-To: <20141030113523.GQ27405@n2100.arm.linux.org.uk>
+References: <1414620418-29472-1-git-send-email-rabin@rab.in>
+ <20141030082606.GA7945@infradead.org>
+ <20141030101808.GO27405@n2100.arm.linux.org.uk>
+ <20141030071039.37633bf5@gandalf.local.home>
+ <20141030111441.GP27405@n2100.arm.linux.org.uk>
+ <20141030073028.284c468c@gandalf.local.home>
+ <20141030113523.GQ27405@n2100.arm.linux.org.uk>
+Message-ID: <5457B673.1000409@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kever,
+On 10/30/2014 06:35 AM, Russell King - ARM Linux wrote:
+> On Thu, Oct 30, 2014 at 07:30:28AM -0400, Steven Rostedt wrote:
+>> On Thu, 30 Oct 2014 11:14:41 +0000
+>> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>>
+>>
+>>> We have always had syscall number range of 0x900000 or so.  The tracing
+>>> design does not expect that.  Therefore, the tracing design did not take
+>>> account of ARM when it was created.  Therefore, it's up to the tracing
+>>> people to decide how to properly fit their ill-designed subsystem into
+>>> one of the popular and well-established kernel architectures - or at
+>>> least suggest a way to work around this issue.
+>>>
+>>
+>>
+>> Fine, lets define a MAX_SYSCALL_NR that is by default NR_syscalls, but
+>> an architecture can override it.
+>>
+>> In trace_syscalls.c, where the checks are done, have this:
+>>
+>> #ifndef MAX_SYSCALL_NR
+>> # define MAX_SYSCALL_NR NR_syscalls
+>> #endif
+>>
+>> change all the checks to test against MAX_SYSCALL_NR instead of
+>> NR_syscalls.
+>>
+>> Then in arch/arm/include/asm/syscall.h have:
+>>
+>> #define MAX_SYSCALL_NR 0xa00000
+>>
+>> or whatever would be the highest syscall number for ARM.
+> 
+> Or do we just ignore the high "special" ARM syscalls and treat them (from
+> the tracing point of view) as non-syscalls, avoiding the allocation of
+> something around 1.2MB for the syscall bitmap.  I really don't know, I
+> don't use any of this tracing stuff, so it isn't something I care about.
+> 
+> Maybe those who do use the facility should have an input here?
 
-On Sat, Nov 1, 2014 at 5:44 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
-> -       COMPOSITE(SCLK_EMMC, "sclk_emmc", mux_mmc_src_p, 0,
-> +       COMPOSITE(SCLK_EMMC, "sclk_emmc", mux_mmc_src_p, CLK_IGNORE_UNUSED,
-
-Is there a reason why this is needed?  I took it out (AKA let eMMC get
-disabled when unused) and my system booted w/ eMMC as the root
-filesystem.
-
-
-> -       GATE(PCLK_UART2, "pclk_uart2", "pclk_cpu", 0, RK3288_CLKGATE_CON(11), 9, GFLAGS),
-> +       GATE(PCLK_UART2, "pclk_uart2", "pclk_cpu", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(11), 9, GFLAGS),
-
-Is there a reason why this is needed?  I took it out (AKA let UART2
-get disabled) and my system booted.
-
-The console-related bits in my cmdline are:
-  earlyprintk=ttyS2,115200n8 console=tty1 console=ttyS2,115200n8 kgdboc=ttyS2
-
-Do you have a different cmdline where it's failing?
-
-
-Other than the two above this looks sane to me (only looked at
-rk3288).  At some point soon we should definitely fix the PWM and the
-USB ones and then start looking at the others and see if there are any
-others that can be fixed.  ...but this seems like it's moving us in
-the right direction and I'd like to see it landed.
-
-
-So with the above two fixes, you can add my Reviewed-by and Tested-by.
-I tested this in the chromeos-3.14 tree (which has tons of backports)
-on rk3288-pinky.  I tested:
-* System continues to work normally (including graphics).
-* WIP Suspend / Resume patches work better with this patch than
-without (both normal and deep modes).
-
-
--Doug
+I checked strace and it knows about ARM's high syscalls.  I wouldn't
+want to go from casually using strace to digging deeper with ftrace only
+to get the impression that syscalls are disappearing.
