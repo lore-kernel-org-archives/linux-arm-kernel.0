@@ -1,65 +1,54 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 3 Nov 2014 11:30:27 +0200
-Subject: [PATCH 01/10] ARM: dts: Fix bootloader version dependencies by
- muxing n900 smc91x pins
-In-Reply-To: <20141030154952.GF2560@atomide.com>
-References: <1414628948-30702-1-git-send-email-tony@atomide.com>
- <1414628948-30702-2-git-send-email-tony@atomide.com>
- <54522829.6060406@ti.com> <20141030154952.GF2560@atomide.com>
-Message-ID: <54574B33.9050303@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 3 Nov 2014 10:34:46 +0100
+Subject: [PATCH v5 4/4] crypto: Add Allwinner Security System crypto
+ accelerator
+In-Reply-To: <20141031100522.GA8655@gondor.apana.org.au>
+References: <1413728182-13569-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1413728182-13569-5-git-send-email-clabbe.montjoie@gmail.com>
+ <20141021191149.GQ21108@lukather> <544A9FEA.6020304@gmail.com>
+ <20141030171933.GR21251@lukather>
+ <20141031072030.GA7563@gondor.apana.org.au>
+ <20141031081323.GS21251@lukather>
+ <20141031081803.GA8012@gondor.apana.org.au>
+ <20141031095706.GA8054@lukather>
+ <20141031100522.GA8655@gondor.apana.org.au>
+Message-ID: <20141103093446.GG11263@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2014 05:49 PM, Tony Lindgren wrote:
-> * Roger Quadros <rogerq@ti.com> [141030 05:01]:
->> On 10/30/2014 02:28 AM, Tony Lindgren wrote:
->>> +
->>> +			/*
->>> +			 * gpmc_ncs0, gpmc_nadv_ale, gpmc_noe, gpmc_nwe, gpmc_wait0 not muxable
->>> +			 * according to TRM. REVISIT: why does nolo set input for gpmc_clk?
->>> +			 */
->>> +                        OMAP3_CORE1_IOPAD(0x20b0, PIN_OUTPUT | MUX_MODE0)       /* gpmc_ncs1.gpmc_ncs1 */
->>> +                        OMAP3_CORE1_IOPAD(0x20be, PIN_INPUT | MUX_MODE0)        /* gpmc_clk.gpmc_clk */
->>
->> Right about the comment. GPMC_CLK should feed the CLK input of the OneNAND.
->> This needs to be an OUTPUT pin.
->>
->> Does OneNAND work when this pin is configured as output?
+On Fri, Oct 31, 2014 at 06:05:22PM +0800, Herbert Xu wrote:
+> On Fri, Oct 31, 2014 at 10:57:06AM +0100, Maxime Ripard wrote:
+> >
+> > On a 3.18-rc2 kernel:
+> > 
+> > $ git grep kmap -- crypto/
+> > crypto/ahash.c:                         walk->data = kmap(walk->pg);
+> > crypto/ahash.c:                         walk->data = kmap_atomic(walk->pg);
+> > crypto/async_tx/async_memcpy.c:         dest_buf = kmap_atomic(dest) + dest_offset;
+> > crypto/async_tx/async_memcpy.c:         src_buf = kmap_atomic(src) + src_offset;
+> > crypto/scatterwalk.c:                   return kmap_atomic(scatterwalk_page(walk)) +
+> > crypto/shash.c:                         data = kmap_atomic(sg_page(sg));
+> > crypto/shash.c:                         data = kmap_atomic(sg_page(sg));
+> > 
+> > None of the drivers are.
 > 
-> Does not seem to work, it produces onenand_wait: ECC error = 0xffff.
-> 
-> It seems the clock needs to be copied to GPMC too in some cases.
-> For MMC, there's the MMCSDIO2ADPCLKISEL option to copy the clock to
-> account for level shifter latencies [1]. But in the OneNAND case I
-> don't think there are any level shifters, and I don't think we have
-> "copy clock" option for GPMC either in SCM so it somehow is automatic
-> in GPMC.
-> 
-> Anyways, updated patch below with wrong guessing removed.
-> 
-> Regards,
-> 
-> Tony
-> 
-> [1] http://processors.wiki.ti.com/index.php/SD-MMC_Usage_Notes_on_OMAP35x_and_AM37x
-> 
-> 
-> 8< --------------------
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Wed, 29 Oct 2014 17:16:47 -0700
-> Subject: [PATCH] ARM: dts: Fix bootloader version dependencies by muxing n900 smc91x pins
-> 
-> Apparently some versions of nolo don't mux the all the necessary GPMC
-> pins for the smc91x probe to work properly. Let's fix this issue
-> by adding mux support for GPMC to the kernel.
-> 
-> Note that GPMC clk needs input enabled for OnenNAND to work.
-> 
-> Cc: Kevin Hilman <khilman@kernel.org>
-> Cc: Roger Quadros <rogerq@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> What do you mean? It's precisely because the page can be in highmem
+> that we are mapping it.  If it's not in highmem it'll be a noop.
 
-Acked-by: Roger Quadros <rogerq@ti.com>
+What I mean is that since you are saying that drivers should do the
+kmap themselves, then *all* of the drivers are broken if they are not
+using it. And all of them are missing this kmap.
 
-cheers,
--roger
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141103/645f2c2e/attachment-0001.sig>
