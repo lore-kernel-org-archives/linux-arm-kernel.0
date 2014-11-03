@@ -1,66 +1,55 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 03 Nov 2014 10:41:09 +0100
-Subject: [PATCH v2 3/3] ARM: dts: mt8135: Add Reset Controller for
- MediaTek SoC
-In-Reply-To: <1415005371-4323-4-git-send-email-flora.fu@mediatek.com>
-References: <1415005371-4323-1-git-send-email-flora.fu@mediatek.com>
- <1415005371-4323-4-git-send-email-flora.fu@mediatek.com>
-Message-ID: <1415007669.3060.6.camel@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 3 Nov 2014 09:50:51 +0000
+Subject: [RFC V6 3/3] arm64:add bitrev.h file to support rbit instruction
+In-Reply-To: <CAKv+Gu-+fe9Hj-uGQHq8KR_6WjrQL-1q=xVBSXVXg2EJO=MW2w@mail.gmail.com>
+References: <35FD53F367049845BC99AC72306C23D103E010D18265@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18266@CNBJMBX05.corpusers.net>
+ <20141030120127.GC32589@arm.com>
+ <CAKv+Gu9g5Q6fjPUy+P8YxkeDrH+bdO4kKGnxTQZRFhQpgPxaPA@mail.gmail.com>
+ <20141030135749.GE32589@arm.com>
+ <35FD53F367049845BC99AC72306C23D103E010D18272@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18274@CNBJMBX05.corpusers.net>
+ <20141031104305.GC6731@arm.com>
+ <35FD53F367049845BC99AC72306C23D103E010D18287@CNBJMBX05.corpusers.net>
+ <CAKv+Gu-+fe9Hj-uGQHq8KR_6WjrQL-1q=xVBSXVXg2EJO=MW2w@mail.gmail.com>
+Message-ID: <20141103095051.GA23019@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 03.11.2014, 17:02 +0800 schrieb Flora Fu:
-> Add reset controller to MT8135 board dts.
+On Mon, Nov 03, 2014 at 08:47:32AM +0000, Ard Biesheuvel wrote:
+> On 3 November 2014 03:17, Wang, Yalin <Yalin.Wang@sonymobile.com> wrote:
+> >> From: Will Deacon [mailto:will.deacon at arm.com]
+> >> > +#ifndef __ASM_ARM64_BITREV_H
+> >> > +#define __ASM_ARM64_BITREV_H
+> >>
+> >> Really minor nit, but we don't tend to include 'ARM64' in our header guards,
+> >> so this should just be __ASM_BITREV_H.
+> >>
+> >> With that change,
+> >>
+> >>   Acked-by: Will Deacon <will.deacon@arm.com>
+> >>
+> > I have send the patch to the patch system:
+> > http://www.arm.linux.org.uk/developer/patches/search.php?uid=4025
+> >
+> > 8187/1 8188/1 8189/1
+> >
+> > Just remind you that , should also cherry-pick Joe Perches's
+> > 2 patches:
+> > [PATCH] 6fire: Convert byte_rev_table uses to bitrev8
+> > [PATCH] carl9170: Convert byte_rev_table uses to bitrev8
+> >
+> > To make sure there is no build error when build these 2 drivers.
+> >
 > 
-> Signed-off-by: Flora Fu <flora.fu@mediatek.com>
-> ---
->  arch/arm/boot/dts/mt8135.dtsi | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
-> index 90a56ad..259a2b5 100644
-> --- a/arch/arm/boot/dts/mt8135.dtsi
-> +++ b/arch/arm/boot/dts/mt8135.dtsi
-> @@ -102,6 +102,32 @@
->  			clock-names = "system-clk", "rtc-clk";
->  		};
->  
-> +		infracfg: syscon at 10001000 {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
+> If this is the case, I suggest you update patch 8187/1 to retain the
+> byte_rev_table symbol, even in the accelerated case, and remove it
+> with a followup patch once Joe's patches have landed upstream. Also, a
+> link to the patches would be nice, and perhaps a bit of explanation
+> how/when they are expected to be merged.
 
-Same as with patch 2, please use #size-cells = <1>.
+Indeed, or instead put together a series with the appropriate acks so
+somebody can merge it all in one go. Merging this on a piecemeal basis is
+going to cause breakages (as you pointed out).
 
-> +			compatible = "mediatek,mt8135-infracfg", "syscon";
-> +			reg = <0 0x10001000 0 0x1000>;
-> +
-> +			infrarst: reset-controller at 30 {
-> +				#reset-cells = <1>;
-> +				compatible = "mediatek,mt8135-infracfg-reset", "mediatek,reset";
-> +				reg = <0x30 0x8>;
-> +			};
-> +		};
-> +
-> +		pericfg: syscon at 10003000 {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-
-And here. Other than that,
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
-
-> +			compatible = "mediatek,mt8135-pericfg", "syscon";
-> +			reg = <0 0x10003000 0 0x1000>;
-> +
-> +			perirst: reset-controller at 00 {
-> +				#reset-cells = <1>;
-> +				compatible = "mediatek,mt8135-pericfg-reset", "mediatek,reset";
-> +				reg = <0x00 0x8>;
-> +			};
-> +		};
-> +
->  		gic: interrupt-controller at 10211000 {
->  			compatible = "arm,cortex-a15-gic";
->  			interrupt-controller;
-
-regards
-Philipp
+Will
