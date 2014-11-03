@@ -1,54 +1,61 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 3 Nov 2014 14:38:40 +0100
-Subject: [PATCH v2 3/4] regulator: fixed: Use gpio_is_valid
-In-Reply-To: <20141013144733.GK27755@sirena.org.uk>
-References: <1412776028-15655-1-git-send-email-mpa@pengutronix.de>
- <1412776028-15655-4-git-send-email-mpa@pengutronix.de>
- <20141013144733.GK27755@sirena.org.uk>
-Message-ID: <20141103133840.GF24292@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 3 Nov 2014 14:41:28 +0100
+Subject: [PATCH 01/15] mfd: add new driver for Sharp LoCoMo
+In-Reply-To: <CALT56yNX8v4mZn=o1ZoVLHPmg6wq0dgFNowpqNuFtU=eCc+d8w@mail.gmail.com>
+References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
+ <1414454528-24240-2-git-send-email-dbaryshkov@gmail.com>
+ <CACRpkdbW3NA00zMZr216ZeZpgVkXwKUo30biTVd5kcHKGGtkHg@mail.gmail.com>
+ <CALT56yNX8v4mZn=o1ZoVLHPmg6wq0dgFNowpqNuFtU=eCc+d8w@mail.gmail.com>
+Message-ID: <CACRpkdaKUZjbSEH75M9xudTF9HefwOCVEe5otv9-9f2UG8=hVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 13, 2014 at 04:47:33PM +0200, Mark Brown wrote:
-> On Wed, Oct 08, 2014 at 03:47:07PM +0200, Markus Pargmann wrote:
-> > Use gpio_is_valid instead of an explicit comparison with 0.
-> > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> >  drivers/regulator/fixed.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/regulator/fixed.c b/drivers/regulator/fixed.c
-> > index 441a3e90e266..696f53cc1927 100644
-> > --- a/drivers/regulator/fixed.c
-> > +++ b/drivers/regulator/fixed.c
-> > @@ -157,7 +157,7 @@ static int reg_fixed_voltage_probe(struct platform_device *pdev)
-> >  
-> >  	drvdata->desc.fixed_uV = config->microvolts;
-> >  
-> > -	if (config->gpio >= 0) {
-> > +	if (gpio_is_valid(config->gpio)) {
-> 
-> Have you audited all users to ensure that they don't rely on zero being
-> ignored?  Right now we're sharing the core behaviour here so the same
-> issues apply to this platform data as apply to the core.
+On Fri, Oct 31, 2014 at 10:54 AM, Dmitry Eremin-Solenikov
+<dbaryshkov@gmail.com> wrote:
+> 2014-10-31 10:42 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
 
-For all other drivers this should be fine (just rechecked again). But
-the fixed regulator driver patch has this problem.
+>> It seems some DAC handling is part of the MFD driver, and we recently
+>> discussed that MFD should not be doing misc stuff but mainly act as
+>> arbiter and switching station.
+>>
+>> Can you please move the DAC parts of the driver to
+>> drivers/iio/dac?
+>>
+>> The IIO DAC subsystem will likely add other goodies to
+>> the driver for free and give a nice API to consumers.
+>
+> I wanted this part to be as simple as possible. I will look into IIO
+> DAC subsystem.
+> The DAC is as simple 2 channel 8-bit i2c device connected to a separate i2c bus
+> controlled through a register in LoCoMo device. One channel is used
+> for backlight,
+> other will be used for volume control. So (in theory) I can add the
+> following device
+> chain:  locomo -> i2c-locomo -> m62332 -> IIO DAC client.  However isn't that
+> quite an overkill for just backlight & volume control? Please advice me on this.
 
-Thanks,
+The point is still the same: no unrelated code in drivers/mfd,
+then either use IIO DAC as a middle layer or sink the DAC handling
+into respective subdriver, i.e. push it into the backlight or
+volume directly then.
 
-Markus
+>>> +       /* Longtime timer */
+>>> +       writew(0, lchip->base + LOCOMO_LTINT);
+>>> +       /* SPI */
+>>> +       writew(0, lchip->base + LOCOMO_SPI + LOCOMO_SPIIE);
+>>> +
+>>> +       writew(6 + 8 + 320 + 30 - 10, lchip->base + LOCOMO_ASD);
+>>
+>> That's a few magic numbers and calculation don't you think?
+>>
+>> A comment stating what's going on would be helpful.
+>
+> Unfortunately little is known here - these values are c&p from old 2.4
+> Lineo code.
+> This part is related to generating synchronization pulses for accessing
+> touchscreen.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141103/4fa6afdc/attachment.sig>
+OK we have to live with reverse engineering results, that's OK.
+
+Yours,
+Linus Walleij
