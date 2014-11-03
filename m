@@ -1,45 +1,23 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 03 Nov 2014 13:07:02 +0100
-Subject: [PATCH 6/8] regulator: max77686: Add external GPIO control
-In-Reply-To: <20141031103217.GJ18557@sirena.org.uk>
-References: <1414422226-10948-7-git-send-email-k.kozlowski@samsung.com>
- <544EA4FA.6040704@collabora.co.uk> <1414486356.24949.19.camel@AMDC1943>
- <1414498308.24949.32.camel@AMDC1943> <1414579362.18868.11.camel@AMDC1943>
- <5450C63B.3000602@collabora.co.uk>
- <CAAVeFuLncbkNLGxEAj90yMmugRDNjtjeGoV_QYTMDZ7NVMJCmg@mail.gmail.com>
- <1414681386.26703.6.camel@AMDC1943>
- <CAAVeFuJo1wTyxOo4FEZM3=GTejuSHi+mnr=QV6HUeV5mAOCmqg@mail.gmail.com>
- <1414741898.20071.8.camel@AMDC1943> <20141031103217.GJ18557@sirena.org.uk>
-Message-ID: <1415016422.4241.28.camel@AMDC1943>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 3 Nov 2014 12:09:56 +0000
+Subject: [PATCH v2] ASoC: rockchip: i2s: add text after tristate for
+ SND_SOC_ROCKCHIP_I2S
+In-Reply-To: <1414810698-5609-1-git-send-email-jay.xu@rock-chips.com>
+References: <1413891110-21059-1-git-send-email-jay.xu@rock-chips.com>
+ <1414810698-5609-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <20141103120956.GF3815@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On pi?, 2014-10-31 at 10:32 +0000, Mark Brown wrote:
-> On Fri, Oct 31, 2014 at 08:51:38AM +0100, Krzysztof Kozlowski wrote:
-> 
-> > However new DT style parsing (regulator_of_get_init_data()) does the
-> > basic parsing stuff and this removes a lot of code from driver. The
-> > driver no longer parses all regulaotrs but the regulator core does it.
-> > Unfortunately regulator core does not parse custom bindings (like such
-> > GPIOs) so I would have to iterate once again through all regulators just
-> > to find "gpios" property.
-> 
-> We could always add a callback for the driver to handle any custom
-> properties...  one of the advantages of an OS like Linux is that we can
-> improve the core code.
+On Sat, Nov 01, 2014 at 10:58:18AM +0800, Jianqun wrote:
+> For SND_SOC_ROCKCHIP_I2S, adding some text after the
+> tristate to make this directly user selectable.
 
-I thought about this - adding a callback, called on each child in
-regulator_of_get_init_data(). However the reason behind this callback is
-to parse GPIO and set config.ena_gpio. However in that context the
-regulator_config is const so the callback cannot change it. Unless it
-casts it to non-const... which isn't what we want I think.
-
-So now I wonder whether adding generic bindings for ena_gpio make sense.
-These would look like bindings for fixed-regulator (with "ena-" prefix).
-Unfortunately this would duplicate a little the ena_gpio in
-regulator_config... but to me it seems more appropriate.
-
-What do you think about adding generic bindings for ena_gpio?
-
-Best regards,
-Krzysztof
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141103/eb05b024/attachment-0001.sig>
