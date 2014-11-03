@@ -1,194 +1,320 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 3 Nov 2014 14:13:22 +0100
-Subject: [PATCH v3 01/19] arm/arm64: KVM: rework MPIDR assignment and add
- accessors
-In-Reply-To: <1414776414-13426-2-git-send-email-andre.przywara@arm.com>
-References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
- <1414776414-13426-2-git-send-email-andre.przywara@arm.com>
-Message-ID: <20141103131322.GB16132@cbox>
+From: m.chehab@samsung.com (Mauro Carvalho Chehab)
+Date: Mon, 03 Nov 2014 11:14:10 -0200
+Subject: [PATCH 1/3] media: rc: add driver for Amlogic Meson IR remote
+ receiver
+In-Reply-To: <1413144115-23188-2-git-send-email-b.galvani@gmail.com>
+References: <1413144115-23188-1-git-send-email-b.galvani@gmail.com>
+ <1413144115-23188-2-git-send-email-b.galvani@gmail.com>
+Message-ID: <20141103111410.6b1147a0.m.chehab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 05:26:36PM +0000, Andre Przywara wrote:
-> The virtual MPIDR registers (containing topology information) for the
-> guest are currently mapped linearily to the vcpu_id. Improve this
-> mapping for arm64 by using three levels to not artificially limit the
-> number of vCPUs. Also add an accessor to later allow easier access to
-> a vCPU with a given MPIDR.
-> Use this new accessor in the PSCI emulation.
+Em Sun, 12 Oct 2014 22:01:53 +0200
+Beniamino Galvani <b.galvani@gmail.com> escreveu:
+
+> Amlogic Meson SoCs include a infrared remote control receiver that can
+> operate in two modes: in "NEC" mode the hardware can decode frames
+> using the NEC IR protocol, while in "general" mode the receiver simply
+> reports the duration of pulses and spaces for software decoding.
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> This is a driver for the IR receiver that uses software decoding of
+> received frames.
+
+There are a few checkpatch warnings there:
+
+WARNING: added, moved or deleted file(s), does MAINTAINERS need updating?
+#71: 
+new file mode 100644
+
+WARNING: Missing a blank line after declarations
+#151: FILE: drivers/media/rc/meson-ir.c:76:
++	u32 duration;
++	DEFINE_IR_RAW_EVENT(rawir);
+
+WARNING: DT compatible string "amlogic,meson6-ir" appears un-documented -- check ./Documentation/devicetree/bindings/
+#272: FILE: drivers/media/rc/meson-ir.c:197:
++	{ .compatible = "amlogic,meson6-ir" },
+
+total: 0 errors, 3 warnings, 238 lines checked
+
+patches/lmml_26418_1_3_media_rc_add_driver_for_amlogic_meson_ir_remote_receiver.patch has style problems, please review.
+
+I'm seeing that the DT patches are there, after this one. The best
+would be to add them before in the series.
+
+Please add also an entry at the MAINTAINERS file.
+
+
+> 
+> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
 > ---
->  arch/arm/include/asm/kvm_emulate.h   |    3 ++-
->  arch/arm/include/asm/kvm_host.h      |    2 ++
->  arch/arm/kvm/arm.c                   |   15 +++++++++++++++
->  arch/arm/kvm/psci.c                  |   15 ++++-----------
->  arch/arm64/include/asm/kvm_emulate.h |    3 ++-
->  arch/arm64/include/asm/kvm_host.h    |    2 ++
->  arch/arm64/kvm/sys_regs.c            |   11 +++++++++--
->  7 files changed, 36 insertions(+), 15 deletions(-)
+>  drivers/media/rc/Kconfig    |  11 +++
+>  drivers/media/rc/Makefile   |   1 +
+>  drivers/media/rc/meson-ir.c | 214 ++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 226 insertions(+)
+>  create mode 100644 drivers/media/rc/meson-ir.c
 > 
-> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-> index b9db269..bd54383 100644
-> --- a/arch/arm/include/asm/kvm_emulate.h
-> +++ b/arch/arm/include/asm/kvm_emulate.h
-> @@ -23,6 +23,7 @@
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_mmio.h>
->  #include <asm/kvm_arm.h>
-> +#include <asm/cputype.h>
+> diff --git a/drivers/media/rc/Kconfig b/drivers/media/rc/Kconfig
+> index 8ce0810..2d742e2 100644
+> --- a/drivers/media/rc/Kconfig
+> +++ b/drivers/media/rc/Kconfig
+> @@ -223,6 +223,17 @@ config IR_FINTEK
+>  	   To compile this driver as a module, choose M here: the
+>  	   module will be called fintek-cir.
 >  
->  unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
->  unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
-> @@ -164,7 +165,7 @@ static inline u32 kvm_vcpu_hvc_get_imm(struct kvm_vcpu *vcpu)
->  
->  static inline unsigned long kvm_vcpu_get_mpidr(struct kvm_vcpu *vcpu)
->  {
-> -	return vcpu->arch.cp15[c0_MPIDR];
-> +	return vcpu->arch.cp15[c0_MPIDR] & MPIDR_HWID_BITMASK;
->  }
+> +config IR_MESON
+> +	tristate "Amlogic Meson IR remote receiver"
+> +	depends on RC_CORE
+> +	depends on ARCH_MESON
 
-continuing the discussion from the previous version, yes, please don't
-call it get_mpidr() if it returns a masked off version of get_mpidr(),
-then call it get_mpidr_hwid() or something.
+Please add COMPILE_TEST too, as we want to be able to compile it on
+x86 and other archs, in order to check if the driver builds fine and
+to enable the static analyzers to look into this code.
 
->  
->  static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 53036e2..b443dfe 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -236,6 +236,8 @@ static inline void vgic_arch_setup(const struct vgic_params *vgic)
->  int kvm_perf_init(void);
->  int kvm_perf_teardown(void);
->  
-> +struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+> +	---help---
+> +	   Say Y if you want to use the IR remote receiver available
+> +	   on Amlogic Meson SoCs.
 > +
->  static inline void kvm_arch_hardware_disable(void) {}
->  static inline void kvm_arch_hardware_unsetup(void) {}
->  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 9e193c8..61f13cc 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -977,6 +977,21 @@ static void check_kvm_target_cpu(void *ret)
->  	*(int *)ret = kvm_target_cpu();
->  }
->  
-> +struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr)
+> +	   To compile this driver as a module, choose M here: the
+> +	   module will be called meson-ir.
+> +
+>  config IR_NUVOTON
+>  	tristate "Nuvoton w836x7hg Consumer Infrared Transceiver"
+>  	depends on PNP
+> diff --git a/drivers/media/rc/Makefile b/drivers/media/rc/Makefile
+> index 0989f94..06859bf 100644
+> --- a/drivers/media/rc/Makefile
+> +++ b/drivers/media/rc/Makefile
+> @@ -22,6 +22,7 @@ obj-$(CONFIG_IR_IMON) += imon.o
+>  obj-$(CONFIG_IR_ITE_CIR) += ite-cir.o
+>  obj-$(CONFIG_IR_MCEUSB) += mceusb.o
+>  obj-$(CONFIG_IR_FINTEK) += fintek-cir.o
+> +obj-$(CONFIG_IR_MESON) += meson-ir.o
+>  obj-$(CONFIG_IR_NUVOTON) += nuvoton-cir.o
+>  obj-$(CONFIG_IR_ENE) += ene_ir.o
+>  obj-$(CONFIG_IR_REDRAT3) += redrat3.o
+> diff --git a/drivers/media/rc/meson-ir.c b/drivers/media/rc/meson-ir.c
+> new file mode 100644
+> index 0000000..0900ece
+> --- /dev/null
+> +++ b/drivers/media/rc/meson-ir.c
+> @@ -0,0 +1,214 @@
+> +/*
+> + * Driver for Amlogic Meson IR remote receiver
+> + *
+> + * Copyright (C) 2014 Beniamino Galvani <b.galvani@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * version 2 as published by the Free Software Foundation.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/interrupt.h>
+> +#include <linux/module.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/spinlock.h>
+> +
+> +#include <media/rc-core.h>
+> +
+> +#define DRIVER_NAME		"meson-ir"
+> +
+> +#define IR_DEC_LDR_ACTIVE	0x00
+> +#define IR_DEC_LDR_IDLE		0x04
+> +#define IR_DEC_LDR_REPEAT	0x08
+> +#define IR_DEC_BIT_0		0x0c
+> +#define IR_DEC_REG0		0x10
+> +#define IR_DEC_FRAME		0x14
+> +#define IR_DEC_STATUS		0x18
+> +#define IR_DEC_REG1		0x1c
+> +
+> +#define REG0_RATE_MASK		(BIT(11) - 1)
+> +
+> +#define REG1_MODE_MASK		(BIT(7) | BIT(8))
+> +#define REG1_MODE_NEC		(0 << 7)
+> +#define REG1_MODE_GENERAL	(2 << 7)
+> +
+> +#define REG1_TIME_IV_SHIFT	16
+> +#define REG1_TIME_IV_MASK	((BIT(13) - 1) << REG1_TIME_IV_SHIFT)
+> +
+> +#define REG1_IRQSEL_MASK	(BIT(2) | BIT(3))
+> +#define REG1_IRQSEL_NEC_MODE	(0 << 2)
+> +#define REG1_IRQSEL_RISE_FALL	(1 << 2)
+> +#define REG1_IRQSEL_FALL	(2 << 2)
+> +#define REG1_IRQSEL_RISE	(3 << 2)
+> +
+> +#define REG1_RESET		BIT(0)
+> +#define REG1_ENABLE		BIT(15)
+> +
+> +#define STATUS_IR_DEC_IN	BIT(8)
+> +
+> +#define MESON_TRATE		10	/* us */
+> +
+> +struct meson_ir {
+> +	void __iomem	*reg;
+> +	struct rc_dev	*rc;
+> +	int		irq;
+> +	spinlock_t	lock;
+> +};
+> +
+> +static void meson_ir_set_mask(struct meson_ir *ir, unsigned int reg,
+> +			      u32 mask, u32 value)
 > +{
-> +	unsigned long c_mpidr;
-> +	struct kvm_vcpu *vcpu;
-> +	int i;
+> +	u32 data;
 > +
-> +	mpidr &= MPIDR_HWID_BITMASK;
-> +	kvm_for_each_vcpu(i, vcpu, kvm) {
-> +		c_mpidr = kvm_vcpu_get_mpidr(vcpu);
-> +		if (c_mpidr == mpidr)
-> +			return vcpu;
-
-why do you need the c_mpidr variable at all?
-
-> +	}
-> +	return NULL;
+> +	data = readl(ir->reg + reg);
+> +	data &= ~mask;
+> +	data |= (value & mask);
+> +	writel(data, ir->reg + reg);
 > +}
 > +
->  /**
->   * Initialize Hyp-mode and memory mappings on all CPUs.
->   */
-> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-> index 09cf377..49f0992 100644
-> --- a/arch/arm/kvm/psci.c
-> +++ b/arch/arm/kvm/psci.c
-> @@ -21,6 +21,7 @@
->  #include <asm/cputype.h>
->  #include <asm/kvm_emulate.h>
->  #include <asm/kvm_psci.h>
-> +#include <asm/kvm_host.h>
->  
->  /*
->   * This is an implementation of the Power State Coordination Interface
-> @@ -65,25 +66,17 @@ static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
->  static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
->  {
->  	struct kvm *kvm = source_vcpu->kvm;
-> -	struct kvm_vcpu *vcpu = NULL, *tmp;
-> +	struct kvm_vcpu *vcpu = NULL;
->  	wait_queue_head_t *wq;
->  	unsigned long cpu_id;
->  	unsigned long context_id;
-> -	unsigned long mpidr;
->  	phys_addr_t target_pc;
-> -	int i;
->  
-> -	cpu_id = *vcpu_reg(source_vcpu, 1);
-> +	cpu_id = *vcpu_reg(source_vcpu, 1) & MPIDR_HWID_BITMASK;
->  	if (vcpu_mode_is_32bit(source_vcpu))
->  		cpu_id &= ~((u32) 0);
->  
-> -	kvm_for_each_vcpu(i, tmp, kvm) {
-> -		mpidr = kvm_vcpu_get_mpidr(tmp);
-> -		if ((mpidr & MPIDR_HWID_BITMASK) == (cpu_id & MPIDR_HWID_BITMASK)) {
-> -			vcpu = tmp;
-> -			break;
-> -		}
-> -	}
-> +	vcpu = kvm_mpidr_to_vcpu(kvm, cpu_id);
->  
->  	/*
->  	 * Make sure the caller requested a valid CPU and that the CPU is
-> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-> index 5674a55..37316dd 100644
-> --- a/arch/arm64/include/asm/kvm_emulate.h
-> +++ b/arch/arm64/include/asm/kvm_emulate.h
-> @@ -27,6 +27,7 @@
->  #include <asm/kvm_arm.h>
->  #include <asm/kvm_mmio.h>
->  #include <asm/ptrace.h>
-> +#include <asm/cputype.h>
->  
->  unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num);
->  unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu);
-> @@ -184,7 +185,7 @@ static inline u8 kvm_vcpu_trap_get_fault_type(const struct kvm_vcpu *vcpu)
->  
->  static inline unsigned long kvm_vcpu_get_mpidr(struct kvm_vcpu *vcpu)
->  {
-> -	return vcpu_sys_reg(vcpu, MPIDR_EL1);
-> +	return vcpu_sys_reg(vcpu, MPIDR_EL1) & MPIDR_HWID_BITMASK;
->  }
->  
->  static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 2012c4b..286bb61 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -207,6 +207,8 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  int kvm_perf_init(void);
->  int kvm_perf_teardown(void);
->  
-> +struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+> +static irqreturn_t meson_ir_irq(int irqno, void *dev_id)
+> +{
+> +	struct meson_ir *ir = dev_id;
+> +	u32 duration;
+> +	DEFINE_IR_RAW_EVENT(rawir);
 > +
->  static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
->  				       phys_addr_t pgd_ptr,
->  				       unsigned long hyp_stack_ptr,
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 4cc3b71..dcc5867 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -252,10 +252,17 @@ static void reset_amair_el1(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
->  
->  static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
->  {
-> +	u64 mpidr;
+> +	spin_lock(&ir->lock);
 > +
->  	/*
-> -	 * Simply map the vcpu_id into the Aff0 field of the MPIDR.
-> +	 * Map the vcpu_id into the first three Aff fields of the MPIDR.
-> +	 * Aff0 uses only 16 CPUs, since there is a SGI injection
-> +	 * limitation of GICv3.
+> +	duration = readl(ir->reg + IR_DEC_REG1);
+> +	duration = (duration & REG1_TIME_IV_MASK) >> REG1_TIME_IV_SHIFT;
+> +	rawir.duration = US_TO_NS(duration * MESON_TRATE);
+> +
+> +	rawir.pulse = !!(readl(ir->reg + IR_DEC_STATUS) & STATUS_IR_DEC_IN);
+> +
+> +	ir_raw_event_store_with_filter(ir->rc, &rawir);
+> +	ir_raw_event_handle(ir->rc);
+> +
+> +	spin_unlock(&ir->lock);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int meson_ir_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *node = dev->of_node;
+> +	struct resource *res;
+> +	const char *map_name;
+> +	struct meson_ir *ir;
+> +	int ret;
+> +
+> +	ir = devm_kzalloc(dev, sizeof(struct meson_ir), GFP_KERNEL);
+> +	if (!ir)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	ir->reg = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(ir->reg)) {
+> +		dev_err(dev, "failed to map registers\n");
+> +		return PTR_ERR(ir->reg);
+> +	}
+> +
+> +	ir->irq = platform_get_irq(pdev, 0);
+> +	if (ir->irq < 0) {
+> +		dev_err(dev, "no irq resource\n");
+> +		return ir->irq;
+> +	}
+> +
+> +	ir->rc = rc_allocate_device();
+> +	if (!ir->rc) {
+> +		dev_err(dev, "failed to allocate rc device\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	ir->rc->priv = ir;
+> +	ir->rc->input_name = DRIVER_NAME;
+> +	ir->rc->input_phys = DRIVER_NAME "/input0";
+> +	ir->rc->input_id.bustype = BUS_HOST;
 
-This last sentence is worded weirdly, so I suggested an alternative
-version in my last review, which you missed/ignored.  Please address it.
+> +	ir->rc->input_id.vendor = 0x0001;
+> +	ir->rc->input_id.product = 0x0001;
+> +	ir->rc->input_id.version = 0x0100;
 
-Thanks,
--Christoffer
+I don't like very much the idea of filling it like that. From where those
+numbers came? Could you add a define for them somewhere?
+
+> +	map_name = of_get_property(node, "linux,rc-map-name", NULL);
+> +	ir->rc->map_name = map_name ? map_name : RC_MAP_EMPTY;
+> +	ir->rc->dev.parent = dev;
+> +	ir->rc->driver_type = RC_DRIVER_IR_RAW;
+> +	ir->rc->allowed_protocols = RC_BIT_ALL;
+> +	ir->rc->rx_resolution = US_TO_NS(MESON_TRATE);
+> +	ir->rc->timeout = MS_TO_NS(200);
+> +	ir->rc->driver_name = DRIVER_NAME;
+> +
+> +	spin_lock_init(&ir->lock);
+> +	platform_set_drvdata(pdev, ir);
+> +
+> +	ret = rc_register_device(ir->rc);
+> +	if (ret) {
+> +		dev_err(dev, "failed to register rc device\n");
+> +		goto out_free;
+> +	}
+> +
+> +	ret = devm_request_irq(dev, ir->irq, meson_ir_irq, 0, "ir-meson", ir);
+> +	if (ret) {
+> +		dev_err(dev, "failed to request irq\n");
+> +		goto out_unreg;
+> +	}
+> +
+> +	/* Reset the decoder */
+> +	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_RESET, REG1_RESET);
+> +	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_RESET, 0);
+> +	/* Set general operation mode */
+> +	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_MODE_MASK, REG1_MODE_GENERAL);
+> +	/* Set rate */
+> +	meson_ir_set_mask(ir, IR_DEC_REG0, REG0_RATE_MASK, MESON_TRATE - 1);
+> +	/* IRQ on rising and falling edges */
+> +	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_IRQSEL_MASK,
+> +			  REG1_IRQSEL_RISE_FALL);
+> +	/* Enable the decoder */
+> +	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_ENABLE, REG1_ENABLE);
+> +
+> +	dev_info(dev, "receiver initialized\n");
+> +
+> +	return 0;
+> +out_unreg:
+> +	rc_unregister_device(ir->rc);
+> +out_free:
+> +	rc_free_device(ir->rc);
+> +
+> +	return ret;
+> +}
+> +
+> +static int meson_ir_remove(struct platform_device *pdev)
+> +{
+> +	struct meson_ir *ir = platform_get_drvdata(pdev);
+> +	unsigned long flags;
+> +
+> +	/* Disable the decoder */
+> +	spin_lock_irqsave(&ir->lock, flags);
+> +	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_ENABLE, 0);
+> +	spin_unlock_irqrestore(&ir->lock, flags);
+> +
+> +	rc_unregister_device(ir->rc);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id meson_ir_match[] = {
+> +	{ .compatible = "amlogic,meson6-ir" },
+> +	{ },
+> +};
+> +
+> +static struct platform_driver meson_ir_driver = {
+> +	.probe		= meson_ir_probe,
+> +	.remove		= meson_ir_remove,
+> +	.driver = {
+> +		.name		= DRIVER_NAME,
+> +		.of_match_table	= meson_ir_match,
+> +	},
+> +};
+> +
+> +module_platform_driver(meson_ir_driver);
+> +
+> +MODULE_DESCRIPTION("Amlogic Meson IR remote receiver driver");
+> +MODULE_AUTHOR("Beniamino Galvani <b.galvani@gmail.com>");
+> +MODULE_LICENSE("GPL v2");
