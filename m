@@ -1,61 +1,76 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 03 Nov 2014 10:51:32 -0800
-Subject: DMA allocations from CMA and fatal_signal_pending check
-In-Reply-To: <xa1tlhnsw7v8.fsf@mina86.com>
-References: <544FE9BE.6040503@gmail.com>
- <20141031082818.GB14642@js1304-P5Q-DELUXE> <5453F80C.4090006@gmail.com>
- <xa1tlhnsw7v8.fsf@mina86.com>
-Message-ID: <5457CEB4.9020700@gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 3 Nov 2014 10:58:05 -0800
+Subject: [PATCH v3 09/47] mfd: palmas: Register with kernel power-off
+ handler
+In-Reply-To: <20141103184312.GW27425@saruman>
+References: <1414425354-10359-1-git-send-email-linux@roeck-us.net>
+ <1414425354-10359-10-git-send-email-linux@roeck-us.net>
+ <20141103175645.GT12011@x1> <20141103175954.GT27425@saruman>
+ <20141103183653.GA10558@roeck-us.net>
+ <20141103184312.GW27425@saruman>
+Message-ID: <20141103185805.GD10558@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/2014 08:45 AM, Michal Nazarewicz wrote:
-> On Fri, Oct 31 2014, Florian Fainelli wrote:
->> I agree that the CMA allocation should not be allowed to succeed, but
->> the dma_alloc_coherent() allocation should succeed. If we look at the
->> sysport driver, there are kmalloc() calls to initialize private
->> structures, those will succeed (except under high memory pressure), so
->> by the same token, a driver expects DMA allocations to succeed (unless
->> we are under high memory pressure)
->>
->> What are we trying to solve exactly with the fatal_signal_pending()
->> check here? Are we just optimizing for the case where a process has
->> allocated from a CMA region to allow this region to be returned to the
->> pool of free pages when it gets killed? Could there be another mechanism
->> used to reclaim those pages if we know the process is getting killed
->> anyway?
+On Mon, Nov 03, 2014 at 12:43:12PM -0600, Felipe Balbi wrote:
+> On Mon, Nov 03, 2014 at 10:36:53AM -0800, Guenter Roeck wrote:
+> > On Mon, Nov 03, 2014 at 11:59:54AM -0600, Felipe Balbi wrote:
+> > > On Mon, Nov 03, 2014 at 05:56:45PM +0000, Lee Jones wrote:
+> > > > On Mon, 27 Oct 2014, Guenter Roeck wrote:
+> > > > 
+> > > > > Register with kernel power-off handler instead of setting pm_power_off
+> > > > > directly. Register with low priority to reflect that the original code
+> > > > > only sets pm_power_off if it was not already set.
+> > > > > 
+> > > > > Cc: Samuel Ortiz <sameo@linux.intel.com>
+> > > > > Cc: Lee Jones <lee.jones@linaro.org>
+> > > > > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> > > > > ---
+> > > > > v3:
+> > > > > - Replace poweroff in all newly introduced variables and in text
+> > > > >   with power_off or power-off as appropriate
+> > > > > - Replace POWEROFF_PRIORITY_xxx with POWER_OFF_PRIORITY_xxx
+> > > > > v2:
+> > > > > - Use define to specify poweroff handler priority
+> > > > > - Use devm_register_power_off_handler
+> > > > > - Use dev_warn instead of dev_err
+> > > > > 
+> > > > >  drivers/mfd/palmas.c       | 31 +++++++++++++++++--------------
+> > > > >  include/linux/mfd/palmas.h |  3 +++
+> > > > >  2 files changed, 20 insertions(+), 14 deletions(-)
+> > > > 
+> > > > Acked-by: Lee Jones <lee.jones@linaro.org>
+> > > 
+> > > missed lakml and linux-omap.
+> > > 
+> > Felipe,
+> > 
+> > unfortunately, get_maintainer.pl doesn't give a hint that this and the
+> > other affected patches should be sent to linux-omap. How am I supposed
+> > to know ?
 > 
-> We're guarding against situations where process may hang around
-> arbitrarily long time after receiving SIGKILL.  If user does ?kill -9
-> $pid? the usual expectation is that the $pid process will die within
-> seconds and anything longer is perceived by user as a bug.
+> yeah, just looked and nobody bothered to patch MAINTAINERS when those
+> files were added. I just sent a patch adding them under OMAP SUPPORT.
 > 
-> What problem are *you* trying to solve?  If user sent SIGKILL to
-> a process that imitated device initialisation, what is the point of
-> continuing initialising the device?  Just recover and return -EINTR.
+I'll add the omap list as Cc: to the affected patches directly for now.
 
-I have two problems with the current approach:
-
-- behavior of a dma_alloc_coherent() call is not consistent between a
-CONFIG_CMA=y vs. CONFIG_CMA=n build, which is probably fine as long as
-we document that properly
-
-- there is currently no way for a caller of dma_alloc_coherent to tell
-whether the allocation failed because it was interrupted by a signal, a
-genuine OOM or something else, this is largely made worse by problem 1
-
+> > Note that linux-kernel at vger.kernel.org was copied on the entire series,
+> > if that is what you mean with lakml. linux-pm at vger.kernel.org was also
+> > copied on all patches. Additional mailing lists were only copied for
+> > affected architectures to avoid for the patches to be tagged as spam.
+> > 
+> > If there is a list named lakml, I must have missed it, and I seem to be
+> > unable to find a reference to it. If that is the case, my apologies,
+> > and please provide a link to it.
 > 
->> Well, not really. This driver is not an isolated case, there are tons of
->> other networking drivers that do exactly the same thing, and we do
->> expect these dma_alloc_* calls to succeed.
+> here it is:
 > 
-> Again, why do you expect them to succeed?  The code must handle failures
-> correctly anyway so why do you wish to ignore fatal signal?
+> Linux ARM Kernel Mailing List <linux-arm-kernel@lists.infradead.org>
+> 
+Same problem here, though. If there are any ARM specific patches where the arm
+mailing list was not copied, that was because the dependency is not listed in
+the MAINTAINERS file. As mentioned before, copying the entire series to all
+lists touched by one of the patches in the series just doesn't work (and may
+be considered severe noise by some subscribers of those lists).
 
-I guess expecting them to succeed is probably not good, but at we should
-at least be able to report an accurate error code to the caller and down
-to user-space.
-
-Thanks
---
-Florian
+Guenter
