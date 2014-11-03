@@ -1,57 +1,29 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 3 Nov 2014 10:45:20 -0200
-Subject: [PATCH] ARM: imx: Explicitly select CONFIG_SPI
-In-Reply-To: <20141103062606.GF10821@tiger>
-References: <1414617568-27615-1-git-send-email-festevam@gmail.com>
- <20141103062606.GF10821@tiger>
-Message-ID: <CAOMZO5AB8khWKYmeOQWd0_jT4Ho0ogAkUX+=3mfhqEVhhxeqGQ@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 03 Nov 2014 13:45:15 +0100
+Subject: [PATCH 2/2] regulator: of: Add support for parsing microvolts
+ for suspend state
+In-Reply-To: <20141103122948.GI3815@sirena.org.uk>
+References: <1414813978-32233-1-git-send-email-dianders@chromium.org>
+ <1414813978-32233-2-git-send-email-dianders@chromium.org>
+ <54549EA6.5060007@collabora.co.uk> <20141103122948.GI3815@sirena.org.uk>
+Message-ID: <545778DB.3030803@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On 11/03/2014 01:29 PM, Mark Brown wrote:
+> 
+> If you're reviewing something please don't quote the entire patch, the
+> same rule applies as always - just include relevant context - and
+> especially don't include your one line of content at the very end of the
+> patch.  Otherwise people have to page through the entire thing to find
+> what you've said (if they don't get fed up first).
+> 
 
-On Mon, Nov 3, 2014 at 4:26 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Wed, Oct 29, 2014 at 07:19:28PM -0200, Fabio Estevam wrote:
->> From: Fabio Estevam <fabio.estevam@freescale.com>
->>
->> Since 3.18-rc1 CONFIG_SPI is no longer automatically selected for
->> imx_v4_v5_defconfig and imx_v6_v7_defconfig, so in order to keep the same
->> behaviour as previous kernel versions and avoid regressions, let's explicitly
->> select CONFIG_SPI.
->>
->> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
->> ---
->> Shawn,
->>
->> If possible, please apply this as a bug fix for 3.18.
->
-> Can you please mention the commit that introduced the regression in the
-> commit log?
+Yes, I usually add my {Review,Acked,Tested}-by tags at the end of the
+commit message and remove the complete patch but since it was a 4-lines
+patch I didn't think it was that bad.
 
-The problem is that 'git bisect' did not produce a valid result for
-me. It says that:
+Sorry about that, I will do it next time no matter the patch size.
 
-commit cf377ad7d42c566356d79049536d9cb37499cb77
-Merge: 212fe84 d8f0faa
-Author: Linus Torvalds <torvalds@linux-foundation.org>
-Date:   Wed Oct 8 17:13:04 2014 -0400
-
-    Merge tag 'soc-for-linus' of
-git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
-
-
-, is the first bad commit, but this does not look correct, so I was
-not able to really identify the commit that caused this regression.
-
-Here is my procedure (starting at 3.18-rc1):
-
-git bisect start
-git bisect bad
-git bisect good v3.17
-make imx_v6_v7_defconfig
-cat .config | grep CONFIG_SPI=y
-
-Then I add "git bisect good or bad" depending on the output of the
-'cat' command.
-
-Any ideas?
+Best regards,
+Javier
