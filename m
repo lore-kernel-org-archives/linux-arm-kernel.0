@@ -1,384 +1,108 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Mon,  3 Nov 2014 11:05:31 -0800
-Subject: [PATCH 7/7] ARM: zynq: DT: Add pinctrl information
-In-Reply-To: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1415041531-15520-8-git-send-email-soren.brinkmann@xilinx.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 3 Nov 2014 10:49:03 -0800
+Subject: [PATCH v3 00/47] kernel: Add support for power-off handler call
+ chain
+In-Reply-To: <20141103182829.GV27425@saruman>
+References: <1414425354-10359-1-git-send-email-linux@roeck-us.net>
+ <20141103175935.GS27425@saruman>
+ <20141103182213.GA10640@roeck-us.net>
+ <20141103182829.GV27425@saruman>
+Message-ID: <20141103184903.GB10558@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl descriptions to the zc702 and zc706 device trees.
+On Mon, Nov 03, 2014 at 12:28:29PM -0600, Felipe Balbi wrote:
+> Hi,
+> 
+> On Mon, Nov 03, 2014 at 10:22:13AM -0800, Guenter Roeck wrote:
+> > On Mon, Nov 03, 2014 at 11:59:35AM -0600, Felipe Balbi wrote:
+> > > Hi,
+> > > 
+> > > On Mon, Oct 27, 2014 at 08:55:07AM -0700, Guenter Roeck wrote:
+> > > > Various drivers implement architecture and/or device specific means to
+> > > > remove power from the system.  For the most part, those drivers set the
+> > > > global variable pm_power_off to point to a function within the driver.
+> > > > 
+> > > > This mechanism has a number of drawbacks.  Typically only one means
+> > > > to remove power is supported (at least if pm_power_off is used).
+> > > > At least in theory there can be multiple means to remove power, some of
+> > > > which may be less desirable.  For example, one mechanism might power off the
+> > > > entire system through an I/O port or gpio pin, while another might power off
+> > > > a board by disabling its power controller. Other mechanisms may really just
+> > > > execute a restart sequence or drop into the ROM monitor, or put the CPU into
+> > > > sleep mode.  Using pm_power_off can also be racy if the function pointer is
+> > > > set from a driver built as module, as the driver may be in the process of
+> > > > being unloaded when pm_power_off is called.  If there are multiple power-off
+> > > > handlers in the system, removing a module with such a handler may
+> > > > inadvertently reset the pointer to pm_power_off to NULL, leaving the system
+> > > > with no means to remove power.
+> > > > 
+> > > > Introduce a system power-off handler call chain to solve the described
+> > > > problems.  This call chain is expected to be executed from the architecture
+> > > > specific machine_power_off() function.  Drivers providing system power-off
+> > > > functionality are expected to register with this call chain.  By using the
+> > > > priority field in the notifier block, callers can control power-off handler
+> > > > execution sequence and thus ensure that the power-off handler with the
+> > > > optimal capabilities to remove power for a given system is called first.
+> > > > A call chain instead of a single call to the highest priority handler is
+> > > > used to provide fallback: If multiple power-off handlers are installed,
+> > > > all handlers will be called until one actually succeeds to power off the
+> > > > system.
+> > > > 
+> > > > Patch 01/47 implements the power-off handler API.
+> > > > 
+> > > > Patches 02/47 to 04/47 are cleanup patches to prepare for the move of
+> > > > pm_power_off to a common location.
+> > > > 
+> > > > Patches 05/47 to 07/47 remove references to pm_power_off from devicetree
+> > > > bindings descriptions.
+> > > > 
+> > > > Patch 08/47 moves the pm_power_off variable from architecture code to
+> > > > kernel/reboot.c. 
+> > > > 
+> > > > Patches 09/47 to 34/47 convert various drivers to register with the kernel
+> > > > power-off handler instead of setting pm_power_off directly.
+> > > > 
+> > > > Patches 35/47 to 46/47 do the same for architecture code.
+> > > > 
+> > > > Patch 47/47 finally removes pm_power_off.
+> > > > 
+> > > > For the most part, the individual patches include explanations why specific
+> > > > priorities were chosen, at least if the selected priority is not the default
+> > > > priority. Subsystem and architecture maintainers are encouraged to have a look
+> > > > at the selected priorities and suggest improvements.
+> > > > 
+> > > > I ran the final code through my normal build and qemu tests. Results are
+> > > > available at http://server.roeck-us.net:8010/builders in the 'poweroff-handler'
+> > > > column. I also built all available configurations for arm, mips, powerpc,
+> > > > m68k, and sh architectures.
+> > > > 
+> > > > The series is available in branch poweroff-handler of my repository at
+> > > > git://git.kernel.org/pub/scm/linux/kernel/git/groeck/linux-staging.git.
+> > > > It is based on 3.18-rc2.
+> > > > 
+> > > > A note on Cc: In the initial submission I had way too many Cc:, causing the
+> > > > patchset to be treated as spam by many mailers and mailing list handlers,
+> > > > which of course defeated the purpose. This time around I am cutting down
+> > > > the distribution list down significantly. My apologies to anyone I may have
+> > > > failed to copy this time around.
+> > > 
+> > > you touch every single architecture with this patchset, but you didn't
+> > > care about Ccing any of the arch-specific mailing lists, like lakml ?
+> > > 
+> > What is lakml ? linux-kernel at vger.kernel.org was copied, if that is what you
+> 
+> only the greatest mailing list of all time.
+> 
+> heh, Linux ARM Kernel Mailing List.
+> 
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
-Changes since RFC v2:
- - add pinconf properties to zc702 mdio node
- - remove arguments from bias-related props
+Similar to linux-omap, linux-arm-kernel was copied on individual patches
+if get_maintainer.pl suggested it. I'll be happy to add both lists manually
+to the entire series for the next version of the patch set if the respective
+maintainers (Tony and Russell) ask me to do so.
 
-Changes since RFC v1:
- - separate DT changes into their own patch
----
- arch/arm/boot/dts/zynq-7000.dtsi |   8 ++-
- arch/arm/boot/dts/zynq-zc702.dts | 143 +++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/zynq-zc706.dts | 120 ++++++++++++++++++++++++++++++++
- 3 files changed, 270 insertions(+), 1 deletion(-)
+Note that this doesn't mean that the patches will actually be accepted by
+those lists, especially if the lists are moderated for non-subscribers.
 
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index ce2ef5bec4f2..fc5246a4f69f 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -237,7 +237,7 @@
- 		slcr: slcr at f8000000 {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
--			compatible = "xlnx,zynq-slcr", "syscon";
-+			compatible = "xlnx,zynq-slcr", "syscon", "simple-bus";
- 			reg = <0xF8000000 0x1000>;
- 			ranges;
- 			clkc: clkc at 100 {
-@@ -258,6 +258,12 @@
- 						"dbg_trc", "dbg_apb";
- 				reg = <0x100 0x100>;
- 			};
-+
-+			pinctrl0: pinctrl at 700 {
-+				compatible = "xlnx,pinctrl-zynq";
-+				reg = <0x700 0x200>;
-+				syscon = <&slcr>;
-+			};
- 		};
- 
- 		dmac_s: dmac at f8003000 {
-diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
-index 94e2cda6f9b6..f64e7ad53c65 100644
---- a/arch/arm/boot/dts/zynq-zc702.dts
-+++ b/arch/arm/boot/dts/zynq-zc702.dts
-@@ -40,21 +40,32 @@
- 
- &can0 {
- 	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_can0_default>;
- };
- 
- &gem0 {
- 	status = "okay";
- 	phy-mode = "rgmii-id";
- 	phy-handle = <&ethernet_phy>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gem0_default>;
- 
- 	ethernet_phy: ethernet-phy at 7 {
- 		reg = <7>;
- 	};
- };
- 
-+&gpio0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gpio0_default>;
-+};
-+
- &i2c0 {
- 	status = "okay";
- 	clock-frequency = <400000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c0_default>;
- 
- 	i2cswitch at 74 {
- 		compatible = "nxp,pca9548";
-@@ -128,10 +139,142 @@
- 	};
- };
- 
-+&pinctrl0 {
-+	pinctrl_can0_default: pinctrl-can0-default {
-+		common {
-+			function = "can0";
-+			groups = "can0_9_grp";
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+
-+		rx {
-+			pins = "MIO46";
-+			bias-high-impedance;
-+		};
-+
-+		tx {
-+			pins = "MIO47";
-+			bias-disable;
-+		};
-+	};
-+
-+	pinctrl_gem0_default: pinctrl-gem0-default {
-+		common {
-+			function = "ethernet0";
-+			groups = "ethernet0_0_grp";
-+			slew-rate = <0>;
-+			io-standard = <4>;
-+		};
-+
-+		rx {
-+			pins = "MIO22", "MIO23", "MIO24", "MIO25", "MIO26", "MIO27";
-+			bias-high-impedance;
-+			low-power-disable;
-+		};
-+
-+		tx {
-+			pins = "MIO16", "MIO17", "MIO18", "MIO19", "MIO20", "MIO21";
-+			bias-disable;
-+			low-power-enable;
-+		};
-+
-+		mdio {
-+			function = "mdio0";
-+			groups = "mdio0_0_grp";
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+			bias-disable;
-+		};
-+	};
-+
-+	pinctrl_gpio0_default: pinctrl-gpio0-default {
-+		common {
-+			function = "gpio0";
-+			groups = "gpio0_7_grp", "gpio0_8_grp", "gpio0_9_grp",
-+				 "gpio0_10_grp", "gpio0_11_grp", "gpio0_12_grp",
-+				 "gpio0_13_grp", "gpio0_14_grp";
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+
-+		pull-up {
-+			pins = "MIO9", "MIO10", "MIO11", "MIO12", "MIO13", "MIO14";
-+			bias-pull-up;
-+		};
-+
-+		pull-none {
-+			pins = "MIO7", "MIO8";
-+			bias-disable;
-+		};
-+	};
-+
-+	pinctrl_i2c0_default: pinctrl-i2c0-default {
-+		common {
-+			groups = "i2c0_10_grp";
-+			function = "i2c0";
-+			bias-pull-up;
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+	};
-+
-+	pinctrl_sdhci0_default: pinctrl-sdhci0-default {
-+		common {
-+			groups = "sdio0_2_grp";
-+			function = "sdio0";
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+			bias-disable;
-+		};
-+
-+		cd {
-+			groups = "gpio0_0_grp";
-+			function = "sdio0_cd";
-+			bias-high-impedance;
-+			bias-pull-up;
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+
-+		wp {
-+			groups = "gpio0_15_grp";
-+			function = "sdio0_wp";
-+			bias-high-impedance;
-+			bias-pull-up;
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+	};
-+
-+	pinctrl_uart1_default: pinctrl-uart1-default {
-+		common {
-+			groups = "uart1_10_grp";
-+			function = "uart1";
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+
-+		rx {
-+			pins = "MIO49";
-+			bias-high-impedance;
-+		};
-+
-+		tx {
-+			pins = "MIO48";
-+			bias-disable = <0>;
-+		};
-+	};
-+};
-+
- &sdhci0 {
- 	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_sdhci0_default>;
- };
- 
- &uart1 {
- 	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1_default>;
- };
-diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
-index a8bbdfbc7093..5575a175f867 100644
---- a/arch/arm/boot/dts/zynq-zc706.dts
-+++ b/arch/arm/boot/dts/zynq-zc706.dts
-@@ -33,15 +33,24 @@
- 	status = "okay";
- 	phy-mode = "rgmii-id";
- 	phy-handle = <&ethernet_phy>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gem0_default>;
- 
- 	ethernet_phy: ethernet-phy at 7 {
- 		reg = <7>;
- 	};
- };
- 
-+&gpio0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gpio0_default>;
-+};
-+
- &i2c0 {
- 	status = "okay";
- 	clock-frequency = <400000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c0_default>;
- 
- 	i2cswitch at 74 {
- 		compatible = "nxp,pca9548";
-@@ -107,10 +116,121 @@
- 	};
- };
- 
-+&pinctrl0 {
-+	pinctrl_gem0_default: pinctrl-gem0-default {
-+		common {
-+			function = "ethernet0";
-+			groups = "ethernet0_0_grp";
-+			slew-rate = <0>;
-+			io-standard = <4>;
-+		};
-+
-+		rx {
-+			pins = "MIO22", "MIO23", "MIO24", "MIO25", "MIO26", "MIO27";
-+			bias-high-impedance;
-+			low-power-disable;
-+		};
-+
-+		tx {
-+			pins = "MIO16", "MIO17", "MIO18", "MIO19", "MIO20", "MIO21";
-+			low-power-enable;
-+			bias-disable;
-+		};
-+
-+		mdio {
-+			function = "mdio0";
-+			groups = "mdio0_0_grp";
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+			bias-disable;
-+		};
-+	};
-+
-+	pinctrl_gpio0_default: pinctrl-gpio0-default {
-+		common {
-+			function = "gpio0";
-+			groups = "gpio0_7_grp", "gpio0_46_grp", "gpio0_47_grp";
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+
-+		pull-up {
-+			pins = "MIO46", "MIO47";
-+			bias-pull-up;
-+		};
-+
-+		pull-none {
-+			pins = "MIO7";
-+			bias-disable;
-+		};
-+	};
-+
-+	pinctrl_i2c0_default: pinctrl-i2c0-default {
-+		common {
-+			groups = "i2c0_10_grp";
-+			function = "i2c0";
-+			bias-pull-up;
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+	};
-+
-+	pinctrl_sdhci0_default: pinctrl-sdhci0-default {
-+		common {
-+			groups = "sdio0_2_grp";
-+			function = "sdio0";
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+			bias-disable;
-+		};
-+
-+		cd {
-+			groups = "gpio0_14_grp";
-+			function = "sdio0_cd";
-+			bias-high-impedance;
-+			bias-pull-up;
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+
-+		wp {
-+			groups = "gpio0_15_grp";
-+			function = "sdio0_wp";
-+			bias-high-impedance;
-+			bias-pull-up;
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+	};
-+
-+	pinctrl_uart1_default: pinctrl-uart1-default {
-+		common {
-+			groups = "uart1_10_grp";
-+			function = "uart1";
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+
-+		rx {
-+			pins = "MIO49";
-+			bias-high-impedance;
-+		};
-+
-+		tx {
-+			pins = "MIO48";
-+			bias-disable;
-+		};
-+	};
-+};
-+
- &sdhci0 {
- 	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_sdhci0_default>;
- };
- 
- &uart1 {
- 	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1_default>;
- };
--- 
-1.9.1
+Guenter
