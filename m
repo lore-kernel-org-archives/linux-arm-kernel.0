@@ -1,34 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 03 Nov 2014 11:09:10 +0100
-Subject: [RFC PATCH 1/2] arm: cns3xxx: pci: remove artificial dependency
- on pci_sys_data domain
-In-Reply-To: <CAHXqBFKrVhjKGRmvWep_KsNt2WDM42g5qqpoEUTnuYSZexyt6Q@mail.gmail.com>
-References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1414669490-1217-2-git-send-email-lorenzo.pieralisi@arm.com>
- <CAHXqBFKrVhjKGRmvWep_KsNt2WDM42g5qqpoEUTnuYSZexyt6Q@mail.gmail.com>
-Message-ID: <1836395.qmSSqUtRH7@wuerfel>
+Date: Mon, 03 Nov 2014 11:11:02 +0100
+Subject: [PATCH v2 0/4] Add support for pxa27x device-tree machine
+In-Reply-To: <87a94891sm.fsf@free.fr>
+References: <1413127731-1187-1-git-send-email-robert.jarzmik@free.fr>
+ <1830013.l3PUsHBfsL@wuerfel> <87a94891sm.fsf@free.fr>
+Message-ID: <3391686.6Ux0ymi7iy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 01 November 2014 13:32:08 Micha? Miros?aw wrote:
-> > @@ -335,7 +328,8 @@ void __init cns3xxx_pcie_init_late(void)
-> >                 cns3xxx_pwr_soft_rst(0x1 << PM_SOFT_RST_REG_OFFST_PCIE(i));
-> >                 cns3xxx_pcie_check_link(&cns3xxx_pcie[i]);
-> >                 cns3xxx_pcie_hw_init(&cns3xxx_pcie[i]);
-> > -               pci_common_init(&cns3xxx_pcie[i].hw_pci);
-> > +               private_data = &cns3xxx_pcie[i];
-> > +               pci_common_init(&hw_pci);
-> >         }
+On Monday 03 November 2014 08:32:57 Robert Jarzmik wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
 > 
-> This looks weird. hw_pci.private_data is a pointer to a (temporary)
-> pointer to private data?
+> > On Thursday 30 October 2014 07:55:48 Robert Jarzmik wrote:
+> > Whole series
+> >
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Thanks Arnd.
 > 
+> Unfortunately my checkers caught a flaw in the non-device tree case :
+>  - pxa27x_dt_init_irq() is defined, even if unused
+>  - it calls pxa_dt_irq_init(), which is conditionaly defined on CONFIG_OF
+>    => breaks non DT builds
+> 
+> So I'll have to enclose this function in a #if defined(CONFIG_OF), and respin
+> patch 1.
 
-hw_pci is a local data structure that is only used to pass arguments
-to pci_common_init. hw_pci->private_data is a pointer to an array of
-pointers to the private data in each host bridge that is created in
-the new domain during the call to pci_common_init. Like most other
-callers, cns3xxx creates only one host bridge per domain, so it's
-an array that contains only one entry.
+Please make it use 
+
+	if (IS_ENABLED(CONFIG_OF))
+		pxa_dt_irq_init(pxa27x_set_wake);
+
+so we get the build-time coverage.
 
 	Arnd
