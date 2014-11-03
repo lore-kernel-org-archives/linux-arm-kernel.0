@@ -1,31 +1,49 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 03 Nov 2014 08:32:57 +0100
-Subject: [PATCH v2 0/4] Add support for pxa27x device-tree machine
-In-Reply-To: <1830013.l3PUsHBfsL@wuerfel> (Arnd Bergmann's message of "Thu, 30
- Oct 2014 08:07:52 +0100")
-References: <1413127731-1187-1-git-send-email-robert.jarzmik@free.fr>
- <87k33i6o7f.fsf@free.fr> <1830013.l3PUsHBfsL@wuerfel>
-Message-ID: <87a94891sm.fsf@free.fr>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 3 Nov 2014 08:47:59 +0100
+Subject: Crash on ARM: 8148/1 flush TLS and thumbee register
+In-Reply-To: <20141102221401.GA4042@n2100.arm.linux.org.uk>
+References: <CAGhQ9VzyK3qW2pr-YOFywUS7=9RLDzrj6wOFFhnvyDkks_2VCA@mail.gmail.com>
+ <5425DA4D.4040301@mentor.com>
+ <3b91528704d24eb119ec6d80ad6ba07f@agner.ch>
+ <20141102221401.GA4042@n2100.arm.linux.org.uk>
+Message-ID: <20141103074759.GU8316@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Sun, Nov 02, 2014 at 10:14:01PM +0000, Russell King - ARM Linux wrote:
+> On Sun, Nov 02, 2014 at 11:03:14PM +0100, Stefan Agner wrote:
+> > Hi all,
+> > 
+> > While working on Vybrid (vf610) Cortex-M4 support I also hit this crash
+> > observed by Joachim:
+> > 
+> > ...
+> > Freeing unused kernel memory: 16K (8800a000 - 8800e000)
+> > 
+> > Unhandled exception: IPSR = 00000005 LR = fffffff1
+> > CPU: 0 PID: 1 Comm: swapper Not tainted 3.18.0-rc1-00041-ga30465a #216
+> > task: 8b838000 ti: 8b82a000 task.ti: 8b82a000
+> > PC is at flush_thread+0x32/0x40
+> > LR is at flush_thread+0x21/0x40
+> > pc : [<8f00157a>]    lr : [<8f001569>]    psr: 4100000b
+> > sp : 8b82be20  ip : 00000000  fp : 8b83c000
+> > r10: 00000001  r9 : 88018c84  r8 : 8bb85000
+> > r7 : 8b838000  r6 : 00000000  r5 : 8bb77400  r4 : 8b82a000
+> > r3 : ffff0ff0  r2 : 8b82a000  r1 : 00000000  r0 : 88020354
+> > xPSR: 4100000b
+> > CPU: 0 PID: 1 Comm: swapper Not tainted 3.18.0-rc1-00041-ga30465a #216
+> > [<8f002bc1>] (unwind_backtrace) from [<8f002033>] (show_stack+0xb/0xc)
+> > [<8f002033>] (show_stack) from [<8f00265b>] (__invalid_entry+0x4b/0x4c)
+> > 
+> > Can reproduce it on 3.18-rc1, as well as 3.17.
+> 
+> Hmm, I think KUSER_HELPERS needs to depend on MMU.  Nathan?
+On Cortex-M3 and M4 addresses that start with 0xf....... cannot be RAM.
+So as long as the address is fixed there it won't work on ARMv7-M.
 
-> On Thursday 30 October 2014 07:55:48 Robert Jarzmik wrote:
-> Whole series
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-Thanks Arnd.
-
-Unfortunately my checkers caught a flaw in the non-device tree case :
- - pxa27x_dt_init_irq() is defined, even if unused
- - it calls pxa_dt_irq_init(), which is conditionaly defined on CONFIG_OF
-   => breaks non DT builds
-
-So I'll have to enclose this function in a #if defined(CONFIG_OF), and respin
-patch 1.
-
-Cheers.
+Best regards
+Uwe
 
 -- 
-Robert
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
