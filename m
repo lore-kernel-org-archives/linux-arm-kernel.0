@@ -1,60 +1,69 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 3 Nov 2014 12:12:44 +0100
-Subject: [PATCH v4 02/58] serial: at91: Use dmaengine_slave_config API
-In-Reply-To: <1414531573-18807-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
- <1414531573-18807-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <5457632C.5020002@atmel.com>
+From: timo.kokkonen@offcode.fi (Timo Kokkonen)
+Date: Mon,  3 Nov 2014 13:12:59 +0200
+Subject: [PATCH] mmc: host: atmel-mci: Add support for non-removable slots
+In-Reply-To: <CAPDyKFpMGk4M=fjBKufxb9iMbV6FmRTEfE_ptXPmM=CHx3Q7iQ@mail.gmail.com>
+References: <CAPDyKFpMGk4M=fjBKufxb9iMbV6FmRTEfE_ptXPmM=CHx3Q7iQ@mail.gmail.com>
+Message-ID: <1415013179-16823-1-git-send-email-timo.kokkonen@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/10/2014 22:25, Maxime Ripard :
-> We are removing the dmaengine_device_control API, that shouldn't even have been
-> exposed in the first place. Change the callers to use the proper API.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Add support for non-removable slots which have no card detection GPIO
+and which should not be polled for a card change.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+---
+ drivers/mmc/host/atmel-mci.c | 11 +++++++++--
+ include/linux/atmel-mci.h    |  2 ++
+ 2 files changed, 11 insertions(+), 2 deletions(-)
 
-Thanks, Maxime. Do I have to carry the patch myself or is it part of a
-series?
-
-Bye,
-
-> ---
->  drivers/tty/serial/atmel_serial.c | 10 ++++------
->  1 file changed, 4 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index edde3eca055d..10e6b382d68f 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -862,9 +862,8 @@ static int atmel_prepare_tx_dma(struct uart_port *port)
->  	config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
->  	config.dst_addr = port->mapbase + ATMEL_US_THR;
->  
-> -	ret = dmaengine_device_control(atmel_port->chan_tx,
-> -					DMA_SLAVE_CONFIG,
-> -					(unsigned long)&config);
-> +	ret = dmaengine_slave_config(atmel_port->chan_tx,
-> +				     &config);
->  	if (ret) {
->  		dev_err(port->dev, "DMA tx slave configuration failed\n");
->  		goto chan_err;
-> @@ -1026,9 +1025,8 @@ static int atmel_prepare_rx_dma(struct uart_port *port)
->  	config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
->  	config.src_addr = port->mapbase + ATMEL_US_RHR;
->  
-> -	ret = dmaengine_device_control(atmel_port->chan_rx,
-> -					DMA_SLAVE_CONFIG,
-> -					(unsigned long)&config);
-> +	ret = dmaengine_slave_config(atmel_port->chan_rx,
-> +				     &config);
->  	if (ret) {
->  		dev_err(port->dev, "DMA rx slave configuration failed\n");
->  		goto chan_err;
-> 
-
-
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index 77250d4..4de1a31 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -560,6 +560,9 @@ atmci_of_init(struct platform_device *pdev)
+ 		pdata->slot[slot_id].detect_is_active_high =
+ 			of_property_read_bool(cnp, "cd-inverted");
+ 
++		pdata->slot[slot_id].non_removable =
++			of_property_read_bool(cnp, "non-removable");
++
+ 		pdata->slot[slot_id].wp_pin =
+ 			of_get_named_gpio(cnp, "wp-gpios", 0);
+ 	}
+@@ -2206,8 +2209,12 @@ static int __init atmci_init_slot(struct atmel_mci *host,
+ 		}
+ 	}
+ 
+-	if (!gpio_is_valid(slot->detect_pin))
+-		mmc->caps |= MMC_CAP_NEEDS_POLL;
++	if (!gpio_is_valid(slot->detect_pin)) {
++		if (slot_data->non_removable)
++			mmc->caps |= MMC_CAP_NONREMOVABLE;
++		else
++			mmc->caps |= MMC_CAP_NEEDS_POLL;
++	}
+ 
+ 	if (gpio_is_valid(slot->wp_pin)) {
+ 		if (devm_gpio_request(&host->pdev->dev, slot->wp_pin,
+diff --git a/include/linux/atmel-mci.h b/include/linux/atmel-mci.h
+index 91b77f8..9177947 100644
+--- a/include/linux/atmel-mci.h
++++ b/include/linux/atmel-mci.h
+@@ -11,6 +11,7 @@
+  * @detect_pin: GPIO pin wired to the card detect switch
+  * @wp_pin: GPIO pin wired to the write protect sensor
+  * @detect_is_active_high: The state of the detect pin when it is active
++ * @non_removable: The slot is not removable, only detect once
+  *
+  * If a given slot is not present on the board, @bus_width should be
+  * set to 0. The other fields are ignored in this case.
+@@ -26,6 +27,7 @@ struct mci_slot_pdata {
+ 	int			detect_pin;
+ 	int			wp_pin;
+ 	bool			detect_is_active_high;
++	bool			non_removable;
+ };
+ 
+ /**
 -- 
-Nicolas Ferre
+1.9.1
