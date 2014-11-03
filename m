@@ -1,88 +1,107 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 03 Nov 2014 17:48:17 +0100
-Subject: [PATCH 7/7] can: m_can: workaround for transmit data less than
- 4 bytes
-In-Reply-To: <1414579527-31100-7-git-send-email-b29396@freescale.com>
-References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
- <1414579527-31100-7-git-send-email-b29396@freescale.com>
-Message-ID: <5457B1D1.6080301@pengutronix.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 03 Nov 2014 17:48:14 +0100
+Subject: [PATCH v2 0/6] Add support for USB cluster(PHY muxer) on the
+ Armada 375
+In-Reply-To: <20141101224647.GD3698@titan.lakedaemon.net>
+References: <1414164254-13053-1-git-send-email-gregory.clement@free-electrons.com>
+ <20141101224647.GD3698@titan.lakedaemon.net>
+Message-ID: <5457B1CE.4060108@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2014 11:45 AM, Dong Aisheng wrote:
-> We meet an IC issue that we have to write the full 8 bytes (whatever
-> value for the second word) in Message RAM to avoid bit error for transmit
-> data less than 4 bytes.
+Hi Jason,
 
-Is this a SoC or a m_can problem? Are all versions of the SoC/m_can
-affected? Is there a m_can version register somewhere?
-
-> Without the workaround, we can easily see the following errors:
-> root at imx6qdlsolo:~# ip link set can0 up type can bitrate 1000000
-> [   66.882520] IPv6: ADDRCONF(NETDEV_CHANGE): can0: link becomes ready
-> root at imx6qdlsolo:~# cansend can0 123#112233
-> [   66.935640] m_can 20e8000.can can0: Bit Error Uncorrected
+On 01/11/2014 23:46, Jason Cooper wrote:
+> Gregory,
 > 
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> ---
->  drivers/net/can/m_can/m_can.c | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
+> On Fri, Oct 24, 2014 at 05:24:08PM +0200, Gregory CLEMENT wrote:
+>> Hello,
+>>
+>> this is the second version of a series I initially submitted in May:
+>> https://lkml.org/lkml/2014/5/16/743
+>>
+>> This series adds support for the USB cluster which is on the Armada
+>> 375 SoC. We can mainly see this device as a PHY muxer.
+>>
+>> I more or less forgotten this series until the talk of Kishon Vijay
+>> Abraham I about the phy framework.
+>>
+>> Since this time, things have changed in the USB framework and I no
+>> longer have to add the generic phy support in the xhci driver since it
+>> was done at the usb core level.
+>>
+>> While I ran coccicheck on my code I also found some possible
+>> improvement in the phy driver: it was done in the 1st patch.
+>>
+>> The second patch was a patch initially submitted by Andrew. This patch
+>> added the mvebu-phy.txt but fell through a crack when adding the
+>> driver. I join this patch on my series in order to be able to add the
+>> new binding for the USB cluster of the Armada 375.
+>>
+>> This was done in the third patch.
+>>
+>> The forth patch was the addition of the phys driver itself.
+>>
+>> The fifth and sixth patches are updating the device tree files related
+>> to the Armada 375 using the new biding.
+>>
+>> Thanks,
+>>
+>> Gregory
+>>
+>> Changelog:
+>>
+>> v1 -> v2:
+>>
+>> - Add a patch fixing the use of PTR_ERR_OR_ZERO.
+>>
+>> - Add the patch adding the DT binding documentation for Marvell MVEBU
+>> SATA phy from Andrew Lunn
+>>
+>> - Move the DT binding documentation of the Armada 375 USB cluster into
+>>   the phy-mvebu.txt file.
+>>
+>> - Made the armada375_usb_phy_xlate more robust" if there is a phy_put
+>>   and then a phy_get".
+>>
+>> Andrew Lunn (1):
+>>   Phy: DT binding documentation for Marvell MVEBU SATA phy.
+>>
+>> Gregory CLEMENT (5):
+>>   phy: Use PTR_ERR_OR_ZERO to fix warning raised by coccinelle
+>>   Phy: DT binding documentation for the Armada 375 USB cluster binding
+>>   phy: add support for USB cluster on the Armada 375 SoC
+>>   ARM: mvebu: add Device Tree description of USB cluster controller on
+>>     Armada 375
+>>   ARM: mvebu: add PHY support to the dts for the USB controllers on
+>>     Armada 375
 > 
-> diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
-> index 219e0e3..f2d9ebe 100644
-> --- a/drivers/net/can/m_can/m_can.c
-> +++ b/drivers/net/can/m_can/m_can.c
-> @@ -1058,10 +1058,19 @@ static netdev_tx_t m_can_start_xmit(struct sk_buff *skb,
->  	m_can_fifo_write(priv, 0, M_CAN_FIFO_ID, id);
->  	m_can_fifo_write(priv, 0, M_CAN_FIFO_DLC, can_len2dlc(cf->len) << 16);
->  
-> -	for (i = 0; i < cf->len; i += 4)
-> +	for (i = 0; i < cf->len; i += 4) {
->  		m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(i / 4),
->  				 *(u32 *)(cf->data + i));
->  
-> +		/* FIXME: we meet an IC issue that we have to write the full 8
+> I assume Kishon is taking the phy portion of this series and we'll
+> handle the dts portion? 
 
-FIXME usually indicates that the driver needs some work here. Just
-describe your hardware bug, you might add a reference to an errata if
-available, though.
+Yes I expect that we merge the patch 5 and 6, and patch 1-4 should
+be pulled by Kishon.
 
-> +		 * bytes (whatever value for the second word) in Message RAM to
-> +		 * avoid bit error for transmit data less than 4 bytes
-> +		 */
-> +		if (cf->len <= 4)
-> +			m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(i / 4 + 1),
-> +					 0x0);
 
-This workaround doesn't handle the dlc == 0 case, your error description
-isn't completely if this is a problem, too.
+> Before doing so, I'd like to see an Ack from
+> the DT maintainers and Kishon...
 
-It should be possible to change the for loop to go always to 8, or
-simply unroll the loop:
+I also would like have a feedback from them :)
 
-/* errata description goes here */
-m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0), *(u32 *)(cf->data + 0));
-m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1), *(u32 *)(cf->data + 4));
 
-> +	}
-> +
->  	can_put_echo_skb(skb, dev, 0);
->  
->  	if (priv->can.ctrlmode & CAN_CTRLMODE_FD) {
+Thanks,
+
+Gregory
+
+> 
+> thx,
+> 
+> Jason.
 > 
 
-Marc
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141103/818246cc/attachment.sig>
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
