@@ -1,66 +1,132 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 3 Nov 2014 18:55:34 +0100
-Subject: [PATCH v4 2/8] ARM: mediatek: add dts for 8127 Moose board
-In-Reply-To: <1413973797-17619-3-git-send-email-yingjoe.chen@mediatek.com>
-References: <1413973797-17619-1-git-send-email-yingjoe.chen@mediatek.com>
- <1413973797-17619-3-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <CABuKBe+ku=vWiWbvAm8M7QgyzvVWZ5sdkRMocuUym8JTyk-okg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 3 Nov 2014 17:55:46 +0000
+Subject: [PATCH v3 12/47] mfd: ab8500-sysctrl: Register with kernel
+ power-off handler
+In-Reply-To: <1414425354-10359-13-git-send-email-linux@roeck-us.net>
+References: <1414425354-10359-1-git-send-email-linux@roeck-us.net>
+ <1414425354-10359-13-git-send-email-linux@roeck-us.net>
+Message-ID: <20141103175546.GP12011@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-10-22 12:29 GMT+02:00 Joe.C <yingjoe.chen@mediatek.com>:
-> From: "Joe.C" <yingjoe.chen@mediatek.com>
->
-> Moose is a tablet evalutation board based on MT8127 SoC.
->
-> Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
+On Mon, 27 Oct 2014, Guenter Roeck wrote:
+
+> Register with kernel power-off handler instead of setting pm_power_off
+> directly. Register with low priority to reflect that the original code
+> only sets pm_power_off if it was not already set.
+> 
+> sysctrl_dev is set prior to power-off handler registration, and the
+> power-off handler is unregistered prior to clearing sysrctrl_dev.
+> It is therefore not necessary to check if sysctrl_dev is NULL in the
+> power-off handler, and the check was removed. Setting sysctrl_dev to NULL
+> in the remove function was also removed as unnecessary. With those changes,
+> devm_register_power_off_handler can be used to register the poeroff handler.
+> The now empty remove function was retained since the ab8500_restart function,
+> which is currently unused, would likely need some cleanup if it was ever used.
+> 
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 > ---
->  arch/arm/boot/dts/mt8127-moose.dts | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
->  create mode 100644 arch/arm/boot/dts/mt8127-moose.dts
->
-> diff --git a/arch/arm/boot/dts/mt8127-moose.dts b/arch/arm/boot/dts/mt8127-moose.dts
-> new file mode 100644
-> index 0000000..602e2f0
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/mt8127-moose.dts
-> @@ -0,0 +1,24 @@
-> +/*
-> + * Copyright (c) 2014 MediaTek Inc.
-> + * Author: Joe.C <yingjoe.chen@mediatek.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
+> v3:
+> - Replace poweroff in all newly introduced variables and in text
+>   with power_off or power-off as appropriate
+> - Replace POWEROFF_PRIORITY_xxx with POWER_OFF_PRIORITY_xxx
+> v2:
+> - Use define to specify poweroff handler priority
+> - Use devm_register_power_off_handler
+> - Use dev_warn instead of dev_err
+> - Since we use devm_register_power_off_handler,
+>   we need to check if sysctrl_dev in the poweroff handler to avoid
+>   a race condition on unload, so this check is no longer removed
+> 
+>  drivers/mfd/ab8500-sysctrl.c | 23 ++++++++++++++++-------
+>  1 file changed, 16 insertions(+), 7 deletions(-)
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
+> diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
+> index 8e0dae5..c49ecaf 100644
+> --- a/drivers/mfd/ab8500-sysctrl.c
+> +++ b/drivers/mfd/ab8500-sysctrl.c
+> @@ -6,6 +6,7 @@
+>  
+>  #include <linux/err.h>
+>  #include <linux/module.h>
+> +#include <linux/notifier.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/pm.h>
+>  #include <linux/reboot.h>
+> @@ -23,7 +24,8 @@
+>  
+>  static struct device *sysctrl_dev;
+>  
+> -static void ab8500_power_off(void)
+> +static int ab8500_power_off(struct notifier_block *this, unsigned long unused1,
+> +			    void *unused2)
+>  {
+>  	sigset_t old;
+>  	sigset_t all;
+> @@ -36,7 +38,7 @@ static void ab8500_power_off(void)
+>  
+>  	if (sysctrl_dev == NULL) {
+>  		pr_err("%s: sysctrl not initialized\n", __func__);
+> -		return;
+> +		return NOTIFY_DONE;
+>  	}
+>  
+>  	/*
+> @@ -83,8 +85,15 @@ shutdown:
+>  					 AB8500_STW4500CTRL1_SWRESET4500N);
+>  		(void)sigprocmask(SIG_SETMASK, &old, NULL);
+>  	}
 > +
-> +/dts-v1/;
-> +#include "mt8127.dtsi"
-> +
-> +/ {
-> +       model = "mediatek,mt8127-moose", "mediatek,mt8127";
-
-The model should be a string that identifies the board, e.g. "Moose".
-Please add the compatible property.
-
-> +
-> +       memory {
-> +               reg = <0 0x80000000 0 0x40000000>;
-
-See comment on mt8127 register definitions.
-
-> +       };
+> +	return NOTIFY_DONE;
+>  }
+>  
+> +static struct notifier_block ab8500_power_off_nb = {
+> +	.notifier_call = ab8500_power_off,
+> +	.priority = POWER_OFF_PRIORITY_LOW,
 > +};
-> --
-> 1.8.1.1.dirty
->
-
-
+> +
+>  /*
+>   * Use the AB WD to reset the platform. It will perform a hard
+>   * reset instead of a soft reset. Write the reset reason to
+> @@ -185,6 +194,7 @@ static int ab8500_sysctrl_probe(struct platform_device *pdev)
+>  	struct ab8500 *ab8500 = dev_get_drvdata(pdev->dev.parent);
+>  	struct ab8500_platform_data *plat;
+>  	struct ab8500_sysctrl_platform_data *pdata;
+> +	int err;
+>  
+>  	plat = dev_get_platdata(pdev->dev.parent);
+>  
+> @@ -193,8 +203,10 @@ static int ab8500_sysctrl_probe(struct platform_device *pdev)
+>  
+>  	sysctrl_dev = &pdev->dev;
+>  
+> -	if (!pm_power_off)
+> -		pm_power_off = ab8500_power_off;
+> +	err = devm_register_power_off_handler(sysctrl_dev,
+> +					      &ab8500_power_off_nb);
+> +	if (err)
+> +		dev_warn(&pdev->dev, "Failed to register power-off handler\n");
+>  
+>  	pdata = plat->sysctrl;
+>  	if (pdata) {
+> @@ -228,9 +240,6 @@ static int ab8500_sysctrl_remove(struct platform_device *pdev)
+>  {
+>  	sysctrl_dev = NULL;
+>  
+> -	if (pm_power_off == ab8500_power_off)
+> -		pm_power_off = NULL;
+> -
+>  	return 0;
+>  }
+>  
 
 -- 
-motzblog.wordpress.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
