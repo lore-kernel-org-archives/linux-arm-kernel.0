@@ -1,128 +1,166 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 3 Nov 2014 11:57:09 -0600
-Subject: [PATCH v3 16/47] mfd: tps6586x: Register with kernel power-off
- handler
-In-Reply-To: <1414425354-10359-17-git-send-email-linux@roeck-us.net>
-References: <1414425354-10359-1-git-send-email-linux@roeck-us.net>
- <1414425354-10359-17-git-send-email-linux@roeck-us.net>
-Message-ID: <20141103175709.GQ27425@saruman>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 3 Nov 2014 18:58:09 +0100
+Subject: [PATCH v4 3/8] ARM: mediatek: Add basic support for mt8135
+In-Reply-To: <1413973797-17619-4-git-send-email-yingjoe.chen@mediatek.com>
+References: <1413973797-17619-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1413973797-17619-4-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <CABuKBeKx3hKiCRwM0jGwjpbF929BZC313DY6KQR8hUsi3jwLcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 08:55:23AM -0700, Guenter Roeck wrote:
-> Register with kernel power-off handler instead of setting pm_power_off
-> directly. Register with low priority to reflect that the original code
-> only sets pm_power_off if it was not already set.
-> 
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-
-should be sent to linux-omap and lakml too
-
+2014-10-22 12:29 GMT+02:00 Joe.C <yingjoe.chen@mediatek.com>:
+> From: "Joe.C" <yingjoe.chen@mediatek.com>
+>
+> This adds a basic dtsi for MT8135 based SoC.
+>
+> Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
 > ---
-> v3:
-> - Replace poweroff in all newly introduced variables and in text
->   with power_off or power-off as appropriate
-> - Replace POWEROFF_PRIORITY_xxx with POWER_OFF_PRIORITY_xxx
-> v2:
-> - Use define to specify poweroff handler priority
-> - Use dev_warn instead of dev_err
-> 
->  drivers/mfd/tps6586x.c | 31 +++++++++++++++++++++++--------
->  1 file changed, 23 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/mfd/tps6586x.c b/drivers/mfd/tps6586x.c
-> index 8e1dbc4..1e97478 100644
-> --- a/drivers/mfd/tps6586x.c
-> +++ b/drivers/mfd/tps6586x.c
-> @@ -21,10 +21,12 @@
->  #include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <linux/mutex.h>
-> +#include <linux/notifier.h>
->  #include <linux/slab.h>
->  #include <linux/err.h>
->  #include <linux/i2c.h>
->  #include <linux/platform_device.h>
-> +#include <linux/pm.h>
->  #include <linux/regmap.h>
->  #include <linux/of.h>
->  
-> @@ -133,6 +135,8 @@ struct tps6586x {
->  	u32			irq_en;
->  	u8			mask_reg[5];
->  	struct irq_domain	*irq_domain;
+>  arch/arm/boot/dts/mt8135.dtsi     | 115 ++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mediatek/mediatek.c |   1 +
+>  2 files changed, 116 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/mt8135.dtsi
+>
+> diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
+> new file mode 100644
+> index 0000000..90a56ad
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/mt8135.dtsi
+> @@ -0,0 +1,115 @@
+> +/*
+> + * Copyright (c) 2014 MediaTek Inc.
+> + * Author: Joe.C <yingjoe.chen@mediatek.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
 > +
-> +	struct notifier_block	power_off_nb;
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include "skeleton64.dtsi"
+
+Same here A15 is 32 bits.
+
+> +
+> +/ {
+> +       compatible = "mediatek,mt8135";
+> +       interrupt-parent = <&gic>;
+> +
+> +       cpu-map {
+> +               cluster0 {
+> +                       core0 {
+> +                               cpu = <&cpu0>;
+> +                       };
+> +                       core1 {
+> +                               cpu = <&cpu1>;
+> +                       };
+> +               };
+> +
+> +               cluster1 {
+> +                       core0 {
+> +                               cpu = <&cpu2>;
+> +                       };
+> +                       core1 {
+> +                               cpu = <&cpu3>;
+> +                       };
+> +               };
+> +       };
+> +
+> +       cpus {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               cpu0: cpu at 0 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x000>;
+> +               };
+> +
+> +               cpu1: cpu at 1 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x001>;
+> +               };
+> +
+> +               cpu2: cpu at 100 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a15";
+> +                       reg = <0x100>;
+> +               };
+> +
+> +               cpu3: cpu at 101 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a15";
+> +                       reg = <0x101>;
+> +               };
+> +       };
+> +
+> +       clocks {
+> +               #address-cells = <2>;
+> +               #size-cells = <2>;
+> +               compatible = "simple-bus";
+> +               ranges;
+> +
+> +               system_clk: dummy13m {
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <13000000>;
+> +                       #clock-cells = <0>;
+> +               };
+> +
+> +               rtc_clk: dummy32k {
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <32000>;
+> +                       #clock-cells = <0>;
+> +               };
+> +       };
+> +
+> +       soc {
+> +               #address-cells = <2>;
+> +               #size-cells = <2>;
+> +               compatible = "simple-bus";
+> +               ranges;
+> +
+> +               timer: timer at 10008000 {
+> +                       compatible = "mediatek,mt8135-timer", "mediatek,mt6577-timer";
+> +                       reg = <0 0x10008000 0 0x80>;
+> +                       interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
+> +                       clocks = <&system_clk>, <&rtc_clk>;
+> +                       clock-names = "system-clk", "rtc-clk";
+> +               };
+> +
+> +               gic: interrupt-controller at 10211000 {
+> +                       compatible = "arm,cortex-a15-gic";
+> +                       interrupt-controller;
+> +                       #interrupt-cells = <3>;
+> +                       reg = <0 0x10211000 0 0x1000>,
+> +                             <0 0x10212000 0 0x1000>,
+> +                             <0 0x10214000 0 0x2000>,
+> +                             <0 0x10216000 0 0x2000>;
+> +               };
+> +       };
+> +};
+> diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+> index 7f478ce..48051a2 100644
+> --- a/arch/arm/mach-mediatek/mediatek.c
+> +++ b/arch/arm/mach-mediatek/mediatek.c
+> @@ -20,6 +20,7 @@
+>  static const char * const mediatek_board_dt_compat[] = {
+>         "mediatek,mt6589",
+>         "mediatek,mt8127",
+> +       "mediatek,mt8135",
+>         NULL,
 >  };
->  
->  static inline struct tps6586x *dev_to_tps6586x(struct device *dev)
-> @@ -472,13 +476,18 @@ static const struct regmap_config tps6586x_regmap_config = {
->  	.cache_type = REGCACHE_RBTREE,
->  };
->  
-> -static struct device *tps6586x_dev;
-> -static void tps6586x_power_off(void)
-> +static int tps6586x_power_off(struct notifier_block *this,
-> +			      unsigned long unused1, void *unused2)
->  {
-> -	if (tps6586x_clr_bits(tps6586x_dev, TPS6586X_SUPPLYENE, EXITSLREQ_BIT))
-> -		return;
-> +	struct tps6586x *tps6586x = container_of(this, struct tps6586x,
-> +						 power_off_nb);
-> +
-> +	if (tps6586x_clr_bits(tps6586x->dev, TPS6586X_SUPPLYENE, EXITSLREQ_BIT))
-> +		return NOTIFY_DONE;
->  
-> -	tps6586x_set_bits(tps6586x_dev, TPS6586X_SUPPLYENE, SLEEP_MODE_BIT);
-> +	tps6586x_set_bits(tps6586x->dev, TPS6586X_SUPPLYENE, SLEEP_MODE_BIT);
-> +
-> +	return NOTIFY_DONE;
->  }
->  
->  static void tps6586x_print_version(struct i2c_client *client, int version)
-> @@ -575,9 +584,13 @@ static int tps6586x_i2c_probe(struct i2c_client *client,
->  		goto err_add_devs;
->  	}
->  
-> -	if (pdata->pm_off && !pm_power_off) {
-> -		tps6586x_dev = &client->dev;
-> -		pm_power_off = tps6586x_power_off;
-> +	if (pdata->pm_off) {
-> +		tps6586x->power_off_nb.notifier_call = tps6586x_power_off;
-> +		tps6586x->power_off_nb.priority = POWER_OFF_PRIORITY_LOW;
-> +		ret = register_power_off_handler(&tps6586x->power_off_nb);
-> +		if (ret)
-> +			dev_warn(&client->dev,
-> +				 "failed to register power-off handler\n");
->  	}
->  
->  	return 0;
-> @@ -594,6 +607,8 @@ static int tps6586x_i2c_remove(struct i2c_client *client)
->  {
->  	struct tps6586x *tps6586x = i2c_get_clientdata(client);
->  
-> +	unregister_power_off_handler(&tps6586x->power_off_nb);
-> +
->  	tps6586x_remove_subdevs(tps6586x);
->  	mfd_remove_devices(tps6586x->dev);
->  	if (client->irq)
-> -- 
-> 1.9.1
-> 
+>
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> 1.8.1.1.dirty
+>
+
+
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141103/8a95c2d7/attachment.sig>
+motzblog.wordpress.com
