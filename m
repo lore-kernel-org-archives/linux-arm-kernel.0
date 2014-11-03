@@ -1,79 +1,178 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 3 Nov 2014 11:21:55 +0100
-Subject: [PATCH 1/1] ARM: at91/dt: sam9263: Add CAN device nodes
-In-Reply-To: <20141006140914.GA15599@piout.net>
-References: <1412599207-15676-1-git-send-email-alexander.stein@systec-electronic.com>
- <20141006140914.GA15599@piout.net>
-Message-ID: <54575743.3080407@atmel.com>
+From: addy.ke@rock-chips.com (addy ke)
+Date: Mon, 03 Nov 2014 18:23:47 +0800
+Subject: [PATCH v3] mmc: dw_mmc: add support for the other bit of sdio
+ interrupt
+In-Reply-To: <5457440E.3070002@samsung.com>
+References: <1414666240-16782-1-git-send-email-addy.ke@rock-chips.com>
+ <1414977633-3196-1-git-send-email-addy.ke@rock-chips.com>
+ <5457440E.3070002@samsung.com>
+Message-ID: <545757B3.30208@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2014 16:09, Alexandre Belloni :
-> On 06/10/2014 at 14:40:07 +0200, Alexander Stein wrote :
->> Add the missing CAN devices node including their pin muxing. The required
->> clock node already exists.
->>
->> Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Hi, Jaehoo
 
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-and stacked on top of at91-3.19-dt branch.
-
-Thanks!
-
+On 2014/11/3 16:59, Jaehoon Chung wrote:
+> Hi, Addy.
 > 
+> On 11/03/2014 10:20 AM, Addy Ke wrote:
+>> The bit of sdio interrupt is 16 in designware implementation,
+>> but it is 24 on Rockchip SoCs.This patch add sdio_id0 for the
+>> number of slot0 in the SDIO interrupt registers.
+>>
+>> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
 >> ---
->>  arch/arm/boot/dts/at91sam9263.dtsi | 19 +++++++++++++++++++
->>  1 file changed, 19 insertions(+)
+>> Changes in v2:
+>> - rebase on http://git.linaro.org/git/people/ulf.hansson/mmc.git, next branch
+>> Changes in v3:
+>> - Remove dts for sdio_id0, just replace this with 8, suggested by Doug
+>> - Change to support all Rockchip Socs, suggested by Heiko
 >>
->> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
->> index bb23c2d..174ab77 100644
->> --- a/arch/arm/boot/dts/at91sam9263.dtsi
->> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
->> @@ -672,6 +672,14 @@
->>  					};
->>  				};
+>>  drivers/mmc/host/dw_mmc-rockchip.c | 10 ++++++++++
+>>  drivers/mmc/host/dw_mmc.c          | 12 +++++++-----
+>>  drivers/mmc/host/dw_mmc.h          |  2 ++
+>>  include/linux/mmc/dw_mmc.h         |  3 +++
+>>  4 files changed, 22 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
+>> index bbb4ec3..b997c8f 100644
+>> --- a/drivers/mmc/host/dw_mmc-rockchip.c
+>> +++ b/drivers/mmc/host/dw_mmc-rockchip.c
+>> @@ -68,14 +68,24 @@ static void dw_mci_rk3288_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+>>  	}
+>>  }
 >>  
->> +				can {
->> +					pinctrl_can_rx_tx: can_rx_tx {
->> +						atmel,pins =
->> +							<AT91_PIOA 14 AT91_PERIPH_A AT91_PINCTRL_NONE	/* CANRX, conflicts with IRQ0 */
->> +							 AT91_PIOA 13 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* CANTX, conflicts with PCK0 */
->> +					};
->> +				};
+>> +static int dw_mci_rockchip_parse_dt(struct dw_mci *host)
+>> +{
+>> +	/* It is slot 8 on Rockchip SoCs */
+>> +	host->sdio_id0 = 8;
 >> +
->>  				pioA: gpio at fffff200 {
->>  					compatible = "atmel,at91rm9200-gpio";
->>  					reg = <0xfffff200 0x200>;
->> @@ -898,6 +906,17 @@
->>  				clock-names = "pwm_clk";
->>  				status = "disabled";
->>  			};
->> +
->> +			can: can at fffac000 {
->> +				compatible = "atmel,at91sam9263-can";
->> +				reg = <0xfffac000 0x300>;
->> +				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 3>;
->> +				pinctrl-names = "default";
->> +				pinctrl-0 = <&pinctrl_can_rx_tx>;
->> +				clocks = <&can_clk>;
->> +				clock-names = "can_clk";
->> +				status = "disabled";
->> +			};
->>  		};
->>  
->>  		fb0: fb at 0x00700000 {
->> -- 
->> 2.0.4
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> +	return 0;
+>> +}
 > 
+> Well, function is "__parse_dt__", but this function don't parse anything.
+> If All rockchip soc is supported, i think that it can be located to other place.
+> 
+Can add it in "init" function? like this:
+int dw_mci_rockchip_init(struct dw_mci *host)
+{
+	/* It is slot 8 on Rockchip SoCs */
+	host->sdio_id0 = 8;
+
+	return 0;
+}
+static const struct dw_mci_drv_data xxxx {
+    ....
+    .init = dw_mci_rockchip_init,
+};
 
 
--- 
-Nicolas Ferre
+> Best Regards,
+> Jaehoon Chung
+> 
+>> +
+>>  static const struct dw_mci_drv_data rk2928_drv_data = {
+>>  	.prepare_command        = dw_mci_rockchip_prepare_command,
+>> +	.parse_dt	= dw_mci_rockchip_parse_dt,
+>>  };
+>>  
+>>  static const struct dw_mci_drv_data rk3288_drv_data = {
+>>  	.prepare_command        = dw_mci_rockchip_prepare_command,
+>>  	.set_ios		= dw_mci_rk3288_set_ios,
+>>  	.setup_clock    = dw_mci_rk3288_setup_clock,
+>> +	.parse_dt	= dw_mci_rockchip_parse_dt,
+>>  };
+>>  
+>>  static const struct of_device_id dw_mci_rockchip_match[] = {
+>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>> index bb46b1b..a633b58 100644
+>> --- a/drivers/mmc/host/dw_mmc.c
+>> +++ b/drivers/mmc/host/dw_mmc.c
+>> @@ -823,7 +823,7 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
+>>  
+>>  		/* enable clock; only low power if no SDIO */
+>>  		clk_en_a = SDMMC_CLKEN_ENABLE << slot->id;
+>> -		if (!(mci_readl(host, INTMASK) & SDMMC_INT_SDIO(slot->id)))
+>> +		if (!(mci_readl(host, INTMASK) & SDMMC_INT_SDIO(slot->sdio_id)))
+>>  			clk_en_a |= SDMMC_CLKEN_LOW_PWR << slot->id;
+>>  		mci_writel(host, CLKENA, clk_en_a);
+>>  
+>> @@ -1184,10 +1184,10 @@ static void dw_mci_enable_sdio_irq(struct mmc_host *mmc, int enb)
+>>  		dw_mci_disable_low_power(slot);
+>>  
+>>  		mci_writel(host, INTMASK,
+>> -			   (int_mask | SDMMC_INT_SDIO(slot->id)));
+>> +			   (int_mask | SDMMC_INT_SDIO(slot->sdio_id)));
+>>  	} else {
+>>  		mci_writel(host, INTMASK,
+>> -			   (int_mask & ~SDMMC_INT_SDIO(slot->id)));
+>> +			   (int_mask & ~SDMMC_INT_SDIO(slot->sdio_id)));
+>>  	}
+>>  }
+>>  
+>> @@ -2056,8 +2056,9 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
+>>  		/* Handle SDIO Interrupts */
+>>  		for (i = 0; i < host->num_slots; i++) {
+>>  			struct dw_mci_slot *slot = host->slot[i];
+>> -			if (pending & SDMMC_INT_SDIO(i)) {
+>> -				mci_writel(host, RINTSTS, SDMMC_INT_SDIO(i));
+>> +			if (pending & SDMMC_INT_SDIO(slot->sdio_id)) {
+>> +				mci_writel(host, RINTSTS,
+>> +					   SDMMC_INT_SDIO(slot->sdio_id));
+>>  				mmc_signal_sdio_irq(slot->mmc);
+>>  			}
+>>  		}
+>> @@ -2145,6 +2146,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+>>  
+>>  	slot = mmc_priv(mmc);
+>>  	slot->id = id;
+>> +	slot->sdio_id = host->sdio_id0 + id;
+>>  	slot->mmc = mmc;
+>>  	slot->host = host;
+>>  	host->slot[id] = slot;
+>> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+>> index 71d4995..0562f10 100644
+>> --- a/drivers/mmc/host/dw_mmc.h
+>> +++ b/drivers/mmc/host/dw_mmc.h
+>> @@ -214,6 +214,7 @@ extern int dw_mci_resume(struct dw_mci *host);
+>>   *	with CONFIG_MMC_CLKGATE.
+>>   * @flags: Random state bits associated with the slot.
+>>   * @id: Number of this slot.
+>> + * @sdio_id: Number of this slot in the SDIO interrupt registers.
+>>   */
+>>  struct dw_mci_slot {
+>>  	struct mmc_host		*mmc;
+>> @@ -233,6 +234,7 @@ struct dw_mci_slot {
+>>  #define DW_MMC_CARD_PRESENT	0
+>>  #define DW_MMC_CARD_NEED_INIT	1
+>>  	int			id;
+>> +	int			sdio_id;
+>>  };
+>>  
+>>  struct dw_mci_tuning_data {
+>> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+>> index 69d0814..72c319f 100644
+>> --- a/include/linux/mmc/dw_mmc.h
+>> +++ b/include/linux/mmc/dw_mmc.h
+>> @@ -96,6 +96,7 @@ struct mmc_data;
+>>   * @quirks: Set of quirks that apply to specific versions of the IP.
+>>   * @irq_flags: The flags to be passed to request_irq.
+>>   * @irq: The irq value to be passed to request_irq.
+>> + * @sdio_id0: Number of slot0 in the SDIO interrupt registers.
+>>   *
+>>   * Locking
+>>   * =======
+>> @@ -191,6 +192,8 @@ struct dw_mci {
+>>  	bool			vqmmc_enabled;
+>>  	unsigned long		irq_flags; /* IRQ flags */
+>>  	int			irq;
+>> +
+>> +	int			sdio_id0;
+>>  };
+>>  
+>>  /* DMA ops for Internal/External DMAC interface */
+>>
+> 
+> 
+> 
+> 
