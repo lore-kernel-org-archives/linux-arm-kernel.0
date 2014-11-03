@@ -1,76 +1,66 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 3 Nov 2014 10:58:05 -0800
-Subject: [PATCH v3 09/47] mfd: palmas: Register with kernel power-off
- handler
-In-Reply-To: <20141103184312.GW27425@saruman>
-References: <1414425354-10359-1-git-send-email-linux@roeck-us.net>
- <1414425354-10359-10-git-send-email-linux@roeck-us.net>
- <20141103175645.GT12011@x1> <20141103175954.GT27425@saruman>
- <20141103183653.GA10558@roeck-us.net>
- <20141103184312.GW27425@saruman>
-Message-ID: <20141103185805.GD10558@roeck-us.net>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Mon,  3 Nov 2014 11:05:24 -0800
+Subject: [PATCH 0/7] Pinctrl support for Zynq
+Message-ID: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 03, 2014 at 12:43:12PM -0600, Felipe Balbi wrote:
-> On Mon, Nov 03, 2014 at 10:36:53AM -0800, Guenter Roeck wrote:
-> > On Mon, Nov 03, 2014 at 11:59:54AM -0600, Felipe Balbi wrote:
-> > > On Mon, Nov 03, 2014 at 05:56:45PM +0000, Lee Jones wrote:
-> > > > On Mon, 27 Oct 2014, Guenter Roeck wrote:
-> > > > 
-> > > > > Register with kernel power-off handler instead of setting pm_power_off
-> > > > > directly. Register with low priority to reflect that the original code
-> > > > > only sets pm_power_off if it was not already set.
-> > > > > 
-> > > > > Cc: Samuel Ortiz <sameo@linux.intel.com>
-> > > > > Cc: Lee Jones <lee.jones@linaro.org>
-> > > > > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> > > > > ---
-> > > > > v3:
-> > > > > - Replace poweroff in all newly introduced variables and in text
-> > > > >   with power_off or power-off as appropriate
-> > > > > - Replace POWEROFF_PRIORITY_xxx with POWER_OFF_PRIORITY_xxx
-> > > > > v2:
-> > > > > - Use define to specify poweroff handler priority
-> > > > > - Use devm_register_power_off_handler
-> > > > > - Use dev_warn instead of dev_err
-> > > > > 
-> > > > >  drivers/mfd/palmas.c       | 31 +++++++++++++++++--------------
-> > > > >  include/linux/mfd/palmas.h |  3 +++
-> > > > >  2 files changed, 20 insertions(+), 14 deletions(-)
-> > > > 
-> > > > Acked-by: Lee Jones <lee.jones@linaro.org>
-> > > 
-> > > missed lakml and linux-omap.
-> > > 
-> > Felipe,
-> > 
-> > unfortunately, get_maintainer.pl doesn't give a hint that this and the
-> > other affected patches should be sent to linux-omap. How am I supposed
-> > to know ?
-> 
-> yeah, just looked and nobody bothered to patch MAINTAINERS when those
-> files were added. I just sent a patch adding them under OMAP SUPPORT.
-> 
-I'll add the omap list as Cc: to the affected patches directly for now.
+Hi,
 
-> > Note that linux-kernel at vger.kernel.org was copied on the entire series,
-> > if that is what you mean with lakml. linux-pm at vger.kernel.org was also
-> > copied on all patches. Additional mailing lists were only copied for
-> > affected architectures to avoid for the patches to be tagged as spam.
-> > 
-> > If there is a list named lakml, I must have missed it, and I seem to be
-> > unable to find a reference to it. If that is the case, my apologies,
-> > and please provide a link to it.
-> 
-> here it is:
-> 
-> Linux ARM Kernel Mailing List <linux-arm-kernel@lists.infradead.org>
-> 
-Same problem here, though. If there are any ARM specific patches where the arm
-mailing list was not copied, that was because the dependency is not listed in
-the MAINTAINERS file. As mentioned before, copying the entire series to all
-lists touched by one of the patches in the series just doesn't work (and may
-be considered severe noise by some subscribers of those lists).
+I think we're getting closer. I re-organized the series to illustrate
+the dependencies better instead of my development process. The
+respective patches have some more details and also changelog.
 
-Guenter
+The first three patches essentially extend pinconf-generic by:
+ - properly support and distinguish between the 'groups' and 'pins' DT
+   properties
+ - option for drivers to use the pinconf-generic infrastructure with the
+   generic + driver-specific DT parameters
+
+Doing so, resulted in one change in the API. I fixed up all the
+call-sites I found, I hope.
+
+The last four patches are the platform specific stuff. The actual
+driver, DT update, documentation, etc.
+The DT binding have been revised another time to conform better with how
+the generic parameters are defined.
+
+Since the Zynq-specific parts rely on the pinconf-generic changes, I
+keep the audience to pinctrl stakeholders. Once there is an agreement on
+those patches I will post the Zynq patches on the relevant lists.
+
+	Thanks,
+	Soren
+
+Soren Brinkmann (7):
+  pinctrl: pinconf-generic: Declare dt_params/conf_items const
+  pinctrl: pinconf-generic: Infer map type from DT property
+  pinctrl: pinconf-generic: Allow driver to specify DT params
+  pinctrl: zynq: Document DT binding
+  pinctrl: Add driver for Zynq
+  ARM: zynq: Enable pinctrl
+  ARM: zynq: DT: Add pinctrl information
+
+ .../bindings/pinctrl/xlnx,zynq-pinctrl.txt         |   90 ++
+ arch/arm/boot/dts/zynq-7000.dtsi                   |    8 +-
+ arch/arm/boot/dts/zynq-zc702.dts                   |  143 +++
+ arch/arm/boot/dts/zynq-zc706.dts                   |  120 ++
+ arch/arm/mach-zynq/Kconfig                         |    2 +
+ drivers/pinctrl/Kconfig                            |    8 +
+ drivers/pinctrl/Makefile                           |    1 +
+ drivers/pinctrl/nomadik/pinctrl-abx500.c           |    6 +-
+ drivers/pinctrl/pinconf-generic.c                  |  192 ++--
+ drivers/pinctrl/pinconf.h                          |    1 +
+ drivers/pinctrl/pinctrl-rockchip.c                 |    2 +-
+ drivers/pinctrl/pinctrl-tz1090-pdc.c               |    2 +-
+ drivers/pinctrl/pinctrl-tz1090.c                   |    2 +-
+ drivers/pinctrl/pinctrl-zynq.c                     | 1164 ++++++++++++++++++++
+ drivers/pinctrl/sh-pfc/pinctrl.c                   |    2 +-
+ include/linux/pinctrl/pinconf-generic.h            |   25 +
+ include/linux/pinctrl/pinctrl.h                    |    8 +
+ 17 files changed, 1683 insertions(+), 93 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/xlnx,zynq-pinctrl.txt
+ create mode 100644 drivers/pinctrl/pinctrl-zynq.c
+
+-- 
+1.9.1
