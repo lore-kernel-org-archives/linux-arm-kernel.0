@@ -1,39 +1,36 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 03 Nov 2014 13:17:28 +0100
-Subject: [PATCH 0/4] Touchscreen performance related fixes
-In-Reply-To: <912A29987EAE174BA6CF187D7CDFA9CE26F46B2B@DLEE08.ent.ti.com>
-References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
- <544E821D.5040004@linutronix.de>
- <912A29987EAE174BA6CF187D7CDFA9CE26F46B2B@DLEE08.ent.ti.com>
-Message-ID: <54577258.9080508@linutronix.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 3 Nov 2014 12:29:48 +0000
+Subject: [PATCH 2/2] regulator: of: Add support for parsing microvolts
+ for suspend state
+In-Reply-To: <54549EA6.5060007@collabora.co.uk>
+References: <1414813978-32233-1-git-send-email-dianders@chromium.org>
+ <1414813978-32233-2-git-send-email-dianders@chromium.org>
+ <54549EA6.5060007@collabora.co.uk>
+Message-ID: <20141103122948.GI3815@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2014 08:02 PM, Griffis, Brad wrote:
-> On 10/27/2014 12:34 PM, Sebastian Andrzej Siewior wrote:
->> Do we really need #3 (and then #4)? Given the complexity we have already, is there any benefit by decreasing this value? 
-> 
-> I specifically requested we add ti,charge-delay to the device tree because it is THE critical value to tune for a given design.  Although I think the current value of 0xB000 will be suitable for a great many designs, I expect that many users will need to adjust this value for their hardware.  Details such as which touchscreen vendor is being used and how the touchscreen is connected (header vs cable) have an effect on what's appropriate here.
+On Sat, Nov 01, 2014 at 09:49:42AM +0100, Javier Martinez Canillas wrote:
+> On 11/01/2014 04:52 AM, Doug Anderson wrote:
 
-Oh. That is one knob I hoped we could avoid since I haven't seen it
-before on other TSCs. But okay. Please make sure that there is a
-message printed if the default value is used. And lets hope the user
-will do something about his.
+> > +
+> >  		of_node_put(suspend_np);
+> >  		suspend_state = NULL;
+> >  		suspend_np = NULL;
 
->> Would  someone want to increase it? Can we safely determine a value which works for everyone?
-> 
-> This value represents a hardware delay before checking for the pen-up event.  So in the scenario where someone is seeing excessive false pen-up events they will want to increase this parameter.  The downsize of making this larger is that it decreases the overall sampling speed of both the touchscreen as well as the standalone ADC samples.  At one point I tried making it huge, but that made the touchscreen overly sluggish because the sampling became too slow.  So there is a definite trade-off that if you make it too large the touchscreen becomes sluggish, and if you make it too small then you may see false pen-up events.  The optimal value will need to be tuned for a given design.
+> Looks good to me.
 
-I applied the patches from this series and did the following test on my
-am335x-evm: A mug on the touchscreen (to make sure the events are
-coming), evtest on the event node to see that the events and loop of
+> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-	cat /sys/bus/iio/devices/iio\:device0/in_voltage4_raw
-
-In the past I was able lock up the TSC/ADC HW that way (see commit
-7ca6740cd1 ("mfd: input: iio: ti_amm335x: Rework TSC/ADC
-synchronization")) for details.
-With this patches applied I don't seen any TSC events once the IIO
-interface is (heavily) used. Can this be fixed?
-
-Sebastian
+If you're reviewing something please don't quote the entire patch, the
+same rule applies as always - just include relevant context - and
+especially don't include your one line of content at the very end of the
+patch.  Otherwise people have to page through the entire thing to find
+what you've said (if they don't get fed up first).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141103/a691f5e7/attachment.sig>
