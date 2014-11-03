@@ -1,38 +1,31 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 3 Nov 2014 19:09:21 +0100
-Subject: [PATCH 0/4] Touchscreen performance related fixes
-In-Reply-To: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
-References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
-Message-ID: <20141103180920.GA20779@localhost.localdomain>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon,  3 Nov 2014 19:12:06 +0100
+Subject: [PATCH v3 3/4] regulator: gpio: Use gpio_is_valid
+In-Reply-To: <1415038327-32616-1-git-send-email-mpa@pengutronix.de>
+References: <1415038327-32616-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1415038327-32616-4-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 04:38:27PM +0530, Vignesh R wrote:
-> This series of patches fix TSC defects related to lag in touchscreen
-> performance and cursor jump at touch release. The lag was result of
-> udelay in TSC interrupt handler. Cursor jump due to false pen-up event.
-> The patches implement Advisory 1.0.31 in silicon errata of am335x-evm
-> to avoid false pen-up events and remove udelay.
+Use gpio_is_valid instead of an explicit comparison with 0.
 
-That advisory has two workarounds. You have chosen the second one?
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/regulator/gpio-regulator.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The text of the second workaround says it only works on 4 wire setups,
-so I wonder how 5 wire designs will be affected.
-
-> The advisory says to use
-> steps 1 to 4 for ADC and 5 to 16 for TSC (assuming 4 wire TSC and 4 channel
-> ADC).
-
-No, it doesn't say that. (sprz360f.pdf)
-
-> Further the X co-ordinate must be the last one to be sampled just
-> before charge step. The first two patches implement the required changes. 
-
-FWIW, I implemented the first workaround and removed the udelay not
-too long ago. Like Sebastian, I saw the TSC unit hang after about
-50000 interrupts when running with the workaround.
-
-Did you test you patch for very long?
-
-Thanks,
-Richard
+diff --git a/drivers/regulator/gpio-regulator.c b/drivers/regulator/gpio-regulator.c
+index 5da0125fac6a..86546c1c32c4 100644
+--- a/drivers/regulator/gpio-regulator.c
++++ b/drivers/regulator/gpio-regulator.c
+@@ -322,7 +322,7 @@ static int gpio_regulator_probe(struct platform_device *pdev)
+ 	cfg.driver_data = drvdata;
+ 	cfg.of_node = np;
+ 
+-	if (config->enable_gpio >= 0) {
++	if (gpio_is_valid(config->enable_gpio)) {
+ 		cfg.ena_gpio = config->enable_gpio;
+ 		cfg.ena_gpio_initialized = true;
+ 	}
+-- 
+2.1.1
