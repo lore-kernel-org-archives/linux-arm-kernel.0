@@ -1,144 +1,94 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 3 Nov 2014 16:13:21 +0000
-Subject: [RFC PATCH 4/5]ARM64: Kernel: To read PMU cycle counter through
- vDSO Path
-In-Reply-To: <1415027045-6573-5-git-send-email-yogesh.tillu@linaro.org>
-References: <1415027045-6573-1-git-send-email-yogesh.tillu@linaro.org>
- <1415027045-6573-5-git-send-email-yogesh.tillu@linaro.org>
-Message-ID: <20141103161321.GK29621@leverpostej>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon,  3 Nov 2014 16:15:56 +0000
+Subject: [PATCH] mfd: db8500-prcmu: Provide sane error path values
+Message-ID: <1415031356-11664-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 03, 2014 at 03:04:04PM +0000, Yogesh Tillu wrote:
-> Kernel patchset to enable vDSO path for reading PMU cycle counter.
-> 
-> Signed-off-by: Yogesh Tillu <yogesh.tillu@linaro.org>
-> ---
->  arch/arm64/kernel/vdso/Makefile     |    6 +++---
->  arch/arm64/kernel/vdso/vdso.lds.S   |    5 +++++
->  arch/arm64/kernel/vdso/vdso_perfc.c |   20 ++++++++++++++++++++
->  3 files changed, 28 insertions(+), 3 deletions(-)
->  create mode 100644 arch/arm64/kernel/vdso/vdso_perfc.c
-> 
-> diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
-> index 6d20b7d..4fde490 100644
-> --- a/arch/arm64/kernel/vdso/Makefile
-> +++ b/arch/arm64/kernel/vdso/Makefile
-> @@ -5,7 +5,7 @@
->  # Heavily based on the vDSO Makefiles for other archs.
->  #
->  
-> -obj-vdso := gettimeofday.o note.o sigreturn.o
-> +obj-vdso := gettimeofday.o note.o sigreturn.o armpmu.o
->  
->  # Build rules
->  targets := $(obj-vdso) vdso.so vdso.so.dbg
-> @@ -43,8 +43,8 @@ $(obj)/vdso-offsets.h: $(obj)/vdso.so.dbg FORCE
->  	$(call if_changed,vdsosym)
->  
->  # Assembly rules for the .S files
-> -$(obj-vdso): %.o: %.S
-> -	$(call if_changed_dep,vdsoas)
-> +#$(obj-vdso): %.o: %.S
-> +#	$(call if_changed_dep,vdsoas)
+Also rid superfluous gotos and label.
 
-Either this is unnecessary, and it goes, or it is necessary, and it
-stays. Do not half-remove code in this fashion.
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mfd/db8500-prcmu.c | 19 ++++++++-----------
+ 1 file changed, 8 insertions(+), 11 deletions(-)
 
->  # Actual build commands
->  quiet_cmd_vdsold = VDSOL $@
-> diff --git a/arch/arm64/kernel/vdso/vdso.lds.S b/arch/arm64/kernel/vdso/vdso.lds.S
-> index 8154b8d..8cb56e0 100644
-> --- a/arch/arm64/kernel/vdso/vdso.lds.S
-> +++ b/arch/arm64/kernel/vdso/vdso.lds.S
-> @@ -90,6 +90,11 @@ VERSION
->  		__kernel_gettimeofday;
->  		__kernel_clock_gettime;
->  		__kernel_clock_getres;
-> +		 /* ADD YOUR VDSO STUFF HERE */
-
-This comment adds no value.
-
-> +		perf_read_counter;
-> +		__vdso_perf_read_counter;
-> +		perf_open_counter;
-> +		__vdso_perf_open_counter;
-
-I believe we need a new version label for these symbols.
-
-Why are we exposing internal names outside of the VDSO? That would seem
-to defeat the point of this linker script.
-
->  	local: *;
->  	};
->  }
-> diff --git a/arch/arm64/kernel/vdso/vdso_perfc.c b/arch/arm64/kernel/vdso/vdso_perfc.c
-> new file mode 100644
-> index 0000000..c363d64
-> --- /dev/null
-> +++ b/arch/arm64/kernel/vdso/vdso_perfc.c
-> @@ -0,0 +1,20 @@
-> +#include <linux/compiler.h>
-> +
-> +int perf_read_counter(void)
-> +    __attribute__((weak, alias("__vdso__perf_read_counter")));
-> +int perf_open_counter(void)
-> +    __attribute__((weak, alias("__vdso__perf_open_counter")));
-
-Why is this not in plain assembly like the rest of the VDSO functions?
-
-There is absolutely no reason for a C wrapper for an asm block,
-especially given the additional changes required to make that work at
-all.
-
-> +
-> +#define ARMV8_PMCNTENSET_EL0_ENABLE (1<<31) /**< Enable Perf count reg */
-> +
-> +__attribute__((no_instrument_function)) int __vdso__perf_read_counter(void)
-> +{
-> +int ret = 0;
-> +asm volatile("mrs %0, pmccntr_el0" : "=r" (ret));
-> +return ret;
-> +}
-> +
-> +__attribute__((no_instrument_function)) void __vdso__perf_open_counter(void)
-> +{
-> +asm volatile("msr pmcntenset_el0, %0" : : "r" (ARMV8_PMCNTENSET_EL0_ENABLE));
-> +}
-
-Huh?
-
-This function is completely misnamed, as it enables the cycle counter in
-hardware -- it does not 'open' any counter in the traditional perf
-meaning. It does so without notifying the kernel, and no code has been
-added to context switch the counter.
-
-This will not work as-is for all but the most trivial of test cases:
-
-* The application's view of the cycle counter will jump up arbitrarily
-  when the kernel/hypervisor/firmware takes control of the hardware
-  (e.g. to handle interrupts).
-
-* The application's view of the cycle counter can change arbitrarily as
-  it gets migrated across CPUs. The counter value can change, and its
-  configuration can also change (e.g. when moving from a CPU where it is
-  enabled to one where it is not).
-
-* If another application is profiling system-wide, it will cause the
-  cycle counter to be reset occasionally on overflow.
-
-* With cpuidle, the hardware context (including the cycle counter
-  configuration) can be lost in low power states. The cycle counter may
-  suddenly stop ticking, and stay at an arbitrary reset value.
-
-If you want to expose the counters directly to userspace for reading,
-then you need to modify the existing framework to work with that. It is
-simply not possible to hack this onto the side. Otherwise the numbers
-you read are effectively meaningless.
-
-There are additional complications for big.LITTLE when using anything
-other than the cycle counter (which even then is meaningless when
-summed).
-
-Thanks,
-Mark.
+diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+index 89ae8bf..a820473 100644
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@ -3150,27 +3150,27 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "prcmu");
+ 	if (!res) {
+ 		dev_err(&pdev->dev, "no prcmu memory region provided\n");
+-		return -ENOENT;
++		return -EINVAL;
+ 	}
+ 	prcmu_base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+ 	if (!prcmu_base) {
+ 		dev_err(&pdev->dev,
+ 			"failed to ioremap prcmu register memory\n");
+-		return -ENOENT;
++		return -ENOMEM;
+ 	}
+ 	init_prcm_registers();
+ 	dbx500_fw_version_init(pdev, pdata->version_offset);
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "prcmu-tcdm");
+ 	if (!res) {
+ 		dev_err(&pdev->dev, "no prcmu tcdm region provided\n");
+-		return -ENOENT;
++		return -EINVAL;
+ 	}
+ 	tcdm_base = devm_ioremap(&pdev->dev, res->start,
+ 			resource_size(res));
+ 	if (!tcdm_base) {
+ 		dev_err(&pdev->dev,
+ 			"failed to ioremap prcmu-tcdm register memory\n");
+-		return -ENOENT;
++		return -ENOMEM;
+ 	}
+ 
+ 	/* Clean up the mailbox interrupts after pre-kernel code. */
+@@ -3179,15 +3179,14 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq <= 0) {
+ 		dev_err(&pdev->dev, "no prcmu irq provided\n");
+-		return -ENOENT;
++		return irq;
+ 	}
+ 
+ 	err = request_threaded_irq(irq, prcmu_irq_handler,
+ 	        prcmu_irq_thread_fn, IRQF_NO_SUSPEND, "prcmu", NULL);
+ 	if (err < 0) {
+ 		pr_err("prcmu: Failed to allocate IRQ_DB8500_PRCMU1.\n");
+-		err = -EBUSY;
+-		goto no_irq_return;
++		return err;
+ 	}
+ 
+ 	db8500_irq_init(np);
+@@ -3211,7 +3210,7 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
+ 		if (err) {
+ 			mfd_remove_devices(&pdev->dev);
+ 			pr_err("prcmu: Failed to add subdevices\n");
+-			goto no_irq_return;
++			return err;
+ 		}
+ 	}
+ 
+@@ -3219,12 +3218,10 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
+ 	if (err) {
+ 		mfd_remove_devices(&pdev->dev);
+ 		pr_err("prcmu: Failed to add ab8500 subdevice\n");
+-		goto no_irq_return;
++		return err;
+ 	}
+ 
+ 	pr_info("DB8500 PRCMU initialized\n");
+-
+-no_irq_return:
+ 	return err;
+ }
+ static const struct of_device_id db8500_prcmu_match[] = {
+-- 
+1.9.1
