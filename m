@@ -1,113 +1,60 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon,  3 Nov 2014 17:54:37 +0100
-Subject: [PATCH v9 00/10] sched: consolidation of CPU capacity and usage
-Message-ID: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
+Date: Mon,  3 Nov 2014 17:54:39 +0100
+Subject: [PATCH v9 02/10] sched: Track group sched_entity usage contributions
+In-Reply-To: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
+References: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1415033687-23294-3-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset consolidates several changes in the capacity and the usage
-tracking of the CPU. It provides a frequency invariant metric of the usage of
-CPUs and generally improves the accuracy of load/usage tracking in the
-scheduler. The frequency invariant metric is the foundation required for the
-consolidation of cpufreq and implementation of a fully invariant load tracking.
-These are currently WIP and require several changes to the load balancer
-(including how it will use and interprets load and capacity metrics) and
-extensive validation. The frequency invariance is done with
-arch_scale_freq_capacity and this patchset doesn't provide the backends of
-the function which are architecture dependent.
+From: Morten Rasmussen <morten.rasmussen@arm.com>
 
-As discussed at LPC14, Morten and I have consolidated our changes into a single
-patchset to make it easier to review and merge.
+Adds usage contribution tracking for group entities. Unlike
+se->avg.load_avg_contrib, se->avg.utilization_avg_contrib for group
+entities is the sum of se->avg.utilization_avg_contrib for all entities on the
+group runqueue. It is _not_ influenced in any way by the task group
+h_load. Hence it is representing the actual cpu usage of the group, not
+its intended load contribution which may differ significantly from the
+utilization on lightly utilized systems.
 
-During load balance, the scheduler evaluates the number of tasks that a group
-of CPUs can handle. The current method assumes that tasks have a fix load of
-SCHED_LOAD_SCALE and CPUs have a default capacity of SCHED_CAPACITY_SCALE.
-This assumption generates wrong decision by creating ghost cores or by
-removing real ones when the original capacity of CPUs is different from the
-default SCHED_CAPACITY_SCALE. With this patch set, we don't try anymore to
-evaluate the number of available cores based on the group_capacity but instead
-we evaluate the usage of a group and compare it with its capacity.
+cc: Paul Turner <pjt@google.com>
+cc: Ben Segall <bsegall@google.com>
 
-This patchset mainly replaces the old capacity_factor method by a new one and
-keeps the general policy almost unchanged. These new metrics will be also used
-in later patches.
+Signed-off-by: Morten Rasmussen <morten.rasmussen@arm.com>
+Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+---
+ kernel/sched/debug.c | 2 ++
+ kernel/sched/fair.c  | 3 +++
+ 2 files changed, 5 insertions(+)
 
-The CPU usage is based on a running time tracking version of the current
-implementation of the load average tracking. I also have a version that is
-based on the new implementation proposal [1] but I haven't provide the patches
-and results as [1] is still under review. I can provide change above [1] to
-change how CPU usage is computed and to adapt to new mecanism.
-
-Change since V8
- - reorder patches
-
-Change since V7
- - add freq invariance for usage tracking
- - add freq invariance for scale_rt
- - update comments and commits' message
- - fix init of utilization_avg_contrib
- - fix prefer_sibling
-
-Change since V6
- - add group usage tracking
- - fix some commits' messages
- - minor fix like comments and argument order
-
-Change since V5
- - remove patches that have been merged since v5 : patches 01, 02, 03, 04, 05, 07
- - update commit log and add more details on the purpose of the patches
- - fix/remove useless code with the rebase on patchset [2]
- - remove capacity_orig in sched_group_capacity as it is not used
- - move code in the right patch
- - add some helper function to factorize code
-
-Change since V4
- - rebase to manage conflicts with changes in selection of busiest group
-
-Change since V3:
- - add usage_avg_contrib statistic which sums the running time of tasks on a rq
- - use usage_avg_contrib instead of runnable_avg_sum for cpu_utilization
- - fix replacement power by capacity
- - update some comments
-
-Change since V2:
- - rebase on top of capacity renaming
- - fix wake_affine statistic update
- - rework nohz_kick_needed
- - optimize the active migration of a task from CPU with reduced capacity
- - rename group_activity by group_utilization and remove unused total_utilization
- - repair SD_PREFER_SIBLING and use it for SMT level
- - reorder patchset to gather patches with same topics
-
-Change since V1:
- - add 3 fixes
- - correct some commit messages
- - replace capacity computation by activity
- - take into account current cpu capacity
-
-[1] https://lkml.org/lkml/2014/10/10/131
-[2] https://lkml.org/lkml/2014/7/25/589
-
-Morten Rasmussen (2):
-  sched: Track group sched_entity usage contributions
-  sched: Make sched entity usage tracking scale-invariant
-
-Vincent Guittot (8):
-  sched: add utilization_avg_contrib
-  sched: remove frequency scaling from cpu_capacity
-  sched: make scale_rt invariant with frequency
-  sched: add per rq cpu_capacity_orig
-  sched: get CPU's usage statistic
-  sched: replace capacity_factor by usage
-  sched: add SD_PREFER_SIBLING for SMT level
-  sched: move cfs task on a CPU with higher capacity
-
- include/linux/sched.h |  21 ++-
- kernel/sched/core.c   |  15 +-
- kernel/sched/debug.c  |  12 +-
- kernel/sched/fair.c   | 369 ++++++++++++++++++++++++++++++++------------------
- kernel/sched/sched.h  |  15 +-
- 5 files changed, 276 insertions(+), 156 deletions(-)
-
+diff --git a/kernel/sched/debug.c b/kernel/sched/debug.c
+index f384452..efb47ed 100644
+--- a/kernel/sched/debug.c
++++ b/kernel/sched/debug.c
+@@ -94,8 +94,10 @@ static void print_cfs_group_stats(struct seq_file *m, int cpu, struct task_group
+ 	P(se->load.weight);
+ #ifdef CONFIG_SMP
+ 	P(se->avg.runnable_avg_sum);
++	P(se->avg.running_avg_sum);
+ 	P(se->avg.avg_period);
+ 	P(se->avg.load_avg_contrib);
++	P(se->avg.utilization_avg_contrib);
+ 	P(se->avg.decay_count);
+ #endif
+ #undef PN
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 3a91ae6..a171e1b 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -2529,6 +2529,9 @@ static long __update_entity_utilization_avg_contrib(struct sched_entity *se)
+ 
+ 	if (entity_is_task(se))
+ 		__update_task_entity_utilization(se);
++	else
++		se->avg.utilization_avg_contrib =
++					group_cfs_rq(se)->utilization_load_avg;
+ 
+ 	return se->avg.utilization_avg_contrib - old_contrib;
+ }
 -- 
 1.9.1
