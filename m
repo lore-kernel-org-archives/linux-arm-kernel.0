@@ -1,35 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 03 Nov 2014 11:11:02 +0100
-Subject: [PATCH v2 0/4] Add support for pxa27x device-tree machine
-In-Reply-To: <87a94891sm.fsf@free.fr>
-References: <1413127731-1187-1-git-send-email-robert.jarzmik@free.fr>
- <1830013.l3PUsHBfsL@wuerfel> <87a94891sm.fsf@free.fr>
-Message-ID: <3391686.6Ux0ymi7iy@wuerfel>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 03 Nov 2014 11:23:52 +0100
+Subject: [PATCH v3] mmc: dw_mmc: add support for the other bit of sdio
+ interrupt
+In-Reply-To: <5457440E.3070002@samsung.com>
+References: <1414666240-16782-1-git-send-email-addy.ke@rock-chips.com>
+ <1414977633-3196-1-git-send-email-addy.ke@rock-chips.com>
+ <5457440E.3070002@samsung.com>
+Message-ID: <3540679.aQ4QUeBEJd@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 November 2014 08:32:57 Robert Jarzmik wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
+Hi Jaehoon,
+
+Am Montag, 3. November 2014, 17:59:58 schrieb Jaehoon Chung:
+> Hi, Addy.
 > 
-> > On Thursday 30 October 2014 07:55:48 Robert Jarzmik wrote:
-> > Whole series
-> >
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Thanks Arnd.
+> On 11/03/2014 10:20 AM, Addy Ke wrote:
+> > The bit of sdio interrupt is 16 in designware implementation,
+> > but it is 24 on Rockchip SoCs.This patch add sdio_id0 for the
+> > number of slot0 in the SDIO interrupt registers.
+> > 
+> > Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> > ---
+> > Changes in v2:
+> > - rebase on http://git.linaro.org/git/people/ulf.hansson/mmc.git, next
+> > branch Changes in v3:
+> > - Remove dts for sdio_id0, just replace this with 8, suggested by Doug
+> > - Change to support all Rockchip Socs, suggested by Heiko
+> > 
+> >  drivers/mmc/host/dw_mmc-rockchip.c | 10 ++++++++++
+> >  drivers/mmc/host/dw_mmc.c          | 12 +++++++-----
+> >  drivers/mmc/host/dw_mmc.h          |  2 ++
+> >  include/linux/mmc/dw_mmc.h         |  3 +++
+> >  4 files changed, 22 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/drivers/mmc/host/dw_mmc-rockchip.c
+> > b/drivers/mmc/host/dw_mmc-rockchip.c index bbb4ec3..b997c8f 100644
+> > --- a/drivers/mmc/host/dw_mmc-rockchip.c
+> > +++ b/drivers/mmc/host/dw_mmc-rockchip.c
+> > @@ -68,14 +68,24 @@ static void dw_mci_rk3288_set_ios(struct dw_mci *host,
+> > struct mmc_ios *ios)> 
+> >  	}
+> >  
+> >  }
+> > 
+> > +static int dw_mci_rockchip_parse_dt(struct dw_mci *host)
+> > +{
+> > +	/* It is slot 8 on Rockchip SoCs */
+> > +	host->sdio_id0 = 8;
+> > +
+> > +	return 0;
+> > +}
 > 
-> Unfortunately my checkers caught a flaw in the non-device tree case :
->  - pxa27x_dt_init_irq() is defined, even if unused
->  - it calls pxa_dt_irq_init(), which is conditionaly defined on CONFIG_OF
->    => breaks non DT builds
-> 
-> So I'll have to enclose this function in a #if defined(CONFIG_OF), and respin
-> patch 1.
+> Well, function is "__parse_dt__", but this function don't parse anything.
+> If All rockchip soc is supported, i think that it can be located to other
+> place.
 
-Please make it use 
+do you have a suggestion for a location?
 
-	if (IS_ENABLED(CONFIG_OF))
-		pxa_dt_irq_init(pxa27x_set_wake);
+The only alternative I can see right now would be using the init-hook in 
+dw_mci_drv_data or adding a new field to it holding the slot-offset.
+[with using the init-hook being my personal preference of the two]
 
-so we get the build-time coverage.
 
-	Arnd
+Heiko
