@@ -1,82 +1,66 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 3 Nov 2014 18:54:47 +0100
-Subject: [GIT PULL] at91: cleanup for 3.19 #1
-Message-ID: <1415037288-4332-1-git-send-email-nicolas.ferre@atmel.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 3 Nov 2014 18:55:34 +0100
+Subject: [PATCH v4 2/8] ARM: mediatek: add dts for 8127 Moose board
+In-Reply-To: <1413973797-17619-3-git-send-email-yingjoe.chen@mediatek.com>
+References: <1413973797-17619-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1413973797-17619-3-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <CABuKBe+ku=vWiWbvAm8M7QgyzvVWZ5sdkRMocuUym8JTyk-okg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+2014-10-22 12:29 GMT+02:00 Joe.C <yingjoe.chen@mediatek.com>:
+> From: "Joe.C" <yingjoe.chen@mediatek.com>
+>
+> Moose is a tablet evalutation board based on MT8127 SoC.
+>
+> Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
+> ---
+>  arch/arm/boot/dts/mt8127-moose.dts | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/mt8127-moose.dts
+>
+> diff --git a/arch/arm/boot/dts/mt8127-moose.dts b/arch/arm/boot/dts/mt8127-moose.dts
+> new file mode 100644
+> index 0000000..602e2f0
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/mt8127-moose.dts
+> @@ -0,0 +1,24 @@
+> +/*
+> + * Copyright (c) 2014 MediaTek Inc.
+> + * Author: Joe.C <yingjoe.chen@mediatek.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +/dts-v1/;
+> +#include "mt8127.dtsi"
+> +
+> +/ {
+> +       model = "mediatek,mt8127-moose", "mediatek,mt8127";
 
-The pull-request that was sent late for 3.18. It was removing the old
-!MMU at91x40 and 2 board files plus the whole code in at91sam9g45 & at91sam9rl
-files for implementing this deprecated method. For these particular ones, the
-EK were the only one to use this code.
-We can use these boards with DT right now.
+The model should be a string that identifies the board, e.g. "Moose".
+Please add the compatible property.
 
-More code removal like that is shedulle for 3.19, so this is just a first set.
+> +
+> +       memory {
+> +               reg = <0 0x80000000 0 0x40000000>;
 
-Thanks, best regards,
+See comment on mt8127 register definitions.
 
-The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
+> +       };
+> +};
+> --
+> 1.8.1.1.dirty
+>
 
-  Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-cleanup
-
-for you to fetch changes up to bcf8c7e7703bb2bbde66bec26a81fed4be9cd1d4:
-
-  ARM: at91: remove at91sam9rl legacy board support (2014-11-03 18:48:02 +0100)
-
-----------------------------------------------------------------
-First batch of cleanup/SoC for 3.19:
-- removal of old at91x40 !MMU ARM7TDMI support which was kind of rusty
-- removal of board-sam9m10g45ek.c and board-sam9rlek.c from mach-at91
-  and the code related to these board C files + defconfigs. Use DT for them
-  now!
-
-----------------------------------------------------------------
-Nicolas Ferre (3):
-      ARM: at91: remove no-MMU at91x40 support
-      ARM: at91: remove at91sam9g45/9m10 legacy board support
-      ARM: at91: remove at91sam9rl legacy board support
-
- arch/arm/configs/at91sam9g45_defconfig       |  175 ---
- arch/arm/configs/at91sam9rl_defconfig        |   92 --
- arch/arm/configs/at91x40_defconfig           |   48 -
- arch/arm/mach-at91/Kconfig                   |   20 +-
- arch/arm/mach-at91/Kconfig.non_dt            |   58 -
- arch/arm/mach-at91/Makefile                  |   12 -
- arch/arm/mach-at91/at91sam9g45.c             |  448 ------
- arch/arm/mach-at91/at91sam9g45_devices.c     | 1915 --------------------------
- arch/arm/mach-at91/at91sam9rl.c              |  371 -----
- arch/arm/mach-at91/at91sam9rl_devices.c      | 1260 -----------------
- arch/arm/mach-at91/at91x40.c                 |   93 --
- arch/arm/mach-at91/at91x40_time.c            |   85 --
- arch/arm/mach-at91/board-eb01.c              |   52 -
- arch/arm/mach-at91/board-sam9m10g45ek.c      |  527 -------
- arch/arm/mach-at91/board-sam9rlek.c          |  333 -----
- arch/arm/mach-at91/generic.h                 |    3 -
- arch/arm/mach-at91/include/mach/at91_dbgu.h  |    3 -
- arch/arm/mach-at91/include/mach/at91x40.h    |   60 -
- arch/arm/mach-at91/include/mach/cpu.h        |    1 -
- arch/arm/mach-at91/include/mach/hardware.h   |    5 -
- arch/arm/mach-at91/include/mach/uncompress.h |    7 -
- arch/arm/mach-at91/setup.c                   |    2 +-
- drivers/rtc/Kconfig                          |    2 +-
- 23 files changed, 5 insertions(+), 5567 deletions(-)
- delete mode 100644 arch/arm/configs/at91sam9g45_defconfig
- delete mode 100644 arch/arm/configs/at91sam9rl_defconfig
- delete mode 100644 arch/arm/configs/at91x40_defconfig
- delete mode 100644 arch/arm/mach-at91/at91sam9g45_devices.c
- delete mode 100644 arch/arm/mach-at91/at91sam9rl_devices.c
- delete mode 100644 arch/arm/mach-at91/at91x40.c
- delete mode 100644 arch/arm/mach-at91/at91x40_time.c
- delete mode 100644 arch/arm/mach-at91/board-eb01.c
- delete mode 100644 arch/arm/mach-at91/board-sam9m10g45ek.c
- delete mode 100644 arch/arm/mach-at91/board-sam9rlek.c
- delete mode 100644 arch/arm/mach-at91/include/mach/at91x40.h
 
 -- 
-Nicolas Ferre
+motzblog.wordpress.com
