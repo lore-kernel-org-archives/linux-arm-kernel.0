@@ -1,43 +1,73 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 3 Nov 2014 16:00:46 -0600
-Subject: PCIe host controller without IO port access.
-In-Reply-To: <CAErSpo5wxRyfpfaTM-MqwMYqzV4tYzz5uZKV5kRWwi5Y7-CiqQ@mail.gmail.com>
-References: <5456C024.4060103@hauke-m.de>
- <CAErSpo5wxRyfpfaTM-MqwMYqzV4tYzz5uZKV5kRWwi5Y7-CiqQ@mail.gmail.com>
-Message-ID: <CAL_JsqK0737hND4C0pkNXYwyuecm8K2k=LUMNDZvqdkg=H52NA@mail.gmail.com>
+From: dev@lynxeye.de (Lucas Stach)
+Date: Mon,  3 Nov 2014 23:20:04 +0100
+Subject: [PATCH] ARM: tegra: add serial aliases to Tegra124 DT
+Message-ID: <1415053204-30114-1-git-send-email-dev@lynxeye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 3, 2014 at 11:41 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> [+cc Rob (author of 3c5d1699887b), Arnd]
->
-> On Sun, Nov 2, 2014 at 4:37 PM, Hauke Mehrtens <hauke@hauke-m.de> wrote:
->> Hi,
->>
->> I am currently writing a driver for a PCIe host controller which does
->> not support IO port access.
->>
->> My plan was to only provide IORESOURCE_MEM to pci_sys_data->resources,
->> but then it allocates some generic IORESOURCE_IO memory in
->> arch/arm/kernel/bios32.c:pcibios_init_resources(). This will work for
->> the fist PCIe controller, but when the second controller gets registered
->> I am getting this: "unable to allocate I/O port region (-16)".
->>
->> Is there an example for an arm driver for a PCIe controller which does
->> not support IO port access?
->>
->> Should I change arch/arm/kernel/bios32.c in a way so that it would
->> ignore the io port mem?
->
-> I think this is a case of "all current platforms support an I/O space,
-> so we'll set it up in the ARM PCI core."  But I/O space is not (as far
-> as I know) a required feature of PCI host bridges on ARM, so I suspect
-> you should change arch/arm/kernel/bios32.c in some way to accomodate
-> controllers with no I/O port space at all.
+Provides consistent numbering of consoles across boards.
 
-I guess we could ignore the error on request_resource or define a way
-to flag no i/o space. However, any new driver should be using all the
-new generic infrastructure. I think this code path should not even be
-called in that case.
+Signed-off-by: Lucas Stach <dev@lynxeye.de>
+---
+These aliases are already present in the base DTs for all
+other Tegra SoCs.
+---
+ arch/arm/boot/dts/tegra124.dtsi | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
 
-Rob
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index 478c555..9b53649 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -12,6 +12,13 @@
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
+ 
++	aliases {
++		serial0 = &uarta;
++		serial1 = &uartb;
++		serial2 = &uartc;
++		serial3 = &uartd;
++	};
++
+ 	pcie-controller at 0,01003000 {
+ 		compatible = "nvidia,tegra124-pcie";
+ 		device_type = "pci";
+@@ -286,7 +293,7 @@
+ 	 * the APB DMA based serial driver, the comptible is
+ 	 * "nvidia,tegra124-hsuart", "nvidia,tegra30-hsuart".
+ 	 */
+-	serial at 0,70006000 {
++	uarta: serial at 0,70006000 {
+ 		compatible = "nvidia,tegra124-uart", "nvidia,tegra20-uart";
+ 		reg = <0x0 0x70006000 0x0 0x40>;
+ 		reg-shift = <2>;
+@@ -299,7 +306,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	serial at 0,70006040 {
++	uartb: serial at 0,70006040 {
+ 		compatible = "nvidia,tegra124-uart", "nvidia,tegra20-uart";
+ 		reg = <0x0 0x70006040 0x0 0x40>;
+ 		reg-shift = <2>;
+@@ -312,7 +319,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	serial at 0,70006200 {
++	uartc: serial at 0,70006200 {
+ 		compatible = "nvidia,tegra124-uart", "nvidia,tegra20-uart";
+ 		reg = <0x0 0x70006200 0x0 0x40>;
+ 		reg-shift = <2>;
+@@ -325,7 +332,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	serial at 0,70006300 {
++	uartd: serial at 0,70006300 {
+ 		compatible = "nvidia,tegra124-uart", "nvidia,tegra20-uart";
+ 		reg = <0x0 0x70006300 0x0 0x40>;
+ 		reg-shift = <2>;
+-- 
+1.9.3
