@@ -1,94 +1,164 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  3 Nov 2014 16:15:56 +0000
-Subject: [PATCH] mfd: db8500-prcmu: Provide sane error path values
-Message-ID: <1415031356-11664-1-git-send-email-lee.jones@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 3 Nov 2014 16:16:17 +0000
+Subject: [RFC PATCH 2/5] Kernel module: to Enable userspace access to PMU
+ counters for ArmV8
+In-Reply-To: <1415027045-6573-3-git-send-email-yogesh.tillu@linaro.org>
+References: <1415027045-6573-1-git-send-email-yogesh.tillu@linaro.org>
+ <1415027045-6573-3-git-send-email-yogesh.tillu@linaro.org>
+Message-ID: <20141103161617.GL29621@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also rid superfluous gotos and label.
+On Mon, Nov 03, 2014 at 03:04:02PM +0000, Yogesh Tillu wrote:
+> This Patchset is for Kernel Module to Enable userspace access to PMU counters(ArmV8)
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mfd/db8500-prcmu.c | 19 ++++++++-----------
- 1 file changed, 8 insertions(+), 11 deletions(-)
+NAK.
 
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 89ae8bf..a820473 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -3150,27 +3150,27 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "prcmu");
- 	if (!res) {
- 		dev_err(&pdev->dev, "no prcmu memory region provided\n");
--		return -ENOENT;
-+		return -EINVAL;
- 	}
- 	prcmu_base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
- 	if (!prcmu_base) {
- 		dev_err(&pdev->dev,
- 			"failed to ioremap prcmu register memory\n");
--		return -ENOENT;
-+		return -ENOMEM;
- 	}
- 	init_prcm_registers();
- 	dbx500_fw_version_init(pdev, pdata->version_offset);
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "prcmu-tcdm");
- 	if (!res) {
- 		dev_err(&pdev->dev, "no prcmu tcdm region provided\n");
--		return -ENOENT;
-+		return -EINVAL;
- 	}
- 	tcdm_base = devm_ioremap(&pdev->dev, res->start,
- 			resource_size(res));
- 	if (!tcdm_base) {
- 		dev_err(&pdev->dev,
- 			"failed to ioremap prcmu-tcdm register memory\n");
--		return -ENOENT;
-+		return -ENOMEM;
- 	}
- 
- 	/* Clean up the mailbox interrupts after pre-kernel code. */
-@@ -3179,15 +3179,14 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq <= 0) {
- 		dev_err(&pdev->dev, "no prcmu irq provided\n");
--		return -ENOENT;
-+		return irq;
- 	}
- 
- 	err = request_threaded_irq(irq, prcmu_irq_handler,
- 	        prcmu_irq_thread_fn, IRQF_NO_SUSPEND, "prcmu", NULL);
- 	if (err < 0) {
- 		pr_err("prcmu: Failed to allocate IRQ_DB8500_PRCMU1.\n");
--		err = -EBUSY;
--		goto no_irq_return;
-+		return err;
- 	}
- 
- 	db8500_irq_init(np);
-@@ -3211,7 +3210,7 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
- 		if (err) {
- 			mfd_remove_devices(&pdev->dev);
- 			pr_err("prcmu: Failed to add subdevices\n");
--			goto no_irq_return;
-+			return err;
- 		}
- 	}
- 
-@@ -3219,12 +3218,10 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
- 	if (err) {
- 		mfd_remove_devices(&pdev->dev);
- 		pr_err("prcmu: Failed to add ab8500 subdevice\n");
--		goto no_irq_return;
-+		return err;
- 	}
- 
- 	pr_info("DB8500 PRCMU initialized\n");
--
--no_irq_return:
- 	return err;
- }
- static const struct of_device_id db8500_prcmu_match[] = {
--- 
-1.9.1
+This _must_ be built within the existing framework.
+
+Thanks,
+Mark.
+
+> 
+> Signed-off-by: Yogesh Tillu <yogesh.tillu@linaro.org>
+> ---
+>  ARMv8_Module/Makefile         |    8 ++++
+>  ARMv8_Module/README           |    1 +
+>  ARMv8_Module/enable_arm_pmu.c |   96 +++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 105 insertions(+)
+>  create mode 100644 ARMv8_Module/Makefile
+>  create mode 100644 ARMv8_Module/README
+>  create mode 100644 ARMv8_Module/enable_arm_pmu.c
+> 
+> diff --git a/ARMv8_Module/Makefile b/ARMv8_Module/Makefile
+> new file mode 100644
+> index 0000000..19a31ea
+> --- /dev/null
+> +++ b/ARMv8_Module/Makefile
+> @@ -0,0 +1,8 @@
+> +obj-m	:= enable_arm_pmu.o
+> +KDIR	:= /lib/modules/$(shell uname -r)/build
+> +PWD	:= $(shell pwd)
+> +
+> +all:
+> +	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
+> +clean:
+> +	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) clean
+> diff --git a/ARMv8_Module/README b/ARMv8_Module/README
+> new file mode 100644
+> index 0000000..648456b
+> --- /dev/null
+> +++ b/ARMv8_Module/README
+> @@ -0,0 +1 @@
+> +make ARCH=arm64 clean;make ARCH=arm64 CROSS_COMPILE=~/arm64-tc-14.06/bin/aarch64-linux-gnu- -C ~/work/lava_ci/juno/linux-linaro/workspace/builddir-3.16.0-linaro-juno/ SUBDIRS=`pwd`
+> diff --git a/ARMv8_Module/enable_arm_pmu.c b/ARMv8_Module/enable_arm_pmu.c
+> new file mode 100644
+> index 0000000..5c87b08
+> --- /dev/null
+> +++ b/ARMv8_Module/enable_arm_pmu.c
+> @@ -0,0 +1,96 @@
+> +/*
+> + * Enable user-mode ARM performance counter access.
+> + */
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/smp.h>
+> +/** -- Configuration stuff ------------------------------------------------- */
+> +
+> +#define DRVR_NAME "enable_arm_pmu"
+> +
+> +#if !defined(__aarch64__)
+> +	#error Module can only be compiled on ARM 64 machines.
+> +#endif
+> +
+> +/** -- Initialization & boilerplate ---------------------------------------- */
+> +
+> +#define PERF_DEF_OPTS 		(1 | 16)
+> +#define PERF_OPT_RESET_CYCLES 	(2 | 4)
+> +#define PERF_OPT_DIV64 		(8)
+> +#define ARMV8_PMCR_MASK         0x3f
+> +#define ARMV8_PMCR_E            (1 << 0) /* Enable all counters */
+> +#define ARMV8_PMCR_P            (1 << 1) /* Reset all counters */
+> +#define ARMV8_PMCR_C            (1 << 2) /* Cycle counter reset */
+> +#define ARMV8_PMCR_D            (1 << 3) /* CCNT counts every 64th cpu cycle */
+> +#define ARMV8_PMCR_X            (1 << 4) /* Export to ETM */
+> +#define ARMV8_PMCR_DP           (1 << 5) /* Disable CCNT if non-invasive debug*/
+> +#define ARMV8_PMCR_N_SHIFT      11       /* Number of counters supported */
+> +#define ARMV8_PMCR_N_MASK       0x1f
+> +
+> +#define ARMV8_PMUSERENR_EN_EL0  (1 << 0) /* EL0 access enable */
+> +#define ARMV8_PMUSERENR_CR      (1 << 2) /* Cycle counter read enable */
+> +#define ARMV8_PMUSERENR_ER      (1 << 3) /* Event counter read enable */
+> +
+> +static inline u32 armv8pmu_pmcr_read(void)
+> +{
+> +        u64 val=0;
+> +        asm volatile("mrs %0, pmcr_el0" : "=r" (val));
+> +        return (u32)val;
+> +}
+> +static inline void armv8pmu_pmcr_write(u32 val)
+> +{
+> +        val &= ARMV8_PMCR_MASK;
+> +        isb();
+> +        asm volatile("msr pmcr_el0, %0" : : "r" ((u64)val));
+> +}
+> + 
+> +static void
+> +enable_cpu_counters(void* data)
+> +{
+> +	u32 val=0;
+> +/* Enable user-mode access to counters. */
+> +	asm volatile("msr pmuserenr_el0, %0" : : "r"((u64)ARMV8_PMUSERENR_EN_EL0|ARMV8_PMUSERENR_ER|ARMV8_PMUSERENR_CR));
+> +/* Initialize & Reset PMNC: C and P bits. */
+> +	armv8pmu_pmcr_write(ARMV8_PMCR_P | ARMV8_PMCR_C); 
+> +/*G4.4.11
+> +PMINTENSET, Performance Monitors Interrupt Enable Set register */
+> +/*cycle counter overflow interrupt request is disabled */
+> +	asm volatile("msr pmintenset_el1, %0" : : "r" ((u64)(0 << 31)));
+> +/*start*/
+> +	armv8pmu_pmcr_write(armv8pmu_pmcr_read() | ARMV8_PMCR_E);
+> +}
+> +
+> +static void
+> +disable_cpu_counters(void* data)
+> +{
+> +	u32 val=0;
+> +	printk(KERN_INFO "\n [" DRVR_NAME "] disabling user-mode PMU access on CPU #%d",
+> +	smp_processor_id());
+> +
+> +	/* Program PMU and disable all counters */
+> +	armv8pmu_pmcr_write(armv8pmu_pmcr_read() |~ARMV8_PMCR_E);
+> +	/* disable user-mode access to counters. */
+> +	asm volatile("msr pmuserenr_el0, %0" : : "r"((u64)0));
+> +
+> +}
+> +
+> +static int __init
+> +init(void)
+> +{
+> +	on_each_cpu(enable_cpu_counters, NULL, 1);
+> +	printk(KERN_INFO "[" DRVR_NAME "] initialized");
+> +	return 0;
+> +}
+> +
+> +static void __exit
+> +fini(void)
+> +{
+> +	on_each_cpu(disable_cpu_counters, NULL, 1);
+> +	printk(KERN_INFO "[" DRVR_NAME "] unloaded");
+> +}
+> +
+> +MODULE_AUTHOR("Yogesh Tillu ");
+> +MODULE_DESCRIPTION("Enables user-mode access to ARMv8 PMU counters");
+> +MODULE_VERSION("0:0.1-dev");
+> +module_init(init);
+> +module_exit(fini);
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
