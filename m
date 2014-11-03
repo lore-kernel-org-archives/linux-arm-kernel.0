@@ -1,22 +1,18 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Mon, 03 Nov 2014 15:22:16 +0000
-Subject: [RFC PATCH 2/5] Kernel module: to Enable userspace access to PMU
- counters for ArmV8
-In-Reply-To: <1415027045-6573-3-git-send-email-yogesh.tillu@linaro.org>
- (Yogesh Tillu's message of "Mon, 3 Nov 2014 20:34:02 +0530")
-References: <1415027045-6573-1-git-send-email-yogesh.tillu@linaro.org>
- <1415027045-6573-3-git-send-email-yogesh.tillu@linaro.org>
-Message-ID: <yw1xd294l36f.fsf@unicorn.mansr.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 3 Nov 2014 16:25:02 +0100
+Subject: [GIT PULL] pinctrl: rockchip: fixes and suspend support
+In-Reply-To: <17258788.jyGObaPyvt@diego>
+References: <17258788.jyGObaPyvt@diego>
+Message-ID: <CACRpkdaW=2B4yNiJeXeLCVwSwmdBZ4QxZkix0k=jt7G1GpeT5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yogesh Tillu <yogesh.tillu@linaro.org> writes:
+On Sun, Nov 2, 2014 at 9:51 PM, Heiko St?bner <heiko@sntech.de> wrote:
 
-> This Patchset is for Kernel Module to Enable userspace access to PMU
-> counters(ArmV8)
+> here is - as requested - a pull request of the sorted (and tested)
+> rockchip pinctrl patches from Doug and Chris.
 
-This would make a lot more sense as a sysfs control.
+Pulled and pushed for testing and linux-next.
 
--- 
-M?ns Rullg?rd
-mans at mansr.com
+Yours,
+Linus Walleij
