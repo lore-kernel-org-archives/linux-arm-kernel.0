@@ -1,49 +1,44 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 3 Nov 2014 08:47:59 +0100
-Subject: Crash on ARM: 8148/1 flush TLS and thumbee register
-In-Reply-To: <20141102221401.GA4042@n2100.arm.linux.org.uk>
-References: <CAGhQ9VzyK3qW2pr-YOFywUS7=9RLDzrj6wOFFhnvyDkks_2VCA@mail.gmail.com>
- <5425DA4D.4040301@mentor.com>
- <3b91528704d24eb119ec6d80ad6ba07f@agner.ch>
- <20141102221401.GA4042@n2100.arm.linux.org.uk>
-Message-ID: <20141103074759.GU8316@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 3 Nov 2014 09:11:05 +0100
+Subject: [PATCH 3/3] I2C: mediatek: Add driver for MediaTek I2C controller
+In-Reply-To: <CABuKBe+RXboBEZD7Bu_kSbVwiapJJcAuuw_wo=xw67osJWJ20w@mail.gmail.com>
+References: <1414561058-23803-1-git-send-email-xudong.chen@mediatek.com>
+ <1414561058-23803-4-git-send-email-xudong.chen@mediatek.com>
+ <CABuKBe+RXboBEZD7Bu_kSbVwiapJJcAuuw_wo=xw67osJWJ20w@mail.gmail.com>
+Message-ID: <20141103081105.GD14482@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 02, 2014 at 10:14:01PM +0000, Russell King - ARM Linux wrote:
-> On Sun, Nov 02, 2014 at 11:03:14PM +0100, Stefan Agner wrote:
-> > Hi all,
-> > 
-> > While working on Vybrid (vf610) Cortex-M4 support I also hit this crash
-> > observed by Joachim:
-> > 
-> > ...
-> > Freeing unused kernel memory: 16K (8800a000 - 8800e000)
-> > 
-> > Unhandled exception: IPSR = 00000005 LR = fffffff1
-> > CPU: 0 PID: 1 Comm: swapper Not tainted 3.18.0-rc1-00041-ga30465a #216
-> > task: 8b838000 ti: 8b82a000 task.ti: 8b82a000
-> > PC is at flush_thread+0x32/0x40
-> > LR is at flush_thread+0x21/0x40
-> > pc : [<8f00157a>]    lr : [<8f001569>]    psr: 4100000b
-> > sp : 8b82be20  ip : 00000000  fp : 8b83c000
-> > r10: 00000001  r9 : 88018c84  r8 : 8bb85000
-> > r7 : 8b838000  r6 : 00000000  r5 : 8bb77400  r4 : 8b82a000
-> > r3 : ffff0ff0  r2 : 8b82a000  r1 : 00000000  r0 : 88020354
-> > xPSR: 4100000b
-> > CPU: 0 PID: 1 Comm: swapper Not tainted 3.18.0-rc1-00041-ga30465a #216
-> > [<8f002bc1>] (unwind_backtrace) from [<8f002033>] (show_stack+0xb/0xc)
-> > [<8f002033>] (show_stack) from [<8f00265b>] (__invalid_entry+0x4b/0x4c)
-> > 
-> > Can reproduce it on 3.18-rc1, as well as 3.17.
+On Thu, Oct 30, 2014 at 02:16:04PM +0100, Matthias Brugger wrote:
+> 2014-10-29 6:37 GMT+01:00 Xudong Chen <xudong.chen@mediatek.com>:
+> > +static int mt_i2c_do_transfer(struct mt_i2c *i2c)
+> > +{
+> > +       u16 addr_reg;
+> > +       u16 control_reg;
+> > +       int tmo = i2c->adap.timeout;
+> > +
+> > +       i2c->trans_stop = false;
+> > +       i2c->irq_stat = 0;
+> > +
+> > +       /* If use i2c pin from PMIC mt6397 side, need set PATH_DIR first */
+> > +       if (i2c->have_pmic)
+> > +               i2c_writew(I2C_CONTROL_WRAPPER, i2c, OFFSET_PATH_DIR);
 > 
-> Hmm, I think KUSER_HELPERS needs to depend on MMU.  Nathan?
-On Cortex-M3 and M4 addresses that start with 0xf....... cannot be RAM.
-So as long as the address is fixed there it won't work on ARMv7-M.
+> So this is some sort of multiplexer bit, right?
+> I think in this case we need to build a multi function device (mfd)
+> where the pmic driver will set this bit.
 
-Best regards
-Uwe
+This bit is in the i2c controller register space, so it shouldn't be
+controlled by some other driver. I think the configuration of this
+register is already in the correct place. What I could think of is that
+the PMIC could implement a pinctrl driver and the i2c controller driver
+gets the pins from the PMIC. Anyway, the controlling of this bit would
+still be in the i2c driver.
+
+Sascha
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
