@@ -1,33 +1,25 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 3 Nov 2014 17:55:46 +0000
-Subject: [PATCH v3 12/47] mfd: ab8500-sysctrl: Register with kernel
- power-off handler
-In-Reply-To: <1414425354-10359-13-git-send-email-linux@roeck-us.net>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 3 Nov 2014 11:57:27 -0600
+Subject: [PATCH v3 17/47] mfd: tps65910: Register with kernel power-off
+ handler
+In-Reply-To: <1414425354-10359-18-git-send-email-linux@roeck-us.net>
 References: <1414425354-10359-1-git-send-email-linux@roeck-us.net>
- <1414425354-10359-13-git-send-email-linux@roeck-us.net>
-Message-ID: <20141103175546.GP12011@x1>
+ <1414425354-10359-18-git-send-email-linux@roeck-us.net>
+Message-ID: <20141103175727.GR27425@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Oct 2014, Guenter Roeck wrote:
-
+On Mon, Oct 27, 2014 at 08:55:24AM -0700, Guenter Roeck wrote:
 > Register with kernel power-off handler instead of setting pm_power_off
 > directly. Register with low priority to reflect that the original code
 > only sets pm_power_off if it was not already set.
 > 
-> sysctrl_dev is set prior to power-off handler registration, and the
-> power-off handler is unregistered prior to clearing sysrctrl_dev.
-> It is therefore not necessary to check if sysctrl_dev is NULL in the
-> power-off handler, and the check was removed. Setting sysctrl_dev to NULL
-> in the remove function was also removed as unnecessary. With those changes,
-> devm_register_power_off_handler can be used to register the poeroff handler.
-> The now empty remove function was retained since the ab8500_restart function,
-> which is currently unused, would likely need some cleanup if it was ever used.
-> 
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Lee Jones <lee.jones@linaro.org>
 > Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
 > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+
+missed lakml and linux-omap here too
+
 > ---
 > v3:
 > - Replace poweroff in all newly introduced variables and in text
@@ -35,98 +27,107 @@ On Mon, 27 Oct 2014, Guenter Roeck wrote:
 > - Replace POWEROFF_PRIORITY_xxx with POWER_OFF_PRIORITY_xxx
 > v2:
 > - Use define to specify poweroff handler priority
-> - Use devm_register_power_off_handler
 > - Use dev_warn instead of dev_err
-> - Since we use devm_register_power_off_handler,
->   we need to check if sysctrl_dev in the poweroff handler to avoid
->   a race condition on unload, so this check is no longer removed
 > 
->  drivers/mfd/ab8500-sysctrl.c | 23 ++++++++++++++++-------
->  1 file changed, 16 insertions(+), 7 deletions(-)
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
-> diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
-> index 8e0dae5..c49ecaf 100644
-> --- a/drivers/mfd/ab8500-sysctrl.c
-> +++ b/drivers/mfd/ab8500-sysctrl.c
-> @@ -6,6 +6,7 @@
->  
->  #include <linux/err.h>
->  #include <linux/module.h>
+>  drivers/mfd/tps65910.c       | 27 ++++++++++++++++++---------
+>  include/linux/mfd/tps65910.h |  3 +++
+>  2 files changed, 21 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/mfd/tps65910.c b/drivers/mfd/tps65910.c
+> index 7612d89..3c94dbf 100644
+> --- a/drivers/mfd/tps65910.c
+> +++ b/drivers/mfd/tps65910.c
+> @@ -23,6 +23,8 @@
+>  #include <linux/irq.h>
+>  #include <linux/irqdomain.h>
+>  #include <linux/mfd/core.h>
 > +#include <linux/notifier.h>
->  #include <linux/platform_device.h>
->  #include <linux/pm.h>
->  #include <linux/reboot.h>
-> @@ -23,7 +24,8 @@
+> +#include <linux/pm.h>
+>  #include <linux/regmap.h>
+>  #include <linux/mfd/tps65910.h>
+>  #include <linux/of.h>
+> @@ -437,19 +439,20 @@ struct tps65910_board *tps65910_parse_dt(struct i2c_client *client,
+>  }
+>  #endif
 >  
->  static struct device *sysctrl_dev;
->  
-> -static void ab8500_power_off(void)
-> +static int ab8500_power_off(struct notifier_block *this, unsigned long unused1,
-> +			    void *unused2)
+> -static struct i2c_client *tps65910_i2c_client;
+> -static void tps65910_power_off(void)
+> +static int tps65910_power_off(struct notifier_block *this,
+> +			      unsigned long unused1, void *unused2)
 >  {
->  	sigset_t old;
->  	sigset_t all;
-> @@ -36,7 +38,7 @@ static void ab8500_power_off(void)
+> -	struct tps65910 *tps65910;
+> -
+> -	tps65910 = dev_get_drvdata(&tps65910_i2c_client->dev);
+> +	struct tps65910 *tps65910 = container_of(this, struct tps65910,
+> +						 power_off_nb);
 >  
->  	if (sysctrl_dev == NULL) {
->  		pr_err("%s: sysctrl not initialized\n", __func__);
+>  	if (tps65910_reg_set_bits(tps65910, TPS65910_DEVCTRL,
+>  			DEVCTRL_PWR_OFF_MASK) < 0)
 > -		return;
 > +		return NOTIFY_DONE;
->  	}
 >  
->  	/*
-> @@ -83,8 +85,15 @@ shutdown:
->  					 AB8500_STW4500CTRL1_SWRESET4500N);
->  		(void)sigprocmask(SIG_SETMASK, &old, NULL);
->  	}
+>  	tps65910_reg_clear_bits(tps65910, TPS65910_DEVCTRL,
+>  			DEVCTRL_DEV_ON_MASK);
 > +
 > +	return NOTIFY_DONE;
 >  }
 >  
-> +static struct notifier_block ab8500_power_off_nb = {
-> +	.notifier_call = ab8500_power_off,
-> +	.priority = POWER_OFF_PRIORITY_LOW,
-> +};
-> +
->  /*
->   * Use the AB WD to reset the platform. It will perform a hard
->   * reset instead of a soft reset. Write the reset reason to
-> @@ -185,6 +194,7 @@ static int ab8500_sysctrl_probe(struct platform_device *pdev)
->  	struct ab8500 *ab8500 = dev_get_drvdata(pdev->dev.parent);
->  	struct ab8500_platform_data *plat;
->  	struct ab8500_sysctrl_platform_data *pdata;
-> +	int err;
+>  static int tps65910_i2c_probe(struct i2c_client *i2c,
+> @@ -505,9 +508,13 @@ static int tps65910_i2c_probe(struct i2c_client *i2c,
+>  	tps65910_ck32k_init(tps65910, pmic_plat_data);
+>  	tps65910_sleepinit(tps65910, pmic_plat_data);
 >  
->  	plat = dev_get_platdata(pdev->dev.parent);
+> -	if (pmic_plat_data->pm_off && !pm_power_off) {
+> -		tps65910_i2c_client = i2c;
+> -		pm_power_off = tps65910_power_off;
+> +	if (pmic_plat_data->pm_off) {
+> +		tps65910->power_off_nb.notifier_call = tps65910_power_off;
+> +		tps65910->power_off_nb.priority = POWER_OFF_PRIORITY_LOW;
+> +		ret = register_power_off_handler(&tps65910->power_off_nb);
+> +		if (ret)
+> +			dev_warn(&i2c->dev,
+> +				 "failed to register power-off handler\n");
+>  	}
 >  
-> @@ -193,8 +203,10 @@ static int ab8500_sysctrl_probe(struct platform_device *pdev)
->  
->  	sysctrl_dev = &pdev->dev;
->  
-> -	if (!pm_power_off)
-> -		pm_power_off = ab8500_power_off;
-> +	err = devm_register_power_off_handler(sysctrl_dev,
-> +					      &ab8500_power_off_nb);
-> +	if (err)
-> +		dev_warn(&pdev->dev, "Failed to register power-off handler\n");
->  
->  	pdata = plat->sysctrl;
->  	if (pdata) {
-> @@ -228,9 +240,6 @@ static int ab8500_sysctrl_remove(struct platform_device *pdev)
+>  	ret = mfd_add_devices(tps65910->dev, -1,
+> @@ -527,6 +534,8 @@ static int tps65910_i2c_remove(struct i2c_client *i2c)
 >  {
->  	sysctrl_dev = NULL;
+>  	struct tps65910 *tps65910 = i2c_get_clientdata(i2c);
 >  
-> -	if (pm_power_off == ab8500_power_off)
-> -		pm_power_off = NULL;
-> -
->  	return 0;
->  }
+> +	unregister_power_off_handler(&tps65910->power_off_nb);
+> +
+>  	tps65910_irq_exit(tps65910);
+>  	mfd_remove_devices(tps65910->dev);
 >  
+> diff --git a/include/linux/mfd/tps65910.h b/include/linux/mfd/tps65910.h
+> index 6483a6f..94876c4 100644
+> --- a/include/linux/mfd/tps65910.h
+> +++ b/include/linux/mfd/tps65910.h
+> @@ -905,6 +905,9 @@ struct tps65910 {
+>  	/* IRQ Handling */
+>  	int chip_irq;
+>  	struct regmap_irq_chip_data *irq_data;
+> +
+> +	/* Power-off handling */
+> +	struct notifier_block power_off_nb;
+>  };
+>  
+>  struct tps65910_platform_data {
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141103/0a98aedf/attachment.sig>
