@@ -1,40 +1,96 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 3 Nov 2014 11:10:18 +0000
-Subject: [PATCH v7 3/8] arm64: introduce is_device_dma_coherent
-In-Reply-To: <20141103105716.GC23162@arm.com>
-References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
- <1414422568-19103-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1411031045340.22875@kaball.uk.xensource.com>
- <20141103105716.GC23162@arm.com>
-Message-ID: <alpine.DEB.2.02.1411031101400.22875@kaball.uk.xensource.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 03 Nov 2014 12:33:51 +0100
+Subject: [RFC PATCH 2/2] arm: pcibios: move to generic PCI domains
+In-Reply-To: <20141103112309.GB24433@red-moon>
+References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1414669490-1217-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <003401cff704$09755cd0$1c601670$%han@samsung.com>
+ <20141103112309.GB24433@red-moon>
+Message-ID: <1415014431.26755.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 3 Nov 2014, Will Deacon wrote:
-> On Mon, Nov 03, 2014 at 10:46:03AM +0000, Stefano Stabellini wrote:
-> > On Mon, 27 Oct 2014, Stefano Stabellini wrote:
-> > > Introduce a boolean flag and an accessor function to check whether a
-> > > device is dma_coherent. Set the flag from set_arch_dma_coherent_ops.
-> > > 
-> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > > CC: will.deacon at arm.com
+Am Montag, den 03.11.2014, 11:23 +0000 schrieb Lorenzo Pieralisi:
+> On Mon, Nov 03, 2014 at 01:18:12AM +0000, Jingoo Han wrote:
+> > On Thursday, October 30, 2014 8:45 PM, Lorenzo Pieralisi wrote:
+> > >
+> > > Most if not all ARM PCI host controller device drivers either ignore the
+> > > domain field in the pci_sys_data structure or just increment it every
+> > > time a host controller is probed, using it as a domain counter.
+> > >
+> > > Therefore, instead of relying on pci_sys_data to stash the domain number
+> > > in a standard location, ARM pcibios code can be moved to the newly
+> > > introduced generic PCI domains code, implemented in commits:
+> > >
+> > > commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
+> > > ("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
+> > >
+> > > commit 670ba0c8883b576d0aec28bd7a838358a4be1
+> > > ("PCI: Add generic domain handling")
+> > >
+> > > In order to assign a domain number dynamically, the ARM pcibios defines
+> > > the function, called by core PCI code:
+> > >
+> > > void pci_bus_assign_domain_nr(...)
+> > >
+> > > that relies on a DT property to define the domain number or falls back to
+> > > a counter; its usage replaces the current domain assignment code in PCI
+> > > host controllers present in the kernel.
+> > >
+> > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > Cc: Phil Edworthy <phil.edworthy@renesas.com>
+> > > Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> > > Cc: Jingoo Han <jg1.han@samsung.com>
+> > > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > > Cc: Russell King <linux@arm.linux.org.uk>
+> > > Cc: Mohit Kumar <mohit.kumar@st.com>
+> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > > 
-> > Will, Catalin,
-> > are you OK with this patch?
+> > (+CC Richard Zhu, Lucas Stach, Kishon Vijay Abraham I, Murali Karicheri)
+> > 
+> > Acked-by: Jingoo Han <jg1.han@samsung.com>
 > 
-> It would be nicer if the dma_coherent flag didn't have to be duplicated by
-> each architecture in dev_archdata. Is there any reason not to put it in the
-> core code?
+> Thank you Jingoo.
+> 
+> > For a long time, I have wanted the patch like this. Personally,
+> > I want to increase the build coverage and keep the same binary
+> > regardless of config options as possible; thus, I don't like
+> > #ifdef guards such as '#ifdef CONFIG_PCI_DOMAINS'. When I submitted
+> > the first patch for 'pcie-designware.c', I was not able to find
+> > a way to remove '#ifdef CONFIG_PCI_DOMAINS' from 'pcie-designware.c'.
+> > 
+> > This patch looks good and I think that this patch will not make
+> > the problem. However, I didn't test this patch with Exynos platform,
+> > due to some reasons. So, I hope that other engineers test this patch
+> > on other SoC platforms related to designware PCIe.
+> > 
+> > To Mohit Kumar (ST SPEAR13XX), Richard Zhu/Lucas Stach (IMX6)
+> >     Kishon Vijay Abraham I (TI DRA7XX), Murali Karicheri (TI KEYSTONE)
+> > 
+> > Would you test this patch and share the result?
+> > It would be very helpful. Thank you.
+> 
+> I am happy to wait for a week or two before asking to add this code to -next,
+> it would be definitely great to get more coverage on pcie-designware.
+> 
+I've just tested this on i.MX6 on top of 3.18-rc3. Given that we only
+use a single domain there this patch should obviously not break
+anything. Testing backs this claim, so:
 
-Yes, there is a reason for it: if I added a boolean dma_coherent flag in
-struct device as Catalin initially suggested, what would be the default
-for each architecture? Where would I set it for arch that don't use
-device tree? It is not easy.
+Tested-by: Lucas Stach <l.stach@pengutronix.de>
 
-I thought it would be better to introduce is_device_dma_coherent only on
-the architectures where it certainly makes sense to have it. In fact I
-checked and arm and arm64 are the only architectures to define
-set_arch_dma_coherent_ops at the moment. At that point if
-is_device_dma_coherent becomes arch-specific, it makes sense to store
-the flag in dev_archdata instead of struct device.
+I also looked through the patch briefly and it seems sane to me, so this
+is also:
+
+Acked-by: Lucas Stach <l.stach@pengutronix.de>
+
+I don't like the fact that a proper binding documentation is missing for
+the "linux,pci-domain" property, but this isn't the fault of this
+patchset.
+
+Regards,
+Lucas
+
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
