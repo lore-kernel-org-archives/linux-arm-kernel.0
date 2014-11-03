@@ -1,58 +1,39 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 3 Nov 2014 10:36:53 -0800
-Subject: [PATCH v3 09/47] mfd: palmas: Register with kernel power-off
- handler
-In-Reply-To: <20141103175954.GT27425@saruman>
-References: <1414425354-10359-1-git-send-email-linux@roeck-us.net>
- <1414425354-10359-10-git-send-email-linux@roeck-us.net>
- <20141103175645.GT12011@x1> <20141103175954.GT27425@saruman>
-Message-ID: <20141103183653.GA10558@roeck-us.net>
+From: socketcan@hartkopp.net (Oliver Hartkopp)
+Date: Mon, 03 Nov 2014 19:37:31 +0100
+Subject: [PATCH 1/7] can: m_can: fix possible sleep in napi poll
+In-Reply-To: <5457B517.8030805@pengutronix.de>
+References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
+ <5457B517.8030805@pengutronix.de>
+Message-ID: <5457CB6B.3080002@hartkopp.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 03, 2014 at 11:59:54AM -0600, Felipe Balbi wrote:
-> On Mon, Nov 03, 2014 at 05:56:45PM +0000, Lee Jones wrote:
-> > On Mon, 27 Oct 2014, Guenter Roeck wrote:
-> > 
-> > > Register with kernel power-off handler instead of setting pm_power_off
-> > > directly. Register with low priority to reflect that the original code
-> > > only sets pm_power_off if it was not already set.
-> > > 
-> > > Cc: Samuel Ortiz <sameo@linux.intel.com>
-> > > Cc: Lee Jones <lee.jones@linaro.org>
-> > > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> > > ---
-> > > v3:
-> > > - Replace poweroff in all newly introduced variables and in text
-> > >   with power_off or power-off as appropriate
-> > > - Replace POWEROFF_PRIORITY_xxx with POWER_OFF_PRIORITY_xxx
-> > > v2:
-> > > - Use define to specify poweroff handler priority
-> > > - Use devm_register_power_off_handler
-> > > - Use dev_warn instead of dev_err
-> > > 
-> > >  drivers/mfd/palmas.c       | 31 +++++++++++++++++--------------
-> > >  include/linux/mfd/palmas.h |  3 +++
-> > >  2 files changed, 20 insertions(+), 14 deletions(-)
-> > 
-> > Acked-by: Lee Jones <lee.jones@linaro.org>
+Hello Marc,
+
+you can omit the 'stable' tag as this driver just emerged in 3.18 - which is
+currently in 3.18-rc3 state.
+
+If possible I would suggest to push all 7 patches via can/master as it is
+pretty bad to say "M_CAN was introduced in 3.18 but M_CAN with CAN FD is
+working since 3.19".
+
+This will produce confusion as the M_CAN core has built-in CAN FD support.
+
+Regards,
+Oliver
+
+On 11/03/2014 06:02 PM, Marc Kleine-Budde wrote:
+> Hey Dong Aisheng,
 > 
-> missed lakml and linux-omap.
+> the state of the patches are:
 > 
-Felipe,
-
-unfortunately, get_maintainer.pl doesn't give a hint that this and the
-other affected patches should be sent to linux-omap. How am I supposed
-to know ?
-
-Note that linux-kernel at vger.kernel.org was copied on the entire series,
-if that is what you mean with lakml. linux-pm at vger.kernel.org was also
-copied on all patches. Additional mailing lists were only copied for
-affected architectures to avoid for the patches to be tagged as spam.
-
-If there is a list named lakml, I must have missed it, and I seem to be
-unable to find a reference to it. If that is the case, my apologies,
-and please provide a link to it.
-
-Thanks,
-Guenter
+> 1: can/master + stable
+> 2: can/mster
+> 3: can/mster
+> 4: can/master + stable
+> 5: waiting for Oliver's opinion due to the user space change
+> 6: waiting for your input
+> 7: waiting for your input
+> 
+> Marc
+> 
