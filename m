@@ -1,113 +1,151 @@
-From: mhei@heimpold.de (Michael Heimpold)
-Date: Tue, 04 Nov 2014 00:26:38 +0100
-Subject: [Regression Resend] mmc: mx28: sd card detection broken since
- 3.18-rc1
-In-Reply-To: <5457F8BD.1040800@gmail.com>
-References: <1747777414.897866.1414878004147.JavaMail.open-xchange@oxbsltgw09.schlund.de>
- <8090335.0rPHov2cpK@kerker> <5457F8BD.1040800@gmail.com>
-Message-ID: <2622508.LMF0YfKZGi@kerker>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 04 Nov 2014 00:55:22 +0100
+Subject: pm_runtime_enable() in ->probe()
+In-Reply-To: <7hwq7ci5hu.fsf@deeprootsystems.com>
+References: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
+ <3099111.MYm8ByzLAF@vostro.rjw.lan> <7hwq7ci5hu.fsf@deeprootsystems.com>
+Message-ID: <2698247.SaeVHk4A16@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kristina,
+On Monday, November 03, 2014 09:00:29 AM Kevin Hilman wrote:
+> "Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
+> 
+> > On Saturday, November 01, 2014 02:08:57 AM Rafael J. Wysocki wrote:
+> >> On Saturday, November 01, 2014 01:20:38 AM Rafael J. Wysocki wrote:
+> >> > On Friday, October 31, 2014 10:16:14 AM Ulf Hansson wrote:
+> >> > > On 24 October 2014 18:12, Kevin Hilman <khilman@kernel.org> wrote:
+> >> 
+> >> [cut]
+> >> 
+> >> > > 
+> >> > > 1)
+> >> > > It's bad practice to use pm_runtime_get_sync() in the ->probe() path,
+> >> > 
+> >> > Honestly, I'm no longer amused.
+> >> > 
+> >> > > to bring your resources to full power. The consequence would be a
+> >> > > driver that requires CONFIG_PM_RUNTIME to be even functional, which
+> >> > > just isn't acceptable.
+> >> > 
+> >> > Sorry, but this is utter nonsense.
+> >> > 
+> >> > CONFIG_PM_RUNTIME unset means "no runtime PM at all", so all drivers can expect
+> >> > everything they need to be always on.  If that is not the case, then someone is
+> >> > doing runtime PM behind the scenes and therefore cheating.  Or in different
+> >> > words, for CONFIG_PM_RUNTIME unset bus types, platforms etc must ensure that
+> >> > everything is on from the drivers' perspective.
+> >> > 
+> >> > If that is the case, then calling pm_runtime_get_sync() from ->probe
+> >> > for CONFIG_PM_RUNTIME unset simply doesn't matter.
+> >> > 
+> >> > Now, for CONFIG_PM_RUNTIME enabled, if power domains are in use, doing
+> >> > pm_runtime_get_sync() from ->probe is the only way the driver can ensure
+> >> > in a non-racy way that the device will be accessible going forward.
+> >> > 
+> >> > Why?  Simply because the probing need not happen during system initialization.
+> >> > It very well may take places when the other devices in the same domain have
+> >> > beein in use for quite a while and have been using runtime PM (in which
+> >> > case the domain may go off at any time unless it is explicityly prevented from
+> >> > doing that).
+> >> > 
+> >> > One thing that you may be missing is that, for CONFIG_PM_RUNTIME set,
+> >> > runtime PM has to be either enabled or disabled for all devices in one
+> >> > domain (and if it is disabled, then the domain needs to be always on for
+> >> > all practical purposes).  Otherwise you can't just make all of them happy
+> >> > at the same time.  The documentation doesn't cover this, because it had been
+> >> > written before we even started to consider power domains.
+> >> > 
+> >> > > Drivers that behaves well within this context, follows the runtime PM
+> >> > > documentation/recommendation.
+> >> > 
+> >> > So please go to Documentation/power/runtime_pm.txt and read it again.  Quote:
+> >> > 
+> >> > "If the default initial runtime PM status of the device (i.e. 'suspended')
+> >> > reflects the actual state of the device, its bus type's or its driver's
+> >> > ->probe() callback will likely need to wake it up using one of the PM core's
+> >> > helper functions described in Section 4.  In that case, pm_runtime_resume()
+> >> > should be used.  Of course, for this purpose the device's runtime PM has to be
+> >> > enabled earlier by calling pm_runtime_enable()."
+> >> 
+> >> All that said there is a logical error related to calling pm_runtime_enable()
+> >> and its derivatives from ->probe() that I've been overlooking pretty much
+> >> from the start.
+> >> 
+> >> Namely, really_probe() sets dev->driver to drv before calling ->probe()
+> >> for either the bus type or the driver itself, so if the driver's probe
+> >> calls pm_runtime_enable(), it will execute the driver's own runtime PM
+> >> resume callback before the driver can check whether or not it wants to handle
+> >> the device in the first place.  That doesn't sound quite right to me.
+> >> 
+> >> This means we need a different mechanism to ensure that the device will
+> >> be accessible to the driver and/or the bus type in ->probe().
+> >> 
+> >> At one point we had pm_runtime_get_sync() before really_probe() in
+> >> driver_proble_device() IIRC, but people complained about it, so we dropped it
+> >> and put a barrier in there instead, but that's not sufficient.
+> >
+> > So we actually had pm_runtime_get_noresume() before the barrier, but then
+> > we dropped it due to complaints.
+> >
+> >> We need to explicitly ensure that the device won't be powered off while
+> >> ->probe() is in progress *but* we need to avoid calling the driver's runtime
+> >> PM resume callback before ->probe() returns.
+> >
+> > I wonder, then, if we just need to do pm_runtime_get_sync() instead of the
+> > barrier and then pm_runtime_put() instead of pm_request_idle() in
+> > driver_probe_device()?
+> 
+> Won't we still have the same problems in the case of ->probe failure
+> that were fixed by removing those calls[1]?
 
-Am Montag, 3. November 2014, 23:50:53 schrieb Kristina Mart?enko:
-> On 03/11/14 22:49, Michael Heimpold wrote:
-> > Hi,
-> 
-> Hi Michael,
-> 
-> > Am Montag, 3. November 2014, 01:01:07 schrieben Sie:
-> >> On 01/11/14 23:40, Stefan Wahren wrote:
-> >>> Hi,
-> >>>
-> >>> i was testing Linux Kernel 3.18-rc2 with my i.MX28 board (I2SE Duckbill) and ran
-> >>> into the problem that the sd card isn't detected from the Kernel at booting
-> >>> (driver: mxs-mmc.c). That results in a endless wait for the root partition
-> >>
-> >> I ran into this issue as well. Seems that a card-detect flag 
-> >> (MMC_CAP2_CD_ACTIVE_HIGH) can currently be set based on an 
-> >> uninitialized variable, which can lead to the card being reported as 
-> >> not present. This patch fixes it for me:
-> >>
-> >> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-> >> index 03c53b72a2d6..f0e187682d3b 100644
-> >> --- a/drivers/mmc/core/host.c
-> >> +++ b/drivers/mmc/core/host.c
-> >> @@ -311,7 +311,7 @@ int mmc_of_parse(struct mmc_host *host)
-> >>  	struct device_node *np;
-> >>  	u32 bus_width;
-> >>  	int len, ret;
-> >> -	bool cap_invert, gpio_invert;
-> >> +	bool cap_invert, gpio_invert = false;
-> >>  
-> > 
-> > sorry, but I don't understand how your patch fixes the problem.
-> > 
-> > First use of the gpio_invert bool is in line 370/371 within mmc_gpiod_request_cd
-> > (re-wrapped into a single line here for better reading):
-> > 
-> > -snip-
-> > ret = mmc_gpiod_request_cd(host, "cd", 0, true,  0, &gpio_invert);
-> > -snap-
-> > 
-> > A pointer to the bool is passed, and inside mmc_gpiod_request_cd (drivers/mmc/core/slot-gpio.c,
-> > line 322), always a value is assigned:
-> > 
-> > -snip-
-> > if (gpio_invert)
-> >                 *gpio_invert = !gpiod_is_active_low(desc);
-> > -snap-
-> > 
-> > So returning to mmc_of_parse, the bool should always have an initialized value.
-> > Apart from some error handling, the bool is used immediately in the xor expression
-> > and results in setting MMC_CAP2_CD_ACTIVE_HIGH bit, or not.
-> > 
-> > I also cannot see a code path, where gpio_invert is used without a call to mmc_gpiod_request_cd.
-> > 
-> > Would be nice, if you could point me to what I'm missing.
-> 
-> mmc_gpiod_request_cd can return without ever reaching the line where 
-> the value is assigned to gpio_invert:
-> 
-> desc = devm_gpiod_get_index(host->parent, con_id, idx, GPIOD_IN);
-> if (IS_ERR(desc))
-> 	return PTR_ERR(desc);
-> 
-> This can happen when the host controller doesn't use a GPIO for card 
-> detection (but instead uses a dedicated pin). In this case 
-> devm_gpiod_get_index will return -ENOENT.
-> 
+Well, it looks like that might not be the best way to fix the problem.
 
-ah, I see - thank you for taking the time to explain.
+First of all, I think that drivers can reasonably expect devices to be
+accessible when ->probe() runs.  This means that the core and possibly
+bus type/PM domain need to make that happen.
 
-> >>  	if (!host->parent || !host->parent->of_node)
-> >>  		return 0;
-> >> @@ -401,6 +401,7 @@ int mmc_of_parse(struct mmc_host *host)
-> >>  	else
-> >>  		cap_invert = false;
-> >>  
-> >> +	gpio_invert = false;
-> >>  	ret = mmc_gpiod_request_ro(host, "wp", 0, false, 0, &gpio_invert);
-> > 
-> > Same here. The functions always assigns a value when a pointer is given.
-> 
-> Same thing, the function can return before gpio_invert is ever assigned 
-> to.
-> 
-> > (And this change is unrelated to the reporters problem, so should be fixed with a
-> > dedicated patch.)
-> 
-> Since both flags are set wrong for the exact same reason, and they're 
-> both regressions in 3.18, I thought it would make sense to fix them 
-> both in one patch. (Especially since I think it's cleaner to split the 
-> gpio_invert variable into cd_gpio_invert and ro_gpio_invert, and I was 
-> going to do that in the patch I'd send.) Let me know if you still think 
-> I should send separate patches for them.
- 
-Splitting the variable sounds good to me and will improve readability. In this case
-(and with proper commit message) I think it's really possible to combine both fixes
-in one patch.
+For this purpose it may be necessary to power up the device, but doing
+that from the bus type's ->probe() requires either (a) not using runtime PM
+or (b) bypassing the driver callbacks somehow.  On the other hand, arguably,
+if either the bus type or a PM domain provide meaningful runtime suspend/resume
+callbacks, then they should be available when driver_probe_device() runs
+and it should be fine to run pm_runtime_resume() at that point to trigger
+the power-up at least.
 
-Thanks,
-Michael
+Now, pm_runtime_resume() would have been sufficient to power up the device
+in driver_probe_device() if it hadn't trigger the "idle" check on return.
+So, if you have concerns regarding the reference counting, we could do
+something like
+
+	/* Grab a referece on dev to prevent runtime idle from being triggered by resume. */
+	pm_runtime_get_sync(dev);
+	/* Drop the reference befor probing to make the driver's life easier. */
+	pm_runtime_put_noidle(dev);
+	ret = really_probe(dev, drv);
+	pm_request_idle(dev);
+
+in there.  But quite frankly, I don't see the point, because
+
+	pm_runtime_get_sync(dev);
+	ret = really_probe(dev, drv);
+	pm_runtime_put(dev);
+
+will suspend the device properly anyway after dropping the reference.
+
+> IOW, after the driver's ->probe returns failure, it's no longer safe to
+> call the driver's runtime PM callbacks, since they may be accessing
+> resources that no longer exits.
+
+Which we don't do anyway, because if ->probe() fails, dev->driver is cleared
+by really_probe().
+
+> Hmm, thinking a little more, maybe this kind of failure is a good time
+> for the driver to use pm_runtime_force_suspend(), then later when the PM
+> core does the _put(), it will see the device aleady suspended and there
+> shouldn't be any problems.
+
+Well, I rather think that ->probe() should leave the device in a state
+which is as close as reasonably possible to the state it was in before.
+
+Rafael
