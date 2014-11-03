@@ -1,60 +1,49 @@
-From: nathan_lynch@mentor.com (Nathan Lynch)
-Date: Mon, 3 Nov 2014 14:06:18 -0600
-Subject: [PATCH] ARM: make kuser helpers depend on MMU
-Message-ID: <1415045178-4673-1-git-send-email-nathan_lynch@mentor.com>
+From: bonbons@linux-vserver.org (Bruno =?UTF-8?B?UHLDqW1vbnQ=?=)
+Date: Mon, 3 Nov 2014 21:14:56 +0100
+Subject: [RFC Patch 2/4] mfd: AXP20x: Add power supply sub-driver
+In-Reply-To: <20141023201235.3b94cc82@smutje.local>
+References: <20141020215954.7f1d5502@neptune.home>
+ <20141020223320.2b4ecba9@neptune.home>
+ <20141023201235.3b94cc82@smutje.local>
+Message-ID: <20141103211456.2eb13a6e@neptune.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kuser helpers page is not set up on non-MMU systems, so it does
-not make sense to allow CONFIG_KUSER_HELPERS to be enabled when
-CONFIG_MMU=n.  Allowing it to be set on !MMU results in an oops in
-set_tls (used in execve and the arm_syscall trap handler):
+On Thu, 23 October 2014 Edgar Toernig <froese@gmx.de> wrote:
+> > +	getnstimeofday(&ts);
+> > +	/* only query hardware if our data is stale */
+> > +	spin_lock(&devdata->lock);
+> > +	if (!init && !(ts.tv_sec > devdata->next_check.tv_sec ||
+> > +	               ts.tv_nsec > devdata->next_check.tv_sec)) {
+> > +		spin_unlock(&devdata->lock);
+> > +		return 0;
+> > +	}
+> > +	spin_unlock(&devdata->lock);
+> 
+> That time comparison is broken - it compares nsec with sec and
+> doesn't check that secs are equal before comparing the nsecs.
+> There's timespec_compare which gets it right.
 
-Unhandled exception: IPSR = 00000005 LR = fffffff1
-CPU: 0 PID: 1 Comm: swapper Not tainted 3.18.0-rc1-00041-ga30465a #216
-task: 8b838000 ti: 8b82a000 task.ti: 8b82a000
-PC is at flush_thread+0x32/0x40
-LR is at flush_thread+0x21/0x40
-pc : [<8f00157a>]    lr : [<8f001569>]    psr: 4100000b
-sp : 8b82be20  ip : 00000000  fp : 8b83c000
-r10: 00000001  r9 : 88018c84  r8 : 8bb85000
-r7 : 8b838000  r6 : 00000000  r5 : 8bb77400  r4 : 8b82a000
-r3 : ffff0ff0  r2 : 8b82a000  r1 : 00000000  r0 : 88020354
-xPSR: 4100000b
-CPU: 0 PID: 1 Comm: swapper Not tainted 3.18.0-rc1-00041-ga30465a #216
-[<8f002bc1>] (unwind_backtrace) from [<8f002033>] (show_stack+0xb/0xc)
-[<8f002033>] (show_stack) from [<8f00265b>] (__invalid_entry+0x4b/0x4c)
+Oops, yeah, going to switch to timespec_compare().
+Thanks for spotting!
 
-As best I can tell this issue existed for the set_tls ARM syscall
-before commit fbfb872f5f41 "ARM: 8148/1: flush TLS and thumbee
-register state during exec" consolidated the TLS manipulation code
-into the set_tls helper function, but now that we're using it to flush
-register state during execve, !MMU users encounter the oops at the
-first exec.
+> Btw, you are aware that the timeofday is a user adjustable
+> value?  If I ever turn back system time I won't get power
+> data any more until the old (future) time is reached.
 
-Prevent CONFIG_MMU=n configurations from enabling
-CONFIG_KUSER_HELPERS.
+Huh, no, I didn't consider that.
 
-Fixes: fbfb872f5f41 ARM: 8148/1: flush TLS and thumbee register state during exec
+> Wouldn't it be easier to simply use jiffies and limit the
+> poll rate to one second or so?
 
-Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
-Reported-by: Stefan Agner <stefan@agner.ch>
-Cc: stable at vger.kernel.org
----
- arch/arm/mm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+I considered limiting to some arbitrary polling rate though think
+it's better to give users the option to query values more often,
+up to the rate at which the value are measured by AXP.
+As the AXP's measurement rate is configurable (not exposed by
+driver) it's better to base on that setting instead of having
+to care at the time of exposing the configuration knob.
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index ae69809a9e47..7eb94e6fc376 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -798,6 +798,7 @@ config NEED_KUSER_HELPERS
- 
- config KUSER_HELPERS
- 	bool "Enable kuser helpers in vector page" if !NEED_KUSER_HELPERS
-+	depends on MMU
- 	default y
- 	help
- 	  Warning: disabling this option may break user programs.
--- 
-1.9.3
+Thus jiffies seem to be a bit at their limit. Is using ktime better?
+
+
+Bruno
