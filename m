@@ -1,69 +1,208 @@
-From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Mon,  3 Nov 2014 13:12:59 +0200
-Subject: [PATCH] mmc: host: atmel-mci: Add support for non-removable slots
-In-Reply-To: <CAPDyKFpMGk4M=fjBKufxb9iMbV6FmRTEfE_ptXPmM=CHx3Q7iQ@mail.gmail.com>
-References: <CAPDyKFpMGk4M=fjBKufxb9iMbV6FmRTEfE_ptXPmM=CHx3Q7iQ@mail.gmail.com>
-Message-ID: <1415013179-16823-1-git-send-email-timo.kokkonen@offcode.fi>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 3 Nov 2014 12:15:52 +0100
+Subject: [PATCH v4 12/58] dmaengine: hdmac: Split device_control
+In-Reply-To: <1414531573-18807-13-git-send-email-maxime.ripard@free-electrons.com>
+References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1414531573-18807-13-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <545763E8.9050204@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for non-removable slots which have no card detection GPIO
-and which should not be polled for a card change.
+On 28/10/2014 22:25, Maxime Ripard :
+> Split the device_control callback of the Atmel HDMAC driver to make use
+> of the newly introduced callbacks, that will eventually be used to retrieve
+> slave capabilities.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
----
- drivers/mmc/host/atmel-mci.c | 11 +++++++++--
- include/linux/atmel-mci.h    |  2 ++
- 2 files changed, 11 insertions(+), 2 deletions(-)
+It seems okay:
 
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index 77250d4..4de1a31 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -560,6 +560,9 @@ atmci_of_init(struct platform_device *pdev)
- 		pdata->slot[slot_id].detect_is_active_high =
- 			of_property_read_bool(cnp, "cd-inverted");
- 
-+		pdata->slot[slot_id].non_removable =
-+			of_property_read_bool(cnp, "non-removable");
-+
- 		pdata->slot[slot_id].wp_pin =
- 			of_get_named_gpio(cnp, "wp-gpios", 0);
- 	}
-@@ -2206,8 +2209,12 @@ static int __init atmci_init_slot(struct atmel_mci *host,
- 		}
- 	}
- 
--	if (!gpio_is_valid(slot->detect_pin))
--		mmc->caps |= MMC_CAP_NEEDS_POLL;
-+	if (!gpio_is_valid(slot->detect_pin)) {
-+		if (slot_data->non_removable)
-+			mmc->caps |= MMC_CAP_NONREMOVABLE;
-+		else
-+			mmc->caps |= MMC_CAP_NEEDS_POLL;
-+	}
- 
- 	if (gpio_is_valid(slot->wp_pin)) {
- 		if (devm_gpio_request(&host->pdev->dev, slot->wp_pin,
-diff --git a/include/linux/atmel-mci.h b/include/linux/atmel-mci.h
-index 91b77f8..9177947 100644
---- a/include/linux/atmel-mci.h
-+++ b/include/linux/atmel-mci.h
-@@ -11,6 +11,7 @@
-  * @detect_pin: GPIO pin wired to the card detect switch
-  * @wp_pin: GPIO pin wired to the write protect sensor
-  * @detect_is_active_high: The state of the detect pin when it is active
-+ * @non_removable: The slot is not removable, only detect once
-  *
-  * If a given slot is not present on the board, @bus_width should be
-  * set to 0. The other fields are ignored in this case.
-@@ -26,6 +27,7 @@ struct mci_slot_pdata {
- 	int			detect_pin;
- 	int			wp_pin;
- 	bool			detect_is_active_high;
-+	bool			non_removable;
- };
- 
- /**
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Thanks.
+
+> ---
+>  drivers/dma/at_hdmac.c | 121 +++++++++++++++++++++++++++++--------------------
+>  1 file changed, 73 insertions(+), 48 deletions(-)
+> 
+> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+> index ca9dd2613283..86450b3442f2 100644
+> --- a/drivers/dma/at_hdmac.c
+> +++ b/drivers/dma/at_hdmac.c
+> @@ -972,11 +972,13 @@ err_out:
+>  	return NULL;
+>  }
+>  
+> -static int set_runtime_config(struct dma_chan *chan,
+> -			      struct dma_slave_config *sconfig)
+> +static int atc_config(struct dma_chan *chan,
+> +		      struct dma_slave_config *sconfig)
+>  {
+>  	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
+>  
+> +	dev_vdbg(chan2dev(chan), "%s\n", __func__);
+> +
+>  	/* Check if it is chan is configured for slave transfers */
+>  	if (!chan->private)
+>  		return -EINVAL;
+> @@ -989,9 +991,28 @@ static int set_runtime_config(struct dma_chan *chan,
+>  	return 0;
+>  }
+>  
+> +static int atc_pause(struct dma_chan *chan)
+> +{
+> +	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
+> +	struct at_dma		*atdma = to_at_dma(chan->device);
+> +	int			chan_id = atchan->chan_common.chan_id;
+> +	unsigned long		flags;
+>  
+> -static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+> -		       unsigned long arg)
+> +	LIST_HEAD(list);
+> +
+> +	dev_vdbg(chan2dev(chan), "%s\n", __func__);
+> +
+> +	spin_lock_irqsave(&atchan->lock, flags);
+> +
+> +	dma_writel(atdma, CHER, AT_DMA_SUSP(chan_id));
+> +	set_bit(ATC_IS_PAUSED, &atchan->status);
+> +
+> +	spin_unlock_irqrestore(&atchan->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static int atc_resume(struct dma_chan *chan)
+>  {
+>  	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
+>  	struct at_dma		*atdma = to_at_dma(chan->device);
+> @@ -1000,60 +1021,61 @@ static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+>  
+>  	LIST_HEAD(list);
+>  
+> -	dev_vdbg(chan2dev(chan), "atc_control (%d)\n", cmd);
+> +	dev_vdbg(chan2dev(chan), "%s\n", __func__);
+>  
+> -	if (cmd == DMA_PAUSE) {
+> -		spin_lock_irqsave(&atchan->lock, flags);
+> +	if (!atc_chan_is_paused(atchan))
+> +		return 0;
+>  
+> -		dma_writel(atdma, CHER, AT_DMA_SUSP(chan_id));
+> -		set_bit(ATC_IS_PAUSED, &atchan->status);
+> +	spin_lock_irqsave(&atchan->lock, flags);
+>  
+> -		spin_unlock_irqrestore(&atchan->lock, flags);
+> -	} else if (cmd == DMA_RESUME) {
+> -		if (!atc_chan_is_paused(atchan))
+> -			return 0;
+> +	dma_writel(atdma, CHDR, AT_DMA_RES(chan_id));
+> +	clear_bit(ATC_IS_PAUSED, &atchan->status);
+>  
+> -		spin_lock_irqsave(&atchan->lock, flags);
+> +	spin_unlock_irqrestore(&atchan->lock, flags);
+>  
+> -		dma_writel(atdma, CHDR, AT_DMA_RES(chan_id));
+> -		clear_bit(ATC_IS_PAUSED, &atchan->status);
+> +	return 0;
+> +}
+>  
+> -		spin_unlock_irqrestore(&atchan->lock, flags);
+> -	} else if (cmd == DMA_TERMINATE_ALL) {
+> -		struct at_desc	*desc, *_desc;
+> -		/*
+> -		 * This is only called when something went wrong elsewhere, so
+> -		 * we don't really care about the data. Just disable the
+> -		 * channel. We still have to poll the channel enable bit due
+> -		 * to AHB/HSB limitations.
+> -		 */
+> -		spin_lock_irqsave(&atchan->lock, flags);
+> +static int atc_terminate_all(struct dma_chan *chan)
+> +{
+> +	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
+> +	struct at_dma		*atdma = to_at_dma(chan->device);
+> +	int			chan_id = atchan->chan_common.chan_id;
+> +	struct at_desc		*desc, *_desc;
+> +	unsigned long		flags;
+>  
+> -		/* disabling channel: must also remove suspend state */
+> -		dma_writel(atdma, CHDR, AT_DMA_RES(chan_id) | atchan->mask);
+> +	LIST_HEAD(list);
+>  
+> -		/* confirm that this channel is disabled */
+> -		while (dma_readl(atdma, CHSR) & atchan->mask)
+> -			cpu_relax();
+> +	dev_vdbg(chan2dev(chan), "%s\n", __func__);
+>  
+> -		/* active_list entries will end up before queued entries */
+> -		list_splice_init(&atchan->queue, &list);
+> -		list_splice_init(&atchan->active_list, &list);
+> +	/*
+> +	 * This is only called when something went wrong elsewhere, so
+> +	 * we don't really care about the data. Just disable the
+> +	 * channel. We still have to poll the channel enable bit due
+> +	 * to AHB/HSB limitations.
+> +	 */
+> +	spin_lock_irqsave(&atchan->lock, flags);
+>  
+> -		/* Flush all pending and queued descriptors */
+> -		list_for_each_entry_safe(desc, _desc, &list, desc_node)
+> -			atc_chain_complete(atchan, desc);
+> +	/* disabling channel: must also remove suspend state */
+> +	dma_writel(atdma, CHDR, AT_DMA_RES(chan_id) | atchan->mask);
+>  
+> -		clear_bit(ATC_IS_PAUSED, &atchan->status);
+> -		/* if channel dedicated to cyclic operations, free it */
+> -		clear_bit(ATC_IS_CYCLIC, &atchan->status);
+> +	/* confirm that this channel is disabled */
+> +	while (dma_readl(atdma, CHSR) & atchan->mask)
+> +		cpu_relax();
+>  
+> -		spin_unlock_irqrestore(&atchan->lock, flags);
+> -	} else if (cmd == DMA_SLAVE_CONFIG) {
+> -		return set_runtime_config(chan, (struct dma_slave_config *)arg);
+> -	} else {
+> -		return -ENXIO;
+> -	}
+> +	/* active_list entries will end up before queued entries */
+> +	list_splice_init(&atchan->queue, &list);
+> +	list_splice_init(&atchan->active_list, &list);
+> +
+> +	/* Flush all pending and queued descriptors */
+> +	list_for_each_entry_safe(desc, _desc, &list, desc_node)
+> +		atc_chain_complete(atchan, desc);
+> +
+> +	clear_bit(ATC_IS_PAUSED, &atchan->status);
+> +	/* if channel dedicated to cyclic operations, free it */
+> +	clear_bit(ATC_IS_CYCLIC, &atchan->status);
+> +
+> +	spin_unlock_irqrestore(&atchan->lock, flags);
+>  
+>  	return 0;
+>  }
+> @@ -1505,7 +1527,10 @@ static int __init at_dma_probe(struct platform_device *pdev)
+>  		/* controller can do slave DMA: can trigger cyclic transfers */
+>  		dma_cap_set(DMA_CYCLIC, atdma->dma_common.cap_mask);
+>  		atdma->dma_common.device_prep_dma_cyclic = atc_prep_dma_cyclic;
+> -		atdma->dma_common.device_control = atc_control;
+> +		atdma->dma_common.device_config = atc_config;
+> +		atdma->dma_common.device_pause = atc_pause;
+> +		atdma->dma_common.device_resume = atc_resume;
+> +		atdma->dma_common.device_terminate_all = atc_terminate_all;
+>  	}
+>  
+>  	dma_writel(atdma, EN, AT_DMA_ENABLE);
+> @@ -1622,7 +1647,7 @@ static void atc_suspend_cyclic(struct at_dma_chan *atchan)
+>  	if (!atc_chan_is_paused(atchan)) {
+>  		dev_warn(chan2dev(chan),
+>  		"cyclic channel not paused, should be done by channel user\n");
+> -		atc_control(chan, DMA_PAUSE, 0);
+> +		atc_pause(chan);
+>  	}
+>  
+>  	/* now preserve additional data for cyclic operations */
+> 
+
+
 -- 
-1.9.1
+Nicolas Ferre
