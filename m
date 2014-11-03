@@ -1,156 +1,57 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 3 Nov 2014 11:59:35 -0600
-Subject: [PATCH v3 00/47] kernel: Add support for power-off handler call
- chain
-In-Reply-To: <1414425354-10359-1-git-send-email-linux@roeck-us.net>
-References: <1414425354-10359-1-git-send-email-linux@roeck-us.net>
-Message-ID: <20141103175935.GS27425@saruman>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 3 Nov 2014 18:00:59 +0000
+Subject: [PATCH 7/7] mfd: ab8500: Decrement the power supply's device
+ reference counter
+In-Reply-To: <20141103175945.GV12011@x1>
+References: <1413290117-13082-1-git-send-email-k.kozlowski@samsung.com>
+ <1413290117-13082-8-git-send-email-k.kozlowski@samsung.com>
+ <20141103175945.GV12011@x1>
+Message-ID: <20141103180059.GW12011@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 03 Nov 2014, Lee Jones wrote:
 
-On Mon, Oct 27, 2014 at 08:55:07AM -0700, Guenter Roeck wrote:
-> Various drivers implement architecture and/or device specific means to
-> remove power from the system.  For the most part, those drivers set the
-> global variable pm_power_off to point to a function within the driver.
+> On Tue, 14 Oct 2014, Krzysztof Kozlowski wrote:
 > 
-> This mechanism has a number of drawbacks.  Typically only one means
-> to remove power is supported (at least if pm_power_off is used).
-> At least in theory there can be multiple means to remove power, some of
-> which may be less desirable.  For example, one mechanism might power off the
-> entire system through an I/O port or gpio pin, while another might power off
-> a board by disabling its power controller. Other mechanisms may really just
-> execute a restart sequence or drop into the ROM monitor, or put the CPU into
-> sleep mode.  Using pm_power_off can also be racy if the function pointer is
-> set from a driver built as module, as the driver may be in the process of
-> being unloaded when pm_power_off is called.  If there are multiple power-off
-> handlers in the system, removing a module with such a handler may
-> inadvertently reset the pointer to pm_power_off to NULL, leaving the system
-> with no means to remove power.
+> > Use power_supply_put() to decrement the power supply's device reference
+> > counter.
+> > 
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > ---
+> >  drivers/mfd/ab8500-sysctrl.c | 2 ++
+> >  1 file changed, 2 insertions(+)
 > 
-> Introduce a system power-off handler call chain to solve the described
-> problems.  This call chain is expected to be executed from the architecture
-> specific machine_power_off() function.  Drivers providing system power-off
-> functionality are expected to register with this call chain.  By using the
-> priority field in the notifier block, callers can control power-off handler
-> execution sequence and thus ensure that the power-off handler with the
-> optimal capabilities to remove power for a given system is called first.
-> A call chain instead of a single call to the highest priority handler is
-> used to provide fallback: If multiple power-off handlers are installed,
-> all handlers will be called until one actually succeeds to power off the
-> system.
-> 
-> Patch 01/47 implements the power-off handler API.
-> 
-> Patches 02/47 to 04/47 are cleanup patches to prepare for the move of
-> pm_power_off to a common location.
-> 
-> Patches 05/47 to 07/47 remove references to pm_power_off from devicetree
-> bindings descriptions.
-> 
-> Patch 08/47 moves the pm_power_off variable from architecture code to
-> kernel/reboot.c. 
-> 
-> Patches 09/47 to 34/47 convert various drivers to register with the kernel
-> power-off handler instead of setting pm_power_off directly.
-> 
-> Patches 35/47 to 46/47 do the same for architecture code.
-> 
-> Patch 47/47 finally removes pm_power_off.
-> 
-> For the most part, the individual patches include explanations why specific
-> priorities were chosen, at least if the selected priority is not the default
-> priority. Subsystem and architecture maintainers are encouraged to have a look
-> at the selected priorities and suggest improvements.
-> 
-> I ran the final code through my normal build and qemu tests. Results are
-> available at http://server.roeck-us.net:8010/builders in the 'poweroff-handler'
-> column. I also built all available configurations for arm, mips, powerpc,
-> m68k, and sh architectures.
-> 
-> The series is available in branch poweroff-handler of my repository at
-> git://git.kernel.org/pub/scm/linux/kernel/git/groeck/linux-staging.git.
-> It is based on 3.18-rc2.
-> 
-> A note on Cc: In the initial submission I had way too many Cc:, causing the
-> patchset to be treated as spam by many mailers and mailing list handlers,
-> which of course defeated the purpose. This time around I am cutting down
-> the distribution list down significantly. My apologies to anyone I may have
-> failed to copy this time around.
+> Applied, thanks.
 
-you touch every single architecture with this patchset, but you didn't
-care about Ccing any of the arch-specific mailing lists, like lakml ?
+Whoops, to hasty there -- unapplied.
 
-Please resend with proper people in Cc, IIRC RMK had a few very
-important comments about the idea behind this series.
+What's going on with this set?
 
-> Important changes since v2:
-> - Rebased series to v3.18-rc2.
-> - Do not hold any locks while executing the power-off call chain.
->   This ensures that power-off handlers are executed in the state
->   selected by the machine_power_off function for a given architecture,
->   ie without changing the current semantics of power-off callbacks and
->   machine_power_off functions.
->   Power-off handler registration and de-registration is handled in atomic
->   context with interrupts disabled to ensure that those functions are not
->   interrupted by code which powers off the system.
-> - Use [xxx_]power_off[_xxx] instead of [xxx_]poweroff[_xxx] for newly
->   introduced function and variable names.
-> - Use power-off instead of poweroff in descriptive text and comments.
-> - Replace POWEROFF_PRIORITY_xxx with POWER_OFF_PRIORITY_xxx
-> - Use ACPI: instead of acpi: for messages in acpi code.
+> > diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
+> > index 93b2d2c32ca3..d05a5719cfc4 100644
+> > --- a/drivers/mfd/ab8500-sysctrl.c
+> > +++ b/drivers/mfd/ab8500-sysctrl.c
+> > @@ -51,6 +51,7 @@ static void ab8500_power_off(void)
+> >  
+> >  		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE,
+> >  				&val);
+> > +		power_supply_put(psy);
+> >  
+> >  		if (!ret && val.intval) {
+> >  			charger_present = true;
+> > @@ -73,6 +74,7 @@ static void ab8500_power_off(void)
+> >  			       pss[i]);
+> >  			machine_restart("charging");
+> >  		}
+> > +		power_supply_put(psy);
+> >  	}
+> >  
+> >  shutdown:
 > 
-> Important changes since v1:
-> - Rebased series to v3.18-rc1.
-> - Use raw notifier with spinlock protection instead of atomic notifiers,
->   since some power-off handlers need to have interrupts enabled.
-> - Renamed API functions from _poweroff to _power_off.
-> - Added various Acks.
-> - Build tested all configurations for arm, powerpc, and mips architectures.
-> - Fixed two compile errors in mips patch.
-> - Replaced dev_err and pr_err with dev_warn and pr_warn if an error is not
->   fatal.
-> - Provide managed resources API and use where appropriate.
-> - Provide and use definitions for standard priorities.
-> - Added patches to convert newly introduced power-off handlers.
-> - Various minor changes.
-> 
-> Important changes since RFC:
-> - Move API to new file kernel/power/power_off_handler.c.
-> - Move pm_power_off pointer to kernel/power/power_off_handler.c. Call
->   pm_power_off from do_kernel_power_off, and only call do_kernel_power_off
->   from architecture code instead of calling both pm_power_off and
->   do_kernel_power_off.
-> - Provide additional API function register_power_off_handler_simple
->   to simplify conversion of architecture code.
-> - Provide additional API function have_kernel_power_off to check if
->   a power-off handler was installed.
-> - Convert all drivers and architecture code to use the new API.
-> - Remove pm_power_off as last patch of the series.
-> 
-> Cc: Alan Cox <gnomes@lxorguk.ukuu.org.uk>
-> Cc: Alexander Graf <agraf@suse.de>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-> cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Len Brown <len.brown@intel.com>
-> Cc: Pavel Machek <pavel@ucw.cz>
-> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Cc: Romain Perier <romain.perier@gmail.com>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141103/38ee0176/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
