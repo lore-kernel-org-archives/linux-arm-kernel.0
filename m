@@ -1,42 +1,57 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 3 Nov 2014 13:33:11 +0100
-Subject: [PATCH v4 02/58] serial: at91: Use dmaengine_slave_config API
-In-Reply-To: <5457632C.5020002@atmel.com>
-References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
- <1414531573-18807-3-git-send-email-maxime.ripard@free-electrons.com>
- <5457632C.5020002@atmel.com>
-Message-ID: <20141103123311.GJ11263@lukather>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 3 Nov 2014 10:45:20 -0200
+Subject: [PATCH] ARM: imx: Explicitly select CONFIG_SPI
+In-Reply-To: <20141103062606.GF10821@tiger>
+References: <1414617568-27615-1-git-send-email-festevam@gmail.com>
+ <20141103062606.GF10821@tiger>
+Message-ID: <CAOMZO5AB8khWKYmeOQWd0_jT4Ho0ogAkUX+=3mfhqEVhhxeqGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Hi Shawn,
 
-On Mon, Nov 03, 2014 at 12:12:44PM +0100, Nicolas Ferre wrote:
-> On 28/10/2014 22:25, Maxime Ripard :
-> > We are removing the dmaengine_device_control API, that shouldn't even have been
-> > exposed in the first place. Change the callers to use the proper API.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> Thanks, Maxime. Do I have to carry the patch myself or is it part of a
-> series?
+On Mon, Nov 3, 2014 at 4:26 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Wed, Oct 29, 2014 at 07:19:28PM -0200, Fabio Estevam wrote:
+>> From: Fabio Estevam <fabio.estevam@freescale.com>
+>>
+>> Since 3.18-rc1 CONFIG_SPI is no longer automatically selected for
+>> imx_v4_v5_defconfig and imx_v6_v7_defconfig, so in order to keep the same
+>> behaviour as previous kernel versions and avoid regressions, let's explicitly
+>> select CONFIG_SPI.
+>>
+>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>> ---
+>> Shawn,
+>>
+>> If possible, please apply this as a bug fix for 3.18.
+>
+> Can you please mention the commit that introduced the regression in the
+> commit log?
 
-I think it would be better to keep it together with that serie, since
-we're removing dmaengine_device_control in a latter patch. If it's ok
-for you of course.
+The problem is that 'git bisect' did not produce a valid result for
+me. It says that:
 
-Maxime
+commit cf377ad7d42c566356d79049536d9cb37499cb77
+Merge: 212fe84 d8f0faa
+Author: Linus Torvalds <torvalds@linux-foundation.org>
+Date:   Wed Oct 8 17:13:04 2014 -0400
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141103/f3fef5a0/attachment-0001.sig>
+    Merge tag 'soc-for-linus' of
+git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
+
+
+, is the first bad commit, but this does not look correct, so I was
+not able to really identify the commit that caused this regression.
+
+Here is my procedure (starting at 3.18-rc1):
+
+git bisect start
+git bisect bad
+git bisect good v3.17
+make imx_v6_v7_defconfig
+cat .config | grep CONFIG_SPI=y
+
+Then I add "git bisect good or bad" depending on the output of the
+'cat' command.
+
+Any ideas?
