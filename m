@@ -1,55 +1,65 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 03 Nov 2014 10:09:36 +0100
-Subject: [RFT] ARM: shmobile: rcar-gen2: Fix build breakage
-In-Reply-To: <CAMuHMdUGZ5jkBB3s0L=gLpbM3=0+0jhgf1OF2PBUZaGBU3nx=w@mail.gmail.com>
-References: <1414767766-19967-1-git-send-email-k.kozlowski@samsung.com>
- <CAMuHMdUGZ5jkBB3s0L=gLpbM3=0+0jhgf1OF2PBUZaGBU3nx=w@mail.gmail.com>
-Message-ID: <1415005776.4241.15.camel@AMDC1943>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 3 Nov 2014 11:30:27 +0200
+Subject: [PATCH 01/10] ARM: dts: Fix bootloader version dependencies by
+ muxing n900 smc91x pins
+In-Reply-To: <20141030154952.GF2560@atomide.com>
+References: <1414628948-30702-1-git-send-email-tony@atomide.com>
+ <1414628948-30702-2-git-send-email-tony@atomide.com>
+ <54522829.6060406@ti.com> <20141030154952.GF2560@atomide.com>
+Message-ID: <54574B33.9050303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On nie, 2014-11-02 at 10:10 +0100, Geert Uytterhoeven wrote:
-> On Fri, Oct 31, 2014 at 4:02 PM, Krzysztof Kozlowski
-> <k.kozlowski@samsung.com> wrote:
-> > Fix build breakage when building allmodconfig or allyesconfig introduced
-> > by adding ISB instruction to rcar_gen2_timer_init() function
-> > (9ce3fa6816c2 "ARM: shmobile: rcar-gen2: Add CA7 arch_timer
-> > initialization for r8a7794"):
-> >
-> >   CC      arch/arm/mach-shmobile/setup-rcar-gen2.o
-> > /tmp/cc770qt0.s: Assembler messages:
-> > /tmp/cc770qt0.s:378: Error: selected processor does not support ARM mode `isb'
-> > /tmp/cc770qt0.s:381: Error: selected processor does not support ARM mode `isb'
-> > /tmp/cc770qt0.s:383: Error: selected processor does not support ARM mode `isb'
-> > make[1]: *** [arch/arm/mach-shmobile/setup-rcar-gen2.o] Error 1
-> >
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > ---
-> >  arch/arm/mach-shmobile/setup-rcar-gen2.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-> > index 3dd6edd9bd1d..47f85643785f 100644
-> > --- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-> > +++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-> > @@ -68,6 +68,7 @@ void __init rcar_gen2_timer_init(void)
-> >                  * secure code.
-> >                  */
-> >                 asm volatile(
-> > +               "       .arch   armv7-a\n"
-> >                 "       cps     0x16\n"
-> >                 "       mrc     p15, 0, r1, c1, c1, 0\n"
-> >                 "       orr     r0, r1, #1\n"
+On 10/30/2014 05:49 PM, Tony Lindgren wrote:
+> * Roger Quadros <rogerq@ti.com> [141030 05:01]:
+>> On 10/30/2014 02:28 AM, Tony Lindgren wrote:
+>>> +
+>>> +			/*
+>>> +			 * gpmc_ncs0, gpmc_nadv_ale, gpmc_noe, gpmc_nwe, gpmc_wait0 not muxable
+>>> +			 * according to TRM. REVISIT: why does nolo set input for gpmc_clk?
+>>> +			 */
+>>> +                        OMAP3_CORE1_IOPAD(0x20b0, PIN_OUTPUT | MUX_MODE0)       /* gpmc_ncs1.gpmc_ncs1 */
+>>> +                        OMAP3_CORE1_IOPAD(0x20be, PIN_INPUT | MUX_MODE0)        /* gpmc_clk.gpmc_clk */
+>>
+>> Right about the comment. GPMC_CLK should feed the CLK input of the OneNAND.
+>> This needs to be an OUTPUT pin.
+>>
+>> Does OneNAND work when this pin is configured as output?
 > 
-> Shouldn't the ".arch" be reset to some generic value afterwards?
+> Does not seem to work, it produces onenand_wait: ECC error = 0xffff.
+> 
+> It seems the clock needs to be copied to GPMC too in some cases.
+> For MMC, there's the MMCSDIO2ADPCLKISEL option to copy the clock to
+> account for level shifter latencies [1]. But in the OneNAND case I
+> don't think there are any level shifters, and I don't think we have
+> "copy clock" option for GPMC either in SCM so it somehow is automatic
+> in GPMC.
+> 
+> Anyways, updated patch below with wrong guessing removed.
+> 
+> Regards,
+> 
+> Tony
+> 
+> [1] http://processors.wiki.ti.com/index.php/SD-MMC_Usage_Notes_on_OMAP35x_and_AM37x
+> 
+> 
+> 8< --------------------
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Wed, 29 Oct 2014 17:16:47 -0700
+> Subject: [PATCH] ARM: dts: Fix bootloader version dependencies by muxing n900 smc91x pins
+> 
+> Apparently some versions of nolo don't mux the all the necessary GPMC
+> pins for the smc91x probe to work properly. Let's fix this issue
+> by adding mux support for GPMC to the kernel.
+> 
+> Note that GPMC clk needs input enabled for OnenNAND to work.
+> 
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-This is per compilation unit so this would make same effect as adding in
-Makefile:
-CFLAGS_setup-rcar-gen2.o := -march=armv7-a
+Acked-by: Roger Quadros <rogerq@ti.com>
 
-In both cases the whole unit is affected by armv7-a. Setting it to armv6
-won't always mean "reset" because shmobile config could be compiled by
-default in armv7.
-
-Best regards,
-Krzysztof
+cheers,
+-roger
