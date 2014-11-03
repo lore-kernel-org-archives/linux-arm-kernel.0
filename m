@@ -1,32 +1,34 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 03 Nov 2014 09:52:35 +0100
-Subject: [GIT PULL] STi: Reset changes for v3.19
-In-Reply-To: <545398BA.8040601@st.com>
-References: <545398BA.8040601@st.com>
-Message-ID: <1415004755.3060.2.camel@pengutronix.de>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 3 Nov 2014 09:54:27 +0100
+Subject: [PATCH v10 0/2] pwm: add support for atmel-hlcdc-pwm device
+In-Reply-To: <1412689095-14259-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1412689095-14259-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20141103095427.3f385b9d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi Thierry,
 
-Am Freitag, den 31.10.2014, 15:12 +0100 schrieb Maxime Coquelin:
-> Hi Philipp,
-> 
-> Please consider these STi reset updates for v3.19:
-> 
-> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-> 
->    Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-> 
-> are available in the git repository at:
-> 
->    git://git.stlinux.com/devel/kernel/linux-sti.git 
-> tags/sti-reset-for-v3.19-1
-> 
-> for you to fetch changes up to 4b171b3d3bdf256b0d75a6b3430d8b73134b1bf7:
-[...]
+On Tue,  7 Oct 2014 15:38:13 +0200
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
 
-Pulled, thanks.
+> Hi Thierry,
+> 
+> This patch series adds support for the atmel-hlcdc-pwm device provided
+> by the atmel-hlcdc MFD driver.
 
-regards
-Philipp
+You seemed to be happy with this version but never told that you would
+take it into your tree.
+
+Is there anything missing (I'd really like to have the atmel-hlcdc
+drivers in 3.19...) ?
+
+Best Regards,
+
+Boris
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
