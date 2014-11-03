@@ -1,10 +1,10 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 3 Nov 2014 10:46:03 +0000
-Subject: [PATCH v7 3/8] arm64: introduce is_device_dma_coherent
-In-Reply-To: <1414422568-19103-3-git-send-email-stefano.stabellini@eu.citrix.com>
+Date: Mon, 3 Nov 2014 10:55:32 +0000
+Subject: [PATCH v7 4/8] arm: introduce is_device_dma_coherent
+In-Reply-To: <1414422568-19103-4-git-send-email-stefano.stabellini@eu.citrix.com>
 References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
- <1414422568-19103-3-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <alpine.DEB.2.02.1411031045340.22875@kaball.uk.xensource.com>
+ <1414422568-19103-4-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <alpine.DEB.2.02.1411031054400.22875@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,50 +14,51 @@ On Mon, 27 Oct 2014, Stefano Stabellini wrote:
 > 
 > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> CC: linux at arm.linux.org.uk
 > CC: will.deacon at arm.com
 
-Will, Catalin,
-are you OK with this patch?
+Any opinions on this?
+FYI I have just submitted the patch to Russell's patch tracking system.
 
 
->  arch/arm64/include/asm/device.h      |    1 +
->  arch/arm64/include/asm/dma-mapping.h |    6 ++++++
+>  arch/arm/include/asm/device.h      |    1 +
+>  arch/arm/include/asm/dma-mapping.h |    6 ++++++
 >  2 files changed, 7 insertions(+)
 > 
-> diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
-> index cf98b36..243ef25 100644
-> --- a/arch/arm64/include/asm/device.h
-> +++ b/arch/arm64/include/asm/device.h
-> @@ -21,6 +21,7 @@ struct dev_archdata {
->  #ifdef CONFIG_IOMMU_API
->  	void *iommu;			/* private IOMMU data */
+> diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
+> index dc662fc..4111592 100644
+> --- a/arch/arm/include/asm/device.h
+> +++ b/arch/arm/include/asm/device.h
+> @@ -17,6 +17,7 @@ struct dev_archdata {
+>  #ifdef CONFIG_ARM_DMA_USE_IOMMU
+>  	struct dma_iommu_mapping	*mapping;
 >  #endif
 > +	bool dma_coherent;
 >  };
 >  
->  struct pdev_archdata {
-> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-> index adeae3f..e213dc4 100644
-> --- a/arch/arm64/include/asm/dma-mapping.h
-> +++ b/arch/arm64/include/asm/dma-mapping.h
-> @@ -54,11 +54,17 @@ static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
+>  struct omap_device;
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index 85738b2..8c3b616 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -123,11 +123,17 @@ static inline unsigned long dma_max_pfn(struct device *dev)
 >  
 >  static inline int set_arch_dma_coherent_ops(struct device *dev)
 >  {
 > +	dev->archdata.dma_coherent = true;
->  	set_dma_ops(dev, &coherent_swiotlb_dma_ops);
+>  	set_dma_ops(dev, &arm_coherent_dma_ops);
 >  	return 0;
 >  }
->  #define set_arch_dma_coherent_ops	set_arch_dma_coherent_ops
+>  #define set_arch_dma_coherent_ops(dev)	set_arch_dma_coherent_ops(dev)
 >  
 > +static inline bool is_device_dma_coherent(struct device *dev)
 > +{
 > +	return dev->archdata.dma_coherent;
 > +}
 > +
->  #include <asm-generic/dma-mapping-common.h>
->  
 >  static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+>  {
+>  	unsigned int offset = paddr & ~PAGE_MASK;
 > -- 
 > 1.7.10.4
 > 
