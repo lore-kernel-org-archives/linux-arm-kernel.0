@@ -1,52 +1,66 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 3 Nov 2014 18:43:17 +0100
-Subject: [GIT PULL] at91: dt for 3.19 #1
-Message-ID: <1415036597-3501-1-git-send-email-nicolas.ferre@atmel.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 03 Nov 2014 18:45:11 +0100
+Subject: [PATCH 05/17] clocksource: time-armada-370-xp: add suspend/resume
+ support
+In-Reply-To: <1414151970-6626-6-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1414151970-6626-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5457BF27.8000108@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+Hi Thomas,
 
-Very little DT update for AT91. More will come but I want to send this first
-batch soon so it doesn't get in the way of larger modifications.
+On 24/10/2014 13:59, Thomas Petazzoni wrote:
+> This commit adds a set of suspend/resume syscore_ops to respectively
+> save and restore a number of timer registers, in order to make sure
+> the clockevent and clocksource devices continue to work properly
+> accross a suspend/resume cycle.
+  across
 
-Thanks, best regards,
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/clocksource/time-armada-370-xp.c | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+> 
+> diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+> index 0451e62..1a32dcb 100644
+> --- a/drivers/clocksource/time-armada-370-xp.c
+> +++ b/drivers/clocksource/time-armada-370-xp.c
+> @@ -43,6 +43,7 @@
+>  #include <linux/module.h>
+>  #include <linux/sched_clock.h>
+>  #include <linux/percpu.h>
+> +#include <linux/syscore_ops.h>
+>  
+>  /*
+>   * Timer block registers.
+> @@ -223,6 +224,28 @@ static struct notifier_block armada_370_xp_timer_cpu_nb = {
+>  	.notifier_call = armada_370_xp_timer_cpu_notify,
+>  };
+>  
+> +static u32 timer_ctrl_reg, timer_local_ctrl_reg;
 
-The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
+We don't need to restore any other timer than the timer 0, but it
+would worth mentioning that we save and restore only this one
+by naming the variable timer0_ctrl_reg and timer0_local_ctrl_reg
 
-  Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
+Besides this and the typo:
 
-are available in the git repository at:
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-dt
 
-for you to fetch changes up to 2667c6adfcf686e8c5a5b56e8c7c65af001df2cb:
+Thanks,
 
-  ARM: at91/dt: at91sam9263: Add CAN device nodes (2014-11-03 11:34:33 +0100)
+Gregory
 
-----------------------------------------------------------------
-First DT batch for 3.19:
-- CAN device nodes for at91sam9263 and at91sam9x5
-- at91sam9x5 DMA definitions for usart
-
-----------------------------------------------------------------
-Alexander Stein (2):
-      ARM: at91/dt: at91sam9x5: Add CAN device nodes
-      ARM: at91/dt: at91sam9263: Add CAN device nodes
-
-Jiri Prchal (1):
-      ARM: at91: at91sam9x5 dt: add usart dma definitions to dt
-
-Nicolas Ferre (1):
-      ARM: at91/dt/trivial: at91sam9x5_can.dtsi: comment and whitespace fixes
-
- arch/arm/boot/dts/at91sam9263.dtsi       | 19 ++++++++++++
- arch/arm/boot/dts/at91sam9x25.dtsi       |  1 +
- arch/arm/boot/dts/at91sam9x35.dtsi       |  1 +
- arch/arm/boot/dts/at91sam9x5.dtsi        | 12 ++++++++
- arch/arm/boot/dts/at91sam9x5_can.dtsi    | 50 ++++++++++++++++++++++++++++----
- arch/arm/boot/dts/at91sam9x5_usart3.dtsi |  3 ++
- 6 files changed, 81 insertions(+), 5 deletions(-)
 
 -- 
-Nicolas Ferre
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
