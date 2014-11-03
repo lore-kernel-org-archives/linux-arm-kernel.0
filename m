@@ -1,51 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 03 Nov 2014 14:10:15 +0000
-Subject: [V9 PATCH 2/2] irqchip: gicv2m: Add supports for ARM GICv2m
- MSI(-X)
-In-Reply-To: <54574FF7.706@arm.com>
-References: <1414743990-28421-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1414743990-28421-3-git-send-email-suravee.suthikulpanit@amd.com>
- <54574FF7.706@arm.com>
-Message-ID: <54578CC7.4050901@arm.com>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Mon,  3 Nov 2014 15:14:11 +0100
+Subject: [PATCH v3 1/2] ARM: add mach-asm9260
+In-Reply-To: <1415024052-12351-1-git-send-email-linux@rempel-privat.de>
+References: <20141102203438.GW3698@titan.lakedaemon.net>
+ <1415024052-12351-1-git-send-email-linux@rempel-privat.de>
+Message-ID: <1415024052-12351-2-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/14 09:50, Marc Zyngier wrote:
+it is low cost (?) SoC targeted for market in China and India which
+trying to compete with AT91SAM9G25.
 
->> @@ -843,10 +847,14 @@ static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
->>         unsigned int type = IRQ_TYPE_NONE;
->>         struct of_phandle_args *irq_data = arg;
->>
->> -       ret = gic_irq_domain_xlate(domain, irq_data->np, irq_data->args,
->> -                                  irq_data->args_count, &hwirq, &type);
->> -       if (ret)
->> -               return ret;
->> +       if (irq_data) {
->> +               ret = gic_irq_domain_xlate(domain, irq_data->np, irq_data->args,
->> +                                          irq_data->args_count, &hwirq, &type);
->> +               if (ret)
->> +                       return ret;
->> +       } else {
->> +               hwirq = virq;
->> +       }
-> 
-> I'm slightly puzzled here. What's the purpose of this? The whole goal of
-> the domain hierarchy is to avoid that kind of thing. Also, you should
-> never have to call xlate on an MSI, because it should never be described
-> in the device tree the first place.
+Here is some info:
+http://www.alphascale.com/index.asp?ics/615.html
 
-Thinking of it some more:
+One of products:
+http://www.aliexpress.com/store/product/2014-hot-sales-FREE-SHIPPING-new-Purple-core-ARM9-development-board-ASM9260T-SDRAM-power-line/433637_1931495721.html
 
-The actual reason why this is required is because the MSI domain calls
-into this via irq_domain_alloc_irqs_parent(). But because MSIs are not
-described in DT, they do not have a of_phandle to pass down to the xlate
-helper. In this case, the v2m widget has the knowledge of what are the
-valid SPI numbers, and the core GIC code must blindly accept it.
+In some cases this SoC looks similar to iMX23/iMX28. But currently it makes no
+sense to merge mach code of this devices. Especially because most differences
+are already collected mach-mxs folder.
 
-This definitely requires a fat comment, because this is far from obvious.
+Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+---
+ arch/arm/Kconfig              | 2 ++
+ arch/arm/mach-asm9260/Kconfig | 6 ++++++
+ 2 files changed, 8 insertions(+)
+ create mode 100644 arch/arm/mach-asm9260/Kconfig
 
-Thanks,
-
-	M.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 89c4b5c..fed7eb1 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -854,6 +854,8 @@ config ARCH_VIRT
+ #
+ source "arch/arm/mach-mvebu/Kconfig"
+ 
++source "arch/arm/mach-asm9260/Kconfig"
++
+ source "arch/arm/mach-at91/Kconfig"
+ 
+ source "arch/arm/mach-axxia/Kconfig"
+diff --git a/arch/arm/mach-asm9260/Kconfig b/arch/arm/mach-asm9260/Kconfig
+new file mode 100644
+index 0000000..8423be7
+--- /dev/null
++++ b/arch/arm/mach-asm9260/Kconfig
+@@ -0,0 +1,6 @@
++config MACH_ASM9260
++	bool "Alphascale ASM9260"
++	depends on ARCH_MULTI_V5
++	select CPU_ARM926T
++	help
++	  Support for Alphascale ASM9260 based platform.
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
