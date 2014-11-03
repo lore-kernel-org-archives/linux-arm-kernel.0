@@ -1,40 +1,113 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 03 Nov 2014 17:52:11 +0100
-Subject: [PATCH 4/7] can: m_can: add a bit delay after setting CCCR_INIT
- bit
-In-Reply-To: <1414579527-31100-4-git-send-email-b29396@freescale.com>
-References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
- <1414579527-31100-4-git-send-email-b29396@freescale.com>
-Message-ID: <5457B2BB.9050807@pengutronix.de>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon,  3 Nov 2014 17:54:37 +0100
+Subject: [PATCH v9 00/10] sched: consolidation of CPU capacity and usage
+Message-ID: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2014 11:45 AM, Dong Aisheng wrote:
-> The spec mentions there may be a delay until the value written to
-> INIT can be read back due to the synchronization mechanism between the
-> two clock domains. But it does not indicate the exact clock cycles needed.
-> The 5us delay is a test value and seems ok.
-> 
-> Without the delay, CCCR.CCE bit may fail to be set and then the
-> initialization fail sometimes when do repeatly up and down.
-> 
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+This patchset consolidates several changes in the capacity and the usage
+tracking of the CPU. It provides a frequency invariant metric of the usage of
+CPUs and generally improves the accuracy of load/usage tracking in the
+scheduler. The frequency invariant metric is the foundation required for the
+consolidation of cpufreq and implementation of a fully invariant load tracking.
+These are currently WIP and require several changes to the load balancer
+(including how it will use and interprets load and capacity metrics) and
+extensive validation. The frequency invariance is done with
+arch_scale_freq_capacity and this patchset doesn't provide the backends of
+the function which are architecture dependent.
 
-Applied to can/master.
+As discussed at LPC14, Morten and I have consolidated our changes into a single
+patchset to make it easier to review and merge.
 
-Thanks,
-Marc
+During load balance, the scheduler evaluates the number of tasks that a group
+of CPUs can handle. The current method assumes that tasks have a fix load of
+SCHED_LOAD_SCALE and CPUs have a default capacity of SCHED_CAPACITY_SCALE.
+This assumption generates wrong decision by creating ghost cores or by
+removing real ones when the original capacity of CPUs is different from the
+default SCHED_CAPACITY_SCALE. With this patch set, we don't try anymore to
+evaluate the number of available cores based on the group_capacity but instead
+we evaluate the usage of a group and compare it with its capacity.
+
+This patchset mainly replaces the old capacity_factor method by a new one and
+keeps the general policy almost unchanged. These new metrics will be also used
+in later patches.
+
+The CPU usage is based on a running time tracking version of the current
+implementation of the load average tracking. I also have a version that is
+based on the new implementation proposal [1] but I haven't provide the patches
+and results as [1] is still under review. I can provide change above [1] to
+change how CPU usage is computed and to adapt to new mecanism.
+
+Change since V8
+ - reorder patches
+
+Change since V7
+ - add freq invariance for usage tracking
+ - add freq invariance for scale_rt
+ - update comments and commits' message
+ - fix init of utilization_avg_contrib
+ - fix prefer_sibling
+
+Change since V6
+ - add group usage tracking
+ - fix some commits' messages
+ - minor fix like comments and argument order
+
+Change since V5
+ - remove patches that have been merged since v5 : patches 01, 02, 03, 04, 05, 07
+ - update commit log and add more details on the purpose of the patches
+ - fix/remove useless code with the rebase on patchset [2]
+ - remove capacity_orig in sched_group_capacity as it is not used
+ - move code in the right patch
+ - add some helper function to factorize code
+
+Change since V4
+ - rebase to manage conflicts with changes in selection of busiest group
+
+Change since V3:
+ - add usage_avg_contrib statistic which sums the running time of tasks on a rq
+ - use usage_avg_contrib instead of runnable_avg_sum for cpu_utilization
+ - fix replacement power by capacity
+ - update some comments
+
+Change since V2:
+ - rebase on top of capacity renaming
+ - fix wake_affine statistic update
+ - rework nohz_kick_needed
+ - optimize the active migration of a task from CPU with reduced capacity
+ - rename group_activity by group_utilization and remove unused total_utilization
+ - repair SD_PREFER_SIBLING and use it for SMT level
+ - reorder patchset to gather patches with same topics
+
+Change since V1:
+ - add 3 fixes
+ - correct some commit messages
+ - replace capacity computation by activity
+ - take into account current cpu capacity
+
+[1] https://lkml.org/lkml/2014/10/10/131
+[2] https://lkml.org/lkml/2014/7/25/589
+
+Morten Rasmussen (2):
+  sched: Track group sched_entity usage contributions
+  sched: Make sched entity usage tracking scale-invariant
+
+Vincent Guittot (8):
+  sched: add utilization_avg_contrib
+  sched: remove frequency scaling from cpu_capacity
+  sched: make scale_rt invariant with frequency
+  sched: add per rq cpu_capacity_orig
+  sched: get CPU's usage statistic
+  sched: replace capacity_factor by usage
+  sched: add SD_PREFER_SIBLING for SMT level
+  sched: move cfs task on a CPU with higher capacity
+
+ include/linux/sched.h |  21 ++-
+ kernel/sched/core.c   |  15 +-
+ kernel/sched/debug.c  |  12 +-
+ kernel/sched/fair.c   | 369 ++++++++++++++++++++++++++++++++------------------
+ kernel/sched/sched.h  |  15 +-
+ 5 files changed, 276 insertions(+), 156 deletions(-)
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141103/634797a0/attachment.sig>
+1.9.1
