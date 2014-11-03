@@ -1,66 +1,33 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 3 Nov 2014 11:59:12 +0100
-Subject: [PATCH v8 07/10] sched: replace capacity_factor by usage
-In-Reply-To: <54572852.7040304@gmail.com>
-References: <1414745252-4895-1-git-send-email-vincent.guittot@linaro.org>
- <1414745252-4895-8-git-send-email-vincent.guittot@linaro.org>
- <54572852.7040304@gmail.com>
-Message-ID: <CAKfTPtC64X+FoKXkVmNE=wntjzhK=P9F4N08a-WNGdan1oX65w@mail.gmail.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Mon, 3 Nov 2014 11:01:49 +0000
+Subject: [Xen-devel] [PATCH v7 7/8] xen/arm/arm64: introduce
+ xen_arch_need_swiotlb
+In-Reply-To: <alpine.DEB.2.02.1411031044480.22875@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>	<1414422568-19103-7-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1411031044480.22875@kaball.uk.xensource.com>
+Message-ID: <5457609D.2000200@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 November 2014 08:01, Wanpeng Li <kernellwp@gmail.com> wrote:
-> Hi Vincent,
-> On 14/10/31 ??4:47, Vincent Guittot wrote:
+On 03/11/14 10:45, Stefano Stabellini wrote:
+> On Mon, 27 Oct 2014, Stefano Stabellini wrote:
+>> Introduce an arch specific function to find out whether a particular dma
+>> mapping operation needs to bounce on the swiotlb buffer.
 >>
->> The scheduler tries to compute how many tasks a group of CPUs can handle
->> by
->> assuming that a task's load is SCHED_LOAD_SCALE and a CPU's capacity is
->> SCHED_CAPACITY_SCALE. group_capacity_factor divides the capacity of the
->> group
->> by SCHED_LOAD_SCALE to estimate how many task can run in the group. Then,
->> it
->> compares this value with the sum of nr_running to decide if the group is
->> overloaded or not. But the group_capacity_factor is hardly working for SMT
->>   system, it sometimes works for big cores but fails to do the right thing
->> for
->>   little cores.
+>> On ARM and ARM64, if the page involved is a foreign page and the device
+>> is not coherent, we need to bounce because at unmap time we cannot
+>> execute any required cache maintenance operations (we don't know how to
+>> find the pfn from the mfn).
 >>
->> Below are two examples to illustrate the problem that this patch solves:
+>> No change of behaviour for x86.
 >>
->> 1- If the original capacity of a CPU is less than SCHED_CAPACITY_SCALE
->> (640 as an example), a group of 3 CPUS will have a max capacity_factor of
->> 2
->> (div_round_closest(3x640/1024) = 2) which means that it will be seen as
->> overloaded even if we have only one task per CPU.
->>
->> 2 - If the original capacity of a CPU is greater than SCHED_CAPACITY_SCALE
->> (1512 as an example), a group of 4 CPUs will have a capacity_factor of 4
->> (at max and thanks to the fix [0] for SMT system that prevent the
->> apparition
->
->
-> What's the story of 'fix [0] for SMT system' here?
+>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+>> Acked-by: Ian Campbell <ian.campbell@citrix.com>
+> 
+> Konrad, David, are you OK with the swiotlb-xen changes?
 
-The [0] url has disappeared. please find it below:
-[0] https://lkml.org/lkml/2013/8/28/194
+Reviewed-by: David Vrabel <david.vrabel@citrix.com>
 
-Let me know if your need more explanation than my answer of your
-previous question for the cover letter
+But swiotlb is Konrad's responsibility.
 
-Regards,
-Vincent
-
->
-> Regards,
-> Wanpeng Li
->
->
->> of ghost CPUs) but if one CPU is fully used by rt tasks (and its capacity
->> is
->> reduced to nearly nothing), the capacity factor of the group will still be
->> 4
->> (div_round_closest(3*1512/1024) = 5 which is cap to 4 with [0]).
->>
-
-[snip]
+David
