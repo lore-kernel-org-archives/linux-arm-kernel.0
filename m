@@ -1,79 +1,31 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Mon,  3 Nov 2014 11:59:56 -0800
-Subject: [PATCH v2 3/3] drivers: net: xgene: fix: Use separate resources
-In-Reply-To: <1415044796-5081-1-git-send-email-isubramanian@apm.com>
-References: <1415044796-5081-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1415044796-5081-4-git-send-email-isubramanian@apm.com>
+Date: Mon,  3 Nov 2014 11:59:53 -0800
+Subject: [PATCH v2 0/3] drivers: net: xgene: Fix crash for backward
+ compatibility
+Message-ID: <1415044796-5081-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the following kernel crash during SGMII based 1GbE probe.
+This patch set fixes the following issues that were reported during regression.
 
-	BUG: Bad page state in process swapper/0  pfn:40fe6ad
-	page:ffffffbee37a75d8 count:-1 mapcount:0 mapping:          (null) index:0x0
-	flags: 0x0()
-	page dumped because: nonzero _count
-	Modules linked in:
-	CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.17.0+ #7
-	Call trace:
-	[<ffffffc000087fa0>] dump_backtrace+0x0/0x12c
-	[<ffffffc0000880dc>] show_stack+0x10/0x1c
-	[<ffffffc0004d981c>] dump_stack+0x74/0xc4
-	[<ffffffc00012fe70>] bad_page+0xd8/0x128
-	[<ffffffc000133000>] get_page_from_freelist+0x4b8/0x640
-	[<ffffffc000133260>] __alloc_pages_nodemask+0xd8/0x834
-	[<ffffffc0004194f8>] __netdev_alloc_frag+0x124/0x1b8
-	[<ffffffc00041bfdc>] __netdev_alloc_skb+0x90/0x10c
-	[<ffffffc00039ff30>] xgene_enet_refill_bufpool+0x11c/0x280
-	[<ffffffc0003a11a4>] xgene_enet_process_ring+0x168/0x340
-	[<ffffffc0003a1498>] xgene_enet_napi+0x1c/0x50
-	[<ffffffc00042b454>] net_rx_action+0xc8/0x18c
-	[<ffffffc0000b0880>] __do_softirq+0x114/0x24c
-	[<ffffffc0000b0c34>] irq_exit+0x94/0xc8
-	[<ffffffc0000e68a0>] __handle_domain_irq+0x8c/0xf4
-	[<ffffffc000081288>] gic_handle_irq+0x30/0x7c
-
-This was due to hardware resource sharing conflict with the firmware. This
-patch fixes this crash by using resources (descriptor ring, prefetch buffer)
-that are not shared.
-
-Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
+Patch 1,2 : Adds backward compatibility with the older firmware (<= 1.13.28).
+Patch 3   : Use separate hardware resources (descriptor ring, prefetch buffer)
+	   that are not shared with the firmware
 ---
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 6 +++---
- drivers/net/ethernet/apm/xgene/xgene_enet_main.h | 3 +++
- 2 files changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-index cc3f955..1236696 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-@@ -639,9 +639,9 @@ static int xgene_enet_create_desc_rings(struct net_device *ndev)
- 	struct device *dev = ndev_to_dev(ndev);
- 	struct xgene_enet_desc_ring *rx_ring, *tx_ring, *cp_ring;
- 	struct xgene_enet_desc_ring *buf_pool = NULL;
--	u8 cpu_bufnum = 0, eth_bufnum = 0;
--	u8 bp_bufnum = 0x20;
--	u16 ring_id, ring_num = 0;
-+	u8 cpu_bufnum = 0, eth_bufnum = START_ETH_BUFNUM;
-+	u8 bp_bufnum = START_BP_BUFNUM;
-+	u16 ring_id, ring_num = START_RING_NUM;
- 	int ret;
- 
- 	/* allocate rx descriptor ring */
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-index dba647d..f9958fa 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-@@ -38,6 +38,9 @@
- #define SKB_BUFFER_SIZE		(XGENE_ENET_MAX_MTU - NET_IP_ALIGN)
- #define NUM_PKT_BUF	64
- #define NUM_BUFPOOL	32
-+#define START_ETH_BUFNUM	2
-+#define START_BP_BUFNUM		0x22
-+#define START_RING_NUM		8
- 
- #define PHY_POLL_LINK_ON	(10 * HZ)
- #define PHY_POLL_LINK_OFF	(PHY_POLL_LINK_ON / 5)
+Iyappan Subramanian (3):
+  dtb: xgene: fix: Backward compatibility with older firmware
+  drivers: net: xgene: Backward compatibility with older firmware
+  drivers: net: xgene: fix: Use separate resources
+
+ arch/arm64/boot/dts/apm-storm.dtsi                | 10 +++++-----
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c    | 18 +++++++++++++++++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h    |  4 ++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c  | 11 +++++++----
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h  |  5 ++++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c |  7 ++++++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c |  7 ++++++-
+ 7 files changed, 49 insertions(+), 13 deletions(-)
+
 -- 
 1.9.1
