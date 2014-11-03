@@ -1,130 +1,134 @@
-From: bonbons@linux-vserver.org (Bruno =?UTF-8?B?UHLDqW1vbnQ=?=)
-Date: Mon, 3 Nov 2014 21:02:44 +0100
-Subject: [RFC Patch 1/4] mfd: AXP20x: Add power supply bindings
- documentation
-In-Reply-To: <20141021191905.GR21108@lukather>
-References: <20141020221959.2f312906@neptune.home>
- <20141020223314.0484f795@neptune.home> <20141021101503.GE26842@x1>
- <20141021180916.432f02e1@neptune.home>
- <20141021191905.GR21108@lukather>
-Message-ID: <20141103210244.1425e0c7@neptune.home>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 3 Nov 2014 21:04:55 +0100
+Subject: [PATCH v3 10/19] arm/arm64: KVM: make the value of ICC_SRE_EL1 a
+ per-VM variable
+In-Reply-To: <1414776414-13426-11-git-send-email-andre.przywara@arm.com>
+References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
+ <1414776414-13426-11-git-send-email-andre.przywara@arm.com>
+Message-ID: <20141103200455.GI16132@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-On Tue, 21 October 2014 Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> On Tue, Oct 21, 2014 at 06:09:16PM +0200, Bruno Pr?mont wrote:
-> > On Tue, 21 October 2014 Lee Jones <lee.jones@linaro.org> wrote:
-> > > On Mon, 20 Oct 2014, Bruno Pr?mont wrote:
-> > > > ---
-> > > > Note: the OCV values seem to have some defaults build into the
-> > > > PMIC though may need adjustment if the used battery has a different
-> > > > open circuit voltage curve.
-> > > > As far as understood (these values are set in vendor driver but not
-> > > > mentioned in chip documentation) they represent charge percentage
-> > > > for some predefined voltages.
-> > > > 
-> > > > If prefixing these values with "x-power," is preferred the following
-> > > > patch should becomes a dependency:
-> > > >   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/267606.html
-> > > > and users in patch 2/4, 4/4 need adjusting.
-> > > > 
-> > > > 
-> > > >  Documentation/devicetree/bindings/mfd/axp20x.txt |   20 +
-> > > >  1 files changed, 20 insertions(+), 0 deletion(-)
-> > > > 
-> > > > diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> > > > index cc9e01b..8ea681c 100644
-> > > > --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-> > > > +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> > > > @@ -28,6 +28,20 @@ Required properties:
-> > > >  		      (range: 750-1875). Default: 1.5MHz
-> > > >  
-> > > >  Optional properties for DCDCs:
-> > > > +- backup: Settings for backup/RTC battery charger
-> > > > +	  (Voltage in ?V, current in ?A)
-> > > > +	  If not present, charger will be left untouched
-> > > > +- battery.ocv: OCV capacity curve points (16 data values)
-> > > > +- battery.resistance: internal battery resistance in m?
-> > > > +                      (defaults to 100m?)
-> > > > +- battery.capacity: Battery capacity in mAh
-> > > > +		    If this attribute is missing, charger will be disabled
-> > > > +		    unless there is a battery connected.
-> > > > +- battery.temp_sensor: Description of temperautre sensor, 3 values
-> > > > +		       - driver current (20?A, 40?A, 60?A or 80?A)
-> > > > +		       - low temperature warning level (in ?V)
-> > > > +		       - high temperature warning level (in ?V)
-> > > > +		       If missing, temperature sensor gets disabled
-> > > >  - x-powers,dcdc-workmode: 1 for PWM mode, 0 for AUTO mode
-> > > >  			  Default: AUTO mode
-> > > >  
-> > > > @@ -49,6 +63,12 @@ axp209: pmic at 34 {
-> > > >  	ldo3in-supply = <&axp_ipsout_reg>;
-> > > >  	ldo5in-supply = <&axp_ipsout_reg>;
-> > > >  
-> > > > +	backup = <3000000 200>;
-> > > > +	battery.ocv = <0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>;
-> > > > +	battery.resistance = <0>;
-> > > > +	battery.capacity = <2000>;
-> > > > +	battery.temp_sensor = <20 1000000 4000000>;
-> > > 
-> > > Since when do we use '.'s in property names?
-> > 
-> > I've not found guidelines on this, but whatever is the right way to
-> > name them, I'm open for suggestions.
+On Fri, Oct 31, 2014 at 05:26:45PM +0000, Andre Przywara wrote:
+> ICC_SRE_EL1 is a system register allowing msr/mrs accesses to the
+> GIC CPU interface for EL1 (guests). Currently we force it to 0, but
+> for proper GICv3 support we have to allow guests to use it (depending
+> on their selected virtual GIC model).
+> So add ICC_SRE_EL1 to the list of saved/restored registers on a
+> world switch, but actually disallow a guest to change it by only
+> restoring a fixed, once-initialized value.
+> This value depends on the GIC model userland has chosen for a guest.
 > 
-> You can take a look at the ePAPR specs. Even if it's quite outdated,
-> it still puts you in the right mindset.
-
-There seems to be some kind of e-mail wall in front of this document.
-
-> That being said, since they are driver-specific properties, they
-> should be prefixed by the vendor name (here x-powers).
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm64/kernel/asm-offsets.c |    1 +
+>  arch/arm64/kvm/vgic-v3-switch.S |   14 +++++++++-----
+>  include/kvm/arm_vgic.h          |    1 +
+>  virt/kvm/arm/vgic-v3.c          |    9 +++++++--
+>  4 files changed, 18 insertions(+), 7 deletions(-)
 > 
-> And I think they all belong in a sub-node, just like what's been done
-> for the regulators.
+> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+> index 9a9fce0..9d34486 100644
+> --- a/arch/arm64/kernel/asm-offsets.c
+> +++ b/arch/arm64/kernel/asm-offsets.c
+> @@ -140,6 +140,7 @@ int main(void)
+>    DEFINE(VGIC_V2_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_v2.vgic_elrsr));
+>    DEFINE(VGIC_V2_CPU_APR,	offsetof(struct vgic_cpu, vgic_v2.vgic_apr));
+>    DEFINE(VGIC_V2_CPU_LR,	offsetof(struct vgic_cpu, vgic_v2.vgic_lr));
+> +  DEFINE(VGIC_V3_CPU_SRE,	offsetof(struct vgic_cpu, vgic_v3.vgic_sre));
+>    DEFINE(VGIC_V3_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_hcr));
+>    DEFINE(VGIC_V3_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_vmcr));
+>    DEFINE(VGIC_V3_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v3.vgic_misr));
+> diff --git a/arch/arm64/kvm/vgic-v3-switch.S b/arch/arm64/kvm/vgic-v3-switch.S
+> index d160469..617a012 100644
+> --- a/arch/arm64/kvm/vgic-v3-switch.S
+> +++ b/arch/arm64/kvm/vgic-v3-switch.S
+> @@ -148,17 +148,18 @@
+>   * x0: Register pointing to VCPU struct
+>   */
+>  .macro	restore_vgic_v3_state
+> -	// Disable SRE_EL1 access. Necessary, otherwise
+> -	// ICH_VMCR_EL2.VFIQEn becomes one, and FIQ happens...
+> -	msr_s	ICC_SRE_EL1, xzr
+> -	isb
+> -
 
-Doing something like this?:
+I know I reviewed this once, but now I'm forgetting how it works with
+this comment above.  First, I don't fully understand the comment.
+Second, now we're restoring a value that may potentially have SRE_EL1
+access enabled, but FIQ doesn't happen.  Can you clarify this for me?
 
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -126,9 +126,11 @@
-                                interrupt-controller;
-                                #interrupt-cells = <1>;
- 
--                               backup = <3000000 200>;
--                               battery.resistance = <100>;
--                               battery.capacity = <2000>;
-+                               x-powers,backup = <3000000 200>;
-+                               battery: battery at 0 {
-+                                       x-powers,resistance = <100>;
-+                                       x-powers,capacity = <2000>;
-+                               };
-                        };
-                };
+Thanks,
+-Christoffer
 
-What are the rules to define the label after the colon?
-Looking at the existing nodes it's either some address or a number...
-
-
-and then the following in driver code (also adjusting the other
-property names accessed)?:
-
-@@ -678,11 +677,11 @@ static int axp20x_battery_config(struct platform_device *pdev,
-        if (ret)
-                return ret;
- 
--       np = of_node_get(axp20x->dev->of_node);
-+       np = of_find_node_by_name(axp20x->dev->of_node, "battery");
-        if (!np)
-                return -ENODEV;
- 
--       ret = of_property_read_u32_array(np, "battery.ocv", ocv, 16);
-+       ret = of_property_read_u32_array(np, "x-powers,ocv", ocv, 16);
-        for (i = 0; ret == 0 && i < ARRAY_SIZE(ocv); i++)
-                if (ocv[i] > 100) {
-                        dev_warn(&pdev->dev, "OCV[%d] %u > 100\n", i, ocv[i]);
-
-
-Bruno
+>  	// Compute the address of struct vgic_cpu
+>  	add	x3, x0, #VCPU_VGIC_CPU
+>  
+>  	// Restore all interesting registers
+>  	ldr	w4, [x3, #VGIC_V3_CPU_HCR]
+>  	ldr	w5, [x3, #VGIC_V3_CPU_VMCR]
+> +	ldr	w25, [x3, #VGIC_V3_CPU_SRE]
+> +
+> +	msr_s	ICC_SRE_EL1, x25
+> +
+> +	// make sure SRE is valid before writing the other registers
+> +	isb
+>  
+>  	msr_s	ICH_HCR_EL2, x4
+>  	msr_s	ICH_VMCR_EL2, x5
+> @@ -244,9 +245,12 @@
+>  	dsb	sy
+>  
+>  	// Prevent the guest from touching the GIC system registers
+> +	// if SRE isn't enabled for GICv3 emulation
+> +	cbnz	x25, 1f
+>  	mrs_s	x5, ICC_SRE_EL2
+>  	and	x5, x5, #~ICC_SRE_EL2_ENABLE
+>  	msr_s	ICC_SRE_EL2, x5
+> +1:
+>  .endm
+>  
+>  ENTRY(__save_vgic_v3_state)
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index a6d41f1..8827bc7 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -243,6 +243,7 @@ struct vgic_v3_cpu_if {
+>  #ifdef CONFIG_ARM_GIC_V3
+>  	u32		vgic_hcr;
+>  	u32		vgic_vmcr;
+> +	u32		vgic_sre;	/* Restored only, change ignored */
+>  	u32		vgic_misr;	/* Saved only */
+>  	u32		vgic_eisr;	/* Saved only */
+>  	u32		vgic_elrsr;	/* Saved only */
+> diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+> index fc4d628..ce50918 100644
+> --- a/virt/kvm/arm/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic-v3.c
+> @@ -145,15 +145,20 @@ static void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+>  
+>  static void vgic_v3_enable(struct kvm_vcpu *vcpu)
+>  {
+> +	struct vgic_v3_cpu_if *vgic_v3;
+> +
+> +	vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
+>  	/*
+>  	 * By forcing VMCR to zero, the GIC will restore the binary
+>  	 * points to their reset values. Anything else resets to zero
+>  	 * anyway.
+>  	 */
+> -	vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr = 0;
+> +	vgic_v3->vgic_vmcr = 0;
+> +
+> +	vgic_v3->vgic_sre = 0;
+>  
+>  	/* Get the show on the road... */
+> -	vcpu->arch.vgic_cpu.vgic_v3.vgic_hcr = ICH_HCR_EN;
+> +	vgic_v3->vgic_hcr = ICH_HCR_EN;
+>  }
+>  
+>  static const struct vgic_ops vgic_v3_ops = {
+> -- 
+> 1.7.9.5
+> 
