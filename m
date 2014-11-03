@@ -1,74 +1,182 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 03 Nov 2014 18:05:17 +0100
-Subject: [PATCH 01/17] Documentation: dt-bindings: minimal documentation
- for MVEBU SDRAM controller
-In-Reply-To: <1414151970-6626-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1414151970-6626-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5457B5CD.1050706@free-electrons.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon,  3 Nov 2014 17:54:47 +0100
+Subject: [PATCH v9 10/10] sched: move cfs task on a CPU with higher capacity
+In-Reply-To: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
+References: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1415033687-23294-11-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+When a CPU is used to handle a lot of IRQs or some RT tasks, the remaining
+capacity for CFS tasks can be significantly reduced. Once we detect such
+situation by comparing cpu_capacity_orig and cpu_capacity, we trig an idle
+load balance to check if it's worth moving its tasks on an idle CPU.
 
-This binding looks coorect for me
+Once the idle load_balance has selected the busiest CPU, it will look for an
+active load balance for only two cases :
+- there is only 1 task on the busiest CPU.
+- we haven't been able to move a task of the busiest rq.
 
-On 24/10/2014 13:59, Thomas Petazzoni wrote:
-> The suspend/resume code for Armada XP has to modify certain registers
-> of the SDRAM controller. Therefore, we need to define a Device Tree
-> binding for this hardware block.
+A CPU with a reduced capacity is included in the 1st case, and it's worth to
+actively migrate its task if the idle CPU has got full capacity. This test has
+been added in need_active_balance.
 
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+As a sidenote, this will note generate more spurious ilb because we already
+trig an ilb if there is more than 1 busy cpu. If this cpu is the only one that
+has a task, we will trig the ilb once for migrating the task.
 
+The nohz_kick_needed function has been cleaned up a bit while adding the new
+test
 
-Thanks,
+env.src_cpu and env.src_rq must be set unconditionnally because they are used
+in need_active_balance which is called even if busiest->nr_running equals 1
 
-Gregory
+Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+---
+ kernel/sched/fair.c | 74 ++++++++++++++++++++++++++++++++++++++---------------
+ 1 file changed, 53 insertions(+), 21 deletions(-)
 
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> ---
->  .../memory-controllers/mvebu-sdram-controller.txt   | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/memory-controllers/mvebu-sdram-controller.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/memory-controllers/mvebu-sdram-controller.txt b/Documentation/devicetree/bindings/memory-controllers/mvebu-sdram-controller.txt
-> new file mode 100644
-> index 0000000..89657d1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/memory-controllers/mvebu-sdram-controller.txt
-> @@ -0,0 +1,21 @@
-> +Device Tree bindings for MVEBU SDRAM controllers
-> +
-> +The Marvell EBU SoCs all have a SDRAM controller. The SDRAM controller
-> +differs from one SoC variant to another, but they also share a number
-> +of commonalities.
-> +
-> +For now, this Device Tree binding documentation only documents the
-> +Armada XP SDRAM controller.
-> +
-> +Required properties:
-> +
-> + - compatible: for Armada XP, "marvell,armada-xp-sdram-controller"
-> + - reg: a resource specifier for the register space, which should
-> +   include all SDRAM controller registers as per the datasheet.
-> +
-> +Example:
-> +
-> +sdramc at 1400 {
-> +	compatible = "marvell,armada-xp-sdram-controller";
-> +	reg = <0x1400 0x500>;
-> +};
-> 
-
-
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index db392a6..02e8f7f 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -6634,6 +6634,28 @@ static int need_active_balance(struct lb_env *env)
+ 			return 1;
+ 	}
+ 
++	/*
++	 * The dst_cpu is idle and the src_cpu CPU has only 1 CFS task.
++	 * It's worth migrating the task if the src_cpu's capacity is reduced
++	 * because of other sched_class or IRQs whereas capacity stays
++	 * available on dst_cpu.
++	 */
++	if ((env->idle != CPU_NOT_IDLE) &&
++			(env->src_rq->cfs.h_nr_running == 1)) {
++		unsigned long src_eff_capacity, dst_eff_capacity;
++
++		dst_eff_capacity = 100;
++		dst_eff_capacity *= capacity_of(env->dst_cpu);
++		dst_eff_capacity *= capacity_orig_of(env->src_cpu);
++
++		src_eff_capacity = sd->imbalance_pct;
++		src_eff_capacity *= capacity_of(env->src_cpu);
++		src_eff_capacity *= capacity_orig_of(env->dst_cpu);
++
++		if (src_eff_capacity < dst_eff_capacity)
++			return 1;
++	}
++
+ 	return unlikely(sd->nr_balance_failed > sd->cache_nice_tries+2);
+ }
+ 
+@@ -6733,6 +6755,9 @@ static int load_balance(int this_cpu, struct rq *this_rq,
+ 
+ 	schedstat_add(sd, lb_imbalance[idle], env.imbalance);
+ 
++	env.src_cpu = busiest->cpu;
++	env.src_rq = busiest;
++
+ 	ld_moved = 0;
+ 	if (busiest->nr_running > 1) {
+ 		/*
+@@ -6742,8 +6767,6 @@ static int load_balance(int this_cpu, struct rq *this_rq,
+ 		 * correctly treated as an imbalance.
+ 		 */
+ 		env.flags |= LBF_ALL_PINNED;
+-		env.src_cpu   = busiest->cpu;
+-		env.src_rq    = busiest;
+ 		env.loop_max  = min(sysctl_sched_nr_migrate, busiest->nr_running);
+ 
+ more_balance:
+@@ -7443,22 +7466,25 @@ static void nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type idle)
+ 
+ /*
+  * Current heuristic for kicking the idle load balancer in the presence
+- * of an idle cpu is the system.
++ * of an idle cpu in the system.
+  *   - This rq has more than one task.
+- *   - At any scheduler domain level, this cpu's scheduler group has multiple
+- *     busy cpu's exceeding the group's capacity.
++ *   - This rq has at least one CFS task and the capacity of the CPU is
++ *     significantly reduced because of RT tasks or IRQs.
++ *   - At parent of LLC scheduler domain level, this cpu's scheduler group has
++ *     multiple busy cpu.
+  *   - For SD_ASYM_PACKING, if the lower numbered cpu's in the scheduler
+  *     domain span are idle.
+  */
+-static inline int nohz_kick_needed(struct rq *rq)
++static inline bool nohz_kick_needed(struct rq *rq)
+ {
+ 	unsigned long now = jiffies;
+ 	struct sched_domain *sd;
+ 	struct sched_group_capacity *sgc;
+ 	int nr_busy, cpu = rq->cpu;
++	bool kick = false;
+ 
+ 	if (unlikely(rq->idle_balance))
+-		return 0;
++		return false;
+ 
+        /*
+ 	* We may be recently in ticked or tickless idle mode. At the first
+@@ -7472,38 +7498,44 @@ static inline int nohz_kick_needed(struct rq *rq)
+ 	 * balancing.
+ 	 */
+ 	if (likely(!atomic_read(&nohz.nr_cpus)))
+-		return 0;
++		return false;
+ 
+ 	if (time_before(now, nohz.next_balance))
+-		return 0;
++		return false;
+ 
+ 	if (rq->nr_running >= 2)
+-		goto need_kick;
++		return true;
+ 
+ 	rcu_read_lock();
+ 	sd = rcu_dereference(per_cpu(sd_busy, cpu));
+-
+ 	if (sd) {
+ 		sgc = sd->groups->sgc;
+ 		nr_busy = atomic_read(&sgc->nr_busy_cpus);
+ 
+-		if (nr_busy > 1)
+-			goto need_kick_unlock;
++		if (nr_busy > 1) {
++			kick = true;
++			goto unlock;
++		}
++
+ 	}
+ 
+-	sd = rcu_dereference(per_cpu(sd_asym, cpu));
++	sd = rcu_dereference(rq->sd);
++	if (sd) {
++		if ((rq->cfs.h_nr_running >= 1) &&
++				check_cpu_capacity(rq, sd)) {
++			kick = true;
++			goto unlock;
++		}
++	}
+ 
++	sd = rcu_dereference(per_cpu(sd_asym, cpu));
+ 	if (sd && (cpumask_first_and(nohz.idle_cpus_mask,
+ 				  sched_domain_span(sd)) < cpu))
+-		goto need_kick_unlock;
++		kick = true;
+ 
++unlock:
+ 	rcu_read_unlock();
+-	return 0;
+-
+-need_kick_unlock:
+-	rcu_read_unlock();
+-need_kick:
+-	return 1;
++	return kick;
+ }
+ #else
+ static void nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type idle) { }
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.9.1
