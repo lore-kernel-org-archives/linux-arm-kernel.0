@@ -1,148 +1,41 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 3 Nov 2014 14:23:50 +0100
-Subject: [PATCH v3 03/19] arm/arm64: KVM: refactor vgic_handle_mmio()
- function
-In-Reply-To: <1414776414-13426-4-git-send-email-andre.przywara@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 03 Nov 2014 13:25:11 +0000
+Subject: [PATCH v3 02/19] arm/arm64: KVM: pass down user space provided
+ GIC type into vGIC code
+In-Reply-To: <20141103131425.GC16132@cbox>
 References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
- <1414776414-13426-4-git-send-email-andre.przywara@arm.com>
-Message-ID: <20141103132350.GD16132@cbox>
+ <1414776414-13426-3-git-send-email-andre.przywara@arm.com>
+ <20141103131425.GC16132@cbox>
+Message-ID: <54578237.3080900@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 05:26:38PM +0000, Andre Przywara wrote:
-> Currently we only need to deal with one MMIO region for the GIC
-> emulation, but we soon need to extend this. Refactor the existing
-> code to allow easier addition of different ranges without code
-> duplication.
+Hi Christoffer,
+
+On 03/11/14 13:14, Christoffer Dall wrote:
+> On Fri, Oct 31, 2014 at 05:26:37PM +0000, Andre Przywara wrote:
+>> With the introduction of a second emulated GIC model we need to let
+>> userspace specify the GIC model to use for each VM. Pass the
+>> userspace provided value down into the vGIC code and store it there
+>> to differentiate later.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  virt/kvm/arm/vgic.c |   77 +++++++++++++++++++++++++++++++++++++--------------
->  1 file changed, 56 insertions(+), 21 deletions(-)
+> Did you change anything since v2?
+
+Yes (and that's why I dropped your ack):
+I moved the line that stores the vgic_model from the "introduce
+per-VM-ops" patch into here (plus the declaration of it):
+
+	kvm->arch.vgic.vgic_model = type;
+
+That was part of the split-up to make that bigger patch more readable.
+
+Regards,
+Andre.
+
 > 
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 2403d72..704be48 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1032,37 +1032,28 @@ static bool vgic_validate_access(const struct vgic_dist *dist,
->  	return true;
->  }
->  
-> -/**
-> - * vgic_handle_mmio - handle an in-kernel MMIO access
-> +/*
-> + * vgic_handle_mmio_range - handle an in-kernel MMIO access
->   * @vcpu:	pointer to the vcpu performing the access
->   * @run:	pointer to the kvm_run structure
->   * @mmio:	pointer to the data describing the access
-> + * @ranges:	pointer to the register defining structure
-> + * @mmio_base:	base address for this mapping
->   *
-> - * returns true if the MMIO access has been performed in kernel space,
-> - * and false if it needs to be emulated in user space.
-> + * returns true if the MMIO access could be performed
->   */
-> -bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> -		      struct kvm_exit_mmio *mmio)
-> +static bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> +			    struct kvm_exit_mmio *mmio,
-> +			    const struct mmio_range *ranges,
-> +			    unsigned long mmio_base)
->  {
->  	const struct mmio_range *range;
->  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> -	unsigned long base = dist->vgic_dist_base;
->  	bool updated_state;
->  	unsigned long offset;
->  
-> -	if (!irqchip_in_kernel(vcpu->kvm) ||
-> -	    mmio->phys_addr < base ||
-> -	    (mmio->phys_addr + mmio->len) > (base + KVM_VGIC_V2_DIST_SIZE))
-> -		return false;
-> -
-> -	/* We don't support ldrd / strd or ldm / stm to the emulated vgic */
-> -	if (mmio->len > 4) {
-> -		kvm_inject_dabt(vcpu, mmio->phys_addr);
-> -		return true;
-> -	}
-> -
-> -	offset = mmio->phys_addr - base;
-> -	range = find_matching_range(vgic_dist_ranges, mmio, offset);
-> +	offset = mmio->phys_addr - mmio_base;
-> +	range = find_matching_range(ranges, mmio, offset);
->  	if (unlikely(!range || !range->handle_mmio)) {
->  		pr_warn("Unhandled access %d %08llx %d\n",
->  			mmio->is_write, mmio->phys_addr, mmio->len);
-> @@ -1070,7 +1061,7 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  	}
->  
->  	spin_lock(&vcpu->kvm->arch.vgic.lock);
-> -	offset = mmio->phys_addr - range->base - base;
-> +	offset -= range->base;
->  	if (vgic_validate_access(dist, range, offset)) {
->  		updated_state = range->handle_mmio(vcpu, mmio, offset);
->  	} else {
-> @@ -1088,6 +1079,50 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  	return true;
->  }
->  
-> +static inline bool is_in_range(phys_addr_t addr, unsigned long len,
-> +			       phys_addr_t baseaddr, unsigned long size)
-> +{
-> +	if (addr < baseaddr)
-> +		return false;
-> +	return addr + len <= baseaddr + size;
-
-not sure, but this may be simpler as you had it before:
-
-return addr >= baseaddr &&
-	addr + len <= baseaddr + size;
-
-> +}
-> +
-> +static bool vgic_v2_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> +				struct kvm_exit_mmio *mmio)
-> +{
-> +	unsigned long base = vcpu->kvm->arch.vgic.vgic_dist_base;
-> +
-> +	if (!is_in_range(mmio->phys_addr, mmio->len, base,
-> +			 KVM_VGIC_V2_DIST_SIZE))
-> +		return false;
-> +
-> +	/* GICv2 does not support accesses wider than 32 bits */
-> +	if (mmio->len > 4) {
-> +		kvm_inject_dabt(vcpu, mmio->phys_addr);
-> +		return true;
-> +	}
-> +
-> +	return vgic_handle_mmio_range(vcpu, run, mmio, vgic_dist_ranges, base);
-> +}
-> +
-> +/**
-> + * vgic_handle_mmio - handle an in-kernel MMIO access for the GIC emulation
-> + * @vcpu:      pointer to the vcpu performing the access
-> + * @run:       pointer to the kvm_run structure
-> + * @mmio:      pointer to the data describing the access
-> + *
-> + * returns true if the MMIO access has been performed in kernel space,
-> + * and false if it needs to be emulated in user space.
-> + */
-> +bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> +		      struct kvm_exit_mmio *mmio)
-> +{
-> +	if (!irqchip_in_kernel(vcpu->kvm))
-> +		return false;
-> +
-> +	return vgic_v2_handle_mmio(vcpu, run, mmio);
-> +}
-> +
->  static u8 *vgic_get_sgi_sources(struct vgic_dist *dist, int vcpu_id, int sgi)
->  {
->  	return dist->irq_sgi_sources + vcpu_id * VGIC_NR_SGIS + sgi;
-> -- 
-> 1.7.9.5
+> If not, care to apply my ack from last time?
 > 
-
-otherwise:
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> -Christoffer
+> 
