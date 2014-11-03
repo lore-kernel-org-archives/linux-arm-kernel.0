@@ -1,31 +1,35 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon,  3 Nov 2014 19:12:05 +0100
-Subject: [PATCH v3 2/4] regulator: fixed: Use gpio_is_valid
+Date: Mon,  3 Nov 2014 19:12:07 +0100
+Subject: [PATCH v3 4/4] regulator: tps65090: Fix gpio initialization
 In-Reply-To: <1415038327-32616-1-git-send-email-mpa@pengutronix.de>
 References: <1415038327-32616-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1415038327-32616-3-git-send-email-mpa@pengutronix.de>
+Message-ID: <1415038327-32616-5-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use gpio_is_valid instead of an explicit comparison with 0.
+The config is used for multiple regulators within a for loop. The config
+field is not cleared before it is used for the next item. To avoid any
+issues this patch adds a proper initialization for the config->ena_gpio
+field in case no gpio is available.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- drivers/regulator/fixed.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/regulator/tps65090-regulator.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/regulator/fixed.c b/drivers/regulator/fixed.c
-index 17f6a7d331f8..709fba19e596 100644
---- a/drivers/regulator/fixed.c
-+++ b/drivers/regulator/fixed.c
-@@ -157,7 +157,7 @@ static int reg_fixed_voltage_probe(struct platform_device *pdev)
+diff --git a/drivers/regulator/tps65090-regulator.c b/drivers/regulator/tps65090-regulator.c
+index 2e92aa8718cc..f1df4423d361 100644
+--- a/drivers/regulator/tps65090-regulator.c
++++ b/drivers/regulator/tps65090-regulator.c
+@@ -314,6 +314,9 @@ static void tps65090_configure_regulator_config(
+ 		config->ena_gpio = tps_pdata->gpio;
+ 		config->ena_gpio_initialized = true;
+ 		config->ena_gpio_flags = gpio_flag;
++	} else {
++		config->ena_gpio = -EINVAL;
++		config->ena_gpio_initialized = false;
+ 	}
+ }
  
- 	drvdata->desc.fixed_uV = config->microvolts;
- 
--	if (config->gpio >= 0) {
-+	if (gpio_is_valid(config->gpio)) {
- 		cfg.ena_gpio = config->gpio;
- 		if (pdev->dev.of_node)
- 			cfg.ena_gpio_initialized = true;
 -- 
 2.1.1
