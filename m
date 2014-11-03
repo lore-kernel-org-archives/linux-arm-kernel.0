@@ -1,35 +1,50 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 3 Nov 2014 16:29:00 +0100
-Subject: [PATCH v8 07/10] sched: replace capacity_factor by usage
-In-Reply-To: <1414745252-4895-8-git-send-email-vincent.guittot@linaro.org>
-References: <1414745252-4895-1-git-send-email-vincent.guittot@linaro.org>
- <1414745252-4895-8-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20141103152900.GJ12706@worktop.programming.kicks-ass.net>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon,  3 Nov 2014 16:34:52 +0100
+Subject: [PATCH v4 5/9] ARM: shmobile: R-Mobile: Enable module clocks if
+ !CONFIG_PM_RUNTIME
+In-Reply-To: <1415028896-9005-1-git-send-email-geert+renesas@glider.be>
+References: <1415028896-9005-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1415028896-9005-6-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 09:47:29AM +0100, Vincent Guittot wrote:
-> @@ -6414,11 +6399,12 @@ static inline void calculate_imbalance(struct lb_env *env, struct sd_lb_stats *s
->  	 */
->  	if (busiest->group_type == group_overloaded &&
->  	    local->group_type   == group_overloaded) {
-> -		load_above_capacity =
-> -			(busiest->sum_nr_running - busiest->group_capacity_factor);
-> -
-> -		load_above_capacity *= (SCHED_LOAD_SCALE * SCHED_CAPACITY_SCALE);
-> -		load_above_capacity /= busiest->group_capacity;
-> +		load_above_capacity = busiest->sum_nr_running *
-> +					SCHED_LOAD_SCALE;
-> +		if (load_above_capacity > busiest->group_capacity)
-> +			load_above_capacity -= busiest->group_capacity;
-> +		else
-> +			load_above_capacity = ~0UL;
->  	}
->  
->  	/*
+If CONFIG_PM_RUNTIME is not set, the clocks must be enabled before the
+devices can be used.
 
-It seems to me we no longer have need to assume each task contributes
-SCHED_LOAD_SCALE, do we?
+Currently these clocks are enabled by the !CONFIG_PM_RUNTIME version of
+pm_clk_notify, activated by the hack in drivers/sh/pm_runtime.c, but
+this will go away soon (at least for DT).
 
-But as it stands I tihnk this patch already does too much -- it could do
-with a splitting, but let me stare at is a wee bit more.
+On detach, disabling the clocks is already handled by pm_clk_destroy().
+On system suspend/resume, disabling/enabling clocks is already handled
+from the genpd->dev_ops.{start,stop}() callbacks.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v4:
+  - New.
+---
+ arch/arm/mach-shmobile/pm-rmobile.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
+index 068608d5f54a9a64..6fb86cdb9fa2b3a7 100644
+--- a/arch/arm/mach-shmobile/pm-rmobile.c
++++ b/arch/arm/mach-shmobile/pm-rmobile.c
+@@ -117,6 +117,14 @@ static int rmobile_pd_attach_dev(struct device *dev)
+ 		goto fail;
+ 	}
+ 
++	if (!IS_ENABLED(CONFIG_PM_RUNTIME)) {
++		error = pm_clk_resume(dev);
++		if (error) {
++			dev_err(dev, "pm_clk_resume failed %d\n", error);
++			goto fail;
++		}
++	}
++
+ 	return 0;
+ 
+ fail:
+-- 
+1.9.1
