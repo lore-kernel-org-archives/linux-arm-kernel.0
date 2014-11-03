@@ -1,28 +1,24 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 3 Nov 2014 00:23:38 -0200
-Subject: [Regression Resend] mmc: mx28: sd card detection broken since
- 3.18-rc1
-In-Reply-To: <5456B7B3.60401@gmail.com>
-References: <1747777414.897866.1414878004147.JavaMail.open-xchange@oxbsltgw09.schlund.de>
- <5456B7B3.60401@gmail.com>
-Message-ID: <CAOMZO5Cw7PGaum+HD7kPbgNqPdUE8U5E4wF61Kg7iu1nwjXxkg@mail.gmail.com>
+From: eddie.huang@mediatek.com (eddie huang)
+Date: Mon, 3 Nov 2014 10:27:11 +0800
+Subject: [PATCH RESEND] tty: serial: 8250_mtk: Fix quot calculation
+In-Reply-To: <9001280.dDNTE2ykLV@wuerfel>
+References: <1414773395-9916-1-git-send-email-matthias.brugger@bq.com>
+ <9001280.dDNTE2ykLV@wuerfel>
+Message-ID: <1414981632.23623.4.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kristina,
+On Fri, 2014-10-31 at 17:48 +0100, Arnd Bergmann wrote:
+> On Friday 31 October 2014 17:36:35 Matthias Brugger wrote:
+> > -               quot = DIV_ROUND_CLOSEST(port->uartclk, 256 * baud);
+> > +               quot = (port->uartclk / (256 * baud)) + 1;
+> 
+> Should this be DIV_ROUND_UP then?
+> 
+> 	Arnd
+> 
 
-On Sun, Nov 2, 2014 at 9:01 PM, Kristina Mart?enko
-<kristina.martsenko@gmail.com> wrote:
+I think DIV_ROUND_UP is more suitable in this case, and I already do
+this and test OK on my MTK platform
 
-> I ran into this issue as well. Seems that a card-detect flag
-> (MMC_CAP2_CD_ACTIVE_HIGH) can currently be set based on an
-> uninitialized variable, which can lead to the card being reported as
-> not present. This patch fixes it for me:
-
-Your patch fixes the card detection issue on mx28.
-
-When you submit the patch formally, you can add my:
-
-Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
-
-Thanks
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296149.html
