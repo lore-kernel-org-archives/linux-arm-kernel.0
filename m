@@ -1,28 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 3 Nov 2014 10:57:16 +0000
-Subject: [PATCH v7 3/8] arm64: introduce is_device_dma_coherent
-In-Reply-To: <alpine.DEB.2.02.1411031045340.22875@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
- <1414422568-19103-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1411031045340.22875@kaball.uk.xensource.com>
-Message-ID: <20141103105716.GC23162@arm.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 3 Nov 2014 11:59:12 +0100
+Subject: [PATCH v8 07/10] sched: replace capacity_factor by usage
+In-Reply-To: <54572852.7040304@gmail.com>
+References: <1414745252-4895-1-git-send-email-vincent.guittot@linaro.org>
+ <1414745252-4895-8-git-send-email-vincent.guittot@linaro.org>
+ <54572852.7040304@gmail.com>
+Message-ID: <CAKfTPtC64X+FoKXkVmNE=wntjzhK=P9F4N08a-WNGdan1oX65w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 03, 2014 at 10:46:03AM +0000, Stefano Stabellini wrote:
-> On Mon, 27 Oct 2014, Stefano Stabellini wrote:
-> > Introduce a boolean flag and an accessor function to check whether a
-> > device is dma_coherent. Set the flag from set_arch_dma_coherent_ops.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > CC: will.deacon at arm.com
-> 
-> Will, Catalin,
-> are you OK with this patch?
+On 3 November 2014 08:01, Wanpeng Li <kernellwp@gmail.com> wrote:
+> Hi Vincent,
+> On 14/10/31 ??4:47, Vincent Guittot wrote:
+>>
+>> The scheduler tries to compute how many tasks a group of CPUs can handle
+>> by
+>> assuming that a task's load is SCHED_LOAD_SCALE and a CPU's capacity is
+>> SCHED_CAPACITY_SCALE. group_capacity_factor divides the capacity of the
+>> group
+>> by SCHED_LOAD_SCALE to estimate how many task can run in the group. Then,
+>> it
+>> compares this value with the sum of nr_running to decide if the group is
+>> overloaded or not. But the group_capacity_factor is hardly working for SMT
+>>   system, it sometimes works for big cores but fails to do the right thing
+>> for
+>>   little cores.
+>>
+>> Below are two examples to illustrate the problem that this patch solves:
+>>
+>> 1- If the original capacity of a CPU is less than SCHED_CAPACITY_SCALE
+>> (640 as an example), a group of 3 CPUS will have a max capacity_factor of
+>> 2
+>> (div_round_closest(3x640/1024) = 2) which means that it will be seen as
+>> overloaded even if we have only one task per CPU.
+>>
+>> 2 - If the original capacity of a CPU is greater than SCHED_CAPACITY_SCALE
+>> (1512 as an example), a group of 4 CPUs will have a capacity_factor of 4
+>> (at max and thanks to the fix [0] for SMT system that prevent the
+>> apparition
+>
+>
+> What's the story of 'fix [0] for SMT system' here?
 
-It would be nicer if the dma_coherent flag didn't have to be duplicated by
-each architecture in dev_archdata. Is there any reason not to put it in the
-core code?
+The [0] url has disappeared. please find it below:
+[0] https://lkml.org/lkml/2013/8/28/194
 
-Will
+Let me know if your need more explanation than my answer of your
+previous question for the cover letter
+
+Regards,
+Vincent
+
+>
+> Regards,
+> Wanpeng Li
+>
+>
+>> of ghost CPUs) but if one CPU is fully used by rt tasks (and its capacity
+>> is
+>> reduced to nearly nothing), the capacity factor of the group will still be
+>> 4
+>> (div_round_closest(3*1512/1024) = 5 which is cap to 4 with [0]).
+>>
+
+[snip]
