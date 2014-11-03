@@ -1,93 +1,113 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 4 Nov 2014 08:26:25 +0900
-Subject: [RFC PATCH 2/2] arm: pcibios: move to generic PCI domains
-In-Reply-To: <08260858dd004e4881e7fbd4b23ea795@SIXPR06MB0639.apcprd06.prod.outlook.com>
-References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1414669490-1217-3-git-send-email-lorenzo.pieralisi@arm.com>
- <b095e031880c44f0b79c8c42bc8d7bd5@SIXPR06MB0639.apcprd06.prod.outlook.com>
- <CAErSpo7R5V1MeDSg+9-+CqVbk_vDn6pRsNwFQS9L97Fkw=7nDA@mail.gmail.com>
- <08260858dd004e4881e7fbd4b23ea795@SIXPR06MB0639.apcprd06.prod.outlook.com>
-Message-ID: <20141103232625.GA22642@verge.net.au>
+From: mhei@heimpold.de (Michael Heimpold)
+Date: Tue, 04 Nov 2014 00:26:38 +0100
+Subject: [Regression Resend] mmc: mx28: sd card detection broken since
+ 3.18-rc1
+In-Reply-To: <5457F8BD.1040800@gmail.com>
+References: <1747777414.897866.1414878004147.JavaMail.open-xchange@oxbsltgw09.schlund.de>
+ <8090335.0rPHov2cpK@kerker> <5457F8BD.1040800@gmail.com>
+Message-ID: <2622508.LMF0YfKZGi@kerker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 05:04:49PM +0000, Phil Edworthy wrote:
-> Hi Bjorn,
+Hi Kristina,
+
+Am Montag, 3. November 2014, 23:50:53 schrieb Kristina Mart?enko:
+> On 03/11/14 22:49, Michael Heimpold wrote:
+> > Hi,
 > 
-> On 31 October 2014 16:37, Bjorn wrote:
-> > On Fri, Oct 31, 2014 at 7:43 AM, Phil Edworthy
-> > <phil.edworthy@renesas.com> wrote:
-> > > Hi Lorenzo,
-> > >
-> > > On 30 October 2014 11:45, Lorenzo wrote:
-> > >> Most if not all ARM PCI host controller device drivers either ignore the
-> > >> domain field in the pci_sys_data structure or just increment it every
-> > >> time a host controller is probed, using it as a domain counter.
-> > >>
-> > >> Therefore, instead of relying on pci_sys_data to stash the domain number
-> > >> in a standard location, ARM pcibios code can be moved to the newly
-> > >> introduced generic PCI domains code, implemented in commits:
-> > >>
-> > >> commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
-> > >> ("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
-> > >>
-> > >> commit 670ba0c8883b576d0aec28bd7a838358a4be1
-> > >> ("PCI: Add generic domain handling")
-> > >>
-> > >> In order to assign a domain number dynamically, the ARM pcibios defines
-> > >> the function, called by core PCI code:
-> > >>
-> > >> void pci_bus_assign_domain_nr(...)
-> > >>
-> > >> that relies on a DT property to define the domain number or falls back to
-> > >> a counter; its usage replaces the current domain assignment code in PCI
-> > >> host controllers present in the kernel.
-> > >>
-> > >> Cc: Arnd Bergmann <arnd@arndb.de>
-> > >> Cc: Phil Edworthy <phil.edworthy@renesas.com>
-> > >> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> > >> Cc: Jingoo Han <jg1.han@samsung.com>
-> > >> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > >> Cc: Russell King <linux@arm.linux.org.uk>
-> > >> Cc: Mohit Kumar <mohit.kumar@st.com>
-> > >> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > >
-> > > This patch fixes a current problem with R-Car devices where there is an
-> > > internal PCI bridge and an external PCIe bridge on the devices. Both drivers
-> > > work independently but need to be on different domains. Just needed to
-> > enable
-> > > PCI_DOMAINS along with this.
-> > > I've done basic testing that the internal PCI and external PCIe work at the
-> > > same time.
-> > 
-> > Hi Phil,
-> > 
-> > Thanks for testing this.  Can you give me some more guidance on where
-> > you'd like to see this merged?  Until your comment about this fixing a
-> > current problem on R-Car, I probably would have considered this to be
-> > a cleanup and enhancement and hence material for v3.19.  But if R-Car
-> > is actually broken and this fixes it, maybe this should go in for
-> > v3.18 instead.
-> I don?t think its urgent as most of our customers use LTSI kernels, e.g. v3.10.
-> Renesas typically provide out-of-tree BSPs with upstream code back ported, along
-> with other patches. Simon Horman (Renesas maintainer, cc'd) generally handles
-> the back ports, so I'll defer to his opinion.
-
-Hi Phil,
-
-from my point of view it would be best if this went into -stable if it is a
-fix. However, as you point out, from a customer point of view it shouldn't
-be a big deal as they should get backports via our LTSI kernel regardless of
-if the patch goes through stable or not.
-
-> > If it is currently broken, is there a point where it broke?  I assume
-> > it used to work at one time.  If there's a commit that broke it, it
-> > would be nice to reference that in the changelog and explain exactly
-> > what was broken and how this fixes it.
-> Both the internal PCI and external PCIe drivers work on their own, but have
-> never worked at the same time. I think it was just unfortunate timing when I
-> added the PCIe driver. At that time, the internal PCI driver didn?t have the
-> relevant DT nodes for the board I was using so I didn't see any conflicts.
+> Hi Michael,
 > 
-> Thanks
-> Phil
+> > Am Montag, 3. November 2014, 01:01:07 schrieben Sie:
+> >> On 01/11/14 23:40, Stefan Wahren wrote:
+> >>> Hi,
+> >>>
+> >>> i was testing Linux Kernel 3.18-rc2 with my i.MX28 board (I2SE Duckbill) and ran
+> >>> into the problem that the sd card isn't detected from the Kernel at booting
+> >>> (driver: mxs-mmc.c). That results in a endless wait for the root partition
+> >>
+> >> I ran into this issue as well. Seems that a card-detect flag 
+> >> (MMC_CAP2_CD_ACTIVE_HIGH) can currently be set based on an 
+> >> uninitialized variable, which can lead to the card being reported as 
+> >> not present. This patch fixes it for me:
+> >>
+> >> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+> >> index 03c53b72a2d6..f0e187682d3b 100644
+> >> --- a/drivers/mmc/core/host.c
+> >> +++ b/drivers/mmc/core/host.c
+> >> @@ -311,7 +311,7 @@ int mmc_of_parse(struct mmc_host *host)
+> >>  	struct device_node *np;
+> >>  	u32 bus_width;
+> >>  	int len, ret;
+> >> -	bool cap_invert, gpio_invert;
+> >> +	bool cap_invert, gpio_invert = false;
+> >>  
+> > 
+> > sorry, but I don't understand how your patch fixes the problem.
+> > 
+> > First use of the gpio_invert bool is in line 370/371 within mmc_gpiod_request_cd
+> > (re-wrapped into a single line here for better reading):
+> > 
+> > -snip-
+> > ret = mmc_gpiod_request_cd(host, "cd", 0, true,  0, &gpio_invert);
+> > -snap-
+> > 
+> > A pointer to the bool is passed, and inside mmc_gpiod_request_cd (drivers/mmc/core/slot-gpio.c,
+> > line 322), always a value is assigned:
+> > 
+> > -snip-
+> > if (gpio_invert)
+> >                 *gpio_invert = !gpiod_is_active_low(desc);
+> > -snap-
+> > 
+> > So returning to mmc_of_parse, the bool should always have an initialized value.
+> > Apart from some error handling, the bool is used immediately in the xor expression
+> > and results in setting MMC_CAP2_CD_ACTIVE_HIGH bit, or not.
+> > 
+> > I also cannot see a code path, where gpio_invert is used without a call to mmc_gpiod_request_cd.
+> > 
+> > Would be nice, if you could point me to what I'm missing.
+> 
+> mmc_gpiod_request_cd can return without ever reaching the line where 
+> the value is assigned to gpio_invert:
+> 
+> desc = devm_gpiod_get_index(host->parent, con_id, idx, GPIOD_IN);
+> if (IS_ERR(desc))
+> 	return PTR_ERR(desc);
+> 
+> This can happen when the host controller doesn't use a GPIO for card 
+> detection (but instead uses a dedicated pin). In this case 
+> devm_gpiod_get_index will return -ENOENT.
+> 
+
+ah, I see - thank you for taking the time to explain.
+
+> >>  	if (!host->parent || !host->parent->of_node)
+> >>  		return 0;
+> >> @@ -401,6 +401,7 @@ int mmc_of_parse(struct mmc_host *host)
+> >>  	else
+> >>  		cap_invert = false;
+> >>  
+> >> +	gpio_invert = false;
+> >>  	ret = mmc_gpiod_request_ro(host, "wp", 0, false, 0, &gpio_invert);
+> > 
+> > Same here. The functions always assigns a value when a pointer is given.
+> 
+> Same thing, the function can return before gpio_invert is ever assigned 
+> to.
+> 
+> > (And this change is unrelated to the reporters problem, so should be fixed with a
+> > dedicated patch.)
+> 
+> Since both flags are set wrong for the exact same reason, and they're 
+> both regressions in 3.18, I thought it would make sense to fix them 
+> both in one patch. (Especially since I think it's cleaner to split the 
+> gpio_invert variable into cd_gpio_invert and ro_gpio_invert, and I was 
+> going to do that in the patch I'd send.) Let me know if you still think 
+> I should send separate patches for them.
+ 
+Splitting the variable sounds good to me and will improve readability. In this case
+(and with proper commit message) I think it's really possible to combine both fixes
+in one patch.
+
+Thanks,
+Michael
