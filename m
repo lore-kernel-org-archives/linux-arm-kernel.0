@@ -1,36 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 3 Nov 2014 16:50:35 +0000
-Subject: [PATCH] mfd: db8500-prcmu: Provide sane error path values
-In-Reply-To: <CAOMZO5C2sB1GNuNE-Bi5jqMO4DqBcDW2C1O+asYkbW=8fXA7TA@mail.gmail.com>
-References: <1415031356-11664-1-git-send-email-lee.jones@linaro.org>
- <CAOMZO5C2sB1GNuNE-Bi5jqMO4DqBcDW2C1O+asYkbW=8fXA7TA@mail.gmail.com>
-Message-ID: <20141103165035.GB12011@x1>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 3 Nov 2014 17:51:21 +0100
+Subject: [PATCH v3 02/19] arm/arm64: KVM: pass down user space provided
+ GIC type into vGIC code
+In-Reply-To: <54578237.3080900@arm.com>
+References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
+ <1414776414-13426-3-git-send-email-andre.przywara@arm.com>
+ <20141103131425.GC16132@cbox> <54578237.3080900@arm.com>
+Message-ID: <20141103165121.GH16132@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 03 Nov 2014, Fabio Estevam wrote:
-
-> On Mon, Nov 3, 2014 at 2:15 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Mon, Nov 03, 2014 at 01:25:11PM +0000, Andre Przywara wrote:
+> Hi Christoffer,
 > 
-> >         /* Clean up the mailbox interrupts after pre-kernel code. */
-> > @@ -3179,15 +3179,14 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
-> >         irq = platform_get_irq(pdev, 0);
-> >         if (irq <= 0) {
+> On 03/11/14 13:14, Christoffer Dall wrote:
+> > On Fri, Oct 31, 2014 at 05:26:37PM +0000, Andre Przywara wrote:
+> >> With the introduction of a second emulated GIC model we need to let
+> >> userspace specify the GIC model to use for each VM. Pass the
+> >> userspace provided value down into the vGIC code and store it there
+> >> to differentiate later.
+> >>
+> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> > 
+> > Did you change anything since v2?
 > 
-> Shouldn't this be if (irq < 0) then?
+> Yes (and that's why I dropped your ack):
+> I moved the line that stores the vgic_model from the "introduce
+> per-VM-ops" patch into here (plus the declaration of it):
+> 
+> 	kvm->arch.vgic.vgic_model = type;
+> 
+> That was part of the split-up to make that bigger patch more readable.
+> 
+ok, it fits perfectly her:
 
-Perhaps Linus can answer that.
-
-Linus,
-
-  Is 0 a valid IRQ on the u8500 platform or not?
-
-> >                 dev_err(&pdev->dev, "no prcmu irq provided\n");
-> > -               return -ENOENT;
-> > +               return irq;
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
