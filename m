@@ -1,55 +1,34 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 3 Nov 2014 14:43:21 +0100
-Subject: [PATCH 02/15] GPIO: port LoCoMo gpio support from old driver
-In-Reply-To: <CALT56yOgMUA7o2dzfHph=S2zkDV4zERzMh4ishpPwpAx7Cqj6Q@mail.gmail.com>
-References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
- <1414454528-24240-3-git-send-email-dbaryshkov@gmail.com>
- <CACRpkdY7tRadod2vQfEytmw-ubaMAvr_=XTczD5bUMkqie0xkg@mail.gmail.com>
- <CALT56yOgMUA7o2dzfHph=S2zkDV4zERzMh4ishpPwpAx7Cqj6Q@mail.gmail.com>
-Message-ID: <CACRpkdb7v3LmOhbhQ9TPk1_bnLnpwizawW6RQvhQRLSjRewAaQ@mail.gmail.com>
+Date: Mon, 3 Nov 2014 14:45:43 +0100
+Subject: [PATCH] leds: leds-gpio: Convert gpio_blink_set() to use GPIO
+ descriptors
+In-Reply-To: <1414755658-96293-1-git-send-email-mika.westerberg@linux.intel.com>
+References: <1414755658-96293-1-git-send-email-mika.westerberg@linux.intel.com>
+Message-ID: <CACRpkdaeeAg3M-tf+odar3m8nF=T9gQhkPL+xg0t+3JVvmNnuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 10:39 AM, Dmitry Eremin-Solenikov
-<dbaryshkov@gmail.com> wrote:
-> 2014-10-31 10:48 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
->> On Tue, Oct 28, 2014 at 1:01 AM, Dmitry Eremin-Solenikov
->> <dbaryshkov@gmail.com> wrote:
->>
->>> Add gpiolib driver for gpio pins placed on the LoCoMo GA.
->>>
->>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->>
->
-> [skipped]
->
->> (etc, everywhere this pattern occurs).
->>> +static void locomo_gpio_set(struct gpio_chip *chip,
->>> +               unsigned offset, int value)
->>> +{
->>> +       struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
->>> +       unsigned long flags;
->>> +
->>> +       spin_lock_irqsave(&lg->lock, flags);
->>> +
->>> +       __locomo_gpio_set(chip, offset, value);
->>> +
->>> +       spin_unlock_irqrestore(&lg->lock, flags);
->>
->> If you actually always have to be getting and releasing a spin lock around
->> the register writes, contemplate using regmap-mmio because that
->> is part of what it does.
->>
->> But is this locking really necessary?
->
-> I have a custom of doing such locking and never having to think about
-> somebody breaking into RMW cycles.
->
-> Also isn't regmap an overkill here? Wouldn't regmap also do a lock/unlock
-> around each register read/write/RMW?
+On Fri, Oct 31, 2014 at 12:40 PM, Mika Westerberg
+<mika.westerberg@linux.intel.com> wrote:
 
-Yes that's the point: if you use regmap mmio you get the RMW-locking
-for free, with the regmap implementation.
+> Commit 21f2aae91e902aad ("leds: leds-gpio: Add support for GPIO
+> descriptors") already converted most of the driver to use GPIO descriptors.
+> What is still missing is the platform specific hook gpio_blink_set() and
+> board files which pass legacy GPIO numbers to this driver in platform data.
+>
+> In this patch we handle the former and convert gpio_blink_set() to take
+> GPIO descriptor instead. In order to do this we convert the existing four
+> users to accept GPIO descriptor and translate it to legacy GPIO number in
+> the platform code. This effectively "pushes" legacy GPIO number usage from
+> the driver to platforms.
+>
+> Also add comment to the remaining block describing that it is legacy code
+> path and we are getting rid of it eventually.
+>
+> Suggested-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
