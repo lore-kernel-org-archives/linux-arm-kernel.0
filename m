@@ -1,153 +1,96 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 3 Nov 2014 13:59:42 +0100
-Subject: [PATCH v3 00/19] KVM GICv3 emulation
-In-Reply-To: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
-References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <20141103125942.GA16132@cbox>
+From: kernellwp@gmail.com (Wanpeng Li)
+Date: Mon, 03 Nov 2014 21:03:54 +0800
+Subject: [PATCH v8 00/10] sched: consolidation of CPU capacity and usage
+In-Reply-To: <CAKfTPtDmyUBaUQ210w36fuao9iKRGP41MqSRxhhy_3O6k4UNrg@mail.gmail.com>
+References: <1414745252-4895-1-git-send-email-vincent.guittot@linaro.org>
+ <5456E48C.6020800@gmail.com>
+ <CAKfTPtDmyUBaUQ210w36fuao9iKRGP41MqSRxhhy_3O6k4UNrg@mail.gmail.com>
+Message-ID: <54577D3A.7020306@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 05:26:35PM +0000, Andre Przywara wrote:
-> This is an updated version of the GICv3 guest emulation series.
-> 
-> This one is now based on v3.18-rc2, which makes this patch series
-> independent now, as all formerly required patches are now upstream.
-> 
-> I addressed most of the comments from Christoffer's review (thanks
-> for that!), this includes a split-up of two patches, so the new
-> series now carries more patches to ease review.
-> 
-> There seem to be still endianess issues with this, so I don't claim
-> this version to be compatible with anything other than LE on LE.
-> I am about to debug this and will include fixes in the next version.
 
-As I stated on the patch in v2, can we at least make a best effort as to
-not write code that breaks on a BE platform?  Thanks.
+On 14/11/3 ??6:55, Vincent Guittot wrote:
+> On 3 November 2014 03:12, Wanpeng Li <kernellwp@gmail.com> wrote:
+>> Hi Vincent,
+>> On 14/10/31 ??4:47, Vincent Guittot wrote:
+>>> This patchset consolidates several changes in the capacity and the usage
+>>> tracking of the CPU. It provides a frequency invariant metric of the usage
+>>> of
+>>> CPUs and generally improves the accuracy of load/usage tracking in the
+>>> scheduler. The frequency invariant metric is the foundation required for
+>>> the
+>>> consolidation of cpufreq and implementation of a fully invariant load
+>>> tracking.
+>>> These are currently WIP and require several changes to the load balancer
+>>> (including how it will use and interprets load and capacity metrics) and
+>>> extensive validation. The frequency invariance is done with
+>>> arch_scale_freq_capacity and this patchset doesn't provide the backends of
+>>> the function which are architecture dependent.
+>>>
+>>> As discussed at LPC14, Morten and I have consolidated our changes into a
+>>> single
+>>> patchset to make it easier to review and merge.
+>>>
+>>> During load balance, the scheduler evaluates the number of tasks that a
+>>> group
+>>> of CPUs can handle. The current method assumes that tasks have a fix load
+>>> of
+>>> SCHED_LOAD_SCALE and CPUs have a default capacity of SCHED_CAPACITY_SCALE.
+>>> This assumption generates wrong decision by creating ghost cores or by
+>>
+>> I don't know the history, could you explain what's the meaning of 'ghost
+>> cores' ?
+> The capacity_factor gives the number of tasks that can be handled by a
+> group of CPUs by dividing the group's capacity by SCHED_CAPACITY_SCALE
+>
+> For a system with SMT, the default capacity of a core is 1178 so the
+> capacity of each CPU for a dual threads per core is 589.
+>
+> At CPU level we have a capacity_factor of 1  = div_round_closest(589, 1024)
+> At core level we still have a capacity_factor of 1  =
+> div_round_closest(1178, 1024).  This is a intended behavior to promote
+> 1 task per core
+> Then, if we have 4 cores in a node, the capacity_factor is 5 =
+> div_round_closest(4712, 1024) whereas we should have 4. So a 5th ghost
+> core has appeared in the group and the load balancer will not
+> considered the group as overloaded if there is 5 tasks whereas it
+> should in order to try to move this 5th task on an idle core (if there
+> is one)
+> Patch [0] solves some use cases by ensuring that we will not have more
+> cores than possible so we can't have more than 4 core for the previous
+> example.
+> Now, if some RT tasks are running and using almost 1 core (1024 as an
+> example), the capacity_factor is still 4 = div_round_closest(3688,
+> 1024) whereas a core is nearly fully used and the capacity_factor
+> should be 3
+>
+> [0] https://lkml.org/lkml/2013/8/28/194
 
-> 
-> A git repo hosting all these patches lives in the kvm-gicv3/v3 branch
-> of: http://www.linux-arm.org/git?p=linux-ap.git
+Got it, thanks for your great explanation.
 
-Nit: In the future you may want to consider including actual git URLs in
-your cover-letters, especially because the arm cgit thingy requires me
-to click back, copy-paste twice etc., to construct the git url.
+Regards,
+Wanpeng Li
 
-> -----
-> 
-> GICv3 is the ARM generic interrupt controller designed to overcome
-> some limits of the prevalent GICv2. Most notably it lifts the 8-CPU
-> limit. Though with recent patches from Marc there is support for
-> hosts to use a GICv3, the CPU limitation still applies to KVM guests,
-> since the current code emulates a GICv2 only.
-> Also, GICv2 backward compatibility being optional in GICv3, a number
-> of systems won't be able to run GICv2 guests.
-> 
-> This patch series provides code to emulate a GICv3 distributor and
-> redistributor for any KVM guest. It requires a GICv3 in the host to
-> work. With those patches one can run guests efficiently on any GICv3
-> host. It has the following features:
-> - Affinity routing (support for up to 255 VCPUs, more possible)
-> - System registers (as opposed to MMIO access)
-> - No ITS
-> - No priority support (as the GICv2 emulation)
-> - No save / restore support so far (will be added soon)
-> 
-> The first patches actually refactor the current VGIC code to make
-> room for a different VGIC model to be dropped in with Patch 16.
-> The remaining patches connect the new model to the kernel backend and
-> the userland facing code.
-> 
-> The series goes on top of v3.18-rc2.
-> The necessary patches for kvmtool to enable the guest's GICv3 have
-> been posted here before [1], an updated version will follow soon.
-> 
-> There was some testing on the fast model with some I/O and interrupt
-> affinity shuffling in a Linux guest with a varying number of VCPUs as
-> well as some testing on a Juno board (GICv2 only, to spot
-> regressions).
-> 
-> Please review and test.
-> I would be grateful for people to test for GICv2 regressions also
-> (so on a GICv2 host with current kvmtool/qemu), as there is quite
-> some refactoring on that front.
-> 
-> Much of the code was inspired by MarcZ, also kudos to him for doing
-> the rather painful rebase on top of v3.17-rc1.
-> 
-> Cheers,
-> Andre.
-> 
-> [1] https://lists.cs.columbia.edu/pipermail/kvmarm/2014-June/010086.html
-> 
-> Changes v2 ... v3:
-> * rebase to v3.18-rc2
-> * adapt to new kvm_register_device() function
-> * split up vm_ops patch and the GICv2 split-off patch to ease review
-> * various smaller changes due to Christoffer's review
-> * fix compilation for arm
-> * remove support for trapping SGI sysreg accesses on arm hosts
-> 
-> Changes v1 ... v2:
-> * rebase to v3.17-rc1, caused quite some changes to the init code
-> * new 9/15 patch to make 10/15 smaller
-> * fix wrongly ordered cp15 register trap entry (MarcZ)
-> * fix SGI broadcast (thanks to wanghaibin for spotting)
-> * fix broken bailout path in kvm_vgic_create (wanghaibin)
-> * check return value of init_emulation_ops() (wanghaibin)
-> * fix return value check in vgic_[sg]et_attr()
-> * add header inclusion guards
-> * remove double definition of VCPU_NOT_ALLOCATED
-> * some code move-around
-> * whitespace fixes
-> 
-> Andre Przywara (19):
->   arm/arm64: KVM: rework MPIDR assignment and add accessors
->   arm/arm64: KVM: pass down user space provided GIC type into vGIC code
->   arm/arm64: KVM: refactor vgic_handle_mmio() function
->   arm/arm64: KVM: wrap 64 bit MMIO accesses with two 32 bit ones
->   arm/arm64: KVM: introduce per-VM ops
->   arm/arm64: KVM: move [sg]et_lr into per-VM ops
->   arm/arm64: KVM: move kvm_register_device_ops() into vGIC probing
->   arm/arm64: KVM: dont rely on a valid GICH base address
->   arm/arm64: KVM: make the maximum number of vCPUs a per-VM value
->   arm/arm64: KVM: make the value of ICC_SRE_EL1 a per-VM variable
->   arm/arm64: KVM: refactor MMIO accessors
->   arm/arm64: KVM: refactor/wrap vgic_set/get_attr()
->   arm/arm64: KVM: add vgic.h header file
->   arm/arm64: KVM: split GICv2 specific emulation code from vgic.c
->   arm/arm64: KVM: add opaque private pointer to MMIO accessors
->   arm/arm64: KVM: add virtual GICv3 distributor emulation
->   arm64: KVM: add SGI system register trapping
->   arm/arm64: KVM: enable kernel side of GICv3 emulation
->   arm/arm64: KVM: allow userland to request a virtual GICv3
-> 
->  arch/arm/include/asm/kvm_emulate.h   |    3 +-
->  arch/arm/include/asm/kvm_host.h      |    3 +
->  arch/arm/kvm/Makefile                |    1 +
->  arch/arm/kvm/arm.c                   |   23 +-
->  arch/arm/kvm/psci.c                  |   15 +-
->  arch/arm64/include/asm/kvm_emulate.h |    3 +-
->  arch/arm64/include/asm/kvm_host.h    |    5 +
->  arch/arm64/include/uapi/asm/kvm.h    |    7 +
->  arch/arm64/kernel/asm-offsets.c      |    1 +
->  arch/arm64/kvm/Makefile              |    2 +
->  arch/arm64/kvm/sys_regs.c            |   37 +-
->  arch/arm64/kvm/vgic-v3-switch.S      |   14 +-
->  include/kvm/arm_vgic.h               |   37 +-
->  include/linux/irqchip/arm-gic-v3.h   |   26 +
->  include/linux/kvm_host.h             |    2 +
->  include/uapi/linux/kvm.h             |    2 +
->  virt/kvm/arm/vgic-v2-emul.c          |  802 ++++++++++++++++++++++++++
->  virt/kvm/arm/vgic-v2.c               |   26 +-
->  virt/kvm/arm/vgic-v3-emul.c          |  894 +++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic-v3.c               |  192 +++++--
->  virt/kvm/arm/vgic.c                  | 1018 +++++++---------------------------
->  virt/kvm/arm/vgic.h                  |  128 +++++
->  22 files changed, 2366 insertions(+), 875 deletions(-)
->  create mode 100644 virt/kvm/arm/vgic-v2-emul.c
->  create mode 100644 virt/kvm/arm/vgic-v3-emul.c
->  create mode 100644 virt/kvm/arm/vgic.h
-> 
-> -- 
-> 1.7.9.5
-> 
+>
+> Regards,
+> Vincent
+>
+>> Regards,
+>> Wanpeng Li
+>>
+>>
+>>> removing real ones when the original capacity of CPUs is different from
+>>> the
+>>> default SCHED_CAPACITY_SCALE. With this patch set, we don't try anymore to
+>>> evaluate the number of available cores based on the group_capacity but
+>>> instead
+>>> we evaluate the usage of a group and compare it with its capacity.
+>>>
+>>> This patchset mainly replaces the old capacity_factor method by a new one
+>>> and
+>>> keeps the general policy almost unchanged. These new metrics will be also
+>>> used
+>>> in later patches.
+>>>
+> [snip]
