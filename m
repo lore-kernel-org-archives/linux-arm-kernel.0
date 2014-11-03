@@ -1,46 +1,88 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Mon, 03 Nov 2014 17:45:31 +0100
-Subject: DMA allocations from CMA and fatal_signal_pending check
-In-Reply-To: <5453F80C.4090006@gmail.com>
-References: <544FE9BE.6040503@gmail.com>
- <20141031082818.GB14642@js1304-P5Q-DELUXE> <5453F80C.4090006@gmail.com>
-Message-ID: <xa1tlhnsw7v8.fsf@mina86.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 03 Nov 2014 17:48:17 +0100
+Subject: [PATCH 7/7] can: m_can: workaround for transmit data less than
+ 4 bytes
+In-Reply-To: <1414579527-31100-7-git-send-email-b29396@freescale.com>
+References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
+ <1414579527-31100-7-git-send-email-b29396@freescale.com>
+Message-ID: <5457B1D1.6080301@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31 2014, Florian Fainelli wrote:
-> I agree that the CMA allocation should not be allowed to succeed, but
-> the dma_alloc_coherent() allocation should succeed. If we look at the
-> sysport driver, there are kmalloc() calls to initialize private
-> structures, those will succeed (except under high memory pressure), so
-> by the same token, a driver expects DMA allocations to succeed (unless
-> we are under high memory pressure)
->
-> What are we trying to solve exactly with the fatal_signal_pending()
-> check here? Are we just optimizing for the case where a process has
-> allocated from a CMA region to allow this region to be returned to the
-> pool of free pages when it gets killed? Could there be another mechanism
-> used to reclaim those pages if we know the process is getting killed
-> anyway?
+On 10/29/2014 11:45 AM, Dong Aisheng wrote:
+> We meet an IC issue that we have to write the full 8 bytes (whatever
+> value for the second word) in Message RAM to avoid bit error for transmit
+> data less than 4 bytes.
 
-We're guarding against situations where process may hang around
-arbitrarily long time after receiving SIGKILL.  If user does ?kill -9
-$pid? the usual expectation is that the $pid process will die within
-seconds and anything longer is perceived by user as a bug.
+Is this a SoC or a m_can problem? Are all versions of the SoC/m_can
+affected? Is there a m_can version register somewhere?
 
-What problem are *you* trying to solve?  If user sent SIGKILL to
-a process that imitated device initialisation, what is the point of
-continuing initialising the device?  Just recover and return -EINTR.
+> Without the workaround, we can easily see the following errors:
+> root at imx6qdlsolo:~# ip link set can0 up type can bitrate 1000000
+> [   66.882520] IPv6: ADDRCONF(NETDEV_CHANGE): can0: link becomes ready
+> root at imx6qdlsolo:~# cansend can0 123#112233
+> [   66.935640] m_can 20e8000.can can0: Bit Error Uncorrected
+> 
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> ---
+>  drivers/net/can/m_can/m_can.c | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
+> index 219e0e3..f2d9ebe 100644
+> --- a/drivers/net/can/m_can/m_can.c
+> +++ b/drivers/net/can/m_can/m_can.c
+> @@ -1058,10 +1058,19 @@ static netdev_tx_t m_can_start_xmit(struct sk_buff *skb,
+>  	m_can_fifo_write(priv, 0, M_CAN_FIFO_ID, id);
+>  	m_can_fifo_write(priv, 0, M_CAN_FIFO_DLC, can_len2dlc(cf->len) << 16);
+>  
+> -	for (i = 0; i < cf->len; i += 4)
+> +	for (i = 0; i < cf->len; i += 4) {
+>  		m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(i / 4),
+>  				 *(u32 *)(cf->data + i));
+>  
+> +		/* FIXME: we meet an IC issue that we have to write the full 8
 
-> Well, not really. This driver is not an isolated case, there are tons of
-> other networking drivers that do exactly the same thing, and we do
-> expect these dma_alloc_* calls to succeed.
+FIXME usually indicates that the driver needs some work here. Just
+describe your hardware bug, you might add a reference to an errata if
+available, though.
 
-Again, why do you expect them to succeed?  The code must handle failures
-correctly anyway so why do you wish to ignore fatal signal?
+> +		 * bytes (whatever value for the second word) in Message RAM to
+> +		 * avoid bit error for transmit data less than 4 bytes
+> +		 */
+> +		if (cf->len <= 4)
+> +			m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(i / 4 + 1),
+> +					 0x0);
+
+This workaround doesn't handle the dlc == 0 case, your error description
+isn't completely if this is a problem, too.
+
+It should be possible to change the for loop to go always to 8, or
+simply unroll the loop:
+
+/* errata description goes here */
+m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0), *(u32 *)(cf->data + 0));
+m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1), *(u32 *)(cf->data + 4));
+
+> +	}
+> +
+>  	can_put_echo_skb(skb, dev, 0);
+>  
+>  	if (priv->can.ctrlmode & CAN_CTRLMODE_FD) {
+> 
+
+Marc
 
 -- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141103/818246cc/attachment.sig>
