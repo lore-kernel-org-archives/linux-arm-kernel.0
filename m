@@ -1,35 +1,32 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 3 Nov 2014 11:32:34 +0100
-Subject: [PATCH v4 1/1] ARM: at91/dt: sam9x5: Add CAN device nodes
-In-Reply-To: <1963737.sgbgq0RFOC@ws-stein>
-References: <1412682710-14219-1-git-send-email-alexander.stein@systec-electronic.com>
- <544692A6.9030509@atmel.com> <1963737.sgbgq0RFOC@ws-stein>
-Message-ID: <545759C2.3050706@atmel.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Mon, 3 Nov 2014 18:35:28 +0800
+Subject: [PATCH v5 4/4] crypto: Add Allwinner Security System crypto
+ accelerator
+In-Reply-To: <20141103093446.GG11263@lukather>
+References: <1413728182-13569-5-git-send-email-clabbe.montjoie@gmail.com>
+ <20141021191149.GQ21108@lukather> <544A9FEA.6020304@gmail.com>
+ <20141030171933.GR21251@lukather>
+ <20141031072030.GA7563@gondor.apana.org.au>
+ <20141031081323.GS21251@lukather>
+ <20141031081803.GA8012@gondor.apana.org.au>
+ <20141031095706.GA8054@lukather>
+ <20141031100522.GA8655@gondor.apana.org.au>
+ <20141103093446.GG11263@lukather>
+Message-ID: <20141103103528.GA30154@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/10/2014 09:27, Alexander Stein :
-> Hello Nicolas,
-> 
-> On Tuesday 21 October 2014 19:06:46, Nicolas Ferre wrote:
->> On 07/10/2014 13:51, Alexander Stein :
->>> Add the missing CAN devices node including their pin muxing to the shared
->>> .dtsi for at91sam9x5. Actually include this file.
->>> While at it, fix white spaces of can1_clk.
->>
->> Well, no: I split the patch in two to separate these whitespace
->> modifications and the addition of nodes. But now worries, I did it and
->> stacked the 2 patches on top of my WIP at91-3.19-dt branch.
-> 
-> It seems this branch is not public, yet. At least I could not find it on git.kernel.org.
+On Mon, Nov 03, 2014 at 10:34:46AM +0100, Maxime Ripard wrote:
+> What I mean is that since you are saying that drivers should do the
+> kmap themselves, then *all* of the drivers are broken if they are not
+> using it. And all of them are missing this kmap.
 
-It is now:
+kmap is used by the software implementations to map the input/output
+into virtual address space.  Drivers typically use DMA and operate
+on physical addresses so they don't need kmap.
 
-
-> Did you also pick "ARM: at91/dt: sam9263: Add CAN device nodes"? (https://www.mail-archive.com/devicetree at vger.kernel.org/msg44970.html)
-
-I've just done it. Thanks for the "heads-up" ;-)
-
-Bye,
+Cheers,
 -- 
-Nicolas Ferre
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
