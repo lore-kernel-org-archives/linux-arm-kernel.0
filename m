@@ -1,44 +1,58 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Mon, 3 Nov 2014 19:33:45 +0100
-Subject: [PATCH] VNIC: Adding support for Cavium ThunderX network
- controller
-In-Reply-To: <20141103101651.1d664cc3@urahara>
-References: <20141030165434.GW20170@rric.localhost>
- <20141030195458.2958d88a@urahara>
- <CA+sq2CfV-90CRvo-FCizkzoxHq-AsfOEDW2Z5pXtnNLNXCfTUg@mail.gmail.com>
- <20141103101651.1d664cc3@urahara>
-Message-ID: <20141103183345.GK31556@rric.localhost>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 3 Nov 2014 10:36:53 -0800
+Subject: [PATCH v3 09/47] mfd: palmas: Register with kernel power-off
+ handler
+In-Reply-To: <20141103175954.GT27425@saruman>
+References: <1414425354-10359-1-git-send-email-linux@roeck-us.net>
+ <1414425354-10359-10-git-send-email-linux@roeck-us.net>
+ <20141103175645.GT12011@x1> <20141103175954.GT27425@saruman>
+Message-ID: <20141103183653.GA10558@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.11.14 10:16:51, Stephen Hemminger wrote:
-> On Fri, 31 Oct 2014 22:44:11 +0530
-> Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
-> 
-> > On Fri, Oct 31, 2014 at 8:24 AM, Stephen Hemminger
-> > <stephen@networkplumber.org> wrote:
-> > > On Thu, 30 Oct 2014 17:54:34 +0100
-> > > Robert Richter <rric@kernel.org> wrote:
-> > >
-> > >> +#ifdef       VNIC_RSS_SUPPORT
-> > >> +static int rss_config = RSS_IP_HASH_ENA | RSS_TCP_HASH_ENA | RSS_UDP_HASH_ENA;
-> > >> +module_param(rss_config, int, S_IRUGO);
-> > >> +MODULE_PARM_DESC(rss_config,
-> > >> +              "RSS hash config [bits 8:0] (Bit0:L2 extended, 1:IP, 2:TCP, 3:TCP SYN, 4:UDP, 5:L4 extended, 6:ROCE 7:L3 bi-directional, 8:L4 bi-directional)");
-> > >> +#endif
-> > >
-> > > This should managed  be via ethtool ETHTOOL_GRXFH rather than a module parameter.
-> > Thanks, i will add setting hash options via ETHTOOL_SRXFH as well.
-> > The idea here is to have a choice of hash while module load (through
-> > module params) and if it needs to be changed runtime then
-> > via Ethtool.
+On Mon, Nov 03, 2014 at 11:59:54AM -0600, Felipe Balbi wrote:
+> On Mon, Nov 03, 2014 at 05:56:45PM +0000, Lee Jones wrote:
+> > On Mon, 27 Oct 2014, Guenter Roeck wrote:
 > > 
-> > Sunil.
+> > > Register with kernel power-off handler instead of setting pm_power_off
+> > > directly. Register with low priority to reflect that the original code
+> > > only sets pm_power_off if it was not already set.
+> > > 
+> > > Cc: Samuel Ortiz <sameo@linux.intel.com>
+> > > Cc: Lee Jones <lee.jones@linaro.org>
+> > > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> > > ---
+> > > v3:
+> > > - Replace poweroff in all newly introduced variables and in text
+> > >   with power_off or power-off as appropriate
+> > > - Replace POWEROFF_PRIORITY_xxx with POWER_OFF_PRIORITY_xxx
+> > > v2:
+> > > - Use define to specify poweroff handler priority
+> > > - Use devm_register_power_off_handler
+> > > - Use dev_warn instead of dev_err
+> > > 
+> > >  drivers/mfd/palmas.c       | 31 +++++++++++++++++--------------
+> > >  include/linux/mfd/palmas.h |  3 +++
+> > >  2 files changed, 20 insertions(+), 14 deletions(-)
+> > 
+> > Acked-by: Lee Jones <lee.jones@linaro.org>
 > 
-> Network developers do not like vendor unique module parameters.
-> Anything device specific doesn't work in a generic distro environment.
+> missed lakml and linux-omap.
+> 
+Felipe,
 
-Do you accept unique module parameters in parallel to ethtool support
-or should this be removed?
+unfortunately, get_maintainer.pl doesn't give a hint that this and the
+other affected patches should be sent to linux-omap. How am I supposed
+to know ?
 
--Robert
+Note that linux-kernel at vger.kernel.org was copied on the entire series,
+if that is what you mean with lakml. linux-pm at vger.kernel.org was also
+copied on all patches. Additional mailing lists were only copied for
+affected architectures to avoid for the patches to be tagged as spam.
+
+If there is a list named lakml, I must have missed it, and I seem to be
+unable to find a reference to it. If that is the case, my apologies,
+and please provide a link to it.
+
+Thanks,
+Guenter
