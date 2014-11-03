@@ -1,138 +1,23 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 3 Nov 2014 15:40:06 +0000
-Subject: [RFC] ARM64: Accessing perf counters from userspace
-In-Reply-To: <1415027045-6573-1-git-send-email-yogesh.tillu@linaro.org>
-References: <1415027045-6573-1-git-send-email-yogesh.tillu@linaro.org>
-Message-ID: <20141103154006.GJ29621@leverpostej>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 3 Nov 2014 16:51:29 +0100
+Subject: [PATCH v8 10/10] sched: make scale_rt invariant with frequency
+In-Reply-To: <1414745252-4895-11-git-send-email-vincent.guittot@linaro.org>
+References: <1414745252-4895-1-git-send-email-vincent.guittot@linaro.org>
+ <1414745252-4895-11-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <20141103155129.GK12706@worktop.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Oct 31, 2014 at 09:47:32AM +0100, Vincent Guittot wrote:
+> The call to arch_scale_frequency_capacity in the rt scheduling path might be
+> a concern for RT folks because I'm not sure whether we can rely on
+> arch_scale_freq_capacity to be short and efficient ?
 
-On Mon, Nov 03, 2014 at 03:04:00PM +0000, Yogesh Tillu wrote:
-> We have tried to implement some changes to allow perf counters to be accessed
-> from user space. Benchmarking so far has show that these are 100s of times 
-> faster than using syscall(perf_event_open). This would be useful for many use
-> cases like networking(critical to fast path code), benchmark executionpath with
-> low budget of cpu cycles etc.
-> 
-> Benchmark figures on ArmV8, "reading perf cycle counter" with below approaches
-> 1) Reading perf cycle counter through perf_event_open syscall 
-> Result[cpu cycles]: 2000 (For Armv7[Arndale] 5407)
-> 2) Direct access of perf counters from userspace through asm
-> Result[cpu cycles]: 2 (For Armv7[Arndale] 16)
-> 3) Reading perf cycle counter through vDSO path
-> Result[cpu cycles]: ~20
-> 
-> 
-> Could you please let me know your comments/review. Below are the details about
-> setup and patchset. 
+Well, you put it in quite a hot path on the CFS side too, so it had
+better be blazing fast anyhow.
 
-For there to be any meaningful review of this, it needs to be based on a
-kernel tree, and implemented within the existing perf framework; it
-cannot be a module on the side. This is impossible to review, because it
-looks nothing like what a real solution will have to.
 
-Please base this on a kernel tree, and integrate with the existing
-frameworks.
-
-It would also be helpful if you could describe a use case for which the
-current mechanisms are too expensive. It will certainly be cheaper to
-read the registers directly, but there is additional work userspace will
-need to do in addition to simply reading the registers. That can impact
-the use-case.
-
-It's unclear to me why you cannot amortize the cost of the reads over a
-number of iterations. A specific (non-trivial) example would help.
-
-Thanks,
-Mark.
-
-> 
-> ** Setup details **
-> Architecture: ArmV8
-> Board       : Juno Board
-> Linux kernel: 3.16.0+
-> Kernel Repo : git://git.linaro.org/kernel/linux-linaro-tracking.git
-> (Branch:linux-linaro)
-> Rootfs      : Linaro Ubuntu rootfs
-> Toolchain   : gcc version 4.9.1 20140529 (prerelease)
-> (crosstool-NG linaro-1.13.1-4.9-2014.06-02 - Linaro GCC 4.9-2014.06)
-> 
-> 1) Reading perf cycle counter through perf_event_open syscall 
-> *Application to read counter using perf_event_open syscall.
-> [PATCH] Application reads perf cycle counter using perf_event_open
-> syscall, and prints Benchmark results.
-> 
-> Signed-off-by: Yogesh Tillu <yogesh.tillu@linaro.org>
-> ---
->  app_readcounter.c |   83 +++++++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 83 insertions(+)
->  create mode 100644 app_readcounter.c
-> 
-> 
-> 2) Direct access of perf counters from userspace using asm
-> This setup contains kernel module + header file with implemented asm to access
-> perf counters + Application uses api provided in header file to access counter.
-> 
-> * Kernel Module: To enable access of counters from userspace
-> Yogesh Tillu (1):
->   Kernel module to Enable userspace access to PMU counters for
->     ArmV8
-> 
->  ARMv8_Module/Makefile         |    8 ++++
->  ARMv8_Module/README           |    1 +
->  ARMv8_Module/enable_arm_pmu.c |   96 +++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 105 insertions(+)
->  create mode 100644 ARMv8_Module/Makefile
->  create mode 100644 ARMv8_Module/README
->  create mode 100644 ARMv8_Module/enable_arm_pmu.c
-> 
-> * Application:
-> [PATCH] Added test for Direct access of perf counter from userspace
->  using asm.
-> 
-> Signed-off-by: Yogesh Tillu <yogesh.tillu@linaro.org>
-> ---
->  README.directaccess |    8 ++++
->  direct_access.c     |   65 ++++++++++++++++++++++++++++
->  direct_access.h     |  117 +++++++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 190 insertions(+)
->  create mode 100644 README.directaccess
->  create mode 100644 direct_access.c
->  create mode 100644 direct_access.h
-> 
-> 3) Reading perf cycle counter through vDSO path
-> * Kernel Module: To enable access of counters from userspace ( Same as setup (2) )
-> * Kernel vDSO implementation: vDSO implementation for reading of perf cycle counter
-> [PATCH] provide open/read function through vDSO for PMU counters
-> Yogesh Tillu (1):
->   To read PMU cycle counter through vDSO Path
-> 
->  arch/arm64/kernel/vdso/Makefile     |    6 +++---
->  arch/arm64/kernel/vdso/vdso.lds.S   |    5 +++++
->  arch/arm64/kernel/vdso/vdso_perfc.c |   20 ++++++++++++++++++++
->  3 files changed, 28 insertions(+), 3 deletions(-)
->  create mode 100644 arch/arm64/kernel/vdso/vdso_perfc.c
-> 
-> * application  : To read perf counter through api(implemented through vDSO)
-> [PATCH] Test Application: access PMU counter through vDSO
-> Yogesh Tillu (1):
->   Test application to read PMU counter through vdso     
-> 
->  vdso_userspace_perf.c |   58 +++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 58 insertions(+)
->  create mode 100644 vdso_userspace_perf.c
-> 
-> NOTE: This codebase mainly for POC of "Access perf counters from userspace",
-> not much concentration towards api standard forms.
-> 
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+That said, can you move all the running + invariance bits at the
+beginning of the patch set, these appear to be the least controversial
+bits and 'desired' by quite a few people, so we'll try and get those
+agreed upon and merged first.
