@@ -1,49 +1,27 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 3 Nov 2014 14:21:15 +0800
-Subject: [PATCH] ARM: dts: imx6sx-sdb: Allow wakeup from buttons
-In-Reply-To: <1414614311-2199-1-git-send-email-festevam@gmail.com>
-References: <1414614311-2199-1-git-send-email-festevam@gmail.com>
-Message-ID: <20141103062114.GE10821@tiger>
+Date: Mon, 3 Nov 2014 14:26:07 +0800
+Subject: [PATCH] ARM: imx: Explicitly select CONFIG_SPI
+In-Reply-To: <1414617568-27615-1-git-send-email-festevam@gmail.com>
+References: <1414617568-27615-1-git-send-email-festevam@gmail.com>
+Message-ID: <20141103062606.GF10821@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 29, 2014 at 06:25:11PM -0200, Fabio Estevam wrote:
+On Wed, Oct 29, 2014 at 07:19:28PM -0200, Fabio Estevam wrote:
 > From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Allow the two button wakeup the system from low power mode.
+> Since 3.18-rc1 CONFIG_SPI is no longer automatically selected for 
+> imx_v4_v5_defconfig and imx_v6_v7_defconfig, so in order to keep the same
+> behaviour as previous kernel versions and avoid regressions, let's explicitly
+> select CONFIG_SPI.
 > 
 > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > ---
->  arch/arm/boot/dts/imx6sx-sdb.dts | 2 ++
->  1 file changed, 2 insertions(+)
+> Shawn,
 > 
-> diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
-> index 448489b..80ae281 100644
-> --- a/arch/arm/boot/dts/imx6sx-sdb.dts
-> +++ b/arch/arm/boot/dts/imx6sx-sdb.dts
-> @@ -39,12 +39,14 @@
->  		volume-up {
->  			label = "Volume Up";
->  			gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
-> +			gpio-key,wakeup;
+> If possible, please apply this as a bug fix for 3.18.
 
-I can understand that this is convenient for developers, but I'm not
-really sure if it's reasonable for users.  IOW, is it expected that
-volume keys can wake up system from low power mode?  Or we should only
-allow that from power key?
+Can you please mention the commit that introduced the regression in the
+commit log?
 
 Shawn
-
->  			linux,code = <KEY_VOLUMEUP>;
->  		};
->  
->  		volume-down {
->  			label = "Volume Down";
->  			gpios = <&gpio1 19 GPIO_ACTIVE_LOW>;
-> +			gpio-key,wakeup;
->  			linux,code = <KEY_VOLUMEDOWN>;
->  		};
->  	};
-> -- 
-> 1.9.1
-> 
