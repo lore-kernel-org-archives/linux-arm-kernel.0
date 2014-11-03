@@ -1,105 +1,39 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 03 Nov 2014 21:13:52 +0900
-Subject: [RFC PATCH 2/2] arm: pcibios: move to generic PCI domains
-In-Reply-To: <1415014431.26755.1.camel@pengutronix.de>
-References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1414669490-1217-3-git-send-email-lorenzo.pieralisi@arm.com>
- <003401cff704$09755cd0$1c601670$%han@samsung.com>
- <20141103112309.GB24433@red-moon> <1415014431.26755.1.camel@pengutronix.de>
-Message-ID: <000901cff75f$a75da640$f618f2c0$%han@samsung.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Mon, 03 Nov 2014 13:17:28 +0100
+Subject: [PATCH 0/4] Touchscreen performance related fixes
+In-Reply-To: <912A29987EAE174BA6CF187D7CDFA9CE26F46B2B@DLEE08.ent.ti.com>
+References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
+ <544E821D.5040004@linutronix.de>
+ <912A29987EAE174BA6CF187D7CDFA9CE26F46B2B@DLEE08.ent.ti.com>
+Message-ID: <54577258.9080508@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 03, 2014 8:34 PM, Lucas Stach wrote:
-> Am Montag, den 03.11.2014, 11:23 +0000 schrieb Lorenzo Pieralisi:
-> > On Mon, Nov 03, 2014 at 01:18:12AM +0000, Jingoo Han wrote:
-> > > On Thursday, October 30, 2014 8:45 PM, Lorenzo Pieralisi wrote:
-> > > >
-> > > > Most if not all ARM PCI host controller device drivers either ignore the
-> > > > domain field in the pci_sys_data structure or just increment it every
-> > > > time a host controller is probed, using it as a domain counter.
-> > > >
-> > > > Therefore, instead of relying on pci_sys_data to stash the domain number
-> > > > in a standard location, ARM pcibios code can be moved to the newly
-> > > > introduced generic PCI domains code, implemented in commits:
-> > > >
-> > > > commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
-> > > > ("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
-> > > >
-> > > > commit 670ba0c8883b576d0aec28bd7a838358a4be1
-> > > > ("PCI: Add generic domain handling")
-> > > >
-> > > > In order to assign a domain number dynamically, the ARM pcibios defines
-> > > > the function, called by core PCI code:
-> > > >
-> > > > void pci_bus_assign_domain_nr(...)
-> > > >
-> > > > that relies on a DT property to define the domain number or falls back to
-> > > > a counter; its usage replaces the current domain assignment code in PCI
-> > > > host controllers present in the kernel.
-> > > >
-> > > > Cc: Arnd Bergmann <arnd@arndb.de>
-> > > > Cc: Phil Edworthy <phil.edworthy@renesas.com>
-> > > > Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> > > > Cc: Jingoo Han <jg1.han@samsung.com>
-> > > > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > > > Cc: Russell King <linux@arm.linux.org.uk>
-> > > > Cc: Mohit Kumar <mohit.kumar@st.com>
-> > > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > >
-> > > (+CC Richard Zhu, Lucas Stach, Kishon Vijay Abraham I, Murali Karicheri)
-> > >
-> > > Acked-by: Jingoo Han <jg1.han@samsung.com>
-> >
-> > Thank you Jingoo.
-> >
-> > > For a long time, I have wanted the patch like this. Personally,
-> > > I want to increase the build coverage and keep the same binary
-> > > regardless of config options as possible; thus, I don't like
-> > > #ifdef guards such as '#ifdef CONFIG_PCI_DOMAINS'. When I submitted
-> > > the first patch for 'pcie-designware.c', I was not able to find
-> > > a way to remove '#ifdef CONFIG_PCI_DOMAINS' from 'pcie-designware.c'.
-> > >
-> > > This patch looks good and I think that this patch will not make
-> > > the problem. However, I didn't test this patch with Exynos platform,
-> > > due to some reasons. So, I hope that other engineers test this patch
-> > > on other SoC platforms related to designware PCIe.
-> > >
-> > > To Mohit Kumar (ST SPEAR13XX), Richard Zhu/Lucas Stach (IMX6)
-> > >     Kishon Vijay Abraham I (TI DRA7XX), Murali Karicheri (TI KEYSTONE)
-> > >
-> > > Would you test this patch and share the result?
-> > > It would be very helpful. Thank you.
-> >
-> > I am happy to wait for a week or two before asking to add this code to -next,
-> > it would be definitely great to get more coverage on pcie-designware.
-> >
-> I've just tested this on i.MX6 on top of 3.18-rc3. Given that we only
-> use a single domain there this patch should obviously not break
-> anything. Testing backs this claim, so:
+On 10/27/2014 08:02 PM, Griffis, Brad wrote:
+> On 10/27/2014 12:34 PM, Sebastian Andrzej Siewior wrote:
+>> Do we really need #3 (and then #4)? Given the complexity we have already, is there any benefit by decreasing this value? 
 > 
-> Tested-by: Lucas Stach <l.stach@pengutronix.de>
+> I specifically requested we add ti,charge-delay to the device tree because it is THE critical value to tune for a given design.  Although I think the current value of 0xB000 will be suitable for a great many designs, I expect that many users will need to adjust this value for their hardware.  Details such as which touchscreen vendor is being used and how the touchscreen is connected (header vs cable) have an effect on what's appropriate here.
 
-Thank you for your testing!
-In fact, Exynos uses multi domain structures.
+Oh. That is one knob I hoped we could avoid since I haven't seen it
+before on other TSCs. But okay. Please make sure that there is a
+message printed if the default value is used. And lets hope the user
+will do something about his.
 
+>> Would  someone want to increase it? Can we safely determine a value which works for everyone?
 > 
-> I also looked through the patch briefly and it seems sane to me, so this
-> is also:
-> 
-> Acked-by: Lucas Stach <l.stach@pengutronix.de>
-> 
-> I don't like the fact that a proper binding documentation is missing for
-> the "linux,pci-domain" property, but this isn't the fault of this
-> patchset.
+> This value represents a hardware delay before checking for the pen-up event.  So in the scenario where someone is seeing excessive false pen-up events they will want to increase this parameter.  The downsize of making this larger is that it decreases the overall sampling speed of both the touchscreen as well as the standalone ADC samples.  At one point I tried making it huge, but that made the touchscreen overly sluggish because the sampling became too slow.  So there is a definite trade-off that if you make it too large the touchscreen becomes sluggish, and if you make it too small then you may see false pen-up events.  The optimal value will need to be tuned for a given design.
 
-I agree with your opinion. I also thought that the binding documentation
-for the "linux,pci-domain" property is needed.
+I applied the patches from this series and did the following test on my
+am335x-evm: A mug on the touchscreen (to make sure the events are
+coming), evtest on the event node to see that the events and loop of
 
-> 
-> Regards,
-> Lucas
-> 
-> --
-> Pengutronix e.K.             | Lucas Stach                 |
-> Industrial Linux Solutions   | http://www.pengutronix.de/  |
+	cat /sys/bus/iio/devices/iio\:device0/in_voltage4_raw
+
+In the past I was able lock up the TSC/ADC HW that way (see commit
+7ca6740cd1 ("mfd: input: iio: ti_amm335x: Rework TSC/ADC
+synchronization")) for details.
+With this patches applied I don't seen any TSC events once the IIO
+interface is (heavily) used. Can this be fixed?
+
+Sebastian
