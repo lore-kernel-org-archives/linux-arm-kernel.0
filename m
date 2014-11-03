@@ -1,142 +1,205 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Mon,  3 Nov 2014 15:14:12 +0100
-Subject: [PATCH v3 2/2] ARM: add lolevel debug support for asm9260
-In-Reply-To: <1415024052-12351-1-git-send-email-linux@rempel-privat.de>
-References: <20141102203438.GW3698@titan.lakedaemon.net>
- <1415024052-12351-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <1415024052-12351-3-git-send-email-linux@rempel-privat.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 3 Nov 2014 15:15:10 +0100
+Subject: [PATCH v3 06/19] arm/arm64: KVM: move [sg]et_lr into per-VM ops
+In-Reply-To: <1414776414-13426-7-git-send-email-andre.przywara@arm.com>
+References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
+ <1414776414-13426-7-git-send-email-andre.przywara@arm.com>
+Message-ID: <20141103141510.GG16132@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since there is no public documentation, this patch also provide register
-offsets for different UART units on this SoC.
+On Fri, Oct 31, 2014 at 05:26:41PM +0000, Andre Przywara wrote:
+> The function to set the VGIC's list registers are not only dependent
+> on the host GIC model, but need to behave slightly different for
+> the type of emulated guest GIC.
+> So move the functions into the new struct vgic_vm_ops and initialize
+> them properly to prepare for guest GICv3 support later.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  include/kvm/arm_vgic.h |    5 +++--
+>  virt/kvm/arm/vgic-v2.c |   17 +++++++++++++++--
+>  virt/kvm/arm/vgic-v3.c |   16 ++++++++++++++--
+>  virt/kvm/arm/vgic.c    |    9 +++++++--
+>  4 files changed, 39 insertions(+), 8 deletions(-)
+> 
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index bfb660a..a6d41f1 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -108,8 +108,6 @@ struct vgic_vmcr {
+>  };
+>  
+>  struct vgic_ops {
+> -	struct vgic_lr	(*get_lr)(const struct kvm_vcpu *, int);
+> -	void	(*set_lr)(struct kvm_vcpu *, int, struct vgic_lr);
+>  	void	(*sync_lr_elrsr)(struct kvm_vcpu *, int, struct vgic_lr);
+>  	u64	(*get_elrsr)(const struct kvm_vcpu *vcpu);
+>  	u64	(*get_eisr)(const struct kvm_vcpu *vcpu);
+> @@ -132,9 +130,12 @@ struct vgic_params {
+>  	unsigned int	maint_irq;
+>  	/* Virtual control interface base address */
+>  	void __iomem	*vctrl_base;
+> +	bool (*init_emul)(struct kvm *kvm, int type);
+>  };
+>  
+>  struct vgic_vm_ops {
+> +	struct vgic_lr	(*get_lr)(const struct kvm_vcpu *, int);
+> +	void	(*set_lr)(struct kvm_vcpu *, int, struct vgic_lr);
+>  	bool	(*handle_mmio)(struct kvm_vcpu *, struct kvm_run *,
+>  			       struct kvm_exit_mmio *);
+>  	bool	(*queue_sgi)(struct kvm_vcpu *vcpu, int irq);
 
-Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
----
- arch/arm/Kconfig.debug           | 31 ++++++++++++++++++++++++++++---
- arch/arm/include/debug/asm9260.S | 31 +++++++++++++++++++++++++++++++
- 2 files changed, 59 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/include/debug/asm9260.S
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index d8f6a2e..66c29db 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -93,6 +93,27 @@ choice
- 	prompt "Kernel low-level debugging port"
- 	depends on DEBUG_LL
- 
-+	config DEBUG_ASM9260_UART
-+		bool "Kernel low-level debugging via asm9260 UART"
-+		depends on MACH_ASM9260
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to an UART or USART port on asm9260 based
-+		  machines.
-+
-+		    DEBUG_UART_PHYS | DEBUG_UART_VIRT
-+
-+		    0x80000000      | 0xf0000000     | UART0
-+		    0x80004000      | 0xf0004000     | UART1
-+		    0x80008000      | 0xf0008000     | UART2
-+		    0x8000c000      | 0xf000c000     | UART3
-+		    0x80010000      | 0xf0010000     | UART4
-+		    0x80014000      | 0xf0014000     | UART5
-+		    0x80018000      | 0xf0018000     | UART6
-+		    0x8001c000      | 0xf001c000     | UART7
-+		    0x80020000      | 0xf0020000     | UART8
-+		    0x80024000      | 0xf0024000     | UART9
-+
- 	config AT91_DEBUG_LL_DBGU0
- 		bool "Kernel low-level debugging on rm9200, 9260/9g20, 9261/9g10 and 9rl"
- 		depends on HAVE_AT91_DBGU0
-@@ -1042,6 +1063,7 @@ config DEBUG_STI_UART
- config DEBUG_LL_INCLUDE
- 	string
- 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
-+	default "debug/asm9260.S" if DEBUG_ASM9260_UART
- 	default "debug/clps711x.S" if DEBUG_CLPS711X_UART1 || DEBUG_CLPS711X_UART2
- 	default "debug/meson.S" if DEBUG_MESON_UARTAO
- 	default "debug/pl01x.S" if DEBUG_LL_UART_PL01X || DEBUG_UART_PL01X
-@@ -1135,6 +1157,7 @@ config DEBUG_UART_PHYS
- 	default 0x78000000 if DEBUG_CNS3XXX
- 	default 0x7c0003f8 if FOOTBRIDGE
- 	default 0x78000000 if DEBUG_CNS3XXX
-+	default 0x80010000 if DEBUG_ASM9260_UART
- 	default 0x80070000 if DEBUG_IMX23_UART
- 	default 0x80074000 if DEBUG_IMX28_UART
- 	default 0x80230000 if DEBUG_PICOXCELL_UART
-@@ -1171,13 +1194,14 @@ config DEBUG_UART_PHYS
- 		DEBUG_LL_UART_EFM32 || \
- 		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_MESON_UARTAO || \
- 		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART || \
--		DEBUG_UART_BCM63XX
-+		DEBUG_UART_BCM63XX || DEBUG_ASM9260_UART
- 
- config DEBUG_UART_VIRT
- 	hex "Virtual base address of debug UART"
- 	default 0xe0010fe0 if ARCH_RPC
- 	default 0xe1000000 if DEBUG_MSM_UART
- 	default 0xf0000be0 if ARCH_EBSA110
-+	default 0xf0010000 if DEBUG_ASM9260_UART
- 	default 0xf01fb000 if DEBUG_NOMADIK_UART
- 	default 0xf0201000 if DEBUG_BCM2835
- 	default 0xf1000300 if DEBUG_BCM_5301X
-@@ -1244,7 +1268,7 @@ config DEBUG_UART_VIRT
- 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
- 		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_MESON_UARTAO || \
- 		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART || \
--		DEBUG_UART_BCM63XX
-+		DEBUG_UART_BCM63XX || DEBUG_ASM9260_UART
- 
- config DEBUG_UART_8250_SHIFT
- 	int "Register offset shift for the 8250 debug UART"
-@@ -1286,7 +1310,8 @@ config DEBUG_UNCOMPRESS
- config UNCOMPRESS_INCLUDE
- 	string
- 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
--					PLAT_SAMSUNG || ARCH_EFM32
-+					PLAT_SAMSUNG || ARCH_EFM32 || \
-+					MACH_ASM9260
- 	default "mach/uncompress.h"
- 
- config EARLY_PRINTK
-diff --git a/arch/arm/include/debug/asm9260.S b/arch/arm/include/debug/asm9260.S
-new file mode 100644
-index 0000000..c70d51f
---- /dev/null
-+++ b/arch/arm/include/debug/asm9260.S
-@@ -0,0 +1,31 @@
-+/* arch/arm/mach-imx/include/mach/debug-macro.S
-+ *
-+ * Debugging macro include header
-+ *
-+ *  Copyright (C) 1994-1999 Russell King
-+ *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
-+ *  Modified for ASM9260 by Oleksij Remepl <linux@rempel-privat.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+		.macro	addruart, rp, rv, tmp
-+		ldr	\rp, = CONFIG_DEBUG_UART_PHYS
-+		ldr	\rv, = CONFIG_DEBUG_UART_VIRT
-+		.endm
-+
-+		.macro	waituart,rd,rx
-+		.endm
-+
-+		.macro	senduart,rd,rx
-+		str	\rd, [\rx, #0x50]	@ TXDATA
-+		.endm
-+
-+		.macro	busyuart,rd,rx
-+1002:		ldr	\rd, [\rx, #0x60]	@ STAT
-+		tst	\rd, #1 << 27		@ TXEMPTY
-+		beq	1002b			@ wait until transmit done
-+		.endm
--- 
-1.9.1
+this has now become incredibly confusing, what are your thoughts on
+renaming vgic_ops to kvm_gic_ops to make it clear that this structure is
+about hardware-managing ops and vgic_vm_ops is about the vgic, the
+virtual instance?
+
+> diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
+> index 2935405..bdc8d97 100644
+> --- a/virt/kvm/arm/vgic-v2.c
+> +++ b/virt/kvm/arm/vgic-v2.c
+> @@ -143,8 +143,6 @@ static void vgic_v2_enable(struct kvm_vcpu *vcpu)
+>  }
+>  
+>  static const struct vgic_ops vgic_v2_ops = {
+> -	.get_lr			= vgic_v2_get_lr,
+> -	.set_lr			= vgic_v2_set_lr,
+>  	.sync_lr_elrsr		= vgic_v2_sync_lr_elrsr,
+>  	.get_elrsr		= vgic_v2_get_elrsr,
+>  	.get_eisr		= vgic_v2_get_eisr,
+> @@ -158,6 +156,20 @@ static const struct vgic_ops vgic_v2_ops = {
+>  
+>  static struct vgic_params vgic_v2_params;
+>  
+> +static bool vgic_v2_init_emul(struct kvm *kvm, int type)
+> +{
+> +	struct vgic_vm_ops *vm_ops = &kvm->arch.vgic.vm_ops;
+> +
+> +	switch (type) {
+> +	case KVM_DEV_TYPE_ARM_VGIC_V2:
+> +		vm_ops->get_lr = vgic_v2_get_lr;
+> +		vm_ops->set_lr = vgic_v2_set_lr;
+> +		return true;
+> +	}
+> +
+> +	return false;
+> +}
+> +
+>  /**
+>   * vgic_v2_probe - probe for a GICv2 compatible interrupt controller in DT
+>   * @node:	pointer to the DT node
+> @@ -196,6 +208,7 @@ int vgic_v2_probe(struct device_node *vgic_node,
+>  		ret = -ENOMEM;
+>  		goto out;
+>  	}
+> +	vgic->init_emul = vgic_v2_init_emul;
+>  
+>  	vgic->nr_lr = readl_relaxed(vgic->vctrl_base + GICH_VTR);
+>  	vgic->nr_lr = (vgic->nr_lr & 0x3f) + 1;
+> diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+> index 1c2c8ee..a38339e 100644
+> --- a/virt/kvm/arm/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic-v3.c
+> @@ -157,8 +157,6 @@ static void vgic_v3_enable(struct kvm_vcpu *vcpu)
+>  }
+>  
+>  static const struct vgic_ops vgic_v3_ops = {
+> -	.get_lr			= vgic_v3_get_lr,
+> -	.set_lr			= vgic_v3_set_lr,
+>  	.sync_lr_elrsr		= vgic_v3_sync_lr_elrsr,
+>  	.get_elrsr		= vgic_v3_get_elrsr,
+>  	.get_eisr		= vgic_v3_get_eisr,
+> @@ -170,6 +168,19 @@ static const struct vgic_ops vgic_v3_ops = {
+>  	.enable			= vgic_v3_enable,
+>  };
+>  
+> +static bool vgic_v3_init_emul_compat(struct kvm *kvm, int type)
+> +{
+> +	struct vgic_vm_ops *vm_ops = &kvm->arch.vgic.vm_ops;
+> +
+> +	switch (type) {
+> +	case KVM_DEV_TYPE_ARM_VGIC_V2:
+> +		vm_ops->get_lr = vgic_v3_get_lr;
+> +		vm_ops->set_lr = vgic_v3_set_lr;
+> +		return true;
+> +	}
+> +	return false;
+> +}
+> +
+>  static struct vgic_params vgic_v3_params;
+>  
+>  /**
+> @@ -231,6 +242,7 @@ int vgic_v3_probe(struct device_node *vgic_node,
+>  		goto out;
+>  	}
+>  
+> +	vgic->init_emul = vgic_v3_init_emul_compat;
+>  	vgic->vcpu_base = vcpu_res.start;
+>  	vgic->vctrl_base = NULL;
+>  	vgic->type = VGIC_V3;
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 2c16684..8c2e707 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1278,13 +1278,13 @@ static void vgic_update_state(struct kvm *kvm)
+>  
+>  static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr)
+>  {
+> -	return vgic_ops->get_lr(vcpu, lr);
+> +	return vgic_vm_op(vcpu->kvm, get_lr)(vcpu, lr);
+>  }
+>  
+>  static void vgic_set_lr(struct kvm_vcpu *vcpu, int lr,
+>  			       struct vgic_lr vlr)
+>  {
+> -	vgic_ops->set_lr(vcpu, lr, vlr);
+> +	return vgic_vm_op(vcpu->kvm, set_lr)(vcpu, lr, vlr);
+>  }
+>  
+>  static void vgic_sync_lr_elrsr(struct kvm_vcpu *vcpu, int lr,
+> @@ -2072,6 +2072,11 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
+>  		}
+>  	}
+>  
+> +	if (!vgic->init_emul(kvm, type)) {
+> +		ret = -ENODEV;
+> +		goto out_unlock;
+> +	}
+> +
+>  	spin_lock_init(&kvm->arch.vgic.lock);
+>  	kvm->arch.vgic.in_kernel = true;
+>  	kvm->arch.vgic.vgic_model = type;
+> -- 
+> 1.7.9.5
+> 
+
+Thanks for splitting up the patches, it's certainly better to review.
+
+However, my question from the last round still stands.  What you're
+doing here is setting a sh*tload of function pointers through an amazing
+amount of abstractions to avoid something like
+
+void vgic_v2_set_lr(struct kvm_vgic *vgic)
+{
+	switch (vgic->type) {
+	case KVM_DEV_TYPE_ARM_VGIC_V2:
+		foo();
+		break;
+	case KVM_DEV_TYPE_ARM_VGIC_V3:
+		bar();
+		break;
+	}
+}
+
+So I have to ask: What's the benefit? That you'll have fewer
+conditionals?  But god have mercy on the poor people having to debug
+some issue and figure out which function the code actually calls when it
+(inside another complicated piece of logic) sets a LR.
+
+This just feels like we're doing something incredibly wrong...
+
+Thoughts?
+
+-Christoffer
