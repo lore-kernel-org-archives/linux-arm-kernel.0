@@ -1,107 +1,130 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 3 Nov 2014 20:02:02 +0000
-Subject: [PATCH 05/10] arm64: Convert dts to use reserved-memory nodes
-In-Reply-To: <1414799092.23621.48.camel@smoke>
-References: <cover.1414099246.git.geoff@infradead.org>
- <411296ab915959b862923d827e730a1db2ff9b4e.1414099246.git.geoff@infradead.org>
- <20141024105111.GD24265@leverpostej>
- <CACxGe6szzOXHkK9ukpcSBZgeyy5AgX3+7PgQseBnB9XWYLj-PQ@mail.gmail.com>
- <20141024122738.GH24265@leverpostej>
- <1414799092.23621.48.camel@smoke>
-Message-ID: <20141103200202.GB30366@leverpostej>
+From: bonbons@linux-vserver.org (Bruno =?UTF-8?B?UHLDqW1vbnQ=?=)
+Date: Mon, 3 Nov 2014 21:02:44 +0100
+Subject: [RFC Patch 1/4] mfd: AXP20x: Add power supply bindings
+ documentation
+In-Reply-To: <20141021191905.GR21108@lukather>
+References: <20141020221959.2f312906@neptune.home>
+ <20141020223314.0484f795@neptune.home> <20141021101503.GE26842@x1>
+ <20141021180916.432f02e1@neptune.home>
+ <20141021191905.GR21108@lukather>
+Message-ID: <20141103210244.1425e0c7@neptune.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 11:44:52PM +0000, Geoff Levand wrote:
-> Hi,
-> 
-> On Fri, 2014-10-24 at 13:27 +0100, Mark Rutland wrote:
-> > On Fri, Oct 24, 2014 at 11:59:38AM +0100, Grant Likely wrote:
-> > > On Fri, Oct 24, 2014 at 11:51 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > > > On Fri, Oct 24, 2014 at 12:10:58AM +0100, Geoff Levand wrote:
-> > > >> Device tree regions described by /memreserve/ entries are not available in
-> > > >> /proc/device-tree, and hence are not available to user space utilities that use
-> > > >> /proc/device-tree.  In order for these regions to be available, convert any
-> > > >> arm64 DTS files using /memreserve/ entries to use reserved-memory nodes.
-> > > >
-> > > > The limitation here is in the kernel (and a partially in userspace), so
-> > > > modifying the dts files is a workaround rather than a fix.
-> > > >
-> > > > It's perfectly valid for people to remain using /memreserve/, so this
-> > > > isn't sufficient. There are also existing DTBs using /memreserve/ which
-> > > > we can't rely on being modified to use reserved-memory.
-> > > >
-> > > > I think we need to expose memreserves to userspace somehow, potentially
-> > > > along with other DTB header fields. Grant, ideas?
+Hi Maxime,
+
+On Tue, 21 October 2014 Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> On Tue, Oct 21, 2014 at 06:09:16PM +0200, Bruno Pr?mont wrote:
+> > On Tue, 21 October 2014 Lee Jones <lee.jones@linaro.org> wrote:
+> > > On Mon, 20 Oct 2014, Bruno Pr?mont wrote:
+> > > > ---
+> > > > Note: the OCV values seem to have some defaults build into the
+> > > > PMIC though may need adjustment if the used battery has a different
+> > > > open circuit voltage curve.
+> > > > As far as understood (these values are set in vendor driver but not
+> > > > mentioned in chip documentation) they represent charge percentage
+> > > > for some predefined voltages.
+> > > > 
+> > > > If prefixing these values with "x-power," is preferred the following
+> > > > patch should becomes a dependency:
+> > > >   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/267606.html
+> > > > and users in patch 2/4, 4/4 need adjusting.
+> > > > 
+> > > > 
+> > > >  Documentation/devicetree/bindings/mfd/axp20x.txt |   20 +
+> > > >  1 files changed, 20 insertions(+), 0 deletion(-)
+> > > > 
+> > > > diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> > > > index cc9e01b..8ea681c 100644
+> > > > --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
+> > > > +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> > > > @@ -28,6 +28,20 @@ Required properties:
+> > > >  		      (range: 750-1875). Default: 1.5MHz
+> > > >  
+> > > >  Optional properties for DCDCs:
+> > > > +- backup: Settings for backup/RTC battery charger
+> > > > +	  (Voltage in ?V, current in ?A)
+> > > > +	  If not present, charger will be left untouched
+> > > > +- battery.ocv: OCV capacity curve points (16 data values)
+> > > > +- battery.resistance: internal battery resistance in m?
+> > > > +                      (defaults to 100m?)
+> > > > +- battery.capacity: Battery capacity in mAh
+> > > > +		    If this attribute is missing, charger will be disabled
+> > > > +		    unless there is a battery connected.
+> > > > +- battery.temp_sensor: Description of temperautre sensor, 3 values
+> > > > +		       - driver current (20?A, 40?A, 60?A or 80?A)
+> > > > +		       - low temperature warning level (in ?V)
+> > > > +		       - high temperature warning level (in ?V)
+> > > > +		       If missing, temperature sensor gets disabled
+> > > >  - x-powers,dcdc-workmode: 1 for PWM mode, 0 for AUTO mode
+> > > >  			  Default: AUTO mode
+> > > >  
+> > > > @@ -49,6 +63,12 @@ axp209: pmic at 34 {
+> > > >  	ldo3in-supply = <&axp_ipsout_reg>;
+> > > >  	ldo5in-supply = <&axp_ipsout_reg>;
+> > > >  
+> > > > +	backup = <3000000 200>;
+> > > > +	battery.ocv = <0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>;
+> > > > +	battery.resistance = <0>;
+> > > > +	battery.capacity = <2000>;
+> > > > +	battery.temp_sensor = <20 1000000 4000000>;
 > > > 
-> > > Yes, I suggested the same thing to Geoff in a separate thread. Here's
-> > > what I wrote:
-> > > 
-> > > >> Geoff Levand wrote:
-> > > >>> I did some work on this and I think we just need to convert all the
-> > > >>> arm64 dts from /memreserve/ to reserved-memory nodes and update the
-> > > >>> arm64 booting.txt to specify using reserved-memory.  I'll prepare a
-> > > >>> patch for it.
-> > > >>
-> > > >> I don't think that is going to be entirely sufficient. There will be
-> > > >> platforms that don't get converted over, and this is a generic problem
-> > > >> that covers all architectures using DT, not just aarch64. The solution
-> > > >> probably needs to include exposing the /memreserve/ sections to
-> > > >> userspace. I can see two ways to do this:
-> > > >>
-> > > >> 1) Create a new property in /sysfs with all the memreserve sctions
-> > > >> 2) Live-modify the device tree to put the memreserve data into a node
-> > > >> at boot time.
-> > > >>
-> > > >> Option 2 is probably the most generic solution, but it will require
-> > > >> some care to make sure there aren't any overlaps if a reserved-memory
-> > > >> node already exists.
+> > > Since when do we use '.'s in property names?
 > > 
-> > I would prefer the former currently. While I currently believe that
-> > modifying the tree is something we're going to have to do for stateful
-> > properties, it's not someting I want to have to do unless absolutely
-> > necessary.
+> > I've not found guidelines on this, but whatever is the right way to
+> > name them, I'm open for suggestions.
 > 
-> Current user space kexec utilities use /proc/device-tree and nothing
-> else.  The intension of the device tree is to describe the system
-> sufficiently for a kernel to boot, so I think we should put the
-> /memreserve/ info into /proc/device-tree.
+> You can take a look at the ePAPR specs. Even if it's quite outdated,
+> it still puts you in the right mindset.
 
-I don't follow. The intention of device tree generically has precisely
-nothing to do with the Linux-specific filesystem hierarchy for exposing
-device tree to userspace.
+There seems to be some kind of e-mail wall in front of this document.
 
-The memreserve entries aren't the same as other elements in
-/proc/device-tree. They're a flat table pointed to by the header rather
-than a hierarchy of nodes and properties. There's no way to expose that
-difference under /proc/device-tree, so exposing that as a parallel
-hierarchy makes the most sense to me.
-
-> We could put the /memreserve/ entries in there directly, or convert
-> to reserved-memory nodes.  At the moment I like the idea to convert to
-> reserved-memory nodes.
-
-I think we need a parallel hierarchy to expose header information
-(though we likely only need the memreserve entries). I'm not keen on
-rewriting the device tree to work around a historical mistake.
-
-> > > > For reference, here is an old conversation about this exact thing.
-> > > > Reading through it, the opinions I expressed then don't necessarily
-> > > > match what I think now. I still don't think it is a good idea to
-> > > > expose the physical address of the old .dtb blob, but I do agree that
-> > > > the memreserve sections need to be exposed.
-> > > >
-> > > > https://lists.ozlabs.org/pipermail/linuxppc-dev/2010-July/083993.html
-> > 
-> > Another option would be to expose the original DTB as a (read-only)
-> > binary file somewhere. That might interact poorly with live tree
-> > modification in future, however.
+> That being said, since they are driver-specific properties, they
+> should be prefixed by the vendor name (here x-powers).
 > 
-> I don't like the idea of having two interfaces to get essentially the same
-> info.  I think it will be a maintenance problem over time.
+> And I think they all belong in a sub-node, just like what's been done
+> for the regulators.
 
-Given Grant's comments, I'm perfectly happy to not expose the raw DTB
-for situations otehr than debugging.
+Doing something like this?:
 
-Thanks,
-Mark.
+--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+@@ -126,9 +126,11 @@
+                                interrupt-controller;
+                                #interrupt-cells = <1>;
+ 
+-                               backup = <3000000 200>;
+-                               battery.resistance = <100>;
+-                               battery.capacity = <2000>;
++                               x-powers,backup = <3000000 200>;
++                               battery: battery at 0 {
++                                       x-powers,resistance = <100>;
++                                       x-powers,capacity = <2000>;
++                               };
+                        };
+                };
+
+What are the rules to define the label after the colon?
+Looking at the existing nodes it's either some address or a number...
+
+
+and then the following in driver code (also adjusting the other
+property names accessed)?:
+
+@@ -678,11 +677,11 @@ static int axp20x_battery_config(struct platform_device *pdev,
+        if (ret)
+                return ret;
+ 
+-       np = of_node_get(axp20x->dev->of_node);
++       np = of_find_node_by_name(axp20x->dev->of_node, "battery");
+        if (!np)
+                return -ENODEV;
+ 
+-       ret = of_property_read_u32_array(np, "battery.ocv", ocv, 16);
++       ret = of_property_read_u32_array(np, "x-powers,ocv", ocv, 16);
+        for (i = 0; ret == 0 && i < ARRAY_SIZE(ocv); i++)
+                if (ocv[i] > 100) {
+                        dev_warn(&pdev->dev, "OCV[%d] %u > 100\n", i, ocv[i]);
+
+
+Bruno
