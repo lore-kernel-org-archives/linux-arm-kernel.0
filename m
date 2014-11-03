@@ -1,109 +1,40 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 03 Nov 2014 11:34:03 -0800
-Subject: [PATCH v12 2/6] KVM: Add generic support for dirty page logging
-In-Reply-To: <20141103120149.01a61560dabe267b89a2478a@gmail.com>
-References: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
- <1414017251-5772-3-git-send-email-m.smarduch@samsung.com>
- <20141030131430.5b50a7c0.cornelia.huck@de.ibm.com>
- <54528F24.6060602@samsung.com>
- <20141103120149.01a61560dabe267b89a2478a@gmail.com>
-Message-ID: <5457D8AB.2080507@samsung.com>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Mon, 3 Nov 2014 11:45:44 -0800
+Subject: [PATCH v1 1/2] dtb: xgene: fix: Disable 10GbE and SGMII based
+ 1GbE by default
+In-Reply-To: <1991367.DGHysZpQVP@wuerfel>
+References: <1414630580-24640-1-git-send-email-isubramanian@apm.com>
+ <1414630580-24640-2-git-send-email-isubramanian@apm.com>
+ <1991367.DGHysZpQVP@wuerfel>
+Message-ID: <CAKh23FkVrPdCuR6dn1S4RvW14_f4Xq8MWaChUh9DyVp44kVtSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/2014 07:01 PM, Takuya Yoshikawa wrote:
-> On Thu, 30 Oct 2014 12:19:00 -0700
-> Mario Smarduch <m.smarduch@samsung.com> wrote:
-> 
->> On 10/30/2014 05:14 AM, Cornelia Huck wrote:
->>> On Wed, 22 Oct 2014 15:34:07 -0700
->>> Mario Smarduch <m.smarduch@samsung.com> wrote:
->>>
->>>> This patch defines KVM_GENERIC_DIRTYLOG, and moves dirty log read function
->>>> to it's own file virt/kvm/dirtylog.c. x86 is updated to use the generic
->>>> dirty log interface, selecting KVM_GENERIC_DIRTYLOG in its Kconfig and 
->>>> makefile. No other architectures are affected, each uses it's own version.
->>>> This changed from previous patch revision where non-generic architectures 
->>>> were modified.
->>>>
->>>> In subsequent patch armv7 does samething. All other architectures continue
->>>> use architecture defined version.
->>>>
->>>
->>> Hm.
->>>
->>> "The x86 specific version of dirty page logging is generic enough to be
->>> used by other architectures, noteably ARMv7. So let's move the x86 code
->>> under virt/kvm/ and make it depend on KVM_GENERIC_DIRTYLOG. Other
->>> architectures continue to use their own implementations."
->>>
->>> ?
+Hi Arnd,
+
+On Thu, Oct 30, 2014 at 3:13 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 29 October 2014 17:56:19 Iyappan Subramanian wrote:
+>> @@ -621,7 +621,7 @@
+>>                         };
+>>                 };
 >>
->> I'll update descriptions for both patches, with the more concise
->> descriptions.
-> 
-> I don't think it's so generic.
-> 
-> Especially, the relationship between mmu_lock and TLB flushing has
-> been changed a few times for optimizing x86 mmu code, and it may change
-> in the future again.
-> 
-> Since how mmu_lock is used is depends on each arch, it's not so
-> simple to make the function generic IMO.
-> 
-> Thanks,
-> 	Takuya
-
-Hi Takuya,
-
-If the bitmap can be processed locklessly then it's not reusable for sure.
-
-The interface is not "to generic", but "generic enough" for arm/armv8 to
-reuse.
-For TLB flushing I would think optimizations would wind up in arch subtree.
-I'm not convinced that location of couple lines doesn't make the
-interface re-usable, going back to 3.10 it hardly changed.
-
-- Mario
-
-> 
+>> -               sgenet0: ethernet at 1f210000 {
+>> +               sgenet0: sgenet at 1f210000 {
+>>                         compatible = "apm,xgene-enet";
+>>                         status = "disabled";
+>>                         reg = <0x0 0x1f210000 0x0 0x10000>,
 >>
->> Thanks.
->>
->>>
->>>>
->>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->>>> ---
->>>>  arch/x86/include/asm/kvm_host.h |    3 --
->>>>  arch/x86/kvm/Kconfig            |    1 +
->>>>  arch/x86/kvm/Makefile           |    1 +
->>>>  arch/x86/kvm/x86.c              |   86 ------------------------------
->>>>  include/linux/kvm_host.h        |    4 ++
->>>>  virt/kvm/Kconfig                |    3 ++
->>>>  virt/kvm/dirtylog.c             |  112 +++++++++++++++++++++++++++++++++++++++
->>>>  7 files changed, 121 insertions(+), 89 deletions(-)
->>>>  create mode 100644 virt/kvm/dirtylog.c
->>>>
->>>
->>>> diff --git a/virt/kvm/dirtylog.c b/virt/kvm/dirtylog.c
->>>> new file mode 100644
->>>> index 0000000..67ffffa
->>>> --- /dev/null
->>>> +++ b/virt/kvm/dirtylog.c
->>>> @@ -0,0 +1,112 @@
->>>> +/*
->>>> + * kvm generic dirty logging support, used by architectures that share
->>>> + * comman dirty page logging implementation.
->>>
->>> s/comman/common/
->>>
->>> The approach looks sane to me, especially as it does not change other
->>> architectures needlessly.
->>>
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe kvm" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
+>
+> This looks like you accidentally reverted a bug fix made earlier.
+> Network devices should always have the name 'ethernet at ...'.
+
+Thanks for the review.  Since our firmware was patching the dtb, based
+on the node-name, we thought by changing node-name, we can avoid the
+patching and maintain backward compatibility.
+
+Now we know that network devices should have 'ethernet at ...', we will
+handle the backward compatibility in a different way and will post the
+patch v2 shortly.
+
+>
+>         Arnd
