@@ -1,117 +1,63 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Mon, 3 Nov 2014 11:04:31 -0500
-Subject: [PATCH v7 7/8] xen/arm/arm64: introduce xen_arch_need_swiotlb
-In-Reply-To: <alpine.DEB.2.02.1411031044480.22875@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
- <1414422568-19103-7-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1411031044480.22875@kaball.uk.xensource.com>
-Message-ID: <20141103160431.GE1638@laptop.dumpdata.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 03 Nov 2014 08:13:17 -0800
+Subject: [RFC 1/2] PM / Domains: Power on domain early during system resume
+In-Reply-To: <54521A8F.5070808@samsung.com> (Andrzej Hajda's message of "Thu,
+ 30 Oct 2014 12:01:35 +0100")
+References: <1414072090-11293-1-git-send-email-k.kozlowski@samsung.com>
+ <1414072090-11293-2-git-send-email-k.kozlowski@samsung.com>
+ <7hk33iahvu.fsf@deeprootsystems.com>
+ <1414654594.5114.8.camel@AMDC1943> <54521A8F.5070808@samsung.com>
+Message-ID: <7hbnoojm8y.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 03, 2014 at 10:45:14AM +0000, Stefano Stabellini wrote:
-> On Mon, 27 Oct 2014, Stefano Stabellini wrote:
-> > Introduce an arch specific function to find out whether a particular dma
-> > mapping operation needs to bounce on the swiotlb buffer.
-> > 
-> > On ARM and ARM64, if the page involved is a foreign page and the device
-> > is not coherent, we need to bounce because at unmap time we cannot
-> > execute any required cache maintenance operations (we don't know how to
-> > find the pfn from the mfn).
-> > 
-> > No change of behaviour for x86.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > Acked-by: Ian Campbell <ian.campbell@citrix.com>
-> 
-> Konrad, David, are you OK with the swiotlb-xen changes?
+Andrzej Hajda <a.hajda@samsung.com> writes:
 
-I am OK.
-> 
-> 
->  
-> > Changes in v6:
-> > - fix ts.
-> > 
-> > Changes in v5:
-> > - fix indentation.
-> > ---
-> >  arch/arm/include/asm/xen/page.h |    4 ++++
-> >  arch/arm/xen/mm.c               |    7 +++++++
-> >  arch/x86/include/asm/xen/page.h |    7 +++++++
-> >  drivers/xen/swiotlb-xen.c       |    5 ++++-
-> >  4 files changed, 22 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
-> > index 135c24a..68c739b 100644
-> > --- a/arch/arm/include/asm/xen/page.h
-> > +++ b/arch/arm/include/asm/xen/page.h
-> > @@ -107,4 +107,8 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
-> >  #define xen_remap(cookie, size) ioremap_cache((cookie), (size))
-> >  #define xen_unmap(cookie) iounmap((cookie))
-> >  
-> > +bool xen_arch_need_swiotlb(struct device *dev,
-> > +			   unsigned long pfn,
-> > +			   unsigned long mfn);
-> > +
-> >  #endif /* _ASM_ARM_XEN_PAGE_H */
-> > diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
-> > index ff413a8..28396aa 100644
-> > --- a/arch/arm/xen/mm.c
-> > +++ b/arch/arm/xen/mm.c
-> > @@ -139,6 +139,13 @@ void xen_dma_sync_single_for_device(struct device *hwdev,
-> >  	__xen_dma_page_cpu_to_dev(hwdev, handle, size, dir);
-> >  }
-> >  
-> > +bool xen_arch_need_swiotlb(struct device *dev,
-> > +			   unsigned long pfn,
-> > +			   unsigned long mfn)
-> > +{
-> > +	return ((pfn != mfn) && !is_device_dma_coherent(dev));
-> > +}
-> > +
-> >  int xen_create_contiguous_region(phys_addr_t pstart, unsigned int order,
-> >  				 unsigned int address_bits,
-> >  				 dma_addr_t *dma_handle)
-> > diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
-> > index c949923..f58ef6c 100644
-> > --- a/arch/x86/include/asm/xen/page.h
-> > +++ b/arch/x86/include/asm/xen/page.h
-> > @@ -236,4 +236,11 @@ void make_lowmem_page_readwrite(void *vaddr);
-> >  #define xen_remap(cookie, size) ioremap((cookie), (size));
-> >  #define xen_unmap(cookie) iounmap((cookie))
-> >  
-> > +static inline bool xen_arch_need_swiotlb(struct device *dev,
-> > +					 unsigned long pfn,
-> > +					 unsigned long mfn)
-> > +{
-> > +	return false;
-> > +}
-> > +
-> >  #endif /* _ASM_X86_XEN_PAGE_H */
-> > diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-> > index ebd8f21..ac5d41b 100644
-> > --- a/drivers/xen/swiotlb-xen.c
-> > +++ b/drivers/xen/swiotlb-xen.c
-> > @@ -399,7 +399,9 @@ dma_addr_t xen_swiotlb_map_page(struct device *dev, struct page *page,
-> >  	 * buffering it.
-> >  	 */
-> >  	if (dma_capable(dev, dev_addr, size) &&
-> > -	    !range_straddles_page_boundary(phys, size) && !swiotlb_force) {
-> > +	    !range_straddles_page_boundary(phys, size) &&
-> > +		!xen_arch_need_swiotlb(dev, PFN_DOWN(phys), PFN_DOWN(dev_addr)) &&
-> > +		!swiotlb_force) {
-> >  		/* we are not interested in the dma_addr returned by
-> >  		 * xen_dma_map_page, only in the potential cache flushes executed
-> >  		 * by the function. */
-> > @@ -557,6 +559,7 @@ xen_swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
-> >  		dma_addr_t dev_addr = xen_phys_to_bus(paddr);
-> >  
-> >  		if (swiotlb_force ||
-> > +		    xen_arch_need_swiotlb(hwdev, PFN_DOWN(paddr), PFN_DOWN(dev_addr)) ||
-> >  		    !dma_capable(hwdev, dev_addr, sg->length) ||
-> >  		    range_straddles_page_boundary(paddr, sg->length)) {
-> >  			phys_addr_t map = swiotlb_tbl_map_single(hwdev,
-> > -- 
-> > 1.7.10.4
-> > 
+> On 10/30/2014 08:36 AM, Krzysztof Kozlowski wrote:
+>> On ?ro, 2014-10-29 at 10:46 -0700, Kevin Hilman wrote:
+>>> Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
+>>>
+>>>> When resuming the system the power domain has to be powered on early so
+>>>> any runtime PM aware devices could resume.
+>>>>
+>>>> This fixes following scenario reproduced on Exynos DRM:
+>>>> 1. Power domain is off before suspending the system.
+>>>> 2. System is suspended to RAM.
+>>>> 3. Resuming starts. The Exynos DRM driver resume callback is called.
+>>>> 4. The Exynos DRM driver calls drm_helper_resume_force_mode which turns
+>>>>    the screen on by calling exynos_dsi_dpms with DRM_MODE_DPMS_ON.
+>>> Dumb Q: if the device (and power domain) were off before (and during)
+>>> suspend, why are they being resumed?
+>>>
+>>> Shouldn't the resume path restore things to the same state they were
+>>> before suspend?
+>> One could expect that... but the Exynos DRM driver behaves differently
+>> (and some other drivers also). In resume method it calls
+>> drm_helper_resume_force_mode() which forces restoring mode setting
+>> configuration. Apparently setting a mode needs DPMS on:
+>> static void exynos_drm_crtc_commit(struct drm_crtc *crtc)
+>> {
+>> 	...
+>> 	exynos_drm_crtc_dpms(crtc, DRM_MODE_DPMS_ON);
+>> 	...
+>>
+>> The previous DPMS status (status during suspend) is completely ignored
+>> here.
+>
+> Suspend callback switches off all connectors (thus all other devs in
+> their pipeline) by calling dpms_off,
+> in restore callback all devs are restored to their previous state by
+> calling appropriate dpms.
+> So I guess drm_helper_resume_force_mode() call at the end of resume is
+> incorrect.
+
+Though I'm not terribly familiar with DRM, it seems incorrect because I
+expect resume to restore the state of things when suspend happened, not
+forcibly resume everything.
+
+> On the other side it is present in many other drivers, so I am also
+> little bit confused.
+
+Many other DRM drivers?  or other drivers too?
+
+Kevin
