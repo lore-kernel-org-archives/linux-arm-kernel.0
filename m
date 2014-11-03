@@ -1,59 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 2 Nov 2014 15:53:33 -0800
-Subject: [GIT PULL] omap fixes against v3.18-rc2
-In-Reply-To: <20141102213946.GA17643@localhost>
-References: <20141030165019.GA31454@atomide.com>
- <20141102213946.GA17643@localhost>
-Message-ID: <20141102235333.GK31454@atomide.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Mon, 03 Nov 2014 08:27:17 +0800
+Subject: [PATCH 1/2] regulator: Document binding for regulator suspend
+ voltage
+In-Reply-To: <54549DBA.5020102@collabora.co.uk>
+References: <1414813978-32233-1-git-send-email-dianders@chromium.org>
+ <54549DBA.5020102@collabora.co.uk>
+Message-ID: <5456CBE5.9050209@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [141102 15:30]:
-> On Thu, Oct 30, 2014 at 09:50:20AM -0700, Tony Lindgren wrote:
-> > The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
-> > 
-> >   Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/fixes-against-v3.18-rc2
-> > 
-> > for you to fetch changes up to 4b91f7f3c8b20e073b7bfc098625b37f99789508:
-> > 
-> >   ARM: OMAP2+: Warn about deprecated legacy booting mode (2014-10-29 12:19:20 -0700)
-> 
-> Thanks, merged.
-> 
-> > 
-> > ----------------------------------------------------------------
-> > Few fixes for omaps to enable NAND BCH so devices won't
-> > produce errors when booted with omap2plus_defconfig, and
-> > reduce bloat by making IPV6 a loadable module.
-> > 
-> > Also let's add a warning about legacy boot being deprecated
-> > for omap3.
-> > 
-> > We now have things working with device tree, and only omap3 is
-> > still booting in legacy mode. So hopefully this warning will
-> > help move the remaining legacy mode users to boot with device
-> > tree.
-> 
-> Hm, I think I saw Russell commenting recently about migrating back from
-> DT to legacy boot on a 3430 board.
 
-I posted a fix for the PMIC that fixes the poweroff issue for
-boards with charger or VBUS wired. So hopefully Russell can switch
-his LDP over finally.
- 
-> > As the total reduction of code and static data is somewhere
-> > around 20000 lines of code once we remove omap3 legacy mode
-> > booting, we really do want to make omap3 to boot also in
-> > device tree mode only over the next few merge cycles.
-> 
-> Yep, that'd be nice.
+On 11/01/2014 04:45 PM, Javier Martinez Canillas wrote:
+> Hello Doug,
+>
+> On 11/01/2014 04:52 AM, Doug Anderson wrote:
+>> This patch builds upon (291d761 regulator: Document binding for
+>> regulator suspend state for PM state) to allow setting the uV in
+>> addition to the state at suspend time.
+>>
+>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> ---
+>>   Documentation/devicetree/bindings/regulator/regulator.txt | 2 ++
+>>   1 file changed, 2 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/regulator/regulator.txt b/Documentation/devicetree/bindings/regulator/regulator.txt
+>> index aaad615..4e7ed76 100644
+>> --- a/Documentation/devicetree/bindings/regulator/regulator.txt
+>> +++ b/Documentation/devicetree/bindings/regulator/regulator.txt
+>> @@ -28,6 +28,8 @@ Optional properties:
+>>   - regulator-state-[mem/disk] node has following common properties:
+>>   	- regulator-on-in-suspend: regulator should be on in suspend state.
+>>   	- regulator-off-in-suspend: regulator should be off in suspend state.
+>> +	- regulator-suspend-microvolt: regulator should be set to this voltage
+>> +	  in suspend.
+> The patch looks good to me:
+>
+> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>
+> On thing I wonder is if the binding should say that the suspend voltage is
+> independent of the runtime one and it may be outside of the runtime range?
+>
+> Best regards,
+> Javier
+>
+>
+>
 
-Indeed.
-
-Thanks,
-
-Tony
+Reviewed-by: Chris Zhong <zyw@rock-chips.com>
