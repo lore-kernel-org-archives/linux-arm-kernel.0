@@ -1,43 +1,28 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Mon, 3 Nov 2014 10:17:15 +0800
-Subject: [RFC V6 3/3] arm64:add bitrev.h file to support rbit instruction
-In-Reply-To: <20141031104305.GC6731@arm.com>
-References: <35FD53F367049845BC99AC72306C23D103E010D18260@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18261@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18264@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18265@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18266@CNBJMBX05.corpusers.net>
- <20141030120127.GC32589@arm.com>
- <CAKv+Gu9g5Q6fjPUy+P8YxkeDrH+bdO4kKGnxTQZRFhQpgPxaPA@mail.gmail.com>
- <20141030135749.GE32589@arm.com>
- <35FD53F367049845BC99AC72306C23D103E010D18272@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18274@CNBJMBX05.corpusers.net>
- <20141031104305.GC6731@arm.com>
-Message-ID: <35FD53F367049845BC99AC72306C23D103E010D18287@CNBJMBX05.corpusers.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 3 Nov 2014 00:23:38 -0200
+Subject: [Regression Resend] mmc: mx28: sd card detection broken since
+ 3.18-rc1
+In-Reply-To: <5456B7B3.60401@gmail.com>
+References: <1747777414.897866.1414878004147.JavaMail.open-xchange@oxbsltgw09.schlund.de>
+ <5456B7B3.60401@gmail.com>
+Message-ID: <CAOMZO5Cw7PGaum+HD7kPbgNqPdUE8U5E4wF61Kg7iu1nwjXxkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> > +#ifndef __ASM_ARM64_BITREV_H
-> > +#define __ASM_ARM64_BITREV_H
-> 
-> Really minor nit, but we don't tend to include 'ARM64' in our header guards,
-> so this should just be __ASM_BITREV_H.
-> 
-> With that change,
-> 
->   Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-I have send the patch to the patch system:
-http://www.arm.linux.org.uk/developer/patches/search.php?uid=4025
+Hi Kristina,
 
-8187/1 8188/1 8189/1
+On Sun, Nov 2, 2014 at 9:01 PM, Kristina Mart?enko
+<kristina.martsenko@gmail.com> wrote:
 
-Just remind you that , should also cherry-pick Joe Perches's 
-2 patches:
-[PATCH] 6fire: Convert byte_rev_table uses to bitrev8
-[PATCH] carl9170: Convert byte_rev_table uses to bitrev8
+> I ran into this issue as well. Seems that a card-detect flag
+> (MMC_CAP2_CD_ACTIVE_HIGH) can currently be set based on an
+> uninitialized variable, which can lead to the card being reported as
+> not present. This patch fixes it for me:
 
-To make sure there is no build error when build these 2 drivers.
+Your patch fixes the card detection issue on mx28.
+
+When you submit the patch formally, you can add my:
+
+Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
 
 Thanks
