@@ -1,108 +1,171 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 3 Nov 2014 18:01:49 +0000
-Subject: [PATCH] mfd: ab8500-sysctrl: Drop ab8500_restart
-In-Reply-To: <1412871518-11359-1-git-send-email-linux@roeck-us.net>
-References: <1412871518-11359-1-git-send-email-linux@roeck-us.net>
-Message-ID: <20141103180149.GA13359@x1>
+From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
+Date: Mon,  3 Nov 2014 11:07:34 -0700
+Subject: [PATCH v9 00/12] Coresight framework and drivers 
+Message-ID: <1415038066-22423-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 09 Oct 2014, Guenter Roeck wrote:
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-> ab8500_restart is not called from anywhere in the kernel, so drop it.
-> 
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> ---
->  drivers/mfd/ab8500-sysctrl.c              | 57 -------------------------------
->  include/linux/mfd/abx500/ab8500-sysctrl.h |  1 -
->  2 files changed, 58 deletions(-)
+Coresight is an umbrella of technologies allowing for the debugging of ARM
+based SoCs.  It includes solutions for JTAG and HW assisted tracing.  This
+patchset is concerned with the latter.
 
-Applied with Linus' Ack.
+Coresight components are cathegorised as source, link and sinks and are
+(usually) discovered using the AMBA bus.
 
-> diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
-> index 8e0dae5..94dbcdd 100644
-> --- a/drivers/mfd/ab8500-sysctrl.c
-> +++ b/drivers/mfd/ab8500-sysctrl.c
-> @@ -85,63 +85,6 @@ shutdown:
->  	}
->  }
->  
-> -/*
-> - * Use the AB WD to reset the platform. It will perform a hard
-> - * reset instead of a soft reset. Write the reset reason to
-> - * the AB before reset, which can be read upon restart.
-> - */
-> -void ab8500_restart(char mode, const char *cmd)
-> -{
-> -	struct ab8500_platform_data *plat;
-> -	struct ab8500_sysctrl_platform_data *pdata;
-> -	u16 reason = 0;
-> -	u8 val;
-> -
-> -	if (sysctrl_dev == NULL) {
-> -		pr_err("%s: sysctrl not initialized\n", __func__);
-> -		return;
-> -	}
-> -
-> -	plat = dev_get_platdata(sysctrl_dev->parent);
-> -	pdata = plat->sysctrl;
-> -	if (pdata && pdata->reboot_reason_code)
-> -		reason = pdata->reboot_reason_code(cmd);
-> -	else
-> -		pr_warn("[%s] No reboot reason set. Default reason %d\n",
-> -			__func__, reason);
-> -
-> -	/*
-> -	 * Disable RTC alarm, just a precaution so that no alarm
-> -	 * is running when WD reset is executed.
-> -	 */
-> -	abx500_get_register_interruptible(sysctrl_dev, AB8500_RTC,
-> -		RTC_CTRL , &val);
-> -	abx500_set_register_interruptible(sysctrl_dev, AB8500_RTC,
-> -		RTC_CTRL , (val & ~RTC_ALARM_ENABLE));
-> -
-> -	/*
-> -	 * Android is not using the RTC alarm registers during reboot
-> -	 * so we borrow them for writing the reason of reset
-> -	 */
-> -
-> -	/* reason[8 LSB] */
-> -	val = reason & 0xFF;
-> -	abx500_set_register_interruptible(sysctrl_dev, AB8500_RTC,
-> -		AB8500_ALARM_MIN_LOW , val);
-> -
-> -	/* reason[8 MSB] */
-> -	val = (reason>>8) & 0xFF;
-> -	abx500_set_register_interruptible(sysctrl_dev, AB8500_RTC,
-> -		AB8500_ALARM_MIN_MID , val);
-> -
-> -	/* Setting WD timeout to 0 */
-> -	ab8500_sysctrl_write(AB8500_MAINWDOGTIMER, 0xFF, 0x0);
-> -
-> -	/* Setting the parameters to AB8500 WD*/
-> -	ab8500_sysctrl_write(AB8500_MAINWDOGCTRL, 0xFF, (AB8500_ENABLE_WD |
-> -		AB8500_WD_RESTART_ON_EXPIRE | AB8500_KICK_WD));
-> -}
-> -
->  static inline bool valid_bank(u8 bank)
->  {
->  	return ((bank == AB8500_SYS_CTRL1_BLOCK) ||
-> diff --git a/include/linux/mfd/abx500/ab8500-sysctrl.h b/include/linux/mfd/abx500/ab8500-sysctrl.h
-> index adba89d..6893127 100644
-> --- a/include/linux/mfd/abx500/ab8500-sysctrl.h
-> +++ b/include/linux/mfd/abx500/ab8500-sysctrl.h
-> @@ -12,7 +12,6 @@
->  
->  int ab8500_sysctrl_read(u16 reg, u8 *value);
->  int ab8500_sysctrl_write(u16 reg, u8 mask, u8 value);
-> -void ab8500_restart(char mode, const char *cmd);
->  
->  #else
->  
+"Sources" generate a compressed stream representing the processor instruction
+path based on tracing scenarios as configured by users.  From there the stream
+flows through the coresight system (via ATB bus) using links that are connecting
+the emanating source to a sink(s).  Sinks serve as endpoints to the coresight
+implementation, either storing the compressed stream in a memory buffer or
+creating an interface to the outside world where data can be transfered to a
+host without fear of filling up the onboard coresight memory buffer.
+
+At typical coresight system would look like this:
+
+  *****************************************************************
+ **************************** AMBA AXI  ****************************===||
+  *****************************************************************    ||
+        ^                    ^                            |            ||
+        |                    |                            *            **
+     0000000    :::::     0000000    :::::    :::::    @@@@@@@    ||||||||||||
+     0 CPU 0<-->: C :     0 CPU 0<-->: C :    : C :    @ STM @    || System ||
+  |->0000000    : T :  |->0000000    : T :    : T :<--->@@@@@     || Memory ||
+  |  #######<-->: I :  |  #######<-->: I :    : I :      @@@<-|   ||||||||||||
+  |  # ETM #    :::::  |  # PTM #    :::::    :::::       @   |
+  |   #####      ^ ^   |   #####      ^ !      ^ !        .   |   |||||||||
+  | |->###       | !   | |->###       | !      | !        .   |   || DAP ||
+  | |   #        | !   | |   #        | !      | !        .   |   |||||||||
+  | |   .        | !   | |   .        | !      | !        .   |      |  |
+  | |   .        | !   | |   .        | !      | !        .   |      |  *
+  | |   .        | !   | |   .        | !      | !        .   |      | SWD/
+  | |   .        | !   | |   .        | !      | !        .   |      | JTAG
+  *****************************************************************<-|
+ *************************** AMBA Debug ABP ************************
+  *****************************************************************
+   |    .          !         .          !        !        .    |
+   |    .          *         .          *        *        .    |
+  *****************************************************************
+ ******************** Cross Trigger Matrix (CTM) *******************
+  *****************************************************************
+   |    .     ^              .                            .    |
+   |    *     !              *                            *    |
+  *****************************************************************
+ ****************** AMBA Advanced Trace Bus (ATB) ******************
+  *****************************************************************
+   |          !                        ===============         |
+   |          *                         ===== F =====<---------|
+   |   :::::::::                         ==== U ====
+   |-->:: CTI ::<!!                       === N ===
+   |   :::::::::  !                        == N ==
+   |    ^         *                        == E ==
+   |    !  &&&&&&&&&       IIIIIII         == L ==
+   |------>&& ETB &&<......II     I        =======
+   |    !  &&&&&&&&&       II     I           .
+   |    !                    I     I          .
+   |    !                    I REP I<..........
+   |    !                    I     I
+   |    !!>&&&&&&&&&       II     I           *Source: ARM ltd.
+   |------>& TPIU  &<......II    I            DAP = Debug Access Port
+           &&&&&&&&&       IIIIIII            ETM = Embedded Trace Macrocell
+               ;                              PTM = Program Trace Macrocell
+               ;                              CTI = Cross Trigger Interface
+               *                              ETB = Embedded Trace Buffer
+          To trace port                       TPIU= Trace Port Interface Unit
+                                              SWD = Serial Wire Debug
+
+While on target configuration of the components is done via the ABP bus,
+all trace data are carried out-of-band on the ATB bus.  The CTM provides
+a way to aggregate and distribute signals between CoreSight components.
+
+The coresight framework provides a central point to represent, configure and
+manage coresight devices on a platform.  This first wave centers on the basic
+tracing functionnality, enabling components such ETM/PTM, funnel, replicator,
+TMC, TPIU and ETB.  Subsequent submissions will enable more intricate IP blocks
+such as STM and CTI.
+
+Generated traces are encoded in a PFTv1.1 format and can be interpreted
+using the procedure detailed here [1] or ptm2human [2]. STM abides to the
+widely available STPv2 standard.
+
+Bindings for the driver have been sent separately to the devicetree list.
+
+[1].https://wiki.linaro.org/WorklingGroups/Kernel/Coresight/traceDecodingWithDS5
+[2].https://github.com/hwangcc23/ptm2human
+
+New in this patchset:
+. Rebased on v3.18-rc3
+. Added support for hip04-d01 board 
+
+Mathieu Poirier (4):
+  coresight: documentation for coresight framework and drivers
+  coresight: adding support for beagle and beagleXM
+  coresight: adding basic support for Vexpress TC2
+  ARM: removing support for etb/etm in "arch/arm/kernel/"
+
+Pratik Patel (7):
+  coresight: add CoreSight core layer framework
+  coresight-tmc: add CoreSight TMC driver
+  coresight-tpiu: add CoreSight TPIU driver
+  coresight-etb: add CoreSight ETB driver
+  coresight-funnel: add CoreSight Funnel driver
+  coresight-replicator: add CoreSight Replicator driver
+  coresight-etm: add CoreSight ETM/PTM driver
+
+Xia Kaixu (1):
+  coresight: adding basic support for D01 board
+
+ Documentation/trace/coresight.txt          |  299 +++++
+ MAINTAINERS                                |    8 +
+ arch/arm/Kconfig.debug                     |   63 +-
+ arch/arm/boot/dts/hip04.dtsi               |  717 +++++++++++
+ arch/arm/boot/dts/omap3-beagle-xm.dts      |   28 +
+ arch/arm/boot/dts/omap3-beagle.dts         |   28 +
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts |  199 +++
+ arch/arm/include/asm/hardware/coresight.h  |  157 ---
+ arch/arm/include/asm/hardware/cp14.h       |  542 ++++++++
+ arch/arm/kernel/Makefile                   |    1 -
+ arch/arm/kernel/etm.c                      |  654 ----------
+ arch/arm/kernel/hw_breakpoint.c            |    4 +-
+ arch/arm/mach-omap2/Kconfig                |    8 -
+ arch/arm/mach-omap2/Makefile               |    1 -
+ arch/arm/mach-omap2/emu.c                  |   50 -
+ drivers/Makefile                           |    1 +
+ drivers/amba/bus.c                         |    2 +-
+ drivers/coresight/Makefile                 |   11 +
+ drivers/coresight/coresight-etb10.c        |  537 ++++++++
+ drivers/coresight/coresight-etm-cp14.c     |  591 +++++++++
+ drivers/coresight/coresight-etm.h          |  251 ++++
+ drivers/coresight/coresight-etm3x.c        | 1928 ++++++++++++++++++++++++++++
+ drivers/coresight/coresight-funnel.c       |  268 ++++
+ drivers/coresight/coresight-priv.h         |   63 +
+ drivers/coresight/coresight-replicator.c   |  138 ++
+ drivers/coresight/coresight-tmc.c          |  776 +++++++++++
+ drivers/coresight/coresight-tpiu.c         |  217 ++++
+ drivers/coresight/coresight.c              |  717 +++++++++++
+ drivers/coresight/of_coresight.c           |  204 +++
+ include/linux/amba/bus.h                   |    1 +
+ include/linux/coresight.h                  |  263 ++++
+ 31 files changed, 7845 insertions(+), 882 deletions(-)
+ create mode 100644 Documentation/trace/coresight.txt
+ delete mode 100644 arch/arm/include/asm/hardware/coresight.h
+ create mode 100644 arch/arm/include/asm/hardware/cp14.h
+ delete mode 100644 arch/arm/kernel/etm.c
+ delete mode 100644 arch/arm/mach-omap2/emu.c
+ create mode 100644 drivers/coresight/Makefile
+ create mode 100644 drivers/coresight/coresight-etb10.c
+ create mode 100644 drivers/coresight/coresight-etm-cp14.c
+ create mode 100644 drivers/coresight/coresight-etm.h
+ create mode 100644 drivers/coresight/coresight-etm3x.c
+ create mode 100644 drivers/coresight/coresight-funnel.c
+ create mode 100644 drivers/coresight/coresight-priv.h
+ create mode 100644 drivers/coresight/coresight-replicator.c
+ create mode 100644 drivers/coresight/coresight-tmc.c
+ create mode 100644 drivers/coresight/coresight-tpiu.c
+ create mode 100644 drivers/coresight/coresight.c
+ create mode 100644 drivers/coresight/of_coresight.c
+ create mode 100644 include/linux/coresight.h
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.1
