@@ -1,52 +1,84 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 03 Nov 2014 10:23:05 -0800
-Subject: [PATCH 03/12] PM / Domains: Add notifier support for power domain
- transitions
-In-Reply-To: <1651173.5xzCFxz3LI@vostro.rjw.lan> (Rafael J. Wysocki's message
- of "Mon, 03 Nov 2014 15:54:05 +0100")
-References: <1414986790-11940-1-git-send-email-amit.daniel@samsung.com>
- <1414986790-11940-4-git-send-email-amit.daniel@samsung.com>
- <1651173.5xzCFxz3LI@vostro.rjw.lan>
-Message-ID: <7hmw88gn3q.fsf@deeprootsystems.com>
+From: socketcan@hartkopp.net (Oliver Hartkopp)
+Date: Mon, 03 Nov 2014 19:25:12 +0100
+Subject: [PATCH 5/7] can: clear ctrlmode when close candev
+In-Reply-To: <5457AD40.7020606@pengutronix.de>
+References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
+ <1414579527-31100-5-git-send-email-b29396@freescale.com>
+ <5457AD40.7020606@pengutronix.de>
+Message-ID: <5457C888.5010000@hartkopp.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Mike Turquette
 
-Hi Amit,
 
-"Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
+On 11/03/2014 05:28 PM, Marc Kleine-Budde wrote:
+> On 10/29/2014 11:45 AM, Dong Aisheng wrote:
+>> Currently priv->ctrlmode is not cleared when close_candev, so next time
+>> the driver will still use this value to set controller even user
+>> does not set any ctrl mode.
+>> e.g.
+>> Step 1. ip link set can0 up type can0 bitrate 1000000 loopback on
+>> Controller will be in loopback mode
+>> Step 2. ip link set can0 down
+>> Step 3. ip link set can0 up type can0 bitrate 1000000
+>> Controller will still be set to loopback mode in driver due to saved
+>> priv->ctrlmode.
+>>
+>> This patch clears priv->ctrlmode when the CAN interface is closed,
+>> and set it to correct mode according to next user setting.
+> 
+> Oliver, what do you think of this patch? It will introduce a subtle
+> change to the userspace.
 
-> CC: Kevin, Ulf, Geert.
->
-> On Monday, November 03, 2014 09:23:01 AM Amit Daniel Kachhap wrote:
->> These power domain transition notifiers will assist in carrying
->> out some activity associated with domain power on/off such as
->> some registers which may lose its contents and need save/restore
->> across domain power off/on.
+Hi Marc,
 
-The runtime PM framework already provides callbacks that are useful for
-context save/restore for devices.  Could you please describe in more
-detail which registers in which kind of devices need to be
-saved/restored, and why they cannot be saved/restored using existing
-mechanisms.
+indeed the current policy is that ifdown/ifup doesn't change any setting.
+When we start to clear priv->ctrlmode when setting the interface down the
+question arises whether the bitrate(s) has/have to be wiped too.
 
-Personally, I'm uncomfortable with notifiers like this because it
-suggests that underlying frameworks are not doing the right thing, or
-are not being used.  (I also don't like the implementation here where a
-single global notifier list is maintained by the core, but the notifiers
-are actually triggered by SoC specific code.)
+Setting the interface down/up can be done with ip or ifconfig without changing
+the controller settings.
 
-IIUC, the usage in this series seems to be that certain clock related
-registers need to be saved/restored across a power domain transition.
+So IMO we can not assume that people always use the 'all-in-one'
 
-Wouldn't an alternative solution be to add a feature to the clock driver
-such that the state of each clock is saved when the clock is disabled,
-and restored when the clock is enabled?   That would allow any clock
-context to survive any power domain transtion also, correct?
+	ip link set can0 up type can0 bitrate 1000000
 
-I have some issues with the implementaion as well, but I think we need
-to first sort out the real need for this before going into those
-details.
+command as given in the example above.
 
-Kevin
+You might also do it like this:
+
+	ip link set can0 up type can0 bitrate 1000000 loopback on
+	ip link set can0 down
+	ip link set can0 type can0 loopback off
+	ip link set can0 up
+
+Finally I would vote to reject this patch to stay consistent.
+
+When users like to fiddle with options like loopback they need to take care
+about their 'expert' settings too.
+
+Regards,
+Oliver
+
+
+> 
+>> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+>> ---
+>>  drivers/net/can/dev.c | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/drivers/net/can/dev.c b/drivers/net/can/dev.c
+>> index 02492d2..1fce485 100644
+>> --- a/drivers/net/can/dev.c
+>> +++ b/drivers/net/can/dev.c
+>> @@ -671,6 +671,7 @@ void close_candev(struct net_device *dev)
+>>  
+>>  	del_timer_sync(&priv->restart_timer);
+>>  	can_flush_echo_skb(dev);
+>> +	priv->ctrlmode = 0;
+>>  }
+>>  EXPORT_SYMBOL_GPL(close_candev);
+>>  
+>>
+> 
+> 
