@@ -1,82 +1,269 @@
-From: mlangsdo@redhat.com (Mark Langsdorf)
-Date: Tue,  4 Nov 2014 10:50:33 -0600
-Subject: [PATCH v2 2/2] [usb] add support for ACPI identification to
- xhci-platform
-In-Reply-To: <1415119833-9135-1-git-send-email-mlangsdo@redhat.com>
-References: <1414692989-23128-2-git-send-email-mlangsdo@redhat.com>
- <1415119833-9135-1-git-send-email-mlangsdo@redhat.com>
-Message-ID: <1415119833-9135-2-git-send-email-mlangsdo@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 4 Nov 2014 17:57:33 +0100
+Subject: [PATCH 1/6] clk: sunxi: Add support for sun9i a80 usb clocks and
+ resets
+In-Reply-To: <1415074039-16590-2-git-send-email-wens@csie.org>
+References: <1415074039-16590-1-git-send-email-wens@csie.org>
+ <1415074039-16590-2-git-send-email-wens@csie.org>
+Message-ID: <20141104165733.GI26729@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide the methods to let ACPI identify the need to use
-xhci-platform. Change the Kconfig files so the
-xhci-plat.o file is selectable during kernel config.
+Hi,
 
-Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
----
-Changes from v1
-	Renamed from "add support for APM X-Gene to xhci-platform"
-	Removed changes to arm64/Kconfig
-	Made CONFIG_USB_XHCI_PLATFORM a user selectable config option
+On Tue, Nov 04, 2014 at 12:07:14PM +0800, Chen-Yu Tsai wrote:
+> The USB controller/phy clocks and reset controls are in a separate
+> address block, unlike previous SoCs where they were in the clock
+> controller.
+> 
+> This patch copies the original gates clk functions used for usb
+> clocks into a separate file, and renames them to *_usb_*. Also
+> add a per-gate parent index, so we can set different parents for
+> each gate.
+> 
+> In time we may move the other usb clock drivers to this file.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  Documentation/devicetree/bindings/clock/sunxi.txt |   5 +
+>  drivers/clk/sunxi/Makefile                        |   1 +
+>  drivers/clk/sunxi/clk-usb.c                       | 192 ++++++++++++++++++++++
+>  3 files changed, 198 insertions(+)
+>  create mode 100644 drivers/clk/sunxi/clk-usb.c
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> index 0455cb9..b953fe5 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> @@ -66,6 +66,8 @@ Required properties:
+>  	"allwinner,sun4i-a10-usb-clk" - for usb gates + resets on A10 / A20
+>  	"allwinner,sun5i-a13-usb-clk" - for usb gates + resets on A13
+>  	"allwinner,sun6i-a31-usb-clk" - for usb gates + resets on A31
+> +	"allwinner,sun9i-a80-usb-mod-clk" - for usb gates + resets on A80
+> +	"allwinner,sun9i-a80-usb-phy-clk" - for usb phy gates + resets on A80
+>  
+>  Required properties for all clocks:
+>  - reg : shall be the control register address for the clock.
+> @@ -82,6 +84,9 @@ Required properties for all clocks:
+>  And "allwinner,*-usb-clk" clocks also require:
+>  - reset-cells : shall be set to 1
+>  
+> +"allwinner,sun9i-a80-usb-*-clk" clocks require:
+> +- clocks : shall be the usb hci ahb1 gate and peripheral pll clocks
+> +
 
- drivers/usb/host/Kconfig     |  7 ++++++-
- drivers/usb/host/xhci-plat.c | 11 +++++++++++
- 2 files changed, 17 insertions(+), 1 deletion(-)
+In this particular order, I assume?
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 82800a7..060a2361 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -27,7 +27,12 @@ config USB_XHCI_HCD
- if USB_XHCI_HCD
- 
- config USB_XHCI_PLATFORM
--	tristate
-+	tristate "xHCI platform driver support"
-+	--help--
-+	  Say 'Y' to enable the support for the xHCI host controller
-+	  as a platform device. Many ARM SoCs provide USB this way.
-+
-+	  If unsure, say 'Y'.
- 
- config USB_XHCI_MVEBU
- 	tristate "xHCI support for Marvell Armada 375/38x"
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index 91c7557..3db47ea 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -18,6 +18,7 @@
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/usb/xhci_pdriver.h>
-+#include <linux/acpi.h>
- 
- #include "xhci.h"
- #include "xhci-mvebu.h"
-@@ -287,6 +288,15 @@ static const struct of_device_id usb_xhci_of_match[] = {
- MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
- #endif
- 
-+#ifdef CONFIG_ACPI
-+static const struct acpi_device_id usb_xhci_acpi_match[] = {
-+	/* APM X-Gene USB Controller */
-+	{ "PNP0D10", },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(acpi, usb_xhci_acpi_match);
-+#endif
-+
- static struct platform_driver usb_xhci_driver = {
- 	.probe	= xhci_plat_probe,
- 	.remove	= xhci_plat_remove,
-@@ -294,6 +304,7 @@ static struct platform_driver usb_xhci_driver = {
- 		.name = "xhci-hcd",
- 		.pm = DEV_PM_OPS,
- 		.of_match_table = of_match_ptr(usb_xhci_of_match),
-+		.acpi_match_table = ACPI_PTR(usb_xhci_acpi_match),
- 	},
- };
- MODULE_ALIAS("platform:xhci-hcd");
+>  For "allwinner,sun7i-a20-gmac-clk", the parent clocks shall be fixed rate
+>  dummy clocks at 25 MHz and 125 MHz, respectively. See example.
+>  
+> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+> index a66953c..f19ce54 100644
+> --- a/drivers/clk/sunxi/Makefile
+> +++ b/drivers/clk/sunxi/Makefile
+> @@ -8,6 +8,7 @@ obj-y += clk-a20-gmac.o
+>  obj-y += clk-mod0.o
+>  obj-y += clk-sun8i-mbus.o
+>  obj-y += clk-sun9i-core.o
+> +obj-y += clk-usb.o
+>  
+>  obj-$(CONFIG_MFD_SUN6I_PRCM) += \
+>  	clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o \
+> diff --git a/drivers/clk/sunxi/clk-usb.c b/drivers/clk/sunxi/clk-usb.c
+> new file mode 100644
+> index 0000000..d92ee36
+> --- /dev/null
+> +++ b/drivers/clk/sunxi/clk-usb.c
+> @@ -0,0 +1,192 @@
+> +/*
+> + * Copyright 2013 Emilio L?pez
+> + *
+> + * Emilio L?pez <emilio@elopez.com.ar>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/reset-controller.h>
+> +#include <linux/spinlock.h>
+> +
+> +
+> +/**
+> + * sunxi_usb_reset... - reset bits in usb clk registers handling
+> + */
+> +
+> +struct usb_reset_data {
+> +	void __iomem			*reg;
+> +	spinlock_t			*lock;
+> +	struct reset_controller_dev	rcdev;
+> +};
+> +
+> +static int sunxi_usb_reset_assert(struct reset_controller_dev *rcdev,
+> +			      unsigned long id)
+> +{
+> +	struct usb_reset_data *data = container_of(rcdev,
+> +						   struct usb_reset_data,
+> +						   rcdev);
+> +	unsigned long flags;
+> +	u32 reg;
+> +
+> +	spin_lock_irqsave(data->lock, flags);
+> +
+> +	reg = readl(data->reg);
+> +	writel(reg & ~BIT(id), data->reg);
+> +
+> +	spin_unlock_irqrestore(data->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static int sunxi_usb_reset_deassert(struct reset_controller_dev *rcdev,
+> +				unsigned long id)
+> +{
+> +	struct usb_reset_data *data = container_of(rcdev,
+> +						     struct usb_reset_data,
+> +						     rcdev);
+> +	unsigned long flags;
+> +	u32 reg;
+> +
+> +	spin_lock_irqsave(data->lock, flags);
+> +
+> +	reg = readl(data->reg);
+> +	writel(reg | BIT(id), data->reg);
+> +
+> +	spin_unlock_irqrestore(data->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct reset_control_ops sunxi_usb_reset_ops = {
+> +	.assert		= sunxi_usb_reset_assert,
+> +	.deassert	= sunxi_usb_reset_deassert,
+> +};
+> +
+> +/**
+> + * sunxi_usb_clk_setup() - Setup function for usb gate clocks
+> + */
+> +
+> +#define SUNXI_USB_MAX_SIZE 32
+> +
+> +struct usb_clk_data {
+> +	u32 clk_mask;
+> +	u32 reset_mask;
+> +	/* which parent to use, should match clock-output-names */
+> +	char parents[SUNXI_USB_MAX_SIZE];
+> +};
+> +
+> +static void __init sunxi_usb_clk_setup(struct device_node *node,
+> +				       const struct usb_clk_data *data,
+> +				       spinlock_t *lock)
+> +{
+> +	struct clk_onecell_data *clk_data;
+> +	struct usb_reset_data *reset_data;
+> +	const char *clk_parent;
+> +	const char *clk_name;
+> +	void __iomem *reg;
+> +	int qty;
+> +	int i = 0;
+> +	int j = 0;
+> +
+> +	reg = of_iomap(node, 0);
+
+of_io_request_and_map?
+
+> +
+> +	/* Worst-case size approximation and memory allocation */
+> +	qty = find_last_bit((unsigned long *)&data->clk_mask,
+> +			    SUNXI_USB_MAX_SIZE);
+> +	clk_data = kmalloc(sizeof(struct clk_onecell_data), GFP_KERNEL);
+> +	if (!clk_data)
+> +		return;
+> +	clk_data->clks = kzalloc((qty+1) * sizeof(struct clk *), GFP_KERNEL);
+> +	if (!clk_data->clks) {
+> +		kfree(clk_data);
+> +		return;
+> +	}
+> +
+> +	for_each_set_bit(i, (unsigned long *)&data->clk_mask,
+> +			 SUNXI_USB_MAX_SIZE) {
+> +		of_property_read_string_index(node, "clock-output-names",
+> +					      j, &clk_name);
+> +		clk_parent = of_clk_get_parent_name(node, data->parents[j]);
+> +
+> +		clk_data->clks[i] = clk_register_gate(NULL, clk_name,
+> +						      clk_parent, 0,
+> +						      reg, i, 0, lock);
+> +		WARN_ON(IS_ERR(clk_data->clks[i]));
+> +		clk_register_clkdev(clk_data->clks[i], clk_name, NULL);
+> +
+> +		j++;
+> +	}
+> +
+> +	/* Adjust to the real max */
+> +	clk_data->clk_num = i;
+> +
+> +	of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+> +
+> +	/* Register a reset controller for usb with reset bits */
+> +	if (data->reset_mask == 0)
+> +		return;
+> +
+> +	reset_data = kzalloc(sizeof(*reset_data), GFP_KERNEL);
+> +	if (!reset_data)
+> +		return;
+> +
+> +	reset_data->reg = reg;
+> +	reset_data->lock = lock;
+> +	reset_data->rcdev.nr_resets = __fls(data->reset_mask) + 1;
+> +	reset_data->rcdev.ops = &sunxi_usb_reset_ops;
+> +	reset_data->rcdev.of_node = node;
+> +	reset_controller_register(&reset_data->rcdev);
+> +}
+> +
+> +static const struct usb_clk_data sun9i_a80_usb_mod_data __initconst = {
+> +	.clk_mask = BIT(6) | BIT(5) | BIT(4) | BIT(3) | BIT(2) | BIT(1),
+> +	.reset_mask = BIT(19) | BIT(18) | BIT(17),
+> +	.parents = {0, 1, 0, 1, 0, 1},
+> +};
+> +
+> +static DEFINE_SPINLOCK(a80_usb_mod_lock);
+> +
+> +static void __init sun9i_a80_usb_mod_setup(struct device_node *node)
+> +{
+> +	/* AHB1 gate must be enabled to access registers */
+> +	struct clk *ahb = of_clk_get(node, 0);
+> +
+> +	WARN_ON(IS_ERR(ahb));
+> +	clk_prepare_enable(ahb);
+
+Hmmmm. That look off.
+
+Why do you need the clock to be enabled all the time? Isn't the CCF
+already taking care of enabling the parent clock whenever it needs to
+access any register?
+
+Thanks,
+Maxime
+
 -- 
-1.9.3
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141104/259f8394/attachment.sig>
