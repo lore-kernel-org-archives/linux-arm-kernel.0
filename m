@@ -1,57 +1,84 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 4 Nov 2014 09:58:35 +0100
-Subject: [PATCH v8 08/10] sched: add SD_PREFER_SIBLING for SMT level
-In-Reply-To: <5458462F.6000704@gmail.com>
-References: <1414745252-4895-1-git-send-email-vincent.guittot@linaro.org>
- <1414745252-4895-9-git-send-email-vincent.guittot@linaro.org>
- <5458462F.6000704@gmail.com>
-Message-ID: <CAKfTPtBcJYBuD-spy6Uq8UnisunUtTiO24JcSoYw+DF87TFLTA@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 4 Nov 2014 01:05:21 -0800
+Subject: [PATCH v3 0/9] PM / Domains: Fix race conditions during boot
+In-Reply-To: <CAPDyKFp=T8Luomeaoz5Y=eLAuFaOfdb+-aoU3QVnpjoDYVKPjg@mail.gmail.com>
+References: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
+ <5370046.DXkB0EA6xC@vostro.rjw.lan>
+ <CAPDyKFo_sxW8bE=C29fyfsqOO0tk_=eYFRkCVFRWc2kUx_bQHA@mail.gmail.com>
+ <2024276.CFr3nVUAlA@vostro.rjw.lan>
+ <CAPDyKFp=T8Luomeaoz5Y=eLAuFaOfdb+-aoU3QVnpjoDYVKPjg@mail.gmail.com>
+Message-ID: <20141104090521.GA13219@dtor-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 November 2014 04:21, Wanpeng Li <kernellwp@gmail.com> wrote:
-> Hi Vincent,
-> On 14/10/31 ??4:47, Vincent Guittot wrote:
->>
->> Add the SD_PREFER_SIBLING flag for SMT level in order to ensure that
->> the scheduler will put at least 1 task per core.
->
->
-> What's the behavior before this patch?
+On Tue, Nov 04, 2014 at 09:54:19AM +0100, Ulf Hansson wrote:
+> [...]
+> 
+> > Generally, there are two or even three levels of runtime PM handling,
+> > driver, (possibly) bus type and (possibly) PM domain (and multiple levels
+> > of these are possible in principle).  All of them have to be initialized
+> > at different times.
+> >
+> > Quite arguably, the PM domain and/or bus type runtime PM handling should
+> > be initialized even before registerind the device or during device
+> > registration.  Doing that later may be too late.  When the device has been
+> > registered, runtime PM should work to an extent allowing the driver to access
+> > the device and configure it further after calling pm_runtime_resume().
+> >
+> > Of course, if ->probe() is to call pm_runtime_resume() for this purpose,
+> > it must take the fact that the driver's own ->runtime_resume() may be called
+> > as a result of this into account.  That's why I'm asking whether or not the
+> > core should call pm_runtime_resume() before calling really_probe() in a
+> > followup branch of this thread.
+> 
+> I am reading the other thread, let's see.
+> 
+> >
+> > The driver's own runtime PM handling must be initialized in the driver and
+> > the only place suitable for that is ->probe().  However, it needs to be done
+> > *before* the driver's own ->runtime_resume() or ->runtime_suspend() callback
+> > is executed.  If that is done properly, it should be possible to cover
+> > both the CONFIG_PM_RUNTIME set/unset cases in that code.
+> >
+> > And I wouldn't recommend anyone to do the runtime PM initialization in
+> > ->runtime_resume() (when it is called for the first time), as that would be
+> > error prone and fragile.
+> 
+> Great! That's means we are at least aligned on this topic. :-)
+> 
+> >
+> >> The AMBA bus and some of its drivers a good example of how this has
+> >> been implemented:
+> >> driver/amba/bus.c
+> >> drivers/mmc/host/mmci.c
+> >> drivers/spi/spi-pl022.c
+> >>
+> >> This conclusion I have made from this is:
+> >> - Using pm_runtime_get_sync() during the ->probe() path to explicitly
+> >> power up a PM domain, is not suitable as the _common_ solution to
+> >> solve the race condition. It certainly may work for some scenarios,
+> >> but not for those I am looking at.
+> >
+> > I think, however, that it might work if the core calls pm_runtime_get_sync()
+> > from driver_probe_device().
+> 
+> Currently this won't work.
+> 
+> That's because the buses' ->probe() are invoked in this path and they
+> are doing the attachment of the device to its PM domain.
+> 
+> In other words, we can't power up the PM domain using
+> pm_runtime_get_sync(), until the device has been attached to its PM
+> domain. Right?
 
-Before this patch, the capacity_factor was 1 at core level (whatever
-the number of CPUs in the core) so the group that represents this core
-was overloaded as soon as more than 1 task was running on this group.
-So if a core has 2 tasks running in its group, it is seen as
-overloaded and the scheduler will try to migrate 1 task on a group
-that is idle
 
-Regards,
-Vincent
+I think this is one of the issues that we have there. Why do we conflate
+probing and placing the device into a power domain? The latter should
+happen when we register the device. The fact that a device was probed
+and has a driver bound or not bound to it should have no bearing on
+whether the device is member of power domain or not.
 
->
-> Regards,
-> Wanpeng Li
->
->
->>
->> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->> Reviewed-by: Preeti U. Murthy <preeti@linux.vnet.ibm.com>
->> ---
->>   kernel/sched/core.c | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/kernel/sched/core.c b/kernel/sched/core.c
->> index 37fb92c..731f2ad 100644
->> --- a/kernel/sched/core.c
->> +++ b/kernel/sched/core.c
->> @@ -6165,6 +6165,7 @@ sd_init(struct sched_domain_topology_level *tl, int
->> cpu)
->>          */
->>         if (sd->flags & SD_SHARE_CPUCAPACITY) {
->> +               sd->flags |= SD_PREFER_SIBLING;
->>                 sd->imbalance_pct = 110;
->>                 sd->smt_gain = 1178; /* ~15% */
->>
->
->
+Thanks.
+
+-- 
+Dmitry
