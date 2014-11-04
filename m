@@ -1,61 +1,46 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 04 Nov 2014 08:50:09 +0100
-Subject: [PATCH 7/7] mfd: ab8500: Decrement the power supply's device
- reference counter
-In-Reply-To: <20141103180059.GW12011@x1>
-References: <1413290117-13082-1-git-send-email-k.kozlowski@samsung.com>
- <1413290117-13082-8-git-send-email-k.kozlowski@samsung.com>
- <20141103175945.GV12011@x1> <20141103180059.GW12011@x1>
-Message-ID: <1415087409.2389.2.camel@AMDC1943>
+Date: Tue, 04 Nov 2014 08:51:50 +0100
+Subject: [PATCH v3 08/14] mfd: max77686/802: Remove support for board files
+In-Reply-To: <20141103170128.GD12011@x1>
+References: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
+ <1414668053-31370-9-git-send-email-k.kozlowski@samsung.com>
+ <20141103170128.GD12011@x1>
+Message-ID: <1415087510.2389.4.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On pon, 2014-11-03 at 18:00 +0000, Lee Jones wrote:
-> On Mon, 03 Nov 2014, Lee Jones wrote:
+On pon, 2014-11-03 at 17:01 +0000, Lee Jones wrote:
+> On Thu, 30 Oct 2014, Krzysztof Kozlowski wrote:
 > 
-> > On Tue, 14 Oct 2014, Krzysztof Kozlowski wrote:
+> > The driver is used only on Exynos based boards with DTS support.
+> > Convert the driver to DTS-only version. This simplifies a little the
+> > code:
+> > 1. No dead (unused) entries in platform_data structure.
+> > 2. More code removed.
+> > 3. Regulator driver does not depend on allocated memory
+> >    from MFD driver.
+> > 4. It makes also easier extending the regulator driver.
 > > 
-> > > Use power_supply_put() to decrement the power supply's device reference
-> > > counter.
-> > > 
-> > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > > ---
-> > >  drivers/mfd/ab8500-sysctrl.c | 2 ++
-> > >  1 file changed, 2 insertions(+)
+> > Add to the max77686 MFD driver dependency on CONFIG_OF because without
+> > DTS the regulator drivers won't bind.
 > > 
-> > Applied, thanks.
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> > ---
+> >  drivers/mfd/Kconfig                  |  1 +
+> >  drivers/mfd/max77686.c               | 23 -----------------------
+> >  include/linux/mfd/max77686-private.h |  1 -
+> >  include/linux/mfd/max77686.h         | 28 ----------------------------
+> >  4 files changed, 1 insertion(+), 52 deletions(-)
 > 
-> Whoops, to hasty there -- unapplied.
-> 
-> What's going on with this set?
+> Applied, thanks.
 
-The set should be pulled at once (everything depends on 1st patch).
 
-It is still waiting for reviews. I'll resend soon.
+Noooo, don't apply it. It depends on previous patches removing the board
+file support from regulators.
+
+If the patch looks OK, please only ack it. I would like to push
+everything through regulator tree.
 
 Best regards,
 Krzysztof
-
-> 
-> > > diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
-> > > index 93b2d2c32ca3..d05a5719cfc4 100644
-> > > --- a/drivers/mfd/ab8500-sysctrl.c
-> > > +++ b/drivers/mfd/ab8500-sysctrl.c
-> > > @@ -51,6 +51,7 @@ static void ab8500_power_off(void)
-> > >  
-> > >  		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE,
-> > >  				&val);
-> > > +		power_supply_put(psy);
-> > >  
-> > >  		if (!ret && val.intval) {
-> > >  			charger_present = true;
-> > > @@ -73,6 +74,7 @@ static void ab8500_power_off(void)
-> > >  			       pss[i]);
-> > >  			machine_restart("charging");
-> > >  		}
-> > > +		power_supply_put(psy);
-> > >  	}
-> > >  
-> > >  shutdown:
-> > 
-> 
