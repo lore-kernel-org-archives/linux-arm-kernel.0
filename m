@@ -1,52 +1,33 @@
 From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Tue, 4 Nov 2014 15:30:52 +0800
-Subject: [PATCH v5 5/8] dt-bindings: add more chips in documentation for
- Mediatek SoC
+Date: Tue, 4 Nov 2014 15:30:55 +0800
+Subject: [PATCH v5 8/8] ARM: mediatek: Fix description for mediatek SoCs
 In-Reply-To: <1415086255-5555-1-git-send-email-yingjoe.chen@mediatek.com>
 References: <1415086255-5555-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1415086255-5555-6-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1415086255-5555-9-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Joe.C" <yingjoe.chen@mediatek.com>
 
-Add MT8127 & MT8135 from Mediatek.
+We support more MediaTek SoCs now, update the description.
 
 Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
 ---
- Documentation/devicetree/bindings/arm/mediatek.txt | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+ arch/arm/mach-mediatek/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-index fa25226..c549c1e 100644
---- a/Documentation/devicetree/bindings/arm/mediatek.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-@@ -1,10 +1,13 @@
--Mediatek MT6589 Platforms Device Tree Bindings
-+MediaTek mt65xx & mt81xx Platforms Device Tree Bindings
- 
--Boards with a SoC of the Mediatek MT6589 shall have the following property:
-+Boards with a MediaTek mt65xx/mt81xx SoC shall have the following property:
- 
- Required root node property:
- 
--compatible: must contain "mediatek,mt6589"
-+compatible: Must contain one of
-+   "mediatek,mt6589"
-+   "mediatek,mt8127"
-+   "mediatek,mt8135"
- 
- 
- Supported boards:
-@@ -12,3 +15,9 @@ Supported boards:
- - bq Aquaris5 smart phone:
-     Required root node properties:
-       - compatible = "mundoreader,bq-aquaris5", "mediatek,mt6589";
-+- MTK mt8127 tablet moose EVB:
-+    Required root node properties:
-+      - compatible = "mediatek,mt8127-moose", "mediatek,mt8127";
-+- MTK mt8135 tablet EVB:
-+    Required root node properties:
-+      - compatible = "mediatek,mt8135-evbp1", "mediatek,mt8135";
+diff --git a/arch/arm/mach-mediatek/Kconfig b/arch/arm/mach-mediatek/Kconfig
+index 2c043a2..f73f588 100644
+--- a/arch/arm/mach-mediatek/Kconfig
++++ b/arch/arm/mach-mediatek/Kconfig
+@@ -1,6 +1,6 @@
+ config ARCH_MEDIATEK
+-	bool "Mediatek MT6589 SoC" if ARCH_MULTI_V7
++	bool "Mediatek MT65xx & MT81xx SoC" if ARCH_MULTI_V7
+ 	select ARM_GIC
+ 	select MTK_TIMER
+ 	help
+-	  Support for Mediatek Cortex-A7 Quad-Core-SoC MT6589.
++	  Support for Mediatek MT65xx & MT81xx SoCs
 -- 
 1.8.1.1.dirty
