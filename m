@@ -1,31 +1,38 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 4 Nov 2014 09:11:26 +0900
-Subject: [PATCH 0/2] ARM: shmobile: r8a7790: Fix SD3CKCR address
-In-Reply-To: <CAMuHMdWS1M24vngxvrf3mRGfVwKvmgsXnqZ6xq_hJuPC=KqqWQ@mail.gmail.com>
-References: <1414648677-31104-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdWS1M24vngxvrf3mRGfVwKvmgsXnqZ6xq_hJuPC=KqqWQ@mail.gmail.com>
-Message-ID: <20141104001125.GB20174@verge.net.au>
+Date: Tue, 4 Nov 2014 09:14:32 +0900
+Subject: [PATCH] ARM: shmobile: ape6evm: Enable PM Runtime in defconfig
+In-Reply-To: <1414634362-14204-1-git-send-email-horms+renesas@verge.net.au>
+References: <1414634362-14204-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20141104001432.GC20174@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 10:51:56AM +0100, Geert Uytterhoeven wrote:
-> On Thu, Oct 30, 2014 at 6:57 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > This short series corrects the SD3CKCR address in both C and DT
-> >
-> > Based on the renesas-devel-20141030-v3.18-rc2 branch of my renesas tree
-> >
-> > Shinobu Uehara (2):
-> >   ARM: shmobile: r8a7790: Fix SD3CKCR address
-> >   ARM: shmobile: r8a7790: Fix SD3CKCR address to device tree
+On Thu, Oct 30, 2014 at 10:59:22AM +0900, Simon Horman wrote:
+> This is consistent with other shmobile defconfigs.
 > 
-> This  matches my copy of the datasheet, so
-
-Mine too :)
-
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
 > 
-> But it would be good to know this has been verified on actual hardware.
+> Based on renesas-devel-20141030-v3.18-rc2
 
-As these came from the BSP my assumption is that they have
-been verified on actual hardware. I will queue up these changes.
+I have queued up this change.
+
+> 
+>  arch/arm/configs/ape6evm_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/ape6evm_defconfig b/arch/arm/configs/ape6evm_defconfig
+> index b54b28f..db81d8c 100644
+> --- a/arch/arm/configs/ape6evm_defconfig
+> +++ b/arch/arm/configs/ape6evm_defconfig
+> @@ -33,6 +33,7 @@ CONFIG_ARM_APPENDED_DTB=y
+>  CONFIG_VFP=y
+>  CONFIG_NEON=y
+>  CONFIG_BINFMT_MISC=y
+> +CONFIG_PM_RUNTIME=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> -- 
+> 2.1.1
+> 
