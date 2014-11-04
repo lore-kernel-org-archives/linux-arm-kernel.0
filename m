@@ -1,250 +1,52 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 4 Nov 2014 16:45:43 +0530
-Subject: [PATCH 2/3] arm: mach-omap2: omap_hwmod_43xx_data: add hwmod
- support for tscadc on am43x-evm
-In-Reply-To: <20141031134459.GB24708@kahuna>
-References: <1414741603-18233-1-git-send-email-vigneshr@ti.com>
- <1414741603-18233-3-git-send-email-vigneshr@ti.com>
- <20141031134459.GB24708@kahuna>
-Message-ID: <5458B55F.2010201@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 4 Nov 2014 19:20:27 +0800
+Subject: [GIT PULL] ARM: imx: fixes for 3.18, 2nd round
+Message-ID: <20141104112026.GL10821@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd, Olof,
 
+This is the second round of i.MX fixes for 3.18.  The clk-vf610 fix is
+relatively big, because it needs some adaption to the change made by
+offending commit dc4805c2e78b (ARM: imx: remove ENABLE and BYPASS bits
+from clk-pllv3 driver).  And it should have been sent to you for earlier
+-rc inclusion, but unfortunately it got delayed for some time because
+Stefan wasn't aware of my email address change.
 
-On Friday 31 October 2014 07:14 PM, Nishanth Menon wrote:
-> On 13:16-20141031, Vignesh R wrote:
->> This patch adds hwmod support for tscadc to work on am43xx-evm. The am33xx
->> hwmod structures of tscadc has been moved to ipblock_data so that it can
->> be reused in am43xx. The clock domain names are separately set for am33xx
->> and am43xx. Thus tscadc dt entries can now be added to am43xx board
->> dt files.
->>
->> Signed-off-by: Vignesh R <vigneshr@ti.com>
->> ---
->>  .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  |  1 +
->>  .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 64 ++++++++++++++++++++++
->>  arch/arm/mach-omap2/omap_hwmod_33xx_data.c         | 49 -----------------
->>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |  1 +
->>  4 files changed, 66 insertions(+), 49 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
->> index 6e57b8ad0db5..b92a7c7825fa 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
->> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
->> @@ -65,6 +65,7 @@ extern struct omap_hwmod_ocp_if am33xx_l4_ls__timer4;
->>  extern struct omap_hwmod_ocp_if am33xx_l4_ls__timer5;
->>  extern struct omap_hwmod_ocp_if am33xx_l4_ls__timer6;
->>  extern struct omap_hwmod_ocp_if am33xx_l4_ls__timer7;
->> +extern struct omap_hwmod_ocp_if am33xx_l4_wkup__adc_tsc;
->>  extern struct omap_hwmod_ocp_if am33xx_l3_main__tpcc;
->>  extern struct omap_hwmod_ocp_if am33xx_l3_main__tptc0;
->>  extern struct omap_hwmod_ocp_if am33xx_l3_main__tptc1;
->> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
->> index 7f44922ab540..ef14e56a3968 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
->> @@ -151,6 +151,54 @@ struct omap_hwmod_class am33xx_wkup_m3_hwmod_class = {
->>  };
->>  
->>  /*
->> + * 'adc/tsc' class
->> + * TouchScreen Controller (Anolog-To-Digital Converter)
->> + */
->> +static struct omap_hwmod_class_sysconfig am33xx_adc_tsc_sysc = {
->> +	.rev_offs	= 0x00,
->> +	.sysc_offs	= 0x10,
->> +	.sysc_flags	= SYSC_HAS_SIDLEMODE,
->> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
->> +			SIDLE_SMART_WKUP),
->> +	.sysc_fields	= &omap_hwmod_sysc_type2,
->> +};
->> +
->> +static struct omap_hwmod_class am33xx_adc_tsc_hwmod_class = {
->> +	.name		= "adc_tsc",
->> +	.sysc		= &am33xx_adc_tsc_sysc,
->> +};
->> +
->> +struct omap_hwmod am33xx_adc_tsc_hwmod = {
->> +	.name		= "adc_tsc",
->> +	.class		= &am33xx_adc_tsc_hwmod_class,
->> +	.clkdm_name	= "l4_wkup_clkdm",
->> +	.main_clk	= "adc_tsc_fck",
->> +	.prcm		= {
->> +		.omap4  = {
->> +			.modulemode     = MODULEMODE_SWCTRL,
->> +		},
->> +	},
->> +};
->> +
->> +/* L4 WKUP -> ADC_TSC */
->> +static struct omap_hwmod_addr_space am33xx_adc_tsc_addrs[] = {
->> +	{
->> +		.pa_start	= 0x44E0D000,
->> +		.pa_end		= 0x44E0D000 + SZ_8K - 1,
->> +		.flags		= ADDR_TYPE_RT
->> +	},
->> +	{ }
->> +};
-> 
-> NAK. we dont want to see phy addresses in hwmod anymore. please add that
-> to DT. I suggest doing that clean up prior to this patch.
-> 
+Please consider to send them for 3.18 inclusion.  Thanks.
 
-Will drop this and pass address from DT
+Shawn
 
->> +
->> +struct omap_hwmod_ocp_if am33xx_l4_wkup__adc_tsc = {
->> +	.master		= &am33xx_l4_wkup_hwmod,
->> +	.slave		= &am33xx_adc_tsc_hwmod,
->> +	.clk		= "dpll_core_m4_div2_ck",
->> +	.addr		= am33xx_adc_tsc_addrs,
->> +	.user		= OCP_USER_MPU,
->> +};
->> +
->> +/*
->>   * 'pru-icss' class
->>   * Programmable Real-Time Unit and Industrial Communication Subsystem
->>   */
->> @@ -1370,6 +1418,7 @@ static void omap_hwmod_am33xx_clkctrl(void)
->>  	CLKCTRL(am33xx_timer5_hwmod, AM33XX_CM_PER_TIMER5_CLKCTRL_OFFSET);
->>  	CLKCTRL(am33xx_timer6_hwmod, AM33XX_CM_PER_TIMER6_CLKCTRL_OFFSET);
->>  	CLKCTRL(am33xx_timer7_hwmod, AM33XX_CM_PER_TIMER7_CLKCTRL_OFFSET);
->> +	CLKCTRL(am33xx_adc_tsc_hwmod, AM33XX_CM_WKUP_ADC_TSC_CLKCTRL_OFFSET);
->>  	CLKCTRL(am33xx_smartreflex0_hwmod,
->>  		AM33XX_CM_WKUP_SMARTREFLEX0_CLKCTRL_OFFSET);
->>  	CLKCTRL(am33xx_smartreflex1_hwmod,
->> @@ -1398,6 +1447,18 @@ static void omap_hwmod_am33xx_clkctrl(void)
->>  	CLKCTRL(am33xx_aes0_hwmod , AM33XX_CM_PER_AES0_CLKCTRL_OFFSET);
->>  }
->>  
->> +static void am33xx_hwmod_clockdomain(void)
->> +{
->> +	am33xx_l4_hs_hwmod.clkdm_name = "l4hs_clkdm";
->> +	am33xx_adc_tsc_hwmod.clkdm_name = "l4_wkup_clkdm";
->> +}
->> +
->> +static void am43xx_hwmod_clockdomain(void)
->> +{
->> +	am33xx_l4_hs_hwmod.clkdm_name = "l3_clkdm";
->> +	am33xx_adc_tsc_hwmod.clkdm_name = "l3s_tsc_clkdm";
->> +}
->> +
-> 
-> maybe do something similar to CLKCTRL macro?
-> 
+The following changes since commit 0df1f2487d2f0d04703f142813d53615d62a1da4:
 
-OK, I will create a macro for clkdm_name.
+  Linux 3.18-rc3 (2014-11-02 15:01:51 -0800)
 
->>  static void omap_hwmod_am33xx_rst(void)
->>  {
->>  	RSTCTRL(am33xx_pruss_hwmod, AM33XX_RM_PER_RSTCTRL_OFFSET);
->> @@ -1409,6 +1470,7 @@ void omap_hwmod_am33xx_reg(void)
->>  {
->>  	omap_hwmod_am33xx_clkctrl();
->>  	omap_hwmod_am33xx_rst();
->> +	am33xx_hwmod_clockdomain();
->>  }
->>  
->>  static void omap_hwmod_am43xx_clkctrl(void)
->> @@ -1443,6 +1505,7 @@ static void omap_hwmod_am43xx_clkctrl(void)
->>  	CLKCTRL(am33xx_timer5_hwmod, AM43XX_CM_PER_TIMER5_CLKCTRL_OFFSET);
->>  	CLKCTRL(am33xx_timer6_hwmod, AM43XX_CM_PER_TIMER6_CLKCTRL_OFFSET);
->>  	CLKCTRL(am33xx_timer7_hwmod, AM43XX_CM_PER_TIMER7_CLKCTRL_OFFSET);
->> +	CLKCTRL(am33xx_adc_tsc_hwmod, AM43XX_CM_WKUP_ADC_TSC_CLKCTRL_OFFSET);
->>  	CLKCTRL(am33xx_smartreflex0_hwmod,
->>  		AM43XX_CM_WKUP_SMARTREFLEX0_CLKCTRL_OFFSET);
->>  	CLKCTRL(am33xx_smartreflex1_hwmod,
->> @@ -1482,4 +1545,5 @@ void omap_hwmod_am43xx_reg(void)
->>  {
->>  	omap_hwmod_am43xx_clkctrl();
->>  	omap_hwmod_am43xx_rst();
->> +	am43xx_hwmod_clockdomain();
->>  }
->> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
->> index ce7d260495cb..c3ff14828850 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
->> @@ -88,37 +88,6 @@ static struct omap_hwmod am33xx_wkup_m3_hwmod = {
->>  };
->>  
->>  /*
->> - * 'adc/tsc' class
->> - * TouchScreen Controller (Anolog-To-Digital Converter)
->> - */
->> -static struct omap_hwmod_class_sysconfig am33xx_adc_tsc_sysc = {
->> -	.rev_offs	= 0x00,
->> -	.sysc_offs	= 0x10,
->> -	.sysc_flags	= SYSC_HAS_SIDLEMODE,
->> -	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
->> -			SIDLE_SMART_WKUP),
->> -	.sysc_fields	= &omap_hwmod_sysc_type2,
->> -};
->> -
->> -static struct omap_hwmod_class am33xx_adc_tsc_hwmod_class = {
->> -	.name		= "adc_tsc",
->> -	.sysc		= &am33xx_adc_tsc_sysc,
->> -};
->> -
->> -static struct omap_hwmod am33xx_adc_tsc_hwmod = {
->> -	.name		= "adc_tsc",
->> -	.class		= &am33xx_adc_tsc_hwmod_class,
->> -	.clkdm_name	= "l4_wkup_clkdm",
->> -	.main_clk	= "adc_tsc_fck",
->> -	.prcm		= {
->> -		.omap4	= {
->> -			.clkctrl_offs	= AM33XX_CM_WKUP_ADC_TSC_CLKCTRL_OFFSET,
->> -			.modulemode	= MODULEMODE_SWCTRL,
->> -		},
->> -	},
->> -};
->> -
->> -/*
->>   * Modules omap_hwmod structures
->>   *
->>   * The following IPs are excluded for the moment because:
->> @@ -426,24 +395,6 @@ static struct omap_hwmod_ocp_if am33xx_l4_wkup__gpio0 = {
->>  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->>  };
->>  
->> -/* L4 WKUP -> ADC_TSC */
->> -static struct omap_hwmod_addr_space am33xx_adc_tsc_addrs[] = {
->> -	{
->> -		.pa_start	= 0x44E0D000,
->> -		.pa_end		= 0x44E0D000 + SZ_8K - 1,
->> -		.flags		= ADDR_TYPE_RT
->> -	},
->> -	{ }
->> -};
->> -
->> -static struct omap_hwmod_ocp_if am33xx_l4_wkup__adc_tsc = {
->> -	.master		= &am33xx_l4_wkup_hwmod,
->> -	.slave		= &am33xx_adc_tsc_hwmod,
->> -	.clk		= "dpll_core_m4_div2_ck",
->> -	.addr		= am33xx_adc_tsc_addrs,
->> -	.user		= OCP_USER_MPU,
->> -};
->> -
->>  static struct omap_hwmod_ocp_if am33xx_l4_hs__cpgmac0 = {
->>  	.master		= &am33xx_l4_hs_hwmod,
->>  	.slave		= &am33xx_cpgmac0_hwmod,
->> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
->> index fea01aa3ef42..3ce8d28c0f9a 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
->> @@ -809,6 +809,7 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
->>  	&am33xx_l4_ls__timer5,
->>  	&am33xx_l4_ls__timer6,
->>  	&am33xx_l4_ls__timer7,
->> +	&am33xx_l4_wkup__adc_tsc,
->>  	&am33xx_l3_main__tpcc,
->>  	&am33xx_l4_ls__uart2,
->>  	&am33xx_l4_ls__uart3,
->> -- 
->> 1.9.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-3.18-2
+
+for you to fetch changes up to 89fbec5b97fbcf08db3a9cd93a340f21f95d38b8:
+
+  ARM: imx: Fix the removal of CONFIG_SPI option (2014-11-04 19:00:01 +0800)
+
+----------------------------------------------------------------
+The i.MX fixes for 3.18, 2nd round:
+ - Fix a regression on Vybrid platform which is caused by commit
+   dc4805c2e78b (ARM: imx: remove ENABLE and BYPASS bits from clk-pllv3
+   driver), and results in a missing configuration on PLL clocks.
+ - Fix a regression with i.MX defconfig files where CONFIG_SPI option
+   gets lost accidentally.
+
+----------------------------------------------------------------
+Fabio Estevam (1):
+      ARM: imx: Fix the removal of CONFIG_SPI option
+
+Stefan Agner (1):
+      ARM: imx: clk-vf610: define PLL's clock tree
+
+ arch/arm/configs/imx_v4_v5_defconfig    |   1 +
+ arch/arm/configs/imx_v6_v7_defconfig    |   1 +
+ arch/arm/mach-imx/clk-vf610.c           | 134 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++----------------------------------
+ include/dt-bindings/clock/vf610-clock.h |  39 ++++++++++++++++++++++++-------
+ 4 files changed, 125 insertions(+), 50 deletions(-)
