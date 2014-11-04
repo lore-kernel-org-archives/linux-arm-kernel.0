@@ -1,121 +1,61 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 4 Nov 2014 15:12:08 +0800
-Subject: [PATCH 6/7] can: m_can: update to support CAN FD features
-In-Reply-To: <5452A071.2000307@hartkopp.net>
-References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
- <1414579527-31100-6-git-send-email-b29396@freescale.com>
- <54513E38.4020703@hartkopp.net>
- <20141030024226.GA29572@shlinux1.ap.freescale.net>
- <5452A071.2000307@hartkopp.net>
-Message-ID: <20141104071146.GA17367@shlinux1.ap.freescale.net>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 04 Nov 2014 08:50:09 +0100
+Subject: [PATCH 7/7] mfd: ab8500: Decrement the power supply's device
+ reference counter
+In-Reply-To: <20141103180059.GW12011@x1>
+References: <1413290117-13082-1-git-send-email-k.kozlowski@samsung.com>
+ <1413290117-13082-8-git-send-email-k.kozlowski@samsung.com>
+ <20141103175945.GV12011@x1> <20141103180059.GW12011@x1>
+Message-ID: <1415087409.2389.2.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 09:32:49PM +0100, Oliver Hartkopp wrote:
+On pon, 2014-11-03 at 18:00 +0000, Lee Jones wrote:
+> On Mon, 03 Nov 2014, Lee Jones wrote:
 > 
-> On 10/30/2014 03:42 AM, Dong Aisheng wrote:
-> > On Wed, Oct 29, 2014 at 08:21:28PM +0100, Oliver Hartkopp wrote:
-> 
-> >> So first I would suggest to check the core release register (CREL) to be
-> >> version 3.0.x and quit the driver initialization if it doesn't fit this
-> >> version. I would suggest to provide a separate patch for that check. What
-> >> about printing the core release version into the kernel log at driver
-> >> initialization time?
-> >>
+> > On Tue, 14 Oct 2014, Krzysztof Kozlowski wrote:
 > > 
-> > One question is that if v3.1.0 and v3.2.0 will be backward compatible with
-> > v3.0.1, if yes, how about let the driver still work for them instead of
-> > simply quit?
-> 
-> There are several important differences between 3.0.x and 3.1.x.
-> E.g. the CCCR, BTP, PSR and others are changed and a register for the
-> transmitter delay compensation is added.
-> 
-> I assume from 3.1.x to 3.2.x the controller registers will only change in
-> small details as the main update will be on the wire and not in the functionality.
-> 
-> > And then we can add new features according new released IP version.
-> 
-> Yes. We probably can wait for 3.[12].x to become available before adding the
-> special code that behaves according the core release register content.
-> 
-
-Okay
-
-> >>> @@ -375,7 +414,7 @@ static int m_can_do_rx_poll(struct net_device *dev, int quota)
-> >>>  		if (rxfs & RXFS_RFL)
-> >>>  			netdev_warn(dev, "Rx FIFO 0 Message Lost\n");
-> >>>  
-> >>> -		skb = alloc_can_skb(dev, &frame);
-> >>> +		skb = alloc_canfd_skb(dev, &frame);
-> >>
-> >> You are *always* allocating CAN FD frames now?
-> >>
+> > > Use power_supply_put() to decrement the power supply's device reference
+> > > counter.
+> > > 
+> > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > > ---
+> > >  drivers/mfd/ab8500-sysctrl.c | 2 ++
+> > >  1 file changed, 2 insertions(+)
 > > 
-> > Yes, currently it is.
-> > The test seemed ok using CAN FD frames even receive normal frame.
+> > Applied, thanks.
 > 
-> When you put CAN frame content into a CAN FD skb it becomes a CAN FD frame -
-> which is wrong.
+> Whoops, to hasty there -- unapplied.
 > 
-> CAN 2.0 frame (EDL is clear) -> alloc_can_skb()
-> CAN FD frame (EDL is set) -> alloc_canfd_skb()
-> 
-> You can have a CAN FD frame with a DLC of 8, which does *not* mean that you
-> have a CAN 2.0 frame.
-> 
-> > The issue i know is that candump seemed can not recognize remote frame reported
-> > by the driver.
-> 
-> Do you use the latest candump from
-> 
+> What's going on with this set?
 
-Yes, i'm using latest candump.
+The set should be pulled at once (everything depends on 1st patch).
 
-> 	https://gitorious.org/linux-can/can-utils/
-> ??
-> 
-> The latest candump switches the CAN_RAW socket into the mode to accept both
-> CAN *and* CAN FD frames and displays the frames correctly.
-> 
-> > Not sure if it's caused by canfd_frame used.
-> 
-> Yes. CAN FD frames do not have a RTR bit.
-> 
+It is still waiting for reviews. I'll resend soon.
 
-You're right.
-It's indeed caused by using the CAN FD frames to receive RTR frame.
-After switch to normal frame, candump showed it well.
+Best regards,
+Krzysztof
 
-> > Will test and check.
+> 
+> > > diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
+> > > index 93b2d2c32ca3..d05a5719cfc4 100644
+> > > --- a/drivers/mfd/ab8500-sysctrl.c
+> > > +++ b/drivers/mfd/ab8500-sysctrl.c
+> > > @@ -51,6 +51,7 @@ static void ab8500_power_off(void)
+> > >  
+> > >  		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE,
+> > >  				&val);
+> > > +		power_supply_put(psy);
+> > >  
+> > >  		if (!ret && val.intval) {
+> > >  			charger_present = true;
+> > > @@ -73,6 +74,7 @@ static void ab8500_power_off(void)
+> > >  			       pss[i]);
+> > >  			machine_restart("charging");
+> > >  		}
+> > > +		power_supply_put(psy);
+> > >  	}
+> > >  
+> > >  shutdown:
 > > 
-> >> Depending on RX_BUF_EDL in the RX FIFO message you should create a CAN or CAN
-> >> FD frame.
-> >>
-> >> Of course you can use the struct canfd_frame in m_can_read_fifo() as the
-> >> layout of the struct can_frame is identical when filled with 'normal' CAN
-> >> frame content.
-> >>
-> >> But you need to distinguish whether it is a CAN or CAN FD frame when
-> >> allocating the skb based on the RX_BUF_EDL value.
-> >>
-> > 
-> > Yes, i think it's good to do that.
-> > One obvious benefit is it saves memory at least.
 > 
-> The main point is that CAN frames and CAN FD frames are separated by this
-> (MTU) length information. It's not about saving memory.
-> A CAN FD frame with DLC 8 still has 64 data bytes inside it's data structure.
-> 
-
-For normal can frame, the CAN_MAX_DLEN is 8 while CANFD_MAX_DLEN is 64.
-So i meant using struct canfd_frame to receive normal frame is a bit waste memory.
-And besides, actually it's wrong as you already indicated.
-I will send out the updated patch with this changed in v2 soon.
-Thanks for pointing out this.
-
-Regards
-Dong Aisheng
-
-> Regards,
-> Oliver
