@@ -1,31 +1,92 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 4 Nov 2014 14:46:07 -0800
-Subject: [GIT PULL] Renesas ARM Based SoC DT Clocksource Updates for v3.19
-In-Reply-To: <cover.1414629281.git.horms+renesas@verge.net.au>
-References: <cover.1414629281.git.horms+renesas@verge.net.au>
-Message-ID: <20141104224607.GK5908@quad.lixom.net>
+From: wigyori@uid0.hu (Zoltan HERPAI)
+Date: Tue, 04 Nov 2014 23:46:58 +0100
+Subject: [PATCH 25/26] ARM: sun7i: pcduino3: Relicense the device tree
+ under GPLv2/X11
+In-Reply-To: <1413538728-17705-25-git-send-email-maxime.ripard@free-electrons.com>
+References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1413538728-17705-25-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <54595762.7040504@uid0.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 10:50:49AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
-> 
-> Please consider these Renesas ARM based SoC DT clocksource updates for v3.19.
-> 
-> 
-> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-> 
->   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-clocksource-for-v3.19
-> 
-> for you to fetch changes up to d5153cd734dd6c1243bb3dc98065be99b10d049f:
-> 
->   clocksource: sh_mtu2: Drop incorrect SoC family name (2014-10-27 10:00:36 +0900)
+Hi Maxime,
 
-Applied. These could probably have been a single patch.
+As discussed:
 
+Acked-by: Zoltan HERPAI <wigyori@uid0.hu>
 
--Olof
+Thanks,
+-w-
+
+Maxime Ripard wrote:
+> The current GPL only licensing on the DTSI makes it very impractical for other
+> software components licensed under another license.
+>
+> In order to make it easier for them to reuse our device trees, relicense our
+> device trees under a GPL/X11 dual-license.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Zoltan HERPAI <wigyori@uid0.hu>
+> ---
+>  arch/arm/boot/dts/sun7i-a20-pcduino3.dts | 46 ++++++++++++++++++++++++++++----
+>  1 file changed, 41 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/sun7i-a20-pcduino3.dts b/arch/arm/boot/dts/sun7i-a20-pcduino3.dts
+> index 046dfc0d45d8..8dca49b2477b 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-pcduino3.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-pcduino3.dts
+> @@ -2,12 +2,48 @@
+>   * Copyright 2014 Zoltan HERPAI
+>   * Zoltan HERPAI <wigyori@uid0.hu>
+>   *
+> - * The code contained herein is licensed under the GNU General Public
+> - * License. You may obtain a copy of the GNU General Public License
+> - * Version 2 or later at the following locations:
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+>   *
+> - * http://www.opensource.org/licenses/gpl-license.html
+> - * http://www.gnu.org/copyleft/gpl.html
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + *     You should have received a copy of the GNU General Public
+> + *     License along with this file; if not, write to the Free
+> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+> + *     MA 02110-1301 USA
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+>   */
+>  
+>  /dts-v1/;
+>   
