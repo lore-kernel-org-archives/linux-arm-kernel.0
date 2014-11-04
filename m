@@ -1,37 +1,17 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Tue,  4 Nov 2014 15:52:39 +0800
-Subject: [PATCH 5/5] clk: rockchip: change DCLK_VOP0 to use new
- COMPOSITE_DIVOPS
-In-Reply-To: <1415087559-19444-1-git-send-email-kever.yang@rock-chips.com>
-References: <1415087559-19444-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <1415087559-19444-6-git-send-email-kever.yang@rock-chips.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 4 Nov 2014 16:02:00 +0800
+Subject: [PATCH RESEND v2 0/4] ARM: vf610: restructure device trees
+In-Reply-To: <1414960607-29316-1-git-send-email-stefan@agner.ch>
+References: <1414960607-29316-1-git-send-email-stefan@agner.ch>
+Message-ID: <20141104080159.GI10821@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HDMI clock is actually provide by DCLK_VOP0, so we need this
-patch to handle the HDMI clock correctly
+On Sun, Nov 02, 2014 at 09:36:43PM +0100, Stefan Agner wrote:
+> Stefan Agner (4):
+>   ARM: dts: vf610: assign oscillator to clock module
+>   ARM: imx: clk-vf610: get input clocks from assigned clocks
+>   ARM: dts: vf610: create generic base device trees
+>   ARM: dts: vf500-colibri: add Colibri VF50 support
 
-Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
----
-
- drivers/clk/rockchip/clk-rk3288.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index 0151140..073a719 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -396,8 +396,10 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
- 			RK3288_CLKSEL_CON(30), 14, 2, MFLAGS, 8, 5, DFLAGS,
- 			RK3288_CLKGATE_CON(3), 4, GFLAGS),
- 
--	COMPOSITE(DCLK_VOP0, "dclk_vop0", mux_pll_src_cpll_gpll_npll_p, 0,
-+	COMPOSITE_DIVOPS(DCLK_VOP0, "dclk_vop0", mux_pll_src_cpll_gpll_npll_p,
-+			(CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT),
- 			RK3288_CLKSEL_CON(27), 0, 2, MFLAGS, 8, 8, DFLAGS,
-+			&dclk_vop_ops,
- 			RK3288_CLKGATE_CON(3), 1, GFLAGS),
- 	COMPOSITE(DCLK_VOP1, "dclk_vop1", mux_pll_src_cpll_gpll_npll_p, 0,
- 			RK3288_CLKSEL_CON(29), 6, 2, MFLAGS, 8, 8, DFLAGS,
--- 
-1.9.1
+Applied all, thanks.
