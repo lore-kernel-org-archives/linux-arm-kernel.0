@@ -1,45 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  4 Nov 2014 10:50:09 +0900
-Subject: [PATCH 4/4] ARM: shmobile: Select CONFIG_ZONE_DMA when
- CONFIG_ARM_LPAE is enabled
-In-Reply-To: <cover.1415058939.git.horms+renesas@verge.net.au>
-References: <cover.1415058939.git.horms+renesas@verge.net.au>
-Message-ID: <3794705aeb318c431c07072f04380c78cc5a84ac.1415058939.git.horms+renesas@verge.net.au>
+Date: Tue,  4 Nov 2014 10:50:19 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Boards Cleanups for
+ v3.19
+Message-ID: <cover.1415059054.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Most IP cores on ARM Renesas platforms can only address 32 bits of
-physical memory for DMA. Without CONFIG_ZONE_DMA enabled and with the
-recent CMA highmem allocation support, the default CMA zone is reserved
-above the 4GiB limit when LPAE is enabled, resulting in various driver
-failures.
+Please consider these second round of Renesas ARM based SoC boards cleanups for v3.19.
 
-Fix the problem by selecting CONFIG_ZONE_DMA. Other options to
-investigate in the future would be to either enable IOMMU support or use
-custom CMA reservations for peripherals not supporting LPAE.
+This pull request is based on the previous round of
+such requests, tagged as renesas-boards-cleanups-for-v3.19,
+which I have already sent a pull-request for.
 
-While not a strict dependency, the "[PATCH 0/4] Low/high memory CMA
-reservation fixes" series is also required to fix a different but related CMA
-allocation problem.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+The following changes since commit f4115f25c11790646351df243dae070a7cf80163:
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 21f457b..6bc018f 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -1,5 +1,6 @@
- config ARCH_SHMOBILE
- 	bool
-+	select ZONE_DMA if ARM_LPAE
- 
- config PM_RCAR
- 	bool
--- 
-2.1.1
+  ARM: shmobile: armadillo800eva: Sort includes (2014-10-24 10:50:47 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards-cleanups2-for-v3.19
+
+for you to fetch changes up to 803fc9b590f74ef1066be328f2f33c2b285ca3af:
+
+  ARM: shmobile: marzen-reference: Don't include legacy clock.h (2014-10-30 09:51:35 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Boards Cleanups for v3.19
+
+* marzen-reference: Don't include legacy clock.h
+
+----------------------------------------------------------------
+Laurent Pinchart (1):
+      ARM: shmobile: marzen-reference: Don't include legacy clock.h
+
+ arch/arm/mach-shmobile/board-marzen-reference.c | 1 -
+ 1 file changed, 1 deletion(-)
