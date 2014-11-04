@@ -1,49 +1,23 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 4 Nov 2014 16:26:41 +0100
-Subject: [PATCH 23/26] ARM: sun7i: olinuxino lime: Relicense the device
- tree under GPLv2/X11
-In-Reply-To: <CAFnsNoR=zyFS-VJFEUFiSc9B4w_ePfi_+Jb2cV_WLVnadyMrtQ@mail.gmail.com>
-References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
- <1413538728-17705-23-git-send-email-maxime.ripard@free-electrons.com>
- <CAFnsNoR=zyFS-VJFEUFiSc9B4w_ePfi_+Jb2cV_WLVnadyMrtQ@mail.gmail.com>
-Message-ID: <20141104152641.GE26729@lukather>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 4 Nov 2014 16:32:03 +0100
+Subject: [Patch Part2 v4 00/31] Enable hierarchy irqdomian on x86 platforms
+In-Reply-To: <5458ECF3.4040308@linux.intel.com>
+References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
+ <20141104144730.GE14512@8bytes.org>
+ <5458ECF3.4040308@linux.intel.com>
+Message-ID: <20141104153203.GE10744@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 04, 2014 at 11:50:15PM +0900, Naoki FUKAUMI wrote:
-> Hi,
-> 
-> sorry for late reply!
-> 
-> On Fri, Oct 17, 2014 at 6:38 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > The current GPL only licensing on the DTSI makes it very impractical for other
-> > software components licensed under another license.
-> >
-> > In order to make it easier for them to reuse our device trees, relicense our
-> > device trees under a GPL/X11 dual-license.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Cc: FUKAUMI Naoki <naobsd@gmail.com>
-> > ---
-> >  arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts | 46 +++++++++++++++++++++++---
-> >  1 file changed, 41 insertions(+), 5 deletions(-)
-> 
-> Acked-by: FUKAUMI Naoki <naobsd@gmail.com>
+On Tue, Nov 04, 2014 at 11:12:51PM +0800, Jiang Liu wrote:
+> 	Do you have the call stack? I have changed the way to call
+> irq_set_msi_desc_off() for MSI/MSIx interrupts, which may cause the
+> panic. Patch 19-21 changes the PCI MSI code.
 
-Applied with your Acked-by.
+Unfortunatly I have no full call-stack yet, as the intersting parts
+scrolled out of the screen. But the last interesting function seen there
+was do_one_initcall(). I'll try to setup serial console on the machine
+and let you know when I have a full call-stack.
 
-Thanks!
-Maxime
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141104/ef30efa8/attachment.sig>
+	Joerg
