@@ -1,28 +1,27 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Tue, 4 Nov 2014 20:18:59 +0000
-Subject: [RFC PATCH] make CONFIG_STRICT_DEVMEM a core non-debug feature
-In-Reply-To: <CAGXu5jJnaAFMUBR50TgapRzRcvKS0j=XO7u9z6fdNouwMb=_sQ@mail.gmail.com>
-References: <1415121836-16241-1-git-send-email-leif.lindholm@linaro.org>
- <CAGXu5jL1BBAvoxVqFa1YHJSMCbGdLiPey-dyC15YKVPB2xGfig@mail.gmail.com>
- <20141104195914.GY22224@bivouac.eciton.net>
- <CAGXu5jJnaAFMUBR50TgapRzRcvKS0j=XO7u9z6fdNouwMb=_sQ@mail.gmail.com>
-Message-ID: <20141104201859.GZ22224@bivouac.eciton.net>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 4 Nov 2014 21:20:13 +0100 (CET)
+Subject: [PATCH v2] ARM: irqchip: mxs: add Alpascale ASM9260 support
+In-Reply-To: <1415128357-12054-1-git-send-email-linux@rempel-privat.de>
+References: <20141104130320.GB21210@tiger>
+ <1415128357-12054-1-git-send-email-linux@rempel-privat.de>
+Message-ID: <alpine.DEB.2.11.1411042118490.4245@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 04, 2014 at 12:02:32PM -0800, Kees Cook wrote:
-> > I considered doing that, but didn't want to risk listing too many
-> > details of one architecture, and too few of others.
-> 
-> Well, the others only say "memory mapped peripherals", so that's what
-> I was suggesting adding the x86 language: it was the most detailed
-> about what that would really mean to the end-user.
+On Tue, 4 Nov 2014, Oleksij Rempel wrote:
 
-The problem is that this currently isn't strictly speaking true for
-some architectures (at least not arm*). Without a standardised memory
-map, we are exposing mapping anything not system RAM.
+> Freescale iMX23/iMX28 and Alphascale ASM9260 have similar
+> interrupt collectors. It makes easy to reuse irq-mxs code for ASM9260.
+> Differences between this devices are fallowing:
+> - different register offsets
+> - different count of intterupt lines per register
+> - ASM9260 don't provide reset bit
+> - ASM9260 don't support FIQ.
 
-(Patches related to that will follow later this month.)
+Why is this a monolithic patch again. IIRC it was split into a
+prepatory (imx) and alphascale part earlier. But my memory might trick
+me.
 
-/
-    Leif
+Thanks,
+
+	tglx
