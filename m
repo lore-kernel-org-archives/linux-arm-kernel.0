@@ -1,427 +1,109 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Tue,  4 Nov 2014 20:02:04 +0800
-Subject: [Patch Part2 v4 30/31] x86,
- htirq: Use hierarchy irqdomain to manage Hypertransport interrupts
-In-Reply-To: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
-References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1415102525-9898-31-git-send-email-jiang.liu@linux.intel.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 04 Nov 2014 13:08:33 +0100
+Subject: [PATCH 03/12] PM / Domains: Add notifier support for power domain
+ transitions
+In-Reply-To: <CADGdYn6TiXmric5Jzm-38KSmU0iV=9Zxg2wWKL-Ydy1bwxxfDA@mail.gmail.com>
+References: <1414986790-11940-1-git-send-email-amit.daniel@samsung.com>
+ <1414986790-11940-4-git-send-email-amit.daniel@samsung.com>
+ <5457C791.1000904@samsung.com>
+ <CADGdYn6TiXmric5Jzm-38KSmU0iV=9Zxg2wWKL-Ydy1bwxxfDA@mail.gmail.com>
+Message-ID: <5458C1C1.1040307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use hierarchy irqdomain to manage Hypertransport interrupts.
-We have slightly changed the architecture interfaces to support htirq
-PCI driver, it should be safe because currently Hypertransport interrupt
-is only enabled on x86 platforms.
+On 04/11/14 07:16, amit daniel kachhap wrote:
+> On Mon, Nov 3, 2014 at 11:51 PM, Sylwester Nawrocki
+> <s.nawrocki@samsung.com> wrote:
+>> On 03/11/14 04:53, Amit Daniel Kachhap wrote:
+[...]
+>>> 4 type of notifications are added,
+>>> GPD_OFF_PRE     - GPD state before power off
+>>> GPD_OFF_POST    - GPD state after power off
+>>> GPD_ON_PRE      - GPD state before power off
+>>> GPD_ON_POST     - GPD state after power off
+>>>
+>>> 3 notfication API's are exported.
+>>> 1) int genpd_register_notifier(struct notifier_block *nb, char *pd_name);
+>>> 2) int genpd_unregister_notifier(struct notifier_block *nb, char *pd_name);
+>>> 3) void genpd_invoke_transition_notifier(struct generic_pm_domain *genpd,
+>>>                       enum gpd_on_off_state state);
+>>>
+>>> In this approach the notifiers are registered/unregistered with pd name.
+>>> The actual invoking of the notfiers will be done by the platform implementing
+>>> power domain enable/disable low level handlers according to the above
+>>> defined notification types. This approach will considerably reduce the
+>>> number of call to notifiers as compared to calling always from core
+>>> powerdomain subsystem.
+>>>
+>>> Also the registered domain's will be managed inside a cache list and not
+>>> part of the genpd structure. This will help in registration of notifiers from
+>>> subsystems (such as clock) even when the PD subsystem is still not initialised.
+>>> This list also filters out the unregistered pd's requesting notification.
+>>
+>> This patch is somewhat similar my patch adding power domain state change
+>> notifications [1].  I have already a reworked version of that patch, with the
+>> notifier list moved to struct generic_pm_domain and using genpd->lock instead
+> 
+> Yes this will be correct as others also suggested to make per genpd
+> notifier block.
+> 
+>> of dev->power.lock.  Anyway, while I'd leave the decision about the location
+>> from where the notifier chains are supposed to be called to the subsystem's
+>> maintainers preference, I'm rather reluctant to having one global notifiers
+>> list for all possible power domains and all the notification clients.
+>> The possibly long list needs to be traversed at each notifier call and it
+>> seems in your implementation any registered user of the notification gets
+>> notifications for all possible power domains.
+>>
+>> [1] https://lkml.org/lkml/2014/8/5/182
+>
+> My fault, I somehow missed this link earlier. After going through
+> this, I found it registers genpd from the platform driver, so the
+> function signature is
+> int pm_genpd_register_notifier(struct device *dev, struct notifier_block *nb);
+> I suggest to make the function signature to be like,
+> int pm_genpd_register_notifier(struct device_node *np, struct
+> notifier_block *nb)
+> 
+> In this way this function should should be able to support both
+> platform devices and non platform devices like clk.
+> 
+> The function may work like,
+> 
+> pdev = of_find_device_by_node(np);
+> if (pdev) {
+>          //  get genpd from device and go ahead with notfier registration.
+>          // blocking_notifier_chain_register(genpd->pd_notifier, nb)
+> } else
+> {
+>         // get pd_handle from np
+>         // get the pd_name from phandle and try registering this gen pd
+>         // if the genpd subsystem is not initialised then add this in
+> a temporary list and register the notifier later
+> }
+> 
+> Can you post your implementation with 1st part ? Later I can post the
+> else part with my changes.
 
-Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
----
- arch/x86/include/asm/hw_irq.h |   13 ++++
- arch/x86/kernel/apic/htirq.c  |  164 +++++++++++++++++++++++++++++++----------
- arch/x86/kernel/apic/vector.c |    1 +
- drivers/pci/htirq.c           |   47 ++----------
- include/linux/htirq.h         |   24 ++++--
- 5 files changed, 162 insertions(+), 87 deletions(-)
+Hmm, I doubt making the first argument of the notifier registration
+function 'struct device_node *' is a good idea. AFAIK we shouldn't be
+introducing and requiring device tree in generic interfaces.
 
-diff --git a/arch/x86/include/asm/hw_irq.h b/arch/x86/include/asm/hw_irq.h
-index 1b7501cfee8c..f54e78023218 100644
---- a/arch/x86/include/asm/hw_irq.h
-+++ b/arch/x86/include/asm/hw_irq.h
-@@ -159,6 +159,14 @@ struct irq_alloc_info {
- 			void		*dmar_data;
- 		};
- #endif
-+#ifdef	CONFIG_HT_IRQ
-+		struct {
-+			int		ht_pos;
-+			int		ht_idx;
-+			struct pci_dev	*ht_dev;
-+			void		*ht_update;
-+		};
-+#endif
- 	};
- };
- 
-@@ -218,6 +226,11 @@ extern void arch_init_msi_domain(struct irq_domain *domain);
- #else
- static inline void arch_init_msi_domain(struct irq_domain *domain) { }
- #endif
-+#ifdef	CONFIG_HT_IRQ
-+extern void arch_init_htirq_domain(struct irq_domain *domain);
-+#else
-+static inline void arch_init_htirq_domain(struct irq_domain *domain) { }
-+#endif
- 
- /* Statistics */
- extern atomic_t irq_err_count;
-diff --git a/arch/x86/kernel/apic/htirq.c b/arch/x86/kernel/apic/htirq.c
-index b307ee7a7148..86ecf81a455a 100644
---- a/arch/x86/kernel/apic/htirq.c
-+++ b/arch/x86/kernel/apic/htirq.c
-@@ -3,6 +3,8 @@
-  *
-  * Copyright (C) 1997, 1998, 1999, 2000, 2009 Ingo Molnar, Hajnalka Szabo
-  *	Moved from arch/x86/kernel/apic/io_apic.c.
-+ * Jiang Liu <jiang.liu@linux.intel.com>
-+ *	Add support of hierarchy irqdomain
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -19,70 +21,105 @@
- #include <asm/apic.h>
- #include <asm/hypertransport.h>
- 
-+static struct irq_domain *htirq_domain;
-+
- /*
-  * Hypertransport interrupt support
-  */
--static void target_ht_irq(unsigned int irq, unsigned int dest, u8 vector)
--{
--	struct ht_irq_msg msg;
--
--	fetch_ht_irq_msg(irq, &msg);
--
--	msg.address_lo &= ~(HT_IRQ_LOW_VECTOR_MASK | HT_IRQ_LOW_DEST_ID_MASK);
--	msg.address_hi &= ~(HT_IRQ_HIGH_DEST_ID_MASK);
--
--	msg.address_lo |= HT_IRQ_LOW_VECTOR(vector) | HT_IRQ_LOW_DEST_ID(dest);
--	msg.address_hi |= HT_IRQ_HIGH_DEST_ID(dest);
--
--	write_ht_irq_msg(irq, &msg);
--}
--
- static int
- ht_set_affinity(struct irq_data *data, const struct cpumask *mask, bool force)
- {
--	struct irq_cfg *cfg = irqd_cfg(data);
--	unsigned int dest;
-+	struct irq_data *parent = data->parent_data;
- 	int ret;
- 
--	ret = apic_set_affinity(data, mask, &dest);
--	if (ret)
--		return ret;
--
--	target_ht_irq(data->irq, dest, cfg->vector);
--	return IRQ_SET_MASK_OK_NOCOPY;
-+	ret = parent->chip->irq_set_affinity(parent, mask, force);
-+	if (ret >= 0) {
-+		struct ht_irq_msg msg;
-+		struct irq_cfg *cfg = data->chip_data;
-+
-+		fetch_ht_irq_msg(data->irq, &msg);
-+		msg.address_lo &= ~(HT_IRQ_LOW_VECTOR_MASK |
-+				    HT_IRQ_LOW_DEST_ID_MASK);
-+		msg.address_lo |= HT_IRQ_LOW_VECTOR(cfg->vector) |
-+				  HT_IRQ_LOW_DEST_ID(cfg->dest_apicid);
-+		msg.address_hi &= ~(HT_IRQ_HIGH_DEST_ID_MASK);
-+		msg.address_hi |= HT_IRQ_HIGH_DEST_ID(cfg->dest_apicid);
-+		write_ht_irq_msg(data->irq, &msg);
-+	}
-+
-+	return ret;
- }
- 
- static struct irq_chip ht_irq_chip = {
- 	.name			= "PCI-HT",
- 	.irq_mask		= mask_ht_irq,
- 	.irq_unmask		= unmask_ht_irq,
--	.irq_ack		= apic_ack_edge,
-+	.irq_ack		= irq_chip_ack_parent,
- 	.irq_set_affinity	= ht_set_affinity,
--	.irq_retrigger		= apic_retrigger_irq,
-+	.irq_retrigger		= irq_chip_retrigger_hierarchy,
- 	.flags			= IRQCHIP_SKIP_SET_WAKE,
- };
- 
--int arch_alloc_ht_irq(struct pci_dev *dev)
-+static int htirq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-+			      unsigned int nr_irqs, void *arg)
- {
--	return irq_domain_alloc_irqs(NULL, 1, dev_to_node(&dev->dev), NULL);
-+	struct ht_irq_cfg *ht_cfg;
-+	struct irq_alloc_info *info = arg;
-+	struct pci_dev *dev;
-+	irq_hw_number_t hwirq;
-+	int ret;
-+
-+	if (nr_irqs > 1 || !info)
-+		return -EINVAL;
-+
-+	dev = info->ht_dev;
-+	hwirq = (info->ht_idx & 0xFF) |
-+		PCI_DEVID(dev->bus->number, dev->devfn) << 8 |
-+		(pci_domain_nr(dev->bus) & 0xFFFFFFFF) << 24;
-+	if (irq_find_mapping(domain, hwirq) > 0)
-+		return -EEXIST;
-+
-+	ht_cfg = kmalloc(sizeof(*ht_cfg), GFP_KERNEL);
-+	if (!ht_cfg)
-+		return -ENOMEM;
-+
-+	ret = irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, info);
-+	if (ret < 0) {
-+		kfree(ht_cfg);
-+		return ret;
-+	}
-+
-+	/* Initialize msg to a value that will never match the first write. */
-+	ht_cfg->msg.address_lo = 0xffffffff;
-+	ht_cfg->msg.address_hi = 0xffffffff;
-+	ht_cfg->dev = info->ht_dev;
-+	ht_cfg->update = info->ht_update;
-+	ht_cfg->pos = info->ht_pos;
-+	ht_cfg->idx = 0x10 + (info->ht_idx * 2);
-+	irq_domain_set_hwirq_and_chip(domain, virq, hwirq, &ht_irq_chip,
-+				      ht_cfg);
-+	__irq_set_handler(virq, handle_edge_irq, 0, "edge");
-+
-+	return 0;
- }
- 
--void arch_free_ht_irq(int irq)
-+static void htirq_domain_free(struct irq_domain *domain, unsigned int virq,
-+			      unsigned int nr_irqs)
- {
--	irq_domain_free_irqs(irq, 1);
-+	struct irq_data *irq_data = irq_domain_get_irq_data(domain, virq);
-+
-+	BUG_ON(nr_irqs != 1);
-+	kfree(irq_data->chip_data);
-+	irq_domain_free_irqs_top(domain, virq, nr_irqs);
- }
- 
--int arch_setup_ht_irq(unsigned int irq, struct pci_dev *dev)
-+static int htirq_domain_activate(struct irq_domain *domain,
-+				 struct irq_data *irq_data)
- {
--	struct irq_cfg *cfg;
- 	struct ht_irq_msg msg;
-+	struct irq_cfg *cfg = irqd_cfg(irq_data);
- 
--	if (disable_apic)
--		return -ENXIO;
--
--	cfg = irq_cfg(irq);
- 	msg.address_hi = HT_IRQ_HIGH_DEST_ID(cfg->dest_apicid);
--
- 	msg.address_lo =
- 		HT_IRQ_LOW_BASE |
- 		HT_IRQ_LOW_DEST_ID(cfg->dest_apicid) |
-@@ -95,13 +132,60 @@ int arch_setup_ht_irq(unsigned int irq, struct pci_dev *dev)
- 			HT_IRQ_LOW_MT_FIXED :
- 			HT_IRQ_LOW_MT_ARBITRATED) |
- 		HT_IRQ_LOW_IRQ_MASKED;
-+	write_ht_irq_msg(irq_data->irq, &msg);
- 
--	write_ht_irq_msg(irq, &msg);
-+	return 0;
-+}
- 
--	irq_set_chip_and_handler_name(irq, &ht_irq_chip,
--				      handle_edge_irq, "edge");
-+static int htirq_domain_deactivate(struct irq_domain *domain,
-+				   struct irq_data *irq_data)
-+{
-+	struct ht_irq_msg msg;
- 
--	dev_dbg(&dev->dev, "irq %d for HT\n", irq);
-+	memset(&msg, 0, sizeof(msg));
-+	write_ht_irq_msg(irq_data->irq, &msg);
- 
- 	return 0;
- }
-+
-+static struct irq_domain_ops htirq_domain_ops = {
-+	.alloc = htirq_domain_alloc,
-+	.free = htirq_domain_free,
-+	.activate = htirq_domain_activate,
-+	.deactivate = htirq_domain_deactivate,
-+};
-+
-+void arch_init_htirq_domain(struct irq_domain *parent)
-+{
-+	if (disable_apic)
-+		return;
-+
-+	htirq_domain = irq_domain_add_tree(NULL, &htirq_domain_ops, NULL);
-+	if (!htirq_domain)
-+		pr_warn("failed to initialize irqdomain for HTIRQ.\n");
-+	else
-+		htirq_domain->parent = parent;
-+}
-+
-+int arch_setup_ht_irq(int idx, int pos, struct pci_dev *dev,
-+		      ht_irq_update_t *update)
-+{
-+	struct irq_alloc_info info;
-+
-+	if (!htirq_domain)
-+		return -ENOSYS;
-+
-+	init_irq_alloc_info(&info, NULL);
-+	info.ht_idx = idx;
-+	info.ht_pos = pos;
-+	info.ht_dev = dev;
-+	info.ht_update = update;
-+
-+	return irq_domain_alloc_irqs(htirq_domain, 1, dev_to_node(&dev->dev),
-+				     &info);
-+}
-+
-+void arch_teardown_ht_irq(unsigned int irq)
-+{
-+	irq_domain_free_irqs(irq, 1);
-+}
-diff --git a/arch/x86/kernel/apic/vector.c b/arch/x86/kernel/apic/vector.c
-index 9ee62cf83edf..678435af82bd 100644
---- a/arch/x86/kernel/apic/vector.c
-+++ b/arch/x86/kernel/apic/vector.c
-@@ -365,6 +365,7 @@ int __init arch_early_irq_init(void)
- 	irq_set_default_host(x86_vector_domain);
- 
- 	arch_init_msi_domain(x86_vector_domain);
-+	arch_init_htirq_domain(x86_vector_domain);
- 
- 	return arch_early_ioapic_init();
- }
-diff --git a/drivers/pci/htirq.c b/drivers/pci/htirq.c
-index ceb0ebeb7b5f..7eb4109a3df4 100644
---- a/drivers/pci/htirq.c
-+++ b/drivers/pci/htirq.c
-@@ -23,20 +23,11 @@
-  */
- static DEFINE_SPINLOCK(ht_irq_lock);
- 
--struct ht_irq_cfg {
--	struct pci_dev *dev;
--	 /* Update callback used to cope with buggy hardware */
--	ht_irq_update_t *update;
--	unsigned pos;
--	unsigned idx;
--	struct ht_irq_msg msg;
--};
--
--
- void write_ht_irq_msg(unsigned int irq, struct ht_irq_msg *msg)
- {
- 	struct ht_irq_cfg *cfg = irq_get_handler_data(irq);
- 	unsigned long flags;
-+
- 	spin_lock_irqsave(&ht_irq_lock, flags);
- 	if (cfg->msg.address_lo != msg->address_lo) {
- 		pci_write_config_byte(cfg->dev, cfg->pos + 2, cfg->idx);
-@@ -55,6 +46,7 @@ void write_ht_irq_msg(unsigned int irq, struct ht_irq_msg *msg)
- void fetch_ht_irq_msg(unsigned int irq, struct ht_irq_msg *msg)
- {
- 	struct ht_irq_cfg *cfg = irq_get_handler_data(irq);
-+
- 	*msg = cfg->msg;
- }
- 
-@@ -86,7 +78,6 @@ void unmask_ht_irq(struct irq_data *data)
-  */
- int __ht_create_irq(struct pci_dev *dev, int idx, ht_irq_update_t *update)
- {
--	struct ht_irq_cfg *cfg;
- 	int max_irq, pos, irq;
- 	unsigned long flags;
- 	u32 data;
-@@ -105,29 +96,9 @@ int __ht_create_irq(struct pci_dev *dev, int idx, ht_irq_update_t *update)
- 	if (idx > max_irq)
- 		return -EINVAL;
- 
--	cfg = kmalloc(sizeof(*cfg), GFP_KERNEL);
--	if (!cfg)
--		return -ENOMEM;
--
--	cfg->dev = dev;
--	cfg->update = update;
--	cfg->pos = pos;
--	cfg->idx = 0x10 + (idx * 2);
--	/* Initialize msg to a value that will never match the first write. */
--	cfg->msg.address_lo = 0xffffffff;
--	cfg->msg.address_hi = 0xffffffff;
--
--	irq = arch_alloc_ht_irq(dev);
--	if (irq <= 0) {
--		kfree(cfg);
--		return -EBUSY;
--	}
--	irq_set_handler_data(irq, cfg);
--
--	if (arch_setup_ht_irq(irq, dev) < 0) {
--		ht_destroy_irq(irq);
--		return -EBUSY;
--	}
-+	irq = arch_setup_ht_irq(idx, pos, dev, update);
-+	if (irq > 0)
-+		dev_dbg(&dev->dev, "irq %d for HT\n", irq);
- 
- 	return irq;
- }
-@@ -158,12 +129,6 @@ EXPORT_SYMBOL(ht_create_irq);
-  */
- void ht_destroy_irq(unsigned int irq)
- {
--	struct ht_irq_cfg *cfg;
--
--	cfg = irq_get_handler_data(irq);
--	irq_set_chip(irq, NULL);
--	irq_set_handler_data(irq, NULL);
--	arch_free_ht_irq(irq);
--	kfree(cfg);
-+	arch_teardown_ht_irq(irq);
- }
- EXPORT_SYMBOL(ht_destroy_irq);
-diff --git a/include/linux/htirq.h b/include/linux/htirq.h
-index 5caa51b7b95c..d4a527e58434 100644
---- a/include/linux/htirq.h
-+++ b/include/linux/htirq.h
-@@ -1,26 +1,38 @@
- #ifndef LINUX_HTIRQ_H
- #define LINUX_HTIRQ_H
- 
-+struct pci_dev;
-+struct irq_data;
-+
- struct ht_irq_msg {
- 	u32	address_lo;	/* low 32 bits of the ht irq message */
- 	u32	address_hi;	/* high 32 bits of the it irq message */
- };
- 
-+typedef void (ht_irq_update_t)(struct pci_dev *dev, int irq,
-+			       struct ht_irq_msg *msg);
-+
-+struct ht_irq_cfg {
-+	struct pci_dev *dev;
-+	 /* Update callback used to cope with buggy hardware */
-+	ht_irq_update_t *update;
-+	unsigned pos;
-+	unsigned idx;
-+	struct ht_irq_msg msg;
-+};
-+
- /* Helper functions.. */
- void fetch_ht_irq_msg(unsigned int irq, struct ht_irq_msg *msg);
- void write_ht_irq_msg(unsigned int irq, struct ht_irq_msg *msg);
--struct irq_data;
- void mask_ht_irq(struct irq_data *data);
- void unmask_ht_irq(struct irq_data *data);
- 
- /* The arch hook for getting things started */
--int arch_setup_ht_irq(unsigned int irq, struct pci_dev *dev);
--int arch_alloc_ht_irq(struct pci_dev *dev);
--void arch_free_ht_irq(int irq);
-+int arch_setup_ht_irq(int idx, int pos, struct pci_dev *dev,
-+		      ht_irq_update_t *update);
-+void arch_teardown_ht_irq(unsigned int irq);
- 
- /* For drivers of buggy hardware */
--typedef void (ht_irq_update_t)(struct pci_dev *dev, int irq,
--			       struct ht_irq_msg *msg);
- int __ht_create_irq(struct pci_dev *dev, int idx, ht_irq_update_t *update);
- 
- #endif /* LINUX_HTIRQ_H */
--- 
-1.7.10.4
+We already tried an approach with pending notifier registration list.
+I.e. when the power domain is not yet available we put the notification
+registration request onto a separate list, which is then traversed
+right before the power domain is registered with PM core.
+Then we had a separate notification type for the notification client,
+to let it know if his registration request has finally failed
+permanently (invoked at some late initcall).
+
+It all works, but it's not something we're really happy with. I hope
+we can work out some reasonable solution for mainline. I will post
+my PD transition notification patch, however it's mostly to demonstrate
+the problem. In v2 PD can be also referred to by name, beside allowing
+to just pass a struct device * to a device which belongs to a power
+domain.
+
+--
+Thanks,
+Sylwester
