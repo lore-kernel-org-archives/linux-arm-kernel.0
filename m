@@ -1,38 +1,36 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Tue, 4 Nov 2014 17:38:28 +0000
-Subject: [PATCH] ARM: shmobile: Enable PCI domains for R-Car Gen2 devices
-Message-ID: <1415122708-4011-1-git-send-email-phil.edworthy@renesas.com>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Tue, 4 Nov 2014 17:39:11 +0000
+Subject: [PATCH v2 07/10] dmi: add support for SMBIOS 3.0 64-bit entry
+ point
+In-Reply-To: <1414513123-20400-8-git-send-email-ard.biesheuvel@linaro.org>
+References: <1414513123-20400-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1414513123-20400-8-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20141104173911.GC3592@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCI core will soon automatically handle the PCI domain number,
-allowing the internal PCI and external PCIe bridges work at the same time.
-In order for that to work, we need to enable PCI_DOMAINS.
+On Tue, 28 Oct, at 05:18:40PM, Ard Biesheuvel wrote:
+> diff --git a/drivers/firmware/dmi_scan.c b/drivers/firmware/dmi_scan.c
+> index 17afc51f3054..4139ef0bd51d 100644
+> --- a/drivers/firmware/dmi_scan.c
+> +++ b/drivers/firmware/dmi_scan.c
+> @@ -93,6 +93,12 @@ static void dmi_table(u8 *buf, int len, int num,
+>  		const struct dmi_header *dm = (const struct dmi_header *)data;
+>  
+>  		/*
+> +		 * 7.45 End-of-Table (Type 127) [SMBIOS reference spec v3.0.0]
+> +		 */
+> +		if (dm->type == 127)
+> +			break;
+> +
+> +		/*
 
-Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
----
+Hmm.. tiny nit, but s/127/DMI_ENTRY_END_OF_TABLE/ we already have a
+symbol for this constant.
 
-In order to automatically handle the PCI domain number, we need a patch from
-Lorenzo Pieralisi:
- "[RFC PATCH 2/2] arm: pcibios: move to generic PCI domains"
-However, enabling PCI_DOMAINS without this doesn't have an adverse effect,
-and the plan is to use PCI domains to solve this problem, so we can apply
-this patch straight away.
+But other than that,
 
- arch/arm/mach-shmobile/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Acked-by: Matt Fleming <matt.fleming@intel.com>
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 21f457b..1c05768 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -18,6 +18,7 @@ config ARCH_RCAR_GEN2
- 	select PM_RCAR if PM || SMP
- 	select RENESAS_IRQC
- 	select SYS_SUPPORTS_SH_CMT
-+	select PCI_DOMAINS if PCI
- 
- config ARCH_RMOBILE
- 	bool
 -- 
-1.9.1
+Matt Fleming, Intel Open Source Technology Center
