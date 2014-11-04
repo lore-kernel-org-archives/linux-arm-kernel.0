@@ -1,155 +1,92 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Tue,  4 Nov 2014 11:51:17 +0100
-Subject: [PATCH v5 1/8] phy: miphy28lp: Add Device Tree bindings for the
- MiPHY28lp
+Date: Tue,  4 Nov 2014 11:51:22 +0100
+Subject: [PATCH v5 6/8] phy: miphy28lp: Add SSC support for PCIE
 In-Reply-To: <1415098284-11182-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1415098284-11182-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1415098284-11182-2-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1415098284-11182-7-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MiPHY28lp is a Generic PHY which can serve various SATA or PCIe
-or USB3 devices.
+SSC is the technique of modulating the operating frequency of a signal
+slightly to spread its radiated emissions over a range of frequencies.
+This reduction in the maximum emission for a given frequency helps meet
+radiated emission requirements.
+These settings are applicable for PCIE with Internal clock.
 
-Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
-Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+Signed-off-by: Harsh Gupta <harsh.gupta@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 ---
- .../devicetree/bindings/phy/phy-miphy28lp.txt      | 126 +++++++++++++++++++++
- 1 file changed, 126 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
+ drivers/phy/phy-miphy28lp.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt b/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
-new file mode 100644
-index 0000000..b7c13ad
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
-@@ -0,0 +1,126 @@
-+STMicroelectronics STi MIPHY28LP PHY binding
-+============================================
+diff --git a/drivers/phy/phy-miphy28lp.c b/drivers/phy/phy-miphy28lp.c
+index d2f797c..d8ff895 100644
+--- a/drivers/phy/phy-miphy28lp.c
++++ b/drivers/phy/phy-miphy28lp.c
+@@ -192,6 +192,7 @@
+ #define SATA_SPDMODE		1
+ 
+ #define MIPHY_SATA_BANK_NB	3
++#define MIPHY_PCIE_BANK_NB	2
+ 
+ struct miphy28lp_phy {
+ 	struct phy *phy;
+@@ -591,6 +592,46 @@ static void miphy_sata_tune_ssc(struct miphy28lp_phy *miphy_phy)
+ 	}
+ }
+ 
++static void miphy_pcie_tune_ssc(struct miphy28lp_phy *miphy_phy)
++{
++	void __iomem *base = miphy_phy->base;
++	u8 val;
 +
-+This binding describes a miphy device that is used to control PHY hardware
-+for SATA, PCIe or USB3.
++	/* Compensate Tx impedance to avoid out of range values */
++	/*
++	 * Enable the SSC on PLL for all banks
++	 * SSC Modulation @ 31 KHz and 4000 ppm modulation amp
++	 */
++	val = readb_relaxed(base + MIPHY_BOUNDARY_2);
++	val |= SSC_EN_SW;
++	writeb_relaxed(val, base + MIPHY_BOUNDARY_2);
 +
-+Required properties (controller (parent) node):
-+- compatible	: Should be "st,miphy28lp-phy".
-+- st,syscfg	: Should be a phandle of the system configuration register group
-+		  which contain the SATA, PCIe or USB3 mode setting bits.
++	val = readb_relaxed(base + MIPHY_BOUNDARY_SEL);
++	val |= SSC_SEL;
++	writeb_relaxed(val, base + MIPHY_BOUNDARY_SEL);
 +
-+Required nodes	:  A sub-node is required for each channel the controller
-+		   provides. Address range information including the usual
-+		   'reg' and 'reg-names' properties are used inside these
-+		   nodes to describe the controller's topology. These nodes
-+		   are translated by the driver's .xlate() function.
++	for (val = 0; val < MIPHY_PCIE_BANK_NB; val++) {
++		writeb_relaxed(val, base + MIPHY_CONF);
 +
-+Required properties (port (child) node):
-+- #phy-cells	: Should be 1 (See second example)
-+		  Cell after port phandle is device type from:
-+			- PHY_TYPE_SATA
-+			- PHY_TYPE_PCI
-+			- PHY_TYPE_USB3
-+- reg		: Address and length of the register set for the device.
-+- reg-names	: The names of the register addresses corresponding to the registers
-+		  filled in "reg". It can also contain the offset of the system configuration
-+		  registers used as glue-logic to setup the device for SATA/PCIe or USB3
-+		  devices.
-+- resets	: phandle to the parent reset controller.
-+- reset-names	: Associated name must be "miphy-sw-rst".
++		/* Validate Step component */
++		writeb_relaxed(0x69, base + MIPHY_PLL_SBR_3);
++		writeb_relaxed(0x21, base + MIPHY_PLL_SBR_4);
 +
-+Optional properties (port (child) node):
-+- st,osc-rdy		: to check the MIPHY0_OSC_RDY status in the glue-logic. This
-+			  is not available in all the MiPHY. For example, for STiH407, only the
-+			  MiPHY0 has this bit.
-+- st,osc-force-ext	: to select the external oscillator. This can change from
-+			  different MiPHY inside the same SoC.
-+- st,sata_gen		: to select which SATA_SPDMODE has to be set in the SATA system config
-+			  register.
-+- st,px_rx_pol_inv	: to invert polarity of RXn/RXp (respectively negative line and positive
-+			  line).
++		/* Validate Period component */
++		writeb_relaxed(0x3c, base + MIPHY_PLL_SBR_2);
++		writeb_relaxed(0x21, base + MIPHY_PLL_SBR_4);
 +
-+example:
++		/* Clear any previous request */
++		writeb_relaxed(0x00, base + MIPHY_PLL_SBR_1);
 +
-+		miphy28lp_phy: miphy28lp at 9b22000 {
-+			compatible = "st,miphy28lp-phy";
-+			st,syscfg = <&syscfg_core>;
-+			#address-cells	= <1>;
-+			#size-cells	= <1>;
-+			ranges;
++		/* requests the PLL to take in account new parameters */
++		writeb_relaxed(SET_NEW_CHANGE, base + MIPHY_PLL_SBR_1);
 +
-+			phy_port0: port at 9b22000 {
-+				reg = <0x9b22000 0xff>,
-+				      <0x9b09000 0xff>,
-+				      <0x9b04000 0xff>,
-+				      <0x114 0x4>, /* sysctrl MiPHY cntrl */
-+				      <0x818 0x4>, /* sysctrl MiPHY status*/
-+				      <0xe0  0x4>, /* sysctrl PCIe */
-+				      <0xec  0x4>; /* sysctrl SATA */
-+				reg-names = "sata-up",
-+					    "pcie-up",
-+					    "pipew",
-+					    "miphy-ctrl-glue",
-+					    "miphy-status-glue",
-+					    "pcie-glue",
-+					    "sata-glue";
-+				#phy-cells = <1>;
-+				st,osc-rdy;
-+				reset-names = "miphy-sw-rst";
-+				resets = <&softreset STIH407_MIPHY0_SOFTRESET>;
-+			};
++		/* To be sure there is no other pending requests */
++		writeb_relaxed(0x00, base + MIPHY_PLL_SBR_1);
++	}
++}
 +
-+			phy_port1: port at 9b2a000 {
-+				reg = <0x9b2a000 0xff>,
-+				      <0x9b19000 0xff>,
-+				      <0x9b14000 0xff>,
-+				      <0x118 0x4>,
-+				      <0x81c 0x4>,
-+				      <0xe4  0x4>,
-+				      <0xf0  0x4>;
-+				reg-names = "sata-up",
-+					    "pcie-up",
-+					    "pipew",
-+					    "miphy-ctrl-glue",
-+					    "miphy-status-glue",
-+					    "pcie-glue",
-+					    "sata-glue";
-+				#phy-cells = <1>;
-+				st,osc-force-ext;
-+				reset-names = "miphy-sw-rst";
-+				resets = <&softreset STIH407_MIPHY1_SOFTRESET>;
-+			};
+ static inline int miphy28lp_configure_sata(struct miphy28lp_phy *miphy_phy)
+ {
+ 	void __iomem *base = miphy_phy->base;
+@@ -659,6 +700,9 @@ static inline int miphy28lp_configure_pcie(struct miphy28lp_phy *miphy_phy)
+ 	if (err)
+ 		return err;
+ 
++	if (miphy_phy->ssc)
++		miphy_pcie_tune_ssc(miphy_phy);
 +
-+			phy_port2: port at 8f95000 {
-+				reg = <0x8f95000 0xff>,
-+				      <0x8f90000 0xff>,
-+				      <0x11c 0x4>,
-+				      <0x820 0x4>;
-+				reg-names = "pipew",
-+				    "usb3-up",
-+				    "miphy-ctrl-glue",
-+				    "miphy-status-glue";
-+				#phy-cells = <1>;
-+				reset-names = "miphy-sw-rst";
-+				resets = <&softreset STIH407_MIPHY2_SOFTRESET>;
-+			};
-+		};
-+
-+
-+Specifying phy control of devices
-+=================================
-+
-+Device nodes should specify the configuration required in their "phys"
-+property, containing a phandle to the miphy device node and an index
-+specifying which configuration to use, as described in phy-bindings.txt.
-+
-+example:
-+		sata0: sata at 9b20000  {
-+			...
-+			phys		= <&phy_port0 PHY_TYPE_SATA>;
-+			...
-+		};
-+
-+Macro definitions for the supported miphy configuration can be found in:
-+
-+include/dt-bindings/phy/phy-miphy28lp.h
+ 	return 0;
+ }
+ 
 -- 
 1.9.1
