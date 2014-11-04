@@ -1,16 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 4 Nov 2014 14:39:37 -0800
-Subject: [GIT PULL] Renesas ARM Based SoC Soc Cleanups for v3.19
-In-Reply-To: <cover.1414556645.git.horms+renesas@verge.net.au>
-References: <cover.1414556645.git.horms+renesas@verge.net.au>
-Message-ID: <20141104223937.GG5908@quad.lixom.net>
+Date: Tue, 4 Nov 2014 14:40:47 -0800
+Subject: [GIT PULL 2/2] cpufreq-dt platform device
+In-Reply-To: <5165858.6mpQCFJLYm@diego>
+References: <8735180.PYWUSJW9sD@diego>
+ <5165858.6mpQCFJLYm@diego>
+Message-ID: <20141104224047.GH5908@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 29, 2014 at 02:00:05PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Wed, Oct 29, 2014 at 05:15:37PM +0100, Heiko St?bner wrote:
+> Hi Arnd, Olof,
 > 
-> Please consider these Renesas ARM based SoC soc cleanups for v3.19.
+> this pull contains the cpufreq-dt device creation needed for cpu frequency
+> scaling on Rockchip platforms.
+> 
+> While this is only a single patch, there are more soc-changes in the pipeline
+> (rk3288-smp and suspend) that'll hopefully marture in time for 3.19, so this
+> probably should get a separate branch in arm-soc and not be merge into the
+> dt-branch.
+> 
+> 
+> Thanks
+> Heiko
 > 
 > 
 > The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
@@ -19,23 +30,15 @@ On Wed, Oct 29, 2014 at 02:00:05PM +0900, Simon Horman wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-cleanups-for-v3.19
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.19-rockchip-soc1
 > 
-> for you to fetch changes up to dac95365dc2683df55c4e221e2f669a056863307:
+> for you to fetch changes up to d3bafa3c09592448358887cfc722f72932134950:
 > 
->   ARM: shmobile: sh73a0: Remove wrapper sh73a0_init_delay() (2014-10-24 13:07:01 +0900)
-> 
-> ----------------------------------------------------------------
-> Renesas ARM Based SoC Soc Cleanups for v3.19
-> 
-> * Remove sh73a0_init_delay and r8a7778_init_delay wrappers
-> 
-> ----------------------------------------------------------------
-> Geert Uytterhoeven (2):
->       ARM: shmobile: r8a7778: Remove wrapper r8a7778_init_delay()
->       ARM: shmobile: sh73a0: Remove wrapper sh73a0_init_delay()
+>   ARM: rockchip: add a cpufreq-dt device (2014-10-20 11:57:56 +0200)
 
-Merged.
+Ack, I merged the previous version of this that was based on 3.17-rc
+last night.  Still, should work just fine to use that as a base for
+future branches if needed.
 
 
 -Olof
