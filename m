@@ -1,40 +1,35 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 4 Nov 2014 12:30:13 +0000
-Subject: [GIT PULL] ARM DT idle states updates
-Message-ID: <20141104123013.GA16832@red-moon>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Tue, 04 Nov 2014 13:37:19 +0100
+Subject: [PATCH 0/4] Touchscreen performance related fixes
+In-Reply-To: <5458BC0B.1040803@ti.com>
+References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
+ <544E821D.5040004@linutronix.de>
+ <912A29987EAE174BA6CF187D7CDFA9CE26F46B2B@DLEE08.ent.ti.com>
+ <54577258.9080508@linutronix.de> <5458BC0B.1040803@ti.com>
+Message-ID: <5458C87F.80409@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On 11/04/2014 12:44 PM, Vignesh R wrote:
 
-please consider pulling the three patches below for 3.19.
+> I ran following commands
+> $ evtest /dev/input/touchscreen0 &
+> (with heavy item on touchscreen)
+>  and
+> $ cat /sys/bus/iio/devices/iio\:device0/scan_elements/in_voltage4_en
+> (in a busy loop)
+> I tried above experiment on my board but I didn't hit any problem even
+> after running for close to 30 minutes. I was unable to reproduce failure
 
-First two are updates on idle states bindings and parsing code to add
-states descriptions and status property, the last one is just a clean-up
-patch, to remove leftovers from the last merge window.
+Just to make sure: You had the touchscreen and iio command running in
+parallel and you saw evtest output while there was iio operation?
 
-Thanks a lot,
-Lorenzo
+> The problem may be in configuring correct charge-delay value. Please run:
+> $ ts_test > /dev/null
+> and let me know if pen events are being detected properly.
 
-The following changes since commit 0df1f2487d2f0d04703f142813d53615d62a1da4:
+Well I get the touch events but not while busy loop on iio interface is
+running (I get maybe one event every 5 seconds or so).
+After all, it is the same HW you have.
 
-  Linux 3.18-rc3 (2014-11-02 15:01:51 -0800)
-
-are available in the git repository at:
-
-  git://linux-arm.org/linux-2.6-lp.git for-upstream/dt-idle-states-updates
-
-for you to fetch changes up to 6e13873494078ac26862144ca2345546ca905c41:
-
-  drivers: cpuidle: remove cpuidle-arm64 duplicate error messages (2014-11-04 12:09:27 +0000)
-
-----------------------------------------------------------------
-Lorenzo Pieralisi (3):
-      drivers: cpuidle: add status property to ARM idle states
-      drivers: cpuidle: add idle-state-name description to ARM idle states
-      drivers: cpuidle: remove cpuidle-arm64 duplicate error messages
-
- .../devicetree/bindings/arm/idle-states.txt          | 20 ++++++++++++++++++++
- drivers/cpuidle/cpuidle-arm64.c                      | 13 ++-----------
- drivers/cpuidle/dt_idle_states.c                     | 10 +++++++++-
- 3 files changed, 31 insertions(+), 12 deletions(-)
+Sebastian
