@@ -1,54 +1,25 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 4 Nov 2014 21:08:04 +0800
-Subject: [PATCH] ARM: dts: imx6qdl-sabresd.dtsi: Fix the microphone route
-In-Reply-To: <1415105769-5358-1-git-send-email-fabio.estevam@freescale.com>
-References: <1415105769-5358-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20141104130803.GM10821@tiger>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 04 Nov 2014 14:32:46 +0100
+Subject: [PATCH v3 0/9] PM / Domains: Fix race conditions during boot
+In-Reply-To: <CAMuHMdVjzRJUL4EL1VbbYdys35f9Jz67_QSPriYnccSOnm1tQw@mail.gmail.com>
+References: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
+ <2024276.CFr3nVUAlA@vostro.rjw.lan>
+ <CAMuHMdVjzRJUL4EL1VbbYdys35f9Jz67_QSPriYnccSOnm1tQw@mail.gmail.com>
+Message-ID: <2649035.CrrTcoPcg3@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 04, 2014 at 10:56:09AM -0200, Fabio Estevam wrote:
-> Since commit e409dfbfccf9a49 ("ASoC: dapm: Add a few supply widget sanity 
-> checks") the following error is seen:
+On Tuesday, November 04, 2014 09:20:44 AM Geert Uytterhoeven wrote:
+> On Tue, Nov 4, 2014 at 2:43 AM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > That is quite simple to address, though.  You can register a bus type
+> > notifier that will power up the domain on BUS_NOTIFY_ADD_DEVICE events
+> > (where the target device belongs to the domain), and do that only for
+> > CONFIG_PM_RUNTIME unset (otherwise runtime PM should take care of this).
 > 
-> imx-wm8962 sound: wm8962 <-> 202c000.ssi mapping ok
-> imx-wm8962 sound: Connecting non-supply widget to supply widget is not supported (AMIC -> MICBIAS)
-> imx-wm8962 sound: ASoC: no dapm match for AMIC --> (null) --> MICBIAS
-> imx-wm8962 sound: ASoC: Failed to add route AMIC -> direct -> MICBIAS
+> Registering a bus type notifier (that will be a platform bus notifier,
+> right?) will affect
+> all platform devices, not only the on-SoC devices.
 
-Any regression behind that error message?
+Yes it will, but the "is the device in this domain?" check is trivial to do.
 
-Shawn
-
-> 
-> Invert the route between the microphone and the bias in order to fix it.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Shawn,
-> 
-> commit e409dfbfccf9a49 is not in your tree. It is in Mark's tree at the moment.
-> 
-> If you prefer I can skip mentioning it in the commit log.
-> 
-> The 'AMIC -> MICBIAS' route is also used on mx6sx-sdb and mx6sl-evk boards.
-> 
->  arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> index d211d5d..d1319bd 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> @@ -107,7 +107,7 @@
->  			"Headphone Jack", "HPOUTR",
->  			"Ext Spk", "SPKOUTL",
->  			"Ext Spk", "SPKOUTR",
-> -			"MICBIAS", "AMIC",
-> +			"AMIC", "MICBIAS",
->  			"IN3R", "MICBIAS",
->  			"DMIC", "MICBIAS",
->  			"DMICDAT", "DMIC";
-> -- 
-> 1.9.1
-> 
+Rafael
