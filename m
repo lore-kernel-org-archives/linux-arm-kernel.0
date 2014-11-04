@@ -1,103 +1,74 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue,  4 Nov 2014 14:07:10 +0100
-Subject: [PATCH 3/3] ARM: dts: vf-colibri: add USB regulators
+Date: Tue,  4 Nov 2014 14:07:08 +0100
+Subject: [PATCH 1/3] ARM: dts: vf610: use new GPIO support
 In-Reply-To: <1415106430-6271-1-git-send-email-stefan@agner.ch>
 References: <1415106430-6271-1-git-send-email-stefan@agner.ch>
-Message-ID: <1415106430-6271-4-git-send-email-stefan@agner.ch>
+Message-ID: <1415106430-6271-2-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add structure of USB supply logic. Especially, the USB hosts power
-enable regulator is needed to control VBUS supply.
+Use GPIO support by adding SD card detection configuration and
+GPIO pinmux for Colibri's standard GPIO pins. Attach the GPIO
+pins to the iomuxc node to get the GPIO pin settings applied.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 45 ++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/vf-colibri.dtsi         | 12 +++++++++
- 2 files changed, 56 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/vf-colibri.dtsi | 9 +++++++++
+ arch/arm/boot/dts/vf610-twr.dts   | 1 +
+ arch/arm/boot/dts/vfxxx.dtsi      | 1 +
+ 3 files changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-index 80e8fbc..eb4ca50 100644
---- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-+++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-@@ -11,6 +11,41 @@
- 	chosen {
- 		bootargs = "console=ttyLP0,115200";
- 	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		sys_5v0_reg: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "5v0";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			regulator-always-on;
-+		};
-+
-+		usbc_vbus_reg: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "usbc_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			vin-supply = <&sys_5v0_reg>;
-+		};
-+
-+		/* USBH_PEN */
-+		usbh_vbus_reg: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			regulator-name = "usbh_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio3 19 GPIO_ACTIVE_LOW>;
-+			vin-supply = <&sys_5v0_reg>;
-+		};
-+	};
- };
- 
- &bl {
-@@ -51,4 +86,12 @@
- 
- &uart2 {
- 	status = "okay";
--};
-\ No newline at end of file
-+};
-+
-+&usbdev0 {
-+	vbus-supply = <&usbc_vbus_reg>;
-+};
-+
-+&usbh1 {
-+	vbus-supply = <&usbh_vbus_reg>;
-+};
 diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
-index 2371760..79ccfe2 100644
+index ab40367..ab9616d7 100644
 --- a/arch/arm/boot/dts/vf-colibri.dtsi
 +++ b/arch/arm/boot/dts/vf-colibri.dtsi
-@@ -163,5 +163,17 @@
- 				VF610_PAD_PTD3__UART2_CTS		0x21a1
- 			>;
- 		};
-+
-+		pinctrl_usbh1_ext: gpio_usb_vbus {
-+			fsl,pins = <
-+				VF610_PAD_PTD4__GPIO_83			0x22ed
-+			>;
-+		};
-+
-+		pinctrl_usbdev0_ext: gpio_usb_cdet {
-+			fsl,pins = <
-+				VF610_PAD_PTC29__GPIO_102		0x22ed
-+			>;
-+		};
- 	};
+@@ -31,6 +31,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_esdhc1>;
+ 	bus-width = <4>;
++	cd-gpios = <&gpio2 10 GPIO_ACTIVE_LOW>;
  };
+ 
+ &fec1 {
+@@ -76,6 +77,14 @@
+ 
+ &iomuxc {
+ 	vf610-colibri {
++		pinctrl_gpio_ext: gpio_ext {
++			fsl,pins = <
++				VF610_PAD_PTD10__GPIO_89	0x22ed /* EXT_IO_0 */
++				VF610_PAD_PTD9__GPIO_88		0x22ed /* EXT_IO_1 */
++				VF610_PAD_PTD26__GPIO_68	0x22ed /* EXT_IO_2 */
++			>;
++		};
++
+ 		pinctrl_esdhc1: esdhc1grp {
+ 			fsl,pins = <
+ 				VF610_PAD_PTA24__ESDHC1_CLK	0x31ef
+diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
+index ebc906b..793a376 100644
+--- a/arch/arm/boot/dts/vf610-twr.dts
++++ b/arch/arm/boot/dts/vf610-twr.dts
+@@ -123,6 +123,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_esdhc1>;
+ 	bus-width = <4>;
++	cd-gpios = <&gpio5 6 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+index 4e70833..505969a 100644
+--- a/arch/arm/boot/dts/vfxxx.dtsi
++++ b/arch/arm/boot/dts/vfxxx.dtsi
+@@ -10,6 +10,7 @@
+ #include "vf610-pinfunc.h"
+ #include <dt-bindings/clock/vf610-clock.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	aliases {
 -- 
 2.1.3
