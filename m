@@ -1,92 +1,51 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 4 Nov 2014 13:35:24 +0200
-Subject: [PATCH v7 3/8] arm64: introduce is_device_dma_coherent
-In-Reply-To: <alpine.DEB.2.02.1411031101400.22875@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
- <1414422568-19103-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1411031045340.22875@kaball.uk.xensource.com>
- <20141103105716.GC23162@arm.com>
- <alpine.DEB.2.02.1411031101400.22875@kaball.uk.xensource.com>
-Message-ID: <5458B9FC.3050309@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 4 Nov 2014 11:35:43 +0000
+Subject: [PATCH 05/10] arm64: Convert dts to use reserved-memory nodes
+In-Reply-To: <CAL_Jsq+V_tLkfwBKDQOOrkKtHWaRD5e1AHzbciwVYFYbpsAE=w@mail.gmail.com>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <411296ab915959b862923d827e730a1db2ff9b4e.1414099246.git.geoff@infradead.org>
+ <20141024105111.GD24265@leverpostej>
+ <CACxGe6szzOXHkK9ukpcSBZgeyy5AgX3+7PgQseBnB9XWYLj-PQ@mail.gmail.com>
+ <20141024122738.GH24265@leverpostej>
+ <1414799092.23621.48.camel@smoke>
+ <CAL_Jsq+V_tLkfwBKDQOOrkKtHWaRD5e1AHzbciwVYFYbpsAE=w@mail.gmail.com>
+Message-ID: <20141104113542.GC31371@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefano,
+On Mon, Nov 03, 2014 at 10:26:02PM +0000, Rob Herring wrote:
+> Adding Leif...
 
-On 11/03/2014 01:10 PM, Stefano Stabellini wrote:
-> On Mon, 3 Nov 2014, Will Deacon wrote:
->> On Mon, Nov 03, 2014 at 10:46:03AM +0000, Stefano Stabellini wrote:
->>> On Mon, 27 Oct 2014, Stefano Stabellini wrote:
->>>> Introduce a boolean flag and an accessor function to check whether a
->>>> device is dma_coherent. Set the flag from set_arch_dma_coherent_ops.
->>>>
->>>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->>>> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
->>>> CC: will.deacon at arm.com
->>>
->>> Will, Catalin,
->>> are you OK with this patch?
->>
->> It would be nicer if the dma_coherent flag didn't have to be duplicated by
->> each architecture in dev_archdata. Is there any reason not to put it in the
->> core code?
-> 
-> Yes, there is a reason for it: if I added a boolean dma_coherent flag in
-> struct device as Catalin initially suggested, what would be the default
-> for each architecture? Where would I set it for arch that don't use
-> device tree? It is not easy.
-> 
-> I thought it would be better to introduce is_device_dma_coherent only on
-> the architectures where it certainly makes sense to have it. In fact I
-> checked and arm and arm64 are the only architectures to define
-> set_arch_dma_coherent_ops at the moment. At that point if
-> is_device_dma_coherent becomes arch-specific, it makes sense to store
-> the flag in dev_archdata instead of struct device.
+[...]
 
-The proposition from Will looks reasonable for me too, because
-there is "small" side-effect of adding such kind of properties to
-arch-specific data or even to the core device structure. ;(
+> I'm just wondering does UEFI being used for the memory information
+> have any impact here as the DT would not have valid memory nodes
+> either?
 
-There are some sub-systems in kernel which do not create their devices
-from DT and instead some host device populates its children devices manually.
- Now, I know at least two cases:
-- usb: dwc3 core creates xhci device manually
-- pci: adds its client devices
+For UEFI, things should just work (TM). The dtb will be free of memory
+nodes (and memreserves), and the next kernel will discover the UEFI
+memory map via the linux,uefi-mmap-* properties as the first kernel did.
 
-In such, case DMA configuration have to be propagated from host to
-child (in our case host device's got DMA configuration from DT), like:
-	dma_set_coherent_mask(&xhci->dev, dwc->dev->coherent_dma_mask);
+We shouldn't need to pass any additional data in this case.
 
-	xhci->dev.parent	= dwc->dev;
-	xhci->dev.dma_mask	= dwc->dev->dma_mask;
-	xhci->dev.dma_parms	= dwc->dev->dma_parms;
+> I'd assume reserved memory comes from UEFI (or both) in that
+> case?
 
-So, once new DMA property is added it has to be propagated from 
-host to child device too.
+Yes. Any memory that should be reserved should be described as such in
+the UEFI memory map.
 
-Recently, the new property  dma_pfn_offset was introduced in struct device 
-and such kind of problem was observed on keystone 2:
-- for usb case it was fixed using Platform Bus notifier (xhci - platform device)
-- for pci - the work is in progress, because solution with PCI Bus notifier
-  was rejected https://lkml.org/lkml/2014/10/10/308.
+One caveat is that reserved-memory nodes are preserved (because they can
+be referred to by phandle for CMA and such). There are few potential
+problems with this (we'll have to reconcile it with the UEFI memory map,
+prevent overlap when the kernel is relocated, etc). The reserved-memory
+nodes should only be used for CMA type carve outs rather than for
+protecting firmware and similar.
 
-In general, if dma_coherent will belong to struct device then
-such problems will be possible to fix directly in drivers/subsystems:
-xhci->dev.dma_coherent	= dwc->dev->dma_coherent;
+> Perhaps we need to expose memory layout independent of DT, UEFI
+> or anything else.
 
-But, if it will be arch-specific data then it will be impossible to
-set it without introducing proper and arch-specific setters/getters functions.
+I can see that being useful for debugging, but I don't think that we
+require it.
 
-Also, as an idea, we are thinking about introducing something like:
-  void dma_apply_parent_cfg(struct device *dev, struct device *parent)
-which will ensure that all DMA configuration properly copied from
-parent to children device. Now it should be (as minimum for ARM):
- dma_mask
- coherent_dma_mask
- dma_parms
- dma_pfn_offset
- dev_archdata->dma_ops
- [dma_coherent]?
-
-regards,
--grygorii 
+Thanks,
+Mark.
