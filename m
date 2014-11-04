@@ -1,113 +1,62 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 4 Nov 2014 11:44:28 +0000
-Subject: [RFC PATCH 2/2] arm: pcibios: move to generic PCI domains
-In-Reply-To: <20141103232625.GA22642@verge.net.au>
-References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1414669490-1217-3-git-send-email-lorenzo.pieralisi@arm.com>
- <b095e031880c44f0b79c8c42bc8d7bd5@SIXPR06MB0639.apcprd06.prod.outlook.com>
- <CAErSpo7R5V1MeDSg+9-+CqVbk_vDn6pRsNwFQS9L97Fkw=7nDA@mail.gmail.com>
- <08260858dd004e4881e7fbd4b23ea795@SIXPR06MB0639.apcprd06.prod.outlook.com>
- <20141103232625.GA22642@verge.net.au>
-Message-ID: <20141104114428.GA11102@e106497-lin.cambridge.arm.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Tue, 4 Nov 2014 17:14:11 +0530
+Subject: [PATCH 0/4] Touchscreen performance related fixes
+In-Reply-To: <54577258.9080508@linutronix.de>
+References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
+ <544E821D.5040004@linutronix.de>
+ <912A29987EAE174BA6CF187D7CDFA9CE26F46B2B@DLEE08.ent.ti.com>
+ <54577258.9080508@linutronix.de>
+Message-ID: <5458BC0B.1040803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 03, 2014 at 11:26:25PM +0000, Simon Horman wrote:
-> On Fri, Oct 31, 2014 at 05:04:49PM +0000, Phil Edworthy wrote:
-> > Hi Bjorn,
-> > 
-> > On 31 October 2014 16:37, Bjorn wrote:
-> > > On Fri, Oct 31, 2014 at 7:43 AM, Phil Edworthy
-> > > <phil.edworthy@renesas.com> wrote:
-> > > > Hi Lorenzo,
-> > > >
-> > > > On 30 October 2014 11:45, Lorenzo wrote:
-> > > >> Most if not all ARM PCI host controller device drivers either ignore the
-> > > >> domain field in the pci_sys_data structure or just increment it every
-> > > >> time a host controller is probed, using it as a domain counter.
-> > > >>
-> > > >> Therefore, instead of relying on pci_sys_data to stash the domain number
-> > > >> in a standard location, ARM pcibios code can be moved to the newly
-> > > >> introduced generic PCI domains code, implemented in commits:
-> > > >>
-> > > >> commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
-> > > >> ("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
-> > > >>
-> > > >> commit 670ba0c8883b576d0aec28bd7a838358a4be1
-> > > >> ("PCI: Add generic domain handling")
-> > > >>
-> > > >> In order to assign a domain number dynamically, the ARM pcibios defines
-> > > >> the function, called by core PCI code:
-> > > >>
-> > > >> void pci_bus_assign_domain_nr(...)
-> > > >>
-> > > >> that relies on a DT property to define the domain number or falls back to
-> > > >> a counter; its usage replaces the current domain assignment code in PCI
-> > > >> host controllers present in the kernel.
-> > > >>
-> > > >> Cc: Arnd Bergmann <arnd@arndb.de>
-> > > >> Cc: Phil Edworthy <phil.edworthy@renesas.com>
-> > > >> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> > > >> Cc: Jingoo Han <jg1.han@samsung.com>
-> > > >> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > > >> Cc: Russell King <linux@arm.linux.org.uk>
-> > > >> Cc: Mohit Kumar <mohit.kumar@st.com>
-> > > >> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > >
-> > > > This patch fixes a current problem with R-Car devices where there is an
-> > > > internal PCI bridge and an external PCIe bridge on the devices. Both drivers
-> > > > work independently but need to be on different domains. Just needed to
-> > > enable
-> > > > PCI_DOMAINS along with this.
-> > > > I've done basic testing that the internal PCI and external PCIe work at the
-> > > > same time.
-> > > 
-> > > Hi Phil,
-> > > 
-> > > Thanks for testing this.  Can you give me some more guidance on where
-> > > you'd like to see this merged?  Until your comment about this fixing a
-> > > current problem on R-Car, I probably would have considered this to be
-> > > a cleanup and enhancement and hence material for v3.19.  But if R-Car
-> > > is actually broken and this fixes it, maybe this should go in for
-> > > v3.18 instead.
-> > I don?t think its urgent as most of our customers use LTSI kernels, e.g. v3.10.
-> > Renesas typically provide out-of-tree BSPs with upstream code back ported, along
-> > with other patches. Simon Horman (Renesas maintainer, cc'd) generally handles
-> > the back ports, so I'll defer to his opinion.
-> 
-> Hi Phil,
-> 
-> from my point of view it would be best if this went into -stable if it is a
-> fix. However, as you point out, from a customer point of view it shouldn't
-> be a big deal as they should get backports via our LTSI kernel regardless of
-> if the patch goes through stable or not.
 
-Unfortunately this patch depends on a series that only got in in v3.18-rc1, so
-I don't think -stable is a workable target.
 
-Best regards,
-Liviu
+On Monday 03 November 2014 05:47 PM, Sebastian Andrzej Siewior wrote:
+> On 10/27/2014 08:02 PM, Griffis, Brad wrote:
+>> On 10/27/2014 12:34 PM, Sebastian Andrzej Siewior wrote:
+>>> Do we really need #3 (and then #4)? Given the complexity we have already, is there any benefit by decreasing this value? 
+>>
+>> I specifically requested we add ti,charge-delay to the device tree because it is THE critical value to tune for a given design.  Although I think the current value of 0xB000 will be suitable for a great many designs, I expect that many users will need to adjust this value for their hardware.  Details such as which touchscreen vendor is being used and how the touchscreen is connected (header vs cable) have an effect on what's appropriate here.
+> 
+> Oh. That is one knob I hoped we could avoid since I haven't seen it
+> before on other TSCs. But okay. Please make sure that there is a
+> message printed if the default value is used. And lets hope the user
+> will do something about his.
+> 
+>>> Would  someone want to increase it? Can we safely determine a value which works for everyone?
+>>
+>> This value represents a hardware delay before checking for the pen-up event.  So in the scenario where someone is seeing excessive false pen-up events they will want to increase this parameter.  The downsize of making this larger is that it decreases the overall sampling speed of both the touchscreen as well as the standalone ADC samples.  At one point I tried making it huge, but that made the touchscreen overly sluggish because the sampling became too slow.  So there is a definite trade-off that if you make it too large the touchscreen becomes sluggish, and if you make it too small then you may see false pen-up events.  The optimal value will need to be tuned for a given design.
+> 
+> I applied the patches from this series and did the following test on my
+> am335x-evm: A mug on the touchscreen (to make sure the events are
+> coming), evtest on the event node to see that the events and loop of
+> 
+> 	cat /sys/bus/iio/devices/iio\:device0/in_voltage4_raw
+> 
+> In the past I was able lock up the TSC/ADC HW that way (see commit
+> 7ca6740cd1 ("mfd: input: iio: ti_amm335x: Rework TSC/ADC
+> synchronization")) for details.
+> With this patches applied I don't seen any TSC events once the IIO
+> interface is (heavily) used. Can this be fixed?
+
+I ran following commands
+$ evtest /dev/input/touchscreen0 &
+(with heavy item on touchscreen)
+ and
+$ cat /sys/bus/iio/devices/iio\:device0/scan_elements/in_voltage4_en
+(in a busy loop)
+I tried above experiment on my board but I didn't hit any problem even
+after running for close to 30 minutes. I was unable to reproduce failure
+
+The problem may be in configuring correct charge-delay value. Please run:
+$ ts_test > /dev/null
+and let me know if pen events are being detected properly.
 
 > 
-> > > If it is currently broken, is there a point where it broke?  I assume
-> > > it used to work at one time.  If there's a commit that broke it, it
-> > > would be nice to reference that in the changelog and explain exactly
-> > > what was broken and how this fixes it.
-> > Both the internal PCI and external PCIe drivers work on their own, but have
-> > never worked at the same time. I think it was just unfortunate timing when I
-> > added the PCIe driver. At that time, the internal PCI driver didn?t have the
-> > relevant DT nodes for the board I was using so I didn't see any conflicts.
-> > 
-> > Thanks
-> > Phil
+> Sebastian
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
