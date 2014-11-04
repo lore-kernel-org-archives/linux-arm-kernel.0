@@ -1,54 +1,46 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  4 Nov 2014 10:50:59 +0900
-Subject: [PATCH 29/34] ARM: shmobile: r8a7778: Add SoC-specific TMU compatible
- property
+Date: Tue,  4 Nov 2014 10:50:56 +0900
+Subject: [PATCH 26/34] ARM: shmobile: koelsch: enable HS-USB
 In-Reply-To: <cover.1415059587.git.horms+renesas@verge.net.au>
 References: <cover.1415059587.git.horms+renesas@verge.net.au>
-Message-ID: <45b439c1aae45d344c55864f81d52ef90ce4d8f8.1415059587.git.horms+renesas@verge.net.au>
+Message-ID: <fc4a00b78c7f8a770b9608164c0c9cdd0e4e68c2.1415059587.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-The TMU timers used the generic compatible property only.
-Add the SoC-specific one, to make it future proof.
+Enable HS-USB device for the Koelsch board, defining the GPIO that the driver
+should check when probing (which is the ID output from MAX3355 OTG chip).
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Note that there will be pinctrl-related error messages if both internal PCI
+and HS-USB drivers are enabled but they should be just ignored.
+
+Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+[Sergei: added pin function/group and prop, moved device node, fixed summary,
+added changelog]
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7778.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
-index 1e80e4c..96297f6 100644
---- a/arch/arm/boot/dts/r8a7778.dtsi
-+++ b/arch/arm/boot/dts/r8a7778.dtsi
-@@ -163,7 +163,7 @@
- 	};
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index 0402c49..191f32b 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -474,6 +474,13 @@
+ 	pinctrl-names = "default";
+ };
  
- 	tmu0: timer at ffd80000 {
--		compatible = "renesas,tmu";
-+		compatible = "renesas,tmu-r8a7778", "renesas,tmu";
- 		reg = <0xffd80000 0x30>;
- 		interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 33 IRQ_TYPE_LEVEL_HIGH>,
-@@ -175,7 +175,7 @@
- 	};
- 
- 	tmu1: timer at ffd81000 {
--		compatible = "renesas,tmu";
-+		compatible = "renesas,tmu-r8a7778", "renesas,tmu";
- 		reg = <0xffd81000 0x30>;
- 		interrupts = <0 36 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 37 IRQ_TYPE_LEVEL_HIGH>,
-@@ -187,7 +187,7 @@
- 	};
- 
- 	tmu2: timer at ffd82000 {
--		compatible = "renesas,tmu";
-+		compatible = "renesas,tmu-r8a7778", "renesas,tmu";
- 		reg = <0xffd82000 0x30>;
- 		interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 41 IRQ_TYPE_LEVEL_HIGH>,
++&hsusb {
++	status = "okay";
++	pinctrl-0 = <&usb0_pins>;
++	pinctrl-names = "default";
++	renesas,enable-gpio = <&gpio5 31 GPIO_ACTIVE_HIGH>;
++};
++
+ &usbphy {
+ 	status = "okay";
+ };
 -- 
 2.1.1
