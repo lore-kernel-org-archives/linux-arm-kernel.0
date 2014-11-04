@@ -1,84 +1,62 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  4 Nov 2014 10:50:39 +0900
-Subject: [PATCH 09/34] ARM: shmobile: r8a7790: switch from scif to scifa
+Date: Tue,  4 Nov 2014 10:50:41 +0900
+Subject: [PATCH 11/34] ARM: shmobile: r8a7790: Add RGX clock to device tree
 In-Reply-To: <cover.1415059587.git.horms+renesas@verge.net.au>
 References: <cover.1415059587.git.horms+renesas@verge.net.au>
-Message-ID: <7c05589413fa9902f2843e91845d6084f6f8e2cd.1415059587.git.horms+renesas@verge.net.au>
+Message-ID: <2284ff5f3f7d58e33812f4387c2ac8a09428e4cf.1415059587.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+From: Kouei Abe <kouei.abe.cp@renesas.com>
 
-SCIF and SCIFA can be plexed onto the same wires on Lager board. The
-datasheet also describes the wires as SCIFA. So, to make use of the
-bigger FIFOs switch to SCIFA instead.
-
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Signed-off-by: Kouei Abe <kouei.abe.cp@renesas.com>
+Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/r8a7790.dtsi            | 9 +++++----
+ include/dt-bindings/clock/r8a7790-clock.h | 1 +
+ 2 files changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index cd530de..e96f952 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -19,8 +19,8 @@
- 	compatible = "renesas,lager", "renesas,r8a7790";
- 
- 	aliases {
--		serial6 = &scif0;
--		serial7 = &scif1;
-+		serial6 = &scifa0;
-+		serial7 = &scifa1;
- 	};
- 
- 	chosen {
-@@ -207,9 +207,9 @@
- 		renesas,function = "du";
- 	};
- 
--	scif0_pins: serial0 {
--		renesas,groups = "scif0_data";
--		renesas,function = "scif0";
-+	scifa0_pins: serial0 {
-+		renesas,groups = "scifa0_data";
-+		renesas,function = "scifa0";
- 	};
- 
- 	ether_pins: ether {
-@@ -222,9 +222,9 @@
- 		renesas,function = "intc";
- 	};
- 
--	scif1_pins: serial1 {
--		renesas,groups = "scif1_data";
--		renesas,function = "scif1";
-+	scifa1_pins: serial1 {
-+		renesas,groups = "scifa1_data";
-+		renesas,function = "scifa1";
- 	};
- 
- 	sdhi0_pins: sd0 {
-@@ -356,15 +356,15 @@
- 	};
- };
- 
--&scif0 {
--	pinctrl-0 = <&scif0_pins>;
-+&scifa0 {
-+	pinctrl-0 = <&scifa0_pins>;
- 	pinctrl-names = "default";
- 
- 	status = "okay";
- };
- 
--&scif1 {
--	pinctrl-0 = <&scif1_pins>;
-+&scifa1 {
-+	pinctrl-0 = <&scifa1_pins>;
- 	pinctrl-names = "default";
- 
- 	status = "okay";
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 7b42b25..602a46a 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -977,18 +977,19 @@
+ 		mstp1_clks: mstp1_clks at e6150134 {
+ 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe6150134 0 4>, <0 0xe6150038 0 4>;
+-			clocks = <&m2_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&rclk_clk>,
++			clocks = <&m2_clk>, <&p_clk>, <&zg_clk>, <&p_clk>, <&p_clk>, <&rclk_clk>,
+ 				 <&cp_clk>, <&zs_clk>, <&zs_clk>, <&zs_clk>,
+ 				 <&zs_clk>;
+ 			#clock-cells = <1>;
+ 			renesas,clock-indices = <
+-				R8A7790_CLK_JPU R8A7790_CLK_TMU1 R8A7790_CLK_TMU3 R8A7790_CLK_TMU2
++				R8A7790_CLK_JPU R8A7790_CLK_TMU1 R8A7790_CLK_3DG
++				R8A7790_CLK_TMU3 R8A7790_CLK_TMU2
+ 				R8A7790_CLK_CMT0 R8A7790_CLK_TMU0 R8A7790_CLK_VSP1_DU1
+ 				R8A7790_CLK_VSP1_DU0 R8A7790_CLK_VSP1_R R8A7790_CLK_VSP1_S
+ 			>;
+ 			clock-output-names =
+-				"jpu", "tmu1", "tmu3", "tmu2", "cmt0", "tmu0", "vsp1-du1",
+-				"vsp1-du0", "vsp1-rt", "vsp1-sy";
++				"jpu", "tmu1", "3dg", "tmu3", "tmu2", "cmt0", "tmu0",
++				"vsp1-du1", "vsp1-du0", "vsp1-rt", "vsp1-sy";
+ 		};
+ 		mstp2_clks: mstp2_clks at e6150138 {
+ 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
+diff --git a/include/dt-bindings/clock/r8a7790-clock.h b/include/dt-bindings/clock/r8a7790-clock.h
+index 8ea7ab0..14a3f12 100644
+--- a/include/dt-bindings/clock/r8a7790-clock.h
++++ b/include/dt-bindings/clock/r8a7790-clock.h
+@@ -28,6 +28,7 @@
+ /* MSTP1 */
+ #define R8A7790_CLK_JPU		6
+ #define R8A7790_CLK_TMU1		11
++#define R8A7790_CLK_3DG			12
+ #define R8A7790_CLK_TMU3		21
+ #define R8A7790_CLK_TMU2		22
+ #define R8A7790_CLK_CMT0		24
 -- 
 2.1.1
