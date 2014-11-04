@@ -1,34 +1,27 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Tue, 4 Nov 2014 16:49:17 +0100
-Subject: [GIT PULL] dts, kbuild: Implement support for dtb vendor subdirs
-In-Reply-To: <20141104044717.GA13562@quad.lixom.net>
-References: <1409899692-1455-1-git-send-email-rric@kernel.org>
- <20141021181504.GV20170@rric.localhost>
- <20141104044717.GA13562@quad.lixom.net>
-Message-ID: <20141104154917.GP31556@rric.localhost>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 4 Nov 2014 07:49:02 -0800
+Subject: [PATCH 06/10] ARM: OMAP2+: Show bootloader GPMC timings to allow
+ configuring the .dts file
+In-Reply-To: <5458D731.1010208@ti.com>
+References: <1414628948-30702-1-git-send-email-tony@atomide.com>
+ <1414628948-30702-7-git-send-email-tony@atomide.com>
+ <545248FA.7040201@ti.com> <20141030144529.GG2542@atomide.com>
+ <54525362.9080000@ti.com> <20141030163031.GG2560@atomide.com>
+ <5458D731.1010208@ti.com>
+Message-ID: <20141104154902.GQ31454@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.11.14 20:47:17, Olof Johansson wrote:
-> > > Robert Richter (6):
-> > >   dts, arm64: Add dtbs_install make target
-> > >   dts, kbuild: Factor out dtbs install rules to Makefile.dtbinst
-> > >   dts, arm/arm64: Remove dtbs build rules in sub-makes
-> > >   dts, kbuild: Implement support for dtb vendor subdirs
-> > >   dts, arm64: Move dts files to vendor subdirs
-> > >   dts, arm: Remove $(MACHINE) variable from dtbs make recipes
-> > 
-> > please pull this series for inclusion into v3.19 from:
-> > 
-> >  git://git.kernel.org/pub/scm/linux/kernel/git/rric/linux.git dts-subdirs-for-arm-soc-v3.19
-> > 
-> > I have updated and rebased the patches to v3.18-rc1. No changes except
-> > conflict resolution of patch 5/6.
+* Roger Quadros <rogerq@ti.com> [141104 05:41]:
 > 
-> Pulled, and I added the description from 0/6 as the merge text -- feel free to
-> add it to the tag if you do something like this in the future.
+> I don't have any board with smsc or working NOR so I called
+> gpmc_cs_show_timings() after NAND was setup.
+> 
+> The printed values match closely to the configured values in the DTS.
 
-Thanks for pulling and the hint on the tag description (I was
-wondering what to put in there).
+OK thanks for checking. I've checked with smsc91x, smsc911x and
+8250 so far so I think we're good to go.
 
--Robert
+Regards,
+
+Tony
