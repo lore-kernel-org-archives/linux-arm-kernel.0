@@ -1,53 +1,61 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 04 Nov 2014 18:05:17 +0000
-Subject: [PATCH v3 15/19] arm/arm64: KVM: add opaque private pointer to
- MMIO accessors
-In-Reply-To: <54590BDA.3050609@arm.com>
-References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
- <1414776414-13426-16-git-send-email-andre.przywara@arm.com>
- <20141104154414.GN16132@cbox> <54590BDA.3050609@arm.com>
-Message-ID: <5459155D.3070203@arm.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 4 Nov 2014 10:08:38 -0800
+Subject: [PATCH v5] clk: rockchip: disable unused clocks
+In-Reply-To: <1415092270-24932-1-git-send-email-kever.yang@rock-chips.com>
+References: <1415092270-24932-1-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <CAD=FV=WAby=EdvpvqARG0c+1_jZOCWM_NAo2eEOR3+JvLC8d=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/14 17:24, Andre Przywara wrote:
-> Hi,
-> 
-> On 04/11/14 15:44, Christoffer Dall wrote:
->> On Fri, Oct 31, 2014 at 05:26:50PM +0000, Andre Przywara wrote:
->>> For a GICv2 there is always only one (v)CPU involved: the one that
->>> does the access. On a GICv3 the access to a CPU redistributor is
->>> memory-mapped, but not banked, so the (v)CPU affected is determined by
->>> looking at the MMIO address region being accessed.
->>> To allow passing the affected CPU into the accessors, extend them to
->>> take an opaque private pointer parameter.
->>> For the current GICv2 emulation we ignore it and simply pass NULL
->>> on the call.
->>>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>
->> Why does it have to be an opaque private pointer?  Would it not always
->> be a struct vcpu * or a vcpu_id then?
-> 
-> IIRC Marc suggested this once be more future proof. Also a pointer makes
-> it easier to pass NULL in the GICv2 parts of the code, which makes it
-> more obvious that this value is not used in this case.
-> 
-> Marc, did I miss some more rationale?
-> Does that still hold?
+Kever,
 
-The main idea was to have a general purpose pointer that you can
-associate with the decoded region. Some form of private context, just
-like we have for a lot of other kernel structures.
+On Tue, Nov 4, 2014 at 1:11 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
+> The rockchip clock driver use CLK_IGNORE_UNUSED flag to make sure
+> all the clocks are available like default power on state.
+> We have implement the clock manage in most of rockchip drivers,
+> it is time to remove it for power save.
+> Instead we add CLK_IGNORE_UNUSED for some clock nodes which should
+> be on during boot or no module driver in kernel will initialize it.
+>
+> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
+> Tested-by: Doug Anderson <dianders@chromium.org>
+> ---
+>
+> Changes in v5:
+> - take CLK_IGNORE_UNUSED tag out of EMMC and UART2
+> - take CLK_IGNORE_UNUSED tag out of pclk_publ*, pclk_ddrupctl*
+> - add Doug's Reviewed-by and Tested-by
 
-Now, I think having that as a explicit pointer looks truly awful. Can't
-that be folded into struct kvm_exit_mmio that is already passed around?
-It would make some sense that the private context is associated with the
-actual access... I haven't seen how that interacts with the GICv3 code
-though.
+You also took CLK_IGNORE_UNUSED out of dclk_vop0.  I don't have a
+problem with that since my test cases still work and I'm all for
+removing as many of these as we can.
 
-Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Changes in v4:
+> - add CLK_IGNORE_UNUSED tag for all the niu/arbi/matrix clock
+>
+> Changes in v3:
+> - get CLK_DIVIDER_READ_ONLY tag back fro armcores
+> - add CLK_IGNORE_UNUSED tag for cs_dbg, pclk_dgb_pre and pclk_rkpwm
+>
+> Changes in v2:
+> - get some clock ID back
+> - add CLK_IGNORE_UNUSED tag for aclk_strc and aclk_core in clk-rk3188.c
+> - add CLK_IGNORE_UNUSED tag for rk3288 dwc2
+>
+>  drivers/clk/rockchip/clk-rk3188.c |  40 ++++++------
+>  drivers/clk/rockchip/clk-rk3288.c | 132 +++++++++++++++++++-------------------
+>  drivers/clk/rockchip/clk.c        |   9 ---
+>  3 files changed, 86 insertions(+), 95 deletions(-)
+
+For whatever reason this patch didn't apply super cleanly.  Maybe you
+have other local patches to these files that you didn't send up?  It's
+nice to post a patch directly atop some upstream tree.  I get:
+
+fatal: sha1 information is lacking or useless
+(drivers/clk/rockchip/clk-rk3288.c).
+Repository lacks necessary blobs to fall back on 3-way merge.
+Cannot fall back to three-way merge.
+
+...but "patch -p1 < x" had no trouble applying for me...
