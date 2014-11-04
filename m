@@ -1,28 +1,34 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 4 Nov 2014 16:44:14 +0100
-Subject: [PATCH v3 15/19] arm/arm64: KVM: add opaque private pointer to
- MMIO accessors
-In-Reply-To: <1414776414-13426-16-git-send-email-andre.przywara@arm.com>
-References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
- <1414776414-13426-16-git-send-email-andre.przywara@arm.com>
-Message-ID: <20141104154414.GN16132@cbox>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Tue, 4 Nov 2014 16:49:17 +0100
+Subject: [GIT PULL] dts, kbuild: Implement support for dtb vendor subdirs
+In-Reply-To: <20141104044717.GA13562@quad.lixom.net>
+References: <1409899692-1455-1-git-send-email-rric@kernel.org>
+ <20141021181504.GV20170@rric.localhost>
+ <20141104044717.GA13562@quad.lixom.net>
+Message-ID: <20141104154917.GP31556@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 05:26:50PM +0000, Andre Przywara wrote:
-> For a GICv2 there is always only one (v)CPU involved: the one that
-> does the access. On a GICv3 the access to a CPU redistributor is
-> memory-mapped, but not banked, so the (v)CPU affected is determined by
-> looking at the MMIO address region being accessed.
-> To allow passing the affected CPU into the accessors, extend them to
-> take an opaque private pointer parameter.
-> For the current GICv2 emulation we ignore it and simply pass NULL
-> on the call.
+On 03.11.14 20:47:17, Olof Johansson wrote:
+> > > Robert Richter (6):
+> > >   dts, arm64: Add dtbs_install make target
+> > >   dts, kbuild: Factor out dtbs install rules to Makefile.dtbinst
+> > >   dts, arm/arm64: Remove dtbs build rules in sub-makes
+> > >   dts, kbuild: Implement support for dtb vendor subdirs
+> > >   dts, arm64: Move dts files to vendor subdirs
+> > >   dts, arm: Remove $(MACHINE) variable from dtbs make recipes
+> > 
+> > please pull this series for inclusion into v3.19 from:
+> > 
+> >  git://git.kernel.org/pub/scm/linux/kernel/git/rric/linux.git dts-subdirs-for-arm-soc-v3.19
+> > 
+> > I have updated and rebased the patches to v3.18-rc1. No changes except
+> > conflict resolution of patch 5/6.
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Pulled, and I added the description from 0/6 as the merge text -- feel free to
+> add it to the tag if you do something like this in the future.
 
-Why does it have to be an opaque private pointer?  Would it not always
-be a struct vcpu * or a vcpu_id then?
+Thanks for pulling and the hint on the tag description (I was
+wondering what to put in there).
 
-Thanks,
--Christoffer
+-Robert
