@@ -1,118 +1,88 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Tue,  4 Nov 2014 11:51:20 +0100
-Subject: [PATCH v5 4/8] ARM: DT: STi: STiH407: Add DT node for MiPHY28lp
+Date: Tue,  4 Nov 2014 11:51:23 +0100
+Subject: [PATCH v5 7/8] phy: miphy28lp: Tune tx impedance across Soc cuts
 In-Reply-To: <1415098284-11182-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1415098284-11182-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1415098284-11182-5-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1415098284-11182-8-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MiPHY28lp is a Generic PHY which can serve various SATA, PCIe or
-USB3 devices. The two first ports can be use for either; both SATA, both
-PCIe or one of each in any configuration.
-The Third port is only for USB3.
+This patch to compensate tx impedance (Sata, PCIe)
+depending on Soc cuts the kernel is built for.
 
+Signed-off-by: Giuseppe Condorelli <giuseppe.condorelli@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 ---
- arch/arm/boot/dts/stih407-b2120.dts | 11 +++++++
- arch/arm/boot/dts/stih407.dtsi      | 65 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 76 insertions(+)
+ Documentation/devicetree/bindings/phy/phy-miphy28lp.txt |  1 +
+ drivers/phy/phy-miphy28lp.c                             | 16 ++++++++++++++++
+ 2 files changed, 17 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih407-b2120.dts b/arch/arm/boot/dts/stih407-b2120.dts
-index fe69f92..d0837fb 100644
---- a/arch/arm/boot/dts/stih407-b2120.dts
-+++ b/arch/arm/boot/dts/stih407-b2120.dts
-@@ -74,5 +74,16 @@
- 			st,i2c-min-scl-pulse-width-us = <0>;
- 			st,i2c-min-sda-pulse-width-us = <5>;
- 		};
-+
-+		miphy28lp_phy: miphy28lp at 9b22000 {
-+
-+			phy_port0: port at 9b22000 {
-+				st,osc-rdy;
-+			};
-+
-+			phy_port1: port at 9b2a000 {
-+				st,osc-force-ext;
-+			};
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
-index 4f9024f..b8cc9a3 100644
---- a/arch/arm/boot/dts/stih407.dtsi
-+++ b/arch/arm/boot/dts/stih407.dtsi
-@@ -259,5 +259,70 @@
+diff --git a/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt b/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
+index 4a3b4af..46a135d 100644
+--- a/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
++++ b/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
+@@ -40,6 +40,7 @@ Optional properties (port (child) node):
+ - st,px_rx_pol_inv	: to invert polarity of RXn/RXp (respectively negative line and positive
+ 			  line).
+ - st,scc-on		: enable ssc to reduce effects of EMI (only for sata or PCIe).
++- st,tx-impedance-comp	: to compensate tx impedance avoiding out of range values.
  
- 			status = "disabled";
- 		};
+ example:
+ 
+diff --git a/drivers/phy/phy-miphy28lp.c b/drivers/phy/phy-miphy28lp.c
+index d8ff895..87dcc9a 100644
+--- a/drivers/phy/phy-miphy28lp.c
++++ b/drivers/phy/phy-miphy28lp.c
+@@ -204,6 +204,7 @@ struct miphy28lp_phy {
+ 	bool osc_rdy;
+ 	bool px_rx_pol_inv;
+ 	bool ssc;
++	bool tx_impedance;
+ 
+ 	struct reset_control *miphy_rst;
+ 
+@@ -632,6 +633,12 @@ static void miphy_pcie_tune_ssc(struct miphy28lp_phy *miphy_phy)
+ 	}
+ }
+ 
++static inline void miphy_tune_tx_impedance(struct miphy28lp_phy *miphy_phy)
++{
++	/* Compensate Tx impedance to avoid out of range values */
++	writeb_relaxed(0x02, miphy_phy->base + MIPHY_COMP_POSTP);
++}
 +
-+		miphy28lp_phy: miphy28lp at 9b22000 {
-+			compatible = "st,miphy28lp-phy";
-+			st,syscfg = <&syscfg_core>;
-+			#address-cells	= <1>;
-+			#size-cells	= <1>;
-+			ranges;
+ static inline int miphy28lp_configure_sata(struct miphy28lp_phy *miphy_phy)
+ {
+ 	void __iomem *base = miphy_phy->base;
+@@ -670,6 +677,9 @@ static inline int miphy28lp_configure_sata(struct miphy28lp_phy *miphy_phy)
+ 	if (miphy_phy->ssc)
+ 		miphy_sata_tune_ssc(miphy_phy);
+ 
++	if (miphy_phy->tx_impedance)
++		miphy_tune_tx_impedance(miphy_phy);
 +
-+			phy_port0: port at 9b22000 {
-+				reg = <0x9b22000 0xff>,
-+				      <0x9b09000 0xff>,
-+				      <0x9b04000 0xff>,
-+				      <0x114 0x4>, /* sysctrl MiPHY cntrl */
-+				      <0x818 0x4>, /* sysctrl MiPHY status*/
-+				      <0xe0  0x4>, /* sysctrl PCIe */
-+				      <0xec  0x4>; /* sysctrl SATA */
-+				reg-names = "sata-up",
-+					    "pcie-up",
-+					    "pipew",
-+					    "miphy-ctrl-glue",
-+					    "miphy-status-glue",
-+					    "pcie-glue",
-+					    "sata-glue";
-+				#phy-cells = <1>;
+ 	return 0;
+ }
+ 
+@@ -703,6 +713,9 @@ static inline int miphy28lp_configure_pcie(struct miphy28lp_phy *miphy_phy)
+ 	if (miphy_phy->ssc)
+ 		miphy_pcie_tune_ssc(miphy_phy);
+ 
++	if (miphy_phy->tx_impedance)
++		miphy_tune_tx_impedance(miphy_phy);
 +
-+				reset-names = "miphy-sw-rst";
-+				resets = <&softreset STIH407_MIPHY0_SOFTRESET>;
-+			};
+ 	return 0;
+ }
+ 
+@@ -1154,6 +1167,9 @@ static int miphy28lp_of_probe(struct device_node *np,
+ 
+ 	miphy_phy->ssc = of_property_read_bool(np, "st,ssc-on");
+ 
++	miphy_phy->tx_impedance =
++		of_property_read_bool(np, "st,tx-impedance-comp");
 +
-+			phy_port1: port at 9b2a000 {
-+				reg = <0x9b2a000 0xff>,
-+				      <0x9b19000 0xff>,
-+				      <0x9b14000 0xff>,
-+				      <0x118 0x4>,
-+				      <0x81c 0x4>,
-+				      <0xe4  0x4>,
-+				      <0xf0  0x4>;
-+				reg-names = "sata-up",
-+					    "pcie-up",
-+					    "pipew",
-+					    "miphy-ctrl-glue",
-+					    "miphy-status-glue",
-+					    "pcie-glue",
-+					    "sata-glue";
-+				#phy-cells = <1>;
-+
-+				reset-names = "miphy-sw-rst";
-+				resets = <&softreset STIH407_MIPHY1_SOFTRESET>;
-+			};
-+
-+			phy_port2: port at 8f95000 {
-+				reg = <0x8f95000 0xff>,
-+				      <0x8f90000 0xff>,
-+				      <0x11c 0x4>,
-+				      <0x820 0x4>;
-+				reg-names = "pipew",
-+				    "usb3-up",
-+				    "miphy-ctrl-glue",
-+				    "miphy-status-glue";
-+				#phy-cells = <1>;
-+
-+				reset-names = "miphy-sw-rst";
-+				resets = <&softreset STIH407_MIPHY2_SOFTRESET>;
-+			};
-+		};
- 	};
- };
+ 	of_property_read_u32(np, "st,sata-gen", &miphy_phy->sata_gen);
+ 	if (!miphy_phy->sata_gen)
+ 		miphy_phy->sata_gen = SATA_GEN1;
 -- 
 1.9.1
