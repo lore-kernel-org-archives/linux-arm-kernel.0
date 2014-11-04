@@ -1,38 +1,33 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 04 Nov 2014 16:01:40 +0100
-Subject: [PATCH RESEND v2 7/8] power: bq2415x_charger: Use power_supply_*() API
- for accessing function attrs
-In-Reply-To: <1415113301-25661-1-git-send-email-k.kozlowski@samsung.com>
-References: <1415113301-25661-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1415113301-25661-8-git-send-email-k.kozlowski@samsung.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 4 Nov 2014 09:02:26 -0600
+Subject: public trm am572x (was Re: Re: [PATCH v2 1/2] ARM: DRA7: Add support
+ for soc_is_dra74x() and soc_is_dra72x() variants)
+In-Reply-To: <5409FD75.3090407@ti.com>
+References: <1406523237-6905-1-git-send-email-lokeshvutla@ti.com>
+ <1406523237-6905-2-git-send-email-lokeshvutla@ti.com>
+ <alpine.DEB.2.02.1407280529320.24161@utopia.booyaka.com>
+ <53D5E0F4.3080607@ti.com>
+ <CAGo_u6pZiyJ8574YUXvg_Pz_P=LDeot-kFh7NQJBUqgwsR+Fmw@mail.gmail.com>
+ <alpine.DEB.2.02.1408280618480.21985@utopia.booyaka.com>
+ <CAGo_u6qLJdrHw-FosDvhdvMQxQntf=ujZdRW+MrCdqbHZruU4A@mail.gmail.com>
+ <alpine.DEB.2.02.1409051803190.9444@utopia.booyaka.com>
+ <5409FD75.3090407@ti.com>
+Message-ID: <5458EA82.7090104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace direct calls to power supply function attributes with wrappers.
-Wrappers provide safe access in case of unregistering the power
-supply (e.g. by removing the driver). Replace:
- - get_property -> power_supply_get_property
+On 09/05/2014 01:14 PM, Menon, Nishanth wrote:
+> On 09/05/2014 01:08 PM, Paul Walmsley wrote:
+> [...]
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Acked-by: Jonghwa Lee <jonghwa3.lee@samusng.com>
-Acked-by: Pavel Machek <pavel@ucw.cz>
----
- drivers/power/bq2415x_charger.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Just adding to this: public version of AM572x is now available here:
 
-diff --git a/drivers/power/bq2415x_charger.c b/drivers/power/bq2415x_charger.c
-index 1f49986fc605..2f80de0410d9 100644
---- a/drivers/power/bq2415x_charger.c
-+++ b/drivers/power/bq2415x_charger.c
-@@ -816,7 +816,8 @@ static int bq2415x_notifier_call(struct notifier_block *nb,
- 
- 	dev_dbg(bq->dev, "notifier call was called\n");
- 
--	ret = psy->get_property(psy, POWER_SUPPLY_PROP_CURRENT_MAX, &prop);
-+	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_CURRENT_MAX,
-+			&prop);
- 	if (ret != 0)
- 		return NOTIFY_OK;
- 
+
+http://www.ti.com/lit/spruhz6
+
+
+
+
 -- 
-1.9.1
+Regards,
+Nishanth Menon
