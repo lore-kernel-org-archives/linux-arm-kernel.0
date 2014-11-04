@@ -1,63 +1,45 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Tue,  4 Nov 2014 11:51:16 +0100
-Subject: [PATCH v5 0/8] phy: miphy28lp: Introduce support for MiPHY28lp
-Message-ID: <1415098284-11182-1-git-send-email-gabriel.fernandez@linaro.org>
+Date: Tue,  4 Nov 2014 11:51:18 +0100
+Subject: [PATCH v5 2/8] phy: miphy28lp: Add PHY header file for DT x Driver
+ defines
+In-Reply-To: <1415098284-11182-1-git-send-email-gabriel.fernandez@linaro.org>
+References: <1415098284-11182-1-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1415098284-11182-3-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes in v5:
- - split TYPE_USB define into TYPE_USB2 & TYPE_USB3
+This provides the shared header file which will be reference from both
+PHY driver and its associated Device Tree node(s).
 
-Changes in v4:
- - use a generic phy header file for dt binding 
- - cosmetic correction
- - add comments
-
-Changes in v3:
- - split into separate smaller functions and can be resued 
-   for sata / pcie and usb
- - uses macros for registers and values
- - cosmetic correction
-
-from Kishon
- - create a common file for phy
- - cosmetic correction in phy-miphy28lp.txt file
- - change initialization of the registers
-from Srinivas
- - rename and simplify a procedure
- - Add Tx impedance and SSC support for SATA and PCI
-
-Hi Kishon,
-
-The goal of this series is to add the support of MiPHY28lp Generic PHY.
-I tried to be as close as possible to the MiPHY365x Lee Jones proposal.
-
-Best Regards
-Gabriel.
-
-Gabriel Fernandez (8):
-  phy: miphy28lp: Add Device Tree bindings for the MiPHY28lp
-  phy: miphy28lp: Add PHY header file for DT x Driver defines
-  phy: miphy28lp: Provide support for the MiPHY28lp Generic PHY
-  ARM: DT: STi: STiH407: Add DT node for MiPHY28lp
-  phy: miphy28lp: Add SSC support for SATA
-  phy: miphy28lp: Add SSC support for PCIE
-  phy: miphy28lp: Tune tx impedance across Soc cuts
-  ARM: multi_v7_defconfig: Enable MiPHY28lp - ST's Generic (SATA, PCIe &
-    USB3) PHY
-
- .../devicetree/bindings/phy/phy-miphy28lp.txt      |  128 ++
- arch/arm/boot/dts/stih407-b2120.dts                |   11 +
- arch/arm/boot/dts/stih407.dtsi                     |   65 +
- arch/arm/configs/multi_v7_defconfig                |    1 +
- drivers/phy/Kconfig                                |    8 +
- drivers/phy/Makefile                               |    1 +
- drivers/phy/phy-miphy28lp.c                        | 1283 ++++++++++++++++++++
- include/dt-bindings/phy/phy.h                      |   18 +
- 8 files changed, 1515 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
- create mode 100644 drivers/phy/phy-miphy28lp.c
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+---
+ include/dt-bindings/phy/phy.h | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
  create mode 100644 include/dt-bindings/phy/phy.h
 
+diff --git a/include/dt-bindings/phy/phy.h b/include/dt-bindings/phy/phy.h
+new file mode 100644
+index 0000000..e8c6a3f
+--- /dev/null
++++ b/include/dt-bindings/phy/phy.h
+@@ -0,0 +1,18 @@
++/*
++ *
++ * This header provides constants for the phy framework
++ *
++ * Copyright (C) 2014 STMicroelectronics
++ * Author: Gabriel Fernandez <gabriel.fernandez@st.com>
++ * License terms:  GNU General Public License (GPL), version 2
++ */
++
++#ifndef _DT_BINDINGS_PHY
++#define _DT_BINDINGS_PHY
++
++#define PHY_TYPE_SATA		1
++#define PHY_TYPE_PCIE		2
++#define PHY_TYPE_USB2		3
++#define PHY_TYPE_USB3		4
++
++#endif /* _DT_BINDINGS_PHY */
 -- 
 1.9.1
