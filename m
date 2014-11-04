@@ -1,32 +1,96 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 4 Nov 2014 10:55:25 +0000
-Subject: [RESEND PATCH] ARM: kexec: Fix validating CPU hotplug support
-In-Reply-To: <1415094025-66180-1-git-send-email-hukeping@huawei.com>
-References: <1415094025-66180-1-git-send-email-hukeping@huawei.com>
-Message-ID: <20141104105525.GE4042@n2100.arm.linux.org.uk>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 04 Nov 2014 12:01:14 +0100
+Subject: [PATCH 03/12] PM / Domains: Add notifier support for power domain
+ transitions
+In-Reply-To: <CADGdYn5Prbbe6Rz=OfVMXm3dinCPrE-N0fn23dMMhZb8GzXm-Q@mail.gmail.com>
+References: <1414986790-11940-1-git-send-email-amit.daniel@samsung.com>
+ <1414986790-11940-4-git-send-email-amit.daniel@samsung.com>
+ <1651173.5xzCFxz3LI@vostro.rjw.lan> <7hmw88gn3q.fsf@deeprootsystems.com>
+ <CADGdYn5Prbbe6Rz=OfVMXm3dinCPrE-N0fn23dMMhZb8GzXm-Q@mail.gmail.com>
+Message-ID: <5458B1FA.7050401@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 04, 2014 at 05:40:25PM +0800, HuKeping wrote:
-> Commit 2103f6cba61a8b8bea3fc1b63661d830a2125e76 added a hotplug checking in
-> machine_kexec_prepare(), but it will lead a failure when loading the
-> crash-kernel in some cases.
-> 
-> Kexec utility can load the crash kernel by two ways:
-> 1. kexec -l kernel-image
-> 2. kexec -p kernel-image
-> 
-> In case #1, for rapid reboot, it's correct to do the hotplug checking things,
-> for it will shut down cpus in _cpu_down() later when command "kexec -e" be
-> sent, this routine needs the support of cpu hotplug.
-> 
-> In case #2, for use on panic, it's unnecessary to do the same thing, the whole
-> routing has no business with cpu shutting down. Check for cpu hot plug will
-> lead a failure to load the kernel.
+On 04/11/14 07:44, amit daniel kachhap wrote:
+> On Mon, Nov 3, 2014 at 11:53 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>> "Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
+>>> On Monday, November 03, 2014 09:23:01 AM Amit Daniel Kachhap wrote:
+>>>> These power domain transition notifiers will assist in carrying
+>>>> out some activity associated with domain power on/off such as
+>>>> some registers which may lose its contents and need save/restore
+>>>> across domain power off/on.
+>>
+>> The runtime PM framework already provides callbacks that are useful for
+>> context save/restore for devices.  Could you please describe in more
+>> detail which registers in which kind of devices need to be
+>> saved/restored, and why they cannot be saved/restored using existing
+>> mechanisms.
+>
+> Basically the requirement is mandated by exynos7 manual. It tells that
+> before turning off the power domain, some clock registers need to saved
+> and should be restored just after turning the power domain. These clock
+> registers are not necessarily gate clocks but could be mux clocks etc.
+> The driver may not have all information of these clocks also. I suppose
+> these are Soc specific changes but drivers should work across Socs.
+> This behavior is almost similar to suspend/resume case where a whole
+> list of clock registers are saved/restored.
 
-So what happens to the other CPUs when you kexec into the new kernel,
-possibly overwriting the instructions which those CPUs are executing?
+Indeed, the somehow complicated power domain power on/off sequences
+are SoC specific.  They involve not only groups of clocks (usually
+gate, mux clock registers of all devices in a power domain) but also
+SoC-specific PMU (Power Management Unit) registers.
+I assume it would be inappropriate to push such details to device 
+drivers.  Moreover, a device driver could not be even loaded.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Since the clocks' state is already maintained by clk driver we came 
+up with an idea of having generic calls from power domain driver back 
+to the clock controller driver.
+
+It might not to be the prettiest solution, nevertheless I couldn't come 
+up with a better one which would satisfy all the requirements.  The power
+domain should only be provided for use with all the clk/PMU sequences 
+handling in place.
+
+Clocks need to also be touched before a power domain switch on or off,
+so attaching the clock controller to some power domain wouldn't help,
+unless we modify/add to existing power domain related callbacks for 
+devices.  Another issue is the clock controller device would need to 
+be attached to multiple power domains, and for each power domain the 
+power on/off sequence is usually slightly different.
+
+There are also hierarchical power domains where each: the master and
+the sub-domain need they own sequence and device usually is attached
+only to a sub-domain.  
+
+> Even earlier post by Sylwester (https://lkml.org/lkml/2014/8/5/182) 
+> also points to the need of this feature.
+>>
+>> Personally, I'm uncomfortable with notifiers like this because it
+>> suggests that underlying frameworks are not doing the right thing, or
+>> are not being used.  (I also don't like the implementation here where a
+>> single global notifier list is maintained by the core, but the notifiers
+>> are actually triggered by SoC specific code.)
+>
+> Yes right the global notifier block can be moved to per genpd structure.
+> Also SoC trigger can be moved to core files.
+>>
+>> IIUC, the usage in this series seems to be that certain clock related
+>> registers need to be saved/restored across a power domain transition.
+>>
+>> Wouldn't an alternative solution be to add a feature to the clock driver
+>> such that the state of each clock is saved when the clock is disabled,
+>> and restored when the clock is enabled?   That would allow any clock
+>> context to survive any power domain transtion also, correct?
+>
+> I also thought about same. But the trigger point for this would be
+> driver calling clk disable/enable and not the power domain. so this 
+> will lead to lot of save/restore for each power domain child.
+
+Even though we would have saved/restored at that points still the power
+domain driver would need to enforce some specific clock/PMU registers 
+state before/after a power domain state transition. And this is what I 
+found difficult with the existing APIs.
+
+--
+Thanks,
+Sylwester
