@@ -1,64 +1,158 @@
 From: xudong.chen@mediatek.com (Xudong Chen)
-Date: Tue, 4 Nov 2014 13:29:35 +0800
-Subject: [PATCH v2 1/3] dt-bindings: Add I2C bindings for mt65xx/mt81xx.
+Date: Tue, 4 Nov 2014 13:29:36 +0800
+Subject: [PATCH v2 2/3] ARM: mediatek: Add I2C node for mt8135 and mt8127
 In-Reply-To: <1415078977-18374-1-git-send-email-xudong.chen@mediatek.com>
 References: <1415078977-18374-1-git-send-email-xudong.chen@mediatek.com>
-Message-ID: <1415078977-18374-2-git-send-email-xudong.chen@mediatek.com>
+Message-ID: <1415078977-18374-3-git-send-email-xudong.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add devicetree bindings for Mediatek Soc I2C driver.
+Add I2C node to mt8135.dtsi and mt8127.dtsi
 
 Signed-off-by: Xudong Chen <xudong.chen@mediatek.com>
 ---
- .../devicetree/bindings/i2c/i2c-mt6577.txt         | 39 ++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+ arch/arm/boot/dts/mt8127.dtsi | 27 +++++++++++++
+ arch/arm/boot/dts/mt8135.dtsi | 90 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 117 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-new file mode 100644
-index 0000000..733e65e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-@@ -0,0 +1,39 @@
-+* Mediatek's I2C controller
+diff --git a/arch/arm/boot/dts/mt8127.dtsi b/arch/arm/boot/dts/mt8127.dtsi
+index 25c9f69..60d7685e 100644
+--- a/arch/arm/boot/dts/mt8127.dtsi
++++ b/arch/arm/boot/dts/mt8127.dtsi
+@@ -89,5 +89,32 @@
+ 			      <0 0x10214000 0 0x2000>,
+ 			      <0 0x10216000 0 0x2000>;
+ 		};
 +
-+The Mediatek's I2C controller is used to interface with I2C devices.
-+
-+Required properties:
-+  - compatible: value should be either of the following.
-+      (a) "mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
-+      (b) "mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
-+      (c) "mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
-+      (d) "mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
-+  - reg: physical base address of the controller and dma base, length of memory mapped
-+    region.
-+  - interrupts: interrupt number to the cpu.
-+  - clock-div: the fixed value for frequency divider of clock source in i2c module.
-+    Each IC may be different.
-+  - clocks: clock name from clock manager
-+  - clock-names: clock name used in i2c driver probe
-+
-+Optional properties:
-+  - clock-frequency: Frequency in Hz of the bus when transfer, the default value is 100000.
-+  - mediatek,have-pmic: platform can control i2c form special pmic side.
-+    Only mt6589 and mt8135 support this feature.
-+  - mediatek,have-dcm: platform has DCM(hardware digital clock manager) property.
-+  - mediatek,use-push-pull: IO use push-pull mode.
-+
-+Example:
-+
-+	i2c0: i2c at 1100d000 {
-+			compatible = "mediatek,mt6577-i2c";
-+			reg = <0x1100d000 0x70>,
-+			      <0x11000300 0x80>;
++		i2c0: i2c at 11007000 {
++			compatible = "mediatek,mt8127-i2c",
++				"mediatek,mt6577-i2c";
++			reg = <0 0x11007000 0 0x70>,
++				<0 0x11000200 0 0x80>;
 +			interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_LOW>;
-+			clock-frequency = <100000>;
-+			mediatek,have-pmic;
-+			clock-div = <16>;
-+			clocks = <&i2c0_ck>, <&ap_dma_ck>;
-+			clock-names = "main", "dma";
-+	};
++			mediatek,have-dcm;
++		};
 +
++		i2c1: i2c at 11008000 {
++			compatible = "mediatek,mt8127-i2c",
++				"mediatek,mt6577-i2c";
++			reg = <0 0x11008000 0 0x70>,
++				<0 0x11000280 0 0x80>;
++			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_LOW>;
++			mediatek,have-dcm;
++		};
++
++		i2c2: i2c at 11009000 {
++			compatible = "mediatek,mt8127-i2c",
++				"mediatek,mt6577-i2c";
++			reg = <0 0x11009000 0 0x70>,
++				<0 0x11000300 0 0x80>;
++			interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_LOW>;
++			mediatek,have-dcm;
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
+index 221ce09..cb32350 100644
+--- a/arch/arm/boot/dts/mt8135.dtsi
++++ b/arch/arm/boot/dts/mt8135.dtsi
+@@ -119,7 +119,97 @@
+ 			      <0 0x1020C000 0 0x1000>;
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
++
++			i2c0_pins_a: i2c0 at 0 {
++				mediatek,pins = <MT8135_PIN_100_SDA0__FUNC_SDA0 &pcfg_pull_none>,
++						<MT8135_PIN_101_SCL0__FUNC_SCL0 &pcfg_pull_none>;
++			};
++
++			i2c1_pins_a: i2c1 at 0 {
++				mediatek,pins = <MT8135_PIN_195_SDA1__FUNC_SDA1 &pcfg_pull_none>,
++						<MT8135_PIN_196_SCL1__FUNC_SCL1 &pcfg_pull_none>;
++			};
++
++			i2c2_pins_a: i2c2 at 0 {
++				mediatek,pins = <MT8135_PIN_193_SDA2__FUNC_SDA2 &pcfg_pull_none>,
++						<MT8135_PIN_194_SCL2__FUNC_SCL2 &pcfg_pull_none>;
++			};
++
++			i2c3_pins_a: i2c3 at 0 {
++				mediatek,pins = <MT8135_PIN_35_SCL3__FUNC_SCL3 &pcfg_pull_none>,
++						<MT8135_PIN_36_SDA3__FUNC_SDA3 &pcfg_pull_none>;
++			};
++
++			i2c4_pins_a: i2c4 at 0 {
++				mediatek,pins = <MT8135_PIN_87_MSDC1_DAT2__FUNC_SCL4 &pcfg_pull_none>,
++						<MT8135_PIN_88_MSDC1_DAT3__FUNC_SDA4 &pcfg_pull_none>;
++			};
++
++			i2c5_pins_a: i2c5 at 0 {
++				mediatek,pins = <MT8135_PIN_63_MSDC1_INSI__FUNC_SCL5 &pcfg_pull_none>,
++						<MT8135_PIN_64_MSDC1_SDWPI__FUNC_SDA5 &pcfg_pull_none>;
++			};
++
++			i2c6_pins_a: i2c6 at 0 {
++				mediatek,pins = <MT8135_PIN_197_MSDC3_DAT2__FUNC_SCL6 &pcfg_pull_none>,
++						<MT8135_PIN_198_MSDC3_DAT3__FUNC_SDA6 &pcfg_pull_none>;
++			};
+ 		};
+ 
++		i2c0: i2c at 1100d000 {
++			compatible = "mediatek,mt8135-i2c",
++				"mediatek,mt6589-i2c";
++			reg = <0 0x1100d000 0 0x70>,
++				<0 0x11000300 0 0x80>;
++			interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_LOW>;
++		};
++
++		i2c1: i2c at 1100e000 {
++			compatible = "mediatek,mt8135-i2c",
++				"mediatek,mt6589-i2c";
++			reg = <0 0x1100e000 0 0x70>,
++				<0 0x11000380 0 0x80>;
++			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_LOW>;
++		};
++
++		i2c2: i2c at 1100f000 {
++			compatible = "mediatek,mt8135-i2c",
++				"mediatek,mt6589-i2c";
++			reg = <0 0x1100f000 0 0x70>,
++				<0 0x11000400 0 0x80>;
++			interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_LOW>;
++		};
++
++		i2c3: i2c at 11010000 {
++			compatible = "mediatek,mt8135-i2c",
++				"mediatek,mt6589-i2c";
++			reg = <0 0x11010000 0 0x70>,
++				<0 0x11000480 0 0x80>;
++			interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_LOW>;
++		};
++
++		i2c4: i2c at 11011000 {
++			compatible = "mediatek,mt8135-i2c",
++				"mediatek,mt6589-i2c";
++			reg = <0 0x11011000 0 0x70>,
++				<0 0x11000500 0 0x80>;
++			interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_LOW>;
++		};
++
++		i2c5: i2c at 11012000 {
++			compatible = "mediatek,mt8135-i2c",
++				"mediatek,mt6589-i2c";
++			reg = <0 0x11012000 0 0x70>,
++				<0 0x11000580 0 0x80>;
++			interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_LOW>;
++		};
++
++		i2c6: i2c at 11013000 {
++			compatible = "mediatek,mt8135-i2c",
++				"mediatek,mt6589-i2c";
++			reg = <0 0x11013000 0 0x70>,
++				<0 0x11000600 0 0x80>;
++			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_LOW>;
++		};
+ 	};
+ };
 -- 
 1.8.1.1.dirty
