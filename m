@@ -1,916 +1,195 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue,  4 Nov 2014 10:54:57 +0100
-Subject: [PATCH 02/15] [media] v4l: Update subdev-formats doc with new
- MEDIA_BUS_FMT values
-In-Reply-To: <1415094910-15899-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1415094910-15899-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1415094910-15899-3-git-send-email-boris.brezillon@free-electrons.com>
+Date: Tue,  4 Nov 2014 10:54:55 +0100
+Subject: [PATCH 00/15] [media] Make mediabus format subsystem neutral
+Message-ID: <1415094910-15899-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to have subsytem agnostic media bus format definitions we've
-moved media bus definition to include/uapi/linux/media-bus-format.h and
-prefixed enum values with MEDIA_BUS_FMT instead of V4L2_MBUS_FMT.
+Hello,
 
-Update the v4l documentation accordingly.
+This patch series prepares the use of media bus formats outside of
+the V4L2 subsytem (my final goal is to use it in the Atmel HLCDC DRM
+driver where I have to configure my DPI/RGB bus according to the
+connected display).
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- Documentation/DocBook/media/Makefile               |   2 +-
+The series first defines a new enum with a neutral name (media_bus_format),
+and then replace all references to the old enum and its values within the
+kernel.
+
+It also deprecates the v4l2_mbus_pixelcode enum and the v4l2-mediabus.h
+header. Kernel users can't use the v4l2_mbus_pixelcode enum anymore and new
+user-space users are encouraged to move to the media_bus_format enum
+and include v4l2-mbus.h.
+
+Hans, I'm not sure this is exactly what you had in mind for
+v4l2_mbus_pixelcode deprecation. If you agree with this approach, and think
+it is worth it, I can reorder the series and squash the last 4 patches into
+previous ones (patches 4, 9, 6 and 8)
+
+Best Regards,
+
+Boris
+
+Boris Brezillon (15):
+  [media] Move mediabus format definition to a more standard place
+  [media] v4l: Update subdev-formats doc with new MEDIA_BUS_FMT values
+  [media] Make use of the new media_bus_format definitions
+  [media] i2c: Make use of media_bus_format enum
+  [media] pci: Make use of media_bus_format enum
+  [media] platform: Make use of media_bus_format enum
+  [media] usb: Make use of media_bus_format enum
+  staging: media: Make use of media_bus_format enum
+  gpu: ipu-v3: Make use of media_bus_format enum
+  [media] v4l: Forbid usage of V4L2_MBUS_FMT definitions inside the
+    kernel
+  [media] Deprecate v4l2_mbus_pixelcode
+  [media] i2c: Replace v4l2-mediabus.h inclusion with v4l2-mbus.h
+  gpu: ipu-v3: Replace v4l2-mediabus.h inclusion with v4l2-mbus.h
+  [media] platform: Replace v4l2-mediabus.h inclusion with v4l2-mbus.h
+  staging: media: Replace v4l2-mediabus.h inclusion with v4l2-mbus.h
+
+ Documentation/DocBook/media/Makefile               |   4 +-
  Documentation/DocBook/media/v4l/subdev-formats.xml | 308 ++++++++++-----------
- include/uapi/linux/v4l2-mediabus.h                 |   2 +
- 3 files changed, 157 insertions(+), 155 deletions(-)
+ Documentation/video4linux/soc-camera.txt           |   2 +-
+ arch/arm/mach-davinci/board-dm355-evm.c            |   2 +-
+ arch/arm/mach-davinci/board-dm365-evm.c            |   4 +-
+ arch/arm/mach-davinci/dm355.c                      |   6 +-
+ arch/arm/mach-davinci/dm365.c                      |   6 +-
+ arch/arm/mach-shmobile/board-mackerel.c            |   2 +-
+ arch/sh/boards/mach-ap325rxa/setup.c               |   2 +-
+ drivers/gpu/ipu-v3/ipu-csi.c                       |  68 ++---
+ drivers/media/i2c/adv7170.c                        |  16 +-
+ drivers/media/i2c/adv7175.c                        |  16 +-
+ drivers/media/i2c/adv7180.c                        |   6 +-
+ drivers/media/i2c/adv7183.c                        |   6 +-
+ drivers/media/i2c/adv7604.c                        |  72 ++---
+ drivers/media/i2c/adv7842.c                        |   6 +-
+ drivers/media/i2c/ak881x.c                         |   8 +-
+ drivers/media/i2c/cx25840/cx25840-core.c           |   2 +-
+ drivers/media/i2c/m5mols/m5mols_core.c             |   6 +-
+ drivers/media/i2c/ml86v7667.c                      |   6 +-
+ drivers/media/i2c/mt9m032.c                        |   8 +-
+ drivers/media/i2c/mt9p031.c                        |   8 +-
+ drivers/media/i2c/mt9t001.c                        |  10 +-
+ drivers/media/i2c/mt9v011.c                        |   6 +-
+ drivers/media/i2c/mt9v032.c                        |  14 +-
+ drivers/media/i2c/noon010pc30.c                    |  12 +-
+ drivers/media/i2c/ov7670.c                         |  16 +-
+ drivers/media/i2c/ov9650.c                         |  10 +-
+ drivers/media/i2c/s5c73m3/s5c73m3.h                |   6 +-
+ drivers/media/i2c/s5k4ecgx.c                       |   4 +-
+ drivers/media/i2c/s5k5baf.c                        |  14 +-
+ drivers/media/i2c/s5k6a3.c                         |   2 +-
+ drivers/media/i2c/s5k6aa.c                         |   8 +-
+ drivers/media/i2c/saa6752hs.c                      |   6 +-
+ drivers/media/i2c/saa7115.c                        |   2 +-
+ drivers/media/i2c/saa717x.c                        |   2 +-
+ drivers/media/i2c/smiapp/smiapp-core.c             |  34 +--
+ drivers/media/i2c/soc_camera/imx074.c              |  10 +-
+ drivers/media/i2c/soc_camera/mt9m001.c             |  14 +-
+ drivers/media/i2c/soc_camera/mt9m111.c             |  72 ++---
+ drivers/media/i2c/soc_camera/mt9t031.c             |  12 +-
+ drivers/media/i2c/soc_camera/mt9t112.c             |  24 +-
+ drivers/media/i2c/soc_camera/mt9v022.c             |  26 +-
+ drivers/media/i2c/soc_camera/ov2640.c              |  56 ++--
+ drivers/media/i2c/soc_camera/ov5642.c              |  10 +-
+ drivers/media/i2c/soc_camera/ov6650.c              |  60 ++--
+ drivers/media/i2c/soc_camera/ov772x.c              |  22 +-
+ drivers/media/i2c/soc_camera/ov9640.c              |  42 +--
+ drivers/media/i2c/soc_camera/ov9740.c              |  14 +-
+ drivers/media/i2c/soc_camera/rj54n1cb0c.c          |  56 ++--
+ drivers/media/i2c/soc_camera/tw9910.c              |  12 +-
+ drivers/media/i2c/sr030pc30.c                      |  14 +-
+ drivers/media/i2c/tvp514x.c                        |  14 +-
+ drivers/media/i2c/tvp5150.c                        |   6 +-
+ drivers/media/i2c/tvp7002.c                        |  10 +-
+ drivers/media/i2c/vs6624.c                         |  18 +-
+ drivers/media/pci/cx18/cx18-av-core.c              |   2 +-
+ drivers/media/pci/cx18/cx18-controls.c             |   2 +-
+ drivers/media/pci/cx18/cx18-ioctl.c                |   2 +-
+ drivers/media/pci/cx23885/cx23885-video.c          |   2 +-
+ drivers/media/pci/ivtv/ivtv-controls.c             |   2 +-
+ drivers/media/pci/ivtv/ivtv-ioctl.c                |   2 +-
+ drivers/media/pci/saa7134/saa7134-empress.c        |   4 +-
+ drivers/media/platform/blackfin/bfin_capture.c     |  14 +-
+ drivers/media/platform/davinci/vpbe.c              |   2 +-
+ drivers/media/platform/davinci/vpfe_capture.c      |   4 +-
+ drivers/media/platform/exynos-gsc/gsc-core.c       |   8 +-
+ drivers/media/platform/exynos-gsc/gsc-core.h       |   2 +-
+ drivers/media/platform/exynos4-is/fimc-capture.c   |   2 +-
+ drivers/media/platform/exynos4-is/fimc-core.c      |  14 +-
+ drivers/media/platform/exynos4-is/fimc-core.h      |   4 +-
+ drivers/media/platform/exynos4-is/fimc-isp.c       |  16 +-
+ drivers/media/platform/exynos4-is/fimc-lite-reg.c  |  26 +-
+ drivers/media/platform/exynos4-is/fimc-lite.c      |  14 +-
+ drivers/media/platform/exynos4-is/fimc-reg.c       |  14 +-
+ drivers/media/platform/exynos4-is/mipi-csis.c      |  14 +-
+ drivers/media/platform/marvell-ccic/mcam-core.c    |  22 +-
+ drivers/media/platform/marvell-ccic/mcam-core.h    |   2 +-
+ drivers/media/platform/omap3isp/ispccdc.c          | 112 ++++----
+ drivers/media/platform/omap3isp/ispccp2.c          |  18 +-
+ drivers/media/platform/omap3isp/ispcsi2.c          |  44 +--
+ drivers/media/platform/omap3isp/isppreview.c       |  58 ++--
+ drivers/media/platform/omap3isp/ispresizer.c       |  18 +-
+ drivers/media/platform/omap3isp/ispvideo.c         |  94 +++----
+ drivers/media/platform/omap3isp/ispvideo.h         |  12 +-
+ drivers/media/platform/s3c-camif/camif-capture.c   |  10 +-
+ drivers/media/platform/s3c-camif/camif-regs.c      |   8 +-
+ drivers/media/platform/s5p-tv/hdmi_drv.c           |   2 +-
+ drivers/media/platform/s5p-tv/sdo_drv.c            |   2 +-
+ drivers/media/platform/sh_vou.c                    |   8 +-
+ drivers/media/platform/soc_camera/atmel-isi.c      |  22 +-
+ drivers/media/platform/soc_camera/mx2_camera.c     |  24 +-
+ drivers/media/platform/soc_camera/mx3_camera.c     |   6 +-
+ drivers/media/platform/soc_camera/omap1_camera.c   |  36 +--
+ drivers/media/platform/soc_camera/pxa_camera.c     |  16 +-
+ drivers/media/platform/soc_camera/rcar_vin.c       |  14 +-
+ .../platform/soc_camera/sh_mobile_ceu_camera.c     |  20 +-
+ drivers/media/platform/soc_camera/sh_mobile_csi2.c |  38 +--
+ drivers/media/platform/soc_camera/soc_camera.c     |   2 +-
+ .../platform/soc_camera/soc_camera_platform.c      |   2 +-
+ drivers/media/platform/soc_camera/soc_mediabus.c   |  78 +++---
+ drivers/media/platform/via-camera.c                |   8 +-
+ drivers/media/platform/vsp1/vsp1_bru.c             |  14 +-
+ drivers/media/platform/vsp1/vsp1_hsit.c            |  12 +-
+ drivers/media/platform/vsp1/vsp1_lif.c             |  10 +-
+ drivers/media/platform/vsp1/vsp1_lut.c             |  14 +-
+ drivers/media/platform/vsp1/vsp1_rwpf.c            |  10 +-
+ drivers/media/platform/vsp1/vsp1_sru.c             |  12 +-
+ drivers/media/platform/vsp1/vsp1_uds.c             |  10 +-
+ drivers/media/platform/vsp1/vsp1_video.c           |  44 +--
+ drivers/media/usb/cx231xx/cx231xx-417.c            |   2 +-
+ drivers/media/usb/cx231xx/cx231xx-video.c          |   4 +-
+ drivers/media/usb/em28xx/em28xx-camera.c           |   2 +-
+ drivers/media/usb/go7007/go7007-v4l2.c             |   2 +-
+ drivers/media/usb/pvrusb2/pvrusb2-hdw.c            |   2 +-
+ drivers/staging/media/davinci_vpfe/dm365_ipipe.c   |  18 +-
+ .../staging/media/davinci_vpfe/dm365_ipipe_hw.c    |  26 +-
+ drivers/staging/media/davinci_vpfe/dm365_ipipeif.c | 100 +++----
+ drivers/staging/media/davinci_vpfe/dm365_isif.c    |  90 +++---
+ drivers/staging/media/davinci_vpfe/dm365_resizer.c |  96 +++----
+ .../staging/media/davinci_vpfe/vpfe_mc_capture.c   |  18 +-
+ drivers/staging/media/omap4iss/iss_csi2.c          |  64 ++---
+ drivers/staging/media/omap4iss/iss_ipipe.c         |  16 +-
+ drivers/staging/media/omap4iss/iss_ipipeif.c       |  28 +-
+ drivers/staging/media/omap4iss/iss_resizer.c       |  26 +-
+ drivers/staging/media/omap4iss/iss_video.c         |  78 +++---
+ drivers/staging/media/omap4iss/iss_video.h         |  12 +-
+ include/media/davinci/vpbe.h                       |   2 +-
+ include/media/davinci/vpbe_venc.h                  |   4 +-
+ include/media/exynos-fimc.h                        |   2 +-
+ include/media/soc_camera.h                         |   2 +-
+ include/media/soc_mediabus.h                       |   8 +-
+ include/media/v4l2-mediabus.h                      |   4 +-
+ include/media/v4l2-subdev.h                        |   2 +-
+ include/uapi/linux/Kbuild                          |   2 +
+ include/uapi/linux/media-bus-format.h              | 126 +++++++++
+ include/uapi/linux/v4l2-mbus.h                     |  35 +++
+ include/uapi/linux/v4l2-mediabus.h                 | 208 ++++++--------
+ include/uapi/linux/v4l2-subdev.h                   |   8 +-
+ 139 files changed, 1632 insertions(+), 1509 deletions(-)
+ create mode 100644 include/uapi/linux/media-bus-format.h
+ create mode 100644 include/uapi/linux/v4l2-mbus.h
 
-diff --git a/Documentation/DocBook/media/Makefile b/Documentation/DocBook/media/Makefile
-index 8bf7c61..181b7f4 100644
---- a/Documentation/DocBook/media/Makefile
-+++ b/Documentation/DocBook/media/Makefile
-@@ -86,7 +86,7 @@ ENUMS = \
- 	$(shell perl -ne 'print "$$1 " if /^enum\s+([^\s]+)\s+/' $(srctree)/include/uapi/linux/dvb/net.h) \
- 	$(shell perl -ne 'print "$$1 " if /^enum\s+([^\s]+)\s+/' $(srctree)/include/uapi/linux/dvb/video.h) \
- 	$(shell perl -ne 'print "$$1 " if /^enum\s+([^\s]+)\s+/' $(srctree)/include/uapi/linux/media.h) \
--	$(shell perl -ne 'print "$$1 " if /^enum\s+([^\s]+)\s+/' $(srctree)/include/uapi/linux/v4l2-mediabus.h) \
-+	$(shell perl -ne 'print "$$1 " if /^enum\s+([^\s]+)\s+/' $(srctree)/include/uapi/linux/media-bus-format.h) \
- 	$(shell perl -ne 'print "$$1 " if /^enum\s+([^\s]+)\s+/' $(srctree)/include/uapi/linux/v4l2-subdev.h)
- 
- STRUCTS = \
-diff --git a/Documentation/DocBook/media/v4l/subdev-formats.xml b/Documentation/DocBook/media/v4l/subdev-formats.xml
-index b2d5a03..18730b9 100644
---- a/Documentation/DocBook/media/v4l/subdev-formats.xml
-+++ b/Documentation/DocBook/media/v4l/subdev-formats.xml
-@@ -86,7 +86,7 @@
-       green and 5-bit blue values padded on the high bit, transferred as 2 8-bit
-       samples per pixel with the most significant bits (padding, red and half of
-       the green value) transferred first will be named
--      <constant>V4L2_MBUS_FMT_RGB555_2X8_PADHI_BE</constant>.
-+      <constant>MEDIA_BUS_FMT_RGB555_2X8_PADHI_BE</constant>.
-       </para>
- 
-       <para>The following tables list existing packed RGB formats.</para>
-@@ -176,8 +176,8 @@
- 	    </row>
- 	  </thead>
- 	  <tbody valign="top">
--	    <row id="V4L2-MBUS-FMT-RGB444-2X8-PADHI-BE">
--	      <entry>V4L2_MBUS_FMT_RGB444_2X8_PADHI_BE</entry>
-+	    <row id="MEDIA-BUS-FMT-RGB444-2X8-PADHI-BE">
-+	      <entry>MEDIA_BUS_FMT_RGB444_2X8_PADHI_BE</entry>
- 	      <entry>0x1001</entry>
- 	      <entry></entry>
- 	      &dash-ent-24;
-@@ -204,8 +204,8 @@
- 	      <entry>b<subscript>1</subscript></entry>
- 	      <entry>b<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-RGB444-2X8-PADHI-LE">
--	      <entry>V4L2_MBUS_FMT_RGB444_2X8_PADHI_LE</entry>
-+	    <row id="MEDIA-BUS-FMT-RGB444-2X8-PADHI-LE">
-+	      <entry>MEDIA_BUS_FMT_RGB444_2X8_PADHI_LE</entry>
- 	      <entry>0x1002</entry>
- 	      <entry></entry>
- 	      &dash-ent-24;
-@@ -232,8 +232,8 @@
- 	      <entry>r<subscript>1</subscript></entry>
- 	      <entry>r<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-RGB555-2X8-PADHI-BE">
--	      <entry>V4L2_MBUS_FMT_RGB555_2X8_PADHI_BE</entry>
-+	    <row id="MEDIA-BUS-FMT-RGB555-2X8-PADHI-BE">
-+	      <entry>MEDIA_BUS_FMT_RGB555_2X8_PADHI_BE</entry>
- 	      <entry>0x1003</entry>
- 	      <entry></entry>
- 	      &dash-ent-24;
-@@ -260,8 +260,8 @@
- 	      <entry>b<subscript>1</subscript></entry>
- 	      <entry>b<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-RGB555-2X8-PADHI-LE">
--	      <entry>V4L2_MBUS_FMT_RGB555_2X8_PADHI_LE</entry>
-+	    <row id="MEDIA-BUS-FMT-RGB555-2X8-PADHI-LE">
-+	      <entry>MEDIA_BUS_FMT_RGB555_2X8_PADHI_LE</entry>
- 	      <entry>0x1004</entry>
- 	      <entry></entry>
- 	      &dash-ent-24;
-@@ -288,8 +288,8 @@
- 	      <entry>g<subscript>4</subscript></entry>
- 	      <entry>g<subscript>3</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-BGR565-2X8-BE">
--	      <entry>V4L2_MBUS_FMT_BGR565_2X8_BE</entry>
-+	    <row id="MEDIA-BUS-FMT-BGR565-2X8-BE">
-+	      <entry>MEDIA_BUS_FMT_BGR565_2X8_BE</entry>
- 	      <entry>0x1005</entry>
- 	      <entry></entry>
- 	      &dash-ent-24;
-@@ -316,8 +316,8 @@
- 	      <entry>r<subscript>1</subscript></entry>
- 	      <entry>r<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-BGR565-2X8-LE">
--	      <entry>V4L2_MBUS_FMT_BGR565_2X8_LE</entry>
-+	    <row id="MEDIA-BUS-FMT-BGR565-2X8-LE">
-+	      <entry>MEDIA_BUS_FMT_BGR565_2X8_LE</entry>
- 	      <entry>0x1006</entry>
- 	      <entry></entry>
- 	      &dash-ent-24;
-@@ -344,8 +344,8 @@
- 	      <entry>g<subscript>4</subscript></entry>
- 	      <entry>g<subscript>3</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-RGB565-2X8-BE">
--	      <entry>V4L2_MBUS_FMT_RGB565_2X8_BE</entry>
-+	    <row id="MEDIA-BUS-FMT-RGB565-2X8-BE">
-+	      <entry>MEDIA_BUS_FMT_RGB565_2X8_BE</entry>
- 	      <entry>0x1007</entry>
- 	      <entry></entry>
- 	      &dash-ent-24;
-@@ -372,8 +372,8 @@
- 	      <entry>b<subscript>1</subscript></entry>
- 	      <entry>b<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-RGB565-2X8-LE">
--	      <entry>V4L2_MBUS_FMT_RGB565_2X8_LE</entry>
-+	    <row id="MEDIA-BUS-FMT-RGB565-2X8-LE">
-+	      <entry>MEDIA_BUS_FMT_RGB565_2X8_LE</entry>
- 	      <entry>0x1008</entry>
- 	      <entry></entry>
- 	      &dash-ent-24;
-@@ -400,8 +400,8 @@
- 	      <entry>g<subscript>4</subscript></entry>
- 	      <entry>g<subscript>3</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-RGB666-1X18">
--	      <entry>V4L2_MBUS_FMT_RGB666_1X18</entry>
-+	    <row id="MEDIA-BUS-FMT-RGB666-1X18">
-+	      <entry>MEDIA_BUS_FMT_RGB666_1X18</entry>
- 	      <entry>0x1009</entry>
- 	      <entry></entry>
- 	      &dash-ent-14;
-@@ -424,8 +424,8 @@
- 	      <entry>b<subscript>1</subscript></entry>
- 	      <entry>b<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-RGB888-1X24">
--	      <entry>V4L2_MBUS_FMT_RGB888_1X24</entry>
-+	    <row id="MEDIA-BUS-FMT-RGB888-1X24">
-+	      <entry>MEDIA_BUS_FMT_RGB888_1X24</entry>
- 	      <entry>0x100a</entry>
- 	      <entry></entry>
- 	      &dash-ent-8;
-@@ -454,8 +454,8 @@
- 	      <entry>b<subscript>1</subscript></entry>
- 	      <entry>b<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-RGB888-2X12-BE">
--	      <entry>V4L2_MBUS_FMT_RGB888_2X12_BE</entry>
-+	    <row id="MEDIA-BUS-FMT-RGB888-2X12-BE">
-+	      <entry>MEDIA_BUS_FMT_RGB888_2X12_BE</entry>
- 	      <entry>0x100b</entry>
- 	      <entry></entry>
- 	      &dash-ent-20;
-@@ -490,8 +490,8 @@
- 	      <entry>b<subscript>1</subscript></entry>
- 	      <entry>b<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-RGB888-2X12-LE">
--	      <entry>V4L2_MBUS_FMT_RGB888_2X12_LE</entry>
-+	    <row id="MEDIA-BUS-FMT-RGB888-2X12-LE">
-+	      <entry>MEDIA_BUS_FMT_RGB888_2X12_LE</entry>
- 	      <entry>0x100c</entry>
- 	      <entry></entry>
- 	      &dash-ent-20;
-@@ -526,8 +526,8 @@
- 	      <entry>g<subscript>5</subscript></entry>
- 	      <entry>g<subscript>4</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-ARGB888-1X32">
--	      <entry>V4L2_MBUS_FMT_ARGB888_1X32</entry>
-+	    <row id="MEDIA-BUS-FMT-ARGB888-1X32">
-+	      <entry>MEDIA_BUS_FMT_ARGB888_1X32</entry>
- 	      <entry>0x100d</entry>
- 	      <entry></entry>
- 	      <entry>a<subscript>7</subscript></entry>
-@@ -600,7 +600,7 @@
-       <para>For instance, a format with uncompressed 10-bit Bayer components
-       arranged in a red, green, green, blue pattern transferred as 2 8-bit
-       samples per pixel with the least significant bits transferred first will
--      be named <constant>V4L2_MBUS_FMT_SRGGB10_2X8_PADHI_LE</constant>.
-+      be named <constant>MEDIA_BUS_FMT_SRGGB10_2X8_PADHI_LE</constant>.
-       </para>
- 
-       <figure id="bayer-patterns">
-@@ -663,8 +663,8 @@
- 	    </row>
- 	  </thead>
- 	  <tbody valign="top">
--	    <row id="V4L2-MBUS-FMT-SBGGR8-1X8">
--	      <entry>V4L2_MBUS_FMT_SBGGR8_1X8</entry>
-+	    <row id="MEDIA-BUS-FMT-SBGGR8-1X8">
-+	      <entry>MEDIA_BUS_FMT_SBGGR8_1X8</entry>
- 	      <entry>0x3001</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -680,8 +680,8 @@
- 	      <entry>b<subscript>1</subscript></entry>
- 	      <entry>b<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SGBRG8-1X8">
--	      <entry>V4L2_MBUS_FMT_SGBRG8_1X8</entry>
-+	    <row id="MEDIA-BUS-FMT-SGBRG8-1X8">
-+	      <entry>MEDIA_BUS_FMT_SGBRG8_1X8</entry>
- 	      <entry>0x3013</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -697,8 +697,8 @@
- 	      <entry>g<subscript>1</subscript></entry>
- 	      <entry>g<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SGRBG8-1X8">
--	      <entry>V4L2_MBUS_FMT_SGRBG8_1X8</entry>
-+	    <row id="MEDIA-BUS-FMT-SGRBG8-1X8">
-+	      <entry>MEDIA_BUS_FMT_SGRBG8_1X8</entry>
- 	      <entry>0x3002</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -714,8 +714,8 @@
- 	      <entry>g<subscript>1</subscript></entry>
- 	      <entry>g<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SRGGB8-1X8">
--	      <entry>V4L2_MBUS_FMT_SRGGB8_1X8</entry>
-+	    <row id="MEDIA-BUS-FMT-SRGGB8-1X8">
-+	      <entry>MEDIA_BUS_FMT_SRGGB8_1X8</entry>
- 	      <entry>0x3014</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -731,8 +731,8 @@
- 	      <entry>r<subscript>1</subscript></entry>
- 	      <entry>r<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SBGGR10-ALAW8-1X8">
--	      <entry>V4L2_MBUS_FMT_SBGGR10_ALAW8_1X8</entry>
-+	    <row id="MEDIA-BUS-FMT-SBGGR10-ALAW8-1X8">
-+	      <entry>MEDIA_BUS_FMT_SBGGR10_ALAW8_1X8</entry>
- 	      <entry>0x3015</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -748,8 +748,8 @@
- 	      <entry>b<subscript>1</subscript></entry>
- 	      <entry>b<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SGBRG10-ALAW8-1X8">
--	      <entry>V4L2_MBUS_FMT_SGBRG10_ALAW8_1X8</entry>
-+	    <row id="MEDIA-BUS-FMT-SGBRG10-ALAW8-1X8">
-+	      <entry>MEDIA_BUS_FMT_SGBRG10_ALAW8_1X8</entry>
- 	      <entry>0x3016</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -765,8 +765,8 @@
- 	      <entry>g<subscript>1</subscript></entry>
- 	      <entry>g<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SGRBG10-ALAW8-1X8">
--	      <entry>V4L2_MBUS_FMT_SGRBG10_ALAW8_1X8</entry>
-+	    <row id="MEDIA-BUS-FMT-SGRBG10-ALAW8-1X8">
-+	      <entry>MEDIA_BUS_FMT_SGRBG10_ALAW8_1X8</entry>
- 	      <entry>0x3017</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -782,8 +782,8 @@
- 	      <entry>g<subscript>1</subscript></entry>
- 	      <entry>g<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SRGGB10-ALAW8-1X8">
--	      <entry>V4L2_MBUS_FMT_SRGGB10_ALAW8_1X8</entry>
-+	    <row id="MEDIA-BUS-FMT-SRGGB10-ALAW8-1X8">
-+	      <entry>MEDIA_BUS_FMT_SRGGB10_ALAW8_1X8</entry>
- 	      <entry>0x3018</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -799,8 +799,8 @@
- 	      <entry>r<subscript>1</subscript></entry>
- 	      <entry>r<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SBGGR10-DPCM8-1X8">
--	      <entry>V4L2_MBUS_FMT_SBGGR10_DPCM8_1X8</entry>
-+	    <row id="MEDIA-BUS-FMT-SBGGR10-DPCM8-1X8">
-+	      <entry>MEDIA_BUS_FMT_SBGGR10_DPCM8_1X8</entry>
- 	      <entry>0x300b</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -816,8 +816,8 @@
- 	      <entry>b<subscript>1</subscript></entry>
- 	      <entry>b<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SGBRG10-DPCM8-1X8">
--	      <entry>V4L2_MBUS_FMT_SGBRG10_DPCM8_1X8</entry>
-+	    <row id="MEDIA-BUS-FMT-SGBRG10-DPCM8-1X8">
-+	      <entry>MEDIA_BUS_FMT_SGBRG10_DPCM8_1X8</entry>
- 	      <entry>0x300c</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -833,8 +833,8 @@
- 	      <entry>g<subscript>1</subscript></entry>
- 	      <entry>g<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SGRBG10-DPCM8-1X8">
--	      <entry>V4L2_MBUS_FMT_SGRBG10_DPCM8_1X8</entry>
-+	    <row id="MEDIA-BUS-FMT-SGRBG10-DPCM8-1X8">
-+	      <entry>MEDIA_BUS_FMT_SGRBG10_DPCM8_1X8</entry>
- 	      <entry>0x3009</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -850,8 +850,8 @@
- 	      <entry>g<subscript>1</subscript></entry>
- 	      <entry>g<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SRGGB10-DPCM8-1X8">
--	      <entry>V4L2_MBUS_FMT_SRGGB10_DPCM8_1X8</entry>
-+	    <row id="MEDIA-BUS-FMT-SRGGB10-DPCM8-1X8">
-+	      <entry>MEDIA_BUS_FMT_SRGGB10_DPCM8_1X8</entry>
- 	      <entry>0x300d</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -867,8 +867,8 @@
- 	      <entry>r<subscript>1</subscript></entry>
- 	      <entry>r<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SBGGR10-2X8-PADHI-BE">
--	      <entry>V4L2_MBUS_FMT_SBGGR10_2X8_PADHI_BE</entry>
-+	    <row id="MEDIA-BUS-FMT-SBGGR10-2X8-PADHI-BE">
-+	      <entry>MEDIA_BUS_FMT_SBGGR10_2X8_PADHI_BE</entry>
- 	      <entry>0x3003</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -901,8 +901,8 @@
- 	      <entry>b<subscript>1</subscript></entry>
- 	      <entry>b<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SBGGR10-2X8-PADHI-LE">
--	      <entry>V4L2_MBUS_FMT_SBGGR10_2X8_PADHI_LE</entry>
-+	    <row id="MEDIA-BUS-FMT-SBGGR10-2X8-PADHI-LE">
-+	      <entry>MEDIA_BUS_FMT_SBGGR10_2X8_PADHI_LE</entry>
- 	      <entry>0x3004</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -935,8 +935,8 @@
- 	      <entry>b<subscript>9</subscript></entry>
- 	      <entry>b<subscript>8</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SBGGR10-2X8-PADLO-BE">
--	      <entry>V4L2_MBUS_FMT_SBGGR10_2X8_PADLO_BE</entry>
-+	    <row id="MEDIA-BUS-FMT-SBGGR10-2X8-PADLO-BE">
-+	      <entry>MEDIA_BUS_FMT_SBGGR10_2X8_PADLO_BE</entry>
- 	      <entry>0x3005</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -969,8 +969,8 @@
- 	      <entry>0</entry>
- 	      <entry>0</entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SBGGR10-2X8-PADLO-LE">
--	      <entry>V4L2_MBUS_FMT_SBGGR10_2X8_PADLO_LE</entry>
-+	    <row id="MEDIA-BUS-FMT-SBGGR10-2X8-PADLO-LE">
-+	      <entry>MEDIA_BUS_FMT_SBGGR10_2X8_PADLO_LE</entry>
- 	      <entry>0x3006</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -1003,8 +1003,8 @@
- 	      <entry>b<subscript>3</subscript></entry>
- 	      <entry>b<subscript>2</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SBGGR10-1X10">
--	      <entry>V4L2_MBUS_FMT_SBGGR10_1X10</entry>
-+	    <row id="MEDIA-BUS-FMT-SBGGR10-1X10">
-+	      <entry>MEDIA_BUS_FMT_SBGGR10_1X10</entry>
- 	      <entry>0x3007</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -1020,8 +1020,8 @@
- 	      <entry>b<subscript>1</subscript></entry>
- 	      <entry>b<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SGBRG10-1X10">
--	      <entry>V4L2_MBUS_FMT_SGBRG10_1X10</entry>
-+	    <row id="MEDIA-BUS-FMT-SGBRG10-1X10">
-+	      <entry>MEDIA_BUS_FMT_SGBRG10_1X10</entry>
- 	      <entry>0x300e</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -1037,8 +1037,8 @@
- 	      <entry>g<subscript>1</subscript></entry>
- 	      <entry>g<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SGRBG10-1X10">
--	      <entry>V4L2_MBUS_FMT_SGRBG10_1X10</entry>
-+	    <row id="MEDIA-BUS-FMT-SGRBG10-1X10">
-+	      <entry>MEDIA_BUS_FMT_SGRBG10_1X10</entry>
- 	      <entry>0x300a</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -1054,8 +1054,8 @@
- 	      <entry>g<subscript>1</subscript></entry>
- 	      <entry>g<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SRGGB10-1X10">
--	      <entry>V4L2_MBUS_FMT_SRGGB10_1X10</entry>
-+	    <row id="MEDIA-BUS-FMT-SRGGB10-1X10">
-+	      <entry>MEDIA_BUS_FMT_SRGGB10_1X10</entry>
- 	      <entry>0x300f</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -1071,8 +1071,8 @@
- 	      <entry>r<subscript>1</subscript></entry>
- 	      <entry>r<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SBGGR12-1X12">
--	      <entry>V4L2_MBUS_FMT_SBGGR12_1X12</entry>
-+	    <row id="MEDIA-BUS-FMT-SBGGR12-1X12">
-+	      <entry>MEDIA_BUS_FMT_SBGGR12_1X12</entry>
- 	      <entry>0x3008</entry>
- 	      <entry></entry>
- 	      <entry>b<subscript>11</subscript></entry>
-@@ -1088,8 +1088,8 @@
- 	      <entry>b<subscript>1</subscript></entry>
- 	      <entry>b<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SGBRG12-1X12">
--	      <entry>V4L2_MBUS_FMT_SGBRG12_1X12</entry>
-+	    <row id="MEDIA-BUS-FMT-SGBRG12-1X12">
-+	      <entry>MEDIA_BUS_FMT_SGBRG12_1X12</entry>
- 	      <entry>0x3010</entry>
- 	      <entry></entry>
- 	      <entry>g<subscript>11</subscript></entry>
-@@ -1105,8 +1105,8 @@
- 	      <entry>g<subscript>1</subscript></entry>
- 	      <entry>g<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SGRBG12-1X12">
--	      <entry>V4L2_MBUS_FMT_SGRBG12_1X12</entry>
-+	    <row id="MEDIA-BUS-FMT-SGRBG12-1X12">
-+	      <entry>MEDIA_BUS_FMT_SGRBG12_1X12</entry>
- 	      <entry>0x3011</entry>
- 	      <entry></entry>
- 	      <entry>g<subscript>11</subscript></entry>
-@@ -1122,8 +1122,8 @@
- 	      <entry>g<subscript>1</subscript></entry>
- 	      <entry>g<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-SRGGB12-1X12">
--	      <entry>V4L2_MBUS_FMT_SRGGB12_1X12</entry>
-+	    <row id="MEDIA-BUS-FMT-SRGGB12-1X12">
-+	      <entry>MEDIA_BUS_FMT_SRGGB12_1X12</entry>
- 	      <entry>0x3012</entry>
- 	      <entry></entry>
- 	      <entry>r<subscript>11</subscript></entry>
-@@ -1175,7 +1175,7 @@
- 
-       <para>For instance, a format where pixels are encoded as 8-bit YUV values
-       downsampled to 4:2:2 and transferred as 2 8-bit bus samples per pixel in the
--      U, Y, V, Y order will be named <constant>V4L2_MBUS_FMT_UYVY8_2X8</constant>.
-+      U, Y, V, Y order will be named <constant>MEDIA_BUS_FMT_UYVY8_2X8</constant>.
-       </para>
- 
- 	<para><xref linkend="v4l2-mbus-pixelcode-yuv8"/> lists existing packed YUV
-@@ -1280,8 +1280,8 @@
- 	    </row>
- 	  </thead>
- 	  <tbody valign="top">
--	    <row id="V4L2-MBUS-FMT-Y8-1X8">
--	      <entry>V4L2_MBUS_FMT_Y8_1X8</entry>
-+	    <row id="MEDIA-BUS-FMT-Y8-1X8">
-+	      <entry>MEDIA_BUS_FMT_Y8_1X8</entry>
- 	      <entry>0x2001</entry>
- 	      <entry></entry>
- 	      &dash-ent-24;
-@@ -1294,8 +1294,8 @@
- 	      <entry>y<subscript>1</subscript></entry>
- 	      <entry>y<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-UV8-1X8">
--	      <entry>V4L2_MBUS_FMT_UV8_1X8</entry>
-+	    <row id="MEDIA-BUS-FMT-UV8-1X8">
-+	      <entry>MEDIA_BUS_FMT_UV8_1X8</entry>
- 	      <entry>0x2015</entry>
- 	      <entry></entry>
- 	      &dash-ent-24;
-@@ -1322,8 +1322,8 @@
- 	      <entry>v<subscript>1</subscript></entry>
- 	      <entry>v<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-UYVY8-1_5X8">
--	      <entry>V4L2_MBUS_FMT_UYVY8_1_5X8</entry>
-+	    <row id="MEDIA-BUS-FMT-UYVY8-1_5X8">
-+	      <entry>MEDIA_BUS_FMT_UYVY8_1_5X8</entry>
- 	      <entry>0x2002</entry>
- 	      <entry></entry>
- 	      &dash-ent-24;
-@@ -1406,8 +1406,8 @@
- 	      <entry>y<subscript>1</subscript></entry>
- 	      <entry>y<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-VYUY8-1_5X8">
--	      <entry>V4L2_MBUS_FMT_VYUY8_1_5X8</entry>
-+	    <row id="MEDIA-BUS-FMT-VYUY8-1_5X8">
-+	      <entry>MEDIA_BUS_FMT_VYUY8_1_5X8</entry>
- 	      <entry>0x2003</entry>
- 	      <entry></entry>
- 	      &dash-ent-24;
-@@ -1490,8 +1490,8 @@
- 	      <entry>y<subscript>1</subscript></entry>
- 	      <entry>y<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-YUYV8-1_5X8">
--	      <entry>V4L2_MBUS_FMT_YUYV8_1_5X8</entry>
-+	    <row id="MEDIA-BUS-FMT-YUYV8-1_5X8">
-+	      <entry>MEDIA_BUS_FMT_YUYV8_1_5X8</entry>
- 	      <entry>0x2004</entry>
- 	      <entry></entry>
- 	      &dash-ent-24;
-@@ -1574,8 +1574,8 @@
- 	      <entry>v<subscript>1</subscript></entry>
- 	      <entry>v<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-YVYU8-1_5X8">
--	      <entry>V4L2_MBUS_FMT_YVYU8_1_5X8</entry>
-+	    <row id="MEDIA-BUS-FMT-YVYU8-1_5X8">
-+	      <entry>MEDIA_BUS_FMT_YVYU8_1_5X8</entry>
- 	      <entry>0x2005</entry>
- 	      <entry></entry>
- 	      &dash-ent-24;
-@@ -1658,8 +1658,8 @@
- 	      <entry>u<subscript>1</subscript></entry>
- 	      <entry>u<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-UYVY8-2X8">
--	      <entry>V4L2_MBUS_FMT_UYVY8_2X8</entry>
-+	    <row id="MEDIA-BUS-FMT-UYVY8-2X8">
-+	      <entry>MEDIA_BUS_FMT_UYVY8_2X8</entry>
- 	      <entry>0x2006</entry>
- 	      <entry></entry>
- 	      &dash-ent-24;
-@@ -1714,8 +1714,8 @@
- 	      <entry>y<subscript>1</subscript></entry>
- 	      <entry>y<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-VYUY8-2X8">
--	      <entry>V4L2_MBUS_FMT_VYUY8_2X8</entry>
-+	    <row id="MEDIA-BUS-FMT-VYUY8-2X8">
-+	      <entry>MEDIA_BUS_FMT_VYUY8_2X8</entry>
- 	      <entry>0x2007</entry>
- 	      <entry></entry>
- 	      &dash-ent-24;
-@@ -1770,8 +1770,8 @@
- 	      <entry>y<subscript>1</subscript></entry>
- 	      <entry>y<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-YUYV8-2X8">
--	      <entry>V4L2_MBUS_FMT_YUYV8_2X8</entry>
-+	    <row id="MEDIA-BUS-FMT-YUYV8-2X8">
-+	      <entry>MEDIA_BUS_FMT_YUYV8_2X8</entry>
- 	      <entry>0x2008</entry>
- 	      <entry></entry>
- 	      &dash-ent-24;
-@@ -1826,8 +1826,8 @@
- 	      <entry>v<subscript>1</subscript></entry>
- 	      <entry>v<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-YVYU8-2X8">
--	      <entry>V4L2_MBUS_FMT_YVYU8_2X8</entry>
-+	    <row id="MEDIA-BUS-FMT-YVYU8-2X8">
-+	      <entry>MEDIA_BUS_FMT_YVYU8_2X8</entry>
- 	      <entry>0x2009</entry>
- 	      <entry></entry>
- 	      &dash-ent-24;
-@@ -1882,8 +1882,8 @@
- 	      <entry>u<subscript>1</subscript></entry>
- 	      <entry>u<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-Y10-1X10">
--	      <entry>V4L2_MBUS_FMT_Y10_1X10</entry>
-+	    <row id="MEDIA-BUS-FMT-Y10-1X10">
-+	      <entry>MEDIA_BUS_FMT_Y10_1X10</entry>
- 	      <entry>0x200a</entry>
- 	      <entry></entry>
- 	      &dash-ent-22;
-@@ -1898,8 +1898,8 @@
- 	      <entry>y<subscript>1</subscript></entry>
- 	      <entry>y<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-UYVY10-2X10">
--	      <entry>V4L2_MBUS_FMT_UYVY10_2X10</entry>
-+	    <row id="MEDIA-BUS-FMT-UYVY10-2X10">
-+	      <entry>MEDIA_BUS_FMT_UYVY10_2X10</entry>
- 	      <entry>0x2018</entry>
- 	      <entry></entry>
- 	      &dash-ent-22;
-@@ -1962,8 +1962,8 @@
- 	      <entry>y<subscript>1</subscript></entry>
- 	      <entry>y<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-VYUY10-2X10">
--	      <entry>V4L2_MBUS_FMT_VYUY10_2X10</entry>
-+	    <row id="MEDIA-BUS-FMT-VYUY10-2X10">
-+	      <entry>MEDIA_BUS_FMT_VYUY10_2X10</entry>
- 	      <entry>0x2019</entry>
- 	      <entry></entry>
- 	      &dash-ent-22;
-@@ -2026,8 +2026,8 @@
- 	      <entry>y<subscript>1</subscript></entry>
- 	      <entry>y<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-YUYV10-2X10">
--	      <entry>V4L2_MBUS_FMT_YUYV10_2X10</entry>
-+	    <row id="MEDIA-BUS-FMT-YUYV10-2X10">
-+	      <entry>MEDIA_BUS_FMT_YUYV10_2X10</entry>
- 	      <entry>0x200b</entry>
- 	      <entry></entry>
- 	      &dash-ent-22;
-@@ -2090,8 +2090,8 @@
- 	      <entry>v<subscript>1</subscript></entry>
- 	      <entry>v<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-YVYU10-2X10">
--	      <entry>V4L2_MBUS_FMT_YVYU10_2X10</entry>
-+	    <row id="MEDIA-BUS-FMT-YVYU10-2X10">
-+	      <entry>MEDIA_BUS_FMT_YVYU10_2X10</entry>
- 	      <entry>0x200c</entry>
- 	      <entry></entry>
- 	      &dash-ent-22;
-@@ -2154,8 +2154,8 @@
- 	      <entry>u<subscript>1</subscript></entry>
- 	      <entry>u<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-Y12-1X12">
--	      <entry>V4L2_MBUS_FMT_Y12_1X12</entry>
-+	    <row id="MEDIA-BUS-FMT-Y12-1X12">
-+	      <entry>MEDIA_BUS_FMT_Y12_1X12</entry>
- 	      <entry>0x2013</entry>
- 	      <entry></entry>
- 	      &dash-ent-20;
-@@ -2172,8 +2172,8 @@
- 	      <entry>y<subscript>1</subscript></entry>
- 	      <entry>y<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-UYVY8-1X16">
--	      <entry>V4L2_MBUS_FMT_UYVY8_1X16</entry>
-+	    <row id="MEDIA-BUS-FMT-UYVY8-1X16">
-+	      <entry>MEDIA_BUS_FMT_UYVY8_1X16</entry>
- 	      <entry>0x200f</entry>
- 	      <entry></entry>
- 	      &dash-ent-16;
-@@ -2216,8 +2216,8 @@
- 	      <entry>y<subscript>1</subscript></entry>
- 	      <entry>y<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-VYUY8-1X16">
--	      <entry>V4L2_MBUS_FMT_VYUY8_1X16</entry>
-+	    <row id="MEDIA-BUS-FMT-VYUY8-1X16">
-+	      <entry>MEDIA_BUS_FMT_VYUY8_1X16</entry>
- 	      <entry>0x2010</entry>
- 	      <entry></entry>
- 	      &dash-ent-16;
-@@ -2260,8 +2260,8 @@
- 	      <entry>y<subscript>1</subscript></entry>
- 	      <entry>y<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-YUYV8-1X16">
--	      <entry>V4L2_MBUS_FMT_YUYV8_1X16</entry>
-+	    <row id="MEDIA-BUS-FMT-YUYV8-1X16">
-+	      <entry>MEDIA_BUS_FMT_YUYV8_1X16</entry>
- 	      <entry>0x2011</entry>
- 	      <entry></entry>
- 	      &dash-ent-16;
-@@ -2304,8 +2304,8 @@
- 	      <entry>v<subscript>1</subscript></entry>
- 	      <entry>v<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-YVYU8-1X16">
--	      <entry>V4L2_MBUS_FMT_YVYU8_1X16</entry>
-+	    <row id="MEDIA-BUS-FMT-YVYU8-1X16">
-+	      <entry>MEDIA_BUS_FMT_YVYU8_1X16</entry>
- 	      <entry>0x2012</entry>
- 	      <entry></entry>
- 	      &dash-ent-16;
-@@ -2348,8 +2348,8 @@
- 	      <entry>u<subscript>1</subscript></entry>
- 	      <entry>u<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-YDYUYDYV8-1X16">
--	      <entry>V4L2_MBUS_FMT_YDYUYDYV8_1X16</entry>
-+	    <row id="MEDIA-BUS-FMT-YDYUYDYV8-1X16">
-+	      <entry>MEDIA_BUS_FMT_YDYUYDYV8_1X16</entry>
- 	      <entry>0x2014</entry>
- 	      <entry></entry>
- 	      &dash-ent-16;
-@@ -2436,8 +2436,8 @@
- 	      <entry>v<subscript>1</subscript></entry>
- 	      <entry>v<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-UYVY10-1X20">
--	      <entry>V4L2_MBUS_FMT_UYVY10_1X20</entry>
-+	    <row id="MEDIA-BUS-FMT-UYVY10-1X20">
-+	      <entry>MEDIA_BUS_FMT_UYVY10_1X20</entry>
- 	      <entry>0x201a</entry>
- 	      <entry></entry>
- 	      &dash-ent-12;
-@@ -2488,8 +2488,8 @@
- 	      <entry>y<subscript>1</subscript></entry>
- 	      <entry>y<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-VYUY10-1X20">
--	      <entry>V4L2_MBUS_FMT_VYUY10_1X20</entry>
-+	    <row id="MEDIA-BUS-FMT-VYUY10-1X20">
-+	      <entry>MEDIA_BUS_FMT_VYUY10_1X20</entry>
- 	      <entry>0x201b</entry>
- 	      <entry></entry>
- 	      &dash-ent-12;
-@@ -2540,8 +2540,8 @@
- 	      <entry>y<subscript>1</subscript></entry>
- 	      <entry>y<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-YUYV10-1X20">
--	      <entry>V4L2_MBUS_FMT_YUYV10_1X20</entry>
-+	    <row id="MEDIA-BUS-FMT-YUYV10-1X20">
-+	      <entry>MEDIA_BUS_FMT_YUYV10_1X20</entry>
- 	      <entry>0x200d</entry>
- 	      <entry></entry>
- 	      &dash-ent-12;
-@@ -2592,8 +2592,8 @@
- 	      <entry>v<subscript>1</subscript></entry>
- 	      <entry>v<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-YVYU10-1X20">
--	      <entry>V4L2_MBUS_FMT_YVYU10_1X20</entry>
-+	    <row id="MEDIA-BUS-FMT-YVYU10-1X20">
-+	      <entry>MEDIA_BUS_FMT_YVYU10_1X20</entry>
- 	      <entry>0x200e</entry>
- 	      <entry></entry>
- 	      &dash-ent-12;
-@@ -2644,8 +2644,8 @@
- 	      <entry>u<subscript>1</subscript></entry>
- 	      <entry>u<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-YUV10-1X30">
--	      <entry>V4L2_MBUS_FMT_YUV10_1X30</entry>
-+	    <row id="MEDIA-BUS-FMT-YUV10-1X30">
-+	      <entry>MEDIA_BUS_FMT_YUV10_1X30</entry>
- 	      <entry>0x2016</entry>
- 	      <entry></entry>
- 	      <entry>-</entry>
-@@ -2681,8 +2681,8 @@
- 	      <entry>v<subscript>1</subscript></entry>
- 	      <entry>v<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-AYUV8-1X32">
--	      <entry>V4L2_MBUS_FMT_AYUV8_1X32</entry>
-+	    <row id="MEDIA-BUS-FMT-AYUV8-1X32">
-+	      <entry>MEDIA_BUS_FMT_AYUV8_1X32</entry>
- 	      <entry>0x2017</entry>
- 	      <entry></entry>
- 	      <entry>a<subscript>7</subscript></entry>
-@@ -2718,8 +2718,8 @@
- 	      <entry>v<subscript>1</subscript></entry>
- 	      <entry>v<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-UYVY12-2X12">
--	      <entry>V4L2_MBUS_FMT_UYVY12_2X12</entry>
-+	    <row id="MEDIA-BUS-FMT-UYVY12-2X12">
-+	      <entry>MEDIA_BUS_FMT_UYVY12_2X12</entry>
- 	      <entry>0x201c</entry>
- 	      <entry></entry>
- 	      &dash-ent-20;
-@@ -2790,8 +2790,8 @@
- 	      <entry>y<subscript>1</subscript></entry>
- 	      <entry>y<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-VYUY12-2X12">
--	      <entry>V4L2_MBUS_FMT_VYUY12_2X12</entry>
-+	    <row id="MEDIA-BUS-FMT-VYUY12-2X12">
-+	      <entry>MEDIA_BUS_FMT_VYUY12_2X12</entry>
- 	      <entry>0x201d</entry>
- 	      <entry></entry>
- 	      &dash-ent-20;
-@@ -2862,8 +2862,8 @@
- 	      <entry>y<subscript>1</subscript></entry>
- 	      <entry>y<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-YUYV12-2X12">
--	      <entry>V4L2_MBUS_FMT_YUYV12_2X12</entry>
-+	    <row id="MEDIA-BUS-FMT-YUYV12-2X12">
-+	      <entry>MEDIA_BUS_FMT_YUYV12_2X12</entry>
- 	      <entry>0x201e</entry>
- 	      <entry></entry>
- 	      &dash-ent-20;
-@@ -2934,8 +2934,8 @@
- 	      <entry>v<subscript>1</subscript></entry>
- 	      <entry>v<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-YVYU12-2X12">
--	      <entry>V4L2_MBUS_FMT_YVYU12_2X12</entry>
-+	    <row id="MEDIA-BUS-FMT-YVYU12-2X12">
-+	      <entry>MEDIA_BUS_FMT_YVYU12_2X12</entry>
- 	      <entry>0x201f</entry>
- 	      <entry></entry>
- 	      &dash-ent-20;
-@@ -3006,8 +3006,8 @@
- 	      <entry>u<subscript>1</subscript></entry>
- 	      <entry>u<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-UYVY12-1X24">
--	      <entry>V4L2_MBUS_FMT_UYVY12_1X24</entry>
-+	    <row id="MEDIA-BUS-FMT-UYVY12-1X24">
-+	      <entry>MEDIA_BUS_FMT_UYVY12_1X24</entry>
- 	      <entry>0x2020</entry>
- 	      <entry></entry>
- 	      &dash-ent-8;
-@@ -3066,8 +3066,8 @@
- 	      <entry>y<subscript>1</subscript></entry>
- 	      <entry>y<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-VYUY12-1X24">
--	      <entry>V4L2_MBUS_FMT_VYUY12_1X24</entry>
-+	    <row id="MEDIA-BUS-FMT-VYUY12-1X24">
-+	      <entry>MEDIA_BUS_FMT_VYUY12_1X24</entry>
- 	      <entry>0x2021</entry>
- 	      <entry></entry>
- 	      &dash-ent-8;
-@@ -3126,8 +3126,8 @@
- 	      <entry>y<subscript>1</subscript></entry>
- 	      <entry>y<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-YUYV12-1X24">
--	      <entry>V4L2_MBUS_FMT_YUYV12_1X24</entry>
-+	    <row id="MEDIA-BUS-FMT-YUYV12-1X24">
-+	      <entry>MEDIA_BUS_FMT_YUYV12_1X24</entry>
- 	      <entry>0x2022</entry>
- 	      <entry></entry>
- 	      &dash-ent-8;
-@@ -3186,8 +3186,8 @@
- 	      <entry>v<subscript>1</subscript></entry>
- 	      <entry>v<subscript>0</subscript></entry>
- 	    </row>
--	    <row id="V4L2-MBUS-FMT-YVYU12-1X24">
--	      <entry>V4L2_MBUS_FMT_YVYU12_1X24</entry>
-+	    <row id="MEDIA-BUS-FMT-YVYU12-1X24">
-+	      <entry>MEDIA_BUS_FMT_YVYU12_1X24</entry>
- 	      <entry>0x2023</entry>
- 	      <entry></entry>
- 	      &dash-ent-8;
-@@ -3366,8 +3366,8 @@
- 	    </row>
- 	  </thead>
- 	  <tbody valign="top">
--	    <row id="V4L2-MBUS-FMT-AHSV8888-1X32">
--	      <entry>V4L2_MBUS_FMT_AHSV8888_1X32</entry>
-+	    <row id="MEDIA-BUS-FMT-AHSV8888-1X32">
-+	      <entry>MEDIA_BUS_FMT_AHSV8888_1X32</entry>
- 	      <entry>0x6001</entry>
- 	      <entry></entry>
- 	      <entry>a<subscript>7</subscript></entry>
-@@ -3422,7 +3422,7 @@
-       </para>
- 
-       <para>For instance, for a JPEG baseline process and an 8-bit bus width
--        the format will be named <constant>V4L2_MBUS_FMT_JPEG_1X8</constant>.
-+        the format will be named <constant>MEDIA_BUS_FMT_JPEG_1X8</constant>.
-       </para>
- 
-       <para>The following table lists existing JPEG compressed formats.</para>
-@@ -3441,8 +3441,8 @@
- 	    </row>
- 	  </thead>
- 	  <tbody valign="top">
--	    <row id="V4L2-MBUS-FMT-JPEG-1X8">
--	      <entry>V4L2_MBUS_FMT_JPEG_1X8</entry>
-+	    <row id="MEDIA-BUS-FMT-JPEG-1X8">
-+	      <entry>MEDIA_BUS_FMT_JPEG_1X8</entry>
- 	      <entry>0x4001</entry>
- 	      <entry>Besides of its usage for the parallel bus this format is
- 		recommended for transmission of JPEG data over MIPI CSI bus
-@@ -3484,8 +3484,8 @@ interface and may change in the future.</para>
- 	    </row>
- 	  </thead>
- 	  <tbody valign="top">
--	    <row id="V4L2-MBUS-FMT-S5C-UYVY-JPEG-1X8">
--	      <entry>V4L2_MBUS_FMT_S5C_UYVY_JPEG_1X8</entry>
-+	    <row id="MEDIA-BUS-FMT-S5C-UYVY-JPEG-1X8">
-+	      <entry>MEDIA_BUS_FMT_S5C_UYVY_JPEG_1X8</entry>
- 	      <entry>0x5001</entry>
- 	      <entry>
- 		Interleaved raw UYVY and JPEG image format with embedded
-diff --git a/include/uapi/linux/v4l2-mediabus.h b/include/uapi/linux/v4l2-mediabus.h
-index f471064..9fbe891 100644
---- a/include/uapi/linux/v4l2-mediabus.h
-+++ b/include/uapi/linux/v4l2-mediabus.h
-@@ -32,6 +32,8 @@ enum v4l2_mbus_pixelcode {
- 	MEDIA_BUS_TO_V4L2_MBUS(RGB888_2X12_BE),
- 	MEDIA_BUS_TO_V4L2_MBUS(RGB888_2X12_LE),
- 	MEDIA_BUS_TO_V4L2_MBUS(ARGB8888_1X32),
-+	MEDIA_BUS_TO_V4L2_MBUS(RGB444_1X12),
-+	MEDIA_BUS_TO_V4L2_MBUS(RGB565_1X16),
- 
- 	MEDIA_BUS_TO_V4L2_MBUS(Y8_1X8),
- 	MEDIA_BUS_TO_V4L2_MBUS(UV8_1X8),
 -- 
 1.9.1
