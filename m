@@ -1,28 +1,90 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Tue, 04 Nov 2014 18:06:37 +0100
+From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
+Date: Tue, 4 Nov 2014 12:02:33 -0500
 Subject: [PATCH 11/13] arm: dts: dra7: add DMA properties for UART
-In-Reply-To: <20141104170233.GB24112@csclub.uwaterloo.ca>
+In-Reply-To: <1412014009-13315-12-git-send-email-bigeasy@linutronix.de>
 References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
  <1412014009-13315-12-git-send-email-bigeasy@linutronix.de>
- <20141104170233.GB24112@csclub.uwaterloo.ca>
-Message-ID: <5459079D.7080703@linutronix.de>
+Message-ID: <20141104170233.GB24112@csclub.uwaterloo.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2014 06:02 PM, Lennart Sorensen wrote:
+On Mon, Sep 29, 2014 at 08:06:47PM +0200, Sebastian Andrzej Siewior wrote:
+> Cc: devicetree at vger.kernel.org
+> Reviewed-by: Tony Lindgren <tony@atomide.com>
+> Tested-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> ---
+>  arch/arm/boot/dts/dra7.dtsi | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 > 
-> According to the manual the DMA channels for UART7 to 10 are:
-> 
-> uart7:  144 145
-> uart8:  146 147
-> uart9:  148 149
-> uart10: 150 151
-> 
-> Might as well add those too.  We have uart 7 and 8 in use on our board
-> so I am about to go test it.
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index d678152db4cb..f273e3811f75 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -332,6 +332,8 @@
+>  			ti,hwmods = "uart1";
+>  			clock-frequency = <48000000>;
+>  			status = "disabled";
+> +			dmas = <&sdma 49>, <&sdma 50>;
+> +			dma-names = "tx", "rx";
+>  		};
+>  
+>  		uart2: serial at 4806c000 {
+> @@ -341,6 +343,8 @@
+>  			ti,hwmods = "uart2";
+>  			clock-frequency = <48000000>;
+>  			status = "disabled";
+> +			dmas = <&sdma 51>, <&sdma 52>;
+> +			dma-names = "tx", "rx";
+>  		};
+>  
+>  		uart3: serial at 48020000 {
+> @@ -350,6 +354,8 @@
+>  			ti,hwmods = "uart3";
+>  			clock-frequency = <48000000>;
+>  			status = "disabled";
+> +			dmas = <&sdma 53>, <&sdma 54>;
+> +			dma-names = "tx", "rx";
+>  		};
+>  
+>  		uart4: serial at 4806e000 {
+> @@ -359,6 +365,8 @@
+>  			ti,hwmods = "uart4";
+>  			clock-frequency = <48000000>;
+>                          status = "disabled";
+> +			dmas = <&sdma 55>, <&sdma 56>;
+> +			dma-names = "tx", "rx";
+>  		};
+>  
+>  		uart5: serial at 48066000 {
+> @@ -368,6 +376,8 @@
+>  			ti,hwmods = "uart5";
+>  			clock-frequency = <48000000>;
+>  			status = "disabled";
+> +			dmas = <&sdma 63>, <&sdma 64>;
+> +			dma-names = "tx", "rx";
+>  		};
+>  
+>  		uart6: serial at 48068000 {
+> @@ -377,6 +387,8 @@
+>  			ti,hwmods = "uart6";
+>  			clock-frequency = <48000000>;
+>  			status = "disabled";
+> +			dmas = <&sdma 79>, <&sdma 80>;
+> +			dma-names = "tx", "rx";
+>  		};
+>  
+>  		uart7: serial at 48420000 {
 
-Mind sharing the manual with me? Mine does not mention DMA channels for
-UART7-10. If you are able to test 7+8 (and it works) could you please
-make patch which with for the remaining four devices?
+According to the manual the DMA channels for UART7 to 10 are:
 
-Sebastian
+uart7:  144 145
+uart8:  146 147
+uart9:  148 149
+uart10: 150 151
+
+Might as well add those too.  We have uart 7 and 8 in use on our board
+so I am about to go test it.
+
+-- 
+Len Sorensen
