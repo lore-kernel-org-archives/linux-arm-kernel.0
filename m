@@ -1,71 +1,123 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  4 Nov 2014 10:50:28 +0900
-Subject: [PATCH 05/10] ARM: shmobile: dts: Add common file for AA104XD12 panel
+Date: Tue,  4 Nov 2014 10:50:29 +0900
+Subject: [PATCH 06/10] ARM: shmobile: marzen: Enable DU device in DT
 In-Reply-To: <cover.1415058552.git.horms+renesas@verge.net.au>
 References: <cover.1415058552.git.horms+renesas@verge.net.au>
-Message-ID: <2610027a48300acc3b98565c7f48b2a48aa6287e.1415058552.git.horms+renesas@verge.net.au>
+Message-ID: <a7aee3ac437be568e6285c10d765ec074fa19587.1415058552.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The Mitsubishi AA104XD12 panel is commonly used with the Marzen, Lager
-and Koelsch boards. Create a .dtsi file that describe the panel and its
-connection to the board.
+Specify the DU output topology, enable the DU device and configure the
+related pins.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a77xx-aa104xd12-panel.dtsi | 41 ++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
- create mode 100644 arch/arm/boot/dts/r8a77xx-aa104xd12-panel.dtsi
+ arch/arm/boot/dts/r8a7779-marzen.dts | 83 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 83 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a77xx-aa104xd12-panel.dtsi b/arch/arm/boot/dts/r8a77xx-aa104xd12-panel.dtsi
-new file mode 100644
-index 0000000..65cb50f
---- /dev/null
-+++ b/arch/arm/boot/dts/r8a77xx-aa104xd12-panel.dtsi
-@@ -0,0 +1,41 @@
-+/*
-+ * Common file for the AA104XD12 panel connected to Renesas R-Car boards
-+ *
-+ * Copyright (C) 2014 Renesas Electronics Corp.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
+diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts b/arch/arm/boot/dts/r8a7779-marzen.dts
+index c160404..765978f 100644
+--- a/arch/arm/boot/dts/r8a7779-marzen.dts
++++ b/arch/arm/boot/dts/r8a7779-marzen.dts
+@@ -68,6 +68,78 @@
+ 			gpios = <&gpio4 31 GPIO_ACTIVE_HIGH>;
+ 		};
+ 	};
 +
-+/ {
-+	panel {
-+		compatible = "mitsubishi,aa104xd12", "panel-dpi";
++	vga-encoder {
++		compatible = "adi,adv7123";
 +
-+		width-mm = <210>;
-+		height-mm = <158>;
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
 +
-+		panel-timing {
-+			/* 1024x768 @65Hz */
-+			clock-frequency = <65000000>;
-+			hactive = <1024>;
-+			vactive = <768>;
-+			hsync-len = <136>;
-+			hfront-porch = <20>;
-+			hback-porch = <160>;
-+			vfront-porch = <3>;
-+			vback-porch = <29>;
-+			vsync-len = <6>;
++			port at 0 {
++				reg = <0>;
++				vga_enc_in: endpoint {
++					remote-endpoint = <&du_out_rgb0>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				vga_enc_out: endpoint {
++					remote-endpoint = <&vga_in>;
++				};
++			};
 +		};
++	};
++
++	vga {
++		compatible = "vga-connector";
 +
 +		port {
-+			panel_in: endpoint {
-+				remote-endpoint = <&lvds_connector>;
++			vga_in: endpoint {
++				remote-endpoint = <&vga_enc_out>;
++			};
++		};
++	};
++
++	lvds-encoder {
++		compatible = "thine,thc63lvdm83d";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				lvds_enc_in: endpoint {
++					remote-endpoint = <&du_out_rgb1>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				lvds_connector: endpoint {
++				};
 +			};
 +		};
 +	};
 +};
 +
-+&lvds_connector {
-+	remote-endpoint = <&panel_in>;
-+};
++&du {
++	pinctrl-0 = <&du_pins>;
++	pinctrl-names = "default";
++	status = "okay";
++
++	ports {
++		port at 0 {
++			endpoint {
++				remote-endpoint = <&vga_enc_in>;
++			};
++		};
++		port at 1 {
++			endpoint {
++				remote-endpoint = <&lvds_enc_in>;
++			};
++		};
++	};
+ };
+ 
+ &irqpin0 {
+@@ -83,6 +155,17 @@
+ };
+ 
+ &pfc {
++	du_pins: du {
++		du0 {
++			renesas,groups = "du0_rgb888", "du0_sync_1", "du0_clk_out_0";
++			renesas,function = "du0";
++		};
++		du1 {
++			renesas,groups = "du1_rgb666", "du1_sync_1", "du1_clk_out";
++			renesas,function = "du1";
++		};
++	};
++
+ 	lan0_pins: lan0 {
+ 		intc {
+ 			renesas,groups = "intc_irq1_b";
 -- 
 2.1.1
