@@ -1,84 +1,56 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Mon, 03 Nov 2014 19:00:52 -0800
-Subject: [PATCH 2/2] tty: serial: msm: Support sysrq on uartDM devices
-In-Reply-To: <54575361.1080400@linaro.org>
-References: <1414606478-13709-1-git-send-email-sboyd@codeaurora.org>
- <1414606478-13709-3-git-send-email-sboyd@codeaurora.org>
- <54522163.8030408@linaro.org> <20141031064130.GG12469@codeaurora.org>
- <545359AB.8070503@linaro.org> <5453D00F.5000906@gmail.com>
- <54575361.1080400@linaro.org>
-Message-ID: <54584164.1080209@gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon,  3 Nov 2014 19:07:48 -0800
+Subject: [PATCH] ARM: v7: replace magic numbers with CP15 macros
+Message-ID: <1415070468-4667-1-git-send-email-computersforpeace@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/3/2014 2:05 AM, Daniel Thompson wrote:
-> On 31/10/14 18:08, Frank Rowand wrote:
->> On 10/31/2014 2:43 AM, Daniel Thompson wrote:
->>> On 31/10/14 06:41, Stephen Boyd wrote:
->>>> On 10/30, Daniel Thompson wrote:
->>>>> On 29/10/14 18:14, Stephen Boyd wrote:
->>>>>> +		r_count = min_t(int, count, sizeof(buf));
->>>>>> +
->>>>>> +		for (i = 0; i < r_count; i++) {
->>>>>> +			char flag = TTY_NORMAL;
->>>>>>  
->>>>>> -		/* TODO: handle sysrq */
->>>>>> -		tty_insert_flip_string(tport, buf, min(count, 4));
->>>>>> -		count -= 4;
->>>>>> +			if (msm_port->break_detected && buf[i] == 0) {
->>>>>> +				port->icount.brk++;
->>>>>> +				flag = TTY_BREAK;
->>>>>> +				msm_port->break_detected = false;
->>>>>> +				if (uart_handle_break(port))
->>>>>> +					continue;
->>>>>> +			}
->>>>>> +
->>>>>> +			if (!(port->read_status_mask & UART_SR_RX_BREAK))
->>>>>> +				flag = TTY_NORMAL;
->>>>>
->>>>> flag is already known to be TTY_NORMAL.
->>>>
->>>> Huh? If we detected a break we would set the flag to TTY_BREAK
->>>> and if uart_handle_break() returned 0 (perhaps sysrq config is
->>>> diasbled) then we would get down here, and then we want to reset
->>>> the flag to TTY_NORMAL if the read_status_mask bits indicate that
->>>> we want to skip checking for breaks. Otherwise we want to
->>>> indicate to the tty layer that it's a break character.
->>>
->>> Agreed. Sorry for noise.
->>>
->>> It now reaches the level of silly quibble (meaning I won't bother to
->>> raise the issue again if there is a v2 patch) but perhaps updating the
->>> flag after the continue would be easier to read.
->>>
->>>
->>>>>> +
->>>>>> +			spin_unlock(&port->lock);
->>>>>
->>>>> Is it safe to unlock at this point? count may no longer be valid when we
->>>>> return.
->>>>
->>>> Can you explain further? If it actually isn't valid something
->>>> needs to be done. I believe other serial drivers are doing this
->>>> sort of thing though so it doesn't seem that uncommon (of course
->>>> those drivers could also be broken I suppose).
->>>
->>> Calling spin_unlock() means we are allow code to alter the state of the
->>> UART. In particular the subsequent call to uart_handle_sysrq_char() can
->>> make significant changes to the FIFO state (by calling the poll_char
->>> functions). Given count is shadowing the FIFO state, when we retake the
->>> lock I think it is possible for count to no longer be valid.
->>
->> uart_handle_sysrq_char() will not _read_ from the serial port.  So it will
->> not directly modify the FIFO state.
-> 
-> poll_char does not read from the FIFO? Since when?
-> 
-> SysRq-g will enter cause the system to enter kdb/kgdb from within
-> uart_handle_sysrq_char().
+These CP15 register bit-masks are slightly more readable when using the
+CP15 macro definitions from <asm/cp15.h>. They also assist in grepping
+for sites which mess with SCTLR bits.
 
-Aarrgh.  You are correct.  I overlooked the obvious SysRq-g.
+Tested on a B15 SMP x4 system, and checked the disassembly before/after
+to confirm equivalence.
 
-/me searches for paper bag.
+Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+---
+ arch/arm/mm/proc-v7.S | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
--Frank
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index b3a947863ac7..3f9dbe91168b 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -13,6 +13,7 @@
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
+ #include <asm/asm-offsets.h>
++#include <asm/cp15.h>
+ #include <asm/hwcap.h>
+ #include <asm/pgtable-hwdef.h>
+ #include <asm/pgtable.h>
+@@ -31,8 +32,8 @@ ENDPROC(cpu_v7_proc_init)
+ 
+ ENTRY(cpu_v7_proc_fin)
+ 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
+-	bic	r0, r0, #0x1000			@ ...i............
+-	bic	r0, r0, #0x0006			@ .............ca.
++	bic	r0, r0, #CR_I			@ ...i............
++	bic	r0, r0, #(CR_C | CR_A)		@ .............ca.
+ 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
+ 	ret	lr
+ ENDPROC(cpu_v7_proc_fin)
+@@ -53,8 +54,8 @@ ENDPROC(cpu_v7_proc_fin)
+ 	.pushsection	.idmap.text, "ax"
+ ENTRY(cpu_v7_reset)
+ 	mrc	p15, 0, r1, c1, c0, 0		@ ctrl register
+-	bic	r1, r1, #0x1			@ ...............m
+- THUMB(	bic	r1, r1, #1 << 30 )		@ SCTLR.TE (Thumb exceptions)
++	bic	r1, r1, #CR_M			@ ...............m
++ THUMB(	bic	r1, r1, #CR_TE )		@ SCTLR.TE (Thumb exceptions)
+ 	mcr	p15, 0, r1, c1, c0, 0		@ disable MMU
+ 	isb
+ 	bx	r0
+-- 
+1.9.1
