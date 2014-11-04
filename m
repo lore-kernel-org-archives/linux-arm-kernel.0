@@ -1,32 +1,71 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 4 Nov 2014 13:05:47 -0200
-Subject: [PATCH v2] ARM: imx: Fix the removal of CONFIG_SPI option
-In-Reply-To: <20141104110713.GK10821@tiger>
-References: <1415096927-4097-1-git-send-email-festevam@gmail.com>
- <20141104110713.GK10821@tiger>
-Message-ID: <CAOMZO5Bb+1UisCUe4Rz-6_7u6JpY3gj5M5Aui_odG9JS4dq8qw@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 04 Nov 2014 16:10:29 +0100
+Subject: [PATCH RESEND v2 0/7] power_supply: Decrement the device reference
+ counter
+Message-ID: <1415113836-26098-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
+Hi,
 
-On Tue, Nov 4, 2014 at 9:07 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Tue, Nov 04, 2014 at 08:28:47AM -0200, Fabio Estevam wrote:
->> From: Fabio Estevam <fabio.estevam@freescale.com>
->>
->> Since 64546e9fe3a5b8c ("ARM: imx_v6_v7_defconfig updates") and commit
->> 0650f855d2e4b0b9 ("ARM: imx_v4_v5_defconfig: Select CONFIG_IMX_WEIM") CONFIG_SPI
->> selection was dropped by savedefconfig for imx_v4_v5_defconfig and
->> imx_v6_v7_defconfig.
->>
->> In order to keep the same behaviour as previous kernel versions and avoid
->> regressions, let's add CONFIG_SPI option back.
->>
->> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
->
-> Applied, thanks.
 
-I have just sent a v3, with an explanation as to why savedefconfig
-dropped CONFIG_SPI=y.
+Resending with some new acks.
+Whole patchset should be taken at once (everything depends on patch 1).
+Depends on [1].
 
-Thanks to Uwe for his analysis!
+
+Changes since v1:
+=================
+1. Remove check for non-NULL in power_supply_put (suggested by
+   Pavel Machek).
+2. Add Pavel Machek's ack.
+
+
+Description:
+============
+The reference counter of device allocated for power supply was
+incremented with each call to power_supply_get_by_name() and
+power_supply_get_by_phandle().
+
+Add a symmetric 'put' operation so the device could be released after
+final put_device() call during supply unregistering.
+
+
+Rebased on next-20141104 + mine [1] patchset.
+Tested on Trats2 board (max77693 + charger manager).
+
+Kindly asking for reviewing and testing other drivers.
+
+Best regards,
+Krzysztof
+
+
+[1] power_supply: Add API for safe access of get_property-like function attrs
+https://lkml.org/lkml/2014/11/4/527
+
+
+Krzysztof Kozlowski (7):
+  power_supply: Add power_supply_put for decrementing device reference
+    counter
+  power: charger-manager: Decrement the power supply's device reference
+    counter
+  x86/olpc/xo1/sci: Use newly added power_supply_put API
+  x86/olpc/xo15/sci: Use newly added power_supply_put API
+  power: 88pm860x_charger: Decrement the power supply's device reference
+    counter
+  power: bq2415x_charger: Decrement the power supply's device reference
+    counter
+  mfd: ab8500: Decrement the power supply's device reference counter
+
+ arch/x86/platform/olpc/olpc-xo1-sci.c  |  4 +-
+ arch/x86/platform/olpc/olpc-xo15-sci.c |  4 +-
+ drivers/mfd/ab8500-sysctrl.c           |  2 +
+ drivers/power/88pm860x_charger.c       | 11 +++++-
+ drivers/power/bq2415x_charger.c        |  6 ++-
+ drivers/power/charger-manager.c        | 70 +++++++++++++++++++++++-----------
+ drivers/power/power_supply_core.c      | 38 ++++++++++++++++++
+ include/linux/power_supply.h           |  1 +
+ 8 files changed, 106 insertions(+), 30 deletions(-)
+
+-- 
+1.9.1
