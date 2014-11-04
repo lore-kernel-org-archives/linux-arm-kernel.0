@@ -1,82 +1,37 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 4 Nov 2014 10:29:20 -0800
-Subject: [PATCH v3 0/9] PM / Domains: Fix race conditions during boot
-In-Reply-To: <CAPDyKFr7fqwb77Xhnwf7ACFX7skrY2O+_-aB1T_yfShDA1jASA@mail.gmail.com>
-References: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
- <20141104090521.GA13219@dtor-glaptop>
- <CAPDyKFrMMnOwOHuVcpxBWNARKUsVyq66yuH+=LcS3K7bBiUTVA@mail.gmail.com>
- <3036013.4SXEGIT6Kk@vostro.rjw.lan>
- <CAPDyKFr7fqwb77Xhnwf7ACFX7skrY2O+_-aB1T_yfShDA1jASA@mail.gmail.com>
-Message-ID: <20141104182920.GB440@dtor-ws>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 4 Nov 2014 19:32:07 +0100
+Subject: [PATCH 11/13] arm: dts: dra7: add DMA properties for UART
+In-Reply-To: <20141104172117.GC24112@csclub.uwaterloo.ca>
+References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
+ <1412014009-13315-12-git-send-email-bigeasy@linutronix.de>
+ <20141104170233.GB24112@csclub.uwaterloo.ca>
+ <5459079D.7080703@linutronix.de>
+ <20141104172117.GC24112@csclub.uwaterloo.ca>
+Message-ID: <CABxcv=kT+M70Xoyf_z4eQQyM0Oo9S5Y0YeX2R6PbAqxK-JTLLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 04, 2014 at 06:01:44PM +0100, Ulf Hansson wrote:
-> >>
-> >> Devices that are created while "discoverable buses" are being probed
-> >> can't be attached to a PM domain before the probing is done, because
-> >> those simply doesn't exist.
-> >
-> > Honestly, I'm not sure what you're talking about.
-> >
-> > Devices on a "discoverable* bus (say PCI) are added when the *controller* is
-> > probed, not when *they* are probed.
-> 
-> Okay, so maybe "discoverable buses" isn't the proper term.
-> 
-> >
-> > You very much need to have a struct device registered to be able to call
-> > really_probe() for it.
-> 
-> Yes. But my point is that the struct device may be created dynamically
-> at some point in time.
+Hello,
 
-And that is fine.
+On Tue, Nov 4, 2014 at 6:21 PM, Lennart Sorensen
+<lsorense@csclub.uwaterloo.ca> wrote:
+>> Mind sharing the manual with me? Mine does not mention DMA channels for
+>> UART7-10. If you are able to test 7+8 (and it works) could you please
+>> make patch which with for the remaining four devices?
+>
+> Well the file I have is called AM572x_ES1.1_NDA_TRM_vT.pdf, so I am not
+> sure who I am allowed to share that file with.  Might be simpler to just
+> ask TI for the latest version.
+>
+> How I hate NDAs.
+>
 
-> 
-> This is how mmc/sd/sdio cards are handled. We don't have the
-> information about the card and thus not the struct device of it, until
-> we have detected it. Maybe we could at that point try to add the
-> device to its PM domain?
+I saw today an announcement about a public AM572x Silicon Revision 1.1
+TRM [0] that has just made available by TI. I'm not familiar with this
+SoC so I don't know if that has the information you want but I thought
+it was worth to mention in case it did.
 
-Well, I think we need to first define what PM domain they will fall
-into. Do they have to be in one? The concept of power domain, as far as I
-understand it, is needed when we need to form relations going outside
-the standard parent/child relationship. Here we have a controller and
-then one or more cards in it. To be able to use card you need to power
-up parent and you can not power down parent until all children are
-powered down.
+Best regards,
+Javier
 
-But in any case, device discovery and binding them to drivers are 2
-separate steps. You have a PCI bus. You enumerate it - new PCI devices
-are created. Some of them may be put in a certain power domain. You then
-bind drivers to PCI devices (not strictly 'then' but we could implement
-driver core to postpone binding until current round of enumeration is
-complete) - and you discover USB controller and maybe i2c controller.
-Then you bind drivers to them which causes enumeration of the new bus
-and new devices are created. But in all these cases enumeration and
-creation of new 'struct device's, and driver binding are logically
-separate steps.
-
-> 
-> >
-> >> Now, I haven't yet seen a demand for such a cases, but it seems wrong
-> >> to not consider them. The current solution cover these.
-> >
-> > Oh dear.  Please rethink this.
-> 
-> Currently, dev_pm_domain_attach() is being invoked at the point when a
-> SDIO card has been found. From sdio_add_func(). How would that be
-> solved?
-> 
-
-It is probably the one place where we currently doing it correctly (form
-logical point of view, not implementation wise - implementation wise in
-sdio we add device to power domain after calling device_add() which
-means that probe() could have been called before we added the new device
-to any power domain).
-
-Thanks.
-
--- 
-Dmitry
+[0]: http://www.ti.com/lit/ug/spruhz6/spruhz6.pdf
