@@ -1,43 +1,80 @@
-From: smoch@web.de (Soeren Moch)
-Date: Tue,  4 Nov 2014 21:11:33 +0100
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: enable DS1307 rtc and gpio fan by
- default
-In-Reply-To: <20141103031609.GA10821@tiger>
-References: <20141103031609.GA10821@tiger>
-Message-ID: <1415131893-3363-1-git-send-email-smoch@web.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 04 Nov 2014 20:17:07 +0000
+Subject: [PATCH v3 15/19] arm/arm64: KVM: add opaque private pointer to
+ MMIO accessors
+In-Reply-To: <20141104191849.GC16138@cbox>
+References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
+ <1414776414-13426-16-git-send-email-andre.przywara@arm.com>
+ <20141104154414.GN16132@cbox> <54590BDA.3050609@arm.com>
+ <5459155D.3070203@arm.com> <20141104191849.GC16138@cbox>
+Message-ID: <54593443.4070904@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Used on TBS2910 board.
+On 04/11/14 19:18, Christoffer Dall wrote:
+> On Tue, Nov 04, 2014 at 06:05:17PM +0000, Marc Zyngier wrote:
+>> On 04/11/14 17:24, Andre Przywara wrote:
+>>> Hi,
+>>>
+>>> On 04/11/14 15:44, Christoffer Dall wrote:
+>>>> On Fri, Oct 31, 2014 at 05:26:50PM +0000, Andre Przywara wrote:
+>>>>> For a GICv2 there is always only one (v)CPU involved: the one that
+>>>>> does the access. On a GICv3 the access to a CPU redistributor is
+>>>>> memory-mapped, but not banked, so the (v)CPU affected is determined by
+>>>>> looking at the MMIO address region being accessed.
+>>>>> To allow passing the affected CPU into the accessors, extend them to
+>>>>> take an opaque private pointer parameter.
+>>>>> For the current GICv2 emulation we ignore it and simply pass NULL
+>>>>> on the call.
+>>>>>
+>>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>>>
+>>>> Why does it have to be an opaque private pointer?  Would it not always
+>>>> be a struct vcpu * or a vcpu_id then?
+>>>
+>>> IIRC Marc suggested this once be more future proof. Also a pointer makes
+>>> it easier to pass NULL in the GICv2 parts of the code, which makes it
+>>> more obvious that this value is not used in this case.
+>>>
+>>> Marc, did I miss some more rationale?
+>>> Does that still hold?
+>>
+>> The main idea was to have a general purpose pointer that you can
+>> associate with the decoded region. Some form of private context, just
+>> like we have for a lot of other kernel structures.
+>>
+>> Now, I think having that as a explicit pointer looks truly awful. Can't
+>> that be folded into struct kvm_exit_mmio that is already passed around?
+>> It would make some sense that the private context is associated with the
+>> actual access... I haven't seen how that interacts with the GICv3 code
+>> though.
+>>
+> Well, the idea with a (void *private) is to have something, which is
+> *generic* be reusable and extendable, no argument there.
+> 
+> So my question is, are we implementing some generic feature, where
+> having that extendability makes things better and clearer, or are we
+> just wrapping an int in a (void *) so we don't have to add another
+> parameter if sometime in the unknown future we need another additional
+> piece of information.
+> 
+> There are plenty of examples where you just pass NULL to a typed pointer
+> or 0 to an int parameter as well.
+> 
+> I'm not trying to fight the idea of a private pointer, I just want to
+> make sure we do what we can to keep this code somewhat sane, so if we
+> have a set of functions where we in 75% of the cases pass a vcpu * and
+> in the other cases don't, then I really think we want a vcpu *
+> parameter.
 
-Signed-off-by: Soeren Moch <smoch@web.de>
---
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
----
- arch/arm/configs/imx_v6_v7_defconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+For the time being, I don't see any other use than a vcpu pointer for
+the GICv3 case. Now, none of the MMIO decoding framework is GICv3
+specific, and it feels a bit weird to hardcode the idea of a vcpu
+pointer being passed around for code that doesn't really care about it
+(GICv2).
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 16cfec4..39e4fe2 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -165,7 +165,7 @@ CONFIG_SPI_IMX=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_MC9S08DZ60=y
- CONFIG_GPIO_STMPE=y
--# CONFIG_HWMON is not set
-+CONFIG_SENSORS_GPIO_FAN=y
- CONFIG_WATCHDOG=y
- CONFIG_IMX2_WDT=y
- CONFIG_MFD_DA9052_I2C=y
-@@ -240,6 +240,7 @@ CONFIG_LEDS_TRIGGER_BACKLIGHT=y
- CONFIG_LEDS_TRIGGER_GPIO=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_INTF_DEV_UIE_EMUL=y
-+CONFIG_RTC_DRV_DS1307=y
- CONFIG_RTC_DRV_PCF8563=y
- CONFIG_RTC_DRV_MC13XXX=y
- CONFIG_RTC_DRV_MXC=y
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
