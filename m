@@ -1,158 +1,91 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 04 Nov 2014 10:22:16 +0100
-Subject: [PATCH 7/7] can: m_can: workaround for transmit data less than
- 4 bytes
-In-Reply-To: <20141104082505.GA8060@shlinux1.ap.freescale.net>
-References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
- <1414579527-31100-7-git-send-email-b29396@freescale.com>
- <5457B1D1.6080301@pengutronix.de>
- <20141104082505.GA8060@shlinux1.ap.freescale.net>
-Message-ID: <54589AC8.4010106@pengutronix.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 4 Nov 2014 10:24:35 +0100
+Subject: [PATCH v3 0/9] PM / Domains: Fix race conditions during boot
+In-Reply-To: <20141104090521.GA13219@dtor-glaptop>
+References: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
+ <5370046.DXkB0EA6xC@vostro.rjw.lan>
+ <CAPDyKFo_sxW8bE=C29fyfsqOO0tk_=eYFRkCVFRWc2kUx_bQHA@mail.gmail.com>
+ <2024276.CFr3nVUAlA@vostro.rjw.lan>
+ <CAPDyKFp=T8Luomeaoz5Y=eLAuFaOfdb+-aoU3QVnpjoDYVKPjg@mail.gmail.com>
+ <20141104090521.GA13219@dtor-glaptop>
+Message-ID: <CAPDyKFrMMnOwOHuVcpxBWNARKUsVyq66yuH+=LcS3K7bBiUTVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2014 09:25 AM, Dong Aisheng wrote:
->>> We meet an IC issue that we have to write the full 8 bytes (whatever
->>> value for the second word) in Message RAM to avoid bit error for transmit
->>> data less than 4 bytes.
+On 4 November 2014 10:05, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
+> On Tue, Nov 04, 2014 at 09:54:19AM +0100, Ulf Hansson wrote:
+>> [...]
 >>
->> Is this a SoC or a m_can problem? Are all versions of the SoC/m_can
->> affected? Is there a m_can version register somewhere?
-
-> I'm still not sure it's SoC or m_can problem.
-> Our IC guys ran the simulation code and found this issue.
-> But due to some reasons, it may be very slow for they to investigate
-> and get the conclusion.
-
-Let's hope they will find the root cause of this problem.
-
->>> Without the workaround, we can easily see the following errors:
->>> root at imx6qdlsolo:~# ip link set can0 up type can bitrate 1000000
->>> [   66.882520] IPv6: ADDRCONF(NETDEV_CHANGE): can0: link becomes ready
->>> root at imx6qdlsolo:~# cansend can0 123#112233
->>> [   66.935640] m_can 20e8000.can can0: Bit Error Uncorrected
->>>
->>> Signed-off-by: Dong Aisheng <b29396@freescale.com>
->>> ---
->>>  drivers/net/can/m_can/m_can.c | 11 ++++++++++-
->>>  1 file changed, 10 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
->>> index 219e0e3..f2d9ebe 100644
->>> --- a/drivers/net/can/m_can/m_can.c
->>> +++ b/drivers/net/can/m_can/m_can.c
->>> @@ -1058,10 +1058,19 @@ static netdev_tx_t m_can_start_xmit(struct sk_buff *skb,
->>>  	m_can_fifo_write(priv, 0, M_CAN_FIFO_ID, id);
->>>  	m_can_fifo_write(priv, 0, M_CAN_FIFO_DLC, can_len2dlc(cf->len) << 16);
->>>  
->>> -	for (i = 0; i < cf->len; i += 4)
->>> +	for (i = 0; i < cf->len; i += 4) {
->>>  		m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(i / 4),
->>>  				 *(u32 *)(cf->data + i));
->>>  
->>> +		/* FIXME: we meet an IC issue that we have to write the full 8
+>> > Generally, there are two or even three levels of runtime PM handling,
+>> > driver, (possibly) bus type and (possibly) PM domain (and multiple levels
+>> > of these are possible in principle).  All of them have to be initialized
+>> > at different times.
+>> >
+>> > Quite arguably, the PM domain and/or bus type runtime PM handling should
+>> > be initialized even before registerind the device or during device
+>> > registration.  Doing that later may be too late.  When the device has been
+>> > registered, runtime PM should work to an extent allowing the driver to access
+>> > the device and configure it further after calling pm_runtime_resume().
+>> >
+>> > Of course, if ->probe() is to call pm_runtime_resume() for this purpose,
+>> > it must take the fact that the driver's own ->runtime_resume() may be called
+>> > as a result of this into account.  That's why I'm asking whether or not the
+>> > core should call pm_runtime_resume() before calling really_probe() in a
+>> > followup branch of this thread.
 >>
->> FIXME usually indicates that the driver needs some work here. Just
->> describe your hardware bug, you might add a reference to an errata if
->> available, though.
+>> I am reading the other thread, let's see.
+>>
+>> >
+>> > The driver's own runtime PM handling must be initialized in the driver and
+>> > the only place suitable for that is ->probe().  However, it needs to be done
+>> > *before* the driver's own ->runtime_resume() or ->runtime_suspend() callback
+>> > is executed.  If that is done properly, it should be possible to cover
+>> > both the CONFIG_PM_RUNTIME set/unset cases in that code.
+>> >
+>> > And I wouldn't recommend anyone to do the runtime PM initialization in
+>> > ->runtime_resume() (when it is called for the first time), as that would be
+>> > error prone and fragile.
+>>
+>> Great! That's means we are at least aligned on this topic. :-)
+>>
+>> >
+>> >> The AMBA bus and some of its drivers a good example of how this has
+>> >> been implemented:
+>> >> driver/amba/bus.c
+>> >> drivers/mmc/host/mmci.c
+>> >> drivers/spi/spi-pl022.c
+>> >>
+>> >> This conclusion I have made from this is:
+>> >> - Using pm_runtime_get_sync() during the ->probe() path to explicitly
+>> >> power up a PM domain, is not suitable as the _common_ solution to
+>> >> solve the race condition. It certainly may work for some scenarios,
+>> >> but not for those I am looking at.
+>> >
+>> > I think, however, that it might work if the core calls pm_runtime_get_sync()
+>> > from driver_probe_device().
+>>
+>> Currently this won't work.
+>>
+>> That's because the buses' ->probe() are invoked in this path and they
+>> are doing the attachment of the device to its PM domain.
+>>
+>> In other words, we can't power up the PM domain using
+>> pm_runtime_get_sync(), until the device has been attached to its PM
+>> domain. Right?
 >
-> We don't have an errata for it now.
-> Because i'm not sure this is the final workaround and also not sure if other
-> SoC vendors having the same issue, so i used FIXME here firstly.
-> Since the code is harmless, so i wish we could put it here first
-> until we find evidence no need for other SoC or only belong to specific
-> IP version.
+>
+> I think this is one of the issues that we have there. Why do we conflate
+> probing and placing the device into a power domain? The latter should
+> happen when we register the device. The fact that a device was probed
+> and has a driver bound or not bound to it should have no bearing on
+> whether the device is member of power domain or not.
 
-It's better to write this in the comment than a FIXME, which is much
-harder to interpret....
+Devices that are created while "discoverable buses" are being probed
+can't be attached to a PM domain before the probing is done, because
+those simply doesn't exist.
 
->>> +		 * bytes (whatever value for the second word) in Message RAM to
->>> +		 * avoid bit error for transmit data less than 4 bytes
->>> +		 */
->>> +		if (cf->len <= 4)
->>> +			m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(i / 4 + 1),
->>> +					 0x0);
->>
->> This workaround doesn't handle the dlc == 0 case, your error description
->> isn't completely if this is a problem, too.
+Now, I haven't yet seen a demand for such a cases, but it seems wrong
+to not consider them. The current solution cover these.
 
-> You're right.
-> I just checked the dlc == 0 case also had such issue and it also needs
-> the extra 8 bytes write to avoid such issue.
-> 
-> BTW the issue only happened on the first time when you send a frame with no
-> data(dlc == 0) at the first time.
-> e.g.
-> root at imx6sxsabresd:~# ip link set can0 up type can bitrate 1000000
-> [   62.326014] IPv6: ADDRCONF(NETDEV_CHANGE): can0: link becomes ready
-> root at imx6sxsabresd:~# cansend can0 123#R
-> [   69.233645] m_can 20e8000.can can0: Bit Error Uncorrected
-> [   69.239167] m_can 20e8000.can can0: Bit Error Corrected
-> 
-> If we send a frame success first (e.g. 5 bytes data), it will not fail
-> again even you send no data frame (dlc == 0) later.
-> 
-> The former failure of sending data less than 4 bytes is similar.
-> 
-> Looks like the first 8 bytes of message ram has to be initialised
-> for the first using.
-
-What about putting
-
-/* errata description goes here */
-m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0), 0x0);
-m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1), 0x0);
-
-into the open() function? Can you ask the hardware colleges if this is a
-functional workaround.
-
->> It should be possible to change the for loop to go always to 8, or
->> simply unroll the loop:
->>
->> /* errata description goes here */
->> m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0), *(u32 *)(cf->data + 0));
->> m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1), *(u32 *)(cf->data + 4));
->>
-> 
-> Yes, i tried to fix it as follows.
-> 
-> /* FIXME: we meet an IC issue that we have to write the full 8
->  * bytes (whatever value for the second word) in Message RAM to
->  * avoid bit error for transmit data less than 4 bytes
->  */
-> if (cf->len <= 4) {
->         m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0),
->                          *(u32 *)(cf->data + 0));
->         m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1),
->                          *(u32 *)(cf->data + 4));
-> } else {
->         for (i = 0; i < cf->len; i += 4)
->                 m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(i / 4),
->                                  *(u32 *)(cf->data + i));
-> 
-> Will update the patch.
-
-Both branches of the above if are doing the same thing, I think you can
-replace the while if ... else ... for with this:
-
-/* errata description goes here */
-m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0), *(u32 *)(cf->data + 0));
-m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1), *(u32 *)(cf->data + 4));
-
-However if writing to DATA(0) and DATA(1) once in the open() function is
-enough this code should stay as it is.
-
-Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141104/428d8ad0/attachment.sig>
+Kind regards
+Uffe
