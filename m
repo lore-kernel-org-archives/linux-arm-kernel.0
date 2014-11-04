@@ -1,230 +1,72 @@
-From: kernellwp@gmail.com (Wanpeng Li)
-Date: Tue, 04 Nov 2014 18:42:15 +0800
-Subject: [PATCH v8 03/10] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <CAKfTPtDOaE00BZnOYW8ioz22mi6H-4xkVa=25f44fQmh46Vq3w@mail.gmail.com>
-References: <1414745252-4895-1-git-send-email-vincent.guittot@linaro.org>
- <1414745252-4895-4-git-send-email-vincent.guittot@linaro.org>
- <54588E89.1080108@gmail.com>
- <CAKfTPtDOaE00BZnOYW8ioz22mi6H-4xkVa=25f44fQmh46Vq3w@mail.gmail.com>
-Message-ID: <5458AD87.7020709@gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 4 Nov 2014 11:45:03 +0100
+Subject: [PATCH 01/15] [media] Move mediabus format definition to a more
+ standard place
+In-Reply-To: <5458A878.3010809@cisco.com>
+References: <1415094910-15899-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1415094910-15899-2-git-send-email-boris.brezillon@free-electrons.com>
+ <5458A878.3010809@cisco.com>
+Message-ID: <20141104114503.309cb54f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent,
-On 14/11/4 ??5:41, Vincent Guittot wrote:
-> On 4 November 2014 09:30, Wanpeng Li <kernellwp@gmail.com> wrote:
->> On 14/10/31 ??4:47, Vincent Guittot wrote:
->>> When a CPU is used to handle a lot of IRQs or some RT tasks, the remaining
->>> capacity for CFS tasks can be significantly reduced. Once we detect such
->>> situation by comparing cpu_capacity_orig and cpu_capacity, we trig an idle
->>> load balance to check if it's worth moving its tasks on an idle CPU.
->>>
->>> Once the idle load_balance has selected the busiest CPU, it will look for
->>> an
->>> active load balance for only two cases :
->>> - there is only 1 task on the busiest CPU.
->>> - we haven't been able to move a task of the busiest rq.
->>>
->>> A CPU with a reduced capacity is included in the 1st case, and it's worth
->>> to
->>> actively migrate its task if the idle CPU has got full capacity. This test
->>> has
->>> been added in need_active_balance.
->>>
->>> As a sidenote, this will note generate more spurious ilb because we
->>> already
->>> trig an ilb if there is more than 1 busy cpu. If this cpu is the only one
->>> that
->>> has a task, we will trig the ilb once for migrating the task.
->>>
->>> The nohz_kick_needed function has been cleaned up a bit while adding the
->>> new
->>> test
->>>
->>> env.src_cpu and env.src_rq must be set unconditionnally because they are
->>> used
->>> in need_active_balance which is called even if busiest->nr_running equals
->>> 1
->>>
->>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->>> ---
->>>    kernel/sched/fair.c | 86
->>> ++++++++++++++++++++++++++++++++++++++++-------------
->>>    1 file changed, 65 insertions(+), 21 deletions(-)
->>>
->>> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
->>> index bd214d2..54468f3 100644
->>> --- a/kernel/sched/fair.c
->>> +++ b/kernel/sched/fair.c
->>> @@ -5889,6 +5889,18 @@ fix_small_capacity(struct sched_domain *sd, struct
->>> sched_group *group)
->>>    }
->>>      /*
->>> + * Check whether the capacity of the rq has been noticeably reduced by
->>> side
->>> + * activity. The imbalance_pct is used for the threshold.
->>> + * Return true is the capacity is reduced
->>> + */
->>> +static inline int
->>> +check_cpu_capacity(struct rq *rq, struct sched_domain *sd)
->>> +{
->>> +       return ((rq->cpu_capacity * sd->imbalance_pct) <
->>> +                               (rq->cpu_capacity_orig * 100));
->>> +}
->>> +
->>> +/*
->>>     * Group imbalance indicates (and tries to solve) the problem where
->>> balancing
->>>     * groups is inadequate due to tsk_cpus_allowed() constraints.
->>>     *
->>> @@ -6562,6 +6574,28 @@ static int need_active_balance(struct lb_env *env)
->>>                          return 1;
->>>          }
->>>    +     /*
->>> +        * The dst_cpu is idle and the src_cpu CPU has only 1 CFS task.
->>
->> Why specify one task instead of not less than one?
-> if cfs.h_nr_running == 0 (which should not occurs at that point), we
-> don't need to do more test to check if it's worth moving the task
-> because there is no task to move.
+Hi Hans,
 
-Sorry for my confusing statement. I mean cfs.h_nr_running >= 1.
+On Tue, 04 Nov 2014 11:20:40 +0100
+Hans Verkuil <hansverk@cisco.com> wrote:
 
-Regards,
-Wanpeng Li
+> Hi Boris,
+> 
+> On 11/04/14 10:54, Boris Brezillon wrote:
+> > Rename mediabus formats and move the enum into a separate header file so
+> > that it can be used by DRM/KMS subsystem without any reference to the V4L2
+> > subsystem.
+> > 
+> > Old V4L2_MBUS_FMT_ definitions are now referencing MEDIA_BUS_FMT_ value.
+> 
+> I missed earlier that v4l2-mediabus.h contained a struct as well, so it can't be
+> deprecated and neither can a #warning be added.
+> 
+> The best approach, I think, is to use a macro in media-bus-format.h
+> that will either define just the MEDIA_BUS value when compiled in the kernel, or
+> define both MEDIA_BUS and V4L2_MBUS values when compiled for userspace.
+> 
+> E.g. something like this:
+> 
+> #ifdef __KERNEL__
+> #define MEDIA_BUS_FMT_ENTRY(name, val) MEDIA_BUS_FMT_ # name = val
+> #else
+> /* Keep V4L2_MBUS_FMT for backwards compatibility */
+> #define MEDIA_BUS_FMT_ENTRY(name, val) \
+> 	MEDIA_BUS_FMT_ # name = val, \
+> 	V4L2_MBUS_FMT_ # name = val
+> #endif
 
->
-> Regards,
-> Vincent
->> Regards,
->> Wanpeng Li
->>
->>
->>> +        * It's worth migrating the task if the src_cpu's capacity is
->>> reduced
->>> +        * because of other sched_class or IRQs whereas capacity stays
->>> +        * available on dst_cpu.
->>> +        */
->>> +       if ((env->idle != CPU_NOT_IDLE) &&
->>> +                       (env->src_rq->cfs.h_nr_running == 1)) {
->>> +               unsigned long src_eff_capacity, dst_eff_capacity;
->>> +
->>> +               dst_eff_capacity = 100;
->>> +               dst_eff_capacity *= capacity_of(env->dst_cpu);
->>> +               dst_eff_capacity *= capacity_orig_of(env->src_cpu);
->>> +
->>> +               src_eff_capacity = sd->imbalance_pct;
->>> +               src_eff_capacity *= capacity_of(env->src_cpu);
->>> +               src_eff_capacity *= capacity_orig_of(env->dst_cpu);
->>> +
->>> +               if (src_eff_capacity < dst_eff_capacity)
->>> +                       return 1;
->>> +       }
->>> +
->>>          return unlikely(sd->nr_balance_failed > sd->cache_nice_tries+2);
->>>    }
->>>    @@ -6661,6 +6695,9 @@ static int load_balance(int this_cpu, struct rq
->>> *this_rq,
->>>          schedstat_add(sd, lb_imbalance[idle], env.imbalance);
->>>    +     env.src_cpu = busiest->cpu;
->>> +       env.src_rq = busiest;
->>> +
->>>          ld_moved = 0;
->>>          if (busiest->nr_running > 1) {
->>>                  /*
->>> @@ -6670,8 +6707,6 @@ static int load_balance(int this_cpu, struct rq
->>> *this_rq,
->>>                   * correctly treated as an imbalance.
->>>                   */
->>>                  env.flags |= LBF_ALL_PINNED;
->>> -               env.src_cpu   = busiest->cpu;
->>> -               env.src_rq    = busiest;
->>>                  env.loop_max  = min(sysctl_sched_nr_migrate,
->>> busiest->nr_running);
->>>      more_balance:
->>> @@ -7371,22 +7406,25 @@ static void nohz_idle_balance(struct rq *this_rq,
->>> enum cpu_idle_type idle)
->>>      /*
->>>     * Current heuristic for kicking the idle load balancer in the presence
->>> - * of an idle cpu is the system.
->>> + * of an idle cpu in the system.
->>>     *   - This rq has more than one task.
->>> - *   - At any scheduler domain level, this cpu's scheduler group has
->>> multiple
->>> - *     busy cpu's exceeding the group's capacity.
->>> + *   - This rq has at least one CFS task and the capacity of the CPU is
->>> + *     significantly reduced because of RT tasks or IRQs.
->>> + *   - At parent of LLC scheduler domain level, this cpu's scheduler
->>> group has
->>> + *     multiple busy cpu.
->>>     *   - For SD_ASYM_PACKING, if the lower numbered cpu's in the scheduler
->>>     *     domain span are idle.
->>>     */
->>> -static inline int nohz_kick_needed(struct rq *rq)
->>> +static inline bool nohz_kick_needed(struct rq *rq)
->>>    {
->>>          unsigned long now = jiffies;
->>>          struct sched_domain *sd;
->>>          struct sched_group_capacity *sgc;
->>>          int nr_busy, cpu = rq->cpu;
->>> +       bool kick = false;
->>>          if (unlikely(rq->idle_balance))
->>> -               return 0;
->>> +               return false;
->>>             /*
->>>          * We may be recently in ticked or tickless idle mode. At the first
->>> @@ -7400,38 +7438,44 @@ static inline int nohz_kick_needed(struct rq *rq)
->>>           * balancing.
->>>           */
->>>          if (likely(!atomic_read(&nohz.nr_cpus)))
->>> -               return 0;
->>> +               return false;
->>>          if (time_before(now, nohz.next_balance))
->>> -               return 0;
->>> +               return false;
->>>          if (rq->nr_running >= 2)
->>> -               goto need_kick;
->>> +               return true;
->>>          rcu_read_lock();
->>>          sd = rcu_dereference(per_cpu(sd_busy, cpu));
->>> -
->>>          if (sd) {
->>>                  sgc = sd->groups->sgc;
->>>                  nr_busy = atomic_read(&sgc->nr_busy_cpus);
->>>    -             if (nr_busy > 1)
->>> -                       goto need_kick_unlock;
->>> +               if (nr_busy > 1) {
->>> +                       kick = true;
->>> +                       goto unlock;
->>> +               }
->>> +
->>>          }
->>>    -     sd = rcu_dereference(per_cpu(sd_asym, cpu));
->>> +       sd = rcu_dereference(rq->sd);
->>> +       if (sd) {
->>> +               if ((rq->cfs.h_nr_running >= 1) &&
->>> +                               check_cpu_capacity(rq, sd)) {
->>> +                       kick = true;
->>> +                       goto unlock;
->>> +               }
->>> +       }
->>>    +     sd = rcu_dereference(per_cpu(sd_asym, cpu));
->>>          if (sd && (cpumask_first_and(nohz.idle_cpus_mask,
->>>                                    sched_domain_span(sd)) < cpu))
->>> -               goto need_kick_unlock;
->>> +               kick = true;
->>>    +unlock:
->>>          rcu_read_unlock();
->>> -       return 0;
->>> -
->>> -need_kick_unlock:
->>> -       rcu_read_unlock();
->>> -need_kick:
->>> -       return 1;
->>> +       return kick;
->>>    }
->>>    #else
->>>    static void nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type
->>> idle) { }
->>
+Okay, but this means we keep adding V4L2_MBUS_FMT_ definitions even for
+new formats (which definitely doesn't encourage people to move on).
+Moreover, we add a V4L2 prefix in what was supposed to be a subsystem
+neutral header.
+
+Anyway, these are just nitpicks, and if you prefer this approach
+I'll rework my series :-).
+
+> 
+> An alternative approach is to have v4l2-mediabus.h include media-bus-format.h,
+> put #ifndef __KERNEL__ around the enum v4l2_mbus_pixelcode and add a big comment
+> there that applications should use the defines from media-bus-format.h and that
+> this enum is frozen (i.e. new values are only added to media-bus-format.h).
+> 
+> But I think I like the macro idea best.
+
+As you wish, my only intent is to use those bus format definitions in a
+DRM driver :-).
+
+Thanks,
+
+Boris
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
