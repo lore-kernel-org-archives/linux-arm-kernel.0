@@ -1,49 +1,49 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 4 Nov 2014 16:26:46 +0100
-Subject: [PATCH v2] ARM: imx: Fix the removal of CONFIG_SPI option
-In-Reply-To: <1415096927-4097-1-git-send-email-festevam@gmail.com>
-References: <1415096927-4097-1-git-send-email-festevam@gmail.com>
-Message-ID: <20141104152646.GA8450@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 4 Nov 2014 16:26:41 +0100
+Subject: [PATCH 23/26] ARM: sun7i: olinuxino lime: Relicense the device
+ tree under GPLv2/X11
+In-Reply-To: <CAFnsNoR=zyFS-VJFEUFiSc9B4w_ePfi_+Jb2cV_WLVnadyMrtQ@mail.gmail.com>
+References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1413538728-17705-23-git-send-email-maxime.ripard@free-electrons.com>
+ <CAFnsNoR=zyFS-VJFEUFiSc9B4w_ePfi_+Jb2cV_WLVnadyMrtQ@mail.gmail.com>
+Message-ID: <20141104152641.GE26729@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Note, this is a resend of a mail I accidently only sent to Fabio 
-before.]
-
-Hello,
-
-On Tue, Nov 04, 2014 at 08:28:47AM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Tue, Nov 04, 2014 at 11:50:15PM +0900, Naoki FUKAUMI wrote:
+> Hi,
 > 
-> Since 64546e9fe3a5b8c ("ARM: imx_v6_v7_defconfig updates") and commit 
-> 0650f855d2e4b0b9 ("ARM: imx_v4_v5_defconfig: Select CONFIG_IMX_WEIM") CONFIG_SPI
-> selection was dropped by savedefconfig for imx_v4_v5_defconfig and 
-> imx_v6_v7_defconfig.
+> sorry for late reply!
 > 
-> In order to keep the same behaviour as previous kernel versions and avoid 
-> regressions, let's add CONFIG_SPI option back.
+> On Fri, Oct 17, 2014 at 6:38 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The current GPL only licensing on the DTSI makes it very impractical for other
+> > software components licensed under another license.
+> >
+> > In order to make it easier for them to reuse our device trees, relicense our
+> > device trees under a GPL/X11 dual-license.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Cc: FUKAUMI Naoki <naobsd@gmail.com>
+> > ---
+> >  arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts | 46 +++++++++++++++++++++++---
+> >  1 file changed, 41 insertions(+), 5 deletions(-)
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - Add commit id's that caused the issue.
-on top of 64546e9fe3a5b8c doing
+> Acked-by: FUKAUMI Naoki <naobsd@gmail.com>
 
-        make imx_v6_v7_defconfig
+Applied with your Acked-by.
 
-resulted in CONFIG_SPI=y. That's because MEDIA_SUBDRV_AUTOSELECT selects
-SPI and has default y.
-
-So the commit that really broke imx_v6_v7_defconfig is 7d24c514e8e0
-([media] Kconfig: do not select SPI bus on sub-driver auto-select).
-On a side note I wonder how that commit sneaked into v3.17-rc6.
-
-I think people need to be more aware of the results of Kconfig changes
-...
-
-Best regards
-Uwe
+Thanks!
+Maxime
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141104/ef30efa8/attachment.sig>
