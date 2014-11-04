@@ -1,37 +1,51 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  4 Nov 2014 10:49:58 +0900
-Subject: [PATCH 10/11] ARM: shmobile: r8a7740: Add A4SU pm domain support
-In-Reply-To: <cover.1415058794.git.horms+renesas@verge.net.au>
-References: <cover.1415058794.git.horms+renesas@verge.net.au>
-Message-ID: <4ee7830c3ef9224bd078abe41a33c7396f827078.1415058794.git.horms+renesas@verge.net.au>
+Date: Tue,  4 Nov 2014 10:50:07 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Soc Updates for v3.19
+Message-ID: <cover.1415058939.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Add support for the A4SU power domain.
-This domain contains the USBPHY hardware block, which is currently not
-used by any driver.
+Please consider these Renesas ARM based SoC soc updates for v3.19.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/pm-r8a7740.c | 3 +++
- 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
-index 74e6a67..27117a8 100644
---- a/arch/arm/mach-shmobile/pm-r8a7740.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7740.c
-@@ -75,6 +75,9 @@ static struct rmobile_pm_domain r8a7740_pm_domains[] = {
- 	}, {
- 		.genpd.name	= "A3SG",
- 		.bit_shift	= 13,
-+	}, {
-+		.genpd.name	= "A4SU",
-+		.bit_shift	= 20,
- 	},
- };
- 
--- 
-2.1.1
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v3.19
+
+for you to fetch changes up to 3794705aeb318c431c07072f04380c78cc5a84ac:
+
+  ARM: shmobile: Select CONFIG_ZONE_DMA when CONFIG_ARM_LPAE is enabled (2014-10-28 08:43:03 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Soc Updates for v3.19
+
+* Select CONFIG_ZONE_DMA when CONFIG_ARM_LPAE is enabled
+* Add CA7 arch_timer initialization for r8a7794
+* Handle CA7 arch timer delay
+* Add shmobile_init_late() to sh7372
+  - This is consistent with other shmobile SoCs
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: shmobile: sh7372: Add shmobile_init_late()
+
+Laurent Pinchart (1):
+      ARM: shmobile: Select CONFIG_ZONE_DMA when CONFIG_ARM_LPAE is enabled
+
+Magnus Damm (1):
+      ARM: shmobile: Handle CA7 arch timer delay
+
+Ulrich Hecht (1):
+      ARM: shmobile: rcar-gen2: Add CA7 arch_timer initialization for r8a7794
+
+ arch/arm/mach-shmobile/Kconfig           |  1 +
+ arch/arm/mach-shmobile/setup-rcar-gen2.c | 72 ++++++++++++++++++++++----------
+ arch/arm/mach-shmobile/setup-sh7372.c    |  1 +
+ arch/arm/mach-shmobile/timer.c           | 23 ++++++----
+ 4 files changed, 66 insertions(+), 31 deletions(-)
