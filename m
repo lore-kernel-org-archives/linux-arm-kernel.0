@@ -1,23 +1,50 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 4 Nov 2014 08:30:24 -0200
-Subject: [PATCH] ARM: imx: Explicitly select CONFIG_SPI
-In-Reply-To: <20141104081645.GJ10821@tiger>
-References: <1414617568-27615-1-git-send-email-festevam@gmail.com>
- <20141103062606.GF10821@tiger>
- <CAOMZO5AB8khWKYmeOQWd0_jT4Ho0ogAkUX+=3mfhqEVhhxeqGQ@mail.gmail.com>
- <20141104081645.GJ10821@tiger>
-Message-ID: <CAOMZO5CdXt64VsmteP4Q-8C_7+PKHVSPeNLd8g5jexORYD1HhA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 4 Nov 2014 11:30:59 +0100
+Subject: [Regression Resend] mmc: mx28: sd card detection broken since
+ 3.18-rc1
+In-Reply-To: <5456B7B3.60401@gmail.com>
+References: <1747777414.897866.1414878004147.JavaMail.open-xchange@oxbsltgw09.schlund.de>
+ <5456B7B3.60401@gmail.com>
+Message-ID: <CACRpkdZ9oYZ10btdvQSAnZhPaxYn_n6JbAUO4h8qadeAiuJq-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 4, 2014 at 6:16 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On Mon, Nov 3, 2014 at 12:01 AM, Kristina Mart?enko
+<kristina.martsenko@gmail.com> wrote:
 
-> The CONFIG_SPI was removed by your commit 64546e9fe3a5 (ARM:
-> imx_v6_v7_defconfig updates), which cames from savedefconfig, I assume.
-> That said, in the code base that your patch was generated, option
-> CONFIG_SPI is redundant, But it's not the case on mainline.
+> I ran into this issue as well. Seems that a card-detect flag
+> (MMC_CAP2_CD_ACTIVE_HIGH) can currently be set based on an
+> uninitialized variable, which can lead to the card being reported as
+> not present. This patch fixes it for me:
+>
+> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+> index 03c53b72a2d6..f0e187682d3b 100644
+> --- a/drivers/mmc/core/host.c
+> +++ b/drivers/mmc/core/host.c
+> @@ -311,7 +311,7 @@ int mmc_of_parse(struct mmc_host *host)
+>         struct device_node *np;
+>         u32 bus_width;
+>         int len, ret;
+> -       bool cap_invert, gpio_invert;
+> +       bool cap_invert, gpio_invert = false;
+>
+>         if (!host->parent || !host->parent->of_node)
+>                 return 0;
+> @@ -401,6 +401,7 @@ int mmc_of_parse(struct mmc_host *host)
+>         else
+>                 cap_invert = false;
+>
+> +       gpio_invert = false;
+>         ret = mmc_gpiod_request_ro(host, "wp", 0, false, 0, &gpio_invert);
+>         if (ret) {
+>                 if (ret == -EPROBE_DEFER)
+>
+> Let me know if this also fixes it for you, and I'll send in a proper
+> patch.
 
-Ops, sorry about that. That's correct. I have just sent v2 and pointed
-out the faulty commits.
+Argh how could I make this stupid mistake :(
 
-Thanks
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
