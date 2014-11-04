@@ -1,98 +1,83 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 04 Nov 2014 14:56:14 +0100
-Subject: [PATCH v3 0/9] PM / Domains: Fix race conditions during boot
-In-Reply-To: <CAPDyKFrMMnOwOHuVcpxBWNARKUsVyq66yuH+=LcS3K7bBiUTVA@mail.gmail.com>
-References: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
- <20141104090521.GA13219@dtor-glaptop>
- <CAPDyKFrMMnOwOHuVcpxBWNARKUsVyq66yuH+=LcS3K7bBiUTVA@mail.gmail.com>
-Message-ID: <3036013.4SXEGIT6Kk@vostro.rjw.lan>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 4 Nov 2014 15:40:01 +0200
+Subject: [PATCH 06/10] ARM: OMAP2+: Show bootloader GPMC timings to allow
+ configuring the .dts file
+In-Reply-To: <20141030163031.GG2560@atomide.com>
+References: <1414628948-30702-1-git-send-email-tony@atomide.com>
+ <1414628948-30702-7-git-send-email-tony@atomide.com>
+ <545248FA.7040201@ti.com> <20141030144529.GG2542@atomide.com>
+ <54525362.9080000@ti.com> <20141030163031.GG2560@atomide.com>
+Message-ID: <5458D731.1010208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 04, 2014 10:24:35 AM Ulf Hansson wrote:
-> On 4 November 2014 10:05, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
-> > On Tue, Nov 04, 2014 at 09:54:19AM +0100, Ulf Hansson wrote:
-> >> [...]
-> >>
-> >> > Generally, there are two or even three levels of runtime PM handling,
-> >> > driver, (possibly) bus type and (possibly) PM domain (and multiple levels
-> >> > of these are possible in principle).  All of them have to be initialized
-> >> > at different times.
-> >> >
-> >> > Quite arguably, the PM domain and/or bus type runtime PM handling should
-> >> > be initialized even before registerind the device or during device
-> >> > registration.  Doing that later may be too late.  When the device has been
-> >> > registered, runtime PM should work to an extent allowing the driver to access
-> >> > the device and configure it further after calling pm_runtime_resume().
-> >> >
-> >> > Of course, if ->probe() is to call pm_runtime_resume() for this purpose,
-> >> > it must take the fact that the driver's own ->runtime_resume() may be called
-> >> > as a result of this into account.  That's why I'm asking whether or not the
-> >> > core should call pm_runtime_resume() before calling really_probe() in a
-> >> > followup branch of this thread.
-> >>
-> >> I am reading the other thread, let's see.
-> >>
-> >> >
-> >> > The driver's own runtime PM handling must be initialized in the driver and
-> >> > the only place suitable for that is ->probe().  However, it needs to be done
-> >> > *before* the driver's own ->runtime_resume() or ->runtime_suspend() callback
-> >> > is executed.  If that is done properly, it should be possible to cover
-> >> > both the CONFIG_PM_RUNTIME set/unset cases in that code.
-> >> >
-> >> > And I wouldn't recommend anyone to do the runtime PM initialization in
-> >> > ->runtime_resume() (when it is called for the first time), as that would be
-> >> > error prone and fragile.
-> >>
-> >> Great! That's means we are at least aligned on this topic. :-)
-> >>
-> >> >
-> >> >> The AMBA bus and some of its drivers a good example of how this has
-> >> >> been implemented:
-> >> >> driver/amba/bus.c
-> >> >> drivers/mmc/host/mmci.c
-> >> >> drivers/spi/spi-pl022.c
-> >> >>
-> >> >> This conclusion I have made from this is:
-> >> >> - Using pm_runtime_get_sync() during the ->probe() path to explicitly
-> >> >> power up a PM domain, is not suitable as the _common_ solution to
-> >> >> solve the race condition. It certainly may work for some scenarios,
-> >> >> but not for those I am looking at.
-> >> >
-> >> > I think, however, that it might work if the core calls pm_runtime_get_sync()
-> >> > from driver_probe_device().
-> >>
-> >> Currently this won't work.
-> >>
-> >> That's because the buses' ->probe() are invoked in this path and they
-> >> are doing the attachment of the device to its PM domain.
-> >>
-> >> In other words, we can't power up the PM domain using
-> >> pm_runtime_get_sync(), until the device has been attached to its PM
-> >> domain. Right?
-> >
-> >
-> > I think this is one of the issues that we have there. Why do we conflate
-> > probing and placing the device into a power domain? The latter should
-> > happen when we register the device. The fact that a device was probed
-> > and has a driver bound or not bound to it should have no bearing on
-> > whether the device is member of power domain or not.
+On 10/30/2014 06:30 PM, Tony Lindgren wrote:
+> * Roger Quadros <rogerq@ti.com> [141030 08:05]:
+>> On 10/30/2014 04:45 PM, Tony Lindgren wrote:
+>>> * Roger Quadros <rogerq@ti.com> [141030 07:21]:
+>>>> On 10/30/2014 02:29 AM, Tony Lindgren wrote:
+>>>>> +static void gpmc_cs_show_timings(int cs, const char *desc)
+>>>>> +{
+>>>>> +	gpmc_show_regs(cs, desc);
+>>>>> +
+>>>>> +	pr_info("gpmc cs%i access configuration:\n", cs);
+>>>>> +	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1,  4,  4, "time-para-granularity");
+>>>>> +	GPMC_GET_RAW(GPMC_CS_CONFIG1,  8,  9, "mux-add-data");
+>>>>> +	GPMC_GET_RAW(GPMC_CS_CONFIG1, 12, 13, "device-width");
+>>>>> +	GPMC_GET_RAW(GPMC_CS_CONFIG1, 16, 17, "wait-pin");
+>>>>> +	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1, 21, 21, "wait-on-write");
+>>>>> +	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1, 22, 22, "wait-on-read");
+>>>>> +	GPMC_GET_RAW_SHIFT(GPMC_CS_CONFIG1, 23, 24, 3, "burst-length");
+>>>>
+>>>> how does this work with shift = 3?
+>>>> Possible values of burst length are
+>>>> 0 -> 4
+>>>> 1 -> 8
+>>>> 2 -> 16
+>>>
+>>> Hmm sounds like a bug..
 > 
-> Devices that are created while "discoverable buses" are being probed
-> can't be attached to a PM domain before the probing is done, because
-> those simply doesn't exist.
+> The shift does not work here for 0 << 3 naturally :) I've changed
+> it to l = (shift << l) where shift is 4 in this case.
+>  
+>>> In general, if you a chance to test this patch with a few
+>>> devices that would be great. Assuming you have working timings
+>>> in the bootloader, just remove the gpmc,* entries temporarily
+>>> from the .dts file for a device, and see if the values printed
+>>> by this patch make sense. I've used this to generate the values
+>>> for the 2430sdp smc91x and zoom 8250 but I don't think I've tried
+>>> anything with a burst mode so far.
+>>
+>> OK. I'll give it a spin with u-boot configured devices.
+> 
+> Great thanks. Updated patch below.
+> 
+> Regards,
+> 
+> Tony
+> 
+> 
+> 8< ----------------
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Wed, 29 Oct 2014 17:16:48 -0700
+> Subject: [PATCH] ARM: OMAP2+: Show bootloader GPMC timings to allow configuring the .dts file
+> 
+> As we still have some devices with GPMC timings missing from the
+> .dts files, let's make it a bit easier to use the bootloader
+> values and print them out.
+> 
+> Note that we now need to move the parsing of the device tree provided
+> configuration a bit earlier so we can use that for checking if anything
+> was configured.
+> 
+> Cc: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
 
-Honestly, I'm not sure what you're talking about.
+I don't have any board with smsc or working NOR so I called
+gpmc_cs_show_timings() after NAND was setup.
 
-Devices on a "discoverable* bus (say PCI) are added when the *controller* is
-probed, not when *they* are probed.
+The printed values match closely to the configured values in the DTS.
 
-You very much need to have a struct device registered to be able to call
-really_probe() for it.
-
-> Now, I haven't yet seen a demand for such a cases, but it seems wrong
-> to not consider them. The current solution cover these.
-
-Oh dear.  Please rethink this.
-
-Rafael
+cheers,
+-roger
