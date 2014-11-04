@@ -1,42 +1,62 @@
 From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Tue, 4 Nov 2014 15:04:21 +0800
-Subject: [PATCH v5 4/6] ARM: mediatek: Add sysirq interrupt polarity
- support
-In-Reply-To: <1414576824-16143-5-git-send-email-yingjoe.chen@mediatek.com>
-References: <1414576824-16143-1-git-send-email-yingjoe.chen@mediatek.com>
- <1414576824-16143-5-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1415084661.31861.5.camel@mtksdaap41>
+Date: Tue, 4 Nov 2014 15:30:47 +0800
+Subject: [PATCH v5 0/8] arm: Add basic support for MediaTek MT8127 & MT8135
+ SoCs
+Message-ID: <1415086255-5555-1-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-10-29 at 18:00 +0800, Yingjoe Chen wrote:
-> diff --git a/drivers/irqchip/irq-mtk-sysirq.c b/drivers/irqchip/irq-mtk-sysirq.c
-> new file mode 100644
-> index 0000000..4403bcf
-> --- /dev/null
-> +++ b/drivers/irqchip/irq-mtk-sysirq.c
-> +static int mtk_sysirq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-> +				   unsigned int nr_irqs, void *arg)
-> +{
-> +	int i, ret;
-> +	irq_hw_number_t hwirq;
-> +	struct of_phandle_args *irq_data = arg;
-> +
-> +	if (irq_data->args_count < 3)
-> +		return -EINVAL;
-> +
-> +	hwirq = irq_data->args[1];
-> +	for (i = 0; i < nr_irqs; i++)
-> +		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
-> +					      &mtk_sysirq_chip,
-> +					      domain->host_data);
-> +
-> +	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, arg);
-> +}
+This is v5 of adding basic device tree support for MT8127 & MT8135.
+This series is based on v3.18-rc1
 
-(answering my own patch)
-The ret is not used in this function. I'll remove it in next version.
+This version fix board model name and change to use 32bits address for
+mt8127/mt8135 dtsi. I also took the chance to do a minor wording change
+in dt-bindings. Please note we already have some patches (uart, reset,
+i2c, pinctrl, intpol) thats depends on old version, and should be changed
+if this version is merged.
 
-Besides this, is there anything that should be changed in this series?
+We are planning to upstream drivers for MT8127 & MT8135 SoCs.
+MT8135 is a tablet soc featuring 2 CA7 + 2 CA15. MT8127 is a
+tablet soc with 4 CA7. They share many similar IP components
+with MT65xx series.
 
-Joe.C
+Changes in v5:
+ - Using 32bits address instead of 64bits in dtsi.
+ - Fix model name error
+ - Adjust wording in dtbindings.
+
+Changes in v4:
+ - Include config options for different mediatek SoCs.
+
+Changes in v3:
+ - Changing earlyprintk order and dt-binding based on Matthias' suggestion.
+
+v2:
+ - Change timer compatible string.
+ - Build dtb for mt8127 & mt8135
+ - Adding earlyprintk support for mt8127 & mt8135
+
+Joe.C (8):
+  ARM: mediatek: Add basic support for mt8127
+  ARM: mediatek: add dts for 8127 Moose board
+  ARM: mediatek: Add basic support for mt8135
+  ARM: mediatek: add dts for MT8135 evaluation board.
+  dt-bindings: add more chips in documentation for Mediatek SoC
+  ARM: dts: Build dtb for mt8127 & mt8135
+  ARM: mediatek: Add earlyprintk support for mt8127 & mt8135
+  ARM: mediatek: Fix description for mediatek SoCs
+
+ Documentation/devicetree/bindings/arm/mediatek.txt |  15 ++-
+ arch/arm/Kconfig.debug                             |  20 ++++
+ arch/arm/boot/dts/Makefile                         |   4 +-
+ arch/arm/boot/dts/mt8127-moose.dts                 |  25 +++++
+ arch/arm/boot/dts/mt8127.dtsi                      |  94 +++++++++++++++++
+ arch/arm/boot/dts/mt8135-evbp1.dts                 |  25 +++++
+ arch/arm/boot/dts/mt8135.dtsi                      | 116 +++++++++++++++++++++
+ arch/arm/mach-mediatek/Kconfig                     |   4 +-
+ arch/arm/mach-mediatek/mediatek.c                  |   2 +
+ 9 files changed, 299 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/boot/dts/mt8127-moose.dts
+ create mode 100644 arch/arm/boot/dts/mt8127.dtsi
+ create mode 100644 arch/arm/boot/dts/mt8135-evbp1.dts
+ create mode 100644 arch/arm/boot/dts/mt8135.dtsi
