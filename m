@@ -1,80 +1,42 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Tue, 4 Nov 2014 12:14:12 +0530
-Subject: [PATCH 03/12] PM / Domains: Add notifier support for power domain
- transitions
-In-Reply-To: <7hmw88gn3q.fsf@deeprootsystems.com>
-References: <1414986790-11940-1-git-send-email-amit.daniel@samsung.com>
- <1414986790-11940-4-git-send-email-amit.daniel@samsung.com>
- <1651173.5xzCFxz3LI@vostro.rjw.lan>
- <7hmw88gn3q.fsf@deeprootsystems.com>
-Message-ID: <CADGdYn5Prbbe6Rz=OfVMXm3dinCPrE-N0fn23dMMhZb8GzXm-Q@mail.gmail.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Tue, 4 Nov 2014 15:04:21 +0800
+Subject: [PATCH v5 4/6] ARM: mediatek: Add sysirq interrupt polarity
+ support
+In-Reply-To: <1414576824-16143-5-git-send-email-yingjoe.chen@mediatek.com>
+References: <1414576824-16143-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1414576824-16143-5-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1415084661.31861.5.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 3, 2014 at 11:53 PM, Kevin Hilman <khilman@kernel.org> wrote:
-> +Mike Turquette
->
-> Hi Amit,
->
-> "Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
->
->> CC: Kevin, Ulf, Geert.
->>
->> On Monday, November 03, 2014 09:23:01 AM Amit Daniel Kachhap wrote:
->>> These power domain transition notifiers will assist in carrying
->>> out some activity associated with domain power on/off such as
->>> some registers which may lose its contents and need save/restore
->>> across domain power off/on.
->
-> The runtime PM framework already provides callbacks that are useful for
-> context save/restore for devices.  Could you please describe in more
-> detail which registers in which kind of devices need to be
-> saved/restored, and why they cannot be saved/restored using existing
-> mechanisms.
-Basically the requirement is mandated by exynos7 manual. It tells that
-before turning off the power domain, some clock registers need to saved
-and should be restored just after turning the power domain. These clock
-registers are not necessarily gate clocks but could be mux clocks etc.
-The driver may not have all information of these clocks also. I suppose
-these are Soc specific changes but drivers should work across Socs.
-This behavior is almost similar to suspend/resume case where a whole
-list of clock registers are saved/restored.
+On Wed, 2014-10-29 at 18:00 +0800, Yingjoe Chen wrote:
+> diff --git a/drivers/irqchip/irq-mtk-sysirq.c b/drivers/irqchip/irq-mtk-sysirq.c
+> new file mode 100644
+> index 0000000..4403bcf
+> --- /dev/null
+> +++ b/drivers/irqchip/irq-mtk-sysirq.c
+> +static int mtk_sysirq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+> +				   unsigned int nr_irqs, void *arg)
+> +{
+> +	int i, ret;
+> +	irq_hw_number_t hwirq;
+> +	struct of_phandle_args *irq_data = arg;
+> +
+> +	if (irq_data->args_count < 3)
+> +		return -EINVAL;
+> +
+> +	hwirq = irq_data->args[1];
+> +	for (i = 0; i < nr_irqs; i++)
+> +		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
+> +					      &mtk_sysirq_chip,
+> +					      domain->host_data);
+> +
+> +	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, arg);
+> +}
 
-Even earlier post by Sylwester (https://lkml.org/lkml/2014/8/5/182) also points
-to the need of this feature.
->
-> Personally, I'm uncomfortable with notifiers like this because it
-> suggests that underlying frameworks are not doing the right thing, or
-> are not being used.  (I also don't like the implementation here where a
-> single global notifier list is maintained by the core, but the notifiers
-> are actually triggered by SoC specific code.)
-Yes right the global notifier block can be moved to per genpd structure.
-Also SoC trigger can be moved to core files.
->
-> IIUC, the usage in this series seems to be that certain clock related
-> registers need to be saved/restored across a power domain transition.
->
-> Wouldn't an alternative solution be to add a feature to the clock driver
-> such that the state of each clock is saved when the clock is disabled,
-> and restored when the clock is enabled?   That would allow any clock
-> context to survive any power domain transtion also, correct?
-I also thought about same. But the trigger point for this would be
-driver calling
-clk disable/enable and not the power domain. so this will lead to lot of
-save/restore for each power domain child.
->
-> I have some issues with the implementaion as well, but I think we need
-> to first sort out the real need for this before going into those
-> details.
-right :( may be I should have posted this as RFC
-Thanks for the review.
+(answering my own patch)
+The ret is not used in this function. I'll remove it in next version.
 
-Regards,
-Amit D
->
-> Kevin
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Besides this, is there anything that should be changed in this series?
+
+Joe.C
