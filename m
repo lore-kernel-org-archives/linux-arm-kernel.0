@@ -1,34 +1,37 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Tue, 4 Nov 2014 17:20:41 +0000
-Subject: [PATCH v2 06/10] efi: dmi: add support for SMBIOS 3.0 UEFI
- configuration table
-In-Reply-To: <1414513123-20400-7-git-send-email-ard.biesheuvel@linaro.org>
-References: <1414513123-20400-1-git-send-email-ard.biesheuvel@linaro.org>
- <1414513123-20400-7-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20141104172041.GB3592@console-pimps.org>
+From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
+Date: Tue, 4 Nov 2014 12:21:17 -0500
+Subject: [PATCH 11/13] arm: dts: dra7: add DMA properties for UART
+In-Reply-To: <5459079D.7080703@linutronix.de>
+References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
+ <1412014009-13315-12-git-send-email-bigeasy@linutronix.de>
+ <20141104170233.GB24112@csclub.uwaterloo.ca>
+ <5459079D.7080703@linutronix.de>
+Message-ID: <20141104172117.GC24112@csclub.uwaterloo.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Oct, at 05:18:39PM, Ard Biesheuvel wrote:
-> This adds support to the UEFI side for detecting the presence of
-> a SMBIOS 3.0 64-bit entry point. This allows the actual SMBIOS
-> structure table to reside at a physical offset over 4 GB, which
-> cannot be supported by the legacy SMBIOS 32-bit entry point.
+On Tue, Nov 04, 2014 at 06:06:37PM +0100, Sebastian Andrzej Siewior wrote:
+> On 11/04/2014 06:02 PM, Lennart Sorensen wrote:
+> > 
+> > According to the manual the DMA channels for UART7 to 10 are:
+> > 
+> > uart7:  144 145
+> > uart8:  146 147
+> > uart9:  148 149
+> > uart10: 150 151
+> > 
+> > Might as well add those too.  We have uart 7 and 8 in use on our board
+> > so I am about to go test it.
 > 
-> Since the firmware can legally provide both entry points, store
-> the SMBIOS 3.0 entry point in a separate variable, and let the
-> DMI decoding layer decide which one will be used.
-> 
-> Tested-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
-> Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  drivers/firmware/efi/efi.c | 4 ++++
->  drivers/xen/efi.c          | 1 +
->  include/linux/efi.h        | 6 +++++-
->  3 files changed, 10 insertions(+), 1 deletion(-)
+> Mind sharing the manual with me? Mine does not mention DMA channels for
+> UART7-10. If you are able to test 7+8 (and it works) could you please
+> make patch which with for the remaining four devices?
 
-Acked-by: Matt Fleming <matt.fleming@intel.com>
+Well the file I have is called AM572x_ES1.1_NDA_TRM_vT.pdf, so I am not
+sure who I am allowed to share that file with.  Might be simpler to just
+ask TI for the latest version.
+
+How I hate NDAs.
 
 -- 
-Matt Fleming, Intel Open Source Technology Center
+Len Sorensen
