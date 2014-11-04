@@ -1,62 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  4 Nov 2014 10:50:41 +0900
-Subject: [PATCH 11/34] ARM: shmobile: r8a7790: Add RGX clock to device tree
+Date: Tue,  4 Nov 2014 10:50:40 +0900
+Subject: [PATCH 10/34] ARM: shmobile: r8a7740 dtsi: Fix clock index for scifa2
 In-Reply-To: <cover.1415059587.git.horms+renesas@verge.net.au>
 References: <cover.1415059587.git.horms+renesas@verge.net.au>
-Message-ID: <2284ff5f3f7d58e33812f4387c2ac8a09428e4cf.1415059587.git.horms+renesas@verge.net.au>
+Message-ID: <b345aee4d7c2387f2e36cdeb64e0f4dce34598f3.1415059587.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kouei Abe <kouei.abe.cp@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Signed-off-by: Kouei Abe <kouei.abe.cp@renesas.com>
-Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+The clocks property for the scifa2 device node referred to the scifa0
+clock index instead of the scifa2 clock index.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi            | 9 +++++----
- include/dt-bindings/clock/r8a7790-clock.h | 1 +
- 2 files changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/r8a7740.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 7b42b25..602a46a 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -977,18 +977,19 @@
- 		mstp1_clks: mstp1_clks at e6150134 {
- 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150134 0 4>, <0 0xe6150038 0 4>;
--			clocks = <&m2_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&rclk_clk>,
-+			clocks = <&m2_clk>, <&p_clk>, <&zg_clk>, <&p_clk>, <&p_clk>, <&rclk_clk>,
- 				 <&cp_clk>, <&zs_clk>, <&zs_clk>, <&zs_clk>,
- 				 <&zs_clk>;
- 			#clock-cells = <1>;
- 			renesas,clock-indices = <
--				R8A7790_CLK_JPU R8A7790_CLK_TMU1 R8A7790_CLK_TMU3 R8A7790_CLK_TMU2
-+				R8A7790_CLK_JPU R8A7790_CLK_TMU1 R8A7790_CLK_3DG
-+				R8A7790_CLK_TMU3 R8A7790_CLK_TMU2
- 				R8A7790_CLK_CMT0 R8A7790_CLK_TMU0 R8A7790_CLK_VSP1_DU1
- 				R8A7790_CLK_VSP1_DU0 R8A7790_CLK_VSP1_R R8A7790_CLK_VSP1_S
- 			>;
- 			clock-output-names =
--				"jpu", "tmu1", "tmu3", "tmu2", "cmt0", "tmu0", "vsp1-du1",
--				"vsp1-du0", "vsp1-rt", "vsp1-sy";
-+				"jpu", "tmu1", "3dg", "tmu3", "tmu2", "cmt0", "tmu0",
-+				"vsp1-du1", "vsp1-du0", "vsp1-rt", "vsp1-sy";
- 		};
- 		mstp2_clks: mstp2_clks at e6150138 {
- 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
-diff --git a/include/dt-bindings/clock/r8a7790-clock.h b/include/dt-bindings/clock/r8a7790-clock.h
-index 8ea7ab0..14a3f12 100644
---- a/include/dt-bindings/clock/r8a7790-clock.h
-+++ b/include/dt-bindings/clock/r8a7790-clock.h
-@@ -28,6 +28,7 @@
- /* MSTP1 */
- #define R8A7790_CLK_JPU		6
- #define R8A7790_CLK_TMU1		11
-+#define R8A7790_CLK_3DG			12
- #define R8A7790_CLK_TMU3		21
- #define R8A7790_CLK_TMU2		22
- #define R8A7790_CLK_CMT0		24
+diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+index 502483f..559bd39 100644
+--- a/arch/arm/boot/dts/r8a7740.dtsi
++++ b/arch/arm/boot/dts/r8a7740.dtsi
+@@ -197,7 +197,7 @@
+ 		compatible = "renesas,scifa-r8a7740", "renesas,scifa";
+ 		reg = <0xe6c60000 0x100>;
+ 		interrupts = <0 102 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&mstp2_clks R8A7740_CLK_SCIFA0>;
++		clocks = <&mstp2_clks R8A7740_CLK_SCIFA2>;
+ 		clock-names = "sci_ick";
+ 		status = "disabled";
+ 	};
 -- 
 2.1.1
