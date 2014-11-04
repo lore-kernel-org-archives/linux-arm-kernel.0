@@ -1,102 +1,31 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue,  4 Nov 2014 13:00:39 -0300
-Subject: [PATCH 2/2] ARM: mvebu: Remove thermal quirk for A375 Z1 revision
-In-Reply-To: <1415116839-4323-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1415116839-4323-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1415116839-4323-3-git-send-email-ezequiel.garcia@free-electrons.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 4 Nov 2014 08:07:16 -0800
+Subject: [PATCH] of/platform: Move platform devices under
+ /sys/devices/platform
+In-Reply-To: <1415097920-30014-1-git-send-email-grant.likely@linaro.org>
+References: <1415097920-30014-1-git-send-email-grant.likely@linaro.org>
+Message-ID: <20141104160716.GA1630@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 375 Z1 SoC revision is no longer supported. This commit
-removes the quirk required to "fix" the reg property and the compatible
-string of the thermal devicetree node.
+On Tue, Nov 04, 2014 at 10:45:20AM +0000, Grant Likely wrote:
+> Currently the devices created by drivers/of/platform.c get created at
+> the root of /sys/devices. This goes against the typical pattern for
+> sysfs where the top level /sys/devices structure contains categories of
+> devices, and the structure of devices is placed below that. To fix this,
+> make the code in drivers/of/platform.c follow the drivers/base/platform.c
+> behaviour, and use &platform_bus as the default parent for all new
+> platform_devices and amba_devices.
+> 
+> This change has been discussed for a long time, but nobody has actually
+> acted on it. Userspace code that expects to find devices under a fixed
+> /sys/devices/... path will be affected. It isn't /supposed/ to do that,
+> but if anyone complains then I'll add a default-off workaround option to
+> put them back into the root.
+> 
+> Signed-off-by: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/mach-mvebu/board-v7.c | 66 +-----------------------------------------
- 1 file changed, 1 insertion(+), 65 deletions(-)
-
-diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-index 6478626..461e726 100644
---- a/arch/arm/mach-mvebu/board-v7.c
-+++ b/arch/arm/mach-mvebu/board-v7.c
-@@ -124,76 +124,12 @@ static void __init i2c_quirk(void)
- 	return;
- }
- 
--#define A375_Z1_THERMAL_FIXUP_OFFSET 0xc
--
--static void __init thermal_quirk(void)
--{
--	struct device_node *np;
--	u32 dev, rev;
--	int res;
--
--	/*
--	 * The early SoC Z1 revision needs a quirk to be applied in order
--	 * for the thermal controller to work properly. This quirk breaks
--	 * the thermal support if applied on a SoC that doesn't need it,
--	 * so we enforce the SoC revision to be known.
--	 */
--	res = mvebu_get_soc_id(&dev, &rev);
--	if (res < 0 || (res == 0 && rev > ARMADA_375_Z1_REV))
--		return;
--
--	for_each_compatible_node(np, NULL, "marvell,armada375-thermal") {
--		struct property *prop;
--		__be32 newval, *newprop, *oldprop;
--		int len;
--
--		/*
--		 * The register offset is at a wrong location. This quirk
--		 * creates a new reg property as a clone of the previous
--		 * one and corrects the offset.
--		 */
--		oldprop = (__be32 *)of_get_property(np, "reg", &len);
--		if (!oldprop)
--			continue;
--
--		/* Create a duplicate of the 'reg' property */
--		prop = kzalloc(sizeof(*prop), GFP_KERNEL);
--		prop->length = len;
--		prop->name = kstrdup("reg", GFP_KERNEL);
--		prop->value = kzalloc(len, GFP_KERNEL);
--		memcpy(prop->value, oldprop, len);
--
--		/* Fixup the register offset of the second entry */
--		oldprop += 2;
--		newprop = (__be32 *)prop->value + 2;
--		newval = cpu_to_be32(be32_to_cpu(*oldprop) -
--				     A375_Z1_THERMAL_FIXUP_OFFSET);
--		*newprop = newval;
--		of_update_property(np, prop);
--
--		/*
--		 * The thermal controller needs some quirk too, so let's change
--		 * the compatible string to reflect this and allow the driver
--		 * the take the necessary action.
--		 */
--		prop = kzalloc(sizeof(*prop), GFP_KERNEL);
--		prop->name = kstrdup("compatible", GFP_KERNEL);
--		prop->length = sizeof("marvell,armada375-z1-thermal");
--		prop->value = kstrdup("marvell,armada375-z1-thermal",
--						GFP_KERNEL);
--		of_update_property(np, prop);
--	}
--	return;
--}
--
- static void __init mvebu_dt_init(void)
- {
- 	if (of_machine_is_compatible("plathome,openblocks-ax3-4"))
- 		i2c_quirk();
--	if (of_machine_is_compatible("marvell,a375-db")) {
-+	if (of_machine_is_compatible("marvell,a375-db"))
- 		external_abort_quirk();
--		thermal_quirk();
--	}
- 
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
--- 
-2.1.0
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
