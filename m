@@ -1,53 +1,42 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Tue, 4 Nov 2014 06:24:55 +0000
-Subject: [PATCH] arm: imx: clean up machine mxc_arch_reset_init_dt reset
- init
-In-Reply-To: <20141104061212.GH10821@tiger>
-References: <1414748393-20799-1-git-send-email-jingchang.lu@freescale.com>
- <20141104061212.GH10821@tiger>
-Message-ID: <4ac66b526b7241928f7f5b3d6dc45a50@BN3PR0301MB1236.namprd03.prod.outlook.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 4 Nov 2014 11:55:17 +0530
+Subject: [PATCH v2 5/6] ARM: mvebu: add Device Tree description of USB
+ cluster controller on Armada 375
+In-Reply-To: <1414164254-13053-6-git-send-email-gregory.clement@free-electrons.com>
+References: <1414164254-13053-1-git-send-email-gregory.clement@free-electrons.com>
+ <1414164254-13053-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <5458714D.4060107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Shawn Guo [mailto:shawn.guo at linaro.org]
->Sent: Tuesday, November 04, 2014 2:12 PM
->To: Lu Jingchang-B35083
->Cc: linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org
->Subject: Re: [PATCH] arm: imx: clean up machine mxc_arch_reset_init_dt
->reset init
->
->On Fri, Oct 31, 2014 at 05:39:53PM +0800, Jingchang Lu wrote:
->> diff --git a/arch/arm/mach-imx/imx31-dt.c
->> b/arch/arm/mach-imx/imx31-dt.c index 418dbc8..e0a4e2f 100644
->> --- a/arch/arm/mach-imx/imx31-dt.c
->> +++ b/arch/arm/mach-imx/imx31-dt.c
->> @@ -15,16 +15,8 @@
->>  #include <asm/mach/arch.h>
->>  #include <asm/mach/time.h>
->>
->> -#include "common.h"
->
->The change causes the build errors below.
->
->  CC      arch/arm/mach-imx/imx31-dt.o
->../arch/arm/mach-imx/imx31-dt.c: In function ?imx31_dt_timer_init?:
->../arch/arm/mach-imx/imx31-dt.c:27:2: error: implicit declaration of
->function ?mx31_clocks_init_dt? [-Werror=implicit-function-declaration]
->../arch/arm/mach-imx/imx31-dt.c: At top level:
->../arch/arm/mach-imx/imx31-dt.c:31:13: error: ?mx31_map_io? undeclared
->here (not in a function)
->../arch/arm/mach-imx/imx31-dt.c:32:16: error: ?imx31_init_early?
->undeclared here (not in a function)
->../arch/arm/mach-imx/imx31-dt.c:33:14: error: ?mx31_init_irq? undeclared
->here (not in a function)
->
->So the common.h inclusion needs to be kept.  I fixed it up and applied the
->patch.
->
->Shawn
 
-Many thanks!
 
-Best Regards,
-Jingchang
+On Friday 24 October 2014 08:54 PM, Gregory CLEMENT wrote:
+> On Armada 375, the USB cluster allows to control the cluster composed
+> of the USB2 and USB3 host controllers.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  arch/arm/boot/dts/armada-375.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+> index de6571445cef..8f45cf5d2a50 100644
+> --- a/arch/arm/boot/dts/armada-375.dtsi
+> +++ b/arch/arm/boot/dts/armada-375.dtsi
+> @@ -342,6 +342,12 @@
+>  				#clock-cells = <1>;
+>  			};
+>  
+> +			usbcluster: usb-cluster at 18400 {
+> +				compatible = "marvell,armada-375-usb-cluster";
+> +				reg = <0x18400 0x4>;
+> +				#phy-cells = <1>;
+> +			};
+> +
+>  			mbusc: mbus-controller at 20000 {
+>  				compatible = "marvell,mbus-controller";
+>  				reg = <0x20000 0x100>, <0x20180 0x20>;
+> 
