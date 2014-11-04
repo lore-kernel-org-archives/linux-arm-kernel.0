@@ -1,92 +1,109 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 4 Nov 2014 07:57:14 -0700
-Subject: [PATCH v4 0/9] ARM: shmobile: R-Mobile: DT PM domain support
-In-Reply-To: <7hegtj69ex.fsf@deeprootsystems.com>
-References: <1415028896-9005-1-git-send-email-geert+renesas@glider.be>
- <CANLsYkzVw_fQQuK9pEomMp6A_z2Qg9L-Hj1f+8b_1o7cFjMiDw@mail.gmail.com>
- <7hegtj69ex.fsf@deeprootsystems.com>
-Message-ID: <CANLsYkzAsvJE_TR4AvP6PEXOO-jkcwMQE_GfBD-jS9k5BOmOeg@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 4 Nov 2014 15:00:18 +0000
+Subject: [PATCH v7 3/8] arm64: introduce is_device_dma_coherent
+In-Reply-To: <5458B9FC.3050309@ti.com>
+References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
+ <1414422568-19103-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1411031045340.22875@kaball.uk.xensource.com>
+ <20141103105716.GC23162@arm.com>
+ <alpine.DEB.2.02.1411031101400.22875@kaball.uk.xensource.com>
+ <5458B9FC.3050309@ti.com>
+Message-ID: <alpine.DEB.2.02.1411041419490.22875@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 November 2014 18:28, Kevin Hilman <khilman@kernel.org> wrote:
-> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+On Tue, 4 Nov 2014, Grygorii Strashko wrote:
+> Hi Stefano,
+> 
+> On 11/03/2014 01:10 PM, Stefano Stabellini wrote:
+> > On Mon, 3 Nov 2014, Will Deacon wrote:
+> >> On Mon, Nov 03, 2014 at 10:46:03AM +0000, Stefano Stabellini wrote:
+> >>> On Mon, 27 Oct 2014, Stefano Stabellini wrote:
+> >>>> Introduce a boolean flag and an accessor function to check whether a
+> >>>> device is dma_coherent. Set the flag from set_arch_dma_coherent_ops.
+> >>>>
+> >>>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> >>>> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> >>>> CC: will.deacon at arm.com
+> >>>
+> >>> Will, Catalin,
+> >>> are you OK with this patch?
+> >>
+> >> It would be nicer if the dma_coherent flag didn't have to be duplicated by
+> >> each architecture in dev_archdata. Is there any reason not to put it in the
+> >> core code?
+> > 
+> > Yes, there is a reason for it: if I added a boolean dma_coherent flag in
+> > struct device as Catalin initially suggested, what would be the default
+> > for each architecture? Where would I set it for arch that don't use
+> > device tree? It is not easy.
+> > 
+> > I thought it would be better to introduce is_device_dma_coherent only on
+> > the architectures where it certainly makes sense to have it. In fact I
+> > checked and arm and arm64 are the only architectures to define
+> > set_arch_dma_coherent_ops at the moment. At that point if
+> > is_device_dma_coherent becomes arch-specific, it makes sense to store
+> > the flag in dev_archdata instead of struct device.
+> 
+> The proposition from Will looks reasonable for me too, because
+> there is "small" side-effect of adding such kind of properties to
+> arch-specific data or even to the core device structure. ;(
+> 
+> There are some sub-systems in kernel which do not create their devices
+> from DT and instead some host device populates its children devices manually.
+>  Now, I know at least two cases:
+> - usb: dwc3 core creates xhci device manually
+> - pci: adds its client devices
+> 
+> In such, case DMA configuration have to be propagated from host to
+> child (in our case host device's got DMA configuration from DT), like:
+> 	dma_set_coherent_mask(&xhci->dev, dwc->dev->coherent_dma_mask);
+> 
+> 	xhci->dev.parent	= dwc->dev;
+> 	xhci->dev.dma_mask	= dwc->dev->dma_mask;
+> 	xhci->dev.dma_parms	= dwc->dev->dma_parms;
+> 
+> So, once new DMA property is added it has to be propagated from 
+> host to child device too.
+> 
+> Recently, the new property  dma_pfn_offset was introduced in struct device 
+> and such kind of problem was observed on keystone 2:
+> - for usb case it was fixed using Platform Bus notifier (xhci - platform device)
+> - for pci - the work is in progress, because solution with PCI Bus notifier
+>   was rejected https://lkml.org/lkml/2014/10/10/308.
+> 
+> In general, if dma_coherent will belong to struct device then
+> such problems will be possible to fix directly in drivers/subsystems:
+> xhci->dev.dma_coherent	= dwc->dev->dma_coherent;
+> 
+> But, if it will be arch-specific data then it will be impossible to
+> set it without introducing proper and arch-specific setters/getters functions.
 >
->> On 3 November 2014 08:34, Geert Uytterhoeven <geert+renesas@glider.be> wrote:
->>>         Hi Rafael, Simon, Magnus,
->>>
->>> This patch series enables DT support for PM domains on Renesas R-Mobile SoCs.
->>>
->>> Currently it's limited to R-Mobile A1 (r8a7740), but given the similarity of
->>> the SYSC System-Controller on the various SH-Mobile/R-Mobile SoCs, and the
->>> abstraction of PM domains in DT, it should be sufficiently generic to handle
->>> other SoCs in the future (e.g. SH-Mobile AP4 (sh7372), SH-Mobile AG5 (sh73a0),
->>> R-Mobile APE6 (r8a73a4)).
->>>
->>> Functionality-wise, this behaves the same as the legacy (non-DT) version
->>> (modulo missing DT support in some device drivers).
->>>
->>> Dependencies:
->>>   - This is based on Simon Horman's renesas-devel-20141030-v3.18-rc2, and
->>>     Rafael J. Wysocki's linux-pm.git#linux-next,
->>>   - This depends on "PM / Domains: Change prototype for the ->attach_dev()
->>>     callback" from Ulf hanson, which is intended to still enter v3.18-rcX
->>>     through the linux-pm tree.
->>>     As this is a one-line change, I included this patch as the first patch of
->>>     this series.  Perhaps it's even acceptable for Simon to (also) apply it, so
->>>     we don't have to wait for the v3.18-rcX that will include it?
->>>
->>> For your convenience, I've also pushed this to
->>> git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git#rmobile-genpd
->>>
->>> Changes compared to v3 (more detailed changelogs in the individual patches):
->>>   - I dropped the patch to add preliminary PM domain latencies, as I want to do
->>>     more measurements for PM domains that are currently never powered off.
->>>     Values seem to range between 8.5 and 26 us, depending on the PM domain.
->>>   - I dropped all patches related to QoS device latencies, as these need more
->>>     discussion,
->>>   - The power-{on,off}-latency properties have been changed from a single value
->>>     to a list,
->>>   - Device save/restore state latencies have been dropped, as they're Linux
->>>     driver-specific, and thus don't belong in DT,
->>>   - Use proper pm_clk_create()/pm_clk_destroy(), and update for attach_dev()
->>>     returning an error code again,
->>>   - New patch to enable module clocks if !CONFIG_PM_RUNTIME,
->>>   - Always keep D4 powered, until the new Coresight code handles runtime
->>>     PM,
->>
->> I took the time to really look at the problems you are experiencing
->> with pm runtime in hw_breackpoint.c this weekend.  The coresight
->> patchset, when supplemented with PM runtime awareness, will fix that
->> problem *only* when traces are activated.  The other obvious condition
->> is that other component using the same power domain are also converted
->> to using runtime PM.
->>
->> That being said, the coresight framework and breakpoint handler code
->> are two different subsystem.  Their only commonality is that they make
->> use of the debug registers (and not even the same ones).  As such (and
->> in my opinion) the code in hw_breakpoint should be getting its own pm
->> runtime reference without relying on the coresight subsystem.  As
->> indicated above, that would only work in some cases.
->>
->> Supplementing hw_breakpoint to interact with the runtime PM may prove
->> trickier than it seems... I'm especially worried about the
->> non-blocking requirement inherent to using "smp_call_function()".  I'm
->> stepping forward to look into that problem but before doing so I need
->> to finish runtime PM on coresight.
->
-> Matthieu, without looking more deeply myself, I'm not sure this is what
-> you need, but have a look at the "IRQ safe" mode of runtime PM.  If you
-> know your devices runtime PM callbacks are IRQ safe, you can call
-> pm_runtime_irq_safe(), and your callbacks will be called with IRQs
-> disabled.
+> Also, as an idea, we are thinking about introducing something like:
+>   void dma_apply_parent_cfg(struct device *dev, struct device *parent)
+> which will ensure that all DMA configuration properly copied from
+> parent to children device. Now it should be (as minimum for ARM):
+>  dma_mask
+>  coherent_dma_mask
+>  dma_parms
+>  dma_pfn_offset
+>  dev_archdata->dma_ops
+>  [dma_coherent]?
 
-Thanks for the follow up - I will have to dig further into the
-irq_safe() API along with understanding the exact requirements
-stemming from hw_breakpoint.c.  I did a few test yesterday and it
-turns out the "reset_ctrl_regs()" problem in hw_breakpoint.c is
-exactly the same as a corner case popping up on coresight.  As such
-fixing one readily provides a solution for the other.
+I understand your concern but the problem you have goes far beyond a
+simple dma_coherent flag: what about all the other dev_archdata fields?
+Aside from dma_ops, on some other architectures there might be other
+data structrures in dev_archdata that need to be properly initialized
+from the parent.
 
->
-> Kevin
+Your idea of introducing something like dma_apply_parent_cfg is the only
+solid solution I can see.  However I would consider naming it something
+more generic like init_dev_from_parent to handle other possible
+configurations (inside or outside dev_archdata) that might have to be
+initialized from information on the parent device.
+
+
+Regarding the dma_coherent flag, I still prefer this approach because
+introducing the dma_coherent flag in dev_archdata wouldn't make this
+issue any worse than already is, but would avoid other problems as
+mentioned in my previous reply.
