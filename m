@@ -1,37 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  4 Nov 2014 10:50:58 +0900
-Subject: [PATCH 28/34] ARM: shmobile: r8a73a4: Add SoC-specific CMT compatible
- property
+Date: Tue,  4 Nov 2014 10:51:00 +0900
+Subject: [PATCH 30/34] ARM: shmobile: r8a7790: Rename mmcif node to mmc
 In-Reply-To: <cover.1415059587.git.horms+renesas@verge.net.au>
 References: <cover.1415059587.git.horms+renesas@verge.net.au>
-Message-ID: <2cd823fc01d61e09f50d64624ec53da090ced742.1415059587.git.horms+renesas@verge.net.au>
+Message-ID: <22c2b78d3131cd161599be7a9f320523969b23c4.1415059587.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The CMT1 timer used the generic compatible property only.
-Add the SoC-specific one, which is already documented, to make it future
-proof.
+Node names should describe the function of the device, not its IP core
+name.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a73a4.dtsi | 2 +-
+ arch/arm/boot/dts/r8a7790.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
-index 8093967..b5ead84 100644
---- a/arch/arm/boot/dts/r8a73a4.dtsi
-+++ b/arch/arm/boot/dts/r8a73a4.dtsi
-@@ -114,7 +114,7 @@
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index a2f2c7f..63922a1 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -392,7 +392,7 @@
+ 		status = "disabled";
  	};
  
- 	cmt1: timer at e6130000 {
--		compatible = "renesas,cmt-48-gen2";
-+		compatible = "renesas,cmt-48-r8a73a4", "renesas,cmt-48-gen2";
- 		reg = <0 0xe6130000 0 0x1004>;
- 		interrupts = <0 120 IRQ_TYPE_LEVEL_HIGH>;
- 
+-	mmcif0: mmcif at ee200000 {
++	mmcif0: mmc at ee200000 {
+ 		compatible = "renesas,mmcif-r8a7790", "renesas,sh-mmcif";
+ 		reg = <0 0xee200000 0 0x80>;
+ 		interrupts = <0 169 IRQ_TYPE_LEVEL_HIGH>;
 -- 
 2.1.1
