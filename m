@@ -1,49 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 04 Nov 2014 11:22:48 +0100
-Subject: [PATCH v2] ARM: BCM5301X: set customized AUXCTL
-In-Reply-To: <54581230.9090205@gmail.com>
-References: <1414851912-30630-1-git-send-email-hauke@hauke-m.de>
- <54580CD9.3050309@hauke-m.de> <54581230.9090205@gmail.com>
-Message-ID: <2789449.fsn4D0imX4@wuerfel>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue,  4 Nov 2014 08:28:47 -0200
+Subject: [PATCH v2] ARM: imx: Fix the removal of CONFIG_SPI option
+Message-ID: <1415096927-4097-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 November 2014 15:39:28 Florian Fainelli wrote:
-> On 11/03/2014 03:16 PM, Hauke Mehrtens wrote:
-> > On 11/03/2014 11:00 AM, Arnd Bergmann wrote:
-> >> On Saturday 01 November 2014 15:41:38 Hauke Mehrtens wrote:
-> >>>  };
-> >>>  
-> >>>  DT_MACHINE_START(BCM5301X, "BCM5301X")
-> >>> -       .l2c_aux_val    = 0,
-> >>> +       .l2c_aux_val    = L310_AUX_CTRL_CACHE_REPLACE_RR |
-> >>> +                         L310_AUX_CTRL_DATA_PREFETCH |
-> >>> +                         L310_AUX_CTRL_INSTR_PREFETCH |
-> >>> +                         L310_AUX_CTRL_EARLY_BRESP,
-> >>
-> >> Please put these into the dts file instead if the boot loader fails
-> >> to set them correctly. We should not override them from source code
-> >> for new platforms any more.
-> > I checked again and I only need L310_AUX_CTRL_DATA_PREFETCH and
-> > L310_AUX_CTRL_INSTR_PREFETCH, the others get activate by the existing
-> > code. Should I make it possible to give l2c_aux_val through dt, or
-> > should I create some boolean options for  L310_AUX_CTRL_DATA_PREFETCH
-> > and  L310_AUX_CTRL_INSTR_PREFETCH?
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Certainly not the entire l2c_aux_val, what I meant is to use
-boolean options for the bits you need. I was under the impression
-that by now we had defined bindings for all the bits that are required
-on any platform.
+Since 64546e9fe3a5b8c ("ARM: imx_v6_v7_defconfig updates") and commit 
+0650f855d2e4b0b9 ("ARM: imx_v4_v5_defconfig: Select CONFIG_IMX_WEIM") CONFIG_SPI
+selection was dropped by savedefconfig for imx_v4_v5_defconfig and 
+imx_v6_v7_defconfig.
 
-> Last we talked about these prefetch bits with Russell, I think we kind
-> of agreed that they could probably be enabled by default
-> 
-> There is already a large number of properties defined in
-> Documentation/devicetree/bindings/arm/l2cc.txt, I suppose that having
-> prefetch properties could work too.
+In order to keep the same behaviour as previous kernel versions and avoid 
+regressions, let's add CONFIG_SPI option back.
 
-I can't really help with this if we don't have a binding. Proving that
-it's always correct to enable these seems better than defining a
-binding.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Add commit id's that caused the issue.
 
-	Arnd
+Shawn,
+
+If possible, please apply this as a bug fix for 3.18.
+
+ arch/arm/configs/imx_v4_v5_defconfig | 1 +
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index e688741..e6b0007 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -97,6 +97,7 @@ CONFIG_SERIAL_IMX_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_IMX=y
++CONFIG_SPI=y
+ CONFIG_SPI_IMX=y
+ CONFIG_SPI_SPIDEV=y
+ CONFIG_GPIO_SYSFS=y
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 8fca6e2..6790f1b 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -158,6 +158,7 @@ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_ALGOPCF=m
+ CONFIG_I2C_ALGOPCA=m
+ CONFIG_I2C_IMX=y
++CONFIG_SPI=y
+ CONFIG_SPI_IMX=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_MC9S08DZ60=y
+-- 
+1.9.1
