@@ -1,185 +1,30 @@
-From: d.lavnikevich@sam-solutions.com (Dmitry Lavnikevich)
-Date: Tue, 4 Nov 2014 16:05:48 +0300
-Subject: [PATCH v6 2/3] ARM: dts: pbab01: enable I2S audio on phyFLEX-i.MX6
- boards
-In-Reply-To: <1415106349-18846-1-git-send-email-d.lavnikevich@sam-solutions.com>
-References: <1415106349-18846-1-git-send-email-d.lavnikevich@sam-solutions.com>
-Message-ID: <1415106349-18846-3-git-send-email-d.lavnikevich@sam-solutions.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue,  4 Nov 2014 14:07:07 +0100
+Subject: [PATCH 0/3] ARM: dts: vf610: USB/GPIO fixes
+Message-ID: <1415106430-6271-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Audio on phyFLEX boards is presented by tlv320aic3007 codec connected
-over SSI interface.
+Hi Shawn,
 
-Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
----
- arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi | 101 ++++++++++++++++++++++++++-
- arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi |  15 ++++
- 2 files changed, 114 insertions(+), 2 deletions(-)
+This patchset collects some vf610 device tree fixes. The first patch
+was part of the "vf610: Add GPIO support" patchset. GPIO support is
+merged by know, so I rebased that on top of your for-next branch.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
-index f1bdcae..6b2c892 100644
---- a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
-@@ -9,10 +9,96 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
- 
-+#include <dt-bindings/sound/fsl-imx-audmux.h>
-+
- / {
- 	chosen {
- 		linux,stdout-path = &uart4;
- 	};
-+
-+	regulators {
-+		sound_1v8: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "i2s-audio-1v8";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+		};
-+
-+		sound_3v3: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			regulator-name = "i2s-audio-3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+		};
-+	};
-+
-+	tlv320_mclk: oscillator {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <19200000>;
-+		clock-output-names = "tlv320-mclk";
-+	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "OnboardTLV320AIC3007";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,bitclock-master = <&dailink_master>;
-+		simple-audio-card,frame-master = <&dailink_master>;
-+		simple-audio-card,widgets =
-+			"Microphone", "Mic Jack",
-+			"Line", "Line In",
-+			"Line", "Line Out",
-+			"Speaker", "Speaker",
-+			"Headphone", "Headphone Jack";
-+		simple-audio-card,routing =
-+			"Line Out", "LLOUT",
-+			"Line Out", "RLOUT",
-+			"Speaker", "SPOP",
-+			"Speaker", "SPOM",
-+			"Headphone Jack", "HPLOUT",
-+			"Headphone Jack", "HPROUT",
-+			"MIC3L", "Mic Jack",
-+			"MIC3R", "Mic Jack",
-+			"Mic Jack", "Mic Bias",
-+			"LINE1L", "Line In",
-+			"LINE1R", "Line In";
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&ssi2>;
-+		};
-+
-+		dailink_master: simple-audio-card,codec {
-+			sound-dai = <&codec>;
-+			clocks = <&tlv320_mclk>;
-+		};
-+	};
-+
-+};
-+
-+&audmux {
-+	status = "okay";
-+
-+	ssi2 {
-+		fsl,audmux-port = <1>;
-+		fsl,port-config = <
-+			(IMX_AUDMUX_V2_PTCR_TFSDIR |
-+			IMX_AUDMUX_V2_PTCR_TFSEL(4) |
-+			IMX_AUDMUX_V2_PTCR_TCLKDIR |
-+			IMX_AUDMUX_V2_PTCR_TCSEL(4))
-+			IMX_AUDMUX_V2_PDCR_RXDSEL(4)
-+		>;
-+	};
-+
-+	pins5 {
-+		fsl,audmux-port = <4>;
-+		fsl,port-config = <
-+			0x00000000
-+			IMX_AUDMUX_V2_PDCR_RXDSEL(1)
-+		>;
-+	};
- };
- 
- &fec {
-@@ -30,9 +116,16 @@
- &i2c2 {
- 	status = "okay";
- 
--	tlv320 at 18 {
--		compatible = "ti,tlv320aic3x";
-+	codec: tlv320 at 18 {
-+		compatible = "ti,tlv320aic3007";
-+		#sound-dai-cells = <0>;
- 		reg = <0x18>;
-+		ai3x-micbias-vg = <2>;
-+
-+		AVDD-supply = <&sound_3v3>;
-+		IOVDD-supply = <&sound_3v3>;
-+		DRVDD-supply = <&sound_3v3>;
-+		DVDD-supply = <&sound_1v8>;
- 	};
- 
- 	stmpe at 41 {
-@@ -55,6 +148,10 @@
- 	status = "okay";
- };
- 
-+&ssi2 {
-+	status = "okay";
-+};
-+
- &uart3 {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-index aa22756..ab3b1f9 100644
---- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-@@ -58,6 +58,12 @@
- 	};
- };
- 
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux>;
-+	status = "disabled";
-+};
-+
- &ecspi3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_ecspi3>;
-@@ -319,6 +325,15 @@
- 				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000
- 			>;
- 		};
-+
-+		pinctrl_audmux: audmuxgrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT16__AUD5_TXC	0x130b0
-+				MX6QDL_PAD_DISP0_DAT17__AUD5_TXD	0x110b0
-+				MX6QDL_PAD_DISP0_DAT18__AUD5_TXFS	0x130b0
-+				MX6QDL_PAD_DISP0_DAT19__AUD5_RXD	0x130b0
-+			>;
-+		};
- 	};
- };
- 
+The second patch is a USB fix I uncovered while testing the 3rd patch,
+which adds regulators, mainly for proper USB VBUS support, as we have
+them on our carrier boards.
+
+Stefan Agner (3):
+  ARM: dts: vf610: use new GPIO support
+  ARM: dts: vf610: enable USB misc/phy nodes where necessary
+  ARM: dts: vf-colibri: add USB regulators
+
+ arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 45 ++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/vf-colibri.dtsi         | 37 +++++++++++++++++++++++++
+ arch/arm/boot/dts/vf610-twr.dts           |  9 +++++++
+ arch/arm/boot/dts/vfxxx.dtsi              |  1 +
+ 4 files changed, 91 insertions(+), 1 deletion(-)
+
 -- 
-2.1.2
+2.1.3
