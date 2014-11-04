@@ -1,56 +1,35 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Tue, 4 Nov 2014 13:44:21 +0800
-Subject: [PATCH v4 2/8] ARM: mediatek: add dts for 8127 Moose board
-In-Reply-To: <CABuKBe+ku=vWiWbvAm8M7QgyzvVWZ5sdkRMocuUym8JTyk-okg@mail.gmail.com>
-References: <1413973797-17619-1-git-send-email-yingjoe.chen@mediatek.com>
- <1413973797-17619-3-git-send-email-yingjoe.chen@mediatek.com>
- <CABuKBe+ku=vWiWbvAm8M7QgyzvVWZ5sdkRMocuUym8JTyk-okg@mail.gmail.com>
-Message-ID: <1415079861.31861.0.camel@mtksdaap41>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 3 Nov 2014 22:02:06 -0800
+Subject: [GIT PULL v2 2/2] ARM: rockchip: cpufreq-cpu0 device
+In-Reply-To: <1712743.HcKV7iIeyP@phil>
+References: <7172632.O1FfdvXn6k@phil> <201717175.L17Ccvmpek@phil>
+ <1712743.HcKV7iIeyP@phil>
+Message-ID: <20141104060206.GB13562@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-11-03 at 18:55 +0100, Matthias Brugger wrote:
-> 2014-10-22 12:29 GMT+02:00 Joe.C <yingjoe.chen@mediatek.com>:
-> > From: "Joe.C" <yingjoe.chen@mediatek.com>
-> >
-> > Moose is a tablet evalutation board based on MT8127 SoC.
-> >
-> > Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
-> > ---
-> >  arch/arm/boot/dts/mt8127-moose.dts | 24 ++++++++++++++++++++++++
-> >  1 file changed, 24 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/mt8127-moose.dts
-> >
-> > diff --git a/arch/arm/boot/dts/mt8127-moose.dts b/arch/arm/boot/dts/mt8127-moose.dts
-> > new file mode 100644
-> > index 0000000..602e2f0
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/mt8127-moose.dts
-> > @@ -0,0 +1,24 @@
-> > +/*
-> > + * Copyright (c) 2014 MediaTek Inc.
-> > + * Author: Joe.C <yingjoe.chen@mediatek.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +/dts-v1/;
-> > +#include "mt8127.dtsi"
-> > +
-> > +/ {
-> > +       model = "mediatek,mt8127-moose", "mediatek,mt8127";
+On Tue, Sep 30, 2014 at 12:15:59PM +0200, Heiko St?bner wrote:
+> Hi Arnd, Olof,
 > 
-> The model should be a string that identifies the board, e.g. "Moose".
-> Please add the compatible property.
+> this is a version 2 of the cpufreq platform-device addition, as cpufreq-cpu0
+> was meanwhile renamed to cpufreq-dt, as reported by Viresh Kumar.
+> 
+> So please pull
+> 
+> 
+> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+> 
+>   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.18-rockchip-cpufreqdev-v2
+> 
+> for you to fetch changes up to 3eb79a5a9d46b32f63f6b9cd86f9b2bba43e127a:
+> 
+>   ARM: rockchip: honor renaming of cpufreq-cpu0 to cpufreq-dt (2014-09-30 10:33:27 +0200)
 
-Thanks for catching this. I just note we have warning on this line.
-Will fix in next version.
+Merged now.
 
-Joe.C
+
+-Olof
