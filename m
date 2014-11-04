@@ -1,27 +1,27 @@
 From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Tue, 4 Nov 2014 15:30:51 +0800
-Subject: [PATCH v5 4/8] ARM: mediatek: add dts for MT8135 evaluation board.
+Date: Tue, 4 Nov 2014 15:30:49 +0800
+Subject: [PATCH v5 2/8] ARM: mediatek: add dts for 8127 Moose board
 In-Reply-To: <1415086255-5555-1-git-send-email-yingjoe.chen@mediatek.com>
 References: <1415086255-5555-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1415086255-5555-5-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1415086255-5555-3-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Joe.C" <yingjoe.chen@mediatek.com>
 
-Evbp1 is a tablet evaluation board based on MT8135 SoC.
+Moose is a tablet evalutation board based on MT8127 SoC.
 
 Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
 ---
- arch/arm/boot/dts/mt8135-evbp1.dts | 25 +++++++++++++++++++++++++
+ arch/arm/boot/dts/mt8127-moose.dts | 25 +++++++++++++++++++++++++
  1 file changed, 25 insertions(+)
- create mode 100644 arch/arm/boot/dts/mt8135-evbp1.dts
+ create mode 100644 arch/arm/boot/dts/mt8127-moose.dts
 
-diff --git a/arch/arm/boot/dts/mt8135-evbp1.dts b/arch/arm/boot/dts/mt8135-evbp1.dts
+diff --git a/arch/arm/boot/dts/mt8127-moose.dts b/arch/arm/boot/dts/mt8127-moose.dts
 new file mode 100644
-index 0000000..5b43500
+index 0000000..c9c3a5c
 --- /dev/null
-+++ b/arch/arm/boot/dts/mt8135-evbp1.dts
++++ b/arch/arm/boot/dts/mt8127-moose.dts
 @@ -0,0 +1,25 @@
 +/*
 + * Copyright (c) 2014 MediaTek Inc.
@@ -38,11 +38,11 @@ index 0000000..5b43500
 + */
 +
 +/dts-v1/;
-+#include "mt8135.dtsi"
++#include "mt8127.dtsi"
 +
 +/ {
-+	model = "MediaTek MT8135 evaluation board";
-+	compatible = "mediatek,mt8135-evbp1", "mediatek,mt8135";
++	model = "MediaTek MT8127 Moose Board";
++	compatible = "mediatek,mt8127-moose", "mediatek,mt8127";
 +
 +	memory {
 +		reg = <0x80000000 0x40000000>;
