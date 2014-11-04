@@ -1,118 +1,619 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  4 Nov 2014 10:50:41 +0900
-Subject: [PATCH 1/7] ARM: shmobile: Remove shmobile_clk_workaround()
- implementation
+Date: Tue,  4 Nov 2014 10:50:43 +0900
+Subject: [PATCH 3/7] ARM: shmobile: r8a7791: Remove legacy code
 In-Reply-To: <cover.1415059146.git.horms+renesas@verge.net.au>
 References: <cover.1415059146.git.horms+renesas@verge.net.au>
-Message-ID: <b6c461d2791ce738bf14fc796e65b9a00072de96.1415059146.git.horms+renesas@verge.net.au>
+Message-ID: <74c917076ab96f648b96a39ec1ce7a8a7ed361f5.1415059146.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The function isn't used or needed anymore, remove it.
+All r8a7791 boards are now used with multiplatform kernels only. We can
+remove all the unused r8a7791 legacy device and clock registration code.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Makefile |  2 +-
- arch/arm/mach-shmobile/clock.c  | 32 +++-----------------------------
- arch/arm/mach-shmobile/clock.h  | 14 --------------
- 3 files changed, 4 insertions(+), 44 deletions(-)
+ arch/arm/mach-shmobile/Kconfig         |   8 -
+ arch/arm/mach-shmobile/Makefile        |   1 -
+ arch/arm/mach-shmobile/clock-r8a7791.c | 338 ---------------------------------
+ arch/arm/mach-shmobile/r8a7791.h       |   3 -
+ arch/arm/mach-shmobile/setup-r8a7791.c | 181 +-----------------
+ 5 files changed, 1 insertion(+), 530 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/clock-r8a7791.c
 
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 8444016..e50402b 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -145,14 +145,6 @@ config ARCH_R8A7790
+ 	select MIGHT_HAVE_PCI
+ 	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+ 
+-config ARCH_R8A7791
+-	bool "R-Car M2-W (R8A77910)"
+-	select ARCH_RCAR_GEN2
+-	select ARCH_WANT_OPTIONAL_GPIOLIB
+-	select ARM_GIC
+-	select MIGHT_HAVE_PCI
+-	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+-
+ comment "Renesas ARM SoCs Board Type"
+ 
+ config MACH_APE6EVM
 diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index e20f278..dcb38d5 100644
+index c49c491..fbb7f85 100644
 --- a/arch/arm/mach-shmobile/Makefile
 +++ b/arch/arm/mach-shmobile/Makefile
-@@ -19,8 +19,8 @@ obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o
- obj-$(CONFIG_ARCH_R7S72100)	+= setup-r7s72100.o
+@@ -28,7 +28,6 @@ obj-$(CONFIG_ARCH_R8A7740)	+= clock-r8a7740.o
+ obj-$(CONFIG_ARCH_R8A7778)	+= clock-r8a7778.o
+ obj-$(CONFIG_ARCH_R8A7779)	+= clock-r8a7779.o
+ obj-$(CONFIG_ARCH_R8A7790)	+= clock-r8a7790.o
+-obj-$(CONFIG_ARCH_R8A7791)	+= clock-r8a7791.o
+ endif
  
- # Clock objects
--obj-y				+= clock.o
- ifndef CONFIG_COMMON_CLK
-+obj-y				+= clock.o
- obj-$(CONFIG_ARCH_SH7372)	+= clock-sh7372.o
- obj-$(CONFIG_ARCH_SH73A0)	+= clock-sh73a0.o
- obj-$(CONFIG_ARCH_R8A73A4)	+= clock-r8a73a4.o
-diff --git a/arch/arm/mach-shmobile/clock.c b/arch/arm/mach-shmobile/clock.c
-index 1f81ad7..34f056f 100644
---- a/arch/arm/mach-shmobile/clock.c
-+++ b/arch/arm/mach-shmobile/clock.c
-@@ -15,36 +15,12 @@
-  * GNU General Public License for more details.
-  *
-  */
-+
-+#include <linux/export.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
--
--#ifdef CONFIG_COMMON_CLK
--#include <linux/clk.h>
+ # CPU reset vector handling objects
+diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
+deleted file mode 100644
+index 82143ca..0000000
+--- a/arch/arm/mach-shmobile/clock-r8a7791.c
++++ /dev/null
+@@ -1,338 +0,0 @@
+-/*
+- * r8a7791 clock framework support
+- *
+- * Copyright (C) 2013  Renesas Electronics Corporation
+- * Copyright (C) 2013  Renesas Solutions Corp.
+- * Copyright (C) 2013  Magnus Damm
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; version 2 of the License.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+- * GNU General Public License for more details.
+- */
+-#include <linux/init.h>
+-#include <linux/io.h>
+-#include <linux/kernel.h>
+-#include <linux/sh_clk.h>
 -#include <linux/clkdev.h>
 -#include "clock.h"
+-#include "common.h"
+-#include "rcar-gen2.h"
 -
--void __init shmobile_clk_workaround(const struct clk_name *clks,
--				    int nr_clks, bool enable)
--{
--	const struct clk_name *clkn;
--	struct clk *clk;
--	unsigned int i;
+-/*
+- *   MD		EXTAL		PLL0	PLL1	PLL3
+- * 14 13 19	(MHz)		*1	*1
+- *---------------------------------------------------
+- * 0  0  0	15 x 1		x172/2	x208/2	x106
+- * 0  0  1	15 x 1		x172/2	x208/2	x88
+- * 0  1  0	20 x 1		x130/2	x156/2	x80
+- * 0  1  1	20 x 1		x130/2	x156/2	x66
+- * 1  0  0	26 / 2		x200/2	x240/2	x122
+- * 1  0  1	26 / 2		x200/2	x240/2	x102
+- * 1  1  0	30 / 2		x172/2	x208/2	x106
+- * 1  1  1	30 / 2		x172/2	x208/2	x88
+- *
+- * *1 :	Table 7.6 indicates VCO ouput (PLLx = VCO/2)
+- *	see "p1 / 2" on R8A7791_CLOCK_ROOT() below
+- */
 -
--	for (i = 0; i < nr_clks; ++i) {
--		clkn = clks + i;
--		clk = clk_get(NULL, clkn->clk);
--		if (!IS_ERR(clk)) {
--			clk_register_clkdev(clk, clkn->con_id, clkn->dev_id);
--			if (enable)
--				clk_prepare_enable(clk);
--			clk_put(clk);
--		}
--	}
--}
+-#define CPG_BASE 0xe6150000
+-#define CPG_LEN 0x1000
 -
--#else /* CONFIG_COMMON_CLK */
- #include <linux/sh_clk.h>
--#include <linux/export.h>
-+
- #include "clock.h"
- #include "common.h"
- 
-@@ -80,5 +56,3 @@ void __clk_put(struct clk *clk)
- {
- }
- EXPORT_SYMBOL(__clk_put);
+-#define SMSTPCR0	0xE6150130
+-#define SMSTPCR1	0xE6150134
+-#define SMSTPCR2	0xe6150138
+-#define SMSTPCR3	0xE615013C
+-#define SMSTPCR5	0xE6150144
+-#define SMSTPCR7	0xe615014c
+-#define SMSTPCR8	0xE6150990
+-#define SMSTPCR9	0xE6150994
+-#define SMSTPCR10	0xE6150998
+-#define SMSTPCR11	0xE615099C
 -
--#endif /* CONFIG_COMMON_CLK */
-diff --git a/arch/arm/mach-shmobile/clock.h b/arch/arm/mach-shmobile/clock.h
-index 31b6417..cf3552e 100644
---- a/arch/arm/mach-shmobile/clock.h
-+++ b/arch/arm/mach-shmobile/clock.h
-@@ -1,19 +1,6 @@
- #ifndef CLOCK_H
- #define CLOCK_H
- 
--#ifdef CONFIG_COMMON_CLK
--/* temporary clock configuration helper for platform devices */
+-#define MSTPSR1		IOMEM(0xe6150038)
+-#define MSTPSR2		IOMEM(0xe6150040)
+-#define MSTPSR3		IOMEM(0xe6150048)
+-#define MSTPSR5		IOMEM(0xe615003c)
+-#define MSTPSR7		IOMEM(0xe61501c4)
+-#define MSTPSR8		IOMEM(0xe61509a0)
+-#define MSTPSR9		IOMEM(0xe61509a4)
+-#define MSTPSR11	IOMEM(0xe61509ac)
 -
--struct clk_name {
--	const char *clk;
--	const char *con_id;
--	const char *dev_id;
+-#define SDCKCR		0xE6150074
+-#define SD1CKCR		0xE6150078
+-#define SD2CKCR		0xE615026c
+-#define MMC0CKCR	0xE6150240
+-#define MMC1CKCR	0xE6150244
+-#define SSPCKCR		0xE6150248
+-#define SSPRSCKCR	0xE615024C
+-
+-static struct clk_mapping cpg_mapping = {
+-	.phys   = CPG_BASE,
+-	.len    = CPG_LEN,
 -};
 -
--void shmobile_clk_workaround(const struct clk_name *clks, int nr_clks,
--			     bool enable);
+-static struct clk extal_clk = {
+-	/* .rate will be updated on r8a7791_clock_init() */
+-	.mapping	= &cpg_mapping,
+-};
 -
--#else /* CONFIG_COMMON_CLK */
- /* legacy clock implementation */
+-static struct sh_clk_ops followparent_clk_ops = {
+-	.recalc	= followparent_recalc,
+-};
+-
+-static struct clk main_clk = {
+-	/* .parent will be set r8a73a4_clock_init */
+-	.ops	= &followparent_clk_ops,
+-};
+-
+-/*
+- * clock ratio of these clock will be updated
+- * on r8a7791_clock_init()
+- */
+-SH_FIXED_RATIO_CLK_SET(pll1_clk,		main_clk,	1, 1);
+-SH_FIXED_RATIO_CLK_SET(pll3_clk,		main_clk,	1, 1);
+-SH_FIXED_RATIO_CLK_SET(qspi_clk,		pll1_clk,	1, 1);
+-
+-/* fixed ratio clock */
+-SH_FIXED_RATIO_CLK_SET(extal_div2_clk,		extal_clk,	1, 2);
+-SH_FIXED_RATIO_CLK_SET(cp_clk,			extal_clk,	1, 2);
+-
+-SH_FIXED_RATIO_CLK_SET(pll1_div2_clk,		pll1_clk,	1, 2);
+-SH_FIXED_RATIO_CLK_SET(hp_clk,			pll1_clk,	1, 12);
+-SH_FIXED_RATIO_CLK_SET(p_clk,			pll1_clk,	1, 24);
+-SH_FIXED_RATIO_CLK_SET(rclk_clk,		pll1_clk,	1, (48 * 1024));
+-SH_FIXED_RATIO_CLK_SET(mp_clk,			pll1_div2_clk,	1, 15);
+-SH_FIXED_RATIO_CLK_SET(zg_clk,			pll1_clk,	1, 3);
+-SH_FIXED_RATIO_CLK_SET(zx_clk,			pll1_clk,	1, 3);
+-SH_FIXED_RATIO_CLK_SET(zs_clk,			pll1_clk,	1, 6);
+-
+-static struct clk *main_clks[] = {
+-	&extal_clk,
+-	&extal_div2_clk,
+-	&main_clk,
+-	&pll1_clk,
+-	&pll1_div2_clk,
+-	&pll3_clk,
+-	&hp_clk,
+-	&p_clk,
+-	&qspi_clk,
+-	&rclk_clk,
+-	&mp_clk,
+-	&cp_clk,
+-	&zg_clk,
+-	&zx_clk,
+-	&zs_clk,
+-};
+-
+-/* SDHI (DIV4) clock */
+-static int divisors[] = { 2, 3, 4, 6, 8, 12, 16, 18, 24, 0, 36, 48, 10 };
+-
+-static struct clk_div_mult_table div4_div_mult_table = {
+-	.divisors = divisors,
+-	.nr_divisors = ARRAY_SIZE(divisors),
+-};
+-
+-static struct clk_div4_table div4_table = {
+-	.div_mult_table = &div4_div_mult_table,
+-};
+-
+-enum {
+-	DIV4_SDH, DIV4_SD0,
+-	DIV4_NR
+-};
+-
+-static struct clk div4_clks[DIV4_NR] = {
+-	[DIV4_SDH] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 8, 0x0dff, CLK_ENABLE_ON_INIT),
+-	[DIV4_SD0] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 4, 0x1df0, CLK_ENABLE_ON_INIT),
+-};
+-
+-/* DIV6 clocks */
+-enum {
+-	DIV6_SD1, DIV6_SD2,
+-	DIV6_NR
+-};
+-
+-static struct clk div6_clks[DIV6_NR] = {
+-	[DIV6_SD1]	= SH_CLK_DIV6(&pll1_div2_clk, SD1CKCR, 0),
+-	[DIV6_SD2]	= SH_CLK_DIV6(&pll1_div2_clk, SD2CKCR, 0),
+-};
+-
+-/* MSTP */
+-enum {
+-	MSTP1108, MSTP1107, MSTP1106,
+-	MSTP931, MSTP930, MSTP929, MSTP928, MSTP927, MSTP925,
+-	MSTP917,
+-	MSTP815, MSTP814,
+-	MSTP813,
+-	MSTP811, MSTP810, MSTP809,
+-	MSTP726, MSTP724, MSTP723, MSTP721, MSTP720,
+-	MSTP719, MSTP718, MSTP715, MSTP714,
+-	MSTP522,
+-	MSTP314, MSTP312, MSTP311,
+-	MSTP216, MSTP207, MSTP206,
+-	MSTP204, MSTP203, MSTP202,
+-	MSTP124,
+-	MSTP_NR
+-};
+-
+-static struct clk mstp_clks[MSTP_NR] = {
+-	[MSTP1108] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 8, MSTPSR11, 0), /* SCIFA5 */
+-	[MSTP1107] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 7, MSTPSR11, 0), /* SCIFA4 */
+-	[MSTP1106] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 6, MSTPSR11, 0), /* SCIFA3 */
+-	[MSTP931] = SH_CLK_MSTP32_STS(&hp_clk, SMSTPCR9, 31, MSTPSR9, 0), /* I2C0 */
+-	[MSTP930] = SH_CLK_MSTP32_STS(&hp_clk, SMSTPCR9, 30, MSTPSR9, 0), /* I2C1 */
+-	[MSTP929] = SH_CLK_MSTP32_STS(&hp_clk, SMSTPCR9, 29, MSTPSR9, 0), /* I2C2 */
+-	[MSTP928] = SH_CLK_MSTP32_STS(&hp_clk, SMSTPCR9, 28, MSTPSR9, 0), /* I2C3 */
+-	[MSTP927] = SH_CLK_MSTP32_STS(&hp_clk, SMSTPCR9, 27, MSTPSR9, 0), /* I2C4 */
+-	[MSTP925] = SH_CLK_MSTP32_STS(&hp_clk, SMSTPCR9, 25, MSTPSR9, 0), /* I2C5 */
+-	[MSTP917] = SH_CLK_MSTP32_STS(&qspi_clk, SMSTPCR9, 17, MSTPSR9, 0), /* QSPI */
+-	[MSTP815] = SH_CLK_MSTP32_STS(&zs_clk, SMSTPCR8, 15, MSTPSR8, 0), /* SATA0 */
+-	[MSTP814] = SH_CLK_MSTP32_STS(&zs_clk, SMSTPCR8, 14, MSTPSR8, 0), /* SATA1 */
+-	[MSTP813] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR8, 13, MSTPSR8, 0), /* Ether */
+-	[MSTP811] = SH_CLK_MSTP32_STS(&zg_clk, SMSTPCR8, 11, MSTPSR8, 0), /* VIN0 */
+-	[MSTP810] = SH_CLK_MSTP32_STS(&zg_clk, SMSTPCR8, 10, MSTPSR8, 0), /* VIN1 */
+-	[MSTP809] = SH_CLK_MSTP32_STS(&zg_clk, SMSTPCR8, 9, MSTPSR8, 0), /* VIN2 */
+-	[MSTP726] = SH_CLK_MSTP32_STS(&zx_clk, SMSTPCR7, 26, MSTPSR7, 0), /* LVDS0 */
+-	[MSTP724] = SH_CLK_MSTP32_STS(&zx_clk, SMSTPCR7, 24, MSTPSR7, 0), /* DU0 */
+-	[MSTP723] = SH_CLK_MSTP32_STS(&zx_clk, SMSTPCR7, 23, MSTPSR7, 0), /* DU1 */
+-	[MSTP721] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR7, 21, MSTPSR7, 0), /* SCIF0 */
+-	[MSTP720] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR7, 20, MSTPSR7, 0), /* SCIF1 */
+-	[MSTP719] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR7, 19, MSTPSR7, 0), /* SCIF2 */
+-	[MSTP718] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR7, 18, MSTPSR7, 0), /* SCIF3 */
+-	[MSTP715] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR7, 15, MSTPSR7, 0), /* SCIF4 */
+-	[MSTP714] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR7, 14, MSTPSR7, 0), /* SCIF5 */
+-	[MSTP522] = SH_CLK_MSTP32_STS(&extal_clk, SMSTPCR5, 22, MSTPSR5, 0), /* Thermal */
+-	[MSTP314] = SH_CLK_MSTP32_STS(&div4_clks[DIV4_SD0], SMSTPCR3, 14, MSTPSR3, 0), /* SDHI0 */
+-	[MSTP312] = SH_CLK_MSTP32_STS(&div6_clks[DIV6_SD1], SMSTPCR3, 12, MSTPSR3, 0), /* SDHI1 */
+-	[MSTP311] = SH_CLK_MSTP32_STS(&div6_clks[DIV6_SD2], SMSTPCR3, 11, MSTPSR3, 0), /* SDHI2 */
+-	[MSTP216] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 16, MSTPSR2, 0), /* SCIFB2 */
+-	[MSTP207] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 7, MSTPSR2, 0), /* SCIFB1 */
+-	[MSTP206] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 6, MSTPSR2, 0), /* SCIFB0 */
+-	[MSTP204] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 4, MSTPSR2, 0), /* SCIFA0 */
+-	[MSTP203] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 3, MSTPSR2, 0), /* SCIFA1 */
+-	[MSTP202] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 2, MSTPSR2, 0), /* SCIFA2 */
+-	[MSTP124] = SH_CLK_MSTP32_STS(&rclk_clk, SMSTPCR1, 24, MSTPSR1, 0), /* CMT0 */
+-};
+-
+-static struct clk_lookup lookups[] = {
+-
+-	/* main clocks */
+-	CLKDEV_CON_ID("extal",		&extal_clk),
+-	CLKDEV_CON_ID("extal_div2",	&extal_div2_clk),
+-	CLKDEV_CON_ID("main",		&main_clk),
+-	CLKDEV_CON_ID("pll1",		&pll1_clk),
+-	CLKDEV_CON_ID("pll1_div2",	&pll1_div2_clk),
+-	CLKDEV_CON_ID("pll3",		&pll3_clk),
+-	CLKDEV_CON_ID("zg",		&zg_clk),
+-	CLKDEV_CON_ID("zs",		&zs_clk),
+-	CLKDEV_CON_ID("hp",		&hp_clk),
+-	CLKDEV_CON_ID("p",		&p_clk),
+-	CLKDEV_CON_ID("qspi",		&qspi_clk),
+-	CLKDEV_CON_ID("rclk",		&rclk_clk),
+-	CLKDEV_CON_ID("mp",		&mp_clk),
+-	CLKDEV_CON_ID("cp",		&cp_clk),
+-	CLKDEV_CON_ID("peripheral_clk", &hp_clk),
+-
+-	/* MSTP */
+-	CLKDEV_ICK_ID("lvds.0", "rcar-du-r8a7791", &mstp_clks[MSTP726]),
+-	CLKDEV_ICK_ID("du.0", "rcar-du-r8a7791", &mstp_clks[MSTP724]),
+-	CLKDEV_ICK_ID("du.1", "rcar-du-r8a7791", &mstp_clks[MSTP723]),
+-	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]), /* SCIFA0 */
+-	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]), /* SCIFA1 */
+-	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP206]), /* SCIFB0 */
+-	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP207]), /* SCIFB1 */
+-	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP216]), /* SCIFB2 */
+-	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP202]), /* SCIFA2 */
+-	CLKDEV_DEV_ID("sh-sci.6", &mstp_clks[MSTP721]), /* SCIF0 */
+-	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]), /* SCIF1 */
+-	CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP719]), /* SCIF2 */
+-	CLKDEV_DEV_ID("sh-sci.9", &mstp_clks[MSTP718]), /* SCIF3 */
+-	CLKDEV_DEV_ID("sh-sci.10", &mstp_clks[MSTP715]), /* SCIF4 */
+-	CLKDEV_DEV_ID("sh-sci.11", &mstp_clks[MSTP714]), /* SCIF5 */
+-	CLKDEV_DEV_ID("sh-sci.12", &mstp_clks[MSTP1106]), /* SCIFA3 */
+-	CLKDEV_DEV_ID("sh-sci.13", &mstp_clks[MSTP1107]), /* SCIFA4 */
+-	CLKDEV_DEV_ID("sh-sci.14", &mstp_clks[MSTP1108]), /* SCIFA5 */
+-	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]),
+-	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP312]),
+-	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP311]),
+-	CLKDEV_ICK_ID("fck", "sh-cmt-48-gen2.0", &mstp_clks[MSTP124]),
+-	CLKDEV_DEV_ID("qspi.0", &mstp_clks[MSTP917]),
+-	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
+-	CLKDEV_DEV_ID("i2c-rcar_gen2.0", &mstp_clks[MSTP931]),
+-	CLKDEV_DEV_ID("i2c-rcar_gen2.1", &mstp_clks[MSTP930]),
+-	CLKDEV_DEV_ID("i2c-rcar_gen2.2", &mstp_clks[MSTP929]),
+-	CLKDEV_DEV_ID("i2c-rcar_gen2.3", &mstp_clks[MSTP928]),
+-	CLKDEV_DEV_ID("i2c-rcar_gen2.4", &mstp_clks[MSTP927]),
+-	CLKDEV_DEV_ID("i2c-rcar_gen2.5", &mstp_clks[MSTP925]),
+-	CLKDEV_DEV_ID("r8a7791-ether", &mstp_clks[MSTP813]), /* Ether */
+-	CLKDEV_DEV_ID("r8a7791-vin.0", &mstp_clks[MSTP811]),
+-	CLKDEV_DEV_ID("r8a7791-vin.1", &mstp_clks[MSTP810]),
+-	CLKDEV_DEV_ID("r8a7791-vin.2", &mstp_clks[MSTP809]),
+-	CLKDEV_DEV_ID("sata-r8a7791.0", &mstp_clks[MSTP815]),
+-	CLKDEV_DEV_ID("sata-r8a7791.1", &mstp_clks[MSTP814]),
+-};
+-
+-#define R8A7791_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
+-	extal_clk.rate	= e * 1000 * 1000;			\
+-	main_clk.parent	= m;					\
+-	SH_CLK_SET_RATIO(&pll1_clk_ratio, p1 / 2, 1);		\
+-	if (mode & MD(19))					\
+-		SH_CLK_SET_RATIO(&pll3_clk_ratio, p31, 1);	\
+-	else							\
+-		SH_CLK_SET_RATIO(&pll3_clk_ratio, p30, 1)
+-
+-
+-void __init r8a7791_clock_init(void)
+-{
+-	u32 mode = rcar_gen2_read_mode_pins();
+-	int k, ret = 0;
+-
+-	switch (mode & (MD(14) | MD(13))) {
+-	case 0:
+-		R8A7791_CLOCK_ROOT(15, &extal_clk, 172, 208, 106, 88);
+-		break;
+-	case MD(13):
+-		R8A7791_CLOCK_ROOT(20, &extal_clk, 130, 156, 80, 66);
+-		break;
+-	case MD(14):
+-		R8A7791_CLOCK_ROOT(26, &extal_div2_clk, 200, 240, 122, 102);
+-		break;
+-	case MD(13) | MD(14):
+-		R8A7791_CLOCK_ROOT(30, &extal_div2_clk, 172, 208, 106, 88);
+-		break;
+-	}
+-
+-	if ((mode & (MD(3) | MD(2) | MD(1))) == MD(2))
+-		SH_CLK_SET_RATIO(&qspi_clk_ratio, 1, 16);
+-	else
+-		SH_CLK_SET_RATIO(&qspi_clk_ratio, 1, 20);
+-
+-	for (k = 0; !ret && (k < ARRAY_SIZE(main_clks)); k++)
+-		ret = clk_register(main_clks[k]);
+-
+-	if (!ret)
+-		ret = sh_clk_div4_register(div4_clks, DIV4_NR, &div4_table);
+-
+-	if (!ret)
+-		ret = sh_clk_div6_register(div6_clks, DIV6_NR);
+-
+-	if (!ret)
+-		ret = sh_clk_mstp_register(mstp_clks, MSTP_NR);
+-
+-	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+-
+-	if (!ret)
+-		shmobile_clk_init();
+-	else
+-		goto epanic;
+-
+-	return;
+-
+-epanic:
+-	panic("failed to setup r8a7791 clocks\n");
+-}
+diff --git a/arch/arm/mach-shmobile/r8a7791.h b/arch/arm/mach-shmobile/r8a7791.h
+index c1bf7ab..6cf11eb 100644
+--- a/arch/arm/mach-shmobile/r8a7791.h
++++ b/arch/arm/mach-shmobile/r8a7791.h
+@@ -1,9 +1,6 @@
+ #ifndef __ASM_R8A7791_H__
+ #define __ASM_R8A7791_H__
  
- struct clk;
-@@ -52,5 +39,4 @@ do {			\
- 	(p)->div = d;	\
- } while (0)
+-void r8a7791_add_standard_devices(void);
+-void r8a7791_clock_init(void);
+-void r8a7791_pinmux_init(void);
+ void r8a7791_pm_init(void);
+ extern struct smp_operations r8a7791_smp_ops;
  
--#endif /* CONFIG_COMMON_CLK */
- #endif
+diff --git a/arch/arm/mach-shmobile/setup-r8a7791.c b/arch/arm/mach-shmobile/setup-r8a7791.c
+index d930925f..ef8eb3a 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7791.c
++++ b/arch/arm/mach-shmobile/setup-r8a7791.c
+@@ -15,192 +15,14 @@
+  * GNU General Public License for more details.
+  */
+ 
+-#include <linux/irq.h>
+-#include <linux/kernel.h>
+-#include <linux/of_platform.h>
+-#include <linux/platform_data/gpio-rcar.h>
+-#include <linux/platform_data/irq-renesas-irqc.h>
+-#include <linux/serial_sci.h>
+-#include <linux/sh_timer.h>
++#include <linux/init.h>
+ 
+ #include <asm/mach/arch.h>
+ 
+ #include "common.h"
+-#include "irqs.h"
+ #include "r8a7791.h"
+ #include "rcar-gen2.h"
+ 
+-static const struct resource pfc_resources[] __initconst = {
+-	DEFINE_RES_MEM(0xe6060000, 0x250),
+-};
+-
+-#define r8a7791_register_pfc()						\
+-	platform_device_register_simple("pfc-r8a7791", -1, pfc_resources, \
+-					ARRAY_SIZE(pfc_resources))
+-
+-#define R8A7791_GPIO(idx, base, nr)					\
+-static const struct resource r8a7791_gpio##idx##_resources[] __initconst = { \
+-	DEFINE_RES_MEM((base), 0x50),					\
+-	DEFINE_RES_IRQ(gic_spi(4 + (idx))),				\
+-};									\
+-									\
+-static const struct gpio_rcar_config					\
+-r8a7791_gpio##idx##_platform_data __initconst = {			\
+-	.gpio_base	= 32 * (idx),					\
+-	.irq_base	= 0,						\
+-	.number_of_pins	= (nr),						\
+-	.pctl_name	= "pfc-r8a7791",				\
+-	.has_both_edge_trigger = 1,					\
+-};									\
+-
+-R8A7791_GPIO(0, 0xe6050000, 32);
+-R8A7791_GPIO(1, 0xe6051000, 32);
+-R8A7791_GPIO(2, 0xe6052000, 32);
+-R8A7791_GPIO(3, 0xe6053000, 32);
+-R8A7791_GPIO(4, 0xe6054000, 32);
+-R8A7791_GPIO(5, 0xe6055000, 32);
+-R8A7791_GPIO(6, 0xe6055400, 32);
+-R8A7791_GPIO(7, 0xe6055800, 26);
+-
+-#define r8a7791_register_gpio(idx)					\
+-	platform_device_register_resndata(NULL, "gpio_rcar", idx,	\
+-		r8a7791_gpio##idx##_resources,				\
+-		ARRAY_SIZE(r8a7791_gpio##idx##_resources),		\
+-		&r8a7791_gpio##idx##_platform_data,			\
+-		sizeof(r8a7791_gpio##idx##_platform_data))
+-
+-void __init r8a7791_pinmux_init(void)
+-{
+-	r8a7791_register_pfc();
+-	r8a7791_register_gpio(0);
+-	r8a7791_register_gpio(1);
+-	r8a7791_register_gpio(2);
+-	r8a7791_register_gpio(3);
+-	r8a7791_register_gpio(4);
+-	r8a7791_register_gpio(5);
+-	r8a7791_register_gpio(6);
+-	r8a7791_register_gpio(7);
+-}
+-
+-#define __R8A7791_SCIF(scif_type, index, baseaddr, irq)			\
+-static struct plat_sci_port scif##index##_platform_data = {		\
+-	.type		= scif_type,					\
+-	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,		\
+-	.scscr		= SCSCR_RE | SCSCR_TE,				\
+-};									\
+-									\
+-static struct resource scif##index##_resources[] = {			\
+-	DEFINE_RES_MEM(baseaddr, 0x100),				\
+-	DEFINE_RES_IRQ(irq),						\
+-}
+-
+-#define R8A7791_SCIF(index, baseaddr, irq)				\
+-	__R8A7791_SCIF(PORT_SCIF, index, baseaddr, irq)
+-
+-#define R8A7791_SCIFA(index, baseaddr, irq)				\
+-	__R8A7791_SCIF(PORT_SCIFA, index, baseaddr, irq)
+-
+-#define R8A7791_SCIFB(index, baseaddr, irq)				\
+-	__R8A7791_SCIF(PORT_SCIFB, index, baseaddr, irq)
+-
+-R8A7791_SCIFA(0,  0xe6c40000, gic_spi(144)); /* SCIFA0 */
+-R8A7791_SCIFA(1,  0xe6c50000, gic_spi(145)); /* SCIFA1 */
+-R8A7791_SCIFB(2,  0xe6c20000, gic_spi(148)); /* SCIFB0 */
+-R8A7791_SCIFB(3,  0xe6c30000, gic_spi(149)); /* SCIFB1 */
+-R8A7791_SCIFB(4,  0xe6ce0000, gic_spi(150)); /* SCIFB2 */
+-R8A7791_SCIFA(5,  0xe6c60000, gic_spi(151)); /* SCIFA2 */
+-R8A7791_SCIF(6,   0xe6e60000, gic_spi(152)); /* SCIF0 */
+-R8A7791_SCIF(7,   0xe6e68000, gic_spi(153)); /* SCIF1 */
+-R8A7791_SCIF(8,   0xe6e58000, gic_spi(22)); /* SCIF2 */
+-R8A7791_SCIF(9,   0xe6ea8000, gic_spi(23)); /* SCIF3 */
+-R8A7791_SCIF(10,  0xe6ee0000, gic_spi(24)); /* SCIF4 */
+-R8A7791_SCIF(11,  0xe6ee8000, gic_spi(25)); /* SCIF5 */
+-R8A7791_SCIFA(12, 0xe6c70000, gic_spi(29)); /* SCIFA3 */
+-R8A7791_SCIFA(13, 0xe6c78000, gic_spi(30)); /* SCIFA4 */
+-R8A7791_SCIFA(14, 0xe6c80000, gic_spi(31)); /* SCIFA5 */
+-
+-#define r8a7791_register_scif(index)					       \
+-	platform_device_register_resndata(NULL, "sh-sci", index,  	       \
+-					  scif##index##_resources,	       \
+-					  ARRAY_SIZE(scif##index##_resources), \
+-					  &scif##index##_platform_data,	       \
+-					  sizeof(scif##index##_platform_data))
+-
+-static struct sh_timer_config cmt0_platform_data = {
+-	.channels_mask = 0x60,
+-};
+-
+-static struct resource cmt0_resources[] = {
+-	DEFINE_RES_MEM(0xffca0000, 0x1004),
+-	DEFINE_RES_IRQ(gic_spi(142)),
+-};
+-
+-#define r8a7791_register_cmt(idx)					\
+-	platform_device_register_resndata(NULL, "sh-cmt-48-gen2",	\
+-					  idx, cmt##idx##_resources,	\
+-					  ARRAY_SIZE(cmt##idx##_resources), \
+-					  &cmt##idx##_platform_data,	\
+-					  sizeof(struct sh_timer_config))
+-
+-static struct renesas_irqc_config irqc0_data = {
+-	.irq_base = irq_pin(0), /* IRQ0 -> IRQ9 */
+-};
+-
+-static struct resource irqc0_resources[] = {
+-	DEFINE_RES_MEM(0xe61c0000, 0x200), /* IRQC Event Detector Block_0 */
+-	DEFINE_RES_IRQ(gic_spi(0)), /* IRQ0 */
+-	DEFINE_RES_IRQ(gic_spi(1)), /* IRQ1 */
+-	DEFINE_RES_IRQ(gic_spi(2)), /* IRQ2 */
+-	DEFINE_RES_IRQ(gic_spi(3)), /* IRQ3 */
+-	DEFINE_RES_IRQ(gic_spi(12)), /* IRQ4 */
+-	DEFINE_RES_IRQ(gic_spi(13)), /* IRQ5 */
+-	DEFINE_RES_IRQ(gic_spi(14)), /* IRQ6 */
+-	DEFINE_RES_IRQ(gic_spi(15)), /* IRQ7 */
+-	DEFINE_RES_IRQ(gic_spi(16)), /* IRQ8 */
+-	DEFINE_RES_IRQ(gic_spi(17)), /* IRQ9 */
+-};
+-
+-#define r8a7791_register_irqc(idx)					\
+-	platform_device_register_resndata(NULL, "renesas_irqc",		\
+-					  idx, irqc##idx##_resources,	\
+-					  ARRAY_SIZE(irqc##idx##_resources), \
+-					  &irqc##idx##_data,		\
+-					  sizeof(struct renesas_irqc_config))
+-
+-static const struct resource thermal_resources[] __initconst = {
+-	DEFINE_RES_MEM(0xe61f0000, 0x14),
+-	DEFINE_RES_MEM(0xe61f0100, 0x38),
+-	DEFINE_RES_IRQ(gic_spi(69)),
+-};
+-
+-#define r8a7791_register_thermal()					\
+-	platform_device_register_simple("rcar_thermal", -1,		\
+-					thermal_resources,		\
+-					ARRAY_SIZE(thermal_resources))
+-
+-void __init r8a7791_add_standard_devices(void)
+-{
+-	r8a7791_register_scif(0);
+-	r8a7791_register_scif(1);
+-	r8a7791_register_scif(2);
+-	r8a7791_register_scif(3);
+-	r8a7791_register_scif(4);
+-	r8a7791_register_scif(5);
+-	r8a7791_register_scif(6);
+-	r8a7791_register_scif(7);
+-	r8a7791_register_scif(8);
+-	r8a7791_register_scif(9);
+-	r8a7791_register_scif(10);
+-	r8a7791_register_scif(11);
+-	r8a7791_register_scif(12);
+-	r8a7791_register_scif(13);
+-	r8a7791_register_scif(14);
+-	r8a7791_register_cmt(0);
+-	r8a7791_register_irqc(0);
+-	r8a7791_register_thermal();
+-}
+-
+-#ifdef CONFIG_USE_OF
+ static const char *r8a7791_boards_compat_dt[] __initdata = {
+ 	"renesas,r8a7791",
+ 	NULL,
+@@ -214,4 +36,3 @@ DT_MACHINE_START(R8A7791_DT, "Generic R8A7791 (Flattened Device Tree)")
+ 	.reserve	= rcar_gen2_reserve,
+ 	.dt_compat	= r8a7791_boards_compat_dt,
+ MACHINE_END
+-#endif /* CONFIG_USE_OF */
 -- 
 2.1.1
