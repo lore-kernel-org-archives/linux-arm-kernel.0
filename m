@@ -1,560 +1,230 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Tue, 04 Nov 2014 21:01:37 +0800
-Subject: [V10 PATCH 2/2] irqchip: gicv2m: Add supports for ARM GICv2m
- MSI(-X)
-In-Reply-To: <1415052977-26036-3-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1415052977-26036-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1415052977-26036-3-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <5458CE31.3040404@linux.intel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 4 Nov 2014 21:03:23 +0800
+Subject: [PATCH v8 5/9] ARM: irqchip: mxs: add Alpascale ASM9260 support
+In-Reply-To: <1413888020-8790-6-git-send-email-linux@rempel-privat.de>
+References: <1413888020-8790-1-git-send-email-linux@rempel-privat.de>
+ <1413888020-8790-6-git-send-email-linux@rempel-privat.de>
+Message-ID: <20141104130320.GB21210@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suravee,
-	You may build a two level hierarchy irqdomains. Use the
-utilities in this thread
-http://www.spinics.net/lists/arm-kernel/msg374722.html to build an MSI
-irqdomain to manage MSI controllers
-in PCI devices. And build another irqdomain to manage SPI allocation
-in GICv2.
-	That is: MSI irqdomain (program MSI registers)  -->
-GIV irqdomain (manage SPIs in GICv2 controller)
+Thanks Jason for pointing me the thread.
 
-Regards!
-Gerry
-
-On 2014/11/4 6:16, suravee.suthikulpanit at amd.com wrote:
-> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+On Tue, Oct 21, 2014 at 12:40:16PM +0200, Oleksij Rempel wrote:
+> Freescale iMX23/iMX28 and Alphascale ASM9260 have similar
+> interrupt collectors. It makes easy to reuse irq-mxs code for ASM9260.
+> Differences between this devices are fallowing:
+> - different register offsets
+> - different count of intterupt lines per register
+> - ASM9260 don't provide reset bit
+> - ASM9260 don't support FIQ.
 > 
-> ARM GICv2m specification extends GICv2 to support MSI(-X) with
-> a new set of register frame. This patch introduces support for
-> the non-secure GICv2m register frame. Currently, GICV2m is available
-> in certain version of GIC-400.
-> 
-> The patch introduces a new property in ARM gic binding, the v2m subnode.
-> It is optional.
-> 
-> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Mark Rutland <Mark.Rutland@arm.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Will Deacon <Will.Deacon@arm.com>
-> Cc: Catalin Marinas <Catalin.Marinas@arm.com>
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
 > ---
->  Documentation/devicetree/bindings/arm/gic.txt |  53 ++++
->  arch/arm64/Kconfig                            |   1 +
->  drivers/irqchip/Kconfig                       |   5 +
->  drivers/irqchip/Makefile                      |   1 +
->  drivers/irqchip/irq-gic-v2m.c                 | 340 ++++++++++++++++++++++++++
->  drivers/irqchip/irq-gic-v2m.h                 |   6 +
->  drivers/irqchip/irq-gic.c                     |  23 +-
->  7 files changed, 425 insertions(+), 4 deletions(-)
+>  drivers/irqchip/Kconfig                    |   9 +++
+>  drivers/irqchip/Makefile                   |   2 +-
+>  drivers/irqchip/alphascale_asm9260-icoll.h | 109 +++++++++++++++++++++++++++++
+>  drivers/irqchip/irq-mxs.c                  | 105 ++++++++++++++++++++++++---
+>  4 files changed, 216 insertions(+), 9 deletions(-)
+>  create mode 100644 drivers/irqchip/alphascale_asm9260-icoll.h
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-> index c7d2fa1..ebf976a 100644
-> --- a/Documentation/devicetree/bindings/arm/gic.txt
-> +++ b/Documentation/devicetree/bindings/arm/gic.txt
-> @@ -96,3 +96,56 @@ Example:
->  		      <0x2c006000 0x2000>;
->  		interrupts = <1 9 0xf04>;
->  	};
-> +
-> +
-> +* GICv2m extension for MSI/MSI-x support (Optional)
-> +
-> +Certain revisions of GIC-400 supports MSI/MSI-x via V2M register frame(s).
-> +This is enabled by specifying v2m sub-node(s).
-> +
-> +Required properties:
-> +
-> +- compatible        : The value here should contain "arm,gic-v2m-frame".
-> +
-> +- msi-controller    : Identifies the node as an MSI controller.
-> +
-> +- reg               : GICv2m MSI interface register base and size
-> +
-> +Optional properties:
-> +
-> +- arm,msi-base-spi  : When the MSI_TYPER register contains an incorrect
-> +                      value, this property should contain the SPI base of
-> +                      the MSI frame, overriding the HW value.
-> +
-> +- arm,msi-num-spis  : When the MSI_TYPER register contains an incorrect
-> +                      value, this property should contain the number of
-> +                      SPIs assigned to the frame, overriding the HW value.
-> +
-> +Example:
-> +
-> +	interrupt-controller at e1101000 {
-> +		compatible = "arm,gic-400";
-> +		#interrupt-cells = <3>;
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		interrupt-controller;
-> +		interrupts = <1 8 0xf04>;
-> +		ranges = <0 0 0 0xe1100000 0 0x100000>;
-> +		reg = <0x0 0xe1110000 0 0x01000>,
-> +		      <0x0 0xe112f000 0 0x02000>,
-> +		      <0x0 0xe1140000 0 0x10000>,
-> +		      <0x0 0xe1160000 0 0x10000>;
-> +		v2m0: v2m at 0x8000 {
-> +			compatible = "arm,gic-v2m-frame";
-> +			msi-controller;
-> +			reg = <0x0 0x80000 0 0x1000>;
-> +		};
-> +
-> +		....
-> +
-> +		v2mN: v2m at 0x9000 {
-> +			compatible = "arm,gic-v2m-frame";
-> +			msi-controller;
-> +			reg = <0x0 0x90000 0 0x1000>;
-> +		};
-> +	};
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index cde2f72..cbcde2d 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -12,6 +12,7 @@ config ARM64
->  	select ARM_ARCH_TIMER
->  	select ARM_GIC
->  	select AUDIT_ARCH_COMPAT_GENERIC
-> +	select ARM_GIC_V2M
->  	select ARM_GIC_V3
->  	select BUILDTIME_EXTABLE_SORT
->  	select CLONE_BACKWARDS
 > diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> index 2a48e0a..39ce065 100644
+> index b8632bf..10470cb 100644
 > --- a/drivers/irqchip/Kconfig
 > +++ b/drivers/irqchip/Kconfig
-> @@ -8,6 +8,11 @@ config ARM_GIC
->  	select IRQ_DOMAIN_HIERARCHY
->  	select MULTI_IRQ_HANDLER
+> @@ -113,3 +113,12 @@ config IRQ_CROSSBAR
+>  	  The primary irqchip invokes the crossbar's callback which inturn allocates
+>  	  a free irq and configures the IP. Thus the peripheral interrupts are
+>  	  routed to one of the free irqchip interrupt lines.
+> +
+> +config IRQ_MXS
+> +	bool "MXS interrupt controller"
+> +	select IRQ_DOMAIN
+> +	select STMP_DEVICE
+> +	default y if MACH_ASM9260 || CONFIG_ARCH_MXS
+
+s/CONFIG_ARCH_MXS/ARCH_MXS
+
+Even with this change, the 'default y' doesn't seem to work for me.
+
+> +	help
+> +	  Support for interrupt controller present in Freescale iMX23/iMX28 and
+> +	  Alphascale ASM9260 SoCs.
+
+...
+
+> diff --git a/drivers/irqchip/irq-mxs.c b/drivers/irqchip/irq-mxs.c
+> index 681125d..8c5c3d2 100644
+> --- a/drivers/irqchip/irq-mxs.c
+> +++ b/drivers/irqchip/irq-mxs.c
+> @@ -1,5 +1,7 @@
+>  /*
+>   * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + * Copyright (C) 2014 Oleksij Rempel <linux@rempel-privat.de>
+> + *	Add Alphascale ASM9260 support.
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License as published by
+> @@ -28,6 +30,7 @@
+>  #include <asm/exception.h>
 >  
-> +config ARM_GIC_V2M
-> +	bool
-> +	depends on ARM_GIC
-> +	depends on PCI && PCI_MSI
-> +
->  config GIC_NON_BANKED
->  	bool
->  
-> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-> index 73052ba..3bda951 100644
-> --- a/drivers/irqchip/Makefile
-> +++ b/drivers/irqchip/Makefile
-> @@ -17,6 +17,7 @@ obj-$(CONFIG_ARCH_SUNXI)		+= irq-sun4i.o
->  obj-$(CONFIG_ARCH_SUNXI)		+= irq-sunxi-nmi.o
->  obj-$(CONFIG_ARCH_SPEAR3XX)		+= spear-shirq.o
->  obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
-> +obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
->  obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
->  obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
->  obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
-> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-> new file mode 100644
-> index 0000000..fd8d51a
-> --- /dev/null
-> +++ b/drivers/irqchip/irq-gic-v2m.c
-> @@ -0,0 +1,340 @@
-> +/*
-> + * ARM GIC v2m MSI(-X) support
-> + * Support for Message Signaled Interrupts for systems that
-> + * implement ARM Generic Interrupt Controller: GICv2m.
-> + *
-> + * Copyright (C) 2014 Advanced Micro Devices, Inc.
-> + * Authors: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
-> + *          Harish Kasiviswanathan <harish.kasiviswanathan@amd.com>
-> + *          Brandon Anderson <brandon.anderson@amd.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License version 2 as published
-> + * by the Free Software Foundation.
-> + */
-> +
-> +#define pr_fmt(fmt) "GICv2m: " fmt
-> +
-> +#include <linux/bitmap.h>
-> +#include <linux/irq.h>
-> +#include <linux/irqdomain.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_pci.h>
-> +#include <linux/pci.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +#include <linux/spinlock.h>
-> +
-> +#include <asm/hardirq.h>
-> +#include <asm/irq.h>
-> +
-> +#include "irqchip.h"
-> +#include "irq-gic-v2m.h"
-> +
-> +/*
-> +* MSI_TYPER:
-> +*     [31:26] Reserved
-> +*     [25:16] lowest SPI assigned to MSI
-> +*     [15:10] Reserved
-> +*     [9:0]   Numer of SPIs assigned to MSI
-> +*/
-> +#define V2M_MSI_TYPER			0x008
-> +#define V2M_MSI_TYPER_BASE_SHIFT	16
-> +#define V2M_MSI_TYPER_BASE_MASK		0x3FF
-> +#define V2M_MSI_TYPER_NUM_MASK		0x3FF
-> +#define V2M_MSI_SETSPI_NS		0x040
-> +#define V2M_MIN_SPI			32
-> +#define V2M_MAX_SPI			1019
-> +
-> +#define V2M_MSI_TYPER_BASE_SPI(x)	\
-> +		(((x) >> V2M_MSI_TYPER_BASE_SHIFT) & V2M_MSI_TYPER_BASE_MASK)
-> +
-> +#define V2M_MSI_TYPER_NUM_SPI(x)	((x) & V2M_MSI_TYPER_NUM_MASK)
-> +
-> +struct v2m_data {
-> +	spinlock_t msi_cnt_lock;
-> +	struct msi_chip msi_chip;
-> +	struct resource res;      /* GICv2m resource */
-> +	void __iomem *base;       /* GICv2m virt address */
-> +	unsigned int spi_start;   /* The SPI number that MSIs start */
-> +	unsigned int nr_spis;     /* The number of SPIs for MSIs */
-> +	unsigned long *bm;        /* MSI vector bitmap */
-> +	struct irq_domain *domain;
-> +};
-> +
-> +static struct irq_chip v2m_chip;
-> +
-> +static void gicv2m_teardown_msi_irq(struct msi_chip *chip, unsigned int irq)
-> +{
-> +	int pos;
-> +	struct v2m_data *v2m = container_of(chip, struct v2m_data, msi_chip);
-> +
-> +	spin_lock(&v2m->msi_cnt_lock);
-> +
-> +	pos = irq - v2m->spi_start;
-> +	if (pos >= 0 && pos < v2m->nr_spis)
-> +		bitmap_clear(v2m->bm, pos, 1);
-> +
-> +	spin_unlock(&v2m->msi_cnt_lock);
-> +}
-> +
-> +static int gicv2m_setup_msi_irq(struct msi_chip *chip, struct pci_dev *pdev,
-> +				struct msi_desc *desc)
-> +{
-> +	int hwirq, virq, offset;
-> +	struct v2m_data *v2m = container_of(chip, struct v2m_data, msi_chip);
-> +
-> +	if (!desc)
-> +		return -EINVAL;
-> +
-> +	spin_lock(&v2m->msi_cnt_lock);
-> +	offset = bitmap_find_free_region(v2m->bm, v2m->nr_spis, 0);
-> +	spin_unlock(&v2m->msi_cnt_lock);
-> +	if (offset < 0)
-> +		return offset;
-> +
-> +	hwirq = v2m->spi_start + offset;
-> +	virq = __irq_domain_alloc_irqs(v2m->domain, hwirq,
-> +				       1, NUMA_NO_NODE, v2m, true);
-> +	if (virq < 0) {
-> +		gicv2m_teardown_msi_irq(chip, hwirq);
-> +		return virq;
-> +	}
-> +
-> +	irq_domain_set_hwirq_and_chip(v2m->domain, virq, hwirq,
-> +				&v2m_chip, v2m);
-> +
-> +	irq_set_msi_desc(hwirq, desc);
-> +	irq_set_irq_type(hwirq, IRQ_TYPE_EDGE_RISING);
-> +
-> +	return 0;
-> +}
-> +
-> +static int gicv2m_domain_activate(struct irq_domain *domain,
-> +				      struct irq_data *data)
-> +{
-> +	struct msi_msg msg;
-> +	struct v2m_data *v2m;
-> +	phys_addr_t addr;
-> +
-> +	v2m = container_of(data->chip_data, struct v2m_data, msi_chip);
-> +	addr = v2m->res.start + V2M_MSI_SETSPI_NS;
-> +
-> +	msg.address_hi = (u32)(addr >> 32);
-> +	msg.address_lo = (u32)(addr);
-> +	msg.data = data->irq;
-> +	write_msi_msg(data->irq, &msg);
-> +
-> +	return 0;
-> +}
-> +
-> +static int gicv2m_domain_deactivate(struct irq_domain *domain,
-> +				    struct irq_data *data)
-> +{
-> +	struct msi_msg msg;
-> +
-> +	memset(&msg, 0, sizeof(msg));
-> +	write_msi_msg(data->irq, &msg);
-> +
-> +	return 0;
-> +}
-> +
-> +static int gicv2m_domain_alloc(struct irq_domain *d, unsigned int virq,
-> +			       unsigned int nr_irqs, void *arg)
-> +{
-> +	int i, ret, irq;
-> +
-> +	for (i = 0; i < nr_irqs; i++) {
-> +		irq = virq + i;
-> +		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-> +		irq_set_chip_and_handler_name(irq, &v2m_chip,
-> +			handle_fasteoi_irq, v2m_chip.name);
-> +	}
-> +
-> +	ret = irq_domain_alloc_irqs_parent(d, virq, nr_irqs, NULL);
-> +	if (ret < 0)
-> +		pr_err("Failed to allocate parent IRQ domain\n");
-> +
-> +	return ret;
-> +}
-> +
-> +static void gicv2m_domain_free(struct irq_domain *d, unsigned int virq,
-> +			       unsigned int nr_irqs)
-> +{
-> +	int i, irq;
-> +
-> +	for (i = 0; i < nr_irqs; i++) {
-> +		irq = virq + i;
-> +		irq_set_handler(irq, NULL);
-> +		irq_domain_set_hwirq_and_chip(d, irq, 0, NULL, NULL);
-> +	}
-> +
-> +	irq_domain_free_irqs_parent(d, virq, nr_irqs);
-> +}
-> +
-> +static bool is_msi_spi_valid(u32 base, u32 num)
-> +{
-> +	if (base < V2M_MIN_SPI) {
-> +		pr_err("Invalid MSI base SPI (base:%u)\n", base);
-> +		return false;
-> +	}
-> +
-> +	if ((num == 0) || (base + num > V2M_MAX_SPI)) {
-> +		pr_err("Number of SPIs (%u) exceed maximum (%u)\n",
-> +		       num, V2M_MAX_SPI - V2M_MIN_SPI + 1);
-> +		return false;
-> +	}
-> +
-> +	return true;
-> +}
-> +
-> +static void gicv2m_mask_irq(struct irq_data *d)
-> +{
-> +	irq_chip_mask_parent(d);
-> +	if (d->msi_desc)
-> +		mask_msi_irq(d);
-> +}
-> +
-> +static void gicv2m_unmask_irq(struct irq_data *d)
-> +{
-> +	irq_chip_unmask_parent(d);
-> +	if (d->msi_desc)
-> +		unmask_msi_irq(d);
-> +}
-> +
-> +static struct irq_chip v2m_chip = {
-> +	.name             = "GICv2m",
-> +	.irq_mask         = gicv2m_mask_irq,
-> +	.irq_unmask       = gicv2m_unmask_irq,
-> +	.irq_eoi          = irq_chip_eoi_parent,
-> +	.irq_set_type     = irq_chip_set_type_parent,
-> +
-> +#ifdef CONFIG_SMP
-> +	.irq_set_affinity = irq_chip_set_affinity_parent,
-> +#endif
-> +};
-> +
-> +static const struct irq_domain_ops gicv2m_domain_ops = {
-> +	.alloc      = gicv2m_domain_alloc,
-> +	.free       = gicv2m_domain_free,
-> +	.activate   = gicv2m_domain_activate,
-> +	.deactivate = gicv2m_domain_deactivate,
-> +};
-> +
-> +static int __init gicv2m_init_one(struct device_node *node,
-> +				  struct v2m_data **v,
-> +				  struct irq_domain *parent)
-> +{
-> +	int ret;
-> +	struct v2m_data *v2m;
-> +
-> +	*v = kzalloc(sizeof(struct v2m_data), GFP_KERNEL);
-> +	if (!*v) {
-> +		pr_err("Failed to allocate struct v2m_data.\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	v2m = *v;
-> +	v2m->msi_chip.owner = THIS_MODULE;
-> +	v2m->msi_chip.of_node = node;
-> +	v2m->msi_chip.setup_irq = gicv2m_setup_msi_irq;
-> +	v2m->msi_chip.teardown_irq = gicv2m_teardown_msi_irq;
-> +	ret = of_address_to_resource(node, 0, &v2m->res);
-> +	if (ret) {
-> +		pr_err("Failed to allocate v2m resource.\n");
-> +		goto err_free_v2m;
-> +	}
-> +
-> +	v2m->base = ioremap(v2m->res.start, resource_size(&v2m->res));
-> +	if (!v2m->base) {
-> +		pr_err("Failed to map GICv2m resource\n");
-> +		ret = -EINVAL;
-> +		goto err_free_v2m;
-> +	}
-> +
-> +	ret = of_pci_msi_chip_add(&v2m->msi_chip);
-> +	if (ret) {
-> +		pr_info("Failed to add msi_chip.\n");
-> +		goto err_iounmap;
-> +	}
-> +
-> +	if (!of_property_read_u32(node, "arm,msi-base-spi", &v2m->spi_start) &&
-> +	    !of_property_read_u32(node, "arm,msi-num-spis", &v2m->nr_spis)) {
-> +		pr_info("Overriding V2M MSI_TYPER (base:%u, num:%u)\n",
-> +			v2m->spi_start, v2m->nr_spis);
-> +	} else {
-> +		u32 typer = readl_relaxed(v2m->base + V2M_MSI_TYPER);
-> +
-> +		v2m->spi_start = V2M_MSI_TYPER_BASE_SPI(typer);
-> +		v2m->nr_spis = V2M_MSI_TYPER_NUM_SPI(typer);
-> +	}
-> +
-> +	if (!is_msi_spi_valid(v2m->spi_start, v2m->nr_spis)) {
-> +		ret = -EINVAL;
-> +		goto err_chip_rm;
-> +	}
-> +
-> +	v2m->bm = kzalloc(sizeof(long) * BITS_TO_LONGS(v2m->nr_spis),
-> +			  GFP_KERNEL);
-> +	if (!v2m->bm) {
-> +		ret = -ENOMEM;
-> +		goto err_chip_rm;
-> +	}
-> +
-> +	v2m->domain = irq_domain_add_simple(node, v2m->nr_spis, v2m->spi_start,
-> +					    &gicv2m_domain_ops, v2m);
-> +	if (!v2m->domain) {
-> +		pr_err("Failed to create GICv2m domain\n");
-> +		ret = -EINVAL;
-> +		goto err_free_bm;
-> +	}
-> +
-> +	v2m->domain->parent = parent;
-> +
-> +	spin_lock_init(&v2m->msi_cnt_lock);
-> +
-> +	pr_info("Node %s: range[%#lx:%#lx], SPI[%d:%d]\n", node->name,
-> +		(unsigned long)v2m->res.start, (unsigned long)v2m->res.end,
-> +		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
-> +
-> +	return 0;
-> +
-> +err_free_bm:
-> +	kfree(v2m->bm);
-> +err_chip_rm:
-> +	of_pci_msi_chip_remove(&v2m->msi_chip);
-> +err_iounmap:
-> +	iounmap(v2m->base);
-> +err_free_v2m:
-> +	kfree(v2m);
-> +	return ret;
-> +}
-> +
-> +int __init gicv2m_of_init(struct device_node *node,
-> +			  struct irq_domain *parent)
-> +{
-> +	int ret = 0;
-> +	struct v2m_data *v2m;
-> +	struct device_node *child = NULL;
-> +
-> +	for (;;) {
-> +		child = of_get_next_child(node, child);
-> +		if (!child)
-> +			break;
-> +
-> +		if (!of_device_is_compatible(child, "arm,gic-v2m-frame"))
-> +			continue;
-> +
-> +		if (!of_find_property(child, "msi-controller", NULL))
-> +			continue;
-> +
-> +		ret = gicv2m_init_one(child, &v2m, parent);
-> +		if (ret) {
-> +			of_node_put(node);
-> +			break;
-> +		}
-> +	}
-> +	return ret;
-> +}
-> diff --git a/drivers/irqchip/irq-gic-v2m.h b/drivers/irqchip/irq-gic-v2m.h
-> new file mode 100644
-> index 0000000..66676a9
-> --- /dev/null
-> +++ b/drivers/irqchip/irq-gic-v2m.h
-> @@ -0,0 +1,6 @@
-> +#ifndef _IRQ_GIC_V2M_H_
-> +#define _IRQ_GIC_V2M_H_
-> +
-> +int gicv2m_of_init(struct device_node *node, struct irq_domain *parent) __init;
-> +
-> +#endif /* _IRQ_GIC_V2M_H_ */
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index a99c211..166bc8a 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -46,6 +46,7 @@
->  #include <asm/smp_plat.h>
->  
->  #include "irq-gic-common.h"
-> +#include "irq-gic-v2m.h"
 >  #include "irqchip.h"
+> +#include "alphascale_asm9260-icoll.h"
 >  
->  union gic_base {
-> @@ -843,10 +844,20 @@ static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
->  	unsigned int type = IRQ_TYPE_NONE;
->  	struct of_phandle_args *irq_data = arg;
+>  /*
+>   * this device provide 4 offsets for each register:
+> @@ -63,6 +66,33 @@ struct icoll_priv {
 >  
-> -	ret = gic_irq_domain_xlate(domain, irq_data->np, irq_data->args,
-> -				   irq_data->args_count, &hwirq, &type);
-> -	if (ret)
-> -		return ret;
-> +	if (irq_data) {
-> +		ret = gic_irq_domain_xlate(domain, irq_data->np, irq_data->args,
-> +					   irq_data->args_count, &hwirq, &type);
-> +		if (ret)
-> +			return ret;
-> +	} else {
-> +		/*
-> +		 * When calling from the children domain (e.g. GICv2m),
-> +		 * the child domain does not always have reference to
-> +		 * the of_phandle_arg.  In this case, GIC domain assumes
-> +		 * direct mapping between virq and hwirq.
-> +		 */
-> +		hwirq = virq;
-> +	}
->  
->  	for (i = 0; i < nr_irqs; i++)
->  		gic_irq_domain_map(domain, virq+i, hwirq+i);
-> @@ -1055,6 +1066,10 @@ gic_of_init(struct device_node *node, struct device_node *parent)
->  		irq = irq_of_parse_and_map(node, 0);
->  		gic_cascade_irq(gic_cnt, irq);
->  	}
+>  static struct icoll_priv icoll_priv;
+>  static struct irq_domain *icoll_domain;
+> +static DEFINE_RAW_SPINLOCK(icoll_lock);
 > +
-> +	if (IS_ENABLED(CONFIG_ARM_GIC_V2M))
-> +		gicv2m_of_init(node, gic_data[gic_cnt].domain);
+> +/* calculate bit offset depending on number of intterupt per register */
+> +static u32 icoll_intr_bitshift(struct irq_data *d, u32 bit)
+> +{
+> +	/*
+> +	 * We expect intr_per_reg to be 4 or 1, it means
+> +	 * "n" will be 3 or 0.
+> +	 */
+> +	int n = icoll_priv.intr_per_reg - 1;
 > +
->  	gic_cnt++;
->  	return 0;
+> +	/*
+> +	 * If n = 0, "bit" is never shifted.
+> +	 * If n = 3, mask lower part of hwirq to convert it
+> +	 * in 0, 1, 2 or 3 and then multiply it by 8 (or shift by 3)
+> +	 */
+> +	return bit << ((d->hwirq & n) << n);
+> +}
+> +
+> +/* calculate mem offset depending on number of intterupt per register */
+> +static void __iomem *icoll_intr_reg(struct irq_data *d)
+> +{
+> +	int n = icoll_priv.intr_per_reg >> 1;
+> +
+> +	/* offset = hwirq / intr_per_reg * 0x10 */
+> +	return icoll_priv.intr + ((d->hwirq >> n) * 0x10);
+> +}
+>  
+>  static void icoll_ack_irq(struct irq_data *d)
+>  {
+> @@ -77,14 +107,21 @@ static void icoll_ack_irq(struct irq_data *d)
+>  
+>  static void icoll_mask_irq(struct irq_data *d)
+>  {
+> -	__raw_writel(BM_ICOLL_INTR_ENABLE,
+> -			icoll_priv.intr + CLR_REG + HW_ICOLL_INTERRUPTn(d->hwirq));
+> +	__raw_writel(icoll_intr_bitshift(d, BM_ICOLL_INTR_ENABLE),
+> +			icoll_intr_reg(d) + CLR_REG);
 >  }
+>  
+>  static void icoll_unmask_irq(struct irq_data *d)
+>  {
+> -	__raw_writel(BM_ICOLL_INTR_ENABLE,
+> -			icoll_priv.intr + SET_REG + HW_ICOLL_INTERRUPTn(d->hwirq));
+> +	raw_spin_lock(&icoll_lock);
+> +	if (icoll_priv.clear)
+> +		__raw_writel(ASM9260_BM_CLEAR_BIT(d->hwirq),
+> +				icoll_priv.clear +
+> +				ASM9260_HW_ICOLL_CLEARn(d->hwirq));
+> +
+> +	__raw_writel(icoll_intr_bitshift(d, BM_ICOLL_INTR_ENABLE),
+> +			icoll_intr_reg(d) + SET_REG);
+> +	raw_spin_unlock(&icoll_lock);
+>  }
+>  
+>  static struct irq_chip mxs_icoll_chip = {
+> @@ -116,12 +153,34 @@ static struct irq_domain_ops icoll_irq_domain_ops = {
+>  	.xlate = irq_domain_xlate_onecell,
+>  };
+>  
+> +static void __init icoll_add_domain(struct device_node *np,
+> +			  int num)
+> +{
+> +	icoll_domain = irq_domain_add_linear(np, num,
+> +					     &icoll_irq_domain_ops, NULL);
+> +
+> +	if (!icoll_domain)
+> +		panic("%s: unable add irq domain", np->full_name);
+> +	irq_set_default_host(icoll_domain);
+> +	set_handle_irq(icoll_handle_irq);
+> +}
+> +
+> +static void __iomem * __init icoll_init_iobase(struct device_node *np)
+> +{
+> +	void __iomem *icoll_base;
+> +
+> +	icoll_base = of_io_request_and_map(np, 0, np->name);
+
+  LD      kernel/built-in.o
+../drivers/irqchip/irq-mxs.c: In function ?icoll_init_iobase?:
+../drivers/irqchip/irq-mxs.c:172:2: warning: passing argument 3 of ?of_io_request_and_map? discards ?const? qualifier from pointer target type [enabled by default]
+In file included from ../drivers/irqchip/irq-mxs.c:27:0:
+../include/linux/of_address.h:108:15: note: expected ?char *? but argument is of type ?const char *?
+
+Shawn
+
+> +	if (!icoll_base)
+> +		panic("%s: unable to map resource", np->full_name);
+> +	return icoll_base;
+> +}
+> +
+>  static int __init icoll_of_init(struct device_node *np,
+>  			  struct device_node *interrupt_parent)
+>  {
+> -	void __iomem *icoll_base = of_iomap(np, 0);
+> -	WARN_ON(!icoll_base);
+> +	void __iomem *icoll_base;
+>  
+> +	icoll_base		= icoll_init_iobase(np);
+>  	icoll_priv.vector	= icoll_base + HW_ICOLL_VECTOR;
+>  	icoll_priv.levelack	= icoll_base + HW_ICOLL_LEVELACK;
+>  	icoll_priv.ctrl		= icoll_base + HW_ICOLL_CTRL;
+> @@ -136,8 +195,38 @@ static int __init icoll_of_init(struct device_node *np,
+>  	 */
+>  	stmp_reset_block(icoll_priv.ctrl);
+>  
+> -	icoll_domain = irq_domain_add_linear(np, ICOLL_NUM_IRQS,
+> -					     &icoll_irq_domain_ops, NULL);
+> +	icoll_add_domain(np, ICOLL_NUM_IRQS);
+> +
+>  	return icoll_domain ? 0 : -ENODEV;
+>  }
+>  IRQCHIP_DECLARE(mxs, "fsl,icoll", icoll_of_init);
+> +
+> +static int __init asm9260_of_init(struct device_node *np,
+> +			  struct device_node *interrupt_parent)
+> +{
+> +	void __iomem *icoll_base;
+> +	int i;
+> +
+> +	icoll_base = icoll_init_iobase(np);
+> +	icoll_priv.vector	= icoll_base + ASM9260_HW_ICOLL_VECTOR;
+> +	icoll_priv.levelack	= icoll_base + ASM9260_HW_ICOLL_LEVELACK;
+> +	icoll_priv.ctrl		= icoll_base + ASM9260_HW_ICOLL_CTRL;
+> +	icoll_priv.stat		= icoll_base + ASM9260_HW_ICOLL_STAT_OFFSET;
+> +	icoll_priv.intr		= icoll_base + ASM9260_HW_ICOLL_INTERRUPT0;
+> +	icoll_priv.intr_per_reg	= 4;
+> +	icoll_priv.clear	= icoll_base + ASM9260_HW_ICOLL_CLEAR0;
+> +
+> +	writel_relaxed(ASM9260_BM_CTRL_IRQ_ENABLE,
+> +			icoll_priv.ctrl);
+> +	/*
+> +	 * ASM9260 don't provide reset bit. So, we need to set level 0
+> +	 * manually.
+> +	 */
+> +	for (i = 0; i < 16 * 0x10; i += 0x10)
+> +		writel(0, icoll_priv.intr + i);
+> +
+> +	icoll_add_domain(np, ASM9260_NUM_IRQS);
+> +
+> +	return icoll_domain ? 0 : -ENODEV;
+> +}
+> +IRQCHIP_DECLARE(asm9260, "alphascale,asm9260-icoll", asm9260_of_init);
+> -- 
+> 1.9.1
 > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
