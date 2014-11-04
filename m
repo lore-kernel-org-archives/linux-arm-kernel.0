@@ -1,23 +1,28 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 4 Nov 2014 16:32:03 +0100
-Subject: [Patch Part2 v4 00/31] Enable hierarchy irqdomian on x86 platforms
-In-Reply-To: <5458ECF3.4040308@linux.intel.com>
-References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
- <20141104144730.GE14512@8bytes.org>
- <5458ECF3.4040308@linux.intel.com>
-Message-ID: <20141104153203.GE10744@8bytes.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 4 Nov 2014 16:44:14 +0100
+Subject: [PATCH v3 15/19] arm/arm64: KVM: add opaque private pointer to
+ MMIO accessors
+In-Reply-To: <1414776414-13426-16-git-send-email-andre.przywara@arm.com>
+References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
+ <1414776414-13426-16-git-send-email-andre.przywara@arm.com>
+Message-ID: <20141104154414.GN16132@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 04, 2014 at 11:12:51PM +0800, Jiang Liu wrote:
-> 	Do you have the call stack? I have changed the way to call
-> irq_set_msi_desc_off() for MSI/MSIx interrupts, which may cause the
-> panic. Patch 19-21 changes the PCI MSI code.
+On Fri, Oct 31, 2014 at 05:26:50PM +0000, Andre Przywara wrote:
+> For a GICv2 there is always only one (v)CPU involved: the one that
+> does the access. On a GICv3 the access to a CPU redistributor is
+> memory-mapped, but not banked, so the (v)CPU affected is determined by
+> looking at the MMIO address region being accessed.
+> To allow passing the affected CPU into the accessors, extend them to
+> take an opaque private pointer parameter.
+> For the current GICv2 emulation we ignore it and simply pass NULL
+> on the call.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-Unfortunatly I have no full call-stack yet, as the intersting parts
-scrolled out of the screen. But the last interesting function seen there
-was do_one_initcall(). I'll try to setup serial console on the machine
-and let you know when I have a full call-stack.
+Why does it have to be an opaque private pointer?  Would it not always
+be a struct vcpu * or a vcpu_id then?
 
-
-	Joerg
+Thanks,
+-Christoffer
