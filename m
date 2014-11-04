@@ -1,38 +1,25 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 4 Nov 2014 09:14:32 +0900
-Subject: [PATCH] ARM: shmobile: ape6evm: Enable PM Runtime in defconfig
-In-Reply-To: <1414634362-14204-1-git-send-email-horms+renesas@verge.net.au>
-References: <1414634362-14204-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20141104001432.GC20174@verge.net.au>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 3 Nov 2014 16:15:14 -0800
+Subject: [PATCH v2 1/3] staging: drm/imx: parallel-display: Add 24-bit
+ BGR support
+In-Reply-To: <1415026488-25309-2-git-send-email-mpa@pengutronix.de>
+References: <1415026488-25309-1-git-send-email-mpa@pengutronix.de>
+ <1415026488-25309-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <20141104001514.GA11430@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 10:59:22AM +0900, Simon Horman wrote:
-> This is consistent with other shmobile defconfigs.
+On Mon, Nov 03, 2014 at 03:54:46PM +0100, Markus Pargmann wrote:
+> From: Philipp Zabel <p.zabel@pengutronix.de>
 > 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> Add support for the BGR24 format to the IPUv3 parallel display.
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 > ---
-> 
-> Based on renesas-devel-20141030-v3.18-rc2
+>  Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt | 4 ++--
+>  drivers/staging/imx-drm/parallel-display.c                        | 2 ++
+>  2 files changed, 4 insertions(+), 2 deletions(-)
 
-I have queued up this change.
-
-> 
->  arch/arm/configs/ape6evm_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/ape6evm_defconfig b/arch/arm/configs/ape6evm_defconfig
-> index b54b28f..db81d8c 100644
-> --- a/arch/arm/configs/ape6evm_defconfig
-> +++ b/arch/arm/configs/ape6evm_defconfig
-> @@ -33,6 +33,7 @@ CONFIG_ARM_APPENDED_DTB=y
->  CONFIG_VFP=y
->  CONFIG_NEON=y
->  CONFIG_BINFMT_MISC=y
-> +CONFIG_PM_RUNTIME=y
->  CONFIG_NET=y
->  CONFIG_PACKET=y
->  CONFIG_UNIX=y
-> -- 
-> 2.1.1
-> 
+Please work to get this driver out of staging instead of adding new
+features to it :(
