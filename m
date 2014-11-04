@@ -1,61 +1,108 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 4 Nov 2014 08:07:50 +0000
-Subject: [PATCH v3 08/14] mfd: max77686/802: Remove support for board files
-In-Reply-To: <1415087510.2389.4.camel@AMDC1943>
-References: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
- <1414668053-31370-9-git-send-email-k.kozlowski@samsung.com>
- <20141103170128.GD12011@x1> <1415087510.2389.4.camel@AMDC1943>
-Message-ID: <20141104080750.GB17577@x1>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 4 Nov 2014 16:15:55 +0800
+Subject: [PATCH V2 00/13] clk: mmp: clock device tree support
+In-Reply-To: <1414721633-29508-1-git-send-email-chao.xie@marvell.com>
+References: <1414721633-29508-1-git-send-email-chao.xie@marvell.com>
+Message-ID: <CAN1soZyqWtKUajbW_R-_uTwSbN4Apo0+NJ9WupS+YLOP_nGJ3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 04 Nov 2014, Krzysztof Kozlowski wrote:
+On Fri, Oct 31, 2014 at 10:13 AM, Chao Xie <chao.xie@marvell.com> wrote:
+> From: Chao Xie <chao.xie@marvell.com>
+>
+> The patch set focuses at support device tree for clock.
+>
+> The first part of the patches
+>   clk: mmp: add prefix "mmp" for structures defined for clk-frac
+>   clk: mmp: add spin lock for clk-frac
+>   clk: mmp: add init callback for clk-frac
+>   clk: mmp: move definiton of mmp_clk_frac to clk.h It enhances the clk-frac.
+>
+> The second part of the patches
+>   clk: mmp: add clock type mix
+>   clk: mmp: add mmp private gate clock
+>
+> The third part of the patches
+>   clk: mmp: add basic support functions for DT support
+>   clk: mmp: add reset support
+>   clk: mmp: add pxa168 DT support for clock driver
+>   clk: mmp: add pxa910 DT support for clock driver
+>   clk: mmp: add mmp2 DT support for clock driver
+> It add the device tree support for pxa168, pxa910 and mmp2.
+>
+> V1 -> V2:
+>   Add reset support for the clocks that have reset bit.
+>
+> Chao Xie (13):
+>   clk: mmp: add prefix "mmp" for structures defined for clk-frac
+>   clk: mmp: add spin lock for clk-frac
+>   clk: mmp: add init callback for clk-frac
+>   clk: mmp: move definiton of mmp_clk_frac to clk.h
+>   clk: mmp: add clock type mix
+>   clk: mmp: add mmp private gate clock
+>   clk: mmp: add basic support functions for DT support
+>   clk: mmp: add reset support
+>   clk: mmp: add pxa168 DT support for clock driver
+>   clk: mmp: add pxa910 DT support for clock driver
+>   clk: mmp: add mmp2 DT support for clock driver
+>   arm: mmp: Make all the dts file to be compiled by Makefile
+>   arm: mmp: Make use of the DT supported clock
+>
+>  .../devicetree/bindings/clock/marvell,mmp2.txt     |  21 +
+>  .../devicetree/bindings/clock/marvell,pxa168.txt   |  21 +
+>  .../devicetree/bindings/clock/marvell,pxa910.txt   |  21 +
+>  arch/arm/boot/dts/Makefile                         |   3 +
+>  arch/arm/boot/dts/mmp2-brownstone.dts              |   2 +-
+>  arch/arm/boot/dts/mmp2.dtsi                        |  29 +-
+>  arch/arm/boot/dts/pxa168-aspenite.dts              |   2 +-
+>  arch/arm/boot/dts/pxa168.dtsi                      |  27 +-
+>  arch/arm/boot/dts/pxa910-dkb.dts                   |   2 +-
+>  arch/arm/boot/dts/pxa910.dtsi                      |  28 +-
+>  arch/arm/mach-mmp/Kconfig                          |  12 +-
+>  arch/arm/mach-mmp/mmp-dt.c                         |  57 +--
+>  arch/arm/mach-mmp/mmp2-dt.c                        |  26 +-
+>  drivers/clk/mmp/Makefile                           |   7 +-
+>  drivers/clk/mmp/clk-frac.c                         |  74 ++-
+>  drivers/clk/mmp/clk-gate.c                         | 133 ++++++
+>  drivers/clk/mmp/clk-mix.c                          | 513 +++++++++++++++++++++
+>  drivers/clk/mmp/clk-mmp2.c                         |   6 +-
+>  drivers/clk/mmp/clk-of-mmp2.c                      | 334 ++++++++++++++
+>  drivers/clk/mmp/clk-of-pxa168.c                    | 279 +++++++++++
+>  drivers/clk/mmp/clk-of-pxa910.c                    | 301 ++++++++++++
+>  drivers/clk/mmp/clk-pxa168.c                       |   6 +-
+>  drivers/clk/mmp/clk-pxa910.c                       |   6 +-
+>  drivers/clk/mmp/clk.c                              | 192 ++++++++
+>  drivers/clk/mmp/clk.h                              | 226 ++++++++-
+>  drivers/clk/mmp/reset.c                            |  99 ++++
+>  drivers/clk/mmp/reset.h                            |  31 ++
+>  include/dt-bindings/clock/marvell,mmp2.h           |  74 +++
+>  include/dt-bindings/clock/marvell,pxa168.h         |  57 +++
+>  include/dt-bindings/clock/marvell,pxa910.h         |  54 +++
+>  30 files changed, 2538 insertions(+), 105 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/marvell,mmp2.txt
+>  create mode 100644 Documentation/devicetree/bindings/clock/marvell,pxa168.txt
+>  create mode 100644 Documentation/devicetree/bindings/clock/marvell,pxa910.txt
+>  create mode 100644 drivers/clk/mmp/clk-gate.c
+>  create mode 100644 drivers/clk/mmp/clk-mix.c
+>  create mode 100644 drivers/clk/mmp/clk-of-mmp2.c
+>  create mode 100644 drivers/clk/mmp/clk-of-pxa168.c
+>  create mode 100644 drivers/clk/mmp/clk-of-pxa910.c
+>  create mode 100644 drivers/clk/mmp/clk.c
+>  create mode 100644 drivers/clk/mmp/reset.c
+>  create mode 100644 drivers/clk/mmp/reset.h
+>  create mode 100644 include/dt-bindings/clock/marvell,mmp2.h
+>  create mode 100644 include/dt-bindings/clock/marvell,pxa168.h
+>  create mode 100644 include/dt-bindings/clock/marvell,pxa910.h
+>
+> --
+> 1.8.3.2
+>
 
-> On pon, 2014-11-03 at 17:01 +0000, Lee Jones wrote:
-> > On Thu, 30 Oct 2014, Krzysztof Kozlowski wrote:
-> > 
-> > > The driver is used only on Exynos based boards with DTS support.
-> > > Convert the driver to DTS-only version. This simplifies a little the
-> > > code:
-> > > 1. No dead (unused) entries in platform_data structure.
-> > > 2. More code removed.
-> > > 3. Regulator driver does not depend on allocated memory
-> > >    from MFD driver.
-> > > 4. It makes also easier extending the regulator driver.
-> > > 
-> > > Add to the max77686 MFD driver dependency on CONFIG_OF because without
-> > > DTS the regulator drivers won't bind.
-> > > 
-> > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > > Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> > > ---
-> > >  drivers/mfd/Kconfig                  |  1 +
-> > >  drivers/mfd/max77686.c               | 23 -----------------------
-> > >  include/linux/mfd/max77686-private.h |  1 -
-> > >  include/linux/mfd/max77686.h         | 28 ----------------------------
-> > >  4 files changed, 1 insertion(+), 52 deletions(-)
-> > 
-> > Applied, thanks.
-> 
-> 
-> Noooo, don't apply it. It depends on previous patches removing the board
-> file support from regulators.
-> 
-> If the patch looks OK, please only ack it. I would like to push
-> everything through regulator tree.
+Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 
-Very well, patch dropped.
+Mike,
+Please merge all mach-mmp patches with clock together. Otherwise, it
+may result in build issue.
 
-As long as Mark puts it on a succinct tagged branch it can go in
-through his tree:
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
-Mark,
-  Please send me the tag to pull from once applied, thanks.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Best Regards
+Haojian
