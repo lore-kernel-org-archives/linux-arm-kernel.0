@@ -1,67 +1,45 @@
-From: socketcan@hartkopp.net (Oliver Hartkopp)
-Date: Tue, 04 Nov 2014 14:13:30 +0100
-Subject: [PATCH 7/7] can: m_can: workaround for transmit data less than
- 4 bytes
-In-Reply-To: <5458AB65.7000500@pengutronix.de>
-References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
- <1414579527-31100-7-git-send-email-b29396@freescale.com>
- <5457B1D1.6080301@pengutronix.de>
- <20141104082505.GA8060@shlinux1.ap.freescale.net>
- <54589AC8.4010106@pengutronix.de>
- <20141104092651.GC8060@shlinux1.ap.freescale.net>
- <5458AB65.7000500@pengutronix.de>
-Message-ID: <5458D0FA.1040504@hartkopp.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 4 Nov 2014 13:13:49 +0000
+Subject: [PATCH v8 5/9] ARM: irqchip: mxs: add Alpascale ASM9260 support
+In-Reply-To: <20141104130320.GB21210@tiger>
+References: <1413888020-8790-1-git-send-email-linux@rempel-privat.de>
+ <1413888020-8790-6-git-send-email-linux@rempel-privat.de>
+ <20141104130320.GB21210@tiger>
+Message-ID: <20141104131349.GF4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 04, 2014 at 09:03:23PM +0800, Shawn Guo wrote:
+> Thanks Jason for pointing me the thread.
+> 
+> On Tue, Oct 21, 2014 at 12:40:16PM +0200, Oleksij Rempel wrote:
+> > +config IRQ_MXS
+> > +	bool "MXS interrupt controller"
+> > +	select IRQ_DOMAIN
+> > +	select STMP_DEVICE
+> > +	default y if MACH_ASM9260 || CONFIG_ARCH_MXS
+> 
+> s/CONFIG_ARCH_MXS/ARCH_MXS
+> 
+> Even with this change, the 'default y' doesn't seem to work for me.
 
+The only way an option follows its default is if it doesn't have a visible
+prompt.  So:
 
-On 04.11.2014 11:33, Marc Kleine-Budde wrote:
-> On 11/04/2014 10:27 AM, Dong Aisheng wrote:
+config IRQ_MXS
+	def_bool y if MACH_ASM9260 || ARCH_MXS
+	select IRQ_DOMAIN
+	select STMP_DEVICE
 
+will cause it to always be defined to 'y' if either of those options are
+enabled.  Otherwise, if it has a visible prompt, it follows (in order of
+precedence) whatever the user specifies, the configuration file, or the
+Kconfig specified default, or 'n'.  (Each limited by selects and
+dependencies.)
 
->> +       /* We meet an IC issue that we have to write the full 8
->
-> At least on the *insert SoC name here*, an issue with the Message RAM
-> was discovered. Sending CAN frames with dlc less than 4 bytes will lead
-> to bit errors, when the first 8 bytes of the Message RAM have not been
-> initialized (i.e. written to). To work around this issue, the first 8
-> bytes are initialized here.
+Is there a particular reason why the option is being offered for user
+selection?
 
-Yes. Also put the current IP revision (3.0.x) into the comment.
-Did inform the Bosch guys from this issue - or is it already in some errata sheet?
-
->
->> +        * bytes (whatever value for the second word) in Message RAM to
->> +        * avoid bit error for transmit data less than 4 bytes at the first
->> +        * time. By initializing the first 8 bytes of tx buffer before using
->> +        * it can avoid such issue.
->> +        */
->> +       m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0), 0x0);
->> +       m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1), 0x0);
->> +
->>          m_can_config_endisable(priv, false);
->>   }
->
-> Can you trigger the issue when sending CAN-FD frames with dlc > 8 && dlc
-> < 64?
-
-Just a nitpick:
-
-DLC can just be 0 .. 15
-
-and the length (struct canfd_frame.len) can be from 0 .. 64
-
-See:
-
-http://lxr.free-electrons.com/source/include/uapi/linux/can.h#L83
-
-That's the reason for all these helpers
-
-http://lxr.free-electrons.com/source/drivers/net/can/dev.c#L36
-
-that hide the evil "DLC" from userspace now and make 'len' a usable loop 
-variable as we were able to use the former dlc for classic CAN :-)
-
-Regards,
-Oliver
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
