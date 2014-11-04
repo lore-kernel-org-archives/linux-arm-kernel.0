@@ -1,48 +1,34 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 04 Nov 2014 11:09:16 +0100
-Subject: [PATCH 11/17] ARM: mvebu: reserve the first 10 KB of each memory
- bank for suspend/resume
-In-Reply-To: <1414151970-6626-12-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1414151970-6626-12-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5458A5CC.8090409@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 4 Nov 2014 11:13:50 +0100
+Subject: [PATCH] mfd: db8500-prcmu: Provide sane error path values
+In-Reply-To: <20141103165035.GB12011@x1>
+References: <1415031356-11664-1-git-send-email-lee.jones@linaro.org>
+ <CAOMZO5C2sB1GNuNE-Bi5jqMO4DqBcDW2C1O+asYkbW=8fXA7TA@mail.gmail.com>
+ <20141103165035.GB12011@x1>
+Message-ID: <CACRpkdb-6-cjHhtLMNf_jevqqmew9u0OAL-rpFd5mfiwK6C6Ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Mon, Nov 3, 2014 at 5:50 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Mon, 03 Nov 2014, Fabio Estevam wrote:
+>
+>> On Mon, Nov 3, 2014 at 2:15 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>>
+>> >         /* Clean up the mailbox interrupts after pre-kernel code. */
+>> > @@ -3179,15 +3179,14 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
+>> >         irq = platform_get_irq(pdev, 0);
+>> >         if (irq <= 0) {
+>>
+>> Shouldn't this be if (irq < 0) then?
+>
+> Perhaps Linus can answer that.
+>
+> Linus,
+>
+>   Is 0 a valid IRQ on the u8500 platform or not?
 
-On 24/10/2014 13:59, Thomas Petazzoni wrote:
-> When going out of suspend to RAM, the Marvell EBU platforms go through
-> the bootloader, which re-configures the DRAM controller. To achieve
-> this, the bootloader executes a piece of code called the "DDR3
-> training code". It does some reads/writes to the memory to find out
-> the optimal timings for the memory chip being used.
-> 
-> This has the nasty side effect that the first 10 KB of each DRAM
-> chip-select are overwritten by the bootloader when exiting the suspend
-> to RAM state.
-> 
-> Therefore, this commit implements the ->reserve() hook for the 'struct
-> machine_desc' used on Armada XP, to reserve the 10 KB of each DRAM
-> chip-select using the memblock API.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/mach-mvebu/board-v7.c | 51 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 51 insertions(+)
+It is not. 0 is NO_IRQ and should be so for every system... just
+the lazy and ancient ones lag behind.
 
-It is unfortunate to put these "holes" in the memory but it is a design constraint.
-However, your solution is nice and very well contained however.
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Thanks,
-
-Gregory
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Yours,
+Linus Walleij
