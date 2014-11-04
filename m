@@ -1,23 +1,77 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 4 Nov 2014 19:07:15 +0800
-Subject: [PATCH v2] ARM: imx: Fix the removal of CONFIG_SPI option
-In-Reply-To: <1415096927-4097-1-git-send-email-festevam@gmail.com>
-References: <1415096927-4097-1-git-send-email-festevam@gmail.com>
-Message-ID: <20141104110713.GK10821@tiger>
+From: hansverk@cisco.com (Hans Verkuil)
+Date: Tue, 04 Nov 2014 12:09:59 +0100
+Subject: [PATCH 01/15] [media] Move mediabus format definition to a more
+ standard place
+In-Reply-To: <20141104114503.309cb54f@bbrezillon>
+References: <1415094910-15899-1-git-send-email-boris.brezillon@free-electrons.com>	<1415094910-15899-2-git-send-email-boris.brezillon@free-electrons.com>	<5458A878.3010809@cisco.com>
+ <20141104114503.309cb54f@bbrezillon>
+Message-ID: <5458B407.6050701@cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 04, 2014 at 08:28:47AM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Since 64546e9fe3a5b8c ("ARM: imx_v6_v7_defconfig updates") and commit 
-> 0650f855d2e4b0b9 ("ARM: imx_v4_v5_defconfig: Select CONFIG_IMX_WEIM") CONFIG_SPI
-> selection was dropped by savedefconfig for imx_v4_v5_defconfig and 
-> imx_v6_v7_defconfig.
-> 
-> In order to keep the same behaviour as previous kernel versions and avoid 
-> regressions, let's add CONFIG_SPI option back.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Well, I gave two alternatives :-)
 
-Applied, thanks.
+Both are fine as far as I am concerned, but it would be nice to hear
+what others think.
+
+Regards,
+
+	Hans
+
+On 11/04/14 11:45, Boris Brezillon wrote:
+> Hi Hans,
+> 
+> On Tue, 04 Nov 2014 11:20:40 +0100
+> Hans Verkuil <hansverk@cisco.com> wrote:
+> 
+>> Hi Boris,
+>>
+>> On 11/04/14 10:54, Boris Brezillon wrote:
+>>> Rename mediabus formats and move the enum into a separate header file so
+>>> that it can be used by DRM/KMS subsystem without any reference to the V4L2
+>>> subsystem.
+>>>
+>>> Old V4L2_MBUS_FMT_ definitions are now referencing MEDIA_BUS_FMT_ value.
+>>
+>> I missed earlier that v4l2-mediabus.h contained a struct as well, so it can't be
+>> deprecated and neither can a #warning be added.
+>>
+>> The best approach, I think, is to use a macro in media-bus-format.h
+>> that will either define just the MEDIA_BUS value when compiled in the kernel, or
+>> define both MEDIA_BUS and V4L2_MBUS values when compiled for userspace.
+>>
+>> E.g. something like this:
+>>
+>> #ifdef __KERNEL__
+>> #define MEDIA_BUS_FMT_ENTRY(name, val) MEDIA_BUS_FMT_ # name = val
+>> #else
+>> /* Keep V4L2_MBUS_FMT for backwards compatibility */
+>> #define MEDIA_BUS_FMT_ENTRY(name, val) \
+>> 	MEDIA_BUS_FMT_ # name = val, \
+>> 	V4L2_MBUS_FMT_ # name = val
+>> #endif
+> 
+> Okay, but this means we keep adding V4L2_MBUS_FMT_ definitions even for
+> new formats (which definitely doesn't encourage people to move on).
+> Moreover, we add a V4L2 prefix in what was supposed to be a subsystem
+> neutral header.
+> 
+> Anyway, these are just nitpicks, and if you prefer this approach
+> I'll rework my series :-).
+> 
+>>
+>> An alternative approach is to have v4l2-mediabus.h include media-bus-format.h,
+>> put #ifndef __KERNEL__ around the enum v4l2_mbus_pixelcode and add a big comment
+>> there that applications should use the defines from media-bus-format.h and that
+>> this enum is frozen (i.e. new values are only added to media-bus-format.h).
+>>
+>> But I think I like the macro idea best.
+> 
+> As you wish, my only intent is to use those bus format definitions in a
+> DRM driver :-).
+> 
+> Thanks,
+> 
+> Boris
+> 
+> 
