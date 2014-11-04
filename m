@@ -1,59 +1,32 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 04 Nov 2014 08:53:13 +0100
-Subject: [PATCH v3 02/14] mfd/regulator: dt-bindings: max77686: Document
- of_compatible for regulator
-In-Reply-To: <20141103170042.GC12011@x1>
-References: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
- <1414668053-31370-3-git-send-email-k.kozlowski@samsung.com>
- <20141103170042.GC12011@x1>
-Message-ID: <1415087593.2389.6.camel@AMDC1943>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Tue,  4 Nov 2014 15:52:34 +0800
+Subject: [PATCH 0/5] clk: rockchip: add full support for HDMI clock on rk3288
+Message-ID: <1415087559-19444-1-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On pon, 2014-11-03 at 17:00 +0000, Lee Jones wrote:
-> On Thu, 30 Oct 2014, Krzysztof Kozlowski wrote:
-> 
-> > Document new required property for regulator driver: of_compatible. The
-> > property allows MFD core to bind the driver to node with regulators and
-> > this simplifies parsing regulators init data from DTS
-> > 
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > ---
-> >  Documentation/devicetree/bindings/mfd/max77686.txt | 7 ++++++-
-> >  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> I want a thumbs-up from Mark on this before applying.
+we are going to make a clock usage solution for rk3288:
+1. CPLL and GPLL always not change after assign init;
+2. NPLL default as 500MHz, may used for most scene;
+3. NPLL may be changed by VOP(HDMI) clock for some special
+   frequency requirement.
 
-I'll be resending new version, without the compatible property.
+    I test it with rk3288 evb on top of Heiko's clk-for-next
 
-Best regards,
-Krzysztof
 
-> 
-> > diff --git a/Documentation/devicetree/bindings/mfd/max77686.txt b/Documentation/devicetree/bindings/mfd/max77686.txt
-> > index 75fdfaf41831..f4010a9f66eb 100644
-> > --- a/Documentation/devicetree/bindings/mfd/max77686.txt
-> > +++ b/Documentation/devicetree/bindings/mfd/max77686.txt
-> > @@ -18,8 +18,11 @@ Required properties:
-> >  
-> >  Optional node:
-> >  - voltage-regulators : The regulators of max77686 have to be instantiated
-> > -  under subnode named "voltage-regulators" using the following format.
-> > +  under subnode named "voltage-regulators".
-> > +  Required property:
-> > +  - compatible : Must be "maxim,max77686-pmic"
-> >  
-> > +  Optional properties: For each regulator use following format:
-> >  	regulator_name {
-> >  		regulator-compatible = LDOn/BUCKn
-> >  		standard regulator constraints....
-> > @@ -49,6 +52,8 @@ Example:
-> >  		reg = <0x09>;
-> >  
-> >  		voltage-regulators {
-> > +			compatible = "maxim,max77686-pmic";
-> > +
-> >  			ldo11_reg {
-> >  				regulator-compatible = "LDO11";
-> >  				regulator-name = "vdd_ldo11";
-> 
+Kever Yang (5):
+  clk: rockchip: add some clock rate into rate table for rk3288
+  clk: divider: make clk_divider_recalc/set_rate available
+  clk: rockchip: introduce the div_ops handling for composite branches
+  clk: rockchip: add the vop_determine_rate for vop dclock
+  clk: rockchip: change DCLK_VOP0 to use new COMPOSITE_DIVOPS
+
+ drivers/clk/clk-divider.c         |  4 +--
+ drivers/clk/rockchip/clk-rk3288.c | 76 ++++++++++++++++++++++++++++++++++++++-
+ drivers/clk/rockchip/clk.c        | 13 ++++---
+ drivers/clk/rockchip/clk.h        | 24 +++++++++++++
+ include/linux/clk-provider.h      |  4 +++
+ 5 files changed, 114 insertions(+), 7 deletions(-)
+
+-- 
+1.9.1
