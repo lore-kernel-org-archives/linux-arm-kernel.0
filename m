@@ -1,40 +1,46 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  4 Nov 2014 10:50:52 +0900
-Subject: [PATCH 22/34] ARM: shmobile: r8a7791: add USB3.0 device node
+Date: Tue,  4 Nov 2014 10:50:53 +0900
+Subject: [PATCH 23/34] ARM: shmobile: r8a7790: add HS-USB device node
 In-Reply-To: <cover.1415059587.git.horms+renesas@verge.net.au>
 References: <cover.1415059587.git.horms+renesas@verge.net.au>
-Message-ID: <c196931ece017a0aeeef4ee6d4fbb5adeb7dfd0a.1415059587.git.horms+renesas@verge.net.au>
+Message-ID: <ae0a555b68ae4feef07e919b22ef2e0b792616ee.1415059587.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
+Define the R8A7790 generic part of the HS-USB device node.
+It is up to the board file to enable the device.
+
 Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+[Sergei: fixed summary, added changelog]
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/r8a7790.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 6ce7819..d55335e 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -1182,6 +1182,16 @@
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index ad5df80..a2f2c7f 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -568,6 +568,17 @@
  		status = "disabled";
  	};
  
-+	xhci: usb at ee000000 {
-+		compatible = "renesas,xhci-r8a7791";
-+		reg = <0 0xee000000 0 0xc00>;
-+		interrupts = <0 101 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7791_CLK_SSUSB>;
-+		phys = <&usb2 1>;
++	hsusb: usb at e6590000 {
++		compatible = "renesas,usbhs-r8a7790";
++		reg = <0 0xe6590000 0 0x100>;
++		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp7_clks R8A7790_CLK_HSUSB>;
++		renesas,buswait = <4>;
++		phys = <&usb0 1>;
 +		phy-names = "usb";
 +		status = "disabled";
 +	};
 +
- 	pci0: pci at ee090000 {
- 		compatible = "renesas,pci-r8a7791";
- 		device_type = "pci";
+ 	usbphy: usb-phy at e6590100 {
+ 		compatible = "renesas,usb-phy-r8a7790";
+ 		reg = <0 0xe6590100 0 0x100>;
 -- 
 2.1.1
