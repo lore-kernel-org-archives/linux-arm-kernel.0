@@ -1,96 +1,113 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue,  4 Nov 2014 10:21:33 -0300
-Subject: [PATCH v3 3/3] clocksource: armada-370-xp: Use the reference clock on
- A375 SoC
-In-Reply-To: <1415107293-19258-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1415107293-19258-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1415107293-19258-4-git-send-email-ezequiel.garcia@free-electrons.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 4 Nov 2014 14:24:23 +0100
+Subject: [PATCH v3 04/19] arm/arm64: KVM: wrap 64 bit MMIO accesses with
+ two 32 bit ones
+In-Reply-To: <5458C408.5070102@arm.com>
+References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
+ <1414776414-13426-5-git-send-email-andre.przywara@arm.com>
+ <20141103132543.GE16132@cbox> <5458C408.5070102@arm.com>
+Message-ID: <20141104132423.GB2537@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 25 MHz reference clock has better stability so its use is preferred over the
-core clock.
+On Tue, Nov 04, 2014 at 12:18:16PM +0000, Andre Przywara wrote:
+> Hi Christoffer,
+> 
+> On 03/11/14 13:25, Christoffer Dall wrote:
+> > On Fri, Oct 31, 2014 at 05:26:39PM +0000, Andre Przywara wrote:
+> >> Some GICv3 registers can and will be accessed as 64 bit registers.
+> >> Currently the register handling code can only deal with 32 bit
+> >> accesses, so we do two consecutive calls to cover this.
+> >>
+> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> >> ---
+> >>  virt/kvm/arm/vgic.c |   48 +++++++++++++++++++++++++++++++++++++++++++++---
+> >>  1 file changed, 45 insertions(+), 3 deletions(-)
+> >>
+> >> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> >> index 704be48..0cbdde9 100644
+> >> --- a/virt/kvm/arm/vgic.c
+> >> +++ b/virt/kvm/arm/vgic.c
+> >> @@ -1033,6 +1033,48 @@ static bool vgic_validate_access(const struct vgic_dist *dist,
+> >>  }
+> >>  
+> >>  /*
+> >> + * Call the respective handler function for the given range.
+> >> + * We split up any 64 bit accesses into two consecutive 32 bit
+> >> + * handler calls and merge the result afterwards.
+> >> + */
+> >> +static bool call_range_handler(struct kvm_vcpu *vcpu,
+> >> +			       struct kvm_exit_mmio *mmio,
+> >> +			       unsigned long offset,
+> >> +			       const struct mmio_range *range)
+> >> +{
+> >> +	u32 *data32 = (void *)mmio->data;
+> >> +	struct kvm_exit_mmio mmio32;
+> >> +	bool ret;
+> >> +
+> >> +	if (likely(mmio->len <= 4))
+> >> +		return range->handle_mmio(vcpu, mmio, offset);
+> >> +
+> >> +	/*
+> >> +	 * Any access bigger than 4 bytes (that we currently handle in KVM)
+> >> +	 * is actually 8 bytes long, caused by a 64-bit access
+> >> +	 */
+> >> +
+> >> +	mmio32.len = 4;
+> >> +	mmio32.is_write = mmio->is_write;
+> >> +
+> >> +	mmio32.phys_addr = mmio->phys_addr + 4;
+> >> +	if (mmio->is_write)
+> >> +		*(u32 *)mmio32.data = data32[1];
+> >> +	ret = range->handle_mmio(vcpu, &mmio32, offset + 4);
+> >> +	if (!mmio->is_write)
+> >> +		data32[1] = *(u32 *)mmio32.data;
+> >> +
+> >> +	mmio32.phys_addr = mmio->phys_addr;
+> >> +	if (mmio->is_write)
+> >> +		*(u32 *)mmio32.data = data32[0];
+> >> +	ret |= range->handle_mmio(vcpu, &mmio32, offset);
+> >> +	if (!mmio->is_write)
+> >> +		data32[0] = *(u32 *)mmio32.data;
+> >> +
+> >> +	return ret;
+> >> +}
+> > 
+> > Please think about the endianness issues here.
+> 
+> I didn't only think about it, I traced the code and tested it:
+> So it works like written above (I actually had a hickup in my kvmtool
+> setup that denied booting the bigendian initrds, so I thought that BE
+> was broken).
+> 
+> So the GIC is always LE, that's why we swap the bytes to LE in any
+> 32-bit register in mmio_data_{write,read}, which gets called for each
+> vGIC register access via the vgic_reg_access() function.
+> 
+> So the memory order that the actual register handler functions
+> implicitly expect is always LE, regardless of the guest or host
+> endianness. vgic_reg_access() makes this transparent for the host code.
+> 
+> Now if we eventually assemble the 64-bit value from the two 32-bit
+> values, we also have to always do this in LE fashion. Hence the
+> hardcoded LE assignment here. Eventually this LE value will be copied
+> into the guest, which will access it through readq, which uses
+> le64_to_cpu() to convert it to the CPU native value.
+> 
+> So the branch as posted (or present in the repo) works fine (boot-tested
+> only so far) with all 8 combinations of (host endianness, guest
+> endianness, guest v2/v3 GIC).
+> 
+> I will add a comment to the function explaining this.
+> 
+Yes, you're right.  Thanks for the explanation.  I think the key to
+understanding that this works is the fact that mmio_data is always
+written in LE in memory.
 
-This commit takes advantage of the already introduced Armada 375 devicetree
-compatible string and adds a new timer initialization. If available, the timer
-will use the reference clock (named as 'fixed'). Otherwise, it falls back to the
-previous behavior.
+I was thrown off by the conversion you were making to a u32*, which you
+don't really use, except as index mamipulation and to copy the data, but
+that's fine.
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- .../bindings/timer/marvell,armada-370-xp-timer.txt |  9 ++++---
- drivers/clocksource/time-armada-370-xp.c           | 28 ++++++++++++++++++++++
- 2 files changed, 34 insertions(+), 3 deletions(-)
+Thanks for explaining this.
 
-diff --git a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
-index f455182..e9c78ce 100644
---- a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
-@@ -2,8 +2,10 @@ Marvell Armada 370 and Armada XP Timers
- ---------------------------------------
- 
- Required properties:
--- compatible: Should be either "marvell,armada-370-timer" or
--  "marvell,armada-xp-timer" as appropriate.
-+- compatible: Should be one of the following
-+              "marvell,armada-370-timer",
-+	      "marvell,armada-375-timer",
-+	      "marvell,armada-xp-timer".
- - interrupts: Should contain the list of Global Timer interrupts and
-   then local timer interrupts
- - reg: Should contain location and length for timers register. First
-@@ -13,7 +15,8 @@ Required properties:
- Clocks required for compatible = "marvell,armada-370-timer":
- - clocks : Must contain a single entry describing the clock input
- 
--Clocks required for compatible = "marvell,armada-xp-timer":
-+Clocks required for compatibles = "marvell,armada-xp-timer",
-+				  "marvell,armada-375-timer":
- - clocks : Must contain an entry for each entry in clock-names.
- - clock-names : Must include the following entries:
-   "nbclk" (L2/coherency fabric clock),
-diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index d8555f9..3a0704b 100644
---- a/drivers/clocksource/time-armada-370-xp.c
-+++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -301,6 +301,34 @@ static void __init armada_xp_timer_init(struct device_node *np)
- CLOCKSOURCE_OF_DECLARE(armada_xp, "marvell,armada-xp-timer",
- 		       armada_xp_timer_init);
- 
-+static void __init armada_375_timer_init(struct device_node *np)
-+{
-+	struct clk *clk;
-+
-+	clk = of_clk_get_by_name(np, "fixed");
-+	if (!IS_ERR(clk)) {
-+		clk_prepare_enable(clk);
-+		timer_clk = clk_get_rate(clk);
-+	} else {
-+
-+		/*
-+		 * This fallback is required in order to retain proper
-+		 * devicetree backwards compatibility.
-+		 */
-+		clk = of_clk_get(np, 0);
-+
-+		/* Must have at least a clock */
-+		BUG_ON(IS_ERR(clk));
-+		clk_prepare_enable(clk);
-+		timer_clk = clk_get_rate(clk) / TIMER_DIVIDER;
-+		timer25Mhz = false;
-+	}
-+
-+	armada_370_xp_timer_common_init(np);
-+}
-+CLOCKSOURCE_OF_DECLARE(armada_375, "marvell,armada-375-timer",
-+		       armada_375_timer_init);
-+
- static void __init armada_370_timer_init(struct device_node *np)
- {
- 	struct clk *clk = of_clk_get(np, 0);
--- 
-2.1.0
+-Christoffer
