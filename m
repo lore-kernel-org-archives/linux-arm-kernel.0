@@ -1,45 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 4 Nov 2014 13:13:49 +0000
-Subject: [PATCH v8 5/9] ARM: irqchip: mxs: add Alpascale ASM9260 support
-In-Reply-To: <20141104130320.GB21210@tiger>
-References: <1413888020-8790-1-git-send-email-linux@rempel-privat.de>
- <1413888020-8790-6-git-send-email-linux@rempel-privat.de>
- <20141104130320.GB21210@tiger>
-Message-ID: <20141104131349.GF4042@n2100.arm.linux.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 04 Nov 2014 16:14:16 +0300
+Subject: [PATCH 04/10] ARM: shmobile: r8a7791: Add DU node to device tree
+In-Reply-To: <8eefac2d6620642e8c44bf4acbf442c7d89f39d8.1415058552.git.horms+renesas@verge.net.au>
+References: <cover.1415058552.git.horms+renesas@verge.net.au>
+ <8eefac2d6620642e8c44bf4acbf442c7d89f39d8.1415058552.git.horms+renesas@verge.net.au>
+Message-ID: <5458D128.1070903@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 04, 2014 at 09:03:23PM +0800, Shawn Guo wrote:
-> Thanks Jason for pointing me the thread.
-> 
-> On Tue, Oct 21, 2014 at 12:40:16PM +0200, Oleksij Rempel wrote:
-> > +config IRQ_MXS
-> > +	bool "MXS interrupt controller"
-> > +	select IRQ_DOMAIN
-> > +	select STMP_DEVICE
-> > +	default y if MACH_ASM9260 || CONFIG_ARCH_MXS
-> 
-> s/CONFIG_ARCH_MXS/ARCH_MXS
-> 
-> Even with this change, the 'default y' doesn't seem to work for me.
+On 11/4/2014 4:50 AM, Simon Horman wrote:
 
-The only way an option follows its default is if it doesn't have a visible
-prompt.  So:
+> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-config IRQ_MXS
-	def_bool y if MACH_ASM9260 || ARCH_MXS
-	select IRQ_DOMAIN
-	select STMP_DEVICE
+> Add the DU device with a disabled state. Boards that want to enable the
+> DU need to specify the output topology
 
-will cause it to always be defined to 'y' if either of those options are
-enabled.  Otherwise, if it has a visible prompt, it follows (in order of
-precedence) whatever the user specifies, the configuration file, or the
-Kconfig specified default, or 'n'.  (Each limited by selects and
-dependencies.)
+   Same question as for the previous patch.
 
-Is there a particular reason why the option is being offered for user
-selection?
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>   arch/arm/boot/dts/r8a7791.dtsi | 69 ++++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 69 insertions(+)
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+> diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+> index e06c11f..e4a7170 100644
+> --- a/arch/arm/boot/dts/r8a7791.dtsi
+> +++ b/arch/arm/boot/dts/r8a7791.dtsi
+> @@ -637,6 +637,75 @@
+>   		status = "disabled";
+>   	};
+>
+> +	vsp1 at fe928000 {
+> +		compatible = "renesas,vsp1";
+> +		reg = <0 0xfe928000 0 0x8000>;
+> +		interrupts = <0 267 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp1_clks R8A7791_CLK_VSP1_S>;
+> +
+> +		renesas,has-lut;
+> +		renesas,has-sru;
+> +		renesas,#rpf = <5>;
+> +		renesas,#uds = <3>;
+> +		renesas,#wpf = <4>;
+> +	};
+> +
+> +	vsp1 at fe930000 {
+> +		compatible = "renesas,vsp1";
+> +		reg = <0 0xfe930000 0 0x8000>;
+> +		interrupts = <0 246 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp1_clks R8A7791_CLK_VSP1_DU0>;
+> +
+> +		renesas,has-lif;
+> +		renesas,has-lut;
+> +		renesas,#rpf = <4>;
+> +		renesas,#uds = <1>;
+> +		renesas,#wpf = <4>;
+> +	};
+> +
+> +	vsp1 at fe938000 {
+> +		compatible = "renesas,vsp1";
+> +		reg = <0 0xfe938000 0 0x8000>;
+> +		interrupts = <0 247 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp1_clks R8A7791_CLK_VSP1_DU1>;
+> +
+> +		renesas,has-lif;
+> +		renesas,has-lut;
+> +		renesas,#rpf = <4>;
+> +		renesas,#uds = <1>;
+> +		renesas,#wpf = <4>;
+> +	};
+[...]
+
+WBR, Sergei
