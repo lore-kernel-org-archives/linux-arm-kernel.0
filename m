@@ -1,42 +1,34 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Tue, 04 Nov 2014 21:27:25 +0100
-Subject: [PATCH v2] ARM: irqchip: mxs: add Alpascale ASM9260 support
-In-Reply-To: <alpine.DEB.2.11.1411042118490.4245@nanos>
-References: <20141104130320.GB21210@tiger>
- <1415128357-12054-1-git-send-email-linux@rempel-privat.de>
- <alpine.DEB.2.11.1411042118490.4245@nanos>
-Message-ID: <545936AD.5060009@rempel-privat.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 4 Nov 2014 12:35:02 -0800
+Subject: [GIT PULL 2/3 v2] 1st Round of Samsung PM updates for v3.19
+In-Reply-To: <021801cff253$0374fe40$0a5efac0$@samsung.com>
+References: <021801cff253$0374fe40$0a5efac0$@samsung.com>
+Message-ID: <20141104203502.GA3851@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 04.11.2014 um 21:20 schrieb Thomas Gleixner:
-> On Tue, 4 Nov 2014, Oleksij Rempel wrote:
+On Tue, Oct 28, 2014 at 11:00:57AM +0900, Kukjin Kim wrote:
+> Hi,
 > 
->> Freescale iMX23/iMX28 and Alphascale ASM9260 have similar
->> interrupt collectors. It makes easy to reuse irq-mxs code for ASM9260.
->> Differences between this devices are fallowing:
->> - different register offsets
->> - different count of intterupt lines per register
->> - ASM9260 don't provide reset bit
->> - ASM9260 don't support FIQ.
+> I'm sending new pull-request for tags/samsung-pm-v2 instead of tags/samsung-pm.
+> Note that just added "fix build with ARM_CPU_SUSPEND=n" from Arnd, please pull.
 > 
-> Why is this a monolithic patch again. IIRC it was split into a
-> prepatory (imx) and alphascale part earlier. But my memory might trick
-> me.
+> Thanks,
+> Kukjin
 
-It is not monolithic. first patch is "[PATCH v8 4/9] ARM: irqchip: mxs:
-prepare driver for HW with different offsets".
-I don't really wont do discus this irq patches now. Please keep
-attention on first two, /arch/arm/ patches.
+Kukjin,
 
--- 
-Regards,
-Oleksij
+The history here is somewhat odd. You've merged in cleanup and dt,
+and two merges of pm (one with just the extra fix from Arnd). Are the
+merges needed just to avoid merge conflicts? If so, we can resolve that
+when we merge here, that's not a problem.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 213 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141104/3bc513c1/attachment-0001.sig>
+If it's needed because pm doesn't work without the dt branch also being
+merged in, then this is not sufficient since when bisecting, you might get
+only the pm branch contents and not the dt contents in some circumstances.
+
+So, please confirm which of the cases it is, and resubmit just the bare
+pm branch if there are no dependencies.
+
+
+-Olof
