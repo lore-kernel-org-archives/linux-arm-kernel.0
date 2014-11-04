@@ -1,35 +1,40 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 3 Nov 2014 22:02:06 -0800
-Subject: [GIT PULL v2 2/2] ARM: rockchip: cpufreq-cpu0 device
-In-Reply-To: <1712743.HcKV7iIeyP@phil>
-References: <7172632.O1FfdvXn6k@phil> <201717175.L17Ccvmpek@phil>
- <1712743.HcKV7iIeyP@phil>
-Message-ID: <20141104060206.GB13562@quad.lixom.net>
+Date: Mon, 3 Nov 2014 22:04:04 -0800
+Subject: [GIT PULL 1/3] 1st Round of Samsung cleanup for v3.19
+In-Reply-To: <54453026.7060005@samsung.com>
+References: <54453026.7060005@samsung.com>
+Message-ID: <20141104060404.GC13562@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 12:15:59PM +0200, Heiko St?bner wrote:
-> Hi Arnd, Olof,
+On Tue, Oct 21, 2014 at 12:54:14AM +0900, Kukjin Kim wrote:
+> Hi,
 > 
-> this is a version 2 of the cpufreq platform-device addition, as cpufreq-cpu0
-> was meanwhile renamed to cpufreq-dt, as reported by Viresh Kumar.
+> Here is 1st round of Samsung updates for v3.19 and actually it has
+> been sent out to arm-soc for v3.18 before but as you know missed.
+> I've just rebased the branch on top of v3.18-rc1, please pull.
 > 
-> So please pull
+> Thanks,
+> Kukjin
 > 
+> ----
 > 
-> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 > 
->   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.18-rockchip-cpufreqdev-v2
-> 
-> for you to fetch changes up to 3eb79a5a9d46b32f63f6b9cd86f9b2bba43e127a:
-> 
->   ARM: rockchip: honor renaming of cpufreq-cpu0 to cpufreq-dt (2014-09-30 10:33:27 +0200)
 
-Merged now.
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/samsung-cleanup
+> 
+> for you to fetch changes up to 13cfa6c4f7facfc690ba9e99ec382c151fddaced:
+> 
+>   ARM: EXYNOS: Fix CPU idle clock down after CPU off (2014-10-21
+> 00:06:22 +0900)
+
+Merged.
 
 
 -Olof
