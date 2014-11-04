@@ -1,71 +1,190 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  4 Nov 2014 10:50:43 +0900
-Subject: [PATCH 3/7] ARM: shmobile: r8a7791: Remove legacy code
+Date: Tue,  4 Nov 2014 10:50:42 +0900
+Subject: [PATCH 2/7] ARM: shmobile: koelsch: Remove legacy C board code
 In-Reply-To: <cover.1415059146.git.horms+renesas@verge.net.au>
 References: <cover.1415059146.git.horms+renesas@verge.net.au>
-Message-ID: <74c917076ab96f648b96a39ec1ce7a8a7ed361f5.1415059146.git.horms+renesas@verge.net.au>
+Message-ID: <7d6a399cf759a3f1d925a85ff37d6a1b6197ec82.1415059146.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-All r8a7791 boards are now used with multiplatform kernels only. We can
-remove all the unused r8a7791 legacy device and clock registration code.
+All features supported by the Koelsch legacy C board code are now
+supported by the multiplatform code, it's thus time to say bye to the
+legacy code. Nobody should miss it.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig         |   8 -
+ arch/arm/configs/koelsch_defconfig     | 113 -------
+ arch/arm/mach-shmobile/Kconfig         |   6 -
  arch/arm/mach-shmobile/Makefile        |   1 -
- arch/arm/mach-shmobile/clock-r8a7791.c | 338 ---------------------------------
- arch/arm/mach-shmobile/r8a7791.h       |   3 -
- arch/arm/mach-shmobile/setup-r8a7791.c | 181 +-----------------
- 5 files changed, 1 insertion(+), 530 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/clock-r8a7791.c
+ arch/arm/mach-shmobile/board-koelsch.c | 523 ---------------------------------
+ 4 files changed, 643 deletions(-)
+ delete mode 100644 arch/arm/configs/koelsch_defconfig
+ delete mode 100644 arch/arm/mach-shmobile/board-koelsch.c
 
+diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
+deleted file mode 100644
+index b33d19b..0000000
+--- a/arch/arm/configs/koelsch_defconfig
++++ /dev/null
+@@ -1,113 +0,0 @@
+-CONFIG_SYSVIPC=y
+-CONFIG_NO_HZ=y
+-CONFIG_IKCONFIG=y
+-CONFIG_IKCONFIG_PROC=y
+-CONFIG_LOG_BUF_SHIFT=16
+-CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+-CONFIG_SYSCTL_SYSCALL=y
+-CONFIG_EMBEDDED=y
+-CONFIG_PERF_EVENTS=y
+-CONFIG_SLAB=y
+-CONFIG_ARCH_SHMOBILE_LEGACY=y
+-CONFIG_ARCH_R8A7791=y
+-CONFIG_MACH_KOELSCH=y
+-# CONFIG_SWP_EMULATE is not set
+-CONFIG_CPU_BPREDICT_DISABLE=y
+-CONFIG_PL310_ERRATA_588369=y
+-CONFIG_ARM_ERRATA_754322=y
+-CONFIG_PCI=y
+-CONFIG_PCI_RCAR_GEN2=y
+-CONFIG_PCI_RCAR_GEN2_PCIE=y
+-CONFIG_SMP=y
+-CONFIG_SCHED_MC=y
+-CONFIG_NR_CPUS=8
+-CONFIG_AEABI=y
+-CONFIG_ZBOOT_ROM_TEXT=0x0
+-CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_ARM_APPENDED_DTB=y
+-CONFIG_KEXEC=y
+-CONFIG_AUTO_ZRELADDR=y
+-CONFIG_VFP=y
+-CONFIG_NEON=y
+-# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+-CONFIG_PM_RUNTIME=y
+-CONFIG_NET=y
+-CONFIG_PACKET=y
+-CONFIG_UNIX=y
+-CONFIG_INET=y
+-CONFIG_IP_PNP=y
+-CONFIG_IP_PNP_DHCP=y
+-CONFIG_DEVTMPFS=y
+-CONFIG_DEVTMPFS_MOUNT=y
+-CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+-CONFIG_BLK_DEV_SD=y
+-CONFIG_ATA=y
+-CONFIG_SATA_RCAR=y
+-CONFIG_MTD=y
+-CONFIG_MTD_M25P80=y
+-CONFIG_MTD_SPI_NOR=y
+-CONFIG_EEPROM_AT24=y
+-CONFIG_NETDEVICES=y
+-# CONFIG_NET_VENDOR_ARC is not set
+-# CONFIG_NET_CADENCE is not set
+-# CONFIG_NET_VENDOR_BROADCOM is not set
+-# CONFIG_NET_VENDOR_CIRRUS is not set
+-# CONFIG_NET_VENDOR_FARADAY is not set
+-# CONFIG_NET_VENDOR_INTEL is not set
+-# CONFIG_NET_VENDOR_MARVELL is not set
+-# CONFIG_NET_VENDOR_MICREL is not set
+-# CONFIG_NET_VENDOR_NATSEMI is not set
+-CONFIG_SH_ETH=y
+-# CONFIG_NET_VENDOR_SEEQ is not set
+-# CONFIG_NET_VENDOR_SMSC is not set
+-# CONFIG_NET_VENDOR_STMICRO is not set
+-# CONFIG_NET_VENDOR_VIA is not set
+-# CONFIG_NET_VENDOR_WIZNET is not set
+-# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+-CONFIG_KEYBOARD_GPIO=y
+-# CONFIG_INPUT_MOUSE is not set
+-# CONFIG_LEGACY_PTYS is not set
+-CONFIG_SERIAL_SH_SCI=y
+-CONFIG_SERIAL_SH_SCI_NR_UARTS=20
+-CONFIG_SERIAL_SH_SCI_CONSOLE=y
+-CONFIG_I2C=y
+-CONFIG_I2C_MUX=y
+-CONFIG_I2C_SH_MOBILE=y
+-CONFIG_I2C_RCAR=y
+-CONFIG_SPI=y
+-CONFIG_SPI_RSPI=y
+-CONFIG_SPI_SH_MSIOF=y
+-CONFIG_GPIOLIB=y
+-CONFIG_GPIO_RCAR=y
+-# CONFIG_HWMON is not set
+-CONFIG_THERMAL=y
+-CONFIG_RCAR_THERMAL=y
+-CONFIG_REGULATOR=y
+-CONFIG_REGULATOR_FIXED_VOLTAGE=y
+-CONFIG_REGULATOR_DA9210=y
+-CONFIG_REGULATOR_GPIO=y
+-CONFIG_MEDIA_SUPPORT=y
+-CONFIG_MEDIA_CAMERA_SUPPORT=y
+-CONFIG_V4L_PLATFORM_DRIVERS=y
+-CONFIG_SOC_CAMERA=y
+-CONFIG_SOC_CAMERA_PLATFORM=y
+-CONFIG_VIDEO_RCAR_VIN=y
+-# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
+-CONFIG_VIDEO_ADV7180=y
+-# CONFIG_HID is not set
+-# CONFIG_USB_SUPPORT is not set
+-CONFIG_MMC=y
+-CONFIG_MMC_SDHI=y
+-CONFIG_NEW_LEDS=y
+-CONFIG_LEDS_CLASS=y
+-CONFIG_LEDS_GPIO=y
+-# CONFIG_IOMMU_SUPPORT is not set
+-# CONFIG_DNOTIFY is not set
+-CONFIG_TMPFS=y
+-CONFIG_CONFIGFS_FS=y
+-# CONFIG_MISC_FILESYSTEMS is not set
+-CONFIG_NFS_FS=y
+-CONFIG_ROOT_NFS=y
+-# CONFIG_ENABLE_WARN_DEPRECATED is not set
+-# CONFIG_ENABLE_MUST_CHECK is not set
+-# CONFIG_ARM_UNWIND is not set
 diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 8444016..e50402b 100644
+index 21f457b..8444016 100644
 --- a/arch/arm/mach-shmobile/Kconfig
 +++ b/arch/arm/mach-shmobile/Kconfig
-@@ -145,14 +145,6 @@ config ARCH_R8A7790
- 	select MIGHT_HAVE_PCI
- 	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+@@ -227,12 +227,6 @@ config MACH_LAGER
+ 	select MICREL_PHY if SH_ETH
+ 	select SND_SOC_AK4642 if SND_SIMPLE_CARD
  
--config ARCH_R8A7791
--	bool "R-Car M2-W (R8A77910)"
--	select ARCH_RCAR_GEN2
--	select ARCH_WANT_OPTIONAL_GPIOLIB
--	select ARM_GIC
--	select MIGHT_HAVE_PCI
--	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+-config MACH_KOELSCH
+-	bool "Koelsch board"
+-	depends on ARCH_R8A7791
+-	select USE_OF
+-	select MICREL_PHY if SH_ETH
 -
- comment "Renesas ARM SoCs Board Type"
- 
- config MACH_APE6EVM
+ config MACH_KZM9G
+ 	bool "KZM-A9-GT board"
+ 	depends on ARCH_SH73A0
 diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index c49c491..fbb7f85 100644
+index dcb38d5..c49c491 100644
 --- a/arch/arm/mach-shmobile/Makefile
 +++ b/arch/arm/mach-shmobile/Makefile
-@@ -28,7 +28,6 @@ obj-$(CONFIG_ARCH_R8A7740)	+= clock-r8a7740.o
- obj-$(CONFIG_ARCH_R8A7778)	+= clock-r8a7778.o
- obj-$(CONFIG_ARCH_R8A7779)	+= clock-r8a7779.o
- obj-$(CONFIG_ARCH_R8A7790)	+= clock-r8a7790.o
--obj-$(CONFIG_ARCH_R8A7791)	+= clock-r8a7791.o
+@@ -69,7 +69,6 @@ obj-$(CONFIG_MACH_BOCKW_REFERENCE)	+= board-bockw-reference.o
+ obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
+ obj-$(CONFIG_MACH_LAGER)	+= board-lager.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
+-obj-$(CONFIG_MACH_KOELSCH)	+= board-koelsch.o
+ obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o
+ obj-$(CONFIG_MACH_KZM9G_REFERENCE)	+= board-kzm9g-reference.o
  endif
- 
- # CPU reset vector handling objects
-diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
+diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
 deleted file mode 100644
-index 82143ca..0000000
---- a/arch/arm/mach-shmobile/clock-r8a7791.c
+index 3a6a276..0000000
+--- a/arch/arm/mach-shmobile/board-koelsch.c
 +++ /dev/null
-@@ -1,338 +0,0 @@
+@@ -1,523 +0,0 @@
 -/*
-- * r8a7791 clock framework support
+- * Koelsch board support
 - *
 - * Copyright (C) 2013  Renesas Electronics Corporation
-- * Copyright (C) 2013  Renesas Solutions Corp.
+- * Copyright (C) 2013-2014  Renesas Solutions Corp.
 - * Copyright (C) 2013  Magnus Damm
+- * Copyright (C) 2014  Cogent Embedded, Inc.
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
@@ -73,547 +192,514 @@ index 82143ca..0000000
 - *
 - * This program is distributed in the hope that it will be useful,
 - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 - * GNU General Public License for more details.
 - */
--#include <linux/init.h>
--#include <linux/io.h>
--#include <linux/kernel.h>
--#include <linux/sh_clk.h>
--#include <linux/clkdev.h>
--#include "clock.h"
--#include "common.h"
--#include "rcar-gen2.h"
 -
--/*
-- *   MD		EXTAL		PLL0	PLL1	PLL3
-- * 14 13 19	(MHz)		*1	*1
-- *---------------------------------------------------
-- * 0  0  0	15 x 1		x172/2	x208/2	x106
-- * 0  0  1	15 x 1		x172/2	x208/2	x88
-- * 0  1  0	20 x 1		x130/2	x156/2	x80
-- * 0  1  1	20 x 1		x130/2	x156/2	x66
-- * 1  0  0	26 / 2		x200/2	x240/2	x122
-- * 1  0  1	26 / 2		x200/2	x240/2	x102
-- * 1  1  0	30 / 2		x172/2	x208/2	x106
-- * 1  1  1	30 / 2		x172/2	x208/2	x88
-- *
-- * *1 :	Table 7.6 indicates VCO ouput (PLLx = VCO/2)
-- *	see "p1 / 2" on R8A7791_CLOCK_ROOT() below
-- */
--
--#define CPG_BASE 0xe6150000
--#define CPG_LEN 0x1000
--
--#define SMSTPCR0	0xE6150130
--#define SMSTPCR1	0xE6150134
--#define SMSTPCR2	0xe6150138
--#define SMSTPCR3	0xE615013C
--#define SMSTPCR5	0xE6150144
--#define SMSTPCR7	0xe615014c
--#define SMSTPCR8	0xE6150990
--#define SMSTPCR9	0xE6150994
--#define SMSTPCR10	0xE6150998
--#define SMSTPCR11	0xE615099C
--
--#define MSTPSR1		IOMEM(0xe6150038)
--#define MSTPSR2		IOMEM(0xe6150040)
--#define MSTPSR3		IOMEM(0xe6150048)
--#define MSTPSR5		IOMEM(0xe615003c)
--#define MSTPSR7		IOMEM(0xe61501c4)
--#define MSTPSR8		IOMEM(0xe61509a0)
--#define MSTPSR9		IOMEM(0xe61509a4)
--#define MSTPSR11	IOMEM(0xe61509ac)
--
--#define SDCKCR		0xE6150074
--#define SD1CKCR		0xE6150078
--#define SD2CKCR		0xE615026c
--#define MMC0CKCR	0xE6150240
--#define MMC1CKCR	0xE6150244
--#define SSPCKCR		0xE6150248
--#define SSPRSCKCR	0xE615024C
--
--static struct clk_mapping cpg_mapping = {
--	.phys   = CPG_BASE,
--	.len    = CPG_LEN,
--};
--
--static struct clk extal_clk = {
--	/* .rate will be updated on r8a7791_clock_init() */
--	.mapping	= &cpg_mapping,
--};
--
--static struct sh_clk_ops followparent_clk_ops = {
--	.recalc	= followparent_recalc,
--};
--
--static struct clk main_clk = {
--	/* .parent will be set r8a73a4_clock_init */
--	.ops	= &followparent_clk_ops,
--};
--
--/*
-- * clock ratio of these clock will be updated
-- * on r8a7791_clock_init()
-- */
--SH_FIXED_RATIO_CLK_SET(pll1_clk,		main_clk,	1, 1);
--SH_FIXED_RATIO_CLK_SET(pll3_clk,		main_clk,	1, 1);
--SH_FIXED_RATIO_CLK_SET(qspi_clk,		pll1_clk,	1, 1);
--
--/* fixed ratio clock */
--SH_FIXED_RATIO_CLK_SET(extal_div2_clk,		extal_clk,	1, 2);
--SH_FIXED_RATIO_CLK_SET(cp_clk,			extal_clk,	1, 2);
--
--SH_FIXED_RATIO_CLK_SET(pll1_div2_clk,		pll1_clk,	1, 2);
--SH_FIXED_RATIO_CLK_SET(hp_clk,			pll1_clk,	1, 12);
--SH_FIXED_RATIO_CLK_SET(p_clk,			pll1_clk,	1, 24);
--SH_FIXED_RATIO_CLK_SET(rclk_clk,		pll1_clk,	1, (48 * 1024));
--SH_FIXED_RATIO_CLK_SET(mp_clk,			pll1_div2_clk,	1, 15);
--SH_FIXED_RATIO_CLK_SET(zg_clk,			pll1_clk,	1, 3);
--SH_FIXED_RATIO_CLK_SET(zx_clk,			pll1_clk,	1, 3);
--SH_FIXED_RATIO_CLK_SET(zs_clk,			pll1_clk,	1, 6);
--
--static struct clk *main_clks[] = {
--	&extal_clk,
--	&extal_div2_clk,
--	&main_clk,
--	&pll1_clk,
--	&pll1_div2_clk,
--	&pll3_clk,
--	&hp_clk,
--	&p_clk,
--	&qspi_clk,
--	&rclk_clk,
--	&mp_clk,
--	&cp_clk,
--	&zg_clk,
--	&zx_clk,
--	&zs_clk,
--};
--
--/* SDHI (DIV4) clock */
--static int divisors[] = { 2, 3, 4, 6, 8, 12, 16, 18, 24, 0, 36, 48, 10 };
--
--static struct clk_div_mult_table div4_div_mult_table = {
--	.divisors = divisors,
--	.nr_divisors = ARRAY_SIZE(divisors),
--};
--
--static struct clk_div4_table div4_table = {
--	.div_mult_table = &div4_div_mult_table,
--};
--
--enum {
--	DIV4_SDH, DIV4_SD0,
--	DIV4_NR
--};
--
--static struct clk div4_clks[DIV4_NR] = {
--	[DIV4_SDH] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 8, 0x0dff, CLK_ENABLE_ON_INIT),
--	[DIV4_SD0] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 4, 0x1df0, CLK_ENABLE_ON_INIT),
--};
--
--/* DIV6 clocks */
--enum {
--	DIV6_SD1, DIV6_SD2,
--	DIV6_NR
--};
--
--static struct clk div6_clks[DIV6_NR] = {
--	[DIV6_SD1]	= SH_CLK_DIV6(&pll1_div2_clk, SD1CKCR, 0),
--	[DIV6_SD2]	= SH_CLK_DIV6(&pll1_div2_clk, SD2CKCR, 0),
--};
--
--/* MSTP */
--enum {
--	MSTP1108, MSTP1107, MSTP1106,
--	MSTP931, MSTP930, MSTP929, MSTP928, MSTP927, MSTP925,
--	MSTP917,
--	MSTP815, MSTP814,
--	MSTP813,
--	MSTP811, MSTP810, MSTP809,
--	MSTP726, MSTP724, MSTP723, MSTP721, MSTP720,
--	MSTP719, MSTP718, MSTP715, MSTP714,
--	MSTP522,
--	MSTP314, MSTP312, MSTP311,
--	MSTP216, MSTP207, MSTP206,
--	MSTP204, MSTP203, MSTP202,
--	MSTP124,
--	MSTP_NR
--};
--
--static struct clk mstp_clks[MSTP_NR] = {
--	[MSTP1108] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 8, MSTPSR11, 0), /* SCIFA5 */
--	[MSTP1107] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 7, MSTPSR11, 0), /* SCIFA4 */
--	[MSTP1106] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR11, 6, MSTPSR11, 0), /* SCIFA3 */
--	[MSTP931] = SH_CLK_MSTP32_STS(&hp_clk, SMSTPCR9, 31, MSTPSR9, 0), /* I2C0 */
--	[MSTP930] = SH_CLK_MSTP32_STS(&hp_clk, SMSTPCR9, 30, MSTPSR9, 0), /* I2C1 */
--	[MSTP929] = SH_CLK_MSTP32_STS(&hp_clk, SMSTPCR9, 29, MSTPSR9, 0), /* I2C2 */
--	[MSTP928] = SH_CLK_MSTP32_STS(&hp_clk, SMSTPCR9, 28, MSTPSR9, 0), /* I2C3 */
--	[MSTP927] = SH_CLK_MSTP32_STS(&hp_clk, SMSTPCR9, 27, MSTPSR9, 0), /* I2C4 */
--	[MSTP925] = SH_CLK_MSTP32_STS(&hp_clk, SMSTPCR9, 25, MSTPSR9, 0), /* I2C5 */
--	[MSTP917] = SH_CLK_MSTP32_STS(&qspi_clk, SMSTPCR9, 17, MSTPSR9, 0), /* QSPI */
--	[MSTP815] = SH_CLK_MSTP32_STS(&zs_clk, SMSTPCR8, 15, MSTPSR8, 0), /* SATA0 */
--	[MSTP814] = SH_CLK_MSTP32_STS(&zs_clk, SMSTPCR8, 14, MSTPSR8, 0), /* SATA1 */
--	[MSTP813] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR8, 13, MSTPSR8, 0), /* Ether */
--	[MSTP811] = SH_CLK_MSTP32_STS(&zg_clk, SMSTPCR8, 11, MSTPSR8, 0), /* VIN0 */
--	[MSTP810] = SH_CLK_MSTP32_STS(&zg_clk, SMSTPCR8, 10, MSTPSR8, 0), /* VIN1 */
--	[MSTP809] = SH_CLK_MSTP32_STS(&zg_clk, SMSTPCR8, 9, MSTPSR8, 0), /* VIN2 */
--	[MSTP726] = SH_CLK_MSTP32_STS(&zx_clk, SMSTPCR7, 26, MSTPSR7, 0), /* LVDS0 */
--	[MSTP724] = SH_CLK_MSTP32_STS(&zx_clk, SMSTPCR7, 24, MSTPSR7, 0), /* DU0 */
--	[MSTP723] = SH_CLK_MSTP32_STS(&zx_clk, SMSTPCR7, 23, MSTPSR7, 0), /* DU1 */
--	[MSTP721] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR7, 21, MSTPSR7, 0), /* SCIF0 */
--	[MSTP720] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR7, 20, MSTPSR7, 0), /* SCIF1 */
--	[MSTP719] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR7, 19, MSTPSR7, 0), /* SCIF2 */
--	[MSTP718] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR7, 18, MSTPSR7, 0), /* SCIF3 */
--	[MSTP715] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR7, 15, MSTPSR7, 0), /* SCIF4 */
--	[MSTP714] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR7, 14, MSTPSR7, 0), /* SCIF5 */
--	[MSTP522] = SH_CLK_MSTP32_STS(&extal_clk, SMSTPCR5, 22, MSTPSR5, 0), /* Thermal */
--	[MSTP314] = SH_CLK_MSTP32_STS(&div4_clks[DIV4_SD0], SMSTPCR3, 14, MSTPSR3, 0), /* SDHI0 */
--	[MSTP312] = SH_CLK_MSTP32_STS(&div6_clks[DIV6_SD1], SMSTPCR3, 12, MSTPSR3, 0), /* SDHI1 */
--	[MSTP311] = SH_CLK_MSTP32_STS(&div6_clks[DIV6_SD2], SMSTPCR3, 11, MSTPSR3, 0), /* SDHI2 */
--	[MSTP216] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 16, MSTPSR2, 0), /* SCIFB2 */
--	[MSTP207] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 7, MSTPSR2, 0), /* SCIFB1 */
--	[MSTP206] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 6, MSTPSR2, 0), /* SCIFB0 */
--	[MSTP204] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 4, MSTPSR2, 0), /* SCIFA0 */
--	[MSTP203] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 3, MSTPSR2, 0), /* SCIFA1 */
--	[MSTP202] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 2, MSTPSR2, 0), /* SCIFA2 */
--	[MSTP124] = SH_CLK_MSTP32_STS(&rclk_clk, SMSTPCR1, 24, MSTPSR1, 0), /* CMT0 */
--};
--
--static struct clk_lookup lookups[] = {
--
--	/* main clocks */
--	CLKDEV_CON_ID("extal",		&extal_clk),
--	CLKDEV_CON_ID("extal_div2",	&extal_div2_clk),
--	CLKDEV_CON_ID("main",		&main_clk),
--	CLKDEV_CON_ID("pll1",		&pll1_clk),
--	CLKDEV_CON_ID("pll1_div2",	&pll1_div2_clk),
--	CLKDEV_CON_ID("pll3",		&pll3_clk),
--	CLKDEV_CON_ID("zg",		&zg_clk),
--	CLKDEV_CON_ID("zs",		&zs_clk),
--	CLKDEV_CON_ID("hp",		&hp_clk),
--	CLKDEV_CON_ID("p",		&p_clk),
--	CLKDEV_CON_ID("qspi",		&qspi_clk),
--	CLKDEV_CON_ID("rclk",		&rclk_clk),
--	CLKDEV_CON_ID("mp",		&mp_clk),
--	CLKDEV_CON_ID("cp",		&cp_clk),
--	CLKDEV_CON_ID("peripheral_clk", &hp_clk),
--
--	/* MSTP */
--	CLKDEV_ICK_ID("lvds.0", "rcar-du-r8a7791", &mstp_clks[MSTP726]),
--	CLKDEV_ICK_ID("du.0", "rcar-du-r8a7791", &mstp_clks[MSTP724]),
--	CLKDEV_ICK_ID("du.1", "rcar-du-r8a7791", &mstp_clks[MSTP723]),
--	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]), /* SCIFA0 */
--	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]), /* SCIFA1 */
--	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP206]), /* SCIFB0 */
--	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP207]), /* SCIFB1 */
--	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP216]), /* SCIFB2 */
--	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP202]), /* SCIFA2 */
--	CLKDEV_DEV_ID("sh-sci.6", &mstp_clks[MSTP721]), /* SCIF0 */
--	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]), /* SCIF1 */
--	CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP719]), /* SCIF2 */
--	CLKDEV_DEV_ID("sh-sci.9", &mstp_clks[MSTP718]), /* SCIF3 */
--	CLKDEV_DEV_ID("sh-sci.10", &mstp_clks[MSTP715]), /* SCIF4 */
--	CLKDEV_DEV_ID("sh-sci.11", &mstp_clks[MSTP714]), /* SCIF5 */
--	CLKDEV_DEV_ID("sh-sci.12", &mstp_clks[MSTP1106]), /* SCIFA3 */
--	CLKDEV_DEV_ID("sh-sci.13", &mstp_clks[MSTP1107]), /* SCIFA4 */
--	CLKDEV_DEV_ID("sh-sci.14", &mstp_clks[MSTP1108]), /* SCIFA5 */
--	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]),
--	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP312]),
--	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP311]),
--	CLKDEV_ICK_ID("fck", "sh-cmt-48-gen2.0", &mstp_clks[MSTP124]),
--	CLKDEV_DEV_ID("qspi.0", &mstp_clks[MSTP917]),
--	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
--	CLKDEV_DEV_ID("i2c-rcar_gen2.0", &mstp_clks[MSTP931]),
--	CLKDEV_DEV_ID("i2c-rcar_gen2.1", &mstp_clks[MSTP930]),
--	CLKDEV_DEV_ID("i2c-rcar_gen2.2", &mstp_clks[MSTP929]),
--	CLKDEV_DEV_ID("i2c-rcar_gen2.3", &mstp_clks[MSTP928]),
--	CLKDEV_DEV_ID("i2c-rcar_gen2.4", &mstp_clks[MSTP927]),
--	CLKDEV_DEV_ID("i2c-rcar_gen2.5", &mstp_clks[MSTP925]),
--	CLKDEV_DEV_ID("r8a7791-ether", &mstp_clks[MSTP813]), /* Ether */
--	CLKDEV_DEV_ID("r8a7791-vin.0", &mstp_clks[MSTP811]),
--	CLKDEV_DEV_ID("r8a7791-vin.1", &mstp_clks[MSTP810]),
--	CLKDEV_DEV_ID("r8a7791-vin.2", &mstp_clks[MSTP809]),
--	CLKDEV_DEV_ID("sata-r8a7791.0", &mstp_clks[MSTP815]),
--	CLKDEV_DEV_ID("sata-r8a7791.1", &mstp_clks[MSTP814]),
--};
--
--#define R8A7791_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
--	extal_clk.rate	= e * 1000 * 1000;			\
--	main_clk.parent	= m;					\
--	SH_CLK_SET_RATIO(&pll1_clk_ratio, p1 / 2, 1);		\
--	if (mode & MD(19))					\
--		SH_CLK_SET_RATIO(&pll3_clk_ratio, p31, 1);	\
--	else							\
--		SH_CLK_SET_RATIO(&pll3_clk_ratio, p30, 1)
--
--
--void __init r8a7791_clock_init(void)
--{
--	u32 mode = rcar_gen2_read_mode_pins();
--	int k, ret = 0;
--
--	switch (mode & (MD(14) | MD(13))) {
--	case 0:
--		R8A7791_CLOCK_ROOT(15, &extal_clk, 172, 208, 106, 88);
--		break;
--	case MD(13):
--		R8A7791_CLOCK_ROOT(20, &extal_clk, 130, 156, 80, 66);
--		break;
--	case MD(14):
--		R8A7791_CLOCK_ROOT(26, &extal_div2_clk, 200, 240, 122, 102);
--		break;
--	case MD(13) | MD(14):
--		R8A7791_CLOCK_ROOT(30, &extal_div2_clk, 172, 208, 106, 88);
--		break;
--	}
--
--	if ((mode & (MD(3) | MD(2) | MD(1))) == MD(2))
--		SH_CLK_SET_RATIO(&qspi_clk_ratio, 1, 16);
--	else
--		SH_CLK_SET_RATIO(&qspi_clk_ratio, 1, 20);
--
--	for (k = 0; !ret && (k < ARRAY_SIZE(main_clks)); k++)
--		ret = clk_register(main_clks[k]);
--
--	if (!ret)
--		ret = sh_clk_div4_register(div4_clks, DIV4_NR, &div4_table);
--
--	if (!ret)
--		ret = sh_clk_div6_register(div6_clks, DIV6_NR);
--
--	if (!ret)
--		ret = sh_clk_mstp_register(mstp_clks, MSTP_NR);
--
--	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
--
--	if (!ret)
--		shmobile_clk_init();
--	else
--		goto epanic;
--
--	return;
--
--epanic:
--	panic("failed to setup r8a7791 clocks\n");
--}
-diff --git a/arch/arm/mach-shmobile/r8a7791.h b/arch/arm/mach-shmobile/r8a7791.h
-index c1bf7ab..6cf11eb 100644
---- a/arch/arm/mach-shmobile/r8a7791.h
-+++ b/arch/arm/mach-shmobile/r8a7791.h
-@@ -1,9 +1,6 @@
- #ifndef __ASM_R8A7791_H__
- #define __ASM_R8A7791_H__
- 
--void r8a7791_add_standard_devices(void);
--void r8a7791_clock_init(void);
--void r8a7791_pinmux_init(void);
- void r8a7791_pm_init(void);
- extern struct smp_operations r8a7791_smp_ops;
- 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7791.c b/arch/arm/mach-shmobile/setup-r8a7791.c
-index d930925f..ef8eb3a 100644
---- a/arch/arm/mach-shmobile/setup-r8a7791.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7791.c
-@@ -15,192 +15,14 @@
-  * GNU General Public License for more details.
-  */
- 
+-#include <linux/dma-mapping.h>
+-#include <linux/gpio.h>
+-#include <linux/gpio_keys.h>
+-#include <linux/input.h>
 -#include <linux/irq.h>
 -#include <linux/kernel.h>
--#include <linux/of_platform.h>
+-#include <linux/leds.h>
+-#include <linux/mfd/tmio.h>
+-#include <linux/mmc/host.h>
+-#include <linux/mmc/sh_mobile_sdhi.h>
+-#include <linux/mtd/mtd.h>
+-#include <linux/mtd/partitions.h>
+-#include <linux/phy.h>
+-#include <linux/pinctrl/machine.h>
 -#include <linux/platform_data/gpio-rcar.h>
--#include <linux/platform_data/irq-renesas-irqc.h>
--#include <linux/serial_sci.h>
--#include <linux/sh_timer.h>
-+#include <linux/init.h>
- 
- #include <asm/mach/arch.h>
- 
- #include "common.h"
+-#include <linux/platform_data/rcar-du.h>
+-#include <linux/platform_device.h>
+-#include <linux/regulator/driver.h>
+-#include <linux/regulator/fixed.h>
+-#include <linux/regulator/gpio-regulator.h>
+-#include <linux/regulator/machine.h>
+-#include <linux/sh_eth.h>
+-#include <linux/spi/flash.h>
+-#include <linux/spi/rspi.h>
+-#include <linux/spi/spi.h>
+-
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-
+-#include "common.h"
 -#include "irqs.h"
- #include "r8a7791.h"
- #include "rcar-gen2.h"
- 
--static const struct resource pfc_resources[] __initconst = {
--	DEFINE_RES_MEM(0xe6060000, 0x250),
+-#include "r8a7791.h"
+-#include "rcar-gen2.h"
+-
+-/* DU */
+-static struct rcar_du_encoder_data koelsch_du_encoders[] = {
+-	{
+-		.type = RCAR_DU_ENCODER_NONE,
+-		.output = RCAR_DU_OUTPUT_LVDS0,
+-		.connector.lvds.panel = {
+-			.width_mm = 210,
+-			.height_mm = 158,
+-			.mode = {
+-				.pixelclock = 65000000,
+-				.hactive = 1024,
+-				.hfront_porch = 20,
+-				.hback_porch = 160,
+-				.hsync_len = 136,
+-				.vactive = 768,
+-				.vfront_porch = 3,
+-				.vback_porch = 29,
+-				.vsync_len = 6,
+-			},
+-		},
+-	},
 -};
 -
--#define r8a7791_register_pfc()						\
--	platform_device_register_simple("pfc-r8a7791", -1, pfc_resources, \
--					ARRAY_SIZE(pfc_resources))
+-static const struct rcar_du_platform_data koelsch_du_pdata __initconst = {
+-	.encoders = koelsch_du_encoders,
+-	.num_encoders = ARRAY_SIZE(koelsch_du_encoders),
+-};
 -
--#define R8A7791_GPIO(idx, base, nr)					\
--static const struct resource r8a7791_gpio##idx##_resources[] __initconst = { \
--	DEFINE_RES_MEM((base), 0x50),					\
--	DEFINE_RES_IRQ(gic_spi(4 + (idx))),				\
+-static const struct resource du_resources[] __initconst = {
+-	DEFINE_RES_MEM(0xfeb00000, 0x40000),
+-	DEFINE_RES_MEM_NAMED(0xfeb90000, 0x1c, "lvds.0"),
+-	DEFINE_RES_IRQ(gic_spi(256)),
+-	DEFINE_RES_IRQ(gic_spi(268)),
+-};
+-
+-static void __init koelsch_add_du_device(void)
+-{
+-	struct platform_device_info info = {
+-		.name = "rcar-du-r8a7791",
+-		.id = -1,
+-		.res = du_resources,
+-		.num_res = ARRAY_SIZE(du_resources),
+-		.data = &koelsch_du_pdata,
+-		.size_data = sizeof(koelsch_du_pdata),
+-		.dma_mask = DMA_BIT_MASK(32),
+-	};
+-
+-	platform_device_register_full(&info);
+-}
+-
+-/* Ether */
+-static const struct sh_eth_plat_data ether_pdata __initconst = {
+-	.phy			= 0x1,
+-	.phy_irq		= irq_pin(0),
+-	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
+-	.phy_interface		= PHY_INTERFACE_MODE_RMII,
+-	.ether_link_active_low	= 1,
+-};
+-
+-static const struct resource ether_resources[] __initconst = {
+-	DEFINE_RES_MEM(0xee700000, 0x400),
+-	DEFINE_RES_IRQ(gic_spi(162)),
+-};
+-
+-static const struct platform_device_info ether_info __initconst = {
+-	.name		= "r8a7791-ether",
+-	.id		= -1,
+-	.res		= ether_resources,
+-	.num_res	= ARRAY_SIZE(ether_resources),
+-	.data		= &ether_pdata,
+-	.size_data	= sizeof(ether_pdata),
+-	.dma_mask	= DMA_BIT_MASK(32),
+-};
+-
+-/* LEDS */
+-static struct gpio_led koelsch_leds[] = {
+-	{
+-		.name		= "led8",
+-		.gpio		= RCAR_GP_PIN(2, 21),
+-		.default_state	= LEDS_GPIO_DEFSTATE_ON,
+-	}, {
+-		.name		= "led7",
+-		.gpio		= RCAR_GP_PIN(2, 20),
+-		.default_state	= LEDS_GPIO_DEFSTATE_ON,
+-	}, {
+-		.name		= "led6",
+-		.gpio		= RCAR_GP_PIN(2, 19),
+-		.default_state	= LEDS_GPIO_DEFSTATE_ON,
+-	},
+-};
+-
+-static const struct gpio_led_platform_data koelsch_leds_pdata __initconst = {
+-	.leds		= koelsch_leds,
+-	.num_leds	= ARRAY_SIZE(koelsch_leds),
+-};
+-
+-/* GPIO KEY */
+-#define GPIO_KEY(c, g, d, ...) \
+-	{ .code = c, .gpio = g, .desc = d, .active_low = 1, \
+-	  .wakeup = 1, .debounce_interval = 20 }
+-
+-static struct gpio_keys_button gpio_buttons[] = {
+-	GPIO_KEY(KEY_4,		RCAR_GP_PIN(5, 3),	"SW2-pin4"),
+-	GPIO_KEY(KEY_3,		RCAR_GP_PIN(5, 2),	"SW2-pin3"),
+-	GPIO_KEY(KEY_2,		RCAR_GP_PIN(5, 1),	"SW2-pin2"),
+-	GPIO_KEY(KEY_1,		RCAR_GP_PIN(5, 0),	"SW2-pin1"),
+-	GPIO_KEY(KEY_G,		RCAR_GP_PIN(7, 6),	"SW36"),
+-	GPIO_KEY(KEY_F,		RCAR_GP_PIN(7, 5),	"SW35"),
+-	GPIO_KEY(KEY_E,		RCAR_GP_PIN(7, 4),	"SW34"),
+-	GPIO_KEY(KEY_D,		RCAR_GP_PIN(7, 3),	"SW33"),
+-	GPIO_KEY(KEY_C,		RCAR_GP_PIN(7, 2),	"SW32"),
+-	GPIO_KEY(KEY_B,		RCAR_GP_PIN(7, 1),	"SW31"),
+-	GPIO_KEY(KEY_A,		RCAR_GP_PIN(7, 0),	"SW30"),
+-};
+-
+-static const struct gpio_keys_platform_data koelsch_keys_pdata __initconst = {
+-	.buttons	= gpio_buttons,
+-	.nbuttons	= ARRAY_SIZE(gpio_buttons),
+-};
+-
+-/* QSPI */
+-static const struct resource qspi_resources[] __initconst = {
+-	DEFINE_RES_MEM(0xe6b10000, 0x1000),
+-	DEFINE_RES_IRQ_NAMED(gic_spi(184), "mux"),
+-};
+-
+-static const struct rspi_plat_data qspi_pdata __initconst = {
+-	.num_chipselect = 1,
+-};
+-
+-/* SPI Flash memory (Spansion S25FL512SAGMFIG11 64 MiB) */
+-static struct mtd_partition spi_flash_part[] = {
+-	{
+-		.name		= "loader",
+-		.offset		= 0x00000000,
+-		.size		= 512 * 1024,
+-		.mask_flags	= MTD_WRITEABLE,
+-	},
+-	{
+-		.name		= "bootenv",
+-		.offset		= MTDPART_OFS_APPEND,
+-		.size		= 512 * 1024,
+-		.mask_flags	= MTD_WRITEABLE,
+-	},
+-	{
+-		.name		= "data",
+-		.offset		= MTDPART_OFS_APPEND,
+-		.size		= MTDPART_SIZ_FULL,
+-	},
+-};
+-
+-static const struct flash_platform_data spi_flash_data = {
+-	.name		= "m25p80",
+-	.parts		= spi_flash_part,
+-	.nr_parts	= ARRAY_SIZE(spi_flash_part),
+-	.type		= "s25fl512s",
+-};
+-
+-static const struct spi_board_info spi_info[] __initconst = {
+-	{
+-		.modalias	= "m25p80",
+-		.platform_data	= &spi_flash_data,
+-		.mode		= SPI_MODE_0 | SPI_TX_QUAD | SPI_RX_QUAD,
+-		.max_speed_hz	= 30000000,
+-		.bus_num	= 0,
+-		.chip_select	= 0,
+-	},
+-};
+-
+-/* SATA0 */
+-static const struct resource sata0_resources[] __initconst = {
+-	DEFINE_RES_MEM(0xee300000, 0x2000),
+-	DEFINE_RES_IRQ(gic_spi(105)),
+-};
+-
+-static const struct platform_device_info sata0_info __initconst = {
+-	.name		= "sata-r8a7791",
+-	.id		= 0,
+-	.res		= sata0_resources,
+-	.num_res	= ARRAY_SIZE(sata0_resources),
+-	.dma_mask	= DMA_BIT_MASK(32),
+-};
+-
+-/* I2C */
+-static const struct resource i2c_resources[] __initconst = {
+-	/* I2C0 */
+-	DEFINE_RES_MEM(0xE6508000, 0x40),
+-	DEFINE_RES_IRQ(gic_spi(287)),
+-	/* I2C1 */
+-	DEFINE_RES_MEM(0xE6518000, 0x40),
+-	DEFINE_RES_IRQ(gic_spi(288)),
+-	/* I2C2 */
+-	DEFINE_RES_MEM(0xE6530000, 0x40),
+-	DEFINE_RES_IRQ(gic_spi(286)),
+-	/* I2C3 */
+-	DEFINE_RES_MEM(0xE6540000, 0x40),
+-	DEFINE_RES_IRQ(gic_spi(290)),
+-	/* I2C4 */
+-	DEFINE_RES_MEM(0xE6520000, 0x40),
+-	DEFINE_RES_IRQ(gic_spi(19)),
+-	/* I2C5 */
+-	DEFINE_RES_MEM(0xE6528000, 0x40),
+-	DEFINE_RES_IRQ(gic_spi(20)),
+-};
+-
+-static void __init koelsch_add_i2c(unsigned idx)
+-{
+-	unsigned res_idx = idx * 2;
+-
+-	BUG_ON(res_idx >= ARRAY_SIZE(i2c_resources));
+-
+-	platform_device_register_simple("i2c-rcar_gen2", idx,
+-					i2c_resources + res_idx, 2);
+-}
+-
+-#define SDHI_REGULATOR(idx, vdd_pin, vccq_pin)				\
+-static struct regulator_consumer_supply vcc_sdhi##idx##_consumer =	\
+-	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi." #idx);		\
+-									\
+-static struct regulator_init_data vcc_sdhi##idx##_init_data = {		\
+-	.constraints = {						\
+-		.valid_ops_mask = REGULATOR_CHANGE_STATUS,		\
+-	},								\
+-	.consumer_supplies	= &vcc_sdhi##idx##_consumer,		\
+-	.num_consumer_supplies	= 1,					\
 -};									\
 -									\
--static const struct gpio_rcar_config					\
--r8a7791_gpio##idx##_platform_data __initconst = {			\
--	.gpio_base	= 32 * (idx),					\
--	.irq_base	= 0,						\
--	.number_of_pins	= (nr),						\
--	.pctl_name	= "pfc-r8a7791",				\
--	.has_both_edge_trigger = 1,					\
--};									\
--
--R8A7791_GPIO(0, 0xe6050000, 32);
--R8A7791_GPIO(1, 0xe6051000, 32);
--R8A7791_GPIO(2, 0xe6052000, 32);
--R8A7791_GPIO(3, 0xe6053000, 32);
--R8A7791_GPIO(4, 0xe6054000, 32);
--R8A7791_GPIO(5, 0xe6055000, 32);
--R8A7791_GPIO(6, 0xe6055400, 32);
--R8A7791_GPIO(7, 0xe6055800, 26);
--
--#define r8a7791_register_gpio(idx)					\
--	platform_device_register_resndata(NULL, "gpio_rcar", idx,	\
--		r8a7791_gpio##idx##_resources,				\
--		ARRAY_SIZE(r8a7791_gpio##idx##_resources),		\
--		&r8a7791_gpio##idx##_platform_data,			\
--		sizeof(r8a7791_gpio##idx##_platform_data))
--
--void __init r8a7791_pinmux_init(void)
--{
--	r8a7791_register_pfc();
--	r8a7791_register_gpio(0);
--	r8a7791_register_gpio(1);
--	r8a7791_register_gpio(2);
--	r8a7791_register_gpio(3);
--	r8a7791_register_gpio(4);
--	r8a7791_register_gpio(5);
--	r8a7791_register_gpio(6);
--	r8a7791_register_gpio(7);
--}
--
--#define __R8A7791_SCIF(scif_type, index, baseaddr, irq)			\
--static struct plat_sci_port scif##index##_platform_data = {		\
--	.type		= scif_type,					\
--	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,		\
--	.scscr		= SCSCR_RE | SCSCR_TE,				\
+-static const struct fixed_voltage_config vcc_sdhi##idx##_info __initconst = {\
+-	.supply_name	= "SDHI" #idx "Vcc",				\
+-	.microvolts	= 3300000,					\
+-	.gpio		= vdd_pin,					\
+-	.enable_high	= 1,						\
+-	.init_data	= &vcc_sdhi##idx##_init_data,			\
 -};									\
 -									\
--static struct resource scif##index##_resources[] = {			\
--	DEFINE_RES_MEM(baseaddr, 0x100),				\
--	DEFINE_RES_IRQ(irq),						\
--}
--
--#define R8A7791_SCIF(index, baseaddr, irq)				\
--	__R8A7791_SCIF(PORT_SCIF, index, baseaddr, irq)
--
--#define R8A7791_SCIFA(index, baseaddr, irq)				\
--	__R8A7791_SCIF(PORT_SCIFA, index, baseaddr, irq)
--
--#define R8A7791_SCIFB(index, baseaddr, irq)				\
--	__R8A7791_SCIF(PORT_SCIFB, index, baseaddr, irq)
--
--R8A7791_SCIFA(0,  0xe6c40000, gic_spi(144)); /* SCIFA0 */
--R8A7791_SCIFA(1,  0xe6c50000, gic_spi(145)); /* SCIFA1 */
--R8A7791_SCIFB(2,  0xe6c20000, gic_spi(148)); /* SCIFB0 */
--R8A7791_SCIFB(3,  0xe6c30000, gic_spi(149)); /* SCIFB1 */
--R8A7791_SCIFB(4,  0xe6ce0000, gic_spi(150)); /* SCIFB2 */
--R8A7791_SCIFA(5,  0xe6c60000, gic_spi(151)); /* SCIFA2 */
--R8A7791_SCIF(6,   0xe6e60000, gic_spi(152)); /* SCIF0 */
--R8A7791_SCIF(7,   0xe6e68000, gic_spi(153)); /* SCIF1 */
--R8A7791_SCIF(8,   0xe6e58000, gic_spi(22)); /* SCIF2 */
--R8A7791_SCIF(9,   0xe6ea8000, gic_spi(23)); /* SCIF3 */
--R8A7791_SCIF(10,  0xe6ee0000, gic_spi(24)); /* SCIF4 */
--R8A7791_SCIF(11,  0xe6ee8000, gic_spi(25)); /* SCIF5 */
--R8A7791_SCIFA(12, 0xe6c70000, gic_spi(29)); /* SCIFA3 */
--R8A7791_SCIFA(13, 0xe6c78000, gic_spi(30)); /* SCIFA4 */
--R8A7791_SCIFA(14, 0xe6c80000, gic_spi(31)); /* SCIFA5 */
--
--#define r8a7791_register_scif(index)					       \
--	platform_device_register_resndata(NULL, "sh-sci", index,  	       \
--					  scif##index##_resources,	       \
--					  ARRAY_SIZE(scif##index##_resources), \
--					  &scif##index##_platform_data,	       \
--					  sizeof(scif##index##_platform_data))
--
--static struct sh_timer_config cmt0_platform_data = {
--	.channels_mask = 0x60,
+-static struct regulator_consumer_supply vccq_sdhi##idx##_consumer =	\
+-	REGULATOR_SUPPLY("vqmmc", "sh_mobile_sdhi." #idx);		\
+-									\
+-static struct regulator_init_data vccq_sdhi##idx##_init_data = {	\
+-	.constraints = {						\
+-		.input_uV	= 3300000,				\
+-		.min_uV		= 1800000,				\
+-		.max_uV		= 3300000,				\
+-		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |		\
+-				  REGULATOR_CHANGE_STATUS,		\
+-	},								\
+-	.consumer_supplies	= &vccq_sdhi##idx##_consumer,		\
+-	.num_consumer_supplies	= 1,					\
+-};									\
+-									\
+-static struct gpio vccq_sdhi##idx##_gpio =				\
+-	{ vccq_pin, GPIOF_OUT_INIT_HIGH, "vccq-sdhi" #idx };		\
+-									\
+-static struct gpio_regulator_state vccq_sdhi##idx##_states[] = {	\
+-	{ .value = 1800000, .gpios = 0 },				\
+-	{ .value = 3300000, .gpios = 1 },				\
+-};									\
+-									\
+-static const struct gpio_regulator_config vccq_sdhi##idx##_info __initconst = {\
+-	.supply_name	= "vqmmc",					\
+-	.gpios		= &vccq_sdhi##idx##_gpio,			\
+-	.nr_gpios	= 1,						\
+-	.states		= vccq_sdhi##idx##_states,			\
+-	.nr_states	= ARRAY_SIZE(vccq_sdhi##idx##_states),		\
+-	.type		= REGULATOR_VOLTAGE,				\
+-	.init_data	= &vccq_sdhi##idx##_init_data,			\
 -};
 -
--static struct resource cmt0_resources[] = {
--	DEFINE_RES_MEM(0xffca0000, 0x1004),
--	DEFINE_RES_IRQ(gic_spi(142)),
+-SDHI_REGULATOR(0, RCAR_GP_PIN(7, 17), RCAR_GP_PIN(2, 12));
+-SDHI_REGULATOR(1, RCAR_GP_PIN(7, 18), RCAR_GP_PIN(2, 13));
+-SDHI_REGULATOR(2, RCAR_GP_PIN(7, 19), RCAR_GP_PIN(2, 26));
+-
+-/* SDHI0 */
+-static struct sh_mobile_sdhi_info sdhi0_info __initdata = {
+-	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
+-			  MMC_CAP_POWER_OFF_CARD,
+-	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT,
 -};
 -
--#define r8a7791_register_cmt(idx)					\
--	platform_device_register_resndata(NULL, "sh-cmt-48-gen2",	\
--					  idx, cmt##idx##_resources,	\
--					  ARRAY_SIZE(cmt##idx##_resources), \
--					  &cmt##idx##_platform_data,	\
--					  sizeof(struct sh_timer_config))
--
--static struct renesas_irqc_config irqc0_data = {
--	.irq_base = irq_pin(0), /* IRQ0 -> IRQ9 */
+-static struct resource sdhi0_resources[] __initdata = {
+-	DEFINE_RES_MEM(0xee100000, 0x200),
+-	DEFINE_RES_IRQ(gic_spi(165)),
 -};
 -
--static struct resource irqc0_resources[] = {
--	DEFINE_RES_MEM(0xe61c0000, 0x200), /* IRQC Event Detector Block_0 */
--	DEFINE_RES_IRQ(gic_spi(0)), /* IRQ0 */
--	DEFINE_RES_IRQ(gic_spi(1)), /* IRQ1 */
--	DEFINE_RES_IRQ(gic_spi(2)), /* IRQ2 */
--	DEFINE_RES_IRQ(gic_spi(3)), /* IRQ3 */
--	DEFINE_RES_IRQ(gic_spi(12)), /* IRQ4 */
--	DEFINE_RES_IRQ(gic_spi(13)), /* IRQ5 */
--	DEFINE_RES_IRQ(gic_spi(14)), /* IRQ6 */
--	DEFINE_RES_IRQ(gic_spi(15)), /* IRQ7 */
--	DEFINE_RES_IRQ(gic_spi(16)), /* IRQ8 */
--	DEFINE_RES_IRQ(gic_spi(17)), /* IRQ9 */
+-/* SDHI1 */
+-static struct sh_mobile_sdhi_info sdhi1_info __initdata = {
+-	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
+-			  MMC_CAP_POWER_OFF_CARD,
+-	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT,
 -};
 -
--#define r8a7791_register_irqc(idx)					\
--	platform_device_register_resndata(NULL, "renesas_irqc",		\
--					  idx, irqc##idx##_resources,	\
--					  ARRAY_SIZE(irqc##idx##_resources), \
--					  &irqc##idx##_data,		\
--					  sizeof(struct renesas_irqc_config))
--
--static const struct resource thermal_resources[] __initconst = {
--	DEFINE_RES_MEM(0xe61f0000, 0x14),
--	DEFINE_RES_MEM(0xe61f0100, 0x38),
--	DEFINE_RES_IRQ(gic_spi(69)),
+-static struct resource sdhi1_resources[] __initdata = {
+-	DEFINE_RES_MEM(0xee140000, 0x100),
+-	DEFINE_RES_IRQ(gic_spi(167)),
 -};
 -
--#define r8a7791_register_thermal()					\
--	platform_device_register_simple("rcar_thermal", -1,		\
--					thermal_resources,		\
--					ARRAY_SIZE(thermal_resources))
+-/* SDHI2 */
+-static struct sh_mobile_sdhi_info sdhi2_info __initdata = {
+-	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
+-			  MMC_CAP_POWER_OFF_CARD,
+-	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT |
+-			  TMIO_MMC_WRPROTECT_DISABLE,
+-};
 -
--void __init r8a7791_add_standard_devices(void)
+-static struct resource sdhi2_resources[] __initdata = {
+-	DEFINE_RES_MEM(0xee160000, 0x100),
+-	DEFINE_RES_IRQ(gic_spi(168)),
+-};
+-
+-static const struct pinctrl_map koelsch_pinctrl_map[] = {
+-	/* DU */
+-	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7791", "pfc-r8a7791",
+-				  "du_rgb666", "du"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7791", "pfc-r8a7791",
+-				  "du_sync", "du"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7791", "pfc-r8a7791",
+-				  "du_clk_out_0", "du"),
+-	/* Ether */
+-	PIN_MAP_MUX_GROUP_DEFAULT("r8a7791-ether", "pfc-r8a7791",
+-				  "eth_link", "eth"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("r8a7791-ether", "pfc-r8a7791",
+-				  "eth_mdio", "eth"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("r8a7791-ether", "pfc-r8a7791",
+-				  "eth_rmii", "eth"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("r8a7791-ether", "pfc-r8a7791",
+-				  "intc_irq0", "intc"),
+-	/* QSPI */
+-	PIN_MAP_MUX_GROUP_DEFAULT("qspi.0", "pfc-r8a7791",
+-				  "qspi_ctrl", "qspi"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("qspi.0", "pfc-r8a7791",
+-				  "qspi_data4", "qspi"),
+-	/* SCIF0 (CN19: DEBUG SERIAL0) */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7791",
+-				  "scif0_data_d", "scif0"),
+-	/* SCIF1 (CN20: DEBUG SERIAL1) */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.7", "pfc-r8a7791",
+-				  "scif1_data_d", "scif1"),
+-	/* I2C1 */
+-	PIN_MAP_MUX_GROUP_DEFAULT("i2c-rcar_gen2.1", "pfc-r8a7791",
+-				  "i2c1_e", "i2c1"),
+-	/* I2C2 */
+-	PIN_MAP_MUX_GROUP_DEFAULT("i2c-rcar_gen2.2", "pfc-r8a7791",
+-				  "i2c2", "i2c2"),
+-	/* I2C4 */
+-	PIN_MAP_MUX_GROUP_DEFAULT("i2c-rcar_gen2.4", "pfc-r8a7791",
+-				  "i2c4_c", "i2c4"),
+-	/* SDHI0 */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7791",
+-				  "sdhi0_data4", "sdhi0"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7791",
+-				  "sdhi0_ctrl", "sdhi0"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7791",
+-				  "sdhi0_cd", "sdhi0"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7791",
+-				  "sdhi0_wp", "sdhi0"),
+-	/* SDHI2 */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-r8a7791",
+-				  "sdhi1_data4", "sdhi1"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-r8a7791",
+-				  "sdhi1_ctrl", "sdhi1"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-r8a7791",
+-				  "sdhi1_cd", "sdhi1"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-r8a7791",
+-				  "sdhi1_wp", "sdhi1"),
+-	/* SDHI2 */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.2", "pfc-r8a7791",
+-				  "sdhi2_data4", "sdhi2"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.2", "pfc-r8a7791",
+-				  "sdhi2_ctrl", "sdhi2"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.2", "pfc-r8a7791",
+-				  "sdhi2_cd", "sdhi2"),
+-};
+-
+-static void __init koelsch_add_standard_devices(void)
 -{
--	r8a7791_register_scif(0);
--	r8a7791_register_scif(1);
--	r8a7791_register_scif(2);
--	r8a7791_register_scif(3);
--	r8a7791_register_scif(4);
--	r8a7791_register_scif(5);
--	r8a7791_register_scif(6);
--	r8a7791_register_scif(7);
--	r8a7791_register_scif(8);
--	r8a7791_register_scif(9);
--	r8a7791_register_scif(10);
--	r8a7791_register_scif(11);
--	r8a7791_register_scif(12);
--	r8a7791_register_scif(13);
--	r8a7791_register_scif(14);
--	r8a7791_register_cmt(0);
--	r8a7791_register_irqc(0);
--	r8a7791_register_thermal();
+-	r8a7791_clock_init();
+-	pinctrl_register_mappings(koelsch_pinctrl_map,
+-				  ARRAY_SIZE(koelsch_pinctrl_map));
+-	r8a7791_pinmux_init();
+-	r8a7791_add_standard_devices();
+-	platform_device_register_full(&ether_info);
+-	platform_device_register_data(NULL, "leds-gpio", -1,
+-				      &koelsch_leds_pdata,
+-				      sizeof(koelsch_leds_pdata));
+-	platform_device_register_data(NULL, "gpio-keys", -1,
+-				      &koelsch_keys_pdata,
+-				      sizeof(koelsch_keys_pdata));
+-	platform_device_register_resndata(NULL, "qspi", 0,
+-					  qspi_resources,
+-					  ARRAY_SIZE(qspi_resources),
+-					  &qspi_pdata, sizeof(qspi_pdata));
+-	spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
+-
+-	koelsch_add_du_device();
+-
+-	platform_device_register_full(&sata0_info);
+-
+-	koelsch_add_i2c(1);
+-	koelsch_add_i2c(2);
+-	koelsch_add_i2c(4);
+-	koelsch_add_i2c(5);
+-
+-	platform_device_register_data(NULL, "reg-fixed-voltage", 0,
+-				      &vcc_sdhi0_info, sizeof(struct fixed_voltage_config));
+-	platform_device_register_data(NULL, "reg-fixed-voltage", 1,
+-				      &vcc_sdhi1_info, sizeof(struct fixed_voltage_config));
+-	platform_device_register_data(NULL, "reg-fixed-voltage", 2,
+-				      &vcc_sdhi2_info, sizeof(struct fixed_voltage_config));
+-	platform_device_register_data(NULL, "gpio-regulator", 0,
+-				      &vccq_sdhi0_info, sizeof(struct gpio_regulator_config));
+-	platform_device_register_data(NULL, "gpio-regulator", 1,
+-				      &vccq_sdhi1_info, sizeof(struct gpio_regulator_config));
+-	platform_device_register_data(NULL, "gpio-regulator", 2,
+-				      &vccq_sdhi2_info, sizeof(struct gpio_regulator_config));
+-
+-	platform_device_register_resndata(NULL, "sh_mobile_sdhi", 0,
+-					  sdhi0_resources, ARRAY_SIZE(sdhi0_resources),
+-					  &sdhi0_info, sizeof(struct sh_mobile_sdhi_info));
+-
+-	platform_device_register_resndata(NULL, "sh_mobile_sdhi", 1,
+-					  sdhi1_resources, ARRAY_SIZE(sdhi1_resources),
+-					  &sdhi1_info, sizeof(struct sh_mobile_sdhi_info));
+-
+-	platform_device_register_resndata(NULL, "sh_mobile_sdhi", 2,
+-					  sdhi2_resources, ARRAY_SIZE(sdhi2_resources),
+-					  &sdhi2_info, sizeof(struct sh_mobile_sdhi_info));
+-
 -}
 -
--#ifdef CONFIG_USE_OF
- static const char *r8a7791_boards_compat_dt[] __initdata = {
- 	"renesas,r8a7791",
- 	NULL,
-@@ -214,4 +36,3 @@ DT_MACHINE_START(R8A7791_DT, "Generic R8A7791 (Flattened Device Tree)")
- 	.reserve	= rcar_gen2_reserve,
- 	.dt_compat	= r8a7791_boards_compat_dt,
- MACHINE_END
--#endif /* CONFIG_USE_OF */
+-/*
+- * Ether LEDs on the Koelsch board are named LINK and ACTIVE which corresponds
+- * to non-default 01 setting of the Micrel KSZ8041 PHY control register 1 bits
+- * 14-15. We have to set them back to 01 from the default 00 value each time
+- * the PHY is reset. It's also important because the PHY's LED0 signal is
+- * connected to SoC's ETH_LINK signal and in the PHY's default mode it will
+- * bounce on and off after each packet, which we apparently want to avoid.
+- */
+-static int koelsch_ksz8041_fixup(struct phy_device *phydev)
+-{
+-	u16 phyctrl1 = phy_read(phydev, 0x1e);
+-
+-	phyctrl1 &= ~0xc000;
+-	phyctrl1 |= 0x4000;
+-	return phy_write(phydev, 0x1e, phyctrl1);
+-}
+-
+-static void __init koelsch_init(void)
+-{
+-	koelsch_add_standard_devices();
+-
+-	irq_set_irq_type(irq_pin(0), IRQ_TYPE_LEVEL_LOW);
+-
+-	if (IS_ENABLED(CONFIG_PHYLIB))
+-		phy_register_fixup_for_id("r8a7791-ether-ff:01",
+-					  koelsch_ksz8041_fixup);
+-}
+-
+-static const char * const koelsch_boards_compat_dt[] __initconst = {
+-	"renesas,koelsch",
+-	NULL,
+-};
+-
+-DT_MACHINE_START(KOELSCH_DT, "koelsch")
+-	.smp		= smp_ops(r8a7791_smp_ops),
+-	.init_early	= shmobile_init_delay,
+-	.init_time	= rcar_gen2_timer_init,
+-	.init_machine	= koelsch_init,
+-	.init_late	= shmobile_init_late,
+-	.reserve	= rcar_gen2_reserve,
+-	.dt_compat	= koelsch_boards_compat_dt,
+-MACHINE_END
 -- 
 2.1.1
