@@ -1,83 +1,40 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 4 Nov 2014 12:10:37 +0100
-Subject: [PATCH v8 03/10] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <5458AD87.7020709@gmail.com>
-References: <1414745252-4895-1-git-send-email-vincent.guittot@linaro.org>
- <1414745252-4895-4-git-send-email-vincent.guittot@linaro.org>
- <54588E89.1080108@gmail.com>
- <CAKfTPtDOaE00BZnOYW8ioz22mi6H-4xkVa=25f44fQmh46Vq3w@mail.gmail.com>
- <5458AD87.7020709@gmail.com>
-Message-ID: <CAKfTPtAgg8b-ERmUXd0imTdp_pEvCX0uSvq7CZvfCs5gw49y+w@mail.gmail.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Tue, 4 Nov 2014 16:45:25 +0530
+Subject: [PATCH v2 0/3] Add support for ADC on am437x-gp and am43x-epos-evm
+Message-ID: <1415099728-10959-1-git-send-email-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 November 2014 11:42, Wanpeng Li <kernellwp@gmail.com> wrote:
-> Hi Vincent,
->
->>>> +
->>>> +/*
->>>>     * Group imbalance indicates (and tries to solve) the problem where
->>>> balancing
->>>>     * groups is inadequate due to tsk_cpus_allowed() constraints.
->>>>     *
->>>> @@ -6562,6 +6574,28 @@ static int need_active_balance(struct lb_env
->>>> *env)
->>>>                          return 1;
->>>>          }
->>>>    +     /*
->>>> +        * The dst_cpu is idle and the src_cpu CPU has only 1 CFS task.
->>>
->>>
->>> Why specify one task instead of not less than one?
->>
->> if cfs.h_nr_running == 0 (which should not occurs at that point), we
->> don't need to do more test to check if it's worth moving the task
->> because there is no task to move.
->
->
-> Sorry for my confusing statement. I mean cfs.h_nr_running >= 1.
+This series of patches enable ADC on am437x-gp-evm and am43x-epos-evm.
+The ADC clock hwmod data of am33xx has been moved to commom place so that
+both am43xx and am33xx can reuse them.
+tscadc DT node has been adided to am437x-gp and am43x-epos dt files.
+With these patches, ADC functionalities are now available on am43xx.
 
-ok.
+Changelog:
 
-If we have more than 1 task, we fall back into the default balancing
-policy than should move a not running task or that will use the
-imbalance field in case of the presence of pinned tasks
+v2:
+Removed phy addresses in hwmod. Using DT instead.
+Removed unused "ti,am4372" compatible string.
+Use macro to set clk domain name.
+Fixed subject format of all patches
 
-Regards,
-Vincent
+Vignesh R (3):
+  ARM: OMAP2+: hwmod: AM335x/AM43x: Move am33xx_l4_hs_hwmod to
+    ipblock_data
+  ARM: OMAP2+: hwmod: AM335x/AM43x: add hwmod support for tscadc on
+    am43x-evm
+  ARM: dts: AM43xx: add tscadc DT entries for am437x-evm and
+    am43x-epos-evm
 
->
-> Regards,
-> Wanpeng Li
->
->
->>
->> Regards,
->> Vincent
->>>
->>> Regards,
->>> Wanpeng Li
->>>
->>>
->>>> +        * It's worth migrating the task if the src_cpu's capacity is
->>>> reduced
->>>> +        * because of other sched_class or IRQs whereas capacity stays
->>>> +        * available on dst_cpu.
->>>> +        */
->>>> +       if ((env->idle != CPU_NOT_IDLE) &&
->>>> +                       (env->src_rq->cfs.h_nr_running == 1)) {
->>>> +               unsigned long src_eff_capacity, dst_eff_capacity;
->>>> +
->>>> +               dst_eff_capacity = 100;
->>>> +               dst_eff_capacity *= capacity_of(env->dst_cpu);
->>>> +               dst_eff_capacity *= capacity_orig_of(env->src_cpu);
->>>> +
->>>> +               src_eff_capacity = sd->imbalance_pct;
->>>> +               src_eff_capacity *= capacity_of(env->src_cpu);
->>>> +               src_eff_capacity *= capacity_orig_of(env->dst_cpu);
->>>> +
->>>> +               if (src_eff_capacity < dst_eff_capacity)
->>>> +                       return 1;
->>>> +       }
->>>> +
+ arch/arm/boot/dts/am4372.dtsi                      | 20 ++++++
+ arch/arm/boot/dts/am437x-gp-evm.dts                |  8 +++
+ arch/arm/boot/dts/am43x-epos-evm.dts               |  8 +++
+ .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  |  2 +
+ .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 71 ++++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         | 64 -------------------
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |  1 +
+ 7 files changed, 110 insertions(+), 64 deletions(-)
+
+-- 
+1.9.1
