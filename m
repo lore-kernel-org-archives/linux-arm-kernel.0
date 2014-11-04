@@ -1,461 +1,92 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  4 Nov 2014 12:34:06 +0100
-Subject: [PATCH] mtd: physmap_of: add a hook for Versatile write protection
-Message-ID: <1415100846-31541-1-git-send-email-linus.walleij@linaro.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 4 Nov 2014 13:35:24 +0200
+Subject: [PATCH v7 3/8] arm64: introduce is_device_dma_coherent
+In-Reply-To: <alpine.DEB.2.02.1411031101400.22875@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
+ <1414422568-19103-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1411031045340.22875@kaball.uk.xensource.com>
+ <20141103105716.GC23162@arm.com>
+ <alpine.DEB.2.02.1411031101400.22875@kaball.uk.xensource.com>
+Message-ID: <5458B9FC.3050309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support device tree probing of Versatile flash chips,
-there must be a way to add the VPP (write protection) enable/disable
-callback. The register in question is in the system controllers
-of these platforms.
+Hi Stefano,
 
-Solve this by adding a arm,versatile-vpp compatibility to the
-device tree node, and look for this. In the driver, add a special
-hook to check for the syscon and register a callback if this
-property is present. Provide a special Kconfig entry for the addon
-hook so it will not be compiled in if the RealView or Integrator
-(or later other Versatile boards) are not supported. Stubs in the
-header file make sure the impact would be zero on other platforms.
+On 11/03/2014 01:10 PM, Stefano Stabellini wrote:
+> On Mon, 3 Nov 2014, Will Deacon wrote:
+>> On Mon, Nov 03, 2014 at 10:46:03AM +0000, Stefano Stabellini wrote:
+>>> On Mon, 27 Oct 2014, Stefano Stabellini wrote:
+>>>> Introduce a boolean flag and an accessor function to check whether a
+>>>> device is dma_coherent. Set the flag from set_arch_dma_coherent_ops.
+>>>>
+>>>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+>>>> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+>>>> CC: will.deacon at arm.com
+>>>
+>>> Will, Catalin,
+>>> are you OK with this patch?
+>>
+>> It would be nicer if the dma_coherent flag didn't have to be duplicated by
+>> each architecture in dev_archdata. Is there any reason not to put it in the
+>> core code?
+> 
+> Yes, there is a reason for it: if I added a boolean dma_coherent flag in
+> struct device as Catalin initially suggested, what would be the default
+> for each architecture? Where would I set it for arch that don't use
+> device tree? It is not easy.
+> 
+> I thought it would be better to introduce is_device_dma_coherent only on
+> the architectures where it certainly makes sense to have it. In fact I
+> checked and arm and arm64 are the only architectures to define
+> set_arch_dma_coherent_ops at the moment. At that point if
+> is_device_dma_coherent becomes arch-specific, it makes sense to store
+> the flag in dev_archdata instead of struct device.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/mtd/maps/Kconfig                |  10 +
- drivers/mtd/maps/Makefile               |   1 +
- drivers/mtd/maps/physmap_of.c           |   5 +
- drivers/mtd/maps/physmap_of_versatile.c | 334 ++++++++++++++++++++++++++++++++
- drivers/mtd/maps/physmap_of_versatile.h |  19 ++
- 5 files changed, 369 insertions(+)
- create mode 100644 drivers/mtd/maps/physmap_of_versatile.c
- create mode 100644 drivers/mtd/maps/physmap_of_versatile.h
+The proposition from Will looks reasonable for me too, because
+there is "small" side-effect of adding such kind of properties to
+arch-specific data or even to the core device structure. ;(
 
-diff --git a/drivers/mtd/maps/Kconfig b/drivers/mtd/maps/Kconfig
-index ba801d2c6dcc..b01cd6e80774 100644
---- a/drivers/mtd/maps/Kconfig
-+++ b/drivers/mtd/maps/Kconfig
-@@ -74,6 +74,16 @@ config MTD_PHYSMAP_OF
- 	  physically into the CPU's memory. The mapping description here is
- 	  taken from OF device tree.
- 
-+config MTD_PHYSMAP_OF_VERSATILE
-+	bool "Support ARM Versatile physmap OF"
-+	depends on MTD_PHYSMAP_OF
-+	depends on MFD_SYSCON
-+	default y if (REALVIEW_DT || ARCH_INTEGRATOR)
-+	help
-+	  This provides some extra DT physmap parsing for the ARM Versatile
-+	  platforms, basically to add a VPP (write protection) callback so
-+	  the flash can be taken out of write protection.
-+
- config MTD_PMC_MSP_EVM
- 	tristate "CFI Flash device mapped on PMC-Sierra MSP"
- 	depends on PMC_MSP && MTD_CFI
-diff --git a/drivers/mtd/maps/Makefile b/drivers/mtd/maps/Makefile
-index 141c91a5b24c..c60b2b40a592 100644
---- a/drivers/mtd/maps/Makefile
-+++ b/drivers/mtd/maps/Makefile
-@@ -18,6 +18,7 @@ obj-$(CONFIG_MTD_TSUNAMI)	+= tsunami_flash.o
- obj-$(CONFIG_MTD_PXA2XX)	+= pxa2xx-flash.o
- obj-$(CONFIG_MTD_PHYSMAP)	+= physmap.o
- obj-$(CONFIG_MTD_PHYSMAP_OF)	+= physmap_of.o
-+physmap_of-$(CONFIG_MTD_PHYSMAP_OF_VERSATILE) += physmap_of_versatile.o
- obj-$(CONFIG_MTD_PISMO)		+= pismo.o
- obj-$(CONFIG_MTD_PMC_MSP_EVM)   += pmcmsp-flash.o
- obj-$(CONFIG_MTD_PCMCIA)	+= pcmciamtd.o
-diff --git a/drivers/mtd/maps/physmap_of.c b/drivers/mtd/maps/physmap_of.c
-index c1d21cb501ca..e9b23022ec94 100644
---- a/drivers/mtd/maps/physmap_of.c
-+++ b/drivers/mtd/maps/physmap_of.c
-@@ -24,6 +24,7 @@
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
- #include <linux/slab.h>
-+#include "physmap_of_versatile.h"
- 
- struct of_flash_list {
- 	struct mtd_info *mtd;
-@@ -67,6 +68,7 @@ static int of_flash_remove(struct platform_device *dev)
- 			kfree(info->list[i].res);
- 		}
- 	}
-+	of_flash_remove_versatile();
- 	return 0;
- }
- 
-@@ -241,6 +243,9 @@ static int of_flash_probe(struct platform_device *dev)
- 		info->list[i].map.size = res_size;
- 		info->list[i].map.bankwidth = be32_to_cpup(width);
- 		info->list[i].map.device_node = dp;
-+		err = of_flash_probe_versatile(&dev->dev, &info->list[i].map);
-+		if (err)
-+			dev_err(&dev->dev, "Can't probe Versatile VPP\n");
- 
- 		err = -ENOMEM;
- 		info->list[i].map.virt = ioremap(info->list[i].map.phys,
-diff --git a/drivers/mtd/maps/physmap_of_versatile.c b/drivers/mtd/maps/physmap_of_versatile.c
-new file mode 100644
-index 000000000000..f5d55cead0ab
---- /dev/null
-+++ b/drivers/mtd/maps/physmap_of_versatile.c
-@@ -0,0 +1,334 @@
-+/*
-+ * Versatile OF physmap driver add-on
-+ *
-+ * Copyright (c) 2014, Linaro Limited
-+ * Author: Linus Walleij <linus.walleij@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of
-+ * the License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
-+ * MA 02111-1307 USA
-+ */
-+#include <linux/bitops.h>
-+#include <linux/device.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/mtd/map.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/regmap.h>
-+#include <linux/slab.h>
-+#include "physmap_of_versatile.h"
-+
-+/**
-+ * struct flashprot_data - per-variant flash protection information
-+ * @init: function to call on initialization
-+ * @exit: function to call on de-initialization
-+ * @set_vpp: function to set the VPP (Voltage for Programming Protection)
-+ */
-+struct flashprot_data {
-+	int (*init)(void);
-+	void (*exit)(void);
-+	void (*set_vpp)(struct map_info *, int);
-+};
-+
-+struct versatile_flash_prot {
-+	struct device *dev;
-+	struct regmap *syscon_regmap;
-+	struct regmap *ap_ebi_regmap;
-+	const struct flashprot_data *fprot;
-+};
-+
-+struct versatile_flash_prot *vprot;
-+
-+#define INTEGRATOR_SC_CTRLS_OFFSET	0x08 /* For setting bits */
-+#define INTEGRATOR_SC_CTRLC_OFFSET	0x0C /* For clearing bits */
-+#define INTEGRATOR_SC_CTRL_FLASH_BITS	BIT(1) | BIT(2)
-+#define INTEGRATOR_SC_CTRL_nFLVPPEN	BIT(1)
-+#define INTEGRATOR_SC_CTRL_nFLWP	BIT(2)
-+
-+#define INTEGRATOR_EBI_CSR0_OFFSET      0x00
-+#define INTEGRATOR_EBI_CSR1_OFFSET      0x04
-+#define INTEGRATOR_EBI_CSR2_OFFSET      0x08
-+#define INTEGRATOR_EBI_CSR3_OFFSET      0x0C
-+#define INTEGRATOR_EBI_LOCK_OFFSET      0x20
-+#define INTEGRATOR_EBI_WRITE_ENABLE     BIT(2)
-+
-+static const struct of_device_id ebi_match[] = {
-+	{ .compatible = "arm,external-bus-interface", },
-+	{},
-+};
-+
-+static int integrator_ap_vpp_init(void)
-+{
-+	struct device_node *ebinp;
-+	int ret;
-+
-+	/* Find the EBI regmap */
-+	ebinp = of_find_matching_node(NULL, ebi_match);
-+	if (!ebinp) {
-+		dev_err(vprot->dev, "no EBI node\n");
-+		return -ENODEV;
-+	}
-+
-+	vprot->ap_ebi_regmap = syscon_node_to_regmap(ebinp);
-+	if (IS_ERR(vprot->ap_ebi_regmap)) {
-+		dev_err(vprot->dev, "no EBI regmap\n");
-+		return PTR_ERR(vprot->ap_ebi_regmap);
-+	}
-+
-+	/* Disable VPP and set write protection on startup */
-+	ret = regmap_write(vprot->syscon_regmap, INTEGRATOR_SC_CTRLC_OFFSET,
-+			   INTEGRATOR_SC_CTRL_FLASH_BITS);
-+	if (ret) {
-+		dev_err(vprot->dev, "failed setting flash protection\n");
-+		return ret;
-+	}
-+
-+	/* Unlock EBI */
-+	ret = regmap_write(vprot->ap_ebi_regmap, INTEGRATOR_EBI_LOCK_OFFSET,
-+			   0xa05f);
-+	if (ret) {
-+		dev_err(vprot->dev, "failed unlocking EBI\n");
-+		return ret;
-+	}
-+	ret = regmap_update_bits(vprot->ap_ebi_regmap,
-+				 INTEGRATOR_EBI_CSR1_OFFSET,
-+				 INTEGRATOR_EBI_WRITE_ENABLE,
-+				 INTEGRATOR_EBI_WRITE_ENABLE);
-+	if (ret)
-+		dev_err(vprot->dev, "failed EBI WE CSR1\n");
-+
-+	/* Lock EBI */
-+	ret = regmap_write(vprot->ap_ebi_regmap, INTEGRATOR_EBI_LOCK_OFFSET, 0);
-+	if (ret) {
-+		dev_err(vprot->dev, "failed locking EBI\n");
-+		return ret;
-+	}
-+	dev_info(vprot->dev, "initialized Integrator/AP flash protection\n");
-+
-+	return 0;
-+}
-+
-+static void integrator_ap_vpp_exit(void)
-+{
-+	int ret;
-+
-+	if (!vprot || !vprot->syscon_regmap || !vprot->ap_ebi_regmap)
-+		return;
-+
-+	/* Disable VPP and set write protection on exit */
-+	ret = regmap_write(vprot->syscon_regmap, INTEGRATOR_SC_CTRLC_OFFSET,
-+			   INTEGRATOR_SC_CTRL_FLASH_BITS);
-+	if (ret)
-+		dev_err(vprot->dev, "failed enabling flash protection\n");
-+
-+	/* Unlock EBI */
-+	ret = regmap_write(vprot->ap_ebi_regmap, INTEGRATOR_EBI_LOCK_OFFSET,
-+			   0xa05f);
-+	if (ret)
-+		dev_err(vprot->dev, "failed unlocking EBI\n");
-+
-+	ret = regmap_update_bits(vprot->ap_ebi_regmap,
-+				 INTEGRATOR_EBI_CSR1_OFFSET,
-+				 INTEGRATOR_EBI_WRITE_ENABLE,
-+				 0);
-+	if (ret)
-+		dev_err(vprot->dev, "failed EBI WE CSR1\n");
-+
-+	/* Lock EBI */
-+	ret = regmap_write(vprot->ap_ebi_regmap, INTEGRATOR_EBI_LOCK_OFFSET, 0);
-+	if (ret)
-+		dev_err(vprot->dev, "failed locking EBI\n");
-+
-+	dev_info(vprot->dev, "enabled flash protection\n");
-+}
-+
-+static void integrator_ap_set_vpp(struct map_info *map, int on)
-+{
-+	int ret;
-+
-+	if (on) {
-+		ret = regmap_write(vprot->syscon_regmap,
-+				   INTEGRATOR_SC_CTRLS_OFFSET,
-+				   INTEGRATOR_SC_CTRL_nFLVPPEN);
-+		if (ret)
-+			dev_err(vprot->dev, "error enable flash VPP\n");
-+	} else {
-+		ret = regmap_write(vprot->syscon_regmap,
-+				   INTEGRATOR_SC_CTRLC_OFFSET,
-+				   INTEGRATOR_SC_CTRL_nFLVPPEN);
-+		if (ret)
-+			dev_err(vprot->dev, "error disable flash VPP");
-+	}
-+}
-+
-+struct flashprot_data integrator_ap_flashprot_data = {
-+	.init = integrator_ap_vpp_init,
-+	.exit = integrator_ap_vpp_exit,
-+	.set_vpp = integrator_ap_set_vpp,
-+};
-+
-+#define INTCP_FLASHPROG			0x04
-+#define CINTEGRATOR_FLASHPROG_FLVPPEN	BIT(0)
-+#define CINTEGRATOR_FLASHPROG_FLWREN	BIT(1)
-+#define CINTEGRATOR_FLASHPROG_BITS	BIT(0) | BIT(1)
-+
-+#define REALVIEW_FLASH_OFFSET 0x4c
-+
-+static int integrator_cp_vpp_init(void)
-+{
-+	int ret;
-+
-+	ret = regmap_update_bits(vprot->ap_ebi_regmap,
-+				 INTCP_FLASHPROG,
-+				 CINTEGRATOR_FLASHPROG_BITS,
-+				 CINTEGRATOR_FLASHPROG_FLWREN);
-+	if (ret)
-+		dev_err(vprot->dev, "failed flash WE\n");
-+
-+	dev_info(vprot->dev, "initialized Integrator/CP flash protection\n");
-+
-+	return 0;
-+}
-+
-+static void integrator_cp_vpp_exit(void)
-+{
-+	int ret;
-+
-+	if (!vprot || !vprot->syscon_regmap || !vprot->ap_ebi_regmap)
-+		return;
-+
-+	ret = regmap_update_bits(vprot->ap_ebi_regmap,
-+				 INTCP_FLASHPROG,
-+				 CINTEGRATOR_FLASHPROG_BITS,
-+				 0);
-+	if (ret)
-+		dev_err(vprot->dev, "failed flash WE\n");
-+
-+	dev_info(vprot->dev, "enabled flash protection\n");
-+}
-+
-+static void integrator_cp_set_vpp(struct map_info *map, int on)
-+{
-+	int ret;
-+
-+	if (on) {
-+		ret = regmap_update_bits(vprot->ap_ebi_regmap,
-+					 INTCP_FLASHPROG,
-+					 CINTEGRATOR_FLASHPROG_FLVPPEN,
-+					 CINTEGRATOR_FLASHPROG_FLVPPEN);
-+		if (ret)
-+			dev_err(vprot->dev, "error enable flash VPP\n");
-+	} else {
-+		ret = regmap_update_bits(vprot->ap_ebi_regmap,
-+					 INTCP_FLASHPROG,
-+					 CINTEGRATOR_FLASHPROG_FLVPPEN,
-+					 0);
-+		if (ret)
-+			dev_err(vprot->dev, "error disable flash VPP\n");
-+	}
-+}
-+
-+struct flashprot_data integrator_cp_flashprot_data = {
-+	.init = integrator_cp_vpp_init,
-+	.exit = integrator_cp_vpp_exit,
-+	.set_vpp = integrator_cp_set_vpp,
-+};
-+
-+static void realview_set_vpp(struct map_info *map, int on)
-+{
-+	int ret;
-+
-+	ret = regmap_update_bits(vprot->syscon_regmap, REALVIEW_FLASH_OFFSET,
-+				 0x01, !!on);
-+	if (ret)
-+		dev_err(vprot->dev, "error setting RealView VPP\n");
-+}
-+
-+struct flashprot_data realview_flashprot_data = {
-+	.set_vpp = realview_set_vpp,
-+};
-+
-+static const struct of_device_id syscon_match[] = {
-+	{
-+		.compatible = "arm,integrator-ap-syscon",
-+		.data = &integrator_ap_flashprot_data,
-+	},
-+	{
-+		.compatible = "arm,integrator-cp-syscon",
-+		.data = &integrator_cp_flashprot_data,
-+	},
-+	{
-+		.compatible = "arm,realview-pb1176-syscon",
-+		.data = &realview_flashprot_data,
-+	},
-+	{},
-+};
-+
-+int of_flash_probe_versatile(struct device *dev,
-+			     struct map_info *map)
-+{
-+	struct device_node *sysnp;
-+	const struct of_device_id *devid;
-+	struct regmap *rmap;
-+	struct device_node *np = dev->of_node;
-+
-+	vprot = devm_kzalloc(dev, sizeof(*vprot), GFP_KERNEL);
-+	if (!vprot)
-+		return -ENOMEM;
-+	vprot->dev = dev;
-+
-+	/* Not all flash chips have to use this protection line */
-+	if (!of_device_is_compatible(np, "arm,versatile-flash"))
-+		return 0;
-+
-+	/* For first chip probed, look up the syscon regmap */
-+	if (!vprot->syscon_regmap) {
-+		int ret;
-+
-+		sysnp = of_find_matching_node_and_match(NULL,
-+							syscon_match,
-+							&devid);
-+		if (!sysnp) {
-+			dev_err(dev, "no syscon match\n");
-+			return -ENODEV;
-+		}
-+
-+		rmap = syscon_node_to_regmap(sysnp);
-+		if (IS_ERR(rmap)) {
-+			dev_err(dev, "no syscon regmap\n");
-+			return PTR_ERR(rmap);
-+		}
-+
-+		vprot->syscon_regmap = rmap;
-+		vprot->fprot = devid->data;
-+
-+		if (vprot->fprot->init) {
-+			ret = vprot->fprot->init();
-+			if (ret)
-+				return ret;
-+		}
-+
-+		map->set_vpp = vprot->fprot->set_vpp;
-+	}
-+	return 0;
-+}
-+
-+void of_flash_remove_versatile(void)
-+{
-+	if (!vprot || !vprot->fprot || !vprot->fprot->exit)
-+		return;
-+	vprot->fprot->exit();
-+}
-diff --git a/drivers/mtd/maps/physmap_of_versatile.h b/drivers/mtd/maps/physmap_of_versatile.h
-new file mode 100644
-index 000000000000..7d176d313860
---- /dev/null
-+++ b/drivers/mtd/maps/physmap_of_versatile.h
-@@ -0,0 +1,19 @@
-+#include <linux/of.h>
-+#include <linux/mtd/map.h>
-+
-+#ifdef CONFIG_MTD_PHYSMAP_OF_VERSATILE
-+int of_flash_probe_versatile(struct device *dev,
-+			     struct map_info *map);
-+void of_flash_remove_versatile(void);
-+#else
-+static inline int
-+of_flash_probe_versatile(struct device *dev,
-+			 struct map_info *map)
-+{
-+	return 0;
-+}
-+static inline void
-+of_flash_remove_versatile(void)
-+{
-+}
-+#endif
--- 
-1.9.3
+There are some sub-systems in kernel which do not create their devices
+from DT and instead some host device populates its children devices manually.
+ Now, I know at least two cases:
+- usb: dwc3 core creates xhci device manually
+- pci: adds its client devices
+
+In such, case DMA configuration have to be propagated from host to
+child (in our case host device's got DMA configuration from DT), like:
+	dma_set_coherent_mask(&xhci->dev, dwc->dev->coherent_dma_mask);
+
+	xhci->dev.parent	= dwc->dev;
+	xhci->dev.dma_mask	= dwc->dev->dma_mask;
+	xhci->dev.dma_parms	= dwc->dev->dma_parms;
+
+So, once new DMA property is added it has to be propagated from 
+host to child device too.
+
+Recently, the new property  dma_pfn_offset was introduced in struct device 
+and such kind of problem was observed on keystone 2:
+- for usb case it was fixed using Platform Bus notifier (xhci - platform device)
+- for pci - the work is in progress, because solution with PCI Bus notifier
+  was rejected https://lkml.org/lkml/2014/10/10/308.
+
+In general, if dma_coherent will belong to struct device then
+such problems will be possible to fix directly in drivers/subsystems:
+xhci->dev.dma_coherent	= dwc->dev->dma_coherent;
+
+But, if it will be arch-specific data then it will be impossible to
+set it without introducing proper and arch-specific setters/getters functions.
+
+Also, as an idea, we are thinking about introducing something like:
+  void dma_apply_parent_cfg(struct device *dev, struct device *parent)
+which will ensure that all DMA configuration properly copied from
+parent to children device. Now it should be (as minimum for ARM):
+ dma_mask
+ coherent_dma_mask
+ dma_parms
+ dma_pfn_offset
+ dev_archdata->dma_ops
+ [dma_coherent]?
+
+regards,
+-grygorii 
