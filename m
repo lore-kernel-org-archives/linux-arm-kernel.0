@@ -1,48 +1,83 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 4 Nov 2014 22:13:28 +0100 (CET)
-Subject: [PATCH v2] ARM: irqchip: mxs: add Alpascale ASM9260 support
-In-Reply-To: <545936AD.5060009@rempel-privat.de>
-References: <20141104130320.GB21210@tiger>
- <1415128357-12054-1-git-send-email-linux@rempel-privat.de>
- <alpine.DEB.2.11.1411042118490.4245@nanos>
- <545936AD.5060009@rempel-privat.de>
-Message-ID: <alpine.DEB.2.11.1411042209110.4245@nanos>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 04 Nov 2014 22:38:35 +0100
+Subject: [PATCH v3 0/9] PM / Domains: Fix race conditions during boot
+In-Reply-To: <20141104182920.GB440@dtor-ws>
+References: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
+ <CAPDyKFr7fqwb77Xhnwf7ACFX7skrY2O+_-aB1T_yfShDA1jASA@mail.gmail.com>
+ <20141104182920.GB440@dtor-ws>
+Message-ID: <22485079.KBJFDeZktT@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Nov 2014, Oleksij Rempel wrote:
-
-> Am 04.11.2014 um 21:20 schrieb Thomas Gleixner:
-> > On Tue, 4 Nov 2014, Oleksij Rempel wrote:
+On Tuesday, November 04, 2014 10:29:20 AM Dmitry Torokhov wrote:
+> On Tue, Nov 04, 2014 at 06:01:44PM +0100, Ulf Hansson wrote:
+> > >>
+> > >> Devices that are created while "discoverable buses" are being probed
+> > >> can't be attached to a PM domain before the probing is done, because
+> > >> those simply doesn't exist.
+> > >
+> > > Honestly, I'm not sure what you're talking about.
+> > >
+> > > Devices on a "discoverable* bus (say PCI) are added when the *controller* is
+> > > probed, not when *they* are probed.
 > > 
-> >> Freescale iMX23/iMX28 and Alphascale ASM9260 have similar
-> >> interrupt collectors. It makes easy to reuse irq-mxs code for ASM9260.
-> >> Differences between this devices are fallowing:
-> >> - different register offsets
-> >> - different count of intterupt lines per register
-> >> - ASM9260 don't provide reset bit
-> >> - ASM9260 don't support FIQ.
+> > Okay, so maybe "discoverable buses" isn't the proper term.
 > > 
-> > Why is this a monolithic patch again. IIRC it was split into a
-> > prepatory (imx) and alphascale part earlier. But my memory might trick
-> > me.
+> > >
+> > > You very much need to have a struct device registered to be able to call
+> > > really_probe() for it.
+> > 
+> > Yes. But my point is that the struct device may be created dynamically
+> > at some point in time.
 > 
-> It is not monolithic. first patch is "[PATCH v8 4/9] ARM: irqchip: mxs:
-> prepare driver for HW with different offsets".
+> And that is fine.
+> 
+> > 
+> > This is how mmc/sd/sdio cards are handled. We don't have the
+> > information about the card and thus not the struct device of it, until
+> > we have detected it. Maybe we could at that point try to add the
+> > device to its PM domain?
+> 
+> Well, I think we need to first define what PM domain they will fall
+> into. Do they have to be in one? The concept of power domain, as far as I
+> understand it, is needed when we need to form relations going outside
+> the standard parent/child relationship. Here we have a controller and
+> then one or more cards in it. To be able to use card you need to power
+> up parent and you can not power down parent until all children are
+> powered down.
+> 
+> But in any case, device discovery and binding them to drivers are 2
+> separate steps. You have a PCI bus. You enumerate it - new PCI devices
+> are created. Some of them may be put in a certain power domain. You then
+> bind drivers to PCI devices (not strictly 'then' but we could implement
+> driver core to postpone binding until current round of enumeration is
+> complete) - and you discover USB controller and maybe i2c controller.
+> Then you bind drivers to them which causes enumeration of the new bus
+> and new devices are created. But in all these cases enumeration and
+> creation of new 'struct device's, and driver binding are logically
+> separate steps.
+> 
+> > 
+> > >
+> > >> Now, I haven't yet seen a demand for such a cases, but it seems wrong
+> > >> to not consider them. The current solution cover these.
+> > >
+> > > Oh dear.  Please rethink this.
+> > 
+> > Currently, dev_pm_domain_attach() is being invoked at the point when a
+> > SDIO card has been found. From sdio_add_func(). How would that be
+> > solved?
+> > 
+> 
+> It is probably the one place where we currently doing it correctly (form
+> logical point of view, not implementation wise - implementation wise in
+> sdio we add device to power domain after calling device_add() which
+> means that probe() could have been called before we added the new device
+> to any power domain).
 
-So you sent that very patch out of context and then you wonder why I
-stumble over that?
+I agree.  Ideally, devices should be added to power (or generally PM) domains
+before registration.  That is, before calling device_add() for them.
 
-> I don't really wont do discus this irq patches now. Please keep
-> attention on first two, /arch/arm/ patches.
+That's the first thing to fix here.
 
-Then do not send them in the first place. I'm not involved in your
-arch/arm patches, but I care about the stuff which is supposed to hit
-the part of the tree which I maintain.
-
-Please keep your attention on sending stuff in the right order to the
-right people at the right time.
-
-Thanks,
-
-	tglx
+Rafael
