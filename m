@@ -1,79 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  4 Nov 2014 10:50:44 +0900
-Subject: [PATCH 14/34] ARM: shmobile: r8a7791: Add MMP clock to device tree
+Date: Tue,  4 Nov 2014 10:50:46 +0900
+Subject: [PATCH 16/34] ARM: shmobile: armadillo800eva dts: Enable TMU0
 In-Reply-To: <cover.1415059587.git.horms+renesas@verge.net.au>
 References: <cover.1415059587.git.horms+renesas@verge.net.au>
-Message-ID: <74d89d25f6b0d84f7cd2fc09dc708177787c1465.1415059587.git.horms+renesas@verge.net.au>
+Message-ID: <df211020718a7cbad0a8018c924ba7dd002f7282.1415059587.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Signed-off-by: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
-Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+ch0 will be used for clock events and for periodic clock events,
+ch1 will be used as clock source.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi            | 21 +++++++++++++--------
- include/dt-bindings/clock/r8a7791-clock.h |  8 +++++++-
- 2 files changed, 20 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 98c1b8b..6ce7819 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -977,18 +977,23 @@
- 		mstp1_clks: mstp1_clks at e6150134 {
- 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150134 0 4>, <0 0xe6150038 0 4>;
--			clocks = <&m2_clk>, <&p_clk>, <&zg_clk>, <&p_clk>, <&p_clk>, <&rclk_clk>,
--				 <&cp_clk>, <&zs_clk>, <&zs_clk>, <&zs_clk>;
-+			clocks = <&zs_clk>, <&zs_clk>, <&m2_clk>, <&zs_clk>, <&p_clk>,
-+				 <&zg_clk>, <&zs_clk>, <&zs_clk>, <&zs_clk>, <&p_clk>,
-+				 <&p_clk>, <&rclk_clk>, <&cp_clk>, <&zs_clk>, <&zs_clk>,
-+				 <&zs_clk>;
- 			#clock-cells = <1>;
- 			renesas,clock-indices = <
--				R8A7791_CLK_JPU R8A7791_CLK_TMU1 R8A7791_CLK_3DG
--				R8A7791_CLK_TMU3 R8A7791_CLK_TMU2
--				R8A7791_CLK_CMT0 R8A7791_CLK_TMU0 R8A7791_CLK_VSP1_DU1
--				R8A7791_CLK_VSP1_DU0 R8A7791_CLK_VSP1_S
-+				R8A7791_CLK_VCP0 R8A7791_CLK_VPC0 R8A7791_CLK_JPU
-+				R8A7791_CLK_SSP1 R8A7791_CLK_TMU1 R8A7791_CLK_3DG
-+				R8A7791_CLK_2DDMAC R8A7791_CLK_FDP1_1 R8A7791_CLK_FDP1_0
-+				R8A7791_CLK_TMU3 R8A7791_CLK_TMU2 R8A7791_CLK_CMT0
-+				R8A7791_CLK_TMU0 R8A7791_CLK_VSP1_DU1 R8A7791_CLK_VSP1_DU0
-+				R8A7791_CLK_VSP1_S
- 			>;
- 			clock-output-names =
--				"jpu", "tmu1", "3dg", "tmu3", "tmu2", "cmt0", "tmu0",
--				"vsp1-du1", "vsp1-du0", "vsp1-sy";
-+				"vcp0", "vpc0", "jpu", "ssp1", "tmu1", "3dg",
-+				"2ddmac", "fdp1-1", "fdp1-0", "tmu3", "tmu2", "cmt0",
-+				"tmu0", "vsp1-du1", "vsp1-du0", "vsp1-sy";
- 		};
- 		mstp2_clks: mstp2_clks at e6150138 {
- 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
-diff --git a/include/dt-bindings/clock/r8a7791-clock.h b/include/dt-bindings/clock/r8a7791-clock.h
-index 9570b7c..dcececd 100644
---- a/include/dt-bindings/clock/r8a7791-clock.h
-+++ b/include/dt-bindings/clock/r8a7791-clock.h
-@@ -25,9 +25,15 @@
- #define R8A7791_CLK_MSIOF0		0
+diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+index 2703428..98504e0 100644
+--- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
++++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+@@ -299,3 +299,7 @@
  
- /* MSTP1 */
--#define R8A7791_CLK_JPU		6
-+#define R8A7791_CLK_VCP0		1
-+#define R8A7791_CLK_VPC0		3
-+#define R8A7791_CLK_JPU			6
-+#define R8A7791_CLK_SSP1		9
- #define R8A7791_CLK_TMU1		11
- #define R8A7791_CLK_3DG			12
-+#define R8A7791_CLK_2DDMAC		15
-+#define R8A7791_CLK_FDP1_1		18
-+#define R8A7791_CLK_FDP1_0		19
- #define R8A7791_CLK_TMU3		21
- #define R8A7791_CLK_TMU2		22
- #define R8A7791_CLK_CMT0		24
+ 	status = "okay";
+ };
++
++&tmu0 {
++	status = "okay";
++};
 -- 
 2.1.1
