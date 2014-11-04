@@ -1,17 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 3 Nov 2014 22:19:13 -0800
-Subject: [GIT PULL] ARM: brcmstb: SMP, Kconfig, earlyprintk and GISB fixes
-In-Reply-To: <1413840408-14860-1-git-send-email-f.fainelli@gmail.com>
-References: <1413840408-14860-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20141104061913.GE13562@quad.lixom.net>
+Date: Mon, 3 Nov 2014 22:23:53 -0800
+Subject: [GIT PULL] RealView DeviceTree support for v3.19
+In-Reply-To: <CACRpkdbtbE6nT0rz0SEKcp67YJ2n7GW=ABxwqek4jYfSPViv0Q@mail.gmail.com>
+References: <CACRpkdbtbE6nT0rz0SEKcp67YJ2n7GW=ABxwqek4jYfSPViv0Q@mail.gmail.com>
+Message-ID: <20141104062353.GF13562@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 20, 2014 at 02:26:48PM -0700, Florian Fainelli wrote:
-> These changes were posted late during the v3.18 release cycle, and were
-> eventually added to your 'late' branch, but here is an updated version
+On Wed, Oct 22, 2014 at 02:05:48PM +0200, Linus Walleij wrote:
+> Hi ARM SoC guys,
 > 
-> Thanks!
+> here is a first pull request for the v3.19 series, with some RealView
+> Device Tree support code!
+> 
+> This is basically the two paches that didn't make it into v3.18 and
+> incremental DTS changes in top of it that was sent out some week
+> ago.
+> 
+> It would be nice to get this into linux-next for some testing so please
+> pull this into ARM SoC!
+> 
+> Yours,
+> Linus Walleij
 > 
 > The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 > 
@@ -19,49 +29,14 @@ On Mon, Oct 20, 2014 at 02:26:48PM -0700, Florian Fainelli wrote:
 > 
 > are available in the git repository at:
 > 
->   http://github.com/brcm/linux.git tags/brcmstb-smp-uart-for-3.19
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+> tags/arm-realview-dt-for-arm-soc
 > 
-> for you to fetch changes up to 203bb85ed605e43eadca62afb3a8cd128a8ec10a:
+> for you to fetch changes up to 10d8ddee10b886e4aec0d3e44a73cfa7c35e72e0:
 > 
->   bus: brcmstb_gisb: save and restore GISB timeout (2014-10-20 12:44:42 -0700)
-> 
-> ----------------------------------------------------------------
-> This pull request contains 3 changes for the brcmstb platform and 2 changes
-> to the GISB bus arbiter driver
-> 
-> - fist patch adds earlyprintk to brcmstb platforms using the existing 8250
->   infrastructure
-> 
-> - second patch re-introduces SMP support after fixing the problems we had in
->   the initial implementation, for this patch to apply cleanly, I had to advance
->   up to "ARM: brcmstb: revert SMP support"
-> 
-> - third patch is dropping unused Kconfig dependencies
-> 
-> - fourth patch registers the ARM fault code for external aborts that the GISB
->   bus arbiter driver is designed to assit
-> 
-> - fifth patch does save/restore the GISB arbiter timeout across S3
->   suspend/resume cycles
-> 
-> Thanks!
-> 
-> ----------------------------------------------------------------
-> Brian Norris (2):
->       ARM: brcmstb: reintroduce SMP support
->       ARM: brcmstb: Kconfig: drop unneeded symbol selections
-> 
-> Florian Fainelli (2):
->       bus: brcmstb_gisb: register the fault code hook
->       bus: brcmstb_gisb: save and restore GISB timeout
-> 
-> Marc Carino (1):
->       ARM: brcmstb: add debug UART for earlyprintk support
+>   ARM: realview: add MMCI to the PB1176 DTS (2014-10-22 13:49:13 +0200)
 
-Ok, actually looking at the pull request now, sorry for the delay.
-
-Looks like the two patches fromy ou should have been in a drivers branch
-instead. Since they were trivial I'll keep them in here though.
+Merged, thanks.
 
 
 -Olof
