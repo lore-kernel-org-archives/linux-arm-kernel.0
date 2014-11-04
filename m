@@ -1,90 +1,97 @@
-From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
-Date: Tue, 4 Nov 2014 12:02:33 -0500
-Subject: [PATCH 11/13] arm: dts: dra7: add DMA properties for UART
-In-Reply-To: <1412014009-13315-12-git-send-email-bigeasy@linutronix.de>
-References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
- <1412014009-13315-12-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20141104170233.GB24112@csclub.uwaterloo.ca>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 4 Nov 2014 09:12:20 -0800
+Subject: [PATCH v2 2/2] [usb] add support for ACPI identification to
+ xhci-platform
+In-Reply-To: <1415119833-9135-2-git-send-email-mlangsdo@redhat.com>
+References: <1414692989-23128-2-git-send-email-mlangsdo@redhat.com>
+ <1415119833-9135-1-git-send-email-mlangsdo@redhat.com>
+ <1415119833-9135-2-git-send-email-mlangsdo@redhat.com>
+Message-ID: <20141104171220.GA30385@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29, 2014 at 08:06:47PM +0200, Sebastian Andrzej Siewior wrote:
-> Cc: devicetree at vger.kernel.org
-> Reviewed-by: Tony Lindgren <tony@atomide.com>
-> Tested-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> ---
->  arch/arm/boot/dts/dra7.dtsi | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+On Tue, Nov 04, 2014 at 10:50:33AM -0600, Mark Langsdorf wrote:
+> Provide the methods to let ACPI identify the need to use
+> xhci-platform. Change the Kconfig files so the
+> xhci-plat.o file is selectable during kernel config.
 > 
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index d678152db4cb..f273e3811f75 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -332,6 +332,8 @@
->  			ti,hwmods = "uart1";
->  			clock-frequency = <48000000>;
->  			status = "disabled";
-> +			dmas = <&sdma 49>, <&sdma 50>;
-> +			dma-names = "tx", "rx";
->  		};
+> Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
+> ---
+> Changes from v1
+> 	Renamed from "add support for APM X-Gene to xhci-platform"
+> 	Removed changes to arm64/Kconfig
+> 	Made CONFIG_USB_XHCI_PLATFORM a user selectable config option
+> 
+>  drivers/usb/host/Kconfig     |  7 ++++++-
+>  drivers/usb/host/xhci-plat.c | 11 +++++++++++
+>  2 files changed, 17 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index 82800a7..060a2361 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -27,7 +27,12 @@ config USB_XHCI_HCD
+>  if USB_XHCI_HCD
 >  
->  		uart2: serial at 4806c000 {
-> @@ -341,6 +343,8 @@
->  			ti,hwmods = "uart2";
->  			clock-frequency = <48000000>;
->  			status = "disabled";
-> +			dmas = <&sdma 51>, <&sdma 52>;
-> +			dma-names = "tx", "rx";
->  		};
->  
->  		uart3: serial at 48020000 {
-> @@ -350,6 +354,8 @@
->  			ti,hwmods = "uart3";
->  			clock-frequency = <48000000>;
->  			status = "disabled";
-> +			dmas = <&sdma 53>, <&sdma 54>;
-> +			dma-names = "tx", "rx";
->  		};
->  
->  		uart4: serial at 4806e000 {
-> @@ -359,6 +365,8 @@
->  			ti,hwmods = "uart4";
->  			clock-frequency = <48000000>;
->                          status = "disabled";
-> +			dmas = <&sdma 55>, <&sdma 56>;
-> +			dma-names = "tx", "rx";
->  		};
->  
->  		uart5: serial at 48066000 {
-> @@ -368,6 +376,8 @@
->  			ti,hwmods = "uart5";
->  			clock-frequency = <48000000>;
->  			status = "disabled";
-> +			dmas = <&sdma 63>, <&sdma 64>;
-> +			dma-names = "tx", "rx";
->  		};
->  
->  		uart6: serial at 48068000 {
-> @@ -377,6 +387,8 @@
->  			ti,hwmods = "uart6";
->  			clock-frequency = <48000000>;
->  			status = "disabled";
-> +			dmas = <&sdma 79>, <&sdma 80>;
-> +			dma-names = "tx", "rx";
->  		};
->  
->  		uart7: serial at 48420000 {
+>  config USB_XHCI_PLATFORM
+> -	tristate
+> +	tristate "xHCI platform driver support"
+> +	--help--
+> +	  Say 'Y' to enable the support for the xHCI host controller
+> +	  as a platform device. Many ARM SoCs provide USB this way.
+> +
+> +	  If unsure, say 'Y'.
 
-According to the manual the DMA channels for UART7 to 10 are:
+You really want a 'default Y' response here?
 
-uart7:  144 145
-uart8:  146 147
-uart9:  148 149
-uart10: 150 151
+That's not good at all, what happens if I select this on a system
+without such hardware?
 
-Might as well add those too.  We have uart 7 and 8 in use on our board
-so I am about to go test it.
 
--- 
-Len Sorensen
+>  
+>  config USB_XHCI_MVEBU
+>  	tristate "xHCI support for Marvell Armada 375/38x"
+> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+> index 91c7557..3db47ea 100644
+> --- a/drivers/usb/host/xhci-plat.c
+> +++ b/drivers/usb/host/xhci-plat.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/slab.h>
+>  #include <linux/usb/xhci_pdriver.h>
+> +#include <linux/acpi.h>
+>  
+>  #include "xhci.h"
+>  #include "xhci-mvebu.h"
+> @@ -287,6 +288,15 @@ static const struct of_device_id usb_xhci_of_match[] = {
+>  MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
+>  #endif
+>  
+> +#ifdef CONFIG_ACPI
+> +static const struct acpi_device_id usb_xhci_acpi_match[] = {
+> +	/* APM X-Gene USB Controller */
+> +	{ "PNP0D10", },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(acpi, usb_xhci_acpi_match);
+> +#endif
+
+That looks like a very "generic" PNP value, are you sure it is assigned
+only to this specific device?
+
+> +
+>  static struct platform_driver usb_xhci_driver = {
+>  	.probe	= xhci_plat_probe,
+>  	.remove	= xhci_plat_remove,
+> @@ -294,6 +304,7 @@ static struct platform_driver usb_xhci_driver = {
+>  		.name = "xhci-hcd",
+>  		.pm = DEV_PM_OPS,
+>  		.of_match_table = of_match_ptr(usb_xhci_of_match),
+> +		.acpi_match_table = ACPI_PTR(usb_xhci_acpi_match),
+
+Shouldn't the reworked driver core code handle this differently with the
+ability to handle either OF or ACPI in the same driver?
+
+thanks,
+
+greg k-h
