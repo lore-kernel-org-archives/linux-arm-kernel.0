@@ -1,113 +1,89 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 4 Nov 2014 14:24:23 +0100
-Subject: [PATCH v3 04/19] arm/arm64: KVM: wrap 64 bit MMIO accesses with
- two 32 bit ones
-In-Reply-To: <5458C408.5070102@arm.com>
-References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
- <1414776414-13426-5-git-send-email-andre.przywara@arm.com>
- <20141103132543.GE16132@cbox> <5458C408.5070102@arm.com>
-Message-ID: <20141104132423.GB2537@cbox>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 04 Nov 2014 14:28:52 +0100
+Subject: [PATCH 7/7] can: m_can: workaround for transmit data less than
+ 4 bytes
+In-Reply-To: <5458D0FA.1040504@hartkopp.net>
+References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
+ <1414579527-31100-7-git-send-email-b29396@freescale.com>
+ <5457B1D1.6080301@pengutronix.de>
+ <20141104082505.GA8060@shlinux1.ap.freescale.net>
+ <54589AC8.4010106@pengutronix.de>
+ <20141104092651.GC8060@shlinux1.ap.freescale.net>
+ <5458AB65.7000500@pengutronix.de> <5458D0FA.1040504@hartkopp.net>
+Message-ID: <5458D494.3040700@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 04, 2014 at 12:18:16PM +0000, Andre Przywara wrote:
-> Hi Christoffer,
+On 11/04/2014 02:13 PM, Oliver Hartkopp wrote:
 > 
-> On 03/11/14 13:25, Christoffer Dall wrote:
-> > On Fri, Oct 31, 2014 at 05:26:39PM +0000, Andre Przywara wrote:
-> >> Some GICv3 registers can and will be accessed as 64 bit registers.
-> >> Currently the register handling code can only deal with 32 bit
-> >> accesses, so we do two consecutive calls to cover this.
-> >>
-> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >> ---
-> >>  virt/kvm/arm/vgic.c |   48 +++++++++++++++++++++++++++++++++++++++++++++---
-> >>  1 file changed, 45 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> >> index 704be48..0cbdde9 100644
-> >> --- a/virt/kvm/arm/vgic.c
-> >> +++ b/virt/kvm/arm/vgic.c
-> >> @@ -1033,6 +1033,48 @@ static bool vgic_validate_access(const struct vgic_dist *dist,
-> >>  }
-> >>  
-> >>  /*
-> >> + * Call the respective handler function for the given range.
-> >> + * We split up any 64 bit accesses into two consecutive 32 bit
-> >> + * handler calls and merge the result afterwards.
-> >> + */
-> >> +static bool call_range_handler(struct kvm_vcpu *vcpu,
-> >> +			       struct kvm_exit_mmio *mmio,
-> >> +			       unsigned long offset,
-> >> +			       const struct mmio_range *range)
-> >> +{
-> >> +	u32 *data32 = (void *)mmio->data;
-> >> +	struct kvm_exit_mmio mmio32;
-> >> +	bool ret;
-> >> +
-> >> +	if (likely(mmio->len <= 4))
-> >> +		return range->handle_mmio(vcpu, mmio, offset);
-> >> +
-> >> +	/*
-> >> +	 * Any access bigger than 4 bytes (that we currently handle in KVM)
-> >> +	 * is actually 8 bytes long, caused by a 64-bit access
-> >> +	 */
-> >> +
-> >> +	mmio32.len = 4;
-> >> +	mmio32.is_write = mmio->is_write;
-> >> +
-> >> +	mmio32.phys_addr = mmio->phys_addr + 4;
-> >> +	if (mmio->is_write)
-> >> +		*(u32 *)mmio32.data = data32[1];
-> >> +	ret = range->handle_mmio(vcpu, &mmio32, offset + 4);
-> >> +	if (!mmio->is_write)
-> >> +		data32[1] = *(u32 *)mmio32.data;
-> >> +
-> >> +	mmio32.phys_addr = mmio->phys_addr;
-> >> +	if (mmio->is_write)
-> >> +		*(u32 *)mmio32.data = data32[0];
-> >> +	ret |= range->handle_mmio(vcpu, &mmio32, offset);
-> >> +	if (!mmio->is_write)
-> >> +		data32[0] = *(u32 *)mmio32.data;
-> >> +
-> >> +	return ret;
-> >> +}
-> > 
-> > Please think about the endianness issues here.
 > 
-> I didn't only think about it, I traced the code and tested it:
-> So it works like written above (I actually had a hickup in my kvmtool
-> setup that denied booting the bigendian initrds, so I thought that BE
-> was broken).
+> On 04.11.2014 11:33, Marc Kleine-Budde wrote:
+>> On 11/04/2014 10:27 AM, Dong Aisheng wrote:
 > 
-> So the GIC is always LE, that's why we swap the bytes to LE in any
-> 32-bit register in mmio_data_{write,read}, which gets called for each
-> vGIC register access via the vgic_reg_access() function.
 > 
-> So the memory order that the actual register handler functions
-> implicitly expect is always LE, regardless of the guest or host
-> endianness. vgic_reg_access() makes this transparent for the host code.
+>>> +       /* We meet an IC issue that we have to write the full 8
+>>
+>> At least on the *insert SoC name here*, an issue with the Message RAM
+>> was discovered. Sending CAN frames with dlc less than 4 bytes will lead
+>> to bit errors, when the first 8 bytes of the Message RAM have not been
+>> initialized (i.e. written to). To work around this issue, the first 8
+>> bytes are initialized here.
 > 
-> Now if we eventually assemble the 64-bit value from the two 32-bit
-> values, we also have to always do this in LE fashion. Hence the
-> hardcoded LE assignment here. Eventually this LE value will be copied
-> into the guest, which will access it through readq, which uses
-> le64_to_cpu() to convert it to the CPU native value.
-> 
-> So the branch as posted (or present in the repo) works fine (boot-tested
-> only so far) with all 8 combinations of (host endianness, guest
-> endianness, guest v2/v3 GIC).
-> 
-> I will add a comment to the function explaining this.
-> 
-Yes, you're right.  Thanks for the explanation.  I think the key to
-understanding that this works is the fact that mmio_data is always
-written in LE in memory.
+> Yes. Also put the current IP revision (3.0.x) into the comment.
 
-I was thrown off by the conversion you were making to a u32*, which you
-don't really use, except as index mamipulation and to copy the data, but
-that's fine.
+Good idea - also add the SoC's mask revision.
 
-Thanks for explaining this.
+> Did inform the Bosch guys from this issue - or is it already in some
+> errata sheet?
+> 
+>>
+>>> +        * bytes (whatever value for the second word) in Message RAM to
+>>> +        * avoid bit error for transmit data less than 4 bytes at the
+>>> first
+>>> +        * time. By initializing the first 8 bytes of tx buffer
+>>> before using
+>>> +        * it can avoid such issue.
+>>> +        */
+>>> +       m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0), 0x0);
+>>> +       m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1), 0x0);
+>>> +
+>>>          m_can_config_endisable(priv, false);
+>>>   }
+>>
+>> Can you trigger the issue when sending CAN-FD frames with dlc > 8 && dlc
+>> < 64?
+> 
+> Just a nitpick:
+> 
+> DLC can just be 0 .. 15
 
--Christoffer
+Correct, I was talking about the length
+
+> and the length (struct canfd_frame.len) can be from 0 .. 64
+> 
+> See:
+> 
+> http://lxr.free-electrons.com/source/include/uapi/linux/can.h#L83
+> 
+> That's the reason for all these helpers
+> 
+> http://lxr.free-electrons.com/source/drivers/net/can/dev.c#L36
+> 
+> that hide the evil "DLC" from userspace now and make 'len' a usable loop
+> variable as we were able to use the former dlc for classic CAN :-)
+
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141104/ad957e98/attachment.sig>
