@@ -1,47 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  4 Nov 2014 10:49:56 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Runtime PM Updates for v3.19
-Message-ID: <cover.1415058794.git.horms+renesas@verge.net.au>
+Date: Tue,  4 Nov 2014 10:49:49 +0900
+Subject: [PATCH 01/11] ARM: shmobile: r8a7740: Add missing A3SP pm domain
+ devices
+In-Reply-To: <cover.1415058794.git.horms+renesas@verge.net.au>
+References: <cover.1415058794.git.horms+renesas@verge.net.au>
+Message-ID: <80f643b39346768878317eb04bd4b1deb4551537.1415058794.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC runtime PM updates for v3.19.
+Commit 802a5639aa7041b2 ("ARM: shmobile: r8a7740: add A3SP pm domain
+support") added the A3SP power domain, but forgot to hook up the IPPMU,
+DMAC0/1/2, and USBDMAC hardware blocks.
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-r8a7740.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-runtime-pm-for-v3.19
-
-for you to fetch changes up to dc4470e177973feedd82596969d86468a1695b1e:
-
-  ARM: shmobile: r8a7740: Add A3SM pm domain support (2014-10-28 08:40:18 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Runtime PM Updates for v3.19
-
-* 8a7740/armadillo800eva legacy PM domain support
-
-----------------------------------------------------------------
-Geert Uytterhoeven (11):
-      ARM: shmobile: r8a7740: Add missing A3SP pm domain devices
-      ARM: shmobile: r8a7740: Add missing A4S pm domain devices
-      ARM: shmobile: armadillo800eva legacy: Add missing A3SP pm domain devices
-      ARM: shmobile: armadillo800eva legacy: Add missing A4S pm domain devices
-      ARM: shmobile: r8a7740: Add A3RV pm domain support
-      ARM: shmobile: r8a7740: Add A3SG pm domain support
-      ARM: shmobile: r8a7740/armadillo legacy: Add A4MP pm domain support
-      ARM: shmobile: r8a7740: Add D4 pm domain support
-      ARM: shmobile: r8a7740/armadillo legacy: Add A4R pm domain support
-      ARM: shmobile: r8a7740: Add A4SU pm domain support
-      ARM: shmobile: r8a7740: Add A3SM pm domain support
-
- arch/arm/mach-shmobile/board-armadillo800eva.c | 12 ++++++-
- arch/arm/mach-shmobile/pm-r8a7740.c            | 44 +++++++++++++++++++++++---
- arch/arm/mach-shmobile/setup-r8a7740.c         | 11 +++++++
- 3 files changed, 62 insertions(+), 5 deletions(-)
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index 8894e1b..6992d40 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -756,6 +756,11 @@ void __init r8a7740_add_standard_devices(void)
+ 		{ "A3SP", &scif7_device },
+ 		{ "A3SP", &scif8_device },
+ 		{ "A3SP", &i2c1_device },
++		{ "A3SP", &ipmmu_device },
++		{ "A3SP", &dma0_device },
++		{ "A3SP", &dma1_device },
++		{ "A3SP", &dma2_device },
++		{ "A3SP", &usb_dma_device },
+ 	};
+ 
+ 	/* I2C work-around */
+-- 
+2.1.1
