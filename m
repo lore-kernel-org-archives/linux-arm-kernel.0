@@ -1,50 +1,109 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 4 Nov 2014 11:30:59 +0100
-Subject: [Regression Resend] mmc: mx28: sd card detection broken since
- 3.18-rc1
-In-Reply-To: <5456B7B3.60401@gmail.com>
-References: <1747777414.897866.1414878004147.JavaMail.open-xchange@oxbsltgw09.schlund.de>
- <5456B7B3.60401@gmail.com>
-Message-ID: <CACRpkdZ9oYZ10btdvQSAnZhPaxYn_n6JbAUO4h8qadeAiuJq-Q@mail.gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 04 Nov 2014 11:33:09 +0100
+Subject: [PATCH 7/7] can: m_can: workaround for transmit data less than
+ 4 bytes
+In-Reply-To: <20141104092651.GC8060@shlinux1.ap.freescale.net>
+References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
+ <1414579527-31100-7-git-send-email-b29396@freescale.com>
+ <5457B1D1.6080301@pengutronix.de>
+ <20141104082505.GA8060@shlinux1.ap.freescale.net>
+ <54589AC8.4010106@pengutronix.de>
+ <20141104092651.GC8060@shlinux1.ap.freescale.net>
+Message-ID: <5458AB65.7000500@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 3, 2014 at 12:01 AM, Kristina Mart?enko
-<kristina.martsenko@gmail.com> wrote:
+On 11/04/2014 10:27 AM, Dong Aisheng wrote:
+>>>> It should be possible to change the for loop to go always to 8, or
+>>>> simply unroll the loop:
+>>>>
+>>>> /* errata description goes here */
+>>>> m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0), *(u32 *)(cf->data + 0));
+>>>> m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1), *(u32 *)(cf->data + 4));
+>>>>
+>>>
+>>> Yes, i tried to fix it as follows.
+>>>
+>>> /* FIXME: we meet an IC issue that we have to write the full 8
+>>>  * bytes (whatever value for the second word) in Message RAM to
+>>>  * avoid bit error for transmit data less than 4 bytes
+>>>  */
+>>> if (cf->len <= 4) {
+>>>         m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0),
+>>>                          *(u32 *)(cf->data + 0));
+>>>         m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1),
+>>>                          *(u32 *)(cf->data + 4));
+>>> } else {
+>>>         for (i = 0; i < cf->len; i += 4)
+>>>                 m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(i / 4),
+>>>                                  *(u32 *)(cf->data + i));
+>>>
+>>> Will update the patch.
+>>
+>> Both branches of the above if are doing the same thing, I think you can
+>> replace the while if ... else ... for with this:
+>>
+> 
+> Not the same thing.
+> The later one will cover payload up to 64 bytes.
 
-> I ran into this issue as well. Seems that a card-detect flag
-> (MMC_CAP2_CD_ACTIVE_HIGH) can currently be set based on an
-> uninitialized variable, which can lead to the card being reported as
-> not present. This patch fixes it for me:
->
-> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-> index 03c53b72a2d6..f0e187682d3b 100644
-> --- a/drivers/mmc/core/host.c
-> +++ b/drivers/mmc/core/host.c
-> @@ -311,7 +311,7 @@ int mmc_of_parse(struct mmc_host *host)
->         struct device_node *np;
->         u32 bus_width;
->         int len, ret;
-> -       bool cap_invert, gpio_invert;
-> +       bool cap_invert, gpio_invert = false;
->
->         if (!host->parent || !host->parent->of_node)
->                 return 0;
-> @@ -401,6 +401,7 @@ int mmc_of_parse(struct mmc_host *host)
->         else
->                 cap_invert = false;
->
-> +       gpio_invert = false;
->         ret = mmc_gpiod_request_ro(host, "wp", 0, false, 0, &gpio_invert);
->         if (ret) {
->                 if (ret == -EPROBE_DEFER)
->
-> Let me know if this also fixes it for you, and I'll send in a proper
-> patch.
+Doh! I'm not used to CAN-FD, yet :) However, I'll apply this fix before
+adding the CAN-FD support.
 
-Argh how could I make this stupid mistake :(
+>> /* errata description goes here */
+>> m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0), *(u32 *)(cf->data + 0));
+>> m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1), *(u32 *)(cf->data + 4));
+>>
+>> However if writing to DATA(0) and DATA(1) once in the open() function is
+>> enough this code should stay as it is.
+> 
+> I tried put them into open() function and the quick test showed it worked.
+> 
+> Do you think it's ok to put things into open() function for this issue
+> as follows?
+> 
+> diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
+> index 065e4f1..ca55988 100644
+> --- a/drivers/net/can/m_can/m_can.c
+> +++ b/drivers/net/can/m_can/m_can.c
+> @@ -901,6 +901,15 @@ static void m_can_chip_config(struct net_device *dev)
+>         /* set bittiming params */
+>         m_can_set_bittiming(dev);
+> 
+> +       /* We meet an IC issue that we have to write the full 8
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+At least on the *insert SoC name here*, an issue with the Message RAM
+was discovered. Sending CAN frames with dlc less than 4 bytes will lead
+to bit errors, when the first 8 bytes of the Message RAM have not been
+initialized (i.e. written to). To work around this issue, the first 8
+bytes are initialized here.
 
-Yours,
-Linus Walleij
+> +        * bytes (whatever value for the second word) in Message RAM to
+> +        * avoid bit error for transmit data less than 4 bytes at the first
+> +        * time. By initializing the first 8 bytes of tx buffer before using
+> +        * it can avoid such issue.
+> +        */
+> +       m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0), 0x0);
+> +       m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1), 0x0);
+> +
+>         m_can_config_endisable(priv, false);
+>  }
+
+Can you trigger the issue when sending CAN-FD frames with dlc > 8 && dlc
+< 64?
+
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141104/f4b29b02/attachment-0001.sig>
