@@ -1,61 +1,66 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  4 Nov 2014 12:07:13 +0800
-Subject: [PATCH 0/6] ARM: sun9i: Add USB host controller support for A80
-Message-ID: <1415074039-16590-1-git-send-email-wens@csie.org>
+Date: Tue,  4 Nov 2014 12:07:17 +0800
+Subject: [PATCH 4/6] ARM: dts: sun9i: Add usb phy nodes to a80 dtsi
+In-Reply-To: <1415074039-16590-1-git-send-email-wens@csie.org>
+References: <1415074039-16590-1-git-send-email-wens@csie.org>
+Message-ID: <1415074039-16590-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+On sun9i, there are 3 independent usb phys. Add device nodes for them.
 
-This series adds USB host controller (EHCI/OHCI) support for the Allwinner
-A80 SoC. The A80 has 3 pairs of host controllers and USB PHYs. The PHYs,
-unlike in previous SoCs, do not have low level control registers anymore.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun9i-a80.dtsi | 37 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-As such, this series forgoes the original phy-sun4i-usb driver, and adds
-a new, simpler driver for the USB PHYs. It may be possible to merge the
-two, but given that work is being done on the OTG front for the earlier
-SoCs, it may be better to merge them after support is complete.
-
-USB0 corresponds to USB1 DP/DM pins; USB1 only has HSIC support; USB2 is
-USB2 DP/DM externally. External pins labeled USB0 are for the USB 3.0 OTG
-controller.
-
-Patch 1 adds a80 specific support for usb-related clocks and resets.
-
-Patch 2 adds the device tree nodes for the usb clocks.
-
-Patch 3 adds a new generic phy driver for a80 usb phys. This has some
-code that is the same as the original phy-sun4i-usb driver, but is simpler.
-
-Patch 4 adds the 3 USB PHY nodes to the a80 dtsi.
-
-Patch 5 adds the USB host controller nodes to the a80 dtsi.
-
-Patch 6 adds the vbus regulator nodes and enables USB on the A80 Optimus
-board.
-
-
-Chen-Yu Tsai (6):
-  clk: sunxi: Add support for sun9i a80 usb clocks and resets
-  ARM: dts: sun9i: Add usb clock nodes to a80 dtsi
-  phy: Add driver to support individual USB PHYs on sun9i
-  ARM: dts: sun9i: Add usb phy nodes to a80 dtsi
-  ARM: dts: sun9i: Add USB host controller nodes to a80 dtsi
-  ARM: dts: sun9i: Enable USB support on A80 Optimus board
-
- Documentation/devicetree/bindings/clock/sunxi.txt  |   5 +
- .../devicetree/bindings/phy/sun9i-usb-phy.txt      |  34 +++
- arch/arm/boot/dts/sun9i-a80-optimus.dts            |  72 +++++++
- arch/arm/boot/dts/sun9i-a80.dtsi                   | 129 ++++++++++++
- drivers/clk/sunxi/Makefile                         |   1 +
- drivers/clk/sunxi/clk-usb.c                        | 192 +++++++++++++++++
- drivers/phy/Kconfig                                |  12 ++
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-sun9i-usb.c                        | 227 +++++++++++++++++++++
- 9 files changed, 673 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/sun9i-usb-phy.txt
- create mode 100644 drivers/clk/sunxi/clk-usb.c
- create mode 100644 drivers/phy/phy-sun9i-usb.c
-
+diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+index 3c25030..1a80e09 100644
+--- a/arch/arm/boot/dts/sun9i-a80.dtsi
++++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+@@ -305,6 +305,43 @@
+ 		 */
+ 		ranges = <0 0 0 0x20000000>;
+ 
++		usbphy0: phy at 00a00800 {
++			compatible = "allwinner,sun9i-a80-usb-phy";
++			reg = <0x00a00800 0x4>;
++			clocks = <&usb_phy_clk 1>;
++			clock-names = "phy";
++			resets = <&usb_phy_clk 17>;
++			reset-names = "phy";
++			status = "disabled";
++			#phy-cells = <0>;
++		};
++
++		usbphy1: phy at 00a01800 {
++			compatible = "allwinner,sun9i-a80-usb-phy";
++			reg = <0x00a01800 0x4>;
++			clocks = <&usb_phy_clk 2>, <&usb_phy_clk 10>,
++				 <&usb_phy_clk 3>;
++			clock-names = "hsic_480M", "hsic_12M", "phy";
++			resets = <&usb_phy_clk 18>, <&usb_phy_clk 19>;
++			reset-names = "hsic", "phy";
++			status = "disabled";
++			#phy-cells = <0>;
++			/* usb1 is always used with HSIC */
++			phy_type = "hsic";
++		};
++
++		usbphy2: phy at 00a02800 {
++			compatible = "allwinner,sun9i-a80-usb-phy";
++			reg = <0x00a02800 0x4>;
++			clocks = <&usb_phy_clk 4>, <&usb_phy_clk 10>,
++				 <&usb_phy_clk 5>;
++			clock-names = "hsic_480M", "hsic_12M", "phy";
++			resets = <&usb_phy_clk 20>, <&usb_phy_clk 21>;
++			reset-names = "hsic", "phy";
++			status = "disabled";
++			#phy-cells = <0>;
++		};
++
+ 		gic: interrupt-controller at 01c41000 {
+ 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
+ 			reg = <0x01c41000 0x1000>,
 -- 
 2.1.1
