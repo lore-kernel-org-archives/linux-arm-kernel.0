@@ -1,37 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 4 Nov 2014 17:19:40 +0000
-Subject: [PATCH 3.17-rc4 v7 0/6] arm: Implement
- arch_trigger_all_cpu_backtrace
-In-Reply-To: <54590755.1070204@linaro.org>
-References: <1410970218-28847-1-git-send-email-daniel.thompson@linaro.org>
- <CAD8Lp44gPOBh_q1zDy3y1GkrRVAvix5YaNr-+E92+g8Q7fLKJA@mail.gmail.com>
- <20141014233126.GF27405@n2100.arm.linux.org.uk>
- <543F90ED.5030005@linaro.org> <54590755.1070204@linaro.org>
-Message-ID: <20141104171939.GI4042@n2100.arm.linux.org.uk>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Tue, 4 Nov 2014 17:20:41 +0000
+Subject: [PATCH v2 06/10] efi: dmi: add support for SMBIOS 3.0 UEFI
+ configuration table
+In-Reply-To: <1414513123-20400-7-git-send-email-ard.biesheuvel@linaro.org>
+References: <1414513123-20400-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1414513123-20400-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20141104172041.GB3592@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 04, 2014 at 05:05:25PM +0000, Daniel Thompson wrote:
-> This week with the help of one of my colleagues (thanks Tixy) I have
-> been able to run some tests and figure out what it going on on vexpress-a9.
+On Tue, 28 Oct, at 05:18:39PM, Ard Biesheuvel wrote:
+> This adds support to the UEFI side for detecting the presence of
+> a SMBIOS 3.0 64-bit entry point. This allows the actual SMBIOS
+> structure table to reside at a physical offset over 4 GB, which
+> cannot be supported by the legacy SMBIOS 32-bit entry point.
 > 
-> The summary is that on some GICv1 implementations the bit to enable
-> group 1 interrupts cannot be accessed using secure memory accesses. More
-> specifically the presence/absence of the EnableGrp1 bit in the secure
-> version GICD_CTRL register is implementation defined.
+> Since the firmware can legally provide both entry points, store
+> the SMBIOS 3.0 entry point in a separate variable, and let the
+> DMI decoding layer decide which one will be used.
 > 
-> My original patches overlooked this and as a result the existing code
-> will migrate all interrupts to group but then cannot enable delivery of
-> group 1 interrupts.
-> 
-> I'm planning to respin the code so it will automatically disable FIQ
-> support when the EnableGrp1 bit is not implemented. This means
-> vexpress-a9 will not benefit from FIQ support but will also not be
-> harmed by it.
+> Tested-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+> Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  drivers/firmware/efi/efi.c | 4 ++++
+>  drivers/xen/efi.c          | 1 +
+>  include/linux/efi.h        | 6 +++++-
+>  3 files changed, 10 insertions(+), 1 deletion(-)
 
-That's good news, and it should mean that the Versatile Express starts
-booting on the nightly boot tests again.  Thanks for looking into it.
+Acked-by: Matt Fleming <matt.fleming@intel.com>
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Matt Fleming, Intel Open Source Technology Center
