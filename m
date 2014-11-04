@@ -1,36 +1,52 @@
 From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Tue, 4 Nov 2014 15:30:53 +0800
-Subject: [PATCH v5 6/8] ARM: dts: Build dtb for mt8127 & mt8135
+Date: Tue, 4 Nov 2014 15:30:52 +0800
+Subject: [PATCH v5 5/8] dt-bindings: add more chips in documentation for
+ Mediatek SoC
 In-Reply-To: <1415086255-5555-1-git-send-email-yingjoe.chen@mediatek.com>
 References: <1415086255-5555-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1415086255-5555-7-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1415086255-5555-6-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Joe.C" <yingjoe.chen@mediatek.com>
 
-This allows the "make dtbs" to build the moose and mt8135-evbp1
-for MediaTek SoC
+Add MT8127 & MT8135 from Mediatek.
 
 Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
 ---
- arch/arm/boot/dts/Makefile | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/mediatek.txt | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 38c89ca..d2e6b2f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -515,7 +515,9 @@ dtb-$(CONFIG_MACH_DOVE) += dove-cm-a510.dtb \
- 	dove-d2plug.dtb \
- 	dove-d3plug.dtb \
- 	dove-dove-db.dtb
--dtb-$(CONFIG_ARCH_MEDIATEK) += mt6589-aquaris5.dtb
-+dtb-$(CONFIG_ARCH_MEDIATEK) += mt6589-aquaris5.dtb \
-+	mt8127-moose.dtb \
-+	mt8135-evbp1.dtb
+diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
+index fa25226..c549c1e 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek.txt
+@@ -1,10 +1,13 @@
+-Mediatek MT6589 Platforms Device Tree Bindings
++MediaTek mt65xx & mt81xx Platforms Device Tree Bindings
  
- targets += dtbs dtbs_install
- targets += $(dtb-y)
+-Boards with a SoC of the Mediatek MT6589 shall have the following property:
++Boards with a MediaTek mt65xx/mt81xx SoC shall have the following property:
+ 
+ Required root node property:
+ 
+-compatible: must contain "mediatek,mt6589"
++compatible: Must contain one of
++   "mediatek,mt6589"
++   "mediatek,mt8127"
++   "mediatek,mt8135"
+ 
+ 
+ Supported boards:
+@@ -12,3 +15,9 @@ Supported boards:
+ - bq Aquaris5 smart phone:
+     Required root node properties:
+       - compatible = "mundoreader,bq-aquaris5", "mediatek,mt6589";
++- MTK mt8127 tablet moose EVB:
++    Required root node properties:
++      - compatible = "mediatek,mt8127-moose", "mediatek,mt8127";
++- MTK mt8135 tablet EVB:
++    Required root node properties:
++      - compatible = "mediatek,mt8135-evbp1", "mediatek,mt8135";
 -- 
 1.8.1.1.dirty
