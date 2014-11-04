@@ -1,36 +1,82 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 04 Nov 2014 08:39:55 +0100
-Subject: [PATCH v4 1/8] ARM: mediatek: Add basic support for mt8127
-In-Reply-To: <1415083006.10186.85.camel@mtksdaap41>
-References: <1413973797-17619-1-git-send-email-yingjoe.chen@mediatek.com>
- <CABuKBeLYMbD-dV_25FJd_NE1RgfVkgF+SoCiAx9O9jKUUAcexA@mail.gmail.com>
- <1415083006.10186.85.camel@mtksdaap41>
-Message-ID: <13477264.GuOdydWub7@wuerfel>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 4 Nov 2014 08:41:51 +0100
+Subject: [PATCH] mmc: host: atmel-mci: Add support for non-removable slots
+In-Reply-To: <1415013179-16823-1-git-send-email-timo.kokkonen@offcode.fi>
+References: <CAPDyKFpMGk4M=fjBKufxb9iMbV6FmRTEfE_ptXPmM=CHx3Q7iQ@mail.gmail.com>
+ <1415013179-16823-1-git-send-email-timo.kokkonen@offcode.fi>
+Message-ID: <CAPDyKFpTVedeMOnL1FRYt8orzYy4YinYuosCH5pWT+tCZPN45g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 November 2014 14:36:45 HC Yen wrote:
-> > > +
-> > > +#include <dt-bindings/interrupt-controller/irq.h>
-> > > +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> > > +#include "skeleton64.dtsi"
-> > 
-> > Cortex a7 is 32 bits, right? So why do you use skeleton64.dtsi?
-> 
-> Cortex-A7 is 32-bit, but that doesn't mean it can only have 32-bit
-> physical address.  With LPAE enabled, we can have physical address more
-> than 32 bits.
-> 
-> The main difference between "skeleton64.dtsi" and "skeleton.dtsi" is
-> "#address-cells" property set to 2.  Although there are few sources
-> using "skeleton64.dtsi", some of them write "#address-cells = <2>"
-> directly in order to have 64-bit address space.  ARM's TC2 reference
-> platform (vexpress-v2p-ca15_a7.dts) is an example.
-> 
-> Some of MediaTek ARMv7 SoCs support address space larger than 4GB. It
-> will be convenient to share the sources if we all use 64-bit device
-> tree.
+On 3 November 2014 12:12, Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
+> Add support for non-removable slots which have no card detection GPIO
+> and which should not be polled for a card change.
+>
+> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
 
-Right, in general, I'd use #address-cells=<2> for Cortex-A7/A15/A17.
+Thanks! Applied for next.
 
-	Arnd
+Kind regards
+Uffe
+
+> ---
+>  drivers/mmc/host/atmel-mci.c | 11 +++++++++--
+>  include/linux/atmel-mci.h    |  2 ++
+>  2 files changed, 11 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index 77250d4..4de1a31 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -560,6 +560,9 @@ atmci_of_init(struct platform_device *pdev)
+>                 pdata->slot[slot_id].detect_is_active_high =
+>                         of_property_read_bool(cnp, "cd-inverted");
+>
+> +               pdata->slot[slot_id].non_removable =
+> +                       of_property_read_bool(cnp, "non-removable");
+> +
+>                 pdata->slot[slot_id].wp_pin =
+>                         of_get_named_gpio(cnp, "wp-gpios", 0);
+>         }
+> @@ -2206,8 +2209,12 @@ static int __init atmci_init_slot(struct atmel_mci *host,
+>                 }
+>         }
+>
+> -       if (!gpio_is_valid(slot->detect_pin))
+> -               mmc->caps |= MMC_CAP_NEEDS_POLL;
+> +       if (!gpio_is_valid(slot->detect_pin)) {
+> +               if (slot_data->non_removable)
+> +                       mmc->caps |= MMC_CAP_NONREMOVABLE;
+> +               else
+> +                       mmc->caps |= MMC_CAP_NEEDS_POLL;
+> +       }
+>
+>         if (gpio_is_valid(slot->wp_pin)) {
+>                 if (devm_gpio_request(&host->pdev->dev, slot->wp_pin,
+> diff --git a/include/linux/atmel-mci.h b/include/linux/atmel-mci.h
+> index 91b77f8..9177947 100644
+> --- a/include/linux/atmel-mci.h
+> +++ b/include/linux/atmel-mci.h
+> @@ -11,6 +11,7 @@
+>   * @detect_pin: GPIO pin wired to the card detect switch
+>   * @wp_pin: GPIO pin wired to the write protect sensor
+>   * @detect_is_active_high: The state of the detect pin when it is active
+> + * @non_removable: The slot is not removable, only detect once
+>   *
+>   * If a given slot is not present on the board, @bus_width should be
+>   * set to 0. The other fields are ignored in this case.
+> @@ -26,6 +27,7 @@ struct mci_slot_pdata {
+>         int                     detect_pin;
+>         int                     wp_pin;
+>         bool                    detect_is_active_high;
+> +       bool                    non_removable;
+>  };
+>
+>  /**
+> --
+> 1.9.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
