@@ -1,35 +1,45 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Tue, 04 Nov 2014 13:37:19 +0100
-Subject: [PATCH 0/4] Touchscreen performance related fixes
-In-Reply-To: <5458BC0B.1040803@ti.com>
-References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
- <544E821D.5040004@linutronix.de>
- <912A29987EAE174BA6CF187D7CDFA9CE26F46B2B@DLEE08.ent.ti.com>
- <54577258.9080508@linutronix.de> <5458BC0B.1040803@ti.com>
-Message-ID: <5458C87F.80409@linutronix.de>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 4 Nov 2014 10:56:09 -0200
+Subject: [PATCH] ARM: dts: imx6qdl-sabresd.dtsi: Fix the microphone route
+Message-ID: <1415105769-5358-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2014 12:44 PM, Vignesh R wrote:
+Since commit e409dfbfccf9a49 ("ASoC: dapm: Add a few supply widget sanity 
+checks") the following error is seen:
 
-> I ran following commands
-> $ evtest /dev/input/touchscreen0 &
-> (with heavy item on touchscreen)
->  and
-> $ cat /sys/bus/iio/devices/iio\:device0/scan_elements/in_voltage4_en
-> (in a busy loop)
-> I tried above experiment on my board but I didn't hit any problem even
-> after running for close to 30 minutes. I was unable to reproduce failure
+imx-wm8962 sound: wm8962 <-> 202c000.ssi mapping ok
+imx-wm8962 sound: Connecting non-supply widget to supply widget is not supported (AMIC -> MICBIAS)
+imx-wm8962 sound: ASoC: no dapm match for AMIC --> (null) --> MICBIAS
+imx-wm8962 sound: ASoC: Failed to add route AMIC -> direct -> MICBIAS
 
-Just to make sure: You had the touchscreen and iio command running in
-parallel and you saw evtest output while there was iio operation?
+Invert the route between the microphone and the bias in order to fix it.
 
-> The problem may be in configuring correct charge-delay value. Please run:
-> $ ts_test > /dev/null
-> and let me know if pen events are being detected properly.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Shawn,
 
-Well I get the touch events but not while busy loop on iio interface is
-running (I get maybe one event every 5 seconds or so).
-After all, it is the same HW you have.
+commit e409dfbfccf9a49 is not in your tree. It is in Mark's tree at the moment.
 
-Sebastian
+If you prefer I can skip mentioning it in the commit log.
+
+The 'AMIC -> MICBIAS' route is also used on mx6sx-sdb and mx6sl-evk boards.
+
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index d211d5d..d1319bd 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -107,7 +107,7 @@
+ 			"Headphone Jack", "HPOUTR",
+ 			"Ext Spk", "SPKOUTL",
+ 			"Ext Spk", "SPKOUTR",
+-			"MICBIAS", "AMIC",
++			"AMIC", "MICBIAS",
+ 			"IN3R", "MICBIAS",
+ 			"DMIC", "MICBIAS",
+ 			"DMICDAT", "DMIC";
+-- 
+1.9.1
