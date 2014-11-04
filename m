@@ -1,32 +1,39 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Tue, 4 Nov 2014 11:23:46 -0600
-Subject: [PATCH] ARM: make kuser helpers depend on MMU
-In-Reply-To: <20141104080353.GX8316@pengutronix.de>
-References: <1415045178-4673-1-git-send-email-nathan_lynch@mentor.com>
- <20141104080353.GX8316@pengutronix.de>
-Message-ID: <54590BA2.9070101@mentor.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 04 Nov 2014 17:24:42 +0000
+Subject: [PATCH v3 15/19] arm/arm64: KVM: add opaque private pointer to
+ MMIO accessors
+In-Reply-To: <20141104154414.GN16132@cbox>
+References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
+ <1414776414-13426-16-git-send-email-andre.przywara@arm.com>
+ <20141104154414.GN16132@cbox>
+Message-ID: <54590BDA.3050609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2014 02:03 AM, Uwe Kleine-K?nig wrote:
-> On Mon, Nov 03, 2014 at 02:06:18PM -0600, Nathan Lynch wrote:
->>
->> Prevent CONFIG_MMU=n configurations from enabling
->> CONFIG_KUSER_HELPERS.
->>
->> Fixes: fbfb872f5f41 ARM: 8148/1: flush TLS and thumbee register state during exec
-> minor nit: Usual syntax here is:
-> 
-> 	Fixes: fbfb872f5f41 ("ARM: 8148/1: flush ...")
-> 
->>
-> and it's part of the s-o-b area, so no empty line
+Hi,
 
-Indeed, will fix before sending to the patch tracker.
-
+On 04/11/14 15:44, Christoffer Dall wrote:
+> On Fri, Oct 31, 2014 at 05:26:50PM +0000, Andre Przywara wrote:
+>> For a GICv2 there is always only one (v)CPU involved: the one that
+>> does the access. On a GICv3 the access to a CPU redistributor is
+>> memory-mapped, but not banked, so the (v)CPU affected is determined by
+>> looking at the MMIO address region being accessed.
+>> To allow passing the affected CPU into the accessors, extend them to
+>> take an opaque private pointer parameter.
+>> For the current GICv2 emulation we ignore it and simply pass NULL
+>> on the call.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > 
->> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
->> Reported-by: Stefan Agner <stefan@agner.ch>
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Why does it have to be an opaque private pointer?  Would it not always
+> be a struct vcpu * or a vcpu_id then?
 
-Thanks.
+IIRC Marc suggested this once be more future proof. Also a pointer makes
+it easier to pass NULL in the GICv2 parts of the code, which makes it
+more obvious that this value is not used in this case.
+
+Marc, did I miss some more rationale?
+Does that still hold?
+
+Cheers,
+Andre.
