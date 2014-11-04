@@ -1,31 +1,56 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 4 Nov 2014 08:07:16 -0800
-Subject: [PATCH] of/platform: Move platform devices under
- /sys/devices/platform
-In-Reply-To: <1415097920-30014-1-git-send-email-grant.likely@linaro.org>
-References: <1415097920-30014-1-git-send-email-grant.likely@linaro.org>
-Message-ID: <20141104160716.GA1630@kroah.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 04 Nov 2014 11:28:58 -0500 (EST)
+Subject: net: fec: fix regression on i.MX28 introduced by rx_copybreak
+ support
+In-Reply-To: <20141104112912.2be8bf1a@ipc1.ka-ro>
+References: <20141030.121710.1524000348187962764.davem@davemloft.net>
+ <20141031063210.69004315@ipc1.ka-ro>
+ <20141104112912.2be8bf1a@ipc1.ka-ro>
+Message-ID: <20141104.112858.356827532569349127.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 04, 2014 at 10:45:20AM +0000, Grant Likely wrote:
-> Currently the devices created by drivers/of/platform.c get created at
-> the root of /sys/devices. This goes against the typical pattern for
-> sysfs where the top level /sys/devices structure contains categories of
-> devices, and the structure of devices is placed below that. To fix this,
-> make the code in drivers/of/platform.c follow the drivers/base/platform.c
-> behaviour, and use &platform_bus as the default parent for all new
-> platform_devices and amba_devices.
-> 
-> This change has been discussed for a long time, but nobody has actually
-> acted on it. Userspace code that expects to find devices under a fixed
-> /sys/devices/... path will be affected. It isn't /supposed/ to do that,
-> but if anyone complains then I'll add a default-off workaround option to
-> put them back into the root.
-> 
-> Signed-off-by: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+From: Lothar Wa?mann <LW@KARO-electronics.de>
+Date: Tue, 4 Nov 2014 11:29:12 +0100
 
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Hi David,
+> 
+> Lothar Wa?mann wrote:
+>> David Miller wrote:
+>> > From: Lothar Wa?mann <LW@KARO-electronics.de>
+>> > Date: Thu, 30 Oct 2014 07:51:04 +0100
+>> > 
+>> > >> Also, I don't thnk your DIV_ROUND_UP() eliminate for the loop
+>> > >> in swap_buffer() is valid.  The whole point is that the current
+>> > >> code handles buffers which have a length which is not a multiple
+>> > >> of 4 properly, after your change it will no longer do so.
+>> > >>
+>> > > Do you really think so?
+>> > 
+>> > Yes, because you're rounding down so you'll miss the final
+>> > partial word (if any).
+>> >
+>> Nope. DIV_ROUND_UP() would give '1' as upper bound for lengths from 1 to
+>> 4, '2' for lengths from 5 to 8 and so on.
+>> 
+>> The loop with increment 4 and i < len does exactly the same.
+>> Try it for yourself, if you don't believe it.
+>> 
+>> 
+> Do you still think, the loop without DIV_ROUND_UP() is incorrect,
+> or can this patch be applied?
+
+I haven't had the time to fully re-look into the details, I'm busy
+with many other things at the moment.
+
+But looking at DIV_ROUND_UP() macro it rounds up.  It gives an
+upper bound of 4 for any value 1 to 4.  Unlike what you claim.
+
+Because it goes "(n + (d - 1)) / d"
+
+Which for 'd' of 4 gives:
+
+1 --> 4
+2 --> 4
+3 --> 4
+4 --> 4
