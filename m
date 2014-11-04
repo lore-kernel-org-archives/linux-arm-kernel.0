@@ -1,94 +1,48 @@
-From: bonbons@linux-vserver.org (Bruno =?UTF-8?B?UHLDqW1vbnQ=?=)
-Date: Tue, 4 Nov 2014 22:08:27 +0100
-Subject: [RFC Patch 1/4] mfd: AXP20x: Add power supply bindings
- documentation
-In-Reply-To: <20141104143117.GC26729@lukather>
-References: <20141020221959.2f312906@neptune.home>
- <20141020223314.0484f795@neptune.home> <20141021101503.GE26842@x1>
- <20141021180916.432f02e1@neptune.home>
- <20141021191905.GR21108@lukather>
- <20141103210244.1425e0c7@neptune.home>
- <20141104143117.GC26729@lukather>
-Message-ID: <20141104220827.773c53d0@neptune.home>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 4 Nov 2014 22:13:28 +0100 (CET)
+Subject: [PATCH v2] ARM: irqchip: mxs: add Alpascale ASM9260 support
+In-Reply-To: <545936AD.5060009@rempel-privat.de>
+References: <20141104130320.GB21210@tiger>
+ <1415128357-12054-1-git-send-email-linux@rempel-privat.de>
+ <alpine.DEB.2.11.1411042118490.4245@nanos>
+ <545936AD.5060009@rempel-privat.de>
+Message-ID: <alpine.DEB.2.11.1411042209110.4245@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Tue, 4 Nov 2014, Oleksij Rempel wrote:
 
-On Tue, 04 November 2014 Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> On Mon, Nov 03, 2014 at 09:02:44PM +0100, Bruno Pr?mont wrote: 
-> > Doing something like this?:
+> Am 04.11.2014 um 21:20 schrieb Thomas Gleixner:
+> > On Tue, 4 Nov 2014, Oleksij Rempel wrote:
 > > 
-> > --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-> > +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-> > @@ -126,9 +126,11 @@
-> >                                 interrupt-controller;
-> >                                 #interrupt-cells = <1>;
-> >  
-> > -                               backup = <3000000 200>;
-> > -                               battery.resistance = <100>;
-> > -                               battery.capacity = <2000>;
-> > +                               x-powers,backup = <3000000 200>;
-> 
-> I don't really remember what was that property used for. Would it make
-> sense to put it into the battery node?
-
-The backup/rtc battery is completely distinct from main battery.
-
-It's presence is in no way related to that of the main battery,
-thus I would not put it into the same node.
-As all the information needed is included in the property I see
-no reason to move it into a separate node.
-
-> > +                               battery: battery at 0 {
-> > +                                       x-powers,resistance = <100>;
-> > +                                       x-powers,capacity = <2000>;
-> > +                               };
-> >                         };
-> >                 };
+> >> Freescale iMX23/iMX28 and Alphascale ASM9260 have similar
+> >> interrupt collectors. It makes easy to reuse irq-mxs code for ASM9260.
+> >> Differences between this devices are fallowing:
+> >> - different register offsets
+> >> - different count of intterupt lines per register
+> >> - ASM9260 don't provide reset bit
+> >> - ASM9260 don't support FIQ.
 > > 
-> > What are the rules to define the label after the colon?
-> > Looking at the existing nodes it's either some address or a number...
+> > Why is this a monolithic patch again. IIRC it was split into a
+> > prepatory (imx) and alphascale part earlier. But my memory might trick
+> > me.
 > 
-> It's not called the label, but the node name, and it's defined in the
-> ePAPR.
-> 
-> It's <device-class>[@<address>]
-> 
-> The address being something to identify the node on a bus, so it can
-> be a chip select number, a memory address, an i2c address,
-> etc. there's really no absolute answer here.
-> 
-> I don't think you really need one in this case.
+> It is not monolithic. first patch is "[PATCH v8 4/9] ARM: irqchip: mxs:
+> prepare driver for HW with different offsets".
 
-In that case, I better omit it completely.
+So you sent that very patch out of context and then you wonder why I
+stumble over that?
 
-> > and then the following in driver code (also adjusting the other
-> > property names accessed)?:
-> > 
-> > @@ -678,11 +677,11 @@ static int axp20x_battery_config(struct platform_device *pdev,
-> >         if (ret)
-> >                 return ret;
-> >  
-> > -       np = of_node_get(axp20x->dev->of_node);
-> > +       np = of_find_node_by_name(axp20x->dev->of_node, "battery");
-> >         if (!np)
-> >                 return -ENODEV;
-> >  
-> > -       ret = of_property_read_u32_array(np, "battery.ocv", ocv, 16);
-> > +       ret = of_property_read_u32_array(np, "x-powers,ocv", ocv, 16);
-> >         for (i = 0; ret == 0 && i < ARRAY_SIZE(ocv); i++)
-> >                 if (ocv[i] > 100) {
-> >                         dev_warn(&pdev->dev, "OCV[%d] %u > 100\n", i, ocv[i]);
-> 
-> Yep, it looks sensible.
+> I don't really wont do discus this irq patches now. Please keep
+> attention on first two, /arch/arm/ patches.
+
+Then do not send them in the first place. I'm not involved in your
+arch/arm patches, but I care about the stuff which is supposed to hit
+the part of the tree which I maintain.
+
+Please keep your attention on sending stuff in the right order to the
+right people at the right time.
 
 Thanks,
-Bruno
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 648 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141104/f588a7ca/attachment-0001.sig>
+
+	tglx
