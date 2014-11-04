@@ -1,83 +1,57 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 04 Nov 2014 16:01:33 +0100
-Subject: [PATCH RESEND v2 0/8] power_supply: Add API for safe access of
- get_property-like function attrs
-Message-ID: <1415113301-25661-1-git-send-email-k.kozlowski@samsung.com>
+Date: Tue, 04 Nov 2014 16:01:35 +0100
+Subject: [PATCH RESEND v2 2/8] power_supply: sysfs: Use power_supply_*() API
+ for accessing function attrs
+In-Reply-To: <1415113301-25661-1-git-send-email-k.kozlowski@samsung.com>
+References: <1415113301-25661-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1415113301-25661-3-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Replace direct calls to power supply function attributes with wrappers.
+Wrappers provide safe access in case of unregistering the power
+supply (e.g. by removing the driver). Replace:
+ - get_property -> power_supply_get_property
+ - set_property -> power_supply_set_property
+ - property_is_writeable -> power_supply_property_is_writeable
 
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Acked-by: Jonghwa Lee <jonghwa3.lee@samusng.com>
+Acked-by: Pavel Machek <pavel@ucw.cz>
+---
+ drivers/power/power_supply_sysfs.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Resending with some new acks.
-Whole patchset should be taken at once (everything depends on patch 1).
-
-Changes since v1:
-=================
-1. Remove checks for non-NULL in new functions (suggested by
-   Pavel Machek).
-2. Fix typos in commit messages.
-3. Add acks: Pavel Machek, Jonghwa Lee, Lee Jones (only 5/8).
-
-
-Description:
-============
-After fixing issue with referencing old power supply after driver
-unbind in charger manager [1] I noticed that the race condition in such
-case may still exist. It would be harder to trigger but still possible.
-
-The race is between using a reference to power supply (obtained
-with power_supply_get_by_name()) and removing the driver.
-
-This patchset aims to fix the race by introducing wrappers for
-accessing the power supply function attributes.
-
-Patch 1 introduces new API. Other patches replace direct calls in
-drivers.
-
-Rebased on next-20141007.
-Tested on Trats2 board (max77693 + charger manager).
-
-
-Kindly asking for reviewing/testing the drivers, although the changes
-are straightforward.
-
-
-Best regards,
-Krzysztof
-
-
-[1] https://lkml.org/lkml/2014/10/13/272
-
-
-Krzysztof Kozlowski (8):
-  power_supply: Add API for safe access of power supply function attrs
-  power_supply: sysfs: Use power_supply_*() API for accessing function
-    attrs
-  power: 88pm860x_charger: Use power_supply_*() API for accessing
-    function attrs
-  power: ab8500: Use power_supply_*() API for accessing function attrs
-  mfd: ab8500: Use power_supply_*() API for accessing function attrs
-  power: apm_power: Use power_supply_*() API for accessing function
-    attrs
-  power: bq2415x_charger: Use power_supply_*() API for accessing
-    function attrs
-  power: charger-manager: Use power_supply_*() API for accessing
-    function attrs
-
- drivers/mfd/ab8500-sysctrl.c       |  7 +++--
- drivers/power/88pm860x_charger.c   | 13 +++++----
- drivers/power/ab8500_btemp.c       |  2 +-
- drivers/power/ab8500_charger.c     |  2 +-
- drivers/power/ab8500_fg.c          |  2 +-
- drivers/power/abx500_chargalg.c    |  4 +--
- drivers/power/apm_power.c          |  4 +--
- drivers/power/bq2415x_charger.c    |  3 +-
- drivers/power/charger-manager.c    | 37 +++++++++++++------------
- drivers/power/power_supply_core.c  | 57 ++++++++++++++++++++++++++++++++++++--
- drivers/power/power_supply_sysfs.c |  6 ++--
- include/linux/power_supply.h       | 16 +++++++++++
- 12 files changed, 115 insertions(+), 38 deletions(-)
-
+diff --git a/drivers/power/power_supply_sysfs.c b/drivers/power/power_supply_sysfs.c
+index 62653f50a524..f817aab80813 100644
+--- a/drivers/power/power_supply_sysfs.c
++++ b/drivers/power/power_supply_sysfs.c
+@@ -76,7 +76,7 @@ static ssize_t power_supply_show_property(struct device *dev,
+ 	if (off == POWER_SUPPLY_PROP_TYPE) {
+ 		value.intval = psy->type;
+ 	} else {
+-		ret = psy->get_property(psy, off, &value);
++		ret = power_supply_get_property(psy, off, &value);
+ 
+ 		if (ret < 0) {
+ 			if (ret == -ENODATA)
+@@ -125,7 +125,7 @@ static ssize_t power_supply_store_property(struct device *dev,
+ 
+ 	value.intval = long_val;
+ 
+-	ret = psy->set_property(psy, off, &value);
++	ret = power_supply_set_property(psy, off, &value);
+ 	if (ret < 0)
+ 		return ret;
+ 
+@@ -223,7 +223,7 @@ static umode_t power_supply_attr_is_visible(struct kobject *kobj,
+ 
+ 		if (property == attrno) {
+ 			if (psy->property_is_writeable &&
+-			    psy->property_is_writeable(psy, property) > 0)
++			    power_supply_property_is_writeable(psy, property) > 0)
+ 				mode |= S_IWUSR;
+ 
+ 			return mode;
 -- 
 1.9.1
