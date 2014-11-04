@@ -1,77 +1,83 @@
-From: hansverk@cisco.com (Hans Verkuil)
-Date: Tue, 04 Nov 2014 12:09:59 +0100
-Subject: [PATCH 01/15] [media] Move mediabus format definition to a more
- standard place
-In-Reply-To: <20141104114503.309cb54f@bbrezillon>
-References: <1415094910-15899-1-git-send-email-boris.brezillon@free-electrons.com>	<1415094910-15899-2-git-send-email-boris.brezillon@free-electrons.com>	<5458A878.3010809@cisco.com>
- <20141104114503.309cb54f@bbrezillon>
-Message-ID: <5458B407.6050701@cisco.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 4 Nov 2014 12:10:37 +0100
+Subject: [PATCH v8 03/10] sched: move cfs task on a CPU with higher
+ capacity
+In-Reply-To: <5458AD87.7020709@gmail.com>
+References: <1414745252-4895-1-git-send-email-vincent.guittot@linaro.org>
+ <1414745252-4895-4-git-send-email-vincent.guittot@linaro.org>
+ <54588E89.1080108@gmail.com>
+ <CAKfTPtDOaE00BZnOYW8ioz22mi6H-4xkVa=25f44fQmh46Vq3w@mail.gmail.com>
+ <5458AD87.7020709@gmail.com>
+Message-ID: <CAKfTPtAgg8b-ERmUXd0imTdp_pEvCX0uSvq7CZvfCs5gw49y+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Well, I gave two alternatives :-)
+On 4 November 2014 11:42, Wanpeng Li <kernellwp@gmail.com> wrote:
+> Hi Vincent,
+>
+>>>> +
+>>>> +/*
+>>>>     * Group imbalance indicates (and tries to solve) the problem where
+>>>> balancing
+>>>>     * groups is inadequate due to tsk_cpus_allowed() constraints.
+>>>>     *
+>>>> @@ -6562,6 +6574,28 @@ static int need_active_balance(struct lb_env
+>>>> *env)
+>>>>                          return 1;
+>>>>          }
+>>>>    +     /*
+>>>> +        * The dst_cpu is idle and the src_cpu CPU has only 1 CFS task.
+>>>
+>>>
+>>> Why specify one task instead of not less than one?
+>>
+>> if cfs.h_nr_running == 0 (which should not occurs at that point), we
+>> don't need to do more test to check if it's worth moving the task
+>> because there is no task to move.
+>
+>
+> Sorry for my confusing statement. I mean cfs.h_nr_running >= 1.
 
-Both are fine as far as I am concerned, but it would be nice to hear
-what others think.
+ok.
+
+If we have more than 1 task, we fall back into the default balancing
+policy than should move a not running task or that will use the
+imbalance field in case of the presence of pinned tasks
 
 Regards,
+Vincent
 
-	Hans
-
-On 11/04/14 11:45, Boris Brezillon wrote:
-> Hi Hans,
-> 
-> On Tue, 04 Nov 2014 11:20:40 +0100
-> Hans Verkuil <hansverk@cisco.com> wrote:
-> 
->> Hi Boris,
+>
+> Regards,
+> Wanpeng Li
+>
+>
 >>
->> On 11/04/14 10:54, Boris Brezillon wrote:
->>> Rename mediabus formats and move the enum into a separate header file so
->>> that it can be used by DRM/KMS subsystem without any reference to the V4L2
->>> subsystem.
+>> Regards,
+>> Vincent
 >>>
->>> Old V4L2_MBUS_FMT_ definitions are now referencing MEDIA_BUS_FMT_ value.
->>
->> I missed earlier that v4l2-mediabus.h contained a struct as well, so it can't be
->> deprecated and neither can a #warning be added.
->>
->> The best approach, I think, is to use a macro in media-bus-format.h
->> that will either define just the MEDIA_BUS value when compiled in the kernel, or
->> define both MEDIA_BUS and V4L2_MBUS values when compiled for userspace.
->>
->> E.g. something like this:
->>
->> #ifdef __KERNEL__
->> #define MEDIA_BUS_FMT_ENTRY(name, val) MEDIA_BUS_FMT_ # name = val
->> #else
->> /* Keep V4L2_MBUS_FMT for backwards compatibility */
->> #define MEDIA_BUS_FMT_ENTRY(name, val) \
->> 	MEDIA_BUS_FMT_ # name = val, \
->> 	V4L2_MBUS_FMT_ # name = val
->> #endif
-> 
-> Okay, but this means we keep adding V4L2_MBUS_FMT_ definitions even for
-> new formats (which definitely doesn't encourage people to move on).
-> Moreover, we add a V4L2 prefix in what was supposed to be a subsystem
-> neutral header.
-> 
-> Anyway, these are just nitpicks, and if you prefer this approach
-> I'll rework my series :-).
-> 
->>
->> An alternative approach is to have v4l2-mediabus.h include media-bus-format.h,
->> put #ifndef __KERNEL__ around the enum v4l2_mbus_pixelcode and add a big comment
->> there that applications should use the defines from media-bus-format.h and that
->> this enum is frozen (i.e. new values are only added to media-bus-format.h).
->>
->> But I think I like the macro idea best.
-> 
-> As you wish, my only intent is to use those bus format definitions in a
-> DRM driver :-).
-> 
-> Thanks,
-> 
-> Boris
-> 
-> 
+>>> Regards,
+>>> Wanpeng Li
+>>>
+>>>
+>>>> +        * It's worth migrating the task if the src_cpu's capacity is
+>>>> reduced
+>>>> +        * because of other sched_class or IRQs whereas capacity stays
+>>>> +        * available on dst_cpu.
+>>>> +        */
+>>>> +       if ((env->idle != CPU_NOT_IDLE) &&
+>>>> +                       (env->src_rq->cfs.h_nr_running == 1)) {
+>>>> +               unsigned long src_eff_capacity, dst_eff_capacity;
+>>>> +
+>>>> +               dst_eff_capacity = 100;
+>>>> +               dst_eff_capacity *= capacity_of(env->dst_cpu);
+>>>> +               dst_eff_capacity *= capacity_orig_of(env->src_cpu);
+>>>> +
+>>>> +               src_eff_capacity = sd->imbalance_pct;
+>>>> +               src_eff_capacity *= capacity_of(env->src_cpu);
+>>>> +               src_eff_capacity *= capacity_orig_of(env->dst_cpu);
+>>>> +
+>>>> +               if (src_eff_capacity < dst_eff_capacity)
+>>>> +                       return 1;
+>>>> +       }
+>>>> +
