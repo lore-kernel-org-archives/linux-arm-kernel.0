@@ -1,62 +1,27 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 4 Nov 2014 17:14:11 +0530
-Subject: [PATCH 0/4] Touchscreen performance related fixes
-In-Reply-To: <54577258.9080508@linutronix.de>
-References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
- <544E821D.5040004@linutronix.de>
- <912A29987EAE174BA6CF187D7CDFA9CE26F46B2B@DLEE08.ent.ti.com>
- <54577258.9080508@linutronix.de>
-Message-ID: <5458BC0B.1040803@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 4 Nov 2014 12:55:43 +0100
+Subject: [PATCH v3 11/19] arm/arm64: KVM: refactor MMIO accessors
+In-Reply-To: <1414776414-13426-12-git-send-email-andre.przywara@arm.com>
+References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
+ <1414776414-13426-12-git-send-email-andre.przywara@arm.com>
+Message-ID: <20141104115543.GM16132@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 31, 2014 at 05:26:46PM +0000, Andre Przywara wrote:
+> The MMIO accessors for GICD_I[CS]ENABLER, GICD_I[CS]PENDR and
+> GICD_ICFGR behave very similar in GICv3, although the way the
+> affected vCPU is determined differs.
 
+They behave similarly to each other (the registers) or similarly to how
+they are implemented for GICv2?
 
-On Monday 03 November 2014 05:47 PM, Sebastian Andrzej Siewior wrote:
-> On 10/27/2014 08:02 PM, Griffis, Brad wrote:
->> On 10/27/2014 12:34 PM, Sebastian Andrzej Siewior wrote:
->>> Do we really need #3 (and then #4)? Given the complexity we have already, is there any benefit by decreasing this value? 
->>
->> I specifically requested we add ti,charge-delay to the device tree because it is THE critical value to tune for a given design.  Although I think the current value of 0xB000 will be suitable for a great many designs, I expect that many users will need to adjust this value for their hardware.  Details such as which touchscreen vendor is being used and how the touchscreen is connected (header vs cable) have an effect on what's appropriate here.
+> Factor out a generic, backend-facing implementation and use small
+> wrappers in the current GICv2 emulation to ease code sharing later.
 > 
-> Oh. That is one knob I hoped we could avoid since I haven't seen it
-> before on other TSCs. But okay. Please make sure that there is a
-> message printed if the default value is used. And lets hope the user
-> will do something about his.
-> 
->>> Would  someone want to increase it? Can we safely determine a value which works for everyone?
->>
->> This value represents a hardware delay before checking for the pen-up event.  So in the scenario where someone is seeing excessive false pen-up events they will want to increase this parameter.  The downsize of making this larger is that it decreases the overall sampling speed of both the touchscreen as well as the standalone ADC samples.  At one point I tried making it huge, but that made the touchscreen overly sluggish because the sampling became too slow.  So there is a definite trade-off that if you make it too large the touchscreen becomes sluggish, and if you make it too small then you may see false pen-up events.  The optimal value will need to be tuned for a given design.
-> 
-> I applied the patches from this series and did the following test on my
-> am335x-evm: A mug on the touchscreen (to make sure the events are
-> coming), evtest on the event node to see that the events and loop of
-> 
-> 	cat /sys/bus/iio/devices/iio\:device0/in_voltage4_raw
-> 
-> In the past I was able lock up the TSC/ADC HW that way (see commit
-> 7ca6740cd1 ("mfd: input: iio: ti_amm335x: Rework TSC/ADC
-> synchronization")) for details.
-> With this patches applied I don't seen any TSC events once the IIO
-> interface is (heavily) used. Can this be fixed?
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-I ran following commands
-$ evtest /dev/input/touchscreen0 &
-(with heavy item on touchscreen)
- and
-$ cat /sys/bus/iio/devices/iio\:device0/scan_elements/in_voltage4_en
-(in a busy loop)
-I tried above experiment on my board but I didn't hit any problem even
-after running for close to 30 minutes. I was unable to reproduce failure
+I can't really understand the motivation from your commit message, but
+the code looks fine and I suppose I'll realize the motivation later:
 
-The problem may be in configuring correct charge-delay value. Please run:
-$ ts_test > /dev/null
-and let me know if pen events are being detected properly.
-
-> 
-> Sebastian
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
