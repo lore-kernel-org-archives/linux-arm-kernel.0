@@ -1,108 +1,66 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 4 Nov 2014 16:15:55 +0800
-Subject: [PATCH V2 00/13] clk: mmp: clock device tree support
-In-Reply-To: <1414721633-29508-1-git-send-email-chao.xie@marvell.com>
-References: <1414721633-29508-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <CAN1soZyqWtKUajbW_R-_uTwSbN4Apo0+NJ9WupS+YLOP_nGJ3w@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 4 Nov 2014 16:16:46 +0800
+Subject: [PATCH] ARM: imx: Explicitly select CONFIG_SPI
+In-Reply-To: <CAOMZO5AB8khWKYmeOQWd0_jT4Ho0ogAkUX+=3mfhqEVhhxeqGQ@mail.gmail.com>
+References: <1414617568-27615-1-git-send-email-festevam@gmail.com>
+ <20141103062606.GF10821@tiger>
+ <CAOMZO5AB8khWKYmeOQWd0_jT4Ho0ogAkUX+=3mfhqEVhhxeqGQ@mail.gmail.com>
+Message-ID: <20141104081645.GJ10821@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 10:13 AM, Chao Xie <chao.xie@marvell.com> wrote:
-> From: Chao Xie <chao.xie@marvell.com>
->
-> The patch set focuses at support device tree for clock.
->
-> The first part of the patches
->   clk: mmp: add prefix "mmp" for structures defined for clk-frac
->   clk: mmp: add spin lock for clk-frac
->   clk: mmp: add init callback for clk-frac
->   clk: mmp: move definiton of mmp_clk_frac to clk.h It enhances the clk-frac.
->
-> The second part of the patches
->   clk: mmp: add clock type mix
->   clk: mmp: add mmp private gate clock
->
-> The third part of the patches
->   clk: mmp: add basic support functions for DT support
->   clk: mmp: add reset support
->   clk: mmp: add pxa168 DT support for clock driver
->   clk: mmp: add pxa910 DT support for clock driver
->   clk: mmp: add mmp2 DT support for clock driver
-> It add the device tree support for pxa168, pxa910 and mmp2.
->
-> V1 -> V2:
->   Add reset support for the clocks that have reset bit.
->
-> Chao Xie (13):
->   clk: mmp: add prefix "mmp" for structures defined for clk-frac
->   clk: mmp: add spin lock for clk-frac
->   clk: mmp: add init callback for clk-frac
->   clk: mmp: move definiton of mmp_clk_frac to clk.h
->   clk: mmp: add clock type mix
->   clk: mmp: add mmp private gate clock
->   clk: mmp: add basic support functions for DT support
->   clk: mmp: add reset support
->   clk: mmp: add pxa168 DT support for clock driver
->   clk: mmp: add pxa910 DT support for clock driver
->   clk: mmp: add mmp2 DT support for clock driver
->   arm: mmp: Make all the dts file to be compiled by Makefile
->   arm: mmp: Make use of the DT supported clock
->
->  .../devicetree/bindings/clock/marvell,mmp2.txt     |  21 +
->  .../devicetree/bindings/clock/marvell,pxa168.txt   |  21 +
->  .../devicetree/bindings/clock/marvell,pxa910.txt   |  21 +
->  arch/arm/boot/dts/Makefile                         |   3 +
->  arch/arm/boot/dts/mmp2-brownstone.dts              |   2 +-
->  arch/arm/boot/dts/mmp2.dtsi                        |  29 +-
->  arch/arm/boot/dts/pxa168-aspenite.dts              |   2 +-
->  arch/arm/boot/dts/pxa168.dtsi                      |  27 +-
->  arch/arm/boot/dts/pxa910-dkb.dts                   |   2 +-
->  arch/arm/boot/dts/pxa910.dtsi                      |  28 +-
->  arch/arm/mach-mmp/Kconfig                          |  12 +-
->  arch/arm/mach-mmp/mmp-dt.c                         |  57 +--
->  arch/arm/mach-mmp/mmp2-dt.c                        |  26 +-
->  drivers/clk/mmp/Makefile                           |   7 +-
->  drivers/clk/mmp/clk-frac.c                         |  74 ++-
->  drivers/clk/mmp/clk-gate.c                         | 133 ++++++
->  drivers/clk/mmp/clk-mix.c                          | 513 +++++++++++++++++++++
->  drivers/clk/mmp/clk-mmp2.c                         |   6 +-
->  drivers/clk/mmp/clk-of-mmp2.c                      | 334 ++++++++++++++
->  drivers/clk/mmp/clk-of-pxa168.c                    | 279 +++++++++++
->  drivers/clk/mmp/clk-of-pxa910.c                    | 301 ++++++++++++
->  drivers/clk/mmp/clk-pxa168.c                       |   6 +-
->  drivers/clk/mmp/clk-pxa910.c                       |   6 +-
->  drivers/clk/mmp/clk.c                              | 192 ++++++++
->  drivers/clk/mmp/clk.h                              | 226 ++++++++-
->  drivers/clk/mmp/reset.c                            |  99 ++++
->  drivers/clk/mmp/reset.h                            |  31 ++
->  include/dt-bindings/clock/marvell,mmp2.h           |  74 +++
->  include/dt-bindings/clock/marvell,pxa168.h         |  57 +++
->  include/dt-bindings/clock/marvell,pxa910.h         |  54 +++
->  30 files changed, 2538 insertions(+), 105 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/marvell,mmp2.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/marvell,pxa168.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/marvell,pxa910.txt
->  create mode 100644 drivers/clk/mmp/clk-gate.c
->  create mode 100644 drivers/clk/mmp/clk-mix.c
->  create mode 100644 drivers/clk/mmp/clk-of-mmp2.c
->  create mode 100644 drivers/clk/mmp/clk-of-pxa168.c
->  create mode 100644 drivers/clk/mmp/clk-of-pxa910.c
->  create mode 100644 drivers/clk/mmp/clk.c
->  create mode 100644 drivers/clk/mmp/reset.c
->  create mode 100644 drivers/clk/mmp/reset.h
->  create mode 100644 include/dt-bindings/clock/marvell,mmp2.h
->  create mode 100644 include/dt-bindings/clock/marvell,pxa168.h
->  create mode 100644 include/dt-bindings/clock/marvell,pxa910.h
->
-> --
-> 1.8.3.2
->
+On Mon, Nov 03, 2014 at 10:45:20AM -0200, Fabio Estevam wrote:
+> Hi Shawn,
+> 
+> On Mon, Nov 3, 2014 at 4:26 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > On Wed, Oct 29, 2014 at 07:19:28PM -0200, Fabio Estevam wrote:
+> >> From: Fabio Estevam <fabio.estevam@freescale.com>
+> >>
+> >> Since 3.18-rc1 CONFIG_SPI is no longer automatically selected for
+> >> imx_v4_v5_defconfig and imx_v6_v7_defconfig, so in order to keep the same
+> >> behaviour as previous kernel versions and avoid regressions, let's explicitly
+> >> select CONFIG_SPI.
+> >>
+> >> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> >> ---
+> >> Shawn,
+> >>
+> >> If possible, please apply this as a bug fix for 3.18.
+> >
+> > Can you please mention the commit that introduced the regression in the
+> > commit log?
+> 
+> The problem is that 'git bisect' did not produce a valid result for
+> me. It says that:
+> 
+> commit cf377ad7d42c566356d79049536d9cb37499cb77
+> Merge: 212fe84 d8f0faa
+> Author: Linus Torvalds <torvalds@linux-foundation.org>
+> Date:   Wed Oct 8 17:13:04 2014 -0400
+> 
+>     Merge tag 'soc-for-linus' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
+> 
+> 
+> , is the first bad commit, but this does not look correct, so I was
+> not able to really identify the commit that caused this regression.
+> 
+> Here is my procedure (starting at 3.18-rc1):
+> 
+> git bisect start
+> git bisect bad
+> git bisect good v3.17
+> make imx_v6_v7_defconfig
+> cat .config | grep CONFIG_SPI=y
+> 
+> Then I add "git bisect good or bad" depending on the output of the
+> 'cat' command.
+> 
+> Any ideas?
 
-Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+The CONFIG_SPI was removed by your commit 64546e9fe3a5 (ARM:
+imx_v6_v7_defconfig updates), which cames from savedefconfig, I assume.
+That said, in the code base that your patch was generated, option
+CONFIG_SPI is redundant, But it's not the case on mainline.
 
-Mike,
-Please merge all mach-mmp patches with clock together. Otherwise, it
-may result in build issue.
-
-Best Regards
-Haojian
+Shawn
