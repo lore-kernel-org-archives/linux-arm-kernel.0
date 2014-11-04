@@ -1,40 +1,38 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 4 Nov 2014 11:37:30 +0000
-Subject: [PATCH 05/10] arm64: Convert dts to use reserved-memory nodes
-In-Reply-To: <CAL_Jsq+V_tLkfwBKDQOOrkKtHWaRD5e1AHzbciwVYFYbpsAE=w@mail.gmail.com>
-References: <cover.1414099246.git.geoff@infradead.org>
- <411296ab915959b862923d827e730a1db2ff9b4e.1414099246.git.geoff@infradead.org>
- <20141024105111.GD24265@leverpostej>
- <CACxGe6szzOXHkK9ukpcSBZgeyy5AgX3+7PgQseBnB9XWYLj-PQ@mail.gmail.com>
- <20141024122738.GH24265@leverpostej> <1414799092.23621.48.camel@smoke>
- <CAL_Jsq+V_tLkfwBKDQOOrkKtHWaRD5e1AHzbciwVYFYbpsAE=w@mail.gmail.com>
-Message-ID: <CACxGe6tWnM6OhAaoYpHdPxbv395EwZyVpuo0hYobx-S1RArPow@mail.gmail.com>
+From: D.Lavnikevich@sam-solutions.com (Dmitry Lavnikevich)
+Date: Tue, 4 Nov 2014 11:40:32 +0000
+Subject: [PATCH v5 2/3] ARM: dts: pbab01: enable I2S audio on
+ phyFLEX-i.MX6 boards
+In-Reply-To: <20141103061408.GA21210@tiger>
+References: <1414590424-25585-1-git-send-email-d.lavnikevich@sam-solutions.com>
+ <1414590424-25585-3-git-send-email-d.lavnikevich@sam-solutions.com>
+ <20141103061408.GA21210@tiger>
+Message-ID: <76742380-95D6-4E0C-8622-E9FA27993A42@sam-solutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 3, 2014 at 10:26 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On Fri, Oct 31, 2014 at 6:44 PM, Geoff Levand <geoff@infradead.org> wrote:
->> On Fri, 2014-10-24 at 13:27 +0100, Mark Rutland wrote:
->> Current user space kexec utilities use /proc/device-tree and nothing
->> else.  The intension of the device tree is to describe the system
->> sufficiently for a kernel to boot, so I think we should put the
->> /memreserve/ info into /proc/device-tree.
->>
->> We could put the /memreserve/ entries in there directly, or convert
->> to reserved-memory nodes.  At the moment I like the idea to convert to
->> reserved-memory nodes.
->
-> I'm just wondering does UEFI being used for the memory information
-> have any impact here as the DT would not have valid memory nodes
-> either? I'd assume reserved memory comes from UEFI (or both) in that
-> case?
 
-It should, but as always the answer is not simple. UEFI+DT, it may be
-that a CMA region is specified in /reserved-memory and we would want
-to respect that, even when getting memory information from UEFI.
+> On 3Nov, 2014, at 09:14, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Wed, Oct 29, 2014 at 04:47:03PM +0300, Dmitry Lavnikevich wrote:
+>> +		fsl,audmux-port = <4>;
+>> +		fsl,port-config = <
+>> +			0x00000000
+>> +			IMX_AUDMUX_V2_PDCR_RXDSEL(1)
+>> +		>;
+>> +	};
+>> +};
+>> +
+>> &i2c2 {
+>> 	status = "okay";
+>> 
+>> -	tlv320 at 18 {
+>> -		compatible = "ti,tlv320aic3x";
+>> +	codec: tlv320 at 18 {
+>> +		compatible = "ti,tlv320aic3007";
+> 
+> Both compatible strings are documented in
+> Documentation/devicetree/bindings/sound/tlv320aic3x.txt.  But I hope
+> this change will not cause any DT compatible issues.
 
-However, the /memreserve/ section shouldn't be an issue in this case.
-Anything firmware needs protected must be reflected in the UEFI memory
-map.
+This change is needed because unlike other tlv320aic3x-codecs tlv320aic3007 has D-class amplifier which is controlled by set of registers that in case of 3x-codecs control mono output.
 
-g.
+I will correct patches according to other notes and soon will resend patchset.
