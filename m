@@ -1,93 +1,148 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 4 Nov 2014 14:57:16 +0100
-Subject: [PATCH v6 1/1] iommu-api: Add map_sg function
-In-Reply-To: <1414256116-26933-2-git-send-email-ohaugan@codeaurora.org>
-References: <1414256116-26933-1-git-send-email-ohaugan@codeaurora.org>
- <1414256116-26933-2-git-send-email-ohaugan@codeaurora.org>
-Message-ID: <20141104135716.GA14512@8bytes.org>
+From: addy.ke@rock-chips.com (Addy Ke)
+Date: Tue,  4 Nov 2014 22:03:09 +0800
+Subject: [PATCH v4] mmc: dw_mmc: add support for the other bit of sdio
+ interrupt
+In-Reply-To: <1414977633-3196-1-git-send-email-addy.ke@rock-chips.com>
+References: <1414977633-3196-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <1415109789-7046-1-git-send-email-addy.ke@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 25, 2014 at 09:55:16AM -0700, Olav Haugan wrote:
->  drivers/iommu/amd_iommu.c      |  1 +
->  drivers/iommu/arm-smmu.c       |  1 +
->  drivers/iommu/exynos-iommu.c   |  1 +
->  drivers/iommu/intel-iommu.c    |  1 +
->  drivers/iommu/iommu.c          | 25 +++++++++++++++++++++++++
->  drivers/iommu/ipmmu-vmsa.c     |  1 +
->  drivers/iommu/msm_iommu.c      |  1 +
->  drivers/iommu/omap-iommu.c     |  1 +
->  drivers/iommu/shmobile-iommu.c |  1 +
->  drivers/iommu/tegra-smmu.c     |  1 +
->  include/linux/iommu.h          | 22 ++++++++++++++++++++++
->  11 files changed, 56 insertions(+)
+The bit of sdio interrupt is 16 in designware implementation,
+but it is 24 on Rockchip SoCs.This patch add sdio_id0 for the
+number of slot0 in the SDIO interrupt registers.
 
-Applied to the core branch in my tree, with the patch below on-top of
-it. Thanks, Olav.
-
->From 38ec010d9b04ed94845f8ff6f10d33eb6bbfe180 Mon Sep 17 00:00:00 2001
-From: Joerg Roedel <jroedel@suse.de>
-Date: Tue, 4 Nov 2014 14:53:51 +0100
-Subject: [PATCH] iommu: Do more input validation in iommu_map_sg()
-
-The IOMMU-API works on page boundarys, unlike the DMA-API
-which can work with sub-page buffers. The sg->offset
-field does not make sense on the IOMMU level, so force it to
-be 0. Do some error-path consolidation while at it.
-
-Signed-off-by: Joerg Roedel <jroedel@suse.de>
+Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
 ---
- drivers/iommu/iommu.c | 29 ++++++++++++++++++-----------
- 1 file changed, 18 insertions(+), 11 deletions(-)
+Changes in v2:
+- rebase on http://git.linaro.org/git/people/ulf.hansson/mmc.git, next branch
+Changes in v3:
+- Remove dts for sdio_id0, just replace this with 8, suggested by Doug
+- Change to support all Rockchip Socs, suggested by Heiko
+Changes in v4:
+- use init-hook to set sdio_id0, suggested by Jaehoon
 
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index 46727ce..08c53c5 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -1127,26 +1127,33 @@ EXPORT_SYMBOL_GPL(iommu_unmap);
- size_t default_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
- 			 struct scatterlist *sg, unsigned int nents, int prot)
- {
--	int ret;
-+	struct scatterlist *s;
- 	size_t mapped = 0;
- 	unsigned int i;
--	struct scatterlist *s;
-+	int ret;
- 
- 	for_each_sg(sg, s, nents, i) {
- 		phys_addr_t phys = page_to_phys(sg_page(s));
--		size_t page_len = s->offset + s->length;
- 
--		ret = iommu_map(domain, iova + mapped, phys, page_len, prot);
--		if (ret) {
--			/* undo mappings already done */
--			iommu_unmap(domain, iova, mapped);
--			mapped = 0;
--			break;
--		}
--		mapped += page_len;
-+		/* We are mapping on page boundarys, so offset must be 0 */
-+		if (s->offset)
-+			goto out_err;
-+
-+		ret = iommu_map(domain, iova + mapped, phys, s->length, prot);
-+		if (ret)
-+			goto out_err;
-+
-+		mapped += s->length;
+ drivers/mmc/host/dw_mmc-rockchip.c | 10 ++++++++++
+ drivers/mmc/host/dw_mmc.c          | 12 +++++++-----
+ drivers/mmc/host/dw_mmc.h          |  2 ++
+ include/linux/mmc/dw_mmc.h         |  3 +++
+ 4 files changed, 22 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
+index bbb4ec3..5650ac4 100644
+--- a/drivers/mmc/host/dw_mmc-rockchip.c
++++ b/drivers/mmc/host/dw_mmc-rockchip.c
+@@ -68,14 +68,24 @@ static void dw_mci_rk3288_set_ios(struct dw_mci *host, struct mmc_ios *ios)
  	}
+ }
  
- 	return mapped;
-+
-+out_err:
-+	/* undo mappings already done */
-+	iommu_unmap(domain, iova, mapped);
++static int dw_mci_rockchip_init(struct dw_mci *host)
++{
++	/* It is slot 8 on Rockchip SoCs */
++	host->sdio_id0 = 8;
 +
 +	return 0;
++}
 +
- }
- EXPORT_SYMBOL_GPL(default_iommu_map_sg);
+ static const struct dw_mci_drv_data rk2928_drv_data = {
+ 	.prepare_command        = dw_mci_rockchip_prepare_command,
++	.init			= dw_mci_rockchip_init,
+ };
  
+ static const struct dw_mci_drv_data rk3288_drv_data = {
+ 	.prepare_command        = dw_mci_rockchip_prepare_command,
+ 	.set_ios		= dw_mci_rk3288_set_ios,
+ 	.setup_clock    = dw_mci_rk3288_setup_clock,
++	.init			= dw_mci_rockchip_init,
+ };
+ 
+ static const struct of_device_id dw_mci_rockchip_match[] = {
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index bb46b1b..a633b58 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -823,7 +823,7 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
+ 
+ 		/* enable clock; only low power if no SDIO */
+ 		clk_en_a = SDMMC_CLKEN_ENABLE << slot->id;
+-		if (!(mci_readl(host, INTMASK) & SDMMC_INT_SDIO(slot->id)))
++		if (!(mci_readl(host, INTMASK) & SDMMC_INT_SDIO(slot->sdio_id)))
+ 			clk_en_a |= SDMMC_CLKEN_LOW_PWR << slot->id;
+ 		mci_writel(host, CLKENA, clk_en_a);
+ 
+@@ -1184,10 +1184,10 @@ static void dw_mci_enable_sdio_irq(struct mmc_host *mmc, int enb)
+ 		dw_mci_disable_low_power(slot);
+ 
+ 		mci_writel(host, INTMASK,
+-			   (int_mask | SDMMC_INT_SDIO(slot->id)));
++			   (int_mask | SDMMC_INT_SDIO(slot->sdio_id)));
+ 	} else {
+ 		mci_writel(host, INTMASK,
+-			   (int_mask & ~SDMMC_INT_SDIO(slot->id)));
++			   (int_mask & ~SDMMC_INT_SDIO(slot->sdio_id)));
+ 	}
+ }
+ 
+@@ -2056,8 +2056,9 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
+ 		/* Handle SDIO Interrupts */
+ 		for (i = 0; i < host->num_slots; i++) {
+ 			struct dw_mci_slot *slot = host->slot[i];
+-			if (pending & SDMMC_INT_SDIO(i)) {
+-				mci_writel(host, RINTSTS, SDMMC_INT_SDIO(i));
++			if (pending & SDMMC_INT_SDIO(slot->sdio_id)) {
++				mci_writel(host, RINTSTS,
++					   SDMMC_INT_SDIO(slot->sdio_id));
+ 				mmc_signal_sdio_irq(slot->mmc);
+ 			}
+ 		}
+@@ -2145,6 +2146,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+ 
+ 	slot = mmc_priv(mmc);
+ 	slot->id = id;
++	slot->sdio_id = host->sdio_id0 + id;
+ 	slot->mmc = mmc;
+ 	slot->host = host;
+ 	host->slot[id] = slot;
+diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+index 71d4995..0562f10 100644
+--- a/drivers/mmc/host/dw_mmc.h
++++ b/drivers/mmc/host/dw_mmc.h
+@@ -214,6 +214,7 @@ extern int dw_mci_resume(struct dw_mci *host);
+  *	with CONFIG_MMC_CLKGATE.
+  * @flags: Random state bits associated with the slot.
+  * @id: Number of this slot.
++ * @sdio_id: Number of this slot in the SDIO interrupt registers.
+  */
+ struct dw_mci_slot {
+ 	struct mmc_host		*mmc;
+@@ -233,6 +234,7 @@ struct dw_mci_slot {
+ #define DW_MMC_CARD_PRESENT	0
+ #define DW_MMC_CARD_NEED_INIT	1
+ 	int			id;
++	int			sdio_id;
+ };
+ 
+ struct dw_mci_tuning_data {
+diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+index 69d0814..72c319f 100644
+--- a/include/linux/mmc/dw_mmc.h
++++ b/include/linux/mmc/dw_mmc.h
+@@ -96,6 +96,7 @@ struct mmc_data;
+  * @quirks: Set of quirks that apply to specific versions of the IP.
+  * @irq_flags: The flags to be passed to request_irq.
+  * @irq: The irq value to be passed to request_irq.
++ * @sdio_id0: Number of slot0 in the SDIO interrupt registers.
+  *
+  * Locking
+  * =======
+@@ -191,6 +192,8 @@ struct dw_mci {
+ 	bool			vqmmc_enabled;
+ 	unsigned long		irq_flags; /* IRQ flags */
+ 	int			irq;
++
++	int			sdio_id0;
+ };
+ 
+ /* DMA ops for Internal/External DMAC interface */
 -- 
-1.8.4.5
+1.8.3.2
