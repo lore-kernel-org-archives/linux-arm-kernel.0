@@ -1,83 +1,68 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 4 Nov 2014 15:40:01 +0200
-Subject: [PATCH 06/10] ARM: OMAP2+: Show bootloader GPMC timings to allow
- configuring the .dts file
-In-Reply-To: <20141030163031.GG2560@atomide.com>
-References: <1414628948-30702-1-git-send-email-tony@atomide.com>
- <1414628948-30702-7-git-send-email-tony@atomide.com>
- <545248FA.7040201@ti.com> <20141030144529.GG2542@atomide.com>
- <54525362.9080000@ti.com> <20141030163031.GG2560@atomide.com>
-Message-ID: <5458D731.1010208@ti.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 4 Nov 2014 15:41:05 +0200
+Subject: [PATCH v3 0/5] ARM: keystone: pm: switch to use generic pm domains
+In-Reply-To: <544A99B2.8080507@gmail.com>
+References: <1414074182-25980-1-git-send-email-grygorii.strashko@ti.com>
+ <544A99B2.8080507@gmail.com>
+Message-ID: <5458D771.1080109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2014 06:30 PM, Tony Lindgren wrote:
-> * Roger Quadros <rogerq@ti.com> [141030 08:05]:
->> On 10/30/2014 04:45 PM, Tony Lindgren wrote:
->>> * Roger Quadros <rogerq@ti.com> [141030 07:21]:
->>>> On 10/30/2014 02:29 AM, Tony Lindgren wrote:
->>>>> +static void gpmc_cs_show_timings(int cs, const char *desc)
->>>>> +{
->>>>> +	gpmc_show_regs(cs, desc);
->>>>> +
->>>>> +	pr_info("gpmc cs%i access configuration:\n", cs);
->>>>> +	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1,  4,  4, "time-para-granularity");
->>>>> +	GPMC_GET_RAW(GPMC_CS_CONFIG1,  8,  9, "mux-add-data");
->>>>> +	GPMC_GET_RAW(GPMC_CS_CONFIG1, 12, 13, "device-width");
->>>>> +	GPMC_GET_RAW(GPMC_CS_CONFIG1, 16, 17, "wait-pin");
->>>>> +	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1, 21, 21, "wait-on-write");
->>>>> +	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1, 22, 22, "wait-on-read");
->>>>> +	GPMC_GET_RAW_SHIFT(GPMC_CS_CONFIG1, 23, 24, 3, "burst-length");
->>>>
->>>> how does this work with shift = 3?
->>>> Possible values of burst length are
->>>> 0 -> 4
->>>> 1 -> 8
->>>> 2 -> 16
->>>
->>> Hmm sounds like a bug..
-> 
-> The shift does not work here for 0 << 3 naturally :) I've changed
-> it to l = (shift << l) where shift is 4 in this case.
->  
->>> In general, if you a chance to test this patch with a few
->>> devices that would be great. Assuming you have working timings
->>> in the bootloader, just remove the gpmc,* entries temporarily
->>> from the .dts file for a device, and see if the values printed
->>> by this patch make sense. I've used this to generate the values
->>> for the 2430sdp smc91x and zoom 8250 but I don't think I've tried
->>> anything with a burst mode so far.
+Hi Santosh,
+
+On 10/24/2014 09:25 PM, Santosh Shilimkar wrote:
+> On 10/23/2014 07:22 AM, Grygorii Strashko wrote:
+>> Hi Santosh, Kevin,
 >>
->> OK. I'll give it a spin with u-boot configured devices.
-> 
-> Great thanks. Updated patch below.
-> 
-> Regards,
-> 
-> Tony
-> 
-> 
-> 8< ----------------
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Wed, 29 Oct 2014 17:16:48 -0700
-> Subject: [PATCH] ARM: OMAP2+: Show bootloader GPMC timings to allow configuring the .dts file
-> 
-> As we still have some devices with GPMC timings missing from the
-> .dts files, let's make it a bit easier to use the bootloader
-> values and print them out.
-> 
-> Note that we now need to move the parsing of the device tree provided
-> configuration a bit earlier so we can use that for checking if anything
-> was configured.
-> 
-> Cc: Roger Quadros <rogerq@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
+>> This series switches Keystone 2 PM code to use Generic PM domains
+>> instead of PM clock domains because of the lack of DT support
+>> for the last.
+>> It will finally allow to enable Runtime PM for Keystone 2.
+>>
+>> Patch 1 was reused from [1].
+>>
+>> RFC version of patches can be found at [2].
+>>
+>> Changes in v3:
+>>   - handling of the case when !CONFIG_PM_RUNTIME has been
+>>     moved in PM clock framework.
+>>
+>> Changes in v2:
+>> - minor comments applied and rebased on top of Linux 3.18-rc1.
+>>
+>> Links on previous versions:
+>> v2:  https://lkml.org/lkml/2014/10/20/248
+>> v1:  https://lkml.org/lkml/2014/9/29/382
+>>
+>> [1] "[PATCH/RFC 0/4] of: Register clocks for Runtime PM with PM core"
+>>    https://lkml.org/lkml/2014/4/24/1118
+>>
+>> [2] "[RFC PATCH 0/4] ARM: keystone: pm: switch to use generic pm domains"
+>>    https://lkml.org/lkml/2014/9/25/364
+>>
+>> CC: Santosh Shilimkar <ssantosh@kernel.org>
+>> CC: Kevin Hilman <khilman@linaro.org>
+>> CC: Ulf Hansson <ulf.hansson@linaro.org>
+>> CC: Geert Uytterhoeven <geert@linux-m68k.org>
+>> CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+>>
+>> Geert Uytterhoeven (1):
+>>    PM / clock_ops: Add pm_clk_add_clk()
+>>
+>> Grygorii Strashko (4):
+>>    PM / clock_ops: make __pm_clk_enable more generic
+>>    PM / clock_ops: add and enable clocks always if !CONFIG_PM_RUNTIME
+>>    ARM: keystone: pm: switch to use generic pm domains
+>>    ARM: dts: keystone: add generic pm controller node
+>>
+> You can split this series. Lets get first 3 patches sorted out as
+> there have been active discussion on those. Once they get direction
+> and merged then you can post the keystone ones which I will be
+> happy to merge.
 
-I don't have any board with smsc or working NOR so I called
-gpmc_cs_show_timings() after NAND was setup.
+Sure, will do.
 
-The printed values match closely to the configured values in the DTS.
+Sorry, for delayed reply - I was ooo last week.
 
-cheers,
--roger
+regards,
+-grygorii
