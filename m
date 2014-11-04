@@ -1,82 +1,121 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 4 Nov 2014 08:41:51 +0100
-Subject: [PATCH] mmc: host: atmel-mci: Add support for non-removable slots
-In-Reply-To: <1415013179-16823-1-git-send-email-timo.kokkonen@offcode.fi>
-References: <CAPDyKFpMGk4M=fjBKufxb9iMbV6FmRTEfE_ptXPmM=CHx3Q7iQ@mail.gmail.com>
- <1415013179-16823-1-git-send-email-timo.kokkonen@offcode.fi>
-Message-ID: <CAPDyKFpTVedeMOnL1FRYt8orzYy4YinYuosCH5pWT+tCZPN45g@mail.gmail.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 4 Nov 2014 15:12:08 +0800
+Subject: [PATCH 6/7] can: m_can: update to support CAN FD features
+In-Reply-To: <5452A071.2000307@hartkopp.net>
+References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
+ <1414579527-31100-6-git-send-email-b29396@freescale.com>
+ <54513E38.4020703@hartkopp.net>
+ <20141030024226.GA29572@shlinux1.ap.freescale.net>
+ <5452A071.2000307@hartkopp.net>
+Message-ID: <20141104071146.GA17367@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 November 2014 12:12, Timo Kokkonen <timo.kokkonen@offcode.fi> wrote:
-> Add support for non-removable slots which have no card detection GPIO
-> and which should not be polled for a card change.
->
-> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+On Thu, Oct 30, 2014 at 09:32:49PM +0100, Oliver Hartkopp wrote:
+> 
+> On 10/30/2014 03:42 AM, Dong Aisheng wrote:
+> > On Wed, Oct 29, 2014 at 08:21:28PM +0100, Oliver Hartkopp wrote:
+> 
+> >> So first I would suggest to check the core release register (CREL) to be
+> >> version 3.0.x and quit the driver initialization if it doesn't fit this
+> >> version. I would suggest to provide a separate patch for that check. What
+> >> about printing the core release version into the kernel log at driver
+> >> initialization time?
+> >>
+> > 
+> > One question is that if v3.1.0 and v3.2.0 will be backward compatible with
+> > v3.0.1, if yes, how about let the driver still work for them instead of
+> > simply quit?
+> 
+> There are several important differences between 3.0.x and 3.1.x.
+> E.g. the CCCR, BTP, PSR and others are changed and a register for the
+> transmitter delay compensation is added.
+> 
+> I assume from 3.1.x to 3.2.x the controller registers will only change in
+> small details as the main update will be on the wire and not in the functionality.
+> 
+> > And then we can add new features according new released IP version.
+> 
+> Yes. We probably can wait for 3.[12].x to become available before adding the
+> special code that behaves according the core release register content.
+> 
 
-Thanks! Applied for next.
+Okay
 
-Kind regards
-Uffe
+> >>> @@ -375,7 +414,7 @@ static int m_can_do_rx_poll(struct net_device *dev, int quota)
+> >>>  		if (rxfs & RXFS_RFL)
+> >>>  			netdev_warn(dev, "Rx FIFO 0 Message Lost\n");
+> >>>  
+> >>> -		skb = alloc_can_skb(dev, &frame);
+> >>> +		skb = alloc_canfd_skb(dev, &frame);
+> >>
+> >> You are *always* allocating CAN FD frames now?
+> >>
+> > 
+> > Yes, currently it is.
+> > The test seemed ok using CAN FD frames even receive normal frame.
+> 
+> When you put CAN frame content into a CAN FD skb it becomes a CAN FD frame -
+> which is wrong.
+> 
+> CAN 2.0 frame (EDL is clear) -> alloc_can_skb()
+> CAN FD frame (EDL is set) -> alloc_canfd_skb()
+> 
+> You can have a CAN FD frame with a DLC of 8, which does *not* mean that you
+> have a CAN 2.0 frame.
+> 
+> > The issue i know is that candump seemed can not recognize remote frame reported
+> > by the driver.
+> 
+> Do you use the latest candump from
+> 
 
-> ---
->  drivers/mmc/host/atmel-mci.c | 11 +++++++++--
->  include/linux/atmel-mci.h    |  2 ++
->  2 files changed, 11 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-> index 77250d4..4de1a31 100644
-> --- a/drivers/mmc/host/atmel-mci.c
-> +++ b/drivers/mmc/host/atmel-mci.c
-> @@ -560,6 +560,9 @@ atmci_of_init(struct platform_device *pdev)
->                 pdata->slot[slot_id].detect_is_active_high =
->                         of_property_read_bool(cnp, "cd-inverted");
->
-> +               pdata->slot[slot_id].non_removable =
-> +                       of_property_read_bool(cnp, "non-removable");
-> +
->                 pdata->slot[slot_id].wp_pin =
->                         of_get_named_gpio(cnp, "wp-gpios", 0);
->         }
-> @@ -2206,8 +2209,12 @@ static int __init atmci_init_slot(struct atmel_mci *host,
->                 }
->         }
->
-> -       if (!gpio_is_valid(slot->detect_pin))
-> -               mmc->caps |= MMC_CAP_NEEDS_POLL;
-> +       if (!gpio_is_valid(slot->detect_pin)) {
-> +               if (slot_data->non_removable)
-> +                       mmc->caps |= MMC_CAP_NONREMOVABLE;
-> +               else
-> +                       mmc->caps |= MMC_CAP_NEEDS_POLL;
-> +       }
->
->         if (gpio_is_valid(slot->wp_pin)) {
->                 if (devm_gpio_request(&host->pdev->dev, slot->wp_pin,
-> diff --git a/include/linux/atmel-mci.h b/include/linux/atmel-mci.h
-> index 91b77f8..9177947 100644
-> --- a/include/linux/atmel-mci.h
-> +++ b/include/linux/atmel-mci.h
-> @@ -11,6 +11,7 @@
->   * @detect_pin: GPIO pin wired to the card detect switch
->   * @wp_pin: GPIO pin wired to the write protect sensor
->   * @detect_is_active_high: The state of the detect pin when it is active
-> + * @non_removable: The slot is not removable, only detect once
->   *
->   * If a given slot is not present on the board, @bus_width should be
->   * set to 0. The other fields are ignored in this case.
-> @@ -26,6 +27,7 @@ struct mci_slot_pdata {
->         int                     detect_pin;
->         int                     wp_pin;
->         bool                    detect_is_active_high;
-> +       bool                    non_removable;
->  };
->
->  /**
-> --
-> 1.9.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Yes, i'm using latest candump.
+
+> 	https://gitorious.org/linux-can/can-utils/
+> ??
+> 
+> The latest candump switches the CAN_RAW socket into the mode to accept both
+> CAN *and* CAN FD frames and displays the frames correctly.
+> 
+> > Not sure if it's caused by canfd_frame used.
+> 
+> Yes. CAN FD frames do not have a RTR bit.
+> 
+
+You're right.
+It's indeed caused by using the CAN FD frames to receive RTR frame.
+After switch to normal frame, candump showed it well.
+
+> > Will test and check.
+> > 
+> >> Depending on RX_BUF_EDL in the RX FIFO message you should create a CAN or CAN
+> >> FD frame.
+> >>
+> >> Of course you can use the struct canfd_frame in m_can_read_fifo() as the
+> >> layout of the struct can_frame is identical when filled with 'normal' CAN
+> >> frame content.
+> >>
+> >> But you need to distinguish whether it is a CAN or CAN FD frame when
+> >> allocating the skb based on the RX_BUF_EDL value.
+> >>
+> > 
+> > Yes, i think it's good to do that.
+> > One obvious benefit is it saves memory at least.
+> 
+> The main point is that CAN frames and CAN FD frames are separated by this
+> (MTU) length information. It's not about saving memory.
+> A CAN FD frame with DLC 8 still has 64 data bytes inside it's data structure.
+> 
+
+For normal can frame, the CAN_MAX_DLEN is 8 while CANFD_MAX_DLEN is 64.
+So i meant using struct canfd_frame to receive normal frame is a bit waste memory.
+And besides, actually it's wrong as you already indicated.
+I will send out the updated patch with this changed in v2 soon.
+Thanks for pointing out this.
+
+Regards
+Dong Aisheng
+
+> Regards,
+> Oliver
