@@ -1,29 +1,43 @@
-From: juergen127@kreuzholzen.de (Juergen Borleis)
-Date: Tue, 4 Nov 2014 21:04:45 +0100
-Subject: Samsung S3C6410 SoC/devicetree: how to describe RTC interrupts
- connected to two different interrupt parents?
-Message-ID: <201411042104.45632.juergen127@kreuzholzen.de>
+From: smoch@web.de (Soeren Moch)
+Date: Tue,  4 Nov 2014 21:11:33 +0100
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: enable DS1307 rtc and gpio fan by
+ default
+In-Reply-To: <20141103031609.GA10821@tiger>
+References: <20141103031609.GA10821@tiger>
+Message-ID: <1415131893-3363-1-git-send-email-smoch@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Used on TBS2910 board.
 
-the Samsung S3C6410 SoC comes with an RTC with two interrupts connected to two 
-different interrupt controllers.
+Signed-off-by: Soeren Moch <smoch@web.de>
+--
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-The old platform code uses this resource to describe it:
-
-static struct resource s3c_rtc_resource[] = {
-	[0] = DEFINE_RES_MEM(S3C24XX_PA_RTC, SZ_256),
-	[1] = DEFINE_RES_IRQ(IRQ_RTC),  <-- channel 2 at VIC0
-	[2] = DEFINE_RES_IRQ(IRQ_TICK), <-- channel 28@VIC1
-};
-
-In the devicetree I can define multiple interrupt channels with the 
-keyword 'interrupts' but it seems all of them must share the same interrupt 
-parent defined via 'interrupt-parent'. How to handle the special S3C6410 
-case?
-The file "Documentation/devicetree/bindings/rtc/s3c-rtc.txt" isn't really 
-helpful.
-
-jbo
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 16cfec4..39e4fe2 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -165,7 +165,7 @@ CONFIG_SPI_IMX=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_MC9S08DZ60=y
+ CONFIG_GPIO_STMPE=y
+-# CONFIG_HWMON is not set
++CONFIG_SENSORS_GPIO_FAN=y
+ CONFIG_WATCHDOG=y
+ CONFIG_IMX2_WDT=y
+ CONFIG_MFD_DA9052_I2C=y
+@@ -240,6 +240,7 @@ CONFIG_LEDS_TRIGGER_BACKLIGHT=y
+ CONFIG_LEDS_TRIGGER_GPIO=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_INTF_DEV_UIE_EMUL=y
++CONFIG_RTC_DRV_DS1307=y
+ CONFIG_RTC_DRV_PCF8563=y
+ CONFIG_RTC_DRV_MC13XXX=y
+ CONFIG_RTC_DRV_MXC=y
+-- 
+1.9.1
