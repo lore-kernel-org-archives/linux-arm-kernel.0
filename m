@@ -1,53 +1,56 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 3 Nov 2014 23:39:52 -0600
-Subject: [PATCH] arm: omap: hwmod: drop unnecessary list initialization
-In-Reply-To: <alpine.DEB.2.02.1407280524160.24161@utopia.booyaka.com>
-References: <1405455492-1087-1-git-send-email-balbi@ti.com>
- <alpine.DEB.2.02.1407280524160.24161@utopia.booyaka.com>
-Message-ID: <20141104053952.GA15760@saruman>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Tue, 4 Nov 2014 13:44:21 +0800
+Subject: [PATCH v4 2/8] ARM: mediatek: add dts for 8127 Moose board
+In-Reply-To: <CABuKBe+ku=vWiWbvAm8M7QgyzvVWZ5sdkRMocuUym8JTyk-okg@mail.gmail.com>
+References: <1413973797-17619-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1413973797-17619-3-git-send-email-yingjoe.chen@mediatek.com>
+ <CABuKBe+ku=vWiWbvAm8M7QgyzvVWZ5sdkRMocuUym8JTyk-okg@mail.gmail.com>
+Message-ID: <1415079861.31861.0.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jul 28, 2014 at 05:24:34AM +0000, Paul Walmsley wrote:
-> On Tue, 15 Jul 2014, Felipe Balbi wrote:
-> 
-> > ml->node and sl->node are currently initialized
-> > by means of INIT_LIST_HEAD(). That initialiation
-> > is followed by a list_add() call.
-> > 
-> > Looking at what both these functions do we will have:
-> > 
-> > 	ml->node.next = &ml->node;
-> > 	ml->node.prev = &ml->node;
-> > 	oi->master->master_ports.next.prev = &ml->node;
-> > 	ml->node.next = &oi->master->master_ports.next;
-> > 	ml->node.prev = &oi->master->master_ports;
-> > 	oi->master->master_ports.next = &ml->node;
-> > 
-> > from this, it's clear that both INIT_LIST_HEAD() calls
-> > are unnecessary and can be safely removed.
-> > 
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+On Mon, 2014-11-03 at 18:55 +0100, Matthias Brugger wrote:
+> 2014-10-22 12:29 GMT+02:00 Joe.C <yingjoe.chen@mediatek.com>:
+> > From: "Joe.C" <yingjoe.chen@mediatek.com>
+> >
+> > Moose is a tablet evalutation board based on MT8127 SoC.
+> >
+> > Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
 > > ---
-> > 
-> > found by code inspection, boot tested on am437x SK on today's
-> > linux-next + pending patches.
+> >  arch/arm/boot/dts/mt8127-moose.dts | 24 ++++++++++++++++++++++++
+> >  1 file changed, 24 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/mt8127-moose.dts
+> >
+> > diff --git a/arch/arm/boot/dts/mt8127-moose.dts b/arch/arm/boot/dts/mt8127-moose.dts
+> > new file mode 100644
+> > index 0000000..602e2f0
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/mt8127-moose.dts
+> > @@ -0,0 +1,24 @@
+> > +/*
+> > + * Copyright (c) 2014 MediaTek Inc.
+> > + * Author: Joe.C <yingjoe.chen@mediatek.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +/dts-v1/;
+> > +#include "mt8127.dtsi"
+> > +
+> > +/ {
+> > +       model = "mediatek,mt8127-moose", "mediatek,mt8127";
 > 
-> Thanks, queued for v3.18.
+> The model should be a string that identifies the board, e.g. "Moose".
+> Please add the compatible property.
 
-This is not on v3.18, what happened ?
+Thanks for catching this. I just note we have warning on this line.
+Will fix in next version.
 
-$ git log --author=balbi at ti.com linus/master ^v3.17 -- arch/arm/mach-omap2/omap_hwmod.c
-$
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141103/355af47a/attachment.sig>
+Joe.C
