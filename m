@@ -1,108 +1,141 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 4 Nov 2014 09:54:19 +0100
-Subject: [PATCH v3 0/9] PM / Domains: Fix race conditions during boot
-In-Reply-To: <2024276.CFr3nVUAlA@vostro.rjw.lan>
-References: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
- <5370046.DXkB0EA6xC@vostro.rjw.lan>
- <CAPDyKFo_sxW8bE=C29fyfsqOO0tk_=eYFRkCVFRWc2kUx_bQHA@mail.gmail.com>
- <2024276.CFr3nVUAlA@vostro.rjw.lan>
-Message-ID: <CAPDyKFp=T8Luomeaoz5Y=eLAuFaOfdb+-aoU3QVnpjoDYVKPjg@mail.gmail.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 4 Nov 2014 16:25:11 +0800
+Subject: [PATCH 7/7] can: m_can: workaround for transmit data less than
+ 4 bytes
+In-Reply-To: <5457B1D1.6080301@pengutronix.de>
+References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
+ <1414579527-31100-7-git-send-email-b29396@freescale.com>
+ <5457B1D1.6080301@pengutronix.de>
+Message-ID: <20141104082505.GA8060@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+On Mon, Nov 03, 2014 at 05:48:17PM +0100, Marc Kleine-Budde wrote:
+> On 10/29/2014 11:45 AM, Dong Aisheng wrote:
+> > We meet an IC issue that we have to write the full 8 bytes (whatever
+> > value for the second word) in Message RAM to avoid bit error for transmit
+> > data less than 4 bytes.
+> 
+> Is this a SoC or a m_can problem? Are all versions of the SoC/m_can
+> affected? Is there a m_can version register somewhere?
+> 
 
-> Generally, there are two or even three levels of runtime PM handling,
-> driver, (possibly) bus type and (possibly) PM domain (and multiple levels
-> of these are possible in principle).  All of them have to be initialized
-> at different times.
->
-> Quite arguably, the PM domain and/or bus type runtime PM handling should
-> be initialized even before registerind the device or during device
-> registration.  Doing that later may be too late.  When the device has been
-> registered, runtime PM should work to an extent allowing the driver to access
-> the device and configure it further after calling pm_runtime_resume().
->
-> Of course, if ->probe() is to call pm_runtime_resume() for this purpose,
-> it must take the fact that the driver's own ->runtime_resume() may be called
-> as a result of this into account.  That's why I'm asking whether or not the
-> core should call pm_runtime_resume() before calling really_probe() in a
-> followup branch of this thread.
+I'm still not sure it's SoC or m_can problem.
+Our IC guys ran the simulation code and found this issue.
+But due to some reasons, it may be very slow for they to investigate
+and get the conclusion.
 
-I am reading the other thread, let's see.
+> > Without the workaround, we can easily see the following errors:
+> > root at imx6qdlsolo:~# ip link set can0 up type can bitrate 1000000
+> > [   66.882520] IPv6: ADDRCONF(NETDEV_CHANGE): can0: link becomes ready
+> > root at imx6qdlsolo:~# cansend can0 123#112233
+> > [   66.935640] m_can 20e8000.can can0: Bit Error Uncorrected
+> > 
+> > Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> > ---
+> >  drivers/net/can/m_can/m_can.c | 11 ++++++++++-
+> >  1 file changed, 10 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
+> > index 219e0e3..f2d9ebe 100644
+> > --- a/drivers/net/can/m_can/m_can.c
+> > +++ b/drivers/net/can/m_can/m_can.c
+> > @@ -1058,10 +1058,19 @@ static netdev_tx_t m_can_start_xmit(struct sk_buff *skb,
+> >  	m_can_fifo_write(priv, 0, M_CAN_FIFO_ID, id);
+> >  	m_can_fifo_write(priv, 0, M_CAN_FIFO_DLC, can_len2dlc(cf->len) << 16);
+> >  
+> > -	for (i = 0; i < cf->len; i += 4)
+> > +	for (i = 0; i < cf->len; i += 4) {
+> >  		m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(i / 4),
+> >  				 *(u32 *)(cf->data + i));
+> >  
+> > +		/* FIXME: we meet an IC issue that we have to write the full 8
+> 
+> FIXME usually indicates that the driver needs some work here. Just
+> describe your hardware bug, you might add a reference to an errata if
+> available, though.
+> 
 
->
-> The driver's own runtime PM handling must be initialized in the driver and
-> the only place suitable for that is ->probe().  However, it needs to be done
-> *before* the driver's own ->runtime_resume() or ->runtime_suspend() callback
-> is executed.  If that is done properly, it should be possible to cover
-> both the CONFIG_PM_RUNTIME set/unset cases in that code.
->
-> And I wouldn't recommend anyone to do the runtime PM initialization in
-> ->runtime_resume() (when it is called for the first time), as that would be
-> error prone and fragile.
+We don't have an errata for it now.
+Because i'm not sure this is the final workaround and also not sure if other
+SoC vendors having the same issue, so i used FIXME here firstly.
+Since the code is harmless, so i wish we could put it here first
+until we find evidence no need for other SoC or only belong to specific
+IP version.
 
-Great! That's means we are at least aligned on this topic. :-)
+> > +		 * bytes (whatever value for the second word) in Message RAM to
+> > +		 * avoid bit error for transmit data less than 4 bytes
+> > +		 */
+> > +		if (cf->len <= 4)
+> > +			m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(i / 4 + 1),
+> > +					 0x0);
+> 
+> This workaround doesn't handle the dlc == 0 case, your error description
+> isn't completely if this is a problem, too.
+> 
 
->
->> The AMBA bus and some of its drivers a good example of how this has
->> been implemented:
->> driver/amba/bus.c
->> drivers/mmc/host/mmci.c
->> drivers/spi/spi-pl022.c
->>
->> This conclusion I have made from this is:
->> - Using pm_runtime_get_sync() during the ->probe() path to explicitly
->> power up a PM domain, is not suitable as the _common_ solution to
->> solve the race condition. It certainly may work for some scenarios,
->> but not for those I am looking at.
->
-> I think, however, that it might work if the core calls pm_runtime_get_sync()
-> from driver_probe_device().
+You're right.
+I just checked the dlc == 0 case also had such issue and it also needs
+the extra 8 bytes write to avoid such issue.
 
-Currently this won't work.
+BTW the issue only happened on the first time when you send a frame with no
+data(dlc == 0) at the first time.
+e.g.
+root at imx6sxsabresd:~# ip link set can0 up type can bitrate 1000000
+[   62.326014] IPv6: ADDRCONF(NETDEV_CHANGE): can0: link becomes ready
+root at imx6sxsabresd:~# cansend can0 123#R
+[   69.233645] m_can 20e8000.can can0: Bit Error Uncorrected
+[   69.239167] m_can 20e8000.can can0: Bit Error Corrected
 
-That's because the buses' ->probe() are invoked in this path and they
-are doing the attachment of the device to its PM domain.
+If we send a frame success first (e.g. 5 bytes data), it will not fail
+again even you send no data frame (dlc == 0) later.
 
-In other words, we can't power up the PM domain using
-pm_runtime_get_sync(), until the device has been attached to its PM
-domain. Right?
+The former failure of sending data less than 4 bytes is similar.
 
-[...]
+Looks like the first 8 bytes of message ram has to be initialised
+for the first using.
 
->> For PM domains that are initialized in powered off state, we can't
->> rely on CONFIG_PM_RUNTIME and thus not on pm_runtime_get_sync() to
->> power on these PM domains. We need a different mechanism, which is
->> suggested in this v3 patchset.
->
-> That is quite simple to address, though.  You can register a bus type
-> notifier that will power up the domain on BUS_NOTIFY_ADD_DEVICE events
-> (where the target device belongs to the domain), and do that only for
-> CONFIG_PM_RUNTIME unset (otherwise runtime PM should take care of this).
+> It should be possible to change the for loop to go always to 8, or
+> simply unroll the loop:
+> 
+> /* errata description goes here */
+> m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0), *(u32 *)(cf->data + 0));
+> m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1), *(u32 *)(cf->data + 4));
+> 
 
-I guess we could use notifiers, but I am not sure I see any benefit.
-The code will be more complex and we need error handling as well.
+Yes, i tried to fix it as follows.
 
->
->> The requirement of being able to initialize PM domains in powered off
->> state, was raised during review of v2 of this patchset. I do realize
->> that's not easy for you to keep track and remember of all discussions.
->> I apologize for not providing this as the topmost important argument
->> to why pm_runtime_get_sync() can't be used, in my reply to Kevin.
->
-> OK
->
-> It looks like we need an agreement on what to do and what the expectations
-> should be for each driver core operation at the high level.  That is,
-> what ->probe() should expect, what ->remove() should expect, what the
-> state after executing each of them should be for CONFIG_PM_RUNTIME set and
-> unset etc.  Otherwise we'll always have various bus types doing what *they*
-> think is appropriate and not agreeing with each other.
->
-> --
-> I speak only for myself.
-> Rafael J. Wysocki, Intel Open Source Technology Center.
+/* FIXME: we meet an IC issue that we have to write the full 8
+ * bytes (whatever value for the second word) in Message RAM to
+ * avoid bit error for transmit data less than 4 bytes
+ */
+if (cf->len <= 4) {
+        m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0),
+                         *(u32 *)(cf->data + 0));
+        m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1),
+                         *(u32 *)(cf->data + 4));
+} else {
+        for (i = 0; i < cf->len; i += 4)
+                m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(i / 4),
+                                 *(u32 *)(cf->data + i));
 
-Kind regards
-Uffe
+Will update the patch.
+
+Regards
+Dong Aisheng
+
+> > +	}
+> > +
+> >  	can_put_echo_skb(skb, dev, 0);
+> >  
+> >  	if (priv->can.ctrlmode & CAN_CTRLMODE_FD) {
+> > 
+> 
+> Marc
+> 
+> -- 
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> 
