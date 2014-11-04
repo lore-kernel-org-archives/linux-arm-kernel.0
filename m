@@ -1,97 +1,37 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 4 Nov 2014 09:12:20 -0800
-Subject: [PATCH v2 2/2] [usb] add support for ACPI identification to
- xhci-platform
-In-Reply-To: <1415119833-9135-2-git-send-email-mlangsdo@redhat.com>
-References: <1414692989-23128-2-git-send-email-mlangsdo@redhat.com>
- <1415119833-9135-1-git-send-email-mlangsdo@redhat.com>
- <1415119833-9135-2-git-send-email-mlangsdo@redhat.com>
-Message-ID: <20141104171220.GA30385@kroah.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 4 Nov 2014 17:19:40 +0000
+Subject: [PATCH 3.17-rc4 v7 0/6] arm: Implement
+ arch_trigger_all_cpu_backtrace
+In-Reply-To: <54590755.1070204@linaro.org>
+References: <1410970218-28847-1-git-send-email-daniel.thompson@linaro.org>
+ <CAD8Lp44gPOBh_q1zDy3y1GkrRVAvix5YaNr-+E92+g8Q7fLKJA@mail.gmail.com>
+ <20141014233126.GF27405@n2100.arm.linux.org.uk>
+ <543F90ED.5030005@linaro.org> <54590755.1070204@linaro.org>
+Message-ID: <20141104171939.GI4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 04, 2014 at 10:50:33AM -0600, Mark Langsdorf wrote:
-> Provide the methods to let ACPI identify the need to use
-> xhci-platform. Change the Kconfig files so the
-> xhci-plat.o file is selectable during kernel config.
+On Tue, Nov 04, 2014 at 05:05:25PM +0000, Daniel Thompson wrote:
+> This week with the help of one of my colleagues (thanks Tixy) I have
+> been able to run some tests and figure out what it going on on vexpress-a9.
 > 
-> Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
-> ---
-> Changes from v1
-> 	Renamed from "add support for APM X-Gene to xhci-platform"
-> 	Removed changes to arm64/Kconfig
-> 	Made CONFIG_USB_XHCI_PLATFORM a user selectable config option
+> The summary is that on some GICv1 implementations the bit to enable
+> group 1 interrupts cannot be accessed using secure memory accesses. More
+> specifically the presence/absence of the EnableGrp1 bit in the secure
+> version GICD_CTRL register is implementation defined.
 > 
->  drivers/usb/host/Kconfig     |  7 ++++++-
->  drivers/usb/host/xhci-plat.c | 11 +++++++++++
->  2 files changed, 17 insertions(+), 1 deletion(-)
+> My original patches overlooked this and as a result the existing code
+> will migrate all interrupts to group but then cannot enable delivery of
+> group 1 interrupts.
 > 
-> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> index 82800a7..060a2361 100644
-> --- a/drivers/usb/host/Kconfig
-> +++ b/drivers/usb/host/Kconfig
-> @@ -27,7 +27,12 @@ config USB_XHCI_HCD
->  if USB_XHCI_HCD
->  
->  config USB_XHCI_PLATFORM
-> -	tristate
-> +	tristate "xHCI platform driver support"
-> +	--help--
-> +	  Say 'Y' to enable the support for the xHCI host controller
-> +	  as a platform device. Many ARM SoCs provide USB this way.
-> +
-> +	  If unsure, say 'Y'.
+> I'm planning to respin the code so it will automatically disable FIQ
+> support when the EnableGrp1 bit is not implemented. This means
+> vexpress-a9 will not benefit from FIQ support but will also not be
+> harmed by it.
 
-You really want a 'default Y' response here?
+That's good news, and it should mean that the Versatile Express starts
+booting on the nightly boot tests again.  Thanks for looking into it.
 
-That's not good at all, what happens if I select this on a system
-without such hardware?
-
-
->  
->  config USB_XHCI_MVEBU
->  	tristate "xHCI support for Marvell Armada 375/38x"
-> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> index 91c7557..3db47ea 100644
-> --- a/drivers/usb/host/xhci-plat.c
-> +++ b/drivers/usb/host/xhci-plat.c
-> @@ -18,6 +18,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/slab.h>
->  #include <linux/usb/xhci_pdriver.h>
-> +#include <linux/acpi.h>
->  
->  #include "xhci.h"
->  #include "xhci-mvebu.h"
-> @@ -287,6 +288,15 @@ static const struct of_device_id usb_xhci_of_match[] = {
->  MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
->  #endif
->  
-> +#ifdef CONFIG_ACPI
-> +static const struct acpi_device_id usb_xhci_acpi_match[] = {
-> +	/* APM X-Gene USB Controller */
-> +	{ "PNP0D10", },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(acpi, usb_xhci_acpi_match);
-> +#endif
-
-That looks like a very "generic" PNP value, are you sure it is assigned
-only to this specific device?
-
-> +
->  static struct platform_driver usb_xhci_driver = {
->  	.probe	= xhci_plat_probe,
->  	.remove	= xhci_plat_remove,
-> @@ -294,6 +304,7 @@ static struct platform_driver usb_xhci_driver = {
->  		.name = "xhci-hcd",
->  		.pm = DEV_PM_OPS,
->  		.of_match_table = of_match_ptr(usb_xhci_of_match),
-> +		.acpi_match_table = ACPI_PTR(usb_xhci_acpi_match),
-
-Shouldn't the reworked driver core code handle this differently with the
-ability to handle either OF or ACPI in the same driver?
-
-thanks,
-
-greg k-h
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
