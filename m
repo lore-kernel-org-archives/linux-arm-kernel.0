@@ -1,46 +1,87 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 4 Nov 2014 15:28:39 +0100 (CET)
-Subject: [V10 PATCH 2/2] irqchip: gicv2m: Add supports for ARM GICv2m
- MSI(-X)
-In-Reply-To: <5458E0BE.2090803@amd.com>
-References: <1415052977-26036-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1415052977-26036-3-git-send-email-suravee.suthikulpanit@amd.com>
- <alpine.DEB.2.11.1411032300160.5308@nanos> <54584681.2010103@amd.com>
- <alpine.DEB.2.11.1411040903340.5308@nanos>
- <5458E0BE.2090803@amd.com>
-Message-ID: <alpine.DEB.2.11.1411041526100.4245@nanos>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 4 Nov 2014 15:31:17 +0100
+Subject: [RFC Patch 1/4] mfd: AXP20x: Add power supply bindings
+ documentation
+In-Reply-To: <20141103210244.1425e0c7@neptune.home>
+References: <20141020221959.2f312906@neptune.home>
+ <20141020223314.0484f795@neptune.home> <20141021101503.GE26842@x1>
+ <20141021180916.432f02e1@neptune.home>
+ <20141021191905.GR21108@lukather>
+ <20141103210244.1425e0c7@neptune.home>
+Message-ID: <20141104143117.GC26729@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Nov 2014, Suravee Suthikulpanit wrote:
-> And that's what I am trying to do here except that GIC is expecting that
-> information to be passed to it via irq_domain_alloc_irqs(..., args) where args
-> is struct of_phandle_args (e.g. in the kernel/irqdomain.c:
-> irq_create_of_mapping). This works fine when specifying interrupt from DT, but
-> that is not always the case.
-> 
-> Currently, I can just create a fake of_phandle_args just to pass the hwirq
-> information to GIC.
-> 
->     --> gicv2m_setup_msi_irq()
->      |    struct of_phandle_args phan;
->      |    phan.np = NULL;
->      |    phan.args_count = 3;
->      |    phan.args[0] = 0;
->      |    phan.args[1] = hwirq - 32;
->      |    phan.args[2] = IRQ_TYPE_EDGE_RISING;
->      |--> irq_domain_alloc_irqs(d, 1, NUMA_NO_NODE, &phan);
->       |--> gicv2m_domain_alloc(d, virq, nr_irqs, arg)
-> 	|--> irq_domain_alloc_irqs_parent(d, virq, nr_irqs, arg);
-> 
-> I am trying to figure out what would be a common data structure for this
-> purpose that would work for both Dt and non-DT case (e.g. GICv2m MSI). Unless
-> you think this is ok.
+Hi Bruno,
 
-You need to sort that out with Marc. It needs to be done in a way
-which is usable for the other potential use cases of stacked domains
-on top of GIC.
+On Mon, Nov 03, 2014 at 09:02:44PM +0100, Bruno Pr?mont wrote: 
+> Doing something like this?:
+> 
+> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> @@ -126,9 +126,11 @@
+>                                 interrupt-controller;
+>                                 #interrupt-cells = <1>;
+>  
+> -                               backup = <3000000 200>;
+> -                               battery.resistance = <100>;
+> -                               battery.capacity = <2000>;
+> +                               x-powers,backup = <3000000 200>;
 
-Thanks,
+I don't really remember what was that property used for. Would it make
+sense to put it into the battery node?
 
-	tglx
+> +                               battery: battery at 0 {
+> +                                       x-powers,resistance = <100>;
+> +                                       x-powers,capacity = <2000>;
+> +                               };
+>                         };
+>                 };
+> 
+> What are the rules to define the label after the colon?
+> Looking at the existing nodes it's either some address or a number...
+
+It's not called the label, but the node name, and it's defined in the
+ePAPR.
+
+It's <device-class>[@<address>]
+
+The address being something to identify the node on a bus, so it can
+be a chip select number, a memory address, an i2c address,
+etc. there's really no absolute answer here.
+
+I don't think you really need one in this case.
+
+> and then the following in driver code (also adjusting the other
+> property names accessed)?:
+> 
+> @@ -678,11 +677,11 @@ static int axp20x_battery_config(struct platform_device *pdev,
+>         if (ret)
+>                 return ret;
+>  
+> -       np = of_node_get(axp20x->dev->of_node);
+> +       np = of_find_node_by_name(axp20x->dev->of_node, "battery");
+>         if (!np)
+>                 return -ENODEV;
+>  
+> -       ret = of_property_read_u32_array(np, "battery.ocv", ocv, 16);
+> +       ret = of_property_read_u32_array(np, "x-powers,ocv", ocv, 16);
+>         for (i = 0; ret == 0 && i < ARRAY_SIZE(ocv); i++)
+>                 if (ocv[i] > 100) {
+>                         dev_warn(&pdev->dev, "OCV[%d] %u > 100\n", i, ocv[i]);
+
+Yep, it looks sensible.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141104/5727ccb9/attachment.sig>
