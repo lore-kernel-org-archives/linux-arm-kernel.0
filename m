@@ -1,57 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  4 Nov 2014 10:50:51 +0900
-Subject: [PATCH 21/34] ARM: shmobile: lager: enable USB3.0
+Date: Tue,  4 Nov 2014 10:50:50 +0900
+Subject: [PATCH 20/34] ARM: shmobile: r8a7790: add USB3.0 device node
 In-Reply-To: <cover.1415059587.git.horms+renesas@verge.net.au>
 References: <cover.1415059587.git.horms+renesas@verge.net.au>
-Message-ID: <37f7c1b0c1ed9465b2e2609ba57bba8a874ddd3c.1415059587.git.horms+renesas@verge.net.au>
+Message-ID: <157fcd8a3e6fb46ad99b615838afe16e8fcebd61.1415059587.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-Since the PHY of USB3.0 and EHCI/OHCI ch2 are the same, the USB3.0
-driver cannot use the phy driver when the EHCI/OHCI ch2 already used it:
-
-phy phy-e6590100.usb-phy.3: phy init failed --> -16
-xhci-hcd: probe of ee000000.usb failed with error -16
-
-If so, we have to unbind the EHCI/OHCI ch2, and then we have to bind
-the USB3.0 driver as the following:
-
-  echo 0000:02:02.0 > /sys/bus/pci/drivers/ehci-pci/unbind
-  echo 0000:02:01.0 > /sys/bus/pci/drivers/ohci-pci/unbind
-  echo ee000000.usb > /sys/bus/platform/drivers/xhci-hcd/bind
-
-Note that there will be pinctrl-related error messages if both
-internal PCI and USB3.0 are enabled but they should be just ignored:
-
-sh-pfc e6060000.pfc: pin GP_5_22 already requested by ee0d0000.pci; cannot claim for ee000000.usb
-sh-pfc e6060000.pfc: pin-182 (ee000000.usb) status -22
-ata1: SATA link down (SStatus 0 SControl 300)
-sh-pfc e6060000.pfc: could not request pin 182 (GP_5_22) from group usb2  on device sh-pfc
-
 Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/r8a7790.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index e96f952..d869f2a 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -466,6 +466,12 @@
- 	pinctrl-names = "default";
- };
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 050e608..ad5df80 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -1186,6 +1186,16 @@
+ 		status = "disabled";
+ 	};
  
-+&xhci {
-+	status = "okay";
-+	pinctrl-0 = <&usb2_pins>;
-+	pinctrl-names = "default";
-+};
++	xhci: usb at ee000000 {
++		compatible = "renesas,xhci-r8a7790";
++		reg = <0 0xee000000 0 0xc00>;
++		interrupts = <0 101 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A7790_CLK_SSUSB>;
++		phys = <&usb2 1>;
++		phy-names = "usb";
++		status = "disabled";
++	};
 +
- &pci2 {
- 	status = "okay";
- 	pinctrl-0 = <&usb2_pins>;
+ 	pci0: pci at ee090000 {
+ 		compatible = "renesas,pci-r8a7790";
+ 		device_type = "pci";
 -- 
 2.1.1
