@@ -1,68 +1,62 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 4 Nov 2014 15:41:05 +0200
-Subject: [PATCH v3 0/5] ARM: keystone: pm: switch to use generic pm domains
-In-Reply-To: <544A99B2.8080507@gmail.com>
-References: <1414074182-25980-1-git-send-email-grygorii.strashko@ti.com>
- <544A99B2.8080507@gmail.com>
-Message-ID: <5458D771.1080109@ti.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 05 Nov 2014 00:42:51 +1100
+Subject: [PATCH] of/platform: Move platform devices under
+ /sys/devices/platform
+In-Reply-To: <1415097920-30014-1-git-send-email-grant.likely@linaro.org>
+References: <1415097920-30014-1-git-send-email-grant.likely@linaro.org>
+Message-ID: <1415108571.19220.13.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+On Tue, 2014-11-04 at 10:45 +0000, Grant Likely wrote:
+> Currently the devices created by drivers/of/platform.c get created at
+> the root of /sys/devices. This goes against the typical pattern for
+> sysfs where the top level /sys/devices structure contains categories of
+> devices, and the structure of devices is placed below that. To fix this,
+> make the code in drivers/of/platform.c follow the drivers/base/platform.c
+> behaviour, and use &platform_bus as the default parent for all new
+> platform_devices and amba_devices.
+> 
+> This change has been discussed for a long time, but nobody has actually
+> acted on it. Userspace code that expects to find devices under a fixed
+> /sys/devices/... path will be affected. It isn't /supposed/ to do that,
+> but if anyone complains then I'll add a default-off workaround option to
+> put them back into the root.
 
-On 10/24/2014 09:25 PM, Santosh Shilimkar wrote:
-> On 10/23/2014 07:22 AM, Grygorii Strashko wrote:
->> Hi Santosh, Kevin,
->>
->> This series switches Keystone 2 PM code to use Generic PM domains
->> instead of PM clock domains because of the lack of DT support
->> for the last.
->> It will finally allow to enable Runtime PM for Keystone 2.
->>
->> Patch 1 was reused from [1].
->>
->> RFC version of patches can be found at [2].
->>
->> Changes in v3:
->>   - handling of the case when !CONFIG_PM_RUNTIME has been
->>     moved in PM clock framework.
->>
->> Changes in v2:
->> - minor comments applied and rebased on top of Linux 3.18-rc1.
->>
->> Links on previous versions:
->> v2:  https://lkml.org/lkml/2014/10/20/248
->> v1:  https://lkml.org/lkml/2014/9/29/382
->>
->> [1] "[PATCH/RFC 0/4] of: Register clocks for Runtime PM with PM core"
->>    https://lkml.org/lkml/2014/4/24/1118
->>
->> [2] "[RFC PATCH 0/4] ARM: keystone: pm: switch to use generic pm domains"
->>    https://lkml.org/lkml/2014/9/25/364
->>
->> CC: Santosh Shilimkar <ssantosh@kernel.org>
->> CC: Kevin Hilman <khilman@linaro.org>
->> CC: Ulf Hansson <ulf.hansson@linaro.org>
->> CC: Geert Uytterhoeven <geert@linux-m68k.org>
->> CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->>
->> Geert Uytterhoeven (1):
->>    PM / clock_ops: Add pm_clk_add_clk()
->>
->> Grygorii Strashko (4):
->>    PM / clock_ops: make __pm_clk_enable more generic
->>    PM / clock_ops: add and enable clocks always if !CONFIG_PM_RUNTIME
->>    ARM: keystone: pm: switch to use generic pm domains
->>    ARM: dts: keystone: add generic pm controller node
->>
-> You can split this series. Lets get first 3 patches sorted out as
-> there have been active discussion on those. Once they get direction
-> and merged then you can post the keystone ones which I will be
-> happy to merge.
+Ack !
 
-Sure, will do.
+Cheers,
+Ben.
 
-Sorry, for delayed reply - I was ooo last week.
-
-regards,
--grygorii
+> 
+> Signed-off-by: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> ---
+>  drivers/of/platform.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index 3b64d0bf5bba..7c6771986c06 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -138,7 +138,7 @@ struct platform_device *of_device_alloc(struct device_node *np,
+>  	}
+>  
+>  	dev->dev.of_node = of_node_get(np);
+> -	dev->dev.parent = parent;
+> +	dev->dev.parent = parent ? : &platform_bus;
+>  
+>  	if (bus_id)
+>  		dev_set_name(&dev->dev, "%s", bus_id);
+> @@ -291,7 +291,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
+>  
+>  	/* setup generic device info */
+>  	dev->dev.of_node = of_node_get(node);
+> -	dev->dev.parent = parent;
+> +	dev->dev.parent = parent ? : &platform_bus;
+>  	dev->dev.platform_data = platform_data;
+>  	if (bus_id)
+>  		dev_set_name(&dev->dev, "%s", bus_id);
