@@ -1,33 +1,47 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 04 Nov 2014 23:50:33 +0100
-Subject: [PATCH] leds: leds-gpio: Convert gpio_blink_set() to use GPIO
- descriptors
-In-Reply-To: <545843B1.3020101@nvidia.com>
-References: <1414755658-96293-1-git-send-email-mika.westerberg@linux.intel.com>
- <545843B1.3020101@nvidia.com>
-Message-ID: <2455157.3p7mHhT8im@vostro.rjw.lan>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 4 Nov 2014 14:30:54 -0800
+Subject: [GIT PULL] Renesas ARM Based SoC Clocks Updates for v3.19
+In-Reply-To: <cover.1414558424.git.horms+renesas@verge.net.au>
+References: <cover.1414558424.git.horms+renesas@verge.net.au>
+Message-ID: <20141104223054.GB5908@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 04, 2014 12:10:41 PM Alexandre Courbot wrote:
-> On 10/31/2014 08:40 PM, Mika Westerberg wrote:
-> > Commit 21f2aae91e902aad ("leds: leds-gpio: Add support for GPIO
-> > descriptors") already converted most of the driver to use GPIO descriptors.
-> > What is still missing is the platform specific hook gpio_blink_set() and
-> > board files which pass legacy GPIO numbers to this driver in platform data.
-> >
-> > In this patch we handle the former and convert gpio_blink_set() to take
-> > GPIO descriptor instead. In order to do this we convert the existing four
-> > users to accept GPIO descriptor and translate it to legacy GPIO number in
-> > the platform code. This effectively "pushes" legacy GPIO number usage from
-> > the driver to platforms.
-> >
-> > Also add comment to the remaining block describing that it is legacy code
-> > path and we are getting rid of it eventually.
-> >
-> > Suggested-by: Linus Walleij <linus.walleij@linaro.org>
-> > Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+On Wed, Oct 29, 2014 at 01:58:17PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Acked-by: Alexandre Courbot <acourbot@nvidia.com>
+> Please consider these Renesas ARM based SoC clocks updates for v3.19.
+> 
+> 
+> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+> 
+>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clocks-for-v3.19
+> 
+> for you to fetch changes up to 2b02b8020fad6ed505ff9cfb1b418c4b59f102a5:
+> 
+>   ARM: shmobile: r8a7740 legacy: Add missing INTCA clock for irqpin module (2014-10-24 10:30:50 +0900)
+> 
+> ----------------------------------------------------------------
+> Renesas ARM Based SoC Clocks Updates for v3.19
+> 
+> * Add missing INTCA clock for irqpin module on r8a7740
+> 
+> ----------------------------------------------------------------
+> Geert Uytterhoeven (1):
+>       ARM: shmobile: r8a7740 legacy: Add missing INTCA clock for irqpin module
 
-Patch applied, thanks everyone!
+Hi,
+
+I'm trying to categorize this patch and it's hard. Is it a fix for a
+bug? Support for new firmware that doesn't enable this clock? How does
+the breakage show itself, and in what circumstances? Essentially, the
+patch description doesn't describe why it's needed and what it fixes.
+
+Which means I don't know where to merge it to.
+
+
+-Olof
