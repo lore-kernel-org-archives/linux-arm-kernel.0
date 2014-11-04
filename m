@@ -1,67 +1,54 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue,  4 Nov 2014 14:07:09 +0100
-Subject: [PATCH 2/3] ARM: dts: vf610: enable USB misc/phy nodes where necessary
-In-Reply-To: <1415106430-6271-1-git-send-email-stefan@agner.ch>
-References: <1415106430-6271-1-git-send-email-stefan@agner.ch>
-Message-ID: <1415106430-6271-3-git-send-email-stefan@agner.ch>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 4 Nov 2014 21:08:04 +0800
+Subject: [PATCH] ARM: dts: imx6qdl-sabresd.dtsi: Fix the microphone route
+In-Reply-To: <1415105769-5358-1-git-send-email-fabio.estevam@freescale.com>
+References: <1415105769-5358-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20141104130803.GM10821@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since restructuring of the device tree files, the USB misc/phy
-nodes are disabled by default. Hence we need to enable those
-explicitly when USB is used.
+On Tue, Nov 04, 2014 at 10:56:09AM -0200, Fabio Estevam wrote:
+> Since commit e409dfbfccf9a49 ("ASoC: dapm: Add a few supply widget sanity 
+> checks") the following error is seen:
+> 
+> imx-wm8962 sound: wm8962 <-> 202c000.ssi mapping ok
+> imx-wm8962 sound: Connecting non-supply widget to supply widget is not supported (AMIC -> MICBIAS)
+> imx-wm8962 sound: ASoC: no dapm match for AMIC --> (null) --> MICBIAS
+> imx-wm8962 sound: ASoC: Failed to add route AMIC -> direct -> MICBIAS
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/boot/dts/vf-colibri.dtsi | 16 ++++++++++++++++
- arch/arm/boot/dts/vf610-twr.dts   |  8 ++++++++
- 2 files changed, 24 insertions(+)
+Any regression behind that error message?
 
-diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
-index ab9616d7..2371760 100644
---- a/arch/arm/boot/dts/vf-colibri.dtsi
-+++ b/arch/arm/boot/dts/vf-colibri.dtsi
-@@ -75,6 +75,22 @@
- 	status = "okay";
- };
- 
-+&usbmisc0 {
-+	status = "okay";
-+};
-+
-+&usbmisc1 {
-+	status = "okay";
-+};
-+
-+&usbphy0 {
-+	status = "okay";
-+};
-+
-+&usbphy1 {
-+	status = "okay";
-+};
-+
- &iomuxc {
- 	vf610-colibri {
- 		pinctrl_gpio_ext: gpio_ext {
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index 793a376..a0f7621 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -294,6 +294,14 @@
- 	status = "okay";
- };
- 
-+&usbmisc0 {
-+	status = "okay";
-+};
-+
-+&usbmisc1 {
-+	status = "okay";
-+};
-+
- &usbphy0 {
- 	status = "okay";
- };
--- 
-2.1.3
+Shawn
+
+> 
+> Invert the route between the microphone and the bias in order to fix it.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Shawn,
+> 
+> commit e409dfbfccf9a49 is not in your tree. It is in Mark's tree at the moment.
+> 
+> If you prefer I can skip mentioning it in the commit log.
+> 
+> The 'AMIC -> MICBIAS' route is also used on mx6sx-sdb and mx6sl-evk boards.
+> 
+>  arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> index d211d5d..d1319bd 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> @@ -107,7 +107,7 @@
+>  			"Headphone Jack", "HPOUTR",
+>  			"Ext Spk", "SPKOUTL",
+>  			"Ext Spk", "SPKOUTR",
+> -			"MICBIAS", "AMIC",
+> +			"AMIC", "MICBIAS",
+>  			"IN3R", "MICBIAS",
+>  			"DMIC", "MICBIAS",
+>  			"DMICDAT", "DMIC";
+> -- 
+> 1.9.1
+> 
