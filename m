@@ -1,42 +1,45 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 4 Nov 2014 11:55:17 +0530
-Subject: [PATCH v2 5/6] ARM: mvebu: add Device Tree description of USB
- cluster controller on Armada 375
-In-Reply-To: <1414164254-13053-6-git-send-email-gregory.clement@free-electrons.com>
-References: <1414164254-13053-1-git-send-email-gregory.clement@free-electrons.com>
- <1414164254-13053-6-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <5458714D.4060107@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 3 Nov 2014 22:32:35 -0800
+Subject: [GIT PULL] Integrator multiplatform migration for v3.19
+In-Reply-To: <CACRpkdafst1j2tp4-=BZMn_P688uUSjeAZEGt26WuD_d521sHQ@mail.gmail.com>
+References: <CACRpkdafst1j2tp4-=BZMn_P688uUSjeAZEGt26WuD_d521sHQ@mail.gmail.com>
+Message-ID: <20141104063235.GG13562@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Oct 22, 2014 at 02:13:04PM +0200, Linus Walleij wrote:
+> Hi ARM SoC folks,
+> 
+> this is the initial set of two patches to migrate the Integrator
+> platforms to multiplatform.
+> 
+> Tested on the Integrator/AP with ARM926EJ-S and Integrator/CP
+> with ARM920T.
+> 
+> Please pull it in for v3.19!
+> 
+> Yours,
+> Linus Walleij
+> 
+> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+> 
+>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+> tags/integrator-multiplatform-for-arm-soc
+> 
+> for you to fetch changes up to 9713497b6c64c67c8763f8f07fad325b193764b6:
+> 
+>   ARM: integrator: set V4T and V5 as default multitargets (2014-10-22
+> 09:49:26 +0200)
+> 
+> ----------------------------------------------------------------
+> Multiplatform migration of the Integrator.
+
+Merged. The patches had better commit texts than the tag though, so please
+feel free to carry forward and/or elaborate just a bit more in the future.
 
 
-On Friday 24 October 2014 08:54 PM, Gregory CLEMENT wrote:
-> On Armada 375, the USB cluster allows to control the cluster composed
-> of the USB2 and USB3 host controllers.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  arch/arm/boot/dts/armada-375.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-> index de6571445cef..8f45cf5d2a50 100644
-> --- a/arch/arm/boot/dts/armada-375.dtsi
-> +++ b/arch/arm/boot/dts/armada-375.dtsi
-> @@ -342,6 +342,12 @@
->  				#clock-cells = <1>;
->  			};
->  
-> +			usbcluster: usb-cluster at 18400 {
-> +				compatible = "marvell,armada-375-usb-cluster";
-> +				reg = <0x18400 0x4>;
-> +				#phy-cells = <1>;
-> +			};
-> +
->  			mbusc: mbus-controller at 20000 {
->  				compatible = "marvell,mbus-controller";
->  				reg = <0x20000 0x100>, <0x20180 0x20>;
-> 
+-Olof
