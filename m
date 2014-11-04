@@ -1,89 +1,26 @@
-From: crope@iki.fi (Antti Palosaari)
-Date: Tue, 04 Nov 2014 21:26:17 +0200
-Subject: [PATCH v2] ARM: imx: Fix the removal of CONFIG_SPI option
-In-Reply-To: <20141104191808.GH8316@pengutronix.de>
-References: <1415096927-4097-1-git-send-email-festevam@gmail.com>
- <20141104152646.GA8450@pengutronix.de> <5458F6F3.8050007@iki.fi>
- <20141104191808.GH8316@pengutronix.de>
-Message-ID: <54592859.7060705@iki.fi>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 4 Nov 2014 20:30:08 +0100
+Subject: [PATCH v3 12/19] arm/arm64: KVM: refactor/wrap vgic_set/get_attr()
+In-Reply-To: <1414776414-13426-13-git-send-email-andre.przywara@arm.com>
+References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
+ <1414776414-13426-13-git-send-email-andre.przywara@arm.com>
+Message-ID: <20141104193008.GO16132@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moikka,
+On Fri, Oct 31, 2014 at 05:26:47PM +0000, Andre Przywara wrote:
+> vgic_set_attr() and vgic_get_attr() contain both code specific for
+> the emulated GIC as well as code for the userland facing, generic
+> part of the GIC.
+> Split the guest GIC facing code of from the generic part to allow
+> easier splitting later.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-On 11/04/2014 09:18 PM, Uwe Kleine-K?nig wrote:
-> Hello,
->
-> On Tue, Nov 04, 2014 at 05:55:31PM +0200, Antti Palosaari wrote:
->> On 11/04/2014 05:26 PM, Uwe Kleine-K?nig wrote:
->>> [Note, this is a resend of a mail I accidently only sent to Fabio
->>> before.]
->>>
->>> Hello,
->>>
->>> On Tue, Nov 04, 2014 at 08:28:47AM -0200, Fabio Estevam wrote:
->>>> From: Fabio Estevam <fabio.estevam@freescale.com>
->>>>
->>>> Since 64546e9fe3a5b8c ("ARM: imx_v6_v7_defconfig updates") and commit
->>>> 0650f855d2e4b0b9 ("ARM: imx_v4_v5_defconfig: Select CONFIG_IMX_WEIM") CONFIG_SPI
->>>> selection was dropped by savedefconfig for imx_v4_v5_defconfig and
->>>> imx_v6_v7_defconfig.
->>>>
->>>> In order to keep the same behaviour as previous kernel versions and avoid
->>>> regressions, let's add CONFIG_SPI option back.
->>>>
->>>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
->>>> ---
->>>> Changes since v1:
->>>> - Add commit id's that caused the issue.
->>> on top of 64546e9fe3a5b8c doing
->>>
->>>          make imx_v6_v7_defconfig
->>>
->>> resulted in CONFIG_SPI=y. That's because MEDIA_SUBDRV_AUTOSELECT selects
->>> SPI and has default y.
->>>
->>> So the commit that really broke imx_v6_v7_defconfig is 7d24c514e8e0
->>> ([media] Kconfig: do not select SPI bus on sub-driver auto-select).
->>> On a side note I wonder how that commit sneaked into v3.17-rc6.
->>>
->>> I think people need to be more aware of the results of Kconfig changes
->>
->> I added that SPI select patch for 3.17-rc1 and it was removed right
->> after I got bug report it should not be there. But there was of
->> course some delay and removal patch went to 3.17-rc6.
-> Still I think that -rc6 is quite late for such a patch. But obviously
-> I'm not the relevant maintainer here and YMMV.
+It's not really clear to me which data is specific to the emulated gic
+and which is not or why you have to do this (yet), for example, the
+_common function is now dealing with the GRP_ADDR case which is very
+GICv2 specific (so far).  But I assume this will make sense as I
+progress through the series.
 
-
-Yes, it is late. I send PULL request last day of rc1, but media fixes 
-are not send for every rc, instead for rc1 and 1-2 times after that, 
-usually very near end of merge window.
-
-
-
->
->> But all in all, it was all happening during 3.17 period and I wonder
->> how it could affect you?
-> Commit 64546e9fe3a5 was based on v3.17-rc3 and so had the "select SPI".
-> That's why savedefconfig removed CONFIG_SPI=y from the minimized config.
->
-> Dropping the select for -rc6 resulted in imx_v6_v7_defconfig not
-> including CONFIG_SPI any more.
->
-> I checked all commits listed by:
->
-> 	git log --oneline linus/master ^e4462ffc1602 -SCONFIG_SPI
->
-> and the two imx defconfigs are the only ones being affected by this
-> issue.
->
-> Best regards
-> Uwe
->
-
-regards
-Antti
-
--- 
-http://palosaari.fi/
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
