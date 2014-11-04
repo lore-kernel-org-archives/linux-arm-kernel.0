@@ -1,54 +1,63 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue,  4 Nov 2014 10:45:20 +0000
-Subject: [PATCH] of/platform: Move platform devices under /sys/devices/platform
-Message-ID: <1415097920-30014-1-git-send-email-grant.likely@linaro.org>
+From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
+Date: Tue,  4 Nov 2014 11:51:16 +0100
+Subject: [PATCH v5 0/8] phy: miphy28lp: Introduce support for MiPHY28lp
+Message-ID: <1415098284-11182-1-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the devices created by drivers/of/platform.c get created at
-the root of /sys/devices. This goes against the typical pattern for
-sysfs where the top level /sys/devices structure contains categories of
-devices, and the structure of devices is placed below that. To fix this,
-make the code in drivers/of/platform.c follow the drivers/base/platform.c
-behaviour, and use &platform_bus as the default parent for all new
-platform_devices and amba_devices.
+Changes in v5:
+ - split TYPE_USB define into TYPE_USB2 & TYPE_USB3
 
-This change has been discussed for a long time, but nobody has actually
-acted on it. Userspace code that expects to find devices under a fixed
-/sys/devices/... path will be affected. It isn't /supposed/ to do that,
-but if anyone complains then I'll add a default-off workaround option to
-put them back into the root.
+Changes in v4:
+ - use a generic phy header file for dt binding 
+ - cosmetic correction
+ - add comments
 
-Signed-off-by: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
----
- drivers/of/platform.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Changes in v3:
+ - split into separate smaller functions and can be resued 
+   for sata / pcie and usb
+ - uses macros for registers and values
+ - cosmetic correction
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 3b64d0bf5bba..7c6771986c06 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -138,7 +138,7 @@ struct platform_device *of_device_alloc(struct device_node *np,
- 	}
- 
- 	dev->dev.of_node = of_node_get(np);
--	dev->dev.parent = parent;
-+	dev->dev.parent = parent ? : &platform_bus;
- 
- 	if (bus_id)
- 		dev_set_name(&dev->dev, "%s", bus_id);
-@@ -291,7 +291,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
- 
- 	/* setup generic device info */
- 	dev->dev.of_node = of_node_get(node);
--	dev->dev.parent = parent;
-+	dev->dev.parent = parent ? : &platform_bus;
- 	dev->dev.platform_data = platform_data;
- 	if (bus_id)
- 		dev_set_name(&dev->dev, "%s", bus_id);
+from Kishon
+ - create a common file for phy
+ - cosmetic correction in phy-miphy28lp.txt file
+ - change initialization of the registers
+from Srinivas
+ - rename and simplify a procedure
+ - Add Tx impedance and SSC support for SATA and PCI
+
+Hi Kishon,
+
+The goal of this series is to add the support of MiPHY28lp Generic PHY.
+I tried to be as close as possible to the MiPHY365x Lee Jones proposal.
+
+Best Regards
+Gabriel.
+
+Gabriel Fernandez (8):
+  phy: miphy28lp: Add Device Tree bindings for the MiPHY28lp
+  phy: miphy28lp: Add PHY header file for DT x Driver defines
+  phy: miphy28lp: Provide support for the MiPHY28lp Generic PHY
+  ARM: DT: STi: STiH407: Add DT node for MiPHY28lp
+  phy: miphy28lp: Add SSC support for SATA
+  phy: miphy28lp: Add SSC support for PCIE
+  phy: miphy28lp: Tune tx impedance across Soc cuts
+  ARM: multi_v7_defconfig: Enable MiPHY28lp - ST's Generic (SATA, PCIe &
+    USB3) PHY
+
+ .../devicetree/bindings/phy/phy-miphy28lp.txt      |  128 ++
+ arch/arm/boot/dts/stih407-b2120.dts                |   11 +
+ arch/arm/boot/dts/stih407.dtsi                     |   65 +
+ arch/arm/configs/multi_v7_defconfig                |    1 +
+ drivers/phy/Kconfig                                |    8 +
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/phy-miphy28lp.c                        | 1283 ++++++++++++++++++++
+ include/dt-bindings/phy/phy.h                      |   18 +
+ 8 files changed, 1515 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
+ create mode 100644 drivers/phy/phy-miphy28lp.c
+ create mode 100644 include/dt-bindings/phy/phy.h
+
 -- 
 1.9.1
