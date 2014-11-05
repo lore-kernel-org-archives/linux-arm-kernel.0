@@ -1,32 +1,85 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  5 Nov 2014 10:12:51 -0200
-Subject: [PATCH] ARM: dts: imx6q-tbs2910: Remove unneeded 'fsl,mode' property
-Message-ID: <1415189571-24035-1-git-send-email-festevam@gmail.com>
+From: linyongting@gmail.com (Lin Yongting)
+Date: Wed,  5 Nov 2014 20:15:20 +0800
+Subject: [PATCH RESEND] ARM: Add unwinding support for memset function
+Message-ID: <1415189721-2693-1-git-send-email-linyongting@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+The memset function never had unwinding annotations added.
+Currently, when accessing NULL pointer by memset occurs the
+backtrace shown will stop at memset or some completely unrelated
+function. Add unwinding annotations in hopes of getting a more
+useful backtrace when accessing NULL pointer by memset, kprobe
+or interrupt.
 
-imx6q-tbs2910 board uses sgtl5000 codec and the machine file (imx-sgtl5000)
-already sets SSI in slave mode and codec in master mode, so there is no need
-for having this property.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Lin Yongting <linyongting@gmail.com>
 ---
- arch/arm/boot/dts/imx6q-tbs2910.dts | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/lib/memset.S |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6q-tbs2910.dts b/arch/arm/boot/dts/imx6q-tbs2910.dts
-index d2a5743..f7427bf 100644
---- a/arch/arm/boot/dts/imx6q-tbs2910.dts
-+++ b/arch/arm/boot/dts/imx6q-tbs2910.dts
-@@ -215,7 +215,6 @@
- };
+diff --git a/arch/arm/lib/memset.S b/arch/arm/lib/memset.S
+index 671455c..a4ee97b 100644
+--- a/arch/arm/lib/memset.S
++++ b/arch/arm/lib/memset.S
+@@ -11,11 +11,13 @@
+  */
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
++#include <asm/unwind.h>
  
- &ssi1 {
--	fsl,mode = "i2s-slave";
- 	status = "okay";
- };
+ 	.text
+ 	.align	5
  
+ ENTRY(memset)
++UNWIND( .fnstart         )
+ 	ands	r3, r0, #3		@ 1 unaligned?
+ 	mov	ip, r0			@ preserve r0 as return value
+ 	bne	6f			@ 1
+@@ -34,6 +36,9 @@ ENTRY(memset)
+  * We need 2 extra registers for this loop - use r8 and the LR
+  */
+ 	stmfd	sp!, {r8, lr}
++UNWIND( .fnend              )
++UNWIND( .fnstart            )
++UNWIND( .save {r8, lr}      )
+ 	mov	r8, r1
+ 	mov	lr, r1
+ 
+@@ -53,6 +58,7 @@ ENTRY(memset)
+ 	tst	r2, #16
+ 	stmneia	ip!, {r1, r3, r8, lr}
+ 	ldmfd	sp!, {r8, lr}
++UNWIND( .fnend              )
+ 
+ #else
+ 
+@@ -62,6 +68,9 @@ ENTRY(memset)
+  */
+ 
+ 	stmfd	sp!, {r4-r8, lr}
++UNWIND( .fnend                 )
++UNWIND( .fnstart               )
++UNWIND( .save {r4-r8, lr}      )
+ 	mov	r4, r1
+ 	mov	r5, r1
+ 	mov	r6, r1
+@@ -94,9 +103,11 @@ ENTRY(memset)
+ 	tst	r2, #16
+ 	stmneia	ip!, {r4-r7}
+ 	ldmfd	sp!, {r4-r8, lr}
++UNWIND( .fnend                 )
+ 
+ #endif
+ 
++UNWIND( .fnstart            )
+ 4:	tst	r2, #8
+ 	stmneia	ip!, {r1, r3}
+ 	tst	r2, #4
+@@ -120,4 +131,5 @@ ENTRY(memset)
+ 	strb	r1, [ip], #1		@ 1
+ 	add	r2, r2, r3		@ 1 (r2 = r2 - (4 - r3))
+ 	b	1b
++UNWIND( .fnend   )
+ ENDPROC(memset)
 -- 
-1.9.1
+1.7.9.5
