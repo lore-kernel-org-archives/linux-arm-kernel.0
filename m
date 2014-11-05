@@ -1,47 +1,37 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 4 Nov 2014 17:33:53 -0800
-Subject: [PATCH] PM / Domains: Change prototype for the ->attach_dev()
- callback
-In-Reply-To: <7h4mul9ttl.fsf@deeprootsystems.com>
-References: <1414670569-3002-1-git-send-email-ulf.hansson@linaro.org>
- <3981560.mBph1QJkfl@vostro.rjw.lan>
- <7h4mul9ttl.fsf@deeprootsystems.com>
-Message-ID: <20141105013353.GA19238@dtor-ws>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 5 Nov 2014 10:56:38 +0900
+Subject: [PATCH 0/2] ARM: shmobile: r8a7791: Correct number of CPU cores
+In-Reply-To: <CANqRtoT4FezTLYr0RC9QzwwHSTSbMA4aJC70K3J42_O22BAgXw@mail.gmail.com>
+References: <1414139589-13605-1-git-send-email-horms+renesas@verge.net.au>
+ <20141105003656.GC2017@verge.net.au>
+ <CANqRtoT4FezTLYr0RC9QzwwHSTSbMA4aJC70K3J42_O22BAgXw@mail.gmail.com>
+Message-ID: <20141105015637.GA32470@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 01:38:30PM -0700, Kevin Hilman wrote:
-> "Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
+On Wed, Nov 05, 2014 at 10:23:34AM +0900, Magnus Damm wrote:
+> Hi Simon,
 > 
-> > On Thursday, October 30, 2014 01:02:49 PM Ulf Hansson wrote:
-> >> Convert the prototype to return and int. This is just an initial step,
-> >> needed to support error handling.
-> >> 
-> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> 
-> Acked-by: Kevin Hilman <khilman@linaro.org>
-> 
-> >> 
-> >> This patch is intended as fix for 3.18 rc[n]. Why?
-> >> 
-> >> There are other SOC specific patches around that adds genpd support and which
-> >> implements the ->attach_dev() callback. To prevent having an "atomic" patch
-> >> during the next release cycle, let's change the prototype now instead.
-> >> 
-> >> Further patches will add the actual error handling in genpd and these can then
-> >> be reviewed and tested thoroughly.
+> On Wed, Nov 5, 2014 at 9:36 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Fri, Oct 24, 2014 at 05:33:07PM +0900, Simon Horman wrote:
+> >> Hi,
+> >>
+> >> this short series separates AMPU resource data as it is not
+> >> common accross R-Car gen2 SoCs: only the r8a7790 (H1) has the resouces
+> >> described. It then corrects the resource data for the r8a7791,
+> >> the only other SoC currently present in mainline that uses this data.
+> >>
+> >> Based on the renesas-next-20141024-v3.18-rc1 tag of my renesas tree.
+> >>
+> >> Hisashi Nakamura (2):
+> >>   ARM: shmobile: Separate APMU resource data into CPU dependant part
+> >>   ARM: shmobile: r8a7791: Correct number of CPU cores
 > >
-> > So we have no users of ->attach_dev at the moment, right?
+> > I have queued up this series.
 > 
-> Not in mainline, but there are a couple getting ready to hit -next, so
-> we wanted to fix this before they arrive so that adding the error
-> handling will be easier.
+> Thanks. I didn't say anything so I should probably be silent, but in
+> the future it would make sense to fold in the fix into the original
+> patch to void merging broken stuff.
 
-BTW, while we are at it, can we also pass the domain itself to
-attach_dev() and detach_dev()? If anything it helps with debugging (you
-can print domain name from the callbacks).
-
-Thanks.
-
--- 
-Dmitry
+I'm not quite sure what you are getting at in relation to this series,
+but yes, in general I agree.
