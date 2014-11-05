@@ -1,50 +1,83 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 5 Nov 2014 10:41:46 +0100
-Subject: [PATCH 1/6] clk: sunxi: Add support for sun9i a80 usb clocks and
- resets
-In-Reply-To: <20141104181219.GJ4042@n2100.arm.linux.org.uk>
-References: <1415074039-16590-1-git-send-email-wens@csie.org>
- <1415074039-16590-2-git-send-email-wens@csie.org>
- <20141104181219.GJ4042@n2100.arm.linux.org.uk>
-Message-ID: <20141105094146.GB27686@lukather>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 5 Nov 2014 10:49:09 +0100
+Subject: [PATCH v3 15/19] arm/arm64: KVM: add opaque private pointer to
+ MMIO accessors
+In-Reply-To: <54593443.4070904@arm.com>
+References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
+ <1414776414-13426-16-git-send-email-andre.przywara@arm.com>
+ <20141104154414.GN16132@cbox> <54590BDA.3050609@arm.com>
+ <5459155D.3070203@arm.com> <20141104191849.GC16138@cbox>
+ <54593443.4070904@arm.com>
+Message-ID: <20141105094909.GA22866@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Tue, Nov 04, 2014 at 06:12:19PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Nov 04, 2014 at 12:07:14PM +0800, Chen-Yu Tsai wrote:
-> > +	spin_lock_irqsave(data->lock, flags);
-> > +
-> > +	reg = readl(data->reg);
-> > +	writel(reg & ~BIT(id), data->reg);
-> > +
-> > +	spin_unlock_irqrestore(data->lock, flags);
+On Tue, Nov 04, 2014 at 08:17:07PM +0000, Marc Zyngier wrote:
+> On 04/11/14 19:18, Christoffer Dall wrote:
+> > On Tue, Nov 04, 2014 at 06:05:17PM +0000, Marc Zyngier wrote:
+> >> On 04/11/14 17:24, Andre Przywara wrote:
+> >>> Hi,
+> >>>
+> >>> On 04/11/14 15:44, Christoffer Dall wrote:
+> >>>> On Fri, Oct 31, 2014 at 05:26:50PM +0000, Andre Przywara wrote:
+> >>>>> For a GICv2 there is always only one (v)CPU involved: the one that
+> >>>>> does the access. On a GICv3 the access to a CPU redistributor is
+> >>>>> memory-mapped, but not banked, so the (v)CPU affected is determined by
+> >>>>> looking at the MMIO address region being accessed.
+> >>>>> To allow passing the affected CPU into the accessors, extend them to
+> >>>>> take an opaque private pointer parameter.
+> >>>>> For the current GICv2 emulation we ignore it and simply pass NULL
+> >>>>> on the call.
+> >>>>>
+> >>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> >>>>
+> >>>> Why does it have to be an opaque private pointer?  Would it not always
+> >>>> be a struct vcpu * or a vcpu_id then?
+> >>>
+> >>> IIRC Marc suggested this once be more future proof. Also a pointer makes
+> >>> it easier to pass NULL in the GICv2 parts of the code, which makes it
+> >>> more obvious that this value is not used in this case.
+> >>>
+> >>> Marc, did I miss some more rationale?
+> >>> Does that still hold?
+> >>
+> >> The main idea was to have a general purpose pointer that you can
+> >> associate with the decoded region. Some form of private context, just
+> >> like we have for a lot of other kernel structures.
+> >>
+> >> Now, I think having that as a explicit pointer looks truly awful. Can't
+> >> that be folded into struct kvm_exit_mmio that is already passed around?
+> >> It would make some sense that the private context is associated with the
+> >> actual access... I haven't seen how that interacts with the GICv3 code
+> >> though.
+> >>
+> > Well, the idea with a (void *private) is to have something, which is
+> > *generic* be reusable and extendable, no argument there.
+> > 
+> > So my question is, are we implementing some generic feature, where
+> > having that extendability makes things better and clearer, or are we
+> > just wrapping an int in a (void *) so we don't have to add another
+> > parameter if sometime in the unknown future we need another additional
+> > piece of information.
+> > 
+> > There are plenty of examples where you just pass NULL to a typed pointer
+> > or 0 to an int parameter as well.
+> > 
+> > I'm not trying to fight the idea of a private pointer, I just want to
+> > make sure we do what we can to keep this code somewhat sane, so if we
+> > have a set of functions where we in 75% of the cases pass a vcpu * and
+> > in the other cases don't, then I really think we want a vcpu *
+> > parameter.
 > 
-> Don't we have generic support for atomic modification of register
-> values?  Hmm, we have it for ARM only - atomic_io_modify() and
-> atomic_io_modify_relaxed().
+> For the time being, I don't see any other use than a vcpu pointer for
+> the GICv3 case. Now, none of the MMIO decoding framework is GICv3
+> specific, and it feels a bit weird to hardcode the idea of a vcpu
+> pointer being passed around for code that doesn't really care about it
+> (GICv2).
 > 
-> I guess we should push for those to become cross-arch if we end up
-> with generic drivers shared between other architectures.
+I don't think it's that bad.  It would be just like pud_free() and
+friends which ignore the struct mm * parameter.  But anyhow, if you
+feeel strongly about one way or the other, then go with it.  I've said
+my piece.
 
-IIRC, the atomic MMIO accessors are doing exactly that, but with a
-global lock for all MMIO accesses, while here we protect a single
-register.
-
-I'm not really sure that sharing this spinlock across the whole system
-is worth it and scales that well.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/85169585/attachment.sig>
+-Christoffer
