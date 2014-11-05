@@ -1,40 +1,33 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 5 Nov 2014 18:13:25 +0100
-Subject: [PATCH 0/2] clk: at91: usb: rate calculation fixes
-In-Reply-To: <1415179995-25062-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1415179995-25062-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <545A5AB5.2040805@atmel.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 5 Nov 2014 09:14:00 -0800
+Subject: [PATCH 5/7] pinctrl: Add driver for Zynq
+In-Reply-To: <5459B1B5.6030001@suse.de>
+References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1415041531-15520-6-git-send-email-soren.brinkmann@xilinx.com>
+ <5459B1B5.6030001@suse.de>
+Message-ID: <77a9809bf6a8476c80d9308a7d3b1ac0@BN1AFFO11FD047.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2014 10:33, Boris Brezillon :
-> Hello,
+On Wed, 2014-11-05 at 06:12AM +0100, Andreas F?rber wrote:
+> Am 03.11.2014 um 20:05 schrieb Soren Brinkmann:
+> > +enum zynq_pinmux_functions {
+> > +	ZYNQ_PMUX_ethernet0,
+> > +	ZYNQ_PMUX_ethernet1,
+> > +	ZYNQ_PMUX_mdio0,
+> > +	ZYNQ_PMUX_mdio1,
+> > +	ZYNQ_PMUX_qspi0,
+> > +	ZYNQ_PMUX_qspi1,
+> > +	ZYNQ_PMUX_qspi_fbclk,
+> > +	ZYNQ_PMUX_qspi_cs1,
 > 
-> Here are a few more fixes for the at91 usb clk driver.
-> 
-> These bugs are related to rate calculation, and have been reported by
-> Andreas.
-> 
-> As this is not my first mistake in this rate calculation algorithm, I'd
-> really like to have reviews/feedback on this fixes to avoid potential
-> regressions.
-> 
-> Mike, when/if we agree on these fixes, can we make them go into one of
-> the 3.18-rc cycle ?
+> Are usb0 and usb1 intentionally missing in this patch for lack of
+> upstream USB driver? If so, then please mention what you left out in the
+> commit message.
 
-Can you give us a hint about the "stable tag" that would be good to add?
+I don't know how that could happen, but no, it's not intentionally
+missing, let's call it accidentally. It just slipped through. Don't
+ask me how I could miss USB.
 
-Bye,
-
-
-> Boris Brezillon (2):
->   clk: at91: usb: fix at91rm9200 round and set rate
->   clk: at91: usb: fix at91sam9x5 recalc, round and set rate
-> 
->  drivers/clk/at91/clk-usb.c | 35 ++++++++++++++++++++---------------
->  1 file changed, 20 insertions(+), 15 deletions(-)
-> 
-
-
--- 
-Nicolas Ferre
+	Thanks,
+	S?ren
