@@ -1,13 +1,15 @@
 From: santosh.shilimkar@oracle.com (santosh.shilimkar@oralce.com)
-Date: Wed, 05 Nov 2014 12:16:14 -0800
+Date: Wed, 05 Nov 2014 12:16:45 -0800
 Subject: [PATCH 1/5] ARM: OMAP3: Fix errors for omap_l3_smx when booted
  with device tree
 In-Reply-To: <1415212550-24692-2-git-send-email-tony@atomide.com>
 References: <1415212550-24692-1-git-send-email-tony@atomide.com>
  <1415212550-24692-2-git-send-email-tony@atomide.com>
-Message-ID: <545A858E.6050701@oracle.com>
+Message-ID: <545A85AD.3030309@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+
 
 On 11/05/2014 10:35 AM, Tony Lindgren wrote:
 > When booting omap3 in device tree mode, we're currently getting
