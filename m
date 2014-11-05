@@ -1,37 +1,36 @@
-From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
-Date: Tue, 4 Nov 2014 20:15:06 -0500
-Subject: [PATCH 11/13] arm: dts: dra7: add DMA properties for UART
-In-Reply-To: <20141104210315.GF24112@csclub.uwaterloo.ca>
-References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
- <1412014009-13315-12-git-send-email-bigeasy@linutronix.de>
- <20141104170233.GB24112@csclub.uwaterloo.ca>
- <5459079D.7080703@linutronix.de>
- <20141104172117.GC24112@csclub.uwaterloo.ca>
- <20141104183315.GD24112@csclub.uwaterloo.ca>
- <20141104210315.GF24112@csclub.uwaterloo.ca>
-Message-ID: <20141105011506.GG24112@csclub.uwaterloo.ca>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 5 Nov 2014 10:23:34 +0900
+Subject: [PATCH 0/2] ARM: shmobile: r8a7791: Correct number of CPU cores
+In-Reply-To: <20141105003656.GC2017@verge.net.au>
+References: <1414139589-13605-1-git-send-email-horms+renesas@verge.net.au>
+ <20141105003656.GC2017@verge.net.au>
+Message-ID: <CANqRtoT4FezTLYr0RC9QzwwHSTSbMA4aJC70K3J42_O22BAgXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 04, 2014 at 04:03:15PM -0500, Lennart Sorensen wrote:
-> So it seems to be working on our board so far.  Will stress test it
-> some more.  No DMA of course for now, but oh well.
+Hi Simon,
 
-Well 4 hours running with multiple reboots (our testsuite reboots every
-30 minutes to test the watchdog).  So far it has only lost 70 bytes out
-of 40MB of data sent between uart7 and uart8 (and we are pretty sure
-the serial test has a small bug that causes a few bytes to be lost right
-after a reboot sometimes).
+On Wed, Nov 5, 2014 at 9:36 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Oct 24, 2014 at 05:33:07PM +0900, Simon Horman wrote:
+>> Hi,
+>>
+>> this short series separates AMPU resource data as it is not
+>> common accross R-Car gen2 SoCs: only the r8a7790 (H1) has the resouces
+>> described. It then corrects the resource data for the r8a7791,
+>> the only other SoC currently present in mainline that uses this data.
+>>
+>> Based on the renesas-next-20141024-v3.18-rc1 tag of my renesas tree.
+>>
+>> Hisashi Nakamura (2):
+>>   ARM: shmobile: Separate APMU resource data into CPU dependant part
+>>   ARM: shmobile: r8a7791: Correct number of CPU cores
+>
+> I have queued up this series.
 
-The reason I am even trying the new driver today is that we were seeing
-soft lockups on the CPU whenever the serial ports were being tested,
-usually in less than 5 minutes, so 4 hours without a lockup is a good
-sign.  No idea what might be wrong with the old omap serial driver, but
-it seems something is (unless of course we managed to break it somehow
-when we tried to solve its habit of dropping characters).
+Thanks. I didn't say anything so I should probably be silent, but in
+the future it would make sense to fold in the fix into the original
+patch to void merging broken stuff.
 
-I think I will stick with this new driver.  Better long term future
-anyhow.
+Cheers,
 
--- 
-Len Sorensen
+/ magnus
