@@ -1,52 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 5 Nov 2014 14:51:17 +0000
-Subject: [PATCHv3 4/5] arm64: Emulate CP15 Barrier instructions
-In-Reply-To: <1414435207-30240-6-git-send-email-punit.agrawal@arm.com>
-References: <1414435207-30240-1-git-send-email-punit.agrawal@arm.com>
- <1414435207-30240-6-git-send-email-punit.agrawal@arm.com>
-Message-ID: <20141105145116.GJ32700@e104818-lin.cambridge.arm.com>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Wed, 5 Nov 2014 15:55:25 +0100
+Subject: [linux-sunxi] [RFC Patch 1/4] mfd: AXP20x: Add power supply
+ bindings documentation
+In-Reply-To: <20141105144832.GB2989@lukather>
+References: <20141020221959.2f312906@neptune.home>
+ <20141020223314.0484f795@neptune.home> <20141021101503.GE26842@x1>
+ <20141021180916.432f02e1@neptune.home> <20141021191905.GR21108@lukather>
+ <20141103210244.1425e0c7@neptune.home> <20141104143117.GC26729@lukather>
+ <20141104220827.773c53d0@neptune.home> <20141105144832.GB2989@lukather>
+Message-ID: <ACF6E448-6936-4212-AB50-0EC4FEEA8C42@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 06:40:06PM +0000, Punit Agrawal wrote:
-> +static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
-> +{
-> +	perf_sw_event(PERF_COUNT_SW_EMULATION_FAULTS, 1, regs, regs->pc);
-> +
-> +	switch (arm_check_condition(instr, regs->pstate)) {
-> +	case ARM_OPCODE_CONDTEST_PASS:
-> +		break;
-> +	case ARM_OPCODE_CONDTEST_FAIL:
-> +		/* Condition failed - return to next instruction */
-> +		goto ret;
-> +	case ARM_OPCODE_CONDTEST_UNCOND:
-> +		/* If unconditional encoding - not a barrier instruction */
-> +		return -EFAULT;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +
-> +	switch (aarch32_insn_mcr_extract_crm(instr)) {
-> +	case 10:
-> +		/*
-> +		 * dmb - mcr p15, 0, Rt, c7, c10, 5
-> +		 * dsb - mcr p15, 0, Rt, c7, c10, 4
-> +		 */
-> +		if (aarch32_insn_mcr_extract_opc2(instr) == 5)
-> +			dmb(sy);
-> +		else
-> +			dsb(sy);
-> +		break;
-> +	case 5:
-> +		/*
-> +		 * isb - mcr p15, 0, Rt, c7, c5, 4
-> +		 */
-> +		isb();
-> +		break;
-> +	}
 
-IIRC we concluded that an isb() isn't needed here as taking an exception
-or returning from one would act as an instruction barrier.
+> Op 5 nov. 2014, om 15:48 heeft Maxime Ripard <maxime.ripard@free-electrons.com> het volgende geschreven:
+> 
+> On Tue, Nov 04, 2014 at 10:08:27PM +0100, Bruno Pr?mont wrote:
+>> On Tue, 04 November 2014 Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+>>> On Mon, Nov 03, 2014 at 09:02:44PM +0100, Bruno Pr?mont wrote: 
+>>>> Doing something like this?:
+>>>> 
+>>>> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+>>>> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+>>>> @@ -126,9 +126,11 @@
+>>>>                                interrupt-controller;
+>>>>                                #interrupt-cells = <1>;
+>>>> 
+>>>> -                               backup = <3000000 200>;
+>>>> -                               battery.resistance = <100>;
+>>>> -                               battery.capacity = <2000>;
+>>>> +                               x-powers,backup = <3000000 200>;
+>>> 
+>>> I don't really remember what was that property used for. Would it make
+>>> sense to put it into the battery node?
+>> 
+>> The backup/rtc battery is completely distinct from main battery.
+>> 
+>> It's presence is in no way related to that of the main battery,
+>> thus I would not put it into the same node.
+>> As all the information needed is included in the property I see
+>> no reason to move it into a separate node.
+> 
+> Oh. So it is to model some button battery that might be here to keep
+> the RTC state while the board is unpowered?
+> 
+> How is that related to the PMIC?
 
--- 
-Catalin
+Some PMICs can recharge it and detect it it's empty or not.
