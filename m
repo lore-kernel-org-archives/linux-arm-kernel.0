@@ -1,53 +1,46 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 5 Nov 2014 16:15:38 +0100
-Subject: [PATCH 11/15] [media] Deprecate v4l2_mbus_pixelcode
-In-Reply-To: <20141105150814.GT3136@valkosipuli.retiisi.org.uk>
-References: <1415094910-15899-1-git-send-email-boris.brezillon@free-electrons.com>
- <1415094910-15899-12-git-send-email-boris.brezillon@free-electrons.com>
- <20141105150814.GT3136@valkosipuli.retiisi.org.uk>
-Message-ID: <20141105161538.7a1686d5@bbrezillon>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed,  5 Nov 2014 16:15:45 +0100
+Subject: [PATCHv9 2/2] pwm: sunxi: document OF bindings
+In-Reply-To: <1415200545-26238-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1415200545-26238-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1415200545-26238-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 5 Nov 2014 17:08:15 +0200
-Sakari Ailus <sakari.ailus@iki.fi> wrote:
+This is the documentation for the Allwinner SoCs PWM bindings.
 
-> Hi Boris,
-> 
-> On Tue, Nov 04, 2014 at 10:55:06AM +0100, Boris Brezillon wrote:
-> > The v4l2_mbus_pixelcode enum (or its values) should be replaced by the
-> > media_bus_format enum.
-> > Keep this enum in v4l2-mediabus.h and create a new header containing
-> > the v4l2_mbus_framefmt struct definition (which is not deprecated) so
-> > that we can add a #warning statement in v4l2-mediabus.h and hopefully
-> > encourage users to move to the new definitions.
-> > 
-> > Replace inclusion of v4l2-mediabus.h with v4l2-mbus.h in all common headers
-> > and update the documentation Makefile to parse v4l2-mbus.h instead of
-> > v4l2-mediabus.h.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> >  Documentation/DocBook/media/Makefile |  2 +-
-> >  include/media/v4l2-mediabus.h        |  2 +-
-> >  include/uapi/linux/Kbuild            |  1 +
-> >  include/uapi/linux/v4l2-mbus.h       | 35 +++++++++++++++++++++++++++++++++++
-> >  include/uapi/linux/v4l2-mediabus.h   | 26 ++++----------------------
-> 
-> I would keep the original file name, even if the compatibility definitions
-> are there. I don't see any harm in having them around as well.
-> 
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ Documentation/devicetree/bindings/pwm/pwm-sun4i.txt | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sun4i.txt
 
-That's the part I was not sure about.
-The goal of this patch (and the following ones) is to deprecate
-v4l2_mbus_pixelcode enum and its values by adding a #warning when
-v4l2-mediabus.h file is included, thus encouraging people to use new
-definitions.
-
-Do you see another solution to generate such warnings at compilation
-time ?
-
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-sun4i.txt b/Documentation/devicetree/bindings/pwm/pwm-sun4i.txt
+new file mode 100644
+index 000000000000..ae0273e19506
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/pwm-sun4i.txt
+@@ -0,0 +1,20 @@
++Allwinner sun4i and sun7i SoC PWM controller
++
++Required properties:
++  - compatible: should be one of:
++    - "allwinner,sun4i-a10-pwm"
++    - "allwinner,sun7i-a20-pwm"
++  - reg: physical base address and length of the controller's registers
++  - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
++    the cells format.
++  - clocks: From common clock binding, handle to the parent clock.
++
++Example:
++
++	pwm: pwm at 01c20e00 {
++		compatible = "allwinner,sun7i-a20-pwm";
++		reg = <0x01c20e00 0xc>;
++		clocks = <&osc24M>;
++		#pwm-cells = <3>;
++		status = "disabled";
++	};
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.1.0
