@@ -1,72 +1,38 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 5 Nov 2014 10:05:11 -0500
-Subject: [PATCHv3 5/5] arm64: Trace emulation of AArch32 legacy
- instructions
-In-Reply-To: <20141105144619.GI32700@e104818-lin.cambridge.arm.com>
-References: <1414435207-30240-1-git-send-email-punit.agrawal@arm.com>
- <1414435207-30240-7-git-send-email-punit.agrawal@arm.com>
- <20141105144619.GI32700@e104818-lin.cambridge.arm.com>
-Message-ID: <20141105100511.2daef605@gandalf.local.home>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Wed, 5 Nov 2014 17:08:15 +0200
+Subject: [PATCH 11/15] [media] Deprecate v4l2_mbus_pixelcode
+In-Reply-To: <1415094910-15899-12-git-send-email-boris.brezillon@free-electrons.com>
+References: <1415094910-15899-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1415094910-15899-12-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20141105150814.GT3136@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 5 Nov 2014 14:46:19 +0000
-Catalin Marinas <catalin.marinas@arm.com> wrote:
+Hi Boris,
 
-> On Mon, Oct 27, 2014 at 06:40:07PM +0000, Punit Agrawal wrote:
-> > Introduce an event to trace the usage of emulated instructions. The
-> > trace event is intended to help identify and encourage the migration
-> > of legacy software using the emulation features.
-> > 
-> > Use this event to trace usage of swp and CP15 barrier emulation.
-> > 
-> > Cc: Steven Rostedt <rostedt@goodmis.org>
-> > Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> > ---
-> >  arch/arm64/kernel/Makefile                 |  1 +
-> >  arch/arm64/kernel/armv8_deprecated.c       | 19 ++++++++++++--
-> >  arch/arm64/kernel/trace-events-emulation.h | 40 ++++++++++++++++++++++++++++++
-> >  3 files changed, 58 insertions(+), 2 deletions(-)
-> >  create mode 100644 arch/arm64/kernel/trace-events-emulation.h
-> > 
-> > diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> > index 5362578..1fc7abd 100644
-> > --- a/arch/arm64/kernel/Makefile
-> > +++ b/arch/arm64/kernel/Makefile
-> > @@ -5,6 +5,7 @@
-> >  CPPFLAGS_vmlinux.lds	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
-> >  AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
-> >  CFLAGS_efi-stub.o 	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
-> > +CFLAGS_armv8_deprecated.o := -I$(src)
+On Tue, Nov 04, 2014 at 10:55:06AM +0100, Boris Brezillon wrote:
+> The v4l2_mbus_pixelcode enum (or its values) should be replaced by the
+> media_bus_format enum.
+> Keep this enum in v4l2-mediabus.h and create a new header containing
+> the v4l2_mbus_framefmt struct definition (which is not deprecated) so
+> that we can add a #warning statement in v4l2-mediabus.h and hopefully
+> encourage users to move to the new definitions.
 > 
-> Why do you need this?
-
-It has to do with the TRACE_EVENT magic.
-
-Read samples/trace_events/Makefile
-
+> Replace inclusion of v4l2-mediabus.h with v4l2-mbus.h in all common headers
+> and update the documentation Makefile to parse v4l2-mbus.h instead of
+> v4l2-mediabus.h.
 > 
-> >  CFLAGS_REMOVE_ftrace.o = -pg
-> >  CFLAGS_REMOVE_insn.o = -pg
-> > diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-> > index fded15f..d376fe2 100644
-> > --- a/arch/arm64/kernel/armv8_deprecated.c
-> > +++ b/arch/arm64/kernel/armv8_deprecated.c
-> > @@ -15,6 +15,9 @@
-> >  #include <linux/slab.h>
-> >  #include <linux/sysctl.h>
-> >  
-> > +#define CREATE_TRACE_POINTS
-> > +#include "trace-events-emulation.h"
-> 
-> Using double quotes should be fine for the current directory.
-> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  Documentation/DocBook/media/Makefile |  2 +-
+>  include/media/v4l2-mediabus.h        |  2 +-
+>  include/uapi/linux/Kbuild            |  1 +
+>  include/uapi/linux/v4l2-mbus.h       | 35 +++++++++++++++++++++++++++++++++++
+>  include/uapi/linux/v4l2-mediabus.h   | 26 ++++----------------------
 
-No it is not enough. It not only gets included by this file, but also
-gets included by include/trace/ftrace.h with:
+I would keep the original file name, even if the compatibility definitions
+are there. I don't see any harm in having them around as well.
 
-#include TRACE_INCLUDE(TRACE_INCLUDE_FILE)
-
-Without that -I$(src) added, this include will fail.
-
--- Steve
+-- 
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
