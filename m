@@ -1,37 +1,64 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Thu, 6 Nov 2014 00:45:56 +0100
-Subject: N900 modem support in 3.18-rc1
-In-Reply-To: <20141105220359.GA32052@amd>
-References: <20141104205117.GA17606@amd> <201411052137.31452@pali>
- <20141105203918.GA29199@amd> <201411052206.05379@pali>
- <20141105220359.GA32052@amd>
-Message-ID: <20141105234555.GA7097@earth.universe>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 6 Nov 2014 00:48:41 +0100 (CET)
+Subject: [Patch Part2 v4 01/31] irqdomain: Introduce new interfaces to
+ support hierarchy irqdomains
+In-Reply-To: <1415102525-9898-2-git-send-email-jiang.liu@linux.intel.com>
+References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
+ <1415102525-9898-2-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <alpine.DEB.2.11.1411060044100.24960@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 4 Nov 2014, Jiang Liu wrote:
+>  /* Number of irqs reserved for a legacy isa controller */
+>  #define NUM_ISA_INTERRUPTS	16
+> @@ -64,6 +66,16 @@ struct irq_domain_ops {
+>  	int (*xlate)(struct irq_domain *d, struct device_node *node,
+>  		     const u32 *intspec, unsigned int intsize,
+>  		     unsigned long *out_hwirq, unsigned int *out_type);
+> +
+> +#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
+> +	/* extended V2 interfaces to support hierarchy irq_domains */
+> +	int (*alloc)(struct irq_domain *d, unsigned int virq,
+> +		     unsigned int nr_irqs, void *arg);
+> +	void (*free)(struct irq_domain *d, unsigned int virq,
+> +		     unsigned int nr_irqs);
+> +	int (*activate)(struct irq_domain *d, struct irq_data *irq_data);
+> +	int (*deactivate)(struct irq_domain *d, struct irq_data *irq_data);
 
-On Wed, Nov 05, 2014 at 11:03:59PM +0100, Pavel Machek wrote:
-> > Maybe you need to enable modem?
-> > 
-> > This is n900 init sequence from script: nokia-n900-configs.sh
-> 
-> From the dts, it looks like this should somehow work without this.
+Why do we have a return value here? Especially the deactivate one
+makes no sense at all.
 
-Right :) The n900-modem driver will take care of this if the "pm"
-parameter is set to 1 (which should be the default).
+> +extern int irq_domain_activate_irq(struct irq_data *irq_data);
+> +extern int irq_domain_deactivate_irq(struct irq_data *irq_data);
 
-> I can try but.. is it safe? I'm using DT-based config, and interrupt
-> numbers definitely changed. If GPIO numbers changed, it will not be
-> funny.
+And here.
 
-Can you provide the output from dmesg?
+> @@ -178,6 +179,7 @@ int irq_startup(struct irq_desc *desc, bool resend)
+>  	irq_state_clr_disabled(desc);
+>  	desc->depth = 0;
+>  
+> +	irq_domain_activate_irq(&desc->irq_data);
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141106/fb830555/attachment.sig>
+We do not check it and we cannot do here AFAICT.
+
+>  	if (desc->irq_data.chip->irq_startup) {
+>  		ret = desc->irq_data.chip->irq_startup(&desc->irq_data);
+>  		irq_state_clr_masked(desc);
+> @@ -199,6 +201,7 @@ void irq_shutdown(struct irq_desc *desc)
+>  		desc->irq_data.chip->irq_disable(&desc->irq_data);
+>  	else
+>  		desc->irq_data.chip->irq_mask(&desc->irq_data);
+> +	irq_domain_deactivate_irq(&desc->irq_data);
+
+Ditto.
+
+So the return value for irq_domain_deactivate_irq() is silly to begin
+with, but also the return value for irq_domain_activate_irq() does not
+really make sense. We've allocated the resources for the interrupt
+already down the hierarchy chain. So there is no reason why the actual
+activation should fail.
+
+Thanks,
+
+	tglx
