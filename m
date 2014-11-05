@@ -1,31 +1,37 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  5 Nov 2014 16:59:47 +0000
-Subject: [PATCH v4 05/11] mtd: nand: Add new generic NAND Device Tree property
- 'nand-chip-select'
+Date: Wed,  5 Nov 2014 16:59:46 +0000
+Subject: [PATCH v4 04/11] ARM: sti: Enable BCH NAND for STiH416 B2020-RevE
 In-Reply-To: <1415206793-25670-1-git-send-email-lee.jones@linaro.org>
 References: <1415206793-25670-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1415206793-25670-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1415206793-25670-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Also supply the platform specific clocks required by the NAND driver.
+
+Reviewed-by: Pekon Gupta <pekon@pek-sem.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- Documentation/devicetree/bindings/mtd/nand.txt | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/stih416-b2020e.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mtd/nand.txt b/Documentation/devicetree/bindings/mtd/nand.txt
-index b53f92e..1d542c51 100644
---- a/Documentation/devicetree/bindings/mtd/nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/nand.txt
-@@ -12,6 +12,9 @@
- - nand-ecc-step-size: integer representing the number of data bytes
- 		      that are covered by a single ECC step.
- 
-+- nand-chip-select: integer representing chip number associated with the
-+		    described Flash chip.
+diff --git a/arch/arm/boot/dts/stih416-b2020e.dts b/arch/arm/boot/dts/stih416-b2020e.dts
+index ba0fa2c..f4b92d5 100644
+--- a/arch/arm/boot/dts/stih416-b2020e.dts
++++ b/arch/arm/boot/dts/stih416-b2020e.dts
+@@ -31,5 +31,13 @@
+ 		ethernet1: dwmac at fef08000 {
+ 			snps,reset-gpio = <&PIO0 7>;
+ 		};
 +
- The ECC strength and ECC step size properties define the correction capability
- of a controller. Together, they say a controller can correct "{strength} bit
- errors per {size} bytes".
++		nand at fe901000 {
++			clock-names = "emi", "bch";
++			clocks = <&clk_s_a0_ls CLK_EMISS>,
++				 <&clk_s_a1_ls CLK_NAND_CTRL>;
++
++			status = "okay";
++		};
+ 	};
+ };
 -- 
 1.9.1
