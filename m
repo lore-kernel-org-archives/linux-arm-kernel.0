@@ -1,79 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 5 Nov 2014 10:44:03 -0800
-Subject: [PATCH 4/5] ARM: dts: Add twl keypad map for LDP
-In-Reply-To: <1415212550-24692-5-git-send-email-tony@atomide.com>
-References: <1415212550-24692-1-git-send-email-tony@atomide.com>
- <1415212550-24692-5-git-send-email-tony@atomide.com>
-Message-ID: <20141105184403.GW31454@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 5 Nov 2014 18:44:38 +0000
+Subject: [PATCH] ASoC: samsung: Add MODULE_DEVICE_TABLE for Snow
+In-Reply-To: <545A683A.9010301@suse.de>
+References: <1415205892-5553-1-git-send-email-afaerber@suse.de>
+ <20141105170957.GE8509@sirena.org.uk> <545A683A.9010301@suse.de>
+Message-ID: <20141105184438.GI8509@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [141105 10:39]:
-> Looks like we're still missing the keypad map for LDP.
-> Let's add it since we have the binding now available
-> for the twl4030_keypad as otherwise we get the following
-> errors during the boot:
-> 
-> twl4030_keypad keypad.31: OF: linux,keymap property not defined
-> in /ocp/i2c at 48070000/twl at 48/keypad
-> twl4030_keypad keypad.31: Failed to build keymap
-> twl4030_keypad: probe of keypad.31 failed with error -2
+On Wed, Nov 05, 2014 at 07:11:06PM +0100, Andreas F?rber wrote:
+> Am 05.11.2014 um 18:09 schrieb Mark Brown:
+> > On Wed, Nov 05, 2014 at 05:44:52PM +0100, Andreas F?rber wrote:
+> >> This enables the snd_soc_snow module to be auto-loaded.
 
-Uhh, this should say EVM instead of LDP.. Copy paste description
-from the LDP patch.
+> > Applied, thanks.
 
-Regards,
+> Thanks. I notice you dropped my Fixes: line that SubmittingPatches asks
+> for. When do I need it and when should I leave it out? I thought it
+> tells GregKH more precisely which stable branches are affected for
+> backports than just a CC.
 
-Tony
- 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/boot/dts/omap3-evm-common.dtsi | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/omap3-evm-common.dtsi b/arch/arm/boot/dts/omap3-evm-common.dtsi
-> index c8747c7..127f3e7 100644
-> --- a/arch/arm/boot/dts/omap3-evm-common.dtsi
-> +++ b/arch/arm/boot/dts/omap3-evm-common.dtsi
-> @@ -2,6 +2,7 @@
->   * Common support for omap3 EVM boards
->   */
->  
-> +#include <dt-bindings/input/input.h>
->  #include "omap-gpmc-smsc911x.dtsi"
->  
->  / {
-> @@ -111,6 +112,26 @@
->  	ti,use-leds;
->  };
->  
-> +&twl_keypad {
-> +	linux,keymap = <
-> +			MATRIX_KEY(2, 2, KEY_1)
-> +			MATRIX_KEY(1, 1, KEY_2)
-> +			MATRIX_KEY(0, 0, KEY_3)
-> +			MATRIX_KEY(3, 2, KEY_4)
-> +			MATRIX_KEY(2, 1, KEY_5)
-> +			MATRIX_KEY(1, 0, KEY_6)
-> +			MATRIX_KEY(1, 3, KEY_7)
-> +			MATRIX_KEY(3, 1, KEY_8)
-> +			MATRIX_KEY(2, 0, KEY_9)
-> +			MATRIX_KEY(2, 3, KEY_KPASTERISK)
-> +			MATRIX_KEY(0, 2, KEY_0)
-> +			MATRIX_KEY(3, 0, KEY_KPDOT)
-> +			/* s4 not wired */
-> +			MATRIX_KEY(1, 2, KEY_BACKSPACE)
-> +			MATRIX_KEY(0, 1, KEY_ENTER)
-> +			>;
-> +};
-> +
->  &usb_otg_hs {
->  	interface-type = <0>;
->  	usb-phy = <&usb2_phy>;
-> -- 
-> 2.1.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+It's not really adding anything if it's just identifying the patch that
+created the file in the first place and what actually happened here is
+that I applied it without the tag then later went back and decided to
+add a stable Cc since it was probably worth that.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/c70e7ce8/attachment-0001.sig>
