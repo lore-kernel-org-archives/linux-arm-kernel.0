@@ -1,66 +1,67 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed,  5 Nov 2014 10:35:48 -0800
-Subject: [PATCH 3/5] ARM: dts: Add twl keypad map for LDP
+Date: Wed,  5 Nov 2014 10:35:50 -0800
+Subject: [PATCH 5/5] ARM: OMAP4+: Remove unused omap_l3_noc platform init
 In-Reply-To: <1415212550-24692-1-git-send-email-tony@atomide.com>
 References: <1415212550-24692-1-git-send-email-tony@atomide.com>
-Message-ID: <1415212550-24692-4-git-send-email-tony@atomide.com>
+Message-ID: <1415212550-24692-6-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like we're still missing the keypad map for LDP.
-Let's add it since we have the binding now available
-for the twl4030_keypad as otherwise we get the following
-errors during the boot:
+Omap4 and later have been booting in device tree only
+mode for quite some time now. This initcall is no longer
+needed. Note that omap3 uses a different driver omap_l3_smx,
+and the initcall for that one is still needed until omap3
+boots in device tree only mode.
 
-twl4030_keypad keypad.31: OF: linux,keymap property not defined
-in /ocp/i2c at 48070000/twl at 48/keypad
-twl4030_keypad keypad.31: Failed to build keymap
-twl4030_keypad: probe of keypad.31 failed with error -2
-
-Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/omap3-ldp.dts | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/mach-omap2/devices.c | 34 ----------------------------------
+ 1 file changed, 34 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap3-ldp.dts b/arch/arm/boot/dts/omap3-ldp.dts
-index f7a45de..77fee3f 100644
---- a/arch/arm/boot/dts/omap3-ldp.dts
-+++ b/arch/arm/boot/dts/omap3-ldp.dts
-@@ -7,6 +7,7 @@
-  */
- /dts-v1/;
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 5544797..492ef16 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -67,40 +67,6 @@ static int __init omap3_l3_init(void)
+ }
+ omap_postcore_initcall(omap3_l3_init);
  
-+#include <dt-bindings/input/input.h>
- #include "omap34xx.dtsi"
- #include "omap-gpmc-smsc911x.dtsi"
+-static int __init omap4_l3_init(void)
+-{
+-	int i;
+-	struct omap_hwmod *oh[3];
+-	struct platform_device *pdev;
+-	char oh_name[L3_MODULES_MAX_LEN];
+-
+-	/* If dtb is there, the devices will be created dynamically */
+-	if (of_have_populated_dt())
+-		return -ENODEV;
+-
+-	/*
+-	 * To avoid code running on other OMAPs in
+-	 * multi-omap builds
+-	 */
+-	if (!cpu_is_omap44xx() && !soc_is_omap54xx())
+-		return -ENODEV;
+-
+-	for (i = 0; i < L3_MODULES; i++) {
+-		snprintf(oh_name, L3_MODULES_MAX_LEN, "l3_main_%d", i+1);
+-
+-		oh[i] = omap_hwmod_lookup(oh_name);
+-		if (!(oh[i]))
+-			pr_err("could not look up %s\n", oh_name);
+-	}
+-
+-	pdev = omap_device_build_ss("omap_l3_noc", 0, oh, 3, NULL, 0);
+-
+-	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
+-
+-	return PTR_RET(pdev);
+-}
+-omap_postcore_initcall(omap4_l3_init);
+-
+ #if defined(CONFIG_VIDEO_OMAP2) || defined(CONFIG_VIDEO_OMAP2_MODULE)
  
-@@ -263,6 +264,26 @@
- 	};
- };
- 
-+&twl_keypad {
-+	linux,keymap = <MATRIX_KEY(0, 0, KEY_1)
-+			MATRIX_KEY(0, 1, KEY_2)
-+			MATRIX_KEY(0, 2, KEY_3)
-+			MATRIX_KEY(1, 0, KEY_4)
-+			MATRIX_KEY(1, 1, KEY_5)
-+			MATRIX_KEY(1, 2, KEY_6)
-+			MATRIX_KEY(1, 3, KEY_F5)
-+			MATRIX_KEY(2, 0, KEY_7)
-+			MATRIX_KEY(2, 1, KEY_8)
-+			MATRIX_KEY(2, 2, KEY_9)
-+			MATRIX_KEY(2, 3, KEY_F6)
-+			MATRIX_KEY(3, 0, KEY_F7)
-+			MATRIX_KEY(3, 1, KEY_0)
-+			MATRIX_KEY(3, 2, KEY_F8)
-+			MATRIX_KEY(5, 4, KEY_RESERVED)
-+			MATRIX_KEY(4, 4, KEY_VOLUMEUP)
-+			MATRIX_KEY(5, 5, KEY_VOLUMEDOWN)>;
-+};
-+
- &uart3 {
- 	interrupts-extended = <&intc 74 &omap3_pmx_core OMAP3_UART3_RX>;
- };
+ static struct resource omap2cam_resources[] = {
 -- 
 2.1.1
