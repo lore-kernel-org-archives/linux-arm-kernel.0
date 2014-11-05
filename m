@@ -1,80 +1,35 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 5 Nov 2014 12:10:55 -0600
-Subject: [PATCH v9] ARM: omap: edma: add suspend resume hook
-In-Reply-To: <545A4A99.70407@ti.com>
-References: <1409043173-24357-1-git-send-email-zonque@gmail.com>
- <545A48F1.8060607@ti.com> <545A4A99.70407@ti.com>
-Message-ID: <545A682F.4060306@ti.com>
+From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
+Date: Wed, 05 Nov 2014 19:11:06 +0100
+Subject: [PATCH] ASoC: samsung: Add MODULE_DEVICE_TABLE for Snow
+In-Reply-To: <20141105170957.GE8509@sirena.org.uk>
+References: <1415205892-5553-1-git-send-email-afaerber@suse.de>
+ <20141105170957.GE8509@sirena.org.uk>
+Message-ID: <545A683A.9010301@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar,
-On 11/05/2014 10:04 AM, Sekhar Nori wrote:
-> On Wednesday 05 November 2014 09:27 PM, Dave Gerlach wrote:
->> On 08/26/2014 03:52 AM, Daniel Mack wrote:
->>> This patch makes the edma driver resume correctly after suspend. Tested
->>> on an AM33xx platform with cyclic audio streams and omap_hsmmc.
->>>
->>> All information can be reconstructed by already known runtime
->>> information.
->>>
->>> As we now use some functions that were previously only used from __init
->>> context, annotations had to be dropped.
->>>
->>> [nm at ti.com: added error handling for runtime + suspend_late/early_resume]
->>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>> Signed-off-by: Daniel Mack <zonque@gmail.com>
->>> Tested-by: Joel Fernandes <joelf@ti.com>
->>> Acked-by: Joel Fernandes <joelf@ti.com>
->>> ---
->>> Changes from v8:
->>>
->>> 	* Drop the edma_suspend hook altogether. Even though back then
->>> 	  when I wrote the code I was sure disabling the interrupts
->>> 	  during suspend is necessary, tests now show it in fact isn't.
->>> 	  My test setup still works if that code is omitted.
->>> 	* Use SET_LATE_SYSTEM_SLEEP_PM_OPS in the dev_pm_ops
->>> 	  declaration.
->>>
->>> 	Thanks to Sekhar for pointing out the above.
->>>
->>>  arch/arm/common/edma.c | 60 ++++++++++++++++++++++++++++++++++++++++++++++++--
->>>  1 file changed, 58 insertions(+), 2 deletions(-)
->>
->> Doesn't seem to be any comments here, any chance this can be picked up? This
->> patch always seems to get missed but will be needed for suspend/resume on both
->> AM335x and AM437x.
+Am 05.11.2014 um 18:09 schrieb Mark Brown:
+> On Wed, Nov 05, 2014 at 05:44:52PM +0100, Andreas F?rber wrote:
+>> This enables the snd_soc_snow module to be auto-loaded.
 > 
-> Dave, do you have a branch against mainline with suspend working on any
-> of these SoCs using which I can test this patch?
+> Applied, thanks.
 
-Yes, here is WIP of next version with all required patches + this one.
-https://github.com/dgerlach/linux-pm/tree/pm-ds0-v3.18-rc3-WIP
-
-For suspend to work you need to select:
-
-CONFIG_WKUP_M3_IPC=y
-CONFIG_WKUP_M3_RPROC=y
-
-And you need to enable USB for multiple suspends to work.
-
-You can get am335x-pm-firmware.elf FW here from HEAD:
-https://git.ti.com/ti-cm3-pm-firmware/amx3-cm3/commits/next
-
-You can place in /lib/firmware and select CONFIG_FW_LOADER_USER_HELPER_FALLBACK
-or build into kernel.
-
-Also for what it's worth you can have my tested by:
-
-Tested-by: Dave Gerlach <d-gerlach@ti.com>
-
-I have tested on am335x-boneblack, am335x-evm, and am335x-evmsk, multiple
-suspend cycles work with no issue.
+Thanks. I notice you dropped my Fixes: line that SubmittingPatches asks
+for. When do I need it and when should I leave it out? I thought it
+tells GregKH more precisely which stable branches are affected for
+backports than just a CC.
 
 Regards,
-Dave
+Andreas
 
-> 
-> Thanks,
-> Sekhar
-> 
+-- 
+SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 21284 AG N?rnberg
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/82ae6d9e/attachment.sig>
