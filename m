@@ -1,35 +1,29 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 05 Nov 2014 15:29:37 +0100
-Subject: [PATCH V3 3/3] can: m_can: workaround for transmit data less
- than 4 bytes
-In-Reply-To: <1415193393-30023-3-git-send-email-b29396@freescale.com>
+Date: Wed, 05 Nov 2014 15:31:21 +0100
+Subject: [PATCH V3 2/3] can: m_can: update to support CAN FD features
+In-Reply-To: <1415193393-30023-2-git-send-email-b29396@freescale.com>
 References: <1415193393-30023-1-git-send-email-b29396@freescale.com>
- <1415193393-30023-3-git-send-email-b29396@freescale.com>
-Message-ID: <545A3451.2090302@pengutronix.de>
+ <1415193393-30023-2-git-send-email-b29396@freescale.com>
+Message-ID: <545A34B9.2060001@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 11/05/2014 02:16 PM, Dong Aisheng wrote:
-> At least on the i.MX6SX TO1.2 with M_CAN IP version 3.0.1, an issue with
-> the Message RAM was discovered. Sending CAN frames with dlc less
-> than 4 bytes will lead to bit errors, when the first 8 bytes of
-> the Message RAM have not been initialized (i.e. written to).
-> To work around this issue, the first 8 bytes are initialized in open()
-> function.
-> 
-> Without the workaround, we can easily see the following errors:
-> root at imx6qdlsolo:~# ip link set can0 up type can bitrate 1000000
-> [   66.882520] IPv6: ADDRCONF(NETDEV_CHANGE): can0: link becomes ready
-> root at imx6qdlsolo:~# cansend can0 123#112233
-> [   66.935640] m_can 20e8000.can can0: Bit Error Uncorrected
+> Bosch M_CAN is CAN FD capable device. This patch implements the CAN
+> FD features include up to 64 bytes payload and bitrate switch function.
+> 1) Change the Rx FIFO and Tx Buffer to 64 bytes for support CAN FD
+>    up to 64 bytes payload. It's backward compatible with old 8 bytes
+>    normal CAN frame.
+> 2) Allocate can frame or canfd frame based on EDL bit
+> 3) Bitrate Switch function is disabled by default and will be enabled
+>    according to CANFD_BRS bit in cf->flags.
 > 
 > Signed-off-by: Dong Aisheng <b29396@freescale.com>
 
-Applied to can/master
+I'm waiting on Oliver's Ack on this patch, then I'll apply 1+2.
 
-Thanks,
+regards,
 Marc
-
 -- 
 Pengutronix e.K.                  | Marc Kleine-Budde           |
 Industrial Linux Solutions        | Phone: +49-231-2826-924     |
@@ -42,4 +36,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/ba1fc85e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/9601428f/attachment.sig>
