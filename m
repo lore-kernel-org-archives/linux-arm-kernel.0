@@ -1,56 +1,105 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 04 Nov 2014 15:23:25 -0800
-Subject: [PATCH 1/2] MAINTAINERS: update brcmstb entries
-In-Reply-To: <CACxGe6s5rCUM_QQ-Da-AOKBbb4tUEJ_rcKU9frdEDDprYND3Tw@mail.gmail.com>
-References: <1414521895-12667-1-git-send-email-f.fainelli@gmail.com>
- <1414521895-12667-2-git-send-email-f.fainelli@gmail.com>
- <20141104204514.GA5908@quad.lixom.net> <545957A5.6010802@gmail.com>
- <CACxGe6s5rCUM_QQ-Da-AOKBbb4tUEJ_rcKU9frdEDDprYND3Tw@mail.gmail.com>
-Message-ID: <54595FED.6000409@gmail.com>
+From: kristina.martsenko@gmail.com (=?UTF-8?q?Kristina=20Mart=C5=A1enko?=)
+Date: Wed,  5 Nov 2014 02:22:41 +0200
+Subject: [PATCH] mmc: core: fix card detection regression
+In-Reply-To: <1747777414.897866.1414878004147.JavaMail.open-xchange@oxbsltgw09.schlund.de>
+References: <1747777414.897866.1414878004147.JavaMail.open-xchange@oxbsltgw09.schlund.de>
+Message-ID: <1415146961-25993-1-git-send-email-kristina.martsenko@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2014 02:56 PM, Grant Likely wrote:
-> On Tue, Nov 4, 2014 at 10:48 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> On 11/04/2014 12:45 PM, Olof Johansson wrote:
->>> Hi,
->>>
->>> On Tue, Oct 28, 2014 at 11:44:54AM -0700, Florian Fainelli wrote:
->>>> Remove Marc Carino from the brcmstb maintainers list and add Gregory
->>>> Fong and myself as new maintainers for the brcmstb platform.
->>>>
->>>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->>>> ---
->>>>  MAINTAINERS | 3 ++-
->>>>  1 file changed, 2 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/MAINTAINERS b/MAINTAINERS
->>>> index dab92a78d1d5..33a8b31e03f0 100644
->>>> --- a/MAINTAINERS
->>>> +++ b/MAINTAINERS
->>>> @@ -2093,8 +2093,9 @@ F:     arch/arm/mach-bcm/bcm63xx.c
->>>>  F:  arch/arm/include/debug/bcm63xx.S
->>>>
->>>>  BROADCOM BCM7XXX ARM ARCHITECTURE
->>>> -M:  Marc Carino <marc.ceeeee@gmail.com>
->>>>  M:  Brian Norris <computersforpeace@gmail.com>
->>>> +M:  Gregory Fong <gregory.0xf0@gmail.com>
->>>> +M:  Florian Fainelli <f.fainelli@gmail.com>
->>>
->>> You're removing Marc here, but I don't see an ack from him, nor has
->>> he been cc:d on the patch. It's common practice for people to agree to
->>> being removed. Can you please make sure we get an ack from him on this,
->>> maybe by reposting and cc:ing him?
->>
->> Marc is no longer with Broadcom, do you still want him to ack this?
-> 
-> Yes, absolutely. Maintainership is entrusted to an individual, not
-> their employer. We've had many situations where someone has continued
-> to maintain a platform even after changing employment. So, yes, there
-> needs to be an ack from Marc.
+Since commit 89168b489915 ("mmc: core: restore detect line inversion
+semantics"), the SD card on i.MX28 (and possibly other) devices isn't
+detected and booting stops at:
 
-He is CC'd, now. Marc, please Ack this if you are okay with the change.
+[    4.120617] Waiting for root device /dev/mmcblk0p3...
 
-Thanks
---
-Florian
+This is caused by the MMC_CAP2_CD_ACTIVE_HIGH flag being set incorrectly
+when the host controller doesn't use a GPIO for card detection (but
+instead uses a dedicated pin). In this case mmc_gpiod_request_cd() will
+return before assigning to the gpio_invert variable, leaving the
+variable uninitialized. The variable then gets used to set the flag.
+This patch fixes the issue by making sure gpio_invert is set to false
+when a GPIO isn't used. After this patch, i.MX28 boots fine.
+
+The MMC_CAP2_RO_ACTIVE_HIGH (write protect) flag is also set incorrectly
+for the exact same reason (it uses the same uninitialized variable), so
+this patch fixes that too.
+
+Fixes: 89168b489915 ("mmc: core: restore detect line inversion semantics")
+Reported-by: Stefan Wahren <stefan.wahren@i2se.com>
+Signed-off-by: Kristina Mart?enko <kristina.martsenko@gmail.com>
+---
+This is a different version of the previous patch [1], so I haven't
+included the Reviewed-by and Tested-by's. Would be nice if someone could
+test this version as well.
+
+[1] http://thread.gmane.org/gmane.linux.kernel.gpio/4609/focus=29576
+
+ drivers/mmc/core/host.c | 21 ++++++++-------------
+ 1 file changed, 8 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+index 03c53b72a2d6..270d58a4c43d 100644
+--- a/drivers/mmc/core/host.c
++++ b/drivers/mmc/core/host.c
+@@ -311,7 +311,8 @@ int mmc_of_parse(struct mmc_host *host)
+ 	struct device_node *np;
+ 	u32 bus_width;
+ 	int len, ret;
+-	bool cap_invert, gpio_invert;
++	bool cd_cap_invert, cd_gpio_invert = false;
++	bool ro_cap_invert, ro_gpio_invert = false;
+ 
+ 	if (!host->parent || !host->parent->of_node)
+ 		return 0;
+@@ -359,16 +360,13 @@ int mmc_of_parse(struct mmc_host *host)
+ 	if (of_find_property(np, "non-removable", &len)) {
+ 		host->caps |= MMC_CAP_NONREMOVABLE;
+ 	} else {
+-		if (of_property_read_bool(np, "cd-inverted"))
+-			cap_invert = true;
+-		else
+-			cap_invert = false;
++		cd_cap_invert = of_property_read_bool(np, "cd-inverted");
+ 
+ 		if (of_find_property(np, "broken-cd", &len))
+ 			host->caps |= MMC_CAP_NEEDS_POLL;
+ 
+ 		ret = mmc_gpiod_request_cd(host, "cd", 0, true,
+-					   0, &gpio_invert);
++					   0, &cd_gpio_invert);
+ 		if (ret) {
+ 			if (ret == -EPROBE_DEFER)
+ 				return ret;
+@@ -391,17 +389,14 @@ int mmc_of_parse(struct mmc_host *host)
+ 		 * both inverted, the end result is that the CD line is
+ 		 * not inverted.
+ 		 */
+-		if (cap_invert ^ gpio_invert)
++		if (cd_cap_invert ^ cd_gpio_invert)
+ 			host->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
+ 	}
+ 
+ 	/* Parse Write Protection */
+-	if (of_property_read_bool(np, "wp-inverted"))
+-		cap_invert = true;
+-	else
+-		cap_invert = false;
++	ro_cap_invert = of_property_read_bool(np, "wp-inverted");
+ 
+-	ret = mmc_gpiod_request_ro(host, "wp", 0, false, 0, &gpio_invert);
++	ret = mmc_gpiod_request_ro(host, "wp", 0, false, 0, &ro_gpio_invert);
+ 	if (ret) {
+ 		if (ret == -EPROBE_DEFER)
+ 			goto out;
+@@ -414,7 +409,7 @@ int mmc_of_parse(struct mmc_host *host)
+ 		dev_info(host->parent, "Got WP GPIO\n");
+ 
+ 	/* See the comment on CD inversion above */
+-	if (cap_invert ^ gpio_invert)
++	if (ro_cap_invert ^ ro_gpio_invert)
+ 		host->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
+ 
+ 	if (of_find_property(np, "cap-sd-highspeed", &len))
+-- 
+2.0.2
