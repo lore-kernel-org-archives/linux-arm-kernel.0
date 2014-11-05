@@ -1,94 +1,111 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 5 Nov 2014 13:05:13 +0000
-Subject: [PATCHv3 4/5] arm64: Emulate CP15 Barrier instructions
-In-Reply-To: <1414435207-30240-6-git-send-email-punit.agrawal@arm.com>
-References: <1414435207-30240-1-git-send-email-punit.agrawal@arm.com>
- <1414435207-30240-6-git-send-email-punit.agrawal@arm.com>
-Message-ID: <20141105130513.GH32700@e104818-lin.cambridge.arm.com>
+From: k.chander@samsung.com (Chander Kashyap)
+Date: Wed, 5 Nov 2014 18:37:39 +0530
+Subject: [PATCH v3] arm64: dts: exynos7: add support for cpuidle core
+ power down
+In-Reply-To: <20141105111205.GA21258@red-moon>
+References: <1415182536-11613-1-git-send-email-k.chander@samsung.com>
+ <20141105111205.GA21258@red-moon>
+Message-ID: <CADWw7Ohf0oxitLdzPWYkYCs7V7Y_ae8KOz=M3jDwfN7fHcb88w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 06:40:06PM +0000, Punit Agrawal wrote:
-> diff --git a/Documentation/arm64/legacy_instructions.txt b/Documentation/arm64/legacy_instructions.txt
-> index 5ab5861..a3b3da2 100644
-> --- a/Documentation/arm64/legacy_instructions.txt
-> +++ b/Documentation/arm64/legacy_instructions.txt
-> @@ -38,3 +38,8 @@ Supported legacy instructions
->  Node: /proc/sys/abi/swp
->  Status: Obsolete
->  Default: Undef (0)
-> +
-> +* CP15 Barriers
-> +Node: /proc/sys/abi/cp15_barrier
-> +Status: Deprecated
-> +Default: Emulate (1)
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 6ae8079..2f7026e 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -199,6 +199,21 @@ config SWP_EMULATION
->  
->  	  If unsure, say N
->  
-> +config CP15_BARRIER_EMULATION
-> +	bool "Emulate CP15 Barrier instructions"
-> +	help
-> +	  The CP15 barrier instructions - CP15ISB, CP15DSB, and
-> +	  CP15DMB - are deprecated in ARMv8 (and ARMv7). It is
-> +	  strongly recommended to use the ISB, DSB, and DMB
-> +	  instructions instead.
-> +
-> +	  Say Y here to enable software emulation of these
-> +	  instructions for AArch32 userspace code. When this option is
-> +	  enabled, CP15 barrier usage is traced which can help
-> +	  identify software that needs updating.
-> +
-> +	  If unsure, say N
-> +
->  endif
+On Wed, Nov 5, 2014 at 4:42 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Wed, Nov 05, 2014 at 10:15:36AM +0000, Chander Kashyap wrote:
+>> Exynos7 has core power down state where cores can be powered off independently.
+>> This patch adds support for this state.
+>>
+>> Entry latency for the core power down is calculated as follows:
+>> 1. Time difference is measured between cpuidle entry and exit.
+>> 2. WFI is skipped measuring the time.
+>> 3. The time is averaged out for 100000 cpuidle transactions with varying load.
+> - entry-latency-us
+>         Usage: Required
+>         "Definition: u32 value representing worst case latency in microseconds
+>                      required to enter the idle state. ..."
+>
+> Is that an average value in your opinion ? I am being pedantic, I know,
+> but we define bindings to be followed, not interpreted.
 
-default y (I think we had a discussion in private whether deprecated
-should default to y and obsolete to y or n but I don't remember the
-conclusion; it's worth adding it to the Documentation/ file).
-
-> +#define SCTLR_EL1_CP15BEN (1 << 5)
-> +
-> +static inline void config_sctlr_el1(u32 clear, u32 set)
-> +{
-> +	u32 val;
-> +
-> +	asm volatile("mrs %0, sctlr_el1" : "=r" (val));
-> +	val &= ~clear;
-> +	val |= set;
-> +	asm volatile("msr sctlr_el1, %0" : : "r" (val));
-> +}
-> +
-> +static void enable_cp15_ben(void *info)
-> +{
-> +	config_sctlr_el1(0, SCTLR_EL1_CP15BEN);
-> +}
-> +
-> +static void disable_cp15_ben(void *info)
-> +{
-> +	config_sctlr_el1(SCTLR_EL1_CP15BEN, 0);
-> +}
-> +
-> +static int cpu_hotplug_notify(struct notifier_block *b, unsigned long action,
-> +			  void *hcpu)
-> +{
-> +	switch (action) {
-> +	case CPU_STARTING:
-> +		enable_cp15_ben(NULL);
-> +		return NOTIFY_DONE;
-> +	}
-> +
-> +	return NOTIFY_OK;
-> +}
-
-Do we need CPU_STARTING_FROZEN as well?
-
-This code always enables the CP15 barriers in hardware but it should
-take into account the actual state (emulation, undef).
-
--- 
-Catalin
+Sorry i missed the point.
+The worst case value in a test set of 100000 cpuidle transactions is ~34us
+I will update this and resend the patch.
+>
+> Thanks,
+> Lorenzo
+>
+>> Exit latency and target residency are supplied as per HW team
+>>
+>> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+>> ---
+>> This patch has following dependencies:
+>>       - [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7 SoC
+>>               http://www.spinics.net/lists/linux-samsung-soc/msg37047.html
+>> Changes in v2:
+>>       - Moved the cpu-idle-state property after reg property
+>>       - removed the status property.
+>>
+>> Changes in v3:
+>>       - Added the Entry latency calculation in commit message.
+>>
+>>  arch/arm64/boot/dts/exynos/exynos7.dtsi |   17 +++++++++++++++++
+>>  1 file changed, 17 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+>> index 50ae936..444dde1 100644
+>> --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
+>> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+>> @@ -37,6 +37,7 @@
+>>                       compatible = "arm,cortex-a57", "arm,armv8";
+>>                       enable-method = "psci";
+>>                       reg = <0x0>;
+>> +                     cpu-idle-states = <&CPU_SLEEP>;
+>>               };
+>>
+>>               cpu at 1 {
+>> @@ -44,6 +45,7 @@
+>>                       compatible = "arm,cortex-a57", "arm,armv8";
+>>                       enable-method = "psci";
+>>                       reg = <0x1>;
+>> +                     cpu-idle-states = <&CPU_SLEEP>;
+>>               };
+>>
+>>               cpu at 2 {
+>> @@ -51,6 +53,7 @@
+>>                       compatible = "arm,cortex-a57", "arm,armv8";
+>>                       enable-method = "psci";
+>>                       reg = <0x2>;
+>> +                     cpu-idle-states = <&CPU_SLEEP>;
+>>               };
+>>
+>>               cpu at 3 {
+>> @@ -58,6 +61,20 @@
+>>                       compatible = "arm,cortex-a57", "arm,armv8";
+>>                       enable-method = "psci";
+>>                       reg = <0x3>;
+>> +                     cpu-idle-states = <&CPU_SLEEP>;
+>> +             };
+>> +
+>> +             idle-states {
+>> +                     entry-method = "arm,psci";
+>> +
+>> +                     CPU_SLEEP: cpu-sleep {
+>> +                             compatible = "arm,idle-state";
+>> +                             local-timer-stop;
+>> +                             arm,psci-suspend-param = <0x0010000>;
+>> +                             entry-latency-us = <20>;
+>> +                             exit-latency-us = <150>;
+>> +                             min-residency-us = <2100>;
+>> +                     };
+>>               };
+>>       };
+>>
+>> --
+>> 1.7.9.5
+>>
+>>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
