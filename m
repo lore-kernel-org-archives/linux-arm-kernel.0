@@ -1,49 +1,52 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Wed, 5 Nov 2014 15:55:25 +0100
-Subject: [linux-sunxi] [RFC Patch 1/4] mfd: AXP20x: Add power supply
- bindings documentation
-In-Reply-To: <20141105144832.GB2989@lukather>
-References: <20141020221959.2f312906@neptune.home>
- <20141020223314.0484f795@neptune.home> <20141021101503.GE26842@x1>
- <20141021180916.432f02e1@neptune.home> <20141021191905.GR21108@lukather>
- <20141103210244.1425e0c7@neptune.home> <20141104143117.GC26729@lukather>
- <20141104220827.773c53d0@neptune.home> <20141105144832.GB2989@lukather>
-Message-ID: <ACF6E448-6936-4212-AB50-0EC4FEEA8C42@dominion.thruhere.net>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Wed, 5 Nov 2014 16:57:27 +0200
+Subject: [PATCH 02/15] [media] v4l: Update subdev-formats doc with new
+ MEDIA_BUS_FMT values
+In-Reply-To: <1415094910-15899-3-git-send-email-boris.brezillon@free-electrons.com>
+References: <1415094910-15899-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1415094910-15899-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20141105145726.GR3136@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Boris,
 
-> Op 5 nov. 2014, om 15:48 heeft Maxime Ripard <maxime.ripard@free-electrons.com> het volgende geschreven:
+On Tue, Nov 04, 2014 at 10:54:57AM +0100, Boris Brezillon wrote:
+> In order to have subsytem agnostic media bus format definitions we've
+> moved media bus definition to include/uapi/linux/media-bus-format.h and
+> prefixed enum values with MEDIA_BUS_FMT instead of V4L2_MBUS_FMT.
 > 
-> On Tue, Nov 04, 2014 at 10:08:27PM +0100, Bruno Pr?mont wrote:
->> On Tue, 04 November 2014 Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
->>> On Mon, Nov 03, 2014 at 09:02:44PM +0100, Bruno Pr?mont wrote: 
->>>> Doing something like this?:
->>>> 
->>>> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
->>>> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
->>>> @@ -126,9 +126,11 @@
->>>>                                interrupt-controller;
->>>>                                #interrupt-cells = <1>;
->>>> 
->>>> -                               backup = <3000000 200>;
->>>> -                               battery.resistance = <100>;
->>>> -                               battery.capacity = <2000>;
->>>> +                               x-powers,backup = <3000000 200>;
->>> 
->>> I don't really remember what was that property used for. Would it make
->>> sense to put it into the battery node?
->> 
->> The backup/rtc battery is completely distinct from main battery.
->> 
->> It's presence is in no way related to that of the main battery,
->> thus I would not put it into the same node.
->> As all the information needed is included in the property I see
->> no reason to move it into a separate node.
+> Update the v4l documentation accordingly.
 > 
-> Oh. So it is to model some button battery that might be here to keep
-> the RTC state while the board is unpowered?
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  Documentation/DocBook/media/Makefile               |   2 +-
+>  Documentation/DocBook/media/v4l/subdev-formats.xml | 308 ++++++++++-----------
+>  include/uapi/linux/v4l2-mediabus.h                 |   2 +
+>  3 files changed, 157 insertions(+), 155 deletions(-)
 > 
-> How is that related to the PMIC?
 
-Some PMICs can recharge it and detect it it's empty or not.
+...
+
+> diff --git a/include/uapi/linux/v4l2-mediabus.h b/include/uapi/linux/v4l2-mediabus.h
+> index f471064..9fbe891 100644
+> --- a/include/uapi/linux/v4l2-mediabus.h
+> +++ b/include/uapi/linux/v4l2-mediabus.h
+> @@ -32,6 +32,8 @@ enum v4l2_mbus_pixelcode {
+>  	MEDIA_BUS_TO_V4L2_MBUS(RGB888_2X12_BE),
+>  	MEDIA_BUS_TO_V4L2_MBUS(RGB888_2X12_LE),
+>  	MEDIA_BUS_TO_V4L2_MBUS(ARGB8888_1X32),
+> +	MEDIA_BUS_TO_V4L2_MBUS(RGB444_1X12),
+> +	MEDIA_BUS_TO_V4L2_MBUS(RGB565_1X16),
+
+Shouldn't this to go to a separate patch?
+
+>  
+>  	MEDIA_BUS_TO_V4L2_MBUS(Y8_1X8),
+>  	MEDIA_BUS_TO_V4L2_MBUS(UV8_1X8),
+
+-- 
+Kind regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
