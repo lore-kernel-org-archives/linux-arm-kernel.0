@@ -1,85 +1,27 @@
-From: linyongting@gmail.com (Lin Yongting)
-Date: Wed,  5 Nov 2014 20:15:20 +0800
-Subject: [PATCH RESEND] ARM: Add unwinding support for memset function
-Message-ID: <1415189721-2693-1-git-send-email-linyongting@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 5 Nov 2014 10:16:40 -0200
+Subject: [PATCH] ARM: dts: imx6qdl-sabresd.dtsi: Fix the microphone route
+In-Reply-To: <20141104130803.GM10821@tiger>
+References: <1415105769-5358-1-git-send-email-fabio.estevam@freescale.com>
+ <20141104130803.GM10821@tiger>
+Message-ID: <CAOMZO5ChyTM2_AnSCbi3R9QXzrCYix_wFHP-5FA-6baBSXVgsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The memset function never had unwinding annotations added.
-Currently, when accessing NULL pointer by memset occurs the
-backtrace shown will stop at memset or some completely unrelated
-function. Add unwinding annotations in hopes of getting a more
-useful backtrace when accessing NULL pointer by memset, kprobe
-or interrupt.
+On Tue, Nov 4, 2014 at 11:08 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Tue, Nov 04, 2014 at 10:56:09AM -0200, Fabio Estevam wrote:
+>> Since commit e409dfbfccf9a49 ("ASoC: dapm: Add a few supply widget sanity
+>> checks") the following error is seen:
+>>
+>> imx-wm8962 sound: wm8962 <-> 202c000.ssi mapping ok
+>> imx-wm8962 sound: Connecting non-supply widget to supply widget is not supported (AMIC -> MICBIAS)
+>> imx-wm8962 sound: ASoC: no dapm match for AMIC --> (null) --> MICBIAS
+>> imx-wm8962 sound: ASoC: Failed to add route AMIC -> direct -> MICBIAS
+>
+> Any regression behind that error message?
 
-Signed-off-by: Lin Yongting <linyongting@gmail.com>
----
- arch/arm/lib/memset.S |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Playback works fine, but I am having issues with arecord with or
+without this patch, so I haven't seen any regression.
 
-diff --git a/arch/arm/lib/memset.S b/arch/arm/lib/memset.S
-index 671455c..a4ee97b 100644
---- a/arch/arm/lib/memset.S
-+++ b/arch/arm/lib/memset.S
-@@ -11,11 +11,13 @@
-  */
- #include <linux/linkage.h>
- #include <asm/assembler.h>
-+#include <asm/unwind.h>
- 
- 	.text
- 	.align	5
- 
- ENTRY(memset)
-+UNWIND( .fnstart         )
- 	ands	r3, r0, #3		@ 1 unaligned?
- 	mov	ip, r0			@ preserve r0 as return value
- 	bne	6f			@ 1
-@@ -34,6 +36,9 @@ ENTRY(memset)
-  * We need 2 extra registers for this loop - use r8 and the LR
-  */
- 	stmfd	sp!, {r8, lr}
-+UNWIND( .fnend              )
-+UNWIND( .fnstart            )
-+UNWIND( .save {r8, lr}      )
- 	mov	r8, r1
- 	mov	lr, r1
- 
-@@ -53,6 +58,7 @@ ENTRY(memset)
- 	tst	r2, #16
- 	stmneia	ip!, {r1, r3, r8, lr}
- 	ldmfd	sp!, {r8, lr}
-+UNWIND( .fnend              )
- 
- #else
- 
-@@ -62,6 +68,9 @@ ENTRY(memset)
-  */
- 
- 	stmfd	sp!, {r4-r8, lr}
-+UNWIND( .fnend                 )
-+UNWIND( .fnstart               )
-+UNWIND( .save {r4-r8, lr}      )
- 	mov	r4, r1
- 	mov	r5, r1
- 	mov	r6, r1
-@@ -94,9 +103,11 @@ ENTRY(memset)
- 	tst	r2, #16
- 	stmneia	ip!, {r4-r7}
- 	ldmfd	sp!, {r4-r8, lr}
-+UNWIND( .fnend                 )
- 
- #endif
- 
-+UNWIND( .fnstart            )
- 4:	tst	r2, #8
- 	stmneia	ip!, {r1, r3}
- 	tst	r2, #4
-@@ -120,4 +131,5 @@ ENTRY(memset)
- 	strb	r1, [ip], #1		@ 1
- 	add	r2, r2, r3		@ 1 (r2 = r2 - (4 - r3))
- 	b	1b
-+UNWIND( .fnend   )
- ENDPROC(memset)
--- 
-1.7.9.5
+Will investigate the arecord problem I am having (maybe it is a
+alsamixer config issue).
