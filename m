@@ -1,59 +1,46 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 5 Nov 2014 11:54:30 +0100
-Subject: [GIT PULL] arm64: UEFI updates for 3.19
-Message-ID: <CAKv+Gu8LEFvdu99vCHbHGPmGLpHWdT+Wb2DECzBEEg8g_yynvg@mail.gmail.com>
+From: hukeping@huawei.com (Hu Keping)
+Date: Wed, 5 Nov 2014 18:57:06 +0800
+Subject: [RESEND PATCH] ARM: kexec: Fix validating CPU hotplug support
+In-Reply-To: <20141104105525.GE4042@n2100.arm.linux.org.uk>
+References: <1415094025-66180-1-git-send-email-hukeping@huawei.com>
+ <20141104105525.GE4042@n2100.arm.linux.org.uk>
+Message-ID: <545A0282.4070001@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
 
-The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
 
-  Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
+? 2014/11/4 18:55, Russell King - ARM Linux ??:
+> On Tue, Nov 04, 2014 at 05:40:25PM +0800, HuKeping wrote:
+>> Commit 2103f6cba61a8b8bea3fc1b63661d830a2125e76 added a hotplug checking in
+>> machine_kexec_prepare(), but it will lead a failure when loading the
+>> crash-kernel in some cases.
+>>
+>> Kexec utility can load the crash kernel by two ways:
+>> 1. kexec -l kernel-image
+>> 2. kexec -p kernel-image
+>>
+>> In case #1, for rapid reboot, it's correct to do the hotplug checking things,
+>> for it will shut down cpus in _cpu_down() later when command "kexec -e" be
+>> sent, this routine needs the support of cpu hotplug.
+>>
+>> In case #2, for use on panic, it's unnecessary to do the same thing, the whole
+>> routing has no business with cpu shutting down. Check for cpu hot plug will
+>> lead a failure to load the kernel.
+>
+> So what happens to the other CPUs when you kexec into the new kernel,
+> possibly overwriting the instructions which those CPUs are executing?
+>
 
-are available in the git repository at:
+Actually, i do think there is something wrong in the panic-rountine:
+when panic comes, we clear the cpu_online_bits of other CPUs and
+keep them calling cpu_relax(). That's why I post that patch ,because
+we do not really shut down the CPUs.
 
-  git://git.linaro.org/people/ard.biesheuvel/linux-arm.git tags/for-3.19
+But as your mentioned , there is another problem:
+what's in the pc register of each cpu is unknown after the MMU has been
+shut down.
 
-for you to fetch changes up to 0bcaa9040d058684d58c36ef273b8946996c7078:
-
-  efi: efi-stub: notify on DTB absence (2014-11-05 09:03:34 +0100)
-
-----------------------------------------------------------------
-UEFI updates for arm64
-
-This series consists of:
-- fixes for compliance with PE/COFF and UEFI specs
-- added support for SMBIOS, including upcoming version 3.0
-- cleanups and diagnostic output improvements
-
-----------------------------------------------------------------
-Ard Biesheuvel (8):
-      arm64/efi: efistub: jump to 'stext' directly, not through the header
-      arm64/efi: set PE/COFF section alignment to 4 KB
-      arm64/efi: set PE/COFF file alignment to 512 bytes
-      arm64/efi: invert UEFI memory region reservation logic
-      arm64/efi: drop redundant set_bit(EFI_CONFIG_TABLES)
-      efi: dmi: add support for SMBIOS 3.0 UEFI configuration table
-      dmi: add support for SMBIOS 3.0 64-bit entry point
-      arm64: dmi: set DMI string as dump stack arch description
-
-Mark Rutland (1):
-      efi: efi-stub: notify on DTB absence
-
-Yi Li (1):
-      arm64: dmi: Add SMBIOS/DMI support
-
- arch/arm64/Kconfig                      | 11 +++++
- arch/arm64/include/asm/dmi.h            | 31 +++++++++++++
- arch/arm64/kernel/efi-entry.S           |  3 +-
- arch/arm64/kernel/efi.c                 | 37 ++++++++++-----
- arch/arm64/kernel/head.S                | 24 +++++++---
- arch/arm64/kernel/vmlinux.lds.S         | 17 +++++++
- drivers/firmware/dmi_scan.c             | 79 ++++++++++++++++++++++++++++++---
- drivers/firmware/efi/efi.c              |  4 ++
- drivers/firmware/efi/libstub/arm-stub.c | 11 ++++-
- drivers/xen/efi.c                       |  1 +
- include/linux/efi.h                     |  6 ++-
- 11 files changed, 195 insertions(+), 29 deletions(-)
- create mode 100644 arch/arm64/include/asm/dmi.h
+On X86, there is a halt() before the cpu_relax(), so do you think we
+need a call wfi() before cpu_relax() to keep the other CPUs on
+status-WFI on ARM?
