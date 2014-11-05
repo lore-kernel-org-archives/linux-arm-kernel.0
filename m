@@ -1,75 +1,144 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 05 Nov 2014 11:17:48 +0100
-Subject: [PATCH V2 2/4] can: m_can: workaround for transmit data less
- than 4 bytes
-In-Reply-To: <1415174326-6623-2-git-send-email-b29396@freescale.com>
-References: <1415174326-6623-1-git-send-email-b29396@freescale.com>
- <1415174326-6623-2-git-send-email-b29396@freescale.com>
-Message-ID: <5459F94C.1030506@pengutronix.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 5 Nov 2014 11:26:59 +0100
+Subject: [RFC 09/10] drm/tegra: Add IOMMU support
+In-Reply-To: <CAOw6vbJy6oy7cibH4f332UM=kS56KUMcnYdUTG0pEYXyQkFDoQ@mail.gmail.com>
+References: <1403815790-8548-1-git-send-email-thierry.reding@gmail.com>
+ <1403815790-8548-10-git-send-email-thierry.reding@gmail.com>
+ <CAOw6vbJy6oy7cibH4f332UM=kS56KUMcnYdUTG0pEYXyQkFDoQ@mail.gmail.com>
+Message-ID: <20141105102657.GB12458@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/2014 08:58 AM, Dong Aisheng wrote:
-> At least on the i.MX6SX with M_CAN IP version 3.0.x, an issue with
-
-Can you add the imx mask revision, too and the exact m_can version (is
-available).
-
-> the Message RAM was discovered. Sending CAN frames with dlc less
-> than 4 bytes will lead to bit errors, when the first 8 bytes of
-> the Message RAM have not been initialized (i.e. written to).
-> To work around this issue, the first 8 bytes are initialized in open()
-> function.
+On Tue, Sep 30, 2014 at 02:48:35PM -0400, Sean Paul wrote:
+> On Thu, Jun 26, 2014 at 4:49 PM, Thierry Reding
+> <thierry.reding@gmail.com> wrote:
+> > From: Thierry Reding <treding@nvidia.com>
+> >
+> > When an IOMMU device is available on the platform bus, allocate an IOMMU
+> > domain and attach the display controllers to it. The display controllers
+> > can then scan out non-contiguous buffers by mapping them through the
+> > IOMMU.
+> >
 > 
-> Without the workaround, we can easily see the following errors:
-> root at imx6qdlsolo:~# ip link set can0 up type can bitrate 1000000
-> [   66.882520] IPv6: ADDRCONF(NETDEV_CHANGE): can0: link becomes ready
-> root at imx6qdlsolo:~# cansend can0 123#112233
-> [   66.935640] m_can 20e8000.can can0: Bit Error Uncorrected
-> 
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> ---
-> ChangeLog since v1:
->  * initialize the first 8 bytes of Tx Buffer of Message RAM in open()
->    to workaround the issue
-> ---
->  drivers/net/can/m_can/m_can.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
-> index 664fe30..f47c200 100644
-> --- a/drivers/net/can/m_can/m_can.c
-> +++ b/drivers/net/can/m_can/m_can.c
-> @@ -902,6 +902,15 @@ static void m_can_chip_config(struct net_device *dev)
->  	/* set bittiming params */
->  	m_can_set_bittiming(dev);
->  
-> +	/* At least on the i.MX6SX with M_CAN IP version 3.0.x, an issue with
-> +	 * the Message RAM was discovered. Sending CAN frames with dlc less
-> +	 * than 4 bytes will lead to bit errors, when the first 8 bytes of
-> +	 * the Message RAM have not been initialized (i.e. written to).
-> +	 * To work around this issue, the first 8 bytes are initialized here.
-> +	 */
-> +	m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0), 0x0);
-> +	m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1), 0x0);
-> +
->  	m_can_config_endisable(priv, false);
->  }
->  
-> 
+> Hi Thierry,
+> A few comments from St?phane and myself that came up while we were
+> reviewing this for our tree.
 
-Marc
+I just realized that I hadn't integrated these comments completely yet,
+but I've done so now in my local tree. I'm running a couple of tests to
+verify that it's all handled correctly.
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> > Signed-off-by: Thierry Reding <treding@nvidia.com>
+> > ---
+> >  drivers/gpu/drm/tegra/dc.c  |  21 ++++
+> >  drivers/gpu/drm/tegra/drm.c |  17 ++++
+> >  drivers/gpu/drm/tegra/drm.h |   3 +
+> >  drivers/gpu/drm/tegra/fb.c  |  16 ++-
+> >  drivers/gpu/drm/tegra/gem.c | 236 +++++++++++++++++++++++++++++++++++++++-----
+> >  drivers/gpu/drm/tegra/gem.h |   4 +
+> >  6 files changed, 273 insertions(+), 24 deletions(-)
+> >
+> > diff --git a/drivers/gpu/drm/tegra/dc.c b/drivers/gpu/drm/tegra/dc.c
+> > index afcca04f5367..0f7452d04811 100644
+> > --- a/drivers/gpu/drm/tegra/dc.c
+> > +++ b/drivers/gpu/drm/tegra/dc.c
+> > @@ -9,6 +9,7 @@
+> >
+> >  #include <linux/clk.h>
+> >  #include <linux/debugfs.h>
+> > +#include <linux/iommu.h>
+> >  #include <linux/reset.h>
+> >
+> >  #include "dc.h"
+> > @@ -1283,8 +1284,18 @@ static int tegra_dc_init(struct host1x_client *client)
+> >  {
+> >         struct drm_device *drm = dev_get_drvdata(client->parent);
+> >         struct tegra_dc *dc = host1x_client_to_dc(client);
+> > +       struct tegra_drm *tegra = drm->dev_private;
+> >         int err;
+> >
+> > +       if (tegra->domain) {
+> > +               err = iommu_attach_device(tegra->domain, dc->dev);
+> > +               if (err < 0) {
+> > +                       dev_err(dc->dev, "failed to attach to IOMMU: %d\n",
+> > +                               err);
+> > +                       return err;
+> > +               }
+> 
+> [from St?phane]
+> 
+> shouldn't we call detach in the error paths below?
 
+This was mostly rewritten for universal plane support, but I've made
+sure that the DC properly detaches from the IOMMU in case of failure
+during the code below.
+
+> > diff --git a/drivers/gpu/drm/tegra/drm.c b/drivers/gpu/drm/tegra/drm.c
+[...]
+> > @@ -8,6 +8,7 @@
+> >   */
+> >
+> >  #include <linux/host1x.h>
+> > +#include <linux/iommu.h>
+> >
+> >  #include "drm.h"
+> >  #include "gem.h"
+> > @@ -33,6 +34,16 @@ static int tegra_drm_load(struct drm_device *drm, unsigned long flags)
+> >         if (!tegra)
+> >                 return -ENOMEM;
+> >
+> > +       if (iommu_present(&platform_bus_type)) {
+> > +               tegra->domain = iommu_domain_alloc(&platform_bus_type);
+> > +               if (IS_ERR(tegra->domain)) {
+> > +                       kfree(tegra);
+> > +                       return PTR_ERR(tegra->domain);
+> > +               }
+> > +
+> > +               drm_mm_init(&tegra->mm, 0, SZ_2G);
+> 
+> 
+> [from St?phane]:
+> 
+> none of these are freed in the error path below (iommu_domain_free and
+> drm_mm_takedown)
+> 
+> also |tegra| isn't freed either?
+
+None of the resources were actually being cleaned up, but I think I have
+it all handled properly now.
+
+> > @@ -108,22 +240,33 @@ struct tegra_bo *tegra_bo_create(struct drm_device *drm, unsigned int size,
+> >         host1x_bo_init(&bo->base, &tegra_bo_ops);
+> >         size = round_up(size, PAGE_SIZE);
+> >
+> > -       bo->vaddr = dma_alloc_writecombine(drm->dev, size, &bo->paddr,
+> > -                                          GFP_KERNEL | __GFP_NOWARN);
+> > -       if (!bo->vaddr) {
+> > -               dev_err(drm->dev, "failed to allocate buffer with size %u\n",
+> > -                       size);
+> > -               err = -ENOMEM;
+> > -               goto err_dma;
+> > -       }
+> > -
+> >         err = drm_gem_object_init(drm, &bo->gem, size);
+> >         if (err)
+> > -               goto err_init;
+> > +               goto free;
+> >
+> >         err = drm_gem_create_mmap_offset(&bo->gem);
+> 
+> We need to call drm_gem_free_mmap_offset if one of the calls below
+> fails, otherwise we'll try to free the mmap_offset on an already
+> destroyed bo.
+
+drm_gem_object_release() (below) already calls drm_gem_free_mmap_offset()
+for us implicitly.
+
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
 Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/f7b96084/attachment-0001.sig>
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/31f52e43/attachment.sig>
