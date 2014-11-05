@@ -1,106 +1,100 @@
-From: mlangsdo@redhat.com (Mark Langsdorf)
-Date: Wed, 05 Nov 2014 07:59:32 -0600
-Subject: [PATCH v2 2/2] [usb] add support for ACPI identification to
- xhci-platform
-In-Reply-To: <20141104171220.GA30385@kroah.com>
-References: <1414692989-23128-2-git-send-email-mlangsdo@redhat.com>
- <1415119833-9135-1-git-send-email-mlangsdo@redhat.com>
- <1415119833-9135-2-git-send-email-mlangsdo@redhat.com>
- <20141104171220.GA30385@kroah.com>
-Message-ID: <545A2D44.8020303@redhat.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 5 Nov 2014 21:46:26 +0800
+Subject: [PATCH V2 1/4] can: m_can: update to support CAN FD features
+In-Reply-To: <545A23DA.7030303@pengutronix.de>
+References: <1415174326-6623-1-git-send-email-b29396@freescale.com>
+ <5459F808.3020903@hartkopp.net>
+ <20141105112639.GB4007@shlinux1.ap.freescale.net>
+ <545A21AD.5040608@hartkopp.net> <545A23DA.7030303@pengutronix.de>
+Message-ID: <20141105134625.GG4007@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2014 11:12 AM, Greg KH wrote:
-> On Tue, Nov 04, 2014 at 10:50:33AM -0600, Mark Langsdorf wrote:
->> Provide the methods to let ACPI identify the need to use
->> xhci-platform. Change the Kconfig files so the
->> xhci-plat.o file is selectable during kernel config.
->>
->> Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
->> ---
->> Changes from v1
->> 	Renamed from "add support for APM X-Gene to xhci-platform"
->> 	Removed changes to arm64/Kconfig
->> 	Made CONFIG_USB_XHCI_PLATFORM a user selectable config option
->>
->>   drivers/usb/host/Kconfig     |  7 ++++++-
->>   drivers/usb/host/xhci-plat.c | 11 +++++++++++
->>   2 files changed, 17 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
->> index 82800a7..060a2361 100644
->> --- a/drivers/usb/host/Kconfig
->> +++ b/drivers/usb/host/Kconfig
->> @@ -27,7 +27,12 @@ config USB_XHCI_HCD
->>   if USB_XHCI_HCD
->>
->>   config USB_XHCI_PLATFORM
->> -	tristate
->> +	tristate "xHCI platform driver support"
->> +	--help--
->> +	  Say 'Y' to enable the support for the xHCI host controller
->> +	  as a platform device. Many ARM SoCs provide USB this way.
->> +
->> +	  If unsure, say 'Y'.
->
-> You really want a 'default Y' response here?
->
-> That's not good at all, what happens if I select this on a system
-> without such hardware?
+On Wed, Nov 05, 2014 at 02:19:22PM +0100, Marc Kleine-Budde wrote:
+> On 11/05/2014 02:10 PM, Oliver Hartkopp wrote:
+> > On 05.11.2014 12:26, Dong Aisheng wrote:
+> >> On Wed, Nov 05, 2014 at 11:12:24AM +0100, Oliver Hartkopp wrote:
+> >>> On 05.11.2014 08:58, Dong Aisheng wrote:
+> > 
+> > 
+> >>> Unfortunately No. Here it becomes complicated due to the fact that
+> >>> the revision 3.0.x does not support per-frame switching for FD/BRS
+> >>> ...
+> >>
+> >> I'm not sure i got your point.
+> >>  From m_can spec, it allows switch CAN mode by setting CMR bit.
+> >>
+> >> Bits 11:10 CMR[1:0]: CAN Mode Request
+> >> A change of the CAN operation mode is requested by writing to this bit
+> >> field. After change to the
+> >> requested operation mode the bit field is reset to ?00? and the status
+> >> flags FDBS and FDO are set
+> >> accordingly. In case the requested CAN operation mode is not enabled,
+> >> the value written to CMR is
+> >> retained until it is overwritten by the next mode change request. In
+> >> case CME = ?01?/?10?/?11? a
+> >> change to CAN operation according to ISO 11898-1 is always possible.
+> >> Default is CAN operation
+> >> according to ISO11898-1.
+> >> 00 unchanged
+> >> 01 Request CAN FD operation
+> >> 10 Request CAN FD operation with bit rate switching
+> >> 11 Request CAN operation according ISO11898-1
+> >>
+> >> So what's the difference between this function and the per-frame
+> >> switching
+> >> you mentioned?
+> >>
+> >>>
+> >>> When (priv->can.ctrlmode & CAN_CTRLMODE_FD) is true this *only*
+> >>> tells us, that the controller is _capable_ to send either CAN or CAN
+> >>> FD frames.
+> >>>
+> >>> It does not configure the controller into one of these specific
+> >>> settings!
+> >>>
+> >>> Additionally: AFAIK when writing to the CCCR you have to make sure
+> >>> that there's currently no ongoing transfer.
+> >>>
+> >>
+> >> I don't know about it before.
+> >> By searching m_can user manual v302 again, i still did not find this
+> >> limitation. Can you point me if you know where it is?
+> >>
+> >> BTW, since we only use one Tx Buffer for transmission currently, so we
+> >> should not meet that case that CAN mode is switched during transfer.
+> >> So the issue you concern may not happen.
+> > 
+> > Yes. You are right. Having a FIFO with a size of 1 will help here :-)
+> 
+> Errrr....sorry...no.
+> 
+> Taking an easy route here but making it x times harder to extend the
+> driver to make use of the FIFO is not an option.
+> 
 
-Based on testing with my 2 x86 systems, nothing bad, but I'll make
-it 'M' because that's correct.
+Hmm, this way is just following the original approach the current driver
+used. It's initial work and won't make things complicated.
 
->>   config USB_XHCI_MVEBU
->>   	tristate "xHCI support for Marvell Armada 375/38x"
->> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
->> index 91c7557..3db47ea 100644
->> --- a/drivers/usb/host/xhci-plat.c
->> +++ b/drivers/usb/host/xhci-plat.c
->> @@ -18,6 +18,7 @@
->>   #include <linux/platform_device.h>
->>   #include <linux/slab.h>
->>   #include <linux/usb/xhci_pdriver.h>
->> +#include <linux/acpi.h>
->>
->>   #include "xhci.h"
->>   #include "xhci-mvebu.h"
->> @@ -287,6 +288,15 @@ static const struct of_device_id usb_xhci_of_match[] = {
->>   MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
->>   #endif
->>
->> +#ifdef CONFIG_ACPI
->> +static const struct acpi_device_id usb_xhci_acpi_match[] = {
->> +	/* APM X-Gene USB Controller */
->> +	{ "PNP0D10", },
->> +	{ }
->> +};
->> +MODULE_DEVICE_TABLE(acpi, usb_xhci_acpi_match);
->> +#endif
->
-> That looks like a very "generic" PNP value, are you sure it is assigned
-> only to this specific device?
+Extend the driver to use FIFO for TX is another story and based on
+my understanding it may be a bit complicated to do CAN FD mode switch on this
+case due to hw limitation that the revision 3.0.x does not support per-frame
+switching for FD/BRS as Oliver pointed out.
+(e.g. how to switch FD MODE for each frame on Tx FIFO?)
+Probably that's why the 3.1.x version will add the FD/BRS bit controller
+in Tx Buffer to fix this issue.
 
-I'll adjust the comment. It is a generic PNP value and a lot of
-other SoCs will use this controller.
+Anyway, that's future work and we can discuss it when adding FIFO support
+for Tx function.
 
->> +
->>   static struct platform_driver usb_xhci_driver = {
->>   	.probe	= xhci_plat_probe,
->>   	.remove	= xhci_plat_remove,
->> @@ -294,6 +304,7 @@ static struct platform_driver usb_xhci_driver = {
->>   		.name = "xhci-hcd",
->>   		.pm = DEV_PM_OPS,
->>   		.of_match_table = of_match_ptr(usb_xhci_of_match),
->> +		.acpi_match_table = ACPI_PTR(usb_xhci_acpi_match),
->
-> Shouldn't the reworked driver core code handle this differently with the
-> ability to handle either OF or ACPI in the same driver?
+Regards
+Dong Aisheng
 
-I'm not sure I understand the question. With these changes, the driver
-handles both ACPI and DTB/OF. It's the same style of code as used
-in drivers/ata/plat-xgene.c, which also handles both ACPI and DTB/OF.
-Why do you think this code isn't correct?
-
---Mark Langsdorf
+> Marc
+> 
+> -- 
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> 
