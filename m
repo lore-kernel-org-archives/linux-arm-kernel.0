@@ -1,18 +1,15 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 5 Nov 2014 14:49:20 -0800
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 06 Nov 2014 00:21:01 +0100
 Subject: [PATCH] PM / Domains: Change prototype for the ->attach_dev()
  callback
 In-Reply-To: <7h7fz92rqk.fsf@deeprootsystems.com>
 References: <1414670569-3002-1-git-send-email-ulf.hansson@linaro.org>
- <3981560.mBph1QJkfl@vostro.rjw.lan>
- <7h4mul9ttl.fsf@deeprootsystems.com>
- <20141105013353.GA19238@dtor-ws>
- <7h7fz92rqk.fsf@deeprootsystems.com>
-Message-ID: <20141105224920.GD22754@dtor-ws>
+ <20141105013353.GA19238@dtor-ws> <7h7fz92rqk.fsf@deeprootsystems.com>
+Message-ID: <3267963.fqUYb7m9Rv@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 05, 2014 at 02:43:31PM -0800, Kevin Hilman wrote:
+On Wednesday, November 05, 2014 02:43:31 PM Kevin Hilman wrote:
 > Dmitry Torokhov <dmitry.torokhov@gmail.com> writes:
 > 
 > > On Thu, Oct 30, 2014 at 01:38:30PM -0700, Kevin Hilman wrote:
@@ -50,10 +47,9 @@ On Wed, Nov 05, 2014 at 02:43:31PM -0800, Kevin Hilman wrote:
 > which currently take struct generic_pm_domain *domain.  
 > 
 > Updated version of $SUBJECT patch below.
-> 
-> Kevin
-> 
-> 
+
+The subject and changelog need to be updated too IMO.
+
 > ----- >8 ------
 > From 353a62ffae2f9228142c8a2093108f9eda8dc6b4 Mon Sep 17 00:00:00 2001
 > From: Ulf Hansson <ulf.hansson@linaro.org>
@@ -68,9 +64,6 @@ On Wed, Nov 05, 2014 at 02:43:31PM -0800, Kevin Hilman wrote:
 > [khilman: added domain as parameter to callbacks, as suggested by Dmitry]
 > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 > Signed-off-by: Kevin Hilman <khilman@linaro.org>
-
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-
 > ---
 >  drivers/base/power/domain.c | 4 ++--
 >  include/linux/pm_domain.h   | 6 ++++--
@@ -86,11 +79,37 @@ Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 >  	if (genpd->attach_dev)
 > -		genpd->attach_dev(dev);
 > +		genpd->attach_dev(genpd, dev);
-
-I guess as a followup we need to propagate the error returned by
-genpd->attach_dev() here.
-
-Thanks.
+>  
+>  	mutex_lock(&gpd_data->lock);
+>  	gpd_data->base.dev = dev;
+> @@ -1499,7 +1499,7 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
+>  	genpd->max_off_time_changed = true;
+>  
+>  	if (genpd->detach_dev)
+> -		genpd->detach_dev(dev);
+> +		genpd->detach_dev(genpd, dev);
+>  
+>  	spin_lock_irq(&dev->power.lock);
+>  
+> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+> index 73e938b7e937..b3ed7766a291 100644
+> --- a/include/linux/pm_domain.h
+> +++ b/include/linux/pm_domain.h
+> @@ -72,8 +72,10 @@ struct generic_pm_domain {
+>  	bool max_off_time_changed;
+>  	bool cached_power_down_ok;
+>  	struct gpd_cpuidle_data *cpuidle_data;
+> -	void (*attach_dev)(struct device *dev);
+> -	void (*detach_dev)(struct device *dev);
+> +	int (*attach_dev)(struct generic_pm_domain *domain,
+> +			  struct device *dev);
+> +	void (*detach_dev)(struct generic_pm_domain *domain,
+> +			   struct device *dev);
+>  };
+>  
+>  static inline struct generic_pm_domain *pd_to_genpd(struct dev_pm_domain *pd)
+> 
 
 -- 
-Dmitry
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
