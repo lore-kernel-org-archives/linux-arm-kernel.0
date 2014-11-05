@@ -1,99 +1,26 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 5 Nov 2014 11:12:05 +0000
-Subject: [PATCH v3] arm64: dts: exynos7: add support for cpuidle core
- power down
-In-Reply-To: <1415182536-11613-1-git-send-email-k.chander@samsung.com>
-References: <1415182536-11613-1-git-send-email-k.chander@samsung.com>
-Message-ID: <20141105111205.GA21258@red-moon>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 5 Nov 2014 11:27:50 +0000
+Subject: [PATCHv3 1/5] arm64: Add support for hooks to handle undefined
+ instructions
+In-Reply-To: <1414435207-30240-2-git-send-email-punit.agrawal@arm.com>
+References: <1414435207-30240-1-git-send-email-punit.agrawal@arm.com>
+ <1414435207-30240-2-git-send-email-punit.agrawal@arm.com>
+Message-ID: <20141105112750.GD32700@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 05, 2014 at 10:15:36AM +0000, Chander Kashyap wrote:
-> Exynos7 has core power down state where cores can be powered off independently.
-> This patch adds support for this state.
-> 
-> Entry latency for the core power down is calculated as follows:
-> 1. Time difference is measured between cpuidle entry and exit.
-> 2. WFI is skipped measuring the time.
-> 3. The time is averaged out for 100000 cpuidle transactions with varying load.
-- entry-latency-us
-	Usage: Required
-	"Definition: u32 value representing worst case latency in microseconds
-		     required to enter the idle state. ..."
-
-Is that an average value in your opinion ? I am being pedantic, I know,
-but we define bindings to be followed, not interpreted.
-
-Thanks,
-Lorenzo
-
-> Exit latency and target residency are supplied as per HW team
-> 
-> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
-> ---
-> This patch has following dependencies:
-> 	- [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7 SoC
-> 		http://www.spinics.net/lists/linux-samsung-soc/msg37047.html
-> Changes in v2:
-> 	- Moved the cpu-idle-state property after reg property
-> 	- removed the status property.
-> 
-> Changes in v3:
-> 	- Added the Entry latency calculation in commit message.
-> 
->  arch/arm64/boot/dts/exynos/exynos7.dtsi |   17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> index 50ae936..444dde1 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> @@ -37,6 +37,7 @@
->  			compatible = "arm,cortex-a57", "arm,armv8";
->  			enable-method = "psci";
->  			reg = <0x0>;
-> +			cpu-idle-states = <&CPU_SLEEP>;
->  		};
->  
->  		cpu at 1 {
-> @@ -44,6 +45,7 @@
->  			compatible = "arm,cortex-a57", "arm,armv8";
->  			enable-method = "psci";
->  			reg = <0x1>;
-> +			cpu-idle-states = <&CPU_SLEEP>;
->  		};
->  
->  		cpu at 2 {
-> @@ -51,6 +53,7 @@
->  			compatible = "arm,cortex-a57", "arm,armv8";
->  			enable-method = "psci";
->  			reg = <0x2>;
-> +			cpu-idle-states = <&CPU_SLEEP>;
->  		};
->  
->  		cpu at 3 {
-> @@ -58,6 +61,20 @@
->  			compatible = "arm,cortex-a57", "arm,armv8";
->  			enable-method = "psci";
->  			reg = <0x3>;
-> +			cpu-idle-states = <&CPU_SLEEP>;
-> +		};
+On Mon, Oct 27, 2014 at 06:40:02PM +0000, Punit Agrawal wrote:
+> --- a/arch/arm64/include/asm/insn.h
+> +++ b/arch/arm64/include/asm/insn.h
+> @@ -354,6 +354,8 @@ bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+>  int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
+>  int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
+>  int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
 > +
-> +		idle-states {
-> +			entry-method = "arm,psci";
-> +
-> +			CPU_SLEEP: cpu-sleep {
-> +				compatible = "arm,idle-state";
-> +				local-timer-stop;
-> +				arm,psci-suspend-param = <0x0010000>;
-> +				entry-latency-us = <20>;
-> +				exit-latency-us = <150>;
-> +				min-residency-us = <2100>;
-> +			};
->  		};
->  	};
->  
-> -- 
-> 1.7.9.5
-> 
-> 
+> +bool aarch32_insn_is_wide_instruction(u32 insn);
+
+Nitpick: too wide function name ;). Maybe aarch32_insn_is_wide().
+
+Otherwise the patch looks fine.
+
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
