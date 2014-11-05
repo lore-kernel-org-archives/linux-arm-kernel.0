@@ -1,43 +1,75 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Wed, 05 Nov 2014 22:42:11 +0100
-Subject: [PATCHv0 0/3] rtc: rtc-isl12057: fixes and alarm support
-Message-ID: <cover.1415222752.git.arno@natisbad.org>
+Date: Wed, 05 Nov 2014 22:42:41 +0100
+Subject: [PATCHv0 2/3] rtc: rtc-isl12057: fix isil vs isl naming for intersil
+In-Reply-To: <cover.1415222752.git.arno@natisbad.org>
+References: <cover.1415222752.git.arno@natisbad.org>
+Message-ID: <2ac5b475fd757ea771296ea0731de75d963999ef.1415222752.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-This series includes three patches for Intersil ISL12057 driver.
+When Intersil ISL12057 driver was introduced by commit 70e123373c05
+(rtc: Add support for Intersil ISL12057 I2C RTC chip), the vendor
+prefix 'isl' was used instead of the expected 'isil' (Intersil
+NASDAQ symbol). Recently, a patch from Philip Zabel (7a6540ca856a,
+ARM: mvebu: Change vendor prefix for Intersil Corporation to isil)
+fixed that prefix in ReadyNAS devices .dts files (AFAICT, the only
+kernel users at the moment).
 
- - first patch is a fix for masking issues which dates back to driver
-   inclusion. Even if those issues are not critical per se, the patch is
-   a good candidate for stable down to 3.14.
+That patch completes that work to change the remaining values in:
 
- - second patch fixes remaining places where 'isl' is used instead of the
-   expected NASDAQ symbol for Intersil (i.e. isil) after commit
-   7a6540ca856ae ("ARM: mvebu: Change vendor prefix for Intersil 
-   Corporation to isil"). 
+ - Intersil ISL12057 driver (compatible string) and also associated
+   Documentation/devicetree/bindings/i2c/trivial-devices.txt file
+   to reflect the changes introduced by previous commit from Philip
 
- - third patch provides alarm support for Intersil ISL12057. This
-   support was not added when the driver was initially pushed in 3.14
-   kernel due to the inability to check interrupt support. After some
-   soldering, this tests have been performed.
+ - Documentation/devicetree/bindings/vendor-prefixes.txt files to
+   avoid future mistakes
 
-Comments are welcome,
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+---
+ Documentation/devicetree/bindings/i2c/trivial-devices.txt | 2 +-
+ Documentation/devicetree/bindings/vendor-prefixes.txt     | 2 +-
+ drivers/rtc/rtc-isl12057.c                                | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-Cheers,
-
-a+
-
-Arnaud Ebalard (3):
-  rtc: rtc-isl12057: fix masking of register values
-  rtc: rtc-isl12057: fix isil vs isl naming for intersil
-  rtc: rtc-isl12057: add alarm support to Intersil ISL12057 RTC driver
-
- .../devicetree/bindings/i2c/trivial-devices.txt    |   2 +-
- .../devicetree/bindings/vendor-prefixes.txt        |   2 +-
- drivers/rtc/rtc-isl12057.c                         | 319 ++++++++++++++++++++-
- 3 files changed, 309 insertions(+), 14 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+index fbde415078e6..edac97c0f756 100644
+--- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
++++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+@@ -55,7 +55,7 @@ fsl,sgtl5000		SGTL5000: Ultra Low-Power Audio Codec
+ gmt,g751		G751: Digital Temperature Sensor and Thermal Watchdog with Two-Wire Interface
+ infineon,slb9635tt	Infineon SLB9635 (Soft-) I2C TPM (old protocol, max 100khz)
+ infineon,slb9645tt	Infineon SLB9645 I2C TPM (new protocol, max 400khz)
+-isl,isl12057		Intersil ISL12057 I2C RTC Chip
++isil,isl12057		Intersil ISL12057 I2C RTC Chip
+ maxim,ds1050		5 Bit Programmable, Pulse-Width Modulator
+ maxim,max1237		Low-Power, 4-/12-Channel, 2-Wire Serial, 12-Bit ADCs
+ maxim,max6625		9-Bit/12-Bit Temperature Sensors with I?C-Compatible Serial Interface
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 723999d73744..84193ecdc41c 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -77,7 +77,7 @@ innolux	Innolux Corporation
+ intel	Intel Corporation
+ intercontrol	Inter Control Group
+ isee	ISEE 2007 S.L.
+-isl	Intersil
++isil	Intersil
+ karo	Ka-Ro electronics GmbH
+ keymile	Keymile GmbH
+ lacie	LaCie
+diff --git a/drivers/rtc/rtc-isl12057.c b/drivers/rtc/rtc-isl12057.c
+index 8132fbc7e10a..adb0646236b1 100644
+--- a/drivers/rtc/rtc-isl12057.c
++++ b/drivers/rtc/rtc-isl12057.c
+@@ -279,7 +279,7 @@ static int isl12057_probe(struct i2c_client *client,
+ 
+ #ifdef CONFIG_OF
+ static const struct of_device_id isl12057_dt_match[] = {
+-	{ .compatible = "isl,isl12057" },
++	{ .compatible = "isil,isl12057" },
+ 	{ },
+ };
+ #endif
 -- 
 2.1.1
