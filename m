@@ -1,45 +1,184 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Wed, 05 Nov 2014 08:22:13 -0800
-Subject: [PATCH V3 1/3] can: add can_is_canfd_skb() API
-In-Reply-To: <1415193393-30023-1-git-send-email-b29396@freescale.com>
-References: <1415193393-30023-1-git-send-email-b29396@freescale.com>
-Message-ID: <1415204533.13896.7.camel@edumazet-glaptop2.roam.corp.google.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Wed, 5 Nov 2014 17:22:57 +0100
+Subject: [PATCH v2 06/11] memory: atmel-ebi: add DT bindings documentation
+In-Reply-To: <1415203287-21517-7-git-send-email-boris.brezillon@free-electrons.com>
+References: <1415203287-21517-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1415203287-21517-7-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <CACh+v5N8dXaH3ZNGr=MKXbQRU7nOMPLvxT0rEsZrbSKj20b_Dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-11-05 at 21:16 +0800, Dong Aisheng wrote:
-> The CAN device drivers can use it to check if the frame to send is on
-> CAN FD mode or normal CAN mode.
-> 
-> Acked-by: Oliver Hartkopp <socketcan@hartkopp.net>
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+Hi Boris,
+
+2014-11-05 17:01 GMT+01:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > ---
-> ChangesLog:
->  * v1->v2: change to skb->len == CANFD_MTU;
-> ---
->  include/linux/can/dev.h | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/include/linux/can/dev.h b/include/linux/can/dev.h
-> index 6992afc..4c3919c 100644
-> --- a/include/linux/can/dev.h
-> +++ b/include/linux/can/dev.h
-> @@ -99,6 +99,11 @@ inval_skb:
->  	return 1;
->  }
->  
-
-This looks a bit strange to assume that skb->len == magical_value is CAN
-FD. A comment would be nice.
-
-> +static inline int can_is_canfd_skb(struct sk_buff *skb)
-
-static inline bool can_is_canfd_skb(const struct sk_buff *skb)
-
-> +{
-> +	return skb->len == CANFD_MTU;
-> +}
+>  .../bindings/memory-controllers/atmel-ebi.txt      | 153 +++++++++++++++++++++
+>  1 file changed, 153 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
+>
+> diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
+> new file mode 100644
+> index 0000000..dc2c34f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
+> @@ -0,0 +1,153 @@
+> +* Device tree bindings for Atmel EBI
 > +
->  /* get data length from can_dlc with sanitized can_dlc */
->  u8 can_dlc2len(u8 can_dlc);
->  
+> +The External Bus Interface (EBI) controller is a bus where you can connect
+> +asynchronous (NAND, NOR, SRAM, ....) and synchronous memories (SDR/DDR SDRAMs).
+> +The EBI provides a glue-less interface to asynchronous memories though the SMC
+> +(Static Memory Controller).
+> +Synchronous memories (and some asynchronous memories like NANDs) can be
+> +attached to specialized controllers which are responsible for configuring the
+> +bus appropriately according to the connected device.
+> +In the other hand, the bus interface can be automated for simple asynchronous
+> +devices.
+> +
+> +Required properties:
+> +
+> +- compatible:          "atmel,at91sam9260-ebi"
+> +                       "atmel,at91sam9261-ebi"
+> +                       "atmel,at91sam9263-ebi0"
+> +                       "atmel,at91sam9263-ebi1"
+> +                       "atmel,at91sam9g45-ebi"
+> +                       "atmel,at91sam9x5-ebi"
+> +                       "atmel,sama5d3-ebi"
+> +
+> +- reg:                 Contains offset/length value for EBI memory mapping.
+> +                       This property might contain several entries if the EBI
+> +                       memory range is not contiguous
+> +
+> +- #address-cells:      Must be 2.
+> +                       The first cell encodes the CS.
+> +                       The second cell encode the offset into the CS memory
+> +                       range.
+> +
+> +- #size-cells:         Must be set to 1.
+> +
+> +- ranges:              Encodes CS to memory region association.
+> +
+> +- clocks:              Clock feeding the EBI controller.
+> +                       See clock-bindings.txt
+> +
+> +Child chip-select (cs) nodes contain the memory devices nodes connected to
+> +such as NOR (e.g. cfi-flash) and NAND.
+> +There might be board specific devices like FPGAs.
+> +You'll define you device requirements in these child nodes.
+> +
+> +Required child cs node properties:
+> +
+> +- #address-cells:      Must be 2.
+> +
+> +- #size-cells:         Must be 1.
+> +
+> +- ranges:              Empty property indicating that child nodes can inherit
+> +                       memory layout.
+> +
+> +Optional child cs node properties:
+> +- atmel,generic-dev            boolean property specifying if the device is
+> +                               a generic device.
+> +                               The following properties are only parsed if
+> +                               this property is present.
+> +                               Specialized devices are attached to specialized
+> +                               controllers which should configure the bus
+> +                               appropriately.
+
+What do you mean by specialized devices ? Can you give an example ?
+
+> +
+> +- atmel,bus-width:             width of the asynchronous device's data bus
+> +                               8, 16 or 32.
+> +                               8 if not present.
+> +
+> +- atmel,byte-access-type       "write" or "select" (see Atmel datasheet).
+> +                               "select" if not present.
+> +
+> +- atmel,read-mode              "nrd" or "ncs".
+> +                               "ncs" is not present.
+> +
+> +- atmel,write-mode             "nwe" or "ncs".
+> +                               "ncs" is not present.
+> +
+> +- atmel,exnw-mode              "disabled", "frozen" or "ready".
+> +                               "disabled" if not present.
+> +
+> +- atmel,page-mode              enable page mode if present. The provided value
+> +                               defines the page size (supported values: 4, 8,
+> +                               16 and 32).
+> +
+> +Optional device timings expressed in nanoseconds (if the property is not
+> +present 0 is assumed):
+> +
+> +- atmel,ncs-rd-setup-ns
+> +- atmel,nrd-setup-ns
+> +- atmel,ncs-wr-setup-ns
+> +- atmel,nwe-setup-ns
+> +- atmel,ncs-rd-pulse-ns
+> +- atmel,nrd-pulse-ns
+> +- atmel,ncs-wr-pulse-ns
+> +- atmel,nwe-pulse-ns
+> +- atmel,nwe-cycle-ns
+> +- atmel,nrd-cycle-ns
+> +- atmel,tdf-ns
+> +
+> +- atmel,tdf-optimized          data float optimized mode. If present the data
+> +                               float time is optimized depending on the next
+> +                               device being accessed (next device setup
+> +                               time is substracted to the current devive data
+> +                               float time).
+> +
+> +
+> +
+> +Example:
+> +
+> +       ebi: ebi at 10000000 {
+> +               compatible = "atmel,sama5d3-ebi", "simple-bus";
+> +               #address-cells = <2>;
+> +               #size-cells = <1>;
+> +               atmel,smc = <&hsmc>;
+> +               atmel,matrix = <&matrix>;
+> +               reg = <0x10000000 0x10000000
+> +                      0x40000000 0x30000000>;
+> +               ranges = <0x0 0x0 0x10000000 0x10000000
+> +                         0x1 0x0 0x40000000 0x10000000
+> +                         0x2 0x0 0x50000000 0x10000000
+> +                         0x3 0x0 0x60000000 0x10000000>;
+> +               clocks = <&mck>;
+> +
+> +               pinctrl-names = "default";
+> +               pinctrl-0 = <&pinctrl_ebi_addr>;
+> +
+> +               cs at 0 {
+> +                       #address-cells = <2>;
+> +                       #size-cells = <1>;
+> +                       ranges;
+> +                       atmel,generic-dev;
+> +                       atmel,read-mode = "nrd";
+> +                       atmel,write-mode = "nwe";
+> +                       atmel,bus-width = <16>;
+> +                       atmel,ncs-rd-setup-ns = <0>;
+> +                       atmel,ncs-wr-setup-ns = <0>;
+> +                       atmel,nwe-setup-ns = <8>;
+> +                       atmel,nrd-setup-ns = <16>;
+> +                       atmel,ncs-rd-pulse-ns = <84>;
+> +                       atmel,ncs-wr-pulse-ns = <84>;
+> +                       atmel,nrd-pulse-ns = <76>;
+> +                       atmel,nwe-pulse-ns = <76>;
+> +                       atmel,nrd-cycle-ns = <107>;
+> +                       atmel,nwe-cycle-ns = <84>;
+> +                       atmel,tdf-ns = <16>;
+> +
+> +                       nor: flash at 0,0 {
+> +                               compatible = "cfi-flash";
+> +                               #address-cells = <1>;
+> +                               #size-cells = <1>;
+> +                               reg = <0x0 0x0 0x1000000>;
+> +                               bank-width = <2>;
+> +                       };
+> +               };
+> +       };
+> +
+> --
+> 1.9.1
+>
