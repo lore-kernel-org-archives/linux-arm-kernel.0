@@ -1,44 +1,84 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed,  5 Nov 2014 13:20:50 +0100
-Subject: [PATCH RESEND] tty: serial: omap: Remove probe error message
-Message-ID: <1415190050-31300-1-git-send-email-mpa@pengutronix.de>
+From: ankit.jindal@linaro.org (Ankit Jindal)
+Date: Wed, 5 Nov 2014 18:25:51 +0530
+Subject: [PATCH v3 2/6] uio: Add new UIO_MEM_PHYS_CACHE type for mem
+ regions
+In-Reply-To: <4B098F57-E202-412C-B54D-085A46792EDC@codeaurora.org>
+References: <1413871011-4101-1-git-send-email-ankit.jindal@linaro.org>
+ <1413871011-4101-3-git-send-email-ankit.jindal@linaro.org>
+ <6D33D50E-2DD1-482C-B05E-45B237F3B779@codeaurora.org>
+ <CAPTm99W0J-Q6CwCDVaYe4eyEWrruWuY5pzpHoESyVu9N3cFA=g@mail.gmail.com>
+ <4B098F57-E202-412C-B54D-085A46792EDC@codeaurora.org>
+Message-ID: <CAPTm99UUA0Oe40uH73Rj8_hvyMYwuxcKhFvU_KVZxmKpR1jn2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This error message is not necessary. The driver core code will print all
-probe error messages. It also resolves some error codes to proper error
-messages. For example -EPROBE_DEFER will only be printed as an info message.
+Hi Kumar,
 
-This patch removes the error message as the core prints the same
-information.
+On 31 October 2014 19:09, Kumar Gala <galak@codeaurora.org> wrote:
+>
+> On Oct 31, 2014, at 4:30 AM, Ankit Jindal <ankit.jindal@linaro.org> wrote:
+>
+>> Hi Kumar,
+>>
+>> On 21 October 2014 12:08, Kumar Gala <galak@codeaurora.org> wrote:
+>>>
+>>> On Oct 21, 2014, at 7:56 AM, Ankit Jindal <ankit.jindal@linaro.org> wrote:
+>>>
+>>>> Currently, three types of mem regions are supported: UIO_MEM_PHYS,
+>>>> UIO_MEM_LOGICAL and UIO_MEM_VIRTUAL. Among these UIO_MEM_PHYS helps
+>>>> UIO driver export physcial memory to user space as non-cacheable
+>>>> user memory. Typcially memory-mapped registers of a device are exported
+>>>> to user space as UIO_MEM_PHYS type mem region. The UIO_MEM_PHYS type
+>>>> is not efficient if dma-capable devices are capable of maintaining coherency
+>>>> with CPU caches.
+>>>>
+>>>> This patch adds new type UIO_MEM_PHYS_CACHE for mem regions to enable
+>>>> cacheable access to physical memory from user space.
+>>>>
+>>>> Signed-off-by: Ankit Jindal <ankit.jindal@linaro.org>
+>>>> Signed-off-by: Tushar Jagad <tushar.jagad@linaro.org>
+>>>> ---
+>>>> drivers/uio/uio.c          |   11 ++++++++---
+>>>> include/linux/uio_driver.h |    1 +
+>>>> 2 files changed, 9 insertions(+), 3 deletions(-)
+>>>
+>>> Rather than adding a new type, why not allow the driver to set the pgprot value, this way one has full control and we don?t need to keep adding types for various different cache attributions in the future.
+>>
+>> Do you mean to add a new field pgprot_t in the memtype structure and
+>> uio_mmap_physical will set vma->vm_page_prot to this value provided by
+>> driver ? If this is the case then we will need to change all the
+>> current uio based drivers which was the reason I preferred to have a
+>> new mem type.
+>>
+>> Please let me know if I have misunderstood anything.
+>
+> I?m suggeting in uio_mmap_physical to do something like:
+>
+> if (idev->info->set_pgprot)
+>         idev->info->set_pgprot(vma->vm_page_prot)
+> else
+>         vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+>
+> And add a set_prprot callback to 'struct uio_info?.
+>
+> Here?s patch from several years ago:
+>
+> http://patchwork.ozlabs.org/patch/119224/
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-Acked-by: Felipe Balbi <balbi@ti.com>
----
+The suggested solution looks okey but not sure whether there is any
+available drivers using different combinations. Also, I looked at the
+available pgprot routines, looks like only pgprot_noncached and
+pgprot_writecombine are the available ones. So if we are not going to
+use these pgprot routines then driver might have architecture
+dependent switches, which we should avoid.
 
-Hi,
-
-this is another resend of this patch. I rebased it onto v3.18-rc3.
-
-Regards,
-
-Markus
-
- drivers/tty/serial/omap-serial.c | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 18c30cabe27f..6cda5cd8b513 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -1747,8 +1747,6 @@ err_add_port:
- 	pm_runtime_disable(&pdev->dev);
- err_rs485:
- err_port_line:
--	dev_err(&pdev->dev, "[UART%d]: failure [%s]: %d\n",
--				pdev->id, __func__, ret);
- 	return ret;
- }
- 
--- 
-2.1.1
+Thanks,
+Ankit
+>
+> - k
+>
+> --
+> Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+>
