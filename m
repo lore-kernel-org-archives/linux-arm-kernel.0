@@ -1,42 +1,33 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 5 Nov 2014 09:03:05 +0100
-Subject: [PATCH 3/4] PM / Domains: Improve error handling while
- adding/removing devices
-In-Reply-To: <CAMuHMdWMEaC3=ibf9E8dLcG=zceU5+oE9NnKyRfAM0O36cBAjg@mail.gmail.com>
-References: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
- <1414507090-516-4-git-send-email-ulf.hansson@linaro.org>
- <CAMuHMdWMEaC3=ibf9E8dLcG=zceU5+oE9NnKyRfAM0O36cBAjg@mail.gmail.com>
-Message-ID: <CAPDyKFoA9oUOtKPvFB1Kex5-x7wn917EBUdv=jYyUwgFth4dvw@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 05 Nov 2014 09:11:35 +0100
+Subject: [PATCH 11/13] arm: dts: dra7: add DMA properties for UART
+In-Reply-To: <20141105011506.GG24112@csclub.uwaterloo.ca>
+References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
+ <1412014009-13315-12-git-send-email-bigeasy@linutronix.de>
+ <20141104170233.GB24112@csclub.uwaterloo.ca> <5459079D.7080703@linutronix.de>
+ <20141104172117.GC24112@csclub.uwaterloo.ca>
+ <20141104183315.GD24112@csclub.uwaterloo.ca>
+ <20141104210315.GF24112@csclub.uwaterloo.ca>
+ <20141105011506.GG24112@csclub.uwaterloo.ca>
+Message-ID: <5459DBB7.1090702@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 November 2014 08:47, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> On Tue, Oct 28, 2014 at 3:38 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> --- a/drivers/base/power/domain.c
->> +++ b/drivers/base/power/domain.c
->> @@ -1358,25 +1358,81 @@ EXPORT_SYMBOL_GPL(pm_genpd_syscore_poweron);
->>
->>  #endif /* CONFIG_PM_SLEEP */
->>
->> -static struct generic_pm_domain_data *__pm_genpd_alloc_dev_data(struct device *dev)
->> +static int genpd_alloc_dev_data(struct generic_pm_domain *genpd,
->> +                               struct device *dev, struct gpd_timing_data *td)
->>  {
->
-> [...]
->
->> +       if (genpd->attach_dev)
->> +               genpd->attach_dev(dev);
->
-> Note that dev->pm_domain is not yet set at this point, so the callee
-> can no longer
-> know to which domain the device is being attached.
-> Should we re-add the parameter, or move the attach_dev() back to
-> __pm_genpd_add_device(), like Kevin suggested.
+On 11/05/2014 02:15 AM, Lennart Sorensen wrote:
+> Well 4 hours running with multiple reboots (our testsuite reboots every
+> 30 minutes to test the watchdog).  So far it has only lost 70 bytes out
+> of 40MB of data sent between uart7 and uart8 (and we are pretty sure
+> the serial test has a small bug that causes a few bytes to be lost right
+> after a reboot sometimes).
+> 
+> The reason I am even trying the new driver today is that we were seeing
+> soft lockups on the CPU whenever the serial ports were being tested,
+> usually in less than 5 minutes, so 4 hours without a lockup is a good
+> sign.  No idea what might be wrong with the old omap serial driver, but
+> it seems something is (unless of course we managed to break it somehow
+> when we tried to solve its habit of dropping characters).
 
-I agree.
+Okay. No DMA but the basic part seems to work for you. Thanks for
+testing.
 
-I am working on a new version, which adopts to your suggestions.
-
-Kind regards
-Uffe
+Sebastian
