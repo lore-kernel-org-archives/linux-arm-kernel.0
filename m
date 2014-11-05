@@ -1,83 +1,39 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed,  5 Nov 2014 10:27:40 +0000
-Subject: [PATCH 3.18-rc3 v7 4/4] arm: smp: Handle ipi_cpu_backtrace() using
- FIQ (if available)
-In-Reply-To: <1415183260-6389-1-git-send-email-daniel.thompson@linaro.org>
-References: <1415183260-6389-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1415183260-6389-5-git-send-email-daniel.thompson@linaro.org>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Wed, 05 Nov 2014 18:28:45 +0800
+Subject: [Patch Part2 v4 00/31] Enable hierarchy irqdomian on x86 platforms
+In-Reply-To: <20141105095850.GH10744@8bytes.org>
+References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
+ <20141104144730.GE14512@8bytes.org> <5458ECF3.4040308@linux.intel.com>
+ <20141105085154.GG10744@8bytes.org> <5459F0DE.6000307@linux.intel.com>
+ <20141105095850.GH10744@8bytes.org>
+Message-ID: <5459FBDD.4020504@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previous changes have introduced both a replacement default FIQ handler
-and an implementation of arch_trigger_all_cpu_backtrace for ARM but
-these are currently independent of each other.
+Hi Joerg,
+	Seems like a silly bug, could you please help to try this
+fix?
+Regards!
+Gerry
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index 7423ee16972f..62ba8a6f6e79 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -1211,7 +1211,7 @@ int msi_irq_domain_alloc_irqs(struct irq_domain
+*domain, int type,
+                                msidesc->nvec_used > 1) ?  1 : -ENOSPC;
+                }
+                for (i = 0; i < msidesc->nvec_used; i++)
+-                       irq_set_msi_desc_off(virq + i, i, msidesc);
++                       irq_set_msi_desc_off(virq, i, msidesc);
+        }
 
-This patch plumbs together these features making it possible, on platforms
-that support it, to trigger backtrace using FIQ.
+        list_for_each_entry(msidesc, &dev->msi_list, list)
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm/include/asm/smp.h | 3 +++
- arch/arm/kernel/smp.c      | 4 +++-
- arch/arm/kernel/traps.c    | 3 +++
- 3 files changed, 9 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index 18f5a55..b076584 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -18,6 +18,8 @@
- # error "<asm/smp.h> included in non-SMP build"
- #endif
- 
-+#define SMP_IPI_FIQ_MASK 0x0100
-+
- #define raw_smp_processor_id() (current_thread_info()->cpu)
- 
- struct seq_file;
-@@ -79,6 +81,7 @@ extern void arch_send_call_function_single_ipi(int cpu);
- extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
- extern void arch_send_wakeup_ipi_mask(const struct cpumask *mask);
- 
-+extern void ipi_cpu_backtrace(struct pt_regs *regs);
- extern int register_ipi_completion(struct completion *completion, int cpu);
- 
- struct smp_operations {
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 14c594a..e923843 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -539,7 +539,7 @@ static void ipi_cpu_stop(unsigned int cpu)
- 		cpu_relax();
- }
- 
--static void ipi_cpu_backtrace(struct pt_regs *regs)
-+void ipi_cpu_backtrace(struct pt_regs *regs)
- {
- 	int cpu = smp_processor_id();
- 
-@@ -580,6 +580,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 	unsigned int cpu = smp_processor_id();
- 	struct pt_regs *old_regs = set_irq_regs(regs);
- 
-+	BUILD_BUG_ON(SMP_IPI_FIQ_MASK != BIT(IPI_CPU_BACKTRACE));
-+
- 	if ((unsigned)ipinr < NR_IPI) {
- 		trace_ipi_entry(ipi_types[ipinr]);
- 		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 4dc45b3..9eb05be 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -483,6 +483,9 @@ asmlinkage void __exception_irq_entry handle_fiq_as_nmi(struct pt_regs *regs)
- #ifdef CONFIG_ARM_GIC
- 	gic_handle_fiq_ipi();
- #endif
-+#ifdef CONFIG_SMP
-+	ipi_cpu_backtrace(regs);
-+#endif
- 
- 	nmi_exit();
- 
--- 
-1.9.3
+On 2014/11/5 17:58, Joerg Roedel wrote:
+> On Wed, Nov 05, 2014 at 05:41:50PM +0800, Jiang Liu wrote:
+>> 	Could you please help to apply the attached patch and send me
+>> console outputs?
+> 
+> Sure, here it is.
+> 
