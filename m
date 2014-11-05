@@ -1,17 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 05 Nov 2014 10:24:56 +0100
-Subject: [PATCH v6] PCI: Layerscape: Add Layerscape PCIe driver
-In-Reply-To: <1415177111-28730-1-git-send-email-Minghuan.Lian@freescale.com>
-References: <1415177111-28730-1-git-send-email-Minghuan.Lian@freescale.com>
-Message-ID: <13483534.gsaDiXRS9D@wuerfel>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 5 Nov 2014 10:30:29 +0100
+Subject: [PATCH] mmc: core: fix card detection regression
+In-Reply-To: <1415146961-25993-1-git-send-email-kristina.martsenko@gmail.com>
+References: <1747777414.897866.1414878004147.JavaMail.open-xchange@oxbsltgw09.schlund.de>
+ <1415146961-25993-1-git-send-email-kristina.martsenko@gmail.com>
+Message-ID: <CAPDyKFqQsQrYJsedgkThJNJ5YZVim9nB=uhKf6BycCjvEXd_bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 05 November 2014 16:45:11 Minghuan Lian wrote:
-> Add support for Freescale Layerscape PCIe controller. This driver
-> re-uses the designware core code.
-> 
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> 
+On 5 November 2014 01:22, Kristina Mart?enko
+<kristina.martsenko@gmail.com> wrote:
+> Since commit 89168b489915 ("mmc: core: restore detect line inversion
+> semantics"), the SD card on i.MX28 (and possibly other) devices isn't
+> detected and booting stops at:
+>
+> [    4.120617] Waiting for root device /dev/mmcblk0p3...
+>
+> This is caused by the MMC_CAP2_CD_ACTIVE_HIGH flag being set incorrectly
+> when the host controller doesn't use a GPIO for card detection (but
+> instead uses a dedicated pin). In this case mmc_gpiod_request_cd() will
+> return before assigning to the gpio_invert variable, leaving the
+> variable uninitialized. The variable then gets used to set the flag.
+> This patch fixes the issue by making sure gpio_invert is set to false
+> when a GPIO isn't used. After this patch, i.MX28 boots fine.
+>
+> The MMC_CAP2_RO_ACTIVE_HIGH (write protect) flag is also set incorrectly
+> for the exact same reason (it uses the same uninitialized variable), so
+> this patch fixes that too.
+>
+> Fixes: 89168b489915 ("mmc: core: restore detect line inversion semantics")
+> Reported-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Signed-off-by: Kristina Mart?enko <kristina.martsenko@gmail.com>
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Thanks! Applied for fixes.
+
+Kind regards
+Uffe
