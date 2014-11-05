@@ -1,33 +1,38 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed,  5 Nov 2014 10:35:45 -0800
-Subject: [PATCH 0/5] Few fixes for omaps to reduce bootup noise
-Message-ID: <1415212550-24692-1-git-send-email-tony@atomide.com>
+Date: Wed,  5 Nov 2014 10:35:47 -0800
+Subject: [PATCH 2/5] ARM: dts: Fix NAND last partition size on LDP
+In-Reply-To: <1415212550-24692-1-git-send-email-tony@atomide.com>
+References: <1415212550-24692-1-git-send-email-tony@atomide.com>
+Message-ID: <1415212550-24692-3-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are few fixes to reduce bootup errors and warnings when
-booting omaps in device tree mode. All these are non-critical,
-so these are intended for the v3.19 merge window unless somebody
-comes up with a real need for these earlier.
+Fix the following warning during the boot:
 
-Regards,
+mtd: partition "Filesystem" extends beyond the end of device
+"omap2-nand.0" -- size truncated to 0x6000000
 
-Tony
+Looks like I got the last partition size wrong while setting
+up the .dts file. Note that this does not affect the partition
+as the size has been getting truncated to the right size.
 
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/omap3-ldp.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Tony Lindgren (5):
-  ARM: OMAP3: Fix errors for omap_l3_smx when booted with device tree
-  ARM: dts: Fix NAND last partition size on LDP
-  ARM: dts: Add twl keypad map for LDP
-  ARM: dts: Add twl keypad map for LDP
-  ARM: OMAP4+: Remove unused omap_l3_noc platform init
-
- arch/arm/boot/dts/omap3-evm-common.dtsi | 21 +++++++++++++++++++
- arch/arm/boot/dts/omap3-ldp.dts         | 23 ++++++++++++++++++++-
- arch/arm/boot/dts/omap3.dtsi            |  2 +-
- arch/arm/mach-omap2/devices.c           | 36 +--------------------------------
- drivers/bus/omap_l3_smx.c               | 26 +++++++++++++++++++-----
- 5 files changed, 66 insertions(+), 42 deletions(-)
-
+diff --git a/arch/arm/boot/dts/omap3-ldp.dts b/arch/arm/boot/dts/omap3-ldp.dts
+index 72dca0b..f7a45de 100644
+--- a/arch/arm/boot/dts/omap3-ldp.dts
++++ b/arch/arm/boot/dts/omap3-ldp.dts
+@@ -141,7 +141,7 @@
+ 		};
+ 		partition at 2000000 {
+ 			label = "Filesystem";
+-			reg = <0x2000000 0xe000000>;
++			reg = <0x2000000 0x6000000>;
+ 		};
+ 	};
+ 
 -- 
 2.1.1
