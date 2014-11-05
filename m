@@ -1,73 +1,37 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 5 Nov 2014 02:11:22 +0100
-Subject: N900 modem support in 3.18-rc1
-In-Reply-To: <20141104205117.GA17606@amd>
-References: <20141104205117.GA17606@amd>
-Message-ID: <20141105011122.GA30622@earth.universe>
+From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
+Date: Tue, 4 Nov 2014 20:15:06 -0500
+Subject: [PATCH 11/13] arm: dts: dra7: add DMA properties for UART
+In-Reply-To: <20141104210315.GF24112@csclub.uwaterloo.ca>
+References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
+ <1412014009-13315-12-git-send-email-bigeasy@linutronix.de>
+ <20141104170233.GB24112@csclub.uwaterloo.ca>
+ <5459079D.7080703@linutronix.de>
+ <20141104172117.GC24112@csclub.uwaterloo.ca>
+ <20141104183315.GD24112@csclub.uwaterloo.ca>
+ <20141104210315.GF24112@csclub.uwaterloo.ca>
+Message-ID: <20141105011506.GG24112@csclub.uwaterloo.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On Tue, Nov 04, 2014 at 04:03:15PM -0500, Lennart Sorensen wrote:
+> So it seems to be working on our board so far.  Will stress test it
+> some more.  No DMA of course for now, but oh well.
 
-On Tue, Nov 04, 2014 at 09:51:17PM +0100, Pavel Machek wrote:
-> I'd like to test a modem (and eventually to get it to work :-) ) on
-> n900. So far I found:
-> 
-> http://lwn.net/Articles/592485/
-> 
-> It says:
-> 
-> # supported. Testing the patchset with ofono works like this:
-> # 
-> #  # provide cmt device for ofono
-> #  ln -sf /sys/bus/hsi/n900-modem /dev/cmt
-> 
-> [...]
->
-> That seemed to match, so I symlinked it.
+Well 4 hours running with multiple reboots (our testsuite reboots every
+30 minutes to test the watchdog).  So far it has only lost 70 bytes out
+of 40MB of data sent between uart7 and uart8 (and we are pretty sure
+the serial test has a small bug that causes a few bytes to be lost right
+after a reboot sometimes).
 
-looks ok. You should have the following files:
+The reason I am even trying the new driver today is that we were seeing
+soft lockups on the CPU whenever the serial ports were being tested,
+usually in less than 5 minutes, so 4 hours without a lockup is a good
+sign.  No idea what might be wrong with the old omap serial driver, but
+it seems something is (unless of course we managed to break it somehow
+when we tried to solve its habit of dropping characters).
 
-/dev/cmt/cmt_apeslpx
-/dev/cmt/cmt_bsi
-/dev/cmt/cmt_en
-/dev/cmt/cmt_rst_rq
-/dev/cmt/cmt_rst
+I think I will stick with this new driver.  Better long term future
+anyhow.
 
-Apart from that the kernel should be provide a phonet0
-network device.
-
-> #  # start ofono
-> #  ofono --nodetach --debug
-> 
-> It it a typo and it wants ofonod?
-
-yes.
-
-> root at n900:~# ofonod --nodetach --debug &
-> [1] 3552
-
-no output from ofono?
-
-> root at n900:~# mdbus2 -s org.ofono /n900_0 xyz
-> [ERR]: There is no method with name xyz on path /n900_0!
->
-> [...]
-> 
-> Any ideas?
-
-call mdbus2 with fewer arguments to see what is available on the
-bus:
-
-mdbus2 -s                      => list all system services
-mdbus2 -s org.ofono            => list all ofono objects
-mdbus2 -s org.ofono /n900_0    => list all methods from n900 object
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/399324a5/attachment-0001.sig>
+-- 
+Len Sorensen
