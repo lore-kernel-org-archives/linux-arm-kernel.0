@@ -1,81 +1,83 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 05 Nov 2014 09:46:17 +0100
-Subject: [PATCH 1/2] ARM: dts: vf-colibri: Add I2C support
-In-Reply-To: <d5e07584708523262df69f5a4dec10609f77baa3.1415099486.git.bhuvanchandra.dv@toradex.com>
-References: <cover.1415099486.git.bhuvanchandra.dv@toradex.com>
- <d5e07584708523262df69f5a4dec10609f77baa3.1415099486.git.bhuvanchandra.dv@toradex.com>
-Message-ID: <8dcb8f78771fe356b9648e74354003e9@agner.ch>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Wed,  5 Nov 2014 16:47:41 +0800
+Subject: [PATCH v2] clk: rockchip: change hierarchy for some clocks
+Message-ID: <1415177261-6942-1-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2014-11-04 12:22, schrieb Bhuvanchandra DV:
-> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
-> ---
->  arch/arm/boot/dts/vf-colibri-eval-v3.dtsi |    7 ++++++-
->  arch/arm/boot/dts/vf-colibri.dtsi         |   13 +++++++++++++
->  2 files changed, 19 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-> b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-> index 80e8fbc..0251e6c 100644
-> --- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-> +++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-> @@ -33,6 +33,11 @@
->  	status = "okay";
->  };
->  
-> +&i2c0 {
-> +	clock-frequency = <400000>;
-> +	status = "okay";
-> +};
-> +
->  &pwm0 {
->  	status = "okay";
->  };
-> @@ -51,4 +56,4 @@
->  
->  &uart2 {
->  	status = "okay";
-> -};
-> \ No newline at end of file
-> +};
-> diff --git a/arch/arm/boot/dts/vf-colibri.dtsi
-> b/arch/arm/boot/dts/vf-colibri.dtsi
-> index ab40367..471eec0 100644
-> --- a/arch/arm/boot/dts/vf-colibri.dtsi
-> +++ b/arch/arm/boot/dts/vf-colibri.dtsi
-> @@ -39,6 +39,12 @@
->  	pinctrl-0 = <&pinctrl_fec1>;
->  };
->  
-> +&i2c0 {
-> +	clock-frequency = <400000>;
+There are some bus clock for multiple controllers with the same
+function in rk3288: four usb controllers on hclk_usb_peri,
+two nandc on hclk_emem and four dw_emmc controller on hclk_mem.
+These bus clock has the same parent with the controllers,
+they should be enabled if at least one of controllers
+on that bus is enabled, and should be disabled if all the
+controllers are disabled.
 
-There is no need to overwrite the clock frequency again on carrier board
-level here.
+There is no existern way to describ this kind of dependency,
+so maybe we can make the bus clock as a pseudo parent.
 
-But other than that.
+This patch change the hierarchy for these bus clocks, to met
+the following bus hierarchy:
+hclk_usb_peri is bus clock for
+|- hclk_otg0,
+|- hclk_host0,
+|- hclk_host1,
+|- hclk_hsic
 
-Acked-by: Stefan Agner <stefan@agner.ch>
+hclk_emem is bus clock for
+|- hclk_nandc0
+|- hclk_nandc1
 
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c0>;
-> +};
-> +
->  &pwm0 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_pwm0>;
-> @@ -102,6 +108,13 @@
->  			>;
->  		};
->  
-> +		pinctrl_i2c0: i2c0grp {
-> +			fsl,pins = <
-> +				VF610_PAD_PTB14__I2C0_SCL		0x37ff
-> +				VF610_PAD_PTB15__I2C0_SDA		0x37ff
-> +			>;
-> +		};
-> +
->  		pinctrl_pwm0: pwm0grp {
->  			fsl,pins = <
->  				VF610_PAD_PTB0__FTM0_CH0		0x1182
+hclk_mem is bus clock for
+|- hclk_sdmmc
+|- hclk_sdio0
+|- hclk_sdio1
+|- hclk_emmc
+
+Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+---
+
+Changes in v2:
+- update the commit message
+
+ drivers/clk/rockchip/clk-rk3288.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index baf8a89..d31bc45 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -652,21 +652,21 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 
+ 	/* hclk_peri gates */
+ 	GATE(0, "hclk_peri_matrix", "hclk_peri", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(6), 0, GFLAGS),
+-	GATE(HCLK_OTG0, "hclk_otg0", "hclk_peri", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(7), 4, GFLAGS),
+-	GATE(HCLK_USBHOST0, "hclk_host0", "hclk_peri", 0, RK3288_CLKGATE_CON(7), 6, GFLAGS),
+-	GATE(HCLK_USBHOST1, "hclk_host1", "hclk_peri", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(7), 7, GFLAGS),
+-	GATE(HCLK_HSIC, "hclk_hsic", "hclk_peri", 0, RK3288_CLKGATE_CON(7), 8, GFLAGS),
++	GATE(HCLK_OTG0, "hclk_otg0", "hclk_usb_peri", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(7), 4, GFLAGS),
++	GATE(HCLK_USBHOST0, "hclk_host0", "hclk_usb_peri", 0, RK3288_CLKGATE_CON(7), 6, GFLAGS),
++	GATE(HCLK_USBHOST1, "hclk_host1", "hclk_usb_peri", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(7), 7, GFLAGS),
++	GATE(HCLK_HSIC, "hclk_hsic", "hclk_usb_peri", 0, RK3288_CLKGATE_CON(7), 8, GFLAGS),
+ 	GATE(0, "hclk_usb_peri", "hclk_peri", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(7), 9, GFLAGS),
+ 	GATE(0, "hclk_peri_ahb_arbi", "hclk_peri", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(7), 10, GFLAGS),
+ 	GATE(0, "hclk_emem", "hclk_peri", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(7), 12, GFLAGS),
+ 	GATE(0, "hclk_mem", "hclk_peri", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(7), 13, GFLAGS),
+-	GATE(HCLK_NANDC0, "hclk_nandc0", "hclk_peri", 0, RK3288_CLKGATE_CON(7), 14, GFLAGS),
+-	GATE(HCLK_NANDC1, "hclk_nandc1", "hclk_peri", 0, RK3288_CLKGATE_CON(7), 15, GFLAGS),
++	GATE(HCLK_NANDC0, "hclk_nandc0", "hclk_emem", 0, RK3288_CLKGATE_CON(7), 14, GFLAGS),
++	GATE(HCLK_NANDC1, "hclk_nandc1", "hclk_emem", 0, RK3288_CLKGATE_CON(7), 15, GFLAGS),
+ 	GATE(HCLK_TSP, "hclk_tsp", "hclk_peri", 0, RK3288_CLKGATE_CON(8), 8, GFLAGS),
+-	GATE(HCLK_SDMMC, "hclk_sdmmc", "hclk_peri", 0, RK3288_CLKGATE_CON(8), 3, GFLAGS),
+-	GATE(HCLK_SDIO0, "hclk_sdio0", "hclk_peri", 0, RK3288_CLKGATE_CON(8), 4, GFLAGS),
+-	GATE(HCLK_SDIO1, "hclk_sdio1", "hclk_peri", 0, RK3288_CLKGATE_CON(8), 5, GFLAGS),
+-	GATE(HCLK_EMMC, "hclk_emmc", "hclk_peri", 0, RK3288_CLKGATE_CON(8), 6, GFLAGS),
++	GATE(HCLK_SDMMC, "hclk_sdmmc", "hclk_mem", 0, RK3288_CLKGATE_CON(8), 3, GFLAGS),
++	GATE(HCLK_SDIO0, "hclk_sdio0", "hclk_mem", 0, RK3288_CLKGATE_CON(8), 4, GFLAGS),
++	GATE(HCLK_SDIO1, "hclk_sdio1", "hclk_mem", 0, RK3288_CLKGATE_CON(8), 5, GFLAGS),
++	GATE(HCLK_EMMC, "hclk_emmc", "hclk_mem", 0, RK3288_CLKGATE_CON(8), 6, GFLAGS),
+ 	GATE(HCLK_HSADC, "hclk_hsadc", "hclk_peri", 0, RK3288_CLKGATE_CON(8), 7, GFLAGS),
+ 	GATE(0, "pmu_hclk_otg0", "hclk_peri", 0, RK3288_CLKGATE_CON(7), 5, GFLAGS),
+ 
+-- 
+1.9.1
