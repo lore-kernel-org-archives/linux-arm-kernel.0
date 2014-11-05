@@ -1,105 +1,113 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 5 Nov 2014 11:09:24 +0900
-Subject: [PATCH 03/10] ARM: shmobile: r8a7790: Add DU node to device tree
-In-Reply-To: <5458D0D1.9080403@cogentembedded.com>
-References: <cover.1415058552.git.horms+renesas@verge.net.au>
- <3ac6a83c09cbb74ebb3d3e7e6e40e1ead3ff9d01.1415058552.git.horms+renesas@verge.net.au>
- <5458D0D1.9080403@cogentembedded.com>
-Message-ID: <20141105020924.GC17779@verge.net.au>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 5 Nov 2014 10:03:25 +0800
+Subject: [PATCH 7/7] can: m_can: workaround for transmit data less than
+ 4 bytes
+In-Reply-To: <5458AB65.7000500@pengutronix.de>
+References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
+ <1414579527-31100-7-git-send-email-b29396@freescale.com>
+ <5457B1D1.6080301@pengutronix.de>
+ <20141104082505.GA8060@shlinux1.ap.freescale.net>
+ <54589AC8.4010106@pengutronix.de>
+ <20141104092651.GC8060@shlinux1.ap.freescale.net>
+ <5458AB65.7000500@pengutronix.de>
+Message-ID: <20141105020322.GA18982@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[CC Olof]
+On Tue, Nov 04, 2014 at 11:33:09AM +0100, Marc Kleine-Budde wrote:
+> On 11/04/2014 10:27 AM, Dong Aisheng wrote:
+> >>>> It should be possible to change the for loop to go always to 8, or
+> >>>> simply unroll the loop:
+> >>>>
+> >>>> /* errata description goes here */
+> >>>> m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0), *(u32 *)(cf->data + 0));
+> >>>> m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1), *(u32 *)(cf->data + 4));
+> >>>>
+> >>>
+> >>> Yes, i tried to fix it as follows.
+> >>>
+> >>> /* FIXME: we meet an IC issue that we have to write the full 8
+> >>>  * bytes (whatever value for the second word) in Message RAM to
+> >>>  * avoid bit error for transmit data less than 4 bytes
+> >>>  */
+> >>> if (cf->len <= 4) {
+> >>>         m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0),
+> >>>                          *(u32 *)(cf->data + 0));
+> >>>         m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1),
+> >>>                          *(u32 *)(cf->data + 4));
+> >>> } else {
+> >>>         for (i = 0; i < cf->len; i += 4)
+> >>>                 m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(i / 4),
+> >>>                                  *(u32 *)(cf->data + i));
+> >>>
+> >>> Will update the patch.
+> >>
+> >> Both branches of the above if are doing the same thing, I think you can
+> >> replace the while if ... else ... for with this:
+> >>
+> > 
+> > Not the same thing.
+> > The later one will cover payload up to 64 bytes.
+> 
+> Doh! I'm not used to CAN-FD, yet :) However, I'll apply this fix before
+> adding the CAN-FD support.
+> 
+> >> /* errata description goes here */
+> >> m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0), *(u32 *)(cf->data + 0));
+> >> m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1), *(u32 *)(cf->data + 4));
+> >>
+> >> However if writing to DATA(0) and DATA(1) once in the open() function is
+> >> enough this code should stay as it is.
+> > 
+> > I tried put them into open() function and the quick test showed it worked.
+> > 
+> > Do you think it's ok to put things into open() function for this issue
+> > as follows?
+> > 
+> > diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
+> > index 065e4f1..ca55988 100644
+> > --- a/drivers/net/can/m_can/m_can.c
+> > +++ b/drivers/net/can/m_can/m_can.c
+> > @@ -901,6 +901,15 @@ static void m_can_chip_config(struct net_device *dev)
+> >         /* set bittiming params */
+> >         m_can_set_bittiming(dev);
+> > 
+> > +       /* We meet an IC issue that we have to write the full 8
+> 
+> At least on the *insert SoC name here*, an issue with the Message RAM
+> was discovered. Sending CAN frames with dlc less than 4 bytes will lead
+> to bit errors, when the first 8 bytes of the Message RAM have not been
+> initialized (i.e. written to). To work around this issue, the first 8
+> bytes are initialized here.
+> 
 
-On Tue, Nov 04, 2014 at 04:12:49PM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 11/4/2014 4:50 AM, Simon Horman wrote:
-> 
-> >From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> 
-> >Add the DU device with a disabled state. Boards that want to enable the
-> >DU need to specify the output topology.
-> 
->    OK, but you're also adding VSP1 device node and don't mention that at all.
-> Haven't you squashed 2 distinct patches by chance?
+Looks good.
+Will do like that.
 
-Yes, I do appear to have squashed two patches.
+> > +        * bytes (whatever value for the second word) in Message RAM to
+> > +        * avoid bit error for transmit data less than 4 bytes at the first
+> > +        * time. By initializing the first 8 bytes of tx buffer before using
+> > +        * it can avoid such issue.
+> > +        */
+> > +       m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0), 0x0);
+> > +       m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1), 0x0);
+> > +
+> >         m_can_config_endisable(priv, false);
+> >  }
+> 
+> Can you trigger the issue when sending CAN-FD frames with dlc > 8 && dlc
+> < 64?
+> 
 
-Its unclear to me if its worth the delay that respinning this pull-request
-would amount to. But I'm happy to do so if that is what Olof would like.
+No, i did not see the issue with dlc > 8 && dlc < 64.
 
-> >Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> >[horms+renesas at verge.net.au: resolved minor conflict]
-> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >---
-> >  arch/arm/boot/dts/r8a7790.dtsi | 90 ++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 90 insertions(+)
+Regards
+Dong Aisheng
+> Marc
 > 
-> >diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-> >index d0e1773..b7c59b7 100644
-> >--- a/arch/arm/boot/dts/r8a7790.dtsi
-> >+++ b/arch/arm/boot/dts/r8a7790.dtsi
-> >@@ -600,6 +600,96 @@
-> >  		status = "disabled";
-> >  	};
-> >
-> >+	vsp1 at fe920000 {
-> >+		compatible = "renesas,vsp1";
-> >+		reg = <0 0xfe920000 0 0x8000>;
-> >+		interrupts = <0 266 IRQ_TYPE_LEVEL_HIGH>;
-> >+		clocks = <&mstp1_clks R8A7790_CLK_VSP1_R>;
-> >+
-> >+		renesas,has-sru;
-> >+		renesas,#rpf = <5>;
-> >+		renesas,#uds = <1>;
-> >+		renesas,#wpf = <4>;
-> >+	};
-> >+
-> >+	vsp1 at fe928000 {
-> >+		compatible = "renesas,vsp1";
-> >+		reg = <0 0xfe928000 0 0x8000>;
-> >+		interrupts = <0 267 IRQ_TYPE_LEVEL_HIGH>;
-> >+		clocks = <&mstp1_clks R8A7790_CLK_VSP1_S>;
-> >+
-> >+		renesas,has-lut;
-> >+		renesas,has-sru;
-> >+		renesas,#rpf = <5>;
-> >+		renesas,#uds = <3>;
-> >+		renesas,#wpf = <4>;
-> >+	};
-> >+
-> >+	vsp1 at fe930000 {
-> >+		compatible = "renesas,vsp1";
-> >+		reg = <0 0xfe930000 0 0x8000>;
-> >+		interrupts = <0 246 IRQ_TYPE_LEVEL_HIGH>;
-> >+		clocks = <&mstp1_clks R8A7790_CLK_VSP1_DU0>;
-> >+
-> >+		renesas,has-lif;
-> >+		renesas,has-lut;
-> >+		renesas,#rpf = <4>;
-> >+		renesas,#uds = <1>;
-> >+		renesas,#wpf = <4>;
-> >+	};
-> >+
-> >+	vsp1 at fe938000 {
-> >+		compatible = "renesas,vsp1";
-> >+		reg = <0 0xfe938000 0 0x8000>;
-> >+		interrupts = <0 247 IRQ_TYPE_LEVEL_HIGH>;
-> >+		clocks = <&mstp1_clks R8A7790_CLK_VSP1_DU1>;
-> >+
-> >+		renesas,has-lif;
-> >+		renesas,has-lut;
-> >+		renesas,#rpf = <4>;
-> >+		renesas,#uds = <1>;
-> >+		renesas,#wpf = <4>;
-> >+	};
-> [...]
-> 
-> WBR, Sergei
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> -- 
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 > 
