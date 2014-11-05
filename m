@@ -1,46 +1,68 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Wed, 5 Nov 2014 22:06:04 +0100
-Subject: N900 modem support in 3.18-rc1
-In-Reply-To: <20141105203918.GA29199@amd>
-References: <20141104205117.GA17606@amd> <201411052137.31452@pali>
- <20141105203918.GA29199@amd>
-Message-ID: <201411052206.05379@pali>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Thu, 6 Nov 2014 01:33:24 +0400
+Subject: [PATCH 02/15] GPIO: port LoCoMo gpio support from old driver
+In-Reply-To: <CACRpkdb7v3LmOhbhQ9TPk1_bnLnpwizawW6RQvhQRLSjRewAaQ@mail.gmail.com>
+References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
+ <1414454528-24240-3-git-send-email-dbaryshkov@gmail.com>
+ <CACRpkdY7tRadod2vQfEytmw-ubaMAvr_=XTczD5bUMkqie0xkg@mail.gmail.com>
+ <CALT56yOgMUA7o2dzfHph=S2zkDV4zERzMh4ishpPwpAx7Cqj6Q@mail.gmail.com>
+ <CACRpkdb7v3LmOhbhQ9TPk1_bnLnpwizawW6RQvhQRLSjRewAaQ@mail.gmail.com>
+Message-ID: <CALT56yO9f8wzaArnmfQSDzCM3S+2oT+62anH5kbFY3WdEt_HZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maybe you need to enable modem?
+2014-11-03 16:43 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Fri, Oct 31, 2014 at 10:39 AM, Dmitry Eremin-Solenikov
+> <dbaryshkov@gmail.com> wrote:
+>> 2014-10-31 10:48 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
+>>> On Tue, Oct 28, 2014 at 1:01 AM, Dmitry Eremin-Solenikov
+>>> <dbaryshkov@gmail.com> wrote:
+>>>
+>>>> Add gpiolib driver for gpio pins placed on the LoCoMo GA.
+>>>>
+>>>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+>>>
+>>
+>> [skipped]
+>>
+>>> (etc, everywhere this pattern occurs).
+>>>> +static void locomo_gpio_set(struct gpio_chip *chip,
+>>>> +               unsigned offset, int value)
+>>>> +{
+>>>> +       struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
+>>>> +       unsigned long flags;
+>>>> +
+>>>> +       spin_lock_irqsave(&lg->lock, flags);
+>>>> +
+>>>> +       __locomo_gpio_set(chip, offset, value);
+>>>> +
+>>>> +       spin_unlock_irqrestore(&lg->lock, flags);
+>>>
+>>> If you actually always have to be getting and releasing a spin lock around
+>>> the register writes, contemplate using regmap-mmio because that
+>>> is part of what it does.
+>>>
+>>> But is this locking really necessary?
+>>
+>> I have a custom of doing such locking and never having to think about
+>> somebody breaking into RMW cycles.
+>>
+>> Also isn't regmap an overkill here? Wouldn't regmap also do a lock/unlock
+>> around each register read/write/RMW?
+>
+> Yes that's the point: if you use regmap mmio you get the RMW-locking
+> for free, with the regmap implementation.
 
-This is n900 init sequence from script: nokia-n900-configs.sh
 
-    # set up the GPIO's for N900 modem:
-    echo 70 >/sys/class/gpio/export
-    echo low >/sys/class/gpio/gpio70/direction
-    echo 0 >/sys/class/gpio/gpio70/value
-    echo 73 >/sys/class/gpio/export
-    echo high >/sys/class/gpio/gpio73/direction
-    echo 0 >/sys/class/gpio/gpio73/value
-    echo 74 >/sys/class/gpio/export
-    echo low >/sys/class/gpio/gpio74/direction
-    echo 75 >/sys/class/gpio/export
-    echo low >/sys/class/gpio/gpio75/direction
-    echo 157 >/sys/class/gpio/export
-    echo low >/sys/class/gpio/gpio157/direction
-    echo 0 >/sys/class/gpio/gpio157/value
-    # create symlinks for ofono N900 plugin
-    mkdir -p /dev/cmt
-    ln -nsf /sys/class/gpio/gpio70 /dev/cmt/cmt_apeslpx
-    ln -nsf /sys/class/gpio/gpio74 /dev/cmt/cmt_en
-    ln -nsf /sys/class/gpio/gpio73 /dev/cmt/cmt_rst_rq
-    ln -nsf /sys/class/gpio/gpio75 /dev/cmt/cmt_rst
-    ln -nsf /sys/class/gpio/gpio157 /dev/cmt/cmt_bsi
+Just to be more concrete. Currently locomo_gpio_ack_irq() function uses
+one lock and one unlock for doing 3 consecutive RMW I I convert locomo
+to regmap, will that be 3 lock/unlock calls or still one? (Or maybe I'm
+trying to be over-protective here and adding more lock/unlock cycles
+won't matter that much?)
+
+Next question: if I have to export regmap to several subdrivers, is it better
+to have one big regmap or to have one-map-per-driver approach?
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/c8bb2e8d/attachment.sig>
+With best wishes
+Dmitry
