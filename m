@@ -1,51 +1,33 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 05 Nov 2014 12:32:21 +0100
-Subject: [PATCH V2 2/4] can: m_can: workaround for transmit data less
- than 4 bytes
-In-Reply-To: <20141105103349.GA4007@shlinux1.ap.freescale.net>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Wed, 05 Nov 2014 17:05:11 +0530
+Subject: [PATCH V2 1/4] can: m_can: update to support CAN FD features
+In-Reply-To: <1415174326-6623-1-git-send-email-b29396@freescale.com>
 References: <1415174326-6623-1-git-send-email-b29396@freescale.com>
- <1415174326-6623-2-git-send-email-b29396@freescale.com>
- <5459F94C.1030506@pengutronix.de>
- <20141105103349.GA4007@shlinux1.ap.freescale.net>
-Message-ID: <545A0AC5.80006@pengutronix.de>
+Message-ID: <545A0B6F.8060706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/2014 11:33 AM, Dong Aisheng wrote:
-> On Wed, Nov 05, 2014 at 11:17:48AM +0100, Marc Kleine-Budde wrote:
->> On 11/05/2014 08:58 AM, Dong Aisheng wrote:
->>> At least on the i.MX6SX with M_CAN IP version 3.0.x, an issue with
->>
->> Can you add the imx mask revision, too and the exact m_can version (is
->> available).
->>
-> 
-> What do you mean imx mask revision?
+Hi Dong Aisheng,
 
-In my imx6sdl/imx6q data sheet it's called: Chip Silicon Version
-(USB_ANALOG_DIGPROG), I expect that the imx6sx has a the same register.
+On 11/05/2014 01:28 PM, Dong Aisheng wrote:
 
-> By reading the Core Release Register (CREL), it seems the exact m_can
-> version is 3.0.1. (CREL = 30130506).
-> 
-> So what about changing to as follows?
-> "At least on the i.MX6SX with M_CAN IP version 3.0.1 (CREL = 30130506),
-> an issue with"
+> Bosch M_CAN is CAN FD capable device. This patch implements the CAN
+> FD features include up to 64 bytes payload and bitrate switch function.
+> 1) Change the Rx FIFO and Tx Buffer to 64 bytes for support CAN FD
+>     up to 64 bytes payload. It's backward compatible with old 8 bytes
+>     normal CAN frame.
+> 2) Allocate can frame or canfd frame based on EDL bit
+> 3) Bitrate Switch function is disabled by default and will be enabled
+>     according to CANFD_BRS bit in cf->flags.
+>
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
 
-Yes, please ass the imx silicon revision, too.
+In these four patches two of them are V1 and other two are V2.
 
-Marc
+Is there any reason..?
+
+How will you be able to generate like this by git format-patch..?
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/b6ee209c/attachment.sig>
+Thanks and Regards,
+Varka Bhadram.
