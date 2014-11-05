@@ -1,45 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 5 Nov 2014 11:28:58 +0000
-Subject: [PATCHv3 2/5] arm64: Add AArch32 instruction set condition code
- checks
-In-Reply-To: <1414435207-30240-4-git-send-email-punit.agrawal@arm.com>
-References: <1414435207-30240-1-git-send-email-punit.agrawal@arm.com>
- <1414435207-30240-4-git-send-email-punit.agrawal@arm.com>
-Message-ID: <20141105112858.GE32700@e104818-lin.cambridge.arm.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 05 Nov 2014 12:32:21 +0100
+Subject: [PATCH V2 2/4] can: m_can: workaround for transmit data less
+ than 4 bytes
+In-Reply-To: <20141105103349.GA4007@shlinux1.ap.freescale.net>
+References: <1415174326-6623-1-git-send-email-b29396@freescale.com>
+ <1415174326-6623-2-git-send-email-b29396@freescale.com>
+ <5459F94C.1030506@pengutronix.de>
+ <20141105103349.GA4007@shlinux1.ap.freescale.net>
+Message-ID: <545A0AC5.80006@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 06:40:04PM +0000, Punit Agrawal wrote:
-> Port support for AArch32 instruction condition code checking from arm
-> to arm64.
+On 11/05/2014 11:33 AM, Dong Aisheng wrote:
+> On Wed, Nov 05, 2014 at 11:17:48AM +0100, Marc Kleine-Budde wrote:
+>> On 11/05/2014 08:58 AM, Dong Aisheng wrote:
+>>> At least on the i.MX6SX with M_CAN IP version 3.0.x, an issue with
+>>
+>> Can you add the imx mask revision, too and the exact m_can version (is
+>> available).
+>>
 > 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> ---
->  arch/arm64/include/asm/opcodes.h | 1 +
->  arch/arm64/kernel/Makefile       | 4 +++-
->  2 files changed, 4 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm64/include/asm/opcodes.h
+> What do you mean imx mask revision?
+
+In my imx6sdl/imx6q data sheet it's called: Chip Silicon Version
+(USB_ANALOG_DIGPROG), I expect that the imx6sx has a the same register.
+
+> By reading the Core Release Register (CREL), it seems the exact m_can
+> version is 3.0.1. (CREL = 30130506).
 > 
-> diff --git a/arch/arm64/include/asm/opcodes.h b/arch/arm64/include/asm/opcodes.h
-> new file mode 100644
-> index 0000000..4e603ea
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/opcodes.h
-> @@ -0,0 +1 @@
-> +#include <../../arm/include/asm/opcodes.h>
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index 5bd029b..798f7d7 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -18,7 +18,9 @@ arm64-obj-y		:= cputable.o debug-monitors.o entry.o irq.o fpsimd.o	\
->  			   cpuinfo.o
->  
->  arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
-> -					   sys_compat.o
-> +					   sys_compat.o 			\
-> +					   $(addprefix ../../arm/kernel/,	\
-> +						opcodes.o)
+> So what about changing to as follows?
+> "At least on the i.MX6SX with M_CAN IP version 3.0.1 (CREL = 30130506),
+> an issue with"
 
-Apart from the addprefix that Russell mentioned:
+Yes, please ass the imx silicon revision, too.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/b6ee209c/attachment.sig>
