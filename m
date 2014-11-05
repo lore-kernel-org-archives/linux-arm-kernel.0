@@ -1,59 +1,149 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 5 Nov 2014 15:52:08 +0000
-Subject: [PATCHv3 5/5] arm64: Trace emulation of AArch32 legacy
- instructions
-In-Reply-To: <20141105100511.2daef605@gandalf.local.home>
-References: <1414435207-30240-1-git-send-email-punit.agrawal@arm.com>
- <1414435207-30240-7-git-send-email-punit.agrawal@arm.com>
- <20141105144619.GI32700@e104818-lin.cambridge.arm.com>
- <20141105100511.2daef605@gandalf.local.home>
-Message-ID: <20141105155207.GK32700@e104818-lin.cambridge.arm.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 5 Nov 2014 09:57:37 -0600
+Subject: [PATCH v9] ARM: omap: edma: add suspend resume hook
+In-Reply-To: <1409043173-24357-1-git-send-email-zonque@gmail.com>
+References: <1409043173-24357-1-git-send-email-zonque@gmail.com>
+Message-ID: <545A48F1.8060607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 05, 2014 at 03:05:11PM +0000, Steven Rostedt wrote:
-> On Wed, 5 Nov 2014 14:46:19 +0000
-> Catalin Marinas <catalin.marinas@arm.com> wrote:
+On 08/26/2014 03:52 AM, Daniel Mack wrote:
+> This patch makes the edma driver resume correctly after suspend. Tested
+> on an AM33xx platform with cyclic audio streams and omap_hsmmc.
 > 
-> > On Mon, Oct 27, 2014 at 06:40:07PM +0000, Punit Agrawal wrote:
-> > > --- a/arch/arm64/kernel/Makefile
-> > > +++ b/arch/arm64/kernel/Makefile
-> > > @@ -5,6 +5,7 @@
-> > >  CPPFLAGS_vmlinux.lds	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
-> > >  AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
-> > >  CFLAGS_efi-stub.o 	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
-> > > +CFLAGS_armv8_deprecated.o := -I$(src)
-> > 
-> > Why do you need this?
+> All information can be reconstructed by already known runtime
+> information.
 > 
-> It has to do with the TRACE_EVENT magic.
+> As we now use some functions that were previously only used from __init
+> context, annotations had to be dropped.
 > 
-> Read samples/trace_events/Makefile
+> [nm at ti.com: added error handling for runtime + suspend_late/early_resume]
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> Tested-by: Joel Fernandes <joelf@ti.com>
+> Acked-by: Joel Fernandes <joelf@ti.com>
+> ---
+> Changes from v8:
 > 
-> > 
-> > >  CFLAGS_REMOVE_ftrace.o = -pg
-> > >  CFLAGS_REMOVE_insn.o = -pg
-> > > diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-> > > index fded15f..d376fe2 100644
-> > > --- a/arch/arm64/kernel/armv8_deprecated.c
-> > > +++ b/arch/arm64/kernel/armv8_deprecated.c
-> > > @@ -15,6 +15,9 @@
-> > >  #include <linux/slab.h>
-> > >  #include <linux/sysctl.h>
-> > >  
-> > > +#define CREATE_TRACE_POINTS
-> > > +#include "trace-events-emulation.h"
-> > 
-> > Using double quotes should be fine for the current directory.
+> 	* Drop the edma_suspend hook altogether. Even though back then
+> 	  when I wrote the code I was sure disabling the interrupts
+> 	  during suspend is necessary, tests now show it in fact isn't.
+> 	  My test setup still works if that code is omitted.
+> 	* Use SET_LATE_SYSTEM_SLEEP_PM_OPS in the dev_pm_ops
+> 	  declaration.
 > 
-> No it is not enough. It not only gets included by this file, but also
-> gets included by include/trace/ftrace.h with:
+> 	Thanks to Sekhar for pointing out the above.
 > 
-> #include TRACE_INCLUDE(TRACE_INCLUDE_FILE)
-> 
-> Without that -I$(src) added, this include will fail.
+>  arch/arm/common/edma.c | 60 ++++++++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 58 insertions(+), 2 deletions(-)
 
-Ah, thanks for clarification.
+Doesn't seem to be any comments here, any chance this can be picked up? This
+patch always seems to get missed but will be needed for suspend/resume on both
+AM335x and AM437x.
 
--- 
-Catalin
+Regards,
+Dave
+
+> 
+> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+> index 485be42..c623dd0 100644
+> --- a/arch/arm/common/edma.c
+> +++ b/arch/arm/common/edma.c
+> @@ -244,6 +244,8 @@ struct edma {
+>  	/* list of channels with no even trigger; terminated by "-1" */
+>  	const s8	*noevent;
+>  
+> +	struct edma_soc_info *info;
+> +
+>  	/* The edma_inuse bit for each PaRAM slot is clear unless the
+>  	 * channel is in use ... by ARM or DSP, for QDMA, or whatever.
+>  	 */
+> @@ -295,7 +297,7 @@ static void map_dmach_queue(unsigned ctlr, unsigned ch_no,
+>  			~(0x7 << bit), queue_no << bit);
+>  }
+>  
+> -static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
+> +static void assign_priority_to_queue(unsigned ctlr, int queue_no,
+>  		int priority)
+>  {
+>  	int bit = queue_no * 4;
+> @@ -314,7 +316,7 @@ static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
+>   * included in that particular EDMA variant (Eg : dm646x)
+>   *
+>   */
+> -static void __init map_dmach_param(unsigned ctlr)
+> +static void map_dmach_param(unsigned ctlr)
+>  {
+>  	int i;
+>  	for (i = 0; i < EDMA_MAX_DMACH; i++)
+> @@ -1762,15 +1764,69 @@ static int edma_probe(struct platform_device *pdev)
+>  			edma_write_array2(j, EDMA_DRAE, i, 1, 0x0);
+>  			edma_write_array(j, EDMA_QRAE, i, 0x0);
+>  		}
+> +		edma_cc[j]->info = info[j];
+>  		arch_num_cc++;
+>  	}
+>  
+>  	return 0;
+>  }
+>  
+> +static int edma_pm_resume(struct device *dev)
+> +{
+> +	int i, j, r;
+> +
+> +	r = pm_runtime_get_sync(dev);
+> +	if (r < 0) {
+> +		dev_err(dev, "%s: get_sync returned %d\n", __func__, r);
+> +		return r;
+> +	}
+> +
+> +	for (j = 0; j < arch_num_cc; j++) {
+> +		struct edma *cc = edma_cc[j];
+> +
+> +		s8 (*queue_priority_mapping)[2];
+> +
+> +		queue_priority_mapping = cc->info->queue_priority_mapping;
+> +
+> +		/* Event queue priority mapping */
+> +		for (i = 0; queue_priority_mapping[i][0] != -1; i++)
+> +			assign_priority_to_queue(j,
+> +						 queue_priority_mapping[i][0],
+> +						 queue_priority_mapping[i][1]);
+> +
+> +		/*
+> +		 * Map the channel to param entry if channel mapping logic
+> +		 * exist
+> +		 */
+> +		if (edma_read(j, EDMA_CCCFG) & CHMAP_EXIST)
+> +			map_dmach_param(j);
+> +
+> +		for (i = 0; i < cc->num_channels; i++) {
+> +			if (test_bit(i, cc->edma_inuse)) {
+> +				/* ensure access through shadow region 0 */
+> +				edma_or_array2(j, EDMA_DRAE, 0, i >> 5,
+> +					       BIT(i & 0x1f));
+> +
+> +				setup_dma_interrupt(i,
+> +						    cc->intr_data[i].callback,
+> +						    cc->intr_data[i].data);
+> +			}
+> +		}
+> +	}
+> +
+> +	pm_runtime_put_sync(dev);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct dev_pm_ops edma_pm_ops = {
+> +	SET_LATE_SYSTEM_SLEEP_PM_OPS(NULL, edma_pm_resume)
+> +};
+> +
+>  static struct platform_driver edma_driver = {
+>  	.driver = {
+>  		.name	= "edma",
+> +		.pm	= &edma_pm_ops,
+>  		.of_match_table = edma_of_ids,
+>  	},
+>  	.probe = edma_probe,
+> 
