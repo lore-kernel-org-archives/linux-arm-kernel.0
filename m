@@ -1,200 +1,135 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Wed, 5 Nov 2014 11:08:27 +0100
-Subject: [PATCH v2 1/4] of: Rename "poweroff-source" property to
- "system-power-controller"
-In-Reply-To: <1414568135-8311-2-git-send-email-romain.perier@gmail.com>
-References: <1414568135-8311-1-git-send-email-romain.perier@gmail.com>
- <1414568135-8311-2-git-send-email-romain.perier@gmail.com>
-Message-ID: <20141105100827.GP31358@localhost>
+From: socketcan@hartkopp.net (Oliver Hartkopp)
+Date: Wed, 05 Nov 2014 11:12:24 +0100
+Subject: [PATCH V2 1/4] can: m_can: update to support CAN FD features
+In-Reply-To: <1415174326-6623-1-git-send-email-b29396@freescale.com>
+References: <1415174326-6623-1-git-send-email-b29396@freescale.com>
+Message-ID: <5459F808.3020903@hartkopp.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ Resend with lkml, arm, Felipe on CC -- why were these dropped from CC? ]
+On 05.11.2014 08:58, Dong Aisheng wrote:
 
-On Wed, Oct 29, 2014 at 07:35:32AM +0000, Romain Perier wrote:
-> As discussed on the mailing list, it makes more sense to rename this property
-> to "system-power-controller". 
+> @@ -327,41 +357,65 @@ static inline void m_can_disable_all_interrupts(const struct m_can_priv *priv)
+>   	m_can_write(priv, M_CAN_ILE, 0x0);
+>   }
+>
+> -static void m_can_read_fifo(const struct net_device *dev, struct can_frame *cf,
+> -			    u32 rxfs)
+> +static void m_can_read_fifo(struct net_device *dev, u32 rxfs)
+>   {
+> +	struct net_device_stats *stats = &dev->stats;
+>   	struct m_can_priv *priv = netdev_priv(dev);
+> -	u32 id, fgi;
+> +	struct canfd_frame *cf;
+> +	struct sk_buff *skb;
+> +	u32 id, fgi, dlc;
+> +	int i;
+>
+>   	/* calculate the fifo get index for where to read data */
+>   	fgi = (rxfs & RXFS_FGI_MASK) >> RXFS_FGI_OFF;
+> +	dlc = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DLC);
+> +	if (dlc & RX_BUF_EDL)
+> +		skb = alloc_canfd_skb(dev, &cf);
+> +	else
+> +		skb = alloc_can_skb(dev, (struct can_frame **)&cf);
 
-Please also refer to the commit in the regulator tree renaming it to
-"poweroff-source", and that this in effect is a revert to the old name
-but without the vendor prefix.
+Yes. That's the way it should look like ;-)
 
-> Problem being that the word "source" usually tends
-> to be used for inputs and that is out of control of the OS. The poweroff
-> capability is an output which simply turns the system-power off. Also, this
-> property might be used by drivers which power-off the system and power back on
-> subsequent RTC alarms. This seems to suggest to remove "poweroff" from the
-> property name and to choose "system-power-controller" as the more generic name.
-> This patchs adds the required renaming changes and defines an helper function
-> which is compatible with both properties, the old one prefixed by a vendor name
-> and the new one without any prefix.
-> 
-> Signed-off-by: Romain Perier <romain.perier@gmail.com>
-
-First of all, always run your patches through checkpatch.pl before
-submitting. There's a few warnings there for you to fix.
-
-> ---
->  .../devicetree/bindings/power/power-controller.txt | 18 ++++++++++++
->  .../devicetree/bindings/power/poweroff.txt         | 18 ------------
->  drivers/of/base.c                                  | 34 ++++++++++++++++++++++
->  include/linux/of.h                                 | 10 ++-----
->  4 files changed, 55 insertions(+), 25 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/power/power-controller.txt
->  delete mode 100644 Documentation/devicetree/bindings/power/poweroff.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/power/power-controller.txt b/Documentation/devicetree/bindings/power/power-controller.txt
-> new file mode 100644
-> index 0000000..942f955
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power/power-controller.txt
-> @@ -0,0 +1,18 @@
-> +* Generic system power control capability
-> +
-> +Power-management integrated circuits or miscellaneous harware components are
-> +sometimes able to control the system power. The device driver associated to these
-
-s/to/with/
-
-> +components might needs to define this capability, 
-
-s/needs/need/
-
-> which tells to the kernel
-
-s/to the/the/
-
-> howto switch off the system. 
-
-this should be something like "that it can be used to switch off...".
-
-> The corresponding driver must have the standard
-
-It's the device that has the property, not the driver.
-
-> +property "system-power-controller" in its device node. This property marks the
-> +device as able to controller the system-power. In order to test if this property
-
-s/controller/control/
-s/system-power/system power/
-
-> +is found programmatically, use the helper function "of_is_system_power_controller"
-> +from of.h .
-> +
-> +Example:
-> +
-> +act8846: act8846 at 5 {
-> +	 compatible = "active-semi,act8846";
-> +	 status = "okay";
-> +	 system-power-controller;
-> +}
-> diff --git a/Documentation/devicetree/bindings/power/poweroff.txt b/Documentation/devicetree/bindings/power/poweroff.txt
-> deleted file mode 100644
-> index 845868b..0000000
-> --- a/Documentation/devicetree/bindings/power/poweroff.txt
-> +++ /dev/null
-> @@ -1,18 +0,0 @@
-> -* Generic Poweroff capability
-> -
-> -Power-management integrated circuits or miscellaneous harware components are
-> -sometimes able to control the system power. The device driver associated to these
-> -components might needs to define poweroff capability, which tells to the kernel
-> -how to switch off the system. The corresponding driver must have the standard
-> -property "poweroff-source" in its device node. This property marks the device as
-> -able to shutdown the system. In order to test if this property is found
-> -programmatically, use the helper function "of_system_has_poweroff_source" from
-> -of.h .
-> -
-> -Example:
-> -
-> -act8846: act8846 at 5 {
-> -	 compatible = "active-semi,act8846";
-> -	 status = "okay";
-> -	 poweroff-source;
-> -}
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index 74ab1b8..438e405 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -2260,3 +2260,37 @@ struct device_node *of_graph_get_remote_port(const struct device_node *node)
->  	return of_get_next_parent(np);
->  }
->  EXPORT_SYMBOL(of_graph_get_remote_port);
-> +
-> +/**
-> + * of_is_system_power_controller() - Tells if the property for controlling system
-> + * power is found in device_node.
-> + * @np: Pointer to the given device_node
-> + *
-> + * Return: true if present false otherwise
-> + */
-> +bool of_is_system_power_controller(const struct device_node *np)
-> +{
-> +	struct property *pp;
-> +	unsigned long flags;
-> +	char *sep;
-> +	bool found = false;
-> +
-> +	raw_spin_lock_irqsave(&devtree_lock, flags);
-> +	for_each_property_of_node(np, pp) {
-> +		if (of_prop_cmp(pp->name, "system-power-controller") == 0) {
-> +			found = true;
-> +			break;
-> +		}
-> +		/* Backward compatibility with previous property "vendor,system-power-controller",
-> +		 * we just check that an non-empty vendor-prefix exists here
-> +		 */
-> +		sep = strchr(pp->name, ',');
-> +		if (sep && sep - pp->name && of_prop_cmp(sep + 1, "system-power-controller") == 0) {
-> +			found = true;
-> +			break;
-> +		}
+> +	if (!skb) {
+> +		stats->rx_dropped++;
+> +		return;
 > +	}
-> +	raw_spin_unlock_irqrestore(&devtree_lock, flags);
-> +	return found;
-> +}
-> +EXPORT_SYMBOL(of_is_system_power_controller);
-
-I think this is the wrong approach. This way any driver will recognise
-the old deprecated vendor prefixes. But not only those -- also
-misspelled vendor prefixes.
-
-Keep it simple and only parse the new property name (inline in the
-header file).
-
-If we need to support the old property names with vendor prefix (we have
-dropped vendor prefixes in the past), then you could add a second helper
-
-	of_is_system_power_controller_compat(np, compat_propname)
-
-where you pass in the whole old property name (e.g.
-"ti,system-power-controller") and use that name as a fall back.
-
-This way it will be clear which drivers are still supporting the
-deprecated property names, and we can make sure that no new ones will.
-
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index 868fdad..e7177b3 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -910,15 +910,11 @@ static inline int of_changeset_update_property(struct of_changeset *ocs,
->  /* CONFIG_OF_RESOLVE api */
->  extern int of_resolve_phandles(struct device_node *tree);
->  
-> -/**
-> - * of_system_has_poweroff_source - Tells if poweroff-source is found for device_node
-> - * @np: Pointer to the given device_node
-> - *
-> - * return true if present false otherwise
-> - */
-> +bool of_is_system_power_controller(const struct device_node *np);
 > +
->  static inline bool of_system_has_poweroff_source(const struct device_node *np)
->  {
-> -	return of_property_read_bool(np, "poweroff-source");
-> +	return of_is_system_power_controller(np);
->  }
->  
->  #endif /* _LINUX_OF_H */
+>   	id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_ID);
+>   	if (id & RX_BUF_XTD)
+>   		cf->can_id = (id & CAN_EFF_MASK) | CAN_EFF_FLAG;
+>   	else
+>   		cf->can_id = (id >> 18) & CAN_SFF_MASK;
+>
+> -	if (id & RX_BUF_RTR) {
+> +	if (id & RX_BUF_ESI) {
+> +		cf->flags |= CANFD_ESI;
+> +		netdev_dbg(dev, "ESI Error\n");
+> +	}
+> +
+> +	if (!(dlc & RX_BUF_EDL) && (id & RX_BUF_RTR)) {
+>   		cf->can_id |= CAN_RTR_FLAG;
+>   	} else {
+>   		id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DLC);
+> -		cf->can_dlc = get_can_dlc((id >> 16) & 0x0F);
+> -		*(u32 *)(cf->data + 0) = m_can_fifo_read(priv, fgi,
+> -							 M_CAN_FIFO_DATA(0));
+> -		*(u32 *)(cf->data + 4) = m_can_fifo_read(priv, fgi,
+> -							 M_CAN_FIFO_DATA(1));
+> +		cf->len = can_dlc2len(get_canfd_dlc((id >> 16) & 0x0F));
 
-Johan
+if (dlc & RX_BUF_EDL)
+	cf->len = can_dlc2len((id >> 16) & 0x0F);
+else
+	cf->len = get_can_dlc((id >> 16) & 0x0F);
+
+(..)
+
+> @@ -804,7 +870,8 @@ static void m_can_chip_config(struct net_device *dev)
+>   		    RXFC_FWM_1 | priv->mcfg[MRAM_RXF1].off);
+>
+>   	cccr = m_can_read(priv, M_CAN_CCCR);
+> -	cccr &= ~(CCCR_TEST | CCCR_MON);
+> +	cccr &= ~(CCCR_TEST | CCCR_MON | (CCCR_CMR_MASK << CCCR_CMR_SHIFT) |
+> +		(CCCR_CME_MASK << CCCR_CME_SHIFT));
+>   	test = m_can_read(priv, M_CAN_TEST);
+>   	test &= ~TEST_LBCK;
+>
+> @@ -816,6 +883,9 @@ static void m_can_chip_config(struct net_device *dev)
+>   		test |= TEST_LBCK;
+>   	}
+>
+> +	if (priv->can.ctrlmode & CAN_CTRLMODE_FD)
+> +		cccr |= CCCR_CME_CANFD_BRS << CCCR_CME_SHIFT;
+> +
+>   	m_can_write(priv, M_CAN_CCCR, cccr);
+>   	m_can_write(priv, M_CAN_TEST, test);
+>
+
+(..)
+
+>
+> +	if (priv->can.ctrlmode & CAN_CTRLMODE_FD) {
+> +		cccr = m_can_read(priv, M_CAN_CCCR);
+> +		cccr &= ~(CCCR_CMR_MASK << CCCR_CMR_SHIFT);
+> +		if (cf->flags & CANFD_BRS)
+> +			cccr |= CCCR_CMR_CANFD_BRS << CCCR_CMR_SHIFT;
+> +		else
+> +			cccr |= CCCR_CMR_CANFD << CCCR_CMR_SHIFT;
+> +		m_can_write(priv, M_CAN_CCCR, cccr);
+> +	}
+
+Unfortunately No. Here it becomes complicated due to the fact that the 
+revision 3.0.x does not support per-frame switching for FD/BRS ...
+
+When (priv->can.ctrlmode & CAN_CTRLMODE_FD) is true this *only* tells us, that 
+the controller is _capable_ to send either CAN or CAN FD frames.
+
+It does not configure the controller into one of these specific settings!
+
+Additionally: AFAIK when writing to the CCCR you have to make sure that 
+there's currently no ongoing transfer.
+
+I would suggest the following approach to make the revision 3.0.x act like a 
+correct CAN FD capable controller:
+
+- create a helper function to switch FD and BRS while taking care of ongoing 
+transmissions
+
+- create a variable that knows the current tx_mode for FD and BRS
+
+When we need to send a CAN frame which doesn't fit the settings in the tx_mode 
+we need to switch the CCCR and update the tx_mode variable.
+
+This at least reduces the needed CCCR operations.
+
+And it also addresses the intention of your patch
+[PATCH V1 4/4] can: m_can: allow to send std frame on CAN FD mode
+
+Regards,
+Oliver
