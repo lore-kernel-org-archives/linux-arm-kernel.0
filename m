@@ -1,43 +1,106 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 5 Nov 2014 14:51:31 +0100
-Subject: [PATCH 00/11] dmaengine: Cleanup chancnt
-In-Reply-To: <20141016090346.GE1638@intel.com>
-References: <1413450063-23829-1-git-send-email-maxime.ripard@free-electrons.com>
- <20141016090346.GE1638@intel.com>
-Message-ID: <20141105135131.GA2989@lukather>
+From: mlangsdo@redhat.com (Mark Langsdorf)
+Date: Wed, 05 Nov 2014 07:59:32 -0600
+Subject: [PATCH v2 2/2] [usb] add support for ACPI identification to
+ xhci-platform
+In-Reply-To: <20141104171220.GA30385@kroah.com>
+References: <1414692989-23128-2-git-send-email-mlangsdo@redhat.com>
+ <1415119833-9135-1-git-send-email-mlangsdo@redhat.com>
+ <1415119833-9135-2-git-send-email-mlangsdo@redhat.com>
+ <20141104171220.GA30385@kroah.com>
+Message-ID: <545A2D44.8020303@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+On 11/04/2014 11:12 AM, Greg KH wrote:
+> On Tue, Nov 04, 2014 at 10:50:33AM -0600, Mark Langsdorf wrote:
+>> Provide the methods to let ACPI identify the need to use
+>> xhci-platform. Change the Kconfig files so the
+>> xhci-plat.o file is selectable during kernel config.
+>>
+>> Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
+>> ---
+>> Changes from v1
+>> 	Renamed from "add support for APM X-Gene to xhci-platform"
+>> 	Removed changes to arm64/Kconfig
+>> 	Made CONFIG_USB_XHCI_PLATFORM a user selectable config option
+>>
+>>   drivers/usb/host/Kconfig     |  7 ++++++-
+>>   drivers/usb/host/xhci-plat.c | 11 +++++++++++
+>>   2 files changed, 17 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+>> index 82800a7..060a2361 100644
+>> --- a/drivers/usb/host/Kconfig
+>> +++ b/drivers/usb/host/Kconfig
+>> @@ -27,7 +27,12 @@ config USB_XHCI_HCD
+>>   if USB_XHCI_HCD
+>>
+>>   config USB_XHCI_PLATFORM
+>> -	tristate
+>> +	tristate "xHCI platform driver support"
+>> +	--help--
+>> +	  Say 'Y' to enable the support for the xHCI host controller
+>> +	  as a platform device. Many ARM SoCs provide USB this way.
+>> +
+>> +	  If unsure, say 'Y'.
+>
+> You really want a 'default Y' response here?
+>
+> That's not good at all, what happens if I select this on a system
+> without such hardware?
 
-On Thu, Oct 16, 2014 at 02:33:46PM +0530, Vinod Koul wrote:
-> On Thu, Oct 16, 2014 at 11:00:52AM +0200, Maxime Ripard wrote:
-> > Hi everyone,
-> > 
-> > As pointed out in the documentation thread [1], the chancnt variable
-> > is filled during the driver registration in dma_async_device_register,
-> > from the liste of channels that has been set.
-> > 
-> > This serie removes the occurences of the drivers that set it in their
-> > probe function.
-> Barring the typos in the cover letter, series looks fine.
+Based on testing with my 2 x86 systems, nothing bad, but I'll make
+it 'M' because that's correct.
 
-It's been 3 weeks already, and there's been no reviews justifying to
-send a second version of the patch set.
+>>   config USB_XHCI_MVEBU
+>>   	tristate "xHCI support for Marvell Armada 375/38x"
+>> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+>> index 91c7557..3db47ea 100644
+>> --- a/drivers/usb/host/xhci-plat.c
+>> +++ b/drivers/usb/host/xhci-plat.c
+>> @@ -18,6 +18,7 @@
+>>   #include <linux/platform_device.h>
+>>   #include <linux/slab.h>
+>>   #include <linux/usb/xhci_pdriver.h>
+>> +#include <linux/acpi.h>
+>>
+>>   #include "xhci.h"
+>>   #include "xhci-mvebu.h"
+>> @@ -287,6 +288,15 @@ static const struct of_device_id usb_xhci_of_match[] = {
+>>   MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
+>>   #endif
+>>
+>> +#ifdef CONFIG_ACPI
+>> +static const struct acpi_device_id usb_xhci_acpi_match[] = {
+>> +	/* APM X-Gene USB Controller */
+>> +	{ "PNP0D10", },
+>> +	{ }
+>> +};
+>> +MODULE_DEVICE_TABLE(acpi, usb_xhci_acpi_match);
+>> +#endif
+>
+> That looks like a very "generic" PNP value, are you sure it is assigned
+> only to this specific device?
 
-Can we merge this in?
+I'll adjust the comment. It is a generic PNP value and a lot of
+other SoCs will use this controller.
 
-Thanks,
-Maxime
+>> +
+>>   static struct platform_driver usb_xhci_driver = {
+>>   	.probe	= xhci_plat_probe,
+>>   	.remove	= xhci_plat_remove,
+>> @@ -294,6 +304,7 @@ static struct platform_driver usb_xhci_driver = {
+>>   		.name = "xhci-hcd",
+>>   		.pm = DEV_PM_OPS,
+>>   		.of_match_table = of_match_ptr(usb_xhci_of_match),
+>> +		.acpi_match_table = ACPI_PTR(usb_xhci_acpi_match),
+>
+> Shouldn't the reworked driver core code handle this differently with the
+> ability to handle either OF or ACPI in the same driver?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/665c1e30/attachment.sig>
+I'm not sure I understand the question. With these changes, the driver
+handles both ACPI and DTB/OF. It's the same style of code as used
+in drivers/ata/plat-xgene.c, which also handles both ACPI and DTB/OF.
+Why do you think this code isn't correct?
+
+--Mark Langsdorf
