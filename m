@@ -1,33 +1,72 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Wed, 05 Nov 2014 17:05:11 +0530
-Subject: [PATCH V2 1/4] can: m_can: update to support CAN FD features
-In-Reply-To: <1415174326-6623-1-git-send-email-b29396@freescale.com>
-References: <1415174326-6623-1-git-send-email-b29396@freescale.com>
-Message-ID: <545A0B6F.8060706@gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 5 Nov 2014 03:40:04 -0800
+Subject: [PATCH v4 1/4] mtd: nand: provide detailed description for raw
+ read/write page methods
+In-Reply-To: <20141025035524.GA3579@localhost.localdomain>
+References: <1413794777-32220-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1413794777-32220-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20141025035524.GA3579@localhost.localdomain>
+Message-ID: <20141105114004.GL22361@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dong Aisheng,
+On Sat, Oct 25, 2014 at 11:55:27AM +0800, Huang Shijie wrote:
+> On Mon, Oct 20, 2014 at 10:46:14AM +0200, Boris Brezillon wrote:
+> > read_page_raw and write_page_raw method description is not clear enough.
+> > It clearly specifies that ECC correction should not be involved but does
+> > not talk about specific layout (by layout I mean where in-band and
+> > out-of-band data are stored on the NAND media) used by NAND/ECC
+> > controllers.
+> > 
+> > Those specific layouts might impact MTD users and thus should be hidden (as
+> > already done in the standard NAND_ECC_HW_SYNDROME implementation).
+> > 
+> > Clearly state this constraint in the nand_ecc_ctrl struct documentation.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  include/linux/mtd/nand.h | 17 +++++++++++++++--
+> >  1 file changed, 15 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
+> > index e4d451e..b14d190 100644
+> > --- a/include/linux/mtd/nand.h
+> > +++ b/include/linux/mtd/nand.h
+> > @@ -455,8 +455,21 @@ struct nand_hw_control {
+> >   *		be provided if an hardware ECC is available
+> >   * @calculate:	function for ECC calculation or readback from ECC hardware
+> >   * @correct:	function for ECC correction, matching to ECC generator (sw/hw)
+> > - * @read_page_raw:	function to read a raw page without ECC
+> > - * @write_page_raw:	function to write a raw page without ECC
+> > + * @read_page_raw:	function to read a raw page without ECC. This function
+> > + *			should hide the specific layout used by the ECC
+> > + *			controller and always return contiguous in-band and
+> > + *			out-of-band data even if they're not stored
+> > + *			contiguously on the NAND chip (e.g.
+> > + *			NAND_ECC_HW_SYNDROME interleaves in-band and
+> > + *			out-of-band data).
+> > + * @write_page_raw:	function to write a raw page without ECC. This function
+> > + *			should hide the specific layout used by the ECC
+> > + *			controller and consider the passed data as contiguous
+> > + *			in-band and out-of-band data. ECC controller is
+> > + *			responsible for doing the appropriate transformations
+> > + *			to adapt to its specific layout (e.g.
+> > + *			NAND_ECC_HW_SYNDROME interleaves in-band and
+> > + *			out-of-band data).
+> >   * @read_page:	function to read a page according to the ECC generator
+> >   *		requirements; returns maximum number of bitflips corrected in
+> >   *		any single ECC step, 0 if bitflips uncorrectable, -EIO hw error
+> > -- 
+> > 1.9.1
+> > 
+> thanks for this patch. 
+> 
+> hi Brian, what's your opinion about this patch?
 
-On 11/05/2014 01:28 PM, Dong Aisheng wrote:
+I like the concept. It might be more succinctly described along the
+lines of "the same layout as the non-raw versions (i.e., .read_page /
+.write_page)". But the extra words may help for being more explicit.
 
-> Bosch M_CAN is CAN FD capable device. This patch implements the CAN
-> FD features include up to 64 bytes payload and bitrate switch function.
-> 1) Change the Rx FIFO and Tx Buffer to 64 bytes for support CAN FD
->     up to 64 bytes payload. It's backward compatible with old 8 bytes
->     normal CAN frame.
-> 2) Allocate can frame or canfd frame based on EDL bit
-> 3) Bitrate Switch function is disabled by default and will be enabled
->     according to CANFD_BRS bit in cf->flags.
->
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+I haven't taken a closer look at the other patches yet.
 
-In these four patches two of them are V1 and other two are V2.
-
-Is there any reason..?
-
-How will you be able to generate like this by git format-patch..?
-
--- 
-Thanks and Regards,
-Varka Bhadram.
+Brian
