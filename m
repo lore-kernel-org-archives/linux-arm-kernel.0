@@ -1,160 +1,135 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 5 Nov 2014 15:35:06 -0700
-Subject: [Patch Part2 v4 19/31] PCI/MSI: Simplify PCI MSI code by
- initializing msi_desc.nvec_used earlier
-In-Reply-To: <1415102525-9898-20-git-send-email-jiang.liu@linux.intel.com>
-References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
- <1415102525-9898-20-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <20141105223506.GF6168@google.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 5 Nov 2014 22:43:17 +0000 (UTC)
+Subject: OMAP baseline test results for v3.18-rc3
+Message-ID: <alpine.DEB.2.02.1411052239570.25985@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 04, 2014 at 08:01:53PM +0800, Jiang Liu wrote:
 
-  PCI/MSI: Initialize msi_desc.nvec_used earlier to simplify code
+Here are some basic OMAP test results for Linux v3.18-rc3.
+Logs and other details at:
 
-> Simplify PCI MSI code by initializing msi_desc.nvec_used and
-> msi_desc.msi_attrib.mutiple when create MSI descriptors.
+    http://www.pwsan.com/omap/testlogs/test_v3.18-rc3/20141105113246/
 
-multiple
-when creating
 
-> Also remove redundant checks in IRQ remapping drivers, PCI MSI core
-> already guarattees these.
+Test summary
+------------
 
-guarantees
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
 
-> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-som,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+Build: zImage:
+    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
 
-> ---
->  drivers/iommu/irq_remapping.c |    8 --------
->  drivers/pci/msi.c             |   40 +++++++++++++++-------------------------
->  2 files changed, 15 insertions(+), 33 deletions(-)
-> 
-> diff --git a/drivers/iommu/irq_remapping.c b/drivers/iommu/irq_remapping.c
-> index 176ff4372b7d..32fe5b1322d0 100644
-> --- a/drivers/iommu/irq_remapping.c
-> +++ b/drivers/iommu/irq_remapping.c
-> @@ -69,19 +69,13 @@ static int do_setup_msi_irqs(struct pci_dev *dev, int nvec)
->  	unsigned int irq;
->  	struct msi_desc *msidesc;
->  
-> -	WARN_ON(!list_is_singular(&dev->msi_list));
->  	msidesc = list_entry(dev->msi_list.next, struct msi_desc, list);
-> -	WARN_ON(msidesc->irq);
-> -	WARN_ON(msidesc->msi_attrib.multiple);
-> -	WARN_ON(msidesc->nvec_used);
->  
->  	irq = irq_alloc_hwirqs(nvec, dev_to_node(&dev->dev));
->  	if (irq == 0)
->  		return -ENOSPC;
->  
->  	nvec_pow2 = __roundup_pow_of_two(nvec);
-> -	msidesc->nvec_used = nvec;
-> -	msidesc->msi_attrib.multiple = ilog2(nvec_pow2);
->  	for (sub_handle = 0; sub_handle < nvec; sub_handle++) {
->  		if (!sub_handle) {
->  			index = msi_alloc_remapped_irq(dev, irq, nvec_pow2);
-> @@ -109,8 +103,6 @@ error:
->  	 * IRQs from tearing down again in default_teardown_msi_irqs()
->  	 */
->  	msidesc->irq = 0;
-> -	msidesc->nvec_used = 0;
-> -	msidesc->msi_attrib.multiple = 0;
->  
->  	return ret;
->  }
-> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-> index fb2ccb536324..afe974600c7d 100644
-> --- a/drivers/pci/msi.c
-> +++ b/drivers/pci/msi.c
-> @@ -85,19 +85,13 @@ int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
->   */
->  void default_teardown_msi_irqs(struct pci_dev *dev)
->  {
-> +	int i;
->  	struct msi_desc *entry;
->  
-> -	list_for_each_entry(entry, &dev->msi_list, list) {
-> -		int i, nvec;
-> -		if (entry->irq == 0)
-> -			continue;
-> -		if (entry->nvec_used)
-> -			nvec = entry->nvec_used;
-> -		else
-> -			nvec = 1 << entry->msi_attrib.multiple;
-> -		for (i = 0; i < nvec; i++)
-> -			arch_teardown_msi_irq(entry->irq + i);
-> -	}
-> +	list_for_each_entry(entry, &dev->msi_list, list)
-> +		if (entry->irq)
-> +			for (i = 0; i < entry->nvec_used; i++)
-> +				arch_teardown_msi_irq(entry->irq + i);
->  }
->  
->  void __weak arch_teardown_msi_irqs(struct pci_dev *dev)
-> @@ -353,19 +347,12 @@ static void free_msi_irqs(struct pci_dev *dev)
->  	struct msi_desc *entry, *tmp;
->  	struct attribute **msi_attrs;
->  	struct device_attribute *dev_attr;
-> -	int count = 0;
-> +	int i, count = 0;
->  
-> -	list_for_each_entry(entry, &dev->msi_list, list) {
-> -		int i, nvec;
-> -		if (!entry->irq)
-> -			continue;
-> -		if (entry->nvec_used)
-> -			nvec = entry->nvec_used;
-> -		else
-> -			nvec = 1 << entry->msi_attrib.multiple;
-> -		for (i = 0; i < nvec; i++)
-> -			BUG_ON(irq_has_action(entry->irq + i));
-> -	}
-> +	list_for_each_entry(entry, &dev->msi_list, list)
-> +		if (entry->irq)
-> +			for (i = 0; i < entry->nvec_used; i++)
-> +				BUG_ON(irq_has_action(entry->irq + i));
->  
->  	arch_teardown_msi_irqs(dev);
->  
-> @@ -556,7 +543,7 @@ error_attrs:
->  	return ret;
->  }
->  
-> -static struct msi_desc *msi_setup_entry(struct pci_dev *dev)
-> +static struct msi_desc *msi_setup_entry(struct pci_dev *dev, int nvec)
->  {
->  	u16 control;
->  	struct msi_desc *entry;
-> @@ -574,6 +561,8 @@ static struct msi_desc *msi_setup_entry(struct pci_dev *dev)
->  	entry->msi_attrib.maskbit	= !!(control & PCI_MSI_FLAGS_MASKBIT);
->  	entry->msi_attrib.default_irq	= dev->irq;	/* Save IOAPIC IRQ */
->  	entry->msi_attrib.multi_cap	= (control & PCI_MSI_FLAGS_QMASK) >> 1;
-> +	entry->msi_attrib.multiple	= ilog2(__roundup_pow_of_two(nvec));
-> +	entry->nvec_used		= nvec;
->  
->  	if (control & PCI_MSI_FLAGS_64BIT)
->  		entry->mask_pos = dev->msi_cap + PCI_MSI_MASK_64;
-> @@ -606,7 +595,7 @@ static int msi_capability_init(struct pci_dev *dev, int nvec)
->  
->  	msi_set_enable(dev, 0);	/* Disable MSI during set up */
->  
-> -	entry = msi_setup_entry(dev);
-> +	entry = msi_setup_entry(dev, nvec);
->  	if (!entry)
->  		return -ENOMEM;
->  
-> @@ -677,6 +666,7 @@ static int msix_setup_entries(struct pci_dev *dev, void __iomem *base,
->  		entry->msi_attrib.entry_nr	= entries[i].entry;
->  		entry->msi_attrib.default_irq	= dev->irq;
->  		entry->mask_base		= base;
-> +		entry->nvec_used		= 1;
->  
->  		list_add_tail(&entry->list, &dev->msi_list);
->  	}
-> -- 
-> 1.7.10.4
-> 
+Boot to userspace:
+    FAIL ( 3/17): 4430es2panda, 2430sdp, 3517evm
+    skip ( 1/17): 5912osk
+    Pass (13/17): am335xbonelt, am335xbone, 4460pandaes, 4460varsomom,
+		  37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
+		  3730es12beaglexm, cmt3517, 5430es2uevm,
+		  5430es2sbct54, 2420n800
+
+PM: chip retention via suspend:
+    FAIL ( 6/12): am335xbonelt, 4430es2panda, 4460varsomom, 2430sdp,
+		  5430es2uevm, 5430es2sbct54
+    Pass ( 6/12): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 7/12): am335xbonelt, 4430es2panda, 4460pandaes,
+		  4460varsomom, 2430sdp, 5430es2uevm, 5430es2sbct54
+    Pass ( 5/12): 37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
+		  3730es12beaglexm
+
+PM: chip off (except CORE, due to errata) via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off (except CORE, due to errata) via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
+
+PM: chip off via dynamic idle:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
+
+
+vmlinux object size
+(delta in bytes from test_v3.18-rc2 (cac7f2429872d3733dc3f9915857b1691da2eb2f)):
+   text     data      bss    total  kernel
+ -14014       -8        0   -14022  omap1_defconfig
+ -13982      -40        0   -14022  omap1_defconfig_1510innovator_only
+  -9918       -8      -32    -9958  omap1_defconfig_5912osk_only
+  -8275      +72      -64    -8267  multi_v7_defconfig
+ -14286       +8        0   -14278  omap2plus_defconfig
+ -14418      -56      -32   -14506  omap2plus_defconfig_2430sdp_only
+ -14198      -16        0   -14214  omap2plus_defconfig_am33xx_only
+ -14450      +16        0   -14434  omap2plus_defconfig_am43xx_only
+ -14286       +8        0   -14278  omap2plus_defconfig_cpupm
+ -14386      -16        0   -14402  omap2plus_defconfig_dra7xx_only
+   +754      +16        0     +770  omap2plus_defconfig_n800_multi_omap2xxx
+   +754      +16        0     +770  omap2plus_defconfig_n800_only_a
+ -14226      -88        0   -14314  omap2plus_defconfig_no_pm
+ -10302      -16        0   -10318  omap2plus_defconfig_omap2_4_only
+ -14402       +8        0   -14394  omap2plus_defconfig_omap3_4_only
+ -14386       -8        0   -14394  omap2plus_defconfig_omap5_only
+  +1748      +32      +52    +1832  rmk_omap3430_ldp_allnoconfig
+ +65072    +3896    +8516   +77484  rmk_omap3430_ldp_oldconfig
+  +1832      +44      +20    +1896  rmk_omap4430_sdp_allnoconfig
+ -13714      -80      -60   -13854  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.18-rc2 (cac7f2429872d3733dc3f9915857b1691da2eb2f))
+  avail  rsrvd   high  freed  board          kconfig
+     8k    -8k      .      .  2430sdp        omap2plus_defconfig
+     8k    -8k      .     4k  3530es31beagle omap2plus_defconfig
+     8k    -8k      .     4k  3530es3beagle  omap2plus_defconfig
+     8k    -8k      .     4k  3730beaglexm   omap2plus_defconfig
+     8k    -8k      .     4k  3730es12beaglexmomap2plus_defconfig
+     8k    -8k      .     4k  37xxevm        omap2plus_defconfig
+     8k    -8k      .     4k  4460pandaes    omap2plus_defconfig
+     8k    -8k      .     4k  4460varsomom   omap2plus_defconfig
+     8k    -8k      .     4k  5430es2sbct54  omap2plus_defconfig
+     8k    -8k      .     4k  5430es2uevm    omap2plus_defconfig
+     8k    -8k      .     4k  am335xbone     omap2plus_defconfig_am33xx_only
+     8k    -8k      .     4k  cmt3517        omap2plus_defconfig
+
+The N800 has been added back to the testbed.
+
+The size difference in rmk's rmk_omap3430_ldp_oldconfig is due to the 
+following delta from v3.18-rc2:
+
+> # 31 Oct 2014: Add CONFIG_BACKLIGHT_GPIO=y, CONFIG_CMA=y, CONFIG_DMA_CMA=y
+> #	CONFIG_DISPLAY_PANEL_SHARP_LS037V7DW01=y, CONFIG_FRAMEBUFFER_CONSOLE=y
+> #	CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
