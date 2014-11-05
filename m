@@ -1,46 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 5 Nov 2014 22:01:50 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC Clocks Updates for v3.19
-In-Reply-To: <CAOesGMhQfUTb_R5EqfH9SCh67bO3UhufPbxR-mf+o1h1G55q0g@mail.gmail.com>
-References: <cover.1414558424.git.horms+renesas@verge.net.au>
- <20141104223054.GB5908@quad.lixom.net>
- <CAMuHMdV-h2p5wcPdYL6GPMkO7GafXs9B9h+4hjOPQmfJ37LTXQ@mail.gmail.com>
- <CAOesGMhQfUTb_R5EqfH9SCh67bO3UhufPbxR-mf+o1h1G55q0g@mail.gmail.com>
-Message-ID: <CAMuHMdVSSfUjKbfXJUvjYYidUE2Y4ht9f_Rd4Jd1jyHwCUqhQg@mail.gmail.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Wed, 5 Nov 2014 22:06:04 +0100
+Subject: N900 modem support in 3.18-rc1
+In-Reply-To: <20141105203918.GA29199@amd>
+References: <20141104205117.GA17606@amd> <201411052137.31452@pali>
+ <20141105203918.GA29199@amd>
+Message-ID: <201411052206.05379@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Maybe you need to enable modem?
 
-On Wed, Nov 5, 2014 at 8:14 PM, Olof Johansson <olof@lixom.net> wrote:
->>>> Geert Uytterhoeven (1):
->>>>       ARM: shmobile: r8a7740 legacy: Add missing INTCA clock for irqpin module
->>>
->>> I'm trying to categorize this patch and it's hard. Is it a fix for a
->>> bug? Support for new firmware that doesn't enable this clock? How does
->>> the breakage show itself, and in what circumstances? Essentially, the
->>> patch description doesn't describe why it's needed and what it fixes.
->>>
->>> Which means I don't know where to merge it to.
->>
->> Unfortunately I've just discovered a stupid typo in that patch.
->> I've sent a fix ("[PATCH] ARM: shmobile: r8a7740 legacy: Fix INTCA
->> clock parent").
->>
->> If you prefer a complete new patch including the fix, just let me know.
->
-> Since I haven't applied it yet, feel free to squash it in and send a
-> fresh pull request. That way you can revisit the commit message too!
+This is n900 init sequence from script: nokia-n900-configs.sh
 
-Sent v2.
+    # set up the GPIO's for N900 modem:
+    echo 70 >/sys/class/gpio/export
+    echo low >/sys/class/gpio/gpio70/direction
+    echo 0 >/sys/class/gpio/gpio70/value
+    echo 73 >/sys/class/gpio/export
+    echo high >/sys/class/gpio/gpio73/direction
+    echo 0 >/sys/class/gpio/gpio73/value
+    echo 74 >/sys/class/gpio/export
+    echo low >/sys/class/gpio/gpio74/direction
+    echo 75 >/sys/class/gpio/export
+    echo low >/sys/class/gpio/gpio75/direction
+    echo 157 >/sys/class/gpio/export
+    echo low >/sys/class/gpio/gpio157/direction
+    echo 0 >/sys/class/gpio/gpio157/value
+    # create symlinks for ofono N900 plugin
+    mkdir -p /dev/cmt
+    ln -nsf /sys/class/gpio/gpio70 /dev/cmt/cmt_apeslpx
+    ln -nsf /sys/class/gpio/gpio74 /dev/cmt/cmt_en
+    ln -nsf /sys/class/gpio/gpio73 /dev/cmt/cmt_rst_rq
+    ln -nsf /sys/class/gpio/gpio75 /dev/cmt/cmt_rst
+    ln -nsf /sys/class/gpio/gpio157 /dev/cmt/cmt_bsi
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/c8bb2e8d/attachment.sig>
