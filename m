@@ -1,84 +1,50 @@
-From: socketcan@hartkopp.net (Oliver Hartkopp)
-Date: Wed, 05 Nov 2014 12:08:21 +0100
-Subject: [PATCH V1 4/4] can: m_can: allow to send std frame on CAN FD mode
-In-Reply-To: <5459FEDE.9050405@pengutronix.de>
-References: <1415174326-6623-1-git-send-email-b29396@freescale.com>
- <1415174326-6623-4-git-send-email-b29396@freescale.com>
- <5459FEDE.9050405@pengutronix.de>
-Message-ID: <545A0525.107@hartkopp.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Nov 2014 11:08:19 +0000
+Subject: [RESEND PATCH] ARM: kexec: Fix validating CPU hotplug support
+In-Reply-To: <545A0282.4070001@huawei.com>
+References: <1415094025-66180-1-git-send-email-hukeping@huawei.com>
+ <20141104105525.GE4042@n2100.arm.linux.org.uk>
+ <545A0282.4070001@huawei.com>
+Message-ID: <20141105110819.GK4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Nov 05, 2014 at 06:57:06PM +0800, Hu Keping wrote:
+> Actually, i do think there is something wrong in the panic-rountine:
+> when panic comes, we clear the cpu_online_bits of other CPUs and
+> keep them calling cpu_relax(). That's why I post that patch ,because
+> we do not really shut down the CPUs.
+> 
+> But as your mentioned , there is another problem:
+> what's in the pc register of each cpu is unknown after the MMU has been
+> shut down.
 
+Correct.
 
-On 05.11.2014 11:41, Marc Kleine-Budde wrote:
-> On 11/05/2014 08:58 AM, Dong Aisheng wrote:
->> The current code sends all CAN frames on CAN FD format(with BRS or not)
->> if CAN_CTRLMODE_FD is enabled.
->> However, even CAN_CTRLMODE_FD is enabled, the can tool may still
->> send normal frames.
->> e.g.
->> ip link set can0 up type can bitrate 1000000 dbitrate 1000000 fd on
->> cansend can0 123#112233
->>
->> Therefore sending normal CAN frame on FD format seems not reasonable
->> and the CAN FD incapable device may not be able to receive it correctly.
->>
->> The patch switches the M_CAN operation mode to ISO11898-1 instead of
->> staying on CAN FD operation mode by writing "11" to CMR bit if find
->> we're sending a normal can skb.
->
-> With this patch applied and Olivre's version of 3/4, how does the
-> application send CAN-FD frames?
+> On X86, there is a halt() before the cpu_relax(), so do you think we
+> need a call wfi() before cpu_relax() to keep the other CPUs on
+> status-WFI on ARM?
 
-This patch becomes obsolete when we do it like in my answer of [3/4].
+X86 benefits from the fact that it is a known architecture, and there are
+ways to ensure that the other CPUs are held in reset or whatever, so the
+system is recoverable from such a situation.
 
-> 1. witch on CAN-FD via "ip fd on"
+That is far from true on ARM: on ARM, everyone does their own thing, which
+leads to situations where we can't reset other CPUs (eg, because the
+hardware isn't implemented, or the secure firmware doesn't support being
+called by non-boot CPUs, etc.)
 
-With
+So, while adding a wfi() call in machine_crash_nonpanic_core() will stop
+the CPU executing instructions, the kernel being kexec'd will not see
+the CPUs it expects.  Also, I worry whether a wfi() is sufficient - what
+if an interrupt does get delivered to that CPU (eg, as part of the kexec'd
+kernel trying to bring the CPU online) or a device raises its interrupt
+and the interrupt has been routed to that CPU.
 
-ip link set can0 type can fd on
+I think this is the reason why we went for the simple option here: we
+know that all the conditions are not correct for being able to safely
+kexec() in SMP mode, especially in a panic scenario.
 
-the netdevice switches to the MTU of CAN FD (72) instead of 16.
-
-This means that this netdevice can handle CAN frames (MTU 16) and CAN FD 
-frames (MTU 72).
-
-When you send a standard CAN frame, e.g.
-
-	cansend can0 123#112233
-
-you would get a CAN 2.0 frame (dlc = 3) on the bus.
-
-When you send a CAN FD frame, e.g.
-
-	cansend can0 123##0112233
-
-you would get a CAN FD frame (dlc = 3) on the bus.
-
-With
-
-	cansend can0 123##1112233
-
-you would get a CAN FD frame (dlc = 3) with BRS on the bus.
-
-Whether it is CAN or CAN FD is given by checking skb->len for CAN_MTU of 
-CANFD_MTU in the driver.
-
-Regards,
-Oliver
-
-
-> 2. write a struct canfd_frame
->
-> Correct?
->
-> What happens if:
-> 3. write a struct can_frame
->
-> A CAN frame is send?
->
-> Oliver are you okay with this behaviour?
->
-> Marc
->
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
