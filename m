@@ -1,266 +1,126 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 5 Nov 2014 16:09:52 -0700
-Subject: [Patch Part2 v4 21/31] PCI/MSI: enhance PCI MSI core to support
- hierarchy irqdomain
-In-Reply-To: <1415102525-9898-22-git-send-email-jiang.liu@linux.intel.com>
-References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
- <1415102525-9898-22-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <20141105230952.GH6168@google.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 05 Nov 2014 15:11:23 -0800
+Subject: [PATCH] PM / Domains: Change prototype for the ->attach_dev()
+ callback
+In-Reply-To: <3267963.fqUYb7m9Rv@vostro.rjw.lan> (Rafael J. Wysocki's message
+ of "Thu, 06 Nov 2014 00:21:01 +0100")
+References: <1414670569-3002-1-git-send-email-ulf.hansson@linaro.org>
+ <20141105013353.GA19238@dtor-ws> <7h7fz92rqk.fsf@deeprootsystems.com>
+ <3267963.fqUYb7m9Rv@vostro.rjw.lan>
+Message-ID: <7hsihx1bvo.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 04, 2014 at 08:01:55PM +0800, Jiang Liu wrote:
+"Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
 
-In your topic:
+> On Wednesday, November 05, 2014 02:43:31 PM Kevin Hilman wrote:
+>> Dmitry Torokhov <dmitry.torokhov@gmail.com> writes:
+>> 
+>> > On Thu, Oct 30, 2014 at 01:38:30PM -0700, Kevin Hilman wrote:
+>> >> "Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
+>> >> 
+>> >> > On Thursday, October 30, 2014 01:02:49 PM Ulf Hansson wrote:
+>> >> >> Convert the prototype to return and int. This is just an initial step,
+>> >> >> needed to support error handling.
+>> >> >> 
+>> >> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> >> 
+>> >> Acked-by: Kevin Hilman <khilman@linaro.org>
+>> >> 
+>> >> >> 
+>> >> >> This patch is intended as fix for 3.18 rc[n]. Why?
+>> >> >> 
+>> >> >> There are other SOC specific patches around that adds genpd support and which
+>> >> >> implements the ->attach_dev() callback. To prevent having an "atomic" patch
+>> >> >> during the next release cycle, let's change the prototype now instead.
+>> >> >> 
+>> >> >> Further patches will add the actual error handling in genpd and these can then
+>> >> >> be reviewed and tested thoroughly.
+>> >> >
+>> >> > So we have no users of ->attach_dev at the moment, right?
+>> >> 
+>> >> Not in mainline, but there are a couple getting ready to hit -next, so
+>> >> we wanted to fix this before they arrive so that adding the error
+>> >> handling will be easier.
+>> >
+>> > BTW, while we are at it, can we also pass the domain itself to
+>> > attach_dev() and detach_dev()? If anything it helps with debugging (you
+>> > can print domain name from the callbacks).
+>> 
+>> Agreed, and it makes it match the other callbacks (power_off, power_on)
+>> which currently take struct generic_pm_domain *domain.  
+>> 
+>> Updated version of $SUBJECT patch below.
+>
+> The subject and changelog need to be updated too IMO.
+>
 
-  PCI/MSI: enhance PCI MSI core to support hierarchy irqdomain
+Right.  Here you go.
 
-There's no need to repeat "PCI MSI".  Please run "git log --oneline
-drivers/pci/msi.c" and make your similar (capitalize the first word).
+Kevin
 
-> Enhance PCI MSI core to support hierarchy irqdomain, so the common
-> code could be shared among architectures.
-> 
-> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-> ---
->  drivers/pci/Kconfig |    4 ++
->  drivers/pci/msi.c   |  126 +++++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/msi.h |   11 +++++
->  3 files changed, 141 insertions(+)
-> 
-> diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
-> index b9db0f2ce11f..022e89745f86 100644
-> --- a/drivers/pci/Kconfig
-> +++ b/drivers/pci/Kconfig
-> @@ -16,6 +16,10 @@ config PCI_MSI
->  
->  	   If you don't know what to do here, say Y.
->  
-> +config PCI_MSI_IRQ_DOMAIN
-> +	bool
-> +	depends on PCI_MSI && IRQ_DOMAIN_HIERARCHY
-> +
->  config PCI_DEBUG
->  	bool "PCI Debugging"
->  	depends on PCI && DEBUG_KERNEL
-> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-> index da181c59394b..7423ee16972f 100644
-> --- a/drivers/pci/msi.c
-> +++ b/drivers/pci/msi.c
-> @@ -19,6 +19,7 @@
->  #include <linux/errno.h>
->  #include <linux/io.h>
->  #include <linux/slab.h>
-> +#include <linux/irqdomain.h>
->  
->  #include "pci.h"
->  
-> @@ -1098,3 +1099,128 @@ int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries,
->  	return nvec;
->  }
->  EXPORT_SYMBOL(pci_enable_msix_range);
-> +
-> +#ifdef	CONFIG_PCI_MSI_IRQ_DOMAIN
 
-Space, not tab.
+----- >8 ------
+>From c18a6bf3121979c4102ba4f7edb3ac41e3921fc6 Mon Sep 17 00:00:00 2001
+From: Ulf Hansson <ulf.hansson@linaro.org>
+Date: Thu, 30 Oct 2014 13:02:49 +0100
+Subject: [PATCH] PM / Domains: Change prototype for the attach and detach
+ callbacks
 
-> +static inline irq_hw_number_t
-> +msi_get_hwirq(struct pci_dev *pdev, struct msi_desc *msidesc)
+Convert the prototypes to return an int in order to support error
+handling in these callbacks.
 
-The convention in this file is "struct pci_dev *dev".  And "struct msi_desc
-*desc" (or maybe "*entry").  Try to converge things, not diverge them.
+Also, as suggested by Dmitry Torokhov, pass the domain pointer for use
+inside the callbacks, and so that they match the existing
+power_on/power_off callbacks which currently take the domain pointer.
 
-> +{
-> +	return (irq_hw_number_t)msidesc->msi_attrib.entry_nr |
-> +		PCI_DEVID(pdev->bus->number, pdev->devfn) << 11 |
-> +		(pci_domain_nr(pdev->bus) & 0xFFFFFFFF) << 27;
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+[khilman: added domain as parameter to callbacks, as suggested by Dmitry]
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+ drivers/base/power/domain.c | 4 ++--
+ include/linux/pm_domain.h   | 6 ++++--
+ 2 files changed, 6 insertions(+), 4 deletions(-)
 
-Where does this bit layout come from?  Is this defined in the spec
-somewhere?  A reference would help.
-
-> +}
-> +
-> +static int msi_domain_alloc(struct irq_domain *domain, unsigned int virq,
-> +			    unsigned int nr_irqs, void *arg)
-> +{
-> +	int i, ret;
-> +	irq_hw_number_t hwirq = arch_msi_irq_domain_get_hwirq(arg);
-> +
-> +	if (irq_find_mapping(domain, hwirq) > 0)
-> +		return -EEXIST;
-> +
-> +	ret = irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, arg);
-> +	if (ret >= 0)
-
-	if (ret < 0)
-		return ret;
-
-and un-indent the mainline code below.  Then it's obvious that this is the
-normal case, not the error case.
-
-> +		for (i = 0; i < nr_irqs; i++) {
-> +			irq_domain_set_hwirq_and_chip(domain, virq + i,
-> +					hwirq + i, &msi_chip, (void *)(long)i);
-> +			__irq_set_handler(virq + i, handle_edge_irq, 0, "edge");
-> +		}
-> +
-> +	return ret;
-> +}
-> +
-> +static void msi_domain_free(struct irq_domain *domain, unsigned int virq,
-> +			    unsigned int nr_irqs)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < nr_irqs; i++) {
-> +		struct msi_desc *msidesc = irq_get_msi_desc(virq);
-> +
-> +		if (msidesc)
-> +			msidesc->irq = 0;
-> +	}
-> +	irq_domain_free_irqs_top(domain, virq, nr_irqs);
-> +}
-> +
-> +static int msi_domain_activate(struct irq_domain *domain,
-> +			       struct irq_data *irq_data)
-> +{
-> +	int ret = 0;
-> +	struct msi_msg msg;
-> +
-> +	/*
-> +	 * irq_data->chip_data is MSI/MSIx offset.
-
-"MSI-X", as you wrote on the next line.
-
-> +	 * MSI-X message is written per-IRQ, the offset is always 0.
-> +	 * MSI message denotes a contiguous group of IRQs, written for 0th IRQ.
-> +	 */
-> +	if (!irq_data->chip_data) {
-
-	if (irq_data->chip_data)
-		return 0;
-
-and un-indent the mainline code below, and drop the "ret = 0" init above.
-
-> +		ret = irq_chip_compose_msi_msg(irq_data, &msg);
-> +		if (ret == 0)
-
-	if (ret)
-		return ret;
-
-> +			write_msi_msg(irq_data->irq, &msg);
-> +	}
-> +
-> +	return ret;
-	return 0;
-> +}
-> +
-> +static int msi_domain_deactivate(struct irq_domain *domain,
-> +				 struct irq_data *irq_data)
-> +{
-> +	struct msi_msg msg;
-> +
-> +	if (irq_data->chip_data) {
-> +		memset(&msg, 0, sizeof(msg));
-> +		write_msi_msg(irq_data->irq, &msg);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct irq_domain_ops msi_domain_ops = {
-> +	.alloc = msi_domain_alloc,
-> +	.free = msi_domain_free,
-> +	.activate = msi_domain_activate,
-> +	.deactivate = msi_domain_deactivate,
-> +};
-> +
-> +struct irq_domain *msi_create_irq_domain(struct irq_domain *parent)
-> +{
-> +	struct irq_domain *domain;
-> +
-> +	domain = irq_domain_add_tree(NULL, &msi_domain_ops, NULL);
-> +	if (domain)
-
-	if (!domain)
-		return NULL;
-
-and un-indent this:
-
-> +		domain->parent = parent;
-> +
-> +	return domain;
-> +}
-> +
-> +int msi_irq_domain_alloc_irqs(struct irq_domain *domain, int type,
-> +			      struct pci_dev *dev, void *arg)
-> +{
-> +	int i, virq;
-> +	struct msi_desc *msidesc;
-> +	int node = dev_to_node(&dev->dev);
-> +
-> +	list_for_each_entry(msidesc, &dev->msi_list, list) {
-> +		arch_msi_irq_domain_set_hwirq(arg, msi_get_hwirq(dev, msidesc));
-> +		virq = irq_domain_alloc_irqs(domain, msidesc->nvec_used,
-> +					     node, arg);
-> +		if (virq < 0) {
-> +			/* Special handling for pci_enable_msi_range(). */
-> +			return (type == PCI_CAP_ID_MSI &&
-> +				msidesc->nvec_used > 1) ?  1 : -ENOSPC;	
-
-I think "if" would be easier to read than this ternary expression.
-
-> +		}
-> +		for (i = 0; i < msidesc->nvec_used; i++)
-> +			irq_set_msi_desc_off(virq + i, i, msidesc);
-> +	}
-> +
-> +	list_for_each_entry(msidesc, &dev->msi_list, list)
-> +		if (msidesc->nvec_used == 1)
-> +			dev_dbg(&dev->dev, "irq %d for MSI/MSI-X\n", virq);
-> +		else
-> +			dev_dbg(&dev->dev, "irq [%d-%d] for MSI/MSI-X\n",
-> +				virq, virq + msidesc->nvec_used - 1);
-> +
-> +	return 0;
-> +}
-> +#endif	/* CONFIG_PCI_MSI_IRQ_DOMAIN */
-> diff --git a/include/linux/msi.h b/include/linux/msi.h
-> index 44f4746d033b..05dcd425f82b 100644
-> --- a/include/linux/msi.h
-> +++ b/include/linux/msi.h
-> @@ -75,4 +75,15 @@ struct msi_chip {
->  	void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
->  };
->  
-> +#ifdef	CONFIG_PCI_MSI_IRQ_DOMAIN
-
-Use a space here, not a tab.
-
-> +extern struct irq_chip msi_chip;
-
-I don't think "msi_chip" is a good name.  "Chip" only hints that it's a
-semiconductor integrated circuit; it doesn't say anything about what it
-does.  I've suggested "msi_controller" elsewhere.
-
-Why does this need to be exported?  And why should there be only one in a
-system?
-
-> +extern struct irq_domain *msi_create_irq_domain(struct irq_domain *parent);
-> +extern int msi_irq_domain_alloc_irqs(struct irq_domain *domain, int type,
-> +				     struct pci_dev *dev, void *arg);
-> +
-> +extern irq_hw_number_t arch_msi_irq_domain_get_hwirq(void *arg);
-> +extern void arch_msi_irq_domain_set_hwirq(void *arg, irq_hw_number_t hwirq);
-
-Look at the rest of the file and notice that the existing code does not use
-"extern" on function declarations.
-
-> +#endif	/* CONFIG_PCI_MSI_IRQ_DOMAIN */
-
-Use a space here (not a tab), like the #endif just below.
-
->  #endif /* LINUX_MSI_H */
-> -- 
-> 1.7.10.4
-> 
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 40bc2f4072cc..b520687046d4 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -1437,7 +1437,7 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
+ 	spin_unlock_irq(&dev->power.lock);
+ 
+ 	if (genpd->attach_dev)
+-		genpd->attach_dev(dev);
++		genpd->attach_dev(genpd, dev);
+ 
+ 	mutex_lock(&gpd_data->lock);
+ 	gpd_data->base.dev = dev;
+@@ -1499,7 +1499,7 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
+ 	genpd->max_off_time_changed = true;
+ 
+ 	if (genpd->detach_dev)
+-		genpd->detach_dev(dev);
++		genpd->detach_dev(genpd, dev);
+ 
+ 	spin_lock_irq(&dev->power.lock);
+ 
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index 73e938b7e937..b3ed7766a291 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -72,8 +72,10 @@ struct generic_pm_domain {
+ 	bool max_off_time_changed;
+ 	bool cached_power_down_ok;
+ 	struct gpd_cpuidle_data *cpuidle_data;
+-	void (*attach_dev)(struct device *dev);
+-	void (*detach_dev)(struct device *dev);
++	int (*attach_dev)(struct generic_pm_domain *domain,
++			  struct device *dev);
++	void (*detach_dev)(struct generic_pm_domain *domain,
++			   struct device *dev);
+ };
+ 
+ static inline struct generic_pm_domain *pd_to_genpd(struct dev_pm_domain *pd)
+-- 
+2.1.0
