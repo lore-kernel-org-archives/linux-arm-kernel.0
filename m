@@ -1,50 +1,44 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 5 Nov 2014 14:50:41 +0900
-Subject: [PATCH] ARM: shmobile: Enable PCI domains for R-Car Gen2 devices
-In-Reply-To: <1415122708-4011-1-git-send-email-phil.edworthy@renesas.com>
-References: <1415122708-4011-1-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <20141105055041.GB32680@verge.net.au>
+Date: Wed, 5 Nov 2014 14:54:07 +0900
+Subject: [PATCH] ARM: shmobile: alt dts: Drop console= bootargs parameter
+In-Reply-To: <1415075018-27529-1-git-send-email-horms+renesas@verge.net.au>
+References: <1415075018-27529-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20141105055407.GD32680@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 04, 2014 at 05:38:28PM +0000, Phil Edworthy wrote:
-> The PCI core will soon automatically handle the PCI domain number,
-> allowing the internal PCI and external PCIe bridges work at the same time.
-> In order for that to work, we need to enable PCI_DOMAINS.
+On Tue, Nov 04, 2014 at 01:23:38PM +0900, Simon Horman wrote:
+> Alt is booted from DT, so chosen/stdout-path is
+> always used, and we can drop the "console=" parameter from chosen/bootargs.
 > 
-> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> This change has a side-effect of changing the console speed from 38400
+> to 115200. This is intentional as 115200 is consistently used on
+> all other shmobile boards.
+> 
+> Cc: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Thanks, I have queued this up.
+I have queued this up.
 
 > ---
+>  arch/arm/boot/dts/r8a7794-alt.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> In order to automatically handle the PCI domain number, we need a patch from
-> Lorenzo Pieralisi:
->  "[RFC PATCH 2/2] arm: pcibios: move to generic PCI domains"
-> However, enabling PCI_DOMAINS without this doesn't have an adverse effect,
-> and the plan is to use PCI domains to solve this problem, so we can apply
-> this patch straight away.
-> 
->  arch/arm/mach-shmobile/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-> index 21f457b..1c05768 100644
-> --- a/arch/arm/mach-shmobile/Kconfig
-> +++ b/arch/arm/mach-shmobile/Kconfig
-> @@ -18,6 +18,7 @@ config ARCH_RCAR_GEN2
->  	select PM_RCAR if PM || SMP
->  	select RENESAS_IRQC
->  	select SYS_SUPPORTS_SH_CMT
-> +	select PCI_DOMAINS if PCI
+> diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
+> index 8aec512..f2cf757 100644
+> --- a/arch/arm/boot/dts/r8a7794-alt.dts
+> +++ b/arch/arm/boot/dts/r8a7794-alt.dts
+> @@ -20,7 +20,7 @@
+>  	};
 >  
->  config ARCH_RMOBILE
->  	bool
+>  	chosen {
+> -		bootargs = "console=ttySC0,38400 ignore_loglevel rw root=/dev/nfs ip=dhcp";
+> +		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
+>  		stdout-path = &scif2;
+>  	};
+>  
 > -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 2.1.1
 > 
