@@ -1,66 +1,85 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Wed, 05 Nov 2014 06:12:21 +0100
-Subject: [PATCH 5/7] pinctrl: Add driver for Zynq
-In-Reply-To: <1415041531-15520-6-git-send-email-soren.brinkmann@xilinx.com>
-References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
- <1415041531-15520-6-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <5459B1B5.6030001@suse.de>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 5 Nov 2014 06:21:48 +0100
+Subject: net: fec: fix regression on i.MX28 introduced by rx_copybreak
+ support
+In-Reply-To: <20141104.112858.356827532569349127.davem@davemloft.net>
+References: <20141030.121710.1524000348187962764.davem@davemloft.net>
+ <20141031063210.69004315@ipc1.ka-ro>
+ <20141104112912.2be8bf1a@ipc1.ka-ro>
+ <20141104.112858.356827532569349127.davem@davemloft.net>
+Message-ID: <20141105062148.2a997b95@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 03.11.2014 um 20:05 schrieb Soren Brinkmann:
-> +enum zynq_pinmux_functions {
-> +	ZYNQ_PMUX_ethernet0,
-> +	ZYNQ_PMUX_ethernet1,
-> +	ZYNQ_PMUX_mdio0,
-> +	ZYNQ_PMUX_mdio1,
-> +	ZYNQ_PMUX_qspi0,
-> +	ZYNQ_PMUX_qspi1,
-> +	ZYNQ_PMUX_qspi_fbclk,
-> +	ZYNQ_PMUX_qspi_cs1,
+Hi,
 
-Are usb0 and usb1 intentionally missing in this patch for lack of
-upstream USB driver? If so, then please mention what you left out in the
-commit message.
+David Miller wrote:
+> From: Lothar Wa?mann <LW@KARO-electronics.de>
+> Date: Tue, 4 Nov 2014 11:29:12 +0100
+> 
+> > Hi David,
+> > 
+> > Lothar Wa?mann wrote:
+> >> David Miller wrote:
+> >> > From: Lothar Wa?mann <LW@KARO-electronics.de>
+> >> > Date: Thu, 30 Oct 2014 07:51:04 +0100
+> >> > 
+> >> > >> Also, I don't thnk your DIV_ROUND_UP() eliminate for the loop
+> >> > >> in swap_buffer() is valid.  The whole point is that the current
+> >> > >> code handles buffers which have a length which is not a multiple
+> >> > >> of 4 properly, after your change it will no longer do so.
+> >> > >>
+> >> > > Do you really think so?
+> >> > 
+> >> > Yes, because you're rounding down so you'll miss the final
+> >> > partial word (if any).
+> >> >
+> >> Nope. DIV_ROUND_UP() would give '1' as upper bound for lengths from 1 to
+> >> 4, '2' for lengths from 5 to 8 and so on.
+> >> 
+> >> The loop with increment 4 and i < len does exactly the same.
+> >> Try it for yourself, if you don't believe it.
+> >> 
+> >> 
+> > Do you still think, the loop without DIV_ROUND_UP() is incorrect,
+> > or can this patch be applied?
+> 
+> I haven't had the time to fully re-look into the details, I'm busy
+> with many other things at the moment.
+> 
+> But looking at DIV_ROUND_UP() macro it rounds up.  It gives an
+> upper bound of 4 for any value 1 to 4.  Unlike what you claim.
+> 
+You're missing the 'DIV' part of DIV_ROUND_UP().
 
-> +	ZYNQ_PMUX_spi0,
-> +	ZYNQ_PMUX_spi1,
-> +	ZYNQ_PMUX_sdio0,
-> +	ZYNQ_PMUX_sdio0_pc,
-> +	ZYNQ_PMUX_sdio0_cd,
-> +	ZYNQ_PMUX_sdio0_wp,
-> +	ZYNQ_PMUX_sdio1,
-> +	ZYNQ_PMUX_sdio1_pc,
-> +	ZYNQ_PMUX_sdio1_cd,
-> +	ZYNQ_PMUX_sdio1_wp,
-> +	ZYNQ_PMUX_smc0_nor,
-> +	ZYNQ_PMUX_smc0_nor_cs1,
-> +	ZYNQ_PMUX_smc0_nor_addr25,
-> +	ZYNQ_PMUX_smc0_nand,
-> +	ZYNQ_PMUX_can0,
-> +	ZYNQ_PMUX_can1,
-> +	ZYNQ_PMUX_uart0,
-> +	ZYNQ_PMUX_uart1,
-> +	ZYNQ_PMUX_i2c0,
-> +	ZYNQ_PMUX_i2c1,
-> +	ZYNQ_PMUX_ttc0,
-> +	ZYNQ_PMUX_ttc1,
-> +	ZYNQ_PMUX_swdt0,
-> +	ZYNQ_PMUX_gpio0,
-> +	ZYNQ_PMUX_MAX_FUNC
-> +};
+> Because it goes "(n + (d - 1)) / d"
+> 
+> Which for 'd' of 4 gives:
+> 
+> 1 --> 4
+> 2 --> 4
+> 3 --> 4
+> 4 --> 4
+>
+'1', not '4'.
+The loop has to be done once for each (probably partial) WORD of input
+data, not for each BYTE.
 
-Regards,
-Andreas
+Without dividing and incrementing by four the loop
+counter will be 0 for the first word which is less than any length > 0.
+Thus the loop will be run once for any number of bytes from 1 thru 4.
+If incremented by 4 after the first loop, it will be run again for any
+length > 5 and so forth.
 
+
+Lothar Wa?mann
 -- 
-SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 21284 AG N?rnberg
+___________________________________________________________
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/9499a213/attachment.sig>
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
