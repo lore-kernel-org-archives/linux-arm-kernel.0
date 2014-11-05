@@ -1,50 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Nov 2014 11:08:19 +0000
-Subject: [RESEND PATCH] ARM: kexec: Fix validating CPU hotplug support
-In-Reply-To: <545A0282.4070001@huawei.com>
-References: <1415094025-66180-1-git-send-email-hukeping@huawei.com>
- <20141104105525.GE4042@n2100.arm.linux.org.uk>
- <545A0282.4070001@huawei.com>
-Message-ID: <20141105110819.GK4042@n2100.arm.linux.org.uk>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 5 Nov 2014 12:10:15 +0100
+Subject: [Patch Part2 v4 00/31] Enable hierarchy irqdomian on x86 platforms
+In-Reply-To: <5459FBDD.4020504@linux.intel.com>
+References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
+ <20141104144730.GE14512@8bytes.org>
+ <5458ECF3.4040308@linux.intel.com>
+ <20141105085154.GG10744@8bytes.org>
+ <5459F0DE.6000307@linux.intel.com>
+ <20141105095850.GH10744@8bytes.org>
+ <5459FBDD.4020504@linux.intel.com>
+Message-ID: <20141105111014.GI10744@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 05, 2014 at 06:57:06PM +0800, Hu Keping wrote:
-> Actually, i do think there is something wrong in the panic-rountine:
-> when panic comes, we clear the cpu_online_bits of other CPUs and
-> keep them calling cpu_relax(). That's why I post that patch ,because
-> we do not really shut down the CPUs.
+Hi Jiang,
+
+On Wed, Nov 05, 2014 at 06:28:45PM +0800, Jiang Liu wrote:
+> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+> index 7423ee16972f..62ba8a6f6e79 100644
+> --- a/drivers/pci/msi.c
+> +++ b/drivers/pci/msi.c
+> @@ -1211,7 +1211,7 @@ int msi_irq_domain_alloc_irqs(struct irq_domain
+> *domain, int type,
+>                                 msidesc->nvec_used > 1) ?  1 : -ENOSPC;
+>                 }
+>                 for (i = 0; i < msidesc->nvec_used; i++)
+> -                       irq_set_msi_desc_off(virq + i, i, msidesc);
+> +                       irq_set_msi_desc_off(virq, i, msidesc);
+>         }
 > 
-> But as your mentioned , there is another problem:
-> what's in the pc register of each cpu is unknown after the MMU has been
-> shut down.
+>         list_for_each_entry(msidesc, &dev->msi_list, list)
 
-Correct.
+Yes, this fixes the issue, thanks :)
 
-> On X86, there is a halt() before the cpu_relax(), so do you think we
-> need a call wfi() before cpu_relax() to keep the other CPUs on
-> status-WFI on ARM?
 
-X86 benefits from the fact that it is a known architecture, and there are
-ways to ensure that the other CPUs are held in reset or whatever, so the
-system is recoverable from such a situation.
-
-That is far from true on ARM: on ARM, everyone does their own thing, which
-leads to situations where we can't reset other CPUs (eg, because the
-hardware isn't implemented, or the secure firmware doesn't support being
-called by non-boot CPUs, etc.)
-
-So, while adding a wfi() call in machine_crash_nonpanic_core() will stop
-the CPU executing instructions, the kernel being kexec'd will not see
-the CPUs it expects.  Also, I worry whether a wfi() is sufficient - what
-if an interrupt does get delivered to that CPU (eg, as part of the kexec'd
-kernel trying to bring the CPU online) or a device raises its interrupt
-and the interrupt has been routed to that CPU.
-
-I think this is the reason why we went for the simple option here: we
-know that all the conditions are not correct for being able to safely
-kexec() in SMP mode, especially in a panic scenario.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+	Joerg
