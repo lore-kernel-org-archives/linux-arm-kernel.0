@@ -1,114 +1,46 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 05 Nov 2014 14:43:31 -0800
-Subject: [PATCH] PM / Domains: Change prototype for the ->attach_dev()
- callback
-In-Reply-To: <20141105013353.GA19238@dtor-ws> (Dmitry Torokhov's message of
- "Tue, 4 Nov 2014 17:33:53 -0800")
-References: <1414670569-3002-1-git-send-email-ulf.hansson@linaro.org>
- <3981560.mBph1QJkfl@vostro.rjw.lan>
- <7h4mul9ttl.fsf@deeprootsystems.com> <20141105013353.GA19238@dtor-ws>
-Message-ID: <7h7fz92rqk.fsf@deeprootsystems.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 5 Nov 2014 15:45:04 -0700
+Subject: [Patch Part2 v4 20/31] PCI/MSI: Kill redundant calling for
+ irq_set_msi_desc() for MSIx interrupts
+In-Reply-To: <1415102525-9898-21-git-send-email-jiang.liu@linux.intel.com>
+References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
+ <1415102525-9898-21-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <20141105224504.GG6168@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dmitry Torokhov <dmitry.torokhov@gmail.com> writes:
+On Tue, Nov 04, 2014 at 08:01:54PM +0800, Jiang Liu wrote:
+> It's arch_setup_msi_irq()/arch_setup_msi_irqs()'s responsibility to call
+> irq_set_msi_desc() to associate IRQ descriptors and MSI descriptors,
+> so kill the redundant call of irq_set_msi_desc() for MSIx interrupts
+> in PCI MSI core.
 
-> On Thu, Oct 30, 2014 at 01:38:30PM -0700, Kevin Hilman wrote:
->> "Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
->> 
->> > On Thursday, October 30, 2014 01:02:49 PM Ulf Hansson wrote:
->> >> Convert the prototype to return and int. This is just an initial step,
->> >> needed to support error handling.
->> >> 
->> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> 
->> Acked-by: Kevin Hilman <khilman@linaro.org>
->> 
->> >> 
->> >> This patch is intended as fix for 3.18 rc[n]. Why?
->> >> 
->> >> There are other SOC specific patches around that adds genpd support and which
->> >> implements the ->attach_dev() callback. To prevent having an "atomic" patch
->> >> during the next release cycle, let's change the prototype now instead.
->> >> 
->> >> Further patches will add the actual error handling in genpd and these can then
->> >> be reviewed and tested thoroughly.
->> >
->> > So we have no users of ->attach_dev at the moment, right?
->> 
->> Not in mainline, but there are a couple getting ready to hit -next, so
->> we wanted to fix this before they arrive so that adding the error
->> handling will be easier.
->
-> BTW, while we are at it, can we also pass the domain itself to
-> attach_dev() and detach_dev()? If anything it helps with debugging (you
-> can print domain name from the callbacks).
+"MSI-X" in English text, "msix" in code.
 
-Agreed, and it makes it match the other callbacks (power_off, power_on)
-which currently take struct generic_pm_domain *domain.  
+The default arch_setup_msi_irq() in drivers/pci/msi.c doesn't call
+irq_set_msi_desc().  Does it happen somewhere inside chip->setup_irq()?
 
-Updated version of $SUBJECT patch below.
+I don't know how to verify that there are calls in all the places needed.
+That makes me wonder if the factoring is wrong -- maybe irq_set_msi_desc()
+could be done in some common place.
 
-Kevin
-
-
------ >8 ------
->From 353a62ffae2f9228142c8a2093108f9eda8dc6b4 Mon Sep 17 00:00:00 2001
-From: Ulf Hansson <ulf.hansson@linaro.org>
-Date: Thu, 30 Oct 2014 13:02:49 +0100
-Subject: [PATCH] PM / Domains: Change prototype for the ->attach_dev()
- callback
-
-Convert the prototype to return and int. This is just an initial step,
-needed to support error handling.
-
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-[khilman: added domain as parameter to callbacks, as suggested by Dmitry]
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
----
- drivers/base/power/domain.c | 4 ++--
- include/linux/pm_domain.h   | 6 ++++--
- 2 files changed, 6 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 40bc2f4072cc..b520687046d4 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -1437,7 +1437,7 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
- 	spin_unlock_irq(&dev->power.lock);
- 
- 	if (genpd->attach_dev)
--		genpd->attach_dev(dev);
-+		genpd->attach_dev(genpd, dev);
- 
- 	mutex_lock(&gpd_data->lock);
- 	gpd_data->base.dev = dev;
-@@ -1499,7 +1499,7 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
- 	genpd->max_off_time_changed = true;
- 
- 	if (genpd->detach_dev)
--		genpd->detach_dev(dev);
-+		genpd->detach_dev(genpd, dev);
- 
- 	spin_lock_irq(&dev->power.lock);
- 
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 73e938b7e937..b3ed7766a291 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -72,8 +72,10 @@ struct generic_pm_domain {
- 	bool max_off_time_changed;
- 	bool cached_power_down_ok;
- 	struct gpd_cpuidle_data *cpuidle_data;
--	void (*attach_dev)(struct device *dev);
--	void (*detach_dev)(struct device *dev);
-+	int (*attach_dev)(struct generic_pm_domain *domain,
-+			  struct device *dev);
-+	void (*detach_dev)(struct generic_pm_domain *domain,
-+			   struct device *dev);
- };
- 
- static inline struct generic_pm_domain *pd_to_genpd(struct dev_pm_domain *pd)
--- 
-2.1.0
+> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+> ---
+>  drivers/pci/msi.c |    1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+> index afe974600c7d..da181c59394b 100644
+> --- a/drivers/pci/msi.c
+> +++ b/drivers/pci/msi.c
+> @@ -685,7 +685,6 @@ static void msix_program_entries(struct pci_dev *dev,
+>  						PCI_MSIX_ENTRY_VECTOR_CTRL;
+>  
+>  		entries[i].vector = entry->irq;
+> -		irq_set_msi_desc(entry->irq, entry);
+>  		entry->masked = readl(entry->mask_base + offset);
+>  		msix_mask_irq(entry, 1);
+>  		i++;
+> -- 
+> 1.7.10.4
+> 
