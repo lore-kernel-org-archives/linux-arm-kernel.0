@@ -1,39 +1,62 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 4 Nov 2014 22:48:45 -0200
-Subject: [PATCH] mmc: core: fix card detection regression
-In-Reply-To: <1415146961-25993-1-git-send-email-kristina.martsenko@gmail.com>
-References: <1747777414.897866.1414878004147.JavaMail.open-xchange@oxbsltgw09.schlund.de>
- <1415146961-25993-1-git-send-email-kristina.martsenko@gmail.com>
-Message-ID: <CAOMZO5CKB4aHTyYCvnT0UZCi4Pe+XyDa2-G1kpzyce1J3y3nfQ@mail.gmail.com>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Wed, 05 Nov 2014 09:02:12 +0800
+Subject: [PATCH] clk: rockchip: change hierarchy for some clocks
+In-Reply-To: <CAD=FV=VByf=YKw7q4L2493C-z9uJ3dTSk9WZyCFdOkSjD2XoDw@mail.gmail.com>
+References: <1414747777-12625-1-git-send-email-kever.yang@rock-chips.com>
+ <CAD=FV=VByf=YKw7q4L2493C-z9uJ3dTSk9WZyCFdOkSjD2XoDw@mail.gmail.com>
+Message-ID: <54597714.3050406@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kristina,
+Hi Doug,
 
-On Tue, Nov 4, 2014 at 10:22 PM, Kristina Mart?enko
-<kristina.martsenko@gmail.com> wrote:
-> Since commit 89168b489915 ("mmc: core: restore detect line inversion
-> semantics"), the SD card on i.MX28 (and possibly other) devices isn't
-> detected and booting stops at:
+On 11/05/2014 05:32 AM, Doug Anderson wrote:
+> Kever
 >
-> [    4.120617] Waiting for root device /dev/mmcblk0p3...
+> On Fri, Oct 31, 2014 at 2:29 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
+>> This patch change the hierarchy for some clocks, to met the following
+>> bus hierarchy:
+>> hclk_usb_peri is bus clock for
+>> |- hclk_otg0,
+>> |- hclk_host0,
+>> |- hclk_host1,
+>> |- hclk_hsic
+>>
+>> hclk_emem is bus clock for
+>> |- hclk_nandc0
+>> |- hclk_nandc1
+>>
+>> hclk_mem is bus clock for
+>> |- hclk_sdmmc
+>> |- hclk_sdio0
+>> |- hclk_sdio1
+>> |- hclk_emmc
+> So as I understand it the "parent" clocks aren't really parents but
+> are actually peer clocks.  That is if "hclk_usb_peri" is gated
+> "hclk_otg0" continues to run.  ...but the OTG periperhal is useless
+> without "hclk_usb_peri" also being enabled.
+Correct.
 >
-> This is caused by the MMC_CAP2_CD_ACTIVE_HIGH flag being set incorrectly
-> when the host controller doesn't use a GPIO for card detection (but
-> instead uses a dedicated pin). In this case mmc_gpiod_request_cd() will
-> return before assigning to the gpio_invert variable, leaving the
-> variable uninitialized. The variable then gets used to set the flag.
-> This patch fixes the issue by making sure gpio_invert is set to false
-> when a GPIO isn't used. After this patch, i.MX28 boots fine.
+> There doesn't seem to be any real downside to modeling thing as you
+> have done it, though it's not quite a true representation of the
+> world.  A slightly more true representation would be to make it so
+> that whenever "hclk_otg0" is enabled/disabled that it makes an
+> enable/disable call to "hclk_usb_peri".  I think you'd have to
+> subclass the gate clock and patch your stuff in the "enable" function.
 >
-> The MMC_CAP2_RO_ACTIVE_HIGH (write protect) flag is also set incorrectly
-> for the exact same reason (it uses the same uninitialized variable), so
-> this patch fixes that too.
+> I'm personally OK with things landing as you've described it (I can
+> see no downside), but it seems like this at least deserves a comment
+> (either in the code or the commit message).
+I will update the commit message in new version, I describe it
+in a private mail ask for how to handle this kind of clock, but not
+in this patch, I will add it.
 >
-> Fixes: 89168b489915 ("mmc: core: restore detect line inversion semantics")
-> Reported-by: Stefan Wahren <stefan.wahren@i2se.com>
-> Signed-off-by: Kristina Mart?enko <kristina.martsenko@gmail.com>
+> If Mike T. thinks that we should use a more truthful model or if
+> there's some better way to express this, you should of course listen
+> to him and not to me.
+Sure, I'm always looks for a better way for these kind of clocks,
+there are many other clocks like *_arbi and *_niu still on rk3288
+are not handled by any module which we have to use
+CLK_IGNORE_UNUSED tag when disable unused init.
 
-This fixes mx28 card detection, thanks!
-
-Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+- Kever
