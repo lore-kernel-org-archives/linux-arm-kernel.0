@@ -1,55 +1,44 @@
-From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
-Date: Wed, 5 Nov 2014 14:43:23 -0500
-Subject: [PATCH 11/13] arm: dts: dra7: add DMA properties for UART
-In-Reply-To: <545A50BB.2020307@linutronix.de>
-References: <20141104170233.GB24112@csclub.uwaterloo.ca>
- <5459079D.7080703@linutronix.de>
- <20141104172117.GC24112@csclub.uwaterloo.ca>
- <20141104183315.GD24112@csclub.uwaterloo.ca>
- <20141104210315.GF24112@csclub.uwaterloo.ca>
- <20141105011506.GG24112@csclub.uwaterloo.ca>
- <5459DBB7.1090702@linutronix.de>
- <20141105153307.GN24110@csclub.uwaterloo.ca>
- <20141105162024.GH24112@csclub.uwaterloo.ca>
- <545A50BB.2020307@linutronix.de>
-Message-ID: <20141105194323.GI24112@csclub.uwaterloo.ca>
+From: mlangsdo@redhat.com (Mark Langsdorf)
+Date: Wed, 05 Nov 2014 13:44:43 -0600
+Subject: [PATCH v2 2/2] [usb] add support for ACPI identification to
+ xhci-platform
+In-Reply-To: <20141105191140.GA5834@kroah.com>
+References: <1414692989-23128-2-git-send-email-mlangsdo@redhat.com>
+ <1415119833-9135-1-git-send-email-mlangsdo@redhat.com>
+ <1415119833-9135-2-git-send-email-mlangsdo@redhat.com>
+ <20141104171220.GA30385@kroah.com> <545A2D44.8020303@redhat.com>
+ <20141105191140.GA5834@kroah.com>
+Message-ID: <545A7E2B.7030803@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 05, 2014 at 05:30:51PM +0100, Sebastian Andrzej Siewior wrote:
-> On 11/05/2014 05:20 PM, Lennart Sorensen wrote:
-> > On Wed, Nov 05, 2014 at 10:33:15AM -0500, Lennart Sorensen wrote:
-> >> Two systems ran 16 hours each so far with no issues.  Pushed 170MB of
-> >> data through the pair of serial ports on one system at 230400.
-> > 
-> > The console on uart3 doesn't appear to be using the dma assuming the
-> > values in /sys for the dma controller and bytes transferred mean anything.
-> > It does mention in dmesg that it allocated dma channels for uart3 though.
-> 
-> Then it should use it :)
+On 11/05/2014 01:11 PM, Greg KH wrote:
+> On Wed, Nov 05, 2014 at 07:59:32AM -0600, Mark Langsdorf wrote:
+>>>>   static struct platform_driver usb_xhci_driver = {
+>>>>   	.probe	= xhci_plat_probe,
+>>>>   	.remove	= xhci_plat_remove,
+>>>> @@ -294,6 +304,7 @@ static struct platform_driver usb_xhci_driver = {
+>>>>   		.name = "xhci-hcd",
+>>>>   		.pm = DEV_PM_OPS,
+>>>>   		.of_match_table = of_match_ptr(usb_xhci_of_match),
+>>>> +		.acpi_match_table = ACPI_PTR(usb_xhci_acpi_match),
+>>>
+>>> Shouldn't the reworked driver core code handle this differently with the
+>>> ability to handle either OF or ACPI in the same driver?
+>>
+>> I'm not sure I understand the question. With these changes, the driver
+>> handles both ACPI and DTB/OF. It's the same style of code as used
+>> in drivers/ata/plat-xgene.c, which also handles both ACPI and DTB/OF.
+>> Why do you think this code isn't correct?
+>
+> There is a new framework in the kernel that keeps a driver from having
+> to query both of and acpi to get the needed resources, it just does one
+> query and depending on the platform, everything "just works".  Shouldn't
+> that be used here as well?
 
-I managed to get something dma related on uart3.  But it isn't happy:
+Would you send me a pointer to a driver that's using this new
+framework? I can't find any references to it and all the other
+drivers that support ACPI and OF are doing it the way I'm doing
+it.
 
-[   95.577401] DMA misaligned error with device 53
-repeated many times.
-
-I wonder if the dma support isn't quite working for the omap572x yet in
-this tree (ti's 3.12.y tree), or maybe it is picky and the driver still
-needs a bit of work.
-
-I have had no issues on uart7 and 8 without dma.
-
-> There is omap_8250_tx_dma() and omap_8250_rx_dma(). Both setup
-> callbacks (the rx+tx _complete). Upon successful DMA transfer you
-> should see them invoked with bytes transfered (>0).
-> For RX transfer you need at least trigger bytes in the FIFO within a
-> given time frame (I think it was 46 bytes and the delay may be up to 2
-> bytes). If you miss this then DMA for RX won't wire and you purge the
-> FIFO manually via "timeout-interrupt" (the callback will be invoked
-> with an error condition and 0 bytes).
-> 
-> Assuming this works for you then one should figure out why the counters
-> in /sys are not updated?
-
--- 
-Len Sorensen
+--Mark Langsdorf
