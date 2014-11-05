@@ -1,46 +1,30 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 5 Nov 2014 11:00:06 -0800
-Subject: [PATCH] ARM: dts: vf610: add SD node to cosmic dts
-In-Reply-To: <566a5b330f05c69ad27902ca8ce24463@agner.ch>
-References: <1415170765-3343-1-git-send-email-olof@lixom.net>
- <566a5b330f05c69ad27902ca8ce24463@agner.ch>
-Message-ID: <CAOesGMjyWyPS-h9xB-MAN8A37PCN6dpqcMQ61yriu6-AZAqvZw@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed,  5 Nov 2014 20:01:58 +0100
+Subject: [PATCH 0/3] Add support for switch on Armanda 370 RD
+Message-ID: <1415214121-29286-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 5, 2014 at 12:40 AM, Stefan Agner <stefan@agner.ch> wrote:
-> Am 2014-11-05 07:59, schrieb Olof Johansson:
->> Driver has been there since a while back, but the dts never seems to
->> have been updated with the node (nor pinctrl). Do so now.
->>
->> Cc: Matt Porter <mporter@linaro.org>
->> Signed-off-by: Olof Johansson <olof@lixom.net>
->> ---
->>
->> Shawn, Stefan: This probably has some small conflicts with Stefan's
->> patchsets that refactors some of the dts contents for 3.19. I'd like to
->> pick this patch up as a fix for 3.18 though, since it makes my Cosmic+
->> board usable for the boot farm.
->>
->> If that'd be OK (i.e. to apply Stefan's patches on top of this), please
->> ack so I can include it with the next set of fixes. :)
->>
->> Thanks,
->>
->> -Olof
->
-> Same reordering complains as Shawn.
->
-> Also note that starting with 3.19, it would be possible to use card
-> detect GPIO. However, SD-card works also fairly well without card
-> detection.
->
-> Acked-by: Stefan Agner <stefan@agner.ch>
+This patchset adds support for the switch chip found on the Marvell
+370 RD board. The first patch extends the current mv88e6171 driver to
+also support the mv88e6172. The second patch described the switch in
+the device tree of the board, and the last patch enables require build
+options in mvebu_v7_defconfig.
 
-Thanks, reordered entries (d'oh!) and applied to fixes with your acks.
+Davem should take patch #1
+Jason Cooper should take patch #2 and #3.
 
-CD gpio would be useful, in my case I always have the card attached
-though. I'll try to remember revisiting for that. :-)
+Andrew Lunn (3):
+  dsa: mv88e6171: Add support for mv88e6172
+  mvebu: 370 RD: Add support for the switch
+  mvebu: defconfig: Enable the mv88E6171 switch driver
 
+ arch/arm/boot/dts/armada-370-rd.dts  | 49 ++++++++++++++++++++++++++++++++----
+ arch/arm/boot/dts/armada-370-xp.dtsi |  2 +-
+ arch/arm/configs/mvebu_v7_defconfig  |  2 ++
+ drivers/net/dsa/Kconfig              |  6 ++---
+ drivers/net/dsa/mv88e6171.c          |  5 +++-
+ 5 files changed, 54 insertions(+), 10 deletions(-)
 
--Olof
+-- 
+2.1.3
