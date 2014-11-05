@@ -1,37 +1,34 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  5 Nov 2014 16:59:46 +0000
-Subject: [PATCH v4 04/11] ARM: sti: Enable BCH NAND for STiH416 B2020-RevE
+Date: Wed,  5 Nov 2014 16:59:48 +0000
+Subject: [PATCH v4 06/11] mtd: nand: WARN() if EEC Bytes per page is larger
+ than the OOB
 In-Reply-To: <1415206793-25670-1-git-send-email-lee.jones@linaro.org>
 References: <1415206793-25670-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1415206793-25670-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1415206793-25670-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also supply the platform specific clocks required by the NAND driver.
+EEC information is held in the Out-Of-Bounds (OOB) area, so can not be
+larger than the area it's stored in.  If the math is out, we issue a
+warning to the user.
 
-Reviewed-by: Pekon Gupta <pekon@pek-sem.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stih416-b2020e.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/mtd/nand/nand_base.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih416-b2020e.dts b/arch/arm/boot/dts/stih416-b2020e.dts
-index ba0fa2c..f4b92d5 100644
---- a/arch/arm/boot/dts/stih416-b2020e.dts
-+++ b/arch/arm/boot/dts/stih416-b2020e.dts
-@@ -31,5 +31,13 @@
- 		ethernet1: dwmac at fef08000 {
- 			snps,reset-gpio = <&PIO0 7>;
- 		};
+diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
+index 4f3e80c..d0ebb05 100644
+--- a/drivers/mtd/nand/nand_base.c
++++ b/drivers/mtd/nand/nand_base.c
+@@ -4063,6 +4063,8 @@ int nand_scan_tail(struct mtd_info *mtd)
+ 	}
+ 	ecc->total = ecc->steps * ecc->bytes;
+ 
++	WARN_ON(ecc->total > mtd->oobsize);
 +
-+		nand at fe901000 {
-+			clock-names = "emi", "bch";
-+			clocks = <&clk_s_a0_ls CLK_EMISS>,
-+				 <&clk_s_a1_ls CLK_NAND_CTRL>;
-+
-+			status = "okay";
-+		};
- 	};
- };
+ 	/* Allow subpage writes up to ecc.steps. Not possible for MLC flash */
+ 	if (!(chip->options & NAND_NO_SUBPAGE_WRITE) && nand_is_slc(chip)) {
+ 		switch (ecc->steps) {
 -- 
 1.9.1
