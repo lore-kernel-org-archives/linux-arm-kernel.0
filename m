@@ -1,70 +1,58 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 5 Nov 2014 08:47:50 +0100
-Subject: [PATCH 3/4] PM / Domains: Improve error handling while
- adding/removing devices
-In-Reply-To: <1414507090-516-4-git-send-email-ulf.hansson@linaro.org>
-References: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
- <1414507090-516-4-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAMuHMdWMEaC3=ibf9E8dLcG=zceU5+oE9NnKyRfAM0O36cBAjg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 5 Nov 2014 08:53:39 +0100
+Subject: [PATCH v2 00/10] arm64 EFI patches for 3.19
+In-Reply-To: <1414513123-20400-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1414513123-20400-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu-05Tf+BFxSGfibgs00WAA+wZTSrgzpTK46QZD8SV62jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 3:38 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -1358,25 +1358,81 @@ EXPORT_SYMBOL_GPL(pm_genpd_syscore_poweron);
+On 28 October 2014 17:18, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> Version v2 of arm64/efi patches for 3.19.
+> Changes since previous version:
+> - dropped patch #6 'arm64/efi: use UEFI memory map unconditionally if available'
+>   (will be revisited later, but due to other changes in the pipeline regarding
+>   the virtual mapping of UEFI Runtime Services, it makes sense to defer this
+>   to 3.20)
+> - added patch #10 'efi: efi-stub: notify on DTB absence'
 >
->  #endif /* CONFIG_PM_SLEEP */
+> Note that Matt Fleming has given his approval for taking all of these through
+> the arm64 tree.
 >
-> -static struct generic_pm_domain_data *__pm_genpd_alloc_dev_data(struct device *dev)
-> +static int genpd_alloc_dev_data(struct generic_pm_domain *genpd,
-> +                               struct device *dev, struct gpd_timing_data *td)
->  {
-
-[...]
-
-> +       if (genpd->attach_dev)
-> +               genpd->attach_dev(dev);
-
-Note that dev->pm_domain is not yet set at this point, so the callee
-can no longer
-know to which domain the device is being attached.
-Should we re-add the parameter, or move the attach_dev() back to
-__pm_genpd_add_device(), like Kevin suggested.
-
-[...]
-
->  }
-
->  /**
-> @@ -1388,7 +1444,7 @@ static void __pm_genpd_free_dev_data(struct device *dev,
->  int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
->                           struct gpd_timing_data *td)
->  {
-
-[...]
-
-> -       ret = dev_pm_get_subsys_data(dev);
-> +       ret = genpd_alloc_dev_data(genpd, dev, td);
-
-[...]
-
->         dev->pm_domain = &genpd->domain;
-> -
-> +       gpd_data = to_gpd_data(dev->power.subsys_data->domain_data);
->         spin_unlock_irq(&dev->power.lock);
+> @Matt: may we have your ack on patches #6, #7 and #10 please? Patch #7 covers
+> DMI not EFI but get_maintainer.pl is not very helpful here. (The patch is cc'ed
+> to akpm and Tony Luck [ia64 maintainer])
 >
-> -       if (genpd->attach_dev)
-> -               genpd->attach_dev(dev);
-> -
+> Patches #1 - #3 are fixes for compliance with the UEFI and PE/COFF specs.
+> No issues are known that require these patches, so there is no reason to
+> pull them into a stable release.
+>
+> Patch #4 fixes is_reserve_region() to correctly identify UEFI memory regions
+> that need to be reserved by the OS. This patch supersedes the patch sent as
+> part of the v1 series: 'arm64/efi: reserve regions of type ACPI_MEMORY_NVS'
+>
+> Patch #5 removes a redundant set_bit(EFI_CONFIG_TABLES) call.
+>
+> Patches #6 - #9 implement DMI/SMBIOS for arm64, both the existing 32-bit
+> version and the upcoming 3.0 version that allows the SMBIOS structure table
+> to reside at a physical offset that cannot be encoded in 32-bits. It also
+> installs a 'Hardware name: xxx' string that is printed along with oopses
+> and kernel call stack dumps on systems that implement DMI/SMBIOS.
+>
+> Patch #10 is a patch from Mark Rutland I picked up that improves the
+> diagnostic output of the EFI stub regarding the origin of the device
+> tree blob.
+>
+> Please refer to the patches themselves for version history. Acks and/or
+> comments appreciated.
+>
 
-Gr{oetje,eeting}s,
+OK, it appears we're good to go with this series.
 
-                        Geert
+@Will: would you like me to repost one final time? Or would you prefer
+a pull request instead? The only changes are added acks and a single
+code change where an open-coded constant 127 is replaced with its
+symbolic name DMI_ENTRY_END_OF_TABLE.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Regards,
+Ard.
