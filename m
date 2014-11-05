@@ -1,15 +1,15 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 5 Nov 2014 09:18:41 +0100
-Subject: [PATCH 10/26] ARM: sun4i: olinuxino lime: Relicense the device
- tree under GPLv2/X11
-In-Reply-To: <1413538728-17705-10-git-send-email-maxime.ripard@free-electrons.com>
+Date: Wed, 5 Nov 2014 09:19:31 +0100
+Subject: [PATCH 25/26] ARM: sun7i: pcduino3: Relicense the device tree
+ under GPLv2/X11
+In-Reply-To: <1413538728-17705-25-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
- <1413538728-17705-10-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20141105081841.GK26729@lukather>
+ <1413538728-17705-25-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20141105081931.GL26729@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 17, 2014 at 11:38:32AM +0200, Maxime Ripard wrote:
+On Fri, Oct 17, 2014 at 11:38:47AM +0200, Maxime Ripard wrote:
 > The current GPL only licensing on the DTSI makes it very impractical for other
 > software components licensed under another license.
 > 
@@ -17,11 +17,9 @@ On Fri, Oct 17, 2014 at 11:38:32AM +0200, Maxime Ripard wrote:
 > device trees under a GPL/X11 dual-license.
 > 
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Carlo Caione <carlo@caione.org>
-> Cc: Hans de Goede <hdegoede@redhat.com>
 > Cc: Zoltan HERPAI <wigyori@uid0.hu>
 
-Applied, with Carlo, Hans and Zoltan Acked-by, and fixed the commit name.
+Applied with Zoltan's Acked-by.
 
 Maxime
 
@@ -35,4 +33,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/8798783b/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/0eeab7ba/attachment.sig>
