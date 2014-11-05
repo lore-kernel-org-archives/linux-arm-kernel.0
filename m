@@ -1,66 +1,134 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  5 Nov 2014 16:59:45 +0000
-Subject: [PATCH v4 03/11] ARM: sti: Add BCH (NAND Flash) Controller support
- for STiH41x (Orly) SoCs
-In-Reply-To: <1415206793-25670-1-git-send-email-lee.jones@linaro.org>
-References: <1415206793-25670-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1415206793-25670-4-git-send-email-lee.jones@linaro.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 5 Nov 2014 17:59:51 +0100
+Subject: [PATCH v2 05/11] memory: add Atmel EBI (External Bus Interface)
+ driver
+In-Reply-To: <CACh+v5MP4XecA_fKrg=W2Xs8gkkEXaoEnFt_c8sC=wdUQg4HFw@mail.gmail.com>
+References: <1415203287-21517-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1415203287-21517-6-git-send-email-boris.brezillon@free-electrons.com>
+ <CACh+v5MP4XecA_fKrg=W2Xs8gkkEXaoEnFt_c8sC=wdUQg4HFw@mail.gmail.com>
+Message-ID: <20141105175951.71ad792a@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide device information and flash layout for the NAND Micron
-MT29F8G08ABABAWP chip found on the STM B2020 Development Board.
+On Wed, 5 Nov 2014 17:53:42 +0100
+Jean-Jacques Hiblot <jjhiblot@traphandler.com> wrote:
 
-Reviewed-by: Pekon Gupta <pekon@pek-sem.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/stih41x-b2020.dtsi | 35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+> 2014-11-05 17:01 GMT+01:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
+> > The EBI (External Bus Interface) is used to access external peripherals
+> > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
+> > Each device is assigned a CS line and an address range and can have its
+> > own configuration (timings, access mode, bus width, ...).
+> > This driver provides a generic DT binding to configure a device according
+> > to its requirements.
+> > For specific device controllers (like the NAND one) the SMC timings
+> > should be configured by the controller driver through the matrix and
+> > smc syscon regmaps.
+> >
+> > Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  drivers/memory/Kconfig     |  11 +
+> >  drivers/memory/Makefile    |   1 +
+> >  drivers/memory/atmel-ebi.c | 615 +++++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 627 insertions(+)
+> >  create mode 100644 drivers/memory/atmel-ebi.c
+> >
+> > diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
+> > index 6d91c27..dfe24a2 100644
+> > --- a/drivers/memory/Kconfig
+> > +++ b/drivers/memory/Kconfig
+> > @@ -17,6 +17,17 @@ config ATMEL_SDRAMC
+> >           Starting with the at91sam9g45, this controller supports SDR, DDR and
+> >           LP-DDR memories.
+> >
+> > +config ATMEL_EBI
+> > +       bool "Atmel EBI driver"
+> > +       default y
+> > +       depends on ARCH_AT91 && OF
+> > +       select MFD_SYSCON
+> > +       help
+> > +         Driver for Atmel EBI controller.
+> > +         Used to configure the EBI (external bus interface) when the device-
+> > +         tree is used. This bus supports NANDs, external ethernet controller,
+> > +         SRAMs, ATA devices, etc.
+> > +
+> >  config TI_AEMIF
+> >         tristate "Texas Instruments AEMIF driver"
+> >         depends on (ARCH_DAVINCI || ARCH_KEYSTONE) && OF
+> > diff --git a/drivers/memory/Makefile b/drivers/memory/Makefile
+> > index c32d319..7ca2c19 100644
+> > --- a/drivers/memory/Makefile
+> > +++ b/drivers/memory/Makefile
+> > @@ -6,6 +6,7 @@ ifeq ($(CONFIG_DDR),y)
+> >  obj-$(CONFIG_OF)               += of_memory.o
+> >  endif
+> >  obj-$(CONFIG_ATMEL_SDRAMC)     += atmel-sdramc.o
+> > +obj-$(CONFIG_ATMEL_EBI)                += atmel-ebi.o
+> >  obj-$(CONFIG_TI_AEMIF)         += ti-aemif.o
+> >  obj-$(CONFIG_TI_EMIF)          += emif.o
+> >  obj-$(CONFIG_FSL_CORENET_CF)   += fsl-corenet-cf.o
+> > diff --git a/drivers/memory/atmel-ebi.c b/drivers/memory/atmel-ebi.c
+> > new file mode 100644
+> > index 0000000..41bc893
+> > --- /dev/null
+> > +++ b/drivers/memory/atmel-ebi.c
+> > @@ -0,0 +1,615 @@
+> > +/*
+> > + * EBI driver for Atmel SAM9 chips
+> > + * inspired by the fsl weim bus driver
+> > + *
+> > + * Copyright (C) 2013 JJ Hiblot.
+> > + *
+> > + * This file is licensed under the terms of the GNU General Public
+> > + * License version 2. This program is licensed "as is" without any
+> > + * warranty of any kind, whether express or implied.
+> > + */
+> > +
+> > +#include <linux/clk.h>
+> > +#include <linux/io.h>
+> > +#include <linux/mfd/syscon.h>
+> > +#include <linux/mfd/syscon/atmel-matrix.h>
+> > +#include <linux/mfd/syscon/atmel-smc.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of_device.h>
+> > +#include <linux/regmap.h>
+> > +
+> > +#define AT91SAM9_SMC_READ_MODE_MSK     BIT(0)
+> > +#define AT91SAM9_SMC_READ_NCS_MODE     0
+> > +#define AT91SAM9_SMC_READ_NRD_MODE     1
+> > +#define AT91SAM9_SMC_WRITE_MODE_MSK    BIT(1)
+> > +#define AT91SAM9_SMC_WRITE_NCS_MODE    (0 << 1)
+> > +#define AT91SAM9_SMC_WRITE_NWE_MODE    (1 << 1)
+> > +#define AT91SAM9_SMC_EXNW_MODE_MSK     GENMASK(5, 4)
+> > +#define AT91SAM9_SMC_EXNW_DIS          (0 << 4)
+> > +#define AT91SAM9_SMC_EXNW_FROZEN       (2 << 4)
+> > +#define AT91SAM9_SMC_EXNW_READY                (3 << 4)
+> > +#define AT91SAM9_SMC_BAT_MSK           BIT(8)
+> > +#define AT91SAM9_SMC_BAT_SELECT                (0 << 8)
+> > +#define AT91SAM9_SMC_BAT_WRITE         (1 << 8)
+> > +#define AT91SAM9_SMC_DBW_MSK           GENMASK(13, 12)
+> > +#define AT91SAM9_SMC_DBW(x)            ((((x) / 16) & 0x3) << 12)
+> > +#define AT91SAM9_SMC_TDF_CYCLES_MSK    GENMASK(19, 16)
+> > +#define AT91SAM9_SMC_TDF_CYCLES(x)     (((x) & 0xf) << 16)
+> > +#define AT91SAM9_SMC_TDF_MODE_MSK      BIT(20)
+> > +#define AT91SAM9_SMC_TDF_OPTIMIZED     (1 << 20)
+> > +#define AT91SAM9_SMC_PMEN              BIT(24)
+> > +#define AT91SAM9_SMC_PS(x)             ((((x) / 4) & 0x3) << 28)
+> 
+> Those definitions are now also available in
+> linux/mfd/syscon/atmel-smc.h.For consistency sake, this driver should
+> probably use the new ones.
 
-diff --git a/arch/arm/boot/dts/stih41x-b2020.dtsi b/arch/arm/boot/dts/stih41x-b2020.dtsi
-index d8a8429..2ff5fe6 100644
---- a/arch/arm/boot/dts/stih41x-b2020.dtsi
-+++ b/arch/arm/boot/dts/stih41x-b2020.dtsi
-@@ -74,5 +74,40 @@
- 
- 			pinctrl-0	= <&pinctrl_rgmii1>;
- 		};
-+
-+		nand at fe901000 {
-+			compatible = "st,nand-bch";
-+			reg = <0xfe901000 0x1000>, <0xfef00000 0x107c>;
-+			reg-names = "emi_nand", "emiss";
-+			interrupts = <0 139 0x0>;
-+			interrupt-names = "nand_irq";
-+			status = "disabled";
-+
-+			/*
-+			 * Micron MT29F8G08ABABAWP:
-+			 *  - Size = 8Gib(1GiB); Page = 4096+224; Block = 512KiB
-+			 *  - ECC = 4-bit/540B min
-+			 *  - ONFI 2.1 (timing parameters retrieved during probe)
-+			 */
-+			bank {
-+				#address-cells		= <1>;
-+				#size-cells		= <1>;
-+				st,nand-csn		= <0>;
-+				st,nand-timing-relax	= <0>;
-+				nand-on-flash-bbt;
-+
-+				partition at 0 {
-+					/* 8MB */
-+					label = "NANDFlash1";
-+					reg = <0x00000000 0x00800000>;
-+				};
-+
-+				partition at 800000 {
-+					/* 8MB - 1GB */
-+					label = "NANDFlash2";
-+					reg = <0x00800000 0x1f000000>;
-+				};
-+			};
-+		};
- 	};
- };
+That was my intention, I just forgot to cleanup this part...
+
+> BTW this patch should probably be applied after patch 3 "mfd: syscon:
+> Add atmel-smc registers definition" and patch 1 "mfd: syscon: Add
+> atmel-matrix registers definition"
+> 
+
+And it is: patch 05/11 :-)
+
 -- 
-1.9.1
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
