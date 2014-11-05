@@ -1,126 +1,142 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 05 Nov 2014 15:11:23 -0800
-Subject: [PATCH] PM / Domains: Change prototype for the ->attach_dev()
- callback
-In-Reply-To: <3267963.fqUYb7m9Rv@vostro.rjw.lan> (Rafael J. Wysocki's message
- of "Thu, 06 Nov 2014 00:21:01 +0100")
-References: <1414670569-3002-1-git-send-email-ulf.hansson@linaro.org>
- <20141105013353.GA19238@dtor-ws> <7h7fz92rqk.fsf@deeprootsystems.com>
- <3267963.fqUYb7m9Rv@vostro.rjw.lan>
-Message-ID: <7hsihx1bvo.fsf@deeprootsystems.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 5 Nov 2014 16:39:21 -0700
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
+In-Reply-To: <2148776.X8NPqiYA6S@wuerfel>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <3256560.C0cZnIlnAv@wuerfel>
+ <20141022155914.GB25939@e102568-lin.cambridge.arm.com>
+ <2148776.X8NPqiYA6S@wuerfel>
+Message-ID: <20141105233921.GJ6168@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
+On Wed, Oct 22, 2014 at 10:52:19PM +0200, Arnd Bergmann wrote:
+> On Wednesday 22 October 2014 16:59:14 Lorenzo Pieralisi wrote:
+> > On Wed, Oct 01, 2014 at 10:38:45AM +0100, Arnd Bergmann wrote:
+> > 
+> > [...]
+> > 
+> > > The arm32 implementations of pci_domain_nr/pci_proc_domain can probably be
+> > > removed if we change the arm32 pcibios_init_hw function to call the new
+> > > interfaces that set the domain number.
+> > 
+> > I wished, but it is a bit more complicated than I thought unfortunately,
+> > mostly because some drivers, eg cns3xxx set the domain numbers
+> > statically in pci_sys_data and this sets a chain of dependency that is
+> > not easy to untangle. I think cns3xxx is the only legacy driver that "uses"
+> > the domain number (in pci_sys_data) in a way that clashes with the
+> > generic domain_nr implementation, I need to give it more thought.
+> 
+> Just had a look at that driver, shouldn't be too hard to change, see below.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-> On Wednesday, November 05, 2014 02:43:31 PM Kevin Hilman wrote:
->> Dmitry Torokhov <dmitry.torokhov@gmail.com> writes:
->> 
->> > On Thu, Oct 30, 2014 at 01:38:30PM -0700, Kevin Hilman wrote:
->> >> "Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
->> >> 
->> >> > On Thursday, October 30, 2014 01:02:49 PM Ulf Hansson wrote:
->> >> >> Convert the prototype to return and int. This is just an initial step,
->> >> >> needed to support error handling.
->> >> >> 
->> >> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> >> 
->> >> Acked-by: Kevin Hilman <khilman@linaro.org>
->> >> 
->> >> >> 
->> >> >> This patch is intended as fix for 3.18 rc[n]. Why?
->> >> >> 
->> >> >> There are other SOC specific patches around that adds genpd support and which
->> >> >> implements the ->attach_dev() callback. To prevent having an "atomic" patch
->> >> >> during the next release cycle, let's change the prototype now instead.
->> >> >> 
->> >> >> Further patches will add the actual error handling in genpd and these can then
->> >> >> be reviewed and tested thoroughly.
->> >> >
->> >> > So we have no users of ->attach_dev at the moment, right?
->> >> 
->> >> Not in mainline, but there are a couple getting ready to hit -next, so
->> >> we wanted to fix this before they arrive so that adding the error
->> >> handling will be easier.
->> >
->> > BTW, while we are at it, can we also pass the domain itself to
->> > attach_dev() and detach_dev()? If anything it helps with debugging (you
->> > can print domain name from the callbacks).
->> 
->> Agreed, and it makes it match the other callbacks (power_off, power_on)
->> which currently take struct generic_pm_domain *domain.  
->> 
->> Updated version of $SUBJECT patch below.
->
-> The subject and changelog need to be updated too IMO.
->
+This patch is in my patchwork, but it lacks a topic & changelog and I'm not
+sure of its state, so I'm going to drop it for now.  Please post it again
+if you want me to do something with it.  I guess it only touches arch/arm,
+so it would probably be merged via your tree anyway.
 
-Right.  Here you go.
+Bjorn
 
-Kevin
-
-
------ >8 ------
->From c18a6bf3121979c4102ba4f7edb3ac41e3921fc6 Mon Sep 17 00:00:00 2001
-From: Ulf Hansson <ulf.hansson@linaro.org>
-Date: Thu, 30 Oct 2014 13:02:49 +0100
-Subject: [PATCH] PM / Domains: Change prototype for the attach and detach
- callbacks
-
-Convert the prototypes to return an int in order to support error
-handling in these callbacks.
-
-Also, as suggested by Dmitry Torokhov, pass the domain pointer for use
-inside the callbacks, and so that they match the existing
-power_on/power_off callbacks which currently take the domain pointer.
-
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-[khilman: added domain as parameter to callbacks, as suggested by Dmitry]
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
----
- drivers/base/power/domain.c | 4 ++--
- include/linux/pm_domain.h   | 6 ++++--
- 2 files changed, 6 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 40bc2f4072cc..b520687046d4 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -1437,7 +1437,7 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
- 	spin_unlock_irq(&dev->power.lock);
- 
- 	if (genpd->attach_dev)
--		genpd->attach_dev(dev);
-+		genpd->attach_dev(genpd, dev);
- 
- 	mutex_lock(&gpd_data->lock);
- 	gpd_data->base.dev = dev;
-@@ -1499,7 +1499,7 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
- 	genpd->max_off_time_changed = true;
- 
- 	if (genpd->detach_dev)
--		genpd->detach_dev(dev);
-+		genpd->detach_dev(genpd, dev);
- 
- 	spin_lock_irq(&dev->power.lock);
- 
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 73e938b7e937..b3ed7766a291 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -72,8 +72,10 @@ struct generic_pm_domain {
- 	bool max_off_time_changed;
- 	bool cached_power_down_ok;
- 	struct gpd_cpuidle_data *cpuidle_data;
--	void (*attach_dev)(struct device *dev);
--	void (*detach_dev)(struct device *dev);
-+	int (*attach_dev)(struct generic_pm_domain *domain,
-+			  struct device *dev);
-+	void (*detach_dev)(struct generic_pm_domain *domain,
-+			   struct device *dev);
- };
- 
- static inline struct generic_pm_domain *pd_to_genpd(struct dev_pm_domain *pd)
--- 
-2.1.0
+> diff --git a/arch/arm/mach-cns3xxx/pcie.c b/arch/arm/mach-cns3xxx/pcie.c
+> index 45d6bd09e6ef..aa4b9d7c52fd 100644
+> --- a/arch/arm/mach-cns3xxx/pcie.c
+> +++ b/arch/arm/mach-cns3xxx/pcie.c
+> @@ -30,18 +30,15 @@ struct cns3xxx_pcie {
+>  	unsigned int irqs[2];
+>  	struct resource res_io;
+>  	struct resource res_mem;
+> -	struct hw_pci hw_pci;
+> -
+> +	int port;
+>  	bool linked;
+>  };
+>  
+> -static struct cns3xxx_pcie cns3xxx_pcie[]; /* forward decl. */
+> -
+>  static struct cns3xxx_pcie *sysdata_to_cnspci(void *sysdata)
+>  {
+>  	struct pci_sys_data *root = sysdata;
+>  
+> -	return &cns3xxx_pcie[root->domain];
+> +	return root->private_data;
+>  }
+>  
+>  static struct cns3xxx_pcie *pdev_to_cnspci(const struct pci_dev *dev)
+> @@ -192,13 +189,7 @@ static struct cns3xxx_pcie cns3xxx_pcie[] = {
+>  			.flags = IORESOURCE_MEM,
+>  		},
+>  		.irqs = { IRQ_CNS3XXX_PCIE0_RC, IRQ_CNS3XXX_PCIE0_DEVICE, },
+> -		.hw_pci = {
+> -			.domain = 0,
+> -			.nr_controllers = 1,
+> -			.ops = &cns3xxx_pcie_ops,
+> -			.setup = cns3xxx_pci_setup,
+> -			.map_irq = cns3xxx_pcie_map_irq,
+> -		},
+> +		.port = 0,
+>  	},
+>  	[1] = {
+>  		.host_regs = (void __iomem *)CNS3XXX_PCIE1_HOST_BASE_VIRT,
+> @@ -217,19 +208,13 @@ static struct cns3xxx_pcie cns3xxx_pcie[] = {
+>  			.flags = IORESOURCE_MEM,
+>  		},
+>  		.irqs = { IRQ_CNS3XXX_PCIE1_RC, IRQ_CNS3XXX_PCIE1_DEVICE, },
+> -		.hw_pci = {
+> -			.domain = 1,
+> -			.nr_controllers = 1,
+> -			.ops = &cns3xxx_pcie_ops,
+> -			.setup = cns3xxx_pci_setup,
+> -			.map_irq = cns3xxx_pcie_map_irq,
+> -		},
+> +		.port = 1,
+>  	},
+>  };
+>  
+>  static void __init cns3xxx_pcie_check_link(struct cns3xxx_pcie *cnspci)
+>  {
+> -	int port = cnspci->hw_pci.domain;
+> +	int port = cnspci->port;
+>  	u32 reg;
+>  	unsigned long time;
+>  
+> @@ -260,9 +245,10 @@ static void __init cns3xxx_pcie_check_link(struct cns3xxx_pcie *cnspci)
+>  
+>  static void __init cns3xxx_pcie_hw_init(struct cns3xxx_pcie *cnspci)
+>  {
+> -	int port = cnspci->hw_pci.domain;
+> +	int port = cnspci->port;
+>  	struct pci_sys_data sd = {
+>  		.domain = port,
+> +		.private_data = cnspci,
+>  	};
+>  	struct pci_bus bus = {
+>  		.number = 0,
+> @@ -323,6 +309,14 @@ static int cns3xxx_pcie_abort_handler(unsigned long addr, unsigned int fsr,
+>  void __init cns3xxx_pcie_init_late(void)
+>  {
+>  	int i;
+> +	void *private_data;
+> +	struct hw_pci hw_pci = {
+> +		.nr_controllers = 1,
+> +		.ops = &cns3xxx_pcie_ops,
+> +		.setup = cns3xxx_pci_setup,
+> +		.map_irq = cns3xxx_pcie_map_irq,
+> +		.private_data = &private_data,
+> +	};
+>  
+>  	pcibios_min_io = 0;
+>  	pcibios_min_mem = 0;
+> @@ -335,7 +329,9 @@ void __init cns3xxx_pcie_init_late(void)
+>  		cns3xxx_pwr_soft_rst(0x1 << PM_SOFT_RST_REG_OFFST_PCIE(i));
+>  		cns3xxx_pcie_check_link(&cns3xxx_pcie[i]);
+>  		cns3xxx_pcie_hw_init(&cns3xxx_pcie[i]);
+> -		pci_common_init(&cns3xxx_pcie[i].hw_pci);
+> +		hw_pci->domain = i;
+> +		private_data = &cns3xxx_pcie[i];
+> +		pci_common_init(&hw_pci);
+>  	}
+>  
+>  	pci_assign_unassigned_resources();
+> 
+> 
