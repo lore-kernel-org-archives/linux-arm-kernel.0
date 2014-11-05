@@ -1,62 +1,73 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Wed, 05 Nov 2014 09:02:12 +0800
-Subject: [PATCH] clk: rockchip: change hierarchy for some clocks
-In-Reply-To: <CAD=FV=VByf=YKw7q4L2493C-z9uJ3dTSk9WZyCFdOkSjD2XoDw@mail.gmail.com>
-References: <1414747777-12625-1-git-send-email-kever.yang@rock-chips.com>
- <CAD=FV=VByf=YKw7q4L2493C-z9uJ3dTSk9WZyCFdOkSjD2XoDw@mail.gmail.com>
-Message-ID: <54597714.3050406@rock-chips.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Wed, 5 Nov 2014 02:11:22 +0100
+Subject: N900 modem support in 3.18-rc1
+In-Reply-To: <20141104205117.GA17606@amd>
+References: <20141104205117.GA17606@amd>
+Message-ID: <20141105011122.GA30622@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
+Hi Pavel,
 
-On 11/05/2014 05:32 AM, Doug Anderson wrote:
-> Kever
+On Tue, Nov 04, 2014 at 09:51:17PM +0100, Pavel Machek wrote:
+> I'd like to test a modem (and eventually to get it to work :-) ) on
+> n900. So far I found:
+> 
+> http://lwn.net/Articles/592485/
+> 
+> It says:
+> 
+> # supported. Testing the patchset with ofono works like this:
+> # 
+> #  # provide cmt device for ofono
+> #  ln -sf /sys/bus/hsi/n900-modem /dev/cmt
+> 
+> [...]
 >
-> On Fri, Oct 31, 2014 at 2:29 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
->> This patch change the hierarchy for some clocks, to met the following
->> bus hierarchy:
->> hclk_usb_peri is bus clock for
->> |- hclk_otg0,
->> |- hclk_host0,
->> |- hclk_host1,
->> |- hclk_hsic
->>
->> hclk_emem is bus clock for
->> |- hclk_nandc0
->> |- hclk_nandc1
->>
->> hclk_mem is bus clock for
->> |- hclk_sdmmc
->> |- hclk_sdio0
->> |- hclk_sdio1
->> |- hclk_emmc
-> So as I understand it the "parent" clocks aren't really parents but
-> are actually peer clocks.  That is if "hclk_usb_peri" is gated
-> "hclk_otg0" continues to run.  ...but the OTG periperhal is useless
-> without "hclk_usb_peri" also being enabled.
-Correct.
->
-> There doesn't seem to be any real downside to modeling thing as you
-> have done it, though it's not quite a true representation of the
-> world.  A slightly more true representation would be to make it so
-> that whenever "hclk_otg0" is enabled/disabled that it makes an
-> enable/disable call to "hclk_usb_peri".  I think you'd have to
-> subclass the gate clock and patch your stuff in the "enable" function.
->
-> I'm personally OK with things landing as you've described it (I can
-> see no downside), but it seems like this at least deserves a comment
-> (either in the code or the commit message).
-I will update the commit message in new version, I describe it
-in a private mail ask for how to handle this kind of clock, but not
-in this patch, I will add it.
->
-> If Mike T. thinks that we should use a more truthful model or if
-> there's some better way to express this, you should of course listen
-> to him and not to me.
-Sure, I'm always looks for a better way for these kind of clocks,
-there are many other clocks like *_arbi and *_niu still on rk3288
-are not handled by any module which we have to use
-CLK_IGNORE_UNUSED tag when disable unused init.
+> That seemed to match, so I symlinked it.
 
-- Kever
+looks ok. You should have the following files:
+
+/dev/cmt/cmt_apeslpx
+/dev/cmt/cmt_bsi
+/dev/cmt/cmt_en
+/dev/cmt/cmt_rst_rq
+/dev/cmt/cmt_rst
+
+Apart from that the kernel should be provide a phonet0
+network device.
+
+> #  # start ofono
+> #  ofono --nodetach --debug
+> 
+> It it a typo and it wants ofonod?
+
+yes.
+
+> root at n900:~# ofonod --nodetach --debug &
+> [1] 3552
+
+no output from ofono?
+
+> root at n900:~# mdbus2 -s org.ofono /n900_0 xyz
+> [ERR]: There is no method with name xyz on path /n900_0!
+>
+> [...]
+> 
+> Any ideas?
+
+call mdbus2 with fewer arguments to see what is available on the
+bus:
+
+mdbus2 -s                      => list all system services
+mdbus2 -s org.ofono            => list all ofono objects
+mdbus2 -s org.ofono /n900_0    => list all methods from n900 object
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/399324a5/attachment-0001.sig>
