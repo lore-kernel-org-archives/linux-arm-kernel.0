@@ -1,25 +1,42 @@
-From: libv@skynet.be (Luc Verhaegen)
-Date: Wed, 5 Nov 2014 09:02:55 +0100
-Subject: [PATCH v4 0/5] simplefb: add clock handling code
-In-Reply-To: <CAKON4Oyw46zjq8QJNAFi9qWA9-6MpXtGavzVmXQT3SPqH=NpjQ@mail.gmail.com>
-References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
- <544F737A.7000109@ti.com>
- <CAL_JsqJ2JRg7k21CEVe4-At7enD+y3TN_7wfqhY0OHZm-_j17w@mail.gmail.com>
- <544F7E5D.60104@redhat.com> <5450CAA5.5020205@ti.com>
- <CAL_JsqKWqq+H5ymUW3n8tkmLJHEUGaKDLX5+orJmGUQ3ECQwUQ@mail.gmail.com>
- <CAKON4Oyw46zjq8QJNAFi9qWA9-6MpXtGavzVmXQT3SPqH=NpjQ@mail.gmail.com>
-Message-ID: <20141105080255.GA23239@skynet.be>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 5 Nov 2014 09:03:05 +0100
+Subject: [PATCH 3/4] PM / Domains: Improve error handling while
+ adding/removing devices
+In-Reply-To: <CAMuHMdWMEaC3=ibf9E8dLcG=zceU5+oE9NnKyRfAM0O36cBAjg@mail.gmail.com>
+References: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
+ <1414507090-516-4-git-send-email-ulf.hansson@linaro.org>
+ <CAMuHMdWMEaC3=ibf9E8dLcG=zceU5+oE9NnKyRfAM0O36cBAjg@mail.gmail.com>
+Message-ID: <CAPDyKFoA9oUOtKPvFB1Kex5-x7wn917EBUdv=jYyUwgFth4dvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 02, 2014 at 10:28:48AM -0500, jonsmirl at gmail.com wrote:
+On 5 November 2014 08:47, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> On Tue, Oct 28, 2014 at 3:38 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> --- a/drivers/base/power/domain.c
+>> +++ b/drivers/base/power/domain.c
+>> @@ -1358,25 +1358,81 @@ EXPORT_SYMBOL_GPL(pm_genpd_syscore_poweron);
+>>
+>>  #endif /* CONFIG_PM_SLEEP */
+>>
+>> -static struct generic_pm_domain_data *__pm_genpd_alloc_dev_data(struct device *dev)
+>> +static int genpd_alloc_dev_data(struct generic_pm_domain *genpd,
+>> +                               struct device *dev, struct gpd_timing_data *td)
+>>  {
 >
-> Simplefb is also being developed as a way of protecting the BIOS setup
-> of the framebuffer past the boot process and out into use as a normal
-> user space console.  I in no way support this use. We have experienced
-> decades of problems on the x86 with VGA and BIOSes that I do not wish
-> to repeat in the ARM world.
+> [...]
+>
+>> +       if (genpd->attach_dev)
+>> +               genpd->attach_dev(dev);
+>
+> Note that dev->pm_domain is not yet set at this point, so the callee
+> can no longer
+> know to which domain the device is being attached.
+> Should we re-add the parameter, or move the attach_dev() back to
+> __pm_genpd_add_device(), like Kevin suggested.
 
-Oh wow.
+I agree.
 
-Luc Verhaegen, aka, the guy who made BIOS-free display drivers possible.
+I am working on a new version, which adopts to your suggestions.
+
+Kind regards
+Uffe
