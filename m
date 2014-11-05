@@ -1,54 +1,32 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 5 Nov 2014 15:58:46 +0800
-Subject: [PATCH V1 4/4] can: m_can: allow to send std frame on CAN FD mode
-In-Reply-To: <1415174326-6623-1-git-send-email-b29396@freescale.com>
-References: <1415174326-6623-1-git-send-email-b29396@freescale.com>
-Message-ID: <1415174326-6623-4-git-send-email-b29396@freescale.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed,  5 Nov 2014 10:09:43 +0100
+Subject: [PATCH] ARM: shmobile: r8a7740 legacy: Fix INTCA clock parent
+Message-ID: <1415178583-28406-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current code sends all CAN frames on CAN FD format(with BRS or not)
-if CAN_CTRLMODE_FD is enabled.
-However, even CAN_CTRLMODE_FD is enabled, the can tool may still
-send normal frames.
-e.g.
-ip link set can0 up type can bitrate 1000000 dbitrate 1000000 fd on
-cansend can0 123#112233
+The parent clock index for the INTCA clock indexed the wrong array,
+causing the parent clock to point to arbitrary memory instead of a real
+struct clk.
 
-Therefore sending normal CAN frame on FD format seems not reasonable
-and the CAN FD incapable device may not be able to receive it correctly.
-
-The patch switches the M_CAN operation mode to ISO11898-1 instead of
-staying on CAN FD operation mode by writing "11" to CMR bit if find
-we're sending a normal can skb.
-
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
+Fixes: 2b02b8020fad6ed5 ("ARM: shmobile: r8a7740 legacy: Add missing INTCA clock for irqpin module")
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- drivers/net/can/m_can/m_can.c | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ arch/arm/mach-shmobile/clock-r8a7740.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
-index f47c200..219c4b7 100644
---- a/drivers/net/can/m_can/m_can.c
-+++ b/drivers/net/can/m_can/m_can.c
-@@ -1080,10 +1080,14 @@ static netdev_tx_t m_can_start_xmit(struct sk_buff *skb,
- 	if (priv->can.ctrlmode & CAN_CTRLMODE_FD) {
- 		cccr = m_can_read(priv, M_CAN_CCCR);
- 		cccr &= ~(CCCR_CMR_MASK << CCCR_CMR_SHIFT);
--		if (cf->flags & CANFD_BRS)
--			cccr |= CCCR_CMR_CANFD_BRS << CCCR_CMR_SHIFT;
--		else
--			cccr |= CCCR_CMR_CANFD << CCCR_CMR_SHIFT;
-+		if (can_is_canfd_skb(skb)) {
-+			if (cf->flags & CANFD_BRS)
-+				cccr |= CCCR_CMR_CANFD_BRS << CCCR_CMR_SHIFT;
-+			else
-+				cccr |= CCCR_CMR_CANFD << CCCR_CMR_SHIFT;
-+		} else {
-+			cccr |= CCCR_CMR_CAN << CCCR_CMR_SHIFT;
-+		}
- 		m_can_write(priv, M_CAN_CCCR, cccr);
- 	}
+diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
+index bd5ecc3c16d756d4..dbb0ab283e2fe91f 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7740.c
++++ b/arch/arm/mach-shmobile/clock-r8a7740.c
+@@ -475,7 +475,7 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP100] = SH_CLK_MSTP32(&div4_clks[DIV4_B],	SMSTPCR1,  0, 0), /* LCDC0 */
  
+ 	[MSTP230] = SH_CLK_MSTP32(&div6_clks[DIV6_SUB],	SMSTPCR2, 30, 0), /* SCIFA6 */
+-	[MSTP229] = SH_CLK_MSTP32(&div6_clks[DIV4_HP],	SMSTPCR2, 29, 0), /* INTCA */
++	[MSTP229] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR2, 29, 0), /* INTCA */
+ 	[MSTP222] = SH_CLK_MSTP32(&div6_clks[DIV6_SUB],	SMSTPCR2, 22, 0), /* SCIFA7 */
+ 	[MSTP218] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],  SMSTPCR2, 18, 0), /* DMAC1 */
+ 	[MSTP217] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],  SMSTPCR2, 17, 0), /* DMAC2 */
 -- 
 1.9.1
