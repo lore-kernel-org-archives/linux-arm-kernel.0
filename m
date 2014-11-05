@@ -1,115 +1,115 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 06 Nov 2014 00:21:01 +0100
-Subject: [PATCH] PM / Domains: Change prototype for the ->attach_dev()
- callback
-In-Reply-To: <7h7fz92rqk.fsf@deeprootsystems.com>
-References: <1414670569-3002-1-git-send-email-ulf.hansson@linaro.org>
- <20141105013353.GA19238@dtor-ws> <7h7fz92rqk.fsf@deeprootsystems.com>
-Message-ID: <3267963.fqUYb7m9Rv@vostro.rjw.lan>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Wed, 05 Nov 2014 15:05:31 -0800
+Subject: [PATCH v12 2/6] KVM: Add generic support for dirty page logging
+In-Reply-To: <545A4BCE.40504@redhat.com>
+References: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
+ <1414017251-5772-3-git-send-email-m.smarduch@samsung.com>
+ <20141101101208.GE12801@jhogan-linux.le.imgtec.org>
+ <545A4BCE.40504@redhat.com>
+Message-ID: <545AAD3B.6070602@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 05, 2014 02:43:31 PM Kevin Hilman wrote:
-> Dmitry Torokhov <dmitry.torokhov@gmail.com> writes:
+On 11/05/2014 08:09 AM, Paolo Bonzini wrote:
 > 
-> > On Thu, Oct 30, 2014 at 01:38:30PM -0700, Kevin Hilman wrote:
-> >> "Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
-> >> 
-> >> > On Thursday, October 30, 2014 01:02:49 PM Ulf Hansson wrote:
-> >> >> Convert the prototype to return and int. This is just an initial step,
-> >> >> needed to support error handling.
-> >> >> 
-> >> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> >> 
-> >> Acked-by: Kevin Hilman <khilman@linaro.org>
-> >> 
-> >> >> 
-> >> >> This patch is intended as fix for 3.18 rc[n]. Why?
-> >> >> 
-> >> >> There are other SOC specific patches around that adds genpd support and which
-> >> >> implements the ->attach_dev() callback. To prevent having an "atomic" patch
-> >> >> during the next release cycle, let's change the prototype now instead.
-> >> >> 
-> >> >> Further patches will add the actual error handling in genpd and these can then
-> >> >> be reviewed and tested thoroughly.
-> >> >
-> >> > So we have no users of ->attach_dev at the moment, right?
-> >> 
-> >> Not in mainline, but there are a couple getting ready to hit -next, so
-> >> we wanted to fix this before they arrive so that adding the error
-> >> handling will be easier.
-> >
-> > BTW, while we are at it, can we also pass the domain itself to
-> > attach_dev() and detach_dev()? If anything it helps with debugging (you
-> > can print domain name from the callbacks).
 > 
-> Agreed, and it makes it match the other callbacks (power_off, power_on)
-> which currently take struct generic_pm_domain *domain.  
+> On 01/11/2014 11:12, James Hogan wrote:
+>> AFAICT all of the arch implementations of kvm_vm_ioctl_get_dirty_log()
+>> except x86 and ppc hv (i.e. ia60, mips, ppc pv, s390) already make use
+>> of the existing generic function kvm_get_dirty_log() to help implement
+>> their kvm_vm_ioctl_get_dirty_log functions, which all look pretty
+>> similar now except for TLB flushing.
+>>
+>> Would they not be a better base for a generic
+>> kvm_vm_ioctl_get_dirty_log()?
+>>
+>> It feels a bit wrong to add a generic higher level function which
+>> doesn't make use of the existing generic lower level abstraction.
+>>
+>> (Appologies if this has already been brought up in previous versions of
+>> the patchset, I haven't been tracking them).
 > 
-> Updated version of $SUBJECT patch below.
+> I agree that we should make the interface look more like
+> kvm_get_dirty_log().  Here the steps are:
+> 
+> + *   1. Take a snapshot of the bit and clear it if needed.
+> + *   2. Write protect the corresponding page.
+> + *   3. Flush TLB's if needed.
+> + *   4. Copy the snapshot to the userspace.
 
-The subject and changelog need to be updated too IMO.
+Hi Paolo,
+  thanks for breaking it down between generic/architecture layers,
+helps a lot. Initially I thought we could get TLB flushing to
+generic layer, previous x86 version worked for ARM. But looking
+deeper other architectures either use non-generic flush or none
+at all. Right now we would have x86, ARM, IA64 using generic TLB flush.
+I'll restructure for another version.
 
-> ----- >8 ------
-> From 353a62ffae2f9228142c8a2093108f9eda8dc6b4 Mon Sep 17 00:00:00 2001
-> From: Ulf Hansson <ulf.hansson@linaro.org>
-> Date: Thu, 30 Oct 2014 13:02:49 +0100
-> Subject: [PATCH] PM / Domains: Change prototype for the ->attach_dev()
->  callback
 > 
-> Convert the prototype to return and int. This is just an initial step,
-> needed to support error handling.
+> and I believe we can swap 3 and 4, since (4) is just a copy of data and
+> it has no ordering relationship with the action of the guest.  Once we
+> do that, we can rewrite code to look a lot like kvm_get_dirty_log(),
+> let's call it kvm_get_dirty_log_protect():
 > 
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> [khilman: added domain as parameter to callbacks, as suggested by Dmitry]
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
-> ---
->  drivers/base/power/domain.c | 4 ++--
->  include/linux/pm_domain.h   | 6 ++++--
->  2 files changed, 6 insertions(+), 4 deletions(-)
+> 	r = -EINVAL;
+> 	if (log->slot >= KVM_USER_MEM_SLOTS)
+> 		goto out;
 > 
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index 40bc2f4072cc..b520687046d4 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -1437,7 +1437,7 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
->  	spin_unlock_irq(&dev->power.lock);
->  
->  	if (genpd->attach_dev)
-> -		genpd->attach_dev(dev);
-> +		genpd->attach_dev(genpd, dev);
->  
->  	mutex_lock(&gpd_data->lock);
->  	gpd_data->base.dev = dev;
-> @@ -1499,7 +1499,7 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
->  	genpd->max_off_time_changed = true;
->  
->  	if (genpd->detach_dev)
-> -		genpd->detach_dev(dev);
-> +		genpd->detach_dev(genpd, dev);
->  
->  	spin_lock_irq(&dev->power.lock);
->  
-> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-> index 73e938b7e937..b3ed7766a291 100644
-> --- a/include/linux/pm_domain.h
-> +++ b/include/linux/pm_domain.h
-> @@ -72,8 +72,10 @@ struct generic_pm_domain {
->  	bool max_off_time_changed;
->  	bool cached_power_down_ok;
->  	struct gpd_cpuidle_data *cpuidle_data;
-> -	void (*attach_dev)(struct device *dev);
-> -	void (*detach_dev)(struct device *dev);
-> +	int (*attach_dev)(struct generic_pm_domain *domain,
-> +			  struct device *dev);
-> +	void (*detach_dev)(struct generic_pm_domain *domain,
-> +			   struct device *dev);
->  };
->  
->  static inline struct generic_pm_domain *pd_to_genpd(struct dev_pm_domain *pd)
+> 	memslot = id_to_memslot(kvm->memslots, log->slot);
+> 
+> 	dirty_bitmap = memslot->dirty_bitmap;
+> 	r = -ENOENT;
+> 	if (!dirty_bitmap)
+> 		goto out;
+> 
+> 	n = kvm_dirty_bitmap_bytes(memslot);
+> 
+> 	dirty_bitmap_buffer = dirty_bitmap + n / sizeof(long);
+> 	memset(dirty_bitmap_buffer, 0, n);
+> 
+> 	spin_lock(&kvm->mmu_lock);
+> 
+> 	*is_dirty = false;
+> 	for (i = 0; i < n / sizeof(long); i++) {
+> 		unsigned long mask;
+> 		gfn_t offset;
+> 
+> 		if (!dirty_bitmap[i])
+> 			continue;
+> 
+> 		*is_dirty = true;
+> 
+> 		mask = xchg(&dirty_bitmap[i], 0);
+> 		dirty_bitmap_buffer[i] = mask;
+> 
+> 		offset = i * BITS_PER_LONG;
+> 		kvm_arch_write_protect_pt_masked(kvm, memslot, offset,
+> 						 mask);
+> 	}
+> 
+> 	spin_unlock(&kvm->mmu_lock);
+> 
+> 	r = -EFAULT;
+> 	if (copy_to_user(log->dirty_bitmap, dirty_bitmap_buffer, n))
+> 		goto out;
+> 
+> 	r = 0;
+> out:
+> 	return r;
+> 
+> where the TLB flushing is moved to the caller as in kvm_get_dirty_log
+> callers.  Taking the slots lock would also be kept in the per-arch
+> kvm_vm_ioctl_get_dirty_log, again similar to PPC/MIPS/S390.
+Ok.
+> 
+> You can add a new Kconfig symbol, or define an implementation of
+> kvm_arch_write_protect_pt_masked that BUG()s for ia64/PPC/MIPS/S390.
+Ok will do.
+> 
+> BTW, you can leave the function in kvm_main.c.
+Ok.
+> 
+> Paolo
 > 
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Thanks.
