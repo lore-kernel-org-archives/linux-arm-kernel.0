@@ -1,44 +1,75 @@
 From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 05 Nov 2014 09:32:01 +0100
-Subject: [GIT PULL] Xilinx Zynq fix for v3.18
-Message-ID: <5459E081.8000903@monstr.eu>
+Date: Wed, 05 Nov 2014 09:36:28 +0100
+Subject: [PATCH v3 1/2] ARM: zynq: Add OCM controller driver
+In-Reply-To: <e65e39088e0f571ee4905172f2f6c84dbc037805.1412599051.git.michal.simek@xilinx.com>
+References: <e65e39088e0f571ee4905172f2f6c84dbc037805.1412599051.git.michal.simek@xilinx.com>
+Message-ID: <5459E18C.1030502@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+Hi Arnd and Olof,
 
-please add this fix to your tree.
+On 10/06/2014 02:38 PM, Michal Simek wrote:
+> The driver provide memory allocator which can
+> be used by others drivers to allocate memory inside OCM.
+> All location for 64kB blocks are supported
+> and driver is trying to allocate the largest continuous
+> block of memory.
+> 
+> Checking mpcore addressing filterring is not done here
+> but could be added in future.
+> 
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+> Changes in v3:
+> - Move OCM to drivers/soc
+> - Update year
+> - Extract DTS node to be able to apply it out of driver
+> - Remove generic allocator enabling
+> - Extract SLCR part
+> - Use const in of_device_id
+> - OCM->OCMC
+> - Use ocmc-1.0 compatible string
+> 
+> Changes in v2:
+> - Change compatibility string to be in xilinx format
+> - Fix kernel-doc format
+> 
+> For everybody on-chip SRAM driver "mmio-sram"
+> is missing parity IRQ handling not sure how to write
+> in generic way and also the memory layout
+> can be changed at run time (not currently supported by this driver)
+> 
+> smp-sram trampoline allocation can be used from mmio-sram
+> and size allocated via DT but currently no reason for using
+> it.
+> 
+> Creating mmio-sram node with setting at run time based on current setting
+> is possible but it won't look good.
+> One way how to do it is here
+> "ARM: mvebu: Add quirk for i2c for the OpenBlocks AX3-4 board"
+> (sha1: 85e618a1be2b2092318178d1d66bdad49cbbeeeb)
+> but creating nodes at run-time or changing compact strings
+> will be just more hacky code.
+> 
+> ---
+>  .../bindings/arm/zynq/xlnx,zynq-ocmc.txt           |  17 ++
+>  drivers/soc/Makefile                               |   1 +
+>  drivers/soc/zynq/Makefile                          |   1 +
+>  drivers/soc/zynq/zynq_ocmc.c                       | 246 +++++++++++++++++++++
+>  4 files changed, 265 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocmc.txt
+>  create mode 100644 drivers/soc/zynq/Makefile
+>  create mode 100644 drivers/soc/zynq/zynq_ocmc.c
+> 
+
+Can you please review this OCM patch?
+I would like to move it when I know how I should handle that slcr connection
+and reserving trampoline size.
 
 Thanks,
 Michal
-
-
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-
-are available in the git repository at:
-
-  https://github.com/Xilinx/linux-xlnx.git tags/zynq-fixes-for-3.18
-
-for you to fetch changes up to 2de4752d6923d7dcc6e68c23be6a52d5f0896f9d:
-
-  ARM: zynq: Actually remove hotplug.c (2014-10-20 20:53:26 +0200)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq fix for v3.18
-
-- Remove unused hotplug.c file
-
-----------------------------------------------------------------
-Soren Brinkmann (1):
-      ARM: zynq: Actually remove hotplug.c
-
- arch/arm/mach-zynq/Makefile  |  2 --
- arch/arm/mach-zynq/hotplug.c | 14 --------------
- 2 files changed, 16 deletions(-)
- delete mode 100644 arch/arm/mach-zynq/hotplug.c
-
 
 -- 
 Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
@@ -54,4 +85,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/f3ea9850/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/c1ea3b22/attachment.sig>
