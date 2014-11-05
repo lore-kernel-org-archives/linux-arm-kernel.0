@@ -1,149 +1,88 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 5 Nov 2014 09:57:37 -0600
-Subject: [PATCH v9] ARM: omap: edma: add suspend resume hook
-In-Reply-To: <1409043173-24357-1-git-send-email-zonque@gmail.com>
-References: <1409043173-24357-1-git-send-email-zonque@gmail.com>
-Message-ID: <545A48F1.8060607@ti.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed,  5 Nov 2014 17:01:19 +0100
+Subject: [PATCH v2 03/11] mfd: syscon: Add atmel-smc registers definition
+In-Reply-To: <1415203287-21517-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1415203287-21517-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1415203287-21517-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/26/2014 03:52 AM, Daniel Mack wrote:
-> This patch makes the edma driver resume correctly after suspend. Tested
-> on an AM33xx platform with cyclic audio streams and omap_hsmmc.
-> 
-> All information can be reconstructed by already known runtime
-> information.
-> 
-> As we now use some functions that were previously only used from __init
-> context, annotations had to be dropped.
-> 
-> [nm at ti.com: added error handling for runtime + suspend_late/early_resume]
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> Tested-by: Joel Fernandes <joelf@ti.com>
-> Acked-by: Joel Fernandes <joelf@ti.com>
-> ---
-> Changes from v8:
-> 
-> 	* Drop the edma_suspend hook altogether. Even though back then
-> 	  when I wrote the code I was sure disabling the interrupts
-> 	  during suspend is necessary, tests now show it in fact isn't.
-> 	  My test setup still works if that code is omitted.
-> 	* Use SET_LATE_SYSTEM_SLEEP_PM_OPS in the dev_pm_ops
-> 	  declaration.
-> 
-> 	Thanks to Sekhar for pointing out the above.
-> 
->  arch/arm/common/edma.c | 60 ++++++++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 58 insertions(+), 2 deletions(-)
+Atmel AT91 SoCs have a memory range reserved for SMC (Static Memory
+Controller) configuration.
+Expose those registers so that drivers can make use of the smc syscon
+declared in at91 DTs.
 
-Doesn't seem to be any comments here, any chance this can be picked up? This
-patch always seems to get missed but will be needed for suspend/resume on both
-AM335x and AM437x.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ include/linux/mfd/syscon/atmel-smc.h | 60 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
+ create mode 100644 include/linux/mfd/syscon/atmel-smc.h
 
-Regards,
-Dave
-
-> 
-> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-> index 485be42..c623dd0 100644
-> --- a/arch/arm/common/edma.c
-> +++ b/arch/arm/common/edma.c
-> @@ -244,6 +244,8 @@ struct edma {
->  	/* list of channels with no even trigger; terminated by "-1" */
->  	const s8	*noevent;
->  
-> +	struct edma_soc_info *info;
-> +
->  	/* The edma_inuse bit for each PaRAM slot is clear unless the
->  	 * channel is in use ... by ARM or DSP, for QDMA, or whatever.
->  	 */
-> @@ -295,7 +297,7 @@ static void map_dmach_queue(unsigned ctlr, unsigned ch_no,
->  			~(0x7 << bit), queue_no << bit);
->  }
->  
-> -static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
-> +static void assign_priority_to_queue(unsigned ctlr, int queue_no,
->  		int priority)
->  {
->  	int bit = queue_no * 4;
-> @@ -314,7 +316,7 @@ static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
->   * included in that particular EDMA variant (Eg : dm646x)
->   *
->   */
-> -static void __init map_dmach_param(unsigned ctlr)
-> +static void map_dmach_param(unsigned ctlr)
->  {
->  	int i;
->  	for (i = 0; i < EDMA_MAX_DMACH; i++)
-> @@ -1762,15 +1764,69 @@ static int edma_probe(struct platform_device *pdev)
->  			edma_write_array2(j, EDMA_DRAE, i, 1, 0x0);
->  			edma_write_array(j, EDMA_QRAE, i, 0x0);
->  		}
-> +		edma_cc[j]->info = info[j];
->  		arch_num_cc++;
->  	}
->  
->  	return 0;
->  }
->  
-> +static int edma_pm_resume(struct device *dev)
-> +{
-> +	int i, j, r;
-> +
-> +	r = pm_runtime_get_sync(dev);
-> +	if (r < 0) {
-> +		dev_err(dev, "%s: get_sync returned %d\n", __func__, r);
-> +		return r;
-> +	}
-> +
-> +	for (j = 0; j < arch_num_cc; j++) {
-> +		struct edma *cc = edma_cc[j];
-> +
-> +		s8 (*queue_priority_mapping)[2];
-> +
-> +		queue_priority_mapping = cc->info->queue_priority_mapping;
-> +
-> +		/* Event queue priority mapping */
-> +		for (i = 0; queue_priority_mapping[i][0] != -1; i++)
-> +			assign_priority_to_queue(j,
-> +						 queue_priority_mapping[i][0],
-> +						 queue_priority_mapping[i][1]);
-> +
-> +		/*
-> +		 * Map the channel to param entry if channel mapping logic
-> +		 * exist
-> +		 */
-> +		if (edma_read(j, EDMA_CCCFG) & CHMAP_EXIST)
-> +			map_dmach_param(j);
-> +
-> +		for (i = 0; i < cc->num_channels; i++) {
-> +			if (test_bit(i, cc->edma_inuse)) {
-> +				/* ensure access through shadow region 0 */
-> +				edma_or_array2(j, EDMA_DRAE, 0, i >> 5,
-> +					       BIT(i & 0x1f));
-> +
-> +				setup_dma_interrupt(i,
-> +						    cc->intr_data[i].callback,
-> +						    cc->intr_data[i].data);
-> +			}
-> +		}
-> +	}
-> +
-> +	pm_runtime_put_sync(dev);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct dev_pm_ops edma_pm_ops = {
-> +	SET_LATE_SYSTEM_SLEEP_PM_OPS(NULL, edma_pm_resume)
-> +};
-> +
->  static struct platform_driver edma_driver = {
->  	.driver = {
->  		.name	= "edma",
-> +		.pm	= &edma_pm_ops,
->  		.of_match_table = edma_of_ids,
->  	},
->  	.probe = edma_probe,
-> 
+diff --git a/include/linux/mfd/syscon/atmel-smc.h b/include/linux/mfd/syscon/atmel-smc.h
+new file mode 100644
+index 0000000..430f486
+--- /dev/null
++++ b/include/linux/mfd/syscon/atmel-smc.h
+@@ -0,0 +1,60 @@
++/*
++ * Atmel SMC (Static Memory Controller) register offsets and bit definitions.
++ *
++ * Copyright (C) 2014 Atmel
++ * Copyright (C) 2014 Free Electrons
++ *
++ * Author: Boris Brezillon <boris.brezillon@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef _LINUX_MFD_SYSCON_ATMEL_SMC_H_
++#define _LINUX_MFD_SYSCON_ATMEL_SMC_H_
++
++#include <linux/regmap.h>
++
++#define AT91SAM9_SMC_GENERIC_OFFSET	0x00
++#define AT91SAM9_SMC_GENERIC_BLK_SZ	0x10
++
++#define SAMA5_SMC_GENERIC_OFFSET	0x600
++#define SAMA5_SMC_GENERIC_BLK_SZ	0x14
++
++#define AT91SAM9_SMC_SETUP(o)		((o) + 0x00)
++#define AT91SAM9_SMC_NWESETUP_SHFT	0
++#define AT91SAM9_SMC_NCS_WRSETUP_SHFT	8
++#define AT91SAM9_SMC_NRDSETUP_SHFT	16
++#define AT91SAM9_SMC_NCS_NRDSETUP_SHFT	24
++
++#define AT91SAM9_SMC_PULSE(o)		((o) + 0x04)
++
++#define AT91SAM9_SMC_CYCLE(o)		((o) + 0x08)
++
++#define AT91SAM9_SMC_MODE(o)		((o) + 0x0c)
++#define SAMA5_SMC_MODE(o)		((o) + 0x10)
++#define AT91_SMC_READMODE		BIT(0)
++#define AT91_SMC_WRITEMODE		BIT(1)
++#define AT91_SMC_EXNWMODE		GENMASK(5, 4)
++#define AT91_SMC_EXNWMODE_DISABLE	(0 << 4)
++#define AT91_SMC_EXNWMODE_FROZEN	(2 << 4)
++#define AT91_SMC_EXNWMODE_READY		(3 << 4)
++#define AT91_SMC_BAT			BIT(8)
++#define AT91_SMC_BAT_SELECT		(0 << 8)
++#define AT91_SMC_BAT_WRITE		(1 << 8)
++#define AT91_SMC_DBW			GENMASK(13, 12)
++#define AT91_SMC_DBW_8			(0 << 12)
++#define AT91_SMC_DBW_16			(1 << 12)
++#define AT91_SMC_DBW_32			(2 << 12)
++#define AT91_SMC_TDF			GENMASK(19, 16)
++#define AT91_SMC_TDF_(x)		(((x) & 0xf) << 16)
++#define AT91_SMC_TDFMODE		BIT(20)
++#define AT91_SMC_PMEN			BIT(24)
++#define AT91_SMC_PS			GENMASK(29, 28)
++#define AT91_SMC_PS_4			(0 << 28)
++#define AT91_SMC_PS_8			(1 << 28)
++#define AT91_SMC_PS_16			(2 << 28)
++#define AT91_SMC_PS_32			(3 << 28)
++
++#endif /* _LINUX_MFD_SYSCON_ATMEL_SMC_H_ */
+-- 
+1.9.1
