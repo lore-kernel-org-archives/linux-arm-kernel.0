@@ -1,39 +1,51 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Wed, 05 Nov 2014 18:28:45 +0800
-Subject: [Patch Part2 v4 00/31] Enable hierarchy irqdomian on x86 platforms
-In-Reply-To: <20141105095850.GH10744@8bytes.org>
-References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
- <20141104144730.GE14512@8bytes.org> <5458ECF3.4040308@linux.intel.com>
- <20141105085154.GG10744@8bytes.org> <5459F0DE.6000307@linux.intel.com>
- <20141105095850.GH10744@8bytes.org>
-Message-ID: <5459FBDD.4020504@linux.intel.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 5 Nov 2014 10:37:34 +0000
+Subject: [PATCH v3 12/19] arm/arm64: KVM: refactor/wrap vgic_set/get_attr()
+In-Reply-To: <5459FB9F.2020104@arm.com>
+References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
+ <1414776414-13426-13-git-send-email-andre.przywara@arm.com>
+ <20141104193008.GO16132@cbox> <5459FB9F.2020104@arm.com>
+Message-ID: <5459FDEE.1010500@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
-	Seems like a silly bug, could you please help to try this
-fix?
-Regards!
-Gerry
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index 7423ee16972f..62ba8a6f6e79 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -1211,7 +1211,7 @@ int msi_irq_domain_alloc_irqs(struct irq_domain
-*domain, int type,
-                                msidesc->nvec_used > 1) ?  1 : -ENOSPC;
-                }
-                for (i = 0; i < msidesc->nvec_used; i++)
--                       irq_set_msi_desc_off(virq + i, i, msidesc);
-+                       irq_set_msi_desc_off(virq, i, msidesc);
-        }
+On 05/11/14 10:27, Andre Przywara wrote:
+> Hi Christoffer,
+>
+> On 04/11/14 19:30, Christoffer Dall wrote:
+>> On Fri, Oct 31, 2014 at 05:26:47PM +0000, Andre Przywara wrote:
+>>> vgic_set_attr() and vgic_get_attr() contain both code specific for
+>>> the emulated GIC as well as code for the userland facing, generic
+>>> part of the GIC.
+>>> Split the guest GIC facing code of from the generic part to allow
+>>> easier splitting later.
+>>>
+>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>
+>> It's not really clear to me which data is specific to the emulated gic
+>> and which is not or why you have to do this (yet), for example, the
+>> _common function is now dealing with the GRP_ADDR case which is very
+>> GICv2 specific (so far).  But I assume this will make sense as I
+>> progress through the series.
+>
+> Admittedly this is somewhat of a corner case. Actually I tried to keep
+> as much code common (in vgic.c) as possible, and it was possible without
+> much pain for GRP_ADDR and kvm_vgic_addr.
+> Also I consider this call part of the switching and connecting
+> functionality of the VGIC.
+> Looking at the code again I think I had it in -emul.c before, but
+> decided to move it back for some reason (probably some other code
+> dependency which needed to be exposed). So unless I find some time ;-)
+> and a good reason to move it I tend to keep it here.
 
-        list_for_each_entry(msidesc, &dev->msi_list, list)
+... just found that kvm_vgic_addr() is not static, but also called from
+the (now legacy) KVM_ARM_SET_DEVICE_ADDR ioctl. So it was causing more
+churn to move it than it gave us clean separation.
 
-On 2014/11/5 17:58, Joerg Roedel wrote:
-> On Wed, Nov 05, 2014 at 05:41:50PM +0800, Jiang Liu wrote:
->> 	Could you please help to apply the attached patch and send me
->> console outputs?
-> 
-> Sure, here it is.
-> 
+Cheers,
+Andre.
+
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+
+ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
+ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
