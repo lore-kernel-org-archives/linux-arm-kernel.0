@@ -1,71 +1,79 @@
-From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
-Date: Wed, 5 Nov 2014 15:35:07 +0530
-Subject: [PATCH V2 1/2] ARM: dts: vf-colibri: Add I2C support
-In-Reply-To: <cover.1415181422.git.bhuvanchandra.dv@toradex.com>
-References: <cover.1415181422.git.bhuvanchandra.dv@toradex.com>
-Message-ID: <cd1efeb312d35f45fee426ab3783beff7af4d327.1415181422.git.bhuvanchandra.dv@toradex.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 5 Nov 2014 11:09:12 +0100
+Subject: [PATCH 1/6] clk: sunxi: Add support for sun9i a80 usb clocks and
+ resets
+In-Reply-To: <CAGb2v65VojZVEijdjXYGkMud7dMFzMzagfN=_4S3msZygu3YPQ@mail.gmail.com>
+References: <1415074039-16590-1-git-send-email-wens@csie.org>
+ <1415074039-16590-2-git-send-email-wens@csie.org>
+ <20141104165733.GI26729@lukather>
+ <CAGb2v65VojZVEijdjXYGkMud7dMFzMzagfN=_4S3msZygu3YPQ@mail.gmail.com>
+Message-ID: <20141105100912.GD27686@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Stefan Agner <stefan@agner.ch>
-Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
----
- arch/arm/boot/dts/vf-colibri-eval-v3.dtsi |    6 +++++-
- arch/arm/boot/dts/vf-colibri.dtsi         |   13 +++++++++++++
- 2 files changed, 18 insertions(+), 1 deletion(-)
+On Wed, Nov 05, 2014 at 06:02:35PM +0800, Chen-Yu Tsai wrote:
+> >> +static void __init sunxi_usb_clk_setup(struct device_node *node,
+> >> +                                    const struct usb_clk_data *data,
+> >> +                                    spinlock_t *lock)
+> >> +{
+> >> +     struct clk_onecell_data *clk_data;
+> >> +     struct usb_reset_data *reset_data;
+> >> +     const char *clk_parent;
+> >> +     const char *clk_name;
+> >> +     void __iomem *reg;
+> >> +     int qty;
+> >> +     int i = 0;
+> >> +     int j = 0;
+> >> +
+> >> +     reg = of_iomap(node, 0);
+> >
+> > of_io_request_and_map?
+> 
+> OK. About that, any recommended naming style for the 3rd argument?
+> Maybe the driver name "clk_sun9i_usb"? Or just a generic name like
+> "usb_clk"?
+> 
+> I'm asking now as we'll likely be changing the existing drivers to
+> use it as well.
 
-diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-index 80e8fbc..7324bdc 100644
---- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-+++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-@@ -33,6 +33,10 @@
- 	status = "okay";
- };
- 
-+&i2c0 {
-+	status = "okay";
-+};
-+
- &pwm0 {
- 	status = "okay";
- };
-@@ -51,4 +55,4 @@
- 
- &uart2 {
- 	status = "okay";
--};
-\ No newline at end of file
-+};
-diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
-index ab40367..471eec0 100644
---- a/arch/arm/boot/dts/vf-colibri.dtsi
-+++ b/arch/arm/boot/dts/vf-colibri.dtsi
-@@ -39,6 +39,12 @@
- 	pinctrl-0 = <&pinctrl_fec1>;
- };
- 
-+&i2c0 {
-+	clock-frequency = <400000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c0>;
-+};
-+
- &pwm0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_pwm0>;
-@@ -102,6 +108,13 @@
- 			>;
- 		};
- 
-+		pinctrl_i2c0: i2c0grp {
-+			fsl,pins = <
-+				VF610_PAD_PTB14__I2C0_SCL		0x37ff
-+				VF610_PAD_PTB15__I2C0_SDA		0x37ff
-+			>;
-+		};
-+
- 		pinctrl_pwm0: pwm0grp {
- 			fsl,pins = <
- 				VF610_PAD_PTB0__FTM0_CH0		0x1182
+I don't really have a preference. Maybe the DT node name would be both
+the easier and better solution.
+
+[...]
+
+> >> +static void __init sun9i_a80_usb_mod_setup(struct device_node *node)
+> >> +{
+> >> +     /* AHB1 gate must be enabled to access registers */
+> >> +     struct clk *ahb = of_clk_get(node, 0);
+> >> +
+> >> +     WARN_ON(IS_ERR(ahb));
+> >> +     clk_prepare_enable(ahb);
+> >
+> > Hmmmm. That look off.
+> >
+> > Why do you need the clock to be enabled all the time? Isn't the CCF
+> > already taking care of enabling the parent clock whenever it needs to
+> > access any register?
+> 
+> There are also resets in the same block. That and I couldn't get it
+> working without enabling the clock beforehand.
+
+Ah, right.
+
+What happens if you just enable and disable the clocks in the
+reset_assert and reset_deassert right before and after accessing the
+registers?
+
+Maxime
+
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/493feafb/attachment.sig>
