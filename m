@@ -1,26 +1,67 @@
-From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
-Date: Wed, 5 Nov 2014 10:33:15 -0500
-Subject: [PATCH 11/13] arm: dts: dra7: add DMA properties for UART
-In-Reply-To: <5459DBB7.1090702@linutronix.de>
-References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
- <1412014009-13315-12-git-send-email-bigeasy@linutronix.de>
- <20141104170233.GB24112@csclub.uwaterloo.ca>
- <5459079D.7080703@linutronix.de>
- <20141104172117.GC24112@csclub.uwaterloo.ca>
- <20141104183315.GD24112@csclub.uwaterloo.ca>
- <20141104210315.GF24112@csclub.uwaterloo.ca>
- <20141105011506.GG24112@csclub.uwaterloo.ca>
- <5459DBB7.1090702@linutronix.de>
-Message-ID: <20141105153307.GN24110@csclub.uwaterloo.ca>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Wed, 05 Nov 2014 16:34:57 +0100
+Subject: [PATCH 11/15] [media] Deprecate v4l2_mbus_pixelcode
+In-Reply-To: <20141105163049.65d02aff@bbrezillon>
+References: <1415094910-15899-1-git-send-email-boris.brezillon@free-electrons.com>	<1415094910-15899-12-git-send-email-boris.brezillon@free-electrons.com>	<20141105150814.GT3136@valkosipuli.retiisi.org.uk>	<20141105161538.7a1686d5@bbrezillon>	<545A401C.8070908@cisco.com>
+ <20141105163049.65d02aff@bbrezillon>
+Message-ID: <545A43A1.1040200@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 05, 2014 at 09:11:35AM +0100, Sebastian Andrzej Siewior wrote:
-> Okay. No DMA but the basic part seems to work for you. Thanks for
-> testing.
+On 11/05/14 16:30, Boris Brezillon wrote:
+> On Wed, 05 Nov 2014 16:19:56 +0100
+> Hans Verkuil <hansverk@cisco.com> wrote:
+> 
+>>
+>>
+>> On 11/05/14 16:15, Boris Brezillon wrote:
+>>> On Wed, 5 Nov 2014 17:08:15 +0200
+>>> Sakari Ailus <sakari.ailus@iki.fi> wrote:
+>>>
+>>>> Hi Boris,
+>>>>
+>>>> On Tue, Nov 04, 2014 at 10:55:06AM +0100, Boris Brezillon wrote:
+>>>>> The v4l2_mbus_pixelcode enum (or its values) should be replaced by the
+>>>>> media_bus_format enum.
+>>>>> Keep this enum in v4l2-mediabus.h and create a new header containing
+>>>>> the v4l2_mbus_framefmt struct definition (which is not deprecated) so
+>>>>> that we can add a #warning statement in v4l2-mediabus.h and hopefully
+>>>>> encourage users to move to the new definitions.
+>>>>>
+>>>>> Replace inclusion of v4l2-mediabus.h with v4l2-mbus.h in all common headers
+>>>>> and update the documentation Makefile to parse v4l2-mbus.h instead of
+>>>>> v4l2-mediabus.h.
+>>>>>
+>>>>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>>>>> ---
+>>>>>  Documentation/DocBook/media/Makefile |  2 +-
+>>>>>  include/media/v4l2-mediabus.h        |  2 +-
+>>>>>  include/uapi/linux/Kbuild            |  1 +
+>>>>>  include/uapi/linux/v4l2-mbus.h       | 35 +++++++++++++++++++++++++++++++++++
+>>>>>  include/uapi/linux/v4l2-mediabus.h   | 26 ++++----------------------
+>>>>
+>>>> I would keep the original file name, even if the compatibility definitions
+>>>> are there. I don't see any harm in having them around as well.
+>>>>
+>>>
+>>> That's the part I was not sure about.
+>>> The goal of this patch (and the following ones) is to deprecate
+>>> v4l2_mbus_pixelcode enum and its values by adding a #warning when
+>>> v4l2-mediabus.h file is included, thus encouraging people to use new
+>>> definitions.
+>>
+>> Since v4l2-mediabus.h contains struct v4l2_mbus_framefmt this header remains
+>> a legal header, so you can't use #warning here in any case.
+>>
+> 
+> Actually this patch moves the struct v4l2_mbus_framefmt definition into
+> another header before adding the warning statement.
 
-Two systems ran 16 hours each so far with no issues.  Pushed 170MB of
-data through the pair of serial ports on one system at 230400.
+There is nothing wrong with keeping the struct in the header. Just keep it
+there.
 
--- 
-Len Sorensen
+	Hans
+
+> 
+> Anyway, this is really a detail, and if everybody agrees that we should
+> just leave the old definition in place, I'm fine with that.
