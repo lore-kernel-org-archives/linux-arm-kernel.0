@@ -1,34 +1,51 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed,  5 Nov 2014 10:33:13 +0100
-Subject: [PATCH 0/2] clk: at91: usb: rate calculation fixes
-Message-ID: <1415179995-25062-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Wed,  5 Nov 2014 10:33:14 +0100
+Subject: [PATCH 1/2] clk: at91: usb: fix at91rm9200 round and set rate
+In-Reply-To: <1415179995-25062-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1415179995-25062-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1415179995-25062-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+at91rm9200_clk_usb_set_rate might fail depending on the requested rate,
+because the parent_rate / rate remainder is not necessarily zero.
+Moreover, when rounding down the calculated rate we might alter the
+divisor calculation and end up with an invalid divisor.
 
-Here are a few more fixes for the at91 usb clk driver.
+To solve those problems, accept a non zero remainder, and always round
+division to the closest result.
 
-These bugs are related to rate calculation, and have been reported by
-Andreas.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Reported-by: Andreas Henriksson <andreas.henriksson@endian.se>
+---
+ drivers/clk/at91/clk-usb.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-As this is not my first mistake in this rate calculation algorithm, I'd
-really like to have reviews/feedback on this fixes to avoid potential
-regressions.
-
-Mike, when/if we agree on these fixes, can we make them go into one of
-the 3.18-rc cycle ?
-
-Thanks,
-
-Boris
-
-Boris Brezillon (2):
-  clk: at91: usb: fix at91rm9200 round and set rate
-  clk: at91: usb: fix at91sam9x5 recalc, round and set rate
-
- drivers/clk/at91/clk-usb.c | 35 ++++++++++++++++++++---------------
- 1 file changed, 20 insertions(+), 15 deletions(-)
-
+diff --git a/drivers/clk/at91/clk-usb.c b/drivers/clk/at91/clk-usb.c
+index 24b5b02..5b3b63c 100644
+--- a/drivers/clk/at91/clk-usb.c
++++ b/drivers/clk/at91/clk-usb.c
+@@ -253,7 +253,7 @@ static long at91rm9200_clk_usb_round_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 		tmp_parent_rate = rate * usb->divisors[i];
+ 		tmp_parent_rate = __clk_round_rate(parent, tmp_parent_rate);
+-		tmprate = tmp_parent_rate / usb->divisors[i];
++		tmprate = DIV_ROUND_CLOSEST(tmp_parent_rate, usb->divisors[i]);
+ 		if (tmprate < rate)
+ 			tmpdiff = rate - tmprate;
+ 		else
+@@ -281,10 +281,10 @@ static int at91rm9200_clk_usb_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	struct at91_pmc *pmc = usb->pmc;
+ 	unsigned long div;
+ 
+-	if (!rate || parent_rate % rate)
++	if (!rate)
+ 		return -EINVAL;
+ 
+-	div = parent_rate / rate;
++	div = DIV_ROUND_CLOSEST(parent_rate, rate);
+ 
+ 	for (i = 0; i < RM9200_USB_DIV_TAB_SIZE; i++) {
+ 		if (usb->divisors[i] == div) {
 -- 
 1.9.1
