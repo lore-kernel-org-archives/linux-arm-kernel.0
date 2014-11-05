@@ -1,35 +1,56 @@
-From: socketcan@hartkopp.net (Oliver Hartkopp)
-Date: Wed, 05 Nov 2014 15:42:00 +0100
-Subject: [PATCH V3 2/3] can: m_can: update to support CAN FD features
-In-Reply-To: <545A34B9.2060001@pengutronix.de>
-References: <1415193393-30023-1-git-send-email-b29396@freescale.com>
- <1415193393-30023-2-git-send-email-b29396@freescale.com>
- <545A34B9.2060001@pengutronix.de>
-Message-ID: <545A3738.2010007@hartkopp.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 5 Nov 2014 14:46:19 +0000
+Subject: [PATCHv3 5/5] arm64: Trace emulation of AArch32 legacy
+ instructions
+In-Reply-To: <1414435207-30240-7-git-send-email-punit.agrawal@arm.com>
+References: <1414435207-30240-1-git-send-email-punit.agrawal@arm.com>
+ <1414435207-30240-7-git-send-email-punit.agrawal@arm.com>
+Message-ID: <20141105144619.GI32700@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks good to me now.
+On Mon, Oct 27, 2014 at 06:40:07PM +0000, Punit Agrawal wrote:
+> Introduce an event to trace the usage of emulated instructions. The
+> trace event is intended to help identify and encourage the migration
+> of legacy software using the emulation features.
+> 
+> Use this event to trace usage of swp and CP15 barrier emulation.
+> 
+> Cc: Steven Rostedt <rostedt@goodmis.org>
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> ---
+>  arch/arm64/kernel/Makefile                 |  1 +
+>  arch/arm64/kernel/armv8_deprecated.c       | 19 ++++++++++++--
+>  arch/arm64/kernel/trace-events-emulation.h | 40 ++++++++++++++++++++++++++++++
+>  3 files changed, 58 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm64/kernel/trace-events-emulation.h
+> 
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index 5362578..1fc7abd 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -5,6 +5,7 @@
+>  CPPFLAGS_vmlinux.lds	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+>  AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+>  CFLAGS_efi-stub.o 	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+> +CFLAGS_armv8_deprecated.o := -I$(src)
 
-Thanks for your patience.
+Why do you need this?
 
-Acked-by: Oliver Hartkopp <socketcan@hartkopp.net>
+>  CFLAGS_REMOVE_ftrace.o = -pg
+>  CFLAGS_REMOVE_insn.o = -pg
+> diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+> index fded15f..d376fe2 100644
+> --- a/arch/arm64/kernel/armv8_deprecated.c
+> +++ b/arch/arm64/kernel/armv8_deprecated.c
+> @@ -15,6 +15,9 @@
+>  #include <linux/slab.h>
+>  #include <linux/sysctl.h>
+>  
+> +#define CREATE_TRACE_POINTS
+> +#include "trace-events-emulation.h"
 
-On 05.11.2014 15:31, Marc Kleine-Budde wrote:
-> On 11/05/2014 02:16 PM, Dong Aisheng wrote:
->> Bosch M_CAN is CAN FD capable device. This patch implements the CAN
->> FD features include up to 64 bytes payload and bitrate switch function.
->> 1) Change the Rx FIFO and Tx Buffer to 64 bytes for support CAN FD
->>     up to 64 bytes payload. It's backward compatible with old 8 bytes
->>     normal CAN frame.
->> 2) Allocate can frame or canfd frame based on EDL bit
->> 3) Bitrate Switch function is disabled by default and will be enabled
->>     according to CANFD_BRS bit in cf->flags.
->>
->> Signed-off-by: Dong Aisheng <b29396@freescale.com>
->
-> I'm waiting on Oliver's Ack on this patch, then I'll apply 1+2.
->
-> regards,
-> Marc
->
+Using double quotes should be fine for the current directory.
+
+-- 
+Catalin
