@@ -1,68 +1,57 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Thu, 6 Nov 2014 01:33:24 +0400
-Subject: [PATCH 02/15] GPIO: port LoCoMo gpio support from old driver
-In-Reply-To: <CACRpkdb7v3LmOhbhQ9TPk1_bnLnpwizawW6RQvhQRLSjRewAaQ@mail.gmail.com>
-References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
- <1414454528-24240-3-git-send-email-dbaryshkov@gmail.com>
- <CACRpkdY7tRadod2vQfEytmw-ubaMAvr_=XTczD5bUMkqie0xkg@mail.gmail.com>
- <CALT56yOgMUA7o2dzfHph=S2zkDV4zERzMh4ishpPwpAx7Cqj6Q@mail.gmail.com>
- <CACRpkdb7v3LmOhbhQ9TPk1_bnLnpwizawW6RQvhQRLSjRewAaQ@mail.gmail.com>
-Message-ID: <CALT56yO9f8wzaArnmfQSDzCM3S+2oT+62anH5kbFY3WdEt_HZg@mail.gmail.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Wed, 05 Nov 2014 22:42:25 +0100
+Subject: [PATCHv0 1/3] rtc: rtc-isl12057: fix masking of register values
+In-Reply-To: <cover.1415222752.git.arno@natisbad.org>
+References: <cover.1415222752.git.arno@natisbad.org>
+Message-ID: <917b6e5e869fce697dec8a1597dfd2f671bf5c46.1415222752.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-03 16:43 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Fri, Oct 31, 2014 at 10:39 AM, Dmitry Eremin-Solenikov
-> <dbaryshkov@gmail.com> wrote:
->> 2014-10-31 10:48 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
->>> On Tue, Oct 28, 2014 at 1:01 AM, Dmitry Eremin-Solenikov
->>> <dbaryshkov@gmail.com> wrote:
->>>
->>>> Add gpiolib driver for gpio pins placed on the LoCoMo GA.
->>>>
->>>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->>>
->>
->> [skipped]
->>
->>> (etc, everywhere this pattern occurs).
->>>> +static void locomo_gpio_set(struct gpio_chip *chip,
->>>> +               unsigned offset, int value)
->>>> +{
->>>> +       struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
->>>> +       unsigned long flags;
->>>> +
->>>> +       spin_lock_irqsave(&lg->lock, flags);
->>>> +
->>>> +       __locomo_gpio_set(chip, offset, value);
->>>> +
->>>> +       spin_unlock_irqrestore(&lg->lock, flags);
->>>
->>> If you actually always have to be getting and releasing a spin lock around
->>> the register writes, contemplate using regmap-mmio because that
->>> is part of what it does.
->>>
->>> But is this locking really necessary?
->>
->> I have a custom of doing such locking and never having to think about
->> somebody breaking into RMW cycles.
->>
->> Also isn't regmap an overkill here? Wouldn't regmap also do a lock/unlock
->> around each register read/write/RMW?
->
-> Yes that's the point: if you use regmap mmio you get the RMW-locking
-> for free, with the regmap implementation.
 
+When Intersil ISL12057 support was added by commit 70e123373c05 ("rtc:
+Add support for Intersil ISL12057 I2C RTC chip"), two masks for time
+registers values imported from the device were either wrong or
+omitted, leading to additional bits from those registers to impact
+read values:
 
-Just to be more concrete. Currently locomo_gpio_ack_irq() function uses
-one lock and one unlock for doing 3 consecutive RMW I I convert locomo
-to regmap, will that be 3 lock/unlock calls or still one? (Or maybe I'm
-trying to be over-protective here and adding more lock/unlock cycles
-won't matter that much?)
+ - mask for hour register value when reading it in AM/PM mode. As
+   AM/PM mode is not the usual mode used by the driver, this error
+   would only have an impact on an externally configured RTC hour
+   later read by the driver.
+ - mask for month value. The lack of masking would provide an
+   erroneous value if century bit is set.
 
-Next question: if I have to export regmap to several subdrivers, is it better
-to have one big regmap or to have one-map-per-driver approach?
+This patch fixes those two masks.
 
+Fixes: 70e123373c05 ("rtc: Add support for Intersil ISL12057 I2C RTC chip")
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+---
+ drivers/rtc/rtc-isl12057.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/rtc/rtc-isl12057.c b/drivers/rtc/rtc-isl12057.c
+index 455b601d731d..8132fbc7e10a 100644
+--- a/drivers/rtc/rtc-isl12057.c
++++ b/drivers/rtc/rtc-isl12057.c
+@@ -88,7 +88,7 @@ static void isl12057_rtc_regs_to_tm(struct rtc_time *tm, u8 *regs)
+ 	tm->tm_min = bcd2bin(regs[ISL12057_REG_RTC_MN]);
+ 
+ 	if (regs[ISL12057_REG_RTC_HR] & ISL12057_REG_RTC_HR_MIL) { /* AM/PM */
+-		tm->tm_hour = bcd2bin(regs[ISL12057_REG_RTC_HR] & 0x0f);
++		tm->tm_hour = bcd2bin(regs[ISL12057_REG_RTC_HR] & 0x1f);
+ 		if (regs[ISL12057_REG_RTC_HR] & ISL12057_REG_RTC_HR_PM)
+ 			tm->tm_hour += 12;
+ 	} else {					    /* 24 hour mode */
+@@ -96,8 +96,8 @@ static void isl12057_rtc_regs_to_tm(struct rtc_time *tm, u8 *regs)
+ 	}
+ 
+ 	tm->tm_mday = bcd2bin(regs[ISL12057_REG_RTC_DT]);
+-	tm->tm_wday = bcd2bin(regs[ISL12057_REG_RTC_DW]) - 1; /* starts at 1 */
+-	tm->tm_mon  = bcd2bin(regs[ISL12057_REG_RTC_MO]) - 1; /* starts at 1 */
++	tm->tm_wday = bcd2bin(regs[ISL12057_REG_RTC_DW]) - 1;  /* starts at 1 */
++	tm->tm_mon  = bcd2bin(regs[ISL12057_REG_RTC_MO] & 0x1f) - 1; /* ditto */
+ 	tm->tm_year = bcd2bin(regs[ISL12057_REG_RTC_YR]) + 100;
+ }
+ 
 -- 
-With best wishes
-Dmitry
+2.1.1
