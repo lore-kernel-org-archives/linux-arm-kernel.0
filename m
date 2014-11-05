@@ -1,84 +1,75 @@
-From: k.chander@samsung.com (Chander Kashyap)
-Date: Wed,  5 Nov 2014 15:45:36 +0530
-Subject: [PATCH v3] arm64: dts: exynos7: add support for cpuidle core power
- down
-Message-ID: <1415182536-11613-1-git-send-email-k.chander@samsung.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 05 Nov 2014 11:17:48 +0100
+Subject: [PATCH V2 2/4] can: m_can: workaround for transmit data less
+ than 4 bytes
+In-Reply-To: <1415174326-6623-2-git-send-email-b29396@freescale.com>
+References: <1415174326-6623-1-git-send-email-b29396@freescale.com>
+ <1415174326-6623-2-git-send-email-b29396@freescale.com>
+Message-ID: <5459F94C.1030506@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos7 has core power down state where cores can be powered off independently.
-This patch adds support for this state.
+On 11/05/2014 08:58 AM, Dong Aisheng wrote:
+> At least on the i.MX6SX with M_CAN IP version 3.0.x, an issue with
 
-Entry latency for the core power down is calculated as follows:
-1. Time difference is measured between cpuidle entry and exit.
-2. WFI is skipped measuring the time.
-3. The time is averaged out for 100000 cpuidle transactions with varying load.
+Can you add the imx mask revision, too and the exact m_can version (is
+available).
 
-Exit latency and target residency are supplied as per HW team
+> the Message RAM was discovered. Sending CAN frames with dlc less
+> than 4 bytes will lead to bit errors, when the first 8 bytes of
+> the Message RAM have not been initialized (i.e. written to).
+> To work around this issue, the first 8 bytes are initialized in open()
+> function.
+> 
+> Without the workaround, we can easily see the following errors:
+> root at imx6qdlsolo:~# ip link set can0 up type can bitrate 1000000
+> [   66.882520] IPv6: ADDRCONF(NETDEV_CHANGE): can0: link becomes ready
+> root at imx6qdlsolo:~# cansend can0 123#112233
+> [   66.935640] m_can 20e8000.can can0: Bit Error Uncorrected
+> 
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> ---
+> ChangeLog since v1:
+>  * initialize the first 8 bytes of Tx Buffer of Message RAM in open()
+>    to workaround the issue
+> ---
+>  drivers/net/can/m_can/m_can.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
+> index 664fe30..f47c200 100644
+> --- a/drivers/net/can/m_can/m_can.c
+> +++ b/drivers/net/can/m_can/m_can.c
+> @@ -902,6 +902,15 @@ static void m_can_chip_config(struct net_device *dev)
+>  	/* set bittiming params */
+>  	m_can_set_bittiming(dev);
+>  
+> +	/* At least on the i.MX6SX with M_CAN IP version 3.0.x, an issue with
+> +	 * the Message RAM was discovered. Sending CAN frames with dlc less
+> +	 * than 4 bytes will lead to bit errors, when the first 8 bytes of
+> +	 * the Message RAM have not been initialized (i.e. written to).
+> +	 * To work around this issue, the first 8 bytes are initialized here.
+> +	 */
+> +	m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0), 0x0);
+> +	m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1), 0x0);
+> +
+>  	m_can_config_endisable(priv, false);
+>  }
+>  
+> 
 
-Signed-off-by: Chander Kashyap <k.chander@samsung.com>
----
-This patch has following dependencies:
-	- [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7 SoC
-		http://www.spinics.net/lists/linux-samsung-soc/msg37047.html
-Changes in v2:
-	- Moved the cpu-idle-state property after reg property
-	- removed the status property.
+Marc
 
-Changes in v3:
-	- Added the Entry latency calculation in commit message.
-
- arch/arm64/boot/dts/exynos/exynos7.dtsi |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-index 50ae936..444dde1 100644
---- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-@@ -37,6 +37,7 @@
- 			compatible = "arm,cortex-a57", "arm,armv8";
- 			enable-method = "psci";
- 			reg = <0x0>;
-+			cpu-idle-states = <&CPU_SLEEP>;
- 		};
- 
- 		cpu at 1 {
-@@ -44,6 +45,7 @@
- 			compatible = "arm,cortex-a57", "arm,armv8";
- 			enable-method = "psci";
- 			reg = <0x1>;
-+			cpu-idle-states = <&CPU_SLEEP>;
- 		};
- 
- 		cpu at 2 {
-@@ -51,6 +53,7 @@
- 			compatible = "arm,cortex-a57", "arm,armv8";
- 			enable-method = "psci";
- 			reg = <0x2>;
-+			cpu-idle-states = <&CPU_SLEEP>;
- 		};
- 
- 		cpu at 3 {
-@@ -58,6 +61,20 @@
- 			compatible = "arm,cortex-a57", "arm,armv8";
- 			enable-method = "psci";
- 			reg = <0x3>;
-+			cpu-idle-states = <&CPU_SLEEP>;
-+		};
-+
-+		idle-states {
-+			entry-method = "arm,psci";
-+
-+			CPU_SLEEP: cpu-sleep {
-+				compatible = "arm,idle-state";
-+				local-timer-stop;
-+				arm,psci-suspend-param = <0x0010000>;
-+				entry-latency-us = <20>;
-+				exit-latency-us = <150>;
-+				min-residency-us = <2100>;
-+			};
- 		};
- 	};
- 
 -- 
-1.7.9.5
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/f7b96084/attachment-0001.sig>
