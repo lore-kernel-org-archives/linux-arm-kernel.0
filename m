@@ -1,135 +1,114 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 5 Nov 2014 22:43:17 +0000 (UTC)
-Subject: OMAP baseline test results for v3.18-rc3
-Message-ID: <alpine.DEB.2.02.1411052239570.25985@utopia.booyaka.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 05 Nov 2014 14:43:31 -0800
+Subject: [PATCH] PM / Domains: Change prototype for the ->attach_dev()
+ callback
+In-Reply-To: <20141105013353.GA19238@dtor-ws> (Dmitry Torokhov's message of
+ "Tue, 4 Nov 2014 17:33:53 -0800")
+References: <1414670569-3002-1-git-send-email-ulf.hansson@linaro.org>
+ <3981560.mBph1QJkfl@vostro.rjw.lan>
+ <7h4mul9ttl.fsf@deeprootsystems.com> <20141105013353.GA19238@dtor-ws>
+Message-ID: <7h7fz92rqk.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dmitry Torokhov <dmitry.torokhov@gmail.com> writes:
 
-Here are some basic OMAP test results for Linux v3.18-rc3.
-Logs and other details at:
+> On Thu, Oct 30, 2014 at 01:38:30PM -0700, Kevin Hilman wrote:
+>> "Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
+>> 
+>> > On Thursday, October 30, 2014 01:02:49 PM Ulf Hansson wrote:
+>> >> Convert the prototype to return and int. This is just an initial step,
+>> >> needed to support error handling.
+>> >> 
+>> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> 
+>> Acked-by: Kevin Hilman <khilman@linaro.org>
+>> 
+>> >> 
+>> >> This patch is intended as fix for 3.18 rc[n]. Why?
+>> >> 
+>> >> There are other SOC specific patches around that adds genpd support and which
+>> >> implements the ->attach_dev() callback. To prevent having an "atomic" patch
+>> >> during the next release cycle, let's change the prototype now instead.
+>> >> 
+>> >> Further patches will add the actual error handling in genpd and these can then
+>> >> be reviewed and tested thoroughly.
+>> >
+>> > So we have no users of ->attach_dev at the moment, right?
+>> 
+>> Not in mainline, but there are a couple getting ready to hit -next, so
+>> we wanted to fix this before they arrive so that adding the error
+>> handling will be easier.
+>
+> BTW, while we are at it, can we also pass the domain itself to
+> attach_dev() and detach_dev()? If anything it helps with debugging (you
+> can print domain name from the callbacks).
 
-    http://www.pwsan.com/omap/testlogs/test_v3.18-rc3/20141105113246/
+Agreed, and it makes it match the other callbacks (power_off, power_on)
+which currently take struct generic_pm_domain *domain.  
 
+Updated version of $SUBJECT patch below.
 
-Test summary
-------------
-
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Build: uImage+dtb:
-    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/omap4-var-som,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig_n800_only_a/omap2420-n800,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-sbc-t3517,
-		  omap2plus_defconfig/omap5-uevm,
-		  omap2plus_defconfig/omap5-sbc-t54
-
-Build: zImage:
-    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
-
-Boot to userspace:
-    FAIL ( 3/17): 4430es2panda, 2430sdp, 3517evm
-    skip ( 1/17): 5912osk
-    Pass (13/17): am335xbonelt, am335xbone, 4460pandaes, 4460varsomom,
-		  37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
-		  3730es12beaglexm, cmt3517, 5430es2uevm,
-		  5430es2sbct54, 2420n800
-
-PM: chip retention via suspend:
-    FAIL ( 6/12): am335xbonelt, 4430es2panda, 4460varsomom, 2430sdp,
-		  5430es2uevm, 5430es2sbct54
-    Pass ( 6/12): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm
-
-PM: chip retention via dynamic idle:
-    FAIL ( 7/12): am335xbonelt, 4430es2panda, 4460pandaes,
-		  4460varsomom, 2430sdp, 5430es2uevm, 5430es2sbct54
-    Pass ( 5/12): 37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
-		  3730es12beaglexm
-
-PM: chip off (except CORE, due to errata) via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off (except CORE, due to errata) via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730es12beaglexm
-
-PM: chip off via dynamic idle:
-    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730es12beaglexm
+Kevin
 
 
-vmlinux object size
-(delta in bytes from test_v3.18-rc2 (cac7f2429872d3733dc3f9915857b1691da2eb2f)):
-   text     data      bss    total  kernel
- -14014       -8        0   -14022  omap1_defconfig
- -13982      -40        0   -14022  omap1_defconfig_1510innovator_only
-  -9918       -8      -32    -9958  omap1_defconfig_5912osk_only
-  -8275      +72      -64    -8267  multi_v7_defconfig
- -14286       +8        0   -14278  omap2plus_defconfig
- -14418      -56      -32   -14506  omap2plus_defconfig_2430sdp_only
- -14198      -16        0   -14214  omap2plus_defconfig_am33xx_only
- -14450      +16        0   -14434  omap2plus_defconfig_am43xx_only
- -14286       +8        0   -14278  omap2plus_defconfig_cpupm
- -14386      -16        0   -14402  omap2plus_defconfig_dra7xx_only
-   +754      +16        0     +770  omap2plus_defconfig_n800_multi_omap2xxx
-   +754      +16        0     +770  omap2plus_defconfig_n800_only_a
- -14226      -88        0   -14314  omap2plus_defconfig_no_pm
- -10302      -16        0   -10318  omap2plus_defconfig_omap2_4_only
- -14402       +8        0   -14394  omap2plus_defconfig_omap3_4_only
- -14386       -8        0   -14394  omap2plus_defconfig_omap5_only
-  +1748      +32      +52    +1832  rmk_omap3430_ldp_allnoconfig
- +65072    +3896    +8516   +77484  rmk_omap3430_ldp_oldconfig
-  +1832      +44      +20    +1896  rmk_omap4430_sdp_allnoconfig
- -13714      -80      -60   -13854  rmk_omap4430_sdp_oldconfig
+----- >8 ------
+>From 353a62ffae2f9228142c8a2093108f9eda8dc6b4 Mon Sep 17 00:00:00 2001
+From: Ulf Hansson <ulf.hansson@linaro.org>
+Date: Thu, 30 Oct 2014 13:02:49 +0100
+Subject: [PATCH] PM / Domains: Change prototype for the ->attach_dev()
+ callback
 
-Boot-time memory difference
-(delta in bytes from test_v3.18-rc2 (cac7f2429872d3733dc3f9915857b1691da2eb2f))
-  avail  rsrvd   high  freed  board          kconfig
-     8k    -8k      .      .  2430sdp        omap2plus_defconfig
-     8k    -8k      .     4k  3530es31beagle omap2plus_defconfig
-     8k    -8k      .     4k  3530es3beagle  omap2plus_defconfig
-     8k    -8k      .     4k  3730beaglexm   omap2plus_defconfig
-     8k    -8k      .     4k  3730es12beaglexmomap2plus_defconfig
-     8k    -8k      .     4k  37xxevm        omap2plus_defconfig
-     8k    -8k      .     4k  4460pandaes    omap2plus_defconfig
-     8k    -8k      .     4k  4460varsomom   omap2plus_defconfig
-     8k    -8k      .     4k  5430es2sbct54  omap2plus_defconfig
-     8k    -8k      .     4k  5430es2uevm    omap2plus_defconfig
-     8k    -8k      .     4k  am335xbone     omap2plus_defconfig_am33xx_only
-     8k    -8k      .     4k  cmt3517        omap2plus_defconfig
+Convert the prototype to return and int. This is just an initial step,
+needed to support error handling.
 
-The N800 has been added back to the testbed.
+Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+[khilman: added domain as parameter to callbacks, as suggested by Dmitry]
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+ drivers/base/power/domain.c | 4 ++--
+ include/linux/pm_domain.h   | 6 ++++--
+ 2 files changed, 6 insertions(+), 4 deletions(-)
 
-The size difference in rmk's rmk_omap3430_ldp_oldconfig is due to the 
-following delta from v3.18-rc2:
-
-> # 31 Oct 2014: Add CONFIG_BACKLIGHT_GPIO=y, CONFIG_CMA=y, CONFIG_DMA_CMA=y
-> #	CONFIG_DISPLAY_PANEL_SHARP_LS037V7DW01=y, CONFIG_FRAMEBUFFER_CONSOLE=y
-> #	CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 40bc2f4072cc..b520687046d4 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -1437,7 +1437,7 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
+ 	spin_unlock_irq(&dev->power.lock);
+ 
+ 	if (genpd->attach_dev)
+-		genpd->attach_dev(dev);
++		genpd->attach_dev(genpd, dev);
+ 
+ 	mutex_lock(&gpd_data->lock);
+ 	gpd_data->base.dev = dev;
+@@ -1499,7 +1499,7 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
+ 	genpd->max_off_time_changed = true;
+ 
+ 	if (genpd->detach_dev)
+-		genpd->detach_dev(dev);
++		genpd->detach_dev(genpd, dev);
+ 
+ 	spin_lock_irq(&dev->power.lock);
+ 
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index 73e938b7e937..b3ed7766a291 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -72,8 +72,10 @@ struct generic_pm_domain {
+ 	bool max_off_time_changed;
+ 	bool cached_power_down_ok;
+ 	struct gpd_cpuidle_data *cpuidle_data;
+-	void (*attach_dev)(struct device *dev);
+-	void (*detach_dev)(struct device *dev);
++	int (*attach_dev)(struct generic_pm_domain *domain,
++			  struct device *dev);
++	void (*detach_dev)(struct generic_pm_domain *domain,
++			   struct device *dev);
+ };
+ 
+ static inline struct generic_pm_domain *pd_to_genpd(struct dev_pm_domain *pd)
+-- 
+2.1.0
