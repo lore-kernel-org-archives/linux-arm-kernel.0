@@ -1,32 +1,43 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 05 Nov 2014 14:47:36 +0100
-Subject: [PATCH 02/12] drivers: mfd: Add support for Exynos PMU driver
-In-Reply-To: <002601cff7de$0f8db7e0$2ea927a0$@samsung.com>
-References: <1414986790-11940-1-git-send-email-amit.daniel@samsung.com>
- <1414986790-11940-3-git-send-email-amit.daniel@samsung.com>
- <20141103152604.GA10544@x1> <002601cff7de$0f8db7e0$2ea927a0$@samsung.com>
-Message-ID: <545A2A78.5000901@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 5 Nov 2014 14:51:31 +0100
+Subject: [PATCH 00/11] dmaengine: Cleanup chancnt
+In-Reply-To: <20141016090346.GE1638@intel.com>
+References: <1413450063-23829-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20141016090346.GE1638@intel.com>
+Message-ID: <20141105135131.GA2989@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/14 04:18, Pankaj Dubey wrote:
-> 2: Since PM domain relies on PMU registers and does not have 
-> its own DT binding, MFD client and MFD device
-> is most suitable for making this kind of platform drivers.
+Hi Vinod,
 
-We have DT binding for the Exynos power domains:
-Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-In fact the IO memory regions used in the power domain bindings
-fall within the (sparse) PMU registers region.
+On Thu, Oct 16, 2014 at 02:33:46PM +0530, Vinod Koul wrote:
+> On Thu, Oct 16, 2014 at 11:00:52AM +0200, Maxime Ripard wrote:
+> > Hi everyone,
+> > 
+> > As pointed out in the documentation thread [1], the chancnt variable
+> > is filled during the driver registration in dma_async_device_register,
+> > from the liste of channels that has been set.
+> > 
+> > This serie removes the occurences of the drivers that set it in their
+> > probe function.
+> Barring the typos in the cover letter, series looks fine.
 
-There is also DT binding for the PMU subsystem:
-Documentation/devicetree/bindings/arm/samsung/pmu.txt
+It's been 3 weeks already, and there's been no reviews justifying to
+send a second version of the patch set.
 
-I guess a platform device driver in drivers/power would be a better
-fit than drivers/mfd. I doubt introducing an mfd driver now makes
-much sense, we have already DT bindings for PHYs, the power domains,
-etc.
+Can we merge this in?
 
---
 Thanks,
-Sylwester
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/665c1e30/attachment.sig>
