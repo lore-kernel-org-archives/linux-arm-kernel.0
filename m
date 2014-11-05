@@ -1,41 +1,147 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 05 Nov 2014 10:27:43 +0000
-Subject: [PATCH v3 12/19] arm/arm64: KVM: refactor/wrap vgic_set/get_attr()
-In-Reply-To: <20141104193008.GO16132@cbox>
-References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
- <1414776414-13426-13-git-send-email-andre.przywara@arm.com>
- <20141104193008.GO16132@cbox>
-Message-ID: <5459FB9F.2020104@arm.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed,  5 Nov 2014 10:27:36 +0000
+Subject: [PATCH 3.18-rc3 v7 0/4] arm: Implement arch_trigger_all_cpu_backtrace
+Message-ID: <1415183260-6389-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+This patchset modifies the GIC driver to allow it, on supported
+platforms, to route IPI interrupts to FIQ and uses this feature
+to implement arch_trigger_all_cpu_backtrace for arm.
 
-On 04/11/14 19:30, Christoffer Dall wrote:
-> On Fri, Oct 31, 2014 at 05:26:47PM +0000, Andre Przywara wrote:
->> vgic_set_attr() and vgic_get_attr() contain both code specific for
->> the emulated GIC as well as code for the userland facing, generic
->> part of the GIC.
->> Split the guest GIC facing code of from the generic part to allow
->> easier splitting later.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> 
-> It's not really clear to me which data is specific to the emulated gic
-> and which is not or why you have to do this (yet), for example, the
-> _common function is now dealing with the GRP_ADDR case which is very
-> GICv2 specific (so far).  But I assume this will make sense as I
-> progress through the series.
+On platforms not capable of supporting FIQ the signal to generate a
+backtrace we fall back to using IRQ for propagation instead (relying
+on a timeout to avoid wedging the CPU requesting the backtrace if other
+CPUs are not responsive).
 
-Admittedly this is somewhat of a corner case. Actually I tried to keep
-as much code common (in vgic.c) as possible, and it was possible without
-much pain for GRP_ADDR and kvm_vgic_addr.
-Also I consider this call part of the switching and connecting
-functionality of the VGIC.
-Looking at the code again I think I had it in -emul.c before, but
-decided to move it back for some reason (probably some other code
-dependency which needed to be exposed). So unless I find some time ;-)
-and a good reason to move it I tend to keep it here.
+It has been tested on two systems capable of supporting grouping
+(Freescale i.MX6 and STiH416) and two that do not (vexpress-a9 and
+Qualcomm Snapdragon 600).
 
-Cheers,
-Andre.
+Changes since v7:
+
+* Fixed boot regression on vexpress-a9 (reported by Russell King).
+
+* Rebased on v3.18-rc3; removed one patch from set that is already
+  included in mainline.
+
+* Dropped arm64/fiq.h patch from the set (still useful but not related
+  to issuing backtraces).
+
+Changes since v6:
+
+* Re-arranged code within the patch series to fix a regression
+  introduced midway through the series and corrected by a later patch
+  (testing by Olof's autobuilder). Tested offending patch in isolation
+  using defconfig identified by the autobuilder.
+
+Changes since v5:
+
+* Renamed svc_entry's call_trace argument to just trace (example code
+  from Russell King).
+
+* Fixed mismatched ENDPROC() in __fiq_abt (example code from Russell
+  King).
+
+* Modified usr_entry to optional avoid calling into the trace code and
+  used this in FIQ entry from usr path. Modified corresponding exit code
+  to avoid calling into trace code and the scheduler (example code from
+  Russell King).
+
+* Ensured the default FIQ register state is restored when the default
+  FIQ handler is reinstalled (example code from Russell King).
+
+* Renamed no_fiq_insn to dfl_fiq_insn to reflect the effect of adopting
+  a default FIQ handler.
+
+* Re-instated fiq_safe_migration_lock and associated logic in
+  gic_raise_softirq(). gic_raise_softirq() is called by wake_up_klogd()
+  in the console unlock logic.
+
+Changes since v4:
+
+* Rebased on 3.17-rc4.
+
+* Removed a spurious line from the final "glue it together" patch
+  that broke the build.
+
+Changes since v3:
+
+* Replaced push/pop with stmfd/ldmfd respectively (review of Nicolas
+  Pitre).
+
+* Really fix bad pt_regs pointer generation in __fiq_abt.
+
+* Remove fiq_safe_migration_lock and associated logic in
+  gic_raise_softirq() (review of Russell King)
+
+* Restructured to introduce the default FIQ handler first, before the
+  new features (review of Russell King).
+
+Changes since v2:
+
+* Removed redundant header guards from arch/arm64/include/asm/fiq.h
+  (review of Catalin Marinas).
+
+* Moved svc_exit_via_fiq macro to entry-header.S (review of Nicolas
+  Pitre).
+
+Changes since v1:
+
+* Restructured to sit nicely on a similar FYI patchset from Russell
+  King. It now effectively replaces the work in progress final patch
+  with something much more complete.
+
+* Implemented (and tested) a Thumb-2 implementation of svc_exit_via_fiq
+  (review of Nicolas Pitre)
+
+* Dropped the GIC group 0 workaround patch. The issue of FIQ interrupts
+  being acknowledged by the IRQ handler does still exist but should be
+  harmless because the IRQ handler will still wind up calling
+  ipi_cpu_backtrace().
+
+* Removed any dependency on CONFIG_FIQ; all cpu backtrace effectively
+  becomes a platform feature (although the use of non-maskable
+  interrupts to implement it is best effort rather than guaranteed).
+
+* Better comments highlighting usage of RAZ/WI registers (and parts of
+  registers) in the GIC code.
+
+Changes *before* v1:
+
+* This patchset is a hugely cut-down successor to "[PATCH v11 00/19]
+  arm: KGDB NMI/FIQ support". Thanks to Thomas Gleixner for suggesting
+  the new structure. For historic details see:
+        https://lkml.org/lkml/2014/9/2/227
+
+* Fix bug in __fiq_abt (no longer passes a bad struct pt_regs value).
+  In fixing this we also remove the useless indirection previously
+  found in the fiq_handler macro.
+
+* Make default fiq handler "always on" by migrating from fiq.c to
+  traps.c and replace do_unexp_fiq with the new handler (review
+  of Russell King).
+
+* Add arm64 version of fiq.h (review of Russell King)
+
+* Removed conditional branching and code from irq-gic.c, this is
+  replaced by much simpler code that relies on the GIC specification's
+  heavy use of read-as-zero/write-ignored (review of Russell King)
+
+
+Daniel Thompson (4):
+  irqchip: gic: Make gic_raise_softirq() FIQ-safe
+  irqchip: gic: Introduce plumbing for IPI FIQ
+  ARM: add basic support for on-demand backtrace of other CPUs
+  arm: smp: Handle ipi_cpu_backtrace() using FIQ (if available)
+
+ arch/arm/include/asm/irq.h      |   5 ++
+ arch/arm/include/asm/smp.h      |   3 +
+ arch/arm/kernel/smp.c           |  64 +++++++++++++++
+ arch/arm/kernel/traps.c         |   8 +-
+ drivers/irqchip/irq-gic.c       | 171 +++++++++++++++++++++++++++++++++++++---
+ include/linux/irqchip/arm-gic.h |   8 ++
+ 6 files changed, 246 insertions(+), 13 deletions(-)
+
+--
+1.9.3
