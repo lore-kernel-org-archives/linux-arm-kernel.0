@@ -1,21 +1,109 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 05 Nov 2014 21:30:30 +0100
-Subject: [PATCH v7 3/3] ARM: dts: rk3288: add VOP iommu nodes
-In-Reply-To: <1414983209-2472-4-git-send-email-djkurtz@chromium.org>
-References: <1414983209-2472-1-git-send-email-djkurtz@chromium.org>
- <1414983209-2472-4-git-send-email-djkurtz@chromium.org>
-Message-ID: <1838591.iyIlAuCyiq@diego>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 5 Nov 2014 21:31:51 +0100
+Subject: N900 modem support in 3.18-rc1
+In-Reply-To: <20141105011122.GA30622@earth.universe>
+References: <20141104205117.GA17606@amd>
+ <20141105011122.GA30622@earth.universe>
+Message-ID: <20141105203151.GA24636@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 3. November 2014, 10:53:29 schrieb Daniel Kurtz:
-> Add device nodes for the VOP iommus.
-> Device nodes for other iommus will be added in later patches.
+On Wed 2014-11-05 02:11:22, Sebastian Reichel wrote:
+> Hi Pavel,
 > 
-> The iommu nodes use the #iommu-cells property as described in:
->   Documentation/devicetree/bindings/iommu/iommu.txt
+> On Tue, Nov 04, 2014 at 09:51:17PM +0100, Pavel Machek wrote:
+> > I'd like to test a modem (and eventually to get it to work :-) ) on
+> > n900. So far I found:
+> > 
+> > http://lwn.net/Articles/592485/
+> > 
+> > It says:
+> > 
+> > # supported. Testing the patchset with ofono works like this:
+> > # 
+> > #  # provide cmt device for ofono
+> > #  ln -sf /sys/bus/hsi/n900-modem /dev/cmt
+> > 
+> > [...]
+> >
+> > That seemed to match, so I symlinked it.
 > 
-> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> Signed-off-by: Simon Xue <xxm@rock-chips.com>
+> looks ok. You should have the following files:
+> 
+> /dev/cmt/cmt_apeslpx
+> /dev/cmt/cmt_bsi
+> /dev/cmt/cmt_en
+> /dev/cmt/cmt_rst_rq
+> /dev/cmt/cmt_rst
 
-I've applied this patch to my dts branch for 3.19
+No, it is not ok :-(. I did enable CONFIG_CMT now (it was not enabled
+before, and wow, that entry has least helpful config help, ever; is it
+related?), but still can't see the required files:
+
+root at n900:/sys# find . | grep cmt
+./bus/hsi/devices/cmt_speech
+./bus/hsi/drivers/cmt_speech
+./bus/hsi/drivers/cmt_speech/bind
+./bus/hsi/drivers/cmt_speech/cmt_speech
+./bus/hsi/drivers/cmt_speech/uevent
+./bus/hsi/drivers/cmt_speech/unbind
+./devices/virtual/misc/cmt_speech
+./devices/virtual/misc/cmt_speech/dev
+./devices/virtual/misc/cmt_speech/power
+./devices/virtual/misc/cmt_speech/power/control
+./devices/virtual/misc/cmt_speech/power/runtime_active_time
+./devices/virtual/misc/cmt_speech/power/autosuspend_delay_ms
+./devices/virtual/misc/cmt_speech/power/runtime_status
+./devices/virtual/misc/cmt_speech/power/runtime_suspended_time
+./devices/virtual/misc/cmt_speech/subsystem
+./devices/virtual/misc/cmt_speech/uevent
+./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech
+./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech/power
+./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech/power/control
+./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech/power/runtime_active_time
+./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech/power/autosuspend_delay_ms
+./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech/power/runtime_status
+./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech/power/runtime_suspended_time
+./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech/modalias
+./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech/driver
+./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech/subsystem
+./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech/uevent
+./class/misc/cmt_speech
+root at n900:/sys# 
+
+(What does CMT mean? I should fix the help files, I guess...)
+
+
+> > root at n900:~# ofonod --nodetach --debug &
+> > [1] 3552
+> 
+> no output from ofono?
+
+Actually, a lot of output from ofonod, but nothing useful.
+
+> > root at n900:~# mdbus2 -s org.ofono /n900_0 xyz
+> > [ERR]: There is no method with name xyz on path /n900_0!
+> >
+> > [...]
+> > 
+> > Any ideas?
+> 
+> call mdbus2 with fewer arguments to see what is available on the
+> bus:
+> 
+> mdbus2 -s                      => list all system services
+> mdbus2 -s org.ofono            => list all ofono objects
+> mdbus2 -s org.ofono /n900_0    => list all methods from n900 object
+
+root at n900:~# mdbus2 -s org.ofono
+/
+root at n900:~# 
+
+But since I do not have required cmt_ files, I guess that's expected?
+
+
+Thanks,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
