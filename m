@@ -1,37 +1,91 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 5 Nov 2014 12:10:15 +0100
-Subject: [Patch Part2 v4 00/31] Enable hierarchy irqdomian on x86 platforms
-In-Reply-To: <5459FBDD.4020504@linux.intel.com>
-References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
- <20141104144730.GE14512@8bytes.org>
- <5458ECF3.4040308@linux.intel.com>
- <20141105085154.GG10744@8bytes.org>
- <5459F0DE.6000307@linux.intel.com>
- <20141105095850.GH10744@8bytes.org>
- <5459FBDD.4020504@linux.intel.com>
-Message-ID: <20141105111014.GI10744@8bytes.org>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 5 Nov 2014 12:10:55 +0100
+Subject: [PATCH v7 0/3] new Atmel DMA controller
+In-Reply-To: <1413991340-11617-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1413991340-11617-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20141105111054.GX20550@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jiang,
+Hi Vinod,
 
-On Wed, Nov 05, 2014 at 06:28:45PM +0800, Jiang Liu wrote:
-> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-> index 7423ee16972f..62ba8a6f6e79 100644
-> --- a/drivers/pci/msi.c
-> +++ b/drivers/pci/msi.c
-> @@ -1211,7 +1211,7 @@ int msi_irq_domain_alloc_irqs(struct irq_domain
-> *domain, int type,
->                                 msidesc->nvec_used > 1) ?  1 : -ENOSPC;
->                 }
->                 for (i = 0; i < msidesc->nvec_used; i++)
-> -                       irq_set_msi_desc_off(virq + i, i, msidesc);
-> +                       irq_set_msi_desc_off(virq, i, msidesc);
->         }
+Does this new version meet your expectations? I would not like to delay
+xdma inclusion to 3.20 because we still have no DMA on sama5d4, that is
+not very convenient.
+
+Regards
+
+Ludovic
+
+On Wed, Oct 22, 2014 at 05:22:17PM +0200, Ludovic Desroches wrote:
+> Hi,
 > 
->         list_for_each_entry(msidesc, &dev->msi_list, list)
-
-Yes, this fixes the issue, thanks :)
-
-
-	Joerg
+> This set of patches introduces support for the new Atmel DMA controller know as
+> XDMAC and available on SAMA5D4.
+> 
+> Changes from:
+> - v6
+>   - change binding: merge the two dma-cells
+>   - no more use direction in slave config
+>   - remove cookie init
+>   - return an error on a bad maxburst value
+> - v5
+>   - fix a bug when doing memcpy, condition to set the NDE was inverted
+>   - replace irqsave locks by bh variant
+>   - unmask channel errors
+> - v4
+>   - compile the driver if COMPILE_TEST is selected
+>   - merge header file into at_xdmac.c
+>   - use write memory barriers before starting the channel
+>   - init active_xfer to false when taking a descriptor from the free
+>   descriptors list
+>   - remove dma capabilities mask
+>   - use CONFIG_PM instead of CONFIG_PM_SLEEP for prepare function
+>   - style fixes
+>   - update documentation to add the <chip> compatible description
+> - v3
+>   - use dma_get_any_slave_channel instead of dma_request_channel
+>   - fix tx_status behavior for non active transfers
+>   - rename at_xdmac_terminate_xfer
+>   - replace suspend/resume no irq variants by late/early variants
+>   - no more use dev res to request the irq, use the legacy way
+>   - add slave capabilities
+> - v2
+>   - documentation updated
+>   - fix locking issues
+> - v1
+>   - add power management stuff
+>   - check maxburst value
+>   - revert subsys_initcall remove, EPROBE_DEFER not yet available on the kernel
+>   version I use to do the tests, moreover other devices are not ready to use it
+> - RFC:
+>   - DMA_SUCCESS replaced by DMA_COMPLETE
+>   - fix memcpy issue caused by a mistake in interfaces used
+>   - add filter function
+>   - remove some parameters from device tree since we can get them through the
+>   dma slave configuration
+>   - use readl/writel relaxed
+>   - remove subsys_initcall
+>   - synchronize irq before killing tasklets
+>   - use BIT macro
+>   - misc cleanup
+> 
+> 
+> Ludovic Desroches (3):
+>   dma: at_xdmac: creation of the atmel eXtended DMA Controller driver
+>   ARM: dts: at_xdmac: add bindings documentation
+>   MAINTAINERS: add entry for Atmel XDMA driver
+> 
+>  .../devicetree/bindings/dma/atmel-xdma.txt         |   54 +
+>  MAINTAINERS                                        |    7 +
+>  drivers/dma/Kconfig                                |    7 +
+>  drivers/dma/Makefile                               |    1 +
+>  drivers/dma/at_xdmac.c                             | 1510 ++++++++++++++++++++
+>  include/dt-bindings/dma/at91.h                     |   25 +
+>  6 files changed, 1604 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/atmel-xdma.txt
+>  create mode 100644 drivers/dma/at_xdmac.c
+> 
+> -- 
+> 2.0.3
+> 
