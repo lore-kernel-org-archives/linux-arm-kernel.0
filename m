@@ -1,139 +1,146 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Wed, 5 Nov 2014 18:05:07 +0100
-Subject: [PATCH v2 05/11] memory: add Atmel EBI (External Bus Interface)
- driver
-In-Reply-To: <20141105175951.71ad792a@bbrezillon>
-References: <1415203287-21517-1-git-send-email-boris.brezillon@free-electrons.com>
- <1415203287-21517-6-git-send-email-boris.brezillon@free-electrons.com>
- <CACh+v5MP4XecA_fKrg=W2Xs8gkkEXaoEnFt_c8sC=wdUQg4HFw@mail.gmail.com>
- <20141105175951.71ad792a@bbrezillon>
-Message-ID: <CACh+v5MiqKVQA7mt8CjMGwmwuO45P2udX5a0ctvuyCAZ1UBKAA@mail.gmail.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 5 Nov 2014 09:07:37 -0800
+Subject: [PATCH 4/7] pinctrl: zynq: Document DT binding
+In-Reply-To: <54599AF6.1030404@suse.de>
+References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1415041531-15520-5-git-send-email-soren.brinkmann@xilinx.com>
+ <54599AF6.1030404@suse.de>
+Message-ID: <bd330b9362414af486fedccacbfe5ba1@BN1BFFO11FD018.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-05 17:59 GMT+01:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
-> On Wed, 5 Nov 2014 17:53:42 +0100
-> Jean-Jacques Hiblot <jjhiblot@traphandler.com> wrote:
->
->> 2014-11-05 17:01 GMT+01:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
->> > The EBI (External Bus Interface) is used to access external peripherals
->> > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
->> > Each device is assigned a CS line and an address range and can have its
->> > own configuration (timings, access mode, bus width, ...).
->> > This driver provides a generic DT binding to configure a device according
->> > to its requirements.
->> > For specific device controllers (like the NAND one) the SMC timings
->> > should be configured by the controller driver through the matrix and
->> > smc syscon regmaps.
->> >
->> > Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
->> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->> > ---
->> >  drivers/memory/Kconfig     |  11 +
->> >  drivers/memory/Makefile    |   1 +
->> >  drivers/memory/atmel-ebi.c | 615 +++++++++++++++++++++++++++++++++++++++++++++
->> >  3 files changed, 627 insertions(+)
->> >  create mode 100644 drivers/memory/atmel-ebi.c
->> >
->> > diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
->> > index 6d91c27..dfe24a2 100644
->> > --- a/drivers/memory/Kconfig
->> > +++ b/drivers/memory/Kconfig
->> > @@ -17,6 +17,17 @@ config ATMEL_SDRAMC
->> >           Starting with the at91sam9g45, this controller supports SDR, DDR and
->> >           LP-DDR memories.
->> >
->> > +config ATMEL_EBI
->> > +       bool "Atmel EBI driver"
->> > +       default y
->> > +       depends on ARCH_AT91 && OF
->> > +       select MFD_SYSCON
->> > +       help
->> > +         Driver for Atmel EBI controller.
->> > +         Used to configure the EBI (external bus interface) when the device-
->> > +         tree is used. This bus supports NANDs, external ethernet controller,
->> > +         SRAMs, ATA devices, etc.
->> > +
->> >  config TI_AEMIF
->> >         tristate "Texas Instruments AEMIF driver"
->> >         depends on (ARCH_DAVINCI || ARCH_KEYSTONE) && OF
->> > diff --git a/drivers/memory/Makefile b/drivers/memory/Makefile
->> > index c32d319..7ca2c19 100644
->> > --- a/drivers/memory/Makefile
->> > +++ b/drivers/memory/Makefile
->> > @@ -6,6 +6,7 @@ ifeq ($(CONFIG_DDR),y)
->> >  obj-$(CONFIG_OF)               += of_memory.o
->> >  endif
->> >  obj-$(CONFIG_ATMEL_SDRAMC)     += atmel-sdramc.o
->> > +obj-$(CONFIG_ATMEL_EBI)                += atmel-ebi.o
->> >  obj-$(CONFIG_TI_AEMIF)         += ti-aemif.o
->> >  obj-$(CONFIG_TI_EMIF)          += emif.o
->> >  obj-$(CONFIG_FSL_CORENET_CF)   += fsl-corenet-cf.o
->> > diff --git a/drivers/memory/atmel-ebi.c b/drivers/memory/atmel-ebi.c
->> > new file mode 100644
->> > index 0000000..41bc893
->> > --- /dev/null
->> > +++ b/drivers/memory/atmel-ebi.c
->> > @@ -0,0 +1,615 @@
->> > +/*
->> > + * EBI driver for Atmel SAM9 chips
->> > + * inspired by the fsl weim bus driver
->> > + *
->> > + * Copyright (C) 2013 JJ Hiblot.
->> > + *
->> > + * This file is licensed under the terms of the GNU General Public
->> > + * License version 2. This program is licensed "as is" without any
->> > + * warranty of any kind, whether express or implied.
->> > + */
->> > +
->> > +#include <linux/clk.h>
->> > +#include <linux/io.h>
->> > +#include <linux/mfd/syscon.h>
->> > +#include <linux/mfd/syscon/atmel-matrix.h>
->> > +#include <linux/mfd/syscon/atmel-smc.h>
->> > +#include <linux/module.h>
->> > +#include <linux/of_device.h>
->> > +#include <linux/regmap.h>
->> > +
->> > +#define AT91SAM9_SMC_READ_MODE_MSK     BIT(0)
->> > +#define AT91SAM9_SMC_READ_NCS_MODE     0
->> > +#define AT91SAM9_SMC_READ_NRD_MODE     1
->> > +#define AT91SAM9_SMC_WRITE_MODE_MSK    BIT(1)
->> > +#define AT91SAM9_SMC_WRITE_NCS_MODE    (0 << 1)
->> > +#define AT91SAM9_SMC_WRITE_NWE_MODE    (1 << 1)
->> > +#define AT91SAM9_SMC_EXNW_MODE_MSK     GENMASK(5, 4)
->> > +#define AT91SAM9_SMC_EXNW_DIS          (0 << 4)
->> > +#define AT91SAM9_SMC_EXNW_FROZEN       (2 << 4)
->> > +#define AT91SAM9_SMC_EXNW_READY                (3 << 4)
->> > +#define AT91SAM9_SMC_BAT_MSK           BIT(8)
->> > +#define AT91SAM9_SMC_BAT_SELECT                (0 << 8)
->> > +#define AT91SAM9_SMC_BAT_WRITE         (1 << 8)
->> > +#define AT91SAM9_SMC_DBW_MSK           GENMASK(13, 12)
->> > +#define AT91SAM9_SMC_DBW(x)            ((((x) / 16) & 0x3) << 12)
->> > +#define AT91SAM9_SMC_TDF_CYCLES_MSK    GENMASK(19, 16)
->> > +#define AT91SAM9_SMC_TDF_CYCLES(x)     (((x) & 0xf) << 16)
->> > +#define AT91SAM9_SMC_TDF_MODE_MSK      BIT(20)
->> > +#define AT91SAM9_SMC_TDF_OPTIMIZED     (1 << 20)
->> > +#define AT91SAM9_SMC_PMEN              BIT(24)
->> > +#define AT91SAM9_SMC_PS(x)             ((((x) / 4) & 0x3) << 28)
->>
->> Those definitions are now also available in
->> linux/mfd/syscon/atmel-smc.h.For consistency sake, this driver should
->> probably use the new ones.
->
-> That was my intention, I just forgot to cleanup this part...
->
->> BTW this patch should probably be applied after patch 3 "mfd: syscon:
->> Add atmel-smc registers definition" and patch 1 "mfd: syscon: Add
->> atmel-matrix registers definition"
->>
->
-> And it is: patch 05/11 :-)
+On Wed, 2014-11-05 at 04:35AM +0100, Andreas F?rber wrote:
+> Am 03.11.2014 um 20:05 schrieb Soren Brinkmann:
+> > Add documentation for the devicetree binding for the Zynq pincontroller.
+> > 
+> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > ---
+> >  .../bindings/pinctrl/xlnx,zynq-pinctrl.txt         | 90 ++++++++++++++++++++++
+> >  1 file changed, 90 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/pinctrl/xlnx,zynq-pinctrl.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/pinctrl/xlnx,zynq-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/xlnx,zynq-pinctrl.txt
+> > new file mode 100644
+> > index 000000000000..86a86b644e6c
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pinctrl/xlnx,zynq-pinctrl.txt
+> > @@ -0,0 +1,90 @@
+> > +	Binding for Xilinx Zynq Pinctrl
+> > +
+> > +Required properties:
+> > +- compatible: "xlnx,zynq-pinctrl"
+> > +- syscon: phandle to SLCR
+> > +- reg: Offset and length of pinctrl space in SLCR
+> > +
+> > +Please refer to pinctrl-bindings.txt in this directory for details of the
+> > +common pinctrl bindings used by client devices, including the meaning of the
+> > +phrase "pin configuration node".
+> > +
+> > +Zynq's pin configuration nodes act as a container for an abitrary number of
+> 
+> "arbitrary"
 
-Damn gmail again for showing it under [Patch 00/11] ! It's definitely
-not the ideal review tool :-)
->
-> --
-> Boris Brezillon, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+I'll fix that.
+
+> 
+> > +subnodes. Each of these subnodes represents some desired configuration for a
+> > +pin, a group, or a list of pins or groups. This configuration can include the
+> > +mux function to select on those pin(s)/group(s), and various pin configuration
+> > +parameters, such as pull-up, slew rate, etc.
+> > +
+> > +The name of each subnode is not important; all subnodes should be enumerated
+> > +and processed purely based on their content.
+> > +
+> > +Each subnode only affects those parameters that are explicitly listed. In
+> > +other words, a subnode that lists a mux function but no pin configuration
+> > +parameters implies no information about any pin configuration parameters.
+> > +Similarly, a pin subnode that describes a pullup parameter implies no
+> > +information about e.g. the mux function.
+> > +
+> > +
+> > +The following generic properties as defined in pinctrl-bindings.txt are valid
+> > +to specify in a pin configuration subnode:
+> > + groups, pins, function, bias-disable, bias-high-impedance, bias-pull-up,
+> > + slew-rate, low-power-disable, low-power-enable
+> > +
+> > + Valid arguments for 'slew-rate' are '0' and '1' to select between slow and fast
+> > + respectively.
+> > +
+> > + Valid values for groups are:
+> > +   ethernet0_0_grp, ethernet1_0_grp, mdio0_0_grp, mdio1_0_grp,
+> > +   qspi0_0_grp, qspi1_0_grp, qspi_fbclk, qspi_cs1_grp, spi0_0_grp,
+> > +   spi0_1_grp - spi0_2_grp, spi1_0_grp - spi1_3_grp, sdio0_0_grp - sdio0_2_grp,
+> > +   sdio1_0_grp - sdio1_3_grp, sdio0_emio_wp, sdio0_emio_cd, sdio1_emio_wp,
+> > +   sdio1_emio_cd, smc0_nor, smc0_nor_cs1_grp, smc0_nor_addr25_grp, smc0_nand,
+> > +   can0_0_grp - can0_10_grp, can1_0_grp - can1_11_grp, uart0_0_grp - uart0_10_grp,
+> > +   uart1_0_grp - uart1_11_grp, i2c0_0_grp - i2c0_10_grp, i2c1_0_grp - i2c1_10_grp,
+> > +   ttc0_0_grp - ttc0_2_grp, ttc1_0_grp - ttc1_2_grp, swdt0_0_grp - swdt0_4_grp,
+> > +   gpio0_0_grp - gpio0_53_grp
+> > +
+> > + Valid values for pins are:
+> > +   MIO0 - MIO53
+> 
+> What about the four EMIO_SD* pins?
+
+You can't do any pinconf on those and the config_(set|get) return some
+error code when you pass anything but the 54 MIO pins to those
+functions. So, they are actually not valid for PINs. They are only used
+as group for pinmuxing where the respective group needs to be used.
+
+> 
+> > +
+> > + Valid values for function are:
+> > +   ethernet0, ethernet1, mdio0, mdio1, qspi0, qspi1, qspi_fbclk, qspi_cs1,
+> > +   spi0, spi1, sdio0, sdio0_pc, sdio0_cd, sdio0_wp,
+> > +   sdio1, sdio1_pc, sdio1_cd, sdio1_wp,
+> > +   smc0_nor, smc0_nor_cs1, smc0_nor_addr25, smc0_nand, can0, can1, uart0, uart1,
+> > +   i2c0, i2c1, ttc0, ttc1, swdt0, gpio0
+> > +
+> > +The following driver-specific properties as defined here are valid to specify in
+> > +a pin configuration subnode:
+> > + - io-standard: Configure the pin to use the selected IO standard according to
+> > +   this mapping:
+> > +    1: LVCMOS18
+> > +    2: LVCMOS25
+> > +    3: LVCMOS33
+> > +    4: HSTL
+> > +
+> > +Example:
+> > +	pinctrl0: pinctrl at 700 {
+> > +		compatible = "xlnx,pinctrl-zynq";
+> > +		reg = <0x700 0x200>;
+> > +		syscon = <&slcr>;
+> > +
+> > +		pinctrl_uart1_default: pinctrl-uart1-default {
+> 
+> Nit: Is it really necessary to prefix subnodes of "pinctrl at 700" with
+> "pinctrl-", here and in .dts?
+
+Guess not. Is there any best practice for naming pinctrl-state nodes?
+I might shorten it.
+
+> 
+> > +			common {
+> > +				groups = "uart1_10_grp";
+> > +				function = "uart1";
+> > +				slew-rate = <0>;
+> > +				io-standard = <1>;
+> > +			};
+> > +
+> > +			rx {
+> > +				pins = "MIO49";
+> > +				bias-high-impedance;
+> > +			};
+> > +
+> > +			tx {
+> > +				pins = "MIO48";
+> > +				bias-disable;
+> > +			};
+> > +		};
+> > +	};
+> 
+> Otherwise looks good.
+
+Thanks for reviewing.
+
+	S?ren
