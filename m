@@ -1,35 +1,45 @@
-From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
-Date: Wed, 05 Nov 2014 19:11:06 +0100
-Subject: [PATCH] ASoC: samsung: Add MODULE_DEVICE_TABLE for Snow
-In-Reply-To: <20141105170957.GE8509@sirena.org.uk>
-References: <1415205892-5553-1-git-send-email-afaerber@suse.de>
- <20141105170957.GE8509@sirena.org.uk>
-Message-ID: <545A683A.9010301@suse.de>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 5 Nov 2014 19:12:31 +0100
+Subject: [PATCH 0/2] clk: at91: usb: rate calculation fixes
+In-Reply-To: <545A5AB5.2040805@atmel.com>
+References: <1415179995-25062-1-git-send-email-boris.brezillon@free-electrons.com>
+ <545A5AB5.2040805@atmel.com>
+Message-ID: <20141105191231.7ed5d5a3@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 05.11.2014 um 18:09 schrieb Mark Brown:
-> On Wed, Nov 05, 2014 at 05:44:52PM +0100, Andreas F?rber wrote:
->> This enables the snd_soc_snow module to be auto-loaded.
-> 
-> Applied, thanks.
+Hi Nicolas,
 
-Thanks. I notice you dropped my Fixes: line that SubmittingPatches asks
-for. When do I need it and when should I leave it out? I thought it
-tells GregKH more precisely which stable branches are affected for
-backports than just a CC.
+On Wed, 5 Nov 2014 18:13:25 +0100
+Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+
+> On 05/11/2014 10:33, Boris Brezillon :
+> > Hello,
+> > 
+> > Here are a few more fixes for the at91 usb clk driver.
+> > 
+> > These bugs are related to rate calculation, and have been reported by
+> > Andreas.
+> > 
+> > As this is not my first mistake in this rate calculation algorithm, I'd
+> > really like to have reviews/feedback on this fixes to avoid potential
+> > regressions.
+> > 
+> > Mike, when/if we agree on these fixes, can we make them go into one of
+> > the 3.18-rc cycle ?
+> 
+> Can you give us a hint about the "stable tag" that would be good to add?
+
+None for the moment: these 2 patches apply on top of other patches that
+were merge in 3.18.
+What we should do though is backport the set of usb fixes merged in 3.18
+to 3.16/3.17 once 3.18 is out...
 
 Regards,
-Andreas
+
+Boris
 
 -- 
-SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 21284 AG N?rnberg
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/82ae6d9e/attachment.sig>
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
