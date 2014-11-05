@@ -1,55 +1,66 @@
-From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
-Date: Wed, 05 Nov 2014 06:56:44 +0100
-Subject: [PATCH 0/7] Pinctrl support for Zynq
-In-Reply-To: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <5459BC1C.3000807@suse.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue,  4 Nov 2014 22:59:25 -0800
+Subject: [PATCH] ARM: dts: vf610: add SD node to cosmic dts
+Message-ID: <1415170765-3343-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi S?ren,
+Driver has been there since a while back, but the dts never seems to
+have been updated with the node (nor pinctrl). Do so now.
 
-Am 03.11.2014 um 20:05 schrieb Soren Brinkmann:
-> Soren Brinkmann (7):
->   pinctrl: pinconf-generic: Declare dt_params/conf_items const
->   pinctrl: pinconf-generic: Infer map type from DT property
->   pinctrl: pinconf-generic: Allow driver to specify DT params
->   pinctrl: zynq: Document DT binding
->   pinctrl: Add driver for Zynq
->   ARM: zynq: Enable pinctrl
->   ARM: zynq: DT: Add pinctrl information
+Cc: Matt Porter <mporter@linaro.org>
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
 
-Thanks for your work on this,
+Shawn, Stefan: This probably has some small conflicts with Stefan's
+patchsets that refactors some of the dts contents for 3.19. I'd like to
+pick this patch up as a fix for 3.18 though, since it makes my Cosmic+
+board usable for the boot farm.
 
-Tested-by: Andreas F?rber <afaerber@suse.de>
+If that'd be OK (i.e. to apply Stefan's patches on top of this), please
+ack so I can include it with the next set of fixes. :)
 
-I've tracked down all 54 MIO pins of the Parallella and cooked up the
-equivalent DT patch. QSPI and USB still seem to be missing drivers
-upstream; I reused the SPI driver for the QSPI with pinctrl and
-Punnaiah's chipidea driver (not fully working) without pinctrl for lack
-of group/function definitions. For testing purposes I've configured a
-heartbeat trigger for the USER_LED (CR10).
+Thanks,
 
-To my disappointment these pinctrl additions did not fix one issue:
-Whenever a write access to be handled by the bitstream (0x808f0f04) is
-performed, the board hangs and the heartbeat stops. Would a bug in the
-bitstream allow this to happen, or are more drivers missing to actually
-make use of the PL in general? With a downstream ADI/Xilinx 3.12 kernel
-that problem does not surface.
+-Olof
 
-Regards,
-Andreas
+ arch/arm/boot/dts/vf610-cosmic.dts |   20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-https://github.com/afaerber/linux/commits/parallella-next
-
+diff --git a/arch/arm/boot/dts/vf610-cosmic.dts b/arch/arm/boot/dts/vf610-cosmic.dts
+index 3fd1b74..c1b8355 100644
+--- a/arch/arm/boot/dts/vf610-cosmic.dts
++++ b/arch/arm/boot/dts/vf610-cosmic.dts
+@@ -56,6 +56,19 @@
+ 			>;
+ 		};
+ 
++		pinctrl_esdhc1: esdhc1grp {
++			fsl,pins = <
++				VF610_PAD_PTA24__ESDHC1_CLK	0x31ef
++				VF610_PAD_PTA25__ESDHC1_CMD	0x31ef
++				VF610_PAD_PTA26__ESDHC1_DAT0	0x31ef
++				VF610_PAD_PTA27__ESDHC1_DAT1	0x31ef
++				VF610_PAD_PTA28__ESDHC1_DATA2	0x31ef
++				VF610_PAD_PTA29__ESDHC1_DAT3	0x31ef
++				VF610_PAD_PTB28__GPIO_98	0x219d
++			>;
++		};
++
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				VF610_PAD_PTB4__UART1_TX		0x21a2
+@@ -70,3 +83,10 @@
+ 	pinctrl-0 = <&pinctrl_uart1>;
+ 	status = "okay";
+ };
++
++&esdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_esdhc1>;
++	bus-width = <4>;
++	status = "okay";
++};
 -- 
-SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 21284 AG N?rnberg
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/1189e856/attachment.sig>
+1.7.10.4
