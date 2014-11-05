@@ -1,44 +1,94 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 5 Nov 2014 13:57:05 +0100
-Subject: [PATCH v3 12/19] arm/arm64: KVM: refactor/wrap vgic_set/get_attr()
-In-Reply-To: <5459FB9F.2020104@arm.com>
-References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
- <1414776414-13426-13-git-send-email-andre.przywara@arm.com>
- <20141104193008.GO16132@cbox> <5459FB9F.2020104@arm.com>
-Message-ID: <20141105125705.GB22866@cbox>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 5 Nov 2014 13:05:13 +0000
+Subject: [PATCHv3 4/5] arm64: Emulate CP15 Barrier instructions
+In-Reply-To: <1414435207-30240-6-git-send-email-punit.agrawal@arm.com>
+References: <1414435207-30240-1-git-send-email-punit.agrawal@arm.com>
+ <1414435207-30240-6-git-send-email-punit.agrawal@arm.com>
+Message-ID: <20141105130513.GH32700@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 05, 2014 at 10:27:43AM +0000, Andre Przywara wrote:
-> Hi Christoffer,
-> 
-> On 04/11/14 19:30, Christoffer Dall wrote:
-> > On Fri, Oct 31, 2014 at 05:26:47PM +0000, Andre Przywara wrote:
-> >> vgic_set_attr() and vgic_get_attr() contain both code specific for
-> >> the emulated GIC as well as code for the userland facing, generic
-> >> part of the GIC.
-> >> Split the guest GIC facing code of from the generic part to allow
-> >> easier splitting later.
-> >>
-> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> > 
-> > It's not really clear to me which data is specific to the emulated gic
-> > and which is not or why you have to do this (yet), for example, the
-> > _common function is now dealing with the GRP_ADDR case which is very
-> > GICv2 specific (so far).  But I assume this will make sense as I
-> > progress through the series.
-> 
-> Admittedly this is somewhat of a corner case. Actually I tried to keep
-> as much code common (in vgic.c) as possible, and it was possible without
-> much pain for GRP_ADDR and kvm_vgic_addr.
-> Also I consider this call part of the switching and connecting
-> functionality of the VGIC.
-> Looking at the code again I think I had it in -emul.c before, but
-> decided to move it back for some reason (probably some other code
-> dependency which needed to be exposed). So unless I find some time ;-)
-> and a good reason to move it I tend to keep it here.
-> 
-That's fine, my comment was more directed at the commit message than the
-code itself; the patch itself looks ok.
+On Mon, Oct 27, 2014 at 06:40:06PM +0000, Punit Agrawal wrote:
+> diff --git a/Documentation/arm64/legacy_instructions.txt b/Documentation/arm64/legacy_instructions.txt
+> index 5ab5861..a3b3da2 100644
+> --- a/Documentation/arm64/legacy_instructions.txt
+> +++ b/Documentation/arm64/legacy_instructions.txt
+> @@ -38,3 +38,8 @@ Supported legacy instructions
+>  Node: /proc/sys/abi/swp
+>  Status: Obsolete
+>  Default: Undef (0)
+> +
+> +* CP15 Barriers
+> +Node: /proc/sys/abi/cp15_barrier
+> +Status: Deprecated
+> +Default: Emulate (1)
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 6ae8079..2f7026e 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -199,6 +199,21 @@ config SWP_EMULATION
+>  
+>  	  If unsure, say N
+>  
+> +config CP15_BARRIER_EMULATION
+> +	bool "Emulate CP15 Barrier instructions"
+> +	help
+> +	  The CP15 barrier instructions - CP15ISB, CP15DSB, and
+> +	  CP15DMB - are deprecated in ARMv8 (and ARMv7). It is
+> +	  strongly recommended to use the ISB, DSB, and DMB
+> +	  instructions instead.
+> +
+> +	  Say Y here to enable software emulation of these
+> +	  instructions for AArch32 userspace code. When this option is
+> +	  enabled, CP15 barrier usage is traced which can help
+> +	  identify software that needs updating.
+> +
+> +	  If unsure, say N
+> +
+>  endif
 
--Christoffer
+default y (I think we had a discussion in private whether deprecated
+should default to y and obsolete to y or n but I don't remember the
+conclusion; it's worth adding it to the Documentation/ file).
+
+> +#define SCTLR_EL1_CP15BEN (1 << 5)
+> +
+> +static inline void config_sctlr_el1(u32 clear, u32 set)
+> +{
+> +	u32 val;
+> +
+> +	asm volatile("mrs %0, sctlr_el1" : "=r" (val));
+> +	val &= ~clear;
+> +	val |= set;
+> +	asm volatile("msr sctlr_el1, %0" : : "r" (val));
+> +}
+> +
+> +static void enable_cp15_ben(void *info)
+> +{
+> +	config_sctlr_el1(0, SCTLR_EL1_CP15BEN);
+> +}
+> +
+> +static void disable_cp15_ben(void *info)
+> +{
+> +	config_sctlr_el1(SCTLR_EL1_CP15BEN, 0);
+> +}
+> +
+> +static int cpu_hotplug_notify(struct notifier_block *b, unsigned long action,
+> +			  void *hcpu)
+> +{
+> +	switch (action) {
+> +	case CPU_STARTING:
+> +		enable_cp15_ben(NULL);
+> +		return NOTIFY_DONE;
+> +	}
+> +
+> +	return NOTIFY_OK;
+> +}
+
+Do we need CPU_STARTING_FROZEN as well?
+
+This code always enables the CP15 barriers in hardware but it should
+take into account the actual state (emulation, undef).
+
+-- 
+Catalin
