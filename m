@@ -1,29 +1,20 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 5 Nov 2014 15:10:01 -0700
+Date: Wed, 5 Nov 2014 15:10:32 -0700
 Subject: [Patch Part2 v4 18/31] PCI/MSI, trivial: Fix minor syntax issues
  according to coding styles
 In-Reply-To: <1415102525-9898-19-git-send-email-jiang.liu@linux.intel.com>
 References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
  <1415102525-9898-19-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <20141105221001.GD6168@google.com>
+Message-ID: <20141105221032.GE6168@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Nov 04, 2014 at 08:01:52PM +0800, Jiang Liu wrote:
 > Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
 
-Needs a changelog, even if it's similar to the topic.
+Oh, I forgot:
 
-Speaking of the topic, please run "git log --oneline drivers/pci/msi.c" and
-make yours look similar to the others.  This doesn't really fix a syntax
-issue; the existing code is syntactically correct.  It's only a style
-issue.
-
-I'd say something like:
-
-  PCI/MSI: Remove unnecessary braces around single statements
-
-  Per Documentation/CodingStyle, don't use braces around single statements.
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
 > ---
 >  drivers/pci/msi.c |    9 +++------
