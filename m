@@ -1,101 +1,359 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Wed, 05 Nov 2014 17:04:43 +0800
-Subject: [Patch Part2 v4 00/31] Enable hierarchy irqdomian on x86 platforms
-In-Reply-To: <20141105085154.GG10744@8bytes.org>
-References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
- <20141104144730.GE14512@8bytes.org> <5458ECF3.4040308@linux.intel.com>
- <20141105085154.GG10744@8bytes.org>
-Message-ID: <5459E82B.2080109@linux.intel.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 5 Nov 2014 15:58:43 +0800
+Subject: [PATCH V2 1/4] can: m_can: update to support CAN FD features
+Message-ID: <1415174326-6623-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/5 16:51, Joerg Roedel wrote:
-> On Tue, Nov 04, 2014 at 11:12:51PM +0800, Jiang Liu wrote:
->> 	Do you have the call stack?
-> 
-> Okay, had some issues with serial setup, but now its working. Here is
-> the complete panic msg from the AMD Kaveri box (the panic only occurs
-> with IOMMU enabled):
-> 
-> [    2.487552] ahci 0000:00:11.0: AHCI 0001.0300 32 slots 8 ports 6 Gbps 0xff impl SATA mode
-> [    2.495844] ahci 0000:00:11.0: flags: 64bit ncq sntf ilck pm led clo pmp pio slum part 
-> [    2.504592] BUG: unable to handle kernel NULL pointer dereference at           (null)
-> [    2.512618] IP: [<ffffffff8136849d>] msi_set_mask_bit+0xd/0x50
-> [    2.518556] PGD 0 
-> [    2.520672] Oops: 0000 [#1] PREEMPT SMP 
-> [    2.524784] Modules linked in:
-> [    2.527946] CPU: 3 PID: 1 Comm: swapper/0 Not tainted 3.18.0-rc3+ #4
-> [    2.534384] Hardware name: Gigabyte Technology Co., Ltd. To be filled by O.E.M./F2A88XM-HD3, BIOS F6 05/28/2014
-> [    2.544576] task: ffff88042b54c010 ti: ffff88042b550000 task.ti: ffff88042b550000
-> [    2.552170] RIP: 0010:[<ffffffff8136849d>]  [<ffffffff8136849d>] msi_set_mask_bit+0xd/0x50
-> [    2.560594] RSP: 0000:ffff88042b5539d8  EFLAGS: 00010096
-> [    2.565954] RAX: 0000000000000000 RBX: 0000000000000000 RCX: ffff88042b553968
-> [    2.573175] RDX: ffffffff81c25f40 RSI: 0000000000000000 RDI: ffff880424c65c00
-> [    2.580361] RBP: ffff88042b5539e8 R08: ffff88042b519800 R09: ffff88042b000b20
-> [    2.587582] R10: ffff880424c24410 R11: 0000000000000246 R12: 0000000000000001
-> [    2.594762] R13: ffff8804253fb2c0 R14: ffff880424c24410 R15: ffff880424c65c98
-> [    2.601983] FS:  0000000000000000(0000) GS:ffff88043ed80000(0000) knlGS:0000000000000000
-> [    2.610181] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
-> [    2.615975] CR2: 0000000000000000 CR3: 0000000001c16000 CR4: 00000000000407e0
-> [    2.623197] Stack:
-> [    2.625264]  ffff88042b5539f8 ffff880424c65c00 ffff88042b5539f8 ffffffff813688fb
-> [    2.632936]  ffff88042b553a18 ffffffff810b0603 ffff880424c65c00 ffff880424c65c00
-> [    2.640598]  ffff88042b553a48 ffffffff810b0685 0000000000000000 0000000000000000
-> [    2.648261] Call Trace:
-> [    2.650768]  [<ffffffff813688fb>] unmask_msi_irq+0xb/0x10
-> [    2.656222]  [<ffffffff810b0603>] irq_enable+0x33/0x50
-> [    2.661414]  [<ffffffff810b0685>] irq_startup+0x65/0x70
-> [    2.666696]  [<ffffffff810af161>] __setup_irq+0x511/0x5a0
-> [    2.672152]  [<ffffffff81196326>] ? __kmalloc_track_caller+0x256/0x4b0
-> [    2.678733]  [<ffffffff81460a50>] ? ahci_bad_pmp_check_ready+0x60/0x60
-> [    2.685347]  [<ffffffff810af34a>] request_threaded_irq+0xca/0x170
-> [    2.691529]  [<ffffffff81460a50>] ? ahci_bad_pmp_check_ready+0x60/0x60
-> [    2.698110]  [<ffffffff81461ee0>] ? ahci_single_irq_intr+0x110/0x110
-> [    2.704517]  [<ffffffff810b102a>] devm_request_threaded_irq+0x5a/0xc0
-> [    2.711002]  [<ffffffff81462b93>] ahci_host_activate+0x143/0x220
-> [    2.717098]  [<ffffffff814602a8>] ahci_init_one+0x7b8/0xb00
-> [    2.722728]  [<ffffffff8134e760>] local_pci_probe+0x40/0xa0
-> [    2.728355]  [<ffffffff8134f9b5>] ? pci_match_device+0xe5/0x110
-> [    2.734365]  [<ffffffff8134faf1>] pci_device_probe+0xd1/0x130
-> [    2.740164]  [<ffffffff81413d9b>] driver_probe_device+0x8b/0x3d0
-> [    2.746216]  [<ffffffff814141b3>] __driver_attach+0x93/0xa0
-> [    2.751846]  [<ffffffff81414120>] ? __device_attach+0x40/0x40
-> [    2.757681]  [<ffffffff81411e13>] bus_for_each_dev+0x63/0xa0
-> [    2.763385]  [<ffffffff81413819>] driver_attach+0x19/0x20
-> [    2.768842]  [<ffffffff81413430>] bus_add_driver+0x180/0x250
-> [    2.774591]  [<ffffffff81d2fd60>] ? ata_sff_init+0x33/0x33
-> [    2.780123]  [<ffffffff81414a0f>] driver_register+0x5f/0xf0
-> [    2.785751]  [<ffffffff8134e107>] __pci_register_driver+0x47/0x50
-> [    2.791892]  [<ffffffff81d2fd79>] ahci_pci_driver_init+0x19/0x1b
-> [    2.797954]  [<ffffffff810002f4>] do_one_initcall+0xb4/0x1f0
-> [    2.803667]  [<ffffffff81095e23>] ? __wake_up+0x43/0x60
-> [    2.808948]  [<ffffffff81ce7248>] kernel_init_freeable+0x197/0x21f
-> [    2.815181]  [<ffffffff81ce6983>] ? initcall_blacklist+0xc0/0xc0
-> [    2.821280]  [<ffffffff815fe680>] ? rest_init+0x90/0x90
-> [    2.826561]  [<ffffffff815fe689>] kernel_init+0x9/0xf0
-> [    2.831756]  [<ffffffff8161433c>] ret_from_fork+0x7c/0xb0
-> [    2.837211]  [<ffffffff815fe680>] ? rest_init+0x90/0x90
-> [    2.842489] Code: c1 83 c9 01 83 c2 0c 85 f6 0f 45 c1 48 63 d2 48 03 57 28 89 02 5d c3 0f 1f 80 00 00 00 00 55 48 89 e5 53 48 83 ec 08 48 8b 5f 40 <f6> 03 01 75 26 8b 4f 04 2b 4b 0c 89 f2 be 01 00 00 00 48 89 df 
-> [    2.864562] RIP  [<ffffffff8136849d>] msi_set_mask_bit+0xd/0x50
-> [    2.870588]  RSP <ffff88042b5539d8>
-> [    2.874127] CR2: 0000000000000000
-> [    2.877501] ---[ end trace dd9f8c29b83b2de1 ]---
-> [    2.882174] note: swapper/0[1] exited with preempt_count 1
-> [    2.887769] Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000009
-> [    2.887769] 
-> [    2.897147] Kernel Offset: 0x0 from 0xffffffff81000000 (relocation range: 0xffffffff80000000-0xffffffff9fffffff)
-> [    2.907440] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000009
-Hi Joerg,
-	Something is wrong with multiple MSI interrupt support, which
-is only enabled when IRQ remapping is in use. Keeping analyzing and
-will ask for you help when I have any ideas for debugging:)
-Regards!
-Gerry
+Bosch M_CAN is CAN FD capable device. This patch implements the CAN
+FD features include up to 64 bytes payload and bitrate switch function.
+1) Change the Rx FIFO and Tx Buffer to 64 bytes for support CAN FD
+   up to 64 bytes payload. It's backward compatible with old 8 bytes
+   normal CAN frame.
+2) Allocate can frame or canfd frame based on EDL bit
+3) Bitrate Switch function is disabled by default and will be enabled
+   according to CANFD_BRS bit in cf->flags.
 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
+---
+Changes Since V1:
+ * Allocate can frame or canfd frame based on EDL bit
+ * Only check and set RTR bit for normal frame (no EDL bit set)
+---
+ drivers/net/can/m_can/m_can.c | 172 +++++++++++++++++++++++++++++++-----------
+ 1 file changed, 129 insertions(+), 43 deletions(-)
+
+diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
+index 6160b9c..664fe30 100644
+--- a/drivers/net/can/m_can/m_can.c
++++ b/drivers/net/can/m_can/m_can.c
+@@ -105,14 +105,36 @@ enum m_can_mram_cfg {
+ 	MRAM_CFG_NUM,
+ };
+ 
++/* Fast Bit Timing & Prescaler Register (FBTP) */
++#define FBTR_FBRP_MASK		0x1f
++#define FBTR_FBRP_SHIFT		16
++#define FBTR_FTSEG1_SHIFT	8
++#define FBTR_FTSEG1_MASK	(0xf << FBTR_FTSEG1_SHIFT)
++#define FBTR_FTSEG2_SHIFT	4
++#define FBTR_FTSEG2_MASK	(0x7 << FBTR_FTSEG2_SHIFT)
++#define FBTR_FSJW_SHIFT		0
++#define FBTR_FSJW_MASK		0x3
++
+ /* Test Register (TEST) */
+ #define TEST_LBCK	BIT(4)
+ 
+ /* CC Control Register(CCCR) */
+-#define CCCR_TEST	BIT(7)
+-#define CCCR_MON	BIT(5)
+-#define CCCR_CCE	BIT(1)
+-#define CCCR_INIT	BIT(0)
++#define CCCR_TEST		BIT(7)
++#define CCCR_CMR_MASK		0x3
++#define CCCR_CMR_SHIFT		10
++#define CCCR_CMR_CANFD		0x1
++#define CCCR_CMR_CANFD_BRS	0x2
++#define CCCR_CMR_CAN		0x3
++#define CCCR_CME_MASK		0x3
++#define CCCR_CME_SHIFT		8
++#define CCCR_CME_CAN		0
++#define CCCR_CME_CANFD		0x1
++#define CCCR_CME_CANFD_BRS	0x2
++#define CCCR_TEST		BIT(7)
++#define CCCR_MON		BIT(5)
++#define CCCR_CCE		BIT(1)
++#define CCCR_INIT		BIT(0)
++#define CCCR_CANFD		0x10
+ 
+ /* Bit Timing & Prescaler Register (BTP) */
+ #define BTR_BRP_MASK		0x3ff
+@@ -204,6 +226,7 @@ enum m_can_mram_cfg {
+ 
+ /* Rx Buffer / FIFO Element Size Configuration (RXESC) */
+ #define M_CAN_RXESC_8BYTES	0x0
++#define M_CAN_RXESC_64BYTES	0x777
+ 
+ /* Tx Buffer Configuration(TXBC) */
+ #define TXBC_NDTB_OFF		16
+@@ -211,6 +234,7 @@ enum m_can_mram_cfg {
+ 
+ /* Tx Buffer Element Size Configuration(TXESC) */
+ #define TXESC_TBDS_8BYTES	0x0
++#define TXESC_TBDS_64BYTES	0x7
+ 
+ /* Tx Event FIFO Con.guration (TXEFC) */
+ #define TXEFC_EFS_OFF		16
+@@ -219,11 +243,11 @@ enum m_can_mram_cfg {
+ /* Message RAM Configuration (in bytes) */
+ #define SIDF_ELEMENT_SIZE	4
+ #define XIDF_ELEMENT_SIZE	8
+-#define RXF0_ELEMENT_SIZE	16
+-#define RXF1_ELEMENT_SIZE	16
++#define RXF0_ELEMENT_SIZE	72
++#define RXF1_ELEMENT_SIZE	72
+ #define RXB_ELEMENT_SIZE	16
+ #define TXE_ELEMENT_SIZE	8
+-#define TXB_ELEMENT_SIZE	16
++#define TXB_ELEMENT_SIZE	72
+ 
+ /* Message RAM Elements */
+ #define M_CAN_FIFO_ID		0x0
+@@ -231,11 +255,17 @@ enum m_can_mram_cfg {
+ #define M_CAN_FIFO_DATA(n)	(0x8 + ((n) << 2))
+ 
+ /* Rx Buffer Element */
++/* R0 */
+ #define RX_BUF_ESI		BIT(31)
+ #define RX_BUF_XTD		BIT(30)
+ #define RX_BUF_RTR		BIT(29)
++/* R1 */
++#define RX_BUF_ANMF		BIT(31)
++#define RX_BUF_EDL		BIT(21)
++#define RX_BUF_BRS		BIT(20)
+ 
+ /* Tx Buffer Element */
++/* R0 */
+ #define TX_BUF_XTD		BIT(30)
+ #define TX_BUF_RTR		BIT(29)
+ 
+@@ -327,41 +357,65 @@ static inline void m_can_disable_all_interrupts(const struct m_can_priv *priv)
+ 	m_can_write(priv, M_CAN_ILE, 0x0);
+ }
+ 
+-static void m_can_read_fifo(const struct net_device *dev, struct can_frame *cf,
+-			    u32 rxfs)
++static void m_can_read_fifo(struct net_device *dev, u32 rxfs)
+ {
++	struct net_device_stats *stats = &dev->stats;
+ 	struct m_can_priv *priv = netdev_priv(dev);
+-	u32 id, fgi;
++	struct canfd_frame *cf;
++	struct sk_buff *skb;
++	u32 id, fgi, dlc;
++	int i;
+ 
+ 	/* calculate the fifo get index for where to read data */
+ 	fgi = (rxfs & RXFS_FGI_MASK) >> RXFS_FGI_OFF;
++	dlc = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DLC);
++	if (dlc & RX_BUF_EDL)
++		skb = alloc_canfd_skb(dev, &cf);
++	else
++		skb = alloc_can_skb(dev, (struct can_frame **)&cf);
++	if (!skb) {
++		stats->rx_dropped++;
++		return;
++	}
++
+ 	id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_ID);
+ 	if (id & RX_BUF_XTD)
+ 		cf->can_id = (id & CAN_EFF_MASK) | CAN_EFF_FLAG;
+ 	else
+ 		cf->can_id = (id >> 18) & CAN_SFF_MASK;
+ 
+-	if (id & RX_BUF_RTR) {
++	if (id & RX_BUF_ESI) {
++		cf->flags |= CANFD_ESI;
++		netdev_dbg(dev, "ESI Error\n");
++	}
++
++	if (!(dlc & RX_BUF_EDL) && (id & RX_BUF_RTR)) {
+ 		cf->can_id |= CAN_RTR_FLAG;
+ 	} else {
+ 		id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DLC);
+-		cf->can_dlc = get_can_dlc((id >> 16) & 0x0F);
+-		*(u32 *)(cf->data + 0) = m_can_fifo_read(priv, fgi,
+-							 M_CAN_FIFO_DATA(0));
+-		*(u32 *)(cf->data + 4) = m_can_fifo_read(priv, fgi,
+-							 M_CAN_FIFO_DATA(1));
++		cf->len = can_dlc2len(get_canfd_dlc((id >> 16) & 0x0F));
++
++		if (id & RX_BUF_BRS)
++			cf->flags |= CANFD_BRS;
++
++		for (i = 0; i < cf->len; i += 4)
++			*(u32 *)(cf->data + i) =
++				m_can_fifo_read(priv, fgi,
++						M_CAN_FIFO_DATA(i / 4));
+ 	}
+ 
+ 	/* acknowledge rx fifo 0 */
+ 	m_can_write(priv, M_CAN_RXF0A, fgi);
++
++	stats->rx_packets++;
++	stats->rx_bytes += cf->len;
++
++	netif_receive_skb(skb);
+ }
+ 
+ static int m_can_do_rx_poll(struct net_device *dev, int quota)
+ {
+ 	struct m_can_priv *priv = netdev_priv(dev);
+-	struct net_device_stats *stats = &dev->stats;
+-	struct sk_buff *skb;
+-	struct can_frame *frame;
+ 	u32 pkts = 0;
+ 	u32 rxfs;
+ 
+@@ -375,18 +429,7 @@ static int m_can_do_rx_poll(struct net_device *dev, int quota)
+ 		if (rxfs & RXFS_RFL)
+ 			netdev_warn(dev, "Rx FIFO 0 Message Lost\n");
+ 
+-		skb = alloc_can_skb(dev, &frame);
+-		if (!skb) {
+-			stats->rx_dropped++;
+-			return pkts;
+-		}
+-
+-		m_can_read_fifo(dev, frame, rxfs);
+-
+-		stats->rx_packets++;
+-		stats->rx_bytes += frame->can_dlc;
+-
+-		netif_receive_skb(skb);
++		m_can_read_fifo(dev, rxfs);
+ 
+ 		quota--;
+ 		pkts++;
+@@ -744,10 +787,23 @@ static const struct can_bittiming_const m_can_bittiming_const = {
+ 	.brp_inc = 1,
+ };
+ 
++static const struct can_bittiming_const m_can_data_bittiming_const = {
++	.name = KBUILD_MODNAME,
++	.tseg1_min = 2,		/* Time segment 1 = prop_seg + phase_seg1 */
++	.tseg1_max = 16,
++	.tseg2_min = 1,		/* Time segment 2 = phase_seg2 */
++	.tseg2_max = 8,
++	.sjw_max = 4,
++	.brp_min = 1,
++	.brp_max = 32,
++	.brp_inc = 1,
++};
++
+ static int m_can_set_bittiming(struct net_device *dev)
+ {
+ 	struct m_can_priv *priv = netdev_priv(dev);
+ 	const struct can_bittiming *bt = &priv->can.bittiming;
++	const struct can_bittiming *dbt = &priv->can.data_bittiming;
+ 	u16 brp, sjw, tseg1, tseg2;
+ 	u32 reg_btp;
+ 
+@@ -758,7 +814,17 @@ static int m_can_set_bittiming(struct net_device *dev)
+ 	reg_btp = (brp << BTR_BRP_SHIFT) | (sjw << BTR_SJW_SHIFT) |
+ 			(tseg1 << BTR_TSEG1_SHIFT) | (tseg2 << BTR_TSEG2_SHIFT);
+ 	m_can_write(priv, M_CAN_BTP, reg_btp);
+-	netdev_dbg(dev, "setting BTP 0x%x\n", reg_btp);
++
++	if (priv->can.ctrlmode & CAN_CTRLMODE_FD) {
++		brp = dbt->brp - 1;
++		sjw = dbt->sjw - 1;
++		tseg1 = dbt->prop_seg + dbt->phase_seg1 - 1;
++		tseg2 = dbt->phase_seg2 - 1;
++		reg_btp = (brp << FBTR_FBRP_SHIFT) | (sjw << FBTR_FSJW_SHIFT) |
++				(tseg1 << FBTR_FTSEG1_SHIFT) |
++				(tseg2 << FBTR_FTSEG2_SHIFT);
++		m_can_write(priv, M_CAN_FBTP, reg_btp);
++	}
+ 
+ 	return 0;
+ }
+@@ -778,8 +844,8 @@ static void m_can_chip_config(struct net_device *dev)
+ 
+ 	m_can_config_endisable(priv, true);
+ 
+-	/* RX Buffer/FIFO Element Size 8 bytes data field */
+-	m_can_write(priv, M_CAN_RXESC, M_CAN_RXESC_8BYTES);
++	/* RX Buffer/FIFO Element Size 64 bytes data field */
++	m_can_write(priv, M_CAN_RXESC, M_CAN_RXESC_64BYTES);
+ 
+ 	/* Accept Non-matching Frames Into FIFO 0 */
+ 	m_can_write(priv, M_CAN_GFC, 0x0);
+@@ -788,8 +854,8 @@ static void m_can_chip_config(struct net_device *dev)
+ 	m_can_write(priv, M_CAN_TXBC, (1 << TXBC_NDTB_OFF) |
+ 		    priv->mcfg[MRAM_TXB].off);
+ 
+-	/* only support 8 bytes firstly */
+-	m_can_write(priv, M_CAN_TXESC, TXESC_TBDS_8BYTES);
++	/* support 64 bytes payload */
++	m_can_write(priv, M_CAN_TXESC, TXESC_TBDS_64BYTES);
+ 
+ 	m_can_write(priv, M_CAN_TXEFC, (1 << TXEFC_EFS_OFF) |
+ 		    priv->mcfg[MRAM_TXE].off);
+@@ -804,7 +870,8 @@ static void m_can_chip_config(struct net_device *dev)
+ 		    RXFC_FWM_1 | priv->mcfg[MRAM_RXF1].off);
+ 
+ 	cccr = m_can_read(priv, M_CAN_CCCR);
+-	cccr &= ~(CCCR_TEST | CCCR_MON);
++	cccr &= ~(CCCR_TEST | CCCR_MON | (CCCR_CMR_MASK << CCCR_CMR_SHIFT) |
++		(CCCR_CME_MASK << CCCR_CME_SHIFT));
+ 	test = m_can_read(priv, M_CAN_TEST);
+ 	test &= ~TEST_LBCK;
+ 
+@@ -816,6 +883,9 @@ static void m_can_chip_config(struct net_device *dev)
+ 		test |= TEST_LBCK;
+ 	}
+ 
++	if (priv->can.ctrlmode & CAN_CTRLMODE_FD)
++		cccr |= CCCR_CME_CANFD_BRS << CCCR_CME_SHIFT;
++
+ 	m_can_write(priv, M_CAN_CCCR, cccr);
+ 	m_can_write(priv, M_CAN_TEST, test);
+ 
+@@ -880,11 +950,13 @@ static struct net_device *alloc_m_can_dev(void)
+ 
+ 	priv->dev = dev;
+ 	priv->can.bittiming_const = &m_can_bittiming_const;
++	priv->can.data_bittiming_const = &m_can_data_bittiming_const;
+ 	priv->can.do_set_mode = m_can_set_mode;
+ 	priv->can.do_get_berr_counter = m_can_get_berr_counter;
+ 	priv->can.ctrlmode_supported = CAN_CTRLMODE_LOOPBACK |
+ 					CAN_CTRLMODE_LISTENONLY |
+-					CAN_CTRLMODE_BERR_REPORTING;
++					CAN_CTRLMODE_BERR_REPORTING |
++					CAN_CTRLMODE_FD;
+ 
+ 	return dev;
+ }
+@@ -967,8 +1039,9 @@ static netdev_tx_t m_can_start_xmit(struct sk_buff *skb,
+ 				    struct net_device *dev)
+ {
+ 	struct m_can_priv *priv = netdev_priv(dev);
+-	struct can_frame *cf = (struct can_frame *)skb->data;
+-	u32 id;
++	struct canfd_frame *cf = (struct canfd_frame *)skb->data;
++	u32 id, cccr;
++	int i;
+ 
+ 	if (can_dropped_invalid_skb(dev, skb))
+ 		return NETDEV_TX_OK;
+@@ -987,11 +1060,24 @@ static netdev_tx_t m_can_start_xmit(struct sk_buff *skb,
+ 
+ 	/* message ram configuration */
+ 	m_can_fifo_write(priv, 0, M_CAN_FIFO_ID, id);
+-	m_can_fifo_write(priv, 0, M_CAN_FIFO_DLC, cf->can_dlc << 16);
+-	m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(0), *(u32 *)(cf->data + 0));
+-	m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(1), *(u32 *)(cf->data + 4));
++	m_can_fifo_write(priv, 0, M_CAN_FIFO_DLC, can_len2dlc(cf->len) << 16);
++
++	for (i = 0; i < cf->len; i += 4)
++		m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(i / 4),
++				 *(u32 *)(cf->data + i));
++
+ 	can_put_echo_skb(skb, dev, 0);
+ 
++	if (priv->can.ctrlmode & CAN_CTRLMODE_FD) {
++		cccr = m_can_read(priv, M_CAN_CCCR);
++		cccr &= ~(CCCR_CMR_MASK << CCCR_CMR_SHIFT);
++		if (cf->flags & CANFD_BRS)
++			cccr |= CCCR_CMR_CANFD_BRS << CCCR_CMR_SHIFT;
++		else
++			cccr |= CCCR_CMR_CANFD << CCCR_CMR_SHIFT;
++		m_can_write(priv, M_CAN_CCCR, cccr);
++	}
++
+ 	/* enable first TX buffer to start transfer  */
+ 	m_can_write(priv, M_CAN_TXBTIE, 0x1);
+ 	m_can_write(priv, M_CAN_TXBAR, 0x1);
+-- 
+1.9.1
