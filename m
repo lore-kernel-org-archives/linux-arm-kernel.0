@@ -1,30 +1,45 @@
-From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
-Date: Wed, 5 Nov 2014 11:20:24 -0500
-Subject: [PATCH 11/13] arm: dts: dra7: add DMA properties for UART
-In-Reply-To: <20141105153307.GN24110@csclub.uwaterloo.ca>
-References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
- <1412014009-13315-12-git-send-email-bigeasy@linutronix.de>
- <20141104170233.GB24112@csclub.uwaterloo.ca>
- <5459079D.7080703@linutronix.de>
- <20141104172117.GC24112@csclub.uwaterloo.ca>
- <20141104183315.GD24112@csclub.uwaterloo.ca>
- <20141104210315.GF24112@csclub.uwaterloo.ca>
- <20141105011506.GG24112@csclub.uwaterloo.ca>
- <5459DBB7.1090702@linutronix.de>
- <20141105153307.GN24110@csclub.uwaterloo.ca>
-Message-ID: <20141105162024.GH24112@csclub.uwaterloo.ca>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Wed, 05 Nov 2014 08:22:13 -0800
+Subject: [PATCH V3 1/3] can: add can_is_canfd_skb() API
+In-Reply-To: <1415193393-30023-1-git-send-email-b29396@freescale.com>
+References: <1415193393-30023-1-git-send-email-b29396@freescale.com>
+Message-ID: <1415204533.13896.7.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 05, 2014 at 10:33:15AM -0500, Lennart Sorensen wrote:
-> Two systems ran 16 hours each so far with no issues.  Pushed 170MB of
-> data through the pair of serial ports on one system at 230400.
+On Wed, 2014-11-05 at 21:16 +0800, Dong Aisheng wrote:
+> The CAN device drivers can use it to check if the frame to send is on
+> CAN FD mode or normal CAN mode.
+> 
+> Acked-by: Oliver Hartkopp <socketcan@hartkopp.net>
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> ---
+> ChangesLog:
+>  * v1->v2: change to skb->len == CANFD_MTU;
+> ---
+>  include/linux/can/dev.h | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/include/linux/can/dev.h b/include/linux/can/dev.h
+> index 6992afc..4c3919c 100644
+> --- a/include/linux/can/dev.h
+> +++ b/include/linux/can/dev.h
+> @@ -99,6 +99,11 @@ inval_skb:
+>  	return 1;
+>  }
+>  
 
-The console on uart3 doesn't appear to be using the dma assuming the
-values in /sys for the dma controller and bytes transferred mean anything.
-It does mention in dmesg that it allocated dma channels for uart3 though.
+This looks a bit strange to assume that skb->len == magical_value is CAN
+FD. A comment would be nice.
 
-How do you tell if it is using dma?
+> +static inline int can_is_canfd_skb(struct sk_buff *skb)
 
--- 
-Len Sorensen
+static inline bool can_is_canfd_skb(const struct sk_buff *skb)
+
+> +{
+> +	return skb->len == CANFD_MTU;
+> +}
+> +
+>  /* get data length from can_dlc with sanitized can_dlc */
+>  u8 can_dlc2len(u8 can_dlc);
+>  
