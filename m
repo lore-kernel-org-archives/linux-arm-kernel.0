@@ -1,33 +1,32 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 5 Nov 2014 09:14:00 -0800
-Subject: [PATCH 5/7] pinctrl: Add driver for Zynq
-In-Reply-To: <5459B1B5.6030001@suse.de>
-References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
- <1415041531-15520-6-git-send-email-soren.brinkmann@xilinx.com>
- <5459B1B5.6030001@suse.de>
-Message-ID: <77a9809bf6a8476c80d9308a7d3b1ac0@BN1AFFO11FD047.protection.gbl>
+From: juergen127@kreuzholzen.de (Juergen Borleis)
+Date: Wed, 5 Nov 2014 18:17:47 +0100
+Subject: Samsung S3C6410 SoC/devicetree: how to describe RTC interrupts
+ connected to two different interrupt parents?
+In-Reply-To: <201411042104.45632.juergen127@kreuzholzen.de>
+References: <201411042104.45632.juergen127@kreuzholzen.de>
+Message-ID: <201411051817.47990.juergen127@kreuzholzen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-11-05 at 06:12AM +0100, Andreas F?rber wrote:
-> Am 03.11.2014 um 20:05 schrieb Soren Brinkmann:
-> > +enum zynq_pinmux_functions {
-> > +	ZYNQ_PMUX_ethernet0,
-> > +	ZYNQ_PMUX_ethernet1,
-> > +	ZYNQ_PMUX_mdio0,
-> > +	ZYNQ_PMUX_mdio1,
-> > +	ZYNQ_PMUX_qspi0,
-> > +	ZYNQ_PMUX_qspi1,
-> > +	ZYNQ_PMUX_qspi_fbclk,
-> > +	ZYNQ_PMUX_qspi_cs1,
-> 
-> Are usb0 and usb1 intentionally missing in this patch for lack of
-> upstream USB driver? If so, then please mention what you left out in the
-> commit message.
+Myself wrote:
+> the Samsung S3C6410 SoC comes with an RTC with two interrupts connected to
+> two different interrupt controllers.
+>
+> The old platform code uses this resource to describe it:
+>
+> static struct resource s3c_rtc_resource[] = {
+> 	[0] = DEFINE_RES_MEM(S3C24XX_PA_RTC, SZ_256),
+> 	[1] = DEFINE_RES_IRQ(IRQ_RTC),  <-- channel 2@VIC0
+> 	[2] = DEFINE_RES_IRQ(IRQ_TICK), <-- channel 28@VIC1
+> };
+>
+> In the devicetree I can define multiple interrupt channels with the
+> keyword 'interrupts' but it seems all of them must share the same interrupt
+> parent defined via 'interrupt-parent'. How to handle the special S3C6410
+> case?
+> The file "Documentation/devicetree/bindings/rtc/s3c-rtc.txt" isn't really
+> helpful.
 
-I don't know how that could happen, but no, it's not intentionally
-missing, let's call it accidentally. It just slipped through. Don't
-ask me how I could miss USB.
+Ahh, "interrupts-extended" is the keyword... solved.
 
-	Thanks,
-	S?ren
+jbo
