@@ -1,72 +1,146 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 5 Nov 2014 03:40:04 -0800
-Subject: [PATCH v4 1/4] mtd: nand: provide detailed description for raw
- read/write page methods
-In-Reply-To: <20141025035524.GA3579@localhost.localdomain>
-References: <1413794777-32220-1-git-send-email-boris.brezillon@free-electrons.com>
- <1413794777-32220-2-git-send-email-boris.brezillon@free-electrons.com>
- <20141025035524.GA3579@localhost.localdomain>
-Message-ID: <20141105114004.GL22361@norris-Latitude-E6410>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 5 Nov 2014 11:47:34 +0000
+Subject: [PATCHv3 3/5] arm64: Port SWP/SWPB emulation support from arm
+In-Reply-To: <1414435207-30240-5-git-send-email-punit.agrawal@arm.com>
+References: <1414435207-30240-1-git-send-email-punit.agrawal@arm.com>
+ <1414435207-30240-5-git-send-email-punit.agrawal@arm.com>
+Message-ID: <20141105114734.GF32700@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 25, 2014 at 11:55:27AM +0800, Huang Shijie wrote:
-> On Mon, Oct 20, 2014 at 10:46:14AM +0200, Boris Brezillon wrote:
-> > read_page_raw and write_page_raw method description is not clear enough.
-> > It clearly specifies that ECC correction should not be involved but does
-> > not talk about specific layout (by layout I mean where in-band and
-> > out-of-band data are stored on the NAND media) used by NAND/ECC
-> > controllers.
-> > 
-> > Those specific layouts might impact MTD users and thus should be hidden (as
-> > already done in the standard NAND_ECC_HW_SYNDROME implementation).
-> > 
-> > Clearly state this constraint in the nand_ecc_ctrl struct documentation.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> >  include/linux/mtd/nand.h | 17 +++++++++++++++--
-> >  1 file changed, 15 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-> > index e4d451e..b14d190 100644
-> > --- a/include/linux/mtd/nand.h
-> > +++ b/include/linux/mtd/nand.h
-> > @@ -455,8 +455,21 @@ struct nand_hw_control {
-> >   *		be provided if an hardware ECC is available
-> >   * @calculate:	function for ECC calculation or readback from ECC hardware
-> >   * @correct:	function for ECC correction, matching to ECC generator (sw/hw)
-> > - * @read_page_raw:	function to read a raw page without ECC
-> > - * @write_page_raw:	function to write a raw page without ECC
-> > + * @read_page_raw:	function to read a raw page without ECC. This function
-> > + *			should hide the specific layout used by the ECC
-> > + *			controller and always return contiguous in-band and
-> > + *			out-of-band data even if they're not stored
-> > + *			contiguously on the NAND chip (e.g.
-> > + *			NAND_ECC_HW_SYNDROME interleaves in-band and
-> > + *			out-of-band data).
-> > + * @write_page_raw:	function to write a raw page without ECC. This function
-> > + *			should hide the specific layout used by the ECC
-> > + *			controller and consider the passed data as contiguous
-> > + *			in-band and out-of-band data. ECC controller is
-> > + *			responsible for doing the appropriate transformations
-> > + *			to adapt to its specific layout (e.g.
-> > + *			NAND_ECC_HW_SYNDROME interleaves in-band and
-> > + *			out-of-band data).
-> >   * @read_page:	function to read a page according to the ECC generator
-> >   *		requirements; returns maximum number of bitflips corrected in
-> >   *		any single ECC step, 0 if bitflips uncorrectable, -EIO hw error
-> > -- 
-> > 1.9.1
-> > 
-> thanks for this patch. 
+On Mon, Oct 27, 2014 at 06:40:05PM +0000, Punit Agrawal wrote:
+> --- /dev/null
+> +++ b/Documentation/arm64/legacy_instructions.txt
+> @@ -0,0 +1,40 @@
+> +The arm64 port of the Linux kernel provides infrastructure to support
+> +emulation of instructions which have been deprecated, or obsoleted in
+> +the architecture. The infrastructure code uses undefined instruction
+> +hooks to support emulation. Where available it also allows turning on
+> +the instruction execution in hardware.
+> +
+> +The emulation mode can be controlled by writing to sysctl nodes
+> +(/proc/sys/abi). The following explains the different execution
+> +behaviours and the corresponding values of the sysctl nodes -
+> +
+> +* Undef
+> +  Value: 0
+> +  Generates undefined instruction abort. Default for instructions that
+> +  have been obsoleted in the architecture, e.g., SWP
+> +
+> +* Emulate
+> +  Value: 1
+> +  Uses software emulation. To aid migration of software, in this mode
+> +  usage of emulated instruction is traced as well as rate limited
+> +  warnings are issued. This is the default for deprecated
+> +  instructions, .e.g., CP15 barriers
+> +
+> +* Hardware Execution
+> +  Value: 2
+> +  Although marked as deprecated, some implementations may support the
+> +  enabling/disabling of hardware support for the execution of these
+> +  instructions. Using hardware execution generally provides better
+> +  performance, but at the loss of ability to gather runtime statistics
+> +  about the use of the deprecated instructions.
+> +
+> +The default mode depends on the status of the instruction in the
+> +architecture. Deprecated instructions should default to emulation
+> +while obsolete instructions must be undefined by default.
+> +
+> +Supported legacy instructions
+> +-----------------------------
+> +* SWP{B}
+> +Node: /proc/sys/abi/swp
+> +Status: Obsolete
+> +Default: Undef (0)
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 9532f8d..6ae8079 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -162,6 +162,45 @@ config ARCH_XGENE
+>         help
+>           This enables support for AppliedMicro X-Gene SOC Family
 > 
-> hi Brian, what's your opinion about this patch?
+> +comment "Processor Features"
+> +
+> +menuconfig ARMV8_DEPRECATED
+> +       bool "Emulate deprecated/obsolete ARMv8 instructions"
+> +       depends on COMPAT
+> +       help
+> +         Legacy software support may require certain instructions
+> +         that have been deprecated or obsoleted in the architecture.
+> +
+> +         Enable this config to enable selective emulation of these
+> +         features.
+> +
+> +         If unsure, say N
 
-I like the concept. It might be more succinctly described along the
-lines of "the same layout as the non-raw versions (i.e., .read_page /
-.write_page)". But the extra words may help for being more explicit.
+I think if unsure we should say Y. It should probably be disabled if you
+know for sure you are not going to have legacy applications using
+deprecated instructions. We could even have a "default y".
 
-I haven't taken a closer look at the other patches yet.
+> +
+> +if ARMV8_DEPRECATED
 
-Brian
+Does menuconfig automatically imply an "if"? Not sure.
+
+> +
+> +config SWP_EMULATION
+> +       bool "Emulate SWP/SWPB instructions"
+> +       help
+> +         ARMv8 obsoletes the use of A32 SWP/SWPB instructions such that
+> +         they are always undefined. Say Y here to enable software
+> +         emulation of these instructions for userspace using LDXR/STXR.
+> +
+> +         In some older versions of glibc [<=2.8] SWP is used during futex
+> +         trylock() operations with the assumption that the code will not
+> +         be preempted. This invalid assumption may be more likely to fail
+> +         with SWP emulation enabled, leading to deadlock of the user
+> +         application.
+> +
+> +         NOTE: when accessing uncached shared regions, LDXR/STXR rely
+> +         on an external transaction monitoring block called a global
+> +         monitor to maintain update atomicity. If your system does not
+> +         implement a global monitor, this option can cause programs that
+> +         perform SWP operations to uncached memory to deadlock.
+> +
+> +         If unsure, say N
+
+Same here, I think we should default to y.
+
+> +static void update_insn_emulation_mode(struct insn_emulation *insn,
+> +                                      enum insn_emulation_mode prev)
+> +{
+> +       switch (prev) {
+> +       case INSN_UNDEF: /* Nothing to be done */
+> +               break;
+> +       case INSN_EMULATE:
+> +               remove_emulation_hooks(insn->ops);
+> +               break;
+> +       case INSN_HW:
+> +               if (insn->ops->set_hw_mode) {
+> +                       insn->ops->set_hw_mode(false);
+> +                       pr_notice("Disabled %s support\n", insn->ops->name);
+> +               }
+> +               break;
+> +       }
+> +
+> +       switch (insn->current_mode) {
+> +       case INSN_UNDEF:
+> +               break;
+> +       case INSN_EMULATE:
+> +               register_emulation_hooks(insn->ops);
+> +               break;
+> +       case INSN_HW:
+> +               if (insn->ops->set_hw_mode) {
+> +                       insn->ops->set_hw_mode(true);
+> +                       pr_notice("Enabled %s support\n", insn->ops->name);
+> +               }
+> +               break;
+
+Here we should return -EINVAL all the way to the sysctl hook when
+!set_hw_mode. SWP doesn't have a hw mode on ARMv8, so we should let the
+user know. We even remove the emulation in this case falling back to
+undef.
+
+-- 
+Catalin
