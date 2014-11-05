@@ -1,34 +1,57 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 05 Nov 2014 15:52:07 -0500 (EST)
-Subject: net: fec: fix regression on i.MX28 introduced by rx_copybreak
- support
-In-Reply-To: <20141105062148.2a997b95@ipc1.ka-ro>
-References: <20141104112912.2be8bf1a@ipc1.ka-ro>
- <20141104.112858.356827532569349127.davem@davemloft.net>
- <20141105062148.2a997b95@ipc1.ka-ro>
-Message-ID: <20141105.155207.760255373450633226.davem@davemloft.net>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed,  5 Nov 2014 21:59:34 +0100
+Subject: [PATCH v2] ARM: shmobile: r8a7740 legacy: Add missing INTCA clock for
+ irqpin module
+Message-ID: <1415221174-29097-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lothar Wa?mann <LW@KARO-electronics.de>
-Date: Wed, 5 Nov 2014 06:21:48 +0100
+This clock drives the irqpin controller modules.
+Before, it was assumed enabled by the bootloader or reset state.
+By making it available to the driver, we make sure it gets enabled when
+needed, and allow it to be managed by system or runtime PM.
 
-> David Miller wrote:
->> Because it goes "(n + (d - 1)) / d"
->> 
->> Which for 'd' of 4 gives:
->> 
->> 1 --> 4
->> 2 --> 4
->> 3 --> 4
->> 4 --> 4
->>
-> '1', not '4'.
-> The loop has to be done once for each (probably partial) WORD of input
-> data, not for each BYTE.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v2:
+  - Index div4_clks[] instead of div6_clks[] (i.e. squashed in "ARM:
+    shmobile: r8a7740 legacy: Fix INTCA clock parent"),
+  - Extend commit message.
+---
+ arch/arm/mach-shmobile/clock-r8a7740.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-You're right, thanks for being so patient with me.
-
-Please repost your patch, I'll integrate it.
-
-Thanks.
+diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
+index 969e85dad09b3588..dbb0ab283e2fe91f 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7740.c
++++ b/arch/arm/mach-shmobile/clock-r8a7740.c
+@@ -451,7 +451,7 @@ enum {
+ 	MSTP128, MSTP127, MSTP125,
+ 	MSTP116, MSTP111, MSTP100, MSTP117,
+ 
+-	MSTP230,
++	MSTP230, MSTP229,
+ 	MSTP222,
+ 	MSTP218, MSTP217, MSTP216, MSTP214,
+ 	MSTP207, MSTP206, MSTP204, MSTP203, MSTP202, MSTP201, MSTP200,
+@@ -475,6 +475,7 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP100] = SH_CLK_MSTP32(&div4_clks[DIV4_B],	SMSTPCR1,  0, 0), /* LCDC0 */
+ 
+ 	[MSTP230] = SH_CLK_MSTP32(&div6_clks[DIV6_SUB],	SMSTPCR2, 30, 0), /* SCIFA6 */
++	[MSTP229] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR2, 29, 0), /* INTCA */
+ 	[MSTP222] = SH_CLK_MSTP32(&div6_clks[DIV6_SUB],	SMSTPCR2, 22, 0), /* SCIFA7 */
+ 	[MSTP218] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],  SMSTPCR2, 18, 0), /* DMAC1 */
+ 	[MSTP217] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],  SMSTPCR2, 17, 0), /* DMAC2 */
+@@ -571,6 +572,10 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh-dma-engine.0",	&mstp_clks[MSTP218]),
+ 	CLKDEV_DEV_ID("sh-sci.7",		&mstp_clks[MSTP222]),
+ 	CLKDEV_DEV_ID("e6cd0000.serial",	&mstp_clks[MSTP222]),
++	CLKDEV_DEV_ID("renesas_intc_irqpin.0",	&mstp_clks[MSTP229]),
++	CLKDEV_DEV_ID("renesas_intc_irqpin.1",	&mstp_clks[MSTP229]),
++	CLKDEV_DEV_ID("renesas_intc_irqpin.2",	&mstp_clks[MSTP229]),
++	CLKDEV_DEV_ID("renesas_intc_irqpin.3",	&mstp_clks[MSTP229]),
+ 	CLKDEV_DEV_ID("sh-sci.6",		&mstp_clks[MSTP230]),
+ 	CLKDEV_DEV_ID("e6cc0000.serial",	&mstp_clks[MSTP230]),
+ 
+-- 
+1.9.1
