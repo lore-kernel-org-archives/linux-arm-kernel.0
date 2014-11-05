@@ -1,88 +1,78 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 05 Nov 2014 09:36:28 +0100
-Subject: [PATCH v3 1/2] ARM: zynq: Add OCM controller driver
-In-Reply-To: <e65e39088e0f571ee4905172f2f6c84dbc037805.1412599051.git.michal.simek@xilinx.com>
-References: <e65e39088e0f571ee4905172f2f6c84dbc037805.1412599051.git.michal.simek@xilinx.com>
-Message-ID: <5459E18C.1030502@monstr.eu>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 05 Nov 2014 09:40:54 +0100
+Subject: [PATCH] ARM: dts: vf610: add SD node to cosmic dts
+In-Reply-To: <1415170765-3343-1-git-send-email-olof@lixom.net>
+References: <1415170765-3343-1-git-send-email-olof@lixom.net>
+Message-ID: <566a5b330f05c69ad27902ca8ce24463@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
-
-On 10/06/2014 02:38 PM, Michal Simek wrote:
-> The driver provide memory allocator which can
-> be used by others drivers to allocate memory inside OCM.
-> All location for 64kB blocks are supported
-> and driver is trying to allocate the largest continuous
-> block of memory.
+Am 2014-11-05 07:59, schrieb Olof Johansson:
+> Driver has been there since a while back, but the dts never seems to
+> have been updated with the node (nor pinctrl). Do so now.
 > 
-> Checking mpcore addressing filterring is not done here
-> but could be added in future.
-> 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> Cc: Matt Porter <mporter@linaro.org>
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 > ---
 > 
-> Changes in v3:
-> - Move OCM to drivers/soc
-> - Update year
-> - Extract DTS node to be able to apply it out of driver
-> - Remove generic allocator enabling
-> - Extract SLCR part
-> - Use const in of_device_id
-> - OCM->OCMC
-> - Use ocmc-1.0 compatible string
+> Shawn, Stefan: This probably has some small conflicts with Stefan's
+> patchsets that refactors some of the dts contents for 3.19. I'd like to
+> pick this patch up as a fix for 3.18 though, since it makes my Cosmic+
+> board usable for the boot farm.
 > 
-> Changes in v2:
-> - Change compatibility string to be in xilinx format
-> - Fix kernel-doc format
+> If that'd be OK (i.e. to apply Stefan's patches on top of this), please
+> ack so I can include it with the next set of fixes. :)
 > 
-> For everybody on-chip SRAM driver "mmio-sram"
-> is missing parity IRQ handling not sure how to write
-> in generic way and also the memory layout
-> can be changed at run time (not currently supported by this driver)
+> Thanks,
 > 
-> smp-sram trampoline allocation can be used from mmio-sram
-> and size allocated via DT but currently no reason for using
-> it.
-> 
-> Creating mmio-sram node with setting at run time based on current setting
-> is possible but it won't look good.
-> One way how to do it is here
-> "ARM: mvebu: Add quirk for i2c for the OpenBlocks AX3-4 board"
-> (sha1: 85e618a1be2b2092318178d1d66bdad49cbbeeeb)
-> but creating nodes at run-time or changing compact strings
-> will be just more hacky code.
-> 
-> ---
->  .../bindings/arm/zynq/xlnx,zynq-ocmc.txt           |  17 ++
->  drivers/soc/Makefile                               |   1 +
->  drivers/soc/zynq/Makefile                          |   1 +
->  drivers/soc/zynq/zynq_ocmc.c                       | 246 +++++++++++++++++++++
->  4 files changed, 265 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocmc.txt
->  create mode 100644 drivers/soc/zynq/Makefile
->  create mode 100644 drivers/soc/zynq/zynq_ocmc.c
-> 
+> -Olof
 
-Can you please review this OCM patch?
-I would like to move it when I know how I should handle that slcr connection
-and reserving trampoline size.
+Same reordering complains as Shawn.
 
-Thanks,
-Michal
+Also note that starting with 3.19, it would be possible to use card
+detect GPIO. However, SD-card works also fairly well without card
+detection.
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+Acked-by: Stefan Agner <stefan@agner.ch>
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141105/c1ea3b22/attachment.sig>
+> 
+>  arch/arm/boot/dts/vf610-cosmic.dts |   20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vf610-cosmic.dts
+> b/arch/arm/boot/dts/vf610-cosmic.dts
+> index 3fd1b74..c1b8355 100644
+> --- a/arch/arm/boot/dts/vf610-cosmic.dts
+> +++ b/arch/arm/boot/dts/vf610-cosmic.dts
+> @@ -56,6 +56,19 @@
+>  			>;
+>  		};
+>  
+> +		pinctrl_esdhc1: esdhc1grp {
+> +			fsl,pins = <
+> +				VF610_PAD_PTA24__ESDHC1_CLK	0x31ef
+> +				VF610_PAD_PTA25__ESDHC1_CMD	0x31ef
+> +				VF610_PAD_PTA26__ESDHC1_DAT0	0x31ef
+> +				VF610_PAD_PTA27__ESDHC1_DAT1	0x31ef
+> +				VF610_PAD_PTA28__ESDHC1_DATA2	0x31ef
+> +				VF610_PAD_PTA29__ESDHC1_DAT3	0x31ef
+> +				VF610_PAD_PTB28__GPIO_98	0x219d
+> +			>;
+> +		};
+> +
+> +
+>  		pinctrl_uart1: uart1grp {
+>  			fsl,pins = <
+>  				VF610_PAD_PTB4__UART1_TX		0x21a2
+> @@ -70,3 +83,10 @@
+>  	pinctrl-0 = <&pinctrl_uart1>;
+>  	status = "okay";
+>  };
+> +
+> +&esdhc1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_esdhc1>;
+> +	bus-width = <4>;
+> +	status = "okay";
+> +};
