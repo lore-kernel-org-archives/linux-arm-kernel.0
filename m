@@ -1,135 +1,84 @@
-From: socketcan@hartkopp.net (Oliver Hartkopp)
-Date: Wed, 05 Nov 2014 11:12:24 +0100
-Subject: [PATCH V2 1/4] can: m_can: update to support CAN FD features
-In-Reply-To: <1415174326-6623-1-git-send-email-b29396@freescale.com>
-References: <1415174326-6623-1-git-send-email-b29396@freescale.com>
-Message-ID: <5459F808.3020903@hartkopp.net>
+From: k.chander@samsung.com (Chander Kashyap)
+Date: Wed,  5 Nov 2014 15:45:36 +0530
+Subject: [PATCH v3] arm64: dts: exynos7: add support for cpuidle core power
+ down
+Message-ID: <1415182536-11613-1-git-send-email-k.chander@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.11.2014 08:58, Dong Aisheng wrote:
+Exynos7 has core power down state where cores can be powered off independently.
+This patch adds support for this state.
 
-> @@ -327,41 +357,65 @@ static inline void m_can_disable_all_interrupts(const struct m_can_priv *priv)
->   	m_can_write(priv, M_CAN_ILE, 0x0);
->   }
->
-> -static void m_can_read_fifo(const struct net_device *dev, struct can_frame *cf,
-> -			    u32 rxfs)
-> +static void m_can_read_fifo(struct net_device *dev, u32 rxfs)
->   {
-> +	struct net_device_stats *stats = &dev->stats;
->   	struct m_can_priv *priv = netdev_priv(dev);
-> -	u32 id, fgi;
-> +	struct canfd_frame *cf;
-> +	struct sk_buff *skb;
-> +	u32 id, fgi, dlc;
-> +	int i;
->
->   	/* calculate the fifo get index for where to read data */
->   	fgi = (rxfs & RXFS_FGI_MASK) >> RXFS_FGI_OFF;
-> +	dlc = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DLC);
-> +	if (dlc & RX_BUF_EDL)
-> +		skb = alloc_canfd_skb(dev, &cf);
-> +	else
-> +		skb = alloc_can_skb(dev, (struct can_frame **)&cf);
+Entry latency for the core power down is calculated as follows:
+1. Time difference is measured between cpuidle entry and exit.
+2. WFI is skipped measuring the time.
+3. The time is averaged out for 100000 cpuidle transactions with varying load.
 
-Yes. That's the way it should look like ;-)
+Exit latency and target residency are supplied as per HW team
 
-> +	if (!skb) {
-> +		stats->rx_dropped++;
-> +		return;
-> +	}
-> +
->   	id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_ID);
->   	if (id & RX_BUF_XTD)
->   		cf->can_id = (id & CAN_EFF_MASK) | CAN_EFF_FLAG;
->   	else
->   		cf->can_id = (id >> 18) & CAN_SFF_MASK;
->
-> -	if (id & RX_BUF_RTR) {
-> +	if (id & RX_BUF_ESI) {
-> +		cf->flags |= CANFD_ESI;
-> +		netdev_dbg(dev, "ESI Error\n");
-> +	}
-> +
-> +	if (!(dlc & RX_BUF_EDL) && (id & RX_BUF_RTR)) {
->   		cf->can_id |= CAN_RTR_FLAG;
->   	} else {
->   		id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DLC);
-> -		cf->can_dlc = get_can_dlc((id >> 16) & 0x0F);
-> -		*(u32 *)(cf->data + 0) = m_can_fifo_read(priv, fgi,
-> -							 M_CAN_FIFO_DATA(0));
-> -		*(u32 *)(cf->data + 4) = m_can_fifo_read(priv, fgi,
-> -							 M_CAN_FIFO_DATA(1));
-> +		cf->len = can_dlc2len(get_canfd_dlc((id >> 16) & 0x0F));
+Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+---
+This patch has following dependencies:
+	- [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7 SoC
+		http://www.spinics.net/lists/linux-samsung-soc/msg37047.html
+Changes in v2:
+	- Moved the cpu-idle-state property after reg property
+	- removed the status property.
 
-if (dlc & RX_BUF_EDL)
-	cf->len = can_dlc2len((id >> 16) & 0x0F);
-else
-	cf->len = get_can_dlc((id >> 16) & 0x0F);
+Changes in v3:
+	- Added the Entry latency calculation in commit message.
 
-(..)
+ arch/arm64/boot/dts/exynos/exynos7.dtsi |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-> @@ -804,7 +870,8 @@ static void m_can_chip_config(struct net_device *dev)
->   		    RXFC_FWM_1 | priv->mcfg[MRAM_RXF1].off);
->
->   	cccr = m_can_read(priv, M_CAN_CCCR);
-> -	cccr &= ~(CCCR_TEST | CCCR_MON);
-> +	cccr &= ~(CCCR_TEST | CCCR_MON | (CCCR_CMR_MASK << CCCR_CMR_SHIFT) |
-> +		(CCCR_CME_MASK << CCCR_CME_SHIFT));
->   	test = m_can_read(priv, M_CAN_TEST);
->   	test &= ~TEST_LBCK;
->
-> @@ -816,6 +883,9 @@ static void m_can_chip_config(struct net_device *dev)
->   		test |= TEST_LBCK;
->   	}
->
-> +	if (priv->can.ctrlmode & CAN_CTRLMODE_FD)
-> +		cccr |= CCCR_CME_CANFD_BRS << CCCR_CME_SHIFT;
-> +
->   	m_can_write(priv, M_CAN_CCCR, cccr);
->   	m_can_write(priv, M_CAN_TEST, test);
->
-
-(..)
-
->
-> +	if (priv->can.ctrlmode & CAN_CTRLMODE_FD) {
-> +		cccr = m_can_read(priv, M_CAN_CCCR);
-> +		cccr &= ~(CCCR_CMR_MASK << CCCR_CMR_SHIFT);
-> +		if (cf->flags & CANFD_BRS)
-> +			cccr |= CCCR_CMR_CANFD_BRS << CCCR_CMR_SHIFT;
-> +		else
-> +			cccr |= CCCR_CMR_CANFD << CCCR_CMR_SHIFT;
-> +		m_can_write(priv, M_CAN_CCCR, cccr);
-> +	}
-
-Unfortunately No. Here it becomes complicated due to the fact that the 
-revision 3.0.x does not support per-frame switching for FD/BRS ...
-
-When (priv->can.ctrlmode & CAN_CTRLMODE_FD) is true this *only* tells us, that 
-the controller is _capable_ to send either CAN or CAN FD frames.
-
-It does not configure the controller into one of these specific settings!
-
-Additionally: AFAIK when writing to the CCCR you have to make sure that 
-there's currently no ongoing transfer.
-
-I would suggest the following approach to make the revision 3.0.x act like a 
-correct CAN FD capable controller:
-
-- create a helper function to switch FD and BRS while taking care of ongoing 
-transmissions
-
-- create a variable that knows the current tx_mode for FD and BRS
-
-When we need to send a CAN frame which doesn't fit the settings in the tx_mode 
-we need to switch the CCCR and update the tx_mode variable.
-
-This at least reduces the needed CCCR operations.
-
-And it also addresses the intention of your patch
-[PATCH V1 4/4] can: m_can: allow to send std frame on CAN FD mode
-
-Regards,
-Oliver
+diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+index 50ae936..444dde1 100644
+--- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+@@ -37,6 +37,7 @@
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			enable-method = "psci";
+ 			reg = <0x0>;
++			cpu-idle-states = <&CPU_SLEEP>;
+ 		};
+ 
+ 		cpu at 1 {
+@@ -44,6 +45,7 @@
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			enable-method = "psci";
+ 			reg = <0x1>;
++			cpu-idle-states = <&CPU_SLEEP>;
+ 		};
+ 
+ 		cpu at 2 {
+@@ -51,6 +53,7 @@
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			enable-method = "psci";
+ 			reg = <0x2>;
++			cpu-idle-states = <&CPU_SLEEP>;
+ 		};
+ 
+ 		cpu at 3 {
+@@ -58,6 +61,20 @@
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			enable-method = "psci";
+ 			reg = <0x3>;
++			cpu-idle-states = <&CPU_SLEEP>;
++		};
++
++		idle-states {
++			entry-method = "arm,psci";
++
++			CPU_SLEEP: cpu-sleep {
++				compatible = "arm,idle-state";
++				local-timer-stop;
++				arm,psci-suspend-param = <0x0010000>;
++				entry-latency-us = <20>;
++				exit-latency-us = <150>;
++				min-residency-us = <2100>;
++			};
+ 		};
+ 	};
+ 
+-- 
+1.7.9.5
