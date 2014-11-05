@@ -1,51 +1,140 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Thu, 6 Nov 2014 00:02:49 +0400
-Subject: [PATCH 01/15] mfd: add new driver for Sharp LoCoMo
-In-Reply-To: <CACRpkdaKUZjbSEH75M9xudTF9HefwOCVEe5otv9-9f2UG8=hVg@mail.gmail.com>
-References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
- <1414454528-24240-2-git-send-email-dbaryshkov@gmail.com>
- <CACRpkdbW3NA00zMZr216ZeZpgVkXwKUo30biTVd5kcHKGGtkHg@mail.gmail.com>
- <CALT56yNX8v4mZn=o1ZoVLHPmg6wq0dgFNowpqNuFtU=eCc+d8w@mail.gmail.com>
- <CACRpkdaKUZjbSEH75M9xudTF9HefwOCVEe5otv9-9f2UG8=hVg@mail.gmail.com>
-Message-ID: <CALT56yM8B3ffYb0=EZVbRRGDZSxMci2sRp9XVtjQuLa5abN+cg@mail.gmail.com>
+From: gregory.0xf0@gmail.com (Gregory Fong)
+Date: Wed,  5 Nov 2014 12:07:54 -0800
+Subject: [PATCH 1/2] lib: bitmap: Added alignment offset for
+ bitmap_find_next_zero_area()
+Message-ID: <1415218078-10078-1-git-send-email-gregory.0xf0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-03 16:41 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Fri, Oct 31, 2014 at 10:54 AM, Dmitry Eremin-Solenikov
-> <dbaryshkov@gmail.com> wrote:
->> 2014-10-31 10:42 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
->
->>> It seems some DAC handling is part of the MFD driver, and we recently
->>> discussed that MFD should not be doing misc stuff but mainly act as
->>> arbiter and switching station.
->>>
->>> Can you please move the DAC parts of the driver to
->>> drivers/iio/dac?
->>>
->>> The IIO DAC subsystem will likely add other goodies to
->>> the driver for free and give a nice API to consumers.
->>
->> I wanted this part to be as simple as possible. I will look into IIO
->> DAC subsystem.
->> The DAC is as simple 2 channel 8-bit i2c device connected to a separate i2c bus
->> controlled through a register in LoCoMo device. One channel is used
->> for backlight,
->> other will be used for volume control. So (in theory) I can add the
->> following device
->> chain:  locomo -> i2c-locomo -> m62332 -> IIO DAC client.  However isn't that
->> quite an overkill for just backlight & volume control? Please advice me on this.
->
-> The point is still the same: no unrelated code in drivers/mfd,
-> then either use IIO DAC as a middle layer or sink the DAC handling
-> into respective subdriver, i.e. push it into the backlight or
-> volume directly then.
+From: Michal Nazarewicz <m.nazarewicz@samsung.com>
 
-The problem is that the DAC is equally used by backlight and by sound
-device (WIP).
-What about true i2c device driver sitting in drivers/misc and exporting a regmap
-of 2 8-bit registers?
+This commit adds a bitmap_find_next_zero_area_off() function which
+works like bitmap_find_next_zero_area() function expect it allows an
+offset to be specified when alignment is checked.  This lets caller
+request a bit such that its number plus the offset is aligned
+according to the mask.
 
+Signed-off-by: Michal Nazarewicz <m.nazarewicz@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+CC: Michal Nazarewicz <mina86@mina86.com>
+[gregory.0xf0 at gmail.com: Retrieved from
+https://patchwork.linuxtv.org/patch/6254/ and updated documentation]
+Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
+---
+ include/linux/bitmap.h | 36 +++++++++++++++++++++++++++++++-----
+ lib/bitmap.c           | 24 +++++++++++++-----------
+ 2 files changed, 44 insertions(+), 16 deletions(-)
+
+diff --git a/include/linux/bitmap.h b/include/linux/bitmap.h
+index e1c8d08..34e020c 100644
+--- a/include/linux/bitmap.h
++++ b/include/linux/bitmap.h
+@@ -45,6 +45,7 @@
+  * bitmap_set(dst, pos, nbits)			Set specified bit area
+  * bitmap_clear(dst, pos, nbits)		Clear specified bit area
+  * bitmap_find_next_zero_area(buf, len, pos, n, mask)	Find bit free area
++ * bitmap_find_next_zero_area_off(buf, len, pos, n, mask)	as above
+  * bitmap_shift_right(dst, src, n, nbits)	*dst = *src >> n
+  * bitmap_shift_left(dst, src, n, nbits)	*dst = *src << n
+  * bitmap_remap(dst, src, old, new, nbits)	*dst = map(old, new)(src)
+@@ -114,11 +115,36 @@ extern int __bitmap_weight(const unsigned long *bitmap, unsigned int nbits);
+ 
+ extern void bitmap_set(unsigned long *map, unsigned int start, int len);
+ extern void bitmap_clear(unsigned long *map, unsigned int start, int len);
+-extern unsigned long bitmap_find_next_zero_area(unsigned long *map,
+-					 unsigned long size,
+-					 unsigned long start,
+-					 unsigned int nr,
+-					 unsigned long align_mask);
++
++extern unsigned long bitmap_find_next_zero_area_off(unsigned long *map,
++						    unsigned long size,
++						    unsigned long start,
++						    unsigned int nr,
++						    unsigned long align_mask,
++						    unsigned long align_offset);
++
++/**
++ * bitmap_find_next_zero_area - find a contiguous aligned zero area
++ * @map: The address to base the search on
++ * @size: The bitmap size in bits
++ * @start: The bitnumber to start searching at
++ * @nr: The number of zeroed bits we're looking for
++ * @align_mask: Alignment mask for zero area
++ *
++ * The @align_mask should be one less than a power of 2; the effect is that
++ * the bit offset of all zero areas this function finds is multiples of that
++ * power of 2. A @align_mask of 0 means no alignment is required.
++ */
++static inline unsigned long
++bitmap_find_next_zero_area(unsigned long *map,
++			   unsigned long size,
++			   unsigned long start,
++			   unsigned int nr,
++			   unsigned long align_mask)
++{
++	return bitmap_find_next_zero_area_off(map, size, start, nr,
++					      align_mask, 0);
++}
+ 
+ extern int bitmap_scnprintf(char *buf, unsigned int len,
+ 			const unsigned long *src, int nbits);
+diff --git a/lib/bitmap.c b/lib/bitmap.c
+index b499ab6..969ae8f 100644
+--- a/lib/bitmap.c
++++ b/lib/bitmap.c
+@@ -326,30 +326,32 @@ void bitmap_clear(unsigned long *map, unsigned int start, int len)
+ }
+ EXPORT_SYMBOL(bitmap_clear);
+ 
+-/*
+- * bitmap_find_next_zero_area - find a contiguous aligned zero area
++/**
++ * bitmap_find_next_zero_area_off - find a contiguous aligned zero area
+  * @map: The address to base the search on
+  * @size: The bitmap size in bits
+  * @start: The bitnumber to start searching at
+  * @nr: The number of zeroed bits we're looking for
+  * @align_mask: Alignment mask for zero area
++ * @align_offset: Alignment offset for zero area.
+  *
+  * The @align_mask should be one less than a power of 2; the effect is that
+- * the bit offset of all zero areas this function finds is multiples of that
+- * power of 2. A @align_mask of 0 means no alignment is required.
++ * the bit offset of all zero areas this function finds plus @align_offset
++ * is multiple of that power of 2.
+  */
+-unsigned long bitmap_find_next_zero_area(unsigned long *map,
+-					 unsigned long size,
+-					 unsigned long start,
+-					 unsigned int nr,
+-					 unsigned long align_mask)
++unsigned long bitmap_find_next_zero_area_off(unsigned long *map,
++					     unsigned long size,
++					     unsigned long start,
++					     unsigned int nr,
++					     unsigned long align_mask,
++					     unsigned long align_offset)
+ {
+ 	unsigned long index, end, i;
+ again:
+ 	index = find_next_zero_bit(map, size, start);
+ 
+ 	/* Align allocation */
+-	index = __ALIGN_MASK(index, align_mask);
++	index = __ALIGN_MASK(index + align_offset, align_mask) - align_offset;
+ 
+ 	end = index + nr;
+ 	if (end > size)
+@@ -361,7 +363,7 @@ again:
+ 	}
+ 	return index;
+ }
+-EXPORT_SYMBOL(bitmap_find_next_zero_area);
++EXPORT_SYMBOL(bitmap_find_next_zero_area_off);
+ 
+ /*
+  * Bitmap printing & parsing functions: first version by Nadia Yvette Chambers,
 -- 
-With best wishes
-Dmitry
+1.9.1
