@@ -1,26 +1,34 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Wed, 05 Nov 2014 04:24:03 +0100
-Subject: [PATCH 5/7] pinctrl: Add driver for Zynq
-In-Reply-To: <1415041531-15520-6-git-send-email-soren.brinkmann@xilinx.com>
-References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
- <1415041531-15520-6-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <54599853.9050706@suse.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue,  4 Nov 2014 20:27:17 -0700
+Subject: [PATCH] MAINTAINERS: update bcm2835 entry
+Message-ID: <1415158037-12015-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add Lee Jones as a new co-maintainer.
 
-Am 03.11.2014 um 20:05 schrieb Soren Brinkmann:
-> +	PINCTRL_PIN(54, "EMIO_SD0_WP"),
-> +	PINCTRL_PIN(55, "EMIO_SD0_CD"),
-> +	PINCTRL_PIN(56, "EMIO_SD1_WP"),
-> +	PINCTRL_PIN(57, "EMIO_SD0_CD"),
+The kernel.org repo moved to allow us both to push to it. Update
+MAINTAINERS to match.
 
-Should this be "EMIO_SD1_CD"?
+Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+---
+ MAINTAINERS | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Regards,
-Andreas
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7c41896bbf1f..203f6a2fe0d7 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2065,8 +2065,9 @@ F:	drivers/clocksource/bcm_kona_timer.c
+ 
+ BROADCOM BCM2835 ARM ARCHITECTURE
+ M:	Stephen Warren <swarren@wwwdotorg.org>
++M:	Lee Jones <lee@kernel.org>
+ L:	linux-rpi-kernel at lists.infradead.org (moderated for non-subscribers)
+-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git
+ S:	Maintained
+ N:	bcm2835
+ 
 -- 
-SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 21284 AG N?rnberg
+1.9.1
