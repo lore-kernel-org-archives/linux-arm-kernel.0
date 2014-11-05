@@ -1,32 +1,43 @@
-From: juergen127@kreuzholzen.de (Juergen Borleis)
-Date: Wed, 5 Nov 2014 18:17:47 +0100
-Subject: Samsung S3C6410 SoC/devicetree: how to describe RTC interrupts
- connected to two different interrupt parents?
-In-Reply-To: <201411042104.45632.juergen127@kreuzholzen.de>
-References: <201411042104.45632.juergen127@kreuzholzen.de>
-Message-ID: <201411051817.47990.juergen127@kreuzholzen.de>
+From: socketcan@hartkopp.net (Oliver Hartkopp)
+Date: Wed, 05 Nov 2014 18:33:09 +0100
+Subject: [PATCH V3 1/3] can: add can_is_canfd_skb() API
+In-Reply-To: <1415204533.13896.7.camel@edumazet-glaptop2.roam.corp.google.com>
+References: <1415193393-30023-1-git-send-email-b29396@freescale.com>
+ <1415204533.13896.7.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <545A5F55.7050307@hartkopp.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Myself wrote:
-> the Samsung S3C6410 SoC comes with an RTC with two interrupts connected to
-> two different interrupt controllers.
->
-> The old platform code uses this resource to describe it:
->
-> static struct resource s3c_rtc_resource[] = {
-> 	[0] = DEFINE_RES_MEM(S3C24XX_PA_RTC, SZ_256),
-> 	[1] = DEFINE_RES_IRQ(IRQ_RTC),  <-- channel 2@VIC0
-> 	[2] = DEFINE_RES_IRQ(IRQ_TICK), <-- channel 28@VIC1
-> };
->
-> In the devicetree I can define multiple interrupt channels with the
-> keyword 'interrupts' but it seems all of them must share the same interrupt
-> parent defined via 'interrupt-parent'. How to handle the special S3C6410
-> case?
-> The file "Documentation/devicetree/bindings/rtc/s3c-rtc.txt" isn't really
-> helpful.
+On 05.11.2014 17:22, Eric Dumazet wrote:
+> On Wed, 2014-11-05 at 21:16 +0800, Dong Aisheng wrote:
 
-Ahh, "interrupts-extended" is the keyword... solved.
+>
+> This looks a bit strange to assume that skb->len == magical_value is CAN
+> FD. A comment would be nice.
+>
 
-jbo
+Yes. Due to exactly two types of struct can(fd)_frame which can be contained 
+in a skb the skbs are distinguished by the length which can be either CAN_MTU 
+or CANFD_MTU.
+
+>> +static inline int can_is_canfd_skb(struct sk_buff *skb)
+>
+> static inline bool can_is_canfd_skb(const struct sk_buff *skb)
+>
+
+ok.
+
+>> +{
+
+What about:
+
+	/* the CAN specific type of skb is identified by its data length */
+
+>> +	return skb->len == CANFD_MTU;
+>> +}
+>> +
+>>   /* get data length from can_dlc with sanitized can_dlc */
+>>   u8 can_dlc2len(u8 can_dlc);
+
+Regards,
+Oliver
