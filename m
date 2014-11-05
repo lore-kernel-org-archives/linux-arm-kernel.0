@@ -1,33 +1,89 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 05 Nov 2014 09:11:35 +0100
-Subject: [PATCH 11/13] arm: dts: dra7: add DMA properties for UART
-In-Reply-To: <20141105011506.GG24112@csclub.uwaterloo.ca>
-References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
- <1412014009-13315-12-git-send-email-bigeasy@linutronix.de>
- <20141104170233.GB24112@csclub.uwaterloo.ca> <5459079D.7080703@linutronix.de>
- <20141104172117.GC24112@csclub.uwaterloo.ca>
- <20141104183315.GD24112@csclub.uwaterloo.ca>
- <20141104210315.GF24112@csclub.uwaterloo.ca>
- <20141105011506.GG24112@csclub.uwaterloo.ca>
-Message-ID: <5459DBB7.1090702@linutronix.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 5 Nov 2014 09:17:29 +0100
+Subject: [PATCH v3 0/9] PM / Domains: Fix race conditions during boot
+In-Reply-To: <22485079.KBJFDeZktT@vostro.rjw.lan>
+References: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
+ <CAPDyKFr7fqwb77Xhnwf7ACFX7skrY2O+_-aB1T_yfShDA1jASA@mail.gmail.com>
+ <20141104182920.GB440@dtor-ws> <22485079.KBJFDeZktT@vostro.rjw.lan>
+Message-ID: <CAPDyKFpEPHcJEJJf7HysTbXjR0xFaSqdy0APdOVCqRRz0kboKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/2014 02:15 AM, Lennart Sorensen wrote:
-> Well 4 hours running with multiple reboots (our testsuite reboots every
-> 30 minutes to test the watchdog).  So far it has only lost 70 bytes out
-> of 40MB of data sent between uart7 and uart8 (and we are pretty sure
-> the serial test has a small bug that causes a few bytes to be lost right
-> after a reboot sometimes).
-> 
-> The reason I am even trying the new driver today is that we were seeing
-> soft lockups on the CPU whenever the serial ports were being tested,
-> usually in less than 5 minutes, so 4 hours without a lockup is a good
-> sign.  No idea what might be wrong with the old omap serial driver, but
-> it seems something is (unless of course we managed to break it somehow
-> when we tried to solve its habit of dropping characters).
+On 4 November 2014 22:38, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Tuesday, November 04, 2014 10:29:20 AM Dmitry Torokhov wrote:
+>> On Tue, Nov 04, 2014 at 06:01:44PM +0100, Ulf Hansson wrote:
+>> > >>
+>> > >> Devices that are created while "discoverable buses" are being probed
+>> > >> can't be attached to a PM domain before the probing is done, because
+>> > >> those simply doesn't exist.
+>> > >
+>> > > Honestly, I'm not sure what you're talking about.
+>> > >
+>> > > Devices on a "discoverable* bus (say PCI) are added when the *controller* is
+>> > > probed, not when *they* are probed.
+>> >
+>> > Okay, so maybe "discoverable buses" isn't the proper term.
+>> >
+>> > >
+>> > > You very much need to have a struct device registered to be able to call
+>> > > really_probe() for it.
+>> >
+>> > Yes. But my point is that the struct device may be created dynamically
+>> > at some point in time.
+>>
+>> And that is fine.
+>>
+>> >
+>> > This is how mmc/sd/sdio cards are handled. We don't have the
+>> > information about the card and thus not the struct device of it, until
+>> > we have detected it. Maybe we could at that point try to add the
+>> > device to its PM domain?
+>>
+>> Well, I think we need to first define what PM domain they will fall
+>> into. Do they have to be in one? The concept of power domain, as far as I
+>> understand it, is needed when we need to form relations going outside
+>> the standard parent/child relationship. Here we have a controller and
+>> then one or more cards in it. To be able to use card you need to power
+>> up parent and you can not power down parent until all children are
+>> powered down.
+>>
+>> But in any case, device discovery and binding them to drivers are 2
+>> separate steps. You have a PCI bus. You enumerate it - new PCI devices
+>> are created. Some of them may be put in a certain power domain. You then
+>> bind drivers to PCI devices (not strictly 'then' but we could implement
+>> driver core to postpone binding until current round of enumeration is
+>> complete) - and you discover USB controller and maybe i2c controller.
+>> Then you bind drivers to them which causes enumeration of the new bus
+>> and new devices are created. But in all these cases enumeration and
+>> creation of new 'struct device's, and driver binding are logically
+>> separate steps.
+>>
+>> >
+>> > >
+>> > >> Now, I haven't yet seen a demand for such a cases, but it seems wrong
+>> > >> to not consider them. The current solution cover these.
+>> > >
+>> > > Oh dear.  Please rethink this.
+>> >
+>> > Currently, dev_pm_domain_attach() is being invoked at the point when a
+>> > SDIO card has been found. From sdio_add_func(). How would that be
+>> > solved?
+>> >
+>>
+>> It is probably the one place where we currently doing it correctly (form
+>> logical point of view, not implementation wise - implementation wise in
+>> sdio we add device to power domain after calling device_add() which
+>> means that probe() could have been called before we added the new device
+>> to any power domain).
+>
+> I agree.  Ideally, devices should be added to power (or generally PM) domains
+> before registration.  That is, before calling device_add() for them.
+>
+> That's the first thing to fix here.
 
-Okay. No DMA but the basic part seems to work for you. Thanks for
-testing.
+It's done in patch 7 in this patchset.
 
-Sebastian
+[PATCH v3 7/9] mmc: core: Attach PM domain prior probing of SDIO func driver
+
+Kind regards
+Uffe
