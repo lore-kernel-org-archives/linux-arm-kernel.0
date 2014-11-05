@@ -1,109 +1,58 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 5 Nov 2014 21:31:51 +0100
-Subject: N900 modem support in 3.18-rc1
-In-Reply-To: <20141105011122.GA30622@earth.universe>
-References: <20141104205117.GA17606@amd>
- <20141105011122.GA30622@earth.universe>
-Message-ID: <20141105203151.GA24636@amd>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Wed, 05 Nov 2014 21:32:37 +0100
+Subject: [PATCH 01/15] mfd: add new driver for Sharp LoCoMo
+In-Reply-To: <CALT56yM8B3ffYb0=EZVbRRGDZSxMci2sRp9XVtjQuLa5abN+cg@mail.gmail.com>
+References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>	<1414454528-24240-2-git-send-email-dbaryshkov@gmail.com>	<CACRpkdbW3NA00zMZr216ZeZpgVkXwKUo30biTVd5kcHKGGtkHg@mail.gmail.com>	<CALT56yNX8v4mZn=o1ZoVLHPmg6wq0dgFNowpqNuFtU=eCc+d8w@mail.gmail.com>	<CACRpkdaKUZjbSEH75M9xudTF9HefwOCVEe5otv9-9f2UG8=hVg@mail.gmail.com>
+ <CALT56yM8B3ffYb0=EZVbRRGDZSxMci2sRp9XVtjQuLa5abN+cg@mail.gmail.com>
+Message-ID: <545A8965.2010406@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2014-11-05 02:11:22, Sebastian Reichel wrote:
-> Hi Pavel,
-> 
-> On Tue, Nov 04, 2014 at 09:51:17PM +0100, Pavel Machek wrote:
-> > I'd like to test a modem (and eventually to get it to work :-) ) on
-> > n900. So far I found:
-> > 
-> > http://lwn.net/Articles/592485/
-> > 
-> > It says:
-> > 
-> > # supported. Testing the patchset with ofono works like this:
-> > # 
-> > #  # provide cmt device for ofono
-> > #  ln -sf /sys/bus/hsi/n900-modem /dev/cmt
-> > 
-> > [...]
-> >
-> > That seemed to match, so I symlinked it.
-> 
-> looks ok. You should have the following files:
-> 
-> /dev/cmt/cmt_apeslpx
-> /dev/cmt/cmt_bsi
-> /dev/cmt/cmt_en
-> /dev/cmt/cmt_rst_rq
-> /dev/cmt/cmt_rst
+On 11/05/2014 09:02 PM, Dmitry Eremin-Solenikov wrote:
+> 2014-11-03 16:41 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
+>> On Fri, Oct 31, 2014 at 10:54 AM, Dmitry Eremin-Solenikov
+>> <dbaryshkov@gmail.com> wrote:
+>>> 2014-10-31 10:42 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
+>>
+>>>> It seems some DAC handling is part of the MFD driver, and we recently
+>>>> discussed that MFD should not be doing misc stuff but mainly act as
+>>>> arbiter and switching station.
+>>>>
+>>>> Can you please move the DAC parts of the driver to
+>>>> drivers/iio/dac?
+>>>>
+>>>> The IIO DAC subsystem will likely add other goodies to
+>>>> the driver for free and give a nice API to consumers.
+>>>
+>>> I wanted this part to be as simple as possible. I will look into IIO
+>>> DAC subsystem.
+>>> The DAC is as simple 2 channel 8-bit i2c device connected to a separate i2c bus
+>>> controlled through a register in LoCoMo device. One channel is used
+>>> for backlight,
+>>> other will be used for volume control. So (in theory) I can add the
+>>> following device
+>>> chain:  locomo -> i2c-locomo -> m62332 -> IIO DAC client.  However isn't that
+>>> quite an overkill for just backlight & volume control? Please advice me on this.
+>>
+>> The point is still the same: no unrelated code in drivers/mfd,
+>> then either use IIO DAC as a middle layer or sink the DAC handling
+>> into respective subdriver, i.e. push it into the backlight or
+>> volume directly then.
+>
+> The problem is that the DAC is equally used by backlight and by sound
+> device (WIP).
 
-No, it is not ok :-(. I did enable CONFIG_CMT now (it was not enabled
-before, and wow, that entry has least helpful config help, ever; is it
-related?), but still can't see the required files:
+That shouldn't be a problem. The IIO API allows different consumers to 
+request different channels of a converter. You can write a generic IIO based 
+backlight driver and a generic IIO based volume control driver. This makes 
+it possible to re-use them in other circuits with other DACs but the same 
+application.
 
-root at n900:/sys# find . | grep cmt
-./bus/hsi/devices/cmt_speech
-./bus/hsi/drivers/cmt_speech
-./bus/hsi/drivers/cmt_speech/bind
-./bus/hsi/drivers/cmt_speech/cmt_speech
-./bus/hsi/drivers/cmt_speech/uevent
-./bus/hsi/drivers/cmt_speech/unbind
-./devices/virtual/misc/cmt_speech
-./devices/virtual/misc/cmt_speech/dev
-./devices/virtual/misc/cmt_speech/power
-./devices/virtual/misc/cmt_speech/power/control
-./devices/virtual/misc/cmt_speech/power/runtime_active_time
-./devices/virtual/misc/cmt_speech/power/autosuspend_delay_ms
-./devices/virtual/misc/cmt_speech/power/runtime_status
-./devices/virtual/misc/cmt_speech/power/runtime_suspended_time
-./devices/virtual/misc/cmt_speech/subsystem
-./devices/virtual/misc/cmt_speech/uevent
-./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech
-./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech/power
-./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech/power/control
-./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech/power/runtime_active_time
-./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech/power/autosuspend_delay_ms
-./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech/power/runtime_status
-./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech/power/runtime_suspended_time
-./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech/modalias
-./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech/driver
-./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech/subsystem
-./devices/68000000.ocp/48058000.ssi-controller/ssi0/port0/cmt_speech/uevent
-./class/misc/cmt_speech
-root at n900:/sys# 
+> What about true i2c device driver sitting in drivers/misc and exporting a regmap
+> of 2 8-bit registers?
 
-(What does CMT mean? I should fix the help files, I guess...)
+If it is a generic DAC it should go into drivers/iio/, this will allow code 
+sharing and code re-usability. Given the simplicity of the DAC there might 
+even be other existing drivers that can be used to control it.
 
-
-> > root at n900:~# ofonod --nodetach --debug &
-> > [1] 3552
-> 
-> no output from ofono?
-
-Actually, a lot of output from ofonod, but nothing useful.
-
-> > root at n900:~# mdbus2 -s org.ofono /n900_0 xyz
-> > [ERR]: There is no method with name xyz on path /n900_0!
-> >
-> > [...]
-> > 
-> > Any ideas?
-> 
-> call mdbus2 with fewer arguments to see what is available on the
-> bus:
-> 
-> mdbus2 -s                      => list all system services
-> mdbus2 -s org.ofono            => list all ofono objects
-> mdbus2 -s org.ofono /n900_0    => list all methods from n900 object
-
-root at n900:~# mdbus2 -s org.ofono
-/
-root at n900:~# 
-
-But since I do not have required cmt_ files, I guess that's expected?
-
-
-Thanks,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+- Lars
