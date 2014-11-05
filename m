@@ -1,184 +1,43 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Wed, 5 Nov 2014 17:22:57 +0100
-Subject: [PATCH v2 06/11] memory: atmel-ebi: add DT bindings documentation
-In-Reply-To: <1415203287-21517-7-git-send-email-boris.brezillon@free-electrons.com>
-References: <1415203287-21517-1-git-send-email-boris.brezillon@free-electrons.com>
- <1415203287-21517-7-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <CACh+v5N8dXaH3ZNGr=MKXbQRU7nOMPLvxT0rEsZrbSKj20b_Dg@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 05 Nov 2014 17:30:51 +0100
+Subject: [PATCH 11/13] arm: dts: dra7: add DMA properties for UART
+In-Reply-To: <20141105162024.GH24112@csclub.uwaterloo.ca>
+References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
+ <1412014009-13315-12-git-send-email-bigeasy@linutronix.de>
+ <20141104170233.GB24112@csclub.uwaterloo.ca> <5459079D.7080703@linutronix.de>
+ <20141104172117.GC24112@csclub.uwaterloo.ca>
+ <20141104183315.GD24112@csclub.uwaterloo.ca>
+ <20141104210315.GF24112@csclub.uwaterloo.ca>
+ <20141105011506.GG24112@csclub.uwaterloo.ca> <5459DBB7.1090702@linutronix.de>
+ <20141105153307.GN24110@csclub.uwaterloo.ca>
+ <20141105162024.GH24112@csclub.uwaterloo.ca>
+Message-ID: <545A50BB.2020307@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On 11/05/2014 05:20 PM, Lennart Sorensen wrote:
+> On Wed, Nov 05, 2014 at 10:33:15AM -0500, Lennart Sorensen wrote:
+>> Two systems ran 16 hours each so far with no issues.  Pushed 170MB of
+>> data through the pair of serial ports on one system at 230400.
+> 
+> The console on uart3 doesn't appear to be using the dma assuming the
+> values in /sys for the dma controller and bytes transferred mean anything.
+> It does mention in dmesg that it allocated dma channels for uart3 though.
 
-2014-11-05 17:01 GMT+01:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  .../bindings/memory-controllers/atmel-ebi.txt      | 153 +++++++++++++++++++++
->  1 file changed, 153 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
->
-> diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
-> new file mode 100644
-> index 0000000..dc2c34f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
-> @@ -0,0 +1,153 @@
-> +* Device tree bindings for Atmel EBI
-> +
-> +The External Bus Interface (EBI) controller is a bus where you can connect
-> +asynchronous (NAND, NOR, SRAM, ....) and synchronous memories (SDR/DDR SDRAMs).
-> +The EBI provides a glue-less interface to asynchronous memories though the SMC
-> +(Static Memory Controller).
-> +Synchronous memories (and some asynchronous memories like NANDs) can be
-> +attached to specialized controllers which are responsible for configuring the
-> +bus appropriately according to the connected device.
-> +In the other hand, the bus interface can be automated for simple asynchronous
-> +devices.
-> +
-> +Required properties:
-> +
-> +- compatible:          "atmel,at91sam9260-ebi"
-> +                       "atmel,at91sam9261-ebi"
-> +                       "atmel,at91sam9263-ebi0"
-> +                       "atmel,at91sam9263-ebi1"
-> +                       "atmel,at91sam9g45-ebi"
-> +                       "atmel,at91sam9x5-ebi"
-> +                       "atmel,sama5d3-ebi"
-> +
-> +- reg:                 Contains offset/length value for EBI memory mapping.
-> +                       This property might contain several entries if the EBI
-> +                       memory range is not contiguous
-> +
-> +- #address-cells:      Must be 2.
-> +                       The first cell encodes the CS.
-> +                       The second cell encode the offset into the CS memory
-> +                       range.
-> +
-> +- #size-cells:         Must be set to 1.
-> +
-> +- ranges:              Encodes CS to memory region association.
-> +
-> +- clocks:              Clock feeding the EBI controller.
-> +                       See clock-bindings.txt
-> +
-> +Child chip-select (cs) nodes contain the memory devices nodes connected to
-> +such as NOR (e.g. cfi-flash) and NAND.
-> +There might be board specific devices like FPGAs.
-> +You'll define you device requirements in these child nodes.
-> +
-> +Required child cs node properties:
-> +
-> +- #address-cells:      Must be 2.
-> +
-> +- #size-cells:         Must be 1.
-> +
-> +- ranges:              Empty property indicating that child nodes can inherit
-> +                       memory layout.
-> +
-> +Optional child cs node properties:
-> +- atmel,generic-dev            boolean property specifying if the device is
-> +                               a generic device.
-> +                               The following properties are only parsed if
-> +                               this property is present.
-> +                               Specialized devices are attached to specialized
-> +                               controllers which should configure the bus
-> +                               appropriately.
+Then it should use it :)
 
-What do you mean by specialized devices ? Can you give an example ?
+> How do you tell if it is using dma?
 
-> +
-> +- atmel,bus-width:             width of the asynchronous device's data bus
-> +                               8, 16 or 32.
-> +                               8 if not present.
-> +
-> +- atmel,byte-access-type       "write" or "select" (see Atmel datasheet).
-> +                               "select" if not present.
-> +
-> +- atmel,read-mode              "nrd" or "ncs".
-> +                               "ncs" is not present.
-> +
-> +- atmel,write-mode             "nwe" or "ncs".
-> +                               "ncs" is not present.
-> +
-> +- atmel,exnw-mode              "disabled", "frozen" or "ready".
-> +                               "disabled" if not present.
-> +
-> +- atmel,page-mode              enable page mode if present. The provided value
-> +                               defines the page size (supported values: 4, 8,
-> +                               16 and 32).
-> +
-> +Optional device timings expressed in nanoseconds (if the property is not
-> +present 0 is assumed):
-> +
-> +- atmel,ncs-rd-setup-ns
-> +- atmel,nrd-setup-ns
-> +- atmel,ncs-wr-setup-ns
-> +- atmel,nwe-setup-ns
-> +- atmel,ncs-rd-pulse-ns
-> +- atmel,nrd-pulse-ns
-> +- atmel,ncs-wr-pulse-ns
-> +- atmel,nwe-pulse-ns
-> +- atmel,nwe-cycle-ns
-> +- atmel,nrd-cycle-ns
-> +- atmel,tdf-ns
-> +
-> +- atmel,tdf-optimized          data float optimized mode. If present the data
-> +                               float time is optimized depending on the next
-> +                               device being accessed (next device setup
-> +                               time is substracted to the current devive data
-> +                               float time).
-> +
-> +
-> +
-> +Example:
-> +
-> +       ebi: ebi at 10000000 {
-> +               compatible = "atmel,sama5d3-ebi", "simple-bus";
-> +               #address-cells = <2>;
-> +               #size-cells = <1>;
-> +               atmel,smc = <&hsmc>;
-> +               atmel,matrix = <&matrix>;
-> +               reg = <0x10000000 0x10000000
-> +                      0x40000000 0x30000000>;
-> +               ranges = <0x0 0x0 0x10000000 0x10000000
-> +                         0x1 0x0 0x40000000 0x10000000
-> +                         0x2 0x0 0x50000000 0x10000000
-> +                         0x3 0x0 0x60000000 0x10000000>;
-> +               clocks = <&mck>;
-> +
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_ebi_addr>;
-> +
-> +               cs at 0 {
-> +                       #address-cells = <2>;
-> +                       #size-cells = <1>;
-> +                       ranges;
-> +                       atmel,generic-dev;
-> +                       atmel,read-mode = "nrd";
-> +                       atmel,write-mode = "nwe";
-> +                       atmel,bus-width = <16>;
-> +                       atmel,ncs-rd-setup-ns = <0>;
-> +                       atmel,ncs-wr-setup-ns = <0>;
-> +                       atmel,nwe-setup-ns = <8>;
-> +                       atmel,nrd-setup-ns = <16>;
-> +                       atmel,ncs-rd-pulse-ns = <84>;
-> +                       atmel,ncs-wr-pulse-ns = <84>;
-> +                       atmel,nrd-pulse-ns = <76>;
-> +                       atmel,nwe-pulse-ns = <76>;
-> +                       atmel,nrd-cycle-ns = <107>;
-> +                       atmel,nwe-cycle-ns = <84>;
-> +                       atmel,tdf-ns = <16>;
-> +
-> +                       nor: flash at 0,0 {
-> +                               compatible = "cfi-flash";
-> +                               #address-cells = <1>;
-> +                               #size-cells = <1>;
-> +                               reg = <0x0 0x0 0x1000000>;
-> +                               bank-width = <2>;
-> +                       };
-> +               };
-> +       };
-> +
-> --
-> 1.9.1
->
+There is omap_8250_tx_dma() and omap_8250_rx_dma(). Both setup
+callbacks (the rx+tx _complete). Upon successful DMA transfer you
+should see them invoked with bytes transfered (>0).
+For RX transfer you need at least trigger bytes in the FIFO within a
+given time frame (I think it was 46 bytes and the delay may be up to 2
+bytes). If you miss this then DMA for RX won't wire and you purge the
+FIFO manually via "timeout-interrupt" (the callback will be invoked
+with an error condition and 0 bytes).
+
+Assuming this works for you then one should figure out why the counters
+in /sys are not updated?
+
+Sebastian
