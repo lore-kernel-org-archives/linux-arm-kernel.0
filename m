@@ -1,37 +1,25 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu, 06 Nov 2014 21:35:21 +0800
-Subject: [Patch Part2 v4 00/31] Enable hierarchy irqdomian on x86 platforms
-In-Reply-To: <20141106130753.GN10744@8bytes.org>
-References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
- <20141106130753.GN10744@8bytes.org>
-Message-ID: <545B7919.2080002@linux.intel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 6 Nov 2014 13:40:29 +0000
+Subject: [PATCH v7 3/8] arm64: introduce is_device_dma_coherent
+In-Reply-To: <alpine.DEB.2.02.1411061155200.22875@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
+ <1414422568-19103-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1411031045340.22875@kaball.uk.xensource.com>
+ <20141103105716.GC23162@arm.com>
+ <alpine.DEB.2.02.1411031101400.22875@kaball.uk.xensource.com>
+ <20141105165646.GN32700@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.02.1411051757140.22875@kaball.uk.xensource.com>
+ <20141106103337.GA19702@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.02.1411061155200.22875@kaball.uk.xensource.com>
+Message-ID: <20141106134028.GB19702@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/6 21:07, Joerg Roedel wrote:
-> On Tue, Nov 04, 2014 at 08:01:34PM +0800, Jiang Liu wrote:
->> Patch 1-5 enhance irqdomain and irq core to support hierarchy irqdomain
->> and stacked irqchip.
->> Patch 6-12 implement an irqdomain to manange CPU interrupt vectors, and
->> it's the root irqdomain for x86 platforms.
->> Patch 13-16 converts Intel and AMD interrupt remapping drivers to
->> support hierarchy irqdomain.
->> Patch 17-23 converts HPET and MSI to support hierarchy irqdomain.
->> Patch 24-27 cleans up unsued code in x86 arch and interrupt remapping
->> drivers.
->> Patch 28-31 converts DMAR, HTIRQ and UV to support hierarchy irqdomain.
-> 
-> Okay, I looked over the IOMMU changes and did some testing. With Jiangs
-> fix for the AMD Kaveri boot panic it looks good to me. So for the IOMMU
-> parts:
-> 
-> Acked-by: Joerg Roedel <jroedel@suse.de>
-Thanks, Joerg!
+On Thu, Nov 06, 2014 at 12:22:13PM +0000, Stefano Stabellini wrote:
+> As I don't feel that strongly against it, I'll resend including this
+> patch (with you as the author of course).
 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+Not just yet, let me understand your reply properly ;).
+
+-- 
+Catalin
