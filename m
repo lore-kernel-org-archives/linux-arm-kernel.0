@@ -1,29 +1,27 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 6 Nov 2014 10:26:36 +0000
-Subject: [PATCH] spi: s3c64xx: add support for exynos7 SPI controller
-In-Reply-To: <1415267509-16653-1-git-send-email-padma.v@samsung.com>
-References: <1415267509-16653-1-git-send-email-padma.v@samsung.com>
-Message-ID: <20141106102636.GT8509@sirena.org.uk>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 06 Nov 2014 11:27:21 +0100
+Subject: [PATCH 00/13 v10] omap 8250 based UART + DMA
+In-Reply-To: <20141106031421.GA22185@kroah.com>
+References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
+ <20141106031421.GA22185@kroah.com>
+Message-ID: <545B4D09.6070102@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 06, 2014 at 03:21:49PM +0530, Padmavathi Venna wrote:
-> Exynos7 SPI controller supports only the auto Selection of
-> CS toggle mode and Exynos7 SoC includes six SPI controllers.
-> Add support for these changes in Exynos7 SPI controller driver.
+On 11/06/2014 04:14 AM, Greg KH wrote:
+> I've now applied the patches here that I could, if I have missed any,
+> please let me know and resend.
 
-Could you give a bit more detail on what the "auto selection of CS
-toggle mode" is - in the diff it looks like it's not an existing mode.
-I'm a bit worried that it's not going to function well with devices that
-send more than one transfer per message.
+Thank you Greg. I pulled your tty-testing and it seems to work on
+am335x-evm/dra7-evm.
 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+Tony, if you could please take the two .dts files then the series would
+be complete (that one dma patch was applied by Vinod during the merge
+window).
 
-It's better if your signoff is using the same e-maill address as 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141106/c9b3884b/attachment.sig>
+> 
+> thanks,
+> 
+> greg k-h
+> 
+Sebastian
