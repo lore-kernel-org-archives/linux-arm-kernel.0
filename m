@@ -1,24 +1,53 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 5 Nov 2014 19:14:21 -0800
-Subject: [PATCH 00/13 v10] omap 8250 based UART + DMA
-In-Reply-To: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
-References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20141106031421.GA22185@kroah.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu,  6 Nov 2014 11:40:28 +0800
+Subject: [PATCH resend 0/4] clk: sunxi: Unify sun4i apb1 clock
+Message-ID: <1415245232-20585-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29, 2014 at 08:06:36PM +0200, Sebastian Andrzej Siewior wrote:
-> The queue is getting smaller. The highlights of v9?v10
-> - the DMA stall Frans Klaver reported which popped up in yocto is gone. It
->   also seems that the "ack the err-irq even if nothing happened" in EDMA
->   can be dropped.
-> - the RX- and TX-DMA callbacks are now OMAP-only and no "bugs" flags are
->   introduced into the generic DMA code. This also means that there is
->   custom IRQ routine in case of DMA.
+(resent with linux-arm-kernel CCed)
 
-I've now applied the patches here that I could, if I have missed any,
-please let me know and resend.
+Hi everyone,
 
-thanks,
+This series unifies the apb1 clock driver for sun4i, which was
+previously split into apb1-mux and apb1. This also fixes the
+apb2 clock on sun6i/sun8i, which we now have documents for.
 
-greg k-h
+The first 2 patches were done by Emilio.
+
+Patch 1 unifies the apb1-mux and apb1 clock drivers using a
+factors clock.
+
+Patch 2 unifies said clocks in the dtsi.
+
+Patch 3 switches the compatibles for apb2 clock on sun6i/sun8i to
+the unified sun4i apb1 clock.
+
+Patch 4 gets rid of the incorrect and now unused sun6i apb2 clock
+driver.
+
+
+Cheers
+ChenYu
+
+
+Chen-Yu Tsai (2):
+  ARM: dts: sunxi: Use sun4i-a10-apb1-clk for sun6i/sun8i apb2 clocks.
+  clk: sunxi: Removed unused/incorrect sun6i-a31-apb2-clk driver
+
+Emilio L?pez (2):
+  clk: sunxi: unify APB1 clock
+  ARM: dts: sunxi: unify APB1 clock
+
+ Documentation/devicetree/bindings/clock/sunxi.txt |  2 --
+ arch/arm/boot/dts/sun4i-a10.dtsi                  | 12 ++----------
+ arch/arm/boot/dts/sun5i-a10s.dtsi                 | 12 ++----------
+ arch/arm/boot/dts/sun5i-a13.dtsi                  | 12 ++----------
+ arch/arm/boot/dts/sun6i-a31.dtsi                  | 12 ++----------
+ arch/arm/boot/dts/sun7i-a20.dtsi                  | 12 ++----------
+ arch/arm/boot/dts/sun8i-a23.dtsi                  | 12 ++----------
+ drivers/clk/sunxi/clk-sunxi.c                     | 14 ++------------
+ 8 files changed, 14 insertions(+), 74 deletions(-)
+
+-- 
+2.1.1
