@@ -1,65 +1,244 @@
-From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu,  6 Nov 2014 17:49:56 +1300
-Subject: [RFC PATCH] ARM: mvebu: Let the device-tree determine smp_ops
-Message-ID: <1415249396-2985-1-git-send-email-chris.packham@alliedtelesis.co.nz>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Thu, 06 Nov 2014 13:06:36 +0800
+Subject: [Patch Part2 v4 21/31] PCI/MSI: enhance PCI MSI core to support
+ hierarchy irqdomain
+In-Reply-To: <545AD5B3.60009@huawei.com>
+References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
+ <1415102525-9898-22-git-send-email-jiang.liu@linux.intel.com>
+ <20141105230952.GH6168@google.com> <545AD5B3.60009@huawei.com>
+Message-ID: <545B01DC.5060107@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The machine specific SMP operations can be configured either via
-setup_arch or via arm_dt_init_cpu_maps. For the ARMADA_370_XP_DT devices
-both of these are called and setup_arch wins because it is called last.
-This means that it is not possible to substitute a different set of SMP
-operations via the device-tree.
+On 2014/11/6 9:58, Yijing Wang wrote:
+>>>  
+>>> @@ -1098,3 +1099,128 @@ int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries,
+>>>  	return nvec;
+>>>  }
+>>>  EXPORT_SYMBOL(pci_enable_msix_range);
+>>> +
+>>> +#ifdef	CONFIG_PCI_MSI_IRQ_DOMAIN
+>>
+>> Space, not tab.
+>>
+>>> +static inline irq_hw_number_t
+>>> +msi_get_hwirq(struct pci_dev *pdev, struct msi_desc *msidesc)
+>>
+>> The convention in this file is "struct pci_dev *dev".  And "struct msi_desc
+>> *desc" (or maybe "*entry").  Try to converge things, not diverge them.
+>>
+>>> +{
+>>> +	return (irq_hw_number_t)msidesc->msi_attrib.entry_nr |
+>>> +		PCI_DEVID(pdev->bus->number, pdev->devfn) << 11 |
+>>> +		(pci_domain_nr(pdev->bus) & 0xFFFFFFFF) << 27;
+>>
+>> Where does this bit layout come from?  Is this defined in the spec
+>> somewhere?  A reference would help.
+> 
+> Currently, more and more Non-PCI device use MSI(or similar MSI mechanism), like DMAR fault irq
+> and HPET FSB irq. And we have to add additional code to support the MSI capability.
+> So I hope we can decouple MSI code and PCI code, then we can unify all MSI(or Message Based interrupt)
+> in one framework.
+Hi Yijing,
+	I have a following patch to share more code among MSI/DMAR/HPET,
+which is one step forward as you suggested. Will send out that patch set
+soon.
+Regards!
+Gerry
 
-All of the ARMADA_370_XP_DT compatible devices are either single core or
-declare an enable-method in the dts (via one of armada-xp-mv78230.dtsi,
-armada-xp-mv78260.dtsi or armada-xp-mv78460.dtsi). Remove the smp
-assignment from board-v7.c so that the SMP operations set via the
-device-tree aren't discarded.
-
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
----
-Hi,
-
-(This is the first patch I've sent to the arm-lkml so beware of my newbie-ness)
-
-I'm working on a new board that uses a integrated CPU that according to the
-vendor is "based on the ARMADA-XP", more on that to come in the future
-hopefully. For the most part things just work if I use a .dts based on the
-mv78260.
-
-One difference I've encountered is in the way the secondary CPU is initialised,
-which requires me to supply a slightly different set of machine specific SMP
-operations so I can bring up the 2nd core. It looks like I should be able to
-supply a different /cpus/enable-method in the .dts and once I define the
-corresponding set of operations it should be picked up. 
-
-Which leads me to what I think could be a bug (or just a lack of clear
-specification). The smp ops are set by both arm_dt_init_cpu_maps (from the
-enable-method) and setup_arch (from mdesc). The latter always wins because it
-is called last and doesn't check to see if smp_ops has already been set.
-
-This is my attempt at fixing the problem by not setting mdesc.smp for the
-ARMADA_370_XP_DT machines thus preventing setup_arch from overriding what has
-been setup by arm_dt_init_cpu_maps.
-
-Thanks,
-Chris
-
- arch/arm/mach-mvebu/board-v7.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-index 6478626..894974b 100644
---- a/arch/arm/mach-mvebu/board-v7.c
-+++ b/arch/arm/mach-mvebu/board-v7.c
-@@ -206,7 +206,6 @@ static const char * const armada_370_xp_dt_compat[] = {
- DT_MACHINE_START(ARMADA_370_XP_DT, "Marvell Armada 370/XP (Device Tree)")
- 	.l2c_aux_val	= 0,
- 	.l2c_aux_mask	= ~0,
--	.smp		= smp_ops(armada_xp_smp_ops),
- 	.init_machine	= mvebu_dt_init,
- 	.init_irq       = mvebu_init_irq,
- 	.restart	= mvebu_restart,
--- 
-2.2.0.rc0
+> 
+> Thanks!
+> Yijing.
+> 
+>>
+>>> +}
+>>> +
+>>> +static int msi_domain_alloc(struct irq_domain *domain, unsigned int virq,
+>>> +			    unsigned int nr_irqs, void *arg)
+>>> +{
+>>> +	int i, ret;
+>>> +	irq_hw_number_t hwirq = arch_msi_irq_domain_get_hwirq(arg);
+>>> +
+>>> +	if (irq_find_mapping(domain, hwirq) > 0)
+>>> +		return -EEXIST;
+>>> +
+>>> +	ret = irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, arg);
+>>> +	if (ret >= 0)
+>>
+>> 	if (ret < 0)
+>> 		return ret;
+>>
+>> and un-indent the mainline code below.  Then it's obvious that this is the
+>> normal case, not the error case.
+>>
+>>> +		for (i = 0; i < nr_irqs; i++) {
+>>> +			irq_domain_set_hwirq_and_chip(domain, virq + i,
+>>> +					hwirq + i, &msi_chip, (void *)(long)i);
+>>> +			__irq_set_handler(virq + i, handle_edge_irq, 0, "edge");
+>>> +		}
+>>> +
+>>> +	return ret;
+>>> +}
+>>> +
+>>> +static void msi_domain_free(struct irq_domain *domain, unsigned int virq,
+>>> +			    unsigned int nr_irqs)
+>>> +{
+>>> +	int i;
+>>> +
+>>> +	for (i = 0; i < nr_irqs; i++) {
+>>> +		struct msi_desc *msidesc = irq_get_msi_desc(virq);
+>>> +
+>>> +		if (msidesc)
+>>> +			msidesc->irq = 0;
+>>> +	}
+>>> +	irq_domain_free_irqs_top(domain, virq, nr_irqs);
+>>> +}
+>>> +
+>>> +static int msi_domain_activate(struct irq_domain *domain,
+>>> +			       struct irq_data *irq_data)
+>>> +{
+>>> +	int ret = 0;
+>>> +	struct msi_msg msg;
+>>> +
+>>> +	/*
+>>> +	 * irq_data->chip_data is MSI/MSIx offset.
+>>
+>> "MSI-X", as you wrote on the next line.
+>>
+>>> +	 * MSI-X message is written per-IRQ, the offset is always 0.
+>>> +	 * MSI message denotes a contiguous group of IRQs, written for 0th IRQ.
+>>> +	 */
+>>> +	if (!irq_data->chip_data) {
+>>
+>> 	if (irq_data->chip_data)
+>> 		return 0;
+>>
+>> and un-indent the mainline code below, and drop the "ret = 0" init above.
+>>
+>>> +		ret = irq_chip_compose_msi_msg(irq_data, &msg);
+>>> +		if (ret == 0)
+>>
+>> 	if (ret)
+>> 		return ret;
+>>
+>>> +			write_msi_msg(irq_data->irq, &msg);
+>>> +	}
+>>> +
+>>> +	return ret;
+>> 	return 0;
+>>> +}
+>>> +
+>>> +static int msi_domain_deactivate(struct irq_domain *domain,
+>>> +				 struct irq_data *irq_data)
+>>> +{
+>>> +	struct msi_msg msg;
+>>> +
+>>> +	if (irq_data->chip_data) {
+>>> +		memset(&msg, 0, sizeof(msg));
+>>> +		write_msi_msg(irq_data->irq, &msg);
+>>> +	}
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static struct irq_domain_ops msi_domain_ops = {
+>>> +	.alloc = msi_domain_alloc,
+>>> +	.free = msi_domain_free,
+>>> +	.activate = msi_domain_activate,
+>>> +	.deactivate = msi_domain_deactivate,
+>>> +};
+>>> +
+>>> +struct irq_domain *msi_create_irq_domain(struct irq_domain *parent)
+>>> +{
+>>> +	struct irq_domain *domain;
+>>> +
+>>> +	domain = irq_domain_add_tree(NULL, &msi_domain_ops, NULL);
+>>> +	if (domain)
+>>
+>> 	if (!domain)
+>> 		return NULL;
+>>
+>> and un-indent this:
+>>
+>>> +		domain->parent = parent;
+>>> +
+>>> +	return domain;
+>>> +}
+>>> +
+>>> +int msi_irq_domain_alloc_irqs(struct irq_domain *domain, int type,
+>>> +			      struct pci_dev *dev, void *arg)
+>>> +{
+>>> +	int i, virq;
+>>> +	struct msi_desc *msidesc;
+>>> +	int node = dev_to_node(&dev->dev);
+>>> +
+>>> +	list_for_each_entry(msidesc, &dev->msi_list, list) {
+>>> +		arch_msi_irq_domain_set_hwirq(arg, msi_get_hwirq(dev, msidesc));
+>>> +		virq = irq_domain_alloc_irqs(domain, msidesc->nvec_used,
+>>> +					     node, arg);
+>>> +		if (virq < 0) {
+>>> +			/* Special handling for pci_enable_msi_range(). */
+>>> +			return (type == PCI_CAP_ID_MSI &&
+>>> +				msidesc->nvec_used > 1) ?  1 : -ENOSPC;	
+>>
+>> I think "if" would be easier to read than this ternary expression.
+>>
+>>> +		}
+>>> +		for (i = 0; i < msidesc->nvec_used; i++)
+>>> +			irq_set_msi_desc_off(virq + i, i, msidesc);
+>>> +	}
+>>> +
+>>> +	list_for_each_entry(msidesc, &dev->msi_list, list)
+>>> +		if (msidesc->nvec_used == 1)
+>>> +			dev_dbg(&dev->dev, "irq %d for MSI/MSI-X\n", virq);
+>>> +		else
+>>> +			dev_dbg(&dev->dev, "irq [%d-%d] for MSI/MSI-X\n",
+>>> +				virq, virq + msidesc->nvec_used - 1);
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +#endif	/* CONFIG_PCI_MSI_IRQ_DOMAIN */
+>>> diff --git a/include/linux/msi.h b/include/linux/msi.h
+>>> index 44f4746d033b..05dcd425f82b 100644
+>>> --- a/include/linux/msi.h
+>>> +++ b/include/linux/msi.h
+>>> @@ -75,4 +75,15 @@ struct msi_chip {
+>>>  	void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
+>>>  };
+>>>  
+>>> +#ifdef	CONFIG_PCI_MSI_IRQ_DOMAIN
+>>
+>> Use a space here, not a tab.
+>>
+>>> +extern struct irq_chip msi_chip;
+>>
+>> I don't think "msi_chip" is a good name.  "Chip" only hints that it's a
+>> semiconductor integrated circuit; it doesn't say anything about what it
+>> does.  I've suggested "msi_controller" elsewhere.
+>>
+>> Why does this need to be exported?  And why should there be only one in a
+>> system?
+>>
+>>> +extern struct irq_domain *msi_create_irq_domain(struct irq_domain *parent);
+>>> +extern int msi_irq_domain_alloc_irqs(struct irq_domain *domain, int type,
+>>> +				     struct pci_dev *dev, void *arg);
+>>> +
+>>> +extern irq_hw_number_t arch_msi_irq_domain_get_hwirq(void *arg);
+>>> +extern void arch_msi_irq_domain_set_hwirq(void *arg, irq_hw_number_t hwirq);
+>>
+>> Look at the rest of the file and notice that the existing code does not use
+>> "extern" on function declarations.
+>>
+>>> +#endif	/* CONFIG_PCI_MSI_IRQ_DOMAIN */
+>>
+>> Use a space here (not a tab), like the #endif just below.
+>>
+>>>  #endif /* LINUX_MSI_H */
+>>> -- 
+>>> 1.7.10.4
+>>>
+>>
+>> .
+>>
+> 
+> 
