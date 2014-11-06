@@ -1,60 +1,31 @@
-From: rafael.j.wysocki@intel.com (Rafael J. Wysocki)
-Date: Thu, 06 Nov 2014 18:31:58 +0100
-Subject: [PATCH] leds: leds-gpio: Fix legacy GPIO number case
-In-Reply-To: <1415273003-27674-1-git-send-email-geert+renesas@glider.be>
-References: <1415273003-27674-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <545BB08E.60408@intel.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 6 Nov 2014 09:33:54 -0800
+Subject: [PATCH] ARM: dts: zynq: Enable PL clocks for Parallella
+In-Reply-To: <1415294531-8942-1-git-send-email-afaerber@suse.de>
+References: <1415294531-8942-1-git-send-email-afaerber@suse.de>
+Message-ID: <e78290abdb85497081f502e5886bf045@BL2FFO11FD057.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/6/2014 12:23 PM, Geert Uytterhoeven wrote:
-> In the legacy case, led_dat->gpiod is initialized correctly, but
-> overwritten later by template->gpiod, which is NULL, causing leds-gpio
-> to fail with:
->
->      gpiod_direction_output: invalid GPIO
->      leds-gpio: probe of leds-gpio failed with error -22
->
-> Move the initialization of led_dat->gpiod from template->gpiod up, and
-> always use led_dat->gpiod later, to fix this.
->
-> Fixes: 5c51277a9ababfa4 ("leds: leds-gpio: Add support for GPIO descriptors")
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Andreas,
 
-Since it fixes a bug in a patch going from my tree, the fix needs to go 
-into my tree as well.
-Thus I'm going to take into my device-properties branch.
+On Thu, 2014-11-06 at 06:22PM +0100, Andreas F?rber wrote:
+> The Parallella board comes with a U-Boot bootloader that loads one of
+> two predefined FPGA bitstreams before booting the kernel. Both define an
+> AXI interface to the on-board Epiphany processor.
+> 
+> Enable clocks FCLK0..FCLK3 for the Programmable Logic by default.
+> 
+> Otherwise accessing, e.g., the ESYSRESET register freezes the board,
+> as seen with the Epiphany SDK tools e-reset and e-hw-rev, using /dev/mem.
 
-Bryan, please let me know if there are any problems with that.
+Yeah, this is the problem. Bypassing the kernel banging on memory
+directly through /dev/mem does not leave any chance of enabling clocks on
+demand through the proper interfaces.
 
-Rafael
+Though, this is a valid workaround for the immediate problem, longer
+term, you should consider adding some kind of proper kernel driver for
+this interface that would then use the clock framework to control the
+required clocks dynamically.
 
-
-> ---
->   drivers/leds/leds-gpio.c | 6 +++---
->   1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/leds/leds-gpio.c b/drivers/leds/leds-gpio.c
-> index ba4698c32bb04bde..b3c5d9d6a42bcd8b 100644
-> --- a/drivers/leds/leds-gpio.c
-> +++ b/drivers/leds/leds-gpio.c
-> @@ -92,7 +92,8 @@ static int create_gpio_led(const struct gpio_led *template,
->   {
->   	int ret, state;
->   
-> -	if (!template->gpiod) {
-> +	led_dat->gpiod = template->gpiod;
-> +	if (!led_dat->gpiod) {
->   		/*
->   		 * This is the legacy code path for platform code that
->   		 * still uses GPIO numbers. Ultimately we would like to get
-> @@ -122,8 +123,7 @@ static int create_gpio_led(const struct gpio_led *template,
->   
->   	led_dat->cdev.name = template->name;
->   	led_dat->cdev.default_trigger = template->default_trigger;
-> -	led_dat->gpiod = template->gpiod;
-> -	led_dat->can_sleep = gpiod_cansleep(template->gpiod);
-> +	led_dat->can_sleep = gpiod_cansleep(led_dat->gpiod);
->   	led_dat->blinking = 0;
->   	if (blink_set) {
->   		led_dat->platform_gpio_blink_set = blink_set;
+	S?ren
