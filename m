@@ -1,186 +1,240 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Thu,  6 Nov 2014 07:38:51 -0800
-Subject: [PATCH] documentation: pinctrl bindings: Fix trivial typo 'abitrary'
-Message-ID: <1415288331-785-1-git-send-email-soren.brinkmann@xilinx.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 06 Nov 2014 16:57:33 +0100
+Subject: [PATCH v2 1/4] PM / Domains: Remove pm_genpd_dev_need_restore()
+ API
+In-Reply-To: <CAPDyKFqi=eKYBXSuRPzTZ0vybRfV6oMNt-_vCqT-6+otGiMucQ@mail.gmail.com>
+References: <1412174494-15346-1-git-send-email-ulf.hansson@linaro.org>
+ <1412174494-15346-2-git-send-email-ulf.hansson@linaro.org>
+ <542C2D9F.8060005@samsung.com>
+ <CAPDyKFq+9G+n3qaj+Ls9i4sOi_BdOGzk5SypDzEMZJwAJMa97Q@mail.gmail.com>
+ <542D3E45.5020908@samsung.com>
+ <CAPDyKFozS+J_sTZykF=9tVJsCByby_BDuQmGiMt-Uw-qC4Tzuw@mail.gmail.com>
+ <542D7525.8000804@samsung.com>
+ <CAPDyKFqi=eKYBXSuRPzTZ0vybRfV6oMNt-_vCqT-6+otGiMucQ@mail.gmail.com>
+Message-ID: <545B9A6D.5060206@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A misspelled 'arbitrary' propagated to quite a few locations in the DT
-binding documentation for pin-controllers. Fixing by:
-  git grep abitrary | cut -f1 -d: | xargs sed -i 's/abitrary/arbitrary/'
+[dropping some addresses from Cc]
 
-Reported-by: Andreas F?rber <afaerber@suse.de>
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+On 03/10/14 12:36, Ulf Hansson wrote:
+> On 2 October 2014 17:54, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
+>> On 02/10/14 15:30, Ulf Hansson wrote:
+>> [...]
+>>> Correct me if I am wrong, but I think in principle these exynos
+>>> drivers don't use pm_runtime_set_active() during ->probe() and are
+>>> instead relying on CONFIG_PM_RUNTIME to be enabled.
+>>
+>> Yes, pm_runtime_set_active() is not used in probe(), I believe this
+>> is not required. In case of those IP blocks there is no use of activating
+>> them during probe(). Instead we check if PM_RUNTIME is enabled through
+>> pm_runtime_enabled() helper and enable the device clock(s) if not.
+>> I agree it all doesn't quite work in current mainline for !PM_RUNTIME,
+>> since there is nothing ensuring that the power domains are enabled
+>> in such kernel configuration.
+>>
+>>> That's not a good behaviour. If these drivers are build without
+>>> CONFIG_PM_RUNTIME - they won't work.
+>>
+>> They wouldn't similarly work with pm_runtime_set_active() call in probe()
+>> with CONFIG_PM_RUNTIME disabled, would they ?
+> 
+> Yes they would, although they require some minor additional adaptations.
+> 
+> Those resources that are enabled from the driver's runtime PM resume
+> callback, should also be enabled during ->probe(). The
+> pm_runtime_set_active() will then update the state to reflect this.
+> 
+> Then, if CONFIG_PM_RUNTIME is enabled - the device will be scheduled
+> to go inactive from driver core (pm_request_idle()), after ->probe()
+> has completed. Thus saving power if it's unused.
+> If CONFIG_PM_RUNTIME isn't enabled - the driver will still be
+> functional, since all resources are enabled during ->probe().
+
+OK, I suspected you also assumed enabling relevant resources, so the PM
+state matches the hardware state.
+
+Sorry for getting back late to this, now there is a regression on
+Exynos seen in multiple drivers, i.e. affecting all the media and
+video devices.  Is this patch series going to be merged for v3.18 as
+a regression fix ? If so I would need to update remaining drivers to
+enable clocks and use pm_runtime_set_active() in probe().
+
+I can see two options to fix bugs which appeared in Exynos after
+merging the patch series switching to the OF generic power domain API:
+
+1. merge this series and update the affected drivers for v3.18,
+
+2. revert for now to the previous behaviour, doing something as
+   the patch below.
+
+1. seems only a partial solution, since the regression remains for the
+loadable modules which are loaded after late_initcall().  At that point
+power domain may be disabled and the driver attempting to access
+the hardware will hand the system.
+
+It's also a bit not clear to me why there is an assumption that when
+a power domain is initially enabled all its corresponding devices are
+already also fully activated ?
+
+int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
+			  struct gpd_timing_data *td)
+{
+	...
+	gpd_data->need_restore = genpd->status == GPD_STATE_POWER_OFF;
+	...
+}
+
+It seems correct to me to have initially the power domain enabled and some
+devices inactive, e.g. if device's driver manages its clocks and didn't
+turn them on yet.
+
+-----8<----
+>From c7dbc17e940db681d51941b3493e216cee6912f5 Mon Sep 17 00:00:00 2001
+From: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Date: Thu, 6 Nov 2014 16:44:05 +0100
+Subject: [PATCH] PM / domains: Allow initial restoring of devices in active
+ domain
+
+Currently a device in the power domain won't be initially runtime
+resumed if it is added to an active power domain. In drivers which
+don't enable all resources they manage and call pm_runtime_set_active()
+in probe() there are now unbalanced runtime_resume() calls seen after
+commit a4a8c2c4962bb655e7152c53a0eb6ca31c47f159
+("ARM: exynos: Move to generic PM domain DT bindings").
+
+To fix the regression revert to previous behaviour for Exynos platform.
+
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- Documentation/devicetree/bindings/pinctrl/img,tz1090-pdc-pinctrl.txt | 2 +-
- Documentation/devicetree/bindings/pinctrl/img,tz1090-pinctrl.txt     | 2 +-
- Documentation/devicetree/bindings/pinctrl/lantiq,falcon-pinumx.txt   | 2 +-
- Documentation/devicetree/bindings/pinctrl/lantiq,xway-pinumx.txt     | 2 +-
- Documentation/devicetree/bindings/pinctrl/nvidia,tegra20-pinmux.txt  | 2 +-
- Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt           | 2 +-
- Documentation/devicetree/bindings/pinctrl/pinctrl_spear.txt          | 2 +-
- Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt   | 2 +-
- Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt   | 2 +-
- Documentation/devicetree/bindings/pinctrl/qcom,ipq8064-pinctrl.txt   | 2 +-
- Documentation/devicetree/bindings/pinctrl/qcom,msm8960-pinctrl.txt   | 2 +-
- Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt   | 2 +-
- 12 files changed, 12 insertions(+), 12 deletions(-)
+ arch/arm/mach-exynos/pm_domains.c   |    2 +-
+ arch/arm/mach-s3c64xx/pm.c          |    4 ++--
+ arch/arm/mach-shmobile/pm-r8a7779.c |    2 +-
+ arch/arm/mach-shmobile/pm-rmobile.c |    2 +-
+ drivers/base/power/domain.c         |    8 ++++++--
+ include/linux/pm_domain.h           |    4 +++-
+ 6 files changed, 14 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/img,tz1090-pdc-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/img,tz1090-pdc-pinctrl.txt
-index a186181c402b..51b943cc9770 100644
---- a/Documentation/devicetree/bindings/pinctrl/img,tz1090-pdc-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/img,tz1090-pdc-pinctrl.txt
-@@ -9,7 +9,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
- common pinctrl bindings used by client devices, including the meaning of the
- phrase "pin configuration node".
- 
--TZ1090-PDC's pin configuration nodes act as a container for an abitrary number
-+TZ1090-PDC's pin configuration nodes act as a container for an arbitrary number
- of subnodes. Each of these subnodes represents some desired configuration for a
- pin, a group, or a list of pins or groups. This configuration can include the
- mux function to select on those pin(s)/group(s), and various pin configuration
-diff --git a/Documentation/devicetree/bindings/pinctrl/img,tz1090-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/img,tz1090-pinctrl.txt
-index 4b27c99f7f9d..49d0e6050940 100644
---- a/Documentation/devicetree/bindings/pinctrl/img,tz1090-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/img,tz1090-pinctrl.txt
-@@ -9,7 +9,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
- common pinctrl bindings used by client devices, including the meaning of the
- phrase "pin configuration node".
- 
--TZ1090's pin configuration nodes act as a container for an abitrary number of
-+TZ1090's pin configuration nodes act as a container for an arbitrary number of
- subnodes. Each of these subnodes represents some desired configuration for a
- pin, a group, or a list of pins or groups. This configuration can include the
- mux function to select on those pin(s)/group(s), and various pin configuration
-diff --git a/Documentation/devicetree/bindings/pinctrl/lantiq,falcon-pinumx.txt b/Documentation/devicetree/bindings/pinctrl/lantiq,falcon-pinumx.txt
-index daa768956069..ac4da9fe07bd 100644
---- a/Documentation/devicetree/bindings/pinctrl/lantiq,falcon-pinumx.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/lantiq,falcon-pinumx.txt
-@@ -9,7 +9,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
- common pinctrl bindings used by client devices, including the meaning of the
- phrase "pin configuration node".
- 
--Lantiq's pin configuration nodes act as a container for an abitrary number of
-+Lantiq's pin configuration nodes act as a container for an arbitrary number of
- subnodes. Each of these subnodes represents some desired configuration for a
- pin, a group, or a list of pins or groups. This configuration can include the
- mux function to select on those group(s), and two pin configuration parameters:
-diff --git a/Documentation/devicetree/bindings/pinctrl/lantiq,xway-pinumx.txt b/Documentation/devicetree/bindings/pinctrl/lantiq,xway-pinumx.txt
-index b5469db1d7ad..e89b4677567d 100644
---- a/Documentation/devicetree/bindings/pinctrl/lantiq,xway-pinumx.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/lantiq,xway-pinumx.txt
-@@ -9,7 +9,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
- common pinctrl bindings used by client devices, including the meaning of the
- phrase "pin configuration node".
- 
--Lantiq's pin configuration nodes act as a container for an abitrary number of
-+Lantiq's pin configuration nodes act as a container for an arbitrary number of
- subnodes. Each of these subnodes represents some desired configuration for a
- pin, a group, or a list of pins or groups. This configuration can include the
- mux function to select on those group(s), and two pin configuration parameters:
-diff --git a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra20-pinmux.txt b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra20-pinmux.txt
-index 61e73cde9ae9..3c8ce28baad6 100644
---- a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra20-pinmux.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra20-pinmux.txt
-@@ -9,7 +9,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
- common pinctrl bindings used by client devices, including the meaning of the
- phrase "pin configuration node".
- 
--Tegra's pin configuration nodes act as a container for an abitrary number of
-+Tegra's pin configuration nodes act as a container for an arbitrary number of
- subnodes. Each of these subnodes represents some desired configuration for a
- pin, a group, or a list of pins or groups. This configuration can include the
- mux function to select on those pin(s)/group(s), and various pin configuration
-diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt
-index c596a6ad3285..5f55be59d914 100644
---- a/Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt
-@@ -13,7 +13,7 @@ Optional properties:
- Please refer to pinctrl-bindings.txt in this directory for details of the common
- pinctrl bindings used by client devices.
- 
--SiRFprimaII's pinmux nodes act as a container for an abitrary number of subnodes.
-+SiRFprimaII's pinmux nodes act as a container for an arbitrary number of subnodes.
- Each of these subnodes represents some desired configuration for a group of pins.
- 
- Required subnode-properties:
-diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl_spear.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl_spear.txt
-index b4480d5c3aca..458615596946 100644
---- a/Documentation/devicetree/bindings/pinctrl/pinctrl_spear.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/pinctrl_spear.txt
-@@ -32,7 +32,7 @@ Required properties:
- Please refer to pinctrl-bindings.txt in this directory for details of the common
- pinctrl bindings used by client devices.
- 
--SPEAr's pinmux nodes act as a container for an abitrary number of subnodes. Each
-+SPEAr's pinmux nodes act as a container for an arbitrary number of subnodes. Each
- of these subnodes represents muxing for a pin, a group, or a list of pins or
- groups.
- 
-diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt
-index 2fb90b37aa09..a7bde64798c7 100644
---- a/Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt
-@@ -18,7 +18,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
- common pinctrl bindings used by client devices, including the meaning of the
- phrase "pin configuration node".
- 
--Qualcomm's pin configuration nodes act as a container for an abitrary number of
-+Qualcomm's pin configuration nodes act as a container for an arbitrary number of
- subnodes. Each of these subnodes represents some desired configuration for a
- pin, a group, or a list of pins or groups. This configuration can include the
- mux function to select on those pin(s)/group(s), and various pin configuration
-diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt
-index ffafa1990a30..c4ea61ac56f2 100644
---- a/Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt
-@@ -47,7 +47,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
- common pinctrl bindings used by client devices, including the meaning of the
- phrase "pin configuration node".
- 
--The pin configuration nodes act as a container for an abitrary number of
-+The pin configuration nodes act as a container for an arbitrary number of
- subnodes. Each of these subnodes represents some desired configuration for a
- pin, a group, or a list of pins or groups. This configuration can include the
- mux function to select on those pin(s)/group(s), and various pin configuration
-diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,ipq8064-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,ipq8064-pinctrl.txt
-index e33e4dcdce79..6e88e91feb11 100644
---- a/Documentation/devicetree/bindings/pinctrl/qcom,ipq8064-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/qcom,ipq8064-pinctrl.txt
-@@ -18,7 +18,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
- common pinctrl bindings used by client devices, including the meaning of the
- phrase "pin configuration node".
- 
--Qualcomm's pin configuration nodes act as a container for an abitrary number of
-+Qualcomm's pin configuration nodes act as a container for an arbitrary number of
- subnodes. Each of these subnodes represents some desired configuration for a
- pin, a group, or a list of pins or groups. This configuration can include the
- mux function to select on those pin(s)/group(s), and various pin configuration
-diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,msm8960-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,msm8960-pinctrl.txt
-index 93b7de91b9f6..eb8d8aa41f20 100644
---- a/Documentation/devicetree/bindings/pinctrl/qcom,msm8960-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/qcom,msm8960-pinctrl.txt
-@@ -47,7 +47,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
- common pinctrl bindings used by client devices, including the meaning of the
- phrase "pin configuration node".
- 
--The pin configuration nodes act as a container for an abitrary number of
-+The pin configuration nodes act as a container for an arbitrary number of
- subnodes. Each of these subnodes represents some desired configuration for a
- pin, a group, or a list of pins or groups. This configuration can include the
- mux function to select on those pin(s)/group(s), and various pin configuration
-diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt
-index d2ea80dc43eb..e4d6a9d20f7d 100644
---- a/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt
-@@ -18,7 +18,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
- common pinctrl bindings used by client devices, including the meaning of the
- phrase "pin configuration node".
- 
--Qualcomm's pin configuration nodes act as a container for an abitrary number of
-+Qualcomm's pin configuration nodes act as a container for an arbitrary number of
- subnodes. Each of these subnodes represents some desired configuration for a
- pin, a group, or a list of pins or groups. This configuration can include the
- mux function to select on those pin(s)/group(s), and various pin configuration
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index 20f2671..0b0bf68 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -157,7 +157,7 @@ static __init int exynos4_pm_init_power_domain(void)
+ no_clk:
+ 		on = __raw_readl(pd->base + 0x4) & INT_LOCAL_PWR_EN;
+
+-		pm_genpd_init(&pd->pd, NULL, !on);
++		pm_genpd_init(&pd->pd, NULL, !on, true);
+ 		of_genpd_add_provider_simple(np, &pd->pd);
+ 	}
+
+diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
+index aaf7bea..a347654 100644
+--- a/arch/arm/mach-s3c64xx/pm.c
++++ b/arch/arm/mach-s3c64xx/pm.c
+@@ -315,10 +315,10 @@ int __init s3c64xx_pm_init(void)
+
+ 	for (i = 0; i < ARRAY_SIZE(s3c64xx_always_on_pm_domains); i++)
+ 		pm_genpd_init(&s3c64xx_always_on_pm_domains[i]->pd,
+-			      &pm_domain_always_on_gov, false);
++			      &pm_domain_always_on_gov, false, false);
+
+ 	for (i = 0; i < ARRAY_SIZE(s3c64xx_pm_domains); i++)
+-		pm_genpd_init(&s3c64xx_pm_domains[i]->pd, NULL, false);
++		pm_genpd_init(&s3c64xx_pm_domains[i]->pd, NULL, false, false);
+
+ #ifdef CONFIG_S3C_DEV_FB
+ 	if (dev_get_platdata(&s3c_device_fb.dev))
+diff --git a/arch/arm/mach-shmobile/pm-r8a7779.c
+b/arch/arm/mach-shmobile/pm-r8a7779.c
+index 82fe3d7..fcb17f7 100644
+--- a/arch/arm/mach-shmobile/pm-r8a7779.c
++++ b/arch/arm/mach-shmobile/pm-r8a7779.c
+@@ -83,7 +83,7 @@ static void r8a7779_init_pm_domain(struct r8a7779_pm_domain
+*r8a7779_pd)
+ {
+ 	struct generic_pm_domain *genpd = &r8a7779_pd->genpd;
+
+-	pm_genpd_init(genpd, NULL, false);
++	pm_genpd_init(genpd, NULL, false, false);
+ 	genpd->dev_ops.stop = pm_clk_suspend;
+ 	genpd->dev_ops.start = pm_clk_resume;
+ 	genpd->dev_ops.active_wakeup = pd_active_wakeup;
+diff --git a/arch/arm/mach-shmobile/pm-rmobile.c
+b/arch/arm/mach-shmobile/pm-rmobile.c
+index 717e641..e8c913e 100644
+--- a/arch/arm/mach-shmobile/pm-rmobile.c
++++ b/arch/arm/mach-shmobile/pm-rmobile.c
+@@ -106,7 +106,7 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain
+*rmobile_pd)
+ 	struct generic_pm_domain *genpd = &rmobile_pd->genpd;
+ 	struct dev_power_governor *gov = rmobile_pd->gov;
+
+-	pm_genpd_init(genpd, gov ? : &simple_qos_governor, false);
++	pm_genpd_init(genpd, gov ? : &simple_qos_governor, false, false);
+ 	genpd->dev_ops.stop		= pm_clk_suspend;
+ 	genpd->dev_ops.start		= pm_clk_resume;
+ 	genpd->dev_ops.active_wakeup	= rmobile_pd_active_wakeup;
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 40bc2f4..6a2da45 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -1442,7 +1442,8 @@ int __pm_genpd_add_device(struct generic_pm_domain
+*genpd, struct device *dev,
+ 	mutex_lock(&gpd_data->lock);
+ 	gpd_data->base.dev = dev;
+ 	list_add_tail(&gpd_data->base.list_node, &genpd->dev_list);
+-	gpd_data->need_restore = genpd->status == GPD_STATE_POWER_OFF;
++	gpd_data->need_restore = (genpd->status == GPD_STATE_POWER_OFF ||
++				  genpd->force_restore);
+ 	gpd_data->td.constraint_changed = true;
+ 	gpd_data->td.effective_constraint_ns = -1;
+ 	mutex_unlock(&gpd_data->lock);
+@@ -1857,9 +1858,11 @@ static int pm_genpd_default_restore_state(struct device
+*dev)
+  * @genpd: PM domain object to initialize.
+  * @gov: PM domain governor to associate with the domain (may be NULL).
+  * @is_off: Initial value of the domain's power_is_off field.
++ * @force_restore: True to set device's being added "need_restore" flag.
+  */
+ void pm_genpd_init(struct generic_pm_domain *genpd,
+-		   struct dev_power_governor *gov, bool is_off)
++		   struct dev_power_governor *gov, bool is_off,
++		   bool force_restore)
+ {
+ 	if (IS_ERR_OR_NULL(genpd))
+ 		return;
+@@ -1873,6 +1876,7 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
+ 	genpd->in_progress = 0;
+ 	atomic_set(&genpd->sd_count, 0);
+ 	genpd->status = is_off ? GPD_STATE_POWER_OFF : GPD_STATE_ACTIVE;
++	genpd->force_restore = force_restore;
+ 	init_waitqueue_head(&genpd->status_wait_queue);
+ 	genpd->poweroff_task = NULL;
+ 	genpd->resume_count = 0;
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index 73e938b..1acfe05 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -71,6 +71,7 @@ struct generic_pm_domain {
+ 	s64 max_off_time_ns;	/* Maximum allowed "suspended" time. */
+ 	bool max_off_time_changed;
+ 	bool cached_power_down_ok;
++	bool force_restore; /* True to always initially restore devices */
+ 	struct gpd_cpuidle_data *cpuidle_data;
+ 	void (*attach_dev)(struct device *dev);
+ 	void (*detach_dev)(struct device *dev);
+@@ -141,7 +142,8 @@ extern int pm_genpd_name_attach_cpuidle(const char *name,
+int state);
+ extern int pm_genpd_detach_cpuidle(struct generic_pm_domain *genpd);
+ extern int pm_genpd_name_detach_cpuidle(const char *name);
+ extern void pm_genpd_init(struct generic_pm_domain *genpd,
+-			  struct dev_power_governor *gov, bool is_off);
++			  struct dev_power_governor *gov, bool is_off,
++			  bool force_restore);
+
+ extern int pm_genpd_poweron(struct generic_pm_domain *genpd);
+ extern int pm_genpd_name_poweron(const char *domain_name);
 -- 
-2.1.3.1.ge241007
+1.7.9.5
+-----8<----
