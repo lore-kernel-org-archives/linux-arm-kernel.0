@@ -1,31 +1,41 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 6 Nov 2014 09:33:54 -0800
-Subject: [PATCH] ARM: dts: zynq: Enable PL clocks for Parallella
-In-Reply-To: <1415294531-8942-1-git-send-email-afaerber@suse.de>
-References: <1415294531-8942-1-git-send-email-afaerber@suse.de>
-Message-ID: <e78290abdb85497081f502e5886bf045@BL2FFO11FD057.protection.gbl>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 6 Nov 2014 11:36:05 -0600
+Subject: [PATCH 1/2] usb: dwc3: core: enable phy suspend quirk on non-FPGA
+Message-ID: <1415295366-593-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
+as it turns out, at least AM437x silicon (non-FPGA)
+needs to enable PHY suspend quirk. So let's allow
+for PHY suspend quirk to be used with non-FPGA
+builds too.
 
-On Thu, 2014-11-06 at 06:22PM +0100, Andreas F?rber wrote:
-> The Parallella board comes with a U-Boot bootloader that loads one of
-> two predefined FPGA bitstreams before booting the kernel. Both define an
-> AXI interface to the on-board Epiphany processor.
-> 
-> Enable clocks FCLK0..FCLK3 for the Programmable Logic by default.
-> 
-> Otherwise accessing, e.g., the ESYSRESET register freezes the board,
-> as seen with the Epiphany SDK tools e-reset and e-hw-rev, using /dev/mem.
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ drivers/usb/dwc3/core.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Yeah, this is the problem. Bypassing the kernel banging on memory
-directly through /dev/mem does not leave any chance of enabling clocks on
-demand through the proper interfaces.
-
-Though, this is a valid workaround for the immediate problem, longer
-term, you should consider adding some kind of proper kernel driver for
-this interface that would then use the clock framework to control the
-required clocks dynamically.
-
-	S?ren
+diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+index 8ae42b8..25ddc39 100644
+--- a/drivers/usb/dwc3/core.c
++++ b/drivers/usb/dwc3/core.c
+@@ -404,7 +404,7 @@ static void dwc3_phy_setup(struct dwc3 *dwc)
+ 	if (dwc->tx_de_emphasis_quirk)
+ 		reg |= DWC3_GUSB3PIPECTL_TX_DEEPH(dwc->tx_de_emphasis);
+ 
+-	if (dwc->dis_u3_susphy_quirk && dwc->is_fpga)
++	if (dwc->dis_u3_susphy_quirk)
+ 		reg &= ~DWC3_GUSB3PIPECTL_SUSPHY;
+ 
+ 	dwc3_writel(dwc->regs, DWC3_GUSB3PIPECTL(0), reg);
+@@ -422,7 +422,7 @@ static void dwc3_phy_setup(struct dwc3 *dwc)
+ 	if (dwc->revision > DWC3_REVISION_194A)
+ 		reg |= DWC3_GUSB2PHYCFG_SUSPHY;
+ 
+-	if (dwc->dis_u2_susphy_quirk && dwc->is_fpga)
++	if (dwc->dis_u2_susphy_quirk)
+ 		reg &= ~DWC3_GUSB2PHYCFG_SUSPHY;
+ 
+ 	dwc3_writel(dwc->regs, DWC3_GUSB2PHYCFG(0), reg);
+-- 
+2.1.0.GIT
