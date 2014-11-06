@@ -1,83 +1,92 @@
-From: Andrew.Jackson@arm.com (Andrew Jackson)
-Date: Thu, 06 Nov 2014 11:39:47 +0000
-Subject: [PATCH] dmaengine: pl330: Correct device assignment.
-Message-ID: <545B5E03.3040809@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 06 Nov 2014 12:53:42 +0100
+Subject: [PATCH v3/resend] ARM: shmobile: Add early debugging support
+ using SCIF(A)
+In-Reply-To: <1415273910-32356-1-git-send-email-geert+renesas@glider.be>
+References: <1415273910-32356-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <3499638.LG41cHl0JS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit f6f2421c0a1c removed pl330_info structure by embedding it into
-pl330_dmac structure, but did not ensure that the dmac->ddma.dev
-pointer gets initialised before use. When dma_alloc_coherent() gets
-called on arm64 a WARN() gets triggered due to dev being NULL.
+On Thursday 06 November 2014 12:38:30 Geert Uytterhoeven wrote:
+> Add serial port debug macros for the SCIF(A) serial ports.
+> This includes all shmobile SoCs, except for EMEV2.
+> 
+> The configuration logic (both Kconfig and #ifdef) is more complicated than
+> one would expect, for several reasons:
+>   1. Not all SoCs have the same serial ports, and they're not always at
+>      the same addresses.
+>   2. There are two different types: SCIF and SCIFA. Fortunately they can
+>      easily be distinguished by physical address.
+>   3. Not all boards use the same serial port for the console.
+>      The defaults correspond to the boards that are supported in
+>      mainline. If you want to use a different serial port, just change
+>      the value of CONFIG_DEBUG_UART_PHYS, and the rest will auto-adapt.
+>   4. On SoCs using the legacy machine_desc.map_io(), an identity mapping
+>      of the SCIF(A) registers must be set up in .map_io(). On all but
+>      r8a7779 this was already done.
+>      On other SoCs, debug_ll_io_init() maps the SCIF(A) registers to a
+>      fixed virtual address. 0xfdxxxxxx was chosen, as it should lie below
+>      VMALLOC_END = 0xff000000, and must not conflict with the 2 MiB
+>      reserved region at PCI_IO_VIRT_BASE = 0xfee00000.
+>      Once all SoCs have migrated away from machine_desc.map_io(), more
+>      consolidation of DEBUG_<SoC>_<PORT> can be done.
+> 
+> This was derived from the r8a7790 version by Laurent Pinchart.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-------------[ cut here ]------------
-WARNING: CPU: 1 PID: 1 at arch/arm64/mm/dma-mapping.c:49 __dma_alloc_coherent+0xd0/0xe0()
-Use an actual device structure for DMA allocation
-Modules linked in:
-CPU: 1 PID: 1 Comm: swapper/0 Not tainted 3.17.0+ #5
-Call trace:
-[<ffffffc000087f24>] dump_backtrace+0x0/0x130
-[<ffffffc000088064>] show_stack+0x10/0x1c
-[<ffffffc0004e8af8>] dump_stack+0x74/0xb8
-[<ffffffc0000aa444>] warn_slowpath_common+0x8c/0xb4
-[<ffffffc0000aa4b8>] warn_slowpath_fmt+0x4c/0x58
-[<ffffffc000092580>] __dma_alloc_coherent+0xcc/0xe0
-[<ffffffc000092734>] __dma_alloc_noncoherent+0x64/0x158
-[<ffffffc000312cd8>] pl330_probe+0x650/0x8f0
-[<ffffffc00030e1d4>] amba_probe+0xa0/0xc8
-[<ffffffc000350240>] really_probe+0xc4/0x22c
-[<ffffffc0003504b4>] __driver_attach+0xa0/0xa8
-[<ffffffc00034e5fc>] bus_for_each_dev+0x54/0x98
-[<ffffffc00034fd8c>] driver_attach+0x1c/0x28
-[<ffffffc00034fa08>] bus_add_driver+0x14c/0x204
-[<ffffffc000350b84>] driver_register+0x64/0x130
-[<ffffffc00030dcf8>] amba_driver_register+0x50/0x5c
-[<ffffffc0006a60d0>] pl330_driver_init+0x10/0x1c
-[<ffffffc0000814ac>] do_one_initcall+0x88/0x19c
-[<ffffffc00068dab8>] kernel_init_freeable+0x140/0x1e0
-[<ffffffc0004e5e18>] kernel_init+0x10/0xd4
----[ end trace 76f2d47a444e523e ]---
-(NULL device *): dmac_alloc_resources:1821 Can't allocate memory!
-(NULL device *): Unable to create channels for DMAC
+I don't object to this patch going in, but have you looked at doing
+just earlycon instead? We are still missing some fixmap changes
+before that works on arm32, but in general, early looks nicer than
+debug_ll because it doesn't require you to build for a particular
+machine, with the downside that it's not available as early during
+boot.
 
-This patch will also ensure that any dev_err messages are printed 
-with the appropriate device name.
 
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
----
- drivers/dma/pl330.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+> @@ -1039,6 +1047,54 @@ config DEBUG_STI_UART
+>  	bool
+>  	depends on ARCH_STI
+>  
+> +choice
+> +	prompt "Renesas SCIF(A) debugging SoC/port"
+> +	depends on DEBUG_RENESAS_SCIF
+> +	help
+> +	  Choose SoC and SCIF(A) debug port combination from the list below.
+> +
+> +	  The kernel will most probably only work on the selected SoC.
+> +	  The selected debug port will be used to provide the default SCIF(A)
+> +	  physical address; the actual address can still be overridden using
+> +	  the DEBUG_UART_PHYS option, if needed.
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 4a5a2a8..ace7d42 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -2629,6 +2629,9 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 		return -ENOMEM;
- 	}
- 
-+	pd = &pl330->ddma;
-+	pd->dev = &adev->dev;
-+
- 	pl330->mcbufsz = pdat ? pdat->mcbuf_sz : 0;
- 
- 	res = &adev->res;
-@@ -2665,7 +2668,6 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 	if (!add_desc(pl330, GFP_KERNEL, NR_DEFAULT_DESC))
- 		dev_warn(&adev->dev, "unable to allocate desc\n");
- 
--	pd = &pl330->ddma;
- 	INIT_LIST_HEAD(&pd->channels);
- 
- 	/* Initialize channel parameters */
-@@ -2702,7 +2704,6 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 		list_add_tail(&pch->chan.device_node, &pd->channels);
- 	}
- 
--	pd->dev = &adev->dev;
- 	if (pdat) {
- 		pd->cap_mask = pdat->cap_mask;
- 	} else {
--- 
-1.7.1
+We used to have multi-level choice statements here, but Russell removed
+them all in cce278d2034 ("ARM: debug: clean up low level kernel debugging
+selection"). Please follow the same style.
+
+> diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+> index d08e75cceaab3ead..b31032294f478c91 100644
+> --- a/arch/arm/mach-shmobile/setup-r8a7779.c
+> +++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+> @@ -62,6 +62,15 @@ static struct map_desc r8a7779_io_desc[] __initdata = {
+>  		.length		= SZ_16M,
+>  		.type		= MT_DEVICE_NONSHARED
+>  	},
+> +#ifdef CONFIG_DEBUG_R8A7779_SCIF2
+> +	/* 64K entity map for 0xffe40000 (SCIF) */
+
+s/entity/identity/ ?
+
+> +	{
+> +		.virtual	= 0xffe40000,
+> +		.pfn		= __phys_to_pfn(0xffe40000),
+> +		.length		= SZ_64K,
+> +		.type		= MT_DEVICE_NONSHARED
+> +	},
+> +#endif /* CONFIG_DEBUG_R8A7779_SCIF2 */
+>  };
+
+This should be done automatically if you call debug_ll_io_init() or
+have an empty map_io() callback.
+
+	Arnd
