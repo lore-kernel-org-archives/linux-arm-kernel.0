@@ -1,54 +1,26 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  6 Nov 2014 19:56:49 +0800
-Subject: [PATCH] ARM: dts: sun6i: Re-parent ahb1_mux to pll6 as required by
- dma controller
-Message-ID: <1415275009-415-1-git-send-email-wens@csie.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 6 Nov 2014 12:59:25 +0100 (CET)
+Subject: [Patch Part2 v4 21/31] PCI/MSI: enhance PCI MSI core to support
+ hierarchy irqdomain
+In-Reply-To: <545B5E5B.8090300@linux.intel.com>
+References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
+ <1415102525-9898-22-git-send-email-jiang.liu@linux.intel.com>
+ <alpine.DEB.2.11.1411061023400.24960@nanos>
+ <545B5E5B.8090300@linux.intel.com>
+Message-ID: <alpine.DEB.2.11.1411061258560.24960@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dma controller requires that the ahb1 bus clock be driven by pll6
-for peripheral access to work. Previously this was done in the dma
-controller driver, but was since removed as part of a series to unify
-the ahb1_mux and ahb1 clock drivers, in
+On Thu, 6 Nov 2014, Jiang Liu wrote:
+> On 2014/11/6 18:01, Thomas Gleixner wrote:
+> Hi Thomas,
+> 	Actually I'm working on a patch set to improve MSI support in
+> the way you described above this afternoon. And I'm also trying to
+> split MSI code into PCI dependent part and PCI independent part.
+> I plan to add a file kernel/irq/msi.c to host PCI independent part,
 
-    14e0e28 dmaengine: sun6i: Remove obsolete clk muxing code
+kernel/irq/msi.c is fine.
 
-Unfortunately the rest of that series did not make it, leaving us with
-broken dma on sun6i.
+Thanks,
 
-This patch reparents ahb1_mux to pll6 using the DT assigned-clocks
-properties in the dma controller node.
-
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
-Hi Maxime,
-
-This is for 3.18 to fix broken dma. I have verified the clock register
-bits on my A31 Hummingbird. Though I do not have actual hardware to test
-dma peripherals, since this does return things to the way they were, it
-is a proper fix.
-
-Sorry for the breakage.
-
-ChenYu
----
- arch/arm/boot/dts/sun6i-a31.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index e80288e..4c4792f 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -361,6 +361,10 @@
- 			clocks = <&ahb1_gates 6>;
- 			resets = <&ahb1_rst 6>;
- 			#dma-cells = <1>;
-+
-+			/* DMA controller requires AHB1 clocked from PLL6 */
-+			assigned-clocks = <&ahb1_mux>;
-+			assigned-clock-parents = <&pll6>;
- 		};
- 
- 		mmc0: mmc at 01c0f000 {
--- 
-2.1.1
+	tglx
