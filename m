@@ -1,67 +1,71 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 6 Nov 2014 10:30:12 +0100
-Subject: [PATCH v5 2/8] phy: miphy28lp: Add PHY header file for DT x Driver
- defines
-In-Reply-To: <545B1C53.9010406@ti.com>
-References: <1415098284-11182-1-git-send-email-gabriel.fernandez@linaro.org>
- <1415098284-11182-3-git-send-email-gabriel.fernandez@linaro.org>
- <545B1C53.9010406@ti.com>
-Message-ID: <545B3FA4.8040109@st.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 6 Nov 2014 10:41:26 +0100
+Subject: [PATCH] mmc: atmel-mci: adopt pinctrl support
+In-Reply-To: <1415263973-15012-1-git-send-email-wenyou.yang@atmel.com>
+References: <1415263973-15012-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <CAPDyKFo_snpdU5EjW7-rAXSwqBt0mi9-oEYuNpONRAr_aKdiPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
-On 11/06/2014 07:59 AM, Kishon Vijay Abraham I wrote:
-> Hi,
+On 6 November 2014 09:52, Wenyou Yang <wenyou.yang@atmel.com> wrote:
+> Amend the atmel mci pin controller to optionally take a pin control
+> handle and set the state of the pins to:
+> - "default" on boot, resume and before performing an transfer.
+> - "sleep" on suspend().
 >
-> On Tuesday 04 November 2014 04:21 PM, Gabriel FERNANDEZ wrote:
->> This provides the shared header file which will be reference from both
->> PHY driver and its associated Device Tree node(s).
->>
->> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
->> ---
->>   include/dt-bindings/phy/phy.h | 18 ++++++++++++++++++
-> I don't see this being used in device tree file. Are you planning to add this
-> after -rc1 is tagged. Or else I have to create a separate branch for this file
-> which will be merged by both me and the dt maintainer. Let me know.
-I think we don't need to create a branch we will merged by both of us.
-
-What we can do that both of us apply this patch in our trees.
-It will avoid dependencies on each others.
-
-What do you think?
-
-Best regards,
-Maxime
-
+> This should make it possible to optimize energy usage for the pins
+> both for the suspend/resume cycle.
 >
-> Thanks
-> Kishon
->>   1 file changed, 18 insertions(+)
->>   create mode 100644 include/dt-bindings/phy/phy.h
->>
->> diff --git a/include/dt-bindings/phy/phy.h b/include/dt-bindings/phy/phy.h
->> new file mode 100644
->> index 0000000..e8c6a3f
->> --- /dev/null
->> +++ b/include/dt-bindings/phy/phy.h
->> @@ -0,0 +1,18 @@
->> +/*
->> + *
->> + * This header provides constants for the phy framework
->> + *
->> + * Copyright (C) 2014 STMicroelectronics
->> + * Author: Gabriel Fernandez <gabriel.fernandez@st.com>
->> + * License terms:  GNU General Public License (GPL), version 2
->> + */
->> +
->> +#ifndef _DT_BINDINGS_PHY
->> +#define _DT_BINDINGS_PHY
->> +
->> +#define PHY_TYPE_SATA		1
->> +#define PHY_TYPE_PCIE		2
->> +#define PHY_TYPE_USB2		3
->> +#define PHY_TYPE_USB3		4
->> +
->> +#endif /* _DT_BINDINGS_PHY */
->>
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> ---
+>  drivers/mmc/host/atmel-mci.c |    7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index 4df1599..eb4bfbc 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -39,6 +39,7 @@
+>  #include <linux/atmel_pdc.h>
+>  #include <linux/pm.h>
+>  #include <linux/pm_runtime.h>
+> +#include <linux/pinctrl/consumer.h>
+>
+>  #include <asm/cacheflush.h>
+>  #include <asm/io.h>
+> @@ -2385,6 +2386,8 @@ static int __init atmci_probe(struct platform_device *pdev)
+>         int                             irq;
+>         int                             ret, i;
+>
+> +       pinctrl_pm_select_default_state(&pdev->dev);
+
+Not needed, it's already taken care of from driver core.
+
+> +
+>         regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>         if (!regs)
+>                 return -ENXIO;
+> @@ -2568,6 +2571,8 @@ static int atmci_runtime_suspend(struct device *dev)
+>
+>         clk_disable_unprepare(host->mck);
+>
+> +       pinctrl_pm_select_sleep_state(dev);
+> +
+>         return 0;
+>  }
+>
+> @@ -2575,6 +2580,8 @@ static int atmci_runtime_resume(struct device *dev)
+>  {
+>         struct atmel_mci *host = dev_get_drvdata(dev);
+>
+> +       pinctrl_pm_select_default_state(dev);
+> +
+>         return clk_prepare_enable(host->mck);
+>  }
+>  #endif
+> --
+> 1.7.9.5
+>
+
+Kind regards
+Uffe
