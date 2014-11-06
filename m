@@ -1,537 +1,722 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 6 Nov 2014 11:00:10 -0600
-Subject: [PATCH] ARM: dts: Add am57xx-beagle-x15
-In-Reply-To: <545BA77F.2080609@ti.com>
-References: <1415290702-11353-1-git-send-email-nm@ti.com>
- <20141106163207.GF16896@saruman> <545BA3E6.90105@ti.com>
- <545BA513.2090907@ti.com> <20141106164843.GY31454@atomide.com>
- <545BA77F.2080609@ti.com>
-Message-ID: <20141106170010.GA15274@kahuna>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu,  6 Nov 2014 08:43:19 -0800
+Subject: [PATCH v5 35/48] arm: Register with kernel power-off handler
+In-Reply-To: <1415292213-28652-1-git-send-email-linux@roeck-us.net>
+References: <1415292213-28652-1-git-send-email-linux@roeck-us.net>
+Message-ID: <1415292213-28652-36-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:53-20141106, Nishanth Menon wrote:
-> On 11/06/2014 10:48 AM, Tony Lindgren wrote:
-> > * Nishanth Menon <nm@ti.com> [141106 08:44]:
-> >> On 11/06/2014 10:37 AM, Tom Rini wrote:
-> >>
-> >>>>> device_type = "memory"; +		reg = <0x80000000 0x40000000>; /* 1GB
-> >>>>> to start. Target 2GB */
-> >>>>
-> >>>> 1GiB ? Why would you put this here btw ? u-boot fills this one up.
-> >>>
-> >>> Yes, it should either be the full and correct value or 0x0 (like a
-> >>> number of PowerPC platforms do) so it's clear something else gives us
-> >>> the right value here.
-> >>
-> >> Honest mistake, my bad.. I thought I cleaned up the patch! Sigh!!! i
-> >> will repost with proper 2GB. it is better that way in case being used
-> >> with "other bootloaders" which are not exactly too good like u-boot.
-> > 
-> > Can you also describe why all the always-on regulators are needed?
-> yep - will do that similar to
-> https://patchwork.kernel.org/patch/5125431/ - same rationale unless
-> there is any specific voltage rail that you are explicitly interested
-> in that needs additional explanation. Is there additional rails of
-> interest?
+Register with kernel power-off handler instead of setting pm_power_off
+directly. Always use register_power_off_handler_simple as there is no
+indication that more than one power-off handler is registered.
 
-Here is what I have in mind: (updated with comments from Felipe/Tom and
-above) - would you like more details added - if you could point out
-areas of interest, I can help improve information provided here.
+If the power-off handler only resets the system or puts the CPU in sleep mode,
+select the fallback priority to indicate that the power-off handler is one
+of last resort. If the power-off handler powers off the system, select the
+default priority.
 
-8<---
->From d73029bc01c9e2193fb769ce5cc6cc5abb14eba5 Mon Sep 17 00:00:00 2001
-From: Nishanth Menon <nm@ti.com>
-Date: Mon, 18 Aug 2014 12:14:08 -0500
-Subject: [PATCH V2] ARM: dts: Add am57xx-beagle-x15
-
-BeagleBoard-X15 is the next generation Open Source Hardware
-BeagleBoard based on TI's AM5728 SoC featuring dual core 1.5GHZ A15
-processor. The platform features 2GB DDR3L (w/dual 32bit busses),
-eSATA, 3 USB3.0 ports, integrated HDMI (1920x108 at 60), separate LCD
-port, video In port, 4GB eMMC, uSD, Analog audio in/out, dual 1G
-Ethernet.
-
-For more information, refer to:
-BeagleBoard-X15 Wiki:
-http://www.elinux.org/Beagleboard:BeagleBoard-X15
-
-AM5728 is part of the Sitara product family whose additional details
-will be available: http://www.ti.com/lsds/ti/arm/overview.page
-
-Technical Reference Manual for AM5728 is public domain at:
-http://www.ti.com/lit/spruhz6
-
-Just add basic support for the moment, the following updates are needed:
-  i)	Ethernet - depends on SoC dts fixes
-  ii)	USB Client (USB2) - depends on GPIO extcon
-  ii)	HDMI - additional driver fixes pending
-  iii)	Audio - additional driver fixes pending
-
-NOTE:
-AM5728 Data Manual (SPRS915L - August 2014) section 4.1.1 states: "All
-unused power supply balls must be supplied with the voltages specified
-in the Section 5.2, Recommended Operating Conditions". This implies
-that all unused voltage rails for AM5728 can never be switched off even
-if the hardware blocks inside that voltage domain is unused. Switching
-off these unused rails may result in stability issues on other domains
-and increased leakage and power-on-hour impacts.
-
-Signed-off-by: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
+v5:
+- Rebase to v3.18-rc3
+v4:
+- No change
+v3:
+- Replace poweroff in all newly introduced variables and in text
+  with power_off or power-off as appropriate
+- Replace POWEROFF_PRIORITY_xxx with POWER_OFF_PRIORITY_xxx
+v2:
+- Use defines to specify poweroff handler priorities
+- Drop changes in arch/arm/mach-at91/setup.c (file removed upstream)
 
-Changes in V2 since V1:
-	- Fix the missing squash of proper DDR size.
+ arch/arm/kernel/psci.c                         | 3 ++-
+ arch/arm/mach-at91/board-gsia18s.c             | 3 ++-
+ arch/arm/mach-bcm/board_bcm2835.c              | 3 ++-
+ arch/arm/mach-cns3xxx/cns3420vb.c              | 3 ++-
+ arch/arm/mach-cns3xxx/core.c                   | 3 ++-
+ arch/arm/mach-highbank/highbank.c              | 3 ++-
+ arch/arm/mach-imx/mach-mx31moboard.c           | 3 ++-
+ arch/arm/mach-iop32x/em7210.c                  | 3 ++-
+ arch/arm/mach-iop32x/glantank.c                | 3 ++-
+ arch/arm/mach-iop32x/iq31244.c                 | 3 ++-
+ arch/arm/mach-iop32x/n2100.c                   | 3 ++-
+ arch/arm/mach-ixp4xx/dsmg600-setup.c           | 3 ++-
+ arch/arm/mach-ixp4xx/nas100d-setup.c           | 3 ++-
+ arch/arm/mach-ixp4xx/nslu2-setup.c             | 3 ++-
+ arch/arm/mach-omap2/board-omap3touchbook.c     | 3 ++-
+ arch/arm/mach-orion5x/board-mss2.c             | 3 ++-
+ arch/arm/mach-orion5x/dns323-setup.c           | 9 ++++++---
+ arch/arm/mach-orion5x/kurobox_pro-setup.c      | 3 ++-
+ arch/arm/mach-orion5x/ls-chl-setup.c           | 3 ++-
+ arch/arm/mach-orion5x/ls_hgl-setup.c           | 3 ++-
+ arch/arm/mach-orion5x/lsmini-setup.c           | 3 ++-
+ arch/arm/mach-orion5x/mv2120-setup.c           | 3 ++-
+ arch/arm/mach-orion5x/net2big-setup.c          | 3 ++-
+ arch/arm/mach-orion5x/terastation_pro2-setup.c | 3 ++-
+ arch/arm/mach-orion5x/ts209-setup.c            | 3 ++-
+ arch/arm/mach-orion5x/ts409-setup.c            | 3 ++-
+ arch/arm/mach-pxa/corgi.c                      | 3 ++-
+ arch/arm/mach-pxa/mioa701.c                    | 3 ++-
+ arch/arm/mach-pxa/poodle.c                     | 3 ++-
+ arch/arm/mach-pxa/spitz.c                      | 3 ++-
+ arch/arm/mach-pxa/tosa.c                       | 3 ++-
+ arch/arm/mach-pxa/viper.c                      | 3 ++-
+ arch/arm/mach-pxa/z2.c                         | 7 ++++---
+ arch/arm/mach-pxa/zeus.c                       | 7 ++++---
+ arch/arm/mach-s3c24xx/mach-gta02.c             | 3 ++-
+ arch/arm/mach-s3c24xx/mach-jive.c              | 3 ++-
+ arch/arm/mach-s3c24xx/mach-vr1000.c            | 3 ++-
+ arch/arm/mach-s3c64xx/mach-smartq.c            | 3 ++-
+ arch/arm/mach-sa1100/generic.c                 | 3 ++-
+ arch/arm/mach-sa1100/simpad.c                  | 3 ++-
+ arch/arm/mach-u300/regulator.c                 | 3 ++-
+ arch/arm/mach-vt8500/vt8500.c                  | 3 ++-
+ arch/arm/xen/enlighten.c                       | 3 ++-
+ 43 files changed, 94 insertions(+), 49 deletions(-)
 
-V1: https://patchwork.kernel.org/patch/5244801/
-
-Additional references:
-	- Missing ethernet dtsi patch series: http://marc.info/?t=141388585300001&r=1&w=2
-	- Missing USB Client extcon patch series: http://marc.info/?t=141520160800004&r=1&w=2
-
-Tested with omap2plus_defconfig modified as: http://slexy.org/view/s2DRTzUwjj
-boot log: http://slexy.org/raw/s25Grf1uoo
-based on 3.18-rc1 tag.
-
-Support for u-boot has been posted as well: (series ending
-http://patchwork.ozlabs.org/patch/407552/ )
-
-Side note: this patch generates a few unrelated checkpatch warning for
-compatible which probably is part of appropriate driver documentation
-fixes (functionality is already present).
-
- arch/arm/boot/dts/Makefile              |    1 +
- arch/arm/boot/dts/am57xx-beagle-x15.dts |  405 +++++++++++++++++++++++++++++++
- 2 files changed, 406 insertions(+)
- create mode 100644 arch/arm/boot/dts/am57xx-beagle-x15.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 38c89ca..eee1e4f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -347,6 +347,7 @@ dtb-$(CONFIG_SOC_OMAP5) += omap5-cm-t54.dtb \
- 	omap5-sbc-t54.dtb \
- 	omap5-uevm.dtb
- dtb-$(CONFIG_SOC_DRA7XX) += dra7-evm.dtb \
-+	am57xx-beagle-x15.dtb \
- 	dra72-evm.dtb
- dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-d2-network.dtb \
- 	orion5x-lacie-ethernet-disk-mini-v2.dtb \
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-new file mode 100644
-index 0000000..1f1875b
---- /dev/null
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-@@ -0,0 +1,405 @@
-+/*
-+ * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+/dts-v1/;
-+
-+#include "dra74x.dtsi"
-+#include <dt-bindings/clk/ti-dra7-atl.h>
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+
-+/ {
-+	model = "TI AM5728 BeagleBoard-X15";
-+	compatible = "ti,am572x-beagle-x15", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7";
-+
-+	aliases {
-+		rtc0 = &mcp_rtc;
-+		rtc1 = &tps659038_rtc;
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x80000000>;
-+	};
-+
-+	vdd_3v3: fixedregulator-vdd_3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vdd_3v3";
-+		vin-supply = <&regen1>;
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	vtt_fixed: fixedregulator-vtt {
-+		/* TPS51200 */
-+		compatible = "regulator-fixed";
-+		regulator-name = "vtt_fixed";
-+		vin-supply = <&smps3_reg>;
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		enable-active-high;
-+		gpio = <&gpio7 11 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&leds_pins_default>;
-+
-+		led at 0 {
-+			label = "beagle-x15:usr0";
-+			gpios = <&gpio7 9 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+			default-state = "off";
-+		};
-+
-+		led at 1 {
-+			label = "beagle-x15:usr1";
-+			gpios = <&gpio7 8 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "cpu0";
-+			default-state = "off";
-+		};
-+
-+		led at 2 {
-+			label = "beagle-x15:usr2";
-+			gpios = <&gpio7 14 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "mmc0";
-+			default-state = "off";
-+		};
-+
-+		led at 3 {
-+			label = "beagle-x15:usr3";
-+			gpios = <&gpio7 15 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "ide-disk";
-+			default-state = "off";
-+		};
-+	};
-+};
-+
-+&dra7_pmx_core {
-+	leds_pins_default: leds_pins_default {
-+		pinctrl-single,pins = <
-+			0x3a8 (PIN_OUTPUT | MUX_MODE14)	/* spi1_d1.gpio7_8 */
-+			0x3ac (PIN_OUTPUT | MUX_MODE14)	/* spi1_d0.gpio7_9 */
-+			0x3c0 (PIN_OUTPUT | MUX_MODE14)	/* spi2_sclk.gpio7_14 */
-+			0x3c4 (PIN_OUTPUT | MUX_MODE14)	/* spi2_d1.gpio7_15 */
-+		>;
-+	};
-+
-+	i2c1_pins_default: i2c1_pins_default {
-+		pinctrl-single,pins = <
-+			0x400 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c1_sda.sda */
-+			0x404 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c1_scl.scl */
-+		>;
-+	};
-+
-+	i2c3_pins_default: i2c3_pins_default {
-+		pinctrl-single,pins = <
-+			0x2a4 (PIN_INPUT| MUX_MODE10)	/* mcasp1_aclkx.i2c3_sda */
-+			0x2a8 (PIN_INPUT| MUX_MODE10)	/* mcasp1_fsx.i2c3_scl */
-+		>;
-+	};
-+
-+	uart3_pins_default: uart3_pins_default {
-+		pinctrl-single,pins = <
-+			0x248 (PIN_INPUT_SLEW | MUX_MODE0) /* uart3_rxd.rxd */
-+			0x24c (PIN_INPUT_SLEW | MUX_MODE0) /* uart3_txd.txd */
-+		>;
-+	};
-+
-+	mmc1_pins_default: mmc1_pins_default {
-+		pinctrl-single,pins = <
-+			0x36c (PIN_INPUT | MUX_MODE14)	/* mmc1sdcd.gpio219 */
-+			0x354 (PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_clk.clk */
-+			0x358 (PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_cmd.cmd */
-+			0x35c (PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat0.dat0 */
-+			0x360 (PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat1.dat1 */
-+			0x364 (PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat2.dat2 */
-+			0x368 (PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat3.dat3 */
-+		>;
-+	};
-+
-+	mmc2_pins_default: mmc2_pins_default {
-+		pinctrl-single,pins = <
-+			0x9c (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a23.mmc2_clk */
-+			0xb0 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_cs1.mmc2_cmd */
-+			0xa0 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a24.mmc2_dat0 */
-+			0xa4 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a25.mmc2_dat1 */
-+			0xa8 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a26.mmc2_dat2 */
-+			0xac (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a27.mmc2_dat3 */
-+			0x8c (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a19.mmc2_dat4 */
-+			0x90 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a20.mmc2_dat5 */
-+			0x94 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a21.mmc2_dat6 */
-+			0x98 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a22.mmc2_dat7 */
-+		>;
-+	};
-+
-+	tps659038_pins_default: tps659038_pins_default {
-+		pinctrl-single,pins = <
-+			0x418 (PIN_INPUT_PULLUP | MUX_MODE14)	/* wakeup0.gpio1_0 */
-+		>;
-+	};
-+
-+	tmp102_pins_default: tmp102_pins_default {
-+		pinctrl-single,pins = <
-+			0x3C8 (PIN_INPUT_PULLUP | MUX_MODE14)	/* spi2_d0.gpio7_16 */
-+		>;
-+	};
-+
-+	mcp79410_pins_default: mcp79410_pins_default {
-+		pinctrl-single,pins = <
-+			0x424 (PIN_INPUT_PULLUP | MUX_MODE1)	/* wakeup3.sys_nirq1 */
-+		>;
-+	};
-+
-+	usb1_pins: pinmux_usb1_pins {
-+		pinctrl-single,pins = <
-+			0x280 (PIN_INPUT_SLEW | MUX_MODE0) /* usb1_drvvbus */
-+		>;
-+	};
-+
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_default>;
-+	clock-frequency = <400000>;
-+
-+	tps659038: tps659038 at 58 {
-+		compatible = "ti,tps659038";
-+		reg = <0x58>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&tps659038_pins_default>;
-+
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+
-+		ti,system-power-controller;
-+
-+		tps659038_pmic {
-+			compatible = "ti,tps659038-pmic";
-+
-+			regulators {
-+				smps12_reg: smps12 {
-+					/* VDD_MPU */
-+					regulator-name = "smps12";
-+					regulator-min-microvolt = < 850000>;
-+					regulator-max-microvolt = <1250000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				smps3_reg: smps3 {
-+					/* VDD_DDR */
-+					regulator-name = "smps3";
-+					regulator-min-microvolt = <1350000>;
-+					regulator-max-microvolt = <1350000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				smps45_reg: smps45 {
-+					/* VDD_DSPEVE, VDD_IVA, VDD_GPU */
-+					regulator-name = "smps45";
-+					regulator-min-microvolt = < 850000>;
-+					regulator-max-microvolt = <1150000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				smps6_reg: smps6 {
-+					/* VDD_CORE */
-+					regulator-name = "smps6";
-+					regulator-min-microvolt = <850000>;
-+					regulator-max-microvolt = <1030000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				/* SMPS7 unused */
-+
-+				smps8_reg: smps8 {
-+					/* VDD_1V8 */
-+					regulator-name = "smps8";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				/* SMPS9 unused */
-+
-+				ldo1_reg: ldo1 {
-+					/* VDD_SD  */
-+					regulator-name = "ldo1";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-boot-on;
-+				};
-+
-+				ldo2_reg: ldo2 {
-+					/* VDD_SHV5 */
-+					regulator-name = "ldo2";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				ldo3_reg: ldo3 {
-+					/* VDDA_1V8_PHY */
-+					regulator-name = "ldo3";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				ldo9_reg: ldo9 {
-+					/* VDD_RTC */
-+					regulator-name = "ldo9";
-+					regulator-min-microvolt = <1050000>;
-+					regulator-max-microvolt = <1050000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				ldoln_reg: ldoln {
-+					/* VDDA_1V8_PLL */
-+					regulator-name = "ldoln";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				ldousb_reg: ldousb {
-+					/* VDDA_3V_USB: VDDA_USBHS33 */
-+					regulator-name = "ldousb";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-boot-on;
-+				};
-+
-+				regen1: regen1 {
-+					/* VDD_3V3_ON */
-+					regulator-name = "regen1";
-+					regulator-boot-on;
-+					regulator-always-on;
-+				};
-+			};
-+		};
-+
-+		tps659038_rtc: tps659038_rtc {
-+			compatible = "ti,palmas-rtc";
-+			interrupt-parent = <&tps659038>;
-+			interrupts = <8 IRQ_TYPE_NONE>;
-+			wakeup-source;
-+		};
-+
-+		tps659038_pwr_button: tps659038_pwr_button {
-+			compatible = "ti,palmas-pwrbutton";
-+			interrupt-parent = <&tps659038>;
-+			interrupts = <1 IRQ_TYPE_NONE>;
-+			wakeup-source;
-+			ti,palmas-long-press-seconds = <12>;
-+		};
-+	};
-+
-+	tmp102: tmp102 at 48 {
-+		compatible = "ti,tmp102";
-+		reg = <0x48>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&tmp102_pins_default>;
-+		interrupt-parent = <&gpio7>;
-+		interrupts = <16 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
-+&i2c3 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c3_pins_default>;
-+	clock-frequency = <400000>;
-+
-+	mcp_rtc: rtc at 6f {
-+		compatible = "microchip,mcp7941x";
-+		reg = <0x6f>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_LOW>;  /* IRQ_SYS_1N */
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&mcp79410_pins_default>;
-+
-+		vcc-supply = <&vdd_3v3>;
-+		wakeup-source;
-+	};
-+};
-+
-+&gpio7 {
-+	ti,no-reset-on-init;
-+	ti,no-idle-on-init;
-+};
-+
-+&cpu0 {
-+	cpu0-supply = <&smps12_reg>;
-+	voltage-tolerance = <1>;
-+};
-+
-+&uart3 {
-+	status = "okay";
-+	interrupts-extended = <&gic GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
-+			      <&dra7_pmx_core 0x248>;
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_pins_default>;
-+};
-+
-+&mmc1 {
-+	status = "okay";
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins_default>;
-+
-+	vmmc-supply = <&ldo1_reg>;
-+	vmmc_aux-supply = <&vdd_3v3>;
-+	pbias-supply = <&pbias_mmc_reg>;
-+	bus-width = <4>;
-+	cd-gpios = <&gpio6 27 0>; /* gpio 219 */
-+};
-+
-+&mmc2 {
-+	status = "okay";
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_pins_default>;
-+
-+	vmmc-supply = <&vdd_3v3>;
-+	bus-width = <8>;
-+	ti,non-removable;
-+	cap-mmc-dual-data-rate;
-+};
-+
-+&sata {
-+	status = "okay";
-+};
-+
-+&usb2_phy1 {
-+	phy-supply = <&ldousb_reg>;
-+};
-+
-+&usb1 {
-+	dr_mode = "host";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb1_pins>;
-+};
+diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
+index f73891b..a7a2b4a 100644
+--- a/arch/arm/kernel/psci.c
++++ b/arch/arm/kernel/psci.c
+@@ -264,7 +264,8 @@ static int psci_0_2_init(struct device_node *np)
+ 
+ 	arm_pm_restart = psci_sys_reset;
+ 
+-	pm_power_off = psci_sys_poweroff;
++	register_power_off_handler_simple(psci_sys_poweroff,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ 
+ out_put_node:
+ 	of_node_put(np);
+diff --git a/arch/arm/mach-at91/board-gsia18s.c b/arch/arm/mach-at91/board-gsia18s.c
+index bf5cc55..e628c4a 100644
+--- a/arch/arm/mach-at91/board-gsia18s.c
++++ b/arch/arm/mach-at91/board-gsia18s.c
+@@ -521,7 +521,8 @@ static void gsia18s_power_off(void)
+ 
+ static int __init gsia18s_power_off_init(void)
+ {
+-	pm_power_off = gsia18s_power_off;
++	register_power_off_handler_simple(gsia18s_power_off,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ 	return 0;
+ }
+ 
+diff --git a/arch/arm/mach-bcm/board_bcm2835.c b/arch/arm/mach-bcm/board_bcm2835.c
+index 70f2f39..1d75c76 100644
+--- a/arch/arm/mach-bcm/board_bcm2835.c
++++ b/arch/arm/mach-bcm/board_bcm2835.c
+@@ -111,7 +111,8 @@ static void __init bcm2835_init(void)
+ 
+ 	bcm2835_setup_restart();
+ 	if (wdt_regs)
+-		pm_power_off = bcm2835_power_off;
++		register_power_off_handler_simple(bcm2835_power_off,
++						  POWER_OFF_PRIORITY_FALLBACK);
+ 
+ 	bcm2835_init_clocks();
+ 
+diff --git a/arch/arm/mach-cns3xxx/cns3420vb.c b/arch/arm/mach-cns3xxx/cns3420vb.c
+index 6428bcc7..5c50461 100644
+--- a/arch/arm/mach-cns3xxx/cns3420vb.c
++++ b/arch/arm/mach-cns3xxx/cns3420vb.c
+@@ -224,7 +224,8 @@ static void __init cns3420_init(void)
+ 	cns3xxx_ahci_init();
+ 	cns3xxx_sdhci_init();
+ 
+-	pm_power_off = cns3xxx_power_off;
++	register_power_off_handler_simple(cns3xxx_power_off,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ }
+ 
+ static struct map_desc cns3420_io_desc[] __initdata = {
+diff --git a/arch/arm/mach-cns3xxx/core.c b/arch/arm/mach-cns3xxx/core.c
+index 4e9837d..9c214cf 100644
+--- a/arch/arm/mach-cns3xxx/core.c
++++ b/arch/arm/mach-cns3xxx/core.c
+@@ -386,7 +386,8 @@ static void __init cns3xxx_init(void)
+ 		cns3xxx_pwr_soft_rst(CNS3XXX_PWR_SOFTWARE_RST(SDIO));
+ 	}
+ 
+-	pm_power_off = cns3xxx_power_off;
++	register_power_off_handler_simple(cns3xxx_power_off,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+                         cns3xxx_auxdata, NULL);
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index 07a0957..6fbdc01 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -155,7 +155,8 @@ static void __init highbank_init(void)
+ 	sregs_base = of_iomap(np, 0);
+ 	WARN_ON(!sregs_base);
+ 
+-	pm_power_off = highbank_power_off;
++	register_power_off_handler_simple(highbank_power_off,
++					  POWER_OFF_PRIORITY_FALLBACK);
+ 	highbank_pm_init();
+ 
+ 	bus_register_notifier(&platform_bus_type, &highbank_platform_nb);
+diff --git a/arch/arm/mach-imx/mach-mx31moboard.c b/arch/arm/mach-imx/mach-mx31moboard.c
+index bb6f8a5..3001b14 100644
+--- a/arch/arm/mach-imx/mach-mx31moboard.c
++++ b/arch/arm/mach-imx/mach-mx31moboard.c
+@@ -559,7 +559,8 @@ static void __init mx31moboard_init(void)
+ 
+ 	imx_add_platform_device("imx_mc13783", 0, NULL, 0, NULL, 0);
+ 
+-	pm_power_off = mx31moboard_poweroff;
++	register_power_off_handler_simple(mx31moboard_poweroff,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ 
+ 	switch (mx31moboard_baseboard) {
+ 	case MX31NOBOARD:
+diff --git a/arch/arm/mach-iop32x/em7210.c b/arch/arm/mach-iop32x/em7210.c
+index 77e1ff0..fd3ad09 100644
+--- a/arch/arm/mach-iop32x/em7210.c
++++ b/arch/arm/mach-iop32x/em7210.c
+@@ -201,7 +201,8 @@ static int __init em7210_request_gpios(void)
+ 		return 0;
+ 	}
+ 
+-	pm_power_off = em7210_power_off;
++	register_power_off_handler_simple(em7210_power_off,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-iop32x/glantank.c b/arch/arm/mach-iop32x/glantank.c
+index 547b234..9298ea0 100644
+--- a/arch/arm/mach-iop32x/glantank.c
++++ b/arch/arm/mach-iop32x/glantank.c
+@@ -199,7 +199,8 @@ static void __init glantank_init_machine(void)
+ 	i2c_register_board_info(0, glantank_i2c_devices,
+ 		ARRAY_SIZE(glantank_i2c_devices));
+ 
+-	pm_power_off = glantank_power_off;
++	register_power_off_handler_simple(glantank_power_off,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ }
+ 
+ MACHINE_START(GLANTANK, "GLAN Tank")
+diff --git a/arch/arm/mach-iop32x/iq31244.c b/arch/arm/mach-iop32x/iq31244.c
+index 0e1392b..50ba54b 100644
+--- a/arch/arm/mach-iop32x/iq31244.c
++++ b/arch/arm/mach-iop32x/iq31244.c
+@@ -293,7 +293,8 @@ static void __init iq31244_init_machine(void)
+ 	platform_device_register(&iop3xx_dma_1_channel);
+ 
+ 	if (is_ep80219())
+-		pm_power_off = ep80219_power_off;
++		register_power_off_handler_simple(ep80219_power_off,
++						  POWER_OFF_PRIORITY_DEFAULT);
+ 
+ 	if (!is_80219())
+ 		platform_device_register(&iop3xx_aau_channel);
+diff --git a/arch/arm/mach-iop32x/n2100.c b/arch/arm/mach-iop32x/n2100.c
+index c1cd80e..734a092 100644
+--- a/arch/arm/mach-iop32x/n2100.c
++++ b/arch/arm/mach-iop32x/n2100.c
+@@ -356,7 +356,8 @@ static void __init n2100_init_machine(void)
+ 	i2c_register_board_info(0, n2100_i2c_devices,
+ 		ARRAY_SIZE(n2100_i2c_devices));
+ 
+-	pm_power_off = n2100_power_off;
++	register_power_off_handler_simple(n2100_power_off,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ }
+ 
+ MACHINE_START(N2100, "Thecus N2100")
+diff --git a/arch/arm/mach-ixp4xx/dsmg600-setup.c b/arch/arm/mach-ixp4xx/dsmg600-setup.c
+index 43ee06d..f34564d 100644
+--- a/arch/arm/mach-ixp4xx/dsmg600-setup.c
++++ b/arch/arm/mach-ixp4xx/dsmg600-setup.c
+@@ -281,7 +281,8 @@ static void __init dsmg600_init(void)
+ 
+ 	platform_add_devices(dsmg600_devices, ARRAY_SIZE(dsmg600_devices));
+ 
+-	pm_power_off = dsmg600_power_off;
++	register_power_off_handler_simple(dsmg600_power_off,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ }
+ 
+ MACHINE_START(DSMG600, "D-Link DSM-G600 RevA")
+diff --git a/arch/arm/mach-ixp4xx/nas100d-setup.c b/arch/arm/mach-ixp4xx/nas100d-setup.c
+index 4e0f762..43a9333 100644
+--- a/arch/arm/mach-ixp4xx/nas100d-setup.c
++++ b/arch/arm/mach-ixp4xx/nas100d-setup.c
+@@ -292,7 +292,8 @@ static void __init nas100d_init(void)
+ 
+ 	platform_add_devices(nas100d_devices, ARRAY_SIZE(nas100d_devices));
+ 
+-	pm_power_off = nas100d_power_off;
++	register_power_off_handler_simple(nas100d_power_off,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ 
+ 	if (request_irq(gpio_to_irq(NAS100D_RB_GPIO), &nas100d_reset_handler,
+ 		IRQF_TRIGGER_LOW, "NAS100D reset button", NULL) < 0) {
+diff --git a/arch/arm/mach-ixp4xx/nslu2-setup.c b/arch/arm/mach-ixp4xx/nslu2-setup.c
+index 88c025f..e094d5f 100644
+--- a/arch/arm/mach-ixp4xx/nslu2-setup.c
++++ b/arch/arm/mach-ixp4xx/nslu2-setup.c
+@@ -262,7 +262,8 @@ static void __init nslu2_init(void)
+ 
+ 	platform_add_devices(nslu2_devices, ARRAY_SIZE(nslu2_devices));
+ 
+-	pm_power_off = nslu2_power_off;
++	register_power_off_handler_simple(nslu2_power_off,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ 
+ 	if (request_irq(gpio_to_irq(NSLU2_RB_GPIO), &nslu2_reset_handler,
+ 		IRQF_TRIGGER_LOW, "NSLU2 reset button", NULL) < 0) {
+diff --git a/arch/arm/mach-omap2/board-omap3touchbook.c b/arch/arm/mach-omap2/board-omap3touchbook.c
+index a01993e..8abce2c 100644
+--- a/arch/arm/mach-omap2/board-omap3touchbook.c
++++ b/arch/arm/mach-omap2/board-omap3touchbook.c
+@@ -344,7 +344,8 @@ static void __init omap3_touchbook_init(void)
+ {
+ 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+ 
+-	pm_power_off = omap3_touchbook_poweroff;
++	register_power_off_handler_simple(omap3_touchbook_poweroff,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ 
+ 	if (system_rev >= 0x20 && system_rev <= 0x34301000) {
+ 		omap_mux_init_gpio(23, OMAP_PIN_INPUT);
+diff --git a/arch/arm/mach-orion5x/board-mss2.c b/arch/arm/mach-orion5x/board-mss2.c
+index 66f9c3b..cac2793 100644
+--- a/arch/arm/mach-orion5x/board-mss2.c
++++ b/arch/arm/mach-orion5x/board-mss2.c
+@@ -86,5 +86,6 @@ static void mss2_power_off(void)
+ void __init mss2_init(void)
+ {
+ 	/* register mss2 specific power-off method */
+-	pm_power_off = mss2_power_off;
++	register_power_off_handler_simple(mss2_power_off,
++					  POWER_OFF_PRIORITY_FALLBACK);
+ }
+diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
+index 09d2a26..9876509 100644
+--- a/arch/arm/mach-orion5x/dns323-setup.c
++++ b/arch/arm/mach-orion5x/dns323-setup.c
+@@ -669,7 +669,8 @@ static void __init dns323_init(void)
+ 		if (gpio_request(DNS323_GPIO_POWER_OFF, "POWEROFF") != 0 ||
+ 		    gpio_direction_output(DNS323_GPIO_POWER_OFF, 0) != 0)
+ 			pr_err("DNS-323: failed to setup power-off GPIO\n");
+-		pm_power_off = dns323a_power_off;
++		register_power_off_handler_simple(dns323a_power_off,
++						  POWER_OFF_PRIORITY_DEFAULT);
+ 		break;
+ 	case DNS323_REV_B1:
+ 		/* 5182 built-in SATA init */
+@@ -686,7 +687,8 @@ static void __init dns323_init(void)
+ 		if (gpio_request(DNS323_GPIO_POWER_OFF, "POWEROFF") != 0 ||
+ 		    gpio_direction_output(DNS323_GPIO_POWER_OFF, 0) != 0)
+ 			pr_err("DNS-323: failed to setup power-off GPIO\n");
+-		pm_power_off = dns323b_power_off;
++		register_power_off_handler_simple(dns323b_power_off,
++						  POWER_OFF_PRIORITY_DEFAULT);
+ 		break;
+ 	case DNS323_REV_C1:
+ 		/* 5182 built-in SATA init */
+@@ -696,7 +698,8 @@ static void __init dns323_init(void)
+ 		if (gpio_request(DNS323C_GPIO_POWER_OFF, "POWEROFF") != 0 ||
+ 		    gpio_direction_output(DNS323C_GPIO_POWER_OFF, 0) != 0)
+ 			pr_err("DNS-323: failed to setup power-off GPIO\n");
+-		pm_power_off = dns323c_power_off;
++		register_power_off_handler_simple(dns323c_power_off,
++						  POWER_OFF_PRIORITY_DEFAULT);
+ 
+ 		/* Now, -this- should theorically be done by the sata_mv driver
+ 		 * once I figure out what's going on there. Maybe the behaviour
+diff --git a/arch/arm/mach-orion5x/kurobox_pro-setup.c b/arch/arm/mach-orion5x/kurobox_pro-setup.c
+index fe6a48a..872d4fe 100644
+--- a/arch/arm/mach-orion5x/kurobox_pro-setup.c
++++ b/arch/arm/mach-orion5x/kurobox_pro-setup.c
+@@ -376,7 +376,8 @@ static void __init kurobox_pro_init(void)
+ 	i2c_register_board_info(0, &kurobox_pro_i2c_rtc, 1);
+ 
+ 	/* register Kurobox Pro specific power-off method */
+-	pm_power_off = kurobox_pro_power_off;
++	register_power_off_handler_simple(kurobox_pro_power_off,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ }
+ 
+ #ifdef CONFIG_MACH_KUROBOX_PRO
+diff --git a/arch/arm/mach-orion5x/ls-chl-setup.c b/arch/arm/mach-orion5x/ls-chl-setup.c
+index 028ea03..3f540d1 100644
+--- a/arch/arm/mach-orion5x/ls-chl-setup.c
++++ b/arch/arm/mach-orion5x/ls-chl-setup.c
+@@ -312,7 +312,8 @@ static void __init lschl_init(void)
+ 	gpio_set_value(LSCHL_GPIO_USB_POWER, 1);
+ 
+ 	/* register power-off method */
+-	pm_power_off = lschl_power_off;
++	register_power_off_handler_simple(lschl_power_off,
++					  POWER_OFF_PRIORITY_FALLBACK);
+ 
+ 	pr_info("%s: finished\n", __func__);
+ }
+diff --git a/arch/arm/mach-orion5x/ls_hgl-setup.c b/arch/arm/mach-orion5x/ls_hgl-setup.c
+index 32b7129..699a5a1 100644
+--- a/arch/arm/mach-orion5x/ls_hgl-setup.c
++++ b/arch/arm/mach-orion5x/ls_hgl-setup.c
+@@ -259,7 +259,8 @@ static void __init ls_hgl_init(void)
+ 	gpio_set_value(LS_HGL_GPIO_USB_POWER, 1);
+ 
+ 	/* register power-off method */
+-	pm_power_off = ls_hgl_power_off;
++	register_power_off_handler_simple(ls_hgl_power_off,
++					  POWER_OFF_PRIORITY_FALLBACK);
+ 
+ 	pr_info("%s: finished\n", __func__);
+ }
+diff --git a/arch/arm/mach-orion5x/lsmini-setup.c b/arch/arm/mach-orion5x/lsmini-setup.c
+index a6493e7..c5712ff 100644
+--- a/arch/arm/mach-orion5x/lsmini-setup.c
++++ b/arch/arm/mach-orion5x/lsmini-setup.c
+@@ -260,7 +260,8 @@ static void __init lsmini_init(void)
+ 	gpio_set_value(LSMINI_GPIO_USB_POWER, 1);
+ 
+ 	/* register power-off method */
+-	pm_power_off = lsmini_power_off;
++	register_power_off_handler_simple(lsmini_power_off,
++					  POWER_OFF_PRIORITY_FALLBACK);
+ 
+ 	pr_info("%s: finished\n", __func__);
+ }
+diff --git a/arch/arm/mach-orion5x/mv2120-setup.c b/arch/arm/mach-orion5x/mv2120-setup.c
+index e032f01..13efbec 100644
+--- a/arch/arm/mach-orion5x/mv2120-setup.c
++++ b/arch/arm/mach-orion5x/mv2120-setup.c
+@@ -225,7 +225,8 @@ static void __init mv2120_init(void)
+ 	if (gpio_request(MV2120_GPIO_POWER_OFF, "POWEROFF") != 0 ||
+ 	    gpio_direction_output(MV2120_GPIO_POWER_OFF, 1) != 0)
+ 		pr_err("mv2120: failed to setup power-off GPIO\n");
+-	pm_power_off = mv2120_power_off;
++	register_power_off_handler_simple(mv2120_power_off,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ }
+ 
+ /* Warning: HP uses a wrong mach-type (=526) in their bootloader */
+diff --git a/arch/arm/mach-orion5x/net2big-setup.c b/arch/arm/mach-orion5x/net2big-setup.c
+index ba73dc7..c7648f0 100644
+--- a/arch/arm/mach-orion5x/net2big-setup.c
++++ b/arch/arm/mach-orion5x/net2big-setup.c
+@@ -413,7 +413,8 @@ static void __init net2big_init(void)
+ 
+ 	if (gpio_request(NET2BIG_GPIO_POWER_OFF, "power-off") == 0 &&
+ 	    gpio_direction_output(NET2BIG_GPIO_POWER_OFF, 0) == 0)
+-		pm_power_off = net2big_power_off;
++		register_power_off_handler_simple(net2big_power_off,
++						  POWER_OFF_PRIORITY_DEFAULT);
+ 	else
+ 		pr_err("net2big: failed to configure power-off GPIO\n");
+ 
+diff --git a/arch/arm/mach-orion5x/terastation_pro2-setup.c b/arch/arm/mach-orion5x/terastation_pro2-setup.c
+index 1208674..227ae91 100644
+--- a/arch/arm/mach-orion5x/terastation_pro2-setup.c
++++ b/arch/arm/mach-orion5x/terastation_pro2-setup.c
+@@ -353,7 +353,8 @@ static void __init tsp2_init(void)
+ 	i2c_register_board_info(0, &tsp2_i2c_rtc, 1);
+ 
+ 	/* register Terastation Pro II specific power-off method */
+-	pm_power_off = tsp2_power_off;
++	register_power_off_handler_simple(tsp2_power_off,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ }
+ 
+ MACHINE_START(TERASTATION_PRO2, "Buffalo Terastation Pro II/Live")
+diff --git a/arch/arm/mach-orion5x/ts209-setup.c b/arch/arm/mach-orion5x/ts209-setup.c
+index c725b7c..540e3f3 100644
+--- a/arch/arm/mach-orion5x/ts209-setup.c
++++ b/arch/arm/mach-orion5x/ts209-setup.c
+@@ -318,7 +318,8 @@ static void __init qnap_ts209_init(void)
+ 	i2c_register_board_info(0, &qnap_ts209_i2c_rtc, 1);
+ 
+ 	/* register tsx09 specific power-off method */
+-	pm_power_off = qnap_tsx09_power_off;
++	register_power_off_handler_simple(qnap_tsx09_power_off,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ }
+ 
+ MACHINE_START(TS209, "QNAP TS-109/TS-209")
+diff --git a/arch/arm/mach-orion5x/ts409-setup.c b/arch/arm/mach-orion5x/ts409-setup.c
+index cf2ab53..40cbdd7 100644
+--- a/arch/arm/mach-orion5x/ts409-setup.c
++++ b/arch/arm/mach-orion5x/ts409-setup.c
+@@ -307,7 +307,8 @@ static void __init qnap_ts409_init(void)
+ 	platform_device_register(&ts409_leds);
+ 
+ 	/* register tsx09 specific power-off method */
+-	pm_power_off = qnap_tsx09_power_off;
++	register_power_off_handler_simple(qnap_tsx09_power_off,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ }
+ 
+ MACHINE_START(TS409, "QNAP TS-409")
+diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
+index 06022b2..93b73a1 100644
+--- a/arch/arm/mach-pxa/corgi.c
++++ b/arch/arm/mach-pxa/corgi.c
+@@ -718,7 +718,8 @@ static void corgi_restart(enum reboot_mode mode, const char *cmd)
+ 
+ static void __init corgi_init(void)
+ {
+-	pm_power_off = corgi_poweroff;
++	register_power_off_handler_simple(corgi_poweroff,
++					  POWER_OFF_PRIORITY_FALLBACK);
+ 
+ 	/* Stop 3.6MHz and drive HIGH to PCMCIA and CS */
+ 	PCFR |= PCFR_OPDE;
+diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
+index 29997bd..5d318d4 100644
+--- a/arch/arm/mach-pxa/mioa701.c
++++ b/arch/arm/mach-pxa/mioa701.c
+@@ -750,7 +750,8 @@ static void __init mioa701_machine_init(void)
+ 	pxa_set_keypad_info(&mioa701_keypad_info);
+ 	pxa_set_udc_info(&mioa701_udc_info);
+ 	pxa_set_ac97_info(&mioa701_ac97_info);
+-	pm_power_off = mioa701_poweroff;
++	register_power_off_handler_simple(mioa701_poweroff,
++					  POWER_OFF_PRIORITY_FALLBACK);
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
+ 	gsm_init();
+ 
+diff --git a/arch/arm/mach-pxa/poodle.c b/arch/arm/mach-pxa/poodle.c
+index 1319916..749d2af 100644
+--- a/arch/arm/mach-pxa/poodle.c
++++ b/arch/arm/mach-pxa/poodle.c
+@@ -432,7 +432,8 @@ static void __init poodle_init(void)
+ {
+ 	int ret = 0;
+ 
+-	pm_power_off = poodle_poweroff;
++	register_power_off_handler_simple(poodle_poweroff,
++					  POWER_OFF_PRIORITY_FALLBACK);
+ 
+ 	PCFR |= PCFR_OPDE;
+ 
+diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+index 840c3a4..ab25b6c 100644
+--- a/arch/arm/mach-pxa/spitz.c
++++ b/arch/arm/mach-pxa/spitz.c
+@@ -944,7 +944,8 @@ static void spitz_restart(enum reboot_mode mode, const char *cmd)
+ static void __init spitz_init(void)
+ {
+ 	init_gpio_reset(SPITZ_GPIO_ON_RESET, 1, 0);
+-	pm_power_off = spitz_poweroff;
++	register_power_off_handler_simple(spitz_poweroff,
++					  POWER_OFF_PRIORITY_FALLBACK);
+ 
+ 	PMCR = 0x00;
+ 
+diff --git a/arch/arm/mach-pxa/tosa.c b/arch/arm/mach-pxa/tosa.c
+index c158a6e..8823448 100644
+--- a/arch/arm/mach-pxa/tosa.c
++++ b/arch/arm/mach-pxa/tosa.c
+@@ -940,7 +940,8 @@ static void __init tosa_init(void)
+ 
+ 	init_gpio_reset(TOSA_GPIO_ON_RESET, 0, 0);
+ 
+-	pm_power_off = tosa_poweroff;
++	register_power_off_handler_simple(tosa_poweroff,
++					  POWER_OFF_PRIORITY_FALLBACK);
+ 
+ 	PCFR |= PCFR_OPDE;
+ 
+diff --git a/arch/arm/mach-pxa/viper.c b/arch/arm/mach-pxa/viper.c
+index de3b080..6bb4de3 100644
+--- a/arch/arm/mach-pxa/viper.c
++++ b/arch/arm/mach-pxa/viper.c
+@@ -919,7 +919,8 @@ static void __init viper_init(void)
+ {
+ 	u8 version;
+ 
+-	pm_power_off = viper_power_off;
++	register_power_off_handler_simple(viper_power_off,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ 
+ 	pxa2xx_mfp_config(ARRAY_AND_SIZE(viper_pin_config));
+ 
+diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
+index e1a121b..0d0a6ae 100644
+--- a/arch/arm/mach-pxa/z2.c
++++ b/arch/arm/mach-pxa/z2.c
+@@ -693,8 +693,6 @@ static void z2_power_off(void)
+ 	pxa27x_set_pwrmode(PWRMODE_DEEPSLEEP);
+ 	pxa27x_cpu_pm_enter(PM_SUSPEND_MEM);
+ }
+-#else
+-#define z2_power_off   NULL
+ #endif
+ 
+ /******************************************************************************
+@@ -719,7 +717,10 @@ static void __init z2_init(void)
+ 	z2_keys_init();
+ 	z2_pmic_init();
+ 
+-	pm_power_off = z2_power_off;
++#ifdef CONFIG_PM
++	register_power_off_handler_simple(z2_power_off,
++					  POWER_OFF_PRIORITY_FALLBACK);
++#endif
+ }
+ 
+ MACHINE_START(ZIPIT2, "Zipit Z2")
+diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
+index 205f9bf..457eed1 100644
+--- a/arch/arm/mach-pxa/zeus.c
++++ b/arch/arm/mach-pxa/zeus.c
+@@ -690,8 +690,6 @@ static void zeus_power_off(void)
+ 	local_irq_disable();
+ 	cpu_suspend(PWRMODE_DEEPSLEEP, pxa27x_finish_suspend);
+ }
+-#else
+-#define zeus_power_off   NULL
+ #endif
+ 
+ #ifdef CONFIG_APM_EMULATION
+@@ -847,7 +845,10 @@ static void __init zeus_init(void)
+ 	__raw_writel(msc0, MSC0);
+ 	__raw_writel(msc1, MSC1);
+ 
+-	pm_power_off = zeus_power_off;
++#ifdef CONFIG_PM
++	register_power_off_handler_simple(zeus_power_off,
++					  POWER_OFF_PRIORITY_FALLBACK);
++#endif
+ 	zeus_setup_apm();
+ 
+ 	pxa2xx_mfp_config(ARRAY_AND_SIZE(zeus_pin_config));
+diff --git a/arch/arm/mach-s3c24xx/mach-gta02.c b/arch/arm/mach-s3c24xx/mach-gta02.c
+index 6d1e0b9..8366b3e 100644
+--- a/arch/arm/mach-s3c24xx/mach-gta02.c
++++ b/arch/arm/mach-s3c24xx/mach-gta02.c
+@@ -579,7 +579,8 @@ static void __init gta02_machine_init(void)
+ 	i2c_register_board_info(0, gta02_i2c_devs, ARRAY_SIZE(gta02_i2c_devs));
+ 
+ 	platform_add_devices(gta02_devices, ARRAY_SIZE(gta02_devices));
+-	pm_power_off = gta02_poweroff;
++	register_power_off_handler_simple(gta02_poweroff,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ 
+ 	regulator_has_full_constraints();
+ }
+diff --git a/arch/arm/mach-s3c24xx/mach-jive.c b/arch/arm/mach-s3c24xx/mach-jive.c
+index 7d99fe8..20beb39 100644
+--- a/arch/arm/mach-s3c24xx/mach-jive.c
++++ b/arch/arm/mach-s3c24xx/mach-jive.c
+@@ -657,7 +657,8 @@ static void __init jive_machine_init(void)
+ 	s3c_i2c0_set_platdata(&jive_i2c_cfg);
+ 	i2c_register_board_info(0, jive_i2c_devs, ARRAY_SIZE(jive_i2c_devs));
+ 
+-	pm_power_off = jive_power_off;
++	register_power_off_handler_simple(jive_power_off,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ 
+ 	platform_add_devices(jive_devices, ARRAY_SIZE(jive_devices));
+ }
+diff --git a/arch/arm/mach-s3c24xx/mach-vr1000.c b/arch/arm/mach-s3c24xx/mach-vr1000.c
+index 89f32bd..1f32ba7 100644
+--- a/arch/arm/mach-s3c24xx/mach-vr1000.c
++++ b/arch/arm/mach-s3c24xx/mach-vr1000.c
+@@ -306,7 +306,8 @@ static void vr1000_power_off(void)
+ 
+ static void __init vr1000_map_io(void)
+ {
+-	pm_power_off = vr1000_power_off;
++	register_power_off_handler_simple(vr1000_power_off,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ 
+ 	s3c24xx_init_io(vr1000_iodesc, ARRAY_SIZE(vr1000_iodesc));
+ 	s3c24xx_init_uarts(vr1000_uartcfgs, ARRAY_SIZE(vr1000_uartcfgs));
+diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
+index b3d1353..b30906f 100644
+--- a/arch/arm/mach-s3c64xx/mach-smartq.c
++++ b/arch/arm/mach-s3c64xx/mach-smartq.c
+@@ -291,7 +291,8 @@ static int __init smartq_power_off_init(void)
+ 	/* leave power on */
+ 	gpio_direction_output(S3C64XX_GPK(15), 0);
+ 
+-	pm_power_off = smartq_power_off;
++	register_power_off_handler_simple(smartq_power_off,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ 
+ 	return ret;
+ }
+diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
+index d4ea142..371bffe 100644
+--- a/arch/arm/mach-sa1100/generic.c
++++ b/arch/arm/mach-sa1100/generic.c
+@@ -311,7 +311,8 @@ static struct platform_device *sa11x0_devices[] __initdata = {
+ 
+ static int __init sa1100_init(void)
+ {
+-	pm_power_off = sa1100_power_off;
++	register_power_off_handler_simple(sa1100_power_off,
++					  POWER_OFF_PRIORITY_FALLBACK);
+ 	return platform_add_devices(sa11x0_devices, ARRAY_SIZE(sa11x0_devices));
+ }
+ 
+diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
+index 41e476e..fb85730 100644
+--- a/arch/arm/mach-sa1100/simpad.c
++++ b/arch/arm/mach-sa1100/simpad.c
+@@ -373,7 +373,8 @@ static int __init simpad_init(void)
+ 	if (ret)
+ 		printk(KERN_WARNING "simpad: Unable to register cs3 GPIO device");
+ 
+-	pm_power_off = simpad_power_off;
++	register_power_off_handler_simple(simpad_power_off,
++					  POWER_OFF_PRIORITY_FALLBACK);
+ 
+ 	sa11x0_ppc_configure_mcp();
+ 	sa11x0_register_mtd(&simpad_flash_data, simpad_flash_resources,
+diff --git a/arch/arm/mach-u300/regulator.c b/arch/arm/mach-u300/regulator.c
+index 0493a84..4ff09b0 100644
+--- a/arch/arm/mach-u300/regulator.c
++++ b/arch/arm/mach-u300/regulator.c
+@@ -98,7 +98,8 @@ static int __init __u300_init_boardpower(struct platform_device *pdev)
+ 			   U300_SYSCON_PMCR_DCON_ENABLE, 0);
+ 
+ 	/* Register globally exported PM poweroff hook */
+-	pm_power_off = u300_pm_poweroff;
++	register_power_off_handler_simple(u300_pm_poweroff,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-vt8500/vt8500.c b/arch/arm/mach-vt8500/vt8500.c
+index 3bc0dc9..48e4fbf 100644
+--- a/arch/arm/mach-vt8500/vt8500.c
++++ b/arch/arm/mach-vt8500/vt8500.c
+@@ -155,7 +155,8 @@ static void __init vt8500_init(void)
+ 			pr_err("%s:ioremap(power_off) failed\n", __func__);
+ 	}
+ 	if (pmc_base)
+-		pm_power_off = &vt8500_power_off;
++		register_power_off_handler_simple(vt8500_power_off,
++						  POWER_OFF_PRIORITY_FALLBACK);
+ 	else
+ 		pr_err("%s: PMC Hibernation register could not be remapped, not enabling power off!\n", __func__);
+ 
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 0e15f01..1c8bce0 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -336,7 +336,8 @@ static int __init xen_pm_init(void)
+ 	if (!xen_domain())
+ 		return -ENODEV;
+ 
+-	pm_power_off = xen_power_off;
++	register_power_off_handler_simple(xen_power_off,
++					  POWER_OFF_PRIORITY_DEFAULT);
+ 	arm_pm_restart = xen_restart;
+ 
+ 	return 0;
 -- 
-1.7.9.5
-
--- 
-Regards,
-Nishanth Menon
+1.9.1
