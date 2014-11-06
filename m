@@ -1,57 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 6 Nov 2014 17:05:48 +0000
-Subject: [RFC PATCH 0/1] arm64: Fix /proc/cpuinfo
-In-Reply-To: <20141106165430.GH31605@arm.com>
-References: <1414159000-27059-1-git-send-email-mark.rutland@arm.com>
- <20141106164311.GD19702@e104818-lin.cambridge.arm.com>
- <20141106165430.GH31605@arm.com>
-Message-ID: <20141106170548.GF19702@e104818-lin.cambridge.arm.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu,  6 Nov 2014 17:20:12 +0000
+Subject: [PATCH] DMA: Fix allocation size for PL330 data buffer depth.
+Message-ID: <1415294412-13818-1-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 06, 2014 at 04:54:31PM +0000, Will Deacon wrote:
-> On Thu, Nov 06, 2014 at 04:43:12PM +0000, Catalin Marinas wrote:
-> > On Fri, Oct 24, 2014 at 02:56:39PM +0100, Mark Rutland wrote:
-> > > [d] Print different hwcaps dependent on the personality.
-> > > 
-> > >     This would allow for 32-bit and 64-bit applications to function
-> > >     correctly, but for some 32-bit applications the personality would
-> > >     need to be set explicitly by the user.
-> > 
-> > Which makes this option actually in line with the uname -m behaviour. My
-> > vote goes for [d] with option [b] as a close alternative.
-> > 
-> > > [1] arm, v3.17, Versatile Express A15x2 A7x3 coretile
-> > > Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae evtstrm 
-> > [...]
-> > > [2] arm64, v3.17, Juno platform
-> > > Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32 
-> > 
-> > As an exercise, I'm trying to see what option [b] would look like when
-> > CONFIG_COMPAT is enabled:
-> > 
-> > Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32 half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae
-> > 
-> > The duplicate strings would only be listed once (evtstrm, aes, pmull,
-> > sha1, sha2, crc32). New AArch64 features that we may expect to be
-> > optional on AArch32 could be prefixed with "a64". If they are missing
-> > entirely from AArch32, (like asimd), no need for the prefix.
-> > 
-> > The advantage is that we don't need to check the personality but we have
-> > to assume that scripts would not search for substrings (sane people
-> > shouldn't do this anyway as the Features string can always be extended).
-> 
-> And a big disadvantage is that I can imagine AArch64 applications checking
-> for "neon" instead of "asimd", which will break if they're run under kernels
-> without COMPAT support enabled.
+The datasheet for PL330 says that the data buffer value in the CRD
+register is 10bits wide. However, the value stored is "minus one",
+which the driver corrects for. Maximum value that the data buffer
+depth can have is 1024 lines, which requires 11 bits for storage.
 
-That's because they do stupid things and I they probably deserve to
-break ;). But I agree, there is a risk.
+While making updates I found printing the peripheral ID as a hex
+value to be more useful as the datasheet shows the values that way.
 
-> So I'm inclined to stick with Mark's patch as it is.
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+ drivers/dma/pl330.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-If we don't hear otherwise, I propose sometime next week we queue Mark's
-patch for -next.
-
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 4839bfa..7f62b73 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -271,7 +271,7 @@ struct pl330_config {
+ #define DMAC_MODE_NS	(1 << 0)
+ 	unsigned int	mode;
+ 	unsigned int	data_bus_width:10; /* In number of bits */
+-	unsigned int	data_buf_dep:10;
++	unsigned int	data_buf_dep:11;
+ 	unsigned int	num_chan:4;
+ 	unsigned int	num_peri:6;
+ 	u32		peri_ns;
+@@ -2732,7 +2732,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 
+ 
+ 	dev_info(&adev->dev,
+-		"Loaded driver for PL330 DMAC-%d\n", adev->periphid);
++		"Loaded driver for PL330 DMAC-%x\n", adev->periphid);
+ 	dev_info(&adev->dev,
+ 		"\tDBUFF-%ux%ubytes Num_Chans-%u Num_Peri-%u Num_Events-%u\n",
+ 		pcfg->data_buf_dep, pcfg->data_bus_width / 8, pcfg->num_chan,
 -- 
-Catalin
+2.1.3
