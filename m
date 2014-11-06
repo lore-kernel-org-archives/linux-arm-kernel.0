@@ -1,70 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 06 Nov 2014 10:50:42 +0100
-Subject: [PATCH 2/4] dmaengine: device tree bindings for PL08x
-In-Reply-To: <CACRpkdZ_R26-PnUycjkvvK3ZuU=2KvupHmvK+H+kUD-Ty=rtqQ@mail.gmail.com>
-References: <1410507442-32451-1-git-send-email-linus.walleij@linaro.org>
- <201409161821.26348.arnd@arndb.de>
- <CACRpkdZ_R26-PnUycjkvvK3ZuU=2KvupHmvK+H+kUD-Ty=rtqQ@mail.gmail.com>
-Message-ID: <8854726.ZIWJHAnVAn@wuerfel>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 6 Nov 2014 09:52:31 +0000
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
+In-Reply-To: <2659321.LYB03rL97X@wuerfel>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <2148776.X8NPqiYA6S@wuerfel> <20141105233921.GJ6168@google.com>
+ <2659321.LYB03rL97X@wuerfel>
+Message-ID: <20141106095231.GA1923@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 06 November 2014 10:11:58 Linus Walleij wrote:
-> >> +     saa0 at dmac0 {
-> >> +             signal = "saa0";
-> >> +             bus-interface-ahb1;
-> >> +     };
-> >
-> > The main value-add this gives you is a name of the signal, but nobody else
-> > does this, and it seems this is only an artifact of the way the driver today
-> > matches devices that come from platform data.
-> >
-> > If you want it just for migration purposes, we can probably put the names
-> > in the platform, but the bus-interface-* should IMHO be expressed in the
-> > dma specifier, the same way we do for the designware part.
+On Thu, Nov 06, 2014 at 12:05:48AM +0000, Arnd Bergmann wrote:
+> On Wednesday 05 November 2014 16:39:21 Bjorn Helgaas wrote:
+> > On Wed, Oct 22, 2014 at 10:52:19PM +0200, Arnd Bergmann wrote:
+> > > On Wednesday 22 October 2014 16:59:14 Lorenzo Pieralisi wrote:
+> > > > On Wed, Oct 01, 2014 at 10:38:45AM +0100, Arnd Bergmann wrote:
+> > > > 
+> > > > [...]
+> > > > 
+> > > > > The arm32 implementations of pci_domain_nr/pci_proc_domain can probably be
+> > > > > removed if we change the arm32 pcibios_init_hw function to call the new
+> > > > > interfaces that set the domain number.
+> > > > 
+> > > > I wished, but it is a bit more complicated than I thought unfortunately,
+> > > > mostly because some drivers, eg cns3xxx set the domain numbers
+> > > > statically in pci_sys_data and this sets a chain of dependency that is
+> > > > not easy to untangle. I think cns3xxx is the only legacy driver that "uses"
+> > > > the domain number (in pci_sys_data) in a way that clashes with the
+> > > > generic domain_nr implementation, I need to give it more thought.
+> > > 
+> > > Just had a look at that driver, shouldn't be too hard to change, see below.
+> > > 
+> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > 
+> > This patch is in my patchwork, but it lacks a topic & changelog and I'm not
+> > sure of its state, so I'm going to drop it for now.  Please post it again
+> > if you want me to do something with it.  I guess it only touches arch/arm,
+> > so it would probably be merged via your tree anyway.
 > 
-> The main requirement is telling which master to use for each
-> channel, really, I can do without the naming (though it is very helpful
-> for debugging).
+> Lorenzo has posted an updated version as
 > 
-> I don't know how to provide a specifier for eligible bus interfaces
-> in some elegant way with the DMA specifier, I could of course use
-> two cells containing a plain number, specifying 0 for any interface,
-> 1 for ahb1 and 2 for ahb2 like that:
-> 
-> #define BUS_AHB_ANY 0
-> #define BUS_AHB1 1
-> #define BUS_AHB2 2
-> 
-> uart1: uart at 101fb000 {
->         compatible = "arm,pl011", "arm,primecell";
->         (...)
->         dmas = <&dmac1 22 BUS_AHB1>,
->                <&dmac1 23 BUS_AHB1>;
->         dma-names = "rx", "tx";
-> };
-> 
-> The problem is that this is just so wrong: the bus master arbitration
-> is a property of the DMA controller, not the consuming device. The DMA
-> controller side is where the lines to the external buses are connected,
-> and it is performing the work on behalf of the device.
-> 
-> This way the knowledge is put in the totally wrong place. People get
-> the impression that this is a property of the consumer...
-> 
-> When it comes to the actual DMA signal line that is more natural to
-> have in the specifier.
+> "arm: cns3xxx: pci: remove artificial dependency on pci_sys_data domain",
+> and a second patch that depends on it. That is the version we should be
+> merging, though I'm not sure through which tree.
 
-Not sure about that, the approach you describe there sounds entirely
-reasonable to me. The DMA specifier is not just a feature of the consumer
-(the DMA slave) but of the connection between the consumer and the
-controller (slave and master). This connection consists of the combination
-of a request line and a bus master that is able to access the fifo
-register, so it makes sense to list both here.
+I am posting a v2 shortly, let's discuss the best way to merge it then.
 
-As far as I understand, the controller has to pick two master numbers
-here: one for the memory side and one for the fifo side. The memory
-side is a property of the dma engine, and that should always be the
-same one, while the fifo side depends on the slave that is connected.
-
-	Arnd
+Thanks,
+Lorenzo
