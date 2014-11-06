@@ -1,41 +1,67 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Thu,  6 Nov 2014 18:22:10 +0100
-Subject: [PATCH] ARM: dts: zynq: Enable PL clocks for Parallella
-Message-ID: <1415294531-8942-1-git-send-email-afaerber@suse.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 6 Nov 2014 17:22:23 +0000
+Subject: [PATCH v5 36/48] arm64: psci: Register with kernel power-off
+ handler
+In-Reply-To: <1415292213-28652-37-git-send-email-linux@roeck-us.net>
+References: <1415292213-28652-1-git-send-email-linux@roeck-us.net>
+ <1415292213-28652-37-git-send-email-linux@roeck-us.net>
+Message-ID: <20141106172222.GA15384@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Parallella board comes with a U-Boot bootloader that loads one of
-two predefined FPGA bitstreams before booting the kernel. Both define an
-AXI interface to the on-board Epiphany processor.
+On Thu, Nov 06, 2014 at 04:43:20PM +0000, Guenter Roeck wrote:
+> Register with kernel power-off handler instead of setting pm_power_off
+> directly.
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 
-Enable clocks FCLK0..FCLK3 for the Programmable Logic by default.
+I just fetched your current poweroff-handler branch and gave it a spin
+on Juno. It looks like this hasn't broken since the last time I tried
+it. :)
 
-Otherwise accessing, e.g., the ESYSRESET register freezes the board,
-as seen with the Epiphany SDK tools e-reset and e-hw-rev, using /dev/mem.
+Tested-by: Mark Rutland <mark.rutland@arm.com>
 
-Cc: <stable@vger.kernel.org> # 3.17.x
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- Michal/Olof, please consider this trivial patch as a fix for 3.18.
+Thanks,
+Mark.
 
- arch/arm/boot/dts/zynq-parallella.dts | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
-index e1f51ca127fe..0429bbd89fba 100644
---- a/arch/arm/boot/dts/zynq-parallella.dts
-+++ b/arch/arm/boot/dts/zynq-parallella.dts
-@@ -34,6 +34,10 @@
- 	};
- };
- 
-+&clkc {
-+	fclk-enable = <0xf>;
-+};
-+
- &gem0 {
- 	status = "okay";
- 	phy-mode = "rgmii-id";
--- 
-2.1.2
+> ---
+> v5:
+> - Rebase to v3.18-rc3
+> v4:
+> - No change
+> v3:
+> - Replace poweroff in all newly introduced variables and in text
+>   with power_off or power-off as appropriate
+> - Replace POWEROFF_PRIORITY_xxx with POWER_OFF_PRIORITY_xxx
+> v2:
+> - Use define to specify poweroff handler priority
+> 
+>  arch/arm64/kernel/psci.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> index 866c1c8..5cab066 100644
+> --- a/arch/arm64/kernel/psci.c
+> +++ b/arch/arm64/kernel/psci.c
+> @@ -359,7 +359,8 @@ static int __init psci_0_2_init(struct device_node *np)
+>  
+>  	arm_pm_restart = psci_sys_reset;
+>  
+> -	pm_power_off = psci_sys_poweroff;
+> +	register_power_off_handler_simple(psci_sys_poweroff,
+> +					  POWER_OFF_PRIORITY_DEFAULT);
+>  
+>  out_put_node:
+>  	of_node_put(np);
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
