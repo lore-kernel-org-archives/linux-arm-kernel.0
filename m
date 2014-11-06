@@ -1,107 +1,45 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 6 Nov 2014 15:51:01 +0200
-Subject: [PATCH v4 2/3] PM / clock_ops: make __pm_clk_enable more generic
-In-Reply-To: <1415281862-23764-1-git-send-email-grygorii.strashko@ti.com>
-References: <1415281862-23764-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1415281862-23764-3-git-send-email-grygorii.strashko@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 6 Nov 2014 13:58:42 +0000
+Subject: gcc 4.9 build warnings (was: Re: arm-soc build: 2917 warnings 0
+ failures (arm-soc/v3.18-rc1-20-g06c0773))
+In-Reply-To: <20141106132828.GP4042@n2100.arm.linux.org.uk>
+References: <544a2a2e.a2db440a.6eeb.ffffaef3@mx.google.com>
+ <1847682.hInUtg9rQz@wuerfel>
+ <CAKv+Gu_4X0RNbgJ+BCb9+ccgTKBjcwb9L4aDUY6fFMa0R3PX-w@mail.gmail.com>
+ <2567100.Zj7YMcXpZG@wuerfel>
+ <CAKv+Gu-0jenous5sLPp+QJa3qRk-RiBgG1vVYP_RmVw0uXaysw@mail.gmail.com>
+ <20141106114919.GL26297@ulmo>
+ <20141106132828.GP4042@n2100.arm.linux.org.uk>
+Message-ID: <20141106135842.GK8509@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now there are two places in code which do the same things,
-so allow __pm_clk_enable() to accept pointer on pm_clock_entry
-structure as second parameter instead of pointer on clock and
-remove duplicated code.
+On Thu, Nov 06, 2014 at 01:28:28PM +0000, Russell King - ARM Linux wrote:
 
-Also, updated function intended to be used by following patch.
+> For the n'th time, what we know is:
 
-CC: Santosh Shilimkar <ssantosh@kernel.org>
-CC: Kevin Hilman <khilman@linaro.org>
-CC: Ulf Hansson <ulf.hansson@linaro.org>
-CC: Geert Uytterhoeven <geert@linux-m68k.org>
-CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- drivers/base/power/clock_ops.c | 38 ++++++++++++++++----------------------
- 1 file changed, 16 insertions(+), 22 deletions(-)
+> - gcc 4.9 bare metal seems to define __SIZE_TYPE__ to be unsigned int.
+> - gcc 4.9's stddef.h typedef's size_t to __SIZE_TYPE__.
+> - therefore, size_t is typedef'd from unsigned int.
+> - the kernel typedefs __kernel_size_t from unsigned int.
+> - the kernel typedefs size_t from __kernel_size_t.
 
-diff --git a/drivers/base/power/clock_ops.c b/drivers/base/power/clock_ops.c
-index f061eaa..b32b5d4 100644
---- a/drivers/base/power/clock_ops.c
-+++ b/drivers/base/power/clock_ops.c
-@@ -35,14 +35,20 @@ struct pm_clock_entry {
- /**
-  * pm_clk_enable - Enable a clock, reporting any errors
-  * @dev: The device for the given clock
-- * @clk: The clock being enabled.
-+ * @ce: PM clock entry corresponding to the clock.
-  */
--static inline int __pm_clk_enable(struct device *dev, struct clk *clk)
-+static inline int __pm_clk_enable(struct device *dev, struct pm_clock_entry *ce)
- {
--	int ret = clk_enable(clk);
--	if (ret)
--		dev_err(dev, "%s: failed to enable clk %p, error %d\n",
--			__func__, clk, ret);
-+	int ret;
-+
-+	if (ce->status < PCE_STATUS_ERROR) {
-+		ret = clk_enable(ce->clk);
-+		if (!ret)
-+			ce->status = PCE_STATUS_ENABLED;
-+		else
-+			dev_err(dev, "%s: failed to enable clk %p, error %d\n",
-+				__func__, ce->clk, ret);
-+	}
- 
- 	return ret;
- }
-@@ -293,7 +299,6 @@ int pm_clk_resume(struct device *dev)
- 	struct pm_subsys_data *psd = dev_to_psd(dev);
- 	struct pm_clock_entry *ce;
- 	unsigned long flags;
--	int ret;
- 
- 	dev_dbg(dev, "%s()\n", __func__);
- 
-@@ -302,13 +307,8 @@ int pm_clk_resume(struct device *dev)
- 
- 	spin_lock_irqsave(&psd->lock, flags);
- 
--	list_for_each_entry(ce, &psd->clock_list, node) {
--		if (ce->status < PCE_STATUS_ERROR) {
--			ret = __pm_clk_enable(dev, ce->clk);
--			if (!ret)
--				ce->status = PCE_STATUS_ENABLED;
--		}
--	}
-+	list_for_each_entry(ce, &psd->clock_list, node)
-+		__pm_clk_enable(dev, ce);
- 
- 	spin_unlock_irqrestore(&psd->lock, flags);
- 
-@@ -417,7 +417,6 @@ int pm_clk_resume(struct device *dev)
- 	struct pm_subsys_data *psd = dev_to_psd(dev);
- 	struct pm_clock_entry *ce;
- 	unsigned long flags;
--	int ret;
- 
- 	dev_dbg(dev, "%s()\n", __func__);
- 
-@@ -427,13 +426,8 @@ int pm_clk_resume(struct device *dev)
- 
- 	spin_lock_irqsave(&psd->lock, flags);
- 
--	list_for_each_entry(ce, &psd->clock_list, node) {
--		if (ce->status < PCE_STATUS_ERROR) {
--			ret = __pm_clk_enable(dev, ce->clk);
--			if (!ret)
--				ce->status = PCE_STATUS_ENABLED;
--		}
--	}
-+	list_for_each_entry(ce, &psd->clock_list, node)
-+		__pm_clk_enable(dev, ce);
- 
- 	spin_unlock_irqrestore(&psd->lock, flags);
- 
--- 
-1.9.1
+> So, in theory, size_t in the kernel is unsigned int too.  However, GCC 4.9
+> issues loads of complains when %zu or %zd is used with a size_t variable
+> in the kernel.
+
+> The question that we've been trying to work out is... why is this?  Right
+> now, it seems no one has an answer for this question.  We don't know
+> whether it's a compiler bug or not - and Arnd has explained why not.
+
+Isn't this GCC tracking the literal use of size_t in addition to the
+actual definition and warning based on that information for the size_t
+specific formatting.  Seems weird that it'd only affect a freestanding
+build though.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141106/8d8167a2/attachment.sig>
