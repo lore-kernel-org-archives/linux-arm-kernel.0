@@ -1,135 +1,80 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 6 Nov 2014 10:55:12 +0100
-Subject: [PATCH] PM / Domains: Change prototype for the ->attach_dev()
- callback
-In-Reply-To: <7hsihx1bvo.fsf@deeprootsystems.com>
-References: <1414670569-3002-1-git-send-email-ulf.hansson@linaro.org>
- <20141105013353.GA19238@dtor-ws>
- <7h7fz92rqk.fsf@deeprootsystems.com>
- <3267963.fqUYb7m9Rv@vostro.rjw.lan>
- <7hsihx1bvo.fsf@deeprootsystems.com>
-Message-ID: <CAPDyKFraQAGUU+BnwuEL0+HS_g2YfM_cRjHAeg2qrGkqFW=YVA@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu,  6 Nov 2014 10:57:01 +0100
+Subject: [PATCH v2 03/10] [media] Make use of the new media_bus_format
+ definitions
+In-Reply-To: <1415267829-4177-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1415267829-4177-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1415267829-4177-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 November 2014 00:11, Kevin Hilman <khilman@kernel.org> wrote:
-> "Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
->
->> On Wednesday, November 05, 2014 02:43:31 PM Kevin Hilman wrote:
->>> Dmitry Torokhov <dmitry.torokhov@gmail.com> writes:
->>>
->>> > On Thu, Oct 30, 2014 at 01:38:30PM -0700, Kevin Hilman wrote:
->>> >> "Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
->>> >>
->>> >> > On Thursday, October 30, 2014 01:02:49 PM Ulf Hansson wrote:
->>> >> >> Convert the prototype to return and int. This is just an initial step,
->>> >> >> needed to support error handling.
->>> >> >>
->>> >> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->>> >>
->>> >> Acked-by: Kevin Hilman <khilman@linaro.org>
->>> >>
->>> >> >>
->>> >> >> This patch is intended as fix for 3.18 rc[n]. Why?
->>> >> >>
->>> >> >> There are other SOC specific patches around that adds genpd support and which
->>> >> >> implements the ->attach_dev() callback. To prevent having an "atomic" patch
->>> >> >> during the next release cycle, let's change the prototype now instead.
->>> >> >>
->>> >> >> Further patches will add the actual error handling in genpd and these can then
->>> >> >> be reviewed and tested thoroughly.
->>> >> >
->>> >> > So we have no users of ->attach_dev at the moment, right?
->>> >>
->>> >> Not in mainline, but there are a couple getting ready to hit -next, so
->>> >> we wanted to fix this before they arrive so that adding the error
->>> >> handling will be easier.
->>> >
->>> > BTW, while we are at it, can we also pass the domain itself to
->>> > attach_dev() and detach_dev()? If anything it helps with debugging (you
->>> > can print domain name from the callbacks).
->>>
->>> Agreed, and it makes it match the other callbacks (power_off, power_on)
->>> which currently take struct generic_pm_domain *domain.
->>>
->>> Updated version of $SUBJECT patch below.
->>
->> The subject and changelog need to be updated too IMO.
->>
->
-> Right.  Here you go.
->
-> Kevin
+Replace references to the v4l2_mbus_pixelcode enum with the new
+media_bus_format enum in all common headers.
 
-Thanks for helping out Kevin!
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+---
+ include/media/v4l2-mediabus.h    | 2 +-
+ include/media/v4l2-subdev.h      | 2 +-
+ include/uapi/linux/v4l2-subdev.h | 6 +++---
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
-Kind regards
-Uffe
-
->
->
-> ----- >8 ------
-> From c18a6bf3121979c4102ba4f7edb3ac41e3921fc6 Mon Sep 17 00:00:00 2001
-> From: Ulf Hansson <ulf.hansson@linaro.org>
-> Date: Thu, 30 Oct 2014 13:02:49 +0100
-> Subject: [PATCH] PM / Domains: Change prototype for the attach and detach
->  callbacks
->
-> Convert the prototypes to return an int in order to support error
-> handling in these callbacks.
->
-> Also, as suggested by Dmitry Torokhov, pass the domain pointer for use
-> inside the callbacks, and so that they match the existing
-> power_on/power_off callbacks which currently take the domain pointer.
->
-> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> [khilman: added domain as parameter to callbacks, as suggested by Dmitry]
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
-> ---
->  drivers/base/power/domain.c | 4 ++--
->  include/linux/pm_domain.h   | 6 ++++--
->  2 files changed, 6 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index 40bc2f4072cc..b520687046d4 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -1437,7 +1437,7 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
->         spin_unlock_irq(&dev->power.lock);
->
->         if (genpd->attach_dev)
-> -               genpd->attach_dev(dev);
-> +               genpd->attach_dev(genpd, dev);
->
->         mutex_lock(&gpd_data->lock);
->         gpd_data->base.dev = dev;
-> @@ -1499,7 +1499,7 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
->         genpd->max_off_time_changed = true;
->
->         if (genpd->detach_dev)
-> -               genpd->detach_dev(dev);
-> +               genpd->detach_dev(genpd, dev);
->
->         spin_lock_irq(&dev->power.lock);
->
-> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-> index 73e938b7e937..b3ed7766a291 100644
-> --- a/include/linux/pm_domain.h
-> +++ b/include/linux/pm_domain.h
-> @@ -72,8 +72,10 @@ struct generic_pm_domain {
->         bool max_off_time_changed;
->         bool cached_power_down_ok;
->         struct gpd_cpuidle_data *cpuidle_data;
-> -       void (*attach_dev)(struct device *dev);
-> -       void (*detach_dev)(struct device *dev);
-> +       int (*attach_dev)(struct generic_pm_domain *domain,
-> +                         struct device *dev);
-> +       void (*detach_dev)(struct generic_pm_domain *domain,
-> +                          struct device *dev);
->  };
->
->  static inline struct generic_pm_domain *pd_to_genpd(struct dev_pm_domain *pd)
-> --
-> 2.1.0
->
+diff --git a/include/media/v4l2-mediabus.h b/include/media/v4l2-mediabus.h
+index 395c4a9..4915621 100644
+--- a/include/media/v4l2-mediabus.h
++++ b/include/media/v4l2-mediabus.h
+@@ -98,7 +98,7 @@ static inline void v4l2_fill_pix_format(struct v4l2_pix_format *pix_fmt,
+ 
+ static inline void v4l2_fill_mbus_format(struct v4l2_mbus_framefmt *mbus_fmt,
+ 			   const struct v4l2_pix_format *pix_fmt,
+-			   enum v4l2_mbus_pixelcode code)
++			   enum media_bus_format code)
+ {
+ 	mbus_fmt->width = pix_fmt->width;
+ 	mbus_fmt->height = pix_fmt->height;
+diff --git a/include/media/v4l2-subdev.h b/include/media/v4l2-subdev.h
+index d746572..9af5932 100644
+--- a/include/media/v4l2-subdev.h
++++ b/include/media/v4l2-subdev.h
+@@ -341,7 +341,7 @@ struct v4l2_subdev_video_ops {
+ 	int (*query_dv_timings)(struct v4l2_subdev *sd,
+ 			struct v4l2_dv_timings *timings);
+ 	int (*enum_mbus_fmt)(struct v4l2_subdev *sd, unsigned int index,
+-			     enum v4l2_mbus_pixelcode *code);
++			     enum media_bus_format *code);
+ 	int (*enum_mbus_fsizes)(struct v4l2_subdev *sd,
+ 			     struct v4l2_frmsizeenum *fsize);
+ 	int (*g_mbus_fmt)(struct v4l2_subdev *sd,
+diff --git a/include/uapi/linux/v4l2-subdev.h b/include/uapi/linux/v4l2-subdev.h
+index a619cdd..7f44f04 100644
+--- a/include/uapi/linux/v4l2-subdev.h
++++ b/include/uapi/linux/v4l2-subdev.h
+@@ -68,7 +68,7 @@ struct v4l2_subdev_crop {
+  * struct v4l2_subdev_mbus_code_enum - Media bus format enumeration
+  * @pad: pad number, as reported by the media API
+  * @index: format index during enumeration
+- * @code: format code (from enum v4l2_mbus_pixelcode)
++ * @code: format code (from enum media_bus_format)
+  */
+ struct v4l2_subdev_mbus_code_enum {
+ 	__u32 pad;
+@@ -81,7 +81,7 @@ struct v4l2_subdev_mbus_code_enum {
+  * struct v4l2_subdev_frame_size_enum - Media bus format enumeration
+  * @pad: pad number, as reported by the media API
+  * @index: format index during enumeration
+- * @code: format code (from enum v4l2_mbus_pixelcode)
++ * @code: format code (from enum media_bus_format)
+  */
+ struct v4l2_subdev_frame_size_enum {
+ 	__u32 index;
+@@ -109,7 +109,7 @@ struct v4l2_subdev_frame_interval {
+  * struct v4l2_subdev_frame_interval_enum - Frame interval enumeration
+  * @pad: pad number, as reported by the media API
+  * @index: frame interval index during enumeration
+- * @code: format code (from enum v4l2_mbus_pixelcode)
++ * @code: format code (from enum media_bus_format)
+  * @width: frame width in pixels
+  * @height: frame height in pixels
+  * @interval: frame interval in seconds
+-- 
+1.9.1
