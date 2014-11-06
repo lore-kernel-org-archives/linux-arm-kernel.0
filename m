@@ -1,44 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 06 Nov 2014 01:05:48 +0100
+Date: Thu, 06 Nov 2014 01:06:39 +0100
 Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
-In-Reply-To: <20141105233921.GJ6168@google.com>
+In-Reply-To: <20141105234058.GK6168@google.com>
 References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <2148776.X8NPqiYA6S@wuerfel> <20141105233921.GJ6168@google.com>
-Message-ID: <2659321.LYB03rL97X@wuerfel>
+ <2355100.WsW1DXh57P@wuerfel> <20141105234058.GK6168@google.com>
+Message-ID: <2679650.sLyVOFDaTG@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 05 November 2014 16:39:21 Bjorn Helgaas wrote:
-> On Wed, Oct 22, 2014 at 10:52:19PM +0200, Arnd Bergmann wrote:
-> > On Wednesday 22 October 2014 16:59:14 Lorenzo Pieralisi wrote:
-> > > On Wed, Oct 01, 2014 at 10:38:45AM +0100, Arnd Bergmann wrote:
-> > > 
-> > > [...]
-> > > 
-> > > > The arm32 implementations of pci_domain_nr/pci_proc_domain can probably be
-> > > > removed if we change the arm32 pcibios_init_hw function to call the new
-> > > > interfaces that set the domain number.
-> > > 
-> > > I wished, but it is a bit more complicated than I thought unfortunately,
-> > > mostly because some drivers, eg cns3xxx set the domain numbers
-> > > statically in pci_sys_data and this sets a chain of dependency that is
-> > > not easy to untangle. I think cns3xxx is the only legacy driver that "uses"
-> > > the domain number (in pci_sys_data) in a way that clashes with the
-> > > generic domain_nr implementation, I need to give it more thought.
+On Wednesday 05 November 2014 16:40:58 Bjorn Helgaas wrote:
 > > 
-> > Just had a look at that driver, shouldn't be too hard to change, see below.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > See below for a sample patch I just did. It duplicates the code from
+> > pci_common_init_dev/pci_common_init because we know that all users
+> > of pci_common_init_dev are modern and only pass a single host bridge.
+> > The new pci_common_init_dev is simpler than the old one but should
+> > do the exact same thing for all current users, with the addition
+> > of propagating the return value.
 > 
-> This patch is in my patchwork, but it lacks a topic & changelog and I'm not
-> sure of its state, so I'm going to drop it for now.  Please post it again
-> if you want me to do something with it.  I guess it only touches arch/arm,
-> so it would probably be merged via your tree anyway.
+> Same with this one; I'm ignoring for now on the theory that this was just a
+> sample to show the idea, and a more formal patch might come later.
+> 
 
-Lorenzo has posted an updated version as
-
-"arm: cns3xxx: pci: remove artificial dependency on pci_sys_data domain",
-and a second patch that depends on it. That is the version we should be
-merging, though I'm not sure through which tree.
+Correct. Or we might not do it at all, if some of the other patches
+are done before we need this.
 
 	Arnd
