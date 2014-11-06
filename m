@@ -1,56 +1,85 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 6 Nov 2014 11:42:32 +0100 (CET)
-Subject: [V10 PATCH 2/2] irqchip: gicv2m: Add supports for ARM GICv2m
- MSI(-X)
-In-Reply-To: <alpine.DEB.2.11.1411060146050.24960@nanos>
-References: <1415052977-26036-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1415052977-26036-3-git-send-email-suravee.suthikulpanit@amd.com>
- <5458CE31.3040404@linux.intel.com> <545ABB4C.8010103@amd.com>
- <545ABF6C.1000308@amd.com>
- <alpine.DEB.2.11.1411060146050.24960@nanos>
-Message-ID: <alpine.DEB.2.11.1411061131330.24960@nanos>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 06 Nov 2014 10:00:34 +0100
+Subject: M_CAN message RAM initialization AppNote  - was: Re: [PATCH V3
+ 3/3] can: m_can: workaround for transmit data less than 4 bytes
+In-Reply-To: <545B1D71.4000408@hartkopp.net>
+References: <1415193393-30023-1-git-send-email-b29396@freescale.com>
+ <1415193393-30023-3-git-send-email-b29396@freescale.com>
+ <545A3451.2090302@pengutronix.de> <545A692E.40002@hartkopp.net>
+ <20141106015716.GB7642@shlinux1.ap.freescale.net>
+ <545B1D71.4000408@hartkopp.net>
+Message-ID: <545B38B2.6000003@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Nov 2014, Thomas Gleixner wrote:
-> On Wed, 5 Nov 2014, Suravee Suthikulanit wrote:
-> > On 11/5/2014 6:05 PM, Suravee Suthikulanit wrote:
-> > > - Overall, it seems that msi_domain_alloc() could be quite different
-> > > across architectures. Would it be possible to declare this function as
-> > > weak, and allow arch to override (similar to arch_setup_msi_irq)?
-> > 
-> > Actually, declaring "msi_domain_ops" as non-static, and allow other code to
-> > override the .alloc and .free?
+On 11/06/2014 08:04 AM, Oliver Hartkopp wrote:
+> On 06.11.2014 02:57, Dong Aisheng wrote:
+>> On Wed, Nov 05, 2014 at 07:15:10PM +0100, Oliver Hartkopp wrote:
 > 
-> Why do you want to do that?
+>>> The Message RAM is usually equipped with a parity or ECC functionality.
+>>> But RAM cells suffer a hardware reset and can therefore hold
+>>> arbitrary content at startup - including parity and/or ECC bits.
+>>>
+>>> So when you write only the CAN ID and the first four bytes the last
+>>> four bytes remain untouched. Then the M_CAN starts to read in 32bit
+>>> words from the start of the Tx Message element. So it is very likely
+>>> to trigger the message RAM error when reading the uninitialized
+>>> 32bit word from the last four bytes.
+>>>
+>>> Finally it turns out that an initial writing (with any kind of data)
+>>> to the entire message RAM is mandatory to create valid parity/ECC
+>>> checksums.
+>>>
+>>> That's it.
+>>>
+>>
+>> Thanks for sharing this information.
+>> Does it mean this issue is related to the nature of Message RAM and is
+>> supposed to exist on all M_CAN IP versions?
+> 
+> From what I know from the 3.1.x revision there's no change regarding
+> IR.BRU and IR.BEC - so I would assume this to stay on all M_CAN IP
+> revisions.
+> 
+> But after some sleep I wonder if this patch [3/3] would need an update too.
+> 
+> Writing to the TX message RAM is obviously no workaround but a valid and
+> needed initialization process.
+> 
+> I would tend to make this patch:
+> 
+> ---
+> 
+> can: m_can: add missing TX message RAM initialization
+> 
+> The M_CAN message RAM is usually equipped with a parity or ECC
+> functionality.
+> But RAM cells suffer a hardware reset and can therefore hold arbitrary
+> content at startup - including parity and/or ECC bits.
+> 
+> To prevent the M_CAN controller detecting checksum errors when reading
+> potentially uninitialized TX message RAM content to transmit CAN frames
+> the TX message RAM has to be written with (any kind of) initial data.
+> 
+> ---
+> 
+> Then the code should memset() the entire TX FIFO element - and not only
+> the 8 data bytes we are addressing now.
 
-I know why. Because you want to spare a level of hierarchy. But thats
-wrong simply because MSI itself is an interrupt chip at the device
-level.
+No literal memset() as this is iomem
 
-[ MSI ] ---> [ GIC-MSI ] ---> [ GIC ]
+Marc
 
-So the MSI level only cares about the allocation of the virq
-space. GIC-MSI allocates out of the bitmap which handles the hard
-wired range of MSI capable GIC interrupts and GIC handles the
-underlying functionality.
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-And this makes a lot of sense, if you think about interrupt
-remapping. If ARM ever grows that you simply insert it into the chain:
-
-[ MSI ] ---> [ Remap] ---> [ GIC-MSI ] ---> [ GIC ]
-
-If you look at Jiangs x86 implementation it does exactly that.
-
-[ MSI ] ---> [ Vector ]
-
-[ MSI ] ---> [ Remap ] ---> [ Vector ]
-
-And because ARM has this intermediate layer of GIC-MSI you need to
-represent it in the hierarchy whether you like it or not. If you'd try
-to bolt the GIC-MSI magic into the MSI layer itself, then interrupt
-remapping would never work.
-
-Thanks,
-
-	tglx
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141106/d31639d1/attachment.sig>
