@@ -1,64 +1,58 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Thu, 6 Nov 2014 13:12:09 +0530
-Subject: [PATCH 0/4] Touchscreen performance related fixes
-In-Reply-To: <20141103180920.GA20779@localhost.localdomain>
-References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
- <20141103180920.GA20779@localhost.localdomain>
-Message-ID: <545B2651.4090905@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 6 Nov 2014 15:54:35 +0800
+Subject: [PATCH v2 0/3] ARM: sun8i: Add DMA controller support
+In-Reply-To: <20141106071123.GV1870@intel.com>
+References: <1411010680-4481-1-git-send-email-wens@csie.org>
+ <CAGb2v65ZkBvqSjwR0bVUu0-=5-pOmydp51K6GeMnxOa4vOtCRQ@mail.gmail.com>
+ <20141106071123.GV1870@intel.com>
+Message-ID: <CAGb2v66m6Q=YX04Yez7HD=P1G5+G_0ej2tAw9dCJMBb+EHpz1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Nov 6, 2014 at 3:11 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Fri, Sep 26, 2014 at 11:06:01AM +0800, Chen-Yu Tsai wrote:
+>> On Thu, Sep 18, 2014 at 11:24 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+>> > Hi everyone,
+>> >
+>> > This is v2 of my sun8i DMA controller support series. This series
+>> > adds support for the DMA controller found in the Allwinner A23 SoC.
+>> > It is the same hardware as found in the A31 (sun6i) SoC. In addition
+>> > to reduced physical channels and endpoints, the controller in the A23
+>> > requires an undocumented register to be toggled. That seems to allow
+>> > memory bus access.
+>> >
+>> > This series is based on my earlier "clk: sun6i: Unify AHB1 clock and
+>> > fix rate calculation" series, which removes the clock muxing calls from
+>> > the sun6i-dma driver. The default PLL6 pre-divider for AHB1 on the A23
+>> > results in an exceedingly high clock rate for AHB1, and the system hangs.
+>> > Also, on the A23, the dma controller happily works even when AHB1 is
+>> > clocked from AXI.
+>> >
+>> >
+>> > Patch 1 changes the channel count macros into runtime data binded to
+>> > the DT compatible strings. It also gets rid of some hardcoded values
+>> > in the interrupt handler.
+>> >
+>> > Patch 2 adds the channel number data for the A23 (sun8i), as well as
+>> > the undocumented register quirk.
+>>
+>> Hi, Vinod,
+>>
+>> Any chance we can get patches 1 & 2 merged? You've already merged the
+>> prerequisite patch "dmaengine: sun6i: Remove obsolete clk muxing code"
+>> a few days ago, and patch 3 is already in arm-soc.
+>
+> Hi ChenYu,
+>
+> The patches look fine to me so I tried applying them but they fail to apply,
+> can you please rebase these two and resend
 
+Hi Vinod,
 
-On Monday 03 November 2014 11:39 PM, Richard Cochran wrote:
-> On Mon, Oct 27, 2014 at 04:38:27PM +0530, Vignesh R wrote:
->> This series of patches fix TSC defects related to lag in touchscreen
->> performance and cursor jump at touch release. The lag was result of
->> udelay in TSC interrupt handler. Cursor jump due to false pen-up event.
->> The patches implement Advisory 1.0.31 in silicon errata of am335x-evm
->> to avoid false pen-up events and remove udelay.
-> 
-> That advisory has two workarounds. You have chosen the second one?
+Could you publish an updated slave-dma/next branch? Currently I see it at
+v3.18-rc1. And the series rebases cleanly onto it with no differences.
 
-Work around one. Hence 5 wire design is not broken.
+I'm guessing some of Maxime's cleanup work is the source of conflict.
 
-> 
-> The text of the second workaround says it only works on 4 wire setups,
-> so I wonder how 5 wire designs will be affected.
-> 
->> The advisory says to use
->> steps 1 to 4 for ADC and 5 to 16 for TSC (assuming 4 wire TSC and 4 channel
->> ADC).
-> 
-> No, it doesn't say that. (sprz360f.pdf)
-
-The pen up event detection happens immediately after charge step. Hence,
-interchanging ADC and TSC steps makes sure that sampling of touch
-co-ordinates and pen events are done one after the other. This
-workaround was suggested by internal hardware folks. Earlier ADC steps
-intervened between sampling of co-ordinates and pen event detection
-which is not desirable.
-
-> 
->> Further the X co-ordinate must be the last one to be sampled just
->> before charge step. The first two patches implement the required changes. 
-> 
-> FWIW, I implemented the first workaround and removed the udelay not
-> too long ago. Like Sebastian, I saw the TSC unit hang after about
-> 50000 interrupts when running with the workaround.
-> 
-> Did you test you patch for very long?
-
-Yes, I tested for about 200000 interrupts and I didn't see any hang.
-This patch series does not just implement workaround but also does some
-minor changes, such as interchanging ADC and TSC steps etc, which makes
-TSC driver more robust. Let me know if you encounter any issues with my
-patch series.
-
-Regards
-Vignesh
-
-> 
-> Thanks,
-> Richard
-> 
+Thanks
+ChenYu
