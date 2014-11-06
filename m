@@ -1,108 +1,306 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 6 Nov 2014 12:12:04 +0100
-Subject: [PATCH] leds: leds-gpio: Convert gpio_blink_set() to use GPIO
- descriptors
-In-Reply-To: <20141106105855.GL1618@lahna.fi.intel.com>
-References: <1414755658-96293-1-git-send-email-mika.westerberg@linux.intel.com>
- <545843B1.3020101@nvidia.com> <2455157.3p7mHhT8im@vostro.rjw.lan>
- <CAMuHMdXn9W2S7N+YGfjDxQozMtRZCVdTzzdDps6YfOv2FqVBmw@mail.gmail.com>
- <20141106103033.GK1618@lahna.fi.intel.com>
- <CAMuHMdWtcZcpW=r60s9auENZxChiLwr14R0p_soKr7C3yGYOMQ@mail.gmail.com>
- <20141106105855.GL1618@lahna.fi.intel.com>
-Message-ID: <CAMuHMdUroLo5SdXrTu+etiW+TwHAWV-Qn9UsVnud+BJ7q6nXjw@mail.gmail.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu,  6 Nov 2014 11:12:57 +0000
+Subject: [PATCH] arm64: percpu: Implement this_cpu operations
+Message-ID: <1415272377-5334-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mika,
+The generic this_cpu operations disable interrupts to ensure that the
+requested operation is protected from pre-emption. For arm64, this is
+overkill and can hurt throughput and latency.
 
-On Thu, Nov 6, 2014 at 11:58 AM, Mika Westerberg
-<mika.westerberg@linux.intel.com> wrote:
-> On Thu, Nov 06, 2014 at 11:32:19AM +0100, Geert Uytterhoeven wrote:
->> On Thu, Nov 6, 2014 at 11:30 AM, Mika Westerberg
->> <mika.westerberg@linux.intel.com> wrote:
->> >> "leds: leds-gpio: Add support for GPIO descriptors" broke leds-gpio on
->> >> non-DT platforms for me:
->> >>
->> >>     gpiod_direction_output: invalid GPIO
->> >>     leds-gpio: probe of leds-gpio failed with error -22
->> >>
->> >> (desc is NULL in gpiod_direction_output()).
->> >>
->> >> DT shmobile reference/multi-platform are fine.
->> >>
->> >> I noticed the hard way, as I wanted to add some LEDs to a new platform,
->> >> but couldn't get it work. It turned out it also had stopped working on
->> >> r8a7740/armadillo-legacy, so I started bisecting...
->> >
->> > Which board file that is?
->> >
->> > There is a bug that gpio_to_desc() returns NULL instead if ERR_PTR() in
->> > that patch but I wonder why gpio_is_valid() and devm_gpio_request_one()
->> > do not complain about that prior.
->>
->> arch/arm/mach-shmobile/board-armadillo800eva.c
->
-> Are you able to put some printks() to the 'if (!template->gpiod)' branch
-> so that it prints out gpio number and what does devm_gpio_request_one()
-> return?
->
-> Something like:
->
->         if (!template->gpiod) {
->                 ...
->                 ret = devm_gpio_request_one(parent, template->gpio, flags,
->                                             template->name);
->                 dev_info(parent, "GPIO %u, ret: %d\n", template->gpio, ret);
->                 if (ret < 0)
->                         ...
->
->                 led_dat->gpiod = gpio_to_desc(template->gpio);
->                 dev_info(parent, "GPIOD: %p\n", led_dat->gpiod);
+This patch provides arm64 specific implementations for the this_cpu
+operations. Rather than disable interrupts, we use the exclusive
+monitor or atomic operations as appropriate.
 
-Sure:
+The following operations are implemented: add, add_return, and, or,
+read, write, xchg. We also wire up a cmpxchg implementation from
+cmpxchg.h.
 
-    leds-gpio leds-gpio: GPIO 102, ret: 0
-    leds-gpio leds-gpio: GPIOD: c050e970
+Testing was performed using the percpu_test module and hackbench on a
+Juno board running 3.18-rc3.
 
-So led_dat is non-NULL. But it's overwritten by NULL later:
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
 
-    led_dat->gpiod = template->gpiod;
+This patch applies on top of one I sent out earlier:
+"arm64: xchg: Implement cmpxchg_double"
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/294705.html
 
-Whitespace damaged fix below, to fold into the original.
-If you prefer a proper separate patch, let me know.
+My two least favourite things in the kernel are excessive pre-processor
+use and assembler, so this patch has been fun to write ;-).
 
-diff --git a/drivers/leds/leds-gpio.c b/drivers/leds/leds-gpio.c
-index ba4698c32bb04bde..b3c5d9d6a42bcd8b 100644
---- a/drivers/leds/leds-gpio.c
-+++ b/drivers/leds/leds-gpio.c
-@@ -92,7 +92,8 @@ static int create_gpio_led(const struct gpio_led *template,
- {
-        int ret, state;
+I've tried to make the inline assembler clearer with named parameters,
+it really upset checkpatch, if it upsets people then please shout and I
+will change it.
 
--       if (!template->gpiod) {
-+       led_dat->gpiod = template->gpiod;
-+       if (!led_dat->gpiod) {
-                /*
-                 * This is the legacy code path for platform code that
-                 * still uses GPIO numbers. Ultimately we would like to get
-@@ -122,8 +123,7 @@ static int create_gpio_led(const struct gpio_led *template,
+Cheers,
+-- 
+Steve
 
-        led_dat->cdev.name = template->name;
-        led_dat->cdev.default_trigger = template->default_trigger;
--       led_dat->gpiod = template->gpiod;
--       led_dat->can_sleep = gpiod_cansleep(template->gpiod);
-+       led_dat->can_sleep = gpiod_cansleep(led_dat->gpiod);
-        led_dat->blinking = 0;
-        if (blink_set) {
-                led_dat->platform_gpio_blink_set = blink_set;
+---
+ arch/arm64/include/asm/cmpxchg.h |   6 +-
+ arch/arm64/include/asm/percpu.h  | 231 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 235 insertions(+), 2 deletions(-)
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
+index 3e02245..3e51f49 100644
+--- a/arch/arm64/include/asm/cmpxchg.h
++++ b/arch/arm64/include/asm/cmpxchg.h
+@@ -237,8 +237,10 @@ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
+ 	__ret; \
+ })
+ 
+-#define this_cpu_cmpxchg_8(ptr, o, n) \
+-	cmpxchg(raw_cpu_ptr(&(ptr)), o, n);
++#define this_cpu_cmpxchg_1(ptr, o, n) cmpxchg(raw_cpu_ptr(&(ptr)), o, n)
++#define this_cpu_cmpxchg_2(ptr, o, n) cmpxchg(raw_cpu_ptr(&(ptr)), o, n)
++#define this_cpu_cmpxchg_4(ptr, o, n) cmpxchg(raw_cpu_ptr(&(ptr)), o, n)
++#define this_cpu_cmpxchg_8(ptr, o, n) cmpxchg(raw_cpu_ptr(&(ptr)), o, n)
+ 
+ #define this_cpu_cmpxchg_double_8(ptr1, ptr2, o1, o2, n1, n2) \
+ 	cmpxchg_double(raw_cpu_ptr(&(ptr1)), raw_cpu_ptr(&(ptr2)), \
+diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
+index 5279e57..e751681 100644
+--- a/arch/arm64/include/asm/percpu.h
++++ b/arch/arm64/include/asm/percpu.h
+@@ -44,6 +44,237 @@ static inline unsigned long __my_cpu_offset(void)
+ 
+ #endif /* CONFIG_SMP */
+ 
++#define PERCPU_OP(op, asm_op)						\
++static inline unsigned long __percpu_##op(void *ptr,			\
++			unsigned long val, int size)			\
++{									\
++	unsigned long loop, ret;					\
++									\
++	switch (size) {							\
++	case 1:								\
++		do {							\
++			asm ("//__per_cpu_" #op "_1\n"			\
++			"ldxrb	  %w[ret], %[ptr]\n"			\
++			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
++			"stxrb	  %w[loop], %w[ret], %[ptr]\n"		\
++			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
++			  [ptr] "+Q"(*(u8 *)ptr)			\
++			: [val] "Ir" (val));				\
++		} while (loop);						\
++		break;							\
++	case 2:								\
++		do {							\
++			asm ("//__per_cpu_" #op "_2\n"			\
++			"ldxrh	  %w[ret], %[ptr]\n"			\
++			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
++			"stxrh	  %w[loop], %w[ret], %[ptr]\n"		\
++			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
++			  [ptr]  "+Q"(*(u16 *)ptr)			\
++			: [val] "Ir" (val));				\
++		} while (loop);						\
++		break;							\
++	case 4:								\
++		do {							\
++			asm ("//__per_cpu_" #op "_4\n"			\
++			"ldxr	  %w[ret], %[ptr]\n"			\
++			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
++			"stxr	  %w[loop], %w[ret], %[ptr]\n"		\
++			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
++			  [ptr] "+Q"(*(u32 *)ptr)			\
++			: [val] "Ir" (val));				\
++		} while (loop);						\
++		break;							\
++	case 8:								\
++		do {							\
++			asm ("//__per_cpu_" #op "_8\n"			\
++			"ldxr	  %[ret], %[ptr]\n"			\
++			#asm_op " %[ret], %[ret], %[val]\n"		\
++			"stxr	  %w[loop], %[ret], %[ptr]\n"		\
++			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
++			  [ptr] "+Q"(*(u64 *)ptr)			\
++			: [val] "Ir" (val));				\
++		} while (loop);						\
++		break;							\
++	default:							\
++		BUILD_BUG();						\
++	}								\
++									\
++	return ret;							\
++}
++
++PERCPU_OP(add, add)
++PERCPU_OP(and, and)
++PERCPU_OP(or, orr)
++#undef PERCPU_OP
++
++static inline unsigned long __percpu_read(void *ptr, int size)
++{
++	unsigned long ret;
++
++	switch (size) {
++	case 1:
++		asm ("//__per_cpu_read_1\n"
++			"ldrb %w[ret], %[ptr]\n" :
++			[ret] "=&r"(ret), [ptr] "+Q"(*(u8 *)ptr));
++		break;
++	case 2:
++		asm ("//__per_cpu_read_2\n"
++			"ldrh %w[ret], %[ptr]\n" :
++			[ret] "=&r"(ret), [ptr] "+Q"(*(u16 *)ptr));
++		break;
++	case 4:
++		asm ("//__per_cpu_read_4\n"
++			"ldr %w[ret], %[ptr]\n" :
++			[ret] "=&r"(ret), [ptr] "+Q"(*(u32 *)ptr));
++		break;
++	case 8:
++		asm ("//__per_cpu_read_8\n"
++			"ldr %[ret], %[ptr]\n" :
++			[ret] "=&r"(ret), [ptr] "+Q"(*(u64 *)ptr));
++		break;
++	default:
++		BUILD_BUG();
++	}
++
++	return ret;
++}
++
++static inline void __percpu_write(void *ptr, unsigned long val, int size)
++{
++	switch (size) {
++	case 1:
++		asm ("//__per_cpu_write_1\n"
++			"strb %w[val], %[ptr]\n" :
++			[ptr] "+Q"(*(u8 *)ptr) : [val] "r"(val));
++		break;
++	case 2:
++		asm ("//__per_cpu_write_2\n"
++			"strh %w[val], %[ptr]\n" :
++			[ptr] "+Q"(*(u16 *)ptr) : [val] "r"(val));
++		break;
++	case 4:
++		asm ("//__per_cpu_write_4\n"
++			"str %w[val], %[ptr]\n" :
++			[ptr] "+Q"(*(u32 *)ptr) : [val] "r"(val));
++		break;
++	case 8:
++		asm ("//__per_cpu_write_8\n"
++			"str %[val], %[ptr]\n" :
++			[ptr] "+Q"(*(u64 *)ptr) : [val] "r"(val));
++		break;
++	default:
++		BUILD_BUG();
++	}
++}
++
++static inline unsigned long __percpu_xchg(void *ptr, unsigned long val,
++						int size)
++{
++	unsigned long ret, loop;
++
++	switch (size) {
++	case 1:
++		do {
++			asm ("//__percpu_xchg_1\n"
++			"ldxrb %w[ret], %[ptr]\n"
++			"stxrb %w[loop], %w[val], %[ptr]\n"
++			: [loop] "=&r"(loop), [ret] "=&r"(ret),
++			  [ptr] "+Q"(*(u8 *)ptr)
++			: [val] "r" (val));
++		} while (loop);
++		break;
++	case 2:
++		do {
++			asm ("//__percpu_xchg_2\n"
++			"ldxrh %w[ret], %[ptr]\n"
++			"stxrh %w[loop], %w[val], %[ptr]\n"
++			: [loop] "=&r"(loop), [ret] "=&r"(ret),
++			  [ptr] "+Q"(*(u16 *)ptr)
++			: [val] "r" (val));
++		} while (loop);
++		break;
++	case 4:
++		do {
++			asm ("//__percpu_xchg_4\n"
++			"ldxr %w[ret], %[ptr]\n"
++			"stxr %w[loop], %w[val], %[ptr]\n"
++			: [loop] "=&r"(loop), [ret] "=&r"(ret),
++			  [ptr] "+Q"(*(u32 *)ptr)
++			: [val] "r" (val));
++		} while (loop);
++		break;
++	case 8:
++		do {
++			asm ("//__percpu_xchg_8\n"
++			"ldxr %[ret], %[ptr]\n"
++			"stxr %w[loop], %[val], %[ptr]\n"
++			: [loop] "=&r"(loop), [ret] "=&r"(ret),
++			  [ptr] "+Q"(*(u64 *)ptr)
++			: [val] "r" (val));
++		} while (loop);
++		break;
++	default:
++		BUILD_BUG();
++	}
++
++	return ret;
++}
++
++#define _percpu_add(pcp, val) \
++	__percpu_add(raw_cpu_ptr(&(pcp)), val, sizeof(pcp))
++
++#define _percpu_add_return(pcp, val) (typeof(pcp)) (_percpu_add(pcp, val))
++
++#define _percpu_and(pcp, val) \
++	__percpu_and(raw_cpu_ptr(&(pcp)), val, sizeof(pcp))
++
++#define _percpu_or(pcp, val) \
++	__percpu_or(raw_cpu_ptr(&(pcp)), val, sizeof(pcp))
++
++#define _percpu_read(pcp) (typeof(pcp))	\
++	(__percpu_read(raw_cpu_ptr(&(pcp)), sizeof(pcp)))
++
++#define _percpu_write(pcp, val) \
++	__percpu_write(raw_cpu_ptr(&(pcp)), (unsigned long)(val), sizeof(pcp))
++
++#define _percpu_xchg(pcp, val) (typeof(pcp)) \
++	(__percpu_xchg(raw_cpu_ptr(&(pcp)), (unsigned long)(val), sizeof(pcp)))
++
++#define this_cpu_add_1(pcp, val) _percpu_add(pcp, val)
++#define this_cpu_add_2(pcp, val) _percpu_add(pcp, val)
++#define this_cpu_add_4(pcp, val) _percpu_add(pcp, val)
++#define this_cpu_add_8(pcp, val) _percpu_add(pcp, val)
++
++#define this_cpu_add_return_1(pcp, val) _percpu_add_return(pcp, val)
++#define this_cpu_add_return_2(pcp, val) _percpu_add_return(pcp, val)
++#define this_cpu_add_return_4(pcp, val) _percpu_add_return(pcp, val)
++#define this_cpu_add_return_8(pcp, val) _percpu_add_return(pcp, val)
++
++#define this_cpu_and_1(pcp, val) _percpu_and(pcp, val)
++#define this_cpu_and_2(pcp, val) _percpu_and(pcp, val)
++#define this_cpu_and_4(pcp, val) _percpu_and(pcp, val)
++#define this_cpu_and_8(pcp, val) _percpu_and(pcp, val)
++
++#define this_cpu_or_1(pcp, val) _percpu_or(pcp, val)
++#define this_cpu_or_2(pcp, val) _percpu_or(pcp, val)
++#define this_cpu_or_4(pcp, val) _percpu_or(pcp, val)
++#define this_cpu_or_8(pcp, val) _percpu_or(pcp, val)
++
++#define this_cpu_read_1(pcp) _percpu_read(pcp)
++#define this_cpu_read_2(pcp) _percpu_read(pcp)
++#define this_cpu_read_4(pcp) _percpu_read(pcp)
++#define this_cpu_read_8(pcp) _percpu_read(pcp)
++
++#define this_cpu_write_1(pcp, val) _percpu_write(pcp, val)
++#define this_cpu_write_2(pcp, val) _percpu_write(pcp, val)
++#define this_cpu_write_4(pcp, val) _percpu_write(pcp, val)
++#define this_cpu_write_8(pcp, val) _percpu_write(pcp, val)
++
++#define this_cpu_xchg_1(pcp, val) _percpu_xchg(pcp, val)
++#define this_cpu_xchg_2(pcp, val) _percpu_xchg(pcp, val)
++#define this_cpu_xchg_4(pcp, val) _percpu_xchg(pcp, val)
++#define this_cpu_xchg_8(pcp, val) _percpu_xchg(pcp, val)
++
+ #include <asm-generic/percpu.h>
+ 
+ #endif /* __ASM_PERCPU_H */
+-- 
+1.9.3
