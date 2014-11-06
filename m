@@ -1,26 +1,32 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 6 Nov 2014 21:16:03 +0100
-Subject: [RFC PATCH] ARM: mvebu: Let the device-tree determine smp_ops
-In-Reply-To: <545BD274.6050103@alliedtelesis.co.nz>
-References: <1415249396-2985-1-git-send-email-chris.packham@alliedtelesis.co.nz>
- <20141106155823.213f8811@free-electrons.com>
- <545BD274.6050103@alliedtelesis.co.nz>
-Message-ID: <20141106201603.GF4974@lunn.ch>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Thu, 06 Nov 2014 21:17:30 +0100
+Subject: [RESEND PATCH 2/3] ARM: OMAP2+: Remove unnecesary include in
+ GPMC driver
+In-Reply-To: <20141106185235.GD31454@atomide.com>
+References: <1395209295-24399-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1395209295-24399-3-git-send-email-javier.martinez@collabora.co.uk>
+ <20141106185235.GD31454@atomide.com>
+Message-ID: <545BD75A.5040708@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Darn. I thought that might be the case but I wanted to keep the scope of 
-> my change small. How about making setup_arch check if smp_ops is already 
-> set?
+Hello Tony,
 
-I think that would be last resort solution. Try not to touch core code
-unless you really have to.
+On 11/06/2014 07:52 PM, Tony Lindgren wrote:
+> * Javier Martinez Canillas <javier.martinez@collabora.co.uk> [140318 23:12]:
+>> The GPMC driver includes arch/arm/mach-omap2/common.h but
+>> does not use anything on that header so it can be removed.
+>> 
+>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> Probably meant Cc here? :) I'll apply this into omap-for-v3.19/gpmc,
+> the rest will need to wait until omap3 is DT only.
+> 
 
-> Alternatively if we gave ARMADA_370_XP_DT a smp_init function that
-> returned non-zero if smp_ops is already set then I think it'd be
-> backwards compatible and keep the scope of the change restricted to
-> the 370-XP platforms.
+Ups, I don't know how your s-o-b ended there :)
 
-This sounds more reasonable.
+Thanks a lot for picking such an old patch.
 
-     Andrew
+Best regards,
+Javier
