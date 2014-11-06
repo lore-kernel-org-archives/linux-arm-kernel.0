@@ -1,136 +1,83 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 6 Nov 2014 11:52:09 +0000
-Subject: [PATCH] arm64: percpu: Implement this_cpu operations
-In-Reply-To: <CAKv+Gu-ba8mSgh2qv8+=gb75rb0wOs0S9QRwHAkm8RRbMz9kHQ@mail.gmail.com>
-References: <1415272377-5334-1-git-send-email-steve.capper@linaro.org>
- <CAKv+Gu-ba8mSgh2qv8+=gb75rb0wOs0S9QRwHAkm8RRbMz9kHQ@mail.gmail.com>
-Message-ID: <20141106115208.GA6258@linaro.org>
+From: Andrew.Jackson@arm.com (Andrew Jackson)
+Date: Thu, 06 Nov 2014 11:39:47 +0000
+Subject: [PATCH] dmaengine: pl330: Correct device assignment.
+Message-ID: <545B5E03.3040809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 06, 2014 at 12:26:46PM +0100, Ard Biesheuvel wrote:
-> Hi Steve,
+Commit f6f2421c0a1c removed pl330_info structure by embedding it into
+pl330_dmac structure, but did not ensure that the dmac->ddma.dev
+pointer gets initialised before use. When dma_alloc_coherent() gets
+called on arm64 a WARN() gets triggered due to dev being NULL.
 
-Hey Ard,
+------------[ cut here ]------------
+WARNING: CPU: 1 PID: 1 at arch/arm64/mm/dma-mapping.c:49 __dma_alloc_coherent+0xd0/0xe0()
+Use an actual device structure for DMA allocation
+Modules linked in:
+CPU: 1 PID: 1 Comm: swapper/0 Not tainted 3.17.0+ #5
+Call trace:
+[<ffffffc000087f24>] dump_backtrace+0x0/0x130
+[<ffffffc000088064>] show_stack+0x10/0x1c
+[<ffffffc0004e8af8>] dump_stack+0x74/0xb8
+[<ffffffc0000aa444>] warn_slowpath_common+0x8c/0xb4
+[<ffffffc0000aa4b8>] warn_slowpath_fmt+0x4c/0x58
+[<ffffffc000092580>] __dma_alloc_coherent+0xcc/0xe0
+[<ffffffc000092734>] __dma_alloc_noncoherent+0x64/0x158
+[<ffffffc000312cd8>] pl330_probe+0x650/0x8f0
+[<ffffffc00030e1d4>] amba_probe+0xa0/0xc8
+[<ffffffc000350240>] really_probe+0xc4/0x22c
+[<ffffffc0003504b4>] __driver_attach+0xa0/0xa8
+[<ffffffc00034e5fc>] bus_for_each_dev+0x54/0x98
+[<ffffffc00034fd8c>] driver_attach+0x1c/0x28
+[<ffffffc00034fa08>] bus_add_driver+0x14c/0x204
+[<ffffffc000350b84>] driver_register+0x64/0x130
+[<ffffffc00030dcf8>] amba_driver_register+0x50/0x5c
+[<ffffffc0006a60d0>] pl330_driver_init+0x10/0x1c
+[<ffffffc0000814ac>] do_one_initcall+0x88/0x19c
+[<ffffffc00068dab8>] kernel_init_freeable+0x140/0x1e0
+[<ffffffc0004e5e18>] kernel_init+0x10/0xd4
+---[ end trace 76f2d47a444e523e ]---
+(NULL device *): dmac_alloc_resources:1821 Can't allocate memory!
+(NULL device *): Unable to create channels for DMAC
 
-> 
-> On 6 November 2014 12:12, Steve Capper <steve.capper@linaro.org> wrote:
-> > The generic this_cpu operations disable interrupts to ensure that the
-> > requested operation is protected from pre-emption. For arm64, this is
-> > overkill and can hurt throughput and latency.
-> >
-> > This patch provides arm64 specific implementations for the this_cpu
-> > operations. Rather than disable interrupts, we use the exclusive
-> > monitor or atomic operations as appropriate.
-> >
-> > The following operations are implemented: add, add_return, and, or,
-> > read, write, xchg. We also wire up a cmpxchg implementation from
-> > cmpxchg.h.
-> >
-> > Testing was performed using the percpu_test module and hackbench on a
-> > Juno board running 3.18-rc3.
-> >
-> 
-> Got any numbers?
+This patch will also ensure that any dev_err messages are printed 
+with the appropriate device name.
 
-For `./hackbench 100 process 1000' on a Juno system running all cores I get:
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
+---
+ drivers/dma/pl330.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-      w/o patch | with patch
- ---------------+------------
- mean     47.05 | 44.93
- stddev    0.38 |  0.68
- ---------------+------------
-(times in seconds, rounded to 2d.p., six runs performed)
-
-So a just under 5% speed boost.
-
-[...]
-
-> > diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
-> > index 5279e57..e751681 100644
-> > --- a/arch/arm64/include/asm/percpu.h
-> > +++ b/arch/arm64/include/asm/percpu.h
-> > @@ -44,6 +44,237 @@ static inline unsigned long __my_cpu_offset(void)
-
-[...]
-
-> > +static inline unsigned long __percpu_read(void *ptr, int size)
-> > +{
-> > +       unsigned long ret;
-> > +
-> > +       switch (size) {
-> > +       case 1:
-> > +               asm ("//__per_cpu_read_1\n"
-> > +                       "ldrb %w[ret], %[ptr]\n" :
-> > +                       [ret] "=&r"(ret), [ptr] "+Q"(*(u8 *)ptr));
-> > +               break;
-> > +       case 2:
-> > +               asm ("//__per_cpu_read_2\n"
-> > +                       "ldrh %w[ret], %[ptr]\n" :
-> > +                       [ret] "=&r"(ret), [ptr] "+Q"(*(u16 *)ptr));
-> > +               break;
-> > +       case 4:
-> > +               asm ("//__per_cpu_read_4\n"
-> > +                       "ldr %w[ret], %[ptr]\n" :
-> > +                       [ret] "=&r"(ret), [ptr] "+Q"(*(u32 *)ptr));
-> > +               break;
-> > +       case 8:
-> > +               asm ("//__per_cpu_read_8\n"
-> > +                       "ldr %[ret], %[ptr]\n" :
-> > +                       [ret] "=&r"(ret), [ptr] "+Q"(*(u64 *)ptr));
-> > +               break;
-> > +       default:
-> > +               BUILD_BUG();
-> > +       }
-> > +
-> > +       return ret;
-> > +}
-> > +
-> 
-> Why are the 'ptr' references '+Q' outputs here rather than 'Q' inputs?
-> 
-
-Because I fudged the constraint :-).
-Thanks, you're quite right it should be 'Q' constraint as we're only reading
-from that address.
-
-> > +static inline void __percpu_write(void *ptr, unsigned long val, int size)
-> > +{
-> > +       switch (size) {
-> > +       case 1:
-> > +               asm ("//__per_cpu_write_1\n"
-> > +                       "strb %w[val], %[ptr]\n" :
-> > +                       [ptr] "+Q"(*(u8 *)ptr) : [val] "r"(val));
-> > +               break;
-> > +       case 2:
-> > +               asm ("//__per_cpu_write_2\n"
-> > +                       "strh %w[val], %[ptr]\n" :
-> > +                       [ptr] "+Q"(*(u16 *)ptr) : [val] "r"(val));
-> > +               break;
-> > +       case 4:
-> > +               asm ("//__per_cpu_write_4\n"
-> > +                       "str %w[val], %[ptr]\n" :
-> > +                       [ptr] "+Q"(*(u32 *)ptr) : [val] "r"(val));
-> > +               break;
-> > +       case 8:
-> > +               asm ("//__per_cpu_write_8\n"
-> > +                       "str %[val], %[ptr]\n" :
-> > +                       [ptr] "+Q"(*(u64 *)ptr) : [val] "r"(val));
-> > +               break;
-> > +       default:
-> > +               BUILD_BUG();
-> > +       }
-> > +}
-> > +
-> 
-> ... and similarly, why are these '+Q' and not just '=Q' ?
-
-Another mistake on my part, it should be "=Q" as we're only writing to that
-address.
-
-Thanks for going through this carefully Ard, I'll send out a corrected V2 once
-I've sanity checked it.
-
-Cheers,
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 4a5a2a8..ace7d42 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -2629,6 +2629,9 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 		return -ENOMEM;
+ 	}
+ 
++	pd = &pl330->ddma;
++	pd->dev = &adev->dev;
++
+ 	pl330->mcbufsz = pdat ? pdat->mcbuf_sz : 0;
+ 
+ 	res = &adev->res;
+@@ -2665,7 +2668,6 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 	if (!add_desc(pl330, GFP_KERNEL, NR_DEFAULT_DESC))
+ 		dev_warn(&adev->dev, "unable to allocate desc\n");
+ 
+-	pd = &pl330->ddma;
+ 	INIT_LIST_HEAD(&pd->channels);
+ 
+ 	/* Initialize channel parameters */
+@@ -2702,7 +2704,6 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 		list_add_tail(&pch->chan.device_node, &pd->channels);
+ 	}
+ 
+-	pd->dev = &adev->dev;
+ 	if (pdat) {
+ 		pd->cap_mask = pdat->cap_mask;
+ 	} else {
 -- 
-Steve
+1.7.1
