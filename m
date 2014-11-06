@@ -1,57 +1,133 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu,  6 Nov 2014 12:47:39 +0100
-Subject: [PATCH] arm/arm64: kvm: vgic: Fix error code in kvm_vgic_create()
-Message-ID: <1415274459-28018-1-git-send-email-christoffer.dall@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 6 Nov 2014 12:49:22 +0100
+Subject: gcc 4.9 build warnings (was: Re: arm-soc build: 2917 warnings 0
+ failures (arm-soc/v3.18-rc1-20-g06c0773))
+In-Reply-To: <CAKv+Gu-0jenous5sLPp+QJa3qRk-RiBgG1vVYP_RmVw0uXaysw@mail.gmail.com>
+References: <544a2a2e.a2db440a.6eeb.ffffaef3@mx.google.com>
+ <1847682.hInUtg9rQz@wuerfel>
+ <CAKv+Gu_4X0RNbgJ+BCb9+ccgTKBjcwb9L4aDUY6fFMa0R3PX-w@mail.gmail.com>
+ <2567100.Zj7YMcXpZG@wuerfel>
+ <CAKv+Gu-0jenous5sLPp+QJa3qRk-RiBgG1vVYP_RmVw0uXaysw@mail.gmail.com>
+Message-ID: <20141106114919.GL26297@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we detect another vCPU is running we just exit and return 0 as if we
-succesfully created the VGIC, but the VGIC wouldn't actual be created.
+On Fri, Oct 24, 2014 at 03:41:48PM +0200, Ard Biesheuvel wrote:
+> On 24 October 2014 15:27, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 24 October 2014 13:50:05 Ard Biesheuvel wrote:
+> >> On 24 October 2014 13:37, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> > On Friday 24 October 2014 12:59:40 Ard Biesheuvel wrote:
+> >> >> On 24 October 2014 12:52, Russell King - ARM Linux
+> >> >> <linux@arm.linux.org.uk> wrote:
+> >> >> > On Fri, Oct 24, 2014 at 12:49:50PM +0200, Arnd Bergmann wrote:
+> >> >> >> >       1 drivers/video/fbdev/sm501fb.c:245:2: warning: format '%zd' expects argument of type 'signed size_t', but argument 8 has type 'size_t' [-Wformat=]
+> >> >> >> >       1 mm/percpu.c:895:3: warning: format '%zu' expects argument of type 'size_t', but argument 2 has type 'unsigned int' [-Wformat=]
+> >> >> >> >       1 mm/percpu.c:895:3: warning: format '%zu' expects argument of type 'size_t', but argument 3 has type 'unsigned int' [-Wformat=]
+> >> >> >>
+> >> >> >> The warnings are completely unchanged, still 249 unique warnings involving size_t,
+> >> >> >> using this patch:
+> >> >> >
+> >> >> > That's probably because the compiler is expecting size_t to be typedef'd
+> >> >> > to __SIZE_TYPE__ and isn't expecting anyone to change it.
+> >> >> >
+> >> >>
+> >> >> Indeed, I wouldn't expect the printf format validation code inside GCC
+> >> >> to care about the actual values of macros and typedefs.
+> >> >> Could someone dump the builtin #define's of that compiler? For
+> >> >> instance, my bare metal 4.9 BE GCC gives me
+> >> >>
+> >> >> $ /usr/local/gcc-linaro-armeb-none-eabi-4.9-2014.06_linux/bin/armeb-none-eabi-gcc
+> >> >> -E -dM - <<<"" |grep _TYPE__
+> >> >> #define __UINT_LEAST8_TYPE__ unsigned char
+> >> >> #define __SIG_ATOMIC_TYPE__ int
+> >> >> #define __UINTMAX_TYPE__ long long unsigned int
+> >> >> #define __INT_FAST16_TYPE__ int
+> >> >> #define __INT_FAST64_TYPE__ long long int
+> >> >> #define __UINT8_TYPE__ unsigned char
+> >> >> #define __INT_FAST32_TYPE__ int
+> >> >> #define __UINT_LEAST16_TYPE__ short unsigned int
+> >> >> #define __SIZE_TYPE__ unsigned int
+> >> >> #define __INT8_TYPE__ signed char
+> >> >> #define __INT_LEAST16_TYPE__ short int
+> >> >> #define __UINT_LEAST64_TYPE__ long long unsigned int
+> >> >> #define __UINT_FAST16_TYPE__ unsigned int
+> >> >> #define __CHAR16_TYPE__ short unsigned int
+> >> >> #define __INT_LEAST64_TYPE__ long long int
+> >> >> #define __INT16_TYPE__ short int
+> >> >> #define __INT_LEAST8_TYPE__ signed char
+> >> >> #define __INTPTR_TYPE__ int
+> >> >> #define __UINT16_TYPE__ short unsigned int
+> >> >> #define __WCHAR_TYPE__ unsigned int
+> >> >> #define __UINT_FAST64_TYPE__ long long unsigned int
+> >> >> #define __INT64_TYPE__ long long int
+> >> >> #define __WINT_TYPE__ unsigned int
+> >> >> #define __UINT_LEAST32_TYPE__ long unsigned int
+> >> >> #define __INT_LEAST32_TYPE__ long int
+> >> >> #define __UINT64_TYPE__ long long unsigned int
+> >> >> #define __INT_FAST8_TYPE__ int
+> >> >> #define __UINT_FAST32_TYPE__ unsigned int
+> >> >> #define __CHAR32_TYPE__ long unsigned int
+> >> >> #define __INT32_TYPE__ long int
+> >> >> #define __INTMAX_TYPE__ long long int
+> >> >> #define __PTRDIFF_TYPE__ int
+> >> >> #define __UINT32_TYPE__ long unsigned int
+> >> >> #define __UINTPTR_TYPE__ unsigned int
+> >> >> #define __UINT_FAST8_TYPE__ unsigned int
+> >> >>
+> >> >> What is surprising here is that __SIZE_TYPE__ is int not long. Could
+> >> >> we in fact be dealing with a 4.9 bare metal GCC bug here?
+> >> >
+> >> > This is what I get on every arm gcc version on my system,
+> >> > all glibc or uClibc targetted, compared to yours:
+> >> >
+> >> >  #define __UINT_FAST64_TYPE__ long long unsigned int
+> >> >  #define __INT64_TYPE__ long long int
+> >> >  #define __WINT_TYPE__ unsigned int
+> >> > -#define __UINT_LEAST32_TYPE__ long unsigned int
+> >> > -#define __INT_LEAST32_TYPE__ long int
+> >> > +#define __UINT_LEAST32_TYPE__ unsigned int
+> >> > +#define __INT_LEAST32_TYPE__ int
+> >> >  #define __UINT64_TYPE__ long long unsigned int
+> >> > -#define __INT_FAST8_TYPE__ int
+> >> > +#define __INT_FAST8_TYPE__ signed char
+> >> >  #define __UINT_FAST32_TYPE__ unsigned int
+> >> > -#define __CHAR32_TYPE__ long unsigned int
+> >> > -#define __INT32_TYPE__ long int
+> >> > +#define __CHAR32_TYPE__ unsigned int
+> >> > +#define __INT32_TYPE__ int
+> >> >  #define __INTMAX_TYPE__ long long int
+> >> >  #define __PTRDIFF_TYPE__ int
+> >> > -#define __UINT32_TYPE__ long unsigned int
+> >> > +#define __UINT32_TYPE__ unsigned int
+> >> >  #define __UINTPTR_TYPE__ unsigned int
+> >> > -#define __UINT_FAST8_TYPE__ unsigned int
+> >> > +#define __UINT_FAST8_TYPE__ unsigned char
+> >> >
+> >>
+> >> So no __SiZE_TYPE__ then? That's surprising ...
+> >>
+> >
+> > Sorry for being unclear here: this is only the diff between my version and
+> > yours, so everything that is not listed above __UINT_FAST64_TYPE__ is the
+> > same on both compilers.
+> >
+> 
+> Ah, ok. So apparently, size_t is not ambiguous between bare metal and
+> glibc GCC, so we are looking at something else here.
 
-This shouldn't break in-kernel behavior because the kernel will not
-observe the failed the attempt to create the VGIC, but userspace could
-be rightfully confused.
+GCC complains about the format specifier being wrong. %zu/%zd are the
+correct specifiers for variables of type size_t/ssize_t, so wherever a
+size_t or ssize_t is used as parameter it should have a corresponding
+%zu or %zd specifier.
 
-Cc: Andre Przywara <andre.przywara@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- virt/kvm/arm/vgic.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Why not just fix it properly instead of mucking about with the size_t
+typedef?
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 3aaca49..aacdb59 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1933,7 +1933,7 @@ out:
- 
- int kvm_vgic_create(struct kvm *kvm)
- {
--	int i, vcpu_lock_idx = -1, ret = 0;
-+	int i, vcpu_lock_idx = -1, ret;
- 	struct kvm_vcpu *vcpu;
- 
- 	mutex_lock(&kvm->lock);
-@@ -1948,6 +1948,7 @@ int kvm_vgic_create(struct kvm *kvm)
- 	 * vcpu->mutex.  By grabbing the vcpu->mutex of all VCPUs we ensure
- 	 * that no other VCPUs are run while we create the vgic.
- 	 */
-+	ret = -EBUSY;
- 	kvm_for_each_vcpu(i, vcpu, kvm) {
- 		if (!mutex_trylock(&vcpu->mutex))
- 			goto out_unlock;
-@@ -1955,11 +1956,10 @@ int kvm_vgic_create(struct kvm *kvm)
- 	}
- 
- 	kvm_for_each_vcpu(i, vcpu, kvm) {
--		if (vcpu->arch.has_run_once) {
--			ret = -EBUSY;
-+		if (vcpu->arch.has_run_once)
- 			goto out_unlock;
--		}
- 	}
-+	ret = 0;
- 
- 	spin_lock_init(&kvm->arch.vgic.lock);
- 	kvm->arch.vgic.in_kernel = true;
--- 
-2.1.2.330.g565301e.dirty
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141106/4058cb8f/attachment.sig>
