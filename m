@@ -1,45 +1,75 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 6 Nov 2014 13:58:42 +0000
-Subject: gcc 4.9 build warnings (was: Re: arm-soc build: 2917 warnings 0
- failures (arm-soc/v3.18-rc1-20-g06c0773))
-In-Reply-To: <20141106132828.GP4042@n2100.arm.linux.org.uk>
-References: <544a2a2e.a2db440a.6eeb.ffffaef3@mx.google.com>
- <1847682.hInUtg9rQz@wuerfel>
- <CAKv+Gu_4X0RNbgJ+BCb9+ccgTKBjcwb9L4aDUY6fFMa0R3PX-w@mail.gmail.com>
- <2567100.Zj7YMcXpZG@wuerfel>
- <CAKv+Gu-0jenous5sLPp+QJa3qRk-RiBgG1vVYP_RmVw0uXaysw@mail.gmail.com>
- <20141106114919.GL26297@ulmo>
- <20141106132828.GP4042@n2100.arm.linux.org.uk>
-Message-ID: <20141106135842.GK8509@sirena.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  6 Nov 2014 15:13:16 +0100
+Subject: [PATCH v2 00/10] arm64: stable UEFI mappings for kexec
+Message-ID: <1415283206-14713-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 06, 2014 at 01:28:28PM +0000, Russell King - ARM Linux wrote:
+This is v2 of the series to update the UEFI memory map handling for the arm64
+architecture so that:
+- virtual mappings of UEFI Runtime Services are stable across kexec
+- userland mappings via /dev/mem use cache attributes that are compatible with
+  the memory type of the UEFI memory map entry
+- code that can be reused for 32-bit ARM is moved to a common area.
 
-> For the n'th time, what we know is:
+Changes since v2 are primarily the move of reusable infrastructure to
+drivers/firmware/efi/virtmap.c, and the newly added handling of /dev/mem
+mappings.
 
-> - gcc 4.9 bare metal seems to define __SIZE_TYPE__ to be unsigned int.
-> - gcc 4.9's stddef.h typedef's size_t to __SIZE_TYPE__.
-> - therefore, size_t is typedef'd from unsigned int.
-> - the kernel typedefs __kernel_size_t from unsigned int.
-> - the kernel typedefs size_t from __kernel_size_t.
+The main premise of these patches is that, in order to support kexec, we need
+to add code to the kernel that is able to deal with the state of the firmware
+after SetVirtualAddressMap() [SVAM] has been called. However, if we are going to
+deal with that anyway, why not make that the default state, and have only a
+single code path for both cases.
 
-> So, in theory, size_t in the kernel is unsigned int too.  However, GCC 4.9
-> issues loads of complains when %zu or %zd is used with a size_t variable
-> in the kernel.
+This means SVAM() needs to move to the stub, and hence the code that invents
+the virtual layout needs to move with it. The result is that the kernel proper
+is entered with the virt_addr members of all EFI_MEMORY_RUNTIME regions
+assigned, and the mapping installed into the firmware. The kernel proper needs
+to set up the page tables, and switch to them while performing the runtime
+services calls. Note that there is also an efi_to_phys() to translate the values
+of the fw_vendor and tables fields of the EFI system table. Again, this is
+something we need to do anyway under kexec, or we end up handing over state
+between one kernel and the next, which implies different code paths between
+non-kexec and kexec.
 
-> The question that we've been trying to work out is... why is this?  Right
-> now, it seems no one has an answer for this question.  We don't know
-> whether it's a compiler bug or not - and Arnd has explained why not.
+The layout is chosen such that it used the userland half of the virtual address
+space (TTBR0), which means no additional alignment or reservation is required
+to ensure that it will always be available.
 
-Isn't this GCC tracking the literal use of size_t in addition to the
-actual definition and warning based on that information for the size_t
-specific formatting.  Seems weird that it'd only affect a freestanding
-build though.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141106/8d8167a2/attachment.sig>
+One thing that may stand out is the reordering of the memory map. The reason
+for doing this is that we can use the same memory map as input to SVAM(). The
+alternative is allocating memory for it using boot services, but that clutters
+up the existing logic a bit between getting the memory map, populating the fdt,
+and loop again if it didn't fit.
+
+Ard Biesheuvel (10):
+  arm64/mm: add explicit struct_mm argument to __create_mapping()
+  arm64/mm: add create_pgd_mapping() to create private page tables
+  efi: split off remapping code from efi_config_init()
+  efi: add common infrastructure for stub-installed virtual mapping
+  arm64/efi: move SetVirtualAddressMap() to UEFI stub
+  arm64/efi: remove free_boot_services() and friends
+  arm64/efi: remove idmap manipulations from UEFI code
+  arm64/efi: use UEFI memory map unconditionally if available
+  arm64/efi: ignore unusable regions instead of reserving them
+  arm64/efi: improve /dev/mem mmap() handling under UEFI
+
+ arch/arm64/Kconfig                 |   1 +
+ arch/arm64/include/asm/efi.h       |  18 +-
+ arch/arm64/include/asm/mmu.h       |   5 +-
+ arch/arm64/include/asm/pgtable.h   |   5 +
+ arch/arm64/kernel/efi.c            | 351 ++++++-------------------------------
+ arch/arm64/kernel/setup.c          |   2 +-
+ arch/arm64/mm/mmu.c                |  78 +++++----
+ drivers/firmware/efi/Kconfig       |   3 +
+ drivers/firmware/efi/Makefile      |   1 +
+ drivers/firmware/efi/efi.c         |  49 ++++--
+ drivers/firmware/efi/libstub/fdt.c | 107 ++++++++++-
+ drivers/firmware/efi/virtmap.c     | 224 +++++++++++++++++++++++
+ include/linux/efi.h                |  17 +-
+ 13 files changed, 496 insertions(+), 365 deletions(-)
+ create mode 100644 drivers/firmware/efi/virtmap.c
+
+-- 
+1.8.3.2
