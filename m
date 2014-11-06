@@ -1,130 +1,61 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  6 Nov 2014 11:40:30 +0800
-Subject: [PATCH resend 2/4] ARM: dts: sunxi: unify APB1 clock
-In-Reply-To: <1415245232-20585-1-git-send-email-wens@csie.org>
-References: <1415245232-20585-1-git-send-email-wens@csie.org>
-Message-ID: <1415245232-20585-3-git-send-email-wens@csie.org>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Thu, 06 Nov 2014 04:51:54 +0100
+Subject: [PATCH 0/7] Pinctrl support for Zynq
+In-Reply-To: <44de30f0237545c6b62871d6c0480a67@BY2FFO11FD050.protection.gbl>
+References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
+ <5459BC1C.3000807@suse.de>
+ <44de30f0237545c6b62871d6c0480a67@BY2FFO11FD050.protection.gbl>
+Message-ID: <545AF05A.1040300@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Emilio L?pez <emilio@elopez.com.ar>
+Am 05.11.2014 um 18:03 schrieb S?ren Brinkmann:
+> On Wed, 2014-11-05 at 06:56AM +0100, Andreas F?rber wrote:
+>> I've tracked down all 54 MIO pins of the Parallella and cooked up the
+>> equivalent DT patch. [...] For testing purposes I've configured a
+>> heartbeat trigger for the USER_LED (CR10).
+>>
+>> To my disappointment these pinctrl additions did not fix one issue:
+>> Whenever a write access to be handled by the bitstream (0x808f0f04) is
+>> performed, the board hangs and the heartbeat stops. Would a bug in the
+>> bitstream allow this to happen, or are more drivers missing to actually
+>> make use of the PL in general? With a downstream ADI/Xilinx 3.12 kernel
+>> that problem does not surface.
+> 
+> This doesn't sound like being related to pinctrl at all.
+> Devices in the PL are just memory mapped on the AXI bus. There is
+> nothing needed to access those. Hangs do in most cases indicate that the
+> IP does not respond (properly). In my experience this is mostly caused
+> by 
+>  - level shifters not enabled
+>  - IP kept in reset
+>  - IP is clock gated
+> With the clock gating being the culprit in most cases. Did you check
+> those things?
 
-With the new factors infrastructure in place, we can unify apb1 and
-apb1_mux as a single clock now.
+Figured it out: zynq-7000.dtsi sets fclk-enable = <0>, i.e., all PL
+clocks are disabled by default. When overriding that tiny property with
+0xf it suddenly works as expected! I'll send a patch later in the day.
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-[wens at csie.org: Change apb1 node label to "apb1"; reword commit title]
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun4i-a10.dtsi  | 12 ++----------
- arch/arm/boot/dts/sun5i-a10s.dtsi | 12 ++----------
- arch/arm/boot/dts/sun5i-a13.dtsi  | 12 ++----------
- arch/arm/boot/dts/sun7i-a20.dtsi  | 12 ++----------
- 4 files changed, 8 insertions(+), 40 deletions(-)
+Are boards expected to use clocks = <&clkc 15>, ...; on individual nodes
+relying on the PL? Or does enabling those clocks require actually
+loading a bitstream so that it is not being done by default?
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 380f914..5e2ec2d 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -174,19 +174,11 @@
- 				"apb0_ir1", "apb0_keypad";
- 		};
- 
--		apb1_mux: apb1_mux at 01c20058 {
--			#clock-cells = <0>;
--			compatible = "allwinner,sun4i-a10-apb1-mux-clk";
--			reg = <0x01c20058 0x4>;
--			clocks = <&osc24M>, <&pll6 1>, <&osc32k>;
--			clock-output-names = "apb1_mux";
--		};
--
--		apb1: apb1 at 01c20058 {
-+		apb1: clk at 01c20058 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-apb1-clk";
- 			reg = <0x01c20058 0x4>;
--			clocks = <&apb1_mux>;
-+			clocks = <&osc24M>, <&pll6 1>, <&osc32k>;
- 			clock-output-names = "apb1";
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index 531272c..d2a8514 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -162,19 +162,11 @@
- 				"apb0_ir", "apb0_keypad";
- 		};
- 
--		apb1_mux: apb1_mux at 01c20058 {
--			#clock-cells = <0>;
--			compatible = "allwinner,sun4i-a10-apb1-mux-clk";
--			reg = <0x01c20058 0x4>;
--			clocks = <&osc24M>, <&pll6 1>, <&osc32k>;
--			clock-output-names = "apb1_mux";
--		};
--
--		apb1: apb1 at 01c20058 {
-+		apb1: clk at 01c20058 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-apb1-clk";
- 			reg = <0x01c20058 0x4>;
--			clocks = <&apb1_mux>;
-+			clocks = <&osc24M>, <&pll6 1>, <&osc32k>;
- 			clock-output-names = "apb1";
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index b131068..c35217e 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -161,19 +161,11 @@
- 			clock-output-names = "apb0_codec", "apb0_pio", "apb0_ir";
- 		};
- 
--		apb1_mux: apb1_mux at 01c20058 {
--			#clock-cells = <0>;
--			compatible = "allwinner,sun4i-a10-apb1-mux-clk";
--			reg = <0x01c20058 0x4>;
--			clocks = <&osc24M>, <&pll6 1>, <&osc32k>;
--			clock-output-names = "apb1_mux";
--		};
--
--		apb1: apb1 at 01c20058 {
-+		apb1: clk at 01c20058 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-apb1-clk";
- 			reg = <0x01c20058 0x4>;
--			clocks = <&apb1_mux>;
-+			clocks = <&osc24M>, <&pll6 1>, <&osc32k>;
- 			clock-output-names = "apb1";
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 45bb916..8605f2b 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -222,19 +222,11 @@
- 				"apb0_iis2", "apb0_keypad";
- 		};
- 
--		apb1_mux: apb1_mux at 01c20058 {
--			#clock-cells = <0>;
--			compatible = "allwinner,sun4i-a10-apb1-mux-clk";
--			reg = <0x01c20058 0x4>;
--			clocks = <&osc24M>, <&pll6 1>, <&osc32k>;
--			clock-output-names = "apb1_mux";
--		};
--
--		apb1: apb1 at 01c20058 {
-+		apb1: clk at 01c20058 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-apb1-clk";
- 			reg = <0x01c20058 0x4>;
--			clocks = <&apb1_mux>;
-+			clocks = <&osc24M>, <&pll6 1>, <&osc32k>;
- 			clock-output-names = "apb1";
- 		};
- 
+It seems ranger dangerous to me that a single MMIO write can freeze the
+system - as a software developer I would've expected this to be caught
+and handled as a SIGBUS.
+
+Regards,
+Andreas
+
 -- 
-2.1.1
+SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 21284 AG N?rnberg
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141106/d0f54ffe/attachment.sig>
