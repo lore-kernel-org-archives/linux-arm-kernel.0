@@ -1,326 +1,60 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 6 Nov 2014 12:26:46 +0100
-Subject: [PATCH] arm64: percpu: Implement this_cpu operations
-In-Reply-To: <1415272377-5334-1-git-send-email-steve.capper@linaro.org>
-References: <1415272377-5334-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <CAKv+Gu-ba8mSgh2qv8+=gb75rb0wOs0S9QRwHAkm8RRbMz9kHQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 6 Nov 2014 12:27:42 +0100
+Subject: [PATCH] leds: leds-gpio: Convert gpio_blink_set() to use GPIO
+ descriptors
+In-Reply-To: <20141106112244.GM1618@lahna.fi.intel.com>
+References: <1414755658-96293-1-git-send-email-mika.westerberg@linux.intel.com>
+ <545843B1.3020101@nvidia.com> <2455157.3p7mHhT8im@vostro.rjw.lan>
+ <CAMuHMdXn9W2S7N+YGfjDxQozMtRZCVdTzzdDps6YfOv2FqVBmw@mail.gmail.com>
+ <20141106103033.GK1618@lahna.fi.intel.com>
+ <CAMuHMdWtcZcpW=r60s9auENZxChiLwr14R0p_soKr7C3yGYOMQ@mail.gmail.com>
+ <20141106105855.GL1618@lahna.fi.intel.com>
+ <CAMuHMdUroLo5SdXrTu+etiW+TwHAWV-Qn9UsVnud+BJ7q6nXjw@mail.gmail.com>
+ <20141106112244.GM1618@lahna.fi.intel.com>
+Message-ID: <CAMuHMdVA=L22R=gDJBHcgGbD5tsTOPpVZHaxeLsaB+mXhQswVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
+On Thu, Nov 6, 2014 at 12:22 PM, Mika Westerberg
+<mika.westerberg@linux.intel.com> wrote:
+> On Thu, Nov 06, 2014 at 12:12:04PM +0100, Geert Uytterhoeven wrote:
+>> On Thu, Nov 6, 2014 at 11:58 AM, Mika Westerberg
+>> <mika.westerberg@linux.intel.com> wrote:
+>> > On Thu, Nov 06, 2014 at 11:32:19AM +0100, Geert Uytterhoeven wrote:
+>> >> On Thu, Nov 6, 2014 at 11:30 AM, Mika Westerberg
+>> >> <mika.westerberg@linux.intel.com> wrote:
+>> >> >> "leds: leds-gpio: Add support for GPIO descriptors" broke leds-gpio on
+>> >> >> non-DT platforms for me:
+>> >> >>
+>> >> >>     gpiod_direction_output: invalid GPIO
+>> >> >>     leds-gpio: probe of leds-gpio failed with error -22
+>> >> >>
+>> >> >> (desc is NULL in gpiod_direction_output()).
 
-On 6 November 2014 12:12, Steve Capper <steve.capper@linaro.org> wrote:
-> The generic this_cpu operations disable interrupts to ensure that the
-> requested operation is protected from pre-emption. For arm64, this is
-> overkill and can hurt throughput and latency.
+>>     leds-gpio leds-gpio: GPIO 102, ret: 0
+>>     leds-gpio leds-gpio: GPIOD: c050e970
+>>
+>> So led_dat is non-NULL. But it's overwritten by NULL later:
+>>
+>>     led_dat->gpiod = template->gpiod;
 >
-> This patch provides arm64 specific implementations for the this_cpu
-> operations. Rather than disable interrupts, we use the exclusive
-> monitor or atomic operations as appropriate.
+> Ah, that's it. Nice catch!
 >
-> The following operations are implemented: add, add_return, and, or,
-> read, write, xchg. We also wire up a cmpxchg implementation from
-> cmpxchg.h.
+>> Whitespace damaged fix below, to fold into the original.
+>> If you prefer a proper separate patch, let me know.
 >
-> Testing was performed using the percpu_test module and hackbench on a
-> Juno board running 3.18-rc3.
->
+> It is up to Rafael. I think he wants to stabilize this branch so in that
+> case separate patch on top would work better.
 
-Got any numbers?
+I've already sent a patch, as I have to publish the fix in my git tree anyway.
 
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> ---
->
-> This patch applies on top of one I sent out earlier:
-> "arm64: xchg: Implement cmpxchg_double"
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/294705.html
->
-> My two least favourite things in the kernel are excessive pre-processor
-> use and assembler, so this patch has been fun to write ;-).
->
-> I've tried to make the inline assembler clearer with named parameters,
-> it really upset checkpatch, if it upsets people then please shout and I
-> will change it.
->
-> Cheers,
-> --
-> Steve
->
-> ---
->  arch/arm64/include/asm/cmpxchg.h |   6 +-
->  arch/arm64/include/asm/percpu.h  | 231 +++++++++++++++++++++++++++++++++++++++
->  2 files changed, 235 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
-> index 3e02245..3e51f49 100644
-> --- a/arch/arm64/include/asm/cmpxchg.h
-> +++ b/arch/arm64/include/asm/cmpxchg.h
-> @@ -237,8 +237,10 @@ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
->         __ret; \
->  })
->
-> -#define this_cpu_cmpxchg_8(ptr, o, n) \
-> -       cmpxchg(raw_cpu_ptr(&(ptr)), o, n);
-> +#define this_cpu_cmpxchg_1(ptr, o, n) cmpxchg(raw_cpu_ptr(&(ptr)), o, n)
-> +#define this_cpu_cmpxchg_2(ptr, o, n) cmpxchg(raw_cpu_ptr(&(ptr)), o, n)
-> +#define this_cpu_cmpxchg_4(ptr, o, n) cmpxchg(raw_cpu_ptr(&(ptr)), o, n)
-> +#define this_cpu_cmpxchg_8(ptr, o, n) cmpxchg(raw_cpu_ptr(&(ptr)), o, n)
->
->  #define this_cpu_cmpxchg_double_8(ptr1, ptr2, o1, o2, n1, n2) \
->         cmpxchg_double(raw_cpu_ptr(&(ptr1)), raw_cpu_ptr(&(ptr2)), \
-> diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
-> index 5279e57..e751681 100644
-> --- a/arch/arm64/include/asm/percpu.h
-> +++ b/arch/arm64/include/asm/percpu.h
-> @@ -44,6 +44,237 @@ static inline unsigned long __my_cpu_offset(void)
->
->  #endif /* CONFIG_SMP */
->
-> +#define PERCPU_OP(op, asm_op)                                          \
-> +static inline unsigned long __percpu_##op(void *ptr,                   \
-> +                       unsigned long val, int size)                    \
-> +{                                                                      \
-> +       unsigned long loop, ret;                                        \
-> +                                                                       \
-> +       switch (size) {                                                 \
-> +       case 1:                                                         \
-> +               do {                                                    \
-> +                       asm ("//__per_cpu_" #op "_1\n"                  \
-> +                       "ldxrb    %w[ret], %[ptr]\n"                    \
-> +                       #asm_op " %w[ret], %w[ret], %w[val]\n"          \
-> +                       "stxrb    %w[loop], %w[ret], %[ptr]\n"          \
-> +                       : [loop] "=&r" (loop), [ret] "=&r" (ret),       \
-> +                         [ptr] "+Q"(*(u8 *)ptr)                        \
-> +                       : [val] "Ir" (val));                            \
-> +               } while (loop);                                         \
-> +               break;                                                  \
-> +       case 2:                                                         \
-> +               do {                                                    \
-> +                       asm ("//__per_cpu_" #op "_2\n"                  \
-> +                       "ldxrh    %w[ret], %[ptr]\n"                    \
-> +                       #asm_op " %w[ret], %w[ret], %w[val]\n"          \
-> +                       "stxrh    %w[loop], %w[ret], %[ptr]\n"          \
-> +                       : [loop] "=&r" (loop), [ret] "=&r" (ret),       \
-> +                         [ptr]  "+Q"(*(u16 *)ptr)                      \
-> +                       : [val] "Ir" (val));                            \
-> +               } while (loop);                                         \
-> +               break;                                                  \
-> +       case 4:                                                         \
-> +               do {                                                    \
-> +                       asm ("//__per_cpu_" #op "_4\n"                  \
-> +                       "ldxr     %w[ret], %[ptr]\n"                    \
-> +                       #asm_op " %w[ret], %w[ret], %w[val]\n"          \
-> +                       "stxr     %w[loop], %w[ret], %[ptr]\n"          \
-> +                       : [loop] "=&r" (loop), [ret] "=&r" (ret),       \
-> +                         [ptr] "+Q"(*(u32 *)ptr)                       \
-> +                       : [val] "Ir" (val));                            \
-> +               } while (loop);                                         \
-> +               break;                                                  \
-> +       case 8:                                                         \
-> +               do {                                                    \
-> +                       asm ("//__per_cpu_" #op "_8\n"                  \
-> +                       "ldxr     %[ret], %[ptr]\n"                     \
-> +                       #asm_op " %[ret], %[ret], %[val]\n"             \
-> +                       "stxr     %w[loop], %[ret], %[ptr]\n"           \
-> +                       : [loop] "=&r" (loop), [ret] "=&r" (ret),       \
-> +                         [ptr] "+Q"(*(u64 *)ptr)                       \
-> +                       : [val] "Ir" (val));                            \
-> +               } while (loop);                                         \
-> +               break;                                                  \
-> +       default:                                                        \
-> +               BUILD_BUG();                                            \
-> +       }                                                               \
-> +                                                                       \
-> +       return ret;                                                     \
-> +}
-> +
-> +PERCPU_OP(add, add)
-> +PERCPU_OP(and, and)
-> +PERCPU_OP(or, orr)
-> +#undef PERCPU_OP
-> +
-> +static inline unsigned long __percpu_read(void *ptr, int size)
-> +{
-> +       unsigned long ret;
-> +
-> +       switch (size) {
-> +       case 1:
-> +               asm ("//__per_cpu_read_1\n"
-> +                       "ldrb %w[ret], %[ptr]\n" :
-> +                       [ret] "=&r"(ret), [ptr] "+Q"(*(u8 *)ptr));
-> +               break;
-> +       case 2:
-> +               asm ("//__per_cpu_read_2\n"
-> +                       "ldrh %w[ret], %[ptr]\n" :
-> +                       [ret] "=&r"(ret), [ptr] "+Q"(*(u16 *)ptr));
-> +               break;
-> +       case 4:
-> +               asm ("//__per_cpu_read_4\n"
-> +                       "ldr %w[ret], %[ptr]\n" :
-> +                       [ret] "=&r"(ret), [ptr] "+Q"(*(u32 *)ptr));
-> +               break;
-> +       case 8:
-> +               asm ("//__per_cpu_read_8\n"
-> +                       "ldr %[ret], %[ptr]\n" :
-> +                       [ret] "=&r"(ret), [ptr] "+Q"(*(u64 *)ptr));
-> +               break;
-> +       default:
-> +               BUILD_BUG();
-> +       }
-> +
-> +       return ret;
-> +}
-> +
+Gr{oetje,eeting}s,
 
-Why are the 'ptr' references '+Q' outputs here rather than 'Q' inputs?
+                        Geert
 
-> +static inline void __percpu_write(void *ptr, unsigned long val, int size)
-> +{
-> +       switch (size) {
-> +       case 1:
-> +               asm ("//__per_cpu_write_1\n"
-> +                       "strb %w[val], %[ptr]\n" :
-> +                       [ptr] "+Q"(*(u8 *)ptr) : [val] "r"(val));
-> +               break;
-> +       case 2:
-> +               asm ("//__per_cpu_write_2\n"
-> +                       "strh %w[val], %[ptr]\n" :
-> +                       [ptr] "+Q"(*(u16 *)ptr) : [val] "r"(val));
-> +               break;
-> +       case 4:
-> +               asm ("//__per_cpu_write_4\n"
-> +                       "str %w[val], %[ptr]\n" :
-> +                       [ptr] "+Q"(*(u32 *)ptr) : [val] "r"(val));
-> +               break;
-> +       case 8:
-> +               asm ("//__per_cpu_write_8\n"
-> +                       "str %[val], %[ptr]\n" :
-> +                       [ptr] "+Q"(*(u64 *)ptr) : [val] "r"(val));
-> +               break;
-> +       default:
-> +               BUILD_BUG();
-> +       }
-> +}
-> +
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-... and similarly, why are these '+Q' and not just '=Q' ?
-
-> +static inline unsigned long __percpu_xchg(void *ptr, unsigned long val,
-> +                                               int size)
-> +{
-> +       unsigned long ret, loop;
-> +
-> +       switch (size) {
-> +       case 1:
-> +               do {
-> +                       asm ("//__percpu_xchg_1\n"
-> +                       "ldxrb %w[ret], %[ptr]\n"
-> +                       "stxrb %w[loop], %w[val], %[ptr]\n"
-> +                       : [loop] "=&r"(loop), [ret] "=&r"(ret),
-> +                         [ptr] "+Q"(*(u8 *)ptr)
-> +                       : [val] "r" (val));
-> +               } while (loop);
-> +               break;
-> +       case 2:
-> +               do {
-> +                       asm ("//__percpu_xchg_2\n"
-> +                       "ldxrh %w[ret], %[ptr]\n"
-> +                       "stxrh %w[loop], %w[val], %[ptr]\n"
-> +                       : [loop] "=&r"(loop), [ret] "=&r"(ret),
-> +                         [ptr] "+Q"(*(u16 *)ptr)
-> +                       : [val] "r" (val));
-> +               } while (loop);
-> +               break;
-> +       case 4:
-> +               do {
-> +                       asm ("//__percpu_xchg_4\n"
-> +                       "ldxr %w[ret], %[ptr]\n"
-> +                       "stxr %w[loop], %w[val], %[ptr]\n"
-> +                       : [loop] "=&r"(loop), [ret] "=&r"(ret),
-> +                         [ptr] "+Q"(*(u32 *)ptr)
-> +                       : [val] "r" (val));
-> +               } while (loop);
-> +               break;
-> +       case 8:
-> +               do {
-> +                       asm ("//__percpu_xchg_8\n"
-> +                       "ldxr %[ret], %[ptr]\n"
-> +                       "stxr %w[loop], %[val], %[ptr]\n"
-> +                       : [loop] "=&r"(loop), [ret] "=&r"(ret),
-> +                         [ptr] "+Q"(*(u64 *)ptr)
-> +                       : [val] "r" (val));
-> +               } while (loop);
-> +               break;
-> +       default:
-> +               BUILD_BUG();
-> +       }
-> +
-> +       return ret;
-> +}
-> +
-> +#define _percpu_add(pcp, val) \
-> +       __percpu_add(raw_cpu_ptr(&(pcp)), val, sizeof(pcp))
-> +
-> +#define _percpu_add_return(pcp, val) (typeof(pcp)) (_percpu_add(pcp, val))
-> +
-> +#define _percpu_and(pcp, val) \
-> +       __percpu_and(raw_cpu_ptr(&(pcp)), val, sizeof(pcp))
-> +
-> +#define _percpu_or(pcp, val) \
-> +       __percpu_or(raw_cpu_ptr(&(pcp)), val, sizeof(pcp))
-> +
-> +#define _percpu_read(pcp) (typeof(pcp))        \
-> +       (__percpu_read(raw_cpu_ptr(&(pcp)), sizeof(pcp)))
-> +
-> +#define _percpu_write(pcp, val) \
-> +       __percpu_write(raw_cpu_ptr(&(pcp)), (unsigned long)(val), sizeof(pcp))
-> +
-> +#define _percpu_xchg(pcp, val) (typeof(pcp)) \
-> +       (__percpu_xchg(raw_cpu_ptr(&(pcp)), (unsigned long)(val), sizeof(pcp)))
-> +
-> +#define this_cpu_add_1(pcp, val) _percpu_add(pcp, val)
-> +#define this_cpu_add_2(pcp, val) _percpu_add(pcp, val)
-> +#define this_cpu_add_4(pcp, val) _percpu_add(pcp, val)
-> +#define this_cpu_add_8(pcp, val) _percpu_add(pcp, val)
-> +
-> +#define this_cpu_add_return_1(pcp, val) _percpu_add_return(pcp, val)
-> +#define this_cpu_add_return_2(pcp, val) _percpu_add_return(pcp, val)
-> +#define this_cpu_add_return_4(pcp, val) _percpu_add_return(pcp, val)
-> +#define this_cpu_add_return_8(pcp, val) _percpu_add_return(pcp, val)
-> +
-> +#define this_cpu_and_1(pcp, val) _percpu_and(pcp, val)
-> +#define this_cpu_and_2(pcp, val) _percpu_and(pcp, val)
-> +#define this_cpu_and_4(pcp, val) _percpu_and(pcp, val)
-> +#define this_cpu_and_8(pcp, val) _percpu_and(pcp, val)
-> +
-> +#define this_cpu_or_1(pcp, val) _percpu_or(pcp, val)
-> +#define this_cpu_or_2(pcp, val) _percpu_or(pcp, val)
-> +#define this_cpu_or_4(pcp, val) _percpu_or(pcp, val)
-> +#define this_cpu_or_8(pcp, val) _percpu_or(pcp, val)
-> +
-> +#define this_cpu_read_1(pcp) _percpu_read(pcp)
-> +#define this_cpu_read_2(pcp) _percpu_read(pcp)
-> +#define this_cpu_read_4(pcp) _percpu_read(pcp)
-> +#define this_cpu_read_8(pcp) _percpu_read(pcp)
-> +
-> +#define this_cpu_write_1(pcp, val) _percpu_write(pcp, val)
-> +#define this_cpu_write_2(pcp, val) _percpu_write(pcp, val)
-> +#define this_cpu_write_4(pcp, val) _percpu_write(pcp, val)
-> +#define this_cpu_write_8(pcp, val) _percpu_write(pcp, val)
-> +
-> +#define this_cpu_xchg_1(pcp, val) _percpu_xchg(pcp, val)
-> +#define this_cpu_xchg_2(pcp, val) _percpu_xchg(pcp, val)
-> +#define this_cpu_xchg_4(pcp, val) _percpu_xchg(pcp, val)
-> +#define this_cpu_xchg_8(pcp, val) _percpu_xchg(pcp, val)
-> +
->  #include <asm-generic/percpu.h>
->
->  #endif /* __ASM_PERCPU_H */
-> --
-> 1.9.3
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
