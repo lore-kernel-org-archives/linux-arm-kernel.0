@@ -1,64 +1,49 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 6 Nov 2014 23:50:05 +0100
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Fri, 7 Nov 2014 00:01:45 +0100
 Subject: N900 modem support in 3.18-rc1
-In-Reply-To: <20141106180335.GA21513@earth.universe>
-References: <20141104205117.GA17606@amd> <201411052137.31452@pali>
- <20141105203918.GA29199@amd> <201411052206.05379@pali>
- <20141105220359.GA32052@amd> <20141105234555.GA7097@earth.universe>
- <20141106124711.GA26944@amd>
- <20141106180335.GA21513@earth.universe>
-Message-ID: <20141106225005.GA14002@amd>
+In-Reply-To: <20141106225005.GA14002@amd>
+References: <20141104205117.GA17606@amd>
+ <20141106180335.GA21513@earth.universe> <20141106225005.GA14002@amd>
+Message-ID: <201411070001.46481@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > I actually had pm=0 on the command line, but I removed it now, and no
-> > change: [...]
+On Thursday 06 November 2014 23:50:05 Pavel Machek wrote:
+> > > What is needed to get voice calls to work?
 > > 
-> > Let me try with explicit =1. .. aha, that helps. Thanks!
+> > There's still a kernel driver missing in mainline for
+> > exchanging voice data between the modem and the cpu (called
+> > cmt-speech).
+> > 
+> > BTW the CMT driver should be removed from your kernel tree;
+> > its a deprecated variant of mainline's nokia-modem driver.
+> > Thus I guess the cmt-speech driver, which is available in
+> > your kernel tree, is not properly integrated into the
+> > changes I did during mainlining the other modem related
+> > drivers.
 > 
-> mh seems I actually missed to make 1 the default value. I will
-> prepare a patch for that.
+> Aha, so CONFIG_CMT is the same thing as CONFIG_NOKIA_NODEM?
+> Ok, will disable that. Speech... if you'd have version I
+> could test, I'll happily do that.
 > 
-> I assume, that the example ofono commands work for you now?
+> Thanks,
+> 									Pavel
 
-Yes. I was able to get list of networks. It stops working after a
-while, for unknown reasons.
+For voice calls you need:
+* kernel driver cmt-speech (or it has some new name)
+* cmt-speech userspace library (communication with kernel)
+* pulseaudio modules which are using that library
 
-BTW... I'm using Debian-7.7 and did
+Freemangordon (Ivaylo Dimitrov, CCed) should know more about it, 
+specially about pulseaudio modules...
 
-XKBMODEL="nokiarx51"
-XKBLAYOUT="us"
-
-(from https://wiki.debian.org/MaemoAndSqueeze). Keyboard works well
--- except "p" key. arrow-P (0) works ok. Do you see that, too?
-
-> > Do you have an example client that can talk to ofonod?
-> 
-> I have not yet played with userland stuff. You could try
-> telepathy-ring, which integrates the ofono into the telepathy
-> framework.
-
-Thanks for the pointer.
-
-> > What is needed to get voice calls to work?
-> 
-> There's still a kernel driver missing in mainline for exchanging
-> voice data between the modem and the cpu (called cmt-speech).
-> 
-> BTW the CMT driver should be removed from your kernel tree; its a
-> deprecated variant of mainline's nokia-modem driver. Thus I guess
-> the cmt-speech driver, which is available in your kernel tree, is
-> not properly integrated into the changes I did during mainlining
-> the other modem related drivers.
-
-Aha, so CONFIG_CMT is the same thing as CONFIG_NOKIA_NODEM? Ok, will
-disable that. Speech... if you'd have version I could test, I'll
-happily do that.
-
-Thanks,
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141107/db30e4f5/attachment.sig>
