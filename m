@@ -1,75 +1,59 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  6 Nov 2014 11:40:31 +0800
-Subject: [PATCH resend 3/4] ARM: dts: sunxi: Use sun4i-a10-apb1-clk for
- sun6i/sun8i apb2 clocks.
+Date: Thu,  6 Nov 2014 11:40:32 +0800
+Subject: [PATCH resend 4/4] clk: sunxi: Removed unused/incorrect
+ sun6i-a31-apb2-clk driver
 In-Reply-To: <1415245232-20585-1-git-send-email-wens@csie.org>
 References: <1415245232-20585-1-git-send-email-wens@csie.org>
-Message-ID: <1415245232-20585-4-git-send-email-wens@csie.org>
+Message-ID: <1415245232-20585-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The apb2 clocks are actually the same as apb1 clocks on the other sunxi
-platforms, hence compatible with "allwinner,sun4i-a10-apb1-clk".
-
-Update the dtsi to use the new unified apb1 clk.
+This driver does not match the hardware, which is actually compatible
+to sun4i-a10-apb1-clk. Since we've switch to the correct one, drop
+this driver.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun6i-a31.dtsi | 12 ++----------
- arch/arm/boot/dts/sun8i-a23.dtsi | 12 ++----------
- 2 files changed, 4 insertions(+), 20 deletions(-)
+ Documentation/devicetree/bindings/clock/sunxi.txt | 1 -
+ drivers/clk/sunxi/clk-sunxi.c                     | 7 -------
+ 2 files changed, 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index e80288e..3a51151 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -217,19 +217,11 @@
- 					"apb1_daudio1";
- 		};
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index 6ddcf6e..d199f91 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -52,7 +52,6 @@ Required properties:
+ 	"allwinner,sun7i-a20-apb1-gates-clk" - for the APB1 gates on A20
+ 	"allwinner,sun8i-a23-apb1-gates-clk" - for the APB1 gates on A23
+ 	"allwinner,sun9i-a80-apb1-gates-clk" - for the APB1 gates on A80
+-	"allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
+ 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+ 	"allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
+ 	"allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 4133e27..46d98e3 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -632,12 +632,6 @@ static const struct div_data sun4i_apb0_data __initconst = {
+ 	.table	= sun4i_apb0_table,
+ };
  
--		apb2_mux: apb2_mux at 01c20058 {
-+		apb2: clk at 01c20058 {
- 			#clock-cells = <0>;
--			compatible = "allwinner,sun4i-a10-apb1-mux-clk";
-+			compatible = "allwinner,sun4i-a10-apb1-clk";
- 			reg = <0x01c20058 0x4>;
- 			clocks = <&osc32k>, <&osc24M>, <&pll6>, <&pll6>;
--			clock-output-names = "apb2_mux";
--		};
+-static const struct div_data sun6i_a31_apb2_div_data __initconst = {
+-	.shift	= 0,
+-	.pow	= 0,
+-	.width	= 4,
+-};
 -
--		apb2: apb2 at 01c20058 {
--			#clock-cells = <0>;
--			compatible = "allwinner,sun6i-a31-apb2-div-clk";
--			reg = <0x01c20058 0x4>;
--			clocks = <&apb2_mux>;
- 			clock-output-names = "apb2";
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
-index 6086adb..0746cd1 100644
---- a/arch/arm/boot/dts/sun8i-a23.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23.dtsi
-@@ -189,19 +189,11 @@
- 					"apb1_daudio0",	"apb1_daudio1";
- 		};
- 
--		apb2_mux: apb2_mux_clk at 01c20058 {
-+		apb2: clk at 01c20058 {
- 			#clock-cells = <0>;
--			compatible = "allwinner,sun4i-a10-apb1-mux-clk";
-+			compatible = "allwinner,sun4i-a10-apb1-clk";
- 			reg = <0x01c20058 0x4>;
- 			clocks = <&osc32k>, <&osc24M>, <&pll6>, <&pll6>;
--			clock-output-names = "apb2_mux";
--		};
--
--		apb2: apb2_clk at 01c20058 {
--			#clock-cells = <0>;
--			compatible = "allwinner,sun6i-a31-apb2-div-clk";
--			reg = <0x01c20058 0x4>;
--			clocks = <&apb2_mux>;
- 			clock-output-names = "apb2";
- 		};
+ static void __init sunxi_divider_clk_setup(struct device_node *node,
+ 					   struct div_data *data)
+ {
+@@ -1093,7 +1087,6 @@ static const struct of_device_id clk_div_match[] __initconst = {
+ 	{.compatible = "allwinner,sun8i-a23-axi-clk", .data = &sun8i_a23_axi_data,},
+ 	{.compatible = "allwinner,sun4i-a10-ahb-clk", .data = &sun4i_ahb_data,},
+ 	{.compatible = "allwinner,sun4i-a10-apb0-clk", .data = &sun4i_apb0_data,},
+-	{.compatible = "allwinner,sun6i-a31-apb2-div-clk", .data = &sun6i_a31_apb2_div_data,},
+ 	{}
+ };
  
 -- 
 2.1.1
