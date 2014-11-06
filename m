@@ -1,47 +1,64 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 6 Nov 2014 08:36:20 +0100
-Subject: [PATCH] PM / Domains: Change prototype for the ->attach_dev()
- callback
-In-Reply-To: <7hsihx1bvo.fsf@deeprootsystems.com>
-References: <1414670569-3002-1-git-send-email-ulf.hansson@linaro.org>
- <20141105013353.GA19238@dtor-ws>
- <7h7fz92rqk.fsf@deeprootsystems.com>
- <3267963.fqUYb7m9Rv@vostro.rjw.lan>
- <7hsihx1bvo.fsf@deeprootsystems.com>
-Message-ID: <CAMuHMdWRXA6pXob=Hacosfic1jeLmo79T-YCKQ77aJbVisZm-Q@mail.gmail.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Thu, 6 Nov 2014 13:12:09 +0530
+Subject: [PATCH 0/4] Touchscreen performance related fixes
+In-Reply-To: <20141103180920.GA20779@localhost.localdomain>
+References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
+ <20141103180920.GA20779@localhost.localdomain>
+Message-ID: <545B2651.4090905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 6, 2014 at 12:11 AM, Kevin Hilman <khilman@kernel.org> wrote:
-> From: Ulf Hansson <ulf.hansson@linaro.org>
-> Date: Thu, 30 Oct 2014 13:02:49 +0100
-> Subject: [PATCH] PM / Domains: Change prototype for the attach and detach
->  callbacks
->
-> Convert the prototypes to return an int in order to support error
-> handling in these callbacks.
->
-> Also, as suggested by Dmitry Torokhov, pass the domain pointer for use
-> inside the callbacks, and so that they match the existing
-> power_on/power_off callbacks which currently take the domain pointer.
->
-> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> [khilman: added domain as parameter to callbacks, as suggested by Dmitry]
 
-OK, so back to the signature of the original version...
 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+On Monday 03 November 2014 11:39 PM, Richard Cochran wrote:
+> On Mon, Oct 27, 2014 at 04:38:27PM +0530, Vignesh R wrote:
+>> This series of patches fix TSC defects related to lag in touchscreen
+>> performance and cursor jump at touch release. The lag was result of
+>> udelay in TSC interrupt handler. Cursor jump due to false pen-up event.
+>> The patches implement Advisory 1.0.31 in silicon errata of am335x-evm
+>> to avoid false pen-up events and remove udelay.
+> 
+> That advisory has two workarounds. You have chosen the second one?
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Work around one. Hence 5 wire design is not broken.
 
-Gr{oetje,eeting}s,
+> 
+> The text of the second workaround says it only works on 4 wire setups,
+> so I wonder how 5 wire designs will be affected.
+> 
+>> The advisory says to use
+>> steps 1 to 4 for ADC and 5 to 16 for TSC (assuming 4 wire TSC and 4 channel
+>> ADC).
+> 
+> No, it doesn't say that. (sprz360f.pdf)
 
-                        Geert
+The pen up event detection happens immediately after charge step. Hence,
+interchanging ADC and TSC steps makes sure that sampling of touch
+co-ordinates and pen events are done one after the other. This
+workaround was suggested by internal hardware folks. Earlier ADC steps
+intervened between sampling of co-ordinates and pen event detection
+which is not desirable.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+>> Further the X co-ordinate must be the last one to be sampled just
+>> before charge step. The first two patches implement the required changes. 
+> 
+> FWIW, I implemented the first workaround and removed the udelay not
+> too long ago. Like Sebastian, I saw the TSC unit hang after about
+> 50000 interrupts when running with the workaround.
+> 
+> Did you test you patch for very long?
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Yes, I tested for about 200000 interrupts and I didn't see any hang.
+This patch series does not just implement workaround but also does some
+minor changes, such as interchanging ADC and TSC steps etc, which makes
+TSC driver more robust. Let me know if you encounter any issues with my
+patch series.
+
+Regards
+Vignesh
+
+> 
+> Thanks,
+> Richard
+> 
