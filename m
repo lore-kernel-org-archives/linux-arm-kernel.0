@@ -1,64 +1,80 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 06 Nov 2014 16:11:56 +0100
-Subject: [PATCH RESEND v3 0/4] power/mfd: Add max77693 charger driver
-Message-ID: <1415286720-6358-1-git-send-email-k.kozlowski@samsung.com>
+Date: Thu, 06 Nov 2014 16:11:57 +0100
+Subject: [PATCH RESEND v3 1/4] devicetree: power/mfd: max77693: Document new
+ bindings for charger
+In-Reply-To: <1415286720-6358-1-git-send-email-k.kozlowski@samsung.com>
+References: <1415286720-6358-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1415286720-6358-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Document new device tree bindings for Maxim 77693 charger driver.
 
-Hi,
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ Documentation/devicetree/bindings/mfd/max77693.txt | 45 ++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-
-I got ack from Sebastian [1] but only for charger driver patch. This
-means that I still need an ack for documentation (bindings, sysfs)...
-
-
-Changes since v2
-================
-1. Add ack from Sebastian Reichel (charger driver).
-2. Drop patch "mfd: max77693: Map charger device to its own of_node"
-   (applied by Lee Jones).
-
-
-Changes since v1
-================
-1. Add patch 2/5: mfd: max77693: Map charger device to its own of_node
-   (forgot to send it in v1)
-2. Remove patches for DTS and configs. I'll send them later.
-3. Add ack from Lee Jones (patch 3/5).
-
-
-Description
-===========
-The patchset adds max77693 charger driver present on Trats2 board
-(and Galaxy S III). The driver configures battery charger and exposes
-power supply interface.
-
-Driver is necessary to provide full charging stack on Trats2 device
-(extcon, charger-manager etc.).
-
-[1] https://lkml.org/lkml/2014/10/27/774
-
-
-Best regards,
-Krzysztof
-
-
-Krzysztof Kozlowski (4):
-  devicetree: power/mfd: max77693: Document new bindings for charger
-  mfd: max77693: Add defines for MAX77693 charger driver
-  power: max77693: Add charger driver for Maxim 77693
-  Documentation: power: max77693-charger: Document exported sysfs entry
-
- Documentation/ABI/testing/sysfs-class-power        |  42 ++
- Documentation/devicetree/bindings/mfd/max77693.txt |  45 ++
- drivers/power/Kconfig                              |   6 +
- drivers/power/Makefile                             |   1 +
- drivers/power/max77693_charger.c                   | 763 +++++++++++++++++++++
- include/linux/mfd/max77693-private.h               | 108 +++
- include/linux/mfd/max77693.h                       |   8 +
- 7 files changed, 973 insertions(+)
- create mode 100644 drivers/power/max77693_charger.c
-
+diff --git a/Documentation/devicetree/bindings/mfd/max77693.txt b/Documentation/devicetree/bindings/mfd/max77693.txt
+index 01e9f30fe678..38e64405e98d 100644
+--- a/Documentation/devicetree/bindings/mfd/max77693.txt
++++ b/Documentation/devicetree/bindings/mfd/max77693.txt
+@@ -41,6 +41,41 @@ Optional properties:
+ 	 To get more informations, please refer to documentaion.
+ 	[*] refer Documentation/devicetree/bindings/pwm/pwm.txt
+ 
++- charger : Node configuring the charger driver.
++  If present, required properties:
++  - compatible : Must be "maxim,max77693-charger".
++
++  Optional properties (if not set, defaults will be used):
++  - maxim,constant-microvolt : Battery constant voltage in uV. The charger
++    will operate in fast charge constant current mode till battery voltage
++    reaches this level. Then the charger will switch to fast charge constant
++    voltage mode. Also vsys (system voltage) will be set to this value when
++    DC power is supplied but charger is not enabled.
++    Valid values: 3650000 - 4400000, step by 25000 (rounded down)
++    Default: 4200000
++
++  - maxim,min-system-microvolt : Minimal system voltage in uV.
++    Valid values: 3000000 - 3700000, step by 100000 (rounded down)
++    Default: 3600000
++
++  - maxim,thermal-regulation-celsius : Temperature in Celsius for entering
++    high temperature charging mode. If die temperature exceeds this value
++    the charging current will be reduced by 105 mA/Celsius.
++    Valid values: 70, 85, 100, 115
++    Default: 100
++
++  - maxim,battery-overcurrent-microamp : Overcurrent protection threshold
++    in uA (current from battery to system).
++    Valid values: 2000000 - 3500000, step by 250000 (rounded down)
++    Default: 3500000
++
++  - maxim,charge-input-threshold-microvolt : Threshold voltage in uV for
++    triggering input voltage regulation loop. If input voltage decreases
++    below this value, the input current will be reduced to reach the
++    threshold voltage.
++    Valid values: 4300000, 4700000, 4800000, 4900000
++    Default: 4300000
++
+ Example:
+ 	max77693 at 66 {
+ 		compatible = "maxim,max77693";
+@@ -73,4 +108,14 @@ Example:
+ 			pwms = <&pwm 0 40000 0>;
+ 			pwm-names = "haptic";
+ 		};
++
++		charger {
++			compatible = "maxim,max77693-charger";
++
++			maxim,constant-microvolt = <4200000>;
++			maxim,min-system-microvolt = <3600000>;
++			maxim,thermal-regulation-celsius = <75>;
++			maxim,battery-overcurrent-microamp = <3000000>;
++			maxim,charge-input-threshold-microvolt = <4300000>;
++		};
+ 	};
 -- 
 1.9.1
