@@ -1,116 +1,60 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 6 Nov 2014 09:31:56 -0800
-Subject: [PATCH v4 2/3] PM / clock_ops: make __pm_clk_enable more generic
-In-Reply-To: <1415281862-23764-3-git-send-email-grygorii.strashko@ti.com>
-References: <1415281862-23764-1-git-send-email-grygorii.strashko@ti.com>
- <1415281862-23764-3-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <20141106173156.GD34214@dtor-ws>
+From: rafael.j.wysocki@intel.com (Rafael J. Wysocki)
+Date: Thu, 06 Nov 2014 18:31:58 +0100
+Subject: [PATCH] leds: leds-gpio: Fix legacy GPIO number case
+In-Reply-To: <1415273003-27674-1-git-send-email-geert+renesas@glider.be>
+References: <1415273003-27674-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <545BB08E.60408@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 06, 2014 at 03:51:01PM +0200, Grygorii Strashko wrote:
-> Now there are two places in code which do the same things,
-> so allow __pm_clk_enable() to accept pointer on pm_clock_entry
-> structure as second parameter instead of pointer on clock and
-> remove duplicated code.
-> 
-> Also, updated function intended to be used by following patch.
-> 
-> CC: Santosh Shilimkar <ssantosh@kernel.org>
-> CC: Kevin Hilman <khilman@linaro.org>
-> CC: Ulf Hansson <ulf.hansson@linaro.org>
-> CC: Geert Uytterhoeven <geert@linux-m68k.org>
-> CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+On 11/6/2014 12:23 PM, Geert Uytterhoeven wrote:
+> In the legacy case, led_dat->gpiod is initialized correctly, but
+> overwritten later by template->gpiod, which is NULL, causing leds-gpio
+> to fail with:
+>
+>      gpiod_direction_output: invalid GPIO
+>      leds-gpio: probe of leds-gpio failed with error -22
+>
+> Move the initialization of led_dat->gpiod from template->gpiod up, and
+> always use led_dat->gpiod later, to fix this.
+>
+> Fixes: 5c51277a9ababfa4 ("leds: leds-gpio: Add support for GPIO descriptors")
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Since it fixes a bug in a patch going from my tree, the fix needs to go 
+into my tree as well.
+Thus I'm going to take into my device-properties branch.
+
+Bryan, please let me know if there are any problems with that.
+
+Rafael
+
 
 > ---
->  drivers/base/power/clock_ops.c | 38 ++++++++++++++++----------------------
->  1 file changed, 16 insertions(+), 22 deletions(-)
-> 
-> diff --git a/drivers/base/power/clock_ops.c b/drivers/base/power/clock_ops.c
-> index f061eaa..b32b5d4 100644
-> --- a/drivers/base/power/clock_ops.c
-> +++ b/drivers/base/power/clock_ops.c
-> @@ -35,14 +35,20 @@ struct pm_clock_entry {
->  /**
->   * pm_clk_enable - Enable a clock, reporting any errors
->   * @dev: The device for the given clock
-> - * @clk: The clock being enabled.
-> + * @ce: PM clock entry corresponding to the clock.
->   */
-> -static inline int __pm_clk_enable(struct device *dev, struct clk *clk)
-> +static inline int __pm_clk_enable(struct device *dev, struct pm_clock_entry *ce)
->  {
-> -	int ret = clk_enable(clk);
-> -	if (ret)
-> -		dev_err(dev, "%s: failed to enable clk %p, error %d\n",
-> -			__func__, clk, ret);
-> +	int ret;
-> +
-> +	if (ce->status < PCE_STATUS_ERROR) {
-> +		ret = clk_enable(ce->clk);
-> +		if (!ret)
-> +			ce->status = PCE_STATUS_ENABLED;
-> +		else
-> +			dev_err(dev, "%s: failed to enable clk %p, error %d\n",
-> +				__func__, ce->clk, ret);
-> +	}
->  
->  	return ret;
->  }
-> @@ -293,7 +299,6 @@ int pm_clk_resume(struct device *dev)
->  	struct pm_subsys_data *psd = dev_to_psd(dev);
->  	struct pm_clock_entry *ce;
->  	unsigned long flags;
-> -	int ret;
->  
->  	dev_dbg(dev, "%s()\n", __func__);
->  
-> @@ -302,13 +307,8 @@ int pm_clk_resume(struct device *dev)
->  
->  	spin_lock_irqsave(&psd->lock, flags);
->  
-> -	list_for_each_entry(ce, &psd->clock_list, node) {
-> -		if (ce->status < PCE_STATUS_ERROR) {
-> -			ret = __pm_clk_enable(dev, ce->clk);
-> -			if (!ret)
-> -				ce->status = PCE_STATUS_ENABLED;
-> -		}
-> -	}
-> +	list_for_each_entry(ce, &psd->clock_list, node)
-> +		__pm_clk_enable(dev, ce);
->  
->  	spin_unlock_irqrestore(&psd->lock, flags);
->  
-> @@ -417,7 +417,6 @@ int pm_clk_resume(struct device *dev)
->  	struct pm_subsys_data *psd = dev_to_psd(dev);
->  	struct pm_clock_entry *ce;
->  	unsigned long flags;
-> -	int ret;
->  
->  	dev_dbg(dev, "%s()\n", __func__);
->  
-> @@ -427,13 +426,8 @@ int pm_clk_resume(struct device *dev)
->  
->  	spin_lock_irqsave(&psd->lock, flags);
->  
-> -	list_for_each_entry(ce, &psd->clock_list, node) {
-> -		if (ce->status < PCE_STATUS_ERROR) {
-> -			ret = __pm_clk_enable(dev, ce->clk);
-> -			if (!ret)
-> -				ce->status = PCE_STATUS_ENABLED;
-> -		}
-> -	}
-> +	list_for_each_entry(ce, &psd->clock_list, node)
-> +		__pm_clk_enable(dev, ce);
->  
->  	spin_unlock_irqrestore(&psd->lock, flags);
->  
-> -- 
-> 1.9.1
-> 
-
--- 
-Dmitry
+>   drivers/leds/leds-gpio.c | 6 +++---
+>   1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/leds/leds-gpio.c b/drivers/leds/leds-gpio.c
+> index ba4698c32bb04bde..b3c5d9d6a42bcd8b 100644
+> --- a/drivers/leds/leds-gpio.c
+> +++ b/drivers/leds/leds-gpio.c
+> @@ -92,7 +92,8 @@ static int create_gpio_led(const struct gpio_led *template,
+>   {
+>   	int ret, state;
+>   
+> -	if (!template->gpiod) {
+> +	led_dat->gpiod = template->gpiod;
+> +	if (!led_dat->gpiod) {
+>   		/*
+>   		 * This is the legacy code path for platform code that
+>   		 * still uses GPIO numbers. Ultimately we would like to get
+> @@ -122,8 +123,7 @@ static int create_gpio_led(const struct gpio_led *template,
+>   
+>   	led_dat->cdev.name = template->name;
+>   	led_dat->cdev.default_trigger = template->default_trigger;
+> -	led_dat->gpiod = template->gpiod;
+> -	led_dat->can_sleep = gpiod_cansleep(template->gpiod);
+> +	led_dat->can_sleep = gpiod_cansleep(led_dat->gpiod);
+>   	led_dat->blinking = 0;
+>   	if (blink_set) {
+>   		led_dat->platform_gpio_blink_set = blink_set;
