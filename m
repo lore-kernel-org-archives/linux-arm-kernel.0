@@ -1,27 +1,72 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 6 Nov 2014 01:49:21 +0100 (CET)
-Subject: [V10 PATCH 2/2] irqchip: gicv2m: Add supports for ARM GICv2m
- MSI(-X)
-In-Reply-To: <545ABF6C.1000308@amd.com>
-References: <1415052977-26036-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1415052977-26036-3-git-send-email-suravee.suthikulpanit@amd.com>
- <5458CE31.3040404@linux.intel.com> <545ABB4C.8010103@amd.com>
- <545ABF6C.1000308@amd.com>
-Message-ID: <alpine.DEB.2.11.1411060146050.24960@nanos>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Thu, 6 Nov 2014 09:32:55 +0800
+Subject: [Patch Part2 v4 20/31] PCI/MSI: Kill redundant calling for
+ irq_set_msi_desc() for MSIx interrupts
+In-Reply-To: <20141105224504.GG6168@google.com>
+References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
+ <1415102525-9898-21-git-send-email-jiang.liu@linux.intel.com>
+ <20141105224504.GG6168@google.com>
+Message-ID: <545ACFC7.9090204@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 5 Nov 2014, Suravee Suthikulanit wrote:
-> On 11/5/2014 6:05 PM, Suravee Suthikulanit wrote:
-> > - Overall, it seems that msi_domain_alloc() could be quite different
-> > across architectures. Would it be possible to declare this function as
-> > weak, and allow arch to override (similar to arch_setup_msi_irq)?
+On 2014/11/6 6:45, Bjorn Helgaas wrote:
+> On Tue, Nov 04, 2014 at 08:01:54PM +0800, Jiang Liu wrote:
+>> It's arch_setup_msi_irq()/arch_setup_msi_irqs()'s responsibility to call
+>> irq_set_msi_desc() to associate IRQ descriptors and MSI descriptors,
+>> so kill the redundant call of irq_set_msi_desc() for MSIx interrupts
+>> in PCI MSI core.
 > 
-> Actually, declaring "msi_domain_ops" as non-static, and allow other code to
-> override the .alloc and .free?
+> "MSI-X" in English text, "msix" in code.
+> 
+> The default arch_setup_msi_irq() in drivers/pci/msi.c doesn't call
+> irq_set_msi_desc().  Does it happen somewhere inside chip->setup_irq()?
 
-Why do you want to do that?
+Yes.
 
-Thanks,
+I also found this.
+http://www.spinics.net/lists/linux-pci/msg34256.html
 
-	tglx
+> 
+> I don't know how to verify that there are calls in all the places needed.
+> That makes me wonder if the factoring is wrong -- maybe irq_set_msi_desc()
+> could be done in some common place.
+
+In my idea, place the irq_set_msi_desc() in common MSI core is ok, but currently almost
+all MSI arch code call irq_set_msi_desc() in arch code. So a lot of code need to change.
+And arch code setup MSI and MSI-X in the same way, so if MSI work happy without irq_set_msi_desc(entry->irq, entry)
+in common MSI code, MSI-X should be the same.
+
+> 
+>> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+>> ---
+>>  drivers/pci/msi.c |    1 -
+>>  1 file changed, 1 deletion(-)
+>>
+>> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+>> index afe974600c7d..da181c59394b 100644
+>> --- a/drivers/pci/msi.c
+>> +++ b/drivers/pci/msi.c
+>> @@ -685,7 +685,6 @@ static void msix_program_entries(struct pci_dev *dev,
+>>  						PCI_MSIX_ENTRY_VECTOR_CTRL;
+>>  
+>>  		entries[i].vector = entry->irq;
+>> -		irq_set_msi_desc(entry->irq, entry);
+>>  		entry->masked = readl(entry->mask_base + offset);
+>>  		msix_mask_irq(entry, 1);
+>>  		i++;
+>> -- 
+>> 1.7.10.4
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> .
+> 
+
+
+-- 
+Thanks!
+Yijing
