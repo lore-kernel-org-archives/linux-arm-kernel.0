@@ -1,101 +1,86 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 6 Nov 2014 13:33:58 +0100
-Subject: [PATCH v3/resend] ARM: shmobile: Add early debugging support
- using SCIF(A)
-In-Reply-To: <3499638.LG41cHl0JS@wuerfel>
-References: <1415273910-32356-1-git-send-email-geert+renesas@glider.be>
- <3499638.LG41cHl0JS@wuerfel>
-Message-ID: <CAMuHMdUU7XK57a70HWP0+nfwaZ-sXQ5EC2CShgmxwx6JKnuyPQ@mail.gmail.com>
+From: socketcan@hartkopp.net (Oliver Hartkopp)
+Date: Thu, 06 Nov 2014 13:33:56 +0100
+Subject: M_CAN message RAM initialization AppNote  - was: Re: [PATCH V3
+ 3/3] can: m_can: workaround for transmit data less than 4 bytes
+In-Reply-To: <20141106080940.GA22964@shlinux1.ap.freescale.net>
+References: <1415193393-30023-1-git-send-email-b29396@freescale.com>
+ <1415193393-30023-3-git-send-email-b29396@freescale.com>
+ <545A3451.2090302@pengutronix.de> <545A692E.40002@hartkopp.net>
+ <20141106015716.GB7642@shlinux1.ap.freescale.net>
+ <545B1D71.4000408@hartkopp.net>
+ <20141106080940.GA22964@shlinux1.ap.freescale.net>
+Message-ID: <545B6AB4.70003@hartkopp.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 06.11.2014 09:09, Dong Aisheng wrote:
+> On Thu, Nov 06, 2014 at 08:04:17AM +0100, Oliver Hartkopp wrote:
 
-Thanks for your review!
 
-On Thu, Nov 6, 2014 at 12:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 06 November 2014 12:38:30 Geert Uytterhoeven wrote:
->> Add serial port debug macros for the SCIF(A) serial ports.
->> This includes all shmobile SoCs, except for EMEV2.
-
-> I don't object to this patch going in, but have you looked at doing
-> just earlycon instead? We are still missing some fixmap changes
-
-I was thinking about earlycon support...
-
-> before that works on arm32, but in general, early looks nicer than
-
-Good to know there are still some parts missing.
-
-> debug_ll because it doesn't require you to build for a particular
-> machine, with the downside that it's not available as early during
-> boot.
-
-Hence we're gonna need debug_ll anyway?
-So far I only needed it for real early issues.
-
->> @@ -1039,6 +1047,54 @@ config DEBUG_STI_UART
->>       bool
->>       depends on ARCH_STI
+>> To prevent the M_CAN controller detecting checksum errors when
+>> reading potentially uninitialized TX message RAM content to transmit
+>> CAN frames the TX message RAM has to be written with (any kind of)
+>> initial data.
 >>
->> +choice
->> +     prompt "Renesas SCIF(A) debugging SoC/port"
->> +     depends on DEBUG_RENESAS_SCIF
->> +     help
->> +       Choose SoC and SCIF(A) debug port combination from the list below.
->> +
->> +       The kernel will most probably only work on the selected SoC.
->> +       The selected debug port will be used to provide the default SCIF(A)
->> +       physical address; the actual address can still be overridden using
->> +       the DEBUG_UART_PHYS option, if needed.
 >
-> We used to have multi-level choice statements here, but Russell removed
-> them all in cce278d2034 ("ARM: debug: clean up low level kernel debugging
-> selection"). Please follow the same style.
-
-OK, will move it up.
-
->> diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
->> index d08e75cceaab3ead..b31032294f478c91 100644
->> --- a/arch/arm/mach-shmobile/setup-r8a7779.c
->> +++ b/arch/arm/mach-shmobile/setup-r8a7779.c
->> @@ -62,6 +62,15 @@ static struct map_desc r8a7779_io_desc[] __initdata = {
->>               .length         = SZ_16M,
->>               .type           = MT_DEVICE_NONSHARED
->>       },
->> +#ifdef CONFIG_DEBUG_R8A7779_SCIF2
->> +     /* 64K entity map for 0xffe40000 (SCIF) */
+> The key point of the issue is that why M_CAN will read potentially uninitialized
+> TX message RAM content which should not happen?
+> e.g. for our case of the issue, if we sending a no data frame or a less
+> than 4 bytes frame, why m_can will read extra 4 bytes uninitialized/unset
+> data which seems not reasonable?
 >
-> s/entity/identity/ ?
+>  From IP code logic, it will read full 8 bytes of data no matter how many data
+> actually to be transfered which is strange.
 
-Yep. Never copy swenglish comments.
+Yes.
 
->> +     {
->> +             .virtual        = 0xffe40000,
->> +             .pfn            = __phys_to_pfn(0xffe40000),
->> +             .length         = SZ_64K,
->> +             .type           = MT_DEVICE_NONSHARED
->> +     },
->> +#endif /* CONFIG_DEBUG_R8A7779_SCIF2 */
->>  };
 >
-> This should be done automatically if you call debug_ll_io_init() or
-> have an empty map_io() callback.
+> For sending data over 4 bytes, since the Message RAM content will be filled
+> with the real data to be transfered so there's no such issue.
 
-On r8a7779 map_io() is not empty, but it didn't cover the SCIF registers,
-cfr. the commit log:
+E.g. think about the transfer of a CAN FD frame with 32 byte.
+When you only fill up content until 28 byte the last four bytes still remain 
+uninitialized.
 
-> >   4. On SoCs using the legacy machine_desc.map_io(), an identity mapping
-> >      of the SCIF(A) registers must be set up in .map_io(). On all but
-> >      r8a7779 this was already done.
+Did you try this 28 byte use-case with an uninitialized TX message RAM ?
 
-Gr{oetje,eeting}s,
+cansend can0 123##1001122334566778899AABBCCDDEEFF001122334566778899AABB
 
-                        Geert
+To me it looks too risky when we only initialize the first 8 byte.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+>> ---
+>>
+>> Then the code should memset() the entire TX FIFO element - and not
+>> only the 8 data bytes we are addressing now.
+>>
+>
+> Our IC guy told me the issue only happened on transferring a data size
+> of less than 4 bytes and my test also proved that.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+'less than'?
+
+So you might try to use 26 bytes too:
+
+cansend can0 123##1001122334566778899AABBCCDDEEFF001122334566778899
+
+
+> So i'm not sure memset() the entire TX FIFO element is neccesary...
+
+It's no big deal - so we should be defensive here.
+And memset() is not working as Marc pointed out in another mail.
+
+So we would need to loop with
+
+	m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(i), 0x0);
+
+>
+> Do you think we could keep the current solution firstly and updated later
+> if needed?
+
+No :-)
+
+I would like to have all data bytes to be written at startup.
+
+Regards,
+Oliver
