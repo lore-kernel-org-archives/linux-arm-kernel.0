@@ -1,175 +1,341 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  6 Nov 2014 15:13:18 +0100
-Subject: [PATCH v2 02/10] arm64/mm: add create_pgd_mapping() to create private
- page tables
-In-Reply-To: <1415283206-14713-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1415283206-14713-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1415283206-14713-3-git-send-email-ard.biesheuvel@linaro.org>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Thu,  6 Nov 2014 22:20:20 +0800
+Subject: [Patch Part2 v5 07/31] x86,
+ irq: Use hierarchy irqdomain to manage CPU interrupt vectors
+In-Reply-To: <1415283644-2559-1-git-send-email-jiang.liu@linux.intel.com>
+References: <1415283644-2559-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1415283644-2559-8-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For UEFI, we need to install the memory mappings used for Runtime Services
-in a dedicated set of page tables. Add create_pgd_mapping(), which allows
-us to allocate and install those page table entries early.
+Abstract CPU local APIC as an interrupt controller and create an
+irqdomain for it to manage CPU interupt vectors. It's the base to
+enable hierarchy irqdomain on x86 systems. Eventually we will build
+a irqdomain hiearchy as below:
+IOAPIC domain-------|
+MSI/MSI-x domain------> [Inerrupt Remapping domain] -> CPU vector domain
+HPET_IRQ domain_____|                                         ^
+DMAR domain---------------------------------------------------|
+HT_IRQ domain-------------------------------------------------|
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
 ---
- arch/arm64/include/asm/mmu.h     |  3 +++
- arch/arm64/include/asm/pgtable.h |  5 +++++
- arch/arm64/mm/mmu.c              | 44 +++++++++++++++++++++-------------------
- 3 files changed, 31 insertions(+), 21 deletions(-)
+ arch/x86/Kconfig               |    3 +-
+ arch/x86/include/asm/hw_irq.h  |   15 ++++
+ arch/x86/kernel/apic/io_apic.c |    3 -
+ arch/x86/kernel/apic/vector.c  |  156 ++++++++++++++++++++++++++++++++++++----
+ 4 files changed, 160 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index c2f006c48bdb..5fd40c43be80 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -33,5 +33,8 @@ extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
- extern void init_mem_pgprot(void);
- /* create an identity mapping for memory (or io if map_io is true) */
- extern void create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io);
-+extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
-+			       unsigned long virt, phys_addr_t size,
-+			       pgprot_t prot);
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 8e3175ba7f4c..9df24a42f54d 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -883,11 +883,12 @@ config X86_LOCAL_APIC
+ 	def_bool y
+ 	depends on X86_64 || SMP || X86_32_NON_STANDARD || X86_UP_APIC || PCI_MSI
+ 	select GENERIC_IRQ_LEGACY_ALLOC_HWIRQ
++	select IRQ_DOMAIN
++	select IRQ_DOMAIN_HIERARCHY
  
- #endif
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 41a43bf26492..1abe4d08725b 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -264,6 +264,11 @@ static inline pmd_t pte_pmd(pte_t pte)
- 	return __pmd(pte_val(pte));
- }
+ config X86_IO_APIC
+ 	def_bool X86_64 || SMP || X86_32_NON_STANDARD || X86_UP_IOAPIC
+ 	depends on X86_LOCAL_APIC
+-	select IRQ_DOMAIN
  
-+static inline pgprot_t mk_sect_prot(pgprot_t prot)
-+{
-+	return __pgprot(pgprot_val(prot) & ~PTE_TABLE_BIT);
-+}
+ config X86_REROUTE_FOR_BROKEN_BOOT_IRQS
+ 	bool "Reroute for broken boot IRQs"
+diff --git a/arch/x86/include/asm/hw_irq.h b/arch/x86/include/asm/hw_irq.h
+index b988ddf7434b..c19ceefeca65 100644
+--- a/arch/x86/include/asm/hw_irq.h
++++ b/arch/x86/include/asm/hw_irq.h
+@@ -112,6 +112,15 @@ struct irq_2_irte {
+ 
+ #ifdef	CONFIG_X86_LOCAL_APIC
+ struct irq_data;
++struct irq_domain;
 +
- /*
-  * THP definitions.
-  */
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 83e6713143a3..b6dc2ce3991a 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -157,20 +157,10 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
++struct irq_alloc_info {
++	u32			flags;
++	const struct cpumask	*mask;	/* CPU mask for vector allocation */
++};
++
++/* Request contigious CPU vectors */
++#define	X86_IRQ_ALLOC_CONTIGOUS_VECTORS	0x1
  
- static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 				  unsigned long addr, unsigned long end,
--				  phys_addr_t phys, int map_io)
-+				  phys_addr_t phys, pgprot_t prot)
- {
- 	pmd_t *pmd;
- 	unsigned long next;
--	pmdval_t prot_sect;
--	pgprot_t prot_pte;
+ struct irq_cfg {
+ 	cpumask_var_t		domain;
+@@ -135,6 +144,12 @@ struct irq_cfg {
+ 	};
+ };
+ 
++extern struct irq_domain *x86_vector_domain;
++
++extern void init_irq_alloc_info(struct irq_alloc_info *info,
++				const struct cpumask *mask);
++extern void copy_irq_alloc_info(struct irq_alloc_info *dst,
++				struct irq_alloc_info *src);
+ extern struct irq_cfg *irq_cfg(unsigned int irq);
+ extern struct irq_cfg *irqd_cfg(struct irq_data *irq_data);
+ extern struct irq_cfg *alloc_irq_and_cfg_at(unsigned int at, int node);
+diff --git a/arch/x86/kernel/apic/io_apic.c b/arch/x86/kernel/apic/io_apic.c
+index 3f5f60406ab1..51936be8ab13 100644
+--- a/arch/x86/kernel/apic/io_apic.c
++++ b/arch/x86/kernel/apic/io_apic.c
+@@ -2353,9 +2353,6 @@ static int mp_irqdomain_create(int ioapic)
+ 		ioapic_dynirq_base = max(ioapic_dynirq_base,
+ 					 gsi_cfg->gsi_end + 1);
+ 
+-	if (gsi_cfg->gsi_base == 0)
+-		irq_set_default_host(ip->irqdomain);
 -
--	if (map_io) {
--		prot_sect = PROT_SECT_DEVICE_nGnRE;
--		prot_pte = __pgprot(PROT_DEVICE_nGnRE);
--	} else {
--		prot_sect = PROT_SECT_NORMAL_EXEC;
--		prot_pte = PAGE_KERNEL_EXEC;
--	}
- 
- 	/*
- 	 * Check for initial section mappings in the pgd/pud and remove them.
-@@ -186,7 +176,8 @@ static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 		/* try section mapping first */
- 		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
- 			pmd_t old_pmd =*pmd;
--			set_pmd(pmd, __pmd(phys | prot_sect));
-+			set_pmd(pmd, __pmd(phys |
-+					   pgprot_val(mk_sect_prot(prot))));
- 			/*
- 			 * Check for previous table entries created during
- 			 * boot (__create_page_tables) and flush them.
-@@ -195,7 +186,7 @@ static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 				flush_tlb_all();
- 		} else {
- 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
--				       prot_pte);
-+				       prot);
- 		}
- 		phys += next - addr;
- 	} while (pmd++, addr = next, addr != end);
-@@ -203,7 +194,7 @@ static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 
- static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- 				  unsigned long addr, unsigned long end,
--				  unsigned long phys, int map_io)
-+				  unsigned long phys, pgprot_t prot)
- {
- 	pud_t *pud;
- 	unsigned long next;
-@@ -221,10 +212,11 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- 		/*
- 		 * For 4K granule only, attempt to put down a 1GB block
- 		 */
--		if (!map_io && (PAGE_SHIFT == 12) &&
-+		if ((PAGE_SHIFT == 12) &&
- 		    ((addr | next | phys) & ~PUD_MASK) == 0) {
- 			pud_t old_pud = *pud;
--			set_pud(pud, __pud(phys | PROT_SECT_NORMAL_EXEC));
-+			set_pud(pud, __pud(phys |
-+					   pgprot_val(mk_sect_prot(prot))));
- 
- 			/*
- 			 * If we have an old value for a pud, it will
-@@ -239,7 +231,7 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- 				flush_tlb_all();
- 			}
- 		} else {
--			alloc_init_pmd(mm, pud, addr, next, phys, map_io);
-+			alloc_init_pmd(mm, pud, addr, next, phys, prot);
- 		}
- 		phys += next - addr;
- 	} while (pud++, addr = next, addr != end);
-@@ -251,7 +243,7 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
-  */
- static void __init __create_mapping(struct mm_struct *mm, pgd_t *pgd,
- 				    phys_addr_t phys, unsigned long virt,
--				    phys_addr_t size, int map_io)
-+				    phys_addr_t size, pgprot_t prot)
- {
- 	unsigned long addr, length, end, next;
- 
-@@ -261,7 +253,8 @@ static void __init __create_mapping(struct mm_struct *mm, pgd_t *pgd,
- 	end = addr + length;
- 	do {
- 		next = pgd_addr_end(addr, end);
--		alloc_init_pud(mm, pgd, addr, next, phys, map_io);
-+		alloc_init_pud(mm, pgd, addr, next, phys, prot);
-+			       
- 		phys += next - addr;
- 	} while (pgd++, addr = next, addr != end);
- }
-@@ -275,7 +268,7 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
- 		return;
- 	}
- 	__create_mapping(&init_mm, pgd_offset_k(virt & PAGE_MASK), phys, virt,
--			 size, 0);
-+			 size, PAGE_KERNEL_EXEC);
+ 	return 0;
  }
  
- void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
-@@ -285,7 +278,16 @@ void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
- 		return;
+diff --git a/arch/x86/kernel/apic/vector.c b/arch/x86/kernel/apic/vector.c
+index c724ef6b218c..e7b1d6892e66 100644
+--- a/arch/x86/kernel/apic/vector.c
++++ b/arch/x86/kernel/apic/vector.c
+@@ -3,6 +3,8 @@
+  *
+  * Copyright (C) 1997, 1998, 1999, 2000, 2009 Ingo Molnar, Hajnalka Szabo
+  *	Moved from arch/x86/kernel/apic/io_apic.c.
++ * Jiang Liu <jiang.liu@linux.intel.com>
++ *	Add support of hierarchy irqdomain
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -19,7 +21,9 @@
+ #include <asm/desc.h>
+ #include <asm/irq_remapping.h>
+ 
++struct irq_domain *x86_vector_domain;
+ static DEFINE_RAW_SPINLOCK(vector_lock);
++static struct irq_chip vector_chip;
+ 
+ void lock_vector_lock(void)
+ {
+@@ -36,15 +40,21 @@ void unlock_vector_lock(void)
+ 
+ struct irq_cfg *irq_cfg(unsigned int irq)
+ {
+-	return irq_get_chip_data(irq);
++	return irqd_cfg(irq_get_irq_data(irq));
+ }
+ 
+ struct irq_cfg *irqd_cfg(struct irq_data *irq_data)
+ {
++	if (!irq_data)
++		return NULL;
++
++	while (irq_data->parent_data)
++		irq_data = irq_data->parent_data;
++
+ 	return irq_data->chip_data;
+ }
+ 
+-static struct irq_cfg *alloc_irq_cfg(unsigned int irq, int node)
++static struct irq_cfg *alloc_irq_cfg(int node)
+ {
+ 	struct irq_cfg *cfg;
+ 
+@@ -79,7 +89,7 @@ struct irq_cfg *alloc_irq_and_cfg_at(unsigned int at, int node)
+ 			return cfg;
  	}
- 	__create_mapping(&init_mm, &idmap_pg_dir[pgd_index(addr)],
--			 addr, addr, size, map_io);
-+			 addr, addr, size,
-+			 map_io ? __pgprot(PROT_DEVICE_nGnRE)
-+				: PAGE_KERNEL_EXEC);
+ 
+-	cfg = alloc_irq_cfg(at, node);
++	cfg = alloc_irq_cfg(node);
+ 	if (cfg)
+ 		irq_set_chip_data(at, cfg);
+ 	else
+@@ -87,14 +97,13 @@ struct irq_cfg *alloc_irq_and_cfg_at(unsigned int at, int node)
+ 	return cfg;
+ }
+ 
+-static void free_irq_cfg(unsigned int at, struct irq_cfg *cfg)
++static void free_irq_cfg(struct irq_cfg *cfg)
+ {
+-	if (!cfg)
+-		return;
+-	irq_set_chip_data(at, NULL);
+-	free_cpumask_var(cfg->domain);
+-	free_cpumask_var(cfg->old_domain);
+-	kfree(cfg);
++	if (cfg) {
++		free_cpumask_var(cfg->domain);
++		free_cpumask_var(cfg->old_domain);
++		kfree(cfg);
++	}
+ }
+ 
+ static int
+@@ -241,6 +250,90 @@ void clear_irq_vector(int irq, struct irq_cfg *cfg)
+ 	raw_spin_unlock_irqrestore(&vector_lock, flags);
+ }
+ 
++void init_irq_alloc_info(struct irq_alloc_info *info,
++			 const struct cpumask *mask)
++{
++	memset(info, 0, sizeof(*info));
++	info->mask = mask;
 +}
 +
-+void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
-+			       unsigned long virt, phys_addr_t size,
-+			       pgprot_t prot)
++void copy_irq_alloc_info(struct irq_alloc_info *dst, struct irq_alloc_info *src)
 +{
-+	__create_mapping(mm, pgd_offset(mm, virt), phys, virt, size, prot);
++	if (src)
++		*dst = *src;
++	else
++		memset(dst, 0, sizeof(*dst));
++}
++
++static inline const struct cpumask *
++irq_alloc_info_get_mask(struct irq_alloc_info *info)
++{
++	return (!info || !info->mask) ? apic->target_cpus() : info->mask;
++}
++
++static void x86_vector_free_irqs(struct irq_domain *domain,
++				 unsigned int virq, unsigned int nr_irqs)
++{
++	int i;
++	struct irq_data *irq_data;
++
++	for (i = 0; i < nr_irqs; i++) {
++		irq_data = irq_domain_get_irq_data(x86_vector_domain, virq + i);
++		if (irq_data && irq_data->chip_data) {
++			free_remapped_irq(virq);
++			clear_irq_vector(virq + i, irq_data->chip_data);
++			free_irq_cfg(irq_data->chip_data);
++			irq_domain_reset_irq_data(irq_data);
++		}
++	}
++}
++
++static int x86_vector_alloc_irqs(struct irq_domain *domain, unsigned int virq,
++				 unsigned int nr_irqs, void *arg)
++{
++	int i, err;
++	struct irq_cfg *cfg;
++	struct irq_data *irq_data;
++	const struct cpumask *mask;
++	struct irq_alloc_info *info = arg;
++
++	if (disable_apic)
++		return -ENXIO;
++
++	/* Currently vector allocator can't guarantee contigious allocations */
++	if ((info->flags & X86_IRQ_ALLOC_CONTIGOUS_VECTORS) && nr_irqs > 1)
++		return -ENOSYS;
++
++	mask = irq_alloc_info_get_mask(info);
++	for (i = 0; i < nr_irqs; i++) {
++		irq_data = irq_domain_get_irq_data(domain, virq + i);
++		BUG_ON(!irq_data);
++		cfg = alloc_irq_cfg(irq_data->node);
++		if (!cfg) {
++			err = -ENOMEM;
++			goto error;
++		}
++
++		irq_data->chip = &vector_chip;
++		irq_data->chip_data = cfg;
++		irq_data->hwirq = virq + i;
++		err = assign_irq_vector(virq, cfg, mask);
++		if (err)
++			goto error;
++	}
++
++	return 0;
++
++error:
++	x86_vector_free_irqs(domain, virq, i + 1);
++	return err;
++}
++
++static struct irq_domain_ops x86_vector_domain_ops = {
++	.alloc = x86_vector_alloc_irqs,
++	.free = x86_vector_free_irqs,
++};
++
+ int __init arch_probe_nr_irqs(void)
+ {
+ 	int nr;
+@@ -266,6 +359,11 @@ int __init arch_probe_nr_irqs(void)
+ 
+ int __init arch_early_irq_init(void)
+ {
++	x86_vector_domain = irq_domain_add_tree(NULL, &x86_vector_domain_ops,
++						NULL);
++	BUG_ON(x86_vector_domain == NULL);
++	irq_set_default_host(x86_vector_domain);
++
+ 	return arch_early_ioapic_init();
  }
  
- static void __init map_mem(void)
+@@ -380,6 +478,37 @@ int apic_set_affinity(struct irq_data *data, const struct cpumask *mask,
+ 	return 0;
+ }
+ 
++static int vector_set_affinity(struct irq_data *irq_data,
++			       const struct cpumask *dest, bool force)
++{
++	int err;
++	int irq = irq_data->irq;
++	struct irq_cfg *cfg = irq_data->chip_data;
++
++	if (!config_enabled(CONFIG_SMP))
++		return -EPERM;
++
++	if (!cpumask_intersects(dest, cpu_online_mask))
++		return -EINVAL;
++
++	err = assign_irq_vector(irq, cfg, dest);
++	if (err) {
++		struct irq_data *top = irq_get_irq_data(irq);
++
++		if (assign_irq_vector(irq, cfg, top->affinity))
++			pr_err("Failed to recover vector for irq %d\n", irq);
++		return err;
++	}
++
++	return IRQ_SET_MASK_OK;
++}
++
++static struct irq_chip vector_chip = {
++	.irq_ack = apic_ack_edge,
++	.irq_set_affinity = vector_set_affinity,
++	.irq_retrigger = apic_retrigger_irq,
++};
++
+ #ifdef CONFIG_SMP
+ void send_cleanup_vector(struct irq_cfg *cfg)
+ {
+@@ -497,7 +626,7 @@ int arch_setup_hwirq(unsigned int irq, int node)
+ 	unsigned long flags;
+ 	int ret;
+ 
+-	cfg = alloc_irq_cfg(irq, node);
++	cfg = alloc_irq_cfg(node);
+ 	if (!cfg)
+ 		return -ENOMEM;
+ 
+@@ -508,7 +637,7 @@ int arch_setup_hwirq(unsigned int irq, int node)
+ 	if (!ret)
+ 		irq_set_chip_data(irq, cfg);
+ 	else
+-		free_irq_cfg(irq, cfg);
++		free_irq_cfg(cfg);
+ 	return ret;
+ }
+ 
+@@ -518,7 +647,8 @@ void arch_teardown_hwirq(unsigned int irq)
+ 
+ 	free_remapped_irq(irq);
+ 	clear_irq_vector(irq, cfg);
+-	free_irq_cfg(irq, cfg);
++	irq_set_chip_data(irq, NULL);
++	free_irq_cfg(cfg);
+ }
+ 
+ static void __init print_APIC_field(int base)
 -- 
-1.8.3.2
+1.7.10.4
