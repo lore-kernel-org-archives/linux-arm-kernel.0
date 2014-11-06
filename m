@@ -1,42 +1,87 @@
-From: smoch@web.de (Soeren Moch)
-Date: Thu, 06 Nov 2014 17:13:31 +0100
-Subject: [PATCH] ARM: dts: imx6q-tbs2910: Remove unneeded 'fsl,
- mode' property
-In-Reply-To: <1415189571-24035-1-git-send-email-festevam@gmail.com>
-References: <1415189571-24035-1-git-send-email-festevam@gmail.com>
-Message-ID: <545B9E2B.2000605@web.de>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Thu, 6 Nov 2014 17:17:25 +0100
+Subject: [PATCH v5 2/8] phy: miphy28lp: Add PHY header file for DT x Driver
+ defines
+In-Reply-To: <20141106153659.GD26543@x1>
+References: <1415098284-11182-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1415098284-11182-3-git-send-email-gabriel.fernandez@linaro.org>
+ <545B1C53.9010406@ti.com> <545B3FA4.8040109@st.com>
+ <20141106112825.GC26543@x1> <545B6144.2020503@st.com>
+ <20141106153659.GD26543@x1>
+Message-ID: <545B9F15.5070404@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/14 13:12, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
->
-> imx6q-tbs2910 board uses sgtl5000 codec and the machine file (imx-sgtl5000)
-> already sets SSI in slave mode and codec in master mode, so there is no need
-> for having this property.
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
+On 11/06/2014 04:36 PM, Lee Jones wrote:
+> On Thu, 06 Nov 2014, Maxime Coquelin wrote:
+>> On 11/06/2014 12:28 PM, Lee Jones wrote:
+>>> On Thu, 06 Nov 2014, Maxime Coquelin wrote:
+>>>
+>>>> Hi Kishon,
+>>>> On 11/06/2014 07:59 AM, Kishon Vijay Abraham I wrote:
+>>>>> Hi,
+>>>>>
+>>>>> On Tuesday 04 November 2014 04:21 PM, Gabriel FERNANDEZ wrote:
+>>>>>> This provides the shared header file which will be reference from both
+>>>>>> PHY driver and its associated Device Tree node(s).
+>>>>>>
+>>>>>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+>>>>>> ---
+>>>>>>   include/dt-bindings/phy/phy.h | 18 ++++++++++++++++++
+>>>>> I don't see this being used in device tree file. Are you planning to add this
+>>>>> after -rc1 is tagged. Or else I have to create a separate branch for this file
+>>>>> which will be merged by both me and the dt maintainer. Let me know.
+>>>> I think we don't need to create a branch we will merged by both of us.
+>>>>
+>>>> What we can do that both of us apply this patch in our trees.
+>>>> It will avoid dependencies on each others.
+>>>>
+>>>> What do you think?
+>>> This makes no sense to me.  Can you find another way to explain this
+>>> please?
+>> I apply the patch on my STi tree.
+>> Kishon applies the patch on his phy tree.
+>>
+>> At the end, both STi and phy branches will be merged in Linus tree,
+>> with no conflicts.
+>>
+>> This is what we are doing for the STiH407 reset DT bindings with Philipp Z.
+> If you do that, you will almost certainly get conflicts.  The commits
+> have to share the same SHA1 for Git to know for sure that they are the
+> same patch.  One of you needs to create a branch and tag it.  The
+> other can then merge the tag _then_ you won't get conflicts.
 
-Yes, audio still works without that property.
+Just made the test on my side, and I don't get any conflict.
+In my test, the two SHA-1 were different.
 
-Tested-by: Soeren Moch <smoch@web.de>
-
-
-> ---
->   arch/arm/boot/dts/imx6q-tbs2910.dts | 1 -
->   1 file changed, 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/imx6q-tbs2910.dts b/arch/arm/boot/dts/imx6q-tbs2910.dts
-> index d2a5743..f7427bf 100644
-> --- a/arch/arm/boot/dts/imx6q-tbs2910.dts
-> +++ b/arch/arm/boot/dts/imx6q-tbs2910.dts
-> @@ -215,7 +215,6 @@
->   };
->
->   &ssi1 {
-> -	fsl,mode = "i2s-slave";
->   	status = "okay";
->   };
->
->
+>>>>> Thanks
+>>>>> Kishon
+>>>>>>   1 file changed, 18 insertions(+)
+>>>>>>   create mode 100644 include/dt-bindings/phy/phy.h
+>>>>>>
+>>>>>> diff --git a/include/dt-bindings/phy/phy.h b/include/dt-bindings/phy/phy.h
+>>>>>> new file mode 100644
+>>>>>> index 0000000..e8c6a3f
+>>>>>> --- /dev/null
+>>>>>> +++ b/include/dt-bindings/phy/phy.h
+>>>>>> @@ -0,0 +1,18 @@
+>>>>>> +/*
+>>>>>> + *
+>>>>>> + * This header provides constants for the phy framework
+>>>>>> + *
+>>>>>> + * Copyright (C) 2014 STMicroelectronics
+>>>>>> + * Author: Gabriel Fernandez <gabriel.fernandez@st.com>
+>>>>>> + * License terms:  GNU General Public License (GPL), version 2
+>>>>>> + */
+>>>>>> +
+>>>>>> +#ifndef _DT_BINDINGS_PHY
+>>>>>> +#define _DT_BINDINGS_PHY
+>>>>>> +
+>>>>>> +#define PHY_TYPE_SATA		1
+>>>>>> +#define PHY_TYPE_PCIE		2
+>>>>>> +#define PHY_TYPE_USB2		3
+>>>>>> +#define PHY_TYPE_USB3		4
+>>>>>> +
+>>>>>> +#endif /* _DT_BINDINGS_PHY */
+>>>>>>
