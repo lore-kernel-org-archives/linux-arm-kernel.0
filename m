@@ -1,133 +1,64 @@
-From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Thu, 06 Nov 2014 21:19:56 +0800
-Subject: [PATCH v8 3/3] ARM: dts: add rk3288 power-domain node
-In-Reply-To: <545B3518.2090409@rock-chips.com>
-References: <1415254961-5746-1-git-send-email-caesar.wang@rock-chips.com>
- <1415254961-5746-4-git-send-email-caesar.wang@rock-chips.com>
- <545B3518.2090409@rock-chips.com>
-Message-ID: <545B757C.2060307@rock-chips.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 06 Nov 2014 14:20:53 +0100
+Subject: gcc 4.9 build warnings (was: Re: arm-soc build: 2917 warnings 0
+ failures (arm-soc/v3.18-rc1-20-g06c0773))
+In-Reply-To: <CAKv+Gu85h2hMsxtYrMeb_s0KdGfozQf908nmt_BvjhoFQdneow@mail.gmail.com>
+References: <544a2a2e.a2db440a.6eeb.ffffaef3@mx.google.com>
+ <20141106125857.GA12260@ulmo>
+ <CAKv+Gu85h2hMsxtYrMeb_s0KdGfozQf908nmt_BvjhoFQdneow@mail.gmail.com>
+Message-ID: <3756555.kWWoRymX5y@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thursday 06 November 2014 14:08:37 Ard Biesheuvel wrote:
+> On 6 November 2014 13:59, Thierry Reding <thierry.reding@gmail.com> wrote:
+> > On Thu, Nov 06, 2014 at 12:56:27PM +0100, Arnd Bergmann wrote:
+> >> On Thursday 06 November 2014 12:49:22 Thierry Reding wrote:
+> >> > GCC complains about the format specifier being wrong. %zu/%zd are the
+> >> > correct specifiers for variables of type size_t/ssize_t, so wherever a
+> >> > size_t or ssize_t is used as parameter it should have a corresponding
+> >> > %zu or %zd specifier.
+> >> >
+> >> > Why not just fix it properly instead of mucking about with the size_t
+> >> > typedef?
+> >> >
+> >>
+> >> Yes, but where are %zu and %zd implemented in gcc? I've looked but
+> >> couldn't find it. For all I can tell is that gcc's own interpretation
+> >> of %z doesn't match its definition of __SIZE_TYPE__ when building for
+> >> bare-metal.
+> >
+> > I think the code you're looking for is gcc/c-family/c-format.c in
+> > function format_type_warning() (and its callers). Now my understanding
+> > of GCC internals is fairly limited, but what I think is happening is
+> > that the matching happens on the exact typedef, so even if size_t is
+> > typedef'd to unsigned int and the argument is of type unsigned int the
+> > check will still fail and cause the warning.
+> >
+> 
+> Yes, that is what it looks like.
 
-? 2014?11?06? 16:45, Kever Yang ??:
-> Hi Caesar,
->
-> On 11/06/2014 02:22 PM, Caesar Wang wrote:
->> Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
->> Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
->> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
-> pls detail the reason why you need to add all the clocks into 
-> power-controller node.
+My reading is different, given this comment:
 
-OK, I will fix in next patch v9 if there is no other problems in 1-2 days.
+  /* If ARG_TYPE is a typedef with a misleading name (for example,
+     size_t but not the standard size_t expected by printf %zu), avoid
+     printing the typedef name.  */
 
->> ---
->>
->> Changes in v8:
->>      - DTS go back to v2
->>
->> Changes in v7: None
->> Changes in v6: None
->> Changes in v5: None
->> Changes in v4: None
->> Changes in v3:
->>      - Decomposition power-controller, changed to multiple controller
->>      (gpu-power-controller, hevc-power-controller)
->>
->> Changes in v2:
->>      - make pd_vio clocks all one entry per line and alphabetize.
->>      - power: power-controller move back to pinctrl: pinctrl.
->>
->>   arch/arm/boot/dts/rk3288.dtsi | 66 
->> +++++++++++++++++++++++++++++++++++++++++++
->>   1 file changed, 66 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/rk3288.dtsi 
->> b/arch/arm/boot/dts/rk3288.dtsi
->> index cb18bb4..9cd269a 100644
->> --- a/arch/arm/boot/dts/rk3288.dtsi
->> +++ b/arch/arm/boot/dts/rk3288.dtsi
->> @@ -989,4 +989,70 @@
->>               };
->>           };
->>       };
->> +
->> +    power: power-controller {
->> +        compatible = "rockchip,rk3288-power-controller";
->> +        #power-domain-cells = <1>;
->> +        rockchip,pmu = <&pmu>;
->> +        #address-cells = <1>;
->> +        #size-cells = <0>;
->> +
->> +        pd_gpu {
->> +            reg = <RK3288_PD_GPU>;
->> +            clocks = <&cru ACLK_GPU>;
->> +        };
->> +
->> +        pd_hevc {
->> +            reg = <RK3288_PD_HEVC>;
->> +            clocks = <&cru ACLK_HEVC>,
->> +                 <&cru SCLK_HEVC_CABAC>,
->> +                 <&cru SCLK_HEVC_CORE>,
->> +                 <&cru HCLK_HEVC>;
->> +        };
->> +
->> +        pd_vio {
->> +            reg = <RK3288_PD_VIO>;
->> +            clocks = <&cru ACLK_IEP>,
->> +                 <&cru ACLK_ISP>,
->> +                 <&cru ACLK_RGA_NIU>,
->> +                 <&cru ACLK_RGA>,
->> +                 <&cru ACLK_VIO0_NIU>,
->> +                 <&cru ACLK_VIO1_NIU>,
->> +                 <&cru ACLK_VIP>,
->> +                 <&cru ACLK_VOP0>,
->> +                 <&cru ACLK_VOP1>,
->> +                 <&cru DCLK_VOP0>,
->> +                 <&cru DCLK_VOP1>,
->> +                 <&cru HCLK_IEP>,
->> +                 <&cru HCLK_ISP>,
->> +                 <&cru HCLK_RGA>,
->> +                 <&cru HCLK_VIO_AHB_ARBI>,
->> +                 <&cru HCLK_VIO_NIU>,
->> +                 <&cru HCLK_VIO2_H2P>,
->> +                 <&cru HCLK_VIP>,
->> +                 <&cru HCLK_VOP0>,
->> +                 <&cru HCLK_VOP1>,
->> +                 <&cru PCLK_EDP_CTRL>,
->> +                 <&cru PCLK_HDMI_CTRL>,
->> +                 <&cru PCLK_LVDS_PHY>,
->> +                 <&cru PCLK_MIPI_CSI>,
->> +                 <&cru PCLK_MIPI_DSI0>,
->> +                 <&cru PCLK_MIPI_DSI1>,
->> +                 <&cru PCLK_VIO2_H2P>,
->> +                 <&cru SCLK_EDP_24M>,
->> +                 <&cru SCLK_EDP>,
->> +                 <&cru SCLK_HDMI_CEC>,
->> +                 <&cru SCLK_HDMI_HDCP>,
->> +                 <&cru SCLK_ISP_JPE>,
->> +                 <&cru SCLK_ISP>,
->> +                 <&cru SCLK_RGA>;
->> +        };
->> +
->> +        pd_video {
->> +            reg = <RK3288_PD_VIDEO>;
->> +            /* FIXME: add clocks */
-> remove the 'FIXME'.
+I think what happens is that %z accepts size_t only when it is
+defined to the right type, but prints a message with the raw
+scalar type if the typedef does not match what %z expects.
 
-Fixed.
+> > Interestingly I can't seem to reproduce these warnings, neither with the
+> > native compiler on my system nor a 4.9.0 ARM cross-compiler. I've used
+> > the attached source file as a test case (derived from the code at line
+> > 1244 in drivers/regmap/regmap.c, which causes the warning in one of your
+> 
+> The mystery is that arm-linux-gnueabihf-gcc does not produce the
+> warning, whereas Olof's arm-none-eabi-gcc does (built from the same
+> source version, as far as we can tell)
 
->> +            clocks = <&cru ACLK_VCODEC>,
->> +                 <&cru HCLK_VCODEC>;
->> +        };
->> +    };
->>   };
->
->
->
->
+Right, and as Russell pointed out, that compiler has other issues
+as well: the size of 'enum' is different and it does not define the
+__linux__ macro.
 
--- 
-Best regards,
-Caesar
+	Arnd
