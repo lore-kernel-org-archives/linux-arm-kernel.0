@@ -1,27 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 06 Nov 2014 01:06:39 +0100
-Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
-In-Reply-To: <20141105234058.GK6168@google.com>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <2355100.WsW1DXh57P@wuerfel> <20141105234058.GK6168@google.com>
-Message-ID: <2679650.sLyVOFDaTG@wuerfel>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Wed, 5 Nov 2014 18:23:08 -0600
+Subject: [V10 PATCH 2/2] irqchip: gicv2m: Add supports for ARM GICv2m
+ MSI(-X)
+In-Reply-To: <545ABB4C.8010103@amd.com>
+References: <1415052977-26036-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1415052977-26036-3-git-send-email-suravee.suthikulpanit@amd.com>
+ <5458CE31.3040404@linux.intel.com> <545ABB4C.8010103@amd.com>
+Message-ID: <545ABF6C.1000308@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 05 November 2014 16:40:58 Bjorn Helgaas wrote:
-> > 
-> > See below for a sample patch I just did. It duplicates the code from
-> > pci_common_init_dev/pci_common_init because we know that all users
-> > of pci_common_init_dev are modern and only pass a single host bridge.
-> > The new pci_common_init_dev is simpler than the old one but should
-> > do the exact same thing for all current users, with the addition
-> > of propagating the return value.
-> 
-> Same with this one; I'm ignoring for now on the theory that this was just a
-> sample to show the idea, and a more formal patch might come later.
-> 
+On 11/5/2014 6:05 PM, Suravee Suthikulanit wrote:
+> - Overall, it seems that msi_domain_alloc() could be quite different
+> across architectures. Would it be possible to declare this function as
+> weak, and allow arch to override (similar to arch_setup_msi_irq)?
 
-Correct. Or we might not do it at all, if some of the other patches
-are done before we need this.
+Actually, declaring "msi_domain_ops" as non-static, and allow other code 
+to override the .alloc and .free?
 
-	Arnd
+Thanks,
+
+Suravee
