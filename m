@@ -1,127 +1,101 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 6 Nov 2014 12:27:53 +0000
-Subject: [PATCH] arm64: percpu: Implement this_cpu operations
-In-Reply-To: <1415272377-5334-1-git-send-email-steve.capper@linaro.org>
-References: <1415272377-5334-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <20141106122753.GC31605@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 6 Nov 2014 13:33:58 +0100
+Subject: [PATCH v3/resend] ARM: shmobile: Add early debugging support
+ using SCIF(A)
+In-Reply-To: <3499638.LG41cHl0JS@wuerfel>
+References: <1415273910-32356-1-git-send-email-geert+renesas@glider.be>
+ <3499638.LG41cHl0JS@wuerfel>
+Message-ID: <CAMuHMdUU7XK57a70HWP0+nfwaZ-sXQ5EC2CShgmxwx6JKnuyPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
+Hi Arnd,
 
-Thanks for looking at this!
+Thanks for your review!
 
-On Thu, Nov 06, 2014 at 11:12:57AM +0000, Steve Capper wrote:
-> The generic this_cpu operations disable interrupts to ensure that the
-> requested operation is protected from pre-emption. For arm64, this is
-> overkill and can hurt throughput and latency.
-> 
-> This patch provides arm64 specific implementations for the this_cpu
-> operations. Rather than disable interrupts, we use the exclusive
-> monitor or atomic operations as appropriate.
-> 
-> The following operations are implemented: add, add_return, and, or,
-> read, write, xchg. We also wire up a cmpxchg implementation from
-> cmpxchg.h.
-> 
-> Testing was performed using the percpu_test module and hackbench on a
-> Juno board running 3.18-rc3.
+On Thu, Nov 6, 2014 at 12:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 06 November 2014 12:38:30 Geert Uytterhoeven wrote:
+>> Add serial port debug macros for the SCIF(A) serial ports.
+>> This includes all shmobile SoCs, except for EMEV2.
 
-[...]
+> I don't object to this patch going in, but have you looked at doing
+> just earlycon instead? We are still missing some fixmap changes
 
-> diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
-> index 3e02245..3e51f49 100644
-> --- a/arch/arm64/include/asm/cmpxchg.h
-> +++ b/arch/arm64/include/asm/cmpxchg.h
-> @@ -237,8 +237,10 @@ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
->  	__ret; \
->  })
->  
-> -#define this_cpu_cmpxchg_8(ptr, o, n) \
-> -	cmpxchg(raw_cpu_ptr(&(ptr)), o, n);
-> +#define this_cpu_cmpxchg_1(ptr, o, n) cmpxchg(raw_cpu_ptr(&(ptr)), o, n)
-> +#define this_cpu_cmpxchg_2(ptr, o, n) cmpxchg(raw_cpu_ptr(&(ptr)), o, n)
-> +#define this_cpu_cmpxchg_4(ptr, o, n) cmpxchg(raw_cpu_ptr(&(ptr)), o, n)
-> +#define this_cpu_cmpxchg_8(ptr, o, n) cmpxchg(raw_cpu_ptr(&(ptr)), o, n)
+I was thinking about earlycon support...
 
-You can use cmpxchg_local here, as we don't require barrier semantics.
+> before that works on arm32, but in general, early looks nicer than
 
->  #define this_cpu_cmpxchg_double_8(ptr1, ptr2, o1, o2, n1, n2) \
->  	cmpxchg_double(raw_cpu_ptr(&(ptr1)), raw_cpu_ptr(&(ptr2)), \
-> diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
-> index 5279e57..e751681 100644
-> --- a/arch/arm64/include/asm/percpu.h
-> +++ b/arch/arm64/include/asm/percpu.h
-> @@ -44,6 +44,237 @@ static inline unsigned long __my_cpu_offset(void)
->  
->  #endif /* CONFIG_SMP */
->  
-> +#define PERCPU_OP(op, asm_op)						\
-> +static inline unsigned long __percpu_##op(void *ptr,			\
-> +			unsigned long val, int size)			\
-> +{									\
-> +	unsigned long loop, ret;					\
-> +									\
-> +	switch (size) {							\
-> +	case 1:								\
-> +		do {							\
-> +			asm ("//__per_cpu_" #op "_1\n"			\
-> +			"ldxrb	  %w[ret], %[ptr]\n"			\
-> +			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
-> +			"stxrb	  %w[loop], %w[ret], %[ptr]\n"		\
-> +			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
-> +			  [ptr] "+Q"(*(u8 *)ptr)			\
-> +			: [val] "Ir" (val));				\
-> +		} while (loop);						\
-> +		break;							\
+Good to know there are still some parts missing.
 
-Curious, but do you see any difference in code generation over an explicit
-cbnz, like we use in the ATOMIC_OP macro?
+> debug_ll because it doesn't require you to build for a particular
+> machine, with the downside that it's not available as early during
+> boot.
 
-> +	case 2:								\
-> +		do {							\
-> +			asm ("//__per_cpu_" #op "_2\n"			\
-> +			"ldxrh	  %w[ret], %[ptr]\n"			\
-> +			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
-> +			"stxrh	  %w[loop], %w[ret], %[ptr]\n"		\
-> +			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
-> +			  [ptr]  "+Q"(*(u16 *)ptr)			\
-> +			: [val] "Ir" (val));				\
-> +		} while (loop);						\
-> +		break;							\
-> +	case 4:								\
-> +		do {							\
-> +			asm ("//__per_cpu_" #op "_4\n"			\
-> +			"ldxr	  %w[ret], %[ptr]\n"			\
-> +			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
-> +			"stxr	  %w[loop], %w[ret], %[ptr]\n"		\
-> +			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
-> +			  [ptr] "+Q"(*(u32 *)ptr)			\
-> +			: [val] "Ir" (val));				\
-> +		} while (loop);						\
-> +		break;							\
-> +	case 8:								\
-> +		do {							\
-> +			asm ("//__per_cpu_" #op "_8\n"			\
-> +			"ldxr	  %[ret], %[ptr]\n"			\
-> +			#asm_op " %[ret], %[ret], %[val]\n"		\
-> +			"stxr	  %w[loop], %[ret], %[ptr]\n"		\
-> +			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
-> +			  [ptr] "+Q"(*(u64 *)ptr)			\
-> +			: [val] "Ir" (val));				\
-> +		} while (loop);						\
-> +		break;							\
-> +	default:							\
-> +		BUILD_BUG();						\
-> +	}								\
-> +									\
-> +	return ret;							\
-> +}
-> +
-> +PERCPU_OP(add, add)
-> +PERCPU_OP(and, and)
-> +PERCPU_OP(or, orr)
+Hence we're gonna need debug_ll anyway?
+So far I only needed it for real early issues.
 
-Can you use these to generate local_t versions too?
+>> @@ -1039,6 +1047,54 @@ config DEBUG_STI_UART
+>>       bool
+>>       depends on ARCH_STI
+>>
+>> +choice
+>> +     prompt "Renesas SCIF(A) debugging SoC/port"
+>> +     depends on DEBUG_RENESAS_SCIF
+>> +     help
+>> +       Choose SoC and SCIF(A) debug port combination from the list below.
+>> +
+>> +       The kernel will most probably only work on the selected SoC.
+>> +       The selected debug port will be used to provide the default SCIF(A)
+>> +       physical address; the actual address can still be overridden using
+>> +       the DEBUG_UART_PHYS option, if needed.
+>
+> We used to have multi-level choice statements here, but Russell removed
+> them all in cce278d2034 ("ARM: debug: clean up low level kernel debugging
+> selection"). Please follow the same style.
 
-Will
+OK, will move it up.
+
+>> diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+>> index d08e75cceaab3ead..b31032294f478c91 100644
+>> --- a/arch/arm/mach-shmobile/setup-r8a7779.c
+>> +++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+>> @@ -62,6 +62,15 @@ static struct map_desc r8a7779_io_desc[] __initdata = {
+>>               .length         = SZ_16M,
+>>               .type           = MT_DEVICE_NONSHARED
+>>       },
+>> +#ifdef CONFIG_DEBUG_R8A7779_SCIF2
+>> +     /* 64K entity map for 0xffe40000 (SCIF) */
+>
+> s/entity/identity/ ?
+
+Yep. Never copy swenglish comments.
+
+>> +     {
+>> +             .virtual        = 0xffe40000,
+>> +             .pfn            = __phys_to_pfn(0xffe40000),
+>> +             .length         = SZ_64K,
+>> +             .type           = MT_DEVICE_NONSHARED
+>> +     },
+>> +#endif /* CONFIG_DEBUG_R8A7779_SCIF2 */
+>>  };
+>
+> This should be done automatically if you call debug_ll_io_init() or
+> have an empty map_io() callback.
+
+On r8a7779 map_io() is not empty, but it didn't cover the SCIF registers,
+cfr. the commit log:
+
+> >   4. On SoCs using the legacy machine_desc.map_io(), an identity mapping
+> >      of the SCIF(A) registers must be set up in .map_io(). On all but
+> >      r8a7779 this was already done.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
