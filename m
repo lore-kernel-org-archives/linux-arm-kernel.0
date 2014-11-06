@@ -1,59 +1,74 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 6 Nov 2014 19:49:22 +0000
-Subject: [RFC PATCH] ARM: mvebu: Let the device-tree determine smp_ops
-In-Reply-To: <20141106144950.GA4974@lunn.ch>
-References: <1415249396-2985-1-git-send-email-chris.packham@alliedtelesis.co.nz>
- <20141106144950.GA4974@lunn.ch>
-Message-ID: <545BD0C2.6000408@alliedtelesis.co.nz>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 06 Nov 2014 20:55:35 +0100
+Subject: [PATCH] usb: gadget: udc: pxa27x: fix build warning when !OF
+In-Reply-To: <545B196F.2020303@zonque.org> (Daniel Mack's message of "Thu, 06
+ Nov 2014 07:47:11 +0100")
+References: <1415249759-6219-1-git-send-email-balbi@ti.com>
+ <545B196F.2020303@zonque.org>
+Message-ID: <87ppd0xfwo.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Daniel Mack <daniel@zonque.org> writes:
 
-On 11/07/2014 03:49 AM, Andrew Lunn wrote:
-> On Thu, Nov 06, 2014 at 05:49:56PM +1300, Chris Packham wrote:
->> The machine specific SMP operations can be configured either via
->> setup_arch or via arm_dt_init_cpu_maps. For the ARMADA_370_XP_DT devices
->> both of these are called and setup_arch wins because it is called last.
->> This means that it is not possible to substitute a different set of SMP
->> operations via the device-tree.
->>
->> All of the ARMADA_370_XP_DT compatible devices are either single core or
->> declare an enable-method in the dts (via one of armada-xp-mv78230.dtsi,
->> armada-xp-mv78260.dtsi or armada-xp-mv78460.dtsi). Remove the smp
->> assignment from board-v7.c so that the SMP operations set via the
->> device-tree aren't discarded.
->>
->> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->> ---
->> Hi,
->>
->> (This is the first patch I've sent to the arm-lkml so beware of my newbie-ness)
-> Hi Chris
+> On 11/06/2014 05:55 AM, Felipe Balbi wrote:
+>> in case kernel is built without CONFIG_OF there
+>> will be a build warning (see below) due to of_match_ptr()
+>> being defined to NULL.
+>> 
+>> Because of_match_ptr() is pretty pointless anyway,
+>> let's just remove it and fix the warning.
 >
-> Congratulations on a good looking patch. Nice changelog, has a
-> signed-off-by, comments are bellow the ---. All good.
->
-> It is however a good idea to Cc: the mvebu maintainers. I added a few
-> people to Cc:.
-Thanks for the warm welcome. I actually thought the same thing after I 
-hit send, thanks for filling in the Cc list for me.
->> I'm working on a new board that uses a integrated CPU that according to the
->> vendor is "based on the ARMADA-XP", more on that to come in the future
->> hopefully.
-> A packet processor chip with an embedded CPU? Next generation
-> Prestera?  No need to answer that if you don't want to.
-You guess correctly. Not sure how much I can say without falling foul of 
-our NDA but they know I intend on trying to get this stuff upstream 
-rather than being locked into their particular SDK.
->> For the most part things just work if I use a .dts based on the
->> mv78260.
->   
->> This is my attempt at fixing the problem by not setting mdesc.smp for the
->> ARMADA_370_XP_DT machines thus preventing setup_arch from overriding what has
->> been setup by arm_dt_init_cpu_maps.
-> You really need Thomas or Gregory to Ack this patch, but to me it
-> looks correct.  Interestingly, this machine descriptor is used by 370,
-> which is a single processor. The smp operations are useless, so your
-> patch is also partly a cleanup.
->
->       Andrew
+> The alternative, of course, would be to wrap the udc_pxa_dt_ids
+> declaration in IS_ENABLED(CONFIG_OF), but I'm not sure whether it's
+> worth it.
+
+Ah, wasn't the patch named "[PATCH v1] usb: gadget: pxa27x_udc: fix warning in
+non device-tree build" sent October the 29th fixing this issue (in [1]) ?
+
+Cheers.
+
+--
+Robert
+
+[1] Patch
+From: Robert Jarzmik <robert.jarzmik@free.fr>
+Subject: [PATCH v1] usb: gadget: pxa27x_udc: fix warning in non device-tree build
+To: Felipe Balbi <balbi@ti.com>
+Cc: linux-usb at vger.kernel.org, Robert Jarzmik <robert.jarzmik@free.fr>
+Date: Wed, 29 Oct 2014 21:58:33 +0100 (1 week, 22 hours, 56 minutes ago)
+Message-Id: <1414616313-8212-1-git-send-email-robert.jarzmik@free.fr>
+X-Mailer: git-send-email 2.1.0
+
+The recent change bringing device-tree support triggers a warning in a
+non device-tree build :
+  drivers/usb/gadget/udc/pxa27x_udc.c:2405:28: warning: 'udc_pxa_dt_ids'
+  defined but not used [-Wunused-variable]
+
+Fix the warning with a preprocessor condition.
+
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ drivers/usb/gadget/udc/pxa27x_udc.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/usb/gadget/udc/pxa27x_udc.c b/drivers/usb/gadget/udc/pxa27x_udc.c
+index 69e7b816..9b03fab 100644
+--- a/drivers/usb/gadget/udc/pxa27x_udc.c
++++ b/drivers/usb/gadget/udc/pxa27x_udc.c
+@@ -2400,11 +2400,13 @@ static struct pxa_udc memory = {
+ 	}
+ };
+ 
++#if defined(CONFIG_OF)
+ static struct of_device_id udc_pxa_dt_ids[] = {
+ 	{ .compatible = "marvell,pxa270-udc" },
+ 	{}
+ };
+ MODULE_DEVICE_TABLE(of, udc_pxa_dt_ids);
++#endif
+ 
+ /**
+  * pxa_udc_probe - probes the udc device
+-- 
+2.1.0
