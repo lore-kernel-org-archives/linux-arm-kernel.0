@@ -1,55 +1,79 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 5 Nov 2014 20:13:12 -0800
-Subject: [PATCH 0/7] Pinctrl support for Zynq
-In-Reply-To: <545AF05A.1040300@suse.de>
-References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
- <5459BC1C.3000807@suse.de>
- <44de30f0237545c6b62871d6c0480a67@BY2FFO11FD050.protection.gbl>
- <545AF05A.1040300@suse.de>
-Message-ID: <149f300f05ec4a28bed74212a7b01529@BY2FFO11FD005.protection.gbl>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Thu, 06 Nov 2014 12:31:02 +0800
+Subject: [Patch Part2 v4 20/31] PCI/MSI: Kill redundant calling for
+ irq_set_msi_desc() for MSIx interrupts
+In-Reply-To: <545ACFC7.9090204@huawei.com>
+References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
+ <1415102525-9898-21-git-send-email-jiang.liu@linux.intel.com>
+ <20141105224504.GG6168@google.com> <545ACFC7.9090204@huawei.com>
+Message-ID: <545AF986.1040903@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-11-06 at 04:51AM +0100, Andreas F?rber wrote:
-> Am 05.11.2014 um 18:03 schrieb S?ren Brinkmann:
-> > On Wed, 2014-11-05 at 06:56AM +0100, Andreas F?rber wrote:
-> >> I've tracked down all 54 MIO pins of the Parallella and cooked up the
-> >> equivalent DT patch. [...] For testing purposes I've configured a
-> >> heartbeat trigger for the USER_LED (CR10).
-> >>
-> >> To my disappointment these pinctrl additions did not fix one issue:
-> >> Whenever a write access to be handled by the bitstream (0x808f0f04) is
-> >> performed, the board hangs and the heartbeat stops. Would a bug in the
-> >> bitstream allow this to happen, or are more drivers missing to actually
-> >> make use of the PL in general? With a downstream ADI/Xilinx 3.12 kernel
-> >> that problem does not surface.
-> > 
-> > This doesn't sound like being related to pinctrl at all.
-> > Devices in the PL are just memory mapped on the AXI bus. There is
-> > nothing needed to access those. Hangs do in most cases indicate that the
-> > IP does not respond (properly). In my experience this is mostly caused
-> > by 
-> >  - level shifters not enabled
-> >  - IP kept in reset
-> >  - IP is clock gated
-> > With the clock gating being the culprit in most cases. Did you check
-> > those things?
+On 2014/11/6 9:32, Yijing Wang wrote:
+> On 2014/11/6 6:45, Bjorn Helgaas wrote:
+>> On Tue, Nov 04, 2014 at 08:01:54PM +0800, Jiang Liu wrote:
+>>> It's arch_setup_msi_irq()/arch_setup_msi_irqs()'s responsibility to call
+>>> irq_set_msi_desc() to associate IRQ descriptors and MSI descriptors,
+>>> so kill the redundant call of irq_set_msi_desc() for MSIx interrupts
+>>> in PCI MSI core.
+>>
+>> "MSI-X" in English text, "msix" in code.
+>>
+>> The default arch_setup_msi_irq() in drivers/pci/msi.c doesn't call
+>> irq_set_msi_desc().  Does it happen somewhere inside chip->setup_irq()?
 > 
-> Figured it out: zynq-7000.dtsi sets fclk-enable = <0>, i.e., all PL
-> clocks are disabled by default. When overriding that tiny property with
-> 0xf it suddenly works as expected! I'll send a patch later in the day.
+> Yes.
 > 
-> Are boards expected to use clocks = <&clkc 15>, ...; on individual nodes
-> relying on the PL? Or does enabling those clocks require actually
-> loading a bitstream so that it is not being done by default?
+> I also found this.
+> http://www.spinics.net/lists/linux-pci/msg34256.html
+> 
+>>
+>> I don't know how to verify that there are calls in all the places needed.
+>> That makes me wonder if the factoring is wrong -- maybe irq_set_msi_desc()
+>> could be done in some common place.
+> 
+> In my idea, place the irq_set_msi_desc() in common MSI core is ok, but currently almost
+> all MSI arch code call irq_set_msi_desc() in arch code. So a lot of code need to change.
+> And arch code setup MSI and MSI-X in the same way, so if MSI work happy without irq_set_msi_desc(entry->irq, entry)
+> in common MSI code, MSI-X should be the same.
+Hi Bjorn and Yijing,
+	I originally plan was to move irq_set_msi_desc() into common
+PCI MSI code. But when implementing this, I found every
+arch_setup_msi_irq()/arch_setup_msi_irqs() needs to set msidesc->irq,
+thus need to lock the irq descriptor. So I realized we should
+rely on arch_setup_msi_irq() to call irq_set_msi_desc():)
+Regards!
+Gerry
 
-Clocks are under control of drivers. Drivers are supposed to
-use the clock framework to enable the clocks they use. The fclk-enable
-is just a work around to enable driver-less IP and similar.
-
-So, if your FPGA part has proper drivers, you should add the appropriate
-description in DT and the drivers would need to use the CCF to enable
-the clocks. Otherwise you can work around this by specifying
-fclk-enable.
-
-	S?ren
+> 
+>>
+>>> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+>>> ---
+>>>  drivers/pci/msi.c |    1 -
+>>>  1 file changed, 1 deletion(-)
+>>>
+>>> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+>>> index afe974600c7d..da181c59394b 100644
+>>> --- a/drivers/pci/msi.c
+>>> +++ b/drivers/pci/msi.c
+>>> @@ -685,7 +685,6 @@ static void msix_program_entries(struct pci_dev *dev,
+>>>  						PCI_MSIX_ENTRY_VECTOR_CTRL;
+>>>  
+>>>  		entries[i].vector = entry->irq;
+>>> -		irq_set_msi_desc(entry->irq, entry);
+>>>  		entry->masked = readl(entry->mask_base + offset);
+>>>  		msix_mask_irq(entry, 1);
+>>>  		i++;
+>>> -- 
+>>> 1.7.10.4
+>>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>> .
+>>
+> 
+> 
