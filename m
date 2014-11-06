@@ -1,89 +1,55 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 6 Nov 2014 11:01:47 +0100 (CET)
-Subject: [Patch Part2 v4 21/31] PCI/MSI: enhance PCI MSI core to support
- hierarchy irqdomain
-In-Reply-To: <1415102525-9898-22-git-send-email-jiang.liu@linux.intel.com>
-References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
- <1415102525-9898-22-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <alpine.DEB.2.11.1411061023400.24960@nanos>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Thu, 06 Nov 2014 11:14:41 +0100
+Subject: [PATCH v12 2/6] KVM: Add generic support for dirty page logging
+In-Reply-To: <545AAD3B.6070602@samsung.com>
+References: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
+ <1414017251-5772-3-git-send-email-m.smarduch@samsung.com>
+ <20141101101208.GE12801@jhogan-linux.le.imgtec.org>
+ <545A4BCE.40504@redhat.com> <545AAD3B.6070602@samsung.com>
+Message-ID: <545B4A11.5080807@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Nov 2014, Jiang Liu wrote:
-> +#ifdef	CONFIG_PCI_MSI_IRQ_DOMAIN
-> +static inline irq_hw_number_t
-> +msi_get_hwirq(struct pci_dev *pdev, struct msi_desc *msidesc)
-> +{
-> +	return (irq_hw_number_t)msidesc->msi_attrib.entry_nr |
-> +		PCI_DEVID(pdev->bus->number, pdev->devfn) << 11 |
-> +		(pci_domain_nr(pdev->bus) & 0xFFFFFFFF) << 27;
-> +}
-> +
-> +static int msi_domain_alloc(struct irq_domain *domain, unsigned int virq,
-> +			    unsigned int nr_irqs, void *arg)
-> +{
-> +	int i, ret;
-> +	irq_hw_number_t hwirq = arch_msi_irq_domain_get_hwirq(arg);
-> +
-> +	if (irq_find_mapping(domain, hwirq) > 0)
-> +		return -EEXIST;
-> +
-> +	ret = irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, arg);
-> +	if (ret >= 0)
-> +		for (i = 0; i < nr_irqs; i++) {
-> +			irq_domain_set_hwirq_and_chip(domain, virq + i,
-> +					hwirq + i, &msi_chip, (void *)(long)i);
 
-I think msi_chip being a global unique thing is problematic. It does
-not allow multi platform kernels to select a chip at boot time and it
-does not allow per domain chip implementations when you have multiple
-msi domains. Aside of that msi_chip is a pretty bad name for a global.
 
-The solution is rather simple and msi is wide spread enough to justify
-that.
+On 06/11/2014 00:05, Mario Smarduch wrote:
+> On 11/05/2014 08:09 AM, Paolo Bonzini wrote:
+>>
+>>
+>> On 01/11/2014 11:12, James Hogan wrote:
+>>> AFAICT all of the arch implementations of kvm_vm_ioctl_get_dirty_log()
+>>> except x86 and ppc hv (i.e. ia60, mips, ppc pv, s390) already make use
+>>> of the existing generic function kvm_get_dirty_log() to help implement
+>>> their kvm_vm_ioctl_get_dirty_log functions, which all look pretty
+>>> similar now except for TLB flushing.
+>>>
+>>> Would they not be a better base for a generic
+>>> kvm_vm_ioctl_get_dirty_log()?
+>>>
+>>> It feels a bit wrong to add a generic higher level function which
+>>> doesn't make use of the existing generic lower level abstraction.
+>>>
+>>> (Appologies if this has already been brought up in previous versions of
+>>> the patchset, I haven't been tracking them).
+>>
+>> I agree that we should make the interface look more like
+>> kvm_get_dirty_log().  Here the steps are:
+>>
+>> + *   1. Take a snapshot of the bit and clear it if needed.
+>> + *   2. Write protect the corresponding page.
+>> + *   3. Flush TLB's if needed.
+>> + *   4. Copy the snapshot to the userspace.
+> 
+> Hi Paolo,
+>   thanks for breaking it down between generic/architecture layers,
+> helps a lot. Initially I thought we could get TLB flushing to
+> generic layer, previous x86 version worked for ARM. But looking
+> deeper other architectures either use non-generic flush or none
+> at all. Right now we would have x86, ARM, IA64 using generic TLB flush.
+> I'll restructure for another version.
 
-struct irqdomain_msi_data {
-       struct irq_chip       *irq_chip;
-};
+I'll test the swap between 3 and 4 above, and send it to the list.  Feel
+free to include it in v13, so that it gets back to me via Christoffer
+and Marc.
 
-We make that a struct so we can accomodate for other special things
-which might be domain rather than architecture specific. One
-obvious use case would be to hold the arch_msi_irq_domain_get/set_hwirq
-callbacks.
-
-struct irq_domain *msi_create_irq_domain(struct irq_domain *parent,
-       		  			 struct irqdomain_msi_data *data)
-{
-        struct irq_domain *domain;
-
-        domain = irq_domain_add_tree(NULL, &msi_domain_ops, NULL);
-        if (domain) {
-                domain->parent = parent;
-		domain->msi_data = data;
-	}
-        return domain;
-}
-
-Now the above becomes:
-
-    	struct irq_chip *msi_chip = domain->msi_data->irq_chip;
-
-	irq_domain_set_hwirq_and_chip(domain, virq + i,
-				      hwirq + i, msi_chip, (void *)(long)i);
-
-> +int msi_irq_domain_alloc_irqs(struct irq_domain *domain, int type,
-> +			      struct pci_dev *dev, void *arg)
-> +{
-> +	int i, virq;
-> +	struct msi_desc *msidesc;
-> +	int node = dev_to_node(&dev->dev);
-> +
-> +	list_for_each_entry(msidesc, &dev->msi_list, list) {
-> +		arch_msi_irq_domain_set_hwirq(arg, msi_get_hwirq(dev, msidesc));
-
-The arch_xxx callbacks want to be documented. It's not obvious what
-they are supposed to do.
-
-Thanks,
-
-	tglx
+Paolo
