@@ -1,49 +1,30 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 6 Nov 2014 08:37:19 -0600
-Subject: [PATCH v2] MAINTAINERS: add more files under OMAP SUPPORT
-Message-ID: <1415284639-6951-1-git-send-email-balbi@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 6 Nov 2014 15:42:21 +0100
+Subject: [PATCH] ARM: tegra: add serial aliases to Tegra124 DT
+In-Reply-To: <1415053204-30114-1-git-send-email-dev@lynxeye.de>
+References: <1415053204-30114-1-git-send-email-dev@lynxeye.de>
+Message-ID: <20141106144219.GD12260@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These files are very important to the healt
-of the OMAP architecture, specially when it
-comes to PM support which currently we have
-working for at least OMAP3 and we'd like
-to know about any changes being made to our
-PMICs and IRQ controllers.
+On Mon, Nov 03, 2014 at 11:20:04PM +0100, Lucas Stach wrote:
+> Provides consistent numbering of consoles across boards.
+> 
+> Signed-off-by: Lucas Stach <dev@lynxeye.de>
+> ---
+> These aliases are already present in the base DTs for all
+> other Tegra SoCs.
+> ---
+>  arch/arm/boot/dts/tegra124.dtsi | 15 +++++++++++----
+>  1 file changed, 11 insertions(+), 4 deletions(-)
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- MAINTAINERS | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Applied to the for-3.19/dt branch, thanks.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 3c64271..ceab240 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -6594,6 +6594,23 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
- S:	Maintained
- F:	arch/arm/*omap*/
- F:	drivers/i2c/busses/i2c-omap.c
-+F:	drivers/irqchip/irq-omap-intc.c
-+F:	drivers/mfd/*omap*.c
-+F:	drivers/mfd/menelaus.c
-+F:	drivers/mfd/palmas.c
-+F:	drivers/mfd/tps65217.c
-+F:	drivers/mfd/tps65218.c
-+F:	drivers/mfd/tps65910.c
-+F:	drivers/mfd/twl-core.[ch]
-+F:	drivers/mfd/twl4030*.c
-+F:	drivers/mfd/twl6030*.c
-+F:	drivers/mfd/twl6040*.c
-+F:	drivers/regulator/palmas-regulator*.c
-+F:	drivers/regulator/pbias-regulator.c
-+F:	drivers/regulator/tps65217-regulator.c
-+F:	drivers/regulator/tps65218-regulator.c
-+F:	drivers/regulator/tps65910-regulator.c
-+F:	drivers/regulator/twl-regulator.c
- F:	include/linux/i2c-omap.h
- 
- OMAP DEVICE TREE SUPPORT
--- 
-2.1.0.GIT
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141106/f44fb056/attachment.sig>
