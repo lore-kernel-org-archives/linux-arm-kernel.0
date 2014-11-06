@@ -1,84 +1,49 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Thu, 6 Nov 2014 08:36:16 -0600
-Subject: [PATCH v9] ARM: omap: edma: add suspend resume hook
-In-Reply-To: <545B325B.4050109@ti.com>
-References: <1409043173-24357-1-git-send-email-zonque@gmail.com>
- <545A48F1.8060607@ti.com> <545A4A99.70407@ti.com> <545A682F.4060306@ti.com>
- <545B325B.4050109@ti.com>
-Message-ID: <545B8760.6060806@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 6 Nov 2014 08:37:19 -0600
+Subject: [PATCH v2] MAINTAINERS: add more files under OMAP SUPPORT
+Message-ID: <1415284639-6951-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar,
-On 11/06/2014 02:33 AM, Sekhar Nori wrote:
-> On Wednesday 05 November 2014 11:40 PM, Dave Gerlach wrote:
->> Sekhar,
->> On 11/05/2014 10:04 AM, Sekhar Nori wrote:
->>> On Wednesday 05 November 2014 09:27 PM, Dave Gerlach wrote:
->>>> On 08/26/2014 03:52 AM, Daniel Mack wrote:
->>>>> This patch makes the edma driver resume correctly after suspend. Tested
->>>>> on an AM33xx platform with cyclic audio streams and omap_hsmmc.
->>>>>
->>>>> All information can be reconstructed by already known runtime
->>>>> information.
->>>>>
->>>>> As we now use some functions that were previously only used from __init
->>>>> context, annotations had to be dropped.
->>>>>
->>>>> [nm at ti.com: added error handling for runtime + suspend_late/early_resume]
->>>>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>>>> Signed-off-by: Daniel Mack <zonque@gmail.com>
->>>>> Tested-by: Joel Fernandes <joelf@ti.com>
->>>>> Acked-by: Joel Fernandes <joelf@ti.com>
->>>>> ---
->>>>> Changes from v8:
->>>>>
->>>>> 	* Drop the edma_suspend hook altogether. Even though back then
->>>>> 	  when I wrote the code I was sure disabling the interrupts
->>>>> 	  during suspend is necessary, tests now show it in fact isn't.
->>>>> 	  My test setup still works if that code is omitted.
->>>>> 	* Use SET_LATE_SYSTEM_SLEEP_PM_OPS in the dev_pm_ops
->>>>> 	  declaration.
->>>>>
->>>>> 	Thanks to Sekhar for pointing out the above.
->>>>>
->>>>>  arch/arm/common/edma.c | 60 ++++++++++++++++++++++++++++++++++++++++++++++++--
->>>>>  1 file changed, 58 insertions(+), 2 deletions(-)
->>>>
->>>> Doesn't seem to be any comments here, any chance this can be picked up? This
->>>> patch always seems to get missed but will be needed for suspend/resume on both
->>>> AM335x and AM437x.
->>>
->>> Dave, do you have a branch against mainline with suspend working on any
->>> of these SoCs using which I can test this patch?
->>
->> Yes, here is WIP of next version with all required patches + this one.
->> https://github.com/dgerlach/linux-pm/tree/pm-ds0-v3.18-rc3-WIP
->>
->> For suspend to work you need to select:
->>
->> CONFIG_WKUP_M3_IPC=y
->> CONFIG_WKUP_M3_RPROC=y
-> 
-> I get this:
-> 
-> arch/arm/mach-omap2/pm33xx.c:28:31: fatal error: linux/wkup_m3_ipc.h: No such file or directory
->  #include <linux/wkup_m3_ipc.h>
->                                ^
-> compilation terminated.
-> make[1]: *** [arch/arm/mach-omap2/pm33xx.o] Error 1
-> 
-> Forgot to commit wkup_m3_ipc.h?
-> 
+These files are very important to the healt
+of the OMAP architecture, specially when it
+comes to PM support which currently we have
+working for at least OMAP3 and we'd like
+to know about any changes being made to our
+PMICs and IRQ controllers.
 
-Ahhh sorry about that, looks like I dropped it during a rebase. Added it in a
-patch and pushed that on top of the tree from yesterday. Sorry again!.
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ MAINTAINERS | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-Regards,
-Dave
-
-
-> Thanks,
-> Sekhar
->  
-> 
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 3c64271..ceab240 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -6594,6 +6594,23 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+ S:	Maintained
+ F:	arch/arm/*omap*/
+ F:	drivers/i2c/busses/i2c-omap.c
++F:	drivers/irqchip/irq-omap-intc.c
++F:	drivers/mfd/*omap*.c
++F:	drivers/mfd/menelaus.c
++F:	drivers/mfd/palmas.c
++F:	drivers/mfd/tps65217.c
++F:	drivers/mfd/tps65218.c
++F:	drivers/mfd/tps65910.c
++F:	drivers/mfd/twl-core.[ch]
++F:	drivers/mfd/twl4030*.c
++F:	drivers/mfd/twl6030*.c
++F:	drivers/mfd/twl6040*.c
++F:	drivers/regulator/palmas-regulator*.c
++F:	drivers/regulator/pbias-regulator.c
++F:	drivers/regulator/tps65217-regulator.c
++F:	drivers/regulator/tps65218-regulator.c
++F:	drivers/regulator/tps65910-regulator.c
++F:	drivers/regulator/twl-regulator.c
+ F:	include/linux/i2c-omap.h
+ 
+ OMAP DEVICE TREE SUPPORT
+-- 
+2.1.0.GIT
