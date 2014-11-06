@@ -1,51 +1,77 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 6 Nov 2014 12:41:23 +0530
-Subject: [PATCH v2 0/3] ARM: sun8i: Add DMA controller support
-In-Reply-To: <CAGb2v65ZkBvqSjwR0bVUu0-=5-pOmydp51K6GeMnxOa4vOtCRQ@mail.gmail.com>
-References: <1411010680-4481-1-git-send-email-wens@csie.org>
- <CAGb2v65ZkBvqSjwR0bVUu0-=5-pOmydp51K6GeMnxOa4vOtCRQ@mail.gmail.com>
-Message-ID: <20141106071123.GV1870@intel.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Thu,  6 Nov 2014 10:20:23 +0300
+Subject: [PATCH RESEND V2] ARM: debug: move StrongARM debug include to
+ arch/arm/include/debug
+Message-ID: <1415258423-17022-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 26, 2014 at 11:06:01AM +0800, Chen-Yu Tsai wrote:
-> On Thu, Sep 18, 2014 at 11:24 AM, Chen-Yu Tsai <wens@csie.org> wrote:
-> > Hi everyone,
-> >
-> > This is v2 of my sun8i DMA controller support series. This series
-> > adds support for the DMA controller found in the Allwinner A23 SoC.
-> > It is the same hardware as found in the A31 (sun6i) SoC. In addition
-> > to reduced physical channels and endpoints, the controller in the A23
-> > requires an undocumented register to be toggled. That seems to allow
-> > memory bus access.
-> >
-> > This series is based on my earlier "clk: sun6i: Unify AHB1 clock and
-> > fix rate calculation" series, which removes the clock muxing calls from
-> > the sun6i-dma driver. The default PLL6 pre-divider for AHB1 on the A23
-> > results in an exceedingly high clock rate for AHB1, and the system hangs.
-> > Also, on the A23, the dma controller happily works even when AHB1 is
-> > clocked from AXI.
-> >
-> >
-> > Patch 1 changes the channel count macros into runtime data binded to
-> > the DT compatible strings. It also gets rid of some hardcoded values
-> > in the interrupt handler.
-> >
-> > Patch 2 adds the channel number data for the A23 (sun8i), as well as
-> > the undocumented register quirk.
-> 
-> Hi, Vinod,
-> 
-> Any chance we can get patches 1 & 2 merged? You've already merged the
-> prerequisite patch "dmaengine: sun6i: Remove obsolete clk muxing code"
-> a few days ago, and patch 3 is already in arm-soc.
+StrongARM debug-macro.S is quite standalone thing, depending only on
+register mappings. Move it to proper place and add Kconfig entry.
 
-Hi ChenYu,
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+[Changes since V1: keep Kconfig.debug sorted alphabetically]
 
-The patches look fine to me so I tried applying them but they fail to apply,
-can you please rebase these two and resend
+ arch/arm/Kconfig.debug                                         |  9 +++++++++
+ .../include/mach/debug-macro.S => include/debug/sa1100.S}      | 10 ++++++++--
+ 2 files changed, 17 insertions(+), 2 deletions(-)
+ rename arch/arm/{mach-sa1100/include/mach/debug-macro.S => include/debug/sa1100.S} (83%)
 
-Thanks
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b11ad54..9a3bff0 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -699,6 +699,14 @@ choice
+ 		  their output to UART 2. The port must have been initialised
+ 		  by the boot-loader before use.
+ 
++	config DEBUG_SA1100
++		depends on ARCH_SA1100
++		bool "Use SA1100 UARTs for low-level debug"
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on SA-11x0 UART ports. The kernel will check for the first
++		  enabled UART in a sequence 3-1-2.
++
+ 	config DEBUG_SOCFPGA_UART
+ 		depends on ARCH_SOCFPGA
+ 		bool "Use SOCFPGA UART for low-level debug"
+@@ -1009,6 +1017,7 @@ config DEBUG_STI_UART
+ 
+ config DEBUG_LL_INCLUDE
+ 	string
++	default "debug/sa1100.S" if DEBUG_SA1100
+ 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
+ 	default "debug/clps711x.S" if DEBUG_CLPS711X_UART1 || DEBUG_CLPS711X_UART2
+ 	default "debug/pl01x.S" if DEBUG_LL_UART_PL01X || DEBUG_UART_PL01X
+diff --git a/arch/arm/mach-sa1100/include/mach/debug-macro.S b/arch/arm/include/debug/sa1100.S
+similarity index 83%
+rename from arch/arm/mach-sa1100/include/mach/debug-macro.S
+rename to arch/arm/include/debug/sa1100.S
+index 530772d..a0ae4f4 100644
+--- a/arch/arm/mach-sa1100/include/mach/debug-macro.S
++++ b/arch/arm/include/debug/sa1100.S
+@@ -1,4 +1,4 @@
+-/* arch/arm/mach-sa1100/include/mach/debug-macro.S
++/* arch/arm/include/debug/sa1100.S
+  *
+  * Debugging macro include header
+  *
+@@ -10,7 +10,13 @@
+  * published by the Free Software Foundation.
+  *
+ */
+-#include <mach/hardware.h>
++
++#define UTCR3		0x0c
++#define UTDR		0x14
++#define UTSR1		0x20
++#define UTCR3_TXE	0x00000002	/* Transmit Enable                 */
++#define UTSR1_TBY	0x00000001	/* Transmitter BusY (read)         */
++#define UTSR1_TNF	0x00000004	/* Transmit FIFO Not Full (read)   */
+ 
+ 		.macro	addruart, rp, rv, tmp
+ 		mrc	p15, 0, \rp, c1, c0
 -- 
-~Vinod
+2.1.1
