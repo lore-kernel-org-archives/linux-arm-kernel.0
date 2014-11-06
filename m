@@ -1,70 +1,88 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 6 Nov 2014 15:50:59 +0200
-Subject: [PATCH v4 0/3] PM / clock_ops: add pm_clk_add_clk() 
-Message-ID: <1415281862-23764-1-git-send-email-grygorii.strashko@ti.com>
+Date: Thu, 6 Nov 2014 15:51:02 +0200
+Subject: [RFC PATCH v4 3/3] PM / clock_ops: add and enable clocks always if
+ !CONFIG_PM_RUNTIME
+In-Reply-To: <1415281862-23764-1-git-send-email-grygorii.strashko@ti.com>
+References: <1415281862-23764-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <1415281862-23764-4-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh, Kevin,
+Device's clocks need to be enabled always at probing time
+if !CONFIG_PM_RUNTIME - in that way, device will become accesible
+and, later, its clocks can be disabled/enabled during system
+suspend/resume by using pm_clk_suspend/pm_clk_resume APIs.
 
-I've separated these patches in standalone series as requested by
-Santosh (https://lkml.org/lkml/2014/10/24/591). Also, I've kept
-versioning of patches from original series and therefor this
-is v4 of patches.
+But now, the clocks management code doesn't enable clocks when
+clocks are being registered per-device by using pm_clk_add/_clk().
+So, update pm_clk_acquire(), which is called from pm_clk_add/_clk(),
+to enable clock always if !CONFIG_PM_RUNTIME.
 
-The patch 1 was originally introduced in [1] (Apr 2014) and it allows
-to fill per-device list of clock from DT.
+Also, Platform PM domains drivers will not have to add code like below
+each time they need to handle the case when !CONFIG_PM_RUNTIME [1 - 3]:
 
-The patch 2 is small clean up needed for patch 3.
+       if (!IS_ENABLED(CONFIG_PM_RUNTIME)) {
+               ret = pm_clk_resume(dev);
+               if (ret) {
+                       dev_err(dev, "pm_clk_resume failed %d\n", ret);
+                       goto clk_err;
+               };
+       }
 
-The patch 3 was created as was discussed in v2 and first introduced in v3.
-Here I marked it as RFC, because I've found some disadvantages of such
-approach - see comments to the patch itself.
-
-Finally, this series is needed to enable to enable Runtime
-PM for Keystone 2, but honestly I need only patch 1.
-
-RFC version of patches can be found at [2].
-
-Changes in v4:
- - pm_clk_add_clk() changed to get reference on clock as
-   requested by Dmitry Torokhov (see v3). Now the caller has to
-   use clk_put() on clock pointer when done.
-
-Changes in v3:
- - handling of the case when !CONFIG_PM_RUNTIME has been
-   moved in PM clock framework.
-
-Changes in v2:
-- minor comments applied and rebased on top of Linux 3.18-rc1.
-
-Links on previous versions:
-v3:  https://lkml.org/lkml/2014/10/23/342
-v2:  https://lkml.org/lkml/2014/10/20/248
-v1:  https://lkml.org/lkml/2014/9/29/382
-
-[1] "[PATCH/RFC 0/4] of: Register clocks for Runtime PM with PM core"
-  https://lkml.org/lkml/2014/4/24/1118
-
-[2] "[RFC PATCH 0/4] ARM: keystone: pm: switch to use generic pm domains"
-  https://lkml.org/lkml/2014/9/25/364
+[1] https://lkml.org/lkml/2014/10/3/306
+[2] https://lkml.org/lkml/2014/10/16/305
+[3] https://lkml.org/lkml/2014/10/20/249
 
 CC: Santosh Shilimkar <ssantosh@kernel.org>
 CC: Kevin Hilman <khilman@linaro.org>
 CC: Ulf Hansson <ulf.hansson@linaro.org>
 CC: Geert Uytterhoeven <geert@linux-m68k.org>
 CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+CC: Philipp Zabel <p.zabel@pengutronix.de>
+CC: Caesar Wang <caesar.wang@rock-chips.com>
 
-Geert Uytterhoeven (1):
-  PM / clock_ops: Add pm_clk_add_clk()
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+Hi,
 
-Grygorii Strashko (2):
-  PM / clock_ops: make __pm_clk_enable more generic
-  PM / clock_ops: add and enable clocks always if !CONFIG_PM_RUNTIME
+I marked it as RFC, because:
+  Generic clock manipulation PM callbacks can be used for any device
+  for which list of clocks need to be maintained - and it doesn't mean
+  that this framework need to be always connected to GPD/Runtime PM or
+  used during suspend resume. Also, for DT-use case - it doesn't perform
+  any actions (except clk_prepare) on clocks by itself and only
+  by request from framework's consumer.
 
- drivers/base/power/clock_ops.c | 89 +++++++++++++++++++++++++++---------------
- include/linux/pm_clock.h       |  8 ++++
- 2 files changed, 65 insertions(+), 32 deletions(-)
+ For example, it can be reused by Power domain/controller drivers like:
+ - Rockchip RK3288 PM Domain (https://lkml.org/lkml/2014/11/6/30)
+ - IMX.6 PU power domain (http://www.spinics.net/lists/arm-kernel/msg360709.html)
 
+ to maintain list of clocks for GPD itself and these clocks should not
+ be enabled by default, because they are used to power on/off Power domain
+ in a specific way:
+     - enable all clocks assigned to PD
+     - power on/off PD
+     - disable all clocks assigned to PD.
+ After this patch it will be impossible to reuse Generic clock manipulation PM
+ callbacks in cases described above.
+
+ drivers/base/power/clock_ops.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/base/power/clock_ops.c b/drivers/base/power/clock_ops.c
+index b32b5d4..36cdff7 100644
+--- a/drivers/base/power/clock_ops.c
++++ b/drivers/base/power/clock_ops.c
+@@ -69,6 +69,10 @@ static void pm_clk_acquire(struct device *dev, struct pm_clock_entry *ce)
+ 		ce->status = PCE_STATUS_ACQUIRED;
+ 		dev_dbg(dev, "Clock %s managed by runtime PM.\n", ce->con_id);
+ 	}
++
++	if (!IS_ENABLED(CONFIG_PM_RUNTIME)) {
++		__pm_clk_enable(dev, ce);
++	}
+ }
+ 
+ static int __pm_clk_add(struct device *dev, const char *con_id,
 -- 
 1.9.1
