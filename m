@@ -1,34 +1,41 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 6 Nov 2014 12:24:11 -0600
-Subject: [PATCHv4 4/7] hwspinlock/core: add common OF helpers
-In-Reply-To: <CAK=WgbYf3++K4MVXW_n4zj-8fMEee61XG5+r40cW=trapRtJ7w@mail.gmail.com>
-References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
- <1389658764-39199-5-git-send-email-s-anna@ti.com>
- <CAJAp7Oj-3ZxvN8o=rg8YeTiXYWyQ1iowgisdU1R5UcZeh4VmOQ@mail.gmail.com>
- <5425938C.6070007@ti.com>
- <CAK=WgbYf3++K4MVXW_n4zj-8fMEee61XG5+r40cW=trapRtJ7w@mail.gmail.com>
-Message-ID: <545BBCCB.7030107@ti.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Thu, 06 Nov 2014 10:25:09 -0800
+Subject: [PATCH 00/10] arm64 kexec kernel patches V5
+In-Reply-To: <CAFdej01wki9btKiDj7TW8_frtZFLVMjsyS5LsZWqO7E+dC+D+w@mail.gmail.com>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <CAFdej01qZMr3CgBv6jOuXHod2F8zHg89yDA8FA4m65bFEn+vYw@mail.gmail.com>
+ <20141106152830.GF23706@leverpostej>
+ <CAFdej01wki9btKiDj7TW8_frtZFLVMjsyS5LsZWqO7E+dC+D+w@mail.gmail.com>
+Message-ID: <1415298309.12884.45.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+Hi Arun,
 
-On 10/06/2014 04:44 AM, Ohad Ben-Cohen wrote:
-> On Fri, Sep 26, 2014 at 7:25 PM, Suman Anna <s-anna@ti.com> wrote:
->> I am yet to receive any comments on v6, but that series should address
->> both your need for a probe deferral and Ohad's request to not change any
->> return types. Please give it a try and let me know if you have any comments.
-> 
-> Guys,
-> 
-> Just to let you know we have several holidays around here these days,
-> and I intend to review all pending patches immediately soon after.
-> 
+On Thu, 2014-11-06 at 21:43 +0530, Arun Chandran wrote:
+> Initializing cgroup subsys cpu
+> Linux version 3.17.0-rc4+ (arun at arun-OptiPlex-9010) (gcc version 4.9.1
+> 20140505 (prerelease) (crosstool-NG linaro-1.13.1-4.9-2014.05 - Linaro
+> GCC 4.9-2014.05) ) #12 PREEMPT Thu Nov 6 21:38:03 IST 2014
+> CPU: AArch64 Processor [500f0000] revision 0
+> Detected PIPT I-cache on CPU0
+> Ignoring memory block 0x100000000 - 0x180000000
+> Early serial console at MMIO32 0x1c020000 (options '')
+> bootconsole [uart0] enabled
+> efi: Getting EFI parameters from FDT:
+> efi: UEFI not found.
+> cma: Failed to reserve 16 MiB
 
-Ping on this. Can you review the latest series v6 [1] and pick it up for
-3.19? The MSM spinlock driver is also blocked/dependent on that series.
+This error comes from cma_declare_contiguous().
 
-regards
-Suman
+> Kernel panic - not syncing: ERROR: Failed to allocate 0x1000 bytes below 0x0.
 
-[1] http://marc.info/?l=linux-arm-kernel&m=141055365513902&w=2
+This panic comes from memblock_alloc_base().  I guess something has
+passed in bad values.
+
+I wonder if your dtb is compatible with this platform.  What if you
+don't pass a dtb to kexec?
+
+It could be caused by memory corruption.
+
+-Geoff
