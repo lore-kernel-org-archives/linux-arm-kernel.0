@@ -1,60 +1,75 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 6 Nov 2014 12:27:42 +0100
-Subject: [PATCH] leds: leds-gpio: Convert gpio_blink_set() to use GPIO
- descriptors
-In-Reply-To: <20141106112244.GM1618@lahna.fi.intel.com>
-References: <1414755658-96293-1-git-send-email-mika.westerberg@linux.intel.com>
- <545843B1.3020101@nvidia.com> <2455157.3p7mHhT8im@vostro.rjw.lan>
- <CAMuHMdXn9W2S7N+YGfjDxQozMtRZCVdTzzdDps6YfOv2FqVBmw@mail.gmail.com>
- <20141106103033.GK1618@lahna.fi.intel.com>
- <CAMuHMdWtcZcpW=r60s9auENZxChiLwr14R0p_soKr7C3yGYOMQ@mail.gmail.com>
- <20141106105855.GL1618@lahna.fi.intel.com>
- <CAMuHMdUroLo5SdXrTu+etiW+TwHAWV-Qn9UsVnud+BJ7q6nXjw@mail.gmail.com>
- <20141106112244.GM1618@lahna.fi.intel.com>
-Message-ID: <CAMuHMdVA=L22R=gDJBHcgGbD5tsTOPpVZHaxeLsaB+mXhQswVg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 6 Nov 2014 11:28:25 +0000
+Subject: [PATCH v5 2/8] phy: miphy28lp: Add PHY header file for DT x
+ Driver defines
+In-Reply-To: <545B3FA4.8040109@st.com>
+References: <1415098284-11182-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1415098284-11182-3-git-send-email-gabriel.fernandez@linaro.org>
+ <545B1C53.9010406@ti.com> <545B3FA4.8040109@st.com>
+Message-ID: <20141106112825.GC26543@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 6, 2014 at 12:22 PM, Mika Westerberg
-<mika.westerberg@linux.intel.com> wrote:
-> On Thu, Nov 06, 2014 at 12:12:04PM +0100, Geert Uytterhoeven wrote:
->> On Thu, Nov 6, 2014 at 11:58 AM, Mika Westerberg
->> <mika.westerberg@linux.intel.com> wrote:
->> > On Thu, Nov 06, 2014 at 11:32:19AM +0100, Geert Uytterhoeven wrote:
->> >> On Thu, Nov 6, 2014 at 11:30 AM, Mika Westerberg
->> >> <mika.westerberg@linux.intel.com> wrote:
->> >> >> "leds: leds-gpio: Add support for GPIO descriptors" broke leds-gpio on
->> >> >> non-DT platforms for me:
->> >> >>
->> >> >>     gpiod_direction_output: invalid GPIO
->> >> >>     leds-gpio: probe of leds-gpio failed with error -22
->> >> >>
->> >> >> (desc is NULL in gpiod_direction_output()).
+On Thu, 06 Nov 2014, Maxime Coquelin wrote:
 
->>     leds-gpio leds-gpio: GPIO 102, ret: 0
->>     leds-gpio leds-gpio: GPIOD: c050e970
->>
->> So led_dat is non-NULL. But it's overwritten by NULL later:
->>
->>     led_dat->gpiod = template->gpiod;
->
-> Ah, that's it. Nice catch!
->
->> Whitespace damaged fix below, to fold into the original.
->> If you prefer a proper separate patch, let me know.
->
-> It is up to Rafael. I think he wants to stabilize this branch so in that
-> case separate patch on top would work better.
+> Hi Kishon,
+> On 11/06/2014 07:59 AM, Kishon Vijay Abraham I wrote:
+> >Hi,
+> >
+> >On Tuesday 04 November 2014 04:21 PM, Gabriel FERNANDEZ wrote:
+> >>This provides the shared header file which will be reference from both
+> >>PHY driver and its associated Device Tree node(s).
+> >>
+> >>Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> >>---
+> >>  include/dt-bindings/phy/phy.h | 18 ++++++++++++++++++
+> >I don't see this being used in device tree file. Are you planning to add this
+> >after -rc1 is tagged. Or else I have to create a separate branch for this file
+> >which will be merged by both me and the dt maintainer. Let me know.
+> I think we don't need to create a branch we will merged by both of us.
+> 
+> What we can do that both of us apply this patch in our trees.
+> It will avoid dependencies on each others.
+> 
+> What do you think?
 
-I've already sent a patch, as I have to publish the fix in my git tree anyway.
+This makes no sense to me.  Can you find another way to explain this
+please?
 
-Gr{oetje,eeting}s,
+> >Thanks
+> >Kishon
+> >>  1 file changed, 18 insertions(+)
+> >>  create mode 100644 include/dt-bindings/phy/phy.h
+> >>
+> >>diff --git a/include/dt-bindings/phy/phy.h b/include/dt-bindings/phy/phy.h
+> >>new file mode 100644
+> >>index 0000000..e8c6a3f
+> >>--- /dev/null
+> >>+++ b/include/dt-bindings/phy/phy.h
+> >>@@ -0,0 +1,18 @@
+> >>+/*
+> >>+ *
+> >>+ * This header provides constants for the phy framework
+> >>+ *
+> >>+ * Copyright (C) 2014 STMicroelectronics
+> >>+ * Author: Gabriel Fernandez <gabriel.fernandez@st.com>
+> >>+ * License terms:  GNU General Public License (GPL), version 2
+> >>+ */
+> >>+
+> >>+#ifndef _DT_BINDINGS_PHY
+> >>+#define _DT_BINDINGS_PHY
+> >>+
+> >>+#define PHY_TYPE_SATA		1
+> >>+#define PHY_TYPE_PCIE		2
+> >>+#define PHY_TYPE_USB2		3
+> >>+#define PHY_TYPE_USB3		4
+> >>+
+> >>+#endif /* _DT_BINDINGS_PHY */
+> >>
+> 
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
