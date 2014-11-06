@@ -1,245 +1,47 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu,  6 Nov 2014 22:20:42 +0800
-Subject: [Patch Part2 v5 29/31] x86,
- irq: Use hierarchy irqdomain to manage DMAR interrupts
-In-Reply-To: <1415283644-2559-1-git-send-email-jiang.liu@linux.intel.com>
-References: <1415283644-2559-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1415283644-2559-30-git-send-email-jiang.liu@linux.intel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 6 Nov 2014 15:26:33 +0100
+Subject: [PATCH v5 4/4] crypto: Add Allwinner Security System crypto
+ accelerator
+In-Reply-To: <20141103103528.GA30154@gondor.apana.org.au>
+References: <20141021191149.GQ21108@lukather> <544A9FEA.6020304@gmail.com>
+ <20141030171933.GR21251@lukather>
+ <20141031072030.GA7563@gondor.apana.org.au>
+ <20141031081323.GS21251@lukather>
+ <20141031081803.GA8012@gondor.apana.org.au>
+ <20141031095706.GA8054@lukather>
+ <20141031100522.GA8655@gondor.apana.org.au>
+ <20141103093446.GG11263@lukather>
+ <20141103103528.GA30154@gondor.apana.org.au>
+Message-ID: <20141106142633.GK2989@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enhance DMAR code to support hierarchy irqdomain, it helps to make
-the architecture more clear.
+On Mon, Nov 03, 2014 at 06:35:28PM +0800, Herbert Xu wrote:
+> On Mon, Nov 03, 2014 at 10:34:46AM +0100, Maxime Ripard wrote:
+> > What I mean is that since you are saying that drivers should do the
+> > kmap themselves, then *all* of the drivers are broken if they are not
+> > using it. And all of them are missing this kmap.
+> 
+> kmap is used by the software implementations to map the input/output
+> into virtual address space.  Drivers typically use DMA and operate
+> on physical addresses so they don't need kmap.
 
-Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
----
- arch/x86/include/asm/hw_irq.h |    7 ++
- arch/x86/kernel/apic/msi.c    |  151 ++++++++++++++++++++++++++---------------
- 2 files changed, 102 insertions(+), 56 deletions(-)
+Yes, plus all memory allocated with GFP_KERNEL is in lowmem.
 
-diff --git a/arch/x86/include/asm/hw_irq.h b/arch/x86/include/asm/hw_irq.h
-index 047d238e69d2..08240216f949 100644
---- a/arch/x86/include/asm/hw_irq.h
-+++ b/arch/x86/include/asm/hw_irq.h
-@@ -122,6 +122,7 @@ enum irq_alloc_type {
- 	X86_IRQ_ALLOC_TYPE_HPET,
- 	X86_IRQ_ALLOC_TYPE_MSI,
- 	X86_IRQ_ALLOC_TYPE_MSIX,
-+	X86_IRQ_ALLOC_TYPE_DMAR,
- };
- 
- struct irq_alloc_info {
-@@ -152,6 +153,12 @@ struct irq_alloc_info {
- 			struct IO_APIC_route_entry *ioapic_entry;
- 		};
- #endif
-+#ifdef	CONFIG_DMAR_TABLE
-+		struct {
-+			int		dmar_id;
-+			void		*dmar_data;
-+		};
-+#endif
- 	};
- };
- 
-diff --git a/arch/x86/kernel/apic/msi.c b/arch/x86/kernel/apic/msi.c
-index 5fc3e61f1b16..a220abbe842e 100644
---- a/arch/x86/kernel/apic/msi.c
-+++ b/arch/x86/kernel/apic/msi.c
-@@ -25,32 +25,6 @@
- 
- static struct irq_domain *msi_default_domain;
- 
--static void native_compose_msi_msg(struct irq_cfg *cfg, struct msi_msg *msg)
--{
--	msg->address_hi = MSI_ADDR_BASE_HI;
--
--	if (x2apic_enabled())
--		msg->address_hi |= MSI_ADDR_EXT_DEST_ID(cfg->dest_apicid);
--
--	msg->address_lo =
--		MSI_ADDR_BASE_LO |
--		((apic->irq_dest_mode == 0) ?
--			MSI_ADDR_DEST_MODE_PHYSICAL :
--			MSI_ADDR_DEST_MODE_LOGICAL) |
--		((apic->irq_delivery_mode != dest_LowestPrio) ?
--			MSI_ADDR_REDIRECTION_CPU :
--			MSI_ADDR_REDIRECTION_LOWPRI) |
--		MSI_ADDR_DEST_ID(cfg->dest_apicid);
--
--	msg->data =
--		MSI_DATA_TRIGGER_EDGE |
--		MSI_DATA_LEVEL_ASSERT |
--		((apic->irq_delivery_mode != dest_LowestPrio) ?
--			MSI_DATA_DELIVERY_FIXED :
--			MSI_DATA_DELIVERY_LOWPRI) |
--		MSI_DATA_VECTOR(cfg->vector);
--}
--
- static void msi_compose_msg(struct irq_data *data, struct msi_msg *msg)
- {
- 	struct irq_cfg *cfg = irqd_cfg(data);
-@@ -87,6 +61,9 @@ static void msi_update_msg(struct msi_msg *msg, struct irq_data *irq_data)
- 	msg->data |= MSI_DATA_VECTOR(cfg->vector);
- 	msg->address_lo &= ~MSI_ADDR_DEST_ID_MASK;
- 	msg->address_lo |= MSI_ADDR_DEST_ID(cfg->dest_apicid);
-+	if (x2apic_enabled())
-+		msg->address_hi = MSI_ADDR_BASE_HI |
-+				  MSI_ADDR_EXT_DEST_ID(cfg->dest_apicid);
- }
- 
- static int msi_set_affinity(struct irq_data *data, const struct cpumask *mask,
-@@ -187,59 +164,121 @@ static int
- dmar_msi_set_affinity(struct irq_data *data, const struct cpumask *mask,
- 		      bool force)
- {
--	struct irq_cfg *cfg = irqd_cfg(data);
--	unsigned int dest, irq = data->irq;
-+	struct irq_data *parent = data->parent_data;
- 	struct msi_msg msg;
- 	int ret;
- 
--	ret = apic_set_affinity(data, mask, &dest);
--	if (ret)
--		return ret;
--
--	dmar_msi_read(irq, &msg);
--
--	msg.data &= ~MSI_DATA_VECTOR_MASK;
--	msg.data |= MSI_DATA_VECTOR(cfg->vector);
--	msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
--	msg.address_lo |= MSI_ADDR_DEST_ID(dest);
--	msg.address_hi = MSI_ADDR_BASE_HI | MSI_ADDR_EXT_DEST_ID(dest);
--
--	dmar_msi_write(irq, &msg);
-+	ret = parent->chip->irq_set_affinity(parent, mask, force);
-+	if (ret >= 0) {
-+		dmar_msi_read(data->irq, &msg);
-+		msi_update_msg(&msg, data);
-+		dmar_msi_write(data->irq, &msg);
-+	}
- 
--	return IRQ_SET_MASK_OK_NOCOPY;
-+	return ret;
- }
- 
- static struct irq_chip dmar_msi_type = {
- 	.name			= "DMAR_MSI",
- 	.irq_unmask		= dmar_msi_unmask,
- 	.irq_mask		= dmar_msi_mask,
--	.irq_ack		= apic_ack_edge,
-+	.irq_ack		= irq_chip_ack_parent,
- 	.irq_set_affinity	= dmar_msi_set_affinity,
--	.irq_retrigger		= apic_retrigger_irq,
-+	.irq_retrigger		= irq_chip_retrigger_hierarchy,
-+	.irq_compose_msi_msg	= msi_compose_msg,
- 	.flags			= IRQCHIP_SKIP_SET_WAKE,
- };
- 
--int dmar_alloc_hwirq(int id, int node, void *arg)
-+static int dmar_domain_alloc(struct irq_domain *domain, unsigned int virq,
-+			     unsigned int nr_irqs, void *arg)
-+{
-+	struct irq_alloc_info *info = arg;
-+	int ret;
-+
-+	if (nr_irqs > 1 || !info || info->type != X86_IRQ_ALLOC_TYPE_DMAR)
-+		return -EINVAL;
-+	if (irq_find_mapping(domain, info->dmar_id)) {
-+		pr_warn("IRQ for DMAR%d already exists.\n", info->dmar_id);
-+		return -EEXIST;
-+	}
-+
-+	ret = irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, arg);
-+	if (ret >= 0) {
-+		irq_domain_set_hwirq_and_chip(domain, virq, info->dmar_id,
-+					      &dmar_msi_type, NULL);
-+		irq_set_handler_data(virq, info->dmar_data);
-+		__irq_set_handler(virq, handle_edge_irq, 0, "edge");
-+	}
-+
-+	return ret;
-+}
-+
-+static void dmar_domain_free(struct irq_domain *domain, unsigned int virq,
-+			     unsigned int nr_irqs)
-+{
-+	BUG_ON(nr_irqs > 1);
-+	irq_domain_free_irqs_top(domain, virq, nr_irqs);
-+}
-+
-+static void dmar_domain_activate(struct irq_domain *domain,
-+				 struct irq_data *irq_data)
- {
--	int irq;
- 	struct msi_msg msg;
- 
--	irq = irq_domain_alloc_irqs(NULL, 1, node, NULL);
--	if (irq > 0) {
--		irq_set_handler_data(irq, arg);
--		irq_set_chip_and_handler_name(irq, &dmar_msi_type,
--					      handle_edge_irq, "edge");
--		native_compose_msi_msg(irq_cfg(irq), &msg);
--		dmar_msi_write(irq, &msg);
-+	BUG_ON(irq_chip_compose_msi_msg(irq_data, &msg));
-+	dmar_msi_write(irq_data->irq, &msg);
-+}
-+
-+static void dmar_domain_deactivate(struct irq_domain *domain,
-+				   struct irq_data *irq_data)
-+{
-+	struct msi_msg msg;
-+
-+	memset(&msg, 0, sizeof(msg));
-+	dmar_msi_write(irq_data->irq, &msg);
-+}
-+
-+static struct irq_domain_ops dmar_domain_ops = {
-+	.alloc = dmar_domain_alloc,
-+	.free = dmar_domain_free,
-+	.activate = dmar_domain_activate,
-+	.deactivate = dmar_domain_deactivate,
-+};
-+
-+static struct irq_domain *dmar_get_irq_domain(void)
-+{
-+	static struct irq_domain *dmar_domain;
-+	static DEFINE_MUTEX(dmar_lock);
-+
-+	mutex_lock(&dmar_lock);
-+	if (dmar_domain == NULL) {
-+		dmar_domain = irq_domain_add_tree(NULL, &dmar_domain_ops, NULL);
-+		if (dmar_domain)
-+			dmar_domain->parent = x86_vector_domain;
- 	}
-+	mutex_unlock(&dmar_lock);
-+
-+	return dmar_domain;
-+}
-+
-+int dmar_alloc_hwirq(int id, int node, void *arg)
-+{
-+	struct irq_domain *domain = dmar_get_irq_domain();
-+	struct irq_alloc_info info;
-+
-+	if (!domain)
-+		return -1;
-+
-+	init_irq_alloc_info(&info, NULL);
-+	info.type = X86_IRQ_ALLOC_TYPE_DMAR;
-+	info.dmar_id = id;
-+	info.dmar_data = arg;
- 
--	return irq;
-+	return irq_domain_alloc_irqs(domain, 1, node, &info);
- }
- 
- void dmar_free_hwirq(int irq)
- {
--	irq_set_handler_data(irq, NULL);
--	irq_set_handler(irq, NULL);
- 	irq_domain_free_irqs(irq, 1);
- }
- #endif
+But you still haven't explain why the driver, while it doesn't handle
+the user space buffer at any time, should be worried that the data the
+framework has given him are actually mapped.
+
+Maxime
+
 -- 
-1.7.10.4
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141106/ae0d74ae/attachment-0001.sig>
