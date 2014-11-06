@@ -1,76 +1,114 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Thu, 6 Nov 2014 12:45:02 +0400
-Subject: [PATCH v1 0/3] Transition pxa25x clock to common clocks
-In-Reply-To: <1414941415-13146-1-git-send-email-robert.jarzmik@free.fr>
-References: <1414941415-13146-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <CALT56yOCBN1NAfNw=vThVZ_o=ONGOTvzKHBH5tCTQShJY0wkrQ@mail.gmail.com>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Thu, 06 Nov 2014 16:45:12 +0800
+Subject: [PATCH v8 3/3] ARM: dts: add rk3288 power-domain node
+In-Reply-To: <1415254961-5746-4-git-send-email-caesar.wang@rock-chips.com>
+References: <1415254961-5746-1-git-send-email-caesar.wang@rock-chips.com>
+ <1415254961-5746-4-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <545B3518.2090409@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Caesar,
 
-2014-11-02 18:16 GMT+03:00 Robert Jarzmik <robert.jarzmik@free.fr>:
-> Hello pxa25x board maintainers,
+On 11/06/2014 02:22 PM, Caesar Wang wrote:
+> Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
+> Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
+> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+pls detail the reason why you need to add all the clocks into 
+power-controller node.
+> ---
 >
-> This patchset will move the clock code out of pxa subarchitecture into the
-> common clock framework. As this change can bring a lot of regression, I'd like
-> to test it on your boards.
+> Changes in v8:
+>      - DTS go back to v2
 >
-> I prepared for you a git tree based on v3.18-rc :
->  - git fetch https://github.com:rjarzmik/linux.git work/clocks-pxa:try
->  - git checkout try
+> Changes in v7: None
+> Changes in v6: None
+> Changes in v5: None
+> Changes in v4: None
+> Changes in v3:
+>      - Decomposition power-controller, changed to multiple controller
+>      (gpu-power-controller, hevc-power-controller)
 >
->  - it contains all the common clock fixes for pxa and this pathset
->  - it builds and runs on lubbock (thanks Russell for the board)
->  - make your defconfig, kernel, boot
->  - test
->    - if it does run normally, tell me
->    - if it doesn't boot, retry once with the kernel command line argument "clk_ignore_unused" and tell me if it fixed or not the problem
->    - be aware of the GPIO11 clock change
->      => this is especially true for Ian as my change doesn't look good
+> Changes in v2:
+>      - make pd_vio clocks all one entry per line and alphabetize.
+>      - power: power-controller move back to pinctrl: pinctrl.
 >
-> If you could give me feedback if it works for you there will be less breakage.
+>   arch/arm/boot/dts/rk3288.dtsi | 66 +++++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 66 insertions(+)
 >
-> And if you want to give a review, even better.
-
-Tested in qemu (pxa25x target).
-
-0) Had to revert 23c4a3a5212701ad34bd30591fa33d7bacef9c5f to get kernel
-to build for pxa25x + pxa27x.
-
-1) I got the following backtrace early in the boot:
-
-Division by zero in kernel.
-CPU: 0 PID: 0 Comm: swapper Not tainted 3.18.0-rc2-00011-g7805b78 #97
-[<c000e028>] (unwind_backtrace) from [<c000c0b4>] (show_stack+0x10/0x14)
-[<c000c0b4>] (show_stack) from [<c01a3af0>] (Ldiv0+0x8/0x10)
-[<c01a3af0>] (Ldiv0) from [<c029bb9c>] (clk_pxa25x_memory_get_rate+0x28/0x30)
-[<c029bb9c>] (clk_pxa25x_memory_get_rate) from [<c029b114>]
-(clk_composite_recalc_rate+0x20/0x24)
-[<c029b114>] (clk_composite_recalc_rate) from [<c0299888>]
-(__clk_init+0x1d0/0x4e8)
-[<c0299888>] (__clk_init) from [<c0299d24>] (clk_register+0x100/0x1c4)
-[<c0299d24>] (clk_register) from [<c029b518>]
-(clk_register_composite+0x17c/0x250)
-[<c029b518>] (clk_register_composite) from [<c04cecd4>]
-(pxa25x_clocks_init+0x194/0x240)
-[<c04cecd4>] (pxa25x_clocks_init) from [<c04c048c>] (pxa_timer_init+0x18/0x64)
-[<c04c048c>] (pxa_timer_init) from [<c04bde88>] (time_init+0x1c/0x2c)
-[<c04bde88>] (time_init) from [<c04bbb14>] (start_kernel+0x268/0x3e8)
-[<c04bbb14>] (start_kernel) from [<a0008040>] (0xa0008040)
-
-It might be due to something being not emulated properly, but I'd
-suggest to add a check
-anyway.
-
-2) sa1100-rtc could not find a clock and thus failed to be probed.
-
-3) Had to patch tc6393xb driver to call
-clk_prepare_enable/clk_disable_unprepare -
-  will submit a patch shortly.
-
-4) Got an issue with IrDA driver - it gets -ENODEV for UARTCLK clock
-
--- 
-With best wishes
-Dmitry
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index cb18bb4..9cd269a 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -989,4 +989,70 @@
+>   			};
+>   		};
+>   	};
+> +
+> +	power: power-controller {
+> +		compatible = "rockchip,rk3288-power-controller";
+> +		#power-domain-cells = <1>;
+> +		rockchip,pmu = <&pmu>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		pd_gpu {
+> +			reg = <RK3288_PD_GPU>;
+> +			clocks = <&cru ACLK_GPU>;
+> +		};
+> +
+> +		pd_hevc {
+> +			reg = <RK3288_PD_HEVC>;
+> +			clocks = <&cru ACLK_HEVC>,
+> +				 <&cru SCLK_HEVC_CABAC>,
+> +				 <&cru SCLK_HEVC_CORE>,
+> +				 <&cru HCLK_HEVC>;
+> +		};
+> +
+> +		pd_vio {
+> +			reg = <RK3288_PD_VIO>;
+> +			clocks = <&cru ACLK_IEP>,
+> +				 <&cru ACLK_ISP>,
+> +				 <&cru ACLK_RGA_NIU>,
+> +				 <&cru ACLK_RGA>,
+> +				 <&cru ACLK_VIO0_NIU>,
+> +				 <&cru ACLK_VIO1_NIU>,
+> +				 <&cru ACLK_VIP>,
+> +				 <&cru ACLK_VOP0>,
+> +				 <&cru ACLK_VOP1>,
+> +				 <&cru DCLK_VOP0>,
+> +				 <&cru DCLK_VOP1>,
+> +				 <&cru HCLK_IEP>,
+> +				 <&cru HCLK_ISP>,
+> +				 <&cru HCLK_RGA>,
+> +				 <&cru HCLK_VIO_AHB_ARBI>,
+> +				 <&cru HCLK_VIO_NIU>,
+> +				 <&cru HCLK_VIO2_H2P>,
+> +				 <&cru HCLK_VIP>,
+> +				 <&cru HCLK_VOP0>,
+> +				 <&cru HCLK_VOP1>,
+> +				 <&cru PCLK_EDP_CTRL>,
+> +				 <&cru PCLK_HDMI_CTRL>,
+> +				 <&cru PCLK_LVDS_PHY>,
+> +				 <&cru PCLK_MIPI_CSI>,
+> +				 <&cru PCLK_MIPI_DSI0>,
+> +				 <&cru PCLK_MIPI_DSI1>,
+> +				 <&cru PCLK_VIO2_H2P>,
+> +				 <&cru SCLK_EDP_24M>,
+> +				 <&cru SCLK_EDP>,
+> +				 <&cru SCLK_HDMI_CEC>,
+> +				 <&cru SCLK_HDMI_HDCP>,
+> +				 <&cru SCLK_ISP_JPE>,
+> +				 <&cru SCLK_ISP>,
+> +				 <&cru SCLK_RGA>;
+> +		};
+> +
+> +		pd_video {
+> +			reg = <RK3288_PD_VIDEO>;
+> +			/* FIXME: add clocks */
+remove the 'FIXME'.
+> +			clocks = <&cru ACLK_VCODEC>,
+> +				 <&cru HCLK_VCODEC>;
+> +		};
+> +	};
+>   };
