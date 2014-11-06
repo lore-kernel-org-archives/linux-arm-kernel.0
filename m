@@ -1,63 +1,79 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 6 Nov 2014 19:09:05 +0100
-Subject: [PATCH v3 00/19] KVM GICv3 emulation
-In-Reply-To: <545B9035.8030108@arm.com>
-References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
- <20141106105751.GA29968@cbox> <20141106112125.GA3748@cbox>
- <545B9035.8030108@arm.com>
-Message-ID: <CAMJs5B-APzJoAYv97upuYQcLSGxaOvOjSBC_=MO9JYvzoTeAxw@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 6 Nov 2014 10:09:56 -0800
+Subject: [RFC PATCH v4 3/3] PM / clock_ops: add and enable clocks always
+ if !CONFIG_PM_RUNTIME
+In-Reply-To: <1415281862-23764-4-git-send-email-grygorii.strashko@ti.com>
+References: <1415281862-23764-1-git-send-email-grygorii.strashko@ti.com>
+ <1415281862-23764-4-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <20141106180956.GE34214@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 6, 2014 at 4:13 PM, Andre Przywara <andre.przywara@arm.com> wrote:
-> Hi Christoffer,
->
-> On 06/11/14 11:21, Christoffer Dall wrote:
->> On Thu, Nov 06, 2014 at 11:57:51AM +0100, Christoffer Dall wrote:
->>> On Fri, Oct 31, 2014 at 05:26:35PM +0000, Andre Przywara wrote:
->>>
->>> [...]
->>>
->>>>
->>>> Please review and test.
->>>> I would be grateful for people to test for GICv2 regressions also
->>>> (so on a GICv2 host with current kvmtool/qemu), as there is quite
->>>> some refactoring on that front.
->>>>
->>> So looking at the final result, we have a very strange flow with the
->>> vgic_create() and kvm_vgic_create() functions.  I lost track in all the
->>> rewrite patches how this happened exactly, but what I think you want to
->>> end up with is:
->>>
->>> one exported function:
->>> int kvm_vgic_create(struct kvm_device *dev, u32 type);
->>>
->>> which calls a static function:
->>> static int vgic_create(struct kvm *kvm, u32 type);
->>>
->>> or simply inline the static one in the exported one, I can't seem to
->>> find other callers.
->>>
->> Strike that, my cscope setup was messed up.
->>
->> What I think you want is a static vgic_v3_create in vgic-v3-emul.c that
->> digs out the struct kvm pointer from the struct kvm_device and calls
->> kvm_vgic_create() and also just copy that single kfree(dev) line into
->> vgic_v3_destroy in vgic-v3-emul.c and the same for v2.
->
-> So you want to remove vgic_destroy() and vgic_create() from vgic.c and
-> vgic.h and use a static version of it in vgic-v[23]-emul.c instead?
-> To avoid the two prototypes and make the declaration of the struct
-> kvm_device_ops look nicer? Did I got this right?
->
-> I did that now, it looks a bit neater, at the cost of small code
-> duplication of admittedly trivial code. So as long as there isn't
-> something added to those functions, that's probably fine.
+On Thu, Nov 06, 2014 at 03:51:02PM +0200, Grygorii Strashko wrote:
+> Device's clocks need to be enabled always at probing time
+> if !CONFIG_PM_RUNTIME - in that way, device will become accesible
+> and, later, its clocks can be disabled/enabled during system
+> suspend/resume by using pm_clk_suspend/pm_clk_resume APIs.
+> 
+> But now, the clocks management code doesn't enable clocks when
+> clocks are being registered per-device by using pm_clk_add/_clk().
+> So, update pm_clk_acquire(), which is called from pm_clk_add/_clk(),
+> to enable clock always if !CONFIG_PM_RUNTIME.
+> 
+> Also, Platform PM domains drivers will not have to add code like below
+> each time they need to handle the case when !CONFIG_PM_RUNTIME [1 - 3]:
+> 
+>        if (!IS_ENABLED(CONFIG_PM_RUNTIME)) {
+>                ret = pm_clk_resume(dev);
+>                if (ret) {
+>                        dev_err(dev, "pm_clk_resume failed %d\n", ret);
+>                        goto clk_err;
+>                };
+>        }
+> 
+> [1] https://lkml.org/lkml/2014/10/3/306
+> [2] https://lkml.org/lkml/2014/10/16/305
+> [3] https://lkml.org/lkml/2014/10/20/249
+> 
+> CC: Santosh Shilimkar <ssantosh@kernel.org>
+> CC: Kevin Hilman <khilman@linaro.org>
+> CC: Ulf Hansson <ulf.hansson@linaro.org>
+> CC: Geert Uytterhoeven <geert@linux-m68k.org>
+> CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> CC: Philipp Zabel <p.zabel@pengutronix.de>
+> CC: Caesar Wang <caesar.wang@rock-chips.com>
+> 
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> ---
+> Hi,
+> 
+> I marked it as RFC, because:
+>   Generic clock manipulation PM callbacks can be used for any device
+>   for which list of clocks need to be maintained - and it doesn't mean
+>   that this framework need to be always connected to GPD/Runtime PM or
+>   used during suspend resume. Also, for DT-use case - it doesn't perform
+>   any actions (except clk_prepare) on clocks by itself and only
+>   by request from framework's consumer.
+> 
+>  For example, it can be reused by Power domain/controller drivers like:
+>  - Rockchip RK3288 PM Domain (https://lkml.org/lkml/2014/11/6/30)
+>  - IMX.6 PU power domain (http://www.spinics.net/lists/arm-kernel/msg360709.html)
+> 
+>  to maintain list of clocks for GPD itself and these clocks should not
+>  be enabled by default, because they are used to power on/off Power domain
+>  in a specific way:
+>      - enable all clocks assigned to PD
+>      - power on/off PD
+>      - disable all clocks assigned to PD.
+>  After this patch it will be impossible to reuse Generic clock manipulation PM
+>  callbacks in cases described above.
 
-Exactly!
+I'd rather keep it separate and concentrate on making pm_clk* code
+working with the power management core. Individual drivers can easily
+keep list of their clocks for whatever additional purpose they need
+without involving pm_clk* API.
 
->
-> So I will include it in the next version.
->
-Thanks,
--Christoffer
+Thanks.
+
+-- 
+Dmitry
