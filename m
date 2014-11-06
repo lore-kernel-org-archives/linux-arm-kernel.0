@@ -1,60 +1,62 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Thu, 6 Nov 2014 19:03:36 +0100
-Subject: N900 modem support in 3.18-rc1
-In-Reply-To: <20141106124711.GA26944@amd>
-References: <20141104205117.GA17606@amd> <201411052137.31452@pali>
- <20141105203918.GA29199@amd> <201411052206.05379@pali>
- <20141105220359.GA32052@amd> <20141105234555.GA7097@earth.universe>
- <20141106124711.GA26944@amd>
-Message-ID: <20141106180335.GA21513@earth.universe>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Thu, 06 Nov 2014 10:07:45 -0800
+Subject: [PATCH v12 2/6] KVM: Add generic support for dirty page logging
+In-Reply-To: <545B4A11.5080807@redhat.com>
+References: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
+ <1414017251-5772-3-git-send-email-m.smarduch@samsung.com>
+ <20141101101208.GE12801@jhogan-linux.le.imgtec.org>
+ <545A4BCE.40504@redhat.com> <545AAD3B.6070602@samsung.com>
+ <545B4A11.5080807@redhat.com>
+Message-ID: <545BB8F1.1060805@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Nov 06, 2014 at 01:47:11PM +0100, Pavel Machek wrote:
-> > On Wed, Nov 05, 2014 at 11:03:59PM +0100, Pavel Machek wrote:
-> > > > Maybe you need to enable modem?
-> > > > 
-> > > > This is n900 init sequence from script: nokia-n900-configs.sh
-> > > 
-> > > From the dts, it looks like this should somehow work without this.
-> > 
-> > Right :) The n900-modem driver will take care of this if the "pm"
-> > parameter is set to 1 (which should be the default).
+On 11/06/2014 02:14 AM, Paolo Bonzini wrote:
 > 
-> I actually had pm=0 on the command line, but I removed it now, and no
-> change: [...]
 > 
-> Let me try with explicit =1. .. aha, that helps. Thanks!
+> On 06/11/2014 00:05, Mario Smarduch wrote:
+>> On 11/05/2014 08:09 AM, Paolo Bonzini wrote:
+>>>
+>>>
+>>> On 01/11/2014 11:12, James Hogan wrote:
+>>>> AFAICT all of the arch implementations of kvm_vm_ioctl_get_dirty_log()
+>>>> except x86 and ppc hv (i.e. ia60, mips, ppc pv, s390) already make use
+>>>> of the existing generic function kvm_get_dirty_log() to help implement
+>>>> their kvm_vm_ioctl_get_dirty_log functions, which all look pretty
+>>>> similar now except for TLB flushing.
+>>>>
+>>>> Would they not be a better base for a generic
+>>>> kvm_vm_ioctl_get_dirty_log()?
+>>>>
+>>>> It feels a bit wrong to add a generic higher level function which
+>>>> doesn't make use of the existing generic lower level abstraction.
+>>>>
+>>>> (Appologies if this has already been brought up in previous versions of
+>>>> the patchset, I haven't been tracking them).
+>>>
+>>> I agree that we should make the interface look more like
+>>> kvm_get_dirty_log().  Here the steps are:
+>>>
+>>> + *   1. Take a snapshot of the bit and clear it if needed.
+>>> + *   2. Write protect the corresponding page.
+>>> + *   3. Flush TLB's if needed.
+>>> + *   4. Copy the snapshot to the userspace.
+>>
+>> Hi Paolo,
+>>   thanks for breaking it down between generic/architecture layers,
+>> helps a lot. Initially I thought we could get TLB flushing to
+>> generic layer, previous x86 version worked for ARM. But looking
+>> deeper other architectures either use non-generic flush or none
+>> at all. Right now we would have x86, ARM, IA64 using generic TLB flush.
+>> I'll restructure for another version.
+> 
+> I'll test the swap between 3 and 4 above, and send it to the list.  Feel
+> free to include it in v13, so that it gets back to me via Christoffer
+> and Marc.
+> 
+> Paolo
+> 
 
-mh seems I actually missed to make 1 the default value. I will
-prepare a patch for that.
+Ok, will do. So it would be kvm/kvm/x86 and 4 armv7 patches.
 
-I assume, that the example ofono commands work for you now?
-
-> Do you have an example client that can talk to ofonod?
-
-I have not yet played with userland stuff. You could try
-telepathy-ring, which integrates the ofono into the telepathy
-framework.
-
-> What is needed to get voice calls to work?
-
-There's still a kernel driver missing in mainline for exchanging
-voice data between the modem and the cpu (called cmt-speech).
-
-BTW the CMT driver should be removed from your kernel tree; its a
-deprecated variant of mainline's nokia-modem driver. Thus I guess
-the cmt-speech driver, which is available in your kernel tree, is
-not properly integrated into the changes I did during mainlining
-the other modem related drivers.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141106/5aa320d1/attachment.sig>
+Mario
