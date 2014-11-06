@@ -1,100 +1,103 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu,  6 Nov 2014 22:20:23 +0800
-Subject: [Patch Part2 v5 10/31] x86,
- uv: Use new irqdomain interfaces to allocate/free IRQ
-In-Reply-To: <1415283644-2559-1-git-send-email-jiang.liu@linux.intel.com>
-References: <1415283644-2559-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1415283644-2559-11-git-send-email-jiang.liu@linux.intel.com>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Thu,  6 Nov 2014 14:23:02 +0000
+Subject: [PATCH v3 1/2] of: Rename "poweroff-source" property to
+ "system-power-controller"
+In-Reply-To: <1415283784-10885-1-git-send-email-romain.perier@gmail.com>
+References: <1415283784-10885-1-git-send-email-romain.perier@gmail.com>
+Message-ID: <1415283784-10885-2-git-send-email-romain.perier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use new irqdomain interfaces to allocate/free IRQ, so we could
-kill GENERIC_IRQ_LEGACY_ALLOC_HWIRQ later.
+It reverts commit a4b4e0461ec5 ("of: Add standard property for poweroff capability").
+As discussed on the mailing list, it makes more sense to rename back to the
+old established property name, without the vendor prefix. Problem being that
+the word "source" usually tends to be used for inputs and that is out of control
+of the OS. The poweroff capability is an output which simply turns the
+system-power off. Also, this property might be used by drivers which power-off
+the system and power back on subsequent RTC alarms. This seems to suggest to
+remove "poweroff" from the property name and to choose "system-power-controller"
+as the more generic name. This patchs adds the required renaming changes and
+defines an helper function which is compatible with both properties, the old one
+which was only used by tps65910 and the new one without vendor-prefix.
 
-Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+Signed-off-by: Romain Perier <romain.perier@gmail.com>
 ---
- arch/x86/platform/uv/uv_irq.c |   27 +++++++++++----------------
- 1 file changed, 11 insertions(+), 16 deletions(-)
+ .../bindings/power/{poweroff.txt => power-controller.txt}         | 0
+ Documentation/devicetree/bindings/regulator/act8865-regulator.txt | 4 ++--
+ drivers/mfd/tps65910.c                                            | 2 +-
+ drivers/regulator/act8865-regulator.c                             | 2 +-
+ include/linux/of.h                                                | 8 +++++---
+ 5 files changed, 9 insertions(+), 7 deletions(-)
+ rename Documentation/devicetree/bindings/power/{poweroff.txt => power-controller.txt} (100%)
 
-diff --git a/arch/x86/platform/uv/uv_irq.c b/arch/x86/platform/uv/uv_irq.c
-index 0ce673645432..474912d03f40 100644
---- a/arch/x86/platform/uv/uv_irq.c
-+++ b/arch/x86/platform/uv/uv_irq.c
-@@ -12,6 +12,7 @@
- #include <linux/rbtree.h>
- #include <linux/slab.h>
- #include <linux/irq.h>
-+#include <linux/irqdomain.h>
+diff --git a/Documentation/devicetree/bindings/power/poweroff.txt b/Documentation/devicetree/bindings/power/power-controller.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/power/poweroff.txt
+rename to Documentation/devicetree/bindings/power/power-controller.txt
+diff --git a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
+index 01a5b07..dad6358 100644
+--- a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
++++ b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
+@@ -6,8 +6,8 @@ Required properties:
+ - reg: I2C slave address
  
- #include <asm/apic.h>
- #include <asm/uv/uv_irq.h>
-@@ -130,24 +131,14 @@ static int
- arch_enable_uv_irq(char *irq_name, unsigned int irq, int cpu, int mmr_blade,
- 		       unsigned long mmr_offset, int limit)
- {
--	const struct cpumask *eligible_cpu = cpumask_of(cpu);
- 	struct irq_cfg *cfg = irq_cfg(irq);
- 	unsigned long mmr_value;
- 	struct uv_IO_APIC_route_entry *entry;
--	int mmr_pnode, err;
--	unsigned int dest;
-+	int mmr_pnode;
+ Optional properties:
+-- poweroff-source: Telling whether or not this pmic is controlling
+-  the system power. See Documentation/devicetree/bindings/power/poweroff.txt .
++- system-power-controller: Telling whether or not this pmic is controlling
++  the system power. See Documentation/devicetree/bindings/power/power-controller.txt .
  
- 	BUILD_BUG_ON(sizeof(struct uv_IO_APIC_route_entry) !=
- 			sizeof(unsigned long));
+ Any standard regulator properties can be used to configure the single regulator.
  
--	err = assign_irq_vector(irq, cfg, eligible_cpu);
--	if (err != 0)
--		return err;
--
--	err = apic->cpu_mask_to_apicid_and(eligible_cpu, eligible_cpu, &dest);
--	if (err != 0)
--		return err;
--
- 	if (limit == UV_AFFINITY_CPU)
- 		irq_set_status_flags(irq, IRQ_NO_BALANCING);
- 	else
-@@ -164,7 +155,7 @@ arch_enable_uv_irq(char *irq_name, unsigned int irq, int cpu, int mmr_blade,
- 	entry->polarity		= 0;
- 	entry->trigger		= 0;
- 	entry->mask		= 0;
--	entry->dest		= dest;
-+	entry->dest		= cfg->dest_apicid;
+diff --git a/drivers/mfd/tps65910.c b/drivers/mfd/tps65910.c
+index b8dca8a..77a7f78 100644
+--- a/drivers/mfd/tps65910.c
++++ b/drivers/mfd/tps65910.c
+@@ -423,7 +423,7 @@ static struct tps65910_board *tps65910_parse_dt(struct i2c_client *client,
  
- 	mmr_pnode = uv_blade_to_pnode(mmr_blade);
- 	uv_write_global_mmr64(mmr_pnode, mmr_offset, mmr_value);
-@@ -238,9 +229,13 @@ uv_set_irq_affinity(struct irq_data *data, const struct cpumask *mask,
- int uv_setup_irq(char *irq_name, int cpu, int mmr_blade,
- 		 unsigned long mmr_offset, int limit)
- {
--	int ret, irq = irq_alloc_hwirq(uv_blade_to_memory_nid(mmr_blade));
-+	int ret, irq;
-+	struct irq_alloc_info info;
+ 	board_info->irq = client->irq;
+ 	board_info->irq_base = -1;
+-	board_info->pm_off = of_system_has_poweroff_source(np);
++	board_info->pm_off = of_is_system_power_controller(np);
  
--	if (!irq)
-+	init_irq_alloc_info(&info, cpumask_of(cpu));
-+	irq = irq_domain_alloc_irqs(NULL, 1, uv_blade_to_memory_nid(mmr_blade),
-+				    &info);
-+	if (irq <= 0)
- 		return -EBUSY;
- 
- 	ret = arch_enable_uv_irq(irq_name, irq, cpu, mmr_blade, mmr_offset,
-@@ -248,7 +243,7 @@ int uv_setup_irq(char *irq_name, int cpu, int mmr_blade,
- 	if (ret == irq)
- 		uv_set_irq_2_mmr_info(irq, mmr_offset, mmr_blade);
- 	else
--		irq_free_hwirq(irq);
-+		irq_domain_free_irqs(irq, 1);
- 
- 	return ret;
+ 	return board_info;
  }
-@@ -283,6 +278,6 @@ void uv_teardown_irq(unsigned int irq)
- 			n = n->rb_right;
+diff --git a/drivers/regulator/act8865-regulator.c b/drivers/regulator/act8865-regulator.c
+index 76301ed..435aba1 100644
+--- a/drivers/regulator/act8865-regulator.c
++++ b/drivers/regulator/act8865-regulator.c
+@@ -365,7 +365,7 @@ static int act8865_pmic_probe(struct i2c_client *client,
+ 		return ret;
  	}
- 	spin_unlock_irqrestore(&uv_irq_lock, irqflags);
--	irq_free_hwirq(irq);
-+	irq_domain_free_irqs(irq, 1);
+ 
+-	if (of_system_has_poweroff_source(dev->of_node)) {
++	if (of_is_system_power_controller(dev->of_node)) {
+ 		if (!pm_power_off) {
+ 			act8865_i2c_client = client;
+ 			act8865->off_reg = off_reg;
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 868fdad..f3595ba 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -911,14 +911,16 @@ static inline int of_changeset_update_property(struct of_changeset *ocs,
+ extern int of_resolve_phandles(struct device_node *tree);
+ 
+ /**
+- * of_system_has_poweroff_source - Tells if poweroff-source is found for device_node
++ * of_is_system_power_controller - Tells if system-power-controller is found for device_node
+  * @np: Pointer to the given device_node
+  *
+  * return true if present false otherwise
+  */
+-static inline bool of_system_has_poweroff_source(const struct device_node *np)
++static inline bool of_is_system_power_controller(const struct device_node *np)
+ {
+-	return of_property_read_bool(np, "poweroff-source");
++	if (of_property_read_bool(np, "system-power-controller"))
++		return true;
++	return of_property_read_bool(np, "ti,system-power-controller");
  }
- EXPORT_SYMBOL_GPL(uv_teardown_irq);
+ 
+ #endif /* _LINUX_OF_H */
 -- 
-1.7.10.4
+1.9.1
