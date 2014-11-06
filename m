@@ -1,29 +1,95 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 6 Nov 2014 10:42:59 -0600
-Subject: [PATCH] ARM: dts: Add am57xx-beagle-x15
-In-Reply-To: <545BA3E6.90105@ti.com>
-References: <1415290702-11353-1-git-send-email-nm@ti.com>
- <20141106163207.GF16896@saruman> <545BA3E6.90105@ti.com>
-Message-ID: <545BA513.2090907@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 6 Nov 2014 16:43:12 +0000
+Subject: [RFC PATCH 0/1] arm64: Fix /proc/cpuinfo
+In-Reply-To: <1414159000-27059-1-git-send-email-mark.rutland@arm.com>
+References: <1414159000-27059-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20141106164311.GD19702@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2014 10:37 AM, Tom Rini wrote:
-
->>> device_type = "memory"; +		reg = <0x80000000 0x40000000>; /* 1GB
->>> to start. Target 2GB */
->>
->> 1GiB ? Why would you put this here btw ? u-boot fills this one up.
+On Fri, Oct 24, 2014 at 02:56:39PM +0100, Mark Rutland wrote:
+> Currently, the arm64 /proc/cpuinfo format differs from that of arm, in a
+> manner which prevents some otherwise portable applications from
+> functioning as expected. Specifically, the "Features" line describes the
+> 64-bit hwcaps exclusive of the 32-bit hwcaps, which causes issues for
+> certain applications which attempt to parse /proc/cpuinfo to detect
+> features rather than directly using the hwcaps exposed via auxval.
 > 
-> Yes, it should either be the full and correct value or 0x0 (like a
-> number of PowerPC platforms do) so it's clear something else gives us
-> the right value here.
+> Additionally, the arm64 /proc/cpuinfo format only provides identifying
+> information for a single CPU (unlike 32-bit), which is problematic for
+> systems with heterogeneous CPUs (i.e. big.LITTLE).
+> 
+> This patch attempts to solve both issues.
 
-Honest mistake, my bad.. I thought I cleaned up the patch! Sigh!!! i
-will repost with proper 2GB. it is better that way in case being used
-with "other bootloaders" which are not exactly too good like u-boot.
+I'm perfectly fine with the heterogeneous CPUs part.
 
+> I believe the contentious part
+> is what to do with the Features line, and for that there are a number of
+> possibilities:
+> 
+> [a] Only print the 64-bit hwcaps
+> 
+>     This would match our current behaviour. However certain 32-bit
+>     applications will not detect CPU features correctly, and could fail
+>     to launch. The appropriate hwcaps are available in auxval, but this
+>     will not be of help to existing binaries.
+> 
+> [b] Append the 64-bit and 32-bit hwcaps
+> 
+>     This would allow for a consistent format. However, some
+>     human-readable hwcap names have been reused for analogous
+>     instruction set features (e.g. "aes") despite 32-bit and 64-bit
+>     instruction set support being largely unrelated per the
+>     architecture. This could lead to applications mis-detecting
+>     instruction set support on some CPUs in future, and may be
+>     misleading to a casual reader.
+
+The only overlap between 32 and 64-bit is aes, pmull, sha1, sha2, crc32.
+An ARMv8 CPU implementing both AArch32 and AArch64 will likely support
+these extensions in both modes. However, "likely" is not enough and we
+need to get some confirmation from the architecture people. If that's
+the case, point [b] is not too bad.
+
+> [c] Print different hwcaps for compat tasks
+> 
+>     This would allow for 32-bit and 64-bit applications to function
+>     correctly. Having the format differ depending on the instruction set
+>     of the application reading /proc/cpuinfo may be misleading in some
+>     cases (e.g. a human using a 32-bit cat to read /proc/cpuinfo on a
+>     64-bit system).
+
+Long time ago we decided that "uname -m" would report "aarch64"
+independent of whether it is compat or not. That's the case for x86 as
+well, you need PER_LINUX32 to report the actual compat UTS name.
+
+> [d] Print different hwcaps dependent on the personality.
+> 
+>     This would allow for 32-bit and 64-bit applications to function
+>     correctly, but for some 32-bit applications the personality would
+>     need to be set explicitly by the user.
+
+Which makes this option actually in line with the uname -m behaviour. My
+vote goes for [d] with option [b] as a close alternative.
+
+> [1] arm, v3.17, Versatile Express A15x2 A7x3 coretile
+> Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae evtstrm 
+[...]
+> [2] arm64, v3.17, Juno platform
+> Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32 
+
+As an exercise, I'm trying to see what option [b] would look like when
+CONFIG_COMPAT is enabled:
+
+Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32 half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae
+
+The duplicate strings would only be listed once (evtstrm, aes, pmull,
+sha1, sha2, crc32). New AArch64 features that we may expect to be
+optional on AArch32 could be prefixed with "a64". If they are missing
+entirely from AArch32, (like asimd), no need for the prefix.
+
+The advantage is that we don't need to check the personality but we have
+to assume that scripts would not search for substrings (sane people
+shouldn't do this anyway as the Features string can always be extended).
 
 -- 
-Regards,
-Nishanth Menon
+Catalin
