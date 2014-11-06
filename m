@@ -1,105 +1,61 @@
-From: addy.ke@rock-chips.com (Addy Ke)
-Date: Thu,  6 Nov 2014 16:11:54 +0800
-Subject: [PATCH] i2c: rk3x: fix bug that cause measured high_ns doesn't meet
- I2C spec
-Message-ID: <1415261514-4051-1-git-send-email-addy.ke@rock-chips.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 6 Nov 2014 09:14:01 +0100
+Subject: [GIT PULL] Nomadik updates for the v3.19 series
+Message-ID: <CACRpkdapOcwzPGGqNVRBuo88N9_MFNRt-Vq0tafT-X-Lv=1KUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-high_ns calculated from the low division of CLKDIV register is the sum of
-actual measured high_ns and rise_ns. The rise time which related to
-external pull-up resistor can be up to the maximum rise time in I2C spec.
+Hi ARM SoC guys,
 
-In my test, if external pull-up resistor is 4.7K, rise_ns is about 700ns.
-So the actual measured high_ns is about 3900ns, which is less than 4000ns
-(the minimum high_ns in I2C spec).
+here is a number of Nomadik DT-related patches, refatcoring,
+adding a new board variant and updating the defconfig.
 
-Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
----
- drivers/i2c/busses/i2c-rk3x.c | 58 +++++++++++++++++++++++++++----------------
- 1 file changed, 37 insertions(+), 21 deletions(-)
+I do not expect any more Nomadik changes for this kernel
+cycle. Please pull this into some relevant branch for testing
+in linux-next!
 
-diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-index e276ffb..8e1cc2b 100644
---- a/drivers/i2c/busses/i2c-rk3x.c
-+++ b/drivers/i2c/busses/i2c-rk3x.c
-@@ -432,9 +432,12 @@ out:
- static int rk3x_i2c_calc_divs(unsigned long i2c_rate, unsigned long scl_rate,
- 			       unsigned long *div_low, unsigned long *div_high)
- {
-+	unsigned long spec_min_low_ns, spec_min_high_ns;
-+	unsigned long spec_max_data_hold_ns;
-+	unsigned long spec_data_hold_buffer_ns;
-+	unsigned long spec_max_rise_ns;
-+
- 	unsigned long min_low_ns, min_high_ns;
--	unsigned long max_data_hold_ns;
--	unsigned long data_hold_buffer_ns;
- 	unsigned long max_low_ns, min_total_ns;
- 
- 	unsigned long i2c_rate_khz, scl_rate_khz;
-@@ -453,30 +456,43 @@ static int rk3x_i2c_calc_divs(unsigned long i2c_rate, unsigned long scl_rate,
- 	if (WARN_ON(scl_rate < 1000))
- 		scl_rate = 1000;
- 
-+	if (scl_rate <= 100000) {
-+		spec_min_low_ns = 4700;
-+		spec_min_high_ns = 4000;
-+		spec_max_rise_ns = 1000;
-+		spec_max_data_hold_ns = 3450;
-+		spec_data_hold_buffer_ns = 50;
-+	} else {
-+		spec_min_low_ns = 1300;
-+		spec_min_high_ns = 600;
-+		spec_max_rise_ns = 300;
-+		spec_max_data_hold_ns = 900;
-+		spec_data_hold_buffer_ns = 50;
-+	}
-+
- 	/*
--	 * min_low_ns:  The minimum number of ns we need to hold low
--	 *		to meet i2c spec
--	 * min_high_ns: The minimum number of ns we need to hold high
--	 *		to meet i2c spec
--	 * max_low_ns:  The maximum number of ns we can hold low
--	 *		to meet i2c spec
-+	 * min_low_ns:  The minimum number of ns we need to hold low.
-+	 *		The fall time in RK3X's I2C controller is approximately
-+	 *		equal to 0. So min_low_ns = spec_min_low_ns.
-+	 * Note: low_ns should be (measured_low_ns + measured_fall_time)
-+	 *	 and measured_low_ns must meet I2C spec.
- 	 *
--	 * Note: max_low_ns should be (max data hold time * 2 - buffer)
-+	 * min_high_ns: The minimum number of ns we need to hold high.
-+	 *		The rise time which related to external pull-up resistor
-+	 *		can be up to spec_max_rise_ns.
-+	 *		So min_high_ns = spec_min_high_ns + spec_max_rise_ns
-+	 * Note: high_ns should be (measured_high_ns + measured_rise_time)
-+	 *	 and measured_high_ns must meet I2C spec.
-+	 *
-+	 * max_low_ns:  The maximum number of ns we can hold low.
-+	 * Note: max_low_ns should be (max_data_hold_time * 2 - buffer)
- 	 *	 This is because the i2c host on Rockchip holds the data line
- 	 *	 for half the low time.
- 	 */
--	if (scl_rate <= 100000) {
--		min_low_ns = 4700;
--		min_high_ns = 4000;
--		max_data_hold_ns = 3450;
--		data_hold_buffer_ns = 50;
--	} else {
--		min_low_ns = 1300;
--		min_high_ns = 600;
--		max_data_hold_ns = 900;
--		data_hold_buffer_ns = 50;
--	}
--	max_low_ns = max_data_hold_ns * 2 - data_hold_buffer_ns;
-+	min_low_ns = spec_min_low_ns;
-+	min_high_ns = spec_min_high_ns + spec_max_rise_ns;
-+	max_low_ns = spec_max_data_hold_ns * 2 - spec_data_hold_buffer_ns;
-+
- 	min_total_ns = min_low_ns + min_high_ns;
- 
- 	/* Adjust to avoid overflow */
--- 
-1.8.3.2
+Yours,
+Linus Walleij
+
+
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+tags/nomadik-for-v3.19
+
+for you to fetch changes up to 640e2f13cadba313a0dd3f83136afec09ad407c4:
+
+  ARM: nomadik: configure in STMPE support (2014-11-06 09:06:22 +0100)
+
+----------------------------------------------------------------
+Nomadik changes for the v3.19 development series:
+- Rearrange the DTS files to make a pure SoC-specific file and
+  a pure board file for S8815.
+- Add the device tree for the NDK15 board.
+- Update the defconfig and configure in the STMPE expander by
+  default on the Nomadik.
+
+----------------------------------------------------------------
+Linus Walleij (8):
+      ARM: nomadik: move MMC/SD card detect GPIO to board DTS
+      ARM: nomadik: disable chrystals in top level board files
+      ARM: nomadik: move GPIO I2C to S8815 board file
+      ARM: nomadik: set up MCDATDIR2
+      ARM: nomadik: push ethernet down to board
+      ARM: nomadik: device tree for NHK15 board
+      ARM: update Nomadik config
+      ARM: nomadik: configure in STMPE support
+
+ .../devicetree/bindings/arm/ste-nomadik.txt        |   6 +
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ arch/arm/boot/dts/ste-nomadik-nhk15.dts            | 151 +++++++++++++++++++++
+ arch/arm/boot/dts/ste-nomadik-s8815.dts            |  56 ++++++--
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi         |  45 +-----
+ arch/arm/configs/nhk8815_defconfig                 |  11 +-
+ arch/arm/mach-nomadik/cpu-8815.c                   |   1 +
+ 7 files changed, 215 insertions(+), 58 deletions(-)
+ create mode 100644 arch/arm/boot/dts/ste-nomadik-nhk15.dts
