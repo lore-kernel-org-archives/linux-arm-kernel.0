@@ -1,257 +1,110 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 6 Nov 2014 13:42:19 +0800
-Subject: [Patch Part2 v4 21/31] PCI/MSI: enhance PCI MSI core to support
- hierarchy irqdomain
-In-Reply-To: <545B01DC.5060107@linux.intel.com>
-References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
- <1415102525-9898-22-git-send-email-jiang.liu@linux.intel.com>
- <20141105230952.GH6168@google.com> <545AD5B3.60009@huawei.com>
- <545B01DC.5060107@linux.intel.com>
-Message-ID: <545B0A3B.40805@huawei.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 6 Nov 2014 05:50:17 +0000
+Subject: [PATCHv0 3/3] rtc: rtc-isl12057: add alarm support to Intersil
+ ISL12057 RTC driver
+In-Reply-To: <148403c0ab1d556cbb99d9242c65f714a77843e5.1415222752.git.arno@natisbad.org>
+References: <cover.1415222752.git.arno@natisbad.org>
+ <148403c0ab1d556cbb99d9242c65f714a77843e5.1415222752.git.arno@natisbad.org>
+Message-ID: <20141106055017.GL8509@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/6 13:06, Jiang Liu wrote:
-> On 2014/11/6 9:58, Yijing Wang wrote:
->>>>  
->>>> @@ -1098,3 +1099,128 @@ int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries,
->>>>  	return nvec;
->>>>  }
->>>>  EXPORT_SYMBOL(pci_enable_msix_range);
->>>> +
->>>> +#ifdef	CONFIG_PCI_MSI_IRQ_DOMAIN
->>>
->>> Space, not tab.
->>>
->>>> +static inline irq_hw_number_t
->>>> +msi_get_hwirq(struct pci_dev *pdev, struct msi_desc *msidesc)
->>>
->>> The convention in this file is "struct pci_dev *dev".  And "struct msi_desc
->>> *desc" (or maybe "*entry").  Try to converge things, not diverge them.
->>>
->>>> +{
->>>> +	return (irq_hw_number_t)msidesc->msi_attrib.entry_nr |
->>>> +		PCI_DEVID(pdev->bus->number, pdev->devfn) << 11 |
->>>> +		(pci_domain_nr(pdev->bus) & 0xFFFFFFFF) << 27;
->>>
->>> Where does this bit layout come from?  Is this defined in the spec
->>> somewhere?  A reference would help.
->>
->> Currently, more and more Non-PCI device use MSI(or similar MSI mechanism), like DMAR fault irq
->> and HPET FSB irq. And we have to add additional code to support the MSI capability.
->> So I hope we can decouple MSI code and PCI code, then we can unify all MSI(or Message Based interrupt)
->> in one framework.
-> Hi Yijing,
-> 	I have a following patch to share more code among MSI/DMAR/HPET,
-> which is one step forward as you suggested. Will send out that patch set
-> soon.
+On Wed, Nov 05, 2014 at 10:42:52PM +0100, Arnaud Ebalard wrote:
 
-That's Great! :)
+> +static int _isl12057_rtc_toggle_alarm(struct device *dev, int enable)
+> +{
+> +	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
 
-> Regards!
-> Gerry
-> 
->>
->> Thanks!
->> Yijing.
->>
->>>
->>>> +}
->>>> +
->>>> +static int msi_domain_alloc(struct irq_domain *domain, unsigned int virq,
->>>> +			    unsigned int nr_irqs, void *arg)
->>>> +{
->>>> +	int i, ret;
->>>> +	irq_hw_number_t hwirq = arch_msi_irq_domain_get_hwirq(arg);
->>>> +
->>>> +	if (irq_find_mapping(domain, hwirq) > 0)
->>>> +		return -EEXIST;
->>>> +
->>>> +	ret = irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, arg);
->>>> +	if (ret >= 0)
->>>
->>> 	if (ret < 0)
->>> 		return ret;
->>>
->>> and un-indent the mainline code below.  Then it's obvious that this is the
->>> normal case, not the error case.
->>>
->>>> +		for (i = 0; i < nr_irqs; i++) {
->>>> +			irq_domain_set_hwirq_and_chip(domain, virq + i,
->>>> +					hwirq + i, &msi_chip, (void *)(long)i);
->>>> +			__irq_set_handler(virq + i, handle_edge_irq, 0, "edge");
->>>> +		}
->>>> +
->>>> +	return ret;
->>>> +}
->>>> +
->>>> +static void msi_domain_free(struct irq_domain *domain, unsigned int virq,
->>>> +			    unsigned int nr_irqs)
->>>> +{
->>>> +	int i;
->>>> +
->>>> +	for (i = 0; i < nr_irqs; i++) {
->>>> +		struct msi_desc *msidesc = irq_get_msi_desc(virq);
->>>> +
->>>> +		if (msidesc)
->>>> +			msidesc->irq = 0;
->>>> +	}
->>>> +	irq_domain_free_irqs_top(domain, virq, nr_irqs);
->>>> +}
->>>> +
->>>> +static int msi_domain_activate(struct irq_domain *domain,
->>>> +			       struct irq_data *irq_data)
->>>> +{
->>>> +	int ret = 0;
->>>> +	struct msi_msg msg;
->>>> +
->>>> +	/*
->>>> +	 * irq_data->chip_data is MSI/MSIx offset.
->>>
->>> "MSI-X", as you wrote on the next line.
->>>
->>>> +	 * MSI-X message is written per-IRQ, the offset is always 0.
->>>> +	 * MSI message denotes a contiguous group of IRQs, written for 0th IRQ.
->>>> +	 */
->>>> +	if (!irq_data->chip_data) {
->>>
->>> 	if (irq_data->chip_data)
->>> 		return 0;
->>>
->>> and un-indent the mainline code below, and drop the "ret = 0" init above.
->>>
->>>> +		ret = irq_chip_compose_msi_msg(irq_data, &msg);
->>>> +		if (ret == 0)
->>>
->>> 	if (ret)
->>> 		return ret;
->>>
->>>> +			write_msi_msg(irq_data->irq, &msg);
->>>> +	}
->>>> +
->>>> +	return ret;
->>> 	return 0;
->>>> +}
->>>> +
->>>> +static int msi_domain_deactivate(struct irq_domain *domain,
->>>> +				 struct irq_data *irq_data)
->>>> +{
->>>> +	struct msi_msg msg;
->>>> +
->>>> +	if (irq_data->chip_data) {
->>>> +		memset(&msg, 0, sizeof(msg));
->>>> +		write_msi_msg(irq_data->irq, &msg);
->>>> +	}
->>>> +
->>>> +	return 0;
->>>> +}
->>>> +
->>>> +static struct irq_domain_ops msi_domain_ops = {
->>>> +	.alloc = msi_domain_alloc,
->>>> +	.free = msi_domain_free,
->>>> +	.activate = msi_domain_activate,
->>>> +	.deactivate = msi_domain_deactivate,
->>>> +};
->>>> +
->>>> +struct irq_domain *msi_create_irq_domain(struct irq_domain *parent)
->>>> +{
->>>> +	struct irq_domain *domain;
->>>> +
->>>> +	domain = irq_domain_add_tree(NULL, &msi_domain_ops, NULL);
->>>> +	if (domain)
->>>
->>> 	if (!domain)
->>> 		return NULL;
->>>
->>> and un-indent this:
->>>
->>>> +		domain->parent = parent;
->>>> +
->>>> +	return domain;
->>>> +}
->>>> +
->>>> +int msi_irq_domain_alloc_irqs(struct irq_domain *domain, int type,
->>>> +			      struct pci_dev *dev, void *arg)
->>>> +{
->>>> +	int i, virq;
->>>> +	struct msi_desc *msidesc;
->>>> +	int node = dev_to_node(&dev->dev);
->>>> +
->>>> +	list_for_each_entry(msidesc, &dev->msi_list, list) {
->>>> +		arch_msi_irq_domain_set_hwirq(arg, msi_get_hwirq(dev, msidesc));
->>>> +		virq = irq_domain_alloc_irqs(domain, msidesc->nvec_used,
->>>> +					     node, arg);
->>>> +		if (virq < 0) {
->>>> +			/* Special handling for pci_enable_msi_range(). */
->>>> +			return (type == PCI_CAP_ID_MSI &&
->>>> +				msidesc->nvec_used > 1) ?  1 : -ENOSPC;	
->>>
->>> I think "if" would be easier to read than this ternary expression.
->>>
->>>> +		}
->>>> +		for (i = 0; i < msidesc->nvec_used; i++)
->>>> +			irq_set_msi_desc_off(virq + i, i, msidesc);
->>>> +	}
->>>> +
->>>> +	list_for_each_entry(msidesc, &dev->msi_list, list)
->>>> +		if (msidesc->nvec_used == 1)
->>>> +			dev_dbg(&dev->dev, "irq %d for MSI/MSI-X\n", virq);
->>>> +		else
->>>> +			dev_dbg(&dev->dev, "irq [%d-%d] for MSI/MSI-X\n",
->>>> +				virq, virq + msidesc->nvec_used - 1);
->>>> +
->>>> +	return 0;
->>>> +}
->>>> +#endif	/* CONFIG_PCI_MSI_IRQ_DOMAIN */
->>>> diff --git a/include/linux/msi.h b/include/linux/msi.h
->>>> index 44f4746d033b..05dcd425f82b 100644
->>>> --- a/include/linux/msi.h
->>>> +++ b/include/linux/msi.h
->>>> @@ -75,4 +75,15 @@ struct msi_chip {
->>>>  	void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
->>>>  };
->>>>  
->>>> +#ifdef	CONFIG_PCI_MSI_IRQ_DOMAIN
->>>
->>> Use a space here, not a tab.
->>>
->>>> +extern struct irq_chip msi_chip;
->>>
->>> I don't think "msi_chip" is a good name.  "Chip" only hints that it's a
->>> semiconductor integrated circuit; it doesn't say anything about what it
->>> does.  I've suggested "msi_controller" elsewhere.
->>>
->>> Why does this need to be exported?  And why should there be only one in a
->>> system?
->>>
->>>> +extern struct irq_domain *msi_create_irq_domain(struct irq_domain *parent);
->>>> +extern int msi_irq_domain_alloc_irqs(struct irq_domain *domain, int type,
->>>> +				     struct pci_dev *dev, void *arg);
->>>> +
->>>> +extern irq_hw_number_t arch_msi_irq_domain_get_hwirq(void *arg);
->>>> +extern void arch_msi_irq_domain_set_hwirq(void *arg, irq_hw_number_t hwirq);
->>>
->>> Look at the rest of the file and notice that the existing code does not use
->>> "extern" on function declarations.
->>>
->>>> +#endif	/* CONFIG_PCI_MSI_IRQ_DOMAIN */
->>>
->>> Use a space here (not a tab), like the #endif just below.
->>>
->>>>  #endif /* LINUX_MSI_H */
->>>> -- 
->>>> 1.7.10.4
->>>>
->>>
->>> .
->>>
->>
->>
-> 
-> .
-> 
+I can't help but think that toggle is a confusing name for this.
+enable?
 
+> +	ret = regmap_update_bits(data->regmap, ISL12057_REG_INT,
+> +				 ISL12057_REG_INT_A1IE,
+> +				 enable ? ISL12057_REG_INT_A1IE : 0);
+> +	if (ret)
+> +		dev_err(dev, "%s: writing INT failed\n", __func__);
 
--- 
-Thanks!
-Yijing
+It's generally helpful to log the error code as well.
+
+> +static int _isl12057_rtc_read_time(struct device *dev, struct rtc_time *tm)
+>  {
+>  	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
+>  	u8 regs[ISL12057_RTC_SEC_LEN];
+>  	int ret;
+>  
+> -	mutex_lock(&data->lock);
+>  	ret = regmap_bulk_read(data->regmap, ISL12057_REG_RTC_SC, regs,
+>  			       ISL12057_RTC_SEC_LEN);
+> -	mutex_unlock(&data->lock);
+> -
+
+This is a perfectly sensible change (there's no need for the lock,
+regmap locks the physical I/O and there's no other interaction) but it's
+not related to enabling alarm functionality so should be in a separate
+patch.
+
+> +static int isl12057_rtc_read_time(struct device *dev, struct rtc_time *tm)
+> +{
+> +	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
+> +	int ret;
+> +
+> +	mutex_lock(&data->lock);
+> +	ret = _isl12057_rtc_read_time(dev, tm);
+> +	mutex_unlock(&data->lock);
+
+Why lock?  I guess this is due to the above change but it seems better
+to just not lock since it's redundant.
+
+> +	ret = rtc_tm_to_time(&rtc_tm, &rtc_secs);
+> +	if (ret)
+> +		goto err_unlock;
+> +
+> +	ret = rtc_tm_to_time(alarm_tm, &alarm_secs);
+> +	if (ret)
+> +		goto err_unlock;
+> +
+> +	/* If alarm time is before current time, disable the alarm */
+> +	if (!alarm->enabled || alarm_secs <= rtc_secs) {
+> +		enable = 0;
+
+Shouldn't there be some margin for time rolling forwards when checking
+for alarm times in the past (or just refuse to set them, I've not
+checked if this is following existing practice for RTC drivers)? 
+
+> +	if (client->irq > 0) {
+> +		ret = devm_request_threaded_irq(&client->dev, client->irq, NULL,
+> +						isl12057_rtc_interrupt,
+> +						IRQF_SHARED|IRQF_ONESHOT,
+> +						DRV_NAME, client);
+> +		if (!ret) {
+> +			device_init_wakeup(&client->dev, true);
+> +		} else {
+> +			dev_err(dev, "irq %d unavailable, no alarm support\n",
+> +				client->irq);
+> +			client->irq = 0;
+> +		}
+> +	}
+> +
+
+None of the alarm functionality checks to see if there's actually an IRQ
+- is that OK?  I'd at least expect the alarm interrupt enable call to
+check if the interrupt is wired up.
+
+It's also bad form to overwrite client->irq - it's possible a future
+probe might work (eg, if the driver for the interrupt controller gets
+loaded).  Ideally we'd handle deferred probe, though I don't think the
+interrupt core supports that yet.
+
+> +err:
+> +	if (client->irq > 0)
+> +		free_irq(client->irq, client);
+
+The whole point with devm_ is that you don't need to manually free
+anything, remove this (and the entire remove function).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141106/4b2c7d8e/attachment.sig>
