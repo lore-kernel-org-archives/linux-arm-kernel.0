@@ -1,114 +1,34 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Thu, 06 Nov 2014 16:45:12 +0800
-Subject: [PATCH v8 3/3] ARM: dts: add rk3288 power-domain node
-In-Reply-To: <1415254961-5746-4-git-send-email-caesar.wang@rock-chips.com>
-References: <1415254961-5746-1-git-send-email-caesar.wang@rock-chips.com>
- <1415254961-5746-4-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <545B3518.2090409@rock-chips.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 6 Nov 2014 09:49:10 +0100
+Subject: [PATCHv0 3/3] rtc: rtc-isl12057: add alarm support to Intersil
+ ISL12057 RTC driver
+In-Reply-To: <148403c0ab1d556cbb99d9242c65f714a77843e5.1415222752.git.arno@natisbad.org>
+References: <cover.1415222752.git.arno@natisbad.org>
+ <148403c0ab1d556cbb99d9242c65f714a77843e5.1415222752.git.arno@natisbad.org>
+Message-ID: <20141106084910.GA10432@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
+Hello,
 
-On 11/06/2014 02:22 PM, Caesar Wang wrote:
-> Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
-> Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
-> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
-pls detail the reason why you need to add all the clocks into 
-power-controller node.
-> ---
->
-> Changes in v8:
->      - DTS go back to v2
->
-> Changes in v7: None
-> Changes in v6: None
-> Changes in v5: None
-> Changes in v4: None
-> Changes in v3:
->      - Decomposition power-controller, changed to multiple controller
->      (gpu-power-controller, hevc-power-controller)
->
-> Changes in v2:
->      - make pd_vio clocks all one entry per line and alphabetize.
->      - power: power-controller move back to pinctrl: pinctrl.
->
->   arch/arm/boot/dts/rk3288.dtsi | 66 +++++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 66 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index cb18bb4..9cd269a 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -989,4 +989,70 @@
->   			};
->   		};
->   	};
+On Wed, Nov 05, 2014 at 10:42:52PM +0100, Arnaud Ebalard wrote:
+> +#ifdef CONFIG_PM_SLEEP
+> +static int isl12057_rtc_suspend(struct device *dev)
+> +{
+> +	struct isl12057_rtc_data *rtc_data = dev_get_drvdata(&client->dev);
+drivers/rtc/rtc-isl12057.c: In function 'isl12057_rtc_suspend':
+drivers/rtc/rtc-isl12057.c:551:56: error: 'client' undeclared (first use in this function)
+
 > +
-> +	power: power-controller {
-> +		compatible = "rockchip,rk3288-power-controller";
-> +		#power-domain-cells = <1>;
-> +		rockchip,pmu = <&pmu>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
+> +	if (device_may_wakeup(dev))
+> +		return enable_irq_wake(rtc_data->irq);
 > +
-> +		pd_gpu {
-> +			reg = <RK3288_PD_GPU>;
-> +			clocks = <&cru ACLK_GPU>;
-> +		};
-> +
-> +		pd_hevc {
-> +			reg = <RK3288_PD_HEVC>;
-> +			clocks = <&cru ACLK_HEVC>,
-> +				 <&cru SCLK_HEVC_CABAC>,
-> +				 <&cru SCLK_HEVC_CORE>,
-> +				 <&cru HCLK_HEVC>;
-> +		};
-> +
-> +		pd_vio {
-> +			reg = <RK3288_PD_VIO>;
-> +			clocks = <&cru ACLK_IEP>,
-> +				 <&cru ACLK_ISP>,
-> +				 <&cru ACLK_RGA_NIU>,
-> +				 <&cru ACLK_RGA>,
-> +				 <&cru ACLK_VIO0_NIU>,
-> +				 <&cru ACLK_VIO1_NIU>,
-> +				 <&cru ACLK_VIP>,
-> +				 <&cru ACLK_VOP0>,
-> +				 <&cru ACLK_VOP1>,
-> +				 <&cru DCLK_VOP0>,
-> +				 <&cru DCLK_VOP1>,
-> +				 <&cru HCLK_IEP>,
-> +				 <&cru HCLK_ISP>,
-> +				 <&cru HCLK_RGA>,
-> +				 <&cru HCLK_VIO_AHB_ARBI>,
-> +				 <&cru HCLK_VIO_NIU>,
-> +				 <&cru HCLK_VIO2_H2P>,
-> +				 <&cru HCLK_VIP>,
-> +				 <&cru HCLK_VOP0>,
-> +				 <&cru HCLK_VOP1>,
-> +				 <&cru PCLK_EDP_CTRL>,
-> +				 <&cru PCLK_HDMI_CTRL>,
-> +				 <&cru PCLK_LVDS_PHY>,
-> +				 <&cru PCLK_MIPI_CSI>,
-> +				 <&cru PCLK_MIPI_DSI0>,
-> +				 <&cru PCLK_MIPI_DSI1>,
-> +				 <&cru PCLK_VIO2_H2P>,
-> +				 <&cru SCLK_EDP_24M>,
-> +				 <&cru SCLK_EDP>,
-> +				 <&cru SCLK_HDMI_CEC>,
-> +				 <&cru SCLK_HDMI_HDCP>,
-> +				 <&cru SCLK_ISP_JPE>,
-> +				 <&cru SCLK_ISP>,
-> +				 <&cru SCLK_RGA>;
-> +		};
-> +
-> +		pd_video {
-> +			reg = <RK3288_PD_VIDEO>;
-> +			/* FIXME: add clocks */
-remove the 'FIXME'.
-> +			clocks = <&cru ACLK_VCODEC>,
-> +				 <&cru HCLK_VCODEC>;
-> +		};
-> +	};
->   };
+> +	return 0;
+>  }
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
