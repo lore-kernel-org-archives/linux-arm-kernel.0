@@ -1,50 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Nov 2014 13:28:28 +0000
-Subject: gcc 4.9 build warnings (was: Re: arm-soc build: 2917 warnings 0
- failures (arm-soc/v3.18-rc1-20-g06c0773))
-In-Reply-To: <20141106114919.GL26297@ulmo>
-References: <544a2a2e.a2db440a.6eeb.ffffaef3@mx.google.com>
- <1847682.hInUtg9rQz@wuerfel>
- <CAKv+Gu_4X0RNbgJ+BCb9+ccgTKBjcwb9L4aDUY6fFMa0R3PX-w@mail.gmail.com>
- <2567100.Zj7YMcXpZG@wuerfel>
- <CAKv+Gu-0jenous5sLPp+QJa3qRk-RiBgG1vVYP_RmVw0uXaysw@mail.gmail.com>
- <20141106114919.GL26297@ulmo>
-Message-ID: <20141106132828.GP4042@n2100.arm.linux.org.uk>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Thu, 06 Nov 2014 21:35:21 +0800
+Subject: [Patch Part2 v4 00/31] Enable hierarchy irqdomian on x86 platforms
+In-Reply-To: <20141106130753.GN10744@8bytes.org>
+References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
+ <20141106130753.GN10744@8bytes.org>
+Message-ID: <545B7919.2080002@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 06, 2014 at 12:49:22PM +0100, Thierry Reding wrote:
-> On Fri, Oct 24, 2014 at 03:41:48PM +0200, Ard Biesheuvel wrote:
-> > Ah, ok. So apparently, size_t is not ambiguous between bare metal and
-> > glibc GCC, so we are looking at something else here.
+On 2014/11/6 21:07, Joerg Roedel wrote:
+> On Tue, Nov 04, 2014 at 08:01:34PM +0800, Jiang Liu wrote:
+>> Patch 1-5 enhance irqdomain and irq core to support hierarchy irqdomain
+>> and stacked irqchip.
+>> Patch 6-12 implement an irqdomain to manange CPU interrupt vectors, and
+>> it's the root irqdomain for x86 platforms.
+>> Patch 13-16 converts Intel and AMD interrupt remapping drivers to
+>> support hierarchy irqdomain.
+>> Patch 17-23 converts HPET and MSI to support hierarchy irqdomain.
+>> Patch 24-27 cleans up unsued code in x86 arch and interrupt remapping
+>> drivers.
+>> Patch 28-31 converts DMAR, HTIRQ and UV to support hierarchy irqdomain.
 > 
-> GCC complains about the format specifier being wrong. %zu/%zd are the
-> correct specifiers for variables of type size_t/ssize_t, so wherever a
-> size_t or ssize_t is used as parameter it should have a corresponding
-> %zu or %zd specifier.
+> Okay, I looked over the IOMMU changes and did some testing. With Jiangs
+> fix for the AMD Kaveri boot panic it looks good to me. So for the IOMMU
+> parts:
 > 
-> Why not just fix it properly instead of mucking about with the size_t
-> typedef?
+> Acked-by: Joerg Roedel <jroedel@suse.de>
+Thanks, Joerg!
 
-We haven't been mucking with the size_t typedef.  We've been trying to
-find out /why/ GCC 4.9 complains.
-
-For the n'th time, what we know is:
-
-- gcc 4.9 bare metal seems to define __SIZE_TYPE__ to be unsigned int.
-- gcc 4.9's stddef.h typedef's size_t to __SIZE_TYPE__.
-- therefore, size_t is typedef'd from unsigned int.
-- the kernel typedefs __kernel_size_t from unsigned int.
-- the kernel typedefs size_t from __kernel_size_t.
-
-So, in theory, size_t in the kernel is unsigned int too.  However, GCC 4.9
-issues loads of complains when %zu or %zd is used with a size_t variable
-in the kernel.
-
-The question that we've been trying to work out is... why is this?  Right
-now, it seems no one has an answer for this question.  We don't know
-whether it's a compiler bug or not - and Arnd has explained why not.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
