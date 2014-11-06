@@ -1,46 +1,55 @@
-From: daniel@zonque.org (Daniel Mack)
-Date: Thu, 06 Nov 2014 07:47:11 +0100
-Subject: [PATCH] usb: gadget: udc: pxa27x: fix build warning when !OF
-In-Reply-To: <1415249759-6219-1-git-send-email-balbi@ti.com>
-References: <1415249759-6219-1-git-send-email-balbi@ti.com>
-Message-ID: <545B196F.2020303@zonque.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 6 Nov 2014 12:29:31 +0530
+Subject: [PATCH v5 2/8] phy: miphy28lp: Add PHY header file for DT x Driver
+ defines
+In-Reply-To: <1415098284-11182-3-git-send-email-gabriel.fernandez@linaro.org>
+References: <1415098284-11182-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1415098284-11182-3-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <545B1C53.9010406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2014 05:55 AM, Felipe Balbi wrote:
-> in case kernel is built without CONFIG_OF there
-> will be a build warning (see below) due to of_match_ptr()
-> being defined to NULL.
+Hi,
+
+On Tuesday 04 November 2014 04:21 PM, Gabriel FERNANDEZ wrote:
+> This provides the shared header file which will be reference from both
+> PHY driver and its associated Device Tree node(s).
 > 
-> Because of_match_ptr() is pretty pointless anyway,
-> let's just remove it and fix the warning.
-
-The alternative, of course, would be to wrap the udc_pxa_dt_ids
-declaration in IS_ENABLED(CONFIG_OF), but I'm not sure whether it's
-worth it.
-
-
-Daniel
-
-> drivers/usb/gadget/udc/pxa27x_udc.c:2403:28: warning: ?udc_pxa_dt_ids? defined but not used [-Wunused-variable]
->  static struct of_device_id udc_pxa_dt_ids[] = {
->                             ^
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 > ---
->  drivers/usb/gadget/udc/pxa27x_udc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  include/dt-bindings/phy/phy.h | 18 ++++++++++++++++++
+
+I don't see this being used in device tree file. Are you planning to add this
+after -rc1 is tagged. Or else I have to create a separate branch for this file
+which will be merged by both me and the dt maintainer. Let me know.
+
+Thanks
+Kishon
+>  1 file changed, 18 insertions(+)
+>  create mode 100644 include/dt-bindings/phy/phy.h
 > 
-> diff --git a/drivers/usb/gadget/udc/pxa27x_udc.c b/drivers/usb/gadget/udc/pxa27x_udc.c
-> index 69e7b816..d1d8a9f 100644
-> --- a/drivers/usb/gadget/udc/pxa27x_udc.c
-> +++ b/drivers/usb/gadget/udc/pxa27x_udc.c
-> @@ -2590,7 +2590,7 @@ static struct platform_driver udc_driver = {
->  	.driver		= {
->  		.name	= "pxa27x-udc",
->  		.owner	= THIS_MODULE,
-> -		.of_match_table = of_match_ptr(udc_pxa_dt_ids),
-> +		.of_match_table = udc_pxa_dt_ids,
->  	},
->  	.probe		= pxa_udc_probe,
->  	.remove		= pxa_udc_remove,
+> diff --git a/include/dt-bindings/phy/phy.h b/include/dt-bindings/phy/phy.h
+> new file mode 100644
+> index 0000000..e8c6a3f
+> --- /dev/null
+> +++ b/include/dt-bindings/phy/phy.h
+> @@ -0,0 +1,18 @@
+> +/*
+> + *
+> + * This header provides constants for the phy framework
+> + *
+> + * Copyright (C) 2014 STMicroelectronics
+> + * Author: Gabriel Fernandez <gabriel.fernandez@st.com>
+> + * License terms:  GNU General Public License (GPL), version 2
+> + */
+> +
+> +#ifndef _DT_BINDINGS_PHY
+> +#define _DT_BINDINGS_PHY
+> +
+> +#define PHY_TYPE_SATA		1
+> +#define PHY_TYPE_PCIE		2
+> +#define PHY_TYPE_USB2		3
+> +#define PHY_TYPE_USB3		4
+> +
+> +#endif /* _DT_BINDINGS_PHY */
 > 
