@@ -1,44 +1,41 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu,  6 Nov 2014 17:20:12 +0000
-Subject: [PATCH] DMA: Fix allocation size for PL330 data buffer depth.
-Message-ID: <1415294412-13818-1-git-send-email-Liviu.Dudau@arm.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Thu,  6 Nov 2014 18:22:10 +0100
+Subject: [PATCH] ARM: dts: zynq: Enable PL clocks for Parallella
+Message-ID: <1415294531-8942-1-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The datasheet for PL330 says that the data buffer value in the CRD
-register is 10bits wide. However, the value stored is "minus one",
-which the driver corrects for. Maximum value that the data buffer
-depth can have is 1024 lines, which requires 11 bits for storage.
+The Parallella board comes with a U-Boot bootloader that loads one of
+two predefined FPGA bitstreams before booting the kernel. Both define an
+AXI interface to the on-board Epiphany processor.
 
-While making updates I found printing the peripheral ID as a hex
-value to be more useful as the datasheet shows the values that way.
+Enable clocks FCLK0..FCLK3 for the Programmable Logic by default.
 
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Otherwise accessing, e.g., the ESYSRESET register freezes the board,
+as seen with the Epiphany SDK tools e-reset and e-hw-rev, using /dev/mem.
+
+Cc: <stable@vger.kernel.org> # 3.17.x
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- drivers/dma/pl330.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Michal/Olof, please consider this trivial patch as a fix for 3.18.
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 4839bfa..7f62b73 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -271,7 +271,7 @@ struct pl330_config {
- #define DMAC_MODE_NS	(1 << 0)
- 	unsigned int	mode;
- 	unsigned int	data_bus_width:10; /* In number of bits */
--	unsigned int	data_buf_dep:10;
-+	unsigned int	data_buf_dep:11;
- 	unsigned int	num_chan:4;
- 	unsigned int	num_peri:6;
- 	u32		peri_ns;
-@@ -2732,7 +2732,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ arch/arm/boot/dts/zynq-parallella.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
+index e1f51ca127fe..0429bbd89fba 100644
+--- a/arch/arm/boot/dts/zynq-parallella.dts
++++ b/arch/arm/boot/dts/zynq-parallella.dts
+@@ -34,6 +34,10 @@
+ 	};
+ };
  
- 
- 	dev_info(&adev->dev,
--		"Loaded driver for PL330 DMAC-%d\n", adev->periphid);
-+		"Loaded driver for PL330 DMAC-%x\n", adev->periphid);
- 	dev_info(&adev->dev,
- 		"\tDBUFF-%ux%ubytes Num_Chans-%u Num_Peri-%u Num_Events-%u\n",
- 		pcfg->data_buf_dep, pcfg->data_bus_width / 8, pcfg->num_chan,
++&clkc {
++	fclk-enable = <0xf>;
++};
++
+ &gem0 {
+ 	status = "okay";
+ 	phy-mode = "rgmii-id";
 -- 
-2.1.3
+2.1.2
