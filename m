@@ -1,30 +1,64 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Thu, 06 Nov 2014 23:47:00 +0100
-Subject: [PATCHv0 3/3] rtc: rtc-isl12057: add alarm support to Intersil
- ISL12057 RTC driver
-References: <cover.1415222752.git.arno@natisbad.org>
- <148403c0ab1d556cbb99d9242c65f714a77843e5.1415222752.git.arno@natisbad.org>
- <20141106084910.GA10432@pengutronix.de>
-Message-ID: <87wq78lzff.fsf@natisbad.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 6 Nov 2014 23:50:05 +0100
+Subject: N900 modem support in 3.18-rc1
+In-Reply-To: <20141106180335.GA21513@earth.universe>
+References: <20141104205117.GA17606@amd> <201411052137.31452@pali>
+ <20141105203918.GA29199@amd> <201411052206.05379@pali>
+ <20141105220359.GA32052@amd> <20141105234555.GA7097@earth.universe>
+ <20141106124711.GA26944@amd>
+ <20141106180335.GA21513@earth.universe>
+Message-ID: <20141106225005.GA14002@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi!
 
-Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> writes:
+> > I actually had pm=0 on the command line, but I removed it now, and no
+> > change: [...]
+> > 
+> > Let me try with explicit =1. .. aha, that helps. Thanks!
+> 
+> mh seems I actually missed to make 1 the default value. I will
+> prepare a patch for that.
+> 
+> I assume, that the example ofono commands work for you now?
 
-> On Wed, Nov 05, 2014 at 10:42:52PM +0100, Arnaud Ebalard wrote:
->> +#ifdef CONFIG_PM_SLEEP
->> +static int isl12057_rtc_suspend(struct device *dev)
->> +{
->> +	struct isl12057_rtc_data *rtc_data = dev_get_drvdata(&client->dev);
-> drivers/rtc/rtc-isl12057.c: In function 'isl12057_rtc_suspend':
-> drivers/rtc/rtc-isl12057.c:551:56: error: 'client' undeclared (first
-> use in this function)
+Yes. I was able to get list of networks. It stops working after a
+while, for unknown reasons.
 
-I guess I forgot to do a git commit after my last quilt refresh before
-pushing the patches. Sorry for that.
+BTW... I'm using Debian-7.7 and did
 
-Cheers,
+XKBMODEL="nokiarx51"
+XKBLAYOUT="us"
 
-a+
+(from https://wiki.debian.org/MaemoAndSqueeze). Keyboard works well
+-- except "p" key. arrow-P (0) works ok. Do you see that, too?
+
+> > Do you have an example client that can talk to ofonod?
+> 
+> I have not yet played with userland stuff. You could try
+> telepathy-ring, which integrates the ofono into the telepathy
+> framework.
+
+Thanks for the pointer.
+
+> > What is needed to get voice calls to work?
+> 
+> There's still a kernel driver missing in mainline for exchanging
+> voice data between the modem and the cpu (called cmt-speech).
+> 
+> BTW the CMT driver should be removed from your kernel tree; its a
+> deprecated variant of mainline's nokia-modem driver. Thus I guess
+> the cmt-speech driver, which is available in your kernel tree, is
+> not properly integrated into the changes I did during mainlining
+> the other modem related drivers.
+
+Aha, so CONFIG_CMT is the same thing as CONFIG_NOKIA_NODEM? Ok, will
+disable that. Speech... if you'd have version I could test, I'll
+happily do that.
+
+Thanks,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
