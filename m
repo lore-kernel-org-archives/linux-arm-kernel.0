@@ -1,32 +1,46 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 06 Nov 2014 21:17:30 +0100
-Subject: [RESEND PATCH 2/3] ARM: OMAP2+: Remove unnecesary include in
- GPMC driver
-In-Reply-To: <20141106185235.GD31454@atomide.com>
-References: <1395209295-24399-1-git-send-email-javier.martinez@collabora.co.uk>
- <1395209295-24399-3-git-send-email-javier.martinez@collabora.co.uk>
- <20141106185235.GD31454@atomide.com>
-Message-ID: <545BD75A.5040708@collabora.co.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 6 Nov 2014 21:38:26 +0100
+Subject: (bisected) Lock up on sh73a0/kzm9g on cpuidle initialization
+Message-ID: <CAMuHMdXaaa2t6+sH2egGacVxkAPeTUkAgwdYsOnMnEPnuLdB5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tony,
+When CONFIG_CPU_IDLE=y, the kernel locks up during cpuidle initialization
+on Renesas sh73a0/kzm9g-reference, which has a dual-core Cortex-A9.
 
-On 11/06/2014 07:52 PM, Tony Lindgren wrote:
-> * Javier Martinez Canillas <javier.martinez@collabora.co.uk> [140318 23:12]:
->> The GPMC driver includes arch/arm/mach-omap2/common.h but
->> does not use anything on that header so it can be removed.
->> 
->> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> Probably meant Cc here? :) I'll apply this into omap-for-v3.19/gpmc,
-> the rest will need to wait until omap3 is DT only.
-> 
+Last message is:
 
-Ups, I don't know how your s-o-b ended there :)
+    DMA: preallocated 256 KiB pool for atomic coherent allocations
 
-Thanks a lot for picking such an old patch.
+After this it's supposed to print:
 
-Best regards,
-Javier
+    cpuidle: using governor ladder
+    cpuidle: using governor menu
+
+I've bisected this to commit 442bf3aaf55a91ebfec71da46a4ee10a3c905bcc
+("sched: Let the scheduler see CPU idle states").
+
+Reverting that commit, and commit 83a0a96a5f26d974580fd7251043ff70c8f1823d
+("sched/fair: Leverage the idle state info when choosing the "idlest"
+cpu") which
+depends on it, fixes the problem.
+
+I saw the discussion "lockdep splat in CPU hotplug", so I enabled lockdep
+debugging, but didn't see a lockdep splat.
+
+I'm using CONFIG_TREE_RCU=y, as this is SMP without PREEMPT.
+
+Anyone with a clue?
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
