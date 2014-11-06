@@ -1,23 +1,74 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 6 Nov 2014 11:36:53 +0530
-Subject: [PATCH 00/11] dmaengine: Cleanup chancnt
-In-Reply-To: <1413450063-23829-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1413450063-23829-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20141106060653.GT1870@intel.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Thu, 06 Nov 2014 14:09:23 +0800
+Subject: [Patch Part2 v4 01/31] irqdomain: Introduce new interfaces to
+ support hierarchy irqdomains
+In-Reply-To: <alpine.DEB.2.11.1411060044100.24960@nanos>
+References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
+ <1415102525-9898-2-git-send-email-jiang.liu@linux.intel.com>
+ <alpine.DEB.2.11.1411060044100.24960@nanos>
+Message-ID: <545B1093.1050403@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 16, 2014 at 11:00:52AM +0200, Maxime Ripard wrote:
-> Hi everyone,
-> 
-> As pointed out in the documentation thread [1], the chancnt variable
-> is filled during the driver registration in dma_async_device_register,
-> from the liste of channels that has been set.
-> 
-> This serie removes the occurences of the drivers that set it in their
-> probe function.
 
-Applied all, thanks
 
--- 
-~Vinod
+On 2014/11/6 7:48, Thomas Gleixner wrote:
+> On Tue, 4 Nov 2014, Jiang Liu wrote:
+>>  /* Number of irqs reserved for a legacy isa controller */
+>>  #define NUM_ISA_INTERRUPTS	16
+>> @@ -64,6 +66,16 @@ struct irq_domain_ops {
+>>  	int (*xlate)(struct irq_domain *d, struct device_node *node,
+>>  		     const u32 *intspec, unsigned int intsize,
+>>  		     unsigned long *out_hwirq, unsigned int *out_type);
+>> +
+>> +#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
+>> +	/* extended V2 interfaces to support hierarchy irq_domains */
+>> +	int (*alloc)(struct irq_domain *d, unsigned int virq,
+>> +		     unsigned int nr_irqs, void *arg);
+>> +	void (*free)(struct irq_domain *d, unsigned int virq,
+>> +		     unsigned int nr_irqs);
+>> +	int (*activate)(struct irq_domain *d, struct irq_data *irq_data);
+>> +	int (*deactivate)(struct irq_domain *d, struct irq_data *irq_data);
+> 
+> Why do we have a return value here? Especially the deactivate one
+> makes no sense at all.
+> 
+>> +extern int irq_domain_activate_irq(struct irq_data *irq_data);
+>> +extern int irq_domain_deactivate_irq(struct irq_data *irq_data);
+> 
+> And here.
+> 
+>> @@ -178,6 +179,7 @@ int irq_startup(struct irq_desc *desc, bool resend)
+>>  	irq_state_clr_disabled(desc);
+>>  	desc->depth = 0;
+>>  
+>> +	irq_domain_activate_irq(&desc->irq_data);
+> 
+> We do not check it and we cannot do here AFAICT.
+> 
+>>  	if (desc->irq_data.chip->irq_startup) {
+>>  		ret = desc->irq_data.chip->irq_startup(&desc->irq_data);
+>>  		irq_state_clr_masked(desc);
+>> @@ -199,6 +201,7 @@ void irq_shutdown(struct irq_desc *desc)
+>>  		desc->irq_data.chip->irq_disable(&desc->irq_data);
+>>  	else
+>>  		desc->irq_data.chip->irq_mask(&desc->irq_data);
+>> +	irq_domain_deactivate_irq(&desc->irq_data);
+> 
+> Ditto.
+> 
+> So the return value for irq_domain_deactivate_irq() is silly to begin
+> with, but also the return value for irq_domain_activate_irq() does not
+> really make sense. We've allocated the resources for the interrupt
+> already down the hierarchy chain. So there is no reason why the actual
+> activation should fail.
+Hi Thomas,
+	Fair enough, I have changed them to return void, which also
+simplify the implementation. But add one or two BUG_ON()s:)
+Regards!
+Gerry
+> 
+> Thanks,
+> 
+> 	tglx
+> 
