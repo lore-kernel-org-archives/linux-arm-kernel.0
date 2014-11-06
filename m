@@ -1,37 +1,60 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 6 Nov 2014 11:57:51 +0100
-Subject: [PATCH v3 00/19] KVM GICv3 emulation
-In-Reply-To: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
-References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <20141106105751.GA29968@cbox>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Thu, 6 Nov 2014 12:58:55 +0200
+Subject: [PATCH] leds: leds-gpio: Convert gpio_blink_set() to use GPIO
+ descriptors
+In-Reply-To: <CAMuHMdWtcZcpW=r60s9auENZxChiLwr14R0p_soKr7C3yGYOMQ@mail.gmail.com>
+References: <1414755658-96293-1-git-send-email-mika.westerberg@linux.intel.com>
+ <545843B1.3020101@nvidia.com> <2455157.3p7mHhT8im@vostro.rjw.lan>
+ <CAMuHMdXn9W2S7N+YGfjDxQozMtRZCVdTzzdDps6YfOv2FqVBmw@mail.gmail.com>
+ <20141106103033.GK1618@lahna.fi.intel.com>
+ <CAMuHMdWtcZcpW=r60s9auENZxChiLwr14R0p_soKr7C3yGYOMQ@mail.gmail.com>
+Message-ID: <20141106105855.GL1618@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 05:26:35PM +0000, Andre Przywara wrote:
-
-[...]
-
+On Thu, Nov 06, 2014 at 11:32:19AM +0100, Geert Uytterhoeven wrote:
+> Hi Mika,
 > 
-> Please review and test.
-> I would be grateful for people to test for GICv2 regressions also
-> (so on a GICv2 host with current kvmtool/qemu), as there is quite
-> some refactoring on that front.
+> On Thu, Nov 6, 2014 at 11:30 AM, Mika Westerberg
+> <mika.westerberg@linux.intel.com> wrote:
+> >> "leds: leds-gpio: Add support for GPIO descriptors" broke leds-gpio on
+> >> non-DT platforms for me:
+> >>
+> >>     gpiod_direction_output: invalid GPIO
+> >>     leds-gpio: probe of leds-gpio failed with error -22
+> >>
+> >> (desc is NULL in gpiod_direction_output()).
+> >>
+> >> DT shmobile reference/multi-platform are fine.
+> >>
+> >> I noticed the hard way, as I wanted to add some LEDs to a new platform,
+> >> but couldn't get it work. It turned out it also had stopped working on
+> >> r8a7740/armadillo-legacy, so I started bisecting...
+> >
+> > Which board file that is?
+> >
+> > There is a bug that gpio_to_desc() returns NULL instead if ERR_PTR() in
+> > that patch but I wonder why gpio_is_valid() and devm_gpio_request_one()
+> > do not complain about that prior.
 > 
-So looking at the final result, we have a very strange flow with the
-vgic_create() and kvm_vgic_create() functions.  I lost track in all the
-rewrite patches how this happened exactly, but what I think you want to
-end up with is:
+> arch/arm/mach-shmobile/board-armadillo800eva.c
 
-one exported function:
-int kvm_vgic_create(struct kvm_device *dev, u32 type);
+Thanks.
 
-which calls a static function:
-static int vgic_create(struct kvm *kvm, u32 type);
+Are you able to put some printks() to the 'if (!template->gpiod)' branch
+so that it prints out gpio number and what does devm_gpio_request_one()
+return?
 
-or simply inline the static one in the exported one, I can't seem to
-find other callers.
+Something like:
 
-Can you take a look at this?
+	if (!template->gpiod) {
+		...
+		ret = devm_gpio_request_one(parent, template->gpio, flags,
+					    template->name);
+		dev_info(parent, "GPIO %u, ret: %d\n", template->gpio, ret);
+		if (ret < 0)
+			...
 
-Thanks,
--Christoffer
+		led_dat->gpiod = gpio_to_desc(template->gpio);
+		dev_info(parent, "GPIOD: %p\n", led_dat->gpiod);
+	}
