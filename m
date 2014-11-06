@@ -1,85 +1,78 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 06 Nov 2014 10:00:34 +0100
-Subject: M_CAN message RAM initialization AppNote  - was: Re: [PATCH V3
- 3/3] can: m_can: workaround for transmit data less than 4 bytes
-In-Reply-To: <545B1D71.4000408@hartkopp.net>
-References: <1415193393-30023-1-git-send-email-b29396@freescale.com>
- <1415193393-30023-3-git-send-email-b29396@freescale.com>
- <545A3451.2090302@pengutronix.de> <545A692E.40002@hartkopp.net>
- <20141106015716.GB7642@shlinux1.ap.freescale.net>
- <545B1D71.4000408@hartkopp.net>
-Message-ID: <545B38B2.6000003@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 6 Nov 2014 10:52:47 +0000
+Subject: [GIT PULL] Integrator multiplatform migration for v3.19
+In-Reply-To: <20141104063235.GG13562@quad.lixom.net>
+References: <CACRpkdafst1j2tp4-=BZMn_P688uUSjeAZEGt26WuD_d521sHQ@mail.gmail.com>
+ <20141104063235.GG13562@quad.lixom.net>
+Message-ID: <20141106105246.GO4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2014 08:04 AM, Oliver Hartkopp wrote:
-> On 06.11.2014 02:57, Dong Aisheng wrote:
->> On Wed, Nov 05, 2014 at 07:15:10PM +0100, Oliver Hartkopp wrote:
+On Mon, Nov 03, 2014 at 10:32:35PM -0800, Olof Johansson wrote:
+> On Wed, Oct 22, 2014 at 02:13:04PM +0200, Linus Walleij wrote:
+> > Hi ARM SoC folks,
+> > 
+> > this is the initial set of two patches to migrate the Integrator
+> > platforms to multiplatform.
+> > 
+> > Tested on the Integrator/AP with ARM926EJ-S and Integrator/CP
+> > with ARM920T.
+> > 
+> > Please pull it in for v3.19!
+> > 
+> > Yours,
+> > Linus Walleij
+> > 
+> > The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+> > 
+> >   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+> > tags/integrator-multiplatform-for-arm-soc
+> > 
+> > for you to fetch changes up to 9713497b6c64c67c8763f8f07fad325b193764b6:
+> > 
+> >   ARM: integrator: set V4T and V5 as default multitargets (2014-10-22
+> > 09:49:26 +0200)
+> > 
+> > ----------------------------------------------------------------
+> > Multiplatform migration of the Integrator.
 > 
->>> The Message RAM is usually equipped with a parity or ECC functionality.
->>> But RAM cells suffer a hardware reset and can therefore hold
->>> arbitrary content at startup - including parity and/or ECC bits.
->>>
->>> So when you write only the CAN ID and the first four bytes the last
->>> four bytes remain untouched. Then the M_CAN starts to read in 32bit
->>> words from the start of the Tx Message element. So it is very likely
->>> to trigger the message RAM error when reading the uninitialized
->>> 32bit word from the last four bytes.
->>>
->>> Finally it turns out that an initial writing (with any kind of data)
->>> to the entire message RAM is mandatory to create valid parity/ECC
->>> checksums.
->>>
->>> That's it.
->>>
->>
->> Thanks for sharing this information.
->> Does it mean this issue is related to the nature of Message RAM and is
->> supposed to exist on all M_CAN IP versions?
-> 
-> From what I know from the 3.1.x revision there's no change regarding
-> IR.BRU and IR.BEC - so I would assume this to stay on all M_CAN IP
-> revisions.
-> 
-> But after some sleep I wonder if this patch [3/3] would need an update too.
-> 
-> Writing to the TX message RAM is obviously no workaround but a valid and
-> needed initialization process.
-> 
-> I would tend to make this patch:
-> 
-> ---
-> 
-> can: m_can: add missing TX message RAM initialization
-> 
-> The M_CAN message RAM is usually equipped with a parity or ECC
-> functionality.
-> But RAM cells suffer a hardware reset and can therefore hold arbitrary
-> content at startup - including parity and/or ECC bits.
-> 
-> To prevent the M_CAN controller detecting checksum errors when reading
-> potentially uninitialized TX message RAM content to transmit CAN frames
-> the TX message RAM has to be written with (any kind of) initial data.
-> 
-> ---
-> 
-> Then the code should memset() the entire TX FIFO element - and not only
-> the 8 data bytes we are addressing now.
+> Merged. The patches had better commit texts than the tag though, so please
+> feel free to carry forward and/or elaborate just a bit more in the future.
 
-No literal memset() as this is iomem
+Unfortunately, this totally screws multiplatform support - with this
+merged, we now can enable all CPUs from ARM720T upwards into a single
+kernel - and that is illegal.
 
-Marc
+The problem is that Integrator can be ARM720T all the way up to ARMv6.
+So, when ARCH_INTEGRATOR is enabled, you are presented with the
+individual CPUs which the platform supports as options to select.
+This results in randconfig seeing all the CPU options, which it can
+then enable, resulting in:
+
+CONFIG_CPU_ARM720T=y
+CONFIG_CPU_ARM920T=y
+CONFIG_CPU_ARM922T=y
+CONFIG_CPU_ARM926T=y
+CONFIG_CPU_ARM1020=y
+CONFIG_CPU_ARM1022=y
+CONFIG_CPU_ARM1026=y
+CONFIG_CPU_V6=y
+CONFIG_CPU_V6K=y
+CONFIG_CPU_V7=y
+
+which then causes:
+
+arch/arm/include/asm/cmpxchg.h:114:2: error: #error "SMP is not supported on this platform"
+arch/arm/include/asm/atomic.h:137:2: error: #error SMP not supported on pre-ARMv6 CPUs
+
+Integrator doesn't fit into the "is it a pre-ARMv6 or not" platform
+structure chosen in the early days of multiplatform support, because
+it straddles that boundary.
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141106/d31639d1/attachment.sig>
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
