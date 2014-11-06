@@ -1,47 +1,43 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu,  6 Nov 2014 08:43:20 -0800
-Subject: [PATCH v5 36/48] arm64: psci: Register with kernel power-off handler
-In-Reply-To: <1415292213-28652-1-git-send-email-linux@roeck-us.net>
-References: <1415292213-28652-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1415292213-28652-37-git-send-email-linux@roeck-us.net>
+From: gerald@granddesignsgroup.com (Gerald Coley)
+Date: Thu, 6 Nov 2014 10:44:40 -0600
+Subject: [PATCH] ARM: dts: Add am57xx-beagle-x15
+In-Reply-To: <20141106164148.GJ24112@csclub.uwaterloo.ca>
+References: <1415290702-11353-1-git-send-email-nm@ti.com>
+ <20141106164148.GJ24112@csclub.uwaterloo.ca>
+Message-ID: <006201cff9e0$f6661730$e3324590$@granddesignsgroup.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register with kernel power-off handler instead of setting pm_power_off
-directly.
+Yes. We have three USB 3.0 ports.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
-v5:
-- Rebase to v3.18-rc3
-v4:
-- No change
-v3:
-- Replace poweroff in all newly introduced variables and in text
-  with power_off or power-off as appropriate
-- Replace POWEROFF_PRIORITY_xxx with POWER_OFF_PRIORITY_xxx
-v2:
-- Use define to specify poweroff handler priority
+Gerald
 
- arch/arm64/kernel/psci.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index 866c1c8..5cab066 100644
---- a/arch/arm64/kernel/psci.c
-+++ b/arch/arm64/kernel/psci.c
-@@ -359,7 +359,8 @@ static int __init psci_0_2_init(struct device_node *np)
- 
- 	arm_pm_restart = psci_sys_reset;
- 
--	pm_power_off = psci_sys_poweroff;
-+	register_power_off_handler_simple(psci_sys_poweroff,
-+					  POWER_OFF_PRIORITY_DEFAULT);
- 
- out_put_node:
- 	of_node_put(np);
--- 
-1.9.1
+-----Original Message-----
+From: Lennart Sorensen [mailto:lsorense at csclub.uwaterloo.ca] 
+Sent: Thursday, November 6, 2014 10:42 AM
+To: Nishanth Menon
+Cc: Tony Lindgren; linux-kernel at vger.kernel.org;
+linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
+linux-omap at vger.kernel.org; balbi at ti.com; gerald at granddesignsgroup.com;
+fcooper at ti.com; beagleboard at googlegroups.com
+Subject: Re: [PATCH] ARM: dts: Add am57xx-beagle-x15
+
+On Thu, Nov 06, 2014 at 10:18:22AM -0600, Nishanth Menon wrote:
+> BeagleBoard-X15 is the next generation Open Source Hardware 
+> BeagleBoard based on TI's AM5728 SoC featuring dual core 1.5GHZ A15 
+> processor. The platform features 2GB DDR3L (w/dual 32bit busses), 
+> eSATA, 3 USB3.0 ports, integrated HDMI (1920x108 at 60), separate LCD 
+> port, video In port, 4GB eMMC, uSD, Analog audio in/out, dual 1G 
+> Ethernet.
+
+Oh neat, you put a USB3 hub on the board?
+
+I really should cleanup and submit my patch to make the system time not run
+576ppm too fast on the AM57xx.
+
+This will sure be a nice board when you get it released.  I will have to get
+one.
+
+--
+Len Sorensen
