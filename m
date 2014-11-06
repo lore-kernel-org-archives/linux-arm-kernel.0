@@ -1,25 +1,70 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 6 Nov 2014 13:40:29 +0000
-Subject: [PATCH v7 3/8] arm64: introduce is_device_dma_coherent
-In-Reply-To: <alpine.DEB.2.02.1411061155200.22875@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
- <1414422568-19103-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1411031045340.22875@kaball.uk.xensource.com>
- <20141103105716.GC23162@arm.com>
- <alpine.DEB.2.02.1411031101400.22875@kaball.uk.xensource.com>
- <20141105165646.GN32700@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.02.1411051757140.22875@kaball.uk.xensource.com>
- <20141106103337.GA19702@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.02.1411061155200.22875@kaball.uk.xensource.com>
-Message-ID: <20141106134028.GB19702@e104818-lin.cambridge.arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 6 Nov 2014 15:50:59 +0200
+Subject: [PATCH v4 0/3] PM / clock_ops: add pm_clk_add_clk() 
+Message-ID: <1415281862-23764-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 06, 2014 at 12:22:13PM +0000, Stefano Stabellini wrote:
-> As I don't feel that strongly against it, I'll resend including this
-> patch (with you as the author of course).
+Hi Santosh, Kevin,
 
-Not just yet, let me understand your reply properly ;).
+I've separated these patches in standalone series as requested by
+Santosh (https://lkml.org/lkml/2014/10/24/591). Also, I've kept
+versioning of patches from original series and therefor this
+is v4 of patches.
+
+The patch 1 was originally introduced in [1] (Apr 2014) and it allows
+to fill per-device list of clock from DT.
+
+The patch 2 is small clean up needed for patch 3.
+
+The patch 3 was created as was discussed in v2 and first introduced in v3.
+Here I marked it as RFC, because I've found some disadvantages of such
+approach - see comments to the patch itself.
+
+Finally, this series is needed to enable to enable Runtime
+PM for Keystone 2, but honestly I need only patch 1.
+
+RFC version of patches can be found at [2].
+
+Changes in v4:
+ - pm_clk_add_clk() changed to get reference on clock as
+   requested by Dmitry Torokhov (see v3). Now the caller has to
+   use clk_put() on clock pointer when done.
+
+Changes in v3:
+ - handling of the case when !CONFIG_PM_RUNTIME has been
+   moved in PM clock framework.
+
+Changes in v2:
+- minor comments applied and rebased on top of Linux 3.18-rc1.
+
+Links on previous versions:
+v3:  https://lkml.org/lkml/2014/10/23/342
+v2:  https://lkml.org/lkml/2014/10/20/248
+v1:  https://lkml.org/lkml/2014/9/29/382
+
+[1] "[PATCH/RFC 0/4] of: Register clocks for Runtime PM with PM core"
+  https://lkml.org/lkml/2014/4/24/1118
+
+[2] "[RFC PATCH 0/4] ARM: keystone: pm: switch to use generic pm domains"
+  https://lkml.org/lkml/2014/9/25/364
+
+CC: Santosh Shilimkar <ssantosh@kernel.org>
+CC: Kevin Hilman <khilman@linaro.org>
+CC: Ulf Hansson <ulf.hansson@linaro.org>
+CC: Geert Uytterhoeven <geert@linux-m68k.org>
+CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+
+Geert Uytterhoeven (1):
+  PM / clock_ops: Add pm_clk_add_clk()
+
+Grygorii Strashko (2):
+  PM / clock_ops: make __pm_clk_enable more generic
+  PM / clock_ops: add and enable clocks always if !CONFIG_PM_RUNTIME
+
+ drivers/base/power/clock_ops.c | 89 +++++++++++++++++++++++++++---------------
+ include/linux/pm_clock.h       |  8 ++++
+ 2 files changed, 65 insertions(+), 32 deletions(-)
 
 -- 
-Catalin
+1.9.1
