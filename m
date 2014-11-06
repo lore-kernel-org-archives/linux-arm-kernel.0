@@ -1,61 +1,84 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 6 Nov 2014 09:14:01 +0100
-Subject: [GIT PULL] Nomadik updates for the v3.19 series
-Message-ID: <CACRpkdapOcwzPGGqNVRBuo88N9_MFNRt-Vq0tafT-X-Lv=1KUw@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 6 Nov 2014 09:29:46 +0100
+Subject: [PATCHv0 1/3] rtc: rtc-isl12057: fix masking of register values
+In-Reply-To: <917b6e5e869fce697dec8a1597dfd2f671bf5c46.1415222752.git.arno@natisbad.org>
+References: <cover.1415222752.git.arno@natisbad.org>
+ <917b6e5e869fce697dec8a1597dfd2f671bf5c46.1415222752.git.arno@natisbad.org>
+Message-ID: <20141106082946.GN8316@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC guys,
+Hello Arnaud,
 
-here is a number of Nomadik DT-related patches, refatcoring,
-adding a new board variant and updating the defconfig.
+On Wed, Nov 05, 2014 at 10:42:25PM +0100, Arnaud Ebalard wrote:
+> When Intersil ISL12057 support was added by commit 70e123373c05 ("rtc:
+> Add support for Intersil ISL12057 I2C RTC chip"), two masks for time
+> registers values imported from the device were either wrong or
+> omitted, leading to additional bits from those registers to impact
+> read values:
+> 
+>  - mask for hour register value when reading it in AM/PM mode. As
+>    AM/PM mode is not the usual mode used by the driver, this error
+>    would only have an impact on an externally configured RTC hour
+>    later read by the driver.
+>  - mask for month value. The lack of masking would provide an
+>    erroneous value if century bit is set.
+> 
+> This patch fixes those two masks.
+> 
+> Fixes: 70e123373c05 ("rtc: Add support for Intersil ISL12057 I2C RTC chip")
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+> ---
+>  drivers/rtc/rtc-isl12057.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/rtc/rtc-isl12057.c b/drivers/rtc/rtc-isl12057.c
+> index 455b601d731d..8132fbc7e10a 100644
+> --- a/drivers/rtc/rtc-isl12057.c
+> +++ b/drivers/rtc/rtc-isl12057.c
+> @@ -88,7 +88,7 @@ static void isl12057_rtc_regs_to_tm(struct rtc_time *tm, u8 *regs)
+>  	tm->tm_min = bcd2bin(regs[ISL12057_REG_RTC_MN]);
+>  
+>  	if (regs[ISL12057_REG_RTC_HR] & ISL12057_REG_RTC_HR_MIL) { /* AM/PM */
+> -		tm->tm_hour = bcd2bin(regs[ISL12057_REG_RTC_HR] & 0x0f);
+> +		tm->tm_hour = bcd2bin(regs[ISL12057_REG_RTC_HR] & 0x1f);
+>  		if (regs[ISL12057_REG_RTC_HR] & ISL12057_REG_RTC_HR_PM)
+>  			tm->tm_hour += 12;
+>  	} else {					    /* 24 hour mode */
+> @@ -96,8 +96,8 @@ static void isl12057_rtc_regs_to_tm(struct rtc_time *tm, u8 *regs)
+>  	}
+>  
+>  	tm->tm_mday = bcd2bin(regs[ISL12057_REG_RTC_DT]);
+> -	tm->tm_wday = bcd2bin(regs[ISL12057_REG_RTC_DW]) - 1; /* starts at 1 */
+> +	tm->tm_wday = bcd2bin(regs[ISL12057_REG_RTC_DW]) - 1;  /* starts at 1 */
+unrelated change?
 
-I do not expect any more Nomadik changes for this kernel
-cycle. Please pull this into some relevant branch for testing
-in linux-next!
+> -	tm->tm_mon  = bcd2bin(regs[ISL12057_REG_RTC_MO]) - 1; /* starts at 1 */
+> +	tm->tm_mon  = bcd2bin(regs[ISL12057_REG_RTC_MO] & 0x1f) - 1; /* ditto */
+>  	tm->tm_year = bcd2bin(regs[ISL12057_REG_RTC_YR]) + 100;
+>  }
+This patch definitly improves the driver, still I see room for more
+improvement (all but the first issue are unrelated to this patch):
 
-Yours,
-Linus Walleij
+ - There is a century bit in the RTC_MO driver that is now correctly
+   masked to determine the month. Shouldn't it be used to flag if year
+   is >= 2100? That seems to match the hardware leap year handling.
+   (I.e. it considers RTC_YR=0 not to be a leap year iff RTC_MO_CENTURY
+   is set.)
 
+ - I wonder how tm_wday should be handled. It seems to be hardly used by
+   callers of rtc_read_time. Is it better to report the hardware state
+   here or the weekday matching year/month/day?
 
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+ - IMHO the probe function shouldn't clear the OSCILLATOR FAILURE BIT
+   (OSF). It's an indicator that the stored time is wrong. Instead this
+   bit should be evaluated in the read_time callback. (If it's set,
+   return -ENODATA.) And only clear the bit in .set_time when the
+   registers were updated. I think most drivers get that wrong.
 
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+Best regards
+Uwe
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-tags/nomadik-for-v3.19
-
-for you to fetch changes up to 640e2f13cadba313a0dd3f83136afec09ad407c4:
-
-  ARM: nomadik: configure in STMPE support (2014-11-06 09:06:22 +0100)
-
-----------------------------------------------------------------
-Nomadik changes for the v3.19 development series:
-- Rearrange the DTS files to make a pure SoC-specific file and
-  a pure board file for S8815.
-- Add the device tree for the NDK15 board.
-- Update the defconfig and configure in the STMPE expander by
-  default on the Nomadik.
-
-----------------------------------------------------------------
-Linus Walleij (8):
-      ARM: nomadik: move MMC/SD card detect GPIO to board DTS
-      ARM: nomadik: disable chrystals in top level board files
-      ARM: nomadik: move GPIO I2C to S8815 board file
-      ARM: nomadik: set up MCDATDIR2
-      ARM: nomadik: push ethernet down to board
-      ARM: nomadik: device tree for NHK15 board
-      ARM: update Nomadik config
-      ARM: nomadik: configure in STMPE support
-
- .../devicetree/bindings/arm/ste-nomadik.txt        |   6 +
- arch/arm/boot/dts/Makefile                         |   3 +-
- arch/arm/boot/dts/ste-nomadik-nhk15.dts            | 151 +++++++++++++++++++++
- arch/arm/boot/dts/ste-nomadik-s8815.dts            |  56 ++++++--
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi         |  45 +-----
- arch/arm/configs/nhk8815_defconfig                 |  11 +-
- arch/arm/mach-nomadik/cpu-8815.c                   |   1 +
- 7 files changed, 215 insertions(+), 58 deletions(-)
- create mode 100644 arch/arm/boot/dts/ste-nomadik-nhk15.dts
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
