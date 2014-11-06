@@ -1,39 +1,105 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  6 Nov 2014 09:07:47 +0100
-Subject: [PATCH 2/2] ARM: nomadik: configure in STMPE support
-Message-ID: <1415261267-4204-1-git-send-email-linus.walleij@linaro.org>
+From: addy.ke@rock-chips.com (Addy Ke)
+Date: Thu,  6 Nov 2014 16:11:54 +0800
+Subject: [PATCH] i2c: rk3x: fix bug that cause measured high_ns doesn't meet
+ I2C spec
+Message-ID: <1415261514-4051-1-git-send-email-addy.ke@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the STMPE MFD, GPIO and keypad support by default on
-the Nomadik builds. This expander is used on the NDK 15 board.
+high_ns calculated from the low division of CLKDIV register is the sum of
+actual measured high_ns and rise_ns. The rise time which related to
+external pull-up resistor can be up to the maximum rise time in I2C spec.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+In my test, if external pull-up resistor is 4.7K, rise_ns is about 700ns.
+So the actual measured high_ns is about 3900ns, which is less than 4000ns
+(the minimum high_ns in I2C spec).
+
+Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
 ---
- arch/arm/configs/nhk8815_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/i2c/busses/i2c-rk3x.c | 58 +++++++++++++++++++++++++++----------------
+ 1 file changed, 37 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/configs/nhk8815_defconfig b/arch/arm/configs/nhk8815_defconfig
-index 783f44c0dfc6..7d2ad30d9e70 100644
---- a/arch/arm/configs/nhk8815_defconfig
-+++ b/arch/arm/configs/nhk8815_defconfig
-@@ -80,6 +80,7 @@ CONFIG_PPP_SYNC_TTY=m
- CONFIG_INPUT_EVDEV=y
- # CONFIG_KEYBOARD_ATKBD is not set
- CONFIG_KEYBOARD_GPIO=y
-+CONFIG_KEYBOARD_STMPE=y
- # CONFIG_MOUSE_PS2 is not set
- # CONFIG_SERIO is not set
- # CONFIG_LEGACY_PTYS is not set
-@@ -89,7 +90,9 @@ CONFIG_HW_RANDOM=y
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_GPIO=y
- CONFIG_DEBUG_GPIO=y
-+CONFIG_GPIO_STMPE=y
- # CONFIG_HWMON is not set
-+CONFIG_MFD_STMPE=y
- CONFIG_REGULATOR=y
- CONFIG_MMC=y
- # CONFIG_MMC_BLOCK_BOUNCE is not set
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index e276ffb..8e1cc2b 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -432,9 +432,12 @@ out:
+ static int rk3x_i2c_calc_divs(unsigned long i2c_rate, unsigned long scl_rate,
+ 			       unsigned long *div_low, unsigned long *div_high)
+ {
++	unsigned long spec_min_low_ns, spec_min_high_ns;
++	unsigned long spec_max_data_hold_ns;
++	unsigned long spec_data_hold_buffer_ns;
++	unsigned long spec_max_rise_ns;
++
+ 	unsigned long min_low_ns, min_high_ns;
+-	unsigned long max_data_hold_ns;
+-	unsigned long data_hold_buffer_ns;
+ 	unsigned long max_low_ns, min_total_ns;
+ 
+ 	unsigned long i2c_rate_khz, scl_rate_khz;
+@@ -453,30 +456,43 @@ static int rk3x_i2c_calc_divs(unsigned long i2c_rate, unsigned long scl_rate,
+ 	if (WARN_ON(scl_rate < 1000))
+ 		scl_rate = 1000;
+ 
++	if (scl_rate <= 100000) {
++		spec_min_low_ns = 4700;
++		spec_min_high_ns = 4000;
++		spec_max_rise_ns = 1000;
++		spec_max_data_hold_ns = 3450;
++		spec_data_hold_buffer_ns = 50;
++	} else {
++		spec_min_low_ns = 1300;
++		spec_min_high_ns = 600;
++		spec_max_rise_ns = 300;
++		spec_max_data_hold_ns = 900;
++		spec_data_hold_buffer_ns = 50;
++	}
++
+ 	/*
+-	 * min_low_ns:  The minimum number of ns we need to hold low
+-	 *		to meet i2c spec
+-	 * min_high_ns: The minimum number of ns we need to hold high
+-	 *		to meet i2c spec
+-	 * max_low_ns:  The maximum number of ns we can hold low
+-	 *		to meet i2c spec
++	 * min_low_ns:  The minimum number of ns we need to hold low.
++	 *		The fall time in RK3X's I2C controller is approximately
++	 *		equal to 0. So min_low_ns = spec_min_low_ns.
++	 * Note: low_ns should be (measured_low_ns + measured_fall_time)
++	 *	 and measured_low_ns must meet I2C spec.
+ 	 *
+-	 * Note: max_low_ns should be (max data hold time * 2 - buffer)
++	 * min_high_ns: The minimum number of ns we need to hold high.
++	 *		The rise time which related to external pull-up resistor
++	 *		can be up to spec_max_rise_ns.
++	 *		So min_high_ns = spec_min_high_ns + spec_max_rise_ns
++	 * Note: high_ns should be (measured_high_ns + measured_rise_time)
++	 *	 and measured_high_ns must meet I2C spec.
++	 *
++	 * max_low_ns:  The maximum number of ns we can hold low.
++	 * Note: max_low_ns should be (max_data_hold_time * 2 - buffer)
+ 	 *	 This is because the i2c host on Rockchip holds the data line
+ 	 *	 for half the low time.
+ 	 */
+-	if (scl_rate <= 100000) {
+-		min_low_ns = 4700;
+-		min_high_ns = 4000;
+-		max_data_hold_ns = 3450;
+-		data_hold_buffer_ns = 50;
+-	} else {
+-		min_low_ns = 1300;
+-		min_high_ns = 600;
+-		max_data_hold_ns = 900;
+-		data_hold_buffer_ns = 50;
+-	}
+-	max_low_ns = max_data_hold_ns * 2 - data_hold_buffer_ns;
++	min_low_ns = spec_min_low_ns;
++	min_high_ns = spec_min_high_ns + spec_max_rise_ns;
++	max_low_ns = spec_max_data_hold_ns * 2 - spec_data_hold_buffer_ns;
++
+ 	min_total_ns = min_low_ns + min_high_ns;
+ 
+ 	/* Adjust to avoid overflow */
 -- 
-1.9.3
+1.8.3.2
