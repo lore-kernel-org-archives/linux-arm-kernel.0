@@ -1,88 +1,46 @@
-From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Thu,  6 Nov 2014 14:22:40 +0800
-Subject: [PATCH v8 2/3] dt-bindings: add document of Rockchip power domain
-In-Reply-To: <1415254961-5746-1-git-send-email-caesar.wang@rock-chips.com>
-References: <1415254961-5746-1-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <1415254961-5746-3-git-send-email-caesar.wang@rock-chips.com>
+From: daniel@zonque.org (Daniel Mack)
+Date: Thu, 06 Nov 2014 07:47:11 +0100
+Subject: [PATCH] usb: gadget: udc: pxa27x: fix build warning when !OF
+In-Reply-To: <1415249759-6219-1-git-send-email-balbi@ti.com>
+References: <1415249759-6219-1-git-send-email-balbi@ti.com>
+Message-ID: <545B196F.2020303@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
-Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
-Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+On 11/06/2014 05:55 AM, Felipe Balbi wrote:
+> in case kernel is built without CONFIG_OF there
+> will be a build warning (see below) due to of_match_ptr()
+> being defined to NULL.
+> 
+> Because of_match_ptr() is pretty pointless anyway,
+> let's just remove it and fix the warning.
 
----
+The alternative, of course, would be to wrap the udc_pxa_dt_ids
+declaration in IS_ENABLED(CONFIG_OF), but I'm not sure whether it's
+worth it.
 
-Changes in v8:
-    - document go back to v2
 
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3:
-    - DT structure has changed
+Daniel
 
-Changes in v2:
-    - move clocks to "optional"
-
- .../bindings/arm/rockchip/power_domain.txt         | 48 ++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
-
-diff --git a/Documentation/devicetree/bindings/arm/rockchip/power_domain.txt b/Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
-new file mode 100644
-index 0000000..3e74e6d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
-@@ -0,0 +1,48 @@
-+* Rockchip Power Domains
-+
-+Rockchip processors include support for multiple power domains which can be
-+powered up/down by software based on different application scenes to save power.
-+
-+Required properties for power domain controller:
-+- compatible: should be one of the following.
-+    * rockchip,rk3288-power-controller - for rk3288 type power domain.
-+- #power-domain-cells: Number of cells in a power-domain specifier.
-+		       should be 1.
-+- rockchip,pmu: phandle referencing a syscon providing the pmu registers
-+- #address-cells: should be 1.
-+- #size-cells: should be 0.
-+
-+Required properties for power domain sub nodes:
-+- reg: index of the power domain, should use macros in:
-+    *  include/dt-bindings/power-domain/rk3288.h - for rk3288 type power domain.
-+- clocks (optional): phandles to clocks which need to be enabled while power domain
-+          switches state.
-+
-+Example:
-+
-+	power: power-controller {
-+	       compatible = "rockchip,rk3288-power-controller";
-+	       #power-domain-cells = <1>;
-+	       rockchip,pmu = <&pmu>;
-+               #address-cells = <1>;
-+               #size-cells = <0>;
-+
-+	       pd_gpu {
-+	               reg = <RK3288_PD_GPU>;
-+	               clocks = <&cru ACLK_GPU>;
-+	       };
-+	};
-+
-+Node of a device using power domains must have a power-domains property,
-+containing a phandle to the power device node and an index specifying which
-+power domain to use.
-+The index should use macros in:
-+   * include/dt-bindings/power-domain/rk3288.h - for rk3288 type power domain.
-+
-+Example of the node using power domain:
-+
-+	node {
-+		/* ... */
-+		power-domains = <&power RK3288_PD_GPU>;
-+		/* ... */
-+	};
--- 
-1.9.1
+> drivers/usb/gadget/udc/pxa27x_udc.c:2403:28: warning: ?udc_pxa_dt_ids? defined but not used [-Wunused-variable]
+>  static struct of_device_id udc_pxa_dt_ids[] = {
+>                             ^
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  drivers/usb/gadget/udc/pxa27x_udc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/usb/gadget/udc/pxa27x_udc.c b/drivers/usb/gadget/udc/pxa27x_udc.c
+> index 69e7b816..d1d8a9f 100644
+> --- a/drivers/usb/gadget/udc/pxa27x_udc.c
+> +++ b/drivers/usb/gadget/udc/pxa27x_udc.c
+> @@ -2590,7 +2590,7 @@ static struct platform_driver udc_driver = {
+>  	.driver		= {
+>  		.name	= "pxa27x-udc",
+>  		.owner	= THIS_MODULE,
+> -		.of_match_table = of_match_ptr(udc_pxa_dt_ids),
+> +		.of_match_table = udc_pxa_dt_ids,
+>  	},
+>  	.probe		= pxa_udc_probe,
+>  	.remove		= pxa_udc_remove,
+> 
