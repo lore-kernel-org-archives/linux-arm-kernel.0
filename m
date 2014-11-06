@@ -1,74 +1,100 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Thu, 6 Nov 2014 15:19:17 +0100
-Subject: [PATCH 1/4] input: touchscreen: ti_am335x_tsc Interchange
- touchscreen and ADC steps
-In-Reply-To: <1414408111-2631-2-git-send-email-vigneshr@ti.com>
-References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
- <1414408111-2631-2-git-send-email-vigneshr@ti.com>
-Message-ID: <20141106141916.GA17151@netboy>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Thu,  6 Nov 2014 22:20:23 +0800
+Subject: [Patch Part2 v5 10/31] x86,
+ uv: Use new irqdomain interfaces to allocate/free IRQ
+In-Reply-To: <1415283644-2559-1-git-send-email-jiang.liu@linux.intel.com>
+References: <1415283644-2559-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1415283644-2559-11-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 04:38:28PM +0530, Vignesh R wrote:
+Use new irqdomain interfaces to allocate/free IRQ, so we could
+kill GENERIC_IRQ_LEGACY_ALLOC_HWIRQ later.
 
-...
+Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+---
+ arch/x86/platform/uv/uv_irq.c |   27 +++++++++++----------------
+ 1 file changed, 11 insertions(+), 16 deletions(-)
 
-> @@ -209,6 +214,7 @@ static void titsc_read_coordinates(struct titsc *ts_dev,
->  	unsigned int read, diff;
->  	unsigned int i, channel;
->  	unsigned int creads = ts_dev->coordinate_readouts;
-> +	unsigned int first_step = TOTAL_STEPS - (creads * 2 + 2);
->  
->  	*z1 = *z2 = 0;
->  	if (fifocount % (creads * 2 + 2))
-> @@ -226,7 +232,7 @@ static void titsc_read_coordinates(struct titsc *ts_dev,
->  
->  		channel = (read & 0xf0000) >> 16;
->  		read &= 0xfff;
-> -		if (channel < creads) {
-> +		if (channel > first_step + creads + 2) {
->  			diff = abs(read - prev_val_x);
->  			if (diff < prev_diff_x) {
->  				prev_diff_x = diff;
-> @@ -234,19 +240,19 @@ static void titsc_read_coordinates(struct titsc *ts_dev,
->  			}
->  			prev_val_x = read;
->  
-> -		} else if (channel < creads * 2) {
-> +		} else if (channel == first_step + creads + 1) {
-> +			*z1 = read;
-> +
-> +		} else if (channel == first_step + creads + 2) {
-> +			*z2 = read;
-> +
-> +		} else if (channel > first_step) {
->  			diff = abs(read - prev_val_y);
->  			if (diff < prev_diff_y) {
->  				prev_diff_y = diff;
->  				*y = read;
-
-While you are at it, please get rid of the this "delta filter"
-nonsense.
-
-Thanks,
-Richard
-
->  			}
->  			prev_val_y = read;
-> -
-> -		} else if (channel < creads * 2 + 1) {
-> -			*z1 = read;
-> -
-> -		} else if (channel < creads * 2 + 2) {
-> -			*z2 = read;
->  		}
->  	}
->  }
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/x86/platform/uv/uv_irq.c b/arch/x86/platform/uv/uv_irq.c
+index 0ce673645432..474912d03f40 100644
+--- a/arch/x86/platform/uv/uv_irq.c
++++ b/arch/x86/platform/uv/uv_irq.c
+@@ -12,6 +12,7 @@
+ #include <linux/rbtree.h>
+ #include <linux/slab.h>
+ #include <linux/irq.h>
++#include <linux/irqdomain.h>
+ 
+ #include <asm/apic.h>
+ #include <asm/uv/uv_irq.h>
+@@ -130,24 +131,14 @@ static int
+ arch_enable_uv_irq(char *irq_name, unsigned int irq, int cpu, int mmr_blade,
+ 		       unsigned long mmr_offset, int limit)
+ {
+-	const struct cpumask *eligible_cpu = cpumask_of(cpu);
+ 	struct irq_cfg *cfg = irq_cfg(irq);
+ 	unsigned long mmr_value;
+ 	struct uv_IO_APIC_route_entry *entry;
+-	int mmr_pnode, err;
+-	unsigned int dest;
++	int mmr_pnode;
+ 
+ 	BUILD_BUG_ON(sizeof(struct uv_IO_APIC_route_entry) !=
+ 			sizeof(unsigned long));
+ 
+-	err = assign_irq_vector(irq, cfg, eligible_cpu);
+-	if (err != 0)
+-		return err;
+-
+-	err = apic->cpu_mask_to_apicid_and(eligible_cpu, eligible_cpu, &dest);
+-	if (err != 0)
+-		return err;
+-
+ 	if (limit == UV_AFFINITY_CPU)
+ 		irq_set_status_flags(irq, IRQ_NO_BALANCING);
+ 	else
+@@ -164,7 +155,7 @@ arch_enable_uv_irq(char *irq_name, unsigned int irq, int cpu, int mmr_blade,
+ 	entry->polarity		= 0;
+ 	entry->trigger		= 0;
+ 	entry->mask		= 0;
+-	entry->dest		= dest;
++	entry->dest		= cfg->dest_apicid;
+ 
+ 	mmr_pnode = uv_blade_to_pnode(mmr_blade);
+ 	uv_write_global_mmr64(mmr_pnode, mmr_offset, mmr_value);
+@@ -238,9 +229,13 @@ uv_set_irq_affinity(struct irq_data *data, const struct cpumask *mask,
+ int uv_setup_irq(char *irq_name, int cpu, int mmr_blade,
+ 		 unsigned long mmr_offset, int limit)
+ {
+-	int ret, irq = irq_alloc_hwirq(uv_blade_to_memory_nid(mmr_blade));
++	int ret, irq;
++	struct irq_alloc_info info;
+ 
+-	if (!irq)
++	init_irq_alloc_info(&info, cpumask_of(cpu));
++	irq = irq_domain_alloc_irqs(NULL, 1, uv_blade_to_memory_nid(mmr_blade),
++				    &info);
++	if (irq <= 0)
+ 		return -EBUSY;
+ 
+ 	ret = arch_enable_uv_irq(irq_name, irq, cpu, mmr_blade, mmr_offset,
+@@ -248,7 +243,7 @@ int uv_setup_irq(char *irq_name, int cpu, int mmr_blade,
+ 	if (ret == irq)
+ 		uv_set_irq_2_mmr_info(irq, mmr_offset, mmr_blade);
+ 	else
+-		irq_free_hwirq(irq);
++		irq_domain_free_irqs(irq, 1);
+ 
+ 	return ret;
+ }
+@@ -283,6 +278,6 @@ void uv_teardown_irq(unsigned int irq)
+ 			n = n->rb_right;
+ 	}
+ 	spin_unlock_irqrestore(&uv_irq_lock, irqflags);
+-	irq_free_hwirq(irq);
++	irq_domain_free_irqs(irq, 1);
+ }
+ EXPORT_SYMBOL_GPL(uv_teardown_irq);
+-- 
+1.7.10.4
