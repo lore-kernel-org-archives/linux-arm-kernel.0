@@ -1,57 +1,37 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 06 Nov 2014 22:02:22 +0100
-Subject: (bisected) Lock up on sh73a0/kzm9g on cpuidle initialization
-In-Reply-To: <CAMuHMdXaaa2t6+sH2egGacVxkAPeTUkAgwdYsOnMnEPnuLdB5Q@mail.gmail.com>
-References: <CAMuHMdXaaa2t6+sH2egGacVxkAPeTUkAgwdYsOnMnEPnuLdB5Q@mail.gmail.com>
-Message-ID: <545BE1DE.6060900@linaro.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 06 Nov 2014 22:06:45 +0100
+Subject: [PATCH 0/5] clk: rockchip: add full support for HDMI clock on
+ rk3288
+In-Reply-To: <1415087559-19444-1-git-send-email-kever.yang@rock-chips.com>
+References: <1415087559-19444-1-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <48806799.thBSifdUp8@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2014 09:38 PM, Geert Uytterhoeven wrote:
-> When CONFIG_CPU_IDLE=y, the kernel locks up during cpuidle initialization
-> on Renesas sh73a0/kzm9g-reference, which has a dual-core Cortex-A9.
->
-> Last message is:
->
->      DMA: preallocated 256 KiB pool for atomic coherent allocations
->
-> After this it's supposed to print:
->
->      cpuidle: using governor ladder
->      cpuidle: using governor menu
->
-> I've bisected this to commit 442bf3aaf55a91ebfec71da46a4ee10a3c905bcc
-> ("sched: Let the scheduler see CPU idle states").
->
-> Reverting that commit, and commit 83a0a96a5f26d974580fd7251043ff70c8f1823d
-> ("sched/fair: Leverage the idle state info when choosing the "idlest"
-> cpu") which
-> depends on it, fixes the problem.
->
-> I saw the discussion "lockdep splat in CPU hotplug", so I enabled lockdep
-> debugging, but didn't see a lockdep splat.
+Hi Kever,
 
-Did you try the fix attached ?
+Am Dienstag, 4. November 2014, 15:52:34 schrieb Kever Yang:
+> we are going to make a clock usage solution for rk3288:
+> 1. CPLL and GPLL always not change after assign init;
+> 2. NPLL default as 500MHz, may used for most scene;
+> 3. NPLL may be changed by VOP(HDMI) clock for some special
+>    frequency requirement.
+> 
+>     I test it with rk3288 evb on top of Heiko's clk-for-next
 
-https://lkml.org/lkml/2014/10/22/722
+In general I'm not really sure if allowing one component to arbitarily change 
+a shared clock wouldn't result in trouble.
 
-> I'm using CONFIG_TREE_RCU=y, as this is SMP without PREEMPT.
->
-> Anyone with a clue?
+At the moment only dclk_vop0 is included in your series, while the hdmi 
+controller can connect to both vop0 and vop1.
+And as Doug mentioned the gpu also has the npll as one possible source.
+
+Looking through the clock-tree there are a lot more components possibly using 
+(or wanting to use) the npll: of course the VOPs, the edp, hdmi, isp, hevc, 
+gpu, tsp uart0 and gmac. So I'm slightly uncomfortable with somehow reserving 
+the npll for VOP0 alone.
+
+But I also don't see a different way to get these frequencies right now.
 
 
-
-
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                  -- Linus Torvalds
->
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Heiko
