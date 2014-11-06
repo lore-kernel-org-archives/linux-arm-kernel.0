@@ -1,53 +1,110 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Thu,  6 Nov 2014 14:23:01 +0000
-Subject: [PATCH v3 0/2] poweroff-source DT property renaming
-Message-ID: <1415283784-10885-1-git-send-email-romain.perier@gmail.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Thu,  6 Nov 2014 22:20:25 +0800
+Subject: [Patch Part2 v5 12/31] x86,
+ dmar: Use new irqdomain interfaces to allocate/free IRQ
+In-Reply-To: <1415283644-2559-1-git-send-email-jiang.liu@linux.intel.com>
+References: <1415283644-2559-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1415283644-2559-13-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The goal of this serie is to rename the property "poweroff-source" to
-"system-power-controller". After discussions, it makes more sense to rename back
-to the old established property name. This patches serie reverts
-commit a4b4e0461ec5 ("of: Add standard property for poweroff capability").
+Use new irqdomain interfaces to allocate/free IRQ for DMAR and interrupt
+remapping, so we could kill GENERIC_IRQ_LEGACY_ALLOC_HWIRQ later.
 
-Changes since v2:
-  - of_is_system_power_controller is inline in of.h and only supports
-    backward compatibility with device drivers which used this helper
-    (which is tps65910)
-  - Quashed all changes into a single patch (except documentation)
-  - Add a separated commit to fix typos and mispellings in documentation
+The private definition of irq_alloc_hwirqs()/irq_free_hwirqs() are
+temporary solution, it will be removed once we have converted interrupt
+remapping driver to use irqdomain framework.
 
-Changes since v1:
+Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+---
+ arch/x86/include/asm/irq_remapping.h |    4 ++--
+ arch/x86/kernel/apic/msi.c           |   10 ++++++++++
+ drivers/iommu/irq_remapping.c        |   17 +++++++++++++++--
+ 3 files changed, 27 insertions(+), 4 deletions(-)
 
-  - The first patch defines "of_is_system_power_controller" which is compatible
-    with both "vendor,system-power-controller" and "system-power-controller"
-    properties. Also, It keeps the old helper function of_system_has_poweroff_source
-    for source compatibility until everything is renamed (in this way, bisections
-    are not broken and change is made "atomically" between each commit)
-
-    Note: the property "poweroff-source" itself is not used in dts files yet.
-    Before this patch tps65910 was broken due to missing backward compatibility
-    with "vendor,system-power-controller". As the old helper uses the new one,
-    it works again.
-
-  - act8865 and tps65910 are ported to the new helper function
-
-  - The last commit removes the olf helper which was only used for source compatibility
-
-Romain Perier (2):
-  of: Rename "poweroff-source" property to "system-power-controller"
-  dt-bindings: Update documentation for "system-power-controller" and
-    fix misspellings
-
- .../devicetree/bindings/power/power-controller.txt     | 18 ++++++++++++++++++
- Documentation/devicetree/bindings/power/poweroff.txt   | 18 ------------------
- .../bindings/regulator/act8865-regulator.txt           |  4 ++--
- drivers/mfd/tps65910.c                                 |  2 +-
- drivers/regulator/act8865-regulator.c                  |  2 +-
- include/linux/of.h                                     |  8 +++++---
- 6 files changed, 27 insertions(+), 25 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/power/power-controller.txt
- delete mode 100644 Documentation/devicetree/bindings/power/poweroff.txt
-
+diff --git a/arch/x86/include/asm/irq_remapping.h b/arch/x86/include/asm/irq_remapping.h
+index b7747c4c2cf2..230dde9b695e 100644
+--- a/arch/x86/include/asm/irq_remapping.h
++++ b/arch/x86/include/asm/irq_remapping.h
+@@ -103,7 +103,7 @@ static inline bool setup_remapped_irq(int irq,
+ }
+ #endif /* CONFIG_IRQ_REMAP */
+ 
+-#define dmar_alloc_hwirq()	irq_alloc_hwirq(-1)
+-#define dmar_free_hwirq		irq_free_hwirq
++extern int dmar_alloc_hwirq(void);
++extern void dmar_free_hwirq(int irq);
+ 
+ #endif /* __X86_IRQ_REMAPPING_H */
+diff --git a/arch/x86/kernel/apic/msi.c b/arch/x86/kernel/apic/msi.c
+index d5def489ca5b..328cf7fbbdc4 100644
+--- a/arch/x86/kernel/apic/msi.c
++++ b/arch/x86/kernel/apic/msi.c
+@@ -223,6 +223,16 @@ int arch_setup_dmar_msi(unsigned int irq)
+ 				      "edge");
+ 	return 0;
+ }
++
++int dmar_alloc_hwirq(void)
++{
++	return irq_domain_alloc_irqs(NULL, 1, NUMA_NO_NODE, NULL);
++}
++
++void dmar_free_hwirq(int irq)
++{
++	irq_domain_free_irqs(irq, 1);
++}
+ #endif
+ 
+ /*
+diff --git a/drivers/iommu/irq_remapping.c b/drivers/iommu/irq_remapping.c
+index e9fbd68db96e..63886bafed9f 100644
+--- a/drivers/iommu/irq_remapping.c
++++ b/drivers/iommu/irq_remapping.c
+@@ -6,6 +6,7 @@
+ #include <linux/msi.h>
+ #include <linux/irq.h>
+ #include <linux/pci.h>
++#include <linux/irqdomain.h>
+ 
+ #include <asm/hw_irq.h>
+ #include <asm/irq_remapping.h>
+@@ -50,6 +51,18 @@ static void irq_remapping_disable_io_apic(void)
+ 		disconnect_bsp_APIC(0);
+ }
+ 
++#ifndef CONFIG_GENERIC_IRQ_LEGACY_ALLOC_HWIRQ
++static unsigned int irq_alloc_hwirqs(int cnt, int node)
++{
++	return irq_domain_alloc_irqs(NULL, -1, cnt, node, NULL);
++}
++
++static void irq_free_hwirqs(unsigned int from, int cnt)
++{
++	irq_domain_free_irqs(from, cnt);
++}
++#endif
++
+ static int do_setup_msi_irqs(struct pci_dev *dev, int nvec)
+ {
+ 	int ret, sub_handle, nvec_pow2, index = 0;
+@@ -113,7 +126,7 @@ static int do_setup_msix_irqs(struct pci_dev *dev, int nvec)
+ 
+ 	list_for_each_entry(msidesc, &dev->msi_list, list) {
+ 
+-		irq = irq_alloc_hwirq(node);
++		irq = irq_alloc_hwirqs(1, node);
+ 		if (irq == 0)
+ 			return -1;
+ 
+@@ -136,7 +149,7 @@ static int do_setup_msix_irqs(struct pci_dev *dev, int nvec)
+ 	return 0;
+ 
+ error:
+-	irq_free_hwirq(irq);
++	irq_free_hwirqs(irq, 1);
+ 	return ret;
+ }
+ 
 -- 
-1.9.1
+1.7.10.4
