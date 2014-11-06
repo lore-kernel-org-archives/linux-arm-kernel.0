@@ -1,26 +1,67 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 6 Nov 2014 14:07:53 +0100
-Subject: [Patch Part2 v4 00/31] Enable hierarchy irqdomian on x86 platforms
-In-Reply-To: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
-References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <20141106130753.GN10744@8bytes.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 6 Nov 2014 14:08:37 +0100
+Subject: gcc 4.9 build warnings (was: Re: arm-soc build: 2917 warnings 0
+ failures (arm-soc/v3.18-rc1-20-g06c0773))
+In-Reply-To: <20141106125857.GA12260@ulmo>
+References: <544a2a2e.a2db440a.6eeb.ffffaef3@mx.google.com>
+ <CAKv+Gu-0jenous5sLPp+QJa3qRk-RiBgG1vVYP_RmVw0uXaysw@mail.gmail.com>
+ <20141106114919.GL26297@ulmo> <2700572.p8cKrIiMH5@wuerfel>
+ <20141106125857.GA12260@ulmo>
+Message-ID: <CAKv+Gu85h2hMsxtYrMeb_s0KdGfozQf908nmt_BvjhoFQdneow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 04, 2014 at 08:01:34PM +0800, Jiang Liu wrote:
-> Patch 1-5 enhance irqdomain and irq core to support hierarchy irqdomain
-> and stacked irqchip.
-> Patch 6-12 implement an irqdomain to manange CPU interrupt vectors, and
-> it's the root irqdomain for x86 platforms.
-> Patch 13-16 converts Intel and AMD interrupt remapping drivers to
-> support hierarchy irqdomain.
-> Patch 17-23 converts HPET and MSI to support hierarchy irqdomain.
-> Patch 24-27 cleans up unsued code in x86 arch and interrupt remapping
-> drivers.
-> Patch 28-31 converts DMAR, HTIRQ and UV to support hierarchy irqdomain.
+On 6 November 2014 13:59, Thierry Reding <thierry.reding@gmail.com> wrote:
+> On Thu, Nov 06, 2014 at 12:56:27PM +0100, Arnd Bergmann wrote:
+>> On Thursday 06 November 2014 12:49:22 Thierry Reding wrote:
+>> > GCC complains about the format specifier being wrong. %zu/%zd are the
+>> > correct specifiers for variables of type size_t/ssize_t, so wherever a
+>> > size_t or ssize_t is used as parameter it should have a corresponding
+>> > %zu or %zd specifier.
+>> >
+>> > Why not just fix it properly instead of mucking about with the size_t
+>> > typedef?
+>> >
+>>
+>> Yes, but where are %zu and %zd implemented in gcc? I've looked but
+>> couldn't find it. For all I can tell is that gcc's own interpretation
+>> of %z doesn't match its definition of __SIZE_TYPE__ when building for
+>> bare-metal.
+>
+> I think the code you're looking for is gcc/c-family/c-format.c in
+> function format_type_warning() (and its callers). Now my understanding
+> of GCC internals is fairly limited, but what I think is happening is
+> that the matching happens on the exact typedef, so even if size_t is
+> typedef'd to unsigned int and the argument is of type unsigned int the
+> check will still fail and cause the warning.
+>
 
-Okay, I looked over the IOMMU changes and did some testing. With Jiangs
-fix for the AMD Kaveri boot panic it looks good to me. So for the IOMMU
-parts:
+Yes, that is what it looks like.
 
-Acked-by: Joerg Roedel <jroedel@suse.de>
+> Interestingly I can't seem to reproduce these warnings, neither with the
+> native compiler on my system nor a 4.9.0 ARM cross-compiler. I've used
+> the attached source file as a test case (derived from the code at line
+> 1244 in drivers/regmap/regmap.c, which causes the warning in one of your
+
+The mystery is that arm-linux-gnueabihf-gcc does not produce the
+warning, whereas Olof's arm-none-eabi-gcc does (built from the same
+source version, as far as we can tell)
+
+> logs). Can you verify that the same warning happens when you run your
+> compiler on that? I've tried compiling with something like this:
+>
+>         $ gcc -Wall -Wextra -Wformat=2 -c test.c
+>
+> I don't think all of these are necessary, plain -Wformat /should/ be
+> enough.
+>
+> It's weird because both operands of the division are size_t, so I'm
+> guessing the compiler looses the type information at some point.
+>
+
+I have tried this with the BE bare metal compiler I have on my system,
+and it did not produce a warning.
+(gcc-linaro-armeb-none-eabi-4.9-2014.06)
+
+-- 
+Ard.
