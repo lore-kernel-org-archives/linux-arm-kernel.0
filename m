@@ -1,42 +1,31 @@
-From: voytikd@gmail.com (Dmitry Voytik)
-Date: Thu,  6 Nov 2014 22:49:32 +0400
-Subject: [PATCH] ARM: imx: simplify clk_pllv3_prepare()
-Message-ID: <1415299772-21079-1-git-send-email-voytikd@gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 6 Nov 2014 10:51:58 -0800
+Subject: [PATCH v5 36/48] arm64: psci: Register with kernel power-off
+ handler
+In-Reply-To: <20141106172222.GA15384@leverpostej>
+References: <1415292213-28652-1-git-send-email-linux@roeck-us.net>
+ <1415292213-28652-37-git-send-email-linux@roeck-us.net>
+ <20141106172222.GA15384@leverpostej>
+Message-ID: <20141106185158.GC31712@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ret variable is redundant. Call clk_pllv3_wait_lock() in the end
-return.
+On Thu, Nov 06, 2014 at 05:22:23PM +0000, Mark Rutland wrote:
+> On Thu, Nov 06, 2014 at 04:43:20PM +0000, Guenter Roeck wrote:
+> > Register with kernel power-off handler instead of setting pm_power_off
+> > directly.
+> > 
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> 
+> I just fetched your current poweroff-handler branch and gave it a spin
+> on Juno. It looks like this hasn't broken since the last time I tried
+> it. :)
+> 
+> Tested-by: Mark Rutland <mark.rutland@arm.com>
+> 
+Thanks a lot!
 
-Signed-off-by: Dmitry Voytik <voytikd@gmail.com>
----
- arch/arm/mach-imx/clk-pllv3.c | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
-index 57de74d..0ad6e54 100644
---- a/arch/arm/mach-imx/clk-pllv3.c
-+++ b/arch/arm/mach-imx/clk-pllv3.c
-@@ -69,7 +69,6 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
- {
- 	struct clk_pllv3 *pll = to_clk_pllv3(hw);
- 	u32 val;
--	int ret;
- 
- 	val = readl_relaxed(pll->base);
- 	if (pll->powerup_set)
-@@ -78,11 +77,7 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
- 		val &= ~BM_PLL_POWER;
- 	writel_relaxed(val, pll->base);
- 
--	ret = clk_pllv3_wait_lock(pll);
--	if (ret)
--		return ret;
--
--	return 0;
-+	return clk_pllv3_wait_lock(pll);
- }
- 
- static void clk_pllv3_unprepare(struct clk_hw *hw)
--- 
-1.9.1
+Guenter
