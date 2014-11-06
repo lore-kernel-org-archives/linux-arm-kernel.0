@@ -1,49 +1,67 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 6 Nov 2014 09:52:31 +0000
-Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
-In-Reply-To: <2659321.LYB03rL97X@wuerfel>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <2148776.X8NPqiYA6S@wuerfel> <20141105233921.GJ6168@google.com>
- <2659321.LYB03rL97X@wuerfel>
-Message-ID: <20141106095231.GA1923@red-moon>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 6 Nov 2014 10:52:35 +0100
+Subject: [PATCH] leds: leds-gpio: Convert gpio_blink_set() to use GPIO
+ descriptors
+In-Reply-To: <2455157.3p7mHhT8im@vostro.rjw.lan>
+References: <1414755658-96293-1-git-send-email-mika.westerberg@linux.intel.com>
+ <545843B1.3020101@nvidia.com> <2455157.3p7mHhT8im@vostro.rjw.lan>
+Message-ID: <CAMuHMdXn9W2S7N+YGfjDxQozMtRZCVdTzzdDps6YfOv2FqVBmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 06, 2014 at 12:05:48AM +0000, Arnd Bergmann wrote:
-> On Wednesday 05 November 2014 16:39:21 Bjorn Helgaas wrote:
-> > On Wed, Oct 22, 2014 at 10:52:19PM +0200, Arnd Bergmann wrote:
-> > > On Wednesday 22 October 2014 16:59:14 Lorenzo Pieralisi wrote:
-> > > > On Wed, Oct 01, 2014 at 10:38:45AM +0100, Arnd Bergmann wrote:
-> > > > 
-> > > > [...]
-> > > > 
-> > > > > The arm32 implementations of pci_domain_nr/pci_proc_domain can probably be
-> > > > > removed if we change the arm32 pcibios_init_hw function to call the new
-> > > > > interfaces that set the domain number.
-> > > > 
-> > > > I wished, but it is a bit more complicated than I thought unfortunately,
-> > > > mostly because some drivers, eg cns3xxx set the domain numbers
-> > > > statically in pci_sys_data and this sets a chain of dependency that is
-> > > > not easy to untangle. I think cns3xxx is the only legacy driver that "uses"
-> > > > the domain number (in pci_sys_data) in a way that clashes with the
-> > > > generic domain_nr implementation, I need to give it more thought.
-> > > 
-> > > Just had a look at that driver, shouldn't be too hard to change, see below.
-> > > 
-> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > 
-> > This patch is in my patchwork, but it lacks a topic & changelog and I'm not
-> > sure of its state, so I'm going to drop it for now.  Please post it again
-> > if you want me to do something with it.  I guess it only touches arch/arm,
-> > so it would probably be merged via your tree anyway.
-> 
-> Lorenzo has posted an updated version as
-> 
-> "arm: cns3xxx: pci: remove artificial dependency on pci_sys_data domain",
-> and a second patch that depends on it. That is the version we should be
-> merging, though I'm not sure through which tree.
+Hi Mika, Rafael,
 
-I am posting a v2 shortly, let's discuss the best way to merge it then.
+On Tue, Nov 4, 2014 at 11:50 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Tuesday, November 04, 2014 12:10:41 PM Alexandre Courbot wrote:
+>> On 10/31/2014 08:40 PM, Mika Westerberg wrote:
+>> > Commit 21f2aae91e902aad ("leds: leds-gpio: Add support for GPIO
+>> > descriptors") already converted most of the driver to use GPIO descriptors.
+>> > What is still missing is the platform specific hook gpio_blink_set() and
+>> > board files which pass legacy GPIO numbers to this driver in platform data.
+>> >
+>> > In this patch we handle the former and convert gpio_blink_set() to take
+>> > GPIO descriptor instead. In order to do this we convert the existing four
+>> > users to accept GPIO descriptor and translate it to legacy GPIO number in
+>> > the platform code. This effectively "pushes" legacy GPIO number usage from
+>> > the driver to platforms.
+>> >
+>> > Also add comment to the remaining block describing that it is legacy code
+>> > path and we are getting rid of it eventually.
+>> >
+>> > Suggested-by: Linus Walleij <linus.walleij@linaro.org>
+>> > Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+>>
+>> Acked-by: Alexandre Courbot <acourbot@nvidia.com>
+>
+> Patch applied, thanks everyone!
 
-Thanks,
-Lorenzo
+"leds: leds-gpio: Add support for GPIO descriptors" broke leds-gpio on
+non-DT platforms for me:
+
+    gpiod_direction_output: invalid GPIO
+    leds-gpio: probe of leds-gpio failed with error -22
+
+(desc is NULL in gpiod_direction_output()).
+
+DT shmobile reference/multi-platform are fine.
+
+I noticed the hard way, as I wanted to add some LEDs to a new platform,
+but couldn't get it work. It turned out it also had stopped working on
+r8a7740/armadillo-legacy, so I started bisecting...
+
+Unfortunately the offending patch can't just be reverted.
+Reverting all three of these on pm/linux-next fixed the issue, though:
+c673a2b400810352 leds: leds-gpio: Convert gpio_blink_set() to use GPIO descripto
+a43f2cbbb009f962 leds: leds-gpio: Make use of device property API
+5c51277a9ababfa4 leds: leds-gpio: Add support for GPIO descriptors
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
