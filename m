@@ -1,58 +1,60 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Thu, 6 Nov 2014 12:30:33 +0200
-Subject: [PATCH] leds: leds-gpio: Convert gpio_blink_set() to use GPIO
- descriptors
-In-Reply-To: <CAMuHMdXn9W2S7N+YGfjDxQozMtRZCVdTzzdDps6YfOv2FqVBmw@mail.gmail.com>
-References: <1414755658-96293-1-git-send-email-mika.westerberg@linux.intel.com>
- <545843B1.3020101@nvidia.com> <2455157.3p7mHhT8im@vostro.rjw.lan>
- <CAMuHMdXn9W2S7N+YGfjDxQozMtRZCVdTzzdDps6YfOv2FqVBmw@mail.gmail.com>
-Message-ID: <20141106103033.GK1618@lahna.fi.intel.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 6 Nov 2014 11:30:47 +0100 (CET)
+Subject: [Patch Part2 v4 21/31] PCI/MSI: enhance PCI MSI core to support
+ hierarchy irqdomain
+In-Reply-To: <alpine.DEB.2.11.1411061023400.24960@nanos>
+References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
+ <1415102525-9898-22-git-send-email-jiang.liu@linux.intel.com>
+ <alpine.DEB.2.11.1411061023400.24960@nanos>
+Message-ID: <alpine.DEB.2.11.1411061110550.24960@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 06, 2014 at 10:52:35AM +0100, Geert Uytterhoeven wrote:
-> Hi Mika, Rafael,
+On Thu, 6 Nov 2014, Thomas Gleixner wrote:
+> On Tue, 4 Nov 2014, Jiang Liu wrote:
+> > +#ifdef	CONFIG_PCI_MSI_IRQ_DOMAIN
+> > +static inline irq_hw_number_t
+> > +msi_get_hwirq(struct pci_dev *pdev, struct msi_desc *msidesc)
+> > +{
+> > +	return (irq_hw_number_t)msidesc->msi_attrib.entry_nr |
+> > +		PCI_DEVID(pdev->bus->number, pdev->devfn) << 11 |
+> > +		(pci_domain_nr(pdev->bus) & 0xFFFFFFFF) << 27;
+> > +}
+> > +
+> > +static int msi_domain_alloc(struct irq_domain *domain, unsigned int virq,
+> > +			    unsigned int nr_irqs, void *arg)
+> > +{
+> > +	int i, ret;
+> > +	irq_hw_number_t hwirq = arch_msi_irq_domain_get_hwirq(arg);
+> > +
+> > +	if (irq_find_mapping(domain, hwirq) > 0)
+> > +		return -EEXIST;
+> > +
+> > +	ret = irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, arg);
+> > +	if (ret >= 0)
+> > +		for (i = 0; i < nr_irqs; i++) {
+> > +			irq_domain_set_hwirq_and_chip(domain, virq + i,
+> > +					hwirq + i, &msi_chip, (void *)(long)i);
 > 
-> On Tue, Nov 4, 2014 at 11:50 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > On Tuesday, November 04, 2014 12:10:41 PM Alexandre Courbot wrote:
-> >> On 10/31/2014 08:40 PM, Mika Westerberg wrote:
-> >> > Commit 21f2aae91e902aad ("leds: leds-gpio: Add support for GPIO
-> >> > descriptors") already converted most of the driver to use GPIO descriptors.
-> >> > What is still missing is the platform specific hook gpio_blink_set() and
-> >> > board files which pass legacy GPIO numbers to this driver in platform data.
-> >> >
-> >> > In this patch we handle the former and convert gpio_blink_set() to take
-> >> > GPIO descriptor instead. In order to do this we convert the existing four
-> >> > users to accept GPIO descriptor and translate it to legacy GPIO number in
-> >> > the platform code. This effectively "pushes" legacy GPIO number usage from
-> >> > the driver to platforms.
-> >> >
-> >> > Also add comment to the remaining block describing that it is legacy code
-> >> > path and we are getting rid of it eventually.
-> >> >
-> >> > Suggested-by: Linus Walleij <linus.walleij@linaro.org>
-> >> > Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
-> >>
-> >> Acked-by: Alexandre Courbot <acourbot@nvidia.com>
-> >
-> > Patch applied, thanks everyone!
+> I think msi_chip being a global unique thing is problematic. It does
+> not allow multi platform kernels to select a chip at boot time and it
+> does not allow per domain chip implementations when you have multiple
+> msi domains. Aside of that msi_chip is a pretty bad name for a global.
 > 
-> "leds: leds-gpio: Add support for GPIO descriptors" broke leds-gpio on
-> non-DT platforms for me:
+> The solution is rather simple and msi is wide spread enough to justify
+> that.
 > 
->     gpiod_direction_output: invalid GPIO
->     leds-gpio: probe of leds-gpio failed with error -22
+> struct irqdomain_msi_data {
+>        struct irq_chip       *irq_chip;
+> };
 > 
-> (desc is NULL in gpiod_direction_output()).
-> 
-> DT shmobile reference/multi-platform are fine.
-> 
-> I noticed the hard way, as I wanted to add some LEDs to a new platform,
-> but couldn't get it work. It turned out it also had stopped working on
-> r8a7740/armadillo-legacy, so I started bisecting...
+> We make that a struct so we can accomodate for other special things
+> which might be domain rather than architecture specific. One
+> obvious use case would be to hold the arch_msi_irq_domain_get/set_hwirq
+> callbacks.
 
-Which board file that is?
+That needs to hand in the domain as an argument as well.
 
-There is a bug that gpio_to_desc() returns NULL instead if ERR_PTR() in
-that patch but I wonder why gpio_is_valid() and devm_gpio_request_one()
-do not complain about that prior.
+Thanks,
+
+	tglx
