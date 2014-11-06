@@ -1,38 +1,239 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Thu, 6 Nov 2014 09:56:42 +0800
-Subject: [PATCH 00/10] arm64 kexec kernel patches V5
-In-Reply-To: <20141103194634.GA30366@leverpostej>
-References: <cover.1414099246.git.geoff@infradead.org>
- <20141031075209.GH3290@darkstar.nay.redhat.com>
- <20141103194634.GA30366@leverpostej>
-Message-ID: <20141106015642.GA2569@darkstar.nay.redhat.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Thu, 6 Nov 2014 09:58:11 +0800
+Subject: [Patch Part2 v4 21/31] PCI/MSI: enhance PCI MSI core to support
+ hierarchy irqdomain
+In-Reply-To: <20141105230952.GH6168@google.com>
+References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
+ <1415102525-9898-22-git-send-email-jiang.liu@linux.intel.com>
+ <20141105230952.GH6168@google.com>
+Message-ID: <545AD5B3.60009@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/14 at 07:46pm, Mark Rutland wrote:
-> On Fri, Oct 31, 2014 at 07:52:09AM +0000, Dave Young wrote:
-> > Hi Geoff
-> > 
-> > I tested your patches. The macihne is using spin-table cpu enable method
-> > so I tried maxcpus=1 as you suggested.
-> > 
-> > There's below issues for me, thoughts?
-> > 
-> > 1. For acpi booting there's no /proc/device-tree so kexec can not find dtb
-> > to use.
+>>  
+>> @@ -1098,3 +1099,128 @@ int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries,
+>>  	return nvec;
+>>  }
+>>  EXPORT_SYMBOL(pci_enable_msix_range);
+>> +
+>> +#ifdef	CONFIG_PCI_MSI_IRQ_DOMAIN
 > 
-> Are you absolutely certain of this?
+> Space, not tab.
 > 
-> To use ACPI, you must have booted via EFI, as the only mechanism for
-> finding the ACPI tables is via EFI. If booted via EFI, the stub will
-> have created a stub DTB if there is no provided DTB, to pass the command
-> line and pointers to EFI data structures. This stub DTB should be
-> present in the usual place.
+>> +static inline irq_hw_number_t
+>> +msi_get_hwirq(struct pci_dev *pdev, struct msi_desc *msidesc)
+> 
+> The convention in this file is "struct pci_dev *dev".  And "struct msi_desc
+> *desc" (or maybe "*entry").  Try to converge things, not diverge them.
+> 
+>> +{
+>> +	return (irq_hw_number_t)msidesc->msi_attrib.entry_nr |
+>> +		PCI_DEVID(pdev->bus->number, pdev->devfn) << 11 |
+>> +		(pci_domain_nr(pdev->bus) & 0xFFFFFFFF) << 27;
+> 
+> Where does this bit layout come from?  Is this defined in the spec
+> somewhere?  A reference would help.
 
-Mark, I used kexec-tools from Geoff's git tree, it will create dtb from procfs
-maybe I can pass external dtb to kexec-tools. What you mentioned should be true
-though but I have not get idea how to get the dtb which kernel is using for boot
-since it is not unflattened.
+Currently, more and more Non-PCI device use MSI(or similar MSI mechanism), like DMAR fault irq
+and HPET FSB irq. And we have to add additional code to support the MSI capability.
+So I hope we can decouple MSI code and PCI code, then we can unify all MSI(or Message Based interrupt)
+in one framework.
 
-Thanks
-Dave
+Thanks!
+Yijing.
+
+> 
+>> +}
+>> +
+>> +static int msi_domain_alloc(struct irq_domain *domain, unsigned int virq,
+>> +			    unsigned int nr_irqs, void *arg)
+>> +{
+>> +	int i, ret;
+>> +	irq_hw_number_t hwirq = arch_msi_irq_domain_get_hwirq(arg);
+>> +
+>> +	if (irq_find_mapping(domain, hwirq) > 0)
+>> +		return -EEXIST;
+>> +
+>> +	ret = irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, arg);
+>> +	if (ret >= 0)
+> 
+> 	if (ret < 0)
+> 		return ret;
+> 
+> and un-indent the mainline code below.  Then it's obvious that this is the
+> normal case, not the error case.
+> 
+>> +		for (i = 0; i < nr_irqs; i++) {
+>> +			irq_domain_set_hwirq_and_chip(domain, virq + i,
+>> +					hwirq + i, &msi_chip, (void *)(long)i);
+>> +			__irq_set_handler(virq + i, handle_edge_irq, 0, "edge");
+>> +		}
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static void msi_domain_free(struct irq_domain *domain, unsigned int virq,
+>> +			    unsigned int nr_irqs)
+>> +{
+>> +	int i;
+>> +
+>> +	for (i = 0; i < nr_irqs; i++) {
+>> +		struct msi_desc *msidesc = irq_get_msi_desc(virq);
+>> +
+>> +		if (msidesc)
+>> +			msidesc->irq = 0;
+>> +	}
+>> +	irq_domain_free_irqs_top(domain, virq, nr_irqs);
+>> +}
+>> +
+>> +static int msi_domain_activate(struct irq_domain *domain,
+>> +			       struct irq_data *irq_data)
+>> +{
+>> +	int ret = 0;
+>> +	struct msi_msg msg;
+>> +
+>> +	/*
+>> +	 * irq_data->chip_data is MSI/MSIx offset.
+> 
+> "MSI-X", as you wrote on the next line.
+> 
+>> +	 * MSI-X message is written per-IRQ, the offset is always 0.
+>> +	 * MSI message denotes a contiguous group of IRQs, written for 0th IRQ.
+>> +	 */
+>> +	if (!irq_data->chip_data) {
+> 
+> 	if (irq_data->chip_data)
+> 		return 0;
+> 
+> and un-indent the mainline code below, and drop the "ret = 0" init above.
+> 
+>> +		ret = irq_chip_compose_msi_msg(irq_data, &msg);
+>> +		if (ret == 0)
+> 
+> 	if (ret)
+> 		return ret;
+> 
+>> +			write_msi_msg(irq_data->irq, &msg);
+>> +	}
+>> +
+>> +	return ret;
+> 	return 0;
+>> +}
+>> +
+>> +static int msi_domain_deactivate(struct irq_domain *domain,
+>> +				 struct irq_data *irq_data)
+>> +{
+>> +	struct msi_msg msg;
+>> +
+>> +	if (irq_data->chip_data) {
+>> +		memset(&msg, 0, sizeof(msg));
+>> +		write_msi_msg(irq_data->irq, &msg);
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static struct irq_domain_ops msi_domain_ops = {
+>> +	.alloc = msi_domain_alloc,
+>> +	.free = msi_domain_free,
+>> +	.activate = msi_domain_activate,
+>> +	.deactivate = msi_domain_deactivate,
+>> +};
+>> +
+>> +struct irq_domain *msi_create_irq_domain(struct irq_domain *parent)
+>> +{
+>> +	struct irq_domain *domain;
+>> +
+>> +	domain = irq_domain_add_tree(NULL, &msi_domain_ops, NULL);
+>> +	if (domain)
+> 
+> 	if (!domain)
+> 		return NULL;
+> 
+> and un-indent this:
+> 
+>> +		domain->parent = parent;
+>> +
+>> +	return domain;
+>> +}
+>> +
+>> +int msi_irq_domain_alloc_irqs(struct irq_domain *domain, int type,
+>> +			      struct pci_dev *dev, void *arg)
+>> +{
+>> +	int i, virq;
+>> +	struct msi_desc *msidesc;
+>> +	int node = dev_to_node(&dev->dev);
+>> +
+>> +	list_for_each_entry(msidesc, &dev->msi_list, list) {
+>> +		arch_msi_irq_domain_set_hwirq(arg, msi_get_hwirq(dev, msidesc));
+>> +		virq = irq_domain_alloc_irqs(domain, msidesc->nvec_used,
+>> +					     node, arg);
+>> +		if (virq < 0) {
+>> +			/* Special handling for pci_enable_msi_range(). */
+>> +			return (type == PCI_CAP_ID_MSI &&
+>> +				msidesc->nvec_used > 1) ?  1 : -ENOSPC;	
+> 
+> I think "if" would be easier to read than this ternary expression.
+> 
+>> +		}
+>> +		for (i = 0; i < msidesc->nvec_used; i++)
+>> +			irq_set_msi_desc_off(virq + i, i, msidesc);
+>> +	}
+>> +
+>> +	list_for_each_entry(msidesc, &dev->msi_list, list)
+>> +		if (msidesc->nvec_used == 1)
+>> +			dev_dbg(&dev->dev, "irq %d for MSI/MSI-X\n", virq);
+>> +		else
+>> +			dev_dbg(&dev->dev, "irq [%d-%d] for MSI/MSI-X\n",
+>> +				virq, virq + msidesc->nvec_used - 1);
+>> +
+>> +	return 0;
+>> +}
+>> +#endif	/* CONFIG_PCI_MSI_IRQ_DOMAIN */
+>> diff --git a/include/linux/msi.h b/include/linux/msi.h
+>> index 44f4746d033b..05dcd425f82b 100644
+>> --- a/include/linux/msi.h
+>> +++ b/include/linux/msi.h
+>> @@ -75,4 +75,15 @@ struct msi_chip {
+>>  	void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
+>>  };
+>>  
+>> +#ifdef	CONFIG_PCI_MSI_IRQ_DOMAIN
+> 
+> Use a space here, not a tab.
+> 
+>> +extern struct irq_chip msi_chip;
+> 
+> I don't think "msi_chip" is a good name.  "Chip" only hints that it's a
+> semiconductor integrated circuit; it doesn't say anything about what it
+> does.  I've suggested "msi_controller" elsewhere.
+> 
+> Why does this need to be exported?  And why should there be only one in a
+> system?
+> 
+>> +extern struct irq_domain *msi_create_irq_domain(struct irq_domain *parent);
+>> +extern int msi_irq_domain_alloc_irqs(struct irq_domain *domain, int type,
+>> +				     struct pci_dev *dev, void *arg);
+>> +
+>> +extern irq_hw_number_t arch_msi_irq_domain_get_hwirq(void *arg);
+>> +extern void arch_msi_irq_domain_set_hwirq(void *arg, irq_hw_number_t hwirq);
+> 
+> Look at the rest of the file and notice that the existing code does not use
+> "extern" on function declarations.
+> 
+>> +#endif	/* CONFIG_PCI_MSI_IRQ_DOMAIN */
+> 
+> Use a space here (not a tab), like the #endif just below.
+> 
+>>  #endif /* LINUX_MSI_H */
+>> -- 
+>> 1.7.10.4
+>>
+> 
+> .
+> 
+
+
+-- 
+Thanks!
+Yijing
