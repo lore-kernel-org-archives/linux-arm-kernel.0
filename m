@@ -1,138 +1,216 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  6 Nov 2014 15:13:25 +0100
-Subject: [PATCH v2 09/10] arm64/efi: ignore unusable regions instead of
- reserving them
-In-Reply-To: <1415283206-14713-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1415283206-14713-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1415283206-14713-10-git-send-email-ard.biesheuvel@linaro.org>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Thu,  6 Nov 2014 22:20:34 +0800
+Subject: [Patch Part2 v5 21/31] PCI/MSI: Enhance core to support hierarchy
+ irqdomain
+In-Reply-To: <1415283644-2559-1-git-send-email-jiang.liu@linux.intel.com>
+References: <1415283644-2559-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1415283644-2559-22-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This changes the way memblocks are installed based on the contents of
-the UEFI memory map. Formerly, all regions would be memblock_add()'ed,
-after which unusable regions would be memblock_reserve()'d as well.
-To simplify things, but also to allow access to the unusable regions
-through mmap(/dev/mem), even with CONFIG_STRICT_DEVMEM set, change
-this so that only usable regions are memblock_add()'ed in the first
-place.
+Enhance PCI MSI core to support hierarchy irqdomain, so the common
+code could be shared among architectures.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
 ---
- arch/arm64/kernel/efi.c | 69 +++++++++++++++++++------------------------------
- 1 file changed, 26 insertions(+), 43 deletions(-)
+Hi Thomas,
+	These changes are a temporary solution, I'm working on another
+patch set which will refine these interfaces, especially kill 
+arch_msi_irq_domain_{set|get}_hwirq().
+Regards!
+Gerry
+---
+ drivers/pci/Kconfig |    4 ++
+ drivers/pci/msi.c   |  134 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/msi.h |   14 ++++++
+ 3 files changed, 152 insertions(+)
 
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 3009c22e2620..af2214c692d3 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -40,13 +40,6 @@ static int __init uefi_debug_setup(char *str)
- }
- early_param("uefi_debug", uefi_debug_setup);
+diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
+index b9db0f2ce11f..022e89745f86 100644
+--- a/drivers/pci/Kconfig
++++ b/drivers/pci/Kconfig
+@@ -16,6 +16,10 @@ config PCI_MSI
  
--static int __init is_normal_ram(efi_memory_desc_t *md)
--{
--	if (md->attribute & EFI_MEMORY_WB)
--		return 1;
--	return 0;
--}
--
- static int __init uefi_init(void)
- {
- 	efi_char16_t *c16;
-@@ -105,28 +98,11 @@ out:
- 	return retval;
- }
+ 	   If you don't know what to do here, say Y.
  
--/*
-- * Return true for RAM regions we want to permanently reserve.
-- */
--static __init int is_reserve_region(efi_memory_desc_t *md)
--{
--	switch (md->type) {
--	case EFI_LOADER_CODE:
--	case EFI_LOADER_DATA:
--	case EFI_BOOT_SERVICES_CODE:
--	case EFI_BOOT_SERVICES_DATA:
--	case EFI_CONVENTIONAL_MEMORY:
--		return 0;
--	default:
--		break;
--	}
--	return is_normal_ram(md);
--}
--
--static __init void reserve_regions(void)
-+static __init void process_memory_map(void)
- {
- 	efi_memory_desc_t *md;
- 	u64 paddr, npages, size;
-+	u32 lost = 0;
- 
- 	if (uefi_debug)
- 		pr_info("Processing EFI memory map:\n");
-@@ -134,31 +110,38 @@ static __init void reserve_regions(void)
- 	for_each_efi_memory_desc(&memmap, md) {
- 		paddr = md->phys_addr;
- 		npages = md->num_pages;
-+		size = npages << EFI_PAGE_SHIFT;
- 
- 		if (uefi_debug) {
- 			char buf[64];
- 
--			pr_info("  0x%012llx-0x%012llx %s",
--				paddr, paddr + (npages << EFI_PAGE_SHIFT) - 1,
-+			pr_info("  0x%012llx-0x%012llx %s\n",
-+				paddr, paddr + size - 1,
- 				efi_md_typeattr_format(buf, sizeof(buf), md));
- 		}
- 
--		memrange_efi_to_native(&paddr, &npages);
--		size = npages << PAGE_SHIFT;
--
--		if (is_normal_ram(md))
--			early_init_dt_add_memory_arch(paddr, size);
--
--		if (is_reserve_region(md)) {
--			memblock_reserve(paddr, size);
--			if (uefi_debug)
--				pr_cont("*");
--		}
--
--		if (uefi_debug)
--			pr_cont("\n");
-+		if (!efi_mem_is_usable_region(md))
-+			continue;
++config PCI_MSI_IRQ_DOMAIN
++	bool
++	depends on PCI_MSI && IRQ_DOMAIN_HIERARCHY
 +
-+		early_init_dt_add_memory_arch(paddr, size);
-+
-+		/*
-+		 * Keep a tally of how much memory we are losing due to
-+		 * rounding of regions that are not aligned to the page
-+		 * size. We cannot easily recover this memory without
-+		 * sorting the memory map and attempting to merge adjacent
-+		 * usable regions.
-+		 */
-+		if (PAGE_SHIFT != EFI_PAGE_SHIFT)
-+			lost += (npages << EFI_PAGE_SHIFT) -
-+				round_down(max_t(s64, size - PAGE_ALIGN(paddr) +
-+						 md->phys_addr, 0),
-+					   PAGE_SIZE);
- 	}
+ config PCI_DEBUG
+ 	bool "PCI Debugging"
+ 	depends on PCI && DEBUG_KERNEL
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index da181c59394b..8de7c8774fd2 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -19,6 +19,7 @@
+ #include <linux/errno.h>
+ #include <linux/io.h>
+ #include <linux/slab.h>
++#include <linux/irqdomain.h>
  
-+	if (lost > SZ_1K)
-+		pr_warn("efi: lost %u KB of RAM to rounding\n", lost / SZ_1K);
-+
- 	set_bit(EFI_MEMMAP, &efi.flags);
+ #include "pci.h"
+ 
+@@ -1098,3 +1099,136 @@ int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries,
+ 	return nvec;
  }
+ EXPORT_SYMBOL(pci_enable_msix_range);
++
++#ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
++/*
++ * Generate a unique ID number for each possible MSI source, the ID number
++ * is only used within the irqdomain.
++ */
++static inline irq_hw_number_t
++msi_get_hwirq(struct pci_dev *dev, struct msi_desc *desc)
++{
++	return (irq_hw_number_t)desc->msi_attrib.entry_nr |
++		PCI_DEVID(dev->bus->number, dev->devfn) << 11 |
++		(pci_domain_nr(dev->bus) & 0xFFFFFFFF) << 27;
++}
++
++static int msi_domain_alloc(struct irq_domain *domain, unsigned int virq,
++			    unsigned int nr_irqs, void *arg)
++{
++	int i, ret;
++	irq_hw_number_t hwirq = arch_msi_irq_domain_get_hwirq(arg);
++
++	if (irq_find_mapping(domain, hwirq) > 0)
++		return -EEXIST;
++
++	ret = irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, arg);
++	if (ret < 0)
++		return ret;
++
++	for (i = 0; i < nr_irqs; i++) {
++		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
++					      domain->host_data,
++					      (void *)(long)i);
++		__irq_set_handler(virq + i, handle_edge_irq, 0, "edge");
++	}
++
++	return ret;
++}
++
++static void msi_domain_free(struct irq_domain *domain, unsigned int virq,
++			    unsigned int nr_irqs)
++{
++	int i;
++
++	for (i = 0; i < nr_irqs; i++) {
++		struct msi_desc *desc = irq_get_msi_desc(virq);
++
++		if (desc)
++			desc->irq = 0;
++	}
++	irq_domain_free_irqs_top(domain, virq, nr_irqs);
++}
++
++static void msi_domain_activate(struct irq_domain *domain,
++				struct irq_data *irq_data)
++{
++	struct msi_msg msg;
++
++	/*
++	 * irq_data->chip_data is MSI/MSI-X offset.
++	 * MSI-X message is written per-IRQ, the offset is always 0.
++	 * MSI message denotes a contiguous group of IRQs, written for 0th IRQ.
++	 */
++	if (irq_data->chip_data)
++		return;
++
++	BUG_ON(irq_chip_compose_msi_msg(irq_data, &msg));
++	__write_msi_msg(irq_data->msi_desc, &msg);
++}
++
++static void msi_domain_deactivate(struct irq_domain *domain,
++				  struct irq_data *irq_data)
++{
++	struct msi_msg msg;
++
++	if (!irq_data->chip_data) {
++		memset(&msg, 0, sizeof(msg));
++		__write_msi_msg(irq_data->msi_desc, &msg);
++	}
++}
++
++static struct irq_domain_ops msi_domain_ops = {
++	.alloc = msi_domain_alloc,
++	.free = msi_domain_free,
++	.activate = msi_domain_activate,
++	.deactivate = msi_domain_deactivate,
++};
++
++struct irq_domain *msi_create_irq_domain(struct device_node *of_node,
++					 struct irq_chip *chip,
++					 struct irq_domain *parent)
++{
++	struct irq_domain *domain;
++
++	domain = irq_domain_add_tree(of_node, &msi_domain_ops, chip);
++	if (!domain)
++		return NULL;
++
++	domain->parent = parent;
++
++	return domain;
++}
++
++int msi_irq_domain_alloc_irqs(struct irq_domain *domain, int type,
++			      struct pci_dev *dev, void *arg)
++{
++	int i, virq;
++	struct msi_desc *desc;
++	int node = dev_to_node(&dev->dev);
++
++	list_for_each_entry(desc, &dev->msi_list, list) {
++		arch_msi_irq_domain_set_hwirq(arg, msi_get_hwirq(dev, desc));
++		virq = irq_domain_alloc_irqs(domain, desc->nvec_used,
++					     node, arg);
++		if (virq < 0) {
++			/* Special handling for pci_enable_msi_range(). */
++			if (type == PCI_CAP_ID_MSI && desc->nvec_used > 1)
++				return 1;
++			else
++				return -ENOSPC;
++		}
++		for (i = 0; i < desc->nvec_used; i++)
++			irq_set_msi_desc_off(virq, i, desc);
++	}
++
++	list_for_each_entry(desc, &dev->msi_list, list)
++		if (desc->nvec_used == 1)
++			dev_dbg(&dev->dev, "irq %d for MSI/MSI-X\n", virq);
++		else
++			dev_dbg(&dev->dev, "irq [%d-%d] for MSI/MSI-X\n",
++				virq, virq + desc->nvec_used - 1);
++
++	return 0;
++}
++#endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index 44f4746d033b..662c628fc2fa 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -75,4 +75,18 @@ struct msi_chip {
+ 	void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
+ };
  
-@@ -182,7 +165,7 @@ void __init efi_init(void)
- 
- 	WARN_ON(uefi_init() < 0);
- 
--	reserve_regions();
-+	process_memory_map();
- }
- 
- static int __init arm64_enter_virtual_mode(void)
++#ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
++struct irq_domain;
++struct irq_chip;
++
++struct irq_domain *msi_create_irq_domain(struct device_node *of_node,
++					 struct irq_chip *chip,
++					 struct irq_domain *parent);
++int msi_irq_domain_alloc_irqs(struct irq_domain *domain, int type,
++			      struct pci_dev *dev, void *arg);
++
++irq_hw_number_t arch_msi_irq_domain_get_hwirq(void *arg);
++void arch_msi_irq_domain_set_hwirq(void *arg, irq_hw_number_t hwirq);
++#endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
++
+ #endif /* LINUX_MSI_H */
 -- 
-1.8.3.2
+1.7.10.4
