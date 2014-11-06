@@ -1,181 +1,57 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 6 Nov 2014 19:43:19 +0800
-Subject: [Patch Part2 v4 13/31] x86: irq_remapping: Introduce new
- interfaces to support hierarchy irqdomain
-In-Reply-To: <1415102525-9898-14-git-send-email-jiang.liu@linux.intel.com>
-References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
- <1415102525-9898-14-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <545B5ED7.7090901@huawei.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu,  6 Nov 2014 12:47:39 +0100
+Subject: [PATCH] arm/arm64: kvm: vgic: Fix error code in kvm_vgic_create()
+Message-ID: <1415274459-28018-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +
-> +enum irq_alloc_type {
-> +	X86_IRQ_ALLOC_TYPE_IOAPIC = 1,
-> +	X86_IRQ_ALLOC_TYPE_HPET,
-> +	X86_IRQ_ALLOC_TYPE_MSI,
-> +	X86_IRQ_ALLOC_TYPE_MSIX,
-> +};
+If we detect another vCPU is running we just exit and return 0 as if we
+succesfully created the VGIC, but the VGIC wouldn't actual be created.
 
-Hi Gerry, why not to use X86_IRQ_ALLOC_TYPE_MSI to represent both MSI and MSI-X type?
-There are some differences to process MSI and MSI-X in irq remapping domain ?
+This shouldn't break in-kernel behavior because the kernel will not
+observe the failed the attempt to create the VGIC, but userspace could
+be rightfully confused.
 
->  
-> +extern struct irq_domain *irq_remapping_get_ir_irq_domain(
-> +				struct irq_alloc_info *info);
-> +extern struct irq_domain *irq_remapping_get_irq_domain(
-> +				struct irq_alloc_info *info);
+Cc: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ virt/kvm/arm/vgic.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-The two functions are too similar, and both get irq_domain by irq_alloc_info, possible to merge them ?
-
-> +extern void irq_remapping_print_chip(struct irq_data *data, struct seq_file *p);
-> +
-> +/*
-> + * Create MSI/MSIx irqdomain for interrupt remapping device, use @parent as
-> + * parent irqdomain.
-> + */
-> +static inline struct irq_domain *
-> +arch_create_msi_irq_domain(struct irq_domain *parent)
-> +{
-> +	return NULL;
-> +}
-> +
-> +/* Get parent irqdomain for interrupt remapping irqdomain */
-> +static inline struct irq_domain *arch_get_ir_parent_domain(void)
-> +{
-> +	return x86_vector_domain;
-> +}
-> +
->  #else  /* CONFIG_IRQ_REMAP */
->  
->  static inline void setup_irq_remapping_ops(void) { }
-> @@ -101,6 +126,20 @@ static inline bool setup_remapped_irq(int irq,
->  {
->  	return false;
->  }
-> +
-> +static inline struct irq_domain *
-> +irq_remapping_get_ir_irq_domain(struct irq_alloc_info *info)
-> +{
-> +	return NULL;
-> +}
-> +
-> +static inline struct irq_domain *
-> +irq_remapping_get_irq_domain(struct irq_alloc_info *info)
-> +{
-> +	return NULL;
-> +}
-> +
-> +#define	irq_remapping_print_chip	NULL
->  #endif /* CONFIG_IRQ_REMAP */
->  
->  extern int dmar_alloc_hwirq(void);
-> diff --git a/drivers/iommu/irq_remapping.c b/drivers/iommu/irq_remapping.c
-> index 63886bafed9f..176ff4372b7d 100644
-> --- a/drivers/iommu/irq_remapping.c
-> +++ b/drivers/iommu/irq_remapping.c
-> @@ -377,7 +377,7 @@ void panic_if_irq_remap(const char *msg)
->  		panic(msg);
->  }
->  
-> -static void ir_ack_apic_edge(struct irq_data *data)
-> +void ir_ack_apic_edge(struct irq_data *data)
->  {
->  	ack_APIC_irq();
->  }
-> @@ -388,6 +388,19 @@ static void ir_ack_apic_level(struct irq_data *data)
->  	eoi_ioapic_irq(data->irq, irqd_cfg(data));
->  }
->  
-> +void irq_remapping_print_chip(struct irq_data *data, struct seq_file *p)
-> +{
-> +	/*
-> +	 * Assume interrupt is remapped if the parent irqdomain isn't the
-> +	 * vector domain, which is true for MSI, HPET and IOAPIC on x86
-> +	 * platforms.
-> +	 */
-> +	if (data->domain && data->domain->parent != arch_get_ir_parent_domain())
-> +		seq_printf(p, " IR-%s", data->chip->name);
-> +	else
-> +		seq_printf(p, " %s", data->chip->name);
-> +}
-> +
->  static void ir_print_prefix(struct irq_data *data, struct seq_file *p)
->  {
->  	seq_printf(p, " IR-%s", data->chip->name);
-> @@ -409,3 +422,36 @@ bool setup_remapped_irq(int irq, struct irq_cfg *cfg, struct irq_chip *chip)
->  	irq_remap_modify_chip_defaults(chip);
->  	return true;
->  }
-> +
-> +/**
-> + * irq_remapping_get_ir_irq_domain - Get the irqdomain associated the IOMMU
-> + *				     device serving @info
-> + * @info: interrupt allocation information, used to find the IOMMU device
-> + *
-> + * It's used to get parent irqdomain for HPET and IOAPIC domains.
-> + * Returns pointer to IRQ domain, or NULL on failure.
-> + */
-> +struct irq_domain *
-> +irq_remapping_get_ir_irq_domain(struct irq_alloc_info *info)
-> +{
-> +	if (!remap_ops || !remap_ops->get_ir_irq_domain)
-> +		return NULL;
-> +
-> +	return remap_ops->get_ir_irq_domain(info);
-> +}
-> +
-> +/**
-> + * irq_remapping_get_irq_domain - Get the irqdomain serving the MSI interrupt
-> + * @info: interrupt allocation information, used to find the IOMMU device
-> + *
-> + * It's used to get irqdomain for MSI/MSIx interrupt allocation.
-> + * Returns pointer to IRQ domain, or NULL on failure.
-> + */
-> +struct irq_domain *
-> +irq_remapping_get_irq_domain(struct irq_alloc_info *info)
-> +{
-> +	if (!remap_ops || !remap_ops->get_irq_domain)
-> +		return NULL;
-> +
-> +	return remap_ops->get_irq_domain(info);
-> +}
-> diff --git a/drivers/iommu/irq_remapping.h b/drivers/iommu/irq_remapping.h
-> index fde250f86e60..8c159d6fac46 100644
-> --- a/drivers/iommu/irq_remapping.h
-> +++ b/drivers/iommu/irq_remapping.h
-> @@ -30,6 +30,8 @@ struct irq_data;
->  struct cpumask;
->  struct pci_dev;
->  struct msi_msg;
-> +struct irq_domain;
-> +struct irq_alloc_info;
->  
->  extern int disable_irq_remap;
->  extern int irq_remap_broken;
-> @@ -81,11 +83,19 @@ struct irq_remap_ops {
->  
->  	/* Setup interrupt remapping for an HPET MSI */
->  	int (*alloc_hpet_msi)(unsigned int, unsigned int);
-> +
-> +	/* Get the irqdomain associated the IOMMU device */
-> +	struct irq_domain *(*get_ir_irq_domain)(struct irq_alloc_info *);
-> +
-> +	/* Get the MSI irqdomain associated with the IOMMU device */
-> +	struct irq_domain *(*get_irq_domain)(struct irq_alloc_info *);
->  };
->  
->  extern struct irq_remap_ops intel_irq_remap_ops;
->  extern struct irq_remap_ops amd_iommu_irq_ops;
->  
-> +extern void ir_ack_apic_edge(struct irq_data *data);
-> +
->  #else  /* CONFIG_IRQ_REMAP */
->  
->  #define irq_remapping_enabled 0
-> 
-
-
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 3aaca49..aacdb59 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1933,7 +1933,7 @@ out:
+ 
+ int kvm_vgic_create(struct kvm *kvm)
+ {
+-	int i, vcpu_lock_idx = -1, ret = 0;
++	int i, vcpu_lock_idx = -1, ret;
+ 	struct kvm_vcpu *vcpu;
+ 
+ 	mutex_lock(&kvm->lock);
+@@ -1948,6 +1948,7 @@ int kvm_vgic_create(struct kvm *kvm)
+ 	 * vcpu->mutex.  By grabbing the vcpu->mutex of all VCPUs we ensure
+ 	 * that no other VCPUs are run while we create the vgic.
+ 	 */
++	ret = -EBUSY;
+ 	kvm_for_each_vcpu(i, vcpu, kvm) {
+ 		if (!mutex_trylock(&vcpu->mutex))
+ 			goto out_unlock;
+@@ -1955,11 +1956,10 @@ int kvm_vgic_create(struct kvm *kvm)
+ 	}
+ 
+ 	kvm_for_each_vcpu(i, vcpu, kvm) {
+-		if (vcpu->arch.has_run_once) {
+-			ret = -EBUSY;
++		if (vcpu->arch.has_run_once)
+ 			goto out_unlock;
+-		}
+ 	}
++	ret = 0;
+ 
+ 	spin_lock_init(&kvm->arch.vgic.lock);
+ 	kvm->arch.vgic.in_kernel = true;
 -- 
-Thanks!
-Yijing
+2.1.2.330.g565301e.dirty
