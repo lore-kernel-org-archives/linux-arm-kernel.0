@@ -1,51 +1,39 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu,  6 Nov 2014 22:20:19 +0800
-Subject: [Patch Part2 v5 06/31] x86, irq: Save destination CPU ID in irq_cfg
-In-Reply-To: <1415283644-2559-1-git-send-email-jiang.liu@linux.intel.com>
-References: <1415283644-2559-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1415283644-2559-7-git-send-email-jiang.liu@linux.intel.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 6 Nov 2014 16:18:32 +0200
+Subject: [PATCH v4 0/5] simplefb: add clock handling code
+In-Reply-To: <54534523.8080801@ti.com>
+References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
+ <54534523.8080801@ti.com>
+Message-ID: <545B8338.8060908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cache destination CPU APIC ID into struct irq_cfg when assigning vector
-for interrupt. Upper layer just needs to read the cached APIC ID instead
-of calling apic->cpu_mask_to_apicid_and(), it helps to hide APIC driver
-details from IOAPIC/HPET/MSI drivers..
+On 31/10/14 10:15, Tomi Valkeinen wrote:
+> Hi Hans,
+> 
+> On 22/10/14 19:45, Hans de Goede wrote:
+> 
+>> -We will add a clocks property to the simplefb devicetree bindings, so
+>>  that u-boot setup framebuffers passed to the kernel (for early console
+>>  support) can properly list the clocks used, and simplefb can claim them to
+>>  avoid them getting turned off, thereby breaking the early console
+> 
+> Perhaps this has been discussed earlier, but I started to wonder if
+> managing clocks is enough.
+> 
+> What about regulators (to power the LCD), gpios (to keep the LCD
+> enabled) and pinctrl (for video signals)? I guess any those could be
+> reset by the kernel if no driver uses them.
 
-Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
----
- arch/x86/include/asm/hw_irq.h |    1 +
- arch/x86/kernel/apic/vector.c |    6 ++++++
- 2 files changed, 7 insertions(+)
+Hans, ping. Have these been already discussed?
 
-diff --git a/arch/x86/include/asm/hw_irq.h b/arch/x86/include/asm/hw_irq.h
-index 9662290e0b20..b988ddf7434b 100644
---- a/arch/x86/include/asm/hw_irq.h
-+++ b/arch/x86/include/asm/hw_irq.h
-@@ -116,6 +116,7 @@ struct irq_data;
- struct irq_cfg {
- 	cpumask_var_t		domain;
- 	cpumask_var_t		old_domain;
-+	unsigned int		dest_apicid;
- 	u8			vector;
- 	u8			move_in_progress : 1;
- #ifdef CONFIG_IRQ_REMAP
-diff --git a/arch/x86/kernel/apic/vector.c b/arch/x86/kernel/apic/vector.c
-index 6cedd7914581..c724ef6b218c 100644
---- a/arch/x86/kernel/apic/vector.c
-+++ b/arch/x86/kernel/apic/vector.c
-@@ -188,6 +188,12 @@ next:
- 	}
- 	free_cpumask_var(tmp_mask);
- 
-+	if (!err) {
-+		/* cache destination APIC IDs into cfg->dest_apicid */
-+		err = apic->cpu_mask_to_apicid_and(mask, cfg->domain,
-+						   &cfg->dest_apicid);
-+	}
-+
- 	return err;
- }
- 
--- 
-1.7.10.4
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141106/2975ed95/attachment.sig>
