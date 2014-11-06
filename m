@@ -1,55 +1,52 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 6 Nov 2014 13:47:11 +0100
-Subject: N900 modem support in 3.18-rc1
-In-Reply-To: <20141105234555.GA7097@earth.universe>
-References: <20141104205117.GA17606@amd> <201411052137.31452@pali>
- <20141105203918.GA29199@amd> <201411052206.05379@pali>
- <20141105220359.GA32052@amd> <20141105234555.GA7097@earth.universe>
-Message-ID: <20141106124711.GA26944@amd>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 06 Nov 2014 13:47:20 +0100
+Subject: M_CAN message RAM initialization AppNote  - was: Re: [PATCH V3
+ 3/3] can: m_can: workaround for transmit data less than 4 bytes
+In-Reply-To: <545B6AB4.70003@hartkopp.net>
+References: <1415193393-30023-1-git-send-email-b29396@freescale.com>
+ <1415193393-30023-3-git-send-email-b29396@freescale.com>
+ <545A3451.2090302@pengutronix.de> <545A692E.40002@hartkopp.net>
+ <20141106015716.GB7642@shlinux1.ap.freescale.net>
+ <545B1D71.4000408@hartkopp.net>
+ <20141106080940.GA22964@shlinux1.ap.freescale.net>
+ <545B6AB4.70003@hartkopp.net>
+Message-ID: <545B6DD8.6010906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> On Wed, Nov 05, 2014 at 11:03:59PM +0100, Pavel Machek wrote:
-> > > Maybe you need to enable modem?
-> > > 
-> > > This is n900 init sequence from script: nokia-n900-configs.sh
-> > 
-> > From the dts, it looks like this should somehow work without this.
+On 11/06/2014 01:33 PM, Oliver Hartkopp wrote:
+>> So i'm not sure memset() the entire TX FIFO element is neccesary...
 > 
-> Right :) The n900-modem driver will take care of this if the "pm"
-> parameter is set to 1 (which should be the default).
+> It's no big deal - so we should be defensive here.
+> And memset() is not working as Marc pointed out in another mail.
+> 
+> So we would need to loop with
+> 
+>     m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(i), 0x0);
+> 
+>>
+>> Do you think we could keep the current solution firstly and updated later
+>> if needed?
+> 
+> No :-)
+> 
+> I would like to have all data bytes to be written at startup.
 
-I actually had pm=0 on the command line, but I removed it now, and no
-change:
+Me, too. As this happens only once during ifconfig up it should not hurt
+performance, either send an incremental or new patch. I'll sort it out.
 
-root at n900:~# find /sys/bus/hsi/devices/n900-modem/
-/sys/bus/hsi/devices/n900-modem/
-/sys/bus/hsi/devices/n900-modem/power
-/sys/bus/hsi/devices/n900-modem/power/control
-/sys/bus/hsi/devices/n900-modem/power/runtime_active_time
-/sys/bus/hsi/devices/n900-modem/power/autosuspend_delay_ms
-/sys/bus/hsi/devices/n900-modem/power/runtime_status
-/sys/bus/hsi/devices/n900-modem/power/runtime_suspended_time
-/sys/bus/hsi/devices/n900-modem/modalias
-/sys/bus/hsi/devices/n900-modem/driver
-/sys/bus/hsi/devices/n900-modem/subsystem
-/sys/bus/hsi/devices/n900-modem/uevent
-root at n900:~# cat /proc/cmdline 
-root=/dev/nfs nfsroot=192.168.1.6:/srv/nfs/n900 rw
-ip=192.168.1.8::192.168.1.6:255.255.255.192::usb0:  no-omap-wd
-no-ext-wd console=tty0
-root at n900:~# 
+Marc
 
-Let me try with explicit =1. .. aha, that helps. Thanks!
-
-Do you have an example client that can talk to ofonod?
-
-What is needed to get voice calls to work?
-
-Best regards,
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141106/87580684/attachment.sig>
