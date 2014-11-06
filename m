@@ -1,69 +1,58 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 5 Nov 2014 17:05:36 -0700
-Subject: [PATCH RFC 1/2] drivers: pci: fix window allocation order wrt
- bus_range filtering
-In-Reply-To: <1414077787-20633-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1414077787-20633-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20141106000536.GL6168@google.com>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Wed, 5 Nov 2014 18:05:32 -0600
+Subject: [V10 PATCH 2/2] irqchip: gicv2m: Add supports for ARM GICv2m
+ MSI(-X)
+In-Reply-To: <5458CE31.3040404@linux.intel.com>
+References: <1415052977-26036-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1415052977-26036-3-git-send-email-suravee.suthikulpanit@amd.com>
+ <5458CE31.3040404@linux.intel.com>
+Message-ID: <545ABB4C.8010103@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 23, 2014 at 04:23:06PM +0100, Lorenzo Pieralisi wrote:
-> The number of windows allocated for the host bridge depends on the
-> bus resource. Instead of first allocating the windows and then
-> limit the bus resource, this patch reshuffles the code so that if any
-> limitation is applied to the bus resource it is taken into account in
-> the windows allocation.
-> 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+On 11/4/2014 7:01 AM, Jiang Liu wrote:
+> Hi Suravee,
+> 	You may build a two level hierarchy irqdomains. Use the
+> utilities in this thread
+> http://www.spinics.net/lists/arm-kernel/msg374722.html  to build an MSI
+> irqdomain to manage MSI controllers
+> in PCI devices. And build another irqdomain to manage SPI allocation
+> in GICv2.
+> 	That is: MSI irqdomain (program MSI registers)  -->
+> GIV irqdomain (manage SPIs in GICv2 controller)
+>
+> Regards!
+> Gerry
 
-I applied these with Will's acks to pci/host-generic for v3.19, thanks!
+Gerry,
 
-In my mind, posting patches to the list is implicitly a request for
-comments, so I usually don't pay too much attention to things explicitly
-marked "RFC" because I figure that's a hint that "this is work-in-progress,
-please comment if you see anything obviously broken."
+I try out your patch from the link above, and I have a couple 
+questions/issues.
 
-Bjorn
+1. In the drivers/pci/msi.c: msi_irq_domain_alloc_irqs(), it seems that 
+the hwirq comes from msi_get_hwirq(dev, msidesc). In GICv2m, hwirq for 
+MSI is fixed over a specific range. This might require arch-specific
+callback.
 
-> ---
->  drivers/pci/host/pci-host-generic.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> index 3d2076f..1e1a80f 100644
-> --- a/drivers/pci/host/pci-host-generic.c
-> +++ b/drivers/pci/host/pci-host-generic.c
-> @@ -276,17 +276,17 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
->  		return err;
->  	}
->  
-> -	pci->cfg.win = devm_kcalloc(dev, resource_size(&pci->cfg.bus_range),
-> -				    sizeof(*pci->cfg.win), GFP_KERNEL);
-> -	if (!pci->cfg.win)
-> -		return -ENOMEM;
-> -
->  	/* Limit the bus-range to fit within reg */
->  	bus_max = pci->cfg.bus_range.start +
->  		  (resource_size(&pci->cfg.res) >> pci->cfg.ops->bus_shift) - 1;
->  	pci->cfg.bus_range.end = min_t(resource_size_t, pci->cfg.bus_range.end,
->  				       bus_max);
->  
-> +	pci->cfg.win = devm_kcalloc(dev, resource_size(&pci->cfg.bus_range),
-> +				    sizeof(*pci->cfg.win), GFP_KERNEL);
-> +	if (!pci->cfg.win)
-> +		return -ENOMEM;
-> +
->  	/* Map our Configuration Space windows */
->  	if (!devm_request_mem_region(dev, pci->cfg.res.start,
->  				     resource_size(&pci->cfg.res),
-> -- 
-> 2.1.2
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+2. In msi_domain_activate, why "if (!irq_data->chip_data)"?
+
+3. In, msi_domain_alloc():
+
+- There should be a way to specify other types of irq handler besides 
+the "handle_edge_irq". In case of GIC, it needs handle_fasteoi_irq.
+
+- When calling irq_domain_set_hwirq_and_chip(), you are passing "(void 
+*)(long)i" for the "void *chip_data" parameter. What is this used for, 
+and where?  Shouldn't this be pointing to arch-specific data structure?
+
+- The code is calling irq_domain_alloc_irqs_parent before the loop, 
+which calls irq_domain_set_hwirq_and_chip() and __irq_set_handler. 
+Shouldn't the order be switched?
+
+- Overall, it seems that msi_domain_alloc() could be quite different 
+across architectures. Would it be possible to declare this function as 
+weak, and allow arch to override (similar to arch_setup_msi_irq)?
+
+Thanks,
+
+Suravee
