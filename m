@@ -1,67 +1,135 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 6 Nov 2014 10:52:35 +0100
-Subject: [PATCH] leds: leds-gpio: Convert gpio_blink_set() to use GPIO
- descriptors
-In-Reply-To: <2455157.3p7mHhT8im@vostro.rjw.lan>
-References: <1414755658-96293-1-git-send-email-mika.westerberg@linux.intel.com>
- <545843B1.3020101@nvidia.com> <2455157.3p7mHhT8im@vostro.rjw.lan>
-Message-ID: <CAMuHMdXn9W2S7N+YGfjDxQozMtRZCVdTzzdDps6YfOv2FqVBmw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 6 Nov 2014 10:55:12 +0100
+Subject: [PATCH] PM / Domains: Change prototype for the ->attach_dev()
+ callback
+In-Reply-To: <7hsihx1bvo.fsf@deeprootsystems.com>
+References: <1414670569-3002-1-git-send-email-ulf.hansson@linaro.org>
+ <20141105013353.GA19238@dtor-ws>
+ <7h7fz92rqk.fsf@deeprootsystems.com>
+ <3267963.fqUYb7m9Rv@vostro.rjw.lan>
+ <7hsihx1bvo.fsf@deeprootsystems.com>
+Message-ID: <CAPDyKFraQAGUU+BnwuEL0+HS_g2YfM_cRjHAeg2qrGkqFW=YVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mika, Rafael,
-
-On Tue, Nov 4, 2014 at 11:50 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Tuesday, November 04, 2014 12:10:41 PM Alexandre Courbot wrote:
->> On 10/31/2014 08:40 PM, Mika Westerberg wrote:
->> > Commit 21f2aae91e902aad ("leds: leds-gpio: Add support for GPIO
->> > descriptors") already converted most of the driver to use GPIO descriptors.
->> > What is still missing is the platform specific hook gpio_blink_set() and
->> > board files which pass legacy GPIO numbers to this driver in platform data.
->> >
->> > In this patch we handle the former and convert gpio_blink_set() to take
->> > GPIO descriptor instead. In order to do this we convert the existing four
->> > users to accept GPIO descriptor and translate it to legacy GPIO number in
->> > the platform code. This effectively "pushes" legacy GPIO number usage from
->> > the driver to platforms.
->> >
->> > Also add comment to the remaining block describing that it is legacy code
->> > path and we are getting rid of it eventually.
->> >
->> > Suggested-by: Linus Walleij <linus.walleij@linaro.org>
->> > Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
->>
->> Acked-by: Alexandre Courbot <acourbot@nvidia.com>
+On 6 November 2014 00:11, Kevin Hilman <khilman@kernel.org> wrote:
+> "Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
 >
-> Patch applied, thanks everyone!
+>> On Wednesday, November 05, 2014 02:43:31 PM Kevin Hilman wrote:
+>>> Dmitry Torokhov <dmitry.torokhov@gmail.com> writes:
+>>>
+>>> > On Thu, Oct 30, 2014 at 01:38:30PM -0700, Kevin Hilman wrote:
+>>> >> "Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
+>>> >>
+>>> >> > On Thursday, October 30, 2014 01:02:49 PM Ulf Hansson wrote:
+>>> >> >> Convert the prototype to return and int. This is just an initial step,
+>>> >> >> needed to support error handling.
+>>> >> >>
+>>> >> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>> >>
+>>> >> Acked-by: Kevin Hilman <khilman@linaro.org>
+>>> >>
+>>> >> >>
+>>> >> >> This patch is intended as fix for 3.18 rc[n]. Why?
+>>> >> >>
+>>> >> >> There are other SOC specific patches around that adds genpd support and which
+>>> >> >> implements the ->attach_dev() callback. To prevent having an "atomic" patch
+>>> >> >> during the next release cycle, let's change the prototype now instead.
+>>> >> >>
+>>> >> >> Further patches will add the actual error handling in genpd and these can then
+>>> >> >> be reviewed and tested thoroughly.
+>>> >> >
+>>> >> > So we have no users of ->attach_dev at the moment, right?
+>>> >>
+>>> >> Not in mainline, but there are a couple getting ready to hit -next, so
+>>> >> we wanted to fix this before they arrive so that adding the error
+>>> >> handling will be easier.
+>>> >
+>>> > BTW, while we are at it, can we also pass the domain itself to
+>>> > attach_dev() and detach_dev()? If anything it helps with debugging (you
+>>> > can print domain name from the callbacks).
+>>>
+>>> Agreed, and it makes it match the other callbacks (power_off, power_on)
+>>> which currently take struct generic_pm_domain *domain.
+>>>
+>>> Updated version of $SUBJECT patch below.
+>>
+>> The subject and changelog need to be updated too IMO.
+>>
+>
+> Right.  Here you go.
+>
+> Kevin
 
-"leds: leds-gpio: Add support for GPIO descriptors" broke leds-gpio on
-non-DT platforms for me:
+Thanks for helping out Kevin!
 
-    gpiod_direction_output: invalid GPIO
-    leds-gpio: probe of leds-gpio failed with error -22
+Kind regards
+Uffe
 
-(desc is NULL in gpiod_direction_output()).
-
-DT shmobile reference/multi-platform are fine.
-
-I noticed the hard way, as I wanted to add some LEDs to a new platform,
-but couldn't get it work. It turned out it also had stopped working on
-r8a7740/armadillo-legacy, so I started bisecting...
-
-Unfortunately the offending patch can't just be reverted.
-Reverting all three of these on pm/linux-next fixed the issue, though:
-c673a2b400810352 leds: leds-gpio: Convert gpio_blink_set() to use GPIO descripto
-a43f2cbbb009f962 leds: leds-gpio: Make use of device property API
-5c51277a9ababfa4 leds: leds-gpio: Add support for GPIO descriptors
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>
+>
+> ----- >8 ------
+> From c18a6bf3121979c4102ba4f7edb3ac41e3921fc6 Mon Sep 17 00:00:00 2001
+> From: Ulf Hansson <ulf.hansson@linaro.org>
+> Date: Thu, 30 Oct 2014 13:02:49 +0100
+> Subject: [PATCH] PM / Domains: Change prototype for the attach and detach
+>  callbacks
+>
+> Convert the prototypes to return an int in order to support error
+> handling in these callbacks.
+>
+> Also, as suggested by Dmitry Torokhov, pass the domain pointer for use
+> inside the callbacks, and so that they match the existing
+> power_on/power_off callbacks which currently take the domain pointer.
+>
+> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> [khilman: added domain as parameter to callbacks, as suggested by Dmitry]
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+> ---
+>  drivers/base/power/domain.c | 4 ++--
+>  include/linux/pm_domain.h   | 6 ++++--
+>  2 files changed, 6 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 40bc2f4072cc..b520687046d4 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1437,7 +1437,7 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
+>         spin_unlock_irq(&dev->power.lock);
+>
+>         if (genpd->attach_dev)
+> -               genpd->attach_dev(dev);
+> +               genpd->attach_dev(genpd, dev);
+>
+>         mutex_lock(&gpd_data->lock);
+>         gpd_data->base.dev = dev;
+> @@ -1499,7 +1499,7 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
+>         genpd->max_off_time_changed = true;
+>
+>         if (genpd->detach_dev)
+> -               genpd->detach_dev(dev);
+> +               genpd->detach_dev(genpd, dev);
+>
+>         spin_lock_irq(&dev->power.lock);
+>
+> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+> index 73e938b7e937..b3ed7766a291 100644
+> --- a/include/linux/pm_domain.h
+> +++ b/include/linux/pm_domain.h
+> @@ -72,8 +72,10 @@ struct generic_pm_domain {
+>         bool max_off_time_changed;
+>         bool cached_power_down_ok;
+>         struct gpd_cpuidle_data *cpuidle_data;
+> -       void (*attach_dev)(struct device *dev);
+> -       void (*detach_dev)(struct device *dev);
+> +       int (*attach_dev)(struct generic_pm_domain *domain,
+> +                         struct device *dev);
+> +       void (*detach_dev)(struct generic_pm_domain *domain,
+> +                          struct device *dev);
+>  };
+>
+>  static inline struct generic_pm_domain *pd_to_genpd(struct dev_pm_domain *pd)
+> --
+> 2.1.0
+>
