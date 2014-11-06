@@ -1,60 +1,70 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Thu, 6 Nov 2014 12:58:55 +0200
-Subject: [PATCH] leds: leds-gpio: Convert gpio_blink_set() to use GPIO
- descriptors
-In-Reply-To: <CAMuHMdWtcZcpW=r60s9auENZxChiLwr14R0p_soKr7C3yGYOMQ@mail.gmail.com>
-References: <1414755658-96293-1-git-send-email-mika.westerberg@linux.intel.com>
- <545843B1.3020101@nvidia.com> <2455157.3p7mHhT8im@vostro.rjw.lan>
- <CAMuHMdXn9W2S7N+YGfjDxQozMtRZCVdTzzdDps6YfOv2FqVBmw@mail.gmail.com>
- <20141106103033.GK1618@lahna.fi.intel.com>
- <CAMuHMdWtcZcpW=r60s9auENZxChiLwr14R0p_soKr7C3yGYOMQ@mail.gmail.com>
-Message-ID: <20141106105855.GL1618@lahna.fi.intel.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Thu,  6 Nov 2014 14:08:29 +0300
+Subject: [PATCH] spi: pxa2xx: toggle clocks on suspend if not disabled by
+ runtime PM
+Message-ID: <1415272109-24970-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 06, 2014 at 11:32:19AM +0100, Geert Uytterhoeven wrote:
-> Hi Mika,
-> 
-> On Thu, Nov 6, 2014 at 11:30 AM, Mika Westerberg
-> <mika.westerberg@linux.intel.com> wrote:
-> >> "leds: leds-gpio: Add support for GPIO descriptors" broke leds-gpio on
-> >> non-DT platforms for me:
-> >>
-> >>     gpiod_direction_output: invalid GPIO
-> >>     leds-gpio: probe of leds-gpio failed with error -22
-> >>
-> >> (desc is NULL in gpiod_direction_output()).
-> >>
-> >> DT shmobile reference/multi-platform are fine.
-> >>
-> >> I noticed the hard way, as I wanted to add some LEDs to a new platform,
-> >> but couldn't get it work. It turned out it also had stopped working on
-> >> r8a7740/armadillo-legacy, so I started bisecting...
-> >
-> > Which board file that is?
-> >
-> > There is a bug that gpio_to_desc() returns NULL instead if ERR_PTR() in
-> > that patch but I wonder why gpio_is_valid() and devm_gpio_request_one()
-> > do not complain about that prior.
-> 
-> arch/arm/mach-shmobile/board-armadillo800eva.c
+If PM_RUNTIME is enabled, it is easy to trigger the following backtrace
+on pxa2xx hosts:
 
-Thanks.
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 1 at /home/lumag/linux/arch/arm/mach-pxa/clock.c:35 clk_disable+0xa0/0xa8()
+Modules linked in:
+CPU: 0 PID: 1 Comm: swapper Not tainted 3.17.0-00007-g1b3d2ee-dirty #104
+[<c000de68>] (unwind_backtrace) from [<c000c078>] (show_stack+0x10/0x14)
+[<c000c078>] (show_stack) from [<c001d75c>] (warn_slowpath_common+0x6c/0x8c)
+[<c001d75c>] (warn_slowpath_common) from [<c001d818>] (warn_slowpath_null+0x1c/0x24)
+[<c001d818>] (warn_slowpath_null) from [<c0015e80>] (clk_disable+0xa0/0xa8)
+[<c0015e80>] (clk_disable) from [<c02507f8>] (pxa2xx_spi_suspend+0x2c/0x34)
+[<c02507f8>] (pxa2xx_spi_suspend) from [<c0200360>] (platform_pm_suspend+0x2c/0x54)
+[<c0200360>] (platform_pm_suspend) from [<c0207fec>] (dpm_run_callback.isra.14+0x2c/0x74)
+[<c0207fec>] (dpm_run_callback.isra.14) from [<c0209254>] (__device_suspend+0x120/0x2f8)
+[<c0209254>] (__device_suspend) from [<c0209a94>] (dpm_suspend+0x50/0x208)
+[<c0209a94>] (dpm_suspend) from [<c00455ac>] (suspend_devices_and_enter+0x8c/0x3a0)
+[<c00455ac>] (suspend_devices_and_enter) from [<c0045ad4>] (pm_suspend+0x214/0x2a8)
+[<c0045ad4>] (pm_suspend) from [<c04b5c34>] (test_suspend+0x14c/0x1dc)
+[<c04b5c34>] (test_suspend) from [<c000880c>] (do_one_initcall+0x8c/0x1fc)
+[<c000880c>] (do_one_initcall) from [<c04aecfc>] (kernel_init_freeable+0xf4/0x1b4)
+[<c04aecfc>] (kernel_init_freeable) from [<c0378078>] (kernel_init+0x8/0xec)
+[<c0378078>] (kernel_init) from [<c0009590>] (ret_from_fork+0x14/0x24)
+---[ end trace 46524156d8faa4f6 ]---
 
-Are you able to put some printks() to the 'if (!template->gpiod)' branch
-so that it prints out gpio number and what does devm_gpio_request_one()
-return?
+This happens because suspend function tries to disable a clock that is
+already disabled by runtime_suspend callback. Add if
+(!pm_runtime_suspended()) checks to suspend/resume path.
 
-Something like:
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Reported-by: Andrea Adami <andrea.adami@gmail.com>
+---
+ drivers/spi/spi-pxa2xx.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-	if (!template->gpiod) {
-		...
-		ret = devm_gpio_request_one(parent, template->gpio, flags,
-					    template->name);
-		dev_info(parent, "GPIO %u, ret: %d\n", template->gpio, ret);
-		if (ret < 0)
-			...
-
-		led_dat->gpiod = gpio_to_desc(template->gpio);
-		dev_info(parent, "GPIOD: %p\n", led_dat->gpiod);
-	}
+diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
+index 46f45ca..9090dad 100644
+--- a/drivers/spi/spi-pxa2xx.c
++++ b/drivers/spi/spi-pxa2xx.c
+@@ -1276,7 +1276,9 @@ static int pxa2xx_spi_suspend(struct device *dev)
+ 	if (status != 0)
+ 		return status;
+ 	write_SSCR0(0, drv_data->ioaddr);
+-	clk_disable_unprepare(ssp->clk);
++
++	if (!pm_runtime_suspended(dev))
++		clk_disable_unprepare(ssp->clk);
+ 
+ 	return 0;
+ }
+@@ -1290,7 +1292,8 @@ static int pxa2xx_spi_resume(struct device *dev)
+ 	pxa2xx_spi_dma_resume(drv_data);
+ 
+ 	/* Enable the SSP clock */
+-	clk_prepare_enable(ssp->clk);
++	if (!pm_runtime_suspended(dev))
++		clk_prepare_enable(ssp->clk);
+ 
+ 	/* Restore LPSS private register bits */
+ 	lpss_ssp_setup(drv_data);
+-- 
+2.1.1
