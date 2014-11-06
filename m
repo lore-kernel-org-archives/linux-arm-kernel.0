@@ -1,41 +1,49 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 6 Nov 2014 11:36:05 -0600
-Subject: [PATCH 1/2] usb: dwc3: core: enable phy suspend quirk on non-FPGA
-Message-ID: <1415295366-593-1-git-send-email-balbi@ti.com>
+Date: Thu, 6 Nov 2014 11:36:06 -0600
+Subject: [PATCH 2/2] arm: boot: dts: am4372: enable dwc3 suspend PHY quirk
+In-Reply-To: <1415295366-593-1-git-send-email-balbi@ti.com>
+References: <1415295366-593-1-git-send-email-balbi@ti.com>
+Message-ID: <1415295366-593-2-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-as it turns out, at least AM437x silicon (non-FPGA)
-needs to enable PHY suspend quirk. So let's allow
-for PHY suspend quirk to be used with non-FPGA
-builds too.
+Whenever Suspend PHY bit is set on AM437x devices,
+USB will not work due to Set EP Configuration command
+always failing.
+
+This was only found after a recent commit 2164a47 (usb:
+dwc3: set SUSPHY bit for all cores, which will be merged
+for v3.19) added a missing *required* step to dwc3
+initialization. Synopsys Databook requires that we enable
+Suspend PHY bit after initialization but that, unfortunately,
+breaks AM437x.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/usb/dwc3/core.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/am4372.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-index 8ae42b8..25ddc39 100644
---- a/drivers/usb/dwc3/core.c
-+++ b/drivers/usb/dwc3/core.c
-@@ -404,7 +404,7 @@ static void dwc3_phy_setup(struct dwc3 *dwc)
- 	if (dwc->tx_de_emphasis_quirk)
- 		reg |= DWC3_GUSB3PIPECTL_TX_DEEPH(dwc->tx_de_emphasis);
+diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+index 46660ff..e19068d 100644
+--- a/arch/arm/boot/dts/am4372.dtsi
++++ b/arch/arm/boot/dts/am4372.dtsi
+@@ -817,6 +817,8 @@
+ 				maximum-speed = "high-speed";
+ 				dr_mode = "otg";
+ 				status = "disabled";
++				snps,dis_u3_susphy_quirk;
++				snps,dis_u2_susphy_quirk;
+ 			};
+ 		};
  
--	if (dwc->dis_u3_susphy_quirk && dwc->is_fpga)
-+	if (dwc->dis_u3_susphy_quirk)
- 		reg &= ~DWC3_GUSB3PIPECTL_SUSPHY;
+@@ -839,6 +841,8 @@
+ 				maximum-speed = "high-speed";
+ 				dr_mode = "otg";
+ 				status = "disabled";
++				snps,dis_u3_susphy_quirk;
++				snps,dis_u2_susphy_quirk;
+ 			};
+ 		};
  
- 	dwc3_writel(dwc->regs, DWC3_GUSB3PIPECTL(0), reg);
-@@ -422,7 +422,7 @@ static void dwc3_phy_setup(struct dwc3 *dwc)
- 	if (dwc->revision > DWC3_REVISION_194A)
- 		reg |= DWC3_GUSB2PHYCFG_SUSPHY;
- 
--	if (dwc->dis_u2_susphy_quirk && dwc->is_fpga)
-+	if (dwc->dis_u2_susphy_quirk)
- 		reg &= ~DWC3_GUSB2PHYCFG_SUSPHY;
- 
- 	dwc3_writel(dwc->regs, DWC3_GUSB2PHYCFG(0), reg);
 -- 
 2.1.0.GIT
