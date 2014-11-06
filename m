@@ -1,74 +1,88 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 06 Nov 2014 20:55:35 +0100
-Subject: [PATCH] usb: gadget: udc: pxa27x: fix build warning when !OF
-In-Reply-To: <545B196F.2020303@zonque.org> (Daniel Mack's message of "Thu, 06
- Nov 2014 07:47:11 +0100")
-References: <1415249759-6219-1-git-send-email-balbi@ti.com>
- <545B196F.2020303@zonque.org>
-Message-ID: <87ppd0xfwo.fsf@free.fr>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Thu, 6 Nov 2014 19:56:36 +0000
+Subject: [RFC PATCH] ARM: mvebu: Let the device-tree determine smp_ops
+In-Reply-To: <20141106155823.213f8811@free-electrons.com>
+References: <1415249396-2985-1-git-send-email-chris.packham@alliedtelesis.co.nz>
+ <20141106155823.213f8811@free-electrons.com>
+Message-ID: <545BD274.6050103@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Mack <daniel@zonque.org> writes:
+Hi Thomas,
 
-> On 11/06/2014 05:55 AM, Felipe Balbi wrote:
->> in case kernel is built without CONFIG_OF there
->> will be a build warning (see below) due to of_match_ptr()
->> being defined to NULL.
->> 
->> Because of_match_ptr() is pretty pointless anyway,
->> let's just remove it and fix the warning.
+On 11/07/2014 03:58 AM, Thomas Petazzoni wrote:
+> Dear Chris Packham,
 >
-> The alternative, of course, would be to wrap the udc_pxa_dt_ids
-> declaration in IS_ENABLED(CONFIG_OF), but I'm not sure whether it's
-> worth it.
-
-Ah, wasn't the patch named "[PATCH v1] usb: gadget: pxa27x_udc: fix warning in
-non device-tree build" sent October the 29th fixing this issue (in [1]) ?
-
-Cheers.
-
---
-Robert
-
-[1] Patch
-From: Robert Jarzmik <robert.jarzmik@free.fr>
-Subject: [PATCH v1] usb: gadget: pxa27x_udc: fix warning in non device-tree build
-To: Felipe Balbi <balbi@ti.com>
-Cc: linux-usb at vger.kernel.org, Robert Jarzmik <robert.jarzmik@free.fr>
-Date: Wed, 29 Oct 2014 21:58:33 +0100 (1 week, 22 hours, 56 minutes ago)
-Message-Id: <1414616313-8212-1-git-send-email-robert.jarzmik@free.fr>
-X-Mailer: git-send-email 2.1.0
-
-The recent change bringing device-tree support triggers a warning in a
-non device-tree build :
-  drivers/usb/gadget/udc/pxa27x_udc.c:2405:28: warning: 'udc_pxa_dt_ids'
-  defined but not used [-Wunused-variable]
-
-Fix the warning with a preprocessor condition.
-
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- drivers/usb/gadget/udc/pxa27x_udc.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/usb/gadget/udc/pxa27x_udc.c b/drivers/usb/gadget/udc/pxa27x_udc.c
-index 69e7b816..9b03fab 100644
---- a/drivers/usb/gadget/udc/pxa27x_udc.c
-+++ b/drivers/usb/gadget/udc/pxa27x_udc.c
-@@ -2400,11 +2400,13 @@ static struct pxa_udc memory = {
- 	}
- };
- 
-+#if defined(CONFIG_OF)
- static struct of_device_id udc_pxa_dt_ids[] = {
- 	{ .compatible = "marvell,pxa270-udc" },
- 	{}
- };
- MODULE_DEVICE_TABLE(of, udc_pxa_dt_ids);
-+#endif
- 
- /**
-  * pxa_udc_probe - probes the udc device
--- 
-2.1.0
+> On Thu,  6 Nov 2014 17:49:56 +1300, Chris Packham wrote:
+>> The machine specific SMP operations can be configured either via
+>> setup_arch or via arm_dt_init_cpu_maps. For the ARMADA_370_XP_DT devices
+>> both of these are called and setup_arch wins because it is called last.
+>> This means that it is not possible to substitute a different set of SMP
+>> operations via the device-tree.
+>>
+>> All of the ARMADA_370_XP_DT compatible devices are either single core or
+>> declare an enable-method in the dts (via one of armada-xp-mv78230.dtsi,
+>> armada-xp-mv78260.dtsi or armada-xp-mv78460.dtsi). Remove the smp
+>> assignment from board-v7.c so that the SMP operations set via the
+>> device-tree aren't discarded.
+>>
+>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+>> ---
+>> Hi,
+>>
+>> (This is the first patch I've sent to the arm-lkml so beware of my newbie-ness)
+>>
+>> I'm working on a new board that uses a integrated CPU that according to the
+>> vendor is "based on the ARMADA-XP", more on that to come in the future
+>> hopefully. For the most part things just work if I use a .dts based on the
+>> mv78260.
+>>
+>> One difference I've encountered is in the way the secondary CPU is initialised,
+>> which requires me to supply a slightly different set of machine specific SMP
+>> operations so I can bring up the 2nd core. It looks like I should be able to
+>> supply a different /cpus/enable-method in the .dts and once I define the
+>> corresponding set of operations it should be picked up.
+>>
+>> Which leads me to what I think could be a bug (or just a lack of clear
+>> specification). The smp ops are set by both arm_dt_init_cpu_maps (from the
+>> enable-method) and setup_arch (from mdesc). The latter always wins because it
+>> is called last and doesn't check to see if smp_ops has already been set.
+>>
+>> This is my attempt at fixing the problem by not setting mdesc.smp for the
+>> ARMADA_370_XP_DT machines thus preventing setup_arch from overriding what has
+>> been setup by arm_dt_init_cpu_maps.
+>>
+>> Thanks,
+>> Chris
+>>
+>>   arch/arm/mach-mvebu/board-v7.c | 1 -
+>>   1 file changed, 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+>> index 6478626..894974b 100644
+>> --- a/arch/arm/mach-mvebu/board-v7.c
+>> +++ b/arch/arm/mach-mvebu/board-v7.c
+>> @@ -206,7 +206,6 @@ static const char * const armada_370_xp_dt_compat[] = {
+>>   DT_MACHINE_START(ARMADA_370_XP_DT, "Marvell Armada 370/XP (Device Tree)")
+>>   	.l2c_aux_val	= 0,
+>>   	.l2c_aux_mask	= ~0,
+>> -	.smp		= smp_ops(armada_xp_smp_ops),
+>>   	.init_machine	= mvebu_dt_init,
+>>   	.init_irq       = mvebu_init_irq,
+>>   	.restart	= mvebu_restart,
+> There is a very good reason to keep this .smp initialization. The
+> Device Tree for Armada XP used to *not* have the enable-method
+> property, since the SMP enable-method binding did not exist at the
+> time we introduced the Armada XP SMP support. Therefore, if we want to
+> keep backward compatibility with the old Armada XP DTs and continue to
+> have SMP support working with those, we need to keep this .smp
+> initialization essentially forever.
+>
+> Yes, backward compatibility sometimes sucks :-/
+Darn. I thought that might be the case but I wanted to keep the scope of 
+my change small. How about making setup_arch check if smp_ops is already 
+set? I didn't do that initially because I thought that might affect too 
+many platforms. Alternatively if we gave ARMADA_370_XP_DT a smp_init 
+function that returned non-zero if smp_ops is already set then I think 
+it'd be backwards compatible and keep the scope of the change restricted 
+to the 370-XP platforms.
