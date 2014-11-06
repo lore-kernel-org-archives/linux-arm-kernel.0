@@ -1,90 +1,186 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 6 Nov 2014 15:36:59 +0000
-Subject: [PATCH v5 2/8] phy: miphy28lp: Add PHY header file for DT x
- Driver defines
-In-Reply-To: <545B6144.2020503@st.com>
-References: <1415098284-11182-1-git-send-email-gabriel.fernandez@linaro.org>
- <1415098284-11182-3-git-send-email-gabriel.fernandez@linaro.org>
- <545B1C53.9010406@ti.com> <545B3FA4.8040109@st.com>
- <20141106112825.GC26543@x1> <545B6144.2020503@st.com>
-Message-ID: <20141106153659.GD26543@x1>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Thu,  6 Nov 2014 07:38:51 -0800
+Subject: [PATCH] documentation: pinctrl bindings: Fix trivial typo 'abitrary'
+Message-ID: <1415288331-785-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 06 Nov 2014, Maxime Coquelin wrote:
-> On 11/06/2014 12:28 PM, Lee Jones wrote:
-> >On Thu, 06 Nov 2014, Maxime Coquelin wrote:
-> >
-> >>Hi Kishon,
-> >>On 11/06/2014 07:59 AM, Kishon Vijay Abraham I wrote:
-> >>>Hi,
-> >>>
-> >>>On Tuesday 04 November 2014 04:21 PM, Gabriel FERNANDEZ wrote:
-> >>>>This provides the shared header file which will be reference from both
-> >>>>PHY driver and its associated Device Tree node(s).
-> >>>>
-> >>>>Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-> >>>>---
-> >>>>  include/dt-bindings/phy/phy.h | 18 ++++++++++++++++++
-> >>>I don't see this being used in device tree file. Are you planning to add this
-> >>>after -rc1 is tagged. Or else I have to create a separate branch for this file
-> >>>which will be merged by both me and the dt maintainer. Let me know.
-> >>I think we don't need to create a branch we will merged by both of us.
-> >>
-> >>What we can do that both of us apply this patch in our trees.
-> >>It will avoid dependencies on each others.
-> >>
-> >>What do you think?
-> >This makes no sense to me.  Can you find another way to explain this
-> >please?
-> 
-> I apply the patch on my STi tree.
-> Kishon applies the patch on his phy tree.
-> 
-> At the end, both STi and phy branches will be merged in Linus tree,
-> with no conflicts.
-> 
-> This is what we are doing for the STiH407 reset DT bindings with Philipp Z.
+A misspelled 'arbitrary' propagated to quite a few locations in the DT
+binding documentation for pin-controllers. Fixing by:
+  git grep abitrary | cut -f1 -d: | xargs sed -i 's/abitrary/arbitrary/'
 
-If you do that, you will almost certainly get conflicts.  The commits
-have to share the same SHA1 for Git to know for sure that they are the
-same patch.  One of you needs to create a branch and tag it.  The
-other can then merge the tag _then_ you won't get conflicts.
+Reported-by: Andreas F?rber <afaerber@suse.de>
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+ Documentation/devicetree/bindings/pinctrl/img,tz1090-pdc-pinctrl.txt | 2 +-
+ Documentation/devicetree/bindings/pinctrl/img,tz1090-pinctrl.txt     | 2 +-
+ Documentation/devicetree/bindings/pinctrl/lantiq,falcon-pinumx.txt   | 2 +-
+ Documentation/devicetree/bindings/pinctrl/lantiq,xway-pinumx.txt     | 2 +-
+ Documentation/devicetree/bindings/pinctrl/nvidia,tegra20-pinmux.txt  | 2 +-
+ Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt           | 2 +-
+ Documentation/devicetree/bindings/pinctrl/pinctrl_spear.txt          | 2 +-
+ Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt   | 2 +-
+ Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt   | 2 +-
+ Documentation/devicetree/bindings/pinctrl/qcom,ipq8064-pinctrl.txt   | 2 +-
+ Documentation/devicetree/bindings/pinctrl/qcom,msm8960-pinctrl.txt   | 2 +-
+ Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt   | 2 +-
+ 12 files changed, 12 insertions(+), 12 deletions(-)
 
-> >>>Thanks
-> >>>Kishon
-> >>>>  1 file changed, 18 insertions(+)
-> >>>>  create mode 100644 include/dt-bindings/phy/phy.h
-> >>>>
-> >>>>diff --git a/include/dt-bindings/phy/phy.h b/include/dt-bindings/phy/phy.h
-> >>>>new file mode 100644
-> >>>>index 0000000..e8c6a3f
-> >>>>--- /dev/null
-> >>>>+++ b/include/dt-bindings/phy/phy.h
-> >>>>@@ -0,0 +1,18 @@
-> >>>>+/*
-> >>>>+ *
-> >>>>+ * This header provides constants for the phy framework
-> >>>>+ *
-> >>>>+ * Copyright (C) 2014 STMicroelectronics
-> >>>>+ * Author: Gabriel Fernandez <gabriel.fernandez@st.com>
-> >>>>+ * License terms:  GNU General Public License (GPL), version 2
-> >>>>+ */
-> >>>>+
-> >>>>+#ifndef _DT_BINDINGS_PHY
-> >>>>+#define _DT_BINDINGS_PHY
-> >>>>+
-> >>>>+#define PHY_TYPE_SATA		1
-> >>>>+#define PHY_TYPE_PCIE		2
-> >>>>+#define PHY_TYPE_USB2		3
-> >>>>+#define PHY_TYPE_USB3		4
-> >>>>+
-> >>>>+#endif /* _DT_BINDINGS_PHY */
-> >>>>
-> 
-
+diff --git a/Documentation/devicetree/bindings/pinctrl/img,tz1090-pdc-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/img,tz1090-pdc-pinctrl.txt
+index a186181c402b..51b943cc9770 100644
+--- a/Documentation/devicetree/bindings/pinctrl/img,tz1090-pdc-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/img,tz1090-pdc-pinctrl.txt
+@@ -9,7 +9,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
+ common pinctrl bindings used by client devices, including the meaning of the
+ phrase "pin configuration node".
+ 
+-TZ1090-PDC's pin configuration nodes act as a container for an abitrary number
++TZ1090-PDC's pin configuration nodes act as a container for an arbitrary number
+ of subnodes. Each of these subnodes represents some desired configuration for a
+ pin, a group, or a list of pins or groups. This configuration can include the
+ mux function to select on those pin(s)/group(s), and various pin configuration
+diff --git a/Documentation/devicetree/bindings/pinctrl/img,tz1090-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/img,tz1090-pinctrl.txt
+index 4b27c99f7f9d..49d0e6050940 100644
+--- a/Documentation/devicetree/bindings/pinctrl/img,tz1090-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/img,tz1090-pinctrl.txt
+@@ -9,7 +9,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
+ common pinctrl bindings used by client devices, including the meaning of the
+ phrase "pin configuration node".
+ 
+-TZ1090's pin configuration nodes act as a container for an abitrary number of
++TZ1090's pin configuration nodes act as a container for an arbitrary number of
+ subnodes. Each of these subnodes represents some desired configuration for a
+ pin, a group, or a list of pins or groups. This configuration can include the
+ mux function to select on those pin(s)/group(s), and various pin configuration
+diff --git a/Documentation/devicetree/bindings/pinctrl/lantiq,falcon-pinumx.txt b/Documentation/devicetree/bindings/pinctrl/lantiq,falcon-pinumx.txt
+index daa768956069..ac4da9fe07bd 100644
+--- a/Documentation/devicetree/bindings/pinctrl/lantiq,falcon-pinumx.txt
++++ b/Documentation/devicetree/bindings/pinctrl/lantiq,falcon-pinumx.txt
+@@ -9,7 +9,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
+ common pinctrl bindings used by client devices, including the meaning of the
+ phrase "pin configuration node".
+ 
+-Lantiq's pin configuration nodes act as a container for an abitrary number of
++Lantiq's pin configuration nodes act as a container for an arbitrary number of
+ subnodes. Each of these subnodes represents some desired configuration for a
+ pin, a group, or a list of pins or groups. This configuration can include the
+ mux function to select on those group(s), and two pin configuration parameters:
+diff --git a/Documentation/devicetree/bindings/pinctrl/lantiq,xway-pinumx.txt b/Documentation/devicetree/bindings/pinctrl/lantiq,xway-pinumx.txt
+index b5469db1d7ad..e89b4677567d 100644
+--- a/Documentation/devicetree/bindings/pinctrl/lantiq,xway-pinumx.txt
++++ b/Documentation/devicetree/bindings/pinctrl/lantiq,xway-pinumx.txt
+@@ -9,7 +9,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
+ common pinctrl bindings used by client devices, including the meaning of the
+ phrase "pin configuration node".
+ 
+-Lantiq's pin configuration nodes act as a container for an abitrary number of
++Lantiq's pin configuration nodes act as a container for an arbitrary number of
+ subnodes. Each of these subnodes represents some desired configuration for a
+ pin, a group, or a list of pins or groups. This configuration can include the
+ mux function to select on those group(s), and two pin configuration parameters:
+diff --git a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra20-pinmux.txt b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra20-pinmux.txt
+index 61e73cde9ae9..3c8ce28baad6 100644
+--- a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra20-pinmux.txt
++++ b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra20-pinmux.txt
+@@ -9,7 +9,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
+ common pinctrl bindings used by client devices, including the meaning of the
+ phrase "pin configuration node".
+ 
+-Tegra's pin configuration nodes act as a container for an abitrary number of
++Tegra's pin configuration nodes act as a container for an arbitrary number of
+ subnodes. Each of these subnodes represents some desired configuration for a
+ pin, a group, or a list of pins or groups. This configuration can include the
+ mux function to select on those pin(s)/group(s), and various pin configuration
+diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt
+index c596a6ad3285..5f55be59d914 100644
+--- a/Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt
++++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt
+@@ -13,7 +13,7 @@ Optional properties:
+ Please refer to pinctrl-bindings.txt in this directory for details of the common
+ pinctrl bindings used by client devices.
+ 
+-SiRFprimaII's pinmux nodes act as a container for an abitrary number of subnodes.
++SiRFprimaII's pinmux nodes act as a container for an arbitrary number of subnodes.
+ Each of these subnodes represents some desired configuration for a group of pins.
+ 
+ Required subnode-properties:
+diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl_spear.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl_spear.txt
+index b4480d5c3aca..458615596946 100644
+--- a/Documentation/devicetree/bindings/pinctrl/pinctrl_spear.txt
++++ b/Documentation/devicetree/bindings/pinctrl/pinctrl_spear.txt
+@@ -32,7 +32,7 @@ Required properties:
+ Please refer to pinctrl-bindings.txt in this directory for details of the common
+ pinctrl bindings used by client devices.
+ 
+-SPEAr's pinmux nodes act as a container for an abitrary number of subnodes. Each
++SPEAr's pinmux nodes act as a container for an arbitrary number of subnodes. Each
+ of these subnodes represents muxing for a pin, a group, or a list of pins or
+ groups.
+ 
+diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt
+index 2fb90b37aa09..a7bde64798c7 100644
+--- a/Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt
+@@ -18,7 +18,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
+ common pinctrl bindings used by client devices, including the meaning of the
+ phrase "pin configuration node".
+ 
+-Qualcomm's pin configuration nodes act as a container for an abitrary number of
++Qualcomm's pin configuration nodes act as a container for an arbitrary number of
+ subnodes. Each of these subnodes represents some desired configuration for a
+ pin, a group, or a list of pins or groups. This configuration can include the
+ mux function to select on those pin(s)/group(s), and various pin configuration
+diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt
+index ffafa1990a30..c4ea61ac56f2 100644
+--- a/Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt
+@@ -47,7 +47,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
+ common pinctrl bindings used by client devices, including the meaning of the
+ phrase "pin configuration node".
+ 
+-The pin configuration nodes act as a container for an abitrary number of
++The pin configuration nodes act as a container for an arbitrary number of
+ subnodes. Each of these subnodes represents some desired configuration for a
+ pin, a group, or a list of pins or groups. This configuration can include the
+ mux function to select on those pin(s)/group(s), and various pin configuration
+diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,ipq8064-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,ipq8064-pinctrl.txt
+index e33e4dcdce79..6e88e91feb11 100644
+--- a/Documentation/devicetree/bindings/pinctrl/qcom,ipq8064-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/qcom,ipq8064-pinctrl.txt
+@@ -18,7 +18,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
+ common pinctrl bindings used by client devices, including the meaning of the
+ phrase "pin configuration node".
+ 
+-Qualcomm's pin configuration nodes act as a container for an abitrary number of
++Qualcomm's pin configuration nodes act as a container for an arbitrary number of
+ subnodes. Each of these subnodes represents some desired configuration for a
+ pin, a group, or a list of pins or groups. This configuration can include the
+ mux function to select on those pin(s)/group(s), and various pin configuration
+diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,msm8960-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,msm8960-pinctrl.txt
+index 93b7de91b9f6..eb8d8aa41f20 100644
+--- a/Documentation/devicetree/bindings/pinctrl/qcom,msm8960-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/qcom,msm8960-pinctrl.txt
+@@ -47,7 +47,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
+ common pinctrl bindings used by client devices, including the meaning of the
+ phrase "pin configuration node".
+ 
+-The pin configuration nodes act as a container for an abitrary number of
++The pin configuration nodes act as a container for an arbitrary number of
+ subnodes. Each of these subnodes represents some desired configuration for a
+ pin, a group, or a list of pins or groups. This configuration can include the
+ mux function to select on those pin(s)/group(s), and various pin configuration
+diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt
+index d2ea80dc43eb..e4d6a9d20f7d 100644
+--- a/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt
+@@ -18,7 +18,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
+ common pinctrl bindings used by client devices, including the meaning of the
+ phrase "pin configuration node".
+ 
+-Qualcomm's pin configuration nodes act as a container for an abitrary number of
++Qualcomm's pin configuration nodes act as a container for an arbitrary number of
+ subnodes. Each of these subnodes represents some desired configuration for a
+ pin, a group, or a list of pins or groups. This configuration can include the
+ mux function to select on those pin(s)/group(s), and various pin configuration
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.1.3.1.ge241007
