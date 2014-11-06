@@ -1,77 +1,115 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Thu,  6 Nov 2014 10:20:23 +0300
-Subject: [PATCH RESEND V2] ARM: debug: move StrongARM debug include to
- arch/arm/include/debug
-Message-ID: <1415258423-17022-1-git-send-email-dbaryshkov@gmail.com>
+Date: Thu,  6 Nov 2014 10:27:11 +0300
+Subject: [PATCH RESEND] ARM: sa1100 collie: use gpio-charger instead of
+ pda-power
+Message-ID: <1415258831-17239-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-StrongARM debug-macro.S is quite standalone thing, depending only on
-register mappings. Move it to proper place and add Kconfig entry.
+Use gpio-charger driver instead of pda-power: it automatically cares
+about used gpio and since collie does not differentiate between usb and
+ac chargers, pda-power is an overkill for it.
+
+As a bonus this allows us to remove gpio_to_irq calls from machine init
+call - it is fragile. These gpio_to_irq calls will fail if gpios are
+registered later, via device driver mechanisms.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
-[Changes since V1: keep Kconfig.debug sorted alphabetically]
+ arch/arm/mach-sa1100/collie.c | 55 ++++++-------------------------------------
+ 1 file changed, 7 insertions(+), 48 deletions(-)
 
- arch/arm/Kconfig.debug                                         |  9 +++++++++
- .../include/mach/debug-macro.S => include/debug/sa1100.S}      | 10 ++++++++--
- 2 files changed, 17 insertions(+), 2 deletions(-)
- rename arch/arm/{mach-sa1100/include/mach/debug-macro.S => include/debug/sa1100.S} (83%)
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index b11ad54..9a3bff0 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -699,6 +699,14 @@ choice
- 		  their output to UART 2. The port must have been initialised
- 		  by the boot-loader before use.
+diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
+index 108939f..b90c7d8 100644
+--- a/arch/arm/mach-sa1100/collie.c
++++ b/arch/arm/mach-sa1100/collie.c
+@@ -30,7 +30,7 @@
+ #include <linux/gpio_keys.h>
+ #include <linux/input.h>
+ #include <linux/gpio.h>
+-#include <linux/pda_power.h>
++#include <linux/power/gpio-charger.h>
  
-+	config DEBUG_SA1100
-+		depends on ARCH_SA1100
-+		bool "Use SA1100 UARTs for low-level debug"
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on SA-11x0 UART ports. The kernel will check for the first
-+		  enabled UART in a sequence 3-1-2.
+ #include <video/sa1100fb.h>
+ 
+@@ -131,62 +131,24 @@ static struct irda_platform_data collie_ir_data = {
+ /*
+  * Collie AC IN
+  */
+-static int collie_power_init(struct device *dev)
+-{
+-	int ret = gpio_request(COLLIE_GPIO_AC_IN, "ac in");
+-	if (ret)
+-		goto err_gpio_req;
+-
+-	ret = gpio_direction_input(COLLIE_GPIO_AC_IN);
+-	if (ret)
+-		goto err_gpio_in;
+-
+-	return 0;
+-
+-err_gpio_in:
+-	gpio_free(COLLIE_GPIO_AC_IN);
+-err_gpio_req:
+-	return ret;
+-}
+-
+-static void collie_power_exit(struct device *dev)
+-{
+-	gpio_free(COLLIE_GPIO_AC_IN);
+-}
+-
+-static int collie_power_ac_online(void)
+-{
+-	return gpio_get_value(COLLIE_GPIO_AC_IN) == 2;
+-}
+-
+ static char *collie_ac_supplied_to[] = {
+ 	"main-battery",
+ 	"backup-battery",
+ };
+ 
+-static struct pda_power_pdata collie_power_data = {
+-	.init			= collie_power_init,
+-	.is_ac_online		= collie_power_ac_online,
+-	.exit			= collie_power_exit,
 +
- 	config DEBUG_SOCFPGA_UART
- 		depends on ARCH_SOCFPGA
- 		bool "Use SOCFPGA UART for low-level debug"
-@@ -1009,6 +1017,7 @@ config DEBUG_STI_UART
++static struct gpio_charger_platform_data collie_power_data = {
++	.name			= "charger",
++	.type			= POWER_SUPPLY_TYPE_MAINS,
++	.gpio			= COLLIE_GPIO_AC_IN,
+ 	.supplied_to		= collie_ac_supplied_to,
+ 	.num_supplicants	= ARRAY_SIZE(collie_ac_supplied_to),
+ };
  
- config DEBUG_LL_INCLUDE
- 	string
-+	default "debug/sa1100.S" if DEBUG_SA1100
- 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
- 	default "debug/clps711x.S" if DEBUG_CLPS711X_UART1 || DEBUG_CLPS711X_UART2
- 	default "debug/pl01x.S" if DEBUG_LL_UART_PL01X || DEBUG_UART_PL01X
-diff --git a/arch/arm/mach-sa1100/include/mach/debug-macro.S b/arch/arm/include/debug/sa1100.S
-similarity index 83%
-rename from arch/arm/mach-sa1100/include/mach/debug-macro.S
-rename to arch/arm/include/debug/sa1100.S
-index 530772d..a0ae4f4 100644
---- a/arch/arm/mach-sa1100/include/mach/debug-macro.S
-+++ b/arch/arm/include/debug/sa1100.S
-@@ -1,4 +1,4 @@
--/* arch/arm/mach-sa1100/include/mach/debug-macro.S
-+/* arch/arm/include/debug/sa1100.S
-  *
-  * Debugging macro include header
-  *
-@@ -10,7 +10,13 @@
-  * published by the Free Software Foundation.
-  *
- */
--#include <mach/hardware.h>
-+
-+#define UTCR3		0x0c
-+#define UTDR		0x14
-+#define UTSR1		0x20
-+#define UTCR3_TXE	0x00000002	/* Transmit Enable                 */
-+#define UTSR1_TBY	0x00000001	/* Transmitter BusY (read)         */
-+#define UTSR1_TNF	0x00000004	/* Transmit FIFO Not Full (read)   */
+-static struct resource collie_power_resource[] = {
+-	{
+-		.name		= "ac",
+-		.flags		= IORESOURCE_IRQ |
+-				  IORESOURCE_IRQ_HIGHEDGE |
+-				  IORESOURCE_IRQ_LOWEDGE,
+-	},
+-};
+-
+ static struct platform_device collie_power_device = {
+-	.name			= "pda-power",
++	.name			= "gpio-charger",
+ 	.id			= -1,
+ 	.dev.platform_data	= &collie_power_data,
+-	.resource		= collie_power_resource,
+-	.num_resources		= ARRAY_SIZE(collie_power_resource),
+ };
  
- 		.macro	addruart, rp, rv, tmp
- 		mrc	p15, 0, \rp, c1, c0
+ #ifdef CONFIG_SHARP_LOCOMO
+@@ -420,9 +382,6 @@ static void __init collie_init(void)
+ 
+ 	GPSR |= _COLLIE_GPIO_UCB1x00_RESET;
+ 
+-	collie_power_resource[0].start = gpio_to_irq(COLLIE_GPIO_AC_IN);
+-	collie_power_resource[0].end = gpio_to_irq(COLLIE_GPIO_AC_IN);
+-
+ 	sa11x0_ppc_configure_mcp();
+ 
+ 
 -- 
 2.1.1
