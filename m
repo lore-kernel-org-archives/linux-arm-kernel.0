@@ -1,40 +1,48 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 6 Nov 2014 10:53:19 -0600
-Subject: [PATCH] ARM: dts: Add am57xx-beagle-x15
-In-Reply-To: <20141106164843.GY31454@atomide.com>
-References: <1415290702-11353-1-git-send-email-nm@ti.com>
- <20141106163207.GF16896@saruman> <545BA3E6.90105@ti.com>
- <545BA513.2090907@ti.com> <20141106164843.GY31454@atomide.com>
-Message-ID: <545BA77F.2080609@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 6 Nov 2014 16:54:31 +0000
+Subject: [RFC PATCH 0/1] arm64: Fix /proc/cpuinfo
+In-Reply-To: <20141106164311.GD19702@e104818-lin.cambridge.arm.com>
+References: <1414159000-27059-1-git-send-email-mark.rutland@arm.com>
+ <20141106164311.GD19702@e104818-lin.cambridge.arm.com>
+Message-ID: <20141106165430.GH31605@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2014 10:48 AM, Tony Lindgren wrote:
-> * Nishanth Menon <nm@ti.com> [141106 08:44]:
->> On 11/06/2014 10:37 AM, Tom Rini wrote:
->>
->>>>> device_type = "memory"; +		reg = <0x80000000 0x40000000>; /* 1GB
->>>>> to start. Target 2GB */
->>>>
->>>> 1GiB ? Why would you put this here btw ? u-boot fills this one up.
->>>
->>> Yes, it should either be the full and correct value or 0x0 (like a
->>> number of PowerPC platforms do) so it's clear something else gives us
->>> the right value here.
->>
->> Honest mistake, my bad.. I thought I cleaned up the patch! Sigh!!! i
->> will repost with proper 2GB. it is better that way in case being used
->> with "other bootloaders" which are not exactly too good like u-boot.
+On Thu, Nov 06, 2014 at 04:43:12PM +0000, Catalin Marinas wrote:
+> On Fri, Oct 24, 2014 at 02:56:39PM +0100, Mark Rutland wrote:
+> > [d] Print different hwcaps dependent on the personality.
+> > 
+> >     This would allow for 32-bit and 64-bit applications to function
+> >     correctly, but for some 32-bit applications the personality would
+> >     need to be set explicitly by the user.
 > 
-> Can you also describe why all the always-on regulators are needed?
-yep - will do that similar to
-https://patchwork.kernel.org/patch/5125431/ - same rationale unless
-there is any specific voltage rail that you are explicitly interested
-in that needs additional explanation. Is there additional rails of
-interest?
+> Which makes this option actually in line with the uname -m behaviour. My
+> vote goes for [d] with option [b] as a close alternative.
+> 
+> > [1] arm, v3.17, Versatile Express A15x2 A7x3 coretile
+> > Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae evtstrm 
+> [...]
+> > [2] arm64, v3.17, Juno platform
+> > Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32 
+> 
+> As an exercise, I'm trying to see what option [b] would look like when
+> CONFIG_COMPAT is enabled:
+> 
+> Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32 half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae
+> 
+> The duplicate strings would only be listed once (evtstrm, aes, pmull,
+> sha1, sha2, crc32). New AArch64 features that we may expect to be
+> optional on AArch32 could be prefixed with "a64". If they are missing
+> entirely from AArch32, (like asimd), no need for the prefix.
+> 
+> The advantage is that we don't need to check the personality but we have
+> to assume that scripts would not search for substrings (sane people
+> shouldn't do this anyway as the Features string can always be extended).
 
+And a big disadvantage is that I can imagine AArch64 applications checking
+for "neon" instead of "asimd", which will break if they're run under kernels
+without COMPAT support enabled.
 
+So I'm inclined to stick with Mark's patch as it is.
 
--- 
-Regards,
-Nishanth Menon
+Will
