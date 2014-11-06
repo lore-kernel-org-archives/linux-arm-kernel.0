@@ -1,98 +1,110 @@
 From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Thu,  6 Nov 2014 14:22:38 +0800
-Subject: [PATCH v8 0/3]     ARM: rk3288 : Add PM Domain support
-Message-ID: <1415254961-5746-1-git-send-email-caesar.wang@rock-chips.com>
+Date: Thu,  6 Nov 2014 14:22:41 +0800
+Subject: [PATCH v8 3/3] ARM: dts: add rk3288 power-domain node
+In-Reply-To: <1415254961-5746-1-git-send-email-caesar.wang@rock-chips.com>
+References: <1415254961-5746-1-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <1415254961-5746-4-git-send-email-caesar.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-    Add power domain drivers based on generic power domain for
-    Rockchip platform, and support RK3288.
+Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
+Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
+Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
 
-    https://chromium-review.googlesource.com/#/c/220253/9
-    This is the GPU driver, add the following information in DT,
-    and it can support the PMDOMAIN
-
-gpu: gpu at ffa30000 {
-                    compatible = "arm,malit764",
-                                 "arm,malit76x",
-                                 "arm,malit7xx",
-                                 "arm,mali-midgard";
-                    reg = <0xffa30000 0x10000>;
-                    interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
-                                 <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
-                                 <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-                    interrupt-names = "JOB", "MMU", "GPU";
-                    clocks = <&cru ACLK_GPU>;
-                    clock-names = "aclk_gpu";
-                    operating-points = <
-                            /* KHz uV */
-                            100000 800000
-                            200000 850000
-                            300000 950000
-                            400000 1000000
-                            600000 1150000
-                    >;
-                    power-domains = <&power RK3288_PD_GPU>;
-                    status = "disabled";
-};
-
-Based on:
-    - [PATCH v1 1/4] PM / clock_ops: Add pm_clk_add_clk()
-    http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg735599.html
+---
 
 Changes in v8:
-    - This reconciles the v2 and v7 code so that we power domain have
-    lists of clocks they toggle on and off during power transitions and
-    independently from power domains clocks we attach clocks to devices
-    comprising power domain and prepare them so they are turned on and off
-    by runtime PM.
-    - document go back to v2
     - DTS go back to v2
 
-Changes in v7:
-    - Delete unused variables
-
-Changes in v6:
-    - delete pmu_lock
-    - modify dev_lock using mutex
-    - pm_clk_resume(pd->dev) change to pm_clk_resume(ed->dev)
-    - pm_clk_suspend(pd->dev) change to pm_clk_suspend(ed->dev)
-    - add devm_kfree(pd->dev, de) in rockchip_pm_domain_detach_dev
-
-Changes in v5:
-    - delete idle_lock
-    - add timeout in rockchip_pmu_set_idle_request()
-
-Changes in v4:
-    - use list storage dev
-
+Changes in v7: None
+Changes in v6: None
+Changes in v5: None
+Changes in v4: None
 Changes in v3:
-    - change use pm_clk_resume() and pm_clk_suspend()
-    - DT structure has changed
     - Decomposition power-controller, changed to multiple controller
     (gpu-power-controller, hevc-power-controller)
 
 Changes in v2:
-    - remove the "pd->pd.of_node = np"
-    - move clocks to "optional"
     - make pd_vio clocks all one entry per line and alphabetize.
     - power: power-controller move back to pinctrl: pinctrl.
 
-Caesar Wang (3):
-  power-domain: rockchip: add power domain drivers
-  dt-bindings: add document of Rockchip power domain
-  ARM: dts: add rk3288 power-domain node
+ arch/arm/boot/dts/rk3288.dtsi | 66 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 66 insertions(+)
 
- .../bindings/arm/rockchip/power_domain.txt         |  48 +++
- arch/arm/boot/dts/rk3288.dtsi                      |  66 +++
- arch/arm/mach-rockchip/Kconfig                     |   1 +
- arch/arm/mach-rockchip/Makefile                    |   1 +
- arch/arm/mach-rockchip/pm_domains.c                | 469 +++++++++++++++++++++
- include/dt-bindings/power-domain/rk3288.h          |  11 +
- 6 files changed, 596 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
- create mode 100644 arch/arm/mach-rockchip/pm_domains.c
- create mode 100644 include/dt-bindings/power-domain/rk3288.h
-
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index cb18bb4..9cd269a 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -989,4 +989,70 @@
+ 			};
+ 		};
+ 	};
++
++	power: power-controller {
++		compatible = "rockchip,rk3288-power-controller";
++		#power-domain-cells = <1>;
++		rockchip,pmu = <&pmu>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		pd_gpu {
++			reg = <RK3288_PD_GPU>;
++			clocks = <&cru ACLK_GPU>;
++		};
++
++		pd_hevc {
++			reg = <RK3288_PD_HEVC>;
++			clocks = <&cru ACLK_HEVC>,
++				 <&cru SCLK_HEVC_CABAC>,
++				 <&cru SCLK_HEVC_CORE>,
++				 <&cru HCLK_HEVC>;
++		};
++
++		pd_vio {
++			reg = <RK3288_PD_VIO>;
++			clocks = <&cru ACLK_IEP>,
++				 <&cru ACLK_ISP>,
++				 <&cru ACLK_RGA_NIU>,
++				 <&cru ACLK_RGA>,
++				 <&cru ACLK_VIO0_NIU>,
++				 <&cru ACLK_VIO1_NIU>,
++				 <&cru ACLK_VIP>,
++				 <&cru ACLK_VOP0>,
++				 <&cru ACLK_VOP1>,
++				 <&cru DCLK_VOP0>,
++				 <&cru DCLK_VOP1>,
++				 <&cru HCLK_IEP>,
++				 <&cru HCLK_ISP>,
++				 <&cru HCLK_RGA>,
++				 <&cru HCLK_VIO_AHB_ARBI>,
++				 <&cru HCLK_VIO_NIU>,
++				 <&cru HCLK_VIO2_H2P>,
++				 <&cru HCLK_VIP>,
++				 <&cru HCLK_VOP0>,
++				 <&cru HCLK_VOP1>,
++				 <&cru PCLK_EDP_CTRL>,
++				 <&cru PCLK_HDMI_CTRL>,
++				 <&cru PCLK_LVDS_PHY>,
++				 <&cru PCLK_MIPI_CSI>,
++				 <&cru PCLK_MIPI_DSI0>,
++				 <&cru PCLK_MIPI_DSI1>,
++				 <&cru PCLK_VIO2_H2P>,
++				 <&cru SCLK_EDP_24M>,
++				 <&cru SCLK_EDP>,
++				 <&cru SCLK_HDMI_CEC>,
++				 <&cru SCLK_HDMI_HDCP>,
++				 <&cru SCLK_ISP_JPE>,
++				 <&cru SCLK_ISP>,
++				 <&cru SCLK_RGA>;
++		};
++
++		pd_video {
++			reg = <RK3288_PD_VIDEO>;
++			/* FIXME: add clocks */
++			clocks = <&cru ACLK_VCODEC>,
++				 <&cru HCLK_VCODEC>;
++		};
++	};
+ };
 -- 
 1.9.1
