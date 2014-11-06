@@ -1,42 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 6 Nov 2014 10:21:32 -0800
-Subject: [PATCH] ARM: dts: am335x-evm: Fix 5th NAND partition's name
-In-Reply-To: <1413890745-3855-1-git-send-email-rogerq@ti.com>
-References: <1413890745-3855-1-git-send-email-rogerq@ti.com>
-Message-ID: <20141106182131.GB31454@atomide.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 6 Nov 2014 12:24:11 -0600
+Subject: [PATCHv4 4/7] hwspinlock/core: add common OF helpers
+In-Reply-To: <CAK=WgbYf3++K4MVXW_n4zj-8fMEee61XG5+r40cW=trapRtJ7w@mail.gmail.com>
+References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
+ <1389658764-39199-5-git-send-email-s-anna@ti.com>
+ <CAJAp7Oj-3ZxvN8o=rg8YeTiXYWyQ1iowgisdU1R5UcZeh4VmOQ@mail.gmail.com>
+ <5425938C.6070007@ti.com>
+ <CAK=WgbYf3++K4MVXW_n4zj-8fMEee61XG5+r40cW=trapRtJ7w@mail.gmail.com>
+Message-ID: <545BBCCB.7030107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roger Quadros <rogerq@ti.com> [141021 04:27]:
-> The 5th NAND partition should be named "NAND.u-boot-spl-os"
-> instead of "NAND.u-boot-spl". This is to be consistent with other
-> TI boards as well as u-boot.
+Hi Ohad,
 
-Applying into omap-for-v3.18/fixes thanks.
+On 10/06/2014 04:44 AM, Ohad Ben-Cohen wrote:
+> On Fri, Sep 26, 2014 at 7:25 PM, Suman Anna <s-anna@ti.com> wrote:
+>> I am yet to receive any comments on v6, but that series should address
+>> both your need for a probe deferral and Ohad's request to not change any
+>> return types. Please give it a try and let me know if you have any comments.
+> 
+> Guys,
+> 
+> Just to let you know we have several holidays around here these days,
+> and I intend to review all pending patches immediately soon after.
+> 
 
-Tony
- 
-> Fixes: 91994facdd2d ("ARM: dts: am335x-evm: NAND: update MTD partition table")
-> 
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> ---
->  arch/arm/boot/dts/am335x-evm.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-> index e2156a5..c4b968f 100644
-> --- a/arch/arm/boot/dts/am335x-evm.dts
-> +++ b/arch/arm/boot/dts/am335x-evm.dts
-> @@ -489,7 +489,7 @@
->  			reg = <0x00060000 0x00020000>;
->  		};
->  		partition at 4 {
-> -			label = "NAND.u-boot-spl";
-> +			label = "NAND.u-boot-spl-os";
->  			reg = <0x00080000 0x00040000>;
->  		};
->  		partition at 5 {
-> -- 
-> 1.8.3.2
-> 
+Ping on this. Can you review the latest series v6 [1] and pick it up for
+3.19? The MSM spinlock driver is also blocked/dependent on that series.
+
+regards
+Suman
+
+[1] http://marc.info/?l=linux-arm-kernel&m=141055365513902&w=2
