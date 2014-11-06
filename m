@@ -1,60 +1,126 @@
-From: voytikd@gmail.com (Dmitry Voytik)
-Date: Thu,  6 Nov 2014 22:55:04 +0400
-Subject: [PATCH] ARM: imx: refactor mxc_iomux_mode()
-Message-ID: <1415300104-21278-1-git-send-email-voytikd@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 6 Nov 2014 20:05:26 +0100
+Subject: [PATCH v2 1/4] PM / Domains: Remove pm_genpd_dev_need_restore()
+ API
+In-Reply-To: <545B9A6D.5060206@samsung.com>
+References: <1412174494-15346-1-git-send-email-ulf.hansson@linaro.org>
+ <1412174494-15346-2-git-send-email-ulf.hansson@linaro.org>
+ <542C2D9F.8060005@samsung.com>
+ <CAPDyKFq+9G+n3qaj+Ls9i4sOi_BdOGzk5SypDzEMZJwAJMa97Q@mail.gmail.com>
+ <542D3E45.5020908@samsung.com>
+ <CAPDyKFozS+J_sTZykF=9tVJsCByby_BDuQmGiMt-Uw-qC4Tzuw@mail.gmail.com>
+ <542D7525.8000804@samsung.com>
+ <CAPDyKFqi=eKYBXSuRPzTZ0vybRfV6oMNt-_vCqT-6+otGiMucQ@mail.gmail.com>
+ <545B9A6D.5060206@samsung.com>
+Message-ID: <CAPDyKFqR6Pu++pGmQ2EM-RvHE4ueeB32OSE_spE+qq3SzH7kQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Refactor mxc_iomux_mode():
- - since it always returns 0 make it to return void
- - remove unnecessary ret variable
- - declare variables according to the kernel coding style
+[...]
 
-Signed-off-by: Dmitry Voytik <voytikd@gmail.com>
----
- arch/arm/mach-imx/iomux-imx31.c | 8 ++++----
- arch/arm/mach-imx/iomux-mx3.h   | 2 +-
- 2 files changed, 5 insertions(+), 5 deletions(-)
+>>
+>> Yes they would, although they require some minor additional adaptations.
+>>
+>> Those resources that are enabled from the driver's runtime PM resume
+>> callback, should also be enabled during ->probe(). The
+>> pm_runtime_set_active() will then update the state to reflect this.
+>>
+>> Then, if CONFIG_PM_RUNTIME is enabled - the device will be scheduled
+>> to go inactive from driver core (pm_request_idle()), after ->probe()
+>> has completed. Thus saving power if it's unused.
+>> If CONFIG_PM_RUNTIME isn't enabled - the driver will still be
+>> functional, since all resources are enabled during ->probe().
+>
+> OK, I suspected you also assumed enabling relevant resources, so the PM
+> state matches the hardware state.
+>
+> Sorry for getting back late to this, now there is a regression on
+> Exynos seen in multiple drivers, i.e. affecting all the media and
+> video devices.  Is this patch series going to be merged for v3.18 as
+> a regression fix ? If so I would need to update remaining drivers to
+> enable clocks and use pm_runtime_set_active() in probe().
 
-diff --git a/arch/arm/mach-imx/iomux-imx31.c b/arch/arm/mach-imx/iomux-imx31.c
-index 1657fe6..d6a3075 100644
---- a/arch/arm/mach-imx/iomux-imx31.c
-+++ b/arch/arm/mach-imx/iomux-imx31.c
-@@ -44,9 +44,11 @@ static unsigned long mxc_pin_alloc_map[NB_PORTS * 32 / BITS_PER_LONG];
- /*
-  * set the mode for a IOMUX pin.
-  */
--int mxc_iomux_mode(unsigned int pin_mode)
-+void mxc_iomux_mode(unsigned int pin_mode)
- {
--	u32 field, l, mode, ret = 0;
-+	u32 field;
-+	u32 l;
-+	u32 mode;
- 	void __iomem *reg;
- 
- 	reg = IOMUXSW_MUX_CTL + (pin_mode & IOMUX_REG_MASK);
-@@ -61,8 +63,6 @@ int mxc_iomux_mode(unsigned int pin_mode)
- 	__raw_writel(l, reg);
- 
- 	spin_unlock(&gpio_mux_lock);
--
--	return ret;
- }
- 
- /*
-diff --git a/arch/arm/mach-imx/iomux-mx3.h b/arch/arm/mach-imx/iomux-mx3.h
-index f79f78a..0a5adba 100644
---- a/arch/arm/mach-imx/iomux-mx3.h
-+++ b/arch/arm/mach-imx/iomux-mx3.h
-@@ -144,7 +144,7 @@ void mxc_iomux_set_gpr(enum iomux_gp_func, bool en);
-  * It is called by the setup functions and should not be called directly anymore.
-  * It is here visible for backward compatibility
-  */
--int mxc_iomux_mode(unsigned int pin_mode);
-+void mxc_iomux_mode(unsigned int pin_mode);
- 
- #define IOMUX_PADNUM_MASK	0x1ff
- #define IOMUX_GPIONUM_SHIFT	9
--- 
-1.9.1
+Urgh!!! Let's see how we can work this out. I will be helping out and
+give this the highest prio!
+
+I did post a patchset for exynos 5 media gsc driver, I guess you have
+seen it!? Now, that doesn't help us much but still.
+https://www.mail-archive.com/linux-media at vger.kernel.org/msg80592.html
+
+>
+> I can see two options to fix bugs which appeared in Exynos after
+> merging the patch series switching to the OF generic power domain API:
+>
+> 1. merge this series and update the affected drivers for v3.18,
+
+This version is superseded by a v3. That takes a more solid approach
+on how to power on the PM domain from the bus' ->probe(). It's being
+discussed currently.
+
+[PATCH v3 0/9] PM / Domains: Fix race conditions during boot
+
+You should be on cc-list of that.
+
+>
+> 2. revert for now to the previous behaviour, doing something as
+>    the patch below.
+>
+> 1. seems only a partial solution, since the regression remains for the
+> loadable modules which are loaded after late_initcall().  At that point
+> power domain may be disabled and the driver attempting to access
+> the hardware will hand the system.
+
+That was a limitation which is fixed in v3. I have tested loading
+modules and it works nicely.
+
+>
+> It's also a bit not clear to me why there is an assumption that when
+> a power domain is initially enabled all its corresponding devices are
+> already also fully activated ?
+
+That's a very good question! I think the assumption is wrong!
+
+Somehow we need to decouple that dependency. To me, typically the
+"need_restore" flag should reflect the current runtime PM status of
+the device, which isn't the case right now.
+
+In the v3 version of this patchset, the PM domain will be powered on
+from the bus's ->probe(), which also means the "need_restore" flag
+will initially always be set to "false" once the device are being
+probed by the driver.
+
+That means, those drivers not invoking pm_runtime_set_active() and
+manually enable clk/resources during ->probe(), but instead relies on
+pm_runtime_get_sync() - will _not_ work. As you stated above for some
+of the Exynos drivers.
+
+Even if it's likely that most of these Exynos drivers should be using
+pm_runtime_set_active() during ->probe(), the key-problem lies in
+genpd's wrong assumption about the device's runtime PM status, which
+is stored in the "need restore" flag.
+
+If we would fix the issue in genpd for the need_restore flag, that
+should solve the regression for Exynos, don't you think?
+
+I will immediately start working on a patch on genpd, which tries this
+approach, I will keep you posted.
+
+>
+> int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
+>                           struct gpd_timing_data *td)
+> {
+>         ...
+>         gpd_data->need_restore = genpd->status == GPD_STATE_POWER_OFF;
+>         ...
+> }
+>
+> It seems correct to me to have initially the power domain enabled and some
+> devices inactive, e.g. if device's driver manages its clocks and didn't
+> turn them on yet.
+
+As stated, I fully agree!
+
+[...]
+
+Kind regards
+Uffe
