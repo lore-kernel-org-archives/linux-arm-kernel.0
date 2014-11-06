@@ -1,37 +1,49 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 5 Nov 2014 22:55:59 -0600
-Subject: [PATCH] usb: gadget: udc: pxa27x: fix build warning when !OF
-Message-ID: <1415249759-6219-1-git-send-email-balbi@ti.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Thu, 6 Nov 2014 12:54:25 +0800
+Subject: [Patch Part2 v4 21/31] PCI/MSI: enhance PCI MSI core to support
+ hierarchy irqdomain
+In-Reply-To: <CAErSpo5PNAQ40-AQZiz_RTU0JKnSAVXO2Wz=XPQ7aMWjm-iaNA@mail.gmail.com>
+References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
+ <1415102525-9898-22-git-send-email-jiang.liu@linux.intel.com>
+ <20141105230952.GH6168@google.com> <545AD5B3.60009@huawei.com>
+ <CAErSpo5PNAQ40-AQZiz_RTU0JKnSAVXO2Wz=XPQ7aMWjm-iaNA@mail.gmail.com>
+Message-ID: <545AFF01.8000502@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-in case kernel is built without CONFIG_OF there
-will be a build warning (see below) due to of_match_ptr()
-being defined to NULL.
+On 2014/11/6 12:10, Bjorn Helgaas wrote:
+> On Wed, Nov 5, 2014 at 6:58 PM, Yijing Wang <wangyijing@huawei.com> wrote:
+> 
+>>>> +{
+>>>> +    return (irq_hw_number_t)msidesc->msi_attrib.entry_nr |
+>>>> +            PCI_DEVID(pdev->bus->number, pdev->devfn) << 11 |
+>>>> +            (pci_domain_nr(pdev->bus) & 0xFFFFFFFF) << 27;
+>>>
+>>> Where does this bit layout come from?  Is this defined in the spec
+>>> somewhere?  A reference would help.
+>>
+>> Currently, more and more Non-PCI device use MSI(or similar MSI mechanism), like DMAR fault irq
+>> and HPET FSB irq. And we have to add additional code to support the MSI capability.
+>> So I hope we can decouple MSI code and PCI code, then we can unify all MSI(or Message Based interrupt)
+>> in one framework.
+> 
+> Was that supposed to answer my question?  If so, I didn't understand
+> how it explains where the bit layout came from.
 
-Because of_match_ptr() is pretty pointless anyway,
-let's just remove it and fix the warning.
+No, that's just my concern. Because this function uses the pci device id,
+but more and more Non-PCI devices use MSI.
 
-drivers/usb/gadget/udc/pxa27x_udc.c:2403:28: warning: ?udc_pxa_dt_ids? defined but not used [-Wunused-variable]
- static struct of_device_id udc_pxa_dt_ids[] = {
-                            ^
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- drivers/usb/gadget/udc/pxa27x_udc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> Bjorn
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> .
+> 
 
-diff --git a/drivers/usb/gadget/udc/pxa27x_udc.c b/drivers/usb/gadget/udc/pxa27x_udc.c
-index 69e7b816..d1d8a9f 100644
---- a/drivers/usb/gadget/udc/pxa27x_udc.c
-+++ b/drivers/usb/gadget/udc/pxa27x_udc.c
-@@ -2590,7 +2590,7 @@ static struct platform_driver udc_driver = {
- 	.driver		= {
- 		.name	= "pxa27x-udc",
- 		.owner	= THIS_MODULE,
--		.of_match_table = of_match_ptr(udc_pxa_dt_ids),
-+		.of_match_table = udc_pxa_dt_ids,
- 	},
- 	.probe		= pxa_udc_probe,
- 	.remove		= pxa_udc_remove,
+
 -- 
-2.1.0.GIT
+Thanks!
+Yijing
