@@ -1,82 +1,38 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 6 Nov 2014 09:58:39 +0000
-Subject: [PATCH RFC 1/2] drivers: pci: fix window allocation order wrt
- bus_range filtering
-In-Reply-To: <20141106000536.GL6168@google.com>
-References: <1414077787-20633-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20141106000536.GL6168@google.com>
-Message-ID: <20141106095839.GB1923@red-moon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 6 Nov 2014 10:58:24 +0100
+Subject: [PATCH 00/11] dmaengine: Cleanup chancnt
+In-Reply-To: <20141106060653.GT1870@intel.com>
+References: <1413450063-23829-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20141106060653.GT1870@intel.com>
+Message-ID: <20141106095824.GH2989@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 06, 2014 at 12:05:36AM +0000, Bjorn Helgaas wrote:
-> On Thu, Oct 23, 2014 at 04:23:06PM +0100, Lorenzo Pieralisi wrote:
-> > The number of windows allocated for the host bridge depends on the
-> > bus resource. Instead of first allocating the windows and then
-> > limit the bus resource, this patch reshuffles the code so that if any
-> > limitation is applied to the bus resource it is taken into account in
-> > the windows allocation.
+On Thu, Nov 06, 2014 at 11:36:53AM +0530, Vinod Koul wrote:
+> On Thu, Oct 16, 2014 at 11:00:52AM +0200, Maxime Ripard wrote:
+> > Hi everyone,
 > > 
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> 
-> I applied these with Will's acks to pci/host-generic for v3.19, thanks!
-
-Thank you !
-
-> In my mind, posting patches to the list is implicitly a request for
-> comments, so I usually don't pay too much attention to things explicitly
-> marked "RFC" because I figure that's a hint that "this is work-in-progress,
-> please comment if you see anything obviously broken."
-
-I decided to give it an RFC tag because it is a rework of existing code
-on top of the new range parsing API and also new iospace remap API, I
-just wanted to be cautious.
-
-Thank you,
-Lorenzo
-
-> 
-> Bjorn
-> 
-> > ---
-> >  drivers/pci/host/pci-host-generic.c | 10 +++++-----
-> >  1 file changed, 5 insertions(+), 5 deletions(-)
+> > As pointed out in the documentation thread [1], the chancnt variable
+> > is filled during the driver registration in dma_async_device_register,
+> > from the liste of channels that has been set.
 > > 
-> > diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> > index 3d2076f..1e1a80f 100644
-> > --- a/drivers/pci/host/pci-host-generic.c
-> > +++ b/drivers/pci/host/pci-host-generic.c
-> > @@ -276,17 +276,17 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
-> >  		return err;
-> >  	}
-> >  
-> > -	pci->cfg.win = devm_kcalloc(dev, resource_size(&pci->cfg.bus_range),
-> > -				    sizeof(*pci->cfg.win), GFP_KERNEL);
-> > -	if (!pci->cfg.win)
-> > -		return -ENOMEM;
-> > -
-> >  	/* Limit the bus-range to fit within reg */
-> >  	bus_max = pci->cfg.bus_range.start +
-> >  		  (resource_size(&pci->cfg.res) >> pci->cfg.ops->bus_shift) - 1;
-> >  	pci->cfg.bus_range.end = min_t(resource_size_t, pci->cfg.bus_range.end,
-> >  				       bus_max);
-> >  
-> > +	pci->cfg.win = devm_kcalloc(dev, resource_size(&pci->cfg.bus_range),
-> > +				    sizeof(*pci->cfg.win), GFP_KERNEL);
-> > +	if (!pci->cfg.win)
-> > +		return -ENOMEM;
-> > +
-> >  	/* Map our Configuration Space windows */
-> >  	if (!devm_request_mem_region(dev, pci->cfg.res.start,
-> >  				     resource_size(&pci->cfg.res),
-> > -- 
-> > 2.1.2
-> > 
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > Please read the FAQ at  http://www.tux.org/lkml/
+> > This serie removes the occurences of the drivers that set it in their
+> > probe function.
 > 
+> Applied all, thanks
+
+Great, thanks!
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141106/5cfa82fc/attachment.sig>
