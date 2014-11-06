@@ -1,29 +1,42 @@
 From: voytikd@gmail.com (Dmitry Voytik)
-Date: Thu,  6 Nov 2014 22:46:20 +0400
-Subject: [PATCH] ARM: imx6q: drop unnecessary semicolon
-Message-ID: <1415299580-20790-1-git-send-email-voytikd@gmail.com>
+Date: Thu,  6 Nov 2014 22:49:32 +0400
+Subject: [PATCH] ARM: imx: simplify clk_pllv3_prepare()
+Message-ID: <1415299772-21079-1-git-send-email-voytikd@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop unnecessary semicolon after closing curly bracket.
+ret variable is redundant. Call clk_pllv3_wait_lock() in the end
+return.
 
 Signed-off-by: Dmitry Voytik <voytikd@gmail.com>
 ---
- arch/arm/mach-imx/clk-imx6q.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-imx/clk-pllv3.c | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 1412daf..43f376f 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -145,7 +145,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 		post_div_table[2].div = 1;
- 		video_div_table[1].div = 1;
- 		video_div_table[2].div = 1;
--	};
-+	}
+diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
+index 57de74d..0ad6e54 100644
+--- a/arch/arm/mach-imx/clk-pllv3.c
++++ b/arch/arm/mach-imx/clk-pllv3.c
+@@ -69,7 +69,6 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
+ {
+ 	struct clk_pllv3 *pll = to_clk_pllv3(hw);
+ 	u32 val;
+-	int ret;
  
- 	clk[IMX6QDL_PLL1_BYPASS_SRC] = imx_clk_mux("pll1_bypass_src", base + 0x00, 14, 2, pll_bypass_src_sels, ARRAY_SIZE(pll_bypass_src_sels));
- 	clk[IMX6QDL_PLL2_BYPASS_SRC] = imx_clk_mux("pll2_bypass_src", base + 0x30, 14, 2, pll_bypass_src_sels, ARRAY_SIZE(pll_bypass_src_sels));
+ 	val = readl_relaxed(pll->base);
+ 	if (pll->powerup_set)
+@@ -78,11 +77,7 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
+ 		val &= ~BM_PLL_POWER;
+ 	writel_relaxed(val, pll->base);
+ 
+-	ret = clk_pllv3_wait_lock(pll);
+-	if (ret)
+-		return ret;
+-
+-	return 0;
++	return clk_pllv3_wait_lock(pll);
+ }
+ 
+ static void clk_pllv3_unprepare(struct clk_hw *hw)
 -- 
 1.9.1
