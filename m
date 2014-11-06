@@ -1,62 +1,63 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 06 Nov 2014 10:07:45 -0800
-Subject: [PATCH v12 2/6] KVM: Add generic support for dirty page logging
-In-Reply-To: <545B4A11.5080807@redhat.com>
-References: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
- <1414017251-5772-3-git-send-email-m.smarduch@samsung.com>
- <20141101101208.GE12801@jhogan-linux.le.imgtec.org>
- <545A4BCE.40504@redhat.com> <545AAD3B.6070602@samsung.com>
- <545B4A11.5080807@redhat.com>
-Message-ID: <545BB8F1.1060805@samsung.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 6 Nov 2014 19:09:05 +0100
+Subject: [PATCH v3 00/19] KVM GICv3 emulation
+In-Reply-To: <545B9035.8030108@arm.com>
+References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
+ <20141106105751.GA29968@cbox> <20141106112125.GA3748@cbox>
+ <545B9035.8030108@arm.com>
+Message-ID: <CAMJs5B-APzJoAYv97upuYQcLSGxaOvOjSBC_=MO9JYvzoTeAxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2014 02:14 AM, Paolo Bonzini wrote:
-> 
-> 
-> On 06/11/2014 00:05, Mario Smarduch wrote:
->> On 11/05/2014 08:09 AM, Paolo Bonzini wrote:
+On Thu, Nov 6, 2014 at 4:13 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+> Hi Christoffer,
+>
+> On 06/11/14 11:21, Christoffer Dall wrote:
+>> On Thu, Nov 06, 2014 at 11:57:51AM +0100, Christoffer Dall wrote:
+>>> On Fri, Oct 31, 2014 at 05:26:35PM +0000, Andre Przywara wrote:
 >>>
+>>> [...]
 >>>
->>> On 01/11/2014 11:12, James Hogan wrote:
->>>> AFAICT all of the arch implementations of kvm_vm_ioctl_get_dirty_log()
->>>> except x86 and ppc hv (i.e. ia60, mips, ppc pv, s390) already make use
->>>> of the existing generic function kvm_get_dirty_log() to help implement
->>>> their kvm_vm_ioctl_get_dirty_log functions, which all look pretty
->>>> similar now except for TLB flushing.
 >>>>
->>>> Would they not be a better base for a generic
->>>> kvm_vm_ioctl_get_dirty_log()?
+>>>> Please review and test.
+>>>> I would be grateful for people to test for GICv2 regressions also
+>>>> (so on a GICv2 host with current kvmtool/qemu), as there is quite
+>>>> some refactoring on that front.
 >>>>
->>>> It feels a bit wrong to add a generic higher level function which
->>>> doesn't make use of the existing generic lower level abstraction.
->>>>
->>>> (Appologies if this has already been brought up in previous versions of
->>>> the patchset, I haven't been tracking them).
+>>> So looking at the final result, we have a very strange flow with the
+>>> vgic_create() and kvm_vgic_create() functions.  I lost track in all the
+>>> rewrite patches how this happened exactly, but what I think you want to
+>>> end up with is:
 >>>
->>> I agree that we should make the interface look more like
->>> kvm_get_dirty_log().  Here the steps are:
+>>> one exported function:
+>>> int kvm_vgic_create(struct kvm_device *dev, u32 type);
 >>>
->>> + *   1. Take a snapshot of the bit and clear it if needed.
->>> + *   2. Write protect the corresponding page.
->>> + *   3. Flush TLB's if needed.
->>> + *   4. Copy the snapshot to the userspace.
+>>> which calls a static function:
+>>> static int vgic_create(struct kvm *kvm, u32 type);
+>>>
+>>> or simply inline the static one in the exported one, I can't seem to
+>>> find other callers.
+>>>
+>> Strike that, my cscope setup was messed up.
 >>
->> Hi Paolo,
->>   thanks for breaking it down between generic/architecture layers,
->> helps a lot. Initially I thought we could get TLB flushing to
->> generic layer, previous x86 version worked for ARM. But looking
->> deeper other architectures either use non-generic flush or none
->> at all. Right now we would have x86, ARM, IA64 using generic TLB flush.
->> I'll restructure for another version.
-> 
-> I'll test the swap between 3 and 4 above, and send it to the list.  Feel
-> free to include it in v13, so that it gets back to me via Christoffer
-> and Marc.
-> 
-> Paolo
-> 
+>> What I think you want is a static vgic_v3_create in vgic-v3-emul.c that
+>> digs out the struct kvm pointer from the struct kvm_device and calls
+>> kvm_vgic_create() and also just copy that single kfree(dev) line into
+>> vgic_v3_destroy in vgic-v3-emul.c and the same for v2.
+>
+> So you want to remove vgic_destroy() and vgic_create() from vgic.c and
+> vgic.h and use a static version of it in vgic-v[23]-emul.c instead?
+> To avoid the two prototypes and make the declaration of the struct
+> kvm_device_ops look nicer? Did I got this right?
+>
+> I did that now, it looks a bit neater, at the cost of small code
+> duplication of admittedly trivial code. So as long as there isn't
+> something added to those functions, that's probably fine.
 
-Ok, will do. So it would be kvm/kvm/x86 and 4 armv7 patches.
+Exactly!
 
-Mario
+>
+> So I will include it in the next version.
+>
+Thanks,
+-Christoffer
