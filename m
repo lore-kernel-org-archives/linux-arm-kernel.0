@@ -1,147 +1,34 @@
 From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu,  6 Nov 2014 22:20:32 +0800
-Subject: [Patch Part2 v5 19/31] PCI/MSI: Simplify PCI MSI code by initializing
- msi_desc.nvec_used earlier
+Date: Thu,  6 Nov 2014 22:20:33 +0800
+Subject: [Patch Part2 v5 20/31] PCI/MSI: Kill redundant call of
+ irq_set_msi_desc() for MSI-X interrupts
 In-Reply-To: <1415283644-2559-1-git-send-email-jiang.liu@linux.intel.com>
 References: <1415283644-2559-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1415283644-2559-20-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1415283644-2559-21-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify PCI MSI code by initializing msi_desc.nvec_used and
-msi_desc.msi_attrib.multiple when creating MSI descriptors.
-
-Also remove redundant checks in IRQ remapping drivers, PCI MSI core
-already guarantees these.
+It's arch_setup_msi_irq()/arch_setup_msi_irqs()'s responsibility to call
+irq_set_msi_desc() to associate IRQ descriptors and MSI descriptors,
+so kill the redundant call of irq_set_msi_desc() for MSI-X interrupts
+in PCI MSI core.
 
 Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
- drivers/iommu/irq_remapping.c |    8 --------
- drivers/pci/msi.c             |   40 +++++++++++++++-------------------------
- 2 files changed, 15 insertions(+), 33 deletions(-)
+ drivers/pci/msi.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/iommu/irq_remapping.c b/drivers/iommu/irq_remapping.c
-index 176ff4372b7d..32fe5b1322d0 100644
---- a/drivers/iommu/irq_remapping.c
-+++ b/drivers/iommu/irq_remapping.c
-@@ -69,19 +69,13 @@ static int do_setup_msi_irqs(struct pci_dev *dev, int nvec)
- 	unsigned int irq;
- 	struct msi_desc *msidesc;
- 
--	WARN_ON(!list_is_singular(&dev->msi_list));
- 	msidesc = list_entry(dev->msi_list.next, struct msi_desc, list);
--	WARN_ON(msidesc->irq);
--	WARN_ON(msidesc->msi_attrib.multiple);
--	WARN_ON(msidesc->nvec_used);
- 
- 	irq = irq_alloc_hwirqs(nvec, dev_to_node(&dev->dev));
- 	if (irq == 0)
- 		return -ENOSPC;
- 
- 	nvec_pow2 = __roundup_pow_of_two(nvec);
--	msidesc->nvec_used = nvec;
--	msidesc->msi_attrib.multiple = ilog2(nvec_pow2);
- 	for (sub_handle = 0; sub_handle < nvec; sub_handle++) {
- 		if (!sub_handle) {
- 			index = msi_alloc_remapped_irq(dev, irq, nvec_pow2);
-@@ -109,8 +103,6 @@ error:
- 	 * IRQs from tearing down again in default_teardown_msi_irqs()
- 	 */
- 	msidesc->irq = 0;
--	msidesc->nvec_used = 0;
--	msidesc->msi_attrib.multiple = 0;
- 
- 	return ret;
- }
 diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index fb2ccb536324..afe974600c7d 100644
+index afe974600c7d..da181c59394b 100644
 --- a/drivers/pci/msi.c
 +++ b/drivers/pci/msi.c
-@@ -85,19 +85,13 @@ int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
-  */
- void default_teardown_msi_irqs(struct pci_dev *dev)
- {
-+	int i;
- 	struct msi_desc *entry;
+@@ -685,7 +685,6 @@ static void msix_program_entries(struct pci_dev *dev,
+ 						PCI_MSIX_ENTRY_VECTOR_CTRL;
  
--	list_for_each_entry(entry, &dev->msi_list, list) {
--		int i, nvec;
--		if (entry->irq == 0)
--			continue;
--		if (entry->nvec_used)
--			nvec = entry->nvec_used;
--		else
--			nvec = 1 << entry->msi_attrib.multiple;
--		for (i = 0; i < nvec; i++)
--			arch_teardown_msi_irq(entry->irq + i);
--	}
-+	list_for_each_entry(entry, &dev->msi_list, list)
-+		if (entry->irq)
-+			for (i = 0; i < entry->nvec_used; i++)
-+				arch_teardown_msi_irq(entry->irq + i);
- }
- 
- void __weak arch_teardown_msi_irqs(struct pci_dev *dev)
-@@ -353,19 +347,12 @@ static void free_msi_irqs(struct pci_dev *dev)
- 	struct msi_desc *entry, *tmp;
- 	struct attribute **msi_attrs;
- 	struct device_attribute *dev_attr;
--	int count = 0;
-+	int i, count = 0;
- 
--	list_for_each_entry(entry, &dev->msi_list, list) {
--		int i, nvec;
--		if (!entry->irq)
--			continue;
--		if (entry->nvec_used)
--			nvec = entry->nvec_used;
--		else
--			nvec = 1 << entry->msi_attrib.multiple;
--		for (i = 0; i < nvec; i++)
--			BUG_ON(irq_has_action(entry->irq + i));
--	}
-+	list_for_each_entry(entry, &dev->msi_list, list)
-+		if (entry->irq)
-+			for (i = 0; i < entry->nvec_used; i++)
-+				BUG_ON(irq_has_action(entry->irq + i));
- 
- 	arch_teardown_msi_irqs(dev);
- 
-@@ -556,7 +543,7 @@ error_attrs:
- 	return ret;
- }
- 
--static struct msi_desc *msi_setup_entry(struct pci_dev *dev)
-+static struct msi_desc *msi_setup_entry(struct pci_dev *dev, int nvec)
- {
- 	u16 control;
- 	struct msi_desc *entry;
-@@ -574,6 +561,8 @@ static struct msi_desc *msi_setup_entry(struct pci_dev *dev)
- 	entry->msi_attrib.maskbit	= !!(control & PCI_MSI_FLAGS_MASKBIT);
- 	entry->msi_attrib.default_irq	= dev->irq;	/* Save IOAPIC IRQ */
- 	entry->msi_attrib.multi_cap	= (control & PCI_MSI_FLAGS_QMASK) >> 1;
-+	entry->msi_attrib.multiple	= ilog2(__roundup_pow_of_two(nvec));
-+	entry->nvec_used		= nvec;
- 
- 	if (control & PCI_MSI_FLAGS_64BIT)
- 		entry->mask_pos = dev->msi_cap + PCI_MSI_MASK_64;
-@@ -606,7 +595,7 @@ static int msi_capability_init(struct pci_dev *dev, int nvec)
- 
- 	msi_set_enable(dev, 0);	/* Disable MSI during set up */
- 
--	entry = msi_setup_entry(dev);
-+	entry = msi_setup_entry(dev, nvec);
- 	if (!entry)
- 		return -ENOMEM;
- 
-@@ -677,6 +666,7 @@ static int msix_setup_entries(struct pci_dev *dev, void __iomem *base,
- 		entry->msi_attrib.entry_nr	= entries[i].entry;
- 		entry->msi_attrib.default_irq	= dev->irq;
- 		entry->mask_base		= base;
-+		entry->nvec_used		= 1;
- 
- 		list_add_tail(&entry->list, &dev->msi_list);
- 	}
+ 		entries[i].vector = entry->irq;
+-		irq_set_msi_desc(entry->irq, entry);
+ 		entry->masked = readl(entry->mask_base + offset);
+ 		msix_mask_irq(entry, 1);
+ 		i++;
 -- 
 1.7.10.4
