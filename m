@@ -1,72 +1,38 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 6 Nov 2014 09:32:55 +0800
-Subject: [Patch Part2 v4 20/31] PCI/MSI: Kill redundant calling for
- irq_set_msi_desc() for MSIx interrupts
-In-Reply-To: <20141105224504.GG6168@google.com>
-References: <1415102525-9898-1-git-send-email-jiang.liu@linux.intel.com>
- <1415102525-9898-21-git-send-email-jiang.liu@linux.intel.com>
- <20141105224504.GG6168@google.com>
-Message-ID: <545ACFC7.9090204@huawei.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Thu, 6 Nov 2014 09:56:42 +0800
+Subject: [PATCH 00/10] arm64 kexec kernel patches V5
+In-Reply-To: <20141103194634.GA30366@leverpostej>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <20141031075209.GH3290@darkstar.nay.redhat.com>
+ <20141103194634.GA30366@leverpostej>
+Message-ID: <20141106015642.GA2569@darkstar.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/6 6:45, Bjorn Helgaas wrote:
-> On Tue, Nov 04, 2014 at 08:01:54PM +0800, Jiang Liu wrote:
->> It's arch_setup_msi_irq()/arch_setup_msi_irqs()'s responsibility to call
->> irq_set_msi_desc() to associate IRQ descriptors and MSI descriptors,
->> so kill the redundant call of irq_set_msi_desc() for MSIx interrupts
->> in PCI MSI core.
+On 11/03/14 at 07:46pm, Mark Rutland wrote:
+> On Fri, Oct 31, 2014 at 07:52:09AM +0000, Dave Young wrote:
+> > Hi Geoff
+> > 
+> > I tested your patches. The macihne is using spin-table cpu enable method
+> > so I tried maxcpus=1 as you suggested.
+> > 
+> > There's below issues for me, thoughts?
+> > 
+> > 1. For acpi booting there's no /proc/device-tree so kexec can not find dtb
+> > to use.
 > 
-> "MSI-X" in English text, "msix" in code.
+> Are you absolutely certain of this?
 > 
-> The default arch_setup_msi_irq() in drivers/pci/msi.c doesn't call
-> irq_set_msi_desc().  Does it happen somewhere inside chip->setup_irq()?
+> To use ACPI, you must have booted via EFI, as the only mechanism for
+> finding the ACPI tables is via EFI. If booted via EFI, the stub will
+> have created a stub DTB if there is no provided DTB, to pass the command
+> line and pointers to EFI data structures. This stub DTB should be
+> present in the usual place.
 
-Yes.
+Mark, I used kexec-tools from Geoff's git tree, it will create dtb from procfs
+maybe I can pass external dtb to kexec-tools. What you mentioned should be true
+though but I have not get idea how to get the dtb which kernel is using for boot
+since it is not unflattened.
 
-I also found this.
-http://www.spinics.net/lists/linux-pci/msg34256.html
-
-> 
-> I don't know how to verify that there are calls in all the places needed.
-> That makes me wonder if the factoring is wrong -- maybe irq_set_msi_desc()
-> could be done in some common place.
-
-In my idea, place the irq_set_msi_desc() in common MSI core is ok, but currently almost
-all MSI arch code call irq_set_msi_desc() in arch code. So a lot of code need to change.
-And arch code setup MSI and MSI-X in the same way, so if MSI work happy without irq_set_msi_desc(entry->irq, entry)
-in common MSI code, MSI-X should be the same.
-
-> 
->> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
->> ---
->>  drivers/pci/msi.c |    1 -
->>  1 file changed, 1 deletion(-)
->>
->> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
->> index afe974600c7d..da181c59394b 100644
->> --- a/drivers/pci/msi.c
->> +++ b/drivers/pci/msi.c
->> @@ -685,7 +685,6 @@ static void msix_program_entries(struct pci_dev *dev,
->>  						PCI_MSIX_ENTRY_VECTOR_CTRL;
->>  
->>  		entries[i].vector = entry->irq;
->> -		irq_set_msi_desc(entry->irq, entry);
->>  		entry->masked = readl(entry->mask_base + offset);
->>  		msix_mask_irq(entry, 1);
->>  		i++;
->> -- 
->> 1.7.10.4
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> .
-> 
-
-
--- 
-Thanks!
-Yijing
+Thanks
+Dave
