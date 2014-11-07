@@ -1,37 +1,31 @@
 From: Andrew.Jackson@arm.com (Andrew Jackson)
-Date: Fri, 07 Nov 2014 14:14:39 +0000
-Subject: [PATCH 2/5] serial: pl011: Avoid assumptions about buffer size when
- refilling TX DMA
-Message-ID: <545CD3CF.4070901@arm.com>
+Date: Fri, 07 Nov 2014 14:14:35 +0000
+Subject: [PATCH 1/5] serial: pl011: Allocate TX DMA buffer from DMA capable
+ memory
+Message-ID: <545CD3CB.7090909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-The existing code assumed that PL011_DMA_BUFFER_SIZE == UART_XMIT_SIZE,
-which may not always be the case.  This allows for these two being
-different sizes and not copying too much data.
+Allocating with __GFP_DMA avoids the need for bounce buffers
 
 Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
 ---
- drivers/tty/serial/amba-pl011.c |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+ drivers/tty/serial/amba-pl011.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index a285196..d8d067a 100644
+index 8572f2a..a285196 100644
 --- a/drivers/tty/serial/amba-pl011.c
 +++ b/drivers/tty/serial/amba-pl011.c
-@@ -501,7 +501,11 @@ static int pl011_dma_tx_refill(struct uart_amba_port *uap)
- 		memcpy(&dmatx->buf[0], &xmit->buf[xmit->tail], count);
- 	else {
- 		size_t first = UART_XMIT_SIZE - xmit->tail;
--		size_t second = xmit->head;
-+		size_t second;
-+
-+		if (first > count)
-+			first = count;
-+		second = count - first;
+@@ -987,7 +987,7 @@ static void pl011_dma_startup(struct uart_amba_port *uap)
+ 	if (!uap->dmatx.chan)
+ 		return;
  
- 		memcpy(&dmatx->buf[0], &xmit->buf[xmit->tail], first);
- 		if (second)
+-	uap->dmatx.buf = kmalloc(PL011_DMA_BUFFER_SIZE, GFP_KERNEL);
++	uap->dmatx.buf = kmalloc(PL011_DMA_BUFFER_SIZE, GFP_KERNEL | __GFP_DMA);
+ 	if (!uap->dmatx.buf) {
+ 		dev_err(uap->port.dev, "no memory for DMA TX buffer\n");
+ 		uap->port.fifosize = uap->fifosize;
 -- 
 1.7.1
