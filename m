@@ -1,79 +1,56 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Fri, 7 Nov 2014 11:18:16 +0530
-Subject: [PATCH 3/4] arm: boot: dts: am335x-evm: Make charge delay a DT
- parameter for tsc
-In-Reply-To: <5453FA8E.3080204@gmx.de>
-References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
- <1414408111-2631-4-git-send-email-vigneshr@ti.com> <5453FA8E.3080204@gmx.de>
-Message-ID: <545C5D20.5010006@ti.com>
+Date: Fri, 7 Nov 2014 11:19:05 +0530
+Subject: [PATCH v2 0/5] Touchscreen performance related fixes
+Message-ID: <1415339350-17679-1-git-send-email-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This series of patches fix TSC defects related to lag in touchscreen
+performance and cursor jump at touch release. The lag was result of
+udelay in TSC interrupt handler. Cursor jump due to false pen-up event.
+The patches implement Advisory 1.0.31 in silicon errata of am335x-evm
+to avoid false pen-up events and remove udelay. The advisory says to use
+steps 1 to 4 for ADC and 5 to 16 for TSC (assuming 4 wire TSC and 4 channel
+ADC). Further the X co-ordinate must be the last one to be sampled just
+before charge step. The first two patches implement the required changes.
 
+A DT parameter to configure the duration of tsc charge step. It represents
+number of ADC clock cycles to wait between applying the step configuration
+registers and going back to the IDLE state. The charge delay value can vary
+across boards. Configuring correct value of charge delay is important to avoid
+false pen-up events. Hence it is necessary to expose charge-delay value as
+DT parameter. The pen-up detection happens immediately after the charge step
+so this does in fact function as a hardware knob for adjusting the amount of
+settling time.
 
-On Saturday 01 November 2014 02:39 AM, Hartmut Knaack wrote:
-> Vignesh R schrieb am 27.10.2014 12:08:
->> The charge delay value is by default 0xB000. But it can be set to lower
->> values on some boards as long as false pen-ups are avoided. Lowering the
->> value increases the sampling rate (though current sampling rate is
->> sufficient for tsc operation). Hence charge delay has been made a DT
->> parameter.
->>
-> I would recommend to use a few colons to separate some thoughts. Also, limit to 80 chars per line would be beneficial. See inline.
+After applying these changes false pen-up events have not be observed and
+smooth circles can be drawn on touch screen. The performance is much better
+in recognizing quick movement across the screen. No lag or cursor jump is
+observed.
 
-I will address this in v2
+Change log:
 
->> Signed-off-by: Vignesh R <vigneshr@ti.com>
->> ---
->>  .../devicetree/bindings/input/touchscreen/ti-tsc-adc.txt    | 13 +++++++++++++
->>  arch/arm/boot/dts/am335x-evm.dts                            |  1 +
->>  2 files changed, 14 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/input/touchscreen/ti-tsc-adc.txt b/Documentation/devicetree/bindings/input/touchscreen/ti-tsc-adc.txt
->> index 878549ba814d..ac62769e70e4 100644
->> --- a/Documentation/devicetree/bindings/input/touchscreen/ti-tsc-adc.txt
->> +++ b/Documentation/devicetree/bindings/input/touchscreen/ti-tsc-adc.txt
->> @@ -28,6 +28,18 @@ Required properties:
->>  	ti,adc-channels: List of analog inputs available for ADC.
->>  			 AIN0 = 0, AIN1 = 1 and so on till AIN7 = 7.
->>  
->> +Optional properties:
->> +- child "tsc"
->> +	ti,charge-delay: Length of touch screen charge delay step in terms of
->> +			 ADC clock cycles. Charge delay value should be large in order
->> +			 to avoid false pen-up events. This value affects the overall
->> +			 sampling speed hence need to be kept as low as possible while
-> <...> speed, hence needs to be <...>
->> +			 avoiding false pen-up event. Start from a lower value say 0x400
-> <...> pen-up events. Start from a lower value, like 0x400, and increase <...>
->> +			 and increase value until false pen-up events are avoided. The
->> +			 pen-up detection happens immediately after the charge step
-> <...> charge step, so this <...>
->> +			 so this does in fact function as a hardware knob for adjusting
->> +			 the amount of "settling time".
->> +
->>  Example:
->>  	tscadc: tscadc at 44e0d000 {
->>  		compatible = "ti,am3359-tscadc";
->> @@ -36,6 +48,7 @@ Example:
->>  			ti,x-plate-resistance = <200>;
->>  			ti,coordiante-readouts = <5>;
->>  			ti,wire-config = <0x00 0x11 0x22 0x33>;
->> +			ti,charge-delay = <0xB000>;
->>  		};
->>  
->>  		adc {
->> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
->> index e2156a583de7..80be0462298b 100644
->> --- a/arch/arm/boot/dts/am335x-evm.dts
->> +++ b/arch/arm/boot/dts/am335x-evm.dts
->> @@ -641,6 +641,7 @@
->>  		ti,x-plate-resistance = <200>;
->>  		ti,coordinate-readouts = <5>;
->>  		ti,wire-config = <0x00 0x11 0x22 0x33>;
->> +		ti,charge-delay = <0xB000>;
->>  	};
->>  
->>  	adc {
->>
-> 
+v2:
+ - Addressed comments by Hartmut Knaack
+ - patch 2 was split into two as per Lee Jones comment
+
+Brad Griffis (2):
+  input: touchscreen: ti_am335x_tsc Interchange touchscreen and ADC
+    steps
+  input: touchscreen: ti_am335x_tsc: Remove udelay in interrupt handler
+
+Vignesh R (3):
+  mfd: ti_am335x_tscadc: Remove unwanted reg_se_cache save
+  ARM: dts: AM335x: Make charge delay a DT parameter for tsc
+  input: touchscreen: ti_am335x_tsc: Use charge delay DT parameter
+
+ .../bindings/input/touchscreen/ti-tsc-adc.txt      |  15 +++
+ arch/arm/boot/dts/am335x-evm.dts                   |   1 +
+ drivers/iio/adc/ti_am335x_adc.c                    |   5 +-
+ drivers/input/touchscreen/ti_am335x_tsc.c          | 106 ++++++++++-----------
+ drivers/mfd/ti_am335x_tscadc.c                     |   7 +-
+ include/linux/mfd/ti_am335x_tscadc.h               |   4 +-
+ 6 files changed, 79 insertions(+), 59 deletions(-)
+
+-- 
+1.9.1
