@@ -1,152 +1,497 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 7 Nov 2014 17:24:19 +0000
-Subject: [PATCH v7 3/8] arm64: introduce is_device_dma_coherent
-In-Reply-To: <20141107160006.GE29148@e104818-lin.cambridge.arm.com>
-References: <1414422568-19103-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1411031045340.22875@kaball.uk.xensource.com>
- <20141103105716.GC23162@arm.com>
- <alpine.DEB.2.02.1411031101400.22875@kaball.uk.xensource.com>
- <20141105165646.GN32700@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.02.1411051757140.22875@kaball.uk.xensource.com>
- <20141106103337.GA19702@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.02.1411061155200.22875@kaball.uk.xensource.com>
- <20141107110524.GA21875@localhost>
- <alpine.DEB.2.02.1411071212250.22875@kaball.uk.xensource.com>
- <20141107160006.GE29148@e104818-lin.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.02.1411071646170.22875@kaball.uk.xensource.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 7 Nov 2014 11:47:13 -0600
+Subject: [PATCH POST V2] ARM: dts: Add am57xx-beagle-x15
+Message-ID: <1415382433-31772-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 7 Nov 2014, Catalin Marinas wrote:
-> (talking to Ian in person helped a bit ;))
-> 
-> On Fri, Nov 07, 2014 at 02:10:25PM +0000, Stefano Stabellini wrote:
-> > On Fri, 7 Nov 2014, Catalin Marinas wrote:
-> > > On Thu, Nov 06, 2014 at 12:22:13PM +0000, Stefano Stabellini wrote:
-> > > > On Thu, 6 Nov 2014, Catalin Marinas wrote:
-> > > > > On Wed, Nov 05, 2014 at 06:15:38PM +0000, Stefano Stabellini wrote:
-> > > > > > On Wed, 5 Nov 2014, Catalin Marinas wrote:
-> > > > > > > Note that if !is_device_dma_coherent(), it doesn't always mean that
-> > > > > > > standard cache maintenance would be enough (but that's a Xen problem,
-> > > > > > > not sure how to solve).
-> > > > > > 
-> > > > > > It is a thorny issue indeed.
-> > > > > > Xen would need to know how to do non-standard cache maintenance
-> > > > > > operations.
-> > > > > 
-> > > > > Is EL2 hyp or EL1 dom0 doing such maintenance? If the latter, you could
-> > > > > just use the currently registered dma ops.
-> > > > 
-> > > > It is Xen, so El2 hypervisor.
-> > > 
-> > > So what is arch/arm/xen/mm32.c cache maintenance for? Doesn't it run in
-> > > dom0?
-> > 
-> > This patch series changes that code path specifically. As a matter of
-> > fact it removes mm32.c.
-> 
-> Well, it actually merges it into another file, dma_cache_maint() still
-> remains.
-> 
-> > Before this patch series, cache maintenance in dom0 was being done with
-> > XENFEAT_grant_map_identity (see explanation in previous email).
-> > After this patch series, an hypercall is made when foreign pages are
-> > involved, see patch 8/8, the if(!pfn_valid(pfn)) code path. Local pages
-> > are still flushed in dom0.
-> 
-> OK. One question I had though is whether pfn_valid(mfn) is always false for
-> foreign pages. IIUC, dom0 uses a 1:1 pfn:mfn mapping, so it would work.
+BeagleBoard-X15 is the next generation Open Source Hardware
+BeagleBoard based on TI's AM5728 SoC featuring dual core 1.5GHz A15
+processor. The platform features 2GB DDR3L (w/dual 32bit busses),
+eSATA, 3 USB3.0 ports, integrated HDMI (1920x1080 at 60), separate LCD
+port, video In port, 4GB eMMC, uSD, Analog audio in/out, dual 1G
+Ethernet.
 
-Right
+For more information, refer to:
+BeagleBoard-X15 Wiki:
+http://www.elinux.org/Beagleboard:BeagleBoard-X15
 
+AM5728 is part of the Sitara product family whose additional details
+will be available: http://www.ti.com/lsds/ti/arm/overview.page
 
-> But from what I gather, there can be other guest, not necessarily dom0,
-> handling the DMA in which case, if it doesn't use a 1:1 pfn:mfn mapping,
-> your pfn_valid(mfn) check would no longer work for foreign pages.
+Technical Reference Manual for AM5728 is public domain at:
+http://www.ti.com/lit/spruhz6
 
-We don't support assigning devices to guests other than dom0 without an
-SMMU. With an SMMU it should all be transparent. Either way the
-pfn_valid check should always work.
+Just add basic support for the moment, the following updates are needed:
+  i)	Ethernet - depends on SoC dts fixes
+  ii)	USB Client (USB2) - depends on GPIO extcon
+  ii)	HDMI - additional driver fixes pending
+  iii)	Audio - additional driver fixes pending
 
+NOTE:
+AM5728 Data Manual (SPRS915L - August 2014) section 4.1.1 states: "All
+unused power supply balls must be supplied with the voltages specified
+in the Section 5.2, Recommended Operating Conditions". This implies
+that all unused voltage rails for AM5728 can never be switched off even
+if the hardware blocks inside that voltage domain is unused. Switching
+off these unused rails may result in stability issues on other domains
+and increased leakage and power-on-hour impacts.
 
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+Changes in V2 since V1:
+	(was updated since v2 inline was posted https://patchwork.kernel.org/patch/5245961/ )
+	- Fix the missing squash of proper DDR size.
+	- Update commit message on why VDD rails must be always-on
+	- Fix commit message typos (thanks to G+ review :P )
+	- Explicit palmas sub irq level in dts (it is not configurable,
+	  but better to be properly documented)
 
-> > > > Fortunately these dma_ops don't actually need to do much. In fact they
-> > > > only need to flush caches if the device is not dma-coherent. So the
-> > > > current proposed solution is to issue an hypercall to ask Xen to do the
-> > > > flushing, passing the physical address dom0 knows.
-> > > 
-> > > I really don't like the dma_cache_maint() duplication you added in
-> > > arch/arm/xen/mm32.c just because you cannot call the host dma_ops when
-> > > the page is not available.
-> > 
-> > I agree is bad, but this patch series is a big step forward removing the
-> > duplication. In fact now that I think about it, when a page is local (not a
-> > foreign page) I could just call the host dma_ops. mm.c:dma_cache_maint
-> > would only be used for foreign pages (pages for which !pfn_valid(pfn)).
-> 
-> Indeed. I already replied to patch 6/8. This way I think you can remove
-> dma_cache_maint() duplication entirely, just add one specific to foreign
-> pages.
+V1: https://patchwork.kernel.org/patch/5244801/
 
-Yes, that was a very good suggestion, the code is much cleaner now.
-Thanks!
+Additional references:
+	- Missing ethernet dtsi patch series: http://marc.info/?t=141388585300001&r=1&w=2
+	- Missing USB Client extcon patch series: http://marc.info/?t=141520160800004&r=1&w=2
 
+Tested with omap2plus_defconfig modified as: http://slexy.org/view/s2DRTzUwjj
+boot log: http://slexy.org/raw/s25Grf1uoo
+based on 3.18-rc1 tag.
 
-> What I would like to see is xen_dma_map_page() also using hyp calls for
-> cache maintenance when !pfn_valid(), for symmetry with unmap. You would
-> need another argument to xen_dma_map_page() though to pass the real
-> device address or mfn (and on the map side you could simply check for
-> page_to_pfn(page) != mfn). For such cases, Xen swiotlb already handles
-> bouncing so you don't need dom0 swiotlb involved as well.
+Support for u-boot has been posted as well: (series ending
+http://patchwork.ozlabs.org/patch/407552/ )
 
-I can see that it would be nice to have map_page and unmap_page be
-symmetrical. However actually doing the map_page flush with an hypercall
-would slow things down. Hypercalls are slower than function calls. It is
-faster to do the cache flushing in dom0 if possible. In the map_page
-case we have the struct page so we can easily do it by calling the
-native dma_ops function.
+Side note: this patch generates a few unrelated checkpatch warning for
+compatible which probably is part of appropriate driver documentation
+fixes (functionality is already present).
 
-Maybe I could just add a comment to explain the reason for the asymmetry?
+ arch/arm/boot/dts/Makefile              |    1 +
+ arch/arm/boot/dts/am57xx-beagle-x15.dts |  405 +++++++++++++++++++++++++++++++
+ 2 files changed, 406 insertions(+)
+ create mode 100644 arch/arm/boot/dts/am57xx-beagle-x15.dts
 
-
-> > > You basically only need a VA that was mapped in dom0 when map_page() was
-> > > called and is still mapped when page_unmap() is called. You can free the
-> > > actual mapping after calling __generic_dma_ops()->unmap_page() in
-> > > xen_dma_unmap_page() (in xen_unmap_single()).
-> > 
-> > That is true, but where would I store the mapping?
-> 
-> dev_archdata ;).
-
-Uhm... I haven't thought about using dev_archdata. It might simplify the
-problem a bit. I'll have to think it over. It could be 3.19 or 3.20
-material.
-
-
-> > I don't want to introduce another data structure to keep physical to va
-> > or physical to struct page mappings that I need to modify at every
-> > map_page and unmap_page. It wouldn't even be a trivial data structure as
-> > multiple dma operations involving the same mfn but different struct page
-> > can happen simultaneously.
-> > 
-> > The performance hit of maintaining such a data structure would be
-> > significant.
-> 
-> There would indeed be a performance hit especially for sg ops.
-> 
-> > It would negatively impact any dma operations involving any devices,
-> > including dma coherent ones. While this series only requires special
-> > handling of dma operations involving non-coherent devices (resulting in
-> > an hypercall being made).
-> > 
-> > In a way this series rewards hardware that makes life easier to software
-> > developers :-)
-> 
-> I only need the pfn_valid() clarification now together with the
-> map/unmap symmetry fix.
->
-> I think for the time being is_device_dma_coherent() can stay as an
-> arch-only function as it is only used by Xen on arm/arm64. If we later
-> need this on other architectures, we can make it generic.
-
-OK
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 38c89ca..eee1e4f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -347,6 +347,7 @@ dtb-$(CONFIG_SOC_OMAP5) += omap5-cm-t54.dtb \
+ 	omap5-sbc-t54.dtb \
+ 	omap5-uevm.dtb
+ dtb-$(CONFIG_SOC_DRA7XX) += dra7-evm.dtb \
++	am57xx-beagle-x15.dtb \
+ 	dra72-evm.dtb
+ dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-d2-network.dtb \
+ 	orion5x-lacie-ethernet-disk-mini-v2.dtb \
+diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+new file mode 100644
+index 0000000..49edbda
+--- /dev/null
++++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+@@ -0,0 +1,405 @@
++/*
++ * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/dts-v1/;
++
++#include "dra74x.dtsi"
++#include <dt-bindings/clk/ti-dra7-atl.h>
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++
++/ {
++	model = "TI AM5728 BeagleBoard-X15";
++	compatible = "ti,am572x-beagle-x15", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7";
++
++	aliases {
++		rtc0 = &mcp_rtc;
++		rtc1 = &tps659038_rtc;
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x80000000>;
++	};
++
++	vdd_3v3: fixedregulator-vdd_3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "vdd_3v3";
++		vin-supply = <&regen1>;
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	vtt_fixed: fixedregulator-vtt {
++		/* TPS51200 */
++		compatible = "regulator-fixed";
++		regulator-name = "vtt_fixed";
++		vin-supply = <&smps3_reg>;
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++		regulator-boot-on;
++		enable-active-high;
++		gpio = <&gpio7 11 GPIO_ACTIVE_HIGH>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&leds_pins_default>;
++
++		led at 0 {
++			label = "beagle-x15:usr0";
++			gpios = <&gpio7 9 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
++			default-state = "off";
++		};
++
++		led at 1 {
++			label = "beagle-x15:usr1";
++			gpios = <&gpio7 8 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "cpu0";
++			default-state = "off";
++		};
++
++		led at 2 {
++			label = "beagle-x15:usr2";
++			gpios = <&gpio7 14 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "mmc0";
++			default-state = "off";
++		};
++
++		led at 3 {
++			label = "beagle-x15:usr3";
++			gpios = <&gpio7 15 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "ide-disk";
++			default-state = "off";
++		};
++	};
++};
++
++&dra7_pmx_core {
++	leds_pins_default: leds_pins_default {
++		pinctrl-single,pins = <
++			0x3a8 (PIN_OUTPUT | MUX_MODE14)	/* spi1_d1.gpio7_8 */
++			0x3ac (PIN_OUTPUT | MUX_MODE14)	/* spi1_d0.gpio7_9 */
++			0x3c0 (PIN_OUTPUT | MUX_MODE14)	/* spi2_sclk.gpio7_14 */
++			0x3c4 (PIN_OUTPUT | MUX_MODE14)	/* spi2_d1.gpio7_15 */
++		>;
++	};
++
++	i2c1_pins_default: i2c1_pins_default {
++		pinctrl-single,pins = <
++			0x400 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c1_sda.sda */
++			0x404 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c1_scl.scl */
++		>;
++	};
++
++	i2c3_pins_default: i2c3_pins_default {
++		pinctrl-single,pins = <
++			0x2a4 (PIN_INPUT| MUX_MODE10)	/* mcasp1_aclkx.i2c3_sda */
++			0x2a8 (PIN_INPUT| MUX_MODE10)	/* mcasp1_fsx.i2c3_scl */
++		>;
++	};
++
++	uart3_pins_default: uart3_pins_default {
++		pinctrl-single,pins = <
++			0x248 (PIN_INPUT_SLEW | MUX_MODE0) /* uart3_rxd.rxd */
++			0x24c (PIN_INPUT_SLEW | MUX_MODE0) /* uart3_txd.txd */
++		>;
++	};
++
++	mmc1_pins_default: mmc1_pins_default {
++		pinctrl-single,pins = <
++			0x36c (PIN_INPUT | MUX_MODE14)	/* mmc1sdcd.gpio219 */
++			0x354 (PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_clk.clk */
++			0x358 (PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_cmd.cmd */
++			0x35c (PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat0.dat0 */
++			0x360 (PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat1.dat1 */
++			0x364 (PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat2.dat2 */
++			0x368 (PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat3.dat3 */
++		>;
++	};
++
++	mmc2_pins_default: mmc2_pins_default {
++		pinctrl-single,pins = <
++			0x9c (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a23.mmc2_clk */
++			0xb0 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_cs1.mmc2_cmd */
++			0xa0 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a24.mmc2_dat0 */
++			0xa4 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a25.mmc2_dat1 */
++			0xa8 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a26.mmc2_dat2 */
++			0xac (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a27.mmc2_dat3 */
++			0x8c (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a19.mmc2_dat4 */
++			0x90 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a20.mmc2_dat5 */
++			0x94 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a21.mmc2_dat6 */
++			0x98 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a22.mmc2_dat7 */
++		>;
++	};
++
++	tps659038_pins_default: tps659038_pins_default {
++		pinctrl-single,pins = <
++			0x418 (PIN_INPUT_PULLUP | MUX_MODE14)	/* wakeup0.gpio1_0 */
++		>;
++	};
++
++	tmp102_pins_default: tmp102_pins_default {
++		pinctrl-single,pins = <
++			0x3C8 (PIN_INPUT_PULLUP | MUX_MODE14)	/* spi2_d0.gpio7_16 */
++		>;
++	};
++
++	mcp79410_pins_default: mcp79410_pins_default {
++		pinctrl-single,pins = <
++			0x424 (PIN_INPUT_PULLUP | MUX_MODE1)	/* wakeup3.sys_nirq1 */
++		>;
++	};
++
++	usb1_pins: pinmux_usb1_pins {
++		pinctrl-single,pins = <
++			0x280 (PIN_INPUT_SLEW | MUX_MODE0) /* usb1_drvvbus */
++		>;
++	};
++
++};
++
++&i2c1 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins_default>;
++	clock-frequency = <400000>;
++
++	tps659038: tps659038 at 58 {
++		compatible = "ti,tps659038";
++		reg = <0x58>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&tps659038_pins_default>;
++
++		#interrupt-cells = <2>;
++		interrupt-controller;
++
++		ti,system-power-controller;
++
++		tps659038_pmic {
++			compatible = "ti,tps659038-pmic";
++
++			regulators {
++				smps12_reg: smps12 {
++					/* VDD_MPU */
++					regulator-name = "smps12";
++					regulator-min-microvolt = < 850000>;
++					regulator-max-microvolt = <1250000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				smps3_reg: smps3 {
++					/* VDD_DDR */
++					regulator-name = "smps3";
++					regulator-min-microvolt = <1350000>;
++					regulator-max-microvolt = <1350000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				smps45_reg: smps45 {
++					/* VDD_DSPEVE, VDD_IVA, VDD_GPU */
++					regulator-name = "smps45";
++					regulator-min-microvolt = < 850000>;
++					regulator-max-microvolt = <1150000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				smps6_reg: smps6 {
++					/* VDD_CORE */
++					regulator-name = "smps6";
++					regulator-min-microvolt = <850000>;
++					regulator-max-microvolt = <1030000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				/* SMPS7 unused */
++
++				smps8_reg: smps8 {
++					/* VDD_1V8 */
++					regulator-name = "smps8";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				/* SMPS9 unused */
++
++				ldo1_reg: ldo1 {
++					/* VDD_SD  */
++					regulator-name = "ldo1";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <3300000>;
++					regulator-boot-on;
++				};
++
++				ldo2_reg: ldo2 {
++					/* VDD_SHV5 */
++					regulator-name = "ldo2";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				ldo3_reg: ldo3 {
++					/* VDDA_1V8_PHY */
++					regulator-name = "ldo3";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				ldo9_reg: ldo9 {
++					/* VDD_RTC */
++					regulator-name = "ldo9";
++					regulator-min-microvolt = <1050000>;
++					regulator-max-microvolt = <1050000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				ldoln_reg: ldoln {
++					/* VDDA_1V8_PLL */
++					regulator-name = "ldoln";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				ldousb_reg: ldousb {
++					/* VDDA_3V_USB: VDDA_USBHS33 */
++					regulator-name = "ldousb";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++					regulator-boot-on;
++				};
++
++				regen1: regen1 {
++					/* VDD_3V3_ON */
++					regulator-name = "regen1";
++					regulator-boot-on;
++					regulator-always-on;
++				};
++			};
++		};
++
++		tps659038_rtc: tps659038_rtc {
++			compatible = "ti,palmas-rtc";
++			interrupt-parent = <&tps659038>;
++			interrupts = <8 IRQ_TYPE_EDGE_FALLING>;
++			wakeup-source;
++		};
++
++		tps659038_pwr_button: tps659038_pwr_button {
++			compatible = "ti,palmas-pwrbutton";
++			interrupt-parent = <&tps659038>;
++			interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
++			wakeup-source;
++			ti,palmas-long-press-seconds = <12>;
++		};
++	};
++
++	tmp102: tmp102 at 48 {
++		compatible = "ti,tmp102";
++		reg = <0x48>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&tmp102_pins_default>;
++		interrupt-parent = <&gpio7>;
++		interrupts = <16 IRQ_TYPE_LEVEL_LOW>;
++	};
++};
++
++&i2c3 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c3_pins_default>;
++	clock-frequency = <400000>;
++
++	mcp_rtc: rtc at 6f {
++		compatible = "microchip,mcp7941x";
++		reg = <0x6f>;
++		interrupt-parent = <&gic>;
++		interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_LOW>;  /* IRQ_SYS_1N */
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&mcp79410_pins_default>;
++
++		vcc-supply = <&vdd_3v3>;
++		wakeup-source;
++	};
++};
++
++&gpio7 {
++	ti,no-reset-on-init;
++	ti,no-idle-on-init;
++};
++
++&cpu0 {
++	cpu0-supply = <&smps12_reg>;
++	voltage-tolerance = <1>;
++};
++
++&uart3 {
++	status = "okay";
++	interrupts-extended = <&gic GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
++			      <&dra7_pmx_core 0x248>;
++
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart3_pins_default>;
++};
++
++&mmc1 {
++	status = "okay";
++
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins_default>;
++
++	vmmc-supply = <&ldo1_reg>;
++	vmmc_aux-supply = <&vdd_3v3>;
++	pbias-supply = <&pbias_mmc_reg>;
++	bus-width = <4>;
++	cd-gpios = <&gpio6 27 0>; /* gpio 219 */
++};
++
++&mmc2 {
++	status = "okay";
++
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_pins_default>;
++
++	vmmc-supply = <&vdd_3v3>;
++	bus-width = <8>;
++	ti,non-removable;
++	cap-mmc-dual-data-rate;
++};
++
++&sata {
++	status = "okay";
++};
++
++&usb2_phy1 {
++	phy-supply = <&ldousb_reg>;
++};
++
++&usb1 {
++	dr_mode = "host";
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb1_pins>;
++};
+-- 
+1.7.9.5
