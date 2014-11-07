@@ -1,28 +1,81 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 7 Nov 2014 11:40:12 +0100 (CET)
-Subject: [Patch Part2 v5 21/31] PCI/MSI: Enhance core to support hierarchy
- irqdomain
-In-Reply-To: <1415283644-2559-22-git-send-email-jiang.liu@linux.intel.com>
-References: <1415283644-2559-1-git-send-email-jiang.liu@linux.intel.com>
- <1415283644-2559-22-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <alpine.DEB.2.11.1411071139260.3789@nanos>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 7 Nov 2014 11:41:11 +0100
+Subject: [PATCH 00/10] arm64 kexec kernel patches V5
+In-Reply-To: <20141107101642.GA4585@leverpostej>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <20141031075209.GH3290@darkstar.nay.redhat.com>
+ <20141103194634.GA30366@leverpostej>
+ <20141106015642.GA2569@darkstar.nay.redhat.com>
+ <20141106150846.GE23706@leverpostej>
+ <CACxGe6u=J_k3XZxyiyti=i=rtW+a5xxuukg3TgOyM+ra1vAACQ@mail.gmail.com>
+ <20141107101642.GA4585@leverpostej>
+Message-ID: <CAKv+Gu9kJ6GHcPm9fa6m84gse9DQat6D54zFD0G0X9od=sYVpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Nov 2014, Jiang Liu wrote:
+On 7 November 2014 11:16, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Nov 07, 2014 at 12:41:45AM +0000, Grant Likely wrote:
+>> On Thu, Nov 6, 2014 at 3:08 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > On Thu, Nov 06, 2014 at 01:56:42AM +0000, Dave Young wrote:
+>> >> On 11/03/14 at 07:46pm, Mark Rutland wrote:
+>> >> > On Fri, Oct 31, 2014 at 07:52:09AM +0000, Dave Young wrote:
+>> >> > > Hi Geoff
+>> >> > >
+>> >> > > I tested your patches. The macihne is using spin-table cpu enable method
+>> >> > > so I tried maxcpus=1 as you suggested.
+>> >> > >
+>> >> > > There's below issues for me, thoughts?
+>> >> > >
+>> >> > > 1. For acpi booting there's no /proc/device-tree so kexec can not find dtb
+>> >> > > to use.
+>> >> >
+>> >> > Are you absolutely certain of this?
+>> >> >
+>> >> > To use ACPI, you must have booted via EFI, as the only mechanism for
+>> >> > finding the ACPI tables is via EFI. If booted via EFI, the stub will
+>> >> > have created a stub DTB if there is no provided DTB, to pass the command
+>> >> > line and pointers to EFI data structures. This stub DTB should be
+>> >> > present in the usual place.
+>> >>
+>> >> Mark, I used kexec-tools from Geoff's git tree, it will create dtb from procfs
+>> >> maybe I can pass external dtb to kexec-tools. What you mentioned should be true
+>> >> though but I have not get idea how to get the dtb which kernel is using for boot
+>> >> since it is not unflattened.
+>> >
+>> > Ah, sorry. I see the problem now. For ACPI you don't unflatten the tree,
+>> > so there's nothing to expose at in sysfs/procfs.
+>> >
+>> > Somehow we need to unflatten the DTB without exposing it to drivers,
+>> > such that it can be exposed to userspace in the usual place but drivers
+>> > don't being probing based off of it.
+>>
+>> Is that even necessary? If the tree isn't unflattened, then it is just
+>> a stub tree. There really isn't anything interesting in it.
+>
+> We need to UEFI properties [1] from /chosen to access the memory map and
+> system table (both of which are necessary to access any ACPI tables).
+>
+>> Kexec should recreate the tree from scratch in that case.
+>
+> I'm not sure if the required information is exposed to userspace
+> elsewhere. Ard, Leif?
+>
 
-> Enhance PCI MSI core to support hierarchy irqdomain, so the common
-> code could be shared among architectures.
-> 
-> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-> ---
-> Hi Thomas,
-> 	These changes are a temporary solution, I'm working on another
-> patch set which will refine these interfaces, especially kill 
-> arch_msi_irq_domain_{set|get}_hwirq().
+Personally, I think we should not be using /proc/device-tree at all,
+but instead retain the original blob in some way and expose that.
 
-Ok. Please don't forget the irq_chip change :)
+We already have /sys/firmware/efi/systab which contains the physical
+addresses of the UEFI configuration tables. We should probably add an
+entry for the FDT there anyway, but we would still be looking at
+mmap(/dev/mem) to access it, which is not a practice we want to
+encourage, I suppose.
 
-Thanks,
+Also, we *must* take the secure boot scenario into account. Booting
+with an arbitrary user generated DTB is nice, but if you are doing
+kexec without an initrd, for instance, it would also be nice if we
+could just reuse the existing DTB without bothering the user for it at
+all, which would be something we could also allow when running
+securely.
 
-	tglx
+-- 
+Ard.
