@@ -1,51 +1,56 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Fri, 07 Nov 2014 13:35:19 +0100
-Subject: [PATCH 0/3] Add support for Tegra Activity Monitor
-In-Reply-To: <545C8BCC.3090908@nvidia.com>
-References: <1414594232-15684-1-git-send-email-tomeu.vizoso@collabora.com>
- <545C8BCC.3090908@nvidia.com>
-Message-ID: <545CBC87.7050404@collabora.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 7 Nov 2014 20:38:24 +0800
+Subject: [GIT PULL]Hisilicon HiX5HD2 soc DT udaptes for v3.19
+Message-ID: <545CBD40.7060003@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2014 10:07 AM, Alexandre Courbot wrote:
-> On 10/29/2014 11:50 PM, Tomeu Vizoso wrote:
->> Hello,
->>
->> these patches implement support for setting the rate of the EMC clock based on
->> stats collected from the ACTMON, a piece of hw in the Tegra124 that counts
->> memory accesses (among others).
->>
->> It depends on the following in-flight patches:
->>
->> * MC driver: http://thread.gmane.org/gmane.linux.ports.tegra/19623
->> * EMC driver: http://thread.gmane.org/gmane.linux.ports.arm.kernel/365125
->> * CPUFreq driver: http://thread.gmane.org/gmane.linux.kernel/1812962
->>
->> I have pushed a branch here for testing:
-> 
-> I am not too familiar with DVFS, but after going through this series it 
-> really seems to me that this could use devfreq. In its current form this 
-> driver mixes control and policy and lacks flexibility, preventing e.g. 
-> to switch to a performance or power-saving profile. Could you study the 
-> feasibility of using devfreq for this?
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Yeah, I started writing a devfreq driver, but then I looked in more
-detail to the downstream driver and realized that most of the
-functionality that devfreq provides overlaps with the hw.
+Please help to merge pull request for hisilicon hix5hd2 soc dt updates for 3.19. 
+Thanks!
 
-The ACTMON can be configured to fire an interrupt when a set of
-thresholds are crossed, similar to the simple-ondemand governor but a
-bit more sophisticated. The only functionality of the governors that
-isn't covered by the ACTMON hw is determining the new frequency after a
-threshold has been crossed, but if we want to retain the flexibility of
-the downstream solution, we would need to write a new governor anyway.
+Best Regards,
+Wei
 
-I realize that it would be cool to reuse the code in devfreq, but being
-able to let the hw sample the counters, calculating averages and
-checking if a threshold has been crossed without the cpu having to
-intervene gives this SoC quite an edge when compared to its competitors.
 
-Regards,
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-Tomeu
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+
+are available in the git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-dt-for-3.19
+
+for you to fetch changes up to 92cfcb26fca45aafa7eb9b8a4401a361caa88dec:
+
+  ARM: dts: hix5hd2: add reboot node (2014-11-07 19:29:53 +0800)
+
+----------------------------------------------------------------
+ARM: DT:  Hisilicon terminal SoC HiX5HD2 DT updates for 3.19
+
+- Add reboot node, reusing syscon-reboot
+- Add I2C nodes Hisilicon IP
+- Add IR node based on Hisilicon IP
+- Add Watchdog node based on ARM IP
+- Add GPIO nodes based on ARM GPIO IP
+- Add SATA node based on Hisilicon IP
+- Add USB nodes
+- Add MMC nodes based on Synopsys IP
+- Add GMAC nodes based on Hisilicon IP
+
+----------------------------------------------------------------
+Zhangfei Gao (9):
+      ARM: dts: hix5hd2: add gmac node
+      ARM: dts: hix5hd2: add mmc node
+      ARM: dts: hix5hd2: add usb node
+      ARM: dts: hix5hd2: add sata node
+      ARM: dts: hix5hd2: add gpio node
+      ARM: dts: hix5hd2: add wdg node
+      ARM: dts: hix5hd2: add ir node
+      ARM: dts: hix5hd2: add i2c node
+      ARM: dts: hix5hd2: add reboot node
+
+ arch/arm/boot/dts/hisi-x5hd2-dkb.dts |  33 ++++++++++++
+ arch/arm/boot/dts/hisi-x5hd2.dtsi    | 390 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 421 insertions(+), 2 deletions(-)
