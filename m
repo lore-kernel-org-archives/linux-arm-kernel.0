@@ -1,87 +1,134 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri,  7 Nov 2014 16:25:30 +0000
-Subject: [PATCH 05/11] arm: perf: reject multi-pmu groups
+Date: Fri,  7 Nov 2014 16:25:31 +0000
+Subject: [PATCH 06/11] arm: perf: probe number of counters on affine CPUs
 In-Reply-To: <1415377536-12841-1-git-send-email-mark.rutland@arm.com>
 References: <1415377536-12841-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1415377536-12841-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <1415377536-12841-7-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An event group spanning multiple CPU PMUs can never be scheduled, as at
-least one event should always fail, and are therefore nonsensical.
-Additionally, groups spanning multiple PMUs would require additional
-validation logic throughout the driver to prevent CPU PMUs from stepping
-on each others' internal state. Given that such groups are nonsensical
-to begin with, the simple option is to reject such groups entirely.
-Groups consisting of software events and CPU PMU events are benign so
-long as the CPU PMU events only target a single CPU PMU.
-
-This patch ensures that we reject the creation of event groups which
-span multiple CPU PMUs, avoiding the issues described above. The
-addition of this_pmu to the validation logic made the fake_pmu more
-confusing than it already was; so this is renamed to the more accurate
-hw_events. As hw_events was being modified anyway, the initialisation of
-hw_events.used_mask is also simplified with the use of a designated
-initializer rather than the existing memset.
+In heterogeneous systems, the number of counters may differ across
+clusters. To find the number of counters for a cluster, we must probe
+the PMU from a CPU in that cluster.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/perf_event.c | 23 ++++++++++++-----------
- 1 file changed, 12 insertions(+), 11 deletions(-)
+ arch/arm/kernel/perf_event_v7.c | 41 +++++++++++++++++++++--------------------
+ 1 file changed, 21 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index b00f6aa..41dcfc0 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -258,13 +258,17 @@ out:
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index fa76b25..dccd108 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -994,15 +994,22 @@ static void armv7pmu_init(struct arm_pmu *cpu_pmu)
+ 	cpu_pmu->max_period	= (1LLU << 32) - 1;
+ };
+ 
+-static u32 armv7_read_num_pmnc_events(void)
++static void armv7_read_num_pmnc_events(void *info)
+ {
+-	u32 nb_cnt;
++	int *nb_cnt = info;
+ 
+ 	/* Read the nb of CNTx counters supported from PMNC */
+-	nb_cnt = (armv7_pmnc_read() >> ARMV7_PMNC_N_SHIFT) & ARMV7_PMNC_N_MASK;
++	*nb_cnt = (armv7_pmnc_read() >> ARMV7_PMNC_N_SHIFT) & ARMV7_PMNC_N_MASK;
+ 
+-	/* Add the CPU cycles counter and return */
+-	return nb_cnt + 1;
++	/* Add the CPU cycles counter */
++	*nb_cnt += 1;
++}
++
++static int armv7_probe_num_events(struct arm_pmu *arm_pmu)
++{
++	return smp_call_function_any(&arm_pmu->supported_cpus,
++				     armv7_read_num_pmnc_events,
++				     &arm_pmu->num_events, 1);
  }
  
- static int
--validate_event(struct pmu_hw_events *hw_events,
-+validate_event(struct pmu *this_pmu,
-+	       struct pmu_hw_events *hw_events,
- 	       struct perf_event *event)
+ static int armv7_a8_pmu_init(struct arm_pmu *cpu_pmu)
+@@ -1010,8 +1017,7 @@ static int armv7_a8_pmu_init(struct arm_pmu *cpu_pmu)
+ 	armv7pmu_init(cpu_pmu);
+ 	cpu_pmu->name		= "armv7_cortex_a8";
+ 	cpu_pmu->map_event	= armv7_a8_map_event;
+-	cpu_pmu->num_events	= armv7_read_num_pmnc_events();
+-	return 0;
++	return armv7_probe_num_events(cpu_pmu);
+ }
+ 
+ static int armv7_a9_pmu_init(struct arm_pmu *cpu_pmu)
+@@ -1019,8 +1025,7 @@ static int armv7_a9_pmu_init(struct arm_pmu *cpu_pmu)
+ 	armv7pmu_init(cpu_pmu);
+ 	cpu_pmu->name		= "armv7_cortex_a9";
+ 	cpu_pmu->map_event	= armv7_a9_map_event;
+-	cpu_pmu->num_events	= armv7_read_num_pmnc_events();
+-	return 0;
++	return armv7_probe_num_events(cpu_pmu);
+ }
+ 
+ static int armv7_a5_pmu_init(struct arm_pmu *cpu_pmu)
+@@ -1028,8 +1033,7 @@ static int armv7_a5_pmu_init(struct arm_pmu *cpu_pmu)
+ 	armv7pmu_init(cpu_pmu);
+ 	cpu_pmu->name		= "armv7_cortex_a5";
+ 	cpu_pmu->map_event	= armv7_a5_map_event;
+-	cpu_pmu->num_events	= armv7_read_num_pmnc_events();
+-	return 0;
++	return armv7_probe_num_events(cpu_pmu);
+ }
+ 
+ static int armv7_a15_pmu_init(struct arm_pmu *cpu_pmu)
+@@ -1037,9 +1041,8 @@ static int armv7_a15_pmu_init(struct arm_pmu *cpu_pmu)
+ 	armv7pmu_init(cpu_pmu);
+ 	cpu_pmu->name		= "armv7_cortex_a15";
+ 	cpu_pmu->map_event	= armv7_a15_map_event;
+-	cpu_pmu->num_events	= armv7_read_num_pmnc_events();
+ 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
+-	return 0;
++	return armv7_probe_num_events(cpu_pmu);
+ }
+ 
+ static int armv7_a7_pmu_init(struct arm_pmu *cpu_pmu)
+@@ -1047,9 +1050,8 @@ static int armv7_a7_pmu_init(struct arm_pmu *cpu_pmu)
+ 	armv7pmu_init(cpu_pmu);
+ 	cpu_pmu->name		= "armv7_cortex_a7";
+ 	cpu_pmu->map_event	= armv7_a7_map_event;
+-	cpu_pmu->num_events	= armv7_read_num_pmnc_events();
+ 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
+-	return 0;
++	return armv7_probe_num_events(cpu_pmu);
+ }
+ 
+ static int armv7_a12_pmu_init(struct arm_pmu *cpu_pmu)
+@@ -1057,16 +1059,15 @@ static int armv7_a12_pmu_init(struct arm_pmu *cpu_pmu)
+ 	armv7pmu_init(cpu_pmu);
+ 	cpu_pmu->name		= "armv7_cortex_a12";
+ 	cpu_pmu->map_event	= armv7_a12_map_event;
+-	cpu_pmu->num_events	= armv7_read_num_pmnc_events();
+ 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
+-	return 0;
++	return armv7_probe_num_events(cpu_pmu);
+ }
+ 
+ static int armv7_a17_pmu_init(struct arm_pmu *cpu_pmu)
  {
- 	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
+-	armv7_a12_pmu_init(cpu_pmu);
++	int ret = armv7_a12_pmu_init(cpu_pmu);
+ 	cpu_pmu->name = "armv7_cortex_a17";
+-	return 0;
++	return ret;
+ }
  
- 	if (is_software_event(event))
- 		return 1;
-+	
-+	if (event->pmu != this_pmu)
-+		return 0;
- 
- 	if (event->state < PERF_EVENT_STATE_OFF)
- 		return 1;
-@@ -279,23 +283,20 @@ static int
- validate_group(struct perf_event *event)
- {
- 	struct perf_event *sibling, *leader = event->group_leader;
--	struct pmu_hw_events fake_pmu;
--
--	/*
--	 * Initialise the fake PMU. We only need to populate the
--	 * used_mask for the purposes of validation.
--	 */
--	memset(&fake_pmu.used_mask, 0, sizeof(fake_pmu.used_mask));
-+	struct pmu *this_pmu = event->pmu;
-+	struct pmu_hw_events hw_events = {
-+		.used_mask = { 0 },
-+	};
- 
--	if (!validate_event(&fake_pmu, leader))
-+	if (!validate_event(this_pmu, &hw_events, leader))
- 		return -EINVAL;
- 
- 	list_for_each_entry(sibling, &leader->sibling_list, group_entry) {
--		if (!validate_event(&fake_pmu, sibling))
-+		if (!validate_event(this_pmu, &hw_events, sibling))
- 			return -EINVAL;
- 	}
- 
--	if (!validate_event(&fake_pmu, event))
-+	if (!validate_event(this_pmu, &hw_events, event))
- 		return -EINVAL;
- 
- 	return 0;
+ /*
+@@ -1453,7 +1454,7 @@ static int krait_pmu_init(struct arm_pmu *cpu_pmu)
+ 		cpu_pmu->map_event = krait_map_event_no_branch;
+ 	else
+ 		cpu_pmu->map_event = krait_map_event;
+-	cpu_pmu->num_events	= armv7_read_num_pmnc_events();
++	cpu_pmu->num_events	= armv7_probe_num_events(cpu_pmu);
+ 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
+ 	cpu_pmu->reset		= krait_pmu_reset;
+ 	cpu_pmu->enable		= krait_pmu_enable_event;
 -- 
 1.9.1
