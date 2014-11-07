@@ -1,52 +1,80 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 7 Nov 2014 16:40:52 +0800
-Subject: M_CAN message RAM initialization AppNote  - was: Re: [PATCH V3
- 3/3] can: m_can: workaround for transmit data less than 4 bytes
-In-Reply-To: <545B6DD8.6010906@pengutronix.de>
-References: <1415193393-30023-1-git-send-email-b29396@freescale.com>
- <1415193393-30023-3-git-send-email-b29396@freescale.com>
- <545A3451.2090302@pengutronix.de> <545A692E.40002@hartkopp.net>
- <20141106015716.GB7642@shlinux1.ap.freescale.net>
- <545B1D71.4000408@hartkopp.net>
- <20141106080940.GA22964@shlinux1.ap.freescale.net>
- <545B6AB4.70003@hartkopp.net> <545B6DD8.6010906@pengutronix.de>
-Message-ID: <20141107084051.GB23086@shlinux1.ap.freescale.net>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Fri, 07 Nov 2014 10:14:55 +0100
+Subject: [PATCH 01/21] thermal: of: Extend of-thermal.c to provide number
+ of trip points
+In-Reply-To: <20141107013405.GB10180@developer>
+References: <1412872737-624-1-git-send-email-l.majewski@samsung.com>
+ <1412872737-624-2-git-send-email-l.majewski@samsung.com>
+ <20141107013405.GB10180@developer>
+Message-ID: <20141107101455.6099c90d@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 06, 2014 at 01:47:20PM +0100, Marc Kleine-Budde wrote:
-> On 11/06/2014 01:33 PM, Oliver Hartkopp wrote:
-> >> So i'm not sure memset() the entire TX FIFO element is neccesary...
-> > 
-> > It's no big deal - so we should be defensive here.
-> > And memset() is not working as Marc pointed out in another mail.
-> > 
-> > So we would need to loop with
-> > 
-> >     m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(i), 0x0);
-> > 
-> >>
-> >> Do you think we could keep the current solution firstly and updated later
-> >> if needed?
-> > 
-> > No :-)
-> > 
-> > I would like to have all data bytes to be written at startup.
-> 
-> Me, too. As this happens only once during ifconfig up it should not hurt
-> performance, either send an incremental or new patch. I'll sort it out.
-> 
+Hi Eduardo,
 
-I will send a new patch for this.
-
-Regards
-Dong Aisheng
-
-> Marc
+> Hello Lukasz,
 > 
-> -- 
-> Pengutronix e.K.                  | Marc Kleine-Budde           |
-> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> On Thu, Oct 09, 2014 at 06:38:37PM +0200, Lukasz Majewski wrote:
+> > This patch extends the of-thermal.c to provide information about
+> > number of available trip points.
+> > 
+> > Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
+> > ---
+> >  drivers/thermal/of-thermal.c   | 6 ++++++
+> >  drivers/thermal/thermal_core.h | 5 +++++
+> >  2 files changed, 11 insertions(+)
+> > 
+> > diff --git a/drivers/thermal/of-thermal.c
+> > b/drivers/thermal/of-thermal.c index f8eb625..b2390d9 100644
+> > --- a/drivers/thermal/of-thermal.c
+> > +++ b/drivers/thermal/of-thermal.c
+> > @@ -113,6 +113,12 @@ static int of_thermal_get_temp(struct
+> > thermal_zone_device *tz, return data->get_temp(data->sensor_data,
+> > temp); }
+> >  
+> > +int of_thermal_get_ntrips(struct thermal_zone_device *tz)
+> > +{
+> > +	struct __thermal_zone *data = tz->devdata;
+> > +	return data->ntrips;
+> > +}
 > 
+> I am not against this addition. I just request you to document it
+> accordingly.
+
+OK, no problem.
+
+> 
+> > +
+> >  static int of_thermal_get_trend(struct thermal_zone_device *tz,
+> > int trip, enum thermal_trend *trend)
+> >  {
+> > diff --git a/drivers/thermal/thermal_core.h
+> > b/drivers/thermal/thermal_core.h index 3db339f..587ca5c 100644
+> > --- a/drivers/thermal/thermal_core.h
+> > +++ b/drivers/thermal/thermal_core.h
+> > @@ -81,9 +81,14 @@ static inline void
+> > thermal_gov_user_space_unregister(void) {} #ifdef CONFIG_THERMAL_OF
+> >  int of_parse_thermal_zones(void);
+> >  void of_thermal_destroy_zones(void);
+> > +int of_thermal_get_ntrips(struct thermal_zone_device *);
+> >  #else
+> >  static inline int of_parse_thermal_zones(void) { return 0; }
+> >  static inline void of_thermal_destroy_zones(void) { }
+> > +static inline int of_thermal_get_ntrips(struct thermal_zone_device
+> > *) +{
+> > +	return 0;
+> > +}
+> >  #endif
+> >  
+> >  #endif /* __THERMAL_CORE_H__ */
+> > -- 
+> > 2.0.0.rc2
+> > 
+
+
+-- 
+Best regards,
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
