@@ -1,38 +1,47 @@
 From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Fri, 07 Nov 2014 10:50:49 +0530
-Subject: [PATCH v6 1/7] arm64: dts: add <dt-bindings/> symlink
+Date: Fri, 07 Nov 2014 10:50:52 +0530
+Subject: [PATCH v6 4/7] arm64: dts: Add PMU DT node for exynos7 SoC
 In-Reply-To: <1415337655-31003-1-git-send-email-a.kesavan@samsung.com>
 References: <1415337655-31003-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1415337655-31003-2-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1415337655-31003-5-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pankaj Dubey <pankaj.dubey@samsung.com>
+Adds PMU DT node for exynos7 SoC.
 
-Add symlink to include/dt-bindings from arch/arm64/boot/dts/include/ to
-match the ones in ARM architectures so that preprocessed device
-tree files can include various useful constant definitions.
-
-See commit c58299aa8754 ("kbuild: create an "include chroot" for DT bindings")
-merged in v3.10-rc1 for details.
-
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
-Tested-by: Thomas Abraham <thomas.ab@samsung.com>
 ---
- arch/arm64/boot/dts/include/dt-bindings |    1 +
- 1 file changed, 1 insertion(+)
- create mode 120000 arch/arm64/boot/dts/include/dt-bindings
+ .../devicetree/bindings/arm/samsung/pmu.txt        |    1 +
+ arch/arm64/boot/dts/exynos/exynos7.dtsi            |    5 +++++
+ 2 files changed, 6 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/include/dt-bindings b/arch/arm64/boot/dts/include/dt-bindings
-new file mode 120000
-index 0000000..08c00e4
---- /dev/null
-+++ b/arch/arm64/boot/dts/include/dt-bindings
-@@ -0,0 +1 @@
-+../../../../../include/dt-bindings
-\ No newline at end of file
+diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+index 1e1979b..67b2113 100644
+--- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
++++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+@@ -10,6 +10,7 @@ Properties:
+ 		   - "samsung,exynos5260-pmu" - for Exynos5260 SoC.
+ 		   - "samsung,exynos5410-pmu" - for Exynos5410 SoC,
+ 		   - "samsung,exynos5420-pmu" - for Exynos5420 SoC.
++		   - "samsung,exynos7-pmu" - for Exynos7 SoC.
+ 		second value must be always "syscon".
+ 
+  - reg : offset and length of the register set.
+diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+index c38567a..2bce3f3 100644
+--- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+@@ -243,6 +243,11 @@
+ 				     <1 11 0xff01>,
+ 				     <1 10 0xff01>;
+ 		};
++
++		pmu_system_controller: system-controller at 105c0000 {
++			compatible = "samsung,exynos7-pmu", "syscon";
++			reg = <0x105c0000 0x5000>;
++		};
+ 	};
+ };
+ 
 -- 
 1.7.9.5
