@@ -1,52 +1,23 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 7 Nov 2014 15:03:58 +0000
-Subject: [PATCH 2/2] arm64: kvm: eliminate literal pool entries
-In-Reply-To: <20141107145150.GA18586@cbox>
-References: <1415369554-7444-1-git-send-email-ard.biesheuvel@linaro.org>
- <1415369554-7444-2-git-send-email-ard.biesheuvel@linaro.org>
- <545CDACC.5070406@arm.com> <20141107145150.GA18586@cbox>
-Message-ID: <20141107150357.GA6906@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 07 Nov 2014 16:05:24 +0100
+Subject: [PATCH v3 09/10] gpu: ipu-v3: Make use of media_bus_format enum
+In-Reply-To: <1415369269-5064-10-git-send-email-boris.brezillon@free-electrons.com>
+References: <1415369269-5064-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1415369269-5064-10-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1415372724.29873.7.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 07, 2014 at 02:51:50PM +0000, Christoffer Dall wrote:
-> On Fri, Nov 07, 2014 at 02:44:28PM +0000, Marc Zyngier wrote:
-> > On 07/11/14 14:12, Ard Biesheuvel wrote:
-> > > Replace two instances of 'ldr xN, =(constant)' in the world switch
-> > > hot path with 'mov' instructions.
-> > > 
-> > > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > > ---
-> > >  arch/arm64/kvm/hyp.S | 4 ++--
-> > >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> > > index b72aa9f9215c..fbe909fb0a1a 100644
-> > > --- a/arch/arm64/kvm/hyp.S
-> > > +++ b/arch/arm64/kvm/hyp.S
-> > > @@ -761,10 +761,10 @@
-> > >  .macro activate_traps
-> > >  	ldr     x2, [x0, #VCPU_HCR_EL2]
-> > >  	msr     hcr_el2, x2
-> > > -	ldr	x2, =(CPTR_EL2_TTA)
-> > > +	mov	x2, #CPTR_EL2_TTA
-> > >  	msr	cptr_el2, x2
-> > >  
-> > > -	ldr	x2, =(1 << 15)	// Trap CP15 Cr=15
-> > > +	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
-> > >  	msr	hstr_el2, x2
-> > >  
-> > >  	mrs	x2, mdcr_el2
-> > > 
-> > 
-> > Looks good to me.
-> > 
-> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> > 
-> Yup, me too:
+Am Freitag, den 07.11.2014, 15:07 +0100 schrieb Boris Brezillon:
+> In order to have subsytem agnostic media bus format definitions we've
+> moved media bus definition to include/uapi/linux/media-bus-format.h and
+> prefixed enum values with MEDIA_BUS_FMT instead of V4L2_MBUS_FMT.
 > 
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Reference new definitions in the ipu-v3 driver.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Cheers guys, I've applied both patches to the arm64 tree for 3.19.
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-Will
+regards
+Philipp
