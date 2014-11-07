@@ -1,210 +1,120 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 7 Nov 2014 16:12:34 +0100
-Subject: [PATCH v2 02/10] arm64/mm: add create_pgd_mapping() to create
- private page tables
-In-Reply-To: <20141107150830.GA10210@linaro.org>
-References: <1415283206-14713-1-git-send-email-ard.biesheuvel@linaro.org>
- <1415283206-14713-3-git-send-email-ard.biesheuvel@linaro.org>
- <20141107150830.GA10210@linaro.org>
-Message-ID: <CAKv+Gu8SuNy8ufq2trZB=0jW6QRZde4QQS3M+jSDuWCTZ257vg@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 7 Nov 2014 15:48:57 +0100
+Subject: [PATCH v4 2/4] serial: mxs-auart: use mctrl_gpio helpers for
+ handling modem signals
+In-Reply-To: <545CC7CB.1010107@elproma.com.pl>
+References: <1412960007-28159-1-git-send-email-j.uzycki@elproma.com.pl>
+ <201411071202.16344.marex@denx.de> <545CC7CB.1010107@elproma.com.pl>
+Message-ID: <201411071548.58044.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 November 2014 16:08, Steve Capper <steve.capper@linaro.org> wrote:
-> On Thu, Nov 06, 2014 at 03:13:18PM +0100, Ard Biesheuvel wrote:
->
-> Hi Ard,
-> Some comments below:
->
->> For UEFI, we need to install the memory mappings used for Runtime Services
->> in a dedicated set of page tables. Add create_pgd_mapping(), which allows
->> us to allocate and install those page table entries early.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/include/asm/mmu.h     |  3 +++
->>  arch/arm64/include/asm/pgtable.h |  5 +++++
->>  arch/arm64/mm/mmu.c              | 44 +++++++++++++++++++++-------------------
->>  3 files changed, 31 insertions(+), 21 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
->> index c2f006c48bdb..5fd40c43be80 100644
->> --- a/arch/arm64/include/asm/mmu.h
->> +++ b/arch/arm64/include/asm/mmu.h
->> @@ -33,5 +33,8 @@ extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
->>  extern void init_mem_pgprot(void);
->>  /* create an identity mapping for memory (or io if map_io is true) */
->>  extern void create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io);
->> +extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
->> +                            unsigned long virt, phys_addr_t size,
->> +                            pgprot_t prot);
->>
->>  #endif
->> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
->> index 41a43bf26492..1abe4d08725b 100644
->> --- a/arch/arm64/include/asm/pgtable.h
->> +++ b/arch/arm64/include/asm/pgtable.h
->> @@ -264,6 +264,11 @@ static inline pmd_t pte_pmd(pte_t pte)
->>       return __pmd(pte_val(pte));
->>  }
->>
->> +static inline pgprot_t mk_sect_prot(pgprot_t prot)
->> +{
->> +     return __pgprot(pgprot_val(prot) & ~PTE_TABLE_BIT);
->> +}
->> +
->>  /*
->>   * THP definitions.
->>   */
->> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> index 83e6713143a3..b6dc2ce3991a 100644
->> --- a/arch/arm64/mm/mmu.c
->> +++ b/arch/arm64/mm/mmu.c
->> @@ -157,20 +157,10 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
->>
->>  static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
->>                                 unsigned long addr, unsigned long end,
->> -                               phys_addr_t phys, int map_io)
->> +                               phys_addr_t phys, pgprot_t prot)
->>  {
->>       pmd_t *pmd;
->>       unsigned long next;
->> -     pmdval_t prot_sect;
->> -     pgprot_t prot_pte;
->> -
->> -     if (map_io) {
->> -             prot_sect = PROT_SECT_DEVICE_nGnRE;
->> -             prot_pte = __pgprot(PROT_DEVICE_nGnRE);
->> -     } else {
->> -             prot_sect = PROT_SECT_NORMAL_EXEC;
->> -             prot_pte = PAGE_KERNEL_EXEC;
->> -     }
->
-> Thanks :-)
->
->>
->>       /*
->>        * Check for initial section mappings in the pgd/pud and remove them.
->> @@ -186,7 +176,8 @@ static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
->>               /* try section mapping first */
->>               if (((addr | next | phys) & ~SECTION_MASK) == 0) {
->>                       pmd_t old_pmd =*pmd;
->> -                     set_pmd(pmd, __pmd(phys | prot_sect));
->> +                     set_pmd(pmd, __pmd(phys |
->> +                                        pgprot_val(mk_sect_prot(prot))));
->>                       /*
->>                        * Check for previous table entries created during
->>                        * boot (__create_page_tables) and flush them.
->> @@ -195,7 +186,7 @@ static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
->>                               flush_tlb_all();
->>               } else {
->>                       alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
->> -                                    prot_pte);
->> +                                    prot);
->>               }
->>               phys += next - addr;
->>       } while (pmd++, addr = next, addr != end);
->> @@ -203,7 +194,7 @@ static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
->>
->>  static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
->>                                 unsigned long addr, unsigned long end,
->> -                               unsigned long phys, int map_io)
->> +                               unsigned long phys, pgprot_t prot)
->>  {
->>       pud_t *pud;
->>       unsigned long next;
->> @@ -221,10 +212,11 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
->>               /*
->>                * For 4K granule only, attempt to put down a 1GB block
->>                */
->> -             if (!map_io && (PAGE_SHIFT == 12) &&
->> +             if ((PAGE_SHIFT == 12) &&
->>                   ((addr | next | phys) & ~PUD_MASK) == 0) {
->>                       pud_t old_pud = *pud;
->> -                     set_pud(pud, __pud(phys | PROT_SECT_NORMAL_EXEC));
->> +                     set_pud(pud, __pud(phys |
->> +                                        pgprot_val(mk_sect_prot(prot))));
->>
->>                       /*
->>                        * If we have an old value for a pud, it will
->> @@ -239,7 +231,7 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
->>                               flush_tlb_all();
->>                       }
->>               } else {
->> -                     alloc_init_pmd(mm, pud, addr, next, phys, map_io);
->> +                     alloc_init_pmd(mm, pud, addr, next, phys, prot);
->>               }
->>               phys += next - addr;
->>       } while (pud++, addr = next, addr != end);
->> @@ -251,7 +243,7 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
->>   */
->>  static void __init __create_mapping(struct mm_struct *mm, pgd_t *pgd,
->>                                   phys_addr_t phys, unsigned long virt,
->> -                                 phys_addr_t size, int map_io)
->> +                                 phys_addr_t size, pgprot_t prot)
->>  {
->>       unsigned long addr, length, end, next;
->>
->> @@ -261,7 +253,8 @@ static void __init __create_mapping(struct mm_struct *mm, pgd_t *pgd,
->>       end = addr + length;
->>       do {
->>               next = pgd_addr_end(addr, end);
->> -             alloc_init_pud(mm, pgd, addr, next, phys, map_io);
->> +             alloc_init_pud(mm, pgd, addr, next, phys, prot);
->> +
->>               phys += next - addr;
->>       } while (pgd++, addr = next, addr != end);
->>  }
->> @@ -275,7 +268,7 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
->>               return;
->>       }
->>       __create_mapping(&init_mm, pgd_offset_k(virt & PAGE_MASK), phys, virt,
->> -                      size, 0);
->> +                      size, PAGE_KERNEL_EXEC);
->>  }
->>
->>  void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
->> @@ -285,7 +278,16 @@ void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
->>               return;
->>       }
->>       __create_mapping(&init_mm, &idmap_pg_dir[pgd_index(addr)],
->> -                      addr, addr, size, map_io);
->> +                      addr, addr, size,
->> +                      map_io ? __pgprot(PROT_DEVICE_nGnRE)
->> +                             : PAGE_KERNEL_EXEC);
->> +}
->
-> Could you please also change efi_setup_idmap (it's the only caller I
-> can see for create_id_mapping)?
->
-> That way the prototype for create_id_mapping would look like:
-> void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, pgprot_t prot)
->
+On Friday, November 07, 2014 at 02:23:23 PM, Janusz U?ycki wrote:
+[...]
 
-I didn't bother because a couple of patches later, this stuff is all
-ripped out anyway
-(7/10 arm64/efi: remove idmap manipulations from UEFI code), because
-there is no longer a need for UEFI to switch to the ID map.
+> >> Hardware RTS/CTS lines can be occupied by RX/TX of other AUART port
+> >> in order to obtain as much uarts as possible using i.mx283.
+> >> Therefore gpios can be used for "hardware" flow control.
+> > 
+> > Your logic is outright flawed here, the first sentence doesn't implicate
+> > the second sentence. In fact, those two are completely unrelated.
+> 
+> I didn't write MUST but CAN. There is a choice. Is flexibility of the
+> driver disadvantage?
 
-Do you feel I should still change it here, and then remove it later?
+If the flexibility brings in known problems, then yes, it is a problem. Not 
+because of the flexibility, but because it brings in bugs.
 
-Thanks,
-Ard.
+> >>>>     If we change them to gpio.  Could the DMA still
+> >>>> 
+> >>>> works fine?
+> >>>> did you test the DMA with this patch?
+> >>>> 
+> >>>> Add Marek for this patch too.
+> >>> 
+> >>> I didn't look too deep into the patch, so here's just my experience:
+> >>> 
+> >>> 1) The AUART block signals and GPIO block signals are not sychronised
+> >>> using the
+> >>> 
+> >>>      same clock. Therefore, the latency between toggling of the AUART
+> >>>      lines and the GPIO-driven pins will not be deterministic and will
+> >>>      vary. There might be a way to approximate that, but that's
+> >>>      definitelly not a reliable solution.
+> >>>      
+> >>>      This is very bad for example if you drive RS485 DIR line with the
+> >>>      RTS pin as a GPIO ; the RTS pin will toggle at non-deterministic
+> >>>      time compared to the end of UART transmission. This will trigger
+> >>>      bit-loss on the RS485 line and you just don't want that.
+> >>> 
+> >>> 2) Speaking of RS485, there's [1] and [2]. which I believe apply to any
+> >>> combo
+> >>> 
+> >>>      of UART+GPIO toggling.
+> >>> 
+> >>> So I hate to bring the bad news , but UART+GPIO combo toggling is
+> >>> really a bad bad idea.
+> >> 
+> >> Unfortunately if hardware is limited there is no choice and UART+GPIO is
+> >> necessary.
+> > 
+> > You will run into timing problems (see above).
+> 
+> A lot of 8250-compatible devices has no hardware flow control and in
+> most cases
+> they works and it is enough even for 115200 speed if CTS is handled by irq.
+> So it depends on your needs.
 
+I presume that in such a case , the 8250 still handles the CTS line, not some 
+external GPIO block, yes ?
 
->> +
->> +void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
->> +                            unsigned long virt, phys_addr_t size,
->> +                            pgprot_t prot)
->> +{
->> +     __create_mapping(mm, pgd_offset(mm, virt), phys, virt, size, prot);
->>  }
->>
->>  static void __init map_mem(void)
->> --
->> 1.8.3.2
->>
->
-> Cheers,
-> --
-> Steve
+> > What you're proposing here is a workaround for broken hardware, which was
+> > proven to be a bad idea and NAK'd already multiple times in the past
+> > (please see the links I posted in my last email).
+> 
+> It is not broken  hardware - rather limited to lower speeds but still
+> very useful solution.
+
+What exact "lower speed" are you talking about here and why ?
+
+> >> Your experience confirms the discussion [3] with Russell King. DMA
+> >> should be disabled and
+> >> the patch disables DMA support in mxs_auart_init_gpios() if RTS or CTS
+> >> line is set as gpio.
+> > 
+> > DMA has nothing to do with those problems here. DMA can be safely ignored
+> > for the purpose of the discussion altogether.
+> 
+> When gpios are used for RTS/CTS DMA is not used. However DMA is related
+> due to the driver
+> and "fsl,uart-has-rtscts". If you look into code of the driver you
+> should agree.
+
+This makes me believe that the DMA introduces too many timing fluctuations,
+so it's really not possible for you to keep toggling the GPIOs such that the
+bus would work. Is that the case ?
+
+[...]
+
+> >> Now the question: "fsl,uart-has-rtscts" name seems to be misleading now,
+> >> do you agree? It rather should include "dma" word in the name. Any
+> >> suggestion?
+> >> 
+> >> [3] http://thread.gmane.org/gmane.linux.serial/16069/focus=16077
+> > 
+> > The best suggestion I can give you is to fix your hardware early, before
+> > you run into nasty deep s.....tuff. These workarounds do not work and
+> > they will bit you later on, when it's hard to fix the hardware anymore.
+> 
+> The speed is limited but why don't you accept SW-HW mixed solutions?
+
+Did you read up on the RS485 timing problems and why that solution was never
+accepted for any driver ? I believe the threads explained that quite clearly.
+
+> Exactly the same method is accepted for 8250.
+
+Can you point out this code please ?
+
+> It is good to have choice than not. We can comment that speed is limited
+> for gpio-based hardware flow control. So please, rethink again.
+[...]
