@@ -1,48 +1,54 @@
-From: Andrew.Jackson@arm.com (Andrew Jackson)
-Date: Fri, 07 Nov 2014 08:31:25 +0000
-Subject: [PATCH v2] drm/i2c: tda998x: Set the CEC I2C address based on the
- slave I2C address.
-Message-ID: <545C835D.1050008@arm.com>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Fri, 7 Nov 2014 14:01:57 +0530
+Subject: [PATCH] spi: s3c64xx: add support for exynos7 SPI controller
+In-Reply-To: <20141106102636.GT8509@sirena.org.uk>
+References: <1415267509-16653-1-git-send-email-padma.v@samsung.com>
+ <20141106102636.GT8509@sirena.org.uk>
+Message-ID: <CAAgF-BfGwcNzMx0meFVkJqNMTbQ4_PP1PZ3i6edOm6U3bc26_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The I2C address for the TDA9989 and TDA19989 is fixed at 0x34
-but the two LSBs of the TDA19988's address are set by two configuration
-pins on the chip.  Irrespective of the chip, the associated CEC
-peripheral's I2C address is based upon the main I2C address.
+Hi Mark,
 
-This patch avoids any special handling required to support
-systems that contain multiple TDA19988 devices on the same
-I2C bus.
+CCing Kukjin Kim.
 
-Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
----
- drivers/gpu/drm/i2c/tda998x_drv.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
+On 11/6/14, Mark Brown <broonie@kernel.org> wrote:
+> On Thu, Nov 06, 2014 at 03:21:49PM +0530, Padmavathi Venna wrote:
+>> Exynos7 SPI controller supports only the auto Selection of
+>> CS toggle mode and Exynos7 SoC includes six SPI controllers.
+>> Add support for these changes in Exynos7 SPI controller driver.
+>
+> Could you give a bit more detail on what the "auto selection of CS
+> toggle mode" is - in the diff it looks like it's not an existing mode.
+> I'm a bit worried that it's not going to function well with devices that
+> send more than one transfer per message.
 
-diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index d476279..eeab17a 100644
---- a/drivers/gpu/drm/i2c/tda998x_drv.c
-+++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -1255,6 +1255,7 @@ static int tda998x_create(struct i2c_client *client, struct tda998x_priv *priv)
- 	struct device_node *np = client->dev.of_node;
- 	u32 video;
- 	int rev_lo, rev_hi, ret;
-+	unsigned short cec_addr;
- 
- 	priv->vip_cntrl_0 = VIP_CNTRL_0_SWAP_A(2) | VIP_CNTRL_0_SWAP_B(3);
- 	priv->vip_cntrl_1 = VIP_CNTRL_1_SWAP_C(0) | VIP_CNTRL_1_SWAP_D(1);
-@@ -1262,7 +1263,9 @@ static int tda998x_create(struct i2c_client *client, struct tda998x_priv *priv)
- 
- 	priv->current_page = 0xff;
- 	priv->hdmi = client;
--	priv->cec = i2c_new_dummy(client->adapter, 0x34);
-+	/* CEC I2C address bound to TDA998x I2C addr by configuration pins */
-+	cec_addr = 0x34 + (client->addr & 0x03);
-+	priv->cec = i2c_new_dummy(client->adapter, cec_addr);
- 	if (!priv->cec)
- 		return -ENODEV;
- 
--- 
-1.7.1
+There is a bit AUTO_N_MANUAL(as per manual) in the spi CS_CFG
+register(as per manual, in the driver it is S3C64XX_SPI_SLAVE_SEL) to
+control the CS toggle mode either manually or automatically. If CS has
+to be controlled manually the AUTO_N_MANUAL should be set to 0 which
+the driver is doing in the s3c64xx_spi_transfer_one function by
+writing 0 in the S3C64XX_SPI_SLAVE_SEL. When it is handled manually
+NSSOUT as per the manual(in the driver it is
+S3C64XX_SPI_SLAVE_SIG_INACT) controls the level of CS which when set
+deactivates the signal and reset activates.
+
+CS can also be controlled automatically by setting AUTO_N_MANUAL to 1
+in CS_CFG. When it is auto CS automatically toggles between packet to
+packet. NCS_TIME_COUNT in CS_CFG controls the inactive period. The
+driver by default uses manual mode. But on exynos7 the manual mode is
+removed.
+
+I tested the driver with wm5110 codec.
+
+>
+>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+>
+> It's better if your signoff is using the same e-maill address as
+
+ok.  I will take care of this.
+
+>
+
+Thanks
+Padma
