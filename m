@@ -1,30 +1,38 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 7 Nov 2014 07:44:16 +0100
-Subject: [PATCH] ARM: dts: zynq: Enable PL clocks for Parallella
-In-Reply-To: <1415294531-8942-1-git-send-email-afaerber@suse.de>
-References: <1415294531-8942-1-git-send-email-afaerber@suse.de>
-Message-ID: <eca8ae5de8184151b03d3fd8d23c62a7@BY2FFO11FD010.protection.gbl>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Fri, 07 Nov 2014 12:24:38 +0530
+Subject: [PATCH 0/2] add support for exynos7 I2S controller
+Message-ID: <1415343280-18916-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2014 06:22 PM, Andreas F?rber wrote:
-> The Parallella board comes with a U-Boot bootloader that loads one of
-> two predefined FPGA bitstreams before booting the kernel. Both define an
-> AXI interface to the on-board Epiphany processor.
-> 
-> Enable clocks FCLK0..FCLK3 for the Programmable Logic by default.
-> 
-> Otherwise accessing, e.g., the ESYSRESET register freezes the board,
-> as seen with the Epiphany SDK tools e-reset and e-hw-rev, using /dev/mem.
-> 
-> Cc: <stable@vger.kernel.org> # 3.17.x
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  Michal/Olof, please consider this trivial patch as a fix for 3.18.
+I2S on exynos7 includes the below changes
+ - has got support for lower root clock sampling frequencies like 64,
+   128, 96, 192fs. I2S on previous SoCs supports only 256,512,384 and 768.
+ - supports 7.1CH TDM mode for recording. exynos5 has only 7.1CH TDM mode
+   for playback.
+ - secondary dai works with only external DMA. on previous SoCs secondary
+   dai can work with either both or only internal DMA.
+ - I2S1 controller upgraded to 5.1CH with slighlty modified bit offsets
+   for supporting lower RFS and more no.of BFS values.
 
-Acked-by: Michal Simek <michal.simek@xilinx.com>
+As internal dma is not mandatory on all SoCs this patchset introduced a
+quirk for the same and added a structure to hold all the modified bit offsets
+across all SoCs.
 
-Olof, Arnd: Can you please pick this directly?
+This patchset is made based on linux-next master branch and tested with
+exynos7 base support from the below link.
+http://www.spinics.net/lists/linux-samsung-soc/msg37047.html
 
-Thanks,
-Michal
+Padmavathi Venna (2):
+  ASoC: Samsung: Add quirk for internal DMA
+  ASoC: samsung: add support for exynos7 I2S controller
+
+ .../devicetree/bindings/sound/samsung-i2s.txt      |   15 +-
+ include/linux/platform_data/asoc-s3c.h             |    1 +
+ sound/soc/samsung/Kconfig                          |    2 +-
+ sound/soc/samsung/i2s-regs.h                       |   10 +-
+ sound/soc/samsung/i2s.c                            |  228 ++++++++++++++------
+ 5 files changed, 180 insertions(+), 76 deletions(-)
+
+-- 
+1.7.4.4
