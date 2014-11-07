@@ -1,79 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 7 Nov 2014 13:11:30 +0000
-Subject: [RFC] ptrace: add generic SET_SYSCALL request
-In-Reply-To: <353850534.aGkkrtTogX@wuerfel>
-References: <1415346443-28915-1-git-send-email-takahiro.akashi@linaro.org>
- <1678531.AUssrM9PAs@wuerfel>
- <20141107121119.GQ4042@n2100.arm.linux.org.uk>
- <353850534.aGkkrtTogX@wuerfel>
-Message-ID: <20141107131129.GF18916@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 7 Nov 2014 14:13:30 +0100
+Subject: [PATCH 01/26] ARM: sunxi: Fix GPLv2 wording
+In-Reply-To: <20141027220251.GB32390@lukather>
+References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20141027220251.GB32390@lukather>
+Message-ID: <20141107131330.GY2989@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 07, 2014 at 12:44:07PM +0000, Arnd Bergmann wrote:
-> On Friday 07 November 2014 12:11:19 Russell King - ARM Linux wrote:
-> > On Fri, Nov 07, 2014 at 01:03:00PM +0100, Arnd Bergmann wrote:
-> > > On Friday 07 November 2014 11:55:51 Will Deacon wrote:
-> > > > We need this for arm64 and, since all architectures seem to have a mechanism
-> > > > for setting a system call via ptrace, moving it to generic code should make
-> > > > sense for new architectures too, no?
-> > > 
-> > > It makes a little more sense now, but I still don't understand why you
-> > > need to set the system call number via ptrace. What is this used for,
-> > > and why doesn't any other architecture have this?
-> > 
-> > All other architectures have a way.  x86, for example, you set orig_eax
-> > (or orig_rax) to change the syscall number.  On ARM, that doesn't work
-> > because we don't always pass the syscall number in a register.
-> > 
-> 
-> Sorry for being slow today, but why can't we use the same interface that
-> s390 has on arm64:
-> 
-> static int s390_system_call_get(struct task_struct *target,
->                                 const struct user_regset *regset,
->                                 unsigned int pos, unsigned int count,
->                                 void *kbuf, void __user *ubuf)
-> {
->         unsigned int *data = &task_thread_info(target)->system_call;
->         return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
->                                    data, 0, sizeof(unsigned int));
-> }
-> 
-> static int s390_system_call_set(struct task_struct *target,
->                                 const struct user_regset *regset,
->                                 unsigned int pos, unsigned int count,
->                                 const void *kbuf, const void __user *ubuf)
-> {
->         unsigned int *data = &task_thread_info(target)->system_call;
->         return user_regset_copyin(&pos, &count, &kbuf, &ubuf,
->                                   data, 0, sizeof(unsigned int));
-> }
-> 
-> static const struct user_regset s390_regsets[] = {
-> 	...
->         {
->                 .core_note_type = NT_S390_SYSTEM_CALL,
->                 .n = 1,
->                 .size = sizeof(unsigned int),
->                 .align = sizeof(unsigned int),
->                 .get = s390_system_call_get,
->                 .set = s390_system_call_set,
->         },
-> 	...
-> };
-> 
-> Is it just preference for being consistent with ARM32, or is there a
-> reason this won't work?
+Hi Alexander, Wills, Zalan,
 
-Interesting, I hadn't considered a unit-length regset.
+I need your approval on this one.
 
-> It's not that I care strongly about the interface, my main point is
-> that the changelog doesn't describe why one interface was used instead
-> the other.
+On Mon, Oct 27, 2014 at 11:02:51PM +0100, Maxime Ripard wrote:
+> Hi everyone,
+> 
+> This should have been in a cover letter, but I somehow forgot to send
+> one...
+> 
+> So here it is.
+> 
+> You've been Cc'd on a relicensing patch, because at some point you
+> contributed a patch to an Allwinner device tree.
+> 
+> We're currently moving toward a GPL/X11 dual-license, instead of a GPL
+> license like what was done when you submitted your patches.
+> 
+> This is mostly so that other free software project licensed under a
+> BSD-like license, such as the BSD systems, can actually use our DT,
+> instead of having to rewrite them on their own.
+> 
+> Such license changes require the agreement of all the contributors, so
+> it would be great, if you agree with the new licensing terms of
+> course, that you reply to the patch by giving your acked-by.
+> 
+> Thanks a lot,
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
 
-I suspect the current approach was taken because it follows the same scheme
-as 32-bit ARM. If both methods are sufficient (Kees would have a better idea
-than me on that), then I don't have a strong preference.
 
-Will
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141107/fe177507/attachment.sig>
