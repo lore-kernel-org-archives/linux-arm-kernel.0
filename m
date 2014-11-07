@@ -1,33 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 7 Nov 2014 10:07:41 +0000
-Subject: [GIT PULL] arm64: UEFI updates for 3.19
-In-Reply-To: <20141107100434.GA32336@arm.com>
-References: <CAKv+Gu8LEFvdu99vCHbHGPmGLpHWdT+Wb2DECzBEEg8g_yynvg@mail.gmail.com>
- <CAKv+Gu8bpgGWRbgdGYHSy515LOXapCm4stv5xJo_tNNhahcTYw@mail.gmail.com>
- <20141107100434.GA32336@arm.com>
-Message-ID: <20141107100740.GB29148@e104818-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 7 Nov 2014 10:13:10 +0000
+Subject: [PATCH] spi: s3c64xx: add support for exynos7 SPI controller
+In-Reply-To: <CAAgF-BfGwcNzMx0meFVkJqNMTbQ4_PP1PZ3i6edOm6U3bc26_Q@mail.gmail.com>
+References: <1415267509-16653-1-git-send-email-padma.v@samsung.com>
+ <20141106102636.GT8509@sirena.org.uk>
+ <CAAgF-BfGwcNzMx0meFVkJqNMTbQ4_PP1PZ3i6edOm6U3bc26_Q@mail.gmail.com>
+Message-ID: <20141107101310.GA8509@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 07, 2014 at 10:04:35AM +0000, Will Deacon wrote:
-> On Fri, Nov 07, 2014 at 07:34:12AM +0000, Ard Biesheuvel wrote:
-> > You are not going to believe this, but I received a report about boot
-> > failures on legacy (non-EFI) x86 using the SMBIOS 3.0 code, so could
-> > you please hold off on pulling this until we know what is going on
-> > there? This does not affect ARM at all, but I may need to update patch
-> > 'dmi: add support for SMBIOS 3.0 64-bit entry point' to drop the
-> > SMBIOS 3.0 check in the non-EFI code path.
-> 
-> D'oh, I put this into -next last night (perhaps that's where the report came
-> from), so I'll recreate that branch now without your series.
-> 
-> Please send another pull request without the SMBIOS patch, then we can
-> perhaps add that on top later on (that way it's easier to revert in the
-> future :).
+On Fri, Nov 07, 2014 at 02:01:57PM +0530, Padma Venkat wrote:
 
-You have a typo: s/perhaps/never/
+> CS can also be controlled automatically by setting AUTO_N_MANUAL to 1
+> in CS_CFG. When it is auto CS automatically toggles between packet to
+> packet. NCS_TIME_COUNT in CS_CFG controls the inactive period. The
+> driver by default uses manual mode. But on exynos7 the manual mode is
+> removed.
 
-;)
+OK, but what's a packet here?
 
--- 
-Catalin
+> I tested the driver with wm5110 codec.
+
+Did you try firmware downloads or something else that generates multiple
+transfers in a message?  Normal register writes will use a single
+transfer so I'd expect them to just work.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141107/83c9de90/attachment.sig>
