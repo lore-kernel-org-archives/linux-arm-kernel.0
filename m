@@ -1,35 +1,23 @@
-From: tixy@linaro.org (Jon Medhurst)
-Date: Fri,  7 Nov 2014 18:05:18 +0000
-Subject: [PATCH 2/2] dma: pl330: Limit MFIFO usage for memcpy to avoid
- exhausting entries
-In-Reply-To: <1415383518-29327-1-git-send-email-tixy@linaro.org>
-References: <1415383518-29327-1-git-send-email-tixy@linaro.org>
-Message-ID: <1415383518-29327-3-git-send-email-tixy@linaro.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 7 Nov 2014 19:15:05 +0100
+Subject: [PATCH 1/2] i2c: cadence: Remove .owner field for driver
+In-Reply-To: <541FEDB5.7050305@monstr.eu>
+References: <c076984af7e65c433fdfd3a3b0f8d20da2c18013.1407931005.git.michal.simek@xilinx.com>
+ <20140920091106.GB1612@katana> <541FEDB5.7050305@monstr.eu>
+Message-ID: <20141107181505.GK3656@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MFIFO is shared by all channels so restrict each memcpy to it's fair
-share. This is being over cautious, but without a global view of DMA
-channel usage on a system it's not possible to come up with a more
-optimum safe limit.
+> oing this for the whole kernel will be the best. coccinelle script
+> is good option I have never played with it.
 
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
----
- drivers/dma/pl330.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks, but superseded in favour of a generic solution
+(https://lkml.org/lkml/2014/10/21/594).
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 8f869ec..849439a 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -2336,7 +2336,7 @@ static inline int get_burst_len(struct dma_pl330_desc *desc, size_t len)
- 	int burst_len;
- 
- 	burst_len = pl330->pcfg.data_bus_width / 8;
--	burst_len *= pl330->pcfg.data_buf_dep;
-+	burst_len *= pl330->pcfg.data_buf_dep / pl330->pcfg.num_chan;
- 	burst_len >>= desc->rqcfg.brst_size;
- 
- 	/* src/dst_burst_len can't be more than 16 */
--- 
-2.1.1
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141107/c163d349/attachment.sig>
