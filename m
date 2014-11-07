@@ -1,99 +1,106 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 07 Nov 2014 11:47:53 -0800
-Subject: [PATCH] PM / Domains: Fix initial default state of the
- need_restore flag
-In-Reply-To: <1415366847-4807-1-git-send-email-ulf.hansson@linaro.org> (Ulf
- Hansson's message of "Fri, 7 Nov 2014 14:27:27 +0100")
-References: <1415366847-4807-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <7hr3xerdw6.fsf@deeprootsystems.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Fri, 07 Nov 2014 11:50:09 -0800
+Subject: [PATCH v13 3/7] KVM: x86: flush TLBs last before returning from
+ KVM_GET_DIRTY_LOG
+In-Reply-To: <545C7845.9010103@redhat.com>
+References: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
+ <1415320848-13813-4-git-send-email-m.smarduch@samsung.com>
+ <545C7845.9010103@redhat.com>
+Message-ID: <545D2271.4090906@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf Hansson <ulf.hansson@linaro.org> writes:
+On 11/06/2014 11:44 PM, Paolo Bonzini wrote:
+> 
+> 
+> On 07/11/2014 01:40, Mario Smarduch wrote:
+>> In the next patches, we will move parts of x86's kvm_vm_ioctl_get_dirty_log
+>> implementation to generic code; leave the arch-specific code at the end,
+>> similar to the existing generic function kvm_get_dirty_log.
+>>
+>> Reviewed-by: Mario Smarduch <m.smarduch@samsung.com>
+>> Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
+> 
+> You should have a "Signed-off-by: Mario Smarduch ..." here, and you 
+> should also add my authorship.  You can do the latter with "git rebase 
+> -i", adding
+> 
+>   x git commit --amend -C HEAD --author 'Paolo Bonzini <pbonzini@redhat.com>'
+> 
+> after this patch.  If you're using a patch queue instead (quilt or
+> similar) you can just edit the "From" line in the patch.
+> 
+> I guess if you reply to the patch with just
+> 
+>    Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> 
+> the ARM maintainers can do the above for you, if there's no need for
+> a v14.
+> 
+> I'll send an eighth patch to actually switch x86 to the new function.
+> Again, the maintainers can apply it in the right place, but please
+> include it yourself if you have to do a v14.
+> 
+> Thanks,
+> 
+> Paolo
 
-> The initial state of the device's need_restore flag should'nt depend on
-> the current state of the PM domain. For example it should be perfectly
-> valid to attach an inactive device to a powered PM domain.
->
-> The pm_genpd_dev_need_restore() API allow us to update the need_restore
-> flag to somewhat cope with such scenarios. Typically that should have
-> been done from drivers/buses ->probe() since it's those that put the
-> requirements on the value of the need_restore flag.
->
-> Until recently, the Exynos SOCs were the only user of the
-> pm_genpd_dev_need_restore() API, though invoking it from a centralized
-> location while adding devices to their PM domains.
->
-> Due to that Exynos now have swithed to the generic OF-based PM domain
-> look-up, it's no longer possible to invoke the API from a centralized
-> location. The reason is because devices are now added to their PM
-> domains during the probe sequence.
->
-> Commit "ARM: exynos: Move to generic PM domain DT bindings"
-> did the switch for Exynos to the generic OF-based PM domain look-up,
-> but it also removed the call to pm_genpd_dev_need_restore(). This
-> caused a regression for some of the Exynos drivers.
->
-> To handle things more properly in the generic PM domain, let's change
-> the default initial value of the need_restore flag to reflect that the
-> state is unknown. As soon as some of the runtime PM callbacks gets
-> invoked, update the initial value accordingly.
->
-> Moreover, since the generic PM domain is verifying that all device's
-> are both runtime PM enabled and suspended, using pm_runtime_suspended()
-> while pm_genpd_poweroff() is invoked from the scheduled work, we can be
-> sure of that the PM domain won't be powering off while having active
-> devices.
->
-> Do note that, the generic PM domain can still only know about active
-> devices which has been activated through invoking its runtime PM resume
-> callback. In other words, buses/drivers using pm_runtime_set_active()
-> during ->probe() will still suffer from a race condition, potentially
-> probing a device without having its PM domain being powered. That issue
-> will have to be solved using a different approach.
->
-> This a log from the boot regression for Exynos5, which is being fixed in
-> this patch.
->
-> ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 308 at ../drivers/clk/clk.c:851 clk_disable+0x24/0x30()
-> Modules linked in:
-> CPU: 0 PID: 308 Comm: kworker/0:1 Not tainted 3.18.0-rc3-00569-gbd9449f-dirty #10
-> Workqueue: pm pm_runtime_work
-> [<c0013c64>] (unwind_backtrace) from [<c0010dec>] (show_stack+0x10/0x14)
-> [<c0010dec>] (show_stack) from [<c03ee4cc>] (dump_stack+0x70/0xbc)
-> [<c03ee4cc>] (dump_stack) from [<c0020d34>] (warn_slowpath_common+0x64/0x88)
-> [<c0020d34>] (warn_slowpath_common) from [<c0020d74>] (warn_slowpath_null+0x1c/0x24)
-> [<c0020d74>] (warn_slowpath_null) from [<c03107b0>] (clk_disable+0x24/0x30)
-> [<c03107b0>] (clk_disable) from [<c02cc834>] (gsc_runtime_suspend+0x128/0x160)
-> [<c02cc834>] (gsc_runtime_suspend) from [<c0249024>] (pm_generic_runtime_suspend+0x2c/0x38)
-> [<c0249024>] (pm_generic_runtime_suspend) from [<c024f44c>] (pm_genpd_default_save_state+0x2c/0x8c)
-> [<c024f44c>] (pm_genpd_default_save_state) from [<c024ff2c>] (pm_genpd_poweroff+0x224/0x3ec)
-> [<c024ff2c>] (pm_genpd_poweroff) from [<c02501b4>] (pm_genpd_runtime_suspend+0x9c/0xcc)
-> [<c02501b4>] (pm_genpd_runtime_suspend) from [<c024a4f8>] (__rpm_callback+0x2c/0x60)
-> [<c024a4f8>] (__rpm_callback) from [<c024a54c>] (rpm_callback+0x20/0x74)
-> [<c024a54c>] (rpm_callback) from [<c024a930>] (rpm_suspend+0xd4/0x43c)
-> [<c024a930>] (rpm_suspend) from [<c024bbcc>] (pm_runtime_work+0x80/0x90)
-> [<c024bbcc>] (pm_runtime_work) from [<c0032a9c>] (process_one_work+0x12c/0x314)
-> [<c0032a9c>] (process_one_work) from [<c0032cf4>] (worker_thread+0x3c/0x4b0)
-> [<c0032cf4>] (worker_thread) from [<c003747c>] (kthread+0xcc/0xe8)
-> [<c003747c>] (kthread) from [<c000e738>] (ret_from_fork+0x14/0x3c)
-> ---[ end trace 40cd58bcd6988f12 ]---
->
-> Fixes: a4a8c2c4962bb655 (ARM: exynos: Move to generic PM domain DT bindings)
-> Reported-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+I kind of thought something was wrong :) Thanks for the explanation,
+until I get the hang of it I'll defer to ARM maintainers. Maybe later
+update SubmittingPatches documentation.
 
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
-
-And looks like we need this for v3.18-rc since it does fix the
-regression.
-
-A minor nit: you add a few new multi-line comment blocks which should
-have a new empty line before them, but currently they're right up
-against the previous code.  Please add a blank line for separation and
-to be consisitent with the rest of the file.
-
-Thanks,
-
-Kevin
+- Mario
+> 
+>> ---
+>>  arch/x86/kvm/x86.c |   22 ++++++++++------------
+>>  1 file changed, 10 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+>> index 8f1e22d..dc8e66b 100644
+>> --- a/arch/x86/kvm/x86.c
+>> +++ b/arch/x86/kvm/x86.c
+>> @@ -3606,13 +3606,13 @@ static int kvm_vm_ioctl_reinject(struct kvm *kvm,
+>>   *
+>>   *   1. Take a snapshot of the bit and clear it if needed.
+>>   *   2. Write protect the corresponding page.
+>> - *   3. Flush TLB's if needed.
+>> - *   4. Copy the snapshot to the userspace.
+>> + *   3. Copy the snapshot to the userspace.
+>> + *   4. Flush TLB's if needed.
+>>   *
+>> - * Between 2 and 3, the guest may write to the page using the remaining TLB
+>> - * entry.  This is not a problem because the page will be reported dirty at
+>> - * step 4 using the snapshot taken before and step 3 ensures that successive
+>> - * writes will be logged for the next call.
+>> + * Between 2 and 4, the guest may write to the page using the remaining TLB
+>> + * entry.  This is not a problem because the page is reported dirty using
+>> + * the snapshot taken before and step 4 ensures that writes done after
+>> + * exiting to userspace will be logged for the next call.
+>>   */
+>>  int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
+>>  {
+>> @@ -3661,6 +3661,10 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
+>>  
+>>  	spin_unlock(&kvm->mmu_lock);
+>>  
+>> +	r = 0;
+>> +	if (copy_to_user(log->dirty_bitmap, dirty_bitmap_buffer, n))
+>> +		r = -EFAULT;
+>> +
+>>  	/* See the comments in kvm_mmu_slot_remove_write_access(). */
+>>  	lockdep_assert_held(&kvm->slots_lock);
+>>  
+>> @@ -3670,12 +3674,6 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
+>>  	 */
+>>  	if (is_dirty)
+>>  		kvm_flush_remote_tlbs(kvm);
+>> -
+>> -	r = -EFAULT;
+>> -	if (copy_to_user(log->dirty_bitmap, dirty_bitmap_buffer, n))
+>> -		goto out;
+>> -
+>> -	r = 0;
+>>  out:
+>>  	mutex_unlock(&kvm->slots_lock);
+>>  	return r;
+>>
