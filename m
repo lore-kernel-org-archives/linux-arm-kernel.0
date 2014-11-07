@@ -1,44 +1,48 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 7 Nov 2014 09:03:11 +0100
-Subject: [PATCH v4 2/4] serial: mxs-auart: use mctrl_gpio helpers for
- handling modem signals
-In-Reply-To: <CAMiH66FKJm8hcgtR=-ZzzpCq+PQ8xkixbUnMzRPVd_cM_6VM1w@mail.gmail.com>
-References: <1412960007-28159-1-git-send-email-j.uzycki@elproma.com.pl>
- <545B57D7.4070609@elproma.com.pl>
- <CAMiH66FKJm8hcgtR=-ZzzpCq+PQ8xkixbUnMzRPVd_cM_6VM1w@mail.gmail.com>
-Message-ID: <201411070903.11645.marex@denx.de>
+From: Andrew.Jackson@arm.com (Andrew Jackson)
+Date: Fri, 07 Nov 2014 08:31:25 +0000
+Subject: [PATCH v2] drm/i2c: tda998x: Set the CEC I2C address based on the
+ slave I2C address.
+Message-ID: <545C835D.1050008@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, November 07, 2014 at 02:34:31 AM, Huang Shijie wrote:
-> why change them to gpio?  If we change them to gpio.  Could the DMA still
-> works fine?
-> did you test the DMA with this patch?
-> 
-> Add Marek for this patch too.
+The I2C address for the TDA9989 and TDA19989 is fixed at 0x34
+but the two LSBs of the TDA19988's address are set by two configuration
+pins on the chip.  Irrespective of the chip, the associated CEC
+peripheral's I2C address is based upon the main I2C address.
 
-I didn't look too deep into the patch, so here's just my experience:
+This patch avoids any special handling required to support
+systems that contain multiple TDA19988 devices on the same
+I2C bus.
 
-1) The AUART block signals and GPIO block signals are not sychronised using the 
-   same clock. Therefore, the latency between toggling of the AUART lines and
-   the GPIO-driven pins will not be deterministic and will vary. There might be
-   a way to approximate that, but that's definitelly not a reliable solution.
+Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+ drivers/gpu/drm/i2c/tda998x_drv.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
 
-   This is very bad for example if you drive RS485 DIR line with the RTS pin as
-   a GPIO ; the RTS pin will toggle at non-deterministic time compared to the
-   end of UART transmission. This will trigger bit-loss on the RS485 line and
-   you just don't want that.
-
-2) Speaking of RS485, there's [1] and [2]. which I believe apply to any combo
-   of UART+GPIO toggling.
-
-So I hate to bring the bad news , but UART+GPIO combo toggling is really a bad
-bad idea.
-
-HTH
-
-[1] http://comments.gmane.org/gmane.linux.serial/6770
-[2] http://article.gmane.org/gmane.linux.serial/3619/
-
-Best regards,
-Marek Vasut
+diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+index d476279..eeab17a 100644
+--- a/drivers/gpu/drm/i2c/tda998x_drv.c
++++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+@@ -1255,6 +1255,7 @@ static int tda998x_create(struct i2c_client *client, struct tda998x_priv *priv)
+ 	struct device_node *np = client->dev.of_node;
+ 	u32 video;
+ 	int rev_lo, rev_hi, ret;
++	unsigned short cec_addr;
+ 
+ 	priv->vip_cntrl_0 = VIP_CNTRL_0_SWAP_A(2) | VIP_CNTRL_0_SWAP_B(3);
+ 	priv->vip_cntrl_1 = VIP_CNTRL_1_SWAP_C(0) | VIP_CNTRL_1_SWAP_D(1);
+@@ -1262,7 +1263,9 @@ static int tda998x_create(struct i2c_client *client, struct tda998x_priv *priv)
+ 
+ 	priv->current_page = 0xff;
+ 	priv->hdmi = client;
+-	priv->cec = i2c_new_dummy(client->adapter, 0x34);
++	/* CEC I2C address bound to TDA998x I2C addr by configuration pins */
++	cec_addr = 0x34 + (client->addr & 0x03);
++	priv->cec = i2c_new_dummy(client->adapter, cec_addr);
+ 	if (!priv->cec)
+ 		return -ENODEV;
+ 
+-- 
+1.7.1
