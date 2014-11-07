@@ -1,146 +1,121 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 7 Nov 2014 12:02:16 +0100
-Subject: [PATCH v4 2/4] serial: mxs-auart: use mctrl_gpio helpers for
- handling modem signals
-In-Reply-To: <545C992B.1070004@elproma.com.pl>
-References: <1412960007-28159-1-git-send-email-j.uzycki@elproma.com.pl>
- <201411070903.11645.marex@denx.de> <545C992B.1070004@elproma.com.pl>
-Message-ID: <201411071202.16344.marex@denx.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 7 Nov 2014 11:05:25 +0000
+Subject: [PATCH v7 3/8] arm64: introduce is_device_dma_coherent
+In-Reply-To: <alpine.DEB.2.02.1411061155200.22875@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
+ <1414422568-19103-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1411031045340.22875@kaball.uk.xensource.com>
+ <20141103105716.GC23162@arm.com>
+ <alpine.DEB.2.02.1411031101400.22875@kaball.uk.xensource.com>
+ <20141105165646.GN32700@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.02.1411051757140.22875@kaball.uk.xensource.com>
+ <20141106103337.GA19702@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.02.1411061155200.22875@kaball.uk.xensource.com>
+Message-ID: <20141107110524.GA21875@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, November 07, 2014 at 11:04:27 AM, Janusz U?ycki wrote:
-> W dniu 2014-11-07 o 09:03, Marek Vasut pisze:
-> > On Friday, November 07, 2014 at 02:34:31 AM, Huang Shijie wrote:
-> >> why change them to gpio?
-
-+CC Alexandre, since he might be interested :-)
-
-> Hardware RTS/CTS lines can be occupied by RX/TX of other AUART port
-> in order to obtain as much uarts as possible using i.mx283.
-> Therefore gpios can be used for "hardware" flow control.
-
-Your logic is outright flawed here, the first sentence doesn't implicate the 
-second sentence. In fact, those two are completely unrelated.
-
-> >>    If we change them to gpio.  Could the DMA still
-> >> 
-> >> works fine?
-> >> did you test the DMA with this patch?
-> >> 
-> >> Add Marek for this patch too.
+On Thu, Nov 06, 2014 at 12:22:13PM +0000, Stefano Stabellini wrote:
+> On Thu, 6 Nov 2014, Catalin Marinas wrote:
+> > On Wed, Nov 05, 2014 at 06:15:38PM +0000, Stefano Stabellini wrote:
+> > > On Wed, 5 Nov 2014, Catalin Marinas wrote:
+> > > > Note that if !is_device_dma_coherent(), it doesn't always mean that
+> > > > standard cache maintenance would be enough (but that's a Xen problem,
+> > > > not sure how to solve).
+> > > 
+> > > It is a thorny issue indeed.
+> > > Xen would need to know how to do non-standard cache maintenance
+> > > operations.
 > > 
-> > I didn't look too deep into the patch, so here's just my experience:
-> > 
-> > 1) The AUART block signals and GPIO block signals are not sychronised
-> > using the
-> > 
-> >     same clock. Therefore, the latency between toggling of the AUART
-> >     lines and the GPIO-driven pins will not be deterministic and will
-> >     vary. There might be a way to approximate that, but that's
-> >     definitelly not a reliable solution.
-> >     
-> >     This is very bad for example if you drive RS485 DIR line with the RTS
-> >     pin as a GPIO ; the RTS pin will toggle at non-deterministic time
-> >     compared to the end of UART transmission. This will trigger bit-loss
-> >     on the RS485 line and you just don't want that.
-> > 
-> > 2) Speaking of RS485, there's [1] and [2]. which I believe apply to any
-> > combo
-> > 
-> >     of UART+GPIO toggling.
-> > 
-> > So I hate to bring the bad news , but UART+GPIO combo toggling is really
-> > a bad bad idea.
+> > Is EL2 hyp or EL1 dom0 doing such maintenance? If the latter, you could
+> > just use the currently registered dma ops.
 > 
-> Unfortunately if hardware is limited there is no choice and UART+GPIO is
-> necessary.
+> It is Xen, so El2 hypervisor.
 
-You will run into timing problems (see above).
+So what is arch/arm/xen/mm32.c cache maintenance for? Doesn't it run in
+dom0?
 
-What you're proposing here is a workaround for broken hardware, which was proven
-to be a bad idea and NAK'd already multiple times in the past (please see the 
-links I posted in my last email).
-
-> Your experience confirms the discussion [3] with Russell King. DMA
-> should be disabled and
-> the patch disables DMA support in mxs_auart_init_gpios() if RTS or CTS
-> line is set as gpio.
-
-DMA has nothing to do with those problems here. DMA can be safely ignored
-for the purpose of the discussion altogether.
-
-Like I explained already -- the problem is with the GPIO and AUART block not
-being synchronised by the same clock. It is therefore impossible to predict
-and control when the GPIO signals and the AUART signals will toggle in relation
-to one another.
-
-> So I didn't test the patch with the DMA - I've just disabled it.
-
-This would break the driver for pretty much everyone using higher baud rates.
-
-> The question is different. The driver supports the cases for RTS/CTS:
-> 1)  both RTS/CTS assigned to hardware AUART (pinmux configured by DT,
->       DT sets fsl,uart-has-rtscts)
->      a) settermios() sets CRTSCTS: DMA enabled, auto RTS/CTS is enabled
->      b) settermios() doesn't set CRTSCTS: DMA disabled, RTS/CTS
-> controlled by get/set_mctrl()
-> 2)  both RTS/CTS assigned to hardware AUART (pinmux configured by DT,
->       DT doesn't set fsl,uart-has-rtscts)
->      a) settermios() sets CRTSCTS: DMA disabled, auto RTS/CTS is enabled
->      b) settermios() doesn't set CRTSCTS: DMA disabled, RTS/CTS
-> controlled by get/set_mctrl()
+> > > Otherwise we would need to resurrect XENFEAT_grant_map_identity (that I
+> > > am reverting in this series) and be content with having CONFIG_XEN_DOM0
+> > > depend on CONFIG_ARM_LPAE.
+> > 
+> > So what does buy you? Is it just the hope that with LPAE you won't have
+> > weird system caches?
 > 
-> and after the patch it is more complex (because of mixed cases):
-> 3) both RTS/CTS assigned to gpios (DT sets or not fsl,uart-has-rtscts):
->      the patch cancels fsl,uart-has-rtscts flag to disable DMA support,
->      settermios() sets or not CRTSCTS: DMA disabled, RTS/CTS controlled
-> by get/set_mctrl(),
->      both lines by gpios. In addition:
->      a) settermios() doesn't set CRTSCTS: RTS of hardware AUART is also
-> controlled but
->          the case assumes it is not selected by pinmux in DT
->      b) settermios() sets CRTSCTS: auto RTS of hardware AUART is also
-> enabled but
->          the case assumes it is not selected by pinmux in DT
-> 4) RTS assigned to hardware AUART (pinmux configured by DT,
-> fsl,uart-has-rtscts set or not),
->      CTS assigned to gpio: the patch cancels fsl,uart-has-rtscts flag to
-> disable DMA support,
->      a) settermios() doesn't set CRTSCTS: DMA disabled, CTS (as gpio)
-> read by get_mctrl(),
->          RTS of hardware AUART controlled by set_mctrl()
->      b) settermios() sets CRTSCTS: DMA disabled, CTS (as gpio) read by
-> get_mctrl(),
->         auto RTS is enabled
->     So case 4) is exactly 3) case with just different pinmux
-> configuration and the patch
->     threats 3) and 4) as the same case.
-> 5) CTS assigned to hardware AUART (pinmux configured by DT,
-> fsl,uart-has-rtscts set or not),
->      RTS assigned to gpio: the patch cancels fsl,uart-has-rtscts flag to
-> disable DMA support,
->      a) settermios() doesn't set CRTSCTS: DMA disabled, CTS of hardware
-> AUART read by
->          get_mctrl(), RTS (as gpio) controlled by set_mctrl(), in
-> addition RTS of hardware AUART
->          is also controlled but the case assumes it is not selected by
-> pinmux in DT
->      b) settermios() sets CRTSCTS: DMA disabled, auto RTS/CTS is enabled
-> but RTS is controlled by set_mctrl() as gpio because the case assumes it
-> is not selected
->          by pinmux in DT
+> Let me explain a bit more and let's assume there is no SMMU.
 > 
-> It is not nice description but I hadn't idea how to write it more clear.
-> The mixed cases 4) and 5) are likely not so useful but possible and not
-> so expensive
-> to support.
-> Now the question: "fsl,uart-has-rtscts" name seems to be misleading now,
-> do you agree? It rather should include "dma" word in the name. Any
-> suggestion?
+> The problem is not normal dma originating in dom0, currently mapped 1:1
+> (pseudo-physical == physical). The problem are dma operations that
+> involve foreign pages (pages belonging to other virtual machines)
+> currently mapped also in dom0 to do IO. It is common for the Xen PV
+> network and block frontends to grant access to one or more pages to the
+> network and block backends for IO. The backends, usually in dom0, map
+> the pages and perform the actual IO. Sometimes the IO is a dma operation
+> that involves one of the granted pages directly.
 > 
-> [3] http://thread.gmane.org/gmane.linux.serial/16069/focus=16077
+> For these pages, the pseudo-physical address in dom0 is different from
+> the physical address. Dom0 keeps track of the pseudo-physical to
+> physical relationship (pfn_to_mfn in Xen terminology). The swiotlb-xen
+> driver makes sure to return the right mfn from map_page and map_sg.
 
-The best suggestion I can give you is to fix your hardware early, before you
-run into nasty deep s.....tuff. These workarounds do not work and they will
-bit you later on, when it's hard to fix the hardware anymore.
+For my understanding, xen_dma_map_page() is called from dom0 and it
+simply calls the __generic_dma_ops()->map_page(). The "page" argument
+here is the dom0 page and it gets translated to dom0 phys and then to a
+bus address via xen_phys_to_bus().
+
+On arm64, __swiotlb_map_page() uses the page structure to get some
+pseudo device address which gets converted back to a dom0 virtual
+address. The latter is used for cache maintenance by VA in dom0. With
+PIPT-like caches, that's fine, you don't need the actual machine PA
+unless you have caches like PL310 (which are not compatible with
+virtualisation anyway and the latest ARMv8 ARM even makes a clear
+statement here).
+
+(one potential problem here is the dma_capable() check in
+swiotlb_map_page() (non-xen) which uses the pseudo device address)
+
+The interesting part is that xen_swiotlb_map_page() returns the real
+machine device address to dom0, which is different from what dom0 thinks
+of a device address (phys_to_dma(phys_to_page(page))). Does dom0 use
+such real/machine device address to program the device directly or there
+is another layer where you could do the translation?
+
+> However some of the dma_ops give you only a dma_addr_t handle
+> (unmap_page and unmap_sg), that is the physical address of the page.
+
+OK, I started to get it now, the __swiotlb_unmap_page() on arm64, if
+called from dom0, would get the machine device address and dma_to_phys()
+does not work.
+
+> Dom0 doesn't know how to find the pseudo-physical address corresponding
+> to it. Therefore it also doesn't know how to find the struct page for
+> it. This is not a trivial problem to solve as the same page can be
+> granted multiple times, therefore could have multiple pseudo-physical
+> addresses and multiple struct pages corresponding to one physical
+> address in dom0.
+
+So what is mfn_to_pfn() and xen_bus_to_phys() used for? Isn't
+mfn_to_pfn(pfn_to_mfn(x)) an identity function?
+
+> Fortunately these dma_ops don't actually need to do much. In fact they
+> only need to flush caches if the device is not dma-coherent. So the
+> current proposed solution is to issue an hypercall to ask Xen to do the
+> flushing, passing the physical address dom0 knows.
+
+I really don't like the dma_cache_maint() duplication you added in
+arch/arm/xen/mm32.c just because you cannot call the host dma_ops when
+the page is not available.
+
+You basically only need a VA that was mapped in dom0 when map_page() was
+called and is still mapped when page_unmap() is called. You can free the
+actual mapping after calling __generic_dma_ops()->unmap_page() in
+xen_dma_unmap_page() (in xen_unmap_single()).
+
+BTW, drivers/xen/swiotlb-xen.c needs something like:
+
+        dma_addr_t dev_addr = xen_phys_to_bus(phys_to_dma(phys));
+
+phys != bus address.
+
+-- 
+Catalin
