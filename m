@@ -1,87 +1,93 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 7 Nov 2014 16:31:41 +0100
-Subject: [PATCH v3 10/10] [media] v4l: Forbid usage of V4L2_MBUS_FMT
- definitions inside the kernel
-In-Reply-To: <545CDB8D.4080406@xs4all.nl>
-References: <1415369269-5064-1-git-send-email-boris.brezillon@free-electrons.com>
- <1415369269-5064-11-git-send-email-boris.brezillon@free-electrons.com>
- <545CDB8D.4080406@xs4all.nl>
-Message-ID: <20141107163141.3866f3c4@bbrezillon>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 7 Nov 2014 15:28:38 +0000
+Subject: [PATCH v7 6/8] xen/arm/arm64: merge xen/mm32.c into xen/mm.c
+In-Reply-To: <20141107142205.GD29148@e104818-lin.cambridge.arm.com>
+References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
+ <1414422568-19103-6-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20141107142205.GD29148@e104818-lin.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1411071523170.22875@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 07 Nov 2014 15:47:41 +0100
-Hans Verkuil <hverkuil@xs4all.nl> wrote:
-
-> Nitpicks:
+On Fri, 7 Nov 2014, Catalin Marinas wrote:
+> On Mon, Oct 27, 2014 at 03:09:26PM +0000, Stefano Stabellini wrote:
+> > Merge xen/mm32.c into xen/mm.c.
+> > As a consequence the code gets compiled on arm64 too: introduce a few
+> > compat functions to actually be able to compile it.
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > Acked-by: Ian Campbell <ian.campbell@citrix.com>
 > 
-> On 11/07/14 15:07, Boris Brezillon wrote:
-> > Place v4l2_mbus_pixelcode in a #ifndef __KERNEL__ section so that kernel
-> > users don't have access to these definitions.
-> > 
-> > We have to keep this definition for user-space users even though they're
-> > encouraged to move to the new media_bus_format enum.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> >  include/uapi/linux/v4l2-mediabus.h | 9 +++++++++
-> >  1 file changed, 9 insertions(+)
-> > 
-> > diff --git a/include/uapi/linux/v4l2-mediabus.h b/include/uapi/linux/v4l2-mediabus.h
-> > index 3d87db7..4f31d0e 100644
-> > --- a/include/uapi/linux/v4l2-mediabus.h
-> > +++ b/include/uapi/linux/v4l2-mediabus.h
-> > @@ -15,6 +15,14 @@
-> >  #include <linux/videodev2.h>
-> >  #include <linux/media-bus-format.h>
-> >  
-> > +#ifndef __KERNEL__
+> Since I missed the commit introducing mm32.c (340720be32d4 xen/arm:
+> reimplement xen_dma_unmap_page & friends), I'll add a retrospective NAK ;).
+> 
+> The main reason is the asymmetry between dma map and unmap. With host
+> swiotlb somehow getting !dma_capable(dev), you even risk leaking dom0
+> swiotlb bounce buffers (on arm64).
+> 
+> > --- a/arch/arm/xen/mm.c
+> > +++ b/arch/arm/xen/mm.c
+> [...]
+> > +/* functions called by SWIOTLB */
 > > +
-> > +/*
-> > + * enum v4l2_mbus_pixelcode and its defintions are now deprecated, and
-> 
-> defintions -> definitions
-> 
-> > + * MEDIA_BUS_FMT_ defintions (defined in media-bus-format.h) should be
-> 
-> and again...
-> 
-> > + * used instead.
-> 
-> I would also add something like this:
-> 
-> "New defines should only be added to media-bus-format.h. The v4l2_mbus_pixelcode
-> enum is frozen."
-
-I'll fix those typos and add this sentence.
-
-> 
-> > + */
+> > +static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
+> > +       size_t size, enum dma_data_direction dir,
+> > +       void (*op)(const void *, size_t, int))
+> > +{
+> > +       unsigned long pfn;
+> > +       size_t left = size;
 > > +
-> >  #define V4L2_MBUS_FROM_MEDIA_BUS_FMT(name)	\
-> >  	MEDIA_BUS_FMT_ ## name = V4L2_MBUS_FMT_ ## name
-> >  
-> > @@ -102,6 +110,7 @@ enum v4l2_mbus_pixelcode {
-> >  
-> >  	V4L2_MBUS_FROM_MEDIA_BUS_FMT(AHSV8888_1X32),
-> >  };
-> > +#endif /* __KERNEL__ */
-> >  
-> >  /**
-> >   * struct v4l2_mbus_framefmt - frame format on the media bus
-> > 
+> > +       pfn = (handle >> PAGE_SHIFT) + offset / PAGE_SIZE;
+> > +       offset %= PAGE_SIZE;
+> > +
+> > +       do {
+> > +               size_t len = left;
+> > +               void *vaddr;
+> > +
+> > +               if (!pfn_valid(pfn))
 > 
-> Can you move this struct forward to before the v4l2_mbus_pixelcode enum? That way
-> the obsolete code is at the end of the header. People might miss this struct
-> otherwise.
+> Is this the pfn or the mfn? As you said in the previous email, there is
+> no mfn_to_pfn() conversion, so that's actually in another address space
+> where dom0 pfn_valid() would not make sense.
 
-Sure.
+That is actually the mfn. The check works because dom0 is mapped 1:1, so
+if the mfn is a valid pfn, then it means that it is a local page.
 
-Regards,
 
-Boris
+> Do you use this as a check for foreign pages? If yes, is the mfn for
+> such pages guaranteed to be different from any valid dom0 pfn?
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Yes and yes
+
+
+> > +               {
+> > +                       /* TODO: cache flush */
+> 
+> What does this TODO mean here? Which cases are not covered yet?
+
+We are going to fill in the cache flush implementation for foreign pages
+later, in patch 8/8.
+
+
+> > +               } else {
+> > +                       struct page *page = pfn_to_page(pfn);
+> 
+> If the pfn here is correct, can you not just have something like:
+> 
+> void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
+> 		size_t size, enum dma_data_direction dir,
+> 		struct dma_attrs *attrs)
+> 
+> {
+> 	unsigned long pfn = handle >> PAGE_SHIFT;	/* could use some macros */
+> 	if (!pfn_valid(pfn)) {
+> 		/* FIXME */
+> 		return;
+> 	}
+> 	__generic_dma_ops(hwdev)->unmap_page(hwdev, handle, size, dir, attrs);
+> }
+
+Yes, this is possible. Then in patch 8/8 I could remove the FIXME and
+add a call to a function that issues the new GNTTABOP_cache_flush
+hypercall. It would also remove the asymmetry you mentioned before
+because we could do the same for map_page.
