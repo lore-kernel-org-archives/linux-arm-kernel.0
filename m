@@ -1,36 +1,22 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  7 Nov 2014 15:12:34 +0100
-Subject: [PATCH 2/2] arm64: kvm: eliminate literal pool entries
-In-Reply-To: <1415369554-7444-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1415369554-7444-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1415369554-7444-2-git-send-email-ard.biesheuvel@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 07 Nov 2014 15:12:45 +0100
+Subject: [Linaro-acpi] [RFC PATCH 3/4] arm64, acpi,
+ pci: Add arch specific functions for mmconfig driver.
+In-Reply-To: <1415366876-30811-4-git-send-email-tomasz.nowicki@linaro.org>
+References: <1415366876-30811-1-git-send-email-tomasz.nowicki@linaro.org>
+ <1415366876-30811-4-git-send-email-tomasz.nowicki@linaro.org>
+Message-ID: <16660879.6KxQndPqBW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace two instances of 'ldr xN, =(constant)' in the world switch
-hot path with 'mov' instructions.
+On Friday 07 November 2014 14:27:55 Tomasz Nowicki wrote:
+> These calls allow to map/unmap PCI config space ranges (which are specified in
+> MMCFG ACPI table).
+> 
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> 
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kvm/hyp.S | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Nothing in this patch looks arm64 specific, and most of it looks like a
+copy of the x86 code.
 
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index b72aa9f9215c..fbe909fb0a1a 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -761,10 +761,10 @@
- .macro activate_traps
- 	ldr     x2, [x0, #VCPU_HCR_EL2]
- 	msr     hcr_el2, x2
--	ldr	x2, =(CPTR_EL2_TTA)
-+	mov	x2, #CPTR_EL2_TTA
- 	msr	cptr_el2, x2
- 
--	ldr	x2, =(1 << 15)	// Trap CP15 Cr=15
-+	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
- 	msr	hstr_el2, x2
- 
- 	mrs	x2, mdcr_el2
--- 
-1.8.3.2
+	Arnd
