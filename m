@@ -1,87 +1,166 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 7 Nov 2014 20:18:08 +0100
-Subject: [PATCH v3 10/19] arm/arm64: KVM: make the value of ICC_SRE_EL1 a
- per-VM variable
-In-Reply-To: <5457E2E0.4080305@arm.com>
-References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
- <1414776414-13426-11-git-send-email-andre.przywara@arm.com>
- <20141103200455.GI16132@cbox> <5457E2E0.4080305@arm.com>
-Message-ID: <20141107191808.GC22848@cbox>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Fri, 07 Nov 2014 11:21:39 -0800
+Subject: [PATCH v13 7/7] arm: KVM: ARMv7 dirty page logging 2nd stage page
+ fault
+In-Reply-To: <545C9FF0.7010802@arm.com>
+References: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
+ <1415320848-13813-8-git-send-email-m.smarduch@samsung.com>
+ <545C9FF0.7010802@arm.com>
+Message-ID: <545D1BC3.8040807@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 03, 2014 at 08:17:36PM +0000, Marc Zyngier wrote:
-> Hi Christoffer,
+On 11/07/2014 02:33 AM, Marc Zyngier wrote:
+> On 07/11/14 00:40, Mario Smarduch wrote:
+>> This patch adds support for handling 2nd stage page faults during migration,
+>> it disables faulting in huge pages, and dissolves huge pages to page tables.
+>> In case migration is canceled huge pages are used again.
+>>
+>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>> ---
+>>  arch/arm/kvm/mmu.c |   47 ++++++++++++++++++++++++++++++++++++++++-------
+>>  1 file changed, 40 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> index 2f5131e..d511fc0 100644
+>> --- a/arch/arm/kvm/mmu.c
+>> +++ b/arch/arm/kvm/mmu.c
+>> @@ -47,6 +47,15 @@ static phys_addr_t hyp_idmap_vector;
+>>  #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
+>>  #define kvm_pud_huge(_x)	pud_huge(_x)
+>>  
+>> +static bool kvm_get_logging_state(struct kvm_memory_slot *memslot)
+>> +{
+>> +#ifdef CONFIG_ARM
+>> +	return !!memslot->dirty_bitmap;
+>> +#else
+>> +	return false;
+>> +#endif
+>> +}
+>> +
+>>  static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>>  {
+>>  	/*
+>> @@ -626,7 +635,8 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+>>  }
+>>  
+>>  static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+>> -			  phys_addr_t addr, const pte_t *new_pte, bool iomap)
+>> +			  phys_addr_t addr, const pte_t *new_pte, bool iomap,
+>> +			  bool logging_active)
 > 
-> On 03/11/14 20:04, Christoffer Dall wrote:
-> > On Fri, Oct 31, 2014 at 05:26:45PM +0000, Andre Przywara wrote:
-> >> ICC_SRE_EL1 is a system register allowing msr/mrs accesses to the
-> >> GIC CPU interface for EL1 (guests). Currently we force it to 0, but
-> >> for proper GICv3 support we have to allow guests to use it (depending
-> >> on their selected virtual GIC model).
-> >> So add ICC_SRE_EL1 to the list of saved/restored registers on a
-> >> world switch, but actually disallow a guest to change it by only
-> >> restoring a fixed, once-initialized value.
-> >> This value depends on the GIC model userland has chosen for a guest.
-> >>
-> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >> ---
-> >>  arch/arm64/kernel/asm-offsets.c |    1 +
-> >>  arch/arm64/kvm/vgic-v3-switch.S |   14 +++++++++-----
-> >>  include/kvm/arm_vgic.h          |    1 +
-> >>  virt/kvm/arm/vgic-v3.c          |    9 +++++++--
-> >>  4 files changed, 18 insertions(+), 7 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> >> index 9a9fce0..9d34486 100644
-> >> --- a/arch/arm64/kernel/asm-offsets.c
-> >> +++ b/arch/arm64/kernel/asm-offsets.c
-> >> @@ -140,6 +140,7 @@ int main(void)
-> >>    DEFINE(VGIC_V2_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_v2.vgic_elrsr));
-> >>    DEFINE(VGIC_V2_CPU_APR,	offsetof(struct vgic_cpu, vgic_v2.vgic_apr));
-> >>    DEFINE(VGIC_V2_CPU_LR,	offsetof(struct vgic_cpu, vgic_v2.vgic_lr));
-> >> +  DEFINE(VGIC_V3_CPU_SRE,	offsetof(struct vgic_cpu, vgic_v3.vgic_sre));
-> >>    DEFINE(VGIC_V3_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_hcr));
-> >>    DEFINE(VGIC_V3_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_vmcr));
-> >>    DEFINE(VGIC_V3_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v3.vgic_misr));
-> >> diff --git a/arch/arm64/kvm/vgic-v3-switch.S b/arch/arm64/kvm/vgic-v3-switch.S
-> >> index d160469..617a012 100644
-> >> --- a/arch/arm64/kvm/vgic-v3-switch.S
-> >> +++ b/arch/arm64/kvm/vgic-v3-switch.S
-> >> @@ -148,17 +148,18 @@
-> >>   * x0: Register pointing to VCPU struct
-> >>   */
-> >>  .macro	restore_vgic_v3_state
-> >> -	// Disable SRE_EL1 access. Necessary, otherwise
-> >> -	// ICH_VMCR_EL2.VFIQEn becomes one, and FIQ happens...
-> >> -	msr_s	ICC_SRE_EL1, xzr
-> >> -	isb
-> >> -
-> > 
-> > I know I reviewed this once, but now I'm forgetting how it works with
-> > this comment above.  First, I don't fully understand the comment.
-> 
-> If you write to ICH_VMCR_EL2 with SRE==1, the architecture forces VFIQEn
-> to 1, which causes interesting effects when you inject an Group0
-> interrupt (as we do for GICv2 emulation).
-> 
-> You end-up spending days debugging this, mostly blaming the model for
-> all these FIQs appearing in your guest, until you read that small gem
-> hidden in the architecture spec. Bad memories, let's not go there.
-> 
-> That's why we must make sure to set ICC_SRE_EL1 *before* writing to
-> ICH_VMCR_EL2.
-> 
-> > Second, now we're restoring a value that may potentially have SRE_EL1
-> > access enabled, but FIQ doesn't happen.  Can you clarify this for me?
-> 
-> That's a side effect of how we inject interrupts with GICv3. They are
-> Group1, always. A Group0 interrupt would definitely be delivered as a
-> FIQ, but we currently don't offer a way to support that.
-> 
-Realized I never responded to this.
+> Yuk. Yet another parameter. Can't we have a set of flags instead,
+> indicating both iomap and logging in one go? That would make things more
+> readable (at least for me).
 
-Thanks for the clarification, this must have been dreadful to debug.
+Sure that could be changed, I didn't like the idea adding another line
+myself, needed some suggestions.
 
--Christoffer
+> 
+>>  {
+>>  	pmd_t *pmd;
+>>  	pte_t *pte, old_pte;
+>> @@ -641,6 +651,18 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+>>  		return 0;
+>>  	}
+>>  
+>> +	/*
+>> +	 * While dirty memory logging, clear PMD entry for huge page and split
+>> +	 * into smaller pages, to track dirty memory at page granularity.
+>> +	 */
+>> +	if (logging_active && kvm_pmd_huge(*pmd)) {
+>> +		phys_addr_t ipa = pmd_pfn(*pmd) << PAGE_SHIFT;
+>> +
+>> +		pmd_clear(pmd);
+>> +		kvm_tlb_flush_vmid_ipa(kvm, ipa);
+>> +		put_page(virt_to_page(pmd));
+>> +	}
+>> +
+> 
+> If we have huge PUDs (like on arn64 with 4k Pages and 4 levels of
+> translation), would we need something similar? If that's the case, a
+> comment would be very welcome.
+
+I'm not sure what we do if we encounter a huge pud, break that
+up into small pages? I was thinking if huge puds are enabled
+then disable page logging. I don't know what kind of comment to
+put in here now other then it's not supported
+
+> 
+>>  	/* Create stage-2 page mappings - Level 2 */
+>>  	if (pmd_none(*pmd)) {
+>>  		if (!cache)
+>> @@ -693,7 +715,7 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+>>  		if (ret)
+>>  			goto out;
+>>  		spin_lock(&kvm->mmu_lock);
+>> -		ret = stage2_set_pte(kvm, &cache, addr, &pte, true);
+>> +		ret = stage2_set_pte(kvm, &cache, addr, &pte, true, false);
+>>  		spin_unlock(&kvm->mmu_lock);
+>>  		if (ret)
+>>  			goto out;
+>> @@ -910,6 +932,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>  	struct vm_area_struct *vma;
+>>  	pfn_t pfn;
+>>  	pgprot_t mem_type = PAGE_S2;
+>> +	bool logging_active = kvm_get_logging_state(memslot);
+>>  
+>>  	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
+>>  	if (fault_status == FSC_PERM && !write_fault) {
+>> @@ -920,7 +943,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>  	/* Let's check if we will get back a huge page backed by hugetlbfs */
+>>  	down_read(&current->mm->mmap_sem);
+>>  	vma = find_vma_intersection(current->mm, hva, hva + 1);
+>> -	if (is_vm_hugetlb_page(vma)) {
+>> +	if (is_vm_hugetlb_page(vma) && !logging_active) {
+>>  		hugetlb = true;
+>>  		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+>>  	} else {
+>> @@ -966,7 +989,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>  	spin_lock(&kvm->mmu_lock);
+>>  	if (mmu_notifier_retry(kvm, mmu_seq))
+>>  		goto out_unlock;
+>> -	if (!hugetlb && !force_pte)
+>> +	if (!hugetlb && !force_pte && !logging_active)
+>>  		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+>>  
+>>  	if (hugetlb) {
+>> @@ -986,10 +1009,12 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>  		}
+>>  		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE);
+>>  		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
+>> -				     mem_type == PAGE_S2_DEVICE);
+>> +					mem_type == PAGE_S2_DEVICE,
+>> +					logging_active);
+>>  	}
+>>  
+>> -
+>> +	if (write_fault)
+>> +		mark_page_dirty(kvm, gfn);
+>>  out_unlock:
+>>  	spin_unlock(&kvm->mmu_lock);
+>>  	kvm_release_pfn_clean(pfn);
+>> @@ -1139,7 +1164,15 @@ static void kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
+>>  {
+>>  	pte_t *pte = (pte_t *)data;
+>>  
+>> -	stage2_set_pte(kvm, NULL, gpa, pte, false);
+>> +	/*
+>> +	 * We can always call stage2_set_pte with logging_active == false,
+>> +	 * because MMU notifiers will have unmapped a huge PMD before calling
+>> +	 * ->change_pte() (which in turn calls kvm_set_spte_hva()) and therefore
+>> +	 * stage2_set_pte() never needs to clear out a huge PMD through this
+>> +	 * calling path.
+>> +	 */
+>> +
+>> +	stage2_set_pte(kvm, NULL, gpa, pte, false, false);
+>>  }
+>>  
+>>  
+>>
+> 
+> Thanks,
+> 
+> 	M.
+> 
