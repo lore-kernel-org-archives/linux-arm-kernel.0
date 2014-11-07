@@ -1,65 +1,132 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Fri, 07 Nov 2014 11:17:37 +0100
-Subject: preferable method for pinctrl driver
-In-Reply-To: <545C846C.6090502@rempel-privat.de>
-References: <54379C10.3050004@rempel-privat.de>
- <CACRpkdYG6sNEfKNJBdbYCn4AbGiX2OfQAVJorR64cbB_gsWDbw@mail.gmail.com>
- <545C846C.6090502@rempel-privat.de>
-Message-ID: <545C9C41.1090300@rempel-privat.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 07 Nov 2014 10:19:35 +0000
+Subject: [PATCH v13 6/7] arm: KVM: dirty log read write protect support
+In-Reply-To: <1415320848-13813-7-git-send-email-m.smarduch@samsung.com>
+References: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
+ <1415320848-13813-7-git-send-email-m.smarduch@samsung.com>
+Message-ID: <545C9CB7.9070200@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 07.11.2014 um 09:35 schrieb Oleksij Rempel:
-> Am 13.10.2014 um 11:05 schrieb Linus Walleij:
->> On Fri, Oct 10, 2014 at 10:42 AM, Oleksij Rempel <linux@rempel-privat.de> wrote:
->>
->>> Looks like there is at least two pinctrl driver types:
->>> - imx23 which makes function description insight of DT;
->>> - tegra with function descrption in the source code.
->>> which way is preferable?
->>
->> The Tegra way. The driver should know about all groups
->> and functions, the DT should just configure the functions to
->> groups relation.
->>
->> The i.MX driver happened before the DT use for pin controllers
->> was thought through.
->>
->>> Other question, i didn't found exact same HW, do it make sense to merge
->>> this driver with existing one? Are there some similarities with this one?:
->>> http://pastebin.com/hW82Xupq
->>
->> No idea, that's very little HW information. However
->> silicon vendors often du their I/O cell layout themselves
->> so many pin controllers are very unique.
->>
->> Yours,
->> Linus Walleij
+On 07/11/14 00:40, Mario Smarduch wrote:
+> Add support to track dirty pages between user space KVM_GET_DIRTY_LOG ioctl
+> calls. We call kvm_get_dirty_log_protect() function to do most of the work.
 > 
-> Hi,
-> thank you for your previous response. One more question: how pins should
-> be numbered? Continuous or register offsets can be used?
-> Documentations for this soc use pin names encoded like this
-> #NAME_#BANK_#PIN. Register offset can be calculated by ((bank) * 32 +
-> (pin) * 4)
-> In this case i need to have extra array to convert pin number to offset,
-> or use offset as pin number.
+> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> ---
+>  arch/arm/kvm/arm.c  |   37 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/kvm/mmu.c  |   22 ++++++++++++++++++++++
+>  virt/kvm/kvm_main.c |    3 +--
+>  3 files changed, 60 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index a99e0cd..212d835 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -737,9 +737,46 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+>  	}
+>  }
+>  
+> +/**
+> + * kvm_vm_ioctl_get_dirty_log - get and clear the log of dirty pages in a slot
+> + * @kvm:	kvm instance
+> + * @log:	slot id and address to which we copy the log
+> + *
+> + * We need to keep it in mind that VCPU threads can write to the bitmap
+> + * concurrently.  So, to avoid losing data, we keep the following order for
+> + * each bit:
+> + *
+> + *   1. Take a snapshot of the bit and clear it if needed.
+> + *   2. Write protect the corresponding page.
+> + *   3. Copy the snapshot to the userspace.
+> + *   4. Flush TLB's if needed.
+> + *
+> + * Steps 1,2,3 are handled by kvm_get_dirty_log_protect().
+> + * Between 2 and 4, the guest may write to the page using the remaining TLB
+> + * entry.  This is not a problem because the page is reported dirty using
+> + * the snapshot taken before and step 4 ensures that writes done after
+> + * exiting to userspace will be logged for the next call.
+> + */
+>  int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
+>  {
+> +#ifdef CONFIG_ARM
+> +	int r;
+> +	bool is_dirty = false;
+> +
+> +	mutex_lock(&kvm->slots_lock);
+> +
+> +	r = kvm_get_dirty_log_protect(kvm, log, &is_dirty);
+> +	if (r)
+> +		goto out;
+> +
+> +	if (is_dirty)
+> +		kvm_flush_remote_tlbs(kvm);
+> +out:
+> +	mutex_unlock(&kvm->slots_lock);
+> +	return r;
+> +#else /* ARM64 */
+>  	return -EINVAL;
+> +#endif
+>  }
+>  
+>  static int kvm_vm_ioctl_set_device_addr(struct kvm *kvm,
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 3b86522..2f5131e 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -872,6 +872,28 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot)
+>  	spin_unlock(&kvm->mmu_lock);
+>  	kvm_flush_remote_tlbs(kvm);
+>  }
+> +
+> +/**
+> + * kvm_arch_mmu_write_protect_pt_masked() - write protect dirty pages
+> + * @kvm:	The KVM pointer
+> + * @slot:	The memory slot associated with mask
+> + * @gfn_offset:	The gfn offset in memory slot
+> + * @mask:	The mask of dirty pages at offset 'gfn_offset' in this memory
+> + *		slot to be write protected
+> + *
+> + * Walks bits set in mask write protects the associated pte's. Caller must
+> + * acquire kvm_mmu_lock.
+> + */
+> +void kvm_arch_mmu_write_protect_pt_masked(struct kvm *kvm,
+> +		struct kvm_memory_slot *slot,
+> +		gfn_t gfn_offset, unsigned long mask)
+> +{
+> +	phys_addr_t base_gfn = slot->base_gfn + gfn_offset;
+> +	phys_addr_t start = (base_gfn +  __ffs(mask)) << PAGE_SHIFT;
+> +	phys_addr_t end = (base_gfn + __fls(mask) + 1) << PAGE_SHIFT;
+> +
+> +	stage2_wp_range(kvm, start, end);
+> +}
+>  #endif
+>  
+>  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+> index f017760..c80dd2f 100644
+> --- a/virt/kvm/kvm_main.c
+> +++ b/virt/kvm/kvm_main.c
+> @@ -982,8 +982,7 @@ out:
+>  EXPORT_SYMBOL_GPL(kvm_get_dirty_log);
+>  
+>  #if defined(CONFIG_S390) || defined(CONFIG_PPC) || defined(CONFIG_MIPS) || \
+> -    defined(CONFIG_IA64) || defined(CONFIG_X86) || defined(CONFIG_ARM) || \
+> -    defined(CONFIG_ARM64)
+> +    defined(CONFIG_IA64) || defined(CONFIG_X86) || defined(CONFIG_ARM64)
 
-Never mind, i think i found the answer:
-This enumeration was arbitrarily chosen, in practice you need to think
-through your numbering system so that it matches the layout of registers
-and such things in your driver, or the code may become complicated. You
-must also consider matching of offsets to the GPIO ranges that may be
-handled by the pin controller.
+Yeah, that's exactly why Cornelia's comment on having a proper config
+symbol is pertinent.
 
+>  /*
+>   * For architectures that don't use kvm_get_dirty_log_protect() for dirty page
+>   * logging, calling this function is illegal. Otherwise the function is defined
+> 
+
+Other that that:
+
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
 -- 
-Regards,
-Oleksij
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 213 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141107/9b3e5c31/attachment.sig>
+Jazz is not dead. It just smells funny...
