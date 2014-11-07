@@ -1,74 +1,155 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 07 Nov 2014 11:30:38 +0100
-Subject: [PATCH V4 3/3] can: m_can: add missing message RAM initialization
-In-Reply-To: <1415349914-9145-3-git-send-email-b29396@freescale.com>
-References: <1415349914-9145-1-git-send-email-b29396@freescale.com>
- <1415349914-9145-3-git-send-email-b29396@freescale.com>
-Message-ID: <545C9F4E.3040901@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 07 Nov 2014 10:33:20 +0000
+Subject: [PATCH v13 7/7] arm: KVM: ARMv7 dirty page logging 2nd stage
+ page fault
+In-Reply-To: <1415320848-13813-8-git-send-email-m.smarduch@samsung.com>
+References: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
+ <1415320848-13813-8-git-send-email-m.smarduch@samsung.com>
+Message-ID: <545C9FF0.7010802@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2014 09:45 AM, Dong Aisheng wrote:
-> The M_CAN message RAM is usually equipped with a parity or ECC functionality.
-> But RAM cells suffer a hardware reset and can therefore hold arbitrary
-> content at startup - including parity and/or ECC bits.
+On 07/11/14 00:40, Mario Smarduch wrote:
+> This patch adds support for handling 2nd stage page faults during migration,
+> it disables faulting in huge pages, and dissolves huge pages to page tables.
+> In case migration is canceled huge pages are used again.
 > 
-> To prevent the M_CAN controller detecting checksum errors when reading
-> potentially uninitialized TX message RAM content to transmit CAN
-> frames the TX message RAM has to be written with (any kind of) initial
-> data.
-> 
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 > ---
-> ChangeLog:
-> v3-v4:
->  * initialize the entire Message RAM in use instead of only 8 bytes
->    since this is a valid and needed initialization process.
->    Patch title also changed.
-> ---
->  drivers/net/can/m_can/m_can.c | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
+>  arch/arm/kvm/mmu.c |   47 ++++++++++++++++++++++++++++++++++++++++-------
+>  1 file changed, 40 insertions(+), 7 deletions(-)
 > 
-> diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
-> index eee1533..de742d0 100644
-> --- a/drivers/net/can/m_can/m_can.c
-> +++ b/drivers/net/can/m_can/m_can.c
-> @@ -1114,7 +1114,7 @@ static int m_can_of_parse_mram(struct platform_device *pdev,
->  	struct resource *res;
->  	void __iomem *addr;
->  	u32 out_val[MRAM_CFG_LEN];
-> -	int ret;
-> +	int i, start, end, ret;
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 2f5131e..d511fc0 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -47,6 +47,15 @@ static phys_addr_t hyp_idmap_vector;
+>  #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
+>  #define kvm_pud_huge(_x)	pud_huge(_x)
 >  
->  	/* message ram could be shared */
->  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "message_ram");
-> @@ -1165,6 +1165,15 @@ static int m_can_of_parse_mram(struct platform_device *pdev,
->  		priv->mcfg[MRAM_TXE].off, priv->mcfg[MRAM_TXE].num,
->  		priv->mcfg[MRAM_TXB].off, priv->mcfg[MRAM_TXB].num);
+> +static bool kvm_get_logging_state(struct kvm_memory_slot *memslot)
+> +{
+> +#ifdef CONFIG_ARM
+> +	return !!memslot->dirty_bitmap;
+> +#else
+> +	return false;
+> +#endif
+> +}
+> +
+>  static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>  {
+>  	/*
+> @@ -626,7 +635,8 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+>  }
 >  
-> +	/* initialize the entire Message RAM in use to avoid possible
-> +	 * ECC/parity checksum errors when reading an uninitialized buffer
+>  static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+> -			  phys_addr_t addr, const pte_t *new_pte, bool iomap)
+> +			  phys_addr_t addr, const pte_t *new_pte, bool iomap,
+> +			  bool logging_active)
+
+Yuk. Yet another parameter. Can't we have a set of flags instead,
+indicating both iomap and logging in one go? That would make things more
+readable (at least for me).
+
+>  {
+>  	pmd_t *pmd;
+>  	pte_t *pte, old_pte;
+> @@ -641,6 +651,18 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+>  		return 0;
+>  	}
+>  
+> +	/*
+> +	 * While dirty memory logging, clear PMD entry for huge page and split
+> +	 * into smaller pages, to track dirty memory at page granularity.
 > +	 */
-> +	start = priv->mcfg[MRAM_SIDF].off;
-> +	end = priv->mcfg[MRAM_TXB].off +
-> +		priv->mcfg[MRAM_TXB].num * TXB_ELEMENT_SIZE;
-> +	for (i = start; i < end; i += 4)
-> +		writel(0x0, priv->mram_base + i);
+> +	if (logging_active && kvm_pmd_huge(*pmd)) {
+> +		phys_addr_t ipa = pmd_pfn(*pmd) << PAGE_SHIFT;
+> +
+> +		pmd_clear(pmd);
+> +		kvm_tlb_flush_vmid_ipa(kvm, ipa);
+> +		put_page(virt_to_page(pmd));
+> +	}
+> +
 
-Can we access the mram without turning on the clock?
+If we have huge PUDs (like on arn64 with 4k Pages and 4 levels of
+translation), would we need something similar? If that's the case, a
+comment would be very welcome.
 
-Marc
+>  	/* Create stage-2 page mappings - Level 2 */
+>  	if (pmd_none(*pmd)) {
+>  		if (!cache)
+> @@ -693,7 +715,7 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+>  		if (ret)
+>  			goto out;
+>  		spin_lock(&kvm->mmu_lock);
+> -		ret = stage2_set_pte(kvm, &cache, addr, &pte, true);
+> +		ret = stage2_set_pte(kvm, &cache, addr, &pte, true, false);
+>  		spin_unlock(&kvm->mmu_lock);
+>  		if (ret)
+>  			goto out;
+> @@ -910,6 +932,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  	struct vm_area_struct *vma;
+>  	pfn_t pfn;
+>  	pgprot_t mem_type = PAGE_S2;
+> +	bool logging_active = kvm_get_logging_state(memslot);
+>  
+>  	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
+>  	if (fault_status == FSC_PERM && !write_fault) {
+> @@ -920,7 +943,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  	/* Let's check if we will get back a huge page backed by hugetlbfs */
+>  	down_read(&current->mm->mmap_sem);
+>  	vma = find_vma_intersection(current->mm, hva, hva + 1);
+> -	if (is_vm_hugetlb_page(vma)) {
+> +	if (is_vm_hugetlb_page(vma) && !logging_active) {
+>  		hugetlb = true;
+>  		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+>  	} else {
+> @@ -966,7 +989,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  	spin_lock(&kvm->mmu_lock);
+>  	if (mmu_notifier_retry(kvm, mmu_seq))
+>  		goto out_unlock;
+> -	if (!hugetlb && !force_pte)
+> +	if (!hugetlb && !force_pte && !logging_active)
+>  		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+>  
+>  	if (hugetlb) {
+> @@ -986,10 +1009,12 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  		}
+>  		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE);
+>  		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
+> -				     mem_type == PAGE_S2_DEVICE);
+> +					mem_type == PAGE_S2_DEVICE,
+> +					logging_active);
+>  	}
+>  
+> -
+> +	if (write_fault)
+> +		mark_page_dirty(kvm, gfn);
+>  out_unlock:
+>  	spin_unlock(&kvm->mmu_lock);
+>  	kvm_release_pfn_clean(pfn);
+> @@ -1139,7 +1164,15 @@ static void kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
+>  {
+>  	pte_t *pte = (pte_t *)data;
+>  
+> -	stage2_set_pte(kvm, NULL, gpa, pte, false);
+> +	/*
+> +	 * We can always call stage2_set_pte with logging_active == false,
+> +	 * because MMU notifiers will have unmapped a huge PMD before calling
+> +	 * ->change_pte() (which in turn calls kvm_set_spte_hva()) and therefore
+> +	 * stage2_set_pte() never needs to clear out a huge PMD through this
+> +	 * calling path.
+> +	 */
+> +
+> +	stage2_set_pte(kvm, NULL, gpa, pte, false, false);
+>  }
+>  
+>  
+> 
 
+Thanks,
+
+	M.
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141107/23c5ba16/attachment.sig>
+Jazz is not dead. It just smells funny...
