@@ -1,10 +1,8 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri,  7 Nov 2014 14:38:26 +0100
-Subject: [PATCH/RFC 2/2] ARM: shmobile: kzm9g-reference dts: Declare the full
- 512 MiB of RAM
-In-Reply-To: <1415367506-8713-1-git-send-email-geert+renesas@glider.be>
-References: <1415367506-8713-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1415367506-8713-2-git-send-email-geert+renesas@glider.be>
+Date: Fri,  7 Nov 2014 14:38:25 +0100
+Subject: [PATCH/RFC 1/2] ARM: shmobile: kzm9g dts: Declare the full 512 MiB of
+ RAM
+Message-ID: <1415367506-8713-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,21 +23,20 @@ Questions:
   - Why was the last 8 MiB of RAM not used?
   - Is it an option to fix CONFIG_AUTO_ZRELADDR instead?
 
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 2 +-
+ arch/arm/boot/dts/sh73a0-kzm9g.dts | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index 0a34c90105e9fcd6..f01b8f53e27c0b42 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -45,7 +45,7 @@
+diff --git a/arch/arm/boot/dts/sh73a0-kzm9g.dts b/arch/arm/boot/dts/sh73a0-kzm9g.dts
+index 27c5f426d172f03d..e7dae01933a575f1 100644
+--- a/arch/arm/boot/dts/sh73a0-kzm9g.dts
++++ b/arch/arm/boot/dts/sh73a0-kzm9g.dts
+@@ -21,6 +21,6 @@
  
  	memory {
  		device_type = "memory";
 -		reg = <0x41000000 0x1e800000>;
 +		reg = <0x40000000 0x20000000>;
  	};
- 
- 	reg_1p8v: regulator at 0 {
+ };
 -- 
 1.9.1
