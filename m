@@ -1,65 +1,120 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 7 Nov 2014 13:48:30 -0800
-Subject: [PATCH v9 01/12] coresight: add CoreSight core layer framework
-In-Reply-To: <CANLsYkzKB7iBUFxsqmaoHob26mEZvfbVSA1O_ZadFCYHE2viAA@mail.gmail.com>
-References: <1415038066-22423-1-git-send-email-mathieu.poirier@linaro.org>
- <1415038066-22423-2-git-send-email-mathieu.poirier@linaro.org>
- <20141107193016.GA29311@kroah.com>
- <20141107193054.GB29311@kroah.com>
- <CANLsYkzKB7iBUFxsqmaoHob26mEZvfbVSA1O_ZadFCYHE2viAA@mail.gmail.com>
-Message-ID: <20141107214830.GA1995@kroah.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 7 Nov 2014 13:57:51 -0800
+Subject: [PATCH] PM / Domains: Fix initial default state of the
+ need_restore flag
+In-Reply-To: <7hr3xerdw6.fsf@deeprootsystems.com>
+References: <1415366847-4807-1-git-send-email-ulf.hansson@linaro.org>
+ <7hr3xerdw6.fsf@deeprootsystems.com>
+Message-ID: <20141107215751.GA4439@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 07, 2014 at 02:39:31PM -0700, Mathieu Poirier wrote:
-> On 7 November 2014 12:30, Greg KH <gregkh@linuxfoundation.org> wrote:
-> > On Fri, Nov 07, 2014 at 11:30:16AM -0800, Greg KH wrote:
-> >> On Mon, Nov 03, 2014 at 11:07:35AM -0700, mathieu.poirier at linaro.org wrote:
-> >> > From: Pratik Patel <pratikp@codeaurora.org>
-> >> >
-> >> > CoreSight components are compliant with the ARM CoreSight
-> >> > architecture specification and can be connected in various
-> >> > topologies to suit a particular SoC tracing needs. These trace
-> >> > components can generally be classified as sources, links and
-> >> > sinks. Trace data produced by one or more sources flows through
-> >> > the intermediate links connecting the source to the currently
-> >> > selected sink.
-> >> >
-> >> > The CoreSight framework provides an interface for the CoreSight trace
-> >> > drivers to register themselves with. It's intended to build up a
-> >> > topological view of the CoreSight components and configure the
-> >> > correct serie of components on user input via sysfs.
-> >> >
-> >> > For eg., when enabling a source, the framework builds up a path
-> >> > consisting of all the components connecting the source to the
-> >> > currently selected sink(s) and enables all of them.
-> >> >
-> >> > The framework also supports switching between available sinks
-> >> > and provides status information to user space applications
-> >> > through the debugfs interface.
-> >> >
-> >> > Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
-> >> > Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> >>
-> >> You don't seem to document the sysfs files you create here in
-> >> Documentation/ABI/ anywhere in the series.  Can you fix that up?
+On Fri, Nov 07, 2014 at 11:47:53AM -0800, Kevin Hilman wrote:
+> Ulf Hansson <ulf.hansson@linaro.org> writes:
 > 
-> Thanks for the review.   Do you want sysfs entries documented for the
-> framework only or all the ones created by the drivers as well?
-
-All need to be documented.
-
-> >> Other than that minor nit, this looks good to me.  Feel free to take it
-> >> through some random ARM tree.
+> > The initial state of the device's need_restore flag should'nt depend on
+> > the current state of the PM domain. For example it should be perfectly
+> > valid to attach an inactive device to a powered PM domain.
 > >
-> > Wait, did you want me to take this through my tree?  If so, I'll be glad
-> > to do so, I can't remember what we talked about here...
+> > The pm_genpd_dev_need_restore() API allow us to update the need_restore
+> > flag to somewhat cope with such scenarios. Typically that should have
+> > been done from drivers/buses ->probe() since it's those that put the
+> > requirements on the value of the need_restore flag.
+> >
+> > Until recently, the Exynos SOCs were the only user of the
+> > pm_genpd_dev_need_restore() API, though invoking it from a centralized
+> > location while adding devices to their PM domains.
+> >
+> > Due to that Exynos now have swithed to the generic OF-based PM domain
+> > look-up, it's no longer possible to invoke the API from a centralized
+> > location. The reason is because devices are now added to their PM
+> > domains during the probe sequence.
+> >
+> > Commit "ARM: exynos: Move to generic PM domain DT bindings"
+> > did the switch for Exynos to the generic OF-based PM domain look-up,
+> > but it also removed the call to pm_genpd_dev_need_restore(). This
+> > caused a regression for some of the Exynos drivers.
+> >
+> > To handle things more properly in the generic PM domain, let's change
+> > the default initial value of the need_restore flag to reflect that the
+> > state is unknown. As soon as some of the runtime PM callbacks gets
+> > invoked, update the initial value accordingly.
+> >
+> > Moreover, since the generic PM domain is verifying that all device's
+> > are both runtime PM enabled and suspended, using pm_runtime_suspended()
+> > while pm_genpd_poweroff() is invoked from the scheduled work, we can be
+> > sure of that the PM domain won't be powering off while having active
+> > devices.
+> >
+> > Do note that, the generic PM domain can still only know about active
+> > devices which has been activated through invoking its runtime PM resume
+> > callback. In other words, buses/drivers using pm_runtime_set_active()
+> > during ->probe() will still suffer from a race condition, potentially
+> > probing a device without having its PM domain being powered. That issue
+> > will have to be solved using a different approach.
+> >
+> > This a log from the boot regression for Exynos5, which is being fixed in
+> > this patch.
+> >
+> > ------------[ cut here ]------------
+> > WARNING: CPU: 0 PID: 308 at ../drivers/clk/clk.c:851 clk_disable+0x24/0x30()
+> > Modules linked in:
+> > CPU: 0 PID: 308 Comm: kworker/0:1 Not tainted 3.18.0-rc3-00569-gbd9449f-dirty #10
+> > Workqueue: pm pm_runtime_work
+> > [<c0013c64>] (unwind_backtrace) from [<c0010dec>] (show_stack+0x10/0x14)
+> > [<c0010dec>] (show_stack) from [<c03ee4cc>] (dump_stack+0x70/0xbc)
+> > [<c03ee4cc>] (dump_stack) from [<c0020d34>] (warn_slowpath_common+0x64/0x88)
+> > [<c0020d34>] (warn_slowpath_common) from [<c0020d74>] (warn_slowpath_null+0x1c/0x24)
+> > [<c0020d74>] (warn_slowpath_null) from [<c03107b0>] (clk_disable+0x24/0x30)
+> > [<c03107b0>] (clk_disable) from [<c02cc834>] (gsc_runtime_suspend+0x128/0x160)
+> > [<c02cc834>] (gsc_runtime_suspend) from [<c0249024>] (pm_generic_runtime_suspend+0x2c/0x38)
+> > [<c0249024>] (pm_generic_runtime_suspend) from [<c024f44c>] (pm_genpd_default_save_state+0x2c/0x8c)
+> > [<c024f44c>] (pm_genpd_default_save_state) from [<c024ff2c>] (pm_genpd_poweroff+0x224/0x3ec)
+> > [<c024ff2c>] (pm_genpd_poweroff) from [<c02501b4>] (pm_genpd_runtime_suspend+0x9c/0xcc)
+> > [<c02501b4>] (pm_genpd_runtime_suspend) from [<c024a4f8>] (__rpm_callback+0x2c/0x60)
+> > [<c024a4f8>] (__rpm_callback) from [<c024a54c>] (rpm_callback+0x20/0x74)
+> > [<c024a54c>] (rpm_callback) from [<c024a930>] (rpm_suspend+0xd4/0x43c)
+> > [<c024a930>] (rpm_suspend) from [<c024bbcc>] (pm_runtime_work+0x80/0x90)
+> > [<c024bbcc>] (pm_runtime_work) from [<c0032a9c>] (process_one_work+0x12c/0x314)
+> > [<c0032a9c>] (process_one_work) from [<c0032cf4>] (worker_thread+0x3c/0x4b0)
+> > [<c0032cf4>] (worker_thread) from [<c003747c>] (kthread+0xcc/0xe8)
+> > [<c003747c>] (kthread) from [<c000e738>] (ret_from_fork+0x14/0x3c)
+> > ---[ end trace 40cd58bcd6988f12 ]---
+> >
+> > Fixes: a4a8c2c4962bb655 (ARM: exynos: Move to generic PM domain DT bindings)
+> > Reported-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 > 
-> I was hoping to go through yours.
+> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+> 
+> And looks like we need this for v3.18-rc since it does fix the
+> regression.
 
-Ok, I can take it, can you send me a follow-on patch for the sysfs
-files?
+I guess we do need it for 3.18, but when we are talking about 3.19,
+before we make any more changes can we outline how power domains are
+supposed to work?
 
-thanks,
+1. How do we attach a device to power domain? Right now it seems that
+individual buses are responsible for attaching their devices to power
+domains. Should we move it into driver core (device_pm_add?) so that
+device starts its life in its proper power domain?
 
-greg k-h
+2. When do we power up the devices (and the domains)? Right now devices
+in ACPI power domain are powered when they are attached to the power
+domain (which coincides with probing), but generic power domains do not
+do that. Can we add a separate API to explicitly power up the device (and
+its domain if it is powered down) and do it again, either in device core
+or in individual buses. This way, regardless of runtime PM or not, we
+will have devices powered on when driver tries to bind to them. If
+binding fails we can power down the device.
+
+I've heard there is a concern about power domain bouncing up and down
+during probing. Is it really a concern? Would not we run into the same
+issues past booting up with aggressive PM policy? Anyway, we could
+probably work around this by refusing to actually power down the domains
+until we are done booting, similarly to who genpd_poweroff_unused works.
+
+Thanks.
+
+-- 
+Dmitry
