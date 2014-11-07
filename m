@@ -1,35 +1,68 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 7 Nov 2014 08:44:18 -0800
-Subject: [RFC] ptrace: add generic SET_SYSCALL request
-In-Reply-To: <6654405.Rf26mgoaDJ@wuerfel>
-References: <1415346443-28915-1-git-send-email-takahiro.akashi@linaro.org>
- <353850534.aGkkrtTogX@wuerfel> <20141107131129.GF18916@arm.com>
- <6654405.Rf26mgoaDJ@wuerfel>
-Message-ID: <CAGXu5jLBWiVieCkMFTboi5tEYw40O=-3_nH4jnMgKGQCrE6f1g@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 7 Nov 2014 16:46:14 +0000
+Subject: [PATCH v7 6/8] xen/arm/arm64: merge xen/mm32.c into xen/mm.c
+In-Reply-To: <20141107160306.GF29148@e104818-lin.cambridge.arm.com>
+References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
+ <1414422568-19103-6-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20141107142205.GD29148@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.02.1411071523170.22875@kaball.uk.xensource.com>
+ <20141107160306.GF29148@e104818-lin.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1411071645480.22875@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 7, 2014 at 6:30 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 07 November 2014 13:11:30 Will Deacon wrote:
->>
->> > It's not that I care strongly about the interface, my main point is
->> > that the changelog doesn't describe why one interface was used instead
->> > the other.
->>
->> I suspect the current approach was taken because it follows the same scheme
->> as 32-bit ARM. If both methods are sufficient (Kees would have a better idea
->> than me on that), then I don't have a strong preference.
->
-> Using the regset would probably address Oleg's comment, and would keep the
-> implementation architecture specific. You could even share the NT_S390_SYSTEM_CALL
-> number, but I don't know if there any downsides to doing that.
+On Fri, 7 Nov 2014, Catalin Marinas wrote:
+> On Fri, Nov 07, 2014 at 03:28:38PM +0000, Stefano Stabellini wrote:
+> > On Fri, 7 Nov 2014, Catalin Marinas wrote:
+> > > On Mon, Oct 27, 2014 at 03:09:26PM +0000, Stefano Stabellini wrote:
+> > > > Merge xen/mm32.c into xen/mm.c.
+> > > > As a consequence the code gets compiled on arm64 too: introduce a few
+> > > > compat functions to actually be able to compile it.
+> > > > 
+> > > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > > Acked-by: Ian Campbell <ian.campbell@citrix.com>
+> > > 
+> > > Since I missed the commit introducing mm32.c (340720be32d4 xen/arm:
+> > > reimplement xen_dma_unmap_page & friends), I'll add a retrospective NAK ;).
+> > > 
+> > > The main reason is the asymmetry between dma map and unmap. With host
+> > > swiotlb somehow getting !dma_capable(dev), you even risk leaking dom0
+> > > swiotlb bounce buffers (on arm64).
+> > > 
+> > > > --- a/arch/arm/xen/mm.c
+> > > > +++ b/arch/arm/xen/mm.c
+> > > [...]
+> > > > +/* functions called by SWIOTLB */
+> > > > +
+> > > > +static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
+> > > > +       size_t size, enum dma_data_direction dir,
+> > > > +       void (*op)(const void *, size_t, int))
+> > > > +{
+> > > > +       unsigned long pfn;
+> > > > +       size_t left = size;
+> > > > +
+> > > > +       pfn = (handle >> PAGE_SHIFT) + offset / PAGE_SIZE;
+> > > > +       offset %= PAGE_SIZE;
+> > > > +
+> > > > +       do {
+> > > > +               size_t len = left;
+> > > > +               void *vaddr;
+> > > > +
+> > > > +               if (!pfn_valid(pfn))
+> > > 
+> > > Is this the pfn or the mfn? As you said in the previous email, there is
+> > > no mfn_to_pfn() conversion, so that's actually in another address space
+> > > where dom0 pfn_valid() would not make sense.
+> > 
+> > That is actually the mfn. The check works because dom0 is mapped 1:1, so
+> > if the mfn is a valid pfn, then it means that it is a local page.
+> 
+> So the Xen DMA ops would never be called on anything other than dom0?
 
-That's fine by me -- I only want an interface. :) I think it'd be nice
-to keep it the same between arm32 and arm64, but using a specific
-regset does seem to be the better approach.
+That's right.
 
--Kees
 
--- 
-Kees Cook
-Chrome OS Security
+> If that's correct, the pfn_valid() check would work. But add some big
+> comments as it's not clear at all to someone not familiar with Xen.
+
+Yeah...
