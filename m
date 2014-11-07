@@ -1,51 +1,31 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 7 Nov 2014 12:06:02 +0100
-Subject: [GIT PULL] arm64: UEFI updates for 3.19
-In-Reply-To: <1415357313.14686.115.camel@mfleming-mobl1.ger.corp.intel.com>
-References: <CAKv+Gu8LEFvdu99vCHbHGPmGLpHWdT+Wb2DECzBEEg8g_yynvg@mail.gmail.com>
- <CAKv+Gu8bpgGWRbgdGYHSy515LOXapCm4stv5xJo_tNNhahcTYw@mail.gmail.com>
- <20141107100434.GA32336@arm.com>
- <CAKv+Gu9Hf2ATGxVbukxyqihChvc9TDvkejPq6KGkvFdJBPT5LA@mail.gmail.com>
- <1415357313.14686.115.camel@mfleming-mobl1.ger.corp.intel.com>
-Message-ID: <CAKv+Gu9woybrvA0vikmcOeyVs0xTsAwBVu1=QsvaM9_Eb0pUEQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 7 Nov 2014 11:11:28 +0000
+Subject: [PATCH v7 3/8] arm64: introduce is_device_dma_coherent
+In-Reply-To: <20141107110524.GA21875@localhost>
+References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
+ <1414422568-19103-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1411031045340.22875@kaball.uk.xensource.com>
+ <20141103105716.GC23162@arm.com>
+ <alpine.DEB.2.02.1411031101400.22875@kaball.uk.xensource.com>
+ <20141105165646.GN32700@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.02.1411051757140.22875@kaball.uk.xensource.com>
+ <20141106103337.GA19702@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.02.1411061155200.22875@kaball.uk.xensource.com>
+ <20141107110524.GA21875@localhost>
+Message-ID: <20141107111126.GB21875@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 November 2014 11:48, Matt Fleming <matt.fleming@intel.com> wrote:
-> On Fri, 2014-11-07 at 11:29 +0100, Ard Biesheuvel wrote:
->>
->> I have confirmation from Matt and another Intel engineer that adding a
->> (arguably redundant) 'u32' cast solves the issue.
->
-> I think we need to get a better handle on this.
->
-> It is completely surprising to me that type promotion from u32 to u64
-> goes through sign extension.
->
-> And by "surprising" I mean, it sounds wrong.
->
-> Ard, if you could throw me a unified diff of objdump -dr vmlinux, with
-> and without the u32 cast, I'll take a look at figuring out what's
-> happening.
->
+On Fri, Nov 07, 2014 at 11:05:25AM +0000, Catalin Marinas wrote:
+> BTW, drivers/xen/swiotlb-xen.c needs something like:
+> 
+>         dma_addr_t dev_addr = xen_phys_to_bus(phys_to_dma(phys));
+> 
+> phys != bus address.
 
-With my compiler
+Wrong place, what I meant is when calling:
 
-gcc version 4.8.1 (Ubuntu/Linaro 4.8.1-10ubuntu9)
-
-the objdump of drivers/firmware/dmi_scan.o is identical with and
-without the 'u32' cast.
-
-If I look at the original code:
-
-dmi_base = (buf[11] << 24) | (buf[10] << 16) | (buf[9] << 8) | buf[8];
-
-I see a 'cltq' instruction in the dump that disappears once I add the
-'u32' cast (which is what we addressed by introducing the
-get_unaligned_le32() in the 1st place)
-
-So, I'd happily share more objdumps, but perhaps we should find out
-first which compiler Yuanhan has been using?
+        xen_dma_unmap_page(hwdev, phys_to_dma(paddr), size, dir, attrs);
 
 -- 
-Ard.
+Catalin
