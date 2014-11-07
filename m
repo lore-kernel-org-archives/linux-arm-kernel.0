@@ -1,53 +1,74 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 7 Nov 2014 11:29:36 +0100
-Subject: [GIT PULL] arm64: UEFI updates for 3.19
-In-Reply-To: <20141107100434.GA32336@arm.com>
-References: <CAKv+Gu8LEFvdu99vCHbHGPmGLpHWdT+Wb2DECzBEEg8g_yynvg@mail.gmail.com>
- <CAKv+Gu8bpgGWRbgdGYHSy515LOXapCm4stv5xJo_tNNhahcTYw@mail.gmail.com>
- <20141107100434.GA32336@arm.com>
-Message-ID: <CAKv+Gu9Hf2ATGxVbukxyqihChvc9TDvkejPq6KGkvFdJBPT5LA@mail.gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 07 Nov 2014 11:30:38 +0100
+Subject: [PATCH V4 3/3] can: m_can: add missing message RAM initialization
+In-Reply-To: <1415349914-9145-3-git-send-email-b29396@freescale.com>
+References: <1415349914-9145-1-git-send-email-b29396@freescale.com>
+ <1415349914-9145-3-git-send-email-b29396@freescale.com>
+Message-ID: <545C9F4E.3040901@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 November 2014 11:04, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Nov 07, 2014 at 07:34:12AM +0000, Ard Biesheuvel wrote:
->> You are not going to believe this, but I received a report about boot
->> failures on legacy (non-EFI) x86 using the SMBIOS 3.0 code, so could
->> you please hold off on pulling this until we know what is going on
->> there? This does not affect ARM at all, but I may need to update patch
->> 'dmi: add support for SMBIOS 3.0 64-bit entry point' to drop the
->> SMBIOS 3.0 check in the non-EFI code path.
->
-> D'oh, I put this into -next last night (perhaps that's where the report came
-> from), so I'll recreate that branch now without your series.
->
+On 11/07/2014 09:45 AM, Dong Aisheng wrote:
+> The M_CAN message RAM is usually equipped with a parity or ECC functionality.
+> But RAM cells suffer a hardware reset and can therefore hold arbitrary
+> content at startup - including parity and/or ECC bits.
+> 
+> To prevent the M_CAN controller detecting checksum errors when reading
+> potentially uninitialized TX message RAM content to transmit CAN
+> frames the TX message RAM has to be written with (any kind of) initial
+> data.
+> 
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> ---
+> ChangeLog:
+> v3-v4:
+>  * initialize the entire Message RAM in use instead of only 8 bytes
+>    since this is a valid and needed initialization process.
+>    Patch title also changed.
+> ---
+>  drivers/net/can/m_can/m_can.c | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
+> index eee1533..de742d0 100644
+> --- a/drivers/net/can/m_can/m_can.c
+> +++ b/drivers/net/can/m_can/m_can.c
+> @@ -1114,7 +1114,7 @@ static int m_can_of_parse_mram(struct platform_device *pdev,
+>  	struct resource *res;
+>  	void __iomem *addr;
+>  	u32 out_val[MRAM_CFG_LEN];
+> -	int ret;
+> +	int i, start, end, ret;
+>  
+>  	/* message ram could be shared */
+>  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "message_ram");
+> @@ -1165,6 +1165,15 @@ static int m_can_of_parse_mram(struct platform_device *pdev,
+>  		priv->mcfg[MRAM_TXE].off, priv->mcfg[MRAM_TXE].num,
+>  		priv->mcfg[MRAM_TXB].off, priv->mcfg[MRAM_TXB].num);
+>  
+> +	/* initialize the entire Message RAM in use to avoid possible
+> +	 * ECC/parity checksum errors when reading an uninitialized buffer
+> +	 */
+> +	start = priv->mcfg[MRAM_SIDF].off;
+> +	end = priv->mcfg[MRAM_TXB].off +
+> +		priv->mcfg[MRAM_TXB].num * TXB_ELEMENT_SIZE;
+> +	for (i = start; i < end; i += 4)
+> +		writel(0x0, priv->mram_base + i);
 
-Ah, yes, that is probably where they found it. Note that this is a
-different patch than the one that has been causing us (me) grief
-before, but apparently it now has infected other patches as well :-)
+Can we access the mram without turning on the clock?
 
-> Please send another pull request without the SMBIOS patch, then we can
-> perhaps add that on top later on (that way it's easier to revert in the
-> future :).
->
-
-In the mean time, we have pinpointed this. It turns out that on x86,
-the RHS of this expression
-
-u64 dmi_base = get_unaligned_le32(buf + 8);
-
-is promoted to a signed type before being assigned, even if
-get_unaligned_le32() returns u32.
-On ARM, it works as expected.
-
-I have confirmation from Matt and another Intel engineer that adding a
-(arguably redundant) 'u32' cast solves the issue.
-
-Should I include the corrected patch and send an updated pull request?
-Or if you and Matt prefer so, we could take this patch and the
-preceding one (efi: dmi: add support for SMBIOS 3.0 UEFI configuration
-table) through Matt's tree as well. There are no interdependencies
-between those two and the other patches.
+Marc
 
 -- 
-Ard.
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141107/23c5ba16/attachment.sig>
