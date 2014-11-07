@@ -1,174 +1,87 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Fri, 07 Nov 2014 12:20:35 +0100
-Subject: [PATCH 04/21] thermal: of: Extend current of-thermal.c code to
- allow setting emulated temp
-In-Reply-To: <20141107014448.GE10180@developer>
-References: <1412872737-624-1-git-send-email-l.majewski@samsung.com>
- <1412872737-624-5-git-send-email-l.majewski@samsung.com>
- <20141107014448.GE10180@developer>
-Message-ID: <20141107122035.2973ad20@amdc2363>
+From: yuanhan.liu@linux.intel.com (Yuanhan Liu)
+Date: Fri, 7 Nov 2014 19:24:07 +0800
+Subject: [GIT PULL] arm64: UEFI updates for 3.19
+In-Reply-To: <CAKv+Gu9woybrvA0vikmcOeyVs0xTsAwBVu1=QsvaM9_Eb0pUEQ@mail.gmail.com>
+References: <CAKv+Gu8LEFvdu99vCHbHGPmGLpHWdT+Wb2DECzBEEg8g_yynvg@mail.gmail.com>
+ <CAKv+Gu8bpgGWRbgdGYHSy515LOXapCm4stv5xJo_tNNhahcTYw@mail.gmail.com>
+ <20141107100434.GA32336@arm.com>
+ <CAKv+Gu9Hf2ATGxVbukxyqihChvc9TDvkejPq6KGkvFdJBPT5LA@mail.gmail.com>
+ <1415357313.14686.115.camel@mfleming-mobl1.ger.corp.intel.com>
+ <CAKv+Gu9woybrvA0vikmcOeyVs0xTsAwBVu1=QsvaM9_Eb0pUEQ@mail.gmail.com>
+Message-ID: <20141107112407.GH24745@yliu-dev.sh.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eduardo,
-
-> Hello,
+On Fri, Nov 07, 2014 at 12:06:02PM +0100, Ard Biesheuvel wrote:
+> On 7 November 2014 11:48, Matt Fleming <matt.fleming@intel.com> wrote:
+> > On Fri, 2014-11-07 at 11:29 +0100, Ard Biesheuvel wrote:
+> >>
+> >> I have confirmation from Matt and another Intel engineer that adding a
+> >> (arguably redundant) 'u32' cast solves the issue.
+> >
+> > I think we need to get a better handle on this.
+> >
+> > It is completely surprising to me that type promotion from u32 to u64
+> > goes through sign extension.
+> >
+> > And by "surprising" I mean, it sounds wrong.
+> >
+> > Ard, if you could throw me a unified diff of objdump -dr vmlinux, with
+> > and without the u32 cast, I'll take a look at figuring out what's
+> > happening.
+> >
 > 
-> On Thu, Oct 09, 2014 at 06:38:40PM +0200, Lukasz Majewski wrote:
-> > Before this change it was only possible to set get_temp() and
-> > get_trend() methods to be used in the common code handling passing
-> > parameters via device tree to "cpu-thermal" CPU thermal zone device.
-> > 
-> > Now it is possible to also set emulated value of temperature for
-> > debug purposes.
-> > 
-> > Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
-> > ---
-> >  drivers/thermal/of-thermal.c | 25 ++++++++++++++++++++++---
-> >  include/linux/thermal.h      |  6 ++++--
-> >  2 files changed, 26 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/thermal/of-thermal.c
-> > b/drivers/thermal/of-thermal.c index cd74e64..f206375 100644
-> > --- a/drivers/thermal/of-thermal.c
-> > +++ b/drivers/thermal/of-thermal.c
-> > @@ -98,10 +98,22 @@ struct __thermal_zone {
-> >  	void *sensor_data;
-> >  	int (*get_temp)(void *, long *);
-> >  	int (*get_trend)(void *, long *);
-> > +	int (*set_emul_temp)(void *, unsigned long);
-> >  };
-> >  
-> >  /***   DT thermal zone device callbacks   ***/
-> >  
-> > +static int of_thermal_set_emul_temp(struct thermal_zone_device *tz,
-> > +				    unsigned long temp)
-> > +{
-> > +	struct __thermal_zone *data = tz->devdata;
-> > +
-> > +	if (!data->set_emul_temp)
-> > +		return -EINVAL;
-> > +
-> > +	return data->set_emul_temp(data->sensor_data, temp);
-> > +}
-> > +
-> >  static int of_thermal_get_temp(struct thermal_zone_device *tz,
-> >  			       unsigned long *temp)
-> >  {
-> > @@ -352,7 +364,8 @@ static struct thermal_zone_device *
-> >  thermal_zone_of_add_sensor(struct device_node *zone,
-> >  			   struct device_node *sensor, void *data,
-> >  			   int (*get_temp)(void *, long *),
-> > -			   int (*get_trend)(void *, long *))
-> > +			   int (*get_trend)(void *, long *),
-> > +			   int (*set_emul_temp)(void *, unsigned
-> > long))
+> With my compiler
 > 
-> Thanks for improving the API. However, looking at what is above, it
-> starts to be pretty ugly. And for sure, this is not the last callback
-> to be added.
-
-Presumably there would be some more callbacks.
-
-> I believe it is time to add a .ops in the of-thermal.
-> While in here, do you mind adding the .ops in a separated patch, then
-> add the .set_emul_temp in the .ops field?
-
-I will add an option to pass .ops with thermal_zone_of_add_sensor().
-
-I'm only concerned a bit about testing other users of of-thermal. 
-I have only beaglebone black (BBB) for testing, which on-soc bandgap
-thermal sensor is very inaccurate and hence not supported even at BBB
-github linux kernel repository (v3.14).
-
-Because of above I would need your support for testing.
-
+> gcc version 4.8.1 (Ubuntu/Linaro 4.8.1-10ubuntu9)
 > 
-> >  {
-> >  	struct thermal_zone_device *tzd;
-> >  	struct __thermal_zone *tz;
-> > @@ -366,10 +379,12 @@ thermal_zone_of_add_sensor(struct device_node
-> > *zone, mutex_lock(&tzd->lock);
-> >  	tz->get_temp = get_temp;
-> >  	tz->get_trend = get_trend;
-> > +	tz->set_emul_temp = set_emul_temp;
-> >  	tz->sensor_data = data;
-> >  
-> >  	tzd->ops->get_temp = of_thermal_get_temp;
-> >  	tzd->ops->get_trend = of_thermal_get_trend;
-> > +	tzd->ops->set_emul_temp = of_thermal_set_emul_temp;
-> >  	mutex_unlock(&tzd->lock);
-> >  
-> >  	return tzd;
-> > @@ -411,7 +426,8 @@ thermal_zone_of_add_sensor(struct device_node
-> > *zone, struct thermal_zone_device *
-> >  thermal_zone_of_sensor_register(struct device *dev, int sensor_id,
-> >  				void *data, int (*get_temp)(void
-> > *, long *),
-> > -				int (*get_trend)(void *, long *))
-> > +				int (*get_trend)(void *, long *),
-> > +				int (*set_emul_temp)(void *,
-> > unsigned long)) {
-> >  	struct device_node *np, *child, *sensor_np;
-> >  
-> > @@ -453,7 +469,8 @@ thermal_zone_of_sensor_register(struct device
-> > *dev, int sensor_id, return thermal_zone_of_add_sensor(child,
-> > sensor_np, data,
-> >  							  get_temp,
-> > -
-> > get_trend);
-> > +
-> > get_trend,
-> > +
-> > set_emul_temp); }
-> >  	}
-> >  	of_node_put(np);
-> > @@ -494,9 +511,11 @@ void thermal_zone_of_sensor_unregister(struct
-> > device *dev, mutex_lock(&tzd->lock);
-> >  	tzd->ops->get_temp = NULL;
-> >  	tzd->ops->get_trend = NULL;
-> > +	tzd->ops->set_emul_temp = NULL;
-> >  
-> >  	tz->get_temp = NULL;
-> >  	tz->get_trend = NULL;
-> > +	tz->set_emul_temp = NULL;
-> >  	tz->sensor_data = NULL;
-> >  	mutex_unlock(&tzd->lock);
-> >  }
-> > diff --git a/include/linux/thermal.h b/include/linux/thermal.h
-> > index 0305cde..36010e9 100644
-> > --- a/include/linux/thermal.h
-> > +++ b/include/linux/thermal.h
-> > @@ -290,14 +290,16 @@ struct thermal_genl_event {
-> >  struct thermal_zone_device *
-> >  thermal_zone_of_sensor_register(struct device *dev, int id,
-> >  				void *data, int (*get_temp)(void
-> > *, long *),
-> > -				int (*get_trend)(void *, long *));
-> > +				int (*get_trend)(void *, long *),
-> > +				int (*set_emul_temp)(void *,
-> > unsigned long)); void thermal_zone_of_sensor_unregister(struct
-> > device *dev, struct thermal_zone_device *tz);
-> >  #else
-> >  static inline struct thermal_zone_device *
-> >  thermal_zone_of_sensor_register(struct device *dev, int id,
-> >  				void *data, int (*get_temp)(void
-> > *, long *),
-> > -				int (*get_trend)(void *, long *))
-> > +				int (*get_trend)(void *, long *),
-> > +				int (*set_emul_temp)(void *,
-> > unsigned long)) {
-> >  	return NULL;
-> >  }
-> > -- 
-> > 2.0.0.rc2
-> > 
+> the objdump of drivers/firmware/dmi_scan.o is identical with and
+> without the 'u32' cast.
+> 
+> If I look at the original code:
+> 
+> dmi_base = (buf[11] << 24) | (buf[10] << 16) | (buf[9] << 8) | buf[8];
+> 
+> I see a 'cltq' instruction in the dump that disappears once I add the
+> 'u32' cast (which is what we addressed by introducing the
+> get_unaligned_le32() in the 1st place)
+
+Yes, that's another mistake I made :(
+
+The story is that LKP reports this issue with an old commit:
+aacdce6e880894acb57d71dcb2e3fc61b4ed4e96("dmi: add support for SMBIOS
+3.0 64-bit entry point"), where still use the original code you showed
+above:
+
+                dmi_num = (buf[13] << 8) | buf[12];
+                dmi_len = (buf[7] << 8) | buf[6];
+                dmi_base = (buf[11] << 24) | (buf[10] << 16) |
+                        (buf[9] << 8) | buf[8];
+
+I didn't except there are two version, thus when it failed to apply the
+debug patch you gave me, I just thought you wrote the debug patch on top
+your branch, and I applied on based of the first bad commit("aacdce6e").
+
+Hence I fixed it manually and got your debug patch applied, but still
+with those original code, hence it never works.
+
+And then you ask me to do the (u32) cast, which is based on
+get_unaligned_le32(), I then changed the original code to
+get_unaligned_le16/32(), and did the cast, which works as expected, and
+I then thought the cast did work. And actually, it's the change to
+get_unaligned_le16/32() works: I double confirmed it this time, and
+that's why I didn't see such panic with your updated commits from
+efi-for-arm64(the code we used bisect is from efi-for-3.19).
 
 
+So, it's totally kind of stupid mistakes I made. Very sorry for the
+noise and for taking you guys time!
 
--- 
-Best regards,
 
-Lukasz Majewski
+	--yliu
 
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+> So, I'd happily share more objdumps, but perhaps we should find out
+> first which compiler Yuanhan has been using?
+> 
+> -- 
+> Ard.
