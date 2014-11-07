@@ -1,30 +1,38 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 7 Nov 2014 21:18:13 +0100
-Subject: [PATCH v13 4/7] arm: KVM: Add ARMv7 API to flush TLBs
-In-Reply-To: <1415320848-13813-5-git-send-email-m.smarduch@samsung.com>
-References: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
- <1415320848-13813-5-git-send-email-m.smarduch@samsung.com>
-Message-ID: <20141107201813.GA24329@cbox>
+Date: Fri, 7 Nov 2014 21:20:22 +0100
+Subject: [PATCH 1/3] arm64: ARMv8 headers changes for dirty page logging
+In-Reply-To: <1412908447-28247-2-git-send-email-m.smarduch@samsung.com>
+References: <1412908447-28247-1-git-send-email-m.smarduch@samsung.com>
+ <1412908447-28247-2-git-send-email-m.smarduch@samsung.com>
+Message-ID: <20141107202022.GF22848@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 06, 2014 at 04:40:45PM -0800, Mario Smarduch wrote:
-> This patch adds ARMv7 architecture TLB Flush function.
+On Thu, Oct 09, 2014 at 07:34:05PM -0700, Mario Smarduch wrote:
+> This patch introduces header updates for ARMv8 dirty page logging.
+
+hm, header updates,
+
+it introduces functions to write protect pages on arm64 and adds a
+prototype for blah blah blah.
+
+Perhaps you can be just slightly more explanatory in your commit
+message.
+
 > 
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 > Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 > ---
->  arch/arm/include/asm/kvm_asm.h  |    1 +
->  arch/arm/include/asm/kvm_host.h |   12 ++++++++++++
->  arch/arm/kvm/Kconfig            |    1 +
->  arch/arm/kvm/interrupts.S       |   11 +++++++++++
->  4 files changed, 25 insertions(+)
+>  arch/arm64/include/asm/kvm_asm.h       |  1 +
+>  arch/arm64/include/asm/kvm_host.h      |  1 +
+>  arch/arm64/include/asm/kvm_mmu.h       | 20 ++++++++++++++++++++
+>  arch/arm64/include/asm/pgtable-hwdef.h |  1 +
+>  4 files changed, 23 insertions(+)
 > 
-> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-> index 3a67bec..25410b2 100644
-> --- a/arch/arm/include/asm/kvm_asm.h
-> +++ b/arch/arm/include/asm/kvm_asm.h
-> @@ -96,6 +96,7 @@ extern char __kvm_hyp_code_end[];
+> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> index 9fcd54b..bb1a870 100644
+> --- a/arch/arm64/include/asm/kvm_asm.h
+> +++ b/arch/arm64/include/asm/kvm_asm.h
+> @@ -101,6 +101,7 @@ extern char __kvm_hyp_code_end[];
 >  
 >  extern void __kvm_flush_vm_context(void);
 >  extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
@@ -32,66 +40,65 @@ On Thu, Nov 06, 2014 at 04:40:45PM -0800, Mario Smarduch wrote:
 >  
 >  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
 >  #endif
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 6dfb404..fad598c 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -220,6 +220,18 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
->  	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 92242ce..5714706 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -180,6 +180,7 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+>  struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
+>  
+>  u64 kvm_call_hyp(void *hypfn, ...);
+> +void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+>  
+>  int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  		int exception_index);
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 8e138c7..8b0ffe3 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -121,6 +121,26 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+>  	pmd_val(*pmd) |= PMD_S2_RDWR;
 >  }
 >  
-> +/**
-> + * kvm_arch_flush_remote_tlbs() - flush all VM TLB entries
-
-this name is not matching the function
-
-> + * @kvm:	pointer to kvm structure.
-> + *
-> + * Interface to HYP function to flush all VM TLB entries without address
-> + * parameter.
-> + */
-> +static inline void kvm_flush_remote_tlbs(struct kvm *kvm)
+> +static inline void kvm_set_s2pte_readonly(pte_t *pte)
 > +{
-> +	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
+> +	pte_val(*pte) = (pte_val(*pte) & ~PTE_S2_RDWR) | PTE_S2_RDONLY;
 > +}
 > +
->  static inline int kvm_arch_dev_ioctl_check_extension(long ext)
->  {
->  	return 0;
-> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-> index 466bd29..a099df4 100644
-> --- a/arch/arm/kvm/Kconfig
-> +++ b/arch/arm/kvm/Kconfig
-> @@ -23,6 +23,7 @@ config KVM
->  	select HAVE_KVM_CPU_RELAX_INTERCEPT
->  	select KVM_MMIO
->  	select KVM_ARM_HOST
-> +	select HAVE_KVM_ARCH_TLB_FLUSH_ALL
->  	depends on ARM_VIRT_EXT && ARM_LPAE
->  	---help---
->  	  Support hosting virtualized guest machines. You will also
-> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-> index 01dcb0e..79caf79 100644
-> --- a/arch/arm/kvm/interrupts.S
-> +++ b/arch/arm/kvm/interrupts.S
-> @@ -66,6 +66,17 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
->  	bx	lr
->  ENDPROC(__kvm_tlb_flush_vmid_ipa)
+> +static inline bool kvm_s2pte_readonly(pte_t *pte)
+> +{
+> +	return (pte_val(*pte) & PTE_S2_RDWR) == PTE_S2_RDONLY;
+> +}
+> +
+> +static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
+> +{
+> +	pmd_val(*pmd) = (pmd_val(*pmd) & ~PMD_S2_RDWR) | PMD_S2_RDONLY;
+> +}
+> +
+> +static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
+> +{
+> +	return (pmd_val(*pmd) & PMD_S2_RDWR) == PMD_S2_RDONLY;
+> +}
+> +
+>  #define kvm_pgd_addr_end(addr, end)	pgd_addr_end(addr, end)
+>  #define kvm_pud_addr_end(addr, end)	pud_addr_end(addr, end)
+>  #define kvm_pmd_addr_end(addr, end)	pmd_addr_end(addr, end)
+> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+> index 955e8c5..21771f6 100644
+> --- a/arch/arm64/include/asm/pgtable-hwdef.h
+> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
+> @@ -87,6 +87,7 @@
+>  #define PTE_S2_RDONLY		(_AT(pteval_t, 1) << 6)   /* HAP[2:1] */
+>  #define PTE_S2_RDWR		(_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
 >  
-> +/**
-> + * void __kvm_tlb_flush_vmid(struct kvm *kvm) - Flush per-VMID TLBs
-> + *
-> + * Reuses __kvm_tlb_flush_vmid_ipa() for ARMv7, without passing address
-> + * parameter
-> + */
-> +
-> +ENTRY(__kvm_tlb_flush_vmid)
-> +	b	__kvm_tlb_flush_vmid_ipa
-> +ENDPROC(__kvm_tlb_flush_vmid)
-> +
->  /********************************************************************
->   * Flush TLBs and instruction caches of all CPUs inside the inner-shareable
->   * domain, for all VMIDs
+> +#define PMD_S2_RDONLY		(_AT(pmdval_t, 1) << 6)   /* HAP[2:1] */
+>  #define PMD_S2_RDWR		(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
+>  
+>  /*
 > -- 
-> 1.7.9.5
+> 1.9.1
 > 
+I assume you'll provide a rebased version of these once you respin the
+ARM series, but this looks overall fine to me.
+
+-Christoffer
