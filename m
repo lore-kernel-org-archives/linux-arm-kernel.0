@@ -1,75 +1,98 @@
 From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Fri, 07 Nov 2014 08:38:17 +0100
-Subject: [PATCH v13 6/7] arm: KVM: dirty log read write protect support
-In-Reply-To: <1415320848-13813-7-git-send-email-m.smarduch@samsung.com>
+Date: Fri, 07 Nov 2014 08:44:05 +0100
+Subject: [PATCH v13 3/7] KVM: x86: flush TLBs last before returning from
+ KVM_GET_DIRTY_LOG
+In-Reply-To: <1415320848-13813-4-git-send-email-m.smarduch@samsung.com>
 References: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
- <1415320848-13813-7-git-send-email-m.smarduch@samsung.com>
-Message-ID: <545C76E9.5090700@redhat.com>
+ <1415320848-13813-4-git-send-email-m.smarduch@samsung.com>
+Message-ID: <545C7845.9010103@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 On 07/11/2014 01:40, Mario Smarduch wrote:
-> Add support to track dirty pages between user space KVM_GET_DIRTY_LOG ioctl
-> calls. We call kvm_get_dirty_log_protect() function to do most of the work.
+> In the next patches, we will move parts of x86's kvm_vm_ioctl_get_dirty_log
+> implementation to generic code; leave the arch-specific code at the end,
+> similar to the existing generic function kvm_get_dirty_log.
 > 
-> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> Reviewed-by: Mario Smarduch <m.smarduch@samsung.com>
+> Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
+
+You should have a "Signed-off-by: Mario Smarduch ..." here, and you 
+should also add my authorship.  You can do the latter with "git rebase 
+-i", adding
+
+  x git commit --amend -C HEAD --author 'Paolo Bonzini <pbonzini@redhat.com>'
+
+after this patch.  If you're using a patch queue instead (quilt or
+similar) you can just edit the "From" line in the patch.
+
+I guess if you reply to the patch with just
+
+   Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+
+the ARM maintainers can do the above for you, if there's no need for
+a v14.
+
+I'll send an eighth patch to actually switch x86 to the new function.
+Again, the maintainers can apply it in the right place, but please
+include it yourself if you have to do a v14.
+
+Thanks,
+
+Paolo
+
 > ---
->  arch/arm/kvm/arm.c  |   37 +++++++++++++++++++++++++++++++++++++
->  arch/arm/kvm/mmu.c  |   22 ++++++++++++++++++++++
->  virt/kvm/kvm_main.c |    3 +--
->  3 files changed, 60 insertions(+), 2 deletions(-)
+>  arch/x86/kvm/x86.c |   22 ++++++++++------------
+>  1 file changed, 10 insertions(+), 12 deletions(-)
 > 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index a99e0cd..212d835 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -737,9 +737,46 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
->  	}
->  }
->  
-> +/**
-> + * kvm_vm_ioctl_get_dirty_log - get and clear the log of dirty pages in a slot
-> + * @kvm:	kvm instance
-> + * @log:	slot id and address to which we copy the log
-> + *
-> + * We need to keep it in mind that VCPU threads can write to the bitmap
-> + * concurrently.  So, to avoid losing data, we keep the following order for
-> + * each bit:
-> + *
-> + *   1. Take a snapshot of the bit and clear it if needed.
-> + *   2. Write protect the corresponding page.
+> diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+> index 8f1e22d..dc8e66b 100644
+> --- a/arch/x86/kvm/x86.c
+> +++ b/arch/x86/kvm/x86.c
+> @@ -3606,13 +3606,13 @@ static int kvm_vm_ioctl_reinject(struct kvm *kvm,
+>   *
+>   *   1. Take a snapshot of the bit and clear it if needed.
+>   *   2. Write protect the corresponding page.
+> - *   3. Flush TLB's if needed.
+> - *   4. Copy the snapshot to the userspace.
 > + *   3. Copy the snapshot to the userspace.
 > + *   4. Flush TLB's if needed.
-> + *
-> + * Steps 1,2,3 are handled by kvm_get_dirty_log_protect().
+>   *
+> - * Between 2 and 3, the guest may write to the page using the remaining TLB
+> - * entry.  This is not a problem because the page will be reported dirty at
+> - * step 4 using the snapshot taken before and step 3 ensures that successive
+> - * writes will be logged for the next call.
 > + * Between 2 and 4, the guest may write to the page using the remaining TLB
 > + * entry.  This is not a problem because the page is reported dirty using
 > + * the snapshot taken before and step 4 ensures that writes done after
 > + * exiting to userspace will be logged for the next call.
-> + */
+>   */
 >  int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
 >  {
-> +#ifdef CONFIG_ARM
-> +	int r;
-> +	bool is_dirty = false;
+> @@ -3661,6 +3661,10 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
+>  
+>  	spin_unlock(&kvm->mmu_lock);
+>  
+> +	r = 0;
+> +	if (copy_to_user(log->dirty_bitmap, dirty_bitmap_buffer, n))
+> +		r = -EFAULT;
 > +
-> +	mutex_lock(&kvm->slots_lock);
-> +
-> +	r = kvm_get_dirty_log_protect(kvm, log, &is_dirty);
-> +	if (r)
-> +		goto out;
-> +
-> +	if (is_dirty)
-> +		kvm_flush_remote_tlbs(kvm);
-
-Should the caller should always flush TLBs if is_dirty is true, even if
-kvm_get_dirty_log_protect reported an error?  That can happen if the
-error occurred in the final copy to userspace, after page tables have
-been modified.
-
-Of course, in this case userspace cannot use the dirty log anymore since
-it has been irrimediably trashed.
-
-Paolo
+>  	/* See the comments in kvm_mmu_slot_remove_write_access(). */
+>  	lockdep_assert_held(&kvm->slots_lock);
+>  
+> @@ -3670,12 +3674,6 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
+>  	 */
+>  	if (is_dirty)
+>  		kvm_flush_remote_tlbs(kvm);
+> -
+> -	r = -EFAULT;
+> -	if (copy_to_user(log->dirty_bitmap, dirty_bitmap_buffer, n))
+> -		goto out;
+> -
+> -	r = 0;
+>  out:
+>  	mutex_unlock(&kvm->slots_lock);
+>  	return r;
+> 
