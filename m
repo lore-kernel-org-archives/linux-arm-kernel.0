@@ -1,75 +1,89 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 07 Nov 2014 11:43:29 +0100
-Subject: [GIT PULL] ARM DT idle states updates
-In-Reply-To: <545CA1E7.5050203@linaro.org>
-References: <20141104123013.GA16832@red-moon> <545CA1E7.5050203@linaro.org>
-Message-ID: <545CA251.2040007@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 7 Nov 2014 11:45:04 +0100
+Subject: [PATCH 00/10] arm64 kexec kernel patches V5
+In-Reply-To: <CAKv+Gu9kJ6GHcPm9fa6m84gse9DQat6D54zFD0G0X9od=sYVpw@mail.gmail.com>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <20141031075209.GH3290@darkstar.nay.redhat.com>
+ <20141103194634.GA30366@leverpostej>
+ <20141106015642.GA2569@darkstar.nay.redhat.com>
+ <20141106150846.GE23706@leverpostej>
+ <CACxGe6u=J_k3XZxyiyti=i=rtW+a5xxuukg3TgOyM+ra1vAACQ@mail.gmail.com>
+ <20141107101642.GA4585@leverpostej>
+ <CAKv+Gu9kJ6GHcPm9fa6m84gse9DQat6D54zFD0G0X9od=sYVpw@mail.gmail.com>
+Message-ID: <CAKv+Gu_uOJPHw0YX_uZVbpmLo+=vhp-PURCDbUgiLXdh5w53aQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2014 11:41 AM, Daniel Lezcano wrote:
-> On 11/04/2014 01:30 PM, Lorenzo Pieralisi wrote:
->> Hi Daniel,
+On 7 November 2014 11:41, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 7 November 2014 11:16, Mark Rutland <mark.rutland@arm.com> wrote:
+>> On Fri, Nov 07, 2014 at 12:41:45AM +0000, Grant Likely wrote:
+>>> On Thu, Nov 6, 2014 at 3:08 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>> > On Thu, Nov 06, 2014 at 01:56:42AM +0000, Dave Young wrote:
+>>> >> On 11/03/14 at 07:46pm, Mark Rutland wrote:
+>>> >> > On Fri, Oct 31, 2014 at 07:52:09AM +0000, Dave Young wrote:
+>>> >> > > Hi Geoff
+>>> >> > >
+>>> >> > > I tested your patches. The macihne is using spin-table cpu enable method
+>>> >> > > so I tried maxcpus=1 as you suggested.
+>>> >> > >
+>>> >> > > There's below issues for me, thoughts?
+>>> >> > >
+>>> >> > > 1. For acpi booting there's no /proc/device-tree so kexec can not find dtb
+>>> >> > > to use.
+>>> >> >
+>>> >> > Are you absolutely certain of this?
+>>> >> >
+>>> >> > To use ACPI, you must have booted via EFI, as the only mechanism for
+>>> >> > finding the ACPI tables is via EFI. If booted via EFI, the stub will
+>>> >> > have created a stub DTB if there is no provided DTB, to pass the command
+>>> >> > line and pointers to EFI data structures. This stub DTB should be
+>>> >> > present in the usual place.
+>>> >>
+>>> >> Mark, I used kexec-tools from Geoff's git tree, it will create dtb from procfs
+>>> >> maybe I can pass external dtb to kexec-tools. What you mentioned should be true
+>>> >> though but I have not get idea how to get the dtb which kernel is using for boot
+>>> >> since it is not unflattened.
+>>> >
+>>> > Ah, sorry. I see the problem now. For ACPI you don't unflatten the tree,
+>>> > so there's nothing to expose at in sysfs/procfs.
+>>> >
+>>> > Somehow we need to unflatten the DTB without exposing it to drivers,
+>>> > such that it can be exposed to userspace in the usual place but drivers
+>>> > don't being probing based off of it.
+>>>
+>>> Is that even necessary? If the tree isn't unflattened, then it is just
+>>> a stub tree. There really isn't anything interesting in it.
 >>
->> please consider pulling the three patches below for 3.19.
+>> We need to UEFI properties [1] from /chosen to access the memory map and
+>> system table (both of which are necessary to access any ACPI tables).
 >>
->> First two are updates on idle states bindings and parsing code to add
->> states descriptions and status property, the last one is just a clean-up
->> patch, to remove leftovers from the last merge window.
->
-> Hi Lorenzo,
->
-> could you please send these three patches along with this pull request ?
-
-Please ignore. I saw the three patches :)
-
-Sorry for the noise.
-
-   -- Daniel
-
+>>> Kexec should recreate the tree from scratch in that case.
 >>
->> Thanks a lot,
->> Lorenzo
->>
->> The following changes since commit
->> 0df1f2487d2f0d04703f142813d53615d62a1da4:
->>
->>    Linux 3.18-rc3 (2014-11-02 15:01:51 -0800)
->>
->> are available in the git repository at:
->>
->>    git://linux-arm.org/linux-2.6-lp.git
->> for-upstream/dt-idle-states-updates
->>
->> for you to fetch changes up to 6e13873494078ac26862144ca2345546ca905c41:
->>
->>    drivers: cpuidle: remove cpuidle-arm64 duplicate error messages
->> (2014-11-04 12:09:27 +0000)
->>
->> ----------------------------------------------------------------
->> Lorenzo Pieralisi (3):
->>        drivers: cpuidle: add status property to ARM idle states
->>        drivers: cpuidle: add idle-state-name description to ARM idle
->> states
->>        drivers: cpuidle: remove cpuidle-arm64 duplicate error messages
->>
->>   .../devicetree/bindings/arm/idle-states.txt          | 20
->> ++++++++++++++++++++
->>   drivers/cpuidle/cpuidle-arm64.c                      | 13 ++-----------
->>   drivers/cpuidle/dt_idle_states.c                     | 10 +++++++++-
->>   3 files changed, 31 insertions(+), 12 deletions(-)
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> I'm not sure if the required information is exposed to userspace
+>> elsewhere. Ard, Leif?
 >>
 >
+> Personally, I think we should not be using /proc/device-tree at all,
+> but instead retain the original blob in some way and expose that.
+>
+> We already have /sys/firmware/efi/systab which contains the physical
+> addresses of the UEFI configuration tables. We should probably add an
+> entry for the FDT there anyway, but we would still be looking at
+> mmap(/dev/mem) to access it, which is not a practice we want to
+> encourage, I suppose.
 >
 
+Nah, strike that. The configuration table entry contains the original
+fdt, so with the device nodes etc still present. The stub makes
+changes to the DTB, and /that/ is the version we want to retain so
+subsequent kexec reboots can use it.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> Also, we *must* take the secure boot scenario into account. Booting
+> with an arbitrary user generated DTB is nice, but if you are doing
+> kexec without an initrd, for instance, it would also be nice if we
+> could just reuse the existing DTB without bothering the user for it at
+> all, which would be something we could also allow when running
+> securely.
+>
+> --
+> Ard.
