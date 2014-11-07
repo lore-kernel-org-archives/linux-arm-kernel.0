@@ -1,17 +1,35 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 07 Nov 2014 23:41:50 +0100
-Subject: [PATCH] clk: rockchip: fix rk3188 hsadc_frac definition
-In-Reply-To: <1711655.syFkKtShzb@diego>
-References: <1711655.syFkKtShzb@diego>
-Message-ID: <2190711.s3Jjdh7ccf@diego>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Sat, 08 Nov 2014 00:47:25 +0200
+Subject: [PATCH v4 10/10] [media] v4l: Forbid usage of
+ V4L2_MBUS_FMT definitions inside the kernel
+In-Reply-To: <1415377630-16564-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <545CDB8D.4080406@xs4all.nl>
+ <1415377630-16564-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <545D4BFD.6000206@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 30. Oktober 2014, 14:26:13 schrieb Heiko St?bner:
-> The arguments to COMPOSITE_FRAC for hsadc_frac were mangled, leaving out the
-> the general clock flags argument. This results in strange effects, as only
-> sometimes a zero-division is reported as the wrong register is read.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Hi Boris,
 
-I've applied this into my rockchip clock branch for 3.19
+Boris Brezillon wrote:
+> @@ -102,6 +113,7 @@ enum v4l2_mbus_pixelcode {
+>  
+>  	V4L2_MBUS_FROM_MEDIA_BUS_FMT(AHSV8888_1X32),
+>  };
+> +#endif /* __KERNEL__ */
+>  
+>  /**
+>   * struct v4l2_mbus_framefmt - frame format on the media bus
+
+Was it intended to be this way, or did I miss something? I'd put this to
+beginning of the file, as Hans suggested.
+
+With this matter sorted out, for the set:
+
+Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+
+-- 
+Kind regards,
+
+Sakari Ailus
+sakari.ailus at iki.fi
