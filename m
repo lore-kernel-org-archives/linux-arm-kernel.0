@@ -1,174 +1,159 @@
-From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
-Date: Fri, 07 Nov 2014 14:23:23 +0100
-Subject: [PATCH v4 2/4] serial: mxs-auart: use mctrl_gpio helpers for
- handling modem signals
-In-Reply-To: <201411071202.16344.marex@denx.de>
-References: <1412960007-28159-1-git-send-email-j.uzycki@elproma.com.pl>
- <201411070903.11645.marex@denx.de> <545C992B.1070004@elproma.com.pl>
- <201411071202.16344.marex@denx.de>
-Message-ID: <545CC7CB.1010107@elproma.com.pl>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri,  7 Nov 2014 14:22:44 +0100
+Subject: [PATCH v2] watchdog: at91rm9200 remove mach/ header dependency
+Message-ID: <1415366564-25408-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Remove the mach/ header dependency by including the necessary macros and taking
+the appropriate resources from the system timer.
 
-W dniu 2014-11-07 o 12:02, Marek Vasut pisze:
-> On Friday, November 07, 2014 at 11:04:27 AM, Janusz U?ycki wrote:
->> W dniu 2014-11-07 o 09:03, Marek Vasut pisze:
->>> On Friday, November 07, 2014 at 02:34:31 AM, Huang Shijie wrote:
->>>> why change them to gpio?
-> +CC Alexandre, since he might be interested :-)
+Also change the name to avoid conflicting with the at91sam9 watchdog driver and
+allow to compile both the at91rm920 and at91sam9 watchdog drivers at the same
+time.
 
-:)
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
 
->
->> Hardware RTS/CTS lines can be occupied by RX/TX of other AUART port
->> in order to obtain as much uarts as possible using i.mx283.
->> Therefore gpios can be used for "hardware" flow control.
-> Your logic is outright flawed here, the first sentence doesn't implicate the
-> second sentence. In fact, those two are completely unrelated.
+Changes in v2:
+ - squashed both patches in one
+ - added suggested-by and acked-by Arnd
 
-I didn't write MUST but CAN. There is a choice. Is flexibility of the 
-driver disadvantage?
+ arch/arm/mach-at91/at91rm9200_devices.c | 13 ++++++++--
+ drivers/watchdog/Kconfig                |  4 +--
+ drivers/watchdog/at91rm9200_wdt.c       | 45 +++++++++++++++++++++++++++++++--
+ 3 files changed, 56 insertions(+), 6 deletions(-)
 
->>>>     If we change them to gpio.  Could the DMA still
->>>>
->>>> works fine?
->>>> did you test the DMA with this patch?
->>>>
->>>> Add Marek for this patch too.
->>> I didn't look too deep into the patch, so here's just my experience:
->>>
->>> 1) The AUART block signals and GPIO block signals are not sychronised
->>> using the
->>>
->>>      same clock. Therefore, the latency between toggling of the AUART
->>>      lines and the GPIO-driven pins will not be deterministic and will
->>>      vary. There might be a way to approximate that, but that's
->>>      definitelly not a reliable solution.
->>>      
->>>      This is very bad for example if you drive RS485 DIR line with the RTS
->>>      pin as a GPIO ; the RTS pin will toggle at non-deterministic time
->>>      compared to the end of UART transmission. This will trigger bit-loss
->>>      on the RS485 line and you just don't want that.
->>>
->>> 2) Speaking of RS485, there's [1] and [2]. which I believe apply to any
->>> combo
->>>
->>>      of UART+GPIO toggling.
->>>
->>> So I hate to bring the bad news , but UART+GPIO combo toggling is really
->>> a bad bad idea.
->> Unfortunately if hardware is limited there is no choice and UART+GPIO is
->> necessary.
-> You will run into timing problems (see above).
-
-A lot of 8250-compatible devices has no hardware flow control and in 
-most cases
-they works and it is enough even for 115200 speed if CTS is handled by irq.
-So it depends on your needs.
-
->
-> What you're proposing here is a workaround for broken hardware, which was proven
-> to be a bad idea and NAK'd already multiple times in the past (please see the
-> links I posted in my last email).
-
-It is not broken  hardware - rather limited to lower speeds but still 
-very useful solution.
-
->> Your experience confirms the discussion [3] with Russell King. DMA
->> should be disabled and
->> the patch disables DMA support in mxs_auart_init_gpios() if RTS or CTS
->> line is set as gpio.
-> DMA has nothing to do with those problems here. DMA can be safely ignored
-> for the purpose of the discussion altogether.
-
-When gpios are used for RTS/CTS DMA is not used. However DMA is related 
-due to the driver
-and "fsl,uart-has-rtscts". If you look into code of the driver you 
-should agree.
-
->
-> Like I explained already -- the problem is with the GPIO and AUART block not
-> being synchronised by the same clock. It is therefore impossible to predict
-> and control when the GPIO signals and the AUART signals will toggle in relation
-> to one another.
->
->> So I didn't test the patch with the DMA - I've just disabled it.
-> This would break the driver for pretty much everyone using higher baud rates.
-
-NO, there is a choice. If you don't use RTS/CTS as GPIO DMA isn't enabled.
-It seems you didn't read neither the patch nor the driver's code and
-analized only the sentence.
-
->
->> The question is different. The driver supports the cases for RTS/CTS:
->> 1)  both RTS/CTS assigned to hardware AUART (pinmux configured by DT,
->>        DT sets fsl,uart-has-rtscts)
->>       a) settermios() sets CRTSCTS: DMA enabled, auto RTS/CTS is enabled
->>       b) settermios() doesn't set CRTSCTS: DMA disabled, RTS/CTS
->> controlled by get/set_mctrl()
->> 2)  both RTS/CTS assigned to hardware AUART (pinmux configured by DT,
->>        DT doesn't set fsl,uart-has-rtscts)
->>       a) settermios() sets CRTSCTS: DMA disabled, auto RTS/CTS is enabled
->>       b) settermios() doesn't set CRTSCTS: DMA disabled, RTS/CTS
->> controlled by get/set_mctrl()
->>
->> and after the patch it is more complex (because of mixed cases):
->> 3) both RTS/CTS assigned to gpios (DT sets or not fsl,uart-has-rtscts):
->>       the patch cancels fsl,uart-has-rtscts flag to disable DMA support,
->>       settermios() sets or not CRTSCTS: DMA disabled, RTS/CTS controlled
->> by get/set_mctrl(),
->>       both lines by gpios. In addition:
->>       a) settermios() doesn't set CRTSCTS: RTS of hardware AUART is also
->> controlled but
->>           the case assumes it is not selected by pinmux in DT
->>       b) settermios() sets CRTSCTS: auto RTS of hardware AUART is also
->> enabled but
->>           the case assumes it is not selected by pinmux in DT
->> 4) RTS assigned to hardware AUART (pinmux configured by DT,
->> fsl,uart-has-rtscts set or not),
->>       CTS assigned to gpio: the patch cancels fsl,uart-has-rtscts flag to
->> disable DMA support,
->>       a) settermios() doesn't set CRTSCTS: DMA disabled, CTS (as gpio)
->> read by get_mctrl(),
->>           RTS of hardware AUART controlled by set_mctrl()
->>       b) settermios() sets CRTSCTS: DMA disabled, CTS (as gpio) read by
->> get_mctrl(),
->>          auto RTS is enabled
->>      So case 4) is exactly 3) case with just different pinmux
->> configuration and the patch
->>      threats 3) and 4) as the same case.
->> 5) CTS assigned to hardware AUART (pinmux configured by DT,
->> fsl,uart-has-rtscts set or not),
->>       RTS assigned to gpio: the patch cancels fsl,uart-has-rtscts flag to
->> disable DMA support,
->>       a) settermios() doesn't set CRTSCTS: DMA disabled, CTS of hardware
->> AUART read by
->>           get_mctrl(), RTS (as gpio) controlled by set_mctrl(), in
->> addition RTS of hardware AUART
->>           is also controlled but the case assumes it is not selected by
->> pinmux in DT
->>       b) settermios() sets CRTSCTS: DMA disabled, auto RTS/CTS is enabled
->> but RTS is controlled by set_mctrl() as gpio because the case assumes it
->> is not selected
->>           by pinmux in DT
->>
->> It is not nice description but I hadn't idea how to write it more clear.
->> The mixed cases 4) and 5) are likely not so useful but possible and not
->> so expensive
->> to support.
->> Now the question: "fsl,uart-has-rtscts" name seems to be misleading now,
->> do you agree? It rather should include "dma" word in the name. Any
->> suggestion?
->>
->> [3] http://thread.gmane.org/gmane.linux.serial/16069/focus=16077
-> The best suggestion I can give you is to fix your hardware early, before you
-> run into nasty deep s.....tuff. These workarounds do not work and they will
-> bit you later on, when it's hard to fix the hardware anymore.
-The speed is limited but why don't you accept SW-HW mixed solutions?
-Exactly the same method is accepted for 8250.
-It is good to have choice than not. We can comment that speed is limited
-for gpio-based hardware flow control. So please, rethink again.
-
-best regards
-Janusz
+diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
+index 74f1eaf97801..4add0481adab 100644
+--- a/arch/arm/mach-at91/at91rm9200_devices.c
++++ b/arch/arm/mach-at91/at91rm9200_devices.c
+@@ -719,10 +719,19 @@ static void __init at91_add_device_rtc(void) {}
+  * -------------------------------------------------------------------- */
+ 
+ #if defined(CONFIG_AT91RM9200_WATCHDOG) || defined(CONFIG_AT91RM9200_WATCHDOG_MODULE)
++static struct resource wdt_resources[] = {
++	[0] = {
++		.start	= AT91RM9200_BASE_ST,
++		.end	= AT91RM9200_BASE_ST + SZ_256 - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
+ static struct platform_device at91rm9200_wdt_device = {
+-	.name		= "at91_wdt",
++	.name		= "at91rm9200_wdt",
+ 	.id		= -1,
+-	.num_resources	= 0,
++	.resource	= wdt_resources,
++	.num_resources	= 1,
+ };
+ 
+ static void __init at91_add_device_watchdog(void)
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index d0107d424ee4..0592db68f3a8 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -154,14 +154,14 @@ config ARM_SP805_WATCHDOG
+ 
+ config AT91RM9200_WATCHDOG
+ 	tristate "AT91RM9200 watchdog"
+-	depends on ARCH_AT91RM9200
++	depends on ARCH_AT91 || COMPILE_TEST
+ 	help
+ 	  Watchdog timer embedded into AT91RM9200 chips. This will reboot your
+ 	  system when the timeout is reached.
+ 
+ config AT91SAM9X_WATCHDOG
+ 	tristate "AT91SAM9X / AT91CAP9 watchdog"
+-	depends on ARCH_AT91 && !ARCH_AT91RM9200
++	depends on ARCH_AT91
+ 	select WATCHDOG_CORE
+ 	help
+ 	  Watchdog timer embedded into AT91SAM9X and AT91CAP9 chips. This will
+diff --git a/drivers/watchdog/at91rm9200_wdt.c b/drivers/watchdog/at91rm9200_wdt.c
+index dee6cc21d270..776cb3b313d9 100644
+--- a/drivers/watchdog/at91rm9200_wdt.c
++++ b/drivers/watchdog/at91rm9200_wdt.c
+@@ -26,11 +26,28 @@
+ #include <linux/uaccess.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+-#include <mach/at91_st.h>
++#include <linux/of_address.h>
+ 
+ #define WDT_DEFAULT_TIME	5	/* seconds */
+ #define WDT_MAX_TIME		256	/* seconds */
+ 
++static void __iomem *at91_st_base;
++
++#define at91_st_read(field) \
++	readl(at91_st_base + field)
++
++#define at91_st_write(field, value) \
++	writel(value, at91_st_base + field)
++
++#define AT91_ST_CR	0x00		/* Control Register */
++#define AT91_ST_WDRST	(1 << 0)	/* Watchdog Timer Restart */
++
++#define AT91_ST_WDMR	0x08		/* Watchdog Mode Register */
++#define AT91_ST_WDV	(0xffff <<  0)	/* Watchdog Counter Value */
++#define AT91_ST_RSTEN	(1	<< 16)	/* Reset Enable */
++#define AT91_ST_EXTEN	(1	<< 17)	/* External Signal Assertion Enable */
++
++
+ static int wdt_time = WDT_DEFAULT_TIME;
+ static bool nowayout = WATCHDOG_NOWAYOUT;
+ 
+@@ -201,14 +218,38 @@ static struct miscdevice at91wdt_miscdev = {
+ 	.fops		= &at91wdt_fops,
+ };
+ 
++static struct of_device_id at91rm9200_st_timer_ids[] = {
++	{ .compatible = "atmel,at91rm9200-st" },
++	{ /* sentinel */ }
++};
++
+ static int at91wdt_probe(struct platform_device *pdev)
+ {
++	struct resource *regs;
++	struct resource _regs;
+ 	int res;
+ 
+ 	if (at91wdt_miscdev.parent)
+ 		return -EBUSY;
+ 	at91wdt_miscdev.parent = &pdev->dev;
+ 
++	if (pdev->dev.of_node) {
++		struct device_node *np;
++
++		np = of_find_matching_node(NULL, at91rm9200_st_timer_ids);
++		if (!np)
++			return -ENXIO;
++		if (of_address_to_resource(np, 0, &_regs))
++			return -ENXIO;
++		regs = &_regs;
++	} else {
++		regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	}
++
++	at91_st_base = devm_ioremap_resource(&pdev->dev, regs);
++	if (!at91_st_base)
++		return -ENXIO;
++
+ 	res = misc_register(&at91wdt_miscdev);
+ 	if (res)
+ 		return res;
+@@ -267,7 +308,7 @@ static struct platform_driver at91wdt_driver = {
+ 	.suspend	= at91wdt_suspend,
+ 	.resume		= at91wdt_resume,
+ 	.driver		= {
+-		.name	= "at91_wdt",
++		.name	= "at91rm9200_wdt",
+ 		.owner	= THIS_MODULE,
+ 		.of_match_table = at91_wdt_dt_ids,
+ 	},
+-- 
+2.1.0
