@@ -1,118 +1,173 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 7 Nov 2014 17:09:33 +0100
-Subject: [PATCH v3 01/10] [media] Move mediabus format definition to a
- more standard place
-In-Reply-To: <20141107152416.GC3136@valkosipuli.retiisi.org.uk>
-References: <1415369269-5064-1-git-send-email-boris.brezillon@free-electrons.com>
- <1415369269-5064-2-git-send-email-boris.brezillon@free-electrons.com>
- <20141107152416.GC3136@valkosipuli.retiisi.org.uk>
-Message-ID: <20141107170933.20234344@bbrezillon>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 7 Nov 2014 17:15:46 +0100
+Subject: [PATCH v3 19/19] arm/arm64: KVM: allow userland to request a
+ virtual GICv3
+In-Reply-To: <1414776414-13426-20-git-send-email-andre.przywara@arm.com>
+References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
+ <1414776414-13426-20-git-send-email-andre.przywara@arm.com>
+Message-ID: <20141107161546.GU16132@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sakari,
+On Fri, Oct 31, 2014 at 05:26:54PM +0000, Andre Przywara wrote:
+> With everything in place we allow userland to request the kernel
+> using a virtual GICv3 in the guest, which finally lifts the 8 vCPU
+> limit for a guest.
 
-On Fri, 7 Nov 2014 17:24:16 +0200
-Sakari Ailus <sakari.ailus@iki.fi> wrote:
+You're actually not explicitly allowing this in this patch, you're
+implicitly allowing it because init would fail without the vgic
+distributor base address being set already.
 
-> Hi Boris,
-> 
-> On Fri, Nov 07, 2014 at 03:07:40PM +0100, Boris Brezillon wrote:
-> > Define MEDIA_BUS_FMT macros (re-using the values defined in the
-> > v4l2_mbus_pixelcode enum) into a separate header file so that they can be
-> > used from the DRM/KMS subsystem without any reference to the V4L2
-> > subsystem.
-> > 
-> > Then set V4L2_MBUS_FMT definitions to the MEDIA_BUS_FMT values using the
-> > V4L2_MBUS_FROM_MEDIA_BUS_FMT macro.
-> > 
-> > Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> >  include/uapi/linux/Kbuild             |   1 +
-> >  include/uapi/linux/media-bus-format.h | 125 +++++++++++++++++++++++
-> >  include/uapi/linux/v4l2-mediabus.h    | 184 +++++++++++++++-------------------
-> >  3 files changed, 206 insertions(+), 104 deletions(-)
-> >  create mode 100644 include/uapi/linux/media-bus-format.h
-> > 
-> > diff --git a/include/uapi/linux/Kbuild b/include/uapi/linux/Kbuild
-> > index b70237e..ed39ac8 100644
-> > --- a/include/uapi/linux/Kbuild
-> > +++ b/include/uapi/linux/Kbuild
-> > @@ -241,6 +241,7 @@ header-y += map_to_7segment.h
-> >  header-y += matroxfb.h
-> >  header-y += mdio.h
-> >  header-y += media.h
-> > +header-y += media-bus-format.h
-> >  header-y += mei.h
-> >  header-y += memfd.h
-> >  header-y += mempolicy.h
-> > diff --git a/include/uapi/linux/media-bus-format.h b/include/uapi/linux/media-bus-format.h
-> > new file mode 100644
-> > index 0000000..23b4090
+Either re-arrange your patches or fix the commit message.
 
-[...]
+> Also we provide the necessary support for guests setting the memory
+> addresses for the virtual distributor and redistributors.
+> This requires some userland code to make use of that feature and
+> explicitly ask for a virtual GICv3.
 
-> > +/* Vendor specific formats - next is	0x5002 */
-> > +
-> > +/* S5C73M3 sensor specific interleaved UYVY and JPEG */
-> > +#define MEDIA_BUS_FMT_S5C_UYVY_JPEG_1X8		0x5001
-> > +
-> > +/* HSV - next is	0x6002 */
-> > +#define MEDIA_BUS_FMT_AHSV8888_1X32		0x6001
-> > +
-> > +#endif /* __LINUX_MEDIA_BUS_FORMAT_H */
-> > diff --git a/include/uapi/linux/v4l2-mediabus.h b/include/uapi/linux/v4l2-mediabus.h
-> > index 1445e85..3d87db7 100644
-> > --- a/include/uapi/linux/v4l2-mediabus.h
-> > +++ b/include/uapi/linux/v4l2-mediabus.h
-> > @@ -13,118 +13,94 @@
-> >  
-> >  #include <linux/types.h>
-> >  #include <linux/videodev2.h>
-> > +#include <linux/media-bus-format.h>
-> 
-> Alphabetical order, please.
-
-I'll fix that.
+You need to add documentation for this new device type and the userspace
+ABI.
 
 > 
-> >  
-> > -/*
-> > - * These pixel codes uniquely identify data formats on the media bus. Mostly
-> > - * they correspond to similarly named V4L2_PIX_FMT_* formats, format 0 is
-> > - * reserved, V4L2_MBUS_FMT_FIXED shall be used by host-client pairs, where the
-> > - * data format is fixed. Additionally, "2X8" means that one pixel is transferred
-> > - * in two 8-bit samples, "BE" or "LE" specify in which order those samples are
-> > - * transferred over the bus: "LE" means that the least significant bits are
-> > - * transferred first, "BE" means that the most significant bits are transferred
-> > - * first, and "PADHI" and "PADLO" define which bits - low or high, in the
-> > - * incomplete high byte, are filled with padding bits.
-> > - *
-> > - * The pixel codes are grouped by type, bus_width, bits per component, samples
-> > - * per pixel and order of subsamples. Numerical values are sorted using generic
-> > - * numerical sort order (8 thus comes before 10).
-> > - *
-> > - * As their value can't change when a new pixel code is inserted in the
-> > - * enumeration, the pixel codes are explicitly given a numerical value. The next
-> > - * free values for each category are listed below, update them when inserting
-> > - * new pixel codes.
-> > - */
-> > -enum v4l2_mbus_pixelcode {
-> > -	V4L2_MBUS_FMT_FIXED = 0x0001,
-> > +#define V4L2_MBUS_FROM_MEDIA_BUS_FMT(name)	\
-> > +	MEDIA_BUS_FMT_ ## name = V4L2_MBUS_FMT_ ## name
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  arch/arm64/include/uapi/asm/kvm.h |    7 ++++++
+>  include/kvm/arm_vgic.h            |    4 ++--
+>  virt/kvm/arm/vgic-v3-emul.c       |    3 +++
+>  virt/kvm/arm/vgic.c               |   46 ++++++++++++++++++++++++++-----------
+>  4 files changed, 45 insertions(+), 15 deletions(-)
 > 
-> Could you add a comment telling these values should no longer be changed?
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index 8e38878..2ed873a 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -78,6 +78,13 @@ struct kvm_regs {
+>  #define KVM_VGIC_V2_DIST_SIZE		0x1000
+>  #define KVM_VGIC_V2_CPU_SIZE		0x2000
+>  
+> +/* Supported VGICv3 address types  */
+> +#define KVM_VGIC_V3_ADDR_TYPE_DIST	2
+> +#define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
+> +
+> +#define KVM_VGIC_V3_DIST_SIZE		SZ_64K
+> +#define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
+> +
+>  #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+>  #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+>  #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index c303083..e2e432c 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -35,8 +35,8 @@
+>  #define VGIC_MAX_IRQS		1024
+>  
+>  /* Sanity checks... */
+> -#if (KVM_MAX_VCPUS > 8)
+> -#error	Invalid number of CPU interfaces
+> +#if (KVM_MAX_VCPUS > 255)
+> +#error Too many KVM VCPUs, the VGIC only supports up to 255 VCPUs for now
 
-I'll add this comment in patch 10 as suggested by Hans.
+what happens now if you add more vcpus after having created a GICv2 with
+8 vcpus?
 
-Regards,
+>  #endif
+>  
+>  #if (VGIC_NR_IRQS_LEGACY & 31)
+> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+> index bcb5374..ba6b0b5 100644
+> --- a/virt/kvm/arm/vgic-v3-emul.c
+> +++ b/virt/kvm/arm/vgic-v3-emul.c
+> @@ -870,6 +870,9 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+>  		case KVM_VGIC_V2_ADDR_TYPE_DIST:
+>  		case KVM_VGIC_V2_ADDR_TYPE_CPU:
+>  			return -ENXIO;
+> +		case KVM_VGIC_V3_ADDR_TYPE_DIST:
+> +		case KVM_VGIC_V3_ADDR_TYPE_REDIST:
+> +			return 0;
+>  		}
+>  		break;
+>  	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 16d7c9d..a5abef1 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1647,7 +1647,7 @@ static int vgic_ioaddr_assign(struct kvm *kvm, phys_addr_t *ioaddr,
+>  /**
+>   * kvm_vgic_addr - set or get vgic VM base addresses
+>   * @kvm:   pointer to the vm struct
+> - * @type:  the VGIC addr type, one of KVM_VGIC_V2_ADDR_TYPE_XXX
+> + * @type:  the VGIC addr type, one of KVM_VGIC_V[23]_ADDR_TYPE_XXX
+>   * @addr:  pointer to address value
+>   * @write: if true set the address in the VM address space, if false read the
+>   *          address
+> @@ -1661,29 +1661,49 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+>  {
+>  	int r = 0;
+>  	struct vgic_dist *vgic = &kvm->arch.vgic;
+> +	int type_needed;
+> +	phys_addr_t *addr_ptr, block_size;
+>  
+>  	mutex_lock(&kvm->lock);
+>  	switch (type) {
+>  	case KVM_VGIC_V2_ADDR_TYPE_DIST:
+> -		if (write) {
+> -			r = vgic_ioaddr_assign(kvm, &vgic->vgic_dist_base,
+> -					       *addr, KVM_VGIC_V2_DIST_SIZE);
+> -		} else {
+> -			*addr = vgic->vgic_dist_base;
+> -		}
+> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
+> +		addr_ptr = &vgic->vgic_dist_base;
+> +		block_size = KVM_VGIC_V2_DIST_SIZE;
+>  		break;
+>  	case KVM_VGIC_V2_ADDR_TYPE_CPU:
+> -		if (write) {
+> -			r = vgic_ioaddr_assign(kvm, &vgic->vgic_cpu_base,
+> -					       *addr, KVM_VGIC_V2_CPU_SIZE);
+> -		} else {
+> -			*addr = vgic->vgic_cpu_base;
+> -		}
+> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
+> +		addr_ptr = &vgic->vgic_cpu_base;
+> +		block_size = KVM_VGIC_V2_CPU_SIZE;
+>  		break;
+> +#ifdef CONFIG_ARM_GIC_V3
+> +	case KVM_VGIC_V3_ADDR_TYPE_DIST:
+> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
+> +		addr_ptr = &vgic->vgic_dist_base;
+> +		block_size = KVM_VGIC_V3_DIST_SIZE;
+> +		break;
+> +	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
+> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
+> +		addr_ptr = &vgic->vgic_redist_base;
+> +		block_size = KVM_VGIC_V3_REDIST_SIZE;
+> +		break;
+> +#endif
+>  	default:
+>  		r = -ENODEV;
+> +		goto out;
+> +	}
+> +
+> +	if (vgic->vgic_model != type_needed) {
+> +		r = -ENODEV;
+> +		goto out;
+>  	}
+>  
+> +	if (write)
+> +		r = vgic_ioaddr_assign(kvm, addr_ptr, *addr, block_size);
+> +	else
+> +		*addr = *addr_ptr;
+> +
+> +out:
+>  	mutex_unlock(&kvm->lock);
+>  	return r;
+>  }
+> -- 
+> 1.7.9.5
+> 
 
-Boris
+Otherwise looks good to me.
 
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks,
+-Christoffer
