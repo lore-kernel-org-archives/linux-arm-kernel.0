@@ -1,73 +1,79 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri,  7 Nov 2014 11:57:42 +0000
-Subject: [PATCH 00/13] Add stih410 SoC and USB2/1.1 support
-Message-ID: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
+Date: Fri,  7 Nov 2014 11:57:43 +0000
+Subject: [PATCH 01/13] ARM: STi: DT: STiH416: Add pinctl setup for usb
+ controllers.
+In-Reply-To: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
+References: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1415361475-6218-2-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds the required pin config for all usb controllers
+on the stih416.
 
-This series adds the required device tree nodes to enable the usb2/1.1 phy
-and usb2/1.1 controllers on the stih416-b2120 board.
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+---
+ arch/arm/boot/dts/stih416-pinctrl.dtsi | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-It additionally re-works and adds support for the new stih410 SoC which is
-very similar to the stih407 SoC, by abstracting out the common parts
-into common dt files. It also then adds the dt nodes to enable usb2/1.1 
-for the stih410 platform as well.
-
-As well as adding dt nodes it also enables the relevant drivers in the 
-mult7_v7_defconfig.
-
-Finally we update the default bootargs for stih407-b2120 and stih410-b2120
-to boot with the clk_ignore_unused kernel parameter so as not to hang
-the SoC when the (as yet) unreferenced interconnect clocks get disabled
-by CCF (this is a tempoary solution).
-
-This series has been tested on stih416-b2020 and stih410-b2120 SoC/boards.
-
-regards,
-
-Peter.
-
-Peter Griffin (13):
-  ARM: STi: DT: STiH416: Add pinctl setup for usb controllers.
-  ARM: STi: DT: STiH416: Add DT node for the stih415/6 usb2 phy
-  ARM: STi: DT: STiH416: Add DT nodes for the ehci and ohci usb
-    controllers.
-  ARM: multi_v7_defconfig: Enable st ohci and ehci HCD drivers.
-  ARM: multi_v7_defconfig: Enable stih415/6 usb2 phy driver.
-  ARM: multi_v7_defconfig: Enable stih407 usb picophy
-  ARM: STi: DT: STiH407: Add usb2 picophy dt nodes
-  ARM: STi: DT: STiH410: Add defines for STiH410 DT clocks
-  ARM: STi: DT: STiH410:  Add pinctl config for usb controllers.
-  ARM: STi: DT: STih410: Add dt nodes for the ehci / ohci usb
-    controllers.
-  ARM: STi: DT: STih407: Abstract common dt nodes into shared files.
-  ARM: STi: DT: STiH410: Add STiH410 SoC clock support.
-  ARM: STi: DT: STih407: Add clk_ignore_unused to kernel bootargs
-
- arch/arm/boot/dts/Makefile               |   1 +
- arch/arm/boot/dts/stih407-b2120.dts      |  67 +-----
- arch/arm/boot/dts/stih407-family.dtsi    | 384 +++++++++++++++++++++++++++++++
- arch/arm/boot/dts/stih407-pinctrl.dtsi   |  18 ++
- arch/arm/boot/dts/stih407.dtsi           | 279 ----------------------
- arch/arm/boot/dts/stih410-b2120.dts      |  42 ++++
- arch/arm/boot/dts/stih410-clock.dtsi     | 338 +++++++++++++++++++++++++++
- arch/arm/boot/dts/stih416-b2020.dts      |   4 +
- arch/arm/boot/dts/stih416-b2020e.dts     |   4 +
- arch/arm/boot/dts/stih416-pinctrl.dtsi   |  34 +++
- arch/arm/boot/dts/stih416.dtsi           | 153 ++++++++++++
- arch/arm/boot/dts/stih41x-b2020.dtsi     |  12 +
- arch/arm/boot/dts/stihxxx-b2120.dtsi     |  73 ++++++
- arch/arm/configs/multi_v7_defconfig      |   4 +
- include/dt-bindings/clock/stih410-clks.h |  24 ++
- 15 files changed, 1094 insertions(+), 343 deletions(-)
- create mode 100644 arch/arm/boot/dts/stih407-family.dtsi
- delete mode 100644 arch/arm/boot/dts/stih407.dtsi
- create mode 100644 arch/arm/boot/dts/stih410-b2120.dts
- create mode 100644 arch/arm/boot/dts/stih410-clock.dtsi
- create mode 100644 arch/arm/boot/dts/stihxxx-b2120.dtsi
- create mode 100644 include/dt-bindings/clock/stih410-clks.h
-
+diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
+index c2025bc..9cccf2d 100644
+--- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
+@@ -147,6 +147,15 @@
+ 				};
+ 			};
+ 
++			usb {
++				pinctrl_usb3: usb3 {
++					st,pins {
++						oc-detect = <&pio40 0 ALT1 IN>;
++						pwr-enable = <&pio40 1 ALT1 OUT>;
++					};
++				};
++			};
++
+ 			sbc_i2c1 {
+ 				pinctrl_sbc_i2c1_default: sbc_i2c1-default {
+ 					st,pins {
+@@ -318,6 +327,16 @@
+ 				};
+ 			};
+ 
++			usb {
++				pinctrl_usb0: usb0 {
++					st,pins {
++						oc-detect = <&pio9 4 ALT1 IN>;
++						pwr-enable = <&pio9 5 ALT1 OUT>;
++					};
++				};
++			};
++
++
+ 			i2c1 {
+ 				pinctrl_i2c1_default: i2c1-default {
+ 					st,pins {
+@@ -506,6 +525,21 @@
+ 					};
+ 				};
+ 			};
++
++			usb {
++				pinctrl_usb1: usb1 {
++					st,pins {
++						oc-detect = <&pio18 0 ALT1 IN>;
++						pwr-enable = <&pio18 1 ALT1 OUT>;
++					};
++				};
++				pinctrl_usb2: usb2 {
++					st,pins {
++						oc-detect = <&pio18 2 ALT1 IN>;
++						pwr-enable = <&pio18 3 ALT1 OUT>;
++					};
++				};
++			};
+ 		};
+ 
+ 		pin-controller-fvdp-fe {
 -- 
 1.9.1
