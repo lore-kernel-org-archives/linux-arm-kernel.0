@@ -1,163 +1,327 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Fri, 7 Nov 2014 12:06:32 -0400
-Subject: [PATCH 03/21] thermal: of: Extend of-thermal.c to provide number
- of non critical trip points
-In-Reply-To: <20141107110551.5316836f@amdc2363>
-References: <1412872737-624-1-git-send-email-l.majewski@samsung.com>
- <1412872737-624-4-git-send-email-l.majewski@samsung.com>
- <20141107014152.GD10180@developer>
- <20141107110551.5316836f@amdc2363>
-Message-ID: <20141107160630.GA23549@developer>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 7 Nov 2014 17:07:35 +0100
+Subject: [PATCH v3 18/19] arm/arm64: KVM: enable kernel side of GICv3
+ emulation
+In-Reply-To: <1414776414-13426-19-git-send-email-andre.przywara@arm.com>
+References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
+ <1414776414-13426-19-git-send-email-andre.przywara@arm.com>
+Message-ID: <20141107160735.GT16132@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 31, 2014 at 05:26:53PM +0000, Andre Przywara wrote:
+> With all the necessary GICv3 emulation code in place, we can now
+> connect the code to the GICv3 backend in the kernel.
+> The LR register handling is different depending on the emulated GIC
+> model, so provide different implementations for each.
+> Also allow non-v2-compatible GICv3 implementations (which don't
+> provide MMIO regions for the virtual CPU interface in the DT), but
+> restrict those hosts to use GICv3 guests only.
 
-Hello Lukasz,
-
-On Fri, Nov 07, 2014 at 11:05:51AM +0100, Lukasz Majewski wrote:
-> Hi Eduardo,
-> 
-> > On Thu, Oct 09, 2014 at 06:38:39PM +0200, Lukasz Majewski wrote:
-> > > This patch extends the of-thermal.c to provide information about
-> > > number of available non critical (i.e. non HW) trip points in the
-> > > system.
-> > > 
-> > > Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
-> > > ---
-> > >  drivers/thermal/of-thermal.c   | 12 ++++++++++++
-> > >  drivers/thermal/thermal_core.h |  5 +++++
-> > >  2 files changed, 17 insertions(+)
-> > > 
-> > > diff --git a/drivers/thermal/of-thermal.c
-> > > b/drivers/thermal/of-thermal.c index 23c8d6c..cd74e64 100644
-> > > --- a/drivers/thermal/of-thermal.c
-> > > +++ b/drivers/thermal/of-thermal.c
-> > > @@ -128,6 +128,18 @@ int of_thermal_is_trip_en(struct
-> > > thermal_zone_device *tz, int trip) return 1;
-> > >  }
-> > >  
-> > > +int of_thermal_get_non_crit_ntrips(struct thermal_zone_device *tz)
-> > > +{
-> > > +	struct __thermal_zone *data = tz->devdata;
-> > > +	int i;
-> > > +
-> > > +	for (i = 0; i < data->ntrips; i++)
-> > > +		if (data->trips[i].type != THERMAL_TRIP_CRITICAL)
-> > > +			continue;
-> > > +
-> > > +	return --i;
-> > > +}
-> > > +
-> > 
-> > 
-> > 
-> > I am not against this addition. But looks like we start to spread some
-> > specific APIs that may not be used to other drivers.
-> 
-> Why do you think that this is a specific API? In the thermal OF we can
-> define trip point as "active", "passive", "hot" and "critical".
-> 
-> With the first three we can handle them and properly react. For the last
-> one SoC's PMU will power down the board.
-> 
-> Do you know if any board (e.g. from TI) is NOT supposed to shut down
-> when "critical" temperature is passed?
-> 
-
-So, my point is not really about the usage of trip points. It is just
-that the of-thermal  API will grow with in a wide way with specific
-functions to check some property on the trip point array. And not all
-drivers may be using these function, e.g. the above proposal.
-
-> The real problem here is the accessibility to __thermal_trip and
-> __thermal_bind arrays.
-> 
-> Use case:
-> In the Exynos driver we do need to initialize TMU registers with
-> threshold temperatures.
-> The temperature is read via tz->ops->get_trip_temp() [1] (from
-> of-thermal.c).
-> Unfortunately, the current API is not exporting the number of
-> non-critical trip points to know how many times call [1].
-> Of course we could by hand instantiate [1] n times, but this looks for
-> me a bit clumsy.
-
-
-I understand your use case. My point was simply that this use case may
-be specific to your driver (or few drivers).
-> 
-> Additionally, we now have implicit assumption about the order of defined
-> temperatures for trip points, but I think this is not a big issue.
-> 
-> > Maybe having a
-> > single API to provide a read-only copy the list / array of trips might
-> > be a better approach. I will think of a better way.
-> 
-> Definitely. Exporting available trip points is crucial.
-> 
-
-Yeah, I think it is the best thing to do. Share a read-only array / copy
-of the needed data, and then drivers would check what ever property they
-need from the array. Just make sure you document that this is a
-read-only array (i.e. any possible change they do, won't affect the
-original array).
-
-> > 
-> > I also request you to document it accordingly.
-> 
-> Ok, I will do that.
-
-Cool!
-
-
+s/use/support/
 
 > 
-> > 
-> > 
-> > >  static int of_thermal_get_trend(struct thermal_zone_device *tz,
-> > > int trip, enum thermal_trend *trend)
-> > >  {
-> > > diff --git a/drivers/thermal/thermal_core.h
-> > > b/drivers/thermal/thermal_core.h index ed8ff05..334a7be 100644
-> > > --- a/drivers/thermal/thermal_core.h
-> > > +++ b/drivers/thermal/thermal_core.h
-> > > @@ -83,6 +83,7 @@ int of_parse_thermal_zones(void);
-> > >  void of_thermal_destroy_zones(void);
-> > >  int of_thermal_get_ntrips(struct thermal_zone_device *);
-> > >  int of_thermal_is_trip_en(struct thermal_zone_device *, int);
-> > > +int of_thermal_get_non_crit_ntrips(struct thermal_zone_device *);
-> > >  #else
-> > >  static inline int of_parse_thermal_zones(void) { return 0; }
-> > >  static inline void of_thermal_destroy_zones(void) { }
-> > > @@ -94,6 +95,10 @@ int of_thermal_is_trip_en(struct
-> > > thermal_zone_device *, int) {
-> > >  	return 0;
-> > >  }
-> > > +int of_thermal_get_non_crit_ntrips(struct thermal_zone_device *)
-> > here, it is supposed to be static inline.
-> > 
-> > > +{
-> > > +	return 0;
-> > > +}
-> > >  #endif
-> > >  
-> > >  #endif /* __THERMAL_CORE_H__ */
-> > > -- 
-> > > 2.0.0.rc2
-> > > 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  virt/kvm/arm/vgic-v3.c |  168 ++++++++++++++++++++++++++++++++++++------------
+>  virt/kvm/arm/vgic.c    |    4 ++
+>  2 files changed, 130 insertions(+), 42 deletions(-)
 > 
-> 
-> 
+> diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+> index ce50918..c0e901c 100644
+> --- a/virt/kvm/arm/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic-v3.c
+> @@ -34,6 +34,7 @@
+>  #define GICH_LR_VIRTUALID		(0x3ffUL << 0)
+>  #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
+>  #define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
+> +#define ICH_LR_VIRTUALID_MASK		(BIT_ULL(32) - 1)
+>  
+>  /*
+>   * LRs are stored in reverse order in memory. make sure we index them
+> @@ -43,7 +44,35 @@
+>  
+>  static u32 ich_vtr_el2;
+>  
+> -static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+> +static u64 sync_lr_val(u8 state)
+
+is this lr_state_to_val ?
+
+> +{
+> +	u64 lr_val = 0;
+> +
+> +	if (state & LR_STATE_PENDING)
+> +		lr_val |= ICH_LR_PENDING_BIT;
+> +	if (state & LR_STATE_ACTIVE)
+> +		lr_val |= ICH_LR_ACTIVE_BIT;
+> +	if (state & LR_EOI_INT)
+> +		lr_val |= ICH_LR_EOI;
+> +
+> +	return lr_val;
+> +}
+> +
+> +static u8 sync_lr_state(u64 lr_val)
+
+and lr_val_to_state ?
+
+at least these sync names don't make much sense to me...
+
+> +{
+> +	u8 state = 0;
+> +
+> +	if (lr_val & ICH_LR_PENDING_BIT)
+> +		state |= LR_STATE_PENDING;
+> +	if (lr_val & ICH_LR_ACTIVE_BIT)
+> +		state |= LR_STATE_ACTIVE;
+> +	if (lr_val & ICH_LR_EOI)
+> +		state |= LR_EOI_INT;
+> +
+> +	return state;
+> +}
+> +
+> +static struct vgic_lr vgic_v2_on_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+>  {
+>  	struct vgic_lr lr_desc;
+>  	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)];
+> @@ -53,30 +82,53 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+>  		lr_desc.source	= (val >> GICH_LR_PHYSID_CPUID_SHIFT) & 0x7;
+>  	else
+>  		lr_desc.source = 0;
+> -	lr_desc.state	= 0;
+> +	lr_desc.state	= sync_lr_state(val);
+>  
+> -	if (val & ICH_LR_PENDING_BIT)
+> -		lr_desc.state |= LR_STATE_PENDING;
+> -	if (val & ICH_LR_ACTIVE_BIT)
+> -		lr_desc.state |= LR_STATE_ACTIVE;
+> -	if (val & ICH_LR_EOI)
+> -		lr_desc.state |= LR_EOI_INT;
+> +	return lr_desc;
+> +}
+> +
+> +static struct vgic_lr vgic_v3_on_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+> +{
+> +	struct vgic_lr lr_desc;
+> +	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)];
+> +
+> +	lr_desc.irq	= val & ICH_LR_VIRTUALID_MASK;
+> +	lr_desc.source	= 0;
+> +	lr_desc.state	= sync_lr_state(val);
+>  
+>  	return lr_desc;
+>  }
+>  
+> -static void vgic_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
+> -			   struct vgic_lr lr_desc)
+> +static void vgic_v3_on_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
+> +				 struct vgic_lr lr_desc)
+>  {
+> -	u64 lr_val = (((u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT) |
+> -		      lr_desc.irq);
+> +	u64 lr_val;
+>  
+> -	if (lr_desc.state & LR_STATE_PENDING)
+> -		lr_val |= ICH_LR_PENDING_BIT;
+> -	if (lr_desc.state & LR_STATE_ACTIVE)
+> -		lr_val |= ICH_LR_ACTIVE_BIT;
+> -	if (lr_desc.state & LR_EOI_INT)
+> -		lr_val |= ICH_LR_EOI;
+> +	lr_val = lr_desc.irq;
+> +
+> +	/*
+> +	 * currently all guest IRQs are Group1, as Group0 would result
+
+Can you guess my comment here?
+
+> +	 * in a FIQ in the guest, which it wouldn't expect.
+> +	 * Eventually we want to make this configurable, so we may revisit
+> +	 * this in the future.
+> +	 */
+> +	lr_val |= ICH_LR_GROUP;
+> +
+> +	lr_val |= sync_lr_val(lr_desc.state);
+> +
+> +	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)] = lr_val;
+> +}
+> +
+> +static void vgic_v2_on_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
+> +				 struct vgic_lr lr_desc)
+> +{
+> +	u64 lr_val;
+> +
+> +	lr_val = lr_desc.irq;
+> +
+> +	lr_val |= (u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT;
+> +
+> +	lr_val |= sync_lr_val(lr_desc.state);
+>  
+>  	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)] = lr_val;
+>  }
+> @@ -145,9 +197,8 @@ static void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+>  
+>  static void vgic_v3_enable(struct kvm_vcpu *vcpu)
+>  {
+> -	struct vgic_v3_cpu_if *vgic_v3;
+> +	struct vgic_v3_cpu_if *vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
+>  
+> -	vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
+
+unnecessary change?
+
+>  	/*
+>  	 * By forcing VMCR to zero, the GIC will restore the binary
+>  	 * points to their reset values. Anything else resets to zero
+> @@ -155,7 +206,14 @@ static void vgic_v3_enable(struct kvm_vcpu *vcpu)
+>  	 */
+>  	vgic_v3->vgic_vmcr = 0;
+>  
+> -	vgic_v3->vgic_sre = 0;
+> +	/*
+> +	 * Set the SRE_EL1 value depending on the configured
+> +	 * emulated vGIC model.
+> +	 */
+> +	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
+> +		vgic_v3->vgic_sre = ICC_SRE_EL1_SRE;
+
+If we're on hardware with the GICv2 backwards compatibility can the
+guest not actually set ICC_SRE_EL1_SRE to 0 but then we are not
+preserving this because we wouldn't be trapping such accesses anymore?
+
+Also, this is really about the reset value of that field, which the
+comment above is not being specific about.
+
+Further, that would mean that the field is NOT actually RAO/WI, and thus
+the spec dictates that the field should reset to zero if EL1 is the
+highest implemented exception level and the field is not RAO/WI, which
+is what the guest expects, no?
+
+> +	else
+> +		vgic_v3->vgic_sre = 0;
+>  
+>  	/* Get the show on the road... */
+>  	vgic_v3->vgic_hcr = ICH_HCR_EN;
+> @@ -173,6 +231,15 @@ static const struct vgic_ops vgic_v3_ops = {
+>  	.enable			= vgic_v3_enable,
+>  };
+>  
+> +static void init_vgic_v3_emul(struct kvm *kvm)
+> +{
+> +	struct vgic_vm_ops *vm_ops = &kvm->arch.vgic.vm_ops;
+> +
+> +	vm_ops->get_lr = vgic_v3_on_v3_get_lr;
+> +	vm_ops->set_lr = vgic_v3_on_v3_set_lr;
+> +	kvm->arch.max_vcpus = KVM_MAX_VCPUS;
+> +}
+
+why do you need this indirection?  Just move vgic_v3_init_emul() up here
+and call that?
+
+> +
+>  static bool vgic_v3_init_emul_compat(struct kvm *kvm, int type)
+>  {
+>  	struct vgic_vm_ops *vm_ops = &kvm->arch.vgic.vm_ops;
+> @@ -186,14 +253,28 @@ static bool vgic_v3_init_emul_compat(struct kvm *kvm, int type)
+>  			return false;
+>  		}
+>  
+> -		vm_ops->get_lr = vgic_v3_get_lr;
+> -		vm_ops->set_lr = vgic_v3_set_lr;
+> +		vm_ops->get_lr = vgic_v2_on_v3_get_lr;
+> +		vm_ops->set_lr = vgic_v2_on_v3_set_lr;
+>  		kvm->arch.max_vcpus = 8;
+>  		return true;
+> +	case KVM_DEV_TYPE_ARM_VGIC_V3:
+> +		init_vgic_v3_emul(kvm);
+> +		return true;
+>  	}
+>  	return false;
+>  }
+>  
+> +static bool vgic_v3_init_emul(struct kvm *kvm, int type)
+> +{
+> +	switch (type) {
+> +	case KVM_DEV_TYPE_ARM_VGIC_V3:
+> +		init_vgic_v3_emul(kvm);
+> +		return true;
+> +	}
+> +
+> +	return false;
+> +}
+> +
+>  static struct vgic_params vgic_v3_params;
+>  
+>  /**
+> @@ -235,29 +316,32 @@ int vgic_v3_probe(struct device_node *vgic_node,
+>  
+>  	gicv_idx += 3; /* Also skip GICD, GICC, GICH */
+>  	if (of_address_to_resource(vgic_node, gicv_idx, &vcpu_res)) {
+> -		kvm_err("Cannot obtain GICV region\n");
+> -		ret = -ENXIO;
+> -		goto out;
+> -	}
+> +		kvm_info("GICv3: GICv2 emulation not available\n");
+> +		vgic->vcpu_base = 0;
+> +		vgic->init_emul = vgic_v3_init_emul;
+> +	} else {
+> +		if (!PAGE_ALIGNED(vcpu_res.start)) {
+> +			kvm_err("GICV physical address 0x%llx not page aligned\n",
+> +				(unsigned long long)vcpu_res.start);
+> +			ret = -ENXIO;
+> +			goto out;
+> +		}
+>  
+> -	if (!PAGE_ALIGNED(vcpu_res.start)) {
+> -		kvm_err("GICV physical address 0x%llx not page aligned\n",
+> -			(unsigned long long)vcpu_res.start);
+> -		ret = -ENXIO;
+> -		goto out;
+> -	}
+> +		if (!PAGE_ALIGNED(resource_size(&vcpu_res))) {
+> +			kvm_err("GICV size 0x%llx not a multiple of page size 0x%lx\n",
+> +				(unsigned long long)resource_size(&vcpu_res),
+> +				PAGE_SIZE);
+> +			ret = -ENXIO;
+> +			goto out;
+> +		}
+>  
+> -	if (!PAGE_ALIGNED(resource_size(&vcpu_res))) {
+> -		kvm_err("GICV size 0x%llx not a multiple of page size 0x%lx\n",
+> -			(unsigned long long)resource_size(&vcpu_res),
+> -			PAGE_SIZE);
+> -		ret = -ENXIO;
+> -		goto out;
+> +		vgic->vcpu_base = vcpu_res.start;
+> +		vgic->init_emul = vgic_v3_init_emul_compat;
+> +		kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
+> +					KVM_DEV_TYPE_ARM_VGIC_V2);
+>  	}
+> -	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
+> +	kvm_register_device_ops(&kvm_arm_vgic_v3_ops, KVM_DEV_TYPE_ARM_VGIC_V3);
+>  
+> -	vgic->init_emul = vgic_v3_init_emul_compat;
+> -	vgic->vcpu_base = vcpu_res.start;
+>  	vgic->vctrl_base = NULL;
+>  	vgic->type = VGIC_V3;
+>  
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 2867269d..16d7c9d 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1542,6 +1542,10 @@ static bool init_emulation_ops(struct kvm *kvm, int type)
+>  	switch (type) {
+>  	case KVM_DEV_TYPE_ARM_VGIC_V2:
+>  		return vgic_v2_init_emulation_ops(kvm, type);
+> +#ifdef CONFIG_ARM_GIC_V3
+> +	case KVM_DEV_TYPE_ARM_VGIC_V3:
+> +		return vgic_v3_init_emulation_ops(kvm, type);
+
+needs Documentation
+
+> +#endif
+>  	}
+>  	return false;
+>  }
 > -- 
-> Best regards,
+> 1.7.9.5
 > 
-> Lukasz Majewski
-> 
-> Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141107/eeb5475a/attachment-0001.sig>
