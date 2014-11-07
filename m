@@ -1,103 +1,80 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 07 Nov 2014 19:52:39 +0100
-Subject: [PATCH] PM / Domains: Fix initial default state of the
- need_restore flag
-In-Reply-To: <1415366847-4807-1-git-send-email-ulf.hansson@linaro.org>
-References: <1415366847-4807-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <545D14F7.9060309@samsung.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Fri, 07 Nov 2014 10:55:15 -0800
+Subject: [PATCH v13 2/7] KVM: Add generic support for dirty page logging
+In-Reply-To: <20141107100721.44c34175.cornelia.huck@de.ibm.com>
+References: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
+ <1415320848-13813-3-git-send-email-m.smarduch@samsung.com>
+ <20141107100721.44c34175.cornelia.huck@de.ibm.com>
+Message-ID: <545D1593.7030604@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/14 14:27, Ulf Hansson wrote:
-[...]
-> To handle things more properly in the generic PM domain, let's change
-> the default initial value of the need_restore flag to reflect that the
-> state is unknown. As soon as some of the runtime PM callbacks gets
-> invoked, update the initial value accordingly.
+On 11/07/2014 01:07 AM, Cornelia Huck wrote:
+> On Thu, 06 Nov 2014 16:40:43 -0800
+> Mario Smarduch <m.smarduch@samsung.com> wrote:
 > 
-> Moreover, since the generic PM domain is verifying that all device's
-> are both runtime PM enabled and suspended, using pm_runtime_suspended()
-> while pm_genpd_poweroff() is invoked from the scheduled work, we can be
-> sure of that the PM domain won't be powering off while having active
-> devices.
+>> kvm_get_dirty_log() provides generic handling of dirty bitmap, currently reused
+>> by several architectures. Building on that we intrdoduce 
+>> kvm_get_dirty_log_protect() adding write protection to mark these pages dirty
+>> for future write access, before next KVM_GET_DIRTY_LOG ioctl call from user
+>> space.
+>>
+>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>> ---
+>>  include/linux/kvm_host.h |    9 +++++
+>>  virt/kvm/kvm_main.c      |   95 ++++++++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 104 insertions(+)
+>>
 > 
-> Do note that, the generic PM domain can still only know about active
-> devices which has been activated through invoking its runtime PM resume
-> callback. In other words, buses/drivers using pm_runtime_set_active()
-> during ->probe() will still suffer from a race condition, potentially
-> probing a device without having its PM domain being powered. That issue
-> will have to be solved using a different approach.
+>> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+>> index 887df87..f017760 100644
+>> --- a/virt/kvm/kvm_main.c
+>> +++ b/virt/kvm/kvm_main.c
+>> @@ -981,6 +981,101 @@ out:
+>>  }
+>>  EXPORT_SYMBOL_GPL(kvm_get_dirty_log);
+>>
+>> +#if defined(CONFIG_S390) || defined(CONFIG_PPC) || defined(CONFIG_MIPS) || \
+>> +    defined(CONFIG_IA64) || defined(CONFIG_X86) || defined(CONFIG_ARM) || \
+>> +    defined(CONFIG_ARM64)
 > 
-> This a log from the boot regression for Exynos5, which is being fixed in
-> this patch.
+> Does this deserve a config symbol that can be selected by architectures
+> actually using kvm_get_dirty_log_protect()? I.e.,
 > 
-> ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 308 at ../drivers/clk/clk.c:851 clk_disable+0x24/0x30()
-> Modules linked in:
-> CPU: 0 PID: 308 Comm: kworker/0:1 Not tainted 3.18.0-rc3-00569-gbd9449f-dirty #10
-> Workqueue: pm pm_runtime_work
-> [<c0013c64>] (unwind_backtrace) from [<c0010dec>] (show_stack+0x10/0x14)
-> [<c0010dec>] (show_stack) from [<c03ee4cc>] (dump_stack+0x70/0xbc)
-> [<c03ee4cc>] (dump_stack) from [<c0020d34>] (warn_slowpath_common+0x64/0x88)
-> [<c0020d34>] (warn_slowpath_common) from [<c0020d74>] (warn_slowpath_null+0x1c/0x24)
-> [<c0020d74>] (warn_slowpath_null) from [<c03107b0>] (clk_disable+0x24/0x30)
-> [<c03107b0>] (clk_disable) from [<c02cc834>] (gsc_runtime_suspend+0x128/0x160)
-> [<c02cc834>] (gsc_runtime_suspend) from [<c0249024>] (pm_generic_runtime_suspend+0x2c/0x38)
-> [<c0249024>] (pm_generic_runtime_suspend) from [<c024f44c>] (pm_genpd_default_save_state+0x2c/0x8c)
-> [<c024f44c>] (pm_genpd_default_save_state) from [<c024ff2c>] (pm_genpd_poweroff+0x224/0x3ec)
-> [<c024ff2c>] (pm_genpd_poweroff) from [<c02501b4>] (pm_genpd_runtime_suspend+0x9c/0xcc)
-> [<c02501b4>] (pm_genpd_runtime_suspend) from [<c024a4f8>] (__rpm_callback+0x2c/0x60)
-> [<c024a4f8>] (__rpm_callback) from [<c024a54c>] (rpm_callback+0x20/0x74)
-> [<c024a54c>] (rpm_callback) from [<c024a930>] (rpm_suspend+0xd4/0x43c)
-> [<c024a930>] (rpm_suspend) from [<c024bbcc>] (pm_runtime_work+0x80/0x90)
-> [<c024bbcc>] (pm_runtime_work) from [<c0032a9c>] (process_one_work+0x12c/0x314)
-> [<c0032a9c>] (process_one_work) from [<c0032cf4>] (worker_thread+0x3c/0x4b0)
-> [<c0032cf4>] (worker_thread) from [<c003747c>] (kthread+0xcc/0xe8)
-> [<c003747c>] (kthread) from [<c000e738>] (ret_from_fork+0x14/0x3c)
-> ---[ end trace 40cd58bcd6988f12 ]---
+> #ifndef CONFIG_KVM_ARCH_DIRTY_LOG_PROTECT
 > 
-> Fixes: a4a8c2c4962bb655 (ARM: exynos: Move to generic PM domain DT bindings)
-> Reported-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
+> or so?
+
+Yes definitely, not sure why I went this way after using Kconfig
+defines before.
+
 > 
-> This patch is intended as fix for 3.18 rc[n] due to the regression for Exynos
-> SOCs.
+>> +/*
+>> + * For architectures that don't use kvm_get_dirty_log_protect() for dirty page
+>> + * logging, calling this function is illegal. Otherwise the function is defined
+>> + * in arch subtree and this restriction is removed.
+>> + */
 > 
-> I would also like to call for help in getting this thoroughly tested.
+> What about
 > 
-> I have tested this on Arndale Dual, Exynos 5250. According the log attached in
-> the commit message as well.
+> /*
+>  * For architectures that don't use kvm_get_dirty_log_protect() for dirty page
+>  * logging, we must never end up calling this function. Architectures that do
+>  * use it define their own version of this function.
+>  */
+> 
+> instead
 
-Thanks Ulf, I've tested this patch on top of v3.18-rc3 on Exynos4412 Trats2
-board and it seems the unbalanced runtime_suspend() call issue is gone.
-
-> I have tested this on UX500, which support for the generic PM domain is about
-> to be queued for 3.19. Since UX500 uses the AMBA bus/drivers, which uses
-> pm_runtime_set_active() instead of pm_runtime_get_sync() during ->probe(), I
-> could also verify that this behavior is maintained.
-
-I had some issues with such configuration, after modifying the drivers to
-call pm_runtime_set_active() (instead of pm_runtime_get_sync()) in probe().
-It looked like there is some access to the hardware with corresponding
-power domain disabled. Couldn't debug it in reasonable time due to system
-hanging, will try to get back to this on Wednesday.
-
-> Finally I have also tested this patchset on UX500 and using the below patchset
-> to make sure the approach is suitable long term wise as well.
-> [PATCH v3 0/9] PM / Domains: Fix race conditions during boot
-> http://www.spinics.net/lists/arm-kernel/msg369409.html
-
-And with that additional patch series and the drivers modified everything
-seemed to work too.
-
-The patch looks good to me as a fix for v3.18, if others don't report
-regressions feel free to add my:
-
-Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-(On Exynos4412 Trats2 board)
-Tested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-
--- 
-Regards,
-Sylwester
+Yeah that reads better, getting the illegal out of there.
+> 
+>> +void kvm_arch_mmu_write_protect_pt_masked(struct kvm *kvm,
+>> +					struct kvm_memory_slot *slot,
+>> +					gfn_t gfn_offset,
+>> +					unsigned long mask)
+>> +{
+>> +	BUG();
+>> +}
+>> +#endif
+>> +
+> (...)
+> 
