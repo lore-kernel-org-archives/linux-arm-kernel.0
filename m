@@ -1,47 +1,73 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 7 Nov 2014 11:55:51 +0000
-Subject: [RFC] ptrace: add generic SET_SYSCALL request
-In-Reply-To: <1977974.l97vvy7Y8b@wuerfel>
-References: <1415346443-28915-1-git-send-email-takahiro.akashi@linaro.org>
- <1977974.l97vvy7Y8b@wuerfel>
-Message-ID: <20141107115551.GC18916@arm.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri,  7 Nov 2014 11:57:42 +0000
+Subject: [PATCH 00/13] Add stih410 SoC and USB2/1.1 support
+Message-ID: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 07, 2014 at 09:30:53AM +0000, Arnd Bergmann wrote:
-> On Friday 07 November 2014 16:47:23 AKASHI Takahiro wrote:
-> > This patch adds a new generic ptrace request, PTRACE_SET_SYSCALL.
-> > It can be used to change a system call number as follows:
-> >     ret = ptrace(pid, PTRACE_SET_SYSCALL, null, new_syscall_no);
-> > 'new_syscall_no' can be -1 to skip this system call, you need to modify
-> > a register's value, in arch-specific way, as return value though.
-> > 
-> > Please note that we can't define PTRACE_SET_SYSCALL macro in
-> > uapi/linux/ptrace.h partly because its value on arm, 23, is used as another
-> > request on sparc.
-> > 
-> > This patch also contains an example of change on arch side, arm.
-> > Only syscall_set_nr() is required to be defined in asm/syscall.h.
-> > 
-> > Currently only arm has this request, while arm64 would also have it
-> > once my patch series of seccomp for arm64 is merged. It will also be
-> > usable for most of other arches.
-> > See the discussions in lak-ml:
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/300167.html
-> > 
-> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > 
-> 
-> Can you describe why you are moving the implementation? Is this a feature
-> that we want to have on all architectures in the future? As you say,
-> only arm32 implements is at the moment.
+Hi,
 
-We need this for arm64 and, since all architectures seem to have a mechanism
-for setting a system call via ptrace, moving it to generic code should make
-sense for new architectures too, no?
+This series adds the required device tree nodes to enable the usb2/1.1 phy
+and usb2/1.1 controllers on the stih416-b2120 board.
 
-We don't have any arch-specific ptrace requests on arm64, so it would be
-a shame if we had to add one now, especially since there's nothing
-conceptually arch-specific about setting a syscall number.
+It additionally re-works and adds support for the new stih410 SoC which is
+very similar to the stih407 SoC, by abstracting out the common parts
+into common dt files. It also then adds the dt nodes to enable usb2/1.1 
+for the stih410 platform as well.
 
-Will
+As well as adding dt nodes it also enables the relevant drivers in the 
+mult7_v7_defconfig.
+
+Finally we update the default bootargs for stih407-b2120 and stih410-b2120
+to boot with the clk_ignore_unused kernel parameter so as not to hang
+the SoC when the (as yet) unreferenced interconnect clocks get disabled
+by CCF (this is a tempoary solution).
+
+This series has been tested on stih416-b2020 and stih410-b2120 SoC/boards.
+
+regards,
+
+Peter.
+
+Peter Griffin (13):
+  ARM: STi: DT: STiH416: Add pinctl setup for usb controllers.
+  ARM: STi: DT: STiH416: Add DT node for the stih415/6 usb2 phy
+  ARM: STi: DT: STiH416: Add DT nodes for the ehci and ohci usb
+    controllers.
+  ARM: multi_v7_defconfig: Enable st ohci and ehci HCD drivers.
+  ARM: multi_v7_defconfig: Enable stih415/6 usb2 phy driver.
+  ARM: multi_v7_defconfig: Enable stih407 usb picophy
+  ARM: STi: DT: STiH407: Add usb2 picophy dt nodes
+  ARM: STi: DT: STiH410: Add defines for STiH410 DT clocks
+  ARM: STi: DT: STiH410:  Add pinctl config for usb controllers.
+  ARM: STi: DT: STih410: Add dt nodes for the ehci / ohci usb
+    controllers.
+  ARM: STi: DT: STih407: Abstract common dt nodes into shared files.
+  ARM: STi: DT: STiH410: Add STiH410 SoC clock support.
+  ARM: STi: DT: STih407: Add clk_ignore_unused to kernel bootargs
+
+ arch/arm/boot/dts/Makefile               |   1 +
+ arch/arm/boot/dts/stih407-b2120.dts      |  67 +-----
+ arch/arm/boot/dts/stih407-family.dtsi    | 384 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/stih407-pinctrl.dtsi   |  18 ++
+ arch/arm/boot/dts/stih407.dtsi           | 279 ----------------------
+ arch/arm/boot/dts/stih410-b2120.dts      |  42 ++++
+ arch/arm/boot/dts/stih410-clock.dtsi     | 338 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/stih416-b2020.dts      |   4 +
+ arch/arm/boot/dts/stih416-b2020e.dts     |   4 +
+ arch/arm/boot/dts/stih416-pinctrl.dtsi   |  34 +++
+ arch/arm/boot/dts/stih416.dtsi           | 153 ++++++++++++
+ arch/arm/boot/dts/stih41x-b2020.dtsi     |  12 +
+ arch/arm/boot/dts/stihxxx-b2120.dtsi     |  73 ++++++
+ arch/arm/configs/multi_v7_defconfig      |   4 +
+ include/dt-bindings/clock/stih410-clks.h |  24 ++
+ 15 files changed, 1094 insertions(+), 343 deletions(-)
+ create mode 100644 arch/arm/boot/dts/stih407-family.dtsi
+ delete mode 100644 arch/arm/boot/dts/stih407.dtsi
+ create mode 100644 arch/arm/boot/dts/stih410-b2120.dts
+ create mode 100644 arch/arm/boot/dts/stih410-clock.dtsi
+ create mode 100644 arch/arm/boot/dts/stihxxx-b2120.dtsi
+ create mode 100644 include/dt-bindings/clock/stih410-clks.h
+
+-- 
+1.9.1
