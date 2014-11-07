@@ -1,70 +1,91 @@
 From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 06 Nov 2014 16:40:44 -0800
-Subject: [PATCH v13 3/7] KVM: x86: flush TLBs last before returning from
- KVM_GET_DIRTY_LOG
+Date: Thu, 06 Nov 2014 16:40:45 -0800
+Subject: [PATCH v13 4/7] arm: KVM: Add ARMv7 API to flush TLBs
 In-Reply-To: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
 References: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <1415320848-13813-4-git-send-email-m.smarduch@samsung.com>
+Message-ID: <1415320848-13813-5-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the next patches, we will move parts of x86's kvm_vm_ioctl_get_dirty_log
-implementation to generic code; leave the arch-specific code at the end,
-similar to the existing generic function kvm_get_dirty_log.
+This patch adds ARMv7 architecture TLB Flush function.
 
-Reviewed-by: Mario Smarduch <m.smarduch@samsung.com>
-Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 ---
- arch/x86/kvm/x86.c |   22 ++++++++++------------
- 1 file changed, 10 insertions(+), 12 deletions(-)
+ arch/arm/include/asm/kvm_asm.h  |    1 +
+ arch/arm/include/asm/kvm_host.h |   12 ++++++++++++
+ arch/arm/kvm/Kconfig            |    1 +
+ arch/arm/kvm/interrupts.S       |   11 +++++++++++
+ 4 files changed, 25 insertions(+)
 
-diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
-index 8f1e22d..dc8e66b 100644
---- a/arch/x86/kvm/x86.c
-+++ b/arch/x86/kvm/x86.c
-@@ -3606,13 +3606,13 @@ static int kvm_vm_ioctl_reinject(struct kvm *kvm,
-  *
-  *   1. Take a snapshot of the bit and clear it if needed.
-  *   2. Write protect the corresponding page.
-- *   3. Flush TLB's if needed.
-- *   4. Copy the snapshot to the userspace.
-+ *   3. Copy the snapshot to the userspace.
-+ *   4. Flush TLB's if needed.
-  *
-- * Between 2 and 3, the guest may write to the page using the remaining TLB
-- * entry.  This is not a problem because the page will be reported dirty at
-- * step 4 using the snapshot taken before and step 3 ensures that successive
-- * writes will be logged for the next call.
-+ * Between 2 and 4, the guest may write to the page using the remaining TLB
-+ * entry.  This is not a problem because the page is reported dirty using
-+ * the snapshot taken before and step 4 ensures that writes done after
-+ * exiting to userspace will be logged for the next call.
-  */
- int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
- {
-@@ -3661,6 +3661,10 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 3a67bec..25410b2 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -96,6 +96,7 @@ extern char __kvm_hyp_code_end[];
  
- 	spin_unlock(&kvm->mmu_lock);
+ extern void __kvm_flush_vm_context(void);
+ extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
++extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
  
-+	r = 0;
-+	if (copy_to_user(log->dirty_bitmap, dirty_bitmap_buffer, n))
-+		r = -EFAULT;
+ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+ #endif
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 6dfb404..fad598c 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -220,6 +220,18 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+ 	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
+ }
+ 
++/**
++ * kvm_arch_flush_remote_tlbs() - flush all VM TLB entries
++ * @kvm:	pointer to kvm structure.
++ *
++ * Interface to HYP function to flush all VM TLB entries without address
++ * parameter.
++ */
++static inline void kvm_flush_remote_tlbs(struct kvm *kvm)
++{
++	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
++}
 +
- 	/* See the comments in kvm_mmu_slot_remove_write_access(). */
- 	lockdep_assert_held(&kvm->slots_lock);
+ static inline int kvm_arch_dev_ioctl_check_extension(long ext)
+ {
+ 	return 0;
+diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+index 466bd29..a099df4 100644
+--- a/arch/arm/kvm/Kconfig
++++ b/arch/arm/kvm/Kconfig
+@@ -23,6 +23,7 @@ config KVM
+ 	select HAVE_KVM_CPU_RELAX_INTERCEPT
+ 	select KVM_MMIO
+ 	select KVM_ARM_HOST
++	select HAVE_KVM_ARCH_TLB_FLUSH_ALL
+ 	depends on ARM_VIRT_EXT && ARM_LPAE
+ 	---help---
+ 	  Support hosting virtualized guest machines. You will also
+diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+index 01dcb0e..79caf79 100644
+--- a/arch/arm/kvm/interrupts.S
++++ b/arch/arm/kvm/interrupts.S
+@@ -66,6 +66,17 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
+ 	bx	lr
+ ENDPROC(__kvm_tlb_flush_vmid_ipa)
  
-@@ -3670,12 +3674,6 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
- 	 */
- 	if (is_dirty)
- 		kvm_flush_remote_tlbs(kvm);
--
--	r = -EFAULT;
--	if (copy_to_user(log->dirty_bitmap, dirty_bitmap_buffer, n))
--		goto out;
--
--	r = 0;
- out:
- 	mutex_unlock(&kvm->slots_lock);
- 	return r;
++/**
++ * void __kvm_tlb_flush_vmid(struct kvm *kvm) - Flush per-VMID TLBs
++ *
++ * Reuses __kvm_tlb_flush_vmid_ipa() for ARMv7, without passing address
++ * parameter
++ */
++
++ENTRY(__kvm_tlb_flush_vmid)
++	b	__kvm_tlb_flush_vmid_ipa
++ENDPROC(__kvm_tlb_flush_vmid)
++
+ /********************************************************************
+  * Flush TLBs and instruction caches of all CPUs inside the inner-shareable
+  * domain, for all VMIDs
 -- 
 1.7.9.5
