@@ -1,123 +1,87 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 7 Nov 2014 13:21:08 +0100
-Subject: [PATCH v2 01/10] [media] Move mediabus format definition to a
- more standard place
-In-Reply-To: <20141107114358.GB3136@valkosipuli.retiisi.org.uk>
-References: <1415267829-4177-1-git-send-email-boris.brezillon@free-electrons.com>
- <1415267829-4177-2-git-send-email-boris.brezillon@free-electrons.com>
- <20141107114358.GB3136@valkosipuli.retiisi.org.uk>
-Message-ID: <20141107132108.0f30dafb@bbrezillon>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 7 Nov 2014 13:25:09 +0100
+Subject: [GIT PULL] arm64: UEFI updates for 3.19
+In-Reply-To: <20141107112407.GH24745@yliu-dev.sh.intel.com>
+References: <CAKv+Gu8LEFvdu99vCHbHGPmGLpHWdT+Wb2DECzBEEg8g_yynvg@mail.gmail.com>
+ <CAKv+Gu8bpgGWRbgdGYHSy515LOXapCm4stv5xJo_tNNhahcTYw@mail.gmail.com>
+ <20141107100434.GA32336@arm.com>
+ <CAKv+Gu9Hf2ATGxVbukxyqihChvc9TDvkejPq6KGkvFdJBPT5LA@mail.gmail.com>
+ <1415357313.14686.115.camel@mfleming-mobl1.ger.corp.intel.com>
+ <CAKv+Gu9woybrvA0vikmcOeyVs0xTsAwBVu1=QsvaM9_Eb0pUEQ@mail.gmail.com>
+ <20141107112407.GH24745@yliu-dev.sh.intel.com>
+Message-ID: <CAKv+Gu9E9b6zMnXh4On7_0GgZ-gFyx0Gitb0Jm__FYAqRz4VmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 7 Nov 2014 13:43:59 +0200
-Sakari Ailus <sakari.ailus@iki.fi> wrote:
+On 7 November 2014 12:24, Yuanhan Liu <yuanhan.liu@linux.intel.com> wrote:
+> On Fri, Nov 07, 2014 at 12:06:02PM +0100, Ard Biesheuvel wrote:
+>> On 7 November 2014 11:48, Matt Fleming <matt.fleming@intel.com> wrote:
+>> > On Fri, 2014-11-07 at 11:29 +0100, Ard Biesheuvel wrote:
+>> >>
+>> >> I have confirmation from Matt and another Intel engineer that adding a
+>> >> (arguably redundant) 'u32' cast solves the issue.
+>> >
+>> > I think we need to get a better handle on this.
+>> >
+>> > It is completely surprising to me that type promotion from u32 to u64
+>> > goes through sign extension.
+>> >
+>> > And by "surprising" I mean, it sounds wrong.
+>> >
+>> > Ard, if you could throw me a unified diff of objdump -dr vmlinux, with
+>> > and without the u32 cast, I'll take a look at figuring out what's
+>> > happening.
+>> >
+>>
+>> With my compiler
+>>
+>> gcc version 4.8.1 (Ubuntu/Linaro 4.8.1-10ubuntu9)
+>>
+>> the objdump of drivers/firmware/dmi_scan.o is identical with and
+>> without the 'u32' cast.
+>>
+>> If I look at the original code:
+>>
+>> dmi_base = (buf[11] << 24) | (buf[10] << 16) | (buf[9] << 8) | buf[8];
+>>
+>> I see a 'cltq' instruction in the dump that disappears once I add the
+>> 'u32' cast (which is what we addressed by introducing the
+>> get_unaligned_le32() in the 1st place)
+>
+> Yes, that's another mistake I made :(
+>
+> The story is that LKP reports this issue with an old commit:
+> aacdce6e880894acb57d71dcb2e3fc61b4ed4e96("dmi: add support for SMBIOS
+> 3.0 64-bit entry point"), where still use the original code you showed
+> above:
+>
+>                 dmi_num = (buf[13] << 8) | buf[12];
+>                 dmi_len = (buf[7] << 8) | buf[6];
+>                 dmi_base = (buf[11] << 24) | (buf[10] << 16) |
+>                         (buf[9] << 8) | buf[8];
+>
+> I didn't except there are two version, thus when it failed to apply the
+> debug patch you gave me, I just thought you wrote the debug patch on top
+> your branch, and I applied on based of the first bad commit("aacdce6e").
+>
+> Hence I fixed it manually and got your debug patch applied, but still
+> with those original code, hence it never works.
+>
+> And then you ask me to do the (u32) cast, which is based on
+> get_unaligned_le32(), I then changed the original code to
+> get_unaligned_le16/32(), and did the cast, which works as expected, and
+> I then thought the cast did work. And actually, it's the change to
+> get_unaligned_le16/32() works: I double confirmed it this time, and
+> that's why I didn't see such panic with your updated commits from
+> efi-for-arm64(the code we used bisect is from efi-for-3.19).
+>
+>
+> So, it's totally kind of stupid mistakes I made. Very sorry for the
+> noise and for taking you guys time!
+>
 
-> Hi Boris,
-> 
-> Thank you for the update.
-> 
-> On Thu, Nov 06, 2014 at 10:56:59AM +0100, Boris Brezillon wrote:
-> > Rename mediabus formats and move the enum into a separate header file so
-> > that it can be used by DRM/KMS subsystem without any reference to the V4L2
-> > subsystem.
-> > 
-> > Old v4l2_mbus_pixelcode now points to media_bus_format.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> > ---
-> >  include/uapi/linux/Kbuild             |   1 +
-> >  include/uapi/linux/media-bus-format.h | 131 ++++++++++++++++++++++++++++++++++
-> >  include/uapi/linux/v4l2-mediabus.h    | 114 +----------------------------
-> >  3 files changed, 134 insertions(+), 112 deletions(-)
-> >  create mode 100644 include/uapi/linux/media-bus-format.h
-> > 
-> > diff --git a/include/uapi/linux/Kbuild b/include/uapi/linux/Kbuild
-> > index b70237e..b2c23f8 100644
-> > --- a/include/uapi/linux/Kbuild
-> > +++ b/include/uapi/linux/Kbuild
-> > @@ -414,6 +414,7 @@ header-y += veth.h
-> >  header-y += vfio.h
-> >  header-y += vhost.h
-> >  header-y += videodev2.h
-> > +header-y += media-bus-format.h
-> 
-> Could you arrange this to the list alphabetically, please?
-> 
-> >  header-y += virtio_9p.h
-> >  header-y += virtio_balloon.h
-> >  header-y += virtio_blk.h
-> > diff --git a/include/uapi/linux/media-bus-format.h b/include/uapi/linux/media-bus-format.h
-> > new file mode 100644
-> > index 0000000..251a902
-> > --- /dev/null
-> > +++ b/include/uapi/linux/media-bus-format.h
-> > @@ -0,0 +1,131 @@
-> > +/*
-> > + * Media Bus API header
-> > + *
-> > + * Copyright (C) 2009, Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#ifndef __LINUX_MEDIA_BUS_FORMAT_H
-> > +#define __LINUX_MEDIA_BUS_FORMAT_H
-> > +
-> > +/*
-> > + * These bus formats uniquely identify data formats on the data bus. Format 0
-> > + * is reserved, MEDIA_BUS_FMT_FIXED shall be used by host-client pairs, where
-> > + * the data format is fixed. Additionally, "2X8" means that one pixel is
-> > + * transferred in two 8-bit samples, "BE" or "LE" specify in which order those
-> > + * samples are transferred over the bus: "LE" means that the least significant
-> > + * bits are transferred first, "BE" means that the most significant bits are
-> > + * transferred first, and "PADHI" and "PADLO" define which bits - low or high,
-> > + * in the incomplete high byte, are filled with padding bits.
-> > + *
-> > + * The bus formats are grouped by type, bus_width, bits per component, samples
-> > + * per pixel and order of subsamples. Numerical values are sorted using generic
-> > + * numerical sort order (8 thus comes before 10).
-> > + *
-> > + * As their value can't change when a new bus format is inserted in the
-> > + * enumeration, the bus formats are explicitly given a numerical value. The next
-> > + * free values for each category are listed below, update them when inserting
-> > + * new pixel codes.
-> > + */
-> > +
-> > +#define MEDIA_BUS_FMT_ENTRY(name, val)	\
-> > +	MEDIA_BUS_FMT_ ## name = val,	\
-> > +	V4L2_MBUS_FMT_ ## name = val
-> > +
-> > +enum media_bus_format {
-> 
-> There's no really a need to keep the definitions inside the enum. It looks a
-> little bit confusing to me. That made me realise something I missed
-> yesterday.
-> 
-> There's a difference: the enum in C++ is a different thing than in C, and
-> the enum type isn't able to contain any other values than those defined in
-> the enumeration.
-> 
-> So what I propose is the following. Keep enum v4l2_mbus_pixelcode around,
-> including the enum values. Define new values for MEDIA_BUS_* equivalents
-> using preprocessor macros, as you've done below. Drop the definition of enum
-> media_bus_format, and use u32 (or uint32_t) type for the variables.
-> 
-> This way the enum stays intact for existing C++ applications, and new
-> applications will have to use a 32-bit type.
-> 
-
-Fair enough. If Hans agree I'll rework the series and drop the
-media_bus_format enum.
+No worries. At the very least, we are a bit more confident now than
+before that the code is fine.
 
 Thanks,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Ard.
