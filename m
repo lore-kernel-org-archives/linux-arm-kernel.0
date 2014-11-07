@@ -1,59 +1,183 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 7 Nov 2014 21:02:15 +0100
-Subject: [PATCH v13 3/7] KVM: x86: flush TLBs last before returning from
- KVM_GET_DIRTY_LOG
-In-Reply-To: <545D2271.4090906@samsung.com>
-References: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
- <1415320848-13813-4-git-send-email-m.smarduch@samsung.com>
- <545C7845.9010103@redhat.com> <545D2271.4090906@samsung.com>
-Message-ID: <20141107200215.GA23953@cbox>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Fri, 7 Nov 2014 14:13:06 -0600
+Subject: [PATCHv4 1/5] arm: socfpga: Enable L2 Cache ECC on startup.
+In-Reply-To: <1415379263-12391-2-git-send-email-tthayer@opensource.altera.com>
+References: <1415379263-12391-1-git-send-email-tthayer@opensource.altera.com>
+ <1415379263-12391-2-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <545D27D2.1080305@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 07, 2014 at 11:50:09AM -0800, Mario Smarduch wrote:
-> On 11/06/2014 11:44 PM, Paolo Bonzini wrote:
-> > 
-> > 
-> > On 07/11/2014 01:40, Mario Smarduch wrote:
-> >> In the next patches, we will move parts of x86's kvm_vm_ioctl_get_dirty_log
-> >> implementation to generic code; leave the arch-specific code at the end,
-> >> similar to the existing generic function kvm_get_dirty_log.
-> >>
-> >> Reviewed-by: Mario Smarduch <m.smarduch@samsung.com>
-> >> Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
-> > 
-> > You should have a "Signed-off-by: Mario Smarduch ..." here, and you 
-> > should also add my authorship.  You can do the latter with "git rebase 
-> > -i", adding
-> > 
-> >   x git commit --amend -C HEAD --author 'Paolo Bonzini <pbonzini@redhat.com>'
-> > 
-> > after this patch.  If you're using a patch queue instead (quilt or
-> > similar) you can just edit the "From" line in the patch.
-> > 
-> > I guess if you reply to the patch with just
-> > 
-> >    Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> > 
-> > the ARM maintainers can do the above for you, if there's no need for
-> > a v14.
-> > 
-> > I'll send an eighth patch to actually switch x86 to the new function.
-> > Again, the maintainers can apply it in the right place, but please
-> > include it yourself if you have to do a v14.
-> > 
-> > Thanks,
-> > 
-> > Paolo
-> 
-> I kind of thought something was wrong :) Thanks for the explanation,
-> until I get the hang of it I'll defer to ARM maintainers. Maybe later
-> update SubmittingPatches documentation.
-> 
-Since you're doing a respin (right?) then please get the authorship
-and signed-off-by's right for the next iteration.
+Hi Thor,
 
-If you're having trouble with the git mangling to get it right, don't be
-afraid to reach out, here or on IRC.
+On 11/07/2014 10:54 AM, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
+> 
+> This patch enables the ECC for L2 cache on machine
+> startup.  The ECC has to be enabled before data is
+> is stored in memory otherwise the ECC will fail on
+> reads.
+> 
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+> v2: Split OCRAM initialization into separate patch.
+> 
+> v3/4: No change
+> ---
+>  MAINTAINERS                      |    1 +
+>  arch/arm/mach-socfpga/Makefile   |    1 +
+>  arch/arm/mach-socfpga/l2_cache.c |   44 ++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-socfpga/l2_cache.h |   28 ++++++++++++++++++++++++
+>  arch/arm/mach-socfpga/socfpga.c  |    5 ++++-
+>  5 files changed, 78 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/mach-socfpga/l2_cache.c
+>  create mode 100644 arch/arm/mach-socfpga/l2_cache.h
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index ee1bc5b..d0c7752 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1407,6 +1407,7 @@ ARM/SOCFPGA EDAC SUPPORT
+>  M:	Thor Thayer <tthayer@opensource.altera.com>
+>  S:	Maintained
+>  F:	drivers/edac/altera_edac.
+> +F:	arch/arm/mach-socfpga/l2_cache.*
+>  
+>  ARM/STI ARCHITECTURE
+>  M:	Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+> diff --git a/arch/arm/mach-socfpga/Makefile b/arch/arm/mach-socfpga/Makefile
+> index 6dd7a93..142609e 100644
+> --- a/arch/arm/mach-socfpga/Makefile
+> +++ b/arch/arm/mach-socfpga/Makefile
+> @@ -4,3 +4,4 @@
+>  
+>  obj-y					:= socfpga.o
+>  obj-$(CONFIG_SMP)	+= headsmp.o platsmp.o
+> +obj-$(CONFIG_EDAC_ALTERA_L2C) += l2_cache.o
+> diff --git a/arch/arm/mach-socfpga/l2_cache.c b/arch/arm/mach-socfpga/l2_cache.c
+> new file mode 100644
+> index 0000000..8e109f3
+> --- /dev/null
+> +++ b/arch/arm/mach-socfpga/l2_cache.c
+> @@ -0,0 +1,44 @@
+> +/*
+> + * Copyright Altera Corporation (C) 2014. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#include <linux/clk-provider.h>
 
--Christoffer
+Why clk-provider.h and not io.h?
+
+> +#include <linux/of_platform.h>
+> +#include <linux/of_address.h>
+> +
+> +#include "l2_cache.h"
+> +
+> +void socfpga_init_l2_ecc(void)
+> +{
+> +	struct device_node *np;
+> +	void __iomem  *mapped_l2_edac_addr;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "altr,l2-edac");
+> +	if (!np) {
+> +		pr_err("SOCFPGA: Unable to find altr,l2-edac in dtb\n");
+> +		return;
+> +	}
+> +
+> +	mapped_l2_edac_addr = of_iomap(np, 0);
+> +	if (!mapped_l2_edac_addr) {
+> +		pr_err("SOCFPGA: Unable to find L2 ECC mapping in dtb\n");
+> +		return;
+> +	}
+> +
+> +	/* Enable ECC */
+> +	writel(0x01, mapped_l2_edac_addr);
+> +
+> +	pr_debug("SOCFPGA: Success Initializing L2 cache ECC\n");
+> +}
+> +
+
+Extra line here...
+
+> diff --git a/arch/arm/mach-socfpga/l2_cache.h b/arch/arm/mach-socfpga/l2_cache.h
+> new file mode 100644
+> index 0000000..58e140d
+> --- /dev/null
+> +++ b/arch/arm/mach-socfpga/l2_cache.h
+> @@ -0,0 +1,28 @@
+> +/*
+> + * Copyright Altera Corporation (C) 2014. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#ifndef MACH_SOCFPGA_L2_CACHE_H
+> +#define MACH_SOCFPGA_L2_CACHE_H
+> +
+> +#ifdef CONFIG_EDAC_ALTERA_L2C
+> +void socfpga_init_l2_ecc(void);
+> +#else
+> +inline void socfpga_init_l2_ecc(void)
+> +{
+> +}
+> +#endif
+> +
+> +#endif /* #ifndef MACH_SOCFPGA_L2_CACHE_H */
+> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+> index adbf383..af6413a 100644
+> --- a/arch/arm/mach-socfpga/socfpga.c
+> +++ b/arch/arm/mach-socfpga/socfpga.c
+> @@ -1,5 +1,5 @@
+>  /*
+> - *  Copyright (C) 2012 Altera Corporation
+> + *  Copyright (C) 2012;2014 Altera Corporation
+
+Should be "2012-2014".
+
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License as published by
+> @@ -25,6 +25,8 @@
+>  #include <asm/mach/map.h>
+>  
+>  #include "core.h"
+> +#include "l2_cache.h"
+> +#include "ocram.h"
+
+Including ocram.h should go into patch 2/5. But I think ocram.h can be
+removed as well if you just use IS_ENABLED().
+
+>  
+>  void __iomem *socfpga_scu_base_addr = ((void __iomem *)(SOCFPGA_SCU_VIRT_BASE));
+>  void __iomem *sys_manager_base_addr;
+> @@ -83,6 +85,7 @@ static void __init socfpga_init_irq(void)
+>  {
+>  	irqchip_init();
+>  	socfpga_sysmgr_init();
+> +	socfpga_init_l2_ecc();
+
+If you use "if (IS_ENABLED(CONFIG_EDAC_ALTERA_L2C))", then you can
+remove l2_cache.h.
+
+Dinh
