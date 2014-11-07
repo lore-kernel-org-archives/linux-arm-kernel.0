@@ -1,53 +1,36 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri,  7 Nov 2014 17:27:10 +0100
-Subject: [PATCH v4 10/10] [media] v4l: Forbid usage of V4L2_MBUS_FMT
- definitions inside the kernel
-In-Reply-To: <545CDB8D.4080406@xs4all.nl>
-References: <545CDB8D.4080406@xs4all.nl>
-Message-ID: <1415377630-16564-1-git-send-email-boris.brezillon@free-electrons.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 07 Nov 2014 12:09:26 -0500 (EST)
+Subject: [PATCHv4 1/1] net: fec: fix regression on i.MX28 introduced by
+ rx_copybreak support
+In-Reply-To: <CAOMZO5Cb1=Nvzu8EHqmV+K+W+ZJxzL1=5MnK6hDSstwh9ruweA@mail.gmail.com>
+References: <1415350967-2238-1-git-send-email-LW@KARO-electronics.de>
+ <1415350967-2238-2-git-send-email-LW@KARO-electronics.de>
+ <CAOMZO5Cb1=Nvzu8EHqmV+K+W+ZJxzL1=5MnK6hDSstwh9ruweA@mail.gmail.com>
+Message-ID: <20141107.120926.297493918093719160.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Place v4l2_mbus_pixelcode in a #ifndef __KERNEL__ section so that kernel
-users don't have access to these definitions.
+From: Fabio Estevam <festevam@gmail.com>
+Date: Fri, 7 Nov 2014 10:26:15 -0200
 
-We have to keep this definition for user-space users even though they're
-encouraged to move to the new media_bus_format enum.
+> On Fri, Nov 7, 2014 at 7:02 AM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
+>> commit 1b7bde6d659d ("net: fec: implement rx_copybreak to improve rx performance")
+>> introduced a regression for i.MX28. The swap_buffer() function doing
+>> the endian conversion of the received data on i.MX28 may access memory
+>> beyond the actual packet size in the DMA buffer. fec_enet_copybreak()
+>> does not copy those bytes, so that the last bytes of a packet may be
+>> filled with invalid data after swapping.
+>> This will likely lead to checksum errors on received packets.
+>> E.g. when trying to mount an NFS rootfs:
+>> UDP: bad checksum. From 192.168.1.225:111 to 192.168.100.73:44662 ulen 36
+>>
+>> Do the byte swapping and copying to the new skb in one go if
+>> necessary.
+>>
+>> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> 
+> With this patch I am able to NFS mount on mx28 again. Thanks, Lothar!
+> 
+> Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- include/uapi/linux/v4l2-mediabus.h | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/include/uapi/linux/v4l2-mediabus.h b/include/uapi/linux/v4l2-mediabus.h
-index d712df8..3358e86 100644
---- a/include/uapi/linux/v4l2-mediabus.h
-+++ b/include/uapi/linux/v4l2-mediabus.h
-@@ -15,6 +15,17 @@
- #include <linux/types.h>
- #include <linux/videodev2.h>
- 
-+#ifndef __KERNEL__
-+
-+/*
-+ * enum v4l2_mbus_pixelcode and its definitions are now deprecated, and
-+ * MEDIA_BUS_FMT_ definitions (defined in media-bus-format.h) should be
-+ * used instead.
-+ *
-+ * New defines should only be added to media-bus-format.h. The
-+ * v4l2_mbus_pixelcode enum is frozen.
-+ */
-+
- #define V4L2_MBUS_FROM_MEDIA_BUS_FMT(name)	\
- 	MEDIA_BUS_FMT_ ## name = V4L2_MBUS_FMT_ ## name
- 
-@@ -102,6 +113,7 @@ enum v4l2_mbus_pixelcode {
- 
- 	V4L2_MBUS_FROM_MEDIA_BUS_FMT(AHSV8888_1X32),
- };
-+#endif /* __KERNEL__ */
- 
- /**
-  * struct v4l2_mbus_framefmt - frame format on the media bus
--- 
-1.9.1
+Applied, thanks everyone.
