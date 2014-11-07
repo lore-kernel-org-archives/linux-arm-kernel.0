@@ -1,232 +1,196 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Fri,  7 Nov 2014 15:59:12 +0100
-Subject: [PATCH 01/01] arm: ftrace: Adds support for ftrace operations
-In-Reply-To: <1415372352-15664-1-git-send-email-jjhiblot@traphandler.com>
-References: <1415372352-15664-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <1415372352-15664-2-git-send-email-jjhiblot@traphandler.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Fri, 7 Nov 2014 15:08:35 +0000
+Subject: [PATCH v2 02/10] arm64/mm: add create_pgd_mapping() to create
+ private page tables
+In-Reply-To: <1415283206-14713-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1415283206-14713-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1415283206-14713-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20141107150830.GA10210@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ftrace operations require that DYNAMIC_FTRACE_WITH_REGS is enabled.
-This patch introduces a new ftrace handler that store the registers on the
-stack before calling the next stage. The registers are also restored from the
-stack before going back to the instrumented function.
+On Thu, Nov 06, 2014 at 03:13:18PM +0100, Ard Biesheuvel wrote:
 
-Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
----
- arch/arm/Kconfig               |  2 ++
- arch/arm/include/asm/ftrace.h  |  3 ++
- arch/arm/kernel/entry-common.S | 68 +++++++++++++++++++++++++++++++++++++++++-
- arch/arm/kernel/ftrace.c       | 34 +++++++++++++++++++++
- 4 files changed, 106 insertions(+), 1 deletion(-)
+Hi Ard,
+Some comments below:
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 32cbbd5..6f928ee 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -39,6 +39,7 @@ config ARM
- 	select HAVE_DMA_ATTRS
- 	select HAVE_DMA_CONTIGUOUS if MMU
- 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
-+	select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE
- 	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
- 	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
- 	select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
-@@ -72,6 +73,7 @@ config ARM
- 	select PERF_USE_VMALLOC
- 	select RTC_LIB
- 	select SYS_SUPPORTS_APM_EMULATION
-+	select FRAME_POINTER if DYNAMIC_FTRACE_WITH_REGS && FUNCTION_GRAPH_TRACER
- 	# Above selects are sorted alphabetically; please add new ones
- 	# according to that.  Thanks.
- 	help
-diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
-index 39eb16b..d8e9bea 100644
---- a/arch/arm/include/asm/ftrace.h
-+++ b/arch/arm/include/asm/ftrace.h
-@@ -10,6 +10,9 @@ extern void mcount(void);
- extern void __gnu_mcount_nc(void);
- 
- #ifdef CONFIG_DYNAMIC_FTRACE
-+
-+#define ARCH_SUPPORTS_FTRACE_OPS 1
-+
- struct dyn_arch_ftrace {
- #ifdef CONFIG_OLD_MCOUNT
- 	bool	old_mcount;
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index e52fe5a..9594fe2 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -197,7 +197,10 @@ ENDPROC(ret_from_fork)
- 
- 	mcount_get_lr	r1			@ lr of instrumented func
- 	mcount_adjust_addr	r0, lr		@ instrumented function
--
-+	ldr r2, =function_trace_op
-+	ldr r2, [r2]				@ pointer to the current
-+						@ function tracing op
-+	mov r3, #0				@ regs is NULL
- 	.globl ftrace_call\suffix
- ftrace_call\suffix:
- 	bl	ftrace_stub
-@@ -211,6 +214,38 @@ ftrace_graph_call\suffix:
- 	mcount_exit
- .endm
- 
-+.macro __ftrace_regs_caller
-+
-+	add 	ip, sp, #4	@ move in IP the value of SP as it was
-+				@ before the push {lr} of the mcount mechanism
-+	stmdb	sp!, {ip,lr,pc}
-+	stmdb	sp!, {r0-r11,lr}
-+	@ stack content  at this point:
-+	@ 0  4         44    48   52       56   60   64
-+	@ RO | R1 | ... | R11 | LR | SP + 4 | LR | PC | previous LR |
-+
-+	mov r3, sp				@ struct pt_regs*
-+	ldr r2, =function_trace_op
-+	ldr r2, [r2]				@ pointer to the current
-+						@ function tracing op
-+	ldr	r1, [sp, #64]			@ lr of instrumented func
-+	mcount_adjust_addr	r0, lr		@ instrumented function
-+
-+	.globl ftrace_regs_call
-+ftrace_regs_call:
-+	bl	ftrace_stub
-+
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	.globl ftrace_graph_regs_call
-+ftrace_graph_regs_call:
-+	mov	r0, r0
-+#endif
-+	ldr	lr, [sp, #64]		@ get the previous LR value from stack
-+	ldmia	sp, {r0-r11, ip, sp}	@ pop the saved registers INCLUDING
-+					@ the stack pointer
-+	ret	ip
-+.endm
-+
- .macro __ftrace_graph_caller
- 	sub	r0, fp, #4		@ &lr of instrumented routine (&parent)
- #ifdef CONFIG_DYNAMIC_FTRACE
-@@ -226,6 +261,24 @@ ftrace_graph_call\suffix:
- 	mcount_exit
- .endm
- 
-+
-+.macro __ftrace_graph_regs_caller
-+
-+	sub	r0, fp, #4		@ &lr of instrumented routine (&parent)
-+
-+	@ called from __ftrace_regs_caller
-+	ldr	r1, [sp, #56]		@ instrumented routine (func)
-+	mcount_adjust_addr	r1, r1
-+
-+	mov	r2, fp			@ frame pointer
-+	bl	prepare_ftrace_return
-+
-+	ldr	lr, [fp, #-4]		@ restore LR from the stack
-+	ldmia	sp, {r0-r11, ip, sp}	@ pop the saved registers INCLUDING
-+					@ the stack pointer
-+	ret	ip
-+.endm
-+
- #ifdef CONFIG_OLD_MCOUNT
- /*
-  * mcount
-@@ -312,14 +365,27 @@ UNWIND(.fnstart)
- 	__ftrace_caller
- UNWIND(.fnend)
- ENDPROC(ftrace_caller)
-+
-+ENTRY(ftrace_regs_caller)
-+UNWIND(.fnstart)
-+	__ftrace_regs_caller
-+UNWIND(.fnend)
-+ENDPROC(ftrace_regs_caller)
- #endif
- 
-+
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
- ENTRY(ftrace_graph_caller)
- UNWIND(.fnstart)
- 	__ftrace_graph_caller
- UNWIND(.fnend)
- ENDPROC(ftrace_graph_caller)
-+
-+ENTRY(ftrace_graph_regs_caller)
-+UNWIND(.fnstart)
-+	__ftrace_graph_regs_caller
-+UNWIND(.fnend)
-+ENDPROC(ftrace_graph_regs_caller)
- #endif
- 
- .purgem mcount_enter
-diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-index af9a8a9..35c5743 100644
---- a/arch/arm/kernel/ftrace.c
-+++ b/arch/arm/kernel/ftrace.c
-@@ -130,6 +130,16 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
- 	}
- #endif
- 
-+
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+	if (!ret) {
-+		pc = (unsigned long)&ftrace_regs_call;
-+		new = ftrace_call_replace(pc, (unsigned long)func);
-+
-+		ret = ftrace_modify_code(pc, 0, new, false);
-+	}
-+#endif
-+
- 	return ret;
- }
- 
-@@ -139,6 +149,20 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
- 	unsigned long ip = rec->ip;
- 
- 	old = ftrace_nop_replace(rec);
-+
-+	new = ftrace_call_replace(ip, adjust_address(rec, addr));
-+
-+	return ftrace_modify_code(rec->ip, old, new, true);
-+}
-+
-+int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
-+				unsigned long addr)
-+{
-+	unsigned long new, old;
-+	unsigned long ip = rec->ip;
-+
-+	old = ftrace_call_replace(ip, adjust_address(rec, old_addr));
-+
- 	new = ftrace_call_replace(ip, adjust_address(rec, addr));
- 
- 	return ftrace_modify_code(rec->ip, old, new, true);
-@@ -211,6 +235,9 @@ void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
- extern unsigned long ftrace_graph_call;
- extern unsigned long ftrace_graph_call_old;
- extern void ftrace_graph_caller_old(void);
-+extern unsigned long ftrace_graph_regs_call;
-+extern void ftrace_graph_regs_caller(void);
-+
- 
- static int __ftrace_modify_caller(unsigned long *callsite,
- 				  void (*func) (void), bool enable)
-@@ -240,6 +267,13 @@ static int ftrace_modify_graph_caller(bool enable)
- 					     enable);
- #endif
- 
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+	if (!ret)
-+		ret = __ftrace_modify_caller(&ftrace_graph_regs_call,
-+				     ftrace_graph_regs_caller,
-+				     enable);
-+#endif
-+
- 	return ret;
- }
- 
+> For UEFI, we need to install the memory mappings used for Runtime Services
+> in a dedicated set of page tables. Add create_pgd_mapping(), which allows
+> us to allocate and install those page table entries early.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/mmu.h     |  3 +++
+>  arch/arm64/include/asm/pgtable.h |  5 +++++
+>  arch/arm64/mm/mmu.c              | 44 +++++++++++++++++++++-------------------
+>  3 files changed, 31 insertions(+), 21 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+> index c2f006c48bdb..5fd40c43be80 100644
+> --- a/arch/arm64/include/asm/mmu.h
+> +++ b/arch/arm64/include/asm/mmu.h
+> @@ -33,5 +33,8 @@ extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
+>  extern void init_mem_pgprot(void);
+>  /* create an identity mapping for memory (or io if map_io is true) */
+>  extern void create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io);
+> +extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+> +			       unsigned long virt, phys_addr_t size,
+> +			       pgprot_t prot);
+>  
+>  #endif
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index 41a43bf26492..1abe4d08725b 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -264,6 +264,11 @@ static inline pmd_t pte_pmd(pte_t pte)
+>  	return __pmd(pte_val(pte));
+>  }
+>  
+> +static inline pgprot_t mk_sect_prot(pgprot_t prot)
+> +{
+> +	return __pgprot(pgprot_val(prot) & ~PTE_TABLE_BIT);
+> +}
+> +
+>  /*
+>   * THP definitions.
+>   */
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 83e6713143a3..b6dc2ce3991a 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -157,20 +157,10 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
+>  
+>  static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+>  				  unsigned long addr, unsigned long end,
+> -				  phys_addr_t phys, int map_io)
+> +				  phys_addr_t phys, pgprot_t prot)
+>  {
+>  	pmd_t *pmd;
+>  	unsigned long next;
+> -	pmdval_t prot_sect;
+> -	pgprot_t prot_pte;
+> -
+> -	if (map_io) {
+> -		prot_sect = PROT_SECT_DEVICE_nGnRE;
+> -		prot_pte = __pgprot(PROT_DEVICE_nGnRE);
+> -	} else {
+> -		prot_sect = PROT_SECT_NORMAL_EXEC;
+> -		prot_pte = PAGE_KERNEL_EXEC;
+> -	}
+
+Thanks :-)
+
+>  
+>  	/*
+>  	 * Check for initial section mappings in the pgd/pud and remove them.
+> @@ -186,7 +176,8 @@ static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+>  		/* try section mapping first */
+>  		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
+>  			pmd_t old_pmd =*pmd;
+> -			set_pmd(pmd, __pmd(phys | prot_sect));
+> +			set_pmd(pmd, __pmd(phys |
+> +					   pgprot_val(mk_sect_prot(prot))));
+>  			/*
+>  			 * Check for previous table entries created during
+>  			 * boot (__create_page_tables) and flush them.
+> @@ -195,7 +186,7 @@ static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+>  				flush_tlb_all();
+>  		} else {
+>  			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
+> -				       prot_pte);
+> +				       prot);
+>  		}
+>  		phys += next - addr;
+>  	} while (pmd++, addr = next, addr != end);
+> @@ -203,7 +194,7 @@ static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+>  
+>  static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+>  				  unsigned long addr, unsigned long end,
+> -				  unsigned long phys, int map_io)
+> +				  unsigned long phys, pgprot_t prot)
+>  {
+>  	pud_t *pud;
+>  	unsigned long next;
+> @@ -221,10 +212,11 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+>  		/*
+>  		 * For 4K granule only, attempt to put down a 1GB block
+>  		 */
+> -		if (!map_io && (PAGE_SHIFT == 12) &&
+> +		if ((PAGE_SHIFT == 12) &&
+>  		    ((addr | next | phys) & ~PUD_MASK) == 0) {
+>  			pud_t old_pud = *pud;
+> -			set_pud(pud, __pud(phys | PROT_SECT_NORMAL_EXEC));
+> +			set_pud(pud, __pud(phys |
+> +					   pgprot_val(mk_sect_prot(prot))));
+>  
+>  			/*
+>  			 * If we have an old value for a pud, it will
+> @@ -239,7 +231,7 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+>  				flush_tlb_all();
+>  			}
+>  		} else {
+> -			alloc_init_pmd(mm, pud, addr, next, phys, map_io);
+> +			alloc_init_pmd(mm, pud, addr, next, phys, prot);
+>  		}
+>  		phys += next - addr;
+>  	} while (pud++, addr = next, addr != end);
+> @@ -251,7 +243,7 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+>   */
+>  static void __init __create_mapping(struct mm_struct *mm, pgd_t *pgd,
+>  				    phys_addr_t phys, unsigned long virt,
+> -				    phys_addr_t size, int map_io)
+> +				    phys_addr_t size, pgprot_t prot)
+>  {
+>  	unsigned long addr, length, end, next;
+>  
+> @@ -261,7 +253,8 @@ static void __init __create_mapping(struct mm_struct *mm, pgd_t *pgd,
+>  	end = addr + length;
+>  	do {
+>  		next = pgd_addr_end(addr, end);
+> -		alloc_init_pud(mm, pgd, addr, next, phys, map_io);
+> +		alloc_init_pud(mm, pgd, addr, next, phys, prot);
+> +			       
+>  		phys += next - addr;
+>  	} while (pgd++, addr = next, addr != end);
+>  }
+> @@ -275,7 +268,7 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+>  		return;
+>  	}
+>  	__create_mapping(&init_mm, pgd_offset_k(virt & PAGE_MASK), phys, virt,
+> -			 size, 0);
+> +			 size, PAGE_KERNEL_EXEC);
+>  }
+>  
+>  void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
+> @@ -285,7 +278,16 @@ void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
+>  		return;
+>  	}
+>  	__create_mapping(&init_mm, &idmap_pg_dir[pgd_index(addr)],
+> -			 addr, addr, size, map_io);
+> +			 addr, addr, size,
+> +			 map_io ? __pgprot(PROT_DEVICE_nGnRE)
+> +				: PAGE_KERNEL_EXEC);
+> +}
+
+Could you please also change efi_setup_idmap (it's the only caller I
+can see for create_id_mapping)?
+
+That way the prototype for create_id_mapping would look like:
+void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, pgprot_t prot)
+
+> +
+> +void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+> +			       unsigned long virt, phys_addr_t size,
+> +			       pgprot_t prot)
+> +{
+> +	__create_mapping(mm, pgd_offset(mm, virt), phys, virt, size, prot);
+>  }
+>  
+>  static void __init map_mem(void)
+> -- 
+> 1.8.3.2
+> 
+
+Cheers,
 -- 
-2.1.3
+Steve
