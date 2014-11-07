@@ -1,41 +1,63 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 07 Nov 2014 14:48:20 -0800
-Subject: [PATCH v7 0/5] This is the 1st version of suspend for RK3288.
-In-Reply-To: <1415368177-6637-1-git-send-email-zyw@rock-chips.com> (Chris
- Zhong's message of "Fri, 7 Nov 2014 21:49:32 +0800")
-References: <1415368177-6637-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <7hwq76pqyz.fsf@deeprootsystems.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 7 Nov 2014 14:52:38 -0800
+Subject: [PATCH] clk: Propagate prepare and enable when reparenting orphans
+In-Reply-To: <20141107185844.GR4042@n2100.arm.linux.org.uk>
+References: <1415386312-23741-1-git-send-email-dianders@chromium.org>
+ <20141107185844.GR4042@n2100.arm.linux.org.uk>
+Message-ID: <CAD=FV=WhWqMB=-ErD-59-z=y7OCZx4r7REkr3DpyYR=76SEJ6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chris Zhong <zyw@rock-chips.com> writes:
+Russell,
 
-> RK3288 can shut down the cpu, gpu and other device controllers in suspend,
-> and it will pull the GLOBAL_PWROFF pin to high in the final stage of the
-> process of suspend, pull the pin to low again when resume.
+On Fri, Nov 7, 2014 at 10:58 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Nov 07, 2014 at 10:51:52AM -0800, Doug Anderson wrote:
+>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+>> index 4896ae9..a3d3d58 100644
+>> --- a/drivers/clk/clk.c
+>> +++ b/drivers/clk/clk.c
+>> @@ -1650,6 +1650,17 @@ void __clk_reparent(struct clk *clk, struct clk *new_parent)
+>>       clk_reparent(clk, new_parent);
+>>       __clk_recalc_accuracies(clk);
+>>       __clk_recalc_rates(clk, POST_RATE_CHANGE);
+>> +
+>> +     if (clk->prepare_count) {
+>> +             unsigned long flags;
+>> +
+>> +             __clk_prepare(new_parent);
+>> +
+>> +             flags = clk_enable_lock();
+>> +             if (clk->enable_count)
+>> +                     __clk_enable(new_parent);
+>> +             clk_enable_unlock(flags);
+>> +     }
+>
+> I really don't understand why this isn't already done - I said this was
+> necessary a /long/ time ago.
+>
+> However, the above isn't sufficient.  Think about the old parent - this
+> should be disabled and unprepared if it was prepared and enabled by the
+> child.
 
-The cover letter still doesn't state what this series applies to, or
-what its dependencies are for testing, even though it was requested in
-earlier reviews[1].  I discovered (again) by trial and error it applies
-to current linux-next.  I also discovered (as was earlier discussed[2])
-that it still does not resume using current upstream code, and those
-dependencies are not described here either.  These are the kinds of
-things that are crucial in a cover letter in order to help reviewers and
-testers not have to spend time digging through the archives trying to
-remember from the previous round of reviews. 
+You may be referring of a different bug than I am addressing.  I can
+think about the old parent, but it always a tear to my eyes since
+these clocks are orphans and had no old parents (unless you count the
+matron at the orphanage, but I doubt she was either prepared or
+enabled).  ;)
 
-Please, please list the out-of-tree dependencies, and how to test,
-including how you tested it, and on what hardware.
+Ah, but I see!  There are other users of this function that are not
+part of "clk.c".  Doh!  Since this was a "__" function with no
+documentation I assumed it was "static", but I see that it is not.  I
+see two callers that are not part of the orphan code.
 
-Speaking of earlier reviews, I've noticed that after reviewing this
-series multiple times, you never respond to questions and/or comments.
-Two-way communication is important when collaborating on getting complex
-code this upstream, so please take some time to acknowledge the comments
-of reviewers and engage in discussion when questions are asked.  Even if
-it's as simple as "OK, I'll fix it in the next version", that helps
-reviewers know that they're not wasting their time.
+I'll happily move this code down so it's only called by the orphan
+code and not touch the two callers of __clk_reparent(), assuming that
+they don't need to deal with this scenario.
 
-Kevin
 
-[1] https://lkml.org/lkml/2014/10/29/759
-[2] https://lkml.org/lkml/2014/10/29/881
+NOTE: As far as I can tell, the standard exposed API call is
+clk_set_parent().  From reading comments that does move the prepared /
+enabled state, but I haven't confirmed that functionality.
+
+-Doug
