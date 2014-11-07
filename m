@@ -1,34 +1,56 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 7 Nov 2014 14:10:34 +0000
-Subject: [PATCH v7 3/8] arm64: introduce is_device_dma_coherent
-In-Reply-To: <20141107111126.GB21875@localhost>
-References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
- <1414422568-19103-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1411031045340.22875@kaball.uk.xensource.com>
- <20141103105716.GC23162@arm.com>
- <alpine.DEB.2.02.1411031101400.22875@kaball.uk.xensource.com>
- <20141105165646.GN32700@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.02.1411051757140.22875@kaball.uk.xensource.com>
- <20141106103337.GA19702@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.02.1411061155200.22875@kaball.uk.xensource.com>
- <20141107110524.GA21875@localhost> <20141107111126.GB21875@localhost>
-Message-ID: <alpine.DEB.2.02.1411071239110.22875@kaball.uk.xensource.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri,  7 Nov 2014 15:12:33 +0100
+Subject: [PATCH 1/2] arm64: ftrace: eliminate literal pool entries
+Message-ID: <1415369554-7444-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 7 Nov 2014, Catalin Marinas wrote:
-> On Fri, Nov 07, 2014 at 11:05:25AM +0000, Catalin Marinas wrote:
-> > BTW, drivers/xen/swiotlb-xen.c needs something like:
-> > 
-> >         dma_addr_t dev_addr = xen_phys_to_bus(phys_to_dma(phys));
-> > 
-> > phys != bus address.
-> 
-> Wrong place, what I meant is when calling:
-> 
->         xen_dma_unmap_page(hwdev, phys_to_dma(paddr), size, dir, attrs);
+Replace ldr xN, =<symbol> with adrp/add or adrp/ldr [as appropriate]
+in the implementation of _mcount(), which may be called very often.
 
-Well spotted! This is an actual mistake in the current code, independent
-from the problem described before. Julien reported it a couple of days
-ago and I have already queued a patch to fix it at the end of the
-series.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/entry-ftrace.S | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
+index 38e704e597f7..08cafc518b9a 100644
+--- a/arch/arm64/kernel/entry-ftrace.S
++++ b/arch/arm64/kernel/entry-ftrace.S
+@@ -98,8 +98,8 @@
+ ENTRY(_mcount)
+ 	mcount_enter
+ 
+-	ldr	x0, =ftrace_trace_function
+-	ldr	x2, [x0]
++	adrp	x0, ftrace_trace_function
++	ldr	x2, [x0, #:lo12:ftrace_trace_function]
+ 	adr	x0, ftrace_stub
+ 	cmp	x0, x2			// if (ftrace_trace_function
+ 	b.eq	skip_ftrace_call	//     != ftrace_stub) {
+@@ -115,14 +115,15 @@ skip_ftrace_call:			//   return;
+ 	mcount_exit			//   return;
+ 					// }
+ skip_ftrace_call:
+-	ldr	x1, =ftrace_graph_return
+-	ldr	x2, [x1]		//   if ((ftrace_graph_return
+-	cmp	x0, x2			//        != ftrace_stub)
+-	b.ne	ftrace_graph_caller
+-
+-	ldr	x1, =ftrace_graph_entry	//     || (ftrace_graph_entry
+-	ldr	x2, [x1]		//        != ftrace_graph_entry_stub))
+-	ldr	x0, =ftrace_graph_entry_stub
++	adrp	x1, ftrace_graph_return
++	ldr	x2, [x1, #:lo12:ftrace_graph_return]
++	cmp	x0, x2			//   if ((ftrace_graph_return
++	b.ne	ftrace_graph_caller	//        != ftrace_stub)
++
++	adrp	x1, ftrace_graph_entry	//     || (ftrace_graph_entry
++	adrp	x0, ftrace_graph_entry_stub //     != ftrace_graph_entry_stub))
++	ldr	x2, [x1, #:lo12:ftrace_graph_entry]
++	add	x0, x0, #:lo12:ftrace_graph_entry_stub
+ 	cmp	x0, x2
+ 	b.ne	ftrace_graph_caller	//     ftrace_graph_caller();
+ 
+-- 
+1.8.3.2
