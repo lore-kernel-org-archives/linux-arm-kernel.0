@@ -1,40 +1,56 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Fri, 7 Nov 2014 09:50:25 -0200
-Subject: [PATCH v2 01/10] [media] Move mediabus format definition to a
- more standard place
-In-Reply-To: <20141107114358.GB3136@valkosipuli.retiisi.org.uk>
-References: <1415267829-4177-1-git-send-email-boris.brezillon@free-electrons.com>
- <1415267829-4177-2-git-send-email-boris.brezillon@free-electrons.com>
- <20141107114358.GB3136@valkosipuli.retiisi.org.uk>
-Message-ID: <20141107095025.4dbf6774@concha.lan>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 07 Nov 2014 20:50:56 +0900
+Subject: [PATCH] ARM: dts: Fix booting on Rinato market device
+In-Reply-To: <1415360662-30390-1-git-send-email-k.kozlowski@samsung.com>
+References: <1415360662-30390-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <545CB220.9030007@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Fri, 07 Nov 2014 13:43:59 +0200
-Sakari Ailus <sakari.ailus@iki.fi> escreveu:
+Hi Krzysztof,
 
->>  +enum media_bus_format {  
+On 11/07/2014 08:44 PM, Krzysztof Kozlowski wrote:
+> The bootloader on market Rinato (Gear 2) device checks for revision in
+> compatible field of DTB. If it is not present or lower than required
+> then booting fails with: "Could not do normal boot. (no DTB found)".
 > 
-> There's no really a need to keep the definitions inside the enum. It looks a
-> little bit confusing to me. That made me realise something I missed
-> yesterday.
+> Log of bootloader in case of failure:
+> h/w: revision  = 0x06
+> h/w: schematic = SM-R380_Rev0.5_Final_0205
+> date = 2000/01/01 12:00:21 (UTC)
+> cmu_div:4, div:5, src_clk:800000000, pixel_clk:31860720
+> load_kernel: loading boot image from 57344.. (BOOT)
+> load_kernel: found zImage, size: 0x3267e8
+> 0xbc Error!
+> Verify_Binary_Signature: failed.
+> pit_check_signature (BOOT) invalid.
+> load_kernel: found custom kernel (ret:-2147483647)
+>  No need to update kernel type.
+> Detected board: samsung,rinato-rev06
+> Could not do normal boot. (no DTB found)
+> : Entering usb mode for SM-R380_EUR_XX (65535)..
 > 
-> There's a difference: the enum in C++ is a different thing than in C, and
-> the enum type isn't able to contain any other values than those defined in
-> the enumeration.
+> Add a "rev06" suffix to compatible to satisfy the bootloader.
 > 
-> So what I propose is the following. Keep enum v4l2_mbus_pixelcode around,
-> including the enum values. Define new values for MEDIA_BUS_* equivalents
-> using preprocessor macros, as you've done below. Drop the definition of enum
-> media_bus_format, and use u32 (or uint32_t) type for the variables.
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos3250-rinato.dts | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> This way the enum stays intact for existing C++ applications, and new
-> applications will have to use a 32-bit type.
+> diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
+> index 84380fa13e37..f72ba0a1d915 100644
+> --- a/arch/arm/boot/dts/exynos3250-rinato.dts
+> +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
+> @@ -18,7 +18,8 @@
+>  
+>  / {
+>  	model = "Samsung Rinato board";
+> -	compatible = "samsung,rinato", "samsung,exynos3250", "samsung,exynos3";
+> +	compatible = "samsung,rinato", "samsung,rinato-rev06",
+> +			"samsung,exynos3250", "samsung,exynos3";
 
-Yeah, enums at the public API is bad, as any change there can potentially
-cause C++ apps to break.
+I think it is wrong. The released bootloader from Samsung is not u-boot.
+Instead, you have to update u-boot to support Exynos3250-basd Rinato board.
 
--- 
-
-Cheers,
-Mauro
+Thanks,
+Chanwoo Choi
