@@ -1,227 +1,36 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri,  7 Nov 2014 11:57:45 +0000
-Subject: [PATCH 03/13] ARM: STi: DT: STiH416: Add DT nodes for the ehci and
- ohci usb controllers.
+Date: Fri,  7 Nov 2014 11:57:46 +0000
+Subject: [PATCH 04/13] ARM: multi_v7_defconfig: Enable st ohci and ehci HCD
+ drivers.
 In-Reply-To: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
 References: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1415361475-6218-4-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1415361475-6218-5-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the DT nodes for the 4 usb ehci and ohci usb controllers
-on the stih416 SoC.
+Enable the ehci and ohci drivers in the multi_v7_defconfig so that
+the USB controllers on stih41x work by default.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- arch/arm/boot/dts/stih416-b2020.dts  |   4 +
- arch/arm/boot/dts/stih416-b2020e.dts |   4 +
- arch/arm/boot/dts/stih416.dtsi       | 144 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/stih41x-b2020.dtsi |  12 +++
- 4 files changed, 164 insertions(+)
+ arch/arm/configs/multi_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
-index 5d1543b..c75b632 100644
---- a/arch/arm/boot/dts/stih416-b2020.dts
-+++ b/arch/arm/boot/dts/stih416-b2020.dts
-@@ -33,5 +33,9 @@
- 		sata0: sata at fe380000{
- 			status = "okay";
- 		};
-+
-+		usb3: usb at fe340000 {
-+			status = "okay";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/stih416-b2020e.dts b/arch/arm/boot/dts/stih416-b2020e.dts
-index 956fab8..9768503 100644
---- a/arch/arm/boot/dts/stih416-b2020e.dts
-+++ b/arch/arm/boot/dts/stih416-b2020e.dts
-@@ -51,5 +51,9 @@
- 		sata0: sata at fe380000{
- 			status = "okay";
- 		};
-+
-+		usb3: usb at fe340000 {
-+			status = "okay";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index 0f3019a..6238d9e 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -325,5 +325,149 @@
- 			clock-names = "osc_phy";
- 
- 		};
-+
-+		ehci0: usb at 0xfe1ffe00 {
-+			compatible = "st,st-ehci-300x";
-+			reg = <0xfe1ffe00 0x100>;
-+			interrupts = <GIC_SPI 148 IRQ_TYPE_NONE>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb0>;
-+			clocks = <&clk_s_a1_ls 0>,
-+				 <&clockgen_b0 0>;
-+			clock-names = "ic", "clk48";
-+
-+			phys = <&usb2_phy>;
-+			phy-names = "usb";
-+			status = "okay";
-+
-+			resets = <&powerdown STIH416_USB0_POWERDOWN>,
-+				 <&softreset STIH416_USB0_SOFTRESET>;
-+			reset-names = "power", "softreset";
-+		};
-+
-+		ohci0: usb at 0xfe1ffc00 {
-+			compatible = "st,st-ohci-300x";
-+			reg = <0xfe1ffc00 0x100>;
-+			interrupts = <GIC_SPI 149 IRQ_TYPE_NONE>;
-+			clocks = <&clk_s_a1_ls 0>,
-+				 <&clockgen_b0 0>;
-+			clock-names = "ic", "clk48";
-+			phys = <&usb2_phy>;
-+			phy-names = "usb";
-+			status = "okay";
-+
-+			resets = <&powerdown STIH416_USB0_POWERDOWN>,
-+				 <&softreset STIH416_USB0_SOFTRESET>;
-+			reset-names = "power", "softreset";
-+		};
-+
-+		ehci1: usb at 0xfe203e00 {
-+			compatible = "st,st-ehci-300x";
-+			reg = <0xfe203e00 0x100>;
-+			interrupts = <GIC_SPI 150 IRQ_TYPE_NONE>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb1>;
-+
-+			clocks = <&clk_s_a1_ls 0>,
-+				 <&clockgen_b0 0>;
-+			clock-names = "ic", "clk48";
-+
-+			phys = <&usb2_phy>;
-+			phy-names = "usb";
-+			status = "okay";
-+
-+			resets = <&powerdown STIH416_USB1_POWERDOWN>,
-+				 <&softreset STIH416_USB1_SOFTRESET>;
-+			reset-names = "power", "softreset";
-+		};
-+
-+		ohci1: usb at 0xfe203c00 {
-+			compatible = "st,st-ohci-300x";
-+			reg = <0xfe203c00 0x100>;
-+			interrupts = <GIC_SPI 151 IRQ_TYPE_NONE>;
-+
-+			clocks = <&clk_s_a1_ls 0>,
-+				 <&clockgen_b0 0>;
-+			clock-names = "ic", "clk48";
-+			phys = <&usb2_phy>;
-+			phy-names = "usb";
-+			status = "okay";
-+
-+			resets = <&powerdown STIH416_USB1_POWERDOWN>,
-+				 <&softreset STIH416_USB1_SOFTRESET>;
-+			reset-names = "power", "softreset";
-+		};
-+
-+		ehci2: usb at 0xfe303e00 {
-+			compatible = "st,st-ehci-300x";
-+			reg = <0xfe303e00 0x100>;
-+			interrupts = <GIC_SPI 152 IRQ_TYPE_NONE>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb2>;
-+
-+			clocks = <&clk_s_a1_ls 0>,
-+				 <&clockgen_b0 0>;
-+			clock-names = "ic", "clk48";
-+
-+			phys = <&usb2_phy>;
-+			phy-names = "usb";
-+			status = "okay";
-+
-+			resets = <&powerdown STIH416_USB2_POWERDOWN>,
-+				 <&softreset STIH416_USB2_SOFTRESET>;
-+			reset-names = "power", "softreset";
-+		};
-+
-+		ohci2: usb at 0xfe303c00 {
-+			compatible = "st,st-ohci-300x";
-+			reg = <0xfe303c00 0x100>;
-+			interrupts = <GIC_SPI 153 IRQ_TYPE_NONE>;
-+			clocks = <&clk_s_a1_ls 0>,
-+				 <&clockgen_b0 0>;
-+			clock-names = "ic", "clk48";
-+			phys = <&usb2_phy>;
-+			phy-names = "usb";
-+			status = "okay";
-+
-+			resets = <&powerdown STIH416_USB2_POWERDOWN>,
-+				 <&softreset STIH416_USB2_SOFTRESET>;
-+			reset-names = "power", "softreset";
-+		};
-+
-+		ehci3: usb at 0xfe343e00 {
-+			compatible = "st,st-ehci-300x";
-+			reg = <0xfe343e00 0x100>;
-+			interrupts = <GIC_SPI 154 IRQ_TYPE_NONE>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb3>;
-+
-+			clocks = <&clk_s_a1_ls 0>,
-+				 <&clockgen_b0 0>;
-+			clock-names = "ic", "clk48";
-+
-+			phys = <&usb2_phy>;
-+			phy-names = "usb";
-+			status = "okay";
-+
-+			resets = <&powerdown STIH416_USB3_POWERDOWN>,
-+				 <&softreset STIH416_USB3_SOFTRESET>;
-+			reset-names = "power", "softreset";
-+		};
-+
-+		ohci3: usb at 0xfe343c00 {
-+			compatible = "st,st-ohci-300x";
-+			reg = <0xfe343c00 0x100>;
-+			interrupts = <GIC_SPI 155 IRQ_TYPE_NONE>;
-+			clocks = <&clk_s_a1_ls 0>,
-+				 <&clockgen_b0 0>;
-+			clock-names = "ic", "clk48";
-+			phys = <&usb2_phy>;
-+			phy-names = "usb";
-+			status = "okay";
-+
-+			resets = <&powerdown STIH416_USB3_POWERDOWN>,
-+				 <&softreset STIH416_USB3_SOFTRESET>;
-+			reset-names = "power", "softreset";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/stih41x-b2020.dtsi b/arch/arm/boot/dts/stih41x-b2020.dtsi
-index 487d7d8..005ab38 100644
---- a/arch/arm/boot/dts/stih41x-b2020.dtsi
-+++ b/arch/arm/boot/dts/stih41x-b2020.dtsi
-@@ -78,5 +78,17 @@
- 		mmc0: sdhci at fe81e000 {
- 			bus-width = <8>;
- 		};
-+
-+		usb0: usb at fe100000 {
-+			status = "okay";
-+		};
-+
-+		usb1: usb at fe200000 {
-+			status = "okay";
-+		};
-+
-+		usb2: usb at fe300000 {
-+			status = "okay";
-+		};
- 	};
- };
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 491b7d5..c7a9517 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -318,9 +318,11 @@ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_XHCI_MVEBU=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_TEGRA=y
++CONFIG_USB_EHCI_HCD_STI=y
+ CONFIG_USB_EHCI_HCD_PLATFORM=y
+ CONFIG_USB_ISP1760_HCD=y
+ CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_OHCI_HCD_STI=y
+ CONFIG_USB_OHCI_HCD_PLATFORM=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_CHIPIDEA=y
 -- 
 1.9.1
