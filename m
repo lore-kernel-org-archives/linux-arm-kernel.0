@@ -1,28 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Nov 2014 12:11:19 +0000
-Subject: [RFC] ptrace: add generic SET_SYSCALL request
-In-Reply-To: <1678531.AUssrM9PAs@wuerfel>
-References: <1415346443-28915-1-git-send-email-takahiro.akashi@linaro.org>
- <1977974.l97vvy7Y8b@wuerfel> <20141107115551.GC18916@arm.com>
- <1678531.AUssrM9PAs@wuerfel>
-Message-ID: <20141107121119.GQ4042@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 07 Nov 2014 13:13:36 +0100
+Subject: [PATCH 12/13] ARM: STi: DT: STiH410: Add STiH410 SoC clock
+ support.
+In-Reply-To: <1415361475-6218-13-git-send-email-peter.griffin@linaro.org>
+References: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
+ <1415361475-6218-13-git-send-email-peter.griffin@linaro.org>
+Message-ID: <88469624.TsXJ3Gpfe2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 07, 2014 at 01:03:00PM +0100, Arnd Bergmann wrote:
-> On Friday 07 November 2014 11:55:51 Will Deacon wrote:
-> > We need this for arm64 and, since all architectures seem to have a mechanism
-> > for setting a system call via ptrace, moving it to generic code should make
-> > sense for new architectures too, no?
+On Friday 07 November 2014 11:57:54 Peter Griffin wrote:
+> +
+> +       soc {
+> +
+> +               ohci0: usb at 9a03c00 {
+> +                       status = "okay";
+> +               };
+> +
+> +               ehci0: usb at 9a03e00 {
+> +                       status = "okay";
+> +               };
+> +
+> +               ohci1: usb at 9a83c00 {
+> +                       status = "okay";
+> +               };
+> +
+> +               ehci1: usb at 9a83e00 {
+> +                       status = "okay";
+> +               };
+> +       };
+> +};
 > 
-> It makes a little more sense now, but I still don't understand why you
-> need to set the system call number via ptrace. What is this used for,
-> and why doesn't any other architecture have this?
 
-All other architectures have a way.  x86, for example, you set orig_eax
-(or orig_rax) to change the syscall number.  On ARM, that doesn't work
-because we don't always pass the syscall number in a register.
+These seem to refer to an existing device in the base dtsi file. Just put the label
+in the shared file and remove the exact names here. Alternatively, drop the labels
+you don't use.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
