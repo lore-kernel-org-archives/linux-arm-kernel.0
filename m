@@ -1,36 +1,71 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Fri, 7 Nov 2014 18:07:24 +0900
-Subject: [PATCH 0/3] Add support for Tegra Activity Monitor
-In-Reply-To: <1414594232-15684-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1414594232-15684-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <545C8BCC.3090908@nvidia.com>
+From: cornelia.huck@de.ibm.com (Cornelia Huck)
+Date: Fri, 7 Nov 2014 10:07:21 +0100
+Subject: [PATCH v13 2/7] KVM: Add generic support for dirty page logging
+In-Reply-To: <1415320848-13813-3-git-send-email-m.smarduch@samsung.com>
+References: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
+ <1415320848-13813-3-git-send-email-m.smarduch@samsung.com>
+Message-ID: <20141107100721.44c34175.cornelia.huck@de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2014 11:50 PM, Tomeu Vizoso wrote:
-> Hello,
->
-> these patches implement support for setting the rate of the EMC clock based on
-> stats collected from the ACTMON, a piece of hw in the Tegra124 that counts
-> memory accesses (among others).
->
-> It depends on the following in-flight patches:
->
-> * MC driver: http://thread.gmane.org/gmane.linux.ports.tegra/19623
-> * EMC driver: http://thread.gmane.org/gmane.linux.ports.arm.kernel/365125
-> * CPUFreq driver: http://thread.gmane.org/gmane.linux.kernel/1812962
->
-> I have pushed a branch here for testing:
+On Thu, 06 Nov 2014 16:40:43 -0800
+Mario Smarduch <m.smarduch@samsung.com> wrote:
 
-I am not too familiar with DVFS, but after going through this series it 
-really seems to me that this could use devfreq. In its current form this 
-driver mixes control and policy and lacks flexibility, preventing e.g. 
-to switch to a performance or power-saving profile. Could you study the 
-feasibility of using devfreq for this?
+> kvm_get_dirty_log() provides generic handling of dirty bitmap, currently reused
+> by several architectures. Building on that we intrdoduce 
+> kvm_get_dirty_log_protect() adding write protection to mark these pages dirty
+> for future write access, before next KVM_GET_DIRTY_LOG ioctl call from user
+> space.
+> 
+> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> ---
+>  include/linux/kvm_host.h |    9 +++++
+>  virt/kvm/kvm_main.c      |   95 ++++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 104 insertions(+)
+> 
 
-I also wonder if this driver could not be made more flexible generally 
-speaking - right now it is hardcoded that you can only control EMC 
-frequency with it. I can imagine that we could want to control several 
-clocks using the same counter information, and that e.g. a notifier 
-block might help with that. But let's keep that for later - whether to 
-use devfreq or not seems to be the most important question for now.
+> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+> index 887df87..f017760 100644
+> --- a/virt/kvm/kvm_main.c
+> +++ b/virt/kvm/kvm_main.c
+> @@ -981,6 +981,101 @@ out:
+>  }
+>  EXPORT_SYMBOL_GPL(kvm_get_dirty_log);
+> 
+> +#if defined(CONFIG_S390) || defined(CONFIG_PPC) || defined(CONFIG_MIPS) || \
+> +    defined(CONFIG_IA64) || defined(CONFIG_X86) || defined(CONFIG_ARM) || \
+> +    defined(CONFIG_ARM64)
+
+Does this deserve a config symbol that can be selected by architectures
+actually using kvm_get_dirty_log_protect()? I.e.,
+
+#ifndef CONFIG_KVM_ARCH_DIRTY_LOG_PROTECT
+
+or so?
+
+> +/*
+> + * For architectures that don't use kvm_get_dirty_log_protect() for dirty page
+> + * logging, calling this function is illegal. Otherwise the function is defined
+> + * in arch subtree and this restriction is removed.
+> + */
+
+What about
+
+/*
+ * For architectures that don't use kvm_get_dirty_log_protect() for dirty page
+ * logging, we must never end up calling this function. Architectures that do
+ * use it define their own version of this function.
+ */
+
+instead?
+
+> +void kvm_arch_mmu_write_protect_pt_masked(struct kvm *kvm,
+> +					struct kvm_memory_slot *slot,
+> +					gfn_t gfn_offset,
+> +					unsigned long mask)
+> +{
+> +	BUG();
+> +}
+> +#endif
+> +
+(...)
