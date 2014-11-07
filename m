@@ -1,45 +1,61 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Fri, 7 Nov 2014 17:19:33 +0100
-Subject: [PATCH v2 06/11] memory: atmel-ebi: add DT bindings documentation
-In-Reply-To: <20141107164940.663f5423@bbrezillon>
-References: <1415203287-21517-1-git-send-email-boris.brezillon@free-electrons.com>
- <1415203287-21517-7-git-send-email-boris.brezillon@free-electrons.com>
- <CAL_JsqJvT-gnr6AYHq42qfgS+ckZ1y6DFiPK5+-MBhHefB8_Sg@mail.gmail.com>
- <20141107164940.663f5423@bbrezillon>
-Message-ID: <CAAObsKDkqksPyidfQmcHtShd3u7AFOd1RwLh3FRWPus2KjnBQA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri,  7 Nov 2014 16:25:25 +0000
+Subject: [PATCH 00/11] arm: perf: add support for heterogeneous PMUs
+Message-ID: <1415377536-12841-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 November 2014 16:49, Boris Brezillon
-<boris.brezillon@free-electrons.com> wrote:
-> On Fri, 7 Nov 2014 09:21:39 -0600
-> Rob Herring <robherring2@gmail.com> wrote:
->
->> On Wed, Nov 5, 2014 at 10:01 AM, Boris Brezillon
->> <boris.brezillon@free-electrons.com> wrote:
->> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->>
->> Perhaps some commit msg?
->
-> Yes, I was just lazy and though this series would make another round
-> anyway :-).
->
-> I'll add a commit log to all my commits...
->
->>
->> While this binding seems mostly okay to me, this is the 2nd memory
->> controller binding I've looked at in the last day [1]. There are
->> probably some others already as well. This makes me think we need a
->> generic binding here. At least the node structure and how we define
->> chip selects should be common.
->
-> Sure.
-> Any suggestion ?
+In systems with heterogeneous CPUs (e.g. big.LITTLE) the associated PMUs
+also differ in terms of the supported set of events, the precise
+behaviour of each of those events, and the number of event counters.
+Thus it is not possible to expose these PMUs as a single logical PMU.
 
-I unfortunately cannot see much benefit to a generic binding, but
-maybe that's because the one in T124 is a bit special? I'm very
-interested in hearing proposals though.
+Instead a logical PMU is created per CPU microarchitecture, which events
+can target directly:
+
+$ perf stat \
+  -e armv7_cortex_a7/config=0x11/ \
+  -e armv7_cortex_a15/config=0x11/ \
+  ./test
+
+ Performance counter stats for './test':
+
+           7980455      armv7_cortex_a7/config=0x11/                                    [27.29%]
+           9947934      armv7_cortex_a15/config=0x11/                                    [72.66%]
+
+       0.016734833 seconds time elapsed
+
+This series is based atop of my recent preparatory rework [1,2].
 
 Thanks,
+Mark.
 
-Tomeu
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/295820.html
+[2] https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/log/?h=perf/updates
+
+Mark Rutland (11):
+  of: Add empty of_get_next_parent stub
+  perf: allow for PMU-specific event filtering
+  arm: perf: treat PMUs as CPU affine
+  arm: perf: filter unschedulable events
+  arm: perf: reject multi-pmu groups
+  arm: perf: probe number of counters on affine CPUs
+  arm: perf: document PMU affinity binding
+  arm: perf: add functions to parse affinity from dt
+  arm: perf: parse cpu affinity from dt
+  arm: perf: remove singleton PMU restriction
+  arm: dts: vexpress: describe all PMUs in TC2 dts
+
+ Documentation/devicetree/bindings/arm/pmu.txt | 104 +++++++-
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts    |  36 ++-
+ arch/arm/include/asm/pmu.h                    |  13 +
+ arch/arm/kernel/perf_event.c                  |  61 ++++-
+ arch/arm/kernel/perf_event_cpu.c              | 356 +++++++++++++++++++++-----
+ arch/arm/kernel/perf_event_v7.c               |  41 +--
+ include/linux/of.h                            |   5 +
+ include/linux/perf_event.h                    |   5 +
+ kernel/events/core.c                          |   8 +-
+ 9 files changed, 534 insertions(+), 95 deletions(-)
+
+-- 
+1.9.1
