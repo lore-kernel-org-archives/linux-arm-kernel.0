@@ -1,60 +1,56 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 7 Nov 2014 16:45:14 +0800
-Subject: [PATCH V4 3/3] can: m_can: add missing message RAM initialization
-In-Reply-To: <1415349914-9145-1-git-send-email-b29396@freescale.com>
-References: <1415349914-9145-1-git-send-email-b29396@freescale.com>
-Message-ID: <1415349914-9145-3-git-send-email-b29396@freescale.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 7 Nov 2014 09:53:07 +0000
+Subject: [PATCHv0 3/3] rtc: rtc-isl12057: add alarm support to Intersil
+ ISL12057 RTC driver
+In-Reply-To: <20141107075843.GD10432@pengutronix.de>
+References: <cover.1415222752.git.arno@natisbad.org>
+ <148403c0ab1d556cbb99d9242c65f714a77843e5.1415222752.git.arno@natisbad.org>
+ <20141106055017.GL8509@sirena.org.uk> <87ppcznbyv.fsf@natisbad.org>
+ <20141107075843.GD10432@pengutronix.de>
+Message-ID: <20141107095307.GZ8509@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The M_CAN message RAM is usually equipped with a parity or ECC functionality.
-But RAM cells suffer a hardware reset and can therefore hold arbitrary
-content at startup - including parity and/or ECC bits.
+On Fri, Nov 07, 2014 at 08:58:43AM +0100, Uwe Kleine-K?nig wrote:
+> On Fri, Nov 07, 2014 at 12:30:48AM +0100, Arnaud Ebalard wrote:
+> > Mark Brown <broonie@kernel.org> writes:
 
-To prevent the M_CAN controller detecting checksum errors when reading
-potentially uninitialized TX message RAM content to transmit CAN
-frames the TX message RAM has to be written with (any kind of) initial
-data.
+> > FWIW, we had a similar discussion a while ago, during driver inclusion:
+> > 
+> >   http://marc.info/?l=devicetree&m=138109313118504&w=2
+> > 
+> > Uwe, any idea?
 
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
----
-ChangeLog:
-v3-v4:
- * initialize the entire Message RAM in use instead of only 8 bytes
-   since this is a valid and needed initialization process.
-   Patch title also changed.
----
- drivers/net/can/m_can/m_can.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+> What is the problem of a not-wired-up irq line? Does the rtc framework
+> need to change to allow setting an alarm without the irq line being
+> hooked up? Is it "only" that the alarm is missed? Irq polling probably
+> isn't sensible?
 
-diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
-index eee1533..de742d0 100644
---- a/drivers/net/can/m_can/m_can.c
-+++ b/drivers/net/can/m_can/m_can.c
-@@ -1114,7 +1114,7 @@ static int m_can_of_parse_mram(struct platform_device *pdev,
- 	struct resource *res;
- 	void __iomem *addr;
- 	u32 out_val[MRAM_CFG_LEN];
--	int ret;
-+	int i, start, end, ret;
- 
- 	/* message ram could be shared */
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "message_ram");
-@@ -1165,6 +1165,15 @@ static int m_can_of_parse_mram(struct platform_device *pdev,
- 		priv->mcfg[MRAM_TXE].off, priv->mcfg[MRAM_TXE].num,
- 		priv->mcfg[MRAM_TXB].off, priv->mcfg[MRAM_TXB].num);
- 
-+	/* initialize the entire Message RAM in use to avoid possible
-+	 * ECC/parity checksum errors when reading an uninitialized buffer
-+	 */
-+	start = priv->mcfg[MRAM_SIDF].off;
-+	end = priv->mcfg[MRAM_TXB].off +
-+		priv->mcfg[MRAM_TXB].num * TXB_ELEMENT_SIZE;
-+	for (i = start; i < end; i += 4)
-+		writel(0x0, priv->mram_base + i);
-+
- 	return 0;
- }
- 
--- 
-1.9.1
+The problem is that we've got operations like alarm_irq_enable() which
+probably shouldn't be reporting success if we don't have an interrupt
+line.  Setting the alarm with no interrupt might still be useful but
+that at least ought to fail I'd expect.
+
+> 
+> I assume it's not that unusual that an rtc irq doesn't trigger a system
+> irq, so having that supported nicely would be great.
+> 
+> Looking through the rtc's datasheet, the device is a tad more
+> complicated than the current driver handles. There are two irq lines and
+> three functions that can be routed through these (alarm1, alarm2 and
+> clkout; not all combinations are possible).
+> 
+> Best regards
+> Uwe
+> 
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141107/ec400187/attachment.sig>
