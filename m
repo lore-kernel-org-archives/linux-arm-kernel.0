@@ -1,63 +1,105 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 07 Nov 2014 09:39:57 +0000
-Subject: [PATCH v13 1/7] KVM: Add architecture-defined TLB flush support
-In-Reply-To: <1415320848-13813-2-git-send-email-m.smarduch@samsung.com>
+Date: Fri, 07 Nov 2014 09:44:47 +0000
+Subject: [PATCH v13 4/7] arm: KVM: Add ARMv7 API to flush TLBs
+In-Reply-To: <1415320848-13813-5-git-send-email-m.smarduch@samsung.com>
 References: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
- <1415320848-13813-2-git-send-email-m.smarduch@samsung.com>
-Message-ID: <545C936D.4050801@arm.com>
+ <1415320848-13813-5-git-send-email-m.smarduch@samsung.com>
+Message-ID: <545C948F.8030308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/11/14 00:40, Mario Smarduch wrote:
-> Allow architectures to override the generic kvm_flush_remote_tlbs()
-> function via HAVE_KVM_ARCH_TLB_FLUSH_ALL. ARMv7 will need this to
-> provide its own TLB flush interface.
+> This patch adds ARMv7 architecture TLB Flush function.
 > 
-> Reviewed-by: Paolo Bonzini <pbonzini@redhat.com>
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 > Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> ---
+>  arch/arm/include/asm/kvm_asm.h  |    1 +
+>  arch/arm/include/asm/kvm_host.h |   12 ++++++++++++
+>  arch/arm/kvm/Kconfig            |    1 +
+>  arch/arm/kvm/interrupts.S       |   11 +++++++++++
+>  4 files changed, 25 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+> index 3a67bec..25410b2 100644
+> --- a/arch/arm/include/asm/kvm_asm.h
+> +++ b/arch/arm/include/asm/kvm_asm.h
+> @@ -96,6 +96,7 @@ extern char __kvm_hyp_code_end[];
+>  
+>  extern void __kvm_flush_vm_context(void);
+>  extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+> +extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+>  
+>  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+>  #endif
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 6dfb404..fad598c 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -220,6 +220,18 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+>  	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
+>  }
+>  
+> +/**
+> + * kvm_arch_flush_remote_tlbs() - flush all VM TLB entries
+> + * @kvm:	pointer to kvm structure.
+> + *
+> + * Interface to HYP function to flush all VM TLB entries without address
+> + * parameter.
+> + */
+> +static inline void kvm_flush_remote_tlbs(struct kvm *kvm)
+> +{
+> +	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
+> +}
+> +
+>  static inline int kvm_arch_dev_ioctl_check_extension(long ext)
+>  {
+>  	return 0;
+> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+> index 466bd29..a099df4 100644
+> --- a/arch/arm/kvm/Kconfig
+> +++ b/arch/arm/kvm/Kconfig
+> @@ -23,6 +23,7 @@ config KVM
+>  	select HAVE_KVM_CPU_RELAX_INTERCEPT
+>  	select KVM_MMIO
+>  	select KVM_ARM_HOST
+> +	select HAVE_KVM_ARCH_TLB_FLUSH_ALL
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+[utter nit] Move this up by two lines so that the "HAVE_KVM_*" options
+are together. The ARM tree has a tendency to sort the config options by
+alphabetical order (though that's clearly not enforced in this file...).
+
+>  	depends on ARM_VIRT_EXT && ARM_LPAE
+>  	---help---
+>  	  Support hosting virtualized guest machines. You will also
+> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+> index 01dcb0e..79caf79 100644
+> --- a/arch/arm/kvm/interrupts.S
+> +++ b/arch/arm/kvm/interrupts.S
+> @@ -66,6 +66,17 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
+>  	bx	lr
+>  ENDPROC(__kvm_tlb_flush_vmid_ipa)
+>  
+> +/**
+> + * void __kvm_tlb_flush_vmid(struct kvm *kvm) - Flush per-VMID TLBs
+> + *
+> + * Reuses __kvm_tlb_flush_vmid_ipa() for ARMv7, without passing address
+> + * parameter
+> + */
+> +
+> +ENTRY(__kvm_tlb_flush_vmid)
+> +	b	__kvm_tlb_flush_vmid_ipa
+> +ENDPROC(__kvm_tlb_flush_vmid)
+> +
+>  /********************************************************************
+>   * Flush TLBs and instruction caches of all CPUs inside the inner-shareable
+>   * domain, for all VMIDs
+> 
+
+Other than that:
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
 	M.
-
-> ---
->  virt/kvm/Kconfig    |    3 +++
->  virt/kvm/kvm_main.c |    2 ++
->  2 files changed, 5 insertions(+)
-> 
-> diff --git a/virt/kvm/Kconfig b/virt/kvm/Kconfig
-> index fc0c5e6..3796a21 100644
-> --- a/virt/kvm/Kconfig
-> +++ b/virt/kvm/Kconfig
-> @@ -37,3 +37,6 @@ config HAVE_KVM_CPU_RELAX_INTERCEPT
->  
->  config KVM_VFIO
->         bool
-> +
-> +config HAVE_KVM_ARCH_TLB_FLUSH_ALL
-> +       bool
-> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> index 33712fb..887df87 100644
-> --- a/virt/kvm/kvm_main.c
-> +++ b/virt/kvm/kvm_main.c
-> @@ -184,6 +184,7 @@ static bool make_all_cpus_request(struct kvm *kvm, unsigned int req)
->  	return called;
->  }
->  
-> +#ifndef CONFIG_HAVE_KVM_ARCH_TLB_FLUSH_ALL
->  void kvm_flush_remote_tlbs(struct kvm *kvm)
->  {
->  	long dirty_count = kvm->tlbs_dirty;
-> @@ -194,6 +195,7 @@ void kvm_flush_remote_tlbs(struct kvm *kvm)
->  	cmpxchg(&kvm->tlbs_dirty, dirty_count, 0);
->  }
->  EXPORT_SYMBOL_GPL(kvm_flush_remote_tlbs);
-> +#endif
->  
->  void kvm_reload_remote_mmus(struct kvm *kvm)
->  {
-> 
-
-
 -- 
 Jazz is not dead. It just smells funny...
