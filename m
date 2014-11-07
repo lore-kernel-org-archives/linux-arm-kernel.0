@@ -1,91 +1,118 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 7 Nov 2014 10:07:30 -0600
-Subject: [PATCH v2 2/2] arm: pcibios: move to generic PCI domains
-In-Reply-To: <1415287936-31203-3-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1415287936-31203-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1415287936-31203-3-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <CAL_JsqLCXwZ-xkByThCj99kwN1W7sHVx=8bKfxmBt-vTHZoATA@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 7 Nov 2014 17:09:33 +0100
+Subject: [PATCH v3 01/10] [media] Move mediabus format definition to a
+ more standard place
+In-Reply-To: <20141107152416.GC3136@valkosipuli.retiisi.org.uk>
+References: <1415369269-5064-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1415369269-5064-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20141107152416.GC3136@valkosipuli.retiisi.org.uk>
+Message-ID: <20141107170933.20234344@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 6, 2014 at 9:32 AM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> Most if not all ARM PCI host controller device drivers either ignore the
-> domain field in the pci_sys_data structure or just increment it every
-> time a host controller is probed, using it as a domain counter.
->
-> Therefore, instead of relying on pci_sys_data to stash the domain number
-> in a standard location, ARM pcibios code can be moved to the newly
-> introduced generic PCI domains code, implemented in commits:
->
-> commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
-> ("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
->
-> commit 670ba0c8883b576d0aec28bd7a838358a4be1
-> ("PCI: Add generic domain handling")
->
-> In order to assign a domain number dynamically, the ARM pcibios defines
-> the function, called by core PCI code:
->
-> void pci_bus_assign_domain_nr(...)
->
-> that relies on a DT property to define the domain number or falls back to
-> a counter; its usage replaces the current domain assignment code in PCI
-> host controllers present in the kernel.
+Hi Sakari,
 
-I realize you are just copying the arm64 version, but as we've agreed
-the DT domain handling should be common and what the error cases are,
-I've got some comments on the current implementation.
+On Fri, 7 Nov 2014 17:24:16 +0200
+Sakari Ailus <sakari.ailus@iki.fi> wrote:
+
+> Hi Boris,
+> 
+> On Fri, Nov 07, 2014 at 03:07:40PM +0100, Boris Brezillon wrote:
+> > Define MEDIA_BUS_FMT macros (re-using the values defined in the
+> > v4l2_mbus_pixelcode enum) into a separate header file so that they can be
+> > used from the DRM/KMS subsystem without any reference to the V4L2
+> > subsystem.
+> > 
+> > Then set V4L2_MBUS_FMT definitions to the MEDIA_BUS_FMT values using the
+> > V4L2_MBUS_FROM_MEDIA_BUS_FMT macro.
+> > 
+> > Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  include/uapi/linux/Kbuild             |   1 +
+> >  include/uapi/linux/media-bus-format.h | 125 +++++++++++++++++++++++
+> >  include/uapi/linux/v4l2-mediabus.h    | 184 +++++++++++++++-------------------
+> >  3 files changed, 206 insertions(+), 104 deletions(-)
+> >  create mode 100644 include/uapi/linux/media-bus-format.h
+> > 
+> > diff --git a/include/uapi/linux/Kbuild b/include/uapi/linux/Kbuild
+> > index b70237e..ed39ac8 100644
+> > --- a/include/uapi/linux/Kbuild
+> > +++ b/include/uapi/linux/Kbuild
+> > @@ -241,6 +241,7 @@ header-y += map_to_7segment.h
+> >  header-y += matroxfb.h
+> >  header-y += mdio.h
+> >  header-y += media.h
+> > +header-y += media-bus-format.h
+> >  header-y += mei.h
+> >  header-y += memfd.h
+> >  header-y += mempolicy.h
+> > diff --git a/include/uapi/linux/media-bus-format.h b/include/uapi/linux/media-bus-format.h
+> > new file mode 100644
+> > index 0000000..23b4090
 
 [...]
 
-> +#ifdef CONFIG_PCI_DOMAINS_GENERIC
-> +static bool dt_domain_found;
+> > +/* Vendor specific formats - next is	0x5002 */
+> > +
+> > +/* S5C73M3 sensor specific interleaved UYVY and JPEG */
+> > +#define MEDIA_BUS_FMT_S5C_UYVY_JPEG_1X8		0x5001
+> > +
+> > +/* HSV - next is	0x6002 */
+> > +#define MEDIA_BUS_FMT_AHSV8888_1X32		0x6001
+> > +
+> > +#endif /* __LINUX_MEDIA_BUS_FORMAT_H */
+> > diff --git a/include/uapi/linux/v4l2-mediabus.h b/include/uapi/linux/v4l2-mediabus.h
+> > index 1445e85..3d87db7 100644
+> > --- a/include/uapi/linux/v4l2-mediabus.h
+> > +++ b/include/uapi/linux/v4l2-mediabus.h
+> > @@ -13,118 +13,94 @@
+> >  
+> >  #include <linux/types.h>
+> >  #include <linux/videodev2.h>
+> > +#include <linux/media-bus-format.h>
+> 
+> Alphabetical order, please.
 
-This can be moved into the function.
+I'll fix that.
 
-> +
-> +void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> +{
-> +       int domain = of_get_pci_domain_nr(parent->of_node);
-> +
-> +       if (domain >= 0) {
-> +               dt_domain_found = true;
-> +       } else if (dt_domain_found == true) {
-> +               dev_err(parent, "Node %s is missing \"linux,pci-domain\" property in DT\n",
-> +                       parent->of_node->full_name);
-> +               return;
+> 
+> >  
+> > -/*
+> > - * These pixel codes uniquely identify data formats on the media bus. Mostly
+> > - * they correspond to similarly named V4L2_PIX_FMT_* formats, format 0 is
+> > - * reserved, V4L2_MBUS_FMT_FIXED shall be used by host-client pairs, where the
+> > - * data format is fixed. Additionally, "2X8" means that one pixel is transferred
+> > - * in two 8-bit samples, "BE" or "LE" specify in which order those samples are
+> > - * transferred over the bus: "LE" means that the least significant bits are
+> > - * transferred first, "BE" means that the most significant bits are transferred
+> > - * first, and "PADHI" and "PADLO" define which bits - low or high, in the
+> > - * incomplete high byte, are filled with padding bits.
+> > - *
+> > - * The pixel codes are grouped by type, bus_width, bits per component, samples
+> > - * per pixel and order of subsamples. Numerical values are sorted using generic
+> > - * numerical sort order (8 thus comes before 10).
+> > - *
+> > - * As their value can't change when a new pixel code is inserted in the
+> > - * enumeration, the pixel codes are explicitly given a numerical value. The next
+> > - * free values for each category are listed below, update them when inserting
+> > - * new pixel codes.
+> > - */
+> > -enum v4l2_mbus_pixelcode {
+> > -	V4L2_MBUS_FMT_FIXED = 0x0001,
+> > +#define V4L2_MBUS_FROM_MEDIA_BUS_FMT(name)	\
+> > +	MEDIA_BUS_FMT_ ## name = V4L2_MBUS_FMT_ ## name
+> 
+> Could you add a comment telling these values should no longer be changed?
 
-No error other than a printk? Do we want to set domain_nr to an
-illegal value or something?
+I'll add this comment in patch 10 as suggested by Hans.
 
-> +       } else {
-> +               domain = pci_get_new_domain_nr();
-> +       }
-> +
-> +       bus->domain_nr = domain;
-> +}
+Regards,
 
-This doesn't handle the case where the 1st node(s) probed does not
-have a domain prop and a later one does. I think something like this
-should work:
-
-static int use_dt_domains = -1;
-int domain = of_get_pci_domain_nr(parent->of_node);
-
-if (domain >= 0 && use_dt_domains) {
-        use_dt_domains = 1;
-} else if (domain < 0 && use_dt_domain != 1) {
-        use_dt_domains = 0;
-        domain = pci_get_new_domain_nr();
-} else {
-        dev_err(parent, "Node %s has inconsistent \"linux,pci-domain\"
-property in DT\n",
-                 parent->of_node->full_name);
-        domain = -1;  // Not sure if -1 would be illegal or not????
-}
-
-bus->domain_nr = domain;
+Boris
 
 
-Rob
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
