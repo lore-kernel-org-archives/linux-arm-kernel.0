@@ -1,54 +1,38 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Fri, 7 Nov 2014 11:19:10 +0530
-Subject: [PATCH 5/5] input: touchscreen: ti_am335x_tsc: Use charge delay DT
- parameter
-In-Reply-To: <1415339350-17679-1-git-send-email-vigneshr@ti.com>
-References: <1415339350-17679-1-git-send-email-vigneshr@ti.com>
-Message-ID: <1415339350-17679-6-git-send-email-vigneshr@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 6 Nov 2014 21:52:18 -0800
+Subject: [PATCH 01/26] ARM: sunxi: Fix GPLv2 wording
+In-Reply-To: <20141027220251.GB32390@lukather>
+References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20141027220251.GB32390@lukather>
+Message-ID: <20141107055218.GA7499@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch reads charge delay from tsc DT node and writes to
-REG_CHARGEDELAY register. If the charge delay is not specified in DT
-then default value of 0xB000(CHARGEDLY_OPENDLY) is used.
+On Mon, Oct 27, 2014 at 11:02:51PM +0100, Maxime Ripard wrote:
+> Hi everyone,
+> 
+> This should have been in a cover letter, but I somehow forgot to send
+> one...
+> 
+> So here it is.
+> 
+> You've been Cc'd on a relicensing patch, because at some point you
+> contributed a patch to an Allwinner device tree.
+> 
+> We're currently moving toward a GPL/X11 dual-license, instead of a GPL
+> license like what was done when you submitted your patches.
+> 
+> This is mostly so that other free software project licensed under a
+> BSD-like license, such as the BSD systems, can actually use our DT,
+> instead of having to rewrite them on their own.
+> 
+> Such license changes require the agreement of all the contributors, so
+> it would be great, if you agree with the new licensing terms of
+> course, that you reply to the patch by giving your acked-by.
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- drivers/input/touchscreen/ti_am335x_tsc.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+I'm definitely fine with relicensing of any of the pieces I have done, so:
 
-diff --git a/drivers/input/touchscreen/ti_am335x_tsc.c b/drivers/input/touchscreen/ti_am335x_tsc.c
-index 483fd97c0e0c..20ce76b1b6e7 100644
---- a/drivers/input/touchscreen/ti_am335x_tsc.c
-+++ b/drivers/input/touchscreen/ti_am335x_tsc.c
-@@ -52,6 +52,7 @@ struct titsc {
- 	u32			bit_xp, bit_xn, bit_yp, bit_yn;
- 	u32			inp_xp, inp_xn, inp_yp, inp_yn;
- 	u32			step_mask;
-+	u32			charge_delay;
- };
- 
- static unsigned int titsc_readl(struct titsc *ts, unsigned int reg)
-@@ -177,7 +178,7 @@ static void titsc_step_config(struct titsc *ts_dev)
- 
- 	config = titsc_readl(ts_dev, REG_IDLECONFIG);
- 	titsc_writel(ts_dev, REG_CHARGECONFIG, config);
--	titsc_writel(ts_dev, REG_CHARGEDELAY, CHARGEDLY_OPENDLY);
-+	titsc_writel(ts_dev, REG_CHARGEDELAY, ts_dev->charge_delay);
- 
- 	/* coordinate_readouts + 1 ... coordinate_readouts + 2 is for Z */
- 	config = STEPCONFIG_MODE_HWSYNC |
-@@ -361,6 +362,11 @@ static int titsc_parse_dt(struct platform_device *pdev,
- 	if (err < 0)
- 		return err;
- 
-+	err = of_property_read_u32(node, "ti,charge-delay",
-+				   &ts_dev->charge_delay);
-+	if (err < 0)
-+		ts_dev->charge_delay = CHARGEDLY_OPENDLY;
-+
- 	return of_property_read_u32_array(node, "ti,wire-config",
- 			ts_dev->config_inp, ARRAY_SIZE(ts_dev->config_inp));
- }
--- 
-1.9.1
+Acked-by: Olof Johansson <olof@lixom.net>
+
+
+-Olof
