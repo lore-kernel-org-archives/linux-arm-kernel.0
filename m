@@ -1,242 +1,125 @@
-From: tthayer@opensource.altera.com (Thor Thayer)
-Date: Fri, 7 Nov 2014 16:11:27 -0600
-Subject: [PATCHv4 2/5] arm: socfpga: Enable OCRAM ECC on startup.
-In-Reply-To: <545D2C4A.6030401@opensource.altera.com>
-References: <1415379263-12391-1-git-send-email-tthayer@opensource.altera.com>
- <1415379263-12391-3-git-send-email-tthayer@opensource.altera.com>
- <545D2C4A.6030401@opensource.altera.com>
-Message-ID: <545D438F.8040801@opensource.altera.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 07 Nov 2014 14:26:22 -0800
+Subject: [PATCH] PM / Domains: Fix initial default state of the
+ need_restore flag
+In-Reply-To: <20141107215751.GA4439@dtor-ws> (Dmitry Torokhov's message of
+ "Fri, 7 Nov 2014 13:57:51 -0800")
+References: <1415366847-4807-1-git-send-email-ulf.hansson@linaro.org>
+ <7hr3xerdw6.fsf@deeprootsystems.com> <20141107215751.GA4439@dtor-ws>
+Message-ID: <7hioiqr6k1.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh,
+Dmitry Torokhov <dmitry.torokhov@gmail.com> writes:
 
-On 11/07/2014 02:32 PM, Dinh Nguyen wrote:
-> Hi Thor,
+> On Fri, Nov 07, 2014 at 11:47:53AM -0800, Kevin Hilman wrote:
+>> Ulf Hansson <ulf.hansson@linaro.org> writes:
+>> 
+>> > The initial state of the device's need_restore flag should'nt depend on
+>> > the current state of the PM domain. For example it should be perfectly
+>> > valid to attach an inactive device to a powered PM domain.
+>> >
+>> > The pm_genpd_dev_need_restore() API allow us to update the need_restore
+>> > flag to somewhat cope with such scenarios. Typically that should have
+>> > been done from drivers/buses ->probe() since it's those that put the
+>> > requirements on the value of the need_restore flag.
+>> >
+>> > Until recently, the Exynos SOCs were the only user of the
+>> > pm_genpd_dev_need_restore() API, though invoking it from a centralized
+>> > location while adding devices to their PM domains.
+>> >
+>> > Due to that Exynos now have swithed to the generic OF-based PM domain
+>> > look-up, it's no longer possible to invoke the API from a centralized
+>> > location. The reason is because devices are now added to their PM
+>> > domains during the probe sequence.
+>> >
+>> > Commit "ARM: exynos: Move to generic PM domain DT bindings"
+>> > did the switch for Exynos to the generic OF-based PM domain look-up,
+>> > but it also removed the call to pm_genpd_dev_need_restore(). This
+>> > caused a regression for some of the Exynos drivers.
+>> >
+>> > To handle things more properly in the generic PM domain, let's change
+>> > the default initial value of the need_restore flag to reflect that the
+>> > state is unknown. As soon as some of the runtime PM callbacks gets
+>> > invoked, update the initial value accordingly.
+>> >
+>> > Moreover, since the generic PM domain is verifying that all device's
+>> > are both runtime PM enabled and suspended, using pm_runtime_suspended()
+>> > while pm_genpd_poweroff() is invoked from the scheduled work, we can be
+>> > sure of that the PM domain won't be powering off while having active
+>> > devices.
+>> >
+>> > Do note that, the generic PM domain can still only know about active
+>> > devices which has been activated through invoking its runtime PM resume
+>> > callback. In other words, buses/drivers using pm_runtime_set_active()
+>> > during ->probe() will still suffer from a race condition, potentially
+>> > probing a device without having its PM domain being powered. That issue
+>> > will have to be solved using a different approach.
+>> >
+>> > This a log from the boot regression for Exynos5, which is being fixed in
+>> > this patch.
+>> >
+>> > ------------[ cut here ]------------
+>> > WARNING: CPU: 0 PID: 308 at ../drivers/clk/clk.c:851 clk_disable+0x24/0x30()
+>> > Modules linked in:
+>> > CPU: 0 PID: 308 Comm: kworker/0:1 Not tainted 3.18.0-rc3-00569-gbd9449f-dirty #10
+>> > Workqueue: pm pm_runtime_work
+>> > [<c0013c64>] (unwind_backtrace) from [<c0010dec>] (show_stack+0x10/0x14)
+>> > [<c0010dec>] (show_stack) from [<c03ee4cc>] (dump_stack+0x70/0xbc)
+>> > [<c03ee4cc>] (dump_stack) from [<c0020d34>] (warn_slowpath_common+0x64/0x88)
+>> > [<c0020d34>] (warn_slowpath_common) from [<c0020d74>] (warn_slowpath_null+0x1c/0x24)
+>> > [<c0020d74>] (warn_slowpath_null) from [<c03107b0>] (clk_disable+0x24/0x30)
+>> > [<c03107b0>] (clk_disable) from [<c02cc834>] (gsc_runtime_suspend+0x128/0x160)
+>> > [<c02cc834>] (gsc_runtime_suspend) from [<c0249024>] (pm_generic_runtime_suspend+0x2c/0x38)
+>> > [<c0249024>] (pm_generic_runtime_suspend) from [<c024f44c>] (pm_genpd_default_save_state+0x2c/0x8c)
+>> > [<c024f44c>] (pm_genpd_default_save_state) from [<c024ff2c>] (pm_genpd_poweroff+0x224/0x3ec)
+>> > [<c024ff2c>] (pm_genpd_poweroff) from [<c02501b4>] (pm_genpd_runtime_suspend+0x9c/0xcc)
+>> > [<c02501b4>] (pm_genpd_runtime_suspend) from [<c024a4f8>] (__rpm_callback+0x2c/0x60)
+>> > [<c024a4f8>] (__rpm_callback) from [<c024a54c>] (rpm_callback+0x20/0x74)
+>> > [<c024a54c>] (rpm_callback) from [<c024a930>] (rpm_suspend+0xd4/0x43c)
+>> > [<c024a930>] (rpm_suspend) from [<c024bbcc>] (pm_runtime_work+0x80/0x90)
+>> > [<c024bbcc>] (pm_runtime_work) from [<c0032a9c>] (process_one_work+0x12c/0x314)
+>> > [<c0032a9c>] (process_one_work) from [<c0032cf4>] (worker_thread+0x3c/0x4b0)
+>> > [<c0032cf4>] (worker_thread) from [<c003747c>] (kthread+0xcc/0xe8)
+>> > [<c003747c>] (kthread) from [<c000e738>] (ret_from_fork+0x14/0x3c)
+>> > ---[ end trace 40cd58bcd6988f12 ]---
+>> >
+>> > Fixes: a4a8c2c4962bb655 (ARM: exynos: Move to generic PM domain DT bindings)
+>> > Reported-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> 
+>> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+>> 
+>> And looks like we need this for v3.18-rc since it does fix the
+>> regression.
 >
-> On 11/07/2014 10:54 AM, tthayer at opensource.altera.com wrote:
->> From: Thor Thayer <tthayer@opensource.altera.com>
->>
->> This patch enables the ECC for On-Chip RAM on machine
->> startup.  The ECC has to be enabled before data is
->> is stored in memory otherwise the ECC will fail on
->> reads.
->>
->> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
->> ---
->> v2: Split OCRAM ECC portion separately. Addition of iounmap()
->> and reorganization of gen_pool_free. Remove defconfig from patch.
->>
->> v3/4: No change
->> ---
->>   MAINTAINERS                     |    1 +
->>   arch/arm/mach-socfpga/Makefile  |    1 +
->>   arch/arm/mach-socfpga/ocram.c   |   90 +++++++++++++++++++++++++++++++++++++++
->>   arch/arm/mach-socfpga/ocram.h   |   28 ++++++++++++
->>   arch/arm/mach-socfpga/socfpga.c |    8 ++++
->>   5 files changed, 128 insertions(+)
->>   create mode 100644 arch/arm/mach-socfpga/ocram.c
->>   create mode 100644 arch/arm/mach-socfpga/ocram.h
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index d0c7752..c6d390e 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -1408,6 +1408,7 @@ M:	Thor Thayer <tthayer@opensource.altera.com>
->>   S:	Maintained
->>   F:	drivers/edac/altera_edac.
->>   F:	arch/arm/mach-socfpga/l2_cache.*
->> +F:	arch/arm/mach-socfpga/ocram.*
-> I think you can remove these entries for l2_cache.c and ocram.c since it
-> already falls under mach-socfpga/, which I already maintain.
+> I guess we do need it for 3.18, but when we are talking about 3.19,
+> before we make any more changes can we outline how power domains are
+> supposed to work?
 
-Thanks. I will remove them.
->>   
->>   ARM/STI ARCHITECTURE
->>   M:	Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
->> diff --git a/arch/arm/mach-socfpga/Makefile b/arch/arm/mach-socfpga/Makefile
->> index 142609e..1552ca5 100644
->> --- a/arch/arm/mach-socfpga/Makefile
->> +++ b/arch/arm/mach-socfpga/Makefile
->> @@ -5,3 +5,4 @@
->>   obj-y					:= socfpga.o
->>   obj-$(CONFIG_SMP)	+= headsmp.o platsmp.o
->>   obj-$(CONFIG_EDAC_ALTERA_L2C) += l2_cache.o
->> +obj-$(CONFIG_EDAC_ALTERA_OCRAM) += ocram.o
->> diff --git a/arch/arm/mach-socfpga/ocram.c b/arch/arm/mach-socfpga/ocram.c
->> new file mode 100644
->> index 0000000..9136009
->> --- /dev/null
->> +++ b/arch/arm/mach-socfpga/ocram.c
->> @@ -0,0 +1,90 @@
->> +/*
->> + * Copyright Altera Corporation (C) 2014. All rights reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms and conditions of the GNU General Public License,
->> + * version 2, as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope it will be useful, but WITHOUT
->> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->> + * more details.
->> + *
->> + * You should have received a copy of the GNU General Public License along with
->> + * this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +#include <linux/clk-provider.h>
-> Why clk-provider.h and not io.h?
+Yes, I agree, we have some things to sort out for v3.19, but as this one
+is a regression fix, I think it needs to be in v3.18-rc.
 
-I will change to io.h.
->> +#include <linux/genalloc.h>
->> +#include <linux/of_platform.h>
->> +
->> +#include "ocram.h"
->> +
->> +void socfpga_init_ocram_ecc(void)
->> +{
->> +	struct device_node *np;
->> +	const __be32 *prop;
->> +	u32 ocr_edac_addr, iram_addr, len;
->> +	void __iomem  *mapped_ocr_edac_addr;
->> +	size_t size;
->> +	struct gen_pool *gp;
->> +
->> +	np = of_find_compatible_node(NULL, NULL, "altr,ocram-edac");
->> +	if (!np) {
->> +		pr_err("SOCFPGA: Unable to find altr,ocram-edac in dtb\n");
->> +		return;
->> +	}
->> +
->> +	prop = of_get_property(np, "reg", &size);
->> +	ocr_edac_addr = be32_to_cpup(prop++);
->> +	len = be32_to_cpup(prop);
-> You should be checking for prop before calling be32_to_cpup.
+Kevin
+
+> 1. How do we attach a device to power domain? Right now it seems that
+> individual buses are responsible for attaching their devices to power
+> domains. Should we move it into driver core (device_pm_add?) so that
+> device starts its life in its proper power domain?
 >
->> +	if (!prop || size < sizeof(*prop)) {
-> Then you don't need check for prop here.
+> 2. When do we power up the devices (and the domains)? Right now devices
+> in ACPI power domain are powered when they are attached to the power
+> domain (which coincides with probing), but generic power domains do not
+> do that. Can we add a separate API to explicitly power up the device (and
+> its domain if it is powered down) and do it again, either in device core
+> or in individual buses. This way, regardless of runtime PM or not, we
+> will have devices powered on when driver tries to bind to them. If
+> binding fails we can power down the device.
 >
->> +		pr_err("SOCFPGA: Unable to find OCRAM ECC mapping in dtb\n");
->> +		return;
->> +	}
->> +
->> +	gp = of_get_named_gen_pool(np, "iram", 0);
->> +	if (!gp) {
->> +		pr_err("SOCFPGA: OCRAM cannot find gen pool\n");
->> +		return;
->> +	}
->> +
->> +	np = of_find_compatible_node(NULL, NULL, "mmio-sram");
->> +	if (!np) {
->> +		pr_err("SOCFPGA: Unable to find mmio-sram in dtb\n");
->> +		return;
->> +	}
->> +	/* Determine the OCRAM address and size */
->> +	prop = of_get_property(np, "reg", &size);
->> +	iram_addr = be32_to_cpup(prop++);
->> +	len = be32_to_cpup(prop);
-> Same comment here for checking prop before calling be32_to_cpu.
-
-Good catch. Thanks.
->> +
->> +	if (!prop || size < sizeof(*prop)) {
->> +		pr_err("SOCFPGA: Unable to find OCRAM mapping in dtb\n");
->> +		return;
->> +	}
->> +
->> +	iram_addr = gen_pool_alloc(gp, len);
->> +	if (iram_addr == 0) {
->> +		pr_err("SOCFPGA: cannot alloc from gen pool\n");
->> +		return;
->> +	}
->> +
->> +	memset((void *)iram_addr, 0, len);
->> +
->> +	gen_pool_free(gp, iram_addr, len);
->> +
->> +	mapped_ocr_edac_addr = ioremap(ocr_edac_addr, 4);
->> +	if (!mapped_ocr_edac_addr) {
->> +		pr_err("SOCFPGA: Unable to map OCRAM ecc regs.\n");
->> +		return;
->> +	}
->> +
->> +	/* Clear any pending OCRAM ECC interrupts, then enable ECC */
->> +	writel(0x18, mapped_ocr_edac_addr);
->> +	writel(0x19, mapped_ocr_edac_addr);
-> Can you add a define for 0x18 and 0x19? What do these values mean?
-
-Sure.
->> +
->> +	iounmap(mapped_ocr_edac_addr);
->> +
->> +	pr_debug("SOCFPGA: Success Initializing OCRAM\n");
->> +}
->> +
->> diff --git a/arch/arm/mach-socfpga/ocram.h b/arch/arm/mach-socfpga/ocram.h
->> new file mode 100644
->> index 0000000..f93cf84
->> --- /dev/null
->> +++ b/arch/arm/mach-socfpga/ocram.h
->> @@ -0,0 +1,28 @@
->> +/*
->> + * Copyright Altera Corporation (C) 2014. All rights reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms and conditions of the GNU General Public License,
->> + * version 2, as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope it will be useful, but WITHOUT
->> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->> + * more details.
->> + *
->> + * You should have received a copy of the GNU General Public License along with
->> + * this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#ifndef MACH_SOCFPGA_OCRAM_H
->> +#define MACH_SOCFPGA_OCRAM_H
->> +
->> +#ifdef CONFIG_EDAC_ALTERA_OCRAM
->> +void socfpga_init_ocram_ecc(void);
->> +#else
->> +inline void socfpga_init_ocram_ecc(void)
->> +{
->> +}
->> +#endif
->> +
->> +#endif /* #ifndef MACH_SOCFPGA_OCRAM_H */
->> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
->> index af6413a..fb41aca 100644
->> --- a/arch/arm/mach-socfpga/socfpga.c
->> +++ b/arch/arm/mach-socfpga/socfpga.c
->> @@ -101,6 +101,13 @@ static void socfpga_cyclone5_restart(enum reboot_mode mode, const char *cmd)
->>   	writel(temp, rst_manager_base_addr + SOCFPGA_RSTMGR_CTRL);
->>   }
->>   
->> +static void __init socfpga_cyclone5_init(void)
->> +{
->> +	of_platform_populate(NULL, of_default_bus_match_table,
->> +			     NULL, NULL);
->> +	socfpga_init_ocram_ecc();
-> Use IS_ENABLED() here, so you can remove the need to have ocram.h. You
-> can put the function declaration in core.h.
+> I've heard there is a concern about power domain bouncing up and down
+> during probing. Is it really a concern? Would not we run into the same
+> issues past booting up with aggressive PM policy? Anyway, we could
+> probably work around this by refusing to actually power down the domains
+> until we are done booting, similarly to who genpd_poweroff_unused works.
 >
-> Dinh
-
-I will make the changes. Thanks!
->
->> +}
->> +
->>   static const char *altera_dt_match[] = {
->>   	"altr,socfpga",
->>   	NULL
->> @@ -112,6 +119,7 @@ DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
->>   	.smp		= smp_ops(socfpga_smp_ops),
->>   	.map_io		= socfpga_map_io,
->>   	.init_irq	= socfpga_init_irq,
->> +	.init_machine	= socfpga_cyclone5_init,
->>   	.restart	= socfpga_cyclone5_restart,
->>   	.dt_compat	= altera_dt_match,
->>   MACHINE_END
->>
+> Thanks.
