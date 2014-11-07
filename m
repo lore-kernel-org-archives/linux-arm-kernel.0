@@ -1,74 +1,75 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 7 Nov 2014 08:34:12 +0100
-Subject: [GIT PULL] arm64: UEFI updates for 3.19
-In-Reply-To: <CAKv+Gu8LEFvdu99vCHbHGPmGLpHWdT+Wb2DECzBEEg8g_yynvg@mail.gmail.com>
-References: <CAKv+Gu8LEFvdu99vCHbHGPmGLpHWdT+Wb2DECzBEEg8g_yynvg@mail.gmail.com>
-Message-ID: <CAKv+Gu8bpgGWRbgdGYHSy515LOXapCm4stv5xJo_tNNhahcTYw@mail.gmail.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Fri, 07 Nov 2014 08:38:17 +0100
+Subject: [PATCH v13 6/7] arm: KVM: dirty log read write protect support
+In-Reply-To: <1415320848-13813-7-git-send-email-m.smarduch@samsung.com>
+References: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
+ <1415320848-13813-7-git-send-email-m.smarduch@samsung.com>
+Message-ID: <545C76E9.5090700@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 November 2014 11:54, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Hi Will,
->
-
-You are not going to believe this, but I received a report about boot
-failures on legacy (non-EFI) x86 using the SMBIOS 3.0 code, so could
-you please hold off on pulling this until we know what is going on
-there? This does not affect ARM at all, but I may need to update patch
-'dmi: add support for SMBIOS 3.0 64-bit entry point' to drop the
-SMBIOS 3.0 check in the non-EFI code path.
-
--- 
-Ard.
 
 
-> The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
->
->   Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
->
-> are available in the git repository at:
->
->   git://git.linaro.org/people/ard.biesheuvel/linux-arm.git tags/for-3.19
->
-> for you to fetch changes up to 0bcaa9040d058684d58c36ef273b8946996c7078:
->
->   efi: efi-stub: notify on DTB absence (2014-11-05 09:03:34 +0100)
->
-> ----------------------------------------------------------------
-> UEFI updates for arm64
->
-> This series consists of:
-> - fixes for compliance with PE/COFF and UEFI specs
-> - added support for SMBIOS, including upcoming version 3.0
-> - cleanups and diagnostic output improvements
->
-> ----------------------------------------------------------------
-> Ard Biesheuvel (8):
->       arm64/efi: efistub: jump to 'stext' directly, not through the header
->       arm64/efi: set PE/COFF section alignment to 4 KB
->       arm64/efi: set PE/COFF file alignment to 512 bytes
->       arm64/efi: invert UEFI memory region reservation logic
->       arm64/efi: drop redundant set_bit(EFI_CONFIG_TABLES)
->       efi: dmi: add support for SMBIOS 3.0 UEFI configuration table
->       dmi: add support for SMBIOS 3.0 64-bit entry point
->       arm64: dmi: set DMI string as dump stack arch description
->
-> Mark Rutland (1):
->       efi: efi-stub: notify on DTB absence
->
-> Yi Li (1):
->       arm64: dmi: Add SMBIOS/DMI support
->
->  arch/arm64/Kconfig                      | 11 +++++
->  arch/arm64/include/asm/dmi.h            | 31 +++++++++++++
->  arch/arm64/kernel/efi-entry.S           |  3 +-
->  arch/arm64/kernel/efi.c                 | 37 ++++++++++-----
->  arch/arm64/kernel/head.S                | 24 +++++++---
->  arch/arm64/kernel/vmlinux.lds.S         | 17 +++++++
->  drivers/firmware/dmi_scan.c             | 79 ++++++++++++++++++++++++++++++---
->  drivers/firmware/efi/efi.c              |  4 ++
->  drivers/firmware/efi/libstub/arm-stub.c | 11 ++++-
->  drivers/xen/efi.c                       |  1 +
->  include/linux/efi.h                     |  6 ++-
->  11 files changed, 195 insertions(+), 29 deletions(-)
->  create mode 100644 arch/arm64/include/asm/dmi.h
+On 07/11/2014 01:40, Mario Smarduch wrote:
+> Add support to track dirty pages between user space KVM_GET_DIRTY_LOG ioctl
+> calls. We call kvm_get_dirty_log_protect() function to do most of the work.
+> 
+> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> ---
+>  arch/arm/kvm/arm.c  |   37 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/kvm/mmu.c  |   22 ++++++++++++++++++++++
+>  virt/kvm/kvm_main.c |    3 +--
+>  3 files changed, 60 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index a99e0cd..212d835 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -737,9 +737,46 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+>  	}
+>  }
+>  
+> +/**
+> + * kvm_vm_ioctl_get_dirty_log - get and clear the log of dirty pages in a slot
+> + * @kvm:	kvm instance
+> + * @log:	slot id and address to which we copy the log
+> + *
+> + * We need to keep it in mind that VCPU threads can write to the bitmap
+> + * concurrently.  So, to avoid losing data, we keep the following order for
+> + * each bit:
+> + *
+> + *   1. Take a snapshot of the bit and clear it if needed.
+> + *   2. Write protect the corresponding page.
+> + *   3. Copy the snapshot to the userspace.
+> + *   4. Flush TLB's if needed.
+> + *
+> + * Steps 1,2,3 are handled by kvm_get_dirty_log_protect().
+> + * Between 2 and 4, the guest may write to the page using the remaining TLB
+> + * entry.  This is not a problem because the page is reported dirty using
+> + * the snapshot taken before and step 4 ensures that writes done after
+> + * exiting to userspace will be logged for the next call.
+> + */
+>  int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
+>  {
+> +#ifdef CONFIG_ARM
+> +	int r;
+> +	bool is_dirty = false;
+> +
+> +	mutex_lock(&kvm->slots_lock);
+> +
+> +	r = kvm_get_dirty_log_protect(kvm, log, &is_dirty);
+> +	if (r)
+> +		goto out;
+> +
+> +	if (is_dirty)
+> +		kvm_flush_remote_tlbs(kvm);
+
+Should the caller should always flush TLBs if is_dirty is true, even if
+kvm_get_dirty_log_protect reported an error?  That can happen if the
+error occurred in the final copy to userspace, after page tables have
+been modified.
+
+Of course, in this case userspace cannot use the dirty log anymore since
+it has been irrimediably trashed.
+
+Paolo
