@@ -1,183 +1,97 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Fri, 7 Nov 2014 14:13:06 -0600
-Subject: [PATCHv4 1/5] arm: socfpga: Enable L2 Cache ECC on startup.
-In-Reply-To: <1415379263-12391-2-git-send-email-tthayer@opensource.altera.com>
-References: <1415379263-12391-1-git-send-email-tthayer@opensource.altera.com>
- <1415379263-12391-2-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <545D27D2.1080305@opensource.altera.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 7 Nov 2014 21:18:13 +0100
+Subject: [PATCH v13 4/7] arm: KVM: Add ARMv7 API to flush TLBs
+In-Reply-To: <1415320848-13813-5-git-send-email-m.smarduch@samsung.com>
+References: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
+ <1415320848-13813-5-git-send-email-m.smarduch@samsung.com>
+Message-ID: <20141107201813.GA24329@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thor,
+On Thu, Nov 06, 2014 at 04:40:45PM -0800, Mario Smarduch wrote:
+> This patch adds ARMv7 architecture TLB Flush function.
+> 
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> ---
+>  arch/arm/include/asm/kvm_asm.h  |    1 +
+>  arch/arm/include/asm/kvm_host.h |   12 ++++++++++++
+>  arch/arm/kvm/Kconfig            |    1 +
+>  arch/arm/kvm/interrupts.S       |   11 +++++++++++
+>  4 files changed, 25 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+> index 3a67bec..25410b2 100644
+> --- a/arch/arm/include/asm/kvm_asm.h
+> +++ b/arch/arm/include/asm/kvm_asm.h
+> @@ -96,6 +96,7 @@ extern char __kvm_hyp_code_end[];
+>  
+>  extern void __kvm_flush_vm_context(void);
+>  extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+> +extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+>  
+>  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+>  #endif
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 6dfb404..fad598c 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -220,6 +220,18 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+>  	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
+>  }
+>  
+> +/**
+> + * kvm_arch_flush_remote_tlbs() - flush all VM TLB entries
 
-On 11/07/2014 10:54 AM, tthayer at opensource.altera.com wrote:
-> From: Thor Thayer <tthayer@opensource.altera.com>
-> 
-> This patch enables the ECC for L2 cache on machine
-> startup.  The ECC has to be enabled before data is
-> is stored in memory otherwise the ECC will fail on
-> reads.
-> 
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
-> ---
-> v2: Split OCRAM initialization into separate patch.
-> 
-> v3/4: No change
-> ---
->  MAINTAINERS                      |    1 +
->  arch/arm/mach-socfpga/Makefile   |    1 +
->  arch/arm/mach-socfpga/l2_cache.c |   44 ++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-socfpga/l2_cache.h |   28 ++++++++++++++++++++++++
->  arch/arm/mach-socfpga/socfpga.c  |    5 ++++-
->  5 files changed, 78 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/mach-socfpga/l2_cache.c
->  create mode 100644 arch/arm/mach-socfpga/l2_cache.h
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index ee1bc5b..d0c7752 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1407,6 +1407,7 @@ ARM/SOCFPGA EDAC SUPPORT
->  M:	Thor Thayer <tthayer@opensource.altera.com>
->  S:	Maintained
->  F:	drivers/edac/altera_edac.
-> +F:	arch/arm/mach-socfpga/l2_cache.*
->  
->  ARM/STI ARCHITECTURE
->  M:	Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
-> diff --git a/arch/arm/mach-socfpga/Makefile b/arch/arm/mach-socfpga/Makefile
-> index 6dd7a93..142609e 100644
-> --- a/arch/arm/mach-socfpga/Makefile
-> +++ b/arch/arm/mach-socfpga/Makefile
-> @@ -4,3 +4,4 @@
->  
->  obj-y					:= socfpga.o
->  obj-$(CONFIG_SMP)	+= headsmp.o platsmp.o
-> +obj-$(CONFIG_EDAC_ALTERA_L2C) += l2_cache.o
-> diff --git a/arch/arm/mach-socfpga/l2_cache.c b/arch/arm/mach-socfpga/l2_cache.c
-> new file mode 100644
-> index 0000000..8e109f3
-> --- /dev/null
-> +++ b/arch/arm/mach-socfpga/l2_cache.c
-> @@ -0,0 +1,44 @@
-> +/*
-> + * Copyright Altera Corporation (C) 2014. All rights reserved.
+this name is not matching the function
+
+> + * @kvm:	pointer to kvm structure.
 > + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + * Interface to HYP function to flush all VM TLB entries without address
+> + * parameter.
 > + */
-> +#include <linux/clk-provider.h>
-
-Why clk-provider.h and not io.h?
-
-> +#include <linux/of_platform.h>
-> +#include <linux/of_address.h>
-> +
-> +#include "l2_cache.h"
-> +
-> +void socfpga_init_l2_ecc(void)
+> +static inline void kvm_flush_remote_tlbs(struct kvm *kvm)
 > +{
-> +	struct device_node *np;
-> +	void __iomem  *mapped_l2_edac_addr;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "altr,l2-edac");
-> +	if (!np) {
-> +		pr_err("SOCFPGA: Unable to find altr,l2-edac in dtb\n");
-> +		return;
-> +	}
-> +
-> +	mapped_l2_edac_addr = of_iomap(np, 0);
-> +	if (!mapped_l2_edac_addr) {
-> +		pr_err("SOCFPGA: Unable to find L2 ECC mapping in dtb\n");
-> +		return;
-> +	}
-> +
-> +	/* Enable ECC */
-> +	writel(0x01, mapped_l2_edac_addr);
-> +
-> +	pr_debug("SOCFPGA: Success Initializing L2 cache ECC\n");
+> +	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
 > +}
 > +
-
-Extra line here...
-
-> diff --git a/arch/arm/mach-socfpga/l2_cache.h b/arch/arm/mach-socfpga/l2_cache.h
-> new file mode 100644
-> index 0000000..58e140d
-> --- /dev/null
-> +++ b/arch/arm/mach-socfpga/l2_cache.h
-> @@ -0,0 +1,28 @@
-> +/*
-> + * Copyright Altera Corporation (C) 2014. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#ifndef MACH_SOCFPGA_L2_CACHE_H
-> +#define MACH_SOCFPGA_L2_CACHE_H
-> +
-> +#ifdef CONFIG_EDAC_ALTERA_L2C
-> +void socfpga_init_l2_ecc(void);
-> +#else
-> +inline void socfpga_init_l2_ecc(void)
-> +{
-> +}
-> +#endif
-> +
-> +#endif /* #ifndef MACH_SOCFPGA_L2_CACHE_H */
-> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-> index adbf383..af6413a 100644
-> --- a/arch/arm/mach-socfpga/socfpga.c
-> +++ b/arch/arm/mach-socfpga/socfpga.c
-> @@ -1,5 +1,5 @@
->  /*
-> - *  Copyright (C) 2012 Altera Corporation
-> + *  Copyright (C) 2012;2014 Altera Corporation
-
-Should be "2012-2014".
-
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License as published by
-> @@ -25,6 +25,8 @@
->  #include <asm/mach/map.h>
->  
->  #include "core.h"
-> +#include "l2_cache.h"
-> +#include "ocram.h"
-
-Including ocram.h should go into patch 2/5. But I think ocram.h can be
-removed as well if you just use IS_ENABLED().
-
->  
->  void __iomem *socfpga_scu_base_addr = ((void __iomem *)(SOCFPGA_SCU_VIRT_BASE));
->  void __iomem *sys_manager_base_addr;
-> @@ -83,6 +85,7 @@ static void __init socfpga_init_irq(void)
+>  static inline int kvm_arch_dev_ioctl_check_extension(long ext)
 >  {
->  	irqchip_init();
->  	socfpga_sysmgr_init();
-> +	socfpga_init_l2_ecc();
-
-If you use "if (IS_ENABLED(CONFIG_EDAC_ALTERA_L2C))", then you can
-remove l2_cache.h.
-
-Dinh
+>  	return 0;
+> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+> index 466bd29..a099df4 100644
+> --- a/arch/arm/kvm/Kconfig
+> +++ b/arch/arm/kvm/Kconfig
+> @@ -23,6 +23,7 @@ config KVM
+>  	select HAVE_KVM_CPU_RELAX_INTERCEPT
+>  	select KVM_MMIO
+>  	select KVM_ARM_HOST
+> +	select HAVE_KVM_ARCH_TLB_FLUSH_ALL
+>  	depends on ARM_VIRT_EXT && ARM_LPAE
+>  	---help---
+>  	  Support hosting virtualized guest machines. You will also
+> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+> index 01dcb0e..79caf79 100644
+> --- a/arch/arm/kvm/interrupts.S
+> +++ b/arch/arm/kvm/interrupts.S
+> @@ -66,6 +66,17 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
+>  	bx	lr
+>  ENDPROC(__kvm_tlb_flush_vmid_ipa)
+>  
+> +/**
+> + * void __kvm_tlb_flush_vmid(struct kvm *kvm) - Flush per-VMID TLBs
+> + *
+> + * Reuses __kvm_tlb_flush_vmid_ipa() for ARMv7, without passing address
+> + * parameter
+> + */
+> +
+> +ENTRY(__kvm_tlb_flush_vmid)
+> +	b	__kvm_tlb_flush_vmid_ipa
+> +ENDPROC(__kvm_tlb_flush_vmid)
+> +
+>  /********************************************************************
+>   * Flush TLBs and instruction caches of all CPUs inside the inner-shareable
+>   * domain, for all VMIDs
+> -- 
+> 1.7.9.5
+> 
