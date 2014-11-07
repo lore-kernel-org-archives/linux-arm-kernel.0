@@ -1,45 +1,73 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 07 Nov 2014 14:44:28 +0000
-Subject: [PATCH 2/2] arm64: kvm: eliminate literal pool entries
-In-Reply-To: <1415369554-7444-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1415369554-7444-1-git-send-email-ard.biesheuvel@linaro.org>
- <1415369554-7444-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <545CDACC.5070406@arm.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 07 Nov 2014 15:47:41 +0100
+Subject: [PATCH v3 10/10] [media] v4l: Forbid usage of V4L2_MBUS_FMT
+ definitions inside the kernel
+In-Reply-To: <1415369269-5064-11-git-send-email-boris.brezillon@free-electrons.com>
+References: <1415369269-5064-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1415369269-5064-11-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <545CDB8D.4080406@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/14 14:12, Ard Biesheuvel wrote:
-> Replace two instances of 'ldr xN, =(constant)' in the world switch
-> hot path with 'mov' instructions.
+Nitpicks:
+
+On 11/07/14 15:07, Boris Brezillon wrote:
+> Place v4l2_mbus_pixelcode in a #ifndef __KERNEL__ section so that kernel
+> users don't have access to these definitions.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> We have to keep this definition for user-space users even though they're
+> encouraged to move to the new media_bus_format enum.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > ---
->  arch/arm64/kvm/hyp.S | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  include/uapi/linux/v4l2-mediabus.h | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 > 
-> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> index b72aa9f9215c..fbe909fb0a1a 100644
-> --- a/arch/arm64/kvm/hyp.S
-> +++ b/arch/arm64/kvm/hyp.S
-> @@ -761,10 +761,10 @@
->  .macro activate_traps
->  	ldr     x2, [x0, #VCPU_HCR_EL2]
->  	msr     hcr_el2, x2
-> -	ldr	x2, =(CPTR_EL2_TTA)
-> +	mov	x2, #CPTR_EL2_TTA
->  	msr	cptr_el2, x2
+> diff --git a/include/uapi/linux/v4l2-mediabus.h b/include/uapi/linux/v4l2-mediabus.h
+> index 3d87db7..4f31d0e 100644
+> --- a/include/uapi/linux/v4l2-mediabus.h
+> +++ b/include/uapi/linux/v4l2-mediabus.h
+> @@ -15,6 +15,14 @@
+>  #include <linux/videodev2.h>
+>  #include <linux/media-bus-format.h>
 >  
-> -	ldr	x2, =(1 << 15)	// Trap CP15 Cr=15
-> +	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
->  	msr	hstr_el2, x2
+> +#ifndef __KERNEL__
+> +
+> +/*
+> + * enum v4l2_mbus_pixelcode and its defintions are now deprecated, and
+
+defintions -> definitions
+
+> + * MEDIA_BUS_FMT_ defintions (defined in media-bus-format.h) should be
+
+and again...
+
+> + * used instead.
+
+I would also add something like this:
+
+"New defines should only be added to media-bus-format.h. The v4l2_mbus_pixelcode
+enum is frozen."
+
+> + */
+> +
+>  #define V4L2_MBUS_FROM_MEDIA_BUS_FMT(name)	\
+>  	MEDIA_BUS_FMT_ ## name = V4L2_MBUS_FMT_ ## name
 >  
->  	mrs	x2, mdcr_el2
+> @@ -102,6 +110,7 @@ enum v4l2_mbus_pixelcode {
+>  
+>  	V4L2_MBUS_FROM_MEDIA_BUS_FMT(AHSV8888_1X32),
+>  };
+> +#endif /* __KERNEL__ */
+>  
+>  /**
+>   * struct v4l2_mbus_framefmt - frame format on the media bus
 > 
 
-Looks good to me.
+Can you move this struct forward to before the v4l2_mbus_pixelcode enum? That way
+the obsolete code is at the end of the header. People might miss this struct
+otherwise.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Regards,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	Hans
