@@ -1,39 +1,45 @@
 From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Fri,  7 Nov 2014 18:34:25 +0530
-Subject: [[PATCHv2] 0/3] Add SNVS clock gating and clock support to rtc-snvs
- driver
-Message-ID: <cover.1415364391.git.maitysanchayan@gmail.com>
+Date: Fri,  7 Nov 2014 18:34:26 +0530
+Subject: [[PATCHv2] 1/3] ARM: imx: clk-vf610: Add clock for SNVS
+In-Reply-To: <cover.1415364391.git.maitysanchayan@gmail.com>
+References: <cover.1415364391.git.maitysanchayan@gmail.com>
+Message-ID: <bbe86ff8ff7461451be5c53242842e966bfd3966.1415364391.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first version of the patches were send quiet a 
-while back. 
-https://lkml.org/lkml/2014/9/26/492
+This patch adds support for clock gating of
+the SNVS peripheral.
 
-The reason for sending this v2 of the patches late was to
-prevent any changes midway to the VF dts patches being tried
-with the below commit.
-https://lkml.org/lkml/2014/10/22/605
-
-Changes since v1:
-The clock enable and disable functions for the SNVS are
-now optional and only enable/disable it, if it has been
-defined in the device tree node. Instead of failing and 
-returning error as in the earlier set of patches, this
-makes sure that the driver does not break for the other
-i.MX devices for which the clock has not been defined and
-enabled elsewhere.
-
-Sanchayan Maity (3):
-  ARM: imx: clk-vf610: Add clock for SNVS
-  ARM: dts: vfxxx: Add SNVS node
-  drivers/rtc/rtc-snvs: Add clock support
-
- arch/arm/boot/dts/vfxxx.dtsi            |   15 ++++++++++++++
+Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+---
  arch/arm/mach-imx/clk-vf610.c           |    1 +
- drivers/rtc/rtc-snvs.c                  |   34 +++++++++++++++++++++++++++++--
  include/dt-bindings/clock/vf610-clock.h |    3 ++-
- 4 files changed, 50 insertions(+), 3 deletions(-)
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
+index 5937dde..bbf4785 100644
+--- a/arch/arm/mach-imx/clk-vf610.c
++++ b/arch/arm/mach-imx/clk-vf610.c
+@@ -379,6 +379,7 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
+ 	clk[VF610_CLK_DMAMUX1] = imx_clk_gate2("dmamux1", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(5));
+ 	clk[VF610_CLK_DMAMUX2] = imx_clk_gate2("dmamux2", "platform_bus", CCM_CCGR6, CCM_CCGRx_CGn(1));
+ 	clk[VF610_CLK_DMAMUX3] = imx_clk_gate2("dmamux3", "platform_bus", CCM_CCGR6, CCM_CCGRx_CGn(2));
++	clk[VF610_CLK_SNVS] = imx_clk_gate2("snvs-rtc", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(7));
+ 
+ 	imx_check_clocks(clk, ARRAY_SIZE(clk));
+ 
+diff --git a/include/dt-bindings/clock/vf610-clock.h b/include/dt-bindings/clock/vf610-clock.h
+index 801c0ac..979d24a 100644
+--- a/include/dt-bindings/clock/vf610-clock.h
++++ b/include/dt-bindings/clock/vf610-clock.h
+@@ -192,6 +192,7 @@
+ #define VF610_PLL5_BYPASS		179
+ #define VF610_PLL6_BYPASS		180
+ #define VF610_PLL7_BYPASS		181
+-#define VF610_CLK_END			182
++#define VF610_CLK_SNVS			182
++#define VF610_CLK_END			183
+ 
+ #endif /* __DT_BINDINGS_CLOCK_VF610_H */
 -- 
 1.7.9.5
