@@ -1,68 +1,47 @@
-From: socketcan@hartkopp.net (Oliver Hartkopp)
-Date: Fri, 07 Nov 2014 12:53:10 +0100
-Subject: [PATCH V4 3/3] can: m_can: add missing message RAM initialization
-In-Reply-To: <1415349914-9145-3-git-send-email-b29396@freescale.com>
-References: <1415349914-9145-1-git-send-email-b29396@freescale.com>
- <1415349914-9145-3-git-send-email-b29396@freescale.com>
-Message-ID: <545CB2A6.1010703@hartkopp.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 7 Nov 2014 11:55:51 +0000
+Subject: [RFC] ptrace: add generic SET_SYSCALL request
+In-Reply-To: <1977974.l97vvy7Y8b@wuerfel>
+References: <1415346443-28915-1-git-send-email-takahiro.akashi@linaro.org>
+ <1977974.l97vvy7Y8b@wuerfel>
+Message-ID: <20141107115551.GC18916@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks!
+On Fri, Nov 07, 2014 at 09:30:53AM +0000, Arnd Bergmann wrote:
+> On Friday 07 November 2014 16:47:23 AKASHI Takahiro wrote:
+> > This patch adds a new generic ptrace request, PTRACE_SET_SYSCALL.
+> > It can be used to change a system call number as follows:
+> >     ret = ptrace(pid, PTRACE_SET_SYSCALL, null, new_syscall_no);
+> > 'new_syscall_no' can be -1 to skip this system call, you need to modify
+> > a register's value, in arch-specific way, as return value though.
+> > 
+> > Please note that we can't define PTRACE_SET_SYSCALL macro in
+> > uapi/linux/ptrace.h partly because its value on arm, 23, is used as another
+> > request on sparc.
+> > 
+> > This patch also contains an example of change on arch side, arm.
+> > Only syscall_set_nr() is required to be defined in asm/syscall.h.
+> > 
+> > Currently only arm has this request, while arm64 would also have it
+> > once my patch series of seccomp for arm64 is merged. It will also be
+> > usable for most of other arches.
+> > See the discussions in lak-ml:
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/300167.html
+> > 
+> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > 
+> 
+> Can you describe why you are moving the implementation? Is this a feature
+> that we want to have on all architectures in the future? As you say,
+> only arm32 implements is at the moment.
 
-Hopefully we can manage to push the patch series via can/master ;-)
+We need this for arm64 and, since all architectures seem to have a mechanism
+for setting a system call via ptrace, moving it to generic code should make
+sense for new architectures too, no?
 
-Regards,
-Oliver
+We don't have any arch-specific ptrace requests on arm64, so it would be
+a shame if we had to add one now, especially since there's nothing
+conceptually arch-specific about setting a syscall number.
 
-On 07.11.2014 09:45, Dong Aisheng wrote:
-> The M_CAN message RAM is usually equipped with a parity or ECC functionality.
-> But RAM cells suffer a hardware reset and can therefore hold arbitrary
-> content at startup - including parity and/or ECC bits.
->
-> To prevent the M_CAN controller detecting checksum errors when reading
-> potentially uninitialized TX message RAM content to transmit CAN
-> frames the TX message RAM has to be written with (any kind of) initial
-> data.
->
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> ---
-> ChangeLog:
-> v3-v4:
->   * initialize the entire Message RAM in use instead of only 8 bytes
->     since this is a valid and needed initialization process.
->     Patch title also changed.
-> ---
->   drivers/net/can/m_can/m_can.c | 11 ++++++++++-
->   1 file changed, 10 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
-> index eee1533..de742d0 100644
-> --- a/drivers/net/can/m_can/m_can.c
-> +++ b/drivers/net/can/m_can/m_can.c
-> @@ -1114,7 +1114,7 @@ static int m_can_of_parse_mram(struct platform_device *pdev,
->   	struct resource *res;
->   	void __iomem *addr;
->   	u32 out_val[MRAM_CFG_LEN];
-> -	int ret;
-> +	int i, start, end, ret;
->
->   	/* message ram could be shared */
->   	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "message_ram");
-> @@ -1165,6 +1165,15 @@ static int m_can_of_parse_mram(struct platform_device *pdev,
->   		priv->mcfg[MRAM_TXE].off, priv->mcfg[MRAM_TXE].num,
->   		priv->mcfg[MRAM_TXB].off, priv->mcfg[MRAM_TXB].num);
->
-> +	/* initialize the entire Message RAM in use to avoid possible
-> +	 * ECC/parity checksum errors when reading an uninitialized buffer
-> +	 */
-> +	start = priv->mcfg[MRAM_SIDF].off;
-> +	end = priv->mcfg[MRAM_TXB].off +
-> +		priv->mcfg[MRAM_TXB].num * TXB_ELEMENT_SIZE;
-> +	for (i = start; i < end; i += 4)
-> +		writel(0x0, priv->mram_base + i);
-> +
->   	return 0;
->   }
->
->
+Will
