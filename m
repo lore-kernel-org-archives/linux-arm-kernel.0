@@ -1,28 +1,46 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 07 Nov 2014 11:25:14 -0800
-Subject: [PATCH v4 2/3] PM / clock_ops: make __pm_clk_enable more generic
-In-Reply-To: <1415281862-23764-3-git-send-email-grygorii.strashko@ti.com>
- (Grygorii Strashko's message of "Thu, 6 Nov 2014 15:51:01 +0200")
-References: <1415281862-23764-1-git-send-email-grygorii.strashko@ti.com>
- <1415281862-23764-3-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <7h1tpestid.fsf@deeprootsystems.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 7 Nov 2014 11:30:16 -0800
+Subject: [PATCH v9 01/12] coresight: add CoreSight core layer framework
+In-Reply-To: <1415038066-22423-2-git-send-email-mathieu.poirier@linaro.org>
+References: <1415038066-22423-1-git-send-email-mathieu.poirier@linaro.org>
+ <1415038066-22423-2-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20141107193016.GA29311@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grygorii Strashko <grygorii.strashko@ti.com> writes:
+On Mon, Nov 03, 2014 at 11:07:35AM -0700, mathieu.poirier at linaro.org wrote:
+> From: Pratik Patel <pratikp@codeaurora.org>
+> 
+> CoreSight components are compliant with the ARM CoreSight
+> architecture specification and can be connected in various
+> topologies to suit a particular SoC tracing needs. These trace
+> components can generally be classified as sources, links and
+> sinks. Trace data produced by one or more sources flows through
+> the intermediate links connecting the source to the currently
+> selected sink.
+> 
+> The CoreSight framework provides an interface for the CoreSight trace
+> drivers to register themselves with. It's intended to build up a
+> topological view of the CoreSight components and configure the
+> correct serie of components on user input via sysfs.
+> 
+> For eg., when enabling a source, the framework builds up a path
+> consisting of all the components connecting the source to the
+> currently selected sink(s) and enables all of them.
+> 
+> The framework also supports switching between available sinks
+> and provides status information to user space applications
+> through the debugfs interface.
+> 
+> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-> Now there are two places in code which do the same things,
-> so allow __pm_clk_enable() to accept pointer on pm_clock_entry
-> structure as second parameter instead of pointer on clock and
-> remove duplicated code.
->
-> Also, updated function intended to be used by following patch.
->
-> CC: Santosh Shilimkar <ssantosh@kernel.org>
-> CC: Kevin Hilman <khilman@linaro.org>
-> CC: Ulf Hansson <ulf.hansson@linaro.org>
-> CC: Geert Uytterhoeven <geert@linux-m68k.org>
-> CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+You don't seem to document the sysfs files you create here in
+Documentation/ABI/ anywhere in the series.  Can you fix that up?
 
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
+Other than that minor nit, this looks good to me.  Feel free to take it
+through some random ARM tree.
+
+thanks,
+
+greg k-h
