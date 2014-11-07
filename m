@@ -1,42 +1,23 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri,  7 Nov 2014 14:38:25 +0100
-Subject: [PATCH/RFC 1/2] ARM: shmobile: kzm9g dts: Declare the full 512 MiB of
- RAM
-Message-ID: <1415367506-8713-1-git-send-email-geert+renesas@glider.be>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 7 Nov 2014 14:41:12 +0100
+Subject: [PATCH v2 00/11] memory: add Atmel EBI (External Bus Interface)
+ driver
+In-Reply-To: <1415203287-21517-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1415203287-21517-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20141107134112.GB4068@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Traditionally, the first 16 MiB of RAM was reserved for the RT
-processor.  However, this is incompatible with CONFIG_AUTO_ZRELADDR=y,
-which requires that the start address of physical memory is a multiple
-of 128 MiB.
+On 05/11/2014 at 17:01:16 +0100, Boris Brezillon wrote :
+> Arnd, you've commented the first version of this driver (IIRC, you
+> focused on the DT binding part), could you give your feedback on this
+> version (I based the new DT binding on TI's aemif driver).
+> 
 
-As CONFIG_AUTO_ZRELADDR=y is enabled for multi-platform kernels, declare
-RAM to start at 0x40000000.
+Shouldn't you Cc Arnd then? ;)
 
-While at it, reclaim the last 8 MiB of RAM, too, so the full 512 MiB is
-available.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-Questions:
-  - Why was the last 8 MiB of RAM not used?
-  - Is it an option to fix CONFIG_AUTO_ZRELADDR instead?
-
- arch/arm/boot/dts/sh73a0-kzm9g.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g.dts b/arch/arm/boot/dts/sh73a0-kzm9g.dts
-index 27c5f426d172f03d..e7dae01933a575f1 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g.dts
-@@ -21,6 +21,6 @@
- 
- 	memory {
- 		device_type = "memory";
--		reg = <0x41000000 0x1e800000>;
-+		reg = <0x40000000 0x20000000>;
- 	};
- };
 -- 
-1.9.1
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
