@@ -1,70 +1,85 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 07 Nov 2014 13:44:07 +0100
-Subject: [RFC] ptrace: add generic SET_SYSCALL request
-In-Reply-To: <20141107121119.GQ4042@n2100.arm.linux.org.uk>
-References: <1415346443-28915-1-git-send-email-takahiro.akashi@linaro.org>
- <1678531.AUssrM9PAs@wuerfel> <20141107121119.GQ4042@n2100.arm.linux.org.uk>
-Message-ID: <353850534.aGkkrtTogX@wuerfel>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 7 Nov 2014 07:59:50 -0500
+Subject: [PATCH 1/2] thermal: armada: Remove support for A375-Z1 SoC
+In-Reply-To: <545CBDEF.6050502@free-electrons.com>
+References: <1415116839-4323-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1415116839-4323-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20141107032619.GD3698@titan.lakedaemon.net>
+ <545CBDEF.6050502@free-electrons.com>
+Message-ID: <20141107125950.GK3698@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 November 2014 12:11:19 Russell King - ARM Linux wrote:
-> On Fri, Nov 07, 2014 at 01:03:00PM +0100, Arnd Bergmann wrote:
-> > On Friday 07 November 2014 11:55:51 Will Deacon wrote:
-> > > We need this for arm64 and, since all architectures seem to have a mechanism
-> > > for setting a system call via ptrace, moving it to generic code should make
-> > > sense for new architectures too, no?
+Ezequiel,
+
++ Mark, Grant (sorry, thought you were Cc'd on the original patch)
+
+On Fri, Nov 07, 2014 at 09:41:19AM -0300, Ezequiel Garcia wrote:
+> On 11/07/2014 12:26 AM, Jason Cooper wrote:
+> > Ezequiel,
 > > 
-> > It makes a little more sense now, but I still don't understand why you
-> > need to set the system call number via ptrace. What is this used for,
-> > and why doesn't any other architecture have this?
+> > On Tue, Nov 04, 2014 at 01:00:38PM -0300, Ezequiel Garcia wrote:
+> >> The Armada 375 Z1 SoC revision is no longer supported. This commit
+> >> removes the quirk needed for the thermal sensor.
+> >>
+> >> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> >> ---
+> >>  .../devicetree/bindings/thermal/armada-thermal.txt   |  8 --------
+> >>  drivers/thermal/armada_thermal.c                     | 20 --------------------
+> >>  2 files changed, 28 deletions(-)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+> >> index 4cf0249..4698e0e 100644
+> >> --- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+> >> +++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+> >> @@ -5,17 +5,9 @@ Required properties:
+> >>  - compatible:	Should be set to one of the following:
+> >>  		marvell,armada370-thermal
+> >>  		marvell,armada375-thermal
+> >> -		marvell,armada375-z1-thermal
+> >>  		marvell,armada380-thermal
+> >>  		marvell,armadaxp-thermal
+> >>  
+> >> -		Note: As the name suggests, "marvell,armada375-z1-thermal"
+> >> -		applies for the SoC Z1 stepping only. On such stepping
+> >> -		some quirks need to be done and the register offset differs
+> >> -		from the one in the A0 stepping.
+> >> -		The operating system may auto-detect the SoC stepping and
+> >> -		update the compatible and register offsets at runtime.
+> >> -
+> >>  - reg:		Device's register space.
+> >>  		Two entries are expected, see the examples below.
+> >>  		The first one is required for the sensor register;
+> > 
+> > I've no problem with removing support for the z1 stepping from the
+> > kernel.  However, I don't think we should erase it from binding docs.
+> > I'm not sure what the DT maintainers think is the appropriate action
+> > here, but I'm thinking we could add a 'Deprecated' section at the end of
+> > the doc and move these hunks there.  With a little rewording of course.
+> > 
+> > I'm primarily concerned about users with older dtbs looking to upgrade,
+> > "Hey, wtf is marvell,armada375-z1-thermal?  I looked in the binding docs
+> > and there's nothing there, do I replace it with marvell,armada375-thermal?"
+> > 
 > 
-> All other architectures have a way.  x86, for example, you set orig_eax
-> (or orig_rax) to change the syscall number.  On ARM, that doesn't work
-> because we don't always pass the syscall number in a register.
+> We can do that if you think it's really useful. However, I think we've
+> designed this so *nobody* would actually have to put the z1 compatible
+> string. The mvebu quirk (tries) to auto-detect it from the revision
+> register and hot fix the compatible string.
 > 
+> Moreover, I'm not at all sure *anyone* would have a Z1 board except
+> early developers like us. Am I being too naive here?
 
-Sorry for being slow today, but why can't we use the same interface that
-s390 has on arm64:
+I'm primarily concerned about dtbs in the wild which have that
+compatible string.  But as you mention, and a quick grep proves, this
+compatible string was never in a dts{i} file.  At least not in the
+kernel tree.
 
-static int s390_system_call_get(struct task_struct *target,
-                                const struct user_regset *regset,
-                                unsigned int pos, unsigned int count,
-                                void *kbuf, void __user *ubuf)
-{
-        unsigned int *data = &task_thread_info(target)->system_call;
-        return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
-                                   data, 0, sizeof(unsigned int));
-}
+It's not a rush, so I'd like to hear from Mark/Grant what they prefer
+for this sort of situation.  It'll be in the git history either way, but
+not everyone goes there when the current docs don't mention something.
+:)
 
-static int s390_system_call_set(struct task_struct *target,
-                                const struct user_regset *regset,
-                                unsigned int pos, unsigned int count,
-                                const void *kbuf, const void __user *ubuf)
-{
-        unsigned int *data = &task_thread_info(target)->system_call;
-        return user_regset_copyin(&pos, &count, &kbuf, &ubuf,
-                                  data, 0, sizeof(unsigned int));
-}
+thx,
 
-static const struct user_regset s390_regsets[] = {
-	...
-        {
-                .core_note_type = NT_S390_SYSTEM_CALL,
-                .n = 1,
-                .size = sizeof(unsigned int),
-                .align = sizeof(unsigned int),
-                .get = s390_system_call_get,
-                .set = s390_system_call_set,
-        },
-	...
-};
-
-Is it just preference for being consistent with ARM32, or is there a
-reason this won't work?
-
-It's not that I care strongly about the interface, my main point is
-that the changelog doesn't describe why one interface was used instead
-the other.
-
-	Arnd
+Jason.
