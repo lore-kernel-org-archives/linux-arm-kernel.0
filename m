@@ -1,120 +1,79 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 07 Nov 2014 14:10:28 +0100
-Subject: [PATCH v2 01/10] [media] Move mediabus format definition to a
- more standard place
-In-Reply-To: <20141107114358.GB3136@valkosipuli.retiisi.org.uk>
-References: <1415267829-4177-1-git-send-email-boris.brezillon@free-electrons.com>
- <1415267829-4177-2-git-send-email-boris.brezillon@free-electrons.com>
- <20141107114358.GB3136@valkosipuli.retiisi.org.uk>
-Message-ID: <545CC4C4.6080600@xs4all.nl>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 7 Nov 2014 13:11:30 +0000
+Subject: [RFC] ptrace: add generic SET_SYSCALL request
+In-Reply-To: <353850534.aGkkrtTogX@wuerfel>
+References: <1415346443-28915-1-git-send-email-takahiro.akashi@linaro.org>
+ <1678531.AUssrM9PAs@wuerfel>
+ <20141107121119.GQ4042@n2100.arm.linux.org.uk>
+ <353850534.aGkkrtTogX@wuerfel>
+Message-ID: <20141107131129.GF18916@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/14 12:43, Sakari Ailus wrote:
-> Hi Boris,
+On Fri, Nov 07, 2014 at 12:44:07PM +0000, Arnd Bergmann wrote:
+> On Friday 07 November 2014 12:11:19 Russell King - ARM Linux wrote:
+> > On Fri, Nov 07, 2014 at 01:03:00PM +0100, Arnd Bergmann wrote:
+> > > On Friday 07 November 2014 11:55:51 Will Deacon wrote:
+> > > > We need this for arm64 and, since all architectures seem to have a mechanism
+> > > > for setting a system call via ptrace, moving it to generic code should make
+> > > > sense for new architectures too, no?
+> > > 
+> > > It makes a little more sense now, but I still don't understand why you
+> > > need to set the system call number via ptrace. What is this used for,
+> > > and why doesn't any other architecture have this?
+> > 
+> > All other architectures have a way.  x86, for example, you set orig_eax
+> > (or orig_rax) to change the syscall number.  On ARM, that doesn't work
+> > because we don't always pass the syscall number in a register.
+> > 
 > 
-> Thank you for the update.
+> Sorry for being slow today, but why can't we use the same interface that
+> s390 has on arm64:
 > 
-> On Thu, Nov 06, 2014 at 10:56:59AM +0100, Boris Brezillon wrote:
->> Rename mediabus formats and move the enum into a separate header file so
->> that it can be used by DRM/KMS subsystem without any reference to the V4L2
->> subsystem.
->>
->> Old v4l2_mbus_pixelcode now points to media_bus_format.
->>
->> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->> Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
->> ---
->>  include/uapi/linux/Kbuild             |   1 +
->>  include/uapi/linux/media-bus-format.h | 131 ++++++++++++++++++++++++++++++++++
->>  include/uapi/linux/v4l2-mediabus.h    | 114 +----------------------------
->>  3 files changed, 134 insertions(+), 112 deletions(-)
->>  create mode 100644 include/uapi/linux/media-bus-format.h
->>
->> diff --git a/include/uapi/linux/Kbuild b/include/uapi/linux/Kbuild
->> index b70237e..b2c23f8 100644
->> --- a/include/uapi/linux/Kbuild
->> +++ b/include/uapi/linux/Kbuild
->> @@ -414,6 +414,7 @@ header-y += veth.h
->>  header-y += vfio.h
->>  header-y += vhost.h
->>  header-y += videodev2.h
->> +header-y += media-bus-format.h
+> static int s390_system_call_get(struct task_struct *target,
+>                                 const struct user_regset *regset,
+>                                 unsigned int pos, unsigned int count,
+>                                 void *kbuf, void __user *ubuf)
+> {
+>         unsigned int *data = &task_thread_info(target)->system_call;
+>         return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
+>                                    data, 0, sizeof(unsigned int));
+> }
 > 
-> Could you arrange this to the list alphabetically, please?
+> static int s390_system_call_set(struct task_struct *target,
+>                                 const struct user_regset *regset,
+>                                 unsigned int pos, unsigned int count,
+>                                 const void *kbuf, const void __user *ubuf)
+> {
+>         unsigned int *data = &task_thread_info(target)->system_call;
+>         return user_regset_copyin(&pos, &count, &kbuf, &ubuf,
+>                                   data, 0, sizeof(unsigned int));
+> }
 > 
->>  header-y += virtio_9p.h
->>  header-y += virtio_balloon.h
->>  header-y += virtio_blk.h
->> diff --git a/include/uapi/linux/media-bus-format.h b/include/uapi/linux/media-bus-format.h
->> new file mode 100644
->> index 0000000..251a902
->> --- /dev/null
->> +++ b/include/uapi/linux/media-bus-format.h
->> @@ -0,0 +1,131 @@
->> +/*
->> + * Media Bus API header
->> + *
->> + * Copyright (C) 2009, Guennadi Liakhovetski <g.liakhovetski@gmx.de>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#ifndef __LINUX_MEDIA_BUS_FORMAT_H
->> +#define __LINUX_MEDIA_BUS_FORMAT_H
->> +
->> +/*
->> + * These bus formats uniquely identify data formats on the data bus. Format 0
->> + * is reserved, MEDIA_BUS_FMT_FIXED shall be used by host-client pairs, where
->> + * the data format is fixed. Additionally, "2X8" means that one pixel is
->> + * transferred in two 8-bit samples, "BE" or "LE" specify in which order those
->> + * samples are transferred over the bus: "LE" means that the least significant
->> + * bits are transferred first, "BE" means that the most significant bits are
->> + * transferred first, and "PADHI" and "PADLO" define which bits - low or high,
->> + * in the incomplete high byte, are filled with padding bits.
->> + *
->> + * The bus formats are grouped by type, bus_width, bits per component, samples
->> + * per pixel and order of subsamples. Numerical values are sorted using generic
->> + * numerical sort order (8 thus comes before 10).
->> + *
->> + * As their value can't change when a new bus format is inserted in the
->> + * enumeration, the bus formats are explicitly given a numerical value. The next
->> + * free values for each category are listed below, update them when inserting
->> + * new pixel codes.
->> + */
->> +
->> +#define MEDIA_BUS_FMT_ENTRY(name, val)	\
->> +	MEDIA_BUS_FMT_ ## name = val,	\
->> +	V4L2_MBUS_FMT_ ## name = val
->> +
->> +enum media_bus_format {
+> static const struct user_regset s390_regsets[] = {
+> 	...
+>         {
+>                 .core_note_type = NT_S390_SYSTEM_CALL,
+>                 .n = 1,
+>                 .size = sizeof(unsigned int),
+>                 .align = sizeof(unsigned int),
+>                 .get = s390_system_call_get,
+>                 .set = s390_system_call_set,
+>         },
+> 	...
+> };
 > 
-> There's no really a need to keep the definitions inside the enum. It looks a
-> little bit confusing to me. That made me realise something I missed
-> yesterday.
-> 
-> There's a difference: the enum in C++ is a different thing than in C, and
-> the enum type isn't able to contain any other values than those defined in
-> the enumeration.
-> 
-> So what I propose is the following. Keep enum v4l2_mbus_pixelcode around,
-> including the enum values. Define new values for MEDIA_BUS_* equivalents
-> using preprocessor macros, as you've done below. Drop the definition of enum
-> media_bus_format, and use u32 (or uint32_t) type for the variables.
-> 
-> This way the enum stays intact for existing C++ applications, and new
-> applications will have to use a 32-bit type.
-> 
-> I'd like to get an ok from Hans to this as well.
+> Is it just preference for being consistent with ARM32, or is there a
+> reason this won't work?
 
-OK, let's do this. Let's keep enum v4l2_mbus_pixelcode but only under #ifndef
-__KERNEL and with a comment that this enum is deprecated and frozen and that
-the values from the new header should be used.
+Interesting, I hadn't considered a unit-length regset.
 
-And make the new MEDIA_BUS_FMT_ values defines instead of an enum.
+> It's not that I care strongly about the interface, my main point is
+> that the changelog doesn't describe why one interface was used instead
+> the other.
 
-Regards,
+I suspect the current approach was taken because it follows the same scheme
+as 32-bit ARM. If both methods are sufficient (Kees would have a better idea
+than me on that), then I don't have a strong preference.
 
-	Hans
+Will
