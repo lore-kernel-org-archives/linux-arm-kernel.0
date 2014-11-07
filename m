@@ -1,37 +1,60 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Fri, 07 Nov 2014 13:35:45 -0800
-Subject: [PATCH] tty: serial: msm_serial: Use DT aliases
-In-Reply-To: <2747100.M77UGx4AmB@wuerfel>
-References: <1414024381-12204-1-git-send-email-sboyd@codeaurora.org>
- <545C694D.1030204@gmail.com> <545C69E7.6010909@gmail.com>
- <2747100.M77UGx4AmB@wuerfel>
-Message-ID: <545D3B31.3030309@gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 7 Nov 2014 14:39:31 -0700
+Subject: [PATCH v9 01/12] coresight: add CoreSight core layer framework
+In-Reply-To: <20141107193054.GB29311@kroah.com>
+References: <1415038066-22423-1-git-send-email-mathieu.poirier@linaro.org>
+ <1415038066-22423-2-git-send-email-mathieu.poirier@linaro.org>
+ <20141107193016.GA29311@kroah.com>
+ <20141107193054.GB29311@kroah.com>
+Message-ID: <CANLsYkzKB7iBUFxsqmaoHob26mEZvfbVSA1O_ZadFCYHE2viAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/7/2014 1:47 AM, Arnd Bergmann wrote:
-> On Thursday 06 November 2014 22:42:47 Frank Rowand wrote:
->> This same change is also needed in:
+On 7 November 2014 12:30, Greg KH <gregkh@linuxfoundation.org> wrote:
+> On Fri, Nov 07, 2014 at 11:30:16AM -0800, Greg KH wrote:
+>> On Mon, Nov 03, 2014 at 11:07:35AM -0700, mathieu.poirier at linaro.org wrote:
+>> > From: Pratik Patel <pratikp@codeaurora.org>
+>> >
+>> > CoreSight components are compliant with the ARM CoreSight
+>> > architecture specification and can be connected in various
+>> > topologies to suit a particular SoC tracing needs. These trace
+>> > components can generally be classified as sources, links and
+>> > sinks. Trace data produced by one or more sources flows through
+>> > the intermediate links connecting the source to the currently
+>> > selected sink.
+>> >
+>> > The CoreSight framework provides an interface for the CoreSight trace
+>> > drivers to register themselves with. It's intended to build up a
+>> > topological view of the CoreSight components and configure the
+>> > correct serie of components on user input via sysfs.
+>> >
+>> > For eg., when enabling a source, the framework builds up a path
+>> > consisting of all the components connecting the source to the
+>> > currently selected sink(s) and enables all of them.
+>> >
+>> > The framework also supports switching between available sinks
+>> > and provides status information to user space applications
+>> > through the debugfs interface.
+>> >
+>> > Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
+>> > Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 >>
->>   qcom-ipq8064.dtsi
->>   qcom-msm8960.dtsi
->>   qcom-apq8084.dtsi
->>   qcom-apq8064.dtsi
->>   qcom-msm8660.dtsi
+>> You don't seem to document the sysfs files you create here in
+>> Documentation/ABI/ anywhere in the series.  Can you fix that up?
+
+Thanks for the review.   Do you want sysfs entries documented for the
+framework only or all the ones created by the drivers as well?
+
 >>
->> but I did not want to just blindly apply those changes without testing.
->>
-> 
-> Is there only one uart on each of these?
-> 
-> If not, it would be better to put the aliases in the board specific file,
-> pointing to whichever ports are in use, in the order that makes sense
-> for that board.
+>> Other than that minor nit, this looks good to me.  Feel free to take it
+>> through some random ARM tree.
+>
+> Wait, did you want me to take this through my tree?  If so, I'll be glad
+> to do so, I can't remember what we talked about here...
 
-Good point, thanks for bringing it up.
+I was hoping to go through yours.
 
-Your comment made me verify that the board dts files can override the
-aliases from the included .dtsi.  So not a problem to have a default
-set of aliases in the .dtsi files.
-
--Frank
+>
+> thanks,
+>
+> greg k-h
