@@ -1,145 +1,190 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri,  7 Nov 2014 16:25:32 +0000
-Subject: [PATCH 07/11] arm: perf: document PMU affinity binding
+Date: Fri,  7 Nov 2014 16:25:33 +0000
+Subject: [PATCH 08/11] arm: perf: add functions to parse affinity from dt
 In-Reply-To: <1415377536-12841-1-git-send-email-mark.rutland@arm.com>
 References: <1415377536-12841-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1415377536-12841-8-git-send-email-mark.rutland@arm.com>
+Message-ID: <1415377536-12841-9-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To describe the various ways CPU PMU interrupts might be wired up, we
-can refer to the topology information in the device tree.
+Depending on hardware configuration, some devices may only be accessible
+from certain CPUs, may have interrupts wired up to a subset of CPUs, or
+may have operations which affect subsets of CPUs. To handle these
+devices it is necessary to describe this affinity information in
+devicetree.
 
-This patch adds a new property to the PMU binding, interrupts-affinity,
-which describes the relationship between CPUs and interrupts. This
-information is necessary to handle systems with heterogeneous PMU
-implementations (e.g. big.LITTLE). Documentation is added describing the
-use of said property.
+This patch adds functions to handle parsing the CPU affinity of
+properties from devicetree, based on Lorenzo's topology binding,
+allowing subsets of CPUs to be associated with interrupts, hardware
+ports, etc. The functions can be used to build cpumasks and also to test
+whether an affinity property only targets one CPU independent of the
+current configuration (e.g. when the kernel supports fewer CPUs than are
+physically present). This is useful for dealing with mixed SPI/PPI
+devices.
+
+A device may have an arbitrary number of affinity properties, the
+meaning of which is device-specific and should be specified in a given
+device's binding document.
+
+For example, an affinity property describing interrupt routing may
+consist of a phandle pointing to a subtree of the topology nodes,
+indicating the set of CPUs an interrupt originates from or may be taken
+on. Bindings may have restrictions on the topology nodes referenced -
+for describing coherency controls an affinity property may indicate a
+whole cluster (including any non-CPU logic it contains) is affected by
+some configuration.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <rob.herring@kernel.org>
 ---
- Documentation/devicetree/bindings/arm/pmu.txt | 104 +++++++++++++++++++++++++-
- 1 file changed, 103 insertions(+), 1 deletion(-)
+ arch/arm/kernel/perf_event_cpu.c | 127 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 127 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
-index 75ef91d..23a0675 100644
---- a/Documentation/devicetree/bindings/arm/pmu.txt
-+++ b/Documentation/devicetree/bindings/arm/pmu.txt
-@@ -24,12 +24,114 @@ Required properties:
+diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+index ce35149..dfcaba5 100644
+--- a/arch/arm/kernel/perf_event_cpu.c
++++ b/arch/arm/kernel/perf_event_cpu.c
+@@ -22,6 +22,7 @@
+ #include <linux/export.h>
+ #include <linux/kernel.h>
+ #include <linux/of.h>
++#include <linux/of_device.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
+@@ -294,6 +295,132 @@ static int probe_current_pmu(struct arm_pmu *pmu)
+ 	return ret;
+ }
  
- Optional properties:
- 
-+- interrupts-affinity : A list of phandles to topology nodes (see topology.txt) describing
-+	     the set of CPUs associated with the interrupt at the same index.
- - qcom,no-pc-write : Indicates that this PMU doesn't support the 0xc and 0xd
-                      events.
- 
--Example:
-+Example 1 (A single CPU):
- 
- pmu {
-         compatible = "arm,cortex-a9-pmu";
-         interrupts = <100 101>;
- };
++/*
++ * Test if the node is within the topology tree.
++ * Walk up to the root, keeping refcounts balanced.
++ */
++static bool is_topology_node(struct device_node *node)
++{
++	struct device_node *np, *cpu_map;
++	bool ret = false;
 +
-+Example 2 (Multiple clusters with single interrupts):
++	cpu_map = of_find_node_by_path("/cpus/cpu-map");
++	if (!cpu_map)
++		return false;
 +
-+cpus {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
++	/*
++	 * of_get_next_parent decrements the refcount of the provided node.
++	 * Increment it first to keep things balanced.
++	 */
++	for (np = of_node_get(node); np; np = of_get_next_parent(np)) {
++		if (np != cpu_map)
++			continue;
 +
-+	CPU0: cpu at 0 {
-+		reg = <0x0>;
-+		compatible = "arm,cortex-a15-pmu";
-+	};
++		ret = true;
++		break;
++	}
 +
-+	CPU1: cpu at 1 {
-+		reg = <0x1>;
-+		compatible = "arm,cotex-a15-pmu";
-+	};
++	of_node_put(np);
++	of_node_put(cpu_map);
++	return ret;
++}
 +
-+	CPU100: cpu at 100 {
-+		reg = <0x100>;
-+		compatible = "arm,cortex-a7-pmu";
-+	};
++static int cpu_node_to_id(struct device_node *node)
++{
++	int cpu;
++	for_each_possible_cpu(cpu)
++		if (of_cpu_device_node_get(cpu) == node)
++			return cpu;
 +
-+	cpu-map {
-+		cluster0 {
-+			CORE_0_0: core0 {
-+				cpu = <&CPU0>;
-+			};
-+			CORE_0_1: core1 {
-+				cpu = <&CPU1>;
-+			};
-+		};
-+		cluster1 {
-+			CORE_1_0: core0 {
-+				cpu = <&CPU100>;
-+			};
-+		};
-+	};
-+};
++	return -EINVAL;
++}
 +
-+pmu_a15 {
-+	compatible = "arm,cortex-a15-pmu";
-+	interrupts = <100>, <101>;
-+	interrupts-affinity = <&CORE0>, <&CORE1>;
-+};
++static int arm_dt_affine_build_mask(struct device_node *affine,
++				    cpumask_t *mask)
++{
++	struct device_node *child, *parent = NULL;
++	int ret = -EINVAL;
 +
-+pmu_a7 {
-+	compatible = "arm,cortex-a7-pmu";
-+	interrupts = <105>;
-+	interrupts-affinity = <&CORE_1_0>;
-+};
++	if (!is_topology_node(affine))
++		return -EINVAL;
 +
-+Example 3 (Multiple clusters with per-cpu interrupts):
++	child = of_node_get(affine);
++	if (!child)
++		goto out_invalid;
 +
-+cpus {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
++	parent = of_get_parent(child);
++	if (!parent)
++		goto out_invalid;
 +
-+	CPU0: cpu at 0 {
-+		reg = <0x0>;
-+		compatible = "arm,cortex-a15-pmu";
-+	};
++	if (!cpumask_empty(mask))
++		goto out_invalid;
 +
-+	CPU1: cpu at 1 {
-+		reg = <0x1>;
-+		compatible = "arm,cotex-a15-pmu";
-+	};
++	/*
++	 * Depth-first search over the topology tree, iterating over leaf nodes
++	 * and adding all referenced CPUs to the cpumask. Almost all of the
++	 * of_* iterators are built for breadth-first search, which means we
++	 * have to do a little more work to ensure refcounts are balanced.
++	 */
++	do {
++		struct device_node *tmp, *cpu_node;
++		int cpu;
 +
-+	CPU100: cpu at 100 {
-+		reg = <0x100>;
-+		compatible = "arm,cortex-a7-pmu";
-+	};
++		/* head down to the leaf */
++		while ((tmp = of_get_next_child(child, NULL))) {
++			of_node_put(parent);
++			parent = child;
++			child = tmp;
++		}
 +
-+	cpu-map {
-+		CLUSTER0: cluster0 {
-+			core0 {
-+				cpu = <&CPU0>;
-+			};
-+			core1 {
-+				cpu = <&CPU1>;
-+			};
-+		};
-+		CLUSTER1: cluster1 {
-+			 core0 {
-+				cpu = <&CPU100>;
-+			};
-+		};
-+	};
-+};
++		/*
++		 * In some cases cpu_node might be NULL, but cpu_node_to_id
++		 * will handle this (albeit slowly) and we don't need another
++		 * error path.
++		 */
++		cpu_node = of_parse_phandle(child, "cpu", 0);
++		cpu = cpu_node_to_id(cpu_node);
 +
-+pmu_a15 {
-+	compatible = "arm,cortex-a15-pmu";
-+	interrupts = <100>;
-+	interrupts-affinity = <&CLUSTER0>;
-+};
++		if (cpu < 0)
++			pr_warn("Invalid or unused node in topology description '%s', skipping\n",
++				child->full_name);
++		else
++			cpumask_set_cpu(cpu, mask);
 +
-+pmu_a7 {
-+	compatible = "arm,cortex-a7-pmu";
-+	interrupts = <105>;
-+	interrupts-affinity = <&CLUSTER1>;
-+};
++		of_node_put(cpu_node);
++
++		/*
++		 * Find the next sibling, or transitively a parent's sibling.
++		 * Don't go further up the tree than the affine node we were
++		 * handed.
++		 */
++		while (child != affine &&
++			!(child = of_get_next_child(parent, child))) {
++			child = parent;
++			parent = of_get_parent(parent);
++		}
++
++	} while (child != affine); /* all children covered. Time to stop */
++
++	ret = 0;
++
++out_invalid:
++	of_node_put(child);
++	of_node_put(parent);
++	return ret;
++}
++
++static int arm_dt_affine_get_mask(struct device_node *node, char *prop,
++				  int idx, cpumask_t *mask)
++{
++	int ret = -EINVAL;
++	struct device_node *affine = of_parse_phandle(node, prop, idx);
++
++	ret = arm_dt_affine_build_mask(affine, mask);
++
++	of_node_put(affine);
++	return ret;
++}
++
+ static int cpu_pmu_device_probe(struct platform_device *pdev)
+ {
+ 	const struct of_device_id *of_id;
 -- 
 1.9.1
