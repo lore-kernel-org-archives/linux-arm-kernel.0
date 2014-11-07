@@ -1,89 +1,232 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 7 Nov 2014 16:07:22 +0100
-Subject: [PATCH v3 17/19] arm64: KVM: add SGI system register trapping
-In-Reply-To: <1414776414-13426-18-git-send-email-andre.przywara@arm.com>
-References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
- <1414776414-13426-18-git-send-email-andre.przywara@arm.com>
-Message-ID: <20141107150722.GS16132@cbox>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Fri,  7 Nov 2014 15:59:12 +0100
+Subject: [PATCH 01/01] arm: ftrace: Adds support for ftrace operations
+In-Reply-To: <1415372352-15664-1-git-send-email-jjhiblot@traphandler.com>
+References: <1415372352-15664-1-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <1415372352-15664-2-git-send-email-jjhiblot@traphandler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 05:26:52PM +0000, Andre Przywara wrote:
-> While the injection of a (virtual) inter-processor interrupt (SGI)
-> on a GICv2 works by writing to a MMIO register, GICv3 uses system
-> registers to trigger them.
-> Trap the appropriate registers on ARM64 hosts and call the SGI
+Ftrace operations require that DYNAMIC_FTRACE_WITH_REGS is enabled.
+This patch introduces a new ftrace handler that store the registers on the
+stack before calling the next stage. The registers are also restored from the
+stack before going back to the instrumented function.
 
-Are you actually enabling the trapping here or just putting the trap
-handler in place?  As I understood so far, we still configure the guest
-at this point to raise an unexpected exception in the guest if it tries
-to eaccess the system registers; did I get this wrong?
+Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+---
+ arch/arm/Kconfig               |  2 ++
+ arch/arm/include/asm/ftrace.h  |  3 ++
+ arch/arm/kernel/entry-common.S | 68 +++++++++++++++++++++++++++++++++++++++++-
+ arch/arm/kernel/ftrace.c       | 34 +++++++++++++++++++++
+ 4 files changed, 106 insertions(+), 1 deletion(-)
 
-> handler function in the vGICv3 emulation code.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  arch/arm64/kvm/sys_regs.c |   26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index dcc5867..cf0452e 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -165,6 +165,27 @@ static bool access_sctlr(struct kvm_vcpu *vcpu,
->  	return true;
->  }
->  
-> +/*
-> + * Trapping on the GICv3 SGI system register.
-
-Use the architecture name for the register here.
-
-> + * Forward the request to the VGIC emulation.
-> + * The cp15_64 code makes sure this automatically works
-> + * for both AArch64 and AArch32 accesses.
-> + */
-> +static bool access_gic_sgi(struct kvm_vcpu *vcpu,
-> +			   const struct sys_reg_params *p,
-> +			   const struct sys_reg_desc *r)
-> +{
-> +	u64 val;
-> +
-> +	if (!p->is_write)
-> +		return read_from_write_only(vcpu, p);
-> +
-> +	val = *vcpu_reg(vcpu, p->Rt);
-> +	vgic_v3_dispatch_sgi(vcpu, val);
-
-So do we guarantee somehow that we'll never get here if userspace didn't
-successfully create a virtual GICv3?
-
-> +
-> +	return true;
-> +}
-> +
->  static bool trap_raz_wi(struct kvm_vcpu *vcpu,
->  			const struct sys_reg_params *p,
->  			const struct sys_reg_desc *r)
-> @@ -431,6 +452,9 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  	/* VBAR_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
->  	  NULL, reset_val, VBAR_EL1, 0 },
-> +	/* ICC_SGI1R_EL1 */
-> +	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1011), Op2(0b101),
-> +	  access_gic_sgi },
->  	/* CONTEXTIDR_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b001),
->  	  access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
-> @@ -659,6 +683,8 @@ static const struct sys_reg_desc cp14_64_regs[] = {
->   * register).
->   */
->  static const struct sys_reg_desc cp15_regs[] = {
-> +	{ Op1( 0), CRn( 0), CRm(12), Op2( 0), access_gic_sgi },
-> +
->  	{ Op1( 0), CRn( 1), CRm( 0), Op2( 0), access_sctlr, NULL, c1_SCTLR },
->  	{ Op1( 0), CRn( 2), CRm( 0), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
->  	{ Op1( 0), CRn( 2), CRm( 0), Op2( 1), access_vm_reg, NULL, c2_TTBR1 },
-> -- 
-> 1.7.9.5
-> 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 32cbbd5..6f928ee 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -39,6 +39,7 @@ config ARM
+ 	select HAVE_DMA_ATTRS
+ 	select HAVE_DMA_CONTIGUOUS if MMU
+ 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
++	select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE
+ 	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
+ 	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
+ 	select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
+@@ -72,6 +73,7 @@ config ARM
+ 	select PERF_USE_VMALLOC
+ 	select RTC_LIB
+ 	select SYS_SUPPORTS_APM_EMULATION
++	select FRAME_POINTER if DYNAMIC_FTRACE_WITH_REGS && FUNCTION_GRAPH_TRACER
+ 	# Above selects are sorted alphabetically; please add new ones
+ 	# according to that.  Thanks.
+ 	help
+diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+index 39eb16b..d8e9bea 100644
+--- a/arch/arm/include/asm/ftrace.h
++++ b/arch/arm/include/asm/ftrace.h
+@@ -10,6 +10,9 @@ extern void mcount(void);
+ extern void __gnu_mcount_nc(void);
+ 
+ #ifdef CONFIG_DYNAMIC_FTRACE
++
++#define ARCH_SUPPORTS_FTRACE_OPS 1
++
+ struct dyn_arch_ftrace {
+ #ifdef CONFIG_OLD_MCOUNT
+ 	bool	old_mcount;
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index e52fe5a..9594fe2 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -197,7 +197,10 @@ ENDPROC(ret_from_fork)
+ 
+ 	mcount_get_lr	r1			@ lr of instrumented func
+ 	mcount_adjust_addr	r0, lr		@ instrumented function
+-
++	ldr r2, =function_trace_op
++	ldr r2, [r2]				@ pointer to the current
++						@ function tracing op
++	mov r3, #0				@ regs is NULL
+ 	.globl ftrace_call\suffix
+ ftrace_call\suffix:
+ 	bl	ftrace_stub
+@@ -211,6 +214,38 @@ ftrace_graph_call\suffix:
+ 	mcount_exit
+ .endm
+ 
++.macro __ftrace_regs_caller
++
++	add 	ip, sp, #4	@ move in IP the value of SP as it was
++				@ before the push {lr} of the mcount mechanism
++	stmdb	sp!, {ip,lr,pc}
++	stmdb	sp!, {r0-r11,lr}
++	@ stack content  at this point:
++	@ 0  4         44    48   52       56   60   64
++	@ RO | R1 | ... | R11 | LR | SP + 4 | LR | PC | previous LR |
++
++	mov r3, sp				@ struct pt_regs*
++	ldr r2, =function_trace_op
++	ldr r2, [r2]				@ pointer to the current
++						@ function tracing op
++	ldr	r1, [sp, #64]			@ lr of instrumented func
++	mcount_adjust_addr	r0, lr		@ instrumented function
++
++	.globl ftrace_regs_call
++ftrace_regs_call:
++	bl	ftrace_stub
++
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++	.globl ftrace_graph_regs_call
++ftrace_graph_regs_call:
++	mov	r0, r0
++#endif
++	ldr	lr, [sp, #64]		@ get the previous LR value from stack
++	ldmia	sp, {r0-r11, ip, sp}	@ pop the saved registers INCLUDING
++					@ the stack pointer
++	ret	ip
++.endm
++
+ .macro __ftrace_graph_caller
+ 	sub	r0, fp, #4		@ &lr of instrumented routine (&parent)
+ #ifdef CONFIG_DYNAMIC_FTRACE
+@@ -226,6 +261,24 @@ ftrace_graph_call\suffix:
+ 	mcount_exit
+ .endm
+ 
++
++.macro __ftrace_graph_regs_caller
++
++	sub	r0, fp, #4		@ &lr of instrumented routine (&parent)
++
++	@ called from __ftrace_regs_caller
++	ldr	r1, [sp, #56]		@ instrumented routine (func)
++	mcount_adjust_addr	r1, r1
++
++	mov	r2, fp			@ frame pointer
++	bl	prepare_ftrace_return
++
++	ldr	lr, [fp, #-4]		@ restore LR from the stack
++	ldmia	sp, {r0-r11, ip, sp}	@ pop the saved registers INCLUDING
++					@ the stack pointer
++	ret	ip
++.endm
++
+ #ifdef CONFIG_OLD_MCOUNT
+ /*
+  * mcount
+@@ -312,14 +365,27 @@ UNWIND(.fnstart)
+ 	__ftrace_caller
+ UNWIND(.fnend)
+ ENDPROC(ftrace_caller)
++
++ENTRY(ftrace_regs_caller)
++UNWIND(.fnstart)
++	__ftrace_regs_caller
++UNWIND(.fnend)
++ENDPROC(ftrace_regs_caller)
+ #endif
+ 
++
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ ENTRY(ftrace_graph_caller)
+ UNWIND(.fnstart)
+ 	__ftrace_graph_caller
+ UNWIND(.fnend)
+ ENDPROC(ftrace_graph_caller)
++
++ENTRY(ftrace_graph_regs_caller)
++UNWIND(.fnstart)
++	__ftrace_graph_regs_caller
++UNWIND(.fnend)
++ENDPROC(ftrace_graph_regs_caller)
+ #endif
+ 
+ .purgem mcount_enter
+diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
+index af9a8a9..35c5743 100644
+--- a/arch/arm/kernel/ftrace.c
++++ b/arch/arm/kernel/ftrace.c
+@@ -130,6 +130,16 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
+ 	}
+ #endif
+ 
++
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++	if (!ret) {
++		pc = (unsigned long)&ftrace_regs_call;
++		new = ftrace_call_replace(pc, (unsigned long)func);
++
++		ret = ftrace_modify_code(pc, 0, new, false);
++	}
++#endif
++
+ 	return ret;
+ }
+ 
+@@ -139,6 +149,20 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
+ 	unsigned long ip = rec->ip;
+ 
+ 	old = ftrace_nop_replace(rec);
++
++	new = ftrace_call_replace(ip, adjust_address(rec, addr));
++
++	return ftrace_modify_code(rec->ip, old, new, true);
++}
++
++int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
++				unsigned long addr)
++{
++	unsigned long new, old;
++	unsigned long ip = rec->ip;
++
++	old = ftrace_call_replace(ip, adjust_address(rec, old_addr));
++
+ 	new = ftrace_call_replace(ip, adjust_address(rec, addr));
+ 
+ 	return ftrace_modify_code(rec->ip, old, new, true);
+@@ -211,6 +235,9 @@ void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
+ extern unsigned long ftrace_graph_call;
+ extern unsigned long ftrace_graph_call_old;
+ extern void ftrace_graph_caller_old(void);
++extern unsigned long ftrace_graph_regs_call;
++extern void ftrace_graph_regs_caller(void);
++
+ 
+ static int __ftrace_modify_caller(unsigned long *callsite,
+ 				  void (*func) (void), bool enable)
+@@ -240,6 +267,13 @@ static int ftrace_modify_graph_caller(bool enable)
+ 					     enable);
+ #endif
+ 
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++	if (!ret)
++		ret = __ftrace_modify_caller(&ftrace_graph_regs_call,
++				     ftrace_graph_regs_caller,
++				     enable);
++#endif
++
+ 	return ret;
+ }
+ 
+-- 
+2.1.3
