@@ -1,104 +1,63 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri,  7 Nov 2014 17:01:03 +0100
-Subject: [PATCH v6 12/12] memory: tegra: Add Tegra132 support
-In-Reply-To: <1415376063-17205-1-git-send-email-thierry.reding@gmail.com>
-References: <1415376063-17205-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1415376063-17205-13-git-send-email-thierry.reding@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 7 Nov 2014 16:03:06 +0000
+Subject: [PATCH v7 6/8] xen/arm/arm64: merge xen/mm32.c into xen/mm.c
+In-Reply-To: <alpine.DEB.2.02.1411071523170.22875@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
+ <1414422568-19103-6-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20141107142205.GD29148@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.02.1411071523170.22875@kaball.uk.xensource.com>
+Message-ID: <20141107160306.GF29148@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On Fri, Nov 07, 2014 at 03:28:38PM +0000, Stefano Stabellini wrote:
+> On Fri, 7 Nov 2014, Catalin Marinas wrote:
+> > On Mon, Oct 27, 2014 at 03:09:26PM +0000, Stefano Stabellini wrote:
+> > > Merge xen/mm32.c into xen/mm.c.
+> > > As a consequence the code gets compiled on arm64 too: introduce a few
+> > > compat functions to actually be able to compile it.
+> > > 
+> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > Acked-by: Ian Campbell <ian.campbell@citrix.com>
+> > 
+> > Since I missed the commit introducing mm32.c (340720be32d4 xen/arm:
+> > reimplement xen_dma_unmap_page & friends), I'll add a retrospective NAK ;).
+> > 
+> > The main reason is the asymmetry between dma map and unmap. With host
+> > swiotlb somehow getting !dma_capable(dev), you even risk leaking dom0
+> > swiotlb bounce buffers (on arm64).
+> > 
+> > > --- a/arch/arm/xen/mm.c
+> > > +++ b/arch/arm/xen/mm.c
+> > [...]
+> > > +/* functions called by SWIOTLB */
+> > > +
+> > > +static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
+> > > +       size_t size, enum dma_data_direction dir,
+> > > +       void (*op)(const void *, size_t, int))
+> > > +{
+> > > +       unsigned long pfn;
+> > > +       size_t left = size;
+> > > +
+> > > +       pfn = (handle >> PAGE_SHIFT) + offset / PAGE_SIZE;
+> > > +       offset %= PAGE_SIZE;
+> > > +
+> > > +       do {
+> > > +               size_t len = left;
+> > > +               void *vaddr;
+> > > +
+> > > +               if (!pfn_valid(pfn))
+> > 
+> > Is this the pfn or the mfn? As you said in the previous email, there is
+> > no mfn_to_pfn() conversion, so that's actually in another address space
+> > where dom0 pfn_valid() would not make sense.
+> 
+> That is actually the mfn. The check works because dom0 is mapped 1:1, so
+> if the mfn is a valid pfn, then it means that it is a local page.
 
-The memory controller on Tegra132 is very similar to the one found on
-Tegra124. But the Denver CPUs don't have an outer cache, so dcache
-maintenance is done slightly differently.
+So the Xen DMA ops would never be called on anything other than dom0? If
+that's correct, the pfn_valid() check would work. But add some big
+comments as it's not clear at all to someone not familiar with Xen.
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- drivers/memory/tegra/Makefile   |  1 +
- drivers/memory/tegra/mc.c       |  3 +++
- drivers/memory/tegra/mc.h       |  4 ++++
- drivers/memory/tegra/tegra124.c | 33 +++++++++++++++++++++++++++++++++
- 4 files changed, 41 insertions(+)
-
-diff --git a/drivers/memory/tegra/Makefile b/drivers/memory/tegra/Makefile
-index b0732cc5686a..cdae9481c864 100644
---- a/drivers/memory/tegra/Makefile
-+++ b/drivers/memory/tegra/Makefile
-@@ -4,5 +4,6 @@ tegra-mc-$(CONFIG_TEGRA_IOMMU_SMMU) += smmu.o
- tegra-mc-$(CONFIG_ARCH_TEGRA_3x_SOC)  += tegra30.o
- tegra-mc-$(CONFIG_ARCH_TEGRA_114_SOC) += tegra114.o
- tegra-mc-$(CONFIG_ARCH_TEGRA_124_SOC) += tegra124.o
-+tegra-mc-$(CONFIG_ARCH_TEGRA_132_SOC) += tegra124-mc.o
- 
- obj-$(CONFIG_TEGRA_MC) += tegra-mc.o
-diff --git a/drivers/memory/tegra/mc.c b/drivers/memory/tegra/mc.c
-index 359281def893..286b9c52e7fd 100644
---- a/drivers/memory/tegra/mc.c
-+++ b/drivers/memory/tegra/mc.c
-@@ -58,6 +58,9 @@ static const struct of_device_id tegra_mc_of_match[] = {
- #ifdef CONFIG_ARCH_TEGRA_124_SOC
- 	{ .compatible = "nvidia,tegra124-mc", .data = &tegra124_mc_soc },
- #endif
-+#ifdef CONFIG_ARCH_TEGRA_132_SOC
-+	{ .compatible = "nvidia,tegra132-mc", .data = &tegra132_mc_soc },
-+#endif
- 	{ }
- };
- 
-diff --git a/drivers/memory/tegra/mc.h b/drivers/memory/tegra/mc.h
-index 7cf7f5bb3cb3..8fabe993d51b 100644
---- a/drivers/memory/tegra/mc.h
-+++ b/drivers/memory/tegra/mc.h
-@@ -122,4 +122,8 @@ extern const struct tegra_mc_soc tegra114_mc_soc;
- extern const struct tegra_mc_soc tegra124_mc_soc;
- #endif
- 
-+#ifdef CONFIG_ARCH_TEGRA_132_SOC
-+extern const struct tegra_mc_soc tegra132_mc_soc;
-+#endif
-+
- #endif /* MEMORY_TEGRA_MC_H */
-diff --git a/drivers/memory/tegra/tegra124.c b/drivers/memory/tegra/tegra124.c
-index 278d40b854c1..ccd19d83ee91 100644
---- a/drivers/memory/tegra/tegra124.c
-+++ b/drivers/memory/tegra/tegra124.c
-@@ -993,3 +993,36 @@ const struct tegra_mc_soc tegra124_mc_soc = {
- 	.smmu = &tegra124_smmu_soc,
- };
- #endif /* CONFIG_ARCH_TEGRA_124_SOC */
-+
-+#ifdef CONFIG_ARCH_TEGRA_132_SOC
-+static void tegra132_flush_dcache(struct page *page, unsigned long offset,
-+				  size_t size)
-+{
-+	void *virt = page_address(page) + offset;
-+
-+	__flush_dcache_area(virt, size);
-+}
-+
-+static const struct tegra_smmu_ops tegra132_smmu_ops = {
-+	.flush_dcache = tegra132_flush_dcache,
-+};
-+
-+static const struct tegra_smmu_soc tegra132_smmu_soc = {
-+	.clients = tegra124_mc_clients,
-+	.num_clients = ARRAY_SIZE(tegra124_mc_clients),
-+	.swgroups = tegra124_swgroups,
-+	.num_swgroups = ARRAY_SIZE(tegra124_swgroups),
-+	.supports_round_robin_arbitration = true,
-+	.supports_request_limit = true,
-+	.num_asids = 128,
-+	.ops = &tegra132_smmu_ops,
-+};
-+
-+const struct tegra_mc_soc tegra132_mc_soc = {
-+	.clients = tegra124_mc_clients,
-+	.num_clients = ARRAY_SIZE(tegra124_mc_clients),
-+	.num_address_bits = 34,
-+	.atom_size = 32,
-+	.smmu = &tegra132_smmu_soc,
-+};
-+#endif /* CONFIG_ARCH_TEGRA_132_SOC */
 -- 
-2.1.3
+Catalin
