@@ -1,91 +1,86 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Fri, 07 Nov 2014 00:34:41 +0100
-Subject: [PATCHv0 1/3] rtc: rtc-isl12057: fix masking of register values
-References: <cover.1415222752.git.arno@natisbad.org>
- <917b6e5e869fce697dec8a1597dfd2f671bf5c46.1415222752.git.arno@natisbad.org>
- <20141106082946.GN8316@pengutronix.de>
-Message-ID: <87ioirnbse.fsf@natisbad.org>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Thu, 06 Nov 2014 16:40:41 -0800
+Subject: [PATCH v13 0/7] KVM/arm/x86: dirty page logging support for ARMv7
+ (3.17.0-rc1)
+Message-ID: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Patch series adds support for ARMv7 and generic dirty page logging support. 
+As we try to move towards generic dirty page logging additional logic is moved 
+to generic code. Initially armv7 KVM_GET_DIRTY_LOG ioctl reuses generic code, 
+to be followed by armv8 and x86. 
 
-Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> writes:
+Testing:
+- Generally live migration + checksumming of source/destination memory regions 
+  is used to validate correctness.
+- ARMv7 - qemu machvirt, VExpress - Exynos 5440, FastModels - lmbench + dirty 
+  guest memory cycling. On FastModels you must set 'migrate_set_downtime=1'
+  for higher dirty rate (for example 2000 pges/100mS).
 
-> Hello Arnaud,
->
-> On Wed, Nov 05, 2014 at 10:42:25PM +0100, Arnaud Ebalard wrote:
->> When Intersil ISL12057 support was added by commit 70e123373c05 ("rtc:
->> Add support for Intersil ISL12057 I2C RTC chip"), two masks for time
->> registers values imported from the device were either wrong or
->> omitted, leading to additional bits from those registers to impact
->> read values:
->> 
->>  - mask for hour register value when reading it in AM/PM mode. As
->>    AM/PM mode is not the usual mode used by the driver, this error
->>    would only have an impact on an externally configured RTC hour
->>    later read by the driver.
->>  - mask for month value. The lack of masking would provide an
->>    erroneous value if century bit is set.
->> 
->> This patch fixes those two masks.
->> 
->> Fixes: 70e123373c05 ("rtc: Add support for Intersil ISL12057 I2C RTC chip")
->> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
->> ---
->>  drivers/rtc/rtc-isl12057.c | 6 +++---
->>  1 file changed, 3 insertions(+), 3 deletions(-)
->> 
->> diff --git a/drivers/rtc/rtc-isl12057.c b/drivers/rtc/rtc-isl12057.c
->> index 455b601d731d..8132fbc7e10a 100644
->> --- a/drivers/rtc/rtc-isl12057.c
->> +++ b/drivers/rtc/rtc-isl12057.c
->> @@ -88,7 +88,7 @@ static void isl12057_rtc_regs_to_tm(struct rtc_time *tm, u8 *regs)
->>  	tm->tm_min = bcd2bin(regs[ISL12057_REG_RTC_MN]);
->>  
->>  	if (regs[ISL12057_REG_RTC_HR] & ISL12057_REG_RTC_HR_MIL) { /* AM/PM */
->> -		tm->tm_hour = bcd2bin(regs[ISL12057_REG_RTC_HR] & 0x0f);
->> +		tm->tm_hour = bcd2bin(regs[ISL12057_REG_RTC_HR] & 0x1f);
->>  		if (regs[ISL12057_REG_RTC_HR] & ISL12057_REG_RTC_HR_PM)
->>  			tm->tm_hour += 12;
->>  	} else {					    /* 24 hour mode */
->> @@ -96,8 +96,8 @@ static void isl12057_rtc_regs_to_tm(struct rtc_time *tm, u8 *regs)
->>  	}
->>  
->>  	tm->tm_mday = bcd2bin(regs[ISL12057_REG_RTC_DT]);
->> -	tm->tm_wday = bcd2bin(regs[ISL12057_REG_RTC_DW]) - 1; /* starts at 1 */
->> +	tm->tm_wday = bcd2bin(regs[ISL12057_REG_RTC_DW]) - 1;  /* starts at 1 */
-> unrelated change?
+See https://github.com/mjsmar/arm-dirtylog-tests for details.
 
-yep, will remove it.
+In addition to ARMv7 patch series was compiled for:
+- x86_64 - defconfig 
+- ia64 - ia64-linux-gcc4.6.3 - defconfig, ia64 Kconfig defines BROKEN worked 
+  around that to make sure new changes don't break build. Eventually build
+  breaks due to other reasons.
+- mips - mips64-linux-gcc4.6.3 - malta_kvm_defconfig
+- ppc - powerpc64-linux-gcc4.6.3 - pseries_defconfig
+- s390 - s390x-linux-gcc4.6.3 - defconfig
+- armv8 - aarch64-linux-gnu-gcc4.8.1 - defconfig
 
+ARMv7 Dirty page logging implementation overivew-
+- initially write protects memory region pages 2nd stage page tables
+- add support to read dirty page log and again write protect dirty pages 
+  for next pass.
+- second stage huge page are dissolved into small page tables to keep track of
+  dirty pages at page granularity. Tracking at huge page granularity limits
+  migration to an almost idle system. Small page size logging supports higher
+  memory dirty rates.
+- In the event migration is canceled, normal behavior is resumed huge pages
+  are rebuilt over time.
 
->> -	tm->tm_mon  = bcd2bin(regs[ISL12057_REG_RTC_MO]) - 1; /* starts at 1 */
->> +	tm->tm_mon  = bcd2bin(regs[ISL12057_REG_RTC_MO] & 0x1f) - 1; /* ditto */
->>  	tm->tm_year = bcd2bin(regs[ISL12057_REG_RTC_YR]) + 100;
->>  }
-> This patch definitly improves the driver, still I see room for more
-> improvement (all but the first issue are unrelated to this patch):
->
->  - There is a century bit in the RTC_MO driver that is now correctly
->    masked to determine the month. Shouldn't it be used to flag if year
->    is >= 2100? That seems to match the hardware leap year handling.
->    (I.e. it considers RTC_YR=0 not to be a leap year iff RTC_MO_CENTURY
->    is set.)
->
->  - I wonder how tm_wday should be handled. It seems to be hardly used by
->    callers of rtc_read_time. Is it better to report the hardware state
->    here or the weekday matching year/month/day?
->
->  - IMHO the probe function shouldn't clear the OSCILLATOR FAILURE BIT
->    (OSF). It's an indicator that the stored time is wrong. Instead this
->    bit should be evaluated in the read_time callback. (If it's set,
->    return -ENODATA.) And only clear the bit in .set_time when the
->    registers were updated. I think most drivers get that wrong.
+Changes since v12:
+- Added Paolos and James Hogan's comments to extend kvm_get_dirty_log() to
+  make it further generic by adding write protection in addition to dirty bit
+  map handling. This led to new generic function kvm_get_dirty_log_protect().
 
-Thanks for your feedback. I will take a look at those after alarm
-support is ok.
+Changes since v11:
+- Implemented Alex's comments to simplify generic layer.
 
-Cheers,
+Changes since v10:
+- addressed wanghaibin comments 
+- addressed Christoffers comments
 
-a+
+Changes since v9:
+- Split patches into generic and architecture specific variants for TLB Flushing
+  and dirty log read (patches 1,2 & 3,4,5,6)
+- rebased to 3.16.0-rc1
+- Applied Christoffers comments.
+
+Mario Smarduch (7):
+  KVM: Add architecture-defined TLB flush support
+  KVM: Add generic support for dirty page logging
+  KVM: x86: flush TLBs last before returning from KVM_GET_DIRTY_LOG
+  arm: KVM: Add ARMv7 API to flush TLBs
+  arm: KVM: Add initial dirty page locking infrastructure
+  arm: KVM: dirty log read write protect support
+  arm: KVM: ARMv7 dirty page logging 2nd stage page fault
+
+ arch/arm/include/asm/kvm_asm.h        |    1 +
+ arch/arm/include/asm/kvm_host.h       |   14 +++
+ arch/arm/include/asm/kvm_mmu.h        |   20 ++++
+ arch/arm/include/asm/pgtable-3level.h |    1 +
+ arch/arm/kvm/Kconfig                  |    1 +
+ arch/arm/kvm/arm.c                    |   17 +++
+ arch/arm/kvm/interrupts.S             |   11 ++
+ arch/arm/kvm/mmu.c                    |  209 +++++++++++++++++++++++++++++++--
+ arch/x86/kvm/x86.c                    |   22 ++--
+ include/linux/kvm_host.h              |    9 ++
+ virt/kvm/Kconfig                      |    3 +
+ virt/kvm/kvm_main.c                   |   96 +++++++++++++++
+ 12 files changed, 385 insertions(+), 19 deletions(-)
+
+-- 
+1.7.9.5
