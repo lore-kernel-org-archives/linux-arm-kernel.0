@@ -1,54 +1,55 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Fri, 7 Nov 2014 14:01:57 +0530
-Subject: [PATCH] spi: s3c64xx: add support for exynos7 SPI controller
-In-Reply-To: <20141106102636.GT8509@sirena.org.uk>
-References: <1415267509-16653-1-git-send-email-padma.v@samsung.com>
- <20141106102636.GT8509@sirena.org.uk>
-Message-ID: <CAAgF-BfGwcNzMx0meFVkJqNMTbQ4_PP1PZ3i6edOm6U3bc26_Q@mail.gmail.com>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Fri, 07 Nov 2014 09:35:56 +0100
+Subject: preferable method for pinctrl driver
+In-Reply-To: <CACRpkdYG6sNEfKNJBdbYCn4AbGiX2OfQAVJorR64cbB_gsWDbw@mail.gmail.com>
+References: <54379C10.3050004@rempel-privat.de>
+ <CACRpkdYG6sNEfKNJBdbYCn4AbGiX2OfQAVJorR64cbB_gsWDbw@mail.gmail.com>
+Message-ID: <545C846C.6090502@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Am 13.10.2014 um 11:05 schrieb Linus Walleij:
+> On Fri, Oct 10, 2014 at 10:42 AM, Oleksij Rempel <linux@rempel-privat.de> wrote:
+> 
+>> Looks like there is at least two pinctrl driver types:
+>> - imx23 which makes function description insight of DT;
+>> - tegra with function descrption in the source code.
+>> which way is preferable?
+> 
+> The Tegra way. The driver should know about all groups
+> and functions, the DT should just configure the functions to
+> groups relation.
+> 
+> The i.MX driver happened before the DT use for pin controllers
+> was thought through.
+> 
+>> Other question, i didn't found exact same HW, do it make sense to merge
+>> this driver with existing one? Are there some similarities with this one?:
+>> http://pastebin.com/hW82Xupq
+> 
+> No idea, that's very little HW information. However
+> silicon vendors often du their I/O cell layout themselves
+> so many pin controllers are very unique.
+> 
+> Yours,
+> Linus Walleij
 
-CCing Kukjin Kim.
+Hi,
+thank you for your previous response. One more question: how pins should
+be numbered? Continuous or register offsets can be used?
+Documentations for this soc use pin names encoded like this
+#NAME_#BANK_#PIN. Register offset can be calculated by ((bank) * 32 +
+(pin) * 4)
+In this case i need to have extra array to convert pin number to offset,
+or use offset as pin number.
+-- 
+Regards,
+Oleksij
 
-On 11/6/14, Mark Brown <broonie@kernel.org> wrote:
-> On Thu, Nov 06, 2014 at 03:21:49PM +0530, Padmavathi Venna wrote:
->> Exynos7 SPI controller supports only the auto Selection of
->> CS toggle mode and Exynos7 SoC includes six SPI controllers.
->> Add support for these changes in Exynos7 SPI controller driver.
->
-> Could you give a bit more detail on what the "auto selection of CS
-> toggle mode" is - in the diff it looks like it's not an existing mode.
-> I'm a bit worried that it's not going to function well with devices that
-> send more than one transfer per message.
-
-There is a bit AUTO_N_MANUAL(as per manual) in the spi CS_CFG
-register(as per manual, in the driver it is S3C64XX_SPI_SLAVE_SEL) to
-control the CS toggle mode either manually or automatically. If CS has
-to be controlled manually the AUTO_N_MANUAL should be set to 0 which
-the driver is doing in the s3c64xx_spi_transfer_one function by
-writing 0 in the S3C64XX_SPI_SLAVE_SEL. When it is handled manually
-NSSOUT as per the manual(in the driver it is
-S3C64XX_SPI_SLAVE_SIG_INACT) controls the level of CS which when set
-deactivates the signal and reset activates.
-
-CS can also be controlled automatically by setting AUTO_N_MANUAL to 1
-in CS_CFG. When it is auto CS automatically toggles between packet to
-packet. NCS_TIME_COUNT in CS_CFG controls the inactive period. The
-driver by default uses manual mode. But on exynos7 the manual mode is
-removed.
-
-I tested the driver with wm5110 codec.
-
->
->> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
->
-> It's better if your signoff is using the same e-maill address as
-
-ok.  I will take care of this.
-
->
-
-Thanks
-Padma
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141107/30aa5c73/attachment.sig>
