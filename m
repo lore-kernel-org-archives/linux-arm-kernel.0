@@ -1,59 +1,35 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 7 Nov 2014 08:59:25 +0100
-Subject: (bisected) Lock up on sh73a0/kzm9g on cpuidle initialization
-In-Reply-To: <545BE1DE.6060900@linaro.org>
-References: <CAMuHMdXaaa2t6+sH2egGacVxkAPeTUkAgwdYsOnMnEPnuLdB5Q@mail.gmail.com>
- <545BE1DE.6060900@linaro.org>
-Message-ID: <CAMuHMdXQr65g4He0D0ZRN923OJ2A7WNgwbiTru_1dGWnvbvCJA@mail.gmail.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Fri, 7 Nov 2014 09:00:34 +0100
+Subject: [PATCH 1/4] input: touchscreen: ti_am335x_tsc Interchange
+ touchscreen and ADC steps
+In-Reply-To: <545C59CD.3070707@ti.com>
+References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
+ <1414408111-2631-2-git-send-email-vigneshr@ti.com>
+ <20141106141916.GA17151@netboy> <545C59CD.3070707@ti.com>
+Message-ID: <20141107080033.GA6455@netboy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Fri, Nov 07, 2014 at 11:04:05AM +0530, Vignesh R wrote:
+> 
+> Currently, there is too much noise in the TSC hardware that is being
+> removed by delta filtering.
 
-On Thu, Nov 6, 2014 at 10:02 PM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> On 11/06/2014 09:38 PM, Geert Uytterhoeven wrote:
->> When CONFIG_CPU_IDLE=y, the kernel locks up during cpuidle initialization
->> on Renesas sh73a0/kzm9g-reference, which has a dual-core Cortex-A9.
->>
->> Last message is:
->>
->>      DMA: preallocated 256 KiB pool for atomic coherent allocations
->>
->> After this it's supposed to print:
->>
->>      cpuidle: using governor ladder
->>      cpuidle: using governor menu
->>
->> I've bisected this to commit 442bf3aaf55a91ebfec71da46a4ee10a3c905bcc
->> ("sched: Let the scheduler see CPU idle states").
->>
->> Reverting that commit, and commit 83a0a96a5f26d974580fd7251043ff70c8f1823d
->> ("sched/fair: Leverage the idle state info when choosing the "idlest"
->> cpu") which
->> depends on it, fixes the problem.
->>
->> I saw the discussion "lockdep splat in CPU hotplug", so I enabled lockdep
->> debugging, but didn't see a lockdep splat.
->
-> Did you try the fix attached ?
->
-> https://lkml.org/lkml/2014/10/22/722
+The so called "filter" was only programmed because the fifo entries
+were being mixed up. Sebastian fixed that.
 
-Thanks, I didn't try that.
+> I tested TSC unit by removing filtering
+> logic, the performance was not at all satisfactory. The cursor jumps
+> wayward and smooth circles cannot be drawn. Looks like delta filtering
+> cannot be removed as of now. May be I will try and address it in future.
 
-However, this patch seems to be in v3.18-rc3, so I'm already using it.
-Hence it doesn't fix the problem for me.
+The "filter" code is nonsensical. It picks the two values in seqeunce
+that are closest to one and another. How is that supposed to work?
 
-On another board, with a dual Cortex-A15, the problem doesn't show up.
+Did you look at the "noise"? What kind of properties did you see?
 
-Gr{oetje,eeting}s,
+A median filter makes more sense. Or sort, remove outliers, and
+average. But choosing the two closest in series is silly.
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Richard
