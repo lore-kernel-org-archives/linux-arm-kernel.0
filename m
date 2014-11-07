@@ -1,108 +1,40 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Fri, 07 Nov 2014 10:58:05 -0800
-Subject: [PATCH v13 4/7] arm: KVM: Add ARMv7 API to flush TLBs
-In-Reply-To: <545C948F.8030308@arm.com>
-References: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
- <1415320848-13813-5-git-send-email-m.smarduch@samsung.com>
- <545C948F.8030308@arm.com>
-Message-ID: <545D163D.4020706@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Nov 2014 18:58:44 +0000
+Subject: [PATCH] clk: Propagate prepare and enable when reparenting orphans
+In-Reply-To: <1415386312-23741-1-git-send-email-dianders@chromium.org>
+References: <1415386312-23741-1-git-send-email-dianders@chromium.org>
+Message-ID: <20141107185844.GR4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2014 01:44 AM, Marc Zyngier wrote:
-> On 07/11/14 00:40, Mario Smarduch wrote:
->> This patch adds ARMv7 architecture TLB Flush function.
->>
->> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
->> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->> ---
->>  arch/arm/include/asm/kvm_asm.h  |    1 +
->>  arch/arm/include/asm/kvm_host.h |   12 ++++++++++++
->>  arch/arm/kvm/Kconfig            |    1 +
->>  arch/arm/kvm/interrupts.S       |   11 +++++++++++
->>  4 files changed, 25 insertions(+)
->>
->> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
->> index 3a67bec..25410b2 100644
->> --- a/arch/arm/include/asm/kvm_asm.h
->> +++ b/arch/arm/include/asm/kvm_asm.h
->> @@ -96,6 +96,7 @@ extern char __kvm_hyp_code_end[];
->>  
->>  extern void __kvm_flush_vm_context(void);
->>  extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
->> +extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
->>  
->>  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
->>  #endif
->> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->> index 6dfb404..fad598c 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -220,6 +220,18 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
->>  	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
->>  }
->>  
->> +/**
->> + * kvm_arch_flush_remote_tlbs() - flush all VM TLB entries
->> + * @kvm:	pointer to kvm structure.
->> + *
->> + * Interface to HYP function to flush all VM TLB entries without address
->> + * parameter.
->> + */
->> +static inline void kvm_flush_remote_tlbs(struct kvm *kvm)
->> +{
->> +	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
->> +}
->> +
->>  static inline int kvm_arch_dev_ioctl_check_extension(long ext)
->>  {
->>  	return 0;
->> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
->> index 466bd29..a099df4 100644
->> --- a/arch/arm/kvm/Kconfig
->> +++ b/arch/arm/kvm/Kconfig
->> @@ -23,6 +23,7 @@ config KVM
->>  	select HAVE_KVM_CPU_RELAX_INTERCEPT
->>  	select KVM_MMIO
->>  	select KVM_ARM_HOST
->> +	select HAVE_KVM_ARCH_TLB_FLUSH_ALL
-> 
-> [utter nit] Move this up by two lines so that the "HAVE_KVM_*" options
-> are together. The ARM tree has a tendency to sort the config options by
-> alphabetical order (though that's clearly not enforced in this file...).
+On Fri, Nov 07, 2014 at 10:51:52AM -0800, Doug Anderson wrote:
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 4896ae9..a3d3d58 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1650,6 +1650,17 @@ void __clk_reparent(struct clk *clk, struct clk *new_parent)
+>  	clk_reparent(clk, new_parent);
+>  	__clk_recalc_accuracies(clk);
+>  	__clk_recalc_rates(clk, POST_RATE_CHANGE);
+> +
+> +	if (clk->prepare_count) {
+> +		unsigned long flags;
+> +
+> +		__clk_prepare(new_parent);
+> +
+> +		flags = clk_enable_lock();
+> +		if (clk->enable_count)
+> +			__clk_enable(new_parent);
+> +		clk_enable_unlock(flags);
+> +	}
 
-Ah, ok will update.
-> 
->>  	depends on ARM_VIRT_EXT && ARM_LPAE
->>  	---help---
->>  	  Support hosting virtualized guest machines. You will also
->> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
->> index 01dcb0e..79caf79 100644
->> --- a/arch/arm/kvm/interrupts.S
->> +++ b/arch/arm/kvm/interrupts.S
->> @@ -66,6 +66,17 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
->>  	bx	lr
->>  ENDPROC(__kvm_tlb_flush_vmid_ipa)
->>  
->> +/**
->> + * void __kvm_tlb_flush_vmid(struct kvm *kvm) - Flush per-VMID TLBs
->> + *
->> + * Reuses __kvm_tlb_flush_vmid_ipa() for ARMv7, without passing address
->> + * parameter
->> + */
->> +
->> +ENTRY(__kvm_tlb_flush_vmid)
->> +	b	__kvm_tlb_flush_vmid_ipa
->> +ENDPROC(__kvm_tlb_flush_vmid)
->> +
->>  /********************************************************************
->>   * Flush TLBs and instruction caches of all CPUs inside the inner-shareable
->>   * domain, for all VMIDs
->>
-> 
-> Other than that:
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> 	M.
-> 
+I really don't understand why this isn't already done - I said this was
+necessary a /long/ time ago.
+
+However, the above isn't sufficient.  Think about the old parent - this
+should be disabled and unprepared if it was prepared and enabled by the
+child.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
