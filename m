@@ -1,113 +1,119 @@
-From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Fri,  7 Nov 2014 15:33:46 +1300
-Subject: [RFC PATCHv2] ARM: mvebu: Let the device-tree determine smp_ops
-In-Reply-To: <20141106201603.GF4974@lunn.ch>
-References: <20141106201603.GF4974@lunn.ch>
-Message-ID: <1415327626-16079-1-git-send-email-chris.packham@alliedtelesis.co.nz>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 6 Nov 2014 21:53:03 -0500
+Subject: [PATCHv2 2/3] ARM: mvebu: disable I/O coherency on non-SMP
+ situations on Armada 370/XP
+In-Reply-To: <1414423955-5933-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1414423955-5933-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1414423955-5933-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20141107025303.GZ3698@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The machine specific SMP operations can be configured either via
-setup_arch or via arm_dt_init_cpu_maps. For the ARMADA_370_XP_DT devices
-both of these are called and setup_arch wins because it is called last.
-This means that it is not possible to substitute a different set of SMP
-operations via the device-tree.
-
-For the ARMADA_370_XP_DT compatible devices add a smp_init function that
-detects if the device tree has an enable-method defined. If it does
-return true to indicate that the smp_ops have already been set which
-will prevent setup_arch from overriding them.
-
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
----
-Hi,
-
-On 11/07/2014 09:16 AM, Andrew Lunn wrote:
->> Darn. I thought that might be the case but I wanted to keep the scope of
->> my change small. How about making setup_arch check if smp_ops is already
->> set?
+On Mon, Oct 27, 2014 at 04:32:34PM +0100, Thomas Petazzoni wrote:
+> Enabling the hardware I/O coherency on Armada 370 and Armada XP
+> requires a certain number of conditions:
 > 
-> I think that would be last resort solution. Try not to touch core code
-> unless you really have to.
+>  - On Armada 370, the cache policy must be set to write-allocate.
+>  - On Armada XP, the cache policy must be set to write-allocate, the
+>    pages must be mapped with the shareable attribute, and the SMP bit
+>    must be set
 > 
->> Alternatively if we gave ARMADA_370_XP_DT a smp_init function that
->> returned non-zero if smp_ops is already set then I think it'd be
->> backwards compatible and keep the scope of the change restricted to
->> the 370-XP platforms.
+> Currently, on Armada XP, when CONFIG_SMP is enabled, those conditions
+> are met. However, when Armada XP is used in a !CONFIG_SMP kernel, none
+> of these conditions are met. With Armada 370, the situation is worse:
+> since the processor is single core, regardless of whether CONFIG_SMP
+> or !CONFIG_SMP is used, the cache policy will be set to write-back by
+> the kernel and not write-allocate.
 > 
-> This sounds more reasonable.
+> Since solving this problem turns out to be quite complicated, and we
+> don't want to let users with a mainline kernel known to have
+> infrequent but existing data corruptions, this commit proposes to
+> simply disable hardware I/O coherency in situations where it is known
+> not to work.
 > 
->       Andrew
+> And basically, the is_smp() function of the kernel tells us whether it
+> is OK to enable hardware I/O coherency or not, so this commit slightly
+> refactors the coherency_type() function to return
+> COHERENCY_FABRIC_TYPE_NONE when is_smp() is false, or the appropriate
+> type of the coherency fabric in the other case.
 > 
+> Thanks to this, the I/O coherency fabric will no longer be used at all
+> in !CONFIG_SMP configurations. It will continue to be used in
+> CONFIG_SMP configurations on Armada XP, Armada 375 and Armada 38x
+> (which are multiple cores processors), but will no longer be used on
+> Armada 370 (which is a single core processor).
+> 
+> In the process, it simplifies the implementation of the
+> coherency_type() function, and adds a missing call to of_node_put().
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Fixes: e60304f8cb7bb545e79fe62d9b9762460c254ec2 ("arm: mvebu: Add hardware I/O Coherency support")
+> Cc: <stable@vger.kernel.org> # v3.8+
+> ---
+>  arch/arm/mach-mvebu/coherency.c | 37 +++++++++++++++++++++++--------------
+>  1 file changed, 23 insertions(+), 14 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+> index 2bdc323..abf4535 100644
+> --- a/arch/arm/mach-mvebu/coherency.c
+> +++ b/arch/arm/mach-mvebu/coherency.c
+> @@ -361,25 +361,34 @@ static int coherency_type(void)
+>  {
+>  	struct device_node *np;
+>  	const struct of_device_id *match;
+> +	int type;
+>  
+> -	np = of_find_matching_node_and_match(NULL, of_coherency_table, &match);
+> -	if (np) {
+> -		int type = (int) match->data;
+> +	/*
+> +	 * The coherency fabric is needed:
+> +	 * - For coherency between processors on Armada XP, so only
+> +	 *   when SMP is enabled.
+> +	 * - For coherency between the processor and I/O devices, but
+> +	 *   this coherency requires many pre-requisites (write
+> +	 *   allocate cache policy, shareable pages, SMP bit set) that
+> +	 *   are only meant in SMP situations.
+> +	 *
+> +	 * Note that this means that on Armada 370, there is currently
+> +	 * no way to use hardware I/O coherency, because even when
+> +	 * CONFIG_SMP is enabled, is_smp() returns false due to the
+> +	 * Armada 370 being a single-core processor.
 
-So here's my next attempt at a patch that is backwards compatible but allows
-the device tree to determine smp_ops. The device-tree searching was borrowed
-from arm_dt_init_cpu_maps which is probably an indication that I'm duplicating
-something that perhaps I shouldn't.
+Could we extend this a bit to let future readers know what needs to
+change to re-enable support on the 370?
 
-I have reservations about the fact that my code is active upon the device-tree
-having and enable-method rather than the combination of the device tree having
-the method and the kernel having that method declared. 
+thx,
 
-I'm also not sure that this is the intended use of the smp_init callback (a
-quick grep through Documentation/ doesn't yield any hits and asm/mach/arch.h
-doesn't say anything either) but nobody seemed to object when I proposed this
-usage.
+Jason.
 
-For v3 I wonder if I should just add a getter for smp_ops and have
-armada_smp_init just use that or perhaps have a flag that is set by
-set_smp_ops_by_method when it knows that the enable-method is something we can
-use. Or perhaps I'm over-thinking things :).
-
-Thanks,
-Chris
-
- arch/arm/mach-mvebu/board-v7.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
-
-diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-index 6478626..7e79eb1 100644
---- a/arch/arm/mach-mvebu/board-v7.c
-+++ b/arch/arm/mach-mvebu/board-v7.c
-@@ -198,6 +198,31 @@ static void __init mvebu_dt_init(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
-+static bool __init armada_smp_init(void)
-+{
-+	struct device_node *cpu, *cpus;
-+	int len;
-+	bool found_method = false;
-+
-+	cpus = of_find_node_by_path("/cpus");
-+	if (!cpus)
-+		return false;
-+
-+	for_each_child_of_node(cpus, cpu) {
-+		if (of_node_cmp(cpu->type, "cpu"))
-+			continue;
-+		if (of_find_property(cpu, "enable-method", &len))
-+			found_method = true;
-+	}
-+
-+	/* Fallback to an enable-method in the cpus node */
-+	if (!found_method)
-+		if (of_find_property(cpus, "enable-method", &len))
-+			found_method = true;
-+
-+	return found_method;
-+}
-+
- static const char * const armada_370_xp_dt_compat[] = {
- 	"marvell,armada-370-xp",
- 	NULL,
-@@ -206,6 +231,7 @@ static const char * const armada_370_xp_dt_compat[] = {
- DT_MACHINE_START(ARMADA_370_XP_DT, "Marvell Armada 370/XP (Device Tree)")
- 	.l2c_aux_val	= 0,
- 	.l2c_aux_mask	= ~0,
-+	.smp_init	= armada_smp_init,
- 	.smp		= smp_ops(armada_xp_smp_ops),
- 	.init_machine	= mvebu_dt_init,
- 	.init_irq       = mvebu_init_irq,
--- 
-2.2.0.rc0
+> +	 */
+> +	if (!is_smp())
+> +		return COHERENCY_FABRIC_TYPE_NONE;
+>  
+> -		/* Armada 370/XP coherency works in both UP and SMP */
+> -		if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
+> -			return type;
+> +	np = of_find_matching_node_and_match(NULL, of_coherency_table, &match);
+> +	if (!np)
+> +		return COHERENCY_FABRIC_TYPE_NONE;
+>  
+> -		/* Armada 375 coherency works only on SMP */
+> -		else if (type == COHERENCY_FABRIC_TYPE_ARMADA_375 && is_smp())
+> -			return type;
+> +	type = (int) match->data;
+>  
+> -		/* Armada 380 coherency works only on SMP */
+> -		else if (type == COHERENCY_FABRIC_TYPE_ARMADA_380 && is_smp())
+> -			return type;
+> -	}
+> +	of_node_put(np);
+>  
+> -	return COHERENCY_FABRIC_TYPE_NONE;
+> +	return type;
+>  }
+>  
+>  int coherency_available(void)
+> -- 
+> 2.0.0
+> 
