@@ -1,149 +1,52 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 06 Nov 2014 16:40:43 -0800
-Subject: [PATCH v13 2/7] KVM: Add generic support for dirty page logging
-In-Reply-To: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
-References: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <1415320848-13813-3-git-send-email-m.smarduch@samsung.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Fri, 7 Nov 2014 00:41:45 +0000
+Subject: [PATCH 00/10] arm64 kexec kernel patches V5
+In-Reply-To: <20141106150846.GE23706@leverpostej>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <20141031075209.GH3290@darkstar.nay.redhat.com>
+ <20141103194634.GA30366@leverpostej>
+ <20141106015642.GA2569@darkstar.nay.redhat.com>
+ <20141106150846.GE23706@leverpostej>
+Message-ID: <CACxGe6u=J_k3XZxyiyti=i=rtW+a5xxuukg3TgOyM+ra1vAACQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kvm_get_dirty_log() provides generic handling of dirty bitmap, currently reused
-by several architectures. Building on that we intrdoduce 
-kvm_get_dirty_log_protect() adding write protection to mark these pages dirty
-for future write access, before next KVM_GET_DIRTY_LOG ioctl call from user
-space.
+On Thu, Nov 6, 2014 at 3:08 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Nov 06, 2014 at 01:56:42AM +0000, Dave Young wrote:
+>> On 11/03/14 at 07:46pm, Mark Rutland wrote:
+>> > On Fri, Oct 31, 2014 at 07:52:09AM +0000, Dave Young wrote:
+>> > > Hi Geoff
+>> > >
+>> > > I tested your patches. The macihne is using spin-table cpu enable method
+>> > > so I tried maxcpus=1 as you suggested.
+>> > >
+>> > > There's below issues for me, thoughts?
+>> > >
+>> > > 1. For acpi booting there's no /proc/device-tree so kexec can not find dtb
+>> > > to use.
+>> >
+>> > Are you absolutely certain of this?
+>> >
+>> > To use ACPI, you must have booted via EFI, as the only mechanism for
+>> > finding the ACPI tables is via EFI. If booted via EFI, the stub will
+>> > have created a stub DTB if there is no provided DTB, to pass the command
+>> > line and pointers to EFI data structures. This stub DTB should be
+>> > present in the usual place.
+>>
+>> Mark, I used kexec-tools from Geoff's git tree, it will create dtb from procfs
+>> maybe I can pass external dtb to kexec-tools. What you mentioned should be true
+>> though but I have not get idea how to get the dtb which kernel is using for boot
+>> since it is not unflattened.
+>
+> Ah, sorry. I see the problem now. For ACPI you don't unflatten the tree,
+> so there's nothing to expose at in sysfs/procfs.
+>
+> Somehow we need to unflatten the DTB without exposing it to drivers,
+> such that it can be exposed to userspace in the usual place but drivers
+> don't being probing based off of it.
 
-Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
----
- include/linux/kvm_host.h |    9 +++++
- virt/kvm/kvm_main.c      |   95 ++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 104 insertions(+)
+Is that even necessary? If the tree isn't unflattened, then it is just
+a stub tree. There really isn't anything interesting in it. Kexec
+should recreate the tree from scratch in that case.
 
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index a4c33b3..c55dd75 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -590,6 +590,15 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext);
- 
- int kvm_get_dirty_log(struct kvm *kvm,
- 			struct kvm_dirty_log *log, int *is_dirty);
-+
-+int kvm_get_dirty_log_protect(struct kvm *kvm,
-+			struct kvm_dirty_log *log, bool *is_dirty);
-+
-+void kvm_arch_mmu_write_protect_pt_masked(struct kvm *kvm,
-+					struct kvm_memory_slot *slot,
-+					gfn_t gfn_offset,
-+					unsigned long mask);
-+
- int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm,
- 				struct kvm_dirty_log *log);
- 
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index 887df87..f017760 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -981,6 +981,101 @@ out:
- }
- EXPORT_SYMBOL_GPL(kvm_get_dirty_log);
- 
-+#if defined(CONFIG_S390) || defined(CONFIG_PPC) || defined(CONFIG_MIPS) || \
-+    defined(CONFIG_IA64) || defined(CONFIG_X86) || defined(CONFIG_ARM) || \
-+    defined(CONFIG_ARM64)
-+/*
-+ * For architectures that don't use kvm_get_dirty_log_protect() for dirty page
-+ * logging, calling this function is illegal. Otherwise the function is defined
-+ * in arch subtree and this restriction is removed.
-+ */
-+void kvm_arch_mmu_write_protect_pt_masked(struct kvm *kvm,
-+					struct kvm_memory_slot *slot,
-+					gfn_t gfn_offset,
-+					unsigned long mask)
-+{
-+	BUG();
-+}
-+#endif
-+
-+/**
-+ * kvm_get_dirty_log_protect - get a snapshot of dirty pages, and if any pages
-+ *	are dirty write protect them for next write.
-+ * @kvm:	pointer to kvm instance
-+ * @log:	slot id and address to which we copy the log
-+ * @is_dirty:	flag set if any page is dirty
-+ *
-+ * We need to keep it in mind that VCPU threads can write to the bitmap
-+ * concurrently. So, to avoid losing track of dirty pages we keep the
-+ * following order:
-+ *
-+ *    1. Take a snapshot of the bit and clear it if needed.
-+ *    2. Write protect the corresponding page.
-+ *    3. Copy the snapshot to the userspace.
-+ *    4. Upon return caller flushes TLB's if needed.
-+ *
-+ * Between 2 and 4, the guest may write to the page using the remaining TLB
-+ * entry.  This is not a problem because the page is reported dirty using
-+ * the snapshot taken before and step 4 ensures that writes done after
-+ * exiting to userspace will be logged for the next call.
-+ *
-+ */
-+int kvm_get_dirty_log_protect(struct kvm *kvm,
-+			struct kvm_dirty_log *log, bool *is_dirty)
-+{
-+	struct kvm_memory_slot *memslot;
-+	int r, i;
-+	unsigned long n;
-+	unsigned long *dirty_bitmap;
-+	unsigned long *dirty_bitmap_buffer;
-+
-+	r = -EINVAL;
-+	if (log->slot >= KVM_USER_MEM_SLOTS)
-+		goto out;
-+
-+	memslot = id_to_memslot(kvm->memslots, log->slot);
-+
-+	dirty_bitmap = memslot->dirty_bitmap;
-+	r = -ENOENT;
-+	if (!dirty_bitmap)
-+		goto out;
-+
-+	n = kvm_dirty_bitmap_bytes(memslot);
-+
-+	dirty_bitmap_buffer = dirty_bitmap + n / sizeof(long);
-+	memset(dirty_bitmap_buffer, 0, n);
-+
-+	spin_lock(&kvm->mmu_lock);
-+	*is_dirty = false;
-+	for (i = 0; i < n / sizeof(long); i++) {
-+		unsigned long mask;
-+		gfn_t offset;
-+
-+		if (!dirty_bitmap[i])
-+			continue;
-+
-+		*is_dirty = true;
-+
-+		mask = xchg(&dirty_bitmap[i], 0);
-+		dirty_bitmap_buffer[i] = mask;
-+
-+		offset = i * BITS_PER_LONG;
-+		kvm_arch_mmu_write_protect_pt_masked(kvm, memslot, offset,
-+								mask);
-+	}
-+
-+	spin_unlock(&kvm->mmu_lock);
-+
-+	r = -EFAULT;
-+	if (copy_to_user(log->dirty_bitmap, dirty_bitmap_buffer, n))
-+		goto out;
-+
-+	r = 0;
-+out:
-+	return r;
-+}
-+EXPORT_SYMBOL_GPL(kvm_get_dirty_log_protect);
-+
- bool kvm_largepages_enabled(void)
- {
- 	return largepages_enabled;
--- 
-1.7.9.5
+g.
