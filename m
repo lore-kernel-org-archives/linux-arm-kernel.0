@@ -1,32 +1,50 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri,  7 Nov 2014 11:57:48 +0000
-Subject: [PATCH 06/13] ARM: multi_v7_defconfig: Enable stih407 usb picophy
+Date: Fri,  7 Nov 2014 11:57:50 +0000
+Subject: [PATCH 08/13] ARM: STi: DT: STiH410: Add defines for STiH410 DT clocks
 In-Reply-To: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
 References: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1415361475-6218-7-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1415361475-6218-9-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the picoPHY usb phy which is used by
-the usb2 and usb3 host controllers when controlling usb2/1.1
-devices. It is found in stih407 family SoC's from STMicroelectronics.
+Although most clock outputs are the same as stih407 SoC, stih410
+also has some additional new clock outputs.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ include/dt-bindings/clock/stih410-clks.h | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 include/dt-bindings/clock/stih410-clks.h
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index e13ab7e..ac7b536 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -427,6 +427,7 @@ CONFIG_OMAP_USB2=y
- CONFIG_TI_PIPE3=y
- CONFIG_PHY_MIPHY365X=y
- CONFIG_PHY_STIH41X_USB=y
-+CONFIG_PHY_STIH407_USB=y
- CONFIG_PHY_SUN4I_USB=y
- CONFIG_EXT4_FS=y
- CONFIG_VFAT_FS=y
+diff --git a/include/dt-bindings/clock/stih410-clks.h b/include/dt-bindings/clock/stih410-clks.h
+new file mode 100644
+index 0000000..2c5d6ff
+--- /dev/null
++++ b/include/dt-bindings/clock/stih410-clks.h
+@@ -0,0 +1,24 @@
++/*
++ * This header provides constants clk index STMicroelectronics
++ * STiH410 SoC.
++ */
++#ifndef _DT_BINDINGS_CLK_STIH410
++#define _DT_BINDINGS_CLK_STIH410
++#include "stih407-clks.h"
++
++/* STiH410 introduces new clock outputs compared to STiH407 */
++
++/* CLOCKGEN C0 */
++#define CLK_TX_ICN_HADES	32
++#define CLK_RX_ICN_HADES	33
++#define CLK_ICN_REG_16		34
++#define CLK_PP_HADES		35
++#define CLK_CLUST_HADES		36
++#define CLK_HWPE_HADES		37
++#define CLK_FC_HADES		38
++
++/* CLOCKGEN D0 */
++#define CLK_PCMR10_MASTER	4
++#define CLK_USB2_PHY		5
++
++#endif
 -- 
 1.9.1
