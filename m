@@ -1,85 +1,70 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 7 Nov 2014 14:43:41 +0200
-Subject: [RFC PATCH v4 3/3] PM / clock_ops: add and enable clocks always
- if !CONFIG_PM_RUNTIME
-In-Reply-To: <20141106180956.GE34214@dtor-ws>
-References: <1415281862-23764-1-git-send-email-grygorii.strashko@ti.com>
- <1415281862-23764-4-git-send-email-grygorii.strashko@ti.com>
- <20141106180956.GE34214@dtor-ws>
-Message-ID: <545CBE7D.4050704@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 07 Nov 2014 13:44:07 +0100
+Subject: [RFC] ptrace: add generic SET_SYSCALL request
+In-Reply-To: <20141107121119.GQ4042@n2100.arm.linux.org.uk>
+References: <1415346443-28915-1-git-send-email-takahiro.akashi@linaro.org>
+ <1678531.AUssrM9PAs@wuerfel> <20141107121119.GQ4042@n2100.arm.linux.org.uk>
+Message-ID: <353850534.aGkkrtTogX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2014 08:09 PM, Dmitry Torokhov wrote:
-> On Thu, Nov 06, 2014 at 03:51:02PM +0200, Grygorii Strashko wrote:
->> Device's clocks need to be enabled always at probing time
->> if !CONFIG_PM_RUNTIME - in that way, device will become accesible
->> and, later, its clocks can be disabled/enabled during system
->> suspend/resume by using pm_clk_suspend/pm_clk_resume APIs.
->>
->> But now, the clocks management code doesn't enable clocks when
->> clocks are being registered per-device by using pm_clk_add/_clk().
->> So, update pm_clk_acquire(), which is called from pm_clk_add/_clk(),
->> to enable clock always if !CONFIG_PM_RUNTIME.
->>
->> Also, Platform PM domains drivers will not have to add code like below
->> each time they need to handle the case when !CONFIG_PM_RUNTIME [1 - 3]:
->>
->>         if (!IS_ENABLED(CONFIG_PM_RUNTIME)) {
->>                 ret = pm_clk_resume(dev);
->>                 if (ret) {
->>                         dev_err(dev, "pm_clk_resume failed %d\n", ret);
->>                         goto clk_err;
->>                 };
->>         }
->>
->> [1] https://lkml.org/lkml/2014/10/3/306
->> [2] https://lkml.org/lkml/2014/10/16/305
->> [3] https://lkml.org/lkml/2014/10/20/249
->>
->> CC: Santosh Shilimkar <ssantosh@kernel.org>
->> CC: Kevin Hilman <khilman@linaro.org>
->> CC: Ulf Hansson <ulf.hansson@linaro.org>
->> CC: Geert Uytterhoeven <geert@linux-m68k.org>
->> CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->> CC: Philipp Zabel <p.zabel@pengutronix.de>
->> CC: Caesar Wang <caesar.wang@rock-chips.com>
->>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> ---
->> Hi,
->>
->> I marked it as RFC, because:
->>    Generic clock manipulation PM callbacks can be used for any device
->>    for which list of clocks need to be maintained - and it doesn't mean
->>    that this framework need to be always connected to GPD/Runtime PM or
->>    used during suspend resume. Also, for DT-use case - it doesn't perform
->>    any actions (except clk_prepare) on clocks by itself and only
->>    by request from framework's consumer.
->>
->>   For example, it can be reused by Power domain/controller drivers like:
->>   - Rockchip RK3288 PM Domain (https://lkml.org/lkml/2014/11/6/30)
->>   - IMX.6 PU power domain (http://www.spinics.net/lists/arm-kernel/msg360709.html)
->>
->>   to maintain list of clocks for GPD itself and these clocks should not
->>   be enabled by default, because they are used to power on/off Power domain
->>   in a specific way:
->>       - enable all clocks assigned to PD
->>       - power on/off PD
->>       - disable all clocks assigned to PD.
->>   After this patch it will be impossible to reuse Generic clock manipulation PM
->>   callbacks in cases described above.
->
-> I'd rather keep it separate and concentrate on making pm_clk* code
-> working with the power management core. Individual drivers can easily
-> keep list of their clocks for whatever additional purpose they need
-> without involving pm_clk* API.
->
+On Friday 07 November 2014 12:11:19 Russell King - ARM Linux wrote:
+> On Fri, Nov 07, 2014 at 01:03:00PM +0100, Arnd Bergmann wrote:
+> > On Friday 07 November 2014 11:55:51 Will Deacon wrote:
+> > > We need this for arm64 and, since all architectures seem to have a mechanism
+> > > for setting a system call via ptrace, moving it to generic code should make
+> > > sense for new architectures too, no?
+> > 
+> > It makes a little more sense now, but I still don't understand why you
+> > need to set the system call number via ptrace. What is this used for,
+> > and why doesn't any other architecture have this?
+> 
+> All other architectures have a way.  x86, for example, you set orig_eax
+> (or orig_rax) to change the syscall number.  On ARM, that doesn't work
+> because we don't always pass the syscall number in a register.
+> 
 
-In general, I'm ok with this patch for Keystone 2 proposes,
-just added some notes about introduced limitations. And  all
-current users of pm_clk* APIs will not regress with this patch, because
-they will go through different code path if !CONFIG_PM_RUNTIME.
+Sorry for being slow today, but why can't we use the same interface that
+s390 has on arm64:
 
-Regards,
--grygorii
+static int s390_system_call_get(struct task_struct *target,
+                                const struct user_regset *regset,
+                                unsigned int pos, unsigned int count,
+                                void *kbuf, void __user *ubuf)
+{
+        unsigned int *data = &task_thread_info(target)->system_call;
+        return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
+                                   data, 0, sizeof(unsigned int));
+}
+
+static int s390_system_call_set(struct task_struct *target,
+                                const struct user_regset *regset,
+                                unsigned int pos, unsigned int count,
+                                const void *kbuf, const void __user *ubuf)
+{
+        unsigned int *data = &task_thread_info(target)->system_call;
+        return user_regset_copyin(&pos, &count, &kbuf, &ubuf,
+                                  data, 0, sizeof(unsigned int));
+}
+
+static const struct user_regset s390_regsets[] = {
+	...
+        {
+                .core_note_type = NT_S390_SYSTEM_CALL,
+                .n = 1,
+                .size = sizeof(unsigned int),
+                .align = sizeof(unsigned int),
+                .get = s390_system_call_get,
+                .set = s390_system_call_set,
+        },
+	...
+};
+
+Is it just preference for being consistent with ARM32, or is there a
+reason this won't work?
+
+It's not that I care strongly about the interface, my main point is
+that the changelog doesn't describe why one interface was used instead
+the other.
+
+	Arnd
