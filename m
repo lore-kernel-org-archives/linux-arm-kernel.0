@@ -1,27 +1,78 @@
-From: matt.fleming@intel.com (Matt Fleming)
-Date: Fri, 7 Nov 2014 10:48:33 +0000
-Subject: [GIT PULL] arm64: UEFI updates for 3.19
-In-Reply-To: <CAKv+Gu9Hf2ATGxVbukxyqihChvc9TDvkejPq6KGkvFdJBPT5LA@mail.gmail.com>
-References: <CAKv+Gu8LEFvdu99vCHbHGPmGLpHWdT+Wb2DECzBEEg8g_yynvg@mail.gmail.com>
- <CAKv+Gu8bpgGWRbgdGYHSy515LOXapCm4stv5xJo_tNNhahcTYw@mail.gmail.com>
- <20141107100434.GA32336@arm.com>
- <CAKv+Gu9Hf2ATGxVbukxyqihChvc9TDvkejPq6KGkvFdJBPT5LA@mail.gmail.com>
-Message-ID: <1415357313.14686.115.camel@mfleming-mobl1.ger.corp.intel.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Fri, 7 Nov 2014 18:21:35 +0800
+Subject: [PATCH V4 3/3] can: m_can: add missing message RAM initialization
+In-Reply-To: <545C9F4E.3040901@pengutronix.de>
+References: <1415349914-9145-1-git-send-email-b29396@freescale.com>
+ <1415349914-9145-3-git-send-email-b29396@freescale.com>
+ <545C9F4E.3040901@pengutronix.de>
+Message-ID: <20141107102130.GA7309@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-11-07 at 11:29 +0100, Ard Biesheuvel wrote:
+On Fri, Nov 07, 2014 at 11:30:38AM +0100, Marc Kleine-Budde wrote:
+> On 11/07/2014 09:45 AM, Dong Aisheng wrote:
+> > The M_CAN message RAM is usually equipped with a parity or ECC functionality.
+> > But RAM cells suffer a hardware reset and can therefore hold arbitrary
+> > content at startup - including parity and/or ECC bits.
+> > 
+> > To prevent the M_CAN controller detecting checksum errors when reading
+> > potentially uninitialized TX message RAM content to transmit CAN
+> > frames the TX message RAM has to be written with (any kind of) initial
+> > data.
+> > 
+> > Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> > ---
+> > ChangeLog:
+> > v3-v4:
+> >  * initialize the entire Message RAM in use instead of only 8 bytes
+> >    since this is a valid and needed initialization process.
+> >    Patch title also changed.
+> > ---
+> >  drivers/net/can/m_can/m_can.c | 11 ++++++++++-
+> >  1 file changed, 10 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
+> > index eee1533..de742d0 100644
+> > --- a/drivers/net/can/m_can/m_can.c
+> > +++ b/drivers/net/can/m_can/m_can.c
+> > @@ -1114,7 +1114,7 @@ static int m_can_of_parse_mram(struct platform_device *pdev,
+> >  	struct resource *res;
+> >  	void __iomem *addr;
+> >  	u32 out_val[MRAM_CFG_LEN];
+> > -	int ret;
+> > +	int i, start, end, ret;
+> >  
+> >  	/* message ram could be shared */
+> >  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "message_ram");
+> > @@ -1165,6 +1165,15 @@ static int m_can_of_parse_mram(struct platform_device *pdev,
+> >  		priv->mcfg[MRAM_TXE].off, priv->mcfg[MRAM_TXE].num,
+> >  		priv->mcfg[MRAM_TXB].off, priv->mcfg[MRAM_TXB].num);
+> >  
+> > +	/* initialize the entire Message RAM in use to avoid possible
+> > +	 * ECC/parity checksum errors when reading an uninitialized buffer
+> > +	 */
+> > +	start = priv->mcfg[MRAM_SIDF].off;
+> > +	end = priv->mcfg[MRAM_TXB].off +
+> > +		priv->mcfg[MRAM_TXB].num * TXB_ELEMENT_SIZE;
+> > +	for (i = start; i < end; i += 4)
+> > +		writel(0x0, priv->mram_base + i);
 > 
-> I have confirmation from Matt and another Intel engineer that adding a
-> (arguably redundant) 'u32' cast solves the issue.
+> Can we access the mram without turning on the clock?
+> 
 
-I think we need to get a better handle on this.
+Yes, we can.
+Since it's CPU access, it seems it does not depend on M_CAN clocks.
+What i see from M_CAN subsystem block diagram of MX6SX,
+it requires CPU clock which should always be enabled.
 
-It is completely surprising to me that type promotion from u32 to u64
-goes through sign extension.
+Regards
+Dong Aisheng
 
-And by "surprising" I mean, it sounds wrong.
-
-Ard, if you could throw me a unified diff of objdump -dr vmlinux, with
-and without the u32 cast, I'll take a look at figuring out what's
-happening.
+> Marc
+> 
+> -- 
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> 
