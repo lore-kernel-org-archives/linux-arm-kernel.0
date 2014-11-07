@@ -1,30 +1,42 @@
-From: Andrew.Jackson@arm.com (Andrew Jackson)
-Date: Fri, 07 Nov 2014 14:14:43 +0000
-Subject: [PATCH 3/5] serial: pl011: Set length of DMA transfer
-Message-ID: <545CD3D3.9000608@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 7 Nov 2014 15:14:55 +0100
+Subject: [PATCH v2 01/11] mfd: syscon: Add atmel-matrix registers
+ definition
+In-Reply-To: <20141107134510.GC4068@piout.net>
+References: <1415203287-21517-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1415203287-21517-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20141107134510.GC4068@piout.net>
+Message-ID: <20141107151455.75c73416@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Alexandre,
 
-The DMA engines on some systems require that the dma_length is set
-when using scatter gather lists.
+On Fri, 7 Nov 2014 14:45:10 +0100
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 
-Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
----
- drivers/tty/serial/amba-pl011.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+> On 05/11/2014 at 17:01:17 +0100, Boris Brezillon wrote :
+> > AT91 SoCs have a memory range reserved for internal bus configuration.
+> > Expose those registers so that drivers can make use of the matrix syscon
+> > declared in at91 DTs.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  include/linux/mfd/syscon/atmel-matrix.h | 114 ++++++++++++++++++++++++++++++++
+> 
+> I think we should stop cluttering the include/linux directory and start
+> doing what has been done for tegra and create an include/soc/atmel or
+> include/soc/at91 directory. that's what I was planning to do in my
+> sdramc/reset series but I didn't get any comment on it.
+> 
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index d8d067a..7c5e263 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -246,6 +246,7 @@ static int pl011_sgbuf_init(struct dma_chan *chan, struct pl011_sgbuf *sg,
- 	sg_set_page(&sg->sg, phys_to_page(dma_addr),
- 		PL011_DMA_BUFFER_SIZE, offset_in_page(dma_addr));
- 	sg_dma_address(&sg->sg) = dma_addr;
-+	sg_dma_len(&sg->sg) = PL011_DMA_BUFFER_SIZE;
- 
- 	return 0;
- }
+I'll let MFD and ARM maintainers decide, but other syscon drivers are
+using this directory to define their registers...
+
+Regards,
+
+Boris
 -- 
-1.7.1
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
