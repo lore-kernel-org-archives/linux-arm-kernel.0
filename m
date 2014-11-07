@@ -1,73 +1,31 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 07 Nov 2014 15:47:41 +0100
-Subject: [PATCH v3 10/10] [media] v4l: Forbid usage of V4L2_MBUS_FMT
- definitions inside the kernel
-In-Reply-To: <1415369269-5064-11-git-send-email-boris.brezillon@free-electrons.com>
-References: <1415369269-5064-1-git-send-email-boris.brezillon@free-electrons.com>
- <1415369269-5064-11-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <545CDB8D.4080406@xs4all.nl>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Fri, 07 Nov 2014 15:43:19 +0100
+Subject: [RFC PATCH 2/4] x86, acpi, pci: Isolate new PCI mmconfig entry
+ insertion.
+In-Reply-To: <1927317.6tJuq4S5Om@wuerfel>
+References: <1415366876-30811-1-git-send-email-tomasz.nowicki@linaro.org>
+ <1415366876-30811-3-git-send-email-tomasz.nowicki@linaro.org>
+ <1927317.6tJuq4S5Om@wuerfel>
+Message-ID: <545CDA87.2040701@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nitpicks:
+On 07.11.2014 15:09, Arnd Bergmann wrote:
+> On Friday 07 November 2014 14:27:54 Tomasz Nowicki wrote:
+>> Add special pci_mmcfg_insert_lock mutex since pci_mmcfg_lock was moved
+>> to common file. No functional changes.
+>>
+>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>>
+>
+> What is the new lock protecting against? You no longer have a mutual
+> exclusion with the other code, which looks like it is a functional
+> change, and also incorrect.
+>
+> It also sounds like the code was broken after the first patch and
+> you need this one to make it compile again. You can't do that, and
+> instead need to change the locking rules first.
 
-On 11/07/14 15:07, Boris Brezillon wrote:
-> Place v4l2_mbus_pixelcode in a #ifndef __KERNEL__ section so that kernel
-> users don't have access to these definitions.
-> 
-> We have to keep this definition for user-space users even though they're
-> encouraged to move to the new media_bus_format enum.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  include/uapi/linux/v4l2-mediabus.h | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/include/uapi/linux/v4l2-mediabus.h b/include/uapi/linux/v4l2-mediabus.h
-> index 3d87db7..4f31d0e 100644
-> --- a/include/uapi/linux/v4l2-mediabus.h
-> +++ b/include/uapi/linux/v4l2-mediabus.h
-> @@ -15,6 +15,14 @@
->  #include <linux/videodev2.h>
->  #include <linux/media-bus-format.h>
->  
-> +#ifndef __KERNEL__
-> +
-> +/*
-> + * enum v4l2_mbus_pixelcode and its defintions are now deprecated, and
+Oh, that's right! Sorry I will take a look again.
 
-defintions -> definitions
-
-> + * MEDIA_BUS_FMT_ defintions (defined in media-bus-format.h) should be
-
-and again...
-
-> + * used instead.
-
-I would also add something like this:
-
-"New defines should only be added to media-bus-format.h. The v4l2_mbus_pixelcode
-enum is frozen."
-
-> + */
-> +
->  #define V4L2_MBUS_FROM_MEDIA_BUS_FMT(name)	\
->  	MEDIA_BUS_FMT_ ## name = V4L2_MBUS_FMT_ ## name
->  
-> @@ -102,6 +110,7 @@ enum v4l2_mbus_pixelcode {
->  
->  	V4L2_MBUS_FROM_MEDIA_BUS_FMT(AHSV8888_1X32),
->  };
-> +#endif /* __KERNEL__ */
->  
->  /**
->   * struct v4l2_mbus_framefmt - frame format on the media bus
-> 
-
-Can you move this struct forward to before the v4l2_mbus_pixelcode enum? That way
-the obsolete code is at the end of the header. People might miss this struct
-otherwise.
-
-Regards,
-
-	Hans
+Tomasz
