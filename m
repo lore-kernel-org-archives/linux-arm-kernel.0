@@ -1,78 +1,85 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 07 Nov 2014 09:41:19 -0300
-Subject: [PATCH 1/2] thermal: armada: Remove support for A375-Z1 SoC
-In-Reply-To: <20141107032619.GD3698@titan.lakedaemon.net>
-References: <1415116839-4323-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1415116839-4323-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20141107032619.GD3698@titan.lakedaemon.net>
-Message-ID: <545CBDEF.6050502@free-electrons.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 7 Nov 2014 14:43:41 +0200
+Subject: [RFC PATCH v4 3/3] PM / clock_ops: add and enable clocks always
+ if !CONFIG_PM_RUNTIME
+In-Reply-To: <20141106180956.GE34214@dtor-ws>
+References: <1415281862-23764-1-git-send-email-grygorii.strashko@ti.com>
+ <1415281862-23764-4-git-send-email-grygorii.strashko@ti.com>
+ <20141106180956.GE34214@dtor-ws>
+Message-ID: <545CBE7D.4050704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2014 12:26 AM, Jason Cooper wrote:
-> Ezequiel,
-> 
-> On Tue, Nov 04, 2014 at 01:00:38PM -0300, Ezequiel Garcia wrote:
->> The Armada 375 Z1 SoC revision is no longer supported. This commit
->> removes the quirk needed for the thermal sensor.
+On 11/06/2014 08:09 PM, Dmitry Torokhov wrote:
+> On Thu, Nov 06, 2014 at 03:51:02PM +0200, Grygorii Strashko wrote:
+>> Device's clocks need to be enabled always at probing time
+>> if !CONFIG_PM_RUNTIME - in that way, device will become accesible
+>> and, later, its clocks can be disabled/enabled during system
+>> suspend/resume by using pm_clk_suspend/pm_clk_resume APIs.
 >>
->> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>> But now, the clocks management code doesn't enable clocks when
+>> clocks are being registered per-device by using pm_clk_add/_clk().
+>> So, update pm_clk_acquire(), which is called from pm_clk_add/_clk(),
+>> to enable clock always if !CONFIG_PM_RUNTIME.
+>>
+>> Also, Platform PM domains drivers will not have to add code like below
+>> each time they need to handle the case when !CONFIG_PM_RUNTIME [1 - 3]:
+>>
+>>         if (!IS_ENABLED(CONFIG_PM_RUNTIME)) {
+>>                 ret = pm_clk_resume(dev);
+>>                 if (ret) {
+>>                         dev_err(dev, "pm_clk_resume failed %d\n", ret);
+>>                         goto clk_err;
+>>                 };
+>>         }
+>>
+>> [1] https://lkml.org/lkml/2014/10/3/306
+>> [2] https://lkml.org/lkml/2014/10/16/305
+>> [3] https://lkml.org/lkml/2014/10/20/249
+>>
+>> CC: Santosh Shilimkar <ssantosh@kernel.org>
+>> CC: Kevin Hilman <khilman@linaro.org>
+>> CC: Ulf Hansson <ulf.hansson@linaro.org>
+>> CC: Geert Uytterhoeven <geert@linux-m68k.org>
+>> CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+>> CC: Philipp Zabel <p.zabel@pengutronix.de>
+>> CC: Caesar Wang <caesar.wang@rock-chips.com>
+>>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 >> ---
->>  .../devicetree/bindings/thermal/armada-thermal.txt   |  8 --------
->>  drivers/thermal/armada_thermal.c                     | 20 --------------------
->>  2 files changed, 28 deletions(-)
+>> Hi,
 >>
->> diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
->> index 4cf0249..4698e0e 100644
->> --- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
->> +++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
->> @@ -5,17 +5,9 @@ Required properties:
->>  - compatible:	Should be set to one of the following:
->>  		marvell,armada370-thermal
->>  		marvell,armada375-thermal
->> -		marvell,armada375-z1-thermal
->>  		marvell,armada380-thermal
->>  		marvell,armadaxp-thermal
->>  
->> -		Note: As the name suggests, "marvell,armada375-z1-thermal"
->> -		applies for the SoC Z1 stepping only. On such stepping
->> -		some quirks need to be done and the register offset differs
->> -		from the one in the A0 stepping.
->> -		The operating system may auto-detect the SoC stepping and
->> -		update the compatible and register offsets at runtime.
->> -
->>  - reg:		Device's register space.
->>  		Two entries are expected, see the examples below.
->>  		The first one is required for the sensor register;
-> 
-> I've no problem with removing support for the z1 stepping from the
-> kernel.  However, I don't think we should erase it from binding docs.
-> I'm not sure what the DT maintainers think is the appropriate action
-> here, but I'm thinking we could add a 'Deprecated' section at the end of
-> the doc and move these hunks there.  With a little rewording of course.
-> 
-> I'm primarily concerned about users with older dtbs looking to upgrade,
-> "Hey, wtf is marvell,armada375-z1-thermal?  I looked in the binding docs
-> and there's nothing there, do I replace it with marvell,armada375-thermal?"
-> 
+>> I marked it as RFC, because:
+>>    Generic clock manipulation PM callbacks can be used for any device
+>>    for which list of clocks need to be maintained - and it doesn't mean
+>>    that this framework need to be always connected to GPD/Runtime PM or
+>>    used during suspend resume. Also, for DT-use case - it doesn't perform
+>>    any actions (except clk_prepare) on clocks by itself and only
+>>    by request from framework's consumer.
+>>
+>>   For example, it can be reused by Power domain/controller drivers like:
+>>   - Rockchip RK3288 PM Domain (https://lkml.org/lkml/2014/11/6/30)
+>>   - IMX.6 PU power domain (http://www.spinics.net/lists/arm-kernel/msg360709.html)
+>>
+>>   to maintain list of clocks for GPD itself and these clocks should not
+>>   be enabled by default, because they are used to power on/off Power domain
+>>   in a specific way:
+>>       - enable all clocks assigned to PD
+>>       - power on/off PD
+>>       - disable all clocks assigned to PD.
+>>   After this patch it will be impossible to reuse Generic clock manipulation PM
+>>   callbacks in cases described above.
+>
+> I'd rather keep it separate and concentrate on making pm_clk* code
+> working with the power management core. Individual drivers can easily
+> keep list of their clocks for whatever additional purpose they need
+> without involving pm_clk* API.
+>
 
-We can do that if you think it's really useful. However, I think we've
-designed this so *nobody* would actually have to put the z1 compatible
-string. The mvebu quirk (tries) to auto-detect it from the revision
-register and hot fix the compatible string.
+In general, I'm ok with this patch for Keystone 2 proposes,
+just added some notes about introduced limitations. And  all
+current users of pm_clk* APIs will not regress with this patch, because
+they will go through different code path if !CONFIG_PM_RUNTIME.
 
-Moreover, I'm not at all sure *anyone* would have a Z1 board except
-early developers like us. Am I being too naive here?
-
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141107/72590425/attachment.sig>
+Regards,
+-grygorii
