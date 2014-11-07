@@ -1,47 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 07 Nov 2014 13:10:05 +0100
-Subject: [PATCH 11/13] ARM: STi: DT: STih407: Abstract common dt nodes
- into shared files.
-In-Reply-To: <1415361475-6218-12-git-send-email-peter.griffin@linaro.org>
-References: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
- <1415361475-6218-12-git-send-email-peter.griffin@linaro.org>
-Message-ID: <3301013.ouyFbjlpZY@wuerfel>
+From: Andrew.Jackson@arm.com (Andrew Jackson)
+Date: Fri, 07 Nov 2014 12:10:44 +0000
+Subject: [PATCH] i2c: designware: prevent early stop on TX FIFO empty
+Message-ID: <545CB6C4.8010201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 November 2014 11:57:53 Peter Griffin wrote:
-> diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-> new file mode 100644
-> index 0000000..862bb2f
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-> @@ -0,0 +1,73 @@
-> +/*
-> + * Copyright (C) 2014 STMicroelectronics (R&D) Limited.
-> + * Author: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +/ {
-> +       chosen {
-> +               bootargs = "console=ttyAS0,115200";
-> +               linux,stdout-path = &sbc_serial0;
-> +       };
-> +
-> +       memory {
-> +               device_type = "memory";
-> +               reg = <0x40000000 0x80000000>;
-> +       };
-> +
-> +       aliases {
-> +               ttyAS0 = &sbc_serial0;
-> +       };
-> +
-> 
+If the Designware core is configured with IC_EMPTYFIFO_HOLD_MASTER_EN
+set to zero, allowing the TX FIFO to become empty causes a STOP
+condition to be generated on the I2C bus. If the transmit FIFO
+threshold is set too high, an erroneous STOP condition can be
+generated on long transfers - particularly where the interrupt
+latency is extended.
 
-Please leave these in the per-board file, each board would have different
-values, so it makes no sense to have them in the shared file.
+Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+ drivers/i2c/busses/i2c-designware-core.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-	Arnd
+diff --git a/drivers/i2c/busses/i2c-designware-core.c b/drivers/i2c/busses/i2c-designware-core.c
+index 3c20e4b..e070edd 100644
+--- a/drivers/i2c/busses/i2c-designware-core.c
++++ b/drivers/i2c/busses/i2c-designware-core.c
+@@ -363,7 +363,7 @@ int i2c_dw_init(struct dw_i2c_dev *dev)
+ 	}
+ 
+ 	/* Configure Tx/Rx FIFO threshold levels */
+-	dw_writel(dev, dev->tx_fifo_depth - 1, DW_IC_TX_TL);
++	dw_writel(dev, dev->tx_fifo_depth / 2, DW_IC_TX_TL);
+ 	dw_writel(dev, 0, DW_IC_RX_TL);
+ 
+ 	/* configure the i2c master */
+-- 
+1.7.1
