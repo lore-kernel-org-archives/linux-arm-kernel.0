@@ -1,327 +1,114 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 7 Nov 2014 17:07:35 +0100
-Subject: [PATCH v3 18/19] arm/arm64: KVM: enable kernel side of GICv3
- emulation
-In-Reply-To: <1414776414-13426-19-git-send-email-andre.przywara@arm.com>
-References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
- <1414776414-13426-19-git-send-email-andre.przywara@arm.com>
-Message-ID: <20141107160735.GT16132@cbox>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 07 Nov 2014 16:07:51 +0000
+Subject: [PATCHv3 4/5] arm64: Emulate CP15 Barrier instructions
+References: <1414435207-30240-1-git-send-email-punit.agrawal@arm.com>
+ <1414435207-30240-6-git-send-email-punit.agrawal@arm.com>
+ <20141105130513.GH32700@e104818-lin.cambridge.arm.com>
+Message-ID: <9hhk3372duw.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 05:26:53PM +0000, Andre Przywara wrote:
-> With all the necessary GICv3 emulation code in place, we can now
-> connect the code to the GICv3 backend in the kernel.
-> The LR register handling is different depending on the emulated GIC
-> model, so provide different implementations for each.
-> Also allow non-v2-compatible GICv3 implementations (which don't
-> provide MMIO regions for the virtual CPU interface in the DT), but
-> restrict those hosts to use GICv3 guests only.
+Catalin Marinas <catalin.marinas@arm.com> writes:
 
-s/use/support/
+> On Mon, Oct 27, 2014 at 06:40:06PM +0000, Punit Agrawal wrote:
+>> diff --git a/Documentation/arm64/legacy_instructions.txt b/Documentation/arm64/legacy_instructions.txt
+>> index 5ab5861..a3b3da2 100644
+>> --- a/Documentation/arm64/legacy_instructions.txt
+>> +++ b/Documentation/arm64/legacy_instructions.txt
+>> @@ -38,3 +38,8 @@ Supported legacy instructions
+>>  Node: /proc/sys/abi/swp
+>>  Status: Obsolete
+>>  Default: Undef (0)
+>> +
+>> +* CP15 Barriers
+>> +Node: /proc/sys/abi/cp15_barrier
+>> +Status: Deprecated
+>> +Default: Emulate (1)
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 6ae8079..2f7026e 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -199,6 +199,21 @@ config SWP_EMULATION
+>>  
+>>  	  If unsure, say N
+>>  
+>> +config CP15_BARRIER_EMULATION
+>> +	bool "Emulate CP15 Barrier instructions"
+>> +	help
+>> +	  The CP15 barrier instructions - CP15ISB, CP15DSB, and
+>> +	  CP15DMB - are deprecated in ARMv8 (and ARMv7). It is
+>> +	  strongly recommended to use the ISB, DSB, and DMB
+>> +	  instructions instead.
+>> +
+>> +	  Say Y here to enable software emulation of these
+>> +	  instructions for AArch32 userspace code. When this option is
+>> +	  enabled, CP15 barrier usage is traced which can help
+>> +	  identify software that needs updating.
+>> +
+>> +	  If unsure, say N
+>> +
+>>  endif
+>
+> default y (I think we had a discussion in private whether deprecated
+> should default to y and obsolete to y or n but I don't remember the
+> conclusion; it's worth adding it to the Documentation/ file).
 
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  virt/kvm/arm/vgic-v3.c |  168 ++++++++++++++++++++++++++++++++++++------------
->  virt/kvm/arm/vgic.c    |    4 ++
->  2 files changed, 130 insertions(+), 42 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-> index ce50918..c0e901c 100644
-> --- a/virt/kvm/arm/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic-v3.c
-> @@ -34,6 +34,7 @@
->  #define GICH_LR_VIRTUALID		(0x3ffUL << 0)
->  #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
->  #define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
-> +#define ICH_LR_VIRTUALID_MASK		(BIT_ULL(32) - 1)
->  
->  /*
->   * LRs are stored in reverse order in memory. make sure we index them
-> @@ -43,7 +44,35 @@
->  
->  static u32 ich_vtr_el2;
->  
-> -static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
-> +static u64 sync_lr_val(u8 state)
+Based on the outcome of the discussion, I've documented the runtime
+defaults ('undef' for obsolete and 'emulation' for deprecated instructions)
+in the previous patch (3/5).
 
-is this lr_state_to_val ?
+As for Kconfig, the conclusion was to keep them off by default. The
+rationale was that they can be enabled quite easily and would form
+another way to communicate that certain features are deprecated and
+software might need updating.
 
-> +{
-> +	u64 lr_val = 0;
-> +
-> +	if (state & LR_STATE_PENDING)
-> +		lr_val |= ICH_LR_PENDING_BIT;
-> +	if (state & LR_STATE_ACTIVE)
-> +		lr_val |= ICH_LR_ACTIVE_BIT;
-> +	if (state & LR_EOI_INT)
-> +		lr_val |= ICH_LR_EOI;
-> +
-> +	return lr_val;
-> +}
-> +
-> +static u8 sync_lr_state(u64 lr_val)
+>
+>> +#define SCTLR_EL1_CP15BEN (1 << 5)
+>> +
+>> +static inline void config_sctlr_el1(u32 clear, u32 set)
+>> +{
+>> +	u32 val;
+>> +
+>> +	asm volatile("mrs %0, sctlr_el1" : "=r" (val));
+>> +	val &= ~clear;
+>> +	val |= set;
+>> +	asm volatile("msr sctlr_el1, %0" : : "r" (val));
+>> +}
+>> +
+>> +static void enable_cp15_ben(void *info)
+>> +{
+>> +	config_sctlr_el1(0, SCTLR_EL1_CP15BEN);
+>> +}
+>> +
+>> +static void disable_cp15_ben(void *info)
+>> +{
+>> +	config_sctlr_el1(SCTLR_EL1_CP15BEN, 0);
+>> +}
+>> +
+>> +static int cpu_hotplug_notify(struct notifier_block *b, unsigned long action,
+>> +			  void *hcpu)
+>> +{
+>> +	switch (action) {
+>> +	case CPU_STARTING:
+>> +		enable_cp15_ben(NULL);
+>> +		return NOTIFY_DONE;
+>> +	}
+>> +
+>> +	return NOTIFY_OK;
+>> +}
+>
+> Do we need CPU_STARTING_FROZEN as well?
 
-and lr_val_to_state ?
+Added this now.
 
-at least these sync names don't make much sense to me...
+Thinking about this, I think I want to disable this bit for CPUs being
+hot-unplugged otherwise we might end up with an inconsistent state
+across cores. I'll fix this up for the next version.
 
-> +{
-> +	u8 state = 0;
-> +
-> +	if (lr_val & ICH_LR_PENDING_BIT)
-> +		state |= LR_STATE_PENDING;
-> +	if (lr_val & ICH_LR_ACTIVE_BIT)
-> +		state |= LR_STATE_ACTIVE;
-> +	if (lr_val & ICH_LR_EOI)
-> +		state |= LR_EOI_INT;
-> +
-> +	return state;
-> +}
-> +
-> +static struct vgic_lr vgic_v2_on_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
->  {
->  	struct vgic_lr lr_desc;
->  	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)];
-> @@ -53,30 +82,53 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
->  		lr_desc.source	= (val >> GICH_LR_PHYSID_CPUID_SHIFT) & 0x7;
->  	else
->  		lr_desc.source = 0;
-> -	lr_desc.state	= 0;
-> +	lr_desc.state	= sync_lr_state(val);
->  
-> -	if (val & ICH_LR_PENDING_BIT)
-> -		lr_desc.state |= LR_STATE_PENDING;
-> -	if (val & ICH_LR_ACTIVE_BIT)
-> -		lr_desc.state |= LR_STATE_ACTIVE;
-> -	if (val & ICH_LR_EOI)
-> -		lr_desc.state |= LR_EOI_INT;
-> +	return lr_desc;
-> +}
-> +
-> +static struct vgic_lr vgic_v3_on_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
-> +{
-> +	struct vgic_lr lr_desc;
-> +	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)];
-> +
-> +	lr_desc.irq	= val & ICH_LR_VIRTUALID_MASK;
-> +	lr_desc.source	= 0;
-> +	lr_desc.state	= sync_lr_state(val);
->  
->  	return lr_desc;
->  }
->  
-> -static void vgic_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
-> -			   struct vgic_lr lr_desc)
-> +static void vgic_v3_on_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
-> +				 struct vgic_lr lr_desc)
->  {
-> -	u64 lr_val = (((u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT) |
-> -		      lr_desc.irq);
-> +	u64 lr_val;
->  
-> -	if (lr_desc.state & LR_STATE_PENDING)
-> -		lr_val |= ICH_LR_PENDING_BIT;
-> -	if (lr_desc.state & LR_STATE_ACTIVE)
-> -		lr_val |= ICH_LR_ACTIVE_BIT;
-> -	if (lr_desc.state & LR_EOI_INT)
-> -		lr_val |= ICH_LR_EOI;
-> +	lr_val = lr_desc.irq;
-> +
-> +	/*
-> +	 * currently all guest IRQs are Group1, as Group0 would result
+>
+> This code always enables the CP15 barriers in hardware but it should
+> take into account the actual state (emulation, undef).
 
-Can you guess my comment here?
-
-> +	 * in a FIQ in the guest, which it wouldn't expect.
-> +	 * Eventually we want to make this configurable, so we may revisit
-> +	 * this in the future.
-> +	 */
-> +	lr_val |= ICH_LR_GROUP;
-> +
-> +	lr_val |= sync_lr_val(lr_desc.state);
-> +
-> +	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)] = lr_val;
-> +}
-> +
-> +static void vgic_v2_on_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
-> +				 struct vgic_lr lr_desc)
-> +{
-> +	u64 lr_val;
-> +
-> +	lr_val = lr_desc.irq;
-> +
-> +	lr_val |= (u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT;
-> +
-> +	lr_val |= sync_lr_val(lr_desc.state);
->  
->  	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)] = lr_val;
->  }
-> @@ -145,9 +197,8 @@ static void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
->  
->  static void vgic_v3_enable(struct kvm_vcpu *vcpu)
->  {
-> -	struct vgic_v3_cpu_if *vgic_v3;
-> +	struct vgic_v3_cpu_if *vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
->  
-> -	vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
-
-unnecessary change?
-
->  	/*
->  	 * By forcing VMCR to zero, the GIC will restore the binary
->  	 * points to their reset values. Anything else resets to zero
-> @@ -155,7 +206,14 @@ static void vgic_v3_enable(struct kvm_vcpu *vcpu)
->  	 */
->  	vgic_v3->vgic_vmcr = 0;
->  
-> -	vgic_v3->vgic_sre = 0;
-> +	/*
-> +	 * Set the SRE_EL1 value depending on the configured
-> +	 * emulated vGIC model.
-> +	 */
-> +	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
-> +		vgic_v3->vgic_sre = ICC_SRE_EL1_SRE;
-
-If we're on hardware with the GICv2 backwards compatibility can the
-guest not actually set ICC_SRE_EL1_SRE to 0 but then we are not
-preserving this because we wouldn't be trapping such accesses anymore?
-
-Also, this is really about the reset value of that field, which the
-comment above is not being specific about.
-
-Further, that would mean that the field is NOT actually RAO/WI, and thus
-the spec dictates that the field should reset to zero if EL1 is the
-highest implemented exception level and the field is not RAO/WI, which
-is what the guest expects, no?
-
-> +	else
-> +		vgic_v3->vgic_sre = 0;
->  
->  	/* Get the show on the road... */
->  	vgic_v3->vgic_hcr = ICH_HCR_EN;
-> @@ -173,6 +231,15 @@ static const struct vgic_ops vgic_v3_ops = {
->  	.enable			= vgic_v3_enable,
->  };
->  
-> +static void init_vgic_v3_emul(struct kvm *kvm)
-> +{
-> +	struct vgic_vm_ops *vm_ops = &kvm->arch.vgic.vm_ops;
-> +
-> +	vm_ops->get_lr = vgic_v3_on_v3_get_lr;
-> +	vm_ops->set_lr = vgic_v3_on_v3_set_lr;
-> +	kvm->arch.max_vcpus = KVM_MAX_VCPUS;
-> +}
-
-why do you need this indirection?  Just move vgic_v3_init_emul() up here
-and call that?
-
-> +
->  static bool vgic_v3_init_emul_compat(struct kvm *kvm, int type)
->  {
->  	struct vgic_vm_ops *vm_ops = &kvm->arch.vgic.vm_ops;
-> @@ -186,14 +253,28 @@ static bool vgic_v3_init_emul_compat(struct kvm *kvm, int type)
->  			return false;
->  		}
->  
-> -		vm_ops->get_lr = vgic_v3_get_lr;
-> -		vm_ops->set_lr = vgic_v3_set_lr;
-> +		vm_ops->get_lr = vgic_v2_on_v3_get_lr;
-> +		vm_ops->set_lr = vgic_v2_on_v3_set_lr;
->  		kvm->arch.max_vcpus = 8;
->  		return true;
-> +	case KVM_DEV_TYPE_ARM_VGIC_V3:
-> +		init_vgic_v3_emul(kvm);
-> +		return true;
->  	}
->  	return false;
->  }
->  
-> +static bool vgic_v3_init_emul(struct kvm *kvm, int type)
-> +{
-> +	switch (type) {
-> +	case KVM_DEV_TYPE_ARM_VGIC_V3:
-> +		init_vgic_v3_emul(kvm);
-> +		return true;
-> +	}
-> +
-> +	return false;
-> +}
-> +
->  static struct vgic_params vgic_v3_params;
->  
->  /**
-> @@ -235,29 +316,32 @@ int vgic_v3_probe(struct device_node *vgic_node,
->  
->  	gicv_idx += 3; /* Also skip GICD, GICC, GICH */
->  	if (of_address_to_resource(vgic_node, gicv_idx, &vcpu_res)) {
-> -		kvm_err("Cannot obtain GICV region\n");
-> -		ret = -ENXIO;
-> -		goto out;
-> -	}
-> +		kvm_info("GICv3: GICv2 emulation not available\n");
-> +		vgic->vcpu_base = 0;
-> +		vgic->init_emul = vgic_v3_init_emul;
-> +	} else {
-> +		if (!PAGE_ALIGNED(vcpu_res.start)) {
-> +			kvm_err("GICV physical address 0x%llx not page aligned\n",
-> +				(unsigned long long)vcpu_res.start);
-> +			ret = -ENXIO;
-> +			goto out;
-> +		}
->  
-> -	if (!PAGE_ALIGNED(vcpu_res.start)) {
-> -		kvm_err("GICV physical address 0x%llx not page aligned\n",
-> -			(unsigned long long)vcpu_res.start);
-> -		ret = -ENXIO;
-> -		goto out;
-> -	}
-> +		if (!PAGE_ALIGNED(resource_size(&vcpu_res))) {
-> +			kvm_err("GICV size 0x%llx not a multiple of page size 0x%lx\n",
-> +				(unsigned long long)resource_size(&vcpu_res),
-> +				PAGE_SIZE);
-> +			ret = -ENXIO;
-> +			goto out;
-> +		}
->  
-> -	if (!PAGE_ALIGNED(resource_size(&vcpu_res))) {
-> -		kvm_err("GICV size 0x%llx not a multiple of page size 0x%lx\n",
-> -			(unsigned long long)resource_size(&vcpu_res),
-> -			PAGE_SIZE);
-> -		ret = -ENXIO;
-> -		goto out;
-> +		vgic->vcpu_base = vcpu_res.start;
-> +		vgic->init_emul = vgic_v3_init_emul_compat;
-> +		kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
-> +					KVM_DEV_TYPE_ARM_VGIC_V2);
->  	}
-> -	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
-> +	kvm_register_device_ops(&kvm_arm_vgic_v3_ops, KVM_DEV_TYPE_ARM_VGIC_V3);
->  
-> -	vgic->init_emul = vgic_v3_init_emul_compat;
-> -	vgic->vcpu_base = vcpu_res.start;
->  	vgic->vctrl_base = NULL;
->  	vgic->type = VGIC_V3;
->  
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 2867269d..16d7c9d 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1542,6 +1542,10 @@ static bool init_emulation_ops(struct kvm *kvm, int type)
->  	switch (type) {
->  	case KVM_DEV_TYPE_ARM_VGIC_V2:
->  		return vgic_v2_init_emulation_ops(kvm, type);
-> +#ifdef CONFIG_ARM_GIC_V3
-> +	case KVM_DEV_TYPE_ARM_VGIC_V3:
-> +		return vgic_v3_init_emulation_ops(kvm, type);
-
-needs Documentation
-
-> +#endif
->  	}
->  	return false;
->  }
-> -- 
-> 1.7.9.5
-> 
+The actual state is taken into account in the previous patch (3/5
+function: update_insn_emulation_mode) and the hotplug notifier is only
+installed to handle offlined CPUs when hardware execution is requested.
