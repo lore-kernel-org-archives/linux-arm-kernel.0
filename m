@@ -1,88 +1,115 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Fri, 7 Nov 2014 11:04:05 +0530
-Subject: [PATCH 1/4] input: touchscreen: ti_am335x_tsc Interchange
- touchscreen and ADC steps
-In-Reply-To: <20141106141916.GA17151@netboy>
+Date: Fri, 7 Nov 2014 11:18:29 +0530
+Subject: [PATCH 2/4] input: touchscreen: ti_am335x_tsc: Remove udelay
+ in interrupt handler
+In-Reply-To: <20141103150526.GI4538@x1>
 References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
- <1414408111-2631-2-git-send-email-vigneshr@ti.com>
- <20141106141916.GA17151@netboy>
-Message-ID: <545C59CD.3070707@ti.com>
+ <1414408111-2631-3-git-send-email-vigneshr@ti.com> <20141103150526.GI4538@x1>
+Message-ID: <545C5D2D.9050406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On Thursday 06 November 2014 07:49 PM, Richard Cochran wrote:
-> On Mon, Oct 27, 2014 at 04:38:28PM +0530, Vignesh R wrote:
+On Monday 03 November 2014 08:35 PM, Lee Jones wrote:
+> On Mon, 27 Oct 2014, Vignesh R wrote:
+>> From: Brad Griffis <bgriffis@ti.com>
+>>
+>> TSC interrupt handler had udelay to avoid reporting of false pen-up
+>> interrupt to user space. This patch implements workaround suggesting in
+>> Advisory 1.0.31 of silicon errata for am335x, thus eliminating udelay
+>> and touchscreen lag. This also improves performance of touchscreen and
+>> eliminates sudden jump of cursor at touch release.
+>>
+>> IDLECONFIG and CHARGECONFIG registers are to be configured
+>> with same values in order to eliminate false pen-up events. This
+>> workaround may result in false pen-down to be detected, hence considerable
+>> charge step delay needs to be added. The charge delay is set to 0xB000
+>> (in terms of ADC clock cycles) by default.
+>>
+>> TSC steps are disabled at the end of every sampling cycle and EOS bit is
+>> set. Once the EOS bit is set, the TSC steps need to be re-enabled to begin
+>> next sampling cycle.
+>>
+>> In one shot mode, sequencer automatically disables all enabled steps at
+>> the end of each cycle. (both ADC steps and TSC steps) Hence these steps
+>> need not be saved in reg_se_cache for clearing these steps at a later
+>> stage.
+>>
+>> Signed-off-by: Brad Griffis <bgriffis@ti.com>
+>> [vigneshr at ti.com: Ported patch from v3.12 to v3.18rc2]
+>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>> ---
+>>  drivers/input/touchscreen/ti_am335x_tsc.c | 56 ++++++++++++-------------------
+>>  drivers/mfd/ti_am335x_tscadc.c            |  7 ++--
+>>  include/linux/mfd/ti_am335x_tscadc.h      |  4 ++-
+>>  3 files changed, 30 insertions(+), 37 deletions(-)
 > 
-> ...
+> [...]
 > 
->> @@ -209,6 +214,7 @@ static void titsc_read_coordinates(struct titsc *ts_dev,
->>  	unsigned int read, diff;
->>  	unsigned int i, channel;
->>  	unsigned int creads = ts_dev->coordinate_readouts;
->> +	unsigned int first_step = TOTAL_STEPS - (creads * 2 + 2);
+>> diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
+>> index d877e777cce6..94ef8992f46b 100644
+>> --- a/drivers/mfd/ti_am335x_tscadc.c
+>> +++ b/drivers/mfd/ti_am335x_tscadc.c
+>> @@ -86,8 +86,12 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
+>>  		spin_lock_irq(&tsadc->reg_lock);
+>>  		finish_wait(&tsadc->reg_se_wait, &wait);
 >>  
->>  	*z1 = *z2 = 0;
->>  	if (fifocount % (creads * 2 + 2))
->> @@ -226,7 +232,7 @@ static void titsc_read_coordinates(struct titsc *ts_dev,
->>  
->>  		channel = (read & 0xf0000) >> 16;
->>  		read &= 0xfff;
->> -		if (channel < creads) {
->> +		if (channel > first_step + creads + 2) {
->>  			diff = abs(read - prev_val_x);
->>  			if (diff < prev_diff_x) {
->>  				prev_diff_x = diff;
->> @@ -234,19 +240,19 @@ static void titsc_read_coordinates(struct titsc *ts_dev,
->>  			}
->>  			prev_val_x = read;
->>  
->> -		} else if (channel < creads * 2) {
->> +		} else if (channel == first_step + creads + 1) {
->> +			*z1 = read;
->> +
->> +		} else if (channel == first_step + creads + 2) {
->> +			*z2 = read;
->> +
->> +		} else if (channel > first_step) {
->>  			diff = abs(read - prev_val_y);
->>  			if (diff < prev_diff_y) {
->>  				prev_diff_y = diff;
->>  				*y = read;
-> 
-> While you are at it, please get rid of the this "delta filter"
-> nonsense.
-
-Currently, there is too much noise in the TSC hardware that is being
-removed by delta filtering. I tested TSC unit by removing filtering
-logic, the performance was not at all satisfactory. The cursor jumps
-wayward and smooth circles cannot be drawn. Looks like delta filtering
-cannot be removed as of now. May be I will try and address it in future.
-
-Regards
-Vignesh
-
-> 
-> Thanks,
-> Richard
-> 
->>  			}
->>  			prev_val_y = read;
->> -
->> -		} else if (channel < creads * 2 + 1) {
->> -			*z1 = read;
->> -
->> -		} else if (channel < creads * 2 + 2) {
->> -			*z2 = read;
->>  		}
+>> +		/*
+>> +		 * Sequencer should either be idle or
+>> +		 * busy applying the charge step.
+>> +		 */
+>>  		reg = tscadc_readl(tsadc, REG_ADCFSM);
+>> -		WARN_ON(reg & SEQ_STATUS);
+>> +		WARN_ON(reg & SEQ_STATUS & (!CHARGE_STEP));
+>>  		tsadc->adc_waiting = false;
 >>  	}
->>  }
->> -- 
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>  	tsadc->adc_in_use = true;
+>> @@ -96,7 +100,6 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
+>>  void am335x_tsc_se_set_once(struct ti_tscadc_dev *tsadc, u32 val)
+>>  {
+>>  	spin_lock_irq(&tsadc->reg_lock);
+>> -	tsadc->reg_se_cache |= val;
+>>  	am335x_tscadc_need_adc(tsadc);
+>>  
+>>  	tscadc_writel(tsadc, REG_SE, val);
+> 
+> I believe all of these changes can, and therefor should live in a
+> separate patch.
+
+I will split this patch accordingly.
+
+> 
+>> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
+>> index e2e70053470e..fcce182e4a35 100644
+>> --- a/include/linux/mfd/ti_am335x_tscadc.h
+>> +++ b/include/linux/mfd/ti_am335x_tscadc.h
+>> @@ -52,6 +52,7 @@
+>>  
+>>  /* IRQ enable */
+>>  #define IRQENB_HW_PEN		BIT(0)
+>> +#define IRQENB_EOS		BIT(1)
+>>  #define IRQENB_FIFO0THRES	BIT(2)
+>>  #define IRQENB_FIFO0OVRRUN	BIT(3)
+>>  #define IRQENB_FIFO0UNDRFLW	BIT(4)
+>> @@ -107,7 +108,7 @@
+>>  /* Charge delay */
+>>  #define CHARGEDLY_OPEN_MASK	(0x3FFFF << 0)
+>>  #define CHARGEDLY_OPEN(val)	((val) << 0)
+>> -#define CHARGEDLY_OPENDLY	CHARGEDLY_OPEN(1)
+>> +#define CHARGEDLY_OPENDLY	CHARGEDLY_OPEN(0xB000)
+>>  
+>>  /* Control register */
+>>  #define CNTRLREG_TSCSSENB	BIT(0)
+>> @@ -127,6 +128,7 @@
+>>  
+>>  /* Sequencer Status */
+>>  #define SEQ_STATUS BIT(5)
+>> +#define CHARGE_STEP		0x11
+>>  
+>>  #define ADC_CLK			3000000
+>>  #define TOTAL_STEPS		16
+> 
+> The header changes should be split between the two Input and MFD
+> patches.
+> 
