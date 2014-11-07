@@ -1,114 +1,91 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 07 Nov 2014 16:07:51 +0000
-Subject: [PATCHv3 4/5] arm64: Emulate CP15 Barrier instructions
-References: <1414435207-30240-1-git-send-email-punit.agrawal@arm.com>
- <1414435207-30240-6-git-send-email-punit.agrawal@arm.com>
- <20141105130513.GH32700@e104818-lin.cambridge.arm.com>
-Message-ID: <9hhk3372duw.fsf@e105922-lin.cambridge.arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 7 Nov 2014 10:07:30 -0600
+Subject: [PATCH v2 2/2] arm: pcibios: move to generic PCI domains
+In-Reply-To: <1415287936-31203-3-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1415287936-31203-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1415287936-31203-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <CAL_JsqLCXwZ-xkByThCj99kwN1W7sHVx=8bKfxmBt-vTHZoATA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas <catalin.marinas@arm.com> writes:
-
-> On Mon, Oct 27, 2014 at 06:40:06PM +0000, Punit Agrawal wrote:
->> diff --git a/Documentation/arm64/legacy_instructions.txt b/Documentation/arm64/legacy_instructions.txt
->> index 5ab5861..a3b3da2 100644
->> --- a/Documentation/arm64/legacy_instructions.txt
->> +++ b/Documentation/arm64/legacy_instructions.txt
->> @@ -38,3 +38,8 @@ Supported legacy instructions
->>  Node: /proc/sys/abi/swp
->>  Status: Obsolete
->>  Default: Undef (0)
->> +
->> +* CP15 Barriers
->> +Node: /proc/sys/abi/cp15_barrier
->> +Status: Deprecated
->> +Default: Emulate (1)
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 6ae8079..2f7026e 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -199,6 +199,21 @@ config SWP_EMULATION
->>  
->>  	  If unsure, say N
->>  
->> +config CP15_BARRIER_EMULATION
->> +	bool "Emulate CP15 Barrier instructions"
->> +	help
->> +	  The CP15 barrier instructions - CP15ISB, CP15DSB, and
->> +	  CP15DMB - are deprecated in ARMv8 (and ARMv7). It is
->> +	  strongly recommended to use the ISB, DSB, and DMB
->> +	  instructions instead.
->> +
->> +	  Say Y here to enable software emulation of these
->> +	  instructions for AArch32 userspace code. When this option is
->> +	  enabled, CP15 barrier usage is traced which can help
->> +	  identify software that needs updating.
->> +
->> +	  If unsure, say N
->> +
->>  endif
+On Thu, Nov 6, 2014 at 9:32 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> Most if not all ARM PCI host controller device drivers either ignore the
+> domain field in the pci_sys_data structure or just increment it every
+> time a host controller is probed, using it as a domain counter.
 >
-> default y (I think we had a discussion in private whether deprecated
-> should default to y and obsolete to y or n but I don't remember the
-> conclusion; it's worth adding it to the Documentation/ file).
-
-Based on the outcome of the discussion, I've documented the runtime
-defaults ('undef' for obsolete and 'emulation' for deprecated instructions)
-in the previous patch (3/5).
-
-As for Kconfig, the conclusion was to keep them off by default. The
-rationale was that they can be enabled quite easily and would form
-another way to communicate that certain features are deprecated and
-software might need updating.
-
+> Therefore, instead of relying on pci_sys_data to stash the domain number
+> in a standard location, ARM pcibios code can be moved to the newly
+> introduced generic PCI domains code, implemented in commits:
 >
->> +#define SCTLR_EL1_CP15BEN (1 << 5)
->> +
->> +static inline void config_sctlr_el1(u32 clear, u32 set)
->> +{
->> +	u32 val;
->> +
->> +	asm volatile("mrs %0, sctlr_el1" : "=r" (val));
->> +	val &= ~clear;
->> +	val |= set;
->> +	asm volatile("msr sctlr_el1, %0" : : "r" (val));
->> +}
->> +
->> +static void enable_cp15_ben(void *info)
->> +{
->> +	config_sctlr_el1(0, SCTLR_EL1_CP15BEN);
->> +}
->> +
->> +static void disable_cp15_ben(void *info)
->> +{
->> +	config_sctlr_el1(SCTLR_EL1_CP15BEN, 0);
->> +}
->> +
->> +static int cpu_hotplug_notify(struct notifier_block *b, unsigned long action,
->> +			  void *hcpu)
->> +{
->> +	switch (action) {
->> +	case CPU_STARTING:
->> +		enable_cp15_ben(NULL);
->> +		return NOTIFY_DONE;
->> +	}
->> +
->> +	return NOTIFY_OK;
->> +}
+> commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
+> ("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
 >
-> Do we need CPU_STARTING_FROZEN as well?
-
-Added this now.
-
-Thinking about this, I think I want to disable this bit for CPUs being
-hot-unplugged otherwise we might end up with an inconsistent state
-across cores. I'll fix this up for the next version.
-
+> commit 670ba0c8883b576d0aec28bd7a838358a4be1
+> ("PCI: Add generic domain handling")
 >
-> This code always enables the CP15 barriers in hardware but it should
-> take into account the actual state (emulation, undef).
+> In order to assign a domain number dynamically, the ARM pcibios defines
+> the function, called by core PCI code:
+>
+> void pci_bus_assign_domain_nr(...)
+>
+> that relies on a DT property to define the domain number or falls back to
+> a counter; its usage replaces the current domain assignment code in PCI
+> host controllers present in the kernel.
 
-The actual state is taken into account in the previous patch (3/5
-function: update_insn_emulation_mode) and the hotplug notifier is only
-installed to handle offlined CPUs when hardware execution is requested.
+I realize you are just copying the arm64 version, but as we've agreed
+the DT domain handling should be common and what the error cases are,
+I've got some comments on the current implementation.
+
+[...]
+
+> +#ifdef CONFIG_PCI_DOMAINS_GENERIC
+> +static bool dt_domain_found;
+
+This can be moved into the function.
+
+> +
+> +void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+> +{
+> +       int domain = of_get_pci_domain_nr(parent->of_node);
+> +
+> +       if (domain >= 0) {
+> +               dt_domain_found = true;
+> +       } else if (dt_domain_found == true) {
+> +               dev_err(parent, "Node %s is missing \"linux,pci-domain\" property in DT\n",
+> +                       parent->of_node->full_name);
+> +               return;
+
+No error other than a printk? Do we want to set domain_nr to an
+illegal value or something?
+
+> +       } else {
+> +               domain = pci_get_new_domain_nr();
+> +       }
+> +
+> +       bus->domain_nr = domain;
+> +}
+
+This doesn't handle the case where the 1st node(s) probed does not
+have a domain prop and a later one does. I think something like this
+should work:
+
+static int use_dt_domains = -1;
+int domain = of_get_pci_domain_nr(parent->of_node);
+
+if (domain >= 0 && use_dt_domains) {
+        use_dt_domains = 1;
+} else if (domain < 0 && use_dt_domain != 1) {
+        use_dt_domains = 0;
+        domain = pci_get_new_domain_nr();
+} else {
+        dev_err(parent, "Node %s has inconsistent \"linux,pci-domain\"
+property in DT\n",
+                 parent->of_node->full_name);
+        domain = -1;  // Not sure if -1 would be illegal or not????
+}
+
+bus->domain_nr = domain;
+
+
+Rob
