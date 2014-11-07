@@ -1,61 +1,40 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri,  7 Nov 2014 16:25:25 +0000
-Subject: [PATCH 00/11] arm: perf: add support for heterogeneous PMUs
-Message-ID: <1415377536-12841-1-git-send-email-mark.rutland@arm.com>
+Date: Fri,  7 Nov 2014 16:25:26 +0000
+Subject: [PATCH 01/11] of: Add empty of_get_next_parent stub
+In-Reply-To: <1415377536-12841-1-git-send-email-mark.rutland@arm.com>
+References: <1415377536-12841-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1415377536-12841-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In systems with heterogeneous CPUs (e.g. big.LITTLE) the associated PMUs
-also differ in terms of the supported set of events, the precise
-behaviour of each of those events, and the number of event counters.
-Thus it is not possible to expose these PMUs as a single logical PMU.
+There's no stub version of of_get_next_parent, so use in code compiled
+without !CONFIG_OF will cause the kernel build to fail.
 
-Instead a logical PMU is created per CPU microarchitecture, which events
-can target directly:
+This patch adds a stub version of of_get_next_parent as is with other
+!CONFIG_OF stub functions, so such code can compile without CONFIG_OF.
 
-$ perf stat \
-  -e armv7_cortex_a7/config=0x11/ \
-  -e armv7_cortex_a15/config=0x11/ \
-  ./test
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Rob Herring <rob.herring@kernel.org>
+Cc: Grant Likely <grant.likely@linaro.org>
+---
+ include/linux/of.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
- Performance counter stats for './test':
-
-           7980455      armv7_cortex_a7/config=0x11/                                    [27.29%]
-           9947934      armv7_cortex_a15/config=0x11/                                    [72.66%]
-
-       0.016734833 seconds time elapsed
-
-This series is based atop of my recent preparatory rework [1,2].
-
-Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/295820.html
-[2] https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/log/?h=perf/updates
-
-Mark Rutland (11):
-  of: Add empty of_get_next_parent stub
-  perf: allow for PMU-specific event filtering
-  arm: perf: treat PMUs as CPU affine
-  arm: perf: filter unschedulable events
-  arm: perf: reject multi-pmu groups
-  arm: perf: probe number of counters on affine CPUs
-  arm: perf: document PMU affinity binding
-  arm: perf: add functions to parse affinity from dt
-  arm: perf: parse cpu affinity from dt
-  arm: perf: remove singleton PMU restriction
-  arm: dts: vexpress: describe all PMUs in TC2 dts
-
- Documentation/devicetree/bindings/arm/pmu.txt | 104 +++++++-
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts    |  36 ++-
- arch/arm/include/asm/pmu.h                    |  13 +
- arch/arm/kernel/perf_event.c                  |  61 ++++-
- arch/arm/kernel/perf_event_cpu.c              | 356 +++++++++++++++++++++-----
- arch/arm/kernel/perf_event_v7.c               |  41 +--
- include/linux/of.h                            |   5 +
- include/linux/perf_event.h                    |   5 +
- kernel/events/core.c                          |   8 +-
- 9 files changed, 534 insertions(+), 95 deletions(-)
-
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 6545e7a..2d4b7e0 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -392,6 +392,11 @@ static inline struct device_node *of_get_parent(const struct device_node *node)
+ 	return NULL;
+ }
+ 
++static inline struct device_node *of_get_next_parent(struct device_node *node)
++{
++	return NULL;
++}
++
+ static inline struct device_node *of_get_next_child(
+ 	const struct device_node *node, struct device_node *prev)
+ {
 -- 
 1.9.1
