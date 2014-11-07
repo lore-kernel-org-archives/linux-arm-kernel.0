@@ -1,57 +1,45 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri,  7 Nov 2014 17:00:58 +0100
-Subject: [PATCH v6 07/12] ARM: tegra: Add memory controller support for
- Tegra114
+Date: Fri,  7 Nov 2014 17:00:59 +0100
+Subject: [PATCH v6 08/12] ARM: tegra: Add memory controller support for
+ Tegra124
 In-Reply-To: <1415376063-17205-1-git-send-email-thierry.reding@gmail.com>
 References: <1415376063-17205-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1415376063-17205-8-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1415376063-17205-9-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <treding@nvidia.com>
 
-Add the device tree node for the memory controller found on Tegra114
-SoCs. The memory controller integrates an IOMMU (called SMMU) as well as
-various knobs to tweak memory accesses by the various clients.
-
-The old IOMMU device tree node is collapsed into the memory controller
-node to more accurately describe the hardware. While this change is
-incompatible, the IOMMU driver has never had any users so the change is
-not going to cause any breakage.
+Add the memory controller and wire up the interrupt that is used to
+report errors. Provide a reference to the memory controller clock and
+mark the device as being an IOMMU by adding an #iommu-cells property.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm/boot/dts/tegra114.dtsi | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/tegra124.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index 2ca9c1807f72..2c26b07c11ed 100644
---- a/arch/arm/boot/dts/tegra114.dtsi
-+++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -505,15 +505,15 @@
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index 478c555ebd96..afe9c6a34709 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -551,6 +551,17 @@
  		reset-names = "fuse";
  	};
  
--	iommu at 70019010 {
--		compatible = "nvidia,tegra114-smmu", "nvidia,tegra30-smmu";
--		reg = <0x70019010 0x02c
--		       0x700191f0 0x010
--		       0x70019228 0x074>;
--		nvidia,#asids = <4>;
--		dma-window = <0 0x40000000>;
--		nvidia,swgroups = <0x18659fe>;
--		nvidia,ahb = <&ahb>;
-+	mc: memory-controller at 70019000 {
-+		compatible = "nvidia,tegra114-mc";
-+		reg = <0x70019000 0x1000>;
-+		clocks = <&tegra_car TEGRA114_CLK_MC>;
++	mc: memory-controller at 0,70019000 {
++		compatible = "nvidia,tegra124-mc";
++		reg = <0x0 0x70019000 0x0 0x1000>;
++		clocks = <&tegra_car TEGRA124_CLK_MC>;
 +		clock-names = "mc";
 +
 +		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
 +
 +		#iommu-cells = <1>;
- 	};
++	};
++
+ 	sata at 0,70020000 {
+ 		compatible = "nvidia,tegra124-ahci";
  
- 	ahub at 70080000 {
 -- 
 2.1.3
