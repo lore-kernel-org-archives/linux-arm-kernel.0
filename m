@@ -1,58 +1,39 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 07 Nov 2014 13:03:12 +0000
-Subject: [PATCHv3 4/5] arm64: Emulate CP15 Barrier instructions
-In-Reply-To: <20141105145116.GJ32700@e104818-lin.cambridge.arm.com> (Catalin
- Marinas's message of "Wed, 5 Nov 2014 14:51:17 +0000")
-References: <1414435207-30240-1-git-send-email-punit.agrawal@arm.com>
- <1414435207-30240-6-git-send-email-punit.agrawal@arm.com>
- <20141105145116.GJ32700@e104818-lin.cambridge.arm.com>
-Message-ID: <9hhmw83qi27.fsf@e105922-lin.cambridge.arm.com>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Fri,  7 Nov 2014 18:34:25 +0530
+Subject: [[PATCHv2] 0/3] Add SNVS clock gating and clock support to rtc-snvs
+ driver
+Message-ID: <cover.1415364391.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas <catalin.marinas@arm.com> writes:
+The first version of the patches were send quiet a 
+while back. 
+https://lkml.org/lkml/2014/9/26/492
 
-> On Mon, Oct 27, 2014 at 06:40:06PM +0000, Punit Agrawal wrote:
->> +static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
->> +{
->> +	perf_sw_event(PERF_COUNT_SW_EMULATION_FAULTS, 1, regs, regs->pc);
->> +
->> +	switch (arm_check_condition(instr, regs->pstate)) {
->> +	case ARM_OPCODE_CONDTEST_PASS:
->> +		break;
->> +	case ARM_OPCODE_CONDTEST_FAIL:
->> +		/* Condition failed - return to next instruction */
->> +		goto ret;
->> +	case ARM_OPCODE_CONDTEST_UNCOND:
->> +		/* If unconditional encoding - not a barrier instruction */
->> +		return -EFAULT;
->> +	default:
->> +		return -EINVAL;
->> +	}
->> +
->> +	switch (aarch32_insn_mcr_extract_crm(instr)) {
->> +	case 10:
->> +		/*
->> +		 * dmb - mcr p15, 0, Rt, c7, c10, 5
->> +		 * dsb - mcr p15, 0, Rt, c7, c10, 4
->> +		 */
->> +		if (aarch32_insn_mcr_extract_opc2(instr) == 5)
->> +			dmb(sy);
->> +		else
->> +			dsb(sy);
->> +		break;
->> +	case 5:
->> +		/*
->> +		 * isb - mcr p15, 0, Rt, c7, c5, 4
->> +		 */
->> +		isb();
->> +		break;
->> +	}
->
-> IIRC we concluded that an isb() isn't needed here as taking an exception
-> or returning from one would act as an instruction barrier.
+The reason for sending this v2 of the patches late was to
+prevent any changes midway to the VF dts patches being tried
+with the below commit.
+https://lkml.org/lkml/2014/10/22/605
 
-I don't remember what the conclusion was - the isb was introduced to err
-on the side of caution. I've removed it now.
+Changes since v1:
+The clock enable and disable functions for the SNVS are
+now optional and only enable/disable it, if it has been
+defined in the device tree node. Instead of failing and 
+returning error as in the earlier set of patches, this
+makes sure that the driver does not break for the other
+i.MX devices for which the clock has not been defined and
+enabled elsewhere.
 
-Thanks.
+Sanchayan Maity (3):
+  ARM: imx: clk-vf610: Add clock for SNVS
+  ARM: dts: vfxxx: Add SNVS node
+  drivers/rtc/rtc-snvs: Add clock support
+
+ arch/arm/boot/dts/vfxxx.dtsi            |   15 ++++++++++++++
+ arch/arm/mach-imx/clk-vf610.c           |    1 +
+ drivers/rtc/rtc-snvs.c                  |   34 +++++++++++++++++++++++++++++--
+ include/dt-bindings/clock/vf610-clock.h |    3 ++-
+ 4 files changed, 50 insertions(+), 3 deletions(-)
+
+-- 
+1.7.9.5
