@@ -1,45 +1,46 @@
 From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Fri,  7 Nov 2014 18:34:26 +0530
-Subject: [[PATCHv2] 1/3] ARM: imx: clk-vf610: Add clock for SNVS
+Date: Fri,  7 Nov 2014 18:34:27 +0530
+Subject: [[PATCHv2] 2/3] ARM: dts: vfxxx: Add SNVS node
 In-Reply-To: <cover.1415364391.git.maitysanchayan@gmail.com>
 References: <cover.1415364391.git.maitysanchayan@gmail.com>
-Message-ID: <bbe86ff8ff7461451be5c53242842e966bfd3966.1415364391.git.maitysanchayan@gmail.com>
+Message-ID: <64244b916de3864b714e829c3adeecec71aea2b3.1415364391.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for clock gating of
-the SNVS peripheral.
+This patch adds a devicetree node for the Secure
+Non-Volatile Storage (SNVS) on the VF610 platform.
+The SNVS block also has a Real Time Counter (RTC).
 
 Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 ---
- arch/arm/mach-imx/clk-vf610.c           |    1 +
- include/dt-bindings/clock/vf610-clock.h |    3 ++-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/vfxxx.dtsi |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
-index 5937dde..bbf4785 100644
---- a/arch/arm/mach-imx/clk-vf610.c
-+++ b/arch/arm/mach-imx/clk-vf610.c
-@@ -379,6 +379,7 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
- 	clk[VF610_CLK_DMAMUX1] = imx_clk_gate2("dmamux1", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(5));
- 	clk[VF610_CLK_DMAMUX2] = imx_clk_gate2("dmamux2", "platform_bus", CCM_CCGR6, CCM_CCGRx_CGn(1));
- 	clk[VF610_CLK_DMAMUX3] = imx_clk_gate2("dmamux3", "platform_bus", CCM_CCGR6, CCM_CCGRx_CGn(2));
-+	clk[VF610_CLK_SNVS] = imx_clk_gate2("snvs-rtc", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(7));
+diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+index 4e70833..bc131b0 100644
+--- a/arch/arm/boot/dts/vfxxx.dtsi
++++ b/arch/arm/boot/dts/vfxxx.dtsi
+@@ -338,6 +338,21 @@
+ 				status = "disabled";
+ 			};
  
- 	imx_check_clocks(clk, ARRAY_SIZE(clk));
- 
-diff --git a/include/dt-bindings/clock/vf610-clock.h b/include/dt-bindings/clock/vf610-clock.h
-index 801c0ac..979d24a 100644
---- a/include/dt-bindings/clock/vf610-clock.h
-+++ b/include/dt-bindings/clock/vf610-clock.h
-@@ -192,6 +192,7 @@
- #define VF610_PLL5_BYPASS		179
- #define VF610_PLL6_BYPASS		180
- #define VF610_PLL7_BYPASS		181
--#define VF610_CLK_END			182
-+#define VF610_CLK_SNVS			182
-+#define VF610_CLK_END			183
- 
- #endif /* __DT_BINDINGS_CLOCK_VF610_H */
++			snvs0: snvs at 400a7000 {
++				compatible = "fsl,sec-v4.0-mon", "simple-bus";
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x400a7000 0x2000>;
++
++				snvs-rtc-lp at 34 {
++					compatible = "fsl,sec-v4.0-mon-rtc-lp";
++					reg = <0x34 0x58>;
++					interrupts = <0 100 IRQ_TYPE_LEVEL_HIGH>;
++					clocks = <&clks VF610_CLK_SNVS>;
++					clock-names = "snvs-rtc";
++				};
++			};
++
+ 			uart4: serial at 400a9000 {
+ 				compatible = "fsl,vf610-lpuart";
+ 				reg = <0x400a9000 0x1000>;
 -- 
 1.7.9.5
