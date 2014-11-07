@@ -1,56 +1,68 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 07 Nov 2014 20:50:56 +0900
-Subject: [PATCH] ARM: dts: Fix booting on Rinato market device
-In-Reply-To: <1415360662-30390-1-git-send-email-k.kozlowski@samsung.com>
-References: <1415360662-30390-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <545CB220.9030007@samsung.com>
+From: socketcan@hartkopp.net (Oliver Hartkopp)
+Date: Fri, 07 Nov 2014 12:53:10 +0100
+Subject: [PATCH V4 3/3] can: m_can: add missing message RAM initialization
+In-Reply-To: <1415349914-9145-3-git-send-email-b29396@freescale.com>
+References: <1415349914-9145-1-git-send-email-b29396@freescale.com>
+ <1415349914-9145-3-git-send-email-b29396@freescale.com>
+Message-ID: <545CB2A6.1010703@hartkopp.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Thanks!
 
-On 11/07/2014 08:44 PM, Krzysztof Kozlowski wrote:
-> The bootloader on market Rinato (Gear 2) device checks for revision in
-> compatible field of DTB. If it is not present or lower than required
-> then booting fails with: "Could not do normal boot. (no DTB found)".
-> 
-> Log of bootloader in case of failure:
-> h/w: revision  = 0x06
-> h/w: schematic = SM-R380_Rev0.5_Final_0205
-> date = 2000/01/01 12:00:21 (UTC)
-> cmu_div:4, div:5, src_clk:800000000, pixel_clk:31860720
-> load_kernel: loading boot image from 57344.. (BOOT)
-> load_kernel: found zImage, size: 0x3267e8
-> 0xbc Error!
-> Verify_Binary_Signature: failed.
-> pit_check_signature (BOOT) invalid.
-> load_kernel: found custom kernel (ret:-2147483647)
->  No need to update kernel type.
-> Detected board: samsung,rinato-rev06
-> Could not do normal boot. (no DTB found)
-> : Entering usb mode for SM-R380_EUR_XX (65535)..
-> 
-> Add a "rev06" suffix to compatible to satisfy the bootloader.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Hopefully we can manage to push the patch series via can/master ;-)
+
+Regards,
+Oliver
+
+On 07.11.2014 09:45, Dong Aisheng wrote:
+> The M_CAN message RAM is usually equipped with a parity or ECC functionality.
+> But RAM cells suffer a hardware reset and can therefore hold arbitrary
+> content at startup - including parity and/or ECC bits.
+>
+> To prevent the M_CAN controller detecting checksum errors when reading
+> potentially uninitialized TX message RAM content to transmit CAN
+> frames the TX message RAM has to be written with (any kind of) initial
+> data.
+>
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
 > ---
->  arch/arm/boot/dts/exynos3250-rinato.dts | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
-> index 84380fa13e37..f72ba0a1d915 100644
-> --- a/arch/arm/boot/dts/exynos3250-rinato.dts
-> +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
-> @@ -18,7 +18,8 @@
->  
->  / {
->  	model = "Samsung Rinato board";
-> -	compatible = "samsung,rinato", "samsung,exynos3250", "samsung,exynos3";
-> +	compatible = "samsung,rinato", "samsung,rinato-rev06",
-> +			"samsung,exynos3250", "samsung,exynos3";
-
-I think it is wrong. The released bootloader from Samsung is not u-boot.
-Instead, you have to update u-boot to support Exynos3250-basd Rinato board.
-
-Thanks,
-Chanwoo Choi
+> ChangeLog:
+> v3-v4:
+>   * initialize the entire Message RAM in use instead of only 8 bytes
+>     since this is a valid and needed initialization process.
+>     Patch title also changed.
+> ---
+>   drivers/net/can/m_can/m_can.c | 11 ++++++++++-
+>   1 file changed, 10 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
+> index eee1533..de742d0 100644
+> --- a/drivers/net/can/m_can/m_can.c
+> +++ b/drivers/net/can/m_can/m_can.c
+> @@ -1114,7 +1114,7 @@ static int m_can_of_parse_mram(struct platform_device *pdev,
+>   	struct resource *res;
+>   	void __iomem *addr;
+>   	u32 out_val[MRAM_CFG_LEN];
+> -	int ret;
+> +	int i, start, end, ret;
+>
+>   	/* message ram could be shared */
+>   	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "message_ram");
+> @@ -1165,6 +1165,15 @@ static int m_can_of_parse_mram(struct platform_device *pdev,
+>   		priv->mcfg[MRAM_TXE].off, priv->mcfg[MRAM_TXE].num,
+>   		priv->mcfg[MRAM_TXB].off, priv->mcfg[MRAM_TXB].num);
+>
+> +	/* initialize the entire Message RAM in use to avoid possible
+> +	 * ECC/parity checksum errors when reading an uninitialized buffer
+> +	 */
+> +	start = priv->mcfg[MRAM_SIDF].off;
+> +	end = priv->mcfg[MRAM_TXB].off +
+> +		priv->mcfg[MRAM_TXB].num * TXB_ELEMENT_SIZE;
+> +	for (i = start; i < end; i += 4)
+> +		writel(0x0, priv->mram_base + i);
+> +
+>   	return 0;
+>   }
+>
+>
