@@ -1,502 +1,153 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Fri,  7 Nov 2014 14:27:56 +0100
-Subject: [RFC PATCH 4/4] arm64, acpi,
- pci: Provide arch-specific calls for PCI host bridge dirver (PNP0A03).
-In-Reply-To: <1415366876-30811-1-git-send-email-tomasz.nowicki@linaro.org>
-References: <1415366876-30811-1-git-send-email-tomasz.nowicki@linaro.org>
-Message-ID: <1415366876-30811-5-git-send-email-tomasz.nowicki@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri,  7 Nov 2014 13:32:21 +0000
+Subject: [PATCH 1/2] arm64: entry: avoid writing lr explicitly for
+ constructing return paths
+Message-ID: <1415367142-5005-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code inspired by arch/x86/pci/acpi.c and arch/ia64/pci/pci.c files.
-The main reasons why we need this:
-- parse and manage resources (BUS, IO and MEM)
-- create pci root bus and enumerate its children
-- provide PCI config space accessors (via MMCONFIG)
+Using an explicit adr instruction to set the link register to point at
+ret_fast_syscall/ret_to_user can defeat branch and return stack predictors.
 
-Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+Instead, use the standard calling instructions (bl, blr) and have an
+unconditional branch as the following instruction.
+
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/pci.h |   8 +
- arch/arm64/kernel/pci.c      | 401 +++++++++++++++++++++++++++++++++++++++++--
- 2 files changed, 391 insertions(+), 18 deletions(-)
+ arch/arm64/kernel/entry.S | 45 +++++++++++++++++++++++++--------------------
+ 1 file changed, 25 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-index fded096..ecd940f 100644
---- a/arch/arm64/include/asm/pci.h
-+++ b/arch/arm64/include/asm/pci.h
-@@ -33,6 +33,14 @@ static inline int pci_get_legacy_ide_irq(struct pci_dev *dev, int channel)
- extern int isa_dma_bridge_buggy;
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 726b910fe6ec..2cebe56d650c 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -455,8 +455,8 @@ el0_da:
+ 	bic	x0, x26, #(0xff << 56)
+ 	mov	x1, x25
+ 	mov	x2, sp
+-	adr	lr, ret_to_user
+-	b	do_mem_abort
++	bl	do_mem_abort
++	b	ret_to_user
+ el0_ia:
+ 	/*
+ 	 * Instruction abort handling
+@@ -468,8 +468,8 @@ el0_ia:
+ 	mov	x0, x26
+ 	orr	x1, x25, #1 << 24		// use reserved ISS bit for instruction aborts
+ 	mov	x2, sp
+-	adr	lr, ret_to_user
+-	b	do_mem_abort
++	bl	do_mem_abort
++	b	ret_to_user
+ el0_fpsimd_acc:
+ 	/*
+ 	 * Floating Point or Advanced SIMD access
+@@ -478,8 +478,8 @@ el0_fpsimd_acc:
+ 	ct_user_exit
+ 	mov	x0, x25
+ 	mov	x1, sp
+-	adr	lr, ret_to_user
+-	b	do_fpsimd_acc
++	bl	do_fpsimd_acc
++	b	ret_to_user
+ el0_fpsimd_exc:
+ 	/*
+ 	 * Floating Point or Advanced SIMD exception
+@@ -488,8 +488,8 @@ el0_fpsimd_exc:
+ 	ct_user_exit
+ 	mov	x0, x25
+ 	mov	x1, sp
+-	adr	lr, ret_to_user
+-	b	do_fpsimd_exc
++	bl	do_fpsimd_exc
++	b	ret_to_user
+ el0_sp_pc:
+ 	/*
+ 	 * Stack or PC alignment exception handling
+@@ -500,8 +500,8 @@ el0_sp_pc:
+ 	mov	x0, x26
+ 	mov	x1, x25
+ 	mov	x2, sp
+-	adr	lr, ret_to_user
+-	b	do_sp_pc_abort
++	bl	do_sp_pc_abort
++	b	ret_to_user
+ el0_undef:
+ 	/*
+ 	 * Undefined instruction
+@@ -510,8 +510,8 @@ el0_undef:
+ 	enable_dbg_and_irq
+ 	ct_user_exit
+ 	mov	x0, sp
+-	adr	lr, ret_to_user
+-	b	do_undefinstr
++	bl	do_undefinstr
++	b	ret_to_user
+ el0_dbg:
+ 	/*
+ 	 * Debug exception handling
+@@ -530,8 +530,8 @@ el0_inv:
+ 	mov	x0, sp
+ 	mov	x1, #BAD_SYNC
+ 	mrs	x2, esr_el1
+-	adr	lr, ret_to_user
+-	b	bad_mode
++	bl	bad_mode
++	b	ret_to_user
+ ENDPROC(el0_sync)
  
- #ifdef CONFIG_PCI
-+struct pci_controller {
-+	struct acpi_device *companion;
-+	int segment;
-+	int node;		/* nearest node with memory or NUMA_NO_NODE for global allocation */
-+};
+ 	.align	6
+@@ -653,14 +653,15 @@ el0_svc_naked:					// compat entry point
+ 	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall hooks
+ 	tst	x16, #_TIF_SYSCALL_WORK
+ 	b.ne	__sys_trace
+-	adr	lr, ret_fast_syscall		// return address
+ 	cmp     scno, sc_nr                     // check upper syscall limit
+ 	b.hs	ni_sys
+ 	ldr	x16, [stbl, scno, lsl #3]	// address in the syscall table
+-	br	x16				// call sys_* routine
++	blr	x16				// call sys_* routine
++	b	ret_fast_syscall
+ ni_sys:
+ 	mov	x0, sp
+-	b	do_ni_syscall
++	bl	do_ni_syscall
++	b	ret_fast_syscall
+ ENDPROC(el0_svc)
+ 
+ 	/*
+@@ -670,17 +671,16 @@ ENDPROC(el0_svc)
+ __sys_trace:
+ 	mov	x0, sp
+ 	bl	syscall_trace_enter
+-	adr	lr, __sys_trace_return		// return address
+ 	uxtw	scno, w0			// syscall number (possibly new)
+ 	mov	x1, sp				// pointer to regs
+ 	cmp	scno, sc_nr			// check upper syscall limit
+-	b.hs	ni_sys
++	b.hs	__ni_sys_trace
+ 	ldp	x0, x1, [sp]			// restore the syscall args
+ 	ldp	x2, x3, [sp, #S_X2]
+ 	ldp	x4, x5, [sp, #S_X4]
+ 	ldp	x6, x7, [sp, #S_X6]
+ 	ldr	x16, [stbl, scno, lsl #3]	// address in the syscall table
+-	br	x16				// call sys_* routine
++	blr	x16				// call sys_* routine
+ 
+ __sys_trace_return:
+ 	str	x0, [sp]			// save returned x0
+@@ -688,6 +688,11 @@ __sys_trace_return:
+ 	bl	syscall_trace_exit
+ 	b	ret_to_user
+ 
++__ni_sys_trace:
++	mov	x0, sp
++	bl	do_ni_syscall
++	b	__sys_trace_return
 +
-+#define PCI_CONTROLLER(busdev) ((struct pci_controller *) busdev->sysdata)
-+
- static inline int pci_proc_domain(struct pci_bus *bus)
- {
- 	return 1;
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index 42fb195..cc34ded 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -1,6 +1,10 @@
  /*
-- * Code borrowed from powerpc/kernel/pci-common.c
-+ * Code borrowed from powerpc/kernel/pci-common.c and arch/ia64/pci/pci.c
-  *
-+ * Copyright (c) 2002, 2005 Hewlett-Packard Development Company, L.P.
-+ *	David Mosberger-Tang <davidm@hpl.hp.com>
-+ *	Bjorn Helgaas <bjorn.helgaas@hp.com>
-+ * Copyright (C) 2004 Silicon Graphics, Inc.
-  * Copyright (C) 2003 Anton Blanchard <anton@au.ibm.com>, IBM
-  * Copyright (C) 2014 ARM Ltd.
-  *
-@@ -17,10 +21,16 @@
- #include <linux/mm.h>
- #include <linux/of_pci.h>
- #include <linux/of_platform.h>
-+#include <linux/of_address.h>
- #include <linux/slab.h>
-+#include <linux/pci.h>
-+#include <linux/acpi.h>
-+#include <linux/mmconfig.h>
- 
- #include <asm/pci-bridge.h>
- 
-+#define PREFIX "PCI: "
-+
- /*
-  * Called after each bus is probed, but before its children are examined
+  * Special system call wrappers.
   */
-@@ -43,7 +53,8 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
-  */
- int pcibios_add_device(struct pci_dev *dev)
- {
--	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-+	if (acpi_disabled)
-+		dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
- 
- 	return 0;
- }
-@@ -54,45 +65,399 @@ static bool dt_domain_found = false;
- 
- void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
- {
--	int domain = of_get_pci_domain_nr(parent->of_node);
-+	int domain = -1;
- 
--	if (domain >= 0) {
--		dt_domain_found = true;
--	} else if (dt_domain_found == true) {
--		dev_err(parent, "Node %s is missing \"linux,pci-domain\" property in DT\n",
--			parent->of_node->full_name);
--		return;
-+	if (acpi_disabled) {
-+		domain = of_get_pci_domain_nr(parent->of_node);
-+
-+		if (domain >= 0) {
-+			dt_domain_found = true;
-+		} else if (dt_domain_found == true) {
-+			dev_err(parent, "Node %s is missing \"linux,pci-domain\" property in DT\n",
-+				parent->of_node->full_name);
-+			return;
-+		} else {
-+			domain = pci_get_new_domain_nr();
-+		}
- 	} else {
--		domain = pci_get_new_domain_nr();
-+		/*
-+		 * Take the domain nr from associated private data.
-+		 * Case where bus has parent is covered in pci_alloc_bus()
-+		 */
-+		if (!parent)
-+			domain = PCI_CONTROLLER(bus)->segment;
- 	}
- 
- 	bus->domain_nr = domain;
- }
- #endif
- 
-+static char __iomem *pci_dev_base(unsigned int seg, unsigned int bus,
-+				  unsigned int devfn)
-+{
-+	struct pci_mmcfg_region *cfg = pci_mmconfig_lookup(seg, bus);
-+
-+	if (cfg && cfg->virt)
-+		return cfg->virt + (PCI_MMCFG_BUS_OFFSET(bus) | (devfn << 12));
-+	return NULL;
-+}
-+
- /*
-  * raw_pci_read/write - Platform-specific PCI config space access.
-- *
-- * Default empty implementation.  Replace with an architecture-specific setup
-- * routine, if necessary.
-  */
- int raw_pci_read(unsigned int domain, unsigned int bus,
- 		  unsigned int devfn, int reg, int len, u32 *val)
- {
--	return -EINVAL;
-+	char __iomem *addr;
-+
-+	if (unlikely((bus > 255) || (devfn > 255) || (reg > 4095))) {
-+err:		*val = -1;
-+		return -EINVAL;
-+	}
-+
-+	rcu_read_lock();
-+	addr = pci_dev_base(domain, bus, devfn);
-+	if (!addr) {
-+		rcu_read_unlock();
-+		goto err;
-+	}
-+
-+	switch (len) {
-+	case 1:
-+		*val = readb(addr + reg);
-+		break;
-+	case 2:
-+		*val = readw(addr + reg);
-+		break;
-+	case 4:
-+		*val = readl(addr + reg);
-+		break;
-+	}
-+	rcu_read_unlock();
-+
-+	return 0;
- }
- 
- int raw_pci_write(unsigned int domain, unsigned int bus,
- 		unsigned int devfn, int reg, int len, u32 val)
- {
--	return -EINVAL;
-+	char __iomem *addr;
-+
-+	if (unlikely((bus > 255) || (devfn > 255) || (reg > 4095)))
-+		return -EINVAL;
-+
-+	rcu_read_lock();
-+	addr = pci_dev_base(domain, bus, devfn);
-+	if (!addr) {
-+		rcu_read_unlock();
-+		return -EINVAL;
-+	}
-+
-+	switch (len) {
-+	case 1:
-+		writeb(val, addr + reg);
-+		break;
-+	case 2:
-+		writew(val, addr + reg);
-+		break;
-+	case 4:
-+		writel(val, addr + reg);
-+		break;
-+	}
-+	rcu_read_unlock();
-+
-+	return 0;
- }
- 
- #ifdef CONFIG_ACPI
-+static int pci_read(struct pci_bus *bus, unsigned int devfn, int where,
-+		    int size, u32 *value)
-+{
-+	return raw_pci_read(pci_domain_nr(bus), bus->number,
-+			    devfn, where, size, value);
-+}
-+
-+static int pci_write(struct pci_bus *bus, unsigned int devfn, int where,
-+		     int size, u32 value)
-+{
-+	return raw_pci_write(pci_domain_nr(bus), bus->number,
-+			     devfn, where, size, value);
-+}
-+
-+struct pci_ops pci_root_ops = {
-+	.read = pci_read,
-+	.write = pci_write,
-+};
-+
-+static struct pci_controller *alloc_pci_controller(int seg)
-+{
-+	struct pci_controller *controller;
-+
-+	controller = kzalloc(sizeof(*controller), GFP_KERNEL);
-+	if (!controller)
-+		return NULL;
-+
-+	controller->segment = seg;
-+	return controller;
-+}
-+
-+struct pci_root_info {
-+	struct acpi_device *bridge;
-+	struct pci_controller *controller;
-+	struct list_head resources;
-+	struct resource *res;
-+	resource_size_t *res_offset;
-+	unsigned int res_num;
-+	char *name;
-+};
-+
-+static acpi_status resource_to_window(struct acpi_resource *resource,
-+				      struct acpi_resource_address64 *addr)
-+{
-+	acpi_status status;
-+
-+	/*
-+	 * We're only interested in _CRS descriptors that are
-+	 *	- address space descriptors for memory
-+	 *	- non-zero size
-+	 *	- producers, i.e., the address space is routed downstream,
-+	 *	  not consumed by the bridge itself
-+	 */
-+	status = acpi_resource_to_address64(resource, addr);
-+	if (ACPI_SUCCESS(status) &&
-+	    (addr->resource_type == ACPI_MEMORY_RANGE ||
-+	     addr->resource_type == ACPI_IO_RANGE) &&
-+	    addr->address_length &&
-+	    addr->producer_consumer == ACPI_PRODUCER)
-+		return AE_OK;
-+
-+	return AE_ERROR;
-+}
-+
-+static acpi_status count_window(struct acpi_resource *resource, void *data)
-+{
-+	unsigned int *windows = (unsigned int *) data;
-+	struct acpi_resource_address64 addr;
-+	acpi_status status;
-+
-+	status = resource_to_window(resource, &addr);
-+	if (ACPI_SUCCESS(status))
-+		(*windows)++;
-+
-+	return AE_OK;
-+}
-+
-+static acpi_status add_window(struct acpi_resource *res, void *data)
-+{
-+	struct pci_root_info *info = data;
-+	struct resource *resource;
-+	struct acpi_resource_address64 addr;
-+	acpi_status status;
-+	unsigned long flags;
-+	struct resource *root;
-+	u64 start;
-+
-+	/* Return AE_OK for non-window resources to keep scanning for more */
-+	status = resource_to_window(res, &addr);
-+	if (!ACPI_SUCCESS(status))
-+		return AE_OK;
-+
-+	if (addr.resource_type == ACPI_MEMORY_RANGE) {
-+		flags = IORESOURCE_MEM;
-+		root = &iomem_resource;
-+	} else if (addr.resource_type == ACPI_IO_RANGE) {
-+		flags = IORESOURCE_IO;
-+		root = &ioport_resource;
-+	} else
-+		return AE_OK;
-+
-+	start = addr.minimum + addr.translation_offset;
-+
-+	resource = &info->res[info->res_num];
-+	resource->name = info->name;
-+	resource->flags = flags;
-+	resource->start = start;
-+	resource->end = resource->start + addr.address_length - 1;
-+
-+	if (flags & IORESOURCE_IO) {
-+		unsigned long port;
-+		int err;
-+
-+		err = pci_register_io_range(start, addr.address_length);
-+		if (err)
-+			return AE_OK;
-+
-+		port = pci_address_to_pio(start);
-+		if (port == (unsigned long)-1)
-+			return AE_OK;
-+
-+		resource->start = port;
-+		resource->end = port + addr.address_length - 1;
-+
-+		if (pci_remap_iospace(resource, start) < 0)
-+			return AE_OK;
-+
-+		info->res_offset[info->res_num] = 0;
-+	} else
-+		info->res_offset[info->res_num] = addr.translation_offset;
-+
-+	if (insert_resource(root, resource)) {
-+		dev_err(&info->bridge->dev,
-+			"can't allocate host bridge window %pR\n",
-+			resource);
-+	} else {
-+		if (addr.translation_offset)
-+			dev_info(&info->bridge->dev, "host bridge window %pR "
-+				 "(PCI address [%#llx-%#llx])\n",
-+				 resource,
-+				 resource->start - addr.translation_offset,
-+				 resource->end - addr.translation_offset);
-+		else
-+			dev_info(&info->bridge->dev,
-+				 "host bridge window %pR\n", resource);
-+	}
-+
-+	pci_add_resource_offset(&info->resources, resource,
-+				info->res_offset[info->res_num]);
-+	info->res_num++;
-+	return AE_OK;
-+}
-+
-+static void free_pci_root_info_res(struct pci_root_info *info)
-+{
-+	kfree(info->name);
-+	kfree(info->res);
-+	info->res = NULL;
-+	kfree(info->res_offset);
-+	info->res_offset = NULL;
-+	info->res_num = 0;
-+	kfree(info->controller);
-+	info->controller = NULL;
-+}
-+
-+static void __release_pci_root_info(struct pci_root_info *info)
-+{
-+	int i;
-+	struct resource *res;
-+
-+	for (i = 0; i < info->res_num; i++) {
-+		res = &info->res[i];
-+
-+		if (!res->parent)
-+			continue;
-+
-+		if (!(res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
-+			continue;
-+
-+		release_resource(res);
-+	}
-+
-+	free_pci_root_info_res(info);
-+	kfree(info);
-+}
-+
-+static void release_pci_root_info(struct pci_host_bridge *bridge)
-+{
-+	struct pci_root_info *info = bridge->release_data;
-+
-+	__release_pci_root_info(info);
-+}
-+
-+static int
-+probe_pci_root_info(struct pci_root_info *info, struct acpi_device *device,
-+		int busnum, int domain)
-+{
-+	char *name;
-+
-+	name = kmalloc(16, GFP_KERNEL);
-+	if (!name)
-+		return -ENOMEM;
-+
-+	sprintf(name, "PCI Bus %04x:%02x", domain, busnum);
-+	info->bridge = device;
-+	info->name = name;
-+
-+	acpi_walk_resources(device->handle, METHOD_NAME__CRS, count_window,
-+			&info->res_num);
-+	if (info->res_num) {
-+		info->res =
-+			kzalloc_node(sizeof(*info->res) * info->res_num,
-+				     GFP_KERNEL, info->controller->node);
-+		if (!info->res) {
-+			kfree(name);
-+			return -ENOMEM;
-+		}
-+
-+		info->res_offset =
-+			kzalloc_node(sizeof(*info->res_offset) * info->res_num,
-+					GFP_KERNEL, info->controller->node);
-+		if (!info->res_offset) {
-+			kfree(name);
-+			kfree(info->res);
-+			info->res = NULL;
-+			return -ENOMEM;
-+		}
-+
-+		info->res_num = 0;
-+		acpi_walk_resources(device->handle, METHOD_NAME__CRS,
-+			add_window, info);
-+	} else
-+		kfree(name);
-+
-+	return 0;
-+}
-+
- /* Root bridge scanning */
- struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- {
--	/* TODO: Should be revisited when implementing PCI on ACPI */
--	return NULL;
-+	struct acpi_device *device = root->device;
-+	int domain = root->segment;
-+	int bus = root->secondary.start;
-+	struct pci_controller *controller;
-+	struct pci_root_info *info = NULL;
-+	int busnum = root->secondary.start;
-+	struct pci_bus *pbus;
-+	int ret;
-+
-+	controller = alloc_pci_controller(domain);
-+	if (!controller)
-+		return NULL;
-+
-+	controller->companion = device;
-+	controller->node = acpi_get_node(device->handle);
-+
-+	info = kzalloc(sizeof(*info), GFP_KERNEL);
-+	if (!info) {
-+		dev_err(&device->dev,
-+				"pci_bus %04x:%02x: ignored (out of memory)\n",
-+				domain, busnum);
-+		kfree(controller);
-+		return NULL;
-+	}
-+
-+	info->controller = controller;
-+	INIT_LIST_HEAD(&info->resources);
-+
-+	ret = probe_pci_root_info(info, device, busnum, domain);
-+	if (ret) {
-+		kfree(info->controller);
-+		kfree(info);
-+		return NULL;
-+	}
-+	/* insert busn resource at first */
-+	pci_add_resource(&info->resources, &root->secondary);
-+
-+	pbus = pci_create_root_bus(NULL, bus, &pci_root_ops, controller,
-+				   &info->resources);
-+	if (!pbus) {
-+		pci_free_resource_list(&info->resources);
-+		__release_pci_root_info(info);
-+		return NULL;
-+	}
-+
-+	pci_set_host_bridge_release(to_pci_host_bridge(pbus->bridge),
-+			release_pci_root_info, info);
-+	pci_scan_child_bus(pbus);
-+	return pbus;
- }
--#endif
-+#endif /* CONFIG_ACPI */
 -- 
-1.9.1
+2.1.1
