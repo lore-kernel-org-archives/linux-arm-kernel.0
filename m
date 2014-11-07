@@ -1,55 +1,66 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Fri, 7 Nov 2014 10:31:20 -0600
-Subject: [PATCHv3 4/5] edac: altera: Add Altera L2 Cache and OCRAM EDAC
- Support
-In-Reply-To: <20141106163134.GF4318@pd.tnic>
-References: <1414683131-20786-1-git-send-email-tthayer@opensource.altera.com>
- <1414683131-20786-5-git-send-email-tthayer@opensource.altera.com>
- <20141104151214.GD9570@pd.tnic> <545959E8.2040005@opensource.altera.com>
- <20141106163134.GF4318@pd.tnic>
-Message-ID: <545CF3D8.1020500@opensource.altera.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri,  7 Nov 2014 16:25:29 +0000
+Subject: [PATCH 04/11] arm: perf: filter unschedulable events
+In-Reply-To: <1415377536-12841-1-git-send-email-mark.rutland@arm.com>
+References: <1415377536-12841-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1415377536-12841-5-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Different CPU microarchitectures implement different PMU events, and
+thus events which can be scheduled on one microarchitecture cannot be
+scheduled on another, and vice-versa. Some archicted events behave
+differently across microarchitectures, and thus cannot be meaningfully
+summed. Due to this, we reject the scheduling of an event on a CPU of a
+different microarchitecture to that the event targets.
 
-On 11/06/2014 10:31 AM, Borislav Petkov wrote:
-> Hi Thor,
-> 
-> On Tue, Nov 04, 2014 at 04:57:44PM -0600, Thor Thayer wrote:
->> We want to at least separate L2/OCRAM ECC from the SDRAM ECC because
->> 1) the SDRAM preparation can take almost 2 seconds on boot and some
->> customers need a faster boot time.
->> 2) the SDRAM has an ECC initialization dependency on the preloader which is
->> outside the kernel. It is desirable to be able to turn the SDRAM on & off
->> separately.
-> 
-> Well, now that I asked and you gave valid reasons for the split,
-> you should keep them split the way they are. But please do add that
-> explanation to the commit message so that it is clear to people why
-> there is a split.
-> 
->> You bring up a good point about the L2 and OCRAM being combined though.
->>
->> If we do want granular control, maybe I should use a submenu? Or isn't that
->> desirable either?
-> 
-> Well, what do you think would be easier/faster for a user configuring? A
-> separate menu where you have to do a couple of key presses just to enter
-> it or simply a subtree in Kconfig with all the options together. I think
-> the "depends" gives you that already...
-> 
-> Ok, once you've worked in the suggested changes, you're good to go,
-> at least for the EDAC bits. Let me know how you want to handle this,
-> whether I should pick up the whole thing or I should ack the EDAC parts.
-> This patchset should go together, in any case, and so I don't care
-> whoever picks it up.
-> 
+When the core perf code is scheduling events and encounters an event
+which cannot be scheduled, it stops attempting to schedule events. As
+the perf core periodically rotates the list of events, for some
+proportion of the time events which are unschedulable will block events
+which are schedulable, resulting in low utilisation of the hardware
+counters.
 
-If it's okay, can you please pick up this series, once everything is
-cleaned up? I just checked to make sure that there aren't any merge
-conflicts in the DTS files in this series against DTS patches that I
-have queue up for 3.19, and there aren't.
+This patch implements a pmu::filter_match callback such that we can
+detect and skip such events while scheduling early, before they can
+block the schedulable events. This prevents the low HW counter
+utilisation issue.
 
-Thanks,
-Dinh
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm/kernel/perf_event.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 9ad21ab..b00f6aa 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -509,6 +509,18 @@ static void armpmu_disable(struct pmu *pmu)
+ 	armpmu->stop(armpmu);
+ }
+ 
++/*
++ * In heterogeneous systems, events are specific to a particular
++ * microarchitecture, and aren't suitable for another. Thus, only match CPUs of
++ * the same microarchitecture.
++ */
++static int armpmu_filter_match(struct perf_event *event)
++{
++	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
++	unsigned int cpu = smp_processor_id();
++	return cpumask_test_cpu(cpu, &armpmu->supported_cpus);
++}
++
+ #ifdef CONFIG_PM_RUNTIME
+ static int armpmu_runtime_resume(struct device *dev)
+ {
+@@ -549,6 +561,7 @@ static void armpmu_init(struct arm_pmu *armpmu)
+ 		.start		= armpmu_start,
+ 		.stop		= armpmu_stop,
+ 		.read		= armpmu_read,
++		.filter_match	= armpmu_filter_match,
+ 	};
+ }
+ 
+-- 
+1.9.1
