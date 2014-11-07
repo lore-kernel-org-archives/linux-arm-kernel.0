@@ -1,66 +1,47 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 7 Nov 2014 20:14:42 +0100
-Subject: [PATCH] arm/arm64: KVM: avoid unnecessary guest register
- mangling on MMIO read
-In-Reply-To: <1415275905-21409-1-git-send-email-andre.przywara@arm.com>
-References: <1415275905-21409-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <20141107191442.GB22848@cbox>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Fri, 07 Nov 2014 16:14:21 -0300
+Subject: [PATCH RFC V3 2/3] mxs: add driver for ocotp in i.MX23 and i.MX28
+In-Reply-To: <1003885907.22061.1415301932743.JavaMail.open-xchange@oxbsltgw00.schlund.de>
+References: <1413628372-2809-1-git-send-email-stefan.wahren@i2se.com>
+ <3434817.dk7dLDFrcN@wuerfel> <544FCFB3.10100@vanguardiasur.com.ar>
+ <2223659.OW08fe0cS1@wuerfel>
+ <1003885907.22061.1415301932743.JavaMail.open-xchange@oxbsltgw00.schlund.de>
+Message-ID: <545D1A0D.9050307@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 06, 2014 at 12:11:45PM +0000, Andre Przywara wrote:
-> Currently we mangle the endianness of the guest's register even on an
-> MMIO _read_, where it is completely useless, because we will not use
-> the value of that register.
-> Rework the io_mem_abort() function to clearly separate between reads
-> and writes and only do the endianness mangling on MMIO writes.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  arch/arm/kvm/mmio.c |   15 +++++++++------
->  1 file changed, 9 insertions(+), 6 deletions(-)
-> 
+
+
+On 11/06/2014 04:25 PM, Stefan Wahren wrote:
 > Hi,
 > 
-> I found this while investigating bi-endianness for MMIO. Not sure if
-> it's really useful, but I found it more clearer this way.
+>> Arnd Bergmann <arnd@arndb.de> hat am 28. Oktober 2014 um 20:13 geschrieben:
+>> [...]
+>>
+>> I came up with MTD just because a grep for OTP showed most hits in there.
+>> I have to admit that I didn't check whether those are actually for
+>> the same kind of device or for something else that goes by the same
+>> name. Having it in MTD doesn't sound too obscure though.
+>>
+>> There are a few other references to efuse or otp in the kernel, which means
+>> that at some point we probably want to have a common subsystem and user
+>> interface for this, either in MTD or standalone.
+>>
+>> Between drivers/misc/fsl_ocotp.c, drivers/soc/tegra/fuse and
+>> drivers/mfd/ab3100-otp.c, is there any commonality that we could
+>> base an abstract API on?
 > 
-> Cheers,
-> Andre.
+> i don't have a answer to this question, but how about changing fsl_ocotp driver
+> to driver/soc/mxs/fuse with a similiar binary interface like the tegra ones.
 > 
-> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-> index 4cb5a93..5d3bfc0 100644
-> --- a/arch/arm/kvm/mmio.c
-> +++ b/arch/arm/kvm/mmio.c
-> @@ -187,15 +187,18 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  	}
->  
->  	rt = vcpu->arch.mmio_decode.rt;
-> -	data = vcpu_data_guest_to_host(vcpu, *vcpu_reg(vcpu, rt), mmio.len);
->  
-> -	trace_kvm_mmio((mmio.is_write) ? KVM_TRACE_MMIO_WRITE :
-> -					 KVM_TRACE_MMIO_READ_UNSATISFIED,
-> -			mmio.len, fault_ipa,
-> -			(mmio.is_write) ? data : 0);
-> +	if (mmio.is_write) {
-> +		data = vcpu_data_guest_to_host(vcpu, *vcpu_reg(vcpu, rt),
-> +					       mmio.len);
->  
-> -	if (mmio.is_write)
-> +		trace_kvm_mmio(KVM_TRACE_MMIO_WRITE, mmio.len,
-> +			       fault_ipa, data);
->  		mmio_write_buf(mmio.data, mmio.len, data);
-> +	} else {
-> +		trace_kvm_mmio(KVM_TRACE_MMIO_READ_UNSATISFIED, mmio.len,
-> +			       fault_ipa, 0);
-> +	}
->  
->  	if (vgic_handle_mmio(vcpu, run, &mmio))
->  		return 1;
-> -- 
-> 1.7.9.5
+> Does it make sense to you?
 > 
 
-Looks good to me:
+While you are here, maybe you can check if your API and driver will also
+be useful to support i.MX6 OCOTP?
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+I understand that I might be asking too much, and that perhaps i.MX23/28
+eFuses are completely different from other another i.MX.
+-- 
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
