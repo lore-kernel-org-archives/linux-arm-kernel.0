@@ -1,36 +1,35 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 07 Nov 2014 12:09:26 -0500 (EST)
-Subject: [PATCHv4 1/1] net: fec: fix regression on i.MX28 introduced by
- rx_copybreak support
-In-Reply-To: <CAOMZO5Cb1=Nvzu8EHqmV+K+W+ZJxzL1=5MnK6hDSstwh9ruweA@mail.gmail.com>
-References: <1415350967-2238-1-git-send-email-LW@KARO-electronics.de>
- <1415350967-2238-2-git-send-email-LW@KARO-electronics.de>
- <CAOMZO5Cb1=Nvzu8EHqmV+K+W+ZJxzL1=5MnK6hDSstwh9ruweA@mail.gmail.com>
-Message-ID: <20141107.120926.297493918093719160.davem@davemloft.net>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 7 Nov 2014 19:13:49 +0200
+Subject: [REPOST PATCH 1/2] ARM: OMAP3+: TWL: add support for mapping
+ platform data via pdata-quirks
+In-Reply-To: <20141107152201.GS8509@sirena.org.uk>
+References: <1412949989-20186-1-git-send-email-t-kristo@ti.com>
+ <1412949989-20186-2-git-send-email-t-kristo@ti.com>
+ <20141107152201.GS8509@sirena.org.uk>
+Message-ID: <545CFDCD.5090006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <festevam@gmail.com>
-Date: Fri, 7 Nov 2014 10:26:15 -0200
+On 11/07/2014 05:22 PM, Mark Brown wrote:
+> On Fri, Oct 10, 2014 at 05:06:28PM +0300, Tero Kristo wrote:
+>
+>> -	dev->platform_data = &twl_gpio_auxdata;
+>> +	if (!strcmp("twl4030-gpio", dev_name(dev)))
+>> +		dev->platform_data = &twl_gpio_auxdata;
+>> +	else
+>> +		dev->platform_data = omap_twl_match_regulator(dev);
+>
+> Looking at this idiom here I'd expect that we'd be adding another string
+> comparison here?
 
-> On Fri, Nov 7, 2014 at 7:02 AM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
->> commit 1b7bde6d659d ("net: fec: implement rx_copybreak to improve rx performance")
->> introduced a regression for i.MX28. The swap_buffer() function doing
->> the endian conversion of the received data on i.MX28 may access memory
->> beyond the actual packet size in the DMA buffer. fec_enet_copybreak()
->> does not copy those bytes, so that the last bytes of a packet may be
->> filled with invalid data after swapping.
->> This will likely lead to checksum errors on received packets.
->> E.g. when trying to mount an NFS rootfs:
->> UDP: bad checksum. From 192.168.1.225:111 to 192.168.100.73:44662 ulen 36
->>
->> Do the byte swapping and copying to the new skb in one go if
->> necessary.
->>
->> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> 
-> With this patch I am able to NFS mount on mx28 again. Thanks, Lothar!
-> 
-> Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+We are actually doing an of_match_node call within the 
+twl_match_regulator. However, we had a short offline discussion with 
+Tony, and this whole function should be fixed to check node 
+compatibility instead of dev_name. I will be posting a new version that 
+does this once I have time to look at it.
 
-Applied, thanks everyone.
+What do you think of patch #2 though? Thats more interesting for the 
+regulator driver purposes and if you NAK that one, the floor goes under 
+this whole approach.
+
+-Tero
