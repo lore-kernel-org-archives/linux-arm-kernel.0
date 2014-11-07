@@ -1,89 +1,75 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 7 Nov 2014 18:45:22 +0000
-Subject: [PATCH v7 3/8] arm64: introduce is_device_dma_coherent
-In-Reply-To: <20141107181430.GH29148@e104818-lin.cambridge.arm.com>
-References: <alpine.DEB.2.02.1411031101400.22875@kaball.uk.xensource.com>
- <20141105165646.GN32700@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.02.1411051757140.22875@kaball.uk.xensource.com>
- <20141106103337.GA19702@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.02.1411061155200.22875@kaball.uk.xensource.com>
- <20141107110524.GA21875@localhost>
- <alpine.DEB.2.02.1411071212250.22875@kaball.uk.xensource.com>
- <20141107160006.GE29148@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.02.1411071646170.22875@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1411071732550.22875@kaball.uk.xensource.com>
- <20141107181430.GH29148@e104818-lin.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.02.1411071834540.22875@kaball.uk.xensource.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri,  7 Nov 2014 10:51:52 -0800
+Subject: [PATCH] clk: Propagate prepare and enable when reparenting orphans
+Message-ID: <1415386312-23741-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 7 Nov 2014, Catalin Marinas wrote:
-> On Fri, Nov 07, 2014 at 05:35:41PM +0000, Stefano Stabellini wrote:
-> > On Fri, 7 Nov 2014, Stefano Stabellini wrote:
-> > > On Fri, 7 Nov 2014, Catalin Marinas wrote:
-> > > > What I would like to see is xen_dma_map_page() also using hyp calls for
-> > > > cache maintenance when !pfn_valid(), for symmetry with unmap. You would
-> > > > need another argument to xen_dma_map_page() though to pass the real
-> > > > device address or mfn (and on the map side you could simply check for
-> > > > page_to_pfn(page) != mfn). For such cases, Xen swiotlb already handles
-> > > > bouncing so you don't need dom0 swiotlb involved as well.
-> > > 
-> > > I can see that it would be nice to have map_page and unmap_page be
-> > > symmetrical. However actually doing the map_page flush with an hypercall
-> > > would slow things down. Hypercalls are slower than function calls. It is
-> > > faster to do the cache flushing in dom0 if possible. In the map_page
-> > > case we have the struct page so we can easily do it by calling the
-> > > native dma_ops function.
-> > > 
-> > > Maybe I could just add a comment to explain the reason for the asymmetry?
-> > 
-> > Ah, but the problem is that map_page could allocate a swiotlb buffer
-> > (actually it does on arm64) that without a corresponding unmap_page
-> > call, would end up being leaked, right?
-> 
-> Yes. You could hack dma_capable() to always return true for dom0
-> (because the pfn/dma address here doesn't have anything to do with the
-> real mfn) but that's more of a hack assuming a lot about the swiotlb
-> implementation.
+With the existing code, if you find a parent for an orhpan that has
+already been prepared / enabled, you won't enable the parent.  That
+can cause later problems since the clock tree isn't in a consistent
+state.  Fix by propagating the prepare and enable.
 
-Another idea would be to avoid calling the native map_page for foreign
-pages, but in the xen specific implementation instead of making the
-hypercall, we could call __dma_map_area on arm64 and map_page on arm.
+NOTE: this does bring up the question about whether the enable of the
+orphan actually made sense.  If the orphan's parent wasn't enabled by
+default (by the bootloader or the default state of the hardware) then
+the original enable of the orphan probably didn't do what the caller
+though it would.  Some users of the orphan might have preferred an
+EPROBE_DEFER be returned until we had a full path to a root clock.
+This patch doesn't address those concerns and really just syncs up the
+state.
 
-Something like this:
+Tested on rk3288-evb-rk808 by temporarily considering "sclk_tsadc" as
+a critical clock (to simulate a driver enabling it at bootup).
 
+Before:
 
-In arch/arm/include/asm/xen/page-coherent.h:
+   clock                         enable_cnt  prepare_cnt        rate   accuracy   phase
+----------------------------------------------------------------------------------------
+ xin32k                                   0            0       32768          0 0
+    sclk_hdmi_cec                         0            0       32768          0 0
+    sclk_otg_adp                          0            0       32768          0 0
+    sclk_tsadc                            1            1         993          0 0
 
-static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
-	     dma_addr_t dev_addr, unsigned long offset, size_t size,
-	     enum dma_data_direction dir, struct dma_attrs *attrs)
-{
-	if (pfn_valid(PFN_DOWN(dev_addr))) {
-		if (__generic_dma_ops(hwdev)->map_page)
-			__generic_dma_ops(hwdev)->map_page(hwdev, page, offset, size, dir, attrs);
-	} else
-		__xen_dma_map_page(hwdev, page, dev_addr, offset, size, dir, attrs);
-}
+After:
 
+   clock                         enable_cnt  prepare_cnt        rate   accuracy   phase
+----------------------------------------------------------------------------------------
+ xin32k                                   1            1       32768          0 0
+    sclk_hdmi_cec                         0            0       32768          0 0
+    sclk_otg_adp                          0            0       32768          0 0
+    sclk_tsadc                            1            1         993          0 0
 
+Note that xin32k on rk808 is a clock that cannot be disabled in
+hardware (it's an always on clock), so really all we needed to do was
+to sync up the state.
 
-In arch/arm/xen/mm.c:
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ drivers/clk/clk.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-void __xen_dma_map_page(struct device *hwdev, struct page *page,
-	     dma_addr_t dev_addr, unsigned long offset, size_t size,
-	     enum dma_data_direction dir, struct dma_attrs *attrs)
-{
-	if (is_device_dma_coherent(hwdev))
-		return;
-#ifdef CONFIG_ARM64
-	__dma_map_area(page_to_phys(page) + offset, size, dir);
-#else
-	__generic_dma_ops(hwdev)->map_page(hwdev, page, offset, size, dir, attrs);
-#endif
-}
-
-
-It wouldn't be as nice as using the hypercall but it would be faster and
-wouldn't depend on the inner workings of the arm64 implementation of
-map_page, except for __dma_map_area.
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 4896ae9..a3d3d58 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1650,6 +1650,17 @@ void __clk_reparent(struct clk *clk, struct clk *new_parent)
+ 	clk_reparent(clk, new_parent);
+ 	__clk_recalc_accuracies(clk);
+ 	__clk_recalc_rates(clk, POST_RATE_CHANGE);
++
++	if (clk->prepare_count) {
++		unsigned long flags;
++
++		__clk_prepare(new_parent);
++
++		flags = clk_enable_lock();
++		if (clk->enable_count)
++			__clk_enable(new_parent);
++		clk_enable_unlock(flags);
++	}
+ }
+ 
+ /**
+-- 
+2.1.0.rc2.206.gedb03e5
