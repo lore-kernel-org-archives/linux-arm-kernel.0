@@ -1,240 +1,68 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Fri, 7 Nov 2014 14:32:10 -0600
-Subject: [PATCHv4 2/5] arm: socfpga: Enable OCRAM ECC on startup.
-In-Reply-To: <1415379263-12391-3-git-send-email-tthayer@opensource.altera.com>
-References: <1415379263-12391-1-git-send-email-tthayer@opensource.altera.com>
- <1415379263-12391-3-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <545D2C4A.6030401@opensource.altera.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Fri, 07 Nov 2014 12:44:13 -0800
+Subject: [PATCH v13 3/7] KVM: x86: flush TLBs last before returning from
+ KVM_GET_DIRTY_LOG
+In-Reply-To: <20141107200215.GA23953@cbox>
+References: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
+ <1415320848-13813-4-git-send-email-m.smarduch@samsung.com>
+ <545C7845.9010103@redhat.com> <545D2271.4090906@samsung.com>
+ <20141107200215.GA23953@cbox>
+Message-ID: <545D2F1D.8040106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thor,
+On 11/07/2014 12:02 PM, Christoffer Dall wrote:
+> On Fri, Nov 07, 2014 at 11:50:09AM -0800, Mario Smarduch wrote:
+>> On 11/06/2014 11:44 PM, Paolo Bonzini wrote:
+>>>
+>>>
+>>> On 07/11/2014 01:40, Mario Smarduch wrote:
+>>>> In the next patches, we will move parts of x86's kvm_vm_ioctl_get_dirty_log
+>>>> implementation to generic code; leave the arch-specific code at the end,
+>>>> similar to the existing generic function kvm_get_dirty_log.
+>>>>
+>>>> Reviewed-by: Mario Smarduch <m.smarduch@samsung.com>
+>>>> Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
+>>>
+>>> You should have a "Signed-off-by: Mario Smarduch ..." here, and you 
+>>> should also add my authorship.  You can do the latter with "git rebase 
+>>> -i", adding
+>>>
+>>>   x git commit --amend -C HEAD --author 'Paolo Bonzini <pbonzini@redhat.com>'
+>>>
+>>> after this patch.  If you're using a patch queue instead (quilt or
+>>> similar) you can just edit the "From" line in the patch.
+>>>
+>>> I guess if you reply to the patch with just
+>>>
+>>>    Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>>>
+>>> the ARM maintainers can do the above for you, if there's no need for
+>>> a v14.
+>>>
+>>> I'll send an eighth patch to actually switch x86 to the new function.
+>>> Again, the maintainers can apply it in the right place, but please
+>>> include it yourself if you have to do a v14.
+>>>
+>>> Thanks,
+>>>
+>>> Paolo
+>>
+>> I kind of thought something was wrong :) Thanks for the explanation,
+>> until I get the hang of it I'll defer to ARM maintainers. Maybe later
+>> update SubmittingPatches documentation.
+>>
+> Since you're doing a respin (right?) then please get the authorship
+> and signed-off-by's right for the next iteration.
 
-On 11/07/2014 10:54 AM, tthayer at opensource.altera.com wrote:
-> From: Thor Thayer <tthayer@opensource.altera.com>
+Yes
 > 
-> This patch enables the ECC for On-Chip RAM on machine
-> startup.  The ECC has to be enabled before data is
-> is stored in memory otherwise the ECC will fail on
-> reads.
+> If you're having trouble with the git mangling to get it right, don't be
+> afraid to reach out, here or on IRC.
+
+Yes definitely need some coaching on this, this is not git 101 anymore.
+
+Thanks.
 > 
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
-> ---
-> v2: Split OCRAM ECC portion separately. Addition of iounmap()
-> and reorganization of gen_pool_free. Remove defconfig from patch.
-> 
-> v3/4: No change
-> ---
->  MAINTAINERS                     |    1 +
->  arch/arm/mach-socfpga/Makefile  |    1 +
->  arch/arm/mach-socfpga/ocram.c   |   90 +++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-socfpga/ocram.h   |   28 ++++++++++++
->  arch/arm/mach-socfpga/socfpga.c |    8 ++++
->  5 files changed, 128 insertions(+)
->  create mode 100644 arch/arm/mach-socfpga/ocram.c
->  create mode 100644 arch/arm/mach-socfpga/ocram.h
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index d0c7752..c6d390e 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1408,6 +1408,7 @@ M:	Thor Thayer <tthayer@opensource.altera.com>
->  S:	Maintained
->  F:	drivers/edac/altera_edac.
->  F:	arch/arm/mach-socfpga/l2_cache.*
-> +F:	arch/arm/mach-socfpga/ocram.*
-
-I think you can remove these entries for l2_cache.c and ocram.c since it
-already falls under mach-socfpga/, which I already maintain.
-
->  
->  ARM/STI ARCHITECTURE
->  M:	Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
-> diff --git a/arch/arm/mach-socfpga/Makefile b/arch/arm/mach-socfpga/Makefile
-> index 142609e..1552ca5 100644
-> --- a/arch/arm/mach-socfpga/Makefile
-> +++ b/arch/arm/mach-socfpga/Makefile
-> @@ -5,3 +5,4 @@
->  obj-y					:= socfpga.o
->  obj-$(CONFIG_SMP)	+= headsmp.o platsmp.o
->  obj-$(CONFIG_EDAC_ALTERA_L2C) += l2_cache.o
-> +obj-$(CONFIG_EDAC_ALTERA_OCRAM) += ocram.o
-> diff --git a/arch/arm/mach-socfpga/ocram.c b/arch/arm/mach-socfpga/ocram.c
-> new file mode 100644
-> index 0000000..9136009
-> --- /dev/null
-> +++ b/arch/arm/mach-socfpga/ocram.c
-> @@ -0,0 +1,90 @@
-> +/*
-> + * Copyright Altera Corporation (C) 2014. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#include <linux/clk-provider.h>
-
-Why clk-provider.h and not io.h?
-
-> +#include <linux/genalloc.h>
-> +#include <linux/of_platform.h>
-> +
-> +#include "ocram.h"
-> +
-> +void socfpga_init_ocram_ecc(void)
-> +{
-> +	struct device_node *np;
-> +	const __be32 *prop;
-> +	u32 ocr_edac_addr, iram_addr, len;
-> +	void __iomem  *mapped_ocr_edac_addr;
-> +	size_t size;
-> +	struct gen_pool *gp;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "altr,ocram-edac");
-> +	if (!np) {
-> +		pr_err("SOCFPGA: Unable to find altr,ocram-edac in dtb\n");
-> +		return;
-> +	}
-> +
-> +	prop = of_get_property(np, "reg", &size);
-> +	ocr_edac_addr = be32_to_cpup(prop++);
-> +	len = be32_to_cpup(prop);
-
-You should be checking for prop before calling be32_to_cpup.
-
-> +	if (!prop || size < sizeof(*prop)) {
-
-Then you don't need check for prop here.
-
-> +		pr_err("SOCFPGA: Unable to find OCRAM ECC mapping in dtb\n");
-> +		return;
-> +	}
-> +
-> +	gp = of_get_named_gen_pool(np, "iram", 0);
-> +	if (!gp) {
-> +		pr_err("SOCFPGA: OCRAM cannot find gen pool\n");
-> +		return;
-> +	}
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "mmio-sram");
-> +	if (!np) {
-> +		pr_err("SOCFPGA: Unable to find mmio-sram in dtb\n");
-> +		return;
-> +	}
-> +	/* Determine the OCRAM address and size */
-> +	prop = of_get_property(np, "reg", &size);
-> +	iram_addr = be32_to_cpup(prop++);
-> +	len = be32_to_cpup(prop);
-
-Same comment here for checking prop before calling be32_to_cpu.
-
-> +
-> +	if (!prop || size < sizeof(*prop)) {
-> +		pr_err("SOCFPGA: Unable to find OCRAM mapping in dtb\n");
-> +		return;
-> +	}
-> +
-> +	iram_addr = gen_pool_alloc(gp, len);
-> +	if (iram_addr == 0) {
-> +		pr_err("SOCFPGA: cannot alloc from gen pool\n");
-> +		return;
-> +	}
-> +
-> +	memset((void *)iram_addr, 0, len);
-> +
-> +	gen_pool_free(gp, iram_addr, len);
-> +
-> +	mapped_ocr_edac_addr = ioremap(ocr_edac_addr, 4);
-> +	if (!mapped_ocr_edac_addr) {
-> +		pr_err("SOCFPGA: Unable to map OCRAM ecc regs.\n");
-> +		return;
-> +	}
-> +
-> +	/* Clear any pending OCRAM ECC interrupts, then enable ECC */
-> +	writel(0x18, mapped_ocr_edac_addr);
-> +	writel(0x19, mapped_ocr_edac_addr);
-
-Can you add a define for 0x18 and 0x19? What do these values mean?
-
-> +
-> +	iounmap(mapped_ocr_edac_addr);
-> +
-> +	pr_debug("SOCFPGA: Success Initializing OCRAM\n");
-> +}
-> +
-> diff --git a/arch/arm/mach-socfpga/ocram.h b/arch/arm/mach-socfpga/ocram.h
-> new file mode 100644
-> index 0000000..f93cf84
-> --- /dev/null
-> +++ b/arch/arm/mach-socfpga/ocram.h
-> @@ -0,0 +1,28 @@
-> +/*
-> + * Copyright Altera Corporation (C) 2014. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#ifndef MACH_SOCFPGA_OCRAM_H
-> +#define MACH_SOCFPGA_OCRAM_H
-> +
-> +#ifdef CONFIG_EDAC_ALTERA_OCRAM
-> +void socfpga_init_ocram_ecc(void);
-> +#else
-> +inline void socfpga_init_ocram_ecc(void)
-> +{
-> +}
-> +#endif
-> +
-> +#endif /* #ifndef MACH_SOCFPGA_OCRAM_H */
-> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-> index af6413a..fb41aca 100644
-> --- a/arch/arm/mach-socfpga/socfpga.c
-> +++ b/arch/arm/mach-socfpga/socfpga.c
-> @@ -101,6 +101,13 @@ static void socfpga_cyclone5_restart(enum reboot_mode mode, const char *cmd)
->  	writel(temp, rst_manager_base_addr + SOCFPGA_RSTMGR_CTRL);
->  }
->  
-> +static void __init socfpga_cyclone5_init(void)
-> +{
-> +	of_platform_populate(NULL, of_default_bus_match_table,
-> +			     NULL, NULL);
-> +	socfpga_init_ocram_ecc();
-
-Use IS_ENABLED() here, so you can remove the need to have ocram.h. You
-can put the function declaration in core.h.
-
-Dinh
-
-
-> +}
-> +
->  static const char *altera_dt_match[] = {
->  	"altr,socfpga",
->  	NULL
-> @@ -112,6 +119,7 @@ DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
->  	.smp		= smp_ops(socfpga_smp_ops),
->  	.map_io		= socfpga_map_io,
->  	.init_irq	= socfpga_init_irq,
-> +	.init_machine	= socfpga_cyclone5_init,
->  	.restart	= socfpga_cyclone5_restart,
->  	.dt_compat	= altera_dt_match,
->  MACHINE_END
+> -Christoffer
 > 
