@@ -1,68 +1,101 @@
 From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Fri, 07 Nov 2014 12:44:13 -0800
-Subject: [PATCH v13 3/7] KVM: x86: flush TLBs last before returning from
- KVM_GET_DIRTY_LOG
-In-Reply-To: <20141107200215.GA23953@cbox>
+Date: Fri, 07 Nov 2014 12:46:13 -0800
+Subject: [PATCH v13 4/7] arm: KVM: Add ARMv7 API to flush TLBs
+In-Reply-To: <20141107201813.GA24329@cbox>
 References: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
- <1415320848-13813-4-git-send-email-m.smarduch@samsung.com>
- <545C7845.9010103@redhat.com> <545D2271.4090906@samsung.com>
- <20141107200215.GA23953@cbox>
-Message-ID: <545D2F1D.8040106@samsung.com>
+ <1415320848-13813-5-git-send-email-m.smarduch@samsung.com>
+ <20141107201813.GA24329@cbox>
+Message-ID: <545D2F95.3040200@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2014 12:02 PM, Christoffer Dall wrote:
-> On Fri, Nov 07, 2014 at 11:50:09AM -0800, Mario Smarduch wrote:
->> On 11/06/2014 11:44 PM, Paolo Bonzini wrote:
->>>
->>>
->>> On 07/11/2014 01:40, Mario Smarduch wrote:
->>>> In the next patches, we will move parts of x86's kvm_vm_ioctl_get_dirty_log
->>>> implementation to generic code; leave the arch-specific code at the end,
->>>> similar to the existing generic function kvm_get_dirty_log.
->>>>
->>>> Reviewed-by: Mario Smarduch <m.smarduch@samsung.com>
->>>> Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
->>>
->>> You should have a "Signed-off-by: Mario Smarduch ..." here, and you 
->>> should also add my authorship.  You can do the latter with "git rebase 
->>> -i", adding
->>>
->>>   x git commit --amend -C HEAD --author 'Paolo Bonzini <pbonzini@redhat.com>'
->>>
->>> after this patch.  If you're using a patch queue instead (quilt or
->>> similar) you can just edit the "From" line in the patch.
->>>
->>> I guess if you reply to the patch with just
->>>
->>>    Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->>>
->>> the ARM maintainers can do the above for you, if there's no need for
->>> a v14.
->>>
->>> I'll send an eighth patch to actually switch x86 to the new function.
->>> Again, the maintainers can apply it in the right place, but please
->>> include it yourself if you have to do a v14.
->>>
->>> Thanks,
->>>
->>> Paolo
+On 11/07/2014 12:18 PM, Christoffer Dall wrote:
+> On Thu, Nov 06, 2014 at 04:40:45PM -0800, Mario Smarduch wrote:
+>> This patch adds ARMv7 architecture TLB Flush function.
 >>
->> I kind of thought something was wrong :) Thanks for the explanation,
->> until I get the hang of it I'll defer to ARM maintainers. Maybe later
->> update SubmittingPatches documentation.
+>> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>> ---
+>>  arch/arm/include/asm/kvm_asm.h  |    1 +
+>>  arch/arm/include/asm/kvm_host.h |   12 ++++++++++++
+>>  arch/arm/kvm/Kconfig            |    1 +
+>>  arch/arm/kvm/interrupts.S       |   11 +++++++++++
+>>  4 files changed, 25 insertions(+)
 >>
-> Since you're doing a respin (right?) then please get the authorship
-> and signed-off-by's right for the next iteration.
-
-Yes
+>> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+>> index 3a67bec..25410b2 100644
+>> --- a/arch/arm/include/asm/kvm_asm.h
+>> +++ b/arch/arm/include/asm/kvm_asm.h
+>> @@ -96,6 +96,7 @@ extern char __kvm_hyp_code_end[];
+>>  
+>>  extern void __kvm_flush_vm_context(void);
+>>  extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+>> +extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+>>  
+>>  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+>>  #endif
+>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>> index 6dfb404..fad598c 100644
+>> --- a/arch/arm/include/asm/kvm_host.h
+>> +++ b/arch/arm/include/asm/kvm_host.h
+>> @@ -220,6 +220,18 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+>>  	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
+>>  }
+>>  
+>> +/**
+>> + * kvm_arch_flush_remote_tlbs() - flush all VM TLB entries
 > 
-> If you're having trouble with the git mangling to get it right, don't be
-> afraid to reach out, here or on IRC.
+> this name is not matching the function
 
-Yes definitely need some coaching on this, this is not git 101 anymore.
-
-Thanks.
+Yes leftover from previous version, will update.
 > 
-> -Christoffer
-> 
+>> + * @kvm:	pointer to kvm structure.
+>> + *
+>> + * Interface to HYP function to flush all VM TLB entries without address
+>> + * parameter.
+>> + */
+>> +static inline void kvm_flush_remote_tlbs(struct kvm *kvm)
+>> +{
+>> +	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
+>> +}
+>> +
+>>  static inline int kvm_arch_dev_ioctl_check_extension(long ext)
+>>  {
+>>  	return 0;
+>> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+>> index 466bd29..a099df4 100644
+>> --- a/arch/arm/kvm/Kconfig
+>> +++ b/arch/arm/kvm/Kconfig
+>> @@ -23,6 +23,7 @@ config KVM
+>>  	select HAVE_KVM_CPU_RELAX_INTERCEPT
+>>  	select KVM_MMIO
+>>  	select KVM_ARM_HOST
+>> +	select HAVE_KVM_ARCH_TLB_FLUSH_ALL
+>>  	depends on ARM_VIRT_EXT && ARM_LPAE
+>>  	---help---
+>>  	  Support hosting virtualized guest machines. You will also
+>> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+>> index 01dcb0e..79caf79 100644
+>> --- a/arch/arm/kvm/interrupts.S
+>> +++ b/arch/arm/kvm/interrupts.S
+>> @@ -66,6 +66,17 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
+>>  	bx	lr
+>>  ENDPROC(__kvm_tlb_flush_vmid_ipa)
+>>  
+>> +/**
+>> + * void __kvm_tlb_flush_vmid(struct kvm *kvm) - Flush per-VMID TLBs
+>> + *
+>> + * Reuses __kvm_tlb_flush_vmid_ipa() for ARMv7, without passing address
+>> + * parameter
+>> + */
+>> +
+>> +ENTRY(__kvm_tlb_flush_vmid)
+>> +	b	__kvm_tlb_flush_vmid_ipa
+>> +ENDPROC(__kvm_tlb_flush_vmid)
+>> +
+>>  /********************************************************************
+>>   * Flush TLBs and instruction caches of all CPUs inside the inner-shareable
+>>   * domain, for all VMIDs
+>> -- 
+>> 1.7.9.5
+>>
