@@ -1,132 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 07 Nov 2014 10:19:35 +0000
-Subject: [PATCH v13 6/7] arm: KVM: dirty log read write protect support
-In-Reply-To: <1415320848-13813-7-git-send-email-m.smarduch@samsung.com>
-References: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
- <1415320848-13813-7-git-send-email-m.smarduch@samsung.com>
-Message-ID: <545C9CB7.9070200@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 7 Nov 2014 11:29:36 +0100
+Subject: [GIT PULL] arm64: UEFI updates for 3.19
+In-Reply-To: <20141107100434.GA32336@arm.com>
+References: <CAKv+Gu8LEFvdu99vCHbHGPmGLpHWdT+Wb2DECzBEEg8g_yynvg@mail.gmail.com>
+ <CAKv+Gu8bpgGWRbgdGYHSy515LOXapCm4stv5xJo_tNNhahcTYw@mail.gmail.com>
+ <20141107100434.GA32336@arm.com>
+Message-ID: <CAKv+Gu9Hf2ATGxVbukxyqihChvc9TDvkejPq6KGkvFdJBPT5LA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/14 00:40, Mario Smarduch wrote:
-> Add support to track dirty pages between user space KVM_GET_DIRTY_LOG ioctl
-> calls. We call kvm_get_dirty_log_protect() function to do most of the work.
-> 
-> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> ---
->  arch/arm/kvm/arm.c  |   37 +++++++++++++++++++++++++++++++++++++
->  arch/arm/kvm/mmu.c  |   22 ++++++++++++++++++++++
->  virt/kvm/kvm_main.c |    3 +--
->  3 files changed, 60 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index a99e0cd..212d835 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -737,9 +737,46 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
->  	}
->  }
->  
-> +/**
-> + * kvm_vm_ioctl_get_dirty_log - get and clear the log of dirty pages in a slot
-> + * @kvm:	kvm instance
-> + * @log:	slot id and address to which we copy the log
-> + *
-> + * We need to keep it in mind that VCPU threads can write to the bitmap
-> + * concurrently.  So, to avoid losing data, we keep the following order for
-> + * each bit:
-> + *
-> + *   1. Take a snapshot of the bit and clear it if needed.
-> + *   2. Write protect the corresponding page.
-> + *   3. Copy the snapshot to the userspace.
-> + *   4. Flush TLB's if needed.
-> + *
-> + * Steps 1,2,3 are handled by kvm_get_dirty_log_protect().
-> + * Between 2 and 4, the guest may write to the page using the remaining TLB
-> + * entry.  This is not a problem because the page is reported dirty using
-> + * the snapshot taken before and step 4 ensures that writes done after
-> + * exiting to userspace will be logged for the next call.
-> + */
->  int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
->  {
-> +#ifdef CONFIG_ARM
-> +	int r;
-> +	bool is_dirty = false;
-> +
-> +	mutex_lock(&kvm->slots_lock);
-> +
-> +	r = kvm_get_dirty_log_protect(kvm, log, &is_dirty);
-> +	if (r)
-> +		goto out;
-> +
-> +	if (is_dirty)
-> +		kvm_flush_remote_tlbs(kvm);
-> +out:
-> +	mutex_unlock(&kvm->slots_lock);
-> +	return r;
-> +#else /* ARM64 */
->  	return -EINVAL;
-> +#endif
->  }
->  
->  static int kvm_vm_ioctl_set_device_addr(struct kvm *kvm,
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 3b86522..2f5131e 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -872,6 +872,28 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot)
->  	spin_unlock(&kvm->mmu_lock);
->  	kvm_flush_remote_tlbs(kvm);
->  }
-> +
-> +/**
-> + * kvm_arch_mmu_write_protect_pt_masked() - write protect dirty pages
-> + * @kvm:	The KVM pointer
-> + * @slot:	The memory slot associated with mask
-> + * @gfn_offset:	The gfn offset in memory slot
-> + * @mask:	The mask of dirty pages at offset 'gfn_offset' in this memory
-> + *		slot to be write protected
-> + *
-> + * Walks bits set in mask write protects the associated pte's. Caller must
-> + * acquire kvm_mmu_lock.
-> + */
-> +void kvm_arch_mmu_write_protect_pt_masked(struct kvm *kvm,
-> +		struct kvm_memory_slot *slot,
-> +		gfn_t gfn_offset, unsigned long mask)
-> +{
-> +	phys_addr_t base_gfn = slot->base_gfn + gfn_offset;
-> +	phys_addr_t start = (base_gfn +  __ffs(mask)) << PAGE_SHIFT;
-> +	phys_addr_t end = (base_gfn + __fls(mask) + 1) << PAGE_SHIFT;
-> +
-> +	stage2_wp_range(kvm, start, end);
-> +}
->  #endif
->  
->  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> index f017760..c80dd2f 100644
-> --- a/virt/kvm/kvm_main.c
-> +++ b/virt/kvm/kvm_main.c
-> @@ -982,8 +982,7 @@ out:
->  EXPORT_SYMBOL_GPL(kvm_get_dirty_log);
->  
->  #if defined(CONFIG_S390) || defined(CONFIG_PPC) || defined(CONFIG_MIPS) || \
-> -    defined(CONFIG_IA64) || defined(CONFIG_X86) || defined(CONFIG_ARM) || \
-> -    defined(CONFIG_ARM64)
-> +    defined(CONFIG_IA64) || defined(CONFIG_X86) || defined(CONFIG_ARM64)
+On 7 November 2014 11:04, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Nov 07, 2014 at 07:34:12AM +0000, Ard Biesheuvel wrote:
+>> You are not going to believe this, but I received a report about boot
+>> failures on legacy (non-EFI) x86 using the SMBIOS 3.0 code, so could
+>> you please hold off on pulling this until we know what is going on
+>> there? This does not affect ARM at all, but I may need to update patch
+>> 'dmi: add support for SMBIOS 3.0 64-bit entry point' to drop the
+>> SMBIOS 3.0 check in the non-EFI code path.
+>
+> D'oh, I put this into -next last night (perhaps that's where the report came
+> from), so I'll recreate that branch now without your series.
+>
 
-Yeah, that's exactly why Cornelia's comment on having a proper config
-symbol is pertinent.
+Ah, yes, that is probably where they found it. Note that this is a
+different patch than the one that has been causing us (me) grief
+before, but apparently it now has infected other patches as well :-)
 
->  /*
->   * For architectures that don't use kvm_get_dirty_log_protect() for dirty page
->   * logging, calling this function is illegal. Otherwise the function is defined
-> 
+> Please send another pull request without the SMBIOS patch, then we can
+> perhaps add that on top later on (that way it's easier to revert in the
+> future :).
+>
 
-Other that that:
+In the mean time, we have pinpointed this. It turns out that on x86,
+the RHS of this expression
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+u64 dmi_base = get_unaligned_le32(buf + 8);
 
-	M.
+is promoted to a signed type before being assigned, even if
+get_unaligned_le32() returns u32.
+On ARM, it works as expected.
+
+I have confirmation from Matt and another Intel engineer that adding a
+(arguably redundant) 'u32' cast solves the issue.
+
+Should I include the corrected patch and send an updated pull request?
+Or if you and Matt prefer so, we could take this patch and the
+preceding one (efi: dmi: add support for SMBIOS 3.0 UEFI configuration
+table) through Matt's tree as well. There are no interdependencies
+between those two and the other patches.
+
 -- 
-Jazz is not dead. It just smells funny...
+Ard.
