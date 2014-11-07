@@ -1,30 +1,52 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Fri,  7 Nov 2014 15:59:11 +0100
-Subject: [PATCH] arm: ftrace: Adds support for ftrace operations
-Message-ID: <1415372352-15664-1-git-send-email-jjhiblot@traphandler.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 7 Nov 2014 15:03:58 +0000
+Subject: [PATCH 2/2] arm64: kvm: eliminate literal pool entries
+In-Reply-To: <20141107145150.GA18586@cbox>
+References: <1415369554-7444-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1415369554-7444-2-git-send-email-ard.biesheuvel@linaro.org>
+ <545CDACC.5070406@arm.com> <20141107145150.GA18586@cbox>
+Message-ID: <20141107150357.GA6906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Fri, Nov 07, 2014 at 02:51:50PM +0000, Christoffer Dall wrote:
+> On Fri, Nov 07, 2014 at 02:44:28PM +0000, Marc Zyngier wrote:
+> > On 07/11/14 14:12, Ard Biesheuvel wrote:
+> > > Replace two instances of 'ldr xN, =(constant)' in the world switch
+> > > hot path with 'mov' instructions.
+> > > 
+> > > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > > ---
+> > >  arch/arm64/kvm/hyp.S | 4 ++--
+> > >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+> > > index b72aa9f9215c..fbe909fb0a1a 100644
+> > > --- a/arch/arm64/kvm/hyp.S
+> > > +++ b/arch/arm64/kvm/hyp.S
+> > > @@ -761,10 +761,10 @@
+> > >  .macro activate_traps
+> > >  	ldr     x2, [x0, #VCPU_HCR_EL2]
+> > >  	msr     hcr_el2, x2
+> > > -	ldr	x2, =(CPTR_EL2_TTA)
+> > > +	mov	x2, #CPTR_EL2_TTA
+> > >  	msr	cptr_el2, x2
+> > >  
+> > > -	ldr	x2, =(1 << 15)	// Trap CP15 Cr=15
+> > > +	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
+> > >  	msr	hstr_el2, x2
+> > >  
+> > >  	mrs	x2, mdcr_el2
+> > > 
+> > 
+> > Looks good to me.
+> > 
+> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > 
+> Yup, me too:
+> 
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-This patch adds support for ftrace operations on the ARM architecture.
-This support is needed by kgraft and possibly other ftrace-based tools.
-My goal is to have kgraft working on ARM and aarch64.
+Cheers guys, I've applied both patches to the arm64 tree for 3.19.
 
-I tested this patch with a toy implementation of kgraft for ARM and basic
-usage of function and function_graph tracers
-It doesn't show any problem with the ftrace selftests and the tests found
-today in branch ftrace/testing-mystuff of linux-trace repository
-(git://git.kernel.org/pub/scm/linux/kernel/git/rostedt/linux-trace.git)
-
-Jean-Jacques Hiblot (1):
-  arm: ftrace: Adds support for ftrace operations
-
- arch/arm/Kconfig               |  2 ++
- arch/arm/include/asm/ftrace.h  |  3 ++
- arch/arm/kernel/entry-common.S | 68 +++++++++++++++++++++++++++++++++++++++++-
- arch/arm/kernel/ftrace.c       | 34 +++++++++++++++++++++
- 4 files changed, 106 insertions(+), 1 deletion(-)
-
--- 
-2.1.3
+Will
