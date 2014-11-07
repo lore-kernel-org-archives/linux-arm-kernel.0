@@ -1,42 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 7 Nov 2014 09:47:21 +0000
-Subject: [PATCHv0 3/3] rtc: rtc-isl12057: add alarm support to Intersil
- ISL12057 RTC driver
-In-Reply-To: <87ppcznbyv.fsf@natisbad.org>
-References: <cover.1415222752.git.arno@natisbad.org>
- <148403c0ab1d556cbb99d9242c65f714a77843e5.1415222752.git.arno@natisbad.org>
- <20141106055017.GL8509@sirena.org.uk> <87ppcznbyv.fsf@natisbad.org>
-Message-ID: <20141107094721.GY8509@sirena.org.uk>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Fri, 7 Nov 2014 16:45:12 +0800
+Subject: [PATCH V4 1/3] can: add can_is_canfd_skb() API
+Message-ID: <1415349914-9145-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 07, 2014 at 12:30:48AM +0100, Arnaud Ebalard wrote:
-> Mark Brown <broonie@kernel.org> writes:
+The CAN device drivers can use it to check if the frame to send is on
+CAN FD mode or normal CAN mode.
 
-> > None of the alarm functionality checks to see if there's actually an IRQ
-> > - is that OK? I'd at least expect the alarm interrupt enable call to
-> > check if the interrupt is wired up.
+Acked-by: Oliver Hartkopp <socketcan@hartkopp.net>
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
+---
+ChangesLog:
+ * v3->v4: add comments and change prototype a bit
+ * v1->v2: change to skb->len == CANFD_MTU;
+---
+ include/linux/can/dev.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-> I can add those check BUT I would like some directions in order to
-> support the following use case too.
-
-> Current three in-tree users of ISL12057 are NAS devices (Netgear
-> ReadyNAS 102, 104 and 2120). All of them *do not have* the interrupt pin
-> of the RTC chip connected to an interrupt line of the SoC. Nonetheless,
-> the IRQ line of the chip being connected to a PMIC on the board (TI
-> TPS65251 [1] on ReadyNAS 102 and 104, I do not know for ReadyNAS
-> 2120). When the device is off and the alarm rings, the device gets
-> powered on. AFAICT, the IRQ coming on the TPS65251 is not replicated on
-> any line of the SoC.
-
-It's OK to support not having the interrupt, the point is that if there
-isn't an interrupt the driver shouldn't support operations which rely on
-the interrupt to succeed - things like enabling the alarm IRQ for
-example.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141107/f0d88edf/attachment.sig>
+diff --git a/include/linux/can/dev.h b/include/linux/can/dev.h
+index 6992afc..b37ea95 100644
+--- a/include/linux/can/dev.h
++++ b/include/linux/can/dev.h
+@@ -99,6 +99,12 @@ inval_skb:
+ 	return 1;
+ }
+ 
++static inline bool can_is_canfd_skb(const struct sk_buff *skb)
++{
++	/* the CAN specific type of skb is identified by its data length */
++	return skb->len == CANFD_MTU;
++}
++
+ /* get data length from can_dlc with sanitized can_dlc */
+ u8 can_dlc2len(u8 can_dlc);
+ 
+-- 
+1.9.1
