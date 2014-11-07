@@ -1,36 +1,23 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Fri, 07 Nov 2014 09:04:52 +0200
-Subject: N900 modem support in 3.18-rc1
-In-Reply-To: <201411070001.46481@pali>
-References: <20141104205117.GA17606@amd>
- <20141106180335.GA21513@earth.universe> <20141106225005.GA14002@amd>
- <201411070001.46481@pali>
-Message-ID: <545C6F14.8050303@gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 07 Nov 2014 08:26:11 +0100
+Subject: [PATCH] usb: gadget: udc: pxa27x: fix build warning when !OF
+In-Reply-To: <20141106222507.GE27324@saruman> (Felipe Balbi's message of "Thu,
+ 6 Nov 2014 16:25:07 -0600")
+References: <1415249759-6219-1-git-send-email-balbi@ti.com>
+ <545B196F.2020303@zonque.org> <87ppd0xfwo.fsf@free.fr>
+ <20141106221748.GD27324@saruman> <20141106222507.GE27324@saruman>
+Message-ID: <87h9ybxyi4.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Felipe Balbi <balbi@ti.com> writes:
 
-
-On  7.11.2014 01:01, Pali Roh?r wrote:
-
+> On Thu, Nov 06, 2014 at 04:17:48PM -0600, Felipe Balbi wrote:
+>> I seem to have missed that, let me replace the patches and use yours.
 >
-> For voice calls you need:
-> * kernel driver cmt-speech (or it has some new name)
-> * cmt-speech userspace library (communication with kernel)
-> * pulseaudio modules which are using that library
->
-> Freemangordon (Ivaylo Dimitrov, CCed) should know more about it,
-> specially about pulseaudio modules...
->
+> now done.
 
-I have a patch for cmt-speech on top of nokia-modem driver living 
-somewhere on my HDD, but I guess it is better Sebastian to make such a 
-patch (Sebastian, no?).
+Thanks.
 
-About the pulseaudio stuff - we're still in process of REing it, so far 
-there are 2 out of 3 closed Nokia modules ready 
-(https://gitorious.org/pulseaudio-nokia), but the last one, which is the 
-one used for voice calls is still not ready and will take it a while :).
-
-Regards,
-Ivo
+-- 
+Robert
