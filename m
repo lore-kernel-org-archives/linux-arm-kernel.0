@@ -1,46 +1,110 @@
-From: nicoleotsuka@gmail.com (Nicolin Chen)
-Date: Thu, 6 Nov 2014 20:47:34 -0800
-Subject: [PATCH] ARM: dts: imx6qdl-sabresd.dtsi: Fix the microphone route
-In-Reply-To: <CAOMZO5ChyTM2_AnSCbi3R9QXzrCYix_wFHP-5FA-6baBSXVgsA@mail.gmail.com>
-References: <1415105769-5358-1-git-send-email-fabio.estevam@freescale.com>
- <20141104130803.GM10821@tiger>
- <CAOMZO5ChyTM2_AnSCbi3R9QXzrCYix_wFHP-5FA-6baBSXVgsA@mail.gmail.com>
-Message-ID: <20141107044733.GA31643@Alpha>
+From: caesar.wang@rock-chips.com (Caesar Wang)
+Date: Fri,  7 Nov 2014 12:53:27 +0800
+Subject: [PATCH v9 0/3] ARM: rk3288: Add PM Domain support
+Message-ID: <1415336010-31663-1-git-send-email-caesar.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 05, 2014 at 10:16:40AM -0200, Fabio Estevam wrote:
-> On Tue, Nov 4, 2014 at 11:08 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > On Tue, Nov 04, 2014 at 10:56:09AM -0200, Fabio Estevam wrote:
-> >> Since commit e409dfbfccf9a49 ("ASoC: dapm: Add a few supply widget sanity
-> >> checks") the following error is seen:
-> >>
-> >> imx-wm8962 sound: wm8962 <-> 202c000.ssi mapping ok
-> >> imx-wm8962 sound: Connecting non-supply widget to supply widget is not supported (AMIC -> MICBIAS)
-> >> imx-wm8962 sound: ASoC: no dapm match for AMIC --> (null) --> MICBIAS
-> >> imx-wm8962 sound: ASoC: Failed to add route AMIC -> direct -> MICBIAS
-> >
-> > Any regression behind that error message?
-> 
-> Playback works fine, but I am having issues with arecord with or
-> without this patch, so I haven't seen any regression.
-> 
-> Will investigate the arecord problem I am having (maybe it is a
-> alsamixer config issue).
+    Add power domain drivers based on generic power domain for
+    Rockchip platform, and support RK3288.
 
-I just took a test on imx6sx-sdb with the identical AMIC route
-as SabreSD does, but the microphone actually still works even
-if the same link error occurs.
+    https://chromium-review.googlesource.com/#/c/220253/9
+    This is the GPU driver, add the following information in DT,
+    and it can support the PMDOMAIN
 
-So I think the error doesn't break the function on Sabre SD
-either...and the reason should be the dts connecting 'IN3R'
-directly to MICBIAS, which isn't so accurate.
+gpu: gpu at ffa30000 {
+    compatible = "arm,malit764",
+                 "arm,malit76x",
+                 "arm,malit7xx",
+                 "arm,mali-midgard";
+    reg = <0xffa30000 0x10000>;
+    interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+                 <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
+                 <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+    interrupt-names = "JOB", "MMU", "GPU";
+    clocks = <&cru ACLK_GPU>;
+    clock-names = "aclk_gpu";
+    operating-points = <
+                /* KHz uV */
+                100000 800000
+                200000 850000
+                300000 950000
+                400000 1000000
+                600000 1150000
+    >;
+    power-domains = <&power RK3288_PD_GPU>;
+    status = "disabled";
+};
 
-For the patch, I think the configuration on imx6sx-sdb would
-be better.
+Based on:
+    - [PATCH v1 1/4] PM / clock_ops: Add pm_clk_add_clk()
+    http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg735599.html
 
-120                         "AMIC", "MICBIAS",
-121                         "IN3R", "AMIC";
+Changes in v9:
+    - add document decription
+    - fix v8 changes as follows:
+    - This reconciles the v2 and v7 code so that we power domain have
+      lists of clocks they toggle on and off during power transitions and
+      independently from power domains clocks we attach clocks to devices
+      comprising power domain and prepare them so they are turn on and off
+      by runtime PM.
+    - add rockchip_pm_add_one_domain() to control domains.
+    - add pd_start/pd_stop interface to control clocks
+    - add decription for power-doamin node
 
-Thanks
-Nicolin
+Changes in v8:
+    - document go back to v2
+    - This reconciles the v2 and v7 code so that we power domain have
+      lists of clocks they toggle on and off during power transitions and
+      independently from power domains clocks we attach clocks to devices
+      comprising power domain and prepare them so they are turn on and off
+      by runtime PM.
+    - DTS go back to v2
+
+Changes in v7:
+    - Delete unused variables
+
+Changes in v6:
+    - delete pmu_lock
+    - modify dev_lock using mutex
+    - pm_clk_resume(pd->dev) change to pm_clk_resume(ed->dev)
+    - pm_clk_suspend(pd->dev) change to pm_clk_suspend(ed->dev)
+    - add devm_kfree(pd->dev, de) in rockchip_pm_domain_detach_dev
+
+Changes in v5:
+    - delete idle_lock
+    - add timeout in rockchip_pmu_set_idle_request()
+
+Changes in v4:
+    - use list storage dev
+
+Changes in v3:
+    - DT structure has changed
+    - change use pm_clk_resume() and pm_clk_suspend()
+    - Decomposition power-controller, changed to multiple controller
+    (gpu-power-controller, hevc-power-controller)
+
+Changes in v2:
+    - move clocks to "optional"
+    - remove the "pd->pd.of_node = np"
+    - make pd_vio clocks all one entry per line and alphabetize.
+    - power: power-controller move back to pinctrl: pinctrl.
+
+Caesar Wang (3):
+  dt-bindings: add document of Rockchip power domain
+  power-domain: rockchip: add power doamin driver
+  ARM: dts: add rk3288 power-domain node
+
+ .../bindings/arm/rockchip/power_domain.txt         |  48 +++
+ arch/arm/boot/dts/rk3288.dtsi                      |  66 +++
+ arch/arm/mach-rockchip/Kconfig                     |   1 +
+ arch/arm/mach-rockchip/Makefile                    |   1 +
+ arch/arm/mach-rockchip/pm_domains.c                | 469 +++++++++++++++++++++
+ include/dt-bindings/power-domain/rk3288.h          |  11 +
+ 6 files changed, 596 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
+ create mode 100644 arch/arm/mach-rockchip/pm_domains.c
+ create mode 100644 include/dt-bindings/power-domain/rk3288.h
+
+-- 
+1.9.1
