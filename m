@@ -1,61 +1,81 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Fri, 7 Nov 2014 08:48:13 +0800
-Subject: [PATCH v2] mmc: atmel-mci: adopt pinctrl support
-Message-ID: <1415321293-17521-1-git-send-email-wenyou.yang@atmel.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Fri, 07 Nov 2014 09:00:36 +0800
+Subject: [V10 PATCH 2/2] irqchip: gicv2m: Add supports for ARM GICv2m
+ MSI(-X)
+In-Reply-To: <545BA301.8000709@arm.com>
+References: <1415052977-26036-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1415052977-26036-3-git-send-email-suravee.suthikulpanit@amd.com>
+ <5458CE31.3040404@linux.intel.com> <545ABB4C.8010103@amd.com>
+ <545ABF6C.1000308@amd.com> <alpine.DEB.2.11.1411060146050.24960@nanos>
+ <alpine.DEB.2.11.1411061131330.24960@nanos> <545BA301.8000709@arm.com>
+Message-ID: <545C19B4.6040006@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amend the atmel mci pin controller to optionally take a pin control
-handle and set the state of the pins to:
-- "default" on boot, resume and before performing an transfer.
-- "sleep" on suspend().
+On 2014/11/7 0:34, Marc Zyngier wrote:
+> Hi Thomas,
+> 
+> On 06/11/14 10:42, Thomas Gleixner wrote:
+>> On Thu, 6 Nov 2014, Thomas Gleixner wrote:
+>>> On Wed, 5 Nov 2014, Suravee Suthikulanit wrote:
+>>>> On 11/5/2014 6:05 PM, Suravee Suthikulanit wrote:
+>>>>> - Overall, it seems that msi_domain_alloc() could be quite different
+>>>>> across architectures. Would it be possible to declare this function as
+>>>>> weak, and allow arch to override (similar to arch_setup_msi_irq)?
+>>>>
+>>>> Actually, declaring "msi_domain_ops" as non-static, and allow other code to
+>>>> override the .alloc and .free?
+>>>
+>>> Why do you want to do that?
+>>
+>> I know why. Because you want to spare a level of hierarchy. But thats
+>> wrong simply because MSI itself is an interrupt chip at the device
+>> level.
+>>
+>> [ MSI ] ---> [ GIC-MSI ] ---> [ GIC ]
+>>
+>> So the MSI level only cares about the allocation of the virq
+>> space. GIC-MSI allocates out of the bitmap which handles the hard
+>> wired range of MSI capable GIC interrupts and GIC handles the
+>> underlying functionality.
+>>
+>> And this makes a lot of sense, if you think about interrupt
+>> remapping. If ARM ever grows that you simply insert it into the chain:
+>>
+>> [ MSI ] ---> [ Remap] ---> [ GIC-MSI ] ---> [ GIC ]
+> 
+> I think ARM has reached that stage with the ITS block in GICv3:
+> - Each device gets programmed with a set of  "event IDs" ranging from 0
+> to N-1, with N being the number of MSI vectors used by the device
+> - the ITS uses both the device ID (basically the PCI requester ID) and
+> the event ID to parse a set of software-managed tables (think page
+> tables for interrupts).
+> 
+> The x86 remapping thing looks quite similar to that, by reading a couple
+> of pages from the VT-D document.
+> 
+> So the way I understand the layout (and please correct me if I'm wrong,
+> which is certainly the case) is that the MSI domain is entirely generic,
+> allocates the virq, uses Remap as a parent, and uses
+> irq_chip_compose_msi_msg to call into the parent and generate whatever
+> goes into the MSI message.
+Hi Marc,
+	It works exactly in this way:)
 
-This should make it possible to optimize energy usage for the pins
-both for the suspend/resume cycle.
+> 
+> I'm still struggling a bit to see how the remapping layer can access the
+> requester ID. x86 uses the irq_alloc_info to store that (the result of
+> an msi_get_hwirq call), but we don't have an equivalent structure on
+> arm/arm64.
+irq_alloc_info is newly introduced for hierarchy irqdomain on x86.
+Regards!
+Gerry
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
-Hi Ulf,
-
-Thanks a lot.
-
-According to your advice, remove pinctrl_pm_select_default_state(&pdev->dev) from the _probe function.
-
-Best Regards,
-Wenyou Yang
-
- drivers/mmc/host/atmel-mci.c |    5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index 4df1599..a7b59ba 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -39,6 +39,7 @@
- #include <linux/atmel_pdc.h>
- #include <linux/pm.h>
- #include <linux/pm_runtime.h>
-+#include <linux/pinctrl/consumer.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/io.h>
-@@ -2568,6 +2569,8 @@ static int atmci_runtime_suspend(struct device *dev)
- 
- 	clk_disable_unprepare(host->mck);
- 
-+	pinctrl_pm_select_sleep_state(dev);
-+
- 	return 0;
- }
- 
-@@ -2575,6 +2578,8 @@ static int atmci_runtime_resume(struct device *dev)
- {
- 	struct atmel_mci *host = dev_get_drvdata(dev);
- 
-+	pinctrl_pm_select_default_state(dev);
-+
- 	return clk_prepare_enable(host->mck);
- }
- #endif
--- 
-1.7.9.5
+> 
+> I'll try to hack something with my current ITS driver and come back with
+> the results.
+> 
+> Thanks,
+> 
+> 	M.
+> 
