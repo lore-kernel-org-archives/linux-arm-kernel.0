@@ -1,85 +1,58 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 7 Nov 2014 07:59:50 -0500
-Subject: [PATCH 1/2] thermal: armada: Remove support for A375-Z1 SoC
-In-Reply-To: <545CBDEF.6050502@free-electrons.com>
-References: <1415116839-4323-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1415116839-4323-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20141107032619.GD3698@titan.lakedaemon.net>
- <545CBDEF.6050502@free-electrons.com>
-Message-ID: <20141107125950.GK3698@titan.lakedaemon.net>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 07 Nov 2014 13:03:12 +0000
+Subject: [PATCHv3 4/5] arm64: Emulate CP15 Barrier instructions
+In-Reply-To: <20141105145116.GJ32700@e104818-lin.cambridge.arm.com> (Catalin
+ Marinas's message of "Wed, 5 Nov 2014 14:51:17 +0000")
+References: <1414435207-30240-1-git-send-email-punit.agrawal@arm.com>
+ <1414435207-30240-6-git-send-email-punit.agrawal@arm.com>
+ <20141105145116.GJ32700@e104818-lin.cambridge.arm.com>
+Message-ID: <9hhmw83qi27.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ezequiel,
+Catalin Marinas <catalin.marinas@arm.com> writes:
 
-+ Mark, Grant (sorry, thought you were Cc'd on the original patch)
+> On Mon, Oct 27, 2014 at 06:40:06PM +0000, Punit Agrawal wrote:
+>> +static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
+>> +{
+>> +	perf_sw_event(PERF_COUNT_SW_EMULATION_FAULTS, 1, regs, regs->pc);
+>> +
+>> +	switch (arm_check_condition(instr, regs->pstate)) {
+>> +	case ARM_OPCODE_CONDTEST_PASS:
+>> +		break;
+>> +	case ARM_OPCODE_CONDTEST_FAIL:
+>> +		/* Condition failed - return to next instruction */
+>> +		goto ret;
+>> +	case ARM_OPCODE_CONDTEST_UNCOND:
+>> +		/* If unconditional encoding - not a barrier instruction */
+>> +		return -EFAULT;
+>> +	default:
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	switch (aarch32_insn_mcr_extract_crm(instr)) {
+>> +	case 10:
+>> +		/*
+>> +		 * dmb - mcr p15, 0, Rt, c7, c10, 5
+>> +		 * dsb - mcr p15, 0, Rt, c7, c10, 4
+>> +		 */
+>> +		if (aarch32_insn_mcr_extract_opc2(instr) == 5)
+>> +			dmb(sy);
+>> +		else
+>> +			dsb(sy);
+>> +		break;
+>> +	case 5:
+>> +		/*
+>> +		 * isb - mcr p15, 0, Rt, c7, c5, 4
+>> +		 */
+>> +		isb();
+>> +		break;
+>> +	}
+>
+> IIRC we concluded that an isb() isn't needed here as taking an exception
+> or returning from one would act as an instruction barrier.
 
-On Fri, Nov 07, 2014 at 09:41:19AM -0300, Ezequiel Garcia wrote:
-> On 11/07/2014 12:26 AM, Jason Cooper wrote:
-> > Ezequiel,
-> > 
-> > On Tue, Nov 04, 2014 at 01:00:38PM -0300, Ezequiel Garcia wrote:
-> >> The Armada 375 Z1 SoC revision is no longer supported. This commit
-> >> removes the quirk needed for the thermal sensor.
-> >>
-> >> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> >> ---
-> >>  .../devicetree/bindings/thermal/armada-thermal.txt   |  8 --------
-> >>  drivers/thermal/armada_thermal.c                     | 20 --------------------
-> >>  2 files changed, 28 deletions(-)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> >> index 4cf0249..4698e0e 100644
-> >> --- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> >> +++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> >> @@ -5,17 +5,9 @@ Required properties:
-> >>  - compatible:	Should be set to one of the following:
-> >>  		marvell,armada370-thermal
-> >>  		marvell,armada375-thermal
-> >> -		marvell,armada375-z1-thermal
-> >>  		marvell,armada380-thermal
-> >>  		marvell,armadaxp-thermal
-> >>  
-> >> -		Note: As the name suggests, "marvell,armada375-z1-thermal"
-> >> -		applies for the SoC Z1 stepping only. On such stepping
-> >> -		some quirks need to be done and the register offset differs
-> >> -		from the one in the A0 stepping.
-> >> -		The operating system may auto-detect the SoC stepping and
-> >> -		update the compatible and register offsets at runtime.
-> >> -
-> >>  - reg:		Device's register space.
-> >>  		Two entries are expected, see the examples below.
-> >>  		The first one is required for the sensor register;
-> > 
-> > I've no problem with removing support for the z1 stepping from the
-> > kernel.  However, I don't think we should erase it from binding docs.
-> > I'm not sure what the DT maintainers think is the appropriate action
-> > here, but I'm thinking we could add a 'Deprecated' section at the end of
-> > the doc and move these hunks there.  With a little rewording of course.
-> > 
-> > I'm primarily concerned about users with older dtbs looking to upgrade,
-> > "Hey, wtf is marvell,armada375-z1-thermal?  I looked in the binding docs
-> > and there's nothing there, do I replace it with marvell,armada375-thermal?"
-> > 
-> 
-> We can do that if you think it's really useful. However, I think we've
-> designed this so *nobody* would actually have to put the z1 compatible
-> string. The mvebu quirk (tries) to auto-detect it from the revision
-> register and hot fix the compatible string.
-> 
-> Moreover, I'm not at all sure *anyone* would have a Z1 board except
-> early developers like us. Am I being too naive here?
+I don't remember what the conclusion was - the isb was introduced to err
+on the side of caution. I've removed it now.
 
-I'm primarily concerned about dtbs in the wild which have that
-compatible string.  But as you mention, and a quick grep proves, this
-compatible string was never in a dts{i} file.  At least not in the
-kernel tree.
-
-It's not a rush, so I'd like to hear from Mark/Grant what they prefer
-for this sort of situation.  It'll be in the git history either way, but
-not everyone goes there when the current docs don't mention something.
-:)
-
-thx,
-
-Jason.
+Thanks.
