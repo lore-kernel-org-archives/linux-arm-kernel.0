@@ -1,98 +1,86 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Fri, 07 Nov 2014 08:44:05 +0100
-Subject: [PATCH v13 3/7] KVM: x86: flush TLBs last before returning from
- KVM_GET_DIRTY_LOG
-In-Reply-To: <1415320848-13813-4-git-send-email-m.smarduch@samsung.com>
-References: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
- <1415320848-13813-4-git-send-email-m.smarduch@samsung.com>
-Message-ID: <545C7845.9010103@redhat.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri,  7 Nov 2014 16:47:23 +0900
+Subject: [RFC] ptrace: add generic SET_SYSCALL request
+Message-ID: <1415346443-28915-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds a new generic ptrace request, PTRACE_SET_SYSCALL.
+It can be used to change a system call number as follows:
+    ret = ptrace(pid, PTRACE_SET_SYSCALL, null, new_syscall_no);
+'new_syscall_no' can be -1 to skip this system call, you need to modify
+a register's value, in arch-specific way, as return value though.
 
+Please note that we can't define PTRACE_SET_SYSCALL macro in
+uapi/linux/ptrace.h partly because its value on arm, 23, is used as another
+request on sparc.
 
-On 07/11/2014 01:40, Mario Smarduch wrote:
-> In the next patches, we will move parts of x86's kvm_vm_ioctl_get_dirty_log
-> implementation to generic code; leave the arch-specific code at the end,
-> similar to the existing generic function kvm_get_dirty_log.
-> 
-> Reviewed-by: Mario Smarduch <m.smarduch@samsung.com>
-> Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
+This patch also contains an example of change on arch side, arm.
+Only syscall_set_nr() is required to be defined in asm/syscall.h.
 
-You should have a "Signed-off-by: Mario Smarduch ..." here, and you 
-should also add my authorship.  You can do the latter with "git rebase 
--i", adding
+Currently only arm has this request, while arm64 would also have it
+once my patch series of seccomp for arm64 is merged. It will also be
+usable for most of other arches.
+See the discussions in lak-ml:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/300167.html
 
-  x git commit --amend -C HEAD --author 'Paolo Bonzini <pbonzini@redhat.com>'
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+ arch/arm/include/asm/syscall.h |    7 +++++++
+ arch/arm/kernel/ptrace.c       |    5 -----
+ kernel/ptrace.c                |    6 ++++++
+ 3 files changed, 13 insertions(+), 5 deletions(-)
 
-after this patch.  If you're using a patch queue instead (quilt or
-similar) you can just edit the "From" line in the patch.
-
-I guess if you reply to the patch with just
-
-   Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-
-the ARM maintainers can do the above for you, if there's no need for
-a v14.
-
-I'll send an eighth patch to actually switch x86 to the new function.
-Again, the maintainers can apply it in the right place, but please
-include it yourself if you have to do a v14.
-
-Thanks,
-
-Paolo
-
-> ---
->  arch/x86/kvm/x86.c |   22 ++++++++++------------
->  1 file changed, 10 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
-> index 8f1e22d..dc8e66b 100644
-> --- a/arch/x86/kvm/x86.c
-> +++ b/arch/x86/kvm/x86.c
-> @@ -3606,13 +3606,13 @@ static int kvm_vm_ioctl_reinject(struct kvm *kvm,
->   *
->   *   1. Take a snapshot of the bit and clear it if needed.
->   *   2. Write protect the corresponding page.
-> - *   3. Flush TLB's if needed.
-> - *   4. Copy the snapshot to the userspace.
-> + *   3. Copy the snapshot to the userspace.
-> + *   4. Flush TLB's if needed.
->   *
-> - * Between 2 and 3, the guest may write to the page using the remaining TLB
-> - * entry.  This is not a problem because the page will be reported dirty at
-> - * step 4 using the snapshot taken before and step 3 ensures that successive
-> - * writes will be logged for the next call.
-> + * Between 2 and 4, the guest may write to the page using the remaining TLB
-> + * entry.  This is not a problem because the page is reported dirty using
-> + * the snapshot taken before and step 4 ensures that writes done after
-> + * exiting to userspace will be logged for the next call.
->   */
->  int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
->  {
-> @@ -3661,6 +3661,10 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
->  
->  	spin_unlock(&kvm->mmu_lock);
->  
-> +	r = 0;
-> +	if (copy_to_user(log->dirty_bitmap, dirty_bitmap_buffer, n))
-> +		r = -EFAULT;
-> +
->  	/* See the comments in kvm_mmu_slot_remove_write_access(). */
->  	lockdep_assert_held(&kvm->slots_lock);
->  
-> @@ -3670,12 +3674,6 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
->  	 */
->  	if (is_dirty)
->  		kvm_flush_remote_tlbs(kvm);
-> -
-> -	r = -EFAULT;
-> -	if (copy_to_user(log->dirty_bitmap, dirty_bitmap_buffer, n))
-> -		goto out;
-> -
-> -	r = 0;
->  out:
->  	mutex_unlock(&kvm->slots_lock);
->  	return r;
-> 
+diff --git a/arch/arm/include/asm/syscall.h b/arch/arm/include/asm/syscall.h
+index e86c985..3e1d9c0 100644
+--- a/arch/arm/include/asm/syscall.h
++++ b/arch/arm/include/asm/syscall.h
+@@ -24,6 +24,13 @@ static inline int syscall_get_nr(struct task_struct *task,
+ 	return task_thread_info(task)->syscall;
+ }
+ 
++static inline int syscall_set_nr(struct task_struct *task,
++				 struct pt_regs *regs, int syscall)
++{
++	task_thread_info(task)->syscall = syscall;
++	return 0;
++}
++
+ static inline void syscall_rollback(struct task_struct *task,
+ 				    struct pt_regs *regs)
+ {
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index ef9119f..908bae8 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -853,11 +853,6 @@ long arch_ptrace(struct task_struct *child, long request,
+ 				       datap);
+ 			break;
+ 
+-		case PTRACE_SET_SYSCALL:
+-			task_thread_info(child)->syscall = data;
+-			ret = 0;
+-			break;
+-
+ #ifdef CONFIG_CRUNCH
+ 		case PTRACE_GETCRUNCHREGS:
+ 			ret = ptrace_getcrunchregs(child, datap);
+diff --git a/kernel/ptrace.c b/kernel/ptrace.c
+index 54e7522..d7048fa 100644
+--- a/kernel/ptrace.c
++++ b/kernel/ptrace.c
+@@ -1001,6 +1001,12 @@ int ptrace_request(struct task_struct *child, long request,
+ 		break;
+ 	}
+ #endif
++
++#ifdef PTRACE_SET_SYSCALL
++	case PTRACE_SET_SYSCALL:
++		ret = syscall_set_nr(child, task_pt_regs(child), data);
++		break;
++#endif
+ 	default:
+ 		break;
+ 	}
+-- 
+1.7.9.5
