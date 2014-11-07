@@ -1,149 +1,87 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 6 Nov 2014 21:44:50 -0400
-Subject: [PATCH 04/21] thermal: of: Extend current of-thermal.c code to
- allow setting emulated temp
-In-Reply-To: <1412872737-624-5-git-send-email-l.majewski@samsung.com>
-References: <1412872737-624-1-git-send-email-l.majewski@samsung.com>
- <1412872737-624-5-git-send-email-l.majewski@samsung.com>
-Message-ID: <20141107014448.GE10180@developer>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 6 Nov 2014 17:57:28 -0800
+Subject: [PATCH v17 1/5] thermal: rockchip: add driver for thermal
+In-Reply-To: <20141107013017.GA10180@developer>
+References: <1414809873-32227-1-git-send-email-caesar.wang@rock-chips.com>
+ <1414809873-32227-2-git-send-email-caesar.wang@rock-chips.com>
+ <20141107013017.GA10180@developer>
+Message-ID: <20141107015728.GF34214@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Eduardo,
 
-On Thu, Oct 09, 2014 at 06:38:40PM +0200, Lukasz Majewski wrote:
-> Before this change it was only possible to set get_temp() and get_trend()
-> methods to be used in the common code handling passing parameters via
-> device tree to "cpu-thermal" CPU thermal zone device.
+On Thu, Nov 06, 2014 at 09:30:20PM -0400, Eduardo Valentin wrote:
+> Hello Caesar,
 > 
-> Now it is possible to also set emulated value of temperature for debug
-> purposes.
+> On Sat, Nov 01, 2014 at 10:44:29AM +0800, Caesar Wang wrote:
+> > Thermal is TS-ADC Controller module supports
+> > user-defined mode and automatic mode.
+> > 
+> > User-defined mode refers,TSADC all the control signals entirely by
+> > software writing to register for direct control.
+> > 
+> > Automaic mode refers to the module automatically poll TSADC output,
+> > and the results were checked.If you find that the temperature High
+> > in a period of time,an interrupt is generated to the processor
+> > down-measures taken;If the temperature over a period of time High,
+> > the resulting TSHUT gave CRU module,let it reset the entire chip,
+> > or via GPIO give PMIC.
+> > 
 > 
-> Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
-> ---
->  drivers/thermal/of-thermal.c | 25 ++++++++++++++++++++++---
->  include/linux/thermal.h      |  6 ++++--
->  2 files changed, 26 insertions(+), 5 deletions(-)
+> First thing, very good progress in this driver! 
 > 
-> diff --git a/drivers/thermal/of-thermal.c b/drivers/thermal/of-thermal.c
-> index cd74e64..f206375 100644
-> --- a/drivers/thermal/of-thermal.c
-> +++ b/drivers/thermal/of-thermal.c
-> @@ -98,10 +98,22 @@ struct __thermal_zone {
->  	void *sensor_data;
->  	int (*get_temp)(void *, long *);
->  	int (*get_trend)(void *, long *);
-> +	int (*set_emul_temp)(void *, unsigned long);
->  };
->  
->  /***   DT thermal zone device callbacks   ***/
->  
-> +static int of_thermal_set_emul_temp(struct thermal_zone_device *tz,
-> +				    unsigned long temp)
-> +{
-> +	struct __thermal_zone *data = tz->devdata;
-> +
-> +	if (!data->set_emul_temp)
-> +		return -EINVAL;
-> +
-> +	return data->set_emul_temp(data->sensor_data, temp);
-> +}
-> +
->  static int of_thermal_get_temp(struct thermal_zone_device *tz,
->  			       unsigned long *temp)
->  {
-> @@ -352,7 +364,8 @@ static struct thermal_zone_device *
->  thermal_zone_of_add_sensor(struct device_node *zone,
->  			   struct device_node *sensor, void *data,
->  			   int (*get_temp)(void *, long *),
-> -			   int (*get_trend)(void *, long *))
-> +			   int (*get_trend)(void *, long *),
-> +			   int (*set_emul_temp)(void *, unsigned long))
+> > Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
+> > Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+> > Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> 
+> Just for the sake of code / documentation history, this patch, which
+> adds the driver, should come after patch 2, which adds dt documentation.
+> 
+> > ---
+> >  drivers/thermal/Kconfig            |   9 +
+> >  drivers/thermal/Makefile           |   1 +
+> >  drivers/thermal/rockchip_thermal.c | 711 +++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 721 insertions(+)
+> >  create mode 100644 drivers/thermal/rockchip_thermal.c
+> 
+> <big cut>
+> 
+> > +static int
+> > +rockchip_thermal_register_sensor(struct platform_device *pdev,
+> > +				 struct rockchip_thermal_data *thermal,
+> > +				 struct rockchip_thermal_sensor *sensor,
+> > +				 enum sensor_id id)
+> > +{
+> > +	const struct rockchip_tsadc_chip *tsadc = thermal->chip;
+> > +	int error;
+> > +
+> > +	tsadc->set_tshut_mode(id, thermal->regs, thermal->tshut_mode);
+> > +	tsadc->set_tshut_temp(id, thermal->regs, thermal->tshut_temp);
+> > +
+> > +	sensor->thermal = thermal;
+> > +	sensor->id = id;
+> > +	sensor->tzd = thermal_zone_of_sensor_register(&pdev->dev, id, sensor,
+> > +						rockchip_thermal_get_temp,
+> > +						NULL,
+> > +						rockchip_thermal_set_trips);
+> 
+> So, did I miss something here? Looks like you have extended the of
+> thermal, and I haven't seen the patch.
+>   CC [M]  drivers/thermal/rockchip_thermal.o
+>   drivers/thermal/rockchip_thermal.c: In function
+>   `rockchip_thermal_register_sensor':
+>   drivers/thermal/rockchip_thermal.c:482:7: error: too many arguments to
+>   function `thermal_zone_of_sensor_register'
+>          rockchip_thermal_set_trips);
 
-Thanks for improving the API. However, looking at what is above, it
-starts to be pretty ugly. And for sure, this is not the last callback to
-be added. I believe it is time to add a .ops in the of-thermal. While in
-here, do you mind adding the .ops in a separated patch, then add the
-.set_emul_temp in the .ops field?
+Yes, it relies on patch by Mikko Perttunen adding support for
+hardware-supported trip points. It allows us to reduce polling frequency
+while still being able to react when we cross the tripping point.
 
->  {
->  	struct thermal_zone_device *tzd;
->  	struct __thermal_zone *tz;
-> @@ -366,10 +379,12 @@ thermal_zone_of_add_sensor(struct device_node *zone,
->  	mutex_lock(&tzd->lock);
->  	tz->get_temp = get_temp;
->  	tz->get_trend = get_trend;
-> +	tz->set_emul_temp = set_emul_temp;
->  	tz->sensor_data = data;
->  
->  	tzd->ops->get_temp = of_thermal_get_temp;
->  	tzd->ops->get_trend = of_thermal_get_trend;
-> +	tzd->ops->set_emul_temp = of_thermal_set_emul_temp;
->  	mutex_unlock(&tzd->lock);
->  
->  	return tzd;
-> @@ -411,7 +426,8 @@ thermal_zone_of_add_sensor(struct device_node *zone,
->  struct thermal_zone_device *
->  thermal_zone_of_sensor_register(struct device *dev, int sensor_id,
->  				void *data, int (*get_temp)(void *, long *),
-> -				int (*get_trend)(void *, long *))
-> +				int (*get_trend)(void *, long *),
-> +				int (*set_emul_temp)(void *, unsigned long))
->  {
->  	struct device_node *np, *child, *sensor_np;
->  
-> @@ -453,7 +469,8 @@ thermal_zone_of_sensor_register(struct device *dev, int sensor_id,
->  			return thermal_zone_of_add_sensor(child, sensor_np,
->  							  data,
->  							  get_temp,
-> -							  get_trend);
-> +							  get_trend,
-> +							  set_emul_temp);
->  		}
->  	}
->  	of_node_put(np);
-> @@ -494,9 +511,11 @@ void thermal_zone_of_sensor_unregister(struct device *dev,
->  	mutex_lock(&tzd->lock);
->  	tzd->ops->get_temp = NULL;
->  	tzd->ops->get_trend = NULL;
-> +	tzd->ops->set_emul_temp = NULL;
->  
->  	tz->get_temp = NULL;
->  	tz->get_trend = NULL;
-> +	tz->set_emul_temp = NULL;
->  	tz->sensor_data = NULL;
->  	mutex_unlock(&tzd->lock);
->  }
-> diff --git a/include/linux/thermal.h b/include/linux/thermal.h
-> index 0305cde..36010e9 100644
-> --- a/include/linux/thermal.h
-> +++ b/include/linux/thermal.h
-> @@ -290,14 +290,16 @@ struct thermal_genl_event {
->  struct thermal_zone_device *
->  thermal_zone_of_sensor_register(struct device *dev, int id,
->  				void *data, int (*get_temp)(void *, long *),
-> -				int (*get_trend)(void *, long *));
-> +				int (*get_trend)(void *, long *),
-> +				int (*set_emul_temp)(void *, unsigned long));
->  void thermal_zone_of_sensor_unregister(struct device *dev,
->  				       struct thermal_zone_device *tz);
->  #else
->  static inline struct thermal_zone_device *
->  thermal_zone_of_sensor_register(struct device *dev, int id,
->  				void *data, int (*get_temp)(void *, long *),
-> -				int (*get_trend)(void *, long *))
-> +				int (*get_trend)(void *, long *),
-> +				int (*set_emul_temp)(void *, unsigned long))
->  {
->  	return NULL;
->  }
-> -- 
-> 2.0.0.rc2
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141106/f8997fc6/attachment.sig>
+See https://lkml.org/lkml/2014/6/27/76
+
+Thanks.
+
+-- 
+Dmitry
