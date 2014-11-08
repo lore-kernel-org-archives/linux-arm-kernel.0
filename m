@@ -1,29 +1,45 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Sat, 08 Nov 2014 08:28:50 +0100
-Subject: [PATCH v13 6/7] arm: KVM: dirty log read write protect support
-In-Reply-To: <545D21BE.2020203@samsung.com>
-References: <1415320848-13813-1-git-send-email-m.smarduch@samsung.com>
- <1415320848-13813-7-git-send-email-m.smarduch@samsung.com>
- <545C76E9.5090700@redhat.com> <545D21BE.2020203@samsung.com>
-Message-ID: <545DC632.6020002@redhat.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Sat, 8 Nov 2014 09:18:51 +0000
+Subject: [PATCH v3 06/10] [media] platform: Make use of media_bus_format
+ enum
+In-Reply-To: <1415369269-5064-7-git-send-email-boris.brezillon@free-electrons.com>
+References: <1415369269-5064-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1415369269-5064-7-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <CA+V-a8t79gYYGcgg5wvM-eqW8H2D6WD7xM9t2Px=WHb2rf34ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+Thanks for the patch,
 
-On 07/11/2014 20:47, Mario Smarduch wrote:
->> That can happen if the error occurred in the final
->> copy to userspace, after page tables have been modified.
+On Fri, Nov 7, 2014 at 2:07 PM, Boris Brezillon
+<boris.brezillon@free-electrons.com> wrote:
+> In order to have subsytem agnostic media bus format definitions we've
+> moved media bus definition to include/uapi/linux/media-bus-format.h and
+> prefixed values with MEDIA_BUS_FMT instead of V4L2_MBUS_FMT.
 >
-> Upon error return userspace should terminate logging, error out whether
-> used for migration or other use cases, with some stale spte TLBs cached
-> read/write, which doesn't appear to be harmful.
+> Reference new definitions in all platform drivers.
+>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  arch/arm/mach-davinci/board-dm355-evm.c            |   2 +-
+>  arch/arm/mach-davinci/board-dm365-evm.c            |   4 +-
+>  arch/arm/mach-davinci/dm355.c                      |   7 +-
+>  arch/arm/mach-davinci/dm365.c                      |   7 +-
 
-Fair enough; for x86 I elected to always do the TLB flush, but you can
-do it differently.  Perhaps add a comment with the above paragraph, thouhg.
+@Sekhar can you ack for the machine changes for davinci ?
 
-> But you mention 'final copy' which makes me think I'm missing something?
+[Snip]
+>  drivers/media/platform/davinci/vpbe.c              |   2 +-
+>  drivers/media/platform/davinci/vpfe_capture.c      |   4 +-
+[snip]
+>  include/media/davinci/vpbe.h                       |   2 +-
+>  include/media/davinci/vpbe_venc.h                  |   5 +-
 
-I meant final copy before leaving the function.
+For all the above.
 
-Paolo
+Acked-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+
+Thanks,
+--Prabhakar Lad
