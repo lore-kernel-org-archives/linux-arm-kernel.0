@@ -1,86 +1,67 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sat,  8 Nov 2014 16:47:12 +0100
-Subject: [PATCH v5 10/10] [media] v4l: Forbid usage of V4L2_MBUS_FMT
- definitions inside the kernel
-In-Reply-To: <1415369269-5064-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1415369269-5064-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1415461632-31236-1-git-send-email-boris.brezillon@free-electrons.com>
+From: dubepankaj1980@gmail.com (Pankaj Dubey)
+Date: Sat, 8 Nov 2014 21:26:33 +0530
+Subject: [PATCH v2 3/6] drivers: soc: samsung: Fix a spelling mistake
+In-Reply-To: <1415452601-13078-4-git-send-email-amit.daniel@samsung.com>
+References: <1415452601-13078-1-git-send-email-amit.daniel@samsung.com>
+ <1415452601-13078-4-git-send-email-amit.daniel@samsung.com>
+Message-ID: <CAGcde9Fctk+XBxLV4VbevU4W7EYW+-it+T3qn3wg=v=b5ykJzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Place v4l2_mbus_pixelcode in a #ifndef __KERNEL__ section so that kernel
-users don't have access to these definitions.
+Hi Amit,
 
-We have to keep this definition for user-space users even though they're
-encouraged to move to the new media_bus_format enum.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
----
- include/uapi/linux/v4l2-mediabus.h | 45 ++++++++++++++++++++++++--------------
- 1 file changed, 28 insertions(+), 17 deletions(-)
+On 8 November 2014 18:46, Amit Daniel Kachhap <amit.daniel@samsung.com> wrote:
+> This patches changes the name of exynos5_list_diable_wfi_wfe to
+> exynos5_list_disable_wfi_wfe.
+>
 
-diff --git a/include/uapi/linux/v4l2-mediabus.h b/include/uapi/linux/v4l2-mediabus.h
-index d712df8..5c9410d 100644
---- a/include/uapi/linux/v4l2-mediabus.h
-+++ b/include/uapi/linux/v4l2-mediabus.h
-@@ -15,6 +15,33 @@
- #include <linux/types.h>
- #include <linux/videodev2.h>
- 
-+/**
-+ * struct v4l2_mbus_framefmt - frame format on the media bus
-+ * @width:	frame width
-+ * @height:	frame height
-+ * @code:	data format code (from enum v4l2_mbus_pixelcode)
-+ * @field:	used interlacing type (from enum v4l2_field)
-+ * @colorspace:	colorspace of the data (from enum v4l2_colorspace)
-+ */
-+struct v4l2_mbus_framefmt {
-+	__u32			width;
-+	__u32			height;
-+	__u32			code;
-+	__u32			field;
-+	__u32			colorspace;
-+	__u32			reserved[7];
-+};
-+
-+#ifndef __KERNEL__
-+/*
-+ * enum v4l2_mbus_pixelcode and its definitions are now deprecated, and
-+ * MEDIA_BUS_FMT_ definitions (defined in media-bus-format.h) should be
-+ * used instead.
-+ *
-+ * New defines should only be added to media-bus-format.h. The
-+ * v4l2_mbus_pixelcode enum is frozen.
-+ */
-+
- #define V4L2_MBUS_FROM_MEDIA_BUS_FMT(name)	\
- 	MEDIA_BUS_FMT_ ## name = V4L2_MBUS_FMT_ ## name
- 
-@@ -102,22 +129,6 @@ enum v4l2_mbus_pixelcode {
- 
- 	V4L2_MBUS_FROM_MEDIA_BUS_FMT(AHSV8888_1X32),
- };
--
--/**
-- * struct v4l2_mbus_framefmt - frame format on the media bus
-- * @width:	frame width
-- * @height:	frame height
-- * @code:	data format code (from enum v4l2_mbus_pixelcode)
-- * @field:	used interlacing type (from enum v4l2_field)
-- * @colorspace:	colorspace of the data (from enum v4l2_colorspace)
-- */
--struct v4l2_mbus_framefmt {
--	__u32			width;
--	__u32			height;
--	__u32			code;
--	__u32			field;
--	__u32			colorspace;
--	__u32			reserved[7];
--};
-+#endif /* __KERNEL__ */
- 
- #endif
--- 
-1.9.1
+Same change I have posted earlier [1] and Kukjin has taken same in his for-next.
+
+1: http://www.spinics.net/lists/arm-kernel/msg372742.html
+
+Thanks,
+Pankaj Dubey
+
+
+> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> ---
+>  drivers/soc/samsung/exynos-pmu.c |    8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/soc/samsung/exynos-pmu.c b/drivers/soc/samsung/exynos-pmu.c
+> index 35774e8..3832cda 100644
+> --- a/drivers/soc/samsung/exynos-pmu.c
+> +++ b/drivers/soc/samsung/exynos-pmu.c
+> @@ -361,7 +361,7 @@ static unsigned int const exynos5_list_both_cnt_feed[] = {
+>         EXYNOS5_TOP_PWR_SYSMEM_OPTION,
+>  };
+>
+> -static unsigned int const exynos5_list_diable_wfi_wfe[] = {
+> +static unsigned int const exynos5_list_disable_wfi_wfe[] = {
+>         EXYNOS5_ARM_CORE1_OPTION,
+>         EXYNOS5_FSYS_ARM_OPTION,
+>         EXYNOS5_ISP_ARM_OPTION,
+> @@ -392,11 +392,11 @@ static void exynos5_powerdown_conf(enum sys_powerdown mode)
+>         /*
+>          * Disable WFI/WFE on XXX_OPTION
+>          */
+> -       for (i = 0; i < ARRAY_SIZE(exynos5_list_diable_wfi_wfe); i++) {
+> -               tmp = pmu_raw_readl(exynos5_list_diable_wfi_wfe[i]);
+> +       for (i = 0; i < ARRAY_SIZE(exynos5_list_disable_wfi_wfe); i++) {
+> +               tmp = pmu_raw_readl(exynos5_list_disable_wfi_wfe[i]);
+>                 tmp &= ~(EXYNOS5_OPTION_USE_STANDBYWFE |
+>                          EXYNOS5_OPTION_USE_STANDBYWFI);
+> -               pmu_raw_writel(tmp, exynos5_list_diable_wfi_wfe[i]);
+> +               pmu_raw_writel(tmp, exynos5_list_disable_wfi_wfe[i]);
+>         }
+>  }
+>
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
