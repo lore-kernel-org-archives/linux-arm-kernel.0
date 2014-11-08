@@ -1,104 +1,60 @@
 From: amit.daniel@samsung.com (Amit Daniel Kachhap)
-Date: Sat, 08 Nov 2014 18:46:39 +0530
-Subject: [PATCH v2 4/6] soc: samsung: exynos-pmu: Register exynos-pmu driver as
- a mfd driver
+Date: Sat, 08 Nov 2014 18:46:40 +0530
+Subject: [PATCH v2 5/6] driver: soc: exynos-pmu: Add an API to be called after
+ wakeup
 In-Reply-To: <1415452601-13078-1-git-send-email-amit.daniel@samsung.com>
 References: <1415452601-13078-1-git-send-email-amit.daniel@samsung.com>
-Message-ID: <1415452601-13078-5-git-send-email-amit.daniel@samsung.com>
+Message-ID: <1415452601-13078-6-git-send-email-amit.daniel@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This can be used later to probe and configure PMU client drivers
-like pm domain, pm sleep etc. A global structure pmu_dev_client_data is
-created to pass exynos-pmu platform data to all the clients. Currently
-the data passed is register base addresses.
-Although the exynos-pmu driver also provides the sysreg interfaces to
-provide register base addresses but this is costlier than readl/writel,
-so both the interfaces are provided to mfd based exynos-pmu client
-drivers.
+This patch adds an API exynos_sys_powerup_conf to be called
+after system sleep wakeup. This is similar to currently existing API
+exynos_sys_powerdown_conf.
 
 Reviewed-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
 ---
- drivers/soc/samsung/exynos-pmu.c       |   24 ++++++++++++++++++++++++
- include/linux/soc/samsung/exynos-pmu.h |    5 +++++
- 2 files changed, 29 insertions(+)
+ drivers/soc/samsung/exynos-pmu.c       |    9 +++++++++
+ include/linux/soc/samsung/exynos-pmu.h |    1 +
+ 2 files changed, 10 insertions(+)
 
 diff --git a/drivers/soc/samsung/exynos-pmu.c b/drivers/soc/samsung/exynos-pmu.c
-index 3832cda..4a5eb50 100644
+index 4a5eb50..a73c1ea 100644
 --- a/drivers/soc/samsung/exynos-pmu.c
 +++ b/drivers/soc/samsung/exynos-pmu.c
-@@ -12,11 +12,17 @@
- #include <linux/io.h>
- #include <linux/of.h>
- #include <linux/platform_device.h>
-+#include <linux/mfd/core.h>
- #include <linux/soc/samsung/exynos-regs-pmu.h>
- #include <linux/soc/samsung/exynos-pmu.h>
+@@ -34,6 +34,7 @@ struct exynos_pmu_data {
  
- #define PMU_TABLE_END	(-1U)
- 
-+enum pmu_mfd_list {
-+	MFD_POWER_DOMAIN,
-+	MFD_MAX,
-+};
-+
- struct exynos_pmu_conf {
- 	unsigned int offset;
- 	unsigned int val[NUM_SYS_POWERDOWN];
-@@ -33,6 +39,8 @@ struct exynos_pmu_data {
- struct exynos_pmu_context {
- 	struct device *dev;
- 	const struct exynos_pmu_data *pmu_data;
-+	struct mfd_cell cells[MFD_MAX];
-+	struct pmu_dev_client_data mfd_data;
+ 	void (*pmu_init)(void);
+ 	void (*powerdown_conf)(enum sys_powerdown);
++	void (*powerup_conf)(enum sys_powerdown);
  };
  
- static void __iomem *pmu_base_addr;
-@@ -482,6 +490,8 @@ static int exynos_pmu_probe(struct platform_device *pdev)
- 	const struct of_device_id *match;
- 	struct device *dev = &pdev->dev;
- 	struct resource *res;
-+	struct mfd_cell *cell;
-+	int ret;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	pmu_base_addr = devm_ioremap_resource(dev, res);
-@@ -506,6 +516,20 @@ static int exynos_pmu_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, pmu_context);
- 
-+	/* Initialize and invoke mfd clients */
-+	cell = &pmu_context->cells[MFD_POWER_DOMAIN];
-+	cell->name = "exynos-pmu-sleep";
-+	pmu_context->mfd_data.mem_base_addr = pmu_base_addr;
-+	pmu_context->mfd_data.mem_size = resource_size(res);
-+	cell->platform_data = &pmu_context->mfd_data;
-+	cell->pdata_size = sizeof(pmu_context->mfd_data);
-+	ret = mfd_add_devices(&pdev->dev, pdev->id, pmu_context->cells, MFD_MAX,
-+				NULL, 0, NULL);
-+	if (ret) {
-+		dev_err(&pdev->dev, "fail to register client devices\n");
-+		return ret;
-+	}
-+
- 	dev_dbg(dev, "Exynos PMU Driver probe done\n");
- 	return 0;
+ struct exynos_pmu_context {
+@@ -430,6 +431,14 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
+ 	}
  }
+ 
++void exynos_sys_powerup_conf(enum sys_powerdown mode)
++{
++	const struct exynos_pmu_data *pmu_data = pmu_context->pmu_data;
++
++	if (pmu_data->powerup_conf)
++		pmu_data->powerup_conf(mode);
++}
++
+ static void exynos5250_pmu_init(void)
+ {
+ 	unsigned int value;
 diff --git a/include/linux/soc/samsung/exynos-pmu.h b/include/linux/soc/samsung/exynos-pmu.h
-index a2ab0d5..d2f4083 100644
+index d2f4083..9a4b833 100644
 --- a/include/linux/soc/samsung/exynos-pmu.h
 +++ b/include/linux/soc/samsung/exynos-pmu.h
-@@ -19,6 +19,11 @@ enum sys_powerdown {
- 	NUM_SYS_POWERDOWN,
+@@ -25,5 +25,6 @@ struct pmu_dev_client_data {
  };
  
-+struct pmu_dev_client_data {
-+	void __iomem *mem_base_addr;
-+	unsigned int mem_size;
-+};
-+
  extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
++extern void exynos_sys_powerup_conf(enum sys_powerdown mode);
  
  #endif /* __EXYNOS_PMU_H */
 -- 
