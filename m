@@ -1,104 +1,69 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 8 Nov 2014 13:39:04 +0100
-Subject: [RFC PATCH 0/6] ARM64: KVM: PMU infrastructure support
-In-Reply-To: <CAAhSdy3CPMdK9+_FesKuJaPt9=VVHsnw=DQO5UQUVNm1aPuZNg@mail.gmail.com>
-References: <1407230655-28864-1-git-send-email-anup.patel@linaro.org>
- <20141107202502.GJ22848@cbox>
- <CAAhSdy3CPMdK9+_FesKuJaPt9=VVHsnw=DQO5UQUVNm1aPuZNg@mail.gmail.com>
-Message-ID: <CAMJs5B8VqS2-3dhSX+PBaQruzyXiYwaYRQ7vvWEMrHbvbjn+9A@mail.gmail.com>
+From: amit.daniel@samsung.com (Amit Daniel Kachhap)
+Date: Sat, 08 Nov 2014 18:46:35 +0530
+Subject: [PATCH v2 0/6] exynos: Move pmu driver to driver/soc folder and add
+ exynos7 support
+Message-ID: <1415452601-13078-1-git-send-email-amit.daniel@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yes, sounds good.  I will review RFC v2 then.
+This patch series[1 - 6] performs,
 
--Christoffer
+1) Moves pmu driver to driver/soc/samsung folder. Some discussion happened about
+   this in the v1 version. Finally adding it in driver/soc folder as it too SoC
+   specific and not a general driver. Entire discussion can be found here (A).
+2) Registers this driver as MFD client driver. This will be used by clients like exynos pm
+   sleep and pm domain driver.
+3) Add exynos7 PMU support.
 
-On Sat, Nov 8, 2014 at 10:36 AM, Anup Patel <anup@brainfault.org> wrote:
-> Hi Christoffer,
->
-> On Sat, Nov 8, 2014 at 1:55 AM, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
->> Hi Anup,
->>
->> [This time to the new email]
->>
->> What are your plans in terms of follow-up on this one?
->
-> Actually, I am already working on RFC v2. I will send-out
-> RFC v2 sometime next time.
->
-> This RFC v2 will be RFC v1 based upon Marc's IRQ
-> forwarding patchset.
->
-> I will try to address PMU context switching for KVM ARM
-> in RFC v3. Does this sound OK?
->
-> Regards,
-> Anup
->
->>
->> Should we review these patches and reply to anup _at_ brainfaul.org or
->> are you looking for someone else to pick them up?
->>
->> Thanks,
->> -Christoffer
->>
->> On Tue, Aug 05, 2014 at 02:54:09PM +0530, Anup Patel wrote:
->>> This patchset enables PMU virtualization in KVM ARM64. The
->>> Guest can now directly use PMU available on the host HW.
->>>
->>> The virtual PMU IRQ injection for Guest VCPUs is managed by
->>> small piece of code shared between KVM ARM and KVM ARM64. The
->>> virtual PMU IRQ number will be based on Guest machine model and
->>> user space will provide it using set device address vm ioctl.
->>>
->>> The second last patch of this series implements full context
->>> switch of PMU registers which will context switch all PMU
->>> registers on every KVM world-switch.
->>>
->>> The last patch implements a lazy context switch of PMU registers
->>> which is very similar to lazy debug context switch.
->>> (Refer, http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/271040.html)
->>>
->>> Also, we reserve last PMU event counter for EL2 mode which
->>> will not be accessible from Host and Guest EL1 mode. This
->>> reserved EL2 mode PMU event counter can be used for profiling
->>> KVM world-switch and other EL2 mode functions.
->>>
->>> All testing have been done using KVMTOOL on X-Gene Mustang and
->>> Foundation v8 Model for both Aarch32 and Aarch64 guest.
->>>
->>> Anup Patel (6):
->>>   ARM64: Move PMU register related defines to asm/pmu.h
->>>   ARM64: perf: Re-enable overflow interrupt from interrupt handler
->>>   ARM: perf: Re-enable overflow interrupt from interrupt handler
->>>   ARM/ARM64: KVM: Add common code PMU IRQ routing
->>>   ARM64: KVM: Implement full context switch of PMU registers
->>>   ARM64: KVM: Upgrade to lazy context switch of PMU registers
->>>
->>>  arch/arm/include/asm/kvm_host.h   |    9 +
->>>  arch/arm/include/uapi/asm/kvm.h   |    1 +
->>>  arch/arm/kernel/perf_event_v7.c   |    8 +
->>>  arch/arm/kvm/arm.c                |    6 +
->>>  arch/arm/kvm/reset.c              |    4 +
->>>  arch/arm64/include/asm/kvm_asm.h  |   39 +++-
->>>  arch/arm64/include/asm/kvm_host.h |   12 ++
->>>  arch/arm64/include/asm/pmu.h      |   44 +++++
->>>  arch/arm64/include/uapi/asm/kvm.h |    1 +
->>>  arch/arm64/kernel/asm-offsets.c   |    2 +
->>>  arch/arm64/kernel/perf_event.c    |   40 +---
->>>  arch/arm64/kvm/Kconfig            |    7 +
->>>  arch/arm64/kvm/Makefile           |    1 +
->>>  arch/arm64/kvm/hyp-init.S         |   15 ++
->>>  arch/arm64/kvm/hyp.S              |  209 +++++++++++++++++++-
->>>  arch/arm64/kvm/reset.c            |    4 +
->>>  arch/arm64/kvm/sys_regs.c         |  385 +++++++++++++++++++++++++++++++++----
->>>  include/kvm/arm_pmu.h             |   52 +++++
->>>  virt/kvm/arm/pmu.c                |  105 ++++++++++
->>>  19 files changed, 870 insertions(+), 74 deletions(-)
->>>  create mode 100644 include/kvm/arm_pmu.h
->>>  create mode 100644 virt/kvm/arm/pmu.c
->>>
->>> --
->>> 1.7.9.5
->>>
+Changes from V1:
+* Move pmu driver in driver/soc/samsung folder
+* Removed the power domain features. They will posted as a separate series.
+* Added exynos7 PMU support.
+* Link to v1 can be found here (B)
+
+This patch has dependency on following patches posted earlier by Pankaj (C),
+which is accepted by maintainer.
+
+Patch 6 was earlier posted by Abhilash (D) which has been reposted here with some
+extra changes.
+
+This complete patch series is rebased on linux-next.
+
+(A) - http://www.spinics.net/lists/linux-samsung-soc/msg38444.html
+(B) - http://www.spinics.net/lists/linux-samsung-soc/msg38442.html
+(C) - https://lkml.org/lkml/2014/10/6/581
+(D) - http://www.spinics.net/lists/arm-kernel/msg358230.html 
+
+Amit Daniel Kachhap (6):
+  ARM: EXYNOS: Move pmu specific header files under "linux/soc/samsung"
+  drivers: soc: Add support for Exynos PMU driver
+  drivers: soc: samsung: Fix a spelling mistake
+  soc: samsung: exynos-pmu: Register exynos-pmu driver as a mfd driver
+  driver: soc: exynos-pmu: Add an API to be called after wakeup
+  drivers: soc: samsung: Add support for Exynos7 pmu
+
+ .../devicetree/bindings/arm/samsung/pmu.txt        |    1 +
+ arch/arm/mach-exynos/Makefile                      |    2 +-
+ arch/arm/mach-exynos/exynos.c                      |    2 +-
+ arch/arm/mach-exynos/mcpm-exynos.c                 |    2 +-
+ arch/arm/mach-exynos/platsmp.c                     |    2 +-
+ arch/arm/mach-exynos/pm.c                          |    4 +-
+ arch/arm/mach-exynos/regs-pmu.h                    |  335 -----------
+ arch/arm/mach-exynos/suspend.c                     |    3 +-
+ drivers/soc/Kconfig                                |    1 +
+ drivers/soc/Makefile                               |    1 +
+ drivers/soc/samsung/Kconfig                        |   19 +
+ drivers/soc/samsung/Makefile                       |    1 +
+ .../pmu.c => drivers/soc/samsung/exynos-pmu.c      |  471 ++++++++++++++-
+ .../linux/soc/samsung}/exynos-pmu.h                |    6 +
+ include/linux/soc/samsung/exynos-regs-pmu.h        |  608 ++++++++++++++++++++
+ 15 files changed, 1109 insertions(+), 349 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos/regs-pmu.h
+ create mode 100644 drivers/soc/samsung/Kconfig
+ create mode 100644 drivers/soc/samsung/Makefile
+ rename arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c (50%)
+ rename {arch/arm/mach-exynos => include/linux/soc/samsung}/exynos-pmu.h (78%)
+ create mode 100644 include/linux/soc/samsung/exynos-regs-pmu.h
+
+-- 
+1.7.9.5
