@@ -1,38 +1,42 @@
-From: darshanapadmadas@gmail.com (Darshana Padmadas)
-Date: Sat,  8 Nov 2014 22:52:07 +0530
-Subject: [PATCH v5 3/4] Staging: iio: light: Added correct vendor-prefix for
- device isl29028
-In-Reply-To: <1415467328-9745-1-git-send-email-darshanapadmadas@gmail.com>
-References: <1415467328-9745-1-git-send-email-darshanapadmadas@gmail.com>
-Message-ID: <1415467328-9745-4-git-send-email-darshanapadmadas@gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 08 Nov 2014 18:26:27 +0100
+Subject: [PATCH v1 0/3] Transition pxa25x clock to common clocks
+In-Reply-To: <CALT56yOCBN1NAfNw=vThVZ_o=ONGOTvzKHBH5tCTQShJY0wkrQ@mail.gmail.com>
+ (Dmitry Eremin-Solenikov's message of "Thu, 6 Nov 2014 12:45:02
+ +0400")
+References: <1414941415-13146-1-git-send-email-robert.jarzmik@free.fr>
+ <CALT56yOCBN1NAfNw=vThVZ_o=ONGOTvzKHBH5tCTQShJY0wkrQ@mail.gmail.com>
+Message-ID: <87lhnlwqm4.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the correct vendor-prefix for device isl29028 and
-maintains deprecated vendor-prefix found by checkpatch warning
-for older kernel releases.
+Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
 
-Signed-off-by: Darshana Padmadas <darshanapadmadas@gmail.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Jonathan Cameron <jic23@kernel.org>
----
- drivers/staging/iio/light/isl29028.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+> Hello,
+> Tested in qemu (pxa25x target).
+>
+> 2) sa1100-rtc could not find a clock and thus failed to be probed.
+> 4) Got an issue with IrDA driver - it gets -ENODEV for UARTCLK clock
 
-diff --git a/drivers/staging/iio/light/isl29028.c b/drivers/staging/iio/light/isl29028.c
-index 6014625..e969107 100644
---- a/drivers/staging/iio/light/isl29028.c
-+++ b/drivers/staging/iio/light/isl29028.c
-@@ -537,7 +537,8 @@ static const struct i2c_device_id isl29028_id[] = {
- MODULE_DEVICE_TABLE(i2c, isl29028_id);
- 
- static const struct of_device_id isl29028_of_match[] = {
--	{ .compatible = "isil,isl29028", },
-+	{ .compatible = "isl,isl29028", },
-+	{ .compatible = "isil,isl29028", },/* deprecated, don't use */
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, isl29028_of_match);
+Hi Dmitry,
+
+Would you mind retesting with the patch in [1] applied to see if points 2 and 4
+are fixed ? Alternatively you can refetch from the github tree, I included that
+incremental patch there too.
+
+If it works correctly for you, could I have your Tested-by ? If not, tell me and
+I'll try to figure out what's wrong.
+
+Cheers.
+
 -- 
-1.9.1
+Robert
+
+[1]
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-fixup-clk-add-pxa25x-clock-drivers.patch
+Type: text/x-diff
+Size: 1467 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141108/e1c60818/attachment-0001.bin>
