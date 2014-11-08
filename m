@@ -1,60 +1,59 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sat, 8 Nov 2014 10:37:28 +0100
-Subject: [PATCH 0/5] irqchip: atmel-aic: add RTT irq fixup
-In-Reply-To: <20141102022905.GT3698@titan.lakedaemon.net>
-References: <1409735271-15353-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140914054648.GJ21986@titan.lakedaemon.net>
- <20140915214907.3ec49158@bbrezillon>
- <20140915215356.4c332acd@bbrezillon>
- <20141102022905.GT3698@titan.lakedaemon.net>
-Message-ID: <20141108103728.32341ce5@bbrezillon>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Sat, 08 Nov 2014 18:46:43 +0900
+Subject: [PATCH v2 1/1] ARM: exynos_defconfig: Enable options for display
+ panel support
+In-Reply-To: <CABxcv=m-aNVcUU2C8LosCECxq1yZo2C3zfA2xe6z7jF8tFPsnw@mail.gmail.com>
+References: <1408956336-17376-1-git-send-email-javier.martinez@collabora.co.uk>
+ <CABxcv=m-aNVcUU2C8LosCECxq1yZo2C3zfA2xe6z7jF8tFPsnw@mail.gmail.com>
+Message-ID: <000d01cffb38$e90e42c0$bb2ac840$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-
-On Sat, 1 Nov 2014 22:29:05 -0400
-Jason Cooper <jason@lakedaemon.net> wrote:
-
-> On Mon, Sep 15, 2014 at 09:53:56PM +0200, Boris BREZILLON wrote:
-> > On Mon, 15 Sep 2014 21:49:07 +0200
-> > Boris BREZILLON <boris.brezillon@free-electrons.com> wrote:
-> > 
-> > > Hi,
-> > > 
-> > > On Sun, 14 Sep 2014 01:46:48 -0400
-> > > Jason Cooper <jason@lakedaemon.net> wrote:
-> > > 
-> > > > On Wed, Sep 03, 2014 at 11:07:46AM +0200, Boris BREZILLON wrote:
-> > > > > The series depends on the acceptation of the RTT DT bindings proposed here
-> > > > > [1].
-> > > > > 
-> > > > > Best Regards,
-> > > > > 
-> > > > > Boris
-> > > > > 
-> > > > > [1]https://lkml.org/lkml/2014/9/3/145
-> > > > 
-> > > > Hmm, the bindings, unfortunately, still seem to be in flux.  Any update?
-> > > 
-> > > Actually, all at91 developers seemed to agree on this binding [2], and
-> > > these changes do not impact the current series.
-> > > 
-> > > Anyway, I think it's safer to wait for an official approval before
-> > > taking this series into irqchip/next.
+Javier Martinez Canillas wrote:
 > 
-> Care to resend against v3.18-rc1?
+> Hello Kukjin,
+> 
+Hi,
 
-Not sure if you noticed, but I have resent this series after rebasing it
-on 3.18-rc3:
+> On Mon, Aug 25, 2014 at 10:45 AM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+> > Many Exynos devices have a display panel. Most of them just have
+> > a simple panel while others have more complex configurations that
+> > requires an embedded DisplayPort (eDP) to LVDS bridges.
+> >
+> > This patch enables the following features to be built in the kernel
+> > image to suport both setups:
+> >
+> > - Direct Rendering Manager (DRM)
+> > - DRM bridge registration and lookup framework
+> > - Parade ps8622/ps8625 eDP/LVDS bridge
+> > - NXP ptn3460 eDP/LVDS bridge
+> > - Exynos Fully Interactive Mobile Display controller (FIMD)
+> > - Panel registration and lookup framework
+> > - Simple panels
+> > - Backlight & LCD device support
+> >
+> > Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> > Tested-by: Kevin Hilman <khilman@linaro.org>
+> > ---
+> 
+> This patch is needed to have display working on many Exynos boards.
+> 
+OK, I'll apply this into samsung tree in this weekend.
 
-http://comments.gmane.org/gmane.linux.kernel/1819609
+Thanks for your gentle reminder.
 
-Regards,
+- Kukjin
 
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> $subject enables the config option for the ps8622/ps8625 eDP/LVDS
+> bridge driver but this has not landed in mainline yet. Ajay will
+> re-spin a new revision of his series that adds this driver though,
+> after addressing some issues pointed out on a previous version.
+> 
+> The Kconfig symbol name (DRM_PS8622) won't change though so maybe is
+> not crazy to pick the patch as is since CONFIG_DRM_PS8622 will have to
+> be enabled later when the bridge driver lands. Or do you want me to
+> re-spin $subject removing that option?
+> 
+> Best regards,
+> Javier
