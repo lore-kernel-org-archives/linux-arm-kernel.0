@@ -1,38 +1,62 @@
-From: darshanapadmadas@gmail.com (Darshana Padmadas)
-Date: Sat,  8 Nov 2014 22:52:08 +0530
-Subject: [PATCH v5 4/4] arch: arm: boot: dts: Correct vendor-prefix for iio
- device isl29028 in compatible property
-In-Reply-To: <1415467328-9745-1-git-send-email-darshanapadmadas@gmail.com>
-References: <1415467328-9745-1-git-send-email-darshanapadmadas@gmail.com>
-Message-ID: <1415467328-9745-5-git-send-email-darshanapadmadas@gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sat, 8 Nov 2014 18:35:13 +0100
+Subject: [PATCH v9 3/3] i2c: imx: add DMA support for freescale i2c driver
+In-Reply-To: <1413025032-14958-4-git-send-email-yao.yuan@freescale.com>
+References: <1413025032-14958-1-git-send-email-yao.yuan@freescale.com>
+ <1413025032-14958-4-git-send-email-yao.yuan@freescale.com>
+Message-ID: <20141108173513.GA4900@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch corrects the vendor-prefix for isl29028 in the compatible property from
-"isil,isl29028" to "isl,isl29028" according to listed vendor-prefixes in
-Documentation/devicetree/bindings/vendor-prefixes.txt. Incorrect vendor-prefix "isl"
-was reported by checkpatch.pl warning for drivers/staging/iio/light/isl29028.c.
-Thus incorrect vendor-prefix "isil" was corrected for every mention of device isl29028.
+Hi,
 
-Signed-off-by: Darshana Padmadas <darshanapadmadas@gmail.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm/boot/dts/tegra30-cardhu.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+mostly looking good...
 
-diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-index 2063795..dcc6c75 100644
---- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
-+++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-@@ -187,7 +187,7 @@
- 
- 		/* ALS and Proximity sensor */
- 		isl29028 at 44 {
--			compatible = "isil,isl29028";
-+			compatible = "isl,isl29028";
- 			reg = <0x44>;
- 			interrupt-parent = <&gpio>;
- 			interrupts = <TEGRA_GPIO(L, 0) IRQ_TYPE_LEVEL_HIGH>;
--- 
-1.9.1
+> +#define IMX_I2C_DMA_THRESHOLD	16
+
+Have you guessed or measured this value? A comment about this value
+would be nice.
+
+>  
+> +struct imx_i2c_dma {
+> +	struct dma_chan		*chan_tx;
+> +	struct dma_chan		*chan_rx;
+> +	struct dma_chan		*chan_using;
+> +	struct completion	cmd_complete;
+> +	dma_addr_t		dma_buf;
+> +	unsigned int		dma_len;
+> +	unsigned int		dma_transfer_dir;
+> +	unsigned int		dma_data_dir;
+
+Please use proper types as there are things like 'enum
+dma_data_direction' and the likes...
+
+> +	dmaengine_submit(txdesc);
+
+This can fail, too. Use dma_submit_error() to check.
+
+> +	result = wait_for_completion_interruptible_timeout(
+> +				&i2c_imx->dma->cmd_complete,
+> +				msecs_to_jiffies(IMX_I2C_DMA_TIMEOUT));
+
+Have you tested signals extensively? I can't really recommend the
+_intrruptible_ here. I don't see any cleaning up to get the bus to a
+consistent state again. Most people drop the interruptible sooner or
+later.
+
+> +	/* Init DMA config if support*/
+> +	i2c_imx_dma_request(i2c_imx, phy_addr);
+
+Make this function void? DMA is optional anyhow.
+
+Thanks,
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141108/e0873e02/attachment.sig>
