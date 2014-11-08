@@ -1,47 +1,40 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Sat, 8 Nov 2014 23:51:35 +0530
-Subject: [PATCH 2/2] mailbox: Don't unnecessarily re-arm the polling timer
-In-Reply-To: <20141031114107.GE10778@ulmo.nvidia.com>
-References: <1414699267-17970-1-git-send-email-abrestic@chromium.org>
- <1414699267-17970-2-git-send-email-abrestic@chromium.org>
- <20141031114107.GE10778@ulmo.nvidia.com>
-Message-ID: <CAJe_ZhcC-nEUQSxVy3AUkAvWrM74TeafX1umqVuWxBSQ=zVdqg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 08 Nov 2014 20:25:22 +0100
+Subject: [PATCH] tty: serial: msm_serial: Use DT aliases
+In-Reply-To: <545D3B31.3030309@gmail.com>
+References: <1414024381-12204-1-git-send-email-sboyd@codeaurora.org>
+ <2747100.M77UGx4AmB@wuerfel> <545D3B31.3030309@gmail.com>
+Message-ID: <1630864.S0zQWJED9T@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 October 2014 17:11, Thierry Reding <thierry.reding@gmail.com> wrote:
-> On Thu, Oct 30, 2014 at 01:01:07PM -0700, Andrew Bresticker wrote:
->> poll_txdone() will unconditionally re-arm the polling timer if there was
->> an active request, even if the active request completed and no other
->> requests were submitted.  This is fixed by:
->>  - only re-arming the timer if the controller reported that the current
->>    transmission has not completed, and,
->>  - moving the call to poll_txdone() into msg_submit() so that the
->>    controller gets polled (and the timer re-armed, if necessary) whenever
->>    a new message is submitted.
->>
->> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
->> ---
->>  drivers/mailbox/mailbox.c | 13 ++++++++-----
->>  1 file changed, 8 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
->> index 5008028..26f74ad 100644
->> --- a/drivers/mailbox/mailbox.c
->> +++ b/drivers/mailbox/mailbox.c
->> @@ -28,6 +28,8 @@
->>  static LIST_HEAD(mbox_cons);
->>  static DEFINE_MUTEX(con_mutex);
->>
->> +static void poll_txdone(unsigned long data);
->
-> I think I'd rather move poll_txdone() here to avoid the forward
-> declaration, but either way:
->
-> Reviewed-by: Thierry Reding <treding@nvidia.com>
->
-Does the 'extra' timer fire cause some issue? I believe it shouldn't.
-Anyways, I have applied the patch.
+On Friday 07 November 2014 13:35:45 Frank Rowand wrote:
+> On 11/7/2014 1:47 AM, Arnd Bergmann wrote:
+> > On Thursday 06 November 2014 22:42:47 Frank Rowand wrote:
+> >> This same change is also needed in:
+> >>
+> >>   qcom-ipq8064.dtsi
+> >>   qcom-msm8960.dtsi
+> >>   qcom-apq8084.dtsi
+> >>   qcom-apq8064.dtsi
+> >>   qcom-msm8660.dtsi
+> >>
+> >> but I did not want to just blindly apply those changes without testing.
+> >>
+> > 
+> > Is there only one uart on each of these?
+> > 
+> > If not, it would be better to put the aliases in the board specific file,
+> > pointing to whichever ports are in use, in the order that makes sense
+> > for that board.
+> 
+> Good point, thanks for bringing it up.
+> 
+> Your comment made me verify that the board dts files can override the
+> aliases from the included .dtsi.  So not a problem to have a default
+> set of aliases in the .dtsi files.
 
-Thanks
-Jassi
+I would think it's better to keep them in the per-board file out of
+principle though.
+	
+	Arnd
