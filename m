@@ -1,71 +1,198 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 08 Nov 2014 19:16:54 +0900
-Subject: [PATCH] ARM: dts: Fix booting on Rinato market device
-In-Reply-To: <1415361564.31102.2.camel@AMDC1943>
-References: <1415360662-30390-1-git-send-email-k.kozlowski@samsung.com>
- <545CB220.9030007@samsung.com> <1415361564.31102.2.camel@AMDC1943>
-Message-ID: <004701cffb3d$1edef9e0$5c9ceda0$@kernel.org>
+From: marex@denx.de (Marek Vasut)
+Date: Sat, 8 Nov 2014 12:22:05 +0100
+Subject: [PATCH v4 2/4] serial: mxs-auart: use mctrl_gpio helpers for
+ handling modem signals
+In-Reply-To: <545CF36D.3060501@elproma.com.pl>
+References: <1412960007-28159-1-git-send-email-j.uzycki@elproma.com.pl>
+ <201411071548.58044.marex@denx.de> <545CF36D.3060501@elproma.com.pl>
+Message-ID: <201411081222.05722.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Kozlowski wrote:
+On Friday, November 07, 2014 at 05:29:33 PM, Janusz U?ycki wrote:
+> W dniu 2014-11-07 o 15:48, Marek Vasut pisze:
+> > On Friday, November 07, 2014 at 02:23:23 PM, Janusz U?ycki wrote:
+> > [...]
+> > 
+> >>>> Hardware RTS/CTS lines can be occupied by RX/TX of other AUART port
+> >>>> in order to obtain as much uarts as possible using i.mx283.
+> >>>> Therefore gpios can be used for "hardware" flow control.
+> >>> 
+> >>> Your logic is outright flawed here, the first sentence doesn't
+> >>> implicate the second sentence. In fact, those two are completely
+> >>> unrelated.
+> >> 
+> >> I didn't write MUST but CAN. There is a choice. Is flexibility of the
+> >> driver disadvantage?
+> > 
+> > If the flexibility brings in known problems, then yes, it is a problem.
+> > Not because of the flexibility, but because it brings in bugs.
 > 
-> On pi?, 2014-11-07 at 20:50 +0900, Chanwoo Choi wrote:
-> > Hi Krzysztof,
-> >
-> > On 11/07/2014 08:44 PM, Krzysztof Kozlowski wrote:
-> > > The bootloader on market Rinato (Gear 2) device checks for revision in
-> > > compatible field of DTB. If it is not present or lower than required
-> > > then booting fails with: "Could not do normal boot. (no DTB found)".
-> > >
-> > > Log of bootloader in case of failure:
-> > > h/w: revision  = 0x06
-> > > h/w: schematic = SM-R380_Rev0.5_Final_0205
-> > > date = 2000/01/01 12:00:21 (UTC)
-> > > cmu_div:4, div:5, src_clk:800000000, pixel_clk:31860720
-> > > load_kernel: loading boot image from 57344.. (BOOT)
-> > > load_kernel: found zImage, size: 0x3267e8
-> > > 0xbc Error!
-> > > Verify_Binary_Signature: failed.
-> > > pit_check_signature (BOOT) invalid.
-> > > load_kernel: found custom kernel (ret:-2147483647)
-> > >  No need to update kernel type.
-> > > Detected board: samsung,rinato-rev06
-> > > Could not do normal boot. (no DTB found)
-> > > : Entering usb mode for SM-R380_EUR_XX (65535)..
-> > >
-> > > Add a "rev06" suffix to compatible to satisfy the bootloader.
-> > >
-> > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > > ---
-> > >  arch/arm/boot/dts/exynos3250-rinato.dts | 3 ++-
-> > >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > >
-> > > diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
-> > > index 84380fa13e37..f72ba0a1d915 100644
-> > > --- a/arch/arm/boot/dts/exynos3250-rinato.dts
-> > > +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
-> > > @@ -18,7 +18,8 @@
-> > >
-> > >  / {
-> > >  	model = "Samsung Rinato board";
-> > > -	compatible = "samsung,rinato", "samsung,exynos3250", "samsung,exynos3";
-> > > +	compatible = "samsung,rinato", "samsung,rinato-rev06",
-> > > +			"samsung,exynos3250", "samsung,exynos3";
-> >
-> > I think it is wrong. The released bootloader from Samsung is not u-boot.
-> > Instead, you have to update u-boot to support Exynos3250-basd Rinato board.
-> 
-> The bootloader on device also was not a u-boot. So the fix is for native
-> bootloader delivered on device.
-> 
-> I do not insist that this is proper fix. It was just needed to boot the
-> device with custom kernel.
-> 
-> Anyway, thanks for comments!
-> 
-Hi Krzysztof and Chanwoo,
+> New features new bugs :) Does it mean to stop development?
 
-So, we don?t need this to fix the problem Krzysztof said? OK.
+You shouldn't push code which is known to be defective by design into mainline.
 
-- Kukjin
+> >>>>>>      If we change them to gpio.  Could the DMA still
+> >>>>>> 
+> >>>>>> works fine?
+> >>>>>> did you test the DMA with this patch?
+> >>>>>> 
+> >>>>>> Add Marek for this patch too.
+> >>>>> 
+> >>>>> I didn't look too deep into the patch, so here's just my experience:
+> >>>>> 
+> >>>>> 1) The AUART block signals and GPIO block signals are not sychronised
+> >>>>> using the
+> >>>>> 
+> >>>>>       same clock. Therefore, the latency between toggling of the
+> >>>>>       AUART lines and the GPIO-driven pins will not be deterministic
+> >>>>>       and will vary. There might be a way to approximate that, but
+> >>>>>       that's definitelly not a reliable solution.
+> >>>>>       
+> >>>>>       This is very bad for example if you drive RS485 DIR line with
+> >>>>>       the RTS pin as a GPIO ; the RTS pin will toggle at
+> >>>>>       non-deterministic time compared to the end of UART
+> >>>>>       transmission. This will trigger bit-loss on the RS485 line and
+> >>>>>       you just don't want that.
+> >>>>> 
+> >>>>> 2) Speaking of RS485, there's [1] and [2]. which I believe apply to
+> >>>>> any combo
+> >>>>> 
+> >>>>>       of UART+GPIO toggling.
+> >>>>> 
+> >>>>> So I hate to bring the bad news , but UART+GPIO combo toggling is
+> >>>>> really a bad bad idea.
+> >>>> 
+> >>>> Unfortunately if hardware is limited there is no choice and UART+GPIO
+> >>>> is necessary.
+> >>> 
+> >>> You will run into timing problems (see above).
+> >> 
+> >> A lot of 8250-compatible devices has no hardware flow control and in
+> >> most cases
+> >> they works and it is enough even for 115200 speed if CTS is handled by
+> >> irq. So it depends on your needs.
+> > 
+> > I presume that in such a case , the 8250 still handles the CTS line, not
+> > some external GPIO block, yes ?
+> 
+> Yes. However mxs includes both GPIO and AUART. Clocks differs but it is
+> still the same silicon.
+> External GPIO block is extreme example highly not recommended here.
+
+The way you implemented this particular change, it is possible to use arbitrary
+GPIO pin. There is no way you can guarantee anything about the latency of the
+GPIO toggling (I am repeating myself).
+
+> >>> What you're proposing here is a workaround for broken hardware, which
+> >>> was proven to be a bad idea and NAK'd already multiple times in the
+> >>> past (please see the links I posted in my last email).
+> >> 
+> >> It is not broken  hardware - rather limited to lower speeds but still
+> >> very useful solution.
+> > 
+> > What exact "lower speed" are you talking about here and why ?
+> 
+> For example not more than 115200 but it depends on CPU load of course,
+> FIFO size
+> and device on the opposite site. RTS/CTS via GPIO require to know the limit
+> in an application.
+
+OK, this is completely unreliable solution, which works just by sheer luck.
+
+> I googled even so exotic thing like:
+> "8250: add support for DTR/DSR hardware flow control"
+
+The fact that those perversions exists doesn't make them right. It doesn't
+even make them mainlinable.
+
+> >>>> Your experience confirms the discussion [3] with Russell King. DMA
+> >>>> should be disabled and
+> >>>> the patch disables DMA support in mxs_auart_init_gpios() if RTS or CTS
+> >>>> line is set as gpio.
+> >>> 
+> >>> DMA has nothing to do with those problems here. DMA can be safely
+> >>> ignored for the purpose of the discussion altogether.
+> >> 
+> >> When gpios are used for RTS/CTS DMA is not used. However DMA is related
+> >> due to the driver
+> >> and "fsl,uart-has-rtscts". If you look into code of the driver you
+> >> should agree.
+> > 
+> > This makes me believe that the DMA introduces too many timing
+> > fluctuations, so it's really not possible for you to keep toggling the
+> > GPIOs such that the bus would work. Is that the case ?
+> 
+> Yes, for RTS/CTS based on gpio DMA is not used. They are just toggled.
+> So you probably misunderstood me.
+
+I understand you -- in case DMA is enabled on the AUART block, your hack
+is no longer capable to working correctly, so everything falls apart.
+
+> > [...]
+> > 
+> >>>> Now the question: "fsl,uart-has-rtscts" name seems to be misleading
+> >>>> now, do you agree? It rather should include "dma" word in the name.
+> >>>> Any suggestion?
+> >>>> 
+> >>>> [3] http://thread.gmane.org/gmane.linux.serial/16069/focus=16077
+> >>> 
+> >>> The best suggestion I can give you is to fix your hardware early,
+> >>> before you run into nasty deep s.....tuff. These workarounds do not
+> >>> work and they will bit you later on, when it's hard to fix the
+> >>> hardware anymore.
+> >> 
+> >> The speed is limited but why don't you accept SW-HW mixed solutions?
+> > 
+> > Did you read up on the RS485 timing problems and why that solution was
+> > never accepted for any driver ? I believe the threads explained that
+> > quite clearly.
+> 
+> Example of RS485 implementation where RTS is toggled by software:
+> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/dri
+> vers/tty/serial/omap-serial.c?id=4a0ac0f55b18dc297a87a85417fcf068658bf103
+> https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/tree/
+> drivers/tty/serial/omap-serial.c
+
+This is a question for Greg. I checked the discussion about this patch [1]
+and I see this timing issue was brought up, but the patch was applied anyway.
+I cannot tell you why , I just know that this GPIO approach has problems and
+I wrestled those a couple of days ago (without success, it's not possible to
+get correct timing).
+
+[1] http://www.spinics.net/lists/linux-serial/msg10574.html
+
+> >> Exactly the same method is accepted for 8250.
+> > 
+> > Can you point out this code please ?
+> 
+> If 8250 doesn't support auto flow control RTS/CTS are also toggled by
+> software,
+> uart_trottle(), uart_untrothle(), uart_handle_cts_change():
+> http://lxr.free-electrons.com/source/drivers/tty/serial/serial_core.c#L635
+> http://lxr.free-electrons.com/source/drivers/tty/serial/serial_core.c#L2796
+> Detected by irq (ms enabled when CRTSCTS) CTS change stops tx because
+> UPF_HARD_FLOW flag is not set by the mxs-auart driver.
+
+This doesn't use GPIO to toggle the RTS/CTS pins, it does toggle then via the
+8250 IP block registers, right ?
+
+> Of course timing problem exists but in many cases it is not critical -
+> the toggle method was implemented many years ago and it seems to work.
+
+Yes, it does seem to work initially, that's why so many hardware people
+implement it, thinking the software people can fix those flubs. Problem
+is, this is one of those nasty problems, which cannot be fixed in software.
+
+> >> It is good to have choice than not. We can comment that speed is limited
+> >> for gpio-based hardware flow control. So please, rethink again.
+> > 
+> > [...]
+> 
+> The only problem for me is misleading "fsl,uart-has-rtscts" name because
+> the flag
+> only enables DMA if CRTSCTS is set and hardware flow control of AUART
+> block is used.
+> 
+> best regards
+> Janusz
