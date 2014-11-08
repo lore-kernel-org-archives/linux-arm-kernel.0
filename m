@@ -1,50 +1,86 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 8 Nov 2014 15:57:01 +0100
-Subject: [PATCH] ARM: dts: sun6i: Re-parent ahb1_mux to pll6 as required
- by dma controller
-In-Reply-To: <1415275009-415-1-git-send-email-wens@csie.org>
-References: <1415275009-415-1-git-send-email-wens@csie.org>
-Message-ID: <20141108145701.GZ2989@lukather>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sat,  8 Nov 2014 16:47:12 +0100
+Subject: [PATCH v5 10/10] [media] v4l: Forbid usage of V4L2_MBUS_FMT
+ definitions inside the kernel
+In-Reply-To: <1415369269-5064-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1415369269-5064-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1415461632-31236-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 06, 2014 at 07:56:49PM +0800, Chen-Yu Tsai wrote:
-> The dma controller requires that the ahb1 bus clock be driven by pll6
-> for peripheral access to work. Previously this was done in the dma
-> controller driver, but was since removed as part of a series to unify
-> the ahb1_mux and ahb1 clock drivers, in
-> 
->     14e0e28 dmaengine: sun6i: Remove obsolete clk muxing code
-> 
-> Unfortunately the rest of that series did not make it, leaving us with
-> broken dma on sun6i.
-> 
-> This patch reparents ahb1_mux to pll6 using the DT assigned-clocks
-> properties in the dma controller node.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> Hi Maxime,
-> 
-> This is for 3.18 to fix broken dma. I have verified the clock register
-> bits on my A31 Hummingbird. Though I do not have actual hardware to test
-> dma peripherals, since this does return things to the way they were, it
-> is a proper fix.
-> 
-> Sorry for the breakage.
+Place v4l2_mbus_pixelcode in a #ifndef __KERNEL__ section so that kernel
+users don't have access to these definitions.
 
-Tested and applied, thanks !
+We have to keep this definition for user-space users even though they're
+encouraged to move to the new media_bus_format enum.
 
-Maxime
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+---
+ include/uapi/linux/v4l2-mediabus.h | 45 ++++++++++++++++++++++++--------------
+ 1 file changed, 28 insertions(+), 17 deletions(-)
 
+diff --git a/include/uapi/linux/v4l2-mediabus.h b/include/uapi/linux/v4l2-mediabus.h
+index d712df8..5c9410d 100644
+--- a/include/uapi/linux/v4l2-mediabus.h
++++ b/include/uapi/linux/v4l2-mediabus.h
+@@ -15,6 +15,33 @@
+ #include <linux/types.h>
+ #include <linux/videodev2.h>
+ 
++/**
++ * struct v4l2_mbus_framefmt - frame format on the media bus
++ * @width:	frame width
++ * @height:	frame height
++ * @code:	data format code (from enum v4l2_mbus_pixelcode)
++ * @field:	used interlacing type (from enum v4l2_field)
++ * @colorspace:	colorspace of the data (from enum v4l2_colorspace)
++ */
++struct v4l2_mbus_framefmt {
++	__u32			width;
++	__u32			height;
++	__u32			code;
++	__u32			field;
++	__u32			colorspace;
++	__u32			reserved[7];
++};
++
++#ifndef __KERNEL__
++/*
++ * enum v4l2_mbus_pixelcode and its definitions are now deprecated, and
++ * MEDIA_BUS_FMT_ definitions (defined in media-bus-format.h) should be
++ * used instead.
++ *
++ * New defines should only be added to media-bus-format.h. The
++ * v4l2_mbus_pixelcode enum is frozen.
++ */
++
+ #define V4L2_MBUS_FROM_MEDIA_BUS_FMT(name)	\
+ 	MEDIA_BUS_FMT_ ## name = V4L2_MBUS_FMT_ ## name
+ 
+@@ -102,22 +129,6 @@ enum v4l2_mbus_pixelcode {
+ 
+ 	V4L2_MBUS_FROM_MEDIA_BUS_FMT(AHSV8888_1X32),
+ };
+-
+-/**
+- * struct v4l2_mbus_framefmt - frame format on the media bus
+- * @width:	frame width
+- * @height:	frame height
+- * @code:	data format code (from enum v4l2_mbus_pixelcode)
+- * @field:	used interlacing type (from enum v4l2_field)
+- * @colorspace:	colorspace of the data (from enum v4l2_colorspace)
+- */
+-struct v4l2_mbus_framefmt {
+-	__u32			width;
+-	__u32			height;
+-	__u32			code;
+-	__u32			field;
+-	__u32			colorspace;
+-	__u32			reserved[7];
+-};
++#endif /* __KERNEL__ */
+ 
+ #endif
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141108/40831afa/attachment.sig>
+1.9.1
