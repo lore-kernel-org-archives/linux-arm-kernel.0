@@ -1,60 +1,50 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sat, 08 Nov 2014 14:58:27 +0100
-Subject: [PATCH v2] ARM: BCM5301X: set customized AUXCTL
-In-Reply-To: <2789449.fsn4D0imX4@wuerfel>
-References: <1414851912-30630-1-git-send-email-hauke@hauke-m.de>
- <54580CD9.3050309@hauke-m.de> <54581230.9090205@gmail.com>
- <2789449.fsn4D0imX4@wuerfel>
-Message-ID: <545E2183.7010308@hauke-m.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 8 Nov 2014 15:57:01 +0100
+Subject: [PATCH] ARM: dts: sun6i: Re-parent ahb1_mux to pll6 as required
+ by dma controller
+In-Reply-To: <1415275009-415-1-git-send-email-wens@csie.org>
+References: <1415275009-415-1-git-send-email-wens@csie.org>
+Message-ID: <20141108145701.GZ2989@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2014 11:22 AM, Arnd Bergmann wrote:
-> On Monday 03 November 2014 15:39:28 Florian Fainelli wrote:
->> On 11/03/2014 03:16 PM, Hauke Mehrtens wrote:
->>> On 11/03/2014 11:00 AM, Arnd Bergmann wrote:
->>>> On Saturday 01 November 2014 15:41:38 Hauke Mehrtens wrote:
->>>>>  };
->>>>>  
->>>>>  DT_MACHINE_START(BCM5301X, "BCM5301X")
->>>>> -       .l2c_aux_val    = 0,
->>>>> +       .l2c_aux_val    = L310_AUX_CTRL_CACHE_REPLACE_RR |
->>>>> +                         L310_AUX_CTRL_DATA_PREFETCH |
->>>>> +                         L310_AUX_CTRL_INSTR_PREFETCH |
->>>>> +                         L310_AUX_CTRL_EARLY_BRESP,
->>>>
->>>> Please put these into the dts file instead if the boot loader fails
->>>> to set them correctly. We should not override them from source code
->>>> for new platforms any more.
->>> I checked again and I only need L310_AUX_CTRL_DATA_PREFETCH and
->>> L310_AUX_CTRL_INSTR_PREFETCH, the others get activate by the existing
->>> code. Should I make it possible to give l2c_aux_val through dt, or
->>> should I create some boolean options for  L310_AUX_CTRL_DATA_PREFETCH
->>> and  L310_AUX_CTRL_INSTR_PREFETCH?
+On Thu, Nov 06, 2014 at 07:56:49PM +0800, Chen-Yu Tsai wrote:
+> The dma controller requires that the ahb1 bus clock be driven by pll6
+> for peripheral access to work. Previously this was done in the dma
+> controller driver, but was since removed as part of a series to unify
+> the ahb1_mux and ahb1 clock drivers, in
 > 
-> Certainly not the entire l2c_aux_val, what I meant is to use
-> boolean options for the bits you need. I was under the impression
-> that by now we had defined bindings for all the bits that are required
-> on any platform.
-
-Currently there are no bindings for L310_AUX_CTRL_DATA_PREFETCH and
-L310_AUX_CTRL_INSTR_PREFETCH, but I can add them.
-
->> Last we talked about these prefetch bits with Russell, I think we kind
->> of agreed that they could probably be enabled by default
-
-If they were changed to be enabled by default I do not have to add any
-device tree stuff at all that would be the best solution for me. ;-)
-
->> There is already a large number of properties defined in
->> Documentation/devicetree/bindings/arm/l2cc.txt, I suppose that having
->> prefetch properties could work too.
+>     14e0e28 dmaengine: sun6i: Remove obsolete clk muxing code
 > 
-> I can't really help with this if we don't have a binding. Proving that
-> it's always correct to enable these seems better than defining a
-> binding.
+> Unfortunately the rest of that series did not make it, leaving us with
+> broken dma on sun6i.
+> 
+> This patch reparents ahb1_mux to pll6 using the DT assigned-clocks
+> properties in the dma controller node.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> Hi Maxime,
+> 
+> This is for 3.18 to fix broken dma. I have verified the clock register
+> bits on my A31 Hummingbird. Though I do not have actual hardware to test
+> dma peripherals, since this does return things to the way they were, it
+> is a proper fix.
+> 
+> Sorry for the breakage.
 
-When should they get activated automatically, every time we find a l2x0
-compatible cache?
+Tested and applied, thanks !
 
-Hauke
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141108/40831afa/attachment.sig>
