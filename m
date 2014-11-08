@@ -1,42 +1,59 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sat,  8 Nov 2014 23:38:54 +0300
-Subject: [PATCH] arm: xscale: correct auxiliary register in suspend/resume
-Message-ID: <1415479134-19999-1-git-send-email-dbaryshkov@gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 08 Nov 2014 22:01:37 +0100
+Subject: [PATCH v1 0/3] Transition pxa25x clock to common clocks
+In-Reply-To: <CALT56yNOXq-ssvsjafz=ae+uWv1GyscoQ3RQ_h--i740zm4trA@mail.gmail.com>
+ (Dmitry Eremin-Solenikov's message of "Sat, 8 Nov 2014 23:55:49
+ +0400")
+References: <1414941415-13146-1-git-send-email-robert.jarzmik@free.fr>
+ <CALT56yOCBN1NAfNw=vThVZ_o=ONGOTvzKHBH5tCTQShJY0wkrQ@mail.gmail.com>
+ <87lhnlwqm4.fsf@free.fr>
+ <CALT56yNOXq-ssvsjafz=ae+uWv1GyscoQ3RQ_h--i740zm4trA@mail.gmail.com>
+Message-ID: <8761epwgni.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the manuals I have, XScale auxiliary register should be
-reached with opc_2 = 1 instead of crn = 1. cpu_xscale_proc_init
-correctly uses c1, c0, 1 arguments, but cpu_xscale_do_suspend and
-cpu_xscale_do_resume use c1, c1, 0. Correct suspend/resume functions to
-also use c1, c0, 1.
+Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- arch/arm/mm/proc-xscale.S | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> 2014-11-08 20:26 GMT+03:00 Robert Jarzmik <robert.jarzmik@free.fr>:
+>> Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
+>>
+>>> Hello,
+>>> Tested in qemu (pxa25x target).
+>>>
+>>> 2) sa1100-rtc could not find a clock and thus failed to be probed.
+>>> 4) Got an issue with IrDA driver - it gets -ENODEV for UARTCLK clock
+>>
+>> Hi Dmitry,
+>>
+>> Would you mind retesting with the patch in [1] applied to see if points 2 and 4
+>> are fixed ? Alternatively you can refetch from the github tree, I included that
+>> incremental patch there too.
+>>
+>> If it works correctly for you, could I have your Tested-by ? If not, tell me and
+>> I'll try to figure out what's wrong.
+>
+> Tested in qemu, everything works fine. I will test on the real hardware
+> tomorow.
+Aha, the test.
+Would you at that time do a "cat /sys/kernel/debug/clk/clk_summary" and send it
+to me please ?
 
-diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
-index 23259f1..afa2b3c 100644
---- a/arch/arm/mm/proc-xscale.S
-+++ b/arch/arm/mm/proc-xscale.S
-@@ -535,7 +535,7 @@ ENTRY(cpu_xscale_do_suspend)
- 	mrc	p15, 0, r5, c15, c1, 0	@ CP access reg
- 	mrc	p15, 0, r6, c13, c0, 0	@ PID
- 	mrc	p15, 0, r7, c3, c0, 0	@ domain ID
--	mrc	p15, 0, r8, c1, c1, 0	@ auxiliary control reg
-+	mrc	p15, 0, r8, c1, c0, 1	@ auxiliary control reg
- 	mrc	p15, 0, r9, c1, c0, 0	@ control reg
- 	bic	r4, r4, #2		@ clear frequency change bit
- 	stmia	r0, {r4 - r9}		@ store cp regs
-@@ -552,7 +552,7 @@ ENTRY(cpu_xscale_do_resume)
- 	mcr	p15, 0, r6, c13, c0, 0	@ PID
- 	mcr	p15, 0, r7, c3, c0, 0	@ domain ID
- 	mcr	p15, 0, r1, c2, c0, 0	@ translation table base addr
--	mcr	p15, 0, r8, c1, c1, 0	@ auxiliary control reg
-+	mcr	p15, 0, r8, c1, c0, 1	@ auxiliary control reg
- 	mov	r0, r9			@ control register
- 	b	cpu_resume_mmu
- ENDPROC(cpu_xscale_do_resume)
+>
+> BTW: It looks like pxa27x also shows the same behaviour wrt. sa1100-rtc and
+> pxa2xx-ir (after reverting a revert).
+Ah yes, you're very right about that.
+
+Same as before, github updated and patch included in this mail.
+
+Cheers.
+
 -- 
-2.1.1
+Robert
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-clk-pxa-add-missing-clocks-for-Irda-and-sa1100-rtc.patch
+Type: text/x-diff
+Size: 1945 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141108/d3e8e121/attachment.bin>
