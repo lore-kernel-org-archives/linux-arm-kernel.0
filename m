@@ -1,98 +1,60 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Sat, 8 Nov 2014 15:06:51 +0530
-Subject: [RFC PATCH 0/6] ARM64: KVM: PMU infrastructure support
-In-Reply-To: <20141107202502.GJ22848@cbox>
-References: <1407230655-28864-1-git-send-email-anup.patel@linaro.org>
- <20141107202502.GJ22848@cbox>
-Message-ID: <CAAhSdy3CPMdK9+_FesKuJaPt9=VVHsnw=DQO5UQUVNm1aPuZNg@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sat, 8 Nov 2014 10:37:28 +0100
+Subject: [PATCH 0/5] irqchip: atmel-aic: add RTT irq fixup
+In-Reply-To: <20141102022905.GT3698@titan.lakedaemon.net>
+References: <1409735271-15353-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140914054648.GJ21986@titan.lakedaemon.net>
+ <20140915214907.3ec49158@bbrezillon>
+ <20140915215356.4c332acd@bbrezillon>
+ <20141102022905.GT3698@titan.lakedaemon.net>
+Message-ID: <20141108103728.32341ce5@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+Hi Jason,
 
-On Sat, Nov 8, 2014 at 1:55 AM, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> Hi Anup,
->
-> [This time to the new email]
->
-> What are your plans in terms of follow-up on this one?
+On Sat, 1 Nov 2014 22:29:05 -0400
+Jason Cooper <jason@lakedaemon.net> wrote:
 
-Actually, I am already working on RFC v2. I will send-out
-RFC v2 sometime next time.
+> On Mon, Sep 15, 2014 at 09:53:56PM +0200, Boris BREZILLON wrote:
+> > On Mon, 15 Sep 2014 21:49:07 +0200
+> > Boris BREZILLON <boris.brezillon@free-electrons.com> wrote:
+> > 
+> > > Hi,
+> > > 
+> > > On Sun, 14 Sep 2014 01:46:48 -0400
+> > > Jason Cooper <jason@lakedaemon.net> wrote:
+> > > 
+> > > > On Wed, Sep 03, 2014 at 11:07:46AM +0200, Boris BREZILLON wrote:
+> > > > > The series depends on the acceptation of the RTT DT bindings proposed here
+> > > > > [1].
+> > > > > 
+> > > > > Best Regards,
+> > > > > 
+> > > > > Boris
+> > > > > 
+> > > > > [1]https://lkml.org/lkml/2014/9/3/145
+> > > > 
+> > > > Hmm, the bindings, unfortunately, still seem to be in flux.  Any update?
+> > > 
+> > > Actually, all at91 developers seemed to agree on this binding [2], and
+> > > these changes do not impact the current series.
+> > > 
+> > > Anyway, I think it's safer to wait for an official approval before
+> > > taking this series into irqchip/next.
+> 
+> Care to resend against v3.18-rc1?
 
-This RFC v2 will be RFC v1 based upon Marc's IRQ
-forwarding patchset.
+Not sure if you noticed, but I have resent this series after rebasing it
+on 3.18-rc3:
 
-I will try to address PMU context switching for KVM ARM
-in RFC v3. Does this sound OK?
+http://comments.gmane.org/gmane.linux.kernel/1819609
 
 Regards,
-Anup
 
->
-> Should we review these patches and reply to anup _at_ brainfaul.org or
-> are you looking for someone else to pick them up?
->
-> Thanks,
-> -Christoffer
->
-> On Tue, Aug 05, 2014 at 02:54:09PM +0530, Anup Patel wrote:
->> This patchset enables PMU virtualization in KVM ARM64. The
->> Guest can now directly use PMU available on the host HW.
->>
->> The virtual PMU IRQ injection for Guest VCPUs is managed by
->> small piece of code shared between KVM ARM and KVM ARM64. The
->> virtual PMU IRQ number will be based on Guest machine model and
->> user space will provide it using set device address vm ioctl.
->>
->> The second last patch of this series implements full context
->> switch of PMU registers which will context switch all PMU
->> registers on every KVM world-switch.
->>
->> The last patch implements a lazy context switch of PMU registers
->> which is very similar to lazy debug context switch.
->> (Refer, http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/271040.html)
->>
->> Also, we reserve last PMU event counter for EL2 mode which
->> will not be accessible from Host and Guest EL1 mode. This
->> reserved EL2 mode PMU event counter can be used for profiling
->> KVM world-switch and other EL2 mode functions.
->>
->> All testing have been done using KVMTOOL on X-Gene Mustang and
->> Foundation v8 Model for both Aarch32 and Aarch64 guest.
->>
->> Anup Patel (6):
->>   ARM64: Move PMU register related defines to asm/pmu.h
->>   ARM64: perf: Re-enable overflow interrupt from interrupt handler
->>   ARM: perf: Re-enable overflow interrupt from interrupt handler
->>   ARM/ARM64: KVM: Add common code PMU IRQ routing
->>   ARM64: KVM: Implement full context switch of PMU registers
->>   ARM64: KVM: Upgrade to lazy context switch of PMU registers
->>
->>  arch/arm/include/asm/kvm_host.h   |    9 +
->>  arch/arm/include/uapi/asm/kvm.h   |    1 +
->>  arch/arm/kernel/perf_event_v7.c   |    8 +
->>  arch/arm/kvm/arm.c                |    6 +
->>  arch/arm/kvm/reset.c              |    4 +
->>  arch/arm64/include/asm/kvm_asm.h  |   39 +++-
->>  arch/arm64/include/asm/kvm_host.h |   12 ++
->>  arch/arm64/include/asm/pmu.h      |   44 +++++
->>  arch/arm64/include/uapi/asm/kvm.h |    1 +
->>  arch/arm64/kernel/asm-offsets.c   |    2 +
->>  arch/arm64/kernel/perf_event.c    |   40 +---
->>  arch/arm64/kvm/Kconfig            |    7 +
->>  arch/arm64/kvm/Makefile           |    1 +
->>  arch/arm64/kvm/hyp-init.S         |   15 ++
->>  arch/arm64/kvm/hyp.S              |  209 +++++++++++++++++++-
->>  arch/arm64/kvm/reset.c            |    4 +
->>  arch/arm64/kvm/sys_regs.c         |  385 +++++++++++++++++++++++++++++++++----
->>  include/kvm/arm_pmu.h             |   52 +++++
->>  virt/kvm/arm/pmu.c                |  105 ++++++++++
->>  19 files changed, 870 insertions(+), 74 deletions(-)
->>  create mode 100644 include/kvm/arm_pmu.h
->>  create mode 100644 virt/kvm/arm/pmu.c
->>
->> --
->> 1.7.9.5
->>
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
