@@ -1,40 +1,206 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 08 Nov 2014 20:25:22 +0100
-Subject: [PATCH] tty: serial: msm_serial: Use DT aliases
-In-Reply-To: <545D3B31.3030309@gmail.com>
-References: <1414024381-12204-1-git-send-email-sboyd@codeaurora.org>
- <2747100.M77UGx4AmB@wuerfel> <545D3B31.3030309@gmail.com>
-Message-ID: <1630864.S0zQWJED9T@wuerfel>
+Date: Sat, 08 Nov 2014 20:47:34 +0100
+Subject: [RFC] PCI: BCM5301X: add PCIe2 driver for BCM5301X SoCs
+In-Reply-To: <1415470392-28229-1-git-send-email-hauke@hauke-m.de>
+References: <1415470392-28229-1-git-send-email-hauke@hauke-m.de>
+Message-ID: <1756974.RYWuW6FYtL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 November 2014 13:35:45 Frank Rowand wrote:
-> On 11/7/2014 1:47 AM, Arnd Bergmann wrote:
-> > On Thursday 06 November 2014 22:42:47 Frank Rowand wrote:
-> >> This same change is also needed in:
-> >>
-> >>   qcom-ipq8064.dtsi
-> >>   qcom-msm8960.dtsi
-> >>   qcom-apq8084.dtsi
-> >>   qcom-apq8064.dtsi
-> >>   qcom-msm8660.dtsi
-> >>
-> >> but I did not want to just blindly apply those changes without testing.
-> >>
-> > 
-> > Is there only one uart on each of these?
-> > 
-> > If not, it would be better to put the aliases in the board specific file,
-> > pointing to whichever ports are in use, in the order that makes sense
-> > for that board.
-> 
-> Good point, thanks for bringing it up.
-> 
-> Your comment made me verify that the board dts files can override the
-> aliases from the included .dtsi.  So not a problem to have a default
-> set of aliases in the .dtsi files.
+On Saturday 08 November 2014 19:13:12 Hauke Mehrtens wrote:
 
-I would think it's better to keep them in the per-board file out of
-principle though.
-	
+> diff --git a/drivers/pci/host/pci-host-bcm5301x.c b/drivers/pci/host/pci-host-bcm5301x.c
+> new file mode 100644
+> index 0000000..8b7ba62
+> --- /dev/null
+> +++ b/drivers/pci/host/pci-host-bcm5301x.c
+> @@ -0,0 +1,483 @@
+> +/*
+> + * Northstar PCI-Express driver
+> + * Only supports Root-Complex (RC) mode
+> + *
+> + * Notes:
+> + * PCI Domains are being used to identify the PCIe port 1:1.
+> + *
+> + * Only MEM access is supported, PAX does not support IO.
+
+What is PAX?
+
+> +static int bcma_pcie2_map_irq(const struct pci_dev *pdev, u8 slot, u8 pin)
+> +{
+> +	struct pci_sys_data *sys = pdev->sysdata;
+> +	struct bcma_device *bdev = sys->private_data;
+> +
+> +	/*
+> +	 * Every PCIe controller has 5 IRQ number and the last one is
+> +	 * triggered every time, use that one
+> +	 */
+> +	if (bdev && bdev->dev.of_node)
+> +		return irq_of_parse_and_map(bdev->dev.of_node, 4);
+> +
+> +	return bdev->irq;
+> +}
+
+If you have an OF device node for the PCI host, you don't need this,
+there should already be an interrupt-map property that correctly
+maps this into the interrupt domain of the bcma bus, so you can use
+the default of_irq_parse_and_map_pci function.
+
+> +static u32 bcma_pcie2_cfg_base(struct bcma_device *bdev, int busno,
+> +			       unsigned int devfn, int where)
+> +{
+> +	int slot = PCI_SLOT(devfn);
+> +	int fn = PCI_FUNC(devfn);
+> +	u32 addr_reg;
+> +
+> +	if (busno == 0) {
+> +		if (slot >= 1)
+> +			return 0;
+> +		bcma_write32(bdev, BCMA_CORE_PCIE2_CONFIGINDADDR,
+> +			     where & 0xffc);
+> +		return BCMA_CORE_PCIE2_CONFIGINDDATA;
+> +	}
+> +	if (fn > 1)
+> +		return 0;
+> +	addr_reg = (busno & 0xff) << 20 | (slot << 15) | (fn << 12) |
+> +		   (where & 0xffc) | (1 & 0x3);
+> +
+> +	bcma_write32(bdev, BCMA_CORE_PCIE2_CFG_ADDR, addr_reg);
+> +	return BCMA_CORE_PCIE2_CFG_DATA;
+> +}
+
+The normal buses seem to be ECAM compliant, I wonder if we can have the
+code to access those shared between this driver, pci-host-generic.c and
+the ACPI PCI implementation.
+
+The root bus is unfortunately not compliant, which for some reason
+is common on a lot of controllers.
+
+> +static u32 bcma_pcie2_read_config(struct bcma_device *bdev, int busno,
+> +				  unsigned int devfn, int where, int size)
+> +{
+> +	u32 base;
+> +	u32 data_reg;
+> +	u32 mask;
+> +	int shift;
+> +
+> +	base = bcma_pcie2_cfg_base(bdev, busno, devfn, where);
+> +
+> +	if (!base)
+> +		return ~0UL;
+> +
+> +	data_reg = bcma_read32(bdev, base);
+> +
+> +	/* NS: CLASS field is R/O, and set to wrong 0x200 value */
+> +	if (busno == 0 && devfn == 0) {
+> +		/*
+> +		 * RC's class is 0x0280, but Linux PCI driver needs 0x604
+> +		 * for a PCIe bridge. So we must fixup the class code
+> +		 * to 0x604 here.
+> +		 */
+> +		if ((where & 0xffc) == PCI_CLASS_REVISION) {
+> +			data_reg &= 0xff;
+> +			data_reg |= 0x604 << 16;
+> +		}
+> +	}
+> +	/* HEADER_TYPE=00 indicates the port in EP mode */
+> +
+> +	if (size == 4)
+> +		return data_reg;
+> +
+> +	mask = (1 << (size * 8)) - 1;
+> +	shift = (where % 4) * 8;
+> +	return (data_reg >> shift) & mask;
+> +}
+
+Interesting. 0x0280 is PCI_CLASS_NETWORK_OTHER, I guess this is the
+same PCI core that is used on broadcom network adapters in endpoint
+mode, and when someone tweaked the core to do root complex mode,
+they forgot to fix this.
+
+Which code depends on this? I think I've seem something similar in
+other host drivers, so maybe we can change the core code instead.
+
+> +
+> +static u8 bcma_pcie2_read_config8(struct bcma_device *bdev, int busno,
+> +				  unsigned int devfn, int where)
+> +{
+> +	return bcma_pcie2_read_config(bdev, busno, devfn, where, 1);
+> +}
+> +
+> +static u16 bcma_pcie2_read_config16(struct bcma_device *bdev, int busno,
+> +				    unsigned int devfn, int where)
+> +{
+> +	return bcma_pcie2_read_config(bdev, busno, devfn, where, 2);
+> +}
+> +
+> +static u32 bcma_pcie2_read_config32(struct bcma_device *bdev, int busno,
+> +				    unsigned int devfn, int where)
+> +{
+> +	return bcma_pcie2_read_config(bdev, busno, devfn, where, 4);
+> +}
+
+These all seem to be relatively pointless, I'd just open-code the
+bcma_pcie2_read_config call in the calling function.
+
+> +
+> +/*
+> + * Initializte the PCIe controller
+> + */
+> +static void bcma_pcie2_hw_init(struct bcma_device *bdev)
+> +{
+> +	u32 tmp32;
+> +	u16 tmp16;
+> +
+> +	/* Change MPS and MRRS to 512 */
+> +	tmp16 = bcma_pcie2_read_config16(bdev, 0, 0, 0x4d4);
+> +	tmp16 &= ~7;
+> +	tmp16 |= 2;
+> +	bcma_pcie2_write_config16(bdev, 0, 0, 0x4d4, tmp16);
+> +
+> +	tmp32 = bcma_pcie2_read_config32(bdev, 0, 0, 0xb4);
+> +	tmp32 &= ~((7 << 12) | (7 << 5));
+> +	tmp32 |= (2 << 12) | (2 << 5);
+> +	bcma_pcie2_write_config32(bdev, 0, 0, 0xb4, tmp32);
+> +
+> +	/*
+> +	 * Turn-on Root-Complex (RC) mode, from reset default of EP
+> +	 * The mode is set by straps, can be overwritten via DMU
+> +	 * register <cru_straps_control> bit 5, "1" means RC
+> +	 */
+> +
+> +	/* Send a downstream reset */
+> +	bcma_write32(bdev, BCMA_CORE_PCIE2_CLK_CONTROL,
+> +		     PCIE2_CLKC_RST_OE | PCIE2_CLKC_RST);
+> +	udelay(250);
+> +	bcma_write32(bdev, BCMA_CORE_PCIE2_CLK_CONTROL, PCIE2_CLKC_RST_OE);
+> +	mdelay(250);
+> +
+> +	/* TBD: take care of PM, check we're on */
+> +}
+
+Can you turn the two delays into msleep()? Wasting 250ms of CPU time is
+really nasty.
+
+> +	/*
+> +	 * Inbound address translation setup
+> +	 * Northstar only maps up to 128 MiB inbound, DRAM could be up to 1 GiB.
+> +	 *
+> +	 * For now allow access to entire DRAM, assuming it is less than 128MiB,
+> +	 * otherwise DMA bouncing mechanism may be required.
+> +	 * Also consider DMA mask to limit DMA physical address
+> +	 */
+> +	/* 64-bit LE regs, write low word, high is 0 at reset */
+> +	bcma_write32(bdev, BCMA_CORE_PCIE2_FUNC0_IMAP1, PHYS_OFFSET | 0x1);
+> +	bcma_write32(bdev, BCMA_CORE_PCIE2_IARR1_LOWER,
+> +			   PHYS_OFFSET | ((SZ_128M >> 20) & 0xff));
+
+Maybe I should bully you into enabling swiotlb on arm32 ;-)
+
+Do you have any machines with more than 128MB of RAM that use this?
+
+According to wikidevi.com [http://tinyurl.com/pdtw2h4], most machines
+with bcm4708/81/9 have 256MB or 512MB. I think it shouldn't be too hard
+to get swiotlb to work on arm32, given that we already use it on arm64.
+
 	Arnd
