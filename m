@@ -1,27 +1,25 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 8 Nov 2014 16:25:01 -0800
-Subject: [GIT PULL] Broadcom Cygnus SoC Device Tree changes
-In-Reply-To: <1414698612-26216-2-git-send-email-f.fainelli@gmail.com>
+Date: Sat, 8 Nov 2014 16:28:46 -0800
+Subject: [GIT PULL] Broadcom Cygnus SoC platforms changes
+In-Reply-To: <1414698612-26216-4-git-send-email-f.fainelli@gmail.com>
 References: <1414698612-26216-1-git-send-email-f.fainelli@gmail.com>
- <1414698612-26216-2-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20141109002501.GC11947@quad.lixom.net>
+ <1414698612-26216-4-git-send-email-f.fainelli@gmail.com>
+Message-ID: <20141109002846.GD11947@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
-
-On Thu, Oct 30, 2014 at 12:50:10PM -0700, Florian Fainelli wrote:
+On Thu, Oct 30, 2014 at 12:50:12PM -0700, Florian Fainelli wrote:
 > The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 > 
 >   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
 > 
 > are available in the git repository at:
 > 
->   http://github.com/brcm/linux.git tags/arm-soc/for-3.18/cygnus-dts-v9
+>   http://github.com/brcm/linux.git tags/arm-soc/for-3.18/cygnus-platform-v9
 > 
-> for you to fetch changes up to 8872fc22c2670cde338ab92be4a8e9ebad8e53e6:
+> for you to fetch changes up to 038aae04d36eff71e0b30a1c3057ec0a05bf9390:
 > 
->   ARM: dts: Enable Broadcom Cygnus SoC (2014-10-30 11:05:55 -0700)
+>   ARM: mach-bcm: ARCH_BCM_MOBILE: remove one level of menu from Kconfig (2014-10-30 11:39:51 -0700)
 > 
 > ----------------------------------------------------------------
 > This patchset contains initial support for Broadcom's Cygnus SoC based on our
@@ -30,23 +28,11 @@ On Thu, Oct 30, 2014 at 12:50:10PM -0700, Florian Fainelli wrote:
 > drivers will be submitted soon, as will device tree configurations for other
 > Cygnus board variants.
 > 
-> These are the Device Tree changes
-> 
-> ----------------------------------------------------------------
-> Jonathan Richardson (1):
->       dt-bindings: Document Broadcom Cygnus SoC and clocks
-> 
-> Scott Branden (1):
->       ARM: dts: Enable Broadcom Cygnus SoC
+> These are the platform changes
 
-I just posted a set of comments on this original patch that I noticed
-when reviewing it while merging. Please send a fresh pull request when
-they're addressed.
+Hi,
 
-Also, about your tag texts: There's no need to have the first paragraph
-boiler on all of them, I'd rather appreciate a sentence or two about
-what the DTS'es are in this case (i.e. one dtsi for the family and three
-different boards based on it), etc. You'll get a hang of it over time. :)
+Merged into next/soc. Thanks!
 
 
 -Olof
