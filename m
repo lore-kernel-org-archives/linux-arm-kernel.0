@@ -1,57 +1,112 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Sun,  9 Nov 2014 09:50:33 +0530
-Subject: [PATCH v7 6/7] arm64: exynos7: Enable ARMv8 based Exynos7 (SoC)
- support
-In-Reply-To: <1415506834-8180-1-git-send-email-a.kesavan@samsung.com>
-References: <1415506834-8180-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1415506834-8180-7-git-send-email-a.kesavan@samsung.com>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Sun, 9 Nov 2014 11:26:44 +0700
+Subject: [Patch Part2 v5 21/31] PCI/MSI: Enhance core to support hierarchy
+ irqdomain
+In-Reply-To: <1415283644-2559-22-git-send-email-jiang.liu@linux.intel.com>
+References: <1415283644-2559-1-git-send-email-jiang.liu@linux.intel.com>
+ <1415283644-2559-22-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <545EED04.4090008@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alim Akhtar <alim.akhtar@samsung.com>
+Hi Gerry,
 
-This patch adds the necessary Kconfig entries to enable
-support for the ARMv8 based Exynos7 SoC. It also enables
-RTC, WDT and Pinctrl for Exynos7.
+Please see my comments / questions below.
 
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-Signed-off-by: Naveen Krishna Ch <naveenkrishna.ch@gmail.com>
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
-Tested-by: Thomas Abraham <thomas.ab@samsung.com>
-Cc: Rob Herring <robh@kernel.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/Kconfig | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+On 11/6/14 21:20, Jiang Liu wrote:
+> Enhance PCI MSI core to support hierarchy irqdomain, so the common
+> code could be shared among architectures.
+>
+> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+> ---
+> Hi Thomas,
+> 	These changes are a temporary solution, I'm working on another
+> patch set which will refine these interfaces, especially kill
+> arch_msi_irq_domain_{set|get}_hwirq().
+> Regards!
+> Gerry
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 66b0b51..2b5e0b0 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -143,6 +143,23 @@ source "kernel/Kconfig.freezer"
- 
- menu "Platform selection"
- 
-+config ARCH_EXYNOS
-+	bool
-+	help
-+	  This enables support for Samsung Exynos SoC family
-+
-+config ARCH_EXYNOS7
-+	bool "ARMv8 based Samsung Exynos7"
-+	select ARCH_EXYNOS
-+	select COMMON_CLK_SAMSUNG
-+	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-+	select HAVE_S3C_RTC if RTC_CLASS
-+	select PINCTRL
-+	select PINCTRL_EXYNOS
-+
-+	help
-+	  This enables support for Samsung Exynos7 SoC family
-+
- config ARCH_THUNDER
- 	bool "Cavium Inc. Thunder SoC Family"
- 	help
--- 
-2.1.0
+Would the change includes the struct irqdomain_msi_data proposed by 
+Thomas here (https://lkml.org/lkml/2014/11/6/210)?
+
+> [...]
+> +static int msi_domain_alloc(struct irq_domain *domain, unsigned int virq,
+> +			    unsigned int nr_irqs, void *arg)
+> +{
+> +	int i, ret;
+> +	irq_hw_number_t hwirq = arch_msi_irq_domain_get_hwirq(arg);
+> +
+> +	if (irq_find_mapping(domain, hwirq) > 0)
+> +		return -EEXIST;
+> +
+> +	ret = irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, arg);
+> +	if (ret < 0)
+> +		return ret;
+> +
+
+When executing irq_domain_alloc_irqs_parent(), it triggers the following 
+warning message due to
+
+	WARN_ON(desc->irq_data.chip == &no_irq_chip)
+
+------------[ cut here ]------------
+WARNING: CPU: 2 PID: 912 at kernel/irq/chip.c:734 
+__irq_set_handler+0x138/0x13c()
+Modules linked in: mlx4_core(+) rtc_efi efivarfs
+CPU: 2 PID: 912 Comm: modprobe Not tainted 3.18.0-rc3-p2v5+ #53
+Call trace:
+[<fffffe00000963d4>] dump_backtrace+0x0/0x16c
+[<fffffe0000096550>] show_stack+0x10/0x1c
+[<fffffe000067545c>] dump_stack+0x74/0x98
+[<fffffe00000b205c>] warn_slowpath_common+0x84/0xac
+[<fffffe00000b2148>] warn_slowpath_null+0x14/0x20
+[<fffffe00000ed968>] __irq_set_handler+0x134/0x13c
+[<fffffe000042af14>] gic_irq_domain_map+0x4c/0xac
+[<fffffe000042afd4>] gic_irq_domain_alloc+0x60/0x88
+[<fffffe000042b374>] gicv2m_domain_alloc+0x30/0xa8
+[<fffffe00000efc1c>] __irq_domain_alloc_irqs+0x144/0x30c
+[<fffffe000042b58c>] gicv2m_setup_msi_irq+0xc0/0x118
+[<fffffe000044548c>] arch_setup_msi_irq+0x34/0x60
+[<fffffe0000445544>] arch_setup_msi_irqs+0x50/0xb0
+[<fffffe0000445e3c>] pci_enable_msix+0x310/0x39c
+[<fffffe0000445efc>] pci_enable_msix_range+0x34/0x9c
+....
+
+However, I think if we call irq_domain_set_hwirq_and_chip() in the 
+msi_create_irq_domain() as suggested by Thomas, that should also fix 
+this issue.
+
+> +	for (i = 0; i < nr_irqs; i++) {
+> +		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
+> +					      domain->host_data,
+> +					      (void *)(long)i);
+> +		__irq_set_handler(virq + i, handle_edge_irq, 0, "edge");
+> +	}
+
+Is there are a way to specify other type of handler besides edge?
+
+> [...]
+> +static void msi_domain_activate(struct irq_domain *domain,
+> +				struct irq_data *irq_data)
+> +{
+> +	struct msi_msg msg;
+> +
+> +	/*
+> +	 * irq_data->chip_data is MSI/MSI-X offset.
+> +	 * MSI-X message is written per-IRQ, the offset is always 0.
+> +	 * MSI message denotes a contiguous group of IRQs, written for 0th IRQ.
+> +	 */
+> +	if (irq_data->chip_data)
+> +		return;
+
+Actually, I am a bit confused with this comment here.  If you look at 
+"/drivers/pci/msi.c: arch_setup_msi_irq()", it calls 
+irq_set_chip_data(des->irq, chip) where chip is *msi_chip.
+
+It looks like if the arch uses this API, it would conflict with what you 
+have here where the irq_data->chip_data would be not NULL at the logic 
+above, and would always return.
+
+Thank you,
+
+Suravee
