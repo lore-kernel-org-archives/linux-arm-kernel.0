@@ -1,17 +1,18 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 8 Nov 2014 16:44:54 -0800
-Subject: [GIT PULL 1/3] ARM: berlin: Driver changes for v3.19 (round 1)
-In-Reply-To: <1414927473-25249-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Sat, 8 Nov 2014 16:47:12 -0800
+Subject: [GIT PULL 2/3] ARM: berlin: SoC changes for v3.19 (round 1)
+In-Reply-To: <1414927473-25249-2-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1414927473-25249-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20141109004454.GG11947@quad.lixom.net>
+ <1414927473-25249-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20141109004712.GH11947@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 02, 2014 at 12:24:31PM +0100, Sebastian Hesselbarth wrote:
+On Sun, Nov 02, 2014 at 12:24:32PM +0100, Sebastian Hesselbarth wrote:
 > Arnd, Kevin, Olof,
 > 
-> this is Berlin driver changes for v3.19 and just contains the reset driver
-> that missed the v3.18 merge window.
+> this is Berlin SoC changes for v3.19 and contains the Kconfig patch
+> for reset driver that missed the v3.18 merge window.
 > 
 > Please pull.
 > 
@@ -24,17 +25,17 @@ On Sun, Nov 02, 2014 at 12:24:31PM +0100, Sebastian Hesselbarth wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-driver-3.19-1
+>   git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-soc-3.19-1
 > 
-> for you to fetch changes up to bd13251f71fc86f06b344810835bc4e5e77edef7:
+> for you to fetch changes up to e9246c8726312aae36202b9e50c7e76a8609b712:
 > 
->   reset: add the Berlin reset controller driver (2014-10-20 16:51:56 +0200)
+>   ARM: Berlin: select the reset controller (2014-10-21 11:35:15 +0200)
 > 
 > ----------------------------------------------------------------
-> Berlin Driver changes for v3.19 (round 1)
-> - Reset driver, Acked by Philipp Zabel
+> Berlin SoC changes for v3.19 (round 1)
+> - Select the reset driver for all SoCs
 
-Merged, thanks.
+Merged into next/soc. Thanks.
 
 
 -Olof
