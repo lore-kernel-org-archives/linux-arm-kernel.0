@@ -1,32 +1,49 @@
 From: b.galvani@gmail.com (Beniamino Galvani)
-Date: Sun,  9 Nov 2014 10:25:10 +0100
-Subject: [PATCH 0/3] spi: Add support for Amlogic Meson SPIFC
-Message-ID: <1415525113-25598-1-git-send-email-b.galvani@gmail.com>
+Date: Sun,  9 Nov 2014 10:25:11 +0100
+Subject: [PATCH 1/3] spi: meson: Add device tree bindings documentation for
+ SPIFC
+In-Reply-To: <1415525113-25598-1-git-send-email-b.galvani@gmail.com>
+References: <1415525113-25598-1-git-send-email-b.galvani@gmail.com>
+Message-ID: <1415525113-25598-2-git-send-email-b.galvani@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This adds documentation of device tree bindings for the Amlogic Meson
+SPIFC (SPI Flash Controller).
 
-this patchset adds a driver for the SPIFC (SPI flash controller)
-available in Amlogic Meson6 and Meson8 SoCs. It doesn't support DMA
-and has a 64-byte unified transmit/receive buffer.
-
-The driver has been tested on a Meson8 based device to communicate
-with a Macronix mx25l1606e serial flash.
-
-Beniamino Galvani (3):
-  spi: meson: Add device tree bindings documentation for SPIFC
-  spi: meson: Add support for Amlogic Meson SPIFC
-  ARM: dts: meson: add node for SPIFC
-
- .../devicetree/bindings/spi/spi-meson.txt          |  22 ++
- arch/arm/boot/dts/meson.dtsi                       |   9 +
- drivers/spi/Kconfig                                |   7 +
- drivers/spi/Makefile                               |   1 +
- drivers/spi/spi-meson-spifc.c                      | 411 +++++++++++++++++++++
- 5 files changed, 450 insertions(+)
+Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+---
+ .../devicetree/bindings/spi/spi-meson.txt          | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/spi/spi-meson.txt
- create mode 100644 drivers/spi/spi-meson-spifc.c
 
+diff --git a/Documentation/devicetree/bindings/spi/spi-meson.txt b/Documentation/devicetree/bindings/spi/spi-meson.txt
+new file mode 100644
+index 0000000..bb52a86
+--- /dev/null
++++ b/Documentation/devicetree/bindings/spi/spi-meson.txt
+@@ -0,0 +1,22 @@
++Amlogic Meson SPI controllers
++
++* SPIFC (SPI Flash Controller)
++
++The Meson SPIFC is a controller optimized for communication with SPI
++NOR memories, without DMA support and a 64-byte unified transmit /
++receive buffer.
++
++Required properties:
++ - compatible: should be "amlogic,meson6-spifc"
++ - reg: physical base address and length of the controller registers
++ - clocks: phandle of the input clock for the baud rate generator
++ - #address-cells: should be 1
++ - #size-cells: should be 0
++
++	spi at c1108c80 {
++		compatible = "amlogic,meson6-spifc";
++		reg = <0xc1108c80 0x80>;
++		clocks = <&clk81>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
 -- 
 1.9.1
