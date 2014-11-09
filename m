@@ -1,16 +1,22 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 8 Nov 2014 16:39:48 -0800
-Subject: [GIT PULL] ARM: STi: DT changes for v3.19, round 1
-In-Reply-To: <54537F9F.4070500@st.com>
-References: <54537F9F.4070500@st.com>
-Message-ID: <20141109003948.GF11947@quad.lixom.net>
+Date: Sat, 8 Nov 2014 16:44:54 -0800
+Subject: [GIT PULL 1/3] ARM: berlin: Driver changes for v3.19 (round 1)
+In-Reply-To: <1414927473-25249-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1414927473-25249-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20141109004454.GG11947@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 01:25:03PM +0100, Maxime Coquelin wrote:
-> Hi Olof, Arnd and Kevin,
+On Sun, Nov 02, 2014 at 12:24:31PM +0100, Sebastian Hesselbarth wrote:
+> Arnd, Kevin, Olof,
 > 
-> Please consider this first round of STi DT updates for v3.19:
+> this is Berlin driver changes for v3.19 and just contains the reset driver
+> that missed the v3.18 merge window.
+> 
+> Please pull.
+> 
+> Thanks,
+>   Sebastian
 > 
 > The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 > 
@@ -18,25 +24,15 @@ On Fri, Oct 31, 2014 at 01:25:03PM +0100, Maxime Coquelin wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.stlinux.com/devel/kernel/linux-sti.git tags/sti-dt-for-v3.19-1
+>   git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-driver-3.19-1
 > 
-> for you to fetch changes up to 43ca480c4e42f536fcf18118afcffad685e1292c:
+> for you to fetch changes up to bd13251f71fc86f06b344810835bc4e5e77edef7:
 > 
->   ARM: STi: DT: STiH407: Fix: clk-tmds-hdmi clock is missing
-> (2014-10-31 12:07:44 +0100)
+>   reset: add the Berlin reset controller driver (2014-10-20 16:51:56 +0200)
 > 
 > ----------------------------------------------------------------
-> STi DT updates for v3.19, round 1.
-> 
-> Highlights:
-> -----------
->  - Add SDHCI support for STiH41x B2020 boards
->  - Add reset controllers to STiH407 SoC
->  - Add MiPHY & SATA support to STiH416
->  - Add Thermal supportto STiH416
->  - Add Clock support to STiH407 SoC
-> 
-> This tag also includes STiH407 bindings definitions for reset controller.
+> Berlin Driver changes for v3.19 (round 1)
+> - Reset driver, Acked by Philipp Zabel
 
 Merged, thanks.
 
