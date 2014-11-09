@@ -1,46 +1,51 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 8 Nov 2014 16:48:50 -0800
-Subject: [GIT PULL 3/3] ARM: berlin: DT changes for v3.19 (round 1)
-In-Reply-To: <1414927473-25249-3-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1414927473-25249-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1414927473-25249-3-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20141109004850.GA13776@quad.lixom.net>
+Date: Sat, 8 Nov 2014 16:53:14 -0800
+Subject: [GIT PULL] Ux500 core changes for v3.19
+In-Reply-To: <CACRpkda3KMkrCSDeSUycmeDUJTDFVq6hesYfLTfmoeCB3oP6MA@mail.gmail.com>
+References: <CACRpkda3KMkrCSDeSUycmeDUJTDFVq6hesYfLTfmoeCB3oP6MA@mail.gmail.com>
+Message-ID: <20141109005314.GA13855@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 02, 2014 at 12:24:33PM +0100, Sebastian Hesselbarth wrote:
-> Arnd, Kevin, Olof,
+On Sun, Nov 02, 2014 at 11:17:31PM +0100, Linus Walleij wrote:
+> Hi ARM SoC folks,
 > 
-> this is Berlin DT changes for v3.19 and contains those patches that missed
-> the v3.18 merge window plus corresponding patches to catch-up with Antoine's
-> BG2Q improvements for BG2 and BG2CD. We now have working SDHCI and Ethernet
-> on all SoCs (well, BG2CD has HDMI HEC only), SATA PHY support for BG2 is still
-> pending.
+> please pull in these Ux500 core changes for this kernel development
+> cycle: mainly a generic power domain implementation from Ulf Hansson
+> that needs to get queued up in -next and tested.
 > 
-> Please pull.
+> Yours,
+> Linus Walleij
 > 
-> Thanks,
->   Sebastian
+> The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
 > 
-> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-> 
->   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+>   Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-dt-3.19-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> tags/ux500-core-for-arm-soc
 > 
-> for you to fetch changes up to e4fdc8e5821d852a933963ba56b9b2fa8f68c68f:
+> for you to fetch changes up to 29417fe80ad2fd4f62f00dcca96c7198870e5642:
 > 
->   ARM: dts: berlin: Enable eMMC on Sony NSZ-GS7 (2014-10-29 19:44:47 +0100)
+>   ARM: ux500: Add i2c devices to the VAPE PM domain (2014-10-28 10:50:46 +0100)
 > 
 > ----------------------------------------------------------------
-> Berlin DT changes for v3.19 (round 1)
-> - AHCI and SATA PHY nodes for BG2Q
-> - Reset controller binding docs
-> - Ethernet nodes for BG2, BG2CD
-> - SDHCI nodes for BG2, BG2CD
-> - Corresponding board changes to enable AHCI, Ethernet, SDHCI
+> Generic power domains for the Ux500
+> 
+> ----------------------------------------------------------------
+> Joe Perches (1):
+>       ARM: u300: Convert pr_warning to pr_warn
+> 
+> Ulf Hansson (8):
+>       dt: bindings: ux500: Add documentation for PM domains
+>       dt: bindings: ux500: Add header for PM domains specifiers
+>       ARM: ux500: Initial support for PM domains
+>       ARM: ux500: Enable Kconfig for the generic PM domain
+>       ARM: ux500: Add DT node for ux500 PM domains
+>       ARM: ux500: Add sdi devices to the VAPE PM domain
+>       ARM: ux500: Add spi and ssp devices to the VAPE PM domain
+>       ARM: ux500: Add i2c devices to the VAPE PM domain
 
 Merged, thanks.
 
