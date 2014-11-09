@@ -1,50 +1,50 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 8 Nov 2014 23:55:50 -0500
-Subject: [PATCH v2 0/5] irqchip: atmel-aic: add RTT irq fixup
-In-Reply-To: <1415003464-29239-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1415003464-29239-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20141109045550.GS3698@titan.lakedaemon.net>
+Date: Sun, 9 Nov 2014 00:23:48 -0500
+Subject: [PATCH 0/7] Armada 375/38x perf support, and a bonus irqchip
+ driver simplification
+In-Reply-To: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20141109052348.GT3698@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 03, 2014 at 09:30:59AM +0100, Boris Brezillon wrote:
-> Hello,
+On Wed, Oct 22, 2014 at 10:43:40AM -0300, Ezequiel Garcia wrote:
+> This patchset enables support for perf hardware events, by enabling the PMU
+> interrupts in the irqchip driver.
 > 
-> This patch series add a new fixup function for the RTT (Real Time Timer)
-> block and make use of it on SoCs integrating at least one RTT to prevent
-> spurious interrupts on the first interrupt line.
+> While doing this, we noticed the driver could use some cleaning to simplify
+> the overly complex implementation of the .map(), .unmask() and .mask()
+> functions.
 > 
-> This fixup function was previously implemented in
-> arch/arm/mach-at91/sysirq_mask.c, but is now moved to the AIC driver so
-> that we can remove SoC specific hooks in arch/arm/mach-at91/ when booting
-> a DT kernel.
+> The first three patches are the result of this cleaning effort, while the
+> rest of the series is the Perf support for Armada 375 and Armada 38x SoCs.
 > 
-> This series also reworks the naming convention of the SoC specific fixup
-> functions and add an entry for the at91rm9200.
+> The series is based on v3.18-rc1.
 > 
-> Best Regards,
-> 
-> Boris
-> 
-> Changes since v1:
-> - rebased on linux-3.18-rc2
-> 
-> Boris BREZILLON (5):
->   irqchip: atmel-aic: add irq fixup for RTT block
->   irqchip: atmel-aic: add irq fixups for at91sam926x SoCs
->   irqchip: atmel-aic: add specific irq fixup function for sam9g45 and
->     sam9rl
->   irqchip: atmel-aic: rename at91sam9_aic_irq_fixup for naming
->     consistency
->   irqchip: atmel-aic: add missing entry for rm9200 irq fixups
-> 
->  drivers/irqchip/irq-atmel-aic-common.c | 26 ++++++++++++++++++++++++++
->  drivers/irqchip/irq-atmel-aic-common.h |  2 ++
->  drivers/irqchip/irq-atmel-aic.c        | 26 +++++++++++++++++++++-----
->  3 files changed, 49 insertions(+), 5 deletions(-)
+> Ezequiel Garcia (7):
+>   irqchip: armada-370-xp: Simplify interrupt map, mask and unmask
+>   irqchip: armada-370-xp: Initialize per cpu registers when CONFIG_SMP=N
+>   irqchip: armada-370-xp: Introduce a is_percpu_irq() helper for
+>     readability
+>   irqchip: armada-370-xp: Enable Performance Counter interrupts
 
-Whole series applied to irqchip/atmel
+Patches 1 to 4 tentatively applied to irqchip/mvebu.  Things have been
+quiet, so let's get it in next for some more test coverage.
 
 thx,
 
 Jason.
+
+>   ARM: mvebu: Enable Performance Monitor Unit on Armada 375 SoC
+>   ARM: mvebu: Enable Performance Monitor Unit on Armada 380/385 SoC
+>   ARM: mvebu: Enable perf support in mvebu_v7_defconfig
+> 
+>  arch/arm/boot/dts/armada-375.dtsi   |  5 ++
+>  arch/arm/boot/dts/armada-38x.dtsi   |  5 ++
+>  arch/arm/configs/mvebu_v7_defconfig |  1 +
+>  drivers/irqchip/irq-armada-370-xp.c | 95 ++++++++++++++++++-------------------
+>  4 files changed, 58 insertions(+), 48 deletions(-)
+> 
+> -- 
+> 2.1.0
+> 
