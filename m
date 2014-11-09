@@ -1,21 +1,19 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 8 Nov 2014 16:53:14 -0800
-Subject: [GIT PULL] Ux500 core changes for v3.19
-In-Reply-To: <CACRpkda3KMkrCSDeSUycmeDUJTDFVq6hesYfLTfmoeCB3oP6MA@mail.gmail.com>
-References: <CACRpkda3KMkrCSDeSUycmeDUJTDFVq6hesYfLTfmoeCB3oP6MA@mail.gmail.com>
-Message-ID: <20141109005314.GA13855@quad.lixom.net>
+Date: Sat, 8 Nov 2014 16:54:20 -0800
+Subject: [GIT PULL] at91: dt for 3.19 #1
+In-Reply-To: <1415036597-3501-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1415036597-3501-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20141109005420.GB13855@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 02, 2014 at 11:17:31PM +0100, Linus Walleij wrote:
-> Hi ARM SoC folks,
+On Mon, Nov 03, 2014 at 06:43:17PM +0100, Nicolas Ferre wrote:
+> Arnd, Olof, Kevin,
 > 
-> please pull in these Ux500 core changes for this kernel development
-> cycle: mainly a generic power domain implementation from Ulf Hansson
-> that needs to get queued up in -next and tested.
+> Very little DT update for AT91. More will come but I want to send this first
+> batch soon so it doesn't get in the way of larger modifications.
 > 
-> Yours,
-> Linus Walleij
+> Thanks, best regards,
 > 
 > The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
 > 
@@ -23,29 +21,16 @@ On Sun, Nov 02, 2014 at 11:17:31PM +0100, Linus Walleij wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-> tags/ux500-core-for-arm-soc
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-dt
 > 
-> for you to fetch changes up to 29417fe80ad2fd4f62f00dcca96c7198870e5642:
+> for you to fetch changes up to 2667c6adfcf686e8c5a5b56e8c7c65af001df2cb:
 > 
->   ARM: ux500: Add i2c devices to the VAPE PM domain (2014-10-28 10:50:46 +0100)
-> 
-> ----------------------------------------------------------------
-> Generic power domains for the Ux500
+>   ARM: at91/dt: at91sam9263: Add CAN device nodes (2014-11-03 11:34:33 +0100)
 > 
 > ----------------------------------------------------------------
-> Joe Perches (1):
->       ARM: u300: Convert pr_warning to pr_warn
-> 
-> Ulf Hansson (8):
->       dt: bindings: ux500: Add documentation for PM domains
->       dt: bindings: ux500: Add header for PM domains specifiers
->       ARM: ux500: Initial support for PM domains
->       ARM: ux500: Enable Kconfig for the generic PM domain
->       ARM: ux500: Add DT node for ux500 PM domains
->       ARM: ux500: Add sdi devices to the VAPE PM domain
->       ARM: ux500: Add spi and ssp devices to the VAPE PM domain
->       ARM: ux500: Add i2c devices to the VAPE PM domain
+> First DT batch for 3.19:
+> - CAN device nodes for at91sam9263 and at91sam9x5
+> - at91sam9x5 DMA definitions for usart
 
 Merged, thanks.
 
