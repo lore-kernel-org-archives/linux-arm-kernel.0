@@ -1,47 +1,22 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 9 Nov 2014 09:44:30 +0000
-Subject: [GIT PULL] arm64 fixes for 3.18
-Message-ID: <20141109094422.GA14540@e104818-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 9 Nov 2014 10:17:29 +0000
+Subject: [PATCH 3/3] ARM: dts: meson: add node for SPIFC
+In-Reply-To: <1415525113-25598-4-git-send-email-b.galvani@gmail.com>
+References: <1415525113-25598-1-git-send-email-b.galvani@gmail.com>
+ <1415525113-25598-4-git-send-email-b.galvani@gmail.com>
+Message-ID: <20141109101729.GN2722@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Sun, Nov 09, 2014 at 10:25:13AM +0100, Beniamino Galvani wrote:
+> This adds a node for the SPI Flash Controller to the Amlogic Meson
+> DTS.
 
-Please pull the arm64 fixes below. Thanks.
-
-The following changes since commit 3dec0fe48a8936528aae2fc3f904c2c9a34ba368:
-
-  arm64: Fix memblock current_limit with 64K pages and 48-bit VA (2014-10-24 18:16:47 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to 2d39ad649eca1e8a993f4fda244fe17ecea7a38d:
-
-  arm64: defconfig: update defconfig for 3.18 (2014-11-05 17:07:58 +0000)
-
-----------------------------------------------------------------
-arm64 fixes:
-
-- enable bpf syscall for compat
-- cpu_suspend fix when checking the idle state type
-- defconfig update
-
-----------------------------------------------------------------
-Amit Daniel Kachhap (1):
-      arm64: psci: fix cpu_suspend to check idle state type for index
-
-Catalin Marinas (1):
-      arm64: compat: Enable bpf syscall
-
-Will Deacon (1):
-      arm64: defconfig: update defconfig for 3.18
-
- arch/arm64/configs/defconfig      | 26 ++++++++++++++++++++++++--
- arch/arm64/include/asm/unistd32.h |  2 ++
- arch/arm64/kernel/psci.c          |  2 +-
- 3 files changed, 27 insertions(+), 3 deletions(-)
-
--- 
-Catalin
+Acked-by: Mark Brown <broonie@kernel.org>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141109/6cc09c3a/attachment.sig>
