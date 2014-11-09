@@ -1,136 +1,307 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 09 Nov 2014 21:27:40 +0100
-Subject: [RFC] PCI: BCM5301X: add PCIe2 driver for BCM5301X SoCs
-In-Reply-To: <545E8AA2.6050301@hauke-m.de>
-References: <1415470392-28229-1-git-send-email-hauke@hauke-m.de>
- <1756974.RYWuW6FYtL@wuerfel> <545E8AA2.6050301@hauke-m.de>
-Message-ID: <11068573.lefhT3BUSj@wuerfel>
+From: sean@mess.org (Sean Young)
+Date: Sun, 9 Nov 2014 20:36:09 +0000
+Subject: [PATCH v2 2/3] media: rc: add driver for Amlogic Meson IR remote
+ receiver
+In-Reply-To: <1415521928-25251-3-git-send-email-b.galvani@gmail.com>
+References: <1415521928-25251-1-git-send-email-b.galvani@gmail.com>
+ <1415521928-25251-3-git-send-email-b.galvani@gmail.com>
+Message-ID: <20141109203608.GA837@gofer.mess.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 08 November 2014 22:26:58 Hauke Mehrtens wrote:
-> On 11/08/2014 08:47 PM, Arnd Bergmann wrote:
-> > On Saturday 08 November 2014 19:13:12 Hauke Mehrtens wrote:
-> > 
-> >> diff --git a/drivers/pci/host/pci-host-bcm5301x.c b/drivers/pci/host/pci-host-bcm5301x.c
-> >> new file mode 100644
-> >> index 0000000..8b7ba62
-> >> --- /dev/null
-> >> +++ b/drivers/pci/host/pci-host-bcm5301x.c
-> >> @@ -0,0 +1,483 @@
-> >> +/*
-> >> + * Northstar PCI-Express driver
-> >> + * Only supports Root-Complex (RC) mode
-> >> + *
-> >> + * Notes:
-> >> + * PCI Domains are being used to identify the PCIe port 1:1.
-> >> + *
-> >> + * Only MEM access is supported, PAX does not support IO.
-> > 
-> > What is PAX?
+On Sun, Nov 09, 2014 at 09:32:07AM +0100, Beniamino Galvani wrote:
+> Amlogic Meson SoCs include a infrared remote control receiver that can
+> operate in two modes: "NEC" mode in which the hardware decodes frames
+> using the NEC IR protocol, and "general" mode in which the receiver
+> simply reports the duration of pulses and spaces for software
+> decoding.
 > 
-> This is the name of the PCIe controller I think, This was copied from
-> the vendor driver, I hope Florian knows more details.
-
-Just clarify this in the comment.
-
-> >> +static int bcma_pcie2_map_irq(const struct pci_dev *pdev, u8 slot, u8 pin)
-> >> +{
-> >> +	struct pci_sys_data *sys = pdev->sysdata;
-> >> +	struct bcma_device *bdev = sys->private_data;
-> >> +
-> >> +	/*
-> >> +	 * Every PCIe controller has 5 IRQ number and the last one is
-> >> +	 * triggered every time, use that one
-> >> +	 */
-> >> +	if (bdev && bdev->dev.of_node)
-> >> +		return irq_of_parse_and_map(bdev->dev.of_node, 4);
-> >> +
-> >> +	return bdev->irq;
-> >> +}
-> > 
-> > If you have an OF device node for the PCI host, you don't need this,
-> > there should already be an interrupt-map property that correctly
-> > maps this into the interrupt domain of the bcma bus, so you can use
-> > the default of_irq_parse_and_map_pci function.
+> This is a driver for the IR receiver that implements software decoding
+> of received frames.
 > 
-> So I just have to define a interrupt-map property for the device this
-> driver gets registered for and then I can use the default implementation?
-
-It depends on what you want to cover. For all I know, you normally don't
-need a DT entry for this PCI host, as it's covered by the upstream bus.
-
-However adding a DT node would let you do some things that you can't
-currently do:
-
-- specify the inbound and outbound windows to configure
-- list different interrupts, e.g. if there is a PCIe-to-PCI bridge
-  and the device connected to it is routed to a GPIO pin or the
-  another input of the main interrupt controller.
-
-> >> +static u32 bcma_pcie2_cfg_base(struct bcma_device *bdev, int busno,
-> >> +			       unsigned int devfn, int where)
-> >> +{
-> >> +	int slot = PCI_SLOT(devfn);
-> >> +	int fn = PCI_FUNC(devfn);
-> >> +	u32 addr_reg;
-> >> +
-> >> +	if (busno == 0) {
-> >> +		if (slot >= 1)
-> >> +			return 0;
-> >> +		bcma_write32(bdev, BCMA_CORE_PCIE2_CONFIGINDADDR,
-> >> +			     where & 0xffc);
-> >> +		return BCMA_CORE_PCIE2_CONFIGINDDATA;
-> >> +	}
-> >> +	if (fn > 1)
-> >> +		return 0;
-> >> +	addr_reg = (busno & 0xff) << 20 | (slot << 15) | (fn << 12) |
-> >> +		   (where & 0xffc) | (1 & 0x3);
-> >> +
-> >> +	bcma_write32(bdev, BCMA_CORE_PCIE2_CFG_ADDR, addr_reg);
-> >> +	return BCMA_CORE_PCIE2_CFG_DATA;
-> >> +}
-> > 
-> > The normal buses seem to be ECAM compliant, I wonder if we can have the
-> > code to access those shared between this driver, pci-host-generic.c and
-> > the ACPI PCI implementation.
+> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+> ---
+>  MAINTAINERS                 |   1 +
+>  drivers/media/rc/Kconfig    |  11 +++
+>  drivers/media/rc/Makefile   |   1 +
+>  drivers/media/rc/meson-ir.c | 215 ++++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 228 insertions(+)
+>  create mode 100644 drivers/media/rc/meson-ir.c
 > 
-> There are just a few lines we can share I do not think that would be
-> worth the effort.
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 0662378..f1bc045 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -850,6 +850,7 @@ ARM/Amlogic MesonX SoC support
+>  M:	Carlo Caione <carlo@caione.org>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  S:	Maintained
+> +F:	drivers/media/rc/meson-ir.c
+>  N:	meson[x68]
+>  
+>  ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES
+> diff --git a/drivers/media/rc/Kconfig b/drivers/media/rc/Kconfig
+> index 1aea732..ddfab25 100644
+> --- a/drivers/media/rc/Kconfig
+> +++ b/drivers/media/rc/Kconfig
+> @@ -223,6 +223,17 @@ config IR_FINTEK
+>  	   To compile this driver as a module, choose M here: the
+>  	   module will be called fintek-cir.
+>  
+> +config IR_MESON
+> +	tristate "Amlogic Meson IR remote receiver"
+> +	depends on RC_CORE
+> +	depends on ARCH_MESON || COMPILE_TEST
+> +	---help---
+> +	   Say Y if you want to use the IR remote receiver available
+> +	   on Amlogic Meson SoCs.
+> +
+> +	   To compile this driver as a module, choose M here: the
+> +	   module will be called meson-ir.
+> +
+>  config IR_NUVOTON
+>  	tristate "Nuvoton w836x7hg Consumer Infrared Transceiver"
+>  	depends on PNP
+> diff --git a/drivers/media/rc/Makefile b/drivers/media/rc/Makefile
+> index 8f509e0..379a5c0 100644
+> --- a/drivers/media/rc/Makefile
+> +++ b/drivers/media/rc/Makefile
+> @@ -22,6 +22,7 @@ obj-$(CONFIG_IR_IMON) += imon.o
+>  obj-$(CONFIG_IR_ITE_CIR) += ite-cir.o
+>  obj-$(CONFIG_IR_MCEUSB) += mceusb.o
+>  obj-$(CONFIG_IR_FINTEK) += fintek-cir.o
+> +obj-$(CONFIG_IR_MESON) += meson-ir.o
+>  obj-$(CONFIG_IR_NUVOTON) += nuvoton-cir.o
+>  obj-$(CONFIG_IR_ENE) += ene_ir.o
+>  obj-$(CONFIG_IR_REDRAT3) += redrat3.o
+> diff --git a/drivers/media/rc/meson-ir.c b/drivers/media/rc/meson-ir.c
+> new file mode 100644
+> index 0000000..4d6aed1
+> --- /dev/null
+> +++ b/drivers/media/rc/meson-ir.c
+> @@ -0,0 +1,215 @@
+> +/*
+> + * Driver for Amlogic Meson IR remote receiver
+> + *
+> + * Copyright (C) 2014 Beniamino Galvani <b.galvani@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * version 2 as published by the Free Software Foundation.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/device.h>
+> +#include <linux/err.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/spinlock.h>
+> +
+> +#include <media/rc-core.h>
+> +
+> +#define DRIVER_NAME		"meson-ir"
+> +
+> +#define IR_DEC_LDR_ACTIVE	0x00
+> +#define IR_DEC_LDR_IDLE		0x04
+> +#define IR_DEC_LDR_REPEAT	0x08
+> +#define IR_DEC_BIT_0		0x0c
+> +#define IR_DEC_REG0		0x10
+> +#define IR_DEC_FRAME		0x14
+> +#define IR_DEC_STATUS		0x18
+> +#define IR_DEC_REG1		0x1c
+> +
+> +#define REG0_RATE_MASK		(BIT(11) - 1)
+> +
+> +#define REG1_MODE_MASK		(BIT(7) | BIT(8))
+> +#define REG1_MODE_NEC		(0 << 7)
+> +#define REG1_MODE_GENERAL	(2 << 7)
+> +
+> +#define REG1_TIME_IV_SHIFT	16
+> +#define REG1_TIME_IV_MASK	((BIT(13) - 1) << REG1_TIME_IV_SHIFT)
+> +
+> +#define REG1_IRQSEL_MASK	(BIT(2) | BIT(3))
+> +#define REG1_IRQSEL_NEC_MODE	(0 << 2)
+> +#define REG1_IRQSEL_RISE_FALL	(1 << 2)
+> +#define REG1_IRQSEL_FALL	(2 << 2)
+> +#define REG1_IRQSEL_RISE	(3 << 2)
+> +
+> +#define REG1_RESET		BIT(0)
+> +#define REG1_ENABLE		BIT(15)
+> +
+> +#define STATUS_IR_DEC_IN	BIT(8)
+> +
+> +#define MESON_TRATE		10	/* us */
+> +
+> +struct meson_ir {
+> +	void __iomem	*reg;
+> +	struct rc_dev	*rc;
+> +	int		irq;
+> +	spinlock_t	lock;
+> +};
+> +
+> +static void meson_ir_set_mask(struct meson_ir *ir, unsigned int reg,
+> +			      u32 mask, u32 value)
+> +{
+> +	u32 data;
+> +
+> +	data = readl(ir->reg + reg);
+> +	data &= ~mask;
+> +	data |= (value & mask);
+> +	writel(data, ir->reg + reg);
+> +}
+> +
+> +static irqreturn_t meson_ir_irq(int irqno, void *dev_id)
+> +{
+> +	struct meson_ir *ir = dev_id;
+> +	u32 duration;
+> +	DEFINE_IR_RAW_EVENT(rawir);
+> +
+> +	spin_lock(&ir->lock);
+> +
+> +	duration = readl(ir->reg + IR_DEC_REG1);
+> +	duration = (duration & REG1_TIME_IV_MASK) >> REG1_TIME_IV_SHIFT;
+> +	rawir.duration = US_TO_NS(duration * MESON_TRATE);
+> +
+> +	rawir.pulse = !!(readl(ir->reg + IR_DEC_STATUS) & STATUS_IR_DEC_IN);
+> +
+> +	ir_raw_event_store_with_filter(ir->rc, &rawir);
+> +	ir_raw_event_handle(ir->rc);
+> +
+> +	spin_unlock(&ir->lock);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int meson_ir_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *node = dev->of_node;
+> +	struct resource *res;
+> +	const char *map_name;
+> +	struct meson_ir *ir;
+> +	int ret;
+> +
+> +	ir = devm_kzalloc(dev, sizeof(struct meson_ir), GFP_KERNEL);
+> +	if (!ir)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	ir->reg = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(ir->reg)) {
+> +		dev_err(dev, "failed to map registers\n");
+> +		return PTR_ERR(ir->reg);
+> +	}
+> +
+> +	ir->irq = platform_get_irq(pdev, 0);
+> +	if (ir->irq < 0) {
+> +		dev_err(dev, "no irq resource\n");
+> +		return ir->irq;
+> +	}
+> +
+> +	ir->rc = rc_allocate_device();
+> +	if (!ir->rc) {
+> +		dev_err(dev, "failed to allocate rc device\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	ir->rc->priv = ir;
+> +	ir->rc->input_name = DRIVER_NAME;
+> +	ir->rc->input_phys = DRIVER_NAME "/input0";
+> +	ir->rc->input_id.bustype = BUS_HOST;
+> +	map_name = of_get_property(node, "linux,rc-map-name", NULL);
+> +	ir->rc->map_name = map_name ? map_name : RC_MAP_EMPTY;
+> +	ir->rc->dev.parent = dev;
+> +	ir->rc->driver_type = RC_DRIVER_IR_RAW;
+> +	ir->rc->allowed_protocols = RC_BIT_ALL;
+> +	ir->rc->rx_resolution = US_TO_NS(MESON_TRATE);
+> +	ir->rc->timeout = MS_TO_NS(200);
+> +	ir->rc->driver_name = DRIVER_NAME;
+> +
+> +	spin_lock_init(&ir->lock);
+> +	platform_set_drvdata(pdev, ir);
+> +
+> +	ret = rc_register_device(ir->rc);
+> +	if (ret) {
+> +		dev_err(dev, "failed to register rc device\n");
+> +		goto out_free;
+> +	}
+> +
+> +	ret = devm_request_irq(dev, ir->irq, meson_ir_irq, 0, "ir-meson", ir);
+> +	if (ret) {
+> +		dev_err(dev, "failed to request irq\n");
+> +		goto out_unreg;
+> +	}
+> +
+> +	/* Reset the decoder */
+> +	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_RESET, REG1_RESET);
+> +	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_RESET, 0);
+> +	/* Set general operation mode */
+> +	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_MODE_MASK, REG1_MODE_GENERAL);
+> +	/* Set rate */
+> +	meson_ir_set_mask(ir, IR_DEC_REG0, REG0_RATE_MASK, MESON_TRATE - 1);
+> +	/* IRQ on rising and falling edges */
+> +	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_IRQSEL_MASK,
+> +			  REG1_IRQSEL_RISE_FALL);
+> +	/* Enable the decoder */
+> +	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_ENABLE, REG1_ENABLE);
+> +
+> +	dev_info(dev, "receiver initialized\n");
+> +
+> +	return 0;
+> +out_unreg:
+> +	rc_unregister_device(ir->rc);
 
-Well, the idea would be that for the root bus, you use simplified pci_ops
-that just do BCMA_CORE_PCIE2_CONFIGINDADDR/DATA, while for the other
-buses you use the standard pci ops.
+rc_unregister_device() already calls rc_free_device().
 
-> > Which code depends on this? I think I've seem something similar in
-> > other host drivers, so maybe we can change the core code instead.
+> +out_free:
+> +	rc_free_device(ir->rc);
+> +
+> +	return ret;
+> +}
+> +
+> +static int meson_ir_remove(struct platform_device *pdev)
+> +{
+> +	struct meson_ir *ir = platform_get_drvdata(pdev);
+> +	unsigned long flags;
+> +
+> +	/* Disable the decoder */
+> +	spin_lock_irqsave(&ir->lock, flags);
+> +	meson_ir_set_mask(ir, IR_DEC_REG1, REG1_ENABLE, 0);
+> +	spin_unlock_irqrestore(&ir->lock, flags);
+> +
+> +	rc_unregister_device(ir->rc);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id meson_ir_match[] = {
+> +	{ .compatible = "amlogic,meson6-ir" },
+> +	{ },
+> +};
+> +
+> +static struct platform_driver meson_ir_driver = {
+> +	.probe		= meson_ir_probe,
+> +	.remove		= meson_ir_remove,
+> +	.driver = {
+> +		.name		= DRIVER_NAME,
+> +		.of_match_table	= meson_ir_match,
+> +	},
+> +};
+> +
+> +module_platform_driver(meson_ir_driver);
+> +
+> +MODULE_DESCRIPTION("Amlogic Meson IR remote receiver driver");
+> +MODULE_AUTHOR("Beniamino Galvani <b.galvani@gmail.com>");
+> +MODULE_LICENSE("GPL v2");
+> -- 
+> 1.9.1
 > 
-> It is used in many places in the core PCI code, I think it is better to
-> change this to the correct value, but the pci-tegra.c driver does it in
-> a better way, by adding a DECLARE_PCI_FIXUP_EARLY only changing the
-> struct data, I will use that version.
-
-Yes, sounds good.
-
-> >> +	/*
-> >> +	 * Inbound address translation setup
-> >> +	 * Northstar only maps up to 128 MiB inbound, DRAM could be up to 1 GiB.
-> >> +	 *
-> >> +	 * For now allow access to entire DRAM, assuming it is less than 128MiB,
-> >> +	 * otherwise DMA bouncing mechanism may be required.
-> >> +	 * Also consider DMA mask to limit DMA physical address
-> >> +	 */
-> >> +	/* 64-bit LE regs, write low word, high is 0 at reset */
-> >> +	bcma_write32(bdev, BCMA_CORE_PCIE2_FUNC0_IMAP1, PHYS_OFFSET | 0x1);
-> >> +	bcma_write32(bdev, BCMA_CORE_PCIE2_IARR1_LOWER,
-> >> +			   PHYS_OFFSET | ((SZ_128M >> 20) & 0xff));
-> > 
-> > Maybe I should bully you into enabling swiotlb on arm32 ;-)
-> 
-> This sounds complicated, I hope I can avoid it. ;-)
-
-I'd really hope that it's not that hard. We basically just need a copy of
-coherent_swiotlb_dma_ops/noncoherent_swiotlb_dma_ops from arm64 and
-use those on bcma devices, with the right dma_mask set.
-
-	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
