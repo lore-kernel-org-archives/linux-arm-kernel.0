@@ -1,47 +1,136 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sun, 9 Nov 2014 12:01:42 -0800
-Subject: tsc2005 touchscreen: implement disable attribute
-In-Reply-To: <201411091349.20116@pali>
-References: <20141109115636.GA3106@amd> <20141109124025.GA21763@earth.universe>
- <201411091349.20116@pali>
-Message-ID: <20141109200142.GA37384@dtor-ws>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 09 Nov 2014 21:27:40 +0100
+Subject: [RFC] PCI: BCM5301X: add PCIe2 driver for BCM5301X SoCs
+In-Reply-To: <545E8AA2.6050301@hauke-m.de>
+References: <1415470392-28229-1-git-send-email-hauke@hauke-m.de>
+ <1756974.RYWuW6FYtL@wuerfel> <545E8AA2.6050301@hauke-m.de>
+Message-ID: <11068573.lefhT3BUSj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 09, 2014 at 01:49:19PM +0100, Pali Roh?r wrote:
-> On Sunday 09 November 2014 13:40:25 Sebastian Reichel wrote:
-> > Hi,
+On Saturday 08 November 2014 22:26:58 Hauke Mehrtens wrote:
+> On 11/08/2014 08:47 PM, Arnd Bergmann wrote:
+> > On Saturday 08 November 2014 19:13:12 Hauke Mehrtens wrote:
 > > 
-> > On Sun, Nov 09, 2014 at 12:56:37PM +0100, Pavel Machek wrote:
-> > > Implement disable attribute for tsc2005 touchscreen. It is
-> > > useful to avoid wakeups when phone is in the pocket.
+> >> diff --git a/drivers/pci/host/pci-host-bcm5301x.c b/drivers/pci/host/pci-host-bcm5301x.c
+> >> new file mode 100644
+> >> index 0000000..8b7ba62
+> >> --- /dev/null
+> >> +++ b/drivers/pci/host/pci-host-bcm5301x.c
+> >> @@ -0,0 +1,483 @@
+> >> +/*
+> >> + * Northstar PCI-Express driver
+> >> + * Only supports Root-Complex (RC) mode
+> >> + *
+> >> + * Notes:
+> >> + * PCI Domains are being used to identify the PCIe port 1:1.
+> >> + *
+> >> + * Only MEM access is supported, PAX does not support IO.
 > > 
-> > I don't think this should be some driver specific sysfs node.
-> > Instead a generic method from the input subsystem should be
-> > used.
-> > 
-> > -- Sebastian
+> > What is PAX?
 > 
-> Yes. I would like to see generic method to turn off input device 
-> (or just "mute" it if device does not support turn off). Similar 
-> problem is also on laptops or other portable devices. E.g when I 
-> close LID of my laptop I want to turn off internal input devices 
-> (keyboard, touchpad, trackstick) without need to unload evdev 
-> Xserver drivers (or killing Xserver). Another use case is to turn 
-> off keyboard (also from kernel tty on Ctrl+Alt+Fx) which cannot 
-> be unplugged (internal laptop keyboard).
+> This is the name of the PCIe controller I think, This was copied from
+> the vendor driver, I hope Florian knows more details.
+
+Just clarify this in the comment.
+
+> >> +static int bcma_pcie2_map_irq(const struct pci_dev *pdev, u8 slot, u8 pin)
+> >> +{
+> >> +	struct pci_sys_data *sys = pdev->sysdata;
+> >> +	struct bcma_device *bdev = sys->private_data;
+> >> +
+> >> +	/*
+> >> +	 * Every PCIe controller has 5 IRQ number and the last one is
+> >> +	 * triggered every time, use that one
+> >> +	 */
+> >> +	if (bdev && bdev->dev.of_node)
+> >> +		return irq_of_parse_and_map(bdev->dev.of_node, 4);
+> >> +
+> >> +	return bdev->irq;
+> >> +}
+> > 
+> > If you have an OF device node for the PCI host, you don't need this,
+> > there should already be an interrupt-map property that correctly
+> > maps this into the interrupt domain of the bcma bus, so you can use
+> > the default of_irq_parse_and_map_pci function.
 > 
-> CCed Dmitry, what do you think about it?
+> So I just have to define a interrupt-map property for the device this
+> driver gets registered for and then I can use the default implementation?
 
-Actually I'd like it to be not limited to input devices but rater try
-doing it at the device core level, if possible. I am sure there are IIO
-and other devices that could be forcibly turned off/put into low power
-mode under certain circumstances.
+It depends on what you want to cover. For all I know, you normally don't
+need a DT entry for this PCI host, as it's covered by the upstream bus.
 
-There were some talks about it with Rafael, but we never come with
-anything concrete.
+However adding a DT node would let you do some things that you can't
+currently do:
 
-Thanks.
+- specify the inbound and outbound windows to configure
+- list different interrupts, e.g. if there is a PCIe-to-PCI bridge
+  and the device connected to it is routed to a GPIO pin or the
+  another input of the main interrupt controller.
 
--- 
-Dmitry
+> >> +static u32 bcma_pcie2_cfg_base(struct bcma_device *bdev, int busno,
+> >> +			       unsigned int devfn, int where)
+> >> +{
+> >> +	int slot = PCI_SLOT(devfn);
+> >> +	int fn = PCI_FUNC(devfn);
+> >> +	u32 addr_reg;
+> >> +
+> >> +	if (busno == 0) {
+> >> +		if (slot >= 1)
+> >> +			return 0;
+> >> +		bcma_write32(bdev, BCMA_CORE_PCIE2_CONFIGINDADDR,
+> >> +			     where & 0xffc);
+> >> +		return BCMA_CORE_PCIE2_CONFIGINDDATA;
+> >> +	}
+> >> +	if (fn > 1)
+> >> +		return 0;
+> >> +	addr_reg = (busno & 0xff) << 20 | (slot << 15) | (fn << 12) |
+> >> +		   (where & 0xffc) | (1 & 0x3);
+> >> +
+> >> +	bcma_write32(bdev, BCMA_CORE_PCIE2_CFG_ADDR, addr_reg);
+> >> +	return BCMA_CORE_PCIE2_CFG_DATA;
+> >> +}
+> > 
+> > The normal buses seem to be ECAM compliant, I wonder if we can have the
+> > code to access those shared between this driver, pci-host-generic.c and
+> > the ACPI PCI implementation.
+> 
+> There are just a few lines we can share I do not think that would be
+> worth the effort.
+
+Well, the idea would be that for the root bus, you use simplified pci_ops
+that just do BCMA_CORE_PCIE2_CONFIGINDADDR/DATA, while for the other
+buses you use the standard pci ops.
+
+> > Which code depends on this? I think I've seem something similar in
+> > other host drivers, so maybe we can change the core code instead.
+> 
+> It is used in many places in the core PCI code, I think it is better to
+> change this to the correct value, but the pci-tegra.c driver does it in
+> a better way, by adding a DECLARE_PCI_FIXUP_EARLY only changing the
+> struct data, I will use that version.
+
+Yes, sounds good.
+
+> >> +	/*
+> >> +	 * Inbound address translation setup
+> >> +	 * Northstar only maps up to 128 MiB inbound, DRAM could be up to 1 GiB.
+> >> +	 *
+> >> +	 * For now allow access to entire DRAM, assuming it is less than 128MiB,
+> >> +	 * otherwise DMA bouncing mechanism may be required.
+> >> +	 * Also consider DMA mask to limit DMA physical address
+> >> +	 */
+> >> +	/* 64-bit LE regs, write low word, high is 0 at reset */
+> >> +	bcma_write32(bdev, BCMA_CORE_PCIE2_FUNC0_IMAP1, PHYS_OFFSET | 0x1);
+> >> +	bcma_write32(bdev, BCMA_CORE_PCIE2_IARR1_LOWER,
+> >> +			   PHYS_OFFSET | ((SZ_128M >> 20) & 0xff));
+> > 
+> > Maybe I should bully you into enabling swiotlb on arm32 ;-)
+> 
+> This sounds complicated, I hope I can avoid it. ;-)
+
+I'd really hope that it's not that hard. We basically just need a copy of
+coherent_swiotlb_dma_ops/noncoherent_swiotlb_dma_ops from arm64 and
+use those on bcma devices, with the right dma_mask set.
+
+	Arnd
