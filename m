@@ -1,25 +1,36 @@
-From: jan.kiszka@web.de (Jan Kiszka)
-Date: Sun, 09 Nov 2014 20:35:49 +0100
-Subject: AMR: sun7i: CPU hotplug support?
-Message-ID: <545FC215.7010802@web.de>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 9 Nov 2014 20:39:53 +0100
+Subject: sound: enable sound support on n900 on devicetree-based boot
+In-Reply-To: <20141109123753.GO2722@sirena.org.uk>
+References: <20141109120222.GA3815@amd> <20141109123753.GO2722@sirena.org.uk>
+Message-ID: <20141109193953.GA7852@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun 2014-11-09 12:37:53, Mark Brown wrote:
+> On Sun, Nov 09, 2014 at 01:02:22PM +0100, Pavel Machek wrote:
+> > 
+> > With device tree, it is possible (and encouraged) to build N900
+> > kernels without CONFIG_MACH_NOKIA_RX51. Update config file to enable
+> > the driver build in this case.
+> 
+> Please do try to use subject lines reflecting the style for the
+> subsystem.
 
-did anyone already happen to look into enabling CPU hotplug for the
-Allwinner A20 in upstream? I'm currently running the sunxi-next branch
-on Banana Pi, and echo 0 > .../cpu1/online just hangs the system. The
-old 3.4 LeMaker kernel works fine in this regard. I can try to look into
-details and port things over, just want to avoid duplicate efforts.
+Ok.
 
-Thanks,
-Jan
+> >  config SND_OMAP_SOC_RX51
+> >  	tristate "SoC Audio support for Nokia RX-51"
+> > -	depends on SND_OMAP_SOC && ARM && (MACH_NOKIA_RX51 || COMPILE_TEST) && I2C
+> > +	depends on SND_OMAP_SOC && ARM && I2C
+> 
+> Please also update the config text so users have a chance to figure out
+> that this driver is the one they need for their system - I guess most
+> people won't know what RX-51 is.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141109/8916a565/attachment.sig>
+Actually help text below already explains that. I'll update tristate
+text, too.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
