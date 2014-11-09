@@ -1,27 +1,31 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Sun, 9 Nov 2014 13:40:25 +0100
-Subject: tsc2005 touchscreen: implement disable attribute
-In-Reply-To: <20141109115636.GA3106@amd>
-References: <20141109115636.GA3106@amd>
-Message-ID: <20141109124025.GA21763@earth.universe>
+From: anilk4.v@gmail.com (Anil Kumar)
+Date: Sun,  9 Nov 2014 18:15:14 +0530
+Subject: [PATCH] ASoC: davinvi-mcasp: Balance pm_runtime_enable() on probe
+ failure
+Message-ID: <1415537114-9642-1-git-send-email-anilk4.v@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+If probe fails then we need to call pm_runtime_disable() to balance
+out the previous pm_runtime_enable() call.
 
-On Sun, Nov 09, 2014 at 12:56:37PM +0100, Pavel Machek wrote:
-> Implement disable attribute for tsc2005 touchscreen. It is useful to
-> avoid wakeups when phone is in the pocket.
+Signed-off-by: Anil Kumar <anilk4.v@gmail.com>
+---
+:100644 100644 0eed9b1... 99c747d... M	sound/soc/davinci/davinci-mcasp.c
+ sound/soc/davinci/davinci-mcasp.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-I don't think this should be some driver specific sysfs node.
-Instead a generic method from the input subsystem should be
-used.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141109/f6b2e45d/attachment.sig>
+diff --git a/sound/soc/davinci/davinci-mcasp.c b/sound/soc/davinci/davinci-mcasp.c
+index 0eed9b1..99c747d 100644
+--- a/sound/soc/davinci/davinci-mcasp.c
++++ b/sound/soc/davinci/davinci-mcasp.c
+@@ -1235,6 +1235,7 @@ static int davinci_mcasp_probe(struct platform_device *pdev)
+ 	ret = pm_runtime_get_sync(&pdev->dev);
+ 	if (IS_ERR_VALUE(ret)) {
+ 		dev_err(&pdev->dev, "pm_runtime_get_sync() failed\n");
++		pm_runtime_disable(&pdev->dev);
+ 		return ret;
+ 	}
+ 
+-- 
+1.9.2
