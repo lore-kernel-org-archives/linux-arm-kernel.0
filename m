@@ -1,31 +1,29 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sun, 9 Nov 2014 20:28:20 +0100
-Subject: [PATCH 1/2] of: Make const the device node pointers in
- of_clk_get and of_node_put
-In-Reply-To: <20141109185019.GU4042@n2100.arm.linux.org.uk>
-References: <cover.1415557680.git.moinejf@free.fr>
- <375a82230accf26dfbbb74e6f928243ea8e38b50.1415557680.git.moinejf@free.fr>
- <20141109185019.GU4042@n2100.arm.linux.org.uk>
-Message-ID: <20141109202820.026252bf@armhf>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 9 Nov 2014 11:29:55 -0800
+Subject: [GIT PULL] ARM: mvebu: Fixes for v3.18
+In-Reply-To: <20141109034131.GQ3698@titan.lakedaemon.net>
+References: <20141101222033.GA3698@titan.lakedaemon.net>
+ <20141109034131.GQ3698@titan.lakedaemon.net>
+Message-ID: <CAOesGMiq_1vOOqMaV6Fma__d9vkTbLeEYeNuyF2jt7YNXM9ECA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 9 Nov 2014 18:50:19 +0000
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+Hi Jason,
 
-> What this then means is that it fundamentally undermines the idea of
-> storing the pointer to a device_node as a const pointer, as the device
-> node must always be modified when you're done with it (because it's a
-> ref-counted structure.)  So, having it const in your code is a bug.
-> 
-> What this also means is that every other place that you've added const
-> below is also very dubious.
+On Sat, Nov 8, 2014 at 7:41 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> On Sat, Nov 01, 2014 at 06:20:33PM -0400, Jason Cooper wrote:
+>> Guys,
+>>
+>> Here's a couple of fixes I've gathered so far for mvebu, nothing
+>> exciting as these are quite old and were in -next for several weeks.
+>>
+>> Please pull.
+>
+> Gentle ping?
 
-Thanks for the explanation.
+Whoops, I've missed this one. Partially becaose you've forgotten to cc
+arm at kernel.org, which is how I usually keep track of pull requests.
 
-The correct patch will be simpler: in the ASoC structures, I found only
-three places where the device_node pointer is const.
+I sent the pull request to Linus last night, I'll include this for -rc5.
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+-Olof
