@@ -1,93 +1,127 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 9 Nov 2014 10:17:12 +0000
-Subject: [PATCH 2/3] spi: meson: Add support for Amlogic Meson SPIFC
-In-Reply-To: <1415525113-25598-3-git-send-email-b.galvani@gmail.com>
-References: <1415525113-25598-1-git-send-email-b.galvani@gmail.com>
- <1415525113-25598-3-git-send-email-b.galvani@gmail.com>
-Message-ID: <20141109101712.GM2722@sirena.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 9 Nov 2014 12:56:37 +0100
+Subject: tsc2005 touchscreen: implement disable attribute
+Message-ID: <20141109115636.GA3106@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 09, 2014 at 10:25:12AM +0100, Beniamino Galvani wrote:
 
-> +static int meson_spifc_wait_ready(struct meson_spifc *spifc)
-> +{
-> +	unsigned long deadline = jiffies + msecs_to_jiffies(1000);
-> +	u32 data;
-> +
-> +	do {
-> +		regmap_read(spifc->regmap, REG_SLAVE, &data);
-> +		if (data & SLAVE_TRST_DONE)
-> +			return 0;
-> +		cond_resched();
-> +	} while (time_before(jiffies, deadline));
+Implement disable attribute for tsc2005 touchscreen. It is useful to
+avoid wakeups when phone is in the pocket.
 
-This will busy wait for up to a second, that seems like a long time to
-busy wait.  We also appear to be using this for the entire duration of
-the transfer which could be a fairly long time even during normal
-operation if doing a large transfer such as a firmware download, or if
-the bus speed is low.
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-> +	meson_spifc_setup_speed(spifc, xfer->speed_hz ? xfer->speed_hz :
-> +				spi->max_speed_hz);
-> +
+---
 
-Please avoid the ternery operator, it does nothing for legibility and in
-this case it's not needed as the core will always ensure that there is a
-per-transfer speed set.
+[This is from Pali's n900 tree that is GPL, so that is okay, but maybe
+I should get his sign-off here?]
 
-> +	while (done < xfer->len && !ret) {
-> +		len = min_t(int, xfer->len - done, SPIFC_BUFFER_SIZE);
-> +		ret = meson_spifc_txrx(spifc, xfer, done, len,
-> +				       last_xfer, done + len >= xfer->len);
-> +		done += len;
-> +	}
+diff --git a/drivers/input/touchscreen/tsc2005.c b/drivers/input/touchscreen/tsc2005.c
+index 52380b6..ec1c276 100644
+--- a/drivers/input/touchscreen/tsc2005.c
++++ b/drivers/input/touchscreen/tsc2005.c
+@@ -147,6 +147,7 @@ struct tsc2005 {
+ 
+ 	unsigned int		x_plate_ohm;
+ 
++	bool			disabled;
+ 	bool			opened;
+ 	bool			suspended;
+ 
+@@ -384,6 +385,48 @@ static void __tsc2005_enable(struct tsc2005 *ts)
+ 
+ }
+ 
++static ssize_t tsc2005_disable_show(struct device *dev,
++				    struct device_attribute *attr, char *buf)
++{
++	struct spi_device *spi = to_spi_device(dev);
++	struct tsc2005 *ts = spi_get_drvdata(spi);
++
++	return sprintf(buf, "%u\n", ts->disabled);
++}
++
++static ssize_t tsc2005_disable_store(struct device *dev,
++				     struct device_attribute *attr,
++				     const char *buf, size_t count)
++{
++	struct spi_device *spi = to_spi_device(dev);
++	struct tsc2005 *ts = spi_get_drvdata(spi);
++	unsigned long val;
++	int error;
++
++	error = kstrtoul(buf, 10, &val);
++	if (error)
++		return error;
++
++	mutex_lock(&ts->mutex);
++
++	if (!ts->suspended && ts->opened) {
++		if (val) {
++			if (!ts->disabled)
++				__tsc2005_disable(ts);
++		} else {
++			if (ts->disabled)
++				__tsc2005_enable(ts);
++		}
++	}
++
++	ts->disabled = !!val;
++
++	mutex_unlock(&ts->mutex);
++
++	return count;
++}
++static DEVICE_ATTR(disable, 0664, tsc2005_disable_show, tsc2005_disable_store);
++
+ static ssize_t tsc2005_selftest_show(struct device *dev,
+ 				     struct device_attribute *attr,
+ 				     char *buf)
+@@ -466,6 +509,7 @@ out:
+ static DEVICE_ATTR(selftest, S_IRUGO, tsc2005_selftest_show, NULL);
+ 
+ static struct attribute *tsc2005_attrs[] = {
++	&dev_attr_disable.attr,
+ 	&dev_attr_selftest.attr,
+ 	NULL
+ };
+@@ -551,7 +595,7 @@ static int tsc2005_open(struct input_dev *input)
+ 
+ 	mutex_lock(&ts->mutex);
+ 
+-	if (!ts->suspended)
++	if (!ts->suspended && !ts->disabled)
+ 		__tsc2005_enable(ts);
+ 
+ 	ts->opened = true;
+@@ -567,7 +611,7 @@ static void tsc2005_close(struct input_dev *input)
+ 
+ 	mutex_lock(&ts->mutex);
+ 
+-	if (!ts->suspended)
++	if (!ts->suspended && !ts->disabled)
+ 		__tsc2005_disable(ts);
+ 
+ 	ts->opened = false;
+@@ -781,7 +825,7 @@ static int tsc2005_suspend(struct device *dev)
+ 
+ 	mutex_lock(&ts->mutex);
+ 
+-	if (!ts->suspended && ts->opened)
++	if (!ts->suspended && !ts->disabled && ts->opened)
+ 		__tsc2005_disable(ts);
+ 
+ 	ts->suspended = true;
+@@ -798,7 +842,7 @@ static int tsc2005_resume(struct device *dev)
+ 
+ 	mutex_lock(&ts->mutex);
+ 
+-	if (ts->suspended && ts->opened)
++	if (ts->suspended && !ts->disabled && ts->opened)
+ 		__tsc2005_enable(ts);
+ 
+ 	ts->suspended = false;
 
-I noticed that the handling of /CS was done in the spifc_txrx() function
-- will this do the right thing if the transfer needs to be split for the
-buffer size?
-
-> +	if (!ret && xfer->delay_usecs)
-> +		udelay(xfer->delay_usecs);
-
-The core will do this for you if you implement this as transfer_one().
-
-> +static int meson_spifc_transfer_one_message(struct spi_master *master,
-> +					    struct spi_message *msg)
-
-This appears to do nothing that the core won't do - just implement
-transfer_one() and remove this.
-
-> +	spifc = spi_master_get_devdata(master);
-> +	memset(spifc, 0, sizeof(struct meson_spifc));
-
-There should be no need for this memset.
-
-> +	spifc_regmap_config.max_register = resource_size(res) - 4;
-> +	spifc_regmap_config.name = "amlogic,meson-spifc";
-
-If you're dynamically initializing the structure you need to work with a
-copy of it rather than directly since there may be multiple instances.
-I'm not seeing a reason to override the regmap name here, this is only
-really intended for devices with multiple register maps.
-
-> +	ret = clk_prepare_enable(spifc->clk);
-> +	if (ret) {
-> +		dev_err(spifc->dev, "can't prepare clock\n");
-> +		goto out_err;
-> +	}
-
-You should really implement runtime PM operations to disable this when
-not in use and use auto_runtime_pm to make sure this happens.
-
-> +	master->bus_num = pdev->id;
-
-Leave this blank for DT only devices (and for non-DT devices this won't
-work if you get two different buses).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141109/68d347bd/attachment.sig>
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
