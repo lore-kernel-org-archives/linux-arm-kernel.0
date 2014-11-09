@@ -1,43 +1,91 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Sun, 9 Nov 2014 13:49:19 +0100
-Subject: tsc2005 touchscreen: implement disable attribute
-In-Reply-To: <20141109124025.GA21763@earth.universe>
-References: <20141109115636.GA3106@amd> <20141109124025.GA21763@earth.universe>
-Message-ID: <201411091349.20116@pali>
+From: merker@debian.org (Karsten Merker)
+Date: Sun,  9 Nov 2014 14:28:33 +0100
+Subject: [PATCH] ARM: dts: Fix failing ethernet PHY detection on the LeMaker
+ Banana Pi
+Message-ID: <1415539714-7652-1-git-send-email-merker@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 09 November 2014 13:40:25 Sebastian Reichel wrote:
-> Hi,
-> 
-> On Sun, Nov 09, 2014 at 12:56:37PM +0100, Pavel Machek wrote:
-> > Implement disable attribute for tsc2005 touchscreen. It is
-> > useful to avoid wakeups when phone is in the pocket.
-> 
-> I don't think this should be some driver specific sysfs node.
-> Instead a generic method from the input subsystem should be
-> used.
-> 
-> -- Sebastian
+While testing the daily builds of the Debian-Installer (d-i) on the
+LeMaker Banana Pi (a small, Allwinner A20-based board), I found that
+within the installer environment, the detection of the external Realtek
+ethernet PHY connected to the Allwinner A20 GMAC fails upon first
+loading of the stmmac driver:
 
-Yes. I would like to see generic method to turn off input device 
-(or just "mute" it if device does not support turn off). Similar 
-problem is also on laptops or other portable devices. E.g when I 
-close LID of my laptop I want to turn off internal input devices 
-(keyboard, touchpad, trackstick) without need to unload evdev 
-Xserver drivers (or killing Xserver). Another use case is to turn 
-off keyboard (also from kernel tty on Ctrl+Alt+Fx) which cannot 
-be unplugged (internal laptop keyboard).
+[   77.235117] stmmaceth 1c50000.ethernet: no reset control found
+[   77.235192]  Ring mode enabled
+[   77.235202]  No HW DMA feature register supported
+[   77.235211]  Normal descriptors
+[   77.235219]  TX Checksum insertion supported
+[   77.242678] libphy: stmmac: probed
+[   77.242708] eth0: No PHY found
 
-CCed Dmitry, what do you think about it?
+Just unloading the stmmac module and immediately afterwards 
+modprobing it again results in proper detection of the PHY:
+
+[  148.823456] stmmaceth 1c50000.ethernet: no reset control found
+[  148.823487]  Ring mode enabled
+[  148.823496]  No HW DMA feature register supported
+[  148.823502]  Normal descriptors
+[  148.823509]  TX Checksum insertion supported
+[  148.854654] libphy: stmmac: probed
+[  148.854683] eth0: PHY ID 001cc915 at 0 IRQ POLL (stmmac-0:00) active
+[  148.854694] eth0: PHY ID 001cc915 at 1 IRQ POLL (stmmac-0:01)
+
+On the Banana Pi, the PHY power supply is handled by a GPIO-controlled
+regulator:
+
+gmac: ethernet at 01c50000 {
+        pinctrl-names = "default";
+        pinctrl-0 = <&gmac_pins_rgmii_a>;
+        phy = <&phy1>;
+        phy-mode = "rgmii";
+        phy-supply = <&reg_gmac_3v3>;
+        status = "okay";
+
+        phy1: ethernet-phy at 1 {
+                reg = <1>;
+        };
+};
+
+reg_gmac_3v3: gmac-3v3 {
+        compatible = "regulator-fixed";
+        pinctrl-names = "default";
+        pinctrl-0 = <&gmac_power_pin_bananapi>;
+        regulator-name = "gmac-3v3";
+        regulator-min-microvolt = <3300000>;
+        regulator-max-microvolt = <3300000>;
+        startup-delay-us = <50000>;
+        enable-active-high;
+        gpio = <&pio 7 23 0>;
+};
+
+and this problem did not show up on the hardware-wise rather similar
+Cubietech Cubietruck (same SoC, same external PHY, but no
+GPIO-controlled regulator for the PHY).  Further tests have shown that
+increasing the startup-delay for the regulator solves the problem.  The
+current sun7i-a20-bananapi.dts file (in linux-next, intended to go into
+kernel 3.19) sets startup-delay-us for the PHY's regulator to 50000.  On
+my Banana Pi board, even with a value of 55000, the PHY detection does
+usually not work on the first probing inside d-i.  Increasing the value
+to 57500 results in a successful probing most of the time, but not
+always; only setting it to 60000 results in a reliable PHY detection
+for me.
+
+I would therefore like to propose increasing the startup-delay in the
+Banana Pi dts to a value of 60000.  Following is an according patch.
+
+Regards,
+Karsten
+
+
+
+Karsten Merker (1):
+  ARM: dts: sunxi: Banana Pi: increase startup-delay for the GMAC PHY
+    regulator
+
+ arch/arm/boot/dts/sun7i-a20-bananapi.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141109/867a9e56/attachment.sig>
+1.7.10.4
