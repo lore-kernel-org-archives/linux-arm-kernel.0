@@ -1,88 +1,65 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 9 Nov 2014 02:07:03 -0500
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.19
-Message-ID: <20141109070703.GY3698@titan.lakedaemon.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 8 Nov 2014 23:09:37 -0800
+Subject: [GIT PULL] ARM: SoC fixes for 3.18-rc4
+Message-ID: <20141109070937.GA8754@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
+Hi Linus,
 
-Here's a round of DT changes that have been in -next for at least 4
-cycles.
+The following changes since commit 0df1f2487d2f0d04703f142813d53615d62a1da4:
 
-Please pull.
-
-thx,
-
-Jason.
-
-
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+  Linux 3.18-rc3 (2014-11-02 15:01:51 -0800)
 
 are available in the git repository at:
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.19
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-for-rc4
 
-for you to fetch changes up to f5ed9ccc4c2dc275a13b765c88fa13211f60b57f:
+for you to fetch changes up to 92c9e0c780e61f821ab8a08f0d4d4fd33ba1197c:
 
-  ARM: mvebu: armada-xp: Fix 74hc595 count for Lenovo ix4-300d (2014-11-02 18:59:10 +0000)
-
-----------------------------------------------------------------
-mvebu DT changes for v3.19
-
- - mvebu
-    - ReadyNAS 102 leds, esata
-    - ReadyNAS 2120 esata
-    - Add cache-unified for Aurora L2 node
-    - Add ref clk for timer and watchdog on Armada 375
-    - Cleanup Armada XP pinctrl for GigE
-    - Add RGMII pinctrl, i2c eeprom, and fix 74hc595 counter on Lenovo ix4-300d
-
- - kirkwood
-    - Add DLink DIR665 and it's DSA configuration
+  ARM: dts: zynq: Enable PL clocks for Parallella (2014-11-08 16:57:44 -0800)
 
 ----------------------------------------------------------------
-Andrew Lunn (1):
-      ARM: Kirkwood: DIR665: Instantiate Distributed Switch Architecture
+ARM: SoC fixes for 3.18-rc4
 
-Arnaud Ebalard (3):
-      arm: mvebu: Fix LED color in NETGEAR ReadyNAS 102 .dts file
-      arm: mvebu: Clarify (e)SATA ports info in NETGEAR ReadyNAS 102 .dts file
-      ARM: mvebu: Enable rear eSATA ports of NETGEAR ReadyNAS 2120
+Another quiet week:
 
-Claudio Leite (1):
-      ARM: Kirkwood: Add support for DLink DIR665
+- A fix to silence edma probe error on non-supported platforms from Arnd
+- A fix to enable the PL clock for Parallella, to make mainline usable with
+  the SDK.
+- A somewhat verbose fix for the PLL clock tree on VF610
+- Enabling of SD/MMC on one of the VF610-based boards (for testing)
+- A fix for i.MX where CONFIG_SPI used to be implicitly enabled and now needs
+  to be added to the defconfig instead
+- Another maintainer added for bcm2835: Lee Jones
 
-Ezequiel Garcia (1):
-      ARM: mvebu: Enable the reference clock for timer and watchdog on Armada 375 SoC
+----------------------------------------------------------------
+Andreas F?rber (1):
+      ARM: dts: zynq: Enable PL clocks for Parallella
 
-Gregory CLEMENT (1):
-      ARM: mvebu: Fix the Aurora L2 cache node with the required cache-unified property
+Arnd Bergmann (1):
+      dma: edma: move device registration to platform code
 
-Sebastian Hesselbarth (8):
-      ARM: mvebu: armada-xp: Consolidate pinctrl node
-      ARM: mvebu: armada-xp: Add node alias to pinctrl and add base address
-      ARM: mvebu: armada-xp: Use pinctrl node alias
-      ARM: mvebu: armada-xp: Move GE0/1 pinctrl settings for RGMII
-      ARM: mvebu: armada-xp: Add GE0 pinctrl settings for GMII
-      ARM: mvebu: armada-xp: Add RGMII pinctrl to Lenovo ix4-300d
-      ARM: mvebu: armada-xp: Add I2C eeprom on Lenovo ix4-300d
-      ARM: mvebu: armada-xp: Fix 74hc595 count for Lenovo ix4-300d
+Fabio Estevam (1):
+      ARM: imx: Fix the removal of CONFIG_SPI option
 
- arch/arm/boot/dts/Makefile                       |   1 +
- arch/arm/boot/dts/armada-370-netgear-rn102.dts   |  17 +-
- arch/arm/boot/dts/armada-370.dtsi                |   1 +
- arch/arm/boot/dts/armada-375.dtsi                |  12 +-
- arch/arm/boot/dts/armada-xp-axpwifiap.dts        |  58 ++---
- arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts  |  73 +++---
- arch/arm/boot/dts/armada-xp-mv78230.dtsi         |  15 +-
- arch/arm/boot/dts/armada-xp-mv78260.dtsi         |  15 +-
- arch/arm/boot/dts/armada-xp-mv78460.dtsi         |  15 +-
- arch/arm/boot/dts/armada-xp-netgear-rn2120.dts   | 166 +++++++-------
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  14 +-
- arch/arm/boot/dts/armada-xp.dtsi                 |  38 ++++
- arch/arm/boot/dts/kirkwood-dir665.dts            | 278 +++++++++++++++++++++++
- 13 files changed, 506 insertions(+), 197 deletions(-)
- create mode 100644 arch/arm/boot/dts/kirkwood-dir665.dts
+Olof Johansson (2):
+      Merge tag 'imx-fixes-3.18-2' of git://git.kernel.org/.../shawnguo/linux into fixes
+      ARM: dts: vf610: add SD node to cosmic dts
+
+Stefan Agner (1):
+      ARM: imx: clk-vf610: define PLL's clock tree
+
+Stephen Warren (1):
+      MAINTAINERS: update bcm2835 entry
+
+ MAINTAINERS                             |   3 +-
+ arch/arm/boot/dts/vf610-cosmic.dts      |  19 +++++
+ arch/arm/boot/dts/zynq-parallella.dts   |   4 +
+ arch/arm/common/edma.c                  |   9 +++
+ arch/arm/configs/imx_v4_v5_defconfig    |   1 +
+ arch/arm/configs/imx_v6_v7_defconfig    |   1 +
+ arch/arm/mach-imx/clk-vf610.c           | 134 ++++++++++++++++++++++----------
+ drivers/dma/edma.c                      |  40 +---------
+ include/dt-bindings/clock/vf610-clock.h |  39 ++++++++--
+ 9 files changed, 160 insertions(+), 90 deletions(-)
