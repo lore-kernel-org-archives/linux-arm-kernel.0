@@ -1,64 +1,38 @@
 From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Sun,  9 Nov 2014 09:50:27 +0530
-Subject: [PATCH v7 0/7] Enable support for Samsung Exynos7 SoC
-Message-ID: <1415506834-8180-1-git-send-email-a.kesavan@samsung.com>
+Date: Sun,  9 Nov 2014 09:50:28 +0530
+Subject: [PATCH v7 1/7] arm64: dts: add <dt-bindings/> symlink
+In-Reply-To: <1415506834-8180-1-git-send-email-a.kesavan@samsung.com>
+References: <1415506834-8180-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1415506834-8180-2-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These were originally part of 2 patchsets[1][2] adding support for Exynos7.
- The clock and pinctrl patches are going through the respective maintainer's
-tree; hence the remaining dt related patches have been consolidated and are
-being posted here as a separate series.
+From: Pankaj Dubey <pankaj.dubey@samsung.com>
 
-This patchset has build dependencies on the following patches:
-a] "[GIT PULL] Samsung clock changes for 3.19" - specifically the clock dt
-   bindings header.
-   http://comments.gmane.org/gmane.linux.kernel.samsung-soc/39142
-b] "tty: serial: samsung: Clean-up selection of number of available UARTs"
-   http://www.spinics.net/lists/linux-samsung-soc/msg37418.html
-c] "dts, kbuild: Implement support for dtb vendor subdirs"(merged in linux-next)
-   https://lkml.org/lkml/2014/10/21/654
+Add symlink to include/dt-bindings from arch/arm64/boot/dts/include/ to
+match the ones in ARM architectures so that preprocessed device
+tree files can include various useful constant definitions.
 
-[1] arch: arm64: Enable support for Samsung Exynos7 SoC
-http://www.spinics.net/lists/linux-samsung-soc/msg37047.html
-[2] Add clock and DT support for a few IPs on Exynos7
-http://www.spinics.net/lists/linux-samsung-soc/msg37973.html
+See commit c58299aa8754 ("kbuild: create an "include chroot" for DT bindings")
+merged in v3.10-rc1 for details.
 
-Changes since v6:
-	- Fixed the platform ordering (exynos before thunder) in Kconfig file.
-	- Fixed the ordering of reg and enable-method properties in cpu node
-	as per Lorenzo Pieralisi's comment.
-
-Abhilash Kesavan (2):
-  arm64: dts: Add PMU DT node for exynos7 SoC
-  arm64: dts: Add nodes for mmc, i2c, rtc, watchdog, adc on Exynos7
-
-Alim Akhtar (2):
-  arm64: exynos7: Enable ARMv8 based Exynos7 (SoC) support
-  arm64: Enable Exynos7 SOC in the defconfig
-
-Naveen Krishna Ch (2):
-  arm64: dts: Add initial device tree support for EXYNOS7
-  arm64: dts: Add initial pinctrl support to EXYNOS7
-
-Pankaj Dubey (1):
-  arm64: dts: add <dt-bindings/> symlink
-
- .../devicetree/bindings/arm/samsung/pmu.txt        |   1 +
- arch/arm64/Kconfig                                 |  17 +
- arch/arm64/boot/dts/Makefile                       |   1 +
- arch/arm64/boot/dts/exynos/Makefile                |   5 +
- arch/arm64/boot/dts/exynos/exynos7-espresso.dts    |  84 +++
- arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi    | 588 +++++++++++++++++++++
- arch/arm64/boot/dts/exynos/exynos7.dtsi            | 530 +++++++++++++++++++
- arch/arm64/boot/dts/include/dt-bindings            |   1 +
- arch/arm64/configs/defconfig                       |   4 +
- 9 files changed, 1231 insertions(+)
- create mode 100644 arch/arm64/boot/dts/exynos/Makefile
- create mode 100644 arch/arm64/boot/dts/exynos/exynos7-espresso.dts
- create mode 100644 arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
- create mode 100644 arch/arm64/boot/dts/exynos/exynos7.dtsi
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
+Tested-by: Thomas Abraham <thomas.ab@samsung.com>
+---
+ arch/arm64/boot/dts/include/dt-bindings | 1 +
+ 1 file changed, 1 insertion(+)
  create mode 120000 arch/arm64/boot/dts/include/dt-bindings
 
+diff --git a/arch/arm64/boot/dts/include/dt-bindings b/arch/arm64/boot/dts/include/dt-bindings
+new file mode 120000
+index 0000000..08c00e4
+--- /dev/null
++++ b/arch/arm64/boot/dts/include/dt-bindings
+@@ -0,0 +1 @@
++../../../../../include/dt-bindings
+\ No newline at end of file
 -- 
 2.1.0
