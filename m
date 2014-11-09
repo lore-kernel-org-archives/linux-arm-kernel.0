@@ -1,207 +1,88 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Sun, 09 Nov 2014 15:04:36 +0800
-Subject: [PATCH v5 3/6] irqchip: gic: Support hierarchy irq domain.
-In-Reply-To: <1414576824-16143-4-git-send-email-yingjoe.chen@mediatek.com>
-References: <1414576824-16143-1-git-send-email-yingjoe.chen@mediatek.com>
- <1414576824-16143-4-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <545F1204.80505@linux.intel.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 9 Nov 2014 02:07:03 -0500
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.19
+Message-ID: <20141109070703.GY3698@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Guys,
+
+Here's a round of DT changes that have been in -next for at least 4
+cycles.
+
+Please pull.
+
+thx,
+
+Jason.
 
 
-On 2014/10/29 18:00, Yingjoe Chen wrote:
-> Add support to use gic as a parent for stacked irq domain.
-> 
-> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> ---
->  drivers/irqchip/Kconfig   |  1 +
->  drivers/irqchip/irq-gic.c | 90 +++++++++++++++++++++++++++++++++--------------
->  2 files changed, 65 insertions(+), 26 deletions(-)
-> 
-> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> index b21f12f..7f34138 100644
-> --- a/drivers/irqchip/Kconfig
-> +++ b/drivers/irqchip/Kconfig
-> @@ -5,6 +5,7 @@ config IRQCHIP
->  config ARM_GIC
->  	bool
->  	select IRQ_DOMAIN
-> +	select IRQ_DOMAIN_HIERARCHY
->  	select MULTI_IRQ_HANDLER
->  
->  config GIC_NON_BANKED
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 38493ff..6f39bef 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -786,19 +786,17 @@ void __init gic_init_physaddr(struct device_node *node)
->  static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
->  				irq_hw_number_t hw)
->  {
-> +	irq_domain_set_hwirq_and_chip(d, irq, hw, &gic_chip, d->host_data);
->  	if (hw < 32) {
->  		irq_set_percpu_devid(irq);
-> -		irq_set_chip_and_handler(irq, &gic_chip,
-> -					 handle_percpu_devid_irq);
-> +		irq_set_handler(irq, handle_percpu_devid_irq);
-Hi Joe,
-	This may trigger a warning when dealing with hierarchy
-irqdomain as below. It's because the child domain hasn't set
-irq_data->chip yet when parent domain's gic_irq_domain_map() gets
-called. We may need to relax the WARNING_ON() in  __irq_set_handler().
-    WARN_ON(desc->irq_data.chip == &no_irq_chip)
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-------------[ cut here ]------------
-WARNING: CPU: 2 PID: 912 at kernel/irq/chip.c:734
-__irq_set_handler+0x138/0x13c()
-Modules linked in: mlx4_core(+) rtc_efi efivarfs
-CPU: 2 PID: 912 Comm: modprobe Not tainted 3.18.0-rc3-p2v5+ #53
-Call trace:
-[<fffffe00000963d4>] dump_backtrace+0x0/0x16c
-[<fffffe0000096550>] show_stack+0x10/0x1c
-[<fffffe000067545c>] dump_stack+0x74/0x98
-[<fffffe00000b205c>] warn_slowpath_common+0x84/0xac
-[<fffffe00000b2148>] warn_slowpath_null+0x14/0x20
-[<fffffe00000ed968>] __irq_set_handler+0x134/0x13c
-[<fffffe000042af14>] gic_irq_domain_map+0x4c/0xac
-[<fffffe000042afd4>] gic_irq_domain_alloc+0x60/0x88
-[<fffffe000042b374>] gicv2m_domain_alloc+0x30/0xa8
-[<fffffe00000efc1c>] __irq_domain_alloc_irqs+0x144/0x30c
-[<fffffe000042b58c>] gicv2m_setup_msi_irq+0xc0/0x118
-[<fffffe000044548c>] arch_setup_msi_irq+0x34/0x60
-[<fffffe0000445544>] arch_setup_msi_irqs+0x50/0xb0
-[<fffffe0000445e3c>] pci_enable_msix+0x310/0x39c
-[<fffffe0000445efc>] pci_enable_msix_range+0x34/0x9c
->  		set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
->  	} else {
-> -		irq_set_chip_and_handler(irq, &gic_chip,
-> -					 handle_fasteoi_irq);
-> +		irq_set_handler(irq, handle_fasteoi_irq);
->  		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
->  
->  		gic_routable_irq_domain_ops->map(d, irq, hw);
->  	}
-> -	irq_set_chip_data(irq, d->host_data);
->  	return 0;
->  }
->  
-> @@ -814,8 +812,6 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
->  {
->  	unsigned long ret = 0;
->  
-> -	if (d->of_node != controller)
-> -		return -EINVAL;
->  	if (intsize < 3)
->  		return -EINVAL;
->  
-> @@ -858,6 +854,42 @@ static struct notifier_block gic_cpu_notifier = {
->  };
->  #endif
->  
-> +static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-> +				unsigned int nr_irqs, void *arg)
-> +{
-> +	int i, ret;
-> +	irq_hw_number_t hwirq;
-> +	unsigned int type = IRQ_TYPE_NONE;
-> +	struct of_phandle_args *irq_data = arg;
-> +
-> +	ret = gic_irq_domain_xlate(domain, irq_data->np, irq_data->args,
-> +				   irq_data->args_count, &hwirq, &type);
-> +	if (ret)
-> +		return ret;
-> +
-> +	for (i = 0; i < nr_irqs; i++)
-> +		gic_irq_domain_map(domain, virq+i, hwirq+i);
-> +
-> +	return 0;
-> +}
-> +
-> +static void gic_irq_domain_free(struct irq_domain *domain, unsigned int virq,
-> +				unsigned int nr_irqs)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < nr_irqs; i++) {
-> +		irq_set_handler(virq + i, NULL);
-> +		irq_domain_set_hwirq_and_chip(domain, virq + i, 0, NULL, NULL);
-> +	}
-> +}
-> +
-> +static const struct irq_domain_ops gic_irq_domain_hierarchy_ops = {
-> +	.xlate = gic_irq_domain_xlate,
-> +	.alloc = gic_irq_domain_alloc,
-> +	.free = gic_irq_domain_free,
-> +};
-> +
->  static const struct irq_domain_ops gic_irq_domain_ops = {
->  	.map = gic_irq_domain_map,
->  	.unmap = gic_irq_domain_unmap,
-> @@ -948,18 +980,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->  		gic_cpu_map[i] = 0xff;
->  
->  	/*
-> -	 * For primary GICs, skip over SGIs.
-> -	 * For secondary GICs, skip over PPIs, too.
-> -	 */
-> -	if (gic_nr == 0 && (irq_start & 31) > 0) {
-> -		hwirq_base = 16;
-> -		if (irq_start != -1)
-> -			irq_start = (irq_start & ~31) + 16;
-> -	} else {
-> -		hwirq_base = 32;
-> -	}
-> -
-> -	/*
->  	 * Find out how many interrupts are supported.
->  	 * The GIC only supports up to 1020 interrupt sources.
->  	 */
-> @@ -969,10 +989,32 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->  		gic_irqs = 1020;
->  	gic->gic_irqs = gic_irqs;
->  
-> -	gic_irqs -= hwirq_base; /* calculate # of irqs to allocate */
-> +	if (node) {		/* DT case */
-> +		const struct irq_domain_ops *ops =
-> +					&gic_irq_domain_hierarchy_ops;
-> +
-> +		if (!of_property_read_u32(node, "arm,routable-irqs",
-> +					  &nr_routable_irqs)) {
-> +			ops = &gic_irq_domain_ops;
-> +			gic_irqs = nr_routable_irqs;
-> +		}
-> +
-> +		gic->domain = irq_domain_add_linear(node, gic_irqs, ops, gic);
-> +	} else {		/* Non-DT case */
-> +		/*
-> +		 * For primary GICs, skip over SGIs.
-> +		 * For secondary GICs, skip over PPIs, too.
-> +		 */
-> +		if (gic_nr == 0 && (irq_start & 31) > 0) {
-> +			hwirq_base = 16;
-> +			if (irq_start != -1)
-> +				irq_start = (irq_start & ~31) + 16;
-> +		} else {
-> +			hwirq_base = 32;
-> +		}
-> +
-> +		gic_irqs -= hwirq_base; /* calculate # of irqs to allocate */
->  
-> -	if (of_property_read_u32(node, "arm,routable-irqs",
-> -				 &nr_routable_irqs)) {
->  		irq_base = irq_alloc_descs(irq_start, 16, gic_irqs,
->  					   numa_node_id());
->  		if (IS_ERR_VALUE(irq_base)) {
-> @@ -983,10 +1025,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->  
->  		gic->domain = irq_domain_add_legacy(node, gic_irqs, irq_base,
->  					hwirq_base, &gic_irq_domain_ops, gic);
-> -	} else {
-> -		gic->domain = irq_domain_add_linear(node, nr_routable_irqs,
-> -						    &gic_irq_domain_ops,
-> -						    gic);
->  	}
->  
->  	if (WARN_ON(!gic->domain))
-> 
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.19
+
+for you to fetch changes up to f5ed9ccc4c2dc275a13b765c88fa13211f60b57f:
+
+  ARM: mvebu: armada-xp: Fix 74hc595 count for Lenovo ix4-300d (2014-11-02 18:59:10 +0000)
+
+----------------------------------------------------------------
+mvebu DT changes for v3.19
+
+ - mvebu
+    - ReadyNAS 102 leds, esata
+    - ReadyNAS 2120 esata
+    - Add cache-unified for Aurora L2 node
+    - Add ref clk for timer and watchdog on Armada 375
+    - Cleanup Armada XP pinctrl for GigE
+    - Add RGMII pinctrl, i2c eeprom, and fix 74hc595 counter on Lenovo ix4-300d
+
+ - kirkwood
+    - Add DLink DIR665 and it's DSA configuration
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      ARM: Kirkwood: DIR665: Instantiate Distributed Switch Architecture
+
+Arnaud Ebalard (3):
+      arm: mvebu: Fix LED color in NETGEAR ReadyNAS 102 .dts file
+      arm: mvebu: Clarify (e)SATA ports info in NETGEAR ReadyNAS 102 .dts file
+      ARM: mvebu: Enable rear eSATA ports of NETGEAR ReadyNAS 2120
+
+Claudio Leite (1):
+      ARM: Kirkwood: Add support for DLink DIR665
+
+Ezequiel Garcia (1):
+      ARM: mvebu: Enable the reference clock for timer and watchdog on Armada 375 SoC
+
+Gregory CLEMENT (1):
+      ARM: mvebu: Fix the Aurora L2 cache node with the required cache-unified property
+
+Sebastian Hesselbarth (8):
+      ARM: mvebu: armada-xp: Consolidate pinctrl node
+      ARM: mvebu: armada-xp: Add node alias to pinctrl and add base address
+      ARM: mvebu: armada-xp: Use pinctrl node alias
+      ARM: mvebu: armada-xp: Move GE0/1 pinctrl settings for RGMII
+      ARM: mvebu: armada-xp: Add GE0 pinctrl settings for GMII
+      ARM: mvebu: armada-xp: Add RGMII pinctrl to Lenovo ix4-300d
+      ARM: mvebu: armada-xp: Add I2C eeprom on Lenovo ix4-300d
+      ARM: mvebu: armada-xp: Fix 74hc595 count for Lenovo ix4-300d
+
+ arch/arm/boot/dts/Makefile                       |   1 +
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts   |  17 +-
+ arch/arm/boot/dts/armada-370.dtsi                |   1 +
+ arch/arm/boot/dts/armada-375.dtsi                |  12 +-
+ arch/arm/boot/dts/armada-xp-axpwifiap.dts        |  58 ++---
+ arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts  |  73 +++---
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi         |  15 +-
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi         |  15 +-
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi         |  15 +-
+ arch/arm/boot/dts/armada-xp-netgear-rn2120.dts   | 166 +++++++-------
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  14 +-
+ arch/arm/boot/dts/armada-xp.dtsi                 |  38 ++++
+ arch/arm/boot/dts/kirkwood-dir665.dts            | 278 +++++++++++++++++++++++
+ 13 files changed, 506 insertions(+), 197 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-dir665.dts
