@@ -1,29 +1,25 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 9 Nov 2014 11:29:55 -0800
-Subject: [GIT PULL] ARM: mvebu: Fixes for v3.18
-In-Reply-To: <20141109034131.GQ3698@titan.lakedaemon.net>
-References: <20141101222033.GA3698@titan.lakedaemon.net>
- <20141109034131.GQ3698@titan.lakedaemon.net>
-Message-ID: <CAOesGMiq_1vOOqMaV6Fma__d9vkTbLeEYeNuyF2jt7YNXM9ECA@mail.gmail.com>
+From: jan.kiszka@web.de (Jan Kiszka)
+Date: Sun, 09 Nov 2014 20:35:49 +0100
+Subject: AMR: sun7i: CPU hotplug support?
+Message-ID: <545FC215.7010802@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Hi,
 
-On Sat, Nov 8, 2014 at 7:41 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> On Sat, Nov 01, 2014 at 06:20:33PM -0400, Jason Cooper wrote:
->> Guys,
->>
->> Here's a couple of fixes I've gathered so far for mvebu, nothing
->> exciting as these are quite old and were in -next for several weeks.
->>
->> Please pull.
->
-> Gentle ping?
+did anyone already happen to look into enabling CPU hotplug for the
+Allwinner A20 in upstream? I'm currently running the sunxi-next branch
+on Banana Pi, and echo 0 > .../cpu1/online just hangs the system. The
+old 3.4 LeMaker kernel works fine in this regard. I can try to look into
+details and port things over, just want to avoid duplicate efforts.
 
-Whoops, I've missed this one. Partially becaose you've forgotten to cc
-arm at kernel.org, which is how I usually keep track of pull requests.
+Thanks,
+Jan
 
-I sent the pull request to Linus last night, I'll include this for -rc5.
-
--Olof
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141109/8916a565/attachment.sig>
