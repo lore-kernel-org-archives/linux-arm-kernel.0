@@ -1,112 +1,51 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 8 Nov 2014 22:49:09 -0800
-Subject: [PATCH v8 4/8] ARM: dts: Enable Broadcom Cygnus SoC
-In-Reply-To: <545F05F0.3000702@broadcom.com>
-References: <sbranden@broadcom.com>
- <1414525992-3678-1-git-send-email-sbranden@broadcom.com>
- <1414525992-3678-5-git-send-email-sbranden@broadcom.com>
- <CAOesGMjUE-Z3L=FU1nspv5M52UhhJ9-dBLr40RTCz2WEhEPHLA@mail.gmail.com>
- <545F05F0.3000702@broadcom.com>
-Message-ID: <CAOesGMhd37UM+7+6eR9iLY22Fb9cG1dr8dD4DAzLJNRmtysnkg@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 9 Nov 2014 01:55:38 -0500
+Subject: [GIT PULL] ARM: mvebu: defconfig changes for v3.19
+Message-ID: <20141109065538.GX3698@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 8, 2014 at 10:13 PM, Scott Branden <sbranden@broadcom.com> wrote:
-> On 14-11-08 04:22 PM, Olof Johansson wrote:
->>
->> Hi,
->>
->> A bunch of small comments below, should be quick to fix.
->>
->> On Tue, Oct 28, 2014 at 12:53 PM, Scott Branden <sbranden@broadcom.com>
->> wrote:
->>>
->>> DT files to enable cygnus consisting on reference designs
->>> and cygnus core configuration.
->>>
->>> Reviewed-by: Ray Jui <rjui@broadcom.com>
->>> Reviewed-by: Arun Parameswaran <aparames@broadcom.com>
->>> Tested-by: Jonathan Richardson <jonathar@broadcom.com>
->>> Reviewed-by: JD (Jiandong) Zheng <jdzheng@broadcom.com>
->>> Signed-off-by: Scott Branden <sbranden@broadcom.com>
->>> ---
->>>   arch/arm/boot/dts/Makefile              |    4 ++
->>>   arch/arm/boot/dts/bcm-cygnus-clock.dtsi |   73 ++++++++++++++++++++++
->>>   arch/arm/boot/dts/bcm-cygnus.dtsi       |  100
->>> +++++++++++++++++++++++++++++++
->>>   arch/arm/boot/dts/bcm911360_entphn.dts  |   32 ++++++++++
->>>   arch/arm/boot/dts/bcm911360k.dts        |   32 ++++++++++
->>>   arch/arm/boot/dts/bcm958300k.dts        |   32 ++++++++++
->>>   6 files changed, 273 insertions(+)
->>>   create mode 100644 arch/arm/boot/dts/bcm-cygnus-clock.dtsi
->>>   create mode 100644 arch/arm/boot/dts/bcm-cygnus.dtsi
->>>   create mode 100644 arch/arm/boot/dts/bcm911360_entphn.dts
->>>   create mode 100644 arch/arm/boot/dts/bcm911360k.dts
->>>   create mode 100644 arch/arm/boot/dts/bcm958300k.dts
->>>
->>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>> index 38c89ca..4b3a590 100644
->>> --- a/arch/arm/boot/dts/Makefile
->>> +++ b/arch/arm/boot/dts/Makefile
->>> @@ -54,6 +54,10 @@ dtb-$(CONFIG_ARCH_AT91)      += at91-sama5d4ek.dtb
->>>   dtb-$(CONFIG_ARCH_ATLAS6) += atlas6-evb.dtb
->>>   dtb-$(CONFIG_ARCH_AXXIA) += axm5516-amarillo.dtb
->>>   dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
->>> +dtb-$(CONFIG_ARCH_BCM_CYGNUS) += \
->>> +       bcm911360_entphn.dtb \
->>> +       bcm911360k.dtb \
->>> +       bcm958300k.dtb
->>>   dtb-$(CONFIG_ARCH_BCM_5301X) += bcm4708-netgear-r6250.dtb
->>>   dtb-$(CONFIG_ARCH_BCM_63XX) += bcm963138dvt.dtb
->>>   dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm28155-ap.dtb \
->>
->>
->> Please add new entries in alphabetical/alphanumerical order. Also,
->> first entry is commonly added on the first line
->>
->>
->>> diff --git a/arch/arm/boot/dts/bcm-cygnus-clock.dtsi
->>> b/arch/arm/boot/dts/bcm-cygnus-clock.dtsi
->>> new file mode 100644
->>> index 0000000..d06172b
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/bcm-cygnus-clock.dtsi
->>> @@ -0,0 +1,73 @@
->>> +/*
->>> + * Copyright 2014 Broadcom Corporation.  All rights reserved.
->>> + *
->>> + * Unless you and Broadcom execute a separate written software license
->>> + * agreement governing use of this software, this software is licensed
->>> to you
->>> + * under the terms of the GNU General Public License as
->>> + * published by the Free Software Foundation version 2.
->>> + *
->>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
->>> + * kind, whether express or implied; without even the implied warranty
->>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + * GNU General Public License for more details.
->>
->>
->> We ask for new DT contents to be added with dual BSD/GPL license, to
->> allow for reuse of the DT data structures in other projects as well.
->> There's currently a lot of activity going on relicensing the current
->> files so I recommend sorting it out before they are added if you can.
->
->
-> This may take more time than you think.  I am going to have to go through
-> legal to get such a license created. Also, why would you need dual license?
-> If it is BSD that should serve both purposes?
+Guys,
 
-I haven't followed the discussion close enough to know if there's been
-discussion about single-license BSD vs dual BSD/GPL.
+Here's a small round of changes I've collected so far.  Nothing real
+exciting.  They've been in -next at least 4 cycles.
 
-At the very least, please start the process of getting it changed.
+Please pull.
 
-Also, I see now that this isn't even a clean GPL v2, given "Unless you
-and Broadcom..." language. I see the bnx2x driver had that in the
-past, but none of the Kona contributions did. I strongly suggest
-sticking to the normal copyrights here and not making things more
-complicated than they have to.
+thx,
+
+Jason.
 
 
--Olof
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-3.19
+
+for you to fetch changes up to 64bbc2bf639cd7891d6d9589ad665f1b30ee1b4a:
+
+  ARM: mvebu: defconfig: Enable the mv88E6171 switch driver (2014-11-07 03:31:21 +0000)
+
+----------------------------------------------------------------
+mvebu defconfig changes for v3.19
+
+ - Add options for DLink DIR665
+ - Add Armada 370 simple-card audio option
+ - Add mv88E6171 switch driver option
+
+----------------------------------------------------------------
+Andrew Lunn (3):
+      ARM: mvebu: Add DLINK DIR665 options to mvebu_v5_defconfig
+      ARM: config: Add DLINK DIR665 options to multi_v5_defconfig
+      ARM: mvebu: defconfig: Enable the mv88E6171 switch driver
+
+Thomas Petazzoni (1):
+      ARM: mvebu: update mvebu_v7_defconfig for Armada 370 audio
+
+ arch/arm/configs/multi_v5_defconfig | 2 ++
+ arch/arm/configs/mvebu_v5_defconfig | 2 ++
+ arch/arm/configs/mvebu_v7_defconfig | 6 +++++-
+ 3 files changed, 9 insertions(+), 1 deletion(-)
