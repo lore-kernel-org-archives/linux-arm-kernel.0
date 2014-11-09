@@ -1,46 +1,47 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 9 Nov 2014 10:41:50 +0100
-Subject: [PATCH 0/7] Armada 375/38x perf support, and a bonus irqchip
- driver simplification
-In-Reply-To: <20141109052348.GT3698@titan.lakedaemon.net>
-References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20141109052348.GT3698@titan.lakedaemon.net>
-Message-ID: <20141109104150.03044ee0@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sun, 9 Nov 2014 09:44:30 +0000
+Subject: [GIT PULL] arm64 fixes for 3.18
+Message-ID: <20141109094422.GA14540@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason, Ezequiel,
+Hi Linus,
 
-On Sun, 9 Nov 2014 00:23:48 -0500, Jason Cooper wrote:
-> On Wed, Oct 22, 2014 at 10:43:40AM -0300, Ezequiel Garcia wrote:
-> > This patchset enables support for perf hardware events, by enabling the PMU
-> > interrupts in the irqchip driver.
-> > 
-> > While doing this, we noticed the driver could use some cleaning to simplify
-> > the overly complex implementation of the .map(), .unmask() and .mask()
-> > functions.
-> > 
-> > The first three patches are the result of this cleaning effort, while the
-> > rest of the series is the Perf support for Armada 375 and Armada 38x SoCs.
-> > 
-> > The series is based on v3.18-rc1.
-> > 
-> > Ezequiel Garcia (7):
-> >   irqchip: armada-370-xp: Simplify interrupt map, mask and unmask
-> >   irqchip: armada-370-xp: Initialize per cpu registers when CONFIG_SMP=N
-> >   irqchip: armada-370-xp: Introduce a is_percpu_irq() helper for
-> >     readability
-> >   irqchip: armada-370-xp: Enable Performance Counter interrupts
-> 
-> Patches 1 to 4 tentatively applied to irqchip/mvebu.  Things have been
-> quiet, so let's get it in next for some more test coverage.
+Please pull the arm64 fixes below. Thanks.
 
-Ezequiel, are these patches really the version we want to see merged? I
-think you're working on a different implementation that demultiplex the
-coherency fabric events interrupt.
+The following changes since commit 3dec0fe48a8936528aae2fc3f904c2c9a34ba368:
 
-Thomas
+  arm64: Fix memblock current_limit with 64K pages and 48-bit VA (2014-10-24 18:16:47 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+
+for you to fetch changes up to 2d39ad649eca1e8a993f4fda244fe17ecea7a38d:
+
+  arm64: defconfig: update defconfig for 3.18 (2014-11-05 17:07:58 +0000)
+
+----------------------------------------------------------------
+arm64 fixes:
+
+- enable bpf syscall for compat
+- cpu_suspend fix when checking the idle state type
+- defconfig update
+
+----------------------------------------------------------------
+Amit Daniel Kachhap (1):
+      arm64: psci: fix cpu_suspend to check idle state type for index
+
+Catalin Marinas (1):
+      arm64: compat: Enable bpf syscall
+
+Will Deacon (1):
+      arm64: defconfig: update defconfig for 3.18
+
+ arch/arm64/configs/defconfig      | 26 ++++++++++++++++++++++++--
+ arch/arm64/include/asm/unistd32.h |  2 ++
+ arch/arm64/kernel/psci.c          |  2 +-
+ 3 files changed, 27 insertions(+), 3 deletions(-)
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Catalin
