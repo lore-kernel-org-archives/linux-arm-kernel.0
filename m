@@ -1,36 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 8 Nov 2014 16:56:55 -0800
-Subject: [GIT PULL] Xilinx Zynq fix for v3.18
-In-Reply-To: <5459E081.8000903@monstr.eu>
-References: <5459E081.8000903@monstr.eu>
-Message-ID: <20141109005655.GD13855@quad.lixom.net>
+Date: Sat, 8 Nov 2014 16:58:02 -0800
+Subject: [PATCH] ARM: dts: zynq: Enable PL clocks for Parallella
+In-Reply-To: <eca8ae5de8184151b03d3fd8d23c62a7@BY2FFO11FD010.protection.gbl>
+References: <1415294531-8942-1-git-send-email-afaerber@suse.de>
+ <eca8ae5de8184151b03d3fd8d23c62a7@BY2FFO11FD010.protection.gbl>
+Message-ID: <20141109005802.GE13855@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Nov 07, 2014 at 07:44:16AM +0100, Michal Simek wrote:
+> On 11/06/2014 06:22 PM, Andreas F?rber wrote:
+> > The Parallella board comes with a U-Boot bootloader that loads one of
+> > two predefined FPGA bitstreams before booting the kernel. Both define an
+> > AXI interface to the on-board Epiphany processor.
+> > 
+> > Enable clocks FCLK0..FCLK3 for the Programmable Logic by default.
+> > 
+> > Otherwise accessing, e.g., the ESYSRESET register freezes the board,
+> > as seen with the Epiphany SDK tools e-reset and e-hw-rev, using /dev/mem.
+> > 
+> > Cc: <stable@vger.kernel.org> # 3.17.x
+> > Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> > ---
+> >  Michal/Olof, please consider this trivial patch as a fix for 3.18.
+> 
+> Acked-by: Michal Simek <michal.simek@xilinx.com>
+> 
+> Olof, Arnd: Can you please pick this directly?
 
-On Wed, Nov 05, 2014 at 09:32:01AM +0100, Michal Simek wrote:
-> Hi guys,
-> 
-> please add this fix to your tree.
-> 
-> Thanks,
-> Michal
-> 
-> 
-> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-> 
->   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/Xilinx/linux-xlnx.git tags/zynq-fixes-for-3.18
-> 
-> for you to fetch changes up to 2de4752d6923d7dcc6e68c23be6a52d5f0896f9d:
-> 
->   ARM: zynq: Actually remove hotplug.c (2014-10-20 20:53:26 +0200)
-
-Did you forget to push this tag out? I can't find it in that repo.
+Done, applied to fixes.
 
 
 -Olof
