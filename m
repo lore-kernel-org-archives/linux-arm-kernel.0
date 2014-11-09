@@ -1,37 +1,34 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 09 Nov 2014 19:04:54 +0100
-Subject: [PATCH] arm: xscale: correct auxiliary register in suspend/resume
-In-Reply-To: <CALT56yMg53Dd0iKc-8zwSeRaAJbTnsx9akod_V+X=1t5VN+VKA@mail.gmail.com>
- (Dmitry Eremin-Solenikov's message of "Sun, 9 Nov 2014 20:14:53
+Date: Sun, 09 Nov 2014 19:19:33 +0100
+Subject: [PATCH v1 0/3] Transition pxa25x clock to common clocks
+In-Reply-To: <CALT56yOU=cqczdEs=FOgoWUHev1A0gihEpV-XsD5_g_ECz6+Qg@mail.gmail.com>
+ (Dmitry Eremin-Solenikov's message of "Sun, 9 Nov 2014 20:11:27
  +0400")
-References: <1415479134-19999-1-git-send-email-dbaryshkov@gmail.com>
- <87oasgv1nc.fsf@free.fr>
- <CALT56yMg53Dd0iKc-8zwSeRaAJbTnsx9akod_V+X=1t5VN+VKA@mail.gmail.com>
-Message-ID: <87k334uu61.fsf@free.fr>
+References: <1414941415-13146-1-git-send-email-robert.jarzmik@free.fr>
+ <CALT56yOCBN1NAfNw=vThVZ_o=ONGOTvzKHBH5tCTQShJY0wkrQ@mail.gmail.com>
+ <87lhnlwqm4.fsf@free.fr>
+ <CALT56yNOXq-ssvsjafz=ae+uWv1GyscoQ3RQ_h--i740zm4trA@mail.gmail.com>
+ <8761epwgni.fsf@free.fr>
+ <CALT56yOU=cqczdEs=FOgoWUHev1A0gihEpV-XsD5_g_ECz6+Qg@mail.gmail.com>
+Message-ID: <87fvdsuthm.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
 
-> Noticed thanks to qemu that reported 'unsupported instruction' on suspend.
->
->>  - did you test this patch during a suspend/resume cycle, and if so on which
->>    variants (pxa25x and tosa maybe) ?
->
-> Tested on tosa (that is pxa255).
->
->>
->> As you might haved guessed, I'd like all these questions to have an answer in
->> the commit message.
->
-> Do you need an updated message?
-In a couple of days, if you don't have any other comments, yes please.
+> 2014-11-09 0:01 GMT+03:00 Robert Jarzmik <robert.jarzmik@free.fr>:
+> Tested-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+OK, that's really great, thanks for your testing effort.
+I'll digest the clk_summary output next week to cross-check everything is in
+order.
 
-And I think the patch subject would rather be "ARM: xscale: ..." if I judge by
-the other patches in that area.
+> Could you please also include a revert of
+> 23c4a3a5212701ad34bd30591fa33d7bacef9c5f
+> into your branch? Otherwise pxa27x is broken in your tree.
+Done.
 
-And as I tested that also on pxa270 and found no regression, with my:
-Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
+I will release v2 of this serie very soon now as the fixes for at least 2
+pxa25x platforms are identified and done.
 
 Cheers.
 
