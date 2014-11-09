@@ -1,77 +1,38 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sun, 9 Nov 2014 12:38:56 +0100
-Subject: [PATCH 2/2] ASoC: Remove useless casts
-In-Reply-To: <cover.1415557680.git.moinejf@free.fr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 9 Nov 2014 18:50:19 +0000
+Subject: [PATCH 1/2] of: Make const the device node pointers in
+ of_clk_get and of_node_put
+In-Reply-To: <375a82230accf26dfbbb74e6f928243ea8e38b50.1415557680.git.moinejf@free.fr>
 References: <cover.1415557680.git.moinejf@free.fr>
-Message-ID: <33e64705e81810201349a09ac22d5e1f66e035e0.1415557680.git.moinejf@free.fr>
+ <375a82230accf26dfbbb74e6f928243ea8e38b50.1415557680.git.moinejf@free.fr>
+Message-ID: <20141109185019.GU4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to cast the cpu_of_node or codec_of_node of the
-dai_links when calling of_put_node.
+On Sat, Nov 08, 2014 at 07:33:22PM +0100, Jean-Francois Moine wrote:
+> Some device nodes are sometimes referenced by const pointers.
+> 
+> This patch avoids to cast these pointers when calling the functions
+> of_clk_get() and of_node_put().
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
- sound/soc/generic/simple-card.c       | 7 ++-----
- sound/soc/samsung/odroidx2_max98090.c | 4 ++--
- sound/soc/ux500/mop500.c              | 6 ++----
- 3 files changed, 6 insertions(+), 11 deletions(-)
+NAK.  Firstly, of_node_put contains a kref, which is /definitely/ not
+a const item when kobject_put() is called on it.  Inside the kobject
+is a kref, which kobject_put() will call kref_put() on.  kref_put()
+in turn will internally call atomic_sub_and_test() on a value embedded
+within the kref struct.
 
-diff --git a/sound/soc/generic/simple-card.c b/sound/soc/generic/simple-card.c
-index cd49d50..3e3fec4 100644
---- a/sound/soc/generic/simple-card.c
-+++ b/sound/soc/generic/simple-card.c
-@@ -457,16 +457,13 @@ static int asoc_simple_card_unref(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card = platform_get_drvdata(pdev);
- 	struct snd_soc_dai_link *dai_link;
--	struct device_node *np;
- 	int num_links;
- 
- 	for (num_links = 0, dai_link = card->dai_link;
- 	     num_links < card->num_links;
- 	     num_links++, dai_link++) {
--		np = (struct device_node *) dai_link->cpu_of_node;
--		of_node_put(np);
--		np = (struct device_node *) dai_link->codec_of_node;
--		of_node_put(np);
-+		of_node_put(dai_link->cpu_of_node);
-+		of_node_put(dai_link->codec_of_node);
- 	}
- 	return 0;
- }
-diff --git a/sound/soc/samsung/odroidx2_max98090.c b/sound/soc/samsung/odroidx2_max98090.c
-index 3c8f604..d7640e7 100644
---- a/sound/soc/samsung/odroidx2_max98090.c
-+++ b/sound/soc/samsung/odroidx2_max98090.c
-@@ -153,8 +153,8 @@ static int odroidx2_audio_remove(struct platform_device *pdev)
- 
- 	snd_soc_unregister_card(card);
- 
--	of_node_put((struct device_node *)odroidx2_dai[0].cpu_of_node);
--	of_node_put((struct device_node *)odroidx2_dai[0].codec_of_node);
-+	of_node_put(odroidx2_dai[0].cpu_of_node);
-+	of_node_put(odroidx2_dai[0].codec_of_node);
- 
- 	return 0;
- }
-diff --git a/sound/soc/ux500/mop500.c b/sound/soc/ux500/mop500.c
-index b3b66aa..ea9ba284 100644
---- a/sound/soc/ux500/mop500.c
-+++ b/sound/soc/ux500/mop500.c
-@@ -64,11 +64,9 @@ static void mop500_of_node_put(void)
- 
- 	for (i = 0; i < 2; i++) {
- 		if (mop500_dai_links[i].cpu_of_node)
--			of_node_put((struct device_node *)
--				mop500_dai_links[i].cpu_of_node);
-+			of_node_put(mop500_dai_links[i].cpu_of_node);
- 		if (mop500_dai_links[i].codec_of_node)
--			of_node_put((struct device_node *)
--				mop500_dai_links[i].codec_of_node);
-+			of_node_put(mop500_dai_links[i].codec_of_node);
- 	}
- }
- 
+Ergo, of_node_put() modifies the struct device_node contents.  Therefore,
+of_node_put() definitely not treating the data pointed to as read-only,
+and therefore it is completely inappropriate for it to be marked "const".
+
+What this then means is that it fundamentally undermines the idea of
+storing the pointer to a device_node as a const pointer, as the device
+node must always be modified when you're done with it (because it's a
+ref-counted structure.)  So, having it const in your code is a bug.
+
+What this also means is that every other place that you've added const
+below is also very dubious.
+
 -- 
-2.1.3
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
