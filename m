@@ -1,33 +1,27 @@
-From: broonie@debian.org (Mark Brown)
-Date: Sun, 9 Nov 2014 12:37:53 +0000
-Subject: sound: enable sound support on n900 on devicetree-based boot
-In-Reply-To: <20141109120222.GA3815@amd>
-References: <20141109120222.GA3815@amd>
-Message-ID: <20141109123753.GO2722@sirena.org.uk>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Sun, 9 Nov 2014 13:40:25 +0100
+Subject: tsc2005 touchscreen: implement disable attribute
+In-Reply-To: <20141109115636.GA3106@amd>
+References: <20141109115636.GA3106@amd>
+Message-ID: <20141109124025.GA21763@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 09, 2014 at 01:02:22PM +0100, Pavel Machek wrote:
-> 
-> With device tree, it is possible (and encouraged) to build N900
-> kernels without CONFIG_MACH_NOKIA_RX51. Update config file to enable
-> the driver build in this case.
+Hi,
 
-Please do try to use subject lines reflecting the style for the
-subsystem.
+On Sun, Nov 09, 2014 at 12:56:37PM +0100, Pavel Machek wrote:
+> Implement disable attribute for tsc2005 touchscreen. It is useful to
+> avoid wakeups when phone is in the pocket.
 
->  config SND_OMAP_SOC_RX51
->  	tristate "SoC Audio support for Nokia RX-51"
-> -	depends on SND_OMAP_SOC && ARM && (MACH_NOKIA_RX51 || COMPILE_TEST) && I2C
-> +	depends on SND_OMAP_SOC && ARM && I2C
+I don't think this should be some driver specific sysfs node.
+Instead a generic method from the input subsystem should be
+used.
 
-Please also update the config text so users have a chance to figure out
-that this driver is the one they need for their system - I guess most
-people won't know what RX-51 is.
+-- Sebastian
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 473 bytes
+Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141109/d707f4bf/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141109/f6b2e45d/attachment.sig>
