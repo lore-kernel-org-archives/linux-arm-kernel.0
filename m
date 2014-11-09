@@ -1,56 +1,36 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 9 Nov 2014 17:50:04 -0500
-Subject: [PATCH 0/7] Armada 375/38x perf support, and a bonus irqchip
- driver simplification
-In-Reply-To: <545F5B82.5090004@free-electrons.com>
-References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20141109052348.GT3698@titan.lakedaemon.net>
- <20141109104150.03044ee0@free-electrons.com>
- <545F5B82.5090004@free-electrons.com>
-Message-ID: <20141109225004.GB3698@titan.lakedaemon.net>
+Date: Sun, 9 Nov 2014 17:51:55 -0500
+Subject: [GIT PULL] ARM: mvebu: Fixes for v3.18
+In-Reply-To: <CAOesGMiq_1vOOqMaV6Fma__d9vkTbLeEYeNuyF2jt7YNXM9ECA@mail.gmail.com>
+References: <20141101222033.GA3698@titan.lakedaemon.net>
+ <20141109034131.GQ3698@titan.lakedaemon.net>
+ <CAOesGMiq_1vOOqMaV6Fma__d9vkTbLeEYeNuyF2jt7YNXM9ECA@mail.gmail.com>
+Message-ID: <20141109225155.GC3698@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 09, 2014 at 09:18:10AM -0300, Ezequiel Garcia wrote:
-> On 11/09/2014 06:41 AM, Thomas Petazzoni wrote:
-> > Jason, Ezequiel,
-> > 
-> > On Sun, 9 Nov 2014 00:23:48 -0500, Jason Cooper wrote:
-> >> On Wed, Oct 22, 2014 at 10:43:40AM -0300, Ezequiel Garcia wrote:
-> >>> This patchset enables support for perf hardware events, by enabling the PMU
-> >>> interrupts in the irqchip driver.
-> >>>
-> >>> While doing this, we noticed the driver could use some cleaning to simplify
-> >>> the overly complex implementation of the .map(), .unmask() and .mask()
-> >>> functions.
-> >>>
-> >>> The first three patches are the result of this cleaning effort, while the
-> >>> rest of the series is the Perf support for Armada 375 and Armada 38x SoCs.
-> >>>
-> >>> The series is based on v3.18-rc1.
-> >>>
-> >>> Ezequiel Garcia (7):
-> >>>   irqchip: armada-370-xp: Simplify interrupt map, mask and unmask
-> >>>   irqchip: armada-370-xp: Initialize per cpu registers when CONFIG_SMP=N
-> >>>   irqchip: armada-370-xp: Introduce a is_percpu_irq() helper for
-> >>>     readability
-> >>>   irqchip: armada-370-xp: Enable Performance Counter interrupts
-> >>
-> >> Patches 1 to 4 tentatively applied to irqchip/mvebu.  Things have been
-> >> quiet, so let's get it in next for some more test coverage.
-> > 
+On Sun, Nov 09, 2014 at 11:29:55AM -0800, Olof Johansson wrote:
+> Hi Jason,
 > 
-> Jason, please consider *only* patch 1 for inclusion, as long as we
-> have Gregory's Ack on it. I don't want to break the irqchip driver
-> because of a clean-up! On the other side, if such weird handling
-> is needed, we need find why and document it.
+> On Sat, Nov 8, 2014 at 7:41 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> > On Sat, Nov 01, 2014 at 06:20:33PM -0400, Jason Cooper wrote:
+> >> Guys,
+> >>
+> >> Here's a couple of fixes I've gathered so far for mvebu, nothing
+> >> exciting as these are quite old and were in -next for several weeks.
+> >>
+> >> Please pull.
+> >
+> > Gentle ping?
+> 
+> Whoops, I've missed this one. Partially becaose you've forgotten to cc
+> arm at kernel.org, which is how I usually keep track of pull requests.
 
-No sweat.  I've now rolled irqchip/mvebu back to:
+Yep, my mistake.  Bit scattered atm.
 
-  aaae00a7fa86 irqchip: armada-370-xp: Simplify interrupt map, mask and unmask
+> I sent the pull request to Linus last night, I'll include this for -rc5.
 
-and an updated for-next is being build-tested and pushed hopefully
-before Stephen gets his cup of coffee.  :)
+No problem.
 
 thx,
 
