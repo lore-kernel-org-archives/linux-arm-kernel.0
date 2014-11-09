@@ -1,36 +1,47 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 9 Nov 2014 20:39:53 +0100
-Subject: sound: enable sound support on n900 on devicetree-based boot
-In-Reply-To: <20141109123753.GO2722@sirena.org.uk>
-References: <20141109120222.GA3815@amd> <20141109123753.GO2722@sirena.org.uk>
-Message-ID: <20141109193953.GA7852@amd>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Sun, 9 Nov 2014 12:01:42 -0800
+Subject: tsc2005 touchscreen: implement disable attribute
+In-Reply-To: <201411091349.20116@pali>
+References: <20141109115636.GA3106@amd> <20141109124025.GA21763@earth.universe>
+ <201411091349.20116@pali>
+Message-ID: <20141109200142.GA37384@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun 2014-11-09 12:37:53, Mark Brown wrote:
-> On Sun, Nov 09, 2014 at 01:02:22PM +0100, Pavel Machek wrote:
+On Sun, Nov 09, 2014 at 01:49:19PM +0100, Pali Roh?r wrote:
+> On Sunday 09 November 2014 13:40:25 Sebastian Reichel wrote:
+> > Hi,
 > > 
-> > With device tree, it is possible (and encouraged) to build N900
-> > kernels without CONFIG_MACH_NOKIA_RX51. Update config file to enable
-> > the driver build in this case.
+> > On Sun, Nov 09, 2014 at 12:56:37PM +0100, Pavel Machek wrote:
+> > > Implement disable attribute for tsc2005 touchscreen. It is
+> > > useful to avoid wakeups when phone is in the pocket.
+> > 
+> > I don't think this should be some driver specific sysfs node.
+> > Instead a generic method from the input subsystem should be
+> > used.
+> > 
+> > -- Sebastian
 > 
-> Please do try to use subject lines reflecting the style for the
-> subsystem.
-
-Ok.
-
-> >  config SND_OMAP_SOC_RX51
-> >  	tristate "SoC Audio support for Nokia RX-51"
-> > -	depends on SND_OMAP_SOC && ARM && (MACH_NOKIA_RX51 || COMPILE_TEST) && I2C
-> > +	depends on SND_OMAP_SOC && ARM && I2C
+> Yes. I would like to see generic method to turn off input device 
+> (or just "mute" it if device does not support turn off). Similar 
+> problem is also on laptops or other portable devices. E.g when I 
+> close LID of my laptop I want to turn off internal input devices 
+> (keyboard, touchpad, trackstick) without need to unload evdev 
+> Xserver drivers (or killing Xserver). Another use case is to turn 
+> off keyboard (also from kernel tty on Ctrl+Alt+Fx) which cannot 
+> be unplugged (internal laptop keyboard).
 > 
-> Please also update the config text so users have a chance to figure out
-> that this driver is the one they need for their system - I guess most
-> people won't know what RX-51 is.
+> CCed Dmitry, what do you think about it?
 
-Actually help text below already explains that. I'll update tristate
-text, too.
-									Pavel
+Actually I'd like it to be not limited to input devices but rater try
+doing it at the device core level, if possible. I am sure there are IIO
+and other devices that could be forcibly turned off/put into low power
+mode under certain circumstances.
+
+There were some talks about it with Rafael, but we never come with
+anything concrete.
+
+Thanks.
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Dmitry
