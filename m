@@ -1,171 +1,223 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Nov 2014 14:15:49 +0100
-Subject: [PATCH] ARM: fix multiplatform allmodcompile
-Message-ID: <1415625349-21472-1-git-send-email-linus.walleij@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 10 Nov 2014 14:24:38 +0100
+Subject: [PATCH v3 18/19] arm/arm64: KVM: enable kernel side of GICv3
+ emulation
+In-Reply-To: <5460AD3D.5050008@arm.com>
+References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
+ <1414776414-13426-19-git-send-email-andre.przywara@arm.com>
+ <20141107160735.GT16132@cbox> <5460AD3D.5050008@arm.com>
+Message-ID: <20141110132438.GD7544@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 68f3b875f7848f5304472184a4634148c5330cbd
-"ARM: integrator: make the Integrator multiplatform"
-broke allmodconfig like this:
+On Mon, Nov 10, 2014 at 12:19:09PM +0000, Andre Przywara wrote:
+> Hej Christoffer,
 
->> arch/arm/include/asm/cmpxchg.h:114:2: error: #error
-"SMP is not supported on this platform"
-(etc)
+  ^^^ Nice, Hej Andre,
 
-This is due to the fact that as we turned on multiplatform
-for the Integrator, this enabled a lot of non-applicable
-CPU's to be selected for its multiplatform images, due to
-a lot of "depends on ARCH_INTEGRATOR" restrictions in
-arch/arm/mm/Kconfig for the different ARM CPU types.
+> 
+> On 07/11/14 16:07, Christoffer Dall wrote:
+> > On Fri, Oct 31, 2014 at 05:26:53PM +0000, Andre Przywara wrote:
+> >> With all the necessary GICv3 emulation code in place, we can now
+> >> connect the code to the GICv3 backend in the kernel.
+> >> The LR register handling is different depending on the emulated GIC
+> >> model, so provide different implementations for each.
+> >> Also allow non-v2-compatible GICv3 implementations (which don't
+> >> provide MMIO regions for the virtual CPU interface in the DT), but
+> >> restrict those hosts to use GICv3 guests only.
+> > 
+> > s/use/support/
+> > 
+> >>
+> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> >> ---
+> >>  virt/kvm/arm/vgic-v3.c |  168 ++++++++++++++++++++++++++++++++++++------------
+> >>  virt/kvm/arm/vgic.c    |    4 ++
+> >>  2 files changed, 130 insertions(+), 42 deletions(-)
+> >>
+> >> diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+> >> index ce50918..c0e901c 100644
+> >> --- a/virt/kvm/arm/vgic-v3.c
+> >> +++ b/virt/kvm/arm/vgic-v3.c
+> >> @@ -34,6 +34,7 @@
+> >>  #define GICH_LR_VIRTUALID		(0x3ffUL << 0)
+> >>  #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
+> >>  #define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
+> >> +#define ICH_LR_VIRTUALID_MASK		(BIT_ULL(32) - 1)
+> >>  
+> >>  /*
+> >>   * LRs are stored in reverse order in memory. make sure we index them
+> >> @@ -43,7 +44,35 @@
+> >>  
+> >>  static u32 ich_vtr_el2;
+> >>  
+> >> -static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+> >> +static u64 sync_lr_val(u8 state)
+> > 
+> > is this lr_state_to_val ?
+> > 
+> >> +{
+> >> +	u64 lr_val = 0;
+> >> +
+> >> +	if (state & LR_STATE_PENDING)
+> >> +		lr_val |= ICH_LR_PENDING_BIT;
+> >> +	if (state & LR_STATE_ACTIVE)
+> >> +		lr_val |= ICH_LR_ACTIVE_BIT;
+> >> +	if (state & LR_EOI_INT)
+> >> +		lr_val |= ICH_LR_EOI;
+> >> +
+> >> +	return lr_val;
+> >> +}
+> >> +
+> >> +static u8 sync_lr_state(u64 lr_val)
+> > 
+> > and lr_val_to_state ?
+> > 
+> > at least these sync names don't make much sense to me...
+> > 
+> >> +{
+> >> +	u8 state = 0;
+> >> +
+> >> +	if (lr_val & ICH_LR_PENDING_BIT)
+> >> +		state |= LR_STATE_PENDING;
+> >> +	if (lr_val & ICH_LR_ACTIVE_BIT)
+> >> +		state |= LR_STATE_ACTIVE;
+> >> +	if (lr_val & ICH_LR_EOI)
+> >> +		state |= LR_EOI_INT;
+> >> +
+> >> +	return state;
+> >> +}
+> >> +
+> >> +static struct vgic_lr vgic_v2_on_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+> >>  {
+> >>  	struct vgic_lr lr_desc;
+> >>  	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)];
+> >> @@ -53,30 +82,53 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+> >>  		lr_desc.source	= (val >> GICH_LR_PHYSID_CPUID_SHIFT) & 0x7;
+> >>  	else
+> >>  		lr_desc.source = 0;
+> >> -	lr_desc.state	= 0;
+> >> +	lr_desc.state	= sync_lr_state(val);
+> >>  
+> >> -	if (val & ICH_LR_PENDING_BIT)
+> >> -		lr_desc.state |= LR_STATE_PENDING;
+> >> -	if (val & ICH_LR_ACTIVE_BIT)
+> >> -		lr_desc.state |= LR_STATE_ACTIVE;
+> >> -	if (val & ICH_LR_EOI)
+> >> -		lr_desc.state |= LR_EOI_INT;
+> >> +	return lr_desc;
+> >> +}
+> >> +
+> >> +static struct vgic_lr vgic_v3_on_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+> >> +{
+> >> +	struct vgic_lr lr_desc;
+> >> +	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)];
+> >> +
+> >> +	lr_desc.irq	= val & ICH_LR_VIRTUALID_MASK;
+> >> +	lr_desc.source	= 0;
+> >> +	lr_desc.state	= sync_lr_state(val);
+> >>  
+> >>  	return lr_desc;
+> >>  }
+> >>  
+> >> -static void vgic_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
+> >> -			   struct vgic_lr lr_desc)
+> >> +static void vgic_v3_on_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
+> >> +				 struct vgic_lr lr_desc)
+> >>  {
+> >> -	u64 lr_val = (((u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT) |
+> >> -		      lr_desc.irq);
+> >> +	u64 lr_val;
+> >>  
+> >> -	if (lr_desc.state & LR_STATE_PENDING)
+> >> -		lr_val |= ICH_LR_PENDING_BIT;
+> >> -	if (lr_desc.state & LR_STATE_ACTIVE)
+> >> -		lr_val |= ICH_LR_ACTIVE_BIT;
+> >> -	if (lr_desc.state & LR_EOI_INT)
+> >> -		lr_val |= ICH_LR_EOI;
+> >> +	lr_val = lr_desc.irq;
+> >> +
+> >> +	/*
+> >> +	 * currently all guest IRQs are Group1, as Group0 would result
+> > 
+> > Can you guess my comment here?
+> > 
+> >> +	 * in a FIQ in the guest, which it wouldn't expect.
+> >> +	 * Eventually we want to make this configurable, so we may revisit
+> >> +	 * this in the future.
+> >> +	 */
+> >> +	lr_val |= ICH_LR_GROUP;
+> >> +
+> >> +	lr_val |= sync_lr_val(lr_desc.state);
+> >> +
+> >> +	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)] = lr_val;
+> >> +}
+> >> +
+> >> +static void vgic_v2_on_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
+> >> +				 struct vgic_lr lr_desc)
+> >> +{
+> >> +	u64 lr_val;
+> >> +
+> >> +	lr_val = lr_desc.irq;
+> >> +
+> >> +	lr_val |= (u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT;
+> >> +
+> >> +	lr_val |= sync_lr_val(lr_desc.state);
+> >>  
+> >>  	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)] = lr_val;
+> >>  }
+> >> @@ -145,9 +197,8 @@ static void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+> >>  
+> >>  static void vgic_v3_enable(struct kvm_vcpu *vcpu)
+> >>  {
+> >> -	struct vgic_v3_cpu_if *vgic_v3;
+> >> +	struct vgic_v3_cpu_if *vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
+> >>  
+> >> -	vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
+> > 
+> > unnecessary change?
+> > 
+> >>  	/*
+> >>  	 * By forcing VMCR to zero, the GIC will restore the binary
+> >>  	 * points to their reset values. Anything else resets to zero
+> 
+> So most of the code above is gone now in this form due to the drop of
+> init_emul and friends I did earlier last week due to your comments.
+> So I will skip those comments for now (or better: try to translate them
+> to the new code structure if possbile) and eagerly wait for them to
+> reappear in a different form in the v4 comments ;-)
 
-Fix this by restricting the CPU selections to respective
-multiplatform config, which now becomes a subset of the
-possible Integrator configurations.
+sounds good, I'll go hunt again in the v4 :)
 
-Reported-by: Build bot for Mark Brown <broonie@kernel.org>
-Reported-by: Kbuild test robot <fengguang.wu@intel.com>
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Sorry for screwing up: if we apply this on top of the
-other multiplatform patches, I guess things will be solved.
-The alternative seems to be to pull all of it out :(
-I get some other build errors on allmodconfig but they seem
-to be unrelated errors.
----
- arch/arm/mm/Kconfig | 28 ++++++++++++++--------------
- 1 file changed, 14 insertions(+), 14 deletions(-)
+> 
+> >> @@ -155,7 +206,14 @@ static void vgic_v3_enable(struct kvm_vcpu *vcpu)
+> >>  	 */
+> >>  	vgic_v3->vgic_vmcr = 0;
+> >>  
+> >> -	vgic_v3->vgic_sre = 0;
+> >> +	/*
+> >> +	 * Set the SRE_EL1 value depending on the configured
+> >> +	 * emulated vGIC model.
+> >> +	 */
+> >> +	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
+> >> +		vgic_v3->vgic_sre = ICC_SRE_EL1_SRE;
+> > 
+> > If we're on hardware with the GICv2 backwards compatibility can the
+> > guest not actually set ICC_SRE_EL1_SRE to 0 but then we are not
+> > preserving this because we wouldn't be trapping such accesses anymore?
+> > 
+> > Also, this is really about the reset value of that field, which the
+> > comment above is not being specific about.
+> > 
+> > Further, that would mean that the field is NOT actually RAO/WI, and thus
+> > the spec dictates that the field should reset to zero if EL1 is the
+> > highest implemented exception level and the field is not RAO/WI, which
+> > is what the guest expects, no?
+> 
+> I am still thinking about this (because it is probably true). Need to
+> discuss with Marc what we can do about this.
+> 
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index ae69809a9e47..4cbecd7a3769 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -21,7 +21,7 @@ config CPU_ARM7TDMI
- 
- # ARM720T
- config CPU_ARM720T
--	bool "Support ARM720T processor" if ARCH_INTEGRATOR
-+	bool "Support ARM720T processor" if ARCH_MULTI_V4T
- 	select CPU_32v4T
- 	select CPU_ABRT_LV4T
- 	select CPU_CACHE_V4
-@@ -39,7 +39,7 @@ config CPU_ARM720T
- 
- # ARM740T
- config CPU_ARM740T
--	bool "Support ARM740T processor" if ARCH_INTEGRATOR
-+	bool "Support ARM740T processor" if ARCH_MULTI_V4T
- 	depends on !MMU
- 	select CPU_32v4T
- 	select CPU_ABRT_LV4T
-@@ -71,7 +71,7 @@ config CPU_ARM9TDMI
- 
- # ARM920T
- config CPU_ARM920T
--	bool "Support ARM920T processor" if ARCH_INTEGRATOR
-+	bool "Support ARM920T processor" if ARCH_MULTI_V4T
- 	select CPU_32v4T
- 	select CPU_ABRT_EV4T
- 	select CPU_CACHE_V4WT
-@@ -89,7 +89,7 @@ config CPU_ARM920T
- 
- # ARM922T
- config CPU_ARM922T
--	bool "Support ARM922T processor" if ARCH_INTEGRATOR
-+	bool "Support ARM922T processor" if ARCH_MULTI_V4T
- 	select CPU_32v4T
- 	select CPU_ABRT_EV4T
- 	select CPU_CACHE_V4WT
-@@ -127,7 +127,7 @@ config CPU_ARM925T
- 
- # ARM926T
- config CPU_ARM926T
--	bool "Support ARM926T processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB
-+	bool "Support ARM926T processor" if ARCH_MULTI_V5 || MACH_REALVIEW_EB
- 	select CPU_32v5
- 	select CPU_ABRT_EV5TJ
- 	select CPU_CACHE_VIVT
-@@ -163,7 +163,7 @@ config CPU_FA526
- 
- # ARM940T
- config CPU_ARM940T
--	bool "Support ARM940T processor" if ARCH_INTEGRATOR
-+	bool "Support ARM940T processor" if ARCH_MULTI_V4T
- 	depends on !MMU
- 	select CPU_32v4T
- 	select CPU_ABRT_NOMMU
-@@ -181,7 +181,7 @@ config CPU_ARM940T
- 
- # ARM946E-S
- config CPU_ARM946E
--	bool "Support ARM946E-S processor" if ARCH_INTEGRATOR
-+	bool "Support ARM946E-S processor" if ARCH_MULTI_V5
- 	depends on !MMU
- 	select CPU_32v5
- 	select CPU_ABRT_NOMMU
-@@ -198,7 +198,7 @@ config CPU_ARM946E
- 
- # ARM1020 - needs validating
- config CPU_ARM1020
--	bool "Support ARM1020T (rev 0) processor" if ARCH_INTEGRATOR
-+	bool "Support ARM1020T (rev 0) processor" if ARCH_MULTI_V5
- 	select CPU_32v5
- 	select CPU_ABRT_EV4T
- 	select CPU_CACHE_V4WT
-@@ -216,7 +216,7 @@ config CPU_ARM1020
- 
- # ARM1020E - needs validating
- config CPU_ARM1020E
--	bool "Support ARM1020E processor" if ARCH_INTEGRATOR
-+	bool "Support ARM1020E processor" if ARCH_MULTI_V5
- 	depends on n
- 	select CPU_32v5
- 	select CPU_ABRT_EV4T
-@@ -229,7 +229,7 @@ config CPU_ARM1020E
- 
- # ARM1022E
- config CPU_ARM1022
--	bool "Support ARM1022E processor" if ARCH_INTEGRATOR
-+	bool "Support ARM1022E processor" if ARCH_MULTI_V5
- 	select CPU_32v5
- 	select CPU_ABRT_EV4T
- 	select CPU_CACHE_VIVT
-@@ -247,7 +247,7 @@ config CPU_ARM1022
- 
- # ARM1026EJ-S
- config CPU_ARM1026
--	bool "Support ARM1026EJ-S processor" if ARCH_INTEGRATOR
-+	bool "Support ARM1026EJ-S processor" if ARCH_MULTI_V5
- 	select CPU_32v5
- 	select CPU_ABRT_EV5T # But need Jazelle, but EV5TJ ignores bit 10
- 	select CPU_CACHE_VIVT
-@@ -358,7 +358,7 @@ config CPU_PJ4B
- 
- # ARMv6
- config CPU_V6
--	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
-+	bool "Support ARM V6 processor" if ARCH_MULTI_V6 || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
- 	select CPU_32v6
- 	select CPU_ABRT_EV6
- 	select CPU_CACHE_V6
-@@ -371,7 +371,7 @@ config CPU_V6
- 
- # ARMv6k
- config CPU_V6K
--	bool "Support ARM V6K processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
-+	bool "Support ARM V6K processor" if ARCH_MULTI_V6K || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
- 	select CPU_32v6
- 	select CPU_32v6K
- 	select CPU_ABRT_EV6
-@@ -385,7 +385,7 @@ config CPU_V6K
- 
- # ARMv7
- config CPU_V7
--	bool "Support ARM V7 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
-+	bool "Support ARM V7 processor" if ARCH_MULTI_V7 || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
- 	select CPU_32v6K
- 	select CPU_32v7
- 	select CPU_ABRT_EV7
--- 
-1.9.3
+Kudos for understanding my cryptic comment.
+
+-Christoffer
