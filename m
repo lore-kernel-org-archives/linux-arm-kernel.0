@@ -1,43 +1,35 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 10 Nov 2014 16:14:29 +0100
-Subject: [PATCH 1/3] ARM: at91: Add Special Function Registers binding
- documentation
-Message-ID: <1415632471-14672-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Mon, 10 Nov 2014 16:14:31 +0100
+Subject: [PATCH 3/3] ARM: at91: sama5d4: Add SFR
+In-Reply-To: <1415632471-14672-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1415632471-14672-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1415632471-14672-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The special function registers gather some registers that allow to tweak
-features provided by IPs controlled through another register range.
+The sama4d4 has Special Function Registers that allow to manage DDR, OHCI, EBI
+and AIC interrupt redirection.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- Documentation/devicetree/bindings/arm/atmel-at91.txt | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/boot/dts/sama5d4.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-index 562cda9d86d9..a6427de45785 100644
---- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-+++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-@@ -136,3 +136,20 @@ Example:
- 		compatible = "atmel,at91sam9260-rstc";
- 		reg = <0xfffffd00 0x10>;
- 	};
+diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+index e0157b0f075c..580486b056fc 100644
+--- a/arch/arm/boot/dts/sama5d4.dtsi
++++ b/arch/arm/boot/dts/sama5d4.dtsi
+@@ -826,6 +826,11 @@
+ 				status = "disabled";
+ 			};
+ 
++			sfr: sfr at f8028000 {
++				compatible = "atmel,sama5d4-sfr", "syscon";
++				reg = <0xf0038000 0x4000>;
++			};
 +
-+Special Function Registers (SFR)
-+
-+Special Function Registers (SFR) manage specific aspects of the integrated
-+memory, bridge implementations, processor and other functionality not controlled
-+elsewhere.
-+
-+required properties:
-+- compatible: Should be "atmel,<chip>-sfr", "syscon".
-+  <chip> can be "at91sam9260", "at91sam9rl" or "at91sam9x5".
-+- reg: Should contain registers location and length
-+
-+	sfr at f0038000 {
-+		compatible = "atmel,sama5d3-sfr", "syscon";
-+		reg = <0xf0038000 0x4000>;
-+	};
-+
+ 			mmc1: mmc at fc000000 {
+ 				compatible = "atmel,hsmci";
+ 				reg = <0xfc000000 0x600>;
 -- 
 2.1.0
