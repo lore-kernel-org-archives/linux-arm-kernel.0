@@ -1,85 +1,30 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Nov 2014 10:50:41 +0000
-Subject: [PATCH 01/13] ARM: STi: DT: STiH416: Add pinctl setup for usb
- controllers.
-In-Reply-To: <1415361475-6218-2-git-send-email-peter.griffin@linaro.org>
-References: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
- <1415361475-6218-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20141110105041.GU21424@x1>
+Date: Mon, 10 Nov 2014 10:56:49 +0000
+Subject: ARM: sti: SOC_STIH407 and STIH407_RESET?
+In-Reply-To: <1415614934.4862.22.camel@x220>
+References: <1415614934.4862.22.camel@x220>
+Message-ID: <20141110105649.GW21424@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 07 Nov 2014, Peter Griffin wrote:
-
-> This patch adds the required pin config for all usb controllers
-> on the stih416.
+On Mon, 10 Nov 2014, Paul Bolle wrote:
+> Your commit c27321141915 ("ARM: sti: Add STiH407 Kconfig entry to select
+> STIH407_RESET") was included in today's linux-next (ie, next-20141110).
+> It adds a Kconfig entry for SOC_STIH407. That entry selects
+> STIH407_RESET.
 > 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  arch/arm/boot/dts/stih416-pinctrl.dtsi | 34 ++++++++++++++++++++++++++++++++++
->  1 file changed, 34 insertions(+)
+> There's no Kconfig symbol STIH407_RESET. And there's nothing in
+> next-20141110 that cares about SOC_STIH407. So this entry is currently a
+> nop.
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+You're right, thanks for your diligence.
 
-> diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-> index c2025bc..9cccf2d 100644
-> --- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-> @@ -147,6 +147,15 @@
->  				};
->  			};
->  
-> +			usb {
-> +				pinctrl_usb3: usb3 {
-> +					st,pins {
-> +						oc-detect = <&pio40 0 ALT1 IN>;
-> +						pwr-enable = <&pio40 1 ALT1 OUT>;
-> +					};
-> +				};
-> +			};
-> +
->  			sbc_i2c1 {
->  				pinctrl_sbc_i2c1_default: sbc_i2c1-default {
->  					st,pins {
-> @@ -318,6 +327,16 @@
->  				};
->  			};
->  
-> +			usb {
-> +				pinctrl_usb0: usb0 {
-> +					st,pins {
-> +						oc-detect = <&pio9 4 ALT1 IN>;
-> +						pwr-enable = <&pio9 5 ALT1 OUT>;
-> +					};
-> +				};
-> +			};
-> +
-> +
->  			i2c1 {
->  				pinctrl_i2c1_default: i2c1-default {
->  					st,pins {
-> @@ -506,6 +525,21 @@
->  					};
->  				};
->  			};
-> +
-> +			usb {
-> +				pinctrl_usb1: usb1 {
-> +					st,pins {
-> +						oc-detect = <&pio18 0 ALT1 IN>;
-> +						pwr-enable = <&pio18 1 ALT1 OUT>;
-> +					};
-> +				};
-> +				pinctrl_usb2: usb2 {
-> +					st,pins {
-> +						oc-detect = <&pio18 2 ALT1 IN>;
-> +						pwr-enable = <&pio18 3 ALT1 OUT>;
-> +					};
-> +				};
-> +			};
->  		};
->  
->  		pin-controller-fvdp-fe {
+> I assume that there are one or more patches queued that make this entry
+> do something. Is that correct?
+
+That is also true.  Patch is en route.
+
+It should be coming through the reset tree and arm-soc.
 
 -- 
 Lee Jones
