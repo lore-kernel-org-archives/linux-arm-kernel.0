@@ -1,128 +1,160 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Mon, 10 Nov 2014 14:38:27 +0530
-Subject: [PATCH 03/12] PM / Domains: Add notifier support for power domain
- transitions
-In-Reply-To: <7h8ujmsvcv.fsf@deeprootsystems.com>
-References: <1414986790-11940-1-git-send-email-amit.daniel@samsung.com>
- <1414986790-11940-4-git-send-email-amit.daniel@samsung.com>
- <1651173.5xzCFxz3LI@vostro.rjw.lan>
- <7hmw88gn3q.fsf@deeprootsystems.com>
- <CADGdYn5Prbbe6Rz=OfVMXm3dinCPrE-N0fn23dMMhZb8GzXm-Q@mail.gmail.com>
- <5458B1FA.7050401@samsung.com> <7h8ujmsvcv.fsf@deeprootsystems.com>
-Message-ID: <CADGdYn4_aDB3bhMw0o5w4Jb8+GttSLYUOpxM=7sQnLy4-vDAuQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Nov 2014 09:11:23 +0000
+Subject: [PATCH 2/5] input: touchscreen: ti_am335x_tsc: Remove udelay in
+ interrupt handler
+In-Reply-To: <1415339350-17679-3-git-send-email-vigneshr@ti.com>
+References: <1415339350-17679-1-git-send-email-vigneshr@ti.com>
+ <1415339350-17679-3-git-send-email-vigneshr@ti.com>
+Message-ID: <20141110091123.GC21424@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 8, 2014 at 12:15 AM, Kevin Hilman <khilman@kernel.org> wrote:
-> Sylwester Nawrocki <s.nawrocki@samsung.com> writes:
->
->> On 04/11/14 07:44, amit daniel kachhap wrote:
->>> On Mon, Nov 3, 2014 at 11:53 PM, Kevin Hilman <khilman@kernel.org> wrote:
->>>> "Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
->>>>> On Monday, November 03, 2014 09:23:01 AM Amit Daniel Kachhap wrote:
->>>>>> These power domain transition notifiers will assist in carrying
->>>>>> out some activity associated with domain power on/off such as
->>>>>> some registers which may lose its contents and need save/restore
->>>>>> across domain power off/on.
->>>>
->>>> The runtime PM framework already provides callbacks that are useful for
->>>> context save/restore for devices.  Could you please describe in more
->>>> detail which registers in which kind of devices need to be
->>>> saved/restored, and why they cannot be saved/restored using existing
->>>> mechanisms.
->>>
->>> Basically the requirement is mandated by exynos7 manual. It tells that
->>> before turning off the power domain, some clock registers need to saved
->>> and should be restored just after turning the power domain. These clock
->>> registers are not necessarily gate clocks but could be mux clocks etc.
->>> The driver may not have all information of these clocks also. I suppose
->>> these are Soc specific changes but drivers should work across Socs.
->>> This behavior is almost similar to suspend/resume case where a whole
->>> list of clock registers are saved/restored.
->>
->> Indeed, the somehow complicated power domain power on/off sequences
->> are SoC specific.  They involve not only groups of clocks (usually
->> gate, mux clock registers of all devices in a power domain) but also
->> SoC-specific PMU (Power Management Unit) registers.
->> I assume it would be inappropriate to push such details to device
->> drivers.  Moreover, a device driver could not be even loaded.
->>
->> Since the clocks' state is already maintained by clk driver we came
->> up with an idea of having generic calls from power domain driver back
->> to the clock controller driver.
->
-> For the clock tree, it still seems to me that this is better handled in
-> the SoC clock driver.  For example, when a power domain is about to be
-> gated, all the devices in that domain are runtime suspended, and
-> presumably all of their gate clocks are disabled.  Now, doesn't the
-> clock driver know the clock tree parent-child hierarchy and shouldn't it
-> be capable of saving the state of parent clocks (like mux clocks) etc?
->
-> Stated diffrently, it still seems to me like we're pushing functionality
-> in PM core notifiers that should be the responsibility of subsystem
-> drivers.
->
->> It might not to be the prettiest solution, nevertheless I couldn't come
->> up with a better one which would satisfy all the requirements.  The power
->> domain should only be provided for use with all the clk/PMU sequences
->> handling in place.
->>
->> Clocks need to also be touched before a power domain switch on or off,
->> so attaching the clock controller to some power domain wouldn't help,
->> unless we modify/add to existing power domain related callbacks for
->> devices.  Another issue is the clock controller device would need to
->> be attached to multiple power domains, and for each power domain the
->> power on/off sequence is usually slightly different.
->>
->> There are also hierarchical power domains where each: the master and
->> the sub-domain need they own sequence and device usually is attached
->> only to a sub-domain.
->>
->>> Even earlier post by Sylwester (https://lkml.org/lkml/2014/8/5/182)
->>> also points to the need of this feature.
->>>>
->>>> Personally, I'm uncomfortable with notifiers like this because it
->>>> suggests that underlying frameworks are not doing the right thing, or
->>>> are not being used.  (I also don't like the implementation here where a
->>>> single global notifier list is maintained by the core, but the notifiers
->>>> are actually triggered by SoC specific code.)
->>>
->>> Yes right the global notifier block can be moved to per genpd structure.
->>> Also SoC trigger can be moved to core files.
->>>>
->>>> IIUC, the usage in this series seems to be that certain clock related
->>>> registers need to be saved/restored across a power domain transition.
->>>>
->>>> Wouldn't an alternative solution be to add a feature to the clock driver
->>>> such that the state of each clock is saved when the clock is disabled,
->>>> and restored when the clock is enabled?   That would allow any clock
->>>> context to survive any power domain transtion also, correct?
->>>
->>> I also thought about same. But the trigger point for this would be
->>> driver calling clk disable/enable and not the power domain. so this
->>> will lead to lot of save/restore for each power domain child.
->>
->> Even though we would have saved/restored at that points still the power
->> domain driver would need to enforce some specific clock/PMU registers
->> state before/after a power domain state transition. And this is what I
->> found difficult with the existing APIs.
->
-> This is what I'm not understanding.
->
-> Why can't the power domain driver's power_on/power_off callback just
-> call the PMU APIs and/or the clk_enable/_disable calls it needs?
-This looks possible for clock enable/disable at least. Will further
-check the implementation
-feasibility and reply.
+On Fri, 07 Nov 2014, Vignesh R wrote:
 
-Regards,
-Amit
->
-> Kevin
->
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> From: Brad Griffis <bgriffis@ti.com>
+> 
+> TSC interrupt handler had udelay to avoid reporting of false pen-up
+> interrupt to user space. This patch implements workaround suggesting in
+> Advisory 1.0.31 of silicon errata for am335x, thus eliminating udelay
+> and touchscreen lag. This also improves performance of touchscreen and
+> eliminates sudden jump of cursor at touch release.
+> 
+> IDLECONFIG and CHARGECONFIG registers are to be configured
+> with same values in order to eliminate false pen-up events. This
+> workaround may result in false pen-down to be detected, hence considerable
+> charge step delay needs to be added. The charge delay is set to 0xB000
+> (in terms of ADC clock cycles) by default.
+> 
+> TSC steps are disabled at the end of every sampling cycle and EOS bit is
+> set. Once the EOS bit is set, the TSC steps need to be re-enabled to begin
+> next sampling cycle.
+> 
+> Signed-off-by: Brad Griffis <bgriffis@ti.com>
+> [vigneshr at ti.com: Ported the patch from v3.12 to v3.18rc2]
+> 
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
+>  drivers/input/touchscreen/ti_am335x_tsc.c | 56 ++++++++++++-------------------
+>  include/linux/mfd/ti_am335x_tscadc.h      |  3 +-
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
+>  2 files changed, 24 insertions(+), 35 deletions(-)
+> 
+> diff --git a/drivers/input/touchscreen/ti_am335x_tsc.c b/drivers/input/touchscreen/ti_am335x_tsc.c
+> index 1aeac9675fe7..483fd97c0e0c 100644
+> --- a/drivers/input/touchscreen/ti_am335x_tsc.c
+> +++ b/drivers/input/touchscreen/ti_am335x_tsc.c
+> @@ -173,11 +173,9 @@ static void titsc_step_config(struct titsc *ts_dev)
+>  		titsc_writel(ts_dev, REG_STEPDELAY(i), STEPCONFIG_OPENDLY);
+>  	}
+>  
+> -	/* Charge step configuration */
+> -	config = ts_dev->bit_xp | ts_dev->bit_yn |
+> -			STEPCHARGE_RFP_XPUL | STEPCHARGE_RFM_XNUR |
+> -			STEPCHARGE_INM_AN1 | STEPCHARGE_INP(ts_dev->inp_yp);
+> +	/* Make CHARGECONFIG same as IDLECONFIG */
+>  
+> +	config = titsc_readl(ts_dev, REG_IDLECONFIG);
+>  	titsc_writel(ts_dev, REG_CHARGECONFIG, config);
+>  	titsc_writel(ts_dev, REG_CHARGEDELAY, CHARGEDLY_OPENDLY);
+>  
+> @@ -264,9 +262,26 @@ static irqreturn_t titsc_irq(int irq, void *dev)
+>  	unsigned int status, irqclr = 0;
+>  	unsigned int x = 0, y = 0;
+>  	unsigned int z1, z2, z;
+> -	unsigned int fsm;
+>  
+> -	status = titsc_readl(ts_dev, REG_IRQSTATUS);
+> +	status = titsc_readl(ts_dev, REG_RAWIRQSTATUS);
+> +	if (status & IRQENB_HW_PEN) {
+> +		ts_dev->pen_down = true;
+> +		titsc_writel(ts_dev, REG_IRQWAKEUP, 0x00);
+> +		titsc_writel(ts_dev, REG_IRQCLR, IRQENB_HW_PEN);
+> +		irqclr |= IRQENB_HW_PEN;
+> +	}
+> +
+> +	if (status & IRQENB_PENUP) {
+> +		ts_dev->pen_down = false;
+> +		input_report_key(input_dev, BTN_TOUCH, 0);
+> +		input_report_abs(input_dev, ABS_PRESSURE, 0);
+> +		input_sync(input_dev);
+> +		irqclr |= IRQENB_PENUP;
+> +	}
+> +
+> +	if (status & IRQENB_EOS)
+> +		irqclr |= IRQENB_EOS;
+> +
+>  	/*
+>  	 * ADC and touchscreen share the IRQ line.
+>  	 * FIFO1 interrupts are used by ADC. Handle FIFO0 IRQs here only
+> @@ -297,34 +312,6 @@ static irqreturn_t titsc_irq(int irq, void *dev)
+>  		}
+>  		irqclr |= IRQENB_FIFO0THRES;
+>  	}
+> -
+> -	/*
+> -	 * Time for sequencer to settle, to read
+> -	 * correct state of the sequencer.
+> -	 */
+> -	udelay(SEQ_SETTLE);
+> -
+> -	status = titsc_readl(ts_dev, REG_RAWIRQSTATUS);
+> -	if (status & IRQENB_PENUP) {
+> -		/* Pen up event */
+> -		fsm = titsc_readl(ts_dev, REG_ADCFSM);
+> -		if (fsm == ADCFSM_STEPID) {
+> -			ts_dev->pen_down = false;
+> -			input_report_key(input_dev, BTN_TOUCH, 0);
+> -			input_report_abs(input_dev, ABS_PRESSURE, 0);
+> -			input_sync(input_dev);
+> -		} else {
+> -			ts_dev->pen_down = true;
+> -		}
+> -		irqclr |= IRQENB_PENUP;
+> -	}
+> -
+> -	if (status & IRQENB_HW_PEN) {
+> -
+> -		titsc_writel(ts_dev, REG_IRQWAKEUP, 0x00);
+> -		titsc_writel(ts_dev, REG_IRQCLR, IRQENB_HW_PEN);
+> -	}
+> -
+>  	if (irqclr) {
+>  		titsc_writel(ts_dev, REG_IRQSTATUS, irqclr);
+>  		am335x_tsc_se_set_cache(ts_dev->mfd_tscadc, ts_dev->step_mask);
+> @@ -417,6 +404,7 @@ static int titsc_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	titsc_writel(ts_dev, REG_IRQENABLE, IRQENB_FIFO0THRES);
+> +	titsc_writel(ts_dev, REG_IRQENABLE, IRQENB_EOS);
+>  	err = titsc_config_wires(ts_dev);
+>  	if (err) {
+>  		dev_err(&pdev->dev, "wrong i/p wire configuration\n");
+> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
+> index e2e70053470e..c99be5dc0f5c 100644
+> --- a/include/linux/mfd/ti_am335x_tscadc.h
+> +++ b/include/linux/mfd/ti_am335x_tscadc.h
+> @@ -52,6 +52,7 @@
+>  
+>  /* IRQ enable */
+>  #define IRQENB_HW_PEN		BIT(0)
+> +#define IRQENB_EOS		BIT(1)
+>  #define IRQENB_FIFO0THRES	BIT(2)
+>  #define IRQENB_FIFO0OVRRUN	BIT(3)
+>  #define IRQENB_FIFO0UNDRFLW	BIT(4)
+> @@ -107,7 +108,7 @@
+>  /* Charge delay */
+>  #define CHARGEDLY_OPEN_MASK	(0x3FFFF << 0)
+>  #define CHARGEDLY_OPEN(val)	((val) << 0)
+> -#define CHARGEDLY_OPENDLY	CHARGEDLY_OPEN(1)
+> +#define CHARGEDLY_OPENDLY	CHARGEDLY_OPEN(0xB000)
+>  
+>  /* Control register */
+>  #define CNTRLREG_TSCSSENB	BIT(0)
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
