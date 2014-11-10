@@ -1,29 +1,75 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 10 Nov 2014 10:22:15 +0530
-Subject: [PATCH v5 12/16] cpufreq: tegra: Rename tegra-cpufreq to
- tegra20-cpufreq
-In-Reply-To: <1414161563-16812-13-git-send-email-mikko.perttunen@kapsi.fi>
-References: <1414161563-16812-1-git-send-email-mikko.perttunen@kapsi.fi>
- <1414161563-16812-13-git-send-email-mikko.perttunen@kapsi.fi>
-Message-ID: <CAKohpo=Kdh2vuvSoQBLdWfZJn3xDezpNBjqM389u45_BdizPXQ@mail.gmail.com>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Mon, 10 Nov 2014 10:29:14 +0530
+Subject: [PATCH v2 3/6] drivers: soc: samsung: Fix a spelling mistake
+In-Reply-To: <CAGcde9Fctk+XBxLV4VbevU4W7EYW+-it+T3qn3wg=v=b5ykJzA@mail.gmail.com>
+References: <1415452601-13078-1-git-send-email-amit.daniel@samsung.com>
+ <1415452601-13078-4-git-send-email-amit.daniel@samsung.com>
+ <CAGcde9Fctk+XBxLV4VbevU4W7EYW+-it+T3qn3wg=v=b5ykJzA@mail.gmail.com>
+Message-ID: <CADGdYn5VL6aXwU4-Hmf__Ox9T964bDf3WwhdJn0Aiatz8zWKbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 October 2014 20:09, Mikko Perttunen <mikko.perttunen@kapsi.fi> wrote:
-> From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+On Sat, Nov 8, 2014 at 9:26 PM, Pankaj Dubey <dubepankaj1980@gmail.com> wrote:
+> Hi Amit,
 >
-> The Tegra124 will use a different driver for frequency scaling, so
-> rename the old driver (which handles only Tegra20) appropriately.
 >
-> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
-> Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
-> ---
->  drivers/cpufreq/Kconfig.arm       |   6 +-
->  drivers/cpufreq/Makefile          |   2 +-
->  drivers/cpufreq/tegra-cpufreq.c   | 218 --------------------------------------
->  drivers/cpufreq/tegra20-cpufreq.c | 218 ++++++++++++++++++++++++++++++++++++++
->  4 files changed, 222 insertions(+), 222 deletions(-)
->  delete mode 100644 drivers/cpufreq/tegra-cpufreq.c
->  create mode 100644 drivers/cpufreq/tegra20-cpufreq.c
-
-Its just not readable enough.. You should have used: git format-patch -C -M
+> On 8 November 2014 18:46, Amit Daniel Kachhap <amit.daniel@samsung.com> wrote:
+>> This patches changes the name of exynos5_list_diable_wfi_wfe to
+>> exynos5_list_disable_wfi_wfe.
+>>
+>
+> Same change I have posted earlier [1] and Kukjin has taken same in his for-next.
+>
+> 1: http://www.spinics.net/lists/arm-kernel/msg372742.html
+ok but this patch is still not visible in linux-next. I will rebase my
+v3 patch series against Kukjin for-next
+>
+> Thanks,
+> Pankaj Dubey
+>
+>
+>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>> ---
+>>  drivers/soc/samsung/exynos-pmu.c |    8 ++++----
+>>  1 file changed, 4 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/soc/samsung/exynos-pmu.c b/drivers/soc/samsung/exynos-pmu.c
+>> index 35774e8..3832cda 100644
+>> --- a/drivers/soc/samsung/exynos-pmu.c
+>> +++ b/drivers/soc/samsung/exynos-pmu.c
+>> @@ -361,7 +361,7 @@ static unsigned int const exynos5_list_both_cnt_feed[] = {
+>>         EXYNOS5_TOP_PWR_SYSMEM_OPTION,
+>>  };
+>>
+>> -static unsigned int const exynos5_list_diable_wfi_wfe[] = {
+>> +static unsigned int const exynos5_list_disable_wfi_wfe[] = {
+>>         EXYNOS5_ARM_CORE1_OPTION,
+>>         EXYNOS5_FSYS_ARM_OPTION,
+>>         EXYNOS5_ISP_ARM_OPTION,
+>> @@ -392,11 +392,11 @@ static void exynos5_powerdown_conf(enum sys_powerdown mode)
+>>         /*
+>>          * Disable WFI/WFE on XXX_OPTION
+>>          */
+>> -       for (i = 0; i < ARRAY_SIZE(exynos5_list_diable_wfi_wfe); i++) {
+>> -               tmp = pmu_raw_readl(exynos5_list_diable_wfi_wfe[i]);
+>> +       for (i = 0; i < ARRAY_SIZE(exynos5_list_disable_wfi_wfe); i++) {
+>> +               tmp = pmu_raw_readl(exynos5_list_disable_wfi_wfe[i]);
+>>                 tmp &= ~(EXYNOS5_OPTION_USE_STANDBYWFE |
+>>                          EXYNOS5_OPTION_USE_STANDBYWFI);
+>> -               pmu_raw_writel(tmp, exynos5_list_diable_wfi_wfe[i]);
+>> +               pmu_raw_writel(tmp, exynos5_list_disable_wfi_wfe[i]);
+>>         }
+>>  }
+>>
+>> --
+>> 1.7.9.5
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
