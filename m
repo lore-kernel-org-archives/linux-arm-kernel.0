@@ -1,21 +1,22 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 10 Nov 2014 15:15:17 +0100
-Subject: [PATCH 16/17] ARM: mvebu: adjust mbus controller description
- on Armada 370/XP
-In-Reply-To: <1414151970-6626-17-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 10 Nov 2014 15:25:08 +0100
+Subject: [PATCH 17/17] ARM: mvebu: add SDRAM controller description for
+ Armada XP
+In-Reply-To: <1414151970-6626-18-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1414151970-6626-17-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5460C875.4090609@free-electrons.com>
+ <1414151970-6626-18-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5460CAC4.7030008@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Thomas,
 
+
 On 24/10/2014 13:59, Thomas Petazzoni wrote:
-> In order to support suspend/resume on Armada XP, an additional set of
-> registers need to be described at the MBus controller level. This
-> commit therefore adjusts the Device Tree of the Armada 370/XP SoC to
-> include those registers in the MBus controller description;
+> The suspend/resume sequence on Armada XP needs to modify a number of
+> registers in the SDRAM controller. Therefore, this commit updates the
+> Armada XP Device Tree description to include the SDRAM controller
+> Device Tree node.
 > 
 
 Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
@@ -27,23 +28,29 @@ Gregory
 
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->  arch/arm/boot/dts/armada-370-xp.dtsi | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+>  arch/arm/boot/dts/armada-xp.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-> index 83286ec..90dba78 100644
-> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-> @@ -180,7 +180,8 @@
+> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+> index bff9f6c..2be244a 100644
+> --- a/arch/arm/boot/dts/armada-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp.dtsi
+> @@ -35,6 +35,11 @@
+>  		};
 >  
->  			mbusc: mbus-controller at 20000 {
->  				compatible = "marvell,mbus-controller";
-> -				reg = <0x20000 0x100>, <0x20180 0x20>;
-> +				reg = <0x20000 0x100>, <0x20180 0x20>,
-> +				      <0x20250 0x8>;
->  			};
->  
->  			mpic: interrupt-controller at 20000 {
+>  		internal-regs {
+> +			sdramc at 1400 {
+> +				compatible = "marvell,armada-xp-sdram-controller";
+> +				reg = <0x1400 0x500>;
+
+It seemed a quite large area, but indeed there are registers related to the sdram
+controller at least until the address 0x18AC.
+
+> +			};
+> +
+>  			L2: l2-cache {
+>  				compatible = "marvell,aurora-system-cache";
+>  				reg = <0x08000 0x1000>;
 > 
 
 
