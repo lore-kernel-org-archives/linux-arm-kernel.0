@@ -1,41 +1,43 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 10 Nov 2014 08:44:43 +0100
-Subject: [PATCH] ARM: at91: fix build breakage due to legacy board removals
-In-Reply-To: <1415515354-7829-1-git-send-email-olof@lixom.net>
-References: <1415515354-7829-1-git-send-email-olof@lixom.net>
-Message-ID: <20141110084443.14e76f40@bbrezillon>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 10 Nov 2014 08:45:32 +0100
+Subject: [PATCH 1/3] drivers: cpuidle: add status property to ARM idle
+ states
+In-Reply-To: <20141021162058.GA17610@e102568-lin.cambridge.arm.com>
+References: <1413467997-32131-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <7hbnp6e81x.fsf@deeprootsystems.com>
+ <20141021162058.GA17610@e102568-lin.cambridge.arm.com>
+Message-ID: <54606D1C.3000300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On 10/21/2014 06:20 PM, Lorenzo Pieralisi wrote:
+> On Mon, Oct 20, 2014 at 10:38:02PM +0100, Kevin Hilman wrote:
+>> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+>>
+>>> On some platforms the device tree bindings must provide the kernel
+>>> with a status flag for idle states, that defines whether the idle
+>>> state is operational or not in the current configuration.
+>>>
+>>> This patch adds a status property to the ARM idle states compliant
+>>> with ePAPR v1.1 and updates the DT parsing code accordingly.
+>>>
+>>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>
+>> For the series:
+>>
+>> Acked-by: Kevin Hilman <khilman@linaro.org>
+>
+> Thanks ! I will queue it for 3.19 then.
 
-On Sat,  8 Nov 2014 22:42:34 -0800
-Olof Johansson <olof@lixom.net> wrote:
+Applied to my tree for 3.19.
 
-> Fixes the following missing includes:
-> 
-> arch/arm/mach-at91/at91sam9g45.c: In function 'at91sam9g45_init_time':
-> arch/arm/mach-at91/at91sam9g45.c:39:23: error: 'NR_IRQS_LEGACY' undeclared (first use in this function)
->   at91sam926x_pit_init(NR_IRQS_LEGACY + AT91_ID_SYS);
->                        ^
-> arch/arm/mach-at91/at91sam9g45.c:39:23: note: each undeclared identifier is reported only once for each function it appears in
-> make[3]: *** [arch/arm/mach-at91/at91sam9g45.o] Error 1
-> arch/arm/mach-at91/at91sam9rl.c: In function 'at91sam9rl_init_time':
-> arch/arm/mach-at91/at91sam9rl.c:51:23: error: 'NR_IRQS_LEGACY' undeclared (first use in this function)
->   at91sam926x_pit_init(NR_IRQS_LEGACY + AT91_ID_SYS);
-> 
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Signed-off-by: Olof Johansson <olof@lixom.net>
+Thanks
+   -- Daniel
 
-Sorry I didn't notice this patch and I just sent a fix for the same bug
-(with a slightly different approach though):
-"ARM: at91: remove useless init_time for DT-only SoCs"
-
-Regards,
-
-Boris
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
