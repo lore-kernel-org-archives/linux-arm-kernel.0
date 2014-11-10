@@ -1,74 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 10 Nov 2014 21:36:55 +0100
-Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
-In-Reply-To: <5460F806.3040305@ti.com>
-References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
- <5331397.OQCQmJO78C@wuerfel> <5460F806.3040305@ti.com>
-Message-ID: <1600093.60yAP0Qpua@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 10 Nov 2014 12:39:23 -0800
+Subject: [PATCH] ARM: dts: dra7-evm: Keep all VDD rails always-on
+In-Reply-To: <54579476.10702@ti.com>
+References: <1413902290-304-1-git-send-email-nm@ti.com> <54579476.10702@ti.com>
+Message-ID: <20141110203922.GX31454@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 November 2014 19:38:14 Grygorii Strashko wrote:
-> Hi Arnd,
+* Roger Quadros <rogerq@ti.com> [141103 06:44]:
+> Hi Nishant,
 > 
-> On 11/10/2014 05:06 PM, Arnd Bergmann wrote:
-> > On Monday 10 November 2014 16:59:16 Grygorii Strashko wrote:
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt
-> >> @@ -0,0 +1,31 @@
-> >> +* TI Keystone 2 Generic PM Controller
-> >> +
-> >> +The TI Keystone 2 Generic PM Controller is responsible for Clock gating
-> >> +for each controlled IP module.
-> >> +
-> >> +Required properties:
-> >> +- compatible: Should be "ti,keystone-powerdomain"
-> >> +- #power-domain-cells: Should be 0, see below:
-> >> +
-> >> +The PM Controller node is a PM domain as documented in
-> >> +Documentation/devicetree/bindings/power/power_domain.txt.
-> >> +
-> >> +Example:
-> >> +
-> >> +       pm_controller: pm-controller {
-> >> +               compatible = "ti,keystone-powerdomain";
-> >> +               #power-domain-cells = <0>;
-> >> +       };
-> >> +
-> >> +       netcp: netcp at 2090000 {
-> >> +               reg = <0x2620110 0x8>;
-> >> +               reg-names = "efuse";
-> >> +               ...
-> >> +               #address-cells = <1>;
-> >> +               #size-cells = <1>;
-> >> +               ranges;
-> >> +               power-domains = <&pm_controller>;
-> >> +
-> >> +               clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>;
-> >> +               dma-coherent;
-> >> +       }
+> On 10/21/2014 05:38 PM, Nishanth Menon wrote:
+> > DRA7 Data Manual (SPRS857L - August 2014) section 4.1.1 states: "All
+> > unused power supply balls must be supplied with the voltages specified
+> > in the Section 5.2, Recommended Operating Conditions".
 > > 
-> > I don't get it. What keystone specific about a "ti,keystone-powerdomain"
-> > device? It seems that the device has no registers whatsoever and the
-> > driver doesn't really do anything that relates to the platform.
+> > This implies that all unused voltage rails for Vayu can never be
+> > switched off even if the hardware blocks inside that voltage domain is
+> > unused. Switching off these unused rails may result in stability issues
+> > on other domains and increased leakage and power-on-hour impacts.
+> > 
+> > J6eco-evm dts file already considers this, however j6evm-dts file needs
+> > to be fixed to consider this constraint of the SoC.
+> > 
+> > Signed-off-by: Nishanth Menon <nm@ti.com>
 > 
-> That's true. but it was the only one acceptable way  to enable
-> Generic clock manipulation PM callbacks for the DT-boot case.
-> After several unsuccessful attempts the idea to use GPD
-> was introduced by Kevin there:
->   https://lkml.org/lkml/2014/9/8/643
+> Acked-by: Roger Quadros <rogerq@ti.com>
 > 
-> So, The Keystone 2 Generic PM Controller is just a proxy PM layer here between
-> device and Generic clock manipulation PM callbacks.
-> It fills per-device clock list when device is attached to GPD and
-> ensures that all clocks from that list enabled/disabled when device is
-> started/stopped.
+> I'm assuming that vddshv8 (MMC1 power group) can be switched off.
 
-The idea of such a generic power domain implementation sounds useful, but
-it has absolutely no business in platform specific code.
+Applying into omap-for-v3.19/dt thanks.
 
-I suggest you either remove the power domain proxy from your drivers
-and use the clocks directly, or come up with an implementation that can
-be used across other platforms and CPU architectures.
-
-	Arnd
+Tony
