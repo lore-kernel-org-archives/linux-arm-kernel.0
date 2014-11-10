@@ -1,48 +1,68 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 10 Nov 2014 17:37:14 -0600
-Subject: [PATCH] arm: boot: dts: dra7: add labels to DWC3 nodes
-In-Reply-To: <20141110232709.GB31454@atomide.com>
-References: <1415032122-8230-1-git-send-email-balbi@ti.com>
- <20141110232709.GB31454@atomide.com>
-Message-ID: <20141110233714.GQ1041@saruman>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 10 Nov 2014 15:36:31 -0800
+Subject: [PATCH 4/4] arm: dts: omap3-gta04: Add static configuration for
+ devconf1 register
+In-Reply-To: <1415051968-4878-5-git-send-email-marek@goldelico.com>
+References: <1415051968-4878-1-git-send-email-marek@goldelico.com>
+ <1415051968-4878-5-git-send-email-marek@goldelico.com>
+Message-ID: <20141110233630.GD31454@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 10, 2014 at 03:27:09PM -0800, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [141103 08:30]:
-> > by adding labels to DWC3 nodes, it's far easier
-> > for boards to reference them.
-> > 
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+* Marek Belisko <marek@goldelico.com> [141103 14:01]:
+> gta04 board need for tvout enabled 2 bits in devconf1 register (tvbypass and acbias).
+> Add single pinmux entry and enable it.
 > 
-> Applying into omap-for-v3.19/dt, had to update it because
-> of "ARM: dts: DRA7: Move USB_OTG 4 to dra74x.dtsi". Updated
-> patch below.
+> Signed-off-by: Marek Belisko <marek@goldelico.com>
+> ---
+>  arch/arm/boot/dts/omap3-gta04.dtsi | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
 > 
-> Regards,
-> 
-> Tony
-> 
-> 8< -------------------
-> From: Felipe Balbi <balbi@ti.com>
-> Date: Mon, 3 Nov 2014 10:28:42 -0600
-> Subject: [PATCH] arm: boot: dts: dra7: add labels to DWC3 nodes
-> 
-> by adding labels to DWC3 nodes, it's far easier
-> for boards to reference them.
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> [tony at atomide.com: updated for otg 4 move to dra74x.dtsi]
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
+> index e4d05f0..a456d37 100644
+> --- a/arch/arm/boot/dts/omap3-gta04.dtsi
+> +++ b/arch/arm/boot/dts/omap3-gta04.dtsi
+> @@ -118,6 +118,17 @@
+>  			};
+>  		};
+>  	};
+> +
+> +	/* pinmux for devconf1 */
+> +	control_devconf1: pinmux at 480022d8 {
+> +		compatible = "pinctrl-single";
+> +		reg = <0x480022d8 4>;	/* single register */
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pinctrl-single,bit-per-mux;
+> +		pinctrl-single,register-width = <32>;
+> +		pinctrl-single,function-mask = <0xfc0bd5>;
+> +	};
+>  };
+>  
 
-looks good, thanks.
+The pinctrl-single entry should be in omap3.dtsi as the mux register is there
+for all the omap3 devices, can you please update the patch for that?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141110/698df04f/attachment.sig>
+Regards,
+
+Tony
+
+>  &omap3_pmx_core {
+> @@ -497,3 +508,14 @@
+>  		};
+>  	};
+>  };
+> +
+> +&control_devconf1 {
+> +	pinctrl-name = "default";
+> +	pinctrl-0 = < &tv_acbias_pins>;
+> +
+> +	tv_acbias_pins: pinmux_tv_acbias_pins {
+> +		pinctrl-single,bits = <
+> +			0 0x40800 0x40800
+> +		>;
+> +	};
+> +};
+> -- 
+> 1.9.1
+> 
