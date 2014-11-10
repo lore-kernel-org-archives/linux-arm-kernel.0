@@ -1,73 +1,122 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Sun, 9 Nov 2014 21:17:37 -0800
-Subject: [PATCH v8 4/8] ARM: dts: Enable Broadcom Cygnus SoC
-In-Reply-To: <5982323.RDuqIHPULA@wuerfel>
-References: <sbranden@broadcom.com>
- <CAOesGMhd37UM+7+6eR9iLY22Fb9cG1dr8dD4DAzLJNRmtysnkg@mail.gmail.com>
- <20141109172311.GB738@kroah.com> <5982323.RDuqIHPULA@wuerfel>
-Message-ID: <54604A71.1010000@broadcom.com>
+From: rric@kernel.org (Robert Richter)
+Date: Sun,  9 Nov 2014 21:30:17 -0800
+Subject: [PATCH] AHCI: Add generic MSI-X interrupt support to SATA PCI driver
+Message-ID: <1415597417-10547-1-git-send-email-rric@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14-11-09 12:38 PM, Arnd Bergmann wrote:
-> On Sunday 09 November 2014 09:23:11 Greg Kroah-Hartman wrote:
->> On Sat, Nov 08, 2014 at 10:49:09PM -0800, Olof Johansson wrote:
->>>>>> +/*
->>>>>> + * Copyright 2014 Broadcom Corporation.  All rights reserved.
->>>>>> + *
->>>>>> + * Unless you and Broadcom execute a separate written software license
->>>>>> + * agreement governing use of this software, this software is licensed
->>>>>> to you
->>>>>> + * under the terms of the GNU General Public License as
->>>>>> + * published by the Free Software Foundation version 2.
->>>>>> + *
->>>>>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
->>>>>> + * kind, whether express or implied; without even the implied warranty
->>>>>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>>>>> + * GNU General Public License for more details.
->>>>>
->>>>>
->>>>> We ask for new DT contents to be added with dual BSD/GPL license, to
->>>>> allow for reuse of the DT data structures in other projects as well.
->>>>> There's currently a lot of activity going on relicensing the current
->>>>> files so I recommend sorting it out before they are added if you can.
->>>>
->>>>
->>>> This may take more time than you think.  I am going to have to go through
->>>> legal to get such a license created. Also, why would you need dual license?
->>>> If it is BSD that should serve both purposes?
->>>
->>> I haven't followed the discussion close enough to know if there's been
->>> discussion about single-license BSD vs dual BSD/GPL.
->
-> I think for all practical purposes, BSD and dual BSD/GPL is the same and
-> listing it as dual was meant as a clarification to make it easier to see
-> that all files in the kernel are GPLv2 compatible.
-A dual BSD/GPL may involve having me get a lawyer to create such a 
-header.  I would prefer to leave it as GPL for now until some concrete 
-decision has finally been made on this by the rest of the community? 
-Or, I can put it as BSD right now if that helps?
->
->>> At the very least, please start the process of getting it changed.
->>>
->>> Also, I see now that this isn't even a clean GPL v2, given "Unless you
->>> and Broadcom..." language. I see the bnx2x driver had that in the
->>> past, but none of the Kona contributions did. I strongly suggest
->>> sticking to the normal copyrights here and not making things more
->>> complicated than they have to.
->>
->> I'm thinking that the "unless you and Broadcom..." language really
->> doesn't mean much other than what all other files in the kernel mean
->> from what I can tell.  This should just default to GPLv2 and everyone
->> should be ok.
->
-> I would hope so at least. It's certainly not obvious whether that means
-> Broadcom can give additional rights to someone over what someone else
-> contributed upstream, or worse if this becomes GPL-incompatible and
-> makes the kernel undistributable for anybody who has an additional
-> license agreement that doesn't give them all the rights that they already
-> had under the GPL.
-I'll change the header on these files so there are no disagreements.
->
-> 	Arnd
->
+From: Sunil Goutham <sgoutham@cavium.com>
+
+This patch adds generic support for MSI-X interrupts to the SATA PCI
+driver. Only single interrupt support is implemented. Thus, per-port
+interrupts can not yet be enabled.
+
+The driver now checks the device for the existence of MSI-X and tries
+to enable the interrupt. Otherwise, if a device is not MSI-X capable,
+the initialization is skipped and MSI or intx interrupts are
+configured.
+
+This patch also enables AHCI for Cavium Thunder SoCs that uses MSI-X.
+
+Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+Signed-off-by: Robert Richter <rrichter@cavium.com>
+---
+ arch/arm64/Kconfig |  1 +
+ drivers/ata/ahci.c | 40 +++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 40 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index ac9afde76dea..55970474d3ae 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -145,6 +145,7 @@ config ARCH_THUNDER
+ 	bool "Cavium Inc. Thunder SoC Family"
+ 	help
+ 	  This enables support for Cavium's Thunder Family of SoCs.
++	select SATA_AHCI
+ 
+ config ARCH_VEXPRESS
+ 	bool "ARMv8 software model (Versatile Express)"
+diff --git a/drivers/ata/ahci.c b/drivers/ata/ahci.c
+index 5f039f191067..8e43ccb72c95 100644
+--- a/drivers/ata/ahci.c
++++ b/drivers/ata/ahci.c
+@@ -52,6 +52,7 @@
+ 
+ enum {
+ 	AHCI_PCI_BAR_STA2X11	= 0,
++	AHCI_PCI_BAR_CAVIUM	= 0,
+ 	AHCI_PCI_BAR_ENMOTUS	= 2,
+ 	AHCI_PCI_BAR_STANDARD	= 5,
+ };
+@@ -483,6 +484,9 @@ static const struct pci_device_id ahci_pci_tbl[] = {
+ 	/* Enmotus */
+ 	{ PCI_DEVICE(0x1c44, 0x8000), board_ahci },
+ 
++	/* Cavium */
++	{ PCI_DEVICE(0x177d, 0xa01c), .driver_data = board_ahci },
++
+ 	/* Generic, PCI class code for AHCI */
+ 	{ PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
+ 	  PCI_CLASS_STORAGE_SATA_AHCI, 0xffffff, board_ahci },
+@@ -1188,11 +1192,43 @@ static inline void ahci_gtf_filter_workaround(struct ata_host *host)
+ {}
+ #endif
+ 
++static int ahci_init_msix(struct pci_dev *pdev, unsigned int n_ports,
++			  struct ahci_host_priv *hpriv)
++{
++	int rc, nvec;
++	struct msix_entry entry = {};
++
++	/* check if msix is supported */
++	nvec = pci_msix_vec_count(pdev);
++	if (nvec <= 0)
++		return 0;
++
++	/* per-port msix interrupts are not supported */
++	if (n_ports > 1 && nvec >= n_ports)
++		return -ENOSYS;
++
++	/* only enable the first entry (entry.entry = 0) */
++	rc = pci_enable_msix_exact(pdev, &entry, 1);
++	if (rc < 0)
++		return rc;
++
++	pdev->irq = entry.vector;
++
++	return 1;
++}
++
+ static int ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
+ 				struct ahci_host_priv *hpriv)
+ {
+ 	int rc, nvec;
+ 
++	nvec = ahci_init_msix(pdev, n_ports, hpriv);
++	if (nvec > 0)
++		return nvec;
++
++	if (nvec && nvec != -ENOSYS)
++		dev_err(&pdev->dev, "failed to enable MSI-X: %d", nvec);
++
+ 	if (hpriv->flags & AHCI_HFLAG_NO_MSI)
+ 		goto intx;
+ 
+@@ -1271,11 +1307,13 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 		dev_info(&pdev->dev,
+ 			 "PDC42819 can only drive SATA devices with this driver\n");
+ 
+-	/* Both Connext and Enmotus devices use non-standard BARs */
++	/* Some devices use non-standard BARs */
+ 	if (pdev->vendor == PCI_VENDOR_ID_STMICRO && pdev->device == 0xCC06)
+ 		ahci_pci_bar = AHCI_PCI_BAR_STA2X11;
+ 	else if (pdev->vendor == 0x1c44 && pdev->device == 0x8000)
+ 		ahci_pci_bar = AHCI_PCI_BAR_ENMOTUS;
++	else if (pdev->vendor == 0x177d && pdev->device == 0xa01c)
++		ahci_pci_bar = AHCI_PCI_BAR_CAVIUM;
+ 
+ 	/*
+ 	 * The JMicron chip 361/363 contains one SATA controller and one
+-- 
+2.1.3
