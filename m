@@ -1,131 +1,39 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Mon, 10 Nov 2014 22:51:44 +0800
-Subject: [PATCH] AHCI: Add generic MSI-X interrupt support to SATA PCI
- driver
-In-Reply-To: <1415597417-10547-1-git-send-email-rric@kernel.org>
-References: <1415597417-10547-1-git-send-email-rric@kernel.org>
-Message-ID: <5460D100.90403@linux.intel.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 10 Nov 2014 14:50:55 +0000
+Subject: [PATCH 1/4] ASoC: ALC5631: Add device tree binding documentation
+In-Reply-To: <E07FA6F208344BC093C8D95F677E8F4A@sisodomain.com>
+References: <1415606519-30744-1-git-send-email-krishna.md@samsung.com>
+ <1415606519-30744-2-git-send-email-krishna.md@samsung.com>
+ <20141110133708.GQ3815@sirena.org.uk>
+ <E07FA6F208344BC093C8D95F677E8F4A@sisodomain.com>
+Message-ID: <20141110145055.GS3815@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/10 13:30, Robert Richter wrote:
-> From: Sunil Goutham <sgoutham@cavium.com>
-> 
-> This patch adds generic support for MSI-X interrupts to the SATA PCI
-> driver. Only single interrupt support is implemented. Thus, per-port
-> interrupts can not yet be enabled.
-> 
-> The driver now checks the device for the existence of MSI-X and tries
-> to enable the interrupt. Otherwise, if a device is not MSI-X capable,
-> the initialization is skipped and MSI or intx interrupts are
-> configured.
-> 
-> This patch also enables AHCI for Cavium Thunder SoCs that uses MSI-X.
-> 
-> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
-> ---
->  arch/arm64/Kconfig |  1 +
->  drivers/ata/ahci.c | 40 +++++++++++++++++++++++++++++++++++++++-
->  2 files changed, 40 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index ac9afde76dea..55970474d3ae 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -145,6 +145,7 @@ config ARCH_THUNDER
->  	bool "Cavium Inc. Thunder SoC Family"
->  	help
->  	  This enables support for Cavium's Thunder Family of SoCs.
-> +	select SATA_AHCI
->  
->  config ARCH_VEXPRESS
->  	bool "ARMv8 software model (Versatile Express)"
-> diff --git a/drivers/ata/ahci.c b/drivers/ata/ahci.c
-> index 5f039f191067..8e43ccb72c95 100644
-> --- a/drivers/ata/ahci.c
-> +++ b/drivers/ata/ahci.c
-> @@ -52,6 +52,7 @@
->  
->  enum {
->  	AHCI_PCI_BAR_STA2X11	= 0,
-> +	AHCI_PCI_BAR_CAVIUM	= 0,
->  	AHCI_PCI_BAR_ENMOTUS	= 2,
->  	AHCI_PCI_BAR_STANDARD	= 5,
->  };
-> @@ -483,6 +484,9 @@ static const struct pci_device_id ahci_pci_tbl[] = {
->  	/* Enmotus */
->  	{ PCI_DEVICE(0x1c44, 0x8000), board_ahci },
->  
-> +	/* Cavium */
-> +	{ PCI_DEVICE(0x177d, 0xa01c), .driver_data = board_ahci },
-> +
->  	/* Generic, PCI class code for AHCI */
->  	{ PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
->  	  PCI_CLASS_STORAGE_SATA_AHCI, 0xffffff, board_ahci },
-> @@ -1188,11 +1192,43 @@ static inline void ahci_gtf_filter_workaround(struct ata_host *host)
->  {}
->  #endif
->  
-> +static int ahci_init_msix(struct pci_dev *pdev, unsigned int n_ports,
-> +			  struct ahci_host_priv *hpriv)
-> +{
-> +	int rc, nvec;
-> +	struct msix_entry entry = {};
-> +
-> +	/* check if msix is supported */
-> +	nvec = pci_msix_vec_count(pdev);
-> +	if (nvec <= 0)
-> +		return 0;
-> +
-> +	/* per-port msix interrupts are not supported */
-> +	if (n_ports > 1 && nvec >= n_ports)
-> +		return -ENOSYS;
-> +
-> +	/* only enable the first entry (entry.entry = 0) */
-> +	rc = pci_enable_msix_exact(pdev, &entry, 1);
-> +	if (rc < 0)
-> +		return rc;
-> +
-> +	pdev->irq = entry.vector;
-Hi Robert,
-	You can't overwrite pci_dev->irq for MSI-X, it's no way to
-recover original irq for INTx after unbinding ahci driver. Instead,
-you may access msi_desc->irq when requesting irq.
-Regards!
-Gerry
-> +
-> +	return 1;
-> +}
-> +
->  static int ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
->  				struct ahci_host_priv *hpriv)
->  {
->  	int rc, nvec;
->  
-> +	nvec = ahci_init_msix(pdev, n_ports, hpriv);
-> +	if (nvec > 0)
-> +		return nvec;
-> +
-> +	if (nvec && nvec != -ENOSYS)
-> +		dev_err(&pdev->dev, "failed to enable MSI-X: %d", nvec);
-> +
->  	if (hpriv->flags & AHCI_HFLAG_NO_MSI)
->  		goto intx;
->  
-> @@ -1271,11 +1307,13 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
->  		dev_info(&pdev->dev,
->  			 "PDC42819 can only drive SATA devices with this driver\n");
->  
-> -	/* Both Connext and Enmotus devices use non-standard BARs */
-> +	/* Some devices use non-standard BARs */
->  	if (pdev->vendor == PCI_VENDOR_ID_STMICRO && pdev->device == 0xCC06)
->  		ahci_pci_bar = AHCI_PCI_BAR_STA2X11;
->  	else if (pdev->vendor == 0x1c44 && pdev->device == 0x8000)
->  		ahci_pci_bar = AHCI_PCI_BAR_ENMOTUS;
-> +	else if (pdev->vendor == 0x177d && pdev->device == 0xa01c)
-> +		ahci_pci_bar = AHCI_PCI_BAR_CAVIUM;
->  
->  	/*
->  	 * The JMicron chip 361/363 contains one SATA controller and one
-> 
+On Mon, Nov 10, 2014 at 07:39:51PM +0530, D Krishna Mohan wrote:
+> Hi Mark Brown,
+
+Don't top post.
+
+>     The codec driver is present in mainline as rt5631.c., Its realtek's
+> alc5631 so retained that name.
+> Similarly machine driver also is named as arndale_rt5631.c but inside that
+> driver I have used alc5631 naming as the
+> audio daughter card on arndale board mentions alc5631 so I have used this
+> convention here so that user should not
+> feel the absence of the driver.
+
+> Is that ok or do you want to have one naming all over?
+
+Ugh, OK.  That was hidden at the back end of the series.  Please:
+
+ - Use subject lines matching the style for the subsystem.
+ - Support both variants of the device name, not just one.
+ - of_match_table() is there to reduce ifdefs.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141110/3ec561eb/attachment-0001.sig>
