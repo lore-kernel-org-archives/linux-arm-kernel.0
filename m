@@ -1,35 +1,74 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 10 Nov 2014 12:34:52 -0800
-Subject: [PATCH V2 3/3] ARM: dts: dra72-evm: Add MMC nodes
-In-Reply-To: <1413902156-32684-1-git-send-email-nm@ti.com>
-References: <1413901848-32268-1-git-send-email-nm@ti.com>
- <1413902156-32684-1-git-send-email-nm@ti.com>
-Message-ID: <20141110203451.GU31454@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 10 Nov 2014 21:36:55 +0100
+Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
+In-Reply-To: <5460F806.3040305@ti.com>
+References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
+ <5331397.OQCQmJO78C@wuerfel> <5460F806.3040305@ti.com>
+Message-ID: <1600093.60yAP0Qpua@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [141021 07:37]:
-> Add MMC1 and 2 nodes. MMC1 is SDcard and MMC2 is eMMC.
+On Monday 10 November 2014 19:38:14 Grygorii Strashko wrote:
+> Hi Arnd,
 > 
-> NOTE on MMC1 card detect: Ideally, we should be using in-built SDCD
-> support, but we dont have it yet. So, use the fact that control module
-> of DRA7 is setup such that no matter what mode one configures it, GPIO
-> option is always hardwired in - use GPIO mode for SDcard detection.
+> On 11/10/2014 05:06 PM, Arnd Bergmann wrote:
+> > On Monday 10 November 2014 16:59:16 Grygorii Strashko wrote:
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt
+> >> @@ -0,0 +1,31 @@
+> >> +* TI Keystone 2 Generic PM Controller
+> >> +
+> >> +The TI Keystone 2 Generic PM Controller is responsible for Clock gating
+> >> +for each controlled IP module.
+> >> +
+> >> +Required properties:
+> >> +- compatible: Should be "ti,keystone-powerdomain"
+> >> +- #power-domain-cells: Should be 0, see below:
+> >> +
+> >> +The PM Controller node is a PM domain as documented in
+> >> +Documentation/devicetree/bindings/power/power_domain.txt.
+> >> +
+> >> +Example:
+> >> +
+> >> +       pm_controller: pm-controller {
+> >> +               compatible = "ti,keystone-powerdomain";
+> >> +               #power-domain-cells = <0>;
+> >> +       };
+> >> +
+> >> +       netcp: netcp at 2090000 {
+> >> +               reg = <0x2620110 0x8>;
+> >> +               reg-names = "efuse";
+> >> +               ...
+> >> +               #address-cells = <1>;
+> >> +               #size-cells = <1>;
+> >> +               ranges;
+> >> +               power-domains = <&pm_controller>;
+> >> +
+> >> +               clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>;
+> >> +               dma-coherent;
+> >> +       }
+> > 
+> > I don't get it. What keystone specific about a "ti,keystone-powerdomain"
+> > device? It seems that the device has no registers whatsoever and the
+> > driver doesn't really do anything that relates to the platform.
 > 
-> [peter.ujfalusi at ti.com]
-> The power line feeding the SD card is also used by other devices on the EVM.
-> Use generic name instead of mmc2_3v3 so when other devices want to use the
-> same regulator it will look a bit better.
+> That's true. but it was the only one acceptable way  to enable
+> Generic clock manipulation PM callbacks for the DT-boot case.
+> After several unsuccessful attempts the idea to use GPD
+> was introduced by Kevin there:
+>   https://lkml.org/lkml/2014/9/8/643
 > 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
-> 
-> Apologies on the spam, I got my own name screwed up -fixing that right now
+> So, The Keystone 2 Generic PM Controller is just a proxy PM layer here between
+> device and Generic clock manipulation PM callbacks.
+> It fills per-device clock list when device is attached to GPD and
+> ensures that all clocks from that list enabled/disabled when device is
+> started/stopped.
 
-Applying all three into omap-for-v3.19/dt thanks.
+The idea of such a generic power domain implementation sounds useful, but
+it has absolutely no business in platform specific code.
 
-Tony
- 
-> Changes in V2: Fixes the formatting error in author name.
-> V1: https://patchwork.kernel.org/patch/5125291/
+I suggest you either remove the power domain proxy from your drivers
+and use the clocks directly, or come up with an implementation that can
+be used across other platforms and CPU architectures.
+
+	Arnd
