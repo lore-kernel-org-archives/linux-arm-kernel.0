@@ -1,37 +1,41 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 10 Nov 2014 15:07:04 +0100
-Subject: [PATCH] ARM: Wire up bpf syscall
-In-Reply-To: <20141110140228.GX4042@n2100.arm.linux.org.uk>
-References: <1415627996-27395-1-git-send-email-thierry.reding@gmail.com>
- <20141110140228.GX4042@n2100.arm.linux.org.uk>
-Message-ID: <20141110140702.GA27835@ulmo>
+From: krishna.md@samsung.com (D Krishna Mohan)
+Date: Mon, 10 Nov 2014 19:39:51 +0530
+Subject: [PATCH 1/4] ASoC: ALC5631: Add device tree binding documentation
+In-Reply-To: <20141110133708.GQ3815@sirena.org.uk>
+References: <1415606519-30744-1-git-send-email-krishna.md@samsung.com>
+ <1415606519-30744-2-git-send-email-krishna.md@samsung.com>
+ <20141110133708.GQ3815@sirena.org.uk>
+Message-ID: <E07FA6F208344BC093C8D95F677E8F4A@sisodomain.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 10, 2014 at 02:02:28PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 10, 2014 at 02:59:56PM +0100, Thierry Reding wrote:
-> > From: Thierry Reding <treding@nvidia.com>
-> > 
-> > Add the bpf syscall to ARM.
-> > 
-> > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> > ---
-> > Note that I haven't tested whether this new syscall actually works on ARM,
-> > but it certainly gets rid of the annoying "syscall bpf not implemented"
-> > warning.
-> 
-> I guess you're using an old kernel... the commit adding this is already
-> merged - v3.18-rc3~4^2~4
+Hi Mark Brown,
 
-Indeed, I had just realized that I had been working on a branch with an
-out-dated base and was going to ask you to disregard this patch.
+     The codec driver is present in mainline as rt5631.c., Its realtek's 
+alc5631 so retained that name.
+Similarly machine driver also is named as arndale_rt5631.c but inside that 
+driver I have used alc5631 naming as the
+audio daughter card on arndale board mentions alc5631 so I have used this 
+convention here so that user should not
+feel the absence of the driver.
 
-Sorry for the noise,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141110/945f310d/attachment.sig>
+Is that ok or do you want to have one naming all over?
+
+-Krishna
+
+
+--------------------------------------------------
+From: "Mark Brown" <broonie@kernel.org>
+Sent: Monday, November 10, 2014 7:07 PM
+To: "Krishna Mohan Dani" <krishna.md@samsung.com>
+Cc: <linux-samsung-soc@vger.kernel.org>; 
+<linux-arm-kernel@lists.infradead.org>; <alsa-devel@alsa-project.org>; 
+<kgene.kim@samsung.com>
+Subject: Re: [PATCH 1/4] ASoC: ALC5631: Add device tree binding 
+documentation
+
+On Mon, Nov 10, 2014 at 01:31:56PM +0530, Krishna Mohan Dani wrote:
+> Document the device tree binding for the ALC5631 codec and update vendor
+> specific prefix for the Realtek.
+
+This driver isn't in mainline, you need to submit the driver. 
