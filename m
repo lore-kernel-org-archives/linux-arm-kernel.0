@@ -1,70 +1,34 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 10 Nov 2014 13:58:06 +0100
-Subject: dtb size limit? was Re: Tiny dts change breaks boot on n900
-In-Reply-To: <20141110123118.GA31134@amd>
-References: <20141110123118.GA31134@amd>
-Message-ID: <20141110125806.GA16650@amd>
+From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
+Date: Mon, 10 Nov 2014 15:12:12 +0200
+Subject: [PATCH v4 REPOST 0/5] Thermal reset support in PMC
+Message-ID: <1415625137-4791-1-git-send-email-mikko.perttunen@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2014-11-10 13:31:18, Pavel Machek wrote:
-> Hi!
-> 
-> I'm confused:
-> 
-> This fixes boot on n900. Strange thing is ... adp1653 driver is not
-> even compiled in -- it is module.
-> 
-> It looks like tiny change in dts noone should care about breaks
-> boot... I don't even have adp1653 device parsing code written.
-> 
-> Something similar happened before -- change in device tree order broke
-> boot.
-> 
-> Any ideas? What is going on?
+Hi,
 
-If I replace the blog below with
+this series adds support for hardware-triggered thermal reset to the PMC
+driver. Namely, it adds device tree properties for specifying the I2C
+command to be sent when thermtrip is triggered.
 
- a = <1>;
- b = <2>;
- c = <3>;
- d = <4>;
+The soctherm driver has now been acked and will be taken into 3.19, so we
+can move forward with this. Note that there are no compile time dependencies
+between the two series; it's just that this series is no-op without the
+soctherm driver being present.
 
-Resulting kernel boots. Replacing it with
+Mikko Perttunen (5):
+  of: Add descriptions of thermtrip properties to Tegra PMC bindings
+  of: Add nvidia,controller-id property to Tegra I2C bindings
+  ARM: tegra124: Add I2C controller ids to device tree
+  ARM: tegra: Add PMC thermtrip programming to Jetson TK1 device tree
+  ARM: tegra: Add thermal reset (thermtrip) support to PMC
 
- a-really-long-attribute-name-hopefully-this-breaks-stuff = <1>;
- b = <2>;
- c = <3>;
- d = <4>;
-
-Breaks the boot. I'm using dtb append option. Any ideas? Nonbooting
-dtb is 68910 bytes.
-
-pavel at amd:/data/l/linux-n900$ ls -al arch/arm/boot/dts/omap3-n900.dtb 
--rw-r--r-- 1 pavel pavel 68910 Nov 10 13:52 arch/arm/boot/dts/omap3-n900.dtb
-
-I removed some "smsc,lan91c94" settings, and it boots again. Weird.
-
-> 								Pavel
-> 
-> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-> index f3118bf..557a19e 100644
-> --- a/arch/arm/boot/dts/omap3-n900.dts
-> +++ b/arch/arm/boot/dts/omap3-n900.dts
-> @@ -565,11 +565,6 @@
->  	adp1653: adp1653 at 30 {
->  		compatible = "ad,adp1653";
->  		reg = <0x30>;
-> -
-> -		max-flash-timeout-usec = <500000>;
-> -		max-flash-intensity-mA = <0>;
-> -		max-torch-intensity-mA = <0>;
-> -		max-indicator-intensity-uA = <0>;
->  	};
->  };
->  
-> 
+ .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      |  24 ++
+ .../devicetree/bindings/i2c/nvidia,tegra20-i2c.txt |   5 +
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts          |   9 +-
+ arch/arm/boot/dts/tegra124.dtsi                    |   6 +
+ drivers/soc/tegra/pmc.c                            | 379 ++++++++++++++-------
+ 5 files changed, 290 insertions(+), 133 deletions(-)
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+2.1.3
