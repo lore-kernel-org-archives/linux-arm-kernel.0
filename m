@@ -1,97 +1,73 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Nov 2014 09:26:45 +0000
-Subject: [PATCH 3/5] mfd: ti_am335x_tscadc: Remove unwanted reg_se_cache
- save
-In-Reply-To: <20141110091527.GD21424@x1>
-References: <1415339350-17679-1-git-send-email-vigneshr@ti.com>
- <1415339350-17679-4-git-send-email-vigneshr@ti.com>
- <20141110091527.GD21424@x1>
-Message-ID: <20141110092645.GE21424@x1>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 10 Nov 2014 10:32:12 +0100
+Subject: [PATCH v2] ARM: at91: remove useless init_time for DT-only SoCs
+Message-ID: <1415611932-7765-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Nov 2014, Lee Jones wrote:
+init_time is only needed when booting non-DT boards, we can thus safely
+remove init_time functions.
 
-> On Fri, 07 Nov 2014, Vignesh R wrote:
-> 
-> > In one shot mode, sequencer automatically disables all enabled steps at
-> > the end of each cycle. (both ADC steps and TSC steps) Hence these steps
-> > need not be saved in reg_se_cache for clearing these steps at a later
-> > stage.
-> > Also, when ADC wakes up Sequencer should not be busy executing any of the
-> > config steps except for the charge step. Previously charge step was 1 ADC
-> > clock cycle and hence it was ignored.
-> > 
-> > Signed-off-by: Vignesh R <vigneshr@ti.com>
-> > ---
-> >  drivers/mfd/ti_am335x_tscadc.c       | 7 +++++--
-> >  include/linux/mfd/ti_am335x_tscadc.h | 1 +
-> >  2 files changed, 6 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
-> > index d877e777cce6..94ef8992f46b 100644
-> > --- a/drivers/mfd/ti_am335x_tscadc.c
-> > +++ b/drivers/mfd/ti_am335x_tscadc.c
-> > @@ -86,8 +86,12 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
-> >  		spin_lock_irq(&tsadc->reg_lock);
-> >  		finish_wait(&tsadc->reg_se_wait, &wait);
-> >  
-> > +		/*
-> > +		 * Sequencer should either be idle or
-> > +		 * busy applying the charge step.
-> > +		 */
-> >  		reg = tscadc_readl(tsadc, REG_ADCFSM);
-> > -		WARN_ON(reg & SEQ_STATUS);
-> > +		WARN_ON(reg & SEQ_STATUS & (!CHARGE_STEP));
-> 
-> This is almost certainly not correct.
-> 
-> Please take another look at the logic.
-> 
-> I'm _assuming_ you mean (reg & SEQ_STATUS && !CHARGE_STEP).
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+Changes since v1:
+- rebased on arm-soc branch
 
-So I just saw that CHARGE_STEP is actually the new macro below.
+ arch/arm/mach-at91/at91sam9g45.c | 7 -------
+ arch/arm/mach-at91/at91sam9rl.c  | 7 -------
+ 2 files changed, 14 deletions(-)
 
-So you're currently ANDing these together.
-
-xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx  reg
-00000000 00000000 00000000 00100000  #define SEQ_STATUS   BIT(5)
-00000000 00000000 00000000 00010001  #define CHARGE_STEP  0x11
-
-... which will always equate to 0.
-
-> >  		tsadc->adc_waiting = false;
-> >  	}
-> >  	tsadc->adc_in_use = true;
-> > @@ -96,7 +100,6 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
-> >  void am335x_tsc_se_set_once(struct ti_tscadc_dev *tsadc, u32 val)
-> >  {
-> >  	spin_lock_irq(&tsadc->reg_lock);
-> > -	tsadc->reg_se_cache |= val;
-
-Didn't you add this line a little over 1 month ago?
-
-Why the change of heart?
-
-> >  	am335x_tscadc_need_adc(tsadc);
-> >  
-> >  	tscadc_writel(tsadc, REG_SE, val);
-> > diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
-> > index c99be5dc0f5c..fcce182e4a35 100644
-> > --- a/include/linux/mfd/ti_am335x_tscadc.h
-> > +++ b/include/linux/mfd/ti_am335x_tscadc.h
-> > @@ -128,6 +128,7 @@
-> >  
-> >  /* Sequencer Status */
-> >  #define SEQ_STATUS BIT(5)
-> > +#define CHARGE_STEP		0x11
-> >  
-> >  #define ADC_CLK			3000000
-> >  #define TOTAL_STEPS		16
-> 
-
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index 042f7c6..2ad0db4 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -11,7 +11,6 @@
+  */
+ 
+ #include <asm/system_misc.h>
+-#include <asm/irq.h>
+ #include <mach/cpu.h>
+ #include <mach/hardware.h>
+ 
+@@ -35,13 +34,7 @@ static void __init at91sam9g45_initialize(void)
+ 	at91_sysirq_mask_rtt(AT91SAM9G45_BASE_RTT);
+ }
+ 
+-static void __init at91sam9g45_init_time(void)
+-{
+-	at91sam926x_pit_init(NR_IRQS_LEGACY + AT91_ID_SYS);
+-}
+-
+ AT91_SOC_START(at91sam9g45)
+ 	.map_io = at91sam9g45_map_io,
+ 	.init = at91sam9g45_initialize,
+-	.init_time = at91sam9g45_init_time,
+ AT91_SOC_END
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index 97efb2e..bd7e568 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -10,7 +10,6 @@
+  */
+ 
+ #include <asm/system_misc.h>
+-#include <asm/irq.h>
+ #include <mach/cpu.h>
+ #include <mach/at91_dbgu.h>
+ #include <mach/hardware.h>
+@@ -47,13 +46,7 @@ static void __init at91sam9rl_initialize(void)
+ 	at91_sysirq_mask_rtt(AT91SAM9RL_BASE_RTT);
+ }
+ 
+-static void __init at91sam9rl_init_time(void)
+-{
+-	at91sam926x_pit_init(NR_IRQS_LEGACY + AT91_ID_SYS);
+-}
+-
+ AT91_SOC_START(at91sam9rl)
+ 	.map_io = at91sam9rl_map_io,
+ 	.init = at91sam9rl_initialize,
+-	.init_time = at91sam9rl_init_time,
+ AT91_SOC_END
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.1
