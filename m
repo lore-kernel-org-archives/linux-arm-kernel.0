@@ -1,40 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 10 Nov 2014 19:02:03 +0100
-Subject: [PATCH] of/fdt: export fdt blob as /sys/firmware/fdt
-In-Reply-To: <CAKv+Gu_y2ej6BGA3E-jAni7q9peWOVprNh_m-LU0M9DRHWWTJg@mail.gmail.com>
-References: <1415638305-24463-1-git-send-email-ard.biesheuvel@linaro.org>
- <3340387.dB5eK3mRnu@wuerfel>
- <CAKv+Gu_y2ej6BGA3E-jAni7q9peWOVprNh_m-LU0M9DRHWWTJg@mail.gmail.com>
-Message-ID: <1710966.sRrJNMnKBO@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 10 Nov 2014 18:24:12 +0000
+Subject: [PATCH v8 07/13] xen: add a dma_addr_t dev_addr argument to
+ xen_dma_map_page
+In-Reply-To: <1415636045-24669-7-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1411101607130.22875@kaball.uk.xensource.com>
+ <1415636045-24669-7-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20141110182411.GD25609@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 November 2014 18:08:03 Ard Biesheuvel wrote:
-> On 10 November 2014 17:57, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday 10 November 2014 17:51:45 Ard Biesheuvel wrote:
-> >> Create a new /sys entry '/sys/firmware/fdt' to export the FDT blob
-> >> that was passed to the kernel by the bootloader. This allows userland
-> >> applications such as kexec to access the raw binary.
-> >>
-> >> The fact that this node does not reside under /sys/firmware/device-tree
-> >> is deliberate: FDT is also used on arm64 UEFI/ACPI systems to
-> >> communicate just the UEFI and ACPI entry points, but the FDT is never
-> >> unflattened and used to configure the system.
-> >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >
-> > Can you elaborate on the motivation? Initially the fdt format was
-> > introduced to make it easy to pass the information from /proc/device-tree
-> > to the next kernel for kexec. Are you interested in cases where this does
-> > not work?
-> >
+On Mon, Nov 10, 2014 at 04:13:59PM +0000, Stefano Stabellini wrote:
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> CC: david.vrabel at citrix.com
+> CC: konrad.wilk at oracle.com
+> ---
+>  arch/arm/include/asm/xen/page-coherent.h   |    4 ++--
+>  arch/arm64/include/asm/xen/page-coherent.h |    4 ++--
+>  arch/x86/include/asm/xen/page-coherent.h   |    4 ++--
+>  drivers/xen/swiotlb-xen.c                  |    6 ++++--
+>  4 files changed, 10 insertions(+), 8 deletions(-)
 > 
-> /sys/firmware/device-tree only gets populated if you are really
-> booting in DT mode, i.e., when the device tree is unflattened.
-> However, in ACPI mode we still need to access the data that was
-> communicated between UEFI and the kernel in the /chosen node if we
-> want to support kexec under UEFI.
+> diff --git a/arch/arm/include/asm/xen/page-coherent.h b/arch/arm/include/asm/xen/page-coherent.h
+> index d97b0b4..25d450c 100644
+> --- a/arch/arm/include/asm/xen/page-coherent.h
+> +++ b/arch/arm/include/asm/xen/page-coherent.h
+> @@ -29,8 +29,8 @@ static inline void xen_free_coherent_pages(struct device *hwdev, size_t size,
+>  }
+>  
+>  static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
+> -	     unsigned long offset, size_t size, enum dma_data_direction dir,
+> -	     struct dma_attrs *attrs)
+> +	     dma_addr_t dev_addr, unsigned long offset, size_t size,
+> +	     enum dma_data_direction dir, struct dma_attrs *attrs)
 
-Ah, now I get it.
+It works for me as well. But it would be good to add a comment for this
+patch to explain why a new argument is needed (like dev_addr being the
+actual machine address and not dom0 physical address).
 
-	Arnd
+-- 
+Catalin
