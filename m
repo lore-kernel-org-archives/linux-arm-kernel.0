@@ -1,48 +1,50 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 10 Nov 2014 12:26:07 -0800
-Subject: [PATCH 0/4] ARM: dts: dra72-evm: NAND and USB support
-In-Reply-To: <54524CD5.5060103@ti.com>
-References: <1413888080-2669-1-git-send-email-rogerq@ti.com>
- <54524CD5.5060103@ti.com>
-Message-ID: <20141110202606.GS31454@atomide.com>
+Date: Mon, 10 Nov 2014 12:30:17 -0800
+Subject: [PATCH] MAINTAINERS: Update entry for omap related .dts files to
+ cover new SoCs
+In-Reply-To: <1413901462-32181-1-git-send-email-nm@ti.com>
+References: <1413901462-32181-1-git-send-email-nm@ti.com>
+Message-ID: <20141110203017.GT31454@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roger Quadros <rogerq@ti.com> [141030 07:37]:
-> Hi Tony,
+* Nishanth Menon <nm@ti.com> [141021 07:25]:
+> DRA7(including AM5x) and AM47x series are handled under OMAP umbrella.
+> These SoC support and dts have been added since 3.14 kernel and Pull
+> requests for these have come in from OMAP till date.
 > 
-> On 10/21/2014 01:41 PM, Roger Quadros wrote:
-> > Hi Tony,
-> > 
-> > These patches add NAND and USB support for DRA72-evm.
-> > Patches are for v3.19 and based on v3.18-rc1.
-> > 
-> > I've tested that NAND and USB host works fine on DRA72-evm.
-> > 
-> > I couldn't get USB gadget mode to work. It doesn't work on DRA7-evm either.
-> > There seems to be some issue at the driver level. The dts entries are correct though.
-> 
-> Any further comments on this? Can we please queue this for -next? Thanks.
+> So just ensure that get_maintainers can pick up this list as well.
 
-Applying into omap-for-v3.19/dt thanks.
+Applying this into omap-for-v3.18/fixes as we've seen some
+patches not copied to linux-omap list.
+
+Regards,
 
 Tony
-
  
-> > cheers,
-> > -roger
-> > 
-> > George Cherian (1):
-> >   ARM: dts: dra72-evm: Enable USB support for dra72-evm.
-> > 
-> > Roger Quadros (3):
-> >   ARM: dts: dra72-evm: Add NAND support
-> >   ARM: dts: DRA7: Move USB_OTG 4 to dra74x.dtsi
-> >   ARM: dts: dra72-evm: Add regulator information to USB2 PHYs
-> > 
-> >  arch/arm/boot/dts/dra7.dtsi     |  20 ------
-> >  arch/arm/boot/dts/dra72-evm.dts | 147 ++++++++++++++++++++++++++++++++++++++++
-> >  arch/arm/boot/dts/dra74x.dtsi   |  22 ++++++
-> >  3 files changed, 169 insertions(+), 20 deletions(-)
-> > 
+> Cc: Beno?t Cousson <bcousson@baylibre.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: linux-omap at vger.kernel.org
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+>  MAINTAINERS |    3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index a20df9b..e205bd2 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -6585,6 +6585,9 @@ L:	devicetree at vger.kernel.org
+>  S:	Maintained
+>  F:	arch/arm/boot/dts/*omap*
+>  F:	arch/arm/boot/dts/*am3*
+> +F:	arch/arm/boot/dts/*am4*
+> +F:	arch/arm/boot/dts/*am5*
+> +F:	arch/arm/boot/dts/*dra7*
+>  
+>  OMAP CLOCK FRAMEWORK SUPPORT
+>  M:	Paul Walmsley <paul@pwsan.com>
+> -- 
+> 1.7.9.5
 > 
