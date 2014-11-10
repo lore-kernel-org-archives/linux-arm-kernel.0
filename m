@@ -1,35 +1,46 @@
-From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
-Date: Mon, 10 Nov 2014 15:25:40 +0000
-Subject: dtb size limit? was Re: Tiny dts change breaks boot on n900
-In-Reply-To: <20141110125806.GA16650@amd>
-References: <20141110123118.GA31134@amd> <20141110125806.GA16650@amd>
-Message-ID: <5460D8F4.9000507@suse.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 10 Nov 2014 16:39:12 +0100
+Subject: [PATCH 3/3] ARM: at91: sama5d4: Add SFR
+In-Reply-To: <1415632471-14672-3-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1415632471-14672-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1415632471-14672-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20141110153912.GU4068@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 10.11.2014 um 12:58 schrieb Pavel Machek:
-> If I replace the blo[ck] below with
+On 10/11/2014 at 16:14:31 +0100, Alexandre Belloni wrote :
+> The sama4d4 has Special Function Registers that allow to manage DDR, OHCI, EBI
+> and AIC interrupt redirection.
 > 
->  a = <1>;
->  b = <2>;
->  c = <3>;
->  d = <4>;
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sama5d4.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> Resulting kernel boots. Replacing it with
-> 
->  a-really-long-attribute-name-hopefully-this-breaks-stuff = <1>;
->  b = <2>;
->  c = <3>;
->  d = <4>;
-> 
-> Breaks the boot. I'm using dtb append option. Any ideas? Nonbooting
-> dtb is 68910 bytes.
+> diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+> index e0157b0f075c..580486b056fc 100644
+> --- a/arch/arm/boot/dts/sama5d4.dtsi
+> +++ b/arch/arm/boot/dts/sama5d4.dtsi
+> @@ -826,6 +826,11 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			sfr: sfr at f8028000 {
+> +				compatible = "atmel,sama5d4-sfr", "syscon";
+> +				reg = <0xf0038000 0x4000>;
 
-Did you verify that your initrd, if any, does not overlap the end of the
-kernel when loading it from the bootloader?
+Obviously, that should be reg = <0xf8028000 0x4000>, I'll fix it
 
-Andreas
+> +			};
+> +
+>  			mmc1: mmc at fc000000 {
+>  				compatible = "atmel,hsmci";
+>  				reg = <0xfc000000 0x600>;
+> -- 
+> 2.1.0
+> 
 
 -- 
-SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 21284 AG N?rnberg
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
