@@ -1,61 +1,66 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 10 Nov 2014 10:32:24 +0900
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Cleanups for v3.19
-Message-ID: <cover.1415582842.git.horms+renesas@verge.net.au>
+Date: Mon, 10 Nov 2014 10:32:19 +0900
+Subject: [PATCH 2/8] ARM: shmobile: r8a7779 dtsi: Remove unnecessary MMC
+ options
+In-Reply-To: <cover.1415582842.git.horms+renesas@verge.net.au>
+References: <cover.1415582842.git.horms+renesas@verge.net.au>
+Message-ID: <92e044aed5aede573ffa1ba2c99212024356e851.1415582842.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Please consider these second round of Renesas ARM based SoC DT cleanups for v3.19.
+As of commit 81bbbc7278fa109f ("mmc: sdhi: update sh_mobile_sdhi_of_data
+for r8a7779"), the driver takes care of r8a7779 specific MMC options.
+Hence they can be removed from the dtsi.
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-dt-cleanups-for-v3.19,
-which I have already sent a pull-request for.
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+[geert: Rebased, reworded, added reference]
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7779.dtsi | 8 --------
+ 1 file changed, 8 deletions(-)
 
-
-The following changes since commit 120f038cf04b95dc895cba503a7516ff75561438:
-
-  ARM: shmobile: kzm9d dts: Add chosen/stdout-path (2014-10-24 10:44:10 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-cleanups2-for-v3.19
-
-for you to fetch changes up to 89aeff9989e87bb2d9d652994010bc18c68675d9:
-
-  ARM: shmobile: alt dts: Drop console= bootargs parameter (2014-11-05 14:54:10 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC DT Cleanups for v3.19
-
-* Drop console= bootargs parameter on alt
-* Correct scifb* naming on r8a73a4
-* Drop 0x unit-address prefixes
-* Remove unnecessary MMC options
-
-----------------------------------------------------------------
-Geert Uytterhoeven (3):
-      ARM: shmobile: r8a7790 dtsi: Drop bogus 0x unit-address prefix
-      ARM: shmobile: r8a7791 dtsi: Drop bogus 0x unit-address prefix
-      ARM: shmobile: kzm9g-reference dts: Drop bogus 0x unit-address prefix
-
-Kuninori Morimoto (3):
-      ARM: shmobile: r8a7778 dtsi: Remove unnecessary MMC options
-      ARM: shmobile: r8a7779 dtsi: Remove unnecessary MMC options
-      ARM: shmobile: r8a7790 dtsi: Remove unnecessary MMC options
-
-Simon Horman (1):
-      ARM: shmobile: alt dts: Drop console= bootargs parameter
-
-Ulrich Hecht (1):
-      ARM: shmobile: r8a73a4: fix scifb* naming
-
- arch/arm/boot/dts/r8a73a4.dtsi               | 8 ++++----
- arch/arm/boot/dts/r8a7778.dtsi               | 6 ------
- arch/arm/boot/dts/r8a7779.dtsi               | 8 --------
- arch/arm/boot/dts/r8a7790.dtsi               | 6 +-----
- arch/arm/boot/dts/r8a7791.dtsi               | 2 +-
- arch/arm/boot/dts/r8a7794-alt.dts            | 2 +-
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 2 +-
- 7 files changed, 8 insertions(+), 26 deletions(-)
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index 7cfba9a..ad83e47 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -314,8 +314,6 @@
+ 		reg = <0xffe4c000 0x100>;
+ 		interrupts = <0 104 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A7779_CLK_SDHI0>;
+-		cap-sd-highspeed;
+-		cap-sdio-irq;
+ 		status = "disabled";
+ 	};
+ 
+@@ -324,8 +322,6 @@
+ 		reg = <0xffe4d000 0x100>;
+ 		interrupts = <0 105 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A7779_CLK_SDHI1>;
+-		cap-sd-highspeed;
+-		cap-sdio-irq;
+ 		status = "disabled";
+ 	};
+ 
+@@ -334,8 +330,6 @@
+ 		reg = <0xffe4e000 0x100>;
+ 		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A7779_CLK_SDHI2>;
+-		cap-sd-highspeed;
+-		cap-sdio-irq;
+ 		status = "disabled";
+ 	};
+ 
+@@ -344,8 +338,6 @@
+ 		reg = <0xffe4f000 0x100>;
+ 		interrupts = <0 106 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A7779_CLK_SDHI3>;
+-		cap-sd-highspeed;
+-		cap-sdio-irq;
+ 		status = "disabled";
+ 	};
+ 
+-- 
+2.1.1
