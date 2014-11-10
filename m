@@ -1,40 +1,55 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 10 Nov 2014 09:03:23 +0100
-Subject: [PATCH v3/resend] ARM: shmobile: Add early debugging support
- using SCIF(A)
-In-Reply-To: <20141110005944.GE16836@verge.net.au>
-References: <1415273910-32356-1-git-send-email-geert+renesas@glider.be>
- <3499638.LG41cHl0JS@wuerfel>
- <CAMuHMdUU7XK57a70HWP0+nfwaZ-sXQ5EC2CShgmxwx6JKnuyPQ@mail.gmail.com>
- <20777697.th35W64j5e@wuerfel> <20141110005944.GE16836@verge.net.au>
-Message-ID: <CAMuHMdUcZYTz4uLn4G9CECT5ZuKtHJuDZzR0WrzR3oo8qD3cfA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 10 Nov 2014 09:11:30 +0100
+Subject: [PATCH v8 4/8] ARM: dts: Enable Broadcom Cygnus SoC
+In-Reply-To: <54604A71.1010000@broadcom.com>
+References: <sbranden@broadcom.com> <5982323.RDuqIHPULA@wuerfel>
+ <54604A71.1010000@broadcom.com>
+Message-ID: <2221359.WPjXKG5OT3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 10, 2014 at 1:59 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Nov 06, 2014 at 02:26:45PM +0100, Arnd Bergmann wrote:
->> On Thursday 06 November 2014 13:33:58 Geert Uytterhoeven wrote:
->> > On Thu, Nov 6, 2014 at 12:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > > On Thursday 06 November 2014 12:38:30 Geert Uytterhoeven wrote:
->> > >> Add serial port debug macros for the SCIF(A) serial ports.
->> > >> This includes all shmobile SoCs, except for EMEV2.
->> >
->> > > I don't object to this patch going in, but have you looked at doing
->> > > just earlycon instead? We are still missing some fixmap changes
+On Sunday 09 November 2014 21:17:37 Scott Branden wrote:
+> On 14-11-09 12:38 PM, Arnd Bergmann wrote:
+> > On Sunday 09 November 2014 09:23:11 Greg Kroah-Hartman wrote:
+> >> On Sat, Nov 08, 2014 at 10:49:09PM -0800, Olof Johansson wrote:
+> >>>>>> +/*
+> >>>>>> + * Copyright 2014 Broadcom Corporation.  All rights reserved.
+> >>>>>> + *
+> >>>>>> + * Unless you and Broadcom execute a separate written software license
+> >>>>>> + * agreement governing use of this software, this software is licensed
+> >>>>>> to you
+> >>>>>> + * under the terms of the GNU General Public License as
+> >>>>>> + * published by the Free Software Foundation version 2.
+> >>>>>> + *
+> >>>>>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> >>>>>> + * kind, whether express or implied; without even the implied warranty
+> >>>>>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >>>>>> + * GNU General Public License for more details.
+> >>>>>
+> >>>>>
+> >>>>> We ask for new DT contents to be added with dual BSD/GPL license, to
+> >>>>> allow for reuse of the DT data structures in other projects as well.
+> >>>>> There's currently a lot of activity going on relicensing the current
+> >>>>> files so I recommend sorting it out before they are added if you can.
+> >>>>
+> >>>>
+> >>>> This may take more time than you think.  I am going to have to go through
+> >>>> legal to get such a license created. Also, why would you need dual license?
+> >>>> If it is BSD that should serve both purposes?
+> >>>
+> >>> I haven't followed the discussion close enough to know if there's been
+> >>> discussion about single-license BSD vs dual BSD/GPL.
+> >
+> > I think for all practical purposes, BSD and dual BSD/GPL is the same and
+> > listing it as dual was meant as a clarification to make it easier to see
+> > that all files in the kernel are GPLv2 compatible.
+> A dual BSD/GPL may involve having me get a lawyer to create such a 
+> header.  I would prefer to leave it as GPL for now until some concrete 
+> decision has finally been made on this by the rest of the community? 
+> Or, I can put it as BSD right now if that helps?
 
-> This patch feels like is is ready for me to queue up.
-> Is that the consensus here?
+I would prefer a pure BSD header for the moment over a pure GPL header.
+The last thing we want is to force other operating systems to create
+another set of dts files for the same hardware.
 
-Please wait for v3, which will get rid of the multi-level choice statements,
-as requested by Arnd.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	Arnd
