@@ -1,58 +1,65 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Mon, 10 Nov 2014 10:28:24 -0800
-Subject: [PATCH v8 4/8] ARM: dts: Enable Broadcom Cygnus SoC
-In-Reply-To: <2221359.WPjXKG5OT3@wuerfel>
-References: <sbranden@broadcom.com> <5982323.RDuqIHPULA@wuerfel>
- <54604A71.1010000@broadcom.com> <2221359.WPjXKG5OT3@wuerfel>
-Message-ID: <546103C8.3030905@broadcom.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 10 Nov 2014 18:32:11 +0000
+Subject: [PATCH v8 09/13] xen/arm/arm64: merge xen/mm32.c into xen/mm.c
+In-Reply-To: <1415636045-24669-9-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1411101607130.22875@kaball.uk.xensource.com>
+ <1415636045-24669-9-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20141110183211.GF25609@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14-11-10 12:11 AM, Arnd Bergmann wrote:
-> On Sunday 09 November 2014 21:17:37 Scott Branden wrote:
->> On 14-11-09 12:38 PM, Arnd Bergmann wrote:
->>> On Sunday 09 November 2014 09:23:11 Greg Kroah-Hartman wrote:
->>>> On Sat, Nov 08, 2014 at 10:49:09PM -0800, Olof Johansson wrote:
->>>>>>>> +/*
->>>>>>>> + * Copyright 2014 Broadcom Corporation.  All rights reserved.
->>>>>>>> + *
->>>>>>>> + * Unless you and Broadcom execute a separate written software license
->>>>>>>> + * agreement governing use of this software, this software is licensed
->>>>>>>> to you
->>>>>>>> + * under the terms of the GNU General Public License as
->>>>>>>> + * published by the Free Software Foundation version 2.
->>>>>>>> + *
->>>>>>>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
->>>>>>>> + * kind, whether express or implied; without even the implied warranty
->>>>>>>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>>>>>>> + * GNU General Public License for more details.
->>>>>>>
->>>>>>>
->>>>>>> We ask for new DT contents to be added with dual BSD/GPL license, to
->>>>>>> allow for reuse of the DT data structures in other projects as well.
->>>>>>> There's currently a lot of activity going on relicensing the current
->>>>>>> files so I recommend sorting it out before they are added if you can.
->>>>>>
->>>>>>
->>>>>> This may take more time than you think.  I am going to have to go through
->>>>>> legal to get such a license created. Also, why would you need dual license?
->>>>>> If it is BSD that should serve both purposes?
->>>>>
->>>>> I haven't followed the discussion close enough to know if there's been
->>>>> discussion about single-license BSD vs dual BSD/GPL.
->>>
->>> I think for all practical purposes, BSD and dual BSD/GPL is the same and
->>> listing it as dual was meant as a clarification to make it easier to see
->>> that all files in the kernel are GPLv2 compatible.
->> A dual BSD/GPL may involve having me get a lawyer to create such a
->> header.  I would prefer to leave it as GPL for now until some concrete
->> decision has finally been made on this by the rest of the community?
->> Or, I can put it as BSD right now if that helps?
->
-> I would prefer a pure BSD header for the moment over a pure GPL header.
-> The last thing we want is to force other operating systems to create
-> another set of dts files for the same hardware.
-I have changed the headers to pure BSD.  I hope this is acceptable.
->
-> 	Arnd
->
+On Mon, Nov 10, 2014 at 04:14:01PM +0000, Stefano Stabellini wrote:
+> --- a/arch/arm/xen/mm.c
+> +++ b/arch/arm/xen/mm.c
+> @@ -1,6 +1,10 @@
+> +#include <linux/cpu.h>
+> +#include <linux/dma-mapping.h>
+>  #include <linux/bootmem.h>
+>  #include <linux/gfp.h>
+> +#include <linux/highmem.h>
+>  #include <linux/export.h>
+> +#include <linux/of_address.h>
+>  #include <linux/slab.h>
+>  #include <linux/types.h>
+>  #include <linux/dma-mapping.h>
+> @@ -16,6 +20,88 @@
+>  #include <asm/xen/hypercall.h>
+>  #include <asm/xen/interface.h>
+>  
+> +enum dma_cache_op {
+> +       DMA_UNMAP,
+> +       DMA_MAP,
+> +};
+> +
+> +/* functions called by SWIOTLB */
+> +
+> +static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
+> +	size_t size, enum dma_data_direction dir, enum dma_cache_op op)
+> +{
+> +	unsigned long pfn;
+> +	size_t left = size;
+> +
+> +	pfn = (handle >> PAGE_SHIFT) + offset / PAGE_SIZE;
+> +	offset %= PAGE_SIZE;
+> +
+> +	do {
+> +		size_t len = left;
+> +	
+> +		BUG_ON(pfn_valid(pfn));
+
+You probably don't need this in the loop.
+
+> +
+> +		/* TODO: cache flush */
+> +
+> +		offset = 0;
+> +		pfn++;
+> +		left -= len;
+> +	} while (left);
+> +}
+
+That's smaller now ;). I have to finish reading the other patches to see
+what ends up replacing TODO.
+
+-- 
+Catalin
