@@ -1,29 +1,45 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Mon, 10 Nov 2014 12:10:04 +0100
-Subject: ARM: sti: SOC_STIH407 and STIH407_RESET?
-In-Reply-To: <1415616570.4862.37.camel@x220>
-References: <1415614934.4862.22.camel@x220> <54609304.4080209@st.com>
- <1415616570.4862.37.camel@x220>
-Message-ID: <54609D0C.3040806@st.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 10 Nov 2014 14:13:28 +0300
+Subject: [PATCH v4] i2c/at91: adopt pinctrl support
+In-Reply-To: <1415584552-11390-1-git-send-email-wenyou.yang@atmel.com>
+References: <1415584552-11390-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <54609DD8.8030903@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello.
 
-On 11/10/2014 11:49 AM, Paul Bolle wrote:
-> Hi Maxime,
->
-> On Mon, 2014-11-10 at 11:27 +0100, Maxime Coquelin wrote:
->> The STiH407 reset has been merged in Philipp Zabel Reset tree for v3.19:
->> http://git.pengutronix.de/?p=pza/linux.git;a=shortlog;h=refs/heads/reset/for_v3.19
-> That tree isn't part of linux-next, is it? Is it included in a tree that
-> itself is included in linux-next, so that it will end up in linux-next
-> one of these days?
-I don't know if reset tree is regularly merged into linux-next.
-I let Philipp, its maintainer, answer.
+On 11/10/2014 4:55 AM, Wenyou Yang wrote:
 
-Kind regards,
-Maxime
+> Amend the at91 i2c pin controller
 
+    You're amending the hardware itself, really? :-)
+
+> to optionally take a pin controlhandle
+
+    I don't see the code that does this.
+
+> and set the state of the pins to:
+> - "default" on boot and resume.
+
+    I don't see where you are changing anything for the probe() method. 
+Perhaps you meant the driver core code which selects the dafault profile 
+automatically?
+
+> - "sleep" on suspend().
+
+> This should make it possible to optimize energy usage for the pins
+> both for the suspend/resume cycle
+
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> ---
+> Hi Wolfram,
 >
-> Paul Bolle
+> Thanks a lot.
 >
+> The change of this version is to remove
+> 	pinctrl_pm_select_default_state(&pdev->dev) from the _probe function.
+
+    Aha, you've specifically removed this...
+
+WBR, Sergei
