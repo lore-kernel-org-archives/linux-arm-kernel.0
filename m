@@ -1,31 +1,50 @@
 From: rbyshko@gmail.com (Roman Byshko)
-Date: Mon, 10 Nov 2014 19:55:08 +0100
-Subject: [PATCH v2 3/5] ARM: sun7i: dtsi: add support for usbphy0
+Date: Mon, 10 Nov 2014 19:55:09 +0100
+Subject: [PATCH v2 4/5] ARM: dts: sun7i: Cubietruck: override regulator pin
 In-Reply-To: <cover.1415645258.git.rbyshko@gmail.com>
 References: <cover.1415645258.git.rbyshko@gmail.com>
-Message-ID: <ef8f31d5cf50014417bd08a326241ba01ec4cf03.1415645258.git.rbyshko@gmail.com>
+Message-ID: <e707575fe1bb0c56fb307be5839977de5dfb8f09.1415645258.git.rbyshko@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Cubietruck uses different pin for the USB OTG VBUS that
+is why we override the one defined in sunxi-common-regulators.dtsi
+
 Signed-off-by: Roman Byshko <rbyshko@gmail.com>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 82097c9..f787ccb 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -552,8 +552,8 @@
- 			reg-names = "phy_ctrl", "pmu1", "pmu2";
- 			clocks = <&usb_clk 8>;
- 			clock-names = "usb_phy";
--			resets = <&usb_clk 1>, <&usb_clk 2>;
--			reset-names = "usb1_reset", "usb2_reset";
-+			resets = <&usb_clk 0>, <&usb_clk 1>, <&usb_clk 2>;
-+			reset-names = "usb0_reset", "usb1_reset", "usb2_reset";
- 			status = "disabled";
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+index a6c1a3c..1682307 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+@@ -92,6 +92,13 @@
+ 				allwinner,drive = <0>;
+ 				allwinner,pull = <0>;
+ 			};
++
++			usb0_vbus_pin_a: usb0_vbus_pin at 0 {
++				allwinner,pins = "PH17";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
  		};
  
+ 		pwm: pwm at 01c20e00 {
+@@ -185,6 +192,12 @@
+ 		status = "okay";
+ 	};
+ 
++	reg_usb0_vbus: usb0-vbus {
++		pinctrl-0 = <&usb0_vbus_pin_a>;
++		gpio = <&pio 7 17 0>;
++		status = "okay";
++	};
++
+ 	reg_usb1_vbus: usb1-vbus {
+ 		status = "okay";
+ 	};
 -- 
 2.1.2
