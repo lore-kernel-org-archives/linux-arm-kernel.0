@@ -1,45 +1,21 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Nov 2014 10:48:10 +0000
-Subject: [PATCH 04/13] ARM: multi_v7_defconfig: Enable st ohci and ehci
- HCD drivers.
-In-Reply-To: <1415361475-6218-5-git-send-email-peter.griffin@linaro.org>
-References: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
- <1415361475-6218-5-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20141110104810.GS21424@x1>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 10 Nov 2014 11:49:30 +0100
+Subject: ARM: sti: SOC_STIH407 and STIH407_RESET?
+In-Reply-To: <54609304.4080209@st.com>
+References: <1415614934.4862.22.camel@x220> <54609304.4080209@st.com>
+Message-ID: <1415616570.4862.37.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 07 Nov 2014, Peter Griffin wrote:
+Hi Maxime,
 
-> Enable the ehci and ohci drivers in the multi_v7_defconfig so that
-> the USB controllers on stih41x work by default.
-> 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  arch/arm/configs/multi_v7_defconfig | 2 ++
->  1 file changed, 2 insertions(+)
+On Mon, 2014-11-10 at 11:27 +0100, Maxime Coquelin wrote:
+> The STiH407 reset has been merged in Philipp Zabel Reset tree for v3.19:
+> http://git.pengutronix.de/?p=pza/linux.git;a=shortlog;h=refs/heads/reset/for_v3.19
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+That tree isn't part of linux-next, is it? Is it included in a tree that
+itself is included in linux-next, so that it will end up in linux-next
+one of these days?
 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 491b7d5..c7a9517 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -318,9 +318,11 @@ CONFIG_USB_XHCI_HCD=y
->  CONFIG_USB_XHCI_MVEBU=y
->  CONFIG_USB_EHCI_HCD=y
->  CONFIG_USB_EHCI_TEGRA=y
-> +CONFIG_USB_EHCI_HCD_STI=y
->  CONFIG_USB_EHCI_HCD_PLATFORM=y
->  CONFIG_USB_ISP1760_HCD=y
->  CONFIG_USB_OHCI_HCD=y
-> +CONFIG_USB_OHCI_HCD_STI=y
->  CONFIG_USB_OHCI_HCD_PLATFORM=y
->  CONFIG_USB_STORAGE=y
->  CONFIG_USB_CHIPIDEA=y
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Paul Bolle
