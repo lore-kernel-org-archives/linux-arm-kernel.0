@@ -1,84 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 10 Nov 2014 07:09:16 -0800
-Subject: dtb size limit? was Re: Tiny dts change breaks boot on n900
-In-Reply-To: <20141110125806.GA16650@amd>
-References: <20141110123118.GA31134@amd>
- <20141110125806.GA16650@amd>
-Message-ID: <20141110150915.GH31454@atomide.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 10 Nov 2014 16:10:11 +0100
+Subject: [PATCH 05/12] soc/tegra: Add efuse driver for Tegra
+In-Reply-To: <20141019031241.GA18880@tiger>
+References: <1405080971-7609-1-git-send-email-thierry.reding@gmail.com>
+ <1405080971-7609-6-git-send-email-thierry.reding@gmail.com>
+ <20141019031241.GA18880@tiger>
+Message-ID: <20141110151009.GA13447@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [141110 04:59]:
-> On Mon 2014-11-10 13:31:18, Pavel Machek wrote:
-> > Hi!
-> > 
-> > I'm confused:
-> > 
-> > This fixes boot on n900. Strange thing is ... adp1653 driver is not
-> > even compiled in -- it is module.
-> > 
-> > It looks like tiny change in dts noone should care about breaks
-> > boot... I don't even have adp1653 device parsing code written.
-> > 
-> > Something similar happened before -- change in device tree order broke
-> > boot.
-> > 
-> > Any ideas? What is going on?
+On Sun, Oct 19, 2014 at 11:12:45AM +0800, Shawn Guo wrote:
+> On Fri, Jul 11, 2014 at 02:16:04PM +0200, Thierry Reding wrote:
+> > diff --git a/drivers/misc/fuse/Makefile b/drivers/misc/fuse/Makefile
+> > new file mode 100644
+> > index 000000000000..0679c4febc89
+> > --- /dev/null
+> > +++ b/drivers/misc/fuse/Makefile
+> > @@ -0,0 +1 @@
+> > +obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
 > 
-> If I replace the blog below with
-> 
->  a = <1>;
->  b = <2>;
->  c = <3>;
->  d = <4>;
-> 
-> Resulting kernel boots. Replacing it with
-> 
->  a-really-long-attribute-name-hopefully-this-breaks-stuff = <1>;
->  b = <2>;
->  c = <3>;
->  d = <4>;
-> 
-> Breaks the boot. I'm using dtb append option. Any ideas? Nonbooting
-> dtb is 68910 bytes.
-> 
-> pavel at amd:/data/l/linux-n900$ ls -al arch/arm/boot/dts/omap3-n900.dtb 
-> -rw-r--r-- 1 pavel pavel 68910 Nov 10 13:52 arch/arm/boot/dts/omap3-n900.dtb
-> 
-> I removed some "smsc,lan91c94" settings, and it boots again. Weird.
+> I just happened to notice this change on linux-next introduced by this
+> patch?  It's a leftover from early version of the patch, I guess?
 
-Seems like we may still have some issues with the relocation if
-it's size related. Or a regression maybe?
+Indeed so. I've sent out a patch to fix this.
 
-See for example commit 5ffb04f6690d ("ARM: zImage: make sure appended
-DTB doesn't get overwritten by kernel .bss")
-
-Regards,
-
-Tony
-
-> > diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-> > index f3118bf..557a19e 100644
-> > --- a/arch/arm/boot/dts/omap3-n900.dts
-> > +++ b/arch/arm/boot/dts/omap3-n900.dts
-> > @@ -565,11 +565,6 @@
-> >  	adp1653: adp1653 at 30 {
-> >  		compatible = "ad,adp1653";
-> >  		reg = <0x30>;
-> > -
-> > -		max-flash-timeout-usec = <500000>;
-> > -		max-flash-intensity-mA = <0>;
-> > -		max-torch-intensity-mA = <0>;
-> > -		max-indicator-intensity-uA = <0>;
-> >  	};
-> >  };
-> >  
-> > 
-> 
-> -- 
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141110/842be9cd/attachment.sig>
