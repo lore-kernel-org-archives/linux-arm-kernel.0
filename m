@@ -1,60 +1,24 @@
-From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
-Date: Mon, 10 Nov 2014 20:05:42 +0100
-Subject: [PATCH v2 2/2] arm64: Add Juno SoC device tree.
-In-Reply-To: <1415618875-8469-3-git-send-email-Liviu.Dudau@arm.com>
-References: <1415618875-8469-1-git-send-email-Liviu.Dudau@arm.com>
- <1415618875-8469-3-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <54610C86.9090002@suse.de>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 10 Nov 2014 20:23:38 +0100
+Subject: [PATCH v9 4/8] ARM: dts: Enable Broadcom Cygnus SoC
+In-Reply-To: <CAOesGMgqsvOtgxKa6aBwvTqW3CO5Q7E_YsVVuS83yR4GdQEHUw@mail.gmail.com>
+References: <sbranden@broadcom.com>
+ <1414538111-11668-1-git-send-email-sbranden@broadcom.com>
+ <1414538111-11668-5-git-send-email-sbranden@broadcom.com>
+ <1415616611.4862.38.camel@x220>
+ <CAOesGMgqsvOtgxKa6aBwvTqW3CO5Q7E_YsVVuS83yR4GdQEHUw@mail.gmail.com>
+Message-ID: <1415647418.21229.17.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 2014-11-10 at 10:35 -0800, Olof Johansson wrote:
+> On Mon, Nov 10, 2014 at 2:50 AM, Paul Bolle <pebolle@tiscali.nl> wrote:
+> > I guess patch 1/8 will be added to linux-next one of these days. Is
+> > that correct?
+> 
+> Yes.
 
-Am 10.11.2014 um 12:27 schrieb Liviu Dudau:
-> diff --git a/arch/arm64/boot/dts/juno.dts b/arch/arm64/boot/dts/juno.dts
-> new file mode 100644
-> index 0000000..7f998de
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/juno.dts
-> @@ -0,0 +1,374 @@
-> +/*
-> + * ARM Ltd. Juno Plaform
+Thanks.
 
-"Platform"
 
-> + *
-
-Shouldn't this mention a license, ideally dual-licensed?
-
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +/ {
-> +	model = "Juno";
-> +	compatible = "arm,juno", "arm,vexpress";
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	aliases {
-> +		serial0 = &soc_uart0;
-> +	};
-> +
-> +	cpus {
-> +		#address-cells = <2>;
-> +		#size-cells = <0>;
-> +
-> +		A53_0:cpu at 100 {
-[snip]
-
-Can you please add a space after colon, like you did for non-CPU nodes?
-
-Regards,
-Andreas
-
--- 
-SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 21284 AG N?rnberg
+Paul Bolle
