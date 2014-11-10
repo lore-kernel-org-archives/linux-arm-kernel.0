@@ -1,41 +1,67 @@
-From: radek.dostal@streamunlimited.com (Radek Dostal)
-Date: Mon, 10 Nov 2014 17:35:58 +0100
-Subject: [PATCH] ARM: dts: bcm63138: change "interupts" to "interrupts"
-Message-ID: <1415637358-24378-1-git-send-email-radek.dostal@streamunlimited.com>
+From: wcohen@redhat.com (William Cohen)
+Date: Mon, 10 Nov 2014 11:36:02 -0500
+Subject: [PATCH] Correct the race condition in aarch64_insn_patch_text_sync()
+Message-ID: <1415637362-30754-1-git-send-email-wcohen@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-all other nodes in bcm63138.dtsi use "interrupts", this had to be just a typo
-which never got noticed, even it may have quite some consequences.
+When experimenting with patches to provide kprobes support for aarch64
+smp machines would hang when inserting breakpoints into kernel code.
+The hangs were caused by a race condition in the code called by
+aarch64_insn_patch_text_sync().  The first processor in the
+aarch64_insn_patch_text_cb() function would patch the code while other
+processors were still entering the function and decrementing the
+cpu_count field.  This resulted in some processors never observing the
+exit condition and exiting the function.  Thus, processors in the
+system hung.
 
-Signed-off-by: Radek Dostal <radek.dostal@streamunlimited.com>
+The patching function now waits for all processors to enter the
+patching function before changing code to ensure that none of the
+processors are in code that is going to be patched.  Once all the
+processors have entered the function, the last processor to enter the
+patching function performs the pathing and signals that the patching
+is complete with one last decrement of the cpu_count field to make it
+-1.
+
+Signed-off-by: William Cohen <wcohen@redhat.com>
 ---
- Hi all,
+ arch/arm64/kernel/insn.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
- when running git grep with typo, I spotted this typo inDT binding, which 
- looks obviously wrong to me. Sorry I do not have the board to test it, but 
- I am pretty sure the patch is correct.
-
- I hope I included, right people get_maintainer.pl showed bit too many.
-
- Thanks,
- Radek
-
- arch/arm/boot/dts/bcm63138.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/bcm63138.dtsi b/arch/arm/boot/dts/bcm63138.dtsi
-index f3bb2dd..d2d8e94 100644
---- a/arch/arm/boot/dts/bcm63138.dtsi
-+++ b/arch/arm/boot/dts/bcm63138.dtsi
-@@ -102,7 +102,7 @@
- 		twd_watchdog: watchdog at 1e620 {
- 			compatible = "arm,cortex-a9-twd-wdt";
- 			reg = <0x1e620 0x20>;
--			interupts = <GIC_PPI 14 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts = <GIC_PPI 14 IRQ_TYPE_LEVEL_HIGH>;
- 		};
- 	};
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index e007714..e6266db 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -153,8 +153,10 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
+ 	int i, ret = 0;
+ 	struct aarch64_insn_patch *pp = arg;
  
+-	/* The first CPU becomes master */
+-	if (atomic_inc_return(&pp->cpu_count) == 1) {
++	/* Make sure all the processors are in this function
++	   before patching the code. The last CPU to this function
++	   does the update. */
++	if (atomic_dec_return(&pp->cpu_count) == 0) {
+ 		for (i = 0; ret == 0 && i < pp->insn_cnt; i++)
+ 			ret = aarch64_insn_patch_text_nosync(pp->text_addrs[i],
+ 							     pp->new_insns[i]);
+@@ -163,7 +165,8 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
+ 		 * which ends with "dsb; isb" pair guaranteeing global
+ 		 * visibility.
+ 		 */
+-		atomic_set(&pp->cpu_count, -1);
++		/* Notifiy other processors with an additional decrement. */
++		atomic_dec(&pp->cpu_count);
+ 	} else {
+ 		while (atomic_read(&pp->cpu_count) != -1)
+ 			cpu_relax();
+@@ -185,6 +188,7 @@ int __kprobes aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt)
+ 	if (cnt <= 0)
+ 		return -EINVAL;
+ 
++	atomic_set(&patch.cpu_count, num_online_cpus());
+ 	return stop_machine(aarch64_insn_patch_text_cb, &patch,
+ 			    cpu_online_mask);
+ }
 -- 
-1.7.9.5
+1.8.3.1
