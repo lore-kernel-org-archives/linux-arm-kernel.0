@@ -1,88 +1,61 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 10 Nov 2014 14:42:06 -0800
-Subject: [PATCH v7 2/5] ARM: rockchip: add suspend and resume for RK3288
-In-Reply-To: <1415368177-6637-3-git-send-email-zyw@rock-chips.com>
-References: <1415368177-6637-1-git-send-email-zyw@rock-chips.com>
- <1415368177-6637-3-git-send-email-zyw@rock-chips.com>
-Message-ID: <CAD=FV=Wdw5OqSv3Zbw=wd19swaRV6QtNdVAzdTf4pCV37r4MKw@mail.gmail.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Mon, 10 Nov 2014 14:52:44 -0800
+Subject: [RFC 0/2] Qualcomm RPM sleep states
+Message-ID: <1415659966-16200-1-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chris,
+During the review of the Qualcomm SMD RPM regulators [1], I got (offline)
+feedback that my implementation did not handle "sleep states". As the problem
+is shared between all families of Qualcomm platforms I use [2] (family A) to
+propose a solution (as I hope to get that merged sooner).
 
-On Fri, Nov 7, 2014 at 5:49 AM, Chris Zhong <zyw@rock-chips.com> wrote:
-> It's a basic version of suspend and resume for rockchip,
-> it only support RK3288 now.
->
-> Signed-off-by: Tony Xie <xxx@rock-chips.com>
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> Tested-by: Doug Anderson <dianders@chromium.org>
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
->
-> ---
->
-> Changes in v7:
-> - get rid all of unused code
->
-> Changes in v6:
-> - get rid of the save/restore of SRAM
-> - doing the copy of resume code once at init time
-> - remove ROCKCHIP_ARM_OFF_LOGIC_DEEP from rk3288_fill_in_bootram
-> - add of_platform_populate in rockchip_dt_init
->
-> Changes in v5:
-> - use rk3288_bootram_sz for memcpy size
-> - fixed error of sram save and restore
->
-> Changes in v4:
-> - remove grf regmap
->
-> Changes in v3:
-> - move the pinmux of gpio6_c6 save and restore to pinctrl-rockchip
->
-> Changes in v2:
-> - add the regulator calls in prepare and finish.
-> - add the pinmux of gpio6_c6 save and restore
->
->  arch/arm/mach-rockchip/Makefile   |   1 +
->  arch/arm/mach-rockchip/pm.c       | 264 ++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-rockchip/pm.h       |  99 ++++++++++++++
->  arch/arm/mach-rockchip/rockchip.c |   2 +
->  arch/arm/mach-rockchip/sleep.S    |  73 +++++++++++
->  5 files changed, 439 insertions(+)
-
-I haven't done a full re-review of this version, but...
+The "sleep states" comment boils down to certain regulators (or rpm resources
+in general) are used by the currently clocked/running CPU(s) and can not be
+disabled while we're still running. Further more, these resources are shared
+with peripherals in the system; e.g. LDO12 on PM8941 is used to clock the CPU
+and WiFi/BT PLLs as well as providing power to the display in our devices. So
+the suspend functionality in the regulator framework doesn't cut it.
 
 
-> +static int rk3288_suspend_iomap(void)
-> +{
-> +       struct device_node *node;
-> +       struct resource res;
-> +
-> +       node = of_find_compatible_node(NULL, NULL, "rockchip,rk3288-pmu-sram");
-> +       if (!node) {
-> +               pr_err("%s: could not find bootram dt node\n", __func__);
-> +               return -1;
-> +       }
-> +
-> +       rk3288_bootram_base = of_iomap(node, 0);
-> +       if (!rk3288_bootram_base) {
-> +               pr_err("%s: could not map bootram base\n", __func__);
-> +               return -1;
-> +       }
-> +
-> +       if (of_address_to_resource(node, 0, &res)) {
-> +               pr_err("%s: could not get bootram phy addr\n", __func__);
-> +               return -1;
-> +       }
-> +
-> +       rk3288_bootram_phy = res.start;
-> +
-> +       /* copy resume code and data to bootsram */
-> +       memcpy(rk3288_bootram_base, rockchip_slp_cpu_resume,
-> +              rk3288_bootram_sz);
-> +
-> +       rk3288_config_bootdata();
+The downstream solution to this is to expose 3 regulators per regulator
+resource, each specified to control the active mode, sleep mode or both modes
+respectively. Peripherals are directed to use the "both" regulator while the
+CPUs are directed to the "active only" regulator.
 
-Note that much of the above is no longer really part of the "iomap".
-It should probably be moved out into "rk3288_suspend_init".
+After reviewing this solution and looking at what it's actually achieving I
+here propose flagging these regulators to have "deferred disable";
+* we consider the specific regulators as always-on _while running_
+* hence, disable and enable affect only the sleep state
+* we update both active and sleep state with all other properties
+
+This gives us a single regulator exposed for the resource, that will be kept on
+with parameters as specified by the clients if it's referenced and upon loosing
+the last reference (disabling all consumers) it will be turned off when the
+CPU(s) are sleeping.
+
+
+As far as I can see this should give the same behaviour as we have downstream,
+without the need for playing tricks with how we expose the regulators. However
+there's plenty of details hidden in that code, so I hope to get some feedback
+from the Qualcomm engineers on this.
+
+
+The first patch in the series applies on top of [2], it should be squashed with
+1 & 2 of [2] and is only included for completeness.
+
+[1] https://lkml.org/lkml/2014/9/29/747
+[2] https://lkml.org/lkml/2014/9/22/731
+
+Bjorn Andersson (2):
+  mfd: qcom-rpm: Expose sleep state resources to clients
+  regulator: qcom-rpm: Implement RPM assisted disable
+
+ Documentation/devicetree/bindings/mfd/qcom-rpm.txt |   28 ++++++++
+ drivers/mfd/qcom_rpm.c                             |    9 +--
+ drivers/regulator/qcom_rpm-regulator.c             |   67 +++++++++++++++-----
+ include/linux/mfd/qcom_rpm.h                       |    5 +-
+ 4 files changed, 88 insertions(+), 21 deletions(-)
+
+-- 
+1.7.9.5
