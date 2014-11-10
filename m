@@ -1,41 +1,69 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 10 Nov 2014 12:48:09 +0000
-Subject: [PATCH 1/3] drivers: cpuidle: add status property to ARM idle
- states
-In-Reply-To: <54606D1C.3000300@linaro.org>
-References: <1413467997-32131-1-git-send-email-lorenzo.pieralisi@arm.com>
- <7hbnp6e81x.fsf@deeprootsystems.com>
- <20141021162058.GA17610@e102568-lin.cambridge.arm.com>
- <54606D1C.3000300@linaro.org>
-Message-ID: <20141110124809.GB15484@red-moon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 10 Nov 2014 13:51:19 +0100
+Subject: [RFC PATCH] drivers: of: move PCI domain assignment to generic OF
+ code
+In-Reply-To: <1415622368-14612-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1415622368-14612-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1459907.RIyEjnM4cg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 10, 2014 at 07:45:32AM +0000, Daniel Lezcano wrote:
-> On 10/21/2014 06:20 PM, Lorenzo Pieralisi wrote:
-> > On Mon, Oct 20, 2014 at 10:38:02PM +0100, Kevin Hilman wrote:
-> >> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
-> >>
-> >>> On some platforms the device tree bindings must provide the kernel
-> >>> with a status flag for idle states, that defines whether the idle
-> >>> state is operational or not in the current configuration.
-> >>>
-> >>> This patch adds a status property to the ARM idle states compliant
-> >>> with ePAPR v1.1 and updates the DT parsing code accordingly.
-> >>>
-> >>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >>
-> >> For the series:
-> >>
-> >> Acked-by: Kevin Hilman <khilman@linaro.org>
-> >
-> > Thanks ! I will queue it for 3.19 then.
+On Monday 10 November 2014 12:26:08 Lorenzo Pieralisi wrote:
+> ---
+>  arch/arm64/kernel/pci.c | 14 +++--------
+>  drivers/of/of_pci.c     | 66 +++++++++++++++++++++++++++++++++++++++++++++++--
+>  include/linux/of_pci.h  |  7 +++---
+>  3 files changed, 71 insertions(+), 16 deletions(-)
 > 
-> Applied to my tree for 3.19.
-> 
-> Thanks
->    -- Daniel
+> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> index ce5836c..5e21c1c 100644
+> --- a/arch/arm64/kernel/pci.c
+> +++ b/arch/arm64/kernel/pci.c
+> @@ -49,20 +49,14 @@ int pcibios_add_device(struct pci_dev *dev)
+>  
+>  
+>  #ifdef CONFIG_PCI_DOMAINS_GENERIC
+> -static bool dt_domain_found = false;
+>  
+>  void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+>  {
+> -	int domain = of_get_pci_domain_nr(parent->of_node);
+> +	int domain = of_assign_pci_domain_nr(parent->of_node);
+>  
+> -	if (domain >= 0) {
+> -		dt_domain_found = true;
+> -	} else if (dt_domain_found == true) {
+> -		dev_err(parent, "Node %s is missing \"linux,pci-domain\" property in DT\n",
+> -			parent->of_node->full_name);
+> -		return;
+> -	} else {
+> -		domain = pci_get_new_domain_nr();
+> +	if (domain < 0) {
+> +		dev_err(parent, "PCI domain assignment failed\n");
+> +		domain = -1;
+>  	}
+>  
+>  	bus->domain_nr = domain;
 
-Thank you !
+Is there a need to still keep this in architecture specific code? Why
+not move it to drivers/pci and let other firmware infrastructure
+hook in there directly.
 
-Lorenzo
+>  {
+> @@ -45,10 +45,9 @@ of_pci_parse_bus_range(struct device_node *node, struct resource *res)
+>  	return -EINVAL;
+>  }
+>  
+> -static inline int
+> -of_get_pci_domain_nr(struct device_node *node)
+> +static inline int of_assign_pci_domain_nr(struct device_node *node)
+>  {
+> -	return -1;
+> +	return pci_get_new_domain_nr();
+>  }
+>  #endif
+
+This gets a bit tricky otherwise once we add ACPI in the mix, with all
+combinations of OF and ACPI at compile time and at runtime.
+
+	Arnd
