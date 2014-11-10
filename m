@@ -1,62 +1,95 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 10 Nov 2014 18:27:00 +0000
-Subject: [PATCH v8 08/13] xen/arm: use hypercall to flush caches in
- map_page
-In-Reply-To: <1415636045-24669-8-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1411101607130.22875@kaball.uk.xensource.com>
- <1415636045-24669-8-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20141110182659.GE25609@e104818-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 10 Nov 2014 18:27:14 +0000
+Subject: [PATCHv3 5/5] arm64: Trace emulation of AArch32 legacy
+ instructions
+In-Reply-To: <1414435207-30240-7-git-send-email-punit.agrawal@arm.com>
+References: <1414435207-30240-1-git-send-email-punit.agrawal@arm.com>
+ <1414435207-30240-7-git-send-email-punit.agrawal@arm.com>
+Message-ID: <20141110182714.GS23942@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 10, 2014 at 04:14:00PM +0000, Stefano Stabellini wrote:
-> In xen_dma_map_page, if the page is a local page, call the native
-> map_page dma_ops. If the page is foreign, call __xen_dma_map_page that
-> issues any required cache maintenane operations via hypercall.
+On Mon, Oct 27, 2014 at 06:40:07PM +0000, Punit Agrawal wrote:
+> Introduce an event to trace the usage of emulated instructions. The
+> trace event is intended to help identify and encourage the migration
+> of legacy software using the emulation features.
 > 
-> The reason for doing this is that the native dma_ops map_page could
-> allocate buffers than need to be freed. If the page is foreign we don't
-> call the native unmap_page dma_ops function, resulting in a memory leak.
+> Use this event to trace usage of swp and CP15 barrier emulation.
 > 
-> Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Cc: Steven Rostedt <rostedt@goodmis.org>
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 > ---
->  arch/arm/include/asm/xen/page-coherent.h |    9 ++++++++-
->  arch/arm/xen/mm32.c                      |   12 ++++++++++++
->  2 files changed, 20 insertions(+), 1 deletion(-)
+>  arch/arm64/kernel/Makefile                 |  1 +
+>  arch/arm64/kernel/armv8_deprecated.c       | 19 ++++++++++++--
+>  arch/arm64/kernel/trace-events-emulation.h | 40 ++++++++++++++++++++++++++++++
+>  3 files changed, 58 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm64/kernel/trace-events-emulation.h
 > 
-> diff --git a/arch/arm/include/asm/xen/page-coherent.h b/arch/arm/include/asm/xen/page-coherent.h
-> index 25d450c..36b79a8 100644
-> --- a/arch/arm/include/asm/xen/page-coherent.h
-> +++ b/arch/arm/include/asm/xen/page-coherent.h
-> @@ -5,6 +5,9 @@
->  #include <linux/dma-attrs.h>
->  #include <linux/dma-mapping.h>
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index 5362578..1fc7abd 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -5,6 +5,7 @@
+>  CPPFLAGS_vmlinux.lds	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+>  AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+>  CFLAGS_efi-stub.o 	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+> +CFLAGS_armv8_deprecated.o := -I$(src)
 >  
-> +void __xen_dma_map_page(struct device *hwdev, struct page *page,
-> +	     dma_addr_t dev_addr, unsigned long offset, size_t size,
-> +	     enum dma_data_direction dir, struct dma_attrs *attrs);
->  void __xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
->  		size_t size, enum dma_data_direction dir,
->  		struct dma_attrs *attrs);
-> @@ -32,7 +35,11 @@ static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
->  	     dma_addr_t dev_addr, unsigned long offset, size_t size,
->  	     enum dma_data_direction dir, struct dma_attrs *attrs)
->  {
-> -	__generic_dma_ops(hwdev)->map_page(hwdev, page, offset, size, dir, attrs);
-> +	if (PFN_DOWN(dev_addr) == page_to_pfn(page)) {
+>  CFLAGS_REMOVE_ftrace.o = -pg
+>  CFLAGS_REMOVE_insn.o = -pg
+> diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+> index fded15f..d376fe2 100644
+> --- a/arch/arm64/kernel/armv8_deprecated.c
+> +++ b/arch/arm64/kernel/armv8_deprecated.c
+> @@ -15,6 +15,9 @@
+>  #include <linux/slab.h>
+>  #include <linux/sysctl.h>
+>  
+> +#define CREATE_TRACE_POINTS
+> +#include "trace-events-emulation.h"
+> +
+>  #include <asm/insn.h>
+>  #include <asm/opcodes.h>
+>  #include <asm/system_misc.h>
+> @@ -203,6 +206,11 @@ static int swp_handler(struct pt_regs *regs, u32 instr)
+>  		regs->user_regs.regs[destreg] = data;
+>  
+>  ret:
+> +	if (type == TYPE_SWPB)
+> +		trace_instruction_emulation("swpb", regs->pc);
+> +	else
+> +		trace_instruction_emulation("swp", regs->pc);
+> +
+>  	pr_warn_ratelimited("\"%s\" (%ld) uses obsolete SWP{B} instruction at 0x%llx\n",
+>  			current->comm, (unsigned long)current->pid, regs->pc);
+>  
+> @@ -260,16 +268,23 @@ static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
+>  		 * dmb - mcr p15, 0, Rt, c7, c10, 5
+>  		 * dsb - mcr p15, 0, Rt, c7, c10, 4
+>  		 */
+> -		if (aarch32_insn_mcr_extract_opc2(instr) == 5)
+> +		if (aarch32_insn_mcr_extract_opc2(instr) == 5) {
+>  			dmb(sy);
+> -		else
+> +			trace_instruction_emulation(
+> +				"mcr p15, 0, Rt, c7, c10, 5", regs->pc);
+> +		} else {
+>  			dsb(sy);
+> +			trace_instruction_emulation(
+> +				"mcr p15, 0, Rt, c7, c10, 4", regs->pc);
+> +		}
+>  		break;
+>  	case 5:
+>  		/*
+>  		 * isb - mcr p15, 0, Rt, c7, c5, 4
+>  		 */
+>  		isb();
+> +		trace_instruction_emulation(
+> +			"mcr p15, 0, Rt, c7, c5, 4", regs->pc);
 
-Nitpick: you could write:
+Any chance you can put the barrier name in here too please? Maybe as an asm
+comment, e.g.:
 
-	bool foreign = PFN_DOWN(dev_addr) == page_to_pfn(page);
+  "mcr p15, 0, Rt, c7, c5, 4 ; isb"
 
-or even a static inline xen_foreign_page(page, dev_addr) function for
-clarity. This code lacks comments.
-
-> +		if (__generic_dma_ops(hwdev)->map_page)
-
-I'm not sure we need to check map_page() here. I thought it's always
-present as host DMA API does not check for it.
-
--- 
-Catalin
+Will
