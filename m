@@ -1,62 +1,71 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Mon, 10 Nov 2014 13:40:19 +0200
-Subject: [PATCH v5 12/16] cpufreq: tegra: Rename tegra-cpufreq to
- tegra20-cpufreq
-In-Reply-To: <CAKohpo=Kdh2vuvSoQBLdWfZJn3xDezpNBjqM389u45_BdizPXQ@mail.gmail.com>
-References: <CAKohpo=Kdh2vuvSoQBLdWfZJn3xDezpNBjqM389u45_BdizPXQ@mail.gmail.com>
-Message-ID: <1415619619-2765-1-git-send-email-mikko.perttunen@kapsi.fi>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 10 Nov 2014 12:43:29 +0100
+Subject: [PATCH v2] mmc: atmel-mci: adopt pinctrl support
+In-Reply-To: <1415321293-17521-1-git-send-email-wenyou.yang@atmel.com>
+References: <1415321293-17521-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <CAPDyKFp6wXqP1x0uO12=mgrCsjvx4vfkr9cCJVAtjkFQ7s=q2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+On 7 November 2014 01:48, Wenyou Yang <wenyou.yang@atmel.com> wrote:
+> Amend the atmel mci pin controller to optionally take a pin control
+> handle and set the state of the pins to:
+> - "default" on boot, resume and before performing an transfer.
+> - "sleep" on suspend().
+>
+> This should make it possible to optimize energy usage for the pins
+> both for the suspend/resume cycle.
+>
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 
-The Tegra124 will use a different driver for frequency scaling, so
-rename the old driver (which handles only Tegra20) appropriately.
+Thanks! Applied for next.
 
-Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
-Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
----
-Sorry, I was not aware of those options.
+Kind regards
+Uffe
 
- drivers/cpufreq/Kconfig.arm                            | 6 +++---
- drivers/cpufreq/Makefile                               | 2 +-
- drivers/cpufreq/{tegra-cpufreq.c => tegra20-cpufreq.c} | 0
- 3 files changed, 4 insertions(+), 4 deletions(-)
- rename drivers/cpufreq/{tegra-cpufreq.c => tegra20-cpufreq.c} (100%)
-
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 83a75dc..22419f4 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -241,9 +241,9 @@ config ARM_SPEAR_CPUFREQ
- 	help
- 	  This adds the CPUFreq driver support for SPEAr SOCs.
- 
--config ARM_TEGRA_CPUFREQ
--	bool "TEGRA CPUFreq support"
-+config ARM_TEGRA20_CPUFREQ
-+	bool "Tegra20 CPUFreq support"
- 	depends on ARCH_TEGRA
- 	default y
- 	help
--	  This adds the CPUFreq driver support for TEGRA SOCs.
-+	  This adds the CPUFreq driver support for Tegra20 SOCs.
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index 40c53dc..0d3ec1c 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -75,7 +75,7 @@ obj-$(CONFIG_ARM_S5PV210_CPUFREQ)	+= s5pv210-cpufreq.o
- obj-$(CONFIG_ARM_SA1100_CPUFREQ)	+= sa1100-cpufreq.o
- obj-$(CONFIG_ARM_SA1110_CPUFREQ)	+= sa1110-cpufreq.o
- obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
--obj-$(CONFIG_ARM_TEGRA_CPUFREQ)		+= tegra-cpufreq.o
-+obj-$(CONFIG_ARM_TEGRA20_CPUFREQ)	+= tegra20-cpufreq.o
- obj-$(CONFIG_ARM_VEXPRESS_SPC_CPUFREQ)	+= vexpress-spc-cpufreq.o
- 
- ##################################################################################
-diff --git a/drivers/cpufreq/tegra-cpufreq.c b/drivers/cpufreq/tegra20-cpufreq.c
-similarity index 100%
-rename from drivers/cpufreq/tegra-cpufreq.c
-rename to drivers/cpufreq/tegra20-cpufreq.c
--- 
-2.1.3
+> ---
+> Hi Ulf,
+>
+> Thanks a lot.
+>
+> According to your advice, remove pinctrl_pm_select_default_state(&pdev->dev) from the _probe function.
+>
+> Best Regards,
+> Wenyou Yang
+>
+>  drivers/mmc/host/atmel-mci.c |    5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index 4df1599..a7b59ba 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -39,6 +39,7 @@
+>  #include <linux/atmel_pdc.h>
+>  #include <linux/pm.h>
+>  #include <linux/pm_runtime.h>
+> +#include <linux/pinctrl/consumer.h>
+>
+>  #include <asm/cacheflush.h>
+>  #include <asm/io.h>
+> @@ -2568,6 +2569,8 @@ static int atmci_runtime_suspend(struct device *dev)
+>
+>         clk_disable_unprepare(host->mck);
+>
+> +       pinctrl_pm_select_sleep_state(dev);
+> +
+>         return 0;
+>  }
+>
+> @@ -2575,6 +2578,8 @@ static int atmci_runtime_resume(struct device *dev)
+>  {
+>         struct atmel_mci *host = dev_get_drvdata(dev);
+>
+> +       pinctrl_pm_select_default_state(dev);
+> +
+>         return clk_prepare_enable(host->mck);
+>  }
+>  #endif
+> --
+> 1.7.9.5
+>
