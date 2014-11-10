@@ -1,78 +1,59 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Nov 2014 09:15:27 +0000
-Subject: [PATCH 3/5] mfd: ti_am335x_tscadc: Remove unwanted reg_se_cache
- save
-In-Reply-To: <1415339350-17679-4-git-send-email-vigneshr@ti.com>
-References: <1415339350-17679-1-git-send-email-vigneshr@ti.com>
- <1415339350-17679-4-git-send-email-vigneshr@ti.com>
-Message-ID: <20141110091527.GD21424@x1>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 10 Nov 2014 09:17:28 +0000
+Subject: AMR: sun7i: CPU hotplug support?
+In-Reply-To: <5460766B.8070000@web.de>
+References: <545FC215.7010802@web.de> <20141109231744.GC2989@lukather>
+ <5460554A.1060701@web.de> <5460766B.8070000@web.de>
+Message-ID: <546082A8.60401@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 07 Nov 2014, Vignesh R wrote:
-
-> In one shot mode, sequencer automatically disables all enabled steps at
-> the end of each cycle. (both ADC steps and TSC steps) Hence these steps
-> need not be saved in reg_se_cache for clearing these steps at a later
-> stage.
-> Also, when ADC wakes up Sequencer should not be busy executing any of the
-> config steps except for the charge step. Previously charge step was 1 ADC
-> clock cycle and hence it was ignored.
+On 10/11/14 08:25, Jan Kiszka wrote:
+> On 2014-11-10 07:03, Jan Kiszka wrote:
+>> On 2014-11-10 00:17, Maxime Ripard wrote:
+>>> Hi Jan,
+>>> 
+>>> On Sun, Nov 09, 2014 at 08:35:49PM +0100, Jan Kiszka wrote:
+>>>> did anyone already happen to look into enabling CPU hotplug
+>>>> for the Allwinner A20 in upstream? I'm currently running the
+>>>> sunxi-next branch on Banana Pi, and echo 0 > .../cpu1/online
+>>>> just hangs the system. The old 3.4 LeMaker kernel works fine
+>>>> in this regard. I can try to look into details and port
+>>>> things over, just want to avoid duplicate efforts.
+>>> 
+>>> Having hotplug support would indeed be very welcome.
+>>> 
+>>> However, it should be done in u-boot, through PSCI, and not in
+>>> the kernel itself.
+>>> 
+>>> As far as I'm aware, no one worked actively on it, beside some
+>>> WIP commit from Marc a while ago: 
+>>> https://git.kernel.org/cgit/linux/kernel/git/maz/u-boot.git/commit/?h=wip/psci&id=45379c0f9cf812f0f62722f4015ec907fa5dc144
+>>
+>>
+>>> 
+OK - I guess I will need a little guidance in then: Is there a good
+>> reference board to study and to derive from? And maybe also: What
+>> is missing or not working in that u-boot branch? If I get this
+>> interface right, I just takes some device tree bits to enable
+>> this for the kernel afterward, correct?
 > 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> ---
->  drivers/mfd/ti_am335x_tscadc.c       | 7 +++++--
->  include/linux/mfd/ti_am335x_tscadc.h | 1 +
->  2 files changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
-> index d877e777cce6..94ef8992f46b 100644
-> --- a/drivers/mfd/ti_am335x_tscadc.c
-> +++ b/drivers/mfd/ti_am335x_tscadc.c
-> @@ -86,8 +86,12 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
->  		spin_lock_irq(&tsadc->reg_lock);
->  		finish_wait(&tsadc->reg_se_wait, &wait);
->  
-> +		/*
-> +		 * Sequencer should either be idle or
-> +		 * busy applying the charge step.
-> +		 */
->  		reg = tscadc_readl(tsadc, REG_ADCFSM);
-> -		WARN_ON(reg & SEQ_STATUS);
-> +		WARN_ON(reg & SEQ_STATUS & (!CHARGE_STEP));
+> Started to play with that patch in naive ways: CPU0 locks up when 
+> offlining CPU1 - unless I disable the FIQ signal from CPU1. Then
+> it "works", both offlining and onlining again. However, I suspect
+> that this only parks CPU1 in wfi and does not do anything
+> interesting to it.
 
-This is almost certainly not correct.
+Here's how this is supposed to work:
+- CPU1 sends a FIQ to CPU0, bringing it into secure mode.
+- CPU0 then kills CPU1 by doing the magic incantations on the power
+controller
 
-Please take another look at the logic.
+What is missing here is all the cache cleaning before signalling CPU0.
+If you add that, things should look a lot better (patches welcome).
 
-I'm _assuming_ you mean (reg & SEQ_STATUS && !CHARGE_STEP).
+Thanks,
 
->  		tsadc->adc_waiting = false;
->  	}
->  	tsadc->adc_in_use = true;
-> @@ -96,7 +100,6 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
->  void am335x_tsc_se_set_once(struct ti_tscadc_dev *tsadc, u32 val)
->  {
->  	spin_lock_irq(&tsadc->reg_lock);
-> -	tsadc->reg_se_cache |= val;
->  	am335x_tscadc_need_adc(tsadc);
->  
->  	tscadc_writel(tsadc, REG_SE, val);
-> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
-> index c99be5dc0f5c..fcce182e4a35 100644
-> --- a/include/linux/mfd/ti_am335x_tscadc.h
-> +++ b/include/linux/mfd/ti_am335x_tscadc.h
-> @@ -128,6 +128,7 @@
->  
->  /* Sequencer Status */
->  #define SEQ_STATUS BIT(5)
-> +#define CHARGE_STEP		0x11
->  
->  #define ADC_CLK			3000000
->  #define TOTAL_STEPS		16
-
+	M.
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Jazz is not dead. It just smells funny...
