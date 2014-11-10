@@ -1,67 +1,141 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Mon, 10 Nov 2014 11:36:02 -0500
-Subject: [PATCH] Correct the race condition in aarch64_insn_patch_text_sync()
-Message-ID: <1415637362-30754-1-git-send-email-wcohen@redhat.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 10 Nov 2014 16:41:46 +0000
+Subject: [RFC PATCH v2] drivers: pci: move PCI domain assignment to generic
+ PCI code
+Message-ID: <1415637706-2195-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When experimenting with patches to provide kprobes support for aarch64
-smp machines would hang when inserting breakpoints into kernel code.
-The hangs were caused by a race condition in the code called by
-aarch64_insn_patch_text_sync().  The first processor in the
-aarch64_insn_patch_text_cb() function would patch the code while other
-processors were still entering the function and decrementing the
-cpu_count field.  This resulted in some processors never observing the
-exit condition and exiting the function.  Thus, processors in the
-system hung.
+The current logic used for PCI domain assignment in arm64
+pci_bus_assign_domain_nr() is flawed in that, depending on the host
+controllers configuration for a platform and the respective initialization
+sequence, core code may end up allocating PCI domain numbers from both DT and
+the core code generic domain counter, which would result in PCI domain
+allocation aliases/errors.
 
-The patching function now waits for all processors to enter the
-patching function before changing code to ensure that none of the
-processors are in code that is going to be patched.  Once all the
-processors have entered the function, the last processor to enter the
-patching function performs the pathing and signals that the patching
-is complete with one last decrement of the cpu_count field to make it
--1.
+This patch fixes the logic behind the PCI domain number assignment and
+moves the resulting code to generic PCI core code so that the same domain
+allocation logic is used on all platforms selecting
 
-Signed-off-by: William Cohen <wcohen@redhat.com>
+CONFIG_PCI_DOMAINS_GENERIC
+
+instead of resorting to an arch specific implementation that might end up
+duplicating the PCI domain assignment logic wrongly.
+
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Liviu Dudau <liviu.dudau@arm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm64/kernel/insn.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+v1 => v2:
 
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index e007714..e6266db 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -153,8 +153,10 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
- 	int i, ret = 0;
- 	struct aarch64_insn_patch *pp = arg;
+- Moved generic pci_bus_assign_domain_nr() code to PCI core instead of
+  adding an OF layer API
+- Updated commit log and code comments
+
+ arch/arm64/kernel/pci.c | 22 ----------------------
+ drivers/pci/pci.c       | 50 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 50 insertions(+), 22 deletions(-)
+
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index ce5836c..6f93c24 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -46,25 +46,3 @@ int pcibios_add_device(struct pci_dev *dev)
  
--	/* The first CPU becomes master */
--	if (atomic_inc_return(&pp->cpu_count) == 1) {
-+	/* Make sure all the processors are in this function
-+	   before patching the code. The last CPU to this function
-+	   does the update. */
-+	if (atomic_dec_return(&pp->cpu_count) == 0) {
- 		for (i = 0; ret == 0 && i < pp->insn_cnt; i++)
- 			ret = aarch64_insn_patch_text_nosync(pp->text_addrs[i],
- 							     pp->new_insns[i]);
-@@ -163,7 +165,8 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
- 		 * which ends with "dsb; isb" pair guaranteeing global
- 		 * visibility.
- 		 */
--		atomic_set(&pp->cpu_count, -1);
-+		/* Notifiy other processors with an additional decrement. */
-+		atomic_dec(&pp->cpu_count);
- 	} else {
- 		while (atomic_read(&pp->cpu_count) != -1)
- 			cpu_relax();
-@@ -185,6 +188,7 @@ int __kprobes aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt)
- 	if (cnt <= 0)
- 		return -EINVAL;
- 
-+	atomic_set(&patch.cpu_count, num_online_cpus());
- 	return stop_machine(aarch64_insn_patch_text_cb, &patch,
- 			    cpu_online_mask);
+ 	return 0;
  }
+-
+-
+-#ifdef CONFIG_PCI_DOMAINS_GENERIC
+-static bool dt_domain_found = false;
+-
+-void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+-{
+-	int domain = of_get_pci_domain_nr(parent->of_node);
+-
+-	if (domain >= 0) {
+-		dt_domain_found = true;
+-	} else if (dt_domain_found == true) {
+-		dev_err(parent, "Node %s is missing \"linux,pci-domain\" property in DT\n",
+-			parent->of_node->full_name);
+-		return;
+-	} else {
+-		domain = pci_get_new_domain_nr();
+-	}
+-
+-	bus->domain_nr = domain;
+-}
+-#endif
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 625a4ac..2279414 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -10,6 +10,8 @@
+ #include <linux/kernel.h>
+ #include <linux/delay.h>
+ #include <linux/init.h>
++#include <linux/of.h>
++#include <linux/of_pci.h>
+ #include <linux/pci.h>
+ #include <linux/pm.h>
+ #include <linux/slab.h>
+@@ -4447,6 +4449,54 @@ int pci_get_new_domain_nr(void)
+ {
+ 	return atomic_inc_return(&__domain_nr);
+ }
++
++#ifdef CONFIG_PCI_DOMAINS_GENERIC
++
++void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
++{
++	static int use_dt_domains = -1;
++	int domain = of_get_pci_domain_nr(parent->of_node);
++
++	/*
++	 * Check DT domain and use_dt_domains values.
++	 *
++	 * If DT domain property is valid (domain >= 0) and
++	 * use_dt_domains != 0, the DT assignment is valid since this means
++	 * we have not previously allocated a domain number by using
++	 * pci_get_new_domain_nr(); we should also update use_dt_domains to
++	 * 1, to indicate that we have just assigned a domain number from
++	 * DT.
++	 *
++	 * If DT domain property value is not valid (ie domain < 0), and we
++	 * have not previously assigned a domain number from DT
++	 * (use_dt_domains != 1) we should assign a domain number by
++	 * using the:
++	 *
++	 * pci_get_new_domain_nr()
++	 *
++	 * API and update the use_dt_domains value to keep track of method we
++	 * are using to assign domain numbers (use_dt_domains = 0).
++	 *
++	 * All other combinations imply we have a platform that is trying
++	 * to mix domain numbers obtained from DT and pci_get_new_domain_nr(),
++	 * which is a recipe for domain mishandling and it is prevented by
++	 * invalidating the domain value (domain = -1) and printing a
++	 * corresponding error.
++	 */
++	if (domain >= 0 && use_dt_domains) {
++		use_dt_domains = 1;
++	} else if (domain < 0 && use_dt_domains != 1) {
++		use_dt_domains = 0;
++		domain = pci_get_new_domain_nr();
++	} else {
++		dev_err(parent, "Node %s has inconsistent \"linux,pci-domain\" property in DT\n",
++			parent->of_node->full_name);
++		domain = -1;
++	}
++
++	bus->domain_nr = domain;
++}
++#endif
+ #endif
+ 
+ /**
 -- 
-1.8.3.1
+2.1.2
