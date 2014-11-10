@@ -1,90 +1,28 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Mon, 10 Nov 2014 01:49:35 +0000
-Subject: [PATCH v3 3/3] i2c/at91: adopt pinctrl support
-In-Reply-To: <20141108180314.GD4900@katana>
-References: <1414133417-11530-1-git-send-email-wenyou.yang@atmel.com>
- <1414133417-11530-4-git-send-email-wenyou.yang@atmel.com>
- <20141108180314.GD4900@katana>
-Message-ID: <B256D81BAE5131468A838E5D7A243641BFC689B2@penmbx01>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 10 Nov 2014 12:56:37 +1100
+Subject: linux-next: manual merge of the mmc-uh tree with the arm-soc tree
+Message-ID: <20141110125637.30fe73b9@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+Hi Ulf,
 
-> -----Original Message-----
-> From: Wolfram Sang [mailto:wsa at the-dreams.de]
-> Sent: Sunday, November 09, 2014 2:03 AM
-> To: Yang, Wenyou
-> Cc: Desroches, Ludovic; linux-i2c at vger.kernel.org; linux-kernel at vger.kernel.org;
-> Ferre, Nicolas; khilman at kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v3 3/3] i2c/at91: adopt pinctrl support
-> 
-> On Fri, Oct 24, 2014 at 02:50:17PM +0800, Wenyou Yang wrote:
-> > Amend the i2c at91 pin controller to optionally take a pin control
-> > handle and set the state of the pins to:
-> >
-> > - "default" on boot, resume and before performing an transfer
-> > - "sleep" on suspend()
-> >
-> > This should make it possible to optimize energy usage for the pins
-> > both for the suspend/resume cycle
-> >
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > ---
-> >  drivers/i2c/busses/i2c-at91.c |    7 +++++++
-> >  1 file changed, 7 insertions(+)
-> >
-> > diff --git a/drivers/i2c/busses/i2c-at91.c
-> > b/drivers/i2c/busses/i2c-at91.c index 6a84a2a..290caf1 100644
-> > --- a/drivers/i2c/busses/i2c-at91.c
-> > +++ b/drivers/i2c/busses/i2c-at91.c
-> > @@ -32,6 +32,7 @@
-> >  #include <linux/slab.h>
-> >  #include <linux/platform_data/dma-atmel.h>  #include
-> > <linux/pm_runtime.h>
-> > +#include <linux/pinctrl/consumer.h>
-> >
-> >  #define DEFAULT_TWI_CLK_HZ		100000		/* max 400 Kbits/s
-> */
-> >  #define AT91_I2C_TIMEOUT	msecs_to_jiffies(100)	/* transfer timeout */
-> > @@ -747,6 +748,8 @@ static int at91_twi_probe(struct platform_device *pdev)
-> >  	u32 phy_addr;
-> >  	u32 bus_clk_rate;
-> >
-> > +	pinctrl_pm_select_default_state(&pdev->dev);
-> > +
-> 
-> Do we really need this in probe? Isn't that default? I'm not sure, though...
-No, we don't need it.
-It is called by the function pinctrl_bind_pins(struct device *dev)  in drivers/base/pinctrl.c
+Today's linux-next merge of the mmc-uh tree got a conflict in
+arch/arm/mach-at91/at91sam9g45_devices.c between commit 4bf7753b8ab7
+("ARM: at91: remove at91sam9g45/9m10 legacy board support") from the
+arm-soc tree and commit 4049854c41e0 ("ARM: at91: remove
+mach/atmel-mci.h") from the mmc-uh tree.
 
-I will remove it, and send it again.
+I fixed it up (I just removed the file) and can carry the fix as
+necessary (no action is required).
 
-> 
-> >  	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
-> >  	if (!dev)
-> >  		return -ENOMEM;
-> > @@ -851,6 +854,8 @@ static int at91_twi_runtime_suspend(struct device
-> > *dev)
-> >
-> >  	clk_disable_unprepare(twi_dev->clk);
-> >
-> > +	pinctrl_pm_select_sleep_state(dev);
-> > +
-> >  	return 0;
-> >  }
-> >
-> > @@ -858,6 +863,8 @@ static int at91_twi_runtime_resume(struct device
-> > *dev)  {
-> >  	struct at91_twi_dev *twi_dev = dev_get_drvdata(dev);
-> >
-> > +	pinctrl_pm_select_default_state(dev);
-> > +
-> >  	return clk_prepare_enable(twi_dev->clk);  }
-> >
-> > --
-> > 1.7.9.5
-> >
-
-Best Regards,
-Wenyou Yang
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141110/b417ef2e/attachment.sig>
