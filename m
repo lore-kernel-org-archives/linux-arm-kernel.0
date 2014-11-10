@@ -1,61 +1,89 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Nov 2014 10:08:40 +0000
-Subject: [PATCH 08/13] ARM: STi: DT: STiH410: Add defines for STiH410 DT
- clocks
-In-Reply-To: <1415361475-6218-9-git-send-email-peter.griffin@linaro.org>
+Date: Mon, 10 Nov 2014 10:11:31 +0000
+Subject: [PATCH 07/13] ARM: STi: DT: STiH407: Add usb2 picophy dt nodes
+In-Reply-To: <1415361475-6218-8-git-send-email-peter.griffin@linaro.org>
 References: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
- <1415361475-6218-9-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20141110100840.GO21424@x1>
+ <1415361475-6218-8-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20141110101131.GP21424@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 07 Nov 2014, Peter Griffin wrote:
 
-> Although most clock outputs are the same as stih407 SoC, stih410
-> also has some additional new clock outputs.
+> This patch adds the dt nodes for the usb2 picophy found on the stih407
+> family of devices. It is used on stih410 and later devices with the ehci/ohci usb
+> controller, and is also used as the usb2 phy with the dwc3 usb3 controller.
 > 
 > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 > ---
->  include/dt-bindings/clock/stih410-clks.h | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
->  create mode 100644 include/dt-bindings/clock/stih410-clks.h
+>  arch/arm/boot/dts/stih407.dtsi | 46 ++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
 > 
-> diff --git a/include/dt-bindings/clock/stih410-clks.h b/include/dt-bindings/clock/stih410-clks.h
-> new file mode 100644
-> index 0000000..2c5d6ff
-> --- /dev/null
-> +++ b/include/dt-bindings/clock/stih410-clks.h
-> @@ -0,0 +1,24 @@
-> +/*
-> + * This header provides constants clk index STMicroelectronics
-> + * STiH410 SoC.
-> + */
-> +#ifndef _DT_BINDINGS_CLK_STIH410
-> +#define _DT_BINDINGS_CLK_STIH410
-> +#include "stih407-clks.h"
-
-Nit: Please add a newline between the sentries and #include.
-
-Apart from that, looks good:
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
-> +/* STiH410 introduces new clock outputs compared to STiH407 */
+> diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
+> index 50637f5..967ec39 100644
+> --- a/arch/arm/boot/dts/stih407.dtsi
+> +++ b/arch/arm/boot/dts/stih407.dtsi
+> @@ -275,5 +275,51 @@
+>  
+>  			status = "disabled";
+>  		};
 > +
-> +/* CLOCKGEN C0 */
-> +#define CLK_TX_ICN_HADES	32
-> +#define CLK_RX_ICN_HADES	33
-> +#define CLK_ICN_REG_16		34
-> +#define CLK_PP_HADES		35
-> +#define CLK_CLUST_HADES		36
-> +#define CLK_HWPE_HADES		37
-> +#define CLK_FC_HADES		38
+> +		/* Generic picoPHY */
+> +		usb2_picophy0: usbpicophy at 0 {
+> +			compatible = "st,stih407-usb2-phy";
+> +			reg =	<0xf8 0x04>,	/* syscfg 5062 */
+> +				<0xf4 0x04>;    /* syscfg 5061 */
+
+Are there really only 2 32bit registers to control this h/w?
+
+> +			reg-names =	"param",
+> +					"ctrl";
+
+Superflous indentation after 'reg = ' and 'reg-names = '.
+
+> +			#phy-cells = <0>;
 > +
-> +/* CLOCKGEN D0 */
-> +#define CLK_PCMR10_MASTER	4
-> +#define CLK_USB2_PHY		5
+> +			st,syscfg = <&syscfg_core>;
+> +			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
+> +				 <&picophyreset STIH407_PICOPHY0_RESET>;
+> +			reset-names = "global",
+> +				      "port";
+
+May as well put these on the same line.
+
+> +		};
 > +
-> +#endif
+> +		usb2_picophy1: usbpicophy at 1 {
+> +			compatible = "st,stih407-usb2-phy";
+> +			#phy-cells = <0>;
+> +			reg =	<0xfc 0x04>,	/* syscfg 5063 */
+> +				<0xf4 0x04>;    /* syscfg 5061 */
+> +			reg-names =	"param",
+> +					"ctrl";
+> +
+> +			st,syscfg = <&syscfg_core>;
+> +			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
+> +				 <&picophyreset STIH407_PICOPHY1_RESET>;
+> +			reset-names = "global",
+> +				      "port";
+> +		};
+> +
+> +		usb2_picophy2: usbpicophy at 2 {
+> +			compatible = "st,stih407-usb2-phy";
+> +			#phy-cells = <0>;
+> +			reg =	<0x100 0x04>,	/* syscfg 5064 */
+> +				<0xf4 0x04>;    /* syscfg 5061 */
+> +			reg-names =	"param",
+> +					"ctrl";
+> +
+> +			st,syscfg = <&syscfg_core>;
+> +			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
+> +				 <&picophyreset STIH407_PICOPHY2_RESET>;
+> +			reset-names = "global",
+> +				      "port";
+> +		};
+>  	};
+>  };
 
 -- 
 Lee Jones
