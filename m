@@ -1,105 +1,47 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 10 Nov 2014 16:12:40 +0000
-Subject: [PATCH v8 0/13] introduce GNTTABOP_cache_flush
-Message-ID: <alpine.DEB.2.02.1411101607130.22875@kaball.uk.xensource.com>
+Date: Mon, 10 Nov 2014 16:13:54 +0000
+Subject: [PATCH v8 02/13] xen/arm: remove outer_*_range call
+In-Reply-To: <alpine.DEB.2.02.1411101607130.22875@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1411101607130.22875@kaball.uk.xensource.com>
+Message-ID: <1415636045-24669-2-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-this patch series introduces support for GNTTABOP_cache_flush to perform
-cache maintenance operation on foreign pages and reverts the current
-code based on XENFEAT_grant_map_identity.
+Dom0 is not actually capable of issuing outer_inv_range or
+outer_clean_range calls.
 
-It also provides a very slow fallback by bouncing on the swiotlb buffer,
-in case the hypercall is not available.
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Acked-by: Ian Campbell <ian.campbell@citrix.com>
+---
+ arch/arm/xen/mm32.c |    9 ---------
+ 1 file changed, 9 deletions(-)
 
-v7 introduces a flag named dma_coherent in dev_archdata and an accessor
-function named is_device_dma_coherent in asm/dma-mapping.h under arm and
-arm64.
-
-
-Changes in v8:
-- remove code duplication in mm32.c by moving the pfn_valid check in
-page-coherent.h;
-- add a dma_addr_t dev_addr argument to xen_dma_map_page;
-- use hypercall to flush caches in map_page;
-- pass dev_addr to xen_dma_unmap_page and xen_dma_sync_single_for_cpu;
-- remove BUG_ON in xen_bus_to_phys.
-
-Changes in v7:
-- rebased on 3.18-rc1;
-- rename is_dma_coherent to is_device_dma_coherent and move it to
-asm/dma-mapping.h on arm and arm64;
-- introduce a dma_coherent flag on arm and arm64;
-- set the flags from set_arch_dma_coherent_ops.
-
-Changes in v6:
-- rename xen_is_dma_coherent to is_dma_coherent;
-- use of_dma_is_coherent to detect the dma coherency of a device;
-- remove arch/arm64/include/asm/xen/page-coherent.h, include
-../../arm/include/asm/xen/page-coherent.h instead;
-- fix indentation.
-
-Changes in v5:
-- introduce xen_is_dma_coherent as a xen specific function;
-- call xen_is_dma_coherent instead of is_dma_coherent;
-- introduce xen_is_dma_coherent to
-arch/arm64/include/asm/xen/page-coherent.h;
-- do not remove arch/arm64/include/asm/xen/page-coherent.h, add
-the missing dma_ops calls from it;
-- fix indentation;
-- rename hypercall_flush to hypercall_cflush;
-- remove spurious change.
-
-Changes in v4:
-- remove outer_*_range call;
-- introduce is_dma_coherent;
-- use is_dma_coherent in arch/arm/xen/mm32.c;
-- merge xen/mm32.c into xen/mm.c;
-- xen/arm/arm64: introduce xen_arch_need_swiotlb;
-- avoid bouncing dma map operations that involve foreign grants and
-non-coherent devices if GNTTABOP_cache_flush is provided by Xen.
-
-Changes in v3:
-- fix the cache maintenance op call to match what Linux does natively;
-- update the hypercall interface to match Xen.
-
-Changes in v2:
-- remove the definition of XENFEAT_grant_map_identity;
-- update the hypercall interface to match Xen;
-- call the interface on a single page at a time.
-
-
-Stefano Stabellini (13):
-      xen/arm: remove handling of XENFEAT_grant_map_identity
-      xen/arm: remove outer_*_range call
-      xen/arm: if(pfn_valid(pfn)) call native dma_ops
-      arm64: introduce is_device_dma_coherent
-      arm: introduce is_device_dma_coherent
-      xen/arm: use is_device_dma_coherent
-      xen: add a dma_addr_t dev_addr argument to xen_dma_map_page
-      xen/arm: use hypercall to flush caches in map_page
-      xen/arm/arm64: merge xen/mm32.c into xen/mm.c
-      xen/arm/arm64: introduce xen_arch_need_swiotlb
-      xen/arm: introduce GNTTABOP_cache_flush
-      swiotlb-xen: pass dev_addr to xen_dma_unmap_page and xen_dma_sync_single_for_cpu
-      swiotlb-xen: remove BUG_ON in xen_bus_to_phys
-
- arch/arm/include/asm/device.h              |    1 +
- arch/arm/include/asm/dma-mapping.h         |    6 +
- arch/arm/include/asm/xen/page-coherent.h   |   56 +++++++-
- arch/arm/include/asm/xen/page.h            |    4 +
- arch/arm/xen/Makefile                      |    2 +-
- arch/arm/xen/enlighten.c                   |    5 -
- arch/arm/xen/mm.c                          |  123 +++++++++++++++++
- arch/arm/xen/mm32.c                        |  202 ----------------------------
- arch/arm64/include/asm/device.h            |    1 +
- arch/arm64/include/asm/dma-mapping.h       |    6 +
- arch/arm64/include/asm/xen/page-coherent.h |   44 +-----
- arch/x86/include/asm/xen/page-coherent.h   |    4 +-
- arch/x86/include/asm/xen/page.h            |    7 +
- drivers/xen/swiotlb-xen.c                  |   19 +--
- include/xen/interface/features.h           |    3 -
- include/xen/interface/grant_table.h        |   19 +++
- 16 files changed, 232 insertions(+), 270 deletions(-)
- delete mode 100644 arch/arm/xen/mm32.c
+diff --git a/arch/arm/xen/mm32.c b/arch/arm/xen/mm32.c
+index a5a93fc..6153d61 100644
+--- a/arch/arm/xen/mm32.c
++++ b/arch/arm/xen/mm32.c
+@@ -61,9 +61,6 @@ static void __xen_dma_page_dev_to_cpu(struct device *hwdev, dma_addr_t handle,
+ 	/* Cannot use __dma_page_dev_to_cpu because we don't have a
+ 	 * struct page for handle */
+ 
+-	if (dir != DMA_TO_DEVICE)
+-		outer_inv_range(handle, handle + size);
+-
+ 	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, dmac_unmap_area);
+ }
+ 
+@@ -72,12 +69,6 @@ static void __xen_dma_page_cpu_to_dev(struct device *hwdev, dma_addr_t handle,
+ {
+ 
+ 	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, dmac_map_area);
+-
+-	if (dir == DMA_FROM_DEVICE) {
+-		outer_inv_range(handle, handle + size);
+-	} else {
+-		outer_clean_range(handle, handle + size);
+-	}
+ }
+ 
+ void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
+-- 
+1.7.10.4
