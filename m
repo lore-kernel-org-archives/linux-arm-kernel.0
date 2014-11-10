@@ -1,58 +1,61 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Nov 2014 09:55:02 +0000
-Subject: [PATCH v2 04/11] mfd: syscon: Add Atmel SMC binding doc
-In-Reply-To: <1415203287-21517-5-git-send-email-boris.brezillon@free-electrons.com>
+Date: Mon, 10 Nov 2014 09:55:59 +0000
+Subject: [PATCH v2 02/11] mfd: syscon: Add Atmel Matrix bus DT binding
+ documentation
+In-Reply-To: <1415203287-21517-3-git-send-email-boris.brezillon@free-electrons.com>
 References: <1415203287-21517-1-git-send-email-boris.brezillon@free-electrons.com>
- <1415203287-21517-5-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20141110095502.GH21424@x1>
+ <1415203287-21517-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20141110095559.GI21424@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, 05 Nov 2014, Boris Brezillon wrote:
 
-> The SMC registers are used to configure Atmel EBI (External Bus Interface)
-> to interface with standard memory devices (NAND, NOR, SRAM or specialized
-> devices like FPGAs).
-> 
-> Declare this memory region as a syscon, so that different drivers can
-> configure the SMC interface (mostly timing configuration) according to
-> their need.
+> The Matrix registers are provided to configure internal bus behavior on
+> at91 SoCs.
+> Some registers might be access by several drivers (e.g. to configure
+> external memory bus timings), hence we declare this register set as a
+> syscon device.
 > 
 > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > ---
->  Documentation/devicetree/bindings/mfd/atmel-smc.txt | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-smc.txt
+>  .../devicetree/bindings/mfd/atmel-matrix.txt       | 24 ++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-matrix.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/atmel-smc.txt b/Documentation/devicetree/bindings/mfd/atmel-smc.txt
+> diff --git a/Documentation/devicetree/bindings/mfd/atmel-matrix.txt b/Documentation/devicetree/bindings/mfd/atmel-matrix.txt
 > new file mode 100644
-> index 0000000..0c0cc3d
+> index 0000000..405cac9
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/atmel-smc.txt
-> @@ -0,0 +1,19 @@
-> +* Device tree bindings for Atmel SMC (Static Memory Controller)
+> +++ b/Documentation/devicetree/bindings/mfd/atmel-matrix.txt
+> @@ -0,0 +1,24 @@
+> +* Device tree bindings for Atmel Bus Matrix
 > +
-> +The SMC registers are used to configure Atmel EBI (External Bus Interface)
-> +to interface with standard memory devices (NAND, NOR, SRAM or specialized
-> +devices like FPGAs).
+> +The Bus Matrix registers are used to configure Atmel SoCs internal bus
+> +behavior (master/slave priorities, undefined burst length type, ...)
 > +
 > +Required properties:
 > +- compatible:		should be one of the following
-> +			"atmel,at91sam9260-smc", "syscon"
-> +			"atmel,sama5d3-smc", "syscon"
-> +- reg:			contains offset/length value of the SMC memory
-> +			region.
+> +			"atmel,at91sam9260-matrix", "syscon"
+> +			"atmel,at91sam9261-matrix", "syscon"
+> +			"atmel,at91sam9263-matrix", "syscon"
+> +			"atmel,at91sam9263-matrix", "syscon"
+> +			"atmel,at91sam9g45-matrix", "syscon"
+> +			"atmel,at91sam9n12-matrix", "syscon"
+> +			"atmel,at91sam9x5-matrix", "syscon"
+> +			"atmel,sama5d3-matrix", "syscon"
+> +- reg:			contains offset/length value of the Bus Matrix
+> +			memory region.
 
-I'd be happier if the sentences started with uppercase letters, but
-nothing too offensive or controversial here:
+Same comments as before:
 
 Acked-by: Lee Jones <lee.jones@linaro.org>
 
 > +Example:
 > +
-> +smc: smc at ffffc000 {
-> +	compatible = "atmel,sama5d3-smc", "syscon";
-> +	reg = <0xffffc000 0x1000>;
+> +matrix: matrix at ffffec00 {
+> +	compatible = "atmel,sama5d3-matrix", "syscon";
+> +	reg = <0xffffec00 0x200>;
 > +};
 
 -- 
