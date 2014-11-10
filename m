@@ -1,36 +1,47 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Sun, 9 Nov 2014 21:55:42 -0800
-Subject: [PATCH 1/2] ARM: multi_v7_defconfig: remove one level of menu from
- Kconfig
-In-Reply-To: <Scott Branden <sbranden@broadcom.com>
-References: <Scott Branden <sbranden@broadcom.com>
-Message-ID: <1415598943-16611-1-git-send-email-sbranden@broadcom.com>
+From: jan.kiszka@web.de (Jan Kiszka)
+Date: Mon, 10 Nov 2014 07:03:54 +0100
+Subject: AMR: sun7i: CPU hotplug support?
+In-Reply-To: <20141109231744.GC2989@lukather>
+References: <545FC215.7010802@web.de> <20141109231744.GC2989@lukather>
+Message-ID: <5460554A.1060701@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-remove menu "Broadcom Mobile SoC Selection"
-This requires:
-- selecting ARCH_BCM_MOBILE based on SoC selections
-- fixup multi_v7_defconfig to work with new menu levels of mach-bcm.
+On 2014-11-10 00:17, Maxime Ripard wrote:
+> Hi Jan,
+> 
+> On Sun, Nov 09, 2014 at 08:35:49PM +0100, Jan Kiszka wrote:
+>> did anyone already happen to look into enabling CPU hotplug for the
+>> Allwinner A20 in upstream? I'm currently running the sunxi-next branch
+>> on Banana Pi, and echo 0 > .../cpu1/online just hangs the system. The
+>> old 3.4 LeMaker kernel works fine in this regard. I can try to look into
+>> details and port things over, just want to avoid duplicate efforts.
+> 
+> Having hotplug support would indeed be very welcome.
+> 
+> However, it should be done in u-boot, through PSCI, and not in the
+> kernel itself.
+> 
+> As far as I'm aware, no one worked actively on it, beside some WIP
+> commit from Marc a while ago:
+> https://git.kernel.org/cgit/linux/kernel/git/maz/u-boot.git/commit/?h=wip/psci&id=45379c0f9cf812f0f62722f4015ec907fa5dc144
 
-Signed-off-by: Scott Branden <sbranden@broadcom.com>
----
- arch/arm/configs/multi_v7_defconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+OK - I guess I will need a little guidance in then: Is there a good
+reference board to study and to derive from? And maybe also: What is
+missing or not working in that u-boot branch? If I get this interface
+right, I just takes some device tree bits to enable this for the kernel
+afterward, correct?
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 491b7d5..e8f79fd 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -17,7 +17,8 @@ CONFIG_MACH_ARMADA_38X=y
- CONFIG_MACH_ARMADA_XP=y
- CONFIG_MACH_DOVE=y
- CONFIG_ARCH_BCM=y
--CONFIG_ARCH_BCM_MOBILE=y
-+CONFIG_ARCH_BCM_21664=y
-+CONFIG_ARCH_BCM_281XX=y
- CONFIG_ARCH_BCM_5301X=y
- CONFIG_ARCH_BRCMSTB=y
- CONFIG_ARCH_BERLIN=y
--- 
-2.1.3
+Thanks,
+Jan
+
+PS: That the GMAC on B-Pi has some TX reliability issues, both with
+kernel and u-boot, is known, right? If not, I'll open a separate thread.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141110/54de2cca/attachment.sig>
