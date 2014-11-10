@@ -1,61 +1,78 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Mon, 10 Nov 2014 10:14:23 +0100
-Subject: tsc2005 touchscreen: implement disable attribute
-In-Reply-To: <20141109200142.GA37384@dtor-ws>
-References: <20141109115636.GA3106@amd> <201411091349.20116@pali>
- <20141109200142.GA37384@dtor-ws>
-Message-ID: <201411101014.25873@pali>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Nov 2014 09:15:27 +0000
+Subject: [PATCH 3/5] mfd: ti_am335x_tscadc: Remove unwanted reg_se_cache
+ save
+In-Reply-To: <1415339350-17679-4-git-send-email-vigneshr@ti.com>
+References: <1415339350-17679-1-git-send-email-vigneshr@ti.com>
+ <1415339350-17679-4-git-send-email-vigneshr@ti.com>
+Message-ID: <20141110091527.GD21424@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 09 November 2014 21:01:42 Dmitry Torokhov wrote:
-> On Sun, Nov 09, 2014 at 01:49:19PM +0100, Pali Roh?r wrote:
-> > On Sunday 09 November 2014 13:40:25 Sebastian Reichel wrote:
-> > > Hi,
-> > > 
-> > > On Sun, Nov 09, 2014 at 12:56:37PM +0100, Pavel Machek 
-wrote:
-> > > > Implement disable attribute for tsc2005 touchscreen. It
-> > > > is useful to avoid wakeups when phone is in the pocket.
-> > > 
-> > > I don't think this should be some driver specific sysfs
-> > > node. Instead a generic method from the input subsystem
-> > > should be used.
-> > > 
-> > > -- Sebastian
-> > 
-> > Yes. I would like to see generic method to turn off input
-> > device (or just "mute" it if device does not support turn
-> > off). Similar problem is also on laptops or other portable
-> > devices. E.g when I close LID of my laptop I want to turn
-> > off internal input devices (keyboard, touchpad, trackstick)
-> > without need to unload evdev Xserver drivers (or killing
-> > Xserver). Another use case is to turn off keyboard (also
-> > from kernel tty on Ctrl+Alt+Fx) which cannot be unplugged
-> > (internal laptop keyboard).
-> > 
-> > CCed Dmitry, what do you think about it?
-> 
-> Actually I'd like it to be not limited to input devices but
-> rater try doing it at the device core level, if possible. I
-> am sure there are IIO and other devices that could be
-> forcibly turned off/put into low power mode under certain
-> circumstances.
-> 
-> There were some talks about it with Rafael, but we never come
-> with anything concrete.
-> 
-> Thanks.
+On Fri, 07 Nov 2014, Vignesh R wrote:
 
-Ok. What about adding sysfs node disable which accept value 0/1?
+> In one shot mode, sequencer automatically disables all enabled steps at
+> the end of each cycle. (both ADC steps and TSC steps) Hence these steps
+> need not be saved in reg_se_cache for clearing these steps at a later
+> stage.
+> Also, when ADC wakes up Sequencer should not be busy executing any of the
+> config steps except for the charge step. Previously charge step was 1 ADC
+> clock cycle and hence it was ignored.
+> 
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
+>  drivers/mfd/ti_am335x_tscadc.c       | 7 +++++--
+>  include/linux/mfd/ti_am335x_tscadc.h | 1 +
+>  2 files changed, 6 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
+> index d877e777cce6..94ef8992f46b 100644
+> --- a/drivers/mfd/ti_am335x_tscadc.c
+> +++ b/drivers/mfd/ti_am335x_tscadc.c
+> @@ -86,8 +86,12 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
+>  		spin_lock_irq(&tsadc->reg_lock);
+>  		finish_wait(&tsadc->reg_se_wait, &wait);
+>  
+> +		/*
+> +		 * Sequencer should either be idle or
+> +		 * busy applying the charge step.
+> +		 */
+>  		reg = tscadc_readl(tsadc, REG_ADCFSM);
+> -		WARN_ON(reg & SEQ_STATUS);
+> +		WARN_ON(reg & SEQ_STATUS & (!CHARGE_STEP));
+
+This is almost certainly not correct.
+
+Please take another look at the logic.
+
+I'm _assuming_ you mean (reg & SEQ_STATUS && !CHARGE_STEP).
+
+>  		tsadc->adc_waiting = false;
+>  	}
+>  	tsadc->adc_in_use = true;
+> @@ -96,7 +100,6 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
+>  void am335x_tsc_se_set_once(struct ti_tscadc_dev *tsadc, u32 val)
+>  {
+>  	spin_lock_irq(&tsadc->reg_lock);
+> -	tsadc->reg_se_cache |= val;
+>  	am335x_tscadc_need_adc(tsadc);
+>  
+>  	tscadc_writel(tsadc, REG_SE, val);
+> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
+> index c99be5dc0f5c..fcce182e4a35 100644
+> --- a/include/linux/mfd/ti_am335x_tscadc.h
+> +++ b/include/linux/mfd/ti_am335x_tscadc.h
+> @@ -128,6 +128,7 @@
+>  
+>  /* Sequencer Status */
+>  #define SEQ_STATUS BIT(5)
+> +#define CHARGE_STEP		0x11
+>  
+>  #define ADC_CLK			3000000
+>  #define TOTAL_STEPS		16
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141110/eaa42bf7/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
