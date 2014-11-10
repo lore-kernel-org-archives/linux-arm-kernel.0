@@ -1,36 +1,83 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Nov 2014 14:48:30 +0100
-Subject: [GIT PULL] Integrator multiplatform migration for v3.19
-In-Reply-To: <7467543.qEZBkbRV4B@wuerfel>
-References: <CACRpkdafst1j2tp4-=BZMn_P688uUSjeAZEGt26WuD_d521sHQ@mail.gmail.com>
- <20141104063235.GG13562@quad.lixom.net>
- <20141106105246.GO4042@n2100.arm.linux.org.uk>
- <7467543.qEZBkbRV4B@wuerfel>
-Message-ID: <CACRpkdYcBdJsHfNfgYnguo4eWn7QUjgz_w_Qbr2NoDRE9-YCDA@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 10 Nov 2014 13:52:32 +0000
+Subject: [RFC PATCH] drivers: of: move PCI domain assignment to generic
+ OF code
+In-Reply-To: <1459907.RIyEjnM4cg@wuerfel>
+References: <1415622368-14612-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1459907.RIyEjnM4cg@wuerfel>
+Message-ID: <20141110135232.GC15484@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 6, 2014 at 12:33 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 06 November 2014 10:52:47 Russell King - ARM Linux wrote:
+On Mon, Nov 10, 2014 at 12:51:19PM +0000, Arnd Bergmann wrote:
+> On Monday 10 November 2014 12:26:08 Lorenzo Pieralisi wrote:
+> > ---
+> >  arch/arm64/kernel/pci.c | 14 +++--------
+> >  drivers/of/of_pci.c     | 66 +++++++++++++++++++++++++++++++++++++++++++++++--
+> >  include/linux/of_pci.h  |  7 +++---
+> >  3 files changed, 71 insertions(+), 16 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> > index ce5836c..5e21c1c 100644
+> > --- a/arch/arm64/kernel/pci.c
+> > +++ b/arch/arm64/kernel/pci.c
+> > @@ -49,20 +49,14 @@ int pcibios_add_device(struct pci_dev *dev)
+> >  
+> >  
+> >  #ifdef CONFIG_PCI_DOMAINS_GENERIC
+> > -static bool dt_domain_found = false;
+> >  
+> >  void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+> >  {
+> > -	int domain = of_get_pci_domain_nr(parent->of_node);
+> > +	int domain = of_assign_pci_domain_nr(parent->of_node);
+> >  
+> > -	if (domain >= 0) {
+> > -		dt_domain_found = true;
+> > -	} else if (dt_domain_found == true) {
+> > -		dev_err(parent, "Node %s is missing \"linux,pci-domain\" property in DT\n",
+> > -			parent->of_node->full_name);
+> > -		return;
+> > -	} else {
+> > -		domain = pci_get_new_domain_nr();
+> > +	if (domain < 0) {
+> > +		dev_err(parent, "PCI domain assignment failed\n");
+> > +		domain = -1;
+> >  	}
+> >  
+> >  	bus->domain_nr = domain;
+> 
+> Is there a need to still keep this in architecture specific code? Why
+> not move it to drivers/pci and let other firmware infrastructure
+> hook in there directly.
 
->> Unfortunately, this totally screws multiplatform support - with this
->> merged, we now can enable all CPUs from ARM720T upwards into a single
->> kernel - and that is illegal.
-(...)
-> I think it would be best to replace all the lines like
->
->         bool "Support ARM926T processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB
->
-> with
->
->         bool "Support ARM926T processor" if ARCH_MULTI_V5 || MACH_REALVIEW_EB
->
-> and ignore whether ARCH_INTEGRATOR is set or not.
+Ok, I can move the function to drivers/pci/pci.c, I did not want to add
+OF code in there but if it is ok with Bjorn I will move the generic
 
-OK I have sent a v2 patch for this check it out.
+pci_bus_assign_domain_nr()
 
-Sorry for screwing up so badly, I've done quite a few allmodconfig builds now,
-just a bit confused with the other noise in linux-next.
+there and be done with this.
 
-Yours,
-Linus Walleij
+> >  {
+> > @@ -45,10 +45,9 @@ of_pci_parse_bus_range(struct device_node *node, struct resource *res)
+> >  	return -EINVAL;
+> >  }
+> >  
+> > -static inline int
+> > -of_get_pci_domain_nr(struct device_node *node)
+> > +static inline int of_assign_pci_domain_nr(struct device_node *node)
+> >  {
+> > -	return -1;
+> > +	return pci_get_new_domain_nr();
+> >  }
+> >  #endif
+> 
+> This gets a bit tricky otherwise once we add ACPI in the mix, with all
+> combinations of OF and ACPI at compile time and at runtime.
+
+I definitely agree, that's why it is an RFC, basically wanted to
+understand what we want to do with the generic implementation and where
+to move it.
+
+Thanks,
+Lorenzo
