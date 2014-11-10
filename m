@@ -1,42 +1,30 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 10 Nov 2014 10:32:11 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v3.19
-Message-ID: <cover.1415582943.git.horms+renesas@verge.net.au>
+Date: Mon, 10 Nov 2014 10:32:09 +0900
+Subject: [PATCH 1/4] ARM: shmobile: ape6evm: Enable PM Runtime in defconfig
+In-Reply-To: <cover.1415582943.git.horms+renesas@verge.net.au>
+References: <cover.1415582943.git.horms+renesas@verge.net.au>
+Message-ID: <c5940e115e188051f34a88ee705c5f81c6bf0e54.1415582943.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+This is consistent with other shmobile defconfigs.
 
-Please consider these Renesas ARM based SoC defconfig updates for v3.19.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/ape6evm_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v3.19
-
-for you to fetch changes up to ccde0fbd4fe88151c8d3a93a3e3a939a0a1753b2:
-
-  ARM: shmobile: multiplatform: add AK4642 support on defconfig (2014-11-05 14:47:56 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Defconfig Updates for v3.19
-
-* Enable AK4642, Audo DMAC peri peri and R-Car DMAC in shmobile defconrig
-* Enable PM Runtime in ape6evm defconfig
-
-----------------------------------------------------------------
-Kuninori Morimoto (3):
-      ARM: shmobile: multiplatform: add R-Car DMAC support on defconfig
-      ARM: shmobile: multiplatform: add Audo DMAC peri peri support on defconfig
-      ARM: shmobile: multiplatform: add AK4642 support on defconfig
-
-Simon Horman (1):
-      ARM: shmobile: ape6evm: Enable PM Runtime in defconfig
-
- arch/arm/configs/ape6evm_defconfig  | 1 +
- arch/arm/configs/shmobile_defconfig | 3 +++
- 2 files changed, 4 insertions(+)
+diff --git a/arch/arm/configs/ape6evm_defconfig b/arch/arm/configs/ape6evm_defconfig
+index b54b28f..db81d8c 100644
+--- a/arch/arm/configs/ape6evm_defconfig
++++ b/arch/arm/configs/ape6evm_defconfig
+@@ -33,6 +33,7 @@ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+ CONFIG_BINFMT_MISC=y
++CONFIG_PM_RUNTIME=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+-- 
+2.1.1
