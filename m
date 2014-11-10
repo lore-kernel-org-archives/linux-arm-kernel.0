@@ -1,54 +1,62 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Mon, 10 Nov 2014 18:53:30 +0900
-Subject: [PATCH v6 00/12] NVIDIA Tegra memory controller and IOMMU support
-In-Reply-To: <1415376063-17205-1-git-send-email-thierry.reding@gmail.com>
-References: <1415376063-17205-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <54608B1A.3010001@nvidia.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Nov 2014 09:55:02 +0000
+Subject: [PATCH v2 04/11] mfd: syscon: Add Atmel SMC binding doc
+In-Reply-To: <1415203287-21517-5-git-send-email-boris.brezillon@free-electrons.com>
+References: <1415203287-21517-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1415203287-21517-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20141110095502.GH21424@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2014 01:00 AM, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
->
-> This is the sixth installment in the Tegra IOMMU and memory controller
-> support series. This version addresses the final outstanding comments from
-> Olof about using proper Kconfig symbols to track the dependencies. It also
-> splits up the driver into one part that implements the memory controller
-> only and a second part that implements the SMMU. This plays nicely with
-> the new Kconfig options introduced.
->
-> Patch 1 is a preparatory patch that exposes the memory controller clock.
->
-> Patches 2 and 3 is a pair of precursory patches needed to make this all
-> work on 64-bit ARM in the future.
->
-> The device tree binding for the Tegra memory controller is added in patch
-> 4 and patch 5 is the bulk of the series that move the existing memory
-> controller and IOMMU drivers into the new unified driver that supports
-> Tegra30, Tegra114 and Tegra124.
->
-> Patches 6, 7 and 8 add the DT nodes for the memory controller/IOMMU on
-> Tegra30, Tegra114 and Tegra124.
->
-> IOMMU support is enabled for the display controllers in patches 9, 10 and
-> 11. This will allow the display controllers to have their memory accesses
-> translated by the SMMU, which will enable non-contiguous buffers to be
-> used for scan-out.
->
-> Finally patch 12 also adds support for Tegra132. It is kept separate because
-> none of the other Tegra132 patches have been merged yet, but I've included
-> it here for completeness.
->
-> Because the patches are rather intertwined, I'd like to merge them all via
-> the Tegra tree. For that I'll need Acked-bys from Mike, Russell and Joerg
-> on patches 1, 2 and 3, and 5, respectively.
+On Wed, 05 Nov 2014, Boris Brezillon wrote:
 
-FWIW,
+> The SMC registers are used to configure Atmel EBI (External Bus Interface)
+> to interface with standard memory devices (NAND, NOR, SRAM or specialized
+> devices like FPGAs).
+> 
+> Declare this memory region as a syscon, so that different drivers can
+> configure the SMC interface (mostly timing configuration) according to
+> their need.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/mfd/atmel-smc.txt | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-smc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/atmel-smc.txt b/Documentation/devicetree/bindings/mfd/atmel-smc.txt
+> new file mode 100644
+> index 0000000..0c0cc3d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/atmel-smc.txt
+> @@ -0,0 +1,19 @@
+> +* Device tree bindings for Atmel SMC (Static Memory Controller)
+> +
+> +The SMC registers are used to configure Atmel EBI (External Bus Interface)
+> +to interface with standard memory devices (NAND, NOR, SRAM or specialized
+> +devices like FPGAs).
+> +
+> +Required properties:
+> +- compatible:		should be one of the following
+> +			"atmel,at91sam9260-smc", "syscon"
+> +			"atmel,sama5d3-smc", "syscon"
+> +- reg:			contains offset/length value of the SMC memory
+> +			region.
 
-Tested-by: Alexandre Courbot <acourbot@nvidia.com>
+I'd be happier if the sentences started with uppercase letters, but
+nothing too offensive or controversial here:
 
-Works nicely with both the display and GPU clients, which allows us to 
-remove the need for CMA on Tegra.
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-Thanks,
-Alex.
+> +Example:
+> +
+> +smc: smc at ffffc000 {
+> +	compatible = "atmel,sama5d3-smc", "syscon";
+> +	reg = <0xffffc000 0x1000>;
+> +};
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
