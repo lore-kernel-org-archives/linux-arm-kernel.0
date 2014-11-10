@@ -1,64 +1,65 @@
 From: suravee.suthikulpanit@amd.com (suravee.suthikulpanit at amd.com)
-Date: Mon, 10 Nov 2014 13:24:39 -0600
-Subject: [PATCH 1/2] PCI: Add new pci_ops for setting MSI parent for PCI bus
+Date: Mon, 10 Nov 2014 13:24:40 -0600
+Subject: [PATCH 2/2] PCI: generic: Add set_msi_parent callback
 In-Reply-To: <1415647480-3320-1-git-send-email-suravee.suthikulpanit@amd.com>
 References: <1415647480-3320-1-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <1415647480-3320-2-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <1415647480-3320-3-git-send-email-suravee.suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-In the pci_scan_root_bus, pci_bus is created and passed down to:
-    pci_scan_child_bus
-        pci_scan_bridge
-    	pci_add_new_bus
-    	    pci_alloc_child_bus
-
-In pci_alloc_child_bus, the parent's msi_chip is propagated to child,
-and the referenced by PCI devices when calling arch_setup_msi_irq().
-
-However, in the current implementation of pci_scan_root_bus, the msi_chip
-of the root_bus is not set before handing off to pci_scan_child_bus.
-
-This patch proposes a new callback function in the struct pci_ops
-to allow host controller to provide a call back for specifying
-msi_chip to be used.
+This patch implement set_msi_parent callback for PCI generic host controller.
 
 Cc: Bjorn Helgass <bhelgaas@google.com>
 Cc: Liviu Dudau <liviu.dudau@arm.com>
 Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 ---
- drivers/pci/probe.c | 3 +++
- include/linux/pci.h | 1 +
- 2 files changed, 4 insertions(+)
+ drivers/pci/host/pci-host-generic.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 5ed9930..cf7114d 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -2081,6 +2081,9 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
- 	if (!b)
- 		return NULL;
- 
-+	if (ops->set_msi_parent)
-+		ops->set_msi_parent(b);
-+
- 	if (!found) {
- 		dev_info(&b->dev,
- 		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 5be8db4..6093544 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -560,6 +560,7 @@ static inline int pcibios_err_to_errno(int err)
- struct pci_ops {
- 	int (*read)(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *val);
- 	int (*write)(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 val);
-+	int (*set_msi_parent)(struct pci_bus *bus);
+diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+index 036ab1b..f9bb97a 100644
+--- a/drivers/pci/host/pci-host-generic.c
++++ b/drivers/pci/host/pci-host-generic.c
+@@ -42,6 +42,7 @@ struct gen_pci {
+ 	struct pci_host_bridge			host;
+ 	struct gen_pci_cfg_windows		cfg;
+ 	struct list_head			resources;
++	struct msi_chip				*mchip;
  };
  
- /*
+ #ifdef CONFIG_ARM
+@@ -128,9 +129,19 @@ static int gen_pci_config_write(struct pci_bus *bus, unsigned int devfn,
+ 	return PCIBIOS_SUCCESSFUL;
+ }
+ 
++static int gen_pci_set_msi_parent(struct pci_bus *bus)
++{
++	struct gen_pci *pci = bus_to_gen_pci(bus);
++
++	bus->msi = pci->mchip;
++
++	return PCIBIOS_SUCCESSFUL;
++}
++
+ static struct pci_ops gen_pci_ops = {
+ 	.read	= gen_pci_config_read,
+ 	.write	= gen_pci_config_write,
++	.set_msi_parent = gen_pci_set_msi_parent,
+ };
+ 
+ static const struct of_device_id gen_pci_of_match[] = {
+@@ -313,6 +324,9 @@ static int gen_pci_probe(struct platform_device *pdev)
+ 		return err;
+ 	}
+ 
++	pci->mchip = of_pci_find_msi_chip_by_node(of_parse_phandle(np,
++						  "msi-parent", 0));
++
+ #ifdef CONFIG_ARM
+ 	pci_common_init_dev(dev, &hw);
+ #else
 -- 
 1.9.3
