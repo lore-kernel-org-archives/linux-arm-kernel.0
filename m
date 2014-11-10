@@ -1,47 +1,57 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 10 Nov 2014 16:13:54 +0000
-Subject: [PATCH v8 02/13] xen/arm: remove outer_*_range call
+Date: Mon, 10 Nov 2014 16:13:57 +0000
+Subject: [PATCH v8 05/13] arm: introduce is_device_dma_coherent
 In-Reply-To: <alpine.DEB.2.02.1411101607130.22875@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1411101607130.22875@kaball.uk.xensource.com>
-Message-ID: <1415636045-24669-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1415636045-24669-5-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dom0 is not actually capable of issuing outer_inv_range or
-outer_clean_range calls.
+Introduce a boolean flag and an accessor function to check whether a
+device is dma_coherent. Set the flag from set_arch_dma_coherent_ops.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Ian Campbell <ian.campbell@citrix.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+CC: linux at arm.linux.org.uk
+CC: will.deacon at arm.com
 ---
- arch/arm/xen/mm32.c |    9 ---------
- 1 file changed, 9 deletions(-)
+ arch/arm/include/asm/device.h      |    1 +
+ arch/arm/include/asm/dma-mapping.h |    6 ++++++
+ 2 files changed, 7 insertions(+)
 
-diff --git a/arch/arm/xen/mm32.c b/arch/arm/xen/mm32.c
-index a5a93fc..6153d61 100644
---- a/arch/arm/xen/mm32.c
-+++ b/arch/arm/xen/mm32.c
-@@ -61,9 +61,6 @@ static void __xen_dma_page_dev_to_cpu(struct device *hwdev, dma_addr_t handle,
- 	/* Cannot use __dma_page_dev_to_cpu because we don't have a
- 	 * struct page for handle */
+diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
+index dc662fc..4111592 100644
+--- a/arch/arm/include/asm/device.h
++++ b/arch/arm/include/asm/device.h
+@@ -17,6 +17,7 @@ struct dev_archdata {
+ #ifdef CONFIG_ARM_DMA_USE_IOMMU
+ 	struct dma_iommu_mapping	*mapping;
+ #endif
++	bool dma_coherent;
+ };
  
--	if (dir != DMA_TO_DEVICE)
--		outer_inv_range(handle, handle + size);
--
- 	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, dmac_unmap_area);
- }
+ struct omap_device;
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index 85738b2..8c3b616 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -123,11 +123,17 @@ static inline unsigned long dma_max_pfn(struct device *dev)
  
-@@ -72,12 +69,6 @@ static void __xen_dma_page_cpu_to_dev(struct device *hwdev, dma_addr_t handle,
+ static inline int set_arch_dma_coherent_ops(struct device *dev)
  {
- 
- 	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, dmac_map_area);
--
--	if (dir == DMA_FROM_DEVICE) {
--		outer_inv_range(handle, handle + size);
--	} else {
--		outer_clean_range(handle, handle + size);
--	}
++	dev->archdata.dma_coherent = true;
+ 	set_dma_ops(dev, &arm_coherent_dma_ops);
+ 	return 0;
  }
+ #define set_arch_dma_coherent_ops(dev)	set_arch_dma_coherent_ops(dev)
  
- void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
++static inline bool is_device_dma_coherent(struct device *dev)
++{
++	return dev->archdata.dma_coherent;
++}
++
+ static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+ {
+ 	unsigned int offset = paddr & ~PAGE_MASK;
 -- 
 1.7.10.4
