@@ -1,65 +1,38 @@
-From: suravee.suthikulpanit@amd.com (suravee.suthikulpanit at amd.com)
-Date: Mon, 10 Nov 2014 13:24:40 -0600
-Subject: [PATCH 2/2] PCI: generic: Add set_msi_parent callback
-In-Reply-To: <1415647480-3320-1-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1415647480-3320-1-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <1415647480-3320-3-git-send-email-suravee.suthikulpanit@amd.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 10 Nov 2014 20:32:08 +0100
+Subject: [PATCH v9 07/12] coresight-etm: add CoreSight ETM/PTM driver
+In-Reply-To: <CANLsYkxivqgyRZspS2uP9Mkwit4obCjZxYr0YUhR3G_zQejERg@mail.gmail.com>
+References: <1415038066-22423-1-git-send-email-mathieu.poirier@linaro.org>
+ <1415038066-22423-8-git-send-email-mathieu.poirier@linaro.org>
+ <1415615671.4862.30.camel@x220>
+ <CANLsYkxivqgyRZspS2uP9Mkwit4obCjZxYr0YUhR3G_zQejERg@mail.gmail.com>
+Message-ID: <1415647928.21229.23.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+On Mon, 2014-11-10 at 08:40 -0700, Mathieu Poirier wrote:
+> On 10 November 2014 03:34, Paul Bolle <pebolle@tiscali.nl> wrote:
+> > On Mon, 2014-11-03 at 11:07 -0700, mathieu.poirier at linaro.org wrote:
+> >> +#ifdef CONFIG_CORESIGHT_SOURCE_ETM_DEFAULT_ENABLE
+> >
+> > There's no Kconfig symbol CORESIGHT_SOURCE_ETM_DEFAULT_ENABLE. Neither
+> > is there a preprocessor definition of this macro. So why was this
+> > added?
+> 
+> Correct - the feature (as we really want it) is currently being worked
+> on but not yet part of the code base.  The default option probably
+> should have been removed but it doesn't do much else when mandating
+> one to add a boot option on the kernel cmd line.
 
-This patch implement set_msi_parent callback for PCI generic host controller.
+I'm afraid I'm not sure what you mean here. Anyhow, using a Kconfig
+symbol to set a default for something that can also be set through a
+kernel parameter might be considered overdoing it. But that's not for me
+to decide.
 
-Cc: Bjorn Helgass <bhelgaas@google.com>
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
----
- drivers/pci/host/pci-host-generic.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+Unless the patch that adds this Kconfig symbol takes a long time to land
+in linux-next, I won't be bothering you again.
 
-diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-index 036ab1b..f9bb97a 100644
---- a/drivers/pci/host/pci-host-generic.c
-+++ b/drivers/pci/host/pci-host-generic.c
-@@ -42,6 +42,7 @@ struct gen_pci {
- 	struct pci_host_bridge			host;
- 	struct gen_pci_cfg_windows		cfg;
- 	struct list_head			resources;
-+	struct msi_chip				*mchip;
- };
- 
- #ifdef CONFIG_ARM
-@@ -128,9 +129,19 @@ static int gen_pci_config_write(struct pci_bus *bus, unsigned int devfn,
- 	return PCIBIOS_SUCCESSFUL;
- }
- 
-+static int gen_pci_set_msi_parent(struct pci_bus *bus)
-+{
-+	struct gen_pci *pci = bus_to_gen_pci(bus);
-+
-+	bus->msi = pci->mchip;
-+
-+	return PCIBIOS_SUCCESSFUL;
-+}
-+
- static struct pci_ops gen_pci_ops = {
- 	.read	= gen_pci_config_read,
- 	.write	= gen_pci_config_write,
-+	.set_msi_parent = gen_pci_set_msi_parent,
- };
- 
- static const struct of_device_id gen_pci_of_match[] = {
-@@ -313,6 +324,9 @@ static int gen_pci_probe(struct platform_device *pdev)
- 		return err;
- 	}
- 
-+	pci->mchip = of_pci_find_msi_chip_by_node(of_parse_phandle(np,
-+						  "msi-parent", 0));
-+
- #ifdef CONFIG_ARM
- 	pci_common_init_dev(dev, &hw);
- #else
--- 
-1.9.3
+Thanks,
+
+
+Paul Bolle
