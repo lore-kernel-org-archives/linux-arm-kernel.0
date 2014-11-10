@@ -1,56 +1,92 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 10 Nov 2014 15:25:08 +0100
-Subject: [PATCH 17/17] ARM: mvebu: add SDRAM controller description for
- Armada XP
-In-Reply-To: <1414151970-6626-18-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1414151970-6626-18-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5460CAC4.7030008@free-electrons.com>
+Date: Mon, 10 Nov 2014 15:41:52 +0100
+Subject: [PATCH v3 2/3] watchdog: orion: Use the reference clock on Armada
+ 375 SoC
+In-Reply-To: <1415107293-19258-3-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1415107293-19258-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1415107293-19258-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <5460CEB0.7080009@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Ezequiel,
 
+[...]
 
-On 24/10/2014 13:59, Thomas Petazzoni wrote:
-> The suspend/resume sequence on Armada XP needs to modify a number of
-> registers in the SDRAM controller. Therefore, this commit updates the
-> Armada XP Device Tree description to include the SDRAM controller
-> Device Tree node.
-> 
+> +static int armada375_wdt_clock_init(struct platform_device *pdev,
+> +				    struct orion_watchdog *dev)
+> +{
+> +	int ret;
+> +
+> +	dev->clk = of_clk_get_by_name(pdev->dev.of_node, "fixed");
+> +	if (!IS_ERR(dev->clk)) {
+> +		ret = clk_prepare_enable(dev->clk);
+> +		if (ret) {
+> +			clk_put(dev->clk);
+> +			return ret;
+> +		}
+> +
+> +		atomic_io_modify(dev->reg + TIMER_CTRL,
+> +				WDT_AXP_FIXED_ENABLE_BIT,
+> +				WDT_AXP_FIXED_ENABLE_BIT);
+> +		dev->clk_rate = clk_get_rate(dev->clk);
+> +
+> +		return 0;
+> +	}
+> +
+> +	/* Mandatory fallback for proper devicetree backward compatibility */
+> +	dev->clk = clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(dev->clk))
+> +		return PTR_ERR(dev->clk);
+> +
+> +	ret = clk_prepare_enable(dev->clk);
+> +	if (ret) {
+> +		clk_put(dev->clk);
+> +		return ret;
+> +	}
+> +
+> +	atomic_io_modify(dev->reg + TIMER_CTRL,
+> +			WDT_A370_RATIO_MASK(WDT_A370_RATIO_SHIFT),
+> +			WDT_A370_RATIO_MASK(WDT_A370_RATIO_SHIFT));
+> +	dev->clk_rate = clk_get_rate(dev->clk) / WDT_A370_RATIO;
+> +
+> +	return 0;
+> +}
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Shouldn't be possible to do the following:
+
+static int armada375_wdt_clock_init(struct platform_device *pdev,
+				    struct orion_watchdog *dev)
+{
+	if (armadaxp_wdt_clock_init(pdev, dev)) {
+		/* Mandatory fallback for proper devicetree backward compatibility */
+		return armadaxp_wdt_clock_init(pdev, dev));
+	}
+	return 0;
+}
+
+Actually reusing the armadaxp_wdt_clock_init() function  was also suggested by Thomas
+on your first version but I didn't find your answer about it.
 
 
 Thanks,
 
 Gregory
 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-xp.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-> index bff9f6c..2be244a 100644
-> --- a/arch/arm/boot/dts/armada-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp.dtsi
-> @@ -35,6 +35,11 @@
->  		};
->  
->  		internal-regs {
-> +			sdramc at 1400 {
-> +				compatible = "marvell,armada-xp-sdram-controller";
-> +				reg = <0x1400 0x500>;
 
-It seemed a quite large area, but indeed there are registers related to the sdram
-controller at least until the address 0x18AC.
-
-> +			};
 > +
->  			L2: l2-cache {
->  				compatible = "marvell,aurora-system-cache";
->  				reg = <0x08000 0x1000>;
+>  static int armadaxp_wdt_clock_init(struct platform_device *pdev,
+>  				   struct orion_watchdog *dev)
+>  {
+> @@ -394,7 +434,7 @@ static const struct orion_watchdog_data armada375_data = {
+>  	.rstout_mask_bit = BIT(10),
+>  	.wdt_enable_bit = BIT(8),
+>  	.wdt_counter_offset = 0x34,
+> -	.clock_init = armada370_wdt_clock_init,
+> +	.clock_init = armada375_wdt_clock_init,
+>  	.enabled = armada375_enabled,
+>  	.start = armada375_start,
+>  	.stop = armada375_stop,
 > 
 
 
