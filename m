@@ -1,47 +1,45 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Mon, 10 Nov 2014 16:16:22 +0530
-Subject: [PATCH 1/4] input: touchscreen: ti_am335x_tsc Interchange
- touchscreen and ADC steps
-In-Reply-To: <20141107080033.GA6455@netboy>
-References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
- <1414408111-2631-2-git-send-email-vigneshr@ti.com>
- <20141106141916.GA17151@netboy> <545C59CD.3070707@ti.com>
- <20141107080033.GA6455@netboy>
-Message-ID: <5460977E.9060604@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Nov 2014 10:48:10 +0000
+Subject: [PATCH 04/13] ARM: multi_v7_defconfig: Enable st ohci and ehci
+ HCD drivers.
+In-Reply-To: <1415361475-6218-5-git-send-email-peter.griffin@linaro.org>
+References: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
+ <1415361475-6218-5-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20141110104810.GS21424@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 07 Nov 2014, Peter Griffin wrote:
 
+> Enable the ehci and ohci drivers in the multi_v7_defconfig so that
+> the USB controllers on stih41x work by default.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
 
-On Friday 07 November 2014 01:30 PM, Richard Cochran wrote:
-> On Fri, Nov 07, 2014 at 11:04:05AM +0530, Vignesh R wrote:
->>
->> Currently, there is too much noise in the TSC hardware that is being
->> removed by delta filtering.
-> 
-> The so called "filter" was only programmed because the fifo entries
-> were being mixed up. Sebastian fixed that.
-> 
->> I tested TSC unit by removing filtering
->> logic, the performance was not at all satisfactory. The cursor jumps
->> wayward and smooth circles cannot be drawn. Looks like delta filtering
->> cannot be removed as of now. May be I will try and address it in future.
-> 
-> The "filter" code is nonsensical. It picks the two values in seqeunce
-> that are closest to one and another. How is that supposed to work?
-> 
-> Did you look at the "noise"? What kind of properties did you see?
-> 
-> A median filter makes more sense. Or sort, remove outliers, and
-> average. But choosing the two closest in series is silly.
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-I was able to implement median filter as you described and achieve
-reliable performance. I will append that to this series of patches in v3.
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 491b7d5..c7a9517 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -318,9 +318,11 @@ CONFIG_USB_XHCI_HCD=y
+>  CONFIG_USB_XHCI_MVEBU=y
+>  CONFIG_USB_EHCI_HCD=y
+>  CONFIG_USB_EHCI_TEGRA=y
+> +CONFIG_USB_EHCI_HCD_STI=y
+>  CONFIG_USB_EHCI_HCD_PLATFORM=y
+>  CONFIG_USB_ISP1760_HCD=y
+>  CONFIG_USB_OHCI_HCD=y
+> +CONFIG_USB_OHCI_HCD_STI=y
+>  CONFIG_USB_OHCI_HCD_PLATFORM=y
+>  CONFIG_USB_STORAGE=y
+>  CONFIG_USB_CHIPIDEA=y
 
-Regards
-Vignesh
-
-> 
-> Thanks,
-> Richard
-> 
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
