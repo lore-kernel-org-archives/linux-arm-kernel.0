@@ -1,83 +1,77 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 10 Nov 2014 13:52:32 +0000
-Subject: [RFC PATCH] drivers: of: move PCI domain assignment to generic
- OF code
-In-Reply-To: <1459907.RIyEjnM4cg@wuerfel>
-References: <1415622368-14612-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1459907.RIyEjnM4cg@wuerfel>
-Message-ID: <20141110135232.GC15484@red-moon>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 10 Nov 2014 14:53:38 +0100
+Subject: [PATCH 12/17] ARM: mvebu: Armada XP GP specific suspend/resume
+ code
+In-Reply-To: <1414151970-6626-13-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1414151970-6626-13-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5460C362.2090802@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 10, 2014 at 12:51:19PM +0000, Arnd Bergmann wrote:
-> On Monday 10 November 2014 12:26:08 Lorenzo Pieralisi wrote:
-> > ---
-> >  arch/arm64/kernel/pci.c | 14 +++--------
-> >  drivers/of/of_pci.c     | 66 +++++++++++++++++++++++++++++++++++++++++++++++--
-> >  include/linux/of_pci.h  |  7 +++---
-> >  3 files changed, 71 insertions(+), 16 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> > index ce5836c..5e21c1c 100644
-> > --- a/arch/arm64/kernel/pci.c
-> > +++ b/arch/arm64/kernel/pci.c
-> > @@ -49,20 +49,14 @@ int pcibios_add_device(struct pci_dev *dev)
-> >  
-> >  
-> >  #ifdef CONFIG_PCI_DOMAINS_GENERIC
-> > -static bool dt_domain_found = false;
-> >  
-> >  void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> >  {
-> > -	int domain = of_get_pci_domain_nr(parent->of_node);
-> > +	int domain = of_assign_pci_domain_nr(parent->of_node);
-> >  
-> > -	if (domain >= 0) {
-> > -		dt_domain_found = true;
-> > -	} else if (dt_domain_found == true) {
-> > -		dev_err(parent, "Node %s is missing \"linux,pci-domain\" property in DT\n",
-> > -			parent->of_node->full_name);
-> > -		return;
-> > -	} else {
-> > -		domain = pci_get_new_domain_nr();
-> > +	if (domain < 0) {
-> > +		dev_err(parent, "PCI domain assignment failed\n");
-> > +		domain = -1;
-> >  	}
-> >  
-> >  	bus->domain_nr = domain;
-> 
-> Is there a need to still keep this in architecture specific code? Why
-> not move it to drivers/pci and let other firmware infrastructure
-> hook in there directly.
+Hi Thomas,
 
-Ok, I can move the function to drivers/pci/pci.c, I did not want to add
-OF code in there but if it is ok with Bjorn I will move the generic
+[...]
 
-pci_bus_assign_domain_nr()
+> +#include "common.h"
+> +
+> +#define ARMADA_XP_GP_PIC_NR_GPIOS 3
+> +
+> +static void __iomem *gpio_ctrl;
+> +static int pic_gpios[ARMADA_XP_GP_PIC_NR_GPIOS];
+> +static int pic_raw_gpios[ARMADA_XP_GP_PIC_NR_GPIOS];
+> +
+> +static void mvebu_armada_xp_gp_pm_enter(void __iomem *sdram_reg, u32 srcmd)
+> +{
+> +	u32 reg, ackcmd;
+> +	int i;
+> +
+> +	/* Put 001 as value on the GPIOs */
+> +	reg = readl(gpio_ctrl);
+> +	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++)
+> +		reg &= ~BIT(pic_raw_gpios[i]);
+> +	reg |= BIT(pic_raw_gpios[0]);
+> +	writel(reg, gpio_ctrl);
+> +
+> +	/* Prepare writing 111 to the GPIOs */
+> +	ackcmd = readl(gpio_ctrl);
+> +	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++)
+> +		ackcmd |= BIT(pic_raw_gpios[i]);
+> +
+> +	/* Wait a while */
+> +	mdelay(250);
+> +
+> +	asm volatile (
+> +		/* Align to a cache line */
+> +		".balign 32\n\t"
+> +
+> +		/* Enter self refresh */
+> +		"str %[srcmd], [%[sdram_reg]]\n\t"
+> +
+> +		/* Wait 100 cycles for DDR to enter self refresh */
+> +		"1: subs r1, r1, #1\n\t"
 
-there and be done with this.
-
-> >  {
-> > @@ -45,10 +45,9 @@ of_pci_parse_bus_range(struct device_node *node, struct resource *res)
-> >  	return -EINVAL;
-> >  }
-> >  
-> > -static inline int
-> > -of_get_pci_domain_nr(struct device_node *node)
-> > +static inline int of_assign_pci_domain_nr(struct device_node *node)
-> >  {
-> > -	return -1;
-> > +	return pci_get_new_domain_nr();
-> >  }
-> >  #endif
-> 
-> This gets a bit tricky otherwise once we add ACPI in the mix, with all
-> combinations of OF and ACPI at compile time and at runtime.
-
-I definitely agree, that's why it is an RFC, basically wanted to
-understand what we want to do with the generic implementation and where
-to move it.
+I should miss something obvious, but I don't see where you load 100 in
+the r1 register. According to your comment and the code, you remove 1 from
+r1 until it reaches 0, so I expected that just before you have loaded 100 in r1.
 
 Thanks,
-Lorenzo
+
+Gregory
+
+> +		"bne 1b\n\t"
+> +
+> +		/* Issue the command ACK */
+> +		"str %[ackcmd], [%[gpio_ctrl]]\n\t"
+> +
+> +		/* Trap the processor */
+> +		"b .\n\t"
+> +		: : [srcmd] "r" (srcmd), [sdram_reg] "r" (sdram_reg),
+> +		  [ackcmd] "r" (ackcmd), [gpio_ctrl] "r" (gpio_ctrl) : "r1");
+> +}
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
