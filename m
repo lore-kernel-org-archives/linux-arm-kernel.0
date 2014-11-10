@@ -1,59 +1,50 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 10 Nov 2014 10:32:24 +0900
-Subject: [PATCH 7/8] ARM: shmobile: r8a73a4: fix scifb* naming
-In-Reply-To: <cover.1415582842.git.horms+renesas@verge.net.au>
-References: <cover.1415582842.git.horms+renesas@verge.net.au>
-Message-ID: <0b3a0ef613538cae4b8b8f41315ef1fd3c957b12.1415582842.git.horms+renesas@verge.net.au>
+Date: Mon, 10 Nov 2014 10:32:34 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Soc Updates for v3.19
+Message-ID: <cover.1415581286.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Ports are named scifb0-3, not scifb2-5.
+Please consider these second round of Renesas ARM based SoC soc updates for v3.19.
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a73a4.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+This pull request is based on the previous round of
+such requests, tagged as renesas-soc-for-v3.19,
+which I have already sent a pull-request for.
 
-diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
-index c17afef..5c75c91 100644
---- a/arch/arm/boot/dts/r8a73a4.dtsi
-+++ b/arch/arm/boot/dts/r8a73a4.dtsi
-@@ -263,14 +263,14 @@
- 		status = "disabled";
- 	};
- 
--	scifb2: serial at e6c20000 {
-+	scifb0: serial at e6c20000 {
- 		compatible = "renesas,scifb-r8a73a4", "renesas,scifb";
- 		reg = <0 0xe6c20000 0 0x100>;
- 		interrupts = <0 148 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
- 	};
- 
--	scifb3: serial at e6c30000 {
-+	scifb1: serial at e6c30000 {
- 		compatible = "renesas,scifb-r8a73a4", "renesas,scifb";
- 		reg = <0 0xe6c30000 0 0x100>;
- 		interrupts = <0 149 IRQ_TYPE_LEVEL_HIGH>;
-@@ -291,14 +291,14 @@
- 		status = "disabled";
- 	};
- 
--	scifb4: serial at e6ce0000 {
-+	scifb2: serial at e6ce0000 {
- 		compatible = "renesas,scifb-r8a73a4", "renesas,scifb";
- 		reg = <0 0xe6ce0000 0 0x100>;
- 		interrupts = <0 150 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
- 	};
- 
--	scifb5: serial at e6cf0000 {
-+	scifb3: serial at e6cf0000 {
- 		compatible = "renesas,scifb-r8a73a4", "renesas,scifb";
- 		reg = <0 0xe6cf0000 0 0x100>;
- 		interrupts = <0 151 IRQ_TYPE_LEVEL_HIGH>;
--- 
-2.1.1
+
+The following changes since commit 3794705aeb318c431c07072f04380c78cc5a84ac:
+
+  ARM: shmobile: Select CONFIG_ZONE_DMA when CONFIG_ARM_LPAE is enabled (2014-10-28 08:43:03 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.19
+
+for you to fetch changes up to 950a3f0e7dd32c372c9957d5c050b08de7ec9e56:
+
+  ARM: shmobile: Enable PCI domains for R-Car Gen2 devices (2014-11-05 14:50:17 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Soc Updates for v3.19
+
+* Enable PCI domains for R-Car Gen2 devices
+* Make APMU resource code SoC-specific
+
+----------------------------------------------------------------
+Hisashi Nakamura (2):
+      ARM: shmobile: Separate APMU resource data into CPU dependant part
+      ARM: shmobile: r8a7791: Correct number of CPU cores
+
+Phil Edworthy (1):
+      ARM: shmobile: Enable PCI domains for R-Car Gen2 devices
+
+ arch/arm/mach-shmobile/Kconfig        |  1 +
+ arch/arm/mach-shmobile/common.h       |  5 -----
+ arch/arm/mach-shmobile/platsmp-apmu.c | 27 +++++++++------------------
+ arch/arm/mach-shmobile/platsmp-apmu.h | 32 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/smp-r8a7790.c  | 16 +++++++++++++++-
+ arch/arm/mach-shmobile/smp-r8a7791.c  | 12 +++++++++++-
+ 6 files changed, 68 insertions(+), 25 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/platsmp-apmu.h
