@@ -1,49 +1,30 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 10 Nov 2014 10:40:14 -0800
-Subject: [PATCH v7 4/5] ARM: dts: add RK3288 suspend support
-In-Reply-To: <1415368177-6637-5-git-send-email-zyw@rock-chips.com>
-References: <1415368177-6637-1-git-send-email-zyw@rock-chips.com>
- <1415368177-6637-5-git-send-email-zyw@rock-chips.com>
-Message-ID: <CAD=FV=Uur0za+NX-vKWhPq61JFBwFRHu2MNFeaLQmpsZbs87dg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 10 Nov 2014 18:41:11 +0000
+Subject: [PATCH v8 03/13] xen/arm: if(pfn_valid(pfn)) call native dma_ops
+In-Reply-To: <1415636045-24669-3-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1411101607130.22875@kaball.uk.xensource.com>
+ <1415636045-24669-3-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20141110184111.GH25609@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chris,
+On Mon, Nov 10, 2014 at 04:13:55PM +0000, Stefano Stabellini wrote:
+>  void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
+>  		size_t size, enum dma_data_direction dir,
+> -		struct dma_attrs *attrs);
+> +		struct dma_attrs *attrs)
+> +{
+> +	unsigned long pfn = PFN_DOWN(handle);
+> +	/* Dom0 is mapped 1:1, so calling pfn_valid on a foreign mfn will
+> +	 * always return false. If the page is local we can safely call the
+> +	 * native dma_ops function, otherwise we call the xen specific
+> +	 * function. */
+> +	if (pfn_valid(pfn)) {
+> +		if (__generic_dma_ops(hwdev)->unmap_page)
+> +			__generic_dma_ops(hwdev)->unmap_page(hwdev, handle, size, dir, attrs);
 
-On Fri, Nov 7, 2014 at 5:49 AM, Chris Zhong <zyw@rock-chips.com> wrote:
-> add pmu sram node for suspend, add global_pwroff pinctrl.
-> The pmu sram is used to store the resume code.
-> global_pwroff is held low level at work, it would be pull to high
-> when entering suspend. reference this in the board DTS file since
-> some boards need it.
->
-> Signed-off-by: Tony Xie <xxx@rock-chips.com>
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
-> Tested-by: Doug Anderson <dianders@chromium.org>
->
-> ---
->
-> Changes in v7: None
-> Changes in v6:
-> - change pmu_intmem at ff720000 to sram at ff720000
->
-> Changes in v5:
-> - change size to 4k
->
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2:
-> - put "rockchip,rk3288-pmu-sram" to first
->
->  arch/arm/boot/dts/rk3288.dtsi | 11 +++++++++++
->  1 file changed, 11 insertions(+)
+Similarly here, do we need the unmap_page check? dma_map_page() does not
+do it.
 
-I was sorta hoping that when you sent out v7 you'd incorporate the
-extra dts bits that you sent me and that I had stashed at
-<https://chromium-review.googlesource.com/#/c/226826/>.  Maybe you
-could do it if you send out a v8.
-
-If you don't send out a v8 we could always land those bits separately.
-
--Doug
+-- 
+Catalin
