@@ -1,102 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 10 Nov 2014 09:52:28 +0000
-Subject: AMR: sun7i: CPU hotplug support?
-In-Reply-To: <5460870C.9010109@web.de>
-References: <545FC215.7010802@web.de> <20141109231744.GC2989@lukather>
- <5460554A.1060701@web.de> <5460766B.8070000@web.de> <546082A8.60401@arm.com>
- <5460870C.9010109@web.de>
-Message-ID: <54608ADC.4050500@arm.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Mon, 10 Nov 2014 18:53:30 +0900
+Subject: [PATCH v6 00/12] NVIDIA Tegra memory controller and IOMMU support
+In-Reply-To: <1415376063-17205-1-git-send-email-thierry.reding@gmail.com>
+References: <1415376063-17205-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <54608B1A.3010001@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+On 11/08/2014 01:00 AM, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+>
+> This is the sixth installment in the Tegra IOMMU and memory controller
+> support series. This version addresses the final outstanding comments from
+> Olof about using proper Kconfig symbols to track the dependencies. It also
+> splits up the driver into one part that implements the memory controller
+> only and a second part that implements the SMMU. This plays nicely with
+> the new Kconfig options introduced.
+>
+> Patch 1 is a preparatory patch that exposes the memory controller clock.
+>
+> Patches 2 and 3 is a pair of precursory patches needed to make this all
+> work on 64-bit ARM in the future.
+>
+> The device tree binding for the Tegra memory controller is added in patch
+> 4 and patch 5 is the bulk of the series that move the existing memory
+> controller and IOMMU drivers into the new unified driver that supports
+> Tegra30, Tegra114 and Tegra124.
+>
+> Patches 6, 7 and 8 add the DT nodes for the memory controller/IOMMU on
+> Tegra30, Tegra114 and Tegra124.
+>
+> IOMMU support is enabled for the display controllers in patches 9, 10 and
+> 11. This will allow the display controllers to have their memory accesses
+> translated by the SMMU, which will enable non-contiguous buffers to be
+> used for scan-out.
+>
+> Finally patch 12 also adds support for Tegra132. It is kept separate because
+> none of the other Tegra132 patches have been merged yet, but I've included
+> it here for completeness.
+>
+> Because the patches are rather intertwined, I'd like to merge them all via
+> the Tegra tree. For that I'll need Acked-bys from Mike, Russell and Joerg
+> on patches 1, 2 and 3, and 5, respectively.
 
-On 10/11/14 09:36, Jan Kiszka wrote:
-> On 2014-11-10 10:17, Marc Zyngier wrote:
->> On 10/11/14 08:25, Jan Kiszka wrote:
->>> On 2014-11-10 07:03, Jan Kiszka wrote:
->>>> On 2014-11-10 00:17, Maxime Ripard wrote:
->>>>> Hi Jan,
->>>>> 
->>>>> On Sun, Nov 09, 2014 at 08:35:49PM +0100, Jan Kiszka
->>>>> wrote:
->>>>>> did anyone already happen to look into enabling CPU
->>>>>> hotplug for the Allwinner A20 in upstream? I'm currently
->>>>>> running the sunxi-next branch on Banana Pi, and echo 0 >
->>>>>> .../cpu1/online just hangs the system. The old 3.4
->>>>>> LeMaker kernel works fine in this regard. I can try to
->>>>>> look into details and port things over, just want to
->>>>>> avoid duplicate efforts.
->>>>> 
->>>>> Having hotplug support would indeed be very welcome.
->>>>> 
->>>>> However, it should be done in u-boot, through PSCI, and not
->>>>> in the kernel itself.
->>>>> 
->>>>> As far as I'm aware, no one worked actively on it, beside
->>>>> some WIP commit from Marc a while ago: 
->>>>> https://git.kernel.org/cgit/linux/kernel/git/maz/u-boot.git/commit/?h=wip/psci&id=45379c0f9cf812f0f62722f4015ec907fa5dc144
->>>>
->>>>
->>>>>
->>
->>>>> 
-OK - I guess I will need a little guidance in then: Is there a good
->>>> reference board to study and to derive from? And maybe also:
->>>> What is missing or not working in that u-boot branch? If I
->>>> get this interface right, I just takes some device tree bits
->>>> to enable this for the kernel afterward, correct?
->>> 
->>> Started to play with that patch in naive ways: CPU0 locks up
->>> when offlining CPU1 - unless I disable the FIQ signal from
->>> CPU1. Then it "works", both offlining and onlining again.
->>> However, I suspect that this only parks CPU1 in wfi and does
->>> not do anything interesting to it.
->> 
->> Here's how this is supposed to work: - CPU1 sends a FIQ to CPU0,
->> bringing it into secure mode. - CPU0 then kills CPU1 by doing the
->> magic incantations on the power controller
->> 
->> What is missing here is all the cache cleaning before signalling
->> CPU0. If you add that, things should look a lot better (patches
->> welcome).
-> 
-> Unsure about this, or maybe this was too simplistic: I added calls
-> to u-boot's flush_dcache_all and invalidate_icache_all (right
-> after disabling the cache, just like the vendor kernel does), but
-> CPU0 still locks up. I suspect there is still a bug in the FIQ
-> handling. There is also a suspicious single "@" printed on the
-> console. I'll play with the FIQ handler a bit.
+FWIW,
 
-The '@' is just my own debug stuff, and might be causing issues too.
+Tested-by: Alexandre Courbot <acourbot@nvidia.com>
 
-Now, you have to realise that by the time you call into this code,
-u-boot itself is long gone. Only the tiny bit of code dealing with
-PSCI still lives in a bank of static, secure memory. So calling into
-u-boot for anything is doomed. You need to actually put the code
-inside the PSCI backend.
+Works nicely with both the display and GPU clients, which allows us to 
+remove the need for CMA on Tegra.
 
 Thanks,
-
-	M.
-- -- 
-Jazz is not dead. It just smells funny...
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.10 (GNU/Linux)
-Comment: Using GnuPG with undefined - http://www.enigmail.net/
-
-iQIcBAEBAgAGBQJUYIrRAAoJECPQ0LrRPXpDyjQQAMpDGLUwVODYi0lHFb20axqZ
-Jjptkh6L2UJ2D2a2Ow17umrnIJqFjvVDasKtoxrBj79ya7LvHdfti4cFAjhZbh53
-dOYmGqWHLP5N2Ue5KGs6zEpmW3bkUQRM2n03pTsqs907zN3XrjhfdtEqun5qAKTX
-Kbk2X/CieQnGx9rYeZUAIiJm0qO4e9ijKFQCvxRDItr0Eb4voRwRCtWCiD530ZTc
-34G7fpqTR4HKNRsaLeBRCUz3dJXP7KgW3VymIu35fAAyUlt0oMENrcX9qKb6AHR7
-KM0JXkts+bMmxeddRPzEEikHvRfSgbFxTY0+6vsqi4DrsuihI5OG+6VqckZRrfpV
-S74IkyEyBscSUhkRcXUEWsly9AcK7gvxlK0DqyR+5v+OOQd6RGfAfA8xYT6GbtpN
-EZ8suyFWsl55QdolWx5Pqb8VfL0Z70AteWcMhJia6eg69hGo1YJVM6DJ93rvSwzx
-x1UniBVBkp9/jZYJPgrCw0ywGXbWex7OcnTCscGAChkFMgFT/LiBCF16PKoyLhYu
-oGoClNbwlLgo4xAoeB/pDLyO0eaOLQS7/w2LdLZGbPXMVqcXkYVS+vkdkfe099Hb
-dYXOCkI8mcxDDisodtSg7W797bJMfjnCmfrXJuyfTbJW2nSrYgqw5yZNhhEhlWB3
-n24nemun99pZ8di2HBSl
-=C/8W
------END PGP SIGNATURE-----
+Alex.
