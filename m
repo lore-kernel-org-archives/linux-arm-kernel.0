@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 10 Nov 2014 10:32:22 +0900
-Subject: [PATCH 5/8] ARM: shmobile: r8a7791 dtsi: Drop bogus 0x unit-address
- prefix
+Date: Mon, 10 Nov 2014 10:32:23 +0900
+Subject: [PATCH 6/8] ARM: shmobile: kzm9g-reference dts: Drop bogus 0x
+ unit-address prefix
 In-Reply-To: <cover.1415582842.git.horms+renesas@verge.net.au>
 References: <cover.1415582842.git.horms+renesas@verge.net.au>
-Message-ID: <6b83dc1d03348ec1b1c6879515de1216e060005c.1415582842.git.horms+renesas@verge.net.au>
+Message-ID: <76ddbdc3010fbb6d5974545a9e91a8ac7460a243.1415582842.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,21 +13,21 @@ From: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 2 +-
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index e06c11f..35b8a75 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -1153,7 +1153,7 @@
- 		status = "disabled";
+diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+index 0dac0e6..8c913d9 100644
+--- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
++++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+@@ -251,7 +251,7 @@
+ 		};
  	};
  
--	rcar_sound: rcar_sound at 0xec500000 {
-+	rcar_sound: rcar_sound at ec500000 {
- 		#sound-dai-cells = <1>;
- 		compatible =  "renesas,rcar_sound-r8a7791", "renesas,rcar_sound-gen2", "renesas,rcar_sound";
- 		reg =	<0 0xec500000 0 0x1000>, /* SCU */
+-	ak4648: ak4648 at 0x12 {
++	ak4648: ak4648 at 12 {
+ 		#sound-dai-cells = <0>;
+ 		compatible = "asahi-kasei,ak4648";
+ 		reg = <0x12>;
 -- 
 2.1.1
