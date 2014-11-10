@@ -1,71 +1,35 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 10 Nov 2014 16:18:50 +0100
-Subject: [PATCH] PM / Domains: Fix initial default state of the
- need_restore flag
-In-Reply-To: <20141107215751.GA4439@dtor-ws>
-References: <1415366847-4807-1-git-send-email-ulf.hansson@linaro.org>
- <7hr3xerdw6.fsf@deeprootsystems.com>
- <20141107215751.GA4439@dtor-ws>
-Message-ID: <CAPDyKFot-LZjazq190cY3-tawB_-ukdsmrLcD3vtidLvX68FOg@mail.gmail.com>
+From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
+Date: Mon, 10 Nov 2014 15:25:40 +0000
+Subject: dtb size limit? was Re: Tiny dts change breaks boot on n900
+In-Reply-To: <20141110125806.GA16650@amd>
+References: <20141110123118.GA31134@amd> <20141110125806.GA16650@amd>
+Message-ID: <5460D8F4.9000507@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+Am 10.11.2014 um 12:58 schrieb Pavel Machek:
+> If I replace the blo[ck] below with
+> 
+>  a = <1>;
+>  b = <2>;
+>  c = <3>;
+>  d = <4>;
+> 
+> Resulting kernel boots. Replacing it with
+> 
+>  a-really-long-attribute-name-hopefully-this-breaks-stuff = <1>;
+>  b = <2>;
+>  c = <3>;
+>  d = <4>;
+> 
+> Breaks the boot. I'm using dtb append option. Any ideas? Nonbooting
+> dtb is 68910 bytes.
 
-> I guess we do need it for 3.18, but when we are talking about 3.19,
-> before we make any more changes can we outline how power domains are
-> supposed to work?
->
-> 1. How do we attach a device to power domain? Right now it seems that
-> individual buses are responsible for attaching their devices to power
-> domains. Should we move it into driver core (device_pm_add?) so that
-> device starts its life in its proper power domain?
+Did you verify that your initrd, if any, does not overlap the end of the
+kernel when loading it from the bootloader?
 
-That was the initial approach.
+Andreas
 
-To my understanding, Rafael's primary reason for not accepting that
-was that it's not common, but it's platform-specific.
-http://marc.info/?l=linux-pm&m=140243462304669&w=2
-
-Now, even if we would reconsider doing as you propose, what would the
-actual benefit be? Obviously, we would get less amount of code to
-maintain, which is one reason, but are there more?
-
->
-> 2. When do we power up the devices (and the domains)? Right now devices
-> in ACPI power domain are powered when they are attached to the power
-> domain (which coincides with probing), but generic power domains do not
-> do that. Can we add a separate API to explicitly power up the device (and
-> its domain if it is powered down) and do it again, either in device core
-> or in individual buses. This way, regardless of runtime PM or not, we
-> will have devices powered on when driver tries to bind to them. If
-> binding fails we can power down the device.
-
-Isn't that exactly what I implemented in [1], what am I missing?
-
->
-> I've heard there is a concern about power domain bouncing up and down
-> during probing. Is it really a concern? Would not we run into the same
-> issues past booting up with aggressive PM policy? Anyway, we could
-> probably work around this by refusing to actually power down the domains
-> until we are done booting, similarly to who genpd_poweroff_unused works.
-
-I haven't heard about this kind of issues, but I think your approach
-seems reasonable.
-
-Currently, I think we should focus on solving the problem in [1].
-Those drivers/subsystems that use pm_runtime_set_active() during
-->probe() are broken in this regards.
-
-Now, if we move the attachment of devices to their PM domains from
-buses into driver core, that could simplify [1]. Still, only if we
-also decide to power on PM domains from driver core, else it wouldn't
-matter much I think.
-
-
-[1]
-[PATCH v3 0/9] PM / Domains: Fix race conditions during boot
-http://marc.info/?t=141320907000003&r=1&w=2
-
-Kind regards
-Uffe
+-- 
+SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 21284 AG N?rnberg
