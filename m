@@ -1,61 +1,84 @@
 From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Mon, 10 Nov 2014 14:52:44 -0800
-Subject: [RFC 0/2] Qualcomm RPM sleep states
-Message-ID: <1415659966-16200-1-git-send-email-bjorn.andersson@sonymobile.com>
+Date: Mon, 10 Nov 2014 14:52:45 -0800
+Subject: [RFC 1/2] mfd: qcom-rpm: Expose sleep state resources to clients
+In-Reply-To: <1415659966-16200-1-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1415659966-16200-1-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <1415659966-16200-2-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During the review of the Qualcomm SMD RPM regulators [1], I got (offline)
-feedback that my implementation did not handle "sleep states". As the problem
-is shared between all families of Qualcomm platforms I use [2] (family A) to
-propose a solution (as I hope to get that merged sooner).
+Resources exposed from the RPM have an "active state" that is used during
+normal operations and a "sleep state" that is used for HW assisted sleep
+modes. Expose this in the api to let client drivers set the "sleep
+state" as well.
 
-The "sleep states" comment boils down to certain regulators (or rpm resources
-in general) are used by the currently clocked/running CPU(s) and can not be
-disabled while we're still running. Further more, these resources are shared
-with peripherals in the system; e.g. LDO12 on PM8941 is used to clock the CPU
-and WiFi/BT PLLs as well as providing power to the display in our devices. So
-the suspend functionality in the regulator framework doesn't cut it.
+Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+---
+ drivers/mfd/qcom_rpm.c                 |    9 +++++----
+ drivers/regulator/qcom_rpm-regulator.c |    1 +
+ include/linux/mfd/qcom_rpm.h           |    5 ++++-
+ 3 files changed, 10 insertions(+), 5 deletions(-)
 
-
-The downstream solution to this is to expose 3 regulators per regulator
-resource, each specified to control the active mode, sleep mode or both modes
-respectively. Peripherals are directed to use the "both" regulator while the
-CPUs are directed to the "active only" regulator.
-
-After reviewing this solution and looking at what it's actually achieving I
-here propose flagging these regulators to have "deferred disable";
-* we consider the specific regulators as always-on _while running_
-* hence, disable and enable affect only the sleep state
-* we update both active and sleep state with all other properties
-
-This gives us a single regulator exposed for the resource, that will be kept on
-with parameters as specified by the clients if it's referenced and upon loosing
-the last reference (disabling all consumers) it will be turned off when the
-CPU(s) are sleeping.
-
-
-As far as I can see this should give the same behaviour as we have downstream,
-without the need for playing tricks with how we expose the regulators. However
-there's plenty of details hidden in that code, so I hope to get some feedback
-from the Qualcomm engineers on this.
-
-
-The first patch in the series applies on top of [2], it should be squashed with
-1 & 2 of [2] and is only included for completeness.
-
-[1] https://lkml.org/lkml/2014/9/29/747
-[2] https://lkml.org/lkml/2014/9/22/731
-
-Bjorn Andersson (2):
-  mfd: qcom-rpm: Expose sleep state resources to clients
-  regulator: qcom-rpm: Implement RPM assisted disable
-
- Documentation/devicetree/bindings/mfd/qcom-rpm.txt |   28 ++++++++
- drivers/mfd/qcom_rpm.c                             |    9 +--
- drivers/regulator/qcom_rpm-regulator.c             |   67 +++++++++++++++-----
- include/linux/mfd/qcom_rpm.h                       |    5 +-
- 4 files changed, 88 insertions(+), 21 deletions(-)
-
+diff --git a/drivers/mfd/qcom_rpm.c b/drivers/mfd/qcom_rpm.c
+index 0dd7a6fe..f696328 100644
+--- a/drivers/mfd/qcom_rpm.c
++++ b/drivers/mfd/qcom_rpm.c
+@@ -67,7 +67,6 @@ struct qcom_rpm {
+ #define RPM_ACK_SELECTOR	23
+ #define RPM_SELECT_SIZE		7
+ 
+-#define RPM_ACTIVE_STATE	BIT(0)
+ #define RPM_NOTIFICATION	BIT(30)
+ #define RPM_REJECTED		BIT(31)
+ 
+@@ -332,7 +331,10 @@ static const struct of_device_id qcom_rpm_of_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, qcom_rpm_of_match);
+ 
+-int qcom_rpm_write(struct qcom_rpm *rpm, int resource, u32 *buf, size_t count)
++int qcom_rpm_write(struct qcom_rpm *rpm,
++		   int state,
++		   int resource,
++		   u32 *buf, size_t count)
+ {
+ 	const struct qcom_rpm_resource *res;
+ 	const struct qcom_rpm_data *data = rpm->data;
+@@ -359,8 +361,7 @@ int qcom_rpm_write(struct qcom_rpm *rpm, int resource, u32 *buf, size_t count)
+ 			       RPM_CTRL_REG(rpm, RPM_REQ_SELECT + i));
+ 	}
+ 
+-	writel_relaxed(RPM_ACTIVE_STATE,
+-		       RPM_CTRL_REG(rpm, RPM_REQUEST_CONTEXT));
++	writel_relaxed(BIT(state), RPM_CTRL_REG(rpm, RPM_REQUEST_CONTEXT));
+ 
+ 	reinit_completion(&rpm->ack);
+ 	regmap_write(rpm->ipc_regmap, rpm->ipc_offset, BIT(rpm->ipc_bit));
+diff --git a/drivers/regulator/qcom_rpm-regulator.c b/drivers/regulator/qcom_rpm-regulator.c
+index b55cd5b..4fc1c7e 100644
+--- a/drivers/regulator/qcom_rpm-regulator.c
++++ b/drivers/regulator/qcom_rpm-regulator.c
+@@ -198,6 +198,7 @@ static int rpm_reg_write(struct qcom_rpm_reg *vreg,
+ 	vreg->val[req->word] |= value << req->shift;
+ 
+ 	return qcom_rpm_write(vreg->rpm,
++			      RPM_ACTIVE_STATE,
+ 			      vreg->resource,
+ 			      vreg->val,
+ 			      vreg->parts->request_len);
+diff --git a/include/linux/mfd/qcom_rpm.h b/include/linux/mfd/qcom_rpm.h
+index a60798d..f0e70b2 100644
+--- a/include/linux/mfd/qcom_rpm.h
++++ b/include/linux/mfd/qcom_rpm.h
+@@ -5,6 +5,9 @@
+ 
+ struct qcom_rpm;
+ 
+-int qcom_rpm_write(struct qcom_rpm *rpm, int resource, u32 *buf, size_t count);
++#define RPM_ACTIVE_STATE	0
++#define RPM_SLEEP_STATE		1
++
++int qcom_rpm_write(struct qcom_rpm *rpm, int state, int resource, u32 *buf, size_t count);
+ 
+ #endif
 -- 
 1.7.9.5
