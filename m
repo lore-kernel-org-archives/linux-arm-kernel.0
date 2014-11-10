@@ -1,171 +1,94 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 9 Nov 2014 22:21:59 -0800
-Subject: [GIT PULL] Broadcom Cygnus SoC defconfig changes
-In-Reply-To: <54604EE1.4020303@broadcom.com>
-References: <1414698612-26216-1-git-send-email-f.fainelli@gmail.com>
- <20141109001302.GB11947@quad.lixom.net>
- <545EFF6E.7000309@broadcom.com> <545FBF72.10202@gmail.com>
- <54604EE1.4020303@broadcom.com>
-Message-ID: <CAOesGMgc30QU8tU15Ddzf_HHpA2rqSa07ThBj+e1Rn36_dbqyg@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 10 Nov 2014 15:36:56 +0900
+Subject: [RFC] ptrace: add generic SET_SYSCALL request
+In-Reply-To: <20141107122734.GE18916@arm.com>
+References: <1415346443-28915-1-git-send-email-takahiro.akashi@linaro.org>
+ <1977974.l97vvy7Y8b@wuerfel> <20141107115551.GC18916@arm.com>
+ <1678531.AUssrM9PAs@wuerfel> <20141107122734.GE18916@arm.com>
+Message-ID: <54605D08.1030008@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 9, 2014 at 9:36 PM, Scott Branden <sbranden@broadcom.com> wrote:
-> On 14-11-09 11:24 AM, Florian Fainelli wrote:
->>
->> On 11/08/14 21:45, Scott Branden wrote:
->>>
->>> Hi Olof,
->>>
->>> Thanks for the comments.  Please see my questions inline before we
->>> determine what needs to be done for the defconfig patchset.
->>>
->>> On 14-11-08 04:13 PM, Olof Johansson wrote:
+On 11/07/2014 09:27 PM, Will Deacon wrote:
+> On Fri, Nov 07, 2014 at 12:03:00PM +0000, Arnd Bergmann wrote:
+>> On Friday 07 November 2014 11:55:51 Will Deacon wrote:
+>>> On Fri, Nov 07, 2014 at 09:30:53AM +0000, Arnd Bergmann wrote:
+>>>> On Friday 07 November 2014 16:47:23 AKASHI Takahiro wrote:
+>>>>> This patch adds a new generic ptrace request, PTRACE_SET_SYSCALL.
+>>>>> It can be used to change a system call number as follows:
+>>>>>      ret = ptrace(pid, PTRACE_SET_SYSCALL, null, new_syscall_no);
+>>>>> 'new_syscall_no' can be -1 to skip this system call, you need to modify
+>>>>> a register's value, in arch-specific way, as return value though.
+>>>>>
+>>>>> Please note that we can't define PTRACE_SET_SYSCALL macro in
+>>>>> uapi/linux/ptrace.h partly because its value on arm, 23, is used as another
+>>>>> request on sparc.
+>>>>>
+>>>>> This patch also contains an example of change on arch side, arm.
+>>>>> Only syscall_set_nr() is required to be defined in asm/syscall.h.
+>>>>>
+>>>>> Currently only arm has this request, while arm64 would also have it
+>>>>> once my patch series of seccomp for arm64 is merged. It will also be
+>>>>> usable for most of other arches.
+>>>>> See the discussions in lak-ml:
+>>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/300167.html
+>>>>>
+>>>>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>>>>
 >>>>
->>>> On Thu, Oct 30, 2014 at 12:50:09PM -0700, Florian Fainelli wrote:
->>>>>
->>>>> The following changes since commit
->>>>> f114040e3ea6e07372334ade75d1ee0775c355e1:
->>>>>
->>>>>     Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
->>>>>
->>>>> are available in the git repository at:
->>>>>
->>>>>     http://github.com/brcm/linux.git
->>>>> tags/arm-soc/for-3.18/cygnus-defconfig-v9
->>>>>
->>>>> for you to fetch changes up to
->>>>> aa0204801143ee2d47e9e8dd5f39cdddd5613b4b:
->>>>>
->>>>>     ARM: multi_v7_defconfig: Enable Broadcom Cygnus (2014-10-30
->>>>> 11:01:35 -0700)
->>>>
->>>>
->>>> Hi Florian,
->>>>
->>>> Apologies for the delay in dealing with this pull request.
->>>>
->>>>> ----------------------------------------------------------------
->>>>> This patchset contains initial support for Broadcom's Cygnus SoC
->>>>> based on our
->>>>> iProc architecture. Initial support is minimal and includes just the
->>>>> mach
->>>>> platform code, clock driver, and a basic device tree configuration.
->>>>> Peripheral
->>>>> drivers will be submitted soon, as will device tree configurations
->>>>> for other
->>>>> Cygnus board variants.
->>>>>
->>>>> These are the defconfig parts of the changes
->>>>>
->>>>> ----------------------------------------------------------------
->>>>> Jonathan Richardson (1):
->>>>>         ARM: cygnus defconfig : Initial defconfig for Broadcom Cygnus
->>>>> SoC
->>>>>
->>>>> Ray Jui (1):
->>>>>         ARM: multi_v7_defconfig: Enable Broadcom Cygnus
->>>>>
->>>>> Scott Branden (1):
->>>>>         ARM: bcm_defconfig/multi_v7_defconfig: remove one level of
->>>>> menu from Kconfig
->>>>>
->>>>>    arch/arm/configs/bcm_cygnus_defconfig | 237
->>>>> ++++++++++++++++++++++++++++++++++
->>>>>    arch/arm/configs/bcm_defconfig        |   3 +-
->>>>>    arch/arm/configs/multi_v7_defconfig   |  21 ++-
->>>>
->>>>
->>>> Please send multi_v7_defconfig updates as a patch instead of including
->>>> in
->>>> a merge request. We ask for this because it's a file that many
->>>> maintainers
->>>> touch and it's easy that we get lots of conflicts otherwise.
+>>>> Can you describe why you are moving the implementation? Is this a feature
+>>>> that we want to have on all architectures in the future? As you say,
+>>>> only arm32 implements is at the moment.
 >>>
->>> OK, easy to do.  Are there other files that we need to be aware of that
->>> have these different requirements to merge as well?
->>>
->>>>
->>>> As far as the bcm_cygnus_defconfig: Since new platforms are
->>>> multiplatform
->>>> enabled by default, we normally only prefer to have one defconfig per
->>>> vendor.
->>>> We've made exceptions in cases where the families are very different,
->>>> but in
->>>> general one defconfig per vendor should be sufficient.
->>>>
->>>> I.e. please enable the cygnus options in bcm_defconfig instead of
->>>> adding a new
->>>> one.
->>>
->>>
->>> Hi Olof, we can do this.  But this makes bcm_defconfig unusable for us
->>> in a product and is not a simple configuration to start from for our
->>> customers.  bcm_defconfig is a different SoC family based around the
->>> Kona architecture. bcm_defconfig won't be what we build and test on
->>> Cygnus at all.  There is a script in scripts/kconfig/mergeconfig.pl that
->>> allows you to merge config files together if you wish to have a kernel
->>> support multiple SoCs.  I see the same problem with multi_v7_defconfig
->>> but even worse.  It isn't a configuration we will ever use.  Its only
->>> purpose seems to be to enable our drivers in the that build just in case
->>> somebody else happens to break something in the build.
+>>> We need this for arm64 and, since all architectures seem to have a mechanism
+>>> for setting a system call via ptrace, moving it to generic code should make
+>>> sense for new architectures too, no?
 >>
->>
->> The defconfigs shipped in the mainline kernel only serve the purpose of
->> building as many drivers/subsystems as possible and making sure they
->> work well together from a general distribution perspective like
->> Debian/Ubuntu/OE... That does not mean this is your configuration
->> template for a downstream kernel with only a specific set of SoCs to
->> support.
->>
->>>
->>> As it stands, multi_v7_defconfig boots noticably slower than
->>> bcm_cygnus_defconfig.  And, the kernel is larger than we want.  And, the
->>> kconfigs are more complicated than we need for our boards.  I also
->>> notice some of the other SoCs families enabled automatically turn on a
->>> lot of features we don't want on.
->>
->>
->> Right, you are also very likely to see code blow away that has been
->> enabled as part of the multi_v7_defconfig, but actually assumes that it
->> will only run on a a particular family of SoCs, of course, all of this
->> is good to fix to improve the multiplatform kernel, but does not
->> necessarily impact you directly.
->>
->>>
->>> Perhaps most of the multi_v7_defconfig merge issue you are facing could
->>> be solved if you used the mergconfig.pl script to merge multiple
->>> defconfigs together?
->>>
->>> What we wish to do is have a config file that only supports the Cygnus
->>> family of SoCs.  This allows others to easily see what applies to Cygnus
->>> without being confused by other configurations.  And, if somebody wishes
->>> to use scripts/kconfig/mergeconfig.pl to merge different SoC support
->>> together they are free to do so.
->>>
->>> So, we can do as you ask to get this upstreamed.  But it really serves
->>> little purpose for us other than verifying things build.
->>>
->>> Where do we upstream the defconfig that we actually use?  Or is this
->>> just not done and everyone keeps everything locally and has to continue
->>> to maintain it there?
->>
->>
->> FWIW, this is typically what we do for the brcmstb_defconfig, it is just
->> present in our downstream kernel, but we do use the multi_v7_defconfig
->> when testing upstream.
+>> It makes a little more sense now, but I still don't understand why you
+>> need to set the system call number via ptrace. What is this used for,
+>> and why doesn't any other architecture have this?
 >
-> Puzzling.  So dts files are allowed to be upstreamed per board, but the
-> reference kernel configuration that is actually tested extensively on that
-> board is not upstreamed?
+> I went through the same thought process back in August, and Akashi
+> eventually convinced me that this was the best thing to do:
+>
+>    http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/278692.html
+>
+> It comes down to a debugger (which could be GDB, seccomp, tracer ...)
+> wanting to change the system call number. This is also used as a mechanism
+> to skip a system call by setting it to '-1' (yeah, it's gross, and the
+> interaction between all of these syscall hooks is horrible too).
+>
+> If we update w8 directly instead, we run into a couple of issues:
+>
+>    - Needing to restore the original w8 if the value is set to '-1' for
+>      skip, but continuing to return -ENOSYS for syscall(-1) when not on a
+>      tracer path
 
-Correct. Distros (desktop/server/embedded/etc) test the kernel too,
-and they don't have their defconfigs in the kernel repo either.
+Yeah, this restriction still exists on my recent patch, v7.
+(this is because arm64 uses the same register, x0, as the first argument
+and a return value.)
 
-The beauty of the defconfigs is that even though you enable more
-options than the bare minimum, the kernel should still work (or it's
-broken). Sure, it'll be larger, and might take a while longer to load
-from disk, but things should work just fine.
+>    - seccomp assumes that syscall_get_nr will return the version set by
+>      the most recent tracer, so then we need hacks in ptrace to route
+>      register writes to w8 to syscallno in pt_regs, but again, only in the
+>      case that we're tracing.
 
+The problem here is that, if we had a hack of replacinging syscallno with w8
+in ptrace (ptrace_syscall_enter()), secure_computing() (actually, seccomp_phase2()
+on v3.18-rc) would have no chance of seeing a modified syscall number because
+the hack would be executed after secure_computing().
+(Please note that a tracer simply modifies w8, not syscallno directly).
 
--Olof
+This eventually results in missing a special case of -1 (skipping this system call).
+     http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/280846.html
+
+That is why we needed to have a dedicated new interface.
+
+-Takahiro AKASHI
+
+> Akashi might be able to elaborate on other problems, since this was a
+> couple of months ago and I take every opportunity I can to avoid looking
+> at this part of the kernel.
+>
+> Will
+>
