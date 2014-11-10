@@ -1,179 +1,109 @@
-From: Minghuan.Lian@freescale.com (Minghuan Lian)
-Date: Mon, 10 Nov 2014 18:43:25 +0800
-Subject: [PATCH] PCI: designware: Add support 4 ATUs assignment
-Message-ID: <1415616205-21255-1-git-send-email-Minghuan.Lian@freescale.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Mon, 10 Nov 2014 16:14:53 +0530
+Subject: [PATCH 3/5] mfd: ti_am335x_tscadc: Remove unwanted reg_se_cache
+ save
+In-Reply-To: <20141110092645.GE21424@x1>
+References: <1415339350-17679-1-git-send-email-vigneshr@ti.com>
+ <1415339350-17679-4-git-send-email-vigneshr@ti.com>
+ <20141110091527.GD21424@x1> <20141110092645.GE21424@x1>
+Message-ID: <54609725.9080608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, pcie-designware.c only supports two ATUs, ATU0 is used
-for CFG0 and MEM, ATU1 is used for CFG1 and IO. There is a conflict
-when MEM and CFG0 are accessed simultaneously. The patch adds
-'num-atus' property to PCIe dts node to describe the number of
-PCIe controller's ATUs. If num_atus is bigger than or equal to 4,
-we will change ATUs assignment: ATU0 for CFG0, ATU1 for CFG1,
-ATU2 for MEM, ATU3 for IO.
 
-Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
----
- .../devicetree/bindings/pci/designware-pcie.txt    |  1 +
- drivers/pci/host/pcie-designware.c                 | 48 ++++++++++++++++------
- drivers/pci/host/pcie-designware.h                 |  5 +++
- 3 files changed, 41 insertions(+), 13 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-index 9f4faa8..500796e 100644
---- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
-+++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-@@ -26,3 +26,4 @@ Optional properties:
- - bus-range: PCI bus numbers covered (it is recommended for new devicetrees to
-   specify this property, to keep backwards compatibility a range of 0x00-0xff
-   is assumed if not present)
-+- num-atus: number of ATUs
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index dfed00a..b872dd0 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -48,6 +48,8 @@
- #define PCIE_ATU_VIEWPORT		0x900
- #define PCIE_ATU_REGION_INBOUND		(0x1 << 31)
- #define PCIE_ATU_REGION_OUTBOUND	(0x0 << 31)
-+#define PCIE_ATU_REGION_INDEX3		(0x3 << 0)
-+#define PCIE_ATU_REGION_INDEX2		(0x2 << 0)
- #define PCIE_ATU_REGION_INDEX1		(0x1 << 0)
- #define PCIE_ATU_REGION_INDEX0		(0x0 << 0)
- #define PCIE_ATU_CR1			0x904
-@@ -346,7 +348,7 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
- 	struct of_pci_range range;
- 	struct of_pci_range_parser parser;
- 	struct resource *cfg_res;
--	u32 val, na, ns;
-+	u32 num_atus, val, na, ns;
- 	const __be32 *addrp;
- 	int i, index, ret;
- 
-@@ -486,6 +488,18 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
- 		}
- 	}
- 
-+	if (of_property_read_u32(np, "num-atus", &num_atus))
-+		num_atus = 2;
-+	if (num_atus >= 4) {
-+		pp->atu_cfg0_idx = PCIE_ATU_REGION_INDEX0;
-+		pp->atu_cfg1_idx = PCIE_ATU_REGION_INDEX1;
-+		pp->atu_mem_idx = PCIE_ATU_REGION_INDEX2;
-+		pp->atu_io_idx = PCIE_ATU_REGION_INDEX3;
-+	} else {
-+		pp->atu_cfg0_idx = pp->atu_mem_idx = PCIE_ATU_REGION_INDEX0;
-+		pp->atu_cfg1_idx = pp->atu_io_idx = PCIE_ATU_REGION_INDEX1;
-+	}
-+
- 	if (pp->ops->host_init)
- 		pp->ops->host_init(pp);
- 
-@@ -511,8 +525,8 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
- 
- static void dw_pcie_prog_viewport_cfg0(struct pcie_port *pp, u32 busdev)
- {
--	/* Program viewport 0 : OUTBOUND : CFG0 */
--	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX0,
-+	/* Program viewport : OUTBOUND : CFG0 */
-+	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | pp->atu_cfg0_idx,
- 			  PCIE_ATU_VIEWPORT);
- 	dw_pcie_writel_rc(pp, pp->cfg0_mod_base, PCIE_ATU_LOWER_BASE);
- 	dw_pcie_writel_rc(pp, (pp->cfg0_mod_base >> 32), PCIE_ATU_UPPER_BASE);
-@@ -526,8 +540,8 @@ static void dw_pcie_prog_viewport_cfg0(struct pcie_port *pp, u32 busdev)
- 
- static void dw_pcie_prog_viewport_cfg1(struct pcie_port *pp, u32 busdev)
- {
--	/* Program viewport 1 : OUTBOUND : CFG1 */
--	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX1,
-+	/* Program viewport : OUTBOUND : CFG1 */
-+	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | pp->atu_cfg1_idx,
- 			  PCIE_ATU_VIEWPORT);
- 	dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_CFG1, PCIE_ATU_CR1);
- 	dw_pcie_writel_rc(pp, pp->cfg1_mod_base, PCIE_ATU_LOWER_BASE);
-@@ -541,8 +555,8 @@ static void dw_pcie_prog_viewport_cfg1(struct pcie_port *pp, u32 busdev)
- 
- static void dw_pcie_prog_viewport_mem_outbound(struct pcie_port *pp)
- {
--	/* Program viewport 0 : OUTBOUND : MEM */
--	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX0,
-+	/* Program viewport : OUTBOUND : MEM */
-+	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | pp->atu_mem_idx,
- 			  PCIE_ATU_VIEWPORT);
- 	dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_MEM, PCIE_ATU_CR1);
- 	dw_pcie_writel_rc(pp, pp->mem_mod_base, PCIE_ATU_LOWER_BASE);
-@@ -557,8 +571,8 @@ static void dw_pcie_prog_viewport_mem_outbound(struct pcie_port *pp)
- 
- static void dw_pcie_prog_viewport_io_outbound(struct pcie_port *pp)
- {
--	/* Program viewport 1 : OUTBOUND : IO */
--	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX1,
-+	/* Program viewport : OUTBOUND : IO */
-+	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | pp->atu_io_idx,
- 			  PCIE_ATU_VIEWPORT);
- 	dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_IO, PCIE_ATU_CR1);
- 	dw_pcie_writel_rc(pp, pp->io_mod_base, PCIE_ATU_LOWER_BASE);
-@@ -585,12 +599,14 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
- 		dw_pcie_prog_viewport_cfg0(pp, busdev);
- 		ret = dw_pcie_cfg_read(pp->va_cfg0_base + address, where, size,
- 				val);
--		dw_pcie_prog_viewport_mem_outbound(pp);
-+		if (pp->atu_mem_idx == pp->atu_cfg0_idx)
-+			dw_pcie_prog_viewport_mem_outbound(pp);
- 	} else {
- 		dw_pcie_prog_viewport_cfg1(pp, busdev);
- 		ret = dw_pcie_cfg_read(pp->va_cfg1_base + address, where, size,
- 				val);
--		dw_pcie_prog_viewport_io_outbound(pp);
-+		if (pp->atu_io_idx == pp->atu_cfg1_idx)
-+			dw_pcie_prog_viewport_io_outbound(pp);
- 	}
- 
- 	return ret;
-@@ -610,12 +626,14 @@ static int dw_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
- 		dw_pcie_prog_viewport_cfg0(pp, busdev);
- 		ret = dw_pcie_cfg_write(pp->va_cfg0_base + address, where, size,
- 				val);
--		dw_pcie_prog_viewport_mem_outbound(pp);
-+		if (pp->atu_mem_idx == pp->atu_cfg0_idx)
-+			dw_pcie_prog_viewport_mem_outbound(pp);
- 	} else {
- 		dw_pcie_prog_viewport_cfg1(pp, busdev);
- 		ret = dw_pcie_cfg_write(pp->va_cfg1_base + address, where, size,
- 				val);
--		dw_pcie_prog_viewport_io_outbound(pp);
-+		if (pp->atu_io_idx == pp->atu_cfg1_idx)
-+			dw_pcie_prog_viewport_io_outbound(pp);
- 	}
- 
- 	return ret;
-@@ -770,6 +788,10 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
- 	u32 membase;
- 	u32 memlimit;
- 
-+	/* set ATUs setting for MEM and IO */
-+	dw_pcie_prog_viewport_mem_outbound(pp);
-+	dw_pcie_prog_viewport_io_outbound(pp);
-+
- 	/* set the number of lanes */
- 	dw_pcie_readl_rc(pp, PCIE_PORT_LINK_CONTROL, &val);
- 	val &= ~PORT_LINK_MODE_MASK;
-diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-index c625675..404f601 100644
---- a/drivers/pci/host/pcie-designware.h
-+++ b/drivers/pci/host/pcie-designware.h
-@@ -53,6 +53,11 @@ struct pcie_port {
- 	struct irq_domain	*irq_domain;
- 	unsigned long		msi_data;
- 	DECLARE_BITMAP(msi_irq_in_use, MAX_MSI_IRQS);
-+	/* ATUs setting */
-+	u8			atu_cfg0_idx;
-+	u8			atu_cfg1_idx;
-+	u8			atu_mem_idx;
-+	u8			atu_io_idx;
- };
- 
- struct pcie_host_ops {
--- 
-1.9.1
+On Monday 10 November 2014 02:56 PM, Lee Jones wrote:
+> On Mon, 10 Nov 2014, Lee Jones wrote:
+> 
+>> On Fri, 07 Nov 2014, Vignesh R wrote:
+>>
+>>> In one shot mode, sequencer automatically disables all enabled steps at
+>>> the end of each cycle. (both ADC steps and TSC steps) Hence these steps
+>>> need not be saved in reg_se_cache for clearing these steps at a later
+>>> stage.
+>>> Also, when ADC wakes up Sequencer should not be busy executing any of the
+>>> config steps except for the charge step. Previously charge step was 1 ADC
+>>> clock cycle and hence it was ignored.
+>>>
+>>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>>> ---
+>>>  drivers/mfd/ti_am335x_tscadc.c       | 7 +++++--
+>>>  include/linux/mfd/ti_am335x_tscadc.h | 1 +
+>>>  2 files changed, 6 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
+>>> index d877e777cce6..94ef8992f46b 100644
+>>> --- a/drivers/mfd/ti_am335x_tscadc.c
+>>> +++ b/drivers/mfd/ti_am335x_tscadc.c
+>>> @@ -86,8 +86,12 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
+>>>  		spin_lock_irq(&tsadc->reg_lock);
+>>>  		finish_wait(&tsadc->reg_se_wait, &wait);
+>>>  
+>>> +		/*
+>>> +		 * Sequencer should either be idle or
+>>> +		 * busy applying the charge step.
+>>> +		 */
+>>>  		reg = tscadc_readl(tsadc, REG_ADCFSM);
+>>> -		WARN_ON(reg & SEQ_STATUS);
+>>> +		WARN_ON(reg & SEQ_STATUS & (!CHARGE_STEP));
+>>
+>> This is almost certainly not correct.
+>>
+>> Please take another look at the logic.
+>>
+>> I'm _assuming_ you mean (reg & SEQ_STATUS && !CHARGE_STEP).
+> 
+> So I just saw that CHARGE_STEP is actually the new macro below.
+> 
+> So you're currently ANDing these together.
+> 
+> xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx  reg
+> 00000000 00000000 00000000 00100000  #define SEQ_STATUS   BIT(5)
+> 00000000 00000000 00000000 00010001  #define CHARGE_STEP  0x11
+> 
+> ... which will always equate to 0.
+> 
+
+Oops.. Sorry.. I meant ((reg & SEQ_STATUS) && !(reg & CHARGE_STEP)).
+I will fix this.
+
+
+>>>  		tsadc->adc_waiting = false;
+>>>  	}
+>>>  	tsadc->adc_in_use = true;
+>>> @@ -96,7 +100,6 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
+>>>  void am335x_tsc_se_set_once(struct ti_tscadc_dev *tsadc, u32 val)
+>>>  {
+>>>  	spin_lock_irq(&tsadc->reg_lock);
+>>> -	tsadc->reg_se_cache |= val;
+> 
+> Didn't you add this line a little over 1 month ago?
+> 
+> Why the change of heart?
+> 
+
+Previously, TSC did not reliably re-enable its steps as the TSC irq
+handler received false pen up events. Hence, in order to use TSC after
+ADC operation, it was necessary to save and re-enable TSC steps
+(basically, to keep TSC steps enabled always).
+The change was more of a workaround to overcome limitation of TSC irq
+handler. With this series of patches, TSC irq handler is very reliable
+and the workaround is no longer required.
+
+>>>  	am335x_tscadc_need_adc(tsadc);
+>>>  
+>>>  	tscadc_writel(tsadc, REG_SE, val);
+>>> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
+>>> index c99be5dc0f5c..fcce182e4a35 100644
+>>> --- a/include/linux/mfd/ti_am335x_tscadc.h
+>>> +++ b/include/linux/mfd/ti_am335x_tscadc.h
+>>> @@ -128,6 +128,7 @@
+>>>  
+>>>  /* Sequencer Status */
+>>>  #define SEQ_STATUS BIT(5)
+>>> +#define CHARGE_STEP		0x11
+>>>  
+>>>  #define ADC_CLK			3000000
+>>>  #define TOTAL_STEPS		16
+>>
+> 
