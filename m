@@ -1,24 +1,26 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 10 Nov 2014 20:23:38 +0100
-Subject: [PATCH v9 4/8] ARM: dts: Enable Broadcom Cygnus SoC
-In-Reply-To: <CAOesGMgqsvOtgxKa6aBwvTqW3CO5Q7E_YsVVuS83yR4GdQEHUw@mail.gmail.com>
-References: <sbranden@broadcom.com>
- <1414538111-11668-1-git-send-email-sbranden@broadcom.com>
- <1414538111-11668-5-git-send-email-sbranden@broadcom.com>
- <1415616611.4862.38.camel@x220>
- <CAOesGMgqsvOtgxKa6aBwvTqW3CO5Q7E_YsVVuS83yR4GdQEHUw@mail.gmail.com>
-Message-ID: <1415647418.21229.17.camel@x220>
+From: suravee.suthikulpanit@amd.com (suravee.suthikulpanit at amd.com)
+Date: Mon, 10 Nov 2014 13:24:38 -0600
+Subject: [PATCH 0/2] PCI: generic: Assiging msi-controller to PCI hostbridge
+Message-ID: <1415647480-3320-1-git-send-email-suravee.suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-11-10 at 10:35 -0800, Olof Johansson wrote:
-> On Mon, Nov 10, 2014 at 2:50 AM, Paul Bolle <pebolle@tiscali.nl> wrote:
-> > I guess patch 1/8 will be added to linux-next one of these days. Is
-> > that correct?
-> 
-> Yes.
+From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-Thanks.
+This patch set introduces a new callback function to allow PCI host drivers
+to specify MSI controller to be used for the child buses / devices.
 
+This is reabased from:
+    git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git pci/host-generic
 
-Paul Bolle
+Suravee Suthikulpanit (2):
+  PCI: Add new pci_ops for setting MSI parent for PCI bus
+  PCI: generic: Add set_msi_parent callback
+
+ drivers/pci/host/pci-host-generic.c | 14 ++++++++++++++
+ drivers/pci/probe.c                 |  3 +++
+ include/linux/pci.h                 |  1 +
+ 3 files changed, 18 insertions(+)
+
+-- 
+1.9.3
