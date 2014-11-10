@@ -1,29 +1,63 @@
-From: rbyshko@gmail.com (Roman Byshko)
-Date: Mon, 10 Nov 2014 19:55:10 +0100
-Subject: [PATCH v2 5/5] ARM: dts: sun7i: Cubietruck: add power supply
- regulator for USB OTG VBUS
-In-Reply-To: <cover.1415645258.git.rbyshko@gmail.com>
-References: <cover.1415645258.git.rbyshko@gmail.com>
-Message-ID: <75c850ce9a46f86bd746205916bbdcae2cf63756.1415645258.git.rbyshko@gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 10 Nov 2014 20:01:04 +0100
+Subject: [GIT PULL] arm: pxa: pxa for v3.19
+Message-ID: <87bnoevq1b.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Roman Byshko <rbyshko@gmail.com>
----
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 1 +
- 1 file changed, 1 insertion(+)
+The following changes since commit 206c5f60a3d902bc4b56dab2de3e88de5eb06108:
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-index 1682307..a281d25 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -40,6 +40,7 @@
- 		};
- 
- 		usbphy: phy at 01c13400 {
-+			usb0_vbus-supply = <&reg_usb0_vbus>;
- 			usb1_vbus-supply = <&reg_usb1_vbus>;
- 			usb2_vbus-supply = <&reg_usb2_vbus>;
- 			status = "okay";
+  Linux 3.18-rc4 (2014-11-09 14:55:29 -0800)
+
+are available in the git repository at:
+
+  https://github.com/rjarzmik/linux.git tags/pxa-for-3.19
+
+for you to fetch changes up to af1e3ad7be02013b7481b0997919d16b871bc907:
+
+  arm: pxa: add pxa27x device-tree support (2014-11-10 00:31:26 +0100)
+
+----------------------------------------------------------------
+arm: pxa: pxa for v3.19
+
+Hello Arnd, Kevin, Olof,
+
+This is a very quiet release, featuring a small cleanup, a tosa change
+on its charger driver, and support for pxa device-tree based pxa27x
+boards.
+
+The device-tree part will only be fully activated once clocks support
+is fully operational in the common clock framework.
+
+----------------------------------------------------------------
+Dmitry Eremin-Solenikov (1):
+      ARM: pxa: tosa: switch to gpio-charger
+
+Joe Perches (1):
+      arm: mach-pxa: Convert pr_warning to pr_warn
+
+Robert Jarzmik (4):
+      arm: pxa: add device-tree irq init for pxa27x
+      arm: pxa: move init functions into generic.h
+      arm: pxa: remove unnecessary includes from pxa-dt
+      arm: pxa: add pxa27x device-tree support
+
+ arch/arm/mach-pxa/Kconfig               | 11 ++++++
+ arch/arm/mach-pxa/Makefile              |  1 +
+ arch/arm/mach-pxa/em-x270.c             |  4 +-
+ arch/arm/mach-pxa/generic.h             | 65 +++++++++++++++++++++------------
+ arch/arm/mach-pxa/gumstix.c             |  3 +-
+ arch/arm/mach-pxa/include/mach/pxa25x.h |  8 ----
+ arch/arm/mach-pxa/include/mach/pxa27x.h |  4 --
+ arch/arm/mach-pxa/include/mach/pxa3xx.h |  5 ---
+ arch/arm/mach-pxa/mfp-pxa2xx.c          | 12 +++---
+ arch/arm/mach-pxa/poodle.c              |  2 +-
+ arch/arm/mach-pxa/pxa-dt.c              | 18 +++++++--
+ arch/arm/mach-pxa/pxa27x.c              |  6 +++
+ arch/arm/mach-pxa/pxa3xx-ulpi.c         |  6 +--
+ arch/arm/mach-pxa/raumfeld.c            | 26 ++++++-------
+ arch/arm/mach-pxa/tosa.c                | 41 ++++-----------------
+ 15 files changed, 107 insertions(+), 105 deletions(-)
+
 -- 
-2.1.2
+Robert
