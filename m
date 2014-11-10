@@ -1,97 +1,97 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Mon, 10 Nov 2014 10:26:00 +0100
-Subject: [PATCH 10/13] ARM: STi: DT: STih410: Add dt nodes for the ehci
- / ohci usb controllers.
-In-Reply-To: <1415361475-6218-11-git-send-email-peter.griffin@linaro.org>
-References: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
- <1415361475-6218-11-git-send-email-peter.griffin@linaro.org>
-Message-ID: <546084A8.9070601@st.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Nov 2014 09:26:45 +0000
+Subject: [PATCH 3/5] mfd: ti_am335x_tscadc: Remove unwanted reg_se_cache
+ save
+In-Reply-To: <20141110091527.GD21424@x1>
+References: <1415339350-17679-1-git-send-email-vigneshr@ti.com>
+ <1415339350-17679-4-git-send-email-vigneshr@ti.com>
+ <20141110091527.GD21424@x1>
+Message-ID: <20141110092645.GE21424@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Mon, 10 Nov 2014, Lee Jones wrote:
 
+> On Fri, 07 Nov 2014, Vignesh R wrote:
+> 
+> > In one shot mode, sequencer automatically disables all enabled steps at
+> > the end of each cycle. (both ADC steps and TSC steps) Hence these steps
+> > need not be saved in reg_se_cache for clearing these steps at a later
+> > stage.
+> > Also, when ADC wakes up Sequencer should not be busy executing any of the
+> > config steps except for the charge step. Previously charge step was 1 ADC
+> > clock cycle and hence it was ignored.
+> > 
+> > Signed-off-by: Vignesh R <vigneshr@ti.com>
+> > ---
+> >  drivers/mfd/ti_am335x_tscadc.c       | 7 +++++--
+> >  include/linux/mfd/ti_am335x_tscadc.h | 1 +
+> >  2 files changed, 6 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
+> > index d877e777cce6..94ef8992f46b 100644
+> > --- a/drivers/mfd/ti_am335x_tscadc.c
+> > +++ b/drivers/mfd/ti_am335x_tscadc.c
+> > @@ -86,8 +86,12 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
+> >  		spin_lock_irq(&tsadc->reg_lock);
+> >  		finish_wait(&tsadc->reg_se_wait, &wait);
+> >  
+> > +		/*
+> > +		 * Sequencer should either be idle or
+> > +		 * busy applying the charge step.
+> > +		 */
+> >  		reg = tscadc_readl(tsadc, REG_ADCFSM);
+> > -		WARN_ON(reg & SEQ_STATUS);
+> > +		WARN_ON(reg & SEQ_STATUS & (!CHARGE_STEP));
+> 
+> This is almost certainly not correct.
+> 
+> Please take another look at the logic.
+> 
+> I'm _assuming_ you mean (reg & SEQ_STATUS && !CHARGE_STEP).
 
-On 11/07/2014 12:57 PM, Peter Griffin wrote:
-> The stih410 has some additional usb controllers. This patch adds the
-> dt nodes which will enabled them to function correctly.
->
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->   arch/arm/boot/dts/stih407.dtsi | 60 ++++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 60 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
-> index 967ec39..5e01db2 100644
-> --- a/arch/arm/boot/dts/stih407.dtsi
-> +++ b/arch/arm/boot/dts/stih407.dtsi
-Shouldn't you create a new stih410.dtsi file, to clearly highlight these 
-USB2 controller are not present on STiH407?
-If you create this file, you could also include the stih410-clocks.dtsi 
-file in it.
-> @@ -321,5 +321,65 @@
->   			reset-names = "global",
->   				      "port";
->   		};
-> +
-> +		ohci0: usb at 9a03c00 {
-> +			compatible = "st,st-ohci-300x";
-> +			status = "disabled";
-> +			reg = <0x9a03c00 0x100>;
-> +			interrupts = <GIC_SPI 180 IRQ_TYPE_NONE>;
-> +			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>;
-> +			resets = <&powerdown STIH407_USB2_PORT0_POWERDOWN>,
-> +				 <&softreset STIH407_USB2_PORT0_SOFTRESET>;
-> +			reset-names = "power", "softreset";
-> +
-> +			phys = <&usb2_picophy0>;
-> +			phy-names = "usb";
-> +		};
-> +
-> +		ehci0: usb at 9a03e00 {
-> +			compatible = "st,st-ehci-300x";
-> +			status = "disabled";
-> +			reg = <0x9a03e00 0x100>;
-> +			interrupts = <GIC_SPI 151 IRQ_TYPE_NONE>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_usb0>;
-> +			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>;
-> +			resets = <&powerdown STIH407_USB2_PORT0_POWERDOWN>,
-> +				 <&softreset STIH407_USB2_PORT0_SOFTRESET>;
-> +			reset-names = "power", "softreset";
-> +
-> +			phys = <&usb2_picophy0>;
-> +			phy-names = "usb";
-> +		};
-> +
-> +		ohci1: usb at 9a83c00 {
-> +			compatible = "st,st-ohci-300x";
-> +			status = "disabled";
-> +			reg = <0x9a83c00 0x100>;
-> +			interrupts = <GIC_SPI 181 IRQ_TYPE_NONE>;
-> +			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>;
-> +			resets = <&powerdown STIH407_USB2_PORT1_POWERDOWN>,
-> +				 <&softreset STIH407_USB2_PORT1_SOFTRESET>;
-> +			reset-names = "power", "softreset";
-> +
-> +			phys = <&usb2_picophy1>;
-> +			phy-names = "usb";
-> +		};
-> +
-> +		ehci1: usb at 9a83e00 {
-> +			compatible = "st,st-ehci-300x";
-> +			status = "disabled";
-> +			reg = <0x9a83e00 0x100>;
-> +			interrupts = <GIC_SPI 153 IRQ_TYPE_NONE>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_usb1>;
-> +			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>;
-> +			resets = <&powerdown STIH407_USB2_PORT1_POWERDOWN>,
-> +				 <&softreset STIH407_USB2_PORT1_SOFTRESET>;
-> +			reset-names = "power", "softreset";
-> +
-> +			phys = <&usb2_picophy1>;
-> +			phy-names = "usb";
-> +		};
->   	};
->   };
+So I just saw that CHARGE_STEP is actually the new macro below.
+
+So you're currently ANDing these together.
+
+xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx  reg
+00000000 00000000 00000000 00100000  #define SEQ_STATUS   BIT(5)
+00000000 00000000 00000000 00010001  #define CHARGE_STEP  0x11
+
+... which will always equate to 0.
+
+> >  		tsadc->adc_waiting = false;
+> >  	}
+> >  	tsadc->adc_in_use = true;
+> > @@ -96,7 +100,6 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
+> >  void am335x_tsc_se_set_once(struct ti_tscadc_dev *tsadc, u32 val)
+> >  {
+> >  	spin_lock_irq(&tsadc->reg_lock);
+> > -	tsadc->reg_se_cache |= val;
+
+Didn't you add this line a little over 1 month ago?
+
+Why the change of heart?
+
+> >  	am335x_tscadc_need_adc(tsadc);
+> >  
+> >  	tscadc_writel(tsadc, REG_SE, val);
+> > diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
+> > index c99be5dc0f5c..fcce182e4a35 100644
+> > --- a/include/linux/mfd/ti_am335x_tscadc.h
+> > +++ b/include/linux/mfd/ti_am335x_tscadc.h
+> > @@ -128,6 +128,7 @@
+> >  
+> >  /* Sequencer Status */
+> >  #define SEQ_STATUS BIT(5)
+> > +#define CHARGE_STEP		0x11
+> >  
+> >  #define ADC_CLK			3000000
+> >  #define TOTAL_STEPS		16
+> 
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
