@@ -1,168 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Nov 2014 14:44:17 +0100
-Subject: [PATCH v2] ARM: fix multiplatform allmodcompile
-Message-ID: <1415627057-18230-1-git-send-email-linus.walleij@linaro.org>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Mon, 10 Nov 2014 14:44:10 +0100
+Subject: [PATCH v2 2/2] ARM: dts: socfpga: Add l3nic node
+In-Reply-To: <1415627050-2235-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1415627050-2235-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1415627050-2235-2-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 68f3b875f7848f5304472184a4634148c5330cbd
-"ARM: integrator: make the Integrator multiplatform"
-broke allmodconfig like this:
-
->> arch/arm/include/asm/cmpxchg.h:114:2: error: #error
-"SMP is not supported on this platform"
-(etc)
-
-This is due to the fact that as we turned on multiplatform
-for the Integrator, this enabled a lot of non-applicable
-CPU's to be selected for its multiplatform images, due to
-a lot of "depends on ARCH_INTEGRATOR" restrictions in
-arch/arm/mm/Kconfig for the different ARM CPU types.
-
-Fix this by restricting the CPU selections to respective
-multiplatform config, which now becomes a subset of the
-possible Integrator configurations.
-
-Reported-by: Build bot for Mark Brown <broonie@kernel.org>
-Reported-by: Kbuild test robot <fengguang.wu@intel.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 ---
-If this v2 version looks OK to everyone, please apply it
-to the ARM SoC tree wherever mu multiplatform mess landed.
----
- arch/arm/mm/Kconfig | 28 ++++++++++++++--------------
- 1 file changed, 14 insertions(+), 14 deletions(-)
+ arch/arm/boot/dts/socfpga.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index ae69809a9e47..c21b34ea0a3f 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -21,7 +21,7 @@ config CPU_ARM7TDMI
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 4472fd92685c..e47b69c9f6cd 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -628,6 +628,11 @@
+ 			arm,data-latency = <2 1 1>;
+ 		};
  
- # ARM720T
- config CPU_ARM720T
--	bool "Support ARM720T processor" if ARCH_INTEGRATOR
-+	bool "Support ARM720T processor" if ARCH_MULTI_V4T
- 	select CPU_32v4T
- 	select CPU_ABRT_LV4T
- 	select CPU_CACHE_V4
-@@ -39,7 +39,7 @@ config CPU_ARM720T
- 
- # ARM740T
- config CPU_ARM740T
--	bool "Support ARM740T processor" if ARCH_INTEGRATOR
-+	bool "Support ARM740T processor" if ARCH_MULTI_V4T
- 	depends on !MMU
- 	select CPU_32v4T
- 	select CPU_ABRT_LV4T
-@@ -71,7 +71,7 @@ config CPU_ARM9TDMI
- 
- # ARM920T
- config CPU_ARM920T
--	bool "Support ARM920T processor" if ARCH_INTEGRATOR
-+	bool "Support ARM920T processor" if ARCH_MULTI_V4T
- 	select CPU_32v4T
- 	select CPU_ABRT_EV4T
- 	select CPU_CACHE_V4WT
-@@ -89,7 +89,7 @@ config CPU_ARM920T
- 
- # ARM922T
- config CPU_ARM922T
--	bool "Support ARM922T processor" if ARCH_INTEGRATOR
-+	bool "Support ARM922T processor" if ARCH_MULTI_V4T
- 	select CPU_32v4T
- 	select CPU_ABRT_EV4T
- 	select CPU_CACHE_V4WT
-@@ -127,7 +127,7 @@ config CPU_ARM925T
- 
- # ARM926T
- config CPU_ARM926T
--	bool "Support ARM926T processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB
-+	bool "Support ARM926T processor" if ARCH_MULTI_V5 || MACH_REALVIEW_EB
- 	select CPU_32v5
- 	select CPU_ABRT_EV5TJ
- 	select CPU_CACHE_VIVT
-@@ -163,7 +163,7 @@ config CPU_FA526
- 
- # ARM940T
- config CPU_ARM940T
--	bool "Support ARM940T processor" if ARCH_INTEGRATOR
-+	bool "Support ARM940T processor" if ARCH_MULTI_V4T
- 	depends on !MMU
- 	select CPU_32v4T
- 	select CPU_ABRT_NOMMU
-@@ -181,7 +181,7 @@ config CPU_ARM940T
- 
- # ARM946E-S
- config CPU_ARM946E
--	bool "Support ARM946E-S processor" if ARCH_INTEGRATOR
-+	bool "Support ARM946E-S processor" if ARCH_MULTI_V5
- 	depends on !MMU
- 	select CPU_32v5
- 	select CPU_ABRT_NOMMU
-@@ -198,7 +198,7 @@ config CPU_ARM946E
- 
- # ARM1020 - needs validating
- config CPU_ARM1020
--	bool "Support ARM1020T (rev 0) processor" if ARCH_INTEGRATOR
-+	bool "Support ARM1020T (rev 0) processor" if ARCH_MULTI_V5
- 	select CPU_32v5
- 	select CPU_ABRT_EV4T
- 	select CPU_CACHE_V4WT
-@@ -216,7 +216,7 @@ config CPU_ARM1020
- 
- # ARM1020E - needs validating
- config CPU_ARM1020E
--	bool "Support ARM1020E processor" if ARCH_INTEGRATOR
-+	bool "Support ARM1020E processor" if ARCH_MULTI_V5
- 	depends on n
- 	select CPU_32v5
- 	select CPU_ABRT_EV4T
-@@ -229,7 +229,7 @@ config CPU_ARM1020E
- 
- # ARM1022E
- config CPU_ARM1022
--	bool "Support ARM1022E processor" if ARCH_INTEGRATOR
-+	bool "Support ARM1022E processor" if ARCH_MULTI_V5
- 	select CPU_32v5
- 	select CPU_ABRT_EV4T
- 	select CPU_CACHE_VIVT
-@@ -247,7 +247,7 @@ config CPU_ARM1022
- 
- # ARM1026EJ-S
- config CPU_ARM1026
--	bool "Support ARM1026EJ-S processor" if ARCH_INTEGRATOR
-+	bool "Support ARM1026EJ-S processor" if ARCH_MULTI_V5
- 	select CPU_32v5
- 	select CPU_ABRT_EV5T # But need Jazelle, but EV5TJ ignores bit 10
- 	select CPU_CACHE_VIVT
-@@ -358,7 +358,7 @@ config CPU_PJ4B
- 
- # ARMv6
- config CPU_V6
--	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
-+	bool "Support ARM V6 processor" if ARCH_MULTI_V6 || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
- 	select CPU_32v6
- 	select CPU_ABRT_EV6
- 	select CPU_CACHE_V6
-@@ -371,7 +371,7 @@ config CPU_V6
- 
- # ARMv6k
- config CPU_V6K
--	bool "Support ARM V6K processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
-+	bool "Support ARM V6K processor" if ARCH_MULTI_V6 || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
- 	select CPU_32v6
- 	select CPU_32v6K
- 	select CPU_ABRT_EV6
-@@ -385,7 +385,7 @@ config CPU_V6K
- 
- # ARMv7
- config CPU_V7
--	bool "Support ARM V7 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
-+	bool "Support ARM V7 processor" if ARCH_MULTI_V7 || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
- 	select CPU_32v6K
- 	select CPU_32v7
- 	select CPU_ABRT_EV7
++		l3regs: gpv at ff800000 {
++			compatible = "altr,l3-nic";
++			reg = <0xff800000 0x100000>;
++		};
++
+ 		mmc: dwmmc0 at ff704000 {
+ 			compatible = "altr,socfpga-dw-mshc";
+ 			reg = <0xff704000 0x1000>;
 -- 
-1.9.3
+2.1.1
