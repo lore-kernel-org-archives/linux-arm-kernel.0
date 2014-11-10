@@ -1,40 +1,29 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Mon, 10 Nov 2014 10:20:27 +0530
-Subject: [PATCH] spi: s3c64xx: add support for exynos7 SPI controller
-In-Reply-To: <20141107101310.GA8509@sirena.org.uk>
-References: <1415267509-16653-1-git-send-email-padma.v@samsung.com>
- <20141106102636.GT8509@sirena.org.uk>
- <CAAgF-BfGwcNzMx0meFVkJqNMTbQ4_PP1PZ3i6edOm6U3bc26_Q@mail.gmail.com>
- <20141107101310.GA8509@sirena.org.uk>
-Message-ID: <CAAgF-Bd=S7-PoA7GZoy87W9Dem3OXVhc1tL-eyWEAHvF0LPTKQ@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 10 Nov 2014 10:22:15 +0530
+Subject: [PATCH v5 12/16] cpufreq: tegra: Rename tegra-cpufreq to
+ tegra20-cpufreq
+In-Reply-To: <1414161563-16812-13-git-send-email-mikko.perttunen@kapsi.fi>
+References: <1414161563-16812-1-git-send-email-mikko.perttunen@kapsi.fi>
+ <1414161563-16812-13-git-send-email-mikko.perttunen@kapsi.fi>
+Message-ID: <CAKohpo=Kdh2vuvSoQBLdWfZJn3xDezpNBjqM389u45_BdizPXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On 11/7/14, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, Nov 07, 2014 at 02:01:57PM +0530, Padma Venkat wrote:
+On 24 October 2014 20:09, Mikko Perttunen <mikko.perttunen@kapsi.fi> wrote:
+> From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
 >
->> CS can also be controlled automatically by setting AUTO_N_MANUAL to 1
->> in CS_CFG. When it is auto CS automatically toggles between packet to
->> packet. NCS_TIME_COUNT in CS_CFG controls the inactive period. The
->> driver by default uses manual mode. But on exynos7 the manual mode is
->> removed.
+> The Tegra124 will use a different driver for frequency scaling, so
+> rename the old driver (which handles only Tegra20) appropriately.
 >
-> OK, but what's a packet here?
+> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+> Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
+> ---
+>  drivers/cpufreq/Kconfig.arm       |   6 +-
+>  drivers/cpufreq/Makefile          |   2 +-
+>  drivers/cpufreq/tegra-cpufreq.c   | 218 --------------------------------------
+>  drivers/cpufreq/tegra20-cpufreq.c | 218 ++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 222 insertions(+), 222 deletions(-)
+>  delete mode 100644 drivers/cpufreq/tegra-cpufreq.c
+>  create mode 100644 drivers/cpufreq/tegra20-cpufreq.c
 
-Packet is either 1 byte or 4 bytes size depends on width of the SPI channel.
-
->
->> I tested the driver with wm5110 codec.
->
-> Did you try firmware downloads or something else that generates multiple
-> transfers in a message?  Normal register writes will use a single
-> transfer so I'd expect them to just work.
->
-
-OK. I don't have provision to test on this board. I will try to test
-on older boards by disabling manual mode.
-
-Thanks
-padma
+Its just not readable enough.. You should have used: git format-patch -C -M
