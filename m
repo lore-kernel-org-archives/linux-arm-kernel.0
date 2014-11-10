@@ -1,35 +1,71 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 10 Nov 2014 16:14:30 +0100
-Subject: [PATCH 2/3] ARM: at91: sama5d3: Add SFR
-In-Reply-To: <1415632471-14672-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1415632471-14672-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1415632471-14672-2-git-send-email-alexandre.belloni@free-electrons.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 10 Nov 2014 16:18:50 +0100
+Subject: [PATCH] PM / Domains: Fix initial default state of the
+ need_restore flag
+In-Reply-To: <20141107215751.GA4439@dtor-ws>
+References: <1415366847-4807-1-git-send-email-ulf.hansson@linaro.org>
+ <7hr3xerdw6.fsf@deeprootsystems.com>
+ <20141107215751.GA4439@dtor-ws>
+Message-ID: <CAPDyKFot-LZjazq190cY3-tawB_-ukdsmrLcD3vtidLvX68FOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sama5d3 has Special Function Registers that allow to manage OHCI, EBI and
-the UTMI clock.
+[...]
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/sama5d3.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+> I guess we do need it for 3.18, but when we are talking about 3.19,
+> before we make any more changes can we outline how power domains are
+> supposed to work?
+>
+> 1. How do we attach a device to power domain? Right now it seems that
+> individual buses are responsible for attaching their devices to power
+> domains. Should we move it into driver core (device_pm_add?) so that
+> device starts its life in its proper power domain?
 
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index 5f4144d1e3a1..499b59f48055 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -217,6 +217,11 @@
- 				status = "disabled";
- 			};
- 
-+			sfr: sfr at f0038000 {
-+				compatible = "atmel,sama5d3-sfr", "syscon";
-+				reg = <0xf0038000 0x4000>;
-+			};
-+
- 			mmc1: mmc at f8000000 {
- 				compatible = "atmel,hsmci";
- 				reg = <0xf8000000 0x600>;
--- 
-2.1.0
+That was the initial approach.
+
+To my understanding, Rafael's primary reason for not accepting that
+was that it's not common, but it's platform-specific.
+http://marc.info/?l=linux-pm&m=140243462304669&w=2
+
+Now, even if we would reconsider doing as you propose, what would the
+actual benefit be? Obviously, we would get less amount of code to
+maintain, which is one reason, but are there more?
+
+>
+> 2. When do we power up the devices (and the domains)? Right now devices
+> in ACPI power domain are powered when they are attached to the power
+> domain (which coincides with probing), but generic power domains do not
+> do that. Can we add a separate API to explicitly power up the device (and
+> its domain if it is powered down) and do it again, either in device core
+> or in individual buses. This way, regardless of runtime PM or not, we
+> will have devices powered on when driver tries to bind to them. If
+> binding fails we can power down the device.
+
+Isn't that exactly what I implemented in [1], what am I missing?
+
+>
+> I've heard there is a concern about power domain bouncing up and down
+> during probing. Is it really a concern? Would not we run into the same
+> issues past booting up with aggressive PM policy? Anyway, we could
+> probably work around this by refusing to actually power down the domains
+> until we are done booting, similarly to who genpd_poweroff_unused works.
+
+I haven't heard about this kind of issues, but I think your approach
+seems reasonable.
+
+Currently, I think we should focus on solving the problem in [1].
+Those drivers/subsystems that use pm_runtime_set_active() during
+->probe() are broken in this regards.
+
+Now, if we move the attachment of devices to their PM domains from
+buses into driver core, that could simplify [1]. Still, only if we
+also decide to power on PM domains from driver core, else it wouldn't
+matter much I think.
+
+
+[1]
+[PATCH v3 0/9] PM / Domains: Fix race conditions during boot
+http://marc.info/?t=141320907000003&r=1&w=2
+
+Kind regards
+Uffe
