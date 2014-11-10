@@ -1,38 +1,55 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 10 Nov 2014 20:32:08 +0100
-Subject: [PATCH v9 07/12] coresight-etm: add CoreSight ETM/PTM driver
-In-Reply-To: <CANLsYkxivqgyRZspS2uP9Mkwit4obCjZxYr0YUhR3G_zQejERg@mail.gmail.com>
-References: <1415038066-22423-1-git-send-email-mathieu.poirier@linaro.org>
- <1415038066-22423-8-git-send-email-mathieu.poirier@linaro.org>
- <1415615671.4862.30.camel@x220>
- <CANLsYkxivqgyRZspS2uP9Mkwit4obCjZxYr0YUhR3G_zQejERg@mail.gmail.com>
-Message-ID: <1415647928.21229.23.camel@x220>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 10 Nov 2014 11:35:23 -0800
+Subject: [PATCH] ARM: exynos_defconfig: disable CONFIG_EXYNOS5420_MCPM;
+ not stable
+In-Reply-To: <000e01cffb39$5ef0a2d0$1cd1e870$@kernel.org> (Kukjin Kim's
+ message of "Sat, 08 Nov 2014 18:50:04 +0900")
+References: <1414796382-5447-1-git-send-email-khilman@kernel.org>
+ <000e01cffb39$5ef0a2d0$1cd1e870$@kernel.org>
+Message-ID: <7hegtaq26c.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-11-10 at 08:40 -0700, Mathieu Poirier wrote:
-> On 10 November 2014 03:34, Paul Bolle <pebolle@tiscali.nl> wrote:
-> > On Mon, 2014-11-03 at 11:07 -0700, mathieu.poirier at linaro.org wrote:
-> >> +#ifdef CONFIG_CORESIGHT_SOURCE_ETM_DEFAULT_ENABLE
-> >
-> > There's no Kconfig symbol CORESIGHT_SOURCE_ETM_DEFAULT_ENABLE. Neither
-> > is there a preprocessor definition of this macro. So why was this
-> > added?
-> 
-> Correct - the feature (as we really want it) is currently being worked
-> on but not yet part of the code base.  The default option probably
-> should have been removed but it doesn't do much else when mandating
-> one to add a boot option on the kernel cmd line.
+Kukjin Kim <kgene@kernel.org> writes:
 
-I'm afraid I'm not sure what you mean here. Anyhow, using a Kconfig
-symbol to set a default for something that can also be set through a
-kernel parameter might be considered overdoing it. But that's not for me
-to decide.
+> Kevin Hilman wrote:
+>> 
+>> From: Kevin Hilman <khilman@linaro.org>
+>> 
+>> The option CONFIG_EXYNOS5420_MCPM is causing imprecise external aborts
+>> during boot testing, causing various userspace startup failures.
+>> 
+>> Disable until it has gotten more testing.
+>> 
+>> Cc: Kukjin Kim <kgene.kim@samsung.com>,
+>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>,
+>> Cc: Sachin Kamat <sachin.kamat@samsung.com>,
+>> Cc: Doug Anderson <dianders@chromium.org>,
+>> Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
+>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>,
+>> Cc: Tushar Behera <tushar.behera@linaro.org>,
+>> Cc: stable at vger.kernel.org # v3.17+
+>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+>> ---
+>> This has been reported by a few people[1], but not investigated or fixed, so it's
+>> time to disable this feature until it can be fixed.
+>> 
+> Hi Kevin,
+>
+> Yeah I agree with your opinion.
+>
+> But as you can see my tree, I've queued regarding mcpm patches for 3.19 will
+> be shown in -next in this weekend. 
 
-Unless the patch that adds this Kconfig symbol takes a long time to land
-in linux-next, I won't be bothering you again.
+Which of the recently queued patches are expected to address the
+imprecise abort issue?  I'd be happy to test them out.  
+
+> Anyway let me apply this into -fixes and
+> then let's enable after test its functionality in -next in a couple of days.
+
+Yes, I think this needs to be applied until these aborts are understood
+and fixed.
 
 Thanks,
 
-
-Paul Bolle
+Kevin
