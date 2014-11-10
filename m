@@ -1,28 +1,62 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 10 Nov 2014 12:56:37 +1100
-Subject: linux-next: manual merge of the mmc-uh tree with the arm-soc tree
-Message-ID: <20141110125637.30fe73b9@canb.auug.org.au>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Mon, 10 Nov 2014 09:55:52 +0800
+Subject: [PATCH v4] i2c/at91: adopt pinctrl support
+Message-ID: <1415584552-11390-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Amend the at91 i2c pin controller to optionally take a pin control
+handle and set the state of the pins to:
+- "default" on boot and resume.
+- "sleep" on suspend().
 
-Today's linux-next merge of the mmc-uh tree got a conflict in
-arch/arm/mach-at91/at91sam9g45_devices.c between commit 4bf7753b8ab7
-("ARM: at91: remove at91sam9g45/9m10 legacy board support") from the
-arm-soc tree and commit 4049854c41e0 ("ARM: at91: remove
-mach/atmel-mci.h") from the mmc-uh tree.
+This should make it possible to optimize energy usage for the pins
+both for the suspend/resume cycle
 
-I fixed it up (I just removed the file) and can carry the fix as
-necessary (no action is required).
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
+Hi Wolfram,
 
+Thanks a lot.
+
+The change of this version is to remove
+	pinctrl_pm_select_default_state(&pdev->dev) from the _probe function.
+
+Best Regards,
+Wenyou Yang
+
+ drivers/i2c/busses/i2c-at91.c |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+index 7c335f4..77fb647 100644
+--- a/drivers/i2c/busses/i2c-at91.c
++++ b/drivers/i2c/busses/i2c-at91.c
+@@ -32,6 +32,7 @@
+ #include <linux/slab.h>
+ #include <linux/platform_data/dma-atmel.h>
+ #include <linux/pm_runtime.h>
++#include <linux/pinctrl/consumer.h>
+ 
+ #define DEFAULT_TWI_CLK_HZ		100000		/* max 400 Kbits/s */
+ #define AT91_I2C_TIMEOUT	msecs_to_jiffies(100)	/* transfer timeout */
+@@ -851,6 +852,8 @@ static int at91_twi_runtime_suspend(struct device *dev)
+ 
+ 	clk_disable_unprepare(twi_dev->clk);
+ 
++	pinctrl_pm_select_sleep_state(dev);
++
+ 	return 0;
+ }
+ 
+@@ -858,6 +861,8 @@ static int at91_twi_runtime_resume(struct device *dev)
+ {
+ 	struct at91_twi_dev *twi_dev = dev_get_drvdata(dev);
+ 
++	pinctrl_pm_select_default_state(dev);
++
+ 	return clk_prepare_enable(twi_dev->clk);
+ }
+ 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141110/b417ef2e/attachment.sig>
+1.7.9.5
