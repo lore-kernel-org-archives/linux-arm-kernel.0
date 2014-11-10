@@ -1,66 +1,78 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 10 Nov 2014 15:11:40 +0000
-Subject: [PATCH 2/3] spi: meson: Add support for Amlogic Meson SPIFC
-In-Reply-To: <20141109225650.GA27950@gmail.com>
-References: <1415525113-25598-1-git-send-email-b.galvani@gmail.com>
- <1415525113-25598-3-git-send-email-b.galvani@gmail.com>
- <20141109101712.GM2722@sirena.org.uk>
- <20141109225650.GA27950@gmail.com>
-Message-ID: <20141110151140.GA3815@sirena.org.uk>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 10 Nov 2014 17:13:05 +0200
+Subject: [PATCH v4 0/2] ARM: keystone: pm: switch to use generic pm domains
+In-Reply-To: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
+References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <5460D601.70504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 09, 2014 at 11:56:50PM +0100, Beniamino Galvani wrote:
-> On Sun, Nov 09, 2014 at 10:17:12AM +0000, Mark Brown wrote:
+Hi Santosh,
 
-> > This will busy wait for up to a second, that seems like a long time to
-> > busy wait.  We also appear to be using this for the entire duration of
-> > the transfer which could be a fairly long time even during normal
-> > operation if doing a large transfer such as a firmware download, or if
-> > the bus speed is low.
+On 11/10/2014 04:59 PM, Grygorii Strashko wrote:
+> Hi Santosh, Kevin,
+> 
+> This series switches Keystone 2 PM code to use Generic PM domains
+> instead of PM clock domains because of the lack of DT support
+> for the last.
+> It will finally allow to enable Runtime PM for Keystone 2.
+> 
+> This series based on top
+> 
+> Changes in v4:
+>   - changes for Generic clock manipulation PM callbacks (clock_ops.c)
+>     were separated in standalone series [3] and Keystone 2 specific
+>     patches were rebased on top of it.
 
-> Yes, probably the timeout value is too long since the maximum length
-> of a basic transfer is 64 bytes. Can you suggest a reasonable value?
+I've just found that prerequisite patches have been taken by Rafael in linux-pm.git/linux-next,
+first two patches from series:
+ "[PATCH v4 0/3] PM / clock_ops: add pm_clk_add_clk()"
+ https://lkml.org/lkml/2014/11/6/319 
 
-10ms?  It depends somewhat 
+Thanks a lot Rafael.
 
-> > > +	while (done < xfer->len && !ret) {
-> > > +		len = min_t(int, xfer->len - done, SPIFC_BUFFER_SIZE);
-> > > +		ret = meson_spifc_txrx(spifc, xfer, done, len,
-> > > +				       last_xfer, done + len >= xfer->len);
-> > > +		done += len;
-> > > +	}
+So, if no complains, this series is ready.
 
-> > I noticed that the handling of /CS was done in the spifc_txrx() function
-> > - will this do the right thing if the transfer needs to be split for the
-> > buffer size?
+> 
+> Changes in v3:
+>   - handling of the case when !CONFIG_PM_RUNTIME has been
+>     moved in PM clock framework.
+> 
+> Changes in v2:
+> - minor comments applied and rebased on top of Linux 3.18-rc1.
+> 
+> Links on previous versions:
+> v2:  https://lkml.org/lkml/2014/10/20/248
+> v1:  https://lkml.org/lkml/2014/9/29/382
+> 
+> RFC version of patches can be found at [2].
+> 
+> [1] "[PATCH/RFC 0/4] of: Register clocks for Runtime PM with PM core"
+>    https://lkml.org/lkml/2014/4/24/1118
+> 
+> [2] "[RFC PATCH 0/4] ARM: keystone: pm: switch to use generic pm domains"
+>    https://lkml.org/lkml/2014/9/25/364
+> 
+> [3] "[PATCH v4 0/3] PM / clock_ops: add pm_clk_add_clk()"
+>    https://lkml.org/lkml/2014/11/6/319
+> 
+> CC: Santosh Shilimkar <ssantosh@kernel.org>
+> CC: Kevin Hilman <khilman@linaro.org>
+> CC: Ulf Hansson <ulf.hansson@linaro.org>
+> CC: Geert Uytterhoeven <geert@linux-m68k.org>
+> CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> 
+> Grygorii Strashko (2):
+>    ARM: keystone: pm: switch to use generic pm domains
+>    ARM: dts: keystone: add generic pm controller node
+> 
+>   .../bindings/power/ti,keystone-powerdomain.txt     |  31 ++++++
+>   arch/arm/boot/dts/keystone.dtsi                    |   6 ++
+>   arch/arm/mach-keystone/Kconfig                     |   1 +
+>   arch/arm/mach-keystone/pm_domain.c                 | 106 ++++++++++++++-------
+>   4 files changed, 107 insertions(+), 37 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt
+> 
 
-> It should. When the transfer gets split, CS is kept active for all the
-> chunks and the value of CS after that depends on the value of
-> cs_change.
-
-Can you be more specific about how that works?  I'm just not seeing the
-code that handles this.
-
-> > > +	if (!ret && xfer->delay_usecs)
-> > > +		udelay(xfer->delay_usecs);
-
-> > The core will do this for you if you implement this as transfer_one().
-
-> Please correct me if I'm wrong, but I think that transfer_one() can't
-> be used in this case. The hardware doesn't support direct manipulation
-> of CS and allows only to specify if CS must be kept active after the
-> current transfer. So I need to know for each transfer if it's the last
-> and this can be achieved only implementing transfer_one_message().
-
-This is already in a function that's operating at the transfer_one()
-level, the function is even called transfer_one() and besides it's
-clearly not something specific to this hardware so should be factored
-out into the core instead of open coded.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141110/08202a63/attachment.sig>
+regards,
+-grygorii
