@@ -1,90 +1,131 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 10 Nov 2014 11:47:11 -0300
-Subject: [PATCH v3 2/3] watchdog: orion: Use the reference clock on Armada
- 375 SoC
-In-Reply-To: <5460CEB0.7080009@free-electrons.com>
-References: <1415107293-19258-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1415107293-19258-3-git-send-email-ezequiel.garcia@free-electrons.com>
- <5460CEB0.7080009@free-electrons.com>
-Message-ID: <5460CFEF.1090400@free-electrons.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Mon, 10 Nov 2014 22:51:44 +0800
+Subject: [PATCH] AHCI: Add generic MSI-X interrupt support to SATA PCI
+ driver
+In-Reply-To: <1415597417-10547-1-git-send-email-rric@kernel.org>
+References: <1415597417-10547-1-git-send-email-rric@kernel.org>
+Message-ID: <5460D100.90403@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2014 11:41 AM, Gregory CLEMENT wrote:
-> Hi Ezequiel,
+On 2014/11/10 13:30, Robert Richter wrote:
+> From: Sunil Goutham <sgoutham@cavium.com>
 > 
-> [...]
+> This patch adds generic support for MSI-X interrupts to the SATA PCI
+> driver. Only single interrupt support is implemented. Thus, per-port
+> interrupts can not yet be enabled.
 > 
->> +static int armada375_wdt_clock_init(struct platform_device *pdev,
->> +				    struct orion_watchdog *dev)
->> +{
->> +	int ret;
->> +
->> +	dev->clk = of_clk_get_by_name(pdev->dev.of_node, "fixed");
->> +	if (!IS_ERR(dev->clk)) {
->> +		ret = clk_prepare_enable(dev->clk);
->> +		if (ret) {
->> +			clk_put(dev->clk);
->> +			return ret;
->> +		}
->> +
->> +		atomic_io_modify(dev->reg + TIMER_CTRL,
->> +				WDT_AXP_FIXED_ENABLE_BIT,
->> +				WDT_AXP_FIXED_ENABLE_BIT);
->> +		dev->clk_rate = clk_get_rate(dev->clk);
->> +
->> +		return 0;
->> +	}
->> +
->> +	/* Mandatory fallback for proper devicetree backward compatibility */
->> +	dev->clk = clk_get(&pdev->dev, NULL);
->> +	if (IS_ERR(dev->clk))
->> +		return PTR_ERR(dev->clk);
->> +
->> +	ret = clk_prepare_enable(dev->clk);
->> +	if (ret) {
->> +		clk_put(dev->clk);
->> +		return ret;
->> +	}
->> +
->> +	atomic_io_modify(dev->reg + TIMER_CTRL,
->> +			WDT_A370_RATIO_MASK(WDT_A370_RATIO_SHIFT),
->> +			WDT_A370_RATIO_MASK(WDT_A370_RATIO_SHIFT));
->> +	dev->clk_rate = clk_get_rate(dev->clk) / WDT_A370_RATIO;
->> +
->> +	return 0;
->> +}
+> The driver now checks the device for the existence of MSI-X and tries
+> to enable the interrupt. Otherwise, if a device is not MSI-X capable,
+> the initialization is skipped and MSI or intx interrupts are
+> configured.
 > 
-> Shouldn't be possible to do the following:
+> This patch also enables AHCI for Cavium Thunder SoCs that uses MSI-X.
 > 
-> static int armada375_wdt_clock_init(struct platform_device *pdev,
-> 				    struct orion_watchdog *dev)
-> {
-> 	if (armadaxp_wdt_clock_init(pdev, dev)) {
-> 		/* Mandatory fallback for proper devicetree backward compatibility */
-> 		return armadaxp_wdt_clock_init(pdev, dev));
-
-I guess you meant armada370_wdt_clock_init for the fallback?
-
-> 	}
-> 	return 0;
-> }
+> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> ---
+>  arch/arm64/Kconfig |  1 +
+>  drivers/ata/ahci.c | 40 +++++++++++++++++++++++++++++++++++++++-
+>  2 files changed, 40 insertions(+), 1 deletion(-)
 > 
-> Actually reusing the armadaxp_wdt_clock_init() function  was also suggested by Thomas
-> on your first version but I didn't find your answer about it.
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index ac9afde76dea..55970474d3ae 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -145,6 +145,7 @@ config ARCH_THUNDER
+>  	bool "Cavium Inc. Thunder SoC Family"
+>  	help
+>  	  This enables support for Cavium's Thunder Family of SoCs.
+> +	select SATA_AHCI
+>  
+>  config ARCH_VEXPRESS
+>  	bool "ARMv8 software model (Versatile Express)"
+> diff --git a/drivers/ata/ahci.c b/drivers/ata/ahci.c
+> index 5f039f191067..8e43ccb72c95 100644
+> --- a/drivers/ata/ahci.c
+> +++ b/drivers/ata/ahci.c
+> @@ -52,6 +52,7 @@
+>  
+>  enum {
+>  	AHCI_PCI_BAR_STA2X11	= 0,
+> +	AHCI_PCI_BAR_CAVIUM	= 0,
+>  	AHCI_PCI_BAR_ENMOTUS	= 2,
+>  	AHCI_PCI_BAR_STANDARD	= 5,
+>  };
+> @@ -483,6 +484,9 @@ static const struct pci_device_id ahci_pci_tbl[] = {
+>  	/* Enmotus */
+>  	{ PCI_DEVICE(0x1c44, 0x8000), board_ahci },
+>  
+> +	/* Cavium */
+> +	{ PCI_DEVICE(0x177d, 0xa01c), .driver_data = board_ahci },
+> +
+>  	/* Generic, PCI class code for AHCI */
+>  	{ PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
+>  	  PCI_CLASS_STORAGE_SATA_AHCI, 0xffffff, board_ahci },
+> @@ -1188,11 +1192,43 @@ static inline void ahci_gtf_filter_workaround(struct ata_host *host)
+>  {}
+>  #endif
+>  
+> +static int ahci_init_msix(struct pci_dev *pdev, unsigned int n_ports,
+> +			  struct ahci_host_priv *hpriv)
+> +{
+> +	int rc, nvec;
+> +	struct msix_entry entry = {};
+> +
+> +	/* check if msix is supported */
+> +	nvec = pci_msix_vec_count(pdev);
+> +	if (nvec <= 0)
+> +		return 0;
+> +
+> +	/* per-port msix interrupts are not supported */
+> +	if (n_ports > 1 && nvec >= n_ports)
+> +		return -ENOSYS;
+> +
+> +	/* only enable the first entry (entry.entry = 0) */
+> +	rc = pci_enable_msix_exact(pdev, &entry, 1);
+> +	if (rc < 0)
+> +		return rc;
+> +
+> +	pdev->irq = entry.vector;
+Hi Robert,
+	You can't overwrite pci_dev->irq for MSI-X, it's no way to
+recover original irq for INTx after unbinding ahci driver. Instead,
+you may access msi_desc->irq when requesting irq.
+Regards!
+Gerry
+> +
+> +	return 1;
+> +}
+> +
+>  static int ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
+>  				struct ahci_host_priv *hpriv)
+>  {
+>  	int rc, nvec;
+>  
+> +	nvec = ahci_init_msix(pdev, n_ports, hpriv);
+> +	if (nvec > 0)
+> +		return nvec;
+> +
+> +	if (nvec && nvec != -ENOSYS)
+> +		dev_err(&pdev->dev, "failed to enable MSI-X: %d", nvec);
+> +
+>  	if (hpriv->flags & AHCI_HFLAG_NO_MSI)
+>  		goto intx;
+>  
+> @@ -1271,11 +1307,13 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+>  		dev_info(&pdev->dev,
+>  			 "PDC42819 can only drive SATA devices with this driver\n");
+>  
+> -	/* Both Connext and Enmotus devices use non-standard BARs */
+> +	/* Some devices use non-standard BARs */
+>  	if (pdev->vendor == PCI_VENDOR_ID_STMICRO && pdev->device == 0xCC06)
+>  		ahci_pci_bar = AHCI_PCI_BAR_STA2X11;
+>  	else if (pdev->vendor == 0x1c44 && pdev->device == 0x8000)
+>  		ahci_pci_bar = AHCI_PCI_BAR_ENMOTUS;
+> +	else if (pdev->vendor == 0x177d && pdev->device == 0xa01c)
+> +		ahci_pci_bar = AHCI_PCI_BAR_CAVIUM;
+>  
+>  	/*
+>  	 * The JMicron chip 361/363 contains one SATA controller and one
 > 
-
-I replied here to the same objection on the clocksource driver:
-http://www.spinics.net/lists/linux-watchdog/msg05318.html
-
-I found that it's a fragile practice, just to save a few lines of code.
-Someone can go and change the 370/xp clock init, in some way that's
-incompatible with 375.
-
-I guess I'm being paranoid, but it's a way to keep the code robust and
-we are only duplicating a few lines.
-
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
