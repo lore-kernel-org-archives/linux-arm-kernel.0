@@ -1,81 +1,119 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 10 Nov 2014 17:08:46 +0000
-Subject: [PATCH] Correct the race condition in
- aarch64_insn_patch_text_sync()
-In-Reply-To: <1415637362-30754-1-git-send-email-wcohen@redhat.com>
-References: <1415637362-30754-1-git-send-email-wcohen@redhat.com>
-Message-ID: <20141110170846.GH23942@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 10 Nov 2014 18:09:31 +0100
+Subject: [PATCH 1/7] irqchip: armada-370-xp: Simplify interrupt map, mask
+ and unmask
+In-Reply-To: <5458ECBE.2020202@free-electrons.com>
+References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1413985427-20918-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <5453BAA7.1040804@free-electrons.com> <5458ECBE.2020202@free-electrons.com>
+Message-ID: <5460F14B.7060702@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Ezequiel,
 
-Thanks for the tracking this down.
-
-On Mon, Nov 10, 2014 at 04:36:02PM +0000, William Cohen wrote:
-> When experimenting with patches to provide kprobes support for aarch64
-> smp machines would hang when inserting breakpoints into kernel code.
-> The hangs were caused by a race condition in the code called by
-> aarch64_insn_patch_text_sync().  The first processor in the
-> aarch64_insn_patch_text_cb() function would patch the code while other
-> processors were still entering the function and decrementing the
-
-s/decrementing/incrementing/
-
-> cpu_count field.  This resulted in some processors never observing the
-> exit condition and exiting the function.  Thus, processors in the
-> system hung.
+On 04/11/2014 16:11, Ezequiel Garcia wrote:
+> Hi Gregory,
 > 
-> The patching function now waits for all processors to enter the
-> patching function before changing code to ensure that none of the
-> processors are in code that is going to be patched.  Once all the
-> processors have entered the function, the last processor to enter the
-> patching function performs the pathing and signals that the patching
-> is complete with one last decrement of the cpu_count field to make it
-> -1.
+> On 10/31/2014 01:36 PM, Gregory CLEMENT wrote:
+>> On 22/10/2014 15:43, Ezequiel Garcia wrote:
+>>> The map, mask and unmask is unnecessarily complicated, with a different
+>>> implementation for shared and per CPU interrupts. The current code does
+>>> the following:
+>>>
+>>> At probe time, all interrupts are disabled and masked on all CPUs.
+>>>
+>>> Shared interrupts:
+>>>
+>>>  * When the interrupt is mapped(), it gets disabled and unmasked on the
+>>>    calling CPU.
+>>>
+>>>  * When the interrupt is unmasked(), masked(), it gets enabled and
+>>>    disabled.
+>>>
+>>> Per CPU interrupts:
+>>>
+>>>  * When the interrupt is mapped, it gets masked on the calling CPU and
+>>>    enabled.
+>>>
+>>>  * When the interrupt is unmasked(), masked(), it gets unmasked and masked,
+>>>    on the calling CPU.
+>>>
+>>> This commit simplifies this code, with a much simpler implementation, common
+>>> to shared and per CPU interrupts.
+>>>
+>>>  * When the interrupt is mapped, it's enabled.
+>>>
+>>>  * When the interrupt is unmasked(), masked(), it gets unmasked and masked,
+>>>    on the calling CPU.
+>>
+>> By doing this you change the behavior of the irqchip. Before this patch, masking
+>> a shared interrupt was masking it on all the CPUs in the same time whereas with this
+>> change it will mask the interrupt only on the calling CPU. It worth checking it is
+>> the expected behavior.
+>>
 > 
-> Signed-off-by: William Cohen <wcohen@redhat.com>
-> ---
->  arch/arm64/kernel/insn.c | 10 +++++++---
->  1 file changed, 7 insertions(+), 3 deletions(-)
+> The kernel will always mask/unmask on the appropriate CPU, so I don't see any
+> issues with this.
 > 
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index e007714..e6266db 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -153,8 +153,10 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
->  	int i, ret = 0;
->  	struct aarch64_insn_patch *pp = arg;
->  
-> -	/* The first CPU becomes master */
-> -	if (atomic_inc_return(&pp->cpu_count) == 1) {
-> +	/* Make sure all the processors are in this function
-> +	   before patching the code. The last CPU to this function
-> +	   does the update. */
-> +	if (atomic_dec_return(&pp->cpu_count) == 0) {
->  		for (i = 0; ret == 0 && i < pp->insn_cnt; i++)
->  			ret = aarch64_insn_patch_text_nosync(pp->text_addrs[i],
->  							     pp->new_insns[i]);
-> @@ -163,7 +165,8 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
->  		 * which ends with "dsb; isb" pair guaranteeing global
->  		 * visibility.
->  		 */
-> -		atomic_set(&pp->cpu_count, -1);
-> +		/* Notifiy other processors with an additional decrement. */
-> +		atomic_dec(&pp->cpu_count);
->  	} else {
->  		while (atomic_read(&pp->cpu_count) != -1)
->  			cpu_relax();
-> @@ -185,6 +188,7 @@ int __kprobes aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt)
->  	if (cnt <= 0)
->  		return -EINVAL;
->  
-> +	atomic_set(&patch.cpu_count, num_online_cpus());
+>> Moreover I wonder how it is supposed to work with the irq affinity. Let say that the
+>> irq was enabled on the CPU0,
+> 
+> If you mean enabled as in irq_enable(irq_desc), then let's keep in mind that
+> currently that calls .irq_unmask.
+> 
+>> then there is irq_unmask call on CPU1, then the irq would be enabled on both CPUs.
+>> It will modify the irq affinity and moreover it will also lead
+>> to an invalidate state with the MPIC because we can't manage an interrupt on more than
+>> one CPU.
+>>
+>> From the point of the view of the armada_370_xp_irq driver there are potential bug, but
+>> maybe the use case I described can't happen. Could you check it?
+>>
+> 
+> In this irqchip driver, shared interrupts are handled via handle_level_irq(),
+> which masks() and unmasks() the interrupt. In other words, it's always done
+> in the same CPU. I guess this is the most frequent mask/unmask operation.
+> 
+> On the other side, if a driver calls enable_irq() on one CPU and then
+> enable_irq() on the other CPU, that's exactly what will happen. Although the
+> smp_affinity setting will prevent an interrupt from being dispatched to more
+> than one CPU.
+> 
+> I really don't see an issue with this patch, but I think it needs as much
+> discussion and as much testing as possible. This piece of code is rather
+> critical, and is working just fine, so I'd like to have an excellent 
+> reason before changing any of it.
 
-I think this is still racy with hotplug before stop_machine has done
-get_online_cpus. How about we leave the increment in the callback and change
-the exit condition to compare with num_online_cpus() instead?
+We already talked about it on IRC but I write it agin o let the other people know
+our status on this subject.
 
-Cheers,
+If a driver call irq_enable() then this functions will call irq_enable() and as we didn't
+implement a .enbale() operation, it will call our only unmask() function.
 
-Will
+So if the IRQ was unmasked on a CPU and a driver call an irq_enable() from an other CPU then
+we will end up with the IRQ enabled on 2 different CPUs. It is a problem for 2 reasons:
+- our hardware don't handle a IRQ enable on more than one CPU
+- it will modify the affinity at the hardware level because a new CPU will be able to
+receive an irq whereas we setup the affinity on only one CPU.
+
+By only using the mask and unmask registers we will need to handle the affinity by
+software instead of using the hardware. I agree that the current code is not trivial,
+but adding more comment instead of removing this capability should be better.
+
+
+Thanks,
+
+Gregory
+
+
+
+
+
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
