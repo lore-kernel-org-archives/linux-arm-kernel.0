@@ -1,141 +1,109 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Nov 2014 12:32:31 +0000
-Subject: [PATCH] mfd: tps65090: Fix bonkers indenting strategy
-Message-ID: <1415622751-23396-1-git-send-email-lee.jones@linaro.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 10 Nov 2014 12:35:06 +0000
+Subject: [PATCH v7 3/8] arm64: introduce is_device_dma_coherent
+In-Reply-To: <20141110101645.GA21366@e104818-lin.cambridge.arm.com>
+References: <alpine.DEB.2.02.1411051757140.22875@kaball.uk.xensource.com>
+ <20141106103337.GA19702@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.02.1411061155200.22875@kaball.uk.xensource.com>
+ <20141107110524.GA21875@localhost>
+ <alpine.DEB.2.02.1411071212250.22875@kaball.uk.xensource.com>
+ <20141107160006.GE29148@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.02.1411071646170.22875@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1411071732550.22875@kaball.uk.xensource.com>
+ <20141107181430.GH29148@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.02.1411071834540.22875@kaball.uk.xensource.com>
+ <20141110101645.GA21366@e104818-lin.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1411101200080.22875@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-First spotted pointless (incorrect) indent of 'if (ret)', then double
-indentations of a struct attribute 'mask'.  Decided to go through the
-whole file and make amendments instead and this is the result.
+On Mon, 10 Nov 2014, Catalin Marinas wrote:
+> On Fri, Nov 07, 2014 at 06:45:22PM +0000, Stefano Stabellini wrote:
+> > On Fri, 7 Nov 2014, Catalin Marinas wrote:
+> > > On Fri, Nov 07, 2014 at 05:35:41PM +0000, Stefano Stabellini wrote:
+> > > > On Fri, 7 Nov 2014, Stefano Stabellini wrote:
+> > > > > On Fri, 7 Nov 2014, Catalin Marinas wrote:
+> > > > > > What I would like to see is xen_dma_map_page() also using hyp calls for
+> > > > > > cache maintenance when !pfn_valid(), for symmetry with unmap. You would
+> > > > > > need another argument to xen_dma_map_page() though to pass the real
+> > > > > > device address or mfn (and on the map side you could simply check for
+> > > > > > page_to_pfn(page) != mfn). For such cases, Xen swiotlb already handles
+> > > > > > bouncing so you don't need dom0 swiotlb involved as well.
+> > > > > 
+> > > > > I can see that it would be nice to have map_page and unmap_page be
+> > > > > symmetrical. However actually doing the map_page flush with an hypercall
+> > > > > would slow things down. Hypercalls are slower than function calls. It is
+> > > > > faster to do the cache flushing in dom0 if possible. In the map_page
+> > > > > case we have the struct page so we can easily do it by calling the
+> > > > > native dma_ops function.
+> > > > > 
+> > > > > Maybe I could just add a comment to explain the reason for the asymmetry?
+> > > > 
+> > > > Ah, but the problem is that map_page could allocate a swiotlb buffer
+> > > > (actually it does on arm64) that without a corresponding unmap_page
+> > > > call, would end up being leaked, right?
+> > > 
+> > > Yes. You could hack dma_capable() to always return true for dom0
+> > > (because the pfn/dma address here doesn't have anything to do with the
+> > > real mfn) but that's more of a hack assuming a lot about the swiotlb
+> > > implementation.
+> > 
+> > Another idea would be to avoid calling the native map_page for foreign
+> > pages, but in the xen specific implementation instead of making the
+> > hypercall, we could call __dma_map_area on arm64 and map_page on arm.
+> 
+> The problem here is that you assume that for an SoC that is not fully
+> coherent all it needs is __dma_map_area. If you look at mach-mvebu, the
+> DMA is nearly cache coherent but it needs some specific synchronisation
+> barrier at the interconnect level. If we get something like this on a
+> platform with virtualisation, it would be implemented at the dom0 level
+> by SoC-specific DMA ops. Xen hypervisor I assume has its own BSP, hence
+> it could implement SoC specific cache flushing there. But with the mix
+> of cache flushing in dom0 on map and hypervisor on unmap such thing is
+> no longer be possible in a nice way.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mfd/tps65090.c | 62 +++++++++++++++++++++++++-------------------------
- 1 file changed, 31 insertions(+), 31 deletions(-)
+Yes, Xen has its own little platform files.
 
-diff --git a/drivers/mfd/tps65090.c b/drivers/mfd/tps65090.c
-index 1c3e6e2..14b62e1 100644
---- a/drivers/mfd/tps65090.c
-+++ b/drivers/mfd/tps65090.c
-@@ -76,58 +76,58 @@ static struct mfd_cell tps65090s[] = {
- static const struct regmap_irq tps65090_irqs[] = {
- 	/* INT1 IRQs*/
- 	[TPS65090_IRQ_VAC_STATUS_CHANGE] = {
--			.mask = TPS65090_INT1_MASK_VAC_STATUS_CHANGE,
-+		.mask = TPS65090_INT1_MASK_VAC_STATUS_CHANGE,
- 	},
- 	[TPS65090_IRQ_VSYS_STATUS_CHANGE] = {
--			.mask = TPS65090_INT1_MASK_VSYS_STATUS_CHANGE,
-+		.mask = TPS65090_INT1_MASK_VSYS_STATUS_CHANGE,
- 	},
- 	[TPS65090_IRQ_BAT_STATUS_CHANGE] = {
--			.mask = TPS65090_INT1_MASK_BAT_STATUS_CHANGE,
-+		.mask = TPS65090_INT1_MASK_BAT_STATUS_CHANGE,
- 	},
- 	[TPS65090_IRQ_CHARGING_STATUS_CHANGE] = {
--			.mask = TPS65090_INT1_MASK_CHARGING_STATUS_CHANGE,
-+		.mask = TPS65090_INT1_MASK_CHARGING_STATUS_CHANGE,
- 	},
- 	[TPS65090_IRQ_CHARGING_COMPLETE] = {
--			.mask = TPS65090_INT1_MASK_CHARGING_COMPLETE,
-+		.mask = TPS65090_INT1_MASK_CHARGING_COMPLETE,
- 	},
- 	[TPS65090_IRQ_OVERLOAD_DCDC1] = {
--			.mask = TPS65090_INT1_MASK_OVERLOAD_DCDC1,
-+		.mask = TPS65090_INT1_MASK_OVERLOAD_DCDC1,
- 	},
- 	[TPS65090_IRQ_OVERLOAD_DCDC2] = {
--			.mask = TPS65090_INT1_MASK_OVERLOAD_DCDC2,
-+		.mask = TPS65090_INT1_MASK_OVERLOAD_DCDC2,
- 	},
- 	/* INT2 IRQs*/
- 	[TPS65090_IRQ_OVERLOAD_DCDC3] = {
--			.reg_offset = 1,
--			.mask = TPS65090_INT2_MASK_OVERLOAD_DCDC3,
-+		.reg_offset = 1,
-+		.mask = TPS65090_INT2_MASK_OVERLOAD_DCDC3,
- 	},
- 	[TPS65090_IRQ_OVERLOAD_FET1] = {
--			.reg_offset = 1,
--			.mask = TPS65090_INT2_MASK_OVERLOAD_FET1,
-+		.reg_offset = 1,
-+		.mask = TPS65090_INT2_MASK_OVERLOAD_FET1,
- 	},
- 	[TPS65090_IRQ_OVERLOAD_FET2] = {
--			.reg_offset = 1,
--			.mask = TPS65090_INT2_MASK_OVERLOAD_FET2,
-+		.reg_offset = 1,
-+		.mask = TPS65090_INT2_MASK_OVERLOAD_FET2,
- 	},
- 	[TPS65090_IRQ_OVERLOAD_FET3] = {
--			.reg_offset = 1,
--			.mask = TPS65090_INT2_MASK_OVERLOAD_FET3,
-+		.reg_offset = 1,
-+		.mask = TPS65090_INT2_MASK_OVERLOAD_FET3,
- 	},
- 	[TPS65090_IRQ_OVERLOAD_FET4] = {
--			.reg_offset = 1,
--			.mask = TPS65090_INT2_MASK_OVERLOAD_FET4,
-+		.reg_offset = 1,
-+		.mask = TPS65090_INT2_MASK_OVERLOAD_FET4,
- 	},
- 	[TPS65090_IRQ_OVERLOAD_FET5] = {
--			.reg_offset = 1,
--			.mask = TPS65090_INT2_MASK_OVERLOAD_FET5,
-+		.reg_offset = 1,
-+		.mask = TPS65090_INT2_MASK_OVERLOAD_FET5,
- 	},
- 	[TPS65090_IRQ_OVERLOAD_FET6] = {
--			.reg_offset = 1,
--			.mask = TPS65090_INT2_MASK_OVERLOAD_FET6,
-+		.reg_offset = 1,
-+		.mask = TPS65090_INT2_MASK_OVERLOAD_FET6,
- 	},
- 	[TPS65090_IRQ_OVERLOAD_FET7] = {
--			.reg_offset = 1,
--			.mask = TPS65090_INT2_MASK_OVERLOAD_FET7,
-+		.reg_offset = 1,
-+		.mask = TPS65090_INT2_MASK_OVERLOAD_FET7,
- 	},
- };
- 
-@@ -176,7 +176,7 @@ MODULE_DEVICE_TABLE(of, tps65090_of_match);
- #endif
- 
- static int tps65090_i2c_probe(struct i2c_client *client,
--					const struct i2c_device_id *id)
-+			      const struct i2c_device_id *id)
- {
- 	struct tps65090_platform_data *pdata = dev_get_platdata(&client->dev);
- 	int irq_base = 0;
-@@ -210,11 +210,11 @@ static int tps65090_i2c_probe(struct i2c_client *client,
- 
- 	if (client->irq) {
- 		ret = regmap_add_irq_chip(tps65090->rmap, client->irq,
--			IRQF_ONESHOT | IRQF_TRIGGER_LOW, irq_base,
--			&tps65090_irq_chip, &tps65090->irq_data);
--			if (ret) {
--				dev_err(&client->dev,
--					"IRQ init failed with err: %d\n", ret);
-+					  IRQF_ONESHOT | IRQF_TRIGGER_LOW, irq_base,
-+					  &tps65090_irq_chip, &tps65090->irq_data);
-+		if (ret) {
-+			dev_err(&client->dev,
-+				"IRQ init failed with err: %d\n", ret);
- 			return ret;
- 		}
- 	} else {
-@@ -223,8 +223,8 @@ static int tps65090_i2c_probe(struct i2c_client *client,
- 	}
- 
- 	ret = mfd_add_devices(tps65090->dev, -1, tps65090s,
--		ARRAY_SIZE(tps65090s), NULL,
--		0, regmap_irq_get_domain(tps65090->irq_data));
-+			      ARRAY_SIZE(tps65090s), NULL,
-+			      0, regmap_irq_get_domain(tps65090->irq_data));
- 	if (ret) {
- 		dev_err(&client->dev, "add mfd devices failed with err: %d\n",
- 			ret);
--- 
-1.9.1
+I think you convinced me that having map in Linux and unmap in Xen is
+not a long term solid solution.
+
+
+> > In arch/arm/include/asm/xen/page-coherent.h:
+> > 
+> > static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
+> > 	     dma_addr_t dev_addr, unsigned long offset, size_t size,
+> > 	     enum dma_data_direction dir, struct dma_attrs *attrs)
+> > {
+> > 	if (pfn_valid(PFN_DOWN(dev_addr))) {
+> 
+> BTW, pfn_valid() is more expensive than simply comparing the mfn with
+> pfn for dom0. The calling code knows this already and it may be quicker
+> to simply pass a "bool foreign" argument.
+
+Good point, I can compare mfn and pfn here.
+I cannot do the same in unmap_page and the various sync operations,
+because there is no pfn available, but maybe I could use
+set_page_private to set a flag. I'll think about it.
+
+
+> > It wouldn't be as nice as using the hypercall but it would be faster and
+> > wouldn't depend on the inner workings of the arm64 implementation of
+> > map_page, except for __dma_map_area.
+> 
+> This "except" is big as we may at some point get some SoC like mvebu (I
+> would say less likely for arm64 than arm32).
+> 
+> BTW, does the Xen hypervisor already have a mapping of the mfn?
+
+On arm64, it does.
+On arm32, we have a pool of mappings, when we run out we start
+overwriting old mappings.
+
+
+> If not
+> and it has to create one temporarily for the flush, you may not lose
+> much by using the dom0 ops for unmap with a hyper call for temporarily
+> mapping the foreign page in dom0's IPA space (you could do the unmapping
+> lazily).
+
+That's true. Fortunately on arm64 we are OK.
