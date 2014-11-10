@@ -1,69 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 10 Nov 2014 13:51:19 +0100
-Subject: [RFC PATCH] drivers: of: move PCI domain assignment to generic OF
- code
-In-Reply-To: <1415622368-14612-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1415622368-14612-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1459907.RIyEjnM4cg@wuerfel>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 10 Nov 2014 14:53:29 +0200
+Subject: [PATCH] ASoC: davinvi-mcasp: Balance pm_runtime_enable() on probe
+ failure
+In-Reply-To: <1415537114-9642-1-git-send-email-anilk4.v@gmail.com>
+References: <1415537114-9642-1-git-send-email-anilk4.v@gmail.com>
+Message-ID: <5460B549.40203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 November 2014 12:26:08 Lorenzo Pieralisi wrote:
-> ---
->  arch/arm64/kernel/pci.c | 14 +++--------
->  drivers/of/of_pci.c     | 66 +++++++++++++++++++++++++++++++++++++++++++++++--
->  include/linux/of_pci.h  |  7 +++---
->  3 files changed, 71 insertions(+), 16 deletions(-)
+On 11/09/2014 02:45 PM, Anil Kumar wrote:
+> If probe fails then we need to call pm_runtime_disable() to balance
+> out the previous pm_runtime_enable() call.
+
+Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+
 > 
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index ce5836c..5e21c1c 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -49,20 +49,14 @@ int pcibios_add_device(struct pci_dev *dev)
->  
->  
->  #ifdef CONFIG_PCI_DOMAINS_GENERIC
-> -static bool dt_domain_found = false;
->  
->  void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
->  {
-> -	int domain = of_get_pci_domain_nr(parent->of_node);
-> +	int domain = of_assign_pci_domain_nr(parent->of_node);
->  
-> -	if (domain >= 0) {
-> -		dt_domain_found = true;
-> -	} else if (dt_domain_found == true) {
-> -		dev_err(parent, "Node %s is missing \"linux,pci-domain\" property in DT\n",
-> -			parent->of_node->full_name);
-> -		return;
-> -	} else {
-> -		domain = pci_get_new_domain_nr();
-> +	if (domain < 0) {
-> +		dev_err(parent, "PCI domain assignment failed\n");
-> +		domain = -1;
+> Signed-off-by: Anil Kumar <anilk4.v@gmail.com>
+> ---
+> :100644 100644 0eed9b1... 99c747d... M	sound/soc/davinci/davinci-mcasp.c
+>  sound/soc/davinci/davinci-mcasp.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/sound/soc/davinci/davinci-mcasp.c b/sound/soc/davinci/davinci-mcasp.c
+> index 0eed9b1..99c747d 100644
+> --- a/sound/soc/davinci/davinci-mcasp.c
+> +++ b/sound/soc/davinci/davinci-mcasp.c
+> @@ -1235,6 +1235,7 @@ static int davinci_mcasp_probe(struct platform_device *pdev)
+>  	ret = pm_runtime_get_sync(&pdev->dev);
+>  	if (IS_ERR_VALUE(ret)) {
+>  		dev_err(&pdev->dev, "pm_runtime_get_sync() failed\n");
+> +		pm_runtime_disable(&pdev->dev);
+>  		return ret;
 >  	}
 >  
->  	bus->domain_nr = domain;
+> 
 
-Is there a need to still keep this in architecture specific code? Why
-not move it to drivers/pci and let other firmware infrastructure
-hook in there directly.
 
->  {
-> @@ -45,10 +45,9 @@ of_pci_parse_bus_range(struct device_node *node, struct resource *res)
->  	return -EINVAL;
->  }
->  
-> -static inline int
-> -of_get_pci_domain_nr(struct device_node *node)
-> +static inline int of_assign_pci_domain_nr(struct device_node *node)
->  {
-> -	return -1;
-> +	return pci_get_new_domain_nr();
->  }
->  #endif
-
-This gets a bit tricky otherwise once we add ACPI in the mix, with all
-combinations of OF and ACPI at compile time and at runtime.
-
-	Arnd
+-- 
+P?ter
