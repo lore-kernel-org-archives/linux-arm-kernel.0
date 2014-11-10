@@ -1,17 +1,29 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 10 Nov 2014 12:10:08 +0100
-Subject: ARM: at91: CONFIG_ARCH_AT91SAM9RL
-Message-ID: <1415617808.4862.49.camel@x220>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Mon, 10 Nov 2014 12:10:04 +0100
+Subject: ARM: sti: SOC_STIH407 and STIH407_RESET?
+In-Reply-To: <1415616570.4862.37.camel@x220>
+References: <1415614934.4862.22.camel@x220> <54609304.4080209@st.com>
+ <1415616570.4862.37.camel@x220>
+Message-ID: <54609D0C.3040806@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Your commit bcf8c7e7703b ("ARM: at91: remove at91sam9rl legacy board
-support") landed in today's linux-next (ie, next-20141110). It removed
-the Kconfig symbol ARCH_AT91SAM9RL.
 
-There is still one check for CONFIG_ARCH_AT91SAM9RL in next-20141110 (in
-drivers/usb/gadget/udc/atmel_usba_udc.c). Is a patch to remove this
-check queued somewhere?
+On 11/10/2014 11:49 AM, Paul Bolle wrote:
+> Hi Maxime,
+>
+> On Mon, 2014-11-10 at 11:27 +0100, Maxime Coquelin wrote:
+>> The STiH407 reset has been merged in Philipp Zabel Reset tree for v3.19:
+>> http://git.pengutronix.de/?p=pza/linux.git;a=shortlog;h=refs/heads/reset/for_v3.19
+> That tree isn't part of linux-next, is it? Is it included in a tree that
+> itself is included in linux-next, so that it will end up in linux-next
+> one of these days?
+I don't know if reset tree is regularly merged into linux-next.
+I let Philipp, its maintainer, answer.
 
+Kind regards,
+Maxime
 
-Paul Bolle
+>
+> Paul Bolle
+>
