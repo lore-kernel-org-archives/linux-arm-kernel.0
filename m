@@ -1,41 +1,57 @@
-From: krishna.md@samsung.com (D Krishna Mohan)
-Date: Mon, 10 Nov 2014 19:39:51 +0530
-Subject: [PATCH 1/4] ASoC: ALC5631: Add device tree binding documentation
-In-Reply-To: <20141110133708.GQ3815@sirena.org.uk>
-References: <1415606519-30744-1-git-send-email-krishna.md@samsung.com>
- <1415606519-30744-2-git-send-email-krishna.md@samsung.com>
- <20141110133708.GQ3815@sirena.org.uk>
-Message-ID: <E07FA6F208344BC093C8D95F677E8F4A@sisodomain.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 10 Nov 2014 15:12:21 +0100
+Subject: [PATCH 14/17] ARM: mvebu: synchronize secondary CPU clocks on
+ resume
+In-Reply-To: <1414151970-6626-15-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1414151970-6626-15-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5460C7C5.7060007@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark Brown,
+Hi Thomas,
+On 24/10/2014 13:59, Thomas Petazzoni wrote:
+> The Armada XP has multiple cores clocked by independent clocks. The
+> SMP startup code contains a function called set_secondary_cpus_clock()
+> called in armada_xp_smp_prepare_cpus() to ensure the clocks of the
+> secondary CPUs match the clock of the boot CPU.
+> 
+> With the introduction of suspend/resume, this operation is no longer
+> needed when booting the system, but also when existing the suspend to
+> RAM state. Therefore this commit reworks a bit the logic: instead of
+> configuring the clock of all secondary CPUs in
+> armada_xp_smp_prepare_cpus(), we do it on a per-secondary CPU basis in
+> armada_xp_boot_secondary(), as this function gets called when existing
+> suspend to RAM for each secondary CPU.
+> 
+> Since the function now only takes care of one CPU, we rename it from
+> set_secondary_cpus_clock() to set_secondary_cpu_clock(), and it looses
+> its __init marker, as it is now used beyond the system initialization.
+> 
+> Note that we can't use smp_processor_id() directly, because when
+> exiting from suspend to RAM, the code is apparently executed with
+> preemption enabled, so smp_processor_id() is not happy (prints a
+> warning). We therefore switch to using get_cpu()/put_cpu(), even
+> though we pretty much have the guarantee that the code starting the
+> secondary CPUs is going to run on the boot CPU and will not be
+> migrated.
+> 
 
-     The codec driver is present in mainline as rt5631.c., Its realtek's 
-alc5631 so retained that name.
-Similarly machine driver also is named as arndale_rt5631.c but inside that 
-driver I have used alc5631 naming as the
-audio daughter card on arndale board mentions alc5631 so I have used this 
-convention here so that user should not
-feel the absence of the driver.
-
-Is that ok or do you want to have one naming all over?
-
--Krishna
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 
---------------------------------------------------
-From: "Mark Brown" <broonie@kernel.org>
-Sent: Monday, November 10, 2014 7:07 PM
-To: "Krishna Mohan Dani" <krishna.md@samsung.com>
-Cc: <linux-samsung-soc@vger.kernel.org>; 
-<linux-arm-kernel@lists.infradead.org>; <alsa-devel@alsa-project.org>; 
-<kgene.kim@samsung.com>
-Subject: Re: [PATCH 1/4] ASoC: ALC5631: Add device tree binding 
-documentation
+Thanks,
 
-On Mon, Nov 10, 2014 at 01:31:56PM +0530, Krishna Mohan Dani wrote:
-> Document the device tree binding for the ALC5631 codec and update vendor
-> specific prefix for the Realtek.
+Gregory
 
-This driver isn't in mainline, you need to submit the driver. 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/platsmp.c | 31 +++++++++++++++----------------
+>  1 file changed, 15 insertions(+), 16 deletions(-)
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
