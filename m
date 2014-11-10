@@ -1,34 +1,72 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 10 Nov 2014 12:39:23 -0800
-Subject: [PATCH] ARM: dts: dra7-evm: Keep all VDD rails always-on
-In-Reply-To: <54579476.10702@ti.com>
-References: <1413902290-304-1-git-send-email-nm@ti.com> <54579476.10702@ti.com>
-Message-ID: <20141110203922.GX31454@atomide.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 10 Nov 2014 21:45:53 +0100
+Subject: [PATCH] ARM: at91: remove CONFIG_MACH_SAMA5_DT
+Message-ID: <1415652353-15985-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roger Quadros <rogerq@ti.com> [141103 06:44]:
-> Hi Nishant,
-> 
-> On 10/21/2014 05:38 PM, Nishanth Menon wrote:
-> > DRA7 Data Manual (SPRS857L - August 2014) section 4.1.1 states: "All
-> > unused power supply balls must be supplied with the voltages specified
-> > in the Section 5.2, Recommended Operating Conditions".
-> > 
-> > This implies that all unused voltage rails for Vayu can never be
-> > switched off even if the hardware blocks inside that voltage domain is
-> > unused. Switching off these unused rails may result in stability issues
-> > on other domains and increased leakage and power-on-hour impacts.
-> > 
-> > J6eco-evm dts file already considers this, however j6evm-dts file needs
-> > to be fixed to consider this constraint of the SoC.
-> > 
-> > Signed-off-by: Nishanth Menon <nm@ti.com>
-> 
-> Acked-by: Roger Quadros <rogerq@ti.com>
-> 
-> I'm assuming that vddshv8 (MMC1 power group) can be switched off.
+CONFIG_MACH_SAMA5_DT is useless as the only way to boot on sama5 based boards is
+to use device tree.
 
-Applying into omap-for-v3.19/dt thanks.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/configs/sama5_defconfig |  1 -
+ arch/arm/mach-at91/Kconfig       | 10 +---------
+ arch/arm/mach-at91/Makefile      |  2 +-
+ 3 files changed, 2 insertions(+), 11 deletions(-)
 
-Tony
+diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
+index c9089c927daf..299ca18bbd75 100644
+--- a/arch/arm/configs/sama5_defconfig
++++ b/arch/arm/configs/sama5_defconfig
+@@ -20,7 +20,6 @@ CONFIG_ARCH_AT91=y
+ CONFIG_SOC_SAM_V7=y
+ CONFIG_SOC_SAMA5D3=y
+ CONFIG_SOC_SAMA5D4=y
+-CONFIG_MACH_SAMA5_DT=y
+ CONFIG_AEABI=y
+ CONFIG_UACCESS_WITH_MEMCPY=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 0e6d548b70d9..81ddd7d31d1e 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -58,6 +58,7 @@ config SOC_SAMA5
+ 	select USE_OF
+ 	select MEMORY
+ 	select ATMEL_SDRAMC
++	select PHYLIB if NETDEVICES
+ 
+ menu "Atmel AT91 System-on-Chip"
+ 
+@@ -221,15 +222,6 @@ config MACH_AT91SAM9_DT
+ 	  Select this if you want to experiment device-tree with
+ 	  an Atmel Evaluation Kit.
+ 
+-config MACH_SAMA5_DT
+-	bool "Atmel SAMA5 Evaluation Kits with device-tree support"
+-	depends on SOC_SAMA5
+-	select USE_OF
+-	select PHYLIB if NETDEVICES
+-	help
+-	  Select this if you want to experiment device-tree with
+-	  an Atmel Evaluation Kit.
+-
+ # ----------------------------------------------------------
+ 
+ comment "AT91 Feature Selections"
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index 1b9ae0257a6e..25ae74837d23 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -80,7 +80,7 @@ obj-$(CONFIG_MACH_AT91RM9200_DT) += board-dt-rm9200.o
+ obj-$(CONFIG_MACH_AT91SAM9_DT) += board-dt-sam9.o
+ 
+ # SAMA5 board with device-tree
+-obj-$(CONFIG_MACH_SAMA5_DT) += board-dt-sama5.o
++obj-$(CONFIG_SOC_SAMA5)		+= board-dt-sama5.o
+ 
+ # AT91X40 board-specific support
+ obj-$(CONFIG_MACH_AT91EB01)	+= board-eb01.o
+-- 
+2.1.0
