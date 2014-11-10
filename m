@@ -1,241 +1,49 @@
-From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Mon, 10 Nov 2014 14:32:21 -0700
-Subject: [PATCH v9 RESEND] coresight: bindings for coresight drivers
-Message-ID: <1415655141-31507-1-git-send-email-mathieu.poirier@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 10 Nov 2014 13:34:19 -0800
+Subject: serial: of-serial: fetch line number from DT
+Message-ID: <CAOesGMjzs=dThDv6S8Xvo+ym-XECaQhTQ8NV6t46fQZ1LoJnHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Can someone in the bindings' maintainer brigade pick this up?  The code has been
-added to linux-next:
-	a06ae86 coresight: add CoreSight core layer framework	
+Greg,
 
-Thanks,
-Mathieu 
+This commit:
 
->From 12ec0ef4753125e470a0899fabd94b46b3a93a9d Mon Sep 17 00:00:00 2001
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
-Date: Thu, 7 Aug 2014 12:34:06 -0600
-Subject: [PATCH v9] coresight: bindings for coresight drivers
+commit 1bd8324535ec1ff44aef55c0e40b9e7d56b310fb
+Author: Lucas Stach <dev@lynxeye.de>
+Date:   Mon Nov 3 23:16:54 2014 +0100
 
-Coresight IP blocks allow for the support of HW assisted tracing
-on ARM SoCs.  Bindings for the currently available blocks are
-presented herein.
+    serial: of-serial: fetch line number from DT
 
-Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- .../devicetree/bindings/arm/coresight.txt          | 203 +++++++++++++++++++++
- 1 file changed, 203 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/coresight.txt
+    The general agreed way to specify a fixed line number
+    for a serial console is to provide a "serial" alias
+    in the devicetree. Start parsing this property in
+    of_serial.
 
-diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-new file mode 100644
-index 0000000..96dd947
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/coresight.txt
-@@ -0,0 +1,203 @@
-+* CoreSight Components:
-+
-+CoreSight components are compliant with the ARM CoreSight architecture
-+specification and can be connected in various topologies to suit a particular
-+SoCs tracing needs. These trace components can generally be classified as sinks,
-+links and sources. Trace data produced by one or more sources flows through the
-+intermediate links connecting the source to the currently selected sink. Each
-+CoreSight component device should use these properties to describe its hardware
-+characteristcs.
-+
-+* Required properties for all components *except* non-configurable replicators:
-+
-+	* compatible: These have to be supplemented with "arm,primecell" as
-+	  drivers are using the AMBA bus interface.  Possible values include:
-+		- "arm,coresight-etb10", "arm,primecell";
-+		- "arm,coresight-tpiu", "arm,primecell";
-+		- "arm,coresight-tmc", "arm,primecell";
-+		- "arm,coresight-funnel", "arm,primecell";
-+		- "arm,coresight-etm3x", "arm,primecell";
-+
-+	* reg: physical base address and length of the register
-+	  set(s) of the component.
-+
-+	* clocks: the clock associated to this component.
-+
-+	* clock-names: the name of the clock as referenced by the code.
-+	  Since we are using the AMBA framework, the name should be
-+	  "apb_pclk".
-+
-+	* port or ports: The representation of the component's port
-+	  layout using the generic DT graph presentation found in
-+	  "bindings/graph.txt".
-+
-+* Required properties for devices that don't show up on the AMBA bus, such as
-+  non-configurable replicators:
-+
-+	* compatible: Currently supported value is (note the absence of the
-+	  AMBA markee):
-+		- "arm,coresight-replicator"
-+
-+	* id: a unique number that will identify this replicator.
-+
-+	* port or ports: same as above.
-+
-+* Optional properties for ETM/PTMs:
-+
-+	* arm,cp14: must be present if the system accesses ETM/PTM management registers
-+	  via co-processor 14.
-+
-+	* cpu: the cpu phandle this ETM/PTM is affined to. When omitted the source is
-+	  considered to belong to CPU0.
-+
-+* Optional property for TMC:
-+
-+	* arm,buffer-size: size of contiguous buffer space for TMC ETR
-+	 (embedded trace router)
-+
-+
-+Example:
-+
-+1. Sinks
-+	etb at 0,20010000 {
-+		compatible = "arm,coresight-etb10", "arm,primecell";
-+		reg = <0 0x20010000 0 0x1000>;
-+
-+		coresight-default-sink;
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+		port {
-+			etb_in_port: endpoint at 0 {
-+				slave-mode;
-+				remote-endpoint = <&replicator_out_port0>;
-+			};
-+		};
-+	};
-+
-+	tpiu at 0,20030000 {
-+		compatible = "arm,coresight-tpiu", "arm,primecell";
-+		reg = <0 0x20030000 0 0x1000>;
-+
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+		port {
-+			tpiu_in_port: endpoint at 0 {
-+				slave-mode;
-+				remote-endpoint = <&replicator_out_port1>;
-+			};
-+		};
-+	};
-+
-+2. Links
-+	replicator {
-+		/* non-configurable replicators don't show up on the
-+		 * AMBA bus.  As such no need to add "arm,primecell".
-+		 */
-+		compatible = "arm,coresight-replicator";
-+		/* this will show up in debugfs as "0.replicator" */
-+		id = <0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* replicator output ports */
-+			port at 0 {
-+				reg = <0>;
-+				replicator_out_port0: endpoint {
-+					remote-endpoint = <&etb_in_port>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				replicator_out_port1: endpoint {
-+					remote-endpoint = <&tpiu_in_port>;
-+				};
-+			};
-+
-+			/* replicator input port */
-+			port at 2 {
-+				reg = <0>;
-+				replicator_in_port0: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&funnel_out_port0>;
-+				};
-+			};
-+		};
-+	};
-+
-+	funnel at 0,20040000 {
-+		compatible = "arm,coresight-funnel", "arm,primecell";
-+		reg = <0 0x20040000 0 0x1000>;
-+
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* funnel output port */
-+			port at 0 {
-+				reg = <0>;
-+				funnel_out_port0: endpoint {
-+					remote-endpoint = <&replicator_in_port0>;
-+				};
-+			};
-+
-+			/* funnel input ports */
-+			port at 1 {
-+				reg = <0>;
-+				funnel_in_port0: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&ptm0_out_port>;
-+				};
-+			};
-+
-+			port at 2 {
-+				reg = <1>;
-+				funnel_in_port1: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&ptm1_out_port>;
-+				};
-+			};
-+
-+			port at 3 {
-+				reg = <2>;
-+				funnel_in_port2: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&etm0_out_port>;
-+				};
-+			};
-+
-+		};
-+	};
-+
-+3. Sources
-+	ptm at 0,2201c000 {
-+		compatible = "arm,coresight-etm3x", "arm,primecell";
-+		reg = <0 0x2201c000 0 0x1000>;
-+
-+		cpu = <&cpu0>;
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+		port {
-+			ptm0_out_port: endpoint {
-+				remote-endpoint = <&funnel_in_port0>;
-+			};
-+		};
-+	};
-+
-+	ptm at 0,2201d000 {
-+		compatible = "arm,coresight-etm3x", "arm,primecell";
-+		reg = <0 0x2201d000 0 0x1000>;
-+
-+		cpu = <&cpu1>;
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+		port {
-+			ptm1_out_port: endpoint {
-+				remote-endpoint = <&funnel_in_port1>;
-+			};
-+		};
-+	};
--- 
-1.9.1
+    Signed-off-by: Lucas Stach <dev@lynxeye.de>
+    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+
+Broke a whole lot of tegra boards in last night's -next here. In
+particular, I've been looking at tegra20-seaboard, which now doesn't
+boot with console any more.
+
+http://arm-soc.lixom.net/bootlogs/next/next-20141110/
+
+Unfortunately, tegra has for a long time been specifying the aliases
+as a fixed 1:1 mapping, but most environments rely on ttyS0 being the
+first _activated_ serial port. That's obviously going to break things
+here. :(
+
+Greg, can you please revert until we get the tegra-side fixes in for
+this, or we're in for a pretty lousy time w.r.t. bisecting problems
+across the two mergepoints?
+
+Stephen: I suppose the best way to handle this on tegra is to specify
+the aliases per-board instead of in the soc dtsi today.
+
+Apologies for not replying to the patch directly -- it was only ever
+posted to linux-serial and I don't seem to be subscribed.
+
+
+-Olof
