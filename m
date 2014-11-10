@@ -1,21 +1,50 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 10 Nov 2014 11:49:30 +0100
-Subject: ARM: sti: SOC_STIH407 and STIH407_RESET?
-In-Reply-To: <54609304.4080209@st.com>
-References: <1415614934.4862.22.camel@x220> <54609304.4080209@st.com>
-Message-ID: <1415616570.4862.37.camel@x220>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Nov 2014 10:49:47 +0000
+Subject: [PATCH 02/13] ARM: STi: DT: STiH416: Add DT node for the
+ stih415/6 usb2 phy
+In-Reply-To: <1415361475-6218-3-git-send-email-peter.griffin@linaro.org>
+References: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
+ <1415361475-6218-3-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20141110104947.GT21424@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Fri, 07 Nov 2014, Peter Griffin wrote:
 
-On Mon, 2014-11-10 at 11:27 +0100, Maxime Coquelin wrote:
-> The STiH407 reset has been merged in Philipp Zabel Reset tree for v3.19:
-> http://git.pengutronix.de/?p=pza/linux.git;a=shortlog;h=refs/heads/reset/for_v3.19
+> This usb picophy is found on stih415/6 SoC.
 
-That tree isn't part of linux-next, is it? Is it included in a tree that
-itself is included in linux-next, so that it will end up in linux-next
-one of these days?
+Then shouldn't it live in stih41x.dtsi?
 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  arch/arm/boot/dts/stih416.dtsi | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
+> index 1137bdf..0f3019a 100644
+> --- a/arch/arm/boot/dts/stih416.dtsi
+> +++ b/arch/arm/boot/dts/stih416.dtsi
+> @@ -316,5 +316,14 @@
+>  
+>  			status	        = "disabled";
+>  		};
+> +
+> +		usb2_phy: usb2phy at 0 {
+> +			compatible = "st,stih416-usb-phy";
+> +			#phy-cells = <0>;
+> +			st,syscfg = <&syscfg_rear>;
+> +			clocks = <&clk_sysin>;
+> +			clock-names = "osc_phy";
+> +
 
-Paul Bolle
+Remove this '\n'.
+
+> +		};
+>  	};
+>  };
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
