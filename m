@@ -1,26 +1,36 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 10 Nov 2014 09:58:59 +0100
-Subject: linux-next: manual merge of the mmc-uh tree with the arm-soc tree
-In-Reply-To: <20141110125637.30fe73b9@canb.auug.org.au>
-References: <20141110125637.30fe73b9@canb.auug.org.au>
-Message-ID: <54607E53.4060105@atmel.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Mon, 10 Nov 2014 09:56:16 +0100
+Subject: [PATCH v2 00/01] arm: ftrace: Adds support for
+ CONFIG_DYNAMIC_FTRACE_WITH_REGS
+In-Reply-To: <20141107115225.72bc6cbf@gandalf.local.home>
+References: <20141107115225.72bc6cbf@gandalf.local.home>
+Message-ID: <1415609777-18525-1-git-send-email-jjhiblot@traphandler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2014 02:56, Stephen Rothwell :
-> Hi Ulf,
-> 
-> Today's linux-next merge of the mmc-uh tree got a conflict in
-> arch/arm/mach-at91/at91sam9g45_devices.c between commit 4bf7753b8ab7
-> ("ARM: at91: remove at91sam9g45/9m10 legacy board support") from the
-> arm-soc tree and commit 4049854c41e0 ("ARM: at91: remove
-> mach/atmel-mci.h") from the mmc-uh tree.
-> 
-> I fixed it up (I just removed the file) and can carry the fix as
-> necessary (no action is required).
+This patch adds support for ftrace operations on the ARM architecture.
+This support is needed by kgraft and possibly other ftrace-based tools.
+My goal is to have kgraft working on ARM and aarch64.
 
-Well fixed. Thanks Stephen.
+I tested this patch with a toy implementation of kgraft for ARM and basic
+usage of function and function_graph tracers
+It doesn't show any problem with the ftrace selftests and the tests found
+today in branch ftrace/testing-mystuff of linux-trace repository
+(git://git.kernel.org/pub/scm/linux/kernel/git/rostedt/linux-trace.git)
 
-Bye,
+
+change since v1:
+ - changed the title and the commit log of the patch to make it more
+   understandable
+
+Jean-Jacques Hiblot (1):
+  arm: ftrace: Adds support for CONFIG_DYNAMIC_FTRACE_WITH_REGS
+
+ arch/arm/Kconfig               |  2 ++
+ arch/arm/include/asm/ftrace.h  |  3 ++
+ arch/arm/kernel/entry-common.S | 68 +++++++++++++++++++++++++++++++++++++++++-
+ arch/arm/kernel/ftrace.c       | 34 +++++++++++++++++++++
+ 4 files changed, 106 insertions(+), 1 deletion(-)
+
 -- 
-Nicolas Ferre
+2.1.3
