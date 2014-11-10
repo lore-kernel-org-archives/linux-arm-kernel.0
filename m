@@ -1,357 +1,241 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Mon, 10 Nov 2014 14:06:42 -0700
-Subject: [PATCH] coresight:  Adding ABI documentation
-Message-ID: <1415653602-25347-1-git-send-email-mathieu.poirier@linaro.org>
+Date: Mon, 10 Nov 2014 14:32:21 -0700
+Subject: [PATCH v9 RESEND] coresight: bindings for coresight drivers
+Message-ID: <1415655141-31507-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
+Can someone in the bindings' maintainer brigade pick this up?  The code has been
+added to linux-next:
+	a06ae86 coresight: add CoreSight core layer framework	
 
+Thanks,
+Mathieu 
+
+>From 12ec0ef4753125e470a0899fabd94b46b3a93a9d Mon Sep 17 00:00:00 2001
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
+Date: Thu, 7 Aug 2014 12:34:06 -0600
+Subject: [PATCH v9] coresight: bindings for coresight drivers
+
+Coresight IP blocks allow for the support of HW assisted tracing
+on ARM SoCs.  Bindings for the currently available blocks are
+presented herein.
+
+Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- .../ABI/testing/sysfs-bus-coresight-devices-etb10  |  24 ++
- .../ABI/testing/sysfs-bus-coresight-devices-etm3x  | 253 +++++++++++++++++++++
- .../ABI/testing/sysfs-bus-coresight-devices-funnel |  12 +
- .../ABI/testing/sysfs-bus-coresight-devices-tmc    |   8 +
- MAINTAINERS                                        |   1 +
- 5 files changed, 298 insertions(+)
- create mode 100644 Documentation/ABI/testing/sysfs-bus-coresight-devices-etb10
- create mode 100644 Documentation/ABI/testing/sysfs-bus-coresight-devices-etm3x
- create mode 100644 Documentation/ABI/testing/sysfs-bus-coresight-devices-funnel
- create mode 100644 Documentation/ABI/testing/sysfs-bus-coresight-devices-tmc
+ .../devicetree/bindings/arm/coresight.txt          | 203 +++++++++++++++++++++
+ 1 file changed, 203 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/coresight.txt
 
-diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etb10 b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etb10
+diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
 new file mode 100644
-index 0000000..4b8d6ec
+index 0000000..96dd947
 --- /dev/null
-+++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etb10
-@@ -0,0 +1,24 @@
-+What:		/sys/bus/coresight/devices/<memory_map>.etb/enable_sink
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(RW) Add/remove a sink from a trace path.  There can be multiple
-+		source for a single sink.
-+		ex: echo 1 > /sys/bus/coresight/devices/20010000.etb/enable_sink
++++ b/Documentation/devicetree/bindings/arm/coresight.txt
+@@ -0,0 +1,203 @@
++* CoreSight Components:
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.etb/status
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) List various control and status registers.  The specific
-+		layout and content is driver specific.
++CoreSight components are compliant with the ARM CoreSight architecture
++specification and can be connected in various topologies to suit a particular
++SoCs tracing needs. These trace components can generally be classified as sinks,
++links and sources. Trace data produced by one or more sources flows through the
++intermediate links connecting the source to the currently selected sink. Each
++CoreSight component device should use these properties to describe its hardware
++characteristcs.
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.etb/trigger_cntr
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(RW) Disables write access to the Trace RAM by stopping the
-+		formatter after a defined number of words have been stored
-+		following the trigger event. The number of 32-bit words written
-+		into the Trace RAM following the trigger event is equal to the
-+		value stored in this register+1 (from ARM ETB-TRM).
-diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm3x b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm3x
-new file mode 100644
-index 0000000..b4d0b99
---- /dev/null
-+++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm3x
-@@ -0,0 +1,253 @@
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/enable_source
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(RW) Enable/disable tracing on this specific trace entiry.
-+		Enabling a source implies the source has been configured
-+		properly and a sink has been identidifed for it.  The path
-+		of coresight components linking the source to the sink is
-+		configured and managed automatically by the coresight framework.
++* Required properties for all components *except* non-configurable replicators:
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/status
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) List various control and status registers.  The specific
-+		layout and content is driver specific.
++	* compatible: These have to be supplemented with "arm,primecell" as
++	  drivers are using the AMBA bus interface.  Possible values include:
++		- "arm,coresight-etb10", "arm,primecell";
++		- "arm,coresight-tpiu", "arm,primecell";
++		- "arm,coresight-tmc", "arm,primecell";
++		- "arm,coresight-funnel", "arm,primecell";
++		- "arm,coresight-etm3x", "arm,primecell";
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/addr_idx
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	Select which address comparator or pair (of comparators) to
-+		work with.
++	* reg: physical base address and length of the register
++	  set(s) of the component.
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/addr_acctype
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(RW) Used in conjunction with @addr_idx.  Specifies
-+		characteristics about the address comparator being configure,
-+		for example the access type, the kind of instruction to trace,
-+		processor contect ID to trigger on, etc.  Individual fields in
-+		the access type register may vary on the version of the trace
-+		entity.
++	* clocks: the clock associated to this component.
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/addr_range
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(RW) Used in conjunction with @addr_idx.  Specifies the range of
-+		addresses to trigger on.  Inclusion or exclusion is specificed
-+		in the corresponding access type register.
++	* clock-names: the name of the clock as referenced by the code.
++	  Since we are using the AMBA framework, the name should be
++	  "apb_pclk".
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/addr_single
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(RW) Used in conjunction with @addr_idx.  Specifies the single
-+		address to trigger on, highly influenced by the configuration
-+		options of the corresponding access type register.
++	* port or ports: The representation of the component's port
++	  layout using the generic DT graph presentation found in
++	  "bindings/graph.txt".
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/addr_start
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(RW) Used in conjunction with @addr_idx.  Specifies the single
-+		address to start tracing on, highly influenced by the
-+		configuration options of the corresponding access type register.
++* Required properties for devices that don't show up on the AMBA bus, such as
++  non-configurable replicators:
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/addr_stop
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(RW) Used in conjunction with @addr_idx.  Specifies the single
-+		address to stop tracing on, highly influenced by the
-+		configuration options of the corresponding access type register.
++	* compatible: Currently supported value is (note the absence of the
++	  AMBA markee):
++		- "arm,coresight-replicator"
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/cntr_idx
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(RW) Specifies the counter to work on.
++	* id: a unique number that will identify this replicator.
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/cntr_event
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Used in conjunction with cntr_idx, give access to the
-+		counter event register.
++	* port or ports: same as above.
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/cntr_val
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Used in conjunction with cntr_idx, give access to the
-+		counter value register.
++* Optional properties for ETM/PTMs:
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/cntr_rld_val
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Used in conjunction with cntr_idx, give access to the
-+		counter reload value register.
++	* arm,cp14: must be present if the system accesses ETM/PTM management registers
++	  via co-processor 14.
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/cntr_rld_event
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Used in conjunction with cntr_idx, give access to the
-+		counter reload event register.
++	* cpu: the cpu phandle this ETM/PTM is affined to. When omitted the source is
++	  considered to belong to CPU0.
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/ctxid_idx
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Specifies the index of the context ID register to be
-+		selected.
++* Optional property for TMC:
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/ctxid_mask
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Mask to apply to all the context ID comparator.
++	* arm,buffer-size: size of contiguous buffer space for TMC ETR
++	 (embedded trace router)
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/ctxid_val
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Used with the ctxid_idx, specify with context ID to trigger
-+		on.
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/enable_event
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Defines which event triggers a trace.
++Example:
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/etmsr
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Gives access to the ETM status register, which holds
-+		programming information and status on certains events.
++1. Sinks
++	etb at 0,20010000 {
++		compatible = "arm,coresight-etb10", "arm,primecell";
++		reg = <0 0x20010000 0 0x1000>;
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/fifofull_level
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Number of byte left in the fifo before considering it full.
-+		Depending on the tracer's version, can also hold threshold for
-+		data suppression.
++		coresight-default-sink;
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		port {
++			etb_in_port: endpoint at 0 {
++				slave-mode;
++				remote-endpoint = <&replicator_out_port0>;
++			};
++		};
++	};
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/mode
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Interface with the driver's 'mode' field, controlling
-+		various aspect of the trace entity such as time stamping,
-+		context ID size and cycle accurate tracing.  Driver specific
-+		and bound to change depending on the driver.
++	tpiu at 0,20030000 {
++		compatible = "arm,coresight-tpiu", "arm,primecell";
++		reg = <0 0x20030000 0 0x1000>;
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/nr_addr_cmp
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(R) Provides the number of address comparators pairs accessible
-+		on a trace unit, as specified by bit 3:0 of register ETMCCR.
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		port {
++			tpiu_in_port: endpoint at 0 {
++				slave-mode;
++				remote-endpoint = <&replicator_out_port1>;
++			};
++		};
++	};
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/nr_cntr
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(R) Provides the number of counters accessible on a trace unit,
-+		as specified by bit 15:13 of register ETMCCR.
++2. Links
++	replicator {
++		/* non-configurable replicators don't show up on the
++		 * AMBA bus.  As such no need to add "arm,primecell".
++		 */
++		compatible = "arm,coresight-replicator";
++		/* this will show up in debugfs as "0.replicator" */
++		id = <0>;
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/nr_ctxid_cmp
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(R) Provides the number of context ID comparator available on a
-+		trace unit, as specified by bit 25:24 of register ETMCCR.
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/reset
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(W) Cancels all configuration on a trace unit and set it back
-+		to its boot configuration.
++			/* replicator output ports */
++			port at 0 {
++				reg = <0>;
++				replicator_out_port0: endpoint {
++					remote-endpoint = <&etb_in_port>;
++				};
++			};
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/seq_12_event
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Defines the event that causes the sequencer to transition
-+		from state 1 to state 2.
++			port at 1 {
++				reg = <1>;
++				replicator_out_port1: endpoint {
++					remote-endpoint = <&tpiu_in_port>;
++				};
++			};
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/seq_13_event
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Defines the event that causes the sequencer to transition
-+		from state 1 to state 3.
++			/* replicator input port */
++			port at 2 {
++				reg = <0>;
++				replicator_in_port0: endpoint {
++					slave-mode;
++					remote-endpoint = <&funnel_out_port0>;
++				};
++			};
++		};
++	};
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/seq_21_event
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Defines the event that causes the sequencer to transition
-+		from state 2 to state 1.
++	funnel at 0,20040000 {
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0 0x20040000 0 0x1000>;
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/seq_23_event
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Defines the event that causes the sequencer to transition
-+		from state 2 to state 3.
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/seq_31_event
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Defines the event that causes the sequencer to transition
-+		from state 3 to state 1.
++			/* funnel output port */
++			port at 0 {
++				reg = <0>;
++				funnel_out_port0: endpoint {
++					remote-endpoint = <&replicator_in_port0>;
++				};
++			};
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/seq_32_event
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Defines the event that causes the sequencer to transition
-+		from state 3 to state 2.
++			/* funnel input ports */
++			port at 1 {
++				reg = <0>;
++				funnel_in_port0: endpoint {
++					slave-mode;
++					remote-endpoint = <&ptm0_out_port>;
++				};
++			};
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/curr_seq_state
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(R) Holds the current state of the sequencer.
++			port at 2 {
++				reg = <1>;
++				funnel_in_port1: endpoint {
++					slave-mode;
++					remote-endpoint = <&ptm1_out_port>;
++				};
++			};
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/sync_freq
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Holds the trace synchronization frequency value - must be
-+		programmed with the various implementation behavior in mind.
++			port at 3 {
++				reg = <2>;
++				funnel_in_port2: endpoint {
++					slave-mode;
++					remote-endpoint = <&etm0_out_port>;
++				};
++			};
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/timestamp_event
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Defines an event that requests the insertion of a timestamp
-+		into the trace stream.
++		};
++	};
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/traceid
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Holds the trace ID that will appear in the trace stream
-+		coming from this trace entity.
++3. Sources
++	ptm at 0,2201c000 {
++		compatible = "arm,coresight-etm3x", "arm,primecell";
++		reg = <0 0x2201c000 0 0x1000>;
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/trigger_event
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description: 	(RW) Define the event that controls the trigger.
-diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-funnel b/Documentation/ABI/testing/sysfs-bus-coresight-devices-funnel
-new file mode 100644
-index 0000000..d75acda
---- /dev/null
-+++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-funnel
-@@ -0,0 +1,12 @@
-+What:		/sys/bus/coresight/devices/<memory_map>.funnel/funnel_ctrl
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(RW) Enables the slave ports and defines the hold time of the
-+		slave ports.
++		cpu = <&cpu0>;
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		port {
++			ptm0_out_port: endpoint {
++				remote-endpoint = <&funnel_in_port0>;
++			};
++		};
++	};
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.funnel/priority
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(RW) Defines input port priority order.
-diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-tmc b/Documentation/ABI/testing/sysfs-bus-coresight-devices-tmc
-new file mode 100644
-index 0000000..f38cded5
---- /dev/null
-+++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-tmc
-@@ -0,0 +1,8 @@
-+What:		/sys/bus/coresight/devices/<memory_map>.tmc/trigger_cntr
-+Date:		November 2014
-+KernelVersion:	3.19
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(RW) Disables write access to the Trace RAM by stopping the
-+		formatter after a defined number of words have been stored
-+		following the trigger event. Additional interface for this
-+		driver are expected to be added as it matures.
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 3995263..7d18080 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -925,6 +925,7 @@ S:	Maintained
- F:	drivers/coresight/*
- F:	Documentation/trace/coresight.txt
- F:	Documentation/devicetree/bindings/arm/coresight.txt
-+F:	Documentation/ABI/testing/sysfs-bus-coresight-devices-*
- 
- ARM/CORGI MACHINE SUPPORT
- M:	Richard Purdie <rpurdie@rpsys.net>
++	ptm at 0,2201d000 {
++		compatible = "arm,coresight-etm3x", "arm,primecell";
++		reg = <0 0x2201d000 0 0x1000>;
++
++		cpu = <&cpu1>;
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		port {
++			ptm1_out_port: endpoint {
++				remote-endpoint = <&funnel_in_port1>;
++			};
++		};
++	};
 -- 
 1.9.1
