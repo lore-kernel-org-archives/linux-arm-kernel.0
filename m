@@ -1,156 +1,102 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Nov 2014 09:47:14 +0000
-Subject: [PATCH v2 01/11] mfd: syscon: Add atmel-matrix registers
- definition
-In-Reply-To: <1415203287-21517-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1415203287-21517-1-git-send-email-boris.brezillon@free-electrons.com>
- <1415203287-21517-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20141110094714.GG21424@x1>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 10 Nov 2014 09:52:28 +0000
+Subject: AMR: sun7i: CPU hotplug support?
+In-Reply-To: <5460870C.9010109@web.de>
+References: <545FC215.7010802@web.de> <20141109231744.GC2989@lukather>
+ <5460554A.1060701@web.de> <5460766B.8070000@web.de> <546082A8.60401@arm.com>
+ <5460870C.9010109@web.de>
+Message-ID: <54608ADC.4050500@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 05 Nov 2014, Boris Brezillon wrote:
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-> AT91 SoCs have a memory range reserved for internal bus configuration.
-> Expose those registers so that drivers can make use of the matrix syscon
-> declared in at91 DTs.
+On 10/11/14 09:36, Jan Kiszka wrote:
+> On 2014-11-10 10:17, Marc Zyngier wrote:
+>> On 10/11/14 08:25, Jan Kiszka wrote:
+>>> On 2014-11-10 07:03, Jan Kiszka wrote:
+>>>> On 2014-11-10 00:17, Maxime Ripard wrote:
+>>>>> Hi Jan,
+>>>>> 
+>>>>> On Sun, Nov 09, 2014 at 08:35:49PM +0100, Jan Kiszka
+>>>>> wrote:
+>>>>>> did anyone already happen to look into enabling CPU
+>>>>>> hotplug for the Allwinner A20 in upstream? I'm currently
+>>>>>> running the sunxi-next branch on Banana Pi, and echo 0 >
+>>>>>> .../cpu1/online just hangs the system. The old 3.4
+>>>>>> LeMaker kernel works fine in this regard. I can try to
+>>>>>> look into details and port things over, just want to
+>>>>>> avoid duplicate efforts.
+>>>>> 
+>>>>> Having hotplug support would indeed be very welcome.
+>>>>> 
+>>>>> However, it should be done in u-boot, through PSCI, and not
+>>>>> in the kernel itself.
+>>>>> 
+>>>>> As far as I'm aware, no one worked actively on it, beside
+>>>>> some WIP commit from Marc a while ago: 
+>>>>> https://git.kernel.org/cgit/linux/kernel/git/maz/u-boot.git/commit/?h=wip/psci&id=45379c0f9cf812f0f62722f4015ec907fa5dc144
+>>>>
+>>>>
+>>>>>
+>>
+>>>>> 
+OK - I guess I will need a little guidance in then: Is there a good
+>>>> reference board to study and to derive from? And maybe also:
+>>>> What is missing or not working in that u-boot branch? If I
+>>>> get this interface right, I just takes some device tree bits
+>>>> to enable this for the kernel afterward, correct?
+>>> 
+>>> Started to play with that patch in naive ways: CPU0 locks up
+>>> when offlining CPU1 - unless I disable the FIQ signal from
+>>> CPU1. Then it "works", both offlining and onlining again.
+>>> However, I suspect that this only parks CPU1 in wfi and does
+>>> not do anything interesting to it.
+>> 
+>> Here's how this is supposed to work: - CPU1 sends a FIQ to CPU0,
+>> bringing it into secure mode. - CPU0 then kills CPU1 by doing the
+>> magic incantations on the power controller
+>> 
+>> What is missing here is all the cache cleaning before signalling
+>> CPU0. If you add that, things should look a lot better (patches
+>> welcome).
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  include/linux/mfd/syscon/atmel-matrix.h | 114 ++++++++++++++++++++++++++++++++
->  1 file changed, 114 insertions(+)
->  create mode 100644 include/linux/mfd/syscon/atmel-matrix.h
-> 
-> diff --git a/include/linux/mfd/syscon/atmel-matrix.h b/include/linux/mfd/syscon/atmel-matrix.h
-> new file mode 100644
-> index 0000000..c3faa18
-> --- /dev/null
-> +++ b/include/linux/mfd/syscon/atmel-matrix.h
-> @@ -0,0 +1,114 @@
-> +/*
-> + *  Copyright (C) 2007 Atmel Corporation.
+> Unsure about this, or maybe this was too simplistic: I added calls
+> to u-boot's flush_dcache_all and invalidate_icache_all (right
+> after disabling the cache, just like the vendor kernel does), but
+> CPU0 still locks up. I suspect there is still a bug in the FIQ
+> handling. There is also a suspicious single "@" printed on the
+> console. I'll play with the FIQ handler a bit.
 
-You need to update this.
+The '@' is just my own debug stuff, and might be causing issues too.
 
-Assuming this gets fixed and all of the misalignments are patchisums
-i.e. everything is in fact nice lined up in the source file:
+Now, you have to realise that by the time you call into this code,
+u-boot itself is long gone. Only the tiny bit of code dealing with
+PSCI still lives in a bank of static, secure memory. So calling into
+u-boot for anything is doomed. You need to actually put the code
+inside the PSCI backend.
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+Thanks,
 
-> + * Memory Controllers (MATRIX, EBI) - System peripherals registers.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +
-> +#ifndef _LINUX_MFD_SYSCON_ATMEL_MATRIX_H
-> +#define _LINUX_MFD_SYSCON_ATMEL_MATRIX_H
-> +
-> +#define AT91SAM9260_MATRIX_MCFG_OFF	0x00
-> +#define AT91SAM9260_MATRIX_SCFG_OFF	0x40
-> +#define AT91SAM9260_MATRIX_PRS_OFF	0x80
-> +#define AT91SAM9260_MATRIX_MRCR_OFF	0x100
-> +#define AT91SAM9260_MATRIX_EBICSA_OFF	0x11c
-> +
-> +#define AT91SAM9261_MATRIX_MRCR_OFF	0x0
-> +#define AT91SAM9261_MATRIX_SCFG_OFF	0x4
-> +#define AT91SAM9261_MATRIX_TCR_OFF	0x24
-> +#define AT91SAM9261_MATRIX_EBICSA_OFF	0x30
-> +#define AT91SAM9261_MATRIX_USBPUCR_OFF	0x34
-> +
-> +#define AT91SAM9263_MATRIX_MCFG_OFF	0x00
-> +#define AT91SAM9263_MATRIX_SCFG_OFF	0x40
-> +#define AT91SAM9263_MATRIX_PRS_OFF	0x80
-> +#define AT91SAM9263_MATRIX_MRCR_OFF	0x100
-> +#define AT91SAM9263_MATRIX_TCR_OFF	0x114
-> +#define AT91SAM9263_MATRIX_EBI0CSA_OFF	0x120
-> +#define AT91SAM9263_MATRIX_EBI1CSA_OFF	0x124
-> +
-> +#define AT91SAM9G45_MATRIX_MCFG_OFF	0x00
-> +#define AT91SAM9G45_MATRIX_SCFG_OFF	0x40
-> +#define AT91SAM9G45_MATRIX_PRS_OFF	0x80
-> +#define AT91SAM9G45_MATRIX_MRCR_OFF	0x100
-> +#define AT91SAM9G45_MATRIX_TCR_OFF	0x110
-> +#define AT91SAM9G45_MATRIX_DDRMPR_OFF	0x118
-> +#define AT91SAM9G45_MATRIX_EBICSA_OFF	0x128
-> +
-> +#define AT91SAM9N12_MATRIX_MCFG_OFF	0x00
-> +#define AT91SAM9N12_MATRIX_SCFG_OFF	0x40
-> +#define AT91SAM9N12_MATRIX_PRS_OFF	0x80
-> +#define AT91SAM9N12_MATRIX_MRCR_OFF	0x100
-> +#define AT91SAM9N12_MATRIX_EBICSA_OFF	0x118
-> +
-> +#define AT91SAM9X5_MATRIX_MCFG_OFF	0x00
-> +#define AT91SAM9X5_MATRIX_SCFG_OFF	0x40
-> +#define AT91SAM9X5_MATRIX_PRS_OFF	0x80
-> +#define AT91SAM9X5_MATRIX_MRCR_OFF	0x100
-> +#define AT91SAM9X5_MATRIX_EBICSA_OFF	0x120
-> +
-> +#define SAMA5D3_MATRIX_MCFG_OFF		0x00
-> +#define SAMA5D3_MATRIX_SCFG_OFF		0x40
-> +#define SAMA5D3_MATRIX_PRS_OFF		0x80
-> +#define SAMA5D3_MATRIX_MRCR_OFF		0x100
-> +
-> +#define AT91_MATRIX_MCFG(o, x)		((o) + ((x) * 0x4))
-> +#define AT91_MATRIX_ULBT		(7 << 0)
-> +#define AT91_MATRIX_ULBT_INFINITE	(0 << 0)
-> +#define AT91_MATRIX_ULBT_SINGLE		(1 << 0)
-> +#define AT91_MATRIX_ULBT_FOUR		(2 << 0)
-> +#define AT91_MATRIX_ULBT_EIGHT		(3 << 0)
-> +#define AT91_MATRIX_ULBT_SIXTEEN	(4 << 0)
-> +
-> +#define AT91_MATRIX_SCFG(o, x)		((o) + ((x) * 0x4))
-> +#define AT91_MATRIX_SLOT_CYCLE		(0xff <<  0)
-> +#define AT91_MATRIX_DEFMSTR_TYPE	(3 << 16)
-> +#define AT91_MATRIX_DEFMSTR_TYPE_NONE	(0 << 16)
-> +#define AT91_MATRIX_DEFMSTR_TYPE_LAST	(1 << 16)
-> +#define AT91_MATRIX_DEFMSTR_TYPE_FIXED	(2 << 16)
-> +#define AT91_MATRIX_FIXED_DEFMSTR	(7 << 18)
-> +#define AT91_MATRIX_ARBT		(3 << 24)
-> +#define AT91_MATRIX_ARBT_ROUND_ROBIN	(0 << 24)
-> +#define AT91_MATRIX_ARBT_FIXED_PRIORITY	(1 << 24)
-> +
-> +#define AT91_MATRIX_TCR(o)		(o)
-> +#define AT91_MATRIX_ITCM_SIZE		(0xf << 0)
-> +#define AT91_MATRIX_ITCM_0		(0 << 0)
-> +#define AT91_MATRIX_ITCM_16		(5 << 0)
-> +#define AT91_MATRIX_ITCM_32		(6 << 0)
-> +#define AT91_MATRIX_ITCM_64		(7 << 0)
-> +#define	AT91_MATRIX_DTCM_SIZE		(0xf << 4)
-> +#define	AT91_MATRIX_DTCM_0		(0 << 4)
-> +#define	AT91_MATRIX_DTCM_16		(5 << 4)
-> +#define AT91_MATRIX_DTCM_32		(6 << 4)
-> +#define AT91_MATRIX_DTCM_64		(7 << 4)
-> +
-> +#define AT91_MATRIX_PRAS(o, x)		((o) + ((x) * 0x8))
-> +#define AT91_MATRIX_PRBS(o, x)		((o) + ((x) * 0x8) + 0x4)
-> +#define AT91_MATRIX_MPR_MSK(x)		(3 << ((x) * 0x4))
-> +
-> +#define AT91_MATRIX_MRC(o)		(o)
-> +#define AT91_MATRIX_RCB(x)		BIT(x)
-> +
-> +#define AT91_MATRIX_EBICSA(o)		(o)
-> +#define AT91_MATRIX_CSA(cs, val)	(val << (cs))
-> +#define AT91_MATRIX_DBPUC		BIT(8)
-> +#define AT91_MATRIX_DBPDC		BIT(9)
-> +#define AT91_MATRIX_VDDIOMSEL		BIT(16)
-> +#define AT91_MATRIX_VDDIOMSEL_1_8V	(0 << 16)
-> +#define AT91_MATRIX_VDDIOMSEL_3_3V	(1 << 16)
-> +#define AT91_MATRIX_EBI_IOSR		BIT(17)
-> +#define AT91_MATRIX_DDR_IOSR		BIT(18)
-> +#define AT91_MATRIX_NFD0_SELECT		BIT(24)
-> +#define AT91_MATRIX_DDR_MP_EN		BIT(25)
-> +#define AT91_MATRIX_EBI_NUM_CS		8
-> +
-> +#define AT91_MATRIX_WPMR(o)		(o)
-> +#define AT91_MATRIX_WPSR(o)		(o)
-> +
-> +#endif /* _LINUX_MFD_SYSCON_ATMEL_MATRIX_H */
+	M.
+- -- 
+Jazz is not dead. It just smells funny...
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.10 (GNU/Linux)
+Comment: Using GnuPG with undefined - http://www.enigmail.net/
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+iQIcBAEBAgAGBQJUYIrRAAoJECPQ0LrRPXpDyjQQAMpDGLUwVODYi0lHFb20axqZ
+Jjptkh6L2UJ2D2a2Ow17umrnIJqFjvVDasKtoxrBj79ya7LvHdfti4cFAjhZbh53
+dOYmGqWHLP5N2Ue5KGs6zEpmW3bkUQRM2n03pTsqs907zN3XrjhfdtEqun5qAKTX
+Kbk2X/CieQnGx9rYeZUAIiJm0qO4e9ijKFQCvxRDItr0Eb4voRwRCtWCiD530ZTc
+34G7fpqTR4HKNRsaLeBRCUz3dJXP7KgW3VymIu35fAAyUlt0oMENrcX9qKb6AHR7
+KM0JXkts+bMmxeddRPzEEikHvRfSgbFxTY0+6vsqi4DrsuihI5OG+6VqckZRrfpV
+S74IkyEyBscSUhkRcXUEWsly9AcK7gvxlK0DqyR+5v+OOQd6RGfAfA8xYT6GbtpN
+EZ8suyFWsl55QdolWx5Pqb8VfL0Z70AteWcMhJia6eg69hGo1YJVM6DJ93rvSwzx
+x1UniBVBkp9/jZYJPgrCw0ywGXbWex7OcnTCscGAChkFMgFT/LiBCF16PKoyLhYu
+oGoClNbwlLgo4xAoeB/pDLyO0eaOLQS7/w2LdLZGbPXMVqcXkYVS+vkdkfe099Hb
+dYXOCkI8mcxDDisodtSg7W797bJMfjnCmfrXJuyfTbJW2nSrYgqw5yZNhhEhlWB3
+n24nemun99pZ8di2HBSl
+=C/8W
+-----END PGP SIGNATURE-----
