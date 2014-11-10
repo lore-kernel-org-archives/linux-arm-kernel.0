@@ -1,10 +1,10 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 10 Nov 2014 18:21:52 +0100
-Subject: [PATCH v6 08/10] staging: media: Make use of MEDIA_BUS_FMT_
+Date: Mon, 10 Nov 2014 18:28:33 +0100
+Subject: [PATCH v6 RESEND 08/10] staging: media: Make use of MEDIA_BUS_FMT_
  definitions
-In-Reply-To: <1415640114-14930-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1415640114-14930-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1415640114-14930-9-git-send-email-boris.brezillon@free-electrons.com>
+In-Reply-To: <1415640515-15069-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1415640515-15069-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1415640515-15069-9-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
