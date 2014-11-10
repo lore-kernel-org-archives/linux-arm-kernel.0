@@ -1,108 +1,105 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 10 Nov 2014 08:40:46 -0700
-Subject: [PATCH v9 07/12] coresight-etm: add CoreSight ETM/PTM driver
-In-Reply-To: <1415615671.4862.30.camel@x220>
-References: <1415038066-22423-1-git-send-email-mathieu.poirier@linaro.org>
- <1415038066-22423-8-git-send-email-mathieu.poirier@linaro.org>
- <1415615671.4862.30.camel@x220>
-Message-ID: <CANLsYkxivqgyRZspS2uP9Mkwit4obCjZxYr0YUhR3G_zQejERg@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 10 Nov 2014 16:12:40 +0000
+Subject: [PATCH v8 0/13] introduce GNTTABOP_cache_flush
+Message-ID: <alpine.DEB.2.02.1411101607130.22875@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 November 2014 03:34, Paul Bolle <pebolle@tiscali.nl> wrote:
-> On Mon, 2014-11-03 at 11:07 -0700, mathieu.poirier at linaro.org wrote:
->> From: Pratik Patel <pratikp@codeaurora.org>
->>
->> This driver manages CoreSight ETM (Embedded Trace Macrocell) that
->> supports processor tracing. Currently supported version are ARM
->> ETMv3.x and PTM1.x.
->>
->> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
->> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->>
->> coresight-etm3x: adding missing error checking
->
-> This landed in today's linx-next (ie, next-20141110) as commit
-> a939fc5a71ad ("coresight-etm: add CoreSight ETM/PTM driver").
->
->>  arch/arm/Kconfig.debug                 |    9 +
->>  arch/arm/include/asm/hardware/cp14.h   |  542 +++++++++
->>  drivers/coresight/Makefile             |    1 +
->>  drivers/coresight/coresight-etm-cp14.c |  591 ++++++++++
->>  drivers/coresight/coresight-etm.h      |  251 +++++
->>  drivers/coresight/coresight-etm3x.c    | 1928 ++++++++++++++++++++++++++++++++
->>  6 files changed, 3322 insertions(+)
->>  create mode 100644 arch/arm/include/asm/hardware/cp14.h
->>  create mode 100644 drivers/coresight/coresight-etm-cp14.c
->>  create mode 100644 drivers/coresight/coresight-etm.h
->>  create mode 100644 drivers/coresight/coresight-etm3x.c
->>
->>[...]
->> diff --git a/drivers/coresight/coresight-etm3x.c b/drivers/coresight/coresight-etm3x.c
->> new file mode 100644
->> index 0000000..d9e3ed6
->> --- /dev/null
->> +++ b/drivers/coresight/coresight-etm3x.c
->> @@ -0,0 +1,1928 @@
->> +/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 and
->> + * only version 2 as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/init.h>
->> +#include <linux/types.h>
->> +#include <linux/device.h>
->> +#include <linux/io.h>
->> +#include <linux/err.h>
->> +#include <linux/fs.h>
->> +#include <linux/slab.h>
->> +#include <linux/delay.h>
->> +#include <linux/smp.h>
->> +#include <linux/sysfs.h>
->> +#include <linux/stat.h>
->> +#include <linux/clk.h>
->> +#include <linux/cpu.h>
->> +#include <linux/of.h>
->> +#include <linux/coresight.h>
->> +#include <linux/amba/bus.h>
->> +#include <linux/seq_file.h>
->> +#include <linux/uaccess.h>
->> +#include <asm/sections.h>
->> +
->> +#include "coresight-etm.h"
->> +
->> +#ifdef CONFIG_CORESIGHT_SOURCE_ETM_DEFAULT_ENABLE
->
-> There's no Kconfig symbol CORESIGHT_SOURCE_ETM_DEFAULT_ENABLE. Neither
-> is there a preprocessor definition of this macro. So why was this
-> added?
+Hi all,
+this patch series introduces support for GNTTABOP_cache_flush to perform
+cache maintenance operation on foreign pages and reverts the current
+code based on XENFEAT_grant_map_identity.
 
-Correct - the feature (as we really want it) is currently being worked
-on but not yet part of the code base.  The default option probably
-should have been removed but it doesn't do much else when mandating
-one to add a boot option on the kernel cmd line.
+It also provides a very slow fallback by bouncing on the swiotlb buffer,
+in case the hypercall is not available.
 
-Thanks for the review,
-Mathieu
+v7 introduces a flag named dma_coherent in dev_archdata and an accessor
+function named is_device_dma_coherent in asm/dma-mapping.h under arm and
+arm64.
 
->
->> +static int boot_enable = 1;
->> +#else
->> +static int boot_enable;
->> +#endif
->> +module_param_named(
->> +     boot_enable, boot_enable, int, S_IRUGO
->> +);
->
->
-> Paul Bolle
->
+
+Changes in v8:
+- remove code duplication in mm32.c by moving the pfn_valid check in
+page-coherent.h;
+- add a dma_addr_t dev_addr argument to xen_dma_map_page;
+- use hypercall to flush caches in map_page;
+- pass dev_addr to xen_dma_unmap_page and xen_dma_sync_single_for_cpu;
+- remove BUG_ON in xen_bus_to_phys.
+
+Changes in v7:
+- rebased on 3.18-rc1;
+- rename is_dma_coherent to is_device_dma_coherent and move it to
+asm/dma-mapping.h on arm and arm64;
+- introduce a dma_coherent flag on arm and arm64;
+- set the flags from set_arch_dma_coherent_ops.
+
+Changes in v6:
+- rename xen_is_dma_coherent to is_dma_coherent;
+- use of_dma_is_coherent to detect the dma coherency of a device;
+- remove arch/arm64/include/asm/xen/page-coherent.h, include
+../../arm/include/asm/xen/page-coherent.h instead;
+- fix indentation.
+
+Changes in v5:
+- introduce xen_is_dma_coherent as a xen specific function;
+- call xen_is_dma_coherent instead of is_dma_coherent;
+- introduce xen_is_dma_coherent to
+arch/arm64/include/asm/xen/page-coherent.h;
+- do not remove arch/arm64/include/asm/xen/page-coherent.h, add
+the missing dma_ops calls from it;
+- fix indentation;
+- rename hypercall_flush to hypercall_cflush;
+- remove spurious change.
+
+Changes in v4:
+- remove outer_*_range call;
+- introduce is_dma_coherent;
+- use is_dma_coherent in arch/arm/xen/mm32.c;
+- merge xen/mm32.c into xen/mm.c;
+- xen/arm/arm64: introduce xen_arch_need_swiotlb;
+- avoid bouncing dma map operations that involve foreign grants and
+non-coherent devices if GNTTABOP_cache_flush is provided by Xen.
+
+Changes in v3:
+- fix the cache maintenance op call to match what Linux does natively;
+- update the hypercall interface to match Xen.
+
+Changes in v2:
+- remove the definition of XENFEAT_grant_map_identity;
+- update the hypercall interface to match Xen;
+- call the interface on a single page at a time.
+
+
+Stefano Stabellini (13):
+      xen/arm: remove handling of XENFEAT_grant_map_identity
+      xen/arm: remove outer_*_range call
+      xen/arm: if(pfn_valid(pfn)) call native dma_ops
+      arm64: introduce is_device_dma_coherent
+      arm: introduce is_device_dma_coherent
+      xen/arm: use is_device_dma_coherent
+      xen: add a dma_addr_t dev_addr argument to xen_dma_map_page
+      xen/arm: use hypercall to flush caches in map_page
+      xen/arm/arm64: merge xen/mm32.c into xen/mm.c
+      xen/arm/arm64: introduce xen_arch_need_swiotlb
+      xen/arm: introduce GNTTABOP_cache_flush
+      swiotlb-xen: pass dev_addr to xen_dma_unmap_page and xen_dma_sync_single_for_cpu
+      swiotlb-xen: remove BUG_ON in xen_bus_to_phys
+
+ arch/arm/include/asm/device.h              |    1 +
+ arch/arm/include/asm/dma-mapping.h         |    6 +
+ arch/arm/include/asm/xen/page-coherent.h   |   56 +++++++-
+ arch/arm/include/asm/xen/page.h            |    4 +
+ arch/arm/xen/Makefile                      |    2 +-
+ arch/arm/xen/enlighten.c                   |    5 -
+ arch/arm/xen/mm.c                          |  123 +++++++++++++++++
+ arch/arm/xen/mm32.c                        |  202 ----------------------------
+ arch/arm64/include/asm/device.h            |    1 +
+ arch/arm64/include/asm/dma-mapping.h       |    6 +
+ arch/arm64/include/asm/xen/page-coherent.h |   44 +-----
+ arch/x86/include/asm/xen/page-coherent.h   |    4 +-
+ arch/x86/include/asm/xen/page.h            |    7 +
+ drivers/xen/swiotlb-xen.c                  |   19 +--
+ include/xen/interface/features.h           |    3 -
+ include/xen/interface/grant_table.h        |   19 +++
+ 16 files changed, 232 insertions(+), 270 deletions(-)
+ delete mode 100644 arch/arm/xen/mm32.c
