@@ -1,256 +1,88 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 10 Nov 2014 16:22:42 -0600
-Subject: [PATCH v9 RESEND] coresight: bindings for coresight drivers
-In-Reply-To: <1415655141-31507-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1415655141-31507-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <CAL_JsqLWqHppPA=s+u-DjEQk9wbF4Kdx1OeqozHJwGbwRDSF_A@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 10 Nov 2014 14:42:06 -0800
+Subject: [PATCH v7 2/5] ARM: rockchip: add suspend and resume for RK3288
+In-Reply-To: <1415368177-6637-3-git-send-email-zyw@rock-chips.com>
+References: <1415368177-6637-1-git-send-email-zyw@rock-chips.com>
+ <1415368177-6637-3-git-send-email-zyw@rock-chips.com>
+Message-ID: <CAD=FV=Wdw5OqSv3Zbw=wd19swaRV6QtNdVAzdTf4pCV37r4MKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 10, 2014 at 3:32 PM,  <mathieu.poirier@linaro.org> wrote:
-> Can someone in the bindings' maintainer brigade pick this up?  The code has been
-> added to linux-next:
->         a06ae86 coresight: add CoreSight core layer framework
+Chris,
 
-Perhaps when I get over being annoyed that you keep sending this as a
-new version with no changes (or perhaps there are, but there is no
-change log) and that you have failed to respond to my previous 3
-emails on it. I've already acked it, so it could have been merged with
-the rest of the series. I've also just noticed you have also failed to
-address the minor comment did I have along with my ack.
-
-Rob
-
-
+On Fri, Nov 7, 2014 at 5:49 AM, Chris Zhong <zyw@rock-chips.com> wrote:
+> It's a basic version of suspend and resume for rockchip,
+> it only support RK3288 now.
 >
-> Thanks,
-> Mathieu
+> Signed-off-by: Tony Xie <xxx@rock-chips.com>
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> Tested-by: Doug Anderson <dianders@chromium.org>
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
 >
-> From 12ec0ef4753125e470a0899fabd94b46b3a93a9d Mon Sep 17 00:00:00 2001
-> From: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Date: Thu, 7 Aug 2014 12:34:06 -0600
-> Subject: [PATCH v9] coresight: bindings for coresight drivers
->
-> Coresight IP blocks allow for the support of HW assisted tracing
-> on ARM SoCs.  Bindings for the currently available blocks are
-> presented herein.
->
-> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 > ---
->  .../devicetree/bindings/arm/coresight.txt          | 203 +++++++++++++++++++++
->  1 file changed, 203 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/coresight.txt
 >
-> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-> new file mode 100644
-> index 0000000..96dd947
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
-> @@ -0,0 +1,203 @@
-> +* CoreSight Components:
-> +
-> +CoreSight components are compliant with the ARM CoreSight architecture
-> +specification and can be connected in various topologies to suit a particular
-> +SoCs tracing needs. These trace components can generally be classified as sinks,
-> +links and sources. Trace data produced by one or more sources flows through the
-> +intermediate links connecting the source to the currently selected sink. Each
-> +CoreSight component device should use these properties to describe its hardware
-> +characteristcs.
-> +
-> +* Required properties for all components *except* non-configurable replicators:
-> +
-> +       * compatible: These have to be supplemented with "arm,primecell" as
-> +         drivers are using the AMBA bus interface.  Possible values include:
-> +               - "arm,coresight-etb10", "arm,primecell";
-> +               - "arm,coresight-tpiu", "arm,primecell";
-> +               - "arm,coresight-tmc", "arm,primecell";
-> +               - "arm,coresight-funnel", "arm,primecell";
-> +               - "arm,coresight-etm3x", "arm,primecell";
-> +
-> +       * reg: physical base address and length of the register
-> +         set(s) of the component.
-> +
-> +       * clocks: the clock associated to this component.
-> +
-> +       * clock-names: the name of the clock as referenced by the code.
-> +         Since we are using the AMBA framework, the name should be
-> +         "apb_pclk".
-> +
-> +       * port or ports: The representation of the component's port
-> +         layout using the generic DT graph presentation found in
-> +         "bindings/graph.txt".
-> +
-> +* Required properties for devices that don't show up on the AMBA bus, such as
-> +  non-configurable replicators:
-> +
-> +       * compatible: Currently supported value is (note the absence of the
-> +         AMBA markee):
-> +               - "arm,coresight-replicator"
-> +
-> +       * id: a unique number that will identify this replicator.
-> +
-> +       * port or ports: same as above.
-> +
-> +* Optional properties for ETM/PTMs:
-> +
-> +       * arm,cp14: must be present if the system accesses ETM/PTM management registers
-> +         via co-processor 14.
-> +
-> +       * cpu: the cpu phandle this ETM/PTM is affined to. When omitted the source is
-> +         considered to belong to CPU0.
-> +
-> +* Optional property for TMC:
-> +
-> +       * arm,buffer-size: size of contiguous buffer space for TMC ETR
-> +        (embedded trace router)
-> +
-> +
-> +Example:
-> +
-> +1. Sinks
-> +       etb at 0,20010000 {
-> +               compatible = "arm,coresight-etb10", "arm,primecell";
-> +               reg = <0 0x20010000 0 0x1000>;
-> +
-> +               coresight-default-sink;
-> +               clocks = <&oscclk6a>;
-> +               clock-names = "apb_pclk";
-> +               port {
-> +                       etb_in_port: endpoint at 0 {
-> +                               slave-mode;
-> +                               remote-endpoint = <&replicator_out_port0>;
-> +                       };
-> +               };
-> +       };
-> +
-> +       tpiu at 0,20030000 {
-> +               compatible = "arm,coresight-tpiu", "arm,primecell";
-> +               reg = <0 0x20030000 0 0x1000>;
-> +
-> +               clocks = <&oscclk6a>;
-> +               clock-names = "apb_pclk";
-> +               port {
-> +                       tpiu_in_port: endpoint at 0 {
-> +                               slave-mode;
-> +                               remote-endpoint = <&replicator_out_port1>;
-> +                       };
-> +               };
-> +       };
-> +
-> +2. Links
-> +       replicator {
-> +               /* non-configurable replicators don't show up on the
-> +                * AMBA bus.  As such no need to add "arm,primecell".
-> +                */
-> +               compatible = "arm,coresight-replicator";
-> +               /* this will show up in debugfs as "0.replicator" */
-> +               id = <0>;
-> +
-> +               ports {
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +
-> +                       /* replicator output ports */
-> +                       port at 0 {
-> +                               reg = <0>;
-> +                               replicator_out_port0: endpoint {
-> +                                       remote-endpoint = <&etb_in_port>;
-> +                               };
-> +                       };
-> +
-> +                       port at 1 {
-> +                               reg = <1>;
-> +                               replicator_out_port1: endpoint {
-> +                                       remote-endpoint = <&tpiu_in_port>;
-> +                               };
-> +                       };
-> +
-> +                       /* replicator input port */
-> +                       port at 2 {
-> +                               reg = <0>;
-> +                               replicator_in_port0: endpoint {
-> +                                       slave-mode;
-> +                                       remote-endpoint = <&funnel_out_port0>;
-> +                               };
-> +                       };
-> +               };
-> +       };
-> +
-> +       funnel at 0,20040000 {
-> +               compatible = "arm,coresight-funnel", "arm,primecell";
-> +               reg = <0 0x20040000 0 0x1000>;
-> +
-> +               clocks = <&oscclk6a>;
-> +               clock-names = "apb_pclk";
-> +               ports {
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +
-> +                       /* funnel output port */
-> +                       port at 0 {
-> +                               reg = <0>;
-> +                               funnel_out_port0: endpoint {
-> +                                       remote-endpoint = <&replicator_in_port0>;
-> +                               };
-> +                       };
-> +
-> +                       /* funnel input ports */
-> +                       port at 1 {
-> +                               reg = <0>;
-> +                               funnel_in_port0: endpoint {
-> +                                       slave-mode;
-> +                                       remote-endpoint = <&ptm0_out_port>;
-> +                               };
-> +                       };
-> +
-> +                       port at 2 {
-> +                               reg = <1>;
-> +                               funnel_in_port1: endpoint {
-> +                                       slave-mode;
-> +                                       remote-endpoint = <&ptm1_out_port>;
-> +                               };
-> +                       };
-> +
-> +                       port at 3 {
-> +                               reg = <2>;
-> +                               funnel_in_port2: endpoint {
-> +                                       slave-mode;
-> +                                       remote-endpoint = <&etm0_out_port>;
-> +                               };
-> +                       };
-> +
-> +               };
-> +       };
-> +
-> +3. Sources
-> +       ptm at 0,2201c000 {
-> +               compatible = "arm,coresight-etm3x", "arm,primecell";
-> +               reg = <0 0x2201c000 0 0x1000>;
-> +
-> +               cpu = <&cpu0>;
-> +               clocks = <&oscclk6a>;
-> +               clock-names = "apb_pclk";
-> +               port {
-> +                       ptm0_out_port: endpoint {
-> +                               remote-endpoint = <&funnel_in_port0>;
-> +                       };
-> +               };
-> +       };
-> +
-> +       ptm at 0,2201d000 {
-> +               compatible = "arm,coresight-etm3x", "arm,primecell";
-> +               reg = <0 0x2201d000 0 0x1000>;
-> +
-> +               cpu = <&cpu1>;
-> +               clocks = <&oscclk6a>;
-> +               clock-names = "apb_pclk";
-> +               port {
-> +                       ptm1_out_port: endpoint {
-> +                               remote-endpoint = <&funnel_in_port1>;
-> +                       };
-> +               };
-> +       };
-> --
-> 1.9.1
+> Changes in v7:
+> - get rid all of unused code
 >
+> Changes in v6:
+> - get rid of the save/restore of SRAM
+> - doing the copy of resume code once at init time
+> - remove ROCKCHIP_ARM_OFF_LOGIC_DEEP from rk3288_fill_in_bootram
+> - add of_platform_populate in rockchip_dt_init
+>
+> Changes in v5:
+> - use rk3288_bootram_sz for memcpy size
+> - fixed error of sram save and restore
+>
+> Changes in v4:
+> - remove grf regmap
+>
+> Changes in v3:
+> - move the pinmux of gpio6_c6 save and restore to pinctrl-rockchip
+>
+> Changes in v2:
+> - add the regulator calls in prepare and finish.
+> - add the pinmux of gpio6_c6 save and restore
+>
+>  arch/arm/mach-rockchip/Makefile   |   1 +
+>  arch/arm/mach-rockchip/pm.c       | 264 ++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-rockchip/pm.h       |  99 ++++++++++++++
+>  arch/arm/mach-rockchip/rockchip.c |   2 +
+>  arch/arm/mach-rockchip/sleep.S    |  73 +++++++++++
+>  5 files changed, 439 insertions(+)
+
+I haven't done a full re-review of this version, but...
+
+
+> +static int rk3288_suspend_iomap(void)
+> +{
+> +       struct device_node *node;
+> +       struct resource res;
+> +
+> +       node = of_find_compatible_node(NULL, NULL, "rockchip,rk3288-pmu-sram");
+> +       if (!node) {
+> +               pr_err("%s: could not find bootram dt node\n", __func__);
+> +               return -1;
+> +       }
+> +
+> +       rk3288_bootram_base = of_iomap(node, 0);
+> +       if (!rk3288_bootram_base) {
+> +               pr_err("%s: could not map bootram base\n", __func__);
+> +               return -1;
+> +       }
+> +
+> +       if (of_address_to_resource(node, 0, &res)) {
+> +               pr_err("%s: could not get bootram phy addr\n", __func__);
+> +               return -1;
+> +       }
+> +
+> +       rk3288_bootram_phy = res.start;
+> +
+> +       /* copy resume code and data to bootsram */
+> +       memcpy(rk3288_bootram_base, rockchip_slp_cpu_resume,
+> +              rk3288_bootram_sz);
+> +
+> +       rk3288_config_bootdata();
+
+Note that much of the above is no longer really part of the "iomap".
+It should probably be moved out into "rk3288_suspend_init".
