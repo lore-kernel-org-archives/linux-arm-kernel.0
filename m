@@ -1,96 +1,44 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Nov 2014 09:57:28 +0000
-Subject: [PATCH v2 03/11] mfd: syscon: Add atmel-smc registers definition
-In-Reply-To: <1415203287-21517-4-git-send-email-boris.brezillon@free-electrons.com>
-References: <1415203287-21517-1-git-send-email-boris.brezillon@free-electrons.com>
- <1415203287-21517-4-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20141110095728.GJ21424@x1>
+Date: Mon, 10 Nov 2014 10:04:06 +0000
+Subject: [PATCH 13/13] ARM: STi: DT: STih407: Add clk_ignore_unused to
+ kernel bootargs
+In-Reply-To: <1415361475-6218-14-git-send-email-peter.griffin@linaro.org>
+References: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
+ <1415361475-6218-14-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20141110100406.GL21424@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 05 Nov 2014, Boris Brezillon wrote:
+On Fri, 07 Nov 2014, Peter Griffin wrote:
 
-> Atmel AT91 SoCs have a memory range reserved for SMC (Static Memory
-> Controller) configuration.
-> Expose those registers so that drivers can make use of the smc syscon
-> declared in at91 DTs.
+> At the moment we don't take a reference on some core interconnect
+> clocks which means when CCF turns off unused clocks the SoC will
+> hang. As a temp soltuion we will boot with clk_ignore_unused
+> parameter for all b2120 boards.
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 > ---
->  include/linux/mfd/syscon/atmel-smc.h | 60 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 60 insertions(+)
->  create mode 100644 include/linux/mfd/syscon/atmel-smc.h
+>  arch/arm/boot/dts/stihxxx-b2120.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> index 862bb2f..7280b6d 100644
+> --- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> +++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> @@ -8,7 +8,7 @@
+>   */
+>  / {
+>  	chosen {
+> -		bootargs = "console=ttyAS0,115200";
+> +		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
 
 Acked-by: Lee Jones <lee.jones@linaro.org>
 
-Any idea who will take this set?
+Although, hopefully we won't require this for too much longer.
 
-> diff --git a/include/linux/mfd/syscon/atmel-smc.h b/include/linux/mfd/syscon/atmel-smc.h
-> new file mode 100644
-> index 0000000..430f486
-> --- /dev/null
-> +++ b/include/linux/mfd/syscon/atmel-smc.h
-> @@ -0,0 +1,60 @@
-> +/*
-> + * Atmel SMC (Static Memory Controller) register offsets and bit definitions.
-> + *
-> + * Copyright (C) 2014 Atmel
-> + * Copyright (C) 2014 Free Electrons
-> + *
-> + * Author: Boris Brezillon <boris.brezillon@free-electrons.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef _LINUX_MFD_SYSCON_ATMEL_SMC_H_
-> +#define _LINUX_MFD_SYSCON_ATMEL_SMC_H_
-> +
-> +#include <linux/regmap.h>
-> +
-> +#define AT91SAM9_SMC_GENERIC_OFFSET	0x00
-> +#define AT91SAM9_SMC_GENERIC_BLK_SZ	0x10
-> +
-> +#define SAMA5_SMC_GENERIC_OFFSET	0x600
-> +#define SAMA5_SMC_GENERIC_BLK_SZ	0x14
-> +
-> +#define AT91SAM9_SMC_SETUP(o)		((o) + 0x00)
-> +#define AT91SAM9_SMC_NWESETUP_SHFT	0
-> +#define AT91SAM9_SMC_NCS_WRSETUP_SHFT	8
-> +#define AT91SAM9_SMC_NRDSETUP_SHFT	16
-> +#define AT91SAM9_SMC_NCS_NRDSETUP_SHFT	24
-> +
-> +#define AT91SAM9_SMC_PULSE(o)		((o) + 0x04)
-> +
-> +#define AT91SAM9_SMC_CYCLE(o)		((o) + 0x08)
-> +
-> +#define AT91SAM9_SMC_MODE(o)		((o) + 0x0c)
-> +#define SAMA5_SMC_MODE(o)		((o) + 0x10)
-> +#define AT91_SMC_READMODE		BIT(0)
-> +#define AT91_SMC_WRITEMODE		BIT(1)
-> +#define AT91_SMC_EXNWMODE		GENMASK(5, 4)
-> +#define AT91_SMC_EXNWMODE_DISABLE	(0 << 4)
-> +#define AT91_SMC_EXNWMODE_FROZEN	(2 << 4)
-> +#define AT91_SMC_EXNWMODE_READY		(3 << 4)
-> +#define AT91_SMC_BAT			BIT(8)
-> +#define AT91_SMC_BAT_SELECT		(0 << 8)
-> +#define AT91_SMC_BAT_WRITE		(1 << 8)
-> +#define AT91_SMC_DBW			GENMASK(13, 12)
-> +#define AT91_SMC_DBW_8			(0 << 12)
-> +#define AT91_SMC_DBW_16			(1 << 12)
-> +#define AT91_SMC_DBW_32			(2 << 12)
-> +#define AT91_SMC_TDF			GENMASK(19, 16)
-> +#define AT91_SMC_TDF_(x)		(((x) & 0xf) << 16)
-> +#define AT91_SMC_TDFMODE		BIT(20)
-> +#define AT91_SMC_PMEN			BIT(24)
-> +#define AT91_SMC_PS			GENMASK(29, 28)
-> +#define AT91_SMC_PS_4			(0 << 28)
-> +#define AT91_SMC_PS_8			(1 << 28)
-> +#define AT91_SMC_PS_16			(2 << 28)
-> +#define AT91_SMC_PS_32			(3 << 28)
-> +
-> +#endif /* _LINUX_MFD_SYSCON_ATMEL_SMC_H_ */
+>  		linux,stdout-path = &sbc_serial0;
+>  	};
+>  
 
 -- 
 Lee Jones
