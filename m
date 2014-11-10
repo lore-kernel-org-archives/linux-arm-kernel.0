@@ -1,45 +1,30 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 10 Nov 2014 14:13:28 +0300
-Subject: [PATCH v4] i2c/at91: adopt pinctrl support
-In-Reply-To: <1415584552-11390-1-git-send-email-wenyou.yang@atmel.com>
-References: <1415584552-11390-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <54609DD8.8030903@cogentembedded.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 10 Nov 2014 11:27:54 +0000
+Subject: [PATCH v2 1/2] arm64: Create link to include/dt-bindings to enable C
+ preprocessor use.
+In-Reply-To: <1415618875-8469-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1415618875-8469-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1415618875-8469-2-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+DT files used in the compilation phase can be preprocessed by the C
+preprocessor. This requires an include/dt-bindings directory to be
+present in the arch/arm64/boot/dts directory.
 
-On 11/10/2014 4:55 AM, Wenyou Yang wrote:
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+ arch/arm64/boot/dts/include/dt-bindings | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 120000 arch/arm64/boot/dts/include/dt-bindings
 
-> Amend the at91 i2c pin controller
-
-    You're amending the hardware itself, really? :-)
-
-> to optionally take a pin controlhandle
-
-    I don't see the code that does this.
-
-> and set the state of the pins to:
-> - "default" on boot and resume.
-
-    I don't see where you are changing anything for the probe() method. 
-Perhaps you meant the driver core code which selects the dafault profile 
-automatically?
-
-> - "sleep" on suspend().
-
-> This should make it possible to optimize energy usage for the pins
-> both for the suspend/resume cycle
-
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
-> Hi Wolfram,
->
-> Thanks a lot.
->
-> The change of this version is to remove
-> 	pinctrl_pm_select_default_state(&pdev->dev) from the _probe function.
-
-    Aha, you've specifically removed this...
-
-WBR, Sergei
+diff --git a/arch/arm64/boot/dts/include/dt-bindings b/arch/arm64/boot/dts/include/dt-bindings
+new file mode 120000
+index 0000000..08c00e4
+--- /dev/null
++++ b/arch/arm64/boot/dts/include/dt-bindings
+@@ -0,0 +1 @@
++../../../../../include/dt-bindings
+\ No newline at end of file
+-- 
+2.1.3
