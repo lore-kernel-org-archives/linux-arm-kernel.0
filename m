@@ -1,37 +1,157 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 10 Nov 2014 16:14:05 +0000
-Subject: [PATCH v8 13/13] swiotlb-xen: remove BUG_ON in xen_bus_to_phys
+Date: Mon, 10 Nov 2014 16:14:03 +0000
+Subject: [PATCH v8 11/13] xen/arm: introduce GNTTABOP_cache_flush
 In-Reply-To: <alpine.DEB.2.02.1411101607130.22875@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1411101607130.22875@kaball.uk.xensource.com>
-Message-ID: <1415636045-24669-13-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1415636045-24669-11-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On x86 truncation cannot occur because config XEN depends on X86_64 ||
-(X86_32 && X86_PAE).
+Introduce support for new hypercall GNTTABOP_cache_flush.
+Use it to perform cache flashing on pages used for dma when necessary.
 
-On ARM truncation can occur without CONFIG_ARM_LPAE, when the dma
-operation involves foreign grants. However in that case the physical
-address returned by xen_bus_to_phys is actually invalid (there is no mfn
-to pfn tracking for foreign grants on ARM) and it is not used.
+If GNTTABOP_cache_flush is supported by the hypervisor, we don't need to
+bounce dma map operations that involve foreign grants and non-coherent
+devices.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
----
- drivers/xen/swiotlb-xen.c |    2 --
- 1 file changed, 2 deletions(-)
+Acked-by: Ian Campbell <ian.campbell@citrix.com>
 
-diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-index 498b654..153cf14 100644
---- a/drivers/xen/swiotlb-xen.c
-+++ b/drivers/xen/swiotlb-xen.c
-@@ -96,8 +96,6 @@ static inline phys_addr_t xen_bus_to_phys(dma_addr_t baddr)
- 	dma_addr_t dma = (dma_addr_t)pfn << PAGE_SHIFT;
- 	phys_addr_t paddr = dma;
+---
+
+Changes in v5:
+- rename hypercall_flush to hypercall_cflush;
+- remove spurious change.
+
+Changes in v4:
+- add comment;
+- avoid bouncing dma map operations that involve foreign grants and
+non-coherent devices if GNTTABOP_cache_flush is provided by Xen.
+
+Changes in v3:
+- fix the cache maintenance op call to match what Linux does natively;
+- update the hypercall interface to match Xen.
+
+Changes in v2:
+- update the hypercall interface to match Xen;
+- call the interface on a single page at a time.
+---
+ arch/arm/xen/mm.c                   |   34 ++++++++++++++++++++++++++++++++--
+ include/xen/interface/grant_table.h |   19 +++++++++++++++++++
+ 2 files changed, 51 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
+index 1b087cd..49bfec9 100644
+--- a/arch/arm/xen/mm.c
++++ b/arch/arm/xen/mm.c
+@@ -12,6 +12,7 @@
+ #include <linux/swiotlb.h>
  
--	BUG_ON(paddr != dma); /* truncation has occurred, should never happen */
--
- 	paddr |= baddr & ~PAGE_MASK;
+ #include <xen/xen.h>
++#include <xen/interface/grant_table.h>
+ #include <xen/interface/memory.h>
+ #include <xen/swiotlb-xen.h>
  
- 	return paddr;
+@@ -24,12 +25,14 @@ enum dma_cache_op {
+        DMA_UNMAP,
+        DMA_MAP,
+ };
++static bool hypercall_cflush = false;
+ 
+ /* functions called by SWIOTLB */
+ 
+ static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
+ 	size_t size, enum dma_data_direction dir, enum dma_cache_op op)
+ {
++	struct gnttab_cache_flush cflush;
+ 	unsigned long pfn;
+ 	size_t left = size;
+ 
+@@ -41,7 +44,26 @@ static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
+ 	
+ 		BUG_ON(pfn_valid(pfn));
+ 
+-		/* TODO: cache flush */
++		/* buffers in highmem or foreign pages cannot cross page
++		 * boundaries */
++		if (len + offset > PAGE_SIZE)
++			len = PAGE_SIZE - offset;
++
++		cflush.op = 0;
++		cflush.a.dev_bus_addr = pfn << PAGE_SHIFT;
++		cflush.offset = offset;
++		cflush.length = len;
++
++		if (op == DMA_UNMAP && dir != DMA_TO_DEVICE)
++			cflush.op = GNTTAB_CACHE_INVAL;
++		if (op == DMA_MAP) {
++			if (dir == DMA_FROM_DEVICE)
++				cflush.op = GNTTAB_CACHE_INVAL;
++			else
++				cflush.op = GNTTAB_CACHE_CLEAN;
++		}
++		if (cflush.op)
++			HYPERVISOR_grant_table_op(GNTTABOP_cache_flush, &cflush, 1);
+ 
+ 		offset = 0;
+ 		pfn++;
+@@ -106,7 +128,7 @@ bool xen_arch_need_swiotlb(struct device *dev,
+ 			   unsigned long pfn,
+ 			   unsigned long mfn)
+ {
+-	return ((pfn != mfn) && !is_device_dma_coherent(dev));
++	return (!hypercall_cflush && (pfn != mfn) && !is_device_dma_coherent(dev));
+ }
+ 
+ int xen_create_contiguous_region(phys_addr_t pstart, unsigned int order,
+@@ -149,10 +171,18 @@ static struct dma_map_ops xen_swiotlb_dma_ops = {
+ 
+ int __init xen_mm_init(void)
+ {
++	struct gnttab_cache_flush cflush;
+ 	if (!xen_initial_domain())
+ 		return 0;
+ 	xen_swiotlb_init(1, false);
+ 	xen_dma_ops = &xen_swiotlb_dma_ops;
++
++	cflush.op = 0;
++	cflush.a.dev_bus_addr = 0;
++	cflush.offset = 0;
++	cflush.length = 0;
++	if (HYPERVISOR_grant_table_op(GNTTABOP_cache_flush, &cflush, 1) != -ENOSYS)
++		hypercall_cflush = true;
+ 	return 0;
+ }
+ arch_initcall(xen_mm_init);
+diff --git a/include/xen/interface/grant_table.h b/include/xen/interface/grant_table.h
+index e40fae9..bcce564 100644
+--- a/include/xen/interface/grant_table.h
++++ b/include/xen/interface/grant_table.h
+@@ -479,6 +479,25 @@ struct gnttab_get_version {
+ DEFINE_GUEST_HANDLE_STRUCT(gnttab_get_version);
+ 
+ /*
++ * Issue one or more cache maintenance operations on a portion of a
++ * page granted to the calling domain by a foreign domain.
++ */
++#define GNTTABOP_cache_flush          12
++struct gnttab_cache_flush {
++    union {
++        uint64_t dev_bus_addr;
++        grant_ref_t ref;
++    } a;
++    uint16_t offset;   /* offset from start of grant */
++    uint16_t length;   /* size within the grant */
++#define GNTTAB_CACHE_CLEAN          (1<<0)
++#define GNTTAB_CACHE_INVAL          (1<<1)
++#define GNTTAB_CACHE_SOURCE_GREF    (1<<31)
++    uint32_t op;
++};
++DEFINE_GUEST_HANDLE_STRUCT(gnttab_cache_flush);
++
++/*
+  * Bitfield values for update_pin_status.flags.
+  */
+  /* Map the grant entry for access by I/O devices. */
 -- 
 1.7.10.4
