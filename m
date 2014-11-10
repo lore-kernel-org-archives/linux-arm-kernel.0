@@ -1,56 +1,38 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 10 Nov 2014 09:01:45 +0100
-Subject: [PATCH v3/resend] ARM: shmobile: Add early debugging support
- using SCIF(A)
-In-Reply-To: <20777697.th35W64j5e@wuerfel>
-References: <1415273910-32356-1-git-send-email-geert+renesas@glider.be>
- <3499638.LG41cHl0JS@wuerfel>
- <CAMuHMdUU7XK57a70HWP0+nfwaZ-sXQ5EC2CShgmxwx6JKnuyPQ@mail.gmail.com>
- <20777697.th35W64j5e@wuerfel>
-Message-ID: <CAMuHMdVJMB7Nz6dR414yG7jyneMbeoaRW43JQUKmW1u7i-=fbA@mail.gmail.com>
+From: krishna.md@samsung.com (Krishna Mohan Dani)
+Date: Mon, 10 Nov 2014 13:31:55 +0530
+Subject: [PATCH 0/4] Arndale: Adding Sound Machine Driver for ALC5631 Codec
+Message-ID: <1415606519-30744-1-git-send-email-krishna.md@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 6, 2014 at 2:26 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> >> +     {
->> >> +             .virtual        = 0xffe40000,
->> >> +             .pfn            = __phys_to_pfn(0xffe40000),
->> >> +             .length         = SZ_64K,
->> >> +             .type           = MT_DEVICE_NONSHARED
->> >> +     },
->> >> +#endif /* CONFIG_DEBUG_R8A7779_SCIF2 */
->> >>  };
->> >
->> > This should be done automatically if you call debug_ll_io_init() or
->> > have an empty map_io() callback.
->>
->> On r8a7779 map_io() is not empty, but it didn't cover the SCIF registers,
->> cfr. the commit log:
->>
->> > >   4. On SoCs using the legacy machine_desc.map_io(), an identity mapping
->> > >      of the SCIF(A) registers must be set up in .map_io(). On all but
->> > >      r8a7779 this was already done.
->
-> Ok. You can of course just call debug_ll_io_init() manually from the
-> map_io function, it will create the same mapping.
+These patches add machine driver to instantiate I2S based realtek's
+ ALC5631 based sound card on Arndale board.
 
-Good idea, that would indeed simpify the logic, both in Kconfig and
-renesas-scif.S.
+There are other variants of Audio Daughter Cards for Arndale
+Board for which support already exists but there is no support for
+Realtek's alc5631 codec based card hence support for ALC5631 based
+machine driver is being added.
 
-I gave it a try. On Armadillo it worked, on kzm9g it didn't.
-Probably the virtual address choice is wrong.
+Most of the code has been pulled from insignal's git for Arndale and
+modified to suit the maintain syntax. Machine driver has been made
+DT compatible.
 
-As I can't test it on the other boards using map_io(), I'd like to
-keep this as-is
-for now. We can migrate them gradually later.
+Krishna Mohan Dani (4):
+  ASoC: ALC5631: Add device tree binding documentation
+  Sound: Samsung: Add sound card machine driver for Arndale Board
+  Sound: Kconfig: Adding the description of the codec
+  Sound: DT: Adding Device Tree compatibility to Realtek's ALC5631
+    codec driver
 
-Gr{oetje,eeting}s,
+ Documentation/devicetree/bindings/sound/rt5631.txt |   41 +++++
+ sound/soc/codecs/Kconfig                           |    3 +-
+ sound/soc/codecs/rt5631.c                          |   11 ++
+ sound/soc/samsung/Kconfig                          |    6 +
+ sound/soc/samsung/Makefile                         |    2 +
+ sound/soc/samsung/arndale_rt5631.c                 |  167 ++++++++++++++++++++
+ 6 files changed, 229 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/rt5631.txt
+ create mode 100644 sound/soc/samsung/arndale_rt5631.c
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+1.7.9.5
