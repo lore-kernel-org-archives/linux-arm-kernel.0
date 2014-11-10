@@ -1,160 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Nov 2014 09:11:23 +0000
-Subject: [PATCH 2/5] input: touchscreen: ti_am335x_tsc: Remove udelay in
- interrupt handler
-In-Reply-To: <1415339350-17679-3-git-send-email-vigneshr@ti.com>
-References: <1415339350-17679-1-git-send-email-vigneshr@ti.com>
- <1415339350-17679-3-git-send-email-vigneshr@ti.com>
-Message-ID: <20141110091123.GC21424@x1>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Mon, 10 Nov 2014 10:14:23 +0100
+Subject: tsc2005 touchscreen: implement disable attribute
+In-Reply-To: <20141109200142.GA37384@dtor-ws>
+References: <20141109115636.GA3106@amd> <201411091349.20116@pali>
+ <20141109200142.GA37384@dtor-ws>
+Message-ID: <201411101014.25873@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 07 Nov 2014, Vignesh R wrote:
+On Sunday 09 November 2014 21:01:42 Dmitry Torokhov wrote:
+> On Sun, Nov 09, 2014 at 01:49:19PM +0100, Pali Roh?r wrote:
+> > On Sunday 09 November 2014 13:40:25 Sebastian Reichel wrote:
+> > > Hi,
+> > > 
+> > > On Sun, Nov 09, 2014 at 12:56:37PM +0100, Pavel Machek 
+wrote:
+> > > > Implement disable attribute for tsc2005 touchscreen. It
+> > > > is useful to avoid wakeups when phone is in the pocket.
+> > > 
+> > > I don't think this should be some driver specific sysfs
+> > > node. Instead a generic method from the input subsystem
+> > > should be used.
+> > > 
+> > > -- Sebastian
+> > 
+> > Yes. I would like to see generic method to turn off input
+> > device (or just "mute" it if device does not support turn
+> > off). Similar problem is also on laptops or other portable
+> > devices. E.g when I close LID of my laptop I want to turn
+> > off internal input devices (keyboard, touchpad, trackstick)
+> > without need to unload evdev Xserver drivers (or killing
+> > Xserver). Another use case is to turn off keyboard (also
+> > from kernel tty on Ctrl+Alt+Fx) which cannot be unplugged
+> > (internal laptop keyboard).
+> > 
+> > CCed Dmitry, what do you think about it?
+> 
+> Actually I'd like it to be not limited to input devices but
+> rater try doing it at the device core level, if possible. I
+> am sure there are IIO and other devices that could be
+> forcibly turned off/put into low power mode under certain
+> circumstances.
+> 
+> There were some talks about it with Rafael, but we never come
+> with anything concrete.
+> 
+> Thanks.
 
-> From: Brad Griffis <bgriffis@ti.com>
-> 
-> TSC interrupt handler had udelay to avoid reporting of false pen-up
-> interrupt to user space. This patch implements workaround suggesting in
-> Advisory 1.0.31 of silicon errata for am335x, thus eliminating udelay
-> and touchscreen lag. This also improves performance of touchscreen and
-> eliminates sudden jump of cursor at touch release.
-> 
-> IDLECONFIG and CHARGECONFIG registers are to be configured
-> with same values in order to eliminate false pen-up events. This
-> workaround may result in false pen-down to be detected, hence considerable
-> charge step delay needs to be added. The charge delay is set to 0xB000
-> (in terms of ADC clock cycles) by default.
-> 
-> TSC steps are disabled at the end of every sampling cycle and EOS bit is
-> set. Once the EOS bit is set, the TSC steps need to be re-enabled to begin
-> next sampling cycle.
-> 
-> Signed-off-by: Brad Griffis <bgriffis@ti.com>
-> [vigneshr at ti.com: Ported the patch from v3.12 to v3.18rc2]
-> 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> ---
->  drivers/input/touchscreen/ti_am335x_tsc.c | 56 ++++++++++++-------------------
->  include/linux/mfd/ti_am335x_tscadc.h      |  3 +-
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
->  2 files changed, 24 insertions(+), 35 deletions(-)
-> 
-> diff --git a/drivers/input/touchscreen/ti_am335x_tsc.c b/drivers/input/touchscreen/ti_am335x_tsc.c
-> index 1aeac9675fe7..483fd97c0e0c 100644
-> --- a/drivers/input/touchscreen/ti_am335x_tsc.c
-> +++ b/drivers/input/touchscreen/ti_am335x_tsc.c
-> @@ -173,11 +173,9 @@ static void titsc_step_config(struct titsc *ts_dev)
->  		titsc_writel(ts_dev, REG_STEPDELAY(i), STEPCONFIG_OPENDLY);
->  	}
->  
-> -	/* Charge step configuration */
-> -	config = ts_dev->bit_xp | ts_dev->bit_yn |
-> -			STEPCHARGE_RFP_XPUL | STEPCHARGE_RFM_XNUR |
-> -			STEPCHARGE_INM_AN1 | STEPCHARGE_INP(ts_dev->inp_yp);
-> +	/* Make CHARGECONFIG same as IDLECONFIG */
->  
-> +	config = titsc_readl(ts_dev, REG_IDLECONFIG);
->  	titsc_writel(ts_dev, REG_CHARGECONFIG, config);
->  	titsc_writel(ts_dev, REG_CHARGEDELAY, CHARGEDLY_OPENDLY);
->  
-> @@ -264,9 +262,26 @@ static irqreturn_t titsc_irq(int irq, void *dev)
->  	unsigned int status, irqclr = 0;
->  	unsigned int x = 0, y = 0;
->  	unsigned int z1, z2, z;
-> -	unsigned int fsm;
->  
-> -	status = titsc_readl(ts_dev, REG_IRQSTATUS);
-> +	status = titsc_readl(ts_dev, REG_RAWIRQSTATUS);
-> +	if (status & IRQENB_HW_PEN) {
-> +		ts_dev->pen_down = true;
-> +		titsc_writel(ts_dev, REG_IRQWAKEUP, 0x00);
-> +		titsc_writel(ts_dev, REG_IRQCLR, IRQENB_HW_PEN);
-> +		irqclr |= IRQENB_HW_PEN;
-> +	}
-> +
-> +	if (status & IRQENB_PENUP) {
-> +		ts_dev->pen_down = false;
-> +		input_report_key(input_dev, BTN_TOUCH, 0);
-> +		input_report_abs(input_dev, ABS_PRESSURE, 0);
-> +		input_sync(input_dev);
-> +		irqclr |= IRQENB_PENUP;
-> +	}
-> +
-> +	if (status & IRQENB_EOS)
-> +		irqclr |= IRQENB_EOS;
-> +
->  	/*
->  	 * ADC and touchscreen share the IRQ line.
->  	 * FIFO1 interrupts are used by ADC. Handle FIFO0 IRQs here only
-> @@ -297,34 +312,6 @@ static irqreturn_t titsc_irq(int irq, void *dev)
->  		}
->  		irqclr |= IRQENB_FIFO0THRES;
->  	}
-> -
-> -	/*
-> -	 * Time for sequencer to settle, to read
-> -	 * correct state of the sequencer.
-> -	 */
-> -	udelay(SEQ_SETTLE);
-> -
-> -	status = titsc_readl(ts_dev, REG_RAWIRQSTATUS);
-> -	if (status & IRQENB_PENUP) {
-> -		/* Pen up event */
-> -		fsm = titsc_readl(ts_dev, REG_ADCFSM);
-> -		if (fsm == ADCFSM_STEPID) {
-> -			ts_dev->pen_down = false;
-> -			input_report_key(input_dev, BTN_TOUCH, 0);
-> -			input_report_abs(input_dev, ABS_PRESSURE, 0);
-> -			input_sync(input_dev);
-> -		} else {
-> -			ts_dev->pen_down = true;
-> -		}
-> -		irqclr |= IRQENB_PENUP;
-> -	}
-> -
-> -	if (status & IRQENB_HW_PEN) {
-> -
-> -		titsc_writel(ts_dev, REG_IRQWAKEUP, 0x00);
-> -		titsc_writel(ts_dev, REG_IRQCLR, IRQENB_HW_PEN);
-> -	}
-> -
->  	if (irqclr) {
->  		titsc_writel(ts_dev, REG_IRQSTATUS, irqclr);
->  		am335x_tsc_se_set_cache(ts_dev->mfd_tscadc, ts_dev->step_mask);
-> @@ -417,6 +404,7 @@ static int titsc_probe(struct platform_device *pdev)
->  	}
->  
->  	titsc_writel(ts_dev, REG_IRQENABLE, IRQENB_FIFO0THRES);
-> +	titsc_writel(ts_dev, REG_IRQENABLE, IRQENB_EOS);
->  	err = titsc_config_wires(ts_dev);
->  	if (err) {
->  		dev_err(&pdev->dev, "wrong i/p wire configuration\n");
-> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
-> index e2e70053470e..c99be5dc0f5c 100644
-> --- a/include/linux/mfd/ti_am335x_tscadc.h
-> +++ b/include/linux/mfd/ti_am335x_tscadc.h
-> @@ -52,6 +52,7 @@
->  
->  /* IRQ enable */
->  #define IRQENB_HW_PEN		BIT(0)
-> +#define IRQENB_EOS		BIT(1)
->  #define IRQENB_FIFO0THRES	BIT(2)
->  #define IRQENB_FIFO0OVRRUN	BIT(3)
->  #define IRQENB_FIFO0UNDRFLW	BIT(4)
-> @@ -107,7 +108,7 @@
->  /* Charge delay */
->  #define CHARGEDLY_OPEN_MASK	(0x3FFFF << 0)
->  #define CHARGEDLY_OPEN(val)	((val) << 0)
-> -#define CHARGEDLY_OPENDLY	CHARGEDLY_OPEN(1)
-> +#define CHARGEDLY_OPENDLY	CHARGEDLY_OPEN(0xB000)
->  
->  /* Control register */
->  #define CNTRLREG_TSCSSENB	BIT(0)
+Ok. What about adding sysfs node disable which accept value 0/1?
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141110/eaa42bf7/attachment.sig>
