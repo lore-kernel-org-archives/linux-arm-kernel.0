@@ -1,63 +1,60 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 10 Nov 2014 20:01:04 +0100
-Subject: [GIT PULL] arm: pxa: pxa for v3.19
-Message-ID: <87bnoevq1b.fsf@free.fr>
+From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
+Date: Mon, 10 Nov 2014 20:05:42 +0100
+Subject: [PATCH v2 2/2] arm64: Add Juno SoC device tree.
+In-Reply-To: <1415618875-8469-3-git-send-email-Liviu.Dudau@arm.com>
+References: <1415618875-8469-1-git-send-email-Liviu.Dudau@arm.com>
+ <1415618875-8469-3-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <54610C86.9090002@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 206c5f60a3d902bc4b56dab2de3e88de5eb06108:
+Hi,
 
-  Linux 3.18-rc4 (2014-11-09 14:55:29 -0800)
+Am 10.11.2014 um 12:27 schrieb Liviu Dudau:
+> diff --git a/arch/arm64/boot/dts/juno.dts b/arch/arm64/boot/dts/juno.dts
+> new file mode 100644
+> index 0000000..7f998de
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/juno.dts
+> @@ -0,0 +1,374 @@
+> +/*
+> + * ARM Ltd. Juno Plaform
 
-are available in the git repository at:
+"Platform"
 
-  https://github.com/rjarzmik/linux.git tags/pxa-for-3.19
+> + *
 
-for you to fetch changes up to af1e3ad7be02013b7481b0997919d16b871bc907:
+Shouldn't this mention a license, ideally dual-licensed?
 
-  arm: pxa: add pxa27x device-tree support (2014-11-10 00:31:26 +0100)
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +
+> +/ {
+> +	model = "Juno";
+> +	compatible = "arm,juno", "arm,vexpress";
+> +	interrupt-parent = <&gic>;
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +
+> +	aliases {
+> +		serial0 = &soc_uart0;
+> +	};
+> +
+> +	cpus {
+> +		#address-cells = <2>;
+> +		#size-cells = <0>;
+> +
+> +		A53_0:cpu at 100 {
+[snip]
 
-----------------------------------------------------------------
-arm: pxa: pxa for v3.19
+Can you please add a space after colon, like you did for non-CPU nodes?
 
-Hello Arnd, Kevin, Olof,
-
-This is a very quiet release, featuring a small cleanup, a tosa change
-on its charger driver, and support for pxa device-tree based pxa27x
-boards.
-
-The device-tree part will only be fully activated once clocks support
-is fully operational in the common clock framework.
-
-----------------------------------------------------------------
-Dmitry Eremin-Solenikov (1):
-      ARM: pxa: tosa: switch to gpio-charger
-
-Joe Perches (1):
-      arm: mach-pxa: Convert pr_warning to pr_warn
-
-Robert Jarzmik (4):
-      arm: pxa: add device-tree irq init for pxa27x
-      arm: pxa: move init functions into generic.h
-      arm: pxa: remove unnecessary includes from pxa-dt
-      arm: pxa: add pxa27x device-tree support
-
- arch/arm/mach-pxa/Kconfig               | 11 ++++++
- arch/arm/mach-pxa/Makefile              |  1 +
- arch/arm/mach-pxa/em-x270.c             |  4 +-
- arch/arm/mach-pxa/generic.h             | 65 +++++++++++++++++++++------------
- arch/arm/mach-pxa/gumstix.c             |  3 +-
- arch/arm/mach-pxa/include/mach/pxa25x.h |  8 ----
- arch/arm/mach-pxa/include/mach/pxa27x.h |  4 --
- arch/arm/mach-pxa/include/mach/pxa3xx.h |  5 ---
- arch/arm/mach-pxa/mfp-pxa2xx.c          | 12 +++---
- arch/arm/mach-pxa/poodle.c              |  2 +-
- arch/arm/mach-pxa/pxa-dt.c              | 18 +++++++--
- arch/arm/mach-pxa/pxa27x.c              |  6 +++
- arch/arm/mach-pxa/pxa3xx-ulpi.c         |  6 +--
- arch/arm/mach-pxa/raumfeld.c            | 26 ++++++-------
- arch/arm/mach-pxa/tosa.c                | 41 ++++-----------------
- 15 files changed, 107 insertions(+), 105 deletions(-)
+Regards,
+Andreas
 
 -- 
-Robert
+SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 21284 AG N?rnberg
