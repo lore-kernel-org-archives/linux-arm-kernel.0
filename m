@@ -1,41 +1,63 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 10 Nov 2014 18:34:54 +0000
-Subject: [PATCH v8 10/13] xen/arm/arm64: introduce xen_arch_need_swiotlb
-In-Reply-To: <1415636045-24669-10-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1411101607130.22875@kaball.uk.xensource.com>
- <1415636045-24669-10-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20141110183453.GG25609@e104818-lin.cambridge.arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 10 Nov 2014 10:35:36 -0800
+Subject: [PATCH v9 4/8] ARM: dts: Enable Broadcom Cygnus SoC
+In-Reply-To: <1415616611.4862.38.camel@x220>
+References: <sbranden@broadcom.com>
+ <1414538111-11668-1-git-send-email-sbranden@broadcom.com>
+ <1414538111-11668-5-git-send-email-sbranden@broadcom.com>
+ <1415616611.4862.38.camel@x220>
+Message-ID: <CAOesGMgqsvOtgxKa6aBwvTqW3CO5Q7E_YsVVuS83yR4GdQEHUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 10, 2014 at 04:14:02PM +0000, Stefano Stabellini wrote:
-> --- a/arch/arm/include/asm/xen/page.h
-> +++ b/arch/arm/include/asm/xen/page.h
-> @@ -107,4 +107,8 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
->  #define xen_remap(cookie, size) ioremap_cache((cookie), (size))
->  #define xen_unmap(cookie) iounmap((cookie))
->  
-> +bool xen_arch_need_swiotlb(struct device *dev,
-> +			   unsigned long pfn,
-> +			   unsigned long mfn);
-> +
->  #endif /* _ASM_ARM_XEN_PAGE_H */
-> diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
-> index 0e96023..1b087cd 100644
-> --- a/arch/arm/xen/mm.c
-> +++ b/arch/arm/xen/mm.c
-> @@ -102,6 +102,13 @@ void __xen_dma_sync_single_for_device(struct device *hwdev,
->  	__xen_dma_page_cpu_to_dev(hwdev, handle, size, dir);
->  }
->  
-> +bool xen_arch_need_swiotlb(struct device *dev,
-> +			   unsigned long pfn,
-> +			   unsigned long mfn)
-> +{
-> +	return ((pfn != mfn) && !is_device_dma_coherent(dev));
-> +}
+On Mon, Nov 10, 2014 at 2:50 AM, Paul Bolle <pebolle@tiscali.nl> wrote:
+> On Tue, 2014-10-28 at 16:15 -0700, Scott Branden wrote:
+>> DT files to enable cygnus consisting on reference designs
+>> and cygnus core configuration.
+>>
+>> Reviewed-by: Ray Jui <rjui@broadcom.com>
+>> Reviewed-by: Arun Parameswaran <aparames@broadcom.com>
+>> Tested-by: Jonathan Richardson <jonathar@broadcom.com>
+>> Reviewed-by: JD (Jiandong) Zheng <jdzheng@broadcom.com>
+>> Signed-off-by: Scott Branden <sbranden@broadcom.com>
+>
+> This landed in today's linux-next (ie, next-21041110) as commit
+> 8872fc22c267 ("ARM: dts: Enable Broadcom Cygnus SoC").
+>
+>>  arch/arm/boot/dts/Makefile              |    4 ++
+>>  arch/arm/boot/dts/bcm-cygnus-clock.dtsi |   73 ++++++++++++++++++++++
+>>  arch/arm/boot/dts/bcm-cygnus.dtsi       |  100 +++++++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/bcm911360_entphn.dts  |   32 ++++++++++
+>>  arch/arm/boot/dts/bcm911360k.dts        |   32 ++++++++++
+>>  arch/arm/boot/dts/bcm958300k.dts        |   32 ++++++++++
+>>  6 files changed, 273 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/bcm-cygnus-clock.dtsi
+>>  create mode 100644 arch/arm/boot/dts/bcm-cygnus.dtsi
+>>  create mode 100644 arch/arm/boot/dts/bcm911360_entphn.dts
+>>  create mode 100644 arch/arm/boot/dts/bcm911360k.dts
+>>  create mode 100644 arch/arm/boot/dts/bcm958300k.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 38c89ca..4b3a590 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -54,6 +54,10 @@ dtb-$(CONFIG_ARCH_AT91)    += at91-sama5d4ek.dtb
+>>  dtb-$(CONFIG_ARCH_ATLAS6) += atlas6-evb.dtb
+>>  dtb-$(CONFIG_ARCH_AXXIA) += axm5516-amarillo.dtb
+>>  dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
+>> +dtb-$(CONFIG_ARCH_BCM_CYGNUS) += \
+>> +     bcm911360_entphn.dtb \
+>> +     bcm911360k.dtb \
+>> +     bcm958300k.dtb
+>>  dtb-$(CONFIG_ARCH_BCM_5301X) += bcm4708-netgear-r6250.dtb
+>>  dtb-$(CONFIG_ARCH_BCM_63XX) += bcm963138dvt.dtb
+>>  dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm28155-ap.dtb \
+>
+> Without patch 1/8 ("ARM: cygnus: Initial support for Broadcom Cygnus
+> SoC") CONFIG_ARCH_BCM_CYGNUS will not be set. I guess patch 1/8 will be
+> added to linux-next one of these days. Is that correct?
 
-Why not a static inline? It doesn't look like a big function.
+Yes.
 
--- 
-Catalin
+
+-Olof
