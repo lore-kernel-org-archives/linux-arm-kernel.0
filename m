@@ -1,119 +1,51 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 10 Nov 2014 18:09:31 +0100
-Subject: [PATCH 1/7] irqchip: armada-370-xp: Simplify interrupt map, mask
- and unmask
-In-Reply-To: <5458ECBE.2020202@free-electrons.com>
-References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1413985427-20918-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <5453BAA7.1040804@free-electrons.com> <5458ECBE.2020202@free-electrons.com>
-Message-ID: <5460F14B.7060702@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 10 Nov 2014 09:15:09 -0800
+Subject: [PATCH 0/2] OMAP Mailbox DTS patches for 3.19
+In-Reply-To: <1415056055-64201-1-git-send-email-s-anna@ti.com>
+References: <1415056055-64201-1-git-send-email-s-anna@ti.com>
+Message-ID: <20141110171508.GN31454@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
-
-On 04/11/2014 16:11, Ezequiel Garcia wrote:
-> Hi Gregory,
+* Suman Anna <s-anna@ti.com> [141103 15:09]:
+> Hi Tony,
 > 
-> On 10/31/2014 01:36 PM, Gregory CLEMENT wrote:
->> On 22/10/2014 15:43, Ezequiel Garcia wrote:
->>> The map, mask and unmask is unnecessarily complicated, with a different
->>> implementation for shared and per CPU interrupts. The current code does
->>> the following:
->>>
->>> At probe time, all interrupts are disabled and masked on all CPUs.
->>>
->>> Shared interrupts:
->>>
->>>  * When the interrupt is mapped(), it gets disabled and unmasked on the
->>>    calling CPU.
->>>
->>>  * When the interrupt is unmasked(), masked(), it gets enabled and
->>>    disabled.
->>>
->>> Per CPU interrupts:
->>>
->>>  * When the interrupt is mapped, it gets masked on the calling CPU and
->>>    enabled.
->>>
->>>  * When the interrupt is unmasked(), masked(), it gets unmasked and masked,
->>>    on the calling CPU.
->>>
->>> This commit simplifies this code, with a much simpler implementation, common
->>> to shared and per CPU interrupts.
->>>
->>>  * When the interrupt is mapped, it's enabled.
->>>
->>>  * When the interrupt is unmasked(), masked(), it gets unmasked and masked,
->>>    on the calling CPU.
->>
->> By doing this you change the behavior of the irqchip. Before this patch, masking
->> a shared interrupt was masking it on all the CPUs in the same time whereas with this
->> change it will mask the interrupt only on the calling CPU. It worth checking it is
->> the expected behavior.
->>
+> The following OMAP mailbox DTS patches are based on 3.18-rc3 and are
+> intended for the 3.19 merge window.
 > 
-> The kernel will always mask/unmask on the appropriate CPU, so I don't see any
-> issues with this.
+> The first patch is new and adds the interrupts property to all the mailbox
+> nodes on DRA7xx now that we have the DRA7xx interrupt crossbar driver
+> functional and merged in the kernel.
 > 
->> Moreover I wonder how it is supposed to work with the irq affinity. Let say that the
->> irq was enabled on the CPU0,
+> The second patch enables the OMAP Mailbox DT users (there are none at the
+> moment) to use the recently merged Mailbox framework API, and is a repost
+> of the DTS patch [1] from the OMAP Mailbox framework adaptation series [2]
+> after rebasing. The driver portion of the adaptation patch is posted
+> separately so that Jassi can pick it up. Together, these are the last
+> base mailbox dependent patches for Dave's PM work on AM335x.
+
+Applying these two into omap-for-v3.19/dt thanks.
+
+Tony
+
+ 
+> [1] http://marc.info/?l=linux-omap&m=141038449717781&w=2
+> [2] http://marc.info/?l=linux-omap&m=141038447817775&w=2
 > 
-> If you mean enabled as in irq_enable(irq_desc), then let's keep in mind that
-> currently that calls .irq_unmask.
+> Suman Anna (2):
+>   ARM: dts: DRA7: Add interrupts property to mailbox nodes
+>   ARM: dts: OMAP2+: Add #mbox-cells property to all mailbox nodes
 > 
->> then there is irq_unmask call on CPU1, then the irq would be enabled on both CPUs.
->> It will modify the irq affinity and moreover it will also lead
->> to an invalidate state with the MPIC because we can't manage an interrupt on more than
->> one CPU.
->>
->> From the point of the view of the armada_370_xp_irq driver there are potential bug, but
->> maybe the use case I described can't happen. Could you check it?
->>
+>  arch/arm/boot/dts/am33xx.dtsi   |  1 +
+>  arch/arm/boot/dts/am4372.dtsi   |  1 +
+>  arch/arm/boot/dts/dra7.dtsi     | 64 +++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/omap2420.dtsi |  1 +
+>  arch/arm/boot/dts/omap2430.dtsi |  1 +
+>  arch/arm/boot/dts/omap3.dtsi    |  1 +
+>  arch/arm/boot/dts/omap4.dtsi    |  1 +
+>  arch/arm/boot/dts/omap5.dtsi    |  1 +
+>  8 files changed, 71 insertions(+)
 > 
-> In this irqchip driver, shared interrupts are handled via handle_level_irq(),
-> which masks() and unmasks() the interrupt. In other words, it's always done
-> in the same CPU. I guess this is the most frequent mask/unmask operation.
+> -- 
+> 2.1.0
 > 
-> On the other side, if a driver calls enable_irq() on one CPU and then
-> enable_irq() on the other CPU, that's exactly what will happen. Although the
-> smp_affinity setting will prevent an interrupt from being dispatched to more
-> than one CPU.
-> 
-> I really don't see an issue with this patch, but I think it needs as much
-> discussion and as much testing as possible. This piece of code is rather
-> critical, and is working just fine, so I'd like to have an excellent 
-> reason before changing any of it.
-
-We already talked about it on IRC but I write it agin o let the other people know
-our status on this subject.
-
-If a driver call irq_enable() then this functions will call irq_enable() and as we didn't
-implement a .enbale() operation, it will call our only unmask() function.
-
-So if the IRQ was unmasked on a CPU and a driver call an irq_enable() from an other CPU then
-we will end up with the IRQ enabled on 2 different CPUs. It is a problem for 2 reasons:
-- our hardware don't handle a IRQ enable on more than one CPU
-- it will modify the affinity at the hardware level because a new CPU will be able to
-receive an irq whereas we setup the affinity on only one CPU.
-
-By only using the mask and unmask registers we will need to handle the affinity by
-software instead of using the hardware. I agree that the current code is not trivial,
-but adding more comment instead of removing this capability should be better.
-
-
-Thanks,
-
-Gregory
-
-
-
-
-
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
