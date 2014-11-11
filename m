@@ -1,151 +1,85 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 11 Nov 2014 14:04:04 +0530
-Subject: [PATCH v3 6/6] input: touchscreen: ti_am335x_tsc: Replace delta
- filtering with median filtering
-In-Reply-To: <1415694844-11230-1-git-send-email-vigneshr@ti.com>
-References: <1415694844-11230-1-git-send-email-vigneshr@ti.com>
-Message-ID: <1415694844-11230-7-git-send-email-vigneshr@ti.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 11 Nov 2014 09:40:49 +0100
+Subject: [PATCH 0/3] Add support for Tegra Activity Monitor
+In-Reply-To: <546190BA.7050502@nvidia.com>
+References: <1414594232-15684-1-git-send-email-tomeu.vizoso@collabora.com>
+ <545C8BCC.3090908@nvidia.com> <545CBC87.7050404@collabora.com>
+ <546190BA.7050502@nvidia.com>
+Message-ID: <CAAObsKB9xxS5C7VsP9cBGYDB5ArhbLM0nKEPk8yqWX=iwqcj7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously, delta filtering was applied TSC co-ordinate readouts before
-reporting a single value to user space. This patch replaces delta filtering
-with median filtering. Median filtering sorts co-ordinate readouts, drops min
-and max values, and reports the average of remaining values. This method is
-more sensible than delta filering. Median filtering is applied only if number
-of readouts is greater than 3 else just average of co-ordinate readouts is
-reported.
+On 11 November 2014 05:29, Alexandre Courbot <acourbot@nvidia.com> wrote:
+> On 11/07/2014 09:35 PM, Tomeu Vizoso wrote:
+>>
+>> On 11/07/2014 10:07 AM, Alexandre Courbot wrote:
+>>>
+>>> On 10/29/2014 11:50 PM, Tomeu Vizoso wrote:
+>>>>
+>>>> Hello,
+>>>>
+>>>> these patches implement support for setting the rate of the EMC clock
+>>>> based on
+>>>> stats collected from the ACTMON, a piece of hw in the Tegra124 that
+>>>> counts
+>>>> memory accesses (among others).
+>>>>
+>>>> It depends on the following in-flight patches:
+>>>>
+>>>> * MC driver: http://thread.gmane.org/gmane.linux.ports.tegra/19623
+>>>> * EMC driver:
+>>>> http://thread.gmane.org/gmane.linux.ports.arm.kernel/365125
+>>>> * CPUFreq driver: http://thread.gmane.org/gmane.linux.kernel/1812962
+>>>>
+>>>> I have pushed a branch here for testing:
+>>>
+>>>
+>>> I am not too familiar with DVFS, but after going through this series it
+>>> really seems to me that this could use devfreq. In its current form this
+>>> driver mixes control and policy and lacks flexibility, preventing e.g.
+>>> to switch to a performance or power-saving profile. Could you study the
+>>> feasibility of using devfreq for this?
+>>
+>>
+>> Yeah, I started writing a devfreq driver, but then I looked in more
+>> detail to the downstream driver and realized that most of the
+>> functionality that devfreq provides overlaps with the hw.
+>>
+>> The ACTMON can be configured to fire an interrupt when a set of
+>> thresholds are crossed, similar to the simple-ondemand governor but a
+>> bit more sophisticated.
+>
+>
+> I think (after a quick look at devfreq's source) that you can avoid polling
+> altogether if you set polling_ms to 0 in your devfreq_dev_profile instance.
+> Then it is up to you to call update_devfreq() from your custom governor
+> whenever it sees fit.
+>
+> ACTMON support seems to overlap between being a governor (which reacts to
+> ACTMON interrupts and calls update_devfreq() when needed) and part of a
+> devfreq_dev_profile (get_dev_status() needs to use the actmon counters). If
+> we keep your current design where the driver simply controls a clock, you
+> could have the ACTMON driver obtain that clock, register its governor,
+> create a non-polling devfreq_dev_profile that controls that clock, and just
+> call devfreq_add_device() with both. Then we will have the benefit of being
+> able to use ACTMON as well as the performance and powersave governors on
+> EMC, and switch policies dynamically.
+>
+> Another benefit is that you will have a placeholder in the governor to
+> implement suspend/resume for the ACTMON IP, in case this becomes necessary
+> in the future.
+>
+> Do you think that would work? Apart from the polling which doesn't seem to
+> be an issue, have you seen any other redundancy between devfreq and ACTMON?
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- drivers/input/touchscreen/ti_am335x_tsc.c | 91 +++++++++++++++++--------------
- 1 file changed, 51 insertions(+), 40 deletions(-)
+I don't think there's any obstacle to having this as a devfreq driver,
+it's just that it won't use much/any functionality of it so I don't
+really see the point.
 
-diff --git a/drivers/input/touchscreen/ti_am335x_tsc.c b/drivers/input/touchscreen/ti_am335x_tsc.c
-index 20ce76b1b6e7..e1df470946e6 100644
---- a/drivers/input/touchscreen/ti_am335x_tsc.c
-+++ b/drivers/input/touchscreen/ti_am335x_tsc.c
-@@ -26,6 +26,7 @@
- #include <linux/delay.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/sort.h>
- 
- #include <linux/mfd/ti_am335x_tscadc.h>
- 
-@@ -204,56 +205,61 @@ static void titsc_step_config(struct titsc *ts_dev)
- 	am335x_tsc_se_set_cache(ts_dev->mfd_tscadc, ts_dev->step_mask);
- }
- 
-+static int titsc_cmp_coord(const void *a, const void *b)
-+{
-+	return *(int *)a - *(int *)b;
-+}
-+
- static void titsc_read_coordinates(struct titsc *ts_dev,
- 		u32 *x, u32 *y, u32 *z1, u32 *z2)
- {
--	unsigned int fifocount = titsc_readl(ts_dev, REG_FIFO0CNT);
--	unsigned int prev_val_x = ~0, prev_val_y = ~0;
--	unsigned int prev_diff_x = ~0, prev_diff_y = ~0;
--	unsigned int read, diff;
--	unsigned int i, channel;
-+	unsigned int yvals[7], xvals[7];
-+	unsigned int i, xsum = 0, ysum = 0;
- 	unsigned int creads = ts_dev->coordinate_readouts;
--	unsigned int first_step = TOTAL_STEPS - (creads * 2 + 2);
- 
--	*z1 = *z2 = 0;
--	if (fifocount % (creads * 2 + 2))
--		fifocount -= fifocount % (creads * 2 + 2);
--	/*
--	 * Delta filter is used to remove large variations in sampled
--	 * values from ADC. The filter tries to predict where the next
--	 * coordinate could be. This is done by taking a previous
--	 * coordinate and subtracting it form current one. Further the
--	 * algorithm compares the difference with that of a present value,
--	 * if true the value is reported to the sub system.
--	 */
--	for (i = 0; i < fifocount; i++) {
--		read = titsc_readl(ts_dev, REG_FIFO0);
--
--		channel = (read & 0xf0000) >> 16;
--		read &= 0xfff;
--		if (channel > first_step + creads + 2) {
--			diff = abs(read - prev_val_x);
--			if (diff < prev_diff_x) {
--				prev_diff_x = diff;
--				*x = read;
--			}
--			prev_val_x = read;
-+	for (i = 0; i < creads; i++) {
-+		yvals[i] = titsc_readl(ts_dev, REG_FIFO0);
-+		yvals[i] &= 0xfff;
-+	}
- 
--		} else if (channel == first_step + creads + 1) {
--			*z1 = read;
-+	*z1 = titsc_readl(ts_dev, REG_FIFO0);
-+	*z1 &= 0xfff;
-+	*z2 = titsc_readl(ts_dev, REG_FIFO0);
-+	*z2 &= 0xfff;
- 
--		} else if (channel == first_step + creads + 2) {
--			*z2 = read;
-+	for (i = 0; i < creads; i++) {
-+		xvals[i] = titsc_readl(ts_dev, REG_FIFO0);
-+		xvals[i] &= 0xfff;
-+	}
- 
--		} else if (channel > first_step) {
--			diff = abs(read - prev_val_y);
--			if (diff < prev_diff_y) {
--				prev_diff_y = diff;
--				*y = read;
--			}
--			prev_val_y = read;
-+	/*
-+	 * If co-ordinates readouts is less than 4 then
-+	 * report the average. In case of 4 or more
-+	 * readouts, sort the co-ordinate samples, drop
-+	 * min and max values and report the average of
-+	 * remaining values.
-+	 */
-+	if (creads <=  3) {
-+		for (i = 0; i < creads; i++) {
-+			ysum += yvals[i];
-+			xsum += xvals[i];
- 		}
-+		ysum /= creads;
-+		xsum /= creads;
-+	} else {
-+		sort(yvals, creads, sizeof(unsigned int),
-+		     titsc_cmp_coord, NULL);
-+		sort(xvals, creads, sizeof(unsigned int),
-+		     titsc_cmp_coord, NULL);
-+		for (i = 1; i < creads - 1; i++) {
-+			ysum += yvals[i];
-+			xsum += xvals[i];
-+		}
-+		ysum /= creads - 2;
-+		xsum /= creads - 2;
- 	}
-+	*y = ysum;
-+	*x = xsum;
- }
- 
- static irqreturn_t titsc_irq(int irq, void *dev)
-@@ -362,6 +368,11 @@ static int titsc_parse_dt(struct platform_device *pdev,
- 	if (err < 0)
- 		return err;
- 
-+	if (ts_dev->coordinate_readouts <= 0) {
-+		dev_warn(&pdev->dev, "invalid co-ordinate readouts, resetting it to 5\n");
-+		ts_dev->coordinate_readouts = 5;
-+	}
-+
- 	err = of_property_read_u32(node, "ti,charge-delay",
- 				   &ts_dev->charge_delay);
- 	if (err < 0)
--- 
-1.9.1
+I think it will be better if I send a version of the driver that uses
+the devfreq framework, so we can better compare (and maybe I will
+change my opinion).
+
+Regards,
+
+Tomeu
