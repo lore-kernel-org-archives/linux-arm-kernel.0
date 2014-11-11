@@ -1,62 +1,41 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Tue, 11 Nov 2014 16:09:29 +0530
-Subject: [PATCH] mtd: remove .owner field for driver using
- module_platform_driver
-In-Reply-To: <1415701649-25915-1-git-send-email-sanjeev_sharma@mentor.com>
-References: <1415701649-25915-1-git-send-email-sanjeev_sharma@mentor.com>
-Message-ID: <5461E761.5090702@gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 11 Nov 2014 16:16:44 +0530
+Subject: [PATCH v5 2/8] phy: miphy28lp: Add PHY header file for DT x Driver
+ defines
+In-Reply-To: <546095EC.2040501@st.com>
+References: <1415098284-11182-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1415098284-11182-3-git-send-email-gabriel.fernandez@linaro.org>
+ <545B1C53.9010406@ti.com> <545B3FA4.8040109@st.com>
+ <20141106112825.GC26543@x1> <545B6144.2020503@st.com>
+ <20141106153659.GD26543@x1> <545B9F15.5070404@st.com>
+ <20141107130538.GB3745@x1> <546095EC.2040501@st.com>
+Message-ID: <5461E914.30906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sanjeev Sharma,
+Hi,
 
-On 11/11/2014 03:57 PM, Sanjeev Sharma wrote:
-> This patch removes the .owner field for drivers which use the
-> platform_driver_register api because this is overriden in
-> _platform_driver_register.
->
-> Signed-off-by: Sanjeev Sharma <Sanjeev_Sharma@mentor.com>
-> ---
->   drivers/mtd/nand/ams-delta.c     | 1 -
->   drivers/mtd/nand/atmel_nand.c    | 2 --
->   drivers/mtd/nand/au1550nd.c      | 1 -
->   drivers/mtd/nand/bf5xx_nand.c    | 1 -
->   drivers/mtd/nand/davinci_nand.c  | 1 -
->   drivers/mtd/nand/denali_dt.c     | 1 -
->   drivers/mtd/nand/docg4.c         | 1 -
->   drivers/mtd/nand/fsl_elbc_nand.c | 1 -
->   drivers/mtd/nand/fsl_ifc_nand.c  | 1 -
->   drivers/mtd/nand/fsl_upm.c       | 1 -
->   drivers/mtd/nand/fsmc_nand.c     | 1 -
->   drivers/mtd/nand/gpio.c          | 1 -
->   drivers/mtd/nand/jz4740_nand.c   | 1 -
->   drivers/mtd/nand/lpc32xx_mlc.c   | 1 -
->   drivers/mtd/nand/lpc32xx_slc.c   | 1 -
->   drivers/mtd/nand/mpc5121_nfc.c   | 1 -
->   drivers/mtd/nand/mxc_nand.c      | 1 -
->   drivers/mtd/nand/ndfc.c          | 1 -
->   drivers/mtd/nand/nuc900_nand.c   | 1 -
->   drivers/mtd/nand/omap2.c         | 1 -
->   drivers/mtd/nand/omap_elm.c      | 1 -
->   drivers/mtd/nand/orion_nand.c    | 1 -
->   drivers/mtd/nand/pasemi_nand.c   | 1 -
->   drivers/mtd/nand/plat_nand.c     | 1 -
->   drivers/mtd/nand/s3c2410.c       | 1 -
->   drivers/mtd/nand/sh_flctl.c      | 1 -
->   drivers/mtd/nand/sharpsl.c       | 1 -
->   drivers/mtd/nand/socrates_nand.c | 1 -
->   drivers/mtd/nand/tmio_nand.c     | 1 -
->   drivers/mtd/nand/txx9ndfmc.c     | 1 -
->   30 files changed, 31 deletions(-)
+On Monday 10 November 2014 04:09 PM, Maxime Coquelin wrote:
+> 
+> On 11/07/2014 02:05 PM, Lee Jones wrote:
+> 
+> <snip>
+>> If the merge turns out to be simple, then Git will do the correct
+>> thing; however, if the first version of the patch is applied, then
+>> some changes around the same area of the file occur _then_ when the
+>> second version (of the same patch differing only by SHA1) is applied
+>> Git will get confused.  If it has the same SHA1 however, Git will
+>> discard it as 'already applied'.  This is the reason we pass around
+>> shared tags to immutable branches.
+> Looking at how the patch is trivial, I persist to think there is no issue.
+> But OK, I will prepare an immutable branch..
 
-This removal of .owner field should be done for all the platform drivers which are using
-module_platform_driver().
+I've pushed this to
+git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git
+tags/phy-dt-header
 
-Wolfram Sang <wsa@the-dreams.de> working on this change on the all the drivers. Please see [1].
+I generally use 'git rebase' since that doesn't create a separate merge commit,
+but it's up to you,
 
-
-[1]:https://git.kernel.org/cgit/linux/kernel/git/wsa/linux.git/log/?h=platform/remove_owner
-
--- 
-Thanks and Regards,
-Varka Bhadram.
+Thanks
+Kishon
