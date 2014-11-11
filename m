@@ -1,38 +1,32 @@
-From: bintian.wang@huawei.com (Bintian Wang)
-Date: Tue, 11 Nov 2014 21:21:48 +0800
-Subject: [PATCH] arm64: dts: create an include directory for DT bindings
-Message-ID: <1415712108-11352-1-git-send-email-bintian.wang@huawei.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 11 Nov 2014 13:23:09 +0000
+Subject: [PATCH 02/15] GPIO: port LoCoMo gpio support from old driver
+In-Reply-To: <CALT56yPr42FV66USngocw=eWPt81d5R2MJxmzBnv02HOMmXAkA@mail.gmail.com>
+References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
+ <1414454528-24240-3-git-send-email-dbaryshkov@gmail.com>
+ <CACRpkdY7tRadod2vQfEytmw-ubaMAvr_=XTczD5bUMkqie0xkg@mail.gmail.com>
+ <CALT56yOgMUA7o2dzfHph=S2zkDV4zERzMh4ishpPwpAx7Cqj6Q@mail.gmail.com>
+ <CACRpkdb7v3LmOhbhQ9TPk1_bnLnpwizawW6RQvhQRLSjRewAaQ@mail.gmail.com>
+ <CALT56yO9f8wzaArnmfQSDzCM3S+2oT+62anH5kbFY3WdEt_HZg@mail.gmail.com>
+ <20141106060335.GR8509@sirena.org.uk>
+ <CALT56yPr42FV66USngocw=eWPt81d5R2MJxmzBnv02HOMmXAkA@mail.gmail.com>
+Message-ID: <20141111132309.GX3815@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some header files may be used by both DT files and kernel, and we
-usually put them under <include/dt-bindings/>, and also include them
-in DT files just like:
-    #include <dt-bindings/xxx/xxx.h>
-for exaple, some clock header files.
+On Tue, Nov 11, 2014 at 05:16:38PM +0400, Dmitry Eremin-Solenikov wrote:
 
-On arm64 platform, the compiler will report an error and terminate
-when compiling DT files:
-    dt-bindings/xxx/xxx.h: No such file or directory
+> Just to better understand your suggestions: do you want me to convert
+> to regmap only gpio driver or do you suggest to convert all LoCoMo drivers?
+> That is doable, of course, but the amount of changes is overwhelming.
+> Also I'm concerned about the performance impact from going through
+> regmap layers.
 
-In order to fix the compile error, create an include directory and symlink
-dt-bindings from there to the actual location of include/dt-bindings/:
-
-arch/arm64/boot/dts/include/dt-bindings -> ../../../../../include/dt-bindings
-
-Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
----
- arch/arm64/boot/dts/include/dt-bindings | 1 +
- 1 file changed, 1 insertion(+)
- create mode 120000 arch/arm64/boot/dts/include/dt-bindings
-
-diff --git a/arch/arm64/boot/dts/include/dt-bindings b/arch/arm64/boot/dts/include/dt-bindings
-new file mode 120000
-index 0000000..08c00e4
---- /dev/null
-+++ b/arch/arm64/boot/dts/include/dt-bindings
-@@ -0,0 +1 @@
-+../../../../../include/dt-bindings
-\ No newline at end of file
--- 
-1.9.1
+I don't care.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141111/6685a490/attachment-0001.sig>
