@@ -1,365 +1,206 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Tue, 11 Nov 2014 08:24:39 +0700
-Subject: [PATCH V3] arm64: amd-seattle: Adding device tree for AMD Seattle
- platform
-In-Reply-To: <1414503414-3863-1-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1414503414-3863-1-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <54616557.1010403@amd.com>
+From: B31939@freescale.com (Lian Minghuan-B31939)
+Date: Tue, 11 Nov 2014 09:48:45 +0800
+Subject: [PATCH] PCI: designware: Add support 4 ATUs assignment
+In-Reply-To: <1415620820.20340.1.camel@pengutronix.de>
+References: <1415616205-21255-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1415620820.20340.1.camel@pengutronix.de>
+Message-ID: <54616AFD.3050404@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping.
+Hi Lucas,
 
-Are there any other concerns about this patch?
+Thanks for your comments.
+Please see my reply inline.
 
 Thanks,
+Minghuan
 
-Suravee
-
-On 10/28/14 20:36, suravee.suthikulpanit at amd.com wrote:
-> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+On 2014?11?10? 20:00, Lucas Stach wrote:
+> Am Montag, den 10.11.2014, 18:43 +0800 schrieb Minghuan Lian:
+>> Currently, pcie-designware.c only supports two ATUs, ATU0 is used
+>> for CFG0 and MEM, ATU1 is used for CFG1 and IO. There is a conflict
+>> when MEM and CFG0 are accessed simultaneously. The patch adds
+>> 'num-atus' property to PCIe dts node to describe the number of
+>> PCIe controller's ATUs. If num_atus is bigger than or equal to 4,
+>> we will change ATUs assignment: ATU0 for CFG0, ATU1 for CFG1,
+>> ATU2 for MEM, ATU3 for IO.
+>>
+>> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+>> ---
+>>   .../devicetree/bindings/pci/designware-pcie.txt    |  1 +
+>>   drivers/pci/host/pcie-designware.c                 | 48 ++++++++++++++++------
+>>   drivers/pci/host/pcie-designware.h                 |  5 +++
+>>   3 files changed, 41 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+>> index 9f4faa8..500796e 100644
+>> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
+>> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+>> @@ -26,3 +26,4 @@ Optional properties:
+>>   - bus-range: PCI bus numbers covered (it is recommended for new devicetrees to
+>>     specify this property, to keep backwards compatibility a range of 0x00-0xff
+>>     is assumed if not present)
+>> +- num-atus: number of ATUs
+> This lacks documentation for the default value if not present.
+[Minghuan] I will add default value
+>> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+>> index dfed00a..b872dd0 100644
+>> --- a/drivers/pci/host/pcie-designware.c
+>> +++ b/drivers/pci/host/pcie-designware.c
+>> @@ -48,6 +48,8 @@
+>>   #define PCIE_ATU_VIEWPORT		0x900
+>>   #define PCIE_ATU_REGION_INBOUND		(0x1 << 31)
+>>   #define PCIE_ATU_REGION_OUTBOUND	(0x0 << 31)
+>> +#define PCIE_ATU_REGION_INDEX3		(0x3 << 0)
+>> +#define PCIE_ATU_REGION_INDEX2		(0x2 << 0)
+>>   #define PCIE_ATU_REGION_INDEX1		(0x1 << 0)
+>>   #define PCIE_ATU_REGION_INDEX0		(0x0 << 0)
+>>   #define PCIE_ATU_CR1			0x904
+>> @@ -346,7 +348,7 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>>   	struct of_pci_range range;
+>>   	struct of_pci_range_parser parser;
+>>   	struct resource *cfg_res;
+>> -	u32 val, na, ns;
+>> +	u32 num_atus, val, na, ns;
+>>   	const __be32 *addrp;
+>>   	int i, index, ret;
+>>   
+>> @@ -486,6 +488,18 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>>   		}
+>>   	}
+>>   
+>> +	if (of_property_read_u32(np, "num-atus", &num_atus))
+>> +		num_atus = 2;
+> You don't need this check. Just initialize num_atus to 2,
+> of_property_read_u32() won't touch the value if the property isn't
+> found.
+[Minghuan] Ok, I will change it.
+>> +	if (num_atus >= 4) {
+>> +		pp->atu_cfg0_idx = PCIE_ATU_REGION_INDEX0;
+>> +		pp->atu_cfg1_idx = PCIE_ATU_REGION_INDEX1;
+>> +		pp->atu_mem_idx = PCIE_ATU_REGION_INDEX2;
+>> +		pp->atu_io_idx = PCIE_ATU_REGION_INDEX3;
+>> +	} else {
+>> +		pp->atu_cfg0_idx = pp->atu_mem_idx = PCIE_ATU_REGION_INDEX0;
+>> +		pp->atu_cfg1_idx = pp->atu_io_idx = PCIE_ATU_REGION_INDEX1;
+>> +	}
+>> +
+>>   	if (pp->ops->host_init)
+>>   		pp->ops->host_init(pp);
+>>   
+>> @@ -511,8 +525,8 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>>   
+>>   static void dw_pcie_prog_viewport_cfg0(struct pcie_port *pp, u32 busdev)
+>>   {
+>> -	/* Program viewport 0 : OUTBOUND : CFG0 */
+>> -	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX0,
+>> +	/* Program viewport : OUTBOUND : CFG0 */
+>> +	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | pp->atu_cfg0_idx,
+>>   			  PCIE_ATU_VIEWPORT);
+>>   	dw_pcie_writel_rc(pp, pp->cfg0_mod_base, PCIE_ATU_LOWER_BASE);
+>>   	dw_pcie_writel_rc(pp, (pp->cfg0_mod_base >> 32), PCIE_ATU_UPPER_BASE);
+>> @@ -526,8 +540,8 @@ static void dw_pcie_prog_viewport_cfg0(struct pcie_port *pp, u32 busdev)
+>>   
+>>   static void dw_pcie_prog_viewport_cfg1(struct pcie_port *pp, u32 busdev)
+>>   {
+>> -	/* Program viewport 1 : OUTBOUND : CFG1 */
+>> -	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX1,
+>> +	/* Program viewport : OUTBOUND : CFG1 */
+>> +	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | pp->atu_cfg1_idx,
+>>   			  PCIE_ATU_VIEWPORT);
+>>   	dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_CFG1, PCIE_ATU_CR1);
+>>   	dw_pcie_writel_rc(pp, pp->cfg1_mod_base, PCIE_ATU_LOWER_BASE);
+>> @@ -541,8 +555,8 @@ static void dw_pcie_prog_viewport_cfg1(struct pcie_port *pp, u32 busdev)
+>>   
+>>   static void dw_pcie_prog_viewport_mem_outbound(struct pcie_port *pp)
+>>   {
+>> -	/* Program viewport 0 : OUTBOUND : MEM */
+>> -	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX0,
+>> +	/* Program viewport : OUTBOUND : MEM */
+>> +	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | pp->atu_mem_idx,
+>>   			  PCIE_ATU_VIEWPORT);
+>>   	dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_MEM, PCIE_ATU_CR1);
+>>   	dw_pcie_writel_rc(pp, pp->mem_mod_base, PCIE_ATU_LOWER_BASE);
+>> @@ -557,8 +571,8 @@ static void dw_pcie_prog_viewport_mem_outbound(struct pcie_port *pp)
+>>   
+>>   static void dw_pcie_prog_viewport_io_outbound(struct pcie_port *pp)
+>>   {
+>> -	/* Program viewport 1 : OUTBOUND : IO */
+>> -	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX1,
+>> +	/* Program viewport : OUTBOUND : IO */
+>> +	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | pp->atu_io_idx,
+>>   			  PCIE_ATU_VIEWPORT);
+>>   	dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_IO, PCIE_ATU_CR1);
+>>   	dw_pcie_writel_rc(pp, pp->io_mod_base, PCIE_ATU_LOWER_BASE);
+>> @@ -585,12 +599,14 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+>>   		dw_pcie_prog_viewport_cfg0(pp, busdev);
+>>   		ret = dw_pcie_cfg_read(pp->va_cfg0_base + address, where, size,
+>>   				val);
+>> -		dw_pcie_prog_viewport_mem_outbound(pp);
+>> +		if (pp->atu_mem_idx == pp->atu_cfg0_idx)
+>> +			dw_pcie_prog_viewport_mem_outbound(pp);
+>>   	} else {
+>>   		dw_pcie_prog_viewport_cfg1(pp, busdev);
+>>   		ret = dw_pcie_cfg_read(pp->va_cfg1_base + address, where, size,
+>>   				val);
+>> -		dw_pcie_prog_viewport_io_outbound(pp);
+>> +		if (pp->atu_io_idx == pp->atu_cfg1_idx)
+>> +			dw_pcie_prog_viewport_io_outbound(pp);
+>>   	}
+>>   
+>>   	return ret;
+>> @@ -610,12 +626,14 @@ static int dw_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+>>   		dw_pcie_prog_viewport_cfg0(pp, busdev);
+>>   		ret = dw_pcie_cfg_write(pp->va_cfg0_base + address, where, size,
+>>   				val);
+>> -		dw_pcie_prog_viewport_mem_outbound(pp);
+>> +		if (pp->atu_mem_idx == pp->atu_cfg0_idx)
+>> +			dw_pcie_prog_viewport_mem_outbound(pp);
+>>   	} else {
+>>   		dw_pcie_prog_viewport_cfg1(pp, busdev);
+>>   		ret = dw_pcie_cfg_write(pp->va_cfg1_base + address, where, size,
+>>   				val);
+>> -		dw_pcie_prog_viewport_io_outbound(pp);
+>> +		if (pp->atu_io_idx == pp->atu_cfg1_idx)
+>> +			dw_pcie_prog_viewport_io_outbound(pp);
+>>   	}
+>>   
+>>   	return ret;
+>> @@ -770,6 +788,10 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
+>>   	u32 membase;
+>>   	u32 memlimit;
+>>   
+>> +	/* set ATUs setting for MEM and IO */
+>> +	dw_pcie_prog_viewport_mem_outbound(pp);
+>> +	dw_pcie_prog_viewport_io_outbound(pp);
+>> +
+>>   	/* set the number of lanes */
+>>   	dw_pcie_readl_rc(pp, PCIE_PORT_LINK_CONTROL, &val);
+>>   	val &= ~PORT_LINK_MODE_MASK;
+>> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+>> index c625675..404f601 100644
+>> --- a/drivers/pci/host/pcie-designware.h
+>> +++ b/drivers/pci/host/pcie-designware.h
+>> @@ -53,6 +53,11 @@ struct pcie_port {
+>>   	struct irq_domain	*irq_domain;
+>>   	unsigned long		msi_data;
+>>   	DECLARE_BITMAP(msi_irq_in_use, MAX_MSI_IRQS);
+>> +	/* ATUs setting */
+>> +	u8			atu_cfg0_idx;
+>> +	u8			atu_cfg1_idx;
+>> +	u8			atu_mem_idx;
+>> +	u8			atu_io_idx;
+> I don't like those single values. Can we please make this an array
+> indexed by a proper enum? Like this:
 >
-> Initial revision of device tree for AMD Seattle platform
+> enum ATU_TYPE {
+> 	ATU_TYPE_CFG0 = 0,
+> 	ATU_TYPE_CFG1 = 1,
+> 	ATU_TYPE_MEM  = 2,
+> 	ATU_TYPE_IO   = 3,
+> 	ATU_TYPE_MAX
+> }
 >
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Signed-off-by: Thomas Lendacky <Thomas.Lendacky@amd.com>
-> Signed-off-by: Joel Schopp <Joel.Schopp@amd.com>
-> ---
-> Change in V3:
-> 	* Change sata compatible-id to "snps,dwc-ahci"
->
->   arch/arm64/Kconfig                          |   5 +
->   arch/arm64/boot/dts/Makefile                |   1 +
->   arch/arm64/boot/dts/amd-seattle-periph.dtsi | 164 ++++++++++++++++++++++++++++
->   arch/arm64/boot/dts/amd-seattle.dts         | 122 +++++++++++++++++++++
->   4 files changed, 292 insertions(+)
->   create mode 100644 arch/arm64/boot/dts/amd-seattle-periph.dtsi
->   create mode 100644 arch/arm64/boot/dts/amd-seattle.dts
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index ef8b4f2..83fa301 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -143,6 +143,11 @@ source "kernel/Kconfig.freezer"
->
->   menu "Platform selection"
->
-> +config ARCH_SEATTLE
-> +	bool "AMD Seattle SoC Family"
-> +	help
-> +	  This enables support for AMD Seattle SOC Family
-> +
->   config ARCH_THUNDER
->   	bool "Cavium Inc. Thunder SoC Family"
->   	help
-> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-> index f8001a6..604af09 100644
-> --- a/arch/arm64/boot/dts/Makefile
-> +++ b/arch/arm64/boot/dts/Makefile
-> @@ -1,3 +1,4 @@
-> +dtb-$(CONFIG_ARCH_SEATTLE) += amd-seattle.dtb
->   dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
->   dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
->   dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
-> diff --git a/arch/arm64/boot/dts/amd-seattle-periph.dtsi b/arch/arm64/boot/dts/amd-seattle-periph.dtsi
-> new file mode 100644
-> index 0000000..5a093a3
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/amd-seattle-periph.dtsi
-> @@ -0,0 +1,164 @@
-> +/*
-> + * DTS file for AMD Seattle Peripheral
-> + *
-> + * Copyright (C) 2014 Advanced Micro Devices, Inc.
-> + */
-> +
-> +motherboard {
-> +	compatible = "simple-bus";
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +	ranges;
-> +
-> +	adl3clk_100mhz: clk100mhz_0 {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <100000000>;
-> +		clock-output-names = "adl3clk_100mhz";
-> +	};
-> +
-> +	ccpclk_375mhz: clk375mhz {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <375000000>;
-> +		clock-output-names = "ccpclk_375mhz";
-> +	};
-> +
-> +	sataclk_333mhz: clk333mhz {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <333000000>;
-> +		clock-output-names = "sataclk_333mhz";
-> +	};
-> +
-> +	pcieclk_500mhz: clk500mhz_0 {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <500000000>;
-> +		clock-output-names = "pcieclk_500mhz";
-> +	};
-> +
-> +	dmaclk_500mhz: clk500mhz_1 {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <500000000>;
-> +		clock-output-names = "dmaclk_500mhz";
-> +	};
-> +
-> +	miscclk_250mhz: clk250mhz_4 {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <250000000>;
-> +		clock-output-names = "miscclk_250mhz";
-> +	};
-> +
-> +	uartspiclk_100mhz: clk100mhz_1 {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <100000000>;
-> +		clock-output-names = "uartspiclk_100mhz";
-> +	};
-> +
-> +	dma0: dma at 0500000 {
-> +		compatible = "arm,pl330", "arm,primecell";
-> +		reg = <0 0x0500000 0 0x1000>;
-> +		interrupts =
-> +			<0 368 4>,
-> +			<0 369 4>,
-> +			<0 370 4>,
-> +			<0 371 4>,
-> +			<0 372 4>,
-> +			<0 373 4>,
-> +			<0 374 4>,
-> +			<0 375 4>;
-> +		clocks = <&dmaclk_500mhz>;
-> +		clock-names = "apb_pclk";
-> +		#dma-cells = <1>;
-> +	};
-> +
-> +	sata0: sata at 00300000 {
-> +		compatible = "snps,dwc-ahci";
-> +		reg = <0 0x300000 0 0x800>;
-> +		interrupts = <0 355 4>;
-> +		clocks = <&sataclk_333mhz>;
-> +		clock-names = "apb_pclk";
-> +		dma-coherent;
-> +	};
-> +
-> +	i2c at 1000000 {
-> +		compatible = "snps,designware-i2c";
-> +		reg = <0 0x01000000 0 0x1000>;
-> +		interrupts = <0 357 4>;
-> +		clocks = <&uartspiclk_100mhz>;
-> +		clock-names = "apb_pclk";
-> +	};
-> +
-> +	serial0: serial at 1010000 {
-> +		compatible = "arm,pl011", "arm,primecell";
-> +		reg = <0 0x1010000 0 0x1000>;
-> +		interrupts = <0 328 4>;
-> +		clocks = <&uartspiclk_100mhz>, <&uartspiclk_100mhz>;
-> +		clock-names = "uartclk", "apb_pclk";
-> +	};
-> +
-> +	ssp at 1020000 {
-> +		compatible = "arm,pl022", "arm,primecell";
-> +		#gpio-cells = <2>;
-> +		reg = <0 0x1020000 0 0x1000>;
-> +		spi-controller;
-> +		interrupts = <0 330 4>;
-> +		clocks = <&uartspiclk_100mhz>;
-> +		clock-names = "apb_pclk";
-> +	};
-> +
-> +	ssp at 1030000 {
-> +		compatible = "arm,pl022", "arm,primecell";
-> +		#gpio-cells = <2>;
-> +		reg = <0 0x1030000 0 0x1000>;
-> +		spi-controller;
-> +		interrupts = <0 329 4>;
-> +		clocks = <&uartspiclk_100mhz>;
-> +		clock-names = "apb_pclk";
-> +		num-cs = <1>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		sdcard at 0 {
-> +			compatible = "mmc-spi-slot";
-> +			reg = <0>;
-> +			spi-max-frequency = <20000000>;
-> +			pl022,hierarchy = <0>;
-> +			pl022,interface = <0>;
-> +			pl022,com-mode = <0x0>;
-> +			pl022,rx-level-trig = <0>;
-> +			pl022,tx-level-trig = <0>;
-> +		};
-> +	};
-> +
-> +	gpio0: gpio at 1040000 {
-> +		compatible = "arm,pl061", "arm,primecell";
-> +		#gpio-cells = <2>;
-> +		reg = <0 0x1040000 0 0x1000>;
-> +		gpio-controller;
-> +		interrupts = <0 359 4>;
-> +		clocks = <&uartspiclk_100mhz>;
-> +		clock-names = "apb_pclk";
-> +	};
-> +
-> +	gpio1: gpio at 1050000 {
-> +		compatible = "arm,pl061", "arm,primecell";
-> +		#gpio-cells = <2>;
-> +		reg = <0 0x1050000 0 0x1000>;
-> +		gpio-controller;
-> +		interrupts = <0 358 4>;
-> +		clocks = <&uartspiclk_100mhz>;
-> +		clock-names = "apb_pclk";
-> +	};
-> +
-> +	ccp: ccp at 00100000 {
-> +		compatible = "amd,ccp-seattle-v1a";
-> +		reg = <0 0x00100000 0 0x10000>;
-> +		interrupts = <0 3 4>;
-> +		dma-coherent;
-> +	};
-> +};
-> diff --git a/arch/arm64/boot/dts/amd-seattle.dts b/arch/arm64/boot/dts/amd-seattle.dts
-> new file mode 100644
-> index 0000000..726e444
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/amd-seattle.dts
-> @@ -0,0 +1,122 @@
-> +/*
-> + * DTS file for AMD Seattle
-> + *
-> + * Copyright (C) 2014 Advanced Micro Devices, Inc.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +/ {
-> +	compatible = "amd,seattle";
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	chosen {
-> +		stdout-path = &serial0;
-> +		linux,pci-probe-only;
-> +	};
-> +
-> +	gic: interrupt-controller at e1101000 {
-> +		compatible = "arm,gic-400", "arm,cortex-a15-gic";
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		reg = <0x0 0xe1110000 0 0x1000>,
-> +		      <0x0 0xe112f000 0 0x2000>,
-> +		      <0x0 0xe1140000 0 0x10000>,
-> +		      <0x0 0xe1160000 0 0x10000>;
-> +		interrupts = <1 8 0xf04>;
-> +		ranges;
-> +		v2m0: v2m at e1180000 {
-> +			compatible = "arm,gic-v2m-frame";
-> +			msi-controller;
-> +			arm,msi-base-spi = <64>;
-> +			arm,msi-num-spis = <256>;
-> +			reg = <0x0 0xe1180000 0 0x1000>;
-> +		};
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupts = <1 13 0xff01>,
-> +			     <1 14 0xff01>,
-> +			     <1 11 0xff01>,
-> +			     <1 10 0xff01>;
-> +	};
-> +
-> +	pmu {
-> +		compatible = "arm,armv8-pmuv3";
-> +		interrupts = <0 7 4>,
-> +			     <0 8 4>,
-> +			     <0 9 4>,
-> +			     <0 10 4>,
-> +			     <0 11 4>,
-> +			     <0 12 4>,
-> +			     <0 13 4>,
-> +			     <0 14 4>;
-> +	};
-> +
-> +	/* This entry is modified by UEFI */
-> +	pcie0: pcie-controller{
-> +		compatible = "pci-host-ecam-generic";
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		device_type = "pci";
-> +		bus-range = <0 0xff>;
-> +		reg = <0 0xf0000000 0 0x10000000>;
-> +		dma-coherent;
-> +		msi-parent = <&v2m0>;
-> +
-> +		interrupts =
-> +			<0 320 4>, /* ioc_soc_serr */
-> +			<0 321 4>; /* ioc_soc_sci */
-> +
-> +		ranges =
-> +			/* I/O Memory (size=64K) */
-> +			<0x01000000 0x00 0xefff0000 0x00 0xefff0000 0x00 0x00010000>,
-> +
-> +			/* Non-Pref 32-bit MMIO (size=512M) */
-> +			<0x02000000 0x00 0x40000000 0x00 0x40000000 0x00 0x20000000>,
-> +
-> +			/* Non-Pref 32-bit MMIO (size=512M) */
-> +			<0x02000000 0x00 0x60000000 0x00 0x60000000 0x00 0x20000000>,
-> +
-> +			/* Non-Pref 32-bit MMIO (size=512M) */
-> +			<0x02000000 0x00 0x80000000 0x00 0x80000000 0x00 0x20000000>,
-> +
-> +			/* Non-Pref 32-bit MMIO (size=512M) */
-> +			<0x02000000 0x00 0xa0000000 0x00 0xa0000000 0x00 0x20000000>,
-> +
-> +			/* Pref 64-bit MMIO (size= 4G) */
-> +			<0x43000000 0x01 0x00000000 0x01 0x00000000 0x01 0x00000000>,
-> +
-> +			/* Pref 64-bit MMIO (size= 8G) */
-> +			<0x43000000 0x02 0x00000000 0x02 0x00000000 0x02 0x00000000>,
-> +
-> +			/* Pref 64-bit MMIO (size=16G) */
-> +			<0x43000000 0x04 0x00000000 0x04 0x00000000 0x04 0x00000000>,
-> +
-> +			/* Pref 64-bit MMIO (size=32G) */
-> +			<0x43000000 0x08 0x00000000 0x08 0x00000000 0x08 0x00000000>,
-> +
-> +			/* Pref 64-bit MMIO (size=64G) */
-> +			<0x43000000 0x10 0x00000000 0x10 0x00000000 0x10 0x00000000>,
-> +
-> +			/* Pref 64-bit MMIO (size=128G) */
-> +			<0x43000000 0x20 0x00000000 0x20 0x00000000 0x20 0x00000000>,
-> +
-> +			/* Pref 64-bit MMIO (size=256G) */
-> +			<0x43000000 0x40 0x00000000 0x40 0x00000000 0x40 0x00000000>;
-> +	};
-> +
-> +	smb {
-> +		compatible = "simple-bus";
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges = <0 0 0 0xE0000000 0 0x01300000>;
-> +
-> +		/include/ "amd-seattle-periph.dtsi"
-> +	};
-> +};
->
+> u8	atu_idx[ATU_TYPE_MAX];
+[Minghuan] Great. it's better to use array.
