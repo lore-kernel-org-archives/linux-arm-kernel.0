@@ -1,33 +1,44 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 11 Nov 2014 09:15:08 +0900
-Subject: [PATCH v3/resend] ARM: shmobile: Add early debugging support
- using SCIF(A)
-In-Reply-To: <CAMuHMdUcZYTz4uLn4G9CECT5ZuKtHJuDZzR0WrzR3oo8qD3cfA@mail.gmail.com>
-References: <1415273910-32356-1-git-send-email-geert+renesas@glider.be>
- <3499638.LG41cHl0JS@wuerfel>
- <CAMuHMdUU7XK57a70HWP0+nfwaZ-sXQ5EC2CShgmxwx6JKnuyPQ@mail.gmail.com>
- <20777697.th35W64j5e@wuerfel> <20141110005944.GE16836@verge.net.au>
- <CAMuHMdUcZYTz4uLn4G9CECT5ZuKtHJuDZzR0WrzR3oo8qD3cfA@mail.gmail.com>
-Message-ID: <20141111001507.GB29665@verge.net.au>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 11 Nov 2014 01:40:29 +0100
+Subject: [PATCH v7 0/5] This is the 1st version of suspend for RK3288.
+In-Reply-To: <7hwq76pqyz.fsf@deeprootsystems.com>
+References: <1415368177-6637-1-git-send-email-zyw@rock-chips.com>
+ <7hwq76pqyz.fsf@deeprootsystems.com>
+Message-ID: <22835729.YDXmW0qp6M@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 10, 2014 at 09:03:23AM +0100, Geert Uytterhoeven wrote:
-> On Mon, Nov 10, 2014 at 1:59 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Thu, Nov 06, 2014 at 02:26:45PM +0100, Arnd Bergmann wrote:
-> >> On Thursday 06 November 2014 13:33:58 Geert Uytterhoeven wrote:
-> >> > On Thu, Nov 6, 2014 at 12:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> > > On Thursday 06 November 2014 12:38:30 Geert Uytterhoeven wrote:
-> >> > >> Add serial port debug macros for the SCIF(A) serial ports.
-> >> > >> This includes all shmobile SoCs, except for EMEV2.
-> >> >
-> >> > > I don't object to this patch going in, but have you looked at doing
-> >> > > just earlycon instead? We are still missing some fixmap changes
-> 
-> > This patch feels like is is ready for me to queue up.
-> > Is that the consensus here?
-> 
-> Please wait for v3, which will get rid of the multi-level choice statements,
-> as requested by Arnd.
+Hi Chris,
 
-Sure, will do.
+Am Freitag, 7. November 2014, 14:48:20 schrieb Kevin Hilman:
+> Chris Zhong <zyw@rock-chips.com> writes:
+> > RK3288 can shut down the cpu, gpu and other device controllers in suspend,
+> > and it will pull the GLOBAL_PWROFF pin to high in the final stage of the
+> > process of suspend, pull the pin to low again when resume.
+> 
+> The cover letter still doesn't state what this series applies to, or
+> what its dependencies are for testing, even though it was requested in
+> earlier reviews[1].  I discovered (again) by trial and error it applies
+> to current linux-next.  I also discovered (as was earlier discussed[2])
+> that it still does not resume using current upstream code, and those
+> dependencies are not described here either.  These are the kinds of
+> things that are crucial in a cover letter in order to help reviewers and
+> testers not have to spend time digging through the archives trying to
+> remember from the previous round of reviews.
+> 
+> Please, please list the out-of-tree dependencies, and how to test,
+> including how you tested it, and on what hardware.
+
+I'll second what Kevin said.
+
+I guess the regulator suspend handling [0] is one of the requirements, but I'd 
+think there is more. And while Doug had a quite long list of suspend-related 
+patches in his try, for now we'll need the minimal set to enable this series 
+to sucessfully wake the system again after going to suspend.
+
+
+Heiko
+
+
+[0] 
+https://git.kernel.org/cgit/linux/kernel/git/broonie/regulator.git/log/?h=topic/suspend
