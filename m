@@ -1,85 +1,91 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 11 Nov 2014 09:40:49 +0100
-Subject: [PATCH 0/3] Add support for Tegra Activity Monitor
-In-Reply-To: <546190BA.7050502@nvidia.com>
-References: <1414594232-15684-1-git-send-email-tomeu.vizoso@collabora.com>
- <545C8BCC.3090908@nvidia.com> <545CBC87.7050404@collabora.com>
- <546190BA.7050502@nvidia.com>
-Message-ID: <CAAObsKB9xxS5C7VsP9cBGYDB5ArhbLM0nKEPk8yqWX=iwqcj7A@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 11 Nov 2014 09:52:47 +0100
+Subject: [PATCH] mmc: dw_mmc: try pick the exact same voltage as vmmc for
+ vqmmc
+In-Reply-To: <1415678573-6093-1-git-send-email-addy.ke@rock-chips.com>
+References: <1415109789-7046-1-git-send-email-addy.ke@rock-chips.com>
+ <1415678573-6093-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <CAPDyKFqUoBjhsbz8rkLa9PY_dpgMxnimz3k7OoA5WVhi7MacPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 November 2014 05:29, Alexandre Courbot <acourbot@nvidia.com> wrote:
-> On 11/07/2014 09:35 PM, Tomeu Vizoso wrote:
->>
->> On 11/07/2014 10:07 AM, Alexandre Courbot wrote:
->>>
->>> On 10/29/2014 11:50 PM, Tomeu Vizoso wrote:
->>>>
->>>> Hello,
->>>>
->>>> these patches implement support for setting the rate of the EMC clock
->>>> based on
->>>> stats collected from the ACTMON, a piece of hw in the Tegra124 that
->>>> counts
->>>> memory accesses (among others).
->>>>
->>>> It depends on the following in-flight patches:
->>>>
->>>> * MC driver: http://thread.gmane.org/gmane.linux.ports.tegra/19623
->>>> * EMC driver:
->>>> http://thread.gmane.org/gmane.linux.ports.arm.kernel/365125
->>>> * CPUFreq driver: http://thread.gmane.org/gmane.linux.kernel/1812962
->>>>
->>>> I have pushed a branch here for testing:
->>>
->>>
->>> I am not too familiar with DVFS, but after going through this series it
->>> really seems to me that this could use devfreq. In its current form this
->>> driver mixes control and policy and lacks flexibility, preventing e.g.
->>> to switch to a performance or power-saving profile. Could you study the
->>> feasibility of using devfreq for this?
->>
->>
->> Yeah, I started writing a devfreq driver, but then I looked in more
->> detail to the downstream driver and realized that most of the
->> functionality that devfreq provides overlaps with the hw.
->>
->> The ACTMON can be configured to fire an interrupt when a set of
->> thresholds are crossed, similar to the simple-ondemand governor but a
->> bit more sophisticated.
->
->
-> I think (after a quick look at devfreq's source) that you can avoid polling
-> altogether if you set polling_ms to 0 in your devfreq_dev_profile instance.
-> Then it is up to you to call update_devfreq() from your custom governor
-> whenever it sees fit.
->
-> ACTMON support seems to overlap between being a governor (which reacts to
-> ACTMON interrupts and calls update_devfreq() when needed) and part of a
-> devfreq_dev_profile (get_dev_status() needs to use the actmon counters). If
-> we keep your current design where the driver simply controls a clock, you
-> could have the ACTMON driver obtain that clock, register its governor,
-> create a non-polling devfreq_dev_profile that controls that clock, and just
-> call devfreq_add_device() with both. Then we will have the benefit of being
-> able to use ACTMON as well as the performance and powersave governors on
-> EMC, and switch policies dynamically.
->
-> Another benefit is that you will have a placeholder in the governor to
-> implement suspend/resume for the ACTMON IP, in case this becomes necessary
-> in the future.
->
-> Do you think that would work? Apart from the polling which doesn't seem to
-> be an issue, have you seen any other redundancy between devfreq and ACTMON?
+On 11 November 2014 05:02, Addy Ke <addy.ke@rock-chips.com> wrote:
+> SD2.0 cards need vqmmc and vmmc to be the same.
 
-I don't think there's any obstacle to having this as a devfreq driver,
-it's just that it won't use much/any functionality of it so I don't
-really see the point.
+No, that's not correct.
 
-I think it will be better if I send a version of the driver that uses
-the devfreq framework, so we can better compare (and maybe I will
-change my opinion).
+If I remember the spec correctly, the bus signal threshold is 0.75 * VDD.
 
-Regards,
+> But vqmmc call regulator_set_voltage to set min_uv(2.7v) as far as possible.
 
-Tomeu
+I guess you want to do that to save as much power as possible.
+
+> So if we set vmmc 3.3V in dt table, we will get error information as follows:
+>
+> [   17.785398] mmc_host mmc1: Bus speed (slot 0) = 50000000Hz (slot req
+> 50000000Hz, actual 50000000HZ div = 0)
+> [   17.795175] mmc1: new high speed SDHC card at address e624
+> [   17.801283] mmcblk1: mmc1:e624 SU08G 7.40 GiB
+> [   17.816033]  mmcblk1: p1
+> [   17.839318] mmcblk1: error -110 sending status command, retrying
+> [   17.845363] mmcblk1: error -115 sending stop command, original cmd
+> response 0x900, card status 0x800b00
+> [   17.854758] mmcblk1: error -84 transferring data, sector 32, nr 24,
+> cmd response 0x900, card status 0xb00
+> [   17.864328] mmcblk1: retrying using single block read
+> [   17.873647] mmcblk1: error -110 sending status command, retrying
+> [   17.879660] mmcblk1: error -84 transferring data, sector 44, nr 12,
+> cmd response 0x900, card status 0x0
+> [   17.889051] end_request: I/O error, dev mmcblk1, sector 44
+> [   17.895594] Buffer I/O error on device mmcblk1, logical block 5
+> [   17.902484] mmcblk1: error -110 sending status command, retrying
+> [   17.908498] mmcblk1: error -84 transferring data, sector 50, nr 6,
+> cmd response 0x900, card status 0x0
+> [   17.917802] end_request: I/O error, dev mmcblk1, sector 50
+> [   17.924984] Buffer I/O error on device mmcblk1, logical block 6
+> [   18.431258] mmc_host mmc1: Timeout sending command (cmd 0x200000 arg
+> 0x0 status 0x80200000)
+>
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> ---
+>  drivers/mmc/host/dw_mmc.c | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index b4c3044..a8b70b5 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -1163,8 +1163,14 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
+>          */
+>         uhs = mci_readl(host, UHS_REG);
+>         if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
+> -               min_uv = 2700000;
+> -               max_uv = 3600000;
+> +               /* try pick the exact same voltage as vmmc for vqmmc */
+
+This seems like a generic SD protocol issue.
+
+Should we maybe provide some helper function from the mmc core, which
+in principle take the negotiated card->ocr into account while
+calculating the signal voltage level. Typically min_uv should be 0.75
+x (card->ocr), for these cases.
+
+Comments?
+
+> +               if (!IS_ERR(mmc->supply.vmmc)) {
+> +                       min_uv = regulator_get_voltage(mmc->supply.vmmc);
+> +                       max_uv = min_uv;
+> +               } else {
+> +                       min_uv = 2700000;
+> +                       max_uv = 3600000;
+> +               }
+>                 uhs &= ~v18;
+>         } else {
+>                 min_uv = 1700000;
+> --
+> 1.8.3.2
+>
+>
+
+Kind regards
+Uffe
