@@ -1,100 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 11 Nov 2014 09:14:29 -0800
-Subject: [GIT PULL 2/2] omap prcm clean-up for v3.19
-In-Reply-To: <pull-1415725783-562282>
-References: <pull-1415725783-562282>
-Message-ID: <pull-1415725783-562282-2>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Tue, 11 Nov 2014 17:32:09 +0000
+Subject: [PATCH v3 0/2] arm64: Add support for Juno development board
+Message-ID: <1415727131-4572-1-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+Hi,
 
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+This patchset adds device tree support for ARM's AArch64 Juno development
+board. It enables use of various peripherals on the board, from USB and
+networking to I2C and PL011 UART.
 
-are available in the git repository at:
+The patches can also be found in the repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.19/prcm-cleanup
+   git://github.com/ARM-software/linux.git juno/dts-for-armsoc
 
-for you to fetch changes up to 61c8621e2bd14faad9b89ab2284955b28000bcd5:
+for you to fetch.
 
-  ARM: OMAP2+: PRM: provide generic API for system reset (2014-10-27 08:39:26 -0700)
 
-----------------------------------------------------------------
-Clean-up series for omap PRCM (Power Reset Clock Module) from
-Tero Kristo to move things a bit closer to becoming a proper
-device driver.
+Changes vs v2:
+  - rebased on top of arm-soc/next/cleanup
+  - Split the flat device tree into several files. Although some
+    commonality still remains in the main .dts file with other
+    devices trees (see psci node) it is not clear what benefits can
+    be gained from moving such a small node into its own file.
+  - Ordered nodes according to their address space
+  - Removed ulpi_phy node as it was redundant and the bindings non-standard.
 
-----------------------------------------------------------------
-Tero Kristo (26):
-      ARM: DRA7: PRM: add voltage processor check behind a prm_feature flag
-      ARM: AM43XX: PRM: use OMAP4 PRM driver
-      ARM: OMAP2/3: hwmod: merge wait_target_ready functions for omap2/3
-      ARM: AM33xx/OMAP4+: CM: remove cdoffs parameter from wait_module_idle/ready
-      ARM: OMAP4/AM33xx: add cm_init / cm_exit calls for AM33xx and OMAP4+
-      ARM: OMAP2+: CM: add common API for cm_wait_module_ready
-      ARM: OMAP4+/AM33xx: CM: add common API for cm_wait_module_idle
-      ARM: OMAP2+: CM: make clkdm_hwsup operations static
-      ARM: OMAP2+: CM: add common APIs for cm_module_enable/disable
-      ARM: OMAP2/3: CM: make cm_split_idlest_reg SoC calls static
-      ARM: AM33xx: hwmod: remove am33xx specific module SoC opts
-      ARM: AM43xx: hwmod: use OMAP4 hardreset ops instead of the AM33xx version
-      ARM: AM33xx: PRM: add support for prm_init
-      ARM: OMAP2+: PRM: add generic API for asserting hardware reset
-      ARM: OMAP2+: PRM: add generic API for deasserting hardware reset
-      ARM: OMAP2+: PRM: add generic API for checking hardreset status
-      ARM: OMAP4: CM: move public definitions from cminst44xx.h to cm44xx.h
-      ARM: OMAP4: CM: make cminst direct register access functions static
-      ARM: OMAP4+: CM: remove omap4_cm1/cm2_* functions
-      ARM: AM33xx: PRM: move global warm reset implementation to driver
-      ARM: AM33xx: PRM: make direct register access functions static
-      ARM: OMAP4: PRM: make omap4_prm_read/write_inst_reg calls static
-      ARM: OMAP3: PRM: make PRCM interrupt handler related functions static
-      ARM: OMAP4: PRM: make PRCM interrupt handler related functions static
-      ARM: OMAP3+: PRM: add generic API for reconfiguring I/O chain
-      ARM: OMAP2+: PRM: provide generic API for system reset
+v2 version: http://lkml.org/lkml/2014/11/10/242
 
- arch/arm/mach-omap2/Makefile         |   2 +-
- arch/arm/mach-omap2/am33xx-restart.c |  12 +-
- arch/arm/mach-omap2/clock.c          |   3 +-
- arch/arm/mach-omap2/cm.h             |  18 ++-
- arch/arm/mach-omap2/cm1_44xx.h       |   2 -
- arch/arm/mach-omap2/cm1_54xx.h       |   2 -
- arch/arm/mach-omap2/cm1_7xx.h        |   2 -
- arch/arm/mach-omap2/cm2_44xx.h       |   2 -
- arch/arm/mach-omap2/cm2_54xx.h       |   2 -
- arch/arm/mach-omap2/cm2_7xx.h        |   2 -
- arch/arm/mach-omap2/cm2xxx.c         |  17 ++-
- arch/arm/mach-omap2/cm2xxx.h         |  10 +-
- arch/arm/mach-omap2/cm33xx.c         |  61 ++++++---
- arch/arm/mach-omap2/cm33xx.h         |  37 +-----
- arch/arm/mach-omap2/cm3xxx.c         |  19 +--
- arch/arm/mach-omap2/cm3xxx.h         |  12 --
- arch/arm/mach-omap2/cm44xx.c         |  49 -------
- arch/arm/mach-omap2/cm44xx.h         |   3 +
- arch/arm/mach-omap2/cm_44xx_54xx.h   |  36 -----
- arch/arm/mach-omap2/cm_common.c      |  82 +++++++++++-
- arch/arm/mach-omap2/cminst44xx.c     |  80 ++++++-----
- arch/arm/mach-omap2/cminst44xx.h     |  43 ------
- arch/arm/mach-omap2/io.c             |  11 +-
- arch/arm/mach-omap2/omap2-restart.c  |   5 +-
- arch/arm/mach-omap2/omap3-restart.c  |   7 +-
- arch/arm/mach-omap2/omap4-restart.c  |   6 +-
- arch/arm/mach-omap2/omap_hwmod.c     | 248 ++++++++---------------------------
- arch/arm/mach-omap2/prm.h            |  16 +++
- arch/arm/mach-omap2/prm2xxx.c        |   6 +-
- arch/arm/mach-omap2/prm2xxx.h        |   1 -
- arch/arm/mach-omap2/prm2xxx_3xxx.c   |  19 ++-
- arch/arm/mach-omap2/prm2xxx_3xxx.h   |   9 +-
- arch/arm/mach-omap2/prm33xx.c        |  64 +++++++--
- arch/arm/mach-omap2/prm33xx.h        |  11 +-
- arch/arm/mach-omap2/prm3xxx.c        |  32 ++---
- arch/arm/mach-omap2/prm3xxx.h        |  16 ---
- arch/arm/mach-omap2/prm44xx.c        |  36 +++--
- arch/arm/mach-omap2/prm44xx_54xx.h   |  19 ---
- arch/arm/mach-omap2/prm_common.c     |  99 ++++++++++++++
- arch/arm/mach-omap2/prminst44xx.c    |  10 +-
- arch/arm/mach-omap2/prminst44xx.h    |   5 +-
- 41 files changed, 530 insertions(+), 586 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/cm44xx.c
- delete mode 100644 arch/arm/mach-omap2/cm_44xx_54xx.h
- delete mode 100644 arch/arm/mach-omap2/cminst44xx.h
+Best regards,
+Liviu
+
+Liviu Dudau (2):
+  arm64: Create link to include/dt-bindings to enable C preprocessor
+    use.
+  arm64: Add Juno board device tree.
+
+ arch/arm64/boot/dts/arm/Makefile              |   1 +
+ arch/arm64/boot/dts/arm/juno-clocks.dtsi      |  45 ++++++
+ arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 129 +++++++++++++++
+ arch/arm64/boot/dts/arm/juno.dts              | 218 ++++++++++++++++++++++++++
+ arch/arm64/boot/dts/include/dt-bindings       |   1 +
+ 5 files changed, 394 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/arm/juno-clocks.dtsi
+ create mode 100644 arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+ create mode 100644 arch/arm64/boot/dts/arm/juno.dts
+ create mode 120000 arch/arm64/boot/dts/include/dt-bindings
+
+-- 
+2.1.3
