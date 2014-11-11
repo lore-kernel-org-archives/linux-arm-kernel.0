@@ -1,48 +1,374 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 11 Nov 2014 21:34:26 +0100
-Subject: [PATCH v2 1/2] of/fdt: export fdt blob as /sys/firmware/fdt
-In-Reply-To: <CACxGe6tsLr52ZLww2JfwHFHajHW+f6nbYJPyWXmZJg3coKmMCA@mail.gmail.com>
-References: <1415645222-14909-1-git-send-email-ard.biesheuvel@linaro.org>
- <1415645222-14909-2-git-send-email-ard.biesheuvel@linaro.org>
- <20141111144221.5FCDAC416AF@trevor.secretlab.ca>
- <CAL_JsqKeG1dWrMZydCN119V3++WKXqsjMm1bG7Fodhf3O8owpw@mail.gmail.com>
- <CACxGe6tsLr52ZLww2JfwHFHajHW+f6nbYJPyWXmZJg3coKmMCA@mail.gmail.com>
-Message-ID: <CAKv+Gu-UOPMaGQ+eRu8TX4DX_AN93JHt9dFHSaWs9+UB3UhdAg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 11 Nov 2014 12:49:30 -0800
+Subject: [PATCH] ARM: dts: tegra: move serial aliases to per-board
+Message-ID: <1415738970-7963-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 November 2014 21:08, Grant Likely <grant.likely@linaro.org> wrote:
-> On Tue, Nov 11, 2014 at 4:25 PM, Rob Herring <robherring2@gmail.com> wrote:
->> On Tue, Nov 11, 2014 at 8:42 AM, Grant Likely <grant.likely@linaro.org> wrote:
->>> On Mon, 10 Nov 2014 19:47:01 +0100
->>> , Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>  wrote:
->>>> Create a new /sys entry '/sys/firmware/fdt' to export the FDT blob
->>>> that was passed to the kernel by the bootloader. This allows userland
->>>> applications such as kexec to access the raw binary. The blob needs to
->>>> be preserved as early as possible by calling preserve_fdt().
->>>>
->>>> The fact that this node does not reside under /sys/firmware/device-tree
->>>> is deliberate: FDT is also used on arm64 UEFI/ACPI systems to
->>>> communicate just the UEFI and ACPI entry points, but the FDT is never
->>>> unflattened and used to configure the system.
->>>>
->>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>
->>> On further thought, nak. I want tree modifications to be treated as
->>> bugs. Do a checksum CRC32 or check. It's simpler and it can be extended
->>> to us an in-blob CRC when the file format gets upreved to include one.
->>
->> Why? MIPS Octeon is full of them BTW. So the rule is any modifications
->> or fixups have to be on the unflattened tree?
->
-> That, or we require the fixups to explicitly clean up the CRC after
-> themselves. That will force them to be visible. Anything using the
-> fdt_*() write functions could potentially take care of it
-> automatically. That would make it immediately discoverable where
-> changes are being made in the tree.
->
+There are general changes pending to make the /aliases/serial* entries
+number the serial ports on the system. On tegra, so far the ports have been
+just numbered dynamically as they are configured so that makes them change.
 
-Doesn't that defeat the purpose of capturing the FDT as it was passed
-by the bootloader? Those fixups will be reapplied by the kexec'ed
-kernel anyway.
+To avoid this, add specific aliases per board to keep the old numbers. This
+allows us to change the numbering by default on future SoCs while keeping the
+numbering on existing boards.
+
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+
+Stephen/Thierry/Alex, as noticed this week we really should try to get
+this in before the 3.19 merge window so that the global aliases change
+can happen there without regression.
+
+If you have more fixes queued up, feel free to add this to the next pull
+request. If not, a review and ack would be appreciated.
+
+ arch/arm/boot/dts/tegra114-dalmore.dts        |    1 +
+ arch/arm/boot/dts/tegra114-roth.dts           |    4 ++++
+ arch/arm/boot/dts/tegra114-tn7.dts            |    4 ++++
+ arch/arm/boot/dts/tegra114.dtsi               |    7 -------
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts     |    1 +
+ arch/arm/boot/dts/tegra124-nyan-big.dts       |    1 +
+ arch/arm/boot/dts/tegra124-venice2.dts        |    1 +
+ arch/arm/boot/dts/tegra124.dtsi               |    7 -------
+ arch/arm/boot/dts/tegra20-harmony.dts         |    1 +
+ arch/arm/boot/dts/tegra20-iris-512.dts        |    5 +++++
+ arch/arm/boot/dts/tegra20-medcom-wide.dts     |    4 ++++
+ arch/arm/boot/dts/tegra20-paz00.dts           |    2 ++
+ arch/arm/boot/dts/tegra20-seaboard.dts        |    1 +
+ arch/arm/boot/dts/tegra20-tamonten.dtsi       |    1 +
+ arch/arm/boot/dts/tegra20-trimslice.dts       |    1 +
+ arch/arm/boot/dts/tegra20-ventana.dts         |    1 +
+ arch/arm/boot/dts/tegra20-whistler.dts        |    1 +
+ arch/arm/boot/dts/tegra20.dtsi                |    8 --------
+ arch/arm/boot/dts/tegra30-apalis-eval.dts     |    4 ++++
+ arch/arm/boot/dts/tegra30-beaver.dts          |    1 +
+ arch/arm/boot/dts/tegra30-cardhu.dtsi         |    2 ++
+ arch/arm/boot/dts/tegra30-colibri-eval-v3.dts |    3 +++
+ arch/arm/boot/dts/tegra30.dtsi                |    8 --------
+ 23 files changed, 39 insertions(+), 30 deletions(-)
+
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+index 5c21d21..8b7aa0d 100644
+--- a/arch/arm/boot/dts/tegra114-dalmore.dts
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -15,6 +15,7 @@
+ 	aliases {
+ 		rtc0 = "/i2c at 7000d000/tps65913 at 58";
+ 		rtc1 = "/rtc at 7000e000";
++		serial0 = &uartd;
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/tegra114-roth.dts b/arch/arm/boot/dts/tegra114-roth.dts
+index c7c6825..a80f1e2 100644
+--- a/arch/arm/boot/dts/tegra114-roth.dts
++++ b/arch/arm/boot/dts/tegra114-roth.dts
+@@ -15,6 +15,10 @@
+ 		linux,initrd-end = <0x82800000>;
+ 	};
+ 
++	aliases {
++		serial0 = &uartd;
++	};
++
+ 	firmware {
+ 		trusted-foundations {
+ 			compatible = "tlm,trusted-foundations";
+diff --git a/arch/arm/boot/dts/tegra114-tn7.dts b/arch/arm/boot/dts/tegra114-tn7.dts
+index 9636621..2301c66 100644
+--- a/arch/arm/boot/dts/tegra114-tn7.dts
++++ b/arch/arm/boot/dts/tegra114-tn7.dts
+@@ -15,6 +15,10 @@
+ 		linux,initrd-end = <0x82800000>;
+ 	};
+ 
++	aliases {
++		serial0 = &uartd;
++	};
++
+ 	firmware {
+ 		trusted-foundations {
+ 			compatible = "tlm,trusted-foundations";
+diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+index 2ca9c18..222f3b3 100644
+--- a/arch/arm/boot/dts/tegra114.dtsi
++++ b/arch/arm/boot/dts/tegra114.dtsi
+@@ -9,13 +9,6 @@
+ 	compatible = "nvidia,tegra114";
+ 	interrupt-parent = <&gic>;
+ 
+-	aliases {
+-		serial0 = &uarta;
+-		serial1 = &uartb;
+-		serial2 = &uartc;
+-		serial3 = &uartd;
+-	};
+-
+ 	host1x at 50000000 {
+ 		compatible = "nvidia,tegra114-host1x", "simple-bus";
+ 		reg = <0x50000000 0x00028000>;
+diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+index f46a789..4eb540b 100644
+--- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
++++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+@@ -10,6 +10,7 @@
+ 	aliases {
+ 		rtc0 = "/i2c at 0,7000d000/pmic at 40";
+ 		rtc1 = "/rtc at 0,7000e000";
++		serial0 = &uartd;
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts b/arch/arm/boot/dts/tegra124-nyan-big.dts
+index 7d0784c..53181d3 100644
+--- a/arch/arm/boot/dts/tegra124-nyan-big.dts
++++ b/arch/arm/boot/dts/tegra124-nyan-big.dts
+@@ -10,6 +10,7 @@
+ 	aliases {
+ 		rtc0 = "/i2c at 0,7000d000/pmic at 40";
+ 		rtc1 = "/rtc at 0,7000e000";
++		serial0 = &uarta;
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
+index 1300885..5c3f781 100644
+--- a/arch/arm/boot/dts/tegra124-venice2.dts
++++ b/arch/arm/boot/dts/tegra124-venice2.dts
+@@ -10,6 +10,7 @@
+ 	aliases {
+ 		rtc0 = "/i2c at 0,7000d000/pmic at 40";
+ 		rtc1 = "/rtc at 0,7000e000";
++		serial0 = &uarta;
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index f765110..dde226e 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -13,13 +13,6 @@
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
+ 
+-	aliases {
+-		serial0 = &uarta;
+-		serial1 = &uartb;
+-		serial2 = &uartc;
+-		serial3 = &uartd;
+-	};
+-
+ 	pcie-controller at 0,01003000 {
+ 		compatible = "nvidia,tegra124-pcie";
+ 		device_type = "pci";
+diff --git a/arch/arm/boot/dts/tegra20-harmony.dts b/arch/arm/boot/dts/tegra20-harmony.dts
+index a37279a..b926a07 100644
+--- a/arch/arm/boot/dts/tegra20-harmony.dts
++++ b/arch/arm/boot/dts/tegra20-harmony.dts
+@@ -10,6 +10,7 @@
+ 	aliases {
+ 		rtc0 = "/i2c at 7000d000/tps6586x at 34";
+ 		rtc1 = "/rtc at 7000e000";
++		serial0 = &uartd;
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/tegra20-iris-512.dts b/arch/arm/boot/dts/tegra20-iris-512.dts
+index 8cfb83f..1dd7d7b 100644
+--- a/arch/arm/boot/dts/tegra20-iris-512.dts
++++ b/arch/arm/boot/dts/tegra20-iris-512.dts
+@@ -6,6 +6,11 @@
+ 	model = "Toradex Colibri T20 512MB on Iris";
+ 	compatible = "toradex,iris", "toradex,colibri_t20-512", "nvidia,tegra20";
+ 
++	aliases {
++		serial0 = &uarta;
++		serial1 = &uartd;
++	};
++
+ 	host1x at 50000000 {
+ 		hdmi at 54280000 {
+ 			status = "okay";
+diff --git a/arch/arm/boot/dts/tegra20-medcom-wide.dts b/arch/arm/boot/dts/tegra20-medcom-wide.dts
+index 1b7c56b..9b87526 100644
+--- a/arch/arm/boot/dts/tegra20-medcom-wide.dts
++++ b/arch/arm/boot/dts/tegra20-medcom-wide.dts
+@@ -6,6 +6,10 @@
+ 	model = "Avionic Design Medcom-Wide board";
+ 	compatible = "ad,medcom-wide", "ad,tamonten", "nvidia,tegra20";
+ 
++	aliases {
++		serial0 = &uartd;
++	};
++
+ 	pwm at 7000a000 {
+ 		status = "okay";
+ 	};
+diff --git a/arch/arm/boot/dts/tegra20-paz00.dts b/arch/arm/boot/dts/tegra20-paz00.dts
+index d4438e3..ed7e100 100644
+--- a/arch/arm/boot/dts/tegra20-paz00.dts
++++ b/arch/arm/boot/dts/tegra20-paz00.dts
+@@ -10,6 +10,8 @@
+ 	aliases {
+ 		rtc0 = "/i2c at 7000d000/tps6586x at 34";
+ 		rtc1 = "/rtc at 7000e000";
++		serial0 = &uarta;
++		serial1 = &uartc;
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
+index a1d4bf9..ea282c7 100644
+--- a/arch/arm/boot/dts/tegra20-seaboard.dts
++++ b/arch/arm/boot/dts/tegra20-seaboard.dts
+@@ -10,6 +10,7 @@
+ 	aliases {
+ 		rtc0 = "/i2c at 7000d000/tps6586x at 34";
+ 		rtc1 = "/rtc at 7000e000";
++		serial0 = &uartd;
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/tegra20-tamonten.dtsi b/arch/arm/boot/dts/tegra20-tamonten.dtsi
+index 80e7d38..13d4e61 100644
+--- a/arch/arm/boot/dts/tegra20-tamonten.dtsi
++++ b/arch/arm/boot/dts/tegra20-tamonten.dtsi
+@@ -7,6 +7,7 @@
+ 	aliases {
+ 		rtc0 = "/i2c at 7000d000/tps6586x at 34";
+ 		rtc1 = "/rtc at 7000e000";
++		serial0 = &uartd;
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
+index 5ad8797..d99af4e 100644
+--- a/arch/arm/boot/dts/tegra20-trimslice.dts
++++ b/arch/arm/boot/dts/tegra20-trimslice.dts
+@@ -10,6 +10,7 @@
+ 	aliases {
+ 		rtc0 = "/i2c at 7000c500/rtc at 56";
+ 		rtc1 = "/rtc at 7000e000";
++		serial0 = &uarta;
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
+index ca8484c..04c58e9 100644
+--- a/arch/arm/boot/dts/tegra20-ventana.dts
++++ b/arch/arm/boot/dts/tegra20-ventana.dts
+@@ -10,6 +10,7 @@
+ 	aliases {
+ 		rtc0 = "/i2c at 7000d000/tps6586x at 34";
+ 		rtc1 = "/rtc at 7000e000";
++		serial0 = &uartd;
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/tegra20-whistler.dts b/arch/arm/boot/dts/tegra20-whistler.dts
+index 1843725..340d811 100644
+--- a/arch/arm/boot/dts/tegra20-whistler.dts
++++ b/arch/arm/boot/dts/tegra20-whistler.dts
+@@ -10,6 +10,7 @@
+ 	aliases {
+ 		rtc0 = "/i2c at 7000d000/max8907 at 3c";
+ 		rtc1 = "/rtc at 7000e000";
++		serial0 = &uarta;
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index 3b374c4..8acf5d8 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -9,14 +9,6 @@
+ 	compatible = "nvidia,tegra20";
+ 	interrupt-parent = <&intc>;
+ 
+-	aliases {
+-		serial0 = &uarta;
+-		serial1 = &uartb;
+-		serial2 = &uartc;
+-		serial3 = &uartd;
+-		serial4 = &uarte;
+-	};
+-
+ 	host1x at 50000000 {
+ 		compatible = "nvidia,tegra20-host1x", "simple-bus";
+ 		reg = <0x50000000 0x00024000>;
+diff --git a/arch/arm/boot/dts/tegra30-apalis-eval.dts b/arch/arm/boot/dts/tegra30-apalis-eval.dts
+index 45d40f0..6236bde 100644
+--- a/arch/arm/boot/dts/tegra30-apalis-eval.dts
++++ b/arch/arm/boot/dts/tegra30-apalis-eval.dts
+@@ -11,6 +11,10 @@
+ 		rtc0 = "/i2c at 7000c000/rtc at 68";
+ 		rtc1 = "/i2c at 7000d000/tps65911 at 2d";
+ 		rtc2 = "/rtc at 7000e000";
++		serial0 = &uarta;
++		serial1 = &uartb;
++		serial2 = &uartc;
++		serial3 = &uartd;
+ 	};
+ 
+ 	pcie-controller at 00003000 {
+diff --git a/arch/arm/boot/dts/tegra30-beaver.dts b/arch/arm/boot/dts/tegra30-beaver.dts
+index cee8f22..6b157ee 100644
+--- a/arch/arm/boot/dts/tegra30-beaver.dts
++++ b/arch/arm/boot/dts/tegra30-beaver.dts
+@@ -9,6 +9,7 @@
+ 	aliases {
+ 		rtc0 = "/i2c at 7000d000/tps65911 at 2d";
+ 		rtc1 = "/rtc at 7000e000";
++		serial0 = &uarta;
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+index 2063795..a1b682e 100644
+--- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
++++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+@@ -30,6 +30,8 @@
+ 	aliases {
+ 		rtc0 = "/i2c at 7000d000/tps65911 at 2d";
+ 		rtc1 = "/rtc at 7000e000";
++		serial0 = &uarta;
++		serial1 = &uartc;
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/tegra30-colibri-eval-v3.dts b/arch/arm/boot/dts/tegra30-colibri-eval-v3.dts
+index 7793abd..4d3ddc5 100644
+--- a/arch/arm/boot/dts/tegra30-colibri-eval-v3.dts
++++ b/arch/arm/boot/dts/tegra30-colibri-eval-v3.dts
+@@ -10,6 +10,9 @@
+ 		rtc0 = "/i2c at 7000c000/rtc at 68";
+ 		rtc1 = "/i2c at 7000d000/tps65911 at 2d";
+ 		rtc2 = "/rtc at 7000e000";
++		serial0 = &uarta;
++		serial1 = &uartb;
++		serial2 = &uartd;
+ 	};
+ 
+ 	host1x at 50000000 {
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index aa6ccea..b270b9e 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -9,14 +9,6 @@
+ 	compatible = "nvidia,tegra30";
+ 	interrupt-parent = <&intc>;
+ 
+-	aliases {
+-		serial0 = &uarta;
+-		serial1 = &uartb;
+-		serial2 = &uartc;
+-		serial3 = &uartd;
+-		serial4 = &uarte;
+-	};
+-
+ 	pcie-controller at 00003000 {
+ 		compatible = "nvidia,tegra30-pcie";
+ 		device_type = "pci";
+-- 
+1.7.10.4
