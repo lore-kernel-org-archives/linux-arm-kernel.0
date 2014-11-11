@@ -1,61 +1,62 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 11 Nov 2014 11:37:39 +0100
-Subject: serial: of-serial: fetch line number from DT
-In-Reply-To: <54613065.1090300@wwwdotorg.org>
-References: <CAOesGMjzs=dThDv6S8Xvo+ym-XECaQhTQ8NV6t46fQZ1LoJnHw@mail.gmail.com>
- <54613065.1090300@wwwdotorg.org>
-Message-ID: <1415702259.2815.1.camel@pengutronix.de>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Tue, 11 Nov 2014 16:09:29 +0530
+Subject: [PATCH] mtd: remove .owner field for driver using
+ module_platform_driver
+In-Reply-To: <1415701649-25915-1-git-send-email-sanjeev_sharma@mentor.com>
+References: <1415701649-25915-1-git-send-email-sanjeev_sharma@mentor.com>
+Message-ID: <5461E761.5090702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 10.11.2014, 14:38 -0700 schrieb Stephen Warren:
-> On 11/10/2014 02:34 PM, Olof Johansson wrote:
-> > Greg,
-> >
-> > This commit:
-> >
-> > commit 1bd8324535ec1ff44aef55c0e40b9e7d56b310fb
-> > Author: Lucas Stach <dev@lynxeye.de>
-> > Date:   Mon Nov 3 23:16:54 2014 +0100
-> >
-> >      serial: of-serial: fetch line number from DT
-> ...
-> > Broke a whole lot of tegra boards in last night's -next here. In
-> > particular, I've been looking at tegra20-seaboard, which now doesn't
-> > boot with console any more.
-> >
-> > http://arm-soc.lixom.net/bootlogs/next/next-20141110/
-> >
-> > Unfortunately, tegra has for a long time been specifying the aliases
-> > as a fixed 1:1 mapping, but most environments rely on ttyS0 being the
-> > first _activated_ serial port. That's obviously going to break things
-> > here. :(
-> ...
-> > Stephen: I suppose the best way to handle this on tegra is to specify
-> > the aliases per-board instead of in the soc dtsi today.
-> 
-> IIRC, there was a deliberate request to name the Tegra UARTs after the 
-> SoC ports rather than board ports, so that it'd be obvious to people 
-> which port was which. I'm not sure if we can change the aliases in the 
-> Tegra DTs now that people may have got used to them?
-> 
-First off: sorry for breaking stuff.
+Hi Sanjeev Sharma,
 
-The point of this patch was exactly to have a common naming scheme
-between bootloader and and kernel. The aliases provide this in a broadly
-recognized way.
-Relying on the fact that ttyS0 maps to the debug UART seems extremely
-fragile and the fact that this patch broke this assumption actually
-proves this.
+On 11/11/2014 03:57 PM, Sanjeev Sharma wrote:
+> This patch removes the .owner field for drivers which use the
+> platform_driver_register api because this is overriden in
+> _platform_driver_register.
+>
+> Signed-off-by: Sanjeev Sharma <Sanjeev_Sharma@mentor.com>
+> ---
+>   drivers/mtd/nand/ams-delta.c     | 1 -
+>   drivers/mtd/nand/atmel_nand.c    | 2 --
+>   drivers/mtd/nand/au1550nd.c      | 1 -
+>   drivers/mtd/nand/bf5xx_nand.c    | 1 -
+>   drivers/mtd/nand/davinci_nand.c  | 1 -
+>   drivers/mtd/nand/denali_dt.c     | 1 -
+>   drivers/mtd/nand/docg4.c         | 1 -
+>   drivers/mtd/nand/fsl_elbc_nand.c | 1 -
+>   drivers/mtd/nand/fsl_ifc_nand.c  | 1 -
+>   drivers/mtd/nand/fsl_upm.c       | 1 -
+>   drivers/mtd/nand/fsmc_nand.c     | 1 -
+>   drivers/mtd/nand/gpio.c          | 1 -
+>   drivers/mtd/nand/jz4740_nand.c   | 1 -
+>   drivers/mtd/nand/lpc32xx_mlc.c   | 1 -
+>   drivers/mtd/nand/lpc32xx_slc.c   | 1 -
+>   drivers/mtd/nand/mpc5121_nfc.c   | 1 -
+>   drivers/mtd/nand/mxc_nand.c      | 1 -
+>   drivers/mtd/nand/ndfc.c          | 1 -
+>   drivers/mtd/nand/nuc900_nand.c   | 1 -
+>   drivers/mtd/nand/omap2.c         | 1 -
+>   drivers/mtd/nand/omap_elm.c      | 1 -
+>   drivers/mtd/nand/orion_nand.c    | 1 -
+>   drivers/mtd/nand/pasemi_nand.c   | 1 -
+>   drivers/mtd/nand/plat_nand.c     | 1 -
+>   drivers/mtd/nand/s3c2410.c       | 1 -
+>   drivers/mtd/nand/sh_flctl.c      | 1 -
+>   drivers/mtd/nand/sharpsl.c       | 1 -
+>   drivers/mtd/nand/socrates_nand.c | 1 -
+>   drivers/mtd/nand/tmio_nand.c     | 1 -
+>   drivers/mtd/nand/txx9ndfmc.c     | 1 -
+>   30 files changed, 31 deletions(-)
 
-IMHO it is a bug in U-Boot that it doesn't look at the aliases when it
-builds the console= kernel parameter. But I recognize the problem that
-this change introduces a non-backward compatible break between firmware
-and kernel and I don't yet see a nice solution for this.
+This removal of .owner field should be done for all the platform drivers which are using
+module_platform_driver().
 
-Regards,
-Lucas
+Wolfram Sang <wsa@the-dreams.de> working on this change on the all the drivers. Please see [1].
+
+
+[1]:https://git.kernel.org/cgit/linux/kernel/git/wsa/linux.git/log/?h=platform/remove_owner
 
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Thanks and Regards,
+Varka Bhadram.
