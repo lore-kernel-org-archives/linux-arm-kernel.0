@@ -1,54 +1,65 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Tue, 11 Nov 2014 20:01:10 +0100
-Subject: [PATCH v3 1/2] of: Rename "poweroff-source" property to
- "system-power-controller"
-In-Reply-To: <20141111150139.A904BC416AF@trevor.secretlab.ca>
-References: <1415283784-10885-1-git-send-email-romain.perier@gmail.com>
- <1415283784-10885-2-git-send-email-romain.perier@gmail.com>
- <20141111150139.A904BC416AF@trevor.secretlab.ca>
-Message-ID: <CABgxDoLfGYRnGCLmxnW6XCwJo3AoecO3=sLNBsOUAHig3P8New@mail.gmail.com>
+From: suravee.suthikulpanit@amd.com (suravee.suthikulpanit at amd.com)
+Date: Tue, 11 Nov 2014 13:17:33 -0600
+Subject: [PATCH V2 1/2] PCI: Add new pci_ops for setting MSI parent for PCI bus
+In-Reply-To: <1415733454-24322-1-git-send-email-suravee.suthikulpanit@amd.com>
+References: <1415733454-24322-1-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <1415733454-24322-2-git-send-email-suravee.suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-11 16:01 GMT+01:00 Grant Likely <grant.likely@linaro.org>:
-> So, to be a little pendantic, the 'ti,' prefix is basically just for
-> backwards compatibility with the old binding, and that old binding is
-> only used on palmas.c, tps65*.c and twl4030-power.c, correct?
+From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-No, the backward compatibility here is only useful for drivers which
-used "ti,system-power-controller" in the past and recently switched to
-the new property through the standard helper function. As most of the
-dts were not updated to use the new property, previous patches broke
-compatibility with "ti,system-power-controller" (this compat would be
-reverted with this serie). Only one driver has this problem, it is
-tps65910.
+In the pci_scan_root_bus, pci_bus is created and passed down to:
+    pci_scan_child_bus
+        pci_scan_bridge
+    	pci_add_new_bus
+    	    pci_alloc_child_bus
 
-So, What you propose is that I should handle the old property directly
-from tps65910, and keep the standard helper generic right ?
+In pci_alloc_child_bus, the parent's msi_chip is propagated to child,
+and the referenced by PCI devices when calling arch_setup_msi_irq().
 
-Romain
+However, in the current implementation of pci_scan_root_bus, the msi_chip
+of the root_bus is not set before handing off to pci_scan_child_bus.
 
+This patch proposes a new callback function in the struct pci_ops
+to allow host controller to provide a call back for specifying
+msi_chip to be used.
 
+Cc: Bjorn Helgass <bhelgaas@google.com>
+Cc: Liviu Dudau <liviu.dudau@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+---
+ drivers/pci/probe.c | 3 +++
+ include/linux/pci.h | 1 +
+ 2 files changed, 4 insertions(+)
 
-
->
-> We don't actually want a ti comparison in the generic code. Normally
-> what you'd do here is have the fixup in the ti driver code, possibly
-> with a ti specific helper for those 4 files.
->
-> I'm not going to nak this patch and I know you need to get things cleaned
-> up, but the static inline really should be reduced back to just checking
-> only for "system-power-controller". The current mainline code does the
-> right thing anyway, and it is a *tiny* amount of extra code in 4 drivers
-> file.
->
-> g.
->
->
->>  }
->>
->>  #endif /* _LINUX_OF_H */
->> --
->> 1.9.1
->>
->
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 5ed9930..cf7114d 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -2081,6 +2081,9 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
+ 	if (!b)
+ 		return NULL;
+ 
++	if (ops->set_msi_parent)
++		ops->set_msi_parent(b);
++
+ 	if (!found) {
+ 		dev_info(&b->dev,
+ 		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 5be8db4..6093544 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -560,6 +560,7 @@ static inline int pcibios_err_to_errno(int err)
+ struct pci_ops {
+ 	int (*read)(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *val);
+ 	int (*write)(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 val);
++	int (*set_msi_parent)(struct pci_bus *bus);
+ };
+ 
+ /*
+-- 
+1.9.3
