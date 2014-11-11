@@ -1,144 +1,39 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 10 Nov 2014 20:30:36 -0800
-Subject: [RESENDv5] serial: of-serial: fix up PM ops on no_console_suspend
- and port type
-In-Reply-To: <1414401857-21121-1-git-send-email-jingchang.lu@freescale.com>
-References: <1414401857-21121-1-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <CAGVrzcamoYbdPijWtrU=ge+UE+g9zBHAG84PJB7G3EyA09jBWg@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 11 Nov 2014 10:12:55 +0530
+Subject: [PATCH v3 06/10] [media] platform: Make use of media_bus_format
+ enum
+In-Reply-To: <CA+V-a8t79gYYGcgg5wvM-eqW8H2D6WD7xM9t2Px=WHb2rf34ow@mail.gmail.com>
+References: <1415369269-5064-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1415369269-5064-7-git-send-email-boris.brezillon@free-electrons.com>
+ <CA+V-a8t79gYYGcgg5wvM-eqW8H2D6WD7xM9t2Px=WHb2rf34ow@mail.gmail.com>
+Message-ID: <546193CF.8090107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-10-27 2:24 GMT-07:00 Jingchang Lu <jingchang.lu@freescale.com>:
-> This patch fixes commit 2dea53bf57783f243c892e99c10c6921e956aa7e,
-> "serial: of-serial: add PM suspend/resume support", which disables
-> the uart clock on suspend, but also causes a hardware hang on register
-> access if no_console_suspend command line option is used.
->
-> Also, not every of_serial device is an 8250 port, so the serial8250
-> suspend/resume functions should only be applied to a real 8250 port.
+On Saturday 08 November 2014 02:48 PM, Prabhakar Lad wrote:
+> Hi,
+> 
+> Thanks for the patch,
+> 
+> On Fri, Nov 7, 2014 at 2:07 PM, Boris Brezillon
+> <boris.brezillon@free-electrons.com> wrote:
+>> In order to have subsytem agnostic media bus format definitions we've
+>> moved media bus definition to include/uapi/linux/media-bus-format.h and
+>> prefixed values with MEDIA_BUS_FMT instead of V4L2_MBUS_FMT.
+>>
+>> Reference new definitions in all platform drivers.
+>>
+>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>> ---
+>>  arch/arm/mach-davinci/board-dm355-evm.c            |   2 +-
+>>  arch/arm/mach-davinci/board-dm365-evm.c            |   4 +-
+>>  arch/arm/mach-davinci/dm355.c                      |   7 +-
+>>  arch/arm/mach-davinci/dm365.c                      |   7 +-
+> 
+> @Sekhar can you ack for the machine changes for davinci ?
 
-Greg, can you pick this one and submit it for your next 3.18-rc
-submission? This fixes a regression when using "no_console_suspend"
-introduced by:
+Heh, I don't have 6/10 in my inbox but have rest of the series. Can you
+forward 6/10 to me?
 
-2dea53bf57783f243c892e99c10c6921e956aa7e ("serial: of-serial: add PM
-suspend/resume support") which has been merged during 3.18-rc1
-
-Thanks!
-
->
-> Reported-By: Joseph Lo <josephl@nvidia.com>
-> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
-> Tested-By: Joseph Lo <josephl@nvidia.com>
-> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
-> ---
-> changes in v5:
->  add missing <linux/console.h> include.
->
-> changes in v4:
->  separate 8250 port suspend/resume from of_serial_suspend/resume.
->
-> changes in v3:
->  fix up point reference and deference.
->
-> changes in v2:
->  add switch selection on uart type.
->
->  drivers/tty/serial/of_serial.c | 53 ++++++++++++++++++++++++++++++++++++------
->  1 file changed, 46 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
-> index 8bc2563..9c64ad2 100644
-> --- a/drivers/tty/serial/of_serial.c
-> +++ b/drivers/tty/serial/of_serial.c
-> @@ -9,6 +9,7 @@
->   *  2 of the License, or (at your option) any later version.
->   *
->   */
-> +#include <linux/console.h>
->  #include <linux/module.h>
->  #include <linux/slab.h>
->  #include <linux/delay.h>
-> @@ -241,13 +242,48 @@ static int of_platform_serial_remove(struct platform_device *ofdev)
->  }
->
->  #ifdef CONFIG_PM_SLEEP
-> -static int of_serial_suspend(struct device *dev)
-> +#ifdef CONFIG_SERIAL_8250
-> +static void of_serial_suspend_8250(struct of_serial_info *info)
->  {
-> -       struct of_serial_info *info = dev_get_drvdata(dev);
-> +       struct uart_8250_port *port8250 = serial8250_get_port(info->line);
-> +       struct uart_port *port = &port8250->port;
->
->         serial8250_suspend_port(info->line);
-> -       if (info->clk)
-> +       if (info->clk && (!uart_console(port) || console_suspend_enabled))
->                 clk_disable_unprepare(info->clk);
-> +}
-> +
-> +static void of_serial_resume_8250(struct of_serial_info *info)
-> +{
-> +       struct uart_8250_port *port8250 = serial8250_get_port(info->line);
-> +       struct uart_port *port = &port8250->port;
-> +
-> +       if (info->clk && (!uart_console(port) || console_suspend_enabled))
-> +               clk_prepare_enable(info->clk);
-> +
-> +       serial8250_resume_port(info->line);
-> +}
-> +#else
-> +static inline void of_serial_suspend_8250(struct of_serial_info *info)
-> +{
-> +}
-> +
-> +static inline void of_serial_resume_8250(struct of_serial_info *info)
-> +{
-> +}
-> +#endif
-> +
-> +static int of_serial_suspend(struct device *dev)
-> +{
-> +       struct of_serial_info *info = dev_get_drvdata(dev);
-> +
-> +       switch(info->type) {
-> +       case PORT_8250 ... PORT_MAX_8250:
-> +               of_serial_suspend_8250(info);
-> +               break;
-> +       default:
-> +               break;
-> +       }
->
->         return 0;
->  }
-> @@ -256,10 +292,13 @@ static int of_serial_resume(struct device *dev)
->  {
->         struct of_serial_info *info = dev_get_drvdata(dev);
->
-> -       if (info->clk)
-> -               clk_prepare_enable(info->clk);
-> -
-> -       serial8250_resume_port(info->line);
-> +       switch(info->type) {
-> +       case PORT_8250 ... PORT_MAX_8250:
-> +               of_serial_resume_8250(info);
-> +               break;
-> +       default:
-> +               break;
-> +       }
->
->         return 0;
->  }
-> --
-> 1.8.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
--- 
-Florian
+Thanks,
+Sekhar
