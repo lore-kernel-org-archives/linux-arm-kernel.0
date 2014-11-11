@@ -1,61 +1,54 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 11 Nov 2014 20:00:26 +0100
-Subject: [PATCH 3/4] ARM: shmobile: rcar-gen2: Add CA7 arch_timer
- initialization for r8a7794
-In-Reply-To: <5583214.HuX5EZ5Unx@wuerfel>
-References: <cover.1415058939.git.horms+renesas@verge.net.au>
- <9ce3fa6816c2fb59d128248c9b0509aef1c5dae7.1415058939.git.horms+renesas@verge.net.au>
- <5583214.HuX5EZ5Unx@wuerfel>
-Message-ID: <CAMuHMdUek9RA-tpVJbXKx1MENk47-E2s+437+SYNR9KbaO62dQ@mail.gmail.com>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Tue, 11 Nov 2014 20:01:10 +0100
+Subject: [PATCH v3 1/2] of: Rename "poweroff-source" property to
+ "system-power-controller"
+In-Reply-To: <20141111150139.A904BC416AF@trevor.secretlab.ca>
+References: <1415283784-10885-1-git-send-email-romain.perier@gmail.com>
+ <1415283784-10885-2-git-send-email-romain.perier@gmail.com>
+ <20141111150139.A904BC416AF@trevor.secretlab.ca>
+Message-ID: <CABgxDoLfGYRnGCLmxnW6XCwJo3AoecO3=sLNBsOUAHig3P8New@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 11, 2014 at 7:27 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 04 November 2014 10:50:08 Simon Horman wrote:
->> From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+2014-11-11 16:01 GMT+01:00 Grant Likely <grant.likely@linaro.org>:
+> So, to be a little pendantic, the 'ti,' prefix is basically just for
+> backwards compatibility with the old binding, and that old binding is
+> only used on palmas.c, tps65*.c and twl4030-power.c, correct?
+
+No, the backward compatibility here is only useful for drivers which
+used "ti,system-power-controller" in the past and recently switched to
+the new property through the standard helper function. As most of the
+dts were not updated to use the new property, previous patches broke
+compatibility with "ti,system-power-controller" (this compat would be
+reverted with this serie). Only one driver has this problem, it is
+tps65910.
+
+So, What you propose is that I should handle the old property directly
+from tps65910, and keep the standard helper generic right ?
+
+Romain
+
+
+
+
+>
+> We don't actually want a ti comparison in the generic code. Normally
+> what you'd do here is have the fixup in the ti driver code, possibly
+> with a ti specific helper for those 4 files.
+>
+> I'm not going to nak this patch and I know you need to get things cleaned
+> up, but the static inline really should be reduced back to just checking
+> only for "system-power-controller". The current mainline code does the
+> right thing anyway, and it is a *tiny* amount of extra code in 4 drivers
+> file.
+>
+> g.
+>
+>
+>>  }
 >>
->> On E2, the arch timer is hooked up to a different clock, and the CA7's arch
->> timer CNTVOFF register must be initialized.
+>>  #endif /* _LINUX_OF_H */
+>> --
+>> 1.9.1
 >>
->> Based on work by Hisashi Nakamura.
->>
->> Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
->> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 >
-> This is one of the patches that broke allmodconfig in linux-next.
->
-> Can you apply the patch below before sending it to arm-soc?
->
-> Thanks,
->
->         Arnd
->
-> ---
-> From 8bf0a4cae3137411498ff23ca46f693e4c22a25b Mon Sep 17 00:00:00 2001
-> From: Arnd Bergmann <arnd@arndb.de>
-> Date: Tue, 11 Nov 2014 16:36:50 +0100
-> Subject: [PATCH] ARM: shmobile: always build rcar setup for armv7
->
-> In a combined ARMv6/v7 kernel, the setup-rcar-gen2.c cannot
-> currently be compiled correctly because it uses the isb
-> instruction that is not available on ARMv6. Adding the
-> -march=armv7-a flag lets the compiler know that it is safe
-> to build this file for ARMv7.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Thanks, this is a better solution than "[RFT] ARM: shmobile: rcar-gen2:
-Fix build breakage" (https://lkml.org/lkml/2014/10/31/338).
-
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
