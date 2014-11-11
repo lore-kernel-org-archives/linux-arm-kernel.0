@@ -1,40 +1,61 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 11 Nov 2014 11:23:26 +0100
-Subject: [PATCH v3 2/2] ARM: EXYNOS: Call regulator core suspend prepare
- and finish functions
-In-Reply-To: <CABxcv==YZjO9p3aNyuRpe3DYS+=BcY_N2esuTg0hGASb_b_OdA@mail.gmail.com>
-References: <1413839151-10875-1-git-send-email-javier.martinez@collabora.co.uk>
- <1413839151-10875-3-git-send-email-javier.martinez@collabora.co.uk>
- <CABxcv==YZjO9p3aNyuRpe3DYS+=BcY_N2esuTg0hGASb_b_OdA@mail.gmail.com>
-Message-ID: <CABxcv=mMqh5UD0_Wz3rNaFbZD3BH_2Z+7srzccd=-5_ndo_a1Q@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 11 Nov 2014 11:37:39 +0100
+Subject: serial: of-serial: fetch line number from DT
+In-Reply-To: <54613065.1090300@wwwdotorg.org>
+References: <CAOesGMjzs=dThDv6S8Xvo+ym-XECaQhTQ8NV6t46fQZ1LoJnHw@mail.gmail.com>
+ <54613065.1090300@wwwdotorg.org>
+Message-ID: <1415702259.2815.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kukjin,
+Am Montag, den 10.11.2014, 14:38 -0700 schrieb Stephen Warren:
+> On 11/10/2014 02:34 PM, Olof Johansson wrote:
+> > Greg,
+> >
+> > This commit:
+> >
+> > commit 1bd8324535ec1ff44aef55c0e40b9e7d56b310fb
+> > Author: Lucas Stach <dev@lynxeye.de>
+> > Date:   Mon Nov 3 23:16:54 2014 +0100
+> >
+> >      serial: of-serial: fetch line number from DT
+> ...
+> > Broke a whole lot of tegra boards in last night's -next here. In
+> > particular, I've been looking at tegra20-seaboard, which now doesn't
+> > boot with console any more.
+> >
+> > http://arm-soc.lixom.net/bootlogs/next/next-20141110/
+> >
+> > Unfortunately, tegra has for a long time been specifying the aliases
+> > as a fixed 1:1 mapping, but most environments rely on ttyS0 being the
+> > first _activated_ serial port. That's obviously going to break things
+> > here. :(
+> ...
+> > Stephen: I suppose the best way to handle this on tegra is to specify
+> > the aliases per-board instead of in the soc dtsi today.
+> 
+> IIRC, there was a deliberate request to name the Tegra UARTs after the 
+> SoC ports rather than board ports, so that it'd be obvious to people 
+> which port was which. I'm not sure if we can change the aliases in the 
+> Tegra DTs now that people may have got used to them?
+> 
+First off: sorry for breaking stuff.
 
-On Thu, Oct 30, 2014 at 11:06 AM, Javier Martinez Canillas
-<javier@dowhile0.org> wrote:
-> Hello Kukjin,
->
-> On Mon, Oct 20, 2014 at 11:05 PM, Javier Martinez Canillas
-> <javier.martinez@collabora.co.uk> wrote:
->> The regulator framework has a set of helpers functions to be used when
->> the system is entering and leaving from suspend but these are not called
->> on Exynos platforms. This means that the .set_suspend_* function handlers
->> defined by regulator drivers are not called when the system is suspended.
->>
->> Suggested-by: Doug Anderson <dianders@chromium.org>
->> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Reviewed-by: Doug Anderson <dianders@chromium.org>
->> ---
->>  arch/arm/mach-exynos/suspend.c | 23 +++++++++++++++++++++++
->>  1 file changed, 23 insertions(+)
->>
->
-> Any comments on this patch?
->
+The point of this patch was exactly to have a common naming scheme
+between bootloader and and kernel. The aliases provide this in a broadly
+recognized way.
+Relying on the fact that ttyS0 maps to the debug UART seems extremely
+fragile and the fact that this patch broke this assumption actually
+proves this.
 
-Just a gentle reminder about this patch.
+IMHO it is a bug in U-Boot that it doesn't look at the aliases when it
+builds the console= kernel parameter. But I recognize the problem that
+this change introduces a non-backward compatible break between firmware
+and kernel and I don't yet see a nice solution for this.
 
-Best regards,
-Javier
+Regards,
+Lucas
+
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
