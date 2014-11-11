@@ -1,45 +1,58 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 11 Nov 2014 21:54:30 +0000
-Subject: [linux-sunxi] Re: [PATCH v4 0/5] simplefb: add clock
- =?iso-8859-1?Q?handling=0D?= code
-In-Reply-To: <545B8E29.90807@redhat.com>
-References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
- <54534523.8080801@ti.com> <545B8338.8060908@ti.com>
- <545B8E29.90807@redhat.com>
-Message-ID: <20141111215430.3FA41C41610@trevor.secretlab.ca>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 11 Nov 2014 14:45:09 -0800
+Subject: [PATCH] ARM: dts: tegra: move serial aliases to per-board
+In-Reply-To: <54627C1F.9050200@wwwdotorg.org>
+References: <1415738970-7963-1-git-send-email-olof@lixom.net>
+ <54627C1F.9050200@wwwdotorg.org>
+Message-ID: <CAOesGMh_8Ft=DKqm=e0fQdREC4aLmAAp3N0QyNsqWn2_rCbmnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 06 Nov 2014 16:05:13 +0100
-, Hans de Goede <hdegoede@redhat.com>
- wrote:
-> Hi,
-> 
-> On 11/06/2014 03:18 PM, Tomi Valkeinen wrote:
-> > On 31/10/14 10:15, Tomi Valkeinen wrote:
-> >> Hi Hans,
-> >>
-> >> On 22/10/14 19:45, Hans de Goede wrote:
-> >>
-> >>> -We will add a clocks property to the simplefb devicetree bindings, so
-> >>>  that u-boot setup framebuffers passed to the kernel (for early console
-> >>>  support) can properly list the clocks used, and simplefb can claim them to
-> >>>  avoid them getting turned off, thereby breaking the early console
-> >>
-> >> Perhaps this has been discussed earlier, but I started to wonder if
-> >> managing clocks is enough.
-> >>
-> >> What about regulators (to power the LCD), gpios (to keep the LCD
-> >> enabled) and pinctrl (for video signals)? I guess any those could be
-> >> reset by the kernel if no driver uses them.
+[again in plain text mode. Sigh]
 
-I'm okay with extending the binding for each of these dependencies
-/providing/ it can be argued that the way simplefb uses it is merely to
-inhibit the kernel from making any changes to the resource, and then
-releasing the resource when it is done. Each resource type will need to
-be taken on a case-by-case basis since each has it's own behaviour. I'll
-want to see that the simplefb driver doesn't need to do anything special
-per device, and that the resource binding is well established and
-generic.
 
-g.
+On Tue, Nov 11, 2014 at 1:14 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 11/11/2014 01:49 PM, Olof Johansson wrote:
+>>
+>> There are general changes pending to make the /aliases/serial* entries
+>> number the serial ports on the system. On tegra, so far the ports have
+>> been
+>> just numbered dynamically as they are configured so that makes them
+>> change.
+>>
+>> To avoid this, add specific aliases per board to keep the old numbers.
+>> This
+>> allows us to change the numbering by default on future SoCs while keeping
+>> the
+>> numbering on existing boards.
+>
+>
+> This change seems mostly OK to me. FWIW though, I had suggested this
+> approach when the UART aliases were first added, and Laxman disagreed with
+> it. See commit b6551bb933f9 "ARM: tegra: dts: add aliases and DMA requestor
+> for serial controller", and its discussion:
+> https://lkml.org/lkml/2012/12/25/4. I've CC'd Laxman in case he still
+> objects.
+>
+>> Signed-off-by: Olof Johansson <olof@lixom.net>
+>> ---
+>>
+>> Stephen/Thierry/Alex, as noticed this week we really should try to get
+>> this in before the 3.19 merge window so that the global aliases change
+>> can happen there without regression.
+>
+>
+> How did we resolve the issue that patch causes with old DTs; namely that it
+> causes a change in behaviour for those old DTs? On IRC, I'd wondered whether
+> we should set a flag so the kernel ignored aliases for boards containing
+> currently upstreamed Tegra SoCs so that issue wouldn't occur. If we did
+> that, we wouldn't need this patch.
+
+Another way could be to remove aliases from the kernel side during
+booting if they're found. Anyway, feel free to send a patch to do that
+if that's your preference.
+
+
+Thanks,
+
+-Olof
