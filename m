@@ -1,51 +1,37 @@
 From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Tue, 11 Nov 2014 10:33:21 -0800
-Subject: [RFC 1/2] mfd: qcom-rpm: Expose sleep state resources to clients
-In-Reply-To: <20141111120457.GZ24004@x1>
+Date: Tue, 11 Nov 2014 10:34:16 -0800
+Subject: [RFC 2/2] regulator: qcom-rpm: Implement RPM assisted disable
+In-Reply-To: <5461D2BD.2080209@suse.de>
 References: <1415659966-16200-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1415659966-16200-2-git-send-email-bjorn.andersson@sonymobile.com>
- <20141111120457.GZ24004@x1>
-Message-ID: <20141111183319.GD16980@sonymobile.com>
+ <1415659966-16200-3-git-send-email-bjorn.andersson@sonymobile.com>
+ <5461D2BD.2080209@suse.de>
+Message-ID: <20141111183414.GE16980@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 11 Nov 04:04 PST 2014, Lee Jones wrote:
+On Tue 11 Nov 01:11 PST 2014, Andreas F?rber wrote:
 
-> On Mon, 10 Nov 2014, Bjorn Andersson wrote:
+> Hi,
 > 
-> > Resources exposed from the RPM have an "active state" that is used during
-> > normal operations and a "sleep state" that is used for HW assisted sleep
-> > modes. Expose this in the api to let client drivers set the "sleep
-> > state" as well.
-> 
-> I assume you have users lined up which will request a sleeping state?
-> 
-
-All users of this interface (regulators, clocks and bus scaling) will have to
-be able to specify this.
-
-[..]
-> > @@ -359,8 +361,7 @@ int qcom_rpm_write(struct qcom_rpm *rpm, int resource, u32 *buf, size_t count)
-> >  			       RPM_CTRL_REG(rpm, RPM_REQ_SELECT + i));
-> >  	}
+> Am 10.11.2014 um 23:52 schrieb Bjorn Andersson:
+> > diff --git a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+> > index 4264021..4671eef 100644
+> > --- a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+> > +++ b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+> > @@ -112,6 +112,13 @@ of valid subnodes that can operate on these resources.
+> >  	Definition: select that the power supply should operate in hysteretic
+> >  		    mode, instead of the default pwm mode
 > >  
-> > -	writel_relaxed(RPM_ACTIVE_STATE,
-> > -		       RPM_CTRL_REG(rpm, RPM_REQUEST_CONTEXT));
-> > +	writel_relaxed(BIT(state), RPM_CTRL_REG(rpm, RPM_REQUEST_CONTEXT));
+> > +- qcom,rpm-assisted-disable:
+> > +	Usage: optional
+> > +	Value type: <empty>
+> > +	Definition: select that the regulator is supplying the active CPU(s)
+> > +		    and can only be disabled with the assistans from the RPM
 > 
-> How are the state bits organised?
+> "assistance"
 > 
 
-BIT(0) is active mode, BIT(1) is sleep mode, as specified below. I could add
-some sanity checking here if you would like to.
-
-[..]
-> > diff --git a/include/linux/mfd/qcom_rpm.h b/include/linux/mfd/qcom_rpm.h
-> > index a60798d..f0e70b2 100644
-> > --- a/include/linux/mfd/qcom_rpm.h
-> > +++ b/include/linux/mfd/qcom_rpm.h
-> > +#define RPM_ACTIVE_STATE	0
-> > +#define RPM_SLEEP_STATE		1
+Thanks
 
 Regards,
 Bjorn
