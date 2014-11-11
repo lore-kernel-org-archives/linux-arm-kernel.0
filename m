@@ -1,58 +1,46 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Nov 2014 14:45:09 -0800
-Subject: [PATCH] ARM: dts: tegra: move serial aliases to per-board
-In-Reply-To: <54627C1F.9050200@wwwdotorg.org>
-References: <1415738970-7963-1-git-send-email-olof@lixom.net>
- <54627C1F.9050200@wwwdotorg.org>
-Message-ID: <CAOesGMh_8Ft=DKqm=e0fQdREC4aLmAAp3N0QyNsqWn2_rCbmnA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 11 Nov 2014 23:52:53 +0100
+Subject: Fwd: [arm-soc:next/soc 1/1] WARNING: vmlinux.o(.text+0x730e38):
+ Section mismatch in reference from the function brcmstb_gisb_arb_probe() to
+ the function .init.text:hook_fault_code()
+Message-ID: <22844091.DkblDJL9Ph@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[again in plain text mode. Sigh]
+The problem was introduced by f1bee783dd37 "bus: brcmstb_gisb: register the
+fault code hook", as hook_fault_code is an __init function and is now
+called from a probe function.
 
+	Arnd
 
-On Tue, Nov 11, 2014 at 1:14 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 11/11/2014 01:49 PM, Olof Johansson wrote:
->>
->> There are general changes pending to make the /aliases/serial* entries
->> number the serial ports on the system. On tegra, so far the ports have
->> been
->> just numbered dynamically as they are configured so that makes them
->> change.
->>
->> To avoid this, add specific aliases per board to keep the old numbers.
->> This
->> allows us to change the numbering by default on future SoCs while keeping
->> the
->> numbering on existing boards.
->
->
-> This change seems mostly OK to me. FWIW though, I had suggested this
-> approach when the UART aliases were first added, and Laxman disagreed with
-> it. See commit b6551bb933f9 "ARM: tegra: dts: add aliases and DMA requestor
-> for serial controller", and its discussion:
-> https://lkml.org/lkml/2012/12/25/4. I've CC'd Laxman in case he still
-> objects.
->
->> Signed-off-by: Olof Johansson <olof@lixom.net>
->> ---
->>
->> Stephen/Thierry/Alex, as noticed this week we really should try to get
->> this in before the 3.19 merge window so that the global aliases change
->> can happen there without regression.
->
->
-> How did we resolve the issue that patch causes with old DTs; namely that it
-> causes a change in behaviour for those old DTs? On IRC, I'd wondered whether
-> we should set a flag so the kernel ignored aliases for boards containing
-> currently upstreamed Tegra SoCs so that issue wouldn't occur. If we did
-> that, we wouldn't need this patch.
+----------  Forwarded Message  ----------
 
-Another way could be to remove aliases from the kernel side during
-booting if they're found. Anyway, feel free to send a patch to do that
-if that's your preference.
+Subject: [arm-soc:next/soc 1/1] WARNING: vmlinux.o(.text+0x730e38): Section mismatch in reference from the function brcmstb_gisb_arb_probe() to the function .init.text:hook_fault_code()
+Date: Wednesday 12 November 2014, 06:41:51
+From: kbuild test robot <fengguang.wu@intel.com>
+To: Linus Walleij <linus.walleij@linaro.org>
+CC: kbuild-all at 01.org, Arnd Bergmann <arnd@arndb.de>
 
+tree:   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git next/soc
+head:   dc680b989d519952e0e0d37204fec850925a0225
+commit: dc680b989d519952e0e0d37204fec850925a0225 [1/1] ARM: fix multiplatform allmodcompile
+config: arm-allmodconfig (attached as .config)
+reproduce:
+  wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+  chmod +x ~/bin/make.cross
+  git checkout dc680b989d519952e0e0d37204fec850925a0225
+  # save the attached .config to linux build tree
+  make.cross ARCH=arm 
 
-Thanks,
+All warnings:
 
--Olof
+>> WARNING: vmlinux.o(.text+0x730e38): Section mismatch in reference from the function brcmstb_gisb_arb_probe() to the function .init.text:hook_fault_code()
+   The function brcmstb_gisb_arb_probe() references
+   the function __init hook_fault_code().
+   This is often because brcmstb_gisb_arb_probe lacks a __init
+   annotation or the annotation of hook_fault_code is wrong.
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+http://lists.01.org/mailman/listinfo/kbuild                 Intel Corporation
+-----------------------------------------
