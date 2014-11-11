@@ -1,130 +1,43 @@
-From: k.chander@samsung.com (Chander Kashyap)
-Date: Tue, 11 Nov 2014 10:46:53 +0530
-Subject: [PATCH v4] arm64: dts: exynos7: add support for cpuidle core
- power down
-In-Reply-To: <20141107115845.GA2062@red-moon>
-References: <1415193331-14790-1-git-send-email-k.chander@samsung.com>
- <20141107115845.GA2062@red-moon>
-Message-ID: <CADWw7Oh_A9PTHKLDNKHBwAvS5pNe34CqZusQ9WxKCZo_YjO=4A@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 11 Nov 2014 10:50:28 +0530
+Subject: [PATCH v5 2/8] phy: miphy28lp: Add PHY header file for DT x Driver
+ defines
+In-Reply-To: <546095EC.2040501@st.com>
+References: <1415098284-11182-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1415098284-11182-3-git-send-email-gabriel.fernandez@linaro.org>
+ <545B1C53.9010406@ti.com> <545B3FA4.8040109@st.com>
+ <20141106112825.GC26543@x1> <545B6144.2020503@st.com>
+ <20141106153659.GD26543@x1> <545B9F15.5070404@st.com>
+ <20141107130538.GB3745@x1> <546095EC.2040501@st.com>
+Message-ID: <54619C9C.90605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 7, 2014 at 5:28 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Wed, Nov 05, 2014 at 01:15:31PM +0000, Chander Kashyap wrote:
->> Exynos7 has core power down state where cores can be powered off independently.
->
-> "...has a core power down idle state..."
->
->> This patch adds support for this state.
->
-> "...for this idle state."
->
->> Entry latency for the core power down is calculated as follows:
->> 1. Time difference is measured between cpuidle entry and exit.
->> 2. WFI is skipped for measuring the time.
->> 3. Select the worst case time in the set of 100000 cpuidle transactions,
->>    with varying load.
->>
->> Exit latency and target residency are supplied as per HW team
->
-> "Exit latency and min residency values are supplied by the HW team."
->
-> Target residency is a kernel naming scheme, non-existent in the idle state
-> bindings.
->
-> Please take time to write proper commit logs, thanks.
->
->> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
->> ---
->> This patch has following dependencies:
->>       - [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7 SoC
->>               http://www.spinics.net/lists/linux-samsung-soc/msg37047.html
->> Changes in v2:
->>       - Moved the cpu-idle-state property after reg property
->>       - removed the status property.
->>
->> Changes in v3:
->>       - Added the Entry latency calculation in commit message.
->> Changes in v4:
->>       - Corrected the commit message.
->>       - Corrected the entry latency value.
->>
->>  arch/arm64/boot/dts/exynos/exynos7.dtsi |   17 +++++++++++++++++
->>  1 file changed, 17 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
->> index 50ae936..444dde1 100644
->> --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
->> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
->> @@ -37,6 +37,7 @@
->>                       compatible = "arm,cortex-a57", "arm,armv8";
->>                       enable-method = "psci";
->
-> enable-method should be after reg, it is not an ordering issues added
-> by this patch but I still do not like that.
 
-This is being taken care in new patch for Exynos7 support.
 
->
-> Other than that, please take some time to rewrite the commit log and
-> ask to fix the ordering above, you can add my:
->
+On Monday 10 November 2014 04:09 PM, Maxime Coquelin wrote:
+> 
+> On 11/07/2014 02:05 PM, Lee Jones wrote:
+> 
+> <snip>
+>> If the merge turns out to be simple, then Git will do the correct
+>> thing; however, if the first version of the patch is applied, then
+>> some changes around the same area of the file occur _then_ when the
+>> second version (of the same patch differing only by SHA1) is applied
+>> Git will get confused.  If it has the same SHA1 however, Git will
+>> discard it as 'already applied'.  This is the reason we pass around
+>> shared tags to immutable branches.
+> Looking at how the patch is trivial, I persist to think there is no issue.
+> But OK, I will prepare an immutable branch..
+> 
+> Kishon, checkpatch complains because this new file has no maintainer.
+> Is it ok for you if I add it to the Generic PHY subsystem?
 
-Yes i will change as suggested.
+yeah.. sure.
 
-Thanks for the review.
-
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->
->>                       reg = <0x0>;
->> +                     cpu-idle-states = <&CPU_SLEEP>;
->>               };
->>
->>               cpu at 1 {
->> @@ -44,6 +45,7 @@
->>                       compatible = "arm,cortex-a57", "arm,armv8";
->>                       enable-method = "psci";
->>                       reg = <0x1>;
->> +                     cpu-idle-states = <&CPU_SLEEP>;
->>               };
->>
->>               cpu at 2 {
->> @@ -51,6 +53,7 @@
->>                       compatible = "arm,cortex-a57", "arm,armv8";
->>                       enable-method = "psci";
->>                       reg = <0x2>;
->> +                     cpu-idle-states = <&CPU_SLEEP>;
->>               };
->>
->>               cpu at 3 {
->> @@ -58,6 +61,20 @@
->>                       compatible = "arm,cortex-a57", "arm,armv8";
->>                       enable-method = "psci";
->>                       reg = <0x3>;
->> +                     cpu-idle-states = <&CPU_SLEEP>;
->> +             };
->> +
->> +             idle-states {
->> +                     entry-method = "arm,psci";
->> +
->> +                     CPU_SLEEP: cpu-sleep {
->> +                             compatible = "arm,idle-state";
->> +                             local-timer-stop;
->> +                             arm,psci-suspend-param = <0x0010000>;
->> +                             entry-latency-us = <34>;
->> +                             exit-latency-us = <150>;
->> +                             min-residency-us = <2100>;
->> +                     };
->>               };
->>       };
->>
->> --
->> 1.7.9.5
->>
->>
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks
+Kishon
+> 
+> Regards,
+> Maxime
+> 
