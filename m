@@ -1,60 +1,52 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Tue, 11 Nov 2014 05:41:10 +0000
-Subject: [RESENDv5] serial: of-serial: fix up PM ops on no_console_suspend
- and port type
-In-Reply-To: <20141111052720.GC24727@kroah.com>
-References: <1414401857-21121-1-git-send-email-jingchang.lu@freescale.com>
- <CAGVrzcamoYbdPijWtrU=ge+UE+g9zBHAG84PJB7G3EyA09jBWg@mail.gmail.com>
- <20141111052720.GC24727@kroah.com>
-Message-ID: <bc2787a32b4d41a79acf582433831510@BN3PR0301MB1236.namprd03.prod.outlook.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 10 Nov 2014 21:47:35 -0800
+Subject: [PATCH v7 0/5] This is the 1st version of suspend for RK3288.
+In-Reply-To: <22835729.YDXmW0qp6M@diego>
+References: <1415368177-6637-1-git-send-email-zyw@rock-chips.com>
+ <7hwq76pqyz.fsf@deeprootsystems.com> <22835729.YDXmW0qp6M@diego>
+Message-ID: <CAD=FV=UJAzVgZedrJJaxCc+3FdJp__NV9-9pY=wTH_ZydXrQcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
->-----Original Message-----
->From: Greg KH [mailto:gregkh at linuxfoundation.org]
->Sent: Tuesday, November 11, 2014 1:27 PM
->To: Florian Fainelli
->Cc: Lu Jingchang-B35083; linux-arm-kernel at lists.infradead.org; linux-
->kernel at vger.kernel.org; linux-serial at vger.kernel.org
->Subject: Re: [RESENDv5] serial: of-serial: fix up PM ops on
->no_console_suspend and port type
+On Mon, Nov 10, 2014 at 4:40 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> Hi Chris,
 >
->On Mon, Nov 10, 2014 at 08:30:36PM -0800, Florian Fainelli wrote:
->> 2014-10-27 2:24 GMT-07:00 Jingchang Lu <jingchang.lu@freescale.com>:
->> > This patch fixes commit 2dea53bf57783f243c892e99c10c6921e956aa7e,
->> > "serial: of-serial: add PM suspend/resume support", which disables
->> > the uart clock on suspend, but also causes a hardware hang on
->> > register access if no_console_suspend command line option is used.
->> >
->> > Also, not every of_serial device is an 8250 port, so the serial8250
->> > suspend/resume functions should only be applied to a real 8250 port.
+> Am Freitag, 7. November 2014, 14:48:20 schrieb Kevin Hilman:
+>> Chris Zhong <zyw@rock-chips.com> writes:
+>> > RK3288 can shut down the cpu, gpu and other device controllers in suspend,
+>> > and it will pull the GLOBAL_PWROFF pin to high in the final stage of the
+>> > process of suspend, pull the pin to low again when resume.
 >>
->> Greg, can you pick this one and submit it for your next 3.18-rc
->> submission? This fixes a regression when using "no_console_suspend"
->> introduced by:
+>> The cover letter still doesn't state what this series applies to, or
+>> what its dependencies are for testing, even though it was requested in
+>> earlier reviews[1].  I discovered (again) by trial and error it applies
+>> to current linux-next.  I also discovered (as was earlier discussed[2])
+>> that it still does not resume using current upstream code, and those
+>> dependencies are not described here either.  These are the kinds of
+>> things that are crucial in a cover letter in order to help reviewers and
+>> testers not have to spend time digging through the archives trying to
+>> remember from the previous round of reviews.
 >>
->> 2dea53bf57783f243c892e99c10c6921e956aa7e ("serial: of-serial: add PM
->> suspend/resume support") which has been merged during 3.18-rc1
+>> Please, please list the out-of-tree dependencies, and how to test,
+>> including how you tested it, and on what hardware.
 >
->Why can't I just revert that patch instead?  This is really late in the -
->rc cycle to be doing large fixes like this.
+> I'll second what Kevin said.
 >
->And this patch is already queued up for 3.19-rc1, so this is a mess...
->
->Any objection to me just reverting
->2dea53bf57783f243c892e99c10c6921e956aa7e, and then this one in my tty-next
->branch as well, and then someone resending the original patch in a format
->that actually works?
-Do you mean resending the "serial: of-serial: add PM suspend/resume support"
-patch with "serial: of-serial: fix up PM ops on no_console_suspend and port type"
-merged together? For you would like to reverting the previous patch of
-"2dea53bf57783f243c892e99c10c6921e956aa7e".
+> I guess the regulator suspend handling [0] is one of the requirements, but I'd
+> think there is more. And while Doug had a quite long list of suspend-related
+> patches in his try, for now we'll need the minimal set to enable this series
+> to sucessfully wake the system again after going to suspend.
 
-Thanks and Best Regards,
-Jingchang
->
->thanks,
->
->greg k-h
+With the current series we have in the Chrome OS tree, the WIP power
+domain patches are a requirement, which makes testing very hard.  I've
+suggested that Chris try going back to leaving the GPU on his patches.
+It's possible you could get basic suspend/resume without power domain
+patches in that case.  Once power domain stuff is in good shape then
+we can turn off the GPU, I think.
+
+...all of those things are needed to actually get the system into the
+lowest power state, but starting simple makes a lot of sense.
+
+-Doug
