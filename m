@@ -1,133 +1,63 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Tue, 11 Nov 2014 15:09:05 +0800
-Subject: [RESEND] serial: of-serial: add PM suspend/resume support
-Message-ID: <1415689745-28572-1-git-send-email-jingchang.lu@freescale.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Tue, 11 Nov 2014 14:03:58 +0530
+Subject: [PATCH v3 0/6] Touchscreen performance related fixes
+Message-ID: <1415694844-11230-1-git-send-email-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds suspend/resume support for the of-serial driver
-to provide power management support on devices attatched.
+This series of patches fix TSC defects related to lag in touchscreen
+performance and cursor jump at touch release. The lag was result of
+udelay in TSC interrupt handler. Cursor jump due to false pen-up event.
+The patches implement Advisory 1.0.31 in silicon errata of am335x-evm
+to avoid false pen-up events and remove udelay. The advisory says to use
+steps 1 to 4 for ADC and 5 to 16 for TSC (assuming 4 wire TSC and 4 channel
+ADC). Further the X co-ordinate must be the last one to be sampled just
+before charge step. The first two patches implement the required changes.
 
-The handling may vary since not every of_serial device is
-an 8250 port. Currently only 8250 port handling is added
-in the suspend/resume function based on the type switch.
+A DT parameter to configure the duration of tsc charge step. It represents
+number of ADC clock cycles to wait between applying the step configuration
+registers and going back to the IDLE state. The charge delay value can vary
+across boards. Configuring correct value of charge delay is important to avoid
+false pen-up events. Hence it is necessary to expose charge-delay value as
+DT parameter. The pen-up detection happens immediately after the charge step
+so this does in fact function as a hardware knob for adjusting the amount of
+settling time.
 
-Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Tested-by: Joseph Lo <josephl@nvidia.com>
-Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
-Tested-by: Florina Fainelli <f.fainelli@gmail.com>
----
-This patch merges the two pervious accepted patches into one
-to make things clearly:
-	commit	2dea53bf57783f243c892e99c10c6921e956aa7e
-	serial: of-serial: add PM suspend/resume support
+After applying these changes false pen-up events have not be observed and
+smooth circles can be drawn on touch screen. The performance is much better
+in recognizing quick movement across the screen. No lag or cursor jump is
+observed.
 
-	commit	513e438581020334e0345561adeeeaefa36701be
-	serial: of-serial: fix up PM ops on no_console_suspend and port type
+Change log:
 
-The first has a bug that causes a hardware hang on register
-access if no_console_suspend command line option used, also
-lack of disnguishing the port type. Then there is the second
-one.
+v3:
+ - Replace delta filtering logic in TSC driver with median filtering
+   as suggested by Richard.
+ - Addressed Lee Jones comments.
 
-The first has entered 3.18-rc but the second not, and both
-have entered linux-next tree, so please drop them first to
-apply this one. Thanks.
+v2:
+ - Addressed comments by Hartmut Knaack
+ - patch 2 was split into two as per Lee Jones comment
 
- drivers/tty/serial/of_serial.c | 66 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
+Brad Griffis (2):
+  input: touchscreen: ti_am335x_tsc Interchange touchscreen and ADC
+    steps
+  input: touchscreen: ti_am335x_tsc: Remove udelay in interrupt handler
 
-diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
-index e60b59f..f66d814 100644
---- a/drivers/tty/serial/of_serial.c
-+++ b/drivers/tty/serial/of_serial.c
-@@ -9,6 +9,7 @@
-  *  2 of the License, or (at your option) any later version.
-  *
-  */
-+#include <linux/console.h>
- #include <linux/module.h>
- #include <linux/slab.h>
- #include <linux/delay.h>
-@@ -251,6 +252,70 @@ static int of_platform_serial_remove(struct platform_device *ofdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+#ifdef CONFIG_SERIAL_8250
-+static void of_serial_suspend_8250(struct of_serial_info *info)
-+{
-+	struct uart_8250_port *port8250 = serial8250_get_port(info->line);
-+	struct uart_port *port = &port8250->port;
-+
-+	serial8250_suspend_port(info->line);
-+	if (info->clk && (!uart_console(port) || console_suspend_enabled))
-+		clk_disable_unprepare(info->clk);
-+}
-+
-+static void of_serial_resume_8250(struct of_serial_info *info)
-+{
-+	struct uart_8250_port *port8250 = serial8250_get_port(info->line);
-+	struct uart_port *port = &port8250->port;
-+
-+	if (info->clk && (!uart_console(port) || console_suspend_enabled))
-+		clk_prepare_enable(info->clk);
-+
-+	serial8250_resume_port(info->line);
-+}
-+#else
-+static inline void of_serial_suspend_8250(struct of_serial_info *info)
-+{
-+}
-+
-+static inline void of_serial_resume_8250(struct of_serial_info *info)
-+{
-+}
-+#endif
-+
-+static int of_serial_suspend(struct device *dev)
-+{
-+	struct of_serial_info *info = dev_get_drvdata(dev);
-+
-+	switch (info->type) {
-+	case PORT_8250 ... PORT_MAX_8250:
-+		of_serial_suspend_8250(info);
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
-+static int of_serial_resume(struct device *dev)
-+{
-+	struct of_serial_info *info = dev_get_drvdata(dev);
-+
-+	switch (info->type) {
-+	case PORT_8250 ... PORT_MAX_8250:
-+		of_serial_resume_8250(info);
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	return 0;
-+}
-+#endif
-+static SIMPLE_DEV_PM_OPS(of_serial_pm_ops, of_serial_suspend, of_serial_resume);
-+
- /*
-  * A few common types, add more as needed.
-  */
-@@ -282,6 +347,7 @@ static struct platform_driver of_platform_serial_driver = {
- 	.driver = {
- 		.name = "of_serial",
- 		.of_match_table = of_platform_serial_table,
-+		.pm = &of_serial_pm_ops,
- 	},
- 	.probe = of_platform_serial_probe,
- 	.remove = of_platform_serial_remove,
+Vignesh R (4):
+  mfd: ti_am335x_tscadc: Remove unwanted reg_se_cache save
+  ARM: dts: AM335x: Make charge delay a DT parameter for tsc
+  input: touchscreen: ti_am335x_tsc: Use charge delay DT parameter
+  input: touchscreen: ti_am335x_tsc: Replace delta filtering with median
+    filtering
+
+ .../bindings/input/touchscreen/ti-tsc-adc.txt      |  15 ++
+ arch/arm/boot/dts/am335x-evm.dts                   |   1 +
+ drivers/iio/adc/ti_am335x_adc.c                    |   5 +-
+ drivers/input/touchscreen/ti_am335x_tsc.c          | 179 +++++++++++----------
+ drivers/mfd/ti_am335x_tscadc.c                     |   7 +-
+ include/linux/mfd/ti_am335x_tscadc.h               |   4 +-
+ 6 files changed, 121 insertions(+), 90 deletions(-)
+
 -- 
-1.8.0
+1.9.1
