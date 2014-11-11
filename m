@@ -1,74 +1,45 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 11 Nov 2014 18:39:35 +0200
-Subject: [PATCH v2] ARM: dts: sbc-t3x: add DVI display data
-In-Reply-To: <20141111144911.GK31454@atomide.com>
-References: <1413364186-23752-1-git-send-email-lifshitz@compulab.co.il>
- <1414927198-7127-1-git-send-email-lifshitz@compulab.co.il>
- <54561E45.7000404@compulab.co.il> <20141110174845.GP31454@atomide.com>
- <5461FAEF.3010607@compulab.co.il> <20141111144911.GK31454@atomide.com>
-Message-ID: <54623BC7.6000603@compulab.co.il>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 12 Nov 2014 00:50:53 +0800
+Subject: [linux-sunxi] [PATCH v2 0/5] ARM: sunxi: Add support for USB OTG
+ PHY
+In-Reply-To: <5461D2C1.6020505@redhat.com>
+References: <cover.1415645258.git.rbyshko@gmail.com>
+ <5461D2C1.6020505@redhat.com>
+Message-ID: <CAGb2v65=xbP+QMTBtVGRg6cEXHhsYda45yKHGrq9QfKcXozHiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/14 16:49, Tony Lindgren wrote:
-> * Igor Grinberg <grinberg@compulab.co.il> [141111 04:04]:
->> Hi Tony,
+On Tue, Nov 11, 2014 at 5:11 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+> On 11/10/2014 07:55 PM, Roman Byshko wrote:
+>> Hi,
 >>
->> On 11/10/14 19:48, Tony Lindgren wrote:
->>> * Igor Grinberg <grinberg@compulab.co.il> [141102 04:08]:
->>>> On 11/02/14 13:19, Dmitry Lifshitz wrote:
->>>>> Add DSS related pinmux and display data nodes required to support
->>>>> DVI video out on SBC-T3530, SBC-T3730 and SBC-T3517.
->>>>>
->>>>> Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
->>>>
->>>> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
->>>
->>> Thanks applying into omap-for-v3.19/dt.
->>>
->>> Are we now ready to drop the board-cm-*.c files?
+>> There is already support for two USB phys, which are used for
+>> USB host controllers on Allwinner SoC aka sunxi.
 >>
->> Let's see, below is a list of things that are yet to be
->> supported in DT boot:
->> NAND, TV, LCD, Touchscreen, Audio (CM-T3x30), RTC (CM-T3517), CAN (CM-3517).
-> 
-> OK great, hopefully that's mostly just configuring the .dts
-> files.
-
-Well, mostly... but not all of it.
-
-The LCD, RTC and CAN require bindings/drivers work.
-
->  
->> We're rc4 now, so hopefully, we will be able to get all this in for 3.19
->> and then have the board files removed for 3.20.
-> 
-> Yes something like that sounds good to me. We should allow at
-> least one release for people to change over.
-> 
->> This way we can have 3.19 with both ways supported and do last checks.
+>> This patch series add support for the USB OTG phy (aka phy0).
 >>
->> Are you ok with this?
-> 
-> Sure if you get the changes posted before -rc6, otherwise
-> it will be too late for v3.19.
+>> The code has been tested on Allwinner A20 aka sun7i (Cubietruck).
+>>
+>> Best regards,
+>> Roman Byshko
+>
+> First of all very cool that you're working on this, I somehow missed
+> v1, but I'm very happy to see this.
+>
+> Second some questions, this series seems to only add support for
+> initializing the phy, without adding the necessary magic for
+> switching from app to host mode, and without actually hooking up musb,
+> I assume you've a follow up series adding musb support, which actually
+> uses the phy ?
+>
+> Also have you coordinated your work with ChenYu? ATM ChenYu is mostly
+> working on other stuff, but AFAIk he has been working on musb support
+> in the past.
 
-I think, I was too optimistic about 3.19, but we can try.
-Since drivers will require adaptation, I'm not sure
-it will be merged for 3.19...
-If we really want to make the DT boot for 3.19, we could work and
-post the drivers adaptation patches and in parallel (to keep thing
-going for board files removal) prepare patches for adding the
-problematic stuff via quirks. This way we can keep only the DT missing
-functionality in quirks and remove the board files. Once the drivers
-are adjusted with new bindings, we can remove the quirks.
+I'm happy that someone has taken over. I was mostly just exploring what
+OTG is, not much code actually made it into my working branch, which is
+available on github.
 
-Or if we are fine with keeping the board files for a little more, then
-just add the DT functionality that is ready and keep working on drivers
-until they are ready (hopefully, 1 - 2 releases).
-
-What do you think?
-
--- 
-Regards,
-Igor.
+ChenYu
