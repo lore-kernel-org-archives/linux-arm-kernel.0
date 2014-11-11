@@ -1,132 +1,334 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 11 Nov 2014 11:28:45 +0000
-Subject: [PATCH] Correct the race condition in
- aarch64_insn_patch_text_sync()
-In-Reply-To: <546113F4.1050304@redhat.com>
-References: <1415637362-30754-1-git-send-email-wcohen@redhat.com>
- <20141110170846.GH23942@arm.com> <546113F4.1050304@redhat.com>
-Message-ID: <20141111112844.GC16265@arm.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Tue, 11 Nov 2014 19:29:17 +0800
+Subject: [PATCH 1/2] watchdog: Add driver for Mediatek mt6589 watchdog
+In-Reply-To: <1414428092-20725-2-git-send-email-matthias.bgg@gmail.com>
+References: <1414428092-20725-1-git-send-email-matthias.bgg@gmail.com>
+ <1414428092-20725-2-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <1415705357.1776.11.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 10, 2014 at 07:37:24PM +0000, William Cohen wrote:
-> On 11/10/2014 12:08 PM, Will Deacon wrote:
-> > On Mon, Nov 10, 2014 at 04:36:02PM +0000, William Cohen wrote:
-> >> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> >> index e007714..e6266db 100644
-> >> --- a/arch/arm64/kernel/insn.c
-> >> +++ b/arch/arm64/kernel/insn.c
-> >> @@ -153,8 +153,10 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
-> >>  	int i, ret = 0;
-> >>  	struct aarch64_insn_patch *pp = arg;
-> >>  
-> >> -	/* The first CPU becomes master */
-> >> -	if (atomic_inc_return(&pp->cpu_count) == 1) {
-> >> +	/* Make sure all the processors are in this functionaarch64_insn_patch_text_cb(
-> >> +	   before patching the code. The last CPU to this function
-> >> +	   does the update. */
-> >> +	if (atomic_dec_return(&pp->cpu_count) == 0) {
-> >>  		for (i = 0; ret == 0 && i < pp->insn_cnt; i++)
-> >>  			ret = aarch64_insn_patch_text_nosync(pp->text_addrs[i],
-> >>  							     pp->new_insns[i]);
-> >> @@ -163,7 +165,8 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
-> >>  		 * which ends with "dsb; isb" pair guaranteeing global
-> >>  		 * visibility.
-> >>  		 */
-> >> -		atomic_set(&pp->cpu_count, -1);
-> >> +		/* Notifiy other processors with an additional decrement. */
-> >> +		atomic_dec(&pp->cpu_count);
-> >>  	} else {
-> >>  		while (atomic_read(&pp->cpu_count) != -1)
-> >>  			cpu_relax();
-> >> @@ -185,6 +188,7 @@ int __kprobes aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt)
-> >>  	if (cnt <= 0)
-> >>  		return -EINVAL;
-> >>  
-> >> +	atomic_set(&patch.cpu_count, num_online_cpus());
-> > 
-> > I think this is still racy with hotplug before stop_machine has done
-> > get_online_cpus. How about we leave the increment in the callback and change
-> > the exit condition to compare with num_online_cpus() instead?
->
-> Thanks for the feedback. I am no expert in the corner cases involved with
-> hotplug.  Dave Long suggested something similar with num_online_cpus in
-> the arch64_insn_patch_text_cb() and using increments and checking the
-> num_cpus_online() inside aarch64_insn_patch_text_cb().  Moving the
-> num_cpu_online() inside the aarch64_insn_patch_text_cb() is sufficient to
-> avoid race conditions with hotplug?  If so, would the attached patch be
-> appropriate?
-
-Yes, because stop_machine() does {get,put}_online_cpus() around the
-invocation.
-
-> From d02e3244c436234d0d07500be6d4df64feb2052a Mon Sep 17 00:00:00 2001
-> From: William Cohen <wcohen@redhat.com>
-> Date: Mon, 10 Nov 2014 14:26:44 -0500
-> Subject: [PATCH] Correct the race condition in aarch64_insn_patch_text_sync()
+On Tue, 2014-10-28 at 00:41 +0800, Matthias Brugger wrote:
+> This patch adds a driver for the Mediatek mt6589 SoC integrated
+> watchdog.
 > 
-> When experimenting with patches to provide kprobes support for aarch64
-> smp machines would hang when inserting breakpoints into kernel code.
-> The hangs were caused by a race condition in the code called by
-> aarch64_insn_patch_text_sync().  The first processor in the
-> aarch64_insn_patch_text_cb() function would patch the code while other
-> processors were still entering the function and incrementing the
-> cpu_count field.  This resulted in some processors never observing the
-> exit condition and exiting the function.  Thus, processors in the
-> system hung.
-> 
-> The patching function now waits for all processors to enter the
-> patching function before changing code to ensure that none of the
-> processors are in code that is going to be patched.  Once all the
-> processors have entered the function, the last processor to enter the
-> patching function performs the patching and signals that the patching
-> is complete with one last increment of the cpu_count field to make it
-> num_cpus_online()+1.
-> 
-> Signed-off-by: William Cohen <wcohen@redhat.com>
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 > ---
->  arch/arm64/kernel/insn.c | 12 ++++++++----
->  1 file changed, 8 insertions(+), 4 deletions(-)
+>  drivers/watchdog/Kconfig   |  10 ++
+>  drivers/watchdog/Makefile  |   1 +
+>  drivers/watchdog/mtk_wdt.c | 264 +++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 275 insertions(+)
+>  create mode 100644 drivers/watchdog/mtk_wdt.c
 > 
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index e007714..4fdddf1 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -151,10 +151,13 @@ struct aarch64_insn_patch {
->  static int __kprobes aarch64_insn_patch_text_cb(void *arg)
->  {
->  	int i, ret = 0;
-> +	int count = num_online_cpus();
->  	struct aarch64_insn_patch *pp = arg;
->  
-> -	/* The first CPU becomes master */
-> -	if (atomic_inc_return(&pp->cpu_count) == 1) {
-> +	/* Make sure all the processors are in this function
-> +	   before patching the code. The last CPU to this function
-> +	   does the update. */
-> +	if (atomic_inc_return(&pp->cpu_count) == count) {
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index d0107d4..fcbca1b 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -505,6 +505,16 @@ config MESON_WATCHDOG
+>           To compile this driver as a module, choose M here: the
+>           module will be called meson_wdt.
+> 
+> +config MEDIATEK_WATCHDOG
+> +       tristate "Mediatek SoCs watchdog support"
+> +       depends on ARCH_MEDIATEK
+> +       select WATCHDOG_CORE
+> +       help
+> +         Say Y here to include support for the watchdog timer
+> +         in Mediatek SoCs.
+> +         To compile this driver as a module, choose M here: the
+> +         module will be called mtk_wdt.
+> +
+>  # AVR32 Architecture
+> 
+>  config AT32AP700X_WDT
+> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+> index c569ec8..0d4821f 100644
+> --- a/drivers/watchdog/Makefile
+> +++ b/drivers/watchdog/Makefile
+> @@ -63,6 +63,7 @@ obj-$(CONFIG_QCOM_WDT) += qcom-wdt.o
+>  obj-$(CONFIG_BCM_KONA_WDT) += bcm_kona_wdt.o
+>  obj-$(CONFIG_TEGRA_WATCHDOG) += tegra_wdt.o
+>  obj-$(CONFIG_MESON_WATCHDOG) += meson_wdt.o
+> +obj-$(CONFIG_MEDIATEK_WATCHDOG) += mtk_wdt.o
+> 
+>  # AVR32 Architecture
+>  obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
+> diff --git a/drivers/watchdog/mtk_wdt.c b/drivers/watchdog/mtk_wdt.c
+> new file mode 100644
+> index 0000000..4624821
+> --- /dev/null
+> +++ b/drivers/watchdog/mtk_wdt.c
+> @@ -0,0 +1,264 @@
+> +/*
+> + * Mediatek Watchdog Driver
+> + *
+> + * Copyright (C) 2014 Matthias Brugger
+> + *
+> + * Matthias Brugger <matthias.bgg@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * Based on mtk_wdt.c
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/err.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/moduleparam.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/types.h>
+> +#include <linux/watchdog.h>
+> +#include <linux/notifier.h>
+> +#include <linux/reboot.h>
+> +#include <linux/delay.h>
+> +
+> +#define WDT_MAX_TIMEOUT                31
+> +#define WDT_MIN_TIMEOUT                1
+> +#define WDT_LENGTH_TIMEOUT(n)  ((n) << 5)
+> +
+> +#define WDT_LENGTH             0x04
+> +#define WDT_LENGTH_KEY         0x8
+> +
+> +#define WDT_RST                        0x08
+> +#define WDT_RST_RELOAD         0x1971
+> +
+> +#define WDT_MODE               0x00
+> +#define WDT_MODE_EN            (1 << 0)
+> +#define WDT_MODE_EXT_POL_LOW   (0 << 1)
+> +#define WDT_MODE_EXT_POL_HIGH  (1 << 1)
+> +#define WDT_MODE_EXRST_EN      (1 << 2)
+> +#define WDT_MODE_IRQ_EN                (1 << 3)
+> +#define WDT_MODE_AUTO_START    (1 << 4)
+> +#define WDT_MODE_DUAL_EN       (1 << 6)
+> +#define WDT_MODE_KEY           0x22000000
+> +
+> +#define WDT_SWRST              0x14
+> +#define WDT_SWRST_KEY          0x1209
+> +
+> +#define DRV_NAME               "mtk-wdt"
+> +#define DRV_VERSION            "1.0"
+> +
+> +static bool nowayout = WATCHDOG_NOWAYOUT;
+> +static unsigned int timeout = WDT_MAX_TIMEOUT;
+> +
+> +struct mtk_wdt_dev {
+> +       struct watchdog_device wdt_dev;
+> +       void __iomem *wdt_base;
+> +       struct notifier_block restart_handler;
+> +};
+> +
+> +static int mtk_reset_handler(struct notifier_block *this, unsigned long mode,
+> +                               void *cmd)
+> +{
+> +       struct mtk_wdt_dev *mtk_wdt = container_of(this,
+> +                                                      struct mtk_wdt_dev,
+> +                                                      restart_handler);
+> +       void __iomem *wdt_base = mtk_wdt->wdt_base;
+> +       u32 reg;
+> +
+> +       /* Enable watchdog */
+> +       reg = readl(wdt_base + WDT_MODE);
+> +       reg |= WDT_MODE_EN;
+> +       writel(reg, wdt_base + WDT_MODE);
+> +
+> +       /* Reload counter */
+> +       writel(WDT_RST_RELOAD, wdt_base + WDT_RST);
+> +
+> +       /* Reset system */
+> +       writel(WDT_SWRST_KEY, wdt_base + WDT_SWRST);
+> +
+> +       while (1) {
+> +               mdelay(5);
+> +               writel(WDT_SWRST_KEY, wdt_base + WDT_SWRST);
+> +       }
+> +       return NOTIFY_DONE;
+> +
+> +}
+> +
+> +static int mtk_wdt_ping(struct watchdog_device *wdt_dev)
+> +{
+> +       struct mtk_wdt_dev *mtk_wdt = watchdog_get_drvdata(wdt_dev);
+> +       void __iomem *wdt_base = mtk_wdt->wdt_base;
+> +
+> +       iowrite32(WDT_RST_RELOAD, wdt_base + WDT_RST);
+> +
+> +       return 0;
+> +}
+> +
+> +static int mtk_wdt_set_timeout(struct watchdog_device *wdt_dev,
+> +               unsigned int timeout)
+> +{
+> +       struct mtk_wdt_dev *mtk_wdt = watchdog_get_drvdata(wdt_dev);
+> +       void __iomem *wdt_base = mtk_wdt->wdt_base;
+> +       u32 reg;
+> +
+> +       mtk_wdt->wdt_dev.timeout = timeout;
+> +
+> +       /* One bit is the value of 512 ticks
+> +        * The clock has 32 KHz
+> +        */
+> +       reg = WDT_LENGTH_TIMEOUT(timeout << 6) | WDT_LENGTH_KEY;
+> +       iowrite32(reg, wdt_base + WDT_LENGTH);
+> +
+> +       mtk_wdt_ping(wdt_dev);
+> +
+> +       return 0;
+> +}
+> +
+> +static int mtk_wdt_stop(struct watchdog_device *wdt_dev)
+> +{
+> +       struct mtk_wdt_dev *mtk_wdt = watchdog_get_drvdata(wdt_dev);
+> +       void __iomem *wdt_base = mtk_wdt->wdt_base;
+> +       u32 reg;
+> +
+> +       reg = readl(wdt_base + WDT_MODE);
+> +       reg &= ~(WDT_MODE_EN);
+> +       iowrite32(reg, wdt_base + WDT_MODE);
+> +
+> +       return 0;
+> +}
+> +
+> +static int mtk_wdt_start(struct watchdog_device *wdt_dev)
+> +{
+> +       u32 reg;
+> +       struct mtk_wdt_dev *mtk_wdt = watchdog_get_drvdata(wdt_dev);
+> +       void __iomem *wdt_base = mtk_wdt->wdt_base;
+> +       u32 ret;
+> +
+> +       ret = mtk_wdt_set_timeout(&mtk_wdt->wdt_dev,
+> +                       mtk_wdt->wdt_dev.timeout);
+> +       if (ret < 0)
+> +               return ret;
+> +
+> +       reg = ioread32(wdt_base + WDT_MODE);
+> +       reg |= (WDT_MODE_EN | WDT_MODE_KEY);
 
-Actually, you can leave this hunk alone and leave the first CPU to do the
-patching.
+According to datasheet, default value of register WDT_MODE bit6 is 1.
+Which means when reach timeout, still need another timeout time to
+restart the system. Should clear this bit to disable dual mode:
+        reg &= ~(WDT_MODE_DUAL_EN);
 
->  		for (i = 0; ret == 0 && i < pp->insn_cnt; i++)
->  			ret = aarch64_insn_patch_text_nosync(pp->text_addrs[i],
->  							     pp->new_insns[i]);
-> @@ -163,9 +166,10 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
->  		 * which ends with "dsb; isb" pair guaranteeing global
->  		 * visibility.
->  		 */
-> -		atomic_set(&pp->cpu_count, -1);
-> +		/* Notifiy other processors with an additional increment. */
-
-Notify
-
-> +		atomic_inc(&pp->cpu_count);
->  	} else {
-> -		while (atomic_read(&pp->cpu_count) != -1)
-> +		while (atomic_read(&pp->cpu_count) <= count)
->  			cpu_relax();
-
-Then make this 'cpu_count <= num_online_cpus()'
-
-Will
+> +       iowrite32(reg, wdt_base + WDT_MODE);
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct watchdog_info mtk_wdt_info = {
+> +       .identity       = DRV_NAME,
+> +       .options        = WDIOF_SETTIMEOUT |
+> +                         WDIOF_KEEPALIVEPING |
+> +                         WDIOF_MAGICCLOSE,
+> +};
+> +
+> +static const struct watchdog_ops mtk_wdt_ops = {
+> +       .owner          = THIS_MODULE,
+> +       .start          = mtk_wdt_start,
+> +       .stop           = mtk_wdt_stop,
+> +       .ping           = mtk_wdt_ping,
+> +       .set_timeout    = mtk_wdt_set_timeout,
+> +};
+> +
+> +static int mtk_wdt_probe(struct platform_device *pdev)
+> +{
+> +       struct mtk_wdt_dev *mtk_wdt;
+> +       struct resource *res;
+> +       int err;
+> +
+> +       mtk_wdt = devm_kzalloc(&pdev->dev, sizeof(*mtk_wdt), GFP_KERNEL);
+> +       if (!mtk_wdt)
+> +               return -EINVAL;
+> +
+> +       platform_set_drvdata(pdev, mtk_wdt);
+> +
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       mtk_wdt->wdt_base = devm_ioremap_resource(&pdev->dev, res);
+> +       if (IS_ERR(mtk_wdt->wdt_base))
+> +               return PTR_ERR(mtk_wdt->wdt_base);
+> +
+> +       mtk_wdt->wdt_dev.info = &mtk_wdt_info;
+> +       mtk_wdt->wdt_dev.ops = &mtk_wdt_ops;
+> +       mtk_wdt->wdt_dev.timeout = WDT_MAX_TIMEOUT;
+> +       mtk_wdt->wdt_dev.max_timeout = WDT_MAX_TIMEOUT;
+> +       mtk_wdt->wdt_dev.min_timeout = WDT_MIN_TIMEOUT;
+> +       mtk_wdt->wdt_dev.parent = &pdev->dev;
+> +
+> +       watchdog_init_timeout(&mtk_wdt->wdt_dev, timeout, &pdev->dev);
+> +       watchdog_set_nowayout(&mtk_wdt->wdt_dev, nowayout);
+> +
+> +       watchdog_set_drvdata(&mtk_wdt->wdt_dev, mtk_wdt);
+> +
+> +       mtk_wdt_stop(&mtk_wdt->wdt_dev);
+> +
+> +       err = watchdog_register_device(&mtk_wdt->wdt_dev);
+> +       if (unlikely(err))
+> +               return err;
+> +
+> +       mtk_wdt->restart_handler.notifier_call = mtk_reset_handler;
+> +       mtk_wdt->restart_handler.priority = 128;
+> +       err = register_restart_handler(&mtk_wdt->restart_handler);
+> +       if (err)
+> +               dev_err(&pdev->dev,
+> +                       "cannot register restart handler (err=%d)\n", err);
+> +
+> +       dev_info(&pdev->dev, "Watchdog enabled (timeout=%d sec, nowayout=%d)",
+> +                       mtk_wdt->wdt_dev.timeout, nowayout);
+> +
+> +       return 0;
+> +}
+> +
+> +static int mtk_wdt_remove(struct platform_device *pdev)
+> +{
+> +       struct mtk_wdt_dev *mtk_wdt = platform_get_drvdata(pdev);
+> +
+> +       unregister_restart_handler(&mtk_wdt->restart_handler);
+> +
+> +       watchdog_unregister_device(&mtk_wdt->wdt_dev);
+> +       watchdog_set_drvdata(&mtk_wdt->wdt_dev, NULL);
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct of_device_id mtk_wdt_dt_ids[] = {
+> +       { .compatible = "mediatek,mt6589-wdt" },
+> +       { /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, mtk_wdt_dt_ids);
+> +
+> +static struct platform_driver mtk_wdt_driver = {
+> +       .probe          = mtk_wdt_probe,
+> +       .remove         = mtk_wdt_remove,
+> +       .driver         = {
+> +               .owner          = THIS_MODULE,
+> +               .name           = DRV_NAME,
+> +               .of_match_table = mtk_wdt_dt_ids,
+> +       },
+> +};
+> +
+> +module_platform_driver(mtk_wdt_driver);
+> +
+> +module_param(timeout, uint, 0);
+> +MODULE_PARM_DESC(timeout, "Watchdog heartbeat in seconds");
+> +
+> +module_param(nowayout, bool, 0);
+> +MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
+> +                       __MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
+> +
+> +MODULE_LICENSE("GPL");
+> +MODULE_AUTHOR("Matthias Brugger <matthias.bgg@gmail.com>");
+> +MODULE_DESCRIPTION("Mediatek WatchDog Timer Driver");
+> +MODULE_VERSION(DRV_VERSION);
+> --
+> 1.9.1
+> 
