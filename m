@@ -1,331 +1,196 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 11 Nov 2014 15:48:07 +0000
-Subject: [PATCH 09/15] irqchip: GICv3: ITS: tables allocators
+Date: Tue, 11 Nov 2014 15:48:09 +0000
+Subject: [PATCH 11/15] irqchip: GICv3: ITS: MSI support
 In-Reply-To: <1415720893-13371-1-git-send-email-marc.zyngier@arm.com>
 References: <1415720893-13371-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1415720893-13371-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1415720893-13371-12-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The interrupt translation is driven by a set of tables (device,
-ITT, and collection) to be in the end delivered to a CPU. Also,
-the redistributors rely on a couple of tables (configuration, and
-pending) to deliver the interrupts to the CPUs.
-
-This patch adds the required allocators for these tables.
+Now, the bit of code that allow us to use the ITS as a MSI controller.
+Both MSI and MSI-X are supported.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 293 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 293 insertions(+)
+ drivers/irqchip/irq-gic-v3-its.c   | 131 +++++++++++++++++++++++++++++++++++++
+ include/linux/irqchip/arm-gic-v3.h |   6 ++
+ 2 files changed, 137 insertions(+)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index f57b6dc..92e0f49 100644
+index 8d13012..0f51d23 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -90,6 +90,15 @@ struct its_device {
- 	u32			device_id;
+@@ -35,6 +35,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/cputype.h>
+ #include <asm/exception.h>
++#include <asm/msi.h>
+ 
+ #include "irqchip.h"
+ 
+@@ -587,12 +588,27 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 	return IRQ_SET_MASK_OK;
+ }
+ 
++static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
++{
++	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
++	struct its_node *its;
++	u64 addr;
++
++	its = its_dev->its;
++	addr = its->phys_base + GITS_TRANSLATER;
++
++	msg->address_lo		= addr & ((1UL << 32) - 1);
++	msg->address_hi		= addr >> 32;
++	msg->data		= its_get_event_id(d);
++}
++
+ static struct irq_chip its_irq_chip = {
+ 	.name			= "ITS",
+ 	.irq_mask		= its_mask_irq,
+ 	.irq_unmask		= its_unmask_irq,
+ 	.irq_eoi		= its_eoi_irq,
+ 	.irq_set_affinity	= its_set_affinity,
++	.irq_compose_msi_msg	= its_irq_compose_msi_msg,
  };
  
-+static LIST_HEAD(its_nodes);
-+static DEFINE_SPINLOCK(its_lock);
-+static struct irq_domain *lpi_domain;
-+static struct device_node *gic_root_node;
-+static struct rdists *gic_rdists;
-+
-+#define gic_data_rdist()		(raw_cpu_ptr(gic_rdists->rdist))
-+#define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
-+
  /*
-  * ITS command descriptors - parameters to be encoded in a command
-  * block.
-@@ -688,3 +697,287 @@ static void its_lpi_free(unsigned long *bitmap, int base, int nr_ids)
- 
- 	kfree(bitmap);
+@@ -1055,3 +1071,118 @@ static void its_free_device(struct its_device *its_dev)
+ 	kfree(its_dev->itt);
+ 	kfree(its_dev);
  }
 +
-+/*
-+ * We allocate 64kB for PROPBASE. That gives us at most 64K LPIs to
-+ * deal with (one configuration byte per interrupt). PENDBASE has to
-+ * be 64kB aligned (one bit per LPI, plus 8192 bits for SPI/PPI/SGI).
-+ */
-+#define LPI_PROPBASE_SZ		SZ_64K
-+#define LPI_PENDBASE_SZ		(LPI_PROPBASE_SZ / 8 + SZ_1K)
-+
-+/*
-+ * This is how many bits of ID we need, including the useless ones.
-+ */
-+#define LPI_NRBITS		ilog2(LPI_PROPBASE_SZ + SZ_8K)
-+
-+#define LPI_PROP_DEFAULT_PRIO	0xa0
-+
-+static int __init its_alloc_lpi_tables(void)
++static int its_alloc_device_irq(struct its_device *dev, irq_hw_number_t *hwirq)
 +{
-+	phys_addr_t paddr;
++	int idx;
 +
-+	gic_rdists->prop_page = alloc_pages(GFP_NOWAIT,
-+					   get_order(LPI_PROPBASE_SZ));
-+	if (!gic_rdists->prop_page) {
-+		pr_err("Failed to allocate PROPBASE\n");
-+		return -ENOMEM;
-+	}
++	idx = find_first_zero_bit(dev->lpi_map, dev->nr_lpis);
++	if (idx == dev->nr_lpis)
++		return -ENOSPC;
 +
-+	paddr = page_to_phys(gic_rdists->prop_page);
-+	pr_info("GIC: using LPI property table @%pa\n", &paddr);
++	*hwirq = dev->lpi_base + idx;
++	set_bit(idx, dev->lpi_map);
 +
-+	/* Priority 0xa0, Group-1, disabled */
-+	memset(page_address(gic_rdists->prop_page),
-+	       LPI_PROP_DEFAULT_PRIO | LPI_PROP_GROUP1,
-+	       LPI_PROPBASE_SZ);
-+
-+	/* Make sure the GIC will observe the written configuration */
-+	__flush_dcache_area(page_address(gic_rdists->prop_page), LPI_PROPBASE_SZ);
++	/* Map the GIC irq ID to the device */
++	its_send_mapvi(dev, *hwirq, idx);
 +
 +	return 0;
 +}
 +
-+static const char *its_base_type_string[] = {
-+	[GITS_BASER_TYPE_DEVICE]	= "Devices",
-+	[GITS_BASER_TYPE_VCPU]		= "Virtual CPUs",
-+	[GITS_BASER_TYPE_CPU]		= "Physical CPUs",
-+	[GITS_BASER_TYPE_COLLECTION]	= "Interrupt Collections",
-+	[GITS_BASER_TYPE_RESERVED5] 	= "Reserved (5)",
-+	[GITS_BASER_TYPE_RESERVED6] 	= "Reserved (6)",
-+	[GITS_BASER_TYPE_RESERVED7] 	= "Reserved (7)",
-+};
-+
-+static void its_free_tables(struct its_node *its)
++static int its_irq_gic_domain_alloc(struct irq_domain *domain,
++				    unsigned int virq,
++				    irq_hw_number_t hwirq)
 +{
-+	int i;
++	struct of_phandle_args args;
 +
-+	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
-+		if (its->tables[i]) {
-+			free_page((unsigned long)its->tables[i]);
-+			its->tables[i] = NULL;
-+		}
-+	}
++	args.np = domain->parent->of_node;
++	args.args_count = 3;
++	args.args[0] = GIC_IRQ_TYPE_LPI;
++	args.args[1] = hwirq;
++	args.args[2] = IRQ_TYPE_EDGE_RISING;
++
++	return irq_domain_alloc_irqs_parent(domain, virq, 1, &args);
 +}
 +
-+static int its_alloc_tables(struct its_node *its)
++/* FIXME: Use proper API once it is available in the kernel... */
++#define PCI_REQUESTER_ID(dev)	PCI_DEVID((dev)->bus->number, (dev)->devfn)
++
++static int its_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
++				unsigned int nr_irqs, void *arg)
 +{
++	struct arm64_msi_info *info = arg;
++	struct pci_dev *pdev = info->pdev;
++	struct msi_chip *chip = pdev->bus->msi;
++	struct its_node *its = container_of(chip, struct its_node, msi_chip);
++	u32 dev_id = PCI_REQUESTER_ID(pdev);
++	struct its_device *its_dev;
++	irq_hw_number_t hwirq;
 +	int err;
 +	int i;
-+	int psz = PAGE_SIZE;
-+	u64 shr = GITS_BASER_InnerShareable;
 +
-+	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
-+		u64 val = readq_relaxed(its->base + GITS_BASER + i * 8);
-+		u64 type = GITS_BASER_TYPE(val);
-+		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
-+		u64 tmp;
-+		void *base;
-+
-+		if (type == GITS_BASER_TYPE_NONE)
-+			continue;
-+
-+		/* We're lazy and only allocate a single page for now */
-+		base = (void *)get_zeroed_page(GFP_KERNEL);
-+		if (!base) {
-+			err = -ENOMEM;
-+			goto out_free;
-+		}
-+
-+		its->tables[i] = base;
-+
-+retry_baser:
-+		val = (virt_to_phys(base) 				 |
-+		       (type << GITS_BASER_TYPE_SHIFT)			 |
-+		       ((entry_size - 1) << GITS_BASER_ENTRY_SIZE_SHIFT) |
-+		       GITS_BASER_WaWb					 |
-+		       shr						 |
-+		       GITS_BASER_VALID);
-+
-+		switch (psz) {
-+		case SZ_4K:
-+			val |= GITS_BASER_PAGE_SIZE_4K;
-+			break;
-+		case SZ_16K:
-+			val |= GITS_BASER_PAGE_SIZE_16K;
-+			break;
-+		case SZ_64K:
-+			val |= GITS_BASER_PAGE_SIZE_64K;
-+			break;
-+		}
-+
-+		val |= (PAGE_SIZE / psz) - 1;
-+
-+		writeq_relaxed(val, its->base + GITS_BASER + i * 8);
-+		tmp = readq_relaxed(its->base + GITS_BASER + i * 8);
-+
-+		if ((val ^ tmp) & GITS_BASER_SHAREABILITY_MASK) {
-+			/*
-+			 * Shareability didn't stick. Just use
-+			 * whatever the read reported, which is likely
-+			 * to be the only thing this redistributor
-+			 * supports.
-+			 */
-+			shr = tmp & GITS_BASER_SHAREABILITY_MASK;
-+			goto retry_baser;
-+		}
-+
-+		if ((val ^ tmp) & GITS_BASER_PAGE_SIZE_MASK) {
-+			/*
-+			 * Page size didn't stick. Let's try a smaller
-+			 * size and retry. If we reach 4K, then
-+			 * something is horribly wrong...
-+			 */
-+			switch (psz) {
-+			case SZ_16K:
-+				psz = SZ_4K;
-+				goto retry_baser;
-+			case SZ_64K:
-+				psz = SZ_16K;
-+				goto retry_baser;
-+			}
-+		}
-+
-+		if (val != tmp) {
-+			pr_err("ITS: %s: GITS_BASER%d doesn't stick: %lx %lx\n",
-+			       its->msi_chip.of_node->full_name, i,
-+			       (unsigned long) val, (unsigned long) tmp);
-+			err = -ENXIO;
-+			goto out_free;
-+		}
-+
-+		pr_info("ITS: allocated %d %s @%lx (psz %dK, shr %d)\n",
-+			(int)(PAGE_SIZE / entry_size),
-+			its_base_type_string[type],
-+			(unsigned long)virt_to_phys(base),
-+			psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
++	its_dev = its_find_device(its, dev_id);
++	if (!its_dev) {
++		its_dev = its_create_device(its, dev_id, info->nvec);
++		dev_dbg(&pdev->dev, "ITT %d entries, %d bits\n",
++			info->nvec, ilog2(info->nvec));
 +	}
-+
-+	return 0;
-+
-+out_free:
-+	its_free_tables(its);
-+
-+	return err;
-+}
-+
-+static int its_alloc_collections(struct its_node *its)
-+{
-+	its->collections = kzalloc(nr_cpu_ids * sizeof(*its->collections),
-+				   GFP_KERNEL);
-+	if (!its->collections)
++	if (!its_dev)
 +		return -ENOMEM;
 +
++	for (i = 0; i < nr_irqs; i++) {
++		err = its_alloc_device_irq(its_dev, &hwirq);
++		if (err)
++			return err;
++
++		err = its_irq_gic_domain_alloc(domain, virq, hwirq);
++		if (err)
++			return err;
++
++		irq_domain_set_hwirq_and_chip(lpi_domain, virq + i,
++					      hwirq, &its_irq_chip, its_dev);
++		dev_dbg(&pdev->dev, "ID:%d pID:%d vID:%d\n",
++			(int)(hwirq - its_dev->lpi_base),
++			(int)hwirq, virq + i);
++	}
++
 +	return 0;
 +}
 +
-+static void its_cpu_init_lpis(void)
++static void its_irq_domain_free(struct irq_domain *domain, unsigned int virq,
++				unsigned int nr_irqs)
 +{
-+	void __iomem *rbase = gic_data_rdist_rd_base();
-+	struct page *pend_page;
-+	u64 val, tmp;
++	struct irq_data *d = irq_get_irq_data(virq);
++	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
++	int i;
 +
-+	/* If we didn't allocate the pending table yet, do it now */
-+	pend_page = gic_data_rdist()->pend_page;
-+	if (!pend_page) {
-+		phys_addr_t paddr;
-+		/*
-+		 * The pending pages have to be at least 64kB aligned,
-+		 * hence the 'max(LPI_PENDBASE_SZ, SZ_64K)' below.
-+		 */
-+		pend_page = alloc_pages(GFP_NOWAIT | __GFP_ZERO,
-+					get_order(max(LPI_PENDBASE_SZ, SZ_64K)));
-+		if (!pend_page) {
-+			pr_err("Failed to allocate PENDBASE for CPU%d\n",
-+			       smp_processor_id());
-+			return;
-+		}
++	for (i = 0; i < nr_irqs; i++) {
++		int event = its_get_event_id(d);
 +
-+		/* Make sure the GIC will observe the zero-ed page */
-+		__flush_dcache_area(page_address(pend_page), LPI_PENDBASE_SZ);
++		/* Stop the delivery of interrupts */
++		its_send_discard(its_dev, event);
 +
-+		paddr = page_to_phys(pend_page);
-+		pr_info("CPU%d: using LPI pending table @%pa\n",
-+			smp_processor_id(), &paddr);
-+		gic_data_rdist()->pend_page = pend_page;
++		/* Mark interrupt index as unused, and clear the mapping */
++		clear_bit(event, its_dev->lpi_map);
++
++		irq_set_handler(virq + i, NULL);
++		irq_domain_set_hwirq_and_chip(domain, virq + i, 0, NULL, NULL);
 +	}
 +
-+	/* Disable LPIs */
-+	val = readl_relaxed(rbase + GICR_CTLR);
-+	val &= ~GICR_CTLR_ENABLE_LPIS;
-+	writel_relaxed(val, rbase + GICR_CTLR);
++	/* If all interrupts have been freed, start mopping the floor */
++	if (bitmap_empty(its_dev->lpi_map, its_dev->nr_lpis)) {
++		its_lpi_free(its_dev->lpi_map,
++			     its_dev->lpi_base,
++			     its_dev->nr_lpis);
 +
-+	/*
-+	 * Make sure any change to the table is observable by the GIC.
-+	 */
-+	dsb(sy);
-+
-+	/* set PROPBASE */
-+	val = (page_to_phys(gic_rdists->prop_page) |
-+	       GICR_PROPBASER_InnerShareable |
-+	       GICR_PROPBASER_WaWb |
-+	       ((LPI_NRBITS - 1) & GICR_PROPBASER_IDBITS_MASK));
-+
-+	writeq_relaxed(val, rbase + GICR_PROPBASER);
-+	tmp = readq_relaxed(rbase + GICR_PROPBASER);
-+
-+	if ((tmp ^ val) & GICR_PROPBASER_SHAREABILITY_MASK) {
-+		pr_info_once("GIC: using cache flushing for LPI property table\n");
-+		gic_rdists->flags |= RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING;
++		/* Unmap device/itt */
++		its_send_mapd(its_dev, 0);
++		its_free_device(its_dev);
 +	}
 +
-+	/* set PENDBASE */
-+	val = (page_to_phys(pend_page) |
-+	       GICR_PROPBASER_InnerShareable |
-+	       GICR_PROPBASER_WaWb);
-+
-+	writeq_relaxed(val, rbase + GICR_PENDBASER);
-+
-+	/* Enable LPIs */
-+	val = readl_relaxed(rbase + GICR_CTLR);
-+	val |= GICR_CTLR_ENABLE_LPIS;
-+	writel_relaxed(val, rbase + GICR_CTLR);
-+
-+	/* Make sure the GIC has seen the above */
-+	dsb(sy);
++	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
 +}
 +
-+static void its_cpu_init_collection(void)
-+{
-+	struct its_node *its;
-+	int cpu;
++static const struct irq_domain_ops its_domain_ops = {
++	.alloc			= its_irq_domain_alloc,
++	.free			= its_irq_domain_free,
++};
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 21c9d70..2a7486b 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -295,6 +295,12 @@
+ 
+ #include <linux/stringify.h>
+ 
++/*
++ * We need a value to serve as a irq-type for LPIs. Choose one that will
++ * pick the interest of the reviewer.
++ */
++#define GIC_IRQ_TYPE_LPI		0xa110c8ed
 +
-+	spin_lock(&its_lock);
-+	cpu = smp_processor_id();
-+
-+	list_for_each_entry(its, &its_nodes, entry) {
-+		u64 target;
-+
-+		/*
-+		 * We now have to bind each collection to its target
-+		 * redistributor.
-+		 */
-+		if (readq_relaxed(its->base + GITS_TYPER) & GITS_TYPER_PTA) {
-+			/*
-+			 * This ITS wants the physical address of the
-+			 * redistributor.
-+			 */
-+			target = gic_data_rdist()->phys_base;
-+		} else {
-+			/*
-+			 * This ITS wants a linear CPU number.
-+			 */
-+			target = readq_relaxed(gic_data_rdist_rd_base() + GICR_TYPER);
-+			target = GICR_TYPER_CPU_NUMBER(target);
-+		}
-+
-+		/* Perform collection mapping */
-+		its->collections[cpu].target_address = target;
-+		its->collections[cpu].col_id = cpu;
-+
-+		its_send_mapc(its, &its->collections[cpu], 1);
-+		its_send_invall(its, &its->collections[cpu]);
-+	}
-+
-+	spin_unlock(&its_lock);
-+}
+ struct rdists {
+ 	struct {
+ 		void __iomem	*rd_base;
 -- 
 2.0.4
