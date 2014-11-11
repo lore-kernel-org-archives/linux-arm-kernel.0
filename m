@@ -1,66 +1,67 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 10 Nov 2014 22:15:23 -0800
-Subject: [RESENDv5] serial: of-serial: fix up PM ops on no_console_suspend
- and port type
-In-Reply-To: <bc2787a32b4d41a79acf582433831510@BN3PR0301MB1236.namprd03.prod.outlook.com>
-References: <1414401857-21121-1-git-send-email-jingchang.lu@freescale.com>
- <CAGVrzcamoYbdPijWtrU=ge+UE+g9zBHAG84PJB7G3EyA09jBWg@mail.gmail.com>
- <20141111052720.GC24727@kroah.com>
- <bc2787a32b4d41a79acf582433831510@BN3PR0301MB1236.namprd03.prod.outlook.com>
-Message-ID: <CAGVrzcb__HxFe3z9oM9WS7_ZnvCMkAsNt+FU6N4m-9Som-LJAw@mail.gmail.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Tue, 11 Nov 2014 15:37:43 +0900
+Subject: [PATCH v4 REPOST 1/5] of: Add descriptions of thermtrip properties
+ to Tegra PMC bindings
+In-Reply-To: <1415625137-4791-2-git-send-email-mikko.perttunen@kapsi.fi>
+References: <1415625137-4791-1-git-send-email-mikko.perttunen@kapsi.fi>
+ <1415625137-4791-2-git-send-email-mikko.perttunen@kapsi.fi>
+Message-ID: <5461AEB7.70507@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-10 21:41 GMT-08:00 Jingchang Lu <jingchang.lu@freescale.com>:
+On 11/10/2014 10:12 PM, Mikko Perttunen wrote:
+> From: Mikko Perttunen <mperttunen@nvidia.com>
 >
+> Hardware-triggered thermal reset requires configuring the I2C
+> reset procedure. This configuration is read from the device tree,
+> so document the relevant properties in the binding documentation.
 >
->>-----Original Message-----
->>From: Greg KH [mailto:gregkh at linuxfoundation.org]
->>Sent: Tuesday, November 11, 2014 1:27 PM
->>To: Florian Fainelli
->>Cc: Lu Jingchang-B35083; linux-arm-kernel at lists.infradead.org; linux-
->>kernel at vger.kernel.org; linux-serial at vger.kernel.org
->>Subject: Re: [RESENDv5] serial: of-serial: fix up PM ops on
->>no_console_suspend and port type
->>
->>On Mon, Nov 10, 2014 at 08:30:36PM -0800, Florian Fainelli wrote:
->>> 2014-10-27 2:24 GMT-07:00 Jingchang Lu <jingchang.lu@freescale.com>:
->>> > This patch fixes commit 2dea53bf57783f243c892e99c10c6921e956aa7e,
->>> > "serial: of-serial: add PM suspend/resume support", which disables
->>> > the uart clock on suspend, but also causes a hardware hang on
->>> > register access if no_console_suspend command line option is used.
->>> >
->>> > Also, not every of_serial device is an 8250 port, so the serial8250
->>> > suspend/resume functions should only be applied to a real 8250 port.
->>>
->>> Greg, can you pick this one and submit it for your next 3.18-rc
->>> submission? This fixes a regression when using "no_console_suspend"
->>> introduced by:
->>>
->>> 2dea53bf57783f243c892e99c10c6921e956aa7e ("serial: of-serial: add PM
->>> suspend/resume support") which has been merged during 3.18-rc1
->>
->>Why can't I just revert that patch instead?  This is really late in the -
->>rc cycle to be doing large fixes like this.
->>
->>And this patch is already queued up for 3.19-rc1, so this is a mess...
->>
->>Any objection to me just reverting
->>2dea53bf57783f243c892e99c10c6921e956aa7e, and then this one in my tty-next
->>branch as well, and then someone resending the original patch in a format
->>that actually works?
-> Do you mean resending the "serial: of-serial: add PM suspend/resume support"
-> patch with "serial: of-serial: fix up PM ops on no_console_suspend and port type"
-> merged together? For you would like to reverting the previous patch of
-> "2dea53bf57783f243c892e99c10c6921e956aa7e".
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> Reviewed-by: Wei Ni <wni@nvidia.com>
+> Tested-by: Wei Ni <wni@nvidia.com>
+> ---
+>   .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      | 24 ++++++++++++++++++++++
+>   1 file changed, 24 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+> index 68ac65f..dc13fb0 100644
+> --- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+> +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+> @@ -47,6 +47,21 @@ Required properties when nvidia,suspend-mode=<0>:
+>     sleep mode, the warm boot code will restore some PLLs, clocks and then
+>     bring up CPU0 for resuming the system.
+>
+> +Hardware-triggered thermal reset:
+> +On Tegra30, Tegra114 and Tegra124, if the 'i2c-thermtrip' subnode exists,
+> +hardware-triggered thermal reset will be enabled.
+> +
+> +Required properties for hardware-triggered thermal reset (inside 'i2c-thermtrip'):
+> +- nvidia,i2c-bus : Phandle to I2C bus containing the PMU
+> +- nvidia,bus-addr : Bus address of the PMU on the I2C bus
+> +- nvidia,reg-addr : I2C register address to write poweroff command to
+> +- nvidia,reg-data : Poweroff command to write to PMU
 
-That is how I understand Greg's suggestion. While you are at it you
-might want to introduce a space between the 'switch' keyword and the
-open-parenthesis in the two call sites that you added. Feel free to
-add my:
+This binding is taking two different routes to provide values to the driver:
 
-Tested-by: Florina Fainelli <f.fainelli@gmail.com>
+1) It uses a phandle for i2c-bus (which must then be provided by another 
+binding implemented in the two following patches)
 
-since I use your v5 patch locally, thanks!
---
-Florian
+2) It uses direct values for bus-addr, reg-addr and reg-data.
+
+Do we need to use both approaches? bus-addr could just as well be 
+obtained through a phandle to the i2c device and reading its reg 
+property. From this phandle you could also go back up to the bus, making 
+the i2c-bus property unnecessary. reg-addr and reg-data cannot be 
+specified that way, obviously.
+
+Actually I think I'd prefer to see i2c-bus become an integer property 
+instead of a phandle, because at the end of the day it is a value field 
+of a particular register and the reference is only used to retrieve that 
+value. It is not like we are actually going to call functions on the bus 
+instance or change its state. And for the single purpose of retrieving 
+that value, this binding requires the addition of a new property on the 
+bus node that will probably never be used for something else.
+
+We can also imagine that some design may not have a PMIC device in the 
+DT but still want to use the thermal reset feature. In this case, it is 
+again preferable to use direct values.
