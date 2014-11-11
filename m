@@ -1,126 +1,96 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 11 Nov 2014 22:27:53 +0100
-Subject: [[PATCHv2] 3/3] drivers/rtc/rtc-snvs: Add clock support
-In-Reply-To: <30e496ce2d6521e608df3b68b73b3e05caa1daef.1415364391.git.maitysanchayan@gmail.com>
-References: <cover.1415364391.git.maitysanchayan@gmail.com>
- <30e496ce2d6521e608df3b68b73b3e05caa1daef.1415364391.git.maitysanchayan@gmail.com>
-Message-ID: <7807253ec0fd349b5bb1489e0d3b1347@agner.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 11 Nov 2014 22:32:23 +0100
+Subject: gcc 4.9 build warnings (was: Re: next build: 2674 warnings 1
+ failures (next/next-20141022))
+In-Reply-To: <20141024182509.GA31232@gate.crashing.org>
+References: <5447442c.a9ca440a.2060.5e09@mx.google.com>
+ <20141024094412.GN27405@n2100.arm.linux.org.uk>
+ <20141024182509.GA31232@gate.crashing.org>
+Message-ID: <2480226.26bJjjL2fl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-11-07 14:04, Sanchayan Maity wrote:
-> This patch adds clock enable and disable support for
-> the SNVS peripheral, which is required for using the
-> RTC within the SNVS block.
-
-What happens if the device tree node is there while this patch is not
-applied? I guess the driver would load, but since the clocks of the
-peripheral are not enabled the first register access would lead to bus
-error or similar. If this is the case, this would break bisectability.
-You should move the device tree patch to the end.
-
-Other than that
-Acked-by: Stefan Agner <stefan@agner.ch>
-
---
-Stefan
-
+On Friday 24 October 2014 13:25:09 Segher Boessenkool wrote:
+> On Fri, Oct 24, 2014 at 10:44:12AM +0100, Russell King - ARM Linux wrote:
+> > On Fri, Oct 24, 2014 at 11:13:27AM +0200, Arnd Bergmann wrote:
+> > > Ok, that also explains the problems with the missing __linux__ macro, given
+> > > Ard's reply about bare-metal gcc.
+> > > 
+> > > I think we have two choices here:
+> > > 
+> > > a) change the buildall script so it actually builds a compiler that behaves
+> > >    in the way we expect for the kernel (__SIZE_TYPE__ and __linux__ at least,
+> > >    possibly others)
+> > > 
+> > > b) change the kernel to work with the way the bare-metal compiler is built,
+> > >    adding -D__linux__ in the ARM Makefile and applying Ard's workaround for
+> > >    __SIZE_TYPE__/__INT32_TYPE__/__UINT32_TYPE__/__UINTPTR_TYPE__.
+> > > 
+> > > Both options are a little hacky and I don't really like them, but I think
+> > > it makes sense to do one of them.
+> > 
+> > Well, (a) is probably the right answer.  EABI had (or still has) the
+> > idea that enums can be a dynamic size, and this was taken out of the
+> > Linux version of EABI.  What this means is that an enum used across an
+> > interface between a compiler targetting Linux and one not targetting
+> > Linux may not be compatible.
 > 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> ---
->  drivers/rtc/rtc-snvs.c |   34 ++++++++++++++++++++++++++++++++--
->  1 file changed, 32 insertions(+), 2 deletions(-)
+> Hi!  Happy to hear some people still find buildall useful.
 > 
-> diff --git a/drivers/rtc/rtc-snvs.c b/drivers/rtc/rtc-snvs.c
-> index fa384fe..d4a6512 100644
-> --- a/drivers/rtc/rtc-snvs.c
-> +++ b/drivers/rtc/rtc-snvs.c
-> @@ -17,6 +17,7 @@
->  #include <linux/of_device.h>
->  #include <linux/platform_device.h>
->  #include <linux/rtc.h>
-> +#include <linux/clk.h>
->  
->  /* These register offsets are relative to LP (Low Power) range */
->  #define SNVS_LPCR		0x04
-> @@ -39,6 +40,7 @@ struct snvs_rtc_data {
->  	void __iomem *ioaddr;
->  	int irq;
->  	spinlock_t lock;
-> +	struct clk *clk;
->  };
->  
->  static u32 rtc_read_lp_counter(void __iomem *ioaddr)
-> @@ -260,6 +262,18 @@ static int snvs_rtc_probe(struct platform_device *pdev)
->  	if (data->irq < 0)
->  		return data->irq;
->  
-> +	data->clk = devm_clk_get(&pdev->dev, "snvs-rtc");
-> +	if (IS_ERR(data->clk)) {
-> +		data->clk = NULL;
-> +	} else {
-> +		ret = clk_prepare_enable(data->clk);
-> +		if (ret) {
-> +			dev_err(&pdev->dev,
-> +				"Could not prepare or enable the snvs clock\n");
-> +			return ret;
-> +		}
-> +	}
-> +
->  	platform_set_drvdata(pdev, data);
->  
->  	spin_lock_init(&data->lock);
-> @@ -280,7 +294,7 @@ static int snvs_rtc_probe(struct platform_device *pdev)
->  	if (ret) {
->  		dev_err(&pdev->dev, "failed to request irq %d: %d\n",
->  			data->irq, ret);
-> -		return ret;
-> +		goto error_rtc_device_register;
->  	}
->  
->  	data->rtc = devm_rtc_device_register(&pdev->dev, pdev->name,
-> @@ -288,10 +302,16 @@ static int snvs_rtc_probe(struct platform_device *pdev)
->  	if (IS_ERR(data->rtc)) {
->  		ret = PTR_ERR(data->rtc);
->  		dev_err(&pdev->dev, "failed to register rtc: %d\n", ret);
-> -		return ret;
-> +		goto error_rtc_device_register;
->  	}
->  
->  	return 0;
-> +
-> +error_rtc_device_register:
-> +	if (data->clk)
-> +		clk_disable_unprepare(data->clk);
-> +
-> +	return ret;
->  }
->  
->  #ifdef CONFIG_PM_SLEEP
-> @@ -302,16 +322,26 @@ static int snvs_rtc_suspend(struct device *dev)
->  	if (device_may_wakeup(dev))
->  		enable_irq_wake(data->irq);
->  
-> +	if (data->clk)
-> +		clk_disable_unprepare(data->clk);
-> +
->  	return 0;
->  }
->  
->  static int snvs_rtc_resume(struct device *dev)
->  {
->  	struct snvs_rtc_data *data = dev_get_drvdata(dev);
-> +	int ret;
->  
->  	if (device_may_wakeup(dev))
->  		disable_irq_wake(data->irq);
->  
-> +	if (data->clk) {
-> +		ret = clk_prepare_enable(data->clk);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
->  	return 0;
->  }
->  #endif
+> The standard arm toolchains it builds are configured for arm-linux-eabi,
+> not "plain" eabi.  So what goes wrong?
+> 
+> Oh.  I changed that april this year; so just update your buildall.
+> 
+> [But of course it would be good if the kernel build would work with *any*
+> reasonable toolchain.  OTOH it seems that most arm toolchains aren't
+> reasonable.]
+> 
+
+I've decided to investigate it further. It seems that your change to
+'arm-linux-eabi' did not have the intended effect. I got it to work with
+this patch:
+
+diff --git a/build b/build
+index 10416a8..b2d38ec 100755
+--- a/build
++++ b/build
+@@ -36,7 +36,7 @@ case $ARCH in
+ 	*-eabi)		TARGET=$ARCH ;;
+ 	*-elf)		TARGET=$ARCH ;;
+ 
+-	arm)		TARGET=arm-linux-eabi ;;
++	arm)		TARGET=arm-linux-gnueabi ;;
+ 	avr32)		TARGET=avr-linux ;;
+ 	blackfin)	TARGET=bfin-uclinux ;;
+ 	h8300)		TARGET=h8300-elf ;;
+
+
+What happens in gcc apparently is that the configuration logic gets confused
+and uses this entry in gcc/config.gcc:
+
+arm*-*-eabi*)
+        default_use_cxa_atexit=yes
+        tm_file="dbxelf.h elfos.h arm/unknown-elf.h arm/elf.h arm/bpabi.h"
+        tmake_file="${tmake_file} arm/t-arm arm/t-arm-elf"
+        tm_file="$tm_file newlib-stdint.h"
+        tmake_file="${tmake_file} arm/t-bpabi"
+        use_gcc_stdint=wrap
+        tm_file="${tm_file} arm/aout.h vxworks-dummy.h arm/arm.h"
+        ;;
+
+instead of this one:
+
+arm*-*-linux-*)                 # ARM GNU/Linux with ELF
+        tm_file="dbxelf.h elfos.h gnu-user.h linux.h linux-android.h glibc-stdint.h arm/elf.h arm/linux-gas.h arm/linux-elf.h"
+        extra_options="${extra_options} linux-android.opt"
+        tmake_file="${tmake_file} arm/t-arm arm/t-arm-elf arm/t-bpabi arm/t-linux-eabi"
+        tm_file="$tm_file arm/bpabi.h arm/linux-eabi.h arm/aout.h vxworks-dummy.h arm/arm.h"
+        # The EABI requires the use of __cxa_atexit.
+        default_use_cxa_atexit=yes
+        with_tls=${with_tls:-gnu}
+        ;;
+
+so among other things, we are missing linux.h and glibc-stdint.h.
+
+	Arnd
