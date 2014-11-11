@@ -1,41 +1,61 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 11 Nov 2014 10:11:29 +0100
-Subject: [linux-sunxi] [PATCH v2 0/5] ARM: sunxi: Add support for USB
- OTG PHY
-In-Reply-To: <cover.1415645258.git.rbyshko@gmail.com>
-References: <cover.1415645258.git.rbyshko@gmail.com>
-Message-ID: <5461D2C1.6020505@redhat.com>
+From: anup@brainfault.org (Anup Patel)
+Date: Tue, 11 Nov 2014 14:48:25 +0530
+Subject: [RFC PATCH 0/6] ARM64: KVM: PMU infrastructure support
+In-Reply-To: <CAMJs5B8VqS2-3dhSX+PBaQruzyXiYwaYRQ7vvWEMrHbvbjn+9A@mail.gmail.com>
+References: <1407230655-28864-1-git-send-email-anup.patel@linaro.org>
+ <20141107202502.GJ22848@cbox>
+ <CAAhSdy3CPMdK9+_FesKuJaPt9=VVHsnw=DQO5UQUVNm1aPuZNg@mail.gmail.com>
+ <CAMJs5B8VqS2-3dhSX+PBaQruzyXiYwaYRQ7vvWEMrHbvbjn+9A@mail.gmail.com>
+Message-ID: <CAAhSdy3iyMpXLh1Qq-TqZ-1W368kG0Oz9iE2McnJkYbA9ZaNPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi All,
 
-On 11/10/2014 07:55 PM, Roman Byshko wrote:
-> Hi,
-> 
-> There is already support for two USB phys, which are used for
-> USB host controllers on Allwinner SoC aka sunxi.
-> 
-> This patch series add support for the USB OTG phy (aka phy0).
-> 
-> The code has been tested on Allwinner A20 aka sun7i (Cubietruck).
-> 
-> Best regards,
-> Roman Byshko
+I have second thoughts about rebasing KVM PMU patches
+to Marc's irq-forwarding patches.
 
-First of all very cool that you're working on this, I somehow missed
-v1, but I'm very happy to see this.
+The PMU IRQs (when virtualized by KVM) are not exactly
+forwarded IRQs because they are shared between Host
+and Guest.
 
-Second some questions, this series seems to only add support for
-initializing the phy, without adding the necessary magic for
-switching from app to host mode, and without actually hooking up musb,
-I assume you've a follow up series adding musb support, which actually
-uses the phy ?
+Scenario1
+-------------
 
-Also have you coordinated your work with ChenYu? ATM ChenYu is mostly
-working on other stuff, but AFAIk he has been working on musb support
-in the past.
+We might have perf running on Host and no KVM guest
+running. In this scenario, we wont get interrupts on Host
+because the kvm_pmu_hyp_init() (similar to the function
+kvm_timer_hyp_init() of Marc's IRQ-forwarding
+implementation) has put all host PMU IRQs in forwarding
+mode.
+
+The only way solve this problem is to not set forwarding
+mode for PMU IRQs in kvm_pmu_hyp_init() and instead
+have special routines to turn on and turn off the forwarding
+mode of PMU IRQs. These routines will be called from
+kvm_arch_vcpu_ioctl_run() for toggling the PMU IRQ
+forwarding state.
+
+Scenario2
+-------------
+
+We might have perf running on Host and Guest simultaneously
+which means it is quite likely that PMU HW trigger IRQ meant
+for Host between "ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);"
+and "kvm_pmu_sync_hwstate(vcpu);" (similar to timer sync routine
+of Marc's patchset which is called before local_irq_enable()).
+
+In this scenario, the updated kvm_pmu_sync_hwstate(vcpu)
+will accidentally forward IRQ meant for Host to Guest unless
+we put additional checks to inspect VCPU PMU state.
+
+Am I missing any detail about IRQ forwarding for above
+scenarios?
+
+If not then can we consider current mask/unmask approach
+for forwarding PMU IRQs?
+
+Marc?? Will??
 
 Regards,
-
-Hans
+Anup
