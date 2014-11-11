@@ -1,92 +1,74 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Nov 2014 12:04:57 +0000
-Subject: [RFC 1/2] mfd: qcom-rpm: Expose sleep state resources to clients
-In-Reply-To: <1415659966-16200-2-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1415659966-16200-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1415659966-16200-2-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <20141111120457.GZ24004@x1>
+Date: Tue, 11 Nov 2014 12:26:24 +0000
+Subject: [PATCH v3 3/6] mfd: ti_am335x_tscadc: Remove unwanted
+ reg_se_cache save
+In-Reply-To: <1415694844-11230-4-git-send-email-vigneshr@ti.com>
+References: <1415694844-11230-1-git-send-email-vigneshr@ti.com>
+ <1415694844-11230-4-git-send-email-vigneshr@ti.com>
+Message-ID: <20141111122623.GA24004@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Nov 2014, Bjorn Andersson wrote:
+On Tue, 11 Nov 2014, Vignesh R wrote:
 
-> Resources exposed from the RPM have an "active state" that is used during
-> normal operations and a "sleep state" that is used for HW assisted sleep
-> modes. Expose this in the api to let client drivers set the "sleep
-> state" as well.
-
-I assume you have users lined up which will request a sleeping state?
-
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> ---
->  drivers/mfd/qcom_rpm.c                 |    9 +++++----
->  drivers/regulator/qcom_rpm-regulator.c |    1 +
->  include/linux/mfd/qcom_rpm.h           |    5 ++++-
->  3 files changed, 10 insertions(+), 5 deletions(-)
+> In one shot mode, sequencer automatically disables all enabled steps at
+> the end of each cycle. (both ADC steps and TSC steps) Hence these steps
+> need not be saved in reg_se_cache for clearing these steps at a later
+> stage.
+> Also, when ADC wakes up Sequencer should not be busy executing any of the
+> config steps except for the charge step. Previously charge step was 1 ADC
+> clock cycle and hence it was ignored.
 > 
-> diff --git a/drivers/mfd/qcom_rpm.c b/drivers/mfd/qcom_rpm.c
-> index 0dd7a6fe..f696328 100644
-> --- a/drivers/mfd/qcom_rpm.c
-> +++ b/drivers/mfd/qcom_rpm.c
-> @@ -67,7 +67,6 @@ struct qcom_rpm {
->  #define RPM_ACK_SELECTOR	23
->  #define RPM_SELECT_SIZE		7
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
+
+You need to provide a changelog here when submitting new versions.
+
+>  drivers/mfd/ti_am335x_tscadc.c       | 7 +++++--
+>  include/linux/mfd/ti_am335x_tscadc.h | 1 +
+>  2 files changed, 6 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
+> index d877e777cce6..110038859a8d 100644
+> --- a/drivers/mfd/ti_am335x_tscadc.c
+> +++ b/drivers/mfd/ti_am335x_tscadc.c
+> @@ -86,8 +86,12 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
+>  		spin_lock_irq(&tsadc->reg_lock);
+>  		finish_wait(&tsadc->reg_se_wait, &wait);
 >  
-> -#define RPM_ACTIVE_STATE	BIT(0)
->  #define RPM_NOTIFICATION	BIT(30)
->  #define RPM_REJECTED		BIT(31)
->  
-> @@ -332,7 +331,10 @@ static const struct of_device_id qcom_rpm_of_match[] = {
->  };
->  MODULE_DEVICE_TABLE(of, qcom_rpm_of_match);
->  
-> -int qcom_rpm_write(struct qcom_rpm *rpm, int resource, u32 *buf, size_t count)
-> +int qcom_rpm_write(struct qcom_rpm *rpm,
-> +		   int state,
-> +		   int resource,
-> +		   u32 *buf, size_t count)
->  {
->  	const struct qcom_rpm_resource *res;
->  	const struct qcom_rpm_data *data = rpm->data;
-> @@ -359,8 +361,7 @@ int qcom_rpm_write(struct qcom_rpm *rpm, int resource, u32 *buf, size_t count)
->  			       RPM_CTRL_REG(rpm, RPM_REQ_SELECT + i));
+> +		/*
+> +		 * Sequencer should either be idle or
+> +		 * busy applying the charge step.
+> +		 */
+>  		reg = tscadc_readl(tsadc, REG_ADCFSM);
+> -		WARN_ON(reg & SEQ_STATUS);
+> +		WARN_ON((reg & SEQ_STATUS) && !(reg & CHARGE_STEP));
+>  		tsadc->adc_waiting = false;
 >  	}
->  
-> -	writel_relaxed(RPM_ACTIVE_STATE,
-> -		       RPM_CTRL_REG(rpm, RPM_REQUEST_CONTEXT));
-> +	writel_relaxed(BIT(state), RPM_CTRL_REG(rpm, RPM_REQUEST_CONTEXT));
+>  	tsadc->adc_in_use = true;
+> @@ -96,7 +100,6 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
+>  void am335x_tsc_se_set_once(struct ti_tscadc_dev *tsadc, u32 val)
+>  {
+>  	spin_lock_irq(&tsadc->reg_lock);
+> -	tsadc->reg_se_cache |= val;
 
-How are the state bits organised?
+You didn't answer my question about this?
 
->  	reinit_completion(&rpm->ack);
->  	regmap_write(rpm->ipc_regmap, rpm->ipc_offset, BIT(rpm->ipc_bit));
-> diff --git a/drivers/regulator/qcom_rpm-regulator.c b/drivers/regulator/qcom_rpm-regulator.c
-> index b55cd5b..4fc1c7e 100644
-> --- a/drivers/regulator/qcom_rpm-regulator.c
-> +++ b/drivers/regulator/qcom_rpm-regulator.c
-> @@ -198,6 +198,7 @@ static int rpm_reg_write(struct qcom_rpm_reg *vreg,
->  	vreg->val[req->word] |= value << req->shift;
+>  	am335x_tscadc_need_adc(tsadc);
 >  
->  	return qcom_rpm_write(vreg->rpm,
-> +			      RPM_ACTIVE_STATE,
->  			      vreg->resource,
->  			      vreg->val,
->  			      vreg->parts->request_len);
-> diff --git a/include/linux/mfd/qcom_rpm.h b/include/linux/mfd/qcom_rpm.h
-> index a60798d..f0e70b2 100644
-> --- a/include/linux/mfd/qcom_rpm.h
-> +++ b/include/linux/mfd/qcom_rpm.h
-> @@ -5,6 +5,9 @@
+>  	tscadc_writel(tsadc, REG_SE, val);
+> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
+> index c99be5dc0f5c..fcce182e4a35 100644
+> --- a/include/linux/mfd/ti_am335x_tscadc.h
+> +++ b/include/linux/mfd/ti_am335x_tscadc.h
+> @@ -128,6 +128,7 @@
 >  
->  struct qcom_rpm;
+>  /* Sequencer Status */
+>  #define SEQ_STATUS BIT(5)
+> +#define CHARGE_STEP		0x11
 >  
-> -int qcom_rpm_write(struct qcom_rpm *rpm, int resource, u32 *buf, size_t count);
-> +#define RPM_ACTIVE_STATE	0
-> +#define RPM_SLEEP_STATE		1
-> +
-> +int qcom_rpm_write(struct qcom_rpm *rpm, int state, int resource, u32 *buf, size_t count);
->  
->  #endif
+>  #define ADC_CLK			3000000
+>  #define TOTAL_STEPS		16
 
 -- 
 Lee Jones
