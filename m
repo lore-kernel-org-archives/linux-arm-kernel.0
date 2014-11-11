@@ -1,288 +1,48 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 11 Nov 2014 21:32:37 +0100
-Subject: [PATCH 4/6] i2c: busses: add SLIMpro I2C device driver on APM
- X-Gene platform
-In-Reply-To: <1412726809-7525-5-git-send-email-fkan@apm.com>
-References: <1412726809-7525-1-git-send-email-fkan@apm.com>
- <1412726809-7525-5-git-send-email-fkan@apm.com>
-Message-ID: <20141111203237.GB6443@katana>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 11 Nov 2014 21:34:26 +0100
+Subject: [PATCH v2 1/2] of/fdt: export fdt blob as /sys/firmware/fdt
+In-Reply-To: <CACxGe6tsLr52ZLww2JfwHFHajHW+f6nbYJPyWXmZJg3coKmMCA@mail.gmail.com>
+References: <1415645222-14909-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1415645222-14909-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20141111144221.5FCDAC416AF@trevor.secretlab.ca>
+ <CAL_JsqKeG1dWrMZydCN119V3++WKXqsjMm1bG7Fodhf3O8owpw@mail.gmail.com>
+ <CACxGe6tsLr52ZLww2JfwHFHajHW+f6nbYJPyWXmZJg3coKmMCA@mail.gmail.com>
+Message-ID: <CAKv+Gu-UOPMaGQ+eRu8TX4DX_AN93JHt9dFHSaWs9+UB3UhdAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 07, 2014 at 05:06:47PM -0700, Feng Kan wrote:
-> Add SLIMpro I2C device driver on APM X-Gene platform. This I2C
-> device driver use the SLIMpro Mailbox driver to tunnel message to
-> the SLIMpro coprocessor to do the work of accessing I2C components.
-> 
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> Signed-off-by: Hieu Le <hnle@apm.com>
+On 11 November 2014 21:08, Grant Likely <grant.likely@linaro.org> wrote:
+> On Tue, Nov 11, 2014 at 4:25 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> On Tue, Nov 11, 2014 at 8:42 AM, Grant Likely <grant.likely@linaro.org> wrote:
+>>> On Mon, 10 Nov 2014 19:47:01 +0100
+>>> , Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>  wrote:
+>>>> Create a new /sys entry '/sys/firmware/fdt' to export the FDT blob
+>>>> that was passed to the kernel by the bootloader. This allows userland
+>>>> applications such as kexec to access the raw binary. The blob needs to
+>>>> be preserved as early as possible by calling preserve_fdt().
+>>>>
+>>>> The fact that this node does not reside under /sys/firmware/device-tree
+>>>> is deliberate: FDT is also used on arm64 UEFI/ACPI systems to
+>>>> communicate just the UEFI and ACPI entry points, but the FDT is never
+>>>> unflattened and used to configure the system.
+>>>>
+>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>
+>>> On further thought, nak. I want tree modifications to be treated as
+>>> bugs. Do a checksum CRC32 or check. It's simpler and it can be extended
+>>> to us an in-blob CRC when the file format gets upreved to include one.
+>>
+>> Why? MIPS Octeon is full of them BTW. So the rule is any modifications
+>> or fixups have to be on the unflattened tree?
+>
+> That, or we require the fixups to explicitly clean up the CRC after
+> themselves. That will force them to be visible. Anything using the
+> fdt_*() write functions could potentially take care of it
+> automatically. That would make it immediately discoverable where
+> changes are being made in the tree.
+>
 
-Thank you for this submission!
-
-> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> index 2e45ae3..a03042c 100644
-> --- a/drivers/i2c/busses/Kconfig
-> +++ b/drivers/i2c/busses/Kconfig
-> @@ -1009,6 +1009,15 @@ config I2C_CROS_EC_TUNNEL
->  	  connected there. This will work whatever the interface used to
->  	  talk to the EC (SPI, I2C or LPC).
->  
-> +config I2C_XGENE_SLIMPRO
-> +	tristate "APM X-Gene SoC I2C SLIMpro devices support"
-> +	depends on ARCH_XGENE && XGENE_SLIMPRO_MBOX
-> +	help
-> +	  Enable I2C bus access using the APM X-Gene SoC SLIMpro
-> +	  co-processor. The I2C device access the I2C bus via the X-Gene
-> +	  to SLIMpro (On chip coprocessor) mailbox mechanism.
-> +	  If unsure, say N.
-> +
-
-I guess this is a driver for embedded? If so, please sort it properly.
-
->  config SCx200_ACB
->  	tristate "Geode ACCESS.bus support"
->  	depends on X86_32 && PCI
-> diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
-> index 49bf07e..22b5f0c 100644
-> --- a/drivers/i2c/busses/Makefile
-> +++ b/drivers/i2c/busses/Makefile
-> @@ -99,6 +99,7 @@ obj-$(CONFIG_I2C_CROS_EC_TUNNEL)	+= i2c-cros-ec-tunnel.o
->  obj-$(CONFIG_I2C_ELEKTOR)	+= i2c-elektor.o
->  obj-$(CONFIG_I2C_PCA_ISA)	+= i2c-pca-isa.o
->  obj-$(CONFIG_I2C_SIBYTE)	+= i2c-sibyte.o
-> +obj-$(CONFIG_I2C_XGENE_SLIMPRO) += i2c-xgene-slimpro.o
-
-Ditto.
-
->  obj-$(CONFIG_SCx200_ACB)	+= scx200_acb.o
->  
->  ccflags-$(CONFIG_I2C_DEBUG_BUS) := -DDEBUG
-> diff --git a/drivers/i2c/busses/i2c-xgene-slimpro.c b/drivers/i2c/busses/i2c-xgene-slimpro.c
-> new file mode 100644
-> index 0000000..2cf6c33
-> --- /dev/null
-> +++ b/drivers/i2c/busses/i2c-xgene-slimpro.c
-> @@ -0,0 +1,531 @@
-> +/*
-> + * X-Gene SLIMpro I2C Driver
-> + *
-> + * Copyright (c) 2014, Applied Micro Circuits Corporation
-> + * Author: Feng Kan <fkan@apm.com>
-> + * Author: Hieu Le <hnle@apm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation; either version 2 of
-> + * the License, or (at your option) any later version.
-
-The license preamble and MODULE_LICENSE do not match!
-
-> +#include <linux/module.h>
-> +#include <linux/version.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/of.h>
-> +#include <linux/i2c.h>
-> +#include <linux/mailbox_client.h>
-> +#include <linux/delay.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/dma-mapping.h>
-
-Please sort the includes.
-
-> +
-> +#define XGENE_SLIMPRO_I2C		"xgene-slimpro-i2c"
-
-Only used once, not really needed
-
-> +
-> +#define SLIMPRO_I2C_WAIT_COUNT		10000
-> +
-> +#define SLIMPRO_OP_TO_MS		1000	/* Operation time out in ms */
-
-*_TOUT_* or *_TIMEOUT_*. TO sounds like a conversion, from op to ms :)
-
-> +#define SLIMPRO_IIC_BUS			1
-
-What does this '1' mean?
-
-> +static int start_i2c_msg_xfer(struct slimpro_i2c_dev *ctx)
-> +{
-> +	int count;
-> +	unsigned long flags;
-> +
-> +	if (ctx->mbox_client.tx_block) {
-> +		if (!wait_for_completion_timeout(&ctx->rd_complete,
-> +						 msecs_to_jiffies
-> +						 (SLIMPRO_OP_TO_MS)))
-> +			return -EIO;
-
-That should be -ETIMEDOUT, no?
-
-> +	} else {
-> +		spin_lock_irqsave(&ctx->lock, flags);
-> +		ctx->i2c_rx_poll = 1;
-> +		for (count = SLIMPRO_I2C_WAIT_COUNT; count > 0; count--) {
-> +			if (ctx->i2c_rx_poll == 0)
-> +				break;
-> +			udelay(100);
-> +		}
-> +
-> +		if (count == 0) {
-> +			ctx->i2c_rx_poll = 0;
-> +			ctx->mbox_client.tx_block = true;
-> +			spin_unlock_irqrestore(&ctx->lock, flags);
-> +			return -EIO;
-
-ditto.
-
-> +		}
-> +		ctx->mbox_client.tx_block = true;
-> +		spin_unlock_irqrestore(&ctx->lock, flags);
-> +	}
-> +
-> +	/* Check of invalid data or no device */
-> +	if (*ctx->resp_msg == 0xffffffff)
-> +		return -ENODEV;
-> +
-> +	return 0;
-> +}
-> +
-> +static int slimpro_i2c_blkrd(struct slimpro_i2c_dev *ctx, u32 chip, u32 addr,
-> +				u32 addrlen, u32 protocol, u32 readlen,
-> +				u32 with_data_len, void *data)
-> +{
-> +	dma_addr_t paddr;
-> +	u32 msg[3];
-> +	int rc;
-> +
-> +	paddr = dma_map_single(ctx->dev, ctx->dma_buffer, readlen,
-> +			       DMA_FROM_DEVICE);
-> +	if (dma_mapping_error(ctx->dev, paddr)) {
-> +		dev_err(&ctx->adapter.dev, "Error in mapping dma buffer %p\n",
-> +			ctx->dma_buffer);
-> +		rc = -EIO;
-
-Return the err value from dma_mapping_error?
-
-> +		goto err;
-> +	}
-> +
-> +	if (irqs_disabled())
-> +		ctx->mbox_client.tx_block = false;
-> +
-> +	msg[0] = SLIMPRO_IIC_ENCODE_MSG(SLIMPRO_IIC_BUS, chip,
-> +					SLIMPRO_IIC_READ, protocol, addrlen,
-> +					readlen);
-> +	msg[1] = SLIMPRO_IIC_ENCODE_FLAG_BUFADDR |
-> +		 SLIMPRO_IIC_ENCODE_FLAG_WITH_DATA_LEN(with_data_len) |
-> +		 SLIMPRO_IIC_ENCODE_UPPER_BUFADDR(paddr) |
-> +		 SLIMPRO_IIC_ENCODE_ADDR(addr);
-> +	msg[2] = (u32) paddr;
-> +	ctx->resp_msg = msg;
-> +
-> +	if (ctx->mbox_client.tx_block)
-> +		init_completion(&ctx->rd_complete);
-
-reinit_completion? and init_completion in probe?
-
-> +
-> +	rc = mbox_send_message(ctx->mbox_chan, &msg);
-> +	if (rc < 0)
-> +		goto err_unmap;
-> +
-> +	rc = start_i2c_msg_xfer(ctx);
-> +
-> +	/* Copy to destination */
-> +	memcpy(data, ctx->dma_buffer, readlen);
-> +
-> +err_unmap:
-> +	dma_unmap_single(ctx->dev, paddr, readlen, DMA_FROM_DEVICE);
-> +err:
-> +	ctx->resp_msg = NULL;
-> +	return rc;
-> +}
-> +
-> +static int slimpro_i2c_blkwr(struct slimpro_i2c_dev *ctx, u32 chip,
-> +			     u32 addr, u32 addrlen, u32 protocol, u32 writelen,
-> +			     void *data)
-> +{
-> +	dma_addr_t paddr;
-> +	u32 msg[3];
-> +	int rc;
-> +
-> +	memcpy(ctx->dma_buffer, data, writelen);
-> +	paddr = dma_map_single(ctx->dev, ctx->dma_buffer, writelen,
-> +			       DMA_TO_DEVICE);
-> +	if (dma_mapping_error(ctx->dev, paddr)) {
-> +		dev_err(&ctx->adapter.dev, "Error in mapping dma buffer %p\n",
-> +			ctx->dma_buffer);
-> +		rc = -EIO;
-
-same as above
-
-> +		goto err;
-> +	}
-> +
-> +	if (irqs_disabled())
-> +		ctx->mbox_client.tx_block = false;
-> +
-> +	msg[0] = SLIMPRO_IIC_ENCODE_MSG(SLIMPRO_IIC_BUS, chip,
-> +					SLIMPRO_IIC_WRITE, protocol, addrlen,
-> +					writelen);
-> +	msg[1] = SLIMPRO_IIC_ENCODE_FLAG_BUFADDR |
-> +		 SLIMPRO_IIC_ENCODE_UPPER_BUFADDR(paddr) |
-> +		 SLIMPRO_IIC_ENCODE_ADDR(addr);
-> +	msg[2] = (u32) paddr;
-> +	ctx->resp_msg = msg;
-> +
-> +	if (ctx->mbox_client.tx_block)
-> +		init_completion(&ctx->rd_complete);
-
-ditto
-
-> +
-> +	rc = mbox_send_message(ctx->mbox_chan, &msg);
-> +	if (rc < 0)
-> +		goto err_unmap;
-> +
-> +	rc = start_i2c_msg_xfer(ctx);
-> +
-> +err_unmap:
-> +	dma_unmap_single(ctx->dev, paddr, writelen, DMA_TO_DEVICE);
-> +err:
-> +	ctx->resp_msg = NULL;
-> +	return rc;
-> +}
-> +
-> +static struct platform_driver xgene_slimpro_i2c_driver = {
-> +	.probe	= xgene_slimpro_i2c_probe,
-> +	.remove	= xgene_slimpro_i2c_remove,
-> +	.driver	= {
-> +		.name	= XGENE_SLIMPRO_I2C,
-> +		.owner	= THIS_MODULE,
-
-Not needed.
-
-> +		.of_match_table = of_match_ptr(xgene_slimpro_i2c_id)
-> +	},
-> +};
-> +
-> +module_platform_driver(xgene_slimpro_i2c_driver);
-> +
-> +MODULE_DESCRIPTION("APM X-Gene SLIMpro I2C driver");
-> +MODULE_LICENSE("GPL v2");
-
-So, only minor stuff. Looking good already to me.
-
-Thanks,
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141111/de6c5f01/attachment.sig>
+Doesn't that defeat the purpose of capturing the FDT as it was passed
+by the bootloader? Those fixups will be reapplied by the kexec'ed
+kernel anyway.
