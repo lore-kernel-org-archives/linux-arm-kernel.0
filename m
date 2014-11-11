@@ -1,61 +1,57 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Tue, 11 Nov 2014 14:48:25 +0530
-Subject: [RFC PATCH 0/6] ARM64: KVM: PMU infrastructure support
-In-Reply-To: <CAMJs5B8VqS2-3dhSX+PBaQruzyXiYwaYRQ7vvWEMrHbvbjn+9A@mail.gmail.com>
-References: <1407230655-28864-1-git-send-email-anup.patel@linaro.org>
- <20141107202502.GJ22848@cbox>
- <CAAhSdy3CPMdK9+_FesKuJaPt9=VVHsnw=DQO5UQUVNm1aPuZNg@mail.gmail.com>
- <CAMJs5B8VqS2-3dhSX+PBaQruzyXiYwaYRQ7vvWEMrHbvbjn+9A@mail.gmail.com>
-Message-ID: <CAAhSdy3iyMpXLh1Qq-TqZ-1W368kG0Oz9iE2McnJkYbA9ZaNPg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 11 Nov 2014 10:36:09 +0100
+Subject: [PATCH] usb: phy: fix twl4030 build regression
+Message-ID: <7831012.jlbEUURqIo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Recent changes to the common OTG handling broke building the twl4030
+OTG driver as found during an allmodconfig build of linux-next:
 
-I have second thoughts about rebasing KVM PMU patches
-to Marc's irq-forwarding patches.
+drivers/phy/phy-twl4030-usb.c: In function 'twl4030_set_peripheral':
+drivers/phy/phy-twl4030-usb.c:609:11: error: 'struct phy' has no member named 'state'
+drivers/phy/phy-twl4030-usb.c: In function 'twl4030_usb_probe':
+drivers/phy/phy-twl4030-usb.c:679:12: warning: assignment from incompatible pointer type
 
-The PMU IRQs (when virtualized by KVM) are not exactly
-forwarded IRQs because they are shared between Host
-and Guest.
+This applies the same changes that were done to the other phy drivers
+to get it to build cleanly.
 
-Scenario1
--------------
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 19c1eac2685b6 ("usb: rename phy to usb_phy in OTG")
+Fixes: e47d92545c297 ("usb: move the OTG state from the USB PHY to the OTG structure")
+---
 
-We might have perf running on Host and no KVM guest
-running. In this scenario, we wont get interrupts on Host
-because the kvm_pmu_hyp_init() (similar to the function
-kvm_timer_hyp_init() of Marc's IRQ-forwarding
-implementation) has put all host PMU IRQs in forwarding
-mode.
+I have no idea if this is the correct fix, this is just a mechanical
+conversion, so please review carefully.
 
-The only way solve this problem is to not set forwarding
-mode for PMU IRQs in kvm_pmu_hyp_init() and instead
-have special routines to turn on and turn off the forwarding
-mode of PMU IRQs. These routines will be called from
-kvm_arch_vcpu_ioctl_run() for toggling the PMU IRQ
-forwarding state.
-
-Scenario2
--------------
-
-We might have perf running on Host and Guest simultaneously
-which means it is quite likely that PMU HW trigger IRQ meant
-for Host between "ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);"
-and "kvm_pmu_sync_hwstate(vcpu);" (similar to timer sync routine
-of Marc's patchset which is called before local_irq_enable()).
-
-In this scenario, the updated kvm_pmu_sync_hwstate(vcpu)
-will accidentally forward IRQ meant for Host to Guest unless
-we put additional checks to inspect VCPU PMU state.
-
-Am I missing any detail about IRQ forwarding for above
-scenarios?
-
-If not then can we consider current mask/unmask approach
-for forwarding PMU IRQs?
-
-Marc?? Will??
-
-Regards,
-Anup
+diff --git a/drivers/phy/phy-twl4030-usb.c b/drivers/phy/phy-twl4030-usb.c
+index 7b04befd5271..e2698d29f436 100644
+--- a/drivers/phy/phy-twl4030-usb.c
++++ b/drivers/phy/phy-twl4030-usb.c
+@@ -606,7 +606,7 @@ static int twl4030_set_peripheral(struct usb_otg *otg,
+ 
+ 	otg->gadget = gadget;
+ 	if (!gadget)
+-		otg->phy->state = OTG_STATE_UNDEFINED;
++		otg->state = OTG_STATE_UNDEFINED;
+ 
+ 	return 0;
+ }
+@@ -618,7 +618,7 @@ static int twl4030_set_host(struct usb_otg *otg, struct usb_bus *host)
+ 
+ 	otg->host = host;
+ 	if (!host)
+-		otg->phy->state = OTG_STATE_UNDEFINED;
++		otg->state = OTG_STATE_UNDEFINED;
+ 
+ 	return 0;
+ }
+@@ -676,7 +676,7 @@ static int twl4030_usb_probe(struct platform_device *pdev)
+ 	twl->phy.otg		= otg;
+ 	twl->phy.type		= USB_PHY_TYPE_USB2;
+ 
+-	otg->phy		= &twl->phy;
++	otg->usb_phy		= &twl->phy;
+ 	otg->set_host		= twl4030_set_host;
+ 	otg->set_peripheral	= twl4030_set_peripheral;
+ 
