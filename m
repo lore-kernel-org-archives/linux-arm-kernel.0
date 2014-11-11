@@ -1,92 +1,60 @@
-From: k.chander@samsung.com (Chander Kashyap)
-Date: Tue, 11 Nov 2014 11:01:37 +0530
-Subject: [PATCH v5] arm64: dts: exynos7: add support for cpuidle core power
- down
-Message-ID: <1415683897-983-1-git-send-email-k.chander@samsung.com>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Tue, 11 Nov 2014 05:41:10 +0000
+Subject: [RESENDv5] serial: of-serial: fix up PM ops on no_console_suspend
+ and port type
+In-Reply-To: <20141111052720.GC24727@kroah.com>
+References: <1414401857-21121-1-git-send-email-jingchang.lu@freescale.com>
+ <CAGVrzcamoYbdPijWtrU=ge+UE+g9zBHAG84PJB7G3EyA09jBWg@mail.gmail.com>
+ <20141111052720.GC24727@kroah.com>
+Message-ID: <bc2787a32b4d41a79acf582433831510@BN3PR0301MB1236.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos7 supports multiple idle states. Core power down is one such
-idle state, where cores can be powered off independently.
 
-This patch adds support for core power down idle state.
 
-Entry latency for core power down idle state is calculated as follows:
-1. Time difference is measured between cpuidle entry and exit.
-2. WFI is skipped for measuring the time.
-3. Select the worst case time in a set of 100000 cpuidle transactions,
-   with varying load.
+>-----Original Message-----
+>From: Greg KH [mailto:gregkh at linuxfoundation.org]
+>Sent: Tuesday, November 11, 2014 1:27 PM
+>To: Florian Fainelli
+>Cc: Lu Jingchang-B35083; linux-arm-kernel at lists.infradead.org; linux-
+>kernel at vger.kernel.org; linux-serial at vger.kernel.org
+>Subject: Re: [RESENDv5] serial: of-serial: fix up PM ops on
+>no_console_suspend and port type
+>
+>On Mon, Nov 10, 2014 at 08:30:36PM -0800, Florian Fainelli wrote:
+>> 2014-10-27 2:24 GMT-07:00 Jingchang Lu <jingchang.lu@freescale.com>:
+>> > This patch fixes commit 2dea53bf57783f243c892e99c10c6921e956aa7e,
+>> > "serial: of-serial: add PM suspend/resume support", which disables
+>> > the uart clock on suspend, but also causes a hardware hang on
+>> > register access if no_console_suspend command line option is used.
+>> >
+>> > Also, not every of_serial device is an 8250 port, so the serial8250
+>> > suspend/resume functions should only be applied to a real 8250 port.
+>>
+>> Greg, can you pick this one and submit it for your next 3.18-rc
+>> submission? This fixes a regression when using "no_console_suspend"
+>> introduced by:
+>>
+>> 2dea53bf57783f243c892e99c10c6921e956aa7e ("serial: of-serial: add PM
+>> suspend/resume support") which has been merged during 3.18-rc1
+>
+>Why can't I just revert that patch instead?  This is really late in the -
+>rc cycle to be doing large fixes like this.
+>
+>And this patch is already queued up for 3.19-rc1, so this is a mess...
+>
+>Any objection to me just reverting
+>2dea53bf57783f243c892e99c10c6921e956aa7e, and then this one in my tty-next
+>branch as well, and then someone resending the original patch in a format
+>that actually works?
+Do you mean resending the "serial: of-serial: add PM suspend/resume support"
+patch with "serial: of-serial: fix up PM ops on no_console_suspend and port type"
+merged together? For you would like to reverting the previous patch of
+"2dea53bf57783f243c892e99c10c6921e956aa7e".
 
-Exit latency and min residency values are supplied as per HW team.
-
-Signed-off-by: Chander Kashyap <k.chander@samsung.com>
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
-This patch has following dependencies:
-	- [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7 SoC
-		www.spinics.net/lists/arm-kernel/msg375961.html
-Changes in v2:
-	- Moved the cpu-idle-state property after reg property
-	- removed the status property.
-Changes in v3:
-	- Added the Entry latency calculation in commit message.
-Changes in v4:
-	- Corrected the commit message.
-	- Corrected the entry latency value.
-Changes in v5:
-	- Commit message modified
-
- arch/arm64/boot/dts/exynos/exynos7.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-index d7a37c3..891eef4 100644
---- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-@@ -37,6 +37,7 @@
- 			compatible = "arm,cortex-a57", "arm,armv8";
- 			reg = <0x0>;
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP>;
- 		};
- 
- 		cpu at 1 {
-@@ -44,6 +45,7 @@
- 			compatible = "arm,cortex-a57", "arm,armv8";
- 			reg = <0x1>;
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP>;
- 		};
- 
- 		cpu at 2 {
-@@ -51,6 +53,7 @@
- 			compatible = "arm,cortex-a57", "arm,armv8";
- 			reg = <0x2>;
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP>;
- 		};
- 
- 		cpu at 3 {
-@@ -58,6 +61,20 @@
- 			compatible = "arm,cortex-a57", "arm,armv8";
- 			reg = <0x3>;
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP>;
-+		};
-+
-+		idle-states {
-+			entry-method = "arm,psci";
-+
-+			CPU_SLEEP: cpu-sleep {
-+				compatible = "arm,idle-state";
-+				local-timer-stop;
-+				arm,psci-suspend-param = <0x0010000>;
-+				entry-latency-us = <34>;
-+				exit-latency-us = <150>;
-+				min-residency-us = <2100>;
-+			};
- 		};
- 	};
- 
--- 
-1.9.1
+Thanks and Best Regards,
+Jingchang
+>
+>thanks,
+>
+>greg k-h
