@@ -1,37 +1,54 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 11 Nov 2014 14:14:07 -0700
-Subject: [PATCH] ARM: dts: tegra: move serial aliases to per-board
-In-Reply-To: <1415738970-7963-1-git-send-email-olof@lixom.net>
-References: <1415738970-7963-1-git-send-email-olof@lixom.net>
-Message-ID: <54627C1F.9050200@wwwdotorg.org>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 11 Nov 2014 22:20:07 +0100
+Subject: [[PATCHv2] 2/3] ARM: dts: vfxxx: Add SNVS node
+In-Reply-To: <64244b916de3864b714e829c3adeecec71aea2b3.1415364391.git.maitysanchayan@gmail.com>
+References: <cover.1415364391.git.maitysanchayan@gmail.com>
+ <64244b916de3864b714e829c3adeecec71aea2b3.1415364391.git.maitysanchayan@gmail.com>
+Message-ID: <38daf99040ba00bd5150e7bc73a2fd76@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2014 01:49 PM, Olof Johansson wrote:
-> There are general changes pending to make the /aliases/serial* entries
-> number the serial ports on the system. On tegra, so far the ports have been
-> just numbered dynamically as they are configured so that makes them change.
->
-> To avoid this, add specific aliases per board to keep the old numbers. This
-> allows us to change the numbering by default on future SoCs while keeping the
-> numbering on existing boards.
-
-This change seems mostly OK to me. FWIW though, I had suggested this 
-approach when the UART aliases were first added, and Laxman disagreed 
-with it. See commit b6551bb933f9 "ARM: tegra: dts: add aliases and DMA 
-requestor for serial controller", and its discussion: 
-https://lkml.org/lkml/2012/12/25/4. I've CC'd Laxman in case he still 
-objects.
-
-> Signed-off-by: Olof Johansson <olof@lixom.net>
+On 2014-11-07 14:04, Sanchayan Maity wrote:
+> This patch adds a devicetree node for the Secure
+> Non-Volatile Storage (SNVS) on the VF610 platform.
+> The SNVS block also has a Real Time Counter (RTC).
+> 
+> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 > ---
->
-> Stephen/Thierry/Alex, as noticed this week we really should try to get
-> this in before the 3.19 merge window so that the global aliases change
-> can happen there without regression.
+>  arch/arm/boot/dts/vfxxx.dtsi |   15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+> index 4e70833..bc131b0 100644
+> --- a/arch/arm/boot/dts/vfxxx.dtsi
+> +++ b/arch/arm/boot/dts/vfxxx.dtsi
+> @@ -338,6 +338,21 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			snvs0: snvs at 400a7000 {
+> +				compatible = "fsl,sec-v4.0-mon", "simple-bus";
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				ranges = <0 0x400a7000 0x2000>;
+> +
+> +				snvs-rtc-lp at 34 {
+> +					compatible = "fsl,sec-v4.0-mon-rtc-lp";
+> +					reg = <0x34 0x58>;
+> +					interrupts = <0 100 IRQ_TYPE_LEVEL_HIGH>;
 
-How did we resolve the issue that patch causes with old DTs; namely that 
-it causes a change in behaviour for those old DTs? On IRC, I'd wondered 
-whether we should set a flag so the kernel ignored aliases for boards 
-containing currently upstreamed Tegra SoCs so that issue wouldn't occur. 
-If we did that, we wouldn't need this patch.
+With the new device tree structure, the interrupt field needs to be part
+of the vf500.dtsi now. The vfxxx.dtsi will be the parent also for the
+Cortex-M4 device tree, which uses a different interrupt controller.
+
+While at it, use the GIC_SPI macro for the first cell (so this will be
+blend into the other interrupt definitions).
+
+> +					clocks = <&clks VF610_CLK_SNVS>;
+> +					clock-names = "snvs-rtc";
+> +				};
+> +			};
+> +
+>  			uart4: serial at 400a9000 {
+>  				compatible = "fsl,vf610-lpuart";
+>  				reg = <0x400a9000 0x1000>;
