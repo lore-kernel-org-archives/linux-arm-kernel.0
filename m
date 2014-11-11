@@ -1,49 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Nov 2014 22:40:01 +0100
-Subject: [PATCH 5/6] Documentation: i2c: Add APM X-Gene platform SLIMpro
- I2C driver documentation
-In-Reply-To: <1412726809-7525-6-git-send-email-fkan@apm.com>
-References: <1412726809-7525-1-git-send-email-fkan@apm.com>
- <1412726809-7525-6-git-send-email-fkan@apm.com>
-Message-ID: <3205278.6fp3VTYkMI@wuerfel>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 11 Nov 2014 21:42:17 +0000
+Subject: [PATCH v4 2/5] dt-bindings: Add a clocks property to the
+ simple-framebuffer binding
+In-Reply-To: <1413996311-4287-3-git-send-email-hdegoede@redhat.com>
+References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
+ <1413996311-4287-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <20141111214217.19EF5C41610@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 October 2014 17:06:48 Feng Kan wrote:
-> Add APM X-Gene platform SLIMpro I2C driver documentation.
+On Wed, 22 Oct 2014 18:45:08 +0200
+, Hans de Goede <hdegoede@redhat.com>
+ wrote:
+> A simple-framebuffer node represents a framebuffer setup by the firmware /
+> bootloader. Such a framebuffer may have a number of clocks in use, add a
+> property to communicate this to the OS.
 > 
-
-Don't just repeat the subject line, explain what this is for.
-
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> Signed-off-by: Hieu Le <hnle@apm.com>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Reviewed-by: Mike Turquette <mturquette@linaro.org>
+> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> --
+> Changes in v2:
+> -Added Reviewed-by: Mike Turquette <mturquette@linaro.org>
+> Changes in v3:
+> -Updated description to make clear simplefb deals with more then just memory
 > ---
->  .../devicetree/bindings/i2c/i2c-xgene-slimpro.txt    | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-xgene-slimpro.txt
+>  Documentation/devicetree/bindings/video/simple-framebuffer.txt | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-xgene-slimpro.txt b/Documentation/devicetree/bindings/i2c/i2c-xgene-slimpro.txt
-> new file mode 100644
-> index 0000000..1a79d53
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-xgene-slimpro.txt
-> @@ -0,0 +1,20 @@
-> +APM X-Gene SLIMpro Mailbox I2C Driver
-> +
-> +This is a I2C driver that access the I2C bus through the mailbox mechanism.
-> +There is documentation of the mailbox driver in the
-> +Documentation/devicetree/binding/mailbox/xgene-slimpro-mbox.txt
-> +
-> +Required properties :
-> +
-> + - compatible : should be "apm,xgene-slimpro-i2c"
-> + - mbox : ptr to the mailbox dts node, use the name of the mailbox as the
-> +	  first parameter. The second parameter is the channel number.
-> +	  The APM X-Gene SLIMpro mailbox has 8 channels.
-> + - mbox-names : the name of the mailbox channel.
+> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+> index 70c26f3..172ad5f 100644
+> --- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+> @@ -1,8 +1,8 @@
+>  Simple Framebuffer
+>  
+> -A simple frame-buffer describes a raw memory region that may be rendered to,
+> -with the assumption that the display hardware has already been set up to scan
+> -out from that buffer.
+> +A simple frame-buffer describes a frame-buffer setup by firmware or
+> +the bootloader, with the assumption that the display hardware has already
+> +been set up to scan out from the memory pointed to by the reg property.
+>  
+>  Required properties:
+>  - compatible: "simple-framebuffer"
+> @@ -14,6 +14,9 @@ Required properties:
+>    - r5g6b5 (16-bit pixels, d[15:11]=r, d[10:5]=g, d[4:0]=b).
+>    - a8b8g8r8 (32-bit pixels, d[31:24]=a, d[23:16]=b, d[15:8]=g, d[7:0]=r).
+>  
+> +Optional properties:
+> +- clocks : List of clocks used by the framebuffer
 
-The current form of the mailbox interface no longer uses mbox-names, so
-just drop that. In the old form, the binding would have been incomplete
-because you don't list the required name.
+Please change to the following:
+- clocks : List of clocks used by the framebuffer. Clocks listed here
+           are expected to already be configured correctly. The OS must
+           ensure these clocks are not modified or disabled while the
+           simple framebuffer remains active.
 
-	Arnd
+g.
