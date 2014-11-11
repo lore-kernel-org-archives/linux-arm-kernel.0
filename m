@@ -1,61 +1,59 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 11 Nov 2014 16:39:54 -0700
-Subject: [PATCH] ARM: dts: tegra: move serial aliases to per-board
-In-Reply-To: <CAOesGMh_8Ft=DKqm=e0fQdREC4aLmAAp3N0QyNsqWn2_rCbmnA@mail.gmail.com>
-References: <1415738970-7963-1-git-send-email-olof@lixom.net>	<54627C1F.9050200@wwwdotorg.org>
- <CAOesGMh_8Ft=DKqm=e0fQdREC4aLmAAp3N0QyNsqWn2_rCbmnA@mail.gmail.com>
-Message-ID: <54629E4A.7050201@wwwdotorg.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 12 Nov 2014 08:59:55 +0900
+Subject: [PATCH 3/4] ARM: shmobile: rcar-gen2: Add CA7 arch_timer
+ initialization for r8a7794
+In-Reply-To: <CAMuHMdUek9RA-tpVJbXKx1MENk47-E2s+437+SYNR9KbaO62dQ@mail.gmail.com>
+References: <cover.1415058939.git.horms+renesas@verge.net.au>
+ <9ce3fa6816c2fb59d128248c9b0509aef1c5dae7.1415058939.git.horms+renesas@verge.net.au>
+ <5583214.HuX5EZ5Unx@wuerfel>
+ <CAMuHMdUek9RA-tpVJbXKx1MENk47-E2s+437+SYNR9KbaO62dQ@mail.gmail.com>
+Message-ID: <20141111235954.GA12594@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2014 03:45 PM, Olof Johansson wrote:
-> [again in plain text mode. Sigh]
->
->
-> On Tue, Nov 11, 2014 at 1:14 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 11/11/2014 01:49 PM, Olof Johansson wrote:
->>>
->>> There are general changes pending to make the /aliases/serial* entries
->>> number the serial ports on the system. On tegra, so far the ports have
->>> been
->>> just numbered dynamically as they are configured so that makes them
->>> change.
->>>
->>> To avoid this, add specific aliases per board to keep the old numbers.
->>> This
->>> allows us to change the numbering by default on future SoCs while keeping
->>> the
->>> numbering on existing boards.
->>
->>
->> This change seems mostly OK to me. FWIW though, I had suggested this
->> approach when the UART aliases were first added, and Laxman disagreed with
->> it. See commit b6551bb933f9 "ARM: tegra: dts: add aliases and DMA requestor
->> for serial controller", and its discussion:
->> https://lkml.org/lkml/2012/12/25/4. I've CC'd Laxman in case he still
->> objects.
->>
->>> Signed-off-by: Olof Johansson <olof@lixom.net>
->>> ---
->>>
->>> Stephen/Thierry/Alex, as noticed this week we really should try to get
->>> this in before the 3.19 merge window so that the global aliases change
->>> can happen there without regression.
->>
->>
->> How did we resolve the issue that patch causes with old DTs; namely that it
->> causes a change in behaviour for those old DTs? On IRC, I'd wondered whether
->> we should set a flag so the kernel ignored aliases for boards containing
->> currently upstreamed Tegra SoCs so that issue wouldn't occur. If we did
->> that, we wouldn't need this patch.
->
-> Another way could be to remove aliases from the kernel side during
-> booting if they're found. Anyway, feel free to send a patch to do that
-> if that's your preference.
+On Tue, Nov 11, 2014 at 08:00:26PM +0100, Geert Uytterhoeven wrote:
+> On Tue, Nov 11, 2014 at 7:27 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 04 November 2014 10:50:08 Simon Horman wrote:
+> >> From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+> >>
+> >> On E2, the arch timer is hooked up to a different clock, and the CA7's arch
+> >> timer CNTVOFF register must be initialized.
+> >>
+> >> Based on work by Hisashi Nakamura.
+> >>
+> >> Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+> >> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >
+> > This is one of the patches that broke allmodconfig in linux-next.
+> >
+> > Can you apply the patch below before sending it to arm-soc?
+> >
+> > Thanks,
+> >
+> >         Arnd
+> >
+> > ---
+> > From 8bf0a4cae3137411498ff23ca46f693e4c22a25b Mon Sep 17 00:00:00 2001
+> > From: Arnd Bergmann <arnd@arndb.de>
+> > Date: Tue, 11 Nov 2014 16:36:50 +0100
+> > Subject: [PATCH] ARM: shmobile: always build rcar setup for armv7
+> >
+> > In a combined ARMv6/v7 kernel, the setup-rcar-gen2.c cannot
+> > currently be compiled correctly because it uses the isb
+> > instruction that is not available on ARMv6. Adding the
+> > -march=armv7-a flag lets the compiler know that it is safe
+> > to build this file for ARMv7.
+> >
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Thanks, this is a better solution than "[RFT] ARM: shmobile: rcar-gen2:
+> Fix build breakage" (https://lkml.org/lkml/2014/10/31/338).
+> 
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-That would work too.
+Agreed.
 
-I'll let Thierry make the call re: whether it's important to support old 
-DTs with the current aliase content without a change in device names 
-when booted on a newer kernel. If not, as I mentioned, I'm fine with 
-this patch.
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
+
+Arnd, what is the best way to get this patch merged?
+Do you plan to take it or should I?
