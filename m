@@ -1,46 +1,133 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 11 Nov 2014 13:19:09 +0530
-Subject: [PATCH v3 06/10] [media] platform: Make use of media_bus_format
- enum
-In-Reply-To: <546193CF.8090107@ti.com>
-References: <1415369269-5064-1-git-send-email-boris.brezillon@free-electrons.com>
- <1415369269-5064-7-git-send-email-boris.brezillon@free-electrons.com>
- <CA+V-a8t79gYYGcgg5wvM-eqW8H2D6WD7xM9t2Px=WHb2rf34ow@mail.gmail.com>
- <546193CF.8090107@ti.com>
-Message-ID: <5461BF75.8000808@ti.com>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Tue, 11 Nov 2014 15:09:05 +0800
+Subject: [RESEND] serial: of-serial: add PM suspend/resume support
+Message-ID: <1415689745-28572-1-git-send-email-jingchang.lu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 November 2014 10:12 AM, Sekhar Nori wrote:
-> On Saturday 08 November 2014 02:48 PM, Prabhakar Lad wrote:
->> Hi,
->>
->> Thanks for the patch,
->>
->> On Fri, Nov 7, 2014 at 2:07 PM, Boris Brezillon
->> <boris.brezillon@free-electrons.com> wrote:
->>> In order to have subsytem agnostic media bus format definitions we've
->>> moved media bus definition to include/uapi/linux/media-bus-format.h and
->>> prefixed values with MEDIA_BUS_FMT instead of V4L2_MBUS_FMT.
->>>
->>> Reference new definitions in all platform drivers.
->>>
->>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->>> ---
->>>  arch/arm/mach-davinci/board-dm355-evm.c            |   2 +-
->>>  arch/arm/mach-davinci/board-dm365-evm.c            |   4 +-
->>>  arch/arm/mach-davinci/dm355.c                      |   7 +-
->>>  arch/arm/mach-davinci/dm365.c                      |   7 +-
->>
->> @Sekhar can you ack for the machine changes for davinci ?
-> 
-> Heh, I don't have 6/10 in my inbox but have rest of the series. Can you
-> forward 6/10 to me?
+This adds suspend/resume support for the of-serial driver
+to provide power management support on devices attatched.
 
-Based on the patch Prabhakar forwarded, for the mach-davinci changes,
-you can add:
+The handling may vary since not every of_serial device is
+an 8250 port. Currently only 8250 port handling is added
+in the suspend/resume function based on the type switch.
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Tested-by: Joseph Lo <josephl@nvidia.com>
+Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+Tested-by: Florina Fainelli <f.fainelli@gmail.com>
+---
+This patch merges the two pervious accepted patches into one
+to make things clearly:
+	commit	2dea53bf57783f243c892e99c10c6921e956aa7e
+	serial: of-serial: add PM suspend/resume support
 
-Thanks,
-Sekhar
+	commit	513e438581020334e0345561adeeeaefa36701be
+	serial: of-serial: fix up PM ops on no_console_suspend and port type
+
+The first has a bug that causes a hardware hang on register
+access if no_console_suspend command line option used, also
+lack of disnguishing the port type. Then there is the second
+one.
+
+The first has entered 3.18-rc but the second not, and both
+have entered linux-next tree, so please drop them first to
+apply this one. Thanks.
+
+ drivers/tty/serial/of_serial.c | 66 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 66 insertions(+)
+
+diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
+index e60b59f..f66d814 100644
+--- a/drivers/tty/serial/of_serial.c
++++ b/drivers/tty/serial/of_serial.c
+@@ -9,6 +9,7 @@
+  *  2 of the License, or (at your option) any later version.
+  *
+  */
++#include <linux/console.h>
+ #include <linux/module.h>
+ #include <linux/slab.h>
+ #include <linux/delay.h>
+@@ -251,6 +252,70 @@ static int of_platform_serial_remove(struct platform_device *ofdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++#ifdef CONFIG_SERIAL_8250
++static void of_serial_suspend_8250(struct of_serial_info *info)
++{
++	struct uart_8250_port *port8250 = serial8250_get_port(info->line);
++	struct uart_port *port = &port8250->port;
++
++	serial8250_suspend_port(info->line);
++	if (info->clk && (!uart_console(port) || console_suspend_enabled))
++		clk_disable_unprepare(info->clk);
++}
++
++static void of_serial_resume_8250(struct of_serial_info *info)
++{
++	struct uart_8250_port *port8250 = serial8250_get_port(info->line);
++	struct uart_port *port = &port8250->port;
++
++	if (info->clk && (!uart_console(port) || console_suspend_enabled))
++		clk_prepare_enable(info->clk);
++
++	serial8250_resume_port(info->line);
++}
++#else
++static inline void of_serial_suspend_8250(struct of_serial_info *info)
++{
++}
++
++static inline void of_serial_resume_8250(struct of_serial_info *info)
++{
++}
++#endif
++
++static int of_serial_suspend(struct device *dev)
++{
++	struct of_serial_info *info = dev_get_drvdata(dev);
++
++	switch (info->type) {
++	case PORT_8250 ... PORT_MAX_8250:
++		of_serial_suspend_8250(info);
++		break;
++	default:
++		break;
++	}
++
++	return 0;
++}
++
++static int of_serial_resume(struct device *dev)
++{
++	struct of_serial_info *info = dev_get_drvdata(dev);
++
++	switch (info->type) {
++	case PORT_8250 ... PORT_MAX_8250:
++		of_serial_resume_8250(info);
++		break;
++	default:
++		break;
++	}
++
++	return 0;
++}
++#endif
++static SIMPLE_DEV_PM_OPS(of_serial_pm_ops, of_serial_suspend, of_serial_resume);
++
+ /*
+  * A few common types, add more as needed.
+  */
+@@ -282,6 +347,7 @@ static struct platform_driver of_platform_serial_driver = {
+ 	.driver = {
+ 		.name = "of_serial",
+ 		.of_match_table = of_platform_serial_table,
++		.pm = &of_serial_pm_ops,
+ 	},
+ 	.probe = of_platform_serial_probe,
+ 	.remove = of_platform_serial_remove,
+-- 
+1.8.0
