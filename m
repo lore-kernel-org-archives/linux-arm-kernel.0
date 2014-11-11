@@ -1,96 +1,117 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 11 Nov 2014 11:52:27 +0000
-Subject: [PATCH 2/2] PCI: generic: Add set_msi_parent callback
-In-Reply-To: <20141111112424.GB16265@arm.com>
-References: <1415647480-3320-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1415647480-3320-3-git-send-email-suravee.suthikulpanit@amd.com>
- <20141111112424.GB16265@arm.com>
-Message-ID: <20141111115227.GF12037@e106497-lin.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Nov 2014 11:59:59 +0000
+Subject: [RFC 2/2] regulator: qcom-rpm: Implement RPM assisted disable
+In-Reply-To: <1415659966-16200-3-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1415659966-16200-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1415659966-16200-3-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <20141111115959.GY24004@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 11, 2014 at 11:24:24AM +0000, Will Deacon wrote:
-> Hi Suravee,
-> 
-> On Mon, Nov 10, 2014 at 07:24:40PM +0000, suravee.suthikulpanit at amd.com wrote:
-> > From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> > 
-> > This patch implement set_msi_parent callback for PCI generic host controller.
-> > 
-> > Cc: Bjorn Helgass <bhelgaas@google.com>
-> > Cc: Liviu Dudau <liviu.dudau@arm.com>
-> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> > ---
-> >  drivers/pci/host/pci-host-generic.c | 14 ++++++++++++++
-> >  1 file changed, 14 insertions(+)
-> > 
-> > diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> > index 036ab1b..f9bb97a 100644
-> > --- a/drivers/pci/host/pci-host-generic.c
-> > +++ b/drivers/pci/host/pci-host-generic.c
-> > @@ -42,6 +42,7 @@ struct gen_pci {
-> >  	struct pci_host_bridge			host;
-> >  	struct gen_pci_cfg_windows		cfg;
-> >  	struct list_head			resources;
-> > +	struct msi_chip				*mchip;
-> >  };
-> >  
-> >  #ifdef CONFIG_ARM
-> > @@ -128,9 +129,19 @@ static int gen_pci_config_write(struct pci_bus *bus, unsigned int devfn,
-> >  	return PCIBIOS_SUCCESSFUL;
-> >  }
-> >  
-> > +static int gen_pci_set_msi_parent(struct pci_bus *bus)
-> > +{
-> > +	struct gen_pci *pci = bus_to_gen_pci(bus);
-> > +
-> > +	bus->msi = pci->mchip;
-> > +
-> > +	return PCIBIOS_SUCCESSFUL;
-> > +}
-> 
-> I don't think this makes much sense a host controller callback. Why can't
-> bus->msi be set in generic code?
+On Mon, 10 Nov 2014, Bjorn Andersson wrote:
 
-Because of the current way in which a bus gets created and them immediately used for
-scanning devices if you use pci_scan_root_bus(). Alternative is to use pci_create_root_bus()
-and increase your code size with the body of pci_scan_root_bus().
-
-Solution is to have pci_host_bridge holding the msi_chip pointer and that gets created
-before root bus, with pci_scan_root_bus() now having all the info needed to do successful
-setup of scanned devices.
-
-Best regards,
-Liviu
-
+> Some regulators are used to power e.g. PLLs that clocks the core we're
+> running on, so we can't turn them off directly; but we do want them off
+> when the core is powered down. To handle this the Qualcomm SoC provides
+> a means to specify a "sleep state" for RPM resources that can be
+> triggered by the hardware when the cores are brought down.
 > 
-> >  static struct pci_ops gen_pci_ops = {
-> >  	.read	= gen_pci_config_read,
-> >  	.write	= gen_pci_config_write,
-> > +	.set_msi_parent = gen_pci_set_msi_parent,
-> >  };
-> >  
-> >  static const struct of_device_id gen_pci_of_match[] = {
-> > @@ -313,6 +324,9 @@ static int gen_pci_probe(struct platform_device *pdev)
-> >  		return err;
-> >  	}
-> >  
-> > +	pci->mchip = of_pci_find_msi_chip_by_node(of_parse_phandle(np,
-> > +						  "msi-parent", 0));
+> Resources of this type should be considered always-on while the CPU(s)
+> are running and we can utilize the "sleep state" functionality to defer
+> disabling them until the CPU(s) go to sleep, if not used by other
+> peripherals at that time.
 > 
-> This bit should be in the generic of_pci.c code and not duplicated for
-> each host controller.
+> Other properties are kept in sync between the states, so that if the
+> CPU(s) go to sleep with a particular regulator still enabled there will
+> be no change.
 > 
-> Will
-> 
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> ---
+>  Documentation/devicetree/bindings/mfd/qcom-rpm.txt |   28 ++++++++
 
+Please place this into a seperate patch.
+
+See: Documentation/devicetree/bindings/submitting-patches.txt
+
+>  drivers/regulator/qcom_rpm-regulator.c             |   68 +++++++++++++++-----
+>  2 files changed, 79 insertions(+), 17 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+> index 4264021..4671eef 100644
+> --- a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+> +++ b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+> @@ -112,6 +112,13 @@ of valid subnodes that can operate on these resources.
+>  	Definition: select that the power supply should operate in hysteretic
+>  		    mode, instead of the default pwm mode
+>  
+> +- qcom,rpm-assisted-disable:
+> +	Usage: optional
+> +	Value type: <empty>
+> +	Definition: select that the regulator is supplying the active CPU(s)
+> +		    and can only be disabled with the assistans from the RPM
+> +		    after going to sleep
+> +
+
+This requires a DT Ack.
+
+>  Standard regulator bindings are used inside switch mode power supply subnodes.
+>  Check Documentation/devicetree/bindings/regulator/regulator.txt for more
+>  details.
+> @@ -160,6 +167,13 @@ details.
+>  						qcom,rpm-pm8921-nldo,
+>  						qcom,rpm-pm8921-nldo1200
+>  
+> +- qcom,rpm-assisted-disable:
+> +	Usage: optional
+> +	Value type: <empty>
+> +	Definition: select that the regulator is supplying the active CPU(s)
+> +		    and can only be disabled with the assistans from the RPM
+> +		    after going to sleep
+> +
+
+Eh?  I think I'm seeing double.
+
+>  Standard regulator bindings are used inside switch low-dropout regulator
+>  subnodes.  Check Documentation/devicetree/bindings/regulator/regulator.txt for
+>  more details.
+> @@ -190,6 +204,13 @@ more details.
+>  		    2740000, 2400000, 2130000, 1920000, 1750000, 1600000,
+>  		    1480000, 1370000, 1280000, 1200000
+>  
+> +- qcom,rpm-assisted-disable:
+> +	Usage: optional
+> +	Value type: <empty>
+> +	Definition: select that the regulator is supplying the active CPU(s)
+> +		    and can only be disabled with the assistans from the RPM
+> +		    after going to sleep
+> +
+
+Triple?
+
+>  Standard regulator bindings are used inside negative charge pump regulator
+>  subnodes.  Check Documentation/devicetree/bindings/regulator/regulator.txt for
+>  more details.
+> @@ -215,6 +236,13 @@ more details.
+>  		    QCOM_RPM_PM8921_LVS1 - QCOM_RPM_PM8921_LVS7,
+>  		    QCOM_RPM_PM8921_MVS
+>  
+> +- qcom,rpm-assisted-disable:
+> +	Usage: optional
+> +	Value type: <empty>
+> +	Definition: select that the regulator is supplying the active CPU(s)
+> +		    and can only be disabled with the assistans from the RPM
+> +		    after going to sleep
+> +
+
+There must be a better way to document this.
+
+>  = EXAMPLE
+>  
+>  	#include <dt-bindings/mfd/qcom-rpm.h>
+
+[...]
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
