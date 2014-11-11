@@ -1,196 +1,153 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 11 Nov 2014 15:48:09 +0000
-Subject: [PATCH 11/15] irqchip: GICv3: ITS: MSI support
+Date: Tue, 11 Nov 2014 15:48:11 +0000
+Subject: [PATCH 13/15] irqchip: GICv3: ITS: plug ITS init into main GICv3 code
 In-Reply-To: <1415720893-13371-1-git-send-email-marc.zyngier@arm.com>
 References: <1415720893-13371-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1415720893-13371-12-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1415720893-13371-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now, the bit of code that allow us to use the ITS as a MSI controller.
-Both MSI and MSI-X are supported.
+As the ITS is always a subsystem if GICv3, its probing/init is
+driven by the main GICv3 code.
+
+Plug that code in (guarded by a config option).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c   | 131 +++++++++++++++++++++++++++++++++++++
- include/linux/irqchip/arm-gic-v3.h |   6 ++
- 2 files changed, 137 insertions(+)
+ drivers/irqchip/irq-gic-v3.c       | 46 +++++++++++++++++++++++++++++++++-----
+ include/linux/irqchip/arm-gic-v3.h |  5 +++++
+ 2 files changed, 45 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 8d13012..0f51d23 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -35,6 +35,7 @@
- #include <asm/cacheflush.h>
- #include <asm/cputype.h>
- #include <asm/exception.h>
-+#include <asm/msi.h>
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index c2cb081..2261bb8 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -76,9 +76,6 @@ static inline void __iomem *gic_dist_base(struct irq_data *d)
+ 	if (d->hwirq <= 1023)		/* SPI -> dist_base */
+ 		return gic_data.dist_base;
  
- #include "irqchip.h"
- 
-@@ -587,12 +588,27 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 	return IRQ_SET_MASK_OK;
+-	if (d->hwirq >= 8192)
+-		BUG();		/* LPI Detected!!! */
+-
+ 	return NULL;
  }
  
-+static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
+@@ -276,11 +273,11 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
+ 	do {
+ 		irqnr = gic_read_iar();
+ 
+-		if (likely(irqnr > 15 && irqnr < 1020)) {
++		if (likely(irqnr > 15 && irqnr < 1020) || irqnr >= 8192) {
+ 			int err;
+ 			err = handle_domain_irq(gic_data.domain, irqnr, regs);
+ 			if (err) {
+-				WARN_ONCE(true, "Unexpected SPI received!\n");
++				WARN_ONCE(true, "Unexpected interrupt received!\n");
+ 				gic_write_eoir(irqnr);
+ 			}
+ 			continue;
+@@ -393,6 +390,11 @@ static void gic_cpu_sys_reg_init(void)
+ 	gic_write_grpen1(1);
+ }
+ 
++static int gic_dist_supports_lpis(void)
 +{
-+	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
-+	struct its_node *its;
-+	u64 addr;
-+
-+	its = its_dev->its;
-+	addr = its->phys_base + GITS_TRANSLATER;
-+
-+	msg->address_lo		= addr & ((1UL << 32) - 1);
-+	msg->address_hi		= addr >> 32;
-+	msg->data		= its_get_event_id(d);
++	return !!(readl_relaxed(gic_data.dist_base + GICD_TYPER) & GICD_TYPER_LPIS);
 +}
 +
- static struct irq_chip its_irq_chip = {
- 	.name			= "ITS",
- 	.irq_mask		= its_mask_irq,
- 	.irq_unmask		= its_unmask_irq,
- 	.irq_eoi		= its_eoi_irq,
- 	.irq_set_affinity	= its_set_affinity,
-+	.irq_compose_msi_msg	= its_irq_compose_msi_msg,
+ static void gic_cpu_init(void)
+ {
+ 	void __iomem *rbase;
+@@ -407,6 +409,10 @@ static void gic_cpu_init(void)
+ 
+ 	gic_cpu_config(rbase, gic_redist_wait_for_rwp);
+ 
++	/* Give LPIs a spin */
++	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
++		its_cpu_init();
++
+ 	/* initialise system registers */
+ 	gic_cpu_sys_reg_init();
+ }
+@@ -593,12 +599,21 @@ static struct irq_chip gic_chip = {
+ 	.irq_set_affinity	= gic_set_affinity,
  };
  
- /*
-@@ -1055,3 +1071,118 @@ static void its_free_device(struct its_device *its_dev)
- 	kfree(its_dev->itt);
- 	kfree(its_dev);
++#define GIC_ID_NR		(1U << gic_data.rdists.id_bits)
++
+ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+ 			      irq_hw_number_t hw)
+ {
+ 	/* SGIs are private to the core kernel */
+ 	if (hw < 16)
+ 		return -EPERM;
++	/* Nothing here */
++	if (hw >= gic_data.irq_nr && hw < 8192)
++		return -EPERM;
++	/* Off limits */
++	if (hw >= GIC_ID_NR)
++		return -EPERM;
++
+ 	/* PPIs */
+ 	if (hw < 32) {
+ 		irq_set_percpu_devid(irq);
+@@ -614,7 +629,20 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+ 		irq_set_handler(irq, handle_fasteoi_irq);
+ 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+ 	}
+-	irq_set_chip_data(irq, d->host_data);
++	/* LPIs */
++	if (hw >= 8192 && hw < GIC_ID_NR) {
++		if (!gic_dist_supports_lpis())
++			return -EPERM;
++		irq_domain_set_hwirq_and_chip(d, irq, hw,
++					      &gic_chip, d->host_data);
++		/*
++		 * We do NOT set the flow here, as this is handled at
++		 * the top level domain (most probably the MSI
++		 * one). We may have to revisit this at some point...
++		 */
++		set_irq_flags(irq, IRQF_VALID);
++	}
++
+ 	return 0;
  }
+ 
+@@ -635,6 +663,9 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
+ 	case 1:			/* PPI */
+ 		*out_hwirq = intspec[1] + 16;
+ 		break;
++	case GIC_IRQ_TYPE_LPI:	/* LPI */
++		*out_hwirq = intspec[1];
++		break;
+ 	default:
+ 		return -EINVAL;
+ 	}
+@@ -761,6 +792,9 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+ 
+ 	set_handle_irq(gic_handle_irq);
+ 
++	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
++		its_init(node, &gic_data.rdists, gic_data.domain);
 +
-+static int its_alloc_device_irq(struct its_device *dev, irq_hw_number_t *hwirq)
-+{
-+	int idx;
-+
-+	idx = find_first_zero_bit(dev->lpi_map, dev->nr_lpis);
-+	if (idx == dev->nr_lpis)
-+		return -ENOSPC;
-+
-+	*hwirq = dev->lpi_base + idx;
-+	set_bit(idx, dev->lpi_map);
-+
-+	/* Map the GIC irq ID to the device */
-+	its_send_mapvi(dev, *hwirq, idx);
-+
-+	return 0;
-+}
-+
-+static int its_irq_gic_domain_alloc(struct irq_domain *domain,
-+				    unsigned int virq,
-+				    irq_hw_number_t hwirq)
-+{
-+	struct of_phandle_args args;
-+
-+	args.np = domain->parent->of_node;
-+	args.args_count = 3;
-+	args.args[0] = GIC_IRQ_TYPE_LPI;
-+	args.args[1] = hwirq;
-+	args.args[2] = IRQ_TYPE_EDGE_RISING;
-+
-+	return irq_domain_alloc_irqs_parent(domain, virq, 1, &args);
-+}
-+
-+/* FIXME: Use proper API once it is available in the kernel... */
-+#define PCI_REQUESTER_ID(dev)	PCI_DEVID((dev)->bus->number, (dev)->devfn)
-+
-+static int its_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-+				unsigned int nr_irqs, void *arg)
-+{
-+	struct arm64_msi_info *info = arg;
-+	struct pci_dev *pdev = info->pdev;
-+	struct msi_chip *chip = pdev->bus->msi;
-+	struct its_node *its = container_of(chip, struct its_node, msi_chip);
-+	u32 dev_id = PCI_REQUESTER_ID(pdev);
-+	struct its_device *its_dev;
-+	irq_hw_number_t hwirq;
-+	int err;
-+	int i;
-+
-+	its_dev = its_find_device(its, dev_id);
-+	if (!its_dev) {
-+		its_dev = its_create_device(its, dev_id, info->nvec);
-+		dev_dbg(&pdev->dev, "ITT %d entries, %d bits\n",
-+			info->nvec, ilog2(info->nvec));
-+	}
-+	if (!its_dev)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < nr_irqs; i++) {
-+		err = its_alloc_device_irq(its_dev, &hwirq);
-+		if (err)
-+			return err;
-+
-+		err = its_irq_gic_domain_alloc(domain, virq, hwirq);
-+		if (err)
-+			return err;
-+
-+		irq_domain_set_hwirq_and_chip(lpi_domain, virq + i,
-+					      hwirq, &its_irq_chip, its_dev);
-+		dev_dbg(&pdev->dev, "ID:%d pID:%d vID:%d\n",
-+			(int)(hwirq - its_dev->lpi_base),
-+			(int)hwirq, virq + i);
-+	}
-+
-+	return 0;
-+}
-+
-+static void its_irq_domain_free(struct irq_domain *domain, unsigned int virq,
-+				unsigned int nr_irqs)
-+{
-+	struct irq_data *d = irq_get_irq_data(virq);
-+	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
-+	int i;
-+
-+	for (i = 0; i < nr_irqs; i++) {
-+		int event = its_get_event_id(d);
-+
-+		/* Stop the delivery of interrupts */
-+		its_send_discard(its_dev, event);
-+
-+		/* Mark interrupt index as unused, and clear the mapping */
-+		clear_bit(event, its_dev->lpi_map);
-+
-+		irq_set_handler(virq + i, NULL);
-+		irq_domain_set_hwirq_and_chip(domain, virq + i, 0, NULL, NULL);
-+	}
-+
-+	/* If all interrupts have been freed, start mopping the floor */
-+	if (bitmap_empty(its_dev->lpi_map, its_dev->nr_lpis)) {
-+		its_lpi_free(its_dev->lpi_map,
-+			     its_dev->lpi_base,
-+			     its_dev->nr_lpis);
-+
-+		/* Unmap device/itt */
-+		its_send_mapd(its_dev, 0);
-+		its_free_device(its_dev);
-+	}
-+
-+	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
-+}
-+
-+static const struct irq_domain_ops its_domain_ops = {
-+	.alloc			= its_irq_domain_alloc,
-+	.free			= its_irq_domain_free,
-+};
+ 	gic_smp_init();
+ 	gic_dist_init();
+ 	gic_cpu_init();
 diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 21c9d70..2a7486b 100644
+index 2a7486b..479a082 100644
 --- a/include/linux/irqchip/arm-gic-v3.h
 +++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -295,6 +295,12 @@
+@@ -318,6 +318,11 @@ static inline void gic_write_eoir(u64 irq)
+ 	isb();
+ }
  
- #include <linux/stringify.h>
- 
-+/*
-+ * We need a value to serve as a irq-type for LPIs. Choose one that will
-+ * pick the interest of the reviewer.
-+ */
-+#define GIC_IRQ_TYPE_LPI		0xa110c8ed
++struct irq_domain;
++int its_cpu_init(void);
++int its_init(struct device_node *node, struct rdists *rdists,
++	     struct irq_domain *domain);
 +
- struct rdists {
- 	struct {
- 		void __iomem	*rd_base;
+ #endif
+ 
+ #endif
 -- 
 2.0.4
