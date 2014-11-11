@@ -1,81 +1,43 @@
-From: b.galvani@gmail.com (Beniamino Galvani)
-Date: Tue, 11 Nov 2014 20:52:34 +0100
-Subject: [PATCH 2/3] spi: meson: Add support for Amlogic Meson SPIFC
-In-Reply-To: <20141110151140.GA3815@sirena.org.uk>
-References: <1415525113-25598-1-git-send-email-b.galvani@gmail.com>
- <1415525113-25598-3-git-send-email-b.galvani@gmail.com>
- <20141109101712.GM2722@sirena.org.uk>
- <20141109225650.GA27950@gmail.com>
- <20141110151140.GA3815@sirena.org.uk>
-Message-ID: <20141111195234.GA15145@gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 11 Nov 2014 20:08:11 +0000
+Subject: [PATCH v2 1/2] of/fdt: export fdt blob as /sys/firmware/fdt
+In-Reply-To: <CAL_JsqKeG1dWrMZydCN119V3++WKXqsjMm1bG7Fodhf3O8owpw@mail.gmail.com>
+References: <1415645222-14909-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1415645222-14909-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20141111144221.5FCDAC416AF@trevor.secretlab.ca>
+ <CAL_JsqKeG1dWrMZydCN119V3++WKXqsjMm1bG7Fodhf3O8owpw@mail.gmail.com>
+Message-ID: <CACxGe6tsLr52ZLww2JfwHFHajHW+f6nbYJPyWXmZJg3coKmMCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 10, 2014 at 03:11:40PM +0000, Mark Brown wrote:
-> On Sun, Nov 09, 2014 at 11:56:50PM +0100, Beniamino Galvani wrote:
-> > On Sun, Nov 09, 2014 at 10:17:12AM +0000, Mark Brown wrote:
+On Tue, Nov 11, 2014 at 4:25 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On Tue, Nov 11, 2014 at 8:42 AM, Grant Likely <grant.likely@linaro.org> wrote:
+>> On Mon, 10 Nov 2014 19:47:01 +0100
+>> , Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>  wrote:
+>>> Create a new /sys entry '/sys/firmware/fdt' to export the FDT blob
+>>> that was passed to the kernel by the bootloader. This allows userland
+>>> applications such as kexec to access the raw binary. The blob needs to
+>>> be preserved as early as possible by calling preserve_fdt().
+>>>
+>>> The fact that this node does not reside under /sys/firmware/device-tree
+>>> is deliberate: FDT is also used on arm64 UEFI/ACPI systems to
+>>> communicate just the UEFI and ACPI entry points, but the FDT is never
+>>> unflattened and used to configure the system.
+>>>
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>
+>> On further thought, nak. I want tree modifications to be treated as
+>> bugs. Do a checksum CRC32 or check. It's simpler and it can be extended
+>> to us an in-blob CRC when the file format gets upreved to include one.
 >
-> > > I noticed that the handling of /CS was done in the spifc_txrx() function
-> > > - will this do the right thing if the transfer needs to be split for the
-> > > buffer size?
-> 
-> > It should. When the transfer gets split, CS is kept active for all the
-> > chunks and the value of CS after that depends on the value of
-> > cs_change.
-> 
-> Can you be more specific about how that works?  I'm just not seeing the
-> code that handles this.
+> Why? MIPS Octeon is full of them BTW. So the rule is any modifications
+> or fixups have to be on the unflattened tree?
 
-It's this:
+That, or we require the fixups to explicitly clean up the CRC after
+themselves. That will force them to be visible. Anything using the
+fdt_*() write functions could potentially take care of it
+automatically. That would make it immediately discoverable where
+changes are being made in the tree.
 
-static int meson_spifc_txrx(struct meson_spifc *spifc,
-                            struct spi_transfer *xfer,
-                            int offset, int len, bool last_xfer,
-                            bool last_chunk)
-{
-	bool keep_cs = true;
-
-	[...]
-
-        if (last_chunk) {
-                if (last_xfer)
-                        keep_cs = xfer->cs_change;
-                else
-                        keep_cs = !xfer->cs_change;
-        }
-
-        regmap_update_bits(spifc->regmap, REG_USER4, USER4_CS_ACT,
-                           keep_cs ? USER4_CS_ACT : 0);
-
-	/* start transfer */
-	[...]
-}
-
-The USER4_CS_ACT bit specifies if CS must be kept active after the
-transfer.
-
-> > > > +	if (!ret && xfer->delay_usecs)
-> > > > +		udelay(xfer->delay_usecs);
-> 
-> > > The core will do this for you if you implement this as transfer_one().
-> 
-> > Please correct me if I'm wrong, but I think that transfer_one() can't
-> > be used in this case. The hardware doesn't support direct manipulation
-> > of CS and allows only to specify if CS must be kept active after the
-> > current transfer. So I need to know for each transfer if it's the last
-> > and this can be achieved only implementing transfer_one_message().
-> 
-> This is already in a function that's operating at the transfer_one()
-> level, the function is even called transfer_one() and besides it's
-> clearly not something specific to this hardware so should be factored
-> out into the core instead of open coded.
-
-A way to simplify this at core level could be to add a 'last' flag to
-the spi_transfer structure and populate it before calling
-transfer_one_message(); in this way, drivers that need to know the
-position of the transfer in the message in order to properly handle CS
-can use the generic version of transfer_one_message() instead of
-reimplementing it. It seems that other existing drivers probably can
-benefit from this.
-
-Beniamino
+g.
