@@ -1,30 +1,134 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Mon, 10 Nov 2014 21:39:50 -0600
-Subject: [PATCH] ARM: multi_v7_defconfig: enable designware watchdog driver
-Message-ID: <1415677190-32695-1-git-send-email-dinguyen@opensource.altera.com>
+From: ibanezchen@gmail.com (Howard Chen)
+Date: Tue, 11 Nov 2014 11:55:09 +0800
+Subject: [PATCH v5 1/3] ARM: mediatek: Add basic support for mt6592
+Message-ID: <1415678111-29914-1-git-send-email-ibanezchen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@opensource.altera.com>
+* A dtsi for boards based on Mediatek MT6592 SoCs
+* Compatible string in arch/arm/mach-mediatek/mediatek.c
 
-The dw watchdog can be found on the socfpga and rockchip platforms.
-
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+Signed-off-by: Howard Chen <ibanezchen@gmail.com>
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/mt6592.dtsi     | 97 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mediatek/mediatek.c |  1 +
+ 2 files changed, 98 insertions(+)
+ create mode 100644 arch/arm/boot/dts/mt6592.dtsi
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 3487046..3d4b9bf 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -263,6 +263,7 @@ CONFIG_XILINX_WATCHDOG=y
- CONFIG_ORION_WATCHDOG=y
- CONFIG_SUNXI_WATCHDOG=y
- CONFIG_MESON_WATCHDOG=y
-+CONFIG_DW_WATCHDOG=y
- CONFIG_MFD_AS3722=y
- CONFIG_MFD_BCM590XX=y
- CONFIG_MFD_CROS_EC=y
+diff --git a/arch/arm/boot/dts/mt6592.dtsi b/arch/arm/boot/dts/mt6592.dtsi
+new file mode 100644
+index 0000000..65aa81b
+--- /dev/null
++++ b/arch/arm/boot/dts/mt6592.dtsi
+@@ -0,0 +1,97 @@
++/*
++ * Copyright (c) 2014 MediaTek Inc.
++ * Author: Howard Chen <ibanezchen@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include "skeleton.dtsi"
++
++/ {
++	compatible = "mediatek,mt6592";
++	interrupt-parent = <&gic>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x0>;
++		};
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x1>;
++		};
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x2>;
++		};
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x3>;
++		};
++		cpu at 4 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x4>;
++		};
++		cpu at 5 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x5>;
++		};
++		cpu at 6 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x6>;
++		};
++		cpu at 7 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x7>;
++		};
++	};
++
++	system_clk: dummy13m {
++		compatible = "fixed-clock";
++		clock-frequency = <13000000>;
++		#clock-cells = <0>;
++	};
++
++	rtc_clk: dummy32k {
++		compatible = "fixed-clock";
++		clock-frequency = <32000>;
++		#clock-cells = <0>;
++	};
++
++	timer: timer at 10008000 {
++		compatible = "mediatek,mt6577-timer";
++		reg = <0x10008000 0x80>;
++		interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&system_clk>, <&rtc_clk>;
++		clock-names = "system-clk", "rtc-clk";
++	};
++
++	gic: interrupt-controller at 10211000 {
++		compatible = "arm,cortex-a7-gic";
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		reg = <0x10211000 0x1000>,
++		      <0x10212000 0x1000>;
++	};
++
++};
+diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+index f2acf07..88e4626 100644
+--- a/arch/arm/mach-mediatek/mediatek.c
++++ b/arch/arm/mach-mediatek/mediatek.c
+@@ -19,6 +19,7 @@
+ 
+ static const char * const mediatek_board_dt_compat[] = {
+ 	"mediatek,mt6589",
++	"mediatek,mt6592",
+ 	NULL,
+ };
+ 
 -- 
-2.0.3
+1.9.1
