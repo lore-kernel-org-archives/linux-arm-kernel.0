@@ -1,62 +1,23 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 11 Nov 2014 21:42:17 +0000
-Subject: [PATCH v4 2/5] dt-bindings: Add a clocks property to the
- simple-framebuffer binding
-In-Reply-To: <1413996311-4287-3-git-send-email-hdegoede@redhat.com>
-References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
- <1413996311-4287-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141111214217.19EF5C41610@trevor.secretlab.ca>
+From: smoch@web.de (Soeren Moch)
+Date: Tue, 11 Nov 2014 22:42:52 +0100
+Subject: [PATCH v4 2/3] power: reset: imx-snvs-poweroff: add power off
+ driver for i.mx6
+In-Reply-To: <1411703947-31956-3-git-send-email-b38343@freescale.com>
+Message-ID: <546282DC.7070606@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 Oct 2014 18:45:08 +0200
-, Hans de Goede <hdegoede@redhat.com>
- wrote:
-> A simple-framebuffer node represents a framebuffer setup by the firmware /
-> bootloader. Such a framebuffer may have a number of clocks in use, add a
-> property to communicate this to the OS.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> Reviewed-by: Mike Turquette <mturquette@linaro.org>
-> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> --
-> Changes in v2:
-> -Added Reviewed-by: Mike Turquette <mturquette@linaro.org>
-> Changes in v3:
-> -Updated description to make clear simplefb deals with more then just memory
-> ---
->  Documentation/devicetree/bindings/video/simple-framebuffer.txt | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-> index 70c26f3..172ad5f 100644
-> --- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-> @@ -1,8 +1,8 @@
->  Simple Framebuffer
->  
-> -A simple frame-buffer describes a raw memory region that may be rendered to,
-> -with the assumption that the display hardware has already been set up to scan
-> -out from that buffer.
-> +A simple frame-buffer describes a frame-buffer setup by firmware or
-> +the bootloader, with the assumption that the display hardware has already
-> +been set up to scan out from the memory pointed to by the reg property.
->  
->  Required properties:
->  - compatible: "simple-framebuffer"
-> @@ -14,6 +14,9 @@ Required properties:
->    - r5g6b5 (16-bit pixels, d[15:11]=r, d[10:5]=g, d[4:0]=b).
->    - a8b8g8r8 (32-bit pixels, d[31:24]=a, d[23:16]=b, d[15:8]=g, d[7:0]=r).
->  
-> +Optional properties:
-> +- clocks : List of clocks used by the framebuffer
+> This driver register pm_power_off with snvs power off function. If
+> your boards NOT use PMIC_ON_REQ to turn on/off external pmic, or use
+> other pin to do, please disable the driver in dts, otherwise, your
+> pm_power_off maybe overwrote by this driver.
 
-Please change to the following:
-- clocks : List of clocks used by the framebuffer. Clocks listed here
-           are expected to already be configured correctly. The OS must
-           ensure these clocks are not modified or disabled while the
-           simple framebuffer remains active.
+> Signed-off-by: Robin Gong <b38343@freescale.com>
 
-g.
+Any news on this?
+Maybe this patchset was lost because it was sent to the old email address of Shawn?
+
+I tested this patchset on a TBS2910 board, works as expected.  Very important feature for me.
+
+
+Tested-by: Soeren Moch <smoch@web.de>
