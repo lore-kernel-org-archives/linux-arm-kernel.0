@@ -1,33 +1,91 @@
 From: suravee.suthikulpanit@amd.com (suravee.suthikulpanit at amd.com)
-Date: Tue, 11 Nov 2014 13:17:32 -0600
-Subject: [PATCH V2 0/2] PCI: generic: Assiging msi-controller to PCI hostbridge
-Message-ID: <1415733454-24322-1-git-send-email-suravee.suthikulpanit@amd.com>
+Date: Tue, 11 Nov 2014 13:17:34 -0600
+Subject: [PATCH V2 2/2] PCI: generic: Add msi_parent DT binding
+In-Reply-To: <1415733454-24322-1-git-send-email-suravee.suthikulpanit@amd.com>
+References: <1415733454-24322-1-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <1415733454-24322-3-git-send-email-suravee.suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-This patch set introduces a new callback function to allow PCI host drivers
-to specify MSI controller to be used for the child buses / devices.
+This patch introduces a new DT binding, msi-parent, which can
+be used to specify MSI-parent phandle for a particular PCI
+generic host controller.
 
-This is reabased from:
-    git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git pci/host-generic
+Also, it implements and registers set_msi_parent callback.
 
-Changes from V1:
-    - Adding "msi-parent" device tree binding in documentation.
-    - Rebase the patch to get rid of artifacts from other precursor patch
-      accidently applied to the developement tree. This should now apply cleanly
-      to the pci/host-generic branch.
-
-Suravee Suthikulpanit (2):
-  PCI: Add new pci_ops for setting MSI parent for PCI bus
-  PCI: generic: Add set_msi_parent callback
-
+Cc: Bjorn Helgass <bhelgaas@google.com>
+Cc: Liviu Dudau <liviu.dudau@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+---
  Documentation/devicetree/bindings/pci/host-generic-pci.txt |  3 +++
  drivers/pci/host/pci-host-generic.c                        | 13 +++++++++++++
- drivers/pci/probe.c                                        |  3 +++
- include/linux/pci.h                                        |  1 +
- 4 files changed, 20 insertions(+)
+ 2 files changed, 16 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+index cf3e205..6996af7 100644
+--- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
++++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+@@ -36,6 +36,8 @@ Properties of the host controller node:
+ - reg            : The Configuration Space base address and size, as accessed
+                    from the parent bus.
+ 
++- msi-parent     : Specify the phandle of the corresponded MSI controller
++                   for this PCI host controller.
+ 
+ Properties of the /chosen node:
+ 
+@@ -77,6 +79,7 @@ pci {
+     device_type = "pci";
+     #address-cells = <3>;
+     #size-cells = <2>;
++    msi-parent = <&msictrl0>;
+     bus-range = <0x0 0x1>;
+ 
+     // CPU_PHYSICAL(2)  SIZE(2)
+diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+index 1895907..c4fbcda 100644
+--- a/drivers/pci/host/pci-host-generic.c
++++ b/drivers/pci/host/pci-host-generic.c
+@@ -42,6 +42,7 @@ struct gen_pci {
+ 	struct pci_host_bridge			host;
+ 	struct gen_pci_cfg_windows		cfg;
+ 	struct list_head			resources;
++	struct msi_chip				*mchip;
+ };
+ 
+ static void __iomem *gen_pci_map_cfg_bus_cam(struct pci_bus *bus,
+@@ -122,9 +123,19 @@ static int gen_pci_config_write(struct pci_bus *bus, unsigned int devfn,
+ 	return PCIBIOS_SUCCESSFUL;
+ }
+ 
++static int gen_pci_set_msi_parent(struct pci_bus *bus)
++{
++	struct gen_pci *pci = bus_to_gen_pci(bus);
++
++	bus->msi = pci->mchip;
++
++	return PCIBIOS_SUCCESSFUL;
++}
++
+ static struct pci_ops gen_pci_ops = {
+ 	.read	= gen_pci_config_read,
+ 	.write	= gen_pci_config_write,
++	.set_msi_parent = gen_pci_set_msi_parent,
+ };
+ 
+ static const struct of_device_id gen_pci_of_match[] = {
+@@ -303,6 +314,8 @@ static int gen_pci_probe(struct platform_device *pdev)
+ 		return err;
+ 	}
+ 
++	pci->mchip = of_pci_find_msi_chip_by_node(of_parse_phandle(np,
++						  "msi-parent", 0));
+ 	pci_common_init_dev(dev, &hw);
+ 	return 0;
+ }
 -- 
 1.9.3
