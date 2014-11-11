@@ -1,50 +1,33 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 11 Nov 2014 09:14:30 +0900
+Date: Tue, 11 Nov 2014 09:15:08 +0900
 Subject: [PATCH v3/resend] ARM: shmobile: Add early debugging support
  using SCIF(A)
-In-Reply-To: <CAMuHMdVJMB7Nz6dR414yG7jyneMbeoaRW43JQUKmW1u7i-=fbA@mail.gmail.com>
+In-Reply-To: <CAMuHMdUcZYTz4uLn4G9CECT5ZuKtHJuDZzR0WrzR3oo8qD3cfA@mail.gmail.com>
 References: <1415273910-32356-1-git-send-email-geert+renesas@glider.be>
  <3499638.LG41cHl0JS@wuerfel>
  <CAMuHMdUU7XK57a70HWP0+nfwaZ-sXQ5EC2CShgmxwx6JKnuyPQ@mail.gmail.com>
- <20777697.th35W64j5e@wuerfel>
- <CAMuHMdVJMB7Nz6dR414yG7jyneMbeoaRW43JQUKmW1u7i-=fbA@mail.gmail.com>
-Message-ID: <20141111001427.GA29665@verge.net.au>
+ <20777697.th35W64j5e@wuerfel> <20141110005944.GE16836@verge.net.au>
+ <CAMuHMdUcZYTz4uLn4G9CECT5ZuKtHJuDZzR0WrzR3oo8qD3cfA@mail.gmail.com>
+Message-ID: <20141111001507.GB29665@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 10, 2014 at 09:01:45AM +0100, Geert Uytterhoeven wrote:
-> On Thu, Nov 6, 2014 at 2:26 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> >> +     {
-> >> >> +             .virtual        = 0xffe40000,
-> >> >> +             .pfn            = __phys_to_pfn(0xffe40000),
-> >> >> +             .length         = SZ_64K,
-> >> >> +             .type           = MT_DEVICE_NONSHARED
-> >> >> +     },
-> >> >> +#endif /* CONFIG_DEBUG_R8A7779_SCIF2 */
-> >> >>  };
+On Mon, Nov 10, 2014 at 09:03:23AM +0100, Geert Uytterhoeven wrote:
+> On Mon, Nov 10, 2014 at 1:59 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, Nov 06, 2014 at 02:26:45PM +0100, Arnd Bergmann wrote:
+> >> On Thursday 06 November 2014 13:33:58 Geert Uytterhoeven wrote:
+> >> > On Thu, Nov 6, 2014 at 12:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> > > On Thursday 06 November 2014 12:38:30 Geert Uytterhoeven wrote:
+> >> > >> Add serial port debug macros for the SCIF(A) serial ports.
+> >> > >> This includes all shmobile SoCs, except for EMEV2.
 > >> >
-> >> > This should be done automatically if you call debug_ll_io_init() or
-> >> > have an empty map_io() callback.
-> >>
-> >> On r8a7779 map_io() is not empty, but it didn't cover the SCIF registers,
-> >> cfr. the commit log:
-> >>
-> >> > >   4. On SoCs using the legacy machine_desc.map_io(), an identity mapping
-> >> > >      of the SCIF(A) registers must be set up in .map_io(). On all but
-> >> > >      r8a7779 this was already done.
-> >
-> > Ok. You can of course just call debug_ll_io_init() manually from the
-> > map_io function, it will create the same mapping.
+> >> > > I don't object to this patch going in, but have you looked at doing
+> >> > > just earlycon instead? We are still missing some fixmap changes
 > 
-> Good idea, that would indeed simpify the logic, both in Kconfig and
-> renesas-scif.S.
+> > This patch feels like is is ready for me to queue up.
+> > Is that the consensus here?
 > 
-> I gave it a try. On Armadillo it worked, on kzm9g it didn't.
-> Probably the virtual address choice is wrong.
-> 
-> As I can't test it on the other boards using map_io(), I'd like to
-> keep this as-is
-> for now. We can migrate them gradually later.
+> Please wait for v3, which will get rid of the multi-level choice statements,
+> as requested by Arnd.
 
-I am happy to assist with testing but I think your incremental approach is
-a good one: lets merge something that works and then improve on it.
+Sure, will do.
