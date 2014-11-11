@@ -1,45 +1,59 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 12 Nov 2014 00:50:53 +0800
-Subject: [linux-sunxi] [PATCH v2 0/5] ARM: sunxi: Add support for USB OTG
- PHY
-In-Reply-To: <5461D2C1.6020505@redhat.com>
-References: <cover.1415645258.git.rbyshko@gmail.com>
- <5461D2C1.6020505@redhat.com>
-Message-ID: <CAGb2v65=xbP+QMTBtVGRg6cEXHhsYda45yKHGrq9QfKcXozHiA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 11 Nov 2014 08:51:18 -0800
+Subject: serial: of-serial: fetch line number from DT
+In-Reply-To: <20141111052407.GB24727@kroah.com>
+References: <CAOesGMjzs=dThDv6S8Xvo+ym-XECaQhTQ8NV6t46fQZ1LoJnHw@mail.gmail.com>
+ <20141111052407.GB24727@kroah.com>
+Message-ID: <CAOesGMhe8orqL6wSiouQvdM8y4N44p12n7M1opraSkAP=3ZB+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 11, 2014 at 5:11 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
->
-> On 11/10/2014 07:55 PM, Roman Byshko wrote:
->> Hi,
+On Mon, Nov 10, 2014 at 9:24 PM, Greg Kroah-Hartman
+<gregkh@linuxfoundation.org> wrote:
+> On Mon, Nov 10, 2014 at 01:34:19PM -0800, Olof Johansson wrote:
+>> Greg,
 >>
->> There is already support for two USB phys, which are used for
->> USB host controllers on Allwinner SoC aka sunxi.
+>> This commit:
 >>
->> This patch series add support for the USB OTG phy (aka phy0).
+>> commit 1bd8324535ec1ff44aef55c0e40b9e7d56b310fb
+>> Author: Lucas Stach <dev@lynxeye.de>
+>> Date:   Mon Nov 3 23:16:54 2014 +0100
 >>
->> The code has been tested on Allwinner A20 aka sun7i (Cubietruck).
+>>     serial: of-serial: fetch line number from DT
 >>
->> Best regards,
->> Roman Byshko
+>>     The general agreed way to specify a fixed line number
+>>     for a serial console is to provide a "serial" alias
+>>     in the devicetree. Start parsing this property in
+>>     of_serial.
+>>
+>>     Signed-off-by: Lucas Stach <dev@lynxeye.de>
+>>     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>
+>>
+>> Broke a whole lot of tegra boards in last night's -next here. In
+>> particular, I've been looking at tegra20-seaboard, which now doesn't
+>> boot with console any more.
+>>
+>> http://arm-soc.lixom.net/bootlogs/next/next-20141110/
+>>
+>> Unfortunately, tegra has for a long time been specifying the aliases
+>> as a fixed 1:1 mapping, but most environments rely on ttyS0 being the
+>> first _activated_ serial port. That's obviously going to break things
+>> here. :(
+>>
+>> Greg, can you please revert until we get the tegra-side fixes in for
+>> this, or we're in for a pretty lousy time w.r.t. bisecting problems
+>> across the two mergepoints?
+>>
+>> Stephen: I suppose the best way to handle this on tegra is to specify
+>> the aliases per-board instead of in the soc dtsi today.
+>>
+>> Apologies for not replying to the patch directly -- it was only ever
+>> posted to linux-serial and I don't seem to be subscribed.
 >
-> First of all very cool that you're working on this, I somehow missed
-> v1, but I'm very happy to see this.
->
-> Second some questions, this series seems to only add support for
-> initializing the phy, without adding the necessary magic for
-> switching from app to host mode, and without actually hooking up musb,
-> I assume you've a follow up series adding musb support, which actually
-> uses the phy ?
->
-> Also have you coordinated your work with ChenYu? ATM ChenYu is mostly
-> working on other stuff, but AFAIk he has been working on musb support
-> in the past.
+> Now reverted, sorry for the problems.
 
-I'm happy that someone has taken over. I was mostly just exploring what
-OTG is, not much code actually made it into my working branch, which is
-available on github.
+No worries, it's what linux-next is for. Thanks for the revert!
 
-ChenYu
+
+-Olof
