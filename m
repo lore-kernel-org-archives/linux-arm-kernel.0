@@ -1,49 +1,63 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 11 Nov 2014 22:19:12 +0800
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: enable DS1307 rtc and gpio fan
- by default
-In-Reply-To: <1415131893-3363-1-git-send-email-smoch@web.de>
-References: <20141103031609.GA10821@tiger>
- <1415131893-3363-1-git-send-email-smoch@web.de>
-Message-ID: <20141111141909.GD2704@dragon>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 11 Nov 2014 15:21:54 +0100
+Subject: [RFC 2/2] regulator: qcom-rpm: Implement RPM assisted disable
+In-Reply-To: <1415659966-16200-3-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1415659966-16200-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1415659966-16200-3-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <CABxcv=nGyV2F9kYALOhTzmUfO8CC6NEwv4v3SPmrum-bBi-eDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 04, 2014 at 09:11:33PM +0100, Soeren Moch wrote:
-> Used on TBS2910 board.
-> 
-> Signed-off-by: Soeren Moch <smoch@web.de>
+Hello Bjorn,
 
-Applied, thanks.
+On Mon, Nov 10, 2014 at 11:52 PM, Bjorn Andersson
+<bjorn.andersson@sonymobile.com> wrote:
+> Some regulators are used to power e.g. PLLs that clocks the core we're
+> running on, so we can't turn them off directly; but we do want them off
+> when the core is powered down. To handle this the Qualcomm SoC provides
+> a means to specify a "sleep state" for RPM resources that can be
+> triggered by the hardware when the cores are brought down.
+>
 
-> --
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> ---
->  arch/arm/configs/imx_v6_v7_defconfig | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-> index 16cfec4..39e4fe2 100644
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@ -165,7 +165,7 @@ CONFIG_SPI_IMX=y
->  CONFIG_GPIO_SYSFS=y
->  CONFIG_GPIO_MC9S08DZ60=y
->  CONFIG_GPIO_STMPE=y
-> -# CONFIG_HWMON is not set
-> +CONFIG_SENSORS_GPIO_FAN=y
->  CONFIG_WATCHDOG=y
->  CONFIG_IMX2_WDT=y
->  CONFIG_MFD_DA9052_I2C=y
-> @@ -240,6 +240,7 @@ CONFIG_LEDS_TRIGGER_BACKLIGHT=y
->  CONFIG_LEDS_TRIGGER_GPIO=y
->  CONFIG_RTC_CLASS=y
->  CONFIG_RTC_INTF_DEV_UIE_EMUL=y
-> +CONFIG_RTC_DRV_DS1307=y
->  CONFIG_RTC_DRV_PCF8563=y
->  CONFIG_RTC_DRV_MC13XXX=y
->  CONFIG_RTC_DRV_MXC=y
-> -- 
-> 1.9.1
-> 
+The regulator core already has support to control the state of
+regulators when the system enters into a sleep state. Now the generic
+regulator DT binding has also been extended to support defining if a
+regulator should be "regulator-{on,off}-in-suspend". Please take a
+look at the topic/suspend branch [0] in the regulator tree that has
+the latest binding.
+
+If that is not enough for your hardware and use case, I've been
+working on adding initial and suspend mode for regulators. The latest
+series is [1] and the needed bits for the max77802 regulator driver is
+[2].
+
+It's always better to use existing functionality if possible, instead
+of adding custom per driver DT bindings. So it would be great if you
+can take a look to the mentioned patches.
+
+>  Documentation/devicetree/bindings/mfd/qcom-rpm.txt |   28 ++++++++
+>  drivers/regulator/qcom_rpm-regulator.c             |   68 +++++++++++++++-----
+
+Against which tree this patch has been developed? afaict
+Documentation/devicetree/bindings/mfd/qcom-rpm.txt does not exist even
+in the latest for-next [3] branch of the mfd tree.
+
+>
+>         #include <dt-bindings/mfd/qcom-rpm.h>
+
+This file doesn't exit either and the regulator driver depends on
+MFD_QCOM_RPM which also is not present in mainline.
+
+By looking at the mail archives I see that you posted both the
+regulator and mfd driver in the same series [4] but only the regulator
+driver was picked by Mark so I guess Lee has to pick the mfd driver in
+order to allow the regulator driver to be built.
+
+Best regards,
+Javier
+
+[0]: https://git.kernel.org/cgit/linux/kernel/git/broonie/regulator.git/log/?h=topic/suspend
+[1]: https://lkml.org/lkml/2014/11/10/325
+[2]: https://lkml.org/lkml/2014/11/11/403
+[3]: https://git.kernel.org/cgit/linux/kernel/git/lee/mfd.git/log/?h=for-mfd-next
+[4]: https://lkml.org/lkml/2014/9/22/731
