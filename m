@@ -1,38 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 10 Nov 2014 16:03:06 -0800
-Subject: [PATCH] ARM: OMAP4+: PM: Program CPU logic power state
-In-Reply-To: <7h61f98hvw.fsf@deeprootsystems.com>
-References: <1413923076-26063-1-git-send-email-nm@ti.com>
- <7h61f98hvw.fsf@deeprootsystems.com>
-Message-ID: <20141111000305.GJ31454@atomide.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 11 Nov 2014 09:14:30 +0900
+Subject: [PATCH v3/resend] ARM: shmobile: Add early debugging support
+ using SCIF(A)
+In-Reply-To: <CAMuHMdVJMB7Nz6dR414yG7jyneMbeoaRW43JQUKmW1u7i-=fbA@mail.gmail.com>
+References: <1415273910-32356-1-git-send-email-geert+renesas@glider.be>
+ <3499638.LG41cHl0JS@wuerfel>
+ <CAMuHMdUU7XK57a70HWP0+nfwaZ-sXQ5EC2CShgmxwx6JKnuyPQ@mail.gmail.com>
+ <20777697.th35W64j5e@wuerfel>
+ <CAMuHMdVJMB7Nz6dR414yG7jyneMbeoaRW43JQUKmW1u7i-=fbA@mail.gmail.com>
+Message-ID: <20141111001427.GA29665@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@kernel.org> [141024 11:04]:
-> Nishanth Menon <nm@ti.com> writes:
+On Mon, Nov 10, 2014 at 09:01:45AM +0100, Geert Uytterhoeven wrote:
+> On Thu, Nov 6, 2014 at 2:26 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> >> +     {
+> >> >> +             .virtual        = 0xffe40000,
+> >> >> +             .pfn            = __phys_to_pfn(0xffe40000),
+> >> >> +             .length         = SZ_64K,
+> >> >> +             .type           = MT_DEVICE_NONSHARED
+> >> >> +     },
+> >> >> +#endif /* CONFIG_DEBUG_R8A7779_SCIF2 */
+> >> >>  };
+> >> >
+> >> > This should be done automatically if you call debug_ll_io_init() or
+> >> > have an empty map_io() callback.
+> >>
+> >> On r8a7779 map_io() is not empty, but it didn't cover the SCIF registers,
+> >> cfr. the commit log:
+> >>
+> >> > >   4. On SoCs using the legacy machine_desc.map_io(), an identity mapping
+> >> > >      of the SCIF(A) registers must be set up in .map_io(). On all but
+> >> > >      r8a7779 this was already done.
+> >
+> > Ok. You can of course just call debug_ll_io_init() manually from the
+> > map_io function, it will create the same mapping.
 > 
-> > CPU logic power state is never programmed in either the initialization
-> > or the suspend/resume logic, instead, we depend on mpuss to program this
-> > properly. However, this leaves CPU logic power state indeterminate and
-> > most probably in reset configuration (If bootloader or other similar
-> > software have'nt monkeyed with the register). This can make powerstate=
-> > RET be either programmed for CSWR (logic=ret) or OSWR(logic = OFF) and
-> > in OSWR, there can be context loss when the code does not expect it.
-> >
-> > To prevent all these confusions, just support clearly ON, INA, CSWR,
-> > OFF which is the intent of the existing code by explicitly programming
-> > logic state.
-> >
-> > NOTE: since this is a hot path (using in cpuidle), the exit path just
-> > programs powerstate (logic state is immaterial when powerstate is ON).
-> >
-> > Without doing this, we end up with lockups when CPUs enter OSWR and
-> > multiple blocks loose context, when we expect them to hit CSWR.
-> >
-> > Signed-off-by: Nishanth Menon <nm@ti.com>
+> Good idea, that would indeed simpify the logic, both in Kconfig and
+> renesas-scif.S.
 > 
-> Acked-by: Kevin Hilman <khilman@linaro.org>
+> I gave it a try. On Armadillo it worked, on kzm9g it didn't.
+> Probably the virtual address choice is wrong.
+> 
+> As I can't test it on the other boards using map_io(), I'd like to
+> keep this as-is
+> for now. We can migrate them gradually later.
 
-Applying into omap-for-v3.19/soc thanks.
-
-Tony
+I am happy to assist with testing but I think your incremental approach is
+a good one: lets merge something that works and then improve on it.
