@@ -1,54 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 11 Nov 2014 16:00:15 +0100
-Subject: [PATCH 4/7] pinctrl: zynq: Document DT binding
-In-Reply-To: <1415041531-15520-5-git-send-email-soren.brinkmann@xilinx.com>
-References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
- <1415041531-15520-5-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <CACRpkdazagbSZdMvHTggQuAFm9uObn2ARoCwcyM-sspuLTXqkQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 11 Nov 2014 15:55:19 +0100
+Subject: [PATCH resend 0/4] clk: sunxi: Unify sun4i apb1 clock
+In-Reply-To: <1415245232-20585-1-git-send-email-wens@csie.org>
+References: <1415245232-20585-1-git-send-email-wens@csie.org>
+Message-ID: <20141111145519.GI14919@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 3, 2014 at 8:05 PM, Soren Brinkmann
-<soren.brinkmann@xilinx.com> wrote:
+On Thu, Nov 06, 2014 at 11:40:28AM +0800, Chen-Yu Tsai wrote:
+> (resent with linux-arm-kernel CCed)
+> 
+> Hi everyone,
+> 
+> This series unifies the apb1 clock driver for sun4i, which was
+> previously split into apb1-mux and apb1. This also fixes the
+> apb2 clock on sun6i/sun8i, which we now have documents for.
+> 
+> The first 2 patches were done by Emilio.
+> 
+> Patch 1 unifies the apb1-mux and apb1 clock drivers using a
+> factors clock.
+> 
+> Patch 2 unifies said clocks in the dtsi.
+> 
+> Patch 3 switches the compatibles for apb2 clock on sun6i/sun8i to
+> the unified sun4i apb1 clock.
+> 
+> Patch 4 gets rid of the incorrect and now unused sun6i apb2 clock
+> driver.
 
-> Add documentation for the devicetree binding for the Zynq pincontroller.
->
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-(...)
-> +Example:
-> +       pinctrl0: pinctrl at 700 {
-> +               compatible = "xlnx,pinctrl-zynq";
-> +               reg = <0x700 0x200>;
-> +               syscon = <&slcr>;
-> +
-> +               pinctrl_uart1_default: pinctrl-uart1-default {
-> +                       common {
-> +                               groups = "uart1_10_grp";
-> +                               function = "uart1";
-> +                               slew-rate = <0>;
-> +                               io-standard = <1>;
-> +                       };
+Merged all the patches, thanks!
 
-I don't really like that you mix multiplexing and config in the
-same node. I would prefer if the generic bindings say we have
-muxing nodes and config nodes, and those are disparate.
+Maxime
 
-Can't you just split this:
-
-common-mux {
-    groups = "uart1_10_grp";
-    function = "uart1";
-};
-
-common-config {
-    groups = "uart1_10_grp";
-    slew-rate = <0>;
-    io-standard = <1>;
-};
-
-That way we can identify nodes as mux nodes (have "function")
-or config nodes (have "groups" or "pins" but not "function") which
-I think makes things easier to read.
-
-Yours,
-Linus Walleij
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141111/51eabbf6/attachment.sig>
