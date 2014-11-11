@@ -1,40 +1,95 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 11 Nov 2014 14:02:55 +0200
-Subject: [PATCH v2] ARM: dts: sbc-t3x: add DVI display data
-In-Reply-To: <20141110174845.GP31454@atomide.com>
-References: <1413364186-23752-1-git-send-email-lifshitz@compulab.co.il>
- <1414927198-7127-1-git-send-email-lifshitz@compulab.co.il>
- <54561E45.7000404@compulab.co.il> <20141110174845.GP31454@atomide.com>
-Message-ID: <5461FAEF.3010607@compulab.co.il>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Nov 2014 12:04:57 +0000
+Subject: [RFC 1/2] mfd: qcom-rpm: Expose sleep state resources to clients
+In-Reply-To: <1415659966-16200-2-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1415659966-16200-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1415659966-16200-2-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <20141111120457.GZ24004@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Mon, 10 Nov 2014, Bjorn Andersson wrote:
 
-On 11/10/14 19:48, Tony Lindgren wrote:
-> * Igor Grinberg <grinberg@compulab.co.il> [141102 04:08]:
->> On 11/02/14 13:19, Dmitry Lifshitz wrote:
->>> Add DSS related pinmux and display data nodes required to support
->>> DVI video out on SBC-T3530, SBC-T3730 and SBC-T3517.
->>>
->>> Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
->>
->> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+> Resources exposed from the RPM have an "active state" that is used during
+> normal operations and a "sleep state" that is used for HW assisted sleep
+> modes. Expose this in the api to let client drivers set the "sleep
+> state" as well.
+
+I assume you have users lined up which will request a sleeping state?
+
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> ---
+>  drivers/mfd/qcom_rpm.c                 |    9 +++++----
+>  drivers/regulator/qcom_rpm-regulator.c |    1 +
+>  include/linux/mfd/qcom_rpm.h           |    5 ++++-
+>  3 files changed, 10 insertions(+), 5 deletions(-)
 > 
-> Thanks applying into omap-for-v3.19/dt.
-> 
-> Are we now ready to drop the board-cm-*.c files?
+> diff --git a/drivers/mfd/qcom_rpm.c b/drivers/mfd/qcom_rpm.c
+> index 0dd7a6fe..f696328 100644
+> --- a/drivers/mfd/qcom_rpm.c
+> +++ b/drivers/mfd/qcom_rpm.c
+> @@ -67,7 +67,6 @@ struct qcom_rpm {
+>  #define RPM_ACK_SELECTOR	23
+>  #define RPM_SELECT_SIZE		7
+>  
+> -#define RPM_ACTIVE_STATE	BIT(0)
+>  #define RPM_NOTIFICATION	BIT(30)
+>  #define RPM_REJECTED		BIT(31)
+>  
+> @@ -332,7 +331,10 @@ static const struct of_device_id qcom_rpm_of_match[] = {
+>  };
+>  MODULE_DEVICE_TABLE(of, qcom_rpm_of_match);
+>  
+> -int qcom_rpm_write(struct qcom_rpm *rpm, int resource, u32 *buf, size_t count)
+> +int qcom_rpm_write(struct qcom_rpm *rpm,
+> +		   int state,
+> +		   int resource,
+> +		   u32 *buf, size_t count)
+>  {
+>  	const struct qcom_rpm_resource *res;
+>  	const struct qcom_rpm_data *data = rpm->data;
+> @@ -359,8 +361,7 @@ int qcom_rpm_write(struct qcom_rpm *rpm, int resource, u32 *buf, size_t count)
+>  			       RPM_CTRL_REG(rpm, RPM_REQ_SELECT + i));
+>  	}
+>  
+> -	writel_relaxed(RPM_ACTIVE_STATE,
+> -		       RPM_CTRL_REG(rpm, RPM_REQUEST_CONTEXT));
+> +	writel_relaxed(BIT(state), RPM_CTRL_REG(rpm, RPM_REQUEST_CONTEXT));
 
-Let's see, below is a list of things that are yet to be
-supported in DT boot:
-NAND, TV, LCD, Touchscreen, Audio (CM-T3x30), RTC (CM-T3517), CAN (CM-3517).
+How are the state bits organised?
 
-We're rc4 now, so hopefully, we will be able to get all this in for 3.19
-and then have the board files removed for 3.20.
-This way we can have 3.19 with both ways supported and do last checks.
-
-Are you ok with this?
+>  	reinit_completion(&rpm->ack);
+>  	regmap_write(rpm->ipc_regmap, rpm->ipc_offset, BIT(rpm->ipc_bit));
+> diff --git a/drivers/regulator/qcom_rpm-regulator.c b/drivers/regulator/qcom_rpm-regulator.c
+> index b55cd5b..4fc1c7e 100644
+> --- a/drivers/regulator/qcom_rpm-regulator.c
+> +++ b/drivers/regulator/qcom_rpm-regulator.c
+> @@ -198,6 +198,7 @@ static int rpm_reg_write(struct qcom_rpm_reg *vreg,
+>  	vreg->val[req->word] |= value << req->shift;
+>  
+>  	return qcom_rpm_write(vreg->rpm,
+> +			      RPM_ACTIVE_STATE,
+>  			      vreg->resource,
+>  			      vreg->val,
+>  			      vreg->parts->request_len);
+> diff --git a/include/linux/mfd/qcom_rpm.h b/include/linux/mfd/qcom_rpm.h
+> index a60798d..f0e70b2 100644
+> --- a/include/linux/mfd/qcom_rpm.h
+> +++ b/include/linux/mfd/qcom_rpm.h
+> @@ -5,6 +5,9 @@
+>  
+>  struct qcom_rpm;
+>  
+> -int qcom_rpm_write(struct qcom_rpm *rpm, int resource, u32 *buf, size_t count);
+> +#define RPM_ACTIVE_STATE	0
+> +#define RPM_SLEEP_STATE		1
+> +
+> +int qcom_rpm_write(struct qcom_rpm *rpm, int state, int resource, u32 *buf, size_t count);
+>  
+>  #endif
 
 -- 
-Regards,
-Igor.
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
