@@ -1,244 +1,101 @@
-From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Tue, 11 Nov 2014 10:46:00 -0700
-Subject: [PATCH] coresight: bindings for coresight drivers
-Message-ID: <1415727960-29524-1-git-send-email-mathieu.poirier@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 11 Nov 2014 17:51:33 +0000
+Subject: [PATCH] Correct the race condition in
+ aarch64_insn_patch_text_sync()
+In-Reply-To: <546221BD.8000207@redhat.com>
+References: <1415637362-30754-1-git-send-email-wcohen@redhat.com>
+ <20141110170846.GH23942@arm.com> <546113F4.1050304@redhat.com>
+ <20141111112844.GC16265@arm.com> <546221BD.8000207@redhat.com>
+Message-ID: <20141111175132.GI16265@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
+On Tue, Nov 11, 2014 at 02:48:29PM +0000, William Cohen wrote:
+> On 11/11/2014 06:28 AM, Will Deacon wrote:
+> > On Mon, Nov 10, 2014 at 07:37:24PM +0000, William Cohen wrote:
+> >> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> >> index e007714..4fdddf1 100644
+> >> --- a/arch/arm64/kernel/insn.c
+> >> +++ b/arch/arm64/kernel/insn.c
+> >> @@ -151,10 +151,13 @@ struct aarch64_insn_patch {
+> >>  static int __kprobes aarch64_insn_patch_text_cb(void *arg)
+> >>  {
+> >>  	int i, ret = 0;
+> >> +	int count = num_online_cpus();
+> >>  	struct aarch64_insn_patch *pp = arg;
+> >>  
+> >> -	/* The first CPU becomes master */
+> >> -	if (atomic_inc_return(&pp->cpu_count) == 1) {
+> >> +	/* Make sure all the processors are in this function
+> >> +	   before patching the code. The last CPU to this function
+> >> +	   does the update. */
+> >> +	if (atomic_inc_return(&pp->cpu_count) == count) {
+> > 
+> > Actually, you can leave this hunk alone and leave the first CPU to do the
+> > patching.
+> 
+> If it doesn't matter which processor is doing the update, do the
+> processors all need to wait for the last one to get to this function
+> before continuing on?  Or would it be acceptable to allow processors to
+> continue once the first processor completes the patch operation?  That
+> could reduce the amount of time that processors spin waiting for other
+> processors to enter arch64_insn_patch_text_cb.
 
-Please consider this as a supplement to the coresight patchset.  It should have
-been sent with the rest of the patches but I missed the original ack from Rob
-Herring.
+I don't think it will make a lot of difference, given the stop_machine
+completion.
 
-Thanks,
-Mathieu
+> Attached is a patch that addresses the current comment.
 
->From 69cae46640b8cdc836bf7b86211d5f2adf3d0270 Mon Sep 17 00:00:00 2001
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
-Date: Thu, 7 Aug 2014 12:34:06 -0600
-Subject: [PATCH] coresight: bindings for coresight drivers
+Thanks, Will.
 
-Coresight IP blocks allow for the support of HW assisted tracing
-on ARM SoCs.  Bindings for the currently available blocks are
-presented herein.
+> From 41c728aeee2185fd30ec6a8ba223a2caec875f47 Mon Sep 17 00:00:00 2001
+> From: William Cohen <wcohen@redhat.com>
+> Date: Tue, 11 Nov 2014 09:41:27 -0500
+> Subject: [PATCH] Correct the race condition in aarch64_insn_patch_text_sync()
+> 
+> When experimenting with patches to provide kprobes support for aarch64
+> smp machines would hang when inserting breakpoints into kernel code.
+> The hangs were caused by a race condition in the code called by
+> aarch64_insn_patch_text_sync().  The first processor in the
+> aarch64_insn_patch_text_cb() function would patch the code while other
+> processors were still entering the function and incrementing the
+> cpu_count field.  This resulted in some processors never observing the
+> exit condition and exiting the function.  Thus, processors in the
+> system hung.
+> 
+> The first processor to enter the patching function performs the
+> patching and signals that the patching is complete with an increment
+> of the cpu_count field. When all the processors have incremented the
+> cpu_count field the cpu_count will be num_cpus_online()+1 and they
+> will return to normal execution.
+> 
+> Signed-off-by: William Cohen <wcohen@redhat.com>
+> ---
+>  arch/arm64/kernel/insn.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 
-Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- .../devicetree/bindings/arm/coresight.txt          | 204 +++++++++++++++++++++
- 1 file changed, 204 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/coresight.txt
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-new file mode 100644
-index 0000000..d790f49
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/coresight.txt
-@@ -0,0 +1,204 @@
-+* CoreSight Components:
-+
-+CoreSight components are compliant with the ARM CoreSight architecture
-+specification and can be connected in various topologies to suit a particular
-+SoCs tracing needs. These trace components can generally be classified as
-+sinks, links and sources. Trace data produced by one or more sources flows
-+through the intermediate links connecting the source to the currently selected
-+sink. Each CoreSight component device should use these properties to describe
-+its hardware characteristcs.
-+
-+* Required properties for all components *except* non-configurable replicators:
-+
-+	* compatible: These have to be supplemented with "arm,primecell" as
-+	  drivers are using the AMBA bus interface.  Possible values include:
-+		- "arm,coresight-etb10", "arm,primecell";
-+		- "arm,coresight-tpiu", "arm,primecell";
-+		- "arm,coresight-tmc", "arm,primecell";
-+		- "arm,coresight-funnel", "arm,primecell";
-+		- "arm,coresight-etm3x", "arm,primecell";
-+
-+	* reg: physical base address and length of the register
-+	  set(s) of the component.
-+
-+	* clocks: the clock associated to this component.
-+
-+	* clock-names: the name of the clock as referenced by the code.
-+	  Since we are using the AMBA framework, the name should be
-+	  "apb_pclk".
-+
-+	* port or ports: The representation of the component's port
-+	  layout using the generic DT graph presentation found in
-+	  "bindings/graph.txt".
-+
-+* Required properties for devices that don't show up on the AMBA bus, such as
-+  non-configurable replicators:
-+
-+	* compatible: Currently supported value is (note the absence of the
-+	  AMBA markee):
-+		- "arm,coresight-replicator"
-+
-+	* id: a unique number that will identify this replicator.
-+
-+	* port or ports: same as above.
-+
-+* Optional properties for ETM/PTMs:
-+
-+	* arm,cp14: must be present if the system accesses ETM/PTM management
-+	  registers via co-processor 14.
-+
-+	* cpu: the cpu phandle this ETM/PTM is affined to. When omitted the
-+	  source is considered to belong to CPU0.
-+
-+* Optional property for TMC:
-+
-+	* arm,buffer-size: size of contiguous buffer space for TMC ETR
-+	 (embedded trace router)
-+
-+
-+Example:
-+
-+1. Sinks
-+	etb at 20010000 {
-+		compatible = "arm,coresight-etb10", "arm,primecell";
-+		reg = <0 0x20010000 0 0x1000>;
-+
-+		coresight-default-sink;
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+		port {
-+			etb_in_port: endpoint at 0 {
-+				slave-mode;
-+				remote-endpoint = <&replicator_out_port0>;
-+			};
-+		};
-+	};
-+
-+	tpiu at 20030000 {
-+		compatible = "arm,coresight-tpiu", "arm,primecell";
-+		reg = <0 0x20030000 0 0x1000>;
-+
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+		port {
-+			tpiu_in_port: endpoint at 0 {
-+				slave-mode;
-+				remote-endpoint = <&replicator_out_port1>;
-+			};
-+		};
-+	};
-+
-+2. Links
-+	replicator {
-+		/* non-configurable replicators don't show up on the
-+		 * AMBA bus.  As such no need to add "arm,primecell".
-+		 */
-+		compatible = "arm,coresight-replicator";
-+		/* this will show up in debugfs as "0.replicator" */
-+		id = <0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* replicator output ports */
-+			port at 0 {
-+				reg = <0>;
-+				replicator_out_port0: endpoint {
-+					remote-endpoint = <&etb_in_port>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				replicator_out_port1: endpoint {
-+					remote-endpoint = <&tpiu_in_port>;
-+				};
-+			};
-+
-+			/* replicator input port */
-+			port at 2 {
-+				reg = <0>;
-+				replicator_in_port0: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&funnel_out_port0>;
-+				};
-+			};
-+		};
-+	};
-+
-+	funnel at 20040000 {
-+		compatible = "arm,coresight-funnel", "arm,primecell";
-+		reg = <0 0x20040000 0 0x1000>;
-+
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* funnel output port */
-+			port at 0 {
-+				reg = <0>;
-+				funnel_out_port0: endpoint {
-+					remote-endpoint =
-+							<&replicator_in_port0>;
-+				};
-+			};
-+
-+			/* funnel input ports */
-+			port at 1 {
-+				reg = <0>;
-+				funnel_in_port0: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&ptm0_out_port>;
-+				};
-+			};
-+
-+			port at 2 {
-+				reg = <1>;
-+				funnel_in_port1: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&ptm1_out_port>;
-+				};
-+			};
-+
-+			port at 3 {
-+				reg = <2>;
-+				funnel_in_port2: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&etm0_out_port>;
-+				};
-+			};
-+
-+		};
-+	};
-+
-+3. Sources
-+	ptm at 2201c000 {
-+		compatible = "arm,coresight-etm3x", "arm,primecell";
-+		reg = <0 0x2201c000 0 0x1000>;
-+
-+		cpu = <&cpu0>;
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+		port {
-+			ptm0_out_port: endpoint {
-+				remote-endpoint = <&funnel_in_port0>;
-+			};
-+		};
-+	};
-+
-+	ptm at 2201d000 {
-+		compatible = "arm,coresight-etm3x", "arm,primecell";
-+		reg = <0 0x2201d000 0 0x1000>;
-+
-+		cpu = <&cpu1>;
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+		port {
-+			ptm1_out_port: endpoint {
-+				remote-endpoint = <&funnel_in_port1>;
-+			};
-+		};
-+	};
--- 
-1.9.1
+Catalin -- can you pick this into the fixes branch please?
+
+Will
+
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index e007714..8cd27fe 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -163,9 +163,10 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
+>  		 * which ends with "dsb; isb" pair guaranteeing global
+>  		 * visibility.
+>  		 */
+> -		atomic_set(&pp->cpu_count, -1);
+> +		/* Notify other processors with an additional increment. */
+> +		atomic_inc(&pp->cpu_count);
+>  	} else {
+> -		while (atomic_read(&pp->cpu_count) != -1)
+> +		while (atomic_read(&pp->cpu_count) <= num_online_cpus())
+>  			cpu_relax();
+>  		isb();
+>  	}
+> -- 
+> 1.8.3.1
