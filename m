@@ -1,65 +1,33 @@
 From: suravee.suthikulpanit@amd.com (suravee.suthikulpanit at amd.com)
-Date: Tue, 11 Nov 2014 13:17:33 -0600
-Subject: [PATCH V2 1/2] PCI: Add new pci_ops for setting MSI parent for PCI bus
-In-Reply-To: <1415733454-24322-1-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1415733454-24322-1-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <1415733454-24322-2-git-send-email-suravee.suthikulpanit@amd.com>
+Date: Tue, 11 Nov 2014 13:17:32 -0600
+Subject: [PATCH V2 0/2] PCI: generic: Assiging msi-controller to PCI hostbridge
+Message-ID: <1415733454-24322-1-git-send-email-suravee.suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-In the pci_scan_root_bus, pci_bus is created and passed down to:
-    pci_scan_child_bus
-        pci_scan_bridge
-    	pci_add_new_bus
-    	    pci_alloc_child_bus
+This patch set introduces a new callback function to allow PCI host drivers
+to specify MSI controller to be used for the child buses / devices.
 
-In pci_alloc_child_bus, the parent's msi_chip is propagated to child,
-and the referenced by PCI devices when calling arch_setup_msi_irq().
+This is reabased from:
+    git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git pci/host-generic
 
-However, in the current implementation of pci_scan_root_bus, the msi_chip
-of the root_bus is not set before handing off to pci_scan_child_bus.
+Changes from V1:
+    - Adding "msi-parent" device tree binding in documentation.
+    - Rebase the patch to get rid of artifacts from other precursor patch
+      accidently applied to the developement tree. This should now apply cleanly
+      to the pci/host-generic branch.
 
-This patch proposes a new callback function in the struct pci_ops
-to allow host controller to provide a call back for specifying
-msi_chip to be used.
+Suravee Suthikulpanit (2):
+  PCI: Add new pci_ops for setting MSI parent for PCI bus
+  PCI: generic: Add set_msi_parent callback
 
-Cc: Bjorn Helgass <bhelgaas@google.com>
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
----
- drivers/pci/probe.c | 3 +++
- include/linux/pci.h | 1 +
- 2 files changed, 4 insertions(+)
+ Documentation/devicetree/bindings/pci/host-generic-pci.txt |  3 +++
+ drivers/pci/host/pci-host-generic.c                        | 13 +++++++++++++
+ drivers/pci/probe.c                                        |  3 +++
+ include/linux/pci.h                                        |  1 +
+ 4 files changed, 20 insertions(+)
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 5ed9930..cf7114d 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -2081,6 +2081,9 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
- 	if (!b)
- 		return NULL;
- 
-+	if (ops->set_msi_parent)
-+		ops->set_msi_parent(b);
-+
- 	if (!found) {
- 		dev_info(&b->dev,
- 		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 5be8db4..6093544 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -560,6 +560,7 @@ static inline int pcibios_err_to_errno(int err)
- struct pci_ops {
- 	int (*read)(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *val);
- 	int (*write)(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 val);
-+	int (*set_msi_parent)(struct pci_bus *bus);
- };
- 
- /*
 -- 
 1.9.3
