@@ -1,86 +1,58 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Wed, 12 Nov 2014 00:10:34 +0800
-Subject: [PATCH 00/15] arm64: PCI/MSI: GICv3 ITS support (stacked domain
- edition)
-In-Reply-To: <1415720893-13371-1-git-send-email-marc.zyngier@arm.com>
-References: <1415720893-13371-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <546234FA.3060501@linux.intel.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 11 Nov 2014 16:15:30 +0000
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <542E56AB.40208@redhat.com>
+References: <20140929101805.GB26008@ulmo> <20141001124800.GA21733@ulmo>
+ <20141001170517.GF4273@sirena.org.uk> <542C3934.3040409@redhat.com>
+ <CAKON4OxzerMyuza-GSfmYiLMqA=Y3HOXko7a8rOcP_8PkHVF3w@mail.gmail.com>
+ <542C4404.8040501@wwwdotorg.org> <542CF3C3.2050708@redhat.com>
+ <CAKON4Oy8sZ-d6JzWLi7pUeNFE5ge0fr5Tgoc_PSpKcOoiN-0yQ@mail.gmail.com>
+ <542D476D.50004@redhat.com>
+ <CAKON4OwOFVFZjxN-SJpDJLcyCpNOT4_mjjr9OpgGXmTYvZwT+A@mail.gmail.com>
+ <542D4FB9.6090805@redhat.com>
+ <CAKON4Oyb3KBWhGgKfwNop7+cwR=p=ZpVs-jfH0iQwm5scfOJ-A@mail.gmail.com>
+ <542D5444.8090903@redhat.com>
+ <CAKON4OxTmNRxSJum17RZGLLku5dAFPauzqyP0BOF-VC=bD=Hng@mail.gmail.com>
+ <542D5C74.4050602@redhat.com>
+ <CAKON4OxHeHszmcbMw_LRJbcaFW5JP7Atsa4RMRwWfqMrCueAnQ@mail.gmail.com>
+ <542D5F62.60907@redhat.com>
+ <CAKON4Oz8mL5jGzBHZeznd5NbPqq93q7PpTDqHHcV_HYSfqBVHA@mail.gmail.com>
+ <542D6633.20907@redhat.com>
+ <CAKON4OwMf-zXC_B=VqdVNrD_ExC3zGiGUm4j5KKgS-U4cPB2zg@mail.gmail.com>
+ <CAGRGNgUUG6TOzC5YJgqqKfCM_iK9KcDXW9DPEr1P5OoO1qwd8w@mail.gm!>
+Message-ID: <20141111161530.3FBF8C416AF@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-	Sorry for the late notification. I have heavily reworked the
-interfaces for MSI irqdomain support based on review comments.
-Please refer to https://lkml.org/lkml/2014/11/9/88, please give your
-comments on the new interfaces:)
-Regards!
-Gerry
+On Fri, 03 Oct 2014 09:56:27 +0200
+, Hans de Goede <hdegoede@redhat.com>
+ wrote:
+> On 10/03/2014 01:31 AM, Julian Calaby wrote:
+> > On Fri, Oct 3, 2014 at 1:14 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+> >> Because you are creating two different device tree nodes describing a
+> >> single piece of hardware and that's not suppose to happen in a device
+> >> tree.  The accurate description of the hardware is being perverted to
+> >> solve a software problem.
+> >>
+> >> One node describes the hardware in a format to make simplefb happy.
+> >> Another node describes the same hardware in a format to make the
+> >> device specific driver happy.
+> > 
+> > Stupid question: What about mangling an existing device node to be
+> > simplefb compatible, and writing simplefb to be binding agnostic?
+> 
+> That will not work, with simplefb a single node represents the currently
+> active video output. While in real hardware that may involve multiple
+> blocks, e.g on sunxi for hdmi out this involves the compositor (which
+> generates video data from 1 or more layers) which feeds into the
+> lcd-controller (which in this case is only used to generate hsync + vsync)
+> signals really, which feeds into the hdmi encoder, all 3 of which are
+> separate hardware blocks with their own clocks, etc.
 
-On 2014/11/11 23:47, Marc Zyngier wrote:
-> The GICv3 architecture provides a way to implement support for
-> MSI/MSI-X using a specific block called the ITS (Interrupt Translation
-> Service).
-> 
-> The ITS can be accurately described as "page tables for
-> interrupts". If you think this sounds scary, you're spot on. It uses a
-> set of opaque memory tables that are manipulated through commands
-> (software almost never touches the tables directly). In order to make
-> it slightly easier to digest, the code has been split into (mostly)
-> logical units.
-> 
-> To make things more fun, this relies on Jiang Liu's stacked domain
-> patch series [1]. In order to make this work, the first three patches
-> introduce support for stacked MSI domain on arm64 (the first patch is
-> just a version of a existing patch by Yingjoe Chen, and is only
-> included here for reference; the following two are the actual
-> implementation).
-> 
-> I'd welcome some guidance of this stacked domain support, as this goes
-> into a slightly different direction compared to what we've had on
-> 32bit ARM so far (using the setup_irq/teardown_irq methods).
-> 
-> This has been tested on arm64 with an FVP model, and is based on
-> 3.18-rc4 + Jiang's p2v5 series + a number of arm64-specific PCI
-> patches. The whole thing is available at:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/stacked-its
-> 
-> 	M.
-> 
-> [1]: http://lwn.net/Articles/619388/
-> 
-> Marc Zyngier (15):
->   genirq: Add a few more helper funtions to support stacked irq_chip
->   PCI/MSI: genirq: allow architecture-specific override of flow handler
->   arm64: MSI: Add support for stacked MSI domain
->   irqchip: GICv3: Convert to domain hierarchy
->   irqchip: GICv3: rework redistributor structure
->   irqchip: GICv3: ITS command queue
->   irqchip: GICv3: ITS: irqchip implementation
->   irqchip: GICv3: ITS: LPI allocator
->   irqchip: GICv3: ITS: tables allocators
->   irqchip: GICv3: ITS: device allocation and configuration
->   irqchip: GICv3: ITS: MSI support
->   irqchip: GICv3: ITS: DT probing and initialization
->   irqchip: GICv3: ITS: plug ITS init into main GICv3 code
->   irqchip: GICv3: ITS: enable compilation of the ITS driver
->   irqchip: GICv3: Binding updates for ITS
-> 
->  Documentation/devicetree/bindings/arm/gic-v3.txt |   39 +
->  arch/arm64/Kconfig                               |    1 +
->  arch/arm64/include/asm/msi.h                     |   26 +
->  arch/arm64/kernel/Makefile                       |    1 +
->  arch/arm64/kernel/msi.c                          |   80 ++
->  drivers/irqchip/Kconfig                          |    5 +
->  drivers/irqchip/Makefile                         |    1 +
->  drivers/irqchip/irq-gic-v3-its.c                 | 1343 ++++++++++++++++++++++
->  drivers/irqchip/irq-gic-v3.c                     |  163 ++-
->  drivers/pci/msi.c                                |    7 +-
->  include/linux/irq.h                              |    6 +
->  include/linux/irqchip/arm-gic-v3.h               |  128 +++
->  kernel/irq/chip.c                                |   31 +
->  13 files changed, 1790 insertions(+), 41 deletions(-)
->  create mode 100644 arch/arm64/include/asm/msi.h
->  create mode 100644 arch/arm64/kernel/msi.c
->  create mode 100644 drivers/irqchip/irq-gic-v3-its.c
-> 
+The answer here should be, 'whoever does the DMA'.
+
+Julian's suggestion is actually the sanest approach, and there is
+precedence for doing exactly that in DT, both for serial devices
+(of_serial.c) and framebuffers (offb.c).
+
+g.
