@@ -1,93 +1,41 @@
-From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
-Date: Tue, 11 Nov 2014 10:11:25 +0100
-Subject: [RFC 2/2] regulator: qcom-rpm: Implement RPM assisted disable
-In-Reply-To: <1415659966-16200-3-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1415659966-16200-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1415659966-16200-3-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <5461D2BD.2080209@suse.de>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 11 Nov 2014 10:11:29 +0100
+Subject: [linux-sunxi] [PATCH v2 0/5] ARM: sunxi: Add support for USB
+ OTG PHY
+In-Reply-To: <cover.1415645258.git.rbyshko@gmail.com>
+References: <cover.1415645258.git.rbyshko@gmail.com>
+Message-ID: <5461D2C1.6020505@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Am 10.11.2014 um 23:52 schrieb Bjorn Andersson:
-> diff --git a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
-> index 4264021..4671eef 100644
-> --- a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
-> +++ b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
-> @@ -112,6 +112,13 @@ of valid subnodes that can operate on these resources.
->  	Definition: select that the power supply should operate in hysteretic
->  		    mode, instead of the default pwm mode
->  
-> +- qcom,rpm-assisted-disable:
-> +	Usage: optional
-> +	Value type: <empty>
-> +	Definition: select that the regulator is supplying the active CPU(s)
-> +		    and can only be disabled with the assistans from the RPM
+On 11/10/2014 07:55 PM, Roman Byshko wrote:
+> Hi,
+> 
+> There is already support for two USB phys, which are used for
+> USB host controllers on Allwinner SoC aka sunxi.
+> 
+> This patch series add support for the USB OTG phy (aka phy0).
+> 
+> The code has been tested on Allwinner A20 aka sun7i (Cubietruck).
+> 
+> Best regards,
+> Roman Byshko
 
-"assistance"
+First of all very cool that you're working on this, I somehow missed
+v1, but I'm very happy to see this.
 
-> +		    after going to sleep
-> +
->  Standard regulator bindings are used inside switch mode power supply subnodes.
->  Check Documentation/devicetree/bindings/regulator/regulator.txt for more
->  details.
-> @@ -160,6 +167,13 @@ details.
->  						qcom,rpm-pm8921-nldo,
->  						qcom,rpm-pm8921-nldo1200
->  
-> +- qcom,rpm-assisted-disable:
-> +	Usage: optional
-> +	Value type: <empty>
-> +	Definition: select that the regulator is supplying the active CPU(s)
-> +		    and can only be disabled with the assistans from the RPM
+Second some questions, this series seems to only add support for
+initializing the phy, without adding the necessary magic for
+switching from app to host mode, and without actually hooking up musb,
+I assume you've a follow up series adding musb support, which actually
+uses the phy ?
 
-ditto
-
-> +		    after going to sleep
-> +
->  Standard regulator bindings are used inside switch low-dropout regulator
->  subnodes.  Check Documentation/devicetree/bindings/regulator/regulator.txt for
->  more details.
-> @@ -190,6 +204,13 @@ more details.
->  		    2740000, 2400000, 2130000, 1920000, 1750000, 1600000,
->  		    1480000, 1370000, 1280000, 1200000
->  
-> +- qcom,rpm-assisted-disable:
-> +	Usage: optional
-> +	Value type: <empty>
-> +	Definition: select that the regulator is supplying the active CPU(s)
-> +		    and can only be disabled with the assistans from the RPM
-
-ditto
-
-> +		    after going to sleep
-> +
->  Standard regulator bindings are used inside negative charge pump regulator
->  subnodes.  Check Documentation/devicetree/bindings/regulator/regulator.txt for
->  more details.
-> @@ -215,6 +236,13 @@ more details.
->  		    QCOM_RPM_PM8921_LVS1 - QCOM_RPM_PM8921_LVS7,
->  		    QCOM_RPM_PM8921_MVS
->  
-> +- qcom,rpm-assisted-disable:
-> +	Usage: optional
-> +	Value type: <empty>
-> +	Definition: select that the regulator is supplying the active CPU(s)
-> +		    and can only be disabled with the assistans from the RPM
-
-ditto
-
-> +		    after going to sleep
-> +
->  = EXAMPLE
->  
->  	#include <dt-bindings/mfd/qcom-rpm.h>
-[snip]
+Also have you coordinated your work with ChenYu? ATM ChenYu is mostly
+working on other stuff, but AFAIk he has been working on musb support
+in the past.
 
 Regards,
-Andreas
 
--- 
-SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 21284 AG N?rnberg
+Hans
