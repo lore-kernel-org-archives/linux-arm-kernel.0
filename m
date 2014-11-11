@@ -1,55 +1,26 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 11 Nov 2014 16:27:47 +0000
-Subject: [PATCH v4 1/5] simplefb: Add simplefb MAINTAINERS entry
-In-Reply-To: <1413996311-4287-2-git-send-email-hdegoede@redhat.com>
-References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
- <1413996311-4287-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141111162748.01BBDC416AF@trevor.secretlab.ca>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 11 Nov 2014 16:27:38 +0000
+Subject: [PATCH 00/15] arm64: PCI/MSI: GICv3 ITS support (stacked domain
+ edition)
+In-Reply-To: <546234FA.3060501@linux.intel.com>
+References: <1415720893-13371-1-git-send-email-marc.zyngier@arm.com>
+ <546234FA.3060501@linux.intel.com>
+Message-ID: <546238FA.3040307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 Oct 2014 18:45:07 +0200
-, Hans de Goede <hdegoede@redhat.com>
- wrote:
-> During the discussion about adding clock handling code to simplefb, it became
-> clear that simplefb currently does not have an active maintainer.
-> 
-> I've discussed this with Stephen Warren <swarren@wwwdotorg.org>, the original
-> author of simplefb, and with his permisson I'm picking up maintainership of
-> simplefb.
-> 
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Reviewed-by: David Herrmann <dh.herrmann@gmail.com>
+On 11/11/14 16:10, Jiang Liu wrote:
+> Hi Marc,
+> 	Sorry for the late notification. I have heavily reworked the
+> interfaces for MSI irqdomain support based on review comments.
+> Please refer to https://lkml.org/lkml/2014/11/9/88, please give your
+> comments on the new interfaces:)
 
-Acked-by: Grant Likely <grant.likely@linaro.org>
+Ah, I feel like I have more catch-up to do. Hopefully the changes are
+simple enough to implement. Rebase time...
 
-> ---
->  MAINTAINERS | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 73d1aef..6e92e73 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -8416,6 +8416,14 @@ F:	drivers/media/usb/siano/
->  F:	drivers/media/usb/siano/
->  F:	drivers/media/mmc/siano/
->  
-> +SIMPLEFB FB DRIVER
-> +M:	Hans de Goede <hdegoede@redhat.com>
-> +L:	linux-fbdev at vger.kernel.org
-> +S:	Maintained
-> +F:	Documentation/devicetree/bindings/video/simple-framebuffer.txt
-> +F:	drivers/video/fbdev/simplefb.c
-> +F:	include/linux/platform_data/simplefb.h
-> +
->  SH_VEU V4L2 MEM2MEM DRIVER
->  L:	linux-media at vger.kernel.org
->  S:	Orphan
-> -- 
-> 2.1.0
-> 
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
