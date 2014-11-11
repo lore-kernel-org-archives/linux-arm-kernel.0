@@ -1,39 +1,95 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 11 Nov 2014 19:35:48 +0100
-Subject: [PATCH] ARM: dts: sunxi: Banana Pi: increase startup-delay for
- the GMAC PHY regulator
-In-Reply-To: <20141111173435.GJ14919@lukather>
-References: <1415539714-7652-1-git-send-email-merker@debian.org>
- <1415539714-7652-2-git-send-email-merker@debian.org>
- <545FD716.5060305@redhat.com> <20141111173435.GJ14919@lukather>
-Message-ID: <54625704.7030100@redhat.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Tue, 11 Nov 2014 10:39:32 -0800
+Subject: [RFC 2/2] regulator: qcom-rpm: Implement RPM assisted disable
+In-Reply-To: <20141111115959.GY24004@x1>
+References: <1415659966-16200-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1415659966-16200-3-git-send-email-bjorn.andersson@sonymobile.com>
+ <20141111115959.GY24004@x1>
+Message-ID: <20141111183815.GF16980@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue 11 Nov 03:59 PST 2014, Lee Jones wrote:
 
-On 11/11/2014 06:34 PM, Maxime Ripard wrote:
-> On Sun, Nov 09, 2014 at 10:05:26PM +0100, Hans de Goede wrote:
->> Hi,
->>
->> On 11/09/2014 02:28 PM, Karsten Merker wrote:
->>> On the LeMaker Banana Pi, probing the external ethernet PHY connected
->>> to the SoC's internal GMAC module sometimes fails.  The PHY power
->>> supply is handled via a GPIO-controlled regulator, and the existing
->>> regulator startup-delay of 50000us is too short to make sure that the
->>> PHY is always fully powered up when it is queried by phylib.  To
->>> guarantee a reliable PHY detection, the startup-delay has to be
->>> increased to 60000us.
->>
->> We should probably just increase it to 100000us to be safe, otherwise:
->>
->> Acked-by: Hans de Goede <hdegoede@redhat.com>
+> On Mon, 10 Nov 2014, Bjorn Andersson wrote:
 > 
-> Soooo, should I merge it or will there be a v2?
+> > Some regulators are used to power e.g. PLLs that clocks the core we're
+> > running on, so we can't turn them off directly; but we do want them off
+> > when the core is powered down. To handle this the Qualcomm SoC provides
+> > a means to specify a "sleep state" for RPM resources that can be
+> > triggered by the hardware when the cores are brought down.
+> > 
+> > Resources of this type should be considered always-on while the CPU(s)
+> > are running and we can utilize the "sleep state" functionality to defer
+> > disabling them until the CPU(s) go to sleep, if not used by other
+> > peripherals at that time.
+> > 
+> > Other properties are kept in sync between the states, so that if the
+> > CPU(s) go to sleep with a particular regulator still enabled there will
+> > be no change.
+> > 
+> > Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> > ---
+> >  Documentation/devicetree/bindings/mfd/qcom-rpm.txt |   28 ++++++++
+> 
+> Please place this into a seperate patch.
+> 
+> See: Documentation/devicetree/bindings/submitting-patches.txt
+> 
 
-It might be easiest if you merge it with the delay increased to 100000 us,
-assuming you agree that it is a good idea to add some extra safety margin.
+Yes, I'm aware. As you probably remember we still haven't gotten an ack on the
+original file, so given the outcome of the discussion of the design of this I
+plan to fold it into the original patch and send out a new version.
+
+> >  drivers/regulator/qcom_rpm-regulator.c             |   68 +++++++++++++++-----
+> >  2 files changed, 79 insertions(+), 17 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+> > index 4264021..4671eef 100644
+> > --- a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+> > +++ b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+> > @@ -112,6 +112,13 @@ of valid subnodes that can operate on these resources.
+> >  	Definition: select that the power supply should operate in hysteretic
+> >  		    mode, instead of the default pwm mode
+> >  
+> > +- qcom,rpm-assisted-disable:
+> > +	Usage: optional
+> > +	Value type: <empty>
+> > +	Definition: select that the regulator is supplying the active CPU(s)
+> > +		    and can only be disabled with the assistans from the RPM
+> > +		    after going to sleep
+> > +
+> 
+> This requires a DT Ack.
+> 
+
+The entire file still requires a dt ack, but the "sleep state" will change the
+binding so let's see where this RFC takes us.
+
+I would have preferred if someone gave me the "sleep state" feedback once we
+had this out for review, but it didn't reach the right people at Qualcomm at
+the time.
+
+> >  Standard regulator bindings are used inside switch mode power supply subnodes.
+> >  Check Documentation/devicetree/bindings/regulator/regulator.txt for more
+> >  details.
+> > @@ -160,6 +167,13 @@ details.
+> >  						qcom,rpm-pm8921-nldo,
+> >  						qcom,rpm-pm8921-nldo1200
+> >  
+> > +- qcom,rpm-assisted-disable:
+> > +	Usage: optional
+> > +	Value type: <empty>
+> > +	Definition: select that the regulator is supplying the active CPU(s)
+> > +		    and can only be disabled with the assistans from the RPM
+> > +		    after going to sleep
+> > +
+> 
+> Eh?  I think I'm seeing double.
+> 
+
+You're right, it would make sense to move this to a "common subnode properties"
+section.
 
 Regards,
-
-Hans
+Bjorn
