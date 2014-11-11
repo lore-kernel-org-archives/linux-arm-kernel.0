@@ -1,49 +1,40 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 11 Nov 2014 11:52:25 +0000
-Subject: [PATCH v8 10/13] xen/arm/arm64: introduce
- xen_arch_need_swiotlb
-In-Reply-To: <20141110183453.GG25609@e104818-lin.cambridge.arm.com>
-References: <alpine.DEB.2.02.1411101607130.22875@kaball.uk.xensource.com>
- <1415636045-24669-10-git-send-email-stefano.stabellini@eu.citrix.com>
- <20141110183453.GG25609@e104818-lin.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.02.1411111151030.26318@kaball.uk.xensource.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 11 Nov 2014 14:02:55 +0200
+Subject: [PATCH v2] ARM: dts: sbc-t3x: add DVI display data
+In-Reply-To: <20141110174845.GP31454@atomide.com>
+References: <1413364186-23752-1-git-send-email-lifshitz@compulab.co.il>
+ <1414927198-7127-1-git-send-email-lifshitz@compulab.co.il>
+ <54561E45.7000404@compulab.co.il> <20141110174845.GP31454@atomide.com>
+Message-ID: <5461FAEF.3010607@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Nov 2014, Catalin Marinas wrote:
-> On Mon, Nov 10, 2014 at 04:14:02PM +0000, Stefano Stabellini wrote:
-> > --- a/arch/arm/include/asm/xen/page.h
-> > +++ b/arch/arm/include/asm/xen/page.h
-> > @@ -107,4 +107,8 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
-> >  #define xen_remap(cookie, size) ioremap_cache((cookie), (size))
-> >  #define xen_unmap(cookie) iounmap((cookie))
-> >  
-> > +bool xen_arch_need_swiotlb(struct device *dev,
-> > +			   unsigned long pfn,
-> > +			   unsigned long mfn);
-> > +
-> >  #endif /* _ASM_ARM_XEN_PAGE_H */
-> > diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
-> > index 0e96023..1b087cd 100644
-> > --- a/arch/arm/xen/mm.c
-> > +++ b/arch/arm/xen/mm.c
-> > @@ -102,6 +102,13 @@ void __xen_dma_sync_single_for_device(struct device *hwdev,
-> >  	__xen_dma_page_cpu_to_dev(hwdev, handle, size, dir);
-> >  }
-> >  
-> > +bool xen_arch_need_swiotlb(struct device *dev,
-> > +			   unsigned long pfn,
-> > +			   unsigned long mfn)
-> > +{
-> > +	return ((pfn != mfn) && !is_device_dma_coherent(dev));
-> > +}
+Hi Tony,
+
+On 11/10/14 19:48, Tony Lindgren wrote:
+> * Igor Grinberg <grinberg@compulab.co.il> [141102 04:08]:
+>> On 11/02/14 13:19, Dmitry Lifshitz wrote:
+>>> Add DSS related pinmux and display data nodes required to support
+>>> DVI video out on SBC-T3530, SBC-T3730 and SBC-T3517.
+>>>
+>>> Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
+>>
+>> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
 > 
-> Why not a static inline? It doesn't look like a big function.
+> Thanks applying into omap-for-v3.19/dt.
+> 
+> Are we now ready to drop the board-cm-*.c files?
 
-Because the next patch is going to make this change:
+Let's see, below is a list of things that are yet to be
+supported in DT boot:
+NAND, TV, LCD, Touchscreen, Audio (CM-T3x30), RTC (CM-T3517), CAN (CM-3517).
 
--   return ((pfn != mfn) && !is_device_dma_coherent(dev));
-+   return (!hypercall_cflush && (pfn != mfn) && !is_device_dma_coherent(dev));
+We're rc4 now, so hopefully, we will be able to get all this in for 3.19
+and then have the board files removed for 3.20.
+This way we can have 3.19 with both ways supported and do last checks.
 
-and I think it makes sense to keep hypercall_cflush as a static variable
-within arch/arm/xen/mm.c (avoid exporting it in page.h).
+Are you ok with this?
+
+-- 
+Regards,
+Igor.
