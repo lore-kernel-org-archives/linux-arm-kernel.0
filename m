@@ -1,53 +1,41 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 11 Nov 2014 14:24:07 +0900
-Subject: serial: of-serial: fetch line number from DT
-In-Reply-To: <CAOesGMjzs=dThDv6S8Xvo+ym-XECaQhTQ8NV6t46fQZ1LoJnHw@mail.gmail.com>
-References: <CAOesGMjzs=dThDv6S8Xvo+ym-XECaQhTQ8NV6t46fQZ1LoJnHw@mail.gmail.com>
-Message-ID: <20141111052407.GB24727@kroah.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 11 Nov 2014 14:27:20 +0900
+Subject: [RESENDv5] serial: of-serial: fix up PM ops on
+ no_console_suspend and port type
+In-Reply-To: <CAGVrzcamoYbdPijWtrU=ge+UE+g9zBHAG84PJB7G3EyA09jBWg@mail.gmail.com>
+References: <1414401857-21121-1-git-send-email-jingchang.lu@freescale.com>
+ <CAGVrzcamoYbdPijWtrU=ge+UE+g9zBHAG84PJB7G3EyA09jBWg@mail.gmail.com>
+Message-ID: <20141111052720.GC24727@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 10, 2014 at 01:34:19PM -0800, Olof Johansson wrote:
-> Greg,
+On Mon, Nov 10, 2014 at 08:30:36PM -0800, Florian Fainelli wrote:
+> 2014-10-27 2:24 GMT-07:00 Jingchang Lu <jingchang.lu@freescale.com>:
+> > This patch fixes commit 2dea53bf57783f243c892e99c10c6921e956aa7e,
+> > "serial: of-serial: add PM suspend/resume support", which disables
+> > the uart clock on suspend, but also causes a hardware hang on register
+> > access if no_console_suspend command line option is used.
+> >
+> > Also, not every of_serial device is an 8250 port, so the serial8250
+> > suspend/resume functions should only be applied to a real 8250 port.
 > 
-> This commit:
+> Greg, can you pick this one and submit it for your next 3.18-rc
+> submission? This fixes a regression when using "no_console_suspend"
+> introduced by:
 > 
-> commit 1bd8324535ec1ff44aef55c0e40b9e7d56b310fb
-> Author: Lucas Stach <dev@lynxeye.de>
-> Date:   Mon Nov 3 23:16:54 2014 +0100
-> 
->     serial: of-serial: fetch line number from DT
-> 
->     The general agreed way to specify a fixed line number
->     for a serial console is to provide a "serial" alias
->     in the devicetree. Start parsing this property in
->     of_serial.
-> 
->     Signed-off-by: Lucas Stach <dev@lynxeye.de>
->     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> 
-> 
-> Broke a whole lot of tegra boards in last night's -next here. In
-> particular, I've been looking at tegra20-seaboard, which now doesn't
-> boot with console any more.
-> 
-> http://arm-soc.lixom.net/bootlogs/next/next-20141110/
-> 
-> Unfortunately, tegra has for a long time been specifying the aliases
-> as a fixed 1:1 mapping, but most environments rely on ttyS0 being the
-> first _activated_ serial port. That's obviously going to break things
-> here. :(
-> 
-> Greg, can you please revert until we get the tegra-side fixes in for
-> this, or we're in for a pretty lousy time w.r.t. bisecting problems
-> across the two mergepoints?
-> 
-> Stephen: I suppose the best way to handle this on tegra is to specify
-> the aliases per-board instead of in the soc dtsi today.
-> 
-> Apologies for not replying to the patch directly -- it was only ever
-> posted to linux-serial and I don't seem to be subscribed.
+> 2dea53bf57783f243c892e99c10c6921e956aa7e ("serial: of-serial: add PM
+> suspend/resume support") which has been merged during 3.18-rc1
 
-Now reverted, sorry for the problems.
+Why can't I just revert that patch instead?  This is really late in the
+-rc cycle to be doing large fixes like this.
+
+And this patch is already queued up for 3.19-rc1, so this is a mess...
+
+Any objection to me just reverting
+2dea53bf57783f243c892e99c10c6921e956aa7e, and then this one in my
+tty-next branch as well, and then someone resending the original patch
+in a format that actually works?
+
+thanks,
 
 greg k-h
