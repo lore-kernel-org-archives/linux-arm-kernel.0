@@ -1,126 +1,113 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 11 Nov 2014 15:01:39 +0000
-Subject: [PATCH v3 1/2] of: Rename "poweroff-source" property to
- "system-power-controller"
-In-Reply-To: <1415283784-10885-2-git-send-email-romain.perier@gmail.com>
-References: <1415283784-10885-1-git-send-email-romain.perier@gmail.com>
- <1415283784-10885-2-git-send-email-romain.perier@gmail.com>
-Message-ID: <20141111150139.A904BC416AF@trevor.secretlab.ca>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 11 Nov 2014 16:25:46 +0100
+Subject: [PATCH v3] of/fdt: export fdt blob as /sys/firmware/fdt
+Message-ID: <1415719546-14076-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  6 Nov 2014 14:23:02 +0000
-, Romain Perier <romain.perier@gmail.com>
- wrote:
-> It reverts commit a4b4e0461ec5 ("of: Add standard property for poweroff capability").
-> As discussed on the mailing list, it makes more sense to rename back to the
-> old established property name, without the vendor prefix. Problem being that
-> the word "source" usually tends to be used for inputs and that is out of control
-> of the OS. The poweroff capability is an output which simply turns the
-> system-power off. Also, this property might be used by drivers which power-off
-> the system and power back on subsequent RTC alarms. This seems to suggest to
-> remove "poweroff" from the property name and to choose "system-power-controller"
-> as the more generic name. This patchs adds the required renaming changes and
-> defines an helper function which is compatible with both properties, the old one
-> which was only used by tps65910 and the new one without vendor-prefix.
-> 
-> Signed-off-by: Romain Perier <romain.perier@gmail.com>
-> ---
->  .../bindings/power/{poweroff.txt => power-controller.txt}         | 0
->  Documentation/devicetree/bindings/regulator/act8865-regulator.txt | 4 ++--
->  drivers/mfd/tps65910.c                                            | 2 +-
->  drivers/regulator/act8865-regulator.c                             | 2 +-
->  include/linux/of.h                                                | 8 +++++---
->  5 files changed, 9 insertions(+), 7 deletions(-)
->  rename Documentation/devicetree/bindings/power/{poweroff.txt => power-controller.txt} (100%)
-> 
-> diff --git a/Documentation/devicetree/bindings/power/poweroff.txt b/Documentation/devicetree/bindings/power/power-controller.txt
-> similarity index 100%
-> rename from Documentation/devicetree/bindings/power/poweroff.txt
-> rename to Documentation/devicetree/bindings/power/power-controller.txt
-> diff --git a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-> index 01a5b07..dad6358 100644
-> --- a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-> +++ b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-> @@ -6,8 +6,8 @@ Required properties:
->  - reg: I2C slave address
->  
->  Optional properties:
-> -- poweroff-source: Telling whether or not this pmic is controlling
-> -  the system power. See Documentation/devicetree/bindings/power/poweroff.txt .
-> +- system-power-controller: Telling whether or not this pmic is controlling
-> +  the system power. See Documentation/devicetree/bindings/power/power-controller.txt .
->  
->  Any standard regulator properties can be used to configure the single regulator.
->  
-> diff --git a/drivers/mfd/tps65910.c b/drivers/mfd/tps65910.c
-> index b8dca8a..77a7f78 100644
-> --- a/drivers/mfd/tps65910.c
-> +++ b/drivers/mfd/tps65910.c
-> @@ -423,7 +423,7 @@ static struct tps65910_board *tps65910_parse_dt(struct i2c_client *client,
->  
->  	board_info->irq = client->irq;
->  	board_info->irq_base = -1;
-> -	board_info->pm_off = of_system_has_poweroff_source(np);
-> +	board_info->pm_off = of_is_system_power_controller(np);
->  
->  	return board_info;
->  }
-> diff --git a/drivers/regulator/act8865-regulator.c b/drivers/regulator/act8865-regulator.c
-> index 76301ed..435aba1 100644
-> --- a/drivers/regulator/act8865-regulator.c
-> +++ b/drivers/regulator/act8865-regulator.c
-> @@ -365,7 +365,7 @@ static int act8865_pmic_probe(struct i2c_client *client,
->  		return ret;
->  	}
->  
-> -	if (of_system_has_poweroff_source(dev->of_node)) {
-> +	if (of_is_system_power_controller(dev->of_node)) {
->  		if (!pm_power_off) {
->  			act8865_i2c_client = client;
->  			act8865->off_reg = off_reg;
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index 868fdad..f3595ba 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -911,14 +911,16 @@ static inline int of_changeset_update_property(struct of_changeset *ocs,
->  extern int of_resolve_phandles(struct device_node *tree);
->  
->  /**
-> - * of_system_has_poweroff_source - Tells if poweroff-source is found for device_node
-> + * of_is_system_power_controller - Tells if system-power-controller is found for device_node
->   * @np: Pointer to the given device_node
->   *
->   * return true if present false otherwise
->   */
-> -static inline bool of_system_has_poweroff_source(const struct device_node *np)
-> +static inline bool of_is_system_power_controller(const struct device_node *np)
->  {
-> -	return of_property_read_bool(np, "poweroff-source");
-> +	if (of_property_read_bool(np, "system-power-controller"))
-> +		return true;
-> +	return of_property_read_bool(np, "ti,system-power-controller");
+Create a new /sys entry '/sys/firmware/fdt' to export the FDT blob
+that was passed to the kernel by the bootloader. This allows userland
+applications such as kexec to access the raw binary.
 
-So, to be a little pendantic, the 'ti,' prefix is basically just for
-backwards compatibility with the old binding, and that old binding is
-only used on palmas.c, tps65*.c and twl4030-power.c, correct?
+The fact that this node does not reside under /sys/firmware/device-tree
+is deliberate: FDT is also used on arm64 UEFI/ACPI systems to
+communicate just the UEFI and ACPI entry points, but the FDT is never
+unflattened and used to configure the system.
 
-We don't actually want a ti comparison in the generic code. Normally
-what you'd do here is have the fixup in the ti driver code, possibly
-with a ti specific helper for those 4 files.
+A CRC32 checksum is calculated over the entire FDT blob, and verified
+at late_initcall time. The sysfs entry is instantiated only if the
+checksum is valid, i.e., if the FDT blob has not been modified in the
+mean time. Otherwise, a warning is printed.
 
-I'm not going to nak this patch and I know you need to get things cleaned
-up, but the static inline really should be reduced back to just checking
-only for "system-power-controller". The current mainline code does the
-right thing anyway, and it is a *tiny* amount of extra code in 4 drivers
-file.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+v3: keep checksum instead of copying the entire blob, and WARN on mismatch
 
-g.
+ drivers/of/Kconfig |  1 +
+ drivers/of/fdt.c   | 36 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 37 insertions(+)
 
-
->  }
->  
->  #endif /* _LINUX_OF_H */
-> -- 
-> 1.9.1
-> 
+diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+index 1a13f5b722c5..0348c208343c 100644
+--- a/drivers/of/Kconfig
++++ b/drivers/of/Kconfig
+@@ -23,6 +23,7 @@ config OF_FLATTREE
+ 	bool
+ 	select DTC
+ 	select LIBFDT
++	select CRC32
+ 
+ config OF_EARLY_FLATTREE
+ 	bool
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index d1ffca8b34ea..6742b6ae1b89 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -9,6 +9,7 @@
+  * version 2 as published by the Free Software Foundation.
+  */
+ 
++#include <linux/crc32.h>
+ #include <linux/kernel.h>
+ #include <linux/initrd.h>
+ #include <linux/memblock.h>
+@@ -22,10 +23,20 @@
+ #include <linux/libfdt.h>
+ #include <linux/debugfs.h>
+ #include <linux/serial_core.h>
++#include <linux/sysfs.h>
+ 
+ #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
+ #include <asm/page.h>
+ 
++static u32 of_fdt_crc32;
++
++static u32 of_fdt_get_crc32(void *fdt)
++{
++	static u32 const OF_FDT_CRC32_SEED = 0x04c11db7;
++
++	return crc32_be(OF_FDT_CRC32_SEED, fdt, fdt_totalsize(fdt));
++}
++
+ /*
+  * of_fdt_limit_memory - limit the number of regions in the /memory node
+  * @limit: maximum entries
+@@ -1003,6 +1014,8 @@ bool __init early_init_dt_verify(void *params)
+ 		return false;
+ 	}
+ 
++	of_fdt_crc32 = of_fdt_get_crc32(initial_boot_params);
++
+ 	return true;
+ }
+ 
+@@ -1103,4 +1116,27 @@ static int __init of_flat_dt_debugfs_export_fdt(void)
+ module_init(of_flat_dt_debugfs_export_fdt);
+ #endif
+ 
++#ifdef CONFIG_SYSFS
++static ssize_t of_fdt_raw_read(struct file *filp, struct kobject *kobj,
++			       struct bin_attribute *bin_attr,
++			       char *buf, loff_t off, size_t count)
++{
++	memcpy(buf, initial_boot_params + off, count);
++	return count;
++}
++
++static int __init of_fdt_raw_init(void)
++{
++	static struct bin_attribute of_fdt_raw_attr =
++		__BIN_ATTR(fdt, S_IRUSR, of_fdt_raw_read, NULL, 0);
++
++	if (WARN(of_fdt_crc32 != of_fdt_get_crc32(initial_boot_params),
++		 "CRC check failed on binary FDT"))
++		return -EFAULT;
++	of_fdt_raw_attr.size = fdt_totalsize(initial_boot_params);
++	return sysfs_create_bin_file(firmware_kobj, &of_fdt_raw_attr);
++}
++late_initcall(of_fdt_raw_init);
++#endif
++
+ #endif /* CONFIG_OF_EARLY_FLATTREE */
+-- 
+1.8.3.2
