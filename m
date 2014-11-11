@@ -1,134 +1,103 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 11 Nov 2014 21:49:50 +0000
-Subject: [linux-sunxi] Re: [PATCH v4 0/5] simplefb: add clock handling code
-In-Reply-To: <CAL_JsqKWqq+H5ymUW3n8tkmLJHEUGaKDLX5+orJmGUQ3ECQwUQ@mail.gmail.com>
-References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
- <544F737A.7000109@ti.com>
- <CAL_JsqJ2JRg7k21CEVe4-At7enD+y3TN_7wfqhY0OHZm-_j17w@mail.gmail.com>
- <544F7E5D.60104@redhat.com> <5450CAA5.5020205@ti.com>
- <CAL_JsqKWqq+H5ymUW3n8tkmLJHEUGaKDLX5+orJmGUQ3ECQwUQ@mail.gmail.com>
-Message-ID: <20141111214950.7FCABC41610@trevor.secretlab.ca>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 11 Nov 2014 22:51:36 +0100
+Subject: [PATCH 4/6] i2c: busses: add SLIMpro I2C device driver on APM
+ X-Gene platform
+In-Reply-To: <1412726809-7525-5-git-send-email-fkan@apm.com>
+References: <1412726809-7525-1-git-send-email-fkan@apm.com>
+ <1412726809-7525-5-git-send-email-fkan@apm.com>
+Message-ID: <1894616.4yY7dajl4R@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 1 Nov 2014 04:47:56 +0800
-, Rob Herring <robherring2@gmail.com>
- wrote:
-> On Wed, Oct 29, 2014 at 7:08 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> > Hi Hans, Rob,
-> >
-> > On 28/10/14 13:30, Hans de Goede wrote:
-> >> Hi,
-> >>
-> >> On 10/28/2014 12:11 PM, Rob Herring wrote:
-> >
-> >>> Yes, I object to the binding still as it has not changed from what was
-> >>> previously posted.
-> >>
-> >> It would be helpful if you could explain why you object. Last time you
-> >> said: " You are mixing in a hardware description that is simply inaccurate."
-> >>
-> >> I then explained that this is not hardware description, but runtime state
-> >> information, as it tells the kernel which clocks were chosen to drive the
-> >> display (out of typically a list of possible options, depending on which
-> >> output is used, etc.). Just like which memory address the bootloader has
-> >> chosen to scan out the video image from.
-> >>
-> >> Then you got quiet, so sorry, but this time your objection really is too
-> >> late. You cannot simply go quiet halfway through a discussion and then pop
-> >> up again when a new version is posted to say "I object" yet another time,
-> >> you've had your chance to make your arguments last time, and chose to stay
-> >> quiet after I explained in detail that this is not hardware description but
-> >> state information, so now it is simply too late.
-> >>
-> >> These bindings have been discussed at Plumbers with various interested people
-> >> present, and the conclusion was that this really is the best way to handle this,
-> >> so this patch is:
-> >>
-> >>     Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>     Reviewed-by: Mike Turquette <mturquette@linaro.org>
-> >>     Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> >>     Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >>
-> >> And David Herrman who is working on simpledrm, which will be merged soon, which
-> >> will also use the simplefb bindings also agrees. So we have the simplefb maintainer,
-> >> simpledrm maintainer, and the clk subsystem maintainer + 2 other maintainers all
-> >> agreeing on a way forward, the time for bikeshedding now really really really is
-> >> over.
-> >>
-> >> Tomi, can you please let us know how you plan to proceed with this ?
-> >
-> > I won't merge DT bindings via fbdev tree, if a DT maintainer says no.
-> >
-> > I took Rob's silence to the earlier series as a silent ack for your
-> > explanation. Obviously that was not the case.
-> >
-> > Rob, please advice asap what should be done to the bindings to get your
-> > ack. As Hans explained above, this discussion has been going on for a
-> > long time, and afaik this series is the best way forward of all the
-> > options discussed.
-> 
-> I still think for the most part this is a kernel problem. It is a
-> kernel policy to turn off unused clocks. The clock framework could
-> just as easily decide that any clocks enabled at boot and left
-> un-managed (i.e. w/o a driver) are kept on until they are managed. I'm
-> not saying this can't be in DT, only that DT is not the only solution
-> here. This problem is not unique to simplefb. A serial console could
-> stop working if no serial driver is loaded before unused clocks are
-> disabled. CPU core clocks have a similar issue as well (often enabled
-> in platform code). I want to see this solved in a generic way for any
-> clock.
+On Tuesday 07 October 2014 17:06:47 Feng Kan wrote:
+> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+> index 2e45ae3..a03042c 100644
+> --- a/drivers/i2c/busses/Kconfig
+> +++ b/drivers/i2c/busses/Kconfig
+> @@ -1009,6 +1009,15 @@ config I2C_CROS_EC_TUNNEL
+>  	  connected there. This will work whatever the interface used to
+>  	  talk to the EC (SPI, I2C or LPC).
+>  
+> +config I2C_XGENE_SLIMPRO
+> +	tristate "APM X-Gene SoC I2C SLIMpro devices support"
+> +	depends on ARCH_XGENE && XGENE_SLIMPRO_MBOX
 
-I've spent most of today rereading the entire thread and thinking about
-this issue. Given that the clock binding is a well established core
-binding at this point, it is entirely reasonable for a generic driver to
-have part of the binding specify the clock resources that it depends on
-to keep working. The binding needs to be very clear that it is a mere
-dependency, and that the OS must not make any attempt to modify the
-clock settings, but it is reasonable indicate to the OS that the clocks
-are used by the firmware framebuffer, and turning them off will cause
-the framebuffer will break. The best place to provide that guidance is
-directly in the node.
+Why this dependency on XGENE_SLIMPRO_MBOX?
 
-If we were talking about a resource that didn't have a well established
-binding, ie, the video path configuration, then I'd still say no way
-because there is no way to do it generically. Claiming clocks on the
-other hand is straight forward and simple.
+Better replace it with a dependency on MAILBOX.
 
-Aside from wanting the documentation to be more explicit about what the
-driver does with the clocks, I don't have a problem with doing it.
+> +	} else {
+> +		spin_lock_irqsave(&ctx->lock, flags);
+> +		ctx->i2c_rx_poll = 1;
+> +		for (count = SLIMPRO_I2C_WAIT_COUNT; count > 0; count--) {
+> +			if (ctx->i2c_rx_poll == 0)
+> +				break;
+> +			udelay(100);
+> +		}
 
-However, I am concerned about handover. I've lost track over the entire
-thread on whether the handover mechanism has been resolved, and I would
-really like to have a proposed solution to this documented in the
-binding. The fact that there is nothing tying the simple framebuffer to
-the actual hardware backing the framebuffer is concerning. It means the
-kernel needs to guess which graphics device is associated with the
-framebuffer.
+No, you can't block the CPU for an extended amount of time with
+interrupts disabled. Please kill this code.
 
-The best solution in my opinion is to embed the simplefb properties
-directly into the graphics device node (Yes, I know some have argued
-that the graphics subsystem is composed of multiple devices; That
-doesn't matter. Just choose one of the device nodes; the device that
-actually DMAs the video buffer is probably the correct choice). That
-makes it crystal clear which graphics controller owns the framebuffer.
-There is precedence in DT bindings for putting current state into the
-tree. offb.c is trying to solve the exact same problem. It also means
-that we can use the driver model to provide mutual exclusion between
-probing simplefb and a full-featured driver.
+> +	ctx->resp_msg = data;
+> +	if (ctx->mbox_client.tx_block)
+> +		init_completion(&ctx->rd_complete);
 
-That approach would require some modifications of the binding to make
-sure properties don't conflict with the device specific properties. The
-easiest way is to allow the properties to live in a sub node so that the
-reg property doesn't conflict.
+reinit_completion()?
 
-However, I'm not stuck on this approach. The solution must be
-unambiguious, and the handover mechanism must be thought through, but it
-doesn't /have/ to be what I suggested above if a proposal that can be
-well argued as better.
+> +static int slimpro_i2c_blkrd(struct slimpro_i2c_dev *ctx, u32 chip, u32 addr,
+> +				u32 addrlen, u32 protocol, u32 readlen,
+> +				u32 with_data_len, void *data)
+> +{
+> +	dma_addr_t paddr;
+> +	u32 msg[3];
+> +	int rc;
+> +
+> +	paddr = dma_map_single(ctx->dev, ctx->dma_buffer, readlen,
+> +			       DMA_FROM_DEVICE);
 
-Hans, let's talk about this tomorrow. #devicetree on freenode? It looks like
-I'm committed to volunteer at my daughters school tomorrow morning, but
-the afternoon looks good.
+ctx->dev is probably the wrong device here. The i2c controller is not
+DMA capable itself, you need to have a pointer to the device that actually
+performs the DMA here.
 
-g.
+
+> +	/* Request mailbox channel */
+> +	cl->dev = &pdev->dev;
+> +	cl->rx_callback = slimpro_i2c_rx_cb;
+> +	cl->tx_done = slimpro_i2c_tx_done;
+> +	cl->tx_block = true;
+> +	cl->tx_tout = SLIMPRO_OP_TO_MS;
+> +	cl->knows_txdone = false;
+> +	cl->chan_name = "i2c-slimpro";
+> +	ctx->mbox_chan = mbox_request_channel(cl);
+
+This is not the correct interface.
+
+> +	rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+> +	if (rc)
+> +		dev_warn(&pdev->dev, "Unable to set dma mask\n");
+
+Are you sure that this is the correct device to perform the DMA?
+
+Moreover, the mask doesn't match the usage: the slimpro_i2c_blkrd
+function passes in only the lower 32 bit of the address, which would
+be DMA_BIT_MASK(32).
+
+> +#ifdef CONFIG_OF
+> +static struct of_device_id xgene_slimpro_i2c_id[] = {
+> +	{.compatible = "apm,xgene-slimpro-i2c" },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, xgene_slimpro_i2c_dt_ids);
+> +#endif
+> +
+> +static struct platform_driver xgene_slimpro_i2c_driver = {
+> +	.probe	= xgene_slimpro_i2c_probe,
+> +	.remove	= xgene_slimpro_i2c_remove,
+> +	.driver	= {
+> +		.name	= XGENE_SLIMPRO_I2C,
+> +		.owner	= THIS_MODULE,
+> +		.of_match_table = of_match_ptr(xgene_slimpro_i2c_id)
+> +	},
+> +};
+
+The driver only supports DT, so just drop the #ifdef and the of_match_ptr().
