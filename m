@@ -1,44 +1,61 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 11 Nov 2014 01:40:29 +0100
-Subject: [PATCH v7 0/5] This is the 1st version of suspend for RK3288.
-In-Reply-To: <7hwq76pqyz.fsf@deeprootsystems.com>
-References: <1415368177-6637-1-git-send-email-zyw@rock-chips.com>
- <7hwq76pqyz.fsf@deeprootsystems.com>
-Message-ID: <22835729.YDXmW0qp6M@diego>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Tue, 11 Nov 2014 00:53:58 +0000
+Subject: [PATCH v4] i2c/at91: adopt pinctrl support
+In-Reply-To: <54609DD8.8030903@cogentembedded.com>
+References: <1415584552-11390-1-git-send-email-wenyou.yang@atmel.com>
+ <54609DD8.8030903@cogentembedded.com>
+Message-ID: <B256D81BAE5131468A838E5D7A243641BFC71DAA@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+Hi,
 
-Am Freitag, 7. November 2014, 14:48:20 schrieb Kevin Hilman:
-> Chris Zhong <zyw@rock-chips.com> writes:
-> > RK3288 can shut down the cpu, gpu and other device controllers in suspend,
-> > and it will pull the GLOBAL_PWROFF pin to high in the final stage of the
-> > process of suspend, pull the pin to low again when resume.
+> -----Original Message-----
+> From: Sergei Shtylyov [mailto:sergei.shtylyov at cogentembedded.com]
+> Sent: Monday, November 10, 2014 7:13 PM
+> To: Yang, Wenyou; wsa at the-dreams.de; Desroches, Ludovic
+> Cc: khilman at kernel.org; Ferre, Nicolas; linux-kernel at vger.kernel.org; linux-
+> i2c at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v4] i2c/at91: adopt pinctrl support
 > 
-> The cover letter still doesn't state what this series applies to, or
-> what its dependencies are for testing, even though it was requested in
-> earlier reviews[1].  I discovered (again) by trial and error it applies
-> to current linux-next.  I also discovered (as was earlier discussed[2])
-> that it still does not resume using current upstream code, and those
-> dependencies are not described here either.  These are the kinds of
-> things that are crucial in a cover letter in order to help reviewers and
-> testers not have to spend time digging through the archives trying to
-> remember from the previous round of reviews.
+> Hello.
 > 
-> Please, please list the out-of-tree dependencies, and how to test,
-> including how you tested it, and on what hardware.
+> On 11/10/2014 4:55 AM, Wenyou Yang wrote:
+> 
+> > Amend the at91 i2c pin controller
+> 
+>     You're amending the hardware itself, really? :-)
+> 
+> > to optionally take a pin controlhandle
+> 
+>     I don't see the code that does this.
+> 
+> > and set the state of the pins to:
+> > - "default" on boot and resume.
+> 
+>     I don't see where you are changing anything for the probe() method.
+> Perhaps you meant the driver core code which selects the dafault profile
+> automatically?
+Yes, the driver core code default do, so remove the redundant code from _probe function.
 
-I'll second what Kevin said.
+> 
+> > - "sleep" on suspend().
+> 
+> > This should make it possible to optimize energy usage for the pins
+> > both for the suspend/resume cycle
+> 
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > ---
+> > Hi Wolfram,
+> >
+> > Thanks a lot.
+> >
+> > The change of this version is to remove
+> > 	pinctrl_pm_select_default_state(&pdev->dev) from the _probe function.
+> 
+>     Aha, you've specifically removed this...
+> 
+> WBR, Sergei
 
-I guess the regulator suspend handling [0] is one of the requirements, but I'd 
-think there is more. And while Doug had a quite long list of suspend-related 
-patches in his try, for now we'll need the minimal set to enable this series 
-to sucessfully wake the system again after going to suspend.
-
-
-Heiko
-
-
-[0] 
-https://git.kernel.org/cgit/linux/kernel/git/broonie/regulator.git/log/?h=topic/suspend
+Best Regards,
+Wenyou Yang
