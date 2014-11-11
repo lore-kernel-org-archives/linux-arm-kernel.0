@@ -1,55 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 11 Nov 2014 08:53:58 -0800
-Subject: [GIT PULL] omap fixes against v3.18-rc4
-Message-ID: <20141111165357.GB26481@atomide.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 12 Nov 2014 00:53:07 +0800
+Subject: [PATCH resend 0/4] clk: sunxi: Unify sun4i apb1 clock
+In-Reply-To: <20141111145519.GI14919@lukather>
+References: <1415245232-20585-1-git-send-email-wens@csie.org>
+ <20141111145519.GI14919@lukather>
+Message-ID: <CAGb2v679z_9xt4kbpegodbBTKJTKAq2Ygz7J22as0D9QsHEc=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 4b91f7f3c8b20e073b7bfc098625b37f99789508:
+On Tue, Nov 11, 2014 at 10:55 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Thu, Nov 06, 2014 at 11:40:28AM +0800, Chen-Yu Tsai wrote:
+>> (resent with linux-arm-kernel CCed)
+>>
+>> Hi everyone,
+>>
+>> This series unifies the apb1 clock driver for sun4i, which was
+>> previously split into apb1-mux and apb1. This also fixes the
+>> apb2 clock on sun6i/sun8i, which we now have documents for.
+>>
+>> The first 2 patches were done by Emilio.
+>>
+>> Patch 1 unifies the apb1-mux and apb1 clock drivers using a
+>> factors clock.
+>>
+>> Patch 2 unifies said clocks in the dtsi.
+>>
+>> Patch 3 switches the compatibles for apb2 clock on sun6i/sun8i to
+>> the unified sun4i apb1 clock.
+>>
+>> Patch 4 gets rid of the incorrect and now unused sun6i apb2 clock
+>> driver.
+>
+> Merged all the patches, thanks!
 
-  ARM: OMAP2+: Warn about deprecated legacy booting mode (2014-10-29 12:19:20 -0700)
+Thanks! I'll send out sun6i ahb1 unification v3 later.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-against-v3.18-rc4
-
-for you to fetch changes up to 73b3a6657a88ef5348a0d69c9a8107d6f01ae862:
-
-  pinctrl: dra: dt-bindings: Fix output pull up/down (2014-11-10 14:29:20 -0800)
-
-----------------------------------------------------------------
-Few omap fixes for hangs and wrong pinctrl defines, and update
-MAINTAINERS file to avoid missing PMIC and SoC related patches:
-
-- Fix random hangs on am437x because of incorrect default
-  value for the DDR regulator
-
-- Fix wrong partition name for NAND on am335x-evm
-
-- Fix wrong pinctrl defines for dra7xx
-
-- Update maintainers entries for PMICs and SoCs
-
-----------------------------------------------------------------
-Felipe Balbi (1):
-      MAINTAINERS: add more files under OMAP SUPPORT
-
-Keerthy (3):
-      ARM: dts: AM43x-EPOS-EVM: Fix DCDC3 voltage
-      ARM: dts: AM437x-GP-EVM: Fix DCDC3 voltage
-      ARM: dts: AM437x-SK-EVM: Fix DCDC3 voltage
-
-Nishanth Menon (1):
-      MAINTAINERS: Update entry for omap related .dts files to cover new SoCs
-
-Roger Quadros (2):
-      ARM: dts: am335x-evm: Fix 5th NAND partition's name
-      pinctrl: dra: dt-bindings: Fix output pull up/down
-
- MAINTAINERS                          | 20 ++++++++++++++++++++
- arch/arm/boot/dts/am335x-evm.dts     |  2 +-
- arch/arm/boot/dts/am437x-gp-evm.dts  |  4 ++--
- arch/arm/boot/dts/am437x-sk-evm.dts  |  4 ++--
- arch/arm/boot/dts/am43x-epos-evm.dts |  4 ++--
- include/dt-bindings/pinctrl/dra.h    |  4 ++--
- 6 files changed, 29 insertions(+), 9 deletions(-)
+ChenYu
