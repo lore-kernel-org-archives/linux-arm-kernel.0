@@ -1,39 +1,66 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 11 Nov 2014 13:59:47 +0800
-Subject: [PATCH 0/3] irqchip: dw-apb-ictl: IRQ_GC_MASK_CACHE_PER_TYPE
- and PM support
-In-Reply-To: <1411454100-6814-1-git-send-email-jszhang@marvell.com>
-References: <1411454100-6814-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20141111135947.393a6d78@xhacker>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 10 Nov 2014 22:15:23 -0800
+Subject: [RESENDv5] serial: of-serial: fix up PM ops on no_console_suspend
+ and port type
+In-Reply-To: <bc2787a32b4d41a79acf582433831510@BN3PR0301MB1236.namprd03.prod.outlook.com>
+References: <1414401857-21121-1-git-send-email-jingchang.lu@freescale.com>
+ <CAGVrzcamoYbdPijWtrU=ge+UE+g9zBHAG84PJB7G3EyA09jBWg@mail.gmail.com>
+ <20141111052720.GC24727@kroah.com>
+ <bc2787a32b4d41a79acf582433831510@BN3PR0301MB1236.namprd03.prod.outlook.com>
+Message-ID: <CAGVrzcb__HxFe3z9oM9WS7_ZnvCMkAsNt+FU6N4m-9Som-LJAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Thomas, Jason,
+2014-11-10 21:41 GMT-08:00 Jingchang Lu <jingchang.lu@freescale.com>:
+>
+>
+>>-----Original Message-----
+>>From: Greg KH [mailto:gregkh at linuxfoundation.org]
+>>Sent: Tuesday, November 11, 2014 1:27 PM
+>>To: Florian Fainelli
+>>Cc: Lu Jingchang-B35083; linux-arm-kernel at lists.infradead.org; linux-
+>>kernel at vger.kernel.org; linux-serial at vger.kernel.org
+>>Subject: Re: [RESENDv5] serial: of-serial: fix up PM ops on
+>>no_console_suspend and port type
+>>
+>>On Mon, Nov 10, 2014 at 08:30:36PM -0800, Florian Fainelli wrote:
+>>> 2014-10-27 2:24 GMT-07:00 Jingchang Lu <jingchang.lu@freescale.com>:
+>>> > This patch fixes commit 2dea53bf57783f243c892e99c10c6921e956aa7e,
+>>> > "serial: of-serial: add PM suspend/resume support", which disables
+>>> > the uart clock on suspend, but also causes a hardware hang on
+>>> > register access if no_console_suspend command line option is used.
+>>> >
+>>> > Also, not every of_serial device is an 8250 port, so the serial8250
+>>> > suspend/resume functions should only be applied to a real 8250 port.
+>>>
+>>> Greg, can you pick this one and submit it for your next 3.18-rc
+>>> submission? This fixes a regression when using "no_console_suspend"
+>>> introduced by:
+>>>
+>>> 2dea53bf57783f243c892e99c10c6921e956aa7e ("serial: of-serial: add PM
+>>> suspend/resume support") which has been merged during 3.18-rc1
+>>
+>>Why can't I just revert that patch instead?  This is really late in the -
+>>rc cycle to be doing large fixes like this.
+>>
+>>And this patch is already queued up for 3.19-rc1, so this is a mess...
+>>
+>>Any objection to me just reverting
+>>2dea53bf57783f243c892e99c10c6921e956aa7e, and then this one in my tty-next
+>>branch as well, and then someone resending the original patch in a format
+>>that actually works?
+> Do you mean resending the "serial: of-serial: add PM suspend/resume support"
+> patch with "serial: of-serial: fix up PM ops on no_console_suspend and port type"
+> merged together? For you would like to reverting the previous patch of
+> "2dea53bf57783f243c892e99c10c6921e956aa7e".
 
-Is there any potential issue with this patch serials I need to resolve?
+That is how I understand Greg's suggestion. While you are at it you
+might want to introduce a space between the 'switch' keyword and the
+open-parenthesis in the two call sites that you added. Feel free to
+add my:
 
-Thanks in advance,
-Jisheng
+Tested-by: Florina Fainelli <f.fainelli@gmail.com>
 
-On Mon, 22 Sep 2014 23:34:57 -0700
-Jisheng Zhang <jszhang@marvell.com> wrote:
-
-> These patches try to improve dw-apb-ictl irqchip driver a bit.
-> 
-> The first patch does a bit clean up work -- unify the register access usage.
-> 
-> The two dw-apb-ictl's irq_chip_type instances have separate mask registers,
-> so the second patch enables IRQ_GC_MASK_CACHE_PER_TYPE.
-> 
-> The last patch adds suspend/resume support to the driver.
-> 
-> Tested on Marvell BG2Q-DMP board.
-> 
-> Jisheng Zhang (3):
->   irqchip: dw-apb-ictl: always use use {readl|writel}_relaxed
->   irqchip: dw-apb-ictl: enable IRQ_GC_MASK_CACHE_PER_TYPE
->   irqchip: dw-apb-ictl: add PM support
-> 
->  drivers/irqchip/irq-dw-apb-ictl.c | 32 ++++++++++++++++++++++++++------
->  1 file changed, 26 insertions(+), 6 deletions(-)
-> 
+since I use your v5 patch locally, thanks!
+--
+Florian
