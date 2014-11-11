@@ -1,113 +1,89 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 11 Nov 2014 16:25:46 +0100
-Subject: [PATCH v3] of/fdt: export fdt blob as /sys/firmware/fdt
-Message-ID: <1415719546-14076-1-git-send-email-ard.biesheuvel@linaro.org>
+From: vigneshr@ti.com (R, Vignesh)
+Date: Tue, 11 Nov 2014 15:26:19 +0000
+Subject: [PATCH v3 3/6] mfd: ti_am335x_tscadc: Remove unwanted
+ reg_se_cache save
+In-Reply-To: <20141111122623.GA24004@x1>
+References: <1415694844-11230-1-git-send-email-vigneshr@ti.com>
+ <1415694844-11230-4-git-send-email-vigneshr@ti.com>
+ <20141111122623.GA24004@x1>
+Message-ID: <71C24A547111EA4E84AE759B748D9EAE4B976C@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a new /sys entry '/sys/firmware/fdt' to export the FDT blob
-that was passed to the kernel by the bootloader. This allows userland
-applications such as kexec to access the raw binary.
 
-The fact that this node does not reside under /sys/firmware/device-tree
-is deliberate: FDT is also used on arm64 UEFI/ACPI systems to
-communicate just the UEFI and ACPI entry points, but the FDT is never
-unflattened and used to configure the system.
+On Tue, 11 Nov 2014, Vignesh R wrote:
 
-A CRC32 checksum is calculated over the entire FDT blob, and verified
-at late_initcall time. The sysfs entry is instantiated only if the
-checksum is valid, i.e., if the FDT blob has not been modified in the
-mean time. Otherwise, a warning is printed.
+> In one shot mode, sequencer automatically disables all enabled steps 
+> at the end of each cycle. (both ADC steps and TSC steps) Hence these 
+> steps need not be saved in reg_se_cache for clearing these steps at a 
+> later stage.
+> Also, when ADC wakes up Sequencer should not be busy executing any of 
+> the config steps except for the charge step. Previously charge step 
+> was 1 ADC clock cycle and hence it was ignored.
+> 
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v3: keep checksum instead of copying the entire blob, and WARN on mismatch
+You need to provide a changelog here when submitting new versions.
 
- drivers/of/Kconfig |  1 +
- drivers/of/fdt.c   | 36 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 37 insertions(+)
+I have included changelog in the cover page. Will include them in 
+individual patches next time.
 
-diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-index 1a13f5b722c5..0348c208343c 100644
---- a/drivers/of/Kconfig
-+++ b/drivers/of/Kconfig
-@@ -23,6 +23,7 @@ config OF_FLATTREE
- 	bool
- 	select DTC
- 	select LIBFDT
-+	select CRC32
- 
- config OF_EARLY_FLATTREE
- 	bool
-diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index d1ffca8b34ea..6742b6ae1b89 100644
---- a/drivers/of/fdt.c
-+++ b/drivers/of/fdt.c
-@@ -9,6 +9,7 @@
-  * version 2 as published by the Free Software Foundation.
-  */
- 
-+#include <linux/crc32.h>
- #include <linux/kernel.h>
- #include <linux/initrd.h>
- #include <linux/memblock.h>
-@@ -22,10 +23,20 @@
- #include <linux/libfdt.h>
- #include <linux/debugfs.h>
- #include <linux/serial_core.h>
-+#include <linux/sysfs.h>
- 
- #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
- #include <asm/page.h>
- 
-+static u32 of_fdt_crc32;
-+
-+static u32 of_fdt_get_crc32(void *fdt)
-+{
-+	static u32 const OF_FDT_CRC32_SEED = 0x04c11db7;
-+
-+	return crc32_be(OF_FDT_CRC32_SEED, fdt, fdt_totalsize(fdt));
-+}
-+
- /*
-  * of_fdt_limit_memory - limit the number of regions in the /memory node
-  * @limit: maximum entries
-@@ -1003,6 +1014,8 @@ bool __init early_init_dt_verify(void *params)
- 		return false;
- 	}
- 
-+	of_fdt_crc32 = of_fdt_get_crc32(initial_boot_params);
-+
- 	return true;
- }
- 
-@@ -1103,4 +1116,27 @@ static int __init of_flat_dt_debugfs_export_fdt(void)
- module_init(of_flat_dt_debugfs_export_fdt);
- #endif
- 
-+#ifdef CONFIG_SYSFS
-+static ssize_t of_fdt_raw_read(struct file *filp, struct kobject *kobj,
-+			       struct bin_attribute *bin_attr,
-+			       char *buf, loff_t off, size_t count)
-+{
-+	memcpy(buf, initial_boot_params + off, count);
-+	return count;
-+}
-+
-+static int __init of_fdt_raw_init(void)
-+{
-+	static struct bin_attribute of_fdt_raw_attr =
-+		__BIN_ATTR(fdt, S_IRUSR, of_fdt_raw_read, NULL, 0);
-+
-+	if (WARN(of_fdt_crc32 != of_fdt_get_crc32(initial_boot_params),
-+		 "CRC check failed on binary FDT"))
-+		return -EFAULT;
-+	of_fdt_raw_attr.size = fdt_totalsize(initial_boot_params);
-+	return sysfs_create_bin_file(firmware_kobj, &of_fdt_raw_attr);
-+}
-+late_initcall(of_fdt_raw_init);
-+#endif
-+
- #endif /* CONFIG_OF_EARLY_FLATTREE */
--- 
-1.8.3.2
+>  drivers/mfd/ti_am335x_tscadc.c       | 7 +++++--
+>  include/linux/mfd/ti_am335x_tscadc.h | 1 +
+>  2 files changed, 6 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mfd/ti_am335x_tscadc.c 
+> b/drivers/mfd/ti_am335x_tscadc.c index d877e777cce6..110038859a8d 
+> 100644
+> --- a/drivers/mfd/ti_am335x_tscadc.c
+> +++ b/drivers/mfd/ti_am335x_tscadc.c
+> @@ -86,8 +86,12 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
+>  		spin_lock_irq(&tsadc->reg_lock);
+>  		finish_wait(&tsadc->reg_se_wait, &wait);
+>  
+> +		/*
+> +		 * Sequencer should either be idle or
+> +		 * busy applying the charge step.
+> +		 */
+>  		reg = tscadc_readl(tsadc, REG_ADCFSM);
+> -		WARN_ON(reg & SEQ_STATUS);
+> +		WARN_ON((reg & SEQ_STATUS) && !(reg & CHARGE_STEP));
+>  		tsadc->adc_waiting = false;
+>  	}
+>  	tsadc->adc_in_use = true;
+> @@ -96,7 +100,6 @@ static void am335x_tscadc_need_adc(struct 
+> ti_tscadc_dev *tsadc)  void am335x_tsc_se_set_once(struct 
+> ti_tscadc_dev *tsadc, u32 val)  {
+>  	spin_lock_irq(&tsadc->reg_lock);
+> -	tsadc->reg_se_cache |= val;
+
+You didn't answer my question about this?
+I did reply to the question in the previous thread.  
+
+Previously, TSC did not reliably re-enable its steps as the TSC irq handler received 
+false pen up events. Hence, in order to use TSC after ADC operation, it was necessary to
+ save and re-enable TSC steps (basically, to keep TSC steps enabled always).
+The change was more of a workaround to overcome limitation of TSC irq handler. With 
+this series of patches, TSC irq handler is very reliable and the workaround is no longer required.
+
+>  	am335x_tscadc_need_adc(tsadc);
+>  
+>  	tscadc_writel(tsadc, REG_SE, val);
+> diff --git a/include/linux/mfd/ti_am335x_tscadc.h 
+> b/include/linux/mfd/ti_am335x_tscadc.h
+> index c99be5dc0f5c..fcce182e4a35 100644
+> --- a/include/linux/mfd/ti_am335x_tscadc.h
+> +++ b/include/linux/mfd/ti_am335x_tscadc.h
+> @@ -128,6 +128,7 @@
+>  
+>  /* Sequencer Status */
+>  #define SEQ_STATUS BIT(5)
+> +#define CHARGE_STEP		0x11
+>  
+>  #define ADC_CLK			3000000
+>  #define TOTAL_STEPS		16
+
+--
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead Linaro.org ? Open source software for ARM SoCs Follow Linaro: Facebook | Twitter | Blog
