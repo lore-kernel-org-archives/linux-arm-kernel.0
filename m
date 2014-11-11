@@ -1,47 +1,55 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 11 Nov 2014 08:53:13 -0800
-Subject: [PATCH v10 2/3] power-domain: rockchip: add power doamin driver
-In-Reply-To: <1415690392-9278-3-git-send-email-caesar.wang@rock-chips.com>
- (Caesar Wang's message of "Tue, 11 Nov 2014 15:19:51 +0800")
-References: <1415690392-9278-1-git-send-email-caesar.wang@rock-chips.com>
- <1415690392-9278-3-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <7h7fz1of0m.fsf@deeprootsystems.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 11 Nov 2014 08:53:58 -0800
+Subject: [GIT PULL] omap fixes against v3.18-rc4
+Message-ID: <20141111165357.GB26481@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Caesar Wang <caesar.wang@rock-chips.com> writes:
+The following changes since commit 4b91f7f3c8b20e073b7bfc098625b37f99789508:
 
-> In order to meet high performance and low power requirements, a power
-> management unit is designed or saving power when RK3288 in low power mode.
-> The RK3288 PMU is dedicated for managing the power ot the whole chip.
->
-> Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
-> Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
-> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
->
-> ---
->
-> Changes in v10:
->     - this switches over domain infos to use masks instead of recomputing
->       them each time and also gets rid of custom domain translator and
->       uses standard onecell on.
->
-> Changes in v9:
->     - fix v8 changes as follows:
->     - This reconciles the v2 and v7 code so that we power domain have
->       lists of clocks they toggle on and off during power transitions and
->       independently from power domains clocks we attach clocks to devices
->       comprising power domain and prepare them so they are turn on and off
->       by runtime PM.
+  ARM: OMAP2+: Warn about deprecated legacy booting mode (2014-10-29 12:19:20 -0700)
 
-I still don't like having lists of clocks in the power-domain DT. 
+are available in the git repository at:
 
-DT is supposed to describe the hardware, and clocks are properties of
-devices, not power-domains, so the DT description should follow from that.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-against-v3.18-rc4
 
-I understand that some device may not be probed etc. when a power-domain
-needs to transition, but the power-domain driver can still get the list
-of clocks it needs from the device nodes within the domain, so it
-shouldn't matter whether devices are probed or not.
+for you to fetch changes up to 73b3a6657a88ef5348a0d69c9a8107d6f01ae862:
 
-Kevin
+  pinctrl: dra: dt-bindings: Fix output pull up/down (2014-11-10 14:29:20 -0800)
+
+----------------------------------------------------------------
+Few omap fixes for hangs and wrong pinctrl defines, and update
+MAINTAINERS file to avoid missing PMIC and SoC related patches:
+
+- Fix random hangs on am437x because of incorrect default
+  value for the DDR regulator
+
+- Fix wrong partition name for NAND on am335x-evm
+
+- Fix wrong pinctrl defines for dra7xx
+
+- Update maintainers entries for PMICs and SoCs
+
+----------------------------------------------------------------
+Felipe Balbi (1):
+      MAINTAINERS: add more files under OMAP SUPPORT
+
+Keerthy (3):
+      ARM: dts: AM43x-EPOS-EVM: Fix DCDC3 voltage
+      ARM: dts: AM437x-GP-EVM: Fix DCDC3 voltage
+      ARM: dts: AM437x-SK-EVM: Fix DCDC3 voltage
+
+Nishanth Menon (1):
+      MAINTAINERS: Update entry for omap related .dts files to cover new SoCs
+
+Roger Quadros (2):
+      ARM: dts: am335x-evm: Fix 5th NAND partition's name
+      pinctrl: dra: dt-bindings: Fix output pull up/down
+
+ MAINTAINERS                          | 20 ++++++++++++++++++++
+ arch/arm/boot/dts/am335x-evm.dts     |  2 +-
+ arch/arm/boot/dts/am437x-gp-evm.dts  |  4 ++--
+ arch/arm/boot/dts/am437x-sk-evm.dts  |  4 ++--
+ arch/arm/boot/dts/am43x-epos-evm.dts |  4 ++--
+ include/dt-bindings/pinctrl/dra.h    |  4 ++--
+ 6 files changed, 29 insertions(+), 9 deletions(-)
