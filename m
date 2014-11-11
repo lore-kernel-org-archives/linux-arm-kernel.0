@@ -1,77 +1,61 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 12 Nov 2014 00:23:07 +0100
-Subject: [PATCH v3 4/5] ARM: berlin: Add AHCI and SATA PHY nodes to BG2
-In-Reply-To: <1414664488-5911-5-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1413882477-27922-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1414664488-5911-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1414664488-5911-5-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <54629A5B.9050209@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 11 Nov 2014 16:39:54 -0700
+Subject: [PATCH] ARM: dts: tegra: move serial aliases to per-board
+In-Reply-To: <CAOesGMh_8Ft=DKqm=e0fQdREC4aLmAAp3N0QyNsqWn2_rCbmnA@mail.gmail.com>
+References: <1415738970-7963-1-git-send-email-olof@lixom.net>	<54627C1F.9050200@wwwdotorg.org>
+ <CAOesGMh_8Ft=DKqm=e0fQdREC4aLmAAp3N0QyNsqWn2_rCbmnA@mail.gmail.com>
+Message-ID: <54629E4A.7050201@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.10.2014 11:21, Sebastian Hesselbarth wrote:
-> Add DT nodes for the AHCI controller and SATA PHY found on Marvell
-> Berlin2 SoCs.
+On 11/11/2014 03:45 PM, Olof Johansson wrote:
+> [again in plain text mode. Sigh]
 >
-> Acked-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>
+> On Tue, Nov 11, 2014 at 1:14 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 11/11/2014 01:49 PM, Olof Johansson wrote:
+>>>
+>>> There are general changes pending to make the /aliases/serial* entries
+>>> number the serial ports on the system. On tegra, so far the ports have
+>>> been
+>>> just numbered dynamically as they are configured so that makes them
+>>> change.
+>>>
+>>> To avoid this, add specific aliases per board to keep the old numbers.
+>>> This
+>>> allows us to change the numbering by default on future SoCs while keeping
+>>> the
+>>> numbering on existing boards.
+>>
+>>
+>> This change seems mostly OK to me. FWIW though, I had suggested this
+>> approach when the UART aliases were first added, and Laxman disagreed with
+>> it. See commit b6551bb933f9 "ARM: tegra: dts: add aliases and DMA requestor
+>> for serial controller", and its discussion:
+>> https://lkml.org/lkml/2012/12/25/4. I've CC'd Laxman in case he still
+>> objects.
+>>
+>>> Signed-off-by: Olof Johansson <olof@lixom.net>
+>>> ---
+>>>
+>>> Stephen/Thierry/Alex, as noticed this week we really should try to get
+>>> this in before the 3.19 merge window so that the global aliases change
+>>> can happen there without regression.
+>>
+>>
+>> How did we resolve the issue that patch causes with old DTs; namely that it
+>> causes a change in behaviour for those old DTs? On IRC, I'd wondered whether
+>> we should set a flag so the kernel ignored aliases for boards containing
+>> currently upstreamed Tegra SoCs so that issue wouldn't occur. If we did
+>> that, we wouldn't need this patch.
+>
+> Another way could be to remove aliases from the kernel side during
+> booting if they're found. Anyway, feel free to send a patch to do that
+> if that's your preference.
 
-Applied both DT patches to berlin/dt.
+That would work too.
 
-Sebastian
-
-> ---
->   arch/arm/boot/dts/berlin2.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
->   1 file changed, 39 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
-> index 9d7c810ebd0b..f39090491eb2 100644
-> --- a/arch/arm/boot/dts/berlin2.dtsi
-> +++ b/arch/arm/boot/dts/berlin2.dtsi
-> @@ -246,6 +246,45 @@
->   			};
->   		};
->
-> +		ahci: sata at e90000 {
-> +			compatible = "marvell,berlin2-ahci", "generic-ahci";
-> +			reg = <0xe90000 0x1000>;
-> +			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&chip CLKID_SATA>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			sata0: sata-port at 0 {
-> +				reg = <0>;
-> +				phys = <&sata_phy 0>;
-> +				status = "disabled";
-> +			};
-> +
-> +			sata1: sata-port at 1 {
-> +				reg = <1>;
-> +				phys = <&sata_phy 1>;
-> +				status = "disabled";
-> +			};
-> +		};
-> +
-> +		sata_phy: phy at e900a0 {
-> +			compatible = "marvell,berlin2-sata-phy";
-> +			reg = <0xe900a0 0x200>;
-> +			clocks = <&chip CLKID_SATA>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			#phy-cells = <1>;
-> +			status = "disabled";
-> +
-> +			sata-phy at 0 {
-> +				reg = <0>;
-> +			};
-> +
-> +			sata-phy at 1 {
-> +				reg = <1>;
-> +			};
-> +		};
-> +
->   		chip: chip-control at ea0000 {
->   			compatible = "marvell,berlin2-chip-ctrl";
->   			#clock-cells = <1>;
->
+I'll let Thierry make the call re: whether it's important to support old 
+DTs with the current aliase content without a change in device names 
+when booted on a newer kernel. If not, as I mentioned, I'm fine with 
+this patch.
