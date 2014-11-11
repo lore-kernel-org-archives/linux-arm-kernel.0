@@ -1,25 +1,23 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 11 Nov 2014 21:33:33 +0800
-Subject: [PATCH v6 1/3] ARM: dts: pbab01: move i2c pins and frequency
- configuration into pfla02
-In-Reply-To: <1415106349-18846-2-git-send-email-d.lavnikevich@sam-solutions.com>
-References: <1415106349-18846-1-git-send-email-d.lavnikevich@sam-solutions.com>
- <1415106349-18846-2-git-send-email-d.lavnikevich@sam-solutions.com>
-Message-ID: <20141111133331.GA2704@dragon>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 11 Nov 2014 08:45:36 -0500
+Subject: [PATCH 0/3] irqchip: dw-apb-ictl: IRQ_GC_MASK_CACHE_PER_TYPE
+ and PM support
+In-Reply-To: <20141111135947.393a6d78@xhacker>
+References: <1411454100-6814-1-git-send-email-jszhang@marvell.com>
+ <20141111135947.393a6d78@xhacker>
+Message-ID: <20141111134536.GD3698@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 04, 2014 at 04:05:47PM +0300, Dmitry Lavnikevich wrote:
-> Since pins and frequency are specific to module (pfla02), not base board
-> (pbab02), it is better to be initialized in corresponding dts file.
+On Tue, Nov 11, 2014 at 01:59:47PM +0800, Jisheng Zhang wrote:
+> Dear Thomas, Jason,
 > 
-> This patch fixes i2c2, i2c3 pin configuration which caused messages:
-> 
-> imx6q-pinctrl 20e0000.iomuxc: no groups defined in /soc/aips-bus at 02000000/iomuxc at 020e0000/i2c2grp
-> imx6q-pinctrl 20e0000.iomuxc: no groups defined in /soc/aips-bus at 02000000/iomuxc at 020e0000/i2c3grp
-> imx6q-pinctrl 20e0000.iomuxc: unable to find group for node i2c2grp
-> imx6q-pinctrl 20e0000.iomuxc: unable to find group for node i2c3grp
-> 
-> Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
+> Is there any potential issue with this patch serials I need to resolve?
 
-Applied all 3, thanks.
+Please send a v2 with Sebastian's Acks.  Also, please update the commit
+log on #1 as requested.  For #3, Please add a summary of the discussion
+to its commit log.  eg: "We can used relaxed variants here because..."
+
+thx,
+
+Jason.
