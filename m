@@ -1,54 +1,66 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 11 Nov 2014 13:29:36 +0100
-Subject: [PATCH 2/7] pinctrl: pinconf-generic: Infer map type from DT
- property
-In-Reply-To: <21124316.ibhe1N9UZS@avalon>
-References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
- <1415041531-15520-3-git-send-email-soren.brinkmann@xilinx.com>
- <21124316.ibhe1N9UZS@avalon>
-Message-ID: <CACRpkdZH9b_KB9Mz8r5vj=KGqr0bJeKMRgODUbNeBDVNr=tsCg@mail.gmail.com>
+From: hongzhou.yang@mediatek.com (Hongzhou Yang)
+Date: Tue, 11 Nov 2014 20:38:52 +0800
+Subject: [PATCH v3 0/3] Add Mediatek SoC Pinctrl/GPIO driver for MT8135. 
+Message-ID: <1415709535-31515-1-git-send-email-hongzhou.yang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 5, 2014 at 2:56 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Monday 03 November 2014 11:05:26 Soren Brinkmann wrote:
->> With the new 'groups' property, the DT parser can infer the map type
->> from the fact whether 'pins' or 'groups' is used to specify the pin
->> group to work on.
->> To maintain backwards compatibitliy with current usage of the DT
->> binding, this is only done when an invalid map type is passed to the
->> parsing function.
->
-> The Renesas PFC implements similar bindings with using the vendor-specific
-> properties "renesas,pins" and "renesas,groups" (bindings and implementation
-> available at Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt
-> and drivers/pinctrl/sh-pfc/pinctrl.c respectively).
->
-> The Renesas implementation is a bit more generic in that it allows both pins
-> and groups to be specified in a single subnode. Do you think that feature
-> would make sense for pinconf-generic as well ?
+This is v3 of add Mediatek SoC Pinctrl/GPIO drvier for MT8135.
+It is based on Joe.C' basic device tree support.
+See http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296093.html
 
-I think for generic pin controllers either nodes with:
+This driver include common and MT8135 part, other Mediatek SoCs will share the common part,
+and MT8135 part only support MT8135. MT8135 has GPIO controller, it includes 203 pins.
 
-{
-    function = "foo";
-    pins = "A0", "A1", "A2";
-}
+Changes in v3:
+  - Rebase on 3.18-rc1.
+  - Follow '[RFC] pinctrl: Provide a generic device tree binding for per-pin pin controllers', modify mediatek,pins format,
+    add config setting for each pin, the reason is that each pin may have different config.
+    The RFC link: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296491.html
+  - Switch to use syscon regmap.
+  - Add CLR_ADDR() and SET_ADDR() macros.
+  - Add mtk_pconf_set_ies() and mtk_pconf_set_smt() functions to deal with input-enable and input-schmitt-enable.
+  - Rename mt_gpio_devdata to mtk_pinctrl_devdata.
+  - Rename all mt_prefix to mtk_prefix.
+  - Rename mt_pconf_pull_conf() to mtk_pconf_parse_conf, add mtk_pconf_set_pull_select() to deal with pull enable and pull up/down.
+    And we will add PIN_CONFIG_DRIVE_STRENGTH to mtk_pconf_parse_conf().
 
-or
+According to Linus' suggestion, make some following changes:
+  - Add port_shf, port_mask and port_align members to mtk_pinctrl_devdata struct.
+  - Use BIT(x) instead of 1 << (x).
+  - Remove mt_pctrl_write_reg() and mt_pctrl_read_reg().
+  - Remove mt_gpio_of_xlate().
+  - Use .set_mux() instead of .enable().
+  - Add some comments.
 
-{
-    function = "foo";
-    groups = "bar", "baz";
-}
+Hongzhou Yang (3):
+  ARM: mediatek: Add Pinctrl/GPIO driver for mt8135.
+  dt-bindings: Add pinctrl bindings for mt65xx/mt81xx.
+  ARM: dts: mt8135: Add pinctrl/GPIO node for mt8135.
 
-In parsing this it's easy to just look for "function" then see if
-we're mapping to groups or pins.
+  .../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt |  123 +
+  arch/arm/boot/dts/mt8135-pinfunc.h                 | 1304 +++++++++++
+  arch/arm/boot/dts/mt8135.dtsi                      |   19 +
+  arch/arm/mach-mediatek/Kconfig                     |    1 +
+  drivers/pinctrl/Kconfig                            |    1 +
+  drivers/pinctrl/Makefile                           |    1 +
+  drivers/pinctrl/mediatek/Kconfig                   |   12 +
+  drivers/pinctrl/mediatek/Makefile                  |    5 +
+  drivers/pinctrl/mediatek/pinctrl-mt8135.c          |   87 +
+  drivers/pinctrl/mediatek/pinctrl-mtk-common.c      |  861 +++++++
+  drivers/pinctrl/mediatek/pinctrl-mtk-common.h      |  123 +
+  drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h      | 2460 ++++++++++++++++++++
+  include/dt-bindings/pinctrl/mt65xx.h               |   23 +
+  13 files changed, 5020 insertions(+)
+  create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
+  create mode 100644 arch/arm/boot/dts/mt8135-pinfunc.h
+  create mode 100644 drivers/pinctrl/mediatek/Kconfig
+  create mode 100644 drivers/pinctrl/mediatek/Makefile
+  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt8135.c
+  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
+  create mode 100644 include/dt-bindings/pinctrl/mt65xx.h
 
-It'd be nice if we could then centralize parsing of functions/pins/groups
-and add the non-renesas-prefixed configs as alternatives to genericized
-the bindings, while keeping backward compatibility.
-
-Yours,
-Linus Walleij
+--
+1.8.1.1.dirty
