@@ -1,169 +1,151 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 11 Nov 2014 15:44:56 +0100
-Subject: [PATCH v2 1/2] of/fdt: export fdt blob as /sys/firmware/fdt
-In-Reply-To: <20141111144221.5FCDAC416AF@trevor.secretlab.ca>
-References: <1415645222-14909-1-git-send-email-ard.biesheuvel@linaro.org>
- <1415645222-14909-2-git-send-email-ard.biesheuvel@linaro.org>
- <20141111144221.5FCDAC416AF@trevor.secretlab.ca>
-Message-ID: <CAKv+Gu_KUFaop440Zg6FZ1XmEiE3_ngy3F1adS7uw4_v-24t5w@mail.gmail.com>
+From: wcohen@redhat.com (William Cohen)
+Date: Tue, 11 Nov 2014 09:48:29 -0500
+Subject: [PATCH] Correct the race condition in
+ aarch64_insn_patch_text_sync()
+In-Reply-To: <20141111112844.GC16265@arm.com>
+References: <1415637362-30754-1-git-send-email-wcohen@redhat.com>
+ <20141110170846.GH23942@arm.com> <546113F4.1050304@redhat.com>
+ <20141111112844.GC16265@arm.com>
+Message-ID: <546221BD.8000207@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 November 2014 15:42, Grant Likely <grant.likely@linaro.org> wrote:
-> On Mon, 10 Nov 2014 19:47:01 +0100
-> , Ard Biesheuvel <ard.biesheuvel@linaro.org>
->  wrote:
->> Create a new /sys entry '/sys/firmware/fdt' to export the FDT blob
->> that was passed to the kernel by the bootloader. This allows userland
->> applications such as kexec to access the raw binary. The blob needs to
->> be preserved as early as possible by calling preserve_fdt().
+On 11/11/2014 06:28 AM, Will Deacon wrote:
+> On Mon, Nov 10, 2014 at 07:37:24PM +0000, William Cohen wrote:
+>> On 11/10/2014 12:08 PM, Will Deacon wrote:
+>>> On Mon, Nov 10, 2014 at 04:36:02PM +0000, William Cohen wrote:
+>>>> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+>>>> index e007714..e6266db 100644
+>>>> --- a/arch/arm64/kernel/insn.c
+>>>> +++ b/arch/arm64/kernel/insn.c
+>>>> @@ -153,8 +153,10 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
+>>>>  	int i, ret = 0;
+>>>>  	struct aarch64_insn_patch *pp = arg;
+>>>>  
+>>>> -	/* The first CPU becomes master */
+>>>> -	if (atomic_inc_return(&pp->cpu_count) == 1) {
+>>>> +	/* Make sure all the processors are in this functionaarch64_insn_patch_text_cb(
+>>>> +	   before patching the code. The last CPU to this function
+>>>> +	   does the update. */
+>>>> +	if (atomic_dec_return(&pp->cpu_count) == 0) {
+>>>>  		for (i = 0; ret == 0 && i < pp->insn_cnt; i++)
+>>>>  			ret = aarch64_insn_patch_text_nosync(pp->text_addrs[i],
+>>>>  							     pp->new_insns[i]);
+>>>> @@ -163,7 +165,8 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
+>>>>  		 * which ends with "dsb; isb" pair guaranteeing global
+>>>>  		 * visibility.
+>>>>  		 */
+>>>> -		atomic_set(&pp->cpu_count, -1);
+>>>> +		/* Notifiy other processors with an additional decrement. */
+>>>> +		atomic_dec(&pp->cpu_count);
+>>>>  	} else {
+>>>>  		while (atomic_read(&pp->cpu_count) != -1)
+>>>>  			cpu_relax();
+>>>> @@ -185,6 +188,7 @@ int __kprobes aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt)
+>>>>  	if (cnt <= 0)
+>>>>  		return -EINVAL;
+>>>>  
+>>>> +	atomic_set(&patch.cpu_count, num_online_cpus());
+>>>
+>>> I think this is still racy with hotplug before stop_machine has done
+>>> get_online_cpus. How about we leave the increment in the callback and change
+>>> the exit condition to compare with num_online_cpus() instead?
 >>
->> The fact that this node does not reside under /sys/firmware/device-tree
->> is deliberate: FDT is also used on arm64 UEFI/ACPI systems to
->> communicate just the UEFI and ACPI entry points, but the FDT is never
->> unflattened and used to configure the system.
+>> Thanks for the feedback. I am no expert in the corner cases involved with
+>> hotplug.  Dave Long suggested something similar with num_online_cpus in
+>> the arch64_insn_patch_text_cb() and using increments and checking the
+>> num_cpus_online() inside aarch64_insn_patch_text_cb().  Moving the
+>> num_cpu_online() inside the aarch64_insn_patch_text_cb() is sufficient to
+>> avoid race conditions with hotplug?  If so, would the attached patch be
+>> appropriate?
+> 
+> Yes, because stop_machine() does {get,put}_online_cpus() around the
+> invocation.
+> 
+>> From d02e3244c436234d0d07500be6d4df64feb2052a Mon Sep 17 00:00:00 2001
+>> From: William Cohen <wcohen@redhat.com>
+>> Date: Mon, 10 Nov 2014 14:26:44 -0500
+>> Subject: [PATCH] Correct the race condition in aarch64_insn_patch_text_sync()
 >>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> On further thought, nak. I want tree modifications to be treated as
-> bugs. Do a checksum CRC32 or check. It's simpler and it can be extended
-> to us an in-blob CRC when the file format gets upreved to include one.
->
-
-Ah, right, I was under the impression that tree modifications were
-expected and allowed.
-In that case, yes, let me respin to calculate a CRC early on, and
-WARN() if it gets corrupted.
-
--- 
-Ard.
-
-
-> g.
->
-> ---
->
-> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-> index be16ce2ffd69..adda0a16934f 100644
-> --- a/drivers/of/Kconfig
-> +++ b/drivers/of/Kconfig
-> @@ -23,6 +23,7 @@ config OF_FLATTREE
->         bool
->         select DTC
->         select LIBFDT
-> +       select CRC
->
->  config OF_EARLY_FLATTREE
->         bool
-> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> index 83a8e1154602..80db46a2eab9 100644
-> --- a/drivers/of/fdt.c
-> +++ b/drivers/of/fdt.c
-> @@ -10,6 +10,7 @@
->   */
->
->  #include <linux/kernel.h>
-> +#include <linux/crc32.h>
->  #include <linux/initrd.h>
->  #include <linux/memblock.h>
->  #include <linux/of.h>
-> @@ -420,6 +421,7 @@ int __initdata dt_root_addr_cells;
->  int __initdata dt_root_size_cells;
->
->  void *initial_boot_params;
-> +u32 initial_boot_params_crc;
->
->  #ifdef CONFIG_OF_EARLY_FLATTREE
->
-> @@ -1003,6 +1005,9 @@ bool __init early_init_dt_verify(void *params)
->
->         /* Setup flat device-tree pointer */
->         initial_boot_params = params;
-> +       initial_boot_params_crc = crc32_be(0, params, fdt_totalsize(params));
-> +       pr_info("FDT CRC: %x\n", initial_boot_params_crc);
-> +
->         return true;
->  }
->
->
->
->
+>> When experimenting with patches to provide kprobes support for aarch64
+>> smp machines would hang when inserting breakpoints into kernel code.
+>> The hangs were caused by a race condition in the code called by
+>> aarch64_insn_patch_text_sync().  The first processor in the
+>> aarch64_insn_patch_text_cb() function would patch the code while other
+>> processors were still entering the function and incrementing the
+>> cpu_count field.  This resulted in some processors never observing the
+>> exit condition and exiting the function.  Thus, processors in the
+>> system hung.
+>>
+>> The patching function now waits for all processors to enter the
+>> patching function before changing code to ensure that none of the
+>> processors are in code that is going to be patched.  Once all the
+>> processors have entered the function, the last processor to enter the
+>> patching function performs the patching and signals that the patching
+>> is complete with one last increment of the cpu_count field to make it
+>> num_cpus_online()+1.
+>>
+>> Signed-off-by: William Cohen <wcohen@redhat.com>
 >> ---
->>  drivers/of/fdt.c       | 34 ++++++++++++++++++++++++++++++++++
->>  include/linux/of_fdt.h |  2 ++
->>  2 files changed, 36 insertions(+)
+>>  arch/arm64/kernel/insn.c | 12 ++++++++----
+>>  1 file changed, 8 insertions(+), 4 deletions(-)
 >>
->> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
->> index d1ffca8b34ea..e9ee3d5f7ea4 100644
->> --- a/drivers/of/fdt.c
->> +++ b/drivers/of/fdt.c
->> @@ -22,6 +22,7 @@
->>  #include <linux/libfdt.h>
->>  #include <linux/debugfs.h>
->>  #include <linux/serial_core.h>
->> +#include <linux/sysfs.h>
->>
->>  #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
->>  #include <asm/page.h>
->> @@ -1103,4 +1104,37 @@ static int __init of_flat_dt_debugfs_export_fdt(void)
->>  module_init(of_flat_dt_debugfs_export_fdt);
->>  #endif
->>
->> +static u8 *raw_fdt_copy;
->> +
->> +void __init preserve_fdt(void)
->> +{
->> +     u32 fdt_size;
->> +
->> +     fdt_size = fdt_totalsize(initial_boot_params);
->> +     raw_fdt_copy = memcpy(__va(memblock_alloc(fdt_size, PAGE_SIZE)),
->> +                           initial_boot_params, fdt_size);
->> +}
->> +
->> +#ifdef CONFIG_SYSFS
->> +static ssize_t of_fdt_raw_read(struct file *filp, struct kobject *kobj,
->> +                            struct bin_attribute *bin_attr,
->> +                            char *buf, loff_t off, size_t count)
->> +{
->> +     memcpy(buf, raw_fdt_copy + off, count);
->> +     return count;
->> +}
->> +
->> +static int __init of_fdt_raw_init(void)
->> +{
->> +     static struct bin_attribute of_fdt_raw_attr =
->> +             __BIN_ATTR(fdt, S_IRUSR, of_fdt_raw_read, NULL, 0);
->> +
->> +     if (!raw_fdt_copy)
->> +             return 0;
->> +     of_fdt_raw_attr.size = fdt_totalsize(raw_fdt_copy);
->> +     return sysfs_create_bin_file(firmware_kobj, &of_fdt_raw_attr);
->> +}
->> +module_init(of_fdt_raw_init);
->> +#endif
->> +
->>  #endif /* CONFIG_OF_EARLY_FLATTREE */
->> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
->> index 0ff360d5b3b3..7672a26305a5 100644
->> --- a/include/linux/of_fdt.h
->> +++ b/include/linux/of_fdt.h
->> @@ -83,6 +83,7 @@ extern const void *of_flat_dt_match_machine(const void *default_match,
->>  /* Other Prototypes */
->>  extern void unflatten_device_tree(void);
->>  extern void unflatten_and_copy_device_tree(void);
->> +extern void preserve_fdt(void);
->>  extern void early_init_devtree(void *);
->>  extern void early_get_first_memblock_info(void *, phys_addr_t *);
->>  extern u64 fdt_translate_address(const void *blob, int node_offset);
->> @@ -92,6 +93,7 @@ static inline void early_init_fdt_scan_reserved_mem(void) {}
->>  static inline const char *of_flat_dt_get_machine_name(void) { return NULL; }
->>  static inline void unflatten_device_tree(void) {}
->>  static inline void unflatten_and_copy_device_tree(void) {}
->> +static inline void preserve_fdt(void) {}
->>  #endif /* CONFIG_OF_FLATTREE */
->>
->>  #endif /* __ASSEMBLY__ */
->> --
->> 1.8.3.2
->>
->
+>> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+>> index e007714..4fdddf1 100644
+>> --- a/arch/arm64/kernel/insn.c
+>> +++ b/arch/arm64/kernel/insn.c
+>> @@ -151,10 +151,13 @@ struct aarch64_insn_patch {
+>>  static int __kprobes aarch64_insn_patch_text_cb(void *arg)
+>>  {
+>>  	int i, ret = 0;
+>> +	int count = num_online_cpus();
+>>  	struct aarch64_insn_patch *pp = arg;
+>>  
+>> -	/* The first CPU becomes master */
+>> -	if (atomic_inc_return(&pp->cpu_count) == 1) {
+>> +	/* Make sure all the processors are in this function
+>> +	   before patching the code. The last CPU to this function
+>> +	   does the update. */
+>> +	if (atomic_inc_return(&pp->cpu_count) == count) {
+> 
+> Actually, you can leave this hunk alone and leave the first CPU to do the
+> patching.
+
+Hi Will,
+
+If it doesn't matter which processor is doing the update, do the processors all need to wait for the last one to get to this function before continuing on?  Or would it be acceptable to allow processors to continue once the first processor completes the patch operation?  That could reduce the amount of time that processors spin waiting for other processors to enter arch64_insn_patch_text_cb.
+
+> 
+>>  		for (i = 0; ret == 0 && i < pp->insn_cnt; i++)
+>>  			ret = aarch64_insn_patch_text_nosync(pp->text_addrs[i],
+>>  							     pp->new_insns[i]);
+>> @@ -163,9 +166,10 @@ static int __kprobes aarch64_insn_patch_text_cb(void *arg)
+>>  		 * which ends with "dsb; isb" pair guaranteeing global
+>>  		 * visibility.
+>>  		 */
+>> -		atomic_set(&pp->cpu_count, -1);
+>> +		/* Notifiy other processors with an additional increment. */
+> 
+> Notify
+> 
+>> +		atomic_inc(&pp->cpu_count);
+>>  	} else {
+>> -		while (atomic_read(&pp->cpu_count) != -1)
+>> +		while (atomic_read(&pp->cpu_count) <= count)
+>>  			cpu_relax();
+> 
+> Then make this 'cpu_count <= num_online_cpus()'
+> 
+> Will
+> 
+
+Attached is a patch that addresses the current comment.
+
+-Will Cohen
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-Correct-the-race-condition-in-aarch64_insn_patch_tex.patch
+Type: text/x-patch
+Size: 1831 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141111/11f7050b/attachment.bin>
