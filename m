@@ -1,66 +1,150 @@
 From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Tue, 11 Nov 2014 20:38:52 +0800
-Subject: [PATCH v3 0/3] Add Mediatek SoC Pinctrl/GPIO driver for MT8135. 
-Message-ID: <1415709535-31515-1-git-send-email-hongzhou.yang@mediatek.com>
+Date: Tue, 11 Nov 2014 20:38:54 +0800
+Subject: [PATCH v3 2/3] dt-bindings: Add pinctrl bindings for mt65xx/mt81xx.
+In-Reply-To: <1415709535-31515-1-git-send-email-hongzhou.yang@mediatek.com>
+References: <1415709535-31515-1-git-send-email-hongzhou.yang@mediatek.com>
+Message-ID: <1415709535-31515-3-git-send-email-hongzhou.yang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is v3 of add Mediatek SoC Pinctrl/GPIO drvier for MT8135.
-It is based on Joe.C' basic device tree support.
-See http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296093.html
+From: Hongzhou Yang <hongzhou.yang@mediatek.com>
 
-This driver include common and MT8135 part, other Mediatek SoCs will share the common part,
-and MT8135 part only support MT8135. MT8135 has GPIO controller, it includes 203 pins.
+Add devicetree bindings for Mediatek SoC pinctrl driver.
 
-Changes in v3:
-  - Rebase on 3.18-rc1.
-  - Follow '[RFC] pinctrl: Provide a generic device tree binding for per-pin pin controllers', modify mediatek,pins format,
-    add config setting for each pin, the reason is that each pin may have different config.
-    The RFC link: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296491.html
-  - Switch to use syscon regmap.
-  - Add CLR_ADDR() and SET_ADDR() macros.
-  - Add mtk_pconf_set_ies() and mtk_pconf_set_smt() functions to deal with input-enable and input-schmitt-enable.
-  - Rename mt_gpio_devdata to mtk_pinctrl_devdata.
-  - Rename all mt_prefix to mtk_prefix.
-  - Rename mt_pconf_pull_conf() to mtk_pconf_parse_conf, add mtk_pconf_set_pull_select() to deal with pull enable and pull up/down.
-    And we will add PIN_CONFIG_DRIVE_STRENGTH to mtk_pconf_parse_conf().
+Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+---
+ .../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt | 123 +++++++++++++++++++++
+ 1 file changed, 123 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
 
-According to Linus' suggestion, make some following changes:
-  - Add port_shf, port_mask and port_align members to mtk_pinctrl_devdata struct.
-  - Use BIT(x) instead of 1 << (x).
-  - Remove mt_pctrl_write_reg() and mt_pctrl_read_reg().
-  - Remove mt_gpio_of_xlate().
-  - Use .set_mux() instead of .enable().
-  - Add some comments.
-
-Hongzhou Yang (3):
-  ARM: mediatek: Add Pinctrl/GPIO driver for mt8135.
-  dt-bindings: Add pinctrl bindings for mt65xx/mt81xx.
-  ARM: dts: mt8135: Add pinctrl/GPIO node for mt8135.
-
-  .../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt |  123 +
-  arch/arm/boot/dts/mt8135-pinfunc.h                 | 1304 +++++++++++
-  arch/arm/boot/dts/mt8135.dtsi                      |   19 +
-  arch/arm/mach-mediatek/Kconfig                     |    1 +
-  drivers/pinctrl/Kconfig                            |    1 +
-  drivers/pinctrl/Makefile                           |    1 +
-  drivers/pinctrl/mediatek/Kconfig                   |   12 +
-  drivers/pinctrl/mediatek/Makefile                  |    5 +
-  drivers/pinctrl/mediatek/pinctrl-mt8135.c          |   87 +
-  drivers/pinctrl/mediatek/pinctrl-mtk-common.c      |  861 +++++++
-  drivers/pinctrl/mediatek/pinctrl-mtk-common.h      |  123 +
-  drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h      | 2460 ++++++++++++++++++++
-  include/dt-bindings/pinctrl/mt65xx.h               |   23 +
-  13 files changed, 5020 insertions(+)
-  create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
-  create mode 100644 arch/arm/boot/dts/mt8135-pinfunc.h
-  create mode 100644 drivers/pinctrl/mediatek/Kconfig
-  create mode 100644 drivers/pinctrl/mediatek/Makefile
-  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt8135.c
-  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-common.h
-  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
-  create mode 100644 include/dt-bindings/pinctrl/mt65xx.h
-
---
+diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
+new file mode 100644
+index 0000000..70f35b8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
+@@ -0,0 +1,123 @@
++* Mediatek MT65XX Pin Controller
++
++The Mediatek's Pin controller is used to control GPIO pins.
++
++Required properties:
++- compatible: value should be either of the following.
++    (a) "mediatek,mt8135-pinctrl", compatible with mt8135 pinctrl.
++- mediatek,pctl-regmap: Should be a phandle of the syscfg node.
++- gpio-controller : Marks the device node as a gpio controller.
++- #gpio-cells: number of cells in GPIO specifier. Since the generic GPIO
++  binding is used, the amount of cells must be specified as 2. See the below
++  mentioned gpio binding representation for description of particular cells.
++
++	Eg: <&pio 6 0>
++	<[phandle of the gpio controller node]
++	[pin number within the gpio controller]
++	[flags]>
++
++	Values for gpio specifier:
++	- Pin number: is a value between 0 to 202.
++	- Flags:  bit field of flags, as defined in <dt-bindings/gpio/gpio.h>.
++            Only the following flags are supported:
++            0 - GPIO_ACTIVE_HIGH
++            1 - GPIO_ACTIVE_LOW
++
++Please refer to pinctrl-bindings.txt in this directory for details of the
++common pinctrl bindings used by client devices.
++
++A pinctrl node should contain at least one subnodes representing the
++pinctrl groups available on the machine. Each subnode will list the
++pins it needs, and how they should be configured, with regard to muxer
++configuration, pullups, drive strngth, input enable/disable and input schmitt.
++
++Required subnode-properties:
++
++- mediatek,pins: 2 integers array, represents gpio pinmux number and config
++  setting. The format as following
++
++    node {
++     mediatek,pins = <PIN_NUMBER_PINMUX>;
++                     GENERIC_PINCONFIG;
++    };
++
++    The PIN_NUMBER_PINMUX is combination of GPIO number and pinmux, it can
++    use macros which already defind in boot/dts/mt8135-pinfunc.h directly.
++    The GENERIC_PINCONFIG is the generic pinconfig options to use, bias-disable,
++    bias-pull-down, bias-pull-up, input-enable, input-disable, output-low, output-high,
++    input-schmitt-enable and input-schmitt-disable are valid.
++
++Examples:
++
++#include "mt8135-pinfunc.h"
++
++...
++{
++	syscfg_pctl_a: syscfg_pctl_a at 10005000 {
++		compatible = "mediatek,mt8135-pctl-a-syscfg", "syscon";
++		reg = <0 0x10005000 0 0x1000>;
++	};
++
++	syscfg_pctl_b: syscfg_pctl_b at 1020C020 {
++		compatible = "mediatek,mt8135-pctl-b-syscfg", "syscon";
++		reg = <0 0x1020C020 0 0x1000>;
++	};
++
++	pinctrl at 01c20800 {
++		compatible = "mediatek,mt8135-pinctrl";
++		mediatek,pctl-regmap = <&syscfg_pctl_a &syscfg_pctl_b>;
++		gpio-controller;
++		#gpio-cells = <2>;
++
++		i2c0_pins_a: i2c0 at 0 {
++			pins1 {
++				mediatek,pins = <MT8135_PIN_100_SDA0__FUNC_SDA0>,
++						<MT8135_PIN_101_SCL0__FUNC_SCL0>;
++				bias-disable;
++			};
++		};
++
++		i2c1_pins_a: i2c1 at 0 {
++			pins {
++				mediatek,pins = <MT8135_PIN_195_SDA1__FUNC_SDA1>,
++						<MT8135_PIN_196_SCL1__FUNC_SCL1>;
++				bias-pull-up = <55>;
++			};
++		};
++
++		i2c2_pins_a: i2c2 at 0 {
++			pins1 {
++				mediatek,pins = <MT8135_PIN_193_SDA2__FUNC_SDA2>;
++				bias-pull-down;
++			};
++
++			pins2 {
++				mediatek,pins = <MT8135_PIN_49_WATCHDOG__FUNC_GPIO49>;
++				bias-pull-up;
++			};
++		};
++
++		i2c3_pins_a: i2c3 at 0 {
++			pins1 {
++				mediatek,pins = <MT8135_PIN_40_DAC_CLK__FUNC_GPIO40>,
++						<MT8135_PIN_41_DAC_WS__FUNC_GPIO41>;
++				bias-pull-up = <55>;
++			};
++
++			pins2 {
++				mediatek,pins = <MT8135_PIN_35_SCL3__FUNC_SCL3>,
++						<MT8135_PIN_36_SDA3__FUNC_SDA3>;
++				output-low;
++				bias-pull-up = <55>;
++			};
++
++			pins3 {
++				mediatek,pins = <MT8135_PIN_57_JTCK__FUNC_GPIO57>,
++						<MT8135_PIN_60_JTDI__FUNC_JTDI>;
++				drive-strength = <32>;
++			};
++		};
++
++		...
++	}
++};
+-- 
 1.8.1.1.dirty
