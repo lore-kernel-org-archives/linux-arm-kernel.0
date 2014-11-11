@@ -1,40 +1,77 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 11 Nov 2014 13:47:08 +0100
-Subject: [PATCH 2/7] pinctrl: pinconf-generic: Infer map type from DT
- property
-In-Reply-To: <1415041531-15520-3-git-send-email-soren.brinkmann@xilinx.com>
-References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
- <1415041531-15520-3-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <CACRpkdbOLMT1vfFg=CAU_VHdjxPWn_Ybso=+8Asp=mXhmNBRSA@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 11 Nov 2014 13:51:48 +0100
+Subject: [PATCH] ARM: sa11x0: Use void __iomem * in MMIO accessors
+Message-ID: <1415710308-29662-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 3, 2014 at 8:05 PM, Soren Brinkmann
-<soren.brinkmann@xilinx.com> wrote:
+From: Thierry Reding <treding@nvidia.com>
 
-> With the new 'groups' property, the DT parser can infer the map type
-> from the fact whether 'pins' or 'groups' is used to specify the pin
-> group to work on.
-> To maintain backwards compatibitliy with current usage of the DT
-> binding, this is only done when an invalid map type is passed to the
-> parsing function.
+MMIO accessors such as readl() and writel() want a void __iomem * for
+the address. Update the BSE nanoEngine PCI driver to pass such pointers
+instead of unsigned long in preparation to converting ARM to use generic
+and more rigidly typed accessors.
 
-So that is this:
+Reported-by: kbuild test robot <fengguang.wu@intel.com>
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+Hi Arnd,
 
-> +               if (type == PIN_MAP_TYPE_INVALID)
-> +                       type = PIN_MAP_TYPE_CONFIGS_GROUP;
-> +               dt_pin_specifier = "groups";
+This is a follow-up patch to the asm-generic/io.h overhaul series that
+fixes a couple of build warnings reported by Fengguang's build system.
+I've sorted this near the beginning of the series, like so:
 
-This is just kludgy. There are only two kernel-internal users of this function,
-refactor the function signature and change the other callers over instead,
-patch the drivers.
+	ARM: ebsa110: Properly override I/O accessors
+	ARM: sa11x0: Use void __iomem * in MMIO accessors
+	ARC: Remove redundant PCI_IOBASE declaration
 
-Take this opportunity to add some kerneldoc above the
-pinconf_generic_dt_subnode_to_map() and give the function a
-reasonable signature.
+But I think anywhere before commit
 
-BTW: this is just for config settings for groups right? Not for muxing
-I hope?
+	ARM: Use include/asm-generic/io.h
 
-Yours,
-Linus Walleij
+should be fine, too.
+
+Thierry
+
+ arch/arm/mach-sa1100/pci-nanoengine.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-sa1100/pci-nanoengine.c b/arch/arm/mach-sa1100/pci-nanoengine.c
+index ff02e2da99f2..b704433c529c 100644
+--- a/arch/arm/mach-sa1100/pci-nanoengine.c
++++ b/arch/arm/mach-sa1100/pci-nanoengine.c
+@@ -33,12 +33,12 @@
+ static DEFINE_SPINLOCK(nano_lock);
+ 
+ static int nanoengine_get_pci_address(struct pci_bus *bus,
+-	unsigned int devfn, int where, unsigned long *address)
++	unsigned int devfn, int where, void __iomem **address)
+ {
+ 	int ret = PCIBIOS_DEVICE_NOT_FOUND;
+ 	unsigned int busnr = bus->number;
+ 
+-	*address = NANO_PCI_CONFIG_SPACE_VIRT +
++	*address = (void __iomem *)NANO_PCI_CONFIG_SPACE_VIRT +
+ 		((bus->number << 16) | (devfn << 8) | (where & ~3));
+ 
+ 	ret = (busnr > 255 || devfn > 255 || where > 255) ?
+@@ -51,7 +51,7 @@ static int nanoengine_read_config(struct pci_bus *bus, unsigned int devfn, int w
+ 	int size, u32 *val)
+ {
+ 	int ret;
+-	unsigned long address;
++	void __iomem *address;
+ 	unsigned long flags;
+ 	u32 v;
+ 
+@@ -85,7 +85,7 @@ static int nanoengine_write_config(struct pci_bus *bus, unsigned int devfn, int
+ 	int size, u32 val)
+ {
+ 	int ret;
+-	unsigned long address;
++	void __iomem *address;
+ 	unsigned long flags;
+ 	unsigned shift;
+ 	u32 v;
+-- 
+2.1.3
