@@ -1,103 +1,74 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 11 Nov 2014 16:34:08 +0000
-Subject: [PATCH v4 3/5] simplefb: formalize pseudo palette handling
-In-Reply-To: <1413996311-4287-4-git-send-email-hdegoede@redhat.com>
-References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
- <1413996311-4287-4-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141111163408.9C364C416AF@trevor.secretlab.ca>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 11 Nov 2014 18:39:35 +0200
+Subject: [PATCH v2] ARM: dts: sbc-t3x: add DVI display data
+In-Reply-To: <20141111144911.GK31454@atomide.com>
+References: <1413364186-23752-1-git-send-email-lifshitz@compulab.co.il>
+ <1414927198-7127-1-git-send-email-lifshitz@compulab.co.il>
+ <54561E45.7000404@compulab.co.il> <20141110174845.GP31454@atomide.com>
+ <5461FAEF.3010607@compulab.co.il> <20141111144911.GK31454@atomide.com>
+Message-ID: <54623BC7.6000603@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 Oct 2014 18:45:09 +0200
-, Hans de Goede <hdegoede@redhat.com>
- wrote:
-> From: Luc Verhaegen <libv@skynet.be>
+On 11/11/14 16:49, Tony Lindgren wrote:
+> * Igor Grinberg <grinberg@compulab.co.il> [141111 04:04]:
+>> Hi Tony,
+>>
+>> On 11/10/14 19:48, Tony Lindgren wrote:
+>>> * Igor Grinberg <grinberg@compulab.co.il> [141102 04:08]:
+>>>> On 11/02/14 13:19, Dmitry Lifshitz wrote:
+>>>>> Add DSS related pinmux and display data nodes required to support
+>>>>> DVI video out on SBC-T3530, SBC-T3730 and SBC-T3517.
+>>>>>
+>>>>> Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
+>>>>
+>>>> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+>>>
+>>> Thanks applying into omap-for-v3.19/dt.
+>>>
+>>> Are we now ready to drop the board-cm-*.c files?
+>>
+>> Let's see, below is a list of things that are yet to be
+>> supported in DT boot:
+>> NAND, TV, LCD, Touchscreen, Audio (CM-T3x30), RTC (CM-T3517), CAN (CM-3517).
 > 
+> OK great, hopefully that's mostly just configuring the .dts
+> files.
 
-Patch description? Write a proper changelog before merging please.
-Describe why the change is necessary and what was done. You need to give
-future readers some information about this patch. Heck, you're listed in
-MAINTAINERS, you should be *enforcing* proper changelogs.
+Well, mostly... but not all of it.
 
-The code looks fine though.
+The LCD, RTC and CAN require bindings/drivers work.
 
-Acked-by: Grant Likely <grant.likely@linaro.org>
-
-> Signed-off-by: Luc Verhaegen <libv@skynet.be>
-> Acked-by: Stephen Warren <swarren@nvidia.com>
-> [hdegoede at redhat.com: drop unnecessary void * cast]
-> Reviewed-by: Hans de Goede <hdegoede@redhat.com>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Reviewed-by: David Herrmann <dh.herrmann@gmail.com>
-> ---
->  drivers/video/fbdev/simplefb.c | 15 ++++++++++++---
->  1 file changed, 12 insertions(+), 3 deletions(-)
+>  
+>> We're rc4 now, so hopefully, we will be able to get all this in for 3.19
+>> and then have the board files removed for 3.20.
 > 
-> diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-> index 210f3a0..ec112c1 100644
-> --- a/drivers/video/fbdev/simplefb.c
-> +++ b/drivers/video/fbdev/simplefb.c
-> @@ -41,6 +41,8 @@ static struct fb_var_screeninfo simplefb_var = {
->  	.vmode		= FB_VMODE_NONINTERLACED,
->  };
->  
-> +#define PSEUDO_PALETTE_SIZE 16
-> +
->  static int simplefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
->  			      u_int transp, struct fb_info *info)
->  {
-> @@ -50,7 +52,7 @@ static int simplefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
->  	u32 cb = blue >> (16 - info->var.blue.length);
->  	u32 value;
->  
-> -	if (regno >= 16)
-> +	if (regno >= PSEUDO_PALETTE_SIZE)
->  		return -EINVAL;
->  
->  	value = (cr << info->var.red.offset) |
-> @@ -163,11 +165,16 @@ static int simplefb_parse_pd(struct platform_device *pdev,
->  	return 0;
->  }
->  
-> +struct simplefb_par {
-> +	u32 palette[PSEUDO_PALETTE_SIZE];
-> +};
-> +
->  static int simplefb_probe(struct platform_device *pdev)
->  {
->  	int ret;
->  	struct simplefb_params params;
->  	struct fb_info *info;
-> +	struct simplefb_par *par;
->  	struct resource *mem;
->  
->  	if (fb_get_options("simplefb", NULL))
-> @@ -188,11 +195,13 @@ static int simplefb_probe(struct platform_device *pdev)
->  		return -EINVAL;
->  	}
->  
-> -	info = framebuffer_alloc(sizeof(u32) * 16, &pdev->dev);
-> +	info = framebuffer_alloc(sizeof(struct simplefb_par), &pdev->dev);
->  	if (!info)
->  		return -ENOMEM;
->  	platform_set_drvdata(pdev, info);
->  
-> +	par = info->par;
-> +
->  	info->fix = simplefb_fix;
->  	info->fix.smem_start = mem->start;
->  	info->fix.smem_len = resource_size(mem);
-> @@ -225,7 +234,7 @@ static int simplefb_probe(struct platform_device *pdev)
->  		framebuffer_release(info);
->  		return -ENODEV;
->  	}
-> -	info->pseudo_palette = (void *)(info + 1);
-> +	info->pseudo_palette = par->palette;
->  
->  	dev_info(&pdev->dev, "framebuffer at 0x%lx, 0x%x bytes, mapped to 0x%p\n",
->  			     info->fix.smem_start, info->fix.smem_len,
-> -- 
-> 2.1.0
+> Yes something like that sounds good to me. We should allow at
+> least one release for people to change over.
 > 
+>> This way we can have 3.19 with both ways supported and do last checks.
+>>
+>> Are you ok with this?
+> 
+> Sure if you get the changes posted before -rc6, otherwise
+> it will be too late for v3.19.
+
+I think, I was too optimistic about 3.19, but we can try.
+Since drivers will require adaptation, I'm not sure
+it will be merged for 3.19...
+If we really want to make the DT boot for 3.19, we could work and
+post the drivers adaptation patches and in parallel (to keep thing
+going for board files removal) prepare patches for adding the
+problematic stuff via quirks. This way we can keep only the DT missing
+functionality in quirks and remove the board files. Once the drivers
+are adjusted with new bindings, we can remove the quirks.
+
+Or if we are fine with keeping the board files for a little more, then
+just add the DT functionality that is ready and keep working on drivers
+until they are ready (hopefully, 1 - 2 releases).
+
+What do you think?
+
+-- 
+Regards,
+Igor.
