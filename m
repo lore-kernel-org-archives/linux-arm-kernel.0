@@ -1,97 +1,30 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Mon, 10 Nov 2014 19:20:23 -0800
-Subject: [PATCH] tty: serial: msm_serial: Use DT aliases
-In-Reply-To: <54616F74.5010408@codeaurora.org>
-References: <1414024381-12204-1-git-send-email-sboyd@codeaurora.org>
- <CAMAWPa_f1K1qUG_UTmM0w8Sz8wed7+CQkK9tc8t1W=CTJvdjyw@mail.gmail.com>
- <5461150B.2010907@codeaurora.org> <54616CB3.5000405@gmail.com>
- <54616F74.5010408@codeaurora.org>
-Message-ID: <54618077.9000108@gmail.com>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Mon, 10 Nov 2014 21:39:50 -0600
+Subject: [PATCH] ARM: multi_v7_defconfig: enable designware watchdog driver
+Message-ID: <1415677190-32695-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2014 6:07 PM, Stephen Boyd wrote:
-> On 11/10/2014 05:56 PM, Frank Rowand wrote:
->> On 11/10/2014 11:42 AM, Stephen Boyd wrote:
->>> diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
->>> index 09364dd8cf3a..d1bc6b6cbc70 100644
->>> --- a/drivers/tty/serial/msm_serial.c
->>> +++ b/drivers/tty/serial/msm_serial.c
->>> @@ -1046,14 +1046,14 @@ static int msm_serial_probe(struct platform_device *pdev)
->>>  	const struct of_device_id *id;
->>>  	int irq, line;
->>>  
->>> -	if (pdev->id == -1)
->>> -		pdev->id = atomic_inc_return(&msm_uart_next_id) - 1;
->>> -
->>>  	if (pdev->dev.of_node)
->>>  		line = of_alias_get_id(pdev->dev.of_node, "serial");
->>>  	else
->>>  		line = pdev->id;
->>>  
->>> +	if (line < 0)
->>> +		line = atomic_inc_return(&msm_uart_next_id) - 1;
->>> +
->>>  	if (unlikely(line < 0 || line >= UART_NR))
->> Then this original check for "line < 0" can also be removed.
->>
->>
-> 
-> Well this matches what was there before. It would do atomic_inc_return
-> if the line was negative and then still check for a negative value. I
-> don't mind removing it though. Perhaps we should use an ida?:
-> 
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-OK, you are right.  If (pdev->id < -1) and (!pdev->dev.of_node) then
-the check is still needed.
+The dw watchdog can be found on the socfpga and rockchip platforms.
 
-You could use an ida.  Some drivers use a bit map.  I really don't think
-this should become a complicated algorithm though.  If the rule is that
-either all UARTS have an alias, or no UART has an alias, then I think
-the patch could be something like the following.
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-This combines your original patch, plus your fix patch, plus making
-the aliases all or nothing.  Not tested, not even compiled.
-
-What do you think?
-
-
-Index: linux/drivers/tty/serial/msm_serial.c
-===================================================================
---- linux.orig/drivers/tty/serial/msm_serial.c
-+++ linux/drivers/tty/serial/msm_serial.c
-@@ -1044,17 +1044,28 @@ static int msm_serial_probe(struct platf
- 	struct resource *resource;
- 	struct uart_port *port;
- 	const struct of_device_id *id;
--	int irq;
-+	int irq, line;
-+	static int no_prev_alias = 1;
- 
--	if (pdev->id == -1)
--		pdev->id = atomic_inc_return(&msm_uart_next_id) - 1;
-+	if (pdev->dev.of_node) {
-+		line = of_alias_get_id(pdev->dev.of_node, "serial");
-+		if (line < 0 && no_prev_alias)
-+			line = atomic_inc_return(&msm_uart_next_id) - 1;
-+		else
-+			no_prev_alias = 0;
-+	} else {
-+		if (pdev->id < 0 && no_prev_alias)
-+			line = atomic_inc_return(&msm_uart_next_id) - 1;
-+		else
-+			line = pdev->id;
-+	}
- 
--	if (unlikely(pdev->id < 0 || pdev->id >= UART_NR))
-+	if (unlikely(line < 0 || line >= UART_NR))
- 		return -ENXIO;
- 
--	dev_info(&pdev->dev, "msm_serial: detected port #%d\n", pdev->id);
-+	dev_info(&pdev->dev, "msm_serial: detected port #%d\n", line);
- 
--	port = get_port_from_line(pdev->id);
-+	port = get_port_from_line(line);
- 	port->dev = &pdev->dev;
- 	msm_port = UART_TO_MSM(port);
- 
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 3487046..3d4b9bf 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -263,6 +263,7 @@ CONFIG_XILINX_WATCHDOG=y
+ CONFIG_ORION_WATCHDOG=y
+ CONFIG_SUNXI_WATCHDOG=y
+ CONFIG_MESON_WATCHDOG=y
++CONFIG_DW_WATCHDOG=y
+ CONFIG_MFD_AS3722=y
+ CONFIG_MFD_BCM590XX=y
+ CONFIG_MFD_CROS_EC=y
+-- 
+2.0.3
