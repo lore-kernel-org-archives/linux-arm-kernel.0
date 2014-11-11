@@ -1,53 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 11 Nov 2014 06:49:12 -0800
-Subject: [PATCH v2] ARM: dts: sbc-t3x: add DVI display data
-In-Reply-To: <5461FAEF.3010607@compulab.co.il>
-References: <1413364186-23752-1-git-send-email-lifshitz@compulab.co.il>
- <1414927198-7127-1-git-send-email-lifshitz@compulab.co.il>
- <54561E45.7000404@compulab.co.il>
- <20141110174845.GP31454@atomide.com>
- <5461FAEF.3010607@compulab.co.il>
-Message-ID: <20141111144911.GK31454@atomide.com>
+From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
+Date: Tue, 11 Nov 2014 15:51:14 +0100
+Subject: [PATCH] arm64: dts: create an include directory for DT bindings
+In-Reply-To: <1415712108-11352-1-git-send-email-bintian.wang@huawei.com>
+References: <1415712108-11352-1-git-send-email-bintian.wang@huawei.com>
+Message-ID: <54622262.2010200@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Igor Grinberg <grinberg@compulab.co.il> [141111 04:04]:
-> Hi Tony,
+Hi,
+
+Am 11.11.2014 um 14:21 schrieb Bintian Wang:
+> Some header files may be used by both DT files and kernel, and we
+> usually put them under <include/dt-bindings/>, and also include them
+> in DT files just like:
+>     #include <dt-bindings/xxx/xxx.h>
+> for exaple, some clock header files.
 > 
-> On 11/10/14 19:48, Tony Lindgren wrote:
-> > * Igor Grinberg <grinberg@compulab.co.il> [141102 04:08]:
-> >> On 11/02/14 13:19, Dmitry Lifshitz wrote:
-> >>> Add DSS related pinmux and display data nodes required to support
-> >>> DVI video out on SBC-T3530, SBC-T3730 and SBC-T3517.
-> >>>
-> >>> Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
-> >>
-> >> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
-> > 
-> > Thanks applying into omap-for-v3.19/dt.
-> > 
-> > Are we now ready to drop the board-cm-*.c files?
+> On arm64 platform, the compiler will report an error and terminate
+> when compiling DT files:
+>     dt-bindings/xxx/xxx.h: No such file or directory
 > 
-> Let's see, below is a list of things that are yet to be
-> supported in DT boot:
-> NAND, TV, LCD, Touchscreen, Audio (CM-T3x30), RTC (CM-T3517), CAN (CM-3517).
-
-OK great, hopefully that's mostly just configuring the .dts
-files.
- 
-> We're rc4 now, so hopefully, we will be able to get all this in for 3.19
-> and then have the board files removed for 3.20.
-
-Yes something like that sounds good to me. We should allow at
-least one release for people to change over.
-
-> This way we can have 3.19 with both ways supported and do last checks.
+> In order to fix the compile error, create an include directory and symlink
+> dt-bindings from there to the actual location of include/dt-bindings/:
 > 
-> Are you ok with this?
+> arch/arm64/boot/dts/include/dt-bindings -> ../../../../../include/dt-bindings
+> 
+> Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
+> ---
+>  arch/arm64/boot/dts/include/dt-bindings | 1 +
+>  1 file changed, 1 insertion(+)
+>  create mode 120000 arch/arm64/boot/dts/include/dt-bindings
+> 
+> diff --git a/arch/arm64/boot/dts/include/dt-bindings b/arch/arm64/boot/dts/include/dt-bindings
+> new file mode 120000
+> index 0000000..08c00e4
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/include/dt-bindings
+> @@ -0,0 +1 @@
+> +../../../../../include/dt-bindings
+> \ No newline at end of file
 
-Sure if you get the changes posted before -rc6, otherwise
-it will be too late for v3.19.
+Such a patch was already on the list for the Juno board.
 
 Regards,
+Andreas
 
-Tony
+-- 
+SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 21284 AG N?rnberg
