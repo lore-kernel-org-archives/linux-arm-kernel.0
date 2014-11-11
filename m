@@ -1,153 +1,111 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 11 Nov 2014 15:48:01 +0000
-Subject: [PATCH 03/15] arm64: MSI: Add support for stacked MSI domain
+Date: Tue, 11 Nov 2014 15:48:05 +0000
+Subject: [PATCH 07/15] irqchip: GICv3: ITS: irqchip implementation
 In-Reply-To: <1415720893-13371-1-git-send-email-marc.zyngier@arm.com>
 References: <1415720893-13371-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1415720893-13371-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1415720893-13371-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the spirit of the new x86 support for stacked domains and MSI,
-add the minimum backend to support this feature on arm64.
+The usual methods that are used to present an irqchip to the rest
+of the kernel
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/msi.h | 26 ++++++++++++++
- arch/arm64/kernel/Makefile   |  1 +
- arch/arm64/kernel/msi.c      | 80 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 107 insertions(+)
- create mode 100644 arch/arm64/include/asm/msi.h
- create mode 100644 arch/arm64/kernel/msi.c
+ drivers/irqchip/irq-gic-v3-its.c | 77 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 77 insertions(+)
 
-diff --git a/arch/arm64/include/asm/msi.h b/arch/arm64/include/asm/msi.h
-new file mode 100644
-index 0000000..d07dab7
---- /dev/null
-+++ b/arch/arm64/include/asm/msi.h
-@@ -0,0 +1,26 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef __ARM64_MSI_H__
-+#define __ARM64_MSI_H__
-+
-+struct arm64_msi_info {
-+	struct pci_dev		*pdev;
-+	irq_hw_number_t		msi_hwirq;
-+	int			nvec;
-+};
-+
-+void arm64_init_msi_domain(struct irq_domain *parent, irq_flow_handler_t handle);
-+
-+#endif /* __ARM64_MSI_H__ */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 5bd029b..33283b8 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -31,6 +31,7 @@ arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
- arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
- arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
- arm64-obj-$(CONFIG_PCI)			+= pci.o
-+arm64-obj-$(CONFIG_PCI_MSI_IRQ_DOMAIN)	+= msi.o
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 1082173..c904769 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -40,6 +40,8 @@
  
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/msi.c b/arch/arm64/kernel/msi.c
-new file mode 100644
-index 0000000..82f6162
---- /dev/null
-+++ b/arch/arm64/kernel/msi.c
-@@ -0,0 +1,80 @@
+ #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1 << 0)
+ 
++#define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
++
+ /*
+  * Collection structure - just an ID, and a redistributor address to
+  * ping. We use one per CPU as a bag of interrupts assigned to this
+@@ -508,3 +510,78 @@ static void its_send_invall(struct its_node *its, struct its_collection *col)
+ 
+ 	its_send_single_command(its, its_build_invall_cmd, &desc);
+ }
++
 +/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ * irqchip functions - assumes MSI, mostly.
 + */
 +
-+#include <linux/irq.h>
-+#include <linux/msi.h>
-+
-+#include <asm/msi.h>
-+
-+static struct irq_domain *msi_default_domain;
-+static irq_flow_handler_t msi_flow_handler;
-+
-+irq_hw_number_t arch_msi_irq_domain_get_hwirq(void *arg)
++static inline u32 its_get_event_id(struct irq_data *d)
 +{
-+	struct arm64_msi_info *info = arg;
-+
-+	return info->msi_hwirq;
++	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
++	return d->hwirq - its_dev->lpi_base;
 +}
 +
-+void arch_msi_irq_domain_set_hwirq(void *arg, irq_hw_number_t msi_hwirq)
++static void lpi_set_config(struct irq_data *d, bool enable)
 +{
-+	struct arm64_msi_info *info = arg;
++	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
++	irq_hw_number_t hwirq = d->hwirq;
++	u32 id = its_get_event_id(d);
++	u8 *cfg = page_address(gic_rdists->prop_page) + hwirq - 8192;
 +
-+	info->msi_hwirq = msi_hwirq;
++	if (enable)
++		*cfg |= LPI_PROP_ENABLED;
++	else
++		*cfg &= ~LPI_PROP_ENABLED;
++
++	/*
++	 * Make the above write visible to the redistributors.
++	 * And yes, we're flushing exactly: One. Single. Byte.
++	 * Humpf...
++	 */
++	if (gic_rdists->flags & RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING)
++		__flush_dcache_area(cfg, sizeof(*cfg));
++	else
++		dsb(ishst);
++	its_send_inv(its_dev, id);
 +}
 +
-+void arch_msi_irq_set_handler(unsigned int virq)
++static void its_mask_irq(struct irq_data *d)
 +{
-+	__irq_set_handler(virq, msi_flow_handler, 0, NULL);
++	lpi_set_config(d, false);
 +}
 +
-+static void arm64_mask_msi_irq(struct irq_data *d)
++static void its_unmask_irq(struct irq_data *d)
 +{
-+	mask_msi_irq(d);
-+	irq_chip_mask_parent(d);
++	lpi_set_config(d, true);
 +}
 +
-+static void arm64_unmask_msi_irq(struct irq_data *d)
++static void its_eoi_irq(struct irq_data *d)
 +{
-+	unmask_msi_irq(d);
-+	irq_chip_unmask_parent(d);
++	gic_write_eoir(d->hwirq);
 +}
 +
-+static struct irq_chip msi_irq_chip = {
-+	.name			= "PCI-MSI",
-+	.irq_unmask		= arm64_unmask_msi_irq,
-+	.irq_mask		= arm64_mask_msi_irq,
-+	.irq_eoi		= irq_chip_eoi_parent,
-+	.irq_set_affinity	= irq_chip_set_affinity_parent,
++static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
++			    bool force)
++{
++	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
++	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
++	struct its_collection *target_col;
++	u32 id = its_get_event_id(d);
++
++	if (cpu >= nr_cpu_ids)
++		return -EINVAL;
++
++	target_col = &its_dev->its->collections[cpu];
++	its_send_movi(its_dev, target_col, id);
++	its_dev->collection = target_col;
++
++	return IRQ_SET_MASK_OK;
++}
++
++static struct irq_chip its_irq_chip = {
++	.name			= "ITS",
++	.irq_mask		= its_mask_irq,
++	.irq_unmask		= its_unmask_irq,
++	.irq_eoi		= its_eoi_irq,
++	.irq_set_affinity	= its_set_affinity,
 +};
-+
-+int arch_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
-+{
-+	struct arm64_msi_info info;
-+
-+	info.pdev = pdev;
-+	info.nvec = nvec;
-+
-+	return msi_irq_domain_alloc_irqs(msi_default_domain, type, pdev, &info);
-+}
-+
-+void arm64_init_msi_domain(struct irq_domain *parent, irq_flow_handler_t handle)
-+{
-+	WARN_ON(msi_default_domain);
-+	WARN_ON(msi_flow_handler);
-+	msi_flow_handler = handle;
-+	msi_default_domain = msi_create_irq_domain(NULL, &msi_irq_chip, parent);
-+	if (!msi_default_domain)
-+		pr_warn("failed to initialize irqdomain for MSI/MSI-x.\n");
-+}
 -- 
 2.0.4
