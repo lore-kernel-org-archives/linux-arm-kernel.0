@@ -1,255 +1,72 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 11 Nov 2014 12:04:58 -0600
-Subject: [PATCH] coresight: bindings for coresight drivers
-In-Reply-To: <1415727960-29524-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1415727960-29524-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <CAL_JsqLXTx9jWT3sm3wnu1oWCk_VH_CUjfVX7t1HEA_9BfSeAg@mail.gmail.com>
+From: juergen@kreuzholzen.de (Juergen Borleis)
+Date: Tue, 11 Nov 2014 19:10:33 +0100
+Subject: Samsung/S3C6410/Mini6410: how to handle NAND's "clock off"
+Message-ID: <201411111910.34231.juergen@kreuzholzen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 11, 2014 at 11:46 AM,  <mathieu.poirier@linaro.org> wrote:
-> Greg,
->
-> Please consider this as a supplement to the coresight patchset.  It should have
-> been sent with the rest of the patches but I missed the original ack from Rob
-> Herring.
+Hi,
 
-Ummm...
+the S3C2410 NAND driver [1] can still be used for NANDs attached to an S3C6410
+SoC. But this driver has a "nice" feature called "clock off" to save some
+power while not in use. I tried it here on my Mini6410 platform and it freezes
+the system.
 
->
-> Thanks,
-> Mathieu
->
-> From 69cae46640b8cdc836bf7b86211d5f2adf3d0270 Mon Sep 17 00:00:00 2001
-> From: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Date: Thu, 7 Aug 2014 12:34:06 -0600
-> Subject: [PATCH] coresight: bindings for coresight drivers
->
-> Coresight IP blocks allow for the support of HW assisted tracing
-> on ARM SoCs.  Bindings for the currently available blocks are
-> presented herein.
->
-> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+The clock tree is somehow:
 
-And you still did.
+[...]
+  hclk                      4            4   133000000          0 0
+     hclk_mfc               0            0   133000000          0 0
+     hclk_mem0              2            2   133000000          0 0
+        mem0_srom           0            0   133000000          0 0
+        mem0_nfcon          1            1   133000000          0 0
+        mem0_onenand0       0            0   133000000          0 0
+        mem0_onenand1       0            0   133000000          0 0
+        mem0_cfcon          0            0   133000000          0 0
+[...]
 
+On the Mini6410 the "mem0_nfcon" clock is the only single user of the
+"hclk_mem0". And this clock is required to keep the access to the external
+network device enabled. When the NAND driver disables its clock "mem0_nfcon",
+the "hclk_mem0" gets also disabled because there is no consumer anymore. The
+next time the network driver tries to access its device, the SoC freezes.
 
-> ---
->  .../devicetree/bindings/arm/coresight.txt          | 204 +++++++++++++++++++++
->  1 file changed, 204 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/coresight.txt
->
-> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-> new file mode 100644
-> index 0000000..d790f49
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
-> @@ -0,0 +1,204 @@
-> +* CoreSight Components:
-> +
-> +CoreSight components are compliant with the ARM CoreSight architecture
-> +specification and can be connected in various topologies to suit a particular
-> +SoCs tracing needs. These trace components can generally be classified as
-> +sinks, links and sources. Trace data produced by one or more sources flows
-> +through the intermediate links connecting the source to the currently selected
-> +sink. Each CoreSight component device should use these properties to describe
-> +its hardware characteristcs.
-> +
-> +* Required properties for all components *except* non-configurable replicators:
-> +
-> +       * compatible: These have to be supplemented with "arm,primecell" as
-> +         drivers are using the AMBA bus interface.  Possible values include:
-> +               - "arm,coresight-etb10", "arm,primecell";
-> +               - "arm,coresight-tpiu", "arm,primecell";
-> +               - "arm,coresight-tmc", "arm,primecell";
-> +               - "arm,coresight-funnel", "arm,primecell";
-> +               - "arm,coresight-etm3x", "arm,primecell";
-> +
-> +       * reg: physical base address and length of the register
-> +         set(s) of the component.
-> +
-> +       * clocks: the clock associated to this component.
-> +
-> +       * clock-names: the name of the clock as referenced by the code.
-> +         Since we are using the AMBA framework, the name should be
-> +         "apb_pclk".
-> +
-> +       * port or ports: The representation of the component's port
-> +         layout using the generic DT graph presentation found in
-> +         "bindings/graph.txt".
-> +
-> +* Required properties for devices that don't show up on the AMBA bus, such as
-> +  non-configurable replicators:
-> +
-> +       * compatible: Currently supported value is (note the absence of the
-> +         AMBA markee):
-> +               - "arm,coresight-replicator"
-> +
-> +       * id: a unique number that will identify this replicator.
-> +
-> +       * port or ports: same as above.
-> +
-> +* Optional properties for ETM/PTMs:
-> +
-> +       * arm,cp14: must be present if the system accesses ETM/PTM management
-> +         registers via co-processor 14.
-> +
-> +       * cpu: the cpu phandle this ETM/PTM is affined to. When omitted the
-> +         source is considered to belong to CPU0.
-> +
-> +* Optional property for TMC:
-> +
-> +       * arm,buffer-size: size of contiguous buffer space for TMC ETR
-> +        (embedded trace router)
-> +
-> +
-> +Example:
-> +
-> +1. Sinks
-> +       etb at 20010000 {
-> +               compatible = "arm,coresight-etb10", "arm,primecell";
-> +               reg = <0 0x20010000 0 0x1000>;
-> +
-> +               coresight-default-sink;
-> +               clocks = <&oscclk6a>;
-> +               clock-names = "apb_pclk";
-> +               port {
-> +                       etb_in_port: endpoint at 0 {
-> +                               slave-mode;
-> +                               remote-endpoint = <&replicator_out_port0>;
-> +                       };
-> +               };
-> +       };
-> +
-> +       tpiu at 20030000 {
-> +               compatible = "arm,coresight-tpiu", "arm,primecell";
-> +               reg = <0 0x20030000 0 0x1000>;
-> +
-> +               clocks = <&oscclk6a>;
-> +               clock-names = "apb_pclk";
-> +               port {
-> +                       tpiu_in_port: endpoint at 0 {
-> +                               slave-mode;
-> +                               remote-endpoint = <&replicator_out_port1>;
-> +                       };
-> +               };
-> +       };
-> +
-> +2. Links
-> +       replicator {
-> +               /* non-configurable replicators don't show up on the
-> +                * AMBA bus.  As such no need to add "arm,primecell".
-> +                */
-> +               compatible = "arm,coresight-replicator";
-> +               /* this will show up in debugfs as "0.replicator" */
-> +               id = <0>;
-> +
-> +               ports {
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +
-> +                       /* replicator output ports */
-> +                       port at 0 {
-> +                               reg = <0>;
-> +                               replicator_out_port0: endpoint {
-> +                                       remote-endpoint = <&etb_in_port>;
-> +                               };
-> +                       };
-> +
-> +                       port at 1 {
-> +                               reg = <1>;
-> +                               replicator_out_port1: endpoint {
-> +                                       remote-endpoint = <&tpiu_in_port>;
-> +                               };
-> +                       };
-> +
-> +                       /* replicator input port */
-> +                       port at 2 {
-> +                               reg = <0>;
-> +                               replicator_in_port0: endpoint {
-> +                                       slave-mode;
-> +                                       remote-endpoint = <&funnel_out_port0>;
-> +                               };
-> +                       };
-> +               };
-> +       };
-> +
-> +       funnel at 20040000 {
-> +               compatible = "arm,coresight-funnel", "arm,primecell";
-> +               reg = <0 0x20040000 0 0x1000>;
-> +
-> +               clocks = <&oscclk6a>;
-> +               clock-names = "apb_pclk";
-> +               ports {
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +
-> +                       /* funnel output port */
-> +                       port at 0 {
-> +                               reg = <0>;
-> +                               funnel_out_port0: endpoint {
-> +                                       remote-endpoint =
-> +                                                       <&replicator_in_port0>;
-> +                               };
-> +                       };
-> +
-> +                       /* funnel input ports */
-> +                       port at 1 {
-> +                               reg = <0>;
-> +                               funnel_in_port0: endpoint {
-> +                                       slave-mode;
-> +                                       remote-endpoint = <&ptm0_out_port>;
-> +                               };
-> +                       };
-> +
-> +                       port at 2 {
-> +                               reg = <1>;
-> +                               funnel_in_port1: endpoint {
-> +                                       slave-mode;
-> +                                       remote-endpoint = <&ptm1_out_port>;
-> +                               };
-> +                       };
-> +
-> +                       port at 3 {
-> +                               reg = <2>;
-> +                               funnel_in_port2: endpoint {
-> +                                       slave-mode;
-> +                                       remote-endpoint = <&etm0_out_port>;
-> +                               };
-> +                       };
-> +
-> +               };
-> +       };
-> +
-> +3. Sources
-> +       ptm at 2201c000 {
-> +               compatible = "arm,coresight-etm3x", "arm,primecell";
-> +               reg = <0 0x2201c000 0 0x1000>;
-> +
-> +               cpu = <&cpu0>;
-> +               clocks = <&oscclk6a>;
-> +               clock-names = "apb_pclk";
-> +               port {
-> +                       ptm0_out_port: endpoint {
-> +                               remote-endpoint = <&funnel_in_port0>;
-> +                       };
-> +               };
-> +       };
-> +
-> +       ptm at 2201d000 {
-> +               compatible = "arm,coresight-etm3x", "arm,primecell";
-> +               reg = <0 0x2201d000 0 0x1000>;
-> +
-> +               cpu = <&cpu1>;
-> +               clocks = <&oscclk6a>;
-> +               clock-names = "apb_pclk";
-> +               port {
-> +                       ptm1_out_port: endpoint {
-> +                               remote-endpoint = <&funnel_in_port1>;
-> +                       };
-> +               };
-> +       };
-> --
-> 1.9.1
->
+How to prevent this? Can we keep the "hclk_mem0" enabled without an active
+consumer? Or do we need a dummy consumer? Or do we need to request for
+"hclk_mem0" when at least one external device is attached? Or should we remove
+the "clock stop" feature for at least the S3C6410 SoC?
+
+With the patch below I was able to reproduce the behavior:
+
+Author: Juergen Borleis <juergen@kreuzholzen.de>
+Date:   Mon Nov 10 23:35:06 2014 +0100
+
+    ARM/S3C6410/NAND: add clock alias to keep an old driver alive
+    
+    This change enables the existing S3c2410.c driver for the S3C6410.
+    
+    But keep in mind to disable the CONFIG_MTD_NAND_S3C2410_CLKSTOP when using
+    this driver!
+    
+    Why? The access to external devices depends on a running "hclk_mem0" clock.
+    As the NAND controller was the only single user of it, it disables it, when
+    it disables its owm clock to save power. This locks the system. m(
+    
+    Signed-off-by: Juergen Borleis <juergen@kreuzholzen.de>
+
+diff --git a/drivers/clk/samsung/clk-s3c64xx.c b/drivers/clk/samsung/clk-s3c64xx.c
+index 0f590e5..f7d2d57 100644
+--- a/drivers/clk/samsung/clk-s3c64xx.c
++++ b/drivers/clk/samsung/clk-s3c64xx.c
+@@ -404,6 +404,7 @@ static struct samsung_clock_alias s3c64xx_clock_aliases[] = {
+ 	ALIAS(PCLK_IIS0, "samsung-i2s.0", "iis"),
+ 	ALIAS(PCLK_AC97, "samsung-ac97", "ac97"),
+ 	ALIAS(PCLK_TSADC, "s3c64xx-adc", "adc"),
++	ALIAS(MEM0_NFCON, NULL, "nand"),
+ 	ALIAS(PCLK_KEYPAD, "samsung-keypad", "keypad"),
+ 	ALIAS(PCLK_PCM1, "samsung-pcm.1", "pcm"),
+ 	ALIAS(PCLK_PCM0, "samsung-pcm.0", "pcm"),
+
+jbe
+
+[1] drivers/mtd/nand/s3c2410.c
