@@ -1,56 +1,53 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 11 Nov 2014 22:49:15 +0800
-Subject: [[PATCHv2] 1/3] ARM: imx: clk-vf610: Add clock for SNVS
-In-Reply-To: <bbe86ff8ff7461451be5c53242842e966bfd3966.1415364391.git.maitysanchayan@gmail.com>
-References: <cover.1415364391.git.maitysanchayan@gmail.com>
- <bbe86ff8ff7461451be5c53242842e966bfd3966.1415364391.git.maitysanchayan@gmail.com>
-Message-ID: <20141111144911.GH2704@dragon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 11 Nov 2014 06:49:12 -0800
+Subject: [PATCH v2] ARM: dts: sbc-t3x: add DVI display data
+In-Reply-To: <5461FAEF.3010607@compulab.co.il>
+References: <1413364186-23752-1-git-send-email-lifshitz@compulab.co.il>
+ <1414927198-7127-1-git-send-email-lifshitz@compulab.co.il>
+ <54561E45.7000404@compulab.co.il>
+ <20141110174845.GP31454@atomide.com>
+ <5461FAEF.3010607@compulab.co.il>
+Message-ID: <20141111144911.GK31454@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 07, 2014 at 06:34:26PM +0530, Sanchayan Maity wrote:
-> This patch adds support for clock gating of
-> the SNVS peripheral.
+* Igor Grinberg <grinberg@compulab.co.il> [141111 04:04]:
+> Hi Tony,
 > 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> ---
->  arch/arm/mach-imx/clk-vf610.c           |    1 +
->  include/dt-bindings/clock/vf610-clock.h |    3 ++-
->  2 files changed, 3 insertions(+), 1 deletion(-)
+> On 11/10/14 19:48, Tony Lindgren wrote:
+> > * Igor Grinberg <grinberg@compulab.co.il> [141102 04:08]:
+> >> On 11/02/14 13:19, Dmitry Lifshitz wrote:
+> >>> Add DSS related pinmux and display data nodes required to support
+> >>> DVI video out on SBC-T3530, SBC-T3730 and SBC-T3517.
+> >>>
+> >>> Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
+> >>
+> >> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+> > 
+> > Thanks applying into omap-for-v3.19/dt.
+> > 
+> > Are we now ready to drop the board-cm-*.c files?
 > 
-> diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
-> index 5937dde..bbf4785 100644
-> --- a/arch/arm/mach-imx/clk-vf610.c
-> +++ b/arch/arm/mach-imx/clk-vf610.c
-> @@ -379,6 +379,7 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
->  	clk[VF610_CLK_DMAMUX1] = imx_clk_gate2("dmamux1", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(5));
->  	clk[VF610_CLK_DMAMUX2] = imx_clk_gate2("dmamux2", "platform_bus", CCM_CCGR6, CCM_CCGRx_CGn(1));
->  	clk[VF610_CLK_DMAMUX3] = imx_clk_gate2("dmamux3", "platform_bus", CCM_CCGR6, CCM_CCGRx_CGn(2));
-> +	clk[VF610_CLK_SNVS] = imx_clk_gate2("snvs-rtc", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(7));
+> Let's see, below is a list of things that are yet to be
+> supported in DT boot:
+> NAND, TV, LCD, Touchscreen, Audio (CM-T3x30), RTC (CM-T3517), CAN (CM-3517).
 
-Stefan,
+OK great, hopefully that's mostly just configuring the .dts
+files.
+ 
+> We're rc4 now, so hopefully, we will be able to get all this in for 3.19
+> and then have the board files removed for 3.20.
 
-Would you confirm this register bits is the gating for SNVS clock?  I
-cannot find it in my Vybrid Reference Manual.
+Yes something like that sounds good to me. We should allow at
+least one release for people to change over.
 
-Shawn
-
->  
->  	imx_check_clocks(clk, ARRAY_SIZE(clk));
->  
-> diff --git a/include/dt-bindings/clock/vf610-clock.h b/include/dt-bindings/clock/vf610-clock.h
-> index 801c0ac..979d24a 100644
-> --- a/include/dt-bindings/clock/vf610-clock.h
-> +++ b/include/dt-bindings/clock/vf610-clock.h
-> @@ -192,6 +192,7 @@
->  #define VF610_PLL5_BYPASS		179
->  #define VF610_PLL6_BYPASS		180
->  #define VF610_PLL7_BYPASS		181
-> -#define VF610_CLK_END			182
-> +#define VF610_CLK_SNVS			182
-> +#define VF610_CLK_END			183
->  
->  #endif /* __DT_BINDINGS_CLOCK_VF610_H */
-> -- 
-> 1.7.9.5
+> This way we can have 3.19 with both ways supported and do last checks.
 > 
+> Are you ok with this?
+
+Sure if you get the changes posted before -rc6, otherwise
+it will be too late for v3.19.
+
+Regards,
+
+Tony
