@@ -1,32 +1,25 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 11 Nov 2014 13:23:09 +0000
-Subject: [PATCH 02/15] GPIO: port LoCoMo gpio support from old driver
-In-Reply-To: <CALT56yPr42FV66USngocw=eWPt81d5R2MJxmzBnv02HOMmXAkA@mail.gmail.com>
-References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
- <1414454528-24240-3-git-send-email-dbaryshkov@gmail.com>
- <CACRpkdY7tRadod2vQfEytmw-ubaMAvr_=XTczD5bUMkqie0xkg@mail.gmail.com>
- <CALT56yOgMUA7o2dzfHph=S2zkDV4zERzMh4ishpPwpAx7Cqj6Q@mail.gmail.com>
- <CACRpkdb7v3LmOhbhQ9TPk1_bnLnpwizawW6RQvhQRLSjRewAaQ@mail.gmail.com>
- <CALT56yO9f8wzaArnmfQSDzCM3S+2oT+62anH5kbFY3WdEt_HZg@mail.gmail.com>
- <20141106060335.GR8509@sirena.org.uk>
- <CALT56yPr42FV66USngocw=eWPt81d5R2MJxmzBnv02HOMmXAkA@mail.gmail.com>
-Message-ID: <20141111132309.GX3815@sirena.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 11 Nov 2014 21:33:33 +0800
+Subject: [PATCH v6 1/3] ARM: dts: pbab01: move i2c pins and frequency
+ configuration into pfla02
+In-Reply-To: <1415106349-18846-2-git-send-email-d.lavnikevich@sam-solutions.com>
+References: <1415106349-18846-1-git-send-email-d.lavnikevich@sam-solutions.com>
+ <1415106349-18846-2-git-send-email-d.lavnikevich@sam-solutions.com>
+Message-ID: <20141111133331.GA2704@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 11, 2014 at 05:16:38PM +0400, Dmitry Eremin-Solenikov wrote:
+On Tue, Nov 04, 2014 at 04:05:47PM +0300, Dmitry Lavnikevich wrote:
+> Since pins and frequency are specific to module (pfla02), not base board
+> (pbab02), it is better to be initialized in corresponding dts file.
+> 
+> This patch fixes i2c2, i2c3 pin configuration which caused messages:
+> 
+> imx6q-pinctrl 20e0000.iomuxc: no groups defined in /soc/aips-bus at 02000000/iomuxc at 020e0000/i2c2grp
+> imx6q-pinctrl 20e0000.iomuxc: no groups defined in /soc/aips-bus at 02000000/iomuxc at 020e0000/i2c3grp
+> imx6q-pinctrl 20e0000.iomuxc: unable to find group for node i2c2grp
+> imx6q-pinctrl 20e0000.iomuxc: unable to find group for node i2c3grp
+> 
+> Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
 
-> Just to better understand your suggestions: do you want me to convert
-> to regmap only gpio driver or do you suggest to convert all LoCoMo drivers?
-> That is doable, of course, but the amount of changes is overwhelming.
-> Also I'm concerned about the performance impact from going through
-> regmap layers.
-
-I don't care.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141111/6685a490/attachment-0001.sig>
+Applied all 3, thanks.
