@@ -1,157 +1,38 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Tue, 11 Nov 2014 15:21:15 +0900
-Subject: [PATCH v4 REPOST 5/5] ARM: tegra: Add thermal reset (thermtrip)
- support to PMC
-In-Reply-To: <1415625137-4791-6-git-send-email-mikko.perttunen@kapsi.fi>
-References: <1415625137-4791-1-git-send-email-mikko.perttunen@kapsi.fi>
- <1415625137-4791-6-git-send-email-mikko.perttunen@kapsi.fi>
-Message-ID: <5461AADB.2060207@nvidia.com>
+From: tbergstrom@nvidia.com (=?windows-1252?Q?Terje_Bergstr=F6m?=)
+Date: Tue, 11 Nov 2014 08:57:30 +0200
+Subject: [PATCH 0/3] Add support for Tegra Activity Monitor
+In-Reply-To: <546190BA.7050502@nvidia.com>
+References: <1414594232-15684-1-git-send-email-tomeu.vizoso@collabora.com>
+ <545C8BCC.3090908@nvidia.com> <545CBC87.7050404@collabora.com>
+ <546190BA.7050502@nvidia.com>
+Message-ID: <5461B35A.3080604@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2014 10:12 PM, Mikko Perttunen wrote:
-> @@ -606,6 +623,234 @@ void tegra_pmc_enter_suspend_mode(enum tegra_suspend_mode mode)
->   }
->   #endif
->
-> +static const char * const tegra20_powergates[] = {
-> +	[TEGRA_POWERGATE_CPU] = "cpu",
-> +	[TEGRA_POWERGATE_3D] = "3d",
-> +	[TEGRA_POWERGATE_VENC] = "venc",
-> +	[TEGRA_POWERGATE_VDEC] = "vdec",
-> +	[TEGRA_POWERGATE_PCIE] = "pcie",
-> +	[TEGRA_POWERGATE_L2] = "l2",
-> +	[TEGRA_POWERGATE_MPE] = "mpe",
-> +};
-> +
-> +static const struct tegra_pmc_soc tegra20_pmc_soc = {
-> +	.num_powergates = ARRAY_SIZE(tegra20_powergates),
-> +	.powergates = tegra20_powergates,
-> +	.num_cpu_powergates = 0,
-> +	.cpu_powergates = NULL,
-> +};
-> +
-> +static const char * const tegra30_powergates[] = {
-> +	[TEGRA_POWERGATE_CPU] = "cpu0",
-> +	[TEGRA_POWERGATE_3D] = "3d0",
-> +	[TEGRA_POWERGATE_VENC] = "venc",
-> +	[TEGRA_POWERGATE_VDEC] = "vdec",
-> +	[TEGRA_POWERGATE_PCIE] = "pcie",
-> +	[TEGRA_POWERGATE_L2] = "l2",
-> +	[TEGRA_POWERGATE_MPE] = "mpe",
-> +	[TEGRA_POWERGATE_HEG] = "heg",
-> +	[TEGRA_POWERGATE_SATA] = "sata",
-> +	[TEGRA_POWERGATE_CPU1] = "cpu1",
-> +	[TEGRA_POWERGATE_CPU2] = "cpu2",
-> +	[TEGRA_POWERGATE_CPU3] = "cpu3",
-> +	[TEGRA_POWERGATE_CELP] = "celp",
-> +	[TEGRA_POWERGATE_3D1] = "3d1",
-> +};
-> +
-> +static const u8 tegra30_cpu_powergates[] = {
-> +	TEGRA_POWERGATE_CPU,
-> +	TEGRA_POWERGATE_CPU1,
-> +	TEGRA_POWERGATE_CPU2,
-> +	TEGRA_POWERGATE_CPU3,
-> +};
-> +
-> +static const struct tegra_pmc_soc tegra30_pmc_soc = {
-> +	.num_powergates = ARRAY_SIZE(tegra30_powergates),
-> +	.powergates = tegra30_powergates,
-> +	.num_cpu_powergates = ARRAY_SIZE(tegra30_cpu_powergates),
-> +	.cpu_powergates = tegra30_cpu_powergates,
-> +	.has_tsense_reset = true,
-> +};
-> +
-> +static const char * const tegra114_powergates[] = {
-> +	[TEGRA_POWERGATE_CPU] = "crail",
-> +	[TEGRA_POWERGATE_3D] = "3d",
-> +	[TEGRA_POWERGATE_VENC] = "venc",
-> +	[TEGRA_POWERGATE_VDEC] = "vdec",
-> +	[TEGRA_POWERGATE_MPE] = "mpe",
-> +	[TEGRA_POWERGATE_HEG] = "heg",
-> +	[TEGRA_POWERGATE_CPU1] = "cpu1",
-> +	[TEGRA_POWERGATE_CPU2] = "cpu2",
-> +	[TEGRA_POWERGATE_CPU3] = "cpu3",
-> +	[TEGRA_POWERGATE_CELP] = "celp",
-> +	[TEGRA_POWERGATE_CPU0] = "cpu0",
-> +	[TEGRA_POWERGATE_C0NC] = "c0nc",
-> +	[TEGRA_POWERGATE_C1NC] = "c1nc",
-> +	[TEGRA_POWERGATE_DIS] = "dis",
-> +	[TEGRA_POWERGATE_DISB] = "disb",
-> +	[TEGRA_POWERGATE_XUSBA] = "xusba",
-> +	[TEGRA_POWERGATE_XUSBB] = "xusbb",
-> +	[TEGRA_POWERGATE_XUSBC] = "xusbc",
-> +};
-> +
-> +static const u8 tegra114_cpu_powergates[] = {
-> +	TEGRA_POWERGATE_CPU0,
-> +	TEGRA_POWERGATE_CPU1,
-> +	TEGRA_POWERGATE_CPU2,
-> +	TEGRA_POWERGATE_CPU3,
-> +};
-> +
-> +static const struct tegra_pmc_soc tegra114_pmc_soc = {
-> +	.num_powergates = ARRAY_SIZE(tegra114_powergates),
-> +	.powergates = tegra114_powergates,
-> +	.num_cpu_powergates = ARRAY_SIZE(tegra114_cpu_powergates),
-> +	.cpu_powergates = tegra114_cpu_powergates,
-> +	.has_tsense_reset = true,
-> +};
-> +
-> +static const char * const tegra124_powergates[] = {
-> +	[TEGRA_POWERGATE_CPU] = "crail",
-> +	[TEGRA_POWERGATE_3D] = "3d",
-> +	[TEGRA_POWERGATE_VENC] = "venc",
-> +	[TEGRA_POWERGATE_PCIE] = "pcie",
-> +	[TEGRA_POWERGATE_VDEC] = "vdec",
-> +	[TEGRA_POWERGATE_L2] = "l2",
-> +	[TEGRA_POWERGATE_MPE] = "mpe",
-> +	[TEGRA_POWERGATE_HEG] = "heg",
-> +	[TEGRA_POWERGATE_SATA] = "sata",
-> +	[TEGRA_POWERGATE_CPU1] = "cpu1",
-> +	[TEGRA_POWERGATE_CPU2] = "cpu2",
-> +	[TEGRA_POWERGATE_CPU3] = "cpu3",
-> +	[TEGRA_POWERGATE_CELP] = "celp",
-> +	[TEGRA_POWERGATE_CPU0] = "cpu0",
-> +	[TEGRA_POWERGATE_C0NC] = "c0nc",
-> +	[TEGRA_POWERGATE_C1NC] = "c1nc",
-> +	[TEGRA_POWERGATE_SOR] = "sor",
-> +	[TEGRA_POWERGATE_DIS] = "dis",
-> +	[TEGRA_POWERGATE_DISB] = "disb",
-> +	[TEGRA_POWERGATE_XUSBA] = "xusba",
-> +	[TEGRA_POWERGATE_XUSBB] = "xusbb",
-> +	[TEGRA_POWERGATE_XUSBC] = "xusbc",
-> +	[TEGRA_POWERGATE_VIC] = "vic",
-> +	[TEGRA_POWERGATE_IRAM] = "iram",
-> +};
-> +
-> +static const u8 tegra124_cpu_powergates[] = {
-> +	TEGRA_POWERGATE_CPU0,
-> +	TEGRA_POWERGATE_CPU1,
-> +	TEGRA_POWERGATE_CPU2,
-> +	TEGRA_POWERGATE_CPU3,
-> +};
-> +
-> +static const struct tegra_pmc_soc tegra124_pmc_soc = {
-> +	.num_powergates = ARRAY_SIZE(tegra124_powergates),
-> +	.powergates = tegra124_powergates,
-> +	.num_cpu_powergates = ARRAY_SIZE(tegra124_cpu_powergates),
-> +	.cpu_powergates = tegra124_cpu_powergates,
-> +	.has_tsense_reset = true,
-> +};
-> +
-> +static const struct of_device_id tegra_pmc_match[] = {
-> +	{ .compatible = "nvidia,tegra124-pmc", .data = &tegra124_pmc_soc },
-> +	{ .compatible = "nvidia,tegra114-pmc", .data = &tegra114_pmc_soc },
-> +	{ .compatible = "nvidia,tegra30-pmc", .data = &tegra30_pmc_soc },
-> +	{ .compatible = "nvidia,tegra20-pmc", .data = &tegra20_pmc_soc },
-> +	{ }
-> +};
+On 11.11.2014 06:29, Alexandre Courbot wrote:
+> I think (after a quick look at devfreq's source) that you can avoid
+> polling altogether if you set polling_ms to 0 in your
+> devfreq_dev_profile instance. Then it is up to you to call
+> update_devfreq() from your custom governor whenever it sees fit.
+> 
+> ACTMON support seems to overlap between being a governor (which reacts
+> to ACTMON interrupts and calls update_devfreq() when needed) and part of
+> a devfreq_dev_profile (get_dev_status() needs to use the actmon
+> counters). If we keep your current design where the driver simply
+> controls a clock, you could have the ACTMON driver obtain that clock,
+> register its governor, create a non-polling devfreq_dev_profile that
+> controls that clock, and just call devfreq_add_device() with both. Then
+> we will have the benefit of being able to use ACTMON as well as the
+> performance and powersave governors on EMC, and switch policies
+> dynamically.
 
-Is there a need for moving this huge block of declarations? AFAICT you 
-are only using tegra_pmc_match in your function, maybe you can just do a 
-forward declaration so does not get longer and more complex than it 
-needs to be?
+Another way to use it is that governor is just a governor. It takes in
+load values and generates new target frequencies, and doesn't know
+anything about HW.
 
-This detail aside, patch looks ok to me.
+Device profile is the one that enables threshold interrupts and disables
+polling. Device profile receives the interrupt, retrieves new load
+number from hardware, and calls update_devfreq().
+
+This way we keep all HW specific code in device profile, and there's
+potential to use a generic governor instead of writing your own.
