@@ -1,49 +1,38 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 11 Nov 2014 17:16:38 +0400
-Subject: [PATCH 02/15] GPIO: port LoCoMo gpio support from old driver
-In-Reply-To: <20141106060335.GR8509@sirena.org.uk>
-References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
- <1414454528-24240-3-git-send-email-dbaryshkov@gmail.com>
- <CACRpkdY7tRadod2vQfEytmw-ubaMAvr_=XTczD5bUMkqie0xkg@mail.gmail.com>
- <CALT56yOgMUA7o2dzfHph=S2zkDV4zERzMh4ishpPwpAx7Cqj6Q@mail.gmail.com>
- <CACRpkdb7v3LmOhbhQ9TPk1_bnLnpwizawW6RQvhQRLSjRewAaQ@mail.gmail.com>
- <CALT56yO9f8wzaArnmfQSDzCM3S+2oT+62anH5kbFY3WdEt_HZg@mail.gmail.com>
- <20141106060335.GR8509@sirena.org.uk>
-Message-ID: <CALT56yPr42FV66USngocw=eWPt81d5R2MJxmzBnv02HOMmXAkA@mail.gmail.com>
+From: bintian.wang@huawei.com (Bintian Wang)
+Date: Tue, 11 Nov 2014 21:21:48 +0800
+Subject: [PATCH] arm64: dts: create an include directory for DT bindings
+Message-ID: <1415712108-11352-1-git-send-email-bintian.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-06 9:03 GMT+03:00 Mark Brown <broonie@kernel.org>:
-> On Thu, Nov 06, 2014 at 01:33:24AM +0400, Dmitry Eremin-Solenikov wrote:
->> 2014-11-03 16:43 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
->
->> > Yes that's the point: if you use regmap mmio you get the RMW-locking
->> > for free, with the regmap implementation.
->
->> Just to be more concrete. Currently locomo_gpio_ack_irq() function uses
->> one lock and one unlock for doing 3 consecutive RMW I I convert locomo
->> to regmap, will that be 3 lock/unlock calls or still one? (Or maybe I'm
->> trying to be over-protective here and adding more lock/unlock cycles
->> won't matter that much?)
->
-> You'll get three lock/unlocks, we could add an interface for bulk
-> updates under one lock if it's important though.
->
->> Next question: if I have to export regmap to several subdrivers, is it better
->> to have one big regmap or to have one-map-per-driver approach?
->
-> One regmap for the physical register map which is shared between all the
-> users.
+Some header files may be used by both DT files and kernel, and we
+usually put them under <include/dt-bindings/>, and also include them
+in DT files just like:
+    #include <dt-bindings/xxx/xxx.h>
+for exaple, some clock header files.
 
-Mark, Linus,
+On arm64 platform, the compiler will report an error and terminate
+when compiling DT files:
+    dt-bindings/xxx/xxx.h: No such file or directory
 
-Just to better understand your suggestions: do you want me to convert
-to regmap only gpio driver or do you suggest to convert all LoCoMo drivers?
-That is doable, of course, but the amount of changes is overwhelming.
-Also I'm concerned about the performance impact from going through
-regmap layers.
+In order to fix the compile error, create an include directory and symlink
+dt-bindings from there to the actual location of include/dt-bindings/:
 
+arch/arm64/boot/dts/include/dt-bindings -> ../../../../../include/dt-bindings
 
+Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
+---
+ arch/arm64/boot/dts/include/dt-bindings | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 120000 arch/arm64/boot/dts/include/dt-bindings
+
+diff --git a/arch/arm64/boot/dts/include/dt-bindings b/arch/arm64/boot/dts/include/dt-bindings
+new file mode 120000
+index 0000000..08c00e4
+--- /dev/null
++++ b/arch/arm64/boot/dts/include/dt-bindings
+@@ -0,0 +1 @@
++../../../../../include/dt-bindings
+\ No newline at end of file
 -- 
-With best wishes
-Dmitry
+1.9.1
