@@ -1,50 +1,46 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 11 Nov 2014 10:42:16 -0500
-Subject: [PATCH v2 09/10] arm64/efi: ignore unusable regions instead of
- reserving them
-In-Reply-To: <CAKv+Gu8ZpDpfJSvDksUfW0L4k9uU0-j9mConGwcdcsmh1XM_2w@mail.gmail.com>
-References: <1415283206-14713-1-git-send-email-ard.biesheuvel@linaro.org>
- <1415283206-14713-10-git-send-email-ard.biesheuvel@linaro.org>
- <1415592695.32311.91.camel@deneb.redhat.com>
- <CAKv+Gu8ZpDpfJSvDksUfW0L4k9uU0-j9mConGwcdcsmh1XM_2w@mail.gmail.com>
-Message-ID: <1415720536.32311.113.camel@deneb.redhat.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 11 Nov 2014 15:48:00 +0000
+Subject: [PATCH 02/15] PCI/MSI: genirq: allow architecture-specific override
+ of flow handler
+In-Reply-To: <1415720893-13371-1-git-send-email-marc.zyngier@arm.com>
+References: <1415720893-13371-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1415720893-13371-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-11-10 at 08:31 +0100, Ard Biesheuvel wrote:
-> On 10 November 2014 05:11, Mark Salter <msalter@redhat.com> wrote:
-> > On Thu, 2014-11-06 at 15:13 +0100, Ard Biesheuvel wrote:
-> >> This changes the way memblocks are installed based on the contents
-> of
-> >> the UEFI memory map. Formerly, all regions would be
-> memblock_add()'ed,
-> >> after which unusable regions would be memblock_reserve()'d as well.
-> >> To simplify things, but also to allow access to the unusable
-> regions
-> >> through mmap(/dev/mem), even with CONFIG_STRICT_DEVMEM set, change
-> >> this so that only usable regions are memblock_add()'ed in the first
-> >> place.
-> >
-> > This patch is crashing 64K pagesize kernels during boot. I'm not
-> exactly
-> > sure why, though. Here is what I get on an APM Mustang box:
-> >
-> 
-> Ah, yes, I meant to mention this patch
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/glikely/linux.git/commit/?id=8cccffc52694938fc88f3d90bc7fed8460e27191
-> 
-> in the cover letter, which addresses this issue at least for the DT
-> case.
-> 
+ARM interrupt controllers tend to use a "fasteoi" handler rather than
+the expected "edge". Allow the architecture to override the function
+call setting up the flow handler by defining arch_msi_irq_set_handler.
 
-That isn't the problem. In general, with 64K kernel pages, you can't be
-sure if you leave something you need out of the kernel linear mapping.
-If you have Loader Code/Data regions begin and/or end at something other
-than a 64K boundary and that region is adjacent to a region not being
-added, then you end up leaving out the unaligned bits from the linear
-mapping. This could be bits of the initramfs or devicetree.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/pci/msi.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-What I don't get with this failure is that it is an alignment fault
-which should be masked at EL1 for the kernel. The same unaligned
-access happens without this patch and it doesn't generate a fault.
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index 8de7c87..6fea997 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -1113,6 +1113,11 @@ msi_get_hwirq(struct pci_dev *dev, struct msi_desc *desc)
+ 		(pci_domain_nr(dev->bus) & 0xFFFFFFFF) << 27;
+ }
+ 
++void __weak arch_msi_irq_set_handler(unsigned int virq)
++{
++	__irq_set_handler(virq, handle_edge_irq, 0, "edge");
++}
++
+ static int msi_domain_alloc(struct irq_domain *domain, unsigned int virq,
+ 			    unsigned int nr_irqs, void *arg)
+ {
+@@ -1130,7 +1135,7 @@ static int msi_domain_alloc(struct irq_domain *domain, unsigned int virq,
+ 		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
+ 					      domain->host_data,
+ 					      (void *)(long)i);
+-		__irq_set_handler(virq + i, handle_edge_irq, 0, "edge");
++		arch_msi_irq_set_handler(virq + i);
+ 	}
+ 
+ 	return ret;
+-- 
+2.0.4
