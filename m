@@ -1,29 +1,26 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 11 Nov 2014 11:16:03 +0000
-Subject: [PATCH v8 0/13] introduce GNTTABOP_cache_flush
-In-Reply-To: <20141110184446.GJ25609@e104818-lin.cambridge.arm.com>
-References: <alpine.DEB.2.02.1411101607130.22875@kaball.uk.xensource.com>
- <20141110184446.GJ25609@e104818-lin.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.02.1411111115400.26318@kaball.uk.xensource.com>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Tue, 11 Nov 2014 12:18:39 +0100
+Subject: [PATCH v2 2/3] media: rc: add driver for Amlogic Meson IR remote
+ receiver
+In-Reply-To: <20141109203608.GA837@gofer.mess.org>
+References: <1415521928-25251-1-git-send-email-b.galvani@gmail.com>
+ <1415521928-25251-3-git-send-email-b.galvani@gmail.com>
+ <20141109203608.GA837@gofer.mess.org>
+Message-ID: <20141111111839.GA17620@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Nov 2014, Catalin Marinas wrote:
-> On Mon, Nov 10, 2014 at 04:12:40PM +0000, Stefano Stabellini wrote:
-> > this patch series introduces support for GNTTABOP_cache_flush to perform
-> > cache maintenance operation on foreign pages and reverts the current
-> > code based on XENFEAT_grant_map_identity.
-> > 
-> > It also provides a very slow fallback by bouncing on the swiotlb buffer,
-> > in case the hypercall is not available.
-> > 
-> > v7 introduces a flag named dma_coherent in dev_archdata and an accessor
-> > function named is_device_dma_coherent in asm/dma-mapping.h under arm and
-> > arm64.
+On Sun, Nov 09, 2014 at 08:36:09PM +0000, Sean Young wrote:
+> > [...]
+> > +	dev_info(dev, "receiver initialized\n");
+> > +
+> > +	return 0;
+> > +out_unreg:
+> > +	rc_unregister_device(ir->rc);
 > 
-> Apart from a few minor comments I gave already, the series looks fine to
-> me. Once addressed, you can add:
-> 
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> rc_unregister_device() already calls rc_free_device().
 
-Thank you very much for your help!
+Right, I will fix this.
+
+Thanks,
+Beniamino
