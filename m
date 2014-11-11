@@ -1,77 +1,226 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 11 Nov 2014 13:51:48 +0100
-Subject: [PATCH] ARM: sa11x0: Use void __iomem * in MMIO accessors
-Message-ID: <1415710308-29662-1-git-send-email-thierry.reding@gmail.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Tue, 11 Nov 2014 21:02:18 +0800
+Subject: [Patch] PCI/MSI: Enhance core to support hierarchy irqdomain
+In-Reply-To: <1415283644-2559-22-git-send-email-jiang.liu@linux.intel.com>
+References: <1415283644-2559-22-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1415710943-6001-1-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+Enhance PCI MSI core to support hierarchy irqdomain, so the common
+code could be shared among architectures.
 
-MMIO accessors such as readl() and writel() want a void __iomem * for
-the address. Update the BSE nanoEngine PCI driver to pass such pointers
-instead of unsigned long in preparation to converting ARM to use generic
-and more rigidly typed accessors.
-
-Reported-by: kbuild test robot <fengguang.wu@intel.com>
-Signed-off-by: Thierry Reding <treding@nvidia.com>
+Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
 ---
-Hi Arnd,
+Hi Thomas,
+	This update fixes a possible conflict on other architectures
+when they try to use the new MSI hierarchy irqdomain, as pointed out by
+Suravee Suthikulanit. The main change is as below.
+Regards!
+Gerry
 
-This is a follow-up patch to the asm-generic/io.h overhaul series that
-fixes a couple of build warnings reported by Fengguang's build system.
-I've sorted this near the beginning of the series, like so:
-
-	ARM: ebsa110: Properly override I/O accessors
-	ARM: sa11x0: Use void __iomem * in MMIO accessors
-	ARC: Remove redundant PCI_IOBASE declaration
-
-But I think anywhere before commit
-
-	ARM: Use include/asm-generic/io.h
-
-should be fine, too.
-
-Thierry
-
- arch/arm/mach-sa1100/pci-nanoengine.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-sa1100/pci-nanoengine.c b/arch/arm/mach-sa1100/pci-nanoengine.c
-index ff02e2da99f2..b704433c529c 100644
---- a/arch/arm/mach-sa1100/pci-nanoengine.c
-+++ b/arch/arm/mach-sa1100/pci-nanoengine.c
-@@ -33,12 +33,12 @@
- static DEFINE_SPINLOCK(nano_lock);
- 
- static int nanoengine_get_pci_address(struct pci_bus *bus,
--	unsigned int devfn, int where, unsigned long *address)
-+	unsigned int devfn, int where, void __iomem **address)
+ static void msi_domain_deactivate(struct irq_domain *domain,
+ 				  struct irq_data *irq_data)
  {
- 	int ret = PCIBIOS_DEVICE_NOT_FOUND;
- 	unsigned int busnr = bus->number;
+ 	struct msi_msg msg;
++	struct msi_desc *desc = irq_data->msi_desc;
  
--	*address = NANO_PCI_CONFIG_SPACE_VIRT +
-+	*address = (void __iomem *)NANO_PCI_CONFIG_SPACE_VIRT +
- 		((bus->number << 16) | (devfn << 8) | (where & ~3));
+-	if (!irq_data->chip_data) {
++	if (desc->irq == irq_data->irq) {
+ 		memset(&msg, 0, sizeof(msg));
+ 		__write_msi_msg(irq_data->msi_desc, &msg);
+ 	}
+---
+ drivers/pci/Kconfig |    4 ++
+ drivers/pci/msi.c   |  133 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/msi.h |   14 ++++++
+ 3 files changed, 151 insertions(+)
+
+diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
+index b9db0f2ce11f..022e89745f86 100644
+--- a/drivers/pci/Kconfig
++++ b/drivers/pci/Kconfig
+@@ -16,6 +16,10 @@ config PCI_MSI
  
- 	ret = (busnr > 255 || devfn > 255 || where > 255) ?
-@@ -51,7 +51,7 @@ static int nanoengine_read_config(struct pci_bus *bus, unsigned int devfn, int w
- 	int size, u32 *val)
- {
- 	int ret;
--	unsigned long address;
-+	void __iomem *address;
- 	unsigned long flags;
- 	u32 v;
+ 	   If you don't know what to do here, say Y.
  
-@@ -85,7 +85,7 @@ static int nanoengine_write_config(struct pci_bus *bus, unsigned int devfn, int
- 	int size, u32 val)
- {
- 	int ret;
--	unsigned long address;
-+	void __iomem *address;
- 	unsigned long flags;
- 	unsigned shift;
- 	u32 v;
++config PCI_MSI_IRQ_DOMAIN
++	bool
++	depends on PCI_MSI && IRQ_DOMAIN_HIERARCHY
++
+ config PCI_DEBUG
+ 	bool "PCI Debugging"
+ 	depends on PCI && DEBUG_KERNEL
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index da181c59394b..365e969f5e8d 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -19,6 +19,7 @@
+ #include <linux/errno.h>
+ #include <linux/io.h>
+ #include <linux/slab.h>
++#include <linux/irqdomain.h>
+ 
+ #include "pci.h"
+ 
+@@ -1098,3 +1099,135 @@ int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries,
+ 	return nvec;
+ }
+ EXPORT_SYMBOL(pci_enable_msix_range);
++
++#ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
++/*
++ * Generate a unique ID number for each possible MSI source, the ID number
++ * is only used within the irqdomain.
++ */
++static inline irq_hw_number_t
++msi_get_hwirq(struct pci_dev *dev, struct msi_desc *desc)
++{
++	return (irq_hw_number_t)desc->msi_attrib.entry_nr |
++		PCI_DEVID(dev->bus->number, dev->devfn) << 11 |
++		(pci_domain_nr(dev->bus) & 0xFFFFFFFF) << 27;
++}
++
++static int msi_domain_alloc(struct irq_domain *domain, unsigned int virq,
++			    unsigned int nr_irqs, void *arg)
++{
++	int i, ret;
++	irq_hw_number_t hwirq = arch_msi_irq_domain_get_hwirq(arg);
++
++	if (irq_find_mapping(domain, hwirq) > 0)
++		return -EEXIST;
++
++	ret = irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, arg);
++	if (ret < 0)
++		return ret;
++
++	for (i = 0; i < nr_irqs; i++) {
++		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
++					      domain->host_data, NULL);
++		__irq_set_handler(virq + i, handle_edge_irq, 0, "edge");
++	}
++
++	return ret;
++}
++
++static void msi_domain_free(struct irq_domain *domain, unsigned int virq,
++			    unsigned int nr_irqs)
++{
++	int i;
++
++	for (i = 0; i < nr_irqs; i++) {
++		struct msi_desc *desc = irq_get_msi_desc(virq);
++
++		if (desc)
++			desc->irq = 0;
++	}
++	irq_domain_free_irqs_top(domain, virq, nr_irqs);
++}
++
++static void msi_domain_activate(struct irq_domain *domain,
++				struct irq_data *irq_data)
++{
++	struct msi_msg msg;
++	struct msi_desc *desc = irq_data->msi_desc;
++
++	/*
++	 * MSI-X message is written per-IRQ.
++	 * MSI message denotes a contiguous group of IRQs, written for 0th IRQ.
++	 */
++	if (desc->irq == irq_data->irq) {
++		BUG_ON(irq_chip_compose_msi_msg(irq_data, &msg));
++		__write_msi_msg(irq_data->msi_desc, &msg);
++	}
++}
++
++static void msi_domain_deactivate(struct irq_domain *domain,
++				  struct irq_data *irq_data)
++{
++	struct msi_msg msg;
++	struct msi_desc *desc = irq_data->msi_desc;
++
++	if (desc->irq == irq_data->irq) {
++		memset(&msg, 0, sizeof(msg));
++		__write_msi_msg(irq_data->msi_desc, &msg);
++	}
++}
++
++static struct irq_domain_ops msi_domain_ops = {
++	.alloc = msi_domain_alloc,
++	.free = msi_domain_free,
++	.activate = msi_domain_activate,
++	.deactivate = msi_domain_deactivate,
++};
++
++struct irq_domain *msi_create_irq_domain(struct device_node *of_node,
++					 struct irq_chip *chip,
++					 struct irq_domain *parent)
++{
++	struct irq_domain *domain;
++
++	domain = irq_domain_add_tree(of_node, &msi_domain_ops, chip);
++	if (!domain)
++		return NULL;
++
++	domain->parent = parent;
++
++	return domain;
++}
++
++int msi_irq_domain_alloc_irqs(struct irq_domain *domain, int type,
++			      struct pci_dev *dev, void *arg)
++{
++	int i, virq;
++	struct msi_desc *desc;
++	int node = dev_to_node(&dev->dev);
++
++	list_for_each_entry(desc, &dev->msi_list, list) {
++		arch_msi_irq_domain_set_hwirq(arg, msi_get_hwirq(dev, desc));
++		virq = irq_domain_alloc_irqs(domain, desc->nvec_used,
++					     node, arg);
++		if (virq < 0) {
++			/* Special handling for pci_enable_msi_range(). */
++			if (type == PCI_CAP_ID_MSI && desc->nvec_used > 1)
++				return 1;
++			else
++				return -ENOSPC;
++		}
++		for (i = 0; i < desc->nvec_used; i++)
++			irq_set_msi_desc_off(virq, i, desc);
++	}
++
++	list_for_each_entry(desc, &dev->msi_list, list)
++		if (desc->nvec_used == 1)
++			dev_dbg(&dev->dev, "irq %d for MSI/MSI-X\n", virq);
++		else
++			dev_dbg(&dev->dev, "irq [%d-%d] for MSI/MSI-X\n",
++				virq, virq + desc->nvec_used - 1);
++
++	return 0;
++}
++#endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index 44f4746d033b..662c628fc2fa 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -75,4 +75,18 @@ struct msi_chip {
+ 	void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
+ };
+ 
++#ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
++struct irq_domain;
++struct irq_chip;
++
++struct irq_domain *msi_create_irq_domain(struct device_node *of_node,
++					 struct irq_chip *chip,
++					 struct irq_domain *parent);
++int msi_irq_domain_alloc_irqs(struct irq_domain *domain, int type,
++			      struct pci_dev *dev, void *arg);
++
++irq_hw_number_t arch_msi_irq_domain_get_hwirq(void *arg);
++void arch_msi_irq_domain_set_hwirq(void *arg, irq_hw_number_t hwirq);
++#endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
++
+ #endif /* LINUX_MSI_H */
 -- 
-2.1.3
+1.7.10.4
