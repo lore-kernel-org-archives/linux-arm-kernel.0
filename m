@@ -1,72 +1,127 @@
-From: juergen@kreuzholzen.de (Juergen Borleis)
-Date: Tue, 11 Nov 2014 19:10:33 +0100
-Subject: Samsung/S3C6410/Mini6410: how to handle NAND's "clock off"
-Message-ID: <201411111910.34231.juergen@kreuzholzen.de>
+From: msalter@redhat.com (Mark Salter)
+Date: Tue, 11 Nov 2014 13:23:35 -0500
+Subject: [PATCH v2 09/10] arm64/efi: ignore unusable regions instead of
+ reserving them
+In-Reply-To: <20141111174458.GE25295@leverpostej>
+References: <1415283206-14713-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1415283206-14713-10-git-send-email-ard.biesheuvel@linaro.org>
+ <1415592695.32311.91.camel@deneb.redhat.com>
+ <CAKv+Gu8ZpDpfJSvDksUfW0L4k9uU0-j9mConGwcdcsmh1XM_2w@mail.gmail.com>
+ <1415720536.32311.113.camel@deneb.redhat.com>
+ <1415725929.32311.130.camel@deneb.redhat.com>
+ <20141111174458.GE25295@leverpostej>
+Message-ID: <1415730215.32311.160.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 2014-11-11 at 17:44 +0000, Mark Rutland wrote:
+> On Tue, Nov 11, 2014 at 05:12:09PM +0000, Mark Salter wrote:
+> > On Tue, 2014-11-11 at 10:42 -0500, Mark Salter wrote:
+> > > On Mon, 2014-11-10 at 08:31 +0100, Ard Biesheuvel wrote:
+> > > > On 10 November 2014 05:11, Mark Salter <msalter@redhat.com> wrote:
+> > > > > On Thu, 2014-11-06 at 15:13 +0100, Ard Biesheuvel wrote:
+> > > > >> This changes the way memblocks are installed based on the contents
+> > > > of
+> > > > >> the UEFI memory map. Formerly, all regions would be
+> > > > memblock_add()'ed,
+> > > > >> after which unusable regions would be memblock_reserve()'d as well.
+> > > > >> To simplify things, but also to allow access to the unusable
+> > > > regions
+> > > > >> through mmap(/dev/mem), even with CONFIG_STRICT_DEVMEM set, change
+> > > > >> this so that only usable regions are memblock_add()'ed in the first
+> > > > >> place.
+> > > > >
+> > > > > This patch is crashing 64K pagesize kernels during boot. I'm not
+> > > > exactly
+> > > > > sure why, though. Here is what I get on an APM Mustang box:
+> > > > >
+> > > > 
+> > > > Ah, yes, I meant to mention this patch
+> > > > 
+> > > > https://git.kernel.org/cgit/linux/kernel/git/glikely/linux.git/commit/?id=8cccffc52694938fc88f3d90bc7fed8460e27191
+> > > > 
+> > > > in the cover letter, which addresses this issue at least for the DT
+> > > > case.
+> > > > 
+> > > 
+> > > That isn't the problem. In general, with 64K kernel pages, you can't be
+> > > sure if you leave something you need out of the kernel linear mapping.
+> 
+> Regardless of 64k pages you can never assume that anything will be in
+> the linear mapping due to the current relationship between the start of
+> the linear map and the address the kernel was loaded at.
 
-the S3C2410 NAND driver [1] can still be used for NANDs attached to an S3C6410
-SoC. But this driver has a "nice" feature called "clock off" to save some
-power while not in use. I tried it here on my Mini6410 platform and it freezes
-the system.
+We know that the kernel, initramfs, and devicetree must be in the linear
+mapping or we have already lost. I don't think we care about anything
+else in Loader Data/Code.
 
-The clock tree is somehow:
+If we fix the kernel so that initramfs and devicetree can exist outside
+the linear mapping, then fine. Until then, if they do fall above the
+kernel and are potentially able to be included the linear mapping, then
+you had better take care of the unaligned bits that get clipped by
+early_init_dt_add_memory_arch().
 
-[...]
-  hclk                      4            4   133000000          0 0
-     hclk_mfc               0            0   133000000          0 0
-     hclk_mem0              2            2   133000000          0 0
-        mem0_srom           0            0   133000000          0 0
-        mem0_nfcon          1            1   133000000          0 0
-        mem0_onenand0       0            0   133000000          0 0
-        mem0_onenand1       0            0   133000000          0 0
-        mem0_cfcon          0            0   133000000          0 0
-[...]
+> 
+> > > If you have Loader Code/Data regions begin and/or end at something other
+> > > than a 64K boundary and that region is adjacent to a region not being
+> > > added, then you end up leaving out the unaligned bits from the linear
+> > > mapping. This could be bits of the initramfs or devicetree.
+> > > 
+> > > What I don't get with this failure is that it is an alignment fault
+> > > which should be masked at EL1 for the kernel. The same unaligned
+> > > access happens without this patch and it doesn't generate a fault.
+> > > 
+> > 
+> > Ah, but unaligned accesses are not ignored for device memory.
+> > I have this in include/acpi/acpi_io.h:
+> > 
+> > static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+> > 					    acpi_size size)
+> > {
+> > #ifdef CONFIG_ARM64
+> > 	if (!page_is_ram(phys >> PAGE_SHIFT))
+> > 		return ioremap(phys, size);
+> > #endif
+> > 
+> >        return ioremap_cache(phys, size);
+> > }
+> > 
+> > Because the table isn't in the linear mapping, it fails the
+> > page_is_ram() test and it gits mapped with ioremap() leading to
+> > the alignment fault.
+> > 
+> > If I take out the code inside the #ifdef, I get a different
+> > fault:
+> > 
+> > [    0.350057] Unhandled fault: synchronous external abort (0x96000010) at 0xfffffe0000fae6f4
+> > [    0.358704] pgd = fffffe0001160000
+> > [    0.362276] [fffffe0000fae6f4] *pgd=0000004001370003, *pud=0000004001370003, *pmd=0000004001370003, *pte=02c00040011a0713
+> > [    0.373746] Internal error: : 96000010 [#1] SMP
+> > [    0.378484] Modules linked in:
+> > [    0.381601] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 3.18.0-rc4+ #15
+> > [    0.388248] Hardware name: APM X-Gene Mustang board (DT)
+> > [    0.393738] task: fffffe03dbe10000 ti: fffffe03dbf00000 task.ti: fffffe03dbf00000
+> > [    0.401503] PC is at acpi_ex_system_memory_space_handler+0x238/0x2e0
+> > [    0.408160] LR is at acpi_ex_system_memory_space_handler+0x130/0x2e0
+> > 
+> > That happens because AML is trying to access a hardware register
+> > which has been mapped as normal memory.
+> 
+> Which is why removing the check in the ifdef is completely nonsensical.
+> We already knew we can't map everything cacheable -- regardless of what
+> AML does the CPU can prefetch from anything mapped cacheable (or simply
+> executable) at any time.
+> 
+> > So, we need a way to tell a table in ram from an io address in AML.
+> > And page_is_ram() no longer cuts it if the tables are not in the
+> > linear mapping.
+> 
+> If the kernel were loaded at an address above the tables, it would fail
+> similarly. So the page_is_ram was never sufficient to ensure tables
+> would be mapped cacheable.
+> 
+> As we haven't decoupled the kernel text mapping from the linear mapping,
+> and that doesn't look to be happening any time soon, we can't fix up
+> page_is_ram -- we need something else entirely.
 
-On the Mini6410 the "mem0_nfcon" clock is the only single user of the
-"hclk_mem0". And this clock is required to keep the access to the external
-network device enabled. When the NAND driver disables its clock "mem0_nfcon",
-the "hclk_mem0" gets also disabled because there is no consumer anymore. The
-next time the network driver tries to access its device, the SoC freezes.
-
-How to prevent this? Can we keep the "hclk_mem0" enabled without an active
-consumer? Or do we need a dummy consumer? Or do we need to request for
-"hclk_mem0" when at least one external device is attached? Or should we remove
-the "clock stop" feature for at least the S3C6410 SoC?
-
-With the patch below I was able to reproduce the behavior:
-
-Author: Juergen Borleis <juergen@kreuzholzen.de>
-Date:   Mon Nov 10 23:35:06 2014 +0100
-
-    ARM/S3C6410/NAND: add clock alias to keep an old driver alive
-    
-    This change enables the existing S3c2410.c driver for the S3C6410.
-    
-    But keep in mind to disable the CONFIG_MTD_NAND_S3C2410_CLKSTOP when using
-    this driver!
-    
-    Why? The access to external devices depends on a running "hclk_mem0" clock.
-    As the NAND controller was the only single user of it, it disables it, when
-    it disables its owm clock to save power. This locks the system. m(
-    
-    Signed-off-by: Juergen Borleis <juergen@kreuzholzen.de>
-
-diff --git a/drivers/clk/samsung/clk-s3c64xx.c b/drivers/clk/samsung/clk-s3c64xx.c
-index 0f590e5..f7d2d57 100644
---- a/drivers/clk/samsung/clk-s3c64xx.c
-+++ b/drivers/clk/samsung/clk-s3c64xx.c
-@@ -404,6 +404,7 @@ static struct samsung_clock_alias s3c64xx_clock_aliases[] = {
- 	ALIAS(PCLK_IIS0, "samsung-i2s.0", "iis"),
- 	ALIAS(PCLK_AC97, "samsung-ac97", "ac97"),
- 	ALIAS(PCLK_TSADC, "s3c64xx-adc", "adc"),
-+	ALIAS(MEM0_NFCON, NULL, "nand"),
- 	ALIAS(PCLK_KEYPAD, "samsung-keypad", "keypad"),
- 	ALIAS(PCLK_PCM1, "samsung-pcm.1", "pcm"),
- 	ALIAS(PCLK_PCM0, "samsung-pcm.0", "pcm"),
-
-jbe
-
-[1] drivers/mtd/nand/s3c2410.c
+Agreed.
