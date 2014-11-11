@@ -1,39 +1,46 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 11 Nov 2014 09:41:58 +0200
-Subject: [PATCH 3/4] arm: dts: omap3-gta04: Add handling for tv output
-In-Reply-To: <20141110233050.GC31454@atomide.com>
-References: <1415051968-4878-1-git-send-email-marek@goldelico.com>
- <1415051968-4878-4-git-send-email-marek@goldelico.com>
- <20141110233050.GC31454@atomide.com>
-Message-ID: <5461BDC6.7090308@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 11 Nov 2014 13:19:09 +0530
+Subject: [PATCH v3 06/10] [media] platform: Make use of media_bus_format
+ enum
+In-Reply-To: <546193CF.8090107@ti.com>
+References: <1415369269-5064-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1415369269-5064-7-git-send-email-boris.brezillon@free-electrons.com>
+ <CA+V-a8t79gYYGcgg5wvM-eqW8H2D6WD7xM9t2Px=WHb2rf34ow@mail.gmail.com>
+ <546193CF.8090107@ti.com>
+Message-ID: <5461BF75.8000808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-
-On 11/11/14 01:30, Tony Lindgren wrote:
-> * Marek Belisko <marek@goldelico.com> [141103 14:01]:
->> Add handling for gta04 tv out chain:
->> venc -> opa362 -> svideo
+On Tuesday 11 November 2014 10:12 AM, Sekhar Nori wrote:
+> On Saturday 08 November 2014 02:48 PM, Prabhakar Lad wrote:
+>> Hi,
 >>
->> Signed-off-by: Marek Belisko <marek@goldelico.com>
->> ---
->>  arch/arm/boot/dts/omap3-gta04.dtsi | 48 ++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 48 insertions(+)
+>> Thanks for the patch,
+>>
+>> On Fri, Nov 7, 2014 at 2:07 PM, Boris Brezillon
+>> <boris.brezillon@free-electrons.com> wrote:
+>>> In order to have subsytem agnostic media bus format definitions we've
+>>> moved media bus definition to include/uapi/linux/media-bus-format.h and
+>>> prefixed values with MEDIA_BUS_FMT instead of V4L2_MBUS_FMT.
+>>>
+>>> Reference new definitions in all platform drivers.
+>>>
+>>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>>> ---
+>>>  arch/arm/mach-davinci/board-dm355-evm.c            |   2 +-
+>>>  arch/arm/mach-davinci/board-dm365-evm.c            |   4 +-
+>>>  arch/arm/mach-davinci/dm355.c                      |   7 +-
+>>>  arch/arm/mach-davinci/dm365.c                      |   7 +-
+>>
+>> @Sekhar can you ack for the machine changes for davinci ?
 > 
-> Applying this patch into omap-for-v3.19/dt thanks.
+> Heh, I don't have 6/10 in my inbox but have rest of the series. Can you
+> forward 6/10 to me?
 
-There are changes needed for this series, so don't apply yet.
+Based on the patch Prabhakar forwarded, for the mach-davinci changes,
+you can add:
 
-I'll try to find the time to do a review and send comments soon.
+Acked-by: Sekhar Nori <nsekhar@ti.com>
 
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141111/830244d6/attachment-0001.sig>
+Thanks,
+Sekhar
