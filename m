@@ -1,135 +1,64 @@
-From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Tue, 11 Nov 2014 15:19:52 +0800
-Subject: [PATCH v10 3/3] ARM: dts: add rk3288 power-domain node
-In-Reply-To: <1415690392-9278-1-git-send-email-caesar.wang@rock-chips.com>
-References: <1415690392-9278-1-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <1415690392-9278-4-git-send-email-caesar.wang@rock-chips.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Tue, 11 Nov 2014 16:32:22 +0900
+Subject: [PATCH 0/3] Add support for Tegra Activity Monitor
+In-Reply-To: <5461B35A.3080604@nvidia.com>
+References: <1414594232-15684-1-git-send-email-tomeu.vizoso@collabora.com>
+ <545C8BCC.3090908@nvidia.com> <545CBC87.7050404@collabora.com>
+ <546190BA.7050502@nvidia.com> <5461B35A.3080604@nvidia.com>
+Message-ID: <5461BB86.509@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the needed clocks into power-controller.
+On 11/11/2014 03:57 PM, Terje Bergstr?m wrote:
+> On 11.11.2014 06:29, Alexandre Courbot wrote:
+>> I think (after a quick look at devfreq's source) that you can avoid
+>> polling altogether if you set polling_ms to 0 in your
+>> devfreq_dev_profile instance. Then it is up to you to call
+>> update_devfreq() from your custom governor whenever it sees fit.
+>>
+>> ACTMON support seems to overlap between being a governor (which reacts
+>> to ACTMON interrupts and calls update_devfreq() when needed) and part of
+>> a devfreq_dev_profile (get_dev_status() needs to use the actmon
+>> counters). If we keep your current design where the driver simply
+>> controls a clock, you could have the ACTMON driver obtain that clock,
+>> register its governor, create a non-polling devfreq_dev_profile that
+>> controls that clock, and just call devfreq_add_device() with both. Then
+>> we will have the benefit of being able to use ACTMON as well as the
+>> performance and powersave governors on EMC, and switch policies
+>> dynamically.
+>
+> Another way to use it is that governor is just a governor. It takes in
+> load values and generates new target frequencies, and doesn't know
+> anything about HW.
+>
+> Device profile is the one that enables threshold interrupts and disables
+> polling. Device profile receives the interrupt, retrieves new load
+> number from hardware, and calls update_devfreq().
+>
+> This way we keep all HW specific code in device profile, and there's
+> potential to use a generic governor instead of writing your own.
 
-why need we do so that?
+I see several obstacles with this approach:
 
-Firstly, we always be needed turn off clocks to save power when
-the system enter suspend.So we need to enumerate the clocks are needed
-to switch power doamin no and off.
+1) update_devfreq() is a governor private function (defined in 
+drivers/devfreq/governor.h) and it would need to be called from the 
+device profile.
 
-Secondly, Rk3288 reset circuit should be syncchronous reset and
-then sync revoked.so we need to enable clocks of all devices.
+2) devfreq events (start monitoring, stop monitoring, suspend, resume, 
+...) are processed by the governor. So it would still need access to the 
+actmon registers to honor these requests.
 
-Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
-Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
-Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+3) simple monitors like performance and powersave set the frequency (max 
+or min) once and for all when they are started, and don't need to be 
+called again afterwards. But this is probably what will happen if you 
+let the devfreq_dev_profile handle the ACTMON registers, since it can 
+make no assumption on when the governor expects to be invoked.
 
----
-
-Changes in v10:
-    - fix missing the #include <dt-bindings/power-domain/rk3288.h>
-    - remove the notes
-
-Changes in v9:
-    - add decription for power-doamin node
-
-Changes in v8:
-    - DTS go back to v2
-
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3:
-    - Decomposition power-controller, changed to multiple controller
-    (gpu-power-controller, hevc-power-controller)
-
-Changes in v2:
-    - make pd_vio clocks all one entry per line and alphabetize.
-    - power: power-controller move back to pinctrl: pinctrl.
-
- arch/arm/boot/dts/rk3288.dtsi | 66 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index cb18bb4..4e64fb2 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -15,6 +15,7 @@
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/pinctrl/rockchip.h>
- #include <dt-bindings/clock/rk3288-cru.h>
-+#include <dt-bindings/power-domain/rk3288.h>
- #include "skeleton.dtsi"
- 
- / {
-@@ -989,4 +990,69 @@
- 			};
- 		};
- 	};
-+
-+	power: power-controller {
-+		compatible = "rockchip,rk3288-power-controller";
-+		#power-domain-cells = <1>;
-+		rockchip,pmu = <&pmu>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		pd_gpu {
-+			reg = <RK3288_PD_GPU>;
-+			clocks = <&cru ACLK_GPU>;
-+		};
-+
-+		pd_hevc {
-+			reg = <RK3288_PD_HEVC>;
-+			clocks = <&cru ACLK_HEVC>,
-+				 <&cru SCLK_HEVC_CABAC>,
-+				 <&cru SCLK_HEVC_CORE>,
-+				 <&cru HCLK_HEVC>;
-+		};
-+
-+		pd_vio {
-+			reg = <RK3288_PD_VIO>;
-+			clocks = <&cru ACLK_IEP>,
-+				 <&cru ACLK_ISP>,
-+				 <&cru ACLK_RGA_NIU>,
-+				 <&cru ACLK_RGA>,
-+				 <&cru ACLK_VIO0_NIU>,
-+				 <&cru ACLK_VIO1_NIU>,
-+				 <&cru ACLK_VIP>,
-+				 <&cru ACLK_VOP0>,
-+				 <&cru ACLK_VOP1>,
-+				 <&cru DCLK_VOP0>,
-+				 <&cru DCLK_VOP1>,
-+				 <&cru HCLK_IEP>,
-+				 <&cru HCLK_ISP>,
-+				 <&cru HCLK_RGA>,
-+				 <&cru HCLK_VIO_AHB_ARBI>,
-+				 <&cru HCLK_VIO_NIU>,
-+				 <&cru HCLK_VIO2_H2P>,
-+				 <&cru HCLK_VIP>,
-+				 <&cru HCLK_VOP0>,
-+				 <&cru HCLK_VOP1>,
-+				 <&cru PCLK_EDP_CTRL>,
-+				 <&cru PCLK_HDMI_CTRL>,
-+				 <&cru PCLK_LVDS_PHY>,
-+				 <&cru PCLK_MIPI_CSI>,
-+				 <&cru PCLK_MIPI_DSI0>,
-+				 <&cru PCLK_MIPI_DSI1>,
-+				 <&cru PCLK_VIO2_H2P>,
-+				 <&cru SCLK_EDP_24M>,
-+				 <&cru SCLK_EDP>,
-+				 <&cru SCLK_HDMI_CEC>,
-+				 <&cru SCLK_HDMI_HDCP>,
-+				 <&cru SCLK_ISP_JPE>,
-+				 <&cru SCLK_ISP>,
-+				 <&cru SCLK_RGA>;
-+		};
-+
-+		pd_video {
-+			reg = <RK3288_PD_VIDEO>;
-+			clocks = <&cru ACLK_VCODEC>,
-+				 <&cru HCLK_VCODEC>;
-+		};
-+	};
- };
--- 
-1.9.1
+It would be good to have the feedback of devfreq's maintainers about 
+this (added them). How could an IP capable of monitoring activity 
+through counters and firing interrupts when these counters reach a 
+certain threshold be integrated nicely into devfreq? The functions seem 
+to overlap between the governor (reacting to specific events, in this 
+case ACTMON interrupts) and dev_profile (querying current status through 
+the counters), and it seems difficult to come with a design where the 
+governor and dev_profile are not tightly intertwined.
