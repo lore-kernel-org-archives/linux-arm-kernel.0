@@ -1,61 +1,41 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 12 Nov 2014 10:53:15 -0800
-Subject: [PATCH 4/7] pinctrl: zynq: Document DT binding
-In-Reply-To: <CACRpkdazagbSZdMvHTggQuAFm9uObn2ARoCwcyM-sspuLTXqkQ@mail.gmail.com>
-References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
- <1415041531-15520-5-git-send-email-soren.brinkmann@xilinx.com>
- <CACRpkdazagbSZdMvHTggQuAFm9uObn2ARoCwcyM-sspuLTXqkQ@mail.gmail.com>
-Message-ID: <682b075ae056422683f93be4ea892011@BL2FFO11FD024.protection.gbl>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Wed, 12 Nov 2014 10:58:17 -0800
+Subject: [PATCH 5/6] iommu/arm-smmu: support buggy implementations with
+ invalidate-on-map
+In-Reply-To: <20141112182642.GH26437@arm.com> (Will Deacon's message of "Wed,
+ 12 Nov 2014 18:26:43 +0000")
+References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
+ <1407891099-24641-6-git-send-email-mitchelh@codeaurora.org>
+ <20141112182642.GH26437@arm.com>
+Message-ID: <vnkwy4rg5jqu.fsf@mitchelh-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-11-11 at 04:00PM +0100, Linus Walleij wrote:
-> On Mon, Nov 3, 2014 at 8:05 PM, Soren Brinkmann
-> <soren.brinkmann@xilinx.com> wrote:
-> 
-> > Add documentation for the devicetree binding for the Zynq pincontroller.
-> >
-> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> (...)
-> > +Example:
-> > +       pinctrl0: pinctrl at 700 {
-> > +               compatible = "xlnx,pinctrl-zynq";
-> > +               reg = <0x700 0x200>;
-> > +               syscon = <&slcr>;
-> > +
-> > +               pinctrl_uart1_default: pinctrl-uart1-default {
-> > +                       common {
-> > +                               groups = "uart1_10_grp";
-> > +                               function = "uart1";
-> > +                               slew-rate = <0>;
-> > +                               io-standard = <1>;
-> > +                       };
-> 
-> I don't really like that you mix multiplexing and config in the
-> same node. I would prefer if the generic bindings say we have
-> muxing nodes and config nodes, and those are disparate.
-> 
-> Can't you just split this:
-> 
-> common-mux {
->     groups = "uart1_10_grp";
->     function = "uart1";
-> };
-> 
-> common-config {
->     groups = "uart1_10_grp";
->     slew-rate = <0>;
->     io-standard = <1>;
-> };
-> 
-> That way we can identify nodes as mux nodes (have "function")
-> or config nodes (have "groups" or "pins" but not "function") which
-> I think makes things easier to read.
+On Wed, Nov 12 2014 at 10:26:43 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Mitch,
+>
+> On Wed, Aug 13, 2014 at 01:51:38AM +0100, Mitchel Humpherys wrote:
+>> Add a workaround for some buggy hardware that requires a TLB invalidate
+>> operation to occur at map time. Activate the feature with the
+>> qcom,smmu-invalidate-on-map boolean DT property.
+>
+> I'm digging up an old thread here, but I've been working on a new page-table
+> allocator for the SMMU and looked into implementing this workaround for you
+> in there. When I do the TLBI on map after installing the new PTE, can I just
+> invalidate the range mapped by that PTE, or does it need to be a full TLBI?
 
-I think such separation is not required by the bindings currently and
-the parser assumes everything can be present in any node.
-Can we add that requirement to the generic bindings without breaking
-current users? I think it would make the implementation a little easier.
-	
-	Thanks,
-	S?ren
+I'm not totally sure on the history of the hardware errata but I believe
+it's just the range mapped by that pte.  We use SMMU_CBn_TLBIVA in the
+our smmu driver.
+
+However, let's actually just drop this...  It's looking like the targets
+we have that will use the arm-smmu driver thankfully won't need this
+workaround.  Thanks for keeping this in mind though :)
+
+
+-Mitch
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
