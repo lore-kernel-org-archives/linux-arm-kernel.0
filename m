@@ -1,42 +1,45 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 12 Nov 2014 16:27:00 +0100
-Subject: [PATCH v4 2/5] dt-bindings: Add a clocks property to the
- simple-framebuffer binding
-In-Reply-To: <CACxGe6v15EjpALit4ZJLXDgCkwEYM4t1mryjoQpa3=wpKmXWEg@mail.gmail.com>
-References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
- <1413996311-4287-3-git-send-email-hdegoede@redhat.com>
- <20141111214217.19EF5C41610@trevor.secretlab.ca>
- <546373C6.4010001@redhat.com>
- <CACxGe6v15EjpALit4ZJLXDgCkwEYM4t1mryjoQpa3=wpKmXWEg@mail.gmail.com>
-Message-ID: <54637C44.8050208@redhat.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 12 Nov 2014 07:28:54 -0800
+Subject: [PATCH] ARM: dts: DRA7: wdt: Fix compatible property for
+ watchdog node
+In-Reply-To: <1415769855-32565-1-git-send-email-lokeshvutla@ti.com>
+References: <1415769855-32565-1-git-send-email-lokeshvutla@ti.com>
+Message-ID: <20141112152853.GH26481@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Lokesh Vutla <lokeshvutla@ti.com> [141111 21:27]:
+> OMAP wdt driver supports only ti,omap3-wdt compatible. In DRA7 dt
+> wdt compatible property is defined as ti,omap4-wdt by mistake instead of
+> ti,omap3-wdt. Correcting the typo.
+> 
+> Fixes: 6e58b8f1daaf1a ("ARM: dts: DRA7: Add the dts files for dra7 SoC and dra7-evm board")
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 
-On 11/12/2014 03:56 PM, Grant Likely wrote:
-> [Replying on-list and with original ccs]
-> 
-> On Wed, Nov 12, 2014 at 2:50 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
->>
->> On 11/11/2014 10:42 PM, Grant Likely wrote:
->>> - clocks : List of clocks used by the framebuffer. Clocks listed here
->>>            are expected to already be configured correctly. The OS must
->>>            ensure these clocks are not modified or disabled while the
->>>            simple framebuffer remains active.
->>
->> Updated in my local tree, where I've also added proper commit messages
->> to the 2 patches missing them. Shall I send a v5 of the set, and may I
->> add your Acked-by to this patch when sending v5?
-> 
-> For this whole series, please add my Acked-by.
-> 
-> Acked-by: Grant Likely <grant.likely@linaro.org>
-
-Thanks, given the above update to the bindings text, and also some updated
-commit messages, I'll post a v5 with all these added soon.
+Thanks applying into omap-for-v3.19/fixes-not-urgent as this is
+a feature that clearly never worked on dra7xx with mainline kernel.
 
 Regards,
 
-Hans
+Tony
+
+> ---
+>  arch/arm/boot/dts/dra7.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 9cc9843..666e796 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -653,7 +653,7 @@
+>  		};
+>  
+>  		wdt2: wdt at 4ae14000 {
+> -			compatible = "ti,omap4-wdt";
+> +			compatible = "ti,omap3-wdt";
+>  			reg = <0x4ae14000 0x80>;
+>  			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
+>  			ti,hwmods = "wd_timer2";
+> -- 
+> 1.9.1
+> 
