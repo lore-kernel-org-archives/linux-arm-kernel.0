@@ -1,93 +1,29 @@
-From: marek.belisko@gmail.com (Belisko Marek)
-Date: Wed, 12 Nov 2014 22:02:52 +0100
-Subject: [PATCH 4/4] arm: dts: omap3-gta04: Add static configuration for
- devconf1 register
-In-Reply-To: <20141110233630.GD31454@atomide.com>
-References: <1415051968-4878-1-git-send-email-marek@goldelico.com>
- <1415051968-4878-5-git-send-email-marek@goldelico.com>
- <20141110233630.GD31454@atomide.com>
-Message-ID: <CAAfyv34sPAa94dYM1QoHKEX+MN8NMnzE91HLhXW6MG1Yr=o8mQ@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 12 Nov 2014 13:04:23 -0800
+Subject: [GIT PULL 3.19] Broadcom Cygnus SoC defconfig
+Message-ID: <1415826266-6867-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-On Tue, Nov 11, 2014 at 12:36 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Marek Belisko <marek@goldelico.com> [141103 14:01]:
->> gta04 board need for tvout enabled 2 bits in devconf1 register (tvbypass and acbias).
->> Add single pinmux entry and enable it.
->>
->> Signed-off-by: Marek Belisko <marek@goldelico.com>
->> ---
->>  arch/arm/boot/dts/omap3-gta04.dtsi | 22 ++++++++++++++++++++++
->>  1 file changed, 22 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
->> index e4d05f0..a456d37 100644
->> --- a/arch/arm/boot/dts/omap3-gta04.dtsi
->> +++ b/arch/arm/boot/dts/omap3-gta04.dtsi
->> @@ -118,6 +118,17 @@
->>                       };
->>               };
->>       };
->> +
->> +     /* pinmux for devconf1 */
->> +     control_devconf1: pinmux at 480022d8 {
->> +             compatible = "pinctrl-single";
->> +             reg = <0x480022d8 4>;   /* single register */
->> +             #address-cells = <1>;
->> +             #size-cells = <0>;
->> +             pinctrl-single,bit-per-mux;
->> +             pinctrl-single,register-width = <32>;
->> +             pinctrl-single,function-mask = <0xfc0bd5>;
->> +     };
->>  };
->>
->
-> The pinctrl-single entry should be in omap3.dtsi as the mux register is there
-> for all the omap3 devices, can you please update the patch for that?
-Ok I'll do. Just one question. I checked TRM for omap3430 and omap3630 and
-reserved bits in devconf1 are different. So keep function-mask for
-omap3430 in omap3.dtsi
-and redefine in omap36xx.dtsi (not sure if this will work in this
-way)? Or exist other way how to deal with that? Thanks.
->
-> Regards,
->
-> Tony
->
->>  &omap3_pmx_core {
->> @@ -497,3 +508,14 @@
->>               };
->>       };
->>  };
->> +
->> +&control_devconf1 {
->> +     pinctrl-name = "default";
->> +     pinctrl-0 = < &tv_acbias_pins>;
->> +
->> +     tv_acbias_pins: pinmux_tv_acbias_pins {
->> +             pinctrl-single,bits = <
->> +                     0 0x40800 0x40800
->> +             >;
->> +     };
->> +};
->> --
->> 1.9.1
->>
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
 
-BR,
+are available in the git repository at:
 
-marek
+  http://github.com/brcm/linux.git tags/arm-soc/for-3.19/cygnus-defconfig-v2
 
--- 
-as simple and primitive as possible
--------------------------------------------------
-Marek Belisko - OPEN-NANDRA
-Freelance Developer
+for you to fetch changes up to b316a9f98a2e328d10f5ed3c341fa28880152af3:
 
-Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
-Tel: +421 915 052 184
-skype: marekwhite
-twitter: #opennandra
-web: http://open-nandra.com
+  ARM: bcm_defconfig: remove one level of menu from Kconfig (2014-11-11 22:42:05 -0800)
+
+----------------------------------------------------------------
+This pull requests removes one level in menuconfig for the BCM SoCs for the
+bcm_defconfig file.
+
+----------------------------------------------------------------
+Scott Branden (1):
+      ARM: bcm_defconfig: remove one level of menu from Kconfig
+
+ arch/arm/configs/bcm_defconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
