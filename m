@@ -1,25 +1,35 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 12 Nov 2014 15:08:10 -0500 (EST)
-Subject: [PATCH] net: pxa168_eth: move SET_NETDEV_DEV a bit earlier
-In-Reply-To: <1415790527-6494-1-git-send-email-jszhang@marvell.com>
-References: <1415790527-6494-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20141112.150810.806933062338696000.davem@davemloft.net>
+From: geoff@infradead.org (Geoff Levand)
+Date: Wed, 12 Nov 2014 12:27:30 -0800
+Subject: [PATCH] efi: Fix free_end build warning
+Message-ID: <1415824050.15847.9.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jisheng Zhang <jszhang@marvell.com>
-Date: Wed, 12 Nov 2014 19:08:47 +0800
+Initialize the free_end variable to zero.  Fixes build warnings
+like these:
 
-> This is to ensure the net_device's dev.parent is set before we used it
-> in dma_zalloc_coherent() from init_hash_table().
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+  arch/arm64/kernel/efi.c: warning: ?free_end? may be used uninitialized in this function
 
-Please always be explicit about what tree you generated this patch against
-and therefore expect it to be applied to by saying "[PATCH net-next]" or
-similar in your Subject line.
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+---
+Got this with the latest arm64/for-next/core branch.  Please consider.
 
-Because this only applies cleanly to net-next, that's where I installed
-it.
+-Geoff 
 
-Thanks.
+ arch/arm64/kernel/efi.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 4f39a18..83fc53c 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -239,6 +239,7 @@ static void __init free_boot_services(void)
+ 	 * want to keep for UEFI.
+ 	 */
+ 
++	free_end = 0;
+ 	keep_end = 0;
+ 	free_start = 0;
+ 
+-- 
+1.9.1
