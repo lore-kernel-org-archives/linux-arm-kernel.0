@@ -1,41 +1,40 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 12 Nov 2014 15:07:56 +0000
-Subject: [PATCH] arm64: topology: Fix handling of multi-level cluster
- MPIDR-based detection
-In-Reply-To: <20141008205628.GO4609@sirena.org.uk>
-References: <1408462379-27968-1-git-send-email-broonie@kernel.org>
- <CAFpQJXWkL_ge8XT9y6vSNwgQgXcvQtUh4PaWxdH1dK0QhFWu2A@mail.gmail.com>
- <20141003163715.GB13939@e102568-lin.cambridge.arm.com>
- <20141008205628.GO4609@sirena.org.uk>
-Message-ID: <20141112150756.GA30300@e102568-lin.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 12 Nov 2014 16:09:42 +0100
+Subject: [PATCH v6 05/12] memory: Add NVIDIA Tegra memory controller
+ support
+In-Reply-To: <20141112150233.GW10744@8bytes.org>
+References: <1415376063-17205-1-git-send-email-thierry.reding@gmail.com>
+ <1415376063-17205-6-git-send-email-thierry.reding@gmail.com>
+ <20141112142150.GV10744@8bytes.org> <20141112144715.GD26488@ulmo>
+ <20141112150233.GW10744@8bytes.org>
+Message-ID: <20141112150940.GE26488@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 08, 2014 at 09:56:28PM +0100, Mark Brown wrote:
-> On Fri, Oct 03, 2014 at 05:37:16PM +0100, Lorenzo Pieralisi wrote:
+On Wed, Nov 12, 2014 at 04:02:34PM +0100, Joerg Roedel wrote:
+> On Wed, Nov 12, 2014 at 03:47:16PM +0100, Thierry Reding wrote:
+> > The SMMU is part of a larger IP block that's also a memory controller.
+> > Having it in drivers/iommu would mean that we need to provide a
+> > mechanism to synchronize between the two drivers. They also share a
+> > number of data tables, so that would need to be shared somehow as well.
+> > By keeping both in the same directory we don't have to expose any of
+> > this publicly.
 > 
-> > To be honest with you all I would have preferred to sort this out with
-> > DT, that's already doable now without this patch.
-> 
-> We'd still have to make sure there's a complete topology binding for
-> ACPI and get through standardisation if any changes are needed.  I guess
-> it's probably mostly OK as the scenarios should all be shared with x86
-> systems but I've not looked to see if some of the subsetting that's
-> being done for ACPI on ARMv8 causes issues.
-> 
-> > Having said that, for platforms setting MPIDR_EL1 to reasonable values,
-> > I think that's what we should do, squash the upper MPIDR levels (for
-> > the non SMT case too). Please stick a proper comment for that to the code.
-> > We can always rely on DT to fix other cases that can't be treated
-> > properly with code above.
-> 
-> OK, I'll send a patch.
+> Since these parts are in different files you export the interfaces
+> anyway through non-static symbols and those dependencys also exist for
+> other IOMMU drivers. So I prefer this file to live in drivers/iommu.
 
-Mark,
+But we don't export symbols to the global symbol table since it's all
+built as a single module. Moving one part to drivers/iommu will mean
+that I need to provide a public header with the symbols. And I'd need
+to actually EXPORT_SYMBOL them because technically there's nothing
+preventing these drivers to be built as modules.
 
-do you have time to send it ?
-
-Please let me know.
-
-Thanks,
-Lorenzo
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141112/9fcf82a7/attachment.sig>
