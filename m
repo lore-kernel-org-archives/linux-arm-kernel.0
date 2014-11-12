@@ -1,31 +1,17 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 12 Nov 2014 15:23:42 -0800
-Subject: [arm-soc:next/soc 1/1] WARNING: vmlinux.o(.text+0x730e38): Section
- mismatch in reference from the function brcmstb_gisb_arb_probe() to the
- function .init.text:hook_fault_code()
-In-Reply-To: <70798892.n4gYya0yuK@wuerfel>
-References: <22844091.DkblDJL9Ph@wuerfel>
- <CACRpkdZ6AovXUVvvdyeUczVpGfkexLHMOaA+F3eiBG=W8gtBGg@mail.gmail.com>
- <70798892.n4gYya0yuK@wuerfel>
-Message-ID: <5463EBFE.6070009@gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 13 Nov 2014 00:32:44 +0100
+Subject: [PATCH] ARM: dts: rockchip: fix invalid unit-address in
+ rk3188.dtsi
+In-Reply-To: <1415407496-18507-1-git-send-email-julien.chauveau@neo-technologies.fr>
+References: <5384745.1WqprI8GVl@diego>
+ <1415407496-18507-1-git-send-email-julien.chauveau@neo-technologies.fr>
+Message-ID: <1834074.A8oL01ENBp@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2014 02:33 AM, Arnd Bergmann wrote:
-> On Wednesday 12 November 2014 11:27:20 Linus Walleij wrote:
->> On Tue, Nov 11, 2014 at 11:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>
->>> The problem was introduced by f1bee783dd37 "bus: brcmstb_gisb: register the
->>> fault code hook", as hook_fault_code is an __init function and is now
->>> called from a probe function.
->>
->> I hope it's not my fault, it doesn't seem to have my name on it 
+Am Samstag, 8. November 2014, 01:44:56 schrieb Julien CHAUVEAU:
+> Unit addresses, whilst written in hex, don't contain a 0x prefix.
 > 
-> No, it's not. The reason that the build bot sent it to you is that you
-> fixed another problem that prevented the kernel from getting built, so
-> now it builds again and we see the new warning that was introduced while
-> the kernel didn't build.
+> Signed-off-by: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
 
-I will submit a fix for that. Thanks!
---
-Florian
+added this to my v3.19-armsoc/dts branch
