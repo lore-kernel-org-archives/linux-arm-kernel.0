@@ -1,27 +1,75 @@
-From: joel.schopp@amd.com (Joel Schopp)
-Date: Wed, 12 Nov 2014 11:12:32 -0600
-Subject: [PATCH] arm64: efi: Fix stub cache maintenance
-In-Reply-To: <1415810351-3462-1-git-send-email-mark.rutland@arm.com>
-References: <1415810351-3462-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <54639500.5010309@amd.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 12 Nov 2014 09:25:28 -0800
+Subject: [GIT PULL] Broadcom Cygnus SoC defconfig changes
+In-Reply-To: <CAGVrzcbQG7qZNOoocgpbV=pf3Jv9mwAfsb=Eq2tiFfMa_pAPZQ@mail.gmail.com>
+References: <1414698612-26216-1-git-send-email-f.fainelli@gmail.com>
+ <20141109001302.GB11947@quad.lixom.net>
+ <CAGVrzcbQG7qZNOoocgpbV=pf3Jv9mwAfsb=Eq2tiFfMa_pAPZQ@mail.gmail.com>
+Message-ID: <CAOesGMh6t6f+_friV6_pE5WLgEFa+OrErmNKnB0v5jcBstwGKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 11, 2014 at 10:29 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> 2014-11-08 16:13 GMT-08:00 Olof Johansson <olof@lixom.net>:
+>> On Thu, Oct 30, 2014 at 12:50:09PM -0700, Florian Fainelli wrote:
+>>> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+>>>
+>>>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   http://github.com/brcm/linux.git tags/arm-soc/for-3.18/cygnus-defconfig-v9
+>>>
+>>> for you to fetch changes up to aa0204801143ee2d47e9e8dd5f39cdddd5613b4b:
+>>>
+>>>   ARM: multi_v7_defconfig: Enable Broadcom Cygnus (2014-10-30 11:01:35 -0700)
+>>
+>> Hi Florian,
+>>
+>> Apologies for the delay in dealing with this pull request.
+>>
+>>> ----------------------------------------------------------------
+>>> This patchset contains initial support for Broadcom's Cygnus SoC based on our
+>>> iProc architecture. Initial support is minimal and includes just the mach
+>>> platform code, clock driver, and a basic device tree configuration. Peripheral
+>>> drivers will be submitted soon, as will device tree configurations for other
+>>> Cygnus board variants.
+>>>
+>>> These are the defconfig parts of the changes
+>>>
+>>> ----------------------------------------------------------------
+>>> Jonathan Richardson (1):
+>>>       ARM: cygnus defconfig : Initial defconfig for Broadcom Cygnus SoC
+>>>
+>>> Ray Jui (1):
+>>>       ARM: multi_v7_defconfig: Enable Broadcom Cygnus
+>>>
+>>> Scott Branden (1):
+>>>       ARM: bcm_defconfig/multi_v7_defconfig: remove one level of menu from Kconfig
+>>>
+>>>  arch/arm/configs/bcm_cygnus_defconfig | 237 ++++++++++++++++++++++++++++++++++
+>>>  arch/arm/configs/bcm_defconfig        |   3 +-
+>>>  arch/arm/configs/multi_v7_defconfig   |  21 ++-
+>>
+>> Please send multi_v7_defconfig updates as a patch instead of including in
+>> a merge request. We ask for this because it's a file that many maintainers
+>> touch and it's easy that we get lots of conflicts otherwise.
+>>
+>> As far as the bcm_cygnus_defconfig: Since new platforms are multiplatform
+>> enabled by default, we normally only prefer to have one defconfig per vendor.
+>> We've made exceptions in cases where the families are very different, but in
+>> general one defconfig per vendor should be sufficient.
+>>
+>> I.e. please enable the cygnus options in bcm_defconfig instead of adding a new
+>> one.
+>
+> Alright, so just to make sure I get this right:
+>
+> - there are two patches from Scott and Ray which enable Cygnus in
+> mutli_v7_defconfig that I should send a separate patches
+> - adding Cygnus to bcm_defconfig can be part of a separate pull request
 
->  
-> +	/*
-> +	 * Ensure that the rest of this function (in the original Image) is
-> +	 * visible when the caches are disabled. The I-cache can't have stale
-> +	 * entries for the VA range of the current image, so no maintenance is
-> +	 * necessary.
-> +	 */
-> +	adr	x0, efi_stub_entry
-> +	adr	x1, efi_stub_entry_end
-> +	sub	x1, x1, x0
-> +	bl	__flush_dcache_area
-It is my understdanding that you also need an isb here.  Tom's testing
-confirms this on my patch with the dsb and without the isb. 
+Yep!
 
-Also, since this is not a performance critical path it seems more
-straightforward to just flush everything.  I'm happy either way.  We
-will test your patch as is and let you know.
+
+-Olof
