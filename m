@@ -1,43 +1,45 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 12 Nov 2014 09:34:41 +0100
-Subject: [linux-sunxi] Re: [PATCH v4 0/5] simplefb: add clock handling code
-In-Reply-To: <20141111214950.7FCABC41610@trevor.secretlab.ca>
-References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
- <544F737A.7000109@ti.com>
- <CAL_JsqJ2JRg7k21CEVe4-At7enD+y3TN_7wfqhY0OHZm-_j17w@mail.gmail.com>
- <544F7E5D.60104@redhat.com> <5450CAA5.5020205@ti.com>
- <CAL_JsqKWqq+H5ymUW3n8tkmLJHEUGaKDLX5+orJmGUQ3ECQwUQ@mail.gmail.com>
- <20141111214950.7FCABC41610@trevor.secretlab.ca>
-Message-ID: <CAMuHMdUoPK_s7OP1Aop4eOyhec+abFij7ZoAAdA5fqpJJy-Dgg@mail.gmail.com>
+From: krishna.md@samsung.com (Krishna Mohan Dani)
+Date: Wed, 12 Nov 2014 14:05:35 +0530
+Subject: [PATCH 0/4 V2] Arndale: Adding Sound Machine Driver for ALC5631 Codec
+Message-ID: <1415781339-16089-1-git-send-email-krishna.md@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+These patches add machine driver to instantiate I2S based realtek's
+ ALC5631 based sound card on Arndale board.
 
-On Tue, Nov 11, 2014 at 10:49 PM, Grant Likely <grant.likely@linaro.org> wrote:
-> However, I am concerned about handover. I've lost track over the entire
-> thread on whether the handover mechanism has been resolved, and I would
-> really like to have a proposed solution to this documented in the
-> binding. The fact that there is nothing tying the simple framebuffer to
-> the actual hardware backing the framebuffer is concerning. It means the
-> kernel needs to guess which graphics device is associated with the
-> framebuffer.
+There are other variants of Audio Daughter Cards for Arndale
+Board for which support already exists but there is no support for
+Realtek's alc5631 codec based card hence support for ALC5631 based
+machine driver is being added.
 
-We did discuss handover in D?sseldorf, and concluded that the simplefb's
-regs property can be used for this.
+Most of the code has been pulled from insignal's git for Arndale and
+modified to suit the maintain syntax. Machine driver has been made
+DT compatible.
 
-While on a modern system with unified memory this association cannot be
-derived in a generic way, a device-specific driver for the graphics hardware
-can if the regs property of the simplefb node matches the address the CRTC
-engine is configured for.
+Changes done:
+	- Removed ifdef for of_device_id structure as commented by Mark Brown
+	- Supporting both variants of device name:alc5631 and rt5631 as
+	  commented by Mark Brown
+	- Added "return -EINVAL" if cpu_of_node or codec_of_node is not
+	  found in dtb, as commented by Anil Kumar 
 
-Gr{oetje,eeting}s,
+Krishna Mohan Dani (4):
+  ASoC: ALC5631/RT5631: Add device tree binding documentation
+  ASoC: Samsung: Add arndale_rt5631 machine driver
+  Sound: Kconfig: Adding the description of the codec
+  ASoC: rt5631: Adding Device Tree compatibility to Realtek's ALC5631
+    codec driver
 
-                        Geert
+ Documentation/devicetree/bindings/sound/rt5631.txt |   48 ++++++
+ sound/soc/codecs/Kconfig                           |    3 +-
+ sound/soc/codecs/rt5631.c                          |   11 ++
+ sound/soc/samsung/Kconfig                          |    6 +
+ sound/soc/samsung/Makefile                         |    2 +
+ sound/soc/samsung/arndale_rt5631.c                 |  166 ++++++++++++++++++++
+ 6 files changed, 235 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/rt5631.txt
+ create mode 100644 sound/soc/samsung/arndale_rt5631.c
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+1.7.9.5
