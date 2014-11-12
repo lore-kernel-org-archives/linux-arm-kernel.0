@@ -1,41 +1,36 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 12 Nov 2014 23:08:43 +0100
-Subject: [PATCH 3/4] simplefb: Change simplefb_init from module_init to
- fs_initcall
+Date: Wed, 12 Nov 2014 23:08:44 +0100
+Subject: [PATCH 4/4] fbcon: Change fbcon_init from module_init to fs_initcall
 In-Reply-To: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
 References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1415830124-28787-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <1415830124-28787-4-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One of the reasons for having the simplefb nodes in /chosen, and doing
-explicit enumeration of the nodes there, is too allow enumerating them sooner,
-so that we get a console earlier on.
+Various fb drivers register themselves before module_init so as to have a
+console as early as possible, this is of little use if fbcon does not initialze
+early too.
 
-Doing this earlier then fs_initcall is not useful, since the fb only turns into
-a console when fbcon intializes, which is a fs_initcall too.
+Fbcon cannot initialize earlier then fs_initcall, because then the creation
+of /sys/class/graphics/fbcon will fail.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/video/fbdev/simplefb.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ drivers/video/console/fbcon.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-index be7d288..8c0c972 100644
---- a/drivers/video/fbdev/simplefb.c
-+++ b/drivers/video/fbdev/simplefb.c
-@@ -415,7 +415,11 @@ static void __exit simplefb_exit(void)
- 	platform_driver_unregister(&simplefb_driver);
+diff --git a/drivers/video/console/fbcon.c b/drivers/video/console/fbcon.c
+index eb976ee..ea43724 100644
+--- a/drivers/video/console/fbcon.c
++++ b/drivers/video/console/fbcon.c
+@@ -3624,7 +3624,7 @@ static int __init fb_console_init(void)
+ 	return 0;
  }
  
--module_init(simplefb_init);
-+/*
-+ * While this can be a module, if builtin it's most likely the console
-+ * So let's leave module_exit but move module_init to an earlier place
-+ */
-+fs_initcall(simplefb_init);
- module_exit(simplefb_exit);
+-module_init(fb_console_init);
++fs_initcall(fb_console_init);
  
- MODULE_AUTHOR("Stephen Warren <swarren@wwwdotorg.org>");
+ #ifdef MODULE
+ 
 -- 
 2.1.0
