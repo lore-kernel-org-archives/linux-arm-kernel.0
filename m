@@ -1,53 +1,61 @@
 From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 12 Nov 2014 10:46:26 -0800
-Subject: [PATCH 2/7] pinctrl: pinconf-generic: Infer map type from DT
- property
-In-Reply-To: <CACRpkdbOLMT1vfFg=CAU_VHdjxPWn_Ybso=+8Asp=mXhmNBRSA@mail.gmail.com>
+Date: Wed, 12 Nov 2014 10:53:15 -0800
+Subject: [PATCH 4/7] pinctrl: zynq: Document DT binding
+In-Reply-To: <CACRpkdazagbSZdMvHTggQuAFm9uObn2ARoCwcyM-sspuLTXqkQ@mail.gmail.com>
 References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
- <1415041531-15520-3-git-send-email-soren.brinkmann@xilinx.com>
- <CACRpkdbOLMT1vfFg=CAU_VHdjxPWn_Ybso=+8Asp=mXhmNBRSA@mail.gmail.com>
-Message-ID: <ce4400ac9091437aa7da16ea131c65cd@BN1BFFO11FD005.protection.gbl>
+ <1415041531-15520-5-git-send-email-soren.brinkmann@xilinx.com>
+ <CACRpkdazagbSZdMvHTggQuAFm9uObn2ARoCwcyM-sspuLTXqkQ@mail.gmail.com>
+Message-ID: <682b075ae056422683f93be4ea892011@BL2FFO11FD024.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-11-11 at 01:47PM +0100, Linus Walleij wrote:
+On Tue, 2014-11-11 at 04:00PM +0100, Linus Walleij wrote:
 > On Mon, Nov 3, 2014 at 8:05 PM, Soren Brinkmann
 > <soren.brinkmann@xilinx.com> wrote:
 > 
-> > With the new 'groups' property, the DT parser can infer the map type
-> > from the fact whether 'pins' or 'groups' is used to specify the pin
-> > group to work on.
-> > To maintain backwards compatibitliy with current usage of the DT
-> > binding, this is only done when an invalid map type is passed to the
-> > parsing function.
+> > Add documentation for the devicetree binding for the Zynq pincontroller.
+> >
+> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> (...)
+> > +Example:
+> > +       pinctrl0: pinctrl at 700 {
+> > +               compatible = "xlnx,pinctrl-zynq";
+> > +               reg = <0x700 0x200>;
+> > +               syscon = <&slcr>;
+> > +
+> > +               pinctrl_uart1_default: pinctrl-uart1-default {
+> > +                       common {
+> > +                               groups = "uart1_10_grp";
+> > +                               function = "uart1";
+> > +                               slew-rate = <0>;
+> > +                               io-standard = <1>;
+> > +                       };
 > 
-> So that is this:
+> I don't really like that you mix multiplexing and config in the
+> same node. I would prefer if the generic bindings say we have
+> muxing nodes and config nodes, and those are disparate.
 > 
-> > +               if (type == PIN_MAP_TYPE_INVALID)
-> > +                       type = PIN_MAP_TYPE_CONFIGS_GROUP;
-> > +               dt_pin_specifier = "groups";
+> Can't you just split this:
 > 
-> This is just kludgy. There are only two kernel-internal users of this function,
-> refactor the function signature and change the other callers over instead,
-> patch the drivers.
-
-As I said in my other email. I chose to maintain current behavior to
-avoid disturbing current users. If changing this the way you suggest,
-works for everybody that is clearly preferred.
-
+> common-mux {
+>     groups = "uart1_10_grp";
+>     function = "uart1";
+> };
 > 
-> Take this opportunity to add some kerneldoc above the
-> pinconf_generic_dt_subnode_to_map() and give the function a
-> reasonable signature.
-
-Yeah, didn't want to put too much effort into it without a confirmation
-of this being on the right track.
-
+> common-config {
+>     groups = "uart1_10_grp";
+>     slew-rate = <0>;
+>     io-standard = <1>;
+> };
 > 
-> BTW: this is just for config settings for groups right? Not for muxing
-> I hope?
+> That way we can identify nodes as mux nodes (have "function")
+> or config nodes (have "groups" or "pins" but not "function") which
+> I think makes things easier to read.
 
-Yep, when 'function' is found, the pins/groups are passed to
-pinctrl_utils_add_map_mux() which always uses mux group as type.
-
+I think such separation is not required by the bindings currently and
+the parser assumes everything can be present in any node.
+Can we add that requirement to the generic bindings without breaking
+current users? I think it would make the implementation a little easier.
+	
+	Thanks,
 	S?ren
