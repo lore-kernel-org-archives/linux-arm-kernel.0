@@ -1,55 +1,236 @@
-From: chanho.min@lge.com (Chanho Min)
-Date: Thu, 13 Nov 2014 08:35:00 +0900
-Subject: arm: Error handling for cacheflush
-In-Reply-To: <20141112180335.GE26437@arm.com>
-References: <004c01cffe64$cb83a220$628ae660$@min@lge.com>
- <20141112180335.GE26437@arm.com>
-Message-ID: <005701cffed1$470084b0$d5018e10$@min@lge.com>
+From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
+Date: Wed, 12 Nov 2014 16:36:59 -0700
+Subject: [PATCH v2] coresight: bindings for coresight drivers
+Message-ID: <1415835419-5565-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> Sent: Thursday, November 13, 2014 3:04 AM
-> To: Chanho Min
-> Cc: '???'; 'Jongsung Kim'; 'HyoJun Im'
-> Subject: Re: arm: Error handling for cacheflush
-> 
-> On Wed, Nov 12, 2014 at 10:38:28AM +0000, Chanho Min wrote:
-> > Dear Will Deacon,
-> 
-> Hello,
-> 
-> > Since commit 28256d612726 ("ARM: cacheflush: split user cache-flushing
-> > into interruptible chunks"), cacheflush can return -EINTR if it is interrupted
-> > by signal and process has user-defined signal handler.
-> >
-> > But, most user of cacheflush haven't handled -EINTR and no man page or guide
-> > is not founded. So, Would you check that cacheflush's behavior is changed to
-> > to as the follows or you have another intention?
-> >
-> > int cacheflush(void *addr, size_t nbytes, int cache)
-> > {
-> >         int err;
-> >         do err = syscall(__ARM_NR_cacheflush, addr, addr + nbytes, cache);
-> >         while (err < 0 && errno == EINTR);
-> >         return err;
-> > }
-> 
-> Well, the system call could always have failed, so applications should be
-> checking for that anyway. It's true that -EINTR is a new error code for
-> this system call, but it was needed to prevent the machine being stalled
-> from userspace for large ranges.
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-I fully understand the intention of this patch.
-But, In this case, cacheflush should be re-invoked from the start of address.
-(restart_syscall is not available in userspace)
-So Handling of -EINTR may cause regression.
+Coresight IP blocks allow for the support of HW assisted tracing
+on ARM SoCs.  Bindings for the currently available blocks are
+presented herein.
 
-> 
-> I don't know of any manpage for the ARM cacheflush system call, as it's
-> private to the architecture.
-> 
-> Will
+Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+Change for v2:
+  - Added ack by Rob Herring
+---
+ .../devicetree/bindings/arm/coresight.txt          | 204 +++++++++++++++++++++
+ 1 file changed, 204 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/coresight.txt
 
-Chanho
+diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+new file mode 100644
+index 0000000..d790f49
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/coresight.txt
+@@ -0,0 +1,204 @@
++* CoreSight Components:
++
++CoreSight components are compliant with the ARM CoreSight architecture
++specification and can be connected in various topologies to suit a particular
++SoCs tracing needs. These trace components can generally be classified as
++sinks, links and sources. Trace data produced by one or more sources flows
++through the intermediate links connecting the source to the currently selected
++sink. Each CoreSight component device should use these properties to describe
++its hardware characteristcs.
++
++* Required properties for all components *except* non-configurable replicators:
++
++	* compatible: These have to be supplemented with "arm,primecell" as
++	  drivers are using the AMBA bus interface.  Possible values include:
++		- "arm,coresight-etb10", "arm,primecell";
++		- "arm,coresight-tpiu", "arm,primecell";
++		- "arm,coresight-tmc", "arm,primecell";
++		- "arm,coresight-funnel", "arm,primecell";
++		- "arm,coresight-etm3x", "arm,primecell";
++
++	* reg: physical base address and length of the register
++	  set(s) of the component.
++
++	* clocks: the clock associated to this component.
++
++	* clock-names: the name of the clock as referenced by the code.
++	  Since we are using the AMBA framework, the name should be
++	  "apb_pclk".
++
++	* port or ports: The representation of the component's port
++	  layout using the generic DT graph presentation found in
++	  "bindings/graph.txt".
++
++* Required properties for devices that don't show up on the AMBA bus, such as
++  non-configurable replicators:
++
++	* compatible: Currently supported value is (note the absence of the
++	  AMBA markee):
++		- "arm,coresight-replicator"
++
++	* id: a unique number that will identify this replicator.
++
++	* port or ports: same as above.
++
++* Optional properties for ETM/PTMs:
++
++	* arm,cp14: must be present if the system accesses ETM/PTM management
++	  registers via co-processor 14.
++
++	* cpu: the cpu phandle this ETM/PTM is affined to. When omitted the
++	  source is considered to belong to CPU0.
++
++* Optional property for TMC:
++
++	* arm,buffer-size: size of contiguous buffer space for TMC ETR
++	 (embedded trace router)
++
++
++Example:
++
++1. Sinks
++	etb at 20010000 {
++		compatible = "arm,coresight-etb10", "arm,primecell";
++		reg = <0 0x20010000 0 0x1000>;
++
++		coresight-default-sink;
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		port {
++			etb_in_port: endpoint at 0 {
++				slave-mode;
++				remote-endpoint = <&replicator_out_port0>;
++			};
++		};
++	};
++
++	tpiu at 20030000 {
++		compatible = "arm,coresight-tpiu", "arm,primecell";
++		reg = <0 0x20030000 0 0x1000>;
++
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		port {
++			tpiu_in_port: endpoint at 0 {
++				slave-mode;
++				remote-endpoint = <&replicator_out_port1>;
++			};
++		};
++	};
++
++2. Links
++	replicator {
++		/* non-configurable replicators don't show up on the
++		 * AMBA bus.  As such no need to add "arm,primecell".
++		 */
++		compatible = "arm,coresight-replicator";
++		/* this will show up in debugfs as "0.replicator" */
++		id = <0>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/* replicator output ports */
++			port at 0 {
++				reg = <0>;
++				replicator_out_port0: endpoint {
++					remote-endpoint = <&etb_in_port>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++				replicator_out_port1: endpoint {
++					remote-endpoint = <&tpiu_in_port>;
++				};
++			};
++
++			/* replicator input port */
++			port at 2 {
++				reg = <0>;
++				replicator_in_port0: endpoint {
++					slave-mode;
++					remote-endpoint = <&funnel_out_port0>;
++				};
++			};
++		};
++	};
++
++	funnel at 20040000 {
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0 0x20040000 0 0x1000>;
++
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/* funnel output port */
++			port at 0 {
++				reg = <0>;
++				funnel_out_port0: endpoint {
++					remote-endpoint =
++							<&replicator_in_port0>;
++				};
++			};
++
++			/* funnel input ports */
++			port at 1 {
++				reg = <0>;
++				funnel_in_port0: endpoint {
++					slave-mode;
++					remote-endpoint = <&ptm0_out_port>;
++				};
++			};
++
++			port at 2 {
++				reg = <1>;
++				funnel_in_port1: endpoint {
++					slave-mode;
++					remote-endpoint = <&ptm1_out_port>;
++				};
++			};
++
++			port at 3 {
++				reg = <2>;
++				funnel_in_port2: endpoint {
++					slave-mode;
++					remote-endpoint = <&etm0_out_port>;
++				};
++			};
++
++		};
++	};
++
++3. Sources
++	ptm at 2201c000 {
++		compatible = "arm,coresight-etm3x", "arm,primecell";
++		reg = <0 0x2201c000 0 0x1000>;
++
++		cpu = <&cpu0>;
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		port {
++			ptm0_out_port: endpoint {
++				remote-endpoint = <&funnel_in_port0>;
++			};
++		};
++	};
++
++	ptm at 2201d000 {
++		compatible = "arm,coresight-etm3x", "arm,primecell";
++		reg = <0 0x2201d000 0 0x1000>;
++
++		cpu = <&cpu1>;
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		port {
++			ptm1_out_port: endpoint {
++				remote-endpoint = <&funnel_in_port1>;
++			};
++		};
++	};
+-- 
+1.9.1
