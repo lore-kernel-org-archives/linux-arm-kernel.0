@@ -1,41 +1,18 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 12 Nov 2014 21:14:44 +0200
-Subject: [PATCHv6 5/5] hwspinlock/omap: add support for dt nodes
-In-Reply-To: <1410553499-55951-6-git-send-email-s-anna@ti.com>
-References: <1410553499-55951-1-git-send-email-s-anna@ti.com>
- <1410553499-55951-6-git-send-email-s-anna@ti.com>
-Message-ID: <CAK=WgbZE7_WrsNz5E+MDX7j2tAGEjv91zeCgqhB=Jsiu0+d8vw@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 12 Nov 2014 11:22:57 -0800
+Subject: [PATCH v10 2/3] power-domain: rockchip: add power doamin driver
+In-Reply-To: <1415690392-9278-3-git-send-email-caesar.wang@rock-chips.com>
+References: <1415690392-9278-1-git-send-email-caesar.wang@rock-chips.com>
+ <1415690392-9278-3-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <CAD=FV=V-qhi5rPxe_WGcS1JAZba_euFY3YuUyO_4mbqvJPUtzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+Caesar,
 
-On Fri, Sep 12, 2014 at 11:24 PM, Suman Anna <s-anna@ti.com> wrote:
->  static int omap_hwspinlock_probe(struct platform_device *pdev)
->  {
-> -       struct hwspinlock_pdata *pdata = pdev->dev.platform_data;
-> +       struct device_node *node = pdev->dev.of_node;
->         struct hwspinlock_device *bank;
->         struct hwspinlock *hwlock;
->         struct resource *res;
->         void __iomem *io_base;
-> -       int num_locks, i, ret;
-> +       int num_locks, i, ret, base_id;
->
-> -       if (!pdata)
-> +       if (!node)
->                 return -ENODEV;
->
-> +       ret = of_hwspin_lock_get_base_id(node);
-> +       if (ret < 0 && ret != -EINVAL)
-> +               return -ENODEV;
-> +       base_id = (ret > 0 ? ret : 0);
+On Mon, Nov 10, 2014 at 11:19 PM, Caesar Wang
+<caesar.wang@rock-chips.com> wrote:
+> +       pm_genpd_init(&pd->genpd, NULL, false);
 
-Does this mean you allow nodes not to have the base_id property? How
-do we protect against multiple nodes not having a base_id property
-then?
-
-Implicitly assuming a base_id value (zero in this case) may not be always safe.
-
-Thanks,
-Ohad.
+As Dmitry pointed out in another context, maybe this should be
+"pm_genpd_init(&pd->genpd, NULL, !is_on);"
