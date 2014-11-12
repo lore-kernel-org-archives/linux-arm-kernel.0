@@ -1,45 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Nov 2014 12:04:57 +0100
-Subject: [PATCH] ARM: imx: temporarily remove CONFIG_SOC_FSL from LS1021A
-In-Reply-To: <20141112104239.GJ2704@dragon>
-References: <1414746073-12394-1-git-send-email-jingchang.lu@freescale.com>
- <1727581.y25NQPsRIm@wuerfel> <20141112104239.GJ2704@dragon>
-Message-ID: <3302008.ezqrZf1odh@wuerfel>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 12 Nov 2014 20:06:59 +0900
+Subject: [RFC] ptrace: add generic SET_SYSCALL request
+In-Reply-To: <20141112110047.GB26437@arm.com>
+References: <1415346443-28915-1-git-send-email-takahiro.akashi@linaro.org>
+ <20141107140405.GA30156@redhat.com> <54633A69.6090202@linaro.org>
+ <20141112110047.GB26437@arm.com>
+Message-ID: <54633F53.8020507@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 November 2014 18:42:41 Shawn Guo wrote:
-> 
-> I noticed the issue from 0-DAY testing and was trying to drop the patch.
-> Jingchang said someone is trying to fixing the issues from driver code.
-> But it seems to take some time.  So I agree with this partial reverting.
-> 
-> Patch applied.  Thanks Arnd.
+On 11/12/2014 08:00 PM, Will Deacon wrote:
+> On Wed, Nov 12, 2014 at 10:46:01AM +0000, AKASHI Takahiro wrote:
+>> On 11/07/2014 11:04 PM, Oleg Nesterov wrote:
+>>> To me the fact that PTRACE_SET_SYSCALL can be undefined and syscall_set_nr()
+>>> is very much arch-dependant (but most probably trivial) means that this  code
+>>> should live in arch_ptrace().
+>>
+>> Thinking of Oleg's comment above, it doesn't make sense neither to define generic
+>> NT_SYSTEM_CALL (user_regset) in uapi/linux/elf.h and implement it in ptrace_regset()
+>> in kernel/ptrace.c with arch-defined syscall_(g)set_nr().
+>>
+>> Since we should have the same interface on arm and arm64, we'd better implement
+>> ptrace(PTRACE_SET_SYSCALL) locally on arm64 for now (as I originally submitted).
+>
+> I think the regset approach is cleaner. We already do something similar for
+> TLS. That would be implemented under arch/arm64/ with it's own NT type.
 
-Thanks a lot!
+Okey, so arm64 goes its own way :)
+Or do you want to have a similar regset on arm, too?
+(In this case, NT_ARM_SYSTEM_CALL can be shared in uapi/linux/elf.h)
 
-Jingchang, can you say which of the drivers that are currently depending
-on FSL_SOC are reused on LS1021A? I see these ones in the source tree:
+-Takahiro AKASHI
 
-drivers/ata/sata_fsl.c
-drivers/crypto/caam/
-drivers/crypto/talitos.c
-drivers/dma/fsldma.c
-drivers/memory/fsl_ifc.c
-drivers/misc/carma/
-drivers/mtd/nand/fsl_ifc_nand.c
-drivers/net/ethernet/freescale/fsl_pq_mdio.c
-drivers/net/ethernet/freescale/gianfar*
-drivers/net/ethernet/freescale/xgmac_mdio.c
-drivers/spi/spi-fsl-cpm.c
-drivers/spi/spi-fsl-dspi.c
-drivers/spi/spi-fsl-espi.c
-drivers/usb/host/ehci-fsl.c
-drivers/video/fbdev/fsl-diu-fb.c
-drivers/virt/fsl_hypervisor.c
-sound/soc/fsl/mpc*
-
-I suspect that you only want a small subset of these, but I have no idea
-which.
-
-	Arnd
+> Will
+>
