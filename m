@@ -1,74 +1,95 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 12 Nov 2014 12:51:50 +0100
-Subject: [PATCH v2 1/2] of/fdt: export fdt blob as /sys/firmware/fdt
-In-Reply-To: <CACxGe6sN6dObiOnbhYM4Ltdn0BU_KTESuefvxh3odm1BbcUVbw@mail.gmail.com>
-References: <1415645222-14909-1-git-send-email-ard.biesheuvel@linaro.org>
- <1415645222-14909-2-git-send-email-ard.biesheuvel@linaro.org>
- <20141111144221.5FCDAC416AF@trevor.secretlab.ca>
- <CAL_JsqKeG1dWrMZydCN119V3++WKXqsjMm1bG7Fodhf3O8owpw@mail.gmail.com>
- <CACxGe6tsLr52ZLww2JfwHFHajHW+f6nbYJPyWXmZJg3coKmMCA@mail.gmail.com>
- <CAKv+Gu-UOPMaGQ+eRu8TX4DX_AN93JHt9dFHSaWs9+UB3UhdAg@mail.gmail.com>
- <CACxGe6sN6dObiOnbhYM4Ltdn0BU_KTESuefvxh3odm1BbcUVbw@mail.gmail.com>
-Message-ID: <CAKv+Gu9BgH8DiU=z-A5NDcCSwamJ84x3s95G=RGNoO9ostmTwg@mail.gmail.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed, 12 Nov 2014 11:44:47 +0000
+Subject: [PATCHv4 0/5] Legacy instruction emulation for arm64
+Message-ID: <1415792692-11189-1-git-send-email-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 November 2014 12:45, Grant Likely <grant.likely@linaro.org> wrote:
-> On Tue, Nov 11, 2014 at 8:34 PM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> On 11 November 2014 21:08, Grant Likely <grant.likely@linaro.org> wrote:
->>> On Tue, Nov 11, 2014 at 4:25 PM, Rob Herring <robherring2@gmail.com> wrote:
->>>> On Tue, Nov 11, 2014 at 8:42 AM, Grant Likely <grant.likely@linaro.org> wrote:
->>>>> On Mon, 10 Nov 2014 19:47:01 +0100
->>>>> , Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>>>  wrote:
->>>>>> Create a new /sys entry '/sys/firmware/fdt' to export the FDT blob
->>>>>> that was passed to the kernel by the bootloader. This allows userland
->>>>>> applications such as kexec to access the raw binary. The blob needs to
->>>>>> be preserved as early as possible by calling preserve_fdt().
->>>>>>
->>>>>> The fact that this node does not reside under /sys/firmware/device-tree
->>>>>> is deliberate: FDT is also used on arm64 UEFI/ACPI systems to
->>>>>> communicate just the UEFI and ACPI entry points, but the FDT is never
->>>>>> unflattened and used to configure the system.
->>>>>>
->>>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>>>
->>>>> On further thought, nak. I want tree modifications to be treated as
->>>>> bugs. Do a checksum CRC32 or check. It's simpler and it can be extended
->>>>> to us an in-blob CRC when the file format gets upreved to include one.
->>>>
->>>> Why? MIPS Octeon is full of them BTW. So the rule is any modifications
->>>> or fixups have to be on the unflattened tree?
->>>
->>> That, or we require the fixups to explicitly clean up the CRC after
->>> themselves. That will force them to be visible. Anything using the
->>> fdt_*() write functions could potentially take care of it
->>> automatically. That would make it immediately discoverable where
->>> changes are being made in the tree.
->>>
->>
->> Doesn't that defeat the purpose of capturing the FDT as it was passed
->> by the bootloader? Those fixups will be reapplied by the kexec'ed
->> kernel anyway.
->
-> We're always going to be in a grey area here. There are some things
-> that should not be passed over. For example, a framebuffer that is
-> passed in from firmware will no longer be valid on kexec. Right now on
-> arch/arm, the exynos platform fixes up the DT because the memory node
-> is outright /corrupt/. In the MIPS case, they do a bunch of stuff in
-> the kernel to figure out the hardware as configured by firmware. I
-> don't agree with that approach, but I would be very surprised if the
-> full original DT has any validity after the early boot fixups.
->
+Hi,
 
-Well, yes, but those fixups will presumably be done on every boot,
-including the kexec ones.
+This is the fourth posting of the legacy instruction support for
+arm64. Previous postings can be found at [1][2][3].
 
-> Early boot fixups to the .dtb are always going to be oddball cases.
->
+The patchset creates the infrastructure to support legacy instruction
+emulation and then uses this to add support for the emulation of
+SWP{B} and CP15 Barrier instructions from ARMv7 to the v8 port of
+Linux. When available, the common infrastructure allows for enabling
+the hardware execution of legacy instructions. Runtime support for
+changing the execution mode - undef, legacy, or hw execution is
+provided via nodes in sysctl. The default behaviour varies with the
+state of the instruction in the architecture (deprecated or obsolete)
+and is documented as part of this series.
 
-OK, so generally speaking, whether the original DTB is more suitable
-to be presented through /sys/firmware/fdt than the 'current' FDT
-(i.e., whatever is in memory at the time the sysfs node is accessed)
-is not obvious at all. So why not just do the latter?
+Patches 1-2/5 add infrastructure code to add support for undefined
+instruction hooks and decoding condition checks.
+
+Patch 3-4/5 adds infrastructure to support legacy instruction
+emulation and uses this to then add support for SWP and CP15 barriers
+respectively.
+
+Patch 5/5 introduces a trace point to log instruction emulation and then
+uses this to trace the usage of the above instructions when using
+emulation.
+
+
+Cheers,
+Punit
+
+Changes since [3]:
+* Shortened function name aarch32_insn_is_wide_instruction ->
+aarch32_insn_is_wide
+* Removed unnecessary addprefix
+* Changed default suggestion from 'N' to 'Y'
+* Allow deprecated instructions to potentially only implement
+emulation or hardware execution - should help when certain
+instructions are difficult to emulate.
+* Disable CP15 barriers when hot-unplugging the CPUs
+* Added assembler comment to trace the equivalent barrier when CP15
+Barriers are used.
+
+Changes since [2]:
+* Made trace point local to arm64
+* Re-factored infrastructure to handle registration / un-registration
+of undefined hooks as well as handle enabling hardware execution when
+supported
+* Added documentation for default execution modes and how to change it
+via sysctl
+
+Changes since [1]:
+* Added support for Thumb instructions when registering undefined
+hooks as well
+* Emulation support is now added to armv8_deprecated.c (was previously
+v7_obsolete.c)
+* Instruction support level - Off, Emulate or Enable (when supported
+in hardware) - is now controlled through sysctl
+* Using trace points instead of debugfs for stats reporting
+
+[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/351054
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/292213.html
+[3] http://thread.gmane.org/gmane.linux.ports.arm.kernel/366728
+
+Punit Agrawal (5):
+  arm64: Add support for hooks to handle undefined instructions
+  arm64: Add AArch32 instruction set condition code checks
+  arm64: Port SWP/SWPB emulation support from arm
+  arm64: Emulate CP15 Barrier instructions
+  arm64: Trace emulation of AArch32 legacy instructions
+
+ Documentation/arm64/legacy_instructions.txt |  45 +++
+ arch/arm64/Kconfig                          |  54 +++
+ arch/arm64/include/asm/insn.h               |  10 +
+ arch/arm64/include/asm/opcodes.h            |   1 +
+ arch/arm64/include/asm/traps.h              |  16 +
+ arch/arm64/kernel/Makefile                  |   5 +-
+ arch/arm64/kernel/armv8_deprecated.c        | 565 ++++++++++++++++++++++++++++
+ arch/arm64/kernel/insn.c                    |  26 ++
+ arch/arm64/kernel/trace-events-emulation.h  |  40 ++
+ arch/arm64/kernel/traps.c                   |  68 ++++
+ 10 files changed, 829 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/arm64/legacy_instructions.txt
+ create mode 100644 arch/arm64/include/asm/opcodes.h
+ create mode 100644 arch/arm64/kernel/armv8_deprecated.c
+ create mode 100644 arch/arm64/kernel/trace-events-emulation.h
+
+-- 
+2.1.1
