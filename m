@@ -1,80 +1,282 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 12 Nov 2014 12:41:47 +0100
-Subject: [PATCH v5 2/3] ARM: mediatek: add dts for mt6592-evb
-In-Reply-To: <1415678111-29914-2-git-send-email-ibanezchen@gmail.com>
-References: <1415678111-29914-1-git-send-email-ibanezchen@gmail.com>
- <1415678111-29914-2-git-send-email-ibanezchen@gmail.com>
-Message-ID: <CABuKBeKTA1Ugf50ZhLOanXFs_cFbsUrgraEtb4UwovKECMwCPQ@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 12 Nov 2014 11:40:50 +0000
+Subject: [PATCH v9 09/13] xen/arm/arm64: merge xen/mm32.c into xen/mm.c
+In-Reply-To: <alpine.DEB.2.02.1411121130020.26318@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1411121130020.26318@kaball.uk.xensource.com>
+Message-ID: <1415792454-23161-9-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-11 4:55 GMT+01:00 Howard Chen <ibanezchen@gmail.com>:
-> The mt6592-evb is an evaluation board based on the MT6592 SoC.
->
-> Signed-off-by: Howard Chen <ibanezchen@gmail.com>
-> ---
->  arch/arm/boot/dts/Makefile       |  3 ++-
->  arch/arm/boot/dts/mt6592-evb.dts | 29 +++++++++++++++++++++++++++++
->  2 files changed, 31 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/mt6592-evb.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index ab63751..0ce0d9e 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -532,7 +532,8 @@ dtb-$(CONFIG_MACH_DOVE) += dove-cm-a510.dtb \
->         dove-d2plug.dtb \
->         dove-d3plug.dtb \
->         dove-dove-db.dtb
-> -dtb-$(CONFIG_ARCH_MEDIATEK) += mt6589-aquaris5.dtb
-> +dtb-$(CONFIG_ARCH_MEDIATEK) += mt6589-aquaris5.dtb \
-> +       mt6592-evb.dtb
->
->  endif
->
-> diff --git a/arch/arm/boot/dts/mt6592-evb.dts b/arch/arm/boot/dts/mt6592-evb.dts
-> new file mode 100644
-> index 0000000..d7294d9
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/mt6592-evb.dts
-> @@ -0,0 +1,29 @@
-> +/*
-> + * Copyright (c) 2014 MediaTek Inc.
-> + * Author: Howard Chen <ibanezchen@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +/dts-v1/;
-> +#include "mt6592.dtsi"
-> +
-> +/ {
-> +       model = "mt6592 evb";
-> +       compatible = "mediatek,mt6592-evb", "mediatek,mt6592";
-> +
-> +       chosen {
-> +               bootargs = "console=ttyS0,921600n8";
-> +       };
+Merge xen/mm32.c into xen/mm.c.
+As a consequence the code gets compiled on arm64 too.
 
-Please delte this, we don't have a serial console at the moment.
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/xen/Makefile                      |    2 +-
+ arch/arm/xen/mm.c                          |   84 +++++++++++++++++++++++++
+ arch/arm/xen/mm32.c                        |   94 ----------------------------
+ arch/arm64/include/asm/xen/page-coherent.h |   44 +------------
+ 4 files changed, 86 insertions(+), 138 deletions(-)
+ delete mode 100644 arch/arm/xen/mm32.c
 
-> +
-> +       memory {
-> +               reg = <0x80000000 0x08000000>;
-> +       };
-> +};
-> --
-> 1.9.1
->
-
-
-
+diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
+index 1f85bfe..1296952 100644
+--- a/arch/arm/xen/Makefile
++++ b/arch/arm/xen/Makefile
+@@ -1 +1 @@
+-obj-y		:= enlighten.o hypercall.o grant-table.o p2m.o mm.o mm32.o
++obj-y		:= enlighten.o hypercall.o grant-table.o p2m.o mm.o
+diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
+index b0e77de..ab700e1 100644
+--- a/arch/arm/xen/mm.c
++++ b/arch/arm/xen/mm.c
+@@ -1,6 +1,10 @@
++#include <linux/cpu.h>
++#include <linux/dma-mapping.h>
+ #include <linux/bootmem.h>
+ #include <linux/gfp.h>
++#include <linux/highmem.h>
+ #include <linux/export.h>
++#include <linux/of_address.h>
+ #include <linux/slab.h>
+ #include <linux/types.h>
+ #include <linux/dma-mapping.h>
+@@ -16,6 +20,86 @@
+ #include <asm/xen/hypercall.h>
+ #include <asm/xen/interface.h>
+ 
++enum dma_cache_op {
++       DMA_UNMAP,
++       DMA_MAP,
++};
++
++/* functions called by SWIOTLB */
++
++static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
++	size_t size, enum dma_data_direction dir, enum dma_cache_op op)
++{
++	unsigned long pfn;
++	size_t left = size;
++
++	pfn = (handle >> PAGE_SHIFT) + offset / PAGE_SIZE;
++	offset %= PAGE_SIZE;
++
++	do {
++		size_t len = left;
++	
++		/* TODO: cache flush */
++
++		offset = 0;
++		pfn++;
++		left -= len;
++	} while (left);
++}
++
++static void __xen_dma_page_dev_to_cpu(struct device *hwdev, dma_addr_t handle,
++		size_t size, enum dma_data_direction dir)
++{
++	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, DMA_UNMAP);
++}
++
++static void __xen_dma_page_cpu_to_dev(struct device *hwdev, dma_addr_t handle,
++		size_t size, enum dma_data_direction dir)
++{
++	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, DMA_MAP);
++}
++
++void __xen_dma_map_page(struct device *hwdev, struct page *page,
++	     dma_addr_t dev_addr, unsigned long offset, size_t size,
++	     enum dma_data_direction dir, struct dma_attrs *attrs)
++{
++	if (is_device_dma_coherent(hwdev))
++		return;
++	if (dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
++		return;
++
++	__xen_dma_page_cpu_to_dev(hwdev, dev_addr, size, dir);
++}
++
++void __xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
++		size_t size, enum dma_data_direction dir,
++		struct dma_attrs *attrs)
++
++{
++	if (is_device_dma_coherent(hwdev))
++		return;
++	if (dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
++		return;
++
++	__xen_dma_page_dev_to_cpu(hwdev, handle, size, dir);
++}
++
++void __xen_dma_sync_single_for_cpu(struct device *hwdev,
++		dma_addr_t handle, size_t size, enum dma_data_direction dir)
++{
++	if (is_device_dma_coherent(hwdev))
++		return;
++	__xen_dma_page_dev_to_cpu(hwdev, handle, size, dir);
++}
++
++void __xen_dma_sync_single_for_device(struct device *hwdev,
++		dma_addr_t handle, size_t size, enum dma_data_direction dir)
++{
++	if (is_device_dma_coherent(hwdev))
++		return;
++	__xen_dma_page_cpu_to_dev(hwdev, handle, size, dir);
++}
++
+ int xen_create_contiguous_region(phys_addr_t pstart, unsigned int order,
+ 				 unsigned int address_bits,
+ 				 dma_addr_t *dma_handle)
+diff --git a/arch/arm/xen/mm32.c b/arch/arm/xen/mm32.c
+deleted file mode 100644
+index c86919b..0000000
+--- a/arch/arm/xen/mm32.c
++++ /dev/null
+@@ -1,94 +0,0 @@
+-#include <linux/cpu.h>
+-#include <linux/dma-mapping.h>
+-#include <linux/gfp.h>
+-#include <linux/highmem.h>
+-
+-#include <xen/features.h>
+-enum dma_cache_op {
+-       DMA_UNMAP,
+-       DMA_MAP,
+-};
+-
+-/* functions called by SWIOTLB */
+-
+-static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
+-	size_t size, enum dma_data_direction dir, enum dma_cache_op op)
+-{
+-	unsigned long pfn;
+-	size_t left = size;
+-
+-	pfn = (handle >> PAGE_SHIFT) + offset / PAGE_SIZE;
+-	offset %= PAGE_SIZE;
+-
+-	do {
+-		size_t len = left;
+-	
+-		/* TODO: cache flush */
+-
+-		offset = 0;
+-		pfn++;
+-		left -= len;
+-	} while (left);
+-}
+-
+-static void __xen_dma_page_dev_to_cpu(struct device *hwdev, dma_addr_t handle,
+-		size_t size, enum dma_data_direction dir)
+-{
+-	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, DMA_UNMAP);
+-}
+-
+-static void __xen_dma_page_cpu_to_dev(struct device *hwdev, dma_addr_t handle,
+-		size_t size, enum dma_data_direction dir)
+-{
+-	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, DMA_MAP);
+-}
+-
+-void __xen_dma_map_page(struct device *hwdev, struct page *page,
+-	     dma_addr_t dev_addr, unsigned long offset, size_t size,
+-	     enum dma_data_direction dir, struct dma_attrs *attrs)
+-{
+-	if (is_device_dma_coherent(hwdev))
+-		return;
+-	if (dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+-		return;
+-
+-	__xen_dma_page_cpu_to_dev(hwdev, dev_addr, size, dir);
+-}
+-
+-void __xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
+-		size_t size, enum dma_data_direction dir,
+-		struct dma_attrs *attrs)
+-
+-{
+-	if (is_device_dma_coherent(hwdev))
+-		return;
+-	if (dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+-		return;
+-
+-	__xen_dma_page_dev_to_cpu(hwdev, handle, size, dir);
+-}
+-
+-void __xen_dma_sync_single_for_cpu(struct device *hwdev,
+-		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+-{
+-	if (is_device_dma_coherent(hwdev))
+-		return;
+-	__xen_dma_page_dev_to_cpu(hwdev, handle, size, dir);
+-}
+-
+-void __xen_dma_sync_single_for_device(struct device *hwdev,
+-		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+-{
+-	if (is_device_dma_coherent(hwdev))
+-		return;
+-	__xen_dma_page_cpu_to_dev(hwdev, handle, size, dir);
+-}
+-
+-int __init xen_mm32_init(void)
+-{
+-	if (!xen_initial_domain())
+-		return 0;
+-
+-	return 0;
+-}
+-arch_initcall(xen_mm32_init);
+diff --git a/arch/arm64/include/asm/xen/page-coherent.h b/arch/arm64/include/asm/xen/page-coherent.h
+index d7cd4c2..2052102 100644
+--- a/arch/arm64/include/asm/xen/page-coherent.h
++++ b/arch/arm64/include/asm/xen/page-coherent.h
+@@ -1,43 +1 @@
+-#ifndef _ASM_ARM64_XEN_PAGE_COHERENT_H
+-#define _ASM_ARM64_XEN_PAGE_COHERENT_H
+-
+-#include <asm/page.h>
+-#include <linux/dma-attrs.h>
+-#include <linux/dma-mapping.h>
+-
+-static inline void *xen_alloc_coherent_pages(struct device *hwdev, size_t size,
+-		dma_addr_t *dma_handle, gfp_t flags,
+-		struct dma_attrs *attrs)
+-{
+-	return __generic_dma_ops(hwdev)->alloc(hwdev, size, dma_handle, flags, attrs);
+-}
+-
+-static inline void xen_free_coherent_pages(struct device *hwdev, size_t size,
+-		void *cpu_addr, dma_addr_t dma_handle,
+-		struct dma_attrs *attrs)
+-{
+-	__generic_dma_ops(hwdev)->free(hwdev, size, cpu_addr, dma_handle, attrs);
+-}
+-
+-static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
+-	     dma_addr_t dev_addr, unsigned long offset, size_t size,
+-	     enum dma_data_direction dir, struct dma_attrs *attrs)
+-{
+-}
+-
+-static inline void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
+-		size_t size, enum dma_data_direction dir,
+-		struct dma_attrs *attrs)
+-{
+-}
+-
+-static inline void xen_dma_sync_single_for_cpu(struct device *hwdev,
+-		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+-{
+-}
+-
+-static inline void xen_dma_sync_single_for_device(struct device *hwdev,
+-		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+-{
+-}
+-#endif /* _ASM_ARM64_XEN_PAGE_COHERENT_H */
++#include <../../arm/include/asm/xen/page-coherent.h>
 -- 
-motzblog.wordpress.com
+1.7.10.4
