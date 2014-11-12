@@ -1,35 +1,57 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Wed, 12 Nov 2014 14:51:16 +0100
-Subject: [PATCH RESEND] Documentation: devicetree: Fix Xilinx VDMA
- specification
-Message-ID: <1415800277-6817-1-git-send-email-afaerber@suse.de>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 12 Nov 2014 13:55:00 +0000
+Subject: [PATCH 02/13] ARM: STi: DT: STiH416: Add DT node for the
+ stih415/6 usb2 phy
+In-Reply-To: <20141110104947.GT21424@x1>
+References: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
+ <1415361475-6218-3-git-send-email-peter.griffin@linaro.org>
+ <20141110104947.GT21424@x1>
+Message-ID: <20141112135500.GC20187@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The specification requires xlnx,data-width, but example and driver use
-xlnx,datawidth. Change the specification to match the implementation.
+Hi Lee,
 
-Reviewed-by: Michal Simek <michal.simek@xilinx.com>
-Fixes: eebeac03db93 ("dma: Add Xilinx Video DMA DT Binding Documentation")
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- This appears to have fallen through the cracks... resending to dmaengine.
+Thanks for reviewing.
 
- Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Mon, 10 Nov 2014, Lee Jones wrote:
 
-diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-index 1405ed071bb4..e4c4d47f8137 100644
---- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-+++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-@@ -25,7 +25,7 @@ Required child node properties:
- - compatible: It should be either "xlnx,axi-vdma-mm2s-channel" or
- 	"xlnx,axi-vdma-s2mm-channel".
- - interrupts: Should contain per channel VDMA interrupts.
--- xlnx,data-width: Should contain the stream data width, take values
-+- xlnx,datawidth: Should contain the stream data width, take values
- 	{32,64...1024}.
- 
- Optional child node properties:
--- 
-2.1.2
+> On Fri, 07 Nov 2014, Peter Griffin wrote:
+> 
+> > This usb picophy is found on stih415/6 SoC.
+> 
+> Then shouldn't it live in stih41x.dtsi?
+
+No, it is the same ip block, and underlying driver, but needs a different
+compatible string as it's wired up to different sysconfig registers on the SoC.
+
+> 
+> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/stih416.dtsi | 9 +++++++++
+> >  1 file changed, 9 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
+> > index 1137bdf..0f3019a 100644
+> > --- a/arch/arm/boot/dts/stih416.dtsi
+> > +++ b/arch/arm/boot/dts/stih416.dtsi
+> > @@ -316,5 +316,14 @@
+> >  
+> >  			status	        = "disabled";
+> >  		};
+> > +
+> > +		usb2_phy: usb2phy at 0 {
+> > +			compatible = "st,stih416-usb-phy";
+> > +			#phy-cells = <0>;
+> > +			st,syscfg = <&syscfg_rear>;
+> > +			clocks = <&clk_sysin>;
+> > +			clock-names = "osc_phy";
+> > +
+> 
+> Remove this '\n'.
+
+Fixed in v2.
+
+regards,
+
+Peter.
