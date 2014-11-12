@@ -1,88 +1,62 @@
-From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Wed, 12 Nov 2014 10:20:57 +0200
-Subject: [PATCH] at91sam9_wdt: Allow watchdog to reset device at early boot
-In-Reply-To: <1414060846-17306-1-git-send-email-timo.kokkonen@offcode.fi>
-References: <1414060846-17306-1-git-send-email-timo.kokkonen@offcode.fi>
-Message-ID: <54631869.9070709@offcode.fi>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 12 Nov 2014 17:22:43 +0900
+Subject: [PATCH/RFC] ARM: shmobile: lager: Fix SPI mode of SPI-Flash into
+ mode3
+In-Reply-To: <CAMuHMdVQ0s35sW=kvf80c0s++R-5uNuJQtxMcX1R5ogxNwkp9w@mail.gmail.com>
+References: <1414648551-30318-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdVQ0s35sW=kvf80c0s++R-5uNuJQtxMcX1R5ogxNwkp9w@mail.gmail.com>
+Message-ID: <20141112082242.GU9007@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Oct 30, 2014 at 10:26:33AM +0100, Geert Uytterhoeven wrote:
+> On Thu, Oct 30, 2014 at 6:55 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+> >
+> > In order to change into mode3, CPOL and CPHA bit of SPCMD register
+> > of MSIOF is changed. Mode3 can avoid intermediate voltage.
+> 
+> This is the QSPI node, not MSIOF?
 
-On 10/23/14 13:40, Timo Kokkonen wrote:
-> By default the driver will start a kernel timer which keeps on kicking
-> the watchdog HW until user space has opened the watchdog
-> device. Usually this is desirable as the watchdog HW is running by
-> default and the user space may not have any watchdog daemon running at
-> all.
->
-> However, on production systems it may be mandatory that also early
-> crashes and lockups will lead to a watchdog reset, even if they happen
-> before the user space has opened the watchdog device.
->
-> To resolve the issue, add a new device tree property
-> "atmel,no-early-timer" which will prevent the kernel timer from
-> pinging the watchdog HW on behalf of user space. The default is still
-> to use kernel timer, but more strict behavior can be enabled via the
-> device tree property.
->
+Indeed.
 
-Any thoughts on this one? Should I resend this with some more people or 
-lists to get someone to comment or review this patch?
+Nakamura-san's patch, which I up-ported, was against the QSPI node
+but the version I posted below is indeed against the MSIOF.
 
-Thanks,
--Timo
+Furthermore, I see that spi-cpol and spi-cpha are already present
+in the MSIOF node in mainline. I would like to withdraw this patch.
 
-> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
-> ---
->   Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 4 ++++
->   drivers/watchdog/at91sam9_wdt.c                          | 6 +++++-
->   2 files changed, 9 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> index f90e294..1b9289e 100644
-> --- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> @@ -28,6 +28,10 @@ Optional properties:
->   	entering idle state.
->   - atmel,dbg-halt : Should be present if you want to stop the watchdog when
->   	entering debug state.
-> +- atmel,no-early-timer : Should be present if you want to let the
-> +	watchdog timer to expire even before user space has opened the
-> +	device. If not set, a kernel timer will keep on pinging the
-> +	watchdog until it is opened.
->
->   Example:
->   	watchdog at fffffd40 {
-> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-> index 489729b..8cac712 100644
-> --- a/drivers/watchdog/at91sam9_wdt.c
-> +++ b/drivers/watchdog/at91sam9_wdt.c
-> @@ -89,6 +89,7 @@ struct at91wdt {
->   	u32 mr_mask;
->   	unsigned long heartbeat;	/* WDT heartbeat in jiffies */
->   	bool nowayout;
-> +	bool no_early_timer;
->   	unsigned int irq;
->   };
->
-> @@ -122,7 +123,7 @@ static void at91_ping(unsigned long data)
->   {
->   	struct at91wdt *wdt = (struct at91wdt *)data;
->   	if (time_before(jiffies, wdt->next_heartbeat) ||
-> -	    !watchdog_active(&wdt->wdd)) {
-> +		(!watchdog_active(&wdt->wdd) && !wdt->no_early_timer)) {
->   		at91_wdt_reset(wdt);
->   		mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
->   	} else {
-> @@ -316,6 +317,9 @@ static int of_at91wdt_init(struct device_node *np, struct at91wdt *wdt)
->
->   	wdt->mr |= max | ((max - min) << 16);
->
-> +	if (of_property_read_bool(np, "atmel,no-early-timer"))
-> +		wdt->no_early_timer = 1;
-> +
->   	return 0;
->   }
->   #else
->
+> > Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> > Based on the renesas-devel-20141030-v3.18-rc2 branch of my renesas tree
+> >
+> >  arch/arm/boot/dts/r8a7790-lager.dts | 2 ++
+> >  1 file changed, 2 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+> > index 830f2e8..1606fad 100644
+> > --- a/arch/arm/boot/dts/r8a7790-lager.dts
+> > +++ b/arch/arm/boot/dts/r8a7790-lager.dts
+> > @@ -343,6 +343,8 @@
+> >                 spi-tx-bus-width = <4>;
+> >                 spi-rx-bus-width = <4>;
+> >                 m25p,fast-read;
+> > +               spi-cpol;
+> > +               spi-cpha;
+> >
+> >                 partition at 0 {
+> >                         label = "loader";
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> 
