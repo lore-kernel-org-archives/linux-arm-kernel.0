@@ -1,37 +1,55 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Wed, 12 Nov 2014 20:48:05 +0100
-Subject: Network timing (?) problems since kernel 3.12
-In-Reply-To: <545F9CC5.6070709@drkrebs.de>
-References: <545F852D.5040209@drkrebs.de> <20141109155502.GA10013@lunn.ch>
- <545F9CC5.6070709@drkrebs.de>
-Message-ID: <20141112194805.GA27092@schnuecks.de>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 12 Nov 2014 13:50:15 -0600
+Subject: [PATCHv6 5/5] hwspinlock/omap: add support for dt nodes
+In-Reply-To: <CAK=WgbZE7_WrsNz5E+MDX7j2tAGEjv91zeCgqhB=Jsiu0+d8vw@mail.gmail.com>
+References: <1410553499-55951-1-git-send-email-s-anna@ti.com>
+ <1410553499-55951-6-git-send-email-s-anna@ti.com>
+ <CAK=WgbZE7_WrsNz5E+MDX7j2tAGEjv91zeCgqhB=Jsiu0+d8vw@mail.gmail.com>
+Message-ID: <5463B9F7.8040105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Markus,
+Hi Ohad,
 
-On Sun, Nov 09, 2014 at 05:56:37PM +0100, Markus Krebs wrote:
-> Am 09.11.2014 um 16:55 schrieb Andrew Lunn:
+On 11/12/2014 01:14 PM, Ohad Ben-Cohen wrote:
+> Hi Suman,
 > 
-> >>I'm using a Sheevaplug (Marvell Kirkwood) with an USB-Stick for
-> >>storage as a server. Since kernel 3.12 I'm experiencing various
-> >>erratic problems when transferring files, especially large or many
-> >>files at the same time, over the network (ssh complaining about
-> >>"Corrupted MAC on input" or Windows [over Samba] about corrupt
-> >>files).
-> >>Turning "offload check summing" off with ethtool didn't really help.
-> >
-> >Try turning off gso.
+> On Fri, Sep 12, 2014 at 11:24 PM, Suman Anna <s-anna@ti.com> wrote:
+>>  static int omap_hwspinlock_probe(struct platform_device *pdev)
+>>  {
+>> -       struct hwspinlock_pdata *pdata = pdev->dev.platform_data;
+>> +       struct device_node *node = pdev->dev.of_node;
+>>         struct hwspinlock_device *bank;
+>>         struct hwspinlock *hwlock;
+>>         struct resource *res;
+>>         void __iomem *io_base;
+>> -       int num_locks, i, ret;
+>> +       int num_locks, i, ret, base_id;
+>>
+>> -       if (!pdata)
+>> +       if (!node)
+>>                 return -ENODEV;
+>>
+>> +       ret = of_hwspin_lock_get_base_id(node);
+>> +       if (ret < 0 && ret != -EINVAL)
+>> +               return -ENODEV;
+>> +       base_id = (ret > 0 ? ret : 0);
 > 
-> Thanks, Andrew; I've tried now but that didn't do the trick either.
+> Does this mean you allow nodes not to have the base_id property? How
+> do we protect against multiple nodes not having a base_id property
+> then?
+> 
+> Implicitly assuming a base_id value (zero in this case) may not be always safe.
 
-I am not able to provoke this behaviour on my Sheevaplug using a
-stock 3.12.32 kernel (but that does not mean much.  Just did some
-quick tests by copying large files from an USB stick using ssh or
-netcat).
+None of the OMAPs have multiple IP instances, and as such the base-id is
+an optional property. I have made this change to make sure we atleast
+attempt to use the value if mentioned in DT and not hard-coding the
+value to begin with (going by the optional property semantics). If and
+when multiple instances get added and a secondary node doesn't add the
+property, the node will not be registered with the core due to an
+overlap failure. Here is the previous version [1] for reference.
 
-Could you elaborate on the actual kernel and config you are using? 
-Is there a simple testcase that reliably reproduces the behaviour on
-your box?
- 
-- Simon
+regards
+Suman
+
+[1] https://patchwork.kernel.org/patch/4096881/
