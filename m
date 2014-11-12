@@ -1,79 +1,121 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 12 Nov 2014 10:28:57 +0000
-Subject: [PATCH v4 0/5] simplefb: add clock handling code
-In-Reply-To: <CAMuHMdVX72ve9TqpA9GUtumZGDnCjYqKemMxyNf=a4AxWR44iQ@mail.gmail.com>
-References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
- <544F737A.7000109@ti.com>
- <CAL_JsqJ2JRg7k21CEVe4-At7enD+y3TN_7wfqhY0OHZm-_j17w@mail.gmail.com>
- <544F7E5D.60104@redhat.com> <5450CAA5.5020205@ti.com>
- <CAL_JsqKWqq+H5ymUW3n8tkmLJHEUGaKDLX5+orJmGUQ3ECQwUQ@mail.gmail.com>
- <20141111214950.7FCABC41610@trevor.secretlab.ca>
- <CAMuHMdUoPK_s7OP1Aop4eOyhec+abFij7ZoAAdA5fqpJJy-Dgg@mail.gmail.com>
- <CACxGe6sMF2C6hvRNNnB_i6a44fh0WC7JjjisFOh5GMV66mC6Fw@mail.gmail.com>
- <CAMuHMdVX72ve9TqpA9GUtumZGDnCjYqKemMxyNf=a4AxWR44iQ@mail.gmail.com>
-Message-ID: <CACxGe6sYy8vY6RjXiCn4O+sM2xcEPW6L5rjoR2GPMWLtKfzRng@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 12 Nov 2014 11:30:16 +0100
+Subject: [PATCH 2/7] irqchip: armada-370-xp: Initialize per cpu registers
+ when CONFIG_SMP=N
+In-Reply-To: <1413985427-20918-3-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1413985427-20918-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <546336B8.2070209@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 12, 2014 at 10:08 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Hi Grant,
->
-> On Wed, Nov 12, 2014 at 10:57 AM, Grant Likely <grant.likely@linaro.org> wrote:
->> On Wednesday, November 12, 2014, Geert Uytterhoeven
->> <geert@linux-m68k.org> wrote:
->>> On Tue, Nov 11, 2014 at 10:49 PM, Grant Likely <grant.likely@linaro.org> wrote:
->>> > However, I am concerned about handover. I've lost track over the entire
->>> > thread on whether the handover mechanism has been resolved, and I would
->>> > really like to have a proposed solution to this documented in the
->>> > binding. The fact that there is nothing tying the simple framebuffer to
->>> > the actual hardware backing the framebuffer is concerning. It means the
->>> > kernel needs to guess which graphics device is associated with the
->>> > framebuffer.
->>>
->>> We did discuss handover in D?sseldorf, and concluded that the simplefb's
->>> regs property can be used for this.
->>>
->>> While on a modern system with unified memory this association cannot be
->>> derived in a generic way, a device-specific driver for the graphics hardware
->>> can if the regs property of the simplefb node matches the address the CRTC
->>> engine is configured for.
->>
->> ???
->>
->> Right, I'm going to be blunt here: That's just dumb. All the
->> capability needed is there in the DT to associate a simple FB to a
->> display controller, and the solution chosen is to use a heuristic?
->>
->> The association needs to be explicit. I strongly prefer putting the
->> simple FB directly into the display controller node, but I would
->> consider phandle linkage also.
->
-> IFF there's a display controller node, you can put it there.
-> I actually proposed to have a minimal/preliminary display controller node,
-> but people countered that for various reasons (too many components
-> with multiple nodes on many systems, bindings not yet defined, etc.).
->
-> And if there's no graphics driver/bindings yet at the time the bootloader
-> is written, it doesn't know how to link simplefb with it in DT.
-> Hence the heuristic to match regs... Does that make sense?
+Hi Ezequiel,
 
-No, not really. The simplefb binding /should/ make it clear that
-handover to the real display controller driver is an expected use
-case; therefore the simplefb binding should itemize exactly how that
-linkage is supposed to be expressed. When the display controller
-binding is written, it should go hand in glove with the simplefb
-binding. We want to be sure that generic code can be used to resolve a
-display controller with (one of) the simple framebuffers.
+On 22/10/2014 15:43, Ezequiel Garcia wrote:
+> The irqchip driver called armada_xp_mpic_smp_cpu_init() when CONFIG_SMP=Y
+> to initialize some per cpu registers. The function is called on each
+> CPU by calling it explicitly on the boot CPU and then using a CPU notifier
+> for the non boot CPUs.
+> 
+> This commit removes the CONFIG_SMP constrain, so the per cpu registers are
+> also initialized when CONFIG_SMP=N, which is the right thing to do.
 
-It also sounds like some are making the assumption that firmware
-should generate the simplefb node from scratch, hence all the hand
-wringing about firmware not knowing what extra stuff to put into the
-simplefb node. I don't think this is necessary, or even a good
-approach. A disabled simplefb node can be put into the dts file with
-any dependencies it needs to care about and linkage to the real
-display controller. Firmware should be able to locate that node,
-update the parameters as needed, and enable it. That gets out of the
-cycle of updating firmware in lockstep.
+Sometime I find the diff output provided by git not really easy to read.
 
-g.
+But about the change itself:
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+
+Thanks,
+
+Gregory
+
+
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  drivers/irqchip/irq-armada-370-xp.c | 47 ++++++++++++++++++-------------------
+>  1 file changed, 23 insertions(+), 24 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+> index af4e307..de5eb26 100644
+> --- a/drivers/irqchip/irq-armada-370-xp.c
+> +++ b/drivers/irqchip/irq-armada-370-xp.c
+> @@ -285,28 +285,6 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
+>  	return 0;
+>  }
+>  
+> -#ifdef CONFIG_SMP
+> -static void armada_mpic_send_doorbell(const struct cpumask *mask,
+> -				      unsigned int irq)
+> -{
+> -	int cpu;
+> -	unsigned long map = 0;
+> -
+> -	/* Convert our logical CPU mask into a physical one. */
+> -	for_each_cpu(cpu, mask)
+> -		map |= 1 << cpu_logical_map(cpu);
+> -
+> -	/*
+> -	 * Ensure that stores to Normal memory are visible to the
+> -	 * other CPUs before issuing the IPI.
+> -	 */
+> -	dsb();
+> -
+> -	/* submit softirq */
+> -	writel((map << 8) | irq, main_int_base +
+> -		ARMADA_370_XP_SW_TRIG_INT_OFFS);
+> -}
+> -
+>  static void armada_xp_mpic_smp_cpu_init(void)
+>  {
+>  	u32 control;
+> @@ -329,6 +307,28 @@ static void armada_xp_mpic_smp_cpu_init(void)
+>  	writel(0, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
+>  }
+>  
+> +#ifdef CONFIG_SMP
+> +static void armada_mpic_send_doorbell(const struct cpumask *mask,
+> +				      unsigned int irq)
+> +{
+> +	int cpu;
+> +	unsigned long map = 0;
+> +
+> +	/* Convert our logical CPU mask into a physical one. */
+> +	for_each_cpu(cpu, mask)
+> +		map |= 1 << cpu_logical_map(cpu);
+> +
+> +	/*
+> +	 * Ensure that stores to Normal memory are visible to the
+> +	 * other CPUs before issuing the IPI.
+> +	 */
+> +	dsb();
+> +
+> +	/* submit softirq */
+> +	writel((map << 8) | irq, main_int_base +
+> +		ARMADA_370_XP_SW_TRIG_INT_OFFS);
+> +}
+> +
+>  static int armada_xp_mpic_secondary_init(struct notifier_block *nfb,
+>  					 unsigned long action, void *hcpu)
+>  {
+> @@ -492,9 +492,8 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+>  
+>  	BUG_ON(!armada_370_xp_mpic_domain);
+>  
+> -#ifdef CONFIG_SMP
+> +	/* Setup for the boot CPU */
+>  	armada_xp_mpic_smp_cpu_init();
+> -#endif
+>  
+>  	armada_370_xp_msi_init(node, main_int_res.start);
+>  
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
