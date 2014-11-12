@@ -1,139 +1,126 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 12 Nov 2014 16:51:16 +0100
-Subject: [PATCH 3/3] ARM: dts: vf-colibri: add USB regulators
-In-Reply-To: <20141111141228.GB2704@dragon>
-References: <1415106430-6271-1-git-send-email-stefan@agner.ch>
- <1415106430-6271-4-git-send-email-stefan@agner.ch>
- <20141111141228.GB2704@dragon>
-Message-ID: <0bb62bdfc866f75977d01070d228ed4c@agner.ch>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed, 12 Nov 2014 15:57:36 +0000
+Subject: [PATCH v4] of/fdt: export fdt blob as /sys/firmware/fdt
+In-Reply-To: <1415795308-14639-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1415795308-14639-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20141112155736.E8A1EC41BAB@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-11-11 15:12, Shawn Guo wrote:
-> On Tue, Nov 04, 2014 at 02:07:10PM +0100, Stefan Agner wrote:
->> Add structure of USB supply logic. Especially, the USB hosts power
->> enable regulator is needed to control VBUS supply.
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
->>  arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 45 ++++++++++++++++++++++++++++++-
->>  arch/arm/boot/dts/vf-colibri.dtsi         | 12 +++++++++
->>  2 files changed, 56 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
->> index 80e8fbc..eb4ca50 100644
->> --- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
->> +++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
->> @@ -11,6 +11,41 @@
->>  	chosen {
->>  		bootargs = "console=ttyLP0,115200";
->>  	};
->> +
->> +	regulators {
->> +		compatible = "simple-bus";
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		sys_5v0_reg: regulator at 1 {
->> +			compatible = "regulator-fixed";
->> +			reg = <1>;
+On Wed, 12 Nov 2014 13:28:28 +0100
+, Ard Biesheuvel <ard.biesheuvel@linaro.org>
+ wrote:
+> Create a new /sys entry '/sys/firmware/fdt' to export the FDT blob
+> that was passed to the kernel by the bootloader. This allows userland
+> applications such as kexec to access the raw binary.
 > 
-> The numbering generally starts from 0 instead of 1.
+> The fact that this node does not reside under /sys/firmware/device-tree
+> is deliberate: FDT is also used on arm64 UEFI/ACPI systems to
+> communicate just the UEFI and ACPI entry points, but the FDT is never
+> unflattened and used to configure the system.
 > 
->> +			regulator-name = "5v0";
->> +			regulator-min-microvolt = <5000000>;
->> +			regulator-max-microvolt = <5000000>;
->> +			regulator-always-on;
->> +		};
->> +
->> +		usbc_vbus_reg: regulator at 2 {
->> +			compatible = "regulator-fixed";
->> +			reg = <2>;
->> +			regulator-name = "usbc_vbus";
->> +			regulator-min-microvolt = <5000000>;
->> +			regulator-max-microvolt = <5000000>;
->> +			vin-supply = <&sys_5v0_reg>;
->> +		};
->> +
->> +		/* USBH_PEN */
->> +		usbh_vbus_reg: regulator at 3 {
->> +			compatible = "regulator-fixed";
->> +			reg = <3>;
->> +			regulator-name = "usbh_vbus";
->> +			regulator-min-microvolt = <5000000>;
->> +			regulator-max-microvolt = <5000000>;
->> +			gpio = <&gpio3 19 GPIO_ACTIVE_LOW>;
->> +			vin-supply = <&sys_5v0_reg>;
->> +		};
->> +	};
->>  };
->>
->>  &bl {
->> @@ -51,4 +86,12 @@
->>
->>  &uart2 {
->>  	status = "okay";
->> -};
->> \ No newline at end of file
->> +};
->> +
->> +&usbdev0 {
->> +	vbus-supply = <&usbc_vbus_reg>;
->> +};
->> +
->> +&usbh1 {
->> +	vbus-supply = <&usbh_vbus_reg>;
->> +};
->> diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
->> index 2371760..79ccfe2 100644
->> --- a/arch/arm/boot/dts/vf-colibri.dtsi
->> +++ b/arch/arm/boot/dts/vf-colibri.dtsi
->> @@ -163,5 +163,17 @@
->>  				VF610_PAD_PTD3__UART2_CTS		0x21a1
->>  			>;
->>  		};
->> +
->> +		pinctrl_usbh1_ext: gpio_usb_vbus {
->> +			fsl,pins = <
->> +				VF610_PAD_PTD4__GPIO_83			0x22ed
+> A CRC32 checksum is calculated over the entire FDT blob, and verified
+> at late_initcall time. The sysfs entry is instantiated only if the
+> checksum is valid, i.e., if the FDT blob has not been modified in the
+> mean time. Otherwise, a warning is printed.
 > 
-> We used to know the GPIO usage by looking for the phandle reference to
-> the node.  But it doesn't work for VF610 case now.
-> 
-> I guess this is for usbh_vbus_reg usage?  It would be nice to have a
-> comment telling the usage of the GPIO.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Yeah its true, its assign is not required for Vybird. However, we could
-assign them anyway, it would even enforce correct pin setup from
-Startup... This would then make a comment superfluous. What do you
-think?
+Looks good to me. Merged, thanks.
 
+g.
 
+> ---
+> v4: use pr_warn() instead of WARN()
+> v3: keep checksum instead of copying the entire blob, and WARN on mismatch
 > 
->> +			>;
->> +		};
->> +
->> +		pinctrl_usbdev0_ext: gpio_usb_cdet {
->> +			fsl,pins = <
->> +				VF610_PAD_PTC29__GPIO_102		0x22ed
+>  drivers/of/Kconfig |  1 +
+>  drivers/of/fdt.c   | 37 +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 38 insertions(+)
 > 
-> How is this one used?
-
-This is not yet used. It is more or less the OTG-ID pin, but on 3.3V
-level. We use that on the Colibri standard to switch between Host/Device
-mode, however a driver which uses that GPIO is still outstanding. I can
-also leave that away for now, if you prefer....
-
---
-Stefan
-
+> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+> index 1a13f5b722c5..0348c208343c 100644
+> --- a/drivers/of/Kconfig
+> +++ b/drivers/of/Kconfig
+> @@ -23,6 +23,7 @@ config OF_FLATTREE
+>  	bool
+>  	select DTC
+>  	select LIBFDT
+> +	select CRC32
+>  
+>  config OF_EARLY_FLATTREE
+>  	bool
+> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> index d1ffca8b34ea..0004871ebccf 100644
+> --- a/drivers/of/fdt.c
+> +++ b/drivers/of/fdt.c
+> @@ -9,6 +9,7 @@
+>   * version 2 as published by the Free Software Foundation.
+>   */
+>  
+> +#include <linux/crc32.h>
+>  #include <linux/kernel.h>
+>  #include <linux/initrd.h>
+>  #include <linux/memblock.h>
+> @@ -22,10 +23,20 @@
+>  #include <linux/libfdt.h>
+>  #include <linux/debugfs.h>
+>  #include <linux/serial_core.h>
+> +#include <linux/sysfs.h>
+>  
+>  #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
+>  #include <asm/page.h>
+>  
+> +static u32 of_fdt_crc32;
+> +
+> +static u32 of_fdt_get_crc32(void *fdt)
+> +{
+> +	static u32 const OF_FDT_CRC32_SEED = 0x04c11db7;
+> +
+> +	return crc32_be(OF_FDT_CRC32_SEED, fdt, fdt_totalsize(fdt));
+> +}
+> +
+>  /*
+>   * of_fdt_limit_memory - limit the number of regions in the /memory node
+>   * @limit: maximum entries
+> @@ -1003,6 +1014,8 @@ bool __init early_init_dt_verify(void *params)
+>  		return false;
+>  	}
+>  
+> +	of_fdt_crc32 = of_fdt_get_crc32(initial_boot_params);
+> +
+>  	return true;
+>  }
+>  
+> @@ -1103,4 +1116,28 @@ static int __init of_flat_dt_debugfs_export_fdt(void)
+>  module_init(of_flat_dt_debugfs_export_fdt);
+>  #endif
+>  
+> +#ifdef CONFIG_SYSFS
+> +static ssize_t of_fdt_raw_read(struct file *filp, struct kobject *kobj,
+> +			       struct bin_attribute *bin_attr,
+> +			       char *buf, loff_t off, size_t count)
+> +{
+> +	memcpy(buf, initial_boot_params + off, count);
+> +	return count;
+> +}
+> +
+> +static int __init of_fdt_raw_init(void)
+> +{
+> +	static struct bin_attribute of_fdt_raw_attr =
+> +		__BIN_ATTR(fdt, S_IRUSR, of_fdt_raw_read, NULL, 0);
+> +
+> +	if (of_fdt_crc32 != of_fdt_get_crc32(initial_boot_params)) {
+> +		pr_warn("fdt: not creating '/sys/firmware/fdt': CRC check failed");
+> +		return 0;
+> +	}
+> +	of_fdt_raw_attr.size = fdt_totalsize(initial_boot_params);
+> +	return sysfs_create_bin_file(firmware_kobj, &of_fdt_raw_attr);
+> +}
+> +late_initcall(of_fdt_raw_init);
+> +#endif
+> +
+>  #endif /* CONFIG_OF_EARLY_FLATTREE */
+> -- 
+> 1.8.3.2
 > 
-> Shawn
-> 
->> +			>;
->> +		};
->>  	};
->>  };
->> --
->> 2.1.3
->>
