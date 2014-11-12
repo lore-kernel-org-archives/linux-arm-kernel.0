@@ -1,7 +1,7 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 12 Nov 2014 13:08:29 +0100
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed, 12 Nov 2014 12:10:47 +0000
 Subject: [PATCH v2 1/2] of/fdt: export fdt blob as /sys/firmware/fdt
-In-Reply-To: <CACxGe6vPC74TtwRxgA2jPQwCrpVjpk9UvnUiUNTF4ZgfmH4YgQ@mail.gmail.com>
+In-Reply-To: <CAKv+Gu8wenvVa3=35pXTJkbZT+cwpAUfs6RdcBtWGyOyzXcupg@mail.gmail.com>
 References: <1415645222-14909-1-git-send-email-ard.biesheuvel@linaro.org>
  <1415645222-14909-2-git-send-email-ard.biesheuvel@linaro.org>
  <20141111144221.5FCDAC416AF@trevor.secretlab.ca>
@@ -11,89 +11,94 @@ References: <1415645222-14909-1-git-send-email-ard.biesheuvel@linaro.org>
  <CACxGe6sN6dObiOnbhYM4Ltdn0BU_KTESuefvxh3odm1BbcUVbw@mail.gmail.com>
  <CAKv+Gu9BgH8DiU=z-A5NDcCSwamJ84x3s95G=RGNoO9ostmTwg@mail.gmail.com>
  <CACxGe6vPC74TtwRxgA2jPQwCrpVjpk9UvnUiUNTF4ZgfmH4YgQ@mail.gmail.com>
-Message-ID: <CAKv+Gu8wenvVa3=35pXTJkbZT+cwpAUfs6RdcBtWGyOyzXcupg@mail.gmail.com>
+ <CAKv+Gu8wenvVa3=35pXTJkbZT+cwpAUfs6RdcBtWGyOyzXcupg@mail.gmail.com>
+Message-ID: <CACxGe6tUFv2GR5pFjDGa=S3pqVndph4E3MauZFoyRRYzNyRu=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 November 2014 13:01, Grant Likely <grant.likely@linaro.org> wrote:
-> On Wed, Nov 12, 2014 at 11:51 AM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> On 12 November 2014 12:45, Grant Likely <grant.likely@linaro.org> wrote:
->>> On Tue, Nov 11, 2014 at 8:34 PM, Ard Biesheuvel
->>> <ard.biesheuvel@linaro.org> wrote:
->>>> On 11 November 2014 21:08, Grant Likely <grant.likely@linaro.org> wrote:
->>>>> On Tue, Nov 11, 2014 at 4:25 PM, Rob Herring <robherring2@gmail.com> wrote:
->>>>>> On Tue, Nov 11, 2014 at 8:42 AM, Grant Likely <grant.likely@linaro.org> wrote:
->>>>>>> On Mon, 10 Nov 2014 19:47:01 +0100
->>>>>>> , Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>>>>>  wrote:
->>>>>>>> Create a new /sys entry '/sys/firmware/fdt' to export the FDT blob
->>>>>>>> that was passed to the kernel by the bootloader. This allows userland
->>>>>>>> applications such as kexec to access the raw binary. The blob needs to
->>>>>>>> be preserved as early as possible by calling preserve_fdt().
+On Wed, Nov 12, 2014 at 12:08 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 12 November 2014 13:01, Grant Likely <grant.likely@linaro.org> wrote:
+>> On Wed, Nov 12, 2014 at 11:51 AM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>>> On 12 November 2014 12:45, Grant Likely <grant.likely@linaro.org> wrote:
+>>>> On Tue, Nov 11, 2014 at 8:34 PM, Ard Biesheuvel
+>>>> <ard.biesheuvel@linaro.org> wrote:
+>>>>> On 11 November 2014 21:08, Grant Likely <grant.likely@linaro.org> wrote:
+>>>>>> On Tue, Nov 11, 2014 at 4:25 PM, Rob Herring <robherring2@gmail.com> wrote:
+>>>>>>> On Tue, Nov 11, 2014 at 8:42 AM, Grant Likely <grant.likely@linaro.org> wrote:
+>>>>>>>> On Mon, 10 Nov 2014 19:47:01 +0100
+>>>>>>>> , Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>>>>>>  wrote:
+>>>>>>>>> Create a new /sys entry '/sys/firmware/fdt' to export the FDT blob
+>>>>>>>>> that was passed to the kernel by the bootloader. This allows userland
+>>>>>>>>> applications such as kexec to access the raw binary. The blob needs to
+>>>>>>>>> be preserved as early as possible by calling preserve_fdt().
+>>>>>>>>>
+>>>>>>>>> The fact that this node does not reside under /sys/firmware/device-tree
+>>>>>>>>> is deliberate: FDT is also used on arm64 UEFI/ACPI systems to
+>>>>>>>>> communicate just the UEFI and ACPI entry points, but the FDT is never
+>>>>>>>>> unflattened and used to configure the system.
+>>>>>>>>>
+>>>>>>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 >>>>>>>>
->>>>>>>> The fact that this node does not reside under /sys/firmware/device-tree
->>>>>>>> is deliberate: FDT is also used on arm64 UEFI/ACPI systems to
->>>>>>>> communicate just the UEFI and ACPI entry points, but the FDT is never
->>>>>>>> unflattened and used to configure the system.
->>>>>>>>
->>>>>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>>>>>> On further thought, nak. I want tree modifications to be treated as
+>>>>>>>> bugs. Do a checksum CRC32 or check. It's simpler and it can be extended
+>>>>>>>> to us an in-blob CRC when the file format gets upreved to include one.
 >>>>>>>
->>>>>>> On further thought, nak. I want tree modifications to be treated as
->>>>>>> bugs. Do a checksum CRC32 or check. It's simpler and it can be extended
->>>>>>> to us an in-blob CRC when the file format gets upreved to include one.
+>>>>>>> Why? MIPS Octeon is full of them BTW. So the rule is any modifications
+>>>>>>> or fixups have to be on the unflattened tree?
 >>>>>>
->>>>>> Why? MIPS Octeon is full of them BTW. So the rule is any modifications
->>>>>> or fixups have to be on the unflattened tree?
+>>>>>> That, or we require the fixups to explicitly clean up the CRC after
+>>>>>> themselves. That will force them to be visible. Anything using the
+>>>>>> fdt_*() write functions could potentially take care of it
+>>>>>> automatically. That would make it immediately discoverable where
+>>>>>> changes are being made in the tree.
+>>>>>>
 >>>>>
->>>>> That, or we require the fixups to explicitly clean up the CRC after
->>>>> themselves. That will force them to be visible. Anything using the
->>>>> fdt_*() write functions could potentially take care of it
->>>>> automatically. That would make it immediately discoverable where
->>>>> changes are being made in the tree.
->>>>>
+>>>>> Doesn't that defeat the purpose of capturing the FDT as it was passed
+>>>>> by the bootloader? Those fixups will be reapplied by the kexec'ed
+>>>>> kernel anyway.
 >>>>
->>>> Doesn't that defeat the purpose of capturing the FDT as it was passed
->>>> by the bootloader? Those fixups will be reapplied by the kexec'ed
->>>> kernel anyway.
+>>>> We're always going to be in a grey area here. There are some things
+>>>> that should not be passed over. For example, a framebuffer that is
+>>>> passed in from firmware will no longer be valid on kexec. Right now on
+>>>> arch/arm, the exynos platform fixes up the DT because the memory node
+>>>> is outright /corrupt/. In the MIPS case, they do a bunch of stuff in
+>>>> the kernel to figure out the hardware as configured by firmware. I
+>>>> don't agree with that approach, but I would be very surprised if the
+>>>> full original DT has any validity after the early boot fixups.
+>>>>
 >>>
->>> We're always going to be in a grey area here. There are some things
->>> that should not be passed over. For example, a framebuffer that is
->>> passed in from firmware will no longer be valid on kexec. Right now on
->>> arch/arm, the exynos platform fixes up the DT because the memory node
->>> is outright /corrupt/. In the MIPS case, they do a bunch of stuff in
->>> the kernel to figure out the hardware as configured by firmware. I
->>> don't agree with that approach, but I would be very surprised if the
->>> full original DT has any validity after the early boot fixups.
+>>> Well, yes, but those fixups will presumably be done on every boot,
+>>> including the kexec ones.
 >>>
->>
->> Well, yes, but those fixups will presumably be done on every boot,
->> including the kexec ones.
->>
->>> Early boot fixups to the .dtb are always going to be oddball cases.
+>>>> Early boot fixups to the .dtb are always going to be oddball cases.
+>>>>
 >>>
+>>> OK, so generally speaking, whether the original DTB is more suitable
+>>> to be presented through /sys/firmware/fdt than the 'current' FDT
+>>> (i.e., whatever is in memory at the time the sysfs node is accessed)
+>>> is not obvious at all. So why not just do the latter?
 >>
->> OK, so generally speaking, whether the original DTB is more suitable
->> to be presented through /sys/firmware/fdt than the 'current' FDT
->> (i.e., whatever is in memory at the time the sysfs node is accessed)
->> is not obvious at all. So why not just do the latter?
+>> We're now talking theoreticals. In the case you're working on
+>> (ACPI+FDT), the FDT is generated by Grub or the EFI stub as an
+>> intermediary format, and there isn't currently any code in your boot
+>> path that modifies the FDT. You're arguing for a future situation
+>> where the kernel makes a fixup that is not wanted in the second
+>> kernel. I'm arguing that 1) I want to /know/ when that happens because
+>> there are very few situations where it is a valid thing to do, and 2)
+>> the likelyhood of that happening in the FDT+ACPI case is somewhere
+>> between slim and none because you're working with an intermediary FDT,
+>> not a real hardware description.
+>>
 >
-> We're now talking theoreticals. In the case you're working on
-> (ACPI+FDT), the FDT is generated by Grub or the EFI stub as an
-> intermediary format, and there isn't currently any code in your boot
-> path that modifies the FDT. You're arguing for a future situation
-> where the kernel makes a fixup that is not wanted in the second
-> kernel. I'm arguing that 1) I want to /know/ when that happens because
-> there are very few situations where it is a valid thing to do, and 2)
-> the likelyhood of that happening in the FDT+ACPI case is somewhere
-> between slim and none because you're working with an intermediary FDT,
-> not a real hardware description.
->
+> But do you still want the warning? Or only if you access the sysfs
+> node? Or just a pr_warn() perhaps rather than a full blown WARN() ?
+> MIPS will start seeing the warning as well even if they don't care
+> about what is in /sys/firmware/fdt
 
-But do you still want the warning? Or only if you access the sysfs
-node? Or just a pr_warn() perhaps rather than a full blown WARN() ?
-MIPS will start seeing the warning as well even if they don't care
-about what is in /sys/firmware/fdt
+pr_warn() and then don't export the file in /sys/firmware/fdt. I'm
+okay with the check being done once at the end of initcalls.
 
--- 
-Ard.
+g.
