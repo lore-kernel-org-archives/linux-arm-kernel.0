@@ -1,26 +1,111 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 12 Nov 2014 16:02:34 +0100
-Subject: [PATCH v6 05/12] memory: Add NVIDIA Tegra memory controller
- support
-In-Reply-To: <20141112144715.GD26488@ulmo>
-References: <1415376063-17205-1-git-send-email-thierry.reding@gmail.com>
- <1415376063-17205-6-git-send-email-thierry.reding@gmail.com>
- <20141112142150.GV10744@8bytes.org> <20141112144715.GD26488@ulmo>
-Message-ID: <20141112150233.GW10744@8bytes.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 12 Nov 2014 07:02:11 -0800
+Subject: [PATCH 4/4] arm: dts: omap3-gta04: Add static configuration for
+ devconf1 register
+In-Reply-To: <5463585D.9070209@ti.com>
+References: <1415051968-4878-1-git-send-email-marek@goldelico.com>
+ <1415051968-4878-5-git-send-email-marek@goldelico.com>
+ <5463585D.9070209@ti.com>
+Message-ID: <20141112150210.GC26481@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 12, 2014 at 03:47:16PM +0100, Thierry Reding wrote:
-> The SMMU is part of a larger IP block that's also a memory controller.
-> Having it in drivers/iommu would mean that we need to provide a
-> mechanism to synchronize between the two drivers. They also share a
-> number of data tables, so that would need to be shared somehow as well.
-> By keeping both in the same directory we don't have to expose any of
-> this publicly.
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [141112 04:56]:
+> Hi,
+> 
+> On 03/11/14 23:59, Marek Belisko wrote:
+> > gta04 board need for tvout enabled 2 bits in devconf1 register (tvbypass and acbias).
+> > Add single pinmux entry and enable it.
+> > 
+> > Signed-off-by: Marek Belisko <marek@goldelico.com>
+> > ---
+> >  arch/arm/boot/dts/omap3-gta04.dtsi | 22 ++++++++++++++++++++++
+> >  1 file changed, 22 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
+> > index e4d05f0..a456d37 100644
+> > --- a/arch/arm/boot/dts/omap3-gta04.dtsi
+> > +++ b/arch/arm/boot/dts/omap3-gta04.dtsi
+> > @@ -118,6 +118,17 @@
+> >  			};
+> >  		};
+> >  	};
+> > +
+> > +	/* pinmux for devconf1 */
+> > +	control_devconf1: pinmux at 480022d8 {
+> > +		compatible = "pinctrl-single";
+> > +		reg = <0x480022d8 4>;	/* single register */
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +		pinctrl-single,bit-per-mux;
+> > +		pinctrl-single,register-width = <32>;
+> > +		pinctrl-single,function-mask = <0xfc0bd5>;
+> > +	};
+> >  };
+> >  
+> >  &omap3_pmx_core {
+> > @@ -497,3 +508,14 @@
+> >  		};
+> >  	};
+> >  };
+> > +
+> > +&control_devconf1 {
+> > +	pinctrl-name = "default";
+> > +	pinctrl-0 = < &tv_acbias_pins>;
+> > +
+> > +	tv_acbias_pins: pinmux_tv_acbias_pins {
+> > +		pinctrl-single,bits = <
+> > +			0 0x40800 0x40800
+> 
+> I think it would be good to have a comment in the .dts above, mentioning
+> that TVOUTBYPASS and TVACEN bits are being set.
+> 
+> > +		>;
+> > +	};
+> > +};
+> > 
+> 
+> OMAP3630 seems to have CONTROL_AVDAC1 and CONTROL_AVDAC2 registers. Did
+> you check if the SoC you use have those? It looks like they need
+> configuration also, if the exist.
 
-Since these parts are in different files you export the interfaces
-anyway through non-static symbols and those dependencys also exist for
-other IOMMU drivers. So I prefer this file to live in drivers/iommu.
+Those look like AVDAC specific control registers that are not mux
+registers. So those should be accessed the existing SCM (System Control
+Mmodule) syscon area by the DSS code. For examples, see what
+pbias-regulator.c is doing for some other registers in the syscon area.
+ 
+> So, I don't think tvbypass and acbias are really pinmux stuff, but it
+> does seem like an easy way to handle the devconf1 register, and I don't
+> see any issues with the setting being fixed.
 
+The CONTROL_DEVCONF registers seem to be all related to muxing signals
+and configuring ping signal levels. So I think the pinctrl-single is
+OK to use with these.
+ 
+> However, devconf1 register seems to have bits for many devices,
+> including mcbsp, mmc, and even some "Force MPU writes to be nonposted" bit.
 
-	Joerg
+Yes the"Force MPU writes to be nonposted" debug bit is an odd one
+there :) But we're not using that luckily anywhere..
+ 
+> And, with a quick grep, I see CONTROL_DEVCONF1 touched in multiple
+> places in the kernel. I wonder if adding a pinmux entry for it could
+> cause some rather odd problems.
+
+They can all use pinctrl-single no problem.
+ 
+> Tony, any idea about this? How should CONTROL_DEVCONFx registers be
+> accessed?
+
+If they are pinctrl related like the CONTROL_DEVCONF registers, then
+pincatrl-single is OK. However, for any registers in the SCM that are
+not just routing signals, then the syscon mapping should be used. And
+we should have a separate driver implementing some standard Linux
+generic framework driver. For example a regulator or clock driver.
+
+Anyways, I'll drop this $subject patch for now and set up a new branch
+for the .dts changes.
+
+Regards,
+
+Tony
