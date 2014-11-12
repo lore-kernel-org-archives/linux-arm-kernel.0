@@ -1,52 +1,76 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Wed, 12 Nov 2014 19:03:32 +0100
-Subject: [PATCH RESEND] Documentation: devicetree: Fix Xilinx VDMA
- specification
-In-Reply-To: <6067bede14b9421fa87db96bdc66dc66@BN1AFFO11FD040.protection.gbl>
-References: <1415800277-6817-1-git-send-email-afaerber@suse.de>
- <6067bede14b9421fa87db96bdc66dc66@BN1AFFO11FD040.protection.gbl>
-Message-ID: <5463A0F4.6060300@suse.de>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 12 Nov 2014 10:04:31 -0800
+Subject: [PATCH] mmc: dw_mmc: try pick the exact same voltage as vmmc for
+ vqmmc
+In-Reply-To: <CAPDyKFqUoBjhsbz8rkLa9PY_dpgMxnimz3k7OoA5WVhi7MacPQ@mail.gmail.com>
+References: <1415109789-7046-1-git-send-email-addy.ke@rock-chips.com>
+ <1415678573-6093-1-git-send-email-addy.ke@rock-chips.com>
+ <CAPDyKFqUoBjhsbz8rkLa9PY_dpgMxnimz3k7OoA5WVhi7MacPQ@mail.gmail.com>
+Message-ID: <CAD=FV=VQHZ6YmcoeAb1OEVLYRrYBnc_dM5Kjt1TZX_CQJC=EfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 12.11.2014 um 16:57 schrieb S?ren Brinkmann:
-> On Wed, 2014-11-12 at 02:51PM +0100, Andreas F?rber wrote:
->> The specification requires xlnx,data-width, but example and driver use
->> xlnx,datawidth. Change the specification to match the implementation.
-> 
-> Isn't this the wrong way around? The bindings are considered API, so
-> shouldn't the driver be fixed to match the spec?
+Ulf,
 
-In theory, patch review should've never let the two differ... ;)
+On Tue, Nov 11, 2014 at 12:52 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 11 November 2014 05:02, Addy Ke <addy.ke@rock-chips.com> wrote:
+>> SD2.0 cards need vqmmc and vmmc to be the same.
+>
+> No, that's not correct.
+>
+> If I remember the spec correctly, the bus signal threshold is 0.75 * VDD.
 
-It's not my driver, so I fixed the perceived inconsistency the least
-invasive way; Michal and Srikanth seemed to concur at the time.
+As usual, I will first state my utter lack of knowledge of all things mmc.
 
-https://patchwork.kernel.org/patch/4620261/
+Now that's out of the way, on two separate board with two separate
+SoCs I've heard stories of cards that don't work when there's a big
+gap between vmmc and vqmmc.
 
-> Are there already dts files out there using either of these options?
+If my memory serves, previously I heard of problems with vmmc=3.3V and
+vqmmc=2.8V.  That means there were problems with .85 * VDD.  Certainly
+Addy seems to have a card that has problems with vmmc=3.3V and
+vqmmc=2.7V (but worked with vmmc=3.3V and vqmmc=2.8V).  That is .82 *
+VDD.
 
-In upstream, no. microblaze and virtex440 use a
-xlnx,include-datawidth-matching-0 property as precedence for the
-spelling, whereas there is an fsl,data-width and an unused msix-data-width.
+I have no idea if these old cards are "to spec", but they exist and it
+would be nice to support them.
 
-Downstream, yes: Beyond my own patch derived from the Parallella tree,
-there's some in the ADI tree. None in the Xilinx tree on quick check.
+It seems like the absolute safest thing would be to try to keep vmmc
+and vqmmc matching if possible, especially during card probe.  Once
+voltage negotiation happened then the vqmmc could go down.
 
-I haven't encountered any using the documented xlnx,data-width - but
-this patch was authored pre 3.17, haven't ran a full Web search again.
 
-Regards,
-Andreas
+>> But vqmmc call regulator_set_voltage to set min_uv(2.7v) as far as possible.
+>
+> I guess you want to do that to save as much power as possible.
 
--- 
-SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 21284 AG N?rnberg
+I don't think it's Addy wanting it, I think it's the regulator framework.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141112/d7c7c1f9/attachment.sig>
+If a regulator is current 1.8V and you request 2.7 - 3.3V, the
+framework needs to pick one of those voltages.  I believe it will pick
+2.7V.
+
+...so I think we get into trouble only when the 2.0 card is plugged in
+after a UHS card has negotiated down the voltage, but I could be
+wrong.  Maybe Addy can clarify.
+
+
+>> @@ -1163,8 +1163,14 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
+>>          */
+>>         uhs = mci_readl(host, UHS_REG);
+>>         if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
+>> -               min_uv = 2700000;
+>> -               max_uv = 3600000;
+>> +               /* try pick the exact same voltage as vmmc for vqmmc */
+>
+> This seems like a generic SD protocol issue.
+>
+> Should we maybe provide some helper function from the mmc core, which
+> in principle take the negotiated card->ocr into account while
+> calculating the signal voltage level. Typically min_uv should be 0.75
+> x (card->ocr), for these cases.
+
+Yes, if there are ways to make the solution more generic I would
+certainly support that.
+
+-Doug
