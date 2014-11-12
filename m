@@ -1,192 +1,65 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 12 Nov 2014 10:47:18 +0000
-Subject: [PATCH] arm64: compat: align cacheflush syscall with arch/arm
-Message-ID: <1415789238-4573-1-git-send-email-vladimir.murzin@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Wed, 12 Nov 2014 10:42:05 +0000
+Subject: [PATCH v2 1/2] of/fdt: export fdt blob as /sys/firmware/fdt
+In-Reply-To: <1415645222-14909-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1415645222-14909-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1415645222-14909-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <5463397D.7060506@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update handling of cacheflush syscall with changes made in arch/arm
-counterpart:
- - return error to userspace when flushing syscall fails
- - split user cache-flushing into interruptible chunks
- - don't bother rounding to nearest vma
+On 10/11/14 18:47, Ard Biesheuvel wrote:
+> Create a new /sys entry '/sys/firmware/fdt' to export the FDT blob
+> that was passed to the kernel by the bootloader. This allows userland
+> applications such as kexec to access the raw binary. The blob needs to
+> be preserved as early as possible by calling preserve_fdt().
+>
+> The fact that this node does not reside under /sys/firmware/device-tree
+> is deliberate: FDT is also used on arm64 UEFI/ACPI systems to
+> communicate just the UEFI and ACPI entry points, but the FDT is never
+> unflattened and used to configure the system.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>   drivers/of/fdt.c       | 34 ++++++++++++++++++++++++++++++++++
+>   include/linux/of_fdt.h |  2 ++
+>   2 files changed, 36 insertions(+)
+>
+> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> index d1ffca8b34ea..e9ee3d5f7ea4 100644
+> --- a/drivers/of/fdt.c
+> +++ b/drivers/of/fdt.c
+> @@ -22,6 +22,7 @@
+>   #include <linux/libfdt.h>
+>   #include <linux/debugfs.h>
+>   #include <linux/serial_core.h>
+> +#include <linux/sysfs.h>
+>
+>   #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
+>   #include <asm/page.h>
+> @@ -1103,4 +1104,37 @@ static int __init of_flat_dt_debugfs_export_fdt(void)
+>   module_init(of_flat_dt_debugfs_export_fdt);
+>   #endif
+>
+> +static u8 *raw_fdt_copy;
+> +
+> +void __init preserve_fdt(void)
+> +{
+> +	u32 fdt_size;
+> +
+> +	fdt_size = fdt_totalsize(initial_boot_params);
+> +	raw_fdt_copy = memcpy(__va(memblock_alloc(fdt_size, PAGE_SIZE)),
+> +			      initial_boot_params, fdt_size);
+> +}
+> +
+> +#ifdef CONFIG_SYSFS
+> +static ssize_t of_fdt_raw_read(struct file *filp, struct kobject *kobj,
+> +			       struct bin_attribute *bin_attr,
+> +			       char *buf, loff_t off, size_t count)
+> +{
+> +	memcpy(buf, raw_fdt_copy + off, count);
+Should we check for the off+count, not to exceed the fdt_size that we 
+actually copied ?
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/cacheflush.h  |    2 +-
- arch/arm64/include/asm/thread_info.h |   12 ++++++
- arch/arm64/kernel/sys_compat.c       |   77 ++++++++++++++++++++++++----------
- arch/arm64/mm/cache.S                |    6 ++-
- 4 files changed, 74 insertions(+), 23 deletions(-)
-
-diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-index 689b637..7ae31a2 100644
---- a/arch/arm64/include/asm/cacheflush.h
-+++ b/arch/arm64/include/asm/cacheflush.h
-@@ -73,7 +73,7 @@ extern void flush_cache_all(void);
- extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
- extern void flush_icache_range(unsigned long start, unsigned long end);
- extern void __flush_dcache_area(void *addr, size_t len);
--extern void __flush_cache_user_range(unsigned long start, unsigned long end);
-+extern long __flush_cache_user_range(unsigned long start, unsigned long end);
- 
- static inline void flush_cache_mm(struct mm_struct *mm)
- {
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index 459bf8e..61ea595 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -39,6 +39,15 @@ struct exec_domain;
- 
- typedef unsigned long mm_segment_t;
- 
-+struct compat_restart_block {
-+	union {
-+		/* For user cache flushing */
-+		struct {
-+			unsigned long start;
-+			unsigned long end;
-+		} cache;
-+	};
-+};
- /*
-  * low level task data that entry.S needs immediate access to.
-  * __switch_to() assumes cpu_context follows immediately after cpu_domain.
-@@ -51,6 +60,9 @@ struct thread_info {
- 	struct restart_block	restart_block;
- 	int			preempt_count;	/* 0 => preemptable, <0 => bug */
- 	int			cpu;		/* cpu */
-+#ifdef CONFIG_COMPAT
-+	struct compat_restart_block     compat_restart_block;
-+#endif
- };
- 
- #define INIT_THREAD_INFO(tsk)						\
-diff --git a/arch/arm64/kernel/sys_compat.c b/arch/arm64/kernel/sys_compat.c
-index dc47e53..7139637 100644
---- a/arch/arm64/kernel/sys_compat.c
-+++ b/arch/arm64/kernel/sys_compat.c
-@@ -28,29 +28,65 @@
- #include <asm/cacheflush.h>
- #include <asm/unistd.h>
- 
--static inline void
--do_compat_cache_op(unsigned long start, unsigned long end, int flags)
-+static long do_compat_cache_op_restart(struct restart_block *);
-+
-+static long
-+__do_compat_cache_op(unsigned long start, unsigned long end)
- {
--	struct mm_struct *mm = current->active_mm;
--	struct vm_area_struct *vma;
-+	long ret;
- 
--	if (end < start || flags)
--		return;
--
--	down_read(&mm->mmap_sem);
--	vma = find_vma(mm, start);
--	if (vma && vma->vm_start < end) {
--		if (start < vma->vm_start)
--			start = vma->vm_start;
--		if (end > vma->vm_end)
--			end = vma->vm_end;
--		up_read(&mm->mmap_sem);
--		__flush_cache_user_range(start & PAGE_MASK, PAGE_ALIGN(end));
--		return;
--	}
--	up_read(&mm->mmap_sem);
-+	do {
-+		unsigned long chunk = min(PAGE_SIZE, end - start);
-+
-+		if (signal_pending(current)) {
-+			struct thread_info *ti = current_thread_info();
-+
-+			ti->restart_block = (struct restart_block) {
-+				.fn     = do_compat_cache_op_restart,
-+			};
-+
-+			ti->compat_restart_block = (struct compat_restart_block) {
-+				{
-+					.cache = {
-+						.start  = start,
-+						.end    = end,
-+					},
-+				},
-+			};
-+
-+			return -ERESTART_RESTARTBLOCK;
-+		}
-+		ret = __flush_cache_user_range(start, start + chunk);
-+		if (ret)
-+			return ret;
-+
-+		cond_resched();
-+		start += chunk;
-+	} while (start < end);
-+
-+	return 0;
- }
- 
-+static long do_compat_cache_op_restart(struct restart_block *unused)
-+{
-+	struct compat_restart_block *restart_block;
-+
-+	restart_block = &current_thread_info()->compat_restart_block;
-+	return __do_compat_cache_op(restart_block->cache.start,
-+				    restart_block->cache.end);
-+}
-+
-+static inline long
-+do_compat_cache_op(unsigned long start, unsigned long end, int flags)
-+{
-+	if (end < start || flags)
-+		return -EINVAL;
-+
-+	if (!access_ok(VERIFY_READ, start, end - start))
-+		return -EFAULT;
-+
-+	return __do_compat_cache_op(start, end);
-+}
- /*
-  * Handle all unrecognised system calls.
-  */
-@@ -74,8 +110,7 @@ long compat_arm_syscall(struct pt_regs *regs)
- 	 * the specified region).
- 	 */
- 	case __ARM_NR_compat_cacheflush:
--		do_compat_cache_op(regs->regs[0], regs->regs[1], regs->regs[2]);
--		return 0;
-+		return do_compat_cache_op(regs->regs[0], regs->regs[1], regs->regs[2]);
- 
- 	case __ARM_NR_compat_set_tls:
- 		current->thread.tp_value = regs->regs[0];
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index 2366383..d41899f 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -17,6 +17,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/errno.h>
- #include <linux/linkage.h>
- #include <linux/init.h>
- #include <asm/assembler.h>
-@@ -138,9 +139,12 @@ USER(9f, ic	ivau, x4	)		// invalidate I line PoU
- 	add	x4, x4, x2
- 	cmp	x4, x1
- 	b.lo	1b
--9:						// ignore any faulting cache operation
- 	dsb	ish
- 	isb
-+	mov	x0, #0
-+	ret
-+9:
-+	mov	x0, #-EFAULT
- 	ret
- ENDPROC(flush_icache_range)
- ENDPROC(__flush_cache_user_range)
--- 
-1.7.9.5
+Thanks
+Suzuki
