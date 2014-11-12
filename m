@@ -1,32 +1,49 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 12 Nov 2014 14:22:53 +0800
-Subject: [PATCH v2 2/3] irqchip: dw-apb-ictl: enable IRQ_GC_MASK_CACHE_PER_TYPE
+Date: Wed, 12 Nov 2014 14:22:52 +0800
+Subject: [PATCH v2 1/3] irqchip: dw-apb-ictl: always use use
+ {readl|writel}_relaxed
 In-Reply-To: <1415773374-4629-1-git-send-email-jszhang@marvell.com>
 References: <1415773374-4629-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1415773374-4629-3-git-send-email-jszhang@marvell.com>
+Message-ID: <1415773374-4629-2-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The irq_chip_type instances have separate mask registers, so we need to
-enable IRQ_GC_MASK_CACHE_PER_TYPE to actually handle separate mask registers.
+There's no DMA at all, the device type memory attribute can ensure the
+operations order and relaxed version imply compiler barrier, so we are safe
+to use relaxed version to improve the performance a bit.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- drivers/irqchip/irq-dw-apb-ictl.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/irqchip/irq-dw-apb-ictl.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/irqchip/irq-dw-apb-ictl.c b/drivers/irqchip/irq-dw-apb-ictl.c
-index fcc3385..c136b67 100644
+index 31e231e..fcc3385 100644
 --- a/drivers/irqchip/irq-dw-apb-ictl.c
 +++ b/drivers/irqchip/irq-dw-apb-ictl.c
-@@ -115,6 +115,7 @@ static int __init dw_apb_ictl_init(struct device_node *np,
+@@ -94,16 +94,16 @@ static int __init dw_apb_ictl_init(struct device_node *np,
+ 	 */
  
- 	ret = irq_alloc_domain_generic_chips(domain, 32, (nrirqs > 32) ? 2 : 1,
- 					     np->name, handle_level_irq, clr, 0,
-+					     IRQ_GC_MASK_CACHE_PER_TYPE |
- 					     IRQ_GC_INIT_MASK_CACHE);
- 	if (ret) {
- 		pr_err("%s: unable to alloc irq domain gc\n", np->full_name);
+ 	/* mask and enable all interrupts */
+-	writel(~0, iobase + APB_INT_MASK_L);
+-	writel(~0, iobase + APB_INT_MASK_H);
+-	writel(~0, iobase + APB_INT_ENABLE_L);
+-	writel(~0, iobase + APB_INT_ENABLE_H);
++	writel_relaxed(~0, iobase + APB_INT_MASK_L);
++	writel_relaxed(~0, iobase + APB_INT_MASK_H);
++	writel_relaxed(~0, iobase + APB_INT_ENABLE_L);
++	writel_relaxed(~0, iobase + APB_INT_ENABLE_H);
+ 
+-	reg = readl(iobase + APB_INT_ENABLE_H);
++	reg = readl_relaxed(iobase + APB_INT_ENABLE_H);
+ 	if (reg)
+ 		nrirqs = 32 + fls(reg);
+ 	else
+-		nrirqs = fls(readl(iobase + APB_INT_ENABLE_L));
++		nrirqs = fls(readl_relaxed(iobase + APB_INT_ENABLE_L));
+ 
+ 	domain = irq_domain_add_linear(np, nrirqs,
+ 				       &irq_generic_chip_ops, NULL);
 -- 
 2.1.3
