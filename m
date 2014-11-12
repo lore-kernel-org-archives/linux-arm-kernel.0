@@ -1,115 +1,108 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 12 Nov 2014 13:28:28 +0100
-Subject: [PATCH v4] of/fdt: export fdt blob as /sys/firmware/fdt
-Message-ID: <1415795308-14639-1-git-send-email-ard.biesheuvel@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 12 Nov 2014 13:29:53 +0100
+Subject: [PATCH v4 REPOST 1/5] of: Add descriptions of thermtrip
+ properties to Tegra PMC bindings
+In-Reply-To: <54634D97.9050500@kapsi.fi>
+References: <1415625137-4791-1-git-send-email-mikko.perttunen@kapsi.fi>
+ <1415625137-4791-2-git-send-email-mikko.perttunen@kapsi.fi>
+ <5461AEB7.70507@nvidia.com> <54634D97.9050500@kapsi.fi>
+Message-ID: <20141112122951.GD30821@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a new /sys entry '/sys/firmware/fdt' to export the FDT blob
-that was passed to the kernel by the bootloader. This allows userland
-applications such as kexec to access the raw binary.
+On Wed, Nov 12, 2014 at 02:07:51PM +0200, Mikko Perttunen wrote:
+> On 11/11/2014 08:37 AM, Alexandre Courbot wrote:
+> >On 11/10/2014 10:12 PM, Mikko Perttunen wrote:
+> >>From: Mikko Perttunen <mperttunen@nvidia.com>
+> >>
+> >>Hardware-triggered thermal reset requires configuring the I2C
+> >>reset procedure. This configuration is read from the device tree,
+> >>so document the relevant properties in the binding documentation.
+> >>
+> >>Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> >>Reviewed-by: Wei Ni <wni@nvidia.com>
+> >>Tested-by: Wei Ni <wni@nvidia.com>
+> >>---
+> >>  .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      | 24
+> >>++++++++++++++++++++++
+> >>  1 file changed, 24 insertions(+)
+> >>
+> >>diff --git
+> >>a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+> >>b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+> >>index 68ac65f..dc13fb0 100644
+> >>--- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+> >>+++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+> >>@@ -47,6 +47,21 @@ Required properties when nvidia,suspend-mode=<0>:
+> >>    sleep mode, the warm boot code will restore some PLLs, clocks and
+> >>then
+> >>    bring up CPU0 for resuming the system.
+> >>
+> >>+Hardware-triggered thermal reset:
+> >>+On Tegra30, Tegra114 and Tegra124, if the 'i2c-thermtrip' subnode
+> >>exists,
+> >>+hardware-triggered thermal reset will be enabled.
+> >>+
+> >>+Required properties for hardware-triggered thermal reset (inside
+> >>'i2c-thermtrip'):
+> >>+- nvidia,i2c-bus : Phandle to I2C bus containing the PMU
+> >>+- nvidia,bus-addr : Bus address of the PMU on the I2C bus
+> >>+- nvidia,reg-addr : I2C register address to write poweroff command to
+> >>+- nvidia,reg-data : Poweroff command to write to PMU
+> >
+> >This binding is taking two different routes to provide values to the
+> >driver:
+> >
+> >1) It uses a phandle for i2c-bus (which must then be provided by another
+> >binding implemented in the two following patches)
+> >
+> >2) It uses direct values for bus-addr, reg-addr and reg-data.
+> >
+> >Do we need to use both approaches? bus-addr could just as well be
+> >obtained through a phandle to the i2c device and reading its reg
+> >property. From this phandle you could also go back up to the bus, making
+> >the i2c-bus property unnecessary. reg-addr and reg-data cannot be
+> >specified that way, obviously.
+> 
+> This was in fact how I used to implement this, but Stephen or Thierry
+> pointed out that the reg property actually might not contain the correct
+> address (I think because the PMIC could have multiple addresses, and the one
+> in DT might not be the one that accepts the reset command).
+> 
+> The workaround for that was to either add this integer property for bus-addr
+> or add a new PMIC API for querying. I went for this as it is much simpler.
+> 
+> >
+> >Actually I think I'd prefer to see i2c-bus become an integer property
+> >instead of a phandle, because at the end of the day it is a value field
+> >of a particular register and the reference is only used to retrieve that
+> >value. It is not like we are actually going to call functions on the bus
+> >instance or change its state. And for the single purpose of retrieving
+> >that value, this binding requires the addition of a new property on the
+> >bus node that will probably never be used for something else.
+> 
+> And this was how I used to implement this even earlier, but Thierry objected
+> to that since it was duplicating information :)
 
-The fact that this node does not reside under /sys/firmware/device-tree
-is deliberate: FDT is also used on arm64 UEFI/ACPI systems to
-communicate just the UEFI and ACPI entry points, but the FDT is never
-unflattened and used to configure the system.
+If I remember correctly what I was asking for was to derive as much as
+possible from simply a phandle. That is, what I was after is a phandle
+to the PMU and ideally a way for the PMU to pass back information about
+the register and value for the power off command.
 
-A CRC32 checksum is calculated over the entire FDT blob, and verified
-at late_initcall time. The sysfs entry is instantiated only if the
-checksum is valid, i.e., if the FDT blob has not been modified in the
-mean time. Otherwise, a warning is printed.
+Given the lack of a PMU abstraction and how this is probably very Tegra
+specific I was okay with leaving reg-addr and reg-data in the DT. But if
+we can't derive even the slave address from a phandle along with the I2C
+bus master, then I think there remains little point in doing it this way
+at all.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v4: use pr_warn() instead of WARN()
-v3: keep checksum instead of copying the entire blob, and WARN on mismatch
+If we're going to duplicate three properties, adding a fourth isn't
+going to make it much worse.
 
- drivers/of/Kconfig |  1 +
- drivers/of/fdt.c   | 37 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 38 insertions(+)
-
-diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-index 1a13f5b722c5..0348c208343c 100644
---- a/drivers/of/Kconfig
-+++ b/drivers/of/Kconfig
-@@ -23,6 +23,7 @@ config OF_FLATTREE
- 	bool
- 	select DTC
- 	select LIBFDT
-+	select CRC32
- 
- config OF_EARLY_FLATTREE
- 	bool
-diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index d1ffca8b34ea..0004871ebccf 100644
---- a/drivers/of/fdt.c
-+++ b/drivers/of/fdt.c
-@@ -9,6 +9,7 @@
-  * version 2 as published by the Free Software Foundation.
-  */
- 
-+#include <linux/crc32.h>
- #include <linux/kernel.h>
- #include <linux/initrd.h>
- #include <linux/memblock.h>
-@@ -22,10 +23,20 @@
- #include <linux/libfdt.h>
- #include <linux/debugfs.h>
- #include <linux/serial_core.h>
-+#include <linux/sysfs.h>
- 
- #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
- #include <asm/page.h>
- 
-+static u32 of_fdt_crc32;
-+
-+static u32 of_fdt_get_crc32(void *fdt)
-+{
-+	static u32 const OF_FDT_CRC32_SEED = 0x04c11db7;
-+
-+	return crc32_be(OF_FDT_CRC32_SEED, fdt, fdt_totalsize(fdt));
-+}
-+
- /*
-  * of_fdt_limit_memory - limit the number of regions in the /memory node
-  * @limit: maximum entries
-@@ -1003,6 +1014,8 @@ bool __init early_init_dt_verify(void *params)
- 		return false;
- 	}
- 
-+	of_fdt_crc32 = of_fdt_get_crc32(initial_boot_params);
-+
- 	return true;
- }
- 
-@@ -1103,4 +1116,28 @@ static int __init of_flat_dt_debugfs_export_fdt(void)
- module_init(of_flat_dt_debugfs_export_fdt);
- #endif
- 
-+#ifdef CONFIG_SYSFS
-+static ssize_t of_fdt_raw_read(struct file *filp, struct kobject *kobj,
-+			       struct bin_attribute *bin_attr,
-+			       char *buf, loff_t off, size_t count)
-+{
-+	memcpy(buf, initial_boot_params + off, count);
-+	return count;
-+}
-+
-+static int __init of_fdt_raw_init(void)
-+{
-+	static struct bin_attribute of_fdt_raw_attr =
-+		__BIN_ATTR(fdt, S_IRUSR, of_fdt_raw_read, NULL, 0);
-+
-+	if (of_fdt_crc32 != of_fdt_get_crc32(initial_boot_params)) {
-+		pr_warn("fdt: not creating '/sys/firmware/fdt': CRC check failed");
-+		return 0;
-+	}
-+	of_fdt_raw_attr.size = fdt_totalsize(initial_boot_params);
-+	return sysfs_create_bin_file(firmware_kobj, &of_fdt_raw_attr);
-+}
-+late_initcall(of_fdt_raw_init);
-+#endif
-+
- #endif /* CONFIG_OF_EARLY_FLATTREE */
--- 
-1.8.3.2
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141112/7f097d33/attachment.sig>
