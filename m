@@ -1,34 +1,29 @@
-From: joel.schopp@amd.com (Joel Schopp)
-Date: Tue, 11 Nov 2014 01:32:04 -0500
-Subject: [PATCH] efi-entry.S: add dsb and isb
-Message-ID: <20141111063204.1506.57655.stgit@joelaarch64.amd.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 12 Nov 2014 16:51:01 +0100
+Subject: [PATCH v4] i2c/at91: adopt pinctrl support
+In-Reply-To: <1415584552-11390-1-git-send-email-wenyou.yang@atmel.com>
+References: <1415584552-11390-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20141112155101.GC4031@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a dsb and isb after the instruction flush before the data cache and
-mm offing.  Without this patch I am seeing synchronous exceptions occur
-every few boots.
+On Mon, Nov 10, 2014 at 09:55:52AM +0800, Wenyou Yang wrote:
+> Amend the at91 i2c pin controller to optionally take a pin control
+> handle and set the state of the pins to:
+> - "default" on boot and resume.
+> - "sleep" on suspend().
+> 
+> This should make it possible to optimize energy usage for the pins
+> both for the suspend/resume cycle
+> 
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 
-Signed-off-by: Joel Schopp <joel.schopp@amd.com>
-Tested-by: Tom Lendacky <Thomas.Lendacky@amd.com>
----
- arch/arm64/kernel/efi-entry.S |    6 ++++++
- 1 file changed, 6 insertions(+)
+Applied to for-next, thanks!
 
-diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
-index 619b1dd..7d95eda 100644
---- a/arch/arm64/kernel/efi-entry.S
-+++ b/arch/arm64/kernel/efi-entry.S
-@@ -76,6 +76,12 @@ ENTRY(efi_stub_entry)
- 	bl	__flush_dcache_area
- 	ic	ialluis
- 
-+	/* We need to sync again after the instruction cache sync
-+	 * and before turning off the dcache and mmu
-+	 */
-+	dsb	sy
-+	isb
-+
- 	/* Turn off Dcache and MMU */
- 	mrs	x0, CurrentEL
- 	cmp	x0, #CurrentEL_EL2
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141112/1f5fa941/attachment.sig>
