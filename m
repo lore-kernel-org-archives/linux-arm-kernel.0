@@ -1,57 +1,62 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 12 Nov 2014 23:10:08 +0100
-Subject: [PATCH] mmc: mvsdio: Work around broken TX DMA
-Message-ID: <1415830208-1888-1-git-send-email-andrew@lunn.ch>
+From: marek@goldelico.com (Marek Belisko)
+Date: Wed, 12 Nov 2014 23:10:44 +0100
+Subject: [PATCH v2 2/5] Documentation: DT: Add documentation for ti,
+ opa362 bindings
+In-Reply-To: <1415830247-31633-1-git-send-email-marek@goldelico.com>
+References: <1415830247-31633-1-git-send-email-marek@goldelico.com>
+Message-ID: <1415830247-31633-3-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to use the mvsdio driver for sdio, it has been necessary to
-use a module parameter to disable DMA so to force PIO is used. It is
-then possible to use wireless LAN devices like mwifiex found on
-topkick and mirabox. However, accessing an MMC SD card does work with
-DMA.
-
-Investigation has shown that MMC block device accesses are always
-aligned to 64 byte boundaries, where as transfers from mwifiex are
-rarely more than word aligned. It has also been determined that card
-to host transfers work with DMA for SDIO devices, but host to card
-transfers with DMA have problems.
-
-This patch extends the current checks for buffers which are not word
-aligned or multiple of words. All host to card transfers which are not
-64 byte aligned are now also performed via PIO. This should not affect
-the performance of SD cards, but allow sdio devices to work out of the
-box, and they are likely to be more efficient since DMA will be used
-for card to host transfers.
-
-Tested on mirabox for wifi via mwifiex
-Tested on 370 RD for file systems on an SD card.
-
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Marek Belisko <marek@goldelico.com>
 ---
- drivers/mmc/host/mvsdio.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/video/ti,opa362.txt        | 38 ++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/video/ti,opa362.txt
 
-diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
-index 6b4c5ad3b393..4f8618f4522d 100644
---- a/drivers/mmc/host/mvsdio.c
-+++ b/drivers/mmc/host/mvsdio.c
-@@ -111,10 +111,15 @@ static int mvsd_setup_data(struct mvsd_host *host, struct mmc_data *data)
- 	mvsd_write(MVSD_BLK_COUNT, data->blocks);
- 	mvsd_write(MVSD_BLK_SIZE, data->blksz);
- 
--	if (nodma || (data->blksz | data->sg->offset) & 3) {
-+	if (nodma || (data->blksz | data->sg->offset) & 3 ||
-+	    ((!(data->flags & MMC_DATA_READ) && data->sg->offset & 0x3f))) {
- 		/*
- 		 * We cannot do DMA on a buffer which offset or size
- 		 * is not aligned on a 4-byte boundary.
-+		 *
-+		 * It also appears the host to card DMA can corrupt
-+		 * data when the buffer is not aligned on a 64 byte
-+		 * boundary.
- 		 */
- 		host->pio_size = data->blocks * data->blksz;
- 		host->pio_ptr = sg_virt(data->sg);
+diff --git a/Documentation/devicetree/bindings/video/ti,opa362.txt b/Documentation/devicetree/bindings/video/ti,opa362.txt
+new file mode 100644
+index 0000000..4747ef9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/video/ti,opa362.txt
+@@ -0,0 +1,38 @@
++OPA362 analog video amplifier
++
++Required properties:
++- compatible: "ti,opa362"
++- gpio: enable/disable output gpio
++
++Required node:
++- Video port 0 for opa362 input
++- Video port 1 for opa362 output
++
++Example:
++
++tv_amp: opa362 {
++	compatible = "ti,opa362";
++	gpios = <&gpio1 23 0>;  /* GPIO to enable video out amplifier */
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port at 0 {
++			reg = <0>;
++			opa_in: endpoint at 0 {
++				remote-endpoint = <&venc_out>;
++			};
++		};
++
++		port at 1 {
++			reg = <1>;
++			opa_out: endpoint at 0 {
++				remote-endpoint = <&tv_connector_in>;
++			};
++		};
++	};
++};
++
++
++
 -- 
-2.1.3
+1.9.1
