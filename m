@@ -1,38 +1,32 @@
-From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Wed, 12 Nov 2014 13:02:42 +0800
-Subject: [PATCH v18 5/5] ARM: dts: enable Thermal on rk3288-evb board
-In-Reply-To: <1415768562-9155-1-git-send-email-caesar.wang@rock-chips.com>
-References: <1415768562-9155-1-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <1415768562-9155-6-git-send-email-caesar.wang@rock-chips.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Wed, 12 Nov 2014 10:54:15 +0530
+Subject: [PATCH] ARM: dts: DRA7: wdt: Fix compatible property for watchdog node
+Message-ID: <1415769855-32565-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-when a thermal temperature over TSHUT.Default to via
-CRU reset the entire chip on rk3288-evb Board,
-TSHUT is low active on rk3288-evb board.
+OMAP wdt driver supports only ti,omap3-wdt compatible. In DRA7 dt
+wdt compatible property is defined as ti,omap4-wdt by mistake instead of
+ti,omap3-wdt. Correcting the typo.
 
-Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
-Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Fixes: 6e58b8f1daaf1a ("ARM: dts: DRA7: Add the dts files for dra7 SoC and dra7-evm board")
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
- arch/arm/boot/dts/rk3288-evb.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/dra7.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-index cb83cea..3e067dd 100644
---- a/arch/arm/boot/dts/rk3288-evb.dtsi
-+++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -148,6 +148,12 @@
- 	status = "okay";
- };
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 9cc9843..666e796 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -653,7 +653,7 @@
+ 		};
  
-+&tsadc {
-+	rockchip,hw-tshut-mode = <0>; /* tshut mode 0:CRU 1:GPIO */
-+	rockchip,hw-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
-+	status = "okay";
-+};
-+
- &pinctrl {
- 	backlight {
- 		bl_en: bl-en {
+ 		wdt2: wdt at 4ae14000 {
+-			compatible = "ti,omap4-wdt";
++			compatible = "ti,omap3-wdt";
+ 			reg = <0x4ae14000 0x80>;
+ 			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "wd_timer2";
 -- 
 1.9.1
