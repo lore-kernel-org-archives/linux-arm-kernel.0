@@ -1,87 +1,88 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 12 Nov 2014 17:20:35 +0900
-Subject: [PATCH/RFC] ARM: shmobile: koelsch: Add MSIOF1 support to device
- tree
-In-Reply-To: <CAMuHMdWyFztuwoatq5mmTp8nifMq8OB6ckud=k-LjKPq6VAnVQ@mail.gmail.com>
-References: <1414648385-29514-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdWyFztuwoatq5mmTp8nifMq8OB6ckud=k-LjKPq6VAnVQ@mail.gmail.com>
-Message-ID: <20141112082034.GT9007@verge.net.au>
+From: timo.kokkonen@offcode.fi (Timo Kokkonen)
+Date: Wed, 12 Nov 2014 10:20:57 +0200
+Subject: [PATCH] at91sam9_wdt: Allow watchdog to reset device at early boot
+In-Reply-To: <1414060846-17306-1-git-send-email-timo.kokkonen@offcode.fi>
+References: <1414060846-17306-1-git-send-email-timo.kokkonen@offcode.fi>
+Message-ID: <54631869.9070709@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 10:21:43AM +0100, Geert Uytterhoeven wrote:
-> On Thu, Oct 30, 2014 at 6:53 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
-> >
-> > MSIOF1 pin is selected and device is enabled.
-> >
-> > Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> > Based on the renesas-devel-20141030-v3.18-rc2 branch of my renesas tree
-> >
-> >  arch/arm/boot/dts/r8a7791-koelsch.dts | 13 +++++++++++++
-> >  1 file changed, 13 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-> > index 523ae4d..2ad0e26 100644
-> > --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-> > +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-> > @@ -286,6 +286,12 @@
-> >                 renesas,function = "msiof0";
-> >         };
-> >
-> > +       msiof1_pins: spi2 {
-> > +               renesas,groups = "msiof1_clk_c", "msiof1_sync_c", "msiof1_rx_c",
-> > +                                "msiof1_tx_c";
-> 
-> These are GPIO pins 2_15, 2_16, 2_17, 2_18, which are routed to EXIO
-> Connector B only. No SPI slave device is present on these pins without
-> connecting something to this connector.
-> 
-> So I'm wondering if this should be put in a separate .dtsi, cfr.
-> http://www.spinics.net/lists/linux-sh/msg36486.html?
-> 
-> What do you think?
+Hi,
 
-Good idea. Should I cook something up?
+On 10/23/14 13:40, Timo Kokkonen wrote:
+> By default the driver will start a kernel timer which keeps on kicking
+> the watchdog HW until user space has opened the watchdog
+> device. Usually this is desirable as the watchdog HW is running by
+> default and the user space may not have any watchdog daemon running at
+> all.
+>
+> However, on production systems it may be mandatory that also early
+> crashes and lockups will lead to a watchdog reset, even if they happen
+> before the user space has opened the watchdog device.
+>
+> To resolve the issue, add a new device tree property
+> "atmel,no-early-timer" which will prevent the kernel timer from
+> pinging the watchdog HW on behalf of user space. The default is still
+> to use kernel timer, but more strict behavior can be enabled via the
+> device tree property.
+>
 
-> > +               renesas,function = "msiof1";
-> > +       };
-> > +
-> >         usb0_pins: usb0 {
-> >                 renesas,groups = "usb0";
-> >                 renesas,function = "usb0";
-> > @@ -420,6 +426,13 @@
-> >         };
-> >  };
-> >
-> > +&msiof1 {
-> > +       pinctrl-0 = <&msiof1_pins>;
-> > +       pinctrl-names = "default";
-> > +
-> > +       status = "okay";
-> > +};
-> > +
-> >  &i2c2 {
-> >         pinctrl-0 = <&i2c2_pins>;
-> >         pinctrl-names = "default";
-> > --
-> > 2.1.1
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Any thoughts on this one? Should I resend this with some more people or 
+lists to get someone to comment or review this patch?
+
+Thanks,
+-Timo
+
+> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+> ---
+>   Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 4 ++++
+>   drivers/watchdog/at91sam9_wdt.c                          | 6 +++++-
+>   2 files changed, 9 insertions(+), 1 deletion(-)
+>
+> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+> index f90e294..1b9289e 100644
+> --- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+> @@ -28,6 +28,10 @@ Optional properties:
+>   	entering idle state.
+>   - atmel,dbg-halt : Should be present if you want to stop the watchdog when
+>   	entering debug state.
+> +- atmel,no-early-timer : Should be present if you want to let the
+> +	watchdog timer to expire even before user space has opened the
+> +	device. If not set, a kernel timer will keep on pinging the
+> +	watchdog until it is opened.
+>
+>   Example:
+>   	watchdog at fffffd40 {
+> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
+> index 489729b..8cac712 100644
+> --- a/drivers/watchdog/at91sam9_wdt.c
+> +++ b/drivers/watchdog/at91sam9_wdt.c
+> @@ -89,6 +89,7 @@ struct at91wdt {
+>   	u32 mr_mask;
+>   	unsigned long heartbeat;	/* WDT heartbeat in jiffies */
+>   	bool nowayout;
+> +	bool no_early_timer;
+>   	unsigned int irq;
+>   };
+>
+> @@ -122,7 +123,7 @@ static void at91_ping(unsigned long data)
+>   {
+>   	struct at91wdt *wdt = (struct at91wdt *)data;
+>   	if (time_before(jiffies, wdt->next_heartbeat) ||
+> -	    !watchdog_active(&wdt->wdd)) {
+> +		(!watchdog_active(&wdt->wdd) && !wdt->no_early_timer)) {
+>   		at91_wdt_reset(wdt);
+>   		mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
+>   	} else {
+> @@ -316,6 +317,9 @@ static int of_at91wdt_init(struct device_node *np, struct at91wdt *wdt)
+>
+>   	wdt->mr |= max | ((max - min) << 16);
+>
+> +	if (of_property_read_bool(np, "atmel,no-early-timer"))
+> +		wdt->no_early_timer = 1;
+> +
+>   	return 0;
+>   }
+>   #else
+>
