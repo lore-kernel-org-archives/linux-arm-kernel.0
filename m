@@ -1,88 +1,109 @@
-From: johannes.pointner@gmail.com (Johannes Pointner)
-Date: Wed, 12 Nov 2014 14:00:32 +0100
-Subject: [PATCH 0/4] Touchscreen performance related fixes
-In-Reply-To: <545B2651.4090905@ti.com>
-References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
- <20141103180920.GA20779@localhost.localdomain>
- <545B2651.4090905@ti.com>
-Message-ID: <CAJKbBDDyShaJkzzfdFs07EK5gDUfwqWiv39Qi4FVSvRrfc6_fA@mail.gmail.com>
+From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
+Date: Wed, 12 Nov 2014 15:07:35 +0200
+Subject: [PATCH v4 REPOST 1/5] of: Add descriptions of thermtrip properties
+ to Tegra PMC bindings
+In-Reply-To: <20141112122951.GD30821@ulmo.nvidia.com>
+References: <1415625137-4791-1-git-send-email-mikko.perttunen@kapsi.fi>
+ <1415625137-4791-2-git-send-email-mikko.perttunen@kapsi.fi>
+ <5461AEB7.70507@nvidia.com> <54634D97.9050500@kapsi.fi>
+ <20141112122951.GD30821@ulmo.nvidia.com>
+Message-ID: <54635B97.3030701@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Vignesh,
+On 11/12/2014 02:29 PM, Thierry Reding wrote:
+> On Wed, Nov 12, 2014 at 02:07:51PM +0200, Mikko Perttunen wrote:
+>> On 11/11/2014 08:37 AM, Alexandre Courbot wrote:
+>>> On 11/10/2014 10:12 PM, Mikko Perttunen wrote:
+>>>> From: Mikko Perttunen <mperttunen@nvidia.com>
+>>>>
+>>>> Hardware-triggered thermal reset requires configuring the I2C
+>>>> reset procedure. This configuration is read from the device tree,
+>>>> so document the relevant properties in the binding documentation.
+>>>>
+>>>> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+>>>> Reviewed-by: Wei Ni <wni@nvidia.com>
+>>>> Tested-by: Wei Ni <wni@nvidia.com>
+>>>> ---
+>>>>   .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      | 24
+>>>> ++++++++++++++++++++++
+>>>>   1 file changed, 24 insertions(+)
+>>>>
+>>>> diff --git
+>>>> a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+>>>> b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+>>>> index 68ac65f..dc13fb0 100644
+>>>> --- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+>>>> +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+>>>> @@ -47,6 +47,21 @@ Required properties when nvidia,suspend-mode=<0>:
+>>>>     sleep mode, the warm boot code will restore some PLLs, clocks and
+>>>> then
+>>>>     bring up CPU0 for resuming the system.
+>>>>
+>>>> +Hardware-triggered thermal reset:
+>>>> +On Tegra30, Tegra114 and Tegra124, if the 'i2c-thermtrip' subnode
+>>>> exists,
+>>>> +hardware-triggered thermal reset will be enabled.
+>>>> +
+>>>> +Required properties for hardware-triggered thermal reset (inside
+>>>> 'i2c-thermtrip'):
+>>>> +- nvidia,i2c-bus : Phandle to I2C bus containing the PMU
+>>>> +- nvidia,bus-addr : Bus address of the PMU on the I2C bus
+>>>> +- nvidia,reg-addr : I2C register address to write poweroff command to
+>>>> +- nvidia,reg-data : Poweroff command to write to PMU
+>>>
+>>> This binding is taking two different routes to provide values to the
+>>> driver:
+>>>
+>>> 1) It uses a phandle for i2c-bus (which must then be provided by another
+>>> binding implemented in the two following patches)
+>>>
+>>> 2) It uses direct values for bus-addr, reg-addr and reg-data.
+>>>
+>>> Do we need to use both approaches? bus-addr could just as well be
+>>> obtained through a phandle to the i2c device and reading its reg
+>>> property. From this phandle you could also go back up to the bus, making
+>>> the i2c-bus property unnecessary. reg-addr and reg-data cannot be
+>>> specified that way, obviously.
+>>
+>> This was in fact how I used to implement this, but Stephen or Thierry
+>> pointed out that the reg property actually might not contain the correct
+>> address (I think because the PMIC could have multiple addresses, and the one
+>> in DT might not be the one that accepts the reset command).
+>>
+>> The workaround for that was to either add this integer property for bus-addr
+>> or add a new PMIC API for querying. I went for this as it is much simpler.
+>>
+>>>
+>>> Actually I think I'd prefer to see i2c-bus become an integer property
+>>> instead of a phandle, because at the end of the day it is a value field
+>>> of a particular register and the reference is only used to retrieve that
+>>> value. It is not like we are actually going to call functions on the bus
+>>> instance or change its state. And for the single purpose of retrieving
+>>> that value, this binding requires the addition of a new property on the
+>>> bus node that will probably never be used for something else.
+>>
+>> And this was how I used to implement this even earlier, but Thierry objected
+>> to that since it was duplicating information :)
+>
+> If I remember correctly what I was asking for was to derive as much as
+> possible from simply a phandle. That is, what I was after is a phandle
+> to the PMU and ideally a way for the PMU to pass back information about
+> the register and value for the power off command.
+>
+> Given the lack of a PMU abstraction and how this is probably very Tegra
+> specific I was okay with leaving reg-addr and reg-data in the DT. But if
+> we can't derive even the slave address from a phandle along with the I2C
+> bus master, then I think there remains little point in doing it this way
+> at all.
+>
+> If we're going to duplicate three properties, adding a fourth isn't
+> going to make it much worse.
+>
+> Thierry
+>
 
-I tried your patch version 3 on a customized board and had some
-behavior I couldn't explain.
-If I only use the touchscreen it works fine but if I also read values
-from the ADCs then I get a lot of pen_up events even if I am still
-touching the screen.
-For the test I read via
-# cat /sys/bus/iio/devices/iio\:device0/in_voltage5_raw
-values from the ADC in an busy loop as you explained in an email
-before. Did you also experience such behavior or do you know what
-causes it?
+Yeah, I guess that's sensible. I'll change the phandle to an integer if 
+that's preferred.
 
-Without the patches the touchscreen works fine during the iio test.
-
-Thanks,
-Hannes
-
-2014-11-06 8:42 GMT+01:00 Vignesh R <vigneshr@ti.com>:
->
->
-> On Monday 03 November 2014 11:39 PM, Richard Cochran wrote:
->> On Mon, Oct 27, 2014 at 04:38:27PM +0530, Vignesh R wrote:
->>> This series of patches fix TSC defects related to lag in touchscreen
->>> performance and cursor jump at touch release. The lag was result of
->>> udelay in TSC interrupt handler. Cursor jump due to false pen-up event.
->>> The patches implement Advisory 1.0.31 in silicon errata of am335x-evm
->>> to avoid false pen-up events and remove udelay.
->>
->> That advisory has two workarounds. You have chosen the second one?
->
-> Work around one. Hence 5 wire design is not broken.
->
->>
->> The text of the second workaround says it only works on 4 wire setups,
->> so I wonder how 5 wire designs will be affected.
->>
->>> The advisory says to use
->>> steps 1 to 4 for ADC and 5 to 16 for TSC (assuming 4 wire TSC and 4 channel
->>> ADC).
->>
->> No, it doesn't say that. (sprz360f.pdf)
->
-> The pen up event detection happens immediately after charge step. Hence,
-> interchanging ADC and TSC steps makes sure that sampling of touch
-> co-ordinates and pen events are done one after the other. This
-> workaround was suggested by internal hardware folks. Earlier ADC steps
-> intervened between sampling of co-ordinates and pen event detection
-> which is not desirable.
->
->>
->>> Further the X co-ordinate must be the last one to be sampled just
->>> before charge step. The first two patches implement the required changes.
->>
->> FWIW, I implemented the first workaround and removed the udelay not
->> too long ago. Like Sebastian, I saw the TSC unit hang after about
->> 50000 interrupts when running with the workaround.
->>
->> Did you test you patch for very long?
->
-> Yes, I tested for about 200000 interrupts and I didn't see any hang.
-> This patch series does not just implement workaround but also does some
-> minor changes, such as interchanging ADC and TSC steps etc, which makes
-> TSC driver more robust. Let me know if you encounter any issues with my
-> patch series.
->
-> Regards
-> Vignesh
->
->>
->> Thanks,
->> Richard
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Mikko
