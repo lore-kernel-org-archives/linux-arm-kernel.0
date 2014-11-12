@@ -1,75 +1,46 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Wed, 12 Nov 2014 11:55:21 -0800
-Subject: [RFC 1/2] mfd: qcom-rpm: Expose sleep state resources to clients
-In-Reply-To: <20141112095200.GD24004@x1>
-References: <1415659966-16200-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1415659966-16200-2-git-send-email-bjorn.andersson@sonymobile.com>
- <20141111120457.GZ24004@x1> <20141111183319.GD16980@sonymobile.com>
- <20141112095200.GD24004@x1>
-Message-ID: <20141112195520.GB19703@sonymobile.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 12 Nov 2014 21:01:14 +0100
+Subject: [PATCH] arm/arm64: KVM: Handle traps of ICC_SRE_EL1 as RAZ/WI
+Message-ID: <1415822474-17398-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 12 Nov 01:52 PST 2014, Lee Jones wrote:
+When running on a system with a GICv3, we currenly don't allow the guest
+to access the system register interface of the GICv3.  We do this by
+clearing the ICC_SRE_EL2.Enable, which causes all guest accesses to
+ICC_SRE_EL1 to trap to EL2 and causes all guest accesses to other ICC_
+registers to cause an undefined exception in the guest.
 
-> On Tue, 11 Nov 2014, Bjorn Andersson wrote:
-> 
-> > On Tue 11 Nov 04:04 PST 2014, Lee Jones wrote:
-> > 
-> > > On Mon, 10 Nov 2014, Bjorn Andersson wrote:
-> > > 
-> > > > Resources exposed from the RPM have an "active state" that is used during
-> > > > normal operations and a "sleep state" that is used for HW assisted sleep
-> > > > modes. Expose this in the api to let client drivers set the "sleep
-> > > > state" as well.
-> > > 
-> > > I assume you have users lined up which will request a sleeping state?
-> > > 
-> > 
-> > All users of this interface (regulators, clocks and bus scaling) will have to
-> > be able to specify this.
-> > 
-> > [..]
-> > > > @@ -359,8 +361,7 @@ int qcom_rpm_write(struct qcom_rpm *rpm, int resource, u32 *buf, size_t count)
-> > > >  			       RPM_CTRL_REG(rpm, RPM_REQ_SELECT + i));
-> > > >  	}
-> > > >  
-> > > > -	writel_relaxed(RPM_ACTIVE_STATE,
-> > > > -		       RPM_CTRL_REG(rpm, RPM_REQUEST_CONTEXT));
-> > > > +	writel_relaxed(BIT(state), RPM_CTRL_REG(rpm, RPM_REQUEST_CONTEXT));
-> > > 
-> > > How are the state bits organised?
-> > > 
-> > 
-> > BIT(0) is active mode, BIT(1) is sleep mode, as specified below. I could add
-> > some sanity checking here if you would like to.
-> 
-> I'm just double checking that you know what that means.
-> 
-> BIT(0) == b01
-> BIT(1) == b10
-> 
-> It seems strange to represent a single boolean state over 2 bits.
-> 
+However, we currently don't handle the trap of guest accesses to
+ICC_SRE_EL1 and will spill out a warning.  The trap just needs to handle
+the access as RAZ/WI, and a guest that tries to prod this register and
+set ICC_SRE_EL1.SRE=1, must read back the value (which Linux already
+does) to see if it succeeded, and will thus observe that ICC_SRE_EL1.SRE
+was not set.
 
-I'm aware of this and find most parts of this solution to be strange.
+Add the simple trap handler in the sorted table of the system registers.
 
-> Also, what happens if b11 or b00 occurs?
-> 
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm64/kvm/sys_regs.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Had to pull out the firmware for the other side; it boils down to a count of
-trailing zeros, with 0 giving 0, that is then turned back into and enum where
-ACTIVE is 0 and SLEEP is 1. This is then sanity checked to be less than 2.
-
-So the possible values and results would be:
- 00 => ACTIVE (seems invalid but "accidentally" accepted)
- 01 => ACTIVE
- 10 => SLEEP
- 11 => ACTIVE
-
-In one of the later versions of the RPM (not applicable for any of these
-platforms) 2 seems to be a valid choice as well; but there it's passed as an
-u32 and not a bitmask.
-
-Regards,
-Bjorn
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 4cc3b71..8f81945 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -424,6 +424,11 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	/* VBAR_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
+ 	  NULL, reset_val, VBAR_EL1, 0 },
++
++	/* ICC_SRE_EL1 */
++	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1100), Op2(0b101),
++	  trap_raz_wi },
++
+ 	/* CONTEXTIDR_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b001),
+ 	  access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
+-- 
+2.1.2.330.g565301e.dirty
