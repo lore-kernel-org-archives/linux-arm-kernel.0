@@ -1,32 +1,22 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Wed, 12 Nov 2014 16:20:39 +0800
-Subject: [PATCH 3/3] ARM: configs: imx_v6_v7_defconfig: add power off driver
-In-Reply-To: <1415780439-29728-1-git-send-email-b38343@freescale.com>
-References: <1415780439-29728-1-git-send-email-b38343@freescale.com>
-Message-ID: <1415780439-29728-4-git-send-email-b38343@freescale.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 12 Nov 2014 15:01:58 +0530
+Subject: [PATCH 0/2] dma: pl330: Fixes for DMA memcpy
+In-Reply-To: <1415383518-29327-1-git-send-email-tixy@linaro.org>
+References: <1415383518-29327-1-git-send-email-tixy@linaro.org>
+Message-ID: <20141112093158.GB24582@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add power off driver in config file.
+On Fri, Nov 07, 2014 at 06:05:16PM +0000, Jon Medhurst wrote:
+> This is a couple of patches I produced when trying to get dmatest to run
+> with the pl330 driver. The second one is actually a theoretical fix
+> because the FIFO on the platform I was using is too large for the tests
+> to hit the limit, but the datasheet says the device can lockup if all
+> the FIFO entries are exhausted, so it seems like a sensible precaution.
+>
+Applied, thanks
 
-Signed-off-by: Robin Gong <b38343@freescale.com>
----
- arch/arm/configs/imx_v6_v7_defconfig |    3 +++
- 1 file changed, 3 insertions(+)
+Please ensure you use the right subsystem name for the patch header
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 16cfec4..a310e61 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -165,6 +165,9 @@ CONFIG_SPI_IMX=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_MC9S08DZ60=y
- CONFIG_GPIO_STMPE=y
-+CONFIG_POWER_SUPPLY=y
-+CONFIG_POWER_RESET=y
-+CONFIG_POWER_RESET_IMX=y
- # CONFIG_HWMON is not set
- CONFIG_WATCHDOG=y
- CONFIG_IMX2_WDT=y
 -- 
-1.7.9.5
+~Vinod
