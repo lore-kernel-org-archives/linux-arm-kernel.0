@@ -1,48 +1,81 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 12 Nov 2014 17:15:48 +0100
-Subject: [PATCH v5 1/5] simplefb: Add simplefb MAINTAINERS entry
+Date: Wed, 12 Nov 2014 17:15:51 +0100
+Subject: [PATCH v5 4/5] simplefb: add goto error path to probe
 In-Reply-To: <1415808952-23549-1-git-send-email-hdegoede@redhat.com>
 References: <1415808952-23549-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1415808952-23549-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1415808952-23549-5-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During the discussion about adding clock handling code to simplefb, it became
-clear that simplefb currently does not have an active maintainer.
+From: Luc Verhaegen <libv@skynet.be>
 
-I've discussed this with Stephen Warren <swarren@wwwdotorg.org>, the original
-author of simplefb, and with his permisson I'm picking up maintainership of
-simplefb.
+Use the usual kernel style of goto error_foo to free resources on probe
+error. This is a preparation patch for adding clocks support.
 
-Cc: Stephen Warren <swarren@wwwdotorg.org>
+While at it also update ioremap_wc error return from ENODEV to ENOMEM.
+
+Signed-off-by: Luc Verhaegen <libv@skynet.be>
+Acked-by: Stephen Warren <swarren@nvidia.com>
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Reviewed-by: David Herrmann <dh.herrmann@gmail.com>
 Acked-by: Grant Likely <grant.likely@linaro.org>
+--
+Changes in v5:
+-Improved commit message
 ---
- MAINTAINERS | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/video/fbdev/simplefb.c | 18 +++++++++++-------
+ 1 file changed, 11 insertions(+), 7 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index df82827..7678808 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -8442,6 +8442,14 @@ F:	drivers/media/usb/siano/
- F:	drivers/media/usb/siano/
- F:	drivers/media/mmc/siano/
+diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
+index ec112c1..cdcf1fe 100644
+--- a/drivers/video/fbdev/simplefb.c
++++ b/drivers/video/fbdev/simplefb.c
+@@ -220,8 +220,8 @@ static int simplefb_probe(struct platform_device *pdev)
  
-+SIMPLEFB FB DRIVER
-+M:	Hans de Goede <hdegoede@redhat.com>
-+L:	linux-fbdev at vger.kernel.org
-+S:	Maintained
-+F:	Documentation/devicetree/bindings/video/simple-framebuffer.txt
-+F:	drivers/video/fbdev/simplefb.c
-+F:	include/linux/platform_data/simplefb.h
+ 	info->apertures = alloc_apertures(1);
+ 	if (!info->apertures) {
+-		framebuffer_release(info);
+-		return -ENOMEM;
++		ret = -ENOMEM;
++		goto error_fb_release;
+ 	}
+ 	info->apertures->ranges[0].base = info->fix.smem_start;
+ 	info->apertures->ranges[0].size = info->fix.smem_len;
+@@ -231,8 +231,8 @@ static int simplefb_probe(struct platform_device *pdev)
+ 	info->screen_base = ioremap_wc(info->fix.smem_start,
+ 				       info->fix.smem_len);
+ 	if (!info->screen_base) {
+-		framebuffer_release(info);
+-		return -ENODEV;
++		ret = -ENOMEM;
++		goto error_fb_release;
+ 	}
+ 	info->pseudo_palette = par->palette;
+ 
+@@ -247,14 +247,18 @@ static int simplefb_probe(struct platform_device *pdev)
+ 	ret = register_framebuffer(info);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "Unable to register simplefb: %d\n", ret);
+-		iounmap(info->screen_base);
+-		framebuffer_release(info);
+-		return ret;
++		goto error_unmap;
+ 	}
+ 
+ 	dev_info(&pdev->dev, "fb%d: simplefb registered!\n", info->node);
+ 
+ 	return 0;
 +
- SH_VEU V4L2 MEM2MEM DRIVER
- L:	linux-media at vger.kernel.org
- S:	Orphan
++error_unmap:
++	iounmap(info->screen_base);
++error_fb_release:
++	framebuffer_release(info);
++	return ret;
+ }
+ 
+ static int simplefb_remove(struct platform_device *pdev)
 -- 
 2.1.0
