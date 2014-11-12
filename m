@@ -1,103 +1,53 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 12 Nov 2014 13:03:17 -0800
-Subject: [PATCH 3.19 2/2] ARM: multi_v7_defconfig: Enable Broadcom Cygnus
-In-Reply-To: <1415826197-6748-1-git-send-email-f.fainelli@gmail.com>
-References: <1415826197-6748-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1415826197-6748-3-git-send-email-f.fainelli@gmail.com>
+From: kyle@redhat.com (Kyle McMartin)
+Date: Wed, 12 Nov 2014 16:07:44 -0500
+Subject: [PATCH] arm64: __clear_user: handle exceptions on strb
+Message-ID: <20141112210744.GC6869@redacted.bos.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ray Jui <rjui@broadcom.com>
+ARM64 currently doesn't fix up faults on the single-byte (strb) case of
+__clear_user... which means that we can cause a nasty kernel panic as an
+ordinary user with any multiple PAGE_SIZE+1 read from /dev/zero.
+i.e.: dd if=/dev/zero of=foo ibs=1 count=1 (or ibs=65537, etc.)
 
-Enable Broadcom Cygnus platform support in multi_v7_defconfig
+This is a pretty obscure bug in the general case since we'll only
+__do_kernel_fault (since there's no extable entry for pc) if the
+mmap_sem is contended. However, with CONFIG_DEBUG_VM enabled, we'll
+always fault.
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
-Signed-off-by: Scott Branden <sbranden@broadcom.com>
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/configs/multi_v7_defconfig | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+if (!down_read_trylock(&mm->mmap_sem)) {
+	if (!user_mode(regs) && !search_exception_tables(regs->pc))
+		goto no_context;
+retry:
+	down_read(&mm->mmap_sem);
+} else {
+	/*
+	 * The above down_read_trylock() might have succeeded in
+	 * which
+	 * case, we'll have missed the might_sleep() from
+	 * down_read().
+	 */
+	might_sleep();
+#ifdef CONFIG_DEBUG_VM
+	if (!user_mode(regs) && !search_exception_tables(regs->pc))
+		goto no_context;
+#endif
+}
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index e8f79fdd4cc3..f3ef3f539f2c 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -17,6 +17,7 @@ CONFIG_MACH_ARMADA_38X=y
- CONFIG_MACH_ARMADA_XP=y
- CONFIG_MACH_DOVE=y
- CONFIG_ARCH_BCM=y
-+CONFIG_ARCH_BCM_CYGNUS=y
- CONFIG_ARCH_BCM_21664=y
- CONFIG_ARCH_BCM_281XX=y
- CONFIG_ARCH_BCM_5301X=y
-@@ -125,8 +126,12 @@ CONFIG_DMA_CMA=y
- CONFIG_CMA_SIZE_MBYTES=64
- CONFIG_OMAP_OCP2SCP=y
- CONFIG_MTD=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_BLOCK=y
- CONFIG_MTD_M25P80=y
-+CONFIG_MTD_NAND=y
- CONFIG_MTD_SPI_NOR=y
-+CONFIG_MTD_UBI=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_AD525X_DPOT=y
- CONFIG_AD525X_DPOT_I2C=y
-@@ -161,6 +166,7 @@ CONFIG_TI_CPSW=y
- CONFIG_XILINX_EMACLITE=y
- CONFIG_AT803X_PHY=y
- CONFIG_MARVELL_PHY=y
-+CONFIG_BROADCOM_PHY=y
- CONFIG_ICPLUS_PHY=y
- CONFIG_USB_PEGASUS=y
- CONFIG_USB_USBNET=y
-@@ -234,6 +240,7 @@ CONFIG_SPI_TEGRA114=y
- CONFIG_SPI_TEGRA20_SFLASH=y
- CONFIG_SPI_TEGRA20_SLINK=y
- CONFIG_SPI_XILINX=y
-+CONFIG_SPI_SPIDEV=y
- CONFIG_PINCTRL_AS3722=y
- CONFIG_PINCTRL_PALMAS=y
- CONFIG_GPIO_SYSFS=y
-@@ -260,6 +267,7 @@ CONFIG_ST_THERMAL_SYSCFG=y
- CONFIG_ST_THERMAL_MEMMAP=y
- CONFIG_WATCHDOG=y
- CONFIG_XILINX_WATCHDOG=y
-+CONFIG_ARM_SP805_WATCHDOG=y
- CONFIG_ORION_WATCHDOG=y
- CONFIG_SUNXI_WATCHDOG=y
- CONFIG_MFD_AS3722=y
-@@ -306,6 +314,8 @@ CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
- CONFIG_SOUND=y
- CONFIG_SND=y
-+CONFIG_SND_DYNAMIC_MINORS=y
-+CONFIG_SND_USB_AUDIO=y
- CONFIG_SND_SOC=y
- CONFIG_SND_SOC_TEGRA=y
- CONFIG_SND_SOC_TEGRA_RT5640=y
-@@ -427,7 +437,12 @@ CONFIG_TI_PIPE3=y
- CONFIG_PHY_MIPHY365X=y
- CONFIG_PHY_SUN4I_USB=y
- CONFIG_EXT4_FS=y
-+CONFIG_AUTOFS4_FS=y
-+CONFIG_MSDOS_FS=y
- CONFIG_VFAT_FS=y
-+CONFIG_NTFS_FS=y
-+CONFIG_TMPFS_POSIX_ACL=y
-+CONFIG_UBIFS_FS=y
- CONFIG_TMPFS=y
- CONFIG_SQUASHFS=y
- CONFIG_SQUASHFS_LZO=y
-@@ -436,6 +451,9 @@ CONFIG_NFS_FS=y
- CONFIG_NFS_V3_ACL=y
- CONFIG_NFS_V4=y
- CONFIG_ROOT_NFS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_NLS_UTF8=y
- CONFIG_PRINTK_TIME=y
- CONFIG_DEBUG_FS=y
- CONFIG_MAGIC_SYSRQ=y
--- 
-1.9.1
+Fix that by adding an extable entry for the strb instruction, since it
+touches user memory, similar to the other stores in __clear_user.
+
+Signed-off-by: Kyle McMartin <kyle@redhat.com>
+Cc: stable at vger.kernel.org
+
+--- a/arch/arm64/lib/clear_user.S
++++ b/arch/arm64/lib/clear_user.S
+@@ -46,7 +46,7 @@ USER(9f, strh	wzr, [x0], #2	)
+ 	sub	x1, x1, #2
+ 4:	adds	x1, x1, #1
+ 	b.mi	5f
+-	strb	wzr, [x0]
++USER(9f, strb	wzr, [x0]	)
+ 5:	mov	x0, #0
+ 	ret
+ ENDPROC(__clear_user)
