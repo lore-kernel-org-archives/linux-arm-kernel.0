@@ -1,250 +1,48 @@
-From: pazke@centrinvest.ru (Andrey Panin)
-Date: Wed, 12 Nov 2014 17:52:25 +0300
-Subject: [PATCH v2] VNIC: Adding support for Cavium ThunderX network
- controller
-In-Reply-To: <1415596445-10061-1-git-send-email-rric@kernel.org>
-References: <1415596445-10061-1-git-send-email-rric@kernel.org>
-Message-ID: <20141112145225.GD12592@pazechnik.unix.domaincib.ru>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Wed, 12 Nov 2014 22:52:57 +0800
+Subject: [RFC Part4 v1 00/17] Refine support of non-PCI-compliant Message
+In-Reply-To: <alpine.DEB.2.11.1411121512270.3935@nanos>
+References: <1415545839-28263-1-git-send-email-jiang.liu@linux.intel.com>
+ <546364FA.7010806@arm.com> <alpine.DEB.2.11.1411121512270.3935@nanos>
+Message-ID: <54637449.4070302@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 313, 11 09, 2014 at 09:14:05PM -0800, Robert Richter wrote:
+On 2014/11/12 22:46, Thomas Gleixner wrote:
+> On Wed, 12 Nov 2014, Marc Zyngier wrote:
+>> This patch introduces two optionnal fields to the msi_chip structure:
+>> - a pointer to an irq domain, describing the MSI domain associated
+>>   with this msi_chip. To be populated with msi_create_irq_domain.
+>> - a domain_alloc_irqs() callback that has the same purpose as
+>>   arch_setup_msi_irqs(), with the above domain as an additional
+>>   parameter.
+>>
+>> If both of these fields are non-NULL, then domain_alloc_irqs() is
+>> called, bypassing the setup_irq callback. This allows the MSI driver
+>> to use the domain stacking feature without mandating core support in
+>> the architecture.
+> 
+> I'd rather have the callback in the irqdomain itself. Along with a
+> callback to free the interrupts.
+> 
+> AFAICT is msi_chip more or less a wrapper around the actual MSI irq
+> domain. So we rather move towards assigning irqdomain to the pci bus
+> and get rid of msi_chip instead of adding another level of obscure
+> indirection through msi_chip.
+Hi Thomas and Marc,
 
-I apologize for possibly repeated mail, my mailsystem was misconfigured :(
+I'm trying to replace all weak functions , such as
+arch_setup_msi_irqs()/arch_setup_msi_irq(), in drivers/pci/msi.c.
 
-Some comments from quick look are below.
+The framework core changes are almost ready, but it does take time
+to convert current arch_setup_msi_irqs() implementations to new
+irqdomain interfaces.
 
-
-> +static int nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct net_device *netdev;
-> +	struct nicpf *nic;
-> +	int    err;
-> +
-> +	netdev = alloc_etherdev(sizeof(struct nicpf));
-> +	if (!netdev)
-> +		return -ENOMEM;
-> +
-> +	pci_set_drvdata(pdev, netdev);
-> +
-> +	SET_NETDEV_DEV(netdev, &pdev->dev);
-> +
-> +	nic = netdev_priv(netdev);
-> +	nic->netdev = netdev;
-> +	nic->pdev = pdev;
-> +
-> +	err = pci_enable_device(pdev);
-> +	if (err) {
-> +		dev_err(dev, "Failed to enable PCI device\n");
-> +		goto exit;
-
-Looks like you leaked netdev here.
-
-> +	}
-> +
-> +	err = pci_request_regions(pdev, DRV_NAME);
-> +	if (err) {
-> +		dev_err(dev, "PCI request regions failed 0x%x\n", err);
-> +		goto err_disable_device;
-> +	}
-> +
-> +	err = pci_set_dma_mask(pdev, DMA_BIT_MASK(48));
-> +	if (err) {
-> +		dev_err(dev, "Unable to get usable DMA configuration\n");
-> +		goto err_release_regions;
-> +	}
-> +
-> +	err = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(48));
-> +	if (err) {
-> +		dev_err(dev, "unable to get 48-bit DMA for consistent allocations\n");
-> +		goto err_release_regions;
-> +	}
-> +
-> +	/* MAP PF's configuration registers */
-> +	nic->reg_base = (uint64_t)pci_ioremap_bar(pdev, PCI_CFG_REG_BAR_NUM);
-> +	if (!nic->reg_base) {
-> +		dev_err(dev, "Cannot map config register space, aborting\n");
-> +		err = -ENOMEM;
-> +		goto err_release_regions;
-> +	}
-> +	nic->node = NIC_NODE_ID(pci_resource_start(pdev, PCI_CFG_REG_BAR_NUM));
-> +
-> +	/* By default set NIC in TNS bypass mode */
-> +	nic->flags &= ~NIC_TNS_ENABLED;
-> +	nic_set_lmac_vf_mapping(nic);
-> +
-> +	/* Initialize hardware */
-> +	nic_init_hw(nic);
-> +
-> +	/* Set RSS TBL size for each VF */
-> +	nic->rss_ind_tbl_size = max((NIC_RSSI_COUNT / nic->num_vf_en),
-> +				    NIC_MAX_RSS_IDR_TBL_SIZE);
-> +	nic->rss_ind_tbl_size = rounddown_pow_of_two(nic->rss_ind_tbl_size);
-> +
-> +	/* Register interrupts */
-> +	if (nic_register_interrupts(nic))
-> +		goto err_unmap_resources;
-> +
-> +	/* Configure SRIOV */
-> +	if (!nic_sriov_init(pdev, nic))
-> +		goto err_unmap_resources;
-> +
-> +	goto exit;
-
-Why not simply return 0; ?
-
-> +
-> +err_unmap_resources:
-> +	if (nic->reg_base)
-
-This check looks unnecessary.
-
-> +		iounmap((void *)nic->reg_base);
-> +err_release_regions:
-> +	pci_release_regions(pdev);
-> +err_disable_device:
-> +	pci_disable_device(pdev);
-> +exit:
-> +	return err;
-> +}
-
-
-> +static int bgx_register_interrupts(struct bgx *bgx, uint8_t lmac)
-> +{
-> +	int irq, ret = 0;
-> +
-> +	/* Register only link interrupts now */
-> +	irq = SPUX_INT + (lmac * BGX_LMAC_VEC_OFFSET);
-> +	sprintf(bgx->irq_name[irq], "LMAC%d", lmac);
-> +	ret = request_irq(bgx->msix_entries[irq].vector,
-> +			  bgx_lmac_intr_handler, 0, bgx->irq_name[irq], bgx);
-> +	if (ret)
-> +		goto fail;
-> +	else
-
-This else just hurts readability.
-
-> +		bgx->irq_allocated[irq] = 1;
-> +
-> +	/* Enable link interrupt */
-> +	bgx_enable_link_intr(bgx, lmac);
-> +	return 0;
-> +
-> +fail:
-
-The code below copypasted from bgx_unregister_interrupts()
-Looks like good candidate for helper function.
-
-> +	dev_err(&bgx->pdev->dev, "Request irq failed\n");
-> +	for (irq = 0; irq < bgx->num_vec; irq++) {
-> +		if (bgx->irq_allocated[irq])
-> +			free_irq(bgx->msix_entries[irq].vector, bgx);
-> +		bgx->irq_allocated[irq] = 0;
-> +	}
-> +	return 1;
-> +}
-> +
-> +static void bgx_unregister_interrupts(struct bgx *bgx)
-> +{
-> +	int irq;
-> +	/* Free registered interrupts */
-> +	for (irq = 0; irq < bgx->num_vec; irq++) {
-> +		if (bgx->irq_allocated[irq])
-> +			free_irq(bgx->msix_entries[irq].vector, bgx);
-> +		bgx->irq_allocated[irq] = 0;
-> +	}
-> +	/* Disable MSI-X */
-> +	bgx_disable_msix(bgx);
-> +}
-> +
-
-> +void bgx_lmac_enable(struct bgx *bgx, int8_t lmac)
-> +{
-> +	uint64_t dmac_bcast = (1ULL << 48) - 1;
-> +
-> +	bgx_reg_write(bgx, lmac, BGX_CMRX_CFG,
-> +		      (1 << 15) | (1 << 14) | (1 << 13));
-> +
-> +	/* Register interrupts */
-> +	bgx_register_interrupts(bgx, lmac);
-
-bgx_register_interrupts() can fail (due to request_irq), but it's return
-value is not checked.
-
-> +
-> +	/* Add broadcast MAC into all LMAC's DMAC filters */
-> +	for (lmac = 0; lmac < bgx->lmac_count; lmac++)
-> +		bgx_add_dmac_addr(dmac_bcast, 0, bgx->bgx_id, lmac);
-> +}
-
-> +static int bgx_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct bgx *bgx;
-> +	int    err;
-> +	uint8_t lmac = 0;
-> +
-> +	bgx = kzalloc(sizeof(*bgx), GFP_KERNEL);
-
-kzalloc() return value not checked
-
-> +	bgx->pdev = pdev;
-> +
-> +	pci_set_drvdata(pdev, bgx);
-> +
-> +	err = pci_enable_device(pdev);
-> +	if (err) {
-> +		dev_err(dev, "Failed to enable PCI device\n");
-> +		goto exit;
-
-bgx is leaked here.
-
-> +	}
-> +
-> +	err = pci_request_regions(pdev, DRV_NAME);
-> +	if (err) {
-> +		dev_err(dev, "PCI request regions failed 0x%x\n", err);
-> +		goto err_disable_device;
-> +	}
-> +
-> +	/* MAP configuration registers */
-> +	bgx->reg_base = (uint64_t)pci_ioremap_bar(pdev, PCI_CFG_REG_BAR_NUM);
-> +	if (!bgx->reg_base) {
-> +		dev_err(dev, "BGX: Cannot map CSR memory space, aborting\n");
-> +		err = -ENOMEM;
-> +		goto err_release_regions;
-> +	}
-> +	bgx->bgx_id = (pci_resource_start(pdev, PCI_CFG_REG_BAR_NUM) >> 24) & 1;
-> +	bgx->bgx_id += NODE_ID(pci_resource_start(pdev, PCI_CFG_REG_BAR_NUM))
-> +							* MAX_BGX_PER_CN88XX;
-> +	bgx_vnic[bgx->bgx_id] = bgx;
-> +
-> +	/* Initialize BGX hardware */
-> +	bgx_init_hw(bgx);
-> +	/* Enable MSI-X */
-> +	if (!bgx_enable_msix(bgx))
-> +		return 1;
-
-Massive resource leak here.
-
-> +	/* Enable all LMACs */
-> +	for (lmac = 0; lmac < bgx->lmac_count; lmac++)
-> +		bgx_lmac_enable(bgx, lmac);
-
-See comment about bgx_lmac_enable() above.
-
-> +	goto exit;
-> +
-
-Lines below are unreachable.
-
-> +	if (bgx->reg_base)
-> +		iounmap((void *)bgx->reg_base);
-> +err_release_regions:
-> +	pci_release_regions(pdev);
-> +err_disable_device:
-> +	pci_disable_device(pdev);
-> +exit:
-> +	return err;
-> +}
+Not sure whether it's the right direction to go:(
+Regards!
+Gerry
+> 
+> Thanks,
+> 
+> 	tglx
+> 
