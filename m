@@ -1,39 +1,26 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 12 Nov 2014 14:56:18 +0000
-Subject: [PATCH v4 2/5] dt-bindings: Add a clocks property to the
- simple-framebuffer binding
-In-Reply-To: <546373C6.4010001@redhat.com>
-References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
- <1413996311-4287-3-git-send-email-hdegoede@redhat.com>
- <20141111214217.19EF5C41610@trevor.secretlab.ca>
- <546373C6.4010001@redhat.com>
-Message-ID: <CACxGe6v15EjpALit4ZJLXDgCkwEYM4t1mryjoQpa3=wpKmXWEg@mail.gmail.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 12 Nov 2014 16:02:34 +0100
+Subject: [PATCH v6 05/12] memory: Add NVIDIA Tegra memory controller
+ support
+In-Reply-To: <20141112144715.GD26488@ulmo>
+References: <1415376063-17205-1-git-send-email-thierry.reding@gmail.com>
+ <1415376063-17205-6-git-send-email-thierry.reding@gmail.com>
+ <20141112142150.GV10744@8bytes.org> <20141112144715.GD26488@ulmo>
+Message-ID: <20141112150233.GW10744@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Replying on-list and with original ccs]
+On Wed, Nov 12, 2014 at 03:47:16PM +0100, Thierry Reding wrote:
+> The SMMU is part of a larger IP block that's also a memory controller.
+> Having it in drivers/iommu would mean that we need to provide a
+> mechanism to synchronize between the two drivers. They also share a
+> number of data tables, so that would need to be shared somehow as well.
+> By keeping both in the same directory we don't have to expose any of
+> this publicly.
 
-On Wed, Nov 12, 2014 at 2:50 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
->
-> On 11/11/2014 10:42 PM, Grant Likely wrote:
->> - clocks : List of clocks used by the framebuffer. Clocks listed here
->>            are expected to already be configured correctly. The OS must
->>            ensure these clocks are not modified or disabled while the
->>            simple framebuffer remains active.
->
-> Updated in my local tree, where I've also added proper commit messages
-> to the 2 patches missing them. Shall I send a v5 of the set, and may I
-> add your Acked-by to this patch when sending v5?
+Since these parts are in different files you export the interfaces
+anyway through non-static symbols and those dependencys also exist for
+other IOMMU drivers. So I prefer this file to live in drivers/iommu.
 
-For this whole series, please add my Acked-by.
 
-Acked-by: Grant Likely <grant.likely@linaro.org>
-
-I'm okay with the bindings, and I'm okay with adding the clock
-dependency to a simplefb node. I'm happy with the conversation we had
-today on IRC, and I'm expecting to see a binding that covers expected
-firmware/OS behaviour and association with the real hardware posted to
-the list shortly.
-
-g.
+	Joerg
