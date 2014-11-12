@@ -1,78 +1,140 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 12 Nov 2014 17:55:57 +0900
-Subject: [PATCH v2 2/2] ARM: shmobile: r8a7794: Add MMP and VSP1 clocks to
- device tree
-In-Reply-To: <1415782557-29550-1-git-send-email-horms+renesas@verge.net.au>
-References: <1415782557-29550-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1415782557-29550-3-git-send-email-horms+renesas@verge.net.au>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Wed, 12 Nov 2014 14:26:51 +0530
+Subject: [[PATCHv2] 3/3] drivers/rtc/rtc-snvs: Add clock support
+In-Reply-To: <7807253ec0fd349b5bb1489e0d3b1347@agner.ch>
+References: <cover.1415364391.git.maitysanchayan@gmail.com>
+ <30e496ce2d6521e608df3b68b73b3e05caa1daef.1415364391.git.maitysanchayan@gmail.com>
+ <7807253ec0fd349b5bb1489e0d3b1347@agner.ch>
+Message-ID: <546320D3.2030501@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
+On Wednesday 12 November 2014 02:57 AM, Stefan Agner wrote:
+> On 2014-11-07 14:04, Sanchayan Maity wrote:
+>> This patch adds clock enable and disable support for
+>> the SNVS peripheral, which is required for using the
+>> RTC within the SNVS block.
+> 
+> What happens if the device tree node is there while this patch is not
+> applied? I guess the driver would load, but since the clocks of the
+> peripheral are not enabled the first register access would lead to bus
+> error or similar. If this is the case, this would break bisectability.
+> You should move the device tree patch to the end.
+> 
 
-Signed-off-by: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+If the DT node was present with this patch not applied, the driver would 
+still crash with a bus error, since the clocks for SNVS are not explicitly 
+enabled anywhere else. I had not thought about any problems which might 
+occur later with git bisect. Will move this to the end with v3.
 
----
-v2
-* As suggested by Geert Uytterhoeven
-  - Use "2ddmac" and "fdp1-0" for names
----
- arch/arm/boot/dts/r8a7794.dtsi            | 14 +++++++++-----
- include/dt-bindings/clock/r8a7794-clock.h |  6 ++++++
- 2 files changed, 15 insertions(+), 5 deletions(-)
+Thanks.
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index b6f8f45..19c9de3 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -461,15 +461,19 @@
- 		mstp1_clks: mstp1_clks at e6150134 {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150134 0 4>, <0 0xe6150038 0 4>;
--			clocks = <&p_clk>, <&zg_clk>, <&p_clk>, <&p_clk>, <&rclk_clk>,
--				 <&cp_clk>, <&zs_clk>, <&zs_clk>, <&zs_clk>;
-+			clocks = <&zs_clk>, <&zs_clk>, <&p_clk>, <&zg_clk>, <&zs_clk>,
-+				 <&zs_clk>, <&p_clk>, <&p_clk>, <&rclk_clk>, <&cp_clk>,
-+				 <&zs_clk>, <&zs_clk>;
- 			#clock-cells = <1>;
- 			renesas,clock-indices = <
--				R8A7794_CLK_TMU1 R8A7794_CLK_3DG R8A7794_CLK_TMU3
--				R8A7794_CLK_TMU2 R8A7794_CLK_CMT0 R8A7794_CLK_TMU0
-+				R8A7794_CLK_VCP0 R8A7794_CLK_VPC0 R8A7794_CLK_TMU1
-+				R8A7794_CLK_3DG R8A7794_CLK_2DDMAC R8A7794_CLK_FDP1_0
-+				R8A7794_CLK_TMU3 R8A7794_CLK_TMU2 R8A7794_CLK_CMT0
-+				R8A7794_CLK_TMU0 R8A7794_CLK_VSP1_DU0 R8A7794_CLK_VSP1_S
- 			>;
- 			clock-output-names =
--				"tmu1", "3dg", "tmu3", "tmu2", "cmt0", "tmu0";
-+				"vcp0", "vpc0", "tmu1", "3dg", "2ddmac", "fdp1-0",
-+				"tmu3", "tmu2", "cmt0", "tmu0", "vsp1-du0", "vsps";
- 		};
- 		mstp2_clks: mstp2_clks at e6150138 {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
-diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
-index 9066213..aa9c286 100644
---- a/include/dt-bindings/clock/r8a7794-clock.h
-+++ b/include/dt-bindings/clock/r8a7794-clock.h
-@@ -26,12 +26,18 @@
- #define R8A7794_CLK_MSIOF0		0
- 
- /* MSTP1 */
-+#define R8A7794_CLK_VCP0		1
-+#define R8A7794_CLK_VPC0		3
- #define R8A7794_CLK_TMU1		11
- #define R8A7794_CLK_3DG			12
-+#define R8A7794_CLK_2DDMAC		15
-+#define R8A7794_CLK_FDP1_0		19
- #define R8A7794_CLK_TMU3		21
- #define R8A7794_CLK_TMU2		22
- #define R8A7794_CLK_CMT0		24
- #define R8A7794_CLK_TMU0		25
-+#define R8A7794_CLK_VSP1_DU0		28
-+#define R8A7794_CLK_VSP1_S		31
- 
- /* MSTP2 */
- #define R8A7794_CLK_SCIFA2		2
--- 
-2.1.1
+Regards,
+Sanchayan.
+
+> Other than that
+> Acked-by: Stefan Agner <stefan@agner.ch>
+> 
+> --
+> Stefan
+> 
+>>
+>> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+>> ---
+>>  drivers/rtc/rtc-snvs.c |   34 ++++++++++++++++++++++++++++++++--
+>>  1 file changed, 32 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/rtc/rtc-snvs.c b/drivers/rtc/rtc-snvs.c
+>> index fa384fe..d4a6512 100644
+>> --- a/drivers/rtc/rtc-snvs.c
+>> +++ b/drivers/rtc/rtc-snvs.c
+>> @@ -17,6 +17,7 @@
+>>  #include <linux/of_device.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/rtc.h>
+>> +#include <linux/clk.h>
+>>  
+>>  /* These register offsets are relative to LP (Low Power) range */
+>>  #define SNVS_LPCR		0x04
+>> @@ -39,6 +40,7 @@ struct snvs_rtc_data {
+>>  	void __iomem *ioaddr;
+>>  	int irq;
+>>  	spinlock_t lock;
+>> +	struct clk *clk;
+>>  };
+>>  
+>>  static u32 rtc_read_lp_counter(void __iomem *ioaddr)
+>> @@ -260,6 +262,18 @@ static int snvs_rtc_probe(struct platform_device *pdev)
+>>  	if (data->irq < 0)
+>>  		return data->irq;
+>>  
+>> +	data->clk = devm_clk_get(&pdev->dev, "snvs-rtc");
+>> +	if (IS_ERR(data->clk)) {
+>> +		data->clk = NULL;
+>> +	} else {
+>> +		ret = clk_prepare_enable(data->clk);
+>> +		if (ret) {
+>> +			dev_err(&pdev->dev,
+>> +				"Could not prepare or enable the snvs clock\n");
+>> +			return ret;
+>> +		}
+>> +	}
+>> +
+>>  	platform_set_drvdata(pdev, data);
+>>  
+>>  	spin_lock_init(&data->lock);
+>> @@ -280,7 +294,7 @@ static int snvs_rtc_probe(struct platform_device *pdev)
+>>  	if (ret) {
+>>  		dev_err(&pdev->dev, "failed to request irq %d: %d\n",
+>>  			data->irq, ret);
+>> -		return ret;
+>> +		goto error_rtc_device_register;
+>>  	}
+>>  
+>>  	data->rtc = devm_rtc_device_register(&pdev->dev, pdev->name,
+>> @@ -288,10 +302,16 @@ static int snvs_rtc_probe(struct platform_device *pdev)
+>>  	if (IS_ERR(data->rtc)) {
+>>  		ret = PTR_ERR(data->rtc);
+>>  		dev_err(&pdev->dev, "failed to register rtc: %d\n", ret);
+>> -		return ret;
+>> +		goto error_rtc_device_register;
+>>  	}
+>>  
+>>  	return 0;
+>> +
+>> +error_rtc_device_register:
+>> +	if (data->clk)
+>> +		clk_disable_unprepare(data->clk);
+>> +
+>> +	return ret;
+>>  }
+>>  
+>>  #ifdef CONFIG_PM_SLEEP
+>> @@ -302,16 +322,26 @@ static int snvs_rtc_suspend(struct device *dev)
+>>  	if (device_may_wakeup(dev))
+>>  		enable_irq_wake(data->irq);
+>>  
+>> +	if (data->clk)
+>> +		clk_disable_unprepare(data->clk);
+>> +
+>>  	return 0;
+>>  }
+>>  
+>>  static int snvs_rtc_resume(struct device *dev)
+>>  {
+>>  	struct snvs_rtc_data *data = dev_get_drvdata(dev);
+>> +	int ret;
+>>  
+>>  	if (device_may_wakeup(dev))
+>>  		disable_irq_wake(data->irq);
+>>  
+>> +	if (data->clk) {
+>> +		ret = clk_prepare_enable(data->clk);
+>> +		if (ret)
+>> +			return ret;
+>> +	}
+>> +
+>>  	return 0;
+>>  }
+>>  #endif
+> 
