@@ -1,21 +1,19 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 12 Nov 2014 15:56:26 +0000
-Subject: [PATCHv2] ASoC: cs42l51: re-hook of_match_table pointer
-In-Reply-To: <1415803244-7010-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1415803244-7010-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20141112155626.GN3815@sirena.org.uk>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 12 Nov 2014 07:57:58 -0800
+Subject: [PATCH RESEND] Documentation: devicetree: Fix Xilinx VDMA
+ specification
+In-Reply-To: <1415800277-6817-1-git-send-email-afaerber@suse.de>
+References: <1415800277-6817-1-git-send-email-afaerber@suse.de>
+Message-ID: <6067bede14b9421fa87db96bdc66dc66@BN1AFFO11FD040.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 12, 2014 at 03:40:44PM +0100, Thomas Petazzoni wrote:
-> In commit a1253ef6d3fa ("ASoC: cs42l51: split i2c from codec driver"),
-> the I2C part of the CS42L51 was moved to a separate file, but the
+On Wed, 2014-11-12 at 02:51PM +0100, Andreas F?rber wrote:
+> The specification requires xlnx,data-width, but example and driver use
+> xlnx,datawidth. Change the specification to match the implementation.
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141112/f9151867/attachment-0001.sig>
+Isn't this the wrong way around? The bindings are considered API, so
+shouldn't the driver be fixed to match the spec?
+Are there already dts files out there using either of these options?
+
+	Soren
