@@ -1,34 +1,27 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 12 Nov 2014 18:56:22 +0800
-Subject: [PATCH v4 0/3] add power off driver for i.mx6
-In-Reply-To: <1415780439-29728-1-git-send-email-b38343@freescale.com>
-References: <1415780439-29728-1-git-send-email-b38343@freescale.com>
-Message-ID: <20141112105620.GM2704@dragon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 12 Nov 2014 11:00:47 +0000
+Subject: [RFC] ptrace: add generic SET_SYSCALL request
+In-Reply-To: <54633A69.6090202@linaro.org>
+References: <1415346443-28915-1-git-send-email-takahiro.akashi@linaro.org>
+ <20141107140405.GA30156@redhat.com> <54633A69.6090202@linaro.org>
+Message-ID: <20141112110047.GB26437@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 12, 2014 at 04:20:36PM +0800, Robin Gong wrote:
-> Resend the patchset  with the latest MAINTAINERS
-> Add simple power off driver for i.mx6, including:
-> - add basic imx-snvs-poweroff driver in drivers/power/reset
-> - add device node in all dts files of i.mx6.
-> - enable in config file
+On Wed, Nov 12, 2014 at 10:46:01AM +0000, AKASHI Takahiro wrote:
+> On 11/07/2014 11:04 PM, Oleg Nesterov wrote:
+> > To me the fact that PTRACE_SET_SYSCALL can be undefined and syscall_set_nr()
+> > is very much arch-dependant (but most probably trivial) means that this  code
+> > should live in arch_ptrace().
 > 
-> Change from v3:
-> - disable poweroff driver in soc level dts and enable it in board level dts
-> - replace 'EIO' with 'ENODEV' while of_iomap fail.
-> Change from v2:
-> - remove useless included head files
-> - split device binding doc from dts patch
-> - add description for the case that PMIC_ON_REQ not used as external power
->   control
+> Thinking of Oleg's comment above, it doesn't make sense neither to define generic
+> NT_SYSTEM_CALL (user_regset) in uapi/linux/elf.h and implement it in ptrace_regset()
+> in kernel/ptrace.c with arch-defined syscall_(g)set_nr().
 > 
-> Robin Gong (3):
->   ARM: dts: imx6: add pm_power_off support for i.mx6 chips
->   power: reset: imx-snvs-poweroff: add power off driver for i.mx6
->   ARM: configs: imx_v6_v7_defconfig: add power off driver
+> Since we should have the same interface on arm and arm64, we'd better implement
+> ptrace(PTRACE_SET_SYSCALL) locally on arm64 for now (as I originally submitted).
 
-I'm fine with the series.  But before I take the patches, I need an ACK
-from DT folks on the bindings.
+I think the regset approach is cleaner. We already do something similar for
+TLS. That would be implemented under arch/arm64/ with it's own NT type.
 
-Shawn
+Will
