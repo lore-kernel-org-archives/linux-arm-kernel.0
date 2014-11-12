@@ -1,42 +1,70 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 12 Nov 2014 14:37:27 +0100
-Subject: [PATCH V2 1/1] ARM: dts: sunxi: Banana Pi: increase
- startup-delay for the GMAC PHY regulator
-In-Reply-To: <1415746906-20835-2-git-send-email-merker@debian.org>
-References: <1415539714-7652-1-git-send-email-merker@debian.org>
- <1415746906-20835-1-git-send-email-merker@debian.org>
- <1415746906-20835-2-git-send-email-merker@debian.org>
-Message-ID: <20141112133727.GO14919@lukather>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 12 Nov 2014 13:44:12 +0000
+Subject: [PATCH 03/13] ARM: STi: DT: STiH416: Add DT nodes for the ehci
+ and ohci usb controllers.
+In-Reply-To: <2945908.5UNg8NaKcc@wuerfel>
+References: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
+ <1415361475-6218-4-git-send-email-peter.griffin@linaro.org>
+ <2945908.5UNg8NaKcc@wuerfel>
+Message-ID: <20141112134412.GA20187@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 12, 2014 at 12:01:46AM +0100, Karsten Merker wrote:
-> On the LeMaker Banana Pi, probing the external ethernet PHY connected
-> to the SoC's internal GMAC module sometimes fails. The PHY power
-> supply is handled via a GPIO-controlled regulator, and the existing
-> regulator startup-delay of 50000us is too short to make sure that the
-> PHY is always fully powered up when it is queried by phylib. Tests
-> have shown that to provide a reliable PHY detection, the startup-delay
-> has to be increased to at least 60000us. To have a certain safety margin
-> and to cater for manufacturing variations between different boards,
-> the delay gets set to 100000us as discussed on the linux-arm-kernel
-> mailinglist.
+Hi Arnd,
+
+Thanks for reviewing.
+
+On Fri, 07 Nov 2014, Arnd Bergmann wrote:
+
+> > +               ehci0: usb at 0xfe1ffe00 {
 > 
-> Signed-off-by: Karsten Merker <merker@debian.org>
-> Acked-by: Hans de Goede <hdegoede@redhat.com>
+> Please drop the '0x' from the unit address in all instances.
 
-Merged, thanks.
+Ok, fixed in v2
 
-Maxime
+> 
+> > +                       compatible = "st,st-ehci-300x";
+> > +                       reg = <0xfe1ffe00 0x100>;
+> > +                       interrupts = <GIC_SPI 148 IRQ_TYPE_NONE>;
+> > +                       pinctrl-names = "default";
+> > +                       pinctrl-0 = <&pinctrl_usb0>;
+> > +                       clocks = <&clk_s_a1_ls 0>,
+> > +                                <&clockgen_b0 0>;
+> > +                       clock-names = "ic", "clk48";
+> > +
+> > +                       phys = <&usb2_phy>;
+> > +                       phy-names = "usb";
+> > +                       status = "okay";
+> 
+> No need to list 'status="okay"', it's the default. It might
+> make sense to change this to 'status="disabled"' though, if the ports
+> might be unused on some boards.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141112/40e14133/attachment.sig>
+ok, removed in v2
+
+> 
+> >                 mmc0: sdhci at fe81e000 {
+> >                         bus-width = <8>;
+> >                 };
+> > +
+> > +               usb0: usb at fe100000 {
+> > +                       status = "okay";
+> > +               };
+> > +
+> > +               usb1: usb at fe200000 {
+> > +                       status = "okay";
+> > +               };
+> > +
+> > +               usb2: usb at fe300000 {
+> > +                       status = "okay";
+> > +               };
+> 
+> I don't understand this part: why do you add extra nodes here that only
+> contain a status property?
+
+Good spot, this is a bit of legacy code which I should have removed before submitting.
+It's removed in v2.
+
+regards,
+
+Peter.
