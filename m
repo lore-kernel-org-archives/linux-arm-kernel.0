@@ -1,48 +1,23 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 12 Nov 2014 11:33:16 +0900
-Subject: [PATCH v2] ARM: shmobile: r8a7740 legacy: Add missing INTCA
- clock for irqpin module
-In-Reply-To: <20141112003307.GA30454@verge.net.au>
-References: <1415221174-29097-1-git-send-email-geert+renesas@glider.be>
- <20141110004809.GB16836@verge.net.au>
- <20141112003307.GA30454@verge.net.au>
-Message-ID: <20141112023315.GI11597@verge.net.au>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 12 Nov 2014 11:41:06 +0900
+Subject: [PATCH 0/2] ARM: dts: Fix the number of DMA channels for Exynos3250/4
+Message-ID: <1415760068-765-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 12, 2014 at 09:33:08AM +0900, Simon Horman wrote:
-> On Mon, Nov 10, 2014 at 09:48:10AM +0900, Simon Horman wrote:
-> > On Wed, Nov 05, 2014 at 09:59:34PM +0100, Geert Uytterhoeven wrote:
-> > > This clock drives the irqpin controller modules.
-> > > Before, it was assumed enabled by the bootloader or reset state.
-> > > By making it available to the driver, we make sure it gets enabled when
-> > > needed, and allow it to be managed by system or runtime PM.
-> > > 
-> > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > 
-> > Thanks Geert,
-> > 
-> > I have queued this up after dropping the previous version.
-> 
-> Hi Geert,
-> 
-> As this appears to be a bug fix I would like to accompany this patch with
-> some text describing when the problem was introduced and what its effects
-> are. In short a rough guide to if it should be applied to -stable. To that
-> end I prepared the following which I would appreciate your feedback on.
-> 
-> * Add missing INTCA clock for irqpin module for r8a7740
-> 
->   This problem appears to have been introduced when the r8a7740 started
->   using the irqpin driver, a change made by 0b7d7820226016205 ("ARM:    
->   shmobile: r8a7740: Migrate from INTC to GIC") in v3.9.
->   It may well have existed in a different form before then.
-> 
->   It is my understanding that the problem problem only manifests if either:
->   * uboot does not start the clock: in practice it does      
->   * The A4S pm domain is in use managed by system or runtime pm.
->     I believe this may only occur since v3.18-rc2   
+This patch fix minor issuse to correct the number of DMA channels for
+Exynos3250 and Exynos4 series. The PL330 DMA of Exynos3250/Exynos4 support
+16 channels simultaneously but, PL330 DMA driver don't use 'dma-channels'
+property directly. This patchset fix the correct information
+of Exynos3250/Exynos4's PL330 DMA simply.
 
-I think the above line should read
+Chanwoo Choi (2):
+  ARM: dts: Fix the number of DMA channels for Exynos3250
+  ARM: dts: Fix the number of DMA channels for Exynos4
 
-     I believe this may only occur with patches queued up for v3.19.
+ arch/arm/boot/dts/exynos3250.dtsi | 4 ++--
+ arch/arm/boot/dts/exynos4.dtsi    | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+-- 
+1.8.5.5
