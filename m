@@ -1,50 +1,35 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 12 Nov 2014 13:48:01 +0000
-Subject: [PATCH 12/13] ARM: STi: DT: STiH410: Add STiH410 SoC clock
- support.
-In-Reply-To: <88469624.TsXJ3Gpfe2@wuerfel>
-References: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
- <1415361475-6218-13-git-send-email-peter.griffin@linaro.org>
- <88469624.TsXJ3Gpfe2@wuerfel>
-Message-ID: <20141112134801.GB20187@griffinp-ThinkPad-X1-Carbon-2nd>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Wed, 12 Nov 2014 14:51:16 +0100
+Subject: [PATCH RESEND] Documentation: devicetree: Fix Xilinx VDMA
+ specification
+Message-ID: <1415800277-6817-1-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+The specification requires xlnx,data-width, but example and driver use
+xlnx,datawidth. Change the specification to match the implementation.
 
-Thanks for reviewing.
+Reviewed-by: Michal Simek <michal.simek@xilinx.com>
+Fixes: eebeac03db93 ("dma: Add Xilinx Video DMA DT Binding Documentation")
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ This appears to have fallen through the cracks... resending to dmaengine.
 
-> On Friday 07 November 2014 11:57:54 Peter Griffin wrote:
-> > +
-> > +       soc {
-> > +
-> > +               ohci0: usb at 9a03c00 {
-> > +                       status = "okay";
-> > +               };
-> > +
-> > +               ehci0: usb at 9a03e00 {
-> > +                       status = "okay";
-> > +               };
-> > +
-> > +               ohci1: usb at 9a83c00 {
-> > +                       status = "okay";
-> > +               };
-> > +
-> > +               ehci1: usb at 9a83e00 {
-> > +                       status = "okay";
-> > +               };
-> > +       };
-> > +};
-> > 
-> 
-> These seem to refer to an existing device in the base dtsi file. Just put the label
-> in the shared file and remove the exact names here. Alternatively, drop the labels
-> you don't use.
+ Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Based on Maximes feedback in V2 I've created a seperate stih410.dtsi file
-which has the extra ehci / ohci device nodes in it. This means they don't need to be
-enabled in the board file any more.
-
-regards,
-
-Peter.
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+index 1405ed071bb4..e4c4d47f8137 100644
+--- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
++++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+@@ -25,7 +25,7 @@ Required child node properties:
+ - compatible: It should be either "xlnx,axi-vdma-mm2s-channel" or
+ 	"xlnx,axi-vdma-s2mm-channel".
+ - interrupts: Should contain per channel VDMA interrupts.
+-- xlnx,data-width: Should contain the stream data width, take values
++- xlnx,datawidth: Should contain the stream data width, take values
+ 	{32,64...1024}.
+ 
+ Optional child node properties:
+-- 
+2.1.2
