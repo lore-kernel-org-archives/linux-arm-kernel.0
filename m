@@ -1,75 +1,64 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 12 Nov 2014 09:25:28 -0800
-Subject: [GIT PULL] Broadcom Cygnus SoC defconfig changes
-In-Reply-To: <CAGVrzcbQG7qZNOoocgpbV=pf3Jv9mwAfsb=Eq2tiFfMa_pAPZQ@mail.gmail.com>
-References: <1414698612-26216-1-git-send-email-f.fainelli@gmail.com>
- <20141109001302.GB11947@quad.lixom.net>
- <CAGVrzcbQG7qZNOoocgpbV=pf3Jv9mwAfsb=Eq2tiFfMa_pAPZQ@mail.gmail.com>
-Message-ID: <CAOesGMh6t6f+_friV6_pE5WLgEFa+OrErmNKnB0v5jcBstwGKA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 12 Nov 2014 17:41:30 +0000
+Subject: [PATCH] arm64: efi: Fix stub cache maintenance
+In-Reply-To: <54639500.5010309@amd.com>
+References: <1415810351-3462-1-git-send-email-mark.rutland@arm.com>
+ <54639500.5010309@amd.com>
+Message-ID: <20141112174130.GN28015@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 11, 2014 at 10:29 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> 2014-11-08 16:13 GMT-08:00 Olof Johansson <olof@lixom.net>:
->> On Thu, Oct 30, 2014 at 12:50:09PM -0700, Florian Fainelli wrote:
->>> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
->>>
->>>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
->>>
->>> are available in the git repository at:
->>>
->>>   http://github.com/brcm/linux.git tags/arm-soc/for-3.18/cygnus-defconfig-v9
->>>
->>> for you to fetch changes up to aa0204801143ee2d47e9e8dd5f39cdddd5613b4b:
->>>
->>>   ARM: multi_v7_defconfig: Enable Broadcom Cygnus (2014-10-30 11:01:35 -0700)
->>
->> Hi Florian,
->>
->> Apologies for the delay in dealing with this pull request.
->>
->>> ----------------------------------------------------------------
->>> This patchset contains initial support for Broadcom's Cygnus SoC based on our
->>> iProc architecture. Initial support is minimal and includes just the mach
->>> platform code, clock driver, and a basic device tree configuration. Peripheral
->>> drivers will be submitted soon, as will device tree configurations for other
->>> Cygnus board variants.
->>>
->>> These are the defconfig parts of the changes
->>>
->>> ----------------------------------------------------------------
->>> Jonathan Richardson (1):
->>>       ARM: cygnus defconfig : Initial defconfig for Broadcom Cygnus SoC
->>>
->>> Ray Jui (1):
->>>       ARM: multi_v7_defconfig: Enable Broadcom Cygnus
->>>
->>> Scott Branden (1):
->>>       ARM: bcm_defconfig/multi_v7_defconfig: remove one level of menu from Kconfig
->>>
->>>  arch/arm/configs/bcm_cygnus_defconfig | 237 ++++++++++++++++++++++++++++++++++
->>>  arch/arm/configs/bcm_defconfig        |   3 +-
->>>  arch/arm/configs/multi_v7_defconfig   |  21 ++-
->>
->> Please send multi_v7_defconfig updates as a patch instead of including in
->> a merge request. We ask for this because it's a file that many maintainers
->> touch and it's easy that we get lots of conflicts otherwise.
->>
->> As far as the bcm_cygnus_defconfig: Since new platforms are multiplatform
->> enabled by default, we normally only prefer to have one defconfig per vendor.
->> We've made exceptions in cases where the families are very different, but in
->> general one defconfig per vendor should be sufficient.
->>
->> I.e. please enable the cygnus options in bcm_defconfig instead of adding a new
->> one.
->
-> Alright, so just to make sure I get this right:
->
-> - there are two patches from Scott and Ray which enable Cygnus in
-> mutli_v7_defconfig that I should send a separate patches
-> - adding Cygnus to bcm_defconfig can be part of a separate pull request
+On Wed, Nov 12, 2014 at 05:12:32PM +0000, Joel Schopp wrote:
+> 
+> >  
+> > +	/*
+> > +	 * Ensure that the rest of this function (in the original Image) is
+> > +	 * visible when the caches are disabled. The I-cache can't have stale
+> > +	 * entries for the VA range of the current image, so no maintenance is
+> > +	 * necessary.
+> > +	 */
+> > +	adr	x0, efi_stub_entry
+> > +	adr	x1, efi_stub_entry_end
+> > +	sub	x1, x1, x0
+> > +	bl	__flush_dcache_area
+> It is my understdanding that you also need an isb here.  Tom's testing
+> confirms this on my patch with the dsb and without the isb. 
 
-Yep!
+Ok. I still can't see what context we would be synchronising, but it's
+entirely possible my reasoning is off. I'm more than happy to add the
+ISB if necessary, but I'd like to know why it is necessary.
 
+> Also, since this is not a performance critical path it seems more
+> straightforward to just flush everything.
 
--Olof
+Unfortunately, there's no way of flushing everything to the PoC.
+
+Due to the possible presence of a system cache (e.g. the L3 in CCN), it
+is only possible to flush data to the PoC by means of VA operations,
+which must respect maintenance by VA per the architecture (see the ARMv8
+ARM ARM, issue A.d).
+
+Using Set/Way operations will at best only flush out to the L3 cache,
+and even that is racy while the D-cache on; the CPU's D-cache can
+speculatively allocate lines out of the system cache (even if dirty),
+and theoretically could shuffle lines between levels (and via that race,
+between ways in a set).
+
+Set/Way operations can only be used safely with the D-cache off, and
+only to ensure that lines have been invalidate or evicted from the CPU's
+cache. They cannot be used to ensure that the lines have made it to the
+PoC (or PoU).
+
+If other cache-coherent masters (e.g. other CPUs) have caches enabled,
+they can similarly acquire cache lines from the current CPU, though that
+shouldn't be a concern in this path.
+
+We could flush the entire physical address space by VA, but that will
+take an extremely long time, even for a path that isn't performance
+critical.
+
+> I'm happy either way. We will test your patch as is and let you know.
+
+Thanks, it's much appreciated.
+
+Mark.
