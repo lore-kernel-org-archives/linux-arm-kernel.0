@@ -1,31 +1,47 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 12 Nov 2014 17:59:25 +0100
-Subject: [PATCH 2/3] power: reset: imx-snvs-poweroff: add power off
- driver for i.mx6
-In-Reply-To: <1415780439-29728-3-git-send-email-b38343@freescale.com>
-References: <1415780439-29728-1-git-send-email-b38343@freescale.com>
- <1415780439-29728-3-git-send-email-b38343@freescale.com>
-Message-ID: <20141112165925.GA27681@earth.universe>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 12 Nov 2014 09:02:08 -0800
+Subject: [PATCH v3 2/2] ARM: EXYNOS: Call regulator core suspend prepare
+ and finish functions
+In-Reply-To: <CABxcv=mMqh5UD0_Wz3rNaFbZD3BH_2Z+7srzccd=-5_ndo_a1Q@mail.gmail.com>
+References: <1413839151-10875-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1413839151-10875-3-git-send-email-javier.martinez@collabora.co.uk>
+ <CABxcv==YZjO9p3aNyuRpe3DYS+=BcY_N2esuTg0hGASb_b_OdA@mail.gmail.com>
+ <CABxcv=mMqh5UD0_Wz3rNaFbZD3BH_2Z+7srzccd=-5_ndo_a1Q@mail.gmail.com>
+Message-ID: <CAOesGMjKP6Yg-M_7Zy5bbEJ7QD7fQ27Bopd6yD3M=r=4SArR6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Nov 11, 2014 at 2:23 AM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> Hello Kukjin,
+>
+> On Thu, Oct 30, 2014 at 11:06 AM, Javier Martinez Canillas
+> <javier@dowhile0.org> wrote:
+>> Hello Kukjin,
+>>
+>> On Mon, Oct 20, 2014 at 11:05 PM, Javier Martinez Canillas
+>> <javier.martinez@collabora.co.uk> wrote:
+>>> The regulator framework has a set of helpers functions to be used when
+>>> the system is entering and leaving from suspend but these are not called
+>>> on Exynos platforms. This means that the .set_suspend_* function handlers
+>>> defined by regulator drivers are not called when the system is suspended.
+>>>
+>>> Suggested-by: Doug Anderson <dianders@chromium.org>
+>>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>>> Reviewed-by: Doug Anderson <dianders@chromium.org>
+>>> ---
+>>>  arch/arm/mach-exynos/suspend.c | 23 +++++++++++++++++++++++
+>>>  1 file changed, 23 insertions(+)
+>>>
+>>
+>> Any comments on this patch?
+>>
+>
+> Just a gentle reminder about this patch.
 
-On Wed, Nov 12, 2014 at 04:20:38PM +0800, Robin Gong wrote:
-> This driver register pm_power_off with snvs power off function. If
-> your boards NOT use PMIC_ON_REQ to turn on/off external pmic, or use
-> other pin to do, please disable the driver in dts, otherwise, your
-> pm_power_off maybe overwrote by this driver.
-> 
-> Signed-off-by: Robin Gong <b38343@freescale.com>
+Kukjin, should I just apply this directly since you seem to be busy?
 
-Acked-By: Sebastian Reichel <sre@kernel.org>
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141112/6ae6d3e0/attachment.sig>
+Thanks,
+
+-Olof
