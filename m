@@ -1,65 +1,50 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Wed, 12 Nov 2014 14:16:00 +0530
-Subject: [[PATCHv2] 2/3] ARM: dts: vfxxx: Add SNVS node
-In-Reply-To: <38daf99040ba00bd5150e7bc73a2fd76@agner.ch>
-References: <cover.1415364391.git.maitysanchayan@gmail.com>
- <64244b916de3864b714e829c3adeecec71aea2b3.1415364391.git.maitysanchayan@gmail.com>
- <38daf99040ba00bd5150e7bc73a2fd76@agner.ch>
-Message-ID: <54631E48.7090804@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 12 Nov 2014 17:46:05 +0900
+Subject: [PATCH 1/3] ARM: shmobile: r8a7794: Add SGX clock to device tree
+In-Reply-To: <CAMuHMdUkqmbuLTjGU5DxyrxroKXHKVYtn9dRfbOxho1Rr1_1rQ@mail.gmail.com>
+References: <1414648736-31412-1-git-send-email-horms+renesas@verge.net.au>
+ <1414648736-31412-2-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdUkqmbuLTjGU5DxyrxroKXHKVYtn9dRfbOxho1Rr1_1rQ@mail.gmail.com>
+Message-ID: <20141112084605.GW9007@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wednesday 12 November 2014 02:50 AM, Stefan Agner wrote:
-> On 2014-11-07 14:04, Sanchayan Maity wrote:
->> This patch adds a devicetree node for the Secure
->> Non-Volatile Storage (SNVS) on the VF610 platform.
->> The SNVS block also has a Real Time Counter (RTC).
->>
->> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
->> ---
->>  arch/arm/boot/dts/vfxxx.dtsi |   15 +++++++++++++++
->>  1 file changed, 15 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
->> index 4e70833..bc131b0 100644
->> --- a/arch/arm/boot/dts/vfxxx.dtsi
->> +++ b/arch/arm/boot/dts/vfxxx.dtsi
->> @@ -338,6 +338,21 @@
->>  				status = "disabled";
->>  			};
->>  
->> +			snvs0: snvs at 400a7000 {
->> +				compatible = "fsl,sec-v4.0-mon", "simple-bus";
->> +				#address-cells = <1>;
->> +				#size-cells = <1>;
->> +				ranges = <0 0x400a7000 0x2000>;
->> +
->> +				snvs-rtc-lp at 34 {
->> +					compatible = "fsl,sec-v4.0-mon-rtc-lp";
->> +					reg = <0x34 0x58>;
->> +					interrupts = <0 100 IRQ_TYPE_LEVEL_HIGH>;
+On Thu, Oct 30, 2014 at 10:54:04AM +0100, Geert Uytterhoeven wrote:
+> On Thu, Oct 30, 2014 at 6:58 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > --- a/arch/arm/boot/dts/r8a7794.dtsi
+> > +++ b/arch/arm/boot/dts/r8a7794.dtsi
+> > @@ -461,16 +461,15 @@
+> >                 mstp1_clks: mstp1_clks at e6150134 {
+> >                         compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+> >                         reg = <0 0xe6150134 0 4>, <0 0xe6150038 0 4>;
+> > -                       clocks = <&p_clk>, <&p_clk>, <&p_clk>, <&rclk_clk>,
+> > -                                <&cp_clk>,
+> > -                                <&zs_clk>, <&zs_clk>, <&zs_clk>;
+> > +                       clocks = <&p_clk>, <&zg_clk>, <&p_clk>, <&p_clk>, <&rclk_clk>,
+> > +                                <&cp_clk>, <&zs_clk>, <&zs_clk>, <&zs_clk>;
+> >                         #clock-cells = <1>;
+> >                         renesas,clock-indices = <
+> > -                               R8A7794_CLK_TMU1 R8A7794_CLK_TMU3 R8A7794_CLK_TMU2
+> > -                               R8A7794_CLK_CMT0 R8A7794_CLK_TMU0
+> > +                               R8A7794_CLK_TMU1 R8A7794_CLK_PVRSRVKM R8A7794_CLK_TMU3
+> > +                               R8A7794_CLK_TMU2 R8A7794_CLK_CMT0 R8A7794_CLK_TMU0
+> >                         >;
+> >                         clock-output-names =
+> > -                               "tmu1", "tmu3", "tmu2", "cmt0", "tmu0";
+> > +                               "tmu1", "pvrsrvkm", "tmu3", "tmu2", "cmt0", "tmu0";
 > 
-> With the new device tree structure, the interrupt field needs to be part
-> of the vf500.dtsi now. The vfxxx.dtsi will be the parent also for the
-> Cortex-M4 device tree, which uses a different interrupt controller.
+> "3dg"
 > 
-> While at it, use the GIC_SPI macro for the first cell (so this will be
-> blend into the other interrupt definitions).
-
-OK. Will fix this and send out a v3. My bad I missed the M4 changes.
-
+> > --- a/include/dt-bindings/clock/r8a7794-clock.h
+> > +++ b/include/dt-bindings/clock/r8a7794-clock.h
+> > @@ -27,6 +27,7 @@
+> >
+> >  /* MSTP1 */
+> >  #define R8A7794_CLK_TMU1               11
+> > +#define R8A7794_CLK_PVRSRVKM           12
 > 
->> +					clocks = <&clks VF610_CLK_SNVS>;
->> +					clock-names = "snvs-rtc";
->> +				};
->> +			};
->> +
->>  			uart4: serial at 400a9000 {
->>  				compatible = "fsl,vf610-lpuart";
->>  				reg = <0x400a9000 0x1000>;
-> 
+> R8A7794_CLK_3DG
 
-Regards,
-Sanchayan.
+Thanks, I will fix that.
+Sorry for missing it the first time around.
