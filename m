@@ -1,33 +1,38 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 12 Nov 2014 11:46:06 +0000
-Subject: [PATCH v3 1/2] of: Rename "poweroff-source" property to
- "system-power-controller"
-In-Reply-To: <CABgxDoLfGYRnGCLmxnW6XCwJo3AoecO3=sLNBsOUAHig3P8New@mail.gmail.com>
-References: <1415283784-10885-1-git-send-email-romain.perier@gmail.com>
- <1415283784-10885-2-git-send-email-romain.perier@gmail.com>
- <20141111150139.A904BC416AF@trevor.secretlab.ca>
- <CABgxDoLfGYRnGCLmxnW6XCwJo3AoecO3=sLNBsOUAHig3P8New@mail.gmail.com>
-Message-ID: <CACxGe6tiv8io4Bv+O6uSsGGwZ87R-_j965qhbQdBexOHakk4Pg@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 12 Nov 2014 11:40:54 +0000
+Subject: [PATCH v9 13/13] swiotlb-xen: remove BUG_ON in xen_bus_to_phys
+In-Reply-To: <alpine.DEB.2.02.1411121130020.26318@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1411121130020.26318@kaball.uk.xensource.com>
+Message-ID: <1415792454-23161-13-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 11, 2014 at 7:01 PM, Romain Perier <romain.perier@gmail.com> wrote:
-> 2014-11-11 16:01 GMT+01:00 Grant Likely <grant.likely@linaro.org>:
->> So, to be a little pendantic, the 'ti,' prefix is basically just for
->> backwards compatibility with the old binding, and that old binding is
->> only used on palmas.c, tps65*.c and twl4030-power.c, correct?
->
-> No, the backward compatibility here is only useful for drivers which
-> used "ti,system-power-controller" in the past and recently switched to
-> the new property through the standard helper function. As most of the
-> dts were not updated to use the new property, previous patches broke
-> compatibility with "ti,system-power-controller" (this compat would be
-> reverted with this serie). Only one driver has this problem, it is
-> tps65910.
->
-> So, What you propose is that I should handle the old property directly
-> from tps65910, and keep the standard helper generic right ?
+On x86 truncation cannot occur because config XEN depends on X86_64 ||
+(X86_32 && X86_PAE).
 
-yes as it is a quirk for only that driver.
+On ARM truncation can occur without CONFIG_ARM_LPAE, when the dma
+operation involves foreign grants. However in that case the physical
+address returned by xen_bus_to_phys is actually invalid (there is no mfn
+to pfn tracking for foreign grants on ARM) and it is not used.
 
-g.
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ drivers/xen/swiotlb-xen.c |    2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+index 498b654..153cf14 100644
+--- a/drivers/xen/swiotlb-xen.c
++++ b/drivers/xen/swiotlb-xen.c
+@@ -96,8 +96,6 @@ static inline phys_addr_t xen_bus_to_phys(dma_addr_t baddr)
+ 	dma_addr_t dma = (dma_addr_t)pfn << PAGE_SHIFT;
+ 	phys_addr_t paddr = dma;
+ 
+-	BUG_ON(paddr != dma); /* truncation has occurred, should never happen */
+-
+ 	paddr |= baddr & ~PAGE_MASK;
+ 
+ 	return paddr;
+-- 
+1.7.10.4
