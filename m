@@ -1,50 +1,24 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 12 Nov 2014 10:26:03 -0800
-Subject: [PATCH RESEND] Documentation: devicetree: Fix Xilinx VDMA
- specification
-In-Reply-To: <5463A0F4.6060300@suse.de>
-References: <1415800277-6817-1-git-send-email-afaerber@suse.de>
- <6067bede14b9421fa87db96bdc66dc66@BN1AFFO11FD040.protection.gbl>
- <5463A0F4.6060300@suse.de>
-Message-ID: <bd47278216b64375b32cdc9ed66fe907@BN1BFFO11FD024.protection.gbl>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 12 Nov 2014 18:26:43 +0000
+Subject: [PATCH 5/6] iommu/arm-smmu: support buggy implementations with
+ invalidate-on-map
+In-Reply-To: <1407891099-24641-6-git-send-email-mitchelh@codeaurora.org>
+References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
+ <1407891099-24641-6-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <20141112182642.GH26437@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-11-12 at 07:03PM +0100, Andreas F?rber wrote:
-> Am 12.11.2014 um 16:57 schrieb S?ren Brinkmann:
-> > On Wed, 2014-11-12 at 02:51PM +0100, Andreas F?rber wrote:
-> >> The specification requires xlnx,data-width, but example and driver use
-> >> xlnx,datawidth. Change the specification to match the implementation.
-> > 
-> > Isn't this the wrong way around? The bindings are considered API, so
-> > shouldn't the driver be fixed to match the spec?
-> 
-> In theory, patch review should've never let the two differ... ;)
-> 
-> It's not my driver, so I fixed the perceived inconsistency the least
-> invasive way; Michal and Srikanth seemed to concur at the time.
-> 
-> https://patchwork.kernel.org/patch/4620261/
-> 
-> > Are there already dts files out there using either of these options?
-> 
-> In upstream, no. microblaze and virtex440 use a
-> xlnx,include-datawidth-matching-0 property as precedence for the
-> spelling, whereas there is an fsl,data-width and an unused msix-data-width.
-> 
-> Downstream, yes: Beyond my own patch derived from the Parallella tree,
-> there's some in the ADI tree. None in the Xilinx tree on quick check.
-> 
-> I haven't encountered any using the documented xlnx,data-width - but
-> this patch was authored pre 3.17, haven't ran a full Web search again.
+Hi Mitch,
 
-grepping through linux-next shows some usage of xlnx,datawidth, but
-only the single hit in  Documentation for xlnx,data-width.
-Other than VDMA the other hit seems to be just some DT
-documentation which I can't find a driver for...
-Anyhow, this patch is probably the best way of fixing this.
+On Wed, Aug 13, 2014 at 01:51:38AM +0100, Mitchel Humpherys wrote:
+> Add a workaround for some buggy hardware that requires a TLB invalidate
+> operation to occur at map time. Activate the feature with the
+> qcom,smmu-invalidate-on-map boolean DT property.
 
-Reviewed-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+I'm digging up an old thread here, but I've been working on a new page-table
+allocator for the SMMU and looked into implementing this workaround for you
+in there. When I do the TLBI on map after installing the new PTE, can I just
+invalidate the range mapped by that PTE, or does it need to be a full TLBI?
 
-	Thanks,
-	S?ren
+Will
