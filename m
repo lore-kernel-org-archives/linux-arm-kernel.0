@@ -1,42 +1,110 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 12 Nov 2014 09:33:08 +0900
-Subject: [PATCH v2] ARM: shmobile: r8a7740 legacy: Add missing INTCA
- clock for irqpin module
-In-Reply-To: <20141110004809.GB16836@verge.net.au>
-References: <1415221174-29097-1-git-send-email-geert+renesas@glider.be>
- <20141110004809.GB16836@verge.net.au>
-Message-ID: <20141112003307.GA30454@verge.net.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 11 Nov 2014 17:34:54 -0800
+Subject: gcc 4.9 build warnings (was: Re: next build: 2674 warnings 1
+ failures (next/next-20141022))
+In-Reply-To: <2480226.26bJjjL2fl@wuerfel>
+References: <5447442c.a9ca440a.2060.5e09@mx.google.com>
+ <20141024094412.GN27405@n2100.arm.linux.org.uk>
+ <20141024182509.GA31232@gate.crashing.org>
+ <2480226.26bJjjL2fl@wuerfel>
+Message-ID: <CAOesGMiscbWfbpxwPxkH+7_4mhK=5+4nQJrWvgHfbsLJYhO1cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 10, 2014 at 09:48:10AM +0900, Simon Horman wrote:
-> On Wed, Nov 05, 2014 at 09:59:34PM +0100, Geert Uytterhoeven wrote:
-> > This clock drives the irqpin controller modules.
-> > Before, it was assumed enabled by the bootloader or reset state.
-> > By making it available to the driver, we make sure it gets enabled when
-> > needed, and allow it to be managed by system or runtime PM.
-> > 
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> Thanks Geert,
-> 
-> I have queued this up after dropping the previous version.
+Hey, look at that:
 
-Hi Geert,
+http://arm-soc.lixom.net/buildlogs/misc/v3.18-rc2/
 
-As this appears to be a bug fix I would like to accompany this patch with
-some text describing when the problem was introduced and what its effects
-are. In short a rough guide to if it should be applied to -stable. To that
-end I prepared the following which I would appreciate your feedback on.
+I've updated the toolchain now, so new builds should be using the proper one.
 
-* Add missing INTCA clock for irqpin module for r8a7740
+Thanks a lot for figuring this out. Segher, feel free to update your
+scripts -- I've got a local edit for it here now. :)
 
-  This problem appears to have been introduced when the r8a7740 started
-  using the irqpin driver, a change made by 0b7d7820226016205 ("ARM:    
-  shmobile: r8a7740: Migrate from INTC to GIC") in v3.9.
-  It may well have existed in a different form before then.
 
-  It is my understanding that the problem problem only manifests if either:
-  * uboot does not start the clock: in practice it does      
-  * The A4S pm domain is in use managed by system or runtime pm.
-    I believe this may only occur since v3.18-rc2   
+-Olof
+
+On Tue, Nov 11, 2014 at 1:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 24 October 2014 13:25:09 Segher Boessenkool wrote:
+>> On Fri, Oct 24, 2014 at 10:44:12AM +0100, Russell King - ARM Linux wrote:
+>> > On Fri, Oct 24, 2014 at 11:13:27AM +0200, Arnd Bergmann wrote:
+>> > > Ok, that also explains the problems with the missing __linux__ macro, given
+>> > > Ard's reply about bare-metal gcc.
+>> > >
+>> > > I think we have two choices here:
+>> > >
+>> > > a) change the buildall script so it actually builds a compiler that behaves
+>> > >    in the way we expect for the kernel (__SIZE_TYPE__ and __linux__ at least,
+>> > >    possibly others)
+>> > >
+>> > > b) change the kernel to work with the way the bare-metal compiler is built,
+>> > >    adding -D__linux__ in the ARM Makefile and applying Ard's workaround for
+>> > >    __SIZE_TYPE__/__INT32_TYPE__/__UINT32_TYPE__/__UINTPTR_TYPE__.
+>> > >
+>> > > Both options are a little hacky and I don't really like them, but I think
+>> > > it makes sense to do one of them.
+>> >
+>> > Well, (a) is probably the right answer.  EABI had (or still has) the
+>> > idea that enums can be a dynamic size, and this was taken out of the
+>> > Linux version of EABI.  What this means is that an enum used across an
+>> > interface between a compiler targetting Linux and one not targetting
+>> > Linux may not be compatible.
+>>
+>> Hi!  Happy to hear some people still find buildall useful.
+>>
+>> The standard arm toolchains it builds are configured for arm-linux-eabi,
+>> not "plain" eabi.  So what goes wrong?
+>>
+>> Oh.  I changed that april this year; so just update your buildall.
+>>
+>> [But of course it would be good if the kernel build would work with *any*
+>> reasonable toolchain.  OTOH it seems that most arm toolchains aren't
+>> reasonable.]
+>>
+>
+> I've decided to investigate it further. It seems that your change to
+> 'arm-linux-eabi' did not have the intended effect. I got it to work with
+> this patch:
+>
+> diff --git a/build b/build
+> index 10416a8..b2d38ec 100755
+> --- a/build
+> +++ b/build
+> @@ -36,7 +36,7 @@ case $ARCH in
+>         *-eabi)         TARGET=$ARCH ;;
+>         *-elf)          TARGET=$ARCH ;;
+>
+> -       arm)            TARGET=arm-linux-eabi ;;
+> +       arm)            TARGET=arm-linux-gnueabi ;;
+>         avr32)          TARGET=avr-linux ;;
+>         blackfin)       TARGET=bfin-uclinux ;;
+>         h8300)          TARGET=h8300-elf ;;
+>
+>
+> What happens in gcc apparently is that the configuration logic gets confused
+> and uses this entry in gcc/config.gcc:
+>
+> arm*-*-eabi*)
+>         default_use_cxa_atexit=yes
+>         tm_file="dbxelf.h elfos.h arm/unknown-elf.h arm/elf.h arm/bpabi.h"
+>         tmake_file="${tmake_file} arm/t-arm arm/t-arm-elf"
+>         tm_file="$tm_file newlib-stdint.h"
+>         tmake_file="${tmake_file} arm/t-bpabi"
+>         use_gcc_stdint=wrap
+>         tm_file="${tm_file} arm/aout.h vxworks-dummy.h arm/arm.h"
+>         ;;
+>
+> instead of this one:
+>
+> arm*-*-linux-*)                 # ARM GNU/Linux with ELF
+>         tm_file="dbxelf.h elfos.h gnu-user.h linux.h linux-android.h glibc-stdint.h arm/elf.h arm/linux-gas.h arm/linux-elf.h"
+>         extra_options="${extra_options} linux-android.opt"
+>         tmake_file="${tmake_file} arm/t-arm arm/t-arm-elf arm/t-bpabi arm/t-linux-eabi"
+>         tm_file="$tm_file arm/bpabi.h arm/linux-eabi.h arm/aout.h vxworks-dummy.h arm/arm.h"
+>         # The EABI requires the use of __cxa_atexit.
+>         default_use_cxa_atexit=yes
+>         with_tls=${with_tls:-gnu}
+>         ;;
+>
+> so among other things, we are missing linux.h and glibc-stdint.h.
+>
+>         Arnd
