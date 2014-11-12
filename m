@@ -1,70 +1,62 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 12 Nov 2014 09:18:32 +0100
-Subject: [PATCH v2 4/6] phy: add support for USB cluster on the Armada
- 375 SoC
-In-Reply-To: <5461E169.1040404@ti.com>
-References: <1414164254-13053-1-git-send-email-gregory.clement@free-electrons.com>
- <1414164254-13053-5-git-send-email-gregory.clement@free-electrons.com>
- <545899CF.3080001@ti.com> <5461E169.1040404@ti.com>
-Message-ID: <546317D8.9010602@free-electrons.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 12 Nov 2014 17:19:14 +0900
+Subject: [PATCH/RFC] ARM: shmobile: koelsch: Fix SPI mode of SPI-Flash
+ into mode3
+In-Reply-To: <CAMuHMdVpnoZatm8kCi=DLUWx9dDm9F8HkEtO4LKjj9J1KiKU=w@mail.gmail.com>
+References: <1414648424-29688-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdVpnoZatm8kCi=DLUWx9dDm9F8HkEtO4LKjj9J1KiKU=w@mail.gmail.com>
+Message-ID: <20141112081914.GS9007@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-[...]
->>> index 000000000000..cbd2d4e720bb
->>> --- /dev/null
->>> +++ b/include/dt-bindings/phy/armada-375-usb-cluster.h
->>> @@ -0,0 +1,19 @@
->>> +/*
->>> + * Copyright (C) 2014 Marvell
->>> + *
->>> + * This program is free software; you can redistribute it and/or
->>> + * modify it under the terms of the GNU General Public License as
->>> + * published by the Free Software Foundation; either version 2 of the
->>> + * License, or (at your option) any later version.
->>> + */
->>> +
->>> +#ifndef __ARMADA_375_USB_CLUSTER__
->>> +#define __ARMADA_375_USB_CLUSTER__
->>> +
->>> +/* The supported mode passed through by the phandle are the following */
->>> +
->>> +#define PHY_NONE    0
->>> +#define PHY_USB2    1
->>> +#define PHY_USB3    2
->>
->> Let's not add a separate file for every platform for these generic modes.
+On Thu, Oct 30, 2014 at 10:11:59AM +0100, Geert Uytterhoeven wrote:
+> On Thu, Oct 30, 2014 at 6:53 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+> >
+> > In order to change into mode3, CPOL and CPHA bit of SPCMD register
+> > of MSIOF is changed. Mode3 can avoid intermediate voltage.
 > 
-> Can you use this patch [1] and resend your series?
+> This is the QSPI node, not MSIOF?
+
+Indeed.
+
+Nakamura-san's patch, which I up-ported, was against the QSPI node
+but the version I posted below is indeed against the MSIOF.
+
+Futhermore, I see that spi-cpol and spi-cpha are already present
+in the MSIOF node in mainline. I would like to withdraw this patch.
+
+> > Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> > Based on the renesas-devel-20141030-v3.18-rc2 branch of my renesas tree
+> >
+> >  arch/arm/boot/dts/r8a7791-koelsch.dts | 2 ++
+> >  1 file changed, 2 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+> > index 523ae4d..ced0738 100644
+> > --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
+> > +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+> > @@ -387,6 +387,8 @@
+> >                 spi-tx-bus-width = <4>;
+> >                 spi-rx-bus-width = <4>;
+> >                 m25p,fast-read;
+> > +               spi-cpol;
+> > +               spi-cpha;
+> >
+> >                 partition at 0 {
+> >                         label = "loader";
 > 
-
-Yes sure, a new series is coming soon.
-
-Thanks,
-
-Gregory
-
-
-> Thanks
-> Kishon
+> Gr{oetje,eeting}s,
 > 
-> [1] -> http://www.gossamer-threads.com/lists/linux/kernel/2044969
->>
->> Thanks
->> Kishon
->>> +
->>> +#endif /* __DT_BINDINGS_CLOCK_R8A7791_H__ */
->>>
+>                         Geert
+> 
 > --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 > 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> 
