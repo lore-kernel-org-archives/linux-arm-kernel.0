@@ -1,50 +1,56 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Wed, 12 Nov 2014 14:22:03 +0300
-Subject: [patch] coresight-etm: unlock on error paths in mode_store()
-Message-ID: <20141112112202.GA28836@mwanda>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 12 Nov 2014 16:55:29 +0530
+Subject: [PATCH v4 00/58] dmaengine: Implement generic slave
+ capabilities retrieval
+In-Reply-To: <20141106143349.GL2989@lukather>
+References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20141106143349.GL2989@lukather>
+Message-ID: <20141112112529.GK24582@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are some missing unlocks on the error paths.
+On Thu, Nov 06, 2014 at 03:33:49PM +0100, Maxime Ripard wrote:
+> Hi Vinod,
+> 
+> On Tue, Oct 28, 2014 at 10:25:15PM +0100, Maxime Ripard wrote:
+> > Hi,
+> > 
+> > As we discussed a couple of weeks ago, this is the third attempt at
+> > creating a generic behaviour for slave capabilities retrieval so that
+> > generic layers using dmaengine can actually rely on that.
+> > 
+> > That has been done mostly through two steps: by moving out the
+> > sub-commands of the device_control callback, so that the dmaengine
+> > core can then infer from that wether a sub-command is implemented, and
+> > then by moving the slave properties, such as the supported buswidth,
+> > to the structure dma_device itself.
+> > 
+> > Comments are as usual appreciated!
+> 
+> How can we move forward on this?
+> 
+> I didn't have any comments on this version, and gathered quite a lot
+> of Acked-by already.
+> 
+> Do you want me to rebase on top of your current next branch and send
+> you a pull request?
 
-Fixes: a939fc5a71ad ('coresight-etm: add CoreSight ETM/PTM driver')
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
----
-I don't have a cross compiler set up so I haven't compiled this.  But
-I think it doesn't have any typos.  :)
+Hi Maxime,
 
-diff --git a/drivers/coresight/coresight-etm3x.c b/drivers/coresight/coresight-etm3x.c
-index d9e3ed6..369cac0 100644
---- a/drivers/coresight/coresight-etm3x.c
-+++ b/drivers/coresight/coresight-etm3x.c
-@@ -573,7 +573,8 @@ static ssize_t mode_store(struct device *dev,
- 	if (drvdata->mode & ETM_MODE_STALL) {
- 		if (!(drvdata->etmccr & ETMCCR_FIFOFULL)) {
- 			dev_warn(drvdata->dev, "stall mode not supported\n");
--			return -EINVAL;
-+			ret = -EINVAL;
-+			goto err_unlock;
- 		}
- 		drvdata->ctrl |= ETMCR_STALL_MODE;
- 	 } else
-@@ -582,7 +583,8 @@ static ssize_t mode_store(struct device *dev,
- 	if (drvdata->mode & ETM_MODE_TIMESTAMP) {
- 		if (!(drvdata->etmccer & ETMCCER_TIMESTAMP)) {
- 			dev_warn(drvdata->dev, "timestamp not supported\n");
--			return -EINVAL;
-+			ret = -EINVAL;
-+			goto err_unlock;
- 		}
- 		drvdata->ctrl |= ETMCR_TIMESTAMP_EN;
- 	} else
-@@ -595,6 +597,10 @@ static ssize_t mode_store(struct device *dev,
- 	spin_unlock(&drvdata->spinlock);
- 
- 	return size;
-+
-+err_unlock:
-+	spin_unlock(&drvdata->spinlock);
-+	return ret;
- }
- static DEVICE_ATTR_RW(mode);
- 
+Thanks for the huge cleanup work
+
+I quickly looked thru the series and looks okay. I will do a detailed review
+in next couple of days and then host it on a topic branch so that Feng's
+robot can test it before merging it.
+
+Thanks
+
+-- 
+~Vinod
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141112/f5c4d3bf/attachment.sig>
