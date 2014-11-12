@@ -1,176 +1,24 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 12 Nov 2014 10:35:22 +0100
-Subject: [PATCH] mmc: sdhci-sirf: add sirf tuning function (cmd 19)
-In-Reply-To: <1415720864-3936-1-git-send-email-21cnbao@gmail.com>
-References: <1415720864-3936-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <CAPDyKFopdcLXVCuoifd7K8NaRY4UXDbDmNJvyFeUQZs62or9Ag@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 12 Nov 2014 15:09:52 +0530
+Subject: [PATCH] DMA: Fix allocation size for PL330 data buffer depth.
+In-Reply-To: <1415294412-13818-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1415294412-13818-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20141112093952.GD24582@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 November 2014 16:47, Barry Song <21cnbao@gmail.com> wrote:
-> From: Minda Chen <Minda.Chen@csr.com>
->
-> Add manual tuning function in CSR atlas7 SoC. It is mainly used
-> for the UHS-I SD card working SDR50 SDR104 mode.
->
-> The tuning principle can be seen in SD spec part1 v3.01 4.2.4.5
-> (tuning command).
->
-> SD host send the cmd19 and set the delay value(0-127).
-> and the sdcard return 64 bytes data. If the data is same with
-> the tuning data. The delay value is valid. Execute this commmand
-> 128 times. And calculate the longest window of the valid values.
-> The value in the middle of this window is the best value.
->
-> Signed-off-by: Minda Chen <Minda.Chen@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
->  drivers/mmc/host/sdhci-sirf.c | 105 +++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 104 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
-> index dd29d47..c71cf4e 100644
-> --- a/drivers/mmc/host/sdhci-sirf.c
-> +++ b/drivers/mmc/host/sdhci-sirf.c
-> @@ -8,14 +8,18 @@
->
->  #include <linux/delay.h>
->  #include <linux/device.h>
-> -#include <linux/mmc/host.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/of_gpio.h>
-> +#include <linux/slab.h>
-> +#include <linux/mmc/host.h>
-> +#include <linux/mmc/mmc.h>
->  #include <linux/mmc/slot-gpio.h>
->  #include "sdhci-pltfm.h"
->
-> +#define SDHCI_CLK_DELAY_SETTING 0x4C
->  #define SDHCI_SIRF_8BITBUS BIT(3)
-> +#define SIRF_TUNING_COUNT 128
->
->  struct sdhci_sirf_priv {
->         struct clk *clk;
-> @@ -49,7 +53,106 @@ static void sdhci_sirf_set_bus_width(struct sdhci_host *host, int width)
->         sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
->  }
->
-> +static int sdhci_sirf_execute_tuning(struct sdhci_host *host, u32 opcode)
-> +{
-> +       int tuning_seq_cnt = 3;
-> +       u8 phase, *data_buf, tuned_phases[SIRF_TUNING_COUNT];
-> +       u8 tuned_phase_cnt = 0;
-> +       const u8 *tuning_block_pattern = tuning_blk_pattern_4bit;
-> +       int size = sizeof(tuning_blk_pattern_4bit);
-> +       int rc, longest_range = 0;
-> +       int start = -1, end, tuning_value = -1, range = 0;
-> +       u16 clock_setting;
-> +       struct mmc_host *mmc = host->mmc;
-> +
-> +       data_buf = kmalloc(size, GFP_KERNEL);
-> +       if (!data_buf)
-> +               return -ENOMEM;
-> +
-> +       clock_setting = sdhci_readw(host, SDHCI_CLK_DELAY_SETTING);
-> +       clock_setting &= ~0x3fff;
-> +
-> +retry:
-> +       phase = 0;
-> +       do {
-> +               struct mmc_command cmd = { 0 };
-> +               struct mmc_data data = { 0 };
-> +               struct mmc_request mrq = {
-> +                       .cmd = &cmd,
-> +                       .data = &data
-> +               };
-> +               struct scatterlist sg;
-> +
-> +               sdhci_writel(host,
-> +                       clock_setting | phase | (phase << 7) | (phase << 16),
-> +                       SDHCI_CLK_DELAY_SETTING);
-> +
-> +               cmd.opcode = opcode;
-> +               cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
-> +
-> +               data.blksz = size;
-> +               data.blocks = 1;
-> +               data.flags = MMC_DATA_READ;
-> +               data.timeout_ns = NSEC_PER_SEC; /* 1 second */
-> +
-> +               data.sg = &sg;
-> +               data.sg_len = 1;
-> +               sg_init_one(&sg, data_buf, size);
-> +               memset(data_buf, 0, size);
-> +               mmc_wait_for_req(mmc, &mrq);
+On Thu, Nov 06, 2014 at 05:20:12PM +0000, Liviu Dudau wrote:
+> The datasheet for PL330 says that the data buffer value in the CRD
+> register is 10bits wide. However, the value stored is "minus one",
+> which the driver corrects for. Maximum value that the data buffer
+> depth can have is 1024 lines, which requires 11 bits for storage.
+> 
+> While making updates I found printing the peripheral ID as a hex
+> value to be more useful as the datasheet shows the values that way.
 
-These piece of code, which sends the tuning command don't belong in
-the host driver. Instead I would like this to be handled from a helper
-function from the mmc core.
+Applied, thanks
 
-I realize that there already a few existing host drivers that
-implemented similar code and I don't like it. We should convert them
-to use a common helper function from the core instead.
+Please snure you use the right subsytem name
 
-> +
-> +               if (!cmd.error && !data.error &&
-> +                   !memcmp(data_buf, tuning_block_pattern, size)) {
-> +                       /* Tuning is successful at this tuning point */
-> +                       tuned_phases[tuned_phase_cnt++] = phase;
-> +                       dev_dbg(mmc_dev(mmc), "%s: Found good phase = %d\n",
-> +                                mmc_hostname(mmc), phase);
-> +                       if (start == -1)
-> +                               start = phase;
-> +                       end = phase;
-> +                       range++;
-> +                       if (phase == (SIRF_TUNING_COUNT - 1)
-> +                               && range > longest_range)
-> +                               tuning_value = (start + end) / 2;
-> +               } else {
-> +                       dev_dbg(mmc_dev(mmc), "%s: Found bad phase = %d\n",
-> +                                mmc_hostname(mmc), phase);
-> +                       if (range > longest_range) {
-> +                               tuning_value = (start + end) / 2;
-> +                               longest_range = range;
-> +                       }
-> +                       start = -1;
-> +                       end = range = 0;
-> +               }
-> +       } while (++phase < ARRAY_SIZE(tuned_phases));
-> +
-> +       if (tuned_phase_cnt && tuning_value > 0) {
-> +               /*
-> +                * Finally set the selected phase in delay
-> +                * line hw block.
-> +                */
-> +               phase = tuning_value;
-> +               sdhci_writel(host,
-> +                       clock_setting | phase | (phase << 7) | (phase << 16),
-> +                       SDHCI_CLK_DELAY_SETTING);
-> +
-> +               dev_dbg(mmc_dev(mmc), "%s: Setting the tuning phase to %d\n",
-> +                        mmc_hostname(mmc), phase);
-> +       } else {
-> +               if (--tuning_seq_cnt)
-> +                       goto retry;
-> +               /* Tuning failed */
-> +               dev_dbg(mmc_dev(mmc), "%s: No tuning point found\n",
-> +                      mmc_hostname(mmc));
-> +               rc = -EIO;
-> +       }
-> +
-> +       kfree(data_buf);
-> +       return rc;
-> +}
-> +
->  static struct sdhci_ops sdhci_sirf_ops = {
-> +       .platform_execute_tuning = sdhci_sirf_execute_tuning,
->         .set_clock = sdhci_set_clock,
->         .get_max_clock  = sdhci_sirf_get_max_clk,
->         .set_bus_width = sdhci_sirf_set_bus_width,
-> --
-> 2.1.1
->
-
-Kind regards
-Uffe
+-- 
+~Vinod
