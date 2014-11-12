@@ -1,66 +1,77 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 12 Nov 2014 14:22:54 +0800
-Subject: [PATCH v2 3/3] irqchip: dw-apb-ictl: add PM support
-In-Reply-To: <1415773374-4629-1-git-send-email-jszhang@marvell.com>
-References: <1415773374-4629-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1415773374-4629-4-git-send-email-jszhang@marvell.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 11 Nov 2014 22:29:45 -0800
+Subject: [GIT PULL] Broadcom Cygnus SoC defconfig changes
+In-Reply-To: <20141109001302.GB11947@quad.lixom.net>
+References: <1414698612-26216-1-git-send-email-f.fainelli@gmail.com>
+ <20141109001302.GB11947@quad.lixom.net>
+Message-ID: <CAGVrzcbQG7qZNOoocgpbV=pf3Jv9mwAfsb=Eq2tiFfMa_pAPZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds in support for S2R for dw-apb-ictl irqchip driver.
+2014-11-08 16:13 GMT-08:00 Olof Johansson <olof@lixom.net>:
+> On Thu, Oct 30, 2014 at 12:50:09PM -0700, Florian Fainelli wrote:
+>> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+>>
+>>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   http://github.com/brcm/linux.git tags/arm-soc/for-3.18/cygnus-defconfig-v9
+>>
+>> for you to fetch changes up to aa0204801143ee2d47e9e8dd5f39cdddd5613b4b:
+>>
+>>   ARM: multi_v7_defconfig: Enable Broadcom Cygnus (2014-10-30 11:01:35 -0700)
+>
+> Hi Florian,
+>
+> Apologies for the delay in dealing with this pull request.
+>
+>> ----------------------------------------------------------------
+>> This patchset contains initial support for Broadcom's Cygnus SoC based on our
+>> iProc architecture. Initial support is minimal and includes just the mach
+>> platform code, clock driver, and a basic device tree configuration. Peripheral
+>> drivers will be submitted soon, as will device tree configurations for other
+>> Cygnus board variants.
+>>
+>> These are the defconfig parts of the changes
+>>
+>> ----------------------------------------------------------------
+>> Jonathan Richardson (1):
+>>       ARM: cygnus defconfig : Initial defconfig for Broadcom Cygnus SoC
+>>
+>> Ray Jui (1):
+>>       ARM: multi_v7_defconfig: Enable Broadcom Cygnus
+>>
+>> Scott Branden (1):
+>>       ARM: bcm_defconfig/multi_v7_defconfig: remove one level of menu from Kconfig
+>>
+>>  arch/arm/configs/bcm_cygnus_defconfig | 237 ++++++++++++++++++++++++++++++++++
+>>  arch/arm/configs/bcm_defconfig        |   3 +-
+>>  arch/arm/configs/multi_v7_defconfig   |  21 ++-
+>
+> Please send multi_v7_defconfig updates as a patch instead of including in
+> a merge request. We ask for this because it's a file that many maintainers
+> touch and it's easy that we get lots of conflicts otherwise.
+>
+> As far as the bcm_cygnus_defconfig: Since new platforms are multiplatform
+> enabled by default, we normally only prefer to have one defconfig per vendor.
+> We've made exceptions in cases where the families are very different, but in
+> general one defconfig per vendor should be sufficient.
+>
+> I.e. please enable the cygnus options in bcm_defconfig instead of adding a new
+> one.
 
-We can used relaxed variants in the resume hook because there's no DMA
-at all here, the device type memory attribute can ensure the operations
-order and relaxed version imply compiler barrier.
+Alright, so just to make sure I get this right:
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- drivers/irqchip/irq-dw-apb-ictl.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+- there are two patches from Scott and Ray which enable Cygnus in
+mutli_v7_defconfig that I should send a separate patches
+- adding Cygnus to bcm_defconfig can be part of a separate pull request
 
-diff --git a/drivers/irqchip/irq-dw-apb-ictl.c b/drivers/irqchip/irq-dw-apb-ictl.c
-index c136b67..53bb732 100644
---- a/drivers/irqchip/irq-dw-apb-ictl.c
-+++ b/drivers/irqchip/irq-dw-apb-ictl.c
-@@ -50,6 +50,21 @@ static void dw_apb_ictl_handler(unsigned int irq, struct irq_desc *desc)
- 	chained_irq_exit(chip, desc);
- }
- 
-+#ifdef CONFIG_PM
-+static void dw_apb_ictl_resume(struct irq_data *d)
-+{
-+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-+	struct irq_chip_type *ct = irq_data_get_chip_type(d);
-+
-+	irq_gc_lock(gc);
-+	writel_relaxed(~0, gc->reg_base + ct->regs.enable);
-+	writel_relaxed(*ct->mask_cache, gc->reg_base + ct->regs.mask);
-+	irq_gc_unlock(gc);
-+}
-+#else
-+#define dw_apb_ictl_resume	NULL
-+#endif /* CONFIG_PM */
-+
- static int __init dw_apb_ictl_init(struct device_node *np,
- 				   struct device_node *parent)
- {
-@@ -127,13 +142,17 @@ static int __init dw_apb_ictl_init(struct device_node *np,
- 	gc->reg_base = iobase;
- 
- 	gc->chip_types[0].regs.mask = APB_INT_MASK_L;
-+	gc->chip_types[0].regs.enable = APB_INT_ENABLE_L;
- 	gc->chip_types[0].chip.irq_mask = irq_gc_mask_set_bit;
- 	gc->chip_types[0].chip.irq_unmask = irq_gc_mask_clr_bit;
-+	gc->chip_types[0].chip.irq_resume = dw_apb_ictl_resume;
- 
- 	if (nrirqs > 32) {
- 		gc->chip_types[1].regs.mask = APB_INT_MASK_H;
-+		gc->chip_types[1].regs.enable = APB_INT_ENABLE_H;
- 		gc->chip_types[1].chip.irq_mask = irq_gc_mask_set_bit;
- 		gc->chip_types[1].chip.irq_unmask = irq_gc_mask_clr_bit;
-+		gc->chip_types[1].chip.irq_resume = dw_apb_ictl_resume;
- 	}
- 
- 	irq_set_handler_data(irq, gc);
+>
+>
+> -Olof
+
+
+
 -- 
-2.1.3
+Florian
