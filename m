@@ -1,42 +1,103 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 12 Nov 2014 13:04:26 -0800
-Subject: [GIT PULL 3.19] Broadcom Cygnus SoC platform support
-In-Reply-To: <1415826266-6867-1-git-send-email-f.fainelli@gmail.com>
-References: <1415826266-6867-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1415826266-6867-4-git-send-email-f.fainelli@gmail.com>
+Date: Wed, 12 Nov 2014 13:03:17 -0800
+Subject: [PATCH 3.19 2/2] ARM: multi_v7_defconfig: Enable Broadcom Cygnus
+In-Reply-To: <1415826197-6748-1-git-send-email-f.fainelli@gmail.com>
+References: <1415826197-6748-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1415826197-6748-3-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+From: Ray Jui <rjui@broadcom.com>
 
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+Enable Broadcom Cygnus platform support in multi_v7_defconfig
 
-are available in the git repository at:
+Signed-off-by: Ray Jui <rjui@broadcom.com>
+Signed-off-by: Scott Branden <sbranden@broadcom.com>
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-  http://github.com/brcm/linux.git tags/arm-soc/for-3.19/cygnus-platform-v2
-
-for you to fetch changes up to 64e74aa788f996cd0e328a1c4223e9d438b78e9c:
-
-  ARM: mach-bcm: ARCH_BCM_MOBILE: remove one level of menu from Kconfig (2014-11-11 22:35:45 -0800)
-
-----------------------------------------------------------------
-This pull request contains the platform code to support the Broadcom Cygnus SoC
-using the iProc architecture:
-
-- add support for the Broadcom Cygnus SoC
-- consolidate the BCM5301X Kconfig options under the iProc menuconfig entry
-- remove one level of menu in menuconfig
-
-----------------------------------------------------------------
-Jonathan Richardson (1):
-      ARM: cygnus: Initial support for Broadcom Cygnus SoC
-
-Scott Branden (2):
-      ARM: mach-bcm: Consolidate currently supported IPROC SoCs
-      ARM: mach-bcm: ARCH_BCM_MOBILE: remove one level of menu from Kconfig
-
- arch/arm/mach-bcm/Kconfig      | 93 ++++++++++++++++++++++++++----------------
- arch/arm/mach-bcm/Makefile     |  3 ++
- arch/arm/mach-bcm/bcm_cygnus.c | 25 ++++++++++++
- 3 files changed, 85 insertions(+), 36 deletions(-)
- create mode 100644 arch/arm/mach-bcm/bcm_cygnus.c
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index e8f79fdd4cc3..f3ef3f539f2c 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -17,6 +17,7 @@ CONFIG_MACH_ARMADA_38X=y
+ CONFIG_MACH_ARMADA_XP=y
+ CONFIG_MACH_DOVE=y
+ CONFIG_ARCH_BCM=y
++CONFIG_ARCH_BCM_CYGNUS=y
+ CONFIG_ARCH_BCM_21664=y
+ CONFIG_ARCH_BCM_281XX=y
+ CONFIG_ARCH_BCM_5301X=y
+@@ -125,8 +126,12 @@ CONFIG_DMA_CMA=y
+ CONFIG_CMA_SIZE_MBYTES=64
+ CONFIG_OMAP_OCP2SCP=y
+ CONFIG_MTD=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_M25P80=y
++CONFIG_MTD_NAND=y
+ CONFIG_MTD_SPI_NOR=y
++CONFIG_MTD_UBI=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_AD525X_DPOT=y
+ CONFIG_AD525X_DPOT_I2C=y
+@@ -161,6 +166,7 @@ CONFIG_TI_CPSW=y
+ CONFIG_XILINX_EMACLITE=y
+ CONFIG_AT803X_PHY=y
+ CONFIG_MARVELL_PHY=y
++CONFIG_BROADCOM_PHY=y
+ CONFIG_ICPLUS_PHY=y
+ CONFIG_USB_PEGASUS=y
+ CONFIG_USB_USBNET=y
+@@ -234,6 +240,7 @@ CONFIG_SPI_TEGRA114=y
+ CONFIG_SPI_TEGRA20_SFLASH=y
+ CONFIG_SPI_TEGRA20_SLINK=y
+ CONFIG_SPI_XILINX=y
++CONFIG_SPI_SPIDEV=y
+ CONFIG_PINCTRL_AS3722=y
+ CONFIG_PINCTRL_PALMAS=y
+ CONFIG_GPIO_SYSFS=y
+@@ -260,6 +267,7 @@ CONFIG_ST_THERMAL_SYSCFG=y
+ CONFIG_ST_THERMAL_MEMMAP=y
+ CONFIG_WATCHDOG=y
+ CONFIG_XILINX_WATCHDOG=y
++CONFIG_ARM_SP805_WATCHDOG=y
+ CONFIG_ORION_WATCHDOG=y
+ CONFIG_SUNXI_WATCHDOG=y
+ CONFIG_MFD_AS3722=y
+@@ -306,6 +314,8 @@ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
+ CONFIG_SOUND=y
+ CONFIG_SND=y
++CONFIG_SND_DYNAMIC_MINORS=y
++CONFIG_SND_USB_AUDIO=y
+ CONFIG_SND_SOC=y
+ CONFIG_SND_SOC_TEGRA=y
+ CONFIG_SND_SOC_TEGRA_RT5640=y
+@@ -427,7 +437,12 @@ CONFIG_TI_PIPE3=y
+ CONFIG_PHY_MIPHY365X=y
+ CONFIG_PHY_SUN4I_USB=y
+ CONFIG_EXT4_FS=y
++CONFIG_AUTOFS4_FS=y
++CONFIG_MSDOS_FS=y
+ CONFIG_VFAT_FS=y
++CONFIG_NTFS_FS=y
++CONFIG_TMPFS_POSIX_ACL=y
++CONFIG_UBIFS_FS=y
+ CONFIG_TMPFS=y
+ CONFIG_SQUASHFS=y
+ CONFIG_SQUASHFS_LZO=y
+@@ -436,6 +451,9 @@ CONFIG_NFS_FS=y
+ CONFIG_NFS_V3_ACL=y
+ CONFIG_NFS_V4=y
+ CONFIG_ROOT_NFS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_NLS_UTF8=y
+ CONFIG_PRINTK_TIME=y
+ CONFIG_DEBUG_FS=y
+ CONFIG_MAGIC_SYSRQ=y
+-- 
+1.9.1
