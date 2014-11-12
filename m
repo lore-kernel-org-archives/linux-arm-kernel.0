@@ -1,77 +1,93 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Wed, 12 Nov 2014 11:23:43 -0800
-Subject: [RFC 1/2] mfd: qcom-rpm: Expose sleep state resources to clients
-In-Reply-To: <20141112144508.GD45276@linaro.org>
-References: <1415659966-16200-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1415659966-16200-2-git-send-email-bjorn.andersson@sonymobile.com>
- <20141111120457.GZ24004@x1> <20141111183319.GD16980@sonymobile.com>
- <20141112095200.GD24004@x1> <20141112144508.GD45276@linaro.org>
-Message-ID: <20141112192342.GA19703@sonymobile.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 12 Nov 2014 13:32:06 -0600
+Subject: [PATCHv6 4/5] hwspinlock/core: add common OF helpers
+In-Reply-To: <CAK=WgbamdqAufjC4Xb5moERRBSB-cO6c1RPTE=f+dp75F+Eh7A@mail.gmail.com>
+References: <1410553499-55951-1-git-send-email-s-anna@ti.com>
+ <1410553499-55951-5-git-send-email-s-anna@ti.com>
+ <CAK=WgbamdqAufjC4Xb5moERRBSB-cO6c1RPTE=f+dp75F+Eh7A@mail.gmail.com>
+Message-ID: <5463B5B6.8040709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 12 Nov 06:45 PST 2014, Lina Iyer wrote:
+Hi Ohad,
 
-> On Wed, Nov 12 2014 at 02:52 -0700, Lee Jones wrote:
-> >On Tue, 11 Nov 2014, Bjorn Andersson wrote:
-> >
-> >> On Tue 11 Nov 04:04 PST 2014, Lee Jones wrote:
-> >>
-> >> > On Mon, 10 Nov 2014, Bjorn Andersson wrote:
-> >> >
+Thanks for the review.
+
+On 11/12/2014 01:08 PM, Ohad Ben-Cohen wrote:
+> Hi Suman,
 > 
-> > > > +	writel_relaxed(BIT(state), RPM_CTRL_REG(rpm, RPM_REQUEST_CONTEXT));
-> >> >
-> >> > How are the state bits organised?
-> >> >
-> >>
-> >> BIT(0) is active mode, BIT(1) is sleep mode, as specified below. I could add
-> >> some sanity checking here if you would like to.
-> >
-> >I'm just double checking that you know what that means.
-> >
-> >BIT(0) == b01
-> >BIT(1) == b10
-> >
-> >It seems strange to represent a single boolean state over 2 bits.
-> >
-> >Also, what happens if b11 or b00 occurs?
-> >
-> Lee is correct, it should be 0 for Active and 1 for Sleep set. 
+> On Fri, Sep 12, 2014 at 11:24 PM, Suman Anna <s-anna@ti.com> wrote:
+>> +int of_hwspin_lock_get_id(struct device_node *np, int index)
+>> +{
+>> +       struct hwspinlock_device *bank;
+>> +       struct of_phandle_args args;
+>> +       int id;
+>> +       int ret;
+>> +
+>> +       ret = of_parse_phandle_with_args(np, "hwlocks", "#hwlock-cells", index,
+>> +                                        &args);
+>> +       if (ret)
+>> +               return ret;
+>> +
+>> +       mutex_lock(&hwspinlock_tree_lock);
+>> +       list_for_each_entry(bank, &hwspinlock_devices, list)
+>> +               if (bank->dev->of_node == args.np)
+>> +                       break;
+>> +       mutex_unlock(&hwspinlock_tree_lock);
+>> +       if (&bank->list == &hwspinlock_devices) {
+>> +               ret = -EPROBE_DEFER;
+>> +               goto out;
+>> +       }
 > 
+> Is this the validation you mentioned which requires the existence of
+> "hwspinlock/core: maintain a list of registered hwspinlock banks" ?
 
-In the caf msm-3.4 tree the regulator core will call e.g. vreg_set_voltage()
-that will call vreg_set(), that will call msm_rpm_set(MSM_RPM_CTX_SET_0,...).
-That comes from the following:
+Well, not exactly. The validation is on the following segment,
 
-enum {
-	MSM_RPM_CTX_SET_0,
-	MSM_RPM_CTX_SET_SLEEP,
-	MSM_RPM_CTX_SET_COUNT,
++	id = of_hwspin_lock_simple_xlate(bank, &args);
++	if (id < 0 || id >= bank->num_locks) {
++		ret = -EINVAL;
++		goto out;
++	}
 
-	MSM_RPM_CTX_NOTIFICATION = 30,
-	MSM_RPM_CTX_REJECTED = 31,
-};
+That said, it is also needed to provide the support for deferred probing
+without changing the return code conventions on the existing API.
 
-So there's your 0 and 1.
+> 
+> I'm not convinced this is needed for several reasons:
+> - the user isn't using the lock yet at this point, and may only need
+> the id in order to communicate it to a remote processor
 
-msm_rpm_set() calls msm_rpm_set_common() that calls msm_rpm_set_exclusive()
-that contains these two statements:
+Yes, and wouldn't that require that the id is validated? It just cannot
+return any return value, and expect it will be verified somewhere else
+or in a following API call. Not doing the validation unnecessarily
+complicates the system usage of a lock as you are sharing an invalid
+lock to a remote processor and then you have two validation failure
+paths on different processors.
 
-        uint32_t ctx_mask = msm_rpm_get_ctx_mask(ctx);
-	...
-	msm_rpm_write(MSM_RPM_PAGE_CTRL, target_ctrl(MSM_RPM_CTRL_REQ_CTX_0), ctx_mask);
+> - if the user will try to use the lock prematurely,
+> hwspin_lock_request_specific should stop her
+> - moreover, hwspin_lock_request_specific must be the one who validates
+> the id, since in heterogeneous systems the user may get the id from a
+> remote processor and not via of_hwspin_lock_get_id
+> 
+>  "hwspinlock/core: maintain a list of registered hwspinlock banks"
+> adds complexity which must be very strongly justified.
+> 
+> If we're not sure there is a strong justification for it, we better
+> not merge it.
+> 
+>> +EXPORT_SYMBOL_GPL(of_hwspin_lock_get_base_id);
+> ...
+>> +EXPORT_SYMBOL_GPL(of_hwspin_lock_get_num_locks);
+> 
+> Do we really must expose these two helpers globally?
+> 
+> Can we instead make these "static inline" methods and embed them in
+> hwspinlock_internal.h ?
 
-And we have:
+Actually, not a bad idea, I will move it, thanks. All the client drivers
+would need it, and they already have to include the internal header.
 
-static inline uint32_t msm_rpm_get_ctx_mask(unsigned int ctx)
-{
-	return 1UL << ctx;
-}
-
-So, as far as I can see it should be BIT(state) here. But there's a lot of code
-and a lot of indirections here and I've been tricked by it before, so please
-let me know if I got something wrong on the way.
-
-Regards,
-Bjorn
+regards
+Suman
