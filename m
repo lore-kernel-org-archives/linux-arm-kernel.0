@@ -1,69 +1,54 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 12 Nov 2014 19:46:01 +0900
-Subject: [RFC] ptrace: add generic SET_SYSCALL request
-In-Reply-To: <20141107140405.GA30156@redhat.com>
-References: <1415346443-28915-1-git-send-email-takahiro.akashi@linaro.org>
- <20141107140405.GA30156@redhat.com>
-Message-ID: <54633A69.6090202@linaro.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 12 Nov 2014 11:46:57 +0100
+Subject: [PATCH] ARM: dts: tegra: move serial aliases to per-board
+In-Reply-To: <54627C1F.9050200@wwwdotorg.org>
+References: <1415738970-7963-1-git-send-email-olof@lixom.net>
+ <54627C1F.9050200@wwwdotorg.org>
+Message-ID: <1415789217.2876.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
+Am Dienstag, den 11.11.2014, 14:14 -0700 schrieb Stephen Warren:
+> On 11/11/2014 01:49 PM, Olof Johansson wrote:
+> > There are general changes pending to make the /aliases/serial* entries
+> > number the serial ports on the system. On tegra, so far the ports have been
+> > just numbered dynamically as they are configured so that makes them change.
+> >
+> > To avoid this, add specific aliases per board to keep the old numbers. This
+> > allows us to change the numbering by default on future SoCs while keeping the
+> > numbering on existing boards.
+> 
+> This change seems mostly OK to me. FWIW though, I had suggested this 
+> approach when the UART aliases were first added, and Laxman disagreed 
+> with it. See commit b6551bb933f9 "ARM: tegra: dts: add aliases and DMA 
+> requestor for serial controller", and its discussion: 
+> https://lkml.org/lkml/2012/12/25/4. I've CC'd Laxman in case he still 
+> objects.
+> 
+> > Signed-off-by: Olof Johansson <olof@lixom.net>
+> > ---
+> >
+> > Stephen/Thierry/Alex, as noticed this week we really should try to get
+> > this in before the 3.19 merge window so that the global aliases change
+> > can happen there without regression.
+> 
+> How did we resolve the issue that patch causes with old DTs; namely that 
+> it causes a change in behaviour for those old DTs? On IRC, I'd wondered 
+> whether we should set a flag so the kernel ignored aliases for boards 
+> containing currently upstreamed Tegra SoCs so that issue wouldn't occur. 
+> If we did that, we wouldn't need this patch.
+> 
+I don't think this is a workable solution. With bootloaders that
+understand the aliases (like Barebox) this will lead to an incoherent
+behavior between kernel and bootloader.
 
-On 11/07/2014 11:04 PM, Oleg Nesterov wrote:
-> On 11/07, AKASHI Takahiro wrote:
->>
->> --- a/arch/arm/kernel/ptrace.c
->> +++ b/arch/arm/kernel/ptrace.c
->> @@ -853,11 +853,6 @@ long arch_ptrace(struct task_struct *child, long request,
->>   				       datap);
->>   			break;
->>
->> -		case PTRACE_SET_SYSCALL:
->> -			task_thread_info(child)->syscall = data;
->> -			ret = 0;
->> -			break;
->> -
->>   #ifdef CONFIG_CRUNCH
->>   		case PTRACE_GETCRUNCHREGS:
->>   			ret = ptrace_getcrunchregs(child, datap);
->> diff --git a/kernel/ptrace.c b/kernel/ptrace.c
->> index 54e7522..d7048fa 100644
->> --- a/kernel/ptrace.c
->> +++ b/kernel/ptrace.c
->> @@ -1001,6 +1001,12 @@ int ptrace_request(struct task_struct *child, long request,
->>   		break;
->>   	}
->>   #endif
->> +
->> +#ifdef PTRACE_SET_SYSCALL
->> +	case PTRACE_SET_SYSCALL:
->> +		ret = syscall_set_nr(child, task_pt_regs(child), data);
->> +		break;
->> +#endif
->
-> I too do not understand why it makes sense to move PTRACE_SET_SYSCALL into
-> the common kernel/ptrace.c.
+Either we don't have any aliases at all, or we respect them in both
+kernel and firmware in the same way. I think this change is the only
+sane solution to not change behavior on old bootloaders, while providing
+a fixed numbering for the serial ports.
 
-I think I explained why we need a new (atomic) interface of changing a system
-call number while tracing with ptrace. But I don't have a strong preference,
-either ptrace(SET_SYSCALL) or ptrace(SETREGSET, NT_SYSTEM_CALL).
-
-> To me the fact that PTRACE_SET_SYSCALL can be undefined and syscall_set_nr()
-> is very much arch-dependant (but most probably trivial) means that this  code
-> should live in arch_ptrace().
-
-Thinking of Oleg's comment above, it doesn't make sense neither to define generic
-NT_SYSTEM_CALL (user_regset) in uapi/linux/elf.h and implement it in ptrace_regset()
-in kernel/ptrace.c with arch-defined syscall_(g)set_nr().
-
-Since we should have the same interface on arm and arm64, we'd better implement
-ptrace(PTRACE_SET_SYSCALL) locally on arm64 for now (as I originally submitted).
-
--Takahiro AKASHI
-
-> In any case, I think it doesn't make sense to pass task_pt_regs(child), this
-> helper can do this itself if it needs struct pt_regs.
->
-> Oleg.
->
+Regards,
+Lucas
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
