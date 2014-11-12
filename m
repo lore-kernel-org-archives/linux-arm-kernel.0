@@ -1,125 +1,49 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Wed, 12 Nov 2014 10:14:25 -0800
-Subject: [PATCH] tty: serial: msm_serial: Use DT aliases
-In-Reply-To: <54618077.9000108@gmail.com>
-References: <1414024381-12204-1-git-send-email-sboyd@codeaurora.org>
- <CAMAWPa_f1K1qUG_UTmM0w8Sz8wed7+CQkK9tc8t1W=CTJvdjyw@mail.gmail.com>
- <5461150B.2010907@codeaurora.org> <54616CB3.5000405@gmail.com>
- <54616F74.5010408@codeaurora.org> <54618077.9000108@gmail.com>
-Message-ID: <5463A381.9060305@gmail.com>
+From: joel.schopp@amd.com (Joel Schopp)
+Date: Wed, 12 Nov 2014 12:14:40 -0600
+Subject: [PATCH] arm64: efi: Fix stub cache maintenance
+In-Reply-To: <1415810351-3462-1-git-send-email-mark.rutland@arm.com>
+References: <1415810351-3462-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <5463A390.9090701@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2014 7:20 PM, Frank Rowand wrote:
-> On 11/10/2014 6:07 PM, Stephen Boyd wrote:
->> On 11/10/2014 05:56 PM, Frank Rowand wrote:
->>> On 11/10/2014 11:42 AM, Stephen Boyd wrote:
->>>> diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
->>>> index 09364dd8cf3a..d1bc6b6cbc70 100644
->>>> --- a/drivers/tty/serial/msm_serial.c
->>>> +++ b/drivers/tty/serial/msm_serial.c
->>>> @@ -1046,14 +1046,14 @@ static int msm_serial_probe(struct platform_device *pdev)
->>>>  	const struct of_device_id *id;
->>>>  	int irq, line;
->>>>  
->>>> -	if (pdev->id == -1)
->>>> -		pdev->id = atomic_inc_return(&msm_uart_next_id) - 1;
->>>> -
->>>>  	if (pdev->dev.of_node)
->>>>  		line = of_alias_get_id(pdev->dev.of_node, "serial");
->>>>  	else
->>>>  		line = pdev->id;
->>>>  
->>>> +	if (line < 0)
->>>> +		line = atomic_inc_return(&msm_uart_next_id) - 1;
->>>> +
->>>>  	if (unlikely(line < 0 || line >= UART_NR))
->>> Then this original check for "line < 0" can also be removed.
->>>
->>>
->>
->> Well this matches what was there before. It would do atomic_inc_return
->> if the line was negative and then still check for a negative value. I
->> don't mind removing it though. Perhaps we should use an ida?:
->>
-> 
-> OK, you are right.  If (pdev->id < -1) and (!pdev->dev.of_node) then
-> the check is still needed.
-> 
-> You could use an ida.  Some drivers use a bit map.  I really don't think
-> this should become a complicated algorithm though.  If the rule is that
-> either all UARTS have an alias, or no UART has an alias, then I think
-> the patch could be something like the following.
-> 
-> This combines your original patch, plus your fix patch, plus making
-> the aliases all or nothing.  Not tested, not even compiled.
-> 
-> What do you think?
 
-< snip - previous version of patch >
+On 11/12/2014 10:39 AM, Mark Rutland wrote:
+> While efi-entry.S mentions that efi_entry() will have relocated the
+> kernel image, it actually means that efi_entry will have placed a copy
+> of the kernel in the appropriate location, and until this is branched to
+> at the end of efi_entry.S, all instructions are executed from the
+> original image.
+>
+> Thus while the flush in efi_entry.S does ensure that the copy is visible
+> to noncacheable accesses, it does not guarantee that this is true for
+> the image instructions are being executed from. This could have
+> disasterous effects when the MMU and caches are disabled if the image
+> has not been naturally evicted to the PoC.
+>
+> Additionally, due to a missing dsb following the ic ialluis, the new
+> kernel image is not necessarily clean in the I-cache when it is branched
+> to, with similar potentially disasterous effects.
+>
+> This patch adds additional flushing to ensure that the currently
+> executing stub text is flushed to the PoC and is thus visible to
+> noncacheable accesses. As it is placed after the instructions cache
+> maintenance for the new image and __flush_dcache_area already contains a
+> dsb, we do not need to add a separate barrier to ensure completion of
+> the icache maintenance.
+>
+> Comments are updated to clarify the situation with regard to the two
+> images and the maintenance required for both.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Ian Campbell <ijc@hellion.org.uk>
+> Cc: Joel Schopp <joel.schopp@amd.com>
+> Cc: Leif Lindholm <leif.lindholm@linaro.org>
+> Cc: Mark Salter <msalter@redhat.com>
+> Cc: Roy Franz <roy.franz@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+Looks more elegant than mine and seems to work.
 
-Previous version of the patch did not protect against no alias, followed
-by alias.
-
-
-
-From: Frank Rowand <frank.rowand@sonymobile.com>
-
-This patch is intended to show roughly what an implementation of an all or
-nothing policy for using serialN aliases would look like.  It is intended
-simply to help determine whether this policy should be used.
-
-Combines Stephen's first patch, Stephen's fix patch (to make the serialN
-alias optional), plus makes use of the serialN alias all or nothing (either
-all ports have an alias or none do).
-
-This is not a correct implementation because the atomic_read(&msm_uart_next_id)
-does not protect against concurrency; instead a lock should be used.
-
-Not tested, not even compiled.
-
-Not-Signed-off-by: Frank Rowand <frank.rowand@sonymobile.com>
----
-
-Index: linux/drivers/tty/serial/msm_serial.c
-===================================================================
---- linux.orig/drivers/tty/serial/msm_serial.c
-+++ linux/drivers/tty/serial/msm_serial.c
-@@ -1044,17 +1044,31 @@ static int msm_serial_probe(struct platf
- 	struct resource *resource;
- 	struct uart_port *port;
- 	const struct of_device_id *id;
--	int irq;
-+	int irq, line;
-+	static int no_prev_alias = 1;
- 
--	if (pdev->id == -1)
--		pdev->id = atomic_inc_return(&msm_uart_next_id) - 1;
-+	if (pdev->dev.of_node) {
-+		line = of_alias_get_id(pdev->dev.of_node, "serial");
-+		if (line < 0 && no_prev_alias) {
-+			line = atomic_inc_return(&msm_uart_next_id) - 1;
-+		} else {
-+			no_prev_alias = 0;
-+			if (atomic_read(&msm_uart_next_id))
-+				line = -ENXIO;
-+		}
-+	} else {
-+		if (pdev->id < 0 && no_prev_alias)
-+			line = atomic_inc_return(&msm_uart_next_id) - 1;
-+		else
-+			line = pdev->id;
-+	}
- 
--	if (unlikely(pdev->id < 0 || pdev->id >= UART_NR))
-+	if (unlikely(line < 0 || line >= UART_NR))
- 		return -ENXIO;
- 
--	dev_info(&pdev->dev, "msm_serial: detected port #%d\n", pdev->id);
-+	dev_info(&pdev->dev, "msm_serial: detected port #%d\n", line);
- 
--	port = get_port_from_line(pdev->id);
-+	port = get_port_from_line(line);
- 	port->dev = &pdev->dev;
- 	msm_port = UART_TO_MSM(port);
- 
+Acked-by: Joel Schopp <joel.schopp@amd.com>
