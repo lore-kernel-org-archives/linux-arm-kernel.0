@@ -1,54 +1,29 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Wed, 12 Nov 2014 11:33:53 +0530
-Subject: [PATCH v11 4/6] ARM: Exynos: switch to using generic cpufreq
- driver for Exynos4210/5250/5420
-In-Reply-To: <1413805281-6269-5-git-send-email-thomas.ab@samsung.com>
-References: <1413805281-6269-1-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-2-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-3-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-4-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-5-git-send-email-thomas.ab@samsung.com>
-Message-ID: <CAHLCerPKv=NsLNZvwo-vhDwkved5+O4a40LvrP_7j30KjeKqUQ@mail.gmail.com>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Wed, 12 Nov 2014 07:12:48 +0100
+Subject: [PATCH v2 1/2] arm: cns3xxx: pci: remove artificial dependency on
+ pci_sys_data domain
+In-Reply-To: <1415287936-31203-2-git-send-email-lorenzo.pieralisi@arm.com>
+ (Lorenzo Pieralisi's message of "Thu, 6 Nov 2014 15:32:13 +0000")
+References: <1415287936-31203-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1415287936-31203-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <m38ujhgd5r.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
 
-On Mon, Oct 20, 2014 at 5:11 PM, Thomas Abraham <thomas.ab@samsung.com> wrote:
-> The new CPU clock type allows the use of generic CPUfreq drivers. So for
-> Exynos4210/5250, switch to using generic cpufreq driver. For Exynos5420,
-> which did not have CPUfreq driver support, enable the use of generic
-> CPUfreq driver.
+> On cns3xxx platforms the PCI controller probing code relies on an
+> artificial dependency on the domain number to look-up the internal
+> data structures.
 >
-> Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
-> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Tested-by: Chander Kashyap <k.chander@samsung.com>
-> ---
->  arch/arm/mach-exynos/exynos.c |   24 +++++++++++++++++++++++-
->  1 files changed, 23 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index 6b283eb..a1be294 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -282,6 +282,28 @@ static void __init exynos_init_irq(void)
->         exynos_map_pmu();
->  }
->
-> +static const struct of_device_id exynos_cpufreq_matches[] = {
-> +       { .compatible = "samsung,exynos5420", .data = "arm-bL-cpufreq-dt" },
+> This patch reworks the host controller control data structure and
+> adds a domain equivalent field named port in it so that the dependency on
+> pci_sys_data domain field can be eventually removed.
 
-While you're at it, can you add this to so we don't have to patch
-kernels for the Chromebook2 and Odroid-XU3?
+Looks sane.
+Acked-by: Krzysztof Ha?asa <khalasa@piap.pl>
+-- 
+Krzysztof Halasa
 
-      { .compatible = "samsung,exynos5422", .data = "arm-bL-cpufreq-dt" },
-      { .compatible = "samsung,exynos5800", .data = "arm-bL-cpufreq-dt" },
-
-
-> +       { .compatible = "samsung,exynos5250", .data = "cpufreq-dt" },
-> +       { .compatible = "samsung,exynos4210", .data = "cpufreq-dt" },
-> +       { .compatible = "samsung,exynos5440", .data = "exynos5440-cpufreq" },
-> +       { /* sentinel */ }
+Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
