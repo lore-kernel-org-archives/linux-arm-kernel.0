@@ -1,120 +1,41 @@
-From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Thu, 13 Nov 2014 06:01:27 +0800
-Subject: [PATCH v11 0/3] ARM: rk3288: Add PM Domain support
-Message-ID: <1415829690-20236-1-git-send-email-caesar.wang@rock-chips.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 12 Nov 2014 20:04:29 -0200
+Subject: [PATCH] dma: imx-sdma: clarify about firmware not found error
+Message-ID: <1415829869-6661-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-    Add power domain drivers based on generic power domain for
-    Rockchip platform, and support RK3288.
+From: Sascha Hauer <s.hauer@pengutronix.de>
 
-    https://chromium-review.googlesource.com/#/c/220253/9
-    This is the GPU driver, add the following information in DT,
-    and it can support the PMDOMAIN
+When a firmware cannot be found for the SDMA engine then we can
+continue with the internal ROM firmware.
 
-gpu: gpu at ffa30000 {
-    compatible = "arm,malit764",
-                 "arm,malit76x",
-                 "arm,malit7xx",
-                 "arm,mali-midgard";
-    reg = <0xffa30000 0x10000>;
-    interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
-                 <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
-                 <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-    interrupt-names = "JOB", "MMU", "GPU";
-    clocks = <&cru ACLK_GPU>;
-    clock-names = "aclk_gpu";
-    operating-points = <
-                /* KHz uV */
-                100000 800000
-                200000 850000
-                300000 950000
-                400000 1000000
-                600000 1150000
-    >;
-    power-domains = <&power RK3288_PD_GPU>;
-    status = "disabled";
-};
+The meaning of this message is frequently asked for, so make clear
+that the driver still works with the internal ROM firmware and reduce
+the loglevel from err to info.
 
-Based on:
-    - [PATCH v1 1/4] PM / clock_ops: Add pm_clk_add_clk()
-    http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg735599.html
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ drivers/dma/imx-sdma.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Changes in v11:
-    - fix pm_genpd_init(&pd->genpd, NULL, false);
-
-Changes in v10:
-    - this switches over domain infos to use masks instead of recomputing
-      them each time and also gets rid of custom domain translator and
-      uses standard onecell on.
-    - fix missing the #include <dt-bindings/power-domain/rk3288.h>
-    - remove the notes
-
-Changes in v9:
-    - add document decription
-    - fix v8 changes as follows:
-    - This reconciles the v2 and v7 code so that we power domain have
-      lists of clocks they toggle on and off during power transitions and
-      independently from power domains clocks we attach clocks to devices
-      comprising power domain and prepare them so they are turn on and off
-      by runtime PM.
-    - add rockchip_pm_add_one_domain() to control domains.
-    - add pd_start/pd_stop interface to control clocks
-    - add decription for power-doamin node
-
-Changes in v8:
-    - document go back to v2
-    - This reconciles the v2 and v7 code so that we power domain have
-      lists of clocks they toggle on and off during power transitions and
-      independently from power domains clocks we attach clocks to devices
-      comprising power domain and prepare them so they are turn on and off
-      by runtime PM.
-    - DTS go back to v2
-
-Changes in v7:
-    - Delete unused variables
-
-Changes in v6:
-    - delete pmu_lock
-    - modify dev_lock using mutex
-    - pm_clk_resume(pd->dev) change to pm_clk_resume(ed->dev)
-    - pm_clk_suspend(pd->dev) change to pm_clk_suspend(ed->dev)
-    - add devm_kfree(pd->dev, de) in rockchip_pm_domain_detach_dev
-
-Changes in v5:
-    - delete idle_lock
-    - add timeout in rockchip_pmu_set_idle_request()
-
-Changes in v4:
-    - use list storage dev
-
-Changes in v3:
-    - DT structure has changed
-    - change use pm_clk_resume() and pm_clk_suspend()
-    - Decomposition power-controller, changed to multiple controller
-    (gpu-power-controller, hevc-power-controller)
-
-Changes in v2:
-    - move clocks to "optional"
-    - remove the "pd->pd.of_node = np"
-    - make pd_vio clocks all one entry per line and alphabetize.
-    - power: power-controller move back to pinctrl: pinctrl.
-
-Caesar Wang (3):
-  dt-bindings: add document of Rockchip power domain
-  power-domain: rockchip: add power doamin driver
-  ARM: dts: add rk3288 power-domain node
-
- .../bindings/arm/rockchip/power_domain.txt         |  48 +++
- arch/arm/boot/dts/rk3288.dtsi                      |  66 +++
- arch/arm/mach-rockchip/Kconfig                     |   1 +
- arch/arm/mach-rockchip/Makefile                    |   1 +
- arch/arm/mach-rockchip/pm_domains.c                | 471 +++++++++++++++++++++
- include/dt-bindings/power-domain/rk3288.h          |  11 +
- 6 files changed, 598 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
- create mode 100644 arch/arm/mach-rockchip/pm_domains.c
- create mode 100644 include/dt-bindings/power-domain/rk3288.h
-
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+index 99d8833..2c67da5 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -1287,7 +1287,8 @@ static void sdma_load_firmware(const struct firmware *fw, void *context)
+ 	unsigned short *ram_code;
+ 
+ 	if (!fw) {
+-		dev_err(sdma->dev, "firmware not found\n");
++		dev_info(sdma->dev, "external firmware not found, using ROM firmware\n");
++		/* In this case we just use the ROM firmware. */
+ 		return;
+ 	}
+ 
 -- 
 1.9.1
