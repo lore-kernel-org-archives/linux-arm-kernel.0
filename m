@@ -1,28 +1,60 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 12 Nov 2014 11:50:27 +0900
-Subject: [PATCHv2 0/2] ARM: dts: Fix the number of DMA channels for
- Exynos3250/4
-Message-ID: <1415760629-1531-1-git-send-email-cw00.choi@samsung.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 11 Nov 2014 21:23:59 -0700
+Subject: [PATCH 00/10] Save MSI chip in pci_sys_data
+In-Reply-To: <1414396127-30023-1-git-send-email-wangyijing@huawei.com>
+References: <1414396127-30023-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <20141112042359.GK28161@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fix minor issuse to correct the number of DMA channels for
-Exynos3250 and Exynos4 series. The PL330 DMA of Exynos3250/Exynos4 support
-16 channels simultaneously but, PL330 DMA driver don't use 'dma-channels'
-property directly. This patchset fix the correct information
-of Exynos3250/Exynos4's PL330 DMA simply.
+On Mon, Oct 27, 2014 at 03:48:37PM +0800, Yijing Wang wrote:
+> Now PCI host bridge drivers in arm associate MSI chip and
+> PCI bus by adding .add_bus(), and assign MSI chip pointer
+> to every PCI bus. Associating MSI chip and every PCI bus
+> is not necessary. All PCI busses under same PCI host brdige
+> share the same MSI chip. So saving MSI chip in pci_sys_data
+> is a better solution, it make PCI host bridge drivers clean.
+> Because we still need to provide arch spec pcibios_msi_controller()
+> to extract MSI controller pointer, a better solution is to
+> refactor PCI host bridge, make a generic pci_host_bridge, and
+> save common info like PCI domain number, MSI chip, resources
+> in it. We will do that work in another series as soon.
+> 
+> To Bjorn: Because struct msi_chip defined in struct hw_pci and pci_sys_data
+> is under the #ifdef CONFIG_PCI_MSI, if we use if(IS_ENABLED(CONFIG_PCI_MSI))
+> in PCI host bridge drivers, it will cause build errors when the CONFIG_PCI_MSI
+> is off. So I keep #ifdef CONFIG_PCI_MSI in this series.
+> 
+> Yijing Wang (10):
+>   MSI: Rename msi_chip to msi_controller for better readability
+>   PCI/MSI: Introduce weak pcibios_msi_controller()
+>   arm/MSI: Save MSI controller in pci_sys_data
+>   PCI: tegra: Save MSI controller in pci_sys_data
+>   PCI: designware: Save MSI controller in pci_sys_data
+>   PCI: rcar: Save MSI controller in pci_sys_data
+>   PCI: mvebu: Save MSI controller in pci_sys_data
+>   PCI: xilinx: Save MSI controller in pci_sys_data
+>   arm/PCI: Clean unused pcibios_add_bus() and pcibios_remove_bus()
+>   PCI/MSI: Remove useless bus->msi assignment
+> 
+>  arch/arm/include/asm/mach/pci.h     |   10 +++++---
+>  arch/arm/kernel/bios32.c            |   28 ++++++++++--------------
+>  drivers/irqchip/irq-armada-370-xp.c |   22 +++++++++---------
+>  drivers/of/of_pci.c                 |   40 +++++++++++++++++-----------------
+>  drivers/pci/host/pci-keystone-dw.c  |    4 +-
+>  drivers/pci/host/pci-keystone.h     |    2 +-
+>  drivers/pci/host/pci-mvebu.c        |   14 ++++-------
+>  drivers/pci/host/pci-tegra.c        |   37 +++++++++++++-------------------
+>  drivers/pci/host/pcie-designware.c  |   25 +++++++--------------
+>  drivers/pci/host/pcie-designware.h  |    2 +-
+>  drivers/pci/host/pcie-rcar.c        |   37 +++++++++++++-------------------
+>  drivers/pci/host/pcie-xilinx.c      |   27 +++++++----------------
+>  drivers/pci/msi.c                   |   22 ++++++++++++++-----
+>  drivers/pci/probe.c                 |    1 -
+>  include/linux/msi.h                 |    6 ++--
+>  include/linux/of_pci.h              |   14 ++++++------
+>  include/linux/pci.h                 |    2 +-
+>  17 files changed, 132 insertions(+), 161 deletions(-)
+> 
 
-Changes from v1:
-- Fix the nubmer for DMA channesl for Exynos4415
-
-Chanwoo Choi (2):
-  ARM: dts: Fix the number of DMA channels for Exynos3250
-  ARM: dts: Fix the number of DMA channels for Exynos4
-
- arch/arm/boot/dts/exynos3250.dtsi | 4 ++--
- arch/arm/boot/dts/exynos4.dtsi    | 4 ++--
- arch/arm/boot/dts/exynos4415.dtsi | 4 ++--
- 3 files changed, 6 insertions(+), 6 deletions(-)
-
--- 
-1.8.5.5
+Applied to pci/msi for v3.19, thanks.
