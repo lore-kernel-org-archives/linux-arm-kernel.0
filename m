@@ -1,67 +1,320 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 12 Nov 2014 11:08:10 +0100
-Subject: [PATCH v4 0/5] simplefb: add clock handling code
-In-Reply-To: <CACxGe6sMF2C6hvRNNnB_i6a44fh0WC7JjjisFOh5GMV66mC6Fw@mail.gmail.com>
-References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
- <544F737A.7000109@ti.com>
- <CAL_JsqJ2JRg7k21CEVe4-At7enD+y3TN_7wfqhY0OHZm-_j17w@mail.gmail.com>
- <544F7E5D.60104@redhat.com> <5450CAA5.5020205@ti.com>
- <CAL_JsqKWqq+H5ymUW3n8tkmLJHEUGaKDLX5+orJmGUQ3ECQwUQ@mail.gmail.com>
- <20141111214950.7FCABC41610@trevor.secretlab.ca>
- <CAMuHMdUoPK_s7OP1Aop4eOyhec+abFij7ZoAAdA5fqpJJy-Dgg@mail.gmail.com>
- <CACxGe6sMF2C6hvRNNnB_i6a44fh0WC7JjjisFOh5GMV66mC6Fw@mail.gmail.com>
-Message-ID: <CAMuHMdVX72ve9TqpA9GUtumZGDnCjYqKemMxyNf=a4AxWR44iQ@mail.gmail.com>
+From: B31939@freescale.com (Lian Minghuan-B31939)
+Date: Wed, 12 Nov 2014 18:09:43 +0800
+Subject: [PATCH v2] PCI: designware: Add support 4 ATUs assignment
+In-Reply-To: <CA+mB=1K=Oyzdb2yfBvPRG9DHi-PFjRPtVS_dY9JMOz6dQog8QQ@mail.gmail.com>
+References: <1415682444-24911-1-git-send-email-Minghuan.Lian@freescale.com>
+ <CA+mB=1+4Dzxhbin6z0PUENvjUz-y8bq-K09FXTnSepFvVfe9HQ@mail.gmail.com>
+ <546308DD.40109@freescale.com>
+ <CA+mB=1K=Oyzdb2yfBvPRG9DHi-PFjRPtVS_dY9JMOz6dQog8QQ@mail.gmail.com>
+Message-ID: <546331E7.5060003@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+Hi Srikanth,
 
-On Wed, Nov 12, 2014 at 10:57 AM, Grant Likely <grant.likely@linaro.org> wrote:
-> On Wednesday, November 12, 2014, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
->> On Tue, Nov 11, 2014 at 10:49 PM, Grant Likely <grant.likely@linaro.org> wrote:
->> > However, I am concerned about handover. I've lost track over the entire
->> > thread on whether the handover mechanism has been resolved, and I would
->> > really like to have a proposed solution to this documented in the
->> > binding. The fact that there is nothing tying the simple framebuffer to
->> > the actual hardware backing the framebuffer is concerning. It means the
->> > kernel needs to guess which graphics device is associated with the
->> > framebuffer.
+please see my comments inline.
+
+Thanks,
+Minghuan
+
+On 2014?11?12? 17:01, Srikanth Thokala wrote:
+> Hi Minghuan,
+>
+> On Wed, Nov 12, 2014 at 12:44 PM, Lian Minghuan-B31939
+> <B31939@freescale.com> wrote:
+>> Hi  Srikanth,
 >>
->> We did discuss handover in D?sseldorf, and concluded that the simplefb's
->> regs property can be used for this.
+>> Thanks for your comments, please see my reply inline.
 >>
->> While on a modern system with unified memory this association cannot be
->> derived in a generic way, a device-specific driver for the graphics hardware
->> can if the regs property of the simplefb node matches the address the CRTC
->> engine is configured for.
->
-> ???
->
-> Right, I'm going to be blunt here: That's just dumb. All the
-> capability needed is there in the DT to associate a simple FB to a
-> display controller, and the solution chosen is to use a heuristic?
->
-> The association needs to be explicit. I strongly prefer putting the
-> simple FB directly into the display controller node, but I would
-> consider phandle linkage also.
+>>
+>> On 2014?11?12? 14:22, Srikanth Thokala wrote:
+>>> Hi,
+>>>
+>>> On Tue, Nov 11, 2014 at 10:37 AM, Minghuan Lian
+>>> <Minghuan.Lian@freescale.com> wrote:
+>>>> Currently, pcie-designware.c only supports two ATUs, ATU0 is used
+>>>> for CFG0 and MEM, ATU1 is used for CFG1 and IO. There is a conflict
+>>>> when MEM and CFG0 are accessed simultaneously. The patch adds
+>>>> 'num-atus' property to PCIe dts node to describe the number of
+>>>> PCIe controller's ATUs. If num_atus is bigger than or equal to 4,
+>>>> we will change ATUs assignment: ATU0 for CFG0, ATU1 for CFG1,
+>>>> ATU2 for MEM, ATU3 for IO.
+>>>>
+>>>> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+>>>> ---
+>>>> change log:
+>>>> v1-v2:
+>>>> 1. add the default value to property num-atus description
+>>>> 2. Use atu_idx[] instead of single values
+>>>> 3. initialize num_atus to 2
+>>>>
+>>>>    .../devicetree/bindings/pci/designware-pcie.txt    |  1 +
+>>>>    drivers/pci/host/pcie-designware.c                 | 53
+>>>> ++++++++++++++++------
+>>>>    drivers/pci/host/pcie-designware.h                 |  9 ++++
+>>>>    3 files changed, 50 insertions(+), 13 deletions(-)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt
+>>>> b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+>>>> index 9f4faa8..64d0533 100644
+>>>> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
+>>>> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+>>>> @@ -26,3 +26,4 @@ Optional properties:
+>>>>    - bus-range: PCI bus numbers covered (it is recommended for new
+>>>> devicetrees to
+>>>>      specify this property, to keep backwards compatibility a range of
+>>>> 0x00-0xff
+>>>>      is assumed if not present)
+>>>> +- num-atus: number of ATUs. The default value is 2 if not present.
+>>>> diff --git a/drivers/pci/host/pcie-designware.c
+>>>> b/drivers/pci/host/pcie-designware.c
+>>>> index dfed00a..46a609d 100644
+>>>> --- a/drivers/pci/host/pcie-designware.c
+>>>> +++ b/drivers/pci/host/pcie-designware.c
+>>>> @@ -48,6 +48,8 @@
+>>>>    #define PCIE_ATU_VIEWPORT              0x900
+>>>>    #define PCIE_ATU_REGION_INBOUND                (0x1 << 31)
+>>>>    #define PCIE_ATU_REGION_OUTBOUND       (0x0 << 31)
+>>>> +#define PCIE_ATU_REGION_INDEX3         (0x3 << 0)
+>>>> +#define PCIE_ATU_REGION_INDEX2         (0x2 << 0)
+>>>>    #define PCIE_ATU_REGION_INDEX1         (0x1 << 0)
+>>>>    #define PCIE_ATU_REGION_INDEX0         (0x0 << 0)
+>>>>    #define PCIE_ATU_CR1                   0x904
+>>>> @@ -346,7 +348,7 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>>>>           struct of_pci_range range;
+>>>>           struct of_pci_range_parser parser;
+>>>>           struct resource *cfg_res;
+>>>> -       u32 val, na, ns;
+>>>> +       u32 num_atus = 2, val, na, ns;
+>>> I think this can be u8?
+>> [Minghuan] I define num-atus like this: num-atus = <6> (our controller
+>> supports 6 outbound ATUs)
+>> So, num_atus should be u32 type.
+>> If we use u8 type to define num_atus, the dts node should be changed to
+>> num_atus = /bits/ 8 <8>.
+>> I prefer the previous definition num-atus = <6> which is more simple and
+>> clear.
+> Yes, I agree.  But as it holds only 6 possible distinct values, I
+> prefer to use u8.
+[Minghuan] PCIe Designware IP supports more than 6 ATUs. But our
+current PCIe controller only supports 6 outbound ATUs and 6 inbound ATUs.
+The next PCIe controller may supports more ATUs. I think u32 can be better
+compatible with hardware upgrade.
 
-IFF there's a display controller node, you can put it there.
-I actually proposed to have a minimal/preliminary display controller node,
-but people countered that for various reasons (too many components
-with multiple nodes on many systems, bindings not yet defined, etc.).
+I inquired dts, almost all dts property use u32 type.
+for example:
+    #address-cells = <3>;
+    #size-cells = <2>;
+    num-lanes = <1>;
 
-And if there's no graphics driver/bindings yet at the time the bootloader
-is written, it doesn't know how to link simplefb with it in DT.
-Hence the heuristic to match regs... Does that make sense?
+>>>>           const __be32 *addrp;
+>>>>           int i, index, ret;
+>>>>
+>>>> @@ -486,6 +488,19 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>>>>                   }
+>>>>           }
+>>>>
+>>>> +       of_property_read_u32(np, "num-atus", &num_atus);
+>>> and here too?
+>> [Minghuan] please refer to the above interpretation.
+>>
+>>>> +       if (num_atus >= 4) {
+>>>> +               pp->atu_idx[ATU_TYPE_CFG0] = PCIE_ATU_REGION_INDEX0;
+>>>> +               pp->atu_idx[ATU_TYPE_CFG1] = PCIE_ATU_REGION_INDEX1;
+>>>> +               pp->atu_idx[ATU_TYPE_MEM] = PCIE_ATU_REGION_INDEX2;
+>>>> +               pp->atu_idx[ATU_TYPE_IO] = PCIE_ATU_REGION_INDEX3;
+>>>> +       } else {
+>>>> +               pp->atu_idx[ATU_TYPE_CFG0] = PCIE_ATU_REGION_INDEX0;
+>>>> +               pp->atu_idx[ATU_TYPE_MEM] = PCIE_ATU_REGION_INDEX0;
+>>>> +               pp->atu_idx[ATU_TYPE_CFG1] = PCIE_ATU_REGION_INDEX1;
+>>>> +               pp->atu_idx[ATU_TYPE_IO] = PCIE_ATU_REGION_INDEX1;
+>>>> +       }
+>>>> +
+>>>>           if (pp->ops->host_init)
+>>>>                   pp->ops->host_init(pp);
+>>>>
+>>>> @@ -511,8 +526,9 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>>>>
+>>>>    static void dw_pcie_prog_viewport_cfg0(struct pcie_port *pp, u32
+>>>> busdev)
+>>>>    {
+>>>> -       /* Program viewport 0 : OUTBOUND : CFG0 */
+>>>> -       dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND |
+>>>> PCIE_ATU_REGION_INDEX0,
+>>>> +       /* Program viewport : OUTBOUND : CFG0 */
+>>>> +       dw_pcie_writel_rc(pp,
+>>>> +                         PCIE_ATU_REGION_OUTBOUND |
+>>>> pp->atu_idx[ATU_TYPE_CFG0],
+>>>>                             PCIE_ATU_VIEWPORT);
+>>>>           dw_pcie_writel_rc(pp, pp->cfg0_mod_base, PCIE_ATU_LOWER_BASE);
+>>>>           dw_pcie_writel_rc(pp, (pp->cfg0_mod_base >> 32),
+>>>> PCIE_ATU_UPPER_BASE);
+>>>> @@ -526,8 +542,9 @@ static void dw_pcie_prog_viewport_cfg0(struct
+>>>> pcie_port *pp, u32 busdev)
+>>>>
+>>>>    static void dw_pcie_prog_viewport_cfg1(struct pcie_port *pp, u32
+>>>> busdev)
+>>>>    {
+>>>> -       /* Program viewport 1 : OUTBOUND : CFG1 */
+>>>> -       dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND |
+>>>> PCIE_ATU_REGION_INDEX1,
+>>>> +       /* Program viewport : OUTBOUND : CFG1 */
+>>>> +       dw_pcie_writel_rc(pp,
+>>>> +                         PCIE_ATU_REGION_OUTBOUND |
+>>>> pp->atu_idx[ATU_TYPE_CFG1],
+>>>>                             PCIE_ATU_VIEWPORT);
+>>>>           dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_CFG1, PCIE_ATU_CR1);
+>>>>           dw_pcie_writel_rc(pp, pp->cfg1_mod_base, PCIE_ATU_LOWER_BASE);
+>>>> @@ -541,8 +558,9 @@ static void dw_pcie_prog_viewport_cfg1(struct
+>>>> pcie_port *pp, u32 busdev)
+>>>>
+>>>>    static void dw_pcie_prog_viewport_mem_outbound(struct pcie_port *pp)
+>>>>    {
+>>>> -       /* Program viewport 0 : OUTBOUND : MEM */
+>>>> -       dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND |
+>>>> PCIE_ATU_REGION_INDEX0,
+>>>> +       /* Program viewport : OUTBOUND : MEM */
+>>>> +       dw_pcie_writel_rc(pp,
+>>>> +                         PCIE_ATU_REGION_OUTBOUND |
+>>>> pp->atu_idx[ATU_TYPE_MEM],
+>>>>                             PCIE_ATU_VIEWPORT);
+>>>>           dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_MEM, PCIE_ATU_CR1);
+>>>>           dw_pcie_writel_rc(pp, pp->mem_mod_base, PCIE_ATU_LOWER_BASE);
+>>>> @@ -557,8 +575,9 @@ static void dw_pcie_prog_viewport_mem_outbound(struct
+>>>> pcie_port *pp)
+>>>>
+>>>>    static void dw_pcie_prog_viewport_io_outbound(struct pcie_port *pp)
+>>>>    {
+>>>> -       /* Program viewport 1 : OUTBOUND : IO */
+>>>> -       dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND |
+>>>> PCIE_ATU_REGION_INDEX1,
+>>>> +       /* Program viewport : OUTBOUND : IO */
+>>>> +       dw_pcie_writel_rc(pp,
+>>>> +                         PCIE_ATU_REGION_OUTBOUND |
+>>>> pp->atu_idx[ATU_TYPE_IO],
+>>>>                             PCIE_ATU_VIEWPORT);
+>>>>           dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_IO, PCIE_ATU_CR1);
+>>>>           dw_pcie_writel_rc(pp, pp->io_mod_base, PCIE_ATU_LOWER_BASE);
+>>>> @@ -585,12 +604,14 @@ static int dw_pcie_rd_other_conf(struct pcie_port
+>>>> *pp, struct pci_bus *bus,
+>>>>                   dw_pcie_prog_viewport_cfg0(pp, busdev);
+>>>>                   ret = dw_pcie_cfg_read(pp->va_cfg0_base + address,
+>>>> where, size,
+>>>>                                   val);
+>>>> -               dw_pcie_prog_viewport_mem_outbound(pp);
+>>>> +               if (pp->atu_idx[ATU_TYPE_MEM] ==
+>>>> pp->atu_idx[ATU_TYPE_CFG0])
+>>>> +                       dw_pcie_prog_viewport_mem_outbound(pp);
+>>>>           } else {
+>>>>                   dw_pcie_prog_viewport_cfg1(pp, busdev);
+>>>>                   ret = dw_pcie_cfg_read(pp->va_cfg1_base + address,
+>>>> where, size,
+>>>>                                   val);
+>>>> -               dw_pcie_prog_viewport_io_outbound(pp);
+>>>> +               if (pp->atu_idx[ATU_TYPE_IO] ==
+>>>> pp->atu_idx[ATU_TYPE_CFG1])
+>>>> +                       dw_pcie_prog_viewport_io_outbound(pp);
+>>>>           }
+>>>>
+>>>>           return ret;
+>>>> @@ -610,12 +631,14 @@ static int dw_pcie_wr_other_conf(struct pcie_port
+>>>> *pp, struct pci_bus *bus,
+>>>>                   dw_pcie_prog_viewport_cfg0(pp, busdev);
+>>>>                   ret = dw_pcie_cfg_write(pp->va_cfg0_base + address,
+>>>> where, size,
+>>>>                                   val);
+>>>> -               dw_pcie_prog_viewport_mem_outbound(pp);
+>>>> +               if (pp->atu_idx[ATU_TYPE_MEM] ==
+>>>> pp->atu_idx[ATU_TYPE_CFG0])
+>>>> +                       dw_pcie_prog_viewport_mem_outbound(pp);
+>>>>           } else {
+>>>>                   dw_pcie_prog_viewport_cfg1(pp, busdev);
+>>>>                   ret = dw_pcie_cfg_write(pp->va_cfg1_base + address,
+>>>> where, size,
+>>>>                                   val);
+>>>> -               dw_pcie_prog_viewport_io_outbound(pp);
+>>>> +               if (pp->atu_idx[ATU_TYPE_IO] ==
+>>>> pp->atu_idx[ATU_TYPE_CFG1])
+>>>> +                       dw_pcie_prog_viewport_io_outbound(pp);
+>>>>           }
+>>>>
+>>>>           return ret;
+>>>> @@ -770,6 +793,10 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
+>>>>           u32 membase;
+>>>>           u32 memlimit;
+>>>>
+>>>> +       /* set ATUs setting for MEM and IO */
+>>>> +       dw_pcie_prog_viewport_mem_outbound(pp);
+>>>> +       dw_pcie_prog_viewport_io_outbound(pp);
+>>>> +
+>>> I see from the code, these settings are required for the calls other than
+>>> dw_pcie_(rd/wr)_other_conf, is it correct? If it is so, I feel this change
+>>> is
+>>> independent of this patch and should go as a separte patch?
+>> [Minghuan] dw_pcie(rd/wr)_other_confg only calls the
+>> dw_pcie_prog_viewport_mem/io_outbound when
+>> we only use 2 ATUs.
+>> The patch is to support 4ATUs. If no the calls, ATU2(MEM) and ATU3 will
+>> not be initialized, and PCIe device driver will be broken.
+> When you have only 2 ATUs (CFG0=MEM & CFG1=IO), you are calling
+> mem/io_outbound() twice with the same writes which is not the case in the
+> original driver. So, I mentioned it should go as a separate patch.
+[Minghuan] Sorry, I do not understand what you mean.
+How to separate patch?
+A patch is to add the following code based on original code
 
-Gr{oetje,eeting}s,
++       /* set ATUs setting for MEM and IO */
++       dw_pcie_prog_viewport_mem_outbound(pp);
++       dw_pcie_prog_viewport_io_outbound(pp);
++
 
-                        Geert
+But why add this patch? 2 ATUs does not need them.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Only 4 ATUs support needs them.
+And them are also ok for 2 ATUs.
+For 2 ATUs, mem/io will be initialized every time read/write PCI device configuration.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+
+- Srikanth
+
+>>> - Srikanth
+>>>
+>>>>           /* set the number of lanes */
+>>>>           dw_pcie_readl_rc(pp, PCIE_PORT_LINK_CONTROL, &val);
+>>>>           val &= ~PORT_LINK_MODE_MASK;
+>>>> diff --git a/drivers/pci/host/pcie-designware.h
+>>>> b/drivers/pci/host/pcie-designware.h
+>>>> index c625675..37604f9 100644
+>>>> --- a/drivers/pci/host/pcie-designware.h
+>>>> +++ b/drivers/pci/host/pcie-designware.h
+>>>> @@ -22,6 +22,14 @@
+>>>>    #define MAX_MSI_IRQS                   32
+>>>>    #define MAX_MSI_CTRLS                  (MAX_MSI_IRQS / 32)
+>>>>
+>>>> +enum ATU_TYPE {
+>>>> +       ATU_TYPE_CFG0,
+>>>> +       ATU_TYPE_CFG1,
+>>>> +       ATU_TYPE_MEM,
+>>>> +       ATU_TYPE_IO,
+>>>> +       ATU_TYPE_MAX
+>>>> +};
+>>>> +
+>>>>    struct pcie_port {
+>>>>           struct device           *dev;
+>>>>           u8                      root_bus_nr;
+>>>> @@ -53,6 +61,7 @@ struct pcie_port {
+>>>>           struct irq_domain       *irq_domain;
+>>>>           unsigned long           msi_data;
+>>>>           DECLARE_BITMAP(msi_irq_in_use, MAX_MSI_IRQS);
+>>>> +       u8                      atu_idx[ATU_TYPE_MAX];
+>>>>    };
+>>>>
+>>>>    struct pcie_host_ops {
+>>>> --
+>>>> 1.9.1
+>>>>
+>>>> --
+>>>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>>>> the body of a message to majordomo at vger.kernel.org
+>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
