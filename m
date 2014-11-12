@@ -1,64 +1,134 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 12 Nov 2014 18:00:47 +0200
-Subject: [PATCH] PM / Domains: restore calling of .suspend/resume_noirq()
- callbacks
-Message-ID: <1415808047-23455-1-git-send-email-grygorii.strashko@ti.com>
+From: ibanezchen@gmail.com (Howard Chen)
+Date: Thu, 13 Nov 2014 00:07:34 +0800
+Subject: [PATCH v6 1/4] ARM: mediatek: Add basic support for mt6592
+Message-ID: <1415808457-4030-1-git-send-email-ibanezchen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now .suspend/resume_noirq() callbacks will not be called during
-system wide suspend/resume for devices which belongs to some GPD.
-It seems, that this change was accidently introduced by
-commit d23b9b00cdde ("PM / Domains: Rework system suspend callback
- routines (v2)").
+* A dtsi for boards based on Mediatek MT6592 SoCs
+* Compatible string in arch/arm/mach-mediatek/mediatek.c
 
-This patch restores calling of .suspend/resume_noirq() callbacks
-for devices from GPD during system wide suspend/resume.
-
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Signed-off-by: Howard Chen <ibanezchen@gmail.com>
 ---
- drivers/base/power/domain.c | 14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/mt6592.dtsi     | 97 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mediatek/mediatek.c |  1 +
+ 2 files changed, 98 insertions(+)
+ create mode 100644 arch/arm/boot/dts/mt6592.dtsi
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index fb83d4a..f8c70e6 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -1014,6 +1014,7 @@ static int pm_genpd_suspend_late(struct device *dev)
- static int pm_genpd_suspend_noirq(struct device *dev)
- {
- 	struct generic_pm_domain *genpd;
-+	int ret;
- 
- 	dev_dbg(dev, "%s()\n", __func__);
- 
-@@ -1021,8 +1022,14 @@ static int pm_genpd_suspend_noirq(struct device *dev)
- 	if (IS_ERR(genpd))
- 		return -EINVAL;
- 
--	if (genpd->suspend_power_off
--	    || (dev->power.wakeup_path && genpd_dev_active_wakeup(genpd, dev)))
-+	if (genpd->suspend_power_off)
-+		return 0;
+diff --git a/arch/arm/boot/dts/mt6592.dtsi b/arch/arm/boot/dts/mt6592.dtsi
+new file mode 100644
+index 0000000..65aa81b
+--- /dev/null
++++ b/arch/arm/boot/dts/mt6592.dtsi
+@@ -0,0 +1,97 @@
++/*
++ * Copyright (c) 2014 MediaTek Inc.
++ * Author: Howard Chen <ibanezchen@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+	ret = pm_generic_suspend_noirq(dev);
-+	if (ret)
-+		return ret;
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include "skeleton.dtsi"
 +
-+	if (dev->power.wakeup_path && genpd_dev_active_wakeup(genpd, dev))
- 		return 0;
++/ {
++	compatible = "mediatek,mt6592";
++	interrupt-parent = <&gic>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x0>;
++		};
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x1>;
++		};
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x2>;
++		};
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x3>;
++		};
++		cpu at 4 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x4>;
++		};
++		cpu at 5 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x5>;
++		};
++		cpu at 6 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x6>;
++		};
++		cpu at 7 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x7>;
++		};
++	};
++
++	system_clk: dummy13m {
++		compatible = "fixed-clock";
++		clock-frequency = <13000000>;
++		#clock-cells = <0>;
++	};
++
++	rtc_clk: dummy32k {
++		compatible = "fixed-clock";
++		clock-frequency = <32000>;
++		#clock-cells = <0>;
++	};
++
++	timer: timer at 10008000 {
++		compatible = "mediatek,mt6577-timer";
++		reg = <0x10008000 0x80>;
++		interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&system_clk>, <&rtc_clk>;
++		clock-names = "system-clk", "rtc-clk";
++	};
++
++	gic: interrupt-controller at 10211000 {
++		compatible = "arm,cortex-a7-gic";
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		reg = <0x10211000 0x1000>,
++		      <0x10212000 0x1000>;
++	};
++
++};
+diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+index f2acf07..88e4626 100644
+--- a/arch/arm/mach-mediatek/mediatek.c
++++ b/arch/arm/mach-mediatek/mediatek.c
+@@ -19,6 +19,7 @@
  
- 	genpd_stop_dev(genpd, dev);
-@@ -1065,8 +1072,9 @@ static int pm_genpd_resume_noirq(struct device *dev)
- 	 */
- 	pm_genpd_sync_poweron(genpd);
- 	genpd->suspended_count--;
-+	genpd_start_dev(genpd, dev);
+ static const char * const mediatek_board_dt_compat[] = {
+ 	"mediatek,mt6589",
++	"mediatek,mt6592",
+ 	NULL,
+ };
  
--	return genpd_start_dev(genpd, dev);
-+	return pm_generic_resume_noirq(dev);
- }
- 
- /**
 -- 
 1.9.1
