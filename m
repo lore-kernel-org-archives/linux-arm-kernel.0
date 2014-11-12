@@ -1,70 +1,120 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 12 Nov 2014 13:44:12 +0000
-Subject: [PATCH 03/13] ARM: STi: DT: STiH416: Add DT nodes for the ehci
- and ohci usb controllers.
-In-Reply-To: <2945908.5UNg8NaKcc@wuerfel>
-References: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
- <1415361475-6218-4-git-send-email-peter.griffin@linaro.org>
- <2945908.5UNg8NaKcc@wuerfel>
-Message-ID: <20141112134412.GA20187@griffinp-ThinkPad-X1-Carbon-2nd>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 12 Nov 2014 13:47:38 +0000
+Subject: [RFC Part4 v1 00/17] Refine support of non-PCI-compliant Message
+In-Reply-To: <1415545839-28263-1-git-send-email-jiang.liu@linux.intel.com>
+References: <1415545839-28263-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <546364FA.7010806@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Jiang,
 
-Thanks for reviewing.
-
-On Fri, 07 Nov 2014, Arnd Bergmann wrote:
-
-> > +               ehci0: usb at 0xfe1ffe00 {
+On 09/11/14 15:10, Jiang Liu wrote:
+> Some interrupt controllers, such as DMAR/HPET/HT_IRQ, work almost in
+> the same as PCI MSI interrupt controller. And there some devices make
+> use of PCI MSI mechanism for non-PCI devices on ARm/ARM64 platforms.
 > 
-> Please drop the '0x' from the unit address in all instances.
-
-Ok, fixed in v2
-
+> So this patches tries to split PCI MSI code into PCI dependent part
+> and PCI independent part. The PCI independent part will be used to
+> support other PCI MSI like interrupt controllers.
 > 
-> > +                       compatible = "st,st-ehci-300x";
-> > +                       reg = <0xfe1ffe00 0x100>;
-> > +                       interrupts = <GIC_SPI 148 IRQ_TYPE_NONE>;
-> > +                       pinctrl-names = "default";
-> > +                       pinctrl-0 = <&pinctrl_usb0>;
-> > +                       clocks = <&clk_s_a1_ls 0>,
-> > +                                <&clockgen_b0 0>;
-> > +                       clock-names = "ic", "clk48";
-> > +
-> > +                       phys = <&usb2_phy>;
-> > +                       phy-names = "usb";
-> > +                       status = "okay";
-> 
-> No need to list 'status="okay"', it's the default. It might
-> make sense to change this to 'status="disabled"' though, if the ports
-> might be unused on some boards.
+> Patch 1-9 are clean ups for previous hierarchy irqdomain patchset
+> and preparation for coming PCI MSI code reorganization.
+> Patch 10-15 split PCI MSI code and implement common mechanism to support
+> other MSI alike interrupt contollers.
+> Patch 16-17 converts HT_IRQ to use the common MSI support mechanism.
 
-ok, removed in v2
+[...]
 
-> 
-> >                 mmc0: sdhci at fe81e000 {
-> >                         bus-width = <8>;
-> >                 };
-> > +
-> > +               usb0: usb at fe100000 {
-> > +                       status = "okay";
-> > +               };
-> > +
-> > +               usb1: usb at fe200000 {
-> > +                       status = "okay";
-> > +               };
-> > +
-> > +               usb2: usb at fe300000 {
-> > +                       status = "okay";
-> > +               };
-> 
-> I don't understand this part: why do you add extra nodes here that only
-> contain a status property?
+I used this patch series (or rather the v2 in your git tree) to rework the GICv3 ITS patch series. So far, the API seems cleaner (fewer global functions, increased flexibility), at the expense of a bit more complexity.
 
-Good spot, this is a bit of legacy code which I should have removed before submitting.
-It's removed in v2.
+One thing is still missing though: the way the MSI stacked domain works at the moment prevents the use of the msi_chip infrastructure (you need to override arch_setup_msi_irqs, which in turn prevents the use of msi_chips using setup_irq/teardown_irq callbacks. On arm/arm64, most MSI controllers are using the latter, while it is likely that the newer ones will be using the stacked domains.
 
-regards,
+My solution to this is to slightly extend the msi_chip framework so that we can hock into the MSI domain framework on a per-msi-chip basis (see patch below). With this in place, I can completely get rid of any arm64-specific code (the msi_chip framework becomes good enough for us):
 
-Peter.
+>From 5e9157ee7879953f89652d6ad9f296fc0ce6cb87 Mon Sep 17 00:00:00 2001
+From: Marc Zyngier <marc.zyngier@arm.com>
+Date: Wed, 12 Nov 2014 10:32:46 +0000
+Subject: [PATCH v2 02/14] PCI/MSI: Allow an msi_chip to be associated to an
+ irq domain
+
+The new MSI stacked domain has the interesting effect that it is
+quite hard to use if the architecture doesn't provide its own
+arch_setup_msi_irqs() function to override the default.
+
+This inhibates the msi_chip infrastructure introduced in
+0cbdcfcf427b (PCI: Introduce new MSI chip infrastructure), as it is
+not possible to use it as an indirection between the core MSI code
+and the MSI driver (useful when having multiple MSI controllers that
+do not share the same requirements). The setup_irq and teardown_irq
+are rendered useless, as their role is now taken over by the alloc/free
+functions in the irq domain code.
+
+This patch introduces two optionnal fields to the msi_chip structure:
+- a pointer to an irq domain, describing the MSI domain associated
+  with this msi_chip. To be populated with msi_create_irq_domain.
+- a domain_alloc_irqs() callback that has the same purpose as
+  arch_setup_msi_irqs(), with the above domain as an additional
+  parameter.
+
+If both of these fields are non-NULL, then domain_alloc_irqs() is
+called, bypassing the setup_irq callback. This allows the MSI driver
+to use the domain stacking feature without mandating core support in
+the architecture.
+
+Tested on arm64 with the GICv3 ITS.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/pci/msi.c   | 9 ++++++++-
+ include/linux/msi.h | 5 +++++
+ 2 files changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index 6c38306..baefc21 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -63,8 +63,15 @@ int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+ 
+ 	/*
+ 	 * If an architecture wants to support multiple MSI, it needs to
+-	 * override arch_setup_msi_irqs()
++	 * override arch_setup_msi_irqs(), or provide a way out on a per
++	 * domain basis.
+ 	 */
++#ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
++	struct msi_chip *chip = dev->bus->msi;
++
++	if (chip->domain && chip->domain_alloc_irqs)
++		return chip->domain_alloc_irqs(chip->domain, dev, nvec, type);
++#endif
+ 	if (type == PCI_CAP_ID_MSI && nvec > 1)
+ 		return 1;
+ 
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index 0789a4d..7170eea 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -110,7 +110,12 @@ struct msi_chip {
+ 	struct device *dev;
+ 	struct device_node *of_node;
+ 	struct list_head list;
++#ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
++	struct irq_domain *domain;
+ 
++	int (*domain_alloc_irqs)(struct irq_domain *domain,
++				 struct pci_dev *pdev, int nvec, int type);
++#endif
+ 	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
+ 			 struct msi_desc *desc);
+ 	void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
+-- 
+2.0.4
+
+Thoughts? I'll post the full patch series later today.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
