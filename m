@@ -1,64 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Nov 2014 13:23:41 -0800
-Subject: [PATCH 4/4] arm: dts: omap3-gta04: Add static configuration for
- devconf1 register
-In-Reply-To: <CAAfyv34sPAa94dYM1QoHKEX+MN8NMnzE91HLhXW6MG1Yr=o8mQ@mail.gmail.com>
-References: <1415051968-4878-1-git-send-email-marek@goldelico.com>
- <1415051968-4878-5-git-send-email-marek@goldelico.com>
- <20141110233630.GD31454@atomide.com>
- <CAAfyv34sPAa94dYM1QoHKEX+MN8NMnzE91HLhXW6MG1Yr=o8mQ@mail.gmail.com>
-Message-ID: <20141112212340.GL26481@atomide.com>
+From: dtor@chromium.org (Dmitry Torokhov)
+Date: Wed, 12 Nov 2014 13:38:45 -0800
+Subject: [PATCH] clk: rockchip: ensure HCLK_VIO2_H2P and PCLK_VIO2_H2P stay
+ enabled
+Message-ID: <20141112213845.GA14153@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Belisko Marek <marek.belisko@gmail.com> [141112 13:04]:
-> Hi Tony,
-> 
-> On Tue, Nov 11, 2014 at 12:36 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Marek Belisko <marek@goldelico.com> [141103 14:01]:
-> >> gta04 board need for tvout enabled 2 bits in devconf1 register (tvbypass and acbias).
-> >> Add single pinmux entry and enable it.
-> >>
-> >> Signed-off-by: Marek Belisko <marek@goldelico.com>
-> >> ---
-> >>  arch/arm/boot/dts/omap3-gta04.dtsi | 22 ++++++++++++++++++++++
-> >>  1 file changed, 22 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
-> >> index e4d05f0..a456d37 100644
-> >> --- a/arch/arm/boot/dts/omap3-gta04.dtsi
-> >> +++ b/arch/arm/boot/dts/omap3-gta04.dtsi
-> >> @@ -118,6 +118,17 @@
-> >>                       };
-> >>               };
-> >>       };
-> >> +
-> >> +     /* pinmux for devconf1 */
-> >> +     control_devconf1: pinmux at 480022d8 {
-> >> +             compatible = "pinctrl-single";
-> >> +             reg = <0x480022d8 4>;   /* single register */
-> >> +             #address-cells = <1>;
-> >> +             #size-cells = <0>;
-> >> +             pinctrl-single,bit-per-mux;
-> >> +             pinctrl-single,register-width = <32>;
-> >> +             pinctrl-single,function-mask = <0xfc0bd5>;
-> >> +     };
-> >>  };
-> >>
-> >
-> > The pinctrl-single entry should be in omap3.dtsi as the mux register is there
-> > for all the omap3 devices, can you please update the patch for that?
-> Ok I'll do. Just one question. I checked TRM for omap3430 and omap3630 and
-> reserved bits in devconf1 are different. So keep function-mask for
-> omap3430 in omap3.dtsi
-> and redefine in omap36xx.dtsi (not sure if this will work in this
-> way)? Or exist other way how to deal with that? Thanks.
+Currently there is no driver owning these clocks and they have to stay
+up for the system to function properly, so let's mark them as
+CLK_IGNORE_UNUSED.
 
-Oh OK. Yes if they are different you should have the common entry in
-omap3.dtsi and the SoC specific fields in omap34xx.dtsi and
-omap36xx.dtsi. And please leave out the bit for configuring the
-MPUFORCEWRNP.
+Without this patch we have trouble with suspend/resume and we have
+trouble turning the eDP back on if it ever idles off.
 
-Regards,
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+Signed-off-by: Dmitry Torokhov <dtor@chromium.org>
+---
+ drivers/clk/rockchip/clk-rk3288.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Tony
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index 2327829..d79d52f 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -724,14 +724,14 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 	GATE(HCLK_VIP, "hclk_vip", "hclk_vio", 0, RK3288_CLKGATE_CON(15), 15, GFLAGS),
+ 	GATE(HCLK_IEP, "hclk_iep", "hclk_vio", 0, RK3288_CLKGATE_CON(15), 3, GFLAGS),
+ 	GATE(HCLK_ISP, "hclk_isp", "hclk_vio", 0, RK3288_CLKGATE_CON(16), 1, GFLAGS),
+-	GATE(HCLK_VIO2_H2P, "hclk_vio2_h2p", "hclk_vio", 0, RK3288_CLKGATE_CON(16), 10, GFLAGS),
++	GATE(HCLK_VIO2_H2P, "hclk_vio2_h2p", "hclk_vio", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(16), 10, GFLAGS),
+ 	GATE(PCLK_MIPI_DSI0, "pclk_mipi_dsi0", "hclk_vio", 0, RK3288_CLKGATE_CON(16), 4, GFLAGS),
+ 	GATE(PCLK_MIPI_DSI1, "pclk_mipi_dsi1", "hclk_vio", 0, RK3288_CLKGATE_CON(16), 5, GFLAGS),
+ 	GATE(PCLK_MIPI_CSI, "pclk_mipi_csi", "hclk_vio", 0, RK3288_CLKGATE_CON(16), 6, GFLAGS),
+ 	GATE(PCLK_LVDS_PHY, "pclk_lvds_phy", "hclk_vio", 0, RK3288_CLKGATE_CON(16), 7, GFLAGS),
+ 	GATE(PCLK_EDP_CTRL, "pclk_edp_ctrl", "hclk_vio", 0, RK3288_CLKGATE_CON(16), 8, GFLAGS),
+ 	GATE(PCLK_HDMI_CTRL, "pclk_hdmi_ctrl", "hclk_vio", 0, RK3288_CLKGATE_CON(16), 9, GFLAGS),
+-	GATE(PCLK_VIO2_H2P, "pclk_vio2_h2p", "hclk_vio", 0, RK3288_CLKGATE_CON(16), 11, GFLAGS),
++	GATE(PCLK_VIO2_H2P, "pclk_vio2_h2p", "hclk_vio", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(16), 11, GFLAGS),
+ 
+ 	/* aclk_vio0 gates */
+ 	GATE(ACLK_VOP0, "aclk_vop0", "aclk_vio0", 0, RK3288_CLKGATE_CON(15), 5, GFLAGS),
+-- 
+2.1.0.rc2.206.gedb03e5
+
+
+-- 
+Dmitry
