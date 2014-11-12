@@ -1,59 +1,55 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 12 Nov 2014 08:59:55 +0900
-Subject: [PATCH 3/4] ARM: shmobile: rcar-gen2: Add CA7 arch_timer
- initialization for r8a7794
-In-Reply-To: <CAMuHMdUek9RA-tpVJbXKx1MENk47-E2s+437+SYNR9KbaO62dQ@mail.gmail.com>
-References: <cover.1415058939.git.horms+renesas@verge.net.au>
- <9ce3fa6816c2fb59d128248c9b0509aef1c5dae7.1415058939.git.horms+renesas@verge.net.au>
- <5583214.HuX5EZ5Unx@wuerfel>
- <CAMuHMdUek9RA-tpVJbXKx1MENk47-E2s+437+SYNR9KbaO62dQ@mail.gmail.com>
-Message-ID: <20141111235954.GA12594@verge.net.au>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 12 Nov 2014 01:10:28 +0100
+Subject: [PATCH v10 2/3] power-domain: rockchip: add power doamin driver
+In-Reply-To: <7h7fz1of0m.fsf@deeprootsystems.com>
+References: <1415690392-9278-1-git-send-email-caesar.wang@rock-chips.com>
+ <1415690392-9278-3-git-send-email-caesar.wang@rock-chips.com>
+ <7h7fz1of0m.fsf@deeprootsystems.com>
+Message-ID: <11419951.x8p1Z4vKjh@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 11, 2014 at 08:00:26PM +0100, Geert Uytterhoeven wrote:
-> On Tue, Nov 11, 2014 at 7:27 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 04 November 2014 10:50:08 Simon Horman wrote:
-> >> From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-> >>
-> >> On E2, the arch timer is hooked up to a different clock, and the CA7's arch
-> >> timer CNTVOFF register must be initialized.
-> >>
-> >> Based on work by Hisashi Nakamura.
-> >>
-> >> Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-> >> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >
-> > This is one of the patches that broke allmodconfig in linux-next.
-> >
-> > Can you apply the patch below before sending it to arm-soc?
-> >
-> > Thanks,
-> >
-> >         Arnd
-> >
+Am Dienstag, 11. November 2014, 08:53:13 schrieb Kevin Hilman:
+> Caesar Wang <caesar.wang@rock-chips.com> writes:
+> > In order to meet high performance and low power requirements, a power
+> > management unit is designed or saving power when RK3288 in low power mode.
+> > The RK3288 PMU is dedicated for managing the power ot the whole chip.
+> > 
+> > Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
+> > Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
+> > Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+> > 
 > > ---
-> > From 8bf0a4cae3137411498ff23ca46f693e4c22a25b Mon Sep 17 00:00:00 2001
-> > From: Arnd Bergmann <arnd@arndb.de>
-> > Date: Tue, 11 Nov 2014 16:36:50 +0100
-> > Subject: [PATCH] ARM: shmobile: always build rcar setup for armv7
-> >
-> > In a combined ARMv6/v7 kernel, the setup-rcar-gen2.c cannot
-> > currently be compiled correctly because it uses the isb
-> > instruction that is not available on ARMv6. Adding the
-> > -march=armv7-a flag lets the compiler know that it is safe
-> > to build this file for ARMv7.
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > 
+> > Changes in v10:
+> >     - this switches over domain infos to use masks instead of recomputing
+> >     
+> >       them each time and also gets rid of custom domain translator and
+> >       uses standard onecell on.
+> > 
+> > Changes in v9:
+> >     - fix v8 changes as follows:
+> >     - This reconciles the v2 and v7 code so that we power domain have
+> >     
+> >       lists of clocks they toggle on and off during power transitions and
+> >       independently from power domains clocks we attach clocks to devices
+> >       comprising power domain and prepare them so they are turn on and off
+> >       by runtime PM.
 > 
-> Thanks, this is a better solution than "[RFT] ARM: shmobile: rcar-gen2:
-> Fix build breakage" (https://lkml.org/lkml/2014/10/31/338).
+> I still don't like having lists of clocks in the power-domain DT.
 > 
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> DT is supposed to describe the hardware, and clocks are properties of
+> devices, not power-domains, so the DT description should follow from that.
 
-Agreed.
+on the policy side one could argue that if the clock needs to be enabled to 
+achieve sucessful domain state-changes, that it is also a property of the 
+domain itself in addition to the device.
 
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
+And on the pratical side we don't have drivers nor bindings for a big part of 
+the domain users - and this will probably be true for quite some time. This of 
+course makes it very impractical (or impossible) to collect the clocks for 
+parts like the gpu (mali), hevc, vcodec (video encoder/decoder), rga (2d 
+stuff), iep, isp.
 
-Arnd, what is the best way to get this patch merged?
-Do you plan to take it or should I?
+
+Heiko
