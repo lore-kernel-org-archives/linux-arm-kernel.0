@@ -1,63 +1,137 @@
-From: jbe@pengutronix.de (Juergen Borleis)
-Date: Wed, 12 Nov 2014 13:00:27 +0100
-Subject: Samsung/S3C6410/Mini6410: how to handle NAND's "clock off"
-In-Reply-To: <20141112091458.GM27002@pengutronix.de>
-References: <201411111910.34231.juergen@kreuzholzen.de>
- <20141111184226.GH27002@pengutronix.de>
- <20141112091458.GM27002@pengutronix.de>
-Message-ID: <201411121300.30286.jbe@pengutronix.de>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed, 12 Nov 2014 11:44:52 +0000
+Subject: [PATCHv4 5/5] arm64: Trace emulation of AArch32 legacy instructions
+In-Reply-To: <1415792692-11189-1-git-send-email-punit.agrawal@arm.com>
+References: <1415792692-11189-1-git-send-email-punit.agrawal@arm.com>
+Message-ID: <1415792692-11189-6-git-send-email-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Introduce an event to trace the usage of emulated instructions. The
+trace event is intended to help identify and encourage the migration
+of legacy software using the emulation features.
 
-On Wednesday 12 November 2014 10:14:58 Uwe Kleine-K?nig wrote:
-> Hello again,
->
-> [extending audience a bit]
->
-> On Tue, Nov 11, 2014 at 07:42:26PM +0100, Uwe Kleine-K?nig wrote:
-> > On Tue, Nov 11, 2014 at 07:10:33PM +0100, Juergen Borleis wrote:
-> > > Hi,
-> > >
-> > > the S3C2410 NAND driver [1] can still be used for NANDs attached to an
-> > > S3C6410 SoC. But this driver has a "nice" feature called "clock off" to
-> > > save some power while not in use. I tried it here on my Mini6410
-> > > platform and it freezes the system.
-> > >
-> > > The clock tree is somehow:
-> > >
-> > > [...]
-> > >   hclk                      4            4   133000000          0 0
-> > >      hclk_mfc               0            0   133000000          0 0
-> > >      hclk_mem0              2            2   133000000          0 0
-> > >         mem0_srom           0            0   133000000          0 0
-> > >         mem0_nfcon          1            1   133000000          0 0
-> > >         mem0_onenand0       0            0   133000000          0 0
-> > >         mem0_onenand1       0            0   133000000          0 0
-> > >         mem0_cfcon          0            0   133000000          0 0
-> > > [...]
-> > >
-> > > On the Mini6410 the "mem0_nfcon" clock is the only single user of the
-> > > "hclk_mem0". And this clock is required to keep the access to the
-> > > external network device enabled. When the NAND driver disables its
-> > > clock "mem0_nfcon", the "hclk_mem0" gets also disabled because there is
-> > > no consumer anymore. The next time the network driver tries to access
-> > > its device, the SoC freezes.
-> >
-> > Sounds like the network driver should hold a reference to hclk_mem0.
->
-> After talking to J?rgen by phone, the solution that the dm9000 driver
-> should handle the clock sounds wrong. The clk in question is needed by
-> the SoC to operate the bus the dm9000 is connected to. So I think the
-> right approach would include
+Use this event to trace usage of swp and CP15 barrier emulation.
 
-I think we need the same here for the S3C6410 SoC, like the imx-weim driver is 
-for i.MX SoCs.
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+---
+ arch/arm64/kernel/Makefile                 |  1 +
+ arch/arm64/kernel/armv8_deprecated.c       | 19 ++++++++++++--
+ arch/arm64/kernel/trace-events-emulation.h | 40 ++++++++++++++++++++++++++++++
+ 3 files changed, 58 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm64/kernel/trace-events-emulation.h
 
-jbe
-
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 84e9e51..b36ebd0 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -5,6 +5,7 @@
+ CPPFLAGS_vmlinux.lds	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+ AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+ CFLAGS_efi-stub.o 	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
++CFLAGS_armv8_deprecated.o := -I$(src)
+ 
+ CFLAGS_REMOVE_ftrace.o = -pg
+ CFLAGS_REMOVE_insn.o = -pg
+diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+index 248b222..62d0672 100644
+--- a/arch/arm64/kernel/armv8_deprecated.c
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -15,6 +15,9 @@
+ #include <linux/slab.h>
+ #include <linux/sysctl.h>
+ 
++#define CREATE_TRACE_POINTS
++#include "trace-events-emulation.h"
++
+ #include <asm/insn.h>
+ #include <asm/opcodes.h>
+ #include <asm/system_misc.h>
+@@ -203,6 +206,11 @@ static int swp_handler(struct pt_regs *regs, u32 instr)
+ 		regs->user_regs.regs[destreg] = data;
+ 
+ ret:
++	if (type == TYPE_SWPB)
++		trace_instruction_emulation("swpb", regs->pc);
++	else
++		trace_instruction_emulation("swp", regs->pc);
++
+ 	pr_warn_ratelimited("\"%s\" (%ld) uses obsolete SWP{B} instruction at 0x%llx\n",
+ 			current->comm, (unsigned long)current->pid, regs->pc);
+ 
+@@ -260,10 +268,15 @@ static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
+ 		 * dmb - mcr p15, 0, Rt, c7, c10, 5
+ 		 * dsb - mcr p15, 0, Rt, c7, c10, 4
+ 		 */
+-		if (aarch32_insn_mcr_extract_opc2(instr) == 5)
++		if (aarch32_insn_mcr_extract_opc2(instr) == 5) {
+ 			dmb(sy);
+-		else
++			trace_instruction_emulation(
++				"mcr p15, 0, Rt, c7, c10, 5 ; dmb", regs->pc);
++		} else {
+ 			dsb(sy);
++			trace_instruction_emulation(
++				"mcr p15, 0, Rt, c7, c10, 4 ; dsb", regs->pc);
++		}
+ 		break;
+ 	case 5:
+ 		/*
+@@ -272,6 +285,8 @@ static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
+ 		 * Taking an exception or returning from one acts as an
+ 		 * instruction barrier. So no explicit barrier needed here.
+ 		 */
++		trace_instruction_emulation(
++			"mcr p15, 0, Rt, c7, c5, 4 ; isb", regs->pc);
+ 		break;
+ 	}
+ 
+diff --git a/arch/arm64/kernel/trace-events-emulation.h b/arch/arm64/kernel/trace-events-emulation.h
+new file mode 100644
+index 0000000..2ba3882
+--- /dev/null
++++ b/arch/arm64/kernel/trace-events-emulation.h
+@@ -0,0 +1,40 @@
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM emulation
++
++#if !defined(_TRACE_EMULATION_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_EMULATION_H
++
++#include <linux/tracepoint.h>
++
++TRACE_EVENT(instruction_emulation,
++
++	TP_PROTO(const char *instr, u64 addr),
++	TP_ARGS(instr, addr),
++
++	TP_STRUCT__entry(
++		__array(char, comm, TASK_COMM_LEN)
++		__field(pid_t, pid)
++		__string(instr, instr)
++		__field(u64, addr)
++	),
++
++	TP_fast_assign(
++		memcpy(__entry->comm, current->comm, TASK_COMM_LEN);
++		__entry->pid = current->pid;
++		__assign_str(instr, instr);
++		__entry->addr = addr;
++	),
++
++	TP_printk("instr=\"%s\" comm=%s pid=%d addr=0x%llx", __get_str(instr),
++		__entry->comm, __entry->pid, __entry->addr)
++);
++
++#endif /* _TRACE_EMULATION_H */
++
++/* This part must be outside protection */
++#undef TRACE_INCLUDE_PATH
++#undef TRACE_INCLUDE_FILE
++#define TRACE_INCLUDE_PATH .
++
++#define TRACE_INCLUDE_FILE trace-events-emulation
++#include <trace/define_trace.h>
 -- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Borleis ? ? ? ? ? ? |
-Industrial Linux Solutions               ? ? ?| Phone: +49-5121-206917-5128 |
-Peiner Str. 6-8, 31137 Hildesheim, Germany ? ?| Fax: ? +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? ? ?| http://www.pengutronix.de/ ?|
+2.1.1
