@@ -1,11 +1,82 @@
-From: fthain@telegraphics.com.au (Finn Thain)
-Date: Wed, 12 Nov 2014 16:12:02 +1100
-Subject: [PATCH v3 16/37] ncr5380: Drop legacy scsi.h include
-References: <20141112051146.525489687@telegraphics.com.au>
-Message-ID: <20141112051150.285462865@telegraphics.com.au>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Wed, 12 Nov 2014 13:54:01 +0800
+Subject: [PATCH 10/10] PCI/MSI: Remove useless bus->msi assignment
+In-Reply-To: <20141112042454.GL28161@google.com>
+References: <1414396127-30023-1-git-send-email-wangyijing@huawei.com>
+ <1414396127-30023-11-git-send-email-wangyijing@huawei.com>
+ <20141112042454.GL28161@google.com>
+Message-ID: <5462F5F9.4000505@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An embedded and charset-unspecified text was scrubbed...
-Name: ncr5380-drop-legacy-scsi-h-include
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141112/cfa992cf/attachment.ksh>
+On 2014/11/12 12:24, Bjorn Helgaas wrote:
+> On Mon, Oct 27, 2014 at 03:48:47PM +0800, Yijing Wang wrote:
+>> Thierry introduced MSI chip(now renamed to MSI controller)
+>> framework to associate MSI chip and PCI bus in arm.
+>> Other platforms still use its own arch MSI functions to
+>> support MSI capability. Thierry introduced the bus->msi
+>> assignment to make child bus can inherit bus->msi from the parent.
+>> But in fact, drivers which used MSI chip always associate
+>> MSI chip and PCI bus by add .add_bus() in arm PCI host bridge
+>> drivers. Now we have saved MSI chip in pci_sys_data.
+>> We can remove this bus->msi assignment safely.
+>>
+>> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+>> CC: Thierry Reding <thierry.reding@gmail.com>
+>> CC: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> ---
+>>  drivers/pci/msi.c   |    5 -----
+>>  drivers/pci/probe.c |    1 -
+>>  2 files changed, 0 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+>> index f085f7f..27b6a54 100644
+>> --- a/drivers/pci/msi.c
+>> +++ b/drivers/pci/msi.c
+>> @@ -37,11 +37,6 @@ struct msi_controller * __weak pcibios_msi_controller(struct pci_bus *bus)
+>>  
+>>  struct msi_controller *pci_msi_controller(struct pci_bus *bus)
+>>  {
+>> -	struct msi_controller *ctrl = bus->msi;
+>> -
+>> -	if (ctrl)
+>> -		return ctrl;
+>> -
+>>  	return pcibios_msi_controller(bus);
+>>  }
+>>  
+>> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+>> index 5ed9930..4b18bf2 100644
+>> --- a/drivers/pci/probe.c
+>> +++ b/drivers/pci/probe.c
+>> @@ -682,7 +682,6 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+>>  
+>>  	child->parent = parent;
+>>  	child->ops = parent->ops;
+>> -	child->msi = parent->msi;
+> 
+> Does this mean that struct pci_bus.msi is now unused?  If not, where is it
+> still used?
+
+Yes, now all arm platforms save msi_chip in pci_sys_data, no one uses it again,
+actually, no platform/pcihost never use it, because all arm pci host drivers use
+pcibios_add_bus() to associate it and pci bus before. Remove it is safety.
+
+Thanks!
+Yijing.
+
+> 
+>>  	child->sysdata = parent->sysdata;
+>>  	child->bus_flags = parent->bus_flags;
+>>  
+>> -- 
+>> 1.7.1
+>>
+> 
+> .
+> 
+
+
+-- 
+Thanks!
+Yijing
