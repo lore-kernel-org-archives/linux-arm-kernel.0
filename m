@@ -1,57 +1,45 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 12 Nov 2014 13:55:00 +0000
-Subject: [PATCH 02/13] ARM: STi: DT: STiH416: Add DT node for the
- stih415/6 usb2 phy
-In-Reply-To: <20141110104947.GT21424@x1>
-References: <1415361475-6218-1-git-send-email-peter.griffin@linaro.org>
- <1415361475-6218-3-git-send-email-peter.griffin@linaro.org>
- <20141110104947.GT21424@x1>
-Message-ID: <20141112135500.GC20187@griffinp-ThinkPad-X1-Carbon-2nd>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 12 Nov 2014 15:57:55 +0200
+Subject: [PATCH 1/4] video: omapdss: Add opa362 driver
+In-Reply-To: <1415051968-4878-2-git-send-email-marek@goldelico.com>
+References: <1415051968-4878-1-git-send-email-marek@goldelico.com>
+ <1415051968-4878-2-git-send-email-marek@goldelico.com>
+Message-ID: <54636763.10605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi,
 
-Thanks for reviewing.
 
-On Mon, 10 Nov 2014, Lee Jones wrote:
-
-> On Fri, 07 Nov 2014, Peter Griffin wrote:
+On 03/11/14 23:59, Marek Belisko wrote:
+> opa362 is amplifier for videoand can be connected to the tvout pads
+> of the OMAP3. It has one gpio control for enable/disable of the output
+> (high impedance).
 > 
-> > This usb picophy is found on stih415/6 SoC.
-> 
-> Then shouldn't it live in stih41x.dtsi?
+> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
+> ---
+>  drivers/video/fbdev/omap2/displays-new/Kconfig     |   6 +
+>  drivers/video/fbdev/omap2/displays-new/Makefile    |   1 +
+>  .../fbdev/omap2/displays-new/amplifier-opa362.c    | 347 +++++++++++++++++++++
+>  3 files changed, 354 insertions(+)
+>  create mode 100644 drivers/video/fbdev/omap2/displays-new/amplifier-opa362.c
 
-No, it is the same ip block, and underlying driver, but needs a different
-compatible string as it's wired up to different sysconfig registers on the SoC.
+This doesn't even compile:
 
-> 
-> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> > ---
-> >  arch/arm/boot/dts/stih416.dtsi | 9 +++++++++
-> >  1 file changed, 9 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-> > index 1137bdf..0f3019a 100644
-> > --- a/arch/arm/boot/dts/stih416.dtsi
-> > +++ b/arch/arm/boot/dts/stih416.dtsi
-> > @@ -316,5 +316,14 @@
-> >  
-> >  			status	        = "disabled";
-> >  		};
-> > +
-> > +		usb2_phy: usb2phy at 0 {
-> > +			compatible = "st,stih416-usb-phy";
-> > +			#phy-cells = <0>;
-> > +			st,syscfg = <&syscfg_rear>;
-> > +			clocks = <&clk_sysin>;
-> > +			clock-names = "osc_phy";
-> > +
-> 
-> Remove this '\n'.
+drivers/video/fbdev/omap2/displays-new/amplifier-opa362.c:207:28: error:
+dereferencing pointer to incomplete type
+  ddata->enable_gpio = pdata->enable_gpio;
 
-Fixed in v2.
+And it seems to have fields for bypass and bypass which are handled in
+the devconf1 patch.
 
-regards,
+ Tomi
 
-Peter.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141112/376c65b7/attachment.sig>
