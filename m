@@ -1,35 +1,34 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 12 Nov 2014 15:47:16 +0100
-Subject: [PATCH v6 05/12] memory: Add NVIDIA Tegra memory controller
- support
-In-Reply-To: <20141112142150.GV10744@8bytes.org>
-References: <1415376063-17205-1-git-send-email-thierry.reding@gmail.com>
- <1415376063-17205-6-git-send-email-thierry.reding@gmail.com>
- <20141112142150.GV10744@8bytes.org>
-Message-ID: <20141112144715.GD26488@ulmo>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 12 Nov 2014 15:46:58 +0100 (CET)
+Subject: [RFC Part4 v1 00/17] Refine support of non-PCI-compliant Message
+In-Reply-To: <546364FA.7010806@arm.com>
+References: <1415545839-28263-1-git-send-email-jiang.liu@linux.intel.com>
+ <546364FA.7010806@arm.com>
+Message-ID: <alpine.DEB.2.11.1411121512270.3935@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 12, 2014 at 03:21:50PM +0100, Joerg Roedel wrote:
-> On Fri, Nov 07, 2014 at 05:00:56PM +0100, Thierry Reding wrote:
-> >  drivers/iommu/tegra-smmu.c               | 1295 ------------------------------
-> >  drivers/memory/tegra/smmu.c              |  716 +++++++++++++++++
+On Wed, 12 Nov 2014, Marc Zyngier wrote:
+> This patch introduces two optionnal fields to the msi_chip structure:
+> - a pointer to an irq domain, describing the MSI domain associated
+>   with this msi_chip. To be populated with msi_create_irq_domain.
+> - a domain_alloc_irqs() callback that has the same purpose as
+>   arch_setup_msi_irqs(), with the above domain as an additional
+>   parameter.
 > 
-> This new smmu.c is an IOMMU driver, why do you put it in drivers/memory
-> and not in drivers/iommu?
+> If both of these fields are non-NULL, then domain_alloc_irqs() is
+> called, bypassing the setup_irq callback. This allows the MSI driver
+> to use the domain stacking feature without mandating core support in
+> the architecture.
 
-The SMMU is part of a larger IP block that's also a memory controller.
-Having it in drivers/iommu would mean that we need to provide a
-mechanism to synchronize between the two drivers. They also share a
-number of data tables, so that would need to be shared somehow as well.
-By keeping both in the same directory we don't have to expose any of
-this publicly.
+I'd rather have the callback in the irqdomain itself. Along with a
+callback to free the interrupts.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141112/9b541f1f/attachment.sig>
+AFAICT is msi_chip more or less a wrapper around the actual MSI irq
+domain. So we rather move towards assigning irqdomain to the pci bus
+and get rid of msi_chip instead of adding another level of obscure
+indirection through msi_chip.
+
+Thanks,
+
+	tglx
