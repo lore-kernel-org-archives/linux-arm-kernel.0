@@ -1,50 +1,65 @@
-From: krishna.md@samsung.com (Krishna Mohan Dani)
-Date: Wed, 12 Nov 2014 14:05:39 +0530
-Subject: [PATCH 4/4 V2] ASoC: rt5631: Adding Device Tree compatibility to
- Realtek's ALC5631 codec driver
-In-Reply-To: <1415781339-16089-1-git-send-email-krishna.md@samsung.com>
-References: <1415781339-16089-1-git-send-email-krishna.md@samsung.com>
-Message-ID: <1415781339-16089-5-git-send-email-krishna.md@samsung.com>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Wed, 12 Nov 2014 14:16:00 +0530
+Subject: [[PATCHv2] 2/3] ARM: dts: vfxxx: Add SNVS node
+In-Reply-To: <38daf99040ba00bd5150e7bc73a2fd76@agner.ch>
+References: <cover.1415364391.git.maitysanchayan@gmail.com>
+ <64244b916de3864b714e829c3adeecec71aea2b3.1415364391.git.maitysanchayan@gmail.com>
+ <38daf99040ba00bd5150e7bc73a2fd76@agner.ch>
+Message-ID: <54631E48.7090804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Krishna Mohan Dani <krishna.md@samsung.com>
----
- sound/soc/codecs/rt5631.c |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+Hello,
 
-diff --git a/sound/soc/codecs/rt5631.c b/sound/soc/codecs/rt5631.c
-index 1ba27db..101b205 100644
---- a/sound/soc/codecs/rt5631.c
-+++ b/sound/soc/codecs/rt5631.c
-@@ -1686,10 +1686,18 @@ static struct snd_soc_codec_driver soc_codec_dev_rt5631 = {
- 
- static const struct i2c_device_id rt5631_i2c_id[] = {
- 	{ "rt5631", 0 },
-+	{ "alc5631", 0 },
- 	{ }
- };
- MODULE_DEVICE_TABLE(i2c, rt5631_i2c_id);
- 
-+static struct of_device_id rt5631_i2c_dt_ids[] = {
-+	{ .compatible = "realtek,rt5631"},
-+	{ .compatible = "realtek,alc5631"},
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, rt5631_i2c_dt_ids);
-+
- static const struct regmap_config rt5631_regmap_config = {
- 	.reg_bits = 8,
- 	.val_bits = 16,
-@@ -1734,6 +1742,9 @@ static struct i2c_driver rt5631_i2c_driver = {
- 	.driver = {
- 		.name = "rt5631",
- 		.owner = THIS_MODULE,
-+#ifdef CONFIG_OF
-+		.of_match_table = of_match_ptr(rt5631_i2c_dt_ids),
-+#endif
- 	},
- 	.probe = rt5631_i2c_probe,
- 	.remove   = rt5631_i2c_remove,
--- 
-1.7.9.5
+On Wednesday 12 November 2014 02:50 AM, Stefan Agner wrote:
+> On 2014-11-07 14:04, Sanchayan Maity wrote:
+>> This patch adds a devicetree node for the Secure
+>> Non-Volatile Storage (SNVS) on the VF610 platform.
+>> The SNVS block also has a Real Time Counter (RTC).
+>>
+>> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/vfxxx.dtsi |   15 +++++++++++++++
+>>  1 file changed, 15 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+>> index 4e70833..bc131b0 100644
+>> --- a/arch/arm/boot/dts/vfxxx.dtsi
+>> +++ b/arch/arm/boot/dts/vfxxx.dtsi
+>> @@ -338,6 +338,21 @@
+>>  				status = "disabled";
+>>  			};
+>>  
+>> +			snvs0: snvs at 400a7000 {
+>> +				compatible = "fsl,sec-v4.0-mon", "simple-bus";
+>> +				#address-cells = <1>;
+>> +				#size-cells = <1>;
+>> +				ranges = <0 0x400a7000 0x2000>;
+>> +
+>> +				snvs-rtc-lp at 34 {
+>> +					compatible = "fsl,sec-v4.0-mon-rtc-lp";
+>> +					reg = <0x34 0x58>;
+>> +					interrupts = <0 100 IRQ_TYPE_LEVEL_HIGH>;
+> 
+> With the new device tree structure, the interrupt field needs to be part
+> of the vf500.dtsi now. The vfxxx.dtsi will be the parent also for the
+> Cortex-M4 device tree, which uses a different interrupt controller.
+> 
+> While at it, use the GIC_SPI macro for the first cell (so this will be
+> blend into the other interrupt definitions).
+
+OK. Will fix this and send out a v3. My bad I missed the M4 changes.
+
+> 
+>> +					clocks = <&clks VF610_CLK_SNVS>;
+>> +					clock-names = "snvs-rtc";
+>> +				};
+>> +			};
+>> +
+>>  			uart4: serial at 400a9000 {
+>>  				compatible = "fsl,vf610-lpuart";
+>>  				reg = <0x400a9000 0x1000>;
+> 
+
+Regards,
+Sanchayan.
