@@ -1,115 +1,66 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Wed, 12 Nov 2014 11:44:57 -0500
-Subject: [PATCH] arm64: efi: Fix stub cache maintenance
-In-Reply-To: <1415810351-3462-1-git-send-email-mark.rutland@arm.com>
-References: <1415810351-3462-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <CAFECyb8bahaOb16p9Wh3qVEWp_bTf_C6=Hiep3UFvOS+w4ff8A@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 12 Nov 2014 16:58:42 +0000
+Subject: [PATCH] efi-entry.S: add dsb and isb
+In-Reply-To: <20141111063204.1506.57655.stgit@joelaarch64.amd.com>
+References: <20141111063204.1506.57655.stgit@joelaarch64.amd.com>
+Message-ID: <20141112165842.GL28015@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 12, 2014 at 11:39 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> While efi-entry.S mentions that efi_entry() will have relocated the
-> kernel image, it actually means that efi_entry will have placed a copy
-> of the kernel in the appropriate location, and until this is branched to
-> at the end of efi_entry.S, all instructions are executed from the
-> original image.
->
-> Thus while the flush in efi_entry.S does ensure that the copy is visible
-> to noncacheable accesses, it does not guarantee that this is true for
-> the image instructions are being executed from. This could have
-> disasterous effects when the MMU and caches are disabled if the image
-> has not been naturally evicted to the PoC.
->
-> Additionally, due to a missing dsb following the ic ialluis, the new
-> kernel image is not necessarily clean in the I-cache when it is branched
-> to, with similar potentially disasterous effects.
->
-> This patch adds additional flushing to ensure that the currently
-> executing stub text is flushed to the PoC and is thus visible to
-> noncacheable accesses. As it is placed after the instructions cache
-> maintenance for the new image and __flush_dcache_area already contains a
-> dsb, we do not need to add a separate barrier to ensure completion of
-> the icache maintenance.
->
-> Comments are updated to clarify the situation with regard to the two
-> images and the maintenance required for both.
+Hi Joel,
 
-Looks good.
-Reviewed-by: Roy Franz <roy.franz@linaro.org>
+I've Cc'd a few people who were involved in authoring this.
 
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Ian Campbell <ijc@hellion.org.uk>
-> Cc: Joel Schopp <joel.schopp@amd.com>
-> Cc: Leif Lindholm <leif.lindholm@linaro.org>
-> Cc: Mark Salter <msalter@redhat.com>
-> Cc: Roy Franz <roy.franz@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
+I have an alternative patch [1] that also adds some missing maintenance.
+Would you be able to give that a go?
+
+On Tue, Nov 11, 2014 at 06:32:04AM +0000, Joel Schopp wrote:
+> Add a dsb and isb after the instruction flush before the data cache and
+> mm offing.  Without this patch I am seeing synchronous exceptions occur
+> every few boots.
+> 
+> Signed-off-by: Joel Schopp <joel.schopp@amd.com>
+> Tested-by: Tom Lendacky <Thomas.Lendacky@amd.com>
 > ---
->  arch/arm64/kernel/efi-entry.S | 27 +++++++++++++++++++++------
->  1 file changed, 21 insertions(+), 6 deletions(-)
->
+>  arch/arm64/kernel/efi-entry.S |    6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
 > diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
-> index 619b1dd..d18a449 100644
+> index 619b1dd..7d95eda 100644
 > --- a/arch/arm64/kernel/efi-entry.S
 > +++ b/arch/arm64/kernel/efi-entry.S
-> @@ -54,18 +54,17 @@ ENTRY(efi_stub_entry)
->         b.eq    efi_load_fail
->
->         /*
-> -        * efi_entry() will have relocated the kernel image if necessary
-> -        * and we return here with device tree address in x0 and the kernel
-> -        * entry point stored at *image_addr. Save those values in registers
-> -        * which are callee preserved.
-> +        * efi_entry() will have copied the kernel image if necessary and we
-> +        * return here with device tree address in x0 and the kernel entry
-> +        * point stored at *image_addr. Save those values in registers which
-> +        * are callee preserved.
->          */
->         mov     x20, x0         // DTB address
->         ldr     x0, [sp, #16]   // relocated _text address
->         mov     x21, x0
->
->         /*
-> -        * Flush dcache covering current runtime addresses
-> -        * of kernel text/data. Then flush all of icache.
-> +        * Calculate size of the kernel Image (same for original and copy).
->          */
->         adrp    x1, _text
->         add     x1, x1, #:lo12:_text
-> @@ -73,9 +72,24 @@ ENTRY(efi_stub_entry)
->         add     x2, x2, #:lo12:_edata
->         sub     x1, x2, x1
->
-> +       /*
-> +        * Flush the copied Image to the PoC, and ensure it is not shadowed by
-> +        * stale icache entries from before relocation.
-> +        */
->         bl      __flush_dcache_area
->         ic      ialluis
->
-> +       /*
-> +        * Ensure that the rest of this function (in the original Image) is
-> +        * visible when the caches are disabled. The I-cache can't have stale
-> +        * entries for the VA range of the current image, so no maintenance is
-> +        * necessary.
-> +        */
-> +       adr     x0, efi_stub_entry
-> +       adr     x1, efi_stub_entry_end
-> +       sub     x1, x1, x0
-> +       bl      __flush_dcache_area
+> @@ -76,6 +76,12 @@ ENTRY(efi_stub_entry)
+>  	bl	__flush_dcache_area
+>  	ic	ialluis
+>  
+> +	/* We need to sync again after the instruction cache sync
+> +	 * and before turning off the dcache and mmu
+> +	 */
+> +	dsb	sy
+> +	isb
+
+In my series I reasoned that it wasn't necessary to have an ISB before
+we disabled the MMU. The current image must already be visible to the
+I-cache, so the I-cache can't have stale entries for it. We don't
+disable the MMU until after the image is visible at the PoC, so we
+shouldn't break the visbility of the current image to the I-cache.
+
+There is a bug in that We don't flush the current image in case of
+relocation, but I don't see how the ISB would help there.
+
+Thanks,
+Mark.
+
 > +
->         /* Turn off Dcache and MMU */
->         mrs     x0, CurrentEL
->         cmp     x0, #CurrentEL_EL2
-> @@ -105,4 +119,5 @@ efi_load_fail:
->         ldp     x29, x30, [sp], #32
->         ret
->
-> +efi_stub_entry_end:
->  ENDPROC(efi_stub_entry)
-> --
-> 1.9.1
->
+>  	/* Turn off Dcache and MMU */
+>  	mrs	x0, CurrentEL
+>  	cmp	x0, #CurrentEL_EL2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/301779.html
