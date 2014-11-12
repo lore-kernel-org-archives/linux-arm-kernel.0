@@ -1,98 +1,99 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Wed, 12 Nov 2014 14:07:51 +0200
-Subject: [PATCH v4 REPOST 1/5] of: Add descriptions of thermtrip properties
- to Tegra PMC bindings
-In-Reply-To: <5461AEB7.70507@nvidia.com>
-References: <1415625137-4791-1-git-send-email-mikko.perttunen@kapsi.fi>
- <1415625137-4791-2-git-send-email-mikko.perttunen@kapsi.fi>
- <5461AEB7.70507@nvidia.com>
-Message-ID: <54634D97.9050500@kapsi.fi>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 12 Nov 2014 13:08:29 +0100
+Subject: [PATCH v2 1/2] of/fdt: export fdt blob as /sys/firmware/fdt
+In-Reply-To: <CACxGe6vPC74TtwRxgA2jPQwCrpVjpk9UvnUiUNTF4ZgfmH4YgQ@mail.gmail.com>
+References: <1415645222-14909-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1415645222-14909-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20141111144221.5FCDAC416AF@trevor.secretlab.ca>
+ <CAL_JsqKeG1dWrMZydCN119V3++WKXqsjMm1bG7Fodhf3O8owpw@mail.gmail.com>
+ <CACxGe6tsLr52ZLww2JfwHFHajHW+f6nbYJPyWXmZJg3coKmMCA@mail.gmail.com>
+ <CAKv+Gu-UOPMaGQ+eRu8TX4DX_AN93JHt9dFHSaWs9+UB3UhdAg@mail.gmail.com>
+ <CACxGe6sN6dObiOnbhYM4Ltdn0BU_KTESuefvxh3odm1BbcUVbw@mail.gmail.com>
+ <CAKv+Gu9BgH8DiU=z-A5NDcCSwamJ84x3s95G=RGNoO9ostmTwg@mail.gmail.com>
+ <CACxGe6vPC74TtwRxgA2jPQwCrpVjpk9UvnUiUNTF4ZgfmH4YgQ@mail.gmail.com>
+Message-ID: <CAKv+Gu8wenvVa3=35pXTJkbZT+cwpAUfs6RdcBtWGyOyzXcupg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2014 08:37 AM, Alexandre Courbot wrote:
-> On 11/10/2014 10:12 PM, Mikko Perttunen wrote:
->> From: Mikko Perttunen <mperttunen@nvidia.com>
+On 12 November 2014 13:01, Grant Likely <grant.likely@linaro.org> wrote:
+> On Wed, Nov 12, 2014 at 11:51 AM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> On 12 November 2014 12:45, Grant Likely <grant.likely@linaro.org> wrote:
+>>> On Tue, Nov 11, 2014 at 8:34 PM, Ard Biesheuvel
+>>> <ard.biesheuvel@linaro.org> wrote:
+>>>> On 11 November 2014 21:08, Grant Likely <grant.likely@linaro.org> wrote:
+>>>>> On Tue, Nov 11, 2014 at 4:25 PM, Rob Herring <robherring2@gmail.com> wrote:
+>>>>>> On Tue, Nov 11, 2014 at 8:42 AM, Grant Likely <grant.likely@linaro.org> wrote:
+>>>>>>> On Mon, 10 Nov 2014 19:47:01 +0100
+>>>>>>> , Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>>>>>  wrote:
+>>>>>>>> Create a new /sys entry '/sys/firmware/fdt' to export the FDT blob
+>>>>>>>> that was passed to the kernel by the bootloader. This allows userland
+>>>>>>>> applications such as kexec to access the raw binary. The blob needs to
+>>>>>>>> be preserved as early as possible by calling preserve_fdt().
+>>>>>>>>
+>>>>>>>> The fact that this node does not reside under /sys/firmware/device-tree
+>>>>>>>> is deliberate: FDT is also used on arm64 UEFI/ACPI systems to
+>>>>>>>> communicate just the UEFI and ACPI entry points, but the FDT is never
+>>>>>>>> unflattened and used to configure the system.
+>>>>>>>>
+>>>>>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>>>>>
+>>>>>>> On further thought, nak. I want tree modifications to be treated as
+>>>>>>> bugs. Do a checksum CRC32 or check. It's simpler and it can be extended
+>>>>>>> to us an in-blob CRC when the file format gets upreved to include one.
+>>>>>>
+>>>>>> Why? MIPS Octeon is full of them BTW. So the rule is any modifications
+>>>>>> or fixups have to be on the unflattened tree?
+>>>>>
+>>>>> That, or we require the fixups to explicitly clean up the CRC after
+>>>>> themselves. That will force them to be visible. Anything using the
+>>>>> fdt_*() write functions could potentially take care of it
+>>>>> automatically. That would make it immediately discoverable where
+>>>>> changes are being made in the tree.
+>>>>>
+>>>>
+>>>> Doesn't that defeat the purpose of capturing the FDT as it was passed
+>>>> by the bootloader? Those fixups will be reapplied by the kexec'ed
+>>>> kernel anyway.
+>>>
+>>> We're always going to be in a grey area here. There are some things
+>>> that should not be passed over. For example, a framebuffer that is
+>>> passed in from firmware will no longer be valid on kexec. Right now on
+>>> arch/arm, the exynos platform fixes up the DT because the memory node
+>>> is outright /corrupt/. In the MIPS case, they do a bunch of stuff in
+>>> the kernel to figure out the hardware as configured by firmware. I
+>>> don't agree with that approach, but I would be very surprised if the
+>>> full original DT has any validity after the early boot fixups.
+>>>
 >>
->> Hardware-triggered thermal reset requires configuring the I2C
->> reset procedure. This configuration is read from the device tree,
->> so document the relevant properties in the binding documentation.
+>> Well, yes, but those fixups will presumably be done on every boot,
+>> including the kexec ones.
 >>
->> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
->> Reviewed-by: Wei Ni <wni@nvidia.com>
->> Tested-by: Wei Ni <wni@nvidia.com>
->> ---
->>   .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      | 24
->> ++++++++++++++++++++++
->>   1 file changed, 24 insertions(+)
+>>> Early boot fixups to the .dtb are always going to be oddball cases.
+>>>
 >>
->> diff --git
->> a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
->> b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
->> index 68ac65f..dc13fb0 100644
->> --- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
->> +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
->> @@ -47,6 +47,21 @@ Required properties when nvidia,suspend-mode=<0>:
->>     sleep mode, the warm boot code will restore some PLLs, clocks and
->> then
->>     bring up CPU0 for resuming the system.
->>
->> +Hardware-triggered thermal reset:
->> +On Tegra30, Tegra114 and Tegra124, if the 'i2c-thermtrip' subnode
->> exists,
->> +hardware-triggered thermal reset will be enabled.
->> +
->> +Required properties for hardware-triggered thermal reset (inside
->> 'i2c-thermtrip'):
->> +- nvidia,i2c-bus : Phandle to I2C bus containing the PMU
->> +- nvidia,bus-addr : Bus address of the PMU on the I2C bus
->> +- nvidia,reg-addr : I2C register address to write poweroff command to
->> +- nvidia,reg-data : Poweroff command to write to PMU
+>> OK, so generally speaking, whether the original DTB is more suitable
+>> to be presented through /sys/firmware/fdt than the 'current' FDT
+>> (i.e., whatever is in memory at the time the sysfs node is accessed)
+>> is not obvious at all. So why not just do the latter?
 >
-> This binding is taking two different routes to provide values to the
-> driver:
->
-> 1) It uses a phandle for i2c-bus (which must then be provided by another
-> binding implemented in the two following patches)
->
-> 2) It uses direct values for bus-addr, reg-addr and reg-data.
->
-> Do we need to use both approaches? bus-addr could just as well be
-> obtained through a phandle to the i2c device and reading its reg
-> property. From this phandle you could also go back up to the bus, making
-> the i2c-bus property unnecessary. reg-addr and reg-data cannot be
-> specified that way, obviously.
-
-This was in fact how I used to implement this, but Stephen or Thierry 
-pointed out that the reg property actually might not contain the correct 
-address (I think because the PMIC could have multiple addresses, and the 
-one in DT might not be the one that accepts the reset command).
-
-The workaround for that was to either add this integer property for 
-bus-addr or add a new PMIC API for querying. I went for this as it is 
-much simpler.
-
->
-> Actually I think I'd prefer to see i2c-bus become an integer property
-> instead of a phandle, because at the end of the day it is a value field
-> of a particular register and the reference is only used to retrieve that
-> value. It is not like we are actually going to call functions on the bus
-> instance or change its state. And for the single purpose of retrieving
-> that value, this binding requires the addition of a new property on the
-> bus node that will probably never be used for something else.
-
-And this was how I used to implement this even earlier, but Thierry 
-objected to that since it was duplicating information :)
-
->
-> We can also imagine that some design may not have a PMIC device in the
-> DT but still want to use the thermal reset feature. In this case, it is
-> again preferable to use direct values.
+> We're now talking theoreticals. In the case you're working on
+> (ACPI+FDT), the FDT is generated by Grub or the EFI stub as an
+> intermediary format, and there isn't currently any code in your boot
+> path that modifies the FDT. You're arguing for a future situation
+> where the kernel makes a fixup that is not wanted in the second
+> kernel. I'm arguing that 1) I want to /know/ when that happens because
+> there are very few situations where it is a valid thing to do, and 2)
+> the likelyhood of that happening in the FDT+ACPI case is somewhere
+> between slim and none because you're working with an intermediary FDT,
+> not a real hardware description.
 >
 
-I don't see how that'd change anything; the hardware feature still 
-requires an I2C device to send a message to. If there's an I2C device on 
-one of the SoC buses, you probably should have it in the DT..
+But do you still want the warning? Or only if you access the sysfs
+node? Or just a pr_warn() perhaps rather than a full blown WARN() ?
+MIPS will start seeing the warning as well even if they don't care
+about what is in /sys/firmware/fdt
 
-Cheers,
-Mikko
+-- 
+Ard.
