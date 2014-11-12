@@ -1,42 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Nov 2014 10:05:13 -0800
-Subject: [GIT PULL 3/3] omap clean-up for v3.19
-In-Reply-To: <pull-1415814409-868361>
-References: <pull-1415814409-868361>
-Message-ID: <pull-1415814409-868361-3>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 13 Nov 2014 02:08:35 +0800
+Subject: [PATCH v3 6/6] ARM: dts: sun8i: Unify ahb1 clock nodes
+In-Reply-To: <1415815715-31791-1-git-send-email-wens@csie.org>
+References: <1415815715-31791-1-git-send-email-wens@csie.org>
+Message-ID: <1415815715-31791-7-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 2dde3bccbf905548a17b8d440053f86454af54a9:
+The clock driver has unified support for the ahb1 clock.
+Unify the clock nodes so it works.
 
-  Merge branch 'for-v3.19/gpmc-omap' of github.com:rogerq/linux into omap-for-v3.19/gpmc (2014-11-03 17:45:36 -0800)
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun8i-a23.dtsi | 12 ++----------
+ 1 file changed, 2 insertions(+), 10 deletions(-)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.19/cleanup-part1
-
-for you to fetch changes up to 1b383f44aabc8b69b8bc0d32b914f3d3cece9e04:
-
-  ARM: OMAP2+: Drop board file for 3430sdp (2014-11-03 17:50:55 -0800)
-
-----------------------------------------------------------------
-Drop few unused omap board files. The support for ti81xx is known to
-be incomplete and broken, and the 3430sdp is only used in few automated
-boot test systems AFAIK and those have been booting in device tree only
-mode for quite some time now.
-
-Note that this branch has a dependency to the related device tree
-changes and GPMC changes sent in a separate pull request.
-
-----------------------------------------------------------------
-Tony Lindgren (2):
-      ARM: OMAP2+: Drop board file for ti8168evm
-      ARM: OMAP2+: Drop board file for 3430sdp
-
- arch/arm/mach-omap2/Kconfig           |  16 -
- arch/arm/mach-omap2/Makefile          |   3 -
- arch/arm/mach-omap2/board-3430sdp.c   | 604 ----------------------------------
- arch/arm/mach-omap2/board-ti8168evm.c |  62 ----
- 4 files changed, 685 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/board-3430sdp.c
- delete mode 100644 arch/arm/mach-omap2/board-ti8168evm.c
+diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
+index 0746cd1..726b613 100644
+--- a/arch/arm/boot/dts/sun8i-a23.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+@@ -140,19 +140,11 @@
+ 			clock-output-names = "axi";
+ 		};
+ 
+-		ahb1_mux: ahb1_mux_clk at 01c20054 {
+-			#clock-cells = <0>;
+-			compatible = "allwinner,sun6i-a31-ahb1-mux-clk";
+-			reg = <0x01c20054 0x4>;
+-			clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6>;
+-			clock-output-names = "ahb1_mux";
+-		};
+-
+ 		ahb1: ahb1_clk at 01c20054 {
+ 			#clock-cells = <0>;
+-			compatible = "allwinner,sun4i-a10-ahb-clk";
++			compatible = "allwinner,sun6i-a31-ahb1-clk";
+ 			reg = <0x01c20054 0x4>;
+-			clocks = <&ahb1_mux>;
++			clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6>;
+ 			clock-output-names = "ahb1";
+ 		};
+ 
+-- 
+2.1.3
