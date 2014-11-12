@@ -1,38 +1,68 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 12 Nov 2014 10:57:16 +0100
-Subject: [PATCH v3 5/6] ARM: mvebu: add Device Tree description of USB cluster
- controller on Armada 375
-In-Reply-To: <1415786237-21985-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1415786237-21985-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1415786237-21985-6-git-send-email-gregory.clement@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 12 Nov 2014 09:52:00 +0000
+Subject: [RFC 1/2] mfd: qcom-rpm: Expose sleep state resources to clients
+In-Reply-To: <20141111183319.GD16980@sonymobile.com>
+References: <1415659966-16200-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1415659966-16200-2-git-send-email-bjorn.andersson@sonymobile.com>
+ <20141111120457.GZ24004@x1> <20141111183319.GD16980@sonymobile.com>
+Message-ID: <20141112095200.GD24004@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Armada 375, the USB cluster allows to control the cluster composed
-of the USB2 and USB3 host controllers.
+On Tue, 11 Nov 2014, Bjorn Andersson wrote:
 
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/armada-375.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+> On Tue 11 Nov 04:04 PST 2014, Lee Jones wrote:
+> 
+> > On Mon, 10 Nov 2014, Bjorn Andersson wrote:
+> > 
+> > > Resources exposed from the RPM have an "active state" that is used during
+> > > normal operations and a "sleep state" that is used for HW assisted sleep
+> > > modes. Expose this in the api to let client drivers set the "sleep
+> > > state" as well.
+> > 
+> > I assume you have users lined up which will request a sleeping state?
+> > 
+> 
+> All users of this interface (regulators, clocks and bus scaling) will have to
+> be able to specify this.
+> 
+> [..]
+> > > @@ -359,8 +361,7 @@ int qcom_rpm_write(struct qcom_rpm *rpm, int resource, u32 *buf, size_t count)
+> > >  			       RPM_CTRL_REG(rpm, RPM_REQ_SELECT + i));
+> > >  	}
+> > >  
+> > > -	writel_relaxed(RPM_ACTIVE_STATE,
+> > > -		       RPM_CTRL_REG(rpm, RPM_REQUEST_CONTEXT));
+> > > +	writel_relaxed(BIT(state), RPM_CTRL_REG(rpm, RPM_REQUEST_CONTEXT));
+> > 
+> > How are the state bits organised?
+> > 
+> 
+> BIT(0) is active mode, BIT(1) is sleep mode, as specified below. I could add
+> some sanity checking here if you would like to.
 
-diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-index de6571445cef..8f45cf5d2a50 100644
---- a/arch/arm/boot/dts/armada-375.dtsi
-+++ b/arch/arm/boot/dts/armada-375.dtsi
-@@ -342,6 +342,12 @@
- 				#clock-cells = <1>;
- 			};
- 
-+			usbcluster: usb-cluster at 18400 {
-+				compatible = "marvell,armada-375-usb-cluster";
-+				reg = <0x18400 0x4>;
-+				#phy-cells = <1>;
-+			};
-+
- 			mbusc: mbus-controller at 20000 {
- 				compatible = "marvell,mbus-controller";
- 				reg = <0x20000 0x100>, <0x20180 0x20>;
+I'm just double checking that you know what that means.
+
+BIT(0) == b01
+BIT(1) == b10
+
+It seems strange to represent a single boolean state over 2 bits.
+
+Also, what happens if b11 or b00 occurs?
+
+> [..]
+> > > diff --git a/include/linux/mfd/qcom_rpm.h b/include/linux/mfd/qcom_rpm.h
+> > > index a60798d..f0e70b2 100644
+> > > --- a/include/linux/mfd/qcom_rpm.h
+> > > +++ b/include/linux/mfd/qcom_rpm.h
+> > > +#define RPM_ACTIVE_STATE	0
+> > > +#define RPM_SLEEP_STATE		1
+> 
+> Regards,
+> Bjorn
+
 -- 
-1.9.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
