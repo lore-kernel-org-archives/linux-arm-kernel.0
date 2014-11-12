@@ -1,61 +1,76 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 12 Nov 2014 09:57:05 +0000
-Subject: [PATCH v4 0/5] simplefb: add clock handling code
-In-Reply-To: <CAMuHMdUoPK_s7OP1Aop4eOyhec+abFij7ZoAAdA5fqpJJy-Dgg@mail.gmail.com>
-References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
- <544F737A.7000109@ti.com>
- <CAL_JsqJ2JRg7k21CEVe4-At7enD+y3TN_7wfqhY0OHZm-_j17w@mail.gmail.com>
- <544F7E5D.60104@redhat.com> <5450CAA5.5020205@ti.com>
- <CAL_JsqKWqq+H5ymUW3n8tkmLJHEUGaKDLX5+orJmGUQ3ECQwUQ@mail.gmail.com>
- <20141111214950.7FCABC41610@trevor.secretlab.ca>
- <CAMuHMdUoPK_s7OP1Aop4eOyhec+abFij7ZoAAdA5fqpJJy-Dgg@mail.gmail.com>
-Message-ID: <CACxGe6sMF2C6hvRNNnB_i6a44fh0WC7JjjisFOh5GMV66mC6Fw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 12 Nov 2014 10:57:13 +0100
+Subject: [PATCH v3 2/6] Phy: DT binding documentation for Marvell MVEBU SATA
+ phy.
+In-Reply-To: <1415786237-21985-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1415786237-21985-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1415786237-21985-3-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 12, 2014, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
->
-> Hi Grant,
->
-> On Tue, Nov 11, 2014 at 10:49 PM, Grant Likely <grant.likely@linaro.org> wrote:
-> > However, I am concerned about handover. I've lost track over the entire
-> > thread on whether the handover mechanism has been resolved, and I would
-> > really like to have a proposed solution to this documented in the
-> > binding. The fact that there is nothing tying the simple framebuffer to
-> > the actual hardware backing the framebuffer is concerning. It means the
-> > kernel needs to guess which graphics device is associated with the
-> > framebuffer.
->
-> We did discuss handover in D?sseldorf, and concluded that the simplefb's
-> regs property can be used for this.
->
-> While on a modern system with unified memory this association cannot be
-> derived in a generic way, a device-specific driver for the graphics hardware
-> can if the regs property of the simplefb node matches the address the CRTC
-> engine is configured for.
+From: Andrew Lunn <andrew@lunn.ch>
 
+Describe the binding for the Marvell MVEBU SATA phy. This driver
+can be used at least with Kirkwood, Dove and maybe others.
+Additionally, update the SATA binding with the properties to link
+to the phy nodes.
 
-???
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ Documentation/devicetree/bindings/ata/marvell.txt  |  6 ++++++
+ .../devicetree/bindings/phy/phy-mvebu.txt          | 22 ++++++++++++++++++++++
+ 2 files changed, 28 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-mvebu.txt
 
-Right, I'm going to be blunt here: That's just dumb. All the
-capability needed is there in the DT to associate a simple FB to a
-display controller, and the solution chosen is to use a heuristic?
-
-The association needs to be explicit. I strongly prefer putting the
-simple FB directly into the display controller node, but I would
-consider phandle linkage also.
-
-g.
-
->
-> Gr{oetje,eeting}s,
->
->                         Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+diff --git a/Documentation/devicetree/bindings/ata/marvell.txt b/Documentation/devicetree/bindings/ata/marvell.txt
+index 1c8351604d38..b460edd12766 100644
+--- a/Documentation/devicetree/bindings/ata/marvell.txt
++++ b/Documentation/devicetree/bindings/ata/marvell.txt
+@@ -6,11 +6,17 @@ Required Properties:
+ - interrupts    : Interrupt controller is using
+ - nr-ports      : Number of SATA ports in use.
+ 
++Optional Properties:
++- phys		: List of phandles to sata phys
++- phy-names	: Should be "0", "1", etc, one number per phandle
++
+ Example:
+ 
+ 	sata at 80000 {
+ 		compatible = "marvell,orion-sata";
+ 		reg = <0x80000 0x5000>;
+ 		interrupts = <21>;
++		phys = <&sata_phy0>, <&sata_phy1>;
++		phy-names = "0", "1";
+ 		nr-ports = <2>;
+ 	}
+diff --git a/Documentation/devicetree/bindings/phy/phy-mvebu.txt b/Documentation/devicetree/bindings/phy/phy-mvebu.txt
+new file mode 100644
+index 000000000000..6cb3364aeafb
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/phy-mvebu.txt
+@@ -0,0 +1,22 @@
++* Marvell MVEBU SATA PHY
++
++Power control for the SATA phy found on Marvell MVEBU SoCs.
++
++This document extends the binding described in phy-bindings.txt
++
++Required properties :
++
++ - reg		   : Offset and length of the register set for the SATA device
++ - compatible	   : Should be "marvell,mvebu-sata-phy"
++ - clocks	   : phandle of clock and specifier that supplies the device
++ - clock-names	   : Should be "sata"
++
++Example:
++		sata-phy at 84000 {
++			compatible = "marvell,mvebu-sata-phy";
++			reg = <0x84000 0x0334>;
++			clocks = <&gate_clk 15>;
++			clock-names = "sata";
++			#phy-cells = <0>;
++			status = "ok";
++		};
+-- 
+1.9.1
