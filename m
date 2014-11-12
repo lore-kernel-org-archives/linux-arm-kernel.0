@@ -1,64 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 12 Nov 2014 17:41:30 +0000
-Subject: [PATCH] arm64: efi: Fix stub cache maintenance
-In-Reply-To: <54639500.5010309@amd.com>
-References: <1415810351-3462-1-git-send-email-mark.rutland@arm.com>
- <54639500.5010309@amd.com>
-Message-ID: <20141112174130.GN28015@leverpostej>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 12 Nov 2014 11:43:56 -0600
+Subject: [PATCH v4 2/5] dt-bindings: Add a clocks property to the
+ simple-framebuffer binding
+In-Reply-To: <CACxGe6vBq5Y6HbogbpVUy9VLaocfrAsR_XRbio4zBB_vY5GRsw@mail.gmail.com>
+References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
+ <1413996311-4287-3-git-send-email-hdegoede@redhat.com>
+ <20141111214217.19EF5C41610@trevor.secretlab.ca>
+ <546373C6.4010001@redhat.com>
+ <CACxGe6v15EjpALit4ZJLXDgCkwEYM4t1mryjoQpa3=wpKmXWEg@mail.gmail.com>
+ <CACxGe6vBq5Y6HbogbpVUy9VLaocfrAsR_XRbio4zBB_vY5GRsw@mail.gmail.com>
+Message-ID: <CAL_Jsq+fzmTOSr8g+6b5R=KPao1ZeumsyNS3nfYBzfVQCiPbWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 12, 2014 at 05:12:32PM +0000, Joel Schopp wrote:
-> 
-> >  
-> > +	/*
-> > +	 * Ensure that the rest of this function (in the original Image) is
-> > +	 * visible when the caches are disabled. The I-cache can't have stale
-> > +	 * entries for the VA range of the current image, so no maintenance is
-> > +	 * necessary.
-> > +	 */
-> > +	adr	x0, efi_stub_entry
-> > +	adr	x1, efi_stub_entry_end
-> > +	sub	x1, x1, x0
-> > +	bl	__flush_dcache_area
-> It is my understdanding that you also need an isb here.  Tom's testing
-> confirms this on my patch with the dsb and without the isb. 
+On Wed, Nov 12, 2014 at 10:38 AM, Grant Likely <grant.likely@linaro.org> wrote:
+> Rob, seeing as we disagree on patch #5, do you have time to discuss this
+> evening, or tomorrow?
 
-Ok. I still can't see what context we would be synchronising, but it's
-entirely possible my reasoning is off. I'm more than happy to add the
-ISB if necessary, but I'd like to know why it is necessary.
+Yes, either is fine.
 
-> Also, since this is not a performance critical path it seems more
-> straightforward to just flush everything.
+Rob
 
-Unfortunately, there's no way of flushing everything to the PoC.
-
-Due to the possible presence of a system cache (e.g. the L3 in CCN), it
-is only possible to flush data to the PoC by means of VA operations,
-which must respect maintenance by VA per the architecture (see the ARMv8
-ARM ARM, issue A.d).
-
-Using Set/Way operations will at best only flush out to the L3 cache,
-and even that is racy while the D-cache on; the CPU's D-cache can
-speculatively allocate lines out of the system cache (even if dirty),
-and theoretically could shuffle lines between levels (and via that race,
-between ways in a set).
-
-Set/Way operations can only be used safely with the D-cache off, and
-only to ensure that lines have been invalidate or evicted from the CPU's
-cache. They cannot be used to ensure that the lines have made it to the
-PoC (or PoU).
-
-If other cache-coherent masters (e.g. other CPUs) have caches enabled,
-they can similarly acquire cache lines from the current CPU, though that
-shouldn't be a concern in this path.
-
-We could flush the entire physical address space by VA, but that will
-take an extremely long time, even for a path that isn't performance
-critical.
-
-> I'm happy either way. We will test your patch as is and let you know.
-
-Thanks, it's much appreciated.
-
-Mark.
+>
+> g.
+>
+> On 12 Nov 2014 14:56, "Grant Likely" <grant.likely@linaro.org> wrote:
+>>
+>> [Replying on-list and with original ccs]
+>>
+>> On Wed, Nov 12, 2014 at 2:50 PM, Hans de Goede <hdegoede@redhat.com>
+>> wrote:
+>> > Hi,
+>> >
+>> > On 11/11/2014 10:42 PM, Grant Likely wrote:
+>> >> - clocks : List of clocks used by the framebuffer. Clocks listed here
+>> >>            are expected to already be configured correctly. The OS must
+>> >>            ensure these clocks are not modified or disabled while the
+>> >>            simple framebuffer remains active.
+>> >
+>> > Updated in my local tree, where I've also added proper commit messages
+>> > to the 2 patches missing them. Shall I send a v5 of the set, and may I
+>> > add your Acked-by to this patch when sending v5?
+>>
+>> For this whole series, please add my Acked-by.
+>>
+>> Acked-by: Grant Likely <grant.likely@linaro.org>
+>>
+>> I'm okay with the bindings, and I'm okay with adding the clock
+>> dependency to a simplefb node. I'm happy with the conversation we had
+>> today on IRC, and I'm expecting to see a binding that covers expected
+>> firmware/OS behaviour and association with the real hardware posted to
+>> the list shortly.
+>>
+>> g.
