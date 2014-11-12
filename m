@@ -1,32 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Nov 2014 10:48:07 +0000
-Subject: gcc 4.9 build warnings (was: Re: next build: 2674 warnings 1
- failures (next/next-20141022))
-In-Reply-To: <CAOesGMiscbWfbpxwPxkH+7_4mhK=5+4nQJrWvgHfbsLJYhO1cg@mail.gmail.com>
-References: <5447442c.a9ca440a.2060.5e09@mx.google.com>
- <20141024094412.GN27405@n2100.arm.linux.org.uk>
- <20141024182509.GA31232@gate.crashing.org>
- <2480226.26bJjjL2fl@wuerfel>
- <CAOesGMiscbWfbpxwPxkH+7_4mhK=5+4nQJrWvgHfbsLJYhO1cg@mail.gmail.com>
-Message-ID: <20141112104807.GZ4042@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 12 Nov 2014 18:50:45 +0800
+Subject: [PATCH] ARM: dts: imx6qdl: Enable CODA960 VPU
+In-Reply-To: <1415740367-326-1-git-send-email-festevam@gmail.com>
+References: <1415740367-326-1-git-send-email-festevam@gmail.com>
+Message-ID: <20141112105044.GL2704@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 11, 2014 at 05:34:54PM -0800, Olof Johansson wrote:
-> Hey, look at that:
+On Tue, Nov 11, 2014 at 07:12:47PM -0200, Fabio Estevam wrote:
+> From: Philipp Zabel <p.zabel@pengutronix.de>
 > 
-> http://arm-soc.lixom.net/buildlogs/misc/v3.18-rc2/
+> This patch adds links to the on-chip SRAM and reset controller nodes
+> and switches the interrupts. Make the BIT processor interrupt, which exists on
+> all variants, the first one. The JPEG unit interrupt, which does not exist on
+> i.MX27 and i.MX5 thus is an optional second interrupt.
+> Use different compatible strings for i.MX6Q/D and i.MX6S/DL, as they have to
+> load separate firmware images for some reason.
 > 
-> I've updated the toolchain now, so new builds should be using the proper one.
-> 
-> Thanks a lot for figuring this out. Segher, feel free to update your
-> scripts -- I've got a local edit for it here now. :)
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Great, thanks Olof and others for fixing this.  Now all we need is for
-people to fix their warnings/errors in the latest -next build, some of
-which have been hanging around for some time.  Like the irq_reg_readl()
-error for the Marvell platforms...
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Applied, thanks.
