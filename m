@@ -1,27 +1,17 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 12 Nov 2014 17:16:37 +0200
-Subject: [PATCHv6 2/5] Documentation: dt: add the omap hwspinlock bindings
- document
-In-Reply-To: <1410553499-55951-3-git-send-email-s-anna@ti.com>
-References: <1410553499-55951-1-git-send-email-s-anna@ti.com>
- <1410553499-55951-3-git-send-email-s-anna@ti.com>
-Message-ID: <CAK=Wgba2hS6jwZ0+-YVPjjg2M9rTSccWmUEKYF_RMPoq14cxaw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 12 Nov 2014 07:21:32 -0800
+Subject: [PATCH] ARM: OMAP2+: clock: remove unused function prototype
+In-Reply-To: <1415721364-25749-1-git-send-email-johan@kernel.org>
+References: <1415721364-25749-1-git-send-email-johan@kernel.org>
+Message-ID: <20141112152132.GE26481@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+* Johan Hovold <johan@kernel.org> [141111 07:58]:
+> Remove unused function prototype that was left by commit 149c09d3a61d
+> ("ARM: AM33xx: remove old clock data and link in new clock init code")
+> which removed the definition.
 
-On Fri, Sep 12, 2014 at 11:24 PM, Suman Anna <s-anna@ti.com> wrote:
-> HwSpinlock IP is present only on OMAP4 and other newer SoCs,
-> which are all device-tree boot only. This patch adds the
-> DT bindings information for OMAP hwspinlock module.
->
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> ---
->  .../devicetree/bindings/hwlock/omap-hwspinlock.txt | 24 ++++++++++++++++++++++
+Applying into omap-for-v3.19/fixes-not-urgent thanks.
 
-I need an ACK from a DT maintainer here as well, please try to get it.
-
-Thanks,
-Ohad.
+Tony
