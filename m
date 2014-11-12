@@ -1,110 +1,345 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Nov 2014 17:34:54 -0800
-Subject: gcc 4.9 build warnings (was: Re: next build: 2674 warnings 1
- failures (next/next-20141022))
-In-Reply-To: <2480226.26bJjjL2fl@wuerfel>
-References: <5447442c.a9ca440a.2060.5e09@mx.google.com>
- <20141024094412.GN27405@n2100.arm.linux.org.uk>
- <20141024182509.GA31232@gate.crashing.org>
- <2480226.26bJjjL2fl@wuerfel>
-Message-ID: <CAOesGMiscbWfbpxwPxkH+7_4mhK=5+4nQJrWvgHfbsLJYhO1cg@mail.gmail.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Wed, 12 Nov 2014 10:41:02 +0900
+Subject: [PATCH] mmc: dw_mmc: exynos: Add support for exynos7
+In-Reply-To: <CAGOxZ529mpKrJAT8HSGucVdYpWPM833VO-PNord71-bDOt+G-w@mail.gmail.com>
+References: <1409231933-14796-1-git-send-email-yuvaraj.cd@samsung.com>
+ <54005990.8070306@samsung.com>
+ <CAM4voan4ih-dD1qm85CQP9Yd0fo8xDbf7WyMdPFyHse9qO9=JA@mail.gmail.com>
+ <CAFp+6iFFq0SBwbd1m5yKK04=FVPtxZHvh+q_WSOPmriv=Uk0YQ@mail.gmail.com>
+ <CAFp+6iFYF+pp01WtcWPnqZ1PkPp8Td0Stuii67kX4cGjV4ojnw@mail.gmail.com>
+ <CAGOxZ529mpKrJAT8HSGucVdYpWPM833VO-PNord71-bDOt+G-w@mail.gmail.com>
+Message-ID: <5462BAAE.9060208@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey, look at that:
+Hi, Alim.
 
-http://arm-soc.lixom.net/buildlogs/misc/v3.18-rc2/
+I have also tested this patch with my board.
+It's working fine. Looks good to me.
 
-I've updated the toolchain now, so new builds should be using the proper one.
+Dear, Ulf.
 
-Thanks a lot for figuring this out. Segher, feel free to update your
-scripts -- I've got a local edit for it here now. :)
+Could you merge this patch at your repository?
 
+Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
 
--Olof
+Best Regards,
+Jaehoon Chung
 
-On Tue, Nov 11, 2014 at 1:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 24 October 2014 13:25:09 Segher Boessenkool wrote:
->> On Fri, Oct 24, 2014 at 10:44:12AM +0100, Russell King - ARM Linux wrote:
->> > On Fri, Oct 24, 2014 at 11:13:27AM +0200, Arnd Bergmann wrote:
->> > > Ok, that also explains the problems with the missing __linux__ macro, given
->> > > Ard's reply about bare-metal gcc.
->> > >
->> > > I think we have two choices here:
->> > >
->> > > a) change the buildall script so it actually builds a compiler that behaves
->> > >    in the way we expect for the kernel (__SIZE_TYPE__ and __linux__ at least,
->> > >    possibly others)
->> > >
->> > > b) change the kernel to work with the way the bare-metal compiler is built,
->> > >    adding -D__linux__ in the ARM Makefile and applying Ard's workaround for
->> > >    __SIZE_TYPE__/__INT32_TYPE__/__UINT32_TYPE__/__UINTPTR_TYPE__.
->> > >
->> > > Both options are a little hacky and I don't really like them, but I think
->> > > it makes sense to do one of them.
->> >
->> > Well, (a) is probably the right answer.  EABI had (or still has) the
->> > idea that enums can be a dynamic size, and this was taken out of the
->> > Linux version of EABI.  What this means is that an enum used across an
->> > interface between a compiler targetting Linux and one not targetting
->> > Linux may not be compatible.
+On 11/11/2014 11:14 PM, Alim Akhtar wrote:
+> Hi Jaehoon,
+> As 64bit dependent patch for dw_mmc is already merged.
+> Do you have any comments on this patch?
+> 
+> This patch still apply cleanly on ulf's next and v3.18-rc4 kernel.
+> 
+> Regards,
+> Alim
+> 
+> On Tue, Oct 21, 2014 at 1:50 PM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+>> On Tue, Oct 21, 2014 at 1:47 PM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
 >>
->> Hi!  Happy to hear some people still find buildall useful.
+>> Corrected Tomasz's mail id, as the earlier samsung one is not valid now.
+>> Also giving a Tested-by
 >>
->> The standard arm toolchains it builds are configured for arm-linux-eabi,
->> not "plain" eabi.  So what goes wrong?
+>>> On Mon, Sep 1, 2014 at 11:14 AM, Abhilash Kesavan
+>>> <kesavan.abhilash@gmail.com> wrote:
+>>>> Hi Jaehoon,
+>>>>
+>>>> +Prabu Thangamuthu
+>>>>
+>>>> On Fri, Aug 29, 2014 at 4:14 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>>>>> Hi, Abhilash.
+>>>>>
+>>>>> On 08/28/2014 10:18 PM, Yuvaraj Kumar C D wrote:
+>>>>>> From: Abhilash Kesavan <a.kesavan@samsung.com>
+>>>>>>
+>>>>>> The Exynos7 has a DWMMC controller (v2.70a) which is different from
+>>>>>> prior versions. This patch adds new compatible strings for exynos7.
+>>>>>> This patch also fixes the CLKSEL register offset on exynos7.
+>>>>>
+>>>>> If support the 64bit, dw-mmc.c need to modify.(according to v2.70, some offset is changed for 64-bit address)
+>>>>> But i didn't see any patches at mailing.
+>>>>> Do you have the plan which send patch of dw-mmc.c?
+>>>>
+>>>> We are using a rebased version of
+>>>> http://www.spinics.net/lists/linux-mmc/msg21742.html to handle the
+>>>> dwmmc side changes. We should have mentioned this dependency as the
+>>>> patch is required for proper functioning of dwmmc on Exynos7.
+>>>> Stress tests are on-going with that patch and once it looks good, we
+>>>> will post our results so that the original patch may be taken forward.
+>>>>
+>>>> Regards,
+>>>> Abhilash
+>>>>>
+>>>>> Best Regards,
+>>>>> Jaehoon Chung
+>>>>>>
+>>>>>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>>>>>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+>>>>>> ---
+>>>
+>>> I have tested this patch following set of patches:
+>>>
+>>> On Exynos7 support side:
+>>> 1) dts, kbuild: Implement support for dtb vendor subdirs" patchset
+>>> http://comments.gmane.org/gmane.linux.kbuild.devel/12131
+>>> 2) arch: arm64: Enable support for Samsung Exynos7 SoC  (V5)
+>>> http://www.spinics.net/lists/linux-samsung-soc/msg37047.html
+>>> 3) Serial clean-up patches for Exynos7
+>>> http://www.spinics.net/lists/arm-kernel/msg367348.html
+>>> http://www.spinics.net/lists/arm-kernel/msg367349.html
+>>> 4) Add initial support for pinctrl on Exynos7  (V5)
+>>> http://www.spinics.net/lists/linux-samsung-soc/msg37708.html
+>>>
+>>> On MMC side:
+>>> 1) mmc: dw_mmc: Add IDMAC 64-bit address mode support  (V7)
+>>> https://lkml.org/lkml/2014/10/20/58
+>>> 2) mmc: dw_mmc: Reset DMA before enabling IDMAC  (V2)
+>>> http://www.gossamer-threads.com/lists/linux/kernel/2028229
+>>>
+>>> eMMC and SD are running fine on Exynos7.
 >>
->> Oh.  I changed that april this year; so just update your buildall.
+>> Tested-by: Vivek Gautam <gautam.vivek@samsung.com>
 >>
->> [But of course it would be good if the kernel build would work with *any*
->> reasonable toolchain.  OTOH it seems that most arm toolchains aren't
->> reasonable.]
+>>>
+>>> If this change looks good, then we can take it in.
+>>>
+>>>>>>  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |    4 +
+>>>>>>  drivers/mmc/host/dw_mmc-exynos.c                   |   91 +++++++++++++++++---
+>>>>>>  2 files changed, 82 insertions(+), 13 deletions(-)
+>>>>>>
+>>>>>> diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+>>>>>> index 6cd3525..ee4fc05 100644
+>>>>>> --- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+>>>>>> +++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+>>>>>> @@ -18,6 +18,10 @@ Required Properties:
+>>>>>>         specific extensions.
+>>>>>>       - "samsung,exynos5420-dw-mshc": for controllers with Samsung Exynos5420
+>>>>>>         specific extensions.
+>>>>>> +     - "samsung,exynos7-dw-mshc": for controllers with Samsung Exynos7
+>>>>>> +       specific extensions.
+>>>>>> +     - "samsung,exynos7-dw-mshc-smu": for controllers with Samsung Exynos7
+>>>>>> +       specific extensions having an SMU.
+>>>>>>
+>>>>>>  * samsung,dw-mshc-ciu-div: Specifies the divider value for the card interface
+>>>>>>    unit (ciu) clock. This property is applicable only for Exynos5 SoC's and
+>>>>>> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
+>>>>>> index 0fbc53a..509365c 100644
+>>>>>> --- a/drivers/mmc/host/dw_mmc-exynos.c
+>>>>>> +++ b/drivers/mmc/host/dw_mmc-exynos.c
+>>>>>> @@ -25,6 +25,7 @@
+>>>>>>  #define NUM_PINS(x)                  (x + 2)
+>>>>>>
+>>>>>>  #define SDMMC_CLKSEL                 0x09C
+>>>>>> +#define SDMMC_CLKSEL64                       0x0A8
+>>>>>>  #define SDMMC_CLKSEL_CCLK_SAMPLE(x)  (((x) & 7) << 0)
+>>>>>>  #define SDMMC_CLKSEL_CCLK_DRIVE(x)   (((x) & 7) << 16)
+>>>>>>  #define SDMMC_CLKSEL_CCLK_DIVIDER(x) (((x) & 7) << 24)
+>>>>>> @@ -65,6 +66,8 @@ enum dw_mci_exynos_type {
+>>>>>>       DW_MCI_TYPE_EXYNOS5250,
+>>>>>>       DW_MCI_TYPE_EXYNOS5420,
+>>>>>>       DW_MCI_TYPE_EXYNOS5420_SMU,
+>>>>>> +     DW_MCI_TYPE_EXYNOS7,
+>>>>>> +     DW_MCI_TYPE_EXYNOS7_SMU,
+>>>>>>  };
+>>>>>>
+>>>>>>  /* Exynos implementation specific driver private data */
+>>>>>> @@ -95,6 +98,12 @@ static struct dw_mci_exynos_compatible {
+>>>>>>       }, {
+>>>>>>               .compatible     = "samsung,exynos5420-dw-mshc-smu",
+>>>>>>               .ctrl_type      = DW_MCI_TYPE_EXYNOS5420_SMU,
+>>>>>> +     }, {
+>>>>>> +             .compatible     = "samsung,exynos7-dw-mshc",
+>>>>>> +             .ctrl_type      = DW_MCI_TYPE_EXYNOS7,
+>>>>>> +     }, {
+>>>>>> +             .compatible     = "samsung,exynos7-dw-mshc-smu",
+>>>>>> +             .ctrl_type      = DW_MCI_TYPE_EXYNOS7_SMU,
+>>>>>>       },
+>>>>>>  };
+>>>>>>
+>>>>>> @@ -102,7 +111,8 @@ static int dw_mci_exynos_priv_init(struct dw_mci *host)
+>>>>>>  {
+>>>>>>       struct dw_mci_exynos_priv_data *priv = host->priv;
+>>>>>>
+>>>>>> -     if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS5420_SMU) {
+>>>>>> +     if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS5420_SMU ||
+>>>>>> +             priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU) {
+>>>>>>               mci_writel(host, MPSBEGIN0, 0);
+>>>>>>               mci_writel(host, MPSEND0, DWMCI_BLOCK_NUM);
+>>>>>>               mci_writel(host, MPSCTRL0, DWMCI_MPSCTRL_SECURE_WRITE_BIT |
+>>>>>> @@ -153,11 +163,22 @@ static int dw_mci_exynos_resume(struct device *dev)
+>>>>>>  static int dw_mci_exynos_resume_noirq(struct device *dev)
+>>>>>>  {
+>>>>>>       struct dw_mci *host = dev_get_drvdata(dev);
+>>>>>> +     struct dw_mci_exynos_priv_data *priv = host->priv;
+>>>>>>       u32 clksel;
+>>>>>>
+>>>>>> -     clksel = mci_readl(host, CLKSEL);
+>>>>>> -     if (clksel & SDMMC_CLKSEL_WAKEUP_INT)
+>>>>>> -             mci_writel(host, CLKSEL, clksel);
+>>>>>> +     if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>>>>>> +             priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+>>>>>> +             clksel = mci_readl(host, CLKSEL64);
+>>>>>> +     else
+>>>>>> +             clksel = mci_readl(host, CLKSEL);
+>>>>>> +
+>>>>>> +     if (clksel & SDMMC_CLKSEL_WAKEUP_INT) {
+>>>>>> +             if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>>>>>> +                     priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+>>>>>> +                     mci_writel(host, CLKSEL64, clksel);
+>>>>>> +             else
+>>>>>> +                     mci_writel(host, CLKSEL, clksel);
+>>>>>> +     }
+>>>>>>
+>>>>>>       return 0;
+>>>>>>  }
+>>>>>> @@ -169,6 +190,7 @@ static int dw_mci_exynos_resume_noirq(struct device *dev)
+>>>>>>
+>>>>>>  static void dw_mci_exynos_prepare_command(struct dw_mci *host, u32 *cmdr)
+>>>>>>  {
+>>>>>> +     struct dw_mci_exynos_priv_data *priv = host->priv;
+>>>>>>       /*
+>>>>>>        * Exynos4412 and Exynos5250 extends the use of CMD register with the
+>>>>>>        * use of bit 29 (which is reserved on standard MSHC controllers) for
+>>>>>> @@ -176,8 +198,14 @@ static void dw_mci_exynos_prepare_command(struct dw_mci *host, u32 *cmdr)
+>>>>>>        * HOLD register should be bypassed in case there is no phase shift
+>>>>>>        * applied on CMD/DATA that is sent to the card.
+>>>>>>        */
+>>>>>> -     if (SDMMC_CLKSEL_GET_DRV_WD3(mci_readl(host, CLKSEL)))
+>>>>>> -             *cmdr |= SDMMC_CMD_USE_HOLD_REG;
+>>>>>> +     if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>>>>>> +             priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU) {
+>>>>>> +             if (SDMMC_CLKSEL_GET_DRV_WD3(mci_readl(host, CLKSEL64)))
+>>>>>> +                     *cmdr |= SDMMC_CMD_USE_HOLD_REG;
+>>>>>> +      } else {
+>>>>>> +             if (SDMMC_CLKSEL_GET_DRV_WD3(mci_readl(host, CLKSEL)))
+>>>>>> +                     *cmdr |= SDMMC_CMD_USE_HOLD_REG;
+>>>>>> +     }
+>>>>>>  }
+>>>>>>
+>>>>>>  static void dw_mci_exynos_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+>>>>>> @@ -188,12 +216,20 @@ static void dw_mci_exynos_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+>>>>>>       u8 div = priv->ciu_div + 1;
+>>>>>>
+>>>>>>       if (ios->timing == MMC_TIMING_MMC_DDR52) {
+>>>>>> -             mci_writel(host, CLKSEL, priv->ddr_timing);
+>>>>>> +             if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>>>>>> +                     priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+>>>>>> +                     mci_writel(host, CLKSEL64, priv->ddr_timing);
+>>>>>> +             else
+>>>>>> +                     mci_writel(host, CLKSEL, priv->ddr_timing);
+>>>>>>               /* Should be double rate for DDR mode */
+>>>>>>               if (ios->bus_width == MMC_BUS_WIDTH_8)
+>>>>>>                       wanted <<= 1;
+>>>>>>       } else {
+>>>>>> -             mci_writel(host, CLKSEL, priv->sdr_timing);
+>>>>>> +             if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>>>>>> +                     priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+>>>>>> +                     mci_writel(host, CLKSEL64, priv->sdr_timing);
+>>>>>> +             else
+>>>>>> +                     mci_writel(host, CLKSEL, priv->sdr_timing);
+>>>>>>       }
+>>>>>>
+>>>>>>       /* Don't care if wanted clock is zero */
+>>>>>> @@ -265,26 +301,51 @@ static int dw_mci_exynos_parse_dt(struct dw_mci *host)
+>>>>>>
+>>>>>>  static inline u8 dw_mci_exynos_get_clksmpl(struct dw_mci *host)
+>>>>>>  {
+>>>>>> -     return SDMMC_CLKSEL_CCLK_SAMPLE(mci_readl(host, CLKSEL));
+>>>>>> +     struct dw_mci_exynos_priv_data *priv = host->priv;
+>>>>>> +
+>>>>>> +     if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>>>>>> +             priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+>>>>>> +             return SDMMC_CLKSEL_CCLK_SAMPLE(mci_readl(host, CLKSEL64));
+>>>>>> +     else
+>>>>>> +             return SDMMC_CLKSEL_CCLK_SAMPLE(mci_readl(host, CLKSEL));
+>>>>>>  }
+>>>>>>
+>>>>>>  static inline void dw_mci_exynos_set_clksmpl(struct dw_mci *host, u8 sample)
+>>>>>>  {
+>>>>>>       u32 clksel;
+>>>>>> -     clksel = mci_readl(host, CLKSEL);
+>>>>>> +     struct dw_mci_exynos_priv_data *priv = host->priv;
+>>>>>> +
+>>>>>> +     if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>>>>>> +             priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+>>>>>> +             clksel = mci_readl(host, CLKSEL64);
+>>>>>> +     else
+>>>>>> +             clksel = mci_readl(host, CLKSEL);
+>>>>>>       clksel = (clksel & ~0x7) | SDMMC_CLKSEL_CCLK_SAMPLE(sample);
+>>>>>> -     mci_writel(host, CLKSEL, clksel);
+>>>>>> +     if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>>>>>> +             priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+>>>>>> +             mci_writel(host, CLKSEL64, clksel);
+>>>>>> +     else
+>>>>>> +             mci_writel(host, CLKSEL, clksel);
+>>>>>>  }
+>>>>>>
+>>>>>>  static inline u8 dw_mci_exynos_move_next_clksmpl(struct dw_mci *host)
+>>>>>>  {
+>>>>>> +     struct dw_mci_exynos_priv_data *priv = host->priv;
+>>>>>>       u32 clksel;
+>>>>>>       u8 sample;
+>>>>>>
+>>>>>> -     clksel = mci_readl(host, CLKSEL);
+>>>>>> +     if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>>>>>> +             priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+>>>>>> +             clksel = mci_readl(host, CLKSEL64);
+>>>>>> +     else
+>>>>>> +             clksel = mci_readl(host, CLKSEL);
+>>>>>>       sample = (clksel + 1) & 0x7;
+>>>>>>       clksel = (clksel & ~0x7) | sample;
+>>>>>> -     mci_writel(host, CLKSEL, clksel);
+>>>>>> +     if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>>>>>> +             priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+>>>>>> +             mci_writel(host, CLKSEL64, clksel);
+>>>>>> +     else
+>>>>>> +             mci_writel(host, CLKSEL, clksel);
+>>>>>>       return sample;
+>>>>>>  }
+>>>>>>
+>>>>>> @@ -411,6 +472,10 @@ static const struct of_device_id dw_mci_exynos_match[] = {
+>>>>>>                       .data = &exynos_drv_data, },
+>>>>>>       { .compatible = "samsung,exynos5420-dw-mshc-smu",
+>>>>>>                       .data = &exynos_drv_data, },
+>>>>>> +     { .compatible = "samsung,exynos7-dw-mshc",
+>>>>>> +                     .data = &exynos_drv_data, },
+>>>>>> +     { .compatible = "samsung,exynos7-dw-mshc-smu",
+>>>>>> +                     .data = &exynos_drv_data, },
+>>>>>>       {},
+>>>>>>  };
+>>>>>>  MODULE_DEVICE_TABLE(of, dw_mci_exynos_match);
+>>>>>>
+>>>>>
+>>>>> --
+>>>>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>>>>> the body of a message to majordomo at vger.kernel.org
+>>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>> --
+>>>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>>>> the body of a message to majordomo at vger.kernel.org
+>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>
+>>>
+>>>
+>>> --
+>>> Best Regards
+>>> Vivek Gautam
+>>> Samsung R&D Institute, Bangalore
+>>> India
 >>
->
-> I've decided to investigate it further. It seems that your change to
-> 'arm-linux-eabi' did not have the intended effect. I got it to work with
-> this patch:
->
-> diff --git a/build b/build
-> index 10416a8..b2d38ec 100755
-> --- a/build
-> +++ b/build
-> @@ -36,7 +36,7 @@ case $ARCH in
->         *-eabi)         TARGET=$ARCH ;;
->         *-elf)          TARGET=$ARCH ;;
->
-> -       arm)            TARGET=arm-linux-eabi ;;
-> +       arm)            TARGET=arm-linux-gnueabi ;;
->         avr32)          TARGET=avr-linux ;;
->         blackfin)       TARGET=bfin-uclinux ;;
->         h8300)          TARGET=h8300-elf ;;
->
->
-> What happens in gcc apparently is that the configuration logic gets confused
-> and uses this entry in gcc/config.gcc:
->
-> arm*-*-eabi*)
->         default_use_cxa_atexit=yes
->         tm_file="dbxelf.h elfos.h arm/unknown-elf.h arm/elf.h arm/bpabi.h"
->         tmake_file="${tmake_file} arm/t-arm arm/t-arm-elf"
->         tm_file="$tm_file newlib-stdint.h"
->         tmake_file="${tmake_file} arm/t-bpabi"
->         use_gcc_stdint=wrap
->         tm_file="${tm_file} arm/aout.h vxworks-dummy.h arm/arm.h"
->         ;;
->
-> instead of this one:
->
-> arm*-*-linux-*)                 # ARM GNU/Linux with ELF
->         tm_file="dbxelf.h elfos.h gnu-user.h linux.h linux-android.h glibc-stdint.h arm/elf.h arm/linux-gas.h arm/linux-elf.h"
->         extra_options="${extra_options} linux-android.opt"
->         tmake_file="${tmake_file} arm/t-arm arm/t-arm-elf arm/t-bpabi arm/t-linux-eabi"
->         tm_file="$tm_file arm/bpabi.h arm/linux-eabi.h arm/aout.h vxworks-dummy.h arm/arm.h"
->         # The EABI requires the use of __cxa_atexit.
->         default_use_cxa_atexit=yes
->         with_tls=${with_tls:-gnu}
->         ;;
->
-> so among other things, we are missing linux.h and glibc-stdint.h.
->
->         Arnd
+>>
+>>
+>> --
+>> Best Regards
+>> Vivek Gautam
+>> Samsung R&D Institute, Bangalore
+>> India
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> 
+> 
