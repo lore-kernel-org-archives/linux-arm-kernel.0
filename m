@@ -1,29 +1,96 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Wed, 12 Nov 2014 13:54:41 -0800
-Subject: [PATCH 08/10] arm64/kexec: Add core kexec support
-In-Reply-To: <CAFdej022x_XxqR3NJJkXD60wQHt8Yvs3vZ7nbMQczHP+hWXfCA@mail.gmail.com>
-References: <cover.1414099246.git.geoff@infradead.org>
- <c8e8a3378f028e54e21931bc7f3d62c48725d5c7.1414099246.git.geoff@infradead.org>
- <CAFdej022x_XxqR3NJJkXD60wQHt8Yvs3vZ7nbMQczHP+hWXfCA@mail.gmail.com>
-Message-ID: <1415829281.15847.16.camel@smoke>
+From: caesar.wang@rock-chips.com (Caesar Wang)
+Date: Thu, 13 Nov 2014 06:01:28 +0800
+Subject: [PATCH v11 1/3] dt-bindings: add document of Rockchip power domain
+In-Reply-To: <1415829690-20236-1-git-send-email-caesar.wang@rock-chips.com>
+References: <1415829690-20236-1-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <1415829690-20236-2-git-send-email-caesar.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arun, Dave,
+This add the necessary binding documentation for the power domain
+found on Rockchip Socs.
 
-On Fri, 2014-11-07 at 16:31 +0530, Arun Chandran wrote:
-> I have issue in flushing with L3 cache on . kexec does not reboot with L3.
-> Is the above logic of flushing (clean + invalidate) after copying the
-> image data is correct? Is there exist the danger of image data being
-> overwritten by invalid cache lines?
-> 
-> I tried with only invalidate(dc ivac); but that also not seems to be
-> working.
-> 
-> Finally I moved the entire flushing logic before copying then
-> things started working. Please see the code change below.
+Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
+Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
+Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
 
-I added this with some minor changes.  Please let me know if
-it works for you.
+---
 
--Geoff
+Changes in v11: None
+Changes in v10: None
+Changes in v9:
+    - add document decription
+
+Changes in v8:
+    - document go back to v2
+
+Changes in v7: None
+Changes in v6: None
+Changes in v5: None
+Changes in v4: None
+Changes in v3:
+    - DT structure has changed
+
+Changes in v2:
+    - move clocks to "optional"
+
+ .../bindings/arm/rockchip/power_domain.txt         | 48 ++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
+
+diff --git a/Documentation/devicetree/bindings/arm/rockchip/power_domain.txt b/Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
+new file mode 100644
+index 0000000..3e74e6d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
+@@ -0,0 +1,48 @@
++* Rockchip Power Domains
++
++Rockchip processors include support for multiple power domains which can be
++powered up/down by software based on different application scenes to save power.
++
++Required properties for power domain controller:
++- compatible: should be one of the following.
++    * rockchip,rk3288-power-controller - for rk3288 type power domain.
++- #power-domain-cells: Number of cells in a power-domain specifier.
++		       should be 1.
++- rockchip,pmu: phandle referencing a syscon providing the pmu registers
++- #address-cells: should be 1.
++- #size-cells: should be 0.
++
++Required properties for power domain sub nodes:
++- reg: index of the power domain, should use macros in:
++    *  include/dt-bindings/power-domain/rk3288.h - for rk3288 type power domain.
++- clocks (optional): phandles to clocks which need to be enabled while power domain
++          switches state.
++
++Example:
++
++	power: power-controller {
++	       compatible = "rockchip,rk3288-power-controller";
++	       #power-domain-cells = <1>;
++	       rockchip,pmu = <&pmu>;
++               #address-cells = <1>;
++               #size-cells = <0>;
++
++	       pd_gpu {
++	               reg = <RK3288_PD_GPU>;
++	               clocks = <&cru ACLK_GPU>;
++	       };
++	};
++
++Node of a device using power domains must have a power-domains property,
++containing a phandle to the power device node and an index specifying which
++power domain to use.
++The index should use macros in:
++   * include/dt-bindings/power-domain/rk3288.h - for rk3288 type power domain.
++
++Example of the node using power domain:
++
++	node {
++		/* ... */
++		power-domains = <&power RK3288_PD_GPU>;
++		/* ... */
++	};
+-- 
+1.9.1
