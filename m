@@ -1,100 +1,71 @@
-From: thomas.lendacky@amd.com (Tom Lendacky)
-Date: Wed, 12 Nov 2014 12:14:29 -0600
-Subject: [PATCH] efi-entry.S: add dsb and isb
-In-Reply-To: <20141112180930.GA4330@leverpostej>
-References: <20141111063204.1506.57655.stgit@joelaarch64.amd.com>
- <20141112165842.GL28015@leverpostej> <54639DEF.1040805@amd.com>
- <20141112180930.GA4330@leverpostej>
-Message-ID: <5463A385.4080307@amd.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 13 Nov 2014 02:17:02 +0800
+Subject: [PATCH] of: pass name argument for of_io_request_and_map as const
+ char *
+Message-ID: <1415816222-32200-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2014 12:09 PM, Mark Rutland wrote:
-> Hi Tom,
->
-> On Wed, Nov 12, 2014 at 05:50:39PM +0000, Tom Lendacky wrote:
->> On 11/12/2014 10:58 AM, Mark Rutland wrote:
->>> Hi Joel,
->>>
->>> I've Cc'd a few people who were involved in authoring this.
->>>
->>> I have an alternative patch [1] that also adds some missing maintenance.
->>> Would you be able to give that a go?
->>
->> I applied the referenced patch and have booted about two dozen times
->> without seeing a synchronous exception.  Prior to either patch I would
->> see a synchronous exception about every three or four (re)boots.
->
-> Thank you for testing.
->
-> May I add your Tested-by?
+The name argument for of_io_request_and_map is only passed to
+request_mem_region, which is a macro of __request_region, which
+takes a const name argument.
 
-Hi Mark,
+Make the name argument const, so when we pass const strings we
+don't get the following warnings:
 
-Certainly.
+    warning: passing argument 3 of 'of_io_request_and_map' discards
+    'const' qualifier from pointer target type [enabled by default]
 
-Tested-by: Tom Lendacky <thomas.lendacky@amd.com>
+    In file included from drivers/clk/sunxi/clk-sunxi.c:20:0:
+    include/linux/of_address.h:108:15: note: expected 'char *' but
+    argument is of type 'const char *'
 
-Thanks,
-Tom
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+---
 
->
-> Cheers,
-> Mark.
->
->> Thanks,
->> Tom
->>
->>>
->>> On Tue, Nov 11, 2014 at 06:32:04AM +0000, Joel Schopp wrote:
->>>> Add a dsb and isb after the instruction flush before the data cache and
->>>> mm offing.  Without this patch I am seeing synchronous exceptions occur
->>>> every few boots.
->>>>
->>>> Signed-off-by: Joel Schopp <joel.schopp@amd.com>
->>>> Tested-by: Tom Lendacky <Thomas.Lendacky@amd.com>
->>>> ---
->>>>    arch/arm64/kernel/efi-entry.S |    6 ++++++
->>>>    1 file changed, 6 insertions(+)
->>>>
->>>> diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
->>>> index 619b1dd..7d95eda 100644
->>>> --- a/arch/arm64/kernel/efi-entry.S
->>>> +++ b/arch/arm64/kernel/efi-entry.S
->>>> @@ -76,6 +76,12 @@ ENTRY(efi_stub_entry)
->>>>    	bl	__flush_dcache_area
->>>>    	ic	ialluis
->>>>
->>>> +	/* We need to sync again after the instruction cache sync
->>>> +	 * and before turning off the dcache and mmu
->>>> +	 */
->>>> +	dsb	sy
->>>> +	isb
->>>
->>> In my series I reasoned that it wasn't necessary to have an ISB before
->>> we disabled the MMU. The current image must already be visible to the
->>> I-cache, so the I-cache can't have stale entries for it. We don't
->>> disable the MMU until after the image is visible at the PoC, so we
->>> shouldn't break the visbility of the current image to the I-cache.
->>>
->>> There is a bug in that We don't flush the current image in case of
->>> relocation, but I don't see how the ISB would help there.
->>>
->>> Thanks,
->>> Mark.
->>>
->>>> +
->>>>    	/* Turn off Dcache and MMU */
->>>>    	mrs	x0, CurrentEL
->>>>    	cmp	x0, #CurrentEL_EL2
->>>>
->>>>
->>>> _______________________________________________
->>>> linux-arm-kernel mailing list
->>>> linux-arm-kernel at lists.infradead.org
->>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>>
->>>
->>> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/301779.html
->>>
->>
+I ran into this while switching some of the sunxi clock code to use
+of_io_request_and_map.
+
+---
+ drivers/of/address.c       | 2 +-
+ include/linux/of_address.h | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index afdb782..e02828f 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -871,7 +871,7 @@ EXPORT_SYMBOL(of_iomap);
+  *		return PTR_ERR(base);
+  */
+ void __iomem *of_io_request_and_map(struct device_node *np, int index,
+-					char *name)
++					const char *name)
+ {
+ 	struct resource res;
+ 	void __iomem *mem;
+diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+index 8cb14eb..d88e81b 100644
+--- a/include/linux/of_address.h
++++ b/include/linux/of_address.h
+@@ -106,7 +106,7 @@ extern int of_address_to_resource(struct device_node *dev, int index,
+ 				  struct resource *r);
+ void __iomem *of_iomap(struct device_node *node, int index);
+ void __iomem *of_io_request_and_map(struct device_node *device,
+-					int index, char *name);
++					int index, const char *name);
+ #else
+ 
+ #include <linux/io.h>
+@@ -123,7 +123,7 @@ static inline void __iomem *of_iomap(struct device_node *device, int index)
+ }
+ 
+ static inline void __iomem *of_io_request_and_map(struct device_node *device,
+-					int index, char *name)
++					int index, const char *name)
+ {
+ 	return IOMEM_ERR_PTR(-EINVAL);
+ }
+-- 
+2.1.3
