@@ -1,50 +1,102 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 12 Nov 2014 16:31:33 +0900
-Subject: [PATCH] coresight: bindings for coresight drivers
-In-Reply-To: <CANLsYkxok7LVGey6tPqmt42GEAs8R7SYAG_cs4VRjYeqkwKEKw@mail.gmail.com>
-References: <1415727960-29524-1-git-send-email-mathieu.poirier@linaro.org>
- <CAL_JsqLXTx9jWT3sm3wnu1oWCk_VH_CUjfVX7t1HEA_9BfSeAg@mail.gmail.com>
- <CANLsYkxok7LVGey6tPqmt42GEAs8R7SYAG_cs4VRjYeqkwKEKw@mail.gmail.com>
-Message-ID: <20141112073133.GA8354@kroah.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed, 12 Nov 2014 08:56:23 +0100
+Subject: [PATCH v4 00/13] Tegra124 EMC (external memory controller) support
+Message-ID: <1415779051-26410-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 11, 2014 at 02:52:17PM -0700, Mathieu Poirier wrote:
-> On 11 November 2014 11:04, Rob Herring <robherring2@gmail.com> wrote:
-> > On Tue, Nov 11, 2014 at 11:46 AM,  <mathieu.poirier@linaro.org> wrote:
-> >> Greg,
-> >>
-> >> Please consider this as a supplement to the coresight patchset.  It should have
-> >> been sent with the rest of the patches but I missed the original ack from Rob
-> >> Herring.
-> >
-> > Ummm...
-> >
-> >>
-> >> Thanks,
-> >> Mathieu
-> >>
-> >> From 69cae46640b8cdc836bf7b86211d5f2adf3d0270 Mon Sep 17 00:00:00 2001
-> >> From: Mathieu Poirier <mathieu.poirier@linaro.org>
-> >> Date: Thu, 7 Aug 2014 12:34:06 -0600
-> >> Subject: [PATCH] coresight: bindings for coresight drivers
-> >>
-> >> Coresight IP blocks allow for the support of HW assisted tracing
-> >> on ARM SoCs.  Bindings for the currently available blocks are
-> >> presented herein.
-> >>
-> >> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
-> >> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> >
-> > And you still did.
-> 
-> https://patchwork.ozlabs.org/patch/388318/
+Hello,
 
-How does that help me?  It's not on this patch, so I can't add it.
+in this v4 you can find these changes:
 
-And I can't even _take_ this patch, I need something that I can apply,
-not have to hand-edit in order to get it to apply properly.
+* Adapt to changes in the latest version of Thierry's IOMMU series
 
-Please resend, _with_ the ack, and then I can queue it up.
+* OF bindings don't specify any unit-address or naming for the timings and timing subnodes. This is
+in line with how the display timings are specified.
 
-greg k-h
+* Misc improvements on error handling and reporting
+
+* Misc style fixes
+
+* Adds a bit more information on the registers that need to be specified for each timing, and points
+to the TRM for more details.
+
+It depends on Thierry's MC patches at [0] and a branch can be found at [1]. So
+far it has been tested only on a Jetson TK1.
+
+Patch 1: Removes the old EMC clock, that was unused and not functional
+
+Patch 2: Documents bindings for the new long-ram-code property
+
+Patch 3: Adds API for reading the ram code
+
+Patches 4 to 6: Document OF additions
+
+Patch 7: Adds EMC node to Tegra124 DT
+
+Patch 8: Adds timings for Jetson TK1 board
+
+Patch 9: Adds functions to the MC driver so the EMC driver can stay within its
+own registers
+
+Patch 10: Adds the actual EMC driver, making use of the new MC API
+
+Patch 11: Adds EMC clock driver, making use of API provided by the EMC driver
+
+Patch 12: Adds debugfs entry for getting and setting the EMC rate
+
+Patch 13: On Tegra124, have the EMC clock be the parent of the MC clock
+
+Regards,
+
+Tomeu
+
+[0] https://github.com/thierryreding/linux/commits/staging/iommu
+[1] http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=emc-v4
+
+Mikko Perttunen (9):
+  clk: tegra124: Remove old emc clock
+  soc/tegra: Add ram code reader helper
+  of: Add Tegra124 EMC bindings
+  ARM: tegra: Add EMC to Tegra124 device tree
+  ARM: tegra: Add EMC timings to Jetson TK1 device tree
+  memory: tegra: Add API needed by the EMC driver
+  memory: tegra: Add EMC (external memory controller) driver
+  clk: tegra: Add EMC clock driver
+  memory: tegra: Add debugfs entry for getting and setting the EMC rate
+
+Tomeu Vizoso (4):
+  of: Document long-ram-code property in nvidia,tegra20-apbmisc
+  of: document new emc-timings subnode in nvidia,tegra124-car
+  of: Document timings subnode of nvidia,tegra-mc
+  clk: tegra: Set the EMC clock as the parent of the MC clock
+
+ .../bindings/clock/nvidia,tegra124-car.txt         |   44 +-
+ .../memory-controllers/nvidia,tegra-mc.txt         |   84 +-
+ .../bindings/memory-controllers/tegra-emc.txt      |  376 +++
+ .../bindings/misc/nvidia,tegra20-apbmisc.txt       |    2 +
+ arch/arm/boot/dts/tegra124-jetson-tk1-emc.dtsi     | 2412 ++++++++++++++++++++
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts          |    2 +
+ arch/arm/boot/dts/tegra124.dtsi                    |    7 +
+ drivers/clk/tegra/Makefile                         |    2 +-
+ drivers/clk/tegra/clk-emc.c                        |  468 ++++
+ drivers/clk/tegra/clk-tegra124.c                   |   18 +-
+ drivers/clk/tegra/clk.h                            |    2 +
+ drivers/memory/tegra/Kconfig                       |   10 +
+ drivers/memory/tegra/Makefile                      |    2 +
+ drivers/memory/tegra/mc.c                          |  130 ++
+ drivers/memory/tegra/mc.h                          |   12 +
+ drivers/memory/tegra/tegra124-emc.c                | 1157 ++++++++++
+ drivers/memory/tegra/tegra124.c                    |   44 +
+ drivers/soc/tegra/fuse/tegra-apbmisc.c             |   19 +
+ include/soc/tegra/fuse.h                           |    1 +
+ include/soc/tegra/memory.h                         |   19 +
+ 20 files changed, 4793 insertions(+), 18 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt
+ create mode 100644 arch/arm/boot/dts/tegra124-jetson-tk1-emc.dtsi
+ create mode 100644 drivers/clk/tegra/clk-emc.c
+ create mode 100644 drivers/memory/tegra/tegra124-emc.c
+ create mode 100644 include/soc/tegra/memory.h
+
+-- 
+1.9.3
