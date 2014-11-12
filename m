@@ -1,144 +1,88 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 13 Nov 2014 02:08:32 +0800
-Subject: [PATCH v3 3/6] ARM: sun6i: DT: Add PLL6 multiple outputs
-In-Reply-To: <1415815715-31791-1-git-send-email-wens@csie.org>
-References: <1415815715-31791-1-git-send-email-wens@csie.org>
-Message-ID: <1415815715-31791-4-git-send-email-wens@csie.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 12 Nov 2014 18:09:30 +0000
+Subject: [PATCH] efi-entry.S: add dsb and isb
+In-Reply-To: <54639DEF.1040805@amd.com>
+References: <20141111063204.1506.57655.stgit@joelaarch64.amd.com>
+ <20141112165842.GL28015@leverpostej> <54639DEF.1040805@amd.com>
+Message-ID: <20141112180930.GA4330@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PLL6 on sun6i has multiple outputs, just like the other sunxi platforms.
+Hi Tom,
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun6i-a31.dtsi | 28 ++++++++++++++--------------
- 1 file changed, 14 insertions(+), 14 deletions(-)
+On Wed, Nov 12, 2014 at 05:50:39PM +0000, Tom Lendacky wrote:
+> On 11/12/2014 10:58 AM, Mark Rutland wrote:
+> > Hi Joel,
+> >
+> > I've Cc'd a few people who were involved in authoring this.
+> >
+> > I have an alternative patch [1] that also adds some missing maintenance.
+> > Would you be able to give that a go?
+> 
+> I applied the referenced patch and have booted about two dozen times
+> without seeing a synchronous exception.  Prior to either patch I would
+> see a synchronous exception about every three or four (re)boots.
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index a674b0f..f1519a8 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -132,11 +132,11 @@
- 		};
- 
- 		pll6: clk at 01c20028 {
--			#clock-cells = <0>;
-+			#clock-cells = <1>;
- 			compatible = "allwinner,sun6i-a31-pll6-clk";
- 			reg = <0x01c20028 0x4>;
- 			clocks = <&osc24M>;
--			clock-output-names = "pll6";
-+			clock-output-names = "pll6", "pll6x2";
- 		};
- 
- 		cpu: cpu at 01c20050 {
-@@ -166,7 +166,7 @@
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun6i-a31-ahb1-mux-clk";
- 			reg = <0x01c20054 0x4>;
--			clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6>;
-+			clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6 0>;
- 			clock-output-names = "ahb1_mux";
- 		};
- 
-@@ -221,7 +221,7 @@
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-apb1-clk";
- 			reg = <0x01c20058 0x4>;
--			clocks = <&osc32k>, <&osc24M>, <&pll6>, <&pll6>;
-+			clocks = <&osc32k>, <&osc24M>, <&pll6 0>, <&pll6 0>;
- 			clock-output-names = "apb2";
- 		};
- 
-@@ -240,7 +240,7 @@
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-mod0-clk";
- 			reg = <0x01c20088 0x4>;
--			clocks = <&osc24M>, <&pll6>;
-+			clocks = <&osc24M>, <&pll6 0>;
- 			clock-output-names = "mmc0";
- 		};
- 
-@@ -248,7 +248,7 @@
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-mod0-clk";
- 			reg = <0x01c2008c 0x4>;
--			clocks = <&osc24M>, <&pll6>;
-+			clocks = <&osc24M>, <&pll6 0>;
- 			clock-output-names = "mmc1";
- 		};
- 
-@@ -256,7 +256,7 @@
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-mod0-clk";
- 			reg = <0x01c20090 0x4>;
--			clocks = <&osc24M>, <&pll6>;
-+			clocks = <&osc24M>, <&pll6 0>;
- 			clock-output-names = "mmc2";
- 		};
- 
-@@ -264,7 +264,7 @@
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-mod0-clk";
- 			reg = <0x01c20094 0x4>;
--			clocks = <&osc24M>, <&pll6>;
-+			clocks = <&osc24M>, <&pll6 0>;
- 			clock-output-names = "mmc3";
- 		};
- 
-@@ -272,7 +272,7 @@
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-mod0-clk";
- 			reg = <0x01c200a0 0x4>;
--			clocks = <&osc24M>, <&pll6>;
-+			clocks = <&osc24M>, <&pll6 0>;
- 			clock-output-names = "spi0";
- 		};
- 
-@@ -280,7 +280,7 @@
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-mod0-clk";
- 			reg = <0x01c200a4 0x4>;
--			clocks = <&osc24M>, <&pll6>;
-+			clocks = <&osc24M>, <&pll6 0>;
- 			clock-output-names = "spi1";
- 		};
- 
-@@ -288,7 +288,7 @@
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-mod0-clk";
- 			reg = <0x01c200a8 0x4>;
--			clocks = <&osc24M>, <&pll6>;
-+			clocks = <&osc24M>, <&pll6 0>;
- 			clock-output-names = "spi2";
- 		};
- 
-@@ -296,7 +296,7 @@
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-mod0-clk";
- 			reg = <0x01c200ac 0x4>;
--			clocks = <&osc24M>, <&pll6>;
-+			clocks = <&osc24M>, <&pll6 0>;
- 			clock-output-names = "spi3";
- 		};
- 
-@@ -356,7 +356,7 @@
- 
- 			/* DMA controller requires AHB1 clocked from PLL6 */
- 			assigned-clocks = <&ahb1_mux>;
--			assigned-clock-parents = <&pll6>;
-+			assigned-clock-parents = <&pll6 0>;
- 		};
- 
- 		mmc0: mmc at 01c0f000 {
-@@ -836,7 +836,7 @@
- 			ar100: ar100_clk {
- 				compatible = "allwinner,sun6i-a31-ar100-clk";
- 				#clock-cells = <0>;
--				clocks = <&osc32k>, <&osc24M>, <&pll6>, <&pll6>;
-+				clocks = <&osc32k>, <&osc24M>, <&pll6 0>, <&pll6 0>;
- 				clock-output-names = "ar100";
- 			};
- 
--- 
-2.1.3
+Thank you for testing.
+
+May I add your Tested-by?
+
+Cheers,
+Mark.
+
+> Thanks,
+> Tom
+> 
+> >
+> > On Tue, Nov 11, 2014 at 06:32:04AM +0000, Joel Schopp wrote:
+> >> Add a dsb and isb after the instruction flush before the data cache and
+> >> mm offing.  Without this patch I am seeing synchronous exceptions occur
+> >> every few boots.
+> >>
+> >> Signed-off-by: Joel Schopp <joel.schopp@amd.com>
+> >> Tested-by: Tom Lendacky <Thomas.Lendacky@amd.com>
+> >> ---
+> >>   arch/arm64/kernel/efi-entry.S |    6 ++++++
+> >>   1 file changed, 6 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
+> >> index 619b1dd..7d95eda 100644
+> >> --- a/arch/arm64/kernel/efi-entry.S
+> >> +++ b/arch/arm64/kernel/efi-entry.S
+> >> @@ -76,6 +76,12 @@ ENTRY(efi_stub_entry)
+> >>   	bl	__flush_dcache_area
+> >>   	ic	ialluis
+> >>
+> >> +	/* We need to sync again after the instruction cache sync
+> >> +	 * and before turning off the dcache and mmu
+> >> +	 */
+> >> +	dsb	sy
+> >> +	isb
+> >
+> > In my series I reasoned that it wasn't necessary to have an ISB before
+> > we disabled the MMU. The current image must already be visible to the
+> > I-cache, so the I-cache can't have stale entries for it. We don't
+> > disable the MMU until after the image is visible at the PoC, so we
+> > shouldn't break the visbility of the current image to the I-cache.
+> >
+> > There is a bug in that We don't flush the current image in case of
+> > relocation, but I don't see how the ISB would help there.
+> >
+> > Thanks,
+> > Mark.
+> >
+> >> +
+> >>   	/* Turn off Dcache and MMU */
+> >>   	mrs	x0, CurrentEL
+> >>   	cmp	x0, #CurrentEL_EL2
+> >>
+> >>
+> >> _______________________________________________
+> >> linux-arm-kernel mailing list
+> >> linux-arm-kernel at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >>
+> >
+> > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/301779.html
+> >
+> 
