@@ -1,68 +1,41 @@
-From: gang.chen.5i5j@gmail.com (Chen Gang)
-Date: Wed, 12 Nov 2014 23:04:23 +0800
-Subject: [PATCH] virt: kvm: arm: vgic: Return failure code '-EBUSY' when
- mutex_trylock() fails
-Message-ID: <546376F7.90502@gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 12 Nov 2014 15:07:56 +0000
+Subject: [PATCH] arm64: topology: Fix handling of multi-level cluster
+ MPIDR-based detection
+In-Reply-To: <20141008205628.GO4609@sirena.org.uk>
+References: <1408462379-27968-1-git-send-email-broonie@kernel.org>
+ <CAFpQJXWkL_ge8XT9y6vSNwgQgXcvQtUh4PaWxdH1dK0QhFWu2A@mail.gmail.com>
+ <20141003163715.GB13939@e102568-lin.cambridge.arm.com>
+ <20141008205628.GO4609@sirena.org.uk>
+Message-ID: <20141112150756.GA30300@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When mutex_trylock() fails, kvm_vgic_create() will not create 'vgic', so
-it need return failure code '-EBUSY' instead of '0' to let outside know
-about it.
+On Wed, Oct 08, 2014 at 09:56:28PM +0100, Mark Brown wrote:
+> On Fri, Oct 03, 2014 at 05:37:16PM +0100, Lorenzo Pieralisi wrote:
+> 
+> > To be honest with you all I would have preferred to sort this out with
+> > DT, that's already doable now without this patch.
+> 
+> We'd still have to make sure there's a complete topology binding for
+> ACPI and get through standardisation if any changes are needed.  I guess
+> it's probably mostly OK as the scenarios should all be shared with x86
+> systems but I've not looked to see if some of the subsetting that's
+> being done for ACPI on ARMv8 causes issues.
+> 
+> > Having said that, for platforms setting MPIDR_EL1 to reasonable values,
+> > I think that's what we should do, squash the upper MPIDR levels (for
+> > the non SMT case too). Please stick a proper comment for that to the code.
+> > We can always rely on DT to fix other cases that can't be treated
+> > properly with code above.
+> 
+> OK, I'll send a patch.
 
-Also simplify the code within kvm_vgic_create():
+Mark,
 
- - kvm_for_each_vcpu() scanning once is enough for current case.
+do you have time to send it ?
 
- - Remove redundant variable 'vcpu_lock_idx'.
+Please let me know.
 
-
-Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
----
- virt/kvm/arm/vgic.c | 15 +++++++--------
- 1 file changed, 7 insertions(+), 8 deletions(-)
-
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 3aaca49..5846725 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1933,7 +1933,7 @@ out:
- 
- int kvm_vgic_create(struct kvm *kvm)
- {
--	int i, vcpu_lock_idx = -1, ret = 0;
-+	int i, ret = 0;
- 	struct kvm_vcpu *vcpu;
- 
- 	mutex_lock(&kvm->lock);
-@@ -1949,13 +1949,12 @@ int kvm_vgic_create(struct kvm *kvm)
- 	 * that no other VCPUs are run while we create the vgic.
- 	 */
- 	kvm_for_each_vcpu(i, vcpu, kvm) {
--		if (!mutex_trylock(&vcpu->mutex))
-+		if (!mutex_trylock(&vcpu->mutex)) {
-+			ret = -EBUSY;
- 			goto out_unlock;
--		vcpu_lock_idx = i;
--	}
--
--	kvm_for_each_vcpu(i, vcpu, kvm) {
-+		}
- 		if (vcpu->arch.has_run_once) {
-+			mutex_unlock(&vcpu->mutex);
- 			ret = -EBUSY;
- 			goto out_unlock;
- 		}
-@@ -1968,8 +1967,8 @@ int kvm_vgic_create(struct kvm *kvm)
- 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
- 
- out_unlock:
--	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
--		vcpu = kvm_get_vcpu(kvm, vcpu_lock_idx);
-+	while (i-- > 0) {
-+		vcpu = kvm_get_vcpu(kvm, i);
- 		mutex_unlock(&vcpu->mutex);
- 	}
- 
--- 
-1.9.3
+Thanks,
+Lorenzo
