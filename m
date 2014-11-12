@@ -1,77 +1,105 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 11 Nov 2014 22:29:45 -0800
-Subject: [GIT PULL] Broadcom Cygnus SoC defconfig changes
-In-Reply-To: <20141109001302.GB11947@quad.lixom.net>
-References: <1414698612-26216-1-git-send-email-f.fainelli@gmail.com>
- <20141109001302.GB11947@quad.lixom.net>
-Message-ID: <CAGVrzcbQG7qZNOoocgpbV=pf3Jv9mwAfsb=Eq2tiFfMa_pAPZQ@mail.gmail.com>
+From: sriku.linux@gmail.com (Srikanth Thokala)
+Date: Wed, 12 Nov 2014 12:26:49 +0530
+Subject: [PATCH V2 2/2] PCI: generic: Add msi_parent DT binding
+In-Reply-To: <1415733454-24322-3-git-send-email-suravee.suthikulpanit@amd.com>
+References: <1415733454-24322-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1415733454-24322-3-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <CA+mB=1LEEtPCixB9Ej74L03yPPH7D6YvfpkZyJgsHCm97-GvKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-08 16:13 GMT-08:00 Olof Johansson <olof@lixom.net>:
-> On Thu, Oct 30, 2014 at 12:50:09PM -0700, Florian Fainelli wrote:
->> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
->>
->>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
->>
->> are available in the git repository at:
->>
->>   http://github.com/brcm/linux.git tags/arm-soc/for-3.18/cygnus-defconfig-v9
->>
->> for you to fetch changes up to aa0204801143ee2d47e9e8dd5f39cdddd5613b4b:
->>
->>   ARM: multi_v7_defconfig: Enable Broadcom Cygnus (2014-10-30 11:01:35 -0700)
->
-> Hi Florian,
->
-> Apologies for the delay in dealing with this pull request.
->
->> ----------------------------------------------------------------
->> This patchset contains initial support for Broadcom's Cygnus SoC based on our
->> iProc architecture. Initial support is minimal and includes just the mach
->> platform code, clock driver, and a basic device tree configuration. Peripheral
->> drivers will be submitted soon, as will device tree configurations for other
->> Cygnus board variants.
->>
->> These are the defconfig parts of the changes
->>
->> ----------------------------------------------------------------
->> Jonathan Richardson (1):
->>       ARM: cygnus defconfig : Initial defconfig for Broadcom Cygnus SoC
->>
->> Ray Jui (1):
->>       ARM: multi_v7_defconfig: Enable Broadcom Cygnus
->>
->> Scott Branden (1):
->>       ARM: bcm_defconfig/multi_v7_defconfig: remove one level of menu from Kconfig
->>
->>  arch/arm/configs/bcm_cygnus_defconfig | 237 ++++++++++++++++++++++++++++++++++
->>  arch/arm/configs/bcm_defconfig        |   3 +-
->>  arch/arm/configs/multi_v7_defconfig   |  21 ++-
->
-> Please send multi_v7_defconfig updates as a patch instead of including in
-> a merge request. We ask for this because it's a file that many maintainers
-> touch and it's easy that we get lots of conflicts otherwise.
->
-> As far as the bcm_cygnus_defconfig: Since new platforms are multiplatform
-> enabled by default, we normally only prefer to have one defconfig per vendor.
-> We've made exceptions in cases where the families are very different, but in
-> general one defconfig per vendor should be sufficient.
->
-> I.e. please enable the cygnus options in bcm_defconfig instead of adding a new
-> one.
+Hi,
 
-Alright, so just to make sure I get this right:
-
-- there are two patches from Scott and Ray which enable Cygnus in
-mutli_v7_defconfig that I should send a separate patches
-- adding Cygnus to bcm_defconfig can be part of a separate pull request
-
+On Wed, Nov 12, 2014 at 12:47 AM,  <suravee.suthikulpanit@amd.com> wrote:
+> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 >
+> This patch introduces a new DT binding, msi-parent, which can
+> be used to specify MSI-parent phandle for a particular PCI
+> generic host controller.
 >
-> -Olof
+> Also, it implements and registers set_msi_parent callback.
+>
+> Cc: Bjorn Helgass <bhelgaas@google.com>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> ---
+>  Documentation/devicetree/bindings/pci/host-generic-pci.txt |  3 +++
+>  drivers/pci/host/pci-host-generic.c                        | 13 +++++++++++++
+>  2 files changed, 16 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> index cf3e205..6996af7 100644
+> --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> @@ -36,6 +36,8 @@ Properties of the host controller node:
+>  - reg            : The Configuration Space base address and size, as accessed
+>                     from the parent bus.
+>
+> +- msi-parent     : Specify the phandle of the corresponded MSI controller
+> +                   for this PCI host controller.
+>
+>  Properties of the /chosen node:
+>
+> @@ -77,6 +79,7 @@ pci {
+>      device_type = "pci";
+>      #address-cells = <3>;
+>      #size-cells = <2>;
+> +    msi-parent = <&msictrl0>;
+>      bus-range = <0x0 0x1>;
+>
+>      // CPU_PHYSICAL(2)  SIZE(2)
+> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> index 1895907..c4fbcda 100644
+> --- a/drivers/pci/host/pci-host-generic.c
+> +++ b/drivers/pci/host/pci-host-generic.c
+> @@ -42,6 +42,7 @@ struct gen_pci {
+>         struct pci_host_bridge                  host;
+>         struct gen_pci_cfg_windows              cfg;
+>         struct list_head                        resources;
+> +       struct msi_chip                         *mchip;
+>  };
+>
+>  static void __iomem *gen_pci_map_cfg_bus_cam(struct pci_bus *bus,
+> @@ -122,9 +123,19 @@ static int gen_pci_config_write(struct pci_bus *bus, unsigned int devfn,
+>         return PCIBIOS_SUCCESSFUL;
+>  }
+>
+> +static int gen_pci_set_msi_parent(struct pci_bus *bus)
+> +{
+> +       struct gen_pci *pci = bus_to_gen_pci(bus);
+> +
+> +       bus->msi = pci->mchip;
+> +
+> +       return PCIBIOS_SUCCESSFUL;
+> +}
+> +
+>  static struct pci_ops gen_pci_ops = {
+>         .read   = gen_pci_config_read,
+>         .write  = gen_pci_config_write,
+> +       .set_msi_parent = gen_pci_set_msi_parent,
 
+We assign the msi chip through add_bus() call, do we still need this?
 
+Srikanth
 
--- 
-Florian
+>  };
+>
+>  static const struct of_device_id gen_pci_of_match[] = {
+> @@ -303,6 +314,8 @@ static int gen_pci_probe(struct platform_device *pdev)
+>                 return err;
+>         }
+>
+> +       pci->mchip = of_pci_find_msi_chip_by_node(of_parse_phandle(np,
+> +                                                 "msi-parent", 0));
+>         pci_common_init_dev(dev, &hw);
+>         return 0;
+>  }
+> --
+> 1.9.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
