@@ -1,137 +1,64 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 12 Nov 2014 16:59:35 +0000
-Subject: [PATCH v4] of/fdt: export fdt blob as /sys/firmware/fdt
-In-Reply-To: <1415795308-14639-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1415795308-14639-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20141112165935.689CCC41BAB@trevor.secretlab.ca>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 12 Nov 2014 13:23:41 -0800
+Subject: [PATCH 4/4] arm: dts: omap3-gta04: Add static configuration for
+ devconf1 register
+In-Reply-To: <CAAfyv34sPAa94dYM1QoHKEX+MN8NMnzE91HLhXW6MG1Yr=o8mQ@mail.gmail.com>
+References: <1415051968-4878-1-git-send-email-marek@goldelico.com>
+ <1415051968-4878-5-git-send-email-marek@goldelico.com>
+ <20141110233630.GD31454@atomide.com>
+ <CAAfyv34sPAa94dYM1QoHKEX+MN8NMnzE91HLhXW6MG1Yr=o8mQ@mail.gmail.com>
+Message-ID: <20141112212340.GL26481@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Nov 2014 13:28:28 +0100
-, Ard Biesheuvel <ard.biesheuvel@linaro.org>
- wrote:
-> Create a new /sys entry '/sys/firmware/fdt' to export the FDT blob
-> that was passed to the kernel by the bootloader. This allows userland
-> applications such as kexec to access the raw binary.
+* Belisko Marek <marek.belisko@gmail.com> [141112 13:04]:
+> Hi Tony,
 > 
-> The fact that this node does not reside under /sys/firmware/device-tree
-> is deliberate: FDT is also used on arm64 UEFI/ACPI systems to
-> communicate just the UEFI and ACPI entry points, but the FDT is never
-> unflattened and used to configure the system.
-> 
-> A CRC32 checksum is calculated over the entire FDT blob, and verified
-> at late_initcall time. The sysfs entry is instantiated only if the
-> checksum is valid, i.e., if the FDT blob has not been modified in the
-> mean time. Otherwise, a warning is printed.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> On Tue, Nov 11, 2014 at 12:36 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Marek Belisko <marek@goldelico.com> [141103 14:01]:
+> >> gta04 board need for tvout enabled 2 bits in devconf1 register (tvbypass and acbias).
+> >> Add single pinmux entry and enable it.
+> >>
+> >> Signed-off-by: Marek Belisko <marek@goldelico.com>
+> >> ---
+> >>  arch/arm/boot/dts/omap3-gta04.dtsi | 22 ++++++++++++++++++++++
+> >>  1 file changed, 22 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
+> >> index e4d05f0..a456d37 100644
+> >> --- a/arch/arm/boot/dts/omap3-gta04.dtsi
+> >> +++ b/arch/arm/boot/dts/omap3-gta04.dtsi
+> >> @@ -118,6 +118,17 @@
+> >>                       };
+> >>               };
+> >>       };
+> >> +
+> >> +     /* pinmux for devconf1 */
+> >> +     control_devconf1: pinmux at 480022d8 {
+> >> +             compatible = "pinctrl-single";
+> >> +             reg = <0x480022d8 4>;   /* single register */
+> >> +             #address-cells = <1>;
+> >> +             #size-cells = <0>;
+> >> +             pinctrl-single,bit-per-mux;
+> >> +             pinctrl-single,register-width = <32>;
+> >> +             pinctrl-single,function-mask = <0xfc0bd5>;
+> >> +     };
+> >>  };
+> >>
+> >
+> > The pinctrl-single entry should be in omap3.dtsi as the mux register is there
+> > for all the omap3 devices, can you please update the patch for that?
+> Ok I'll do. Just one question. I checked TRM for omap3430 and omap3630 and
+> reserved bits in devconf1 are different. So keep function-mask for
+> omap3430 in omap3.dtsi
+> and redefine in omap36xx.dtsi (not sure if this will work in this
+> way)? Or exist other way how to deal with that? Thanks.
 
-Actually, I made a couple of changes when I merged it. I removed the
-older debugfs interface since it overlaps, and I added tests for
-initial_boot_params to make sure it doesn't try to run on an invalid
-FDT:
+Oh OK. Yes if they are different you should have the common entry in
+omap3.dtsi and the SoC specific fields in omap34xx.dtsi and
+omap36xx.dtsi. And please leave out the bit for configuring the
+MPUFORCEWRNP.
 
-diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-index be16ce2ffd69..fbe8f8d418f7 100644
---- a/drivers/of/Kconfig
-+++ b/drivers/of/Kconfig
-@@ -23,6 +23,7 @@ config OF_FLATTREE
- 	bool
- 	select DTC
- 	select LIBFDT
-+	select CRC32
- 
- config OF_EARLY_FLATTREE
- 	bool
-diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index 83a8e1154602..c7997e87b4b5 100644
---- a/drivers/of/fdt.c
-+++ b/drivers/of/fdt.c
-@@ -9,6 +9,7 @@
-  * version 2 as published by the Free Software Foundation.
-  */
- 
-+#include <linux/crc32.h>
- #include <linux/kernel.h>
- #include <linux/initrd.h>
- #include <linux/memblock.h>
-@@ -22,10 +23,20 @@
- #include <linux/libfdt.h>
- #include <linux/debugfs.h>
- #include <linux/serial_core.h>
-+#include <linux/sysfs.h>
- 
- #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
- #include <asm/page.h>
- 
-+static u32 of_fdt_crc32;
-+
-+static u32 of_fdt_get_crc32(void *fdt)
-+{
-+	static u32 const OF_FDT_CRC32_SEED = 0x04c11db7;
-+
-+	return crc32_be(OF_FDT_CRC32_SEED, fdt, fdt_totalsize(fdt));
-+}
-+
- /*
-  * of_fdt_limit_memory - limit the number of regions in the /memory node
-  * @limit: maximum entries
-@@ -1003,6 +1014,7 @@ bool __init early_init_dt_verify(void *params)
- 
- 	/* Setup flat device-tree pointer */
- 	initial_boot_params = params;
-+	of_fdt_crc32 = of_fdt_get_crc32(initial_boot_params);
- 	return true;
- }
- 
-@@ -1080,27 +1092,31 @@ void __init unflatten_and_copy_device_tree(void)
- 	unflatten_device_tree();
- }
- 
--#if defined(CONFIG_DEBUG_FS) && defined(DEBUG)
--static struct debugfs_blob_wrapper flat_dt_blob;
--
--static int __init of_flat_dt_debugfs_export_fdt(void)
-+#ifdef CONFIG_SYSFS
-+static ssize_t of_fdt_raw_read(struct file *filp, struct kobject *kobj,
-+			       struct bin_attribute *bin_attr,
-+			       char *buf, loff_t off, size_t count)
- {
--	struct dentry *d = debugfs_create_dir("device-tree", NULL);
--
--	if (!d)
--		return -ENOENT;
-+	memcpy(buf, initial_boot_params + off, count);
-+	return count;
-+}
- 
--	flat_dt_blob.data = initial_boot_params;
--	flat_dt_blob.size = fdt_totalsize(initial_boot_params);
-+static int __init of_fdt_raw_init(void)
-+{
-+	static struct bin_attribute of_fdt_raw_attr =
-+		__BIN_ATTR(fdt, S_IRUSR, of_fdt_raw_read, NULL, 0);
- 
--	d = debugfs_create_blob("flat-device-tree", S_IFREG | S_IRUSR,
--				d, &flat_dt_blob);
--	if (!d)
--		return -ENOENT;
-+	if (!initial_boot_params || fdt_check_header(initial_boot_params))
-+		return 0;
- 
--	return 0;
-+	if (of_fdt_crc32 != of_fdt_get_crc32(initial_boot_params)) {
-+		pr_warn("fdt: not creating '/sys/firmware/fdt': CRC check failed");
-+		return 0;
-+	}
-+	of_fdt_raw_attr.size = fdt_totalsize(initial_boot_params);
-+	return sysfs_create_bin_file(firmware_kobj, &of_fdt_raw_attr);
- }
--module_init(of_flat_dt_debugfs_export_fdt);
-+late_initcall(of_fdt_raw_init);
- #endif
- 
- #endif /* CONFIG_OF_EARLY_FLATTREE */
+Regards,
 
-
-g.
+Tony
