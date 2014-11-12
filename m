@@ -1,50 +1,42 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 12 Nov 2014 14:34:45 +0100
-Subject: [PATCH] net: pxa168_eth: move SET_NETDEV_DEV a bit earlier
-In-Reply-To: <1415790527-6494-1-git-send-email-jszhang@marvell.com>
-References: <1415790527-6494-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20141112133445.GC18559@kwain>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 12 Nov 2014 14:37:27 +0100
+Subject: [PATCH V2 1/1] ARM: dts: sunxi: Banana Pi: increase
+ startup-delay for the GMAC PHY regulator
+In-Reply-To: <1415746906-20835-2-git-send-email-merker@debian.org>
+References: <1415539714-7652-1-git-send-email-merker@debian.org>
+ <1415746906-20835-1-git-send-email-merker@debian.org>
+ <1415746906-20835-2-git-send-email-merker@debian.org>
+Message-ID: <20141112133727.GO14919@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng,
-
-On Wed, Nov 12, 2014 at 07:08:47PM +0800, Jisheng Zhang wrote:
-> This is to ensure the net_device's dev.parent is set before we used it
-> in dma_zalloc_coherent() from init_hash_table().
-
-Applies on top of net-next.
-
+On Wed, Nov 12, 2014 at 12:01:46AM +0100, Karsten Merker wrote:
+> On the LeMaker Banana Pi, probing the external ethernet PHY connected
+> to the SoC's internal GMAC module sometimes fails. The PHY power
+> supply is handled via a GPIO-controlled regulator, and the existing
+> regulator startup-delay of 50000us is too short to make sure that the
+> PHY is always fully powered up when it is queried by phylib. Tests
+> have shown that to provide a reliable PHY detection, the startup-delay
+> has to be increased to at least 60000us. To have a certain safety margin
+> and to cater for manufacturing variations between different boards,
+> the delay gets set to 100000us as discussed on the linux-arm-kernel
+> mailinglist.
 > 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Signed-off-by: Karsten Merker <merker@debian.org>
+> Acked-by: Hans de Goede <hdegoede@redhat.com>
 
-FWIW,
+Merged, thanks.
 
-Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-
-> ---
->  drivers/net/ethernet/marvell/pxa168_eth.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/net/ethernet/marvell/pxa168_eth.c b/drivers/net/ethernet/marvell/pxa168_eth.c
-> index 21ddece..38f7cee 100644
-> --- a/drivers/net/ethernet/marvell/pxa168_eth.c
-> +++ b/drivers/net/ethernet/marvell/pxa168_eth.c
-> @@ -1540,8 +1540,8 @@ static int pxa168_eth_probe(struct platform_device *pdev)
->  	if (err)
->  		goto err_free_mdio;
->  
-> -	pxa168_init_hw(pep);
->  	SET_NETDEV_DEV(dev, &pdev->dev);
-> +	pxa168_init_hw(pep);
->  	err = register_netdev(dev);
->  	if (err)
->  		goto err_mdiobus;
-> -- 
-> 2.1.3
-> 
+Maxime
 
 -- 
-Antoine T?nart, Free Electrons
+Maxime Ripard, Free Electrons
 Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141112/40e14133/attachment.sig>
