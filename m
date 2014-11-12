@@ -1,37 +1,29 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 12 Nov 2014 13:49:18 -0800
-Subject: [PATCH] clk: rockchip: ensure HCLK_VIO2_H2P and PCLK_VIO2_H2P
- stay enabled
-In-Reply-To: <20141112213845.GA14153@dtor-ws>
-References: <20141112213845.GA14153@dtor-ws>
-Message-ID: <CAD=FV=UsYWDw0wB6KSANXZYnnBFdTL9wOEqf9DoUF8aFuDpNSw@mail.gmail.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Wed, 12 Nov 2014 13:54:41 -0800
+Subject: [PATCH 08/10] arm64/kexec: Add core kexec support
+In-Reply-To: <CAFdej022x_XxqR3NJJkXD60wQHt8Yvs3vZ7nbMQczHP+hWXfCA@mail.gmail.com>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <c8e8a3378f028e54e21931bc7f3d62c48725d5c7.1414099246.git.geoff@infradead.org>
+ <CAFdej022x_XxqR3NJJkXD60wQHt8Yvs3vZ7nbMQczHP+hWXfCA@mail.gmail.com>
+Message-ID: <1415829281.15847.16.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arun, Dave,
 
-On Wed, Nov 12, 2014 at 1:38 PM, Dmitry Torokhov <dtor@chromium.org> wrote:
-> Currently there is no driver owning these clocks and they have to stay
-> up for the system to function properly, so let's mark them as
-> CLK_IGNORE_UNUSED.
->
-> Without this patch we have trouble with suspend/resume and we have
-> trouble turning the eDP back on if it ever idles off.
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Dmitry Torokhov <dtor@chromium.org>
-> ---
->  drivers/clk/rockchip/clk-rk3288.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+On Fri, 2014-11-07 at 16:31 +0530, Arun Chandran wrote:
+> I have issue in flushing with L3 cache on . kexec does not reboot with L3.
+> Is the above logic of flushing (clean + invalidate) after copying the
+> image data is correct? Is there exist the danger of image data being
+> overwritten by invalid cache lines?
+> 
+> I tried with only invalidate(dc ivac); but that also not seems to be
+> working.
+> 
+> Finally I moved the entire flushing logic before copying then
+> things started working. Please see the code change below.
 
-I'm already on the signed-off-by (mostly because I tweaked the commit
-message and tested this), but in case anyone cares I have reviewed
-this and tested it.  ;)
+I added this with some minor changes.  Please let me know if
+it works for you.
 
-...obviously we want to get to the bottom of the right way to handle
-all of these clocks, but since we _just_ removed the blanket "leave
-all clocks enabled" adding a few clocks back into the fold seems sane
-until we get all our ducks in a row.
-
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-Tested-by: Doug Anderson <dianders@chromium.org>
+-Geoff
