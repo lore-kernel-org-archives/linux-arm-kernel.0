@@ -1,111 +1,68 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Nov 2014 07:02:11 -0800
-Subject: [PATCH 4/4] arm: dts: omap3-gta04: Add static configuration for
- devconf1 register
-In-Reply-To: <5463585D.9070209@ti.com>
-References: <1415051968-4878-1-git-send-email-marek@goldelico.com>
- <1415051968-4878-5-git-send-email-marek@goldelico.com>
- <5463585D.9070209@ti.com>
-Message-ID: <20141112150210.GC26481@atomide.com>
+From: gang.chen.5i5j@gmail.com (Chen Gang)
+Date: Wed, 12 Nov 2014 23:04:23 +0800
+Subject: [PATCH] virt: kvm: arm: vgic: Return failure code '-EBUSY' when
+ mutex_trylock() fails
+Message-ID: <546376F7.90502@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [141112 04:56]:
-> Hi,
-> 
-> On 03/11/14 23:59, Marek Belisko wrote:
-> > gta04 board need for tvout enabled 2 bits in devconf1 register (tvbypass and acbias).
-> > Add single pinmux entry and enable it.
-> > 
-> > Signed-off-by: Marek Belisko <marek@goldelico.com>
-> > ---
-> >  arch/arm/boot/dts/omap3-gta04.dtsi | 22 ++++++++++++++++++++++
-> >  1 file changed, 22 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
-> > index e4d05f0..a456d37 100644
-> > --- a/arch/arm/boot/dts/omap3-gta04.dtsi
-> > +++ b/arch/arm/boot/dts/omap3-gta04.dtsi
-> > @@ -118,6 +118,17 @@
-> >  			};
-> >  		};
-> >  	};
-> > +
-> > +	/* pinmux for devconf1 */
-> > +	control_devconf1: pinmux at 480022d8 {
-> > +		compatible = "pinctrl-single";
-> > +		reg = <0x480022d8 4>;	/* single register */
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		pinctrl-single,bit-per-mux;
-> > +		pinctrl-single,register-width = <32>;
-> > +		pinctrl-single,function-mask = <0xfc0bd5>;
-> > +	};
-> >  };
-> >  
-> >  &omap3_pmx_core {
-> > @@ -497,3 +508,14 @@
-> >  		};
-> >  	};
-> >  };
-> > +
-> > +&control_devconf1 {
-> > +	pinctrl-name = "default";
-> > +	pinctrl-0 = < &tv_acbias_pins>;
-> > +
-> > +	tv_acbias_pins: pinmux_tv_acbias_pins {
-> > +		pinctrl-single,bits = <
-> > +			0 0x40800 0x40800
-> 
-> I think it would be good to have a comment in the .dts above, mentioning
-> that TVOUTBYPASS and TVACEN bits are being set.
-> 
-> > +		>;
-> > +	};
-> > +};
-> > 
-> 
-> OMAP3630 seems to have CONTROL_AVDAC1 and CONTROL_AVDAC2 registers. Did
-> you check if the SoC you use have those? It looks like they need
-> configuration also, if the exist.
+When mutex_trylock() fails, kvm_vgic_create() will not create 'vgic', so
+it need return failure code '-EBUSY' instead of '0' to let outside know
+about it.
 
-Those look like AVDAC specific control registers that are not mux
-registers. So those should be accessed the existing SCM (System Control
-Mmodule) syscon area by the DSS code. For examples, see what
-pbias-regulator.c is doing for some other registers in the syscon area.
+Also simplify the code within kvm_vgic_create():
+
+ - kvm_for_each_vcpu() scanning once is enough for current case.
+
+ - Remove redundant variable 'vcpu_lock_idx'.
+
+
+Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
+---
+ virt/kvm/arm/vgic.c | 15 +++++++--------
+ 1 file changed, 7 insertions(+), 8 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 3aaca49..5846725 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1933,7 +1933,7 @@ out:
  
-> So, I don't think tvbypass and acbias are really pinmux stuff, but it
-> does seem like an easy way to handle the devconf1 register, and I don't
-> see any issues with the setting being fixed.
-
-The CONTROL_DEVCONF registers seem to be all related to muxing signals
-and configuring ping signal levels. So I think the pinctrl-single is
-OK to use with these.
+ int kvm_vgic_create(struct kvm *kvm)
+ {
+-	int i, vcpu_lock_idx = -1, ret = 0;
++	int i, ret = 0;
+ 	struct kvm_vcpu *vcpu;
  
-> However, devconf1 register seems to have bits for many devices,
-> including mcbsp, mmc, and even some "Force MPU writes to be nonposted" bit.
-
-Yes the"Force MPU writes to be nonposted" debug bit is an odd one
-there :) But we're not using that luckily anywhere..
+ 	mutex_lock(&kvm->lock);
+@@ -1949,13 +1949,12 @@ int kvm_vgic_create(struct kvm *kvm)
+ 	 * that no other VCPUs are run while we create the vgic.
+ 	 */
+ 	kvm_for_each_vcpu(i, vcpu, kvm) {
+-		if (!mutex_trylock(&vcpu->mutex))
++		if (!mutex_trylock(&vcpu->mutex)) {
++			ret = -EBUSY;
+ 			goto out_unlock;
+-		vcpu_lock_idx = i;
+-	}
+-
+-	kvm_for_each_vcpu(i, vcpu, kvm) {
++		}
+ 		if (vcpu->arch.has_run_once) {
++			mutex_unlock(&vcpu->mutex);
+ 			ret = -EBUSY;
+ 			goto out_unlock;
+ 		}
+@@ -1968,8 +1967,8 @@ int kvm_vgic_create(struct kvm *kvm)
+ 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
  
-> And, with a quick grep, I see CONTROL_DEVCONF1 touched in multiple
-> places in the kernel. I wonder if adding a pinmux entry for it could
-> cause some rather odd problems.
-
-They can all use pinctrl-single no problem.
+ out_unlock:
+-	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
+-		vcpu = kvm_get_vcpu(kvm, vcpu_lock_idx);
++	while (i-- > 0) {
++		vcpu = kvm_get_vcpu(kvm, i);
+ 		mutex_unlock(&vcpu->mutex);
+ 	}
  
-> Tony, any idea about this? How should CONTROL_DEVCONFx registers be
-> accessed?
-
-If they are pinctrl related like the CONTROL_DEVCONF registers, then
-pincatrl-single is OK. However, for any registers in the SCM that are
-not just routing signals, then the syscon mapping should be used. And
-we should have a separate driver implementing some standard Linux
-generic framework driver. For example a regulator or clock driver.
-
-Anyways, I'll drop this $subject patch for now and set up a new branch
-for the .dts changes.
-
-Regards,
-
-Tony
+-- 
+1.9.3
