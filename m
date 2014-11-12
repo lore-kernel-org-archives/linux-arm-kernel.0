@@ -1,142 +1,107 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 12 Nov 2014 17:32:09 +0100
-Subject: [PATCH v2] PCI: designware: Add support 4 ATUs assignment
-In-Reply-To: <CA+mB=1KObT9O783SMcvHy8nJGQPnxyKgP332r5bHx-K_D+LhVg@mail.gmail.com>
-References: <1415682444-24911-1-git-send-email-Minghuan.Lian@freescale.com>
- <CA+mB=1+4Dzxhbin6z0PUENvjUz-y8bq-K09FXTnSepFvVfe9HQ@mail.gmail.com>
- <546308DD.40109@freescale.com>
- <CA+mB=1K=Oyzdb2yfBvPRG9DHi-PFjRPtVS_dY9JMOz6dQog8QQ@mail.gmail.com>
- <546331E7.5060003@freescale.com>
- <CA+mB=1KObT9O783SMcvHy8nJGQPnxyKgP332r5bHx-K_D+LhVg@mail.gmail.com>
-Message-ID: <1415809929.2876.5.camel@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 12 Nov 2014 16:39:11 +0000
+Subject: [PATCH] arm64: efi: Fix stub cache maintenance
+Message-ID: <1415810351-3462-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 12.11.2014, 21:53 +0530 schrieb Srikanth Thokala:
-> Hi Minghuan,
-> 
-> On Wed, Nov 12, 2014 at 3:39 PM, Lian Minghuan-B31939
-> <B31939@freescale.com> wrote:
-> > Hi Srikanth,
-> >
-> > please see my comments inline.
-> >
-> > Thanks,
-> > Minghuan
-> >
-> >
-> > On 2014?11?12? 17:01, Srikanth Thokala wrote:
-> >>
-> >> Hi Minghuan,
-> >>
-> >> On Wed, Nov 12, 2014 at 12:44 PM, Lian Minghuan-B31939
-> >> <B31939@freescale.com> wrote:
-> >>>
-> >>> Hi  Srikanth,
-> >>>
-> >>> Thanks for your comments, please see my reply inline.
-> >>>
-> >>>
-> >>> On 2014?11?12? 14:22, Srikanth Thokala wrote:
-> >>>>
-> >>>> Hi,
-> >>>>
-> >>>> On Tue, Nov 11, 2014 at 10:37 AM, Minghuan Lian
-> >>>> <Minghuan.Lian@freescale.com> wrote:
-> >>>>>
-> >>>>> Currently, pcie-designware.c only supports two ATUs, ATU0 is used
-> >>>>> for CFG0 and MEM, ATU1 is used for CFG1 and IO. There is a conflict
-> >>>>> when MEM and CFG0 are accessed simultaneously. The patch adds
-> >>>>> 'num-atus' property to PCIe dts node to describe the number of
-> >>>>> PCIe controller's ATUs. If num_atus is bigger than or equal to 4,
-> >>>>> we will change ATUs assignment: ATU0 for CFG0, ATU1 for CFG1,
-> >>>>> ATU2 for MEM, ATU3 for IO.
-> >>>>>
-> >>>>> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> >>>>> ---
-> >>>>> change log:
-> >>>>> v1-v2:
-> >>>>> 1. add the default value to property num-atus description
-> >>>>> 2. Use atu_idx[] instead of single values
-> >>>>> 3. initialize num_atus to 2
-> >>>>>
-> >>>>>    .../devicetree/bindings/pci/designware-pcie.txt    |  1 +
-> >>>>>    drivers/pci/host/pcie-designware.c                 | 53
-> >>>>> ++++++++++++++++------
-> >>>>>    drivers/pci/host/pcie-designware.h                 |  9 ++++
-> >>>>>    3 files changed, 50 insertions(+), 13 deletions(-)
-> >>>>>
-> >>>>> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> >>>>> b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> >>>>> index 9f4faa8..64d0533 100644
-> >>>>> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> >>>>> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> >>>>> @@ -26,3 +26,4 @@ Optional properties:
-> >>>>>    - bus-range: PCI bus numbers covered (it is recommended for new
-> >>>>> devicetrees to
-> >>>>>      specify this property, to keep backwards compatibility a range of
-> >>>>> 0x00-0xff
-> >>>>>      is assumed if not present)
-> >>>>> +- num-atus: number of ATUs. The default value is 2 if not present.
-> >>>>> diff --git a/drivers/pci/host/pcie-designware.c
-> >>>>> b/drivers/pci/host/pcie-designware.c
-> >>>>> index dfed00a..46a609d 100644
-> >>>>> --- a/drivers/pci/host/pcie-designware.c
-> >>>>> +++ b/drivers/pci/host/pcie-designware.c
-> >>>>> @@ -48,6 +48,8 @@
-> >>>>>    #define PCIE_ATU_VIEWPORT              0x900
-> >>>>>    #define PCIE_ATU_REGION_INBOUND                (0x1 << 31)
-> >>>>>    #define PCIE_ATU_REGION_OUTBOUND       (0x0 << 31)
-> >>>>> +#define PCIE_ATU_REGION_INDEX3         (0x3 << 0)
-> >>>>> +#define PCIE_ATU_REGION_INDEX2         (0x2 << 0)
-> >>>>>    #define PCIE_ATU_REGION_INDEX1         (0x1 << 0)
-> >>>>>    #define PCIE_ATU_REGION_INDEX0         (0x0 << 0)
-> >>>>>    #define PCIE_ATU_CR1                   0x904
-> >>>>> @@ -346,7 +348,7 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
-> >>>>>           struct of_pci_range range;
-> >>>>>           struct of_pci_range_parser parser;
-> >>>>>           struct resource *cfg_res;
-> >>>>> -       u32 val, na, ns;
-> >>>>> +       u32 num_atus = 2, val, na, ns;
-> >>>>
-> >>>> I think this can be u8?
-> >>>
-> >>> [Minghuan] I define num-atus like this: num-atus = <6> (our controller
-> >>> supports 6 outbound ATUs)
-> >>> So, num_atus should be u32 type.
-> >>> If we use u8 type to define num_atus, the dts node should be changed to
-> >>> num_atus = /bits/ 8 <8>.
-> >>> I prefer the previous definition num-atus = <6> which is more simple and
-> >>> clear.
-> >>
-> >> Yes, I agree.  But as it holds only 6 possible distinct values, I
-> >> prefer to use u8.
-> >
-> > [Minghuan] PCIe Designware IP supports more than 6 ATUs. But our
-> > current PCIe controller only supports 6 outbound ATUs and 6 inbound ATUs.
-> > The next PCIe controller may supports more ATUs. I think u32 can be better
-> > compatible with hardware upgrade.
-> >
-> > I inquired dts, almost all dts property use u32 type.
-> 
-> I don't think this property will have values > 255, but if you think
-> so you could
-> use u16 and then u32.
-> 
-Using a smaller type complicates the DT for little to no benefit. I
-think it's ok to use u32 here, which is a common standard for integer
-values in DT.
+While efi-entry.S mentions that efi_entry() will have relocated the
+kernel image, it actually means that efi_entry will have placed a copy
+of the kernel in the appropriate location, and until this is branched to
+at the end of efi_entry.S, all instructions are executed from the
+original image.
 
-Though this discussion lead me to the question if we even need to have
-this property in the DT at all. Isn't this a property that is fixed for
-a specific silicon implementation of the DW core? In that case we could
-just infer the number of ATUs from the DT compatible, so this should
-probably just be added to struct pcie_port and properly initialized by
-the SoC glue drivers.
+Thus while the flush in efi_entry.S does ensure that the copy is visible
+to noncacheable accesses, it does not guarantee that this is true for
+the image instructions are being executed from. This could have
+disasterous effects when the MMU and caches are disabled if the image
+has not been naturally evicted to the PoC.
 
-Regards,
-Lucas
+Additionally, due to a missing dsb following the ic ialluis, the new
+kernel image is not necessarily clean in the I-cache when it is branched
+to, with similar potentially disasterous effects.
 
+This patch adds additional flushing to ensure that the currently
+executing stub text is flushed to the PoC and is thus visible to
+noncacheable accesses. As it is placed after the instructions cache
+maintenance for the new image and __flush_dcache_area already contains a
+dsb, we do not need to add a separate barrier to ensure completion of
+the icache maintenance.
+
+Comments are updated to clarify the situation with regard to the two
+images and the maintenance required for both.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Ian Campbell <ijc@hellion.org.uk>
+Cc: Joel Schopp <joel.schopp@amd.com>
+Cc: Leif Lindholm <leif.lindholm@linaro.org>
+Cc: Mark Salter <msalter@redhat.com>
+Cc: Roy Franz <roy.franz@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/efi-entry.S | 27 +++++++++++++++++++++------
+ 1 file changed, 21 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
+index 619b1dd..d18a449 100644
+--- a/arch/arm64/kernel/efi-entry.S
++++ b/arch/arm64/kernel/efi-entry.S
+@@ -54,18 +54,17 @@ ENTRY(efi_stub_entry)
+ 	b.eq	efi_load_fail
+ 
+ 	/*
+-	 * efi_entry() will have relocated the kernel image if necessary
+-	 * and we return here with device tree address in x0 and the kernel
+-	 * entry point stored at *image_addr. Save those values in registers
+-	 * which are callee preserved.
++	 * efi_entry() will have copied the kernel image if necessary and we
++	 * return here with device tree address in x0 and the kernel entry
++	 * point stored at *image_addr. Save those values in registers which
++	 * are callee preserved.
+ 	 */
+ 	mov	x20, x0		// DTB address
+ 	ldr	x0, [sp, #16]	// relocated _text address
+ 	mov	x21, x0
+ 
+ 	/*
+-	 * Flush dcache covering current runtime addresses
+-	 * of kernel text/data. Then flush all of icache.
++	 * Calculate size of the kernel Image (same for original and copy).
+ 	 */
+ 	adrp	x1, _text
+ 	add	x1, x1, #:lo12:_text
+@@ -73,9 +72,24 @@ ENTRY(efi_stub_entry)
+ 	add	x2, x2, #:lo12:_edata
+ 	sub	x1, x2, x1
+ 
++	/*
++	 * Flush the copied Image to the PoC, and ensure it is not shadowed by
++	 * stale icache entries from before relocation.
++	 */
+ 	bl	__flush_dcache_area
+ 	ic	ialluis
+ 
++	/*
++	 * Ensure that the rest of this function (in the original Image) is
++	 * visible when the caches are disabled. The I-cache can't have stale
++	 * entries for the VA range of the current image, so no maintenance is
++	 * necessary.
++	 */
++	adr	x0, efi_stub_entry
++	adr	x1, efi_stub_entry_end
++	sub	x1, x1, x0
++	bl	__flush_dcache_area
++
+ 	/* Turn off Dcache and MMU */
+ 	mrs	x0, CurrentEL
+ 	cmp	x0, #CurrentEL_EL2
+@@ -105,4 +119,5 @@ efi_load_fail:
+ 	ldp	x29, x30, [sp], #32
+ 	ret
+ 
++efi_stub_entry_end:
+ ENDPROC(efi_stub_entry)
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+1.9.1
