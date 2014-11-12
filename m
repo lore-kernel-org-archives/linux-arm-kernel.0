@@ -1,72 +1,36 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 12 Nov 2014 11:31:04 +0000
-Subject: [PATCHv3 5/5] arm64: Trace emulation of AArch32 legacy
- instructions
-In-Reply-To: <20141110182714.GS23942@arm.com> (Will Deacon's message of "Mon,
- 10 Nov 2014 18:27:14 +0000")
-References: <1414435207-30240-1-git-send-email-punit.agrawal@arm.com>
- <1414435207-30240-7-git-send-email-punit.agrawal@arm.com>
- <20141110182714.GS23942@arm.com>
-Message-ID: <9hhwq70fyfb.fsf@e105922-lin.cambridge.arm.com>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Wed, 12 Nov 2014 18:36:07 +0700
+Subject: [PATCH V2 2/2] PCI: generic: Add msi_parent DT binding
+In-Reply-To: <CA+mB=1LEEtPCixB9Ej74L03yPPH7D6YvfpkZyJgsHCm97-GvKg@mail.gmail.com>
+References: <1415733454-24322-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1415733454-24322-3-git-send-email-suravee.suthikulpanit@amd.com>
+ <CA+mB=1LEEtPCixB9Ej74L03yPPH7D6YvfpkZyJgsHCm97-GvKg@mail.gmail.com>
+Message-ID: <54634627.60502@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On 11/12/14 13:56, Srikanth Thokala wrote:
+>> @@ -122,9 +123,19 @@ static int gen_pci_config_write(struct pci_bus *bus, unsigned int devfn,
+>> >         return PCIBIOS_SUCCESSFUL;
+>> >  }
+>> >
+>> >+static int gen_pci_set_msi_parent(struct pci_bus *bus)
+>> >+{
+>> >+       struct gen_pci *pci = bus_to_gen_pci(bus);
+>> >+
+>> >+       bus->msi = pci->mchip;
+>> >+
+>> >+       return PCIBIOS_SUCCESSFUL;
+>> >+}
+>> >+
+>> >  static struct pci_ops gen_pci_ops = {
+>> >         .read   = gen_pci_config_read,
+>> >         .write  = gen_pci_config_write,
+>> >+       .set_msi_parent = gen_pci_set_msi_parent,
+> We assign the msi chip through add_bus() call, do we still need this?
 
-Thanks for taking a look.
+Certain architecture (i.e arm64) doesn't implement struct hw_pci. 
+Therefore, there is no add_bus().  However, this new API should allow 
+non-arch dependent implementation.
 
-Will Deacon <will.deacon@arm.com> writes:
-
-> On Mon, Oct 27, 2014 at 06:40:07PM +0000, Punit Agrawal wrote:
->> Introduce an event to trace the usage of emulated instructions. The
->> trace event is intended to help identify and encourage the migration
->> of legacy software using the emulation features.
->> 
->> Use this event to trace usage of swp and CP15 barrier emulation.
->> 
->> Cc: Steven Rostedt <rostedt@goodmis.org>
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> ---
-
-[...]
-
->> @@ -260,16 +268,23 @@ static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
->>  		 * dmb - mcr p15, 0, Rt, c7, c10, 5
->>  		 * dsb - mcr p15, 0, Rt, c7, c10, 4
->>  		 */
->> -		if (aarch32_insn_mcr_extract_opc2(instr) == 5)
->> +		if (aarch32_insn_mcr_extract_opc2(instr) == 5) {
->>  			dmb(sy);
->> -		else
->> +			trace_instruction_emulation(
->> +				"mcr p15, 0, Rt, c7, c10, 5", regs->pc);
->> +		} else {
->>  			dsb(sy);
->> +			trace_instruction_emulation(
->> +				"mcr p15, 0, Rt, c7, c10, 4", regs->pc);
->> +		}
->>  		break;
->>  	case 5:
->>  		/*
->>  		 * isb - mcr p15, 0, Rt, c7, c5, 4
->>  		 */
->>  		isb();
->> +		trace_instruction_emulation(
->> +			"mcr p15, 0, Rt, c7, c5, 4", regs->pc);
->
-> Any chance you can put the barrier name in here too please? Maybe as an asm
-> comment, e.g.:
->
->   "mcr p15, 0, Rt, c7, c5, 4 ; isb"
-
-Good point. I've added the barrier names as assembler comments.
-
-Thanks.
-
->
-> Will
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Suravee
