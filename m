@@ -1,71 +1,41 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 12 Nov 2014 23:08:42 +0100
-Subject: [PATCH 2/4] simplefb: Add support for enumerating simplefb dt nodes
- in /chosen
+Date: Wed, 12 Nov 2014 23:08:43 +0100
+Subject: [PATCH 3/4] simplefb: Change simplefb_init from module_init to
+ fs_initcall
 In-Reply-To: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
 References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1415830124-28787-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1415830124-28787-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update simplefb to support the new preferred location for simplefb dt nodes
-under /chosen.
+One of the reasons for having the simplefb nodes in /chosen, and doing
+explicit enumeration of the nodes there, is too allow enumerating them sooner,
+so that we get a console earlier on.
+
+Doing this earlier then fs_initcall is not useful, since the fb only turns into
+a console when fbcon intializes, which is a fs_initcall too.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/video/fbdev/simplefb.c | 33 ++++++++++++++++++++++++++++++++-
- 1 file changed, 32 insertions(+), 1 deletion(-)
+ drivers/video/fbdev/simplefb.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-index cd96edd..be7d288 100644
+index be7d288..8c0c972 100644
 --- a/drivers/video/fbdev/simplefb.c
 +++ b/drivers/video/fbdev/simplefb.c
-@@ -27,6 +27,7 @@
- #include <linux/platform_data/simplefb.h>
- #include <linux/platform_device.h>
- #include <linux/clk-provider.h>
-+#include <linux/of_platform.h>
+@@ -415,7 +415,11 @@ static void __exit simplefb_exit(void)
+ 	platform_driver_unregister(&simplefb_driver);
+ }
  
- static struct fb_fix_screeninfo simplefb_fix = {
- 	.id		= "simple",
-@@ -385,7 +386,37 @@ static struct platform_driver simplefb_driver = {
- 	.probe = simplefb_probe,
- 	.remove = simplefb_remove,
- };
--module_platform_driver(simplefb_driver);
-+
-+static int __init simplefb_init(void)
-+{
-+	int i, ret;
-+	char name[16];
-+	struct device_node *np;
-+
-+	ret = platform_driver_register(&simplefb_driver);
-+	if (ret)
-+		return ret;
-+
-+	for (i = 0; ; i++) {
-+		snprintf(name, sizeof(name), "framebuffer%d", i);
-+		np = of_find_node_by_name(of_chosen, name);
-+		if (!np)
-+			break;
-+
-+		/* of_platform_device_create will check status for us */
-+		of_platform_device_create(np, NULL, NULL);
-+	}
-+
-+	return 0;
-+}
-+
-+static void __exit simplefb_exit(void)
-+{
-+	platform_driver_unregister(&simplefb_driver);
-+}
-+
-+module_init(simplefb_init);
-+module_exit(simplefb_exit);
+-module_init(simplefb_init);
++/*
++ * While this can be a module, if builtin it's most likely the console
++ * So let's leave module_exit but move module_init to an earlier place
++ */
++fs_initcall(simplefb_init);
+ module_exit(simplefb_exit);
  
  MODULE_AUTHOR("Stephen Warren <swarren@wwwdotorg.org>");
- MODULE_DESCRIPTION("Simple framebuffer driver");
 -- 
 2.1.0
