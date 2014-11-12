@@ -1,43 +1,87 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 12 Nov 2014 11:38:58 -0800
-Subject: [PATCH 2/7] pinctrl: pinconf-generic: Infer map type from DT
- property
-In-Reply-To: <CACRpkdbOLMT1vfFg=CAU_VHdjxPWn_Ybso=+8Asp=mXhmNBRSA@mail.gmail.com>
-References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
- <1415041531-15520-3-git-send-email-soren.brinkmann@xilinx.com>
- <CACRpkdbOLMT1vfFg=CAU_VHdjxPWn_Ybso=+8Asp=mXhmNBRSA@mail.gmail.com>
-Message-ID: <02ceb46374884cbeaf0335ac44b9ba45@BY2FFO11FD043.protection.gbl>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 12 Nov 2014 20:41:44 +0100
+Subject: [PATCH] virt: kvm: arm: vgic: Return failure code '-EBUSY' when
+ mutex_trylock() fails
+In-Reply-To: <546376F7.90502@gmail.com>
+References: <546376F7.90502@gmail.com>
+Message-ID: <20141112194144.GK19598@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-11-11 at 01:47PM +0100, Linus Walleij wrote:
-> On Mon, Nov 3, 2014 at 8:05 PM, Soren Brinkmann
-> <soren.brinkmann@xilinx.com> wrote:
-> 
-> > With the new 'groups' property, the DT parser can infer the map type
-> > from the fact whether 'pins' or 'groups' is used to specify the pin
-> > group to work on.
-> > To maintain backwards compatibitliy with current usage of the DT
-> > binding, this is only done when an invalid map type is passed to the
-> > parsing function.
-> 
-> So that is this:
-> 
-> > +               if (type == PIN_MAP_TYPE_INVALID)
-> > +                       type = PIN_MAP_TYPE_CONFIGS_GROUP;
-> > +               dt_pin_specifier = "groups";
-> 
-> This is just kludgy. There are only two kernel-internal users of this function,
-> refactor the function signature and change the other callers over instead,
-> patch the drivers.
+On Wed, Nov 12, 2014 at 11:04:23PM +0800, Chen Gang wrote:
+> When mutex_trylock() fails, kvm_vgic_create() will not create 'vgic', so
+> it need return failure code '-EBUSY' instead of '0' to let outside know
+> about it.
 
-Just looking into this, one user besides those two drivers is
-pinconf-generic: pinconf_generic_dt_node_to_map() which is called from
- pinconf_generic_dt_node_to_map_pin() and
- pinconf_generic_dt_node_to_map_group()
+I already sent a patch for the -EBUSY:
+https://lists.cs.columbia.edu/pipermail/kvmarm/2014-November/011936.html
 
-And those would be a couple of more users. That's why I chose to not
-change the behavior since this adds another 4 drivers to the list of
-users that might depend on certain behavior.
+> 
+> Also simplify the code within kvm_vgic_create():
+> 
+>  - kvm_for_each_vcpu() scanning once is enough for current case.
+> 
+>  - Remove redundant variable 'vcpu_lock_idx'.
 
-	S?ren
+I don't like using the iterator variable for this kind of thing because
+it can really break in languages where i is out-of-scope after the loop
+and it is too easy to reuse the iterator variable in later versions of
+the code.
+
+That being said, the scanning once is slightly prettier I guess,
+but I'd rather not introduce the churn unless others (Marc) think this
+is a big win.
+
+-Christoffer
+
+> 
+> 
+> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
+> ---
+>  virt/kvm/arm/vgic.c | 15 +++++++--------
+>  1 file changed, 7 insertions(+), 8 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 3aaca49..5846725 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1933,7 +1933,7 @@ out:
+>  
+>  int kvm_vgic_create(struct kvm *kvm)
+>  {
+> -	int i, vcpu_lock_idx = -1, ret = 0;
+> +	int i, ret = 0;
+>  	struct kvm_vcpu *vcpu;
+>  
+>  	mutex_lock(&kvm->lock);
+> @@ -1949,13 +1949,12 @@ int kvm_vgic_create(struct kvm *kvm)
+>  	 * that no other VCPUs are run while we create the vgic.
+>  	 */
+>  	kvm_for_each_vcpu(i, vcpu, kvm) {
+> -		if (!mutex_trylock(&vcpu->mutex))
+> +		if (!mutex_trylock(&vcpu->mutex)) {
+> +			ret = -EBUSY;
+>  			goto out_unlock;
+> -		vcpu_lock_idx = i;
+> -	}
+> -
+> -	kvm_for_each_vcpu(i, vcpu, kvm) {
+> +		}
+>  		if (vcpu->arch.has_run_once) {
+> +			mutex_unlock(&vcpu->mutex);
+>  			ret = -EBUSY;
+>  			goto out_unlock;
+>  		}
+> @@ -1968,8 +1967,8 @@ int kvm_vgic_create(struct kvm *kvm)
+>  	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
+>  
+>  out_unlock:
+> -	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
+> -		vcpu = kvm_get_vcpu(kvm, vcpu_lock_idx);
+> +	while (i-- > 0) {
+> +		vcpu = kvm_get_vcpu(kvm, i);
+>  		mutex_unlock(&vcpu->mutex);
+>  	}
+>  
+> -- 
+> 1.9.3
