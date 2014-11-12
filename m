@@ -1,82 +1,54 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Wed, 12 Nov 2014 13:54:01 +0800
-Subject: [PATCH 10/10] PCI/MSI: Remove useless bus->msi assignment
-In-Reply-To: <20141112042454.GL28161@google.com>
-References: <1414396127-30023-1-git-send-email-wangyijing@huawei.com>
- <1414396127-30023-11-git-send-email-wangyijing@huawei.com>
- <20141112042454.GL28161@google.com>
-Message-ID: <5462F5F9.4000505@huawei.com>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Wed, 12 Nov 2014 11:33:53 +0530
+Subject: [PATCH v11 4/6] ARM: Exynos: switch to using generic cpufreq
+ driver for Exynos4210/5250/5420
+In-Reply-To: <1413805281-6269-5-git-send-email-thomas.ab@samsung.com>
+References: <1413805281-6269-1-git-send-email-thomas.ab@samsung.com>
+ <1413805281-6269-2-git-send-email-thomas.ab@samsung.com>
+ <1413805281-6269-3-git-send-email-thomas.ab@samsung.com>
+ <1413805281-6269-4-git-send-email-thomas.ab@samsung.com>
+ <1413805281-6269-5-git-send-email-thomas.ab@samsung.com>
+Message-ID: <CAHLCerPKv=NsLNZvwo-vhDwkved5+O4a40LvrP_7j30KjeKqUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/12 12:24, Bjorn Helgaas wrote:
-> On Mon, Oct 27, 2014 at 03:48:47PM +0800, Yijing Wang wrote:
->> Thierry introduced MSI chip(now renamed to MSI controller)
->> framework to associate MSI chip and PCI bus in arm.
->> Other platforms still use its own arch MSI functions to
->> support MSI capability. Thierry introduced the bus->msi
->> assignment to make child bus can inherit bus->msi from the parent.
->> But in fact, drivers which used MSI chip always associate
->> MSI chip and PCI bus by add .add_bus() in arm PCI host bridge
->> drivers. Now we have saved MSI chip in pci_sys_data.
->> We can remove this bus->msi assignment safely.
->>
->> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
->> CC: Thierry Reding <thierry.reding@gmail.com>
->> CC: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> ---
->>  drivers/pci/msi.c   |    5 -----
->>  drivers/pci/probe.c |    1 -
->>  2 files changed, 0 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
->> index f085f7f..27b6a54 100644
->> --- a/drivers/pci/msi.c
->> +++ b/drivers/pci/msi.c
->> @@ -37,11 +37,6 @@ struct msi_controller * __weak pcibios_msi_controller(struct pci_bus *bus)
->>  
->>  struct msi_controller *pci_msi_controller(struct pci_bus *bus)
->>  {
->> -	struct msi_controller *ctrl = bus->msi;
->> -
->> -	if (ctrl)
->> -		return ctrl;
->> -
->>  	return pcibios_msi_controller(bus);
->>  }
->>  
->> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->> index 5ed9930..4b18bf2 100644
->> --- a/drivers/pci/probe.c
->> +++ b/drivers/pci/probe.c
->> @@ -682,7 +682,6 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
->>  
->>  	child->parent = parent;
->>  	child->ops = parent->ops;
->> -	child->msi = parent->msi;
-> 
-> Does this mean that struct pci_bus.msi is now unused?  If not, where is it
-> still used?
+Hi Thomas,
 
-Yes, now all arm platforms save msi_chip in pci_sys_data, no one uses it again,
-actually, no platform/pcihost never use it, because all arm pci host drivers use
-pcibios_add_bus() to associate it and pci bus before. Remove it is safety.
+On Mon, Oct 20, 2014 at 5:11 PM, Thomas Abraham <thomas.ab@samsung.com> wrote:
+> The new CPU clock type allows the use of generic CPUfreq drivers. So for
+> Exynos4210/5250, switch to using generic cpufreq driver. For Exynos5420,
+> which did not have CPUfreq driver support, enable the use of generic
+> CPUfreq driver.
+>
+> Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
+> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Tested-by: Chander Kashyap <k.chander@samsung.com>
+> ---
+>  arch/arm/mach-exynos/exynos.c |   24 +++++++++++++++++++++++-
+>  1 files changed, 23 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+> index 6b283eb..a1be294 100644
+> --- a/arch/arm/mach-exynos/exynos.c
+> +++ b/arch/arm/mach-exynos/exynos.c
+> @@ -282,6 +282,28 @@ static void __init exynos_init_irq(void)
+>         exynos_map_pmu();
+>  }
+>
+> +static const struct of_device_id exynos_cpufreq_matches[] = {
+> +       { .compatible = "samsung,exynos5420", .data = "arm-bL-cpufreq-dt" },
 
-Thanks!
-Yijing.
+While you're at it, can you add this to so we don't have to patch
+kernels for the Chromebook2 and Odroid-XU3?
 
-> 
->>  	child->sysdata = parent->sysdata;
->>  	child->bus_flags = parent->bus_flags;
->>  
->> -- 
->> 1.7.1
->>
-> 
-> .
-> 
+      { .compatible = "samsung,exynos5422", .data = "arm-bL-cpufreq-dt" },
+      { .compatible = "samsung,exynos5800", .data = "arm-bL-cpufreq-dt" },
 
 
--- 
-Thanks!
-Yijing
+> +       { .compatible = "samsung,exynos5250", .data = "cpufreq-dt" },
+> +       { .compatible = "samsung,exynos4210", .data = "cpufreq-dt" },
+> +       { .compatible = "samsung,exynos5440", .data = "exynos5440-cpufreq" },
+> +       { /* sentinel */ }
