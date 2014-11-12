@@ -1,27 +1,98 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Nov 2014 12:05:49 +0000
-Subject: [RFC] ptrace: add generic SET_SYSCALL request
-In-Reply-To: <6358312.yt5WU3kBm9@wuerfel>
-References: <1415346443-28915-1-git-send-email-takahiro.akashi@linaro.org>
- <54633F53.8020507@linaro.org> <20141112111352.GC26437@arm.com>
- <6358312.yt5WU3kBm9@wuerfel>
-Message-ID: <20141112120549.GA4042@n2100.arm.linux.org.uk>
+From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
+Date: Wed, 12 Nov 2014 14:07:51 +0200
+Subject: [PATCH v4 REPOST 1/5] of: Add descriptions of thermtrip properties
+ to Tegra PMC bindings
+In-Reply-To: <5461AEB7.70507@nvidia.com>
+References: <1415625137-4791-1-git-send-email-mikko.perttunen@kapsi.fi>
+ <1415625137-4791-2-git-send-email-mikko.perttunen@kapsi.fi>
+ <5461AEB7.70507@nvidia.com>
+Message-ID: <54634D97.9050500@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 12, 2014 at 12:19:26PM +0100, Arnd Bergmann wrote:
-> On Wednesday 12 November 2014 11:13:52 Will Deacon wrote:
-> > Just do arm64. We already have the dedicated request for arch/arm/.
-> 
-> I wonder if we should define NT_ARM64_SYSTEM_CALL to the same value
-> as NT_S390_SYSTEM_CALL (0x307), or even define it as an architecture-
-> independent NT_SYSTEM_CALL number with that value, so other architectures
-> don't have to introduce new types when they also want to implement it.
+On 11/11/2014 08:37 AM, Alexandre Courbot wrote:
+> On 11/10/2014 10:12 PM, Mikko Perttunen wrote:
+>> From: Mikko Perttunen <mperttunen@nvidia.com>
+>>
+>> Hardware-triggered thermal reset requires configuring the I2C
+>> reset procedure. This configuration is read from the device tree,
+>> so document the relevant properties in the binding documentation.
+>>
+>> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+>> Reviewed-by: Wei Ni <wni@nvidia.com>
+>> Tested-by: Wei Ni <wni@nvidia.com>
+>> ---
+>>   .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      | 24
+>> ++++++++++++++++++++++
+>>   1 file changed, 24 insertions(+)
+>>
+>> diff --git
+>> a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+>> b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+>> index 68ac65f..dc13fb0 100644
+>> --- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+>> +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+>> @@ -47,6 +47,21 @@ Required properties when nvidia,suspend-mode=<0>:
+>>     sleep mode, the warm boot code will restore some PLLs, clocks and
+>> then
+>>     bring up CPU0 for resuming the system.
+>>
+>> +Hardware-triggered thermal reset:
+>> +On Tegra30, Tegra114 and Tegra124, if the 'i2c-thermtrip' subnode
+>> exists,
+>> +hardware-triggered thermal reset will be enabled.
+>> +
+>> +Required properties for hardware-triggered thermal reset (inside
+>> 'i2c-thermtrip'):
+>> +- nvidia,i2c-bus : Phandle to I2C bus containing the PMU
+>> +- nvidia,bus-addr : Bus address of the PMU on the I2C bus
+>> +- nvidia,reg-addr : I2C register address to write poweroff command to
+>> +- nvidia,reg-data : Poweroff command to write to PMU
+>
+> This binding is taking two different routes to provide values to the
+> driver:
+>
+> 1) It uses a phandle for i2c-bus (which must then be provided by another
+> binding implemented in the two following patches)
+>
+> 2) It uses direct values for bus-addr, reg-addr and reg-data.
+>
+> Do we need to use both approaches? bus-addr could just as well be
+> obtained through a phandle to the i2c device and reading its reg
+> property. From this phandle you could also go back up to the bus, making
+> the i2c-bus property unnecessary. reg-addr and reg-data cannot be
+> specified that way, obviously.
 
-That would be a sane thing to do, so that tools which want to get at
-this information can do in an almost standardised way for architectures
-implementing this method.
+This was in fact how I used to implement this, but Stephen or Thierry 
+pointed out that the reg property actually might not contain the correct 
+address (I think because the PMIC could have multiple addresses, and the 
+one in DT might not be the one that accepts the reset command).
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+The workaround for that was to either add this integer property for 
+bus-addr or add a new PMIC API for querying. I went for this as it is 
+much simpler.
+
+>
+> Actually I think I'd prefer to see i2c-bus become an integer property
+> instead of a phandle, because at the end of the day it is a value field
+> of a particular register and the reference is only used to retrieve that
+> value. It is not like we are actually going to call functions on the bus
+> instance or change its state. And for the single purpose of retrieving
+> that value, this binding requires the addition of a new property on the
+> bus node that will probably never be used for something else.
+
+And this was how I used to implement this even earlier, but Thierry 
+objected to that since it was duplicating information :)
+
+>
+> We can also imagine that some design may not have a PMIC device in the
+> DT but still want to use the thermal reset feature. In this case, it is
+> again preferable to use direct values.
+>
+
+I don't see how that'd change anything; the hardware feature still 
+requires an I2C device to send a message to. If there's an I2C device on 
+one of the SoC buses, you probably should have it in the DT..
+
+Cheers,
+Mikko
