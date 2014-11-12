@@ -1,58 +1,34 @@
-From: mk@drkrebs.de (Markus Krebs)
-Date: Wed, 12 Nov 2014 21:30:14 +0100
-Subject: Network timing (?) problems since kernel 3.12
-In-Reply-To: <20141112194805.GA27092@schnuecks.de>
-References: <545F852D.5040209@drkrebs.de> <20141109155502.GA10013@lunn.ch>
- <545F9CC5.6070709@drkrebs.de> <20141112194805.GA27092@schnuecks.de>
-Message-ID: <5463C356.50505@drkrebs.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 12 Nov 2014 21:29:27 +0100
+Subject: [PATCH v2 1/5] phy: sun4i: add support for USB phy0
+In-Reply-To: <997f1e2744504f3461f9e94e2171180b5ce87aa2.1415645258.git.rbyshko@gmail.com>
+References: <cover.1415645258.git.rbyshko@gmail.com>
+ <997f1e2744504f3461f9e94e2171180b5ce87aa2.1415645258.git.rbyshko@gmail.com>
+Message-ID: <20141112202927.GB20972@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 12.11.2014 um 20:48 schrieb Simon Baatz:
-> Hi Markus,
->
-> On Sun, Nov 09, 2014 at 05:56:37PM +0100, Markus Krebs wrote:
->> Am 09.11.2014 um 16:55 schrieb Andrew Lunn:
->>
->>>> I'm using a Sheevaplug (Marvell Kirkwood) with an USB-Stick for
->>>> storage as a server. Since kernel 3.12 I'm experiencing various
->>>> erratic problems when transferring files, especially large or many
->>>> files at the same time, over the network (ssh complaining about
->>>> "Corrupted MAC on input" or Windows [over Samba] about corrupt
->>>> files).
->>>> Turning "offload check summing" off with ethtool didn't really help.
->>>
->>> Try turning off gso.
->>
->> Thanks, Andrew; I've tried now but that didn't do the trick either.
->
-> I am not able to provoke this behaviour on my Sheevaplug using a
-> stock 3.12.32 kernel (but that does not mean much.  Just did some
-> quick tests by copying large files from an USB stick using ssh or
-> netcat).
->
-> Could you elaborate on the actual kernel and config you are using?
-> Is there a simple testcase that reliably reproduces the behaviour on
-> your box?
->
-> - Simon
->
+On Mon, Nov 10, 2014 at 07:55:06PM +0100, Roman Byshko wrote:
+> The driver for sun4i USB phys currently supports
+> only phy1 and phy2 which are used for USB host
+> controllers. This patch adds support for USB phy0,
+> which is used by the musb hdrc USB controller.
+> 
+> Signed-off-by: Roman Byshko <rbyshko@gmail.com>
 
-Hi Simon,
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-the actual working kernel I'm using is "3.11-2-kirkwood #1 Debian 
-3.11.10-1 (2013-12-04) armv5tel". It never fails on anything.
+Thanks!
+Maxime
 
-When I upgrade to a newer kernel (3.15, 3.16, 3.17 ..), my testcase 
-is/was to do a unison synchronisation run: I synchronize a large 
-directory on the server with a backup directory on a Windows machine. 
-Unison is invoked from Windows, while the Linux unison server is 
-waiting, over ssh. Immediately after invoking unison from Windows, it 
-crashes, when the server runs a newer kernel. This is reproduceable.
-Being curious what could be the problem, I have synchronized two Linux 
-servers with unison, again over ssh. It then gave the error "Corrupted 
-MAC on input".
-This "unison over ssh"-scenario is my testcase, as when copying files, 
-the error is not consistently reproduceable.
-
-- Markus
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141112/00769842/attachment.sig>
