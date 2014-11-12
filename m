@@ -1,23 +1,34 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 12 Nov 2014 18:50:45 +0800
-Subject: [PATCH] ARM: dts: imx6qdl: Enable CODA960 VPU
-In-Reply-To: <1415740367-326-1-git-send-email-festevam@gmail.com>
-References: <1415740367-326-1-git-send-email-festevam@gmail.com>
-Message-ID: <20141112105044.GL2704@dragon>
+Date: Wed, 12 Nov 2014 18:56:22 +0800
+Subject: [PATCH v4 0/3] add power off driver for i.mx6
+In-Reply-To: <1415780439-29728-1-git-send-email-b38343@freescale.com>
+References: <1415780439-29728-1-git-send-email-b38343@freescale.com>
+Message-ID: <20141112105620.GM2704@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 11, 2014 at 07:12:47PM -0200, Fabio Estevam wrote:
-> From: Philipp Zabel <p.zabel@pengutronix.de>
+On Wed, Nov 12, 2014 at 04:20:36PM +0800, Robin Gong wrote:
+> Resend the patchset  with the latest MAINTAINERS
+> Add simple power off driver for i.mx6, including:
+> - add basic imx-snvs-poweroff driver in drivers/power/reset
+> - add device node in all dts files of i.mx6.
+> - enable in config file
 > 
-> This patch adds links to the on-chip SRAM and reset controller nodes
-> and switches the interrupts. Make the BIT processor interrupt, which exists on
-> all variants, the first one. The JPEG unit interrupt, which does not exist on
-> i.MX27 and i.MX5 thus is an optional second interrupt.
-> Use different compatible strings for i.MX6Q/D and i.MX6S/DL, as they have to
-> load separate firmware images for some reason.
+> Change from v3:
+> - disable poweroff driver in soc level dts and enable it in board level dts
+> - replace 'EIO' with 'ENODEV' while of_iomap fail.
+> Change from v2:
+> - remove useless included head files
+> - split device binding doc from dts patch
+> - add description for the case that PMIC_ON_REQ not used as external power
+>   control
 > 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Robin Gong (3):
+>   ARM: dts: imx6: add pm_power_off support for i.mx6 chips
+>   power: reset: imx-snvs-poweroff: add power off driver for i.mx6
+>   ARM: configs: imx_v6_v7_defconfig: add power off driver
 
-Applied, thanks.
+I'm fine with the series.  But before I take the patches, I need an ACK
+from DT folks on the bindings.
+
+Shawn
