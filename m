@@ -1,108 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Nov 2014 11:39:17 +0100
-Subject: [RFC PATCH v2] drivers: pci: move PCI domain assignment to
- generic PCI code
-In-Reply-To: <1415637706-2195-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1415637706-2195-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <176983067.8qgFVmI6qY@wuerfel>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 12 Nov 2014 18:42:41 +0800
+Subject: [PATCH] ARM: imx: temporarily remove CONFIG_SOC_FSL from LS1021A
+In-Reply-To: <1727581.y25NQPsRIm@wuerfel>
+References: <1414746073-12394-1-git-send-email-jingchang.lu@freescale.com>
+ <1414746073-12394-6-git-send-email-jingchang.lu@freescale.com>
+ <1727581.y25NQPsRIm@wuerfel>
+Message-ID: <20141112104239.GJ2704@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 November 2014 16:41:46 Lorenzo Pieralisi wrote:
-> The current logic used for PCI domain assignment in arm64
-> pci_bus_assign_domain_nr() is flawed in that, depending on the host
-> controllers configuration for a platform and the respective initialization
-> sequence, core code may end up allocating PCI domain numbers from both DT and
-> the core code generic domain counter, which would result in PCI domain
-> allocation aliases/errors.
+On Tue, Nov 11, 2014 at 05:03:25PM +0100, Arnd Bergmann wrote:
+> The newly introduced LS1021A SoC selects CONFIG_SOC_FSL, which
+> is originally symbol used for the PowerPC based platforms
+> and guards lots of code that does not build on ARM.
 > 
-> This patch fixes the logic behind the PCI domain number assignment and
-> moves the resulting code to generic PCI core code so that the same domain
-> allocation logic is used on all platforms selecting
+> This breaks allmodconfig, so let's remove it for now, until
+> either all those drivers are fixed or they use a dependency
+> on IMX instead.
 > 
-> CONFIG_PCI_DOMAINS_GENERIC
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > 
-> instead of resorting to an arch specific implementation that might end up
-> duplicating the PCI domain assignment logic wrongly.
+> ---
+> On Friday 31 October 2014 17:01:12 Jingchang Lu wrote:
+> > From: Jingchang Lu <b35083@freescale.com>
+> > 
+> > The LS1021A SoC is a dual-core Cortex-A7 based processor,
+> > this adds the initial support for it.
+> > 
+> > Signed-off-by: Jingchang Lu <b35083@freescale.com>
 > 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >  
+> > +config FSL_SOC
+> > +       bool
+> > +
+> > +config SOC_LS1021A
+> > +       bool "Freescale LS1021A support"
+> > +       select ARM_GIC
+> > +       select HAVE_ARM_ARCH_TIMER
+> > +       select FSL_SOC
+> >
+> 
+> 
+> This broke allmodconfig builds in linux-next, please apply this
+> partial revert for the moment.
 
-The general approach seems good to me,
+I noticed the issue from 0-DAY testing and was trying to drop the patch.
+Jingchang said someone is trying to fixing the issues from driver code.
+But it seems to take some time.  So I agree with this partial reverting.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Patch applied.  Thanks Arnd.
 
-I would suggest one simplification:
+Shawn
 
-> +
-> +#ifdef CONFIG_PCI_DOMAINS_GENERIC
-> +
-> +void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> +{
-> +	static int use_dt_domains = -1;
-> +	int domain = of_get_pci_domain_nr(parent->of_node);
-> +
-> +	/*
-> +	 * Check DT domain and use_dt_domains values.
-> +	 *
-> +	 * If DT domain property is valid (domain >= 0) and
-> +	 * use_dt_domains != 0, the DT assignment is valid since this means
-> +	 * we have not previously allocated a domain number by using
-> +	 * pci_get_new_domain_nr(); we should also update use_dt_domains to
-> +	 * 1, to indicate that we have just assigned a domain number from
-> +	 * DT.
-> +	 *
-> +	 * If DT domain property value is not valid (ie domain < 0), and we
-> +	 * have not previously assigned a domain number from DT
-> +	 * (use_dt_domains != 1) we should assign a domain number by
-> +	 * using the:
-> +	 *
-> +	 * pci_get_new_domain_nr()
-> +	 *
-> +	 * API and update the use_dt_domains value to keep track of method we
-> +	 * are using to assign domain numbers (use_dt_domains = 0).
-> +	 *
-> +	 * All other combinations imply we have a platform that is trying
-> +	 * to mix domain numbers obtained from DT and pci_get_new_domain_nr(),
-> +	 * which is a recipe for domain mishandling and it is prevented by
-> +	 * invalidating the domain value (domain = -1) and printing a
-> +	 * corresponding error.
-> +	 */
-> +	if (domain >= 0 && use_dt_domains) {
-> +		use_dt_domains = 1;
-> +	} else if (domain < 0 && use_dt_domains != 1) {
-> +		use_dt_domains = 0;
-> +		domain = pci_get_new_domain_nr();
-> +	} else {
-> +		dev_err(parent, "Node %s has inconsistent \"linux,pci-domain\" property in DT\n",
-> +			parent->of_node->full_name);
-> +		domain = -1;
-> +	}
-> +
-> +	bus->domain_nr = domain;
-> +}
-> +#endif
->  #endif
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index ef549ef1cd6d..e8627e04e1e6 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -658,14 +658,10 @@ choice
 >  
-
-Since this is now in the file in which it gets called, you can mark the
-function itself as 'static' and remove the extern declaration and inline
-wrapper from the header file. You can also avoid the #ifdef by doing
-
-void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-{
-	static int use_dt_domains = -1;
-	int domain = of_get_pci_domain_nr(parent->of_node);
-
-	if (!IS_ENABLED(CONFIG_PCI_DOMAINS_GENERIC))
-		return;
-
-	...
-}
-
-
-	Arnd
+>  endchoice
+>  
+> -config FSL_SOC
+> -	bool
+> -
+>  config SOC_LS1021A
+>  	bool "Freescale LS1021A support"
+>  	select ARM_GIC
+>  	select HAVE_ARM_ARCH_TIMER
+> -	select FSL_SOC
+>  	select PCI_DOMAINS if PCI
+>  	select ZONE_DMA if ARM_LPAE
+>  
+> 
