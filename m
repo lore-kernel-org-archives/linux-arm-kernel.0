@@ -1,19 +1,64 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 12 Nov 2014 07:57:58 -0800
-Subject: [PATCH RESEND] Documentation: devicetree: Fix Xilinx VDMA
- specification
-In-Reply-To: <1415800277-6817-1-git-send-email-afaerber@suse.de>
-References: <1415800277-6817-1-git-send-email-afaerber@suse.de>
-Message-ID: <6067bede14b9421fa87db96bdc66dc66@BN1AFFO11FD040.protection.gbl>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 12 Nov 2014 18:00:47 +0200
+Subject: [PATCH] PM / Domains: restore calling of .suspend/resume_noirq()
+ callbacks
+Message-ID: <1415808047-23455-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-11-12 at 02:51PM +0100, Andreas F?rber wrote:
-> The specification requires xlnx,data-width, but example and driver use
-> xlnx,datawidth. Change the specification to match the implementation.
+Now .suspend/resume_noirq() callbacks will not be called during
+system wide suspend/resume for devices which belongs to some GPD.
+It seems, that this change was accidently introduced by
+commit d23b9b00cdde ("PM / Domains: Rework system suspend callback
+ routines (v2)").
 
-Isn't this the wrong way around? The bindings are considered API, so
-shouldn't the driver be fixed to match the spec?
-Are there already dts files out there using either of these options?
+This patch restores calling of .suspend/resume_noirq() callbacks
+for devices from GPD during system wide suspend/resume.
 
-	Soren
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ drivers/base/power/domain.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index fb83d4a..f8c70e6 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -1014,6 +1014,7 @@ static int pm_genpd_suspend_late(struct device *dev)
+ static int pm_genpd_suspend_noirq(struct device *dev)
+ {
+ 	struct generic_pm_domain *genpd;
++	int ret;
+ 
+ 	dev_dbg(dev, "%s()\n", __func__);
+ 
+@@ -1021,8 +1022,14 @@ static int pm_genpd_suspend_noirq(struct device *dev)
+ 	if (IS_ERR(genpd))
+ 		return -EINVAL;
+ 
+-	if (genpd->suspend_power_off
+-	    || (dev->power.wakeup_path && genpd_dev_active_wakeup(genpd, dev)))
++	if (genpd->suspend_power_off)
++		return 0;
++
++	ret = pm_generic_suspend_noirq(dev);
++	if (ret)
++		return ret;
++
++	if (dev->power.wakeup_path && genpd_dev_active_wakeup(genpd, dev))
+ 		return 0;
+ 
+ 	genpd_stop_dev(genpd, dev);
+@@ -1065,8 +1072,9 @@ static int pm_genpd_resume_noirq(struct device *dev)
+ 	 */
+ 	pm_genpd_sync_poweron(genpd);
+ 	genpd->suspended_count--;
++	genpd_start_dev(genpd, dev);
+ 
+-	return genpd_start_dev(genpd, dev);
++	return pm_generic_resume_noirq(dev);
+ }
+ 
+ /**
+-- 
+1.9.1
