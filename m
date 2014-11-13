@@ -1,24 +1,61 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 13 Nov 2014 09:44:49 +0100
-Subject: [PATCH] clk: rockchip: ensure HCLK_VIO2_H2P and PCLK_VIO2_H2P
- stay enabled
-In-Reply-To: <20141113004046.25314.61598@quantum>
-References: <20141112213845.GA14153@dtor-ws>
- <CAD=FV=UsYWDw0wB6KSANXZYnnBFdTL9wOEqf9DoUF8aFuDpNSw@mail.gmail.com>
- <20141113004046.25314.61598@quantum>
-Message-ID: <6158549.ckz49I10o4@diego>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 13 Nov 2014 09:43:24 +0100
+Subject: [PATCH 1/4] dt-bindings: simplefb: Specify node location and
+ handoff related properties
+In-Reply-To: <CAMuHMdU4YTwyMrD5U1i3DYy=cvpocmzXqajySUfgBKVRhcAJVw@mail.gmail.com>
+References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
+ <CAMuHMdU4YTwyMrD5U1i3DYy=cvpocmzXqajySUfgBKVRhcAJVw@mail.gmail.com>
+Message-ID: <54646F2C.1000707@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi,
 
-Am Mittwoch, 12. November 2014, 16:40:46 schrieb Mike Turquette:
-> Seems fine to me. Just to be clear, Heiko will be picking up the
-> Rockchip clock patches and submitting a PR, correct? I believe last
-> merge window was the first time we did that for Rockchip and it went
-> well.
+On 11/13/2014 09:38 AM, Geert Uytterhoeven wrote:
+> On Wed, Nov 12, 2014 at 11:08 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Since simplefb nodes do not relate directly to hw typically they have been
+>> placed in the root of the devicetree. As the represent runtime information
+>> having them as sub-nodes of /chosen is more logical, specify this.
+>>
+>> Also specify when to set the chosen stdout-path property to a simplefb node.
+>>
+>> For reliable handover to a hardware specific driver, that driver needs to
+>> know which simplefb to unregister when taking over, specify how the hw driver
+>> can find the matching simplefb node.
+>>
+>> Last add some advice on how to fill and use simplefb nodes from a firmware
+>> pov.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> 
+> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-yep, I'm picking up the clock patches.
+Thanks.
 
+> 
+>> ---
+>>  .../bindings/video/simple-framebuffer.txt          | 37 +++++++++++++++++++++-
+>>  1 file changed, 36 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+>> index 8f35718..95fe284 100644
+>> --- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+>> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+>> @@ -4,6 +4,26 @@ A simple frame-buffer describes a frame-buffer setup by firmware or
+>>  the bootloader, with the assumption that the display hardware has already
+>>  been set up to scan out from the memory pointed to by the reg property.
+>>
+>> +Since simplefb nodes represent runtime information they must be sub-nodes of
+>> +the chosen node (*). The primary display node must be named framebuffer0,
+>> +additional nodes must be called framebuffer1, etc.
+>> +
+>> +If a simplefb node represents the preferred console for user interaction,
+>> +then the chosen node's stdout-path property must point to it.
+> 
+> You may want to add an stdout-path property to the example.
 
-Heiko
+That is a good idea, done for v2.
+
+Regards,
+
+Hans
