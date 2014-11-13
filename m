@@ -1,67 +1,72 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 13 Nov 2014 20:23:39 +0000
-Subject: [Patch V1 3/6] genirq: Introduce msi_domain_{alloc|free}_irqs()
-In-Reply-To: <1415879029-20098-4-git-send-email-jiang.liu@linux.intel.com>
-References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
- <1415879029-20098-4-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <5465134B.7070709@arm.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 13 Nov 2014 12:24:47 -0800
+Subject: [PATCH v10 2/3] power-domain: rockchip: add power doamin driver
+In-Reply-To: <11419951.x8p1Z4vKjh@diego> ("Heiko =?utf-8?Q?St=C3=BCbner=22?=
+ =?utf-8?Q?'s?= message of "Wed, 12 Nov 2014 01:10:28 +0100")
+References: <1415690392-9278-1-git-send-email-caesar.wang@rock-chips.com>
+ <1415690392-9278-3-git-send-email-caesar.wang@rock-chips.com>
+ <7h7fz1of0m.fsf@deeprootsystems.com> <11419951.x8p1Z4vKjh@diego>
+Message-ID: <7hh9y2c0hc.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/11/14 11:43, Jiang Liu wrote:
-> Introduce msi_domain_{alloc|free}_irqs() to alloc/free interrupts
-> from generic MSI irqdomain.
-> 
-> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-> ---
->  include/linux/msi.h |   35 ++++++++++++++++++++++++++++++
->  kernel/irq/msi.c    |   59 +++++++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 94 insertions(+)
-> 
-> diff --git a/include/linux/msi.h b/include/linux/msi.h
-> index 714716a3ffdd..6b356a1410b2 100644
-> --- a/include/linux/msi.h
-> +++ b/include/linux/msi.h
-> @@ -3,6 +3,7 @@
->  
->  #include <linux/kobject.h>
->  #include <linux/list.h>
-> +#include <asm/hw_irq.h>		/* for msi_alloc_info_t */
->  
->  struct msi_msg {
->  	u32	address_lo;	/* low 32 bits of msi message address */
-> @@ -100,7 +101,26 @@ struct irq_chip;
->  struct device_node;
->  struct msi_domain_info;
->  
-> +#ifndef NUM_MSI_ALLOC_SCRATCHPAD_REGS
-> +#define NUM_MSI_ALLOC_SCRATCHPAD_REGS	2
-> +#endif
-> +
-> +/*
-> + * Default structure for MSI interrupt allocation.
-> + * Arch may overwrite it by define msi_alloc_info_t.
-> + */
-> +struct msi_alloc_info {
-> +	struct msi_desc *desc;
-> +	irq_hw_number_t hwirq;
-> +	long		scratchpad[NUM_MSI_ALLOC_SCRATCHPAD_REGS];
+Heiko St?bner <heiko@sntech.de> writes:
 
-As much as I'm relieved to see a generic structure here, could
-scratchpad be slightly less awkward to use? Something like:
+> Am Dienstag, 11. November 2014, 08:53:13 schrieb Kevin Hilman:
+>> Caesar Wang <caesar.wang@rock-chips.com> writes:
+>> > In order to meet high performance and low power requirements, a power
+>> > management unit is designed or saving power when RK3288 in low power mode.
+>> > The RK3288 PMU is dedicated for managing the power ot the whole chip.
+>> > 
+>> > Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
+>> > Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
+>> > Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+>> > 
+>> > ---
+>> > 
+>> > Changes in v10:
+>> >     - this switches over domain infos to use masks instead of recomputing
+>> >     
+>> >       them each time and also gets rid of custom domain translator and
+>> >       uses standard onecell on.
+>> > 
+>> > Changes in v9:
+>> >     - fix v8 changes as follows:
+>> >     - This reconciles the v2 and v7 code so that we power domain have
+>> >     
+>> >       lists of clocks they toggle on and off during power transitions and
+>> >       independently from power domains clocks we attach clocks to devices
+>> >       comprising power domain and prepare them so they are turn on and off
+>> >       by runtime PM.
+>> 
+>> I still don't like having lists of clocks in the power-domain DT.
+>> 
+>> DT is supposed to describe the hardware, and clocks are properties of
+>> devices, not power-domains, so the DT description should follow from that.
+>
+> on the policy side one could argue that if the clock needs to be enabled to 
+> achieve sucessful domain state-changes, that it is also a property of the 
+> domain itself in addition to the device.
 
-struct msi_alloc_info {
-	[...]
-	union	{
-		unsigned long ul;
-		void *ptr;
-	} scratchpad[NUM_MSI_ALLOC_SCRATCHPAD_REGS];
-};
+You could, but from a hardware perspective, the clock is a property of
+the device.
 
-That would avoid some very ugly casting.
+> And on the pratical side we don't have drivers nor bindings for a big part of 
+> the domain users - and this will probably be true for quite some time. This of 
+> course makes it very impractical (or impossible) to collect the clocks for 
+> parts like the gpu (mali), hevc, vcodec (video encoder/decoder), rga (2d 
+> stuff), iep, isp.
 
-Thanks,
+This doesn't sound impossible at all.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+You have to collect the clocks anyways.  The only debate is whether to
+list them in the device node or the power-domain node.  
+
+Even for devices without drivers, you just need a minimal node in the DT if
+which lists the clocks and has a phandle to the parent power domain.
+
+Sounds rather simple to me, and since the DT is supposed to describe the
+hardware, doing it this way makes looking at the DT actually help
+understand the hardware.
+
+Kevin
