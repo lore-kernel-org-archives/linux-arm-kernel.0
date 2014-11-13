@@ -1,33 +1,41 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 13 Nov 2014 10:31:43 +0100
-Subject: [PATCH 1/7] ARM: dts: sunxi: Add regulator-boot-on property to
- ahci-5v regulator
-Message-ID: <1415871109-28332-1-git-send-email-hdegoede@redhat.com>
+Date: Thu, 13 Nov 2014 10:31:47 +0100
+Subject: [PATCH 5/7] ARM: dts: sun7i: Add simplefb node
+In-Reply-To: <1415871109-28332-1-git-send-email-hdegoede@redhat.com>
+References: <1415871109-28332-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1415871109-28332-5-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This avoids it getting briefly turned off between when the regulator getting
-registered and the ahci driver turning it back on, thus avoiding the disk
-going into emergency head park mode.
+Add a simplefb template node for u-boot to further fill and activate.
 
-Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
-Reported-and-tested-by: Bruno Pr?mont <bonbons@linux-vserver.org>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sunxi-common-regulators.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/sun7i-a20.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sunxi-common-regulators.dtsi b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
-index c9c5b10..a950671 100644
---- a/arch/arm/boot/dts/sunxi-common-regulators.dtsi
-+++ b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
-@@ -44,6 +44,7 @@
- 		regulator-name = "ahci-5v";
- 		regulator-min-microvolt = <5000000>;
- 		regulator-max-microvolt = <5000000>;
-+		regulator-boot-on;
- 		enable-active-high;
- 		gpio = <&pio 1 8 0>;
- 		status = "disabled";
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 81d4e55..3ef078f 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -64,6 +64,18 @@
+ 		serial7 = &uart7;
+ 	};
+ 
++	chosen {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		framebuffer0 {
++			compatible = "simple-framebuffer";
++			clocks = <&ahb_gates 36>, <&ahb_gates 43>, <&ahb_gates 44>;
++			status = "disabled";
++		};
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
 -- 
 2.1.0
