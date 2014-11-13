@@ -1,154 +1,165 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 13 Nov 2014 15:14:56 +0100
-Subject: [PATCH 2/2] dmaengine: at_xdmac: split device_control
-In-Reply-To: <1415888096-22090-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1415888096-22090-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1415888096-22090-3-git-send-email-ludovic.desroches@atmel.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 13 Nov 2014 15:16:16 +0100
+Subject: [RFC PATCH 1/4] ARM: KVM: on unhandled IO mem abort, route the
+ call to the KVM MMIO bus
+In-Reply-To: <CADDJ2=PTM0fJ0RFfWdVQ1-471xqaJmj0vP1f5-pf57xOV5jgig@mail.gmail.com>
+References: <1394726249-1547-1-git-send-email-a.motakis@virtualopensystems.com>
+ <1394726249-1547-2-git-send-email-a.motakis@virtualopensystems.com>
+ <20140328190913.GJ25519@cbox>
+ <CADDJ2=Opx2d5ex0hWSXYJjs6uLifR9wZVsahUHzZ7zytSj7ZSg@mail.gmail.com>
+ <20141110162736.GA16054@cbox>
+ <CADDJ2=PTM0fJ0RFfWdVQ1-471xqaJmj0vP1f5-pf57xOV5jgig@mail.gmail.com>
+Message-ID: <5464BD30.7040702@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use newly introduced callbacks.
+On 11/13/2014 11:45 AM, Nikolay Nikolaev wrote:
+> On Mon, Nov 10, 2014 at 6:27 PM, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
+>> On Mon, Nov 10, 2014 at 05:09:07PM +0200, Nikolay Nikolaev wrote:
+>>> Hello,
+>>>
+>>> On Fri, Mar 28, 2014 at 9:09 PM, Christoffer Dall
+>>> <christoffer.dall@linaro.org> wrote:
+>>>>
+>>>> On Thu, Mar 13, 2014 at 04:57:26PM +0100, Antonios Motakis wrote:
+>>>>> On an unhandled IO memory abort, use the kvm_io_bus_* API in order to
+>>>>> handle the MMIO access through any registered read/write callbacks. This
+>>>>> is a dependency for eventfd support (ioeventfd and irqfd).
+>>>>>
+>>>>> However, accesses to the VGIC are still left implemented independently,
+>>>>> since the kvm_io_bus_* API doesn't pass the VCPU pointer doing the access.
+>>>>>
+>>>>> Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
+>>>>> Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
+>>>>> ---
+>>>>>  arch/arm/kvm/mmio.c | 32 ++++++++++++++++++++++++++++++++
+>>>>>  virt/kvm/arm/vgic.c |  5 ++++-
+>>>>>  2 files changed, 36 insertions(+), 1 deletion(-)
+>>>>>
+>>>>> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+>>>>> index 4cb5a93..1d17831 100644
+>>>>> --- a/arch/arm/kvm/mmio.c
+>>>>> +++ b/arch/arm/kvm/mmio.c
+>>>>> @@ -162,6 +162,35 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>>>>       return 0;
+>>>>>  }
+>>>>>
+>>>>> +/**
+>>>>> + * kvm_handle_mmio - handle an in-kernel MMIO access
+>>>>> + * @vcpu:    pointer to the vcpu performing the access
+>>>>> + * @run:     pointer to the kvm_run structure
+>>>>> + * @mmio:    pointer to the data describing the access
+>>>>> + *
+>>>>> + * returns true if the MMIO access has been performed in kernel space,
+>>>>> + * and false if it needs to be emulated in user space.
+>>>>> + */
+>>>>> +static bool handle_kernel_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>>>> +             struct kvm_exit_mmio *mmio)
+>>>>> +{
+>>>>> +     int ret;
+>>>>> +     if (mmio->is_write) {
+>>>>> +             ret = kvm_io_bus_write(vcpu->kvm, KVM_MMIO_BUS, mmio->phys_addr,
+>>>>> +                             mmio->len, &mmio->data);
+>>>>> +
+>>>>> +     } else {
+>>>>> +             ret = kvm_io_bus_read(vcpu->kvm, KVM_MMIO_BUS, mmio->phys_addr,
+>>>>> +                             mmio->len, &mmio->data);
+>>>>> +     }
+>>>>> +     if (!ret) {
+>>>>> +             kvm_prepare_mmio(run, mmio);
+>>>>> +             kvm_handle_mmio_return(vcpu, run);
+>>>>> +     }
+>>>>> +
+>>>>> +     return !ret;
+>>>>> +}
+>>>>> +
+>>>>>  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>>>>                phys_addr_t fault_ipa)
+>>>>>  {
+>>>>> @@ -200,6 +229,9 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>>>>       if (vgic_handle_mmio(vcpu, run, &mmio))
+>>>>>               return 1;
+>>>>>
+>>>>> +     if (handle_kernel_mmio(vcpu, run, &mmio))
+>>>>> +             return 1;
+>>>>> +
+>>>
+>>>
+>>> We're reconsidering ioeventfds patchseries and we tried to evaluate
+>>> what you suggested here.
+>>>
+>>>>
+>>>> this special-casing of the vgic is now really terrible.  Is there
+>>>> anything holding you back from doing the necessary restructure of the
+>>>> kvm_bus_io_*() API instead?
+>>>
+>>> Restructuring the kvm_io_bus_ API is not a big thing (we actually did
+>>> it), but is not directly related to the these patches.
+>>> Of course it can be justified if we do it in the context of removing
+>>> vgic_handle_mmio and leaving only handle_kernel_mmio.
+>>>
+>>>>
+>>>> That would allow us to get rid of the ugly
+>>>> Fix it! in the vgic driver as well.
+>>>
+>>> Going through the vgic_handle_mmio we see that it will require large
+>>> refactoring:
+>>>  - there are 15 MMIO ranges for the vgic now - each should be
+>>> registered as a separate device
+Hi Nikolaev, Andre,
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/dma/at_xdmac.c | 94 ++++++++++++++++++++++++++++++--------------------
- 1 file changed, 57 insertions(+), 37 deletions(-)
+what does mandate to register 15 devices? Isn't possible to register a
+single kvm_io_device covering the whole distributor range [base, base +
+KVM_VGIC_V2_DIST_SIZE] (current code) and in associated
+kvm_io_device_ops read/write locate the addressed range and do the same
+as what is done in current vgic_handle_mmio? Isn't it done that way for
+the ioapic? what do I miss?
 
-diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-index ff67466..c7f3350 100644
---- a/drivers/dma/at_xdmac.c
-+++ b/drivers/dma/at_xdmac.c
-@@ -1107,58 +1107,75 @@ static void at_xdmac_issue_pending(struct dma_chan *chan)
- 	return;
- }
- 
--static int at_xdmac_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--			    unsigned long arg)
-+static int at_xdmac_device_config(struct dma_chan *chan,
-+				  struct dma_slave_config *config)
-+{
-+	struct at_xdmac_chan	*atchan = to_at_xdmac_chan(chan);
-+	int ret;
-+
-+	dev_dbg(chan2dev(chan), "%s\n", __func__);
-+
-+	spin_lock_bh(&atchan->lock);
-+	ret = at_xdmac_set_slave_config(chan, config);
-+	spin_unlock_bh(&atchan->lock);
-+
-+	return ret;
-+}
-+
-+static int at_xdmac_device_pause(struct dma_chan *chan)
- {
--	struct at_xdmac_desc	*desc, *_desc;
- 	struct at_xdmac_chan	*atchan = to_at_xdmac_chan(chan);
- 	struct at_xdmac		*atxdmac = to_at_xdmac(atchan->chan.device);
--	int			ret = 0;
- 
--	dev_dbg(chan2dev(chan), "%s: cmd=%d\n", __func__, cmd);
-+	dev_dbg(chan2dev(chan), "%s\n", __func__);
- 
- 	spin_lock_bh(&atchan->lock);
-+	at_xdmac_write(atxdmac, AT_XDMAC_GRWS, atchan->mask);
-+	set_bit(AT_XDMAC_CHAN_IS_PAUSED, &atchan->status);
-+	spin_unlock_bh(&atchan->lock);
- 
--	switch (cmd) {
--	case DMA_PAUSE:
--		at_xdmac_write(atxdmac, AT_XDMAC_GRWS, atchan->mask);
--		set_bit(AT_XDMAC_CHAN_IS_PAUSED, &atchan->status);
--		break;
-+	return 0;
-+}
- 
--	case DMA_RESUME:
--		if (!at_xdmac_chan_is_paused(atchan))
--			break;
-+static int at_xdmac_device_resume(struct dma_chan *chan)
-+{
-+	struct at_xdmac_chan	*atchan = to_at_xdmac_chan(chan);
-+	struct at_xdmac		*atxdmac = to_at_xdmac(atchan->chan.device);
- 
--		at_xdmac_write(atxdmac, AT_XDMAC_GRWR, atchan->mask);
--		clear_bit(AT_XDMAC_CHAN_IS_PAUSED, &atchan->status);
--		break;
-+	dev_dbg(chan2dev(chan), "%s\n", __func__);
- 
--	case DMA_TERMINATE_ALL:
--		at_xdmac_write(atxdmac, AT_XDMAC_GD, atchan->mask);
--		while (at_xdmac_read(atxdmac, AT_XDMAC_GS) & atchan->mask)
--			cpu_relax();
-+	spin_lock_bh(&atchan->lock);
-+	if (!at_xdmac_chan_is_paused(atchan))
-+		return 0;
- 
--		/* Cancel all pending transfers. */
--		list_for_each_entry_safe(desc, _desc, &atchan->xfers_list, xfer_node)
--			at_xdmac_remove_xfer(atchan, desc);
-+	at_xdmac_write(atxdmac, AT_XDMAC_GRWR, atchan->mask);
-+	clear_bit(AT_XDMAC_CHAN_IS_PAUSED, &atchan->status);
-+	spin_unlock_bh(&atchan->lock);
-+
-+	return 0;
-+}
-+
-+static int at_xdmac_device_terminate_all(struct dma_chan *chan)
-+{
-+	struct at_xdmac_desc	*desc, *_desc;
-+	struct at_xdmac_chan	*atchan = to_at_xdmac_chan(chan);
-+	struct at_xdmac		*atxdmac = to_at_xdmac(atchan->chan.device);
- 
--		clear_bit(AT_XDMAC_CHAN_IS_CYCLIC, &atchan->status);
--		break;
-+	dev_dbg(chan2dev(chan), "%s\n", __func__);
- 
--	case DMA_SLAVE_CONFIG:
--		ret = at_xdmac_set_slave_config(chan,
--				(struct dma_slave_config *)arg);
--		break;
-+	spin_lock_bh(&atchan->lock);
-+	at_xdmac_write(atxdmac, AT_XDMAC_GD, atchan->mask);
-+	while (at_xdmac_read(atxdmac, AT_XDMAC_GS) & atchan->mask)
-+		cpu_relax();
- 
--	default:
--		dev_err(chan2dev(chan),
--			"unmanaged or unknown dma control cmd: %d\n", cmd);
--		ret = -ENXIO;
--	}
-+	/* Cancel all pending transfers. */
-+	list_for_each_entry_safe(desc, _desc, &atchan->xfers_list, xfer_node)
-+		at_xdmac_remove_xfer(atchan, desc);
- 
-+	clear_bit(AT_XDMAC_CHAN_IS_CYCLIC, &atchan->status);
- 	spin_unlock_bh(&atchan->lock);
- 
--	return ret;
-+	return 0;
- }
- 
- static int at_xdmac_alloc_chan_resources(struct dma_chan *chan)
-@@ -1270,7 +1287,7 @@ static int atmel_xdmac_suspend(struct device *dev)
- 
- 		if (at_xdmac_chan_is_cyclic(atchan)) {
- 			if (!at_xdmac_chan_is_paused(atchan))
--				at_xdmac_control(chan, DMA_PAUSE, 0);
-+				at_xdmac_device_pause(chan);
- 			atchan->save_cim = at_xdmac_chan_read(atchan, AT_XDMAC_CIM);
- 			atchan->save_cnda = at_xdmac_chan_read(atchan, AT_XDMAC_CNDA);
- 			atchan->save_cndc = at_xdmac_chan_read(atchan, AT_XDMAC_CNDC);
-@@ -1407,7 +1424,10 @@ static int at_xdmac_probe(struct platform_device *pdev)
- 	atxdmac->dma.device_prep_dma_cyclic		= at_xdmac_prep_dma_cyclic;
- 	atxdmac->dma.device_prep_dma_memcpy		= at_xdmac_prep_dma_memcpy;
- 	atxdmac->dma.device_prep_slave_sg		= at_xdmac_prep_slave_sg;
--	atxdmac->dma.device_control			= at_xdmac_control;
-+	atxdmac->dma.device_config			= at_xdmac_device_config;
-+	atxdmac->dma.device_pause			= at_xdmac_device_pause;
-+	atxdmac->dma.device_resume			= at_xdmac_device_resume;
-+	atxdmac->dma.device_terminate_all		= at_xdmac_device_terminate_all;
- 	atxdmac->dma.device_slave_caps			= at_xdmac_device_slave_caps;
- 
- 	/* Disable all chans and interrupts. */
--- 
-2.0.3
+Thanks
+
+Best Regards
+
+Eric
+>>>  - the handler of each range should be split into read and write
+>>>  - all handlers take 'struct kvm_exit_mmio', and pass it to
+>>> 'vgic_reg_access', 'mmio_data_read' and 'mmio_data_read'
+>>>
+>>> To sum up - if we do this refactoring of vgic's MMIO handling +
+>>> kvm_io_bus_ API getting 'vcpu" argument we'll get a 'much' cleaner
+>>> vgic code and as a bonus we'll get 'ioeventfd' capabilities.
+>>>
+>>> We have 3 questions:
+>>>  - is the kvm_io_bus_ getting 'vcpu' argument acceptable for the other
+>>> architectures too?
+>>>  - is this huge vgic MMIO handling redesign acceptable/desired (it
+>>> touches a lot of code)?
+>>>  - is there a way that ioeventfd is accepted leaving vgic.c in it's
+>>> current state?
+>>>
+>> Not sure how the latter question is relevant to this, but check with
+>> Andre who recently looked at this as well and decided that for GICv3 the
+>> only sane thing was to remove that comment for the gic.
+> @Andre - what's your experience with the GICv3 and MMIO handling,
+> anything specific?
+>>
+>> I don't recall the details of what you were trying to accomplish here
+>> (it's been 8 months or so) but the surely the vgic handling code should
+>> *somehow* be integrated into the handle_kernel_mmio (like Paolo
+>> suggested), unless you come back and tell me that that would involve a
+>> complete rewrite of the vgic code.
+> I'm experimenting now - it's not exactly rewrite of whole vgic code,
+> but it will touch a lot of it  - all MMIO access handlers and the
+> supporting functions.
+> We're ready to spend the effort. My question is  - is this acceptable?
+> 
+> regards,
+> Nikolay Nikolaev
+> Virtual Open Systems
+>>
+>> -Christoffer
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> 
