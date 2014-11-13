@@ -1,144 +1,53 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Thu, 13 Nov 2014 23:37:08 +0800
-Subject: [PATCH v6 5/6] ARM: mediatek: Add sysirq in mt6589/mt8135/mt8127 dtsi
-In-Reply-To: <1415893029-2971-1-git-send-email-yingjoe.chen@mediatek.com>
-References: <1415893029-2971-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1415893029-2971-6-git-send-email-yingjoe.chen@mediatek.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 13 Nov 2014 16:45:51 +0100
+Subject: [PATCH 1/7] dmaengine: at_xdmac: prefer usage of
+ readl/writel_relaxed
+In-Reply-To: <20141113153449.GO24582@intel.com>
+References: <1415875965-6905-1-git-send-email-ludovic.desroches@atmel.com>
+ <1415875965-6905-2-git-send-email-ludovic.desroches@atmel.com>
+ <2791155.z0l2TZezWO@wuerfel> <20141113153449.GO24582@intel.com>
+Message-ID: <20141113154551.GV3639@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add sysirq settings for mt6589/mt8135/mt8127
-This also correct timer interrupt flag. The old setting works
-because boot loader already set polarity for timer interrupt.
-Without intpol support, the setting was not changed so gic
-can get the irq correctly.
+On Thu, Nov 13, 2014 at 09:04:49PM +0530, Vinod Koul wrote:
+> On Thu, Nov 13, 2014 at 12:01:49PM +0100, Arnd Bergmann wrote:
+> > On Thursday 13 November 2014 11:52:39 Ludovic Desroches wrote:
+> > > _relaxed version of readl and writel are not implemented on all
+> > > architecture so COMPILE_TEST has to be removed in order to not cause
+> > > some build failures.
+> > > 
+> > > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > > ---
+> > > 
+> > 
+> > I've queued up Will Deacon's series to enable the relaxed accessors
+> > on all architectures, so the Kconfig change should no longer
+> > be required in 3.19.
+> And why is _relaxed() version required for thsi driver. Why cant readl(),
+> writel() with barriers do?
 
-Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
----
- arch/arm/boot/dts/mt6589.dtsi | 14 ++++++++++++--
- arch/arm/boot/dts/mt8127.dtsi | 14 ++++++++++++--
- arch/arm/boot/dts/mt8135.dtsi | 14 ++++++++++++--
- 3 files changed, 36 insertions(+), 6 deletions(-)
+Required not but preferred to my mind. I don't need a barrier for all
+read and write I am performing. Barriers have been added when needed.
 
-diff --git a/arch/arm/boot/dts/mt6589.dtsi b/arch/arm/boot/dts/mt6589.dtsi
-index e3c7600..c91b2a9 100644
---- a/arch/arm/boot/dts/mt6589.dtsi
-+++ b/arch/arm/boot/dts/mt6589.dtsi
-@@ -19,7 +19,7 @@
- 
- / {
- 	compatible = "mediatek,mt6589";
--	interrupt-parent = <&gic>;
-+	interrupt-parent = <&sysirq>;
- 
- 	cpus {
- 		#address-cells = <1>;
-@@ -76,15 +76,25 @@
- 		timer: timer at 10008000 {
- 			compatible = "mediatek,mt6577-timer";
- 			reg = <0x10008000 0x80>;
--			interrupts = <GIC_SPI 113 IRQ_TYPE_EDGE_RISING>;
-+			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
- 			clocks = <&system_clk>, <&rtc_clk>;
- 			clock-names = "system-clk", "rtc-clk";
- 		};
- 
-+		sysirq: interrupt-controller at 10200100 {
-+			compatible = "mediatek,mt6589-sysirq",
-+				     "mediatek,mt6577-sysirq";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			interrupt-parent = <&gic>;
-+			reg = <0x10200100 0x1c>;
-+		};
-+
- 		gic: interrupt-controller at 10211000 {
- 			compatible = "arm,cortex-a7-gic";
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
-+			interrupt-parent = <&gic>;
- 			reg = <0x10211000 0x1000>,
- 			      <0x10212000 0x1000>,
- 			      <0x10214000 0x2000>,
-diff --git a/arch/arm/boot/dts/mt8127.dtsi b/arch/arm/boot/dts/mt8127.dtsi
-index c3ee060..49f5976 100644
---- a/arch/arm/boot/dts/mt8127.dtsi
-+++ b/arch/arm/boot/dts/mt8127.dtsi
-@@ -18,7 +18,7 @@
- 
- / {
- 	compatible = "mediatek,mt8127";
--	interrupt-parent = <&gic>;
-+	interrupt-parent = <&sysirq>;
- 
- 	cpus {
- 		#address-cells = <1>;
-@@ -82,15 +82,25 @@
- 			compatible = "mediatek,mt8127-timer",
- 					"mediatek,mt6577-timer";
- 			reg = <0 0x10008000 0 0x80>;
--			interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_LOW>;
- 			clocks = <&system_clk>, <&rtc_clk>;
- 			clock-names = "system-clk", "rtc-clk";
- 		};
- 
-+		sysirq: interrupt-controller at 10200100 {
-+			compatible = "mediatek,mt8127-sysirq",
-+				     "mediatek,mt6577-sysirq";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			interrupt-parent = <&gic>;
-+			reg = <0 0x10200100 0 0x1c>;
-+		};
-+
- 		gic: interrupt-controller at 10211000 {
- 			compatible = "arm,cortex-a7-gic";
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
-+			interrupt-parent = <&gic>;
- 			reg = <0 0x10211000 0 0x1000>,
- 			      <0 0x10212000 0 0x1000>,
- 			      <0 0x10214000 0 0x2000>,
-diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
-index 5faae6e..60338d9 100644
---- a/arch/arm/boot/dts/mt8135.dtsi
-+++ b/arch/arm/boot/dts/mt8135.dtsi
-@@ -18,7 +18,7 @@
- 
- / {
- 	compatible = "mediatek,mt8135";
--	interrupt-parent = <&gic>;
-+	interrupt-parent = <&sysirq>;
- 
- 	cpu-map {
- 		cluster0 {
-@@ -105,15 +105,25 @@
- 			compatible = "mediatek,mt8135-timer",
- 					"mediatek,mt6577-timer";
- 			reg = <0 0x10008000 0 0x80>;
--			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
- 			clocks = <&system_clk>, <&rtc_clk>;
- 			clock-names = "system-clk", "rtc-clk";
- 		};
- 
-+		sysirq: interrupt-controller at 10200030 {
-+			compatible = "mediatek,mt8135-sysirq",
-+				     "mediatek,mt6577-sysirq";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			interrupt-parent = <&gic>;
-+			reg = <0 0x10200030 0 0x1c>;
-+		};
-+
- 		gic: interrupt-controller at 10211000 {
- 			compatible = "arm,cortex-a15-gic";
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
-+			interrupt-parent = <&gic>;
- 			reg = <0 0x10211000 0 0x1000>,
- 			      <0 0x10212000 0 0x1000>,
- 			      <0 0x10214000 0 0x2000>,
--- 
-1.8.1.1.dirty
+When you have fixed my code because of the compilation breakage on other
+architecture, you only change the read and write macros. Currently, there are
+some redundancies because of the barriers added in the code.
+
+To be honest, I have no idea about the performance impact between the
+use of read/write and read/write_relaxed. Then two choices:
+- go back to relaxed version, good new can keep COMPILE_TEST thanks to
+  Will Deacon
+- remove barrier since they are no more needed if using readl/writel
+
+
+Ludovic
+
+> 
+> -- 
+> ~Vinod
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
