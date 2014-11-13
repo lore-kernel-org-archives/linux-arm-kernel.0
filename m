@@ -1,39 +1,48 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 13 Nov 2014 16:28:19 +0100
-Subject: [PATCH 0/5] Minor fixes for Marvell Armada 38x SoC.
-In-Reply-To: <20141113090249.1ab69b4d@free-electrons.com>
-References: <1415835600-97188-1-git-send-email-mw@semihalf.com>
- <20141113090249.1ab69b4d@free-electrons.com>
-Message-ID: <20141113152819.GD2001@lunn.ch>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 13 Nov 2014 15:30:34 +0000
+Subject: [PATCH] virt: kvm: arm: vgic: Process the failure case when
+ kvm_register_device_ops() fails
+In-Reply-To: <5464C865.90504@gmail.com>
+References: <5464C865.90504@gmail.com>
+Message-ID: <5464CE9A.6050209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 13, 2014 at 09:02:49AM +0100, Thomas Petazzoni wrote:
-> Dear Marcin Wojtas,
+On 13/11/14 15:04, Chen Gang wrote:
+> When kvm_register_device_ops() fails, also need call free_percpu_irq()
+> just like others have down within kvm_vgic_hyp_init().
 > 
-> On Thu, 13 Nov 2014 00:39:55 +0100, Marcin Wojtas wrote:
-> > This patchset adds minor fixes for Armada 38x SoC around SDHCI interface. It
-> > also enables usage of I2C char-device and adjusts ethernet aliases for
-> > bootloader's needs. Any feedback is welcome.
-> > 
-> > Marcin Wojtas (5):
-> >   ARM: mvebu: re-enable SDHCI driver for Armada 38x SoC in v7 defconfig
-> >   ARM: mvebu: enable no-1-8-v flag for Armada 385 DB SDHCI interface
-> >   ARM: mvebu: remove clock-frequency from Armada 38x SDHCI Device Tree
-> >     node
-> >   ARM: mvebu: adjust ethernet aliases according to U-Boot requirements
-> >     for A38x
-> >   ARM: mvebu: enable i2c device in mvebu_v7_defconfig
+> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
+> ---
+>  virt/kvm/arm/vgic.c | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
 > 
-> On the entire series, you forgot to Cc some of the mvebu maintainers,
-> namely Andrew Lunn and Sebastian Hesselbarth. I've added them in Cc of
-> the cover letter, so that they get notified about this patch series.
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 3aaca49..b799f17 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -2470,8 +2470,14 @@ int kvm_vgic_hyp_init(void)
+>  
+>  	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
+>  
+> -	return kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
+> -				       KVM_DEV_TYPE_ARM_VGIC_V2);
+> +	ret = kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
+> +				      KVM_DEV_TYPE_ARM_VGIC_V2);
+> +	if (ret) {
+> +		kvm_err("Cannot register device ops\n");
+> +		goto out_free_irq;
+> +	}
+> +
+> +	return 0;
+>  
+>  out_free_irq:
+>  	free_percpu_irq(vgic->maint_irq, kvm_get_running_vcpus());
+> 
 
-Hi Marcin
+Awesome. You're now freeing a per-cpu interrupt after just after having
+enabled it on all CPUs. What could possibly go wrong?
 
-I don't think the patches made it to linux-arm-kernel. And i cannot
-find them with google.
-
-You might need to repost them before i can review them.
-
-    Andrew
+	M.
+-- 
+Jazz is not dead. It just smells funny...
