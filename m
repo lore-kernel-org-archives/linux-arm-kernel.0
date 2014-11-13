@@ -1,30 +1,61 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 13 Nov 2014 09:45:09 +0100
-Subject: [PATCH 1/1] ARM: exynos_defconfig: Enable max77802 rtc and clock
- drivers
-In-Reply-To: <04e101cff29f$4021ea00$c065be00$@kernel.org>
-References: <1414401440-10972-1-git-send-email-javier.martinez@collabora.co.uk>
- <04e101cff29f$4021ea00$c065be00$@kernel.org>
-Message-ID: <CABxcv=kaOa1+6a1n_+GjoH=PgG=LzAnXLU7U_E5NvYYP-0WedA@mail.gmail.com>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Thu, 13 Nov 2014 19:47:30 +1100
+Subject: [linux-sunxi] [PATCH 2/4] simplefb: Add support for enumerating
+ simplefb dt nodes in /chosen
+In-Reply-To: <54646E83.9070704@redhat.com>
+References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
+ <1415830124-28787-2-git-send-email-hdegoede@redhat.com>
+ <CAGRGNgW_Q6oghpe5Mw-8aYPVVj1YZ6R3iaqOQzCE9dSD1nYSyA@mail.gmail.com>
+ <54646B5B.1070604@redhat.com>
+ <CAMuHMdVSfYyHc52Tdu_wzb6ZYPzeZtOzweUwADHxiJLypuBQNw@mail.gmail.com>
+ <54646E83.9070704@redhat.com>
+Message-ID: <CAGRGNgVjZCY2+A5fs54bu=JWQJa=fzBSrC_3VYa1dcOydxXw0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kukjin,
+Hi Hans,
 
-On Tue, Oct 28, 2014 at 12:06 PM, Kukjin Kim <kgene@kernel.org> wrote:
-> Javier Martinez Canillas wrote:
->> Commit 6e80e3d87549 ("ARM: exynos_defconfig: Enable MAX77802")
->> enabled support for the max77802 regulators but the PMIC also
->> has a Real-Time-Clock (RTC) and 2-channel 32kHz clock outputs.
+On Thu, Nov 13, 2014 at 7:40 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+> On 11/13/2014 09:34 AM, Geert Uytterhoeven wrote:
+>> Hi Hans,
 >>
+>> On Thu, Nov 13, 2014 at 9:27 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>> +       char name[16];
+>>>>> +       struct device_node *np;
+>>>>> +
+>>>>> +       ret = platform_driver_register(&simplefb_driver);
+>>>>> +       if (ret)
+>>>>> +               return ret;
+>>>>> +
+>>>>> +       for (i = 0; ; i++) {
+>>>>> +               snprintf(name, sizeof(name), "framebuffer%d", i);
+>>>>
+>>>> This smells like an infinite loop: we can be pretty sure that no
+>>>> hardware will ever exist with more than 9999 (I think?) framebuffers,
+>>>> however if that ever happens this'll loop until it runs out of RAM.
+>>>> Maybe add a suitably high limit to the for loop?
+>>>
+>>> The loop will stop as soon as there are no more framebuffer# nodes in chosen,
+>>> so the loop is only infinite if there are infinite nodes in the devicetree,
+>>> which would make the devicetree infinitely large, so this will never happen.
+>>
+>> If there are 10000 frame buffers, the loop will continue beyond that,
+>> as the index will be truncated to 4 digits due to the size of name[].
+>> It will stop when (signed) i becomes negative, though ;-)
+>>
+>> One solution is to increase the size of name[],
 >
-> I'll apply this, thanks.
->
-> - Kukjin
->
+> This is probably never going to happen, but I'll increase the size of name in v2
+> anyways.
 
-You say that you will apply this patch but I can't find it in any of
-your branches.
+You could also just limit it to 100 or something like that.
 
-Best regards,
-Javier
+Thanks,
+
+-- 
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
