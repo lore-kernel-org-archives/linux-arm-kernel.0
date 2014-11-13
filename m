@@ -1,32 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 13 Nov 2014 21:28:30 +0000
-Subject: [Patch V1 0/6] Refine generic/PCI MSI irqodmian interfaces
-In-Reply-To: <alpine.DEB.2.11.1411132207470.3935@nanos>
-References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
- <54651BE2.9080008@arm.com> <alpine.DEB.2.11.1411132207470.3935@nanos>
-Message-ID: <5465227E.6000309@arm.com>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Thu, 13 Nov 2014 14:00:21 -0800
+Subject: exynos5250/arndale: failed to set cpu voltage
+Message-ID: <CANMBJr4ZgEZDAtdfuLhCXppCGHnHhgmT1aFUi+=kJb2PdkqhGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/11/14 21:11, Thomas Gleixner wrote:
-> On Thu, 13 Nov 2014, Marc Zyngier wrote:
->> With the new stacked irq domains, it becomes pretty tempting
->> to allocate an MSI domain per PCI bus, which would remove
->> the requirement of either relying on arch-specific code, or
->> a default PCI MSI domain.
-> 
-> Right. That's what I roughly had in mind. And that would solve the
-> multi-iommu issue on x86 nicely as well. We establish the association
-> at the time where the bus gets populated. So the whole lookup magic
-> simply goes away.
+In recent upstream kernels, exynos5420-based arndale boards have been
+producing boot-time errors due to the fact they failed to set the cpu
+voltage. These message flood the serial console even after userspace
+has been loaded, yielding the console unusable without forcing a lower
+log level. These errors are produced _only_ with the
+multi_v7_defconfig and they are _not_ present
+with exynos_defconfig. Here are some recent boot logs showing the boot errors:
 
-Great. I've pushed the whole thing out with this patch, the couple
-of fixes I mentioned earlier, as well as the whole ITS code:
+mainline/v3.18-rc4-65-g2c54396:
+    multi_v7_defconfig:
+        http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc4-65-g2c54396/arm-multi_v7_defconfig/boot-exynos5250-arndale.html
+    exynos_defconfig:
+        http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc4-65-g2c54396/arm-exynos_defconfig/boot-exynos5250-arndale.html
 
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/stacked-its-v2
+next/next-20141113:
+    multi_v7_defconfig:
+        http://storage.armcloud.us/kernel-ci/next/next-20141113/arm-multi_v7_defconfig/boot-exynos5250-arndale.html
+    exynos_defconfig:
+        http://storage.armcloud.us/kernel-ci/next/next-20141113/arm-exynos_defconfig/boot-exynos5250-arndale.html
 
-Time to go home.
+arm-soc/v3.18-rc4-185-gbfcf8f9:
+    multi_v7_defconfig:
+        http://storage.armcloud.us/kernel-ci/arm-soc/v3.18-rc4-185-gbfcf8f9/arm-multi_v7_defconfig/boot-exynos5250-arndale.html
+    exynos_defconfig:
+        http://storage.armcloud.us/kernel-ci/arm-soc/v3.18-rc4-185-gbfcf8f9/arm-exynos_defconfig/boot-exynos5250-arndale.html
 
-	M.
+Cheers,
+
 -- 
-Jazz is not dead. It just smells funny...
+Tyler Baker
+Tech Lead, LAVA
+Linaro.org | Open source software for ARM SoCs
+Follow Linaro: http://www.facebook.com/pages/Linaro
+http://twitter.com/#!/linaroorg - http://www.linaro.org/linaro-blog
