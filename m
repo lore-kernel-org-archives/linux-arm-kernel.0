@@ -1,31 +1,54 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 13 Nov 2014 10:28:44 -0800
-Subject: [PATCH] dmaengine: pl330: Fix linker error "undefined reference
- to `__aeabi_uldivmod'"
-In-Reply-To: <1415902763.1787.8.camel@linaro.org>
-References: <1415896047.1787.4.camel@linaro.org>
- <1415898172.4223.1.camel@perches.com> <1415902763.1787.8.camel@linaro.org>
-Message-ID: <1415903324.4223.5.camel@perches.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 13 Nov 2014 10:28:49 -0800
+Subject: [PATCH 4/4] arm: dts: omap3-gta04: Add static configuration for
+ devconf1 register
+In-Reply-To: <5464969F.30708@ti.com>
+References: <1415051968-4878-1-git-send-email-marek@goldelico.com>
+ <1415051968-4878-5-git-send-email-marek@goldelico.com>
+ <5463585D.9070209@ti.com> <20141112150210.GC26481@atomide.com>
+ <5464969F.30708@ti.com>
+Message-ID: <20141113182848.GQ26481@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-11-13 at 18:19 +0000, Jon Medhurst (Tixy) wrote:
-> There are many ways to code the limiting of the burst width, but as it
-> starts out as the data bus width the DMA can handle (maximum 16 bytes)
-> then at most we'll be going round the existing while loop 4 times so I
-> don't think it's that much overhead, and probably less code size than
-> using ffs.
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [141113 03:33]:
+> On 12/11/14 17:02, Tony Lindgren wrote:
+> 
+> >> And, with a quick grep, I see CONTROL_DEVCONF1 touched in multiple
+> >> places in the kernel. I wonder if adding a pinmux entry for it could
+> >> cause some rather odd problems.
+> > 
+> > They can all use pinctrl-single no problem.
+> 
+> Can, but don't. That's my worry. If we touch the DEVCONF1 via pinmux,
+> and we have code in mach-omap2 that also touch DEVCONF1, without any
+> knowledge (and locking) between those...
 
-For arm, isn't ffs just a few instruction with no loops?
+Hmm yeah the McBSP clock mux could be racy as the mux register for
+McBSP is treated as a clock. This register muxes the clock between
+external pin and internal clock. Considering that this should be
+selectable at board level as the external clock probably needs to be
+used if level shifters are being used, it should be really handled by
+pinctrl-single.
 
-> And as the driver has been broken for the unaligned memcpy case since
-> the day it was added then I can't see that anyone is actually using it
-> that way anyway, so all existing users (if any) must already be doing
-> bus aligned copies and the current while loop will iterate zero times.
+The other use for hsmmc.c and pdata-quirks.c for the one time mux for
+MMC clock from the MMC clock pin. That can be done with pinctrl-single
+from the MMC driver too for DT based booting.
 
-That's probably right, I just don't like reading
-while loops where ffs/fls might be suitable.
+Then we just have the save and restore of the registers for
+off-idle.
+ 
+> So _maybe_ that's not an issue, as the pinmux config we have here is
+> fixed, and done once at boot time, and maybe the code in mach-omap2 that
+> touch DEVCONF1 is also ran just once and not at the same time as the
+> pinmux. But I don't know if that's so.
 
-> That's probably enough bikeshedding from me :-)
+It seems we could just do a read-only check for McBSP in the clock
+code for the mux register, or even completely drop that code from
+cclock3xxx_data.c and start using the pinctrl for that mux.
 
-;)  Me too.  cheers, Joe
+Paul & Tero, got any comments here?
+
+Regards,
+
+Tony
