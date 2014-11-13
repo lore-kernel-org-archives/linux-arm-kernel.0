@@ -1,18 +1,21 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Nov 2014 10:20:13 +0900
-Subject: [PATCH 22/25] ARM: shmobile: r8a73a4 dtsi: Add SoC-specific IIC
+Date: Thu, 13 Nov 2014 10:20:14 +0900
+Subject: [PATCH 23/25] ARM: shmobile: sh73a0 dtsi: Add SoC-specific IIC
  compatible properties
 In-Reply-To: <cover.1415755881.git.horms+renesas@verge.net.au>
 References: <cover.1415755881.git.horms+renesas@verge.net.au>
-Message-ID: <9ebe389f1929b39af162b9c0053311000b8b309d.1415755881.git.horms+renesas@verge.net.au>
+Message-ID: <ba15de4d6a7976fdcb18fd31c2f840737be6f660.1415755881.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
 The IIC nodes used the generic compatible properties only.
-This may cause the driver to fail when using Standard Speed on IIC
-masters where the operational clock is driven by the 130 MHz HP clock.
+This causes the driver to fail when using Standard Speed, as the
+operational clock is driven by the 104 MHz HP clock:
+
+    i2c-sh_mobile e6820000.i2c: timing values out of range: L/H=0x208/0x1bf
+    i2c-sh_mobile: probe of e6820000.i2c failed with error -22
 
 Add the SoC-specific compatible property to fix this.
 
@@ -20,93 +23,57 @@ Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a73a4.dtsi | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/sh73a0.dtsi | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
-index b5ead84..01373ee 100644
---- a/arch/arm/boot/dts/r8a73a4.dtsi
-+++ b/arch/arm/boot/dts/r8a73a4.dtsi
-@@ -106,7 +106,7 @@
- 	i2c5: i2c at e60b0000 {
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 030a592..d8def5a 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -138,7 +138,7 @@
+ 	i2c0: i2c at e6820000 {
  		#address-cells = <1>;
  		#size-cells = <0>;
 -		compatible = "renesas,rmobile-iic";
-+		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
- 		reg = <0 0xe60b0000 0 0x428>;
- 		interrupts = <0 179 IRQ_TYPE_LEVEL_HIGH>;
- 
-@@ -205,7 +205,7 @@
- 	i2c0: i2c at e6500000 {
++		compatible = "renesas,iic-sh73a0", "renesas,rmobile-iic";
+ 		reg = <0xe6820000 0x425>;
+ 		interrupts = <0 167 IRQ_TYPE_LEVEL_HIGH
+ 			      0 168 IRQ_TYPE_LEVEL_HIGH
+@@ -150,7 +150,7 @@
+ 	i2c1: i2c@e6822000 {
  		#address-cells = <1>;
  		#size-cells = <0>;
 -		compatible = "renesas,rmobile-iic";
-+		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
- 		reg = <0 0xe6500000 0 0x428>;
- 		interrupts = <0 174 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
-@@ -214,7 +214,7 @@
- 	i2c1: i2c at e6510000 {
++		compatible = "renesas,iic-sh73a0", "renesas,rmobile-iic";
+ 		reg = <0xe6822000 0x425>;
+ 		interrupts = <0 51 IRQ_TYPE_LEVEL_HIGH
+ 			      0 52 IRQ_TYPE_LEVEL_HIGH
+@@ -162,7 +162,7 @@
+ 	i2c2: i2c@e6824000 {
  		#address-cells = <1>;
  		#size-cells = <0>;
 -		compatible = "renesas,rmobile-iic";
-+		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
- 		reg = <0 0xe6510000 0 0x428>;
- 		interrupts = <0 175 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
-@@ -223,7 +223,7 @@
- 	i2c2: i2c at e6520000 {
++		compatible = "renesas,iic-sh73a0", "renesas,rmobile-iic";
+ 		reg = <0xe6824000 0x425>;
+ 		interrupts = <0 171 IRQ_TYPE_LEVEL_HIGH
+ 			      0 172 IRQ_TYPE_LEVEL_HIGH
+@@ -174,7 +174,7 @@
+ 	i2c3: i2c@e6826000 {
  		#address-cells = <1>;
  		#size-cells = <0>;
 -		compatible = "renesas,rmobile-iic";
-+		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
- 		reg = <0 0xe6520000 0 0x428>;
- 		interrupts = <0 176 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
-@@ -232,7 +232,7 @@
- 	i2c3: i2c at e6530000 {
++		compatible = "renesas,iic-sh73a0", "renesas,rmobile-iic";
+ 		reg = <0xe6826000 0x425>;
+ 		interrupts = <0 183 IRQ_TYPE_LEVEL_HIGH
+ 			      0 184 IRQ_TYPE_LEVEL_HIGH
+@@ -186,7 +186,7 @@
+ 	i2c4: i2c@e6828000 {
  		#address-cells = <1>;
  		#size-cells = <0>;
 -		compatible = "renesas,rmobile-iic";
-+		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
- 		reg = <0 0xe6530000 0 0x428>;
- 		interrupts = <0 177 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
-@@ -241,7 +241,7 @@
- 	i2c4: i2c at e6540000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,rmobile-iic";
-+		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
- 		reg = <0 0xe6540000 0 0x428>;
- 		interrupts = <0 178 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
-@@ -250,7 +250,7 @@
- 	i2c6: i2c at e6550000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,rmobile-iic";
-+		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
- 		reg = <0 0xe6550000 0 0x428>;
- 		interrupts = <0 184 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
-@@ -259,7 +259,7 @@
- 	i2c7: i2c at e6560000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,rmobile-iic";
-+		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
- 		reg = <0 0xe6560000 0 0x428>;
- 		interrupts = <0 185 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
-@@ -268,7 +268,7 @@
- 	i2c8: i2c at e6570000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,rmobile-iic";
-+		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
- 		reg = <0 0xe6570000 0 0x428>;
- 		interrupts = <0 173 IRQ_TYPE_LEVEL_HIGH>;
- 		status = "disabled";
++		compatible = "renesas,iic-sh73a0", "renesas,rmobile-iic";
+ 		reg = <0xe6828000 0x425>;
+ 		interrupts = <0 187 IRQ_TYPE_LEVEL_HIGH
+ 			      0 188 IRQ_TYPE_LEVEL_HIGH
 -- 
 2.1.1
