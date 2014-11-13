@@ -1,37 +1,33 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 13 Nov 2014 11:00:07 +0000
-Subject: [PATCH v2 04/14] ARM: multi_v7_defconfig: Enable st ohci and ehci HCD
- drivers.
+Date: Thu, 13 Nov 2014 11:00:08 +0000
+Subject: [PATCH v2 05/14] ARM: multi_v7_defconfig: Enable stih415/6 usb2 phy
+ driver.
 In-Reply-To: <1415876417-28728-1-git-send-email-peter.griffin@linaro.org>
 References: <1415876417-28728-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1415876417-28728-5-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1415876417-28728-6-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the ehci and ohci drivers in the multi_v7_defconfig so that
-the USB controllers on stih41x work by default.
+This driver is used by the ehci / ohci usb controllers on stih415/6 SoCs.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
 Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/configs/multi_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 491b7d5..c7a9517 100644
+index c7a9517..e13ab7e 100644
 --- a/arch/arm/configs/multi_v7_defconfig
 +++ b/arch/arm/configs/multi_v7_defconfig
-@@ -318,9 +318,11 @@ CONFIG_USB_XHCI_HCD=y
- CONFIG_USB_XHCI_MVEBU=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_TEGRA=y
-+CONFIG_USB_EHCI_HCD_STI=y
- CONFIG_USB_EHCI_HCD_PLATFORM=y
- CONFIG_USB_ISP1760_HCD=y
- CONFIG_USB_OHCI_HCD=y
-+CONFIG_USB_OHCI_HCD_STI=y
- CONFIG_USB_OHCI_HCD_PLATFORM=y
- CONFIG_USB_STORAGE=y
- CONFIG_USB_CHIPIDEA=y
+@@ -426,6 +426,7 @@ CONFIG_PWM_VT8500=y
+ CONFIG_OMAP_USB2=y
+ CONFIG_TI_PIPE3=y
+ CONFIG_PHY_MIPHY365X=y
++CONFIG_PHY_STIH41X_USB=y
+ CONFIG_PHY_SUN4I_USB=y
+ CONFIG_EXT4_FS=y
+ CONFIG_VFAT_FS=y
 -- 
 1.9.1
