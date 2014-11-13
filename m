@@ -1,48 +1,64 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 13 Nov 2014 10:34:25 +0100
-Subject: [PATCH] ARM: at91: remove CONFIG_MACH_SAMA5_DT
-In-Reply-To: <1415652353-15985-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1415652353-15985-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20141113103425.1cf5e8ea@bbrezillon>
+Date: Thu, 13 Nov 2014 10:37:09 +0100
+Subject: [PATCH] ARM: at91: remove unused CONFIG_ARCH_AT91SAM9G45 option
+In-Reply-To: <1415871190-32244-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1415617517.4862.44.camel@x220>
+ <1415871190-32244-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20141113103709.35b053ad@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Nov 2014 21:45:53 +0100
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+On Thu, 13 Nov 2014 10:33:10 +0100
+Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
 
-> CONFIG_MACH_SAMA5_DT is useless as the only way to boot on sama5 based boards is
-> to use device tree.
+> The CONFIG_ARCH_AT91SAM9G45 config option was removed by ("ARM: at91: remove
+> at91sam9g45/9m10 legacy board support") so cleanup the use of it.
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Reported-by: Paul Bolle <pebolle@tiscali.nl>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
 > ---
->  arch/arm/configs/sama5_defconfig |  1 -
->  arch/arm/mach-at91/Kconfig       | 10 +---------
->  arch/arm/mach-at91/Makefile      |  2 +-
->  3 files changed, 2 insertions(+), 11 deletions(-)
+>  arch/arm/mach-at91/Makefile.boot | 6 ------
+>  arch/arm/mach-at91/board.h       | 4 ----
+>  2 files changed, 10 deletions(-)
 > 
-> diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-> index c9089c927daf..299ca18bbd75 100644
-> --- a/arch/arm/configs/sama5_defconfig
-> +++ b/arch/arm/configs/sama5_defconfig
-> @@ -20,7 +20,6 @@ CONFIG_ARCH_AT91=y
->  CONFIG_SOC_SAM_V7=y
->  CONFIG_SOC_SAMA5D3=y
->  CONFIG_SOC_SAMA5D4=y
-> -CONFIG_MACH_SAMA5_DT=y
->  CONFIG_AEABI=y
->  CONFIG_UACCESS_WITH_MEMCPY=y
->  CONFIG_ZBOOT_ROM_TEXT=0x0
-> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> index 0e6d548b70d9..81ddd7d31d1e 100644
-> --- a/arch/arm/mach-at91/Kconfig
-> +++ b/arch/arm/mach-at91/Kconfig
-> @@ -58,6 +58,7 @@ config SOC_SAMA5
->  	select USE_OF
->  	select MEMORY
->  	select ATMEL_SDRAMC
-> +	select PHYLIB if NETDEVICES
+> diff --git a/arch/arm/mach-at91/Makefile.boot b/arch/arm/mach-at91/Makefile.boot
+> index 5309f9b6aabc..29ed0fa374ca 100644
+> --- a/arch/arm/mach-at91/Makefile.boot
+> +++ b/arch/arm/mach-at91/Makefile.boot
+> @@ -3,12 +3,6 @@
+>  #   PARAMS_PHYS must be within 4MB of ZRELADDR
+>  #   INITRD_PHYS must be in RAM
+>  
+> -ifeq ($(CONFIG_ARCH_AT91SAM9G45),y)
+> -   zreladdr-y	+= 0x70008000
+> -params_phys-y	:= 0x70000100
+> -initrd_phys-y	:= 0x70410000
+> -else
+>     zreladdr-y	+= 0x20008000
+>  params_phys-y	:= 0x20000100
+>  initrd_phys-y	:= 0x20410000
+> -endif
+> diff --git a/arch/arm/mach-at91/board.h b/arch/arm/mach-at91/board.h
+> index 836e9a537e0c..d268ec3781dd 100644
+> --- a/arch/arm/mach-at91/board.h
+> +++ b/arch/arm/mach-at91/board.h
+> @@ -56,11 +56,7 @@ extern void __init at91_add_device_usbh_ehci(struct at91_usbh_data *data);
+>  extern void __init at91_add_device_nand(struct atmel_nand_data *data);
+>  
+>   /* I2C*/
+> -#if defined(CONFIG_ARCH_AT91SAM9G45)
+> -extern void __init at91_add_device_i2c(short i2c_id, struct i2c_board_info *devices, int nr_devices);
+> -#else
+>  extern void __init at91_add_device_i2c(struct i2c_board_info *devices, int nr_devices);
+> -#endif
+>  
+>   /* SPI */
+>  extern void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices);
 
-Is this really related to this commit ?
+
 
 -- 
 Boris Brezillon, Free Electrons
