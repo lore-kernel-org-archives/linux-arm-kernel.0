@@ -1,54 +1,57 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 13 Nov 2014 10:33:10 +0100
-Subject: [PATCH] ARM: at91: remove unused CONFIG_ARCH_AT91SAM9G45 option
-In-Reply-To: <1415617517.4862.44.camel@x220>
-References: <1415617517.4862.44.camel@x220>
-Message-ID: <1415871190-32244-1-git-send-email-nicolas.ferre@atmel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 13 Nov 2014 10:32:32 +0100
+Subject: [PATCH v7 07/12] ARM: tegra: Add memory controller support for
+ Tegra114
+In-Reply-To: <1415871157-21968-1-git-send-email-thierry.reding@gmail.com>
+References: <1415871157-21968-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1415871157-21968-8-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CONFIG_ARCH_AT91SAM9G45 config option was removed by ("ARM: at91: remove
-at91sam9g45/9m10 legacy board support") so cleanup the use of it.
+From: Thierry Reding <treding@nvidia.com>
 
-Reported-by: Paul Bolle <pebolle@tiscali.nl>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Add the device tree node for the memory controller found on Tegra114
+SoCs. The memory controller integrates an IOMMU (called SMMU) as well as
+various knobs to tweak memory accesses by the various clients.
+
+The old IOMMU device tree node is collapsed into the memory controller
+node to more accurately describe the hardware. While this change is
+incompatible, the IOMMU driver has never had any users so the change is
+not going to cause any breakage.
+
+Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm/mach-at91/Makefile.boot | 6 ------
- arch/arm/mach-at91/board.h       | 4 ----
- 2 files changed, 10 deletions(-)
+ arch/arm/boot/dts/tegra114.dtsi | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-at91/Makefile.boot b/arch/arm/mach-at91/Makefile.boot
-index 5309f9b6aabc..29ed0fa374ca 100644
---- a/arch/arm/mach-at91/Makefile.boot
-+++ b/arch/arm/mach-at91/Makefile.boot
-@@ -3,12 +3,6 @@
- #   PARAMS_PHYS must be within 4MB of ZRELADDR
- #   INITRD_PHYS must be in RAM
+diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+index 222f3b3f4dd5..e22eeca0979a 100644
+--- a/arch/arm/boot/dts/tegra114.dtsi
++++ b/arch/arm/boot/dts/tegra114.dtsi
+@@ -498,15 +498,15 @@
+ 		reset-names = "fuse";
+ 	};
  
--ifeq ($(CONFIG_ARCH_AT91SAM9G45),y)
--   zreladdr-y	+= 0x70008000
--params_phys-y	:= 0x70000100
--initrd_phys-y	:= 0x70410000
--else
-    zreladdr-y	+= 0x20008000
- params_phys-y	:= 0x20000100
- initrd_phys-y	:= 0x20410000
--endif
-diff --git a/arch/arm/mach-at91/board.h b/arch/arm/mach-at91/board.h
-index 836e9a537e0c..d268ec3781dd 100644
---- a/arch/arm/mach-at91/board.h
-+++ b/arch/arm/mach-at91/board.h
-@@ -56,11 +56,7 @@ extern void __init at91_add_device_usbh_ehci(struct at91_usbh_data *data);
- extern void __init at91_add_device_nand(struct atmel_nand_data *data);
+-	iommu at 70019010 {
+-		compatible = "nvidia,tegra114-smmu", "nvidia,tegra30-smmu";
+-		reg = <0x70019010 0x02c
+-		       0x700191f0 0x010
+-		       0x70019228 0x074>;
+-		nvidia,#asids = <4>;
+-		dma-window = <0 0x40000000>;
+-		nvidia,swgroups = <0x18659fe>;
+-		nvidia,ahb = <&ahb>;
++	mc: memory-controller at 70019000 {
++		compatible = "nvidia,tegra114-mc";
++		reg = <0x70019000 0x1000>;
++		clocks = <&tegra_car TEGRA114_CLK_MC>;
++		clock-names = "mc";
++
++		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
++
++		#iommu-cells = <1>;
+ 	};
  
-  /* I2C*/
--#if defined(CONFIG_ARCH_AT91SAM9G45)
--extern void __init at91_add_device_i2c(short i2c_id, struct i2c_board_info *devices, int nr_devices);
--#else
- extern void __init at91_add_device_i2c(struct i2c_board_info *devices, int nr_devices);
--#endif
- 
-  /* SPI */
- extern void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices);
+ 	ahub at 70080000 {
 -- 
-1.8.2.2
+2.1.3
