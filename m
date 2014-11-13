@@ -1,30 +1,109 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 13 Nov 2014 15:21:15 +0000
-Subject: [PATCH] arm64: __clear_user: handle exceptions on strb
-In-Reply-To: <20141113151407.GG6869@redacted.bos.redhat.com>
-References: <20141112210744.GC6869@redacted.bos.redhat.com>
- <20141113150624.GB18494@e104818-lin.cambridge.arm.com>
- <20141113151407.GG6869@redacted.bos.redhat.com>
-Message-ID: <20141113152115.GB22361@e104818-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 13 Nov 2014 15:22:43 +0000
+Subject: [PATCH 2/2] PCI: generic: Add set_msi_parent callback
+In-Reply-To: <20141111115227.GF12037@e106497-lin.cambridge.arm.com>
+References: <1415647480-3320-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1415647480-3320-3-git-send-email-suravee.suthikulpanit@amd.com>
+ <20141111112424.GB16265@arm.com>
+ <20141111115227.GF12037@e106497-lin.cambridge.arm.com>
+Message-ID: <20141113152243.GB9726@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 13, 2014 at 03:14:08PM +0000, Kyle McMartin wrote:
-> On Thu, Nov 13, 2014 at 03:06:25PM +0000, Catalin Marinas wrote:
-> > On Wed, Nov 12, 2014 at 09:07:44PM +0000, Kyle McMartin wrote:
-> > > ARM64 currently doesn't fix up faults on the single-byte (strb) case of
-> > > __clear_user... which means that we can cause a nasty kernel panic as an
-> > > ordinary user with any multiple PAGE_SIZE+1 read from /dev/zero.
-> > > i.e.: dd if=/dev/zero of=foo ibs=1 count=1 (or ibs=65537, etc.)
+On Tue, Nov 11, 2014 at 11:52:27AM +0000, Liviu Dudau wrote:
+> On Tue, Nov 11, 2014 at 11:24:24AM +0000, Will Deacon wrote:
+> > Hi Suravee,
 > > 
-> > Thanks for this, it's been like this for a while. Applied.
+> > On Mon, Nov 10, 2014 at 07:24:40PM +0000, suravee.suthikulpanit at amd.com wrote:
+> > > From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> > > 
+> > > This patch implement set_msi_parent callback for PCI generic host controller.
+> > > 
+> > > Cc: Bjorn Helgass <bhelgaas@google.com>
+> > > Cc: Liviu Dudau <liviu.dudau@arm.com>
+> > > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> > > ---
+> > >  drivers/pci/host/pci-host-generic.c | 14 ++++++++++++++
+> > >  1 file changed, 14 insertions(+)
+> > > 
+> > > diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> > > index 036ab1b..f9bb97a 100644
+> > > --- a/drivers/pci/host/pci-host-generic.c
+> > > +++ b/drivers/pci/host/pci-host-generic.c
+> > > @@ -42,6 +42,7 @@ struct gen_pci {
+> > >  	struct pci_host_bridge			host;
+> > >  	struct gen_pci_cfg_windows		cfg;
+> > >  	struct list_head			resources;
+> > > +	struct msi_chip				*mchip;
+> > >  };
+> > >  
+> > >  #ifdef CONFIG_ARM
+> > > @@ -128,9 +129,19 @@ static int gen_pci_config_write(struct pci_bus *bus, unsigned int devfn,
+> > >  	return PCIBIOS_SUCCESSFUL;
+> > >  }
+> > >  
+> > > +static int gen_pci_set_msi_parent(struct pci_bus *bus)
+> > > +{
+> > > +	struct gen_pci *pci = bus_to_gen_pci(bus);
+> > > +
+> > > +	bus->msi = pci->mchip;
+> > > +
+> > > +	return PCIBIOS_SUCCESSFUL;
+> > > +}
+> > 
+> > I don't think this makes much sense a host controller callback. Why can't
+> > bus->msi be set in generic code?
+> 
+> Because of the current way in which a bus gets created and them immediately used for
+> scanning devices if you use pci_scan_root_bus(). Alternative is to use pci_create_root_bus()
+> and increase your code size with the body of pci_scan_root_bus().
+> 
+> Solution is to have pci_host_bridge holding the msi_chip pointer and that gets created
+> before root bus, with pci_scan_root_bus() now having all the info needed to do successful
+> setup of scanned devices.
+
+Why can't we add a hook like pci_bus_assign_domain_nr(), say:
+
+pci_bus_msi_init()
+
+in pci_create_root_bus() that does what Suravee wants in a generic way ?
+
+What am I missing ?
+
+Lorenzo
+
+> 
+> Best regards,
+> Liviu
+> 
+> > 
+> > >  static struct pci_ops gen_pci_ops = {
+> > >  	.read	= gen_pci_config_read,
+> > >  	.write	= gen_pci_config_write,
+> > > +	.set_msi_parent = gen_pci_set_msi_parent,
+> > >  };
+> > >  
+> > >  static const struct of_device_id gen_pci_of_match[] = {
+> > > @@ -313,6 +324,9 @@ static int gen_pci_probe(struct platform_device *pdev)
+> > >  		return err;
+> > >  	}
+> > >  
+> > > +	pci->mchip = of_pci_find_msi_chip_by_node(of_parse_phandle(np,
+> > > +						  "msi-parent", 0));
+> > 
+> > This bit should be in the generic of_pci.c code and not duplicated for
+> > each host controller.
+> > 
+> > Will
 > > 
 > 
-> Thanks Catalin, if it's not too late, I forgot to add a
-> Reported-by: Milo? Prchl?k <mprchlik@redhat.com>
-> for the initial report of the panic.
-
-I'll add this, I haven't pushed it out yet.
-
--- 
-Catalin
+> -- 
+> ====================
+> | I would like to |
+> | fix the world,  |
+> | but they're not |
+> | giving me the   |
+>  \ source code!  /
+>   ---------------
+>     ?\_(?)_/?
