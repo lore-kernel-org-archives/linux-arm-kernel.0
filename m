@@ -1,38 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 13 Nov 2014 23:25:29 +0100
-Subject: [RFC] ptrace: add generic SET_SYSCALL request
-In-Reply-To: <OF152076B7.38277C08-ONC1257D8F.0050C2DF-C1257D8F.00516BF2@de.ibm.com>
-References: <1415346443-28915-1-git-send-email-takahiro.akashi@linaro.org>
- <3899236.yrOvvrZHD6@wuerfel>
- <OF152076B7.38277C08-ONC1257D8F.0050C2DF-C1257D8F.00516BF2@de.ibm.com>
-Message-ID: <1472197.o98pKNTkBz@wuerfel>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 13 Nov 2014 15:27:05 -0700
+Subject: [PATCH 0/3] miscellaneous fixes in coresight
+In-Reply-To: <20141113191704.GA28033@kroah.com>
+References: <1415868169-13325-1-git-send-email-pankaj.dubey@samsung.com>
+ <CANLsYkyPnVJ75-TYYionMtd2KJzs29UK9LD3Fj4vk=Apvfh0Gw@mail.gmail.com>
+ <20141113191704.GA28033@kroah.com>
+Message-ID: <CANLsYkw5vi5cFpyPkSS6Ypn8M=gznqb20TOc6HzM=yTGEDakrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 November 2014 15:49:20 Ulrich Weigand wrote:
-> Arnd Bergmann <arnd@arndb.de> wrote on 13.11.2014 11:21:28:
-> 
-> > I have to admit that I don't really understand gdb internals, but from
-> > a first look I get the impression that it will just do the right thing
-> > if you reuse NT_S390_SYSTEM_CALL on ARM64 with the same semantics.
-> 
-> There's an interface between BFD and GDB proper involved here.  BFD will
-> detect the presence of register set notes in the core dump, and will
-> translate them into virtual sections; GDB will then simply look up such
-> sections under well-known names.
-> 
-> In particular, the NT_S390_SYSTEM_CALL note will be translated by BFD
-> into a virtual section named ".reg-s390-system-call"; GDB platform-
-> specific code will look for sections of this particular name.
-> 
-> So if you were to create notes using the same note type, by default it
-> would do nothing on ARM64.  You might add code to the ARM64 back-end
-> to also look for a section ".reg-s390-system-call", but that would be
-> somewhat confusing.  Using a new, platform-specific note type for ARM64
-> would appear to fit better with existing precedent.
+I took them in my tree and I'll send you a pull request.
 
-Ok, thanks a lot for your insight and for confirming what Takahiro AKASHI
-said. Let's use a new NT_ARM64_SYSTEM_CALL type with a different
-number then.
-
-	Arnd
+On 13 November 2014 12:17, Greg KH <gregkh@linuxfoundation.org> wrote:
+> On Thu, Nov 13, 2014 at 11:12:40AM -0700, Mathieu Poirier wrote:
+>> On 13 November 2014 01:42, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+>> > This patch series fixes some typo and minor issues in coresight which
+>> > I observed while going through this driver.
+>> >
+>> > Pankaj Dubey (3):
+>> >   coresight: fix typo in comment in coresight-priv.h
+>> >   coresight: fixed comments in coresight.h
+>> >   coresight-replicator: remove .owner field for driver
+>> >
+>> >  drivers/coresight/coresight-priv.h       |    2 +-
+>> >  drivers/coresight/coresight-replicator.c |    1 -
+>> >  include/linux/coresight.h                |    6 +++---
+>> >  3 files changed, 4 insertions(+), 5 deletions(-)
+>> >
+>> > --
+>> > 1.7.9.5
+>> >
+>>
+>> Applied all 3 patches - thanks
+>
+> Applied to what?  Shouldn't I be taking these?
+>
+> confused,
+>
+> greg k-h
