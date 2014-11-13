@@ -1,33 +1,39 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 13 Nov 2014 20:04:35 +0100
-Subject: [linux-sunxi] Re: [PATCH 3/4] simplefb: Change simplefb_init
- from module_init to fs_initcall
-In-Reply-To: <jwvy4rf2i7h.fsf-monnier+gmane.comp.hardware.netbook.arm.sunxi@gnu.org>
-References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>	<1415830124-28787-3-git-send-email-hdegoede@redhat.com>	<20141113085238.GE20972@lukather>
- <546478B5.2040002@redhat.com>	<CACxGe6u8B854PEWw8XzwhyX8joMWwOsHOOXtmBmC1TgCGjGtdg@mail.gmail.com>
- <jwvy4rf2i7h.fsf-monnier+gmane.comp.hardware.netbook.arm.sunxi@gnu.org>
-Message-ID: <546500C3.7040908@redhat.com>
+From: greg@kroah.com (Greg KH)
+Date: Thu, 13 Nov 2014 11:08:29 -0800
+Subject: [PATCH v2 2/2] [usb] add support for ACPI identification to
+ xhci-platform
+In-Reply-To: <5464FA19.6030609@redhat.com>
+References: <1414692989-23128-2-git-send-email-mlangsdo@redhat.com>
+ <1415119833-9135-1-git-send-email-mlangsdo@redhat.com>
+ <1415119833-9135-2-git-send-email-mlangsdo@redhat.com>
+ <20141104171220.GA30385@kroah.com> <5464FA19.6030609@redhat.com>
+Message-ID: <20141113190829.GA3672@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 11/13/2014 05:13 PM, Stefan Monnier wrote:
->> Like a lot of things, if it is made a modules, and it breaks for the
->> user, the user gets to keep the pieces.  There are potentially some
+On Thu, Nov 13, 2014 at 12:36:09PM -0600, Mark Langsdorf wrote:
+> On 11/04/2014 11:12 AM, Greg KH wrote:
+> >On Tue, Nov 04, 2014 at 10:50:33AM -0600, Mark Langsdorf wrote:
+>   #endif
+> >>
+> >>+#ifdef CONFIG_ACPI
+> >>+static const struct acpi_device_id usb_xhci_acpi_match[] = {
+> >>+	/* APM X-Gene USB Controller */
+> >>+	{ "PNP0D10", },
+> >>+	{ }
+> >>+};
+> >>+MODULE_DEVICE_TABLE(acpi, usb_xhci_acpi_match);
+> >>+#endif
+> >
+> >That looks like a very "generic" PNP value, are you sure it is assigned
+> >only to this specific device?
 > 
-> But the option's description should probably include some blurb about
-> the fact that it only works as a module with some combinations of
-> SoC+kernel.
+> Although this is a generic PNP device, the specific implementation
+> I'm testing has issues with USB3. Is there a flag or function
+> call that will disable the USB3 host while keeping the USB2
+> host?? My naive attempts in finding one mostly hung the machine.
 
-So I was about to add an update of the Kconfig text along this line
-while I was respinning the patch anyways, and guess what simplefb
-currently cannot be build as a module, so this is a non-issue.
+If this is an xhci chip, there is no stand-along USB 2 controller
+anymore, sorry.
 
-I'll update my "simplefb: Add support for enumerating simplefb dt nodes in /chosen"
-patch to not have a module_exit in the next version, since that is
-not really useful if it cannot be build as a module anyways.
-
-Regards,
-
-Hans
+greg k-h
