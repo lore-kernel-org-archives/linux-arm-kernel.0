@@ -1,56 +1,65 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 13 Nov 2014 11:20:15 +0100
-Subject: [PATCH v2] PCI: designware: Add support 4 ATUs assignment
-In-Reply-To: <546481A3.5050700@freescale.com>
-References: <1415682444-24911-1-git-send-email-Minghuan.Lian@freescale.com>
- <CA+mB=1+4Dzxhbin6z0PUENvjUz-y8bq-K09FXTnSepFvVfe9HQ@mail.gmail.com>
- <546308DD.40109@freescale.com>
- <CA+mB=1K=Oyzdb2yfBvPRG9DHi-PFjRPtVS_dY9JMOz6dQog8QQ@mail.gmail.com>
- <546331E7.5060003@freescale.com>
- <CA+mB=1KObT9O783SMcvHy8nJGQPnxyKgP332r5bHx-K_D+LhVg@mail.gmail.com>
- <1415809929.2876.5.camel@pengutronix.de> <546481A3.5050700@freescale.com>
-Message-ID: <1415874015.2420.5.camel@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 13 Nov 2014 11:21:28 +0100
+Subject: [RFC] ptrace: add generic SET_SYSCALL request
+In-Reply-To: <54645799.5010409@linaro.org>
+References: <1415346443-28915-1-git-send-email-takahiro.akashi@linaro.org>
+ <6358312.yt5WU3kBm9@wuerfel> <54645799.5010409@linaro.org>
+Message-ID: <3899236.yrOvvrZHD6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 13.11.2014, 18:02 +0800 schrieb Lian Minghuan-B31939:
-> Hi Lucas,
-> 
-> Please see my comments inline.
-> 
-> Thanks,
-> Minghuan
-> 
-> On 2014?11?13? 00:32, Lucas Stach wrote:
-> > Am Mittwoch, den 12.11.2014, 21:53 +0530 schrieb Srikanth Thokala:
-> >> Hi Minghuan,
-
-[...]
-
-> > Using a smaller type complicates the DT for little to no benefit. I
-> > think it's ok to use u32 here, which is a common standard for integer
-> > values in DT.
+On Thursday 13 November 2014 16:02:49 AKASHI Takahiro wrote:
+> On 11/12/2014 08:19 PM, Arnd Bergmann wrote:
+> > On Wednesday 12 November 2014 11:13:52 Will Deacon wrote:
+> >> On Wed, Nov 12, 2014 at 11:06:59AM +0000, AKASHI Takahiro wrote:
+> >>> On 11/12/2014 08:00 PM, Will Deacon wrote:
+> >>>> On Wed, Nov 12, 2014 at 10:46:01AM +0000, AKASHI Takahiro wrote:
+> >>>>> On 11/07/2014 11:04 PM, Oleg Nesterov wrote:
+> >>>>>> To me the fact that PTRACE_SET_SYSCALL can be undefined and syscall_set_nr()
+> >>>>>> is very much arch-dependant (but most probably trivial) means that this  code
+> >>>>>> should live in arch_ptrace().
+> >>>>>
+> >>>>> Thinking of Oleg's comment above, it doesn't make sense neither to define generic
+> >>>>> NT_SYSTEM_CALL (user_regset) in uapi/linux/elf.h and implement it in ptrace_regset()
+> >>>>> in kernel/ptrace.c with arch-defined syscall_(g)set_nr().
+> >>>>>
+> >>>>> Since we should have the same interface on arm and arm64, we'd better implement
+> >>>>> ptrace(PTRACE_SET_SYSCALL) locally on arm64 for now (as I originally submitted).
+> >>>>
+> >>>> I think the regset approach is cleaner. We already do something similar for
+> >>>> TLS. That would be implemented under arch/arm64/ with it's own NT type.
+> >>>
+> >>> Okey, so arm64 goes its own way
+> >>> Or do you want to have a similar regset on arm, too?
+> >>> (In this case, NT_ARM_SYSTEM_CALL can be shared in uapi/linux/elf.h)
+> >>
+> >> Just do arm64. We already have the dedicated request for arch/arm/.
 > >
-> > Though this discussion lead me to the question if we even need to have
-> > this property in the DT at all. Isn't this a property that is fixed for
-> > a specific silicon implementation of the DW core? In that case we could
-> > just infer the number of ATUs from the DT compatible, so this should
-> > probably just be added to struct pcie_port and properly initialized by
-> > the SoC glue drivers.
-> [Minghuan]  As far as I know, exynos implements only 2 ATUs, this is why
-> pcie-designware only supports 2 ATU. iMX implements 4 ATUs and LS1021A
-> implements 6 ATUs.
+> > I wonder if we should define NT_ARM64_SYSTEM_CALL to the same value
+> > as NT_S390_SYSTEM_CALL (0x307), or even define it as an architecture-
+> > independent NT_SYSTEM_CALL number with that value, so other architectures
+> > don't have to introduce new types when they also want to implement it.
 > 
+> I digged into gdb code (gdb/bfd/elf.c):
+> https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=blob;f=bfd/elf.c;h=8b207ad872a3992381e93bdfa0a75ef444651613;hb=HEAD
+>    elf_parse_notes()->elfcore_grok_note()->elfcore_grok_s390_system_call()
+> 
+> It seems to me that NT_S390_SYSTEM_CALL(=0x307) is recognized as a s390 specific
+> value (without checking for machine type). So thinking of potential conflict, it might not be
+> a good idea to use this value as a common number (of NT_SYSTEM_CALL).
+> It's very unlikely that a "note" section for NT_(S390_)SYSTEM_CALL appears in a coredump file, though.
+>
+> What do you think?
 
-Right so we don't need an additional property in the DT at all. The
-number of ATUs is fixed for a specific core compatible and can be passed
-in by the respective exynos, imx and ls1021 glue drivers.
+(adding Ulrich and Andreas)
 
-You may ask the Keystone and Spear maintainers to get the correct number
-of ATUs for those implementations.
+This code was introduced by http://sourceware-org.1504.n7.nabble.com/rfa-s390-bfd-part-Support-extended-register-sets-td50072.html
 
-Regards,
-Lucas
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+I have to admit that I don't really understand gdb internals, but from
+a first look I get the impression that it will just do the right thing
+if you reuse NT_S390_SYSTEM_CALL on ARM64 with the same semantics.
+
+If not, we should indeed have a different number for it and duplicate that
+code.
+
+	Arnd
