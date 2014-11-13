@@ -1,30 +1,46 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 13 Nov 2014 09:14:27 +0100
-Subject: [PATCH 4/5] ARM: mvebu: adjust ethernet aliases according to
- U-Boot requirements for A38x
-In-Reply-To: <1415835600-97188-5-git-send-email-mw@semihalf.com>
-References: <1415835600-97188-1-git-send-email-mw@semihalf.com>
- <1415835600-97188-5-git-send-email-mw@semihalf.com>
-Message-ID: <20141113091427.31113495@free-electrons.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 13 Nov 2014 09:15:55 +0100
+Subject: [PATCH 2/4] simplefb: Add support for enumerating simplefb dt
+ nodes in /chosen
+In-Reply-To: <1415830124-28787-2-git-send-email-hdegoede@redhat.com>
+References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
+ <1415830124-28787-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAMuHMdWdtxcmDc7fDbQHfVa425sR3MGwJ70cRnh2Wb50iAo2CQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Marcin Wojtas,
+On Wed, Nov 12, 2014 at 11:08 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> --- a/drivers/video/fbdev/simplefb.c
+> +++ b/drivers/video/fbdev/simplefb.c
 
-On Thu, 13 Nov 2014 00:39:59 +0100, Marcin Wojtas wrote:
-> The vendor bootloader provided for Armada 38x boards expects an
-> alias for the ethernet nodes, which is used to fixup the MAC address.
-> The alias format naming is strict.
+> @@ -385,7 +386,37 @@ static struct platform_driver simplefb_driver = {
+>         .probe = simplefb_probe,
+>         .remove = simplefb_remove,
+>  };
+> -module_platform_driver(simplefb_driver);
+> +
+> +static int __init simplefb_init(void)
+> +{
+> +       int i, ret;
 
-I believe this needs a bit more explanation: why would we care about
-the "vendor bootloader" ? What are expecting the mainline versions of
-popular bootloaders like U-Boot and Barebox ? What are other platforms
-supported in the mainline doing ?
+unsigned int i;
 
-Best regards,
+> +       char name[16];
+> +       struct device_node *np;
+> +
+> +       ret = platform_driver_register(&simplefb_driver);
+> +       if (ret)
+> +               return ret;
+> +
+> +       for (i = 0; ; i++) {
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
