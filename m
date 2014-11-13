@@ -1,73 +1,150 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 13 Nov 2014 17:15:37 +0100
-Subject: [GIT PULL] ARM: tegra: Device tree fixes for v3.18-rc5
-Message-ID: <20141113161530.GA3613@ulmo>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 13 Nov 2014 17:17:48 +0100
+Subject: [PATCH v6 1/4] ARM: mediatek: Add basic support for mt6592
+In-Reply-To: <1415808457-4030-1-git-send-email-ibanezchen@gmail.com>
+References: <1415808457-4030-1-git-send-email-ibanezchen@gmail.com>
+Message-ID: <CABuKBeJv0S2Q4W1fqb=8BUG6AEvFsZ6sY9QXuz=CRe+qbaYzQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+2014-11-12 17:07 GMT+01:00 Howard Chen <ibanezchen@gmail.com>:
+> * A dtsi for boards based on Mediatek MT6592 SoCs
+> * Compatible string in arch/arm/mach-mediatek/mediatek.c
+>
+> Signed-off-by: Howard Chen <ibanezchen@gmail.com>
+> ---
+>  arch/arm/boot/dts/mt6592.dtsi     | 97 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mediatek/mediatek.c |  1 +
+>  2 files changed, 98 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/mt6592.dtsi
+>
+> diff --git a/arch/arm/boot/dts/mt6592.dtsi b/arch/arm/boot/dts/mt6592.dtsi
+> new file mode 100644
+> index 0000000..65aa81b
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/mt6592.dtsi
+> @@ -0,0 +1,97 @@
+> +/*
+> + * Copyright (c) 2014 MediaTek Inc.
+> + * Author: Howard Chen <ibanezchen@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include "skeleton.dtsi"
 
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+Regarding a discussion I had with Joe and Arnd [0], I think we should
+use skeleton64.dtsi here, right?
+The datasheets states that mt6592 supports up to 8 GB.
 
-are available in the git repository at:
+[0] https://lkml.org/lkml/2014/11/4/192
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-3.18-fixes-for-rc5
+> +
+> +/ {
+> +       compatible = "mediatek,mt6592";
+> +       interrupt-parent = <&gic>;
+> +
+> +       cpus {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               cpu at 0 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x0>;
+> +               };
+> +               cpu at 1 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x1>;
+> +               };
+> +               cpu at 2 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x2>;
+> +               };
+> +               cpu at 3 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x3>;
+> +               };
+> +               cpu at 4 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x4>;
+> +               };
+> +               cpu at 5 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x5>;
+> +               };
+> +               cpu at 6 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x6>;
+> +               };
+> +               cpu at 7 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x7>;
+> +               };
+> +       };
+> +
+> +       system_clk: dummy13m {
+> +               compatible = "fixed-clock";
+> +               clock-frequency = <13000000>;
+> +               #clock-cells = <0>;
+> +       };
+> +
+> +       rtc_clk: dummy32k {
+> +               compatible = "fixed-clock";
+> +               clock-frequency = <32000>;
+> +               #clock-cells = <0>;
+> +       };
+> +
+> +       timer: timer at 10008000 {
+> +               compatible = "mediatek,mt6577-timer";
+> +               reg = <0x10008000 0x80>;
+> +               interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
+> +               clocks = <&system_clk>, <&rtc_clk>;
+> +               clock-names = "system-clk", "rtc-clk";
+> +       };
+> +
+> +       gic: interrupt-controller at 10211000 {
+> +               compatible = "arm,cortex-a7-gic";
+> +               interrupt-controller;
+> +               #interrupt-cells = <3>;
+> +               reg = <0x10211000 0x1000>,
+> +                     <0x10212000 0x1000>;
+> +       };
+> +
+> +};
+> diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+> index f2acf07..88e4626 100644
+> --- a/arch/arm/mach-mediatek/mediatek.c
+> +++ b/arch/arm/mach-mediatek/mediatek.c
+> @@ -19,6 +19,7 @@
+>
+>  static const char * const mediatek_board_dt_compat[] = {
+>         "mediatek,mt6589",
+> +       "mediatek,mt6592",
+>         NULL,
+>  };
+>
+> --
+> 1.9.1
+>
 
-for you to fetch changes up to 221b9bf42b26a22e6904d20f35c53aec2e73a646:
 
-  ARM: tegra: roth: Fix SD card VDD_IO regulator (2014-11-13 16:58:53 +0100)
 
-Thierry
-
-----------------------------------------------------------------
-ARM: tegra: Device tree fixes for v3.18-rc5
-
-This contains the serial port numbering fixes that are required for the
-serial port numbering to stay the same with or without the serial core
-making use of the aliases defined in DT.
-
-eMMC is also fixed for TN7 and Roth boards which were using the wrong
-regulators.
-
-----------------------------------------------------------------
-Alexandre Courbot (2):
-      ARM: tegra: Remove eMMC vmmc property for roth/tn7
-      ARM: tegra: roth: Fix SD card VDD_IO regulator
-
-Lucas Stach (1):
-      ARM: tegra: Add serial port labels to Tegra124 DT
-
-Olof Johansson (1):
-      ARM: dts: tegra: move serial aliases to per-board
-
- arch/arm/boot/dts/tegra114-dalmore.dts        | 1 +
- arch/arm/boot/dts/tegra114-roth.dts           | 9 +++++----
- arch/arm/boot/dts/tegra114-tn7.dts            | 5 ++++-
- arch/arm/boot/dts/tegra114.dtsi               | 7 -------
- arch/arm/boot/dts/tegra124-jetson-tk1.dts     | 1 +
- arch/arm/boot/dts/tegra124-nyan-big.dts       | 1 +
- arch/arm/boot/dts/tegra124-venice2.dts        | 1 +
- arch/arm/boot/dts/tegra124.dtsi               | 8 ++++----
- arch/arm/boot/dts/tegra20-harmony.dts         | 1 +
- arch/arm/boot/dts/tegra20-iris-512.dts        | 5 +++++
- arch/arm/boot/dts/tegra20-medcom-wide.dts     | 4 ++++
- arch/arm/boot/dts/tegra20-paz00.dts           | 2 ++
- arch/arm/boot/dts/tegra20-seaboard.dts        | 1 +
- arch/arm/boot/dts/tegra20-tamonten.dtsi       | 1 +
- arch/arm/boot/dts/tegra20-trimslice.dts       | 1 +
- arch/arm/boot/dts/tegra20-ventana.dts         | 1 +
- arch/arm/boot/dts/tegra20-whistler.dts        | 1 +
- arch/arm/boot/dts/tegra20.dtsi                | 8 --------
- arch/arm/boot/dts/tegra30-apalis-eval.dts     | 4 ++++
- arch/arm/boot/dts/tegra30-beaver.dts          | 1 +
- arch/arm/boot/dts/tegra30-cardhu.dtsi         | 2 ++
- arch/arm/boot/dts/tegra30-colibri-eval-v3.dts | 3 +++
- arch/arm/boot/dts/tegra30.dtsi                | 8 --------
- 23 files changed, 44 insertions(+), 32 deletions(-)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/dc19ff2b/attachment-0001.sig>
+-- 
+motzblog.wordpress.com
