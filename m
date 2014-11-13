@@ -1,33 +1,42 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 13 Nov 2014 11:00:09 +0000
-Subject: [PATCH v2 06/14] ARM: multi_v7_defconfig: Enable stih407 usb picophy
+Date: Thu, 13 Nov 2014 11:00:10 +0000
+Subject: [PATCH v2 07/14] ARM: STi: DT: STiH407: Add usb2 picophy dt nodes
 In-Reply-To: <1415876417-28728-1-git-send-email-peter.griffin@linaro.org>
 References: <1415876417-28728-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1415876417-28728-7-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1415876417-28728-8-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the picoPHY usb phy which is used by
-the usb2 and usb3 host controllers when controlling usb2/1.1
-devices. It is found in stih407 family SoC's from STMicroelectronics.
+This patch adds the dt nodes for the usb2 picophy found on the stih407
+device family. It is used on stih407 by the dwc3 usb3 controller when
+controlling usb2/1.1 devices.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/stih407.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index e13ab7e..ac7b536 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -427,6 +427,7 @@ CONFIG_OMAP_USB2=y
- CONFIG_TI_PIPE3=y
- CONFIG_PHY_MIPHY365X=y
- CONFIG_PHY_STIH41X_USB=y
-+CONFIG_PHY_STIH407_USB=y
- CONFIG_PHY_SUN4I_USB=y
- CONFIG_EXT4_FS=y
- CONFIG_VFAT_FS=y
+diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
+index 50637f5..4ce1f07 100644
+--- a/arch/arm/boot/dts/stih407.dtsi
++++ b/arch/arm/boot/dts/stih407.dtsi
+@@ -275,5 +275,17 @@
+ 
+ 			status = "disabled";
+ 		};
++
++		usb2_picophy0: usbpicophy at 0 {
++			compatible = "st,stih407-usb2-phy";
++			reg = <0xf8 0x04>,	/* syscfg 5062 */
++			      <0xf4 0x04>;	/* syscfg 5061 */
++			reg-names = "param", "ctrl";
++			#phy-cells = <0>;
++			st,syscfg = <&syscfg_core>;
++			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
++				 <&picophyreset STIH407_PICOPHY0_RESET>;
++			reset-names = "global", "port";
++		};
+ 	};
+ };
 -- 
 1.9.1
