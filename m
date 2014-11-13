@@ -1,64 +1,93 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 13 Nov 2014 14:06:36 +0100
-Subject: [PATCH v4 4/7] phy: add support for USB cluster on the Armada
- 375 SoC
-In-Reply-To: <1415879269-29711-5-git-send-email-gregory.clement@free-electrons.com>
-References: <1415879269-29711-1-git-send-email-gregory.clement@free-electrons.com>
- <1415879269-29711-5-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20141113140636.21226234@free-electrons.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 13 Nov 2014 14:18:07 +0100
+Subject: [PATCH v8 0/7] Enable L2 cache support on Exynos4210/4x12 SoCs
+Message-ID: <1415884694-5868-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+This is an updated patchset, which intends to add support for L2 cache
+on Exynos4 SoCs on boards running under secure firmware, which requires
+certain initialization steps to be done with help of firmware, as
+selected registers are writable only from secure mode.
 
-On Thu, 13 Nov 2014 12:47:46 +0100, Gregory CLEMENT wrote:
-> The Armada 375 SoC comes with an USB2 host and device controller and
-> an USB3 controller. The USB cluster control register allows to manage
-> common features of both USB controllers.
-> 
-> This commit adds a driver integrated in the generic PHY framework to
-> control this USB cluster feature.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/phy/Kconfig              |   6 ++
->  drivers/phy/Makefile             |   1 +
->  drivers/phy/phy-armada375-usb2.c | 158 +++++++++++++++++++++++++++++++++++++++
->  include/dt-bindings/phy/phy.h    |   1 +
->  4 files changed, 166 insertions(+)
->  create mode 100644 drivers/phy/phy-armada375-usb2.c
-> 
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index 2a436e607f99..625adb0abd43 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -21,6 +21,12 @@ config PHY_BERLIN_SATA
->  	select GENERIC_PHY
->  	help
->  	  Enable this to support the SATA PHY on Marvell Berlin SoCs.
-> +config ARMADA375_USBCLUSTER_PHY
+First four patches extend existing support for secure write in L2C driver
+to account for design of secure firmware running on Exynos. Namely:
+ 1) direct read access to certain registers is needed on Exynos, because
+    secure firmware calls set several registers at once,
+ 2) not all boards are running secure firmware, so .write_sec callback
+    needs to be installed in Exynos firmware ops initialization code,
+ 3) write access to {DATA,TAG}_LATENCY_CTRL registers fron non-secure world
+    is not allowed and so must use l2c_write_sec as well,
+ 4) on certain boards, default value of prefetch register is incorrect
+    and must be overridden at L2C initialization.
+For boards running with firmware that provides access to individual
+L2C registers this series should introduce no functional changes. However
+since the driver is widely used on other platforms I'd like to kindly ask
+any interested people for testing.
 
-Missing new line here.
+Further three patches add implementation of .write_sec and .configure
+callbacks for Exynos secure firmware and necessary DT nodes to enable
+L2 cache.
 
-> +	def_bool y
-> +	depends on MACH_ARMADA_375 || COMPILE_TEST
-> +	depends on OF
-> +	select GENERIC_PHY
-> +
->  
-
-One too many new line.
+Changes in this version tested on Exynos4412-based TRATS2 and OdroidU3+
+boards (both with secure firmware). There should be no functional change
+for Exynos boards running without secure firmware. I do not have access
+to affected non-Exynos boards, so I could not test on them.
 
 
-> +	cluster_phy = dev_get_drvdata(phy->dev.parent);
-> +	if (!cluster_phy)
-> +		return -ENOMEM;
+Depends on:
+ - [PATCH v3 0/5] Firmware-assisted suspend/resume of Exynos SoCs
+   (https://lkml.org/lkml/2014/8/26/445)
+   available in samsung/pm2 branch in
+   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+ - L2C patches merged to v3.18-rc3
 
-Is ENOMEM really the appropriate error code here?
 
-Thomas
+Changelog:
+Changes since v7:
+(https://lkml.org/lkml/2014/10/29/158)
+- rebased onto arm-soc/for-next kernel tree (depends on patches merged to
+  v3.18-rc3 and arm-soc/samsung/pm2 branch)
+- removed 'ARM: l2c: unify L2C-310 OF initialization error messages' patch
+  (no longer needed)
+
+Changes since v6:
+(https://lkml.org/lkml/2014/10/27/233)
+- changed PL310 to L2C-310 prefix in error messages
+- added patch shortening the error message about incorrect associativity
+
+Changes since v5:
+(https://lkml.org/lkml/2014/9/24/364)
+- rebased onto v3.18-rc2
+- added error message about missing properties values
+
+Changes since v4:
+(https://lkml.org/lkml/2014/8/26/461)
+ - rewrote the code accessing l2x0_saved_regs from assembly code
+ - added comment and reworked unconditional call to SMC_CMD_L2X0INVALL
+
+
+Patch summary:
+
+Tomasz Figa (7):
+  ARM: l2c: Refactor the driver to use commit-like interface
+  ARM: l2c: Add interface to ask hypervisor to configure L2C
+  ARM: l2c: Get outer cache .write_sec callback from mach_desc only if
+    not NULL
+  ARM: l2c: Add support for overriding prefetch settings
+  ARM: EXYNOS: Add .write_sec outer cache callback for L2C-310
+  ARM: EXYNOS: Add support for non-secure L2X0 resume
+  ARM: dts: exynos4: Add nodes for L2 cache controller
+
+ Documentation/devicetree/bindings/arm/l2cc.txt |  10 +
+ arch/arm/boot/dts/exynos4210.dtsi              |   9 +
+ arch/arm/boot/dts/exynos4x12.dtsi              |  14 ++
+ arch/arm/include/asm/outercache.h              |   3 +
+ arch/arm/kernel/irq.c                          |   3 +-
+ arch/arm/mach-exynos/firmware.c                |  50 +++++
+ arch/arm/mach-exynos/sleep.S                   |  46 +++++
+ arch/arm/mm/cache-l2x0.c                       | 270 ++++++++++++++++---------
+ 8 files changed, 309 insertions(+), 96 deletions(-)
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.9.2
