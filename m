@@ -1,49 +1,22 @@
-From: socketcan@hartkopp.net (Oliver Hartkopp)
-Date: Thu, 13 Nov 2014 17:56:55 +0100
-Subject: [PATCH V4 2/3] can: m_can: update to support CAN FD features
-In-Reply-To: <54648382.9080105@pengutronix.de>
-References: <1415349914-9145-1-git-send-email-b29396@freescale.com>
- <1415349914-9145-2-git-send-email-b29396@freescale.com>
- <54648382.9080105@pengutronix.de>
-Message-ID: <5464E2D7.7010906@hartkopp.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 13 Nov 2014 16:59:34 +0000 (UTC)
+Subject: [PATCH 0/5] ARM: OMAP3+: DPLL: fix set_rate logic
+In-Reply-To: <1412344634-2798-1-git-send-email-t-kristo@ti.com>
+References: <1412344634-2798-1-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.02.1411131629220.31460@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/13/2014 11:10 AM, Marc Kleine-Budde wrote:
-> On 11/07/2014 09:45 AM, Dong Aisheng wrote:
+On Fri, 3 Oct 2014, Tero Kristo wrote:
 
->>  
->> -	if (id & RX_BUF_RTR) {
->> +	if (id & RX_BUF_ESI) {
->> +		cf->flags |= CANFD_ESI;
->> +		netdev_dbg(dev, "ESI Error\n");
->> +	}
->> +
->> +	if (!(dlc & RX_BUF_EDL) && (id & RX_BUF_RTR)) {
->>  		cf->can_id |= CAN_RTR_FLAG;
-> 
-> I just noticed, that you don't set the cf->dlc (or cf->len) in the RTR
-> case. Please create a separate patch that fixes this problem.
-> 
->>  	} else {
->>  		id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DLC);
->> -		cf->can_dlc = get_can_dlc((id >> 16) & 0x0F);
->> -		*(u32 *)(cf->data + 0) = m_can_fifo_read(priv, fgi,
->> -							 M_CAN_FIFO_DATA(0));
->> -		*(u32 *)(cf->data + 4) = m_can_fifo_read(priv, fgi,
->> -							 M_CAN_FIFO_DATA(1));
->> +		if (dlc & RX_BUF_EDL)
->> +			cf->len = can_dlc2len((id >> 16) & 0x0F);
->> +		else
->> +			cf->len = get_can_dlc((id >> 16) & 0x0F);
->> +
+> OMAP3+ DPLL code is currently using set_rate op to change DPLL rates.
+> This is kind of wrong, as it also involves changing DPLL parent in certain
+> cases (switch between locked mode <-> bypass mode.) This set fixes these
+> issues by introducing the support of determine_rate and set_rate_and_parent
+> ops for the DPLL clocks. Also introduces support for set_parent, which
+> just switches a DPLL between locked <-> bypass modes.
 
-Grr. I missed that one too :-(
+Thanks, queued for v3.19.
 
-Thanks for catching it.
 
-As you committed patch 1 & 3 you expect a new single patch containing the
-(fixed) content of this patch 2, right?
-
-Regards,
-Oliver
+- Paul
