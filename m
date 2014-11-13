@@ -1,82 +1,32 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 13 Nov 2014 12:46:45 +0100
-Subject: [PATCH v3 4/6] phy: add support for USB cluster on the Armada
- 375 SoC
-In-Reply-To: <54644C92.8000900@ti.com>
-References: <1415786237-21985-1-git-send-email-gregory.clement@free-electrons.com>
- <1415786237-21985-5-git-send-email-gregory.clement@free-electrons.com>
- <54644C92.8000900@ti.com>
-Message-ID: <54649A25.6050304@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Nov 2014 11:47:44 +0000
+Subject: [PATCH] arm64: compat: align cacheflush syscall with arch/arm
+In-Reply-To: <1415789238-4573-1-git-send-email-vladimir.murzin@arm.com>
+References: <1415789238-4573-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20141113114743.GG13350@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Vladimir,
 
-[...]
->> +
->> +static struct armada375_cluster_phy usb_cluster_phy;
+On Wed, Nov 12, 2014 at 10:47:18AM +0000, Vladimir Murzin wrote:
+> Update handling of cacheflush syscall with changes made in arch/arm
+> counterpart:
+>  - return error to userspace when flushing syscall fails
+>  - split user cache-flushing into interruptible chunks
+>  - don't bother rounding to nearest vma
 > 
-> don't use global variables.
->> +
->> +static int armada375_usb_phy_init(struct phy *phy)
->> +{
->> +	struct armada375_cluster_phy *cluster_phy = phy_get_drvdata(phy);
->> +	u32 reg;
->> +
->> +	reg = readl(cluster_phy->reg);
->> +	if (cluster_phy->use_usb3)
->> +		reg |= USB2_PHY_CONFIG_DISABLE;
->> +	else
->> +		reg &= ~USB2_PHY_CONFIG_DISABLE;
->> +	writel(reg, cluster_phy->reg);
->> +
->> +	return 0;
->> +}
->> +
->> +static struct phy_ops armada375_usb_phy_ops = {
->> +	.init = armada375_usb_phy_init,
->> +	.owner = THIS_MODULE,
->> +};
->> +
->> +/*
->> + * Only one controller can use this PHY. We shouldn't have the case
->> + * when two controllers want to use this PHY. But if this case occurs
->> + * then we provide a phy to the first one and return an error for the
->> + * next one. This error has also to be an error returned by
->> + * devm_phy_optional_get() so different from ENODEV for USB2. In the
->> + * USB3 case it still optional and we use ENODEV.
->> + */
->> +static struct phy *armada375_usb_phy_xlate(struct device *dev,
->> +					struct of_phandle_args *args)
->> +{
->> +
->> +    /*
->> +     * Either the phy had never been requested and then the first usb
->> +     * claiming it can get it, or it had already been requested in
->> +     * this case, we only allow to use it with the same configuration.
->> +     */
-> 
-> You can dynamically create usb_cluster_phy in probe and then invoke
-> platform_set_drvdata by passing *usb_cluster_phy. Then you can invoke
-> platform_get_drvdata here to get *usb_cluster_phy.
-> 
-> While fixing this also add yourself as Maintainer of this file.
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/cacheflush.h  |    2 +-
+>  arch/arm64/include/asm/thread_info.h |   12 ++++++
+>  arch/arm64/kernel/sys_compat.c       |   77 ++++++++++++++++++++++++----------
+>  arch/arm64/mm/cache.S                |    6 ++-
+>  4 files changed, 74 insertions(+), 23 deletions(-)
 
-I am taking into account your comment and I am going to send a new version soon.
+We should hold off on this patch until the EINTR issue has been resolved:
 
-Thanks,
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/302105.html
 
-Gregory
-
-
-> 
-> Thanks
-> Kishon
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Will
