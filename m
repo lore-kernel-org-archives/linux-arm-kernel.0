@@ -1,56 +1,112 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Nov 2014 10:20:12 +0900
-Subject: [PATCH 21/25] ARM: shmobile: koelsch: Sound DMA support via DVC on DTS
+Date: Thu, 13 Nov 2014 10:20:13 +0900
+Subject: [PATCH 22/25] ARM: shmobile: r8a73a4 dtsi: Add SoC-specific IIC
+ compatible properties
 In-Reply-To: <cover.1415755881.git.horms+renesas@verge.net.au>
 References: <cover.1415755881.git.horms+renesas@verge.net.au>
-Message-ID: <be97956cd25198ec99298afb05446423ccb25bbc.1415755881.git.horms+renesas@verge.net.au>
+Message-ID: <9ebe389f1929b39af162b9c0053311000b8b309d.1415755881.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-DMA transfer uses DVC
+The IIC nodes used the generic compatible properties only.
+This may cause the driver to fail when using Standard Speed on IIC
+masters where the operational clock is driven by the 130 MHz HP clock.
 
-     DMA               DMApp
-[MEM] -> [SRC] -> [DVC] -> [SSIU] -> [SSI]
+Add the SoC-specific compatible property to fix this.
 
-     DMA               DMApp
-[MEM] <- [DVC] <- [SRC] <- [SSIU] <- [SSI]
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a73a4.dtsi | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index d2fe677..f056e64 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -20,6 +20,13 @@
-  * This command is required when Playback/Capture
-  *
-  *	amixer set "LINEOUT Mixer DACL" on
-+ *	amixer set "DVC Out" 100%
-+ *	amixer set "DVC In" 100%
-+ *
-+ * You can use Mute
-+ *
-+ *	amixer set "DVC Out Mute" on
-+ *	amixer set "DVC In Mute" on
-  */
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index b5ead84..01373ee 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -106,7 +106,7 @@
+ 	i2c5: i2c at e60b0000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,rmobile-iic";
++		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe60b0000 0 0x428>;
+ 		interrupts = <0 179 IRQ_TYPE_LEVEL_HIGH>;
  
- /dts-v1/;
-@@ -569,8 +576,8 @@
- 
- 	rcar_sound,dai {
- 		dai0 {
--			playback = <&ssi0 &src2>;
--			capture  = <&ssi1 &src3>;
-+			playback = <&ssi0 &src2 &dvc0>;
-+			capture  = <&ssi1 &src3 &dvc1>;
- 		};
- 	};
- };
+@@ -205,7 +205,7 @@
+ 	i2c0: i2c at e6500000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,rmobile-iic";
++		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6500000 0 0x428>;
+ 		interrupts = <0 174 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+@@ -214,7 +214,7 @@
+ 	i2c1: i2c at e6510000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,rmobile-iic";
++		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6510000 0 0x428>;
+ 		interrupts = <0 175 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+@@ -223,7 +223,7 @@
+ 	i2c2: i2c at e6520000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,rmobile-iic";
++		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6520000 0 0x428>;
+ 		interrupts = <0 176 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+@@ -232,7 +232,7 @@
+ 	i2c3: i2c at e6530000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,rmobile-iic";
++		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6530000 0 0x428>;
+ 		interrupts = <0 177 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+@@ -241,7 +241,7 @@
+ 	i2c4: i2c at e6540000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,rmobile-iic";
++		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6540000 0 0x428>;
+ 		interrupts = <0 178 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+@@ -250,7 +250,7 @@
+ 	i2c6: i2c at e6550000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,rmobile-iic";
++		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6550000 0 0x428>;
+ 		interrupts = <0 184 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+@@ -259,7 +259,7 @@
+ 	i2c7: i2c at e6560000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,rmobile-iic";
++		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6560000 0 0x428>;
+ 		interrupts = <0 185 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+@@ -268,7 +268,7 @@
+ 	i2c8: i2c at e6570000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,rmobile-iic";
++		compatible = "renesas,iic-r8a73a4", "renesas,rmobile-iic";
+ 		reg = <0 0xe6570000 0 0x428>;
+ 		interrupts = <0 173 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
 -- 
 2.1.1
