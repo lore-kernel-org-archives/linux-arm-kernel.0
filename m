@@ -1,37 +1,86 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Thu, 13 Nov 2014 20:18:04 +0200
-Subject: N900 modem support in 3.18-rc1
-In-Reply-To: <20141113174534.GO26481@atomide.com>
-References: <20141104205117.GA17606@amd> <201411052137.31452@pali>
- <20141105203918.GA29199@amd> <201411052206.05379@pali>
- <20141105220359.GA32052@amd> <20141105234555.GA7097@earth.universe>
- <20141106124711.GA26944@amd>
- <20141106180335.GA21513@earth.universe>
- <20141113162155.GA8512@xo-6d-61-c0.localdomain>
- <20141113174534.GO26481@atomide.com>
-Message-ID: <20141113181803.GB984@fuloong-minipc.musicnaut.iki.fi>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Thu, 13 Nov 2014 18:19:23 +0000
+Subject: [PATCH] dmaengine: pl330: Fix linker error "undefined reference
+ to `__aeabi_uldivmod'"
+In-Reply-To: <1415898172.4223.1.camel@perches.com>
+References: <1415896047.1787.4.camel@linaro.org>
+ <1415898172.4223.1.camel@perches.com>
+Message-ID: <1415902763.1787.8.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Nov 13, 2014 at 09:45:36AM -0800, Tony Lindgren wrote:
-> * Pavel Machek <pavel@ucw.cz> [141113 08:23]:
-> > OTOH ofono seems pretty reasonable. So I played a bit, and result
-> > is python/pygtk gui which can receive an sms, initiate a call, and
-> > report missed call. If someone wants to play, source is at
+On Thu, 2014-11-13 at 09:02 -0800, Joe Perches wrote:
+> On Thu, 2014-11-13 at 16:27 +0000, Jon Medhurst (Tixy) wrote:
+> > 32-bit ARM kernels may have a 64-bit dma_addr_t but have no
+> > implementation of the compiler helper for 64-bit unsigned division,
+> > therefore the use of the modulo operator in pl330_prep_dma_memcpy causes
+> > the link error "undefined reference to `__aeabi_uldivmod'"
 > > 
-> > https://gitorious.org/tui/tui/source/b6141107e9341a1412720aed4b0d09143dfa2f4e:ofone
+> > As the burst value is always a power of two we can fix the problem, and
+> > make the code more efficient, by replacing "% burst" with "& (burst-1)".
+> > 
+> > Reported-by: kbuild test robot <fengguang.wu@intel.com>
+> > Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> > ---
+> > 
+> > Vinod. I haven't added a 'Fixes:' line because I was unsure if the patch
+> > in linux-next is part of a stable branch or if the SHA1 might change
+> > before hitting mainline. If it stable then the line should be...
+> > 
+> > Fixes: 63369d0a96dc ("dmaengine: pl330: Align DMA memcpy operations to MFIFO width")
+> > 
+> > 
+> >  drivers/dma/pl330.c | 5 +----
+> >  1 file changed, 1 insertion(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> > index 38c9617..52c4c62 100644
+> > --- a/drivers/dma/pl330.c
+> > +++ b/drivers/dma/pl330.c
+> > @@ -2464,11 +2464,8 @@ pl330_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dst,
+> >  	 * parameters because our DMA programming algorithm doesn't cope with
+> >  	 * transfers which straddle an entry in the DMA device's MFIFO.
+> >  	 */
+> > -	while (burst > 1) {
+> > -		if (!((src | dst | len) % burst))
+> > -			break;
+> > +	while ((src | dst | len) & (burst - 1))
+> >  		burst /= 2;
+> > -	}
 > 
-> Pavel, care to fill in the the following type patch with some
-> instructions in the description now that you got it working?
+> Maybe something like:
+> 
+> 	div = ffs(src | dst | len);
+> 	if (burst > 1 && div)
+> 		burst >>= div;
 
-Could we even have some "permanent" instructions under Documentation/?
+That doesn't work, the code is trying to limit burst to make it a factor
+of src, dst and len, so it would need to be something like
 
-> I did not have luck yet when I tried. I got the /dev/cmt/*
-> entries after adding pm=1 param, but no luck scanning any networks.
+	div = ffs(src | dst | len);
+	if (div)
+ 		burst = min(burst, 1 << div);
 
-I haven't tested anything yet, but looking forward to do that during
-the weekend... Sounds pretty exciting. :-)
+There are many ways to code the limiting of the burst width, but as it
+starts out as the data bus width the DMA can handle (maximum 16 bytes)
+then@most we'll be going round the existing while loop 4 times so I
+don't think it's that much overhead, and probably less code size than
+using ffs.
 
-A.
+And as the driver has been broken for the unaligned memcpy case since
+the day it was added then I can't see that anyone is actually using it
+that way anyway, so all existing users (if any) must already be doing
+bus aligned copies and the current while loop will iterate zero times.
+
+That's probably enough bikeshedding from me :-)
+ 
+> ?
+> 
+> dunno if dma_addr_t src or dst can ever be a 64 bit value
+> for AMBA or not.
+
+The pl330 TRM I have and the current Linux driver explicitly have 32-bit
+addresses, so you would need an IOMMU to access addresses above 4GB.
+
+-- 
+Tixy
