@@ -1,77 +1,85 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 13 Nov 2014 12:32:18 +0100
-Subject: [PATCH] can: Fix bug in suspend/resume
-In-Reply-To: <9455da2b86c74d5aafe9bf118edec7bb@BN1AFFO11FD045.protection.gbl>
-References: <a44efc1fb0144cca9d0c4851cc51db25@BL2FFO11FD024.protection.gbl>
- <546484D9.4030005@pengutronix.de> <54648BF4.60007@pengutronix.de>
- <9455da2b86c74d5aafe9bf118edec7bb@BN1AFFO11FD045.protection.gbl>
-Message-ID: <20141113123218.79850236@ipc1.ka-ro>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 13 Nov 2014 11:37:08 +0000
+Subject: [RFC PATCH 1/4] ARM: KVM: on unhandled IO mem abort, route the
+ call to the KVM MMIO bus
+In-Reply-To: <20141113112012.GO19598@cbox>
+References: <1394726249-1547-1-git-send-email-a.motakis@virtualopensystems.com>
+ <1394726249-1547-2-git-send-email-a.motakis@virtualopensystems.com>
+ <20140328190913.GJ25519@cbox>
+ <CADDJ2=Opx2d5ex0hWSXYJjs6uLifR9wZVsahUHzZ7zytSj7ZSg@mail.gmail.com>
+ <20141110162736.GA16054@cbox>
+ <CADDJ2=PTM0fJ0RFfWdVQ1-471xqaJmj0vP1f5-pf57xOV5jgig@mail.gmail.com>
+ <20141113112012.GO19598@cbox>
+Message-ID: <546497E4.8040100@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+[fixing Andre's email address]
 
-Appana Durga Kedareswara Rao wrote:
-> Hi Marc,
+On 13/11/14 11:20, Christoffer Dall wrote:
+> On Thu, Nov 13, 2014 at 12:45:42PM +0200, Nikolay Nikolaev wrote:
 > 
-> -----Original Message-----
-> From: Marc Kleine-Budde [mailto:mkl at pengutronix.de]
-> Sent: Thursday, November 13, 2014 4:16 PM
-> To: Appana Durga Kedareswara Rao; wg at grandegger.com; Michal Simek; Soren Brinkmann; grant.likely at linaro.org; robh+dt at kernel.org
-> Cc: linux-can at vger.kernel.org; netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Appana Durga Kedareswara Rao
-> Subject: Re: [PATCH] can: Fix bug in suspend/resume
+> [...]
 > 
-> On 11/13/2014 11:15 AM, Marc Kleine-Budde wrote:
-> > On 11/13/2014 07:58 AM, Kedareswara rao Appana wrote:
-> >> When accessing the priv structure use container_of instead of dev_get_drvdata.
-> >
-> > Why?
+>>>>
+>>>> Going through the vgic_handle_mmio we see that it will require large
+>>>> refactoring:
+>>>>  - there are 15 MMIO ranges for the vgic now - each should be
+>>>> registered as a separate device
+>>>>  - the handler of each range should be split into read and write
+>>>>  - all handlers take 'struct kvm_exit_mmio', and pass it to
+>>>> 'vgic_reg_access', 'mmio_data_read' and 'mmio_data_read'
+>>>>
+>>>> To sum up - if we do this refactoring of vgic's MMIO handling +
+>>>> kvm_io_bus_ API getting 'vcpu" argument we'll get a 'much' cleaner
+>>>> vgic code and as a bonus we'll get 'ioeventfd' capabilities.
+>>>>
+>>>> We have 3 questions:
+>>>>  - is the kvm_io_bus_ getting 'vcpu' argument acceptable for the other
+>>>> architectures too?
+>>>>  - is this huge vgic MMIO handling redesign acceptable/desired (it
+>>>> touches a lot of code)?
+>>>>  - is there a way that ioeventfd is accepted leaving vgic.c in it's
+>>>> current state?
+>>>>
+>>> Not sure how the latter question is relevant to this, but check with
+>>> Andre who recently looked at this as well and decided that for GICv3 the
+>>> only sane thing was to remove that comment for the gic.
+>> @Andre - what's your experience with the GICv3 and MMIO handling,
+>> anything specific?
+>>>
+>>> I don't recall the details of what you were trying to accomplish here
+>>> (it's been 8 months or so) but the surely the vgic handling code should
+>>> *somehow* be integrated into the handle_kernel_mmio (like Paolo
+>>> suggested), unless you come back and tell me that that would involve a
+>>> complete rewrite of the vgic code.
+>> I'm experimenting now - it's not exactly rewrite of whole vgic code,
+>> but it will touch a lot of it  - all MMIO access handlers and the
+>> supporting functions.
+>> We're ready to spend the effort. My question is  - is this acceptable?
+>>
+> I certainly appreciate the offer to do this work, but it's hard to say
+> at this point if it is worth it.
 > 
-> The drvdata here is the struct net_device, not the platform device.
-> Please state this in the commit message.
+> What I was trying to say above is that Andre looked at this, and came to
+> the conclusion that it is not worth it.
 > 
-> If I understand the code correct, you can make use of the existing helper function to_platform_device():
-> 
-> http://lxr.free-electrons.com/source/include/linux/platform_device.h#L42
-> 
-> Thanks for the suggestion.
->  Will use this macro(to_platform_device)  .
-> 
-> >
-> >> Enable the clocks in the suspend before accessing the registers of the CAN.
-> >>
-> >> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> >> ---
-> >>  drivers/net/can/xilinx_can.c |   20 ++++++++++++++++++--
-> >>  1 files changed, 18 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/drivers/net/can/xilinx_can.c
-> >> b/drivers/net/can/xilinx_can.c index 5e8b560..63ef645 100644
-> >> --- a/drivers/net/can/xilinx_can.c
-> >> +++ b/drivers/net/can/xilinx_can.c
-> >> @@ -972,15 +972,30 @@ static const struct net_device_ops xcan_netdev_ops = {
-> >>   */
-> >>  static int __maybe_unused xcan_suspend(struct device *dev)  {
-> >> -    struct platform_device *pdev = dev_get_drvdata(dev);
-> >> +    struct platform_device *pdev = container_of(dev,
-> >> +                    struct platform_device, dev);
-> >>      struct net_device *ndev = platform_get_drvdata(pdev);
-> >>      struct xcan_priv *priv = netdev_priv(ndev);
->
-Why not simply:
-	struct net_device *ndev = dev_get_drvdata(dev);
+> Marc, what are your thoughts?
 
-There is no need for a struct platform_device* at all.
+Same here, I rely on Andre's view that it was not very useful. Now, it
+would be good to see a mock-up of the patches and find out:
 
+- if it is a major improvement for the general quality of the code
+- if that allow us to *delete* a lot of code (if it is just churn, I'm
+not really interested)
+- if it helps or hinders further developments that are currently in the
+pipeline
 
-Lothar Wa?mann
+Andre, can you please share your findings? I don't remember the
+specifics of the discussion we had a few months ago...
+
+Thanks,
+
+	M.
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Jazz is not dead. It just smells funny...
