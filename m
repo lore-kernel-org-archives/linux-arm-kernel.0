@@ -1,48 +1,97 @@
-From: krishna.md@samsung.com (Krishna Mohan Dani)
-Date: Thu, 13 Nov 2014 17:44:24 +0530
-Subject: [PATCH 4/4 V3] ASoC: rt5631: Adding Device Tree compatibility to
- Realtek's ALC5631/RT5631 codec driver
-In-Reply-To: <1415880864-2246-1-git-send-email-krishna.md@samsung.com>
-References: <1415880864-2246-1-git-send-email-krishna.md@samsung.com>
-Message-ID: <1415880864-2246-5-git-send-email-krishna.md@samsung.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Thu, 13 Nov 2014 17:53:17 +0530
+Subject: [PATCH 0/4] Touchscreen performance related fixes
+In-Reply-To: <CAJKbBDDyShaJkzzfdFs07EK5gDUfwqWiv39Qi4FVSvRrfc6_fA@mail.gmail.com>
+References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>	<20141103180920.GA20779@localhost.localdomain>	<545B2651.4090905@ti.com>
+ <CAJKbBDDyShaJkzzfdFs07EK5gDUfwqWiv39Qi4FVSvRrfc6_fA@mail.gmail.com>
+Message-ID: <5464A2B5.3020207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Krishna Mohan Dani <krishna.md@samsung.com>
----
- sound/soc/codecs/rt5631.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
+Hi,
 
-diff --git a/sound/soc/codecs/rt5631.c b/sound/soc/codecs/rt5631.c
-index 1ba27db..3b7d5e4 100644
---- a/sound/soc/codecs/rt5631.c
-+++ b/sound/soc/codecs/rt5631.c
-@@ -1686,10 +1686,18 @@ static struct snd_soc_codec_driver soc_codec_dev_rt5631 = {
- 
- static const struct i2c_device_id rt5631_i2c_id[] = {
- 	{ "rt5631", 0 },
-+	{ "alc5631", 0 },
- 	{ }
- };
- MODULE_DEVICE_TABLE(i2c, rt5631_i2c_id);
- 
-+static struct of_device_id rt5631_i2c_dt_ids[] = {
-+	{ .compatible = "realtek,rt5631"},
-+	{ .compatible = "realtek,alc5631"},
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, rt5631_i2c_dt_ids);
-+
- static const struct regmap_config rt5631_regmap_config = {
- 	.reg_bits = 8,
- 	.val_bits = 16,
-@@ -1734,6 +1742,7 @@ static struct i2c_driver rt5631_i2c_driver = {
- 	.driver = {
- 		.name = "rt5631",
- 		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(rt5631_i2c_dt_ids),
- 	},
- 	.probe = rt5631_i2c_probe,
- 	.remove   = rt5631_i2c_remove,
--- 
-1.7.9.5
+On Wednesday 12 November 2014 06:30 PM, Johannes Pointner wrote:
+> Hello Vignesh,
+> 
+> I tried your patch version 3 on a customized board and had some
+> behavior I couldn't explain.
+> If I only use the touchscreen it works fine but if I also read values
+> from the ADCs then I get a lot of pen_up events even if I am still
+> touching the screen.
+> For the test I read via
+> # cat /sys/bus/iio/devices/iio\:device0/in_voltage5_raw
+> values from the ADC in an busy loop as you explained in an email
+> before. Did you also experience such behavior or do you know what
+> causes it?
+
+Thanks for testing. I was able to fix this issue. Will post version 4
+shortly.
+
+Regards
+Vignesh
+
+> 
+> Without the patches the touchscreen works fine during the iio test.
+> 
+> Thanks,
+> Hannes
+> 
+> 2014-11-06 8:42 GMT+01:00 Vignesh R <vigneshr@ti.com>:
+>>
+>>
+>> On Monday 03 November 2014 11:39 PM, Richard Cochran wrote:
+>>> On Mon, Oct 27, 2014 at 04:38:27PM +0530, Vignesh R wrote:
+>>>> This series of patches fix TSC defects related to lag in touchscreen
+>>>> performance and cursor jump at touch release. The lag was result of
+>>>> udelay in TSC interrupt handler. Cursor jump due to false pen-up event.
+>>>> The patches implement Advisory 1.0.31 in silicon errata of am335x-evm
+>>>> to avoid false pen-up events and remove udelay.
+>>>
+>>> That advisory has two workarounds. You have chosen the second one?
+>>
+>> Work around one. Hence 5 wire design is not broken.
+>>
+>>>
+>>> The text of the second workaround says it only works on 4 wire setups,
+>>> so I wonder how 5 wire designs will be affected.
+>>>
+>>>> The advisory says to use
+>>>> steps 1 to 4 for ADC and 5 to 16 for TSC (assuming 4 wire TSC and 4 channel
+>>>> ADC).
+>>>
+>>> No, it doesn't say that. (sprz360f.pdf)
+>>
+>> The pen up event detection happens immediately after charge step. Hence,
+>> interchanging ADC and TSC steps makes sure that sampling of touch
+>> co-ordinates and pen events are done one after the other. This
+>> workaround was suggested by internal hardware folks. Earlier ADC steps
+>> intervened between sampling of co-ordinates and pen event detection
+>> which is not desirable.
+>>
+>>>
+>>>> Further the X co-ordinate must be the last one to be sampled just
+>>>> before charge step. The first two patches implement the required changes.
+>>>
+>>> FWIW, I implemented the first workaround and removed the udelay not
+>>> too long ago. Like Sebastian, I saw the TSC unit hang after about
+>>> 50000 interrupts when running with the workaround.
+>>>
+>>> Did you test you patch for very long?
+>>
+>> Yes, I tested for about 200000 interrupts and I didn't see any hang.
+>> This patch series does not just implement workaround but also does some
+>> minor changes, such as interchanging ADC and TSC steps etc, which makes
+>> TSC driver more robust. Let me know if you encounter any issues with my
+>> patch series.
+>>
+>> Regards
+>> Vignesh
+>>
+>>>
+>>> Thanks,
+>>> Richard
+>>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
