@@ -1,48 +1,76 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 13 Nov 2014 11:24:16 +0100
-Subject: [PATCH] ahci_sunxi: Drop AHCI_HFLAG_NO_PMP flag
-Message-ID: <1415874256-6580-1-git-send-email-hdegoede@redhat.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Thu, 13 Nov 2014 10:24:41 +0000
+Subject: [linux-sunxi] [PATCH 2/4] simplefb: Add support for enumerating
+ simplefb dt nodes in /chosen
+In-Reply-To: <CAGRGNgW_Q6oghpe5Mw-8aYPVVj1YZ6R3iaqOQzCE9dSD1nYSyA@mail.gmail.com>
+References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
+ <1415830124-28787-2-git-send-email-hdegoede@redhat.com>
+ <CAGRGNgW_Q6oghpe5Mw-8aYPVVj1YZ6R3iaqOQzCE9dSD1nYSyA@mail.gmail.com>
+Message-ID: <CACxGe6uegSdZFhqx8J0MEPr4PPTw9pDMqH45cBka5qk4mkHW6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is something which we inherited from the Allwinner android kernel sources,
-and I've always wanted to test if this is really necessary.
+On Wed, Nov 12, 2014 at 11:39 PM, Julian Calaby <julian.calaby@gmail.com> wrote:
+> Hi Hans,
+>
+> On Thu, Nov 13, 2014 at 9:08 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Update simplefb to support the new preferred location for simplefb dt nodes
+>> under /chosen.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>  drivers/video/fbdev/simplefb.c | 33 ++++++++++++++++++++++++++++++++-
+>>  1 file changed, 32 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
+>> index cd96edd..be7d288 100644
+>> --- a/drivers/video/fbdev/simplefb.c
+>> +++ b/drivers/video/fbdev/simplefb.c
+>> @@ -27,6 +27,7 @@
+>>  #include <linux/platform_data/simplefb.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/clk-provider.h>
+>> +#include <linux/of_platform.h>
+>>
+>>  static struct fb_fix_screeninfo simplefb_fix = {
+>>         .id             = "simple",
+>> @@ -385,7 +386,37 @@ static struct platform_driver simplefb_driver = {
+>>         .probe = simplefb_probe,
+>>         .remove = simplefb_remove,
+>>  };
+>> -module_platform_driver(simplefb_driver);
+>> +
+>> +static int __init simplefb_init(void)
+>> +{
+>> +       int i, ret;
+>> +       char name[16];
+>> +       struct device_node *np;
+>> +
+>> +       ret = platform_driver_register(&simplefb_driver);
+>> +       if (ret)
+>> +               return ret;
+>> +
+>> +       for (i = 0; ; i++) {
+>> +               snprintf(name, sizeof(name), "framebuffer%d", i);
+>
+> This smells like an infinite loop: we can be pretty sure that no
+> hardware will ever exist with more than 9999 (I think?) framebuffers,
+> however if that ever happens this'll loop until it runs out of RAM.
+> Maybe add a suitably high limit to the for loop?
 
-So recently I've bought a sata port multiplexer, and I've given this a test
-spin on both A10 and A20 devices, and it seems to work fine:
+Unlikely, but the loop is wrong anyway. The loop should be:
 
-[    2.154456] ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
-[    2.161092] ata1.15: Port Multiplier 1.2, 0x197b:0x0325 r0, 5 ports, feat 0x5/0xf
-[    2.175511] ata1.00: hard resetting link
-[    2.524929] ata1.00: SATA link up 3.0 Gbps (SStatus 123 SControl 320)
-[    2.531430] ata1.01: hard resetting link
-[    2.974465] ata1.01: link resume succeeded after 1 retries
-[    3.094932] ata1.01: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
-[    3.101431] ata1.02: hard resetting link
-[    4.174466] ata1.02: failed to resume link (SControl 0)
-[    4.180065] ata1.02: SATA link down (SStatus 0 SControl 0)
-(and the same for links 3 and 4)
+for_each_child_of_node(of_chosen, child)
+        if (of_device_is_compatible(child, "simple-framebuffer");
+                of_platform_device_create(np, NULL, NULL);
 
-Once the NO_PMP flag is removed it correctly sees the 2 disks which I've
-attached, and I can mount and use them just fine, so lets drop the flag.
+Then make the probe hook choose an appropriate FB number. It looks
+like you structured the code the way you did to get the framebuffers
+to register in a particular order, and therefore implicitly get the
+right numbers, but that is a fragile way to go about it.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/ata/ahci_sunxi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Using /aliases really is the right way to get specific framebuffer
+numbers. We already use it for UARTs, so we should do the same here.
+Use of_alias_get_id(, "framebuffer") to get the framebuffer number.
 
-diff --git a/drivers/ata/ahci_sunxi.c b/drivers/ata/ahci_sunxi.c
-index e44d675..3dd0224 100644
---- a/drivers/ata/ahci_sunxi.c
-+++ b/drivers/ata/ahci_sunxi.c
-@@ -184,7 +184,7 @@ static int ahci_sunxi_probe(struct platform_device *pdev)
- 		goto disable_resources;
- 
- 	hpriv->flags = AHCI_HFLAG_32BIT_ONLY | AHCI_HFLAG_NO_MSI |
--		       AHCI_HFLAG_NO_PMP | AHCI_HFLAG_YES_NCQ;
-+		       AHCI_HFLAG_YES_NCQ;
- 
- 	rc = ahci_platform_init_host(pdev, hpriv, &ahci_sunxi_port_info);
- 	if (rc)
--- 
-2.1.0
+g.
