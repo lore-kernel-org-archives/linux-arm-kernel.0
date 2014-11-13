@@ -1,79 +1,96 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 13 Nov 2014 21:50:22 +0300
-Subject: [GIT PULL] Third Round of Renesas ARM Based Soc Updates for v3.19
-In-Reply-To: <cover.1415841454.git.horms+renesas@verge.net.au>
-References: <cover.1415841454.git.horms+renesas@verge.net.au>
-Message-ID: <5464FD6E.1090404@cogentembedded.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 14 Nov 2014 02:56:10 +0800
+Subject: [PATCH] of: pass name argument for of_io_request_and_map as const
+ char *
+In-Reply-To: <CABuKBe+vRJUk1fB2mwUzGnnVcS-3N9U2uwgW1ZFwKBOe5sWf0Q@mail.gmail.com>
+References: <1415816222-32200-1-git-send-email-wens@csie.org>
+ <CABuKBe+vRJUk1fB2mwUzGnnVcS-3N9U2uwgW1ZFwKBOe5sWf0Q@mail.gmail.com>
+Message-ID: <CAGb2v67MRg7C2_U_CWfGfcZWjn_1+k3tAwb=OU+Eo-0i8kBRnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, Nov 13, 2014 at 5:04 PM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
+> I already send a patch for that which got accepted by Grant [0].
+> Although right now, I'm not able to find it on his repository [1].
 
-On 11/13/2014 04:20 AM, Simon Horman wrote:
+Oh great! Please ignore this one then.
 
-> Hi Olof, Hi Kevin, Hi Arnd,
+ChenYu
 
-> Please consider these third round of Renesas ARM based soc updates for v3.19.
-
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-soc2-for-v3.19,
-> which I have already sent a pull-request for.
-
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-soc2-for-v3.19,
-> which I have already sent a pull-request for.
-
-    OK, but we've got it the first time. :-)
-
-> Please note that "ARM: shmobile: always build rcar setup for armv7"
-> corrects a build failure in allmodconfig caused by "ARM: shmobile:
-> rcar-gen2: Add CA7 arch_timer initialization for r8a7794" which
-> is included in the first round of Renesas ARM Based SoC Soc Updates for
-> v3.19, tagged as renesas-soc2-for-v3.19, which I have previously sent
-> a pull-request for.
-
-    This is a third time you're repeating that. :-)
-
-> To be clear, this pull request is based on renesas-soc2-for-v3.19 which
-> is in turn based on renesas-soc2-for-v3.19.
-
-    Based on itself? :-)
-
-> The following changes since commit 950a3f0e7dd32c372c9957d5c050b08de7ec9e56:
-
->    ARM: shmobile: Enable PCI domains for R-Car Gen2 devices (2014-11-05 14:50:17 +0900)
-
-> are available in the git repository at:
-
->    git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc3-for-v3.19
-
-> for you to fetch changes up to e3d163329753b3b473f40c9be71561ed8eb98aea:
-
->    ARM: shmobile: always build rcar setup for armv7 (2014-11-12 18:14:42 +0900)
-
-> ----------------------------------------------------------------
-> Third Round of Renesas ARM Based Soc Updates for v3.19
-
-> * Always build rcar setup for armv7
->    - Fixes allmodconfig build fauilre caused by
-
-    Failure.
-
->      "ARM: shmobile: always build rcar setup for armv7"
-
-    Caused by itself? :-)
-
-> * Add restart callback to sh73a0
-
-> ----------------------------------------------------------------
-> Arnd Bergmann (1):
->        ARM: shmobile: always build rcar setup for armv7
-
-> Geert Uytterhoeven (1):
->        ARM: shmobile: sh73a0: Add restart callback
-
->   arch/arm/mach-shmobile/Makefile       | 1 +
->   arch/arm/mach-shmobile/setup-sh73a0.c | 8 ++++++++
->   2 files changed, 9 insertions(+)
-
-WBR, Sergei
+> Cheers,
+> Matthias
+>
+> [0] https://lkml.org/lkml/2014/11/4/588
+> [1] https://git.kernel.org/cgit/linux/kernel/git/glikely/linux.git/
+>
+> 2014-11-12 19:17 GMT+01:00 Chen-Yu Tsai <wens@csie.org>:
+>> The name argument for of_io_request_and_map is only passed to
+>> request_mem_region, which is a macro of __request_region, which
+>> takes a const name argument.
+>>
+>> Make the name argument const, so when we pass const strings we
+>> don't get the following warnings:
+>>
+>>     warning: passing argument 3 of 'of_io_request_and_map' discards
+>>     'const' qualifier from pointer target type [enabled by default]
+>>
+>>     In file included from drivers/clk/sunxi/clk-sunxi.c:20:0:
+>>     include/linux/of_address.h:108:15: note: expected 'char *' but
+>>     argument is of type 'const char *'
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+>> ---
+>>
+>> I ran into this while switching some of the sunxi clock code to use
+>> of_io_request_and_map.
+>>
+>> ---
+>>  drivers/of/address.c       | 2 +-
+>>  include/linux/of_address.h | 4 ++--
+>>  2 files changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/of/address.c b/drivers/of/address.c
+>> index afdb782..e02828f 100644
+>> --- a/drivers/of/address.c
+>> +++ b/drivers/of/address.c
+>> @@ -871,7 +871,7 @@ EXPORT_SYMBOL(of_iomap);
+>>   *             return PTR_ERR(base);
+>>   */
+>>  void __iomem *of_io_request_and_map(struct device_node *np, int index,
+>> -                                       char *name)
+>> +                                       const char *name)
+>>  {
+>>         struct resource res;
+>>         void __iomem *mem;
+>> diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+>> index 8cb14eb..d88e81b 100644
+>> --- a/include/linux/of_address.h
+>> +++ b/include/linux/of_address.h
+>> @@ -106,7 +106,7 @@ extern int of_address_to_resource(struct device_node *dev, int index,
+>>                                   struct resource *r);
+>>  void __iomem *of_iomap(struct device_node *node, int index);
+>>  void __iomem *of_io_request_and_map(struct device_node *device,
+>> -                                       int index, char *name);
+>> +                                       int index, const char *name);
+>>  #else
+>>
+>>  #include <linux/io.h>
+>> @@ -123,7 +123,7 @@ static inline void __iomem *of_iomap(struct device_node *device, int index)
+>>  }
+>>
+>>  static inline void __iomem *of_io_request_and_map(struct device_node *device,
+>> -                                       int index, char *name)
+>> +                                       int index, const char *name)
+>>  {
+>>         return IOMEM_ERR_PTR(-EINVAL);
+>>  }
+>> --
+>> 2.1.3
+>>
+>
+>
+>
+> --
+> motzblog.wordpress.com
