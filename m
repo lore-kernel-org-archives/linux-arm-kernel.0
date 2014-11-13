@@ -1,144 +1,98 @@
-From: n.nikolaev@virtualopensystems.com (Nikolay Nikolaev)
-Date: Thu, 13 Nov 2014 12:45:42 +0200
-Subject: [RFC PATCH 1/4] ARM: KVM: on unhandled IO mem abort, route the
- call to the KVM MMIO bus
-In-Reply-To: <20141110162736.GA16054@cbox>
-References: <1394726249-1547-1-git-send-email-a.motakis@virtualopensystems.com>
- <1394726249-1547-2-git-send-email-a.motakis@virtualopensystems.com>
- <20140328190913.GJ25519@cbox>
- <CADDJ2=Opx2d5ex0hWSXYJjs6uLifR9wZVsahUHzZ7zytSj7ZSg@mail.gmail.com>
- <20141110162736.GA16054@cbox>
-Message-ID: <CADDJ2=PTM0fJ0RFfWdVQ1-471xqaJmj0vP1f5-pf57xOV5jgig@mail.gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 13 Nov 2014 11:46:12 +0100
+Subject: [PATCH] can: Fix bug in suspend/resume
+In-Reply-To: <546484D9.4030005@pengutronix.de>
+References: <a44efc1fb0144cca9d0c4851cc51db25@BL2FFO11FD024.protection.gbl>
+ <546484D9.4030005@pengutronix.de>
+Message-ID: <54648BF4.60007@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 10, 2014 at 6:27 PM, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> On Mon, Nov 10, 2014 at 05:09:07PM +0200, Nikolay Nikolaev wrote:
->> Hello,
->>
->> On Fri, Mar 28, 2014 at 9:09 PM, Christoffer Dall
->> <christoffer.dall@linaro.org> wrote:
->> >
->> > On Thu, Mar 13, 2014 at 04:57:26PM +0100, Antonios Motakis wrote:
->> > > On an unhandled IO memory abort, use the kvm_io_bus_* API in order to
->> > > handle the MMIO access through any registered read/write callbacks. This
->> > > is a dependency for eventfd support (ioeventfd and irqfd).
->> > >
->> > > However, accesses to the VGIC are still left implemented independently,
->> > > since the kvm_io_bus_* API doesn't pass the VCPU pointer doing the access.
->> > >
->> > > Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
->> > > Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
->> > > ---
->> > >  arch/arm/kvm/mmio.c | 32 ++++++++++++++++++++++++++++++++
->> > >  virt/kvm/arm/vgic.c |  5 ++++-
->> > >  2 files changed, 36 insertions(+), 1 deletion(-)
->> > >
->> > > diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
->> > > index 4cb5a93..1d17831 100644
->> > > --- a/arch/arm/kvm/mmio.c
->> > > +++ b/arch/arm/kvm/mmio.c
->> > > @@ -162,6 +162,35 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->> > >       return 0;
->> > >  }
->> > >
->> > > +/**
->> > > + * kvm_handle_mmio - handle an in-kernel MMIO access
->> > > + * @vcpu:    pointer to the vcpu performing the access
->> > > + * @run:     pointer to the kvm_run structure
->> > > + * @mmio:    pointer to the data describing the access
->> > > + *
->> > > + * returns true if the MMIO access has been performed in kernel space,
->> > > + * and false if it needs to be emulated in user space.
->> > > + */
->> > > +static bool handle_kernel_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
->> > > +             struct kvm_exit_mmio *mmio)
->> > > +{
->> > > +     int ret;
->> > > +     if (mmio->is_write) {
->> > > +             ret = kvm_io_bus_write(vcpu->kvm, KVM_MMIO_BUS, mmio->phys_addr,
->> > > +                             mmio->len, &mmio->data);
->> > > +
->> > > +     } else {
->> > > +             ret = kvm_io_bus_read(vcpu->kvm, KVM_MMIO_BUS, mmio->phys_addr,
->> > > +                             mmio->len, &mmio->data);
->> > > +     }
->> > > +     if (!ret) {
->> > > +             kvm_prepare_mmio(run, mmio);
->> > > +             kvm_handle_mmio_return(vcpu, run);
->> > > +     }
->> > > +
->> > > +     return !ret;
->> > > +}
->> > > +
->> > >  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->> > >                phys_addr_t fault_ipa)
->> > >  {
->> > > @@ -200,6 +229,9 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->> > >       if (vgic_handle_mmio(vcpu, run, &mmio))
->> > >               return 1;
->> > >
->> > > +     if (handle_kernel_mmio(vcpu, run, &mmio))
->> > > +             return 1;
->> > > +
->>
->>
->> We're reconsidering ioeventfds patchseries and we tried to evaluate
->> what you suggested here.
->>
->> >
->> > this special-casing of the vgic is now really terrible.  Is there
->> > anything holding you back from doing the necessary restructure of the
->> > kvm_bus_io_*() API instead?
->>
->> Restructuring the kvm_io_bus_ API is not a big thing (we actually did
->> it), but is not directly related to the these patches.
->> Of course it can be justified if we do it in the context of removing
->> vgic_handle_mmio and leaving only handle_kernel_mmio.
->>
->> >
->> > That would allow us to get rid of the ugly
->> > Fix it! in the vgic driver as well.
->>
->> Going through the vgic_handle_mmio we see that it will require large
->> refactoring:
->>  - there are 15 MMIO ranges for the vgic now - each should be
->> registered as a separate device
->>  - the handler of each range should be split into read and write
->>  - all handlers take 'struct kvm_exit_mmio', and pass it to
->> 'vgic_reg_access', 'mmio_data_read' and 'mmio_data_read'
->>
->> To sum up - if we do this refactoring of vgic's MMIO handling +
->> kvm_io_bus_ API getting 'vcpu" argument we'll get a 'much' cleaner
->> vgic code and as a bonus we'll get 'ioeventfd' capabilities.
->>
->> We have 3 questions:
->>  - is the kvm_io_bus_ getting 'vcpu' argument acceptable for the other
->> architectures too?
->>  - is this huge vgic MMIO handling redesign acceptable/desired (it
->> touches a lot of code)?
->>  - is there a way that ioeventfd is accepted leaving vgic.c in it's
->> current state?
->>
-> Not sure how the latter question is relevant to this, but check with
-> Andre who recently looked at this as well and decided that for GICv3 the
-> only sane thing was to remove that comment for the gic.
-@Andre - what's your experience with the GICv3 and MMIO handling,
-anything specific?
->
-> I don't recall the details of what you were trying to accomplish here
-> (it's been 8 months or so) but the surely the vgic handling code should
-> *somehow* be integrated into the handle_kernel_mmio (like Paolo
-> suggested), unless you come back and tell me that that would involve a
-> complete rewrite of the vgic code.
-I'm experimenting now - it's not exactly rewrite of whole vgic code,
-but it will touch a lot of it  - all MMIO access handlers and the
-supporting functions.
-We're ready to spend the effort. My question is  - is this acceptable?
+On 11/13/2014 11:15 AM, Marc Kleine-Budde wrote:
+> On 11/13/2014 07:58 AM, Kedareswara rao Appana wrote:
+>> When accessing the priv structure use container_of instead of dev_get_drvdata.
+> 
+> Why?
 
-regards,
-Nikolay Nikolaev
-Virtual Open Systems
->
-> -Christoffer
+The drvdata here is the struct net_device, not the platform device.
+Please state this in the commit message.
+
+If I understand the code correct, you can make use of the existing
+helper function to_platform_device():
+
+http://lxr.free-electrons.com/source/include/linux/platform_device.h#L42
+
+> 
+>> Enable the clocks in the suspend before accessing the registers of the CAN.
+>>
+>> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+>> ---
+>>  drivers/net/can/xilinx_can.c |   20 ++++++++++++++++++--
+>>  1 files changed, 18 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
+>> index 5e8b560..63ef645 100644
+>> --- a/drivers/net/can/xilinx_can.c
+>> +++ b/drivers/net/can/xilinx_can.c
+>> @@ -972,15 +972,30 @@ static const struct net_device_ops xcan_netdev_ops = {
+>>   */
+>>  static int __maybe_unused xcan_suspend(struct device *dev)
+>>  {
+>> -	struct platform_device *pdev = dev_get_drvdata(dev);
+>> +	struct platform_device *pdev = container_of(dev,
+>> +			struct platform_device, dev);
+>>  	struct net_device *ndev = platform_get_drvdata(pdev);
+>>  	struct xcan_priv *priv = netdev_priv(ndev);
+>> +	int ret;
+>>  
+>>  	if (netif_running(ndev)) {
+>>  		netif_stop_queue(ndev);
+>>  		netif_device_detach(ndev);
+>>  	}
+>>  
+>> +	ret = clk_prepare_enable(priv->can_clk);
+>> +	if (ret) {
+>> +		dev_err(dev, "unable to enable device clock\n");
+>> +		return ret;
+>> +	}
+>> +
+>> +	ret = clk_prepare_enable(priv->bus_clk);
+>> +	if (ret) {
+>> +		dev_err(dev, "unable to enable bus clock\n");
+>> +		clk_disable_unprepare(priv->can_clk);
+>> +		return ret;
+>> +	}
+> 
+> Now you have clock imbalance. Per suspend/resume cycle the clocks are
+> enabled twice, but disabled only once.
+> 
+>> +
+>>  	priv->write_reg(priv, XCAN_MSR_OFFSET, XCAN_MSR_SLEEP_MASK);
+>>  	priv->can.state = CAN_STATE_SLEEPING;
+>>  
+>> @@ -999,7 +1014,8 @@ static int __maybe_unused xcan_suspend(struct device *dev)
+>>   */
+>>  static int __maybe_unused xcan_resume(struct device *dev)
+>>  {
+>> -	struct platform_device *pdev = dev_get_drvdata(dev);
+>> +	struct platform_device *pdev = container_of(dev,
+>> +			struct platform_device, dev);
+>>  	struct net_device *ndev = platform_get_drvdata(pdev);
+>>  	struct xcan_priv *priv = netdev_priv(ndev);
+>>  	int ret;
+
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/fb52e0ee/attachment.sig>
