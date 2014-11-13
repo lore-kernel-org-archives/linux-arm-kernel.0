@@ -1,9 +1,7 @@
 From: ssantosh@kernel.org (Santosh Shilimkar)
-Date: Wed, 12 Nov 2014 17:59:42 -0800
-Subject: [GIT PULL 3/3] ARM: Keystone dts updates for 3.19
-In-Reply-To: <1415843982-5739-1-git-send-email-ssantosh@kernel.org>
-References: <1415843982-5739-1-git-send-email-ssantosh@kernel.org>
-Message-ID: <1415843982-5739-3-git-send-email-ssantosh@kernel.org>
+Date: Wed, 12 Nov 2014 17:59:40 -0800
+Subject: [GIT PULL 1/3] soc: few non crtical fixes for 3.19
+Message-ID: <1415843982-5739-1-git-send-email-ssantosh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,29 +11,26 @@ The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-driver-soc
 
-for you to fetch changes up to fc89a576006794f06f7b2919131f6e3e07af5b92:
+for you to fetch changes up to 148bb0439adeeae466dca31dd4c643e194bee023:
 
-  ARM: dts: keystone-k2e: add DT bindings for PCI controller for port 1 (2014-11-04 10:27:21 -0800)
-
-----------------------------------------------------------------
-Keystone dts updates for 3.19
-
-	- PCIE controller related updates
-	- 1GBe phy related upates
+  soc: ti: knav_qmss_queue: Use list_for_each_entry_safe to prevent use after free (2014-11-03 10:22:06 -0800)
 
 ----------------------------------------------------------------
-Grygorii Strashko (2):
-      ARM: dts: k2e-evm: add 1g ethernet phys nodes
-      ARM: dts: k2l-evm: add 1g ethernet phys nodes
+Keystone SOC Navigator driver non critical fixes frm Alex for 3.19
 
-Murali Karicheri (2):
-      ARM: dts: keystone: add DT bindings for PCI controller for port 0
-      ARM: dts: keystone-k2e: add DT bindings for PCI controller for port 1
+	- Use list_for_each_entry_safe to prevent use after free
+	- Return proper error if devm_kzalloc fails
+	- Use list_first_entry_or_null() at appropriate places
 
- arch/arm/boot/dts/k2e-evm.dts   | 12 +++++++++++
- arch/arm/boot/dts/k2e.dtsi      | 45 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/k2l-evm.dts   | 12 +++++++++++
- arch/arm/boot/dts/keystone.dtsi | 45 +++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 114 insertions(+)
+----------------------------------------------------------------
+Axel Lin (4):
+      soc: ti: Use list_first_entry_or_null() at appropriate places
+      soc: ti: knav_qmss_queue: Fix unbalanced locking ins knav_pool_create()
+      soc: ti: knav_qmss_queue: Return proper error if devm_kzalloc fails
+      soc: ti: knav_qmss_queue: Use list_for_each_entry_safe to prevent use after free
+
+ drivers/soc/ti/knav_qmss.h       |  8 ++++----
+ drivers/soc/ti/knav_qmss_queue.c | 13 +++++++------
+ 2 files changed, 11 insertions(+), 10 deletions(-)
