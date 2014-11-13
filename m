@@ -1,36 +1,39 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Nov 2014 10:20:04 +0900
-Subject: [PATCH 1/2] ARM: shmobile: r8a7790: Fix SD3CKCR address to device tree
+Date: Thu, 13 Nov 2014 10:20:05 +0900
+Subject: [PATCH 2/2] ARM: shmobile: r8a7740 dtsi: Correct IIC0 parent clock
 In-Reply-To: <cover.1415756961.git.horms+renesas@verge.net.au>
 References: <cover.1415756961.git.horms+renesas@verge.net.au>
-Message-ID: <edd7b938637701567a54306adb27cfb4345fedc5.1415756961.git.horms+renesas@verge.net.au>
+Message-ID: <b89ff7c3c2dee189489a5f45eb8d72e106179299.1415756961.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+According to the datasheet, the operating clock for IIC0 is the HPP
+(RT Peri) clock, not the SUB (Peri) clock. Both clocks run at the same
+speed (50 Mhz).
+
+This is consistent with IIC0 being located in the A4R PM domain, and
+IIC1 in the A3SP PM domain.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7740.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index d0e1773..e20affe 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -666,9 +666,9 @@
- 			#clock-cells = <0>;
- 			clock-output-names = "sd2";
- 		};
--		sd3_clk: sd3_clk at e615007c {
-+		sd3_clk: sd3_clk at e615026c {
- 			compatible = "renesas,r8a7790-div6-clock", "renesas,cpg-div6-clock";
--			reg = <0 0xe615007c 0 4>;
-+			reg = <0 0xe615026c 0 4>;
- 			clocks = <&pll1_div2_clk>;
- 			#clock-cells = <0>;
- 			clock-output-names = "sd3";
+diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+index d46c213..eed697a 100644
+--- a/arch/arm/boot/dts/r8a7740.dtsi
++++ b/arch/arm/boot/dts/r8a7740.dtsi
+@@ -433,7 +433,7 @@
+ 			clocks = <&cpg_clocks R8A7740_CLK_S>,
+ 				 <&cpg_clocks R8A7740_CLK_S>, <&sub_clk>,
+ 				 <&cpg_clocks R8A7740_CLK_B>,
+-				 <&sub_clk>, <&sub_clk>,
++				 <&cpg_clocks R8A7740_CLK_HPP>, <&sub_clk>,
+ 				 <&cpg_clocks R8A7740_CLK_B>;
+ 			#clock-cells = <1>;
+ 			renesas,clock-indices = <
 -- 
 2.1.1
