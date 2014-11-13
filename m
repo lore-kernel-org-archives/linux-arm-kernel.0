@@ -1,40 +1,39 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 13 Nov 2014 15:27:05 -0700
-Subject: [PATCH 0/3] miscellaneous fixes in coresight
-In-Reply-To: <20141113191704.GA28033@kroah.com>
-References: <1415868169-13325-1-git-send-email-pankaj.dubey@samsung.com>
- <CANLsYkyPnVJ75-TYYionMtd2KJzs29UK9LD3Fj4vk=Apvfh0Gw@mail.gmail.com>
- <20141113191704.GA28033@kroah.com>
-Message-ID: <CANLsYkw5vi5cFpyPkSS6Ypn8M=gznqb20TOc6HzM=yTGEDakrQ@mail.gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Thu, 13 Nov 2014 17:29:52 -0500
+Subject: [PATCH] ahci_sunxi: Drop AHCI_HFLAG_NO_PMP flag
+In-Reply-To: <1415874256-6580-1-git-send-email-hdegoede@redhat.com>
+References: <1415874256-6580-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20141113222952.GI2598@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I took them in my tree and I'll send you a pull request.
+On Thu, Nov 13, 2014 at 11:24:16AM +0100, Hans de Goede wrote:
+> This is something which we inherited from the Allwinner android kernel sources,
+> and I've always wanted to test if this is really necessary.
+> 
+> So recently I've bought a sata port multiplexer, and I've given this a test
+> spin on both A10 and A20 devices, and it seems to work fine:
+> 
+> [    2.154456] ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
+> [    2.161092] ata1.15: Port Multiplier 1.2, 0x197b:0x0325 r0, 5 ports, feat 0x5/0xf
+> [    2.175511] ata1.00: hard resetting link
+> [    2.524929] ata1.00: SATA link up 3.0 Gbps (SStatus 123 SControl 320)
+> [    2.531430] ata1.01: hard resetting link
+> [    2.974465] ata1.01: link resume succeeded after 1 retries
+> [    3.094932] ata1.01: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
+> [    3.101431] ata1.02: hard resetting link
+> [    4.174466] ata1.02: failed to resume link (SControl 0)
+> [    4.180065] ata1.02: SATA link down (SStatus 0 SControl 0)
+> (and the same for links 3 and 4)
+> 
+> Once the NO_PMP flag is removed it correctly sees the 2 disks which I've
+> attached, and I can mount and use them just fine, so lets drop the flag.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-On 13 November 2014 12:17, Greg KH <gregkh@linuxfoundation.org> wrote:
-> On Thu, Nov 13, 2014 at 11:12:40AM -0700, Mathieu Poirier wrote:
->> On 13 November 2014 01:42, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
->> > This patch series fixes some typo and minor issues in coresight which
->> > I observed while going through this driver.
->> >
->> > Pankaj Dubey (3):
->> >   coresight: fix typo in comment in coresight-priv.h
->> >   coresight: fixed comments in coresight.h
->> >   coresight-replicator: remove .owner field for driver
->> >
->> >  drivers/coresight/coresight-priv.h       |    2 +-
->> >  drivers/coresight/coresight-replicator.c |    1 -
->> >  include/linux/coresight.h                |    6 +++---
->> >  3 files changed, 4 insertions(+), 5 deletions(-)
->> >
->> > --
->> > 1.7.9.5
->> >
->>
->> Applied all 3 patches - thanks
->
-> Applied to what?  Shouldn't I be taking these?
->
-> confused,
->
-> greg k-h
+Applied to libata/for-3.18-fixes.
+
+Thanks.
+
+-- 
+tejun
