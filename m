@@ -1,50 +1,46 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 13 Nov 2014 17:21:55 +0100
-Subject: N900 modem support in 3.18-rc1
-In-Reply-To: <20141106180335.GA21513@earth.universe>
-References: <20141104205117.GA17606@amd> <201411052137.31452@pali>
- <20141105203918.GA29199@amd> <201411052206.05379@pali>
- <20141105220359.GA32052@amd> <20141105234555.GA7097@earth.universe>
- <20141106124711.GA26944@amd>
- <20141106180335.GA21513@earth.universe>
-Message-ID: <20141113162155.GA8512@xo-6d-61-c0.localdomain>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 13 Nov 2014 18:22:42 +0200
+Subject: [PATCH v5 0/5] simplefb: add clock handling code
+In-Reply-To: <CACxGe6ssdeOnQnem1012h_jFK1wWOD_WwosjFgiAcgBoqyDt9A@mail.gmail.com>
+References: <1415808952-23549-1-git-send-email-hdegoede@redhat.com>
+ <CACxGe6ua8OF5+SNjgO3Nc5ZSVvaic3OzrFES-5=f+bsj-fvE3g@mail.gmail.com>
+ <CACxGe6ssdeOnQnem1012h_jFK1wWOD_WwosjFgiAcgBoqyDt9A@mail.gmail.com>
+Message-ID: <5464DAD2.5040505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > I actually had pm=0 on the command line, but I removed it now, and no
-> > change: [...]
-> > 
-> > Let me try with explicit =1. .. aha, that helps. Thanks!
+On 13/11/14 18:05, Grant Likely wrote:
+> On Thu, Nov 13, 2014 at 7:38 AM, Grant Likely <grant.likely@linaro.org> wrote:
+>> On Wed, Nov 12, 2014 at 4:15 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>> Hi Tomi,
+>>>
+>>> Here is v5 of my simplefb patch-set, this time with an Ack from
+>>> Grant Likely for the dt-bindings bits, which should end all controversy
+>>> surrounding that patch.
+>>>
+>>> For changes since the original postings please see the per patch changelogs
+>>> in the patch commit messages.
+>>>
+>>> Please merge this into your tree for 3.19.
+>>
+>> Hi Tomi,
+>>
+>> I'm discussing this with Rob today. Please hold off 24 hours before
+>> merging. If you don't hear anything to the contrary by tomorrow then
+>> go ahead and merge.
 > 
-> mh seems I actually missed to make 1 the default value. I will
-> prepare a patch for that.
-> 
-> I assume, that the example ofono commands work for you now?
+> I just talked to Rob. All is good, you can apply.
 
-Yes, it now works great.
+Ok. I'll apply tomorrow if there are no more comments during the night
+for the new series, and the compilation issue has been solved.
 
-> > Do you have an example client that can talk to ofonod?
-> 
-> I have not yet played with userland stuff. You could try
-> telepathy-ring, which integrates the ofono into the telepathy
-> framework.
-
-Ok, I took a look, and telepathy-ring is not in debian, and has
-a lot of dependencies.
-
-OTOH ofono seems pretty reasonable. So I played a bit, and result
-is python/pygtk gui which can receive an sms, initiate a call, and
-report missed call. If someone wants to play, source is at
-
-https://gitorious.org/tui/tui/source/b6141107e9341a1412720aed4b0d09143dfa2f4e:ofone
-
-Best regards,
-									Pavel
+ Tomi
 
 
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/5957f252/attachment.sig>
