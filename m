@@ -1,42 +1,29 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 13 Nov 2014 14:34:04 +0100
-Subject: [PATCH v3 3/4] simplefb: Change simplefb_init from module_init to
- fs_initcall
-In-Reply-To: <1415885645-24613-1-git-send-email-hdegoede@redhat.com>
-References: <1415885645-24613-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1415885645-24613-3-git-send-email-hdegoede@redhat.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 13 Nov 2014 15:05:12 +0100
+Subject: [PATCH v3 0/9] PM / Domains: Fix race conditions during boot
+In-Reply-To: <545D0074.7060205@ti.com>
+References: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
+ <2024276.CFr3nVUAlA@vostro.rjw.lan>
+ <CAPDyKFp=T8Luomeaoz5Y=eLAuFaOfdb+-aoU3QVnpjoDYVKPjg@mail.gmail.com>
+ <17707586.6KbjDf5Kep@vostro.rjw.lan>
+ <CAPDyKFo-On2MfqHk081o_JZvwbrbi0=n9h6o7A9dJ+X4c8goKg@mail.gmail.com>
+ <545D0074.7060205@ti.com>
+Message-ID: <20141113140512.GB18995@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One of the reasons for having the simplefb nodes in /chosen, and doing
-explicit enumeration of the nodes there, is too allow enumerating them sooner,
-so that we get a console earlier on.
+Hi!
 
-Doing this earlier then fs_initcall is not useful, since the fb only turns into
-a console when fbcon intializes, which is a fs_initcall too.
+> 2) There are no requirements for arch/platforms/drivers to work in both cases
+> CONFIG_PM_RUNTIME=y/n. But they must be built without errors/warning for both
+> cases.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Acked-by: Grant Likely <grant.likely@linaro.org>
----
- drivers/video/fbdev/simplefb.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+I don't think where you got that. They are config options, they should
+work.
 
-diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-index 223f230..1028a0d 100644
---- a/drivers/video/fbdev/simplefb.c
-+++ b/drivers/video/fbdev/simplefb.c
-@@ -409,7 +409,11 @@ static void __exit simplefb_exit(void)
- 	platform_driver_unregister(&simplefb_driver);
- }
- 
--module_init(simplefb_init);
-+/*
-+ * While this can be a module, if builtin it's most likely the console
-+ * So let's leave module_exit but move module_init to an earlier place
-+ */
-+fs_initcall(simplefb_init);
- module_exit(simplefb_exit);
- 
- MODULE_AUTHOR("Stephen Warren <swarren@wwwdotorg.org>");
+It is prefer not to compile than to compile but not work.
+									Pavel
+
 -- 
-2.1.0
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
