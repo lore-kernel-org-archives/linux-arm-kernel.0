@@ -1,48 +1,24 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 13 Nov 2014 09:40:35 +0100
-Subject: [linux-sunxi] [PATCH 2/4] simplefb: Add support for enumerating
- simplefb dt nodes in /chosen
-In-Reply-To: <CAMuHMdVSfYyHc52Tdu_wzb6ZYPzeZtOzweUwADHxiJLypuBQNw@mail.gmail.com>
-References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>	<1415830124-28787-2-git-send-email-hdegoede@redhat.com>	<CAGRGNgW_Q6oghpe5Mw-8aYPVVj1YZ6R3iaqOQzCE9dSD1nYSyA@mail.gmail.com>	<54646B5B.1070604@redhat.com>
- <CAMuHMdVSfYyHc52Tdu_wzb6ZYPzeZtOzweUwADHxiJLypuBQNw@mail.gmail.com>
-Message-ID: <54646E83.9070704@redhat.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 13 Nov 2014 09:44:49 +0100
+Subject: [PATCH] clk: rockchip: ensure HCLK_VIO2_H2P and PCLK_VIO2_H2P
+ stay enabled
+In-Reply-To: <20141113004046.25314.61598@quantum>
+References: <20141112213845.GA14153@dtor-ws>
+ <CAD=FV=UsYWDw0wB6KSANXZYnnBFdTL9wOEqf9DoUF8aFuDpNSw@mail.gmail.com>
+ <20141113004046.25314.61598@quantum>
+Message-ID: <6158549.ckz49I10o4@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Mike,
 
-On 11/13/2014 09:34 AM, Geert Uytterhoeven wrote:
-> Hi Hans,
-> 
-> On Thu, Nov 13, 2014 at 9:27 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->>>> +       char name[16];
->>>> +       struct device_node *np;
->>>> +
->>>> +       ret = platform_driver_register(&simplefb_driver);
->>>> +       if (ret)
->>>> +               return ret;
->>>> +
->>>> +       for (i = 0; ; i++) {
->>>> +               snprintf(name, sizeof(name), "framebuffer%d", i);
->>>
->>> This smells like an infinite loop: we can be pretty sure that no
->>> hardware will ever exist with more than 9999 (I think?) framebuffers,
->>> however if that ever happens this'll loop until it runs out of RAM.
->>> Maybe add a suitably high limit to the for loop?
->>
->> The loop will stop as soon as there are no more framebuffer# nodes in chosen,
->> so the loop is only infinite if there are infinite nodes in the devicetree,
->> which would make the devicetree infinitely large, so this will never happen.
-> 
-> If there are 10000 frame buffers, the loop will continue beyond that,
-> as the index will be truncated to 4 digits due to the size of name[].
-> It will stop when (signed) i becomes negative, though ;-)
-> 
-> One solution is to increase the size of name[],
+Am Mittwoch, 12. November 2014, 16:40:46 schrieb Mike Turquette:
+> Seems fine to me. Just to be clear, Heiko will be picking up the
+> Rockchip clock patches and submitting a PR, correct? I believe last
+> merge window was the first time we did that for Rockchip and it went
+> well.
 
-This is probably never going to happen, but I'll increase the size of name in v2
-anyways.
+yep, I'm picking up the clock patches.
 
-Regards,
 
-Hans
+Heiko
