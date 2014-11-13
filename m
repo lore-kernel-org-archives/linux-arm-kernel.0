@@ -1,14 +1,14 @@
 From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu, 13 Nov 2014 19:43:45 +0800
-Subject: [Patch V1 3/6] genirq: Introduce msi_domain_{alloc|free}_irqs()
+Date: Thu, 13 Nov 2014 19:43:46 +0800
+Subject: [Patch V1 3/6] genirq: Introduce msi_irq_domain_{alloc|free}_irqs()
 In-Reply-To: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
 References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1415879029-20098-4-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1415879029-20098-5-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce msi_domain_{alloc|free}_irqs() to alloc/free interrupts
-from generic MSI irqdomain.
+Introduce msi_irq_domain_{alloc|free}_irqs() to alloc/free interrupts
+from irqdomain for generic MSI interrupts.
 
 Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
 ---
