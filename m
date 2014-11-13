@@ -1,30 +1,76 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 13 Nov 2014 09:04:52 +0800
-Subject: [PATCH] net: pxa168_eth: move SET_NETDEV_DEV a bit earlier
-In-Reply-To: <20141112.150810.806933062338696000.davem@davemloft.net>
-References: <1415790527-6494-1-git-send-email-jszhang@marvell.com>
- <20141112.150810.806933062338696000.davem@davemloft.net>
-Message-ID: <20141113090452.635b4fa0@xhacker>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 13 Nov 2014 02:33:42 +0100
+Subject: [PATCH] PM / Domains: restore calling of .suspend/resume_noirq()
+ callbacks
+In-Reply-To: <1415808047-23455-1-git-send-email-grygorii.strashko@ti.com>
+References: <1415808047-23455-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <2997289.NEH22PNoYM@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear David,
+On Wednesday, November 12, 2014 06:00:47 PM Grygorii Strashko wrote:
+> Now .suspend/resume_noirq() callbacks will not be called during
+> system wide suspend/resume for devices which belongs to some GPD.
+> It seems, that this change was accidently introduced by
+> commit d23b9b00cdde ("PM / Domains: Rework system suspend callback
+>  routines (v2)").
 
-On Wed, 12 Nov 2014 12:08:10 -0800
-David Miller <davem@davemloft.net> wrote:
+I'm not sure if that was really accidentally.
 
-> From: Jisheng Zhang <jszhang@marvell.com>
-> Date: Wed, 12 Nov 2014 19:08:47 +0800
+Can you describe the problem that the change below is attempting to
+address, without going to much into the history?  IOW, what's that
+doesn't work right now?
+
+> This patch restores calling of .suspend/resume_noirq() callbacks
+> for devices from GPD during system wide suspend/resume.
 > 
-> > This is to ensure the net_device's dev.parent is set before we used it
-> > in dma_zalloc_coherent() from init_hash_table().
-> > 
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> ---
+>  drivers/base/power/domain.c | 14 +++++++++++---
+>  1 file changed, 11 insertions(+), 3 deletions(-)
 > 
-> Please always be explicit about what tree you generated this patch against
-> and therefore expect it to be applied to by saying "[PATCH net-next]" or
-> similar in your Subject line.
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index fb83d4a..f8c70e6 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1014,6 +1014,7 @@ static int pm_genpd_suspend_late(struct device *dev)
+>  static int pm_genpd_suspend_noirq(struct device *dev)
+>  {
+>  	struct generic_pm_domain *genpd;
+> +	int ret;
+>  
+>  	dev_dbg(dev, "%s()\n", __func__);
+>  
+> @@ -1021,8 +1022,14 @@ static int pm_genpd_suspend_noirq(struct device *dev)
+>  	if (IS_ERR(genpd))
+>  		return -EINVAL;
+>  
+> -	if (genpd->suspend_power_off
+> -	    || (dev->power.wakeup_path && genpd_dev_active_wakeup(genpd, dev)))
+> +	if (genpd->suspend_power_off)
+> +		return 0;
+> +
+> +	ret = pm_generic_suspend_noirq(dev);
+> +	if (ret)
+> +		return ret;
+> +
+> +	if (dev->power.wakeup_path && genpd_dev_active_wakeup(genpd, dev))
+>  		return 0;
+>  
+>  	genpd_stop_dev(genpd, dev);
+> @@ -1065,8 +1072,9 @@ static int pm_genpd_resume_noirq(struct device *dev)
+>  	 */
+>  	pm_genpd_sync_poweron(genpd);
+>  	genpd->suspended_count--;
+> +	genpd_start_dev(genpd, dev);
+>  
+> -	return genpd_start_dev(genpd, dev);
+> +	return pm_generic_resume_noirq(dev);
+>  }
+>  
+>  /**
+> 
 
-Got it. I will take care next time.
-
-Thanks a lot
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
