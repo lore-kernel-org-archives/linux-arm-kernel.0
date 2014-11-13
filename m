@@ -1,56 +1,28 @@
-From: chanho.min@lge.com (Chanho Min)
-Date: Thu, 13 Nov 2014 16:29:53 +0900
-Subject: [PATCH] ARM: cacheflush: disallow pending signals during cacheflush
-Message-ID: <1415863793-6219-1-git-send-email-chanho.min@lge.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Thu, 13 Nov 2014 07:38:38 +0000
+Subject: [PATCH v5 0/5] simplefb: add clock handling code
+In-Reply-To: <1415808952-23549-1-git-send-email-hdegoede@redhat.com>
+References: <1415808952-23549-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <CACxGe6ua8OF5+SNjgO3Nc5ZSVvaic3OzrFES-5=f+bsj-fvE3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 28256d612726 ("ARM: cacheflush: split user cache-flushing
-into interruptible chunks"), cacheflush can be interrupted by signal.
+On Wed, Nov 12, 2014 at 4:15 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi Tomi,
+>
+> Here is v5 of my simplefb patch-set, this time with an Ack from
+> Grant Likely for the dt-bindings bits, which should end all controversy
+> surrounding that patch.
+>
+> For changes since the original postings please see the per patch changelogs
+> in the patch commit messages.
+>
+> Please merge this into your tree for 3.19.
 
-But, cacheflush doesn't resume from where we left off if process has
-user-defined signal handlers. It returns -EINTR then cacheflush
-should be re-invoked from the start of address until cache-flushing
-of whole address ranges is completed (restart_syscall isn't available
-in userspace). It may cause regression. So I suggest to disallow
-pending signals during cacheflush.
+Hi Tomi,
 
-This partially reverts commit 28256d612726a28a8b9d3c49f2b74198c4423d6a.
+I'm discussing this with Rob today. Please hold off 24 hours before
+merging. If you don't hear anything to the contrary by tomorrow then
+go ahead and merge.
 
-Signed-off-by: Chanho Min <chanho.min@lge.com>
----
- arch/arm/kernel/traps.c |   19 -------------------
- 1 file changed, 19 deletions(-)
-
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index abd2fc0..275e086 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -521,25 +521,6 @@ __do_cache_op(unsigned long start, unsigned long end)
- 	do {
- 		unsigned long chunk = min(PAGE_SIZE, end - start);
- 
--		if (signal_pending(current)) {
--			struct thread_info *ti = current_thread_info();
--
--			ti->restart_block = (struct restart_block) {
--				.fn	= do_cache_op_restart,
--			};
--
--			ti->arm_restart_block = (struct arm_restart_block) {
--				{
--					.cache = {
--						.start	= start,
--						.end	= end,
--					},
--				},
--			};
--
--			return -ERESTART_RESTARTBLOCK;
--		}
--
- 		ret = flush_cache_user_range(start, start + chunk);
- 		if (ret)
- 			return ret;
--- 
-1.7.9.5
+g.
