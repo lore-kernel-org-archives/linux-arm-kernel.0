@@ -1,63 +1,74 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 13 Nov 2014 09:33:15 -0800
-Subject: [PATCH v11 3/3] ARM: dts: add rk3288 power-domain node
-In-Reply-To: <1415829690-20236-4-git-send-email-caesar.wang@rock-chips.com>
-References: <1415829690-20236-1-git-send-email-caesar.wang@rock-chips.com>
- <1415829690-20236-4-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <CAD=FV=UKUnr33s85imePmcxizLK=AMYS8fPC7VvKnV4XXWFG2w@mail.gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 13 Nov 2014 11:38:02 -0600
+Subject: [PATCHv6 4/5] hwspinlock/core: add common OF helpers
+In-Reply-To: <CAK=WgbbatPTiz3efDWHVEcuug_UQfkCViMoK0zcfUg3JwB2oTA@mail.gmail.com>
+References: <1410553499-55951-1-git-send-email-s-anna@ti.com>
+ <1410553499-55951-5-git-send-email-s-anna@ti.com>
+ <CAK=WgbamdqAufjC4Xb5moERRBSB-cO6c1RPTE=f+dp75F+Eh7A@mail.gmail.com>
+ <5463B5B6.8040709@ti.com>
+ <CAK=WgbbatPTiz3efDWHVEcuug_UQfkCViMoK0zcfUg3JwB2oTA@mail.gmail.com>
+Message-ID: <5464EC7A.7050603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Ohad,
 
-On Wed, Nov 12, 2014 at 2:01 PM, Caesar Wang <caesar.wang@rock-chips.com> wrote:
-> +               pd_vio {
-> +                       reg = <RK3288_PD_VIO>;
-> +                       clocks = <&cru ACLK_IEP>,
-> +                                <&cru ACLK_ISP>,
-> +                                <&cru ACLK_RGA_NIU>,
-> +                                <&cru ACLK_RGA>,
-> +                                <&cru ACLK_VIO0_NIU>,
-> +                                <&cru ACLK_VIO1_NIU>,
-> +                                <&cru ACLK_VIP>,
-> +                                <&cru ACLK_VOP0>,
-> +                                <&cru ACLK_VOP1>,
-> +                                <&cru DCLK_VOP0>,
-> +                                <&cru DCLK_VOP1>,
-> +                                <&cru HCLK_IEP>,
-> +                                <&cru HCLK_ISP>,
-> +                                <&cru HCLK_RGA>,
-> +                                <&cru HCLK_VIO_AHB_ARBI>,
-> +                                <&cru HCLK_VIO_NIU>,
-> +                                <&cru HCLK_VIO2_H2P>,
-> +                                <&cru HCLK_VIP>,
-> +                                <&cru HCLK_VOP0>,
-> +                                <&cru HCLK_VOP1>,
-> +                                <&cru PCLK_EDP_CTRL>,
-> +                                <&cru PCLK_HDMI_CTRL>,
-> +                                <&cru PCLK_LVDS_PHY>,
-> +                                <&cru PCLK_MIPI_CSI>,
-> +                                <&cru PCLK_MIPI_DSI0>,
-> +                                <&cru PCLK_MIPI_DSI1>,
-> +                                <&cru PCLK_VIO2_H2P>,
-> +                                <&cru SCLK_EDP_24M>,
-> +                                <&cru SCLK_EDP>,
-> +                                <&cru SCLK_HDMI_CEC>,
-> +                                <&cru SCLK_HDMI_HDCP>,
-> +                                <&cru SCLK_ISP_JPE>,
-> +                                <&cru SCLK_ISP>,
-> +                                <&cru SCLK_RGA>;
+On 11/13/2014 04:03 AM, Ohad Ben-Cohen wrote:
+> Hi Suman,
+> 
+> On Wed, Nov 12, 2014 at 9:32 PM, Suman Anna <s-anna@ti.com> wrote:
+>>> Is this the validation you mentioned which requires the existence of
+>>> "hwspinlock/core: maintain a list of registered hwspinlock banks" ?
+>>
+>> Well, not exactly. The validation is on the following segment,
+>>
+>> +       id = of_hwspin_lock_simple_xlate(bank, &args);
+>> +       if (id < 0 || id >= bank->num_locks) {
+>> +               ret = -EINVAL;
+>> +               goto out;
+>> +       }
+> 
+> I'm not entirely convinced that this justifies adding the proposed
+> linked list. Can't we can get the base_id and number of locks by
+> traversing the DT?
 
-This was discussed offlist, but just to make sure it's summarized here:
+No, not always, because, either of them can be optional between
+different platform implementations. For example, on OMAP, the number of
+locks is read from an IP register, and not coded in DT. Similarly,
+base_id can be optional on SoCs that don't have multiple IP instances.
+The only place the hwspinlock core knows both of them for sure is at the
+device registration time, but the core only stores the locks and not the
+devices at the moment. Any operation on the device is not possible
+without knowing the exact global lock we are dealing with, and this API
+is about returning that exact global lock id.
 
-Some of the above clocks are "IGNORE_UNUSED" (AKA left on) in Linux
-right now because nobody is managing them right now (due to the fact
-that they are "interface unit clocks", etc).  The fact that these are
-now being enabled and disabled as part of power domain transitions
-will break this.
+> 
+>> That said, it is also needed to provide the support for deferred probing
+>> without changing the return code conventions on the existing API.
+> 
+> Here too, adding a data structure maintaining memory objects and
+> taking care of it life cycle seems a bit overkill for anything to do
+> with return values.
 
-My vote would be to leave such clocks out of the list for now until we
-figure out how they should be dealt with.
+IMHO, this life cycle management is not that complicated, it is managed
+alongside the addition/removal of the locks during the device
+registration/unregistration time.
 
+> 
+>> Yes, and wouldn't that require that the id is validated? It just cannot
+>> return any return value, and expect it will be verified somewhere else
+>> or in a following API call. Not doing the validation unnecessarily
+>> complicates the system usage of a lock as you are sharing an invalid
+>> lock to a remote processor and then you have two validation failure
+>> paths on different processors.
+> 
+> Validation is great but I'm still not convinced it can't be done
+> without maintaining another data structure.
+> 
+> Please show me specific technical issues that can't be resolved
+> without adding the proposed linked list.
 
--Doug
+Same as above.
+
+regards
+Suman
