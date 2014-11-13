@@ -1,71 +1,38 @@
 From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
-Date: Thu, 13 Nov 2014 10:05:31 +0530
-Subject: [RESEND PATCH V2 1/2] ARM: dts: vf-colibri: Add I2C support
+Date: Thu, 13 Nov 2014 10:05:32 +0530
+Subject: [RESEND PATCH V2 2/2] ARM: dts: vf-colibri-eval-v3.dts: Enable
+ ST-M41T0M6 RTC
 In-Reply-To: <cover.1415852424.git.bhuvanchandra.dv@toradex.com>
 References: <cover.1415852424.git.bhuvanchandra.dv@toradex.com>
-Message-ID: <cd1efeb312d35f45fee426ab3783beff7af4d327.1415852425.git.bhuvanchandra.dv@toradex.com>
+Message-ID: <b360a079a8a2acfc92a607105fb88bdd731155f7.1415852425.git.bhuvanchandra.dv@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+ST-M41T0M6 is available on Colibri carrier boards.
+Hence enable M41T0M6 RTC.
 
 Acked-by: Stefan Agner <stefan@agner.ch>
 Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
 ---
- arch/arm/boot/dts/vf-colibri-eval-v3.dtsi |    6 +++++-
- arch/arm/boot/dts/vf-colibri.dtsi         |   13 +++++++++++++
- 2 files changed, 18 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/vf-colibri-eval-v3.dtsi |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-index 80e8fbc..7324bdc 100644
+index 7324bdc..20251a3 100644
 --- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
 +++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-@@ -33,6 +33,10 @@
+@@ -35,6 +35,12 @@
+ 
+ &i2c0 {
  	status = "okay";
++
++	/* M41T0M6 real time clock on carrier board */
++	rtc: m41t0m6 at 68 {
++		compatible = "st,m41t00";
++		reg = <0x68>;
++	};
  };
  
-+&i2c0 {
-+	status = "okay";
-+};
-+
  &pwm0 {
- 	status = "okay";
- };
-@@ -51,4 +55,4 @@
- 
- &uart2 {
- 	status = "okay";
--};
-\ No newline at end of file
-+};
-diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
-index ab40367..471eec0 100644
---- a/arch/arm/boot/dts/vf-colibri.dtsi
-+++ b/arch/arm/boot/dts/vf-colibri.dtsi
-@@ -39,6 +39,12 @@
- 	pinctrl-0 = <&pinctrl_fec1>;
- };
- 
-+&i2c0 {
-+	clock-frequency = <400000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c0>;
-+};
-+
- &pwm0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_pwm0>;
-@@ -102,6 +108,13 @@
- 			>;
- 		};
- 
-+		pinctrl_i2c0: i2c0grp {
-+			fsl,pins = <
-+				VF610_PAD_PTB14__I2C0_SCL		0x37ff
-+				VF610_PAD_PTB15__I2C0_SDA		0x37ff
-+			>;
-+		};
-+
- 		pinctrl_pwm0: pwm0grp {
- 			fsl,pins = <
- 				VF610_PAD_PTB0__FTM0_CH0		0x1182
 -- 
 1.7.9.5
