@@ -1,107 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 13 Nov 2014 09:45:36 -0800
-Subject: N900 modem support in 3.18-rc1
-In-Reply-To: <20141113162155.GA8512@xo-6d-61-c0.localdomain>
-References: <20141104205117.GA17606@amd> <201411052137.31452@pali>
- <20141105203918.GA29199@amd> <201411052206.05379@pali>
- <20141105220359.GA32052@amd> <20141105234555.GA7097@earth.universe>
- <20141106124711.GA26944@amd>
- <20141106180335.GA21513@earth.universe>
- <20141113162155.GA8512@xo-6d-61-c0.localdomain>
-Message-ID: <20141113174534.GO26481@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 13 Nov 2014 17:48:00 +0000
+Subject: [RFC PATCH 0/1] arm64: Fix /proc/cpuinfo
+In-Reply-To: <20141106170548.GF19702@e104818-lin.cambridge.arm.com>
+References: <1414159000-27059-1-git-send-email-mark.rutland@arm.com>
+ <20141106164311.GD19702@e104818-lin.cambridge.arm.com>
+ <20141106165430.GH31605@arm.com>
+ <20141106170548.GF19702@e104818-lin.cambridge.arm.com>
+Message-ID: <20141113174800.GD22361@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [141113 08:23]:
-> Hi!
-> 
-> > > I actually had pm=0 on the command line, but I removed it now, and no
-> > > change: [...]
+On Thu, Nov 06, 2014 at 05:05:48PM +0000, Catalin Marinas wrote:
+> On Thu, Nov 06, 2014 at 04:54:31PM +0000, Will Deacon wrote:
+> > On Thu, Nov 06, 2014 at 04:43:12PM +0000, Catalin Marinas wrote:
+> > > On Fri, Oct 24, 2014 at 02:56:39PM +0100, Mark Rutland wrote:
+> > > > [d] Print different hwcaps dependent on the personality.
+> > > > 
+> > > >     This would allow for 32-bit and 64-bit applications to function
+> > > >     correctly, but for some 32-bit applications the personality would
+> > > >     need to be set explicitly by the user.
 > > > 
-> > > Let me try with explicit =1. .. aha, that helps. Thanks!
+> > > Which makes this option actually in line with the uname -m behaviour. My
+> > > vote goes for [d] with option [b] as a close alternative.
+> > > 
+> > > > [1] arm, v3.17, Versatile Express A15x2 A7x3 coretile
+> > > > Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae evtstrm 
+> > > [...]
+> > > > [2] arm64, v3.17, Juno platform
+> > > > Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32 
+> > > 
+> > > As an exercise, I'm trying to see what option [b] would look like when
+> > > CONFIG_COMPAT is enabled:
+> > > 
+> > > Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32 half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae
+> > > 
+> > > The duplicate strings would only be listed once (evtstrm, aes, pmull,
+> > > sha1, sha2, crc32). New AArch64 features that we may expect to be
+> > > optional on AArch32 could be prefixed with "a64". If they are missing
+> > > entirely from AArch32, (like asimd), no need for the prefix.
+> > > 
+> > > The advantage is that we don't need to check the personality but we have
+> > > to assume that scripts would not search for substrings (sane people
+> > > shouldn't do this anyway as the Features string can always be extended).
 > > 
-> > mh seems I actually missed to make 1 the default value. I will
-> > prepare a patch for that.
-> > 
-> > I assume, that the example ofono commands work for you now?
+> > And a big disadvantage is that I can imagine AArch64 applications checking
+> > for "neon" instead of "asimd", which will break if they're run under kernels
+> > without COMPAT support enabled.
+[...]
+> > So I'm inclined to stick with Mark's patch as it is.
 > 
-> Yes, it now works great.
-> 
-> > > Do you have an example client that can talk to ofonod?
-> > 
-> > I have not yet played with userland stuff. You could try
-> > telepathy-ring, which integrates the ofono into the telepathy
-> > framework.
-> 
-> Ok, I took a look, and telepathy-ring is not in debian, and has
-> a lot of dependencies.
-> 
-> OTOH ofono seems pretty reasonable. So I played a bit, and result
-> is python/pygtk gui which can receive an sms, initiate a call, and
-> report missed call. If someone wants to play, source is at
-> 
-> https://gitorious.org/tui/tui/source/b6141107e9341a1412720aed4b0d09143dfa2f4e:ofone
+> If we don't hear otherwise, I propose sometime next week we queue Mark's
+> patch for -next.
 
-Pavel, care to fill in the the following type patch with some
-instructions in the description now that you got it working?
+As we haven't heard otherwise:
 
-I did not have luck yet when I tried. I got the /dev/cmt/*
-entries after adding pm=1 param, but no luck scanning any networks.
-
-Regards,
-
-Tony
-
-8< -----------------
-ARM: omap2plus_defconfig: Enable n900 modem as loadable modules
-
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -88,6 +88,7 @@ CONFIG_IP_PNP_BOOTP=y
- CONFIG_IP_PNP_RARP=y
- # CONFIG_INET_LRO is not set
- CONFIG_NETFILTER=y
-+CONFIG_PHONET=m
- CONFIG_CAN=m
- CONFIG_CAN_C_CAN=m
- CONFIG_CAN_C_CAN_PLATFORM=m
-@@ -158,6 +159,7 @@ CONFIG_USB_ALI_M5632=y
- CONFIG_USB_AN2720=y
- CONFIG_USB_EPSON2888=y
- CONFIG_USB_KC2190=y
-+CONFIG_USB_CDC_PHONET=m
- CONFIG_LIBERTAS=m
- CONFIG_LIBERTAS_USB=m
- CONFIG_LIBERTAS_SDIO=m
-@@ -197,6 +199,11 @@ CONFIG_HW_RANDOM=y
- CONFIG_I2C_CHARDEV=y
- CONFIG_SPI=y
- CONFIG_SPI_OMAP24XX=y
-+CONFIG_HSI=m
-+CONFIG_OMAP_SSI=m
-+CONFIG_NOKIA_MODEM=m
-+CONFIG_SSI_PROTOCOL=m
-+CONFIG_HSI_CHAR=m
- CONFIG_PINCTRL_SINGLE=y
- CONFIG_DEBUG_GPIO=y
- CONFIG_GPIO_SYSFS=y
-@@ -312,9 +319,11 @@ CONFIG_USB_CONFIGFS_ECM=y
- CONFIG_USB_CONFIGFS_ECM_SUBSET=y
- CONFIG_USB_CONFIGFS_RNDIS=y
- CONFIG_USB_CONFIGFS_EEM=y
-+CONFIG_USB_CONFIGFS_PHONET=y
- CONFIG_USB_CONFIGFS_MASS_STORAGE=y
- CONFIG_USB_CONFIGFS_F_LB_SS=y
- CONFIG_USB_CONFIGFS_F_FS=y
-+CONFIG_USB_G_NOKIA=m
- CONFIG_MMC=y
- CONFIG_SDIO_UART=y
- CONFIG_MMC_OMAP=y
-@@ -359,6 +368,7 @@ CONFIG_MSDOS_FS=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_TMPFS_POSIX_ACL=y
-+CONFIG_CONFIGFS_FS=y
- CONFIG_JFFS2_FS=y
- CONFIG_JFFS2_SUMMARY=y
- CONFIG_JFFS2_FS_XATTR=y
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
