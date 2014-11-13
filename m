@@ -1,47 +1,36 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 13 Nov 2014 20:11:17 +0100
-Subject: [PATCH] PM / Domains: restore calling of .suspend/resume_noirq()
- callbacks
-In-Reply-To: <5464FBCC.7060307@ti.com>
-References: <1415808047-23455-1-git-send-email-grygorii.strashko@ti.com>
- <2997289.NEH22PNoYM@vostro.rjw.lan> <5464FBCC.7060307@ti.com>
-Message-ID: <CAMuHMdV2JdEhvMsOahaMH8RUO12sit_39AfcWUFD9eGCYCCKGA@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 13 Nov 2014 11:17:04 -0800
+Subject: [PATCH 0/3] miscellaneous fixes in coresight
+In-Reply-To: <CANLsYkyPnVJ75-TYYionMtd2KJzs29UK9LD3Fj4vk=Apvfh0Gw@mail.gmail.com>
+References: <1415868169-13325-1-git-send-email-pankaj.dubey@samsung.com>
+ <CANLsYkyPnVJ75-TYYionMtd2KJzs29UK9LD3Fj4vk=Apvfh0Gw@mail.gmail.com>
+Message-ID: <20141113191704.GA28033@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 13, 2014 at 7:43 PM, Grygorii Strashko
-<grygorii.strashko@ti.com> wrote:
-> On 11/13/2014 03:33 AM, Rafael J. Wysocki wrote:
->> On Wednesday, November 12, 2014 06:00:47 PM Grygorii Strashko wrote:
->>> Now .suspend/resume_noirq() callbacks will not be called during
->>> system wide suspend/resume for devices which belongs to some GPD.
->>> It seems, that this change was accidentally introduced by
->>> commit d23b9b00cdde ("PM / Domains: Rework system suspend callback
->>>   routines (v2)").
->>
->> I'm not sure if that was really accidentally.
->>
->> Can you describe the problem that the change below is attempting to
->> address, without going to much into the history?  IOW, what's that
->> doesn't work right now?
->
-> There are no real issues - now in Kernel there are no users of GPD
-> which use "noirq" callbacks.
+On Thu, Nov 13, 2014 at 11:12:40AM -0700, Mathieu Poirier wrote:
+> On 13 November 2014 01:42, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+> > This patch series fixes some typo and minor issues in coresight which
+> > I observed while going through this driver.
+> >
+> > Pankaj Dubey (3):
+> >   coresight: fix typo in comment in coresight-priv.h
+> >   coresight: fixed comments in coresight.h
+> >   coresight-replicator: remove .owner field for driver
+> >
+> >  drivers/coresight/coresight-priv.h       |    2 +-
+> >  drivers/coresight/coresight-replicator.c |    1 -
+> >  include/linux/coresight.h                |    6 +++---
+> >  3 files changed, 4 insertions(+), 5 deletions(-)
+> >
+> > --
+> > 1.7.9.5
+> >
+> 
+> Applied all 3 patches - thanks
 
-Indeed.
+Applied to what?  Shouldn't I be taking these?
 
-But as the .suspend_noirq() and .resume_noirq() callbacks are not called
-when using the generic PM domain, I had to manually handle interrupt
-disable/enable in commit a00d91ea264f974b ("fbdev: sh_mobile_hdmi:
-Re-init regs before irq re-enable on resume").
+confused,
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+greg k-h
