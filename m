@@ -1,80 +1,70 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 13 Nov 2014 14:27:42 +0100 (CET)
-Subject: [RFC Part4 v1 00/17] Refine support of non-PCI-compliant Message
-In-Reply-To: <546495AB.9050308@arm.com>
-References: <1415545839-28263-1-git-send-email-jiang.liu@linux.intel.com>
- <546364FA.7010806@arm.com> <alpine.DEB.2.11.1411121512270.3935@nanos>
- <546495AB.9050308@arm.com>
-Message-ID: <alpine.DEB.2.11.1411131410560.3935@nanos>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 13 Nov 2014 14:34:03 +0100
+Subject: [PATCH v3 2/4] simplefb: Add support for enumerating simplefb dt
+ nodes in /chosen
+In-Reply-To: <1415885645-24613-1-git-send-email-hdegoede@redhat.com>
+References: <1415885645-24613-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1415885645-24613-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Nov 2014, Marc Zyngier wrote:
-> On 12/11/14 14:46, Thomas Gleixner wrote:
-> > On Wed, 12 Nov 2014, Marc Zyngier wrote:
-> >> This patch introduces two optionnal fields to the msi_chip structure:
-> >> - a pointer to an irq domain, describing the MSI domain associated
-> >>   with this msi_chip. To be populated with msi_create_irq_domain.
-> >> - a domain_alloc_irqs() callback that has the same purpose as
-> >>   arch_setup_msi_irqs(), with the above domain as an additional
-> >>   parameter.
-> >>
-> >> If both of these fields are non-NULL, then domain_alloc_irqs() is
-> >> called, bypassing the setup_irq callback. This allows the MSI driver
-> >> to use the domain stacking feature without mandating core support in
-> >> the architecture.
-> > 
-> > I'd rather have the callback in the irqdomain itself. Along with a
-> > callback to free the interrupts.
-> > 
-> > AFAICT is msi_chip more or less a wrapper around the actual MSI irq
-> > domain. So we rather move towards assigning irqdomain to the pci bus
-> > and get rid of msi_chip instead of adding another level of obscure
-> > indirection through msi_chip.
-> 
-> I can see that putting the irq domain at the bus level makes a lot of 
-> sense (assuming nobody tries to have multiple MSI controllers per bus...).
+Update simplefb to support the new preferred location for simplefb dt nodes
+under /chosen.
 
-That would be interesting :)
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+--
+Changes in v2:
+-Make name array larger in case we ever encounter more then 10000 framebuffers
+Changes in v3:
+-Switch to for_each_child_of_node to loop over the nodes under chosen
+---
+ drivers/video/fbdev/simplefb.c | 27 ++++++++++++++++++++++++++-
+ 1 file changed, 26 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
+index cd96edd..223f230 100644
+--- a/drivers/video/fbdev/simplefb.c
++++ b/drivers/video/fbdev/simplefb.c
+@@ -27,6 +27,7 @@
+ #include <linux/platform_data/simplefb.h>
+ #include <linux/platform_device.h>
+ #include <linux/clk-provider.h>
++#include <linux/of_platform.h>
  
-> So I'm starting with something like this:
-> 
-> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-> index 640a1ec..07e50fc 100644
-> --- a/include/linux/irqdomain.h
-> +++ b/include/linux/irqdomain.h
-> @@ -41,6 +41,7 @@ struct irq_domain;
->  struct of_device_id;
->  struct irq_chip;
->  struct irq_data;
-> +struct device;
->  
->  /* Number of irqs reserved for a legacy isa controller */
->  #define NUM_ISA_INTERRUPTS	16
-> @@ -76,6 +77,10 @@ struct irq_domain_ops {
->  		     unsigned int nr_irqs);
->  	void (*activate)(struct irq_domain *d, struct irq_data *irq_data);
->  	void (*deactivate)(struct irq_domain *d, struct irq_data *irq_data);
-> +	int (*prepare_alloc_irqs)(struct irq_domain *d, struct device *dev,
-> +				  unsigned int nr_irqs, int type);
-> +	int (*cleanup_free_irqs)(struct irq_domain *d, struct device *dev,
-> +				 unsigned int virq, unsigned int nr_irqs);
->  #endif
->  };
-> 
-> How do you see this behaving? At the moment, I have the "prepare" callback
-> directly calling into pci_msi_domain_alloc_irqs() so that the irqs get
-> created, but I have the nagging feeling that it's not what you want... ;-)
-> The main issue I can see is that if more than one domain in the stack
-> implements that, who gets to call pci_msi_domain_alloc_irqs?
->
-> If we try to decouple those two, there is a problem with the creation of
-> the intermediate structure (the irq_alloc_info that's in Jiang's patches),
-> as this is a arch/driver/whatever specific structure.
-
-Hard to tell. I just saw Jiangs new series arrive and I want to look
-at that first before muttering nonsense.
-
-Thanks,
-
-	tglx
+ static struct fb_fix_screeninfo simplefb_fix = {
+ 	.id		= "simple",
+@@ -385,7 +386,31 @@ static struct platform_driver simplefb_driver = {
+ 	.probe = simplefb_probe,
+ 	.remove = simplefb_remove,
+ };
+-module_platform_driver(simplefb_driver);
++
++static int __init simplefb_init(void)
++{
++	int ret;
++	struct device_node *np;
++
++	ret = platform_driver_register(&simplefb_driver);
++	if (ret)
++		return ret;
++
++	for_each_child_of_node(of_chosen, np) {
++		if (of_device_is_compatible(np, "simple-framebuffer"))
++			of_platform_device_create(np, NULL, NULL);
++	}
++
++	return 0;
++}
++
++static void __exit simplefb_exit(void)
++{
++	platform_driver_unregister(&simplefb_driver);
++}
++
++module_init(simplefb_init);
++module_exit(simplefb_exit);
+ 
+ MODULE_AUTHOR("Stephen Warren <swarren@wwwdotorg.org>");
+ MODULE_DESCRIPTION("Simple framebuffer driver");
+-- 
+2.1.0
