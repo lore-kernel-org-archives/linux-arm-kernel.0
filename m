@@ -1,68 +1,169 @@
-From: segher@kernel.crashing.org (Segher Boessenkool)
-Date: Thu, 13 Nov 2014 08:19:50 -0600
-Subject: gcc 4.9 build warnings (was: Re: next build: 2674 warnings 1
- failures (next/next-20141022))
-In-Reply-To: <2480226.26bJjjL2fl@wuerfel>
-References: <5447442c.a9ca440a.2060.5e09@mx.google.com>
- <20141024094412.GN27405@n2100.arm.linux.org.uk>
- <20141024182509.GA31232@gate.crashing.org> <2480226.26bJjjL2fl@wuerfel>
-Message-ID: <20141113141950.GA17287@gate.crashing.org>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 13 Nov 2014 15:23:05 +0100
+Subject: [RFC PATCH 1/4] ARM: KVM: on unhandled IO mem abort, route the
+ call to the KVM MMIO bus
+In-Reply-To: <5464BD30.7040702@linaro.org>
+References: <1394726249-1547-1-git-send-email-a.motakis@virtualopensystems.com>
+ <1394726249-1547-2-git-send-email-a.motakis@virtualopensystems.com>
+ <20140328190913.GJ25519@cbox>
+ <CADDJ2=Opx2d5ex0hWSXYJjs6uLifR9wZVsahUHzZ7zytSj7ZSg@mail.gmail.com>
+ <20141110162736.GA16054@cbox>
+ <CADDJ2=PTM0fJ0RFfWdVQ1-471xqaJmj0vP1f5-pf57xOV5jgig@mail.gmail.com>
+ <5464BD30.7040702@linaro.org>
+Message-ID: <5464BEC9.1050401@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 11, 2014 at 10:32:23PM +0100, Arnd Bergmann wrote:
-> I've decided to investigate it further. It seems that your change to
-> 'arm-linux-eabi' did not have the intended effect.
+On 11/13/2014 03:16 PM, Eric Auger wrote:
+> On 11/13/2014 11:45 AM, Nikolay Nikolaev wrote:
+>> On Mon, Nov 10, 2014 at 6:27 PM, Christoffer Dall
+>> <christoffer.dall@linaro.org> wrote:
+>>> On Mon, Nov 10, 2014 at 05:09:07PM +0200, Nikolay Nikolaev wrote:
+>>>> Hello,
+>>>>
+>>>> On Fri, Mar 28, 2014 at 9:09 PM, Christoffer Dall
+>>>> <christoffer.dall@linaro.org> wrote:
+>>>>>
+>>>>> On Thu, Mar 13, 2014 at 04:57:26PM +0100, Antonios Motakis wrote:
+>>>>>> On an unhandled IO memory abort, use the kvm_io_bus_* API in order to
+>>>>>> handle the MMIO access through any registered read/write callbacks. This
+>>>>>> is a dependency for eventfd support (ioeventfd and irqfd).
+>>>>>>
+>>>>>> However, accesses to the VGIC are still left implemented independently,
+>>>>>> since the kvm_io_bus_* API doesn't pass the VCPU pointer doing the access.
+>>>>>>
+>>>>>> Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
+>>>>>> Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
+>>>>>> ---
+>>>>>>  arch/arm/kvm/mmio.c | 32 ++++++++++++++++++++++++++++++++
+>>>>>>  virt/kvm/arm/vgic.c |  5 ++++-
+>>>>>>  2 files changed, 36 insertions(+), 1 deletion(-)
+>>>>>>
+>>>>>> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+>>>>>> index 4cb5a93..1d17831 100644
+>>>>>> --- a/arch/arm/kvm/mmio.c
+>>>>>> +++ b/arch/arm/kvm/mmio.c
+>>>>>> @@ -162,6 +162,35 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>>>>>       return 0;
+>>>>>>  }
+>>>>>>
+>>>>>> +/**
+>>>>>> + * kvm_handle_mmio - handle an in-kernel MMIO access
+>>>>>> + * @vcpu:    pointer to the vcpu performing the access
+>>>>>> + * @run:     pointer to the kvm_run structure
+>>>>>> + * @mmio:    pointer to the data describing the access
+>>>>>> + *
+>>>>>> + * returns true if the MMIO access has been performed in kernel space,
+>>>>>> + * and false if it needs to be emulated in user space.
+>>>>>> + */
+>>>>>> +static bool handle_kernel_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>>>>> +             struct kvm_exit_mmio *mmio)
+>>>>>> +{
+>>>>>> +     int ret;
+>>>>>> +     if (mmio->is_write) {
+>>>>>> +             ret = kvm_io_bus_write(vcpu->kvm, KVM_MMIO_BUS, mmio->phys_addr,
+>>>>>> +                             mmio->len, &mmio->data);
+>>>>>> +
+>>>>>> +     } else {
+>>>>>> +             ret = kvm_io_bus_read(vcpu->kvm, KVM_MMIO_BUS, mmio->phys_addr,
+>>>>>> +                             mmio->len, &mmio->data);
+>>>>>> +     }
+>>>>>> +     if (!ret) {
+>>>>>> +             kvm_prepare_mmio(run, mmio);
+>>>>>> +             kvm_handle_mmio_return(vcpu, run);
+>>>>>> +     }
+>>>>>> +
+>>>>>> +     return !ret;
+>>>>>> +}
+>>>>>> +
+>>>>>>  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>>>>>                phys_addr_t fault_ipa)
+>>>>>>  {
+>>>>>> @@ -200,6 +229,9 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>>>>>       if (vgic_handle_mmio(vcpu, run, &mmio))
+>>>>>>               return 1;
+>>>>>>
+>>>>>> +     if (handle_kernel_mmio(vcpu, run, &mmio))
+>>>>>> +             return 1;
+>>>>>> +
+>>>>
+>>>>
+>>>> We're reconsidering ioeventfds patchseries and we tried to evaluate
+>>>> what you suggested here.
+>>>>
+>>>>>
+>>>>> this special-casing of the vgic is now really terrible.  Is there
+>>>>> anything holding you back from doing the necessary restructure of the
+>>>>> kvm_bus_io_*() API instead?
+>>>>
+>>>> Restructuring the kvm_io_bus_ API is not a big thing (we actually did
+>>>> it), but is not directly related to the these patches.
+>>>> Of course it can be justified if we do it in the context of removing
+>>>> vgic_handle_mmio and leaving only handle_kernel_mmio.
+>>>>
+>>>>>
+>>>>> That would allow us to get rid of the ugly
+>>>>> Fix it! in the vgic driver as well.
+>>>>
+>>>> Going through the vgic_handle_mmio we see that it will require large
+>>>> refactoring:
+>>>>  - there are 15 MMIO ranges for the vgic now - each should be
+>>>> registered as a separate device
+Re-correcting Andre's address, sorry:
+Hi Nikolay, Andre,
 
-"It worked for me", i.e., it did build kernels.  I don't build arm terribly
-often, does it show?
+what does mandate to register 15 devices? Isn't possible to register a
+single kvm_io_device covering the whole distributor range [base, base +
+KVM_VGIC_V2_DIST_SIZE] (current code) and in associated
+kvm_io_device_ops read/write locate the addressed range and do the same
+as what is done in current vgic_handle_mmio? Isn't it done that way for
+the ioapic? what do I miss?
 
-> I got it to work with this patch:
+Thanks
 
-> -	arm)		TARGET=arm-linux-eabi ;;
-> +	arm)		TARGET=arm-linux-gnueabi ;;
+Best Regards
 
-That looks right (and Olof says it works :-) ).  I'll apply the patch.
-
-> What happens in gcc apparently is that the configuration logic gets confused
-> and uses this entry in gcc/config.gcc:
+Eric
+>>>>  - the handler of each range should be split into read and write
+>>>>  - all handlers take 'struct kvm_exit_mmio', and pass it to
+>>>> 'vgic_reg_access', 'mmio_data_read' and 'mmio_data_read'
+>>>>
+>>>> To sum up - if we do this refactoring of vgic's MMIO handling +
+>>>> kvm_io_bus_ API getting 'vcpu" argument we'll get a 'much' cleaner
+>>>> vgic code and as a bonus we'll get 'ioeventfd' capabilities.
+>>>>
+>>>> We have 3 questions:
+>>>>  - is the kvm_io_bus_ getting 'vcpu' argument acceptable for the other
+>>>> architectures too?
+>>>>  - is this huge vgic MMIO handling redesign acceptable/desired (it
+>>>> touches a lot of code)?
+>>>>  - is there a way that ioeventfd is accepted leaving vgic.c in it's
+>>>> current state?
+>>>>
+>>> Not sure how the latter question is relevant to this, but check with
+>>> Andre who recently looked at this as well and decided that for GICv3 the
+>>> only sane thing was to remove that comment for the gic.
+>> @Andre - what's your experience with the GICv3 and MMIO handling,
+>> anything specific?
+>>>
+>>> I don't recall the details of what you were trying to accomplish here
+>>> (it's been 8 months or so) but the surely the vgic handling code should
+>>> *somehow* be integrated into the handle_kernel_mmio (like Paolo
+>>> suggested), unless you come back and tell me that that would involve a
+>>> complete rewrite of the vgic code.
+>> I'm experimenting now - it's not exactly rewrite of whole vgic code,
+>> but it will touch a lot of it  - all MMIO access handlers and the
+>> supporting functions.
+>> We're ready to spend the effort. My question is  - is this acceptable?
+>>
+>> regards,
+>> Nikolay Nikolaev
+>> Virtual Open Systems
+>>>
+>>> -Christoffer
+>> _______________________________________________
+>> kvmarm mailing list
+>> kvmarm at lists.cs.columbia.edu
+>> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+>>
 > 
-> arm*-*-eabi*)
->         default_use_cxa_atexit=yes
->         tm_file="dbxelf.h elfos.h arm/unknown-elf.h arm/elf.h arm/bpabi.h"
->         tmake_file="${tmake_file} arm/t-arm arm/t-arm-elf"
->         tm_file="$tm_file newlib-stdint.h"
->         tmake_file="${tmake_file} arm/t-bpabi"
->         use_gcc_stdint=wrap
->         tm_file="${tm_file} arm/aout.h vxworks-dummy.h arm/arm.h"
->         ;;
-> 
-> instead of this one:
-> 
-> arm*-*-linux-*)                 # ARM GNU/Linux with ELF
-
-That one would match arm-unknown-linux-eabi (as it does
-arm-unknown-linux-gnueabi), not arm-linux-eabi.  "triples" ;-)
-
-arm-linux-eabi canonicalises to arm-linux-eabi;
-arm-linux-gnueabi canonicalises to arm-unknown-linux-gnueabi.
-
->         tm_file="dbxelf.h elfos.h gnu-user.h linux.h linux-android.h glibc-stdint.h arm/elf.h arm/linux-gas.h arm/linux-elf.h"
->         extra_options="${extra_options} linux-android.opt"
->         tmake_file="${tmake_file} arm/t-arm arm/t-arm-elf arm/t-bpabi arm/t-linux-eabi"
->         tm_file="$tm_file arm/bpabi.h arm/linux-eabi.h arm/aout.h vxworks-dummy.h arm/arm.h"
->         # The EABI requires the use of __cxa_atexit.
->         default_use_cxa_atexit=yes
->         with_tls=${with_tls:-gnu}
->         ;;
-> 
-> so among other things, we are missing linux.h and glibc-stdint.h.
-
-Right.  The kernel should not depend on anything about userland (i.e., the
-linux.h header); but the stdint thing is needed to get the ABI you expect it
-seems.
-
-Great that you managed to figure out the mess,
-
-
-Segher
