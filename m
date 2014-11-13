@@ -1,89 +1,40 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 13 Nov 2014 13:02:20 +0100
-Subject: [PATCH v2 0/4] Hot plug support for the Armada 38x SoCs
-In-Reply-To: <1414669184-16785-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1414669184-16785-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <54649DCC.3000900@free-electrons.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 13 Nov 2014 13:03:22 +0100
+Subject: [PATCH] can: Fix bug in suspend/resume
+In-Reply-To: <20141113123218.79850236@ipc1.ka-ro>
+References: <a44efc1fb0144cca9d0c4851cc51db25@BL2FFO11FD024.protection.gbl>	<546484D9.4030005@pengutronix.de>	<54648BF4.60007@pengutronix.de>	<9455da2b86c74d5aafe9bf118edec7bb@BN1AFFO11FD045.protection.gbl>
+ <20141113123218.79850236@ipc1.ka-ro>
+Message-ID: <54649E0A.7030607@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+On 11/13/2014 12:32 PM, Lothar Wa?mann wrote:
+>>>>  static int __maybe_unused xcan_suspend(struct device *dev)  {
+>>>> -    struct platform_device *pdev = dev_get_drvdata(dev);
+>>>> +    struct platform_device *pdev = container_of(dev,
+>>>> +                    struct platform_device, dev);
+>>>>      struct net_device *ndev = platform_get_drvdata(pdev);
+>>>>      struct xcan_priv *priv = netdev_priv(ndev);
+>>
+> Why not simply:
+> 	struct net_device *ndev = dev_get_drvdata(dev);
+> 
+> There is no need for a struct platform_device* at all.
 
-On 30/10/2014 12:39, Gregory CLEMENT wrote:
-> Hi,
-> 
-> This patch set is the second version of the series adding the hot plug
-> and also kexec support for the Armada 38x Socs.
-> 
-> If nobody object we could push them in linux-next.
-> 
-> The first patch was done in order to have the same code between Armada
-> XP and the Cortex A9 based mvebu SoCs. In order to ensure the the
-> backward compatibility for the device tree, it is only a preliminary
-> work for it.
-> 
-> The second patch moves the SCU power up sequence in a dedicated
-> assembly function. It was done in order to reuse it in the 3rd patch.
-> 
-> The third patch fixes the secondary startup for the cortex A9 mvebu
-> SoC. Indeed, the initial code was written with the assumption the SCU
-> will be always power on, which is not only true especially in the
-> kexec case.
-> 
-> These 2 patches may worth to be pushed to the stable kernel.
-> 
-> Then the last patch adds the CPU hotplug support for Armada 38x. I
-> tested the hotplug using the /sys/devices/system/cpu/cpu1/online
-> virtual file.  I also tested the kexec feature and managed to switch
-> to a new kernel using kexec.
-> 
-> Thanks,
-> 
-> Gregory
-> 
+ACK
 
-This second series have been sent 2 weeks ago and it didn't receive more
-comments. The biggest part of this series is similar to what have been
-done for the Armada XP. Unless you have any comments, what about applying it
-on the mvebu branches?
-
-Thanks,
-
-Gregory
-
-
-> Changelog:
-> 
-> v1 -> v2:
-> 
-> - Fix typo and improve the comment explaining why we need to keep the
->   .smp filed in the 1st patch.
-> 
-> - Add a prefix to the function power_up_scu function to keep it
->   private and not "pollute" the global namespace.
-> 
-> Gregory CLEMENT (4):
->   ARM: mvebu: Clean-up the Armada XP support
->   ARM: mvebu: Move SCU power up in a function
->   ARM: mvebu: Fix the secondary startup for Cortex A9 SoC
->   ARM: mvebu: Implement the CPU hotplug support for the Armada 38x SoCs
-> 
->  arch/arm/mach-mvebu/armada-370-xp.h |  6 -----
->  arch/arm/mach-mvebu/board-v7.c      |  5 ++++
->  arch/arm/mach-mvebu/coherency.c     |  1 -
->  arch/arm/mach-mvebu/cpu-reset.c     |  1 -
->  arch/arm/mach-mvebu/headsmp-a9.S    |  1 +
->  arch/arm/mach-mvebu/platsmp-a9.c    | 53 +++++++++++++++++++++++++++++++++++--
->  arch/arm/mach-mvebu/platsmp.c       |  2 ++
->  arch/arm/mach-mvebu/pmsu.c          |  3 +--
->  arch/arm/mach-mvebu/pmsu.h          |  2 ++
->  arch/arm/mach-mvebu/pmsu_ll.S       | 20 +++++++++-----
->  10 files changed, 75 insertions(+), 19 deletions(-)
-> 
-
+Marc
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/7020cd38/attachment.sig>
