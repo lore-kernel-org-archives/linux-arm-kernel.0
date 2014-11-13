@@ -1,55 +1,88 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 13 Nov 2014 09:52:38 +0100
-Subject: [PATCH 3/4] simplefb: Change simplefb_init from module_init to
- fs_initcall
-In-Reply-To: <1415830124-28787-3-git-send-email-hdegoede@redhat.com>
-References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
- <1415830124-28787-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141113085238.GE20972@lukather>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Thu, 13 Nov 2014 14:26:23 +0530
+Subject: [PATCH v2 0/6] exynos: Move pmu driver to driver/soc folder and
+ add exynos7 support
+In-Reply-To: <1415452601-13078-1-git-send-email-amit.daniel@samsung.com>
+References: <1415452601-13078-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <CADGdYn46=X1FS7TWp=qCDsm3J9Xg=pEZb945X8tfwc0k6thfvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 12, 2014 at 11:08:43PM +0100, Hans de Goede wrote:
-> One of the reasons for having the simplefb nodes in /chosen, and doing
-> explicit enumeration of the nodes there, is too allow enumerating them sooner,
-> so that we get a console earlier on.
-> 
-> Doing this earlier then fs_initcall is not useful, since the fb only turns into
-> a console when fbcon intializes, which is a fs_initcall too.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  drivers/video/fbdev/simplefb.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-> index be7d288..8c0c972 100644
-> --- a/drivers/video/fbdev/simplefb.c
-> +++ b/drivers/video/fbdev/simplefb.c
-> @@ -415,7 +415,11 @@ static void __exit simplefb_exit(void)
->  	platform_driver_unregister(&simplefb_driver);
->  }
->  
-> -module_init(simplefb_init);
-> +/*
-> + * While this can be a module, if builtin it's most likely the console
-> + * So let's leave module_exit but move module_init to an earlier place
-> + */
+On Sat, Nov 8, 2014 at 6:46 PM, Amit Daniel Kachhap
+<amit.daniel@samsung.com> wrote:
+> This patch series[1 - 6] performs,
+>
+> 1) Moves pmu driver to driver/soc/samsung folder. Some discussion happened about
+>    this in the v1 version. Finally adding it in driver/soc folder as it too SoC
+>    specific and not a general driver. Entire discussion can be found here (A).
+> 2) Registers this driver as MFD client driver. This will be used by clients like exynos pm
+>    sleep and pm domain driver.
+> 3) Add exynos7 PMU support.
+>
+> Changes from V1:
+> * Move pmu driver in driver/soc/samsung folder
+> * Removed the power domain features. They will posted as a separate series.
+> * Added exynos7 PMU support.
+> * Link to v1 can be found here (B)
+>
+> This patch has dependency on following patches posted earlier by Pankaj (C),
+> which is accepted by maintainer.
+>
+> Patch 6 was earlier posted by Abhilash (D) which has been reposted here with some
+> extra changes.
+>
+> This complete patch series is rebased on linux-next.
+>
+> (A) - http://www.spinics.net/lists/linux-samsung-soc/msg38444.html
+> (B) - http://www.spinics.net/lists/linux-samsung-soc/msg38442.html
+> (C) - https://lkml.org/lkml/2014/10/6/581
+> (D) - http://www.spinics.net/lists/arm-kernel/msg358230.html
+>
+> Amit Daniel Kachhap (6):
+>   ARM: EXYNOS: Move pmu specific header files under "linux/soc/samsung"
+>   drivers: soc: Add support for Exynos PMU driver
+>   drivers: soc: samsung: Fix a spelling mistake
+>   soc: samsung: exynos-pmu: Register exynos-pmu driver as a mfd driver
+>   driver: soc: exynos-pmu: Add an API to be called after wakeup
+>   drivers: soc: samsung: Add support for Exynos7 pmu
+>
+>  .../devicetree/bindings/arm/samsung/pmu.txt        |    1 +
+>  arch/arm/mach-exynos/Makefile                      |    2 +-
+>  arch/arm/mach-exynos/exynos.c                      |    2 +-
+>  arch/arm/mach-exynos/mcpm-exynos.c                 |    2 +-
+>  arch/arm/mach-exynos/platsmp.c                     |    2 +-
+>  arch/arm/mach-exynos/pm.c                          |    4 +-
+>  arch/arm/mach-exynos/regs-pmu.h                    |  335 -----------
+>  arch/arm/mach-exynos/suspend.c                     |    3 +-
+>  drivers/soc/Kconfig                                |    1 +
+>  drivers/soc/Makefile                               |    1 +
+>  drivers/soc/samsung/Kconfig                        |   19 +
+>  drivers/soc/samsung/Makefile                       |    1 +
+>  .../pmu.c => drivers/soc/samsung/exynos-pmu.c      |  471 ++++++++++++++-
 
-Not really related to this patch itself, but do we want to support
-simplefb as a module? It seems like it's going to be most of the time
-broken.
+Hi Olof/Kukjin,
 
-Maxime
+I am not sure that driver/soc/samsung/* shall go in whose tree.
+I am preparing the next version so if any comment from your side
+please let me know.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/6baced6e/attachment-0001.sig>
+Regards,
+Amit
+
+>  .../linux/soc/samsung}/exynos-pmu.h                |    6 +
+>  include/linux/soc/samsung/exynos-regs-pmu.h        |  608 ++++++++++++++++++++
+>  15 files changed, 1109 insertions(+), 349 deletions(-)
+>  delete mode 100644 arch/arm/mach-exynos/regs-pmu.h
+>  create mode 100644 drivers/soc/samsung/Kconfig
+>  create mode 100644 drivers/soc/samsung/Makefile
+>  rename arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c (50%)
+>  rename {arch/arm/mach-exynos => include/linux/soc/samsung}/exynos-pmu.h (78%)
+>  create mode 100644 include/linux/soc/samsung/exynos-regs-pmu.h
+>
+> --
+> 1.7.9.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
