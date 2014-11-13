@@ -1,64 +1,87 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 13 Nov 2014 22:59:38 +0000 (UTC)
-Subject: [PATCH 4/4] arm: dts: omap3-gta04: Add static configuration for
- devconf1 register
-In-Reply-To: <20141113182848.GQ26481@atomide.com>
-References: <1415051968-4878-1-git-send-email-marek@goldelico.com>
- <1415051968-4878-5-git-send-email-marek@goldelico.com>
- <5463585D.9070209@ti.com> <20141112150210.GC26481@atomide.com>
- <5464969F.30708@ti.com> <20141113182848.GQ26481@atomide.com>
-Message-ID: <alpine.DEB.2.02.1411132251320.17030@utopia.booyaka.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Fri, 14 Nov 2014 07:19:22 +0800
+Subject: [PATCH 2/2] PCI: generic: Add set_msi_parent callback
+In-Reply-To: <20141113152243.GB9726@red-moon>
+References: <1415647480-3320-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1415647480-3320-3-git-send-email-suravee.suthikulpanit@amd.com>
+ <20141111112424.GB16265@arm.com>
+ <20141111115227.GF12037@e106497-lin.cambridge.arm.com>
+ <20141113152243.GB9726@red-moon>
+Message-ID: <54653C7A.6060003@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Thu, 13 Nov 2014, Tony Lindgren wrote:
-
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [141113 03:33]:
-> > On 12/11/14 17:02, Tony Lindgren wrote:
-> > 
-> > >> And, with a quick grep, I see CONTROL_DEVCONF1 touched in multiple
-> > >> places in the kernel. I wonder if adding a pinmux entry for it could
-> > >> cause some rather odd problems.
-> > > 
-> > > They can all use pinctrl-single no problem.
-> > 
-> > Can, but don't. That's my worry. If we touch the DEVCONF1 via pinmux,
-> > and we have code in mach-omap2 that also touch DEVCONF1, without any
-> > knowledge (and locking) between those...
+On 2014/11/13 23:22, Lorenzo Pieralisi wrote:
+> On Tue, Nov 11, 2014 at 11:52:27AM +0000, Liviu Dudau wrote:
+>> On Tue, Nov 11, 2014 at 11:24:24AM +0000, Will Deacon wrote:
+>>> Hi Suravee,
+>>>
+>>> On Mon, Nov 10, 2014 at 07:24:40PM +0000, suravee.suthikulpanit at amd.com wrote:
+>>>> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>>>
+>>> I don't think this makes much sense a host controller callback. Why can't
+>>> bus->msi be set in generic code?
+>>
+>> Because of the current way in which a bus gets created and them immediately used for
+>> scanning devices if you use pci_scan_root_bus(). Alternative is to use pci_create_root_bus()
+>> and increase your code size with the body of pci_scan_root_bus().
+>>
+>> Solution is to have pci_host_bridge holding the msi_chip pointer and that gets created
+>> before root bus, with pci_scan_root_bus() now having all the info needed to do successful
+>> setup of scanned devices.
 > 
-> Hmm yeah the McBSP clock mux could be racy as the mux register for
-> McBSP is treated as a clock. This register muxes the clock between
-> external pin and internal clock. Considering that this should be
-> selectable at board level as the external clock probably needs to be
-> used if level shifters are being used, it should be really handled by
-> pinctrl-single.
+> Why can't we add a hook like pci_bus_assign_domain_nr(), say:
 > 
-> The other use for hsmmc.c and pdata-quirks.c for the one time mux for
-> MMC clock from the MMC clock pin. That can be done with pinctrl-single
-> from the MMC driver too for DT based booting.
+> pci_bus_msi_init()
 > 
-> Then we just have the save and restore of the registers for
-> off-idle.
->  
-> > So _maybe_ that's not an issue, as the pinmux config we have here is
-> > fixed, and done once at boot time, and maybe the code in mach-omap2 that
-> > touch DEVCONF1 is also ran just once and not at the same time as the
-> > pinmux. But I don't know if that's so.
+> in pci_create_root_bus() that does what Suravee wants in a generic way ?
++1
+BTW, x86 may have multiple MSI controllers/domains under a host bridge,
+so prefer calling it for every bus instead of for root bus only.
+Regards!
+Gerry
 > 
-> It seems we could just do a read-only check for McBSP in the clock
-> code for the mux register, or even completely drop that code from
-> cclock3xxx_data.c and start using the pinctrl for that mux.
+> What am I missing ?
 > 
-> Paul & Tero, got any comments here?
-
-It's best to move all of the SCM register reads/writes to an SCM IP block 
-driver.  This driver would be the only entity that would touch the SCM IP 
-block registers - no other code on the system would touch it (perhaps 
-aside from anything needed for early init).  The SCM driver would enforce 
-mutual exclusion via a spinlock, so concurrent SCM register modifications 
-wouldn't flake out.  Then the SCM driver would register clocks with the 
-CCF, register pins with the pinctrl subsystem, etc. etc.
-
-- Paul
+> Lorenzo
+> 
+>>
+>> Best regards,
+>> Liviu
+>>
+>>>
+>>>>  static struct pci_ops gen_pci_ops = {
+>>>>  	.read	= gen_pci_config_read,
+>>>>  	.write	= gen_pci_config_write,
+>>>> +	.set_msi_parent = gen_pci_set_msi_parent,
+>>>>  };
+>>>>  
+>>>>  static const struct of_device_id gen_pci_of_match[] = {
+>>>> @@ -313,6 +324,9 @@ static int gen_pci_probe(struct platform_device *pdev)
+>>>>  		return err;
+>>>>  	}
+>>>>  
+>>>> +	pci->mchip = of_pci_find_msi_chip_by_node(of_parse_phandle(np,
+>>>> +						  "msi-parent", 0));
+>>>
+>>> This bit should be in the generic of_pci.c code and not duplicated for
+>>> each host controller.
+>>>
+>>> Will
+>>>
+>>
+>> -- 
+>> ====================
+>> | I would like to |
+>> | fix the world,  |
+>> | but they're not |
+>> | giving me the   |
+>>  \ source code!  /
+>>   ---------------
+>>     ?\_(?)_/?
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
