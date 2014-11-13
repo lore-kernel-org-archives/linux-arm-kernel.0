@@ -1,80 +1,44 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 13 Nov 2014 16:11:20 +0100
-Subject: [PATCH] dmaengine: at_xdmac: Declare slave capabilities for the
- generic code
-In-Reply-To: <1415888096-22090-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1415888096-22090-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1415891480-9563-1-git-send-email-ludovic.desroches@atmel.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 13 Nov 2014 16:11:42 +0100
+Subject: [PATCH] ARM: mvebu: add MTD_BLOCK to mvebu_v7_defconfig
+In-Reply-To: <1415873489-22446-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1415873489-22446-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20141113151142.GC2001@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the generic slave caps code can make use of the device assigned
-capabilities, instead of relying on a callback to be implemented.
+On Thu, Nov 13, 2014 at 11:11:29AM +0100, Thomas Petazzoni wrote:
+> Since many (most?) mvebu platforms have NAND or SPI flashes, it makes
+> sense to have CONFIG_MTD_BLOCK=y in mvebu_v7_defconfig. The vast
+> majority of the other ARM defconfigs have it enabled, including
+> mvebu_v5_defconfig.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+> Patch based on mvebu/defconfig
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Make use of this code.
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/dma/at_xdmac.c | 33 +++++++++++----------------------
- 1 file changed, 11 insertions(+), 22 deletions(-)
+	  Andrew
 
-diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-index c7f3350..8c799f6 100644
---- a/drivers/dma/at_xdmac.c
-+++ b/drivers/dma/at_xdmac.c
-@@ -174,6 +174,13 @@
- 
- #define AT_XDMAC_MAX_CHAN	0x20
- 
-+#define AT_XDMAC_DMA_BUSWIDTHS\
-+	(BIT(DMA_SLAVE_BUSWIDTH_UNDEFINED) |\
-+	BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |\
-+	BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |\
-+	BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) |\
-+	BIT(DMA_SLAVE_BUSWIDTH_8_BYTES))
-+
- enum atc_status {
- 	AT_XDMAC_CHAN_IS_CYCLIC = 0,
- 	AT_XDMAC_CHAN_IS_PAUSED,
-@@ -1234,27 +1241,6 @@ static void at_xdmac_free_chan_resources(struct dma_chan *chan)
- 	return;
- }
- 
--#define AT_XDMAC_DMA_BUSWIDTHS\
--	(BIT(DMA_SLAVE_BUSWIDTH_UNDEFINED) |\
--	BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |\
--	BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |\
--	BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) |\
--	BIT(DMA_SLAVE_BUSWIDTH_8_BYTES))
--
--static int at_xdmac_device_slave_caps(struct dma_chan *dchan,
--				      struct dma_slave_caps *caps)
--{
--
--	caps->src_addr_widths = AT_XDMAC_DMA_BUSWIDTHS;
--	caps->dst_addr_widths = AT_XDMAC_DMA_BUSWIDTHS;
--	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
--	caps->cmd_pause = true;
--	caps->cmd_terminate = true;
--	caps->residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
--
--	return 0;
--}
--
- #ifdef CONFIG_PM
- static int atmel_xdmac_prepare(struct device *dev)
- {
-@@ -1428,7 +1414,10 @@ static int at_xdmac_probe(struct platform_device *pdev)
- 	atxdmac->dma.device_pause			= at_xdmac_device_pause;
- 	atxdmac->dma.device_resume			= at_xdmac_device_resume;
- 	atxdmac->dma.device_terminate_all		= at_xdmac_device_terminate_all;
--	atxdmac->dma.device_slave_caps			= at_xdmac_device_slave_caps;
-+	atxdmac->dma.src_addr_widths = AT_XDMAC_DMA_BUSWIDTHS;
-+	atxdmac->dma.dst_addr_widths = AT_XDMAC_DMA_BUSWIDTHS;
-+	atxdmac->dma.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
-+	atxdmac->dma.residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
- 
- 	/* Disable all chans and interrupts. */
- 	at_xdmac_off(atxdmac);
--- 
-2.0.3
+> ---
+>  arch/arm/configs/mvebu_v7_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
+> index 9ca7e78..802c3c6 100644
+> --- a/arch/arm/configs/mvebu_v7_defconfig
+> +++ b/arch/arm/configs/mvebu_v7_defconfig
+> @@ -45,6 +45,7 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+>  CONFIG_DEVTMPFS=y
+>  CONFIG_DEVTMPFS_MOUNT=y
+>  CONFIG_MTD=y
+> +CONFIG_MTD_BLOCK=y
+>  CONFIG_MTD_CFI=y
+>  CONFIG_MTD_CFI_INTELEXT=y
+>  CONFIG_MTD_CFI_AMDSTD=y
+> -- 
+> 2.0.0
+> 
