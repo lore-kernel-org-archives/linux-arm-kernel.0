@@ -1,134 +1,85 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 13 Nov 2014 11:02:14 +0000
-Subject: [PATCH v2 1/4] dt-bindings: simplefb: Specify node location and
- handoff related properties
-In-Reply-To: <1415868610-13297-1-git-send-email-hdegoede@redhat.com>
-References: <1415868610-13297-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CACxGe6uX7V-TcZfM0vP4SvjxKx3T_RGByX8wFqTdFo4LEzP2Yg@mail.gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 13 Nov 2014 11:00:03 +0000
+Subject: [PATCH v2 00/14] Add stih410 SoC and USB2/1.1 support
+Message-ID: <1415876417-28728-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 13, 2014 at 8:50 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Since simplefb nodes do not relate directly to hw typically they have been
-> placed in the root of the devicetree. As the represent runtime information
-> having them as sub-nodes of /chosen is more logical, specify this.
->
-> Also specify when to set the chosen stdout-path property to a simplefb node.
->
-> For reliable handover to a hardware specific driver, that driver needs to
-> know which simplefb to unregister when taking over, specify how the hw driver
-> can find the matching simplefb node.
->
-> Last add some advice on how to fill and use simplefb nodes from a firmware
-> pov.
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> --
-> Changes in v2:
-> -Add stdout-path to the example code
-> ---
->  .../bindings/video/simple-framebuffer.txt          | 38 +++++++++++++++++++++-
->  1 file changed, 37 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-> index 8f35718..8b7ecf6 100644
-> --- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-> @@ -4,6 +4,26 @@ A simple frame-buffer describes a frame-buffer setup by firmware or
->  the bootloader, with the assumption that the display hardware has already
->  been set up to scan out from the memory pointed to by the reg property.
->
-> +Since simplefb nodes represent runtime information they must be sub-nodes of
-> +the chosen node (*). The primary display node must be named framebuffer0,
-> +additional nodes must be called framebuffer1, etc.
+Hi folks,
 
-Thinking more about our conversation yesterday, the preferred name
-should still be framebuffer@<address>. There is no reason to break
-with established convention, and as mentioned in my reply on patch #2,
-using the name is not the preferred way to identify a device node. So,
-my recommendation is to prefer the name "framebuffer@<addr>", but if
-it is inconvenient because the address isn't known, then
-"framebuffer#" is acceptable. Then use /aliases for actual enumeration
-which has the advantage of also working for framebuffers that aren't
-in /chosen.
+This series adds the required device tree nodes to enable the usb2/1.1 phy
+and usb2/1.1 controllers on the stih416-b2120 board.
 
-> +
-> +If a simplefb node represents the preferred console for user interaction,
-> +then the chosen node's stdout-path property must point to it.
-> +
-> +If the devicetree contains nodes for the display hardware used by a simplefb,
-> +then one of the hw nodes must have a property called "framebuffer" pointing to
-> +the framebuffer# node in chosen, so that the operating system knows which
-> +simplefb to disable when handing over control to a driver for the real
-> +hardware. The bindings for the hw nodes must specify which node contains the
-> +framebuffer property.
+It additionally re-works and adds support for the new stih410 SoC which is
+very similar to the stih407 SoC, by abstracting out the common parts
+into common dt files. It also then adds the dt nodes to enable usb2/1.1 
+for the stih410 platform as well.
 
-I've also been thinking about this. When we talked yesterday I said I
-didn't have a preference as to which direction the link between the
-framebuffer and the display hardware pointed. Thinking about it now,
-between the two nodes, the HW node is pretty much static, but the FB
-node is dynamic and in most scenarios will be enabled by firmware, and
-then disabled by the operating system. If the framebuffer property is
-in the HW node, then that means the firmware needs to modify two nodes
-to set up the linkage correctly. It needs to enable the framebuffer,
-and then add the link. If one of several possible FB nodes was enabled
-by the firmware, it need to modify the display controller node to
-match. And, when the framebuffer is disabled, the HW node is left with
-a dangling link that kexec won't necessarily know how to fix up.
+As well as adding dt nodes it also enables the relevant drivers in the 
+mult7_v7_defconfig.
 
-If instead the link goes the other way, as a property in the
-framebuffer node pointing to display controller, all of the
-functionality still stays the same, but the display controller node
-never needs to change when framebuffers are
-enabled/disabled/added/removed. Since the location and/or compatible
-value of framebuffers is always well known, (aside from the fact that
-the simplefb driver binds to them), we can have a single API that will
-return all the framebuffers associated to a given display controller
-node. The real HW driver will be able to use that to find its
-framebuffers and coordinate handover between them.
+Finally we update the default bootargs for stih407-b2120 and stih410-b2120
+to boot with the clk_ignore_unused kernel parameter so as not to hang
+the SoC when the (as yet) unreferenced interconnect clocks get disabled
+by CCF (this is a tempoary solution).
 
-g.
+This series has been tested on stih416-b2020 and stih410-b2120 SoC/boards.
 
-> +
-> +It is advised that devicetree files contain pre-filled, disabled framebuffer#
-> +nodes, so that the firmware only needs to update the mode information and
-> +enable them. This way if e.g. later on support for more display clocks get
-> +added, the simplefb nodes will already contain this info and the firmware
-> +does not need to be updated.
-> +
->  Required properties:
->  - compatible: "simple-framebuffer"
->  - reg: Should contain the location and size of the framebuffer memory.
-> @@ -22,11 +42,27 @@ Optional properties:
->
->  Example:
->
-> -       framebuffer {
-> +chosen {
-> +       framebuffer0 {
->                 compatible = "simple-framebuffer";
->                 reg = <0x1d385000 (1600 * 1200 * 2)>;
->                 width = <1600>;
->                 height = <1200>;
->                 stride = <(1600 * 2)>;
->                 format = "r5g6b5";
-> +               clocks = <&ahb_gates 36>, <&ahb_gates 43>, <&ahb_gates 44>;
->         };
-> +       stdout-path = &framebuffer0;
-> +};
-> +
-> +soc at 01c00000 {
-> +       lcdc0: lcdc at 1c0c000 {
-> +               compatible = "allwinner,sun4i-a10-lcdc";
-> +               framebuffer = <&framebuffer0>;
-> +       };
-> +};
-> +
-> +
-> +*) Older devicetree files may have a compatible = "simple-framebuffer" node
-> +in a different place, operating systems must first enumerate any framebuffer#
-> +nodes found under chosen and then check for other compatible nodes.
-> --
-> 2.1.0
->
+Changes since v1:
+- Leave bootargs & memory dt nodes in board files (Arnd)
+- Remove '0x' from the unit address in all instances. (Arnd)
+- Remove 'status="okay"' from some nodes (Arnd)
+- Remove some legacy extra nodes which only contain status property (Arnd)
+- Fix stih410 commit description (Maxime)
+- Add a stih410.dtsi and stih410-pinctrl.dtsi files (Maxime)
+- Remove superflous '\n' (Lee)
+- Add a '\n' between the sentries and #include (Lee)
+
+regards,
+
+Peter.
+
+Peter Griffin (14):
+  ARM: STi: DT: STiH416: Add pinctl setup for usb controllers.
+  ARM: STi: DT: STiH416: Add DT node for the stih415/6 usb2 phy
+  ARM: STi: DT: STiH416: Add DT nodes for the ehci and ohci usb
+    controllers.
+  ARM: multi_v7_defconfig: Enable st ohci and ehci HCD drivers.
+  ARM: multi_v7_defconfig: Enable stih415/6 usb2 phy driver.
+  ARM: multi_v7_defconfig: Enable stih407 usb picophy
+  ARM: STi: DT: STiH407: Add usb2 picophy dt nodes
+  ARM: STi: DT: STiH410: Add defines for STiH410 DT clocks
+  ARM: STi: DT: STiH410:  Add pinctl config for usb controllers.
+  ARM: STi: DT: STih407: Abstract common dt nodes into shared files.
+  ARM: STi: DT: STiH410: Add STiH410 SoC and b2120 board support.
+  ARM: STi: DT: STih407: STih410: Add clk_ignore_unused to kernel
+    bootargs
+  ARM: STi: DT: STiH410: Add usb2 picophy dt nodes
+  ARM: STi: DT: STiH410: Add DT nodes for the ehci and ohci usb
+    controllers.
+
+ arch/arm/boot/dts/Makefile               |   1 +
+ arch/arm/boot/dts/stih407-b2120.dts      |  55 +----
+ arch/arm/boot/dts/stih407-family.dtsi    | 290 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/stih407.dtsi           | 279 -------------------------
+ arch/arm/boot/dts/stih410-b2120.dts      |  29 +++
+ arch/arm/boot/dts/stih410-clock.dtsi     | 338 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/stih410-pinctrl.dtsi   |  34 ++++
+ arch/arm/boot/dts/stih410.dtsi           |  90 ++++++++
+ arch/arm/boot/dts/stih416-pinctrl.dtsi   |  34 ++++
+ arch/arm/boot/dts/stih416.dtsi           | 129 ++++++++++++
+ arch/arm/boot/dts/stihxxx-b2120.dtsi     |  59 ++++++
+ arch/arm/configs/multi_v7_defconfig      |   4 +
+ include/dt-bindings/clock/stih410-clks.h |  25 +++
+ 13 files changed, 1037 insertions(+), 330 deletions(-)
+ create mode 100644 arch/arm/boot/dts/stih407-family.dtsi
+ delete mode 100644 arch/arm/boot/dts/stih407.dtsi
+ create mode 100644 arch/arm/boot/dts/stih410-b2120.dts
+ create mode 100644 arch/arm/boot/dts/stih410-clock.dtsi
+ create mode 100644 arch/arm/boot/dts/stih410-pinctrl.dtsi
+ create mode 100644 arch/arm/boot/dts/stih410.dtsi
+ create mode 100644 arch/arm/boot/dts/stihxxx-b2120.dtsi
+ create mode 100644 include/dt-bindings/clock/stih410-clks.h
+
+-- 
+1.9.1
