@@ -1,65 +1,26 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Thu, 13 Nov 2014 10:39:10 +1100
-Subject: [linux-sunxi] [PATCH 2/4] simplefb: Add support for enumerating
- simplefb dt nodes in /chosen
-In-Reply-To: <1415830124-28787-2-git-send-email-hdegoede@redhat.com>
-References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
- <1415830124-28787-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGRGNgW_Q6oghpe5Mw-8aYPVVj1YZ6R3iaqOQzCE9dSD1nYSyA@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 13 Nov 2014 01:21:40 +0100
+Subject: [RESEND/PATCH] i2c: pxa: Use suspend() and resume() instead of
+ the _noirq hooks
+In-Reply-To: <7hzjcnaazl.fsf@deeprootsystems.com>
+References: <1413829432-7815-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <7hzjcqe9ge.fsf@deeprootsystems.com>
+ <54482EB1.9030407@vanguardiasur.com.ar>
+ <7hzjcnaazl.fsf@deeprootsystems.com>
+Message-ID: <20141113002139.GC2062@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
 
-On Thu, Nov 13, 2014 at 9:08 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Update simplefb to support the new preferred location for simplefb dt nodes
-> under /chosen.
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  drivers/video/fbdev/simplefb.c | 33 ++++++++++++++++++++++++++++++++-
->  1 file changed, 32 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-> index cd96edd..be7d288 100644
-> --- a/drivers/video/fbdev/simplefb.c
-> +++ b/drivers/video/fbdev/simplefb.c
-> @@ -27,6 +27,7 @@
->  #include <linux/platform_data/simplefb.h>
->  #include <linux/platform_device.h>
->  #include <linux/clk-provider.h>
-> +#include <linux/of_platform.h>
->
->  static struct fb_fix_screeninfo simplefb_fix = {
->         .id             = "simple",
-> @@ -385,7 +386,37 @@ static struct platform_driver simplefb_driver = {
->         .probe = simplefb_probe,
->         .remove = simplefb_remove,
->  };
-> -module_platform_driver(simplefb_driver);
-> +
-> +static int __init simplefb_init(void)
-> +{
-> +       int i, ret;
-> +       char name[16];
-> +       struct device_node *np;
-> +
-> +       ret = platform_driver_register(&simplefb_driver);
-> +       if (ret)
-> +               return ret;
-> +
-> +       for (i = 0; ; i++) {
-> +               snprintf(name, sizeof(name), "framebuffer%d", i);
+> suspend/resume order depends on probe ordering, so with deferred probe,
+> the probe ordering might be right, but it should be thoroughly tested.
 
-This smells like an infinite loop: we can be pretty sure that no
-hardware will ever exist with more than 9999 (I think?) framebuffers,
-however if that ever happens this'll loop until it runs out of RAM.
-Maybe add a suitably high limit to the for loop?
+Thanks a lot for the input here, Kevin!
 
-Thanks,
-
--- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/99d86d88/attachment-0001.sig>
