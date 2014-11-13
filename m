@@ -1,35 +1,33 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 13 Nov 2014 11:11:29 +0100
-Subject: [PATCH] ARM: mvebu: add MTD_BLOCK to mvebu_v7_defconfig
-Message-ID: <1415873489-22446-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 13 Nov 2014 11:12:20 +0100
+Subject: [PATCH v7 00/12] NVIDIA Tegra memory controller and IOMMU support
+In-Reply-To: <1415871157-21968-1-git-send-email-thierry.reding@gmail.com>
+References: <1415871157-21968-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1550140.Lb4KHPOqX1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since many (most?) mvebu platforms have NAND or SPI flashes, it makes
-sense to have CONFIG_MTD_BLOCK=y in mvebu_v7_defconfig. The vast
-majority of the other ARM defconfigs have it enabled, including
-mvebu_v5_defconfig.
+On Thursday 13 November 2014 10:32:25 Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+> 
+> This is the sixth installment in the Tegra IOMMU and memory controller
+> support series. This version addresses the final outstanding comments from
+> Olof about using proper Kconfig symbols to track the dependencies. It also
+> splits up the driver into one part that implements the memory controller
+> only and a second part that implements the SMMU. This plays nicely with
+> the new Kconfig options introduced.
+> 
+> Patch 1 is a preparatory patch that exposes the memory controller clock.
+> 
+> Patches 2 and 3 is a pair of precursory patches needed to make this all
+> work on 64-bit ARM in the future.
+> 
+> The device tree binding for the Tegra memory controller is added in patch
+> 4 and patch 5 is the bulk of the series that move the existing memory
+> controller and IOMMU drivers into the new unified driver that supports
+> Tegra30, Tegra114 and Tegra124.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
-Patch based on mvebu/defconfig
+I just noticed that patch 5 has never made it into my inbox in any of the
+submissions. Did it get filtered by the mailing list?
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/configs/mvebu_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index 9ca7e78..802c3c6 100644
---- a/arch/arm/configs/mvebu_v7_defconfig
-+++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -45,6 +45,7 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_MTD=y
-+CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_INTELEXT=y
- CONFIG_MTD_CFI_AMDSTD=y
--- 
-2.0.0
+	Arnd
