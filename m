@@ -1,37 +1,36 @@
-From: ankit.jindal@linaro.org (Ankit Jindal)
-Date: Thu, 13 Nov 2014 13:15:22 +0530
-Subject: [PATCH v4 6/6] MAINTAINERS: Add entry for APM X-Gene QMTM UIO driver
-In-Reply-To: <1415864722-2800-1-git-send-email-ankit.jindal@linaro.org>
-References: <1415864722-2800-1-git-send-email-ankit.jindal@linaro.org>
-Message-ID: <1415864722-2800-7-git-send-email-ankit.jindal@linaro.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 13 Nov 2014 09:02:49 +0100
+Subject: [PATCH 0/5] Minor fixes for Marvell Armada 38x SoC.
+In-Reply-To: <1415835600-97188-1-git-send-email-mw@semihalf.com>
+References: <1415835600-97188-1-git-send-email-mw@semihalf.com>
+Message-ID: <20141113090249.1ab69b4d@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add entry to maintainer list for APM X-Gene QMTM UIO driver.
+Dear Marcin Wojtas,
 
-Signed-off-by: Ankit Jindal <ankit.jindal@linaro.org>
-Signed-off-by: Tushar Jagad <tushar.jagad@linaro.org>
----
- MAINTAINERS |    7 +++++++
- 1 file changed, 7 insertions(+)
+On Thu, 13 Nov 2014 00:39:55 +0100, Marcin Wojtas wrote:
+> This patchset adds minor fixes for Armada 38x SoC around SDHCI interface. It
+> also enables usage of I2C char-device and adjusts ethernet aliases for
+> bootloader's needs. Any feedback is welcome.
+> 
+> Marcin Wojtas (5):
+>   ARM: mvebu: re-enable SDHCI driver for Armada 38x SoC in v7 defconfig
+>   ARM: mvebu: enable no-1-8-v flag for Armada 385 DB SDHCI interface
+>   ARM: mvebu: remove clock-frequency from Armada 38x SDHCI Device Tree
+>     node
+>   ARM: mvebu: adjust ethernet aliases according to U-Boot requirements
+>     for A38x
+>   ARM: mvebu: enable i2c device in mvebu_v7_defconfig
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 5e7866a..138663f 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -727,6 +727,13 @@ S:	Supported
- F:	drivers/net/ethernet/apm/xgene/
- F:	Documentation/devicetree/bindings/net/apm-xgene-enet.txt
- 
-+APPLIED MICRO (APM) X-GENE QMTM UIO DRIVER
-+M:	Ankit Jindal <ankit.jindal@linaro.org>
-+M:	Tushar Jagad <tushar.jagad@linaro.org>
-+S:	Supported
-+F:	drivers/uio/uio_xgene_qmtm.c
-+F:	Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt
-+
- APTINA CAMERA SENSOR PLL
- M:	Laurent Pinchart <Laurent.pinchart@ideasonboard.com>
- L:	linux-media at vger.kernel.org
+On the entire series, you forgot to Cc some of the mvebu maintainers,
+namely Andrew Lunn and Sebastian Hesselbarth. I've added them in Cc of
+the cover letter, so that they get notified about this patch series.
+
+Best regards,
+
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
