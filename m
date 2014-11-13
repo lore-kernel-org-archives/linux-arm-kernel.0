@@ -1,85 +1,81 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 13 Nov 2014 11:00:03 +0000
-Subject: [PATCH v2 00/14] Add stih410 SoC and USB2/1.1 support
-Message-ID: <1415876417-28728-1-git-send-email-peter.griffin@linaro.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 13 Nov 2014 12:09:48 +0100
+Subject: [PATCH v2] PCI: designware: Add support 4 ATUs assignment
+In-Reply-To: <54648D61.6050704@freescale.com>
+References: <1415682444-24911-1-git-send-email-Minghuan.Lian@freescale.com>
+ <CA+mB=1+4Dzxhbin6z0PUENvjUz-y8bq-K09FXTnSepFvVfe9HQ@mail.gmail.com>
+ <546308DD.40109@freescale.com>
+ <CA+mB=1K=Oyzdb2yfBvPRG9DHi-PFjRPtVS_dY9JMOz6dQog8QQ@mail.gmail.com>
+ <546331E7.5060003@freescale.com>
+ <CA+mB=1KObT9O783SMcvHy8nJGQPnxyKgP332r5bHx-K_D+LhVg@mail.gmail.com>
+ <1415809929.2876.5.camel@pengutronix.de> <546481A3.5050700@freescale.com>
+ <1415874015.2420.5.camel@pengutronix.de> <54648D61.6050704@freescale.com>
+Message-ID: <1415876988.2420.7.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi folks,
+Am Donnerstag, den 13.11.2014, 18:52 +0800 schrieb Lian Minghuan-B31939:
+> Hi Lucas,
+> 
+> On 2014?11?13? 18:20, Lucas Stach wrote:
+> > Am Donnerstag, den 13.11.2014, 18:02 +0800 schrieb Lian Minghuan-B31939:
+> >> Hi Lucas,
+> >>
+> >> Please see my comments inline.
+> >>
+> >> Thanks,
+> >> Minghuan
+> >>
+> >> On 2014?11?13? 00:32, Lucas Stach wrote:
+> >>> Am Mittwoch, den 12.11.2014, 21:53 +0530 schrieb Srikanth Thokala:
+> >>>> Hi Minghuan,
+> > [...]
+> >
+> >>> Using a smaller type complicates the DT for little to no benefit. I
+> >>> think it's ok to use u32 here, which is a common standard for integer
+> >>> values in DT.
+> >>>
+> >>> Though this discussion lead me to the question if we even need to have
+> >>> this property in the DT at all. Isn't this a property that is fixed for
+> >>> a specific silicon implementation of the DW core? In that case we could
+> >>> just infer the number of ATUs from the DT compatible, so this should
+> >>> probably just be added to struct pcie_port and properly initialized by
+> >>> the SoC glue drivers.
+> >> [Minghuan]  As far as I know, exynos implements only 2 ATUs, this is why
+> >> pcie-designware only supports 2 ATU. iMX implements 4 ATUs and LS1021A
+> >> implements 6 ATUs.
+> >>
+> > Right so we don't need an additional property in the DT at all. The
+> > number of ATUs is fixed for a specific core compatible and can be passed
+> > in by the respective exynos, imx and ls1021 glue drivers.
+> >
+> > You may ask the Keystone and Spear maintainers to get the correct number
+> > of ATUs for those implementations.
+> >
+> > Regards,
+> > Lucas
+> [Minghuan] Yes. This a way that specific core driver passes the ATU 
+> number to
+> pci-designware. But I perfer to adding dts node for the following reasons:
+> 1. ATU number is hardware attribute, so it can be added to DTS.
 
-This series adds the required device tree nodes to enable the usb2/1.1 phy
-and usb2/1.1 controllers on the stih416-b2120 board.
+But it is a duplication of information that can be inferred from the DT
+compatible alone, which is usually frowned upon.
 
-It additionally re-works and adds support for the new stih410 SoC which is
-very similar to the stih407 SoC, by abstracting out the common parts
-into common dt files. It also then adds the dt nodes to enable usb2/1.1 
-for the stih410 platform as well.
+Also in contrast to the num-lanes property I don't see a use-case to
+reduce the number of used ATUs in a specific system, so num-atus is
+basically fixed for a specific implementation.
 
-As well as adding dt nodes it also enables the relevant drivers in the 
-mult7_v7_defconfig.
+> 2. That pci-designware common code parses the 'num-atus' can avoid every 
+> specific controller driver to define and pass num-atus, so can reduce 
+> code size and simplify the specific controller driver implementation.
+> 
+I don't think the code reduction matters here and the simplification is
+minimal.
 
-Finally we update the default bootargs for stih407-b2120 and stih410-b2120
-to boot with the clk_ignore_unused kernel parameter so as not to hang
-the SoC when the (as yet) unreferenced interconnect clocks get disabled
-by CCF (this is a tempoary solution).
-
-This series has been tested on stih416-b2020 and stih410-b2120 SoC/boards.
-
-Changes since v1:
-- Leave bootargs & memory dt nodes in board files (Arnd)
-- Remove '0x' from the unit address in all instances. (Arnd)
-- Remove 'status="okay"' from some nodes (Arnd)
-- Remove some legacy extra nodes which only contain status property (Arnd)
-- Fix stih410 commit description (Maxime)
-- Add a stih410.dtsi and stih410-pinctrl.dtsi files (Maxime)
-- Remove superflous '\n' (Lee)
-- Add a '\n' between the sentries and #include (Lee)
-
-regards,
-
-Peter.
-
-Peter Griffin (14):
-  ARM: STi: DT: STiH416: Add pinctl setup for usb controllers.
-  ARM: STi: DT: STiH416: Add DT node for the stih415/6 usb2 phy
-  ARM: STi: DT: STiH416: Add DT nodes for the ehci and ohci usb
-    controllers.
-  ARM: multi_v7_defconfig: Enable st ohci and ehci HCD drivers.
-  ARM: multi_v7_defconfig: Enable stih415/6 usb2 phy driver.
-  ARM: multi_v7_defconfig: Enable stih407 usb picophy
-  ARM: STi: DT: STiH407: Add usb2 picophy dt nodes
-  ARM: STi: DT: STiH410: Add defines for STiH410 DT clocks
-  ARM: STi: DT: STiH410:  Add pinctl config for usb controllers.
-  ARM: STi: DT: STih407: Abstract common dt nodes into shared files.
-  ARM: STi: DT: STiH410: Add STiH410 SoC and b2120 board support.
-  ARM: STi: DT: STih407: STih410: Add clk_ignore_unused to kernel
-    bootargs
-  ARM: STi: DT: STiH410: Add usb2 picophy dt nodes
-  ARM: STi: DT: STiH410: Add DT nodes for the ehci and ohci usb
-    controllers.
-
- arch/arm/boot/dts/Makefile               |   1 +
- arch/arm/boot/dts/stih407-b2120.dts      |  55 +----
- arch/arm/boot/dts/stih407-family.dtsi    | 290 ++++++++++++++++++++++++++
- arch/arm/boot/dts/stih407.dtsi           | 279 -------------------------
- arch/arm/boot/dts/stih410-b2120.dts      |  29 +++
- arch/arm/boot/dts/stih410-clock.dtsi     | 338 +++++++++++++++++++++++++++++++
- arch/arm/boot/dts/stih410-pinctrl.dtsi   |  34 ++++
- arch/arm/boot/dts/stih410.dtsi           |  90 ++++++++
- arch/arm/boot/dts/stih416-pinctrl.dtsi   |  34 ++++
- arch/arm/boot/dts/stih416.dtsi           | 129 ++++++++++++
- arch/arm/boot/dts/stihxxx-b2120.dtsi     |  59 ++++++
- arch/arm/configs/multi_v7_defconfig      |   4 +
- include/dt-bindings/clock/stih410-clks.h |  25 +++
- 13 files changed, 1037 insertions(+), 330 deletions(-)
- create mode 100644 arch/arm/boot/dts/stih407-family.dtsi
- delete mode 100644 arch/arm/boot/dts/stih407.dtsi
- create mode 100644 arch/arm/boot/dts/stih410-b2120.dts
- create mode 100644 arch/arm/boot/dts/stih410-clock.dtsi
- create mode 100644 arch/arm/boot/dts/stih410-pinctrl.dtsi
- create mode 100644 arch/arm/boot/dts/stih410.dtsi
- create mode 100644 arch/arm/boot/dts/stihxxx-b2120.dtsi
- create mode 100644 include/dt-bindings/clock/stih410-clks.h
+Regards,
+Lucas
 
 -- 
-1.9.1
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
