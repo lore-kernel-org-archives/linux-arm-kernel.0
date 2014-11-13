@@ -1,55 +1,23 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 13 Nov 2014 11:09:59 -0700
-Subject: [PATCH V2 0/2] PCI: generic: Assiging msi-controller to PCI
- hostbridge
-In-Reply-To: <1415733454-24322-1-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1415733454-24322-1-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <20141113180959.GR5064@google.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 13 Nov 2014 18:10:02 +0000
+Subject: [PATCH 1/4 V3] ASoC: ALC5631/RT5631: Add device tree binding
+ documentation
+In-Reply-To: <1415880864-2246-2-git-send-email-krishna.md@samsung.com>
+References: <1415880864-2246-1-git-send-email-krishna.md@samsung.com>
+ <1415880864-2246-2-git-send-email-krishna.md@samsung.com>
+Message-ID: <20141113181002.GM3815@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Yijing]
+On Thu, Nov 13, 2014 at 05:44:21PM +0530, Krishna Mohan Dani wrote:
+> Document the device tree binding for the ALC5631 codec and update vendor
+> specific prefix for the Realtek.
 
-On Tue, Nov 11, 2014 at 01:17:32PM -0600, suravee.suthikulpanit at amd.com wrote:
-> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> 
-> This patch set introduces a new callback function to allow PCI host drivers
-> to specify MSI controller to be used for the child buses / devices.
-
-Hi Suravee, 
-
-As Srikanth mentioned, there's a series of MSI-related stuff from Yijing.
-I recently put them on my pci/msi branch, and they overlap a bit with
-what you're doing here.
-
-So I'll drop these for now.  Maybe there's a way you can accomplish what
-you need by implementing pcibios_msi_controller(), which Yijing added?
-
-Also note that "msi-controller" is already being used in device tree (see
-Documentation/devicetree/bindings/interrupt-controller/marvell), so maybe
-you can do the name.
-
-Bjorn
-
-> This is reabased from:
->     git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git pci/host-generic
-> 
-> Changes from V1:
->     - Adding "msi-parent" device tree binding in documentation.
->     - Rebase the patch to get rid of artifacts from other precursor patch
->       accidently applied to the developement tree. This should now apply cleanly
->       to the pci/host-generic branch.
-> 
-> Suravee Suthikulpanit (2):
->   PCI: Add new pci_ops for setting MSI parent for PCI bus
->   PCI: generic: Add set_msi_parent callback
-> 
->  Documentation/devicetree/bindings/pci/host-generic-pci.txt |  3 +++
->  drivers/pci/host/pci-host-generic.c                        | 13 +++++++++++++
->  drivers/pci/probe.c                                        |  3 +++
->  include/linux/pci.h                                        |  1 +
->  4 files changed, 20 insertions(+)
-> 
-> -- 
-> 1.9.3
-> 
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/4039aa87/attachment.sig>
