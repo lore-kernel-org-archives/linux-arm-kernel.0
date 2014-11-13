@@ -1,74 +1,57 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 13 Nov 2014 11:38:02 -0600
-Subject: [PATCHv6 4/5] hwspinlock/core: add common OF helpers
-In-Reply-To: <CAK=WgbbatPTiz3efDWHVEcuug_UQfkCViMoK0zcfUg3JwB2oTA@mail.gmail.com>
-References: <1410553499-55951-1-git-send-email-s-anna@ti.com>
- <1410553499-55951-5-git-send-email-s-anna@ti.com>
- <CAK=WgbamdqAufjC4Xb5moERRBSB-cO6c1RPTE=f+dp75F+Eh7A@mail.gmail.com>
- <5463B5B6.8040709@ti.com>
- <CAK=WgbbatPTiz3efDWHVEcuug_UQfkCViMoK0zcfUg3JwB2oTA@mail.gmail.com>
-Message-ID: <5464EC7A.7050603@ti.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 13 Nov 2014 17:39:00 +0000
+Subject: [PATCH] ARM: cacheflush: disallow pending signals during
+ cacheflush
+In-Reply-To: <20141113112633.GE13350@arm.com>
+References: <1415863793-6219-1-git-send-email-chanho.min@lge.com>
+ <20141113112633.GE13350@arm.com>
+Message-ID: <CAFEAcA_dSxRgkvuJW6aHdSv88NkXXHBMAzjyJMTRbW3mXAV3Sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+On 13 November 2014 11:26, Will Deacon <will.deacon@arm.com> wrote:
+> Whilst I don't think this is the correct solution, I agree that there's
+> a potential issue here. We could change the restart return value to
+> -ERESTARTNOINTR instead, but I can imagine something like a periodic
+> SIGALRM which could prevent a large cacheflush from ever completing.
+> Do we actually care about making forward progress in such a scenario?
+>
+> It is interesting to note that this change has been in mainline since
+> May last year without any reported issues. That could be down to a number
+> of reasons:
+>
+>   (1) People are using old kernels on ARM
+>
+>   (2) Code doesn't check the return value from the cacheflush system call,
+>       because it historically always returned 0
 
-On 11/13/2014 04:03 AM, Ohad Ben-Cohen wrote:
-> Hi Suman,
-> 
-> On Wed, Nov 12, 2014 at 9:32 PM, Suman Anna <s-anna@ti.com> wrote:
->>> Is this the validation you mentioned which requires the existence of
->>> "hwspinlock/core: maintain a list of registered hwspinlock banks" ?
->>
->> Well, not exactly. The validation is on the following segment,
->>
->> +       id = of_hwspin_lock_simple_xlate(bank, &args);
->> +       if (id < 0 || id >= bank->num_locks) {
->> +               ret = -EINVAL;
->> +               goto out;
->> +       }
-> 
-> I'm not entirely convinced that this justifies adding the proposed
-> linked list. Can't we can get the base_id and number of locks by
-> traversing the DT?
+...and the documentation comment in the source code didn't say
+anything about the syscall having a return value; it only
+described the input parameters. I would actually be surprised
+if any userspace caller of this syscall checked its return value
+(the libgcc cacheflush function used by gcc's clear_cache builtin
+doesn't, to pick one popularly used example).
 
-No, not always, because, either of them can be optional between
-different platform implementations. For example, on OMAP, the number of
-locks is read from an IP register, and not coded in DT. Similarly,
-base_id can be optional on SoCs that don't have multiple IP instances.
-The only place the hwspinlock core knows both of them for sure is at the
-device registration time, but the core only stores the locks and not the
-devices at the moment. Any operation on the device is not possible
-without knowing the exact global lock we are dealing with, and this API
-is about returning that exact global lock id.
+>   (3) People are getting lucky with timing, as this is likely difficult
+>       to hit
 
-> 
->> That said, it is also needed to provide the support for deferred probing
->> without changing the return code conventions on the existing API.
-> 
-> Here too, adding a data structure maintaining memory objects and
-> taking care of it life cycle seems a bit overkill for anything to do
-> with return values.
+    (4) The resulting misbehaviour ("my JIT crashes occasionally and
+        non-reproducibly at some point possibly some while after the
+        cacheflush call") will be extremely hard to track back
+        to this kernel change
 
-IMHO, this life cycle management is not that complicated, it is managed
-alongside the addition/removal of the locks during the device
-registration/unregistration time.
+> This leaves me with the following questions:
+>
+>   - Has this change been shown to break anything in practice?
+>   - Can we change the internal return value to -ERESTARTNOINTR?
+>   - What do we do about kernels that *do* return -EINTR? (>=3.12?)
 
-> 
->> Yes, and wouldn't that require that the id is validated? It just cannot
->> return any return value, and expect it will be verified somewhere else
->> or in a following API call. Not doing the validation unnecessarily
->> complicates the system usage of a lock as you are sharing an invalid
->> lock to a remote processor and then you have two validation failure
->> paths on different processors.
-> 
-> Validation is great but I'm still not convinced it can't be done
-> without maintaining another data structure.
-> 
-> Please show me specific technical issues that can't be resolved
-> without adding the proposed linked list.
+My suggestion would be "treat this as a bugfix, put it into
+stable kernels in the usual way (and assume distros will pick
+it up if appropriate)".
 
-Same as above.
+>   - Can we get a manpage put together to describe this mess?
 
-regards
-Suman
+That would be nice :-)
+
+-- PMM
