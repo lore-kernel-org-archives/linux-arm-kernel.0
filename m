@@ -1,91 +1,84 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 13 Nov 2014 18:41:10 +0200
-Subject: [PATCH v2 1/5] video: omapdss: Add opa362 driver
-In-Reply-To: <9FD016B8-4EA2-4A0D-B790-6494AB449B31@goldelico.com>
-References: <1415830247-31633-1-git-send-email-marek@goldelico.com>
- <1415830247-31633-2-git-send-email-marek@goldelico.com>
- <54649B43.1000801@ti.com>
- <9FD016B8-4EA2-4A0D-B790-6494AB449B31@goldelico.com>
-Message-ID: <5464DF26.2010707@ti.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 13 Nov 2014 09:29:37 -0800
+Subject: [PATCH v11 2/3] power-domain: rockchip: add power doamin driver
+In-Reply-To: <1415829690-20236-3-git-send-email-caesar.wang@rock-chips.com>
+References: <1415829690-20236-1-git-send-email-caesar.wang@rock-chips.com>
+ <1415829690-20236-3-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <CAD=FV=XHcpT8VaBeytJ2mYJ-fg96uvdDrbVna6md=Ne2y=dN=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/11/14 18:25, Dr. H. Nikolaus Schaller wrote:
-> Hi,
-> 
-> Am 13.11.2014 um 12:51 schrieb Tomi Valkeinen <tomi.valkeinen@ti.com>:
-> 
->> On 13/11/14 00:10, Marek Belisko wrote:
->>> opa362 is amplifier for video and can be connected to the tvout pads
->>> of the OMAP3. It has one gpio control for enable/disable of the output
->>> (high impedance).
->>>
->>> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
->>> ---
->>> drivers/video/fbdev/omap2/displays-new/Kconfig     |   6 +
->>> drivers/video/fbdev/omap2/displays-new/Makefile    |   1 +
->>> .../fbdev/omap2/displays-new/amplifier-opa362.c    | 343 +++++++++++++++++++++
->>
->> I think it would be better to rename this to encoder-opa362.c. It's not
-> 
-> When developing this driver we did simply rename the encoder-tfp410 file,
-> but thent hough that it does not fit into the ?encoder? category, because we
-> would expect something digital or digital to analog ?encoding? which it does not.
+Hi,
 
-That is true, but we already have other "encoders" like
-encoder-tpd12s015.c, which also do not encode. "encoder" in this context
-means something that takes a video input, and has a video output. In
-contrast to a panel or a connector.
+On Wed, Nov 12, 2014 at 2:01 PM, Caesar Wang <caesar.wang@rock-chips.com> wrote:
+> In order to meet high performance and low power requirements, a power
+> management unit is designed or saving power when RK3288 in low power mode.
+> The RK3288 PMU is dedicated for managing the power ot the whole chip.
+>
+> Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
+> Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
+> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+>
+> ---
+>
+> Changes in v11:
+>     - fix pm_genpd_init(&pd->genpd, NULL, false);
+>
+> Changes in v10:
+>     - this switches over domain infos to use masks instead of recomputing
+>       them each time and also gets rid of custom domain translator and
+>       uses standard onecell on.
+>
+> Changes in v9:
+>     - fix v8 changes as follows:
+>     - This reconciles the v2 and v7 code so that we power domain have
+>       lists of clocks they toggle on and off during power transitions and
+>       independently from power domains clocks we attach clocks to devices
+>       comprising power domain and prepare them so they are turn on and off
+>       by runtime PM.
+>     - add rockchip_pm_add_one_domain() to control domains.
+>     - add pd_start/pd_stop interface to control clocks
+>
+> Changes in v8:
+>     - This reconciles the v2 and v7 code so that we power domain have
+>       lists of clocks they toggle on and off during power transitions and
+>       independently from power domains clocks we attach clocks to devices
+>       comprising power domain and prepare them so they are turn on and off
+>       by runtime PM.
+>
+> Changes in v7:
+>     - Delete unused variables
+>
+> Changes in v6:
+>     - delete pmu_lock
+>     - modify dev_lock using mutex
+>     - pm_clk_resume(pd->dev) change to pm_clk_resume(ed->dev)
+>     - pm_clk_suspend(pd->dev) change to pm_clk_suspend(ed->dev)
+>     - add devm_kfree(pd->dev, de) in rockchip_pm_domain_detach_dev
+>
+> Changes in v5:
+>     - delete idle_lock
+>     - add timeout in rockchip_pmu_set_idle_request()
+>
+> Changes in v4:
+>     - use list storage dev
+>
+> Changes in v3:
+>     - change use pm_clk_resume() and pm_clk_suspend()
+>
+> Changes in v2:
+>     - remove the "pd->pd.of_node = np"
+>
+>  arch/arm/mach-rockchip/Kconfig            |   1 +
+>  arch/arm/mach-rockchip/Makefile           |   1 +
+>  arch/arm/mach-rockchip/pm_domains.c       | 471 ++++++++++++++++++++++++++++++
+>  include/dt-bindings/power-domain/rk3288.h |  11 +
+>  4 files changed, 484 insertions(+)
 
->>> +
->>> +	in->ops.atv->set_timings(in, &ddata->timings);
->>> +	/* fixme: should we receive the invert from our consumer, i.e. the connector? */
->>> +	in->ops.atv->invert_vid_out_polarity(in, true);
->>
->> Well this does seem to be broken. I don't know what the answer to the
->> question above is, but the code doesn't work properly.
->>
->> In the opa362_invert_vid_out_polarity function below, you get the invert
->> boolean from the connector. This you pass to the OMAP venc. However,
->> above you always override that value in venc with true.
->>
->> So, either the invert_vid_out_polarity value has to be always true or
->> false, because _OPA362_ requires it to be true or false, OR you need use
->> the value from the connector.
->>
->> Seeing the comment in opa362_invert_vid_out_polarity, my guess is the
->> latter, and the call above should be removed.
-> 
-> Yes, you are right - this is not systematic.
-> 
-> But the problem is that we can?t ask the connector here what it wants
-> to see. It might (or might not) call our opa362_invert_vid_out_polarity() later
-> which we can then forward to overwrite the inital state of this opa362_enable().
+This was discussed offlist, but just to make sure it's also included here:
 
-You don't need to ask. The connector calls invert_vid_out_polarity
-before enabling the output. You can just pass it forward inverted, as
-you already do in this driver. If it doesn't, it's either a bug or you
-can just rely on the value that is already programmed to venc.
+This patch will need to be spun to deal with the fact that (c16561e PM
+/ Domains: Change prototype for the attach and detach callbacks) has
+landed.
 
->> We are going to support only DT boot at some point. Thus I think the
->> whole platform data code should be left out.
-> 
-> Is there already a decision? I think it should not be done before. And it
-> does not harm to still have it.
-
-It's just a matter of time. I don't accept any new boards using platform
-data for display, or new display drivers using platform data, because I
-don't want to spend my time converting them later. And as this is a new
-driver, no existing board can be using the opa362 platform_data. So we
-can support DT only.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/26f87c09/attachment.sig>
+-Doug
