@@ -1,60 +1,60 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 13 Nov 2014 10:48:03 +0100
-Subject: [PATCH 1/3] ARM: at91: Add Special Function Registers binding
- documentation
-In-Reply-To: <1415632471-14672-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1415632471-14672-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20141113104803.179a7529@bbrezillon>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 13 Nov 2014 10:38:55 +0100
+Subject: [PATCHv3 0/5] ARM: mvebu: no I/O coherency on non-SMP and related
+ updates
+Message-ID: <1415871540-20302-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Nov 2014 16:14:29 +0100
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+Hello,
 
-> The special function registers gather some registers that allow to tweak
-> features provided by IPs controlled through another register range.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+This series makes a number of updates to the I/O coherency code of
+Marvell EBU platforms.
 
-Once you've fixed your dtsi you can add my
+Changes since v2:
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+ - Drop patch "ARM: mvebu: add missing of_node_put() call in
+   coherency.c" since it was merged.
 
-on the whole series.
+ - Update "make the coherency_ll.S functions work with no coherency
+   fabric" to use "reteq <reg>" instead of "moveq pc, <reg>", as
+   suggested by Gr?gory Clement.
 
-> ---
->  Documentation/devicetree/bindings/arm/atmel-at91.txt | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> index 562cda9d86d9..a6427de45785 100644
-> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> @@ -136,3 +136,20 @@ Example:
->  		compatible = "atmel,at91sam9260-rstc";
->  		reg = <0xfffffd00 0x10>;
->  	};
-> +
-> +Special Function Registers (SFR)
-> +
-> +Special Function Registers (SFR) manage specific aspects of the integrated
-> +memory, bridge implementations, processor and other functionality not controlled
-> +elsewhere.
-> +
-> +required properties:
-> +- compatible: Should be "atmel,<chip>-sfr", "syscon".
-> +  <chip> can be "at91sam9260", "at91sam9rl" or "at91sam9x5".
-> +- reg: Should contain registers location and length
-> +
-> +	sfr at f0038000 {
-> +		compatible = "atmel,sama5d3-sfr", "syscon";
-> +		reg = <0xf0038000 0x4000>;
-> +	};
-> +
+ - Update the comment in "disable I/O coherency on non-SMP situations
+   on Armada 370/375/38x/XP" to give more details about what would be
+   needed to get HW I/O coherency working on Armada 370, as suggested
+   by Jason Cooper.
 
+ - Added Acked-by from Gr?gory Clement as appropriate.
 
+ - Added one patch to drop the Armada 375 Z1 workaround for I/O
+   coherency, which removes a significant chunk of code from
+   coherency.c.
+
+ - Added two patches doing minor cleanup/updates to coherency.c
+
+Changes since v1:
+
+ - Rebased on top of v3.18-rc2.
+ - Added some Fixes:/Cc: tags on the last patch to get it merged into
+   the stable tree, as it fixes a real DT reference count leak.
+
+Best regards,
+
+Thomas Petazzoni
+
+Thomas Petazzoni (5):
+  ARM: mvebu: make the coherency_ll.S functions work with no coherency
+    fabric
+  ARM: mvebu: disable I/O coherency on non-SMP situations on Armada
+    370/375/38x/XP
+  ARM: mvebu: remove unused register offset definition
+  ARM: mvebu: remove Armada 375 Z1 workaround for I/O coherency
+  ARM: mvebu: update comments in coherency.c
+
+ arch/arm/mach-mvebu/coherency.c    | 220 ++++++-------------------------------
+ arch/arm/mach-mvebu/coherency_ll.S |  21 +++-
+ 2 files changed, 55 insertions(+), 186 deletions(-)
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.0.0
