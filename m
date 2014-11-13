@@ -1,49 +1,232 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 13 Nov 2014 11:12:55 +0900
-Subject: [PATCH v3 2/2] ARM: EXYNOS: Call regulator core suspend prepare
- and finish functions
-In-Reply-To: <CAOesGMjKP6Yg-M_7Zy5bbEJ7QD7fQ27Bopd6yD3M=r=4SArR6w@mail.gmail.com>
-References: <1413839151-10875-1-git-send-email-javier.martinez@collabora.co.uk>
- <1413839151-10875-3-git-send-email-javier.martinez@collabora.co.uk>
- <CABxcv==YZjO9p3aNyuRpe3DYS+=BcY_N2esuTg0hGASb_b_OdA@mail.gmail.com>
- <CABxcv=mMqh5UD0_Wz3rNaFbZD3BH_2Z+7srzccd=-5_ndo_a1Q@mail.gmail.com>
- <CAOesGMjKP6Yg-M_7Zy5bbEJ7QD7fQ27Bopd6yD3M=r=4SArR6w@mail.gmail.com>
-Message-ID: <546413A7.1050803@samsung.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Wed, 12 Nov 2014 18:19:48 -0800
+Subject: [PATCH 08/10] arm64/kexec: Add core kexec support
+In-Reply-To: <20141024102838.GB24265@leverpostej>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <c8e8a3378f028e54e21931bc7f3d62c48725d5c7.1414099246.git.geoff@infradead.org>
+ <20141024102838.GB24265@leverpostej>
+Message-ID: <1415845188.15847.79.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/13/14 02:02, Olof Johansson wrote:
-> On Tue, Nov 11, 2014 at 2:23 AM, Javier Martinez Canillas
-> <javier@dowhile0.org>  wrote:
->> Hello Kukjin,
->>
->> On Thu, Oct 30, 2014 at 11:06 AM, Javier Martinez Canillas
->> <javier@dowhile0.org>  wrote:
->>> Hello Kukjin,
->>>
->>> On Mon, Oct 20, 2014 at 11:05 PM, Javier Martinez Canillas
->>> <javier.martinez@collabora.co.uk>  wrote:
->>>> The regulator framework has a set of helpers functions to be used when
->>>> the system is entering and leaving from suspend but these are not called
->>>> on Exynos platforms. This means that the .set_suspend_* function handlers
->>>> defined by regulator drivers are not called when the system is suspended.
->>>>
->>>> Suggested-by: Doug Anderson<dianders@chromium.org>
->>>> Signed-off-by: Javier Martinez Canillas<javier.martinez@collabora.co.uk>
->>>> Reviewed-by: Doug Anderson<dianders@chromium.org>
->>>> ---
->>>>   arch/arm/mach-exynos/suspend.c | 23 +++++++++++++++++++++++
->>>>   1 file changed, 23 insertions(+)
->>>>
->>>
->>> Any comments on this patch?
->>>
->>
->> Just a gentle reminder about this patch.
->
-> Kukjin, should I just apply this directly since you seem to be busy?
->
-Oh, sorry. I'm here and applying this patch into samsung tree.
+Hi Mark,
 
-Thanks,
-Kukjin
+On Fri, 2014-10-24 at 11:28 +0100, Mark Rutland wrote:
+> > +++ b/arch/arm64/Kconfig
+> > @@ -313,6 +313,15 @@ config ARCH_HAS_CACHE_LINE_SIZE
+> >
+> >  source "mm/Kconfig"
+> >
+> > +config KEXEC
+> > +       depends on (!SMP || PM_SLEEP_SMP)
+> 
+> In its current state this also depends on !KVM && !EFI (technically you
+> could detect those cases at runtime, but I don't see that in this
+> series).
+
+A kernel built with CONFIG_EFI is OK if run on a non-EFI system or
+without using a system's EFI support.  I added a patch that adds
+runtime checks in the kexec_load syscall path to print a message
+and return failure for situations where KVM or EFI won't work.
+
+> > +/**
+> > + * machine_kexec_prepare - Prepare for a kexec reboot.
+> > + *
+> > + * Called from the core kexec code when a kernel image is loaded.
+> > + */
+> > +
+> > +int machine_kexec_prepare(struct kimage *image)
+> > +{
+> > +       const struct kexec_segment *dtb_seg = kexec_find_dtb_seg(image);
+> > +
+> > +       if (!dtb_seg)
+> > +               pr_warn("%s: No device tree segment found.\n", __func__);
+> > +
+> > +       arm64_kexec_dtb_addr = dtb_seg ? dtb_seg->mem : 0;
+> > +       arm64_kexec_kimage_start = image->start;
+> > +
+> > +       return 0;
+> > +}
+> 
+> I thought all of the DTB handling was moving to purgatory?
+
+Non-purgatory booting is needed for kexec-lite.  We can do
+this simple check here which optionally sets x0 to the dtb
+address to support that.  The other solution is to have a
+trampoline in kexec-lite that sets x0 (basically an absolute
+minimal purgatory), but I think to do it here is nicer, and
+is also the same way that the arm arch code does it.
+
+Maybe removing this pr_warn message and just relying on the
+kexec_image_info() output would be better.
+
+> > +/**
+> > + * kexec_list_flush - Helper to flush the kimage list to PoC.
+> > + */
+> > +
+> > +static void kexec_list_flush(unsigned long kimage_head)
+> > +{
+> > +       void *dest;
+> > +       unsigned long *entry;
+> > +
+> > +       for (entry = &kimage_head, dest = NULL; ; entry++) {
+> > +               unsigned int flag = *entry &
+> > +                       (IND_DESTINATION | IND_INDIRECTION | IND_DONE |
+> > +                       IND_SOURCE);
+> > +               void *addr = phys_to_virt(*entry & PAGE_MASK);
+> > +
+> > +               switch (flag) {
+> > +               case IND_INDIRECTION:
+> > +                       entry = (unsigned long *)addr - 1;
+> > +                       __flush_dcache_area(addr, PAGE_SIZE);
+> > +                       break;
+> > +               case IND_DESTINATION:
+> > +                       dest = addr;
+> > +                       break;
+> > +               case IND_SOURCE:
+> > +                       __flush_dcache_area(addr, PAGE_SIZE);
+> > +                       dest += PAGE_SIZE;
+> > +                       break;
+> > +               case IND_DONE:
+> > +                       return;
+> > +               default:
+> > +                       break;
+> 
+> Can an image ever have no flags? Given the presence of IND_NONE I'd
+> assume not, so this looks like a candidate for a BUG().
+
+Sure, I guess things will blow up before it ever gets here though.
+
+> 
+> > +               }
+> > +       }
+> > +}
+> > +
+> > +/**
+> > + * machine_kexec - Do the kexec reboot.
+> > + *
+> > + * Called from the core kexec code for a sys_reboot with LINUX_REBOOT_CMD_KEXEC.
+> > + */
+> > +
+> > +void machine_kexec(struct kimage *image)
+> > +{
+> > +       phys_addr_t reboot_code_buffer_phys;
+> > +       void *reboot_code_buffer;
+> > +
+> > +       BUG_ON(num_online_cpus() > 1);
+> > +
+> > +       arm64_kexec_kimage_head = image->head;
+> > +
+> > +       reboot_code_buffer_phys = page_to_phys(image->control_code_page);
+> > +       reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
+> > +
+> > +       /*
+> > +        * Copy relocate_new_kernel to the reboot_code_buffer for use
+> > +        * after the kernel is shut down.
+> > +        */
+> > +
+> > +       memcpy(reboot_code_buffer, relocate_new_kernel,
+> > +               relocate_new_kernel_size);
+> 
+> Can we get rid of the line gaps between comments and the single function
+> calls they apply to, please? I realise it's a minor thing, but this
+> looks rather inconsistent with the rest of arch/arm64/.
+
+checkpatch doesn't seem to mind, but sure, I can do that.
+
+> > +
+> > +       /* Flush the reboot_code_buffer in preparation for its execution. */
+> > +
+> > +       __flush_dcache_area(reboot_code_buffer, relocate_new_kernel_size);
+> 
+> That code should already be at the PoC per the boot protocol (the entire
+> kernel image should have been clean to the PoC at boot, so the
+> instructions forming relocate_new_kernel are globally visible).
+> 
+> From the looks of it you only need to flush the variables at the very
+> end.
+
+We copy the relocate_new_kernel routine to reboot_code_buffer, which is
+a buffer allocated by the kexec core with alloc_pages().  That copy of
+relocate_new_kernel is what we are flushing here.
+
+I believe we need to flush that buffer out to PoC so we can execute
+the code it contains after cpu_soft_restart().
+
+> > --- /dev/null
+> > +++ b/arch/arm64/kernel/relocate_kernel.S
+> > @@ -0,0 +1,184 @@
+> > +/*
+> > + * kexec for arm64
+> > + *
+> > + * Copyright (C) Linaro.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +
+> > +#include <asm/assembler.h>
+> > +#include <asm/kexec.h>
+> > +#include <asm/memory.h>
+> > +#include <asm/page.h>
+> > +#include <asm/proc-macros.S>
+> > +
+> > +/* The list entry flags. */
+> > +
+> > +#define IND_DESTINATION_BIT 0
+> > +#define IND_INDIRECTION_BIT 1
+> > +#define IND_DONE_BIT        2
+> > +#define IND_SOURCE_BIT      3
+> 
+> As previously, I think these need to be moved into a common header, and
+> defined in terms of the existing IND_* macros (or vice-versa). I believe
+> you had a patch doing so; what's the status of that?
+
+Still working to get it merged:
+
+  https://lkml.org/lkml/2014/11/12/675
+
+> > +/*
+> > + * relocate_new_kernel - Put a 2nd stage kernel image in place and boot it.
+> > + *
+> > + * The memory that the old kernel occupies may be overwritten when coping the
+> > + * new image to its final location.  To assure that the relocate_new_kernel
+> > + * routine which does that copy is not overwritten all code and data needed
+> > + * by relocate_new_kernel must be between the symbols relocate_new_kernel and
+> > + * relocate_new_kernel_end.  The machine_kexec() routine will copy
+> > + * relocate_new_kernel to the kexec control_code_page, a special page which
+> > + * has been set up to be preserved during the copy operation.
+> > + */
+> > +
+> > +.globl relocate_new_kernel
+> > +relocate_new_kernel:
+
+...
+
+> > +
+> > +       /* start_new_image */
+> > +
+> > +       ldr     x4, arm64_kexec_kimage_start
+> > +       ldr     x0, arm64_kexec_dtb_addr
+> > +       mov     x1, xzr
+> > +       mov     x2, xzr
+> > +       mov     x3, xzr
+> > +       br      x4
+> 
+> This last part should be in userspace-provided purgatory. If you have
+> purgatory code which does this then we should be able to rely on that,
+> and we don't have to try to maintain this DTB handling in kernelspace
+> (which I suspect may become painful as the boot protocol evolves).
+
+I think the putting the dtb address in x0 is already fixed.  There are
+users with firmware that does this and any change to the boot protocol
+will have to work with it.
+
+As I mentioned above, we need a solution for non-purgatory re-boot and I
+think this is the best way.
+
+Thanks for taking the time to review.  I'll post an updated patch set
+soon.
+
+-Geoff
