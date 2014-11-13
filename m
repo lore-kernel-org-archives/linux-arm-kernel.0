@@ -1,21 +1,27 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Nov 2014 10:20:09 +0900
-Subject: [PATCH 18/25] ARM: shmobile: koelsch: Sound DMA support on DTS
+Date: Thu, 13 Nov 2014 10:20:11 +0900
+Subject: [PATCH 20/25] ARM: shmobile: koelsch: Sound DMA support via SRC on DTS
 In-Reply-To: <cover.1415755881.git.horms+renesas@verge.net.au>
 References: <cover.1415755881.git.horms+renesas@verge.net.au>
-Message-ID: <d7e004a70a3a21dca6c3da3f368dc8fa0c7cbd1c.1415755881.git.horms+renesas@verge.net.au>
+Message-ID: <145d21fce60314ea492ba3c83d05c443532229a3.1415755881.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-DMA transfer to/from SSI
+DMA transfer to/from SRC
 
-     DMA
-[MEM] -> [SSI]
+     DMA      DMApp
+[MEM] -> [SRC] -> [SSIU] -> [SSI]
 
-     DMA
-[MEM] <- [SSI]
+     DMA      DMApp
+[MEM] <- [SRC] <- [SSIU] <- [SSI]
+
+Current sound driver is supporting
+SSI/SRC random connection.
+So, this patch is tring
+SSI0 -> SRC2
+SSI1 <- SRC3
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
@@ -24,21 +30,19 @@ Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index c92d0d7..68628cf 100644
+index 5bc675f..d2fe677 100644
 --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
 +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -576,10 +576,10 @@
- };
+@@ -569,8 +569,8 @@
  
- &ssi0 {
--	pio-transfer;
-+	no-busif;
- };
- 
- &ssi1 {
--	pio-transfer;
-+	no-busif;
- 	shared-pin;
+ 	rcar_sound,dai {
+ 		dai0 {
+-			playback = <&ssi0>;
+-			capture  = <&ssi1>;
++			playback = <&ssi0 &src2>;
++			capture  = <&ssi1 &src3>;
+ 		};
+ 	};
  };
 -- 
 2.1.1
