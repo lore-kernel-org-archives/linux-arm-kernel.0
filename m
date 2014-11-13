@@ -1,150 +1,63 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 13 Nov 2014 11:45:46 +0530
-Subject: [PATCH v3 4/6] phy: add support for USB cluster on the Armada
- 375 SoC
-In-Reply-To: <1415786237-21985-5-git-send-email-gregory.clement@free-electrons.com>
-References: <1415786237-21985-1-git-send-email-gregory.clement@free-electrons.com>
- <1415786237-21985-5-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <54644C92.8000900@ti.com>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Thu, 13 Nov 2014 12:28:11 +0530
+Subject: [PATCH] can: Fix bug in suspend/resume
+Message-ID: <a44efc1fb0144cca9d0c4851cc51db25@BL2FFO11FD024.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When accessing the priv structure use container_of instead of dev_get_drvdata.
+Enable the clocks in the suspend before accessing the registers of the CAN.
 
-On Wednesday 12 November 2014 03:27 PM, Gregory CLEMENT wrote:
-> The Armada 375 SoC comes with an USB2 host and device controller and
-> an USB3 controller. The USB cluster control register allows to manage
-> common features of both USB controllers.
-> 
-> This commit adds a driver integrated in the generic PHY framework to
-> control this USB cluster feature.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/phy/Kconfig              |   6 ++
->  drivers/phy/Makefile             |   1 +
->  drivers/phy/phy-armada375-usb2.c | 145 +++++++++++++++++++++++++++++++++++++++
->  include/dt-bindings/phy/phy.h    |   1 +
->  4 files changed, 153 insertions(+)
->  create mode 100644 drivers/phy/phy-armada375-usb2.c
-> 
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index 2a436e607f99..625adb0abd43 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -21,6 +21,12 @@ config PHY_BERLIN_SATA
->  	select GENERIC_PHY
->  	help
->  	  Enable this to support the SATA PHY on Marvell Berlin SoCs.
-> +config ARMADA375_USBCLUSTER_PHY
-> +	def_bool y
-> +	depends on MACH_ARMADA_375 || COMPILE_TEST
-> +	depends on OF
-> +	select GENERIC_PHY
-> +
->  
->  config PHY_EXYNOS_MIPI_VIDEO
->  	tristate "S5P/EXYNOS SoC series MIPI CSI-2/DSI PHY driver"
-> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-> index c4590fce082f..26b5633f378a 100644
-> --- a/drivers/phy/Makefile
-> +++ b/drivers/phy/Makefile
-> @@ -4,6 +4,7 @@
->  
->  obj-$(CONFIG_GENERIC_PHY)		+= phy-core.o
->  obj-$(CONFIG_PHY_BERLIN_SATA)		+= phy-berlin-sata.o
-> +obj-$(CONFIG_ARMADA375_USBCLUSTER_PHY)	+= phy-armada375-usb2.o
->  obj-$(CONFIG_BCM_KONA_USB2_PHY)		+= phy-bcm-kona-usb2.o
->  obj-$(CONFIG_PHY_EXYNOS_DP_VIDEO)	+= phy-exynos-dp-video.o
->  obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)	+= phy-exynos-mipi-video.o
-> diff --git a/drivers/phy/phy-armada375-usb2.c b/drivers/phy/phy-armada375-usb2.c
-> new file mode 100644
-> index 000000000000..d22fed4761f4
-> --- /dev/null
-> +++ b/drivers/phy/phy-armada375-usb2.c
-> @@ -0,0 +1,145 @@
-> +/*
-> + * USB cluster support for Armada 375 platform.
-> + *
-> + * Copyright (C) 2014 Marvell
-> + *
-> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2 or later. This program is licensed "as is"
-> + * without any warranty of any kind, whether express or implied.
-> + *
-> + * Armada 375 comes with an USB2 host and device controller and an
-> + * USB3 controller. The USB cluster control register allows to manage
-> + * common features of both USB controllers.
-> + */
-> +
-> +#include <dt-bindings/phy/phy.h>
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/phy/phy.h>
-> +#include <linux/platform_device.h>
-> +
-> +#define USB2_PHY_CONFIG_DISABLE BIT(0)
-> +
-> +struct armada375_cluster_phy {
-> +	struct phy *phy;
-> +	void __iomem *reg;
-> +	bool use_usb3;
-> +	int phy_provided;
-> +};
-> +
-> +static struct armada375_cluster_phy usb_cluster_phy;
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+---
+ drivers/net/can/xilinx_can.c |   20 ++++++++++++++++++--
+ 1 files changed, 18 insertions(+), 2 deletions(-)
 
-don't use global variables.
-> +
-> +static int armada375_usb_phy_init(struct phy *phy)
-> +{
-> +	struct armada375_cluster_phy *cluster_phy = phy_get_drvdata(phy);
-> +	u32 reg;
-> +
-> +	reg = readl(cluster_phy->reg);
-> +	if (cluster_phy->use_usb3)
-> +		reg |= USB2_PHY_CONFIG_DISABLE;
-> +	else
-> +		reg &= ~USB2_PHY_CONFIG_DISABLE;
-> +	writel(reg, cluster_phy->reg);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct phy_ops armada375_usb_phy_ops = {
-> +	.init = armada375_usb_phy_init,
-> +	.owner = THIS_MODULE,
-> +};
-> +
-> +/*
-> + * Only one controller can use this PHY. We shouldn't have the case
-> + * when two controllers want to use this PHY. But if this case occurs
-> + * then we provide a phy to the first one and return an error for the
-> + * next one. This error has also to be an error returned by
-> + * devm_phy_optional_get() so different from ENODEV for USB2. In the
-> + * USB3 case it still optional and we use ENODEV.
-> + */
-> +static struct phy *armada375_usb_phy_xlate(struct device *dev,
-> +					struct of_phandle_args *args)
-> +{
-> +
-> +    /*
-> +     * Either the phy had never been requested and then the first usb
-> +     * claiming it can get it, or it had already been requested in
-> +     * this case, we only allow to use it with the same configuration.
-> +     */
-
-You can dynamically create usb_cluster_phy in probe and then invoke
-platform_set_drvdata by passing *usb_cluster_phy. Then you can invoke
-platform_get_drvdata here to get *usb_cluster_phy.
-
-While fixing this also add yourself as Maintainer of this file.
-
-Thanks
-Kishon
+diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
+index 5e8b560..63ef645 100644
+--- a/drivers/net/can/xilinx_can.c
++++ b/drivers/net/can/xilinx_can.c
+@@ -972,15 +972,30 @@ static const struct net_device_ops xcan_netdev_ops = {
+  */
+ static int __maybe_unused xcan_suspend(struct device *dev)
+ {
+-	struct platform_device *pdev = dev_get_drvdata(dev);
++	struct platform_device *pdev = container_of(dev,
++			struct platform_device, dev);
+ 	struct net_device *ndev = platform_get_drvdata(pdev);
+ 	struct xcan_priv *priv = netdev_priv(ndev);
++	int ret;
+ 
+ 	if (netif_running(ndev)) {
+ 		netif_stop_queue(ndev);
+ 		netif_device_detach(ndev);
+ 	}
+ 
++	ret = clk_prepare_enable(priv->can_clk);
++	if (ret) {
++		dev_err(dev, "unable to enable device clock\n");
++		return ret;
++	}
++
++	ret = clk_prepare_enable(priv->bus_clk);
++	if (ret) {
++		dev_err(dev, "unable to enable bus clock\n");
++		clk_disable_unprepare(priv->can_clk);
++		return ret;
++	}
++
+ 	priv->write_reg(priv, XCAN_MSR_OFFSET, XCAN_MSR_SLEEP_MASK);
+ 	priv->can.state = CAN_STATE_SLEEPING;
+ 
+@@ -999,7 +1014,8 @@ static int __maybe_unused xcan_suspend(struct device *dev)
+  */
+ static int __maybe_unused xcan_resume(struct device *dev)
+ {
+-	struct platform_device *pdev = dev_get_drvdata(dev);
++	struct platform_device *pdev = container_of(dev,
++			struct platform_device, dev);
+ 	struct net_device *ndev = platform_get_drvdata(pdev);
+ 	struct xcan_priv *priv = netdev_priv(ndev);
+ 	int ret;
+-- 
+1.7.4
