@@ -1,40 +1,37 @@
-From: ssantosh@kernel.org (Santosh Shilimkar)
-Date: Wed, 12 Nov 2014 17:59:41 -0800
-Subject: [GIT PULL 2/3] ARM: keystone: config updates for 3.19
-In-Reply-To: <1415843982-5739-1-git-send-email-ssantosh@kernel.org>
-References: <1415843982-5739-1-git-send-email-ssantosh@kernel.org>
-Message-ID: <1415843982-5739-2-git-send-email-ssantosh@kernel.org>
+From: b38343@freescale.com (Robin Gong)
+Date: Thu, 13 Nov 2014 10:10:08 +0800
+Subject: [PATCH v4 0/3] add power off driver for i.mx6
+In-Reply-To: <20141112105620.GM2704@dragon>
+References: <1415780439-29728-1-git-send-email-b38343@freescale.com>
+ <20141112105620.GM2704@dragon>
+Message-ID: <20141113021007.GA30646@Robin-OptiPlex-780>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-soc
-
-for you to fetch changes up to 97ef1af9b275924406556bfaec528a3e9e2980c7:
-
-  ARM: keystone: defconfig: add options to enable PCI controller (2014-11-04 10:29:39 -0800)
-
-----------------------------------------------------------------
-Keystone config updates for 3.19
-
-	- Enable PCIE controller and related options
-	- Enable MDIO and ethernet phy options
-	- Enable DSP IRQCHIP option
-
-----------------------------------------------------------------
-Grygorii Strashko (2):
-      ARM: keystone_defconfig: enable dsp irq and gpio support
-      ARM: keystone_defconfig: enable mdio and marvell eth phys
-
-Murali Karicheri (2):
-      ARM: keystone: add pcie related options
-      ARM: keystone: defconfig: add options to enable PCI controller
-
- arch/arm/configs/keystone_defconfig | 7 +++++++
- arch/arm/mach-keystone/Kconfig      | 2 ++
- 2 files changed, 9 insertions(+)
+Thanks, Shawn.
+On Wed, Nov 12, 2014 at 06:56:22PM +0800, Shawn Guo wrote:
+> On Wed, Nov 12, 2014 at 04:20:36PM +0800, Robin Gong wrote:
+> > Resend the patchset  with the latest MAINTAINERS
+> > Add simple power off driver for i.mx6, including:
+> > - add basic imx-snvs-poweroff driver in drivers/power/reset
+> > - add device node in all dts files of i.mx6.
+> > - enable in config file
+> > 
+> > Change from v3:
+> > - disable poweroff driver in soc level dts and enable it in board level dts
+> > - replace 'EIO' with 'ENODEV' while of_iomap fail.
+> > Change from v2:
+> > - remove useless included head files
+> > - split device binding doc from dts patch
+> > - add description for the case that PMIC_ON_REQ not used as external power
+> >   control
+> > 
+> > Robin Gong (3):
+> >   ARM: dts: imx6: add pm_power_off support for i.mx6 chips
+> >   power: reset: imx-snvs-poweroff: add power off driver for i.mx6
+> >   ARM: configs: imx_v6_v7_defconfig: add power off driver
+> 
+> I'm fine with the series.  But before I take the patches, I need an ACK
+> from DT folks on the bindings.
+> 
+> Shawn
