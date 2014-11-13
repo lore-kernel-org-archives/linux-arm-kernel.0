@@ -1,129 +1,128 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 13 Nov 2014 19:46:01 +0000
-Subject: [Patch V1 6/6] PCI, MSI: Provide mechanism to alloc/free MSI/MSIX
- interrupt from irqdomain
-In-Reply-To: <1415879029-20098-8-git-send-email-jiang.liu@linux.intel.com>
-References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
- <1415879029-20098-8-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <54650A79.1020408@arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 13 Nov 2014 22:13:03 +0200
+Subject: [PATCH v3 0/9] PM / Domains: Fix race conditions during boot
+In-Reply-To: <7390758.7nHkBpm2Zh@vostro.rjw.lan>
+References: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
+ <CAPDyKFo-On2MfqHk081o_JZvwbrbi0=n9h6o7A9dJ+X4c8goKg@mail.gmail.com>
+ <545D0074.7060205@ti.com> <7390758.7nHkBpm2Zh@vostro.rjw.lan>
+Message-ID: <546510CF.7060004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jiang,
-
-On 13/11/14 11:43, Jiang Liu wrote:
-> Provide mechanism to directly alloc/free MSI/MSIX interrupt from
-> irqdomain, which will be used to replace arch_setup_msi_irq()/
-> arch_setup_msi_irqs()/arch_teardown_msi_irq()/arch_teardown_msi_irqs().
+On 11/13/2014 04:07 AM, Rafael J. Wysocki wrote:
+> On Friday, November 07, 2014 07:25:08 PM Grygorii Strashko wrote:
 > 
-> To kill weak functions, this patch introduce a new weak function
-> arch_get_pci_msi_domain(), which is to retrieve the MSI irqdomain
-> for a PCI device. This weak function could be killed once we get
-> a common way to associate MSI domain with PCI device.
+> [cut]
 > 
-> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-> ---
->  drivers/pci/msi.c   |   60 +++++++++++++++++++++++++++++++++++++++++++++++----
->  include/linux/msi.h |    3 +++
->  2 files changed, 59 insertions(+), 4 deletions(-)
+>>
+>> 4) I've copied here comment from Rafael:
+>>   >>>> Of course, if ->probe() is to call pm_runtime_resume() for this purpose,
+>>   >>>> it must take the fact that the driver's own ->runtime_resume() may be called
+>>   >>>> as a result of this into account.
+>>   Agree, that's a little bit annoying, but we are living with that for more then
+>>   5 years already (I'm 3 years) - so, I am, as driver developer, expecting above behavior
+>>   (just walk through the drivers and you will see how many drivers expecting the same).
+>>
+>> So, any volunteers to check and fix ~500 drivers.
 > 
-> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-> index 0319c21dd208..6f8a2f93187a 100644
-> --- a/drivers/pci/msi.c
-> +++ b/drivers/pci/msi.c
-> @@ -27,8 +27,41 @@ static int pci_msi_enable = 1;
->  
->  #define msix_table_size(flags)	((flags & PCI_MSIX_FLAGS_QSIZE) + 1)
->  
-> -/* Arch hooks */
-> +#ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
-> +static struct irq_domain *pci_msi_default_domain;
-> +
-> +struct irq_domain * __weak arch_get_pci_msi_domain(struct pci_dev *dev)
-> +{
-> +	return pci_msi_default_domain;
-> +}
-> +
-> +static int pci_msi_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
-> +{
-> +	struct irq_domain *domain;
->  
-> +	domain = arch_get_pci_msi_domain(dev);
-> +	if (domain)
-> +		return pci_msi_domain_alloc_irqs(domain, type, dev);
-> +
-> +	return arch_setup_msi_irqs(dev, nvec, type);
-> +}
-> +
-> +static void pci_msi_teardown_msi_irqs(struct pci_dev *dev)
-> +{
-> +	struct irq_domain *domain;
-> +
-> +	domain = arch_get_pci_msi_domain(dev);
-> +	if (domain)
-> +		pci_msi_domain_free_irqs(domain, dev);
-> +	else
-> +		arch_teardown_msi_irqs(dev);
-> +}
-> +#else
-> +#define pci_msi_setup_msi_irqs		arch_setup_msi_irqs
-> +#define pci_msi_teardown_msi_irqs	arch_teardown_msi_irqs
-> +#endif
-> +
-> +/* Arch hooks */
->  int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
->  {
->  	struct msi_chip *chip = dev->bus->msi;
-> @@ -329,7 +362,7 @@ static void free_msi_irqs(struct pci_dev *dev)
->  			for (i = 0; i < entry->nvec_used; i++)
->  				BUG_ON(irq_has_action(entry->irq + i));
->  
-> -	arch_teardown_msi_irqs(dev);
-> +	pci_msi_teardown_msi_irqs(dev);
->  
->  	list_for_each_entry_safe(entry, tmp, &dev->msi_list, list) {
->  		if (entry->msi_attrib.is_msix) {
-> @@ -581,7 +614,7 @@ static int msi_capability_init(struct pci_dev *dev, int nvec)
->  	list_add_tail(&entry->list, &dev->msi_list);
->  
->  	/* Configure MSI capability structure */
-> -	ret = arch_setup_msi_irqs(dev, nvec, PCI_CAP_ID_MSI);
-> +	ret = pci_msi_setup_msi_irqs(dev, nvec, PCI_CAP_ID_MSI);
->  	if (ret) {
->  		msi_mask_irq(entry, mask, ~mask);
->  		free_msi_irqs(dev);
-> @@ -696,7 +729,7 @@ static int msix_capability_init(struct pci_dev *dev,
->  	if (ret)
->  		return ret;
->  
-> -	ret = arch_setup_msi_irqs(dev, nvec, PCI_CAP_ID_MSIX);
-> +	ret = pci_msi_setup_msi_irqs(dev, nvec, PCI_CAP_ID_MSIX);
->  	if (ret)
->  		goto out_avail;
->  
-> @@ -1183,4 +1216,23 @@ void pci_msi_domain_free_irqs(struct irq_domain *domain, struct pci_dev *dev)
->  {
->  	msi_domain_free_irqs(domain, &dev->dev);
->  }
-> +
-> +struct irq_domain *pci_msi_create_default_irq_domain(struct device_node *node,
-> +		 struct msi_domain_info *info, struct irq_domain *parent)
-> +{
-> +	struct irq_domain *domain;
-> +	static DEFINE_MUTEX(pci_msi_domain_lock);
-> +
-> +	mutex_lock(&pci_msi_domain_lock);
-> +	if (pci_msi_default_domain) {
-> +		pr_err("PCI: default irq domain for PCI MSI has already been created.\n");
-> +		domain = NULL;
-> +	} else {
-> +		domain = msi_create_irq_domain(node, info, parent);
+> Where did you get that number from?
 
-Surely this needs to be a call to pci_msi_create_irq_domain().
-Otherwise, not much is working on the PCI side...
+Sry, my bad. Rechecked - found 289 occurrences of pm_runtime_enable().
+Number of Runtime PM enabled drivers = at about 289 +-10%.
+- headers, suspend/resume,..
++ buses like amba and spmi 
 
-Thanks,
+> 
+> Also please note that some bus types don't have this problem by design (e.g. PCI,
+> as pointed to by Alan).
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Right. I worry about Platform bus first of all, because HW PM implementation
+(at least for ARM SoCs) can be very different there.
+
+> 
+> [cut]
+> 
+>>>
+>>>>
+>>>> - Runtime PM (if compiled in) needs to be enabled for all devices in power
+>>>>     domains by default.  Otherwise devices may lose power as a result for
+>>>>     power management of the other devices in the same domain.
+>>
+>> It should prevent enabling/disabling of RPM from sys_fs too.
+> 
+> It looks like you're confusing disable/enable with auto/on.  These are different
+> things.
+> 
+>>>>
+>>>> - The core should try to power up domains before calling really_probe() both
+>>>>     for CONFIG_PM_RUNTIME set and unset, so ->probe() can always make the
+>>>>     "device is accessible" assumption.
+>>
+>> Here I'm still think that pm_runtime_get_sync() (or similar) API should work.
+>> Another way, PM domain should decide what to do when the first device attached to it
+>> - power up and stay powered on for example
+>>   (It will work if devices are attached before ->probe();
+>>    it will not work if devices will be attached once they've been created, but this is different
+>>    question)
+> 
+> The PM domain itself can't do that.  The only place that has enough knowledge
+> is the code that enumerates devices (DT, ACPI or board-specific).
+> 
+>>>
+>>> And how exactly will you then power up the PM domain when
+>>> CONFIG_PM_RUNTIME is unset?
+>>>
+>>>>
+>>>> - Bus types may need to do more on top of that in their ->probe(), so the
+>>>>     driver's ->probe() can make that assumption too in all cases.
+>>>>
+>>>> Does that make sense to you?
+>>>
+>>
+>> I would like to take the liberty to add a couple of points from me:
+>>   - it seems reasonable to have ability to disable Runtime PM globally from sys_fs:
+>>     once disabled - "get" should power on device, "put" should do nothing all the
+>>     time except when ->remove() is called.
+> 
+> This is how the "power/control" file works and you can easily have this by writing
+> "on" to that file for every device.
+> 
+>>   
+>>   - It might be reasonable to add API like pm_runtime_probe_getXXX() which will do
+>>     everything what standard pm_runtime_get_sync() is doing with one exception:
+>>     it will not call driver's .runtime_resume() callback.
+> 
+> Use case?
+
+This is just a different view (RFC) on your idea to call pm_runtime_get_sync()
+ before dev->driver is initialized
+("(b) bypassing the driver callbacks somehow".
+  http://marc.info/?l=linux-pm&m=141505768026211&w=2)
+
+- add some flag like dev->is_probing
+- in pm_runtime_probe_get_sync() do
+  dev->is_probing = true;
+  pm_runtime_get_sync();
+  dev->is_probing = false;
+  
+- update 3 places in code pm_generic_runtime_resume, pm_genpd_default_save_state and
+  __rpm_get_callback like below (only for .runtime_resume):
+
++++ b/drivers/base/power/generic_ops.c
+@@ -42,6 +42,9 @@ int pm_generic_runtime_resume(struct device *dev)
+ {
+        const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
+        int ret;
++       
++       if (dev->is_probing)
++               pm = NULL;
+
+Then drivers (at least platform drivers) will be able to call
+  pm_runtime_enable(dev);
+  pm_runtime_probe_get_sync(dev);
+at any time they think is right (no problem with parent devices,
+Power domain will be enabled, class/type/bus callback will be called,
+no need to use pm_runtime_set_active()).
+
+regards,
+-grygorii
