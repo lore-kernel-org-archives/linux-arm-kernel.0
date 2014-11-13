@@ -1,54 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 13 Nov 2014 10:28:49 -0800
-Subject: [PATCH 4/4] arm: dts: omap3-gta04: Add static configuration for
- devconf1 register
-In-Reply-To: <5464969F.30708@ti.com>
-References: <1415051968-4878-1-git-send-email-marek@goldelico.com>
- <1415051968-4878-5-git-send-email-marek@goldelico.com>
- <5463585D.9070209@ti.com> <20141112150210.GC26481@atomide.com>
- <5464969F.30708@ti.com>
-Message-ID: <20141113182848.GQ26481@atomide.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 13 Nov 2014 19:31:22 +0100
+Subject: [PATCH v2 0/3] ARM: mediatek: Add driver for Mediatek I2C
+ controller
+In-Reply-To: <1415078977-18374-1-git-send-email-xudong.chen@mediatek.com>
+References: <1415078977-18374-1-git-send-email-xudong.chen@mediatek.com>
+Message-ID: <20141113183122.GH1275@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [141113 03:33]:
-> On 12/11/14 17:02, Tony Lindgren wrote:
+
+> MTK I2C HW has some limitation.
+> 1. If the i2c_msg number is more than one, STOP will be issued instead of
+> RS(Repeat Start) between each message.
 > 
-> >> And, with a quick grep, I see CONTROL_DEVCONF1 touched in multiple
-> >> places in the kernel. I wonder if adding a pinmux entry for it could
-> >> cause some rather odd problems.
-> > 
-> > They can all use pinctrl-single no problem.
+> 2. Mediatek I2C controller support WRRD(write then read) mode, in WRRD
+> mode the Repeat Start will be issued between 2 messages.
+> In this driver if 2 messages is first write then read, the driver will
+> combine 2 messages using Write-Read mode so the RS will be issued between
+> the 2 messages.
+> Ex: W/R/R, driver will combine first W/R and then R.
 > 
-> Can, but don't. That's my worry. If we touch the DEVCONF1 via pinmux,
-> and we have code in mach-omap2 that also touch DEVCONF1, without any
-> knowledge (and locking) between those...
+> 3. Due to HW limitation, in this version the max transfer data length is 255
+> in one message.
 
-Hmm yeah the McBSP clock mux could be racy as the mux register for
-McBSP is treated as a clock. This register muxes the clock between
-external pin and internal clock. Considering that this should be
-selectable at board level as the external clock probably needs to be
-used if level shifters are being used, it should be really handled by
-pinctrl-single.
+This looks to me more like an SMBUS controller instead of I2C. Maybe you
+should populate smbus_xfer rather than master_xfer?
 
-The other use for hsmmc.c and pdata-quirks.c for the one time mux for
-MMC clock from the MMC clock pin. That can be done with pinctrl-single
-from the MMC driver too for DT based booting.
+> MT8135 and MT6589 can control I2C pins on PMIC(MT6397) by setting the i2c
+> registers in MT8135 side.
 
-Then we just have the save and restore of the registers for
-off-idle.
- 
-> So _maybe_ that's not an issue, as the pinmux config we have here is
-> fixed, and done once at boot time, and maybe the code in mach-omap2 that
-> touch DEVCONF1 is also ran just once and not at the same time as the
-> pinmux. But I don't know if that's so.
+I still didn't get this, even after reading the mail thread of old
+series. Can someone maybe draw me a nice ASCII picture showing the setup
+which is going on here?
 
-It seems we could just do a read-only check for McBSP in the clock
-code for the mux register, or even completely drop that code from
-cclock3xxx_data.c and start using the pinctrl for that mux.
-
-Paul & Tero, got any comments here?
-
-Regards,
-
-Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/3c345ed1/attachment.sig>
