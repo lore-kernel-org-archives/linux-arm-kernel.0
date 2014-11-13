@@ -1,37 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Nov 2014 10:20:07 +0900
-Subject: [PATCH 16/25] ARM: shmobile: koelsch: fixup I2C2 clock frequency
+Date: Thu, 13 Nov 2014 10:20:09 +0900
+Subject: [PATCH 18/25] ARM: shmobile: koelsch: Sound DMA support on DTS
 In-Reply-To: <cover.1415755881.git.horms+renesas@verge.net.au>
 References: <cover.1415755881.git.horms+renesas@verge.net.au>
-Message-ID: <091fffde6d5a41e388ba7823e51151144da8ced5.1415755881.git.horms+renesas@verge.net.au>
+Message-ID: <d7e004a70a3a21dca6c3da3f368dc8fa0c7cbd1c.1415755881.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Current Koelsch I2C2 has 400kHz settings,
-but, ak4643 audio codec chip which is connected to I2C2 can't
-work such frequency.
-Fixup I2C2 clock frequency to 100kHz.
+DMA transfer to/from SSI
+
+     DMA
+[MEM] -> [SSI]
+
+     DMA
+[MEM] <- [SSI]
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index 191f32b..59e4251 100644
+index c92d0d7..68628cf 100644
 --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
 +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -425,7 +425,7 @@
- 	pinctrl-names = "default";
+@@ -576,10 +576,10 @@
+ };
  
- 	status = "okay";
--	clock-frequency = <400000>;
-+	clock-frequency = <100000>;
+ &ssi0 {
+-	pio-transfer;
++	no-busif;
+ };
  
- 	composite-in at 20 {
- 		compatible = "adi,adv7180";
+ &ssi1 {
+-	pio-transfer;
++	no-busif;
+ 	shared-pin;
+ };
 -- 
 2.1.1
