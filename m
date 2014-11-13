@@ -1,25 +1,38 @@
-From: kmcmarti@redhat.com (Kyle McMartin)
-Date: Thu, 13 Nov 2014 10:14:08 -0500
-Subject: [PATCH] arm64: __clear_user: handle exceptions on strb
-In-Reply-To: <20141113150624.GB18494@e104818-lin.cambridge.arm.com>
-References: <20141112210744.GC6869@redacted.bos.redhat.com>
- <20141113150624.GB18494@e104818-lin.cambridge.arm.com>
-Message-ID: <20141113151407.GG6869@redacted.bos.redhat.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 13 Nov 2014 16:14:26 +0100
+Subject: [PATCH v9 00/10] rtc: at91sam9: add DT support
+In-Reply-To: <544501AE.7030706@atmel.com>
+References: <1411483725-31532-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20141020141748.063d6835@bbrezillon> <544501AE.7030706@atmel.com>
+Message-ID: <5464CAD2.8040901@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 13, 2014 at 03:06:25PM +0000, Catalin Marinas wrote:
-> On Wed, Nov 12, 2014 at 09:07:44PM +0000, Kyle McMartin wrote:
-> > ARM64 currently doesn't fix up faults on the single-byte (strb) case of
-> > __clear_user... which means that we can cause a nasty kernel panic as an
-> > ordinary user with any multiple PAGE_SIZE+1 read from /dev/zero.
-> > i.e.: dd if=/dev/zero of=foo ibs=1 count=1 (or ibs=65537, etc.)
+On 20/10/2014 14:35, Nicolas Ferre :
+> On 20/10/2014 14:17, Boris Brezillon :
+>> Hi Alessandro,
+>>
+>> On Tue, 23 Sep 2014 16:48:35 +0200
+>> Boris BREZILLON <boris.brezillon@free-electrons.com> wrote:
+>>
+>>> Hello,
+>>>
+>>> This patch series adds DT support to the atmel at91sam9 RTC driver.
+>>>
+>>> It also removes any machine specific inclusions to prepare the migration
+>>> to multi platform kernel support, and retain the slow clock to prevent
+>>> the CCF from disabling it at the end of boot.
+>>
+>> Nicolas was planning to take this series (except for patch 10 which was
+>> already applied by Lee) in his tree for 3.19, but if you prefer to take
+>> it into yours just let us know.
 > 
-> Thanks for this, it's been like this for a while. Applied.
-> 
+> Absolutely, I'll happily take them for at91-3.19-drivers and push them
+> through arm-soc tree unless Alessandro says otherwise.
 
-Thanks Catalin, if it's not too late, I forgot to add a
-Reported-by: Milo? Prchl?k <mprchlik@redhat.com>
-for the initial report of the panic.
+Now in at91-3.19-drivers with Arnd's Ack on the documentation patch.
+I'll sent them soon to arm-soc.
 
-regards, Kyle
+Thanks, best regards,
+-- 
+Nicolas Ferre
