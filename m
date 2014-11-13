@@ -1,167 +1,80 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 13 Nov 2014 14:18:44 +0100
-Subject: [PATCH] ARM: dts: sama5d4: add DMA support
-Message-ID: <1415884724-11777-1-git-send-email-ludovic.desroches@atmel.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 13 Nov 2014 14:27:42 +0100 (CET)
+Subject: [RFC Part4 v1 00/17] Refine support of non-PCI-compliant Message
+In-Reply-To: <546495AB.9050308@arm.com>
+References: <1415545839-28263-1-git-send-email-jiang.liu@linux.intel.com>
+ <546364FA.7010806@arm.com> <alpine.DEB.2.11.1411121512270.3935@nanos>
+ <546495AB.9050308@arm.com>
+Message-ID: <alpine.DEB.2.11.1411131410560.3935@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DMA controllers and device configurations.
+On Thu, 13 Nov 2014, Marc Zyngier wrote:
+> On 12/11/14 14:46, Thomas Gleixner wrote:
+> > On Wed, 12 Nov 2014, Marc Zyngier wrote:
+> >> This patch introduces two optionnal fields to the msi_chip structure:
+> >> - a pointer to an irq domain, describing the MSI domain associated
+> >>   with this msi_chip. To be populated with msi_create_irq_domain.
+> >> - a domain_alloc_irqs() callback that has the same purpose as
+> >>   arch_setup_msi_irqs(), with the above domain as an additional
+> >>   parameter.
+> >>
+> >> If both of these fields are non-NULL, then domain_alloc_irqs() is
+> >> called, bypassing the setup_irq callback. This allows the MSI driver
+> >> to use the domain stacking feature without mandating core support in
+> >> the architecture.
+> > 
+> > I'd rather have the callback in the irqdomain itself. Along with a
+> > callback to free the interrupts.
+> > 
+> > AFAICT is msi_chip more or less a wrapper around the actual MSI irq
+> > domain. So we rather move towards assigning irqdomain to the pci bus
+> > and get rid of msi_chip instead of adding another level of obscure
+> > indirection through msi_chip.
+> 
+> I can see that putting the irq domain at the bus level makes a lot of 
+> sense (assuming nobody tries to have multiple MSI controllers per bus...).
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
+That would be interesting :)
+ 
+> So I'm starting with something like this:
+> 
+> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+> index 640a1ec..07e50fc 100644
+> --- a/include/linux/irqdomain.h
+> +++ b/include/linux/irqdomain.h
+> @@ -41,6 +41,7 @@ struct irq_domain;
+>  struct of_device_id;
+>  struct irq_chip;
+>  struct irq_data;
+> +struct device;
+>  
+>  /* Number of irqs reserved for a legacy isa controller */
+>  #define NUM_ISA_INTERRUPTS	16
+> @@ -76,6 +77,10 @@ struct irq_domain_ops {
+>  		     unsigned int nr_irqs);
+>  	void (*activate)(struct irq_domain *d, struct irq_data *irq_data);
+>  	void (*deactivate)(struct irq_domain *d, struct irq_data *irq_data);
+> +	int (*prepare_alloc_irqs)(struct irq_domain *d, struct device *dev,
+> +				  unsigned int nr_irqs, int type);
+> +	int (*cleanup_free_irqs)(struct irq_domain *d, struct device *dev,
+> +				 unsigned int virq, unsigned int nr_irqs);
+>  #endif
+>  };
+> 
+> How do you see this behaving? At the moment, I have the "prepare" callback
+> directly calling into pci_msi_domain_alloc_irqs() so that the irqs get
+> created, but I have the nagging feeling that it's not what you want... ;-)
+> The main issue I can see is that if more than one domain in the stack
+> implements that, who gets to call pci_msi_domain_alloc_irqs?
+>
+> If we try to decouple those two, there is a problem with the creation of
+> the intermediate structure (the irq_alloc_info that's in Jiang's patches),
+> as this is a arch/driver/whatever specific structure.
 
- arch/arm/boot/dts/sama5d4.dtsi | 69 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 69 insertions(+)
+Hard to tell. I just saw Jiangs new series arrive and I want to look
+at that first before muttering nonsense.
 
-diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-index 338dfd8..05e0526 100644
---- a/arch/arm/boot/dts/sama5d4.dtsi
-+++ b/arch/arm/boot/dts/sama5d4.dtsi
-@@ -45,6 +45,7 @@
- 
- #include "skeleton.dtsi"
- #include <dt-bindings/clock/at91.h>
-+#include <dt-bindings/dma/at91.h>
- #include <dt-bindings/pinctrl/at91.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/gpio/gpio.h>
-@@ -302,6 +303,15 @@
- 			#size-cells = <1>;
- 			ranges;
- 
-+			dma1: dma-controller at f0004000 {
-+				compatible = "atmel,sama5d4-dma";
-+				reg = <0xf0004000 0x200>;
-+				interrupts = <50 IRQ_TYPE_LEVEL_HIGH 0>;
-+				#dma-cells = <1>;
-+				clocks = <&dma1_clk>;
-+				clock-names = "dma_clk";
-+			};
-+
- 			ramc0: ramc at f0010000 {
- 				compatible = "atmel,sama5d3-ddramc";
- 				reg = <0xf0010000 0x200>;
-@@ -309,6 +319,15 @@
- 				clock-names = "ddrck", "mpddr";
- 			};
- 
-+			dma0: dma-controller at f0014000 {
-+				compatible = "atmel,sama5d4-dma";
-+				reg = <0xf0014000 0x200>;
-+				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 0>;
-+				#dma-cells = <1>;
-+				clocks = <&dma0_clk>;
-+				clock-names = "dma_clk";
-+			};
-+
- 			pmc: pmc at f0018000 {
- 				compatible = "atmel,sama5d3-pmc";
- 				reg = <0xf0018000 0x120>;
-@@ -761,6 +780,10 @@
- 				compatible = "atmel,hsmci";
- 				reg = <0xf8000000 0x600>;
- 				interrupts = <35 IRQ_TYPE_LEVEL_HIGH 0>;
-+				dmas = <&dma1
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(0))>;
-+				dma-names = "rxtx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_mmc0_clk_cmd_dat0 &pinctrl_mmc0_dat1_3>;
- 				status = "disabled";
-@@ -776,6 +799,13 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xf8010000 0x100>;
- 				interrupts = <37 IRQ_TYPE_LEVEL_HIGH 3>;
-+				dmas = <&dma1
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(10))>,
-+				       <&dma1
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(11))>;
-+				dma-names = "tx", "rx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_spi0>;
- 				clocks = <&spi0_clk>;
-@@ -787,6 +817,13 @@
- 				compatible = "atmel,at91sam9x5-i2c";
- 				reg = <0xf8014000 0x4000>;
- 				interrupts = <32 IRQ_TYPE_LEVEL_HIGH 6>;
-+				dmas = <&dma1
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(2))>,
-+				       <&dma1
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(3))>;
-+				dma-names = "tx", "rx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_i2c0>;
- 				#address-cells = <1>;
-@@ -818,6 +855,13 @@
- 				compatible = "atmel,at91sam9x5-i2c";
- 				reg = <0xf8024000 0x4000>;
- 				interrupts = <34 IRQ_TYPE_LEVEL_HIGH 6>;
-+				dmas = <&dma1
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(6))>,
-+				       <&dma1
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(7))>;
-+				dma-names = "tx", "rx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_i2c2>;
- 				#address-cells = <1>;
-@@ -830,6 +874,10 @@
- 				compatible = "atmel,hsmci";
- 				reg = <0xfc000000 0x600>;
- 				interrupts = <36 IRQ_TYPE_LEVEL_HIGH 0>;
-+				dmas = <&dma1
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(1))>;
-+				dma-names = "rxtx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_mmc1_clk_cmd_dat0 &pinctrl_mmc1_dat1_3>;
- 				status = "disabled";
-@@ -843,6 +891,13 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfc008000 0x100>;
- 				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 5>;
-+				dmas = <&dma1
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(16))>,
-+				       <&dma1
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(17))>;
-+				dma-names = "tx", "rx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart2 &pinctrl_usart2_rts &pinctrl_usart2_cts>;
- 				clocks = <&usart2_clk>;
-@@ -854,6 +909,13 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfc00c000 0x100>;
- 				interrupts = <30 IRQ_TYPE_LEVEL_HIGH 5>;
-+				dmas = <&dma1
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(18))>,
-+				       <&dma1
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(19))>;
-+				dma-names = "tx", "rx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart3>;
- 				clocks = <&usart3_clk>;
-@@ -865,6 +927,13 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfc010000 0x100>;
- 				interrupts = <31 IRQ_TYPE_LEVEL_HIGH 5>;
-+				dmas = <&dma1
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(20))>,
-+				       <&dma1
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(21))>;
-+				dma-names = "tx", "rx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart4>;
- 				clocks = <&usart4_clk>;
--- 
-2.0.3
+Thanks,
+
+	tglx
