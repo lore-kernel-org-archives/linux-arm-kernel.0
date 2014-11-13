@@ -1,53 +1,54 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 13 Nov 2014 11:00:11 +0000
-Subject: [PATCH v2 08/14] ARM: STi: DT: STiH410: Add defines for STiH410 DT
- clocks
+Date: Thu, 13 Nov 2014 11:00:16 +0000
+Subject: [PATCH v2 13/14] ARM: STi: DT: STiH410: Add usb2 picophy dt nodes
 In-Reply-To: <1415876417-28728-1-git-send-email-peter.griffin@linaro.org>
 References: <1415876417-28728-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1415876417-28728-9-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1415876417-28728-14-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although most clock outputs are the same as stih407 SoC, stih410
-also has some additional new clock outputs.
+This patch adds the dt nodes for the extra usb2 picophys found on the stih410.
+These two picophys are used in conjunction with the extra ehci/ohci usb
+controllers also found on the stih410.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- include/dt-bindings/clock/stih410-clks.h | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
- create mode 100644 include/dt-bindings/clock/stih410-clks.h
+ arch/arm/boot/dts/stih410.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/include/dt-bindings/clock/stih410-clks.h b/include/dt-bindings/clock/stih410-clks.h
-new file mode 100644
-index 0000000..2097a4b
---- /dev/null
-+++ b/include/dt-bindings/clock/stih410-clks.h
-@@ -0,0 +1,25 @@
-+/*
-+ * This header provides constants clk index STMicroelectronics
-+ * STiH410 SoC.
-+ */
-+#ifndef _DT_BINDINGS_CLK_STIH410
-+#define _DT_BINDINGS_CLK_STIH410
-+
-+#include "stih407-clks.h"
-+
-+/* STiH410 introduces new clock outputs compared to STiH407 */
-+
-+/* CLOCKGEN C0 */
-+#define CLK_TX_ICN_HADES	32
-+#define CLK_RX_ICN_HADES	33
-+#define CLK_ICN_REG_16		34
-+#define CLK_PP_HADES		35
-+#define CLK_CLUST_HADES		36
-+#define CLK_HWPE_HADES		37
-+#define CLK_FC_HADES		38
-+
-+/* CLOCKGEN D0 */
-+#define CLK_PCMR10_MASTER	4
-+#define CLK_USB2_PHY		5
-+
-+#endif
+diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
+index c05627e..5ade3ed 100644
+--- a/arch/arm/boot/dts/stih410.dtsi
++++ b/arch/arm/boot/dts/stih410.dtsi
+@@ -10,5 +10,29 @@
+ #include "stih407-family.dtsi"
+ #include "stih410-pinctrl.dtsi"
+ / {
++	soc {
++		usb2_picophy0: usbpicophy at 0 {
++			compatible = "st,stih407-usb2-phy";
++			reg = <0xf8 0x04>,	/* syscfg 5062 */
++			      <0xf4 0x04>;	/* syscfg 5061 */
++			reg-names = "param", "ctrl";
++			#phy-cells = <0>;
++			st,syscfg = <&syscfg_core>;
++			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
++				 <&picophyreset STIH407_PICOPHY0_RESET>;
++			reset-names = "global", "port";
++		};
+ 
++		usb2_picophy1: usbpicophy at 1 {
++			compatible = "st,stih407-usb2-phy";
++			#phy-cells = <0>;
++			reg = <0xfc 0x04>,	/* syscfg 5063 */
++			      <0xf4 0x04>;	/* syscfg 5061 */
++			reg-names = "param", "ctrl";
++			st,syscfg = <&syscfg_core>;
++			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
++				 <&picophyreset STIH407_PICOPHY1_RESET>;
++			reset-names = "global", "port";
++		};
++	};
+ };
 -- 
 1.9.1
