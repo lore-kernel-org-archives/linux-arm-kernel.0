@@ -1,56 +1,55 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Thu, 13 Nov 2014 16:52:18 +0800
-Subject: [PATCH 0/5] clk: rockchip: add full support for HDMI clock on
- rk3288
-In-Reply-To: <48806799.thBSifdUp8@diego>
-References: <1415087559-19444-1-git-send-email-kever.yang@rock-chips.com>
- <48806799.thBSifdUp8@diego>
-Message-ID: <54647142.4080800@rock-chips.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 13 Nov 2014 09:52:38 +0100
+Subject: [PATCH 3/4] simplefb: Change simplefb_init from module_init to
+ fs_initcall
+In-Reply-To: <1415830124-28787-3-git-send-email-hdegoede@redhat.com>
+References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
+ <1415830124-28787-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <20141113085238.GE20972@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Wed, Nov 12, 2014 at 11:08:43PM +0100, Hans de Goede wrote:
+> One of the reasons for having the simplefb nodes in /chosen, and doing
+> explicit enumeration of the nodes there, is too allow enumerating them sooner,
+> so that we get a console earlier on.
+> 
+> Doing this earlier then fs_initcall is not useful, since the fb only turns into
+> a console when fbcon intializes, which is a fs_initcall too.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  drivers/video/fbdev/simplefb.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
+> index be7d288..8c0c972 100644
+> --- a/drivers/video/fbdev/simplefb.c
+> +++ b/drivers/video/fbdev/simplefb.c
+> @@ -415,7 +415,11 @@ static void __exit simplefb_exit(void)
+>  	platform_driver_unregister(&simplefb_driver);
+>  }
+>  
+> -module_init(simplefb_init);
+> +/*
+> + * While this can be a module, if builtin it's most likely the console
+> + * So let's leave module_exit but move module_init to an earlier place
+> + */
 
-On 11/07/2014 05:06 AM, Heiko St?bner wrote:
-> Hi Kever,
->
-> Am Dienstag, 4. November 2014, 15:52:34 schrieb Kever Yang:
->> we are going to make a clock usage solution for rk3288:
->> 1. CPLL and GPLL always not change after assign init;
->> 2. NPLL default as 500MHz, may used for most scene;
->> 3. NPLL may be changed by VOP(HDMI) clock for some special
->>     frequency requirement.
->>
->>      I test it with rk3288 evb on top of Heiko's clk-for-next
-> In general I'm not really sure if allowing one component to arbitarily change
-> a shared clock wouldn't result in trouble.
->
-> At the moment only dclk_vop0 is included in your series, while the hdmi
-> controller can connect to both vop0 and vop1.
-> And as Doug mentioned the gpu also has the npll as one possible source.
-I think the problem GPU HANGs with 480MHz clock from usbphy has
-been fixed with my patch to gerrit:
-https://chromium-review.googlesource.com/#/c/229554/
->
-> Looking through the clock-tree there are a lot more components possibly using
-> (or wanting to use) the npll: of course the VOPs, the edp, hdmi, isp, hevc,
-> gpu, tsp uart0 and gmac. So I'm slightly uncomfortable with somehow reserving
-> the npll for VOP0 alone.
-It's true that I customized the usage of npll for VOP0 when we need some
-very special frequency, but it doesn't means other modules can't use the
-npll, it will always decided by clock core for module clocks that which 
-parent
-is the best.
+Not really related to this patch itself, but do we want to support
+simplefb as a module? It seems like it's going to be most of the time
+broken.
 
-I'll be very happy if there is a better solution for this situation, and any
-suggestion is welcome.
+Maxime
 
-- Kever
->
-> But I also don't see a different way to get these frequencies right now.
->
->
-> Heiko
->
->
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/6baced6e/attachment-0001.sig>
