@@ -1,54 +1,51 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 13 Nov 2014 18:52:57 +0100
-Subject: [PATCH 4/7] ARM: dts: sun6i: Add simplefb node
-In-Reply-To: <20141113164606.GM20972@lukather>
-References: <1415871109-28332-1-git-send-email-hdegoede@redhat.com>
- <1415871109-28332-4-git-send-email-hdegoede@redhat.com>
- <20141113164606.GM20972@lukather>
-Message-ID: <5464EFF9.9010203@redhat.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 13 Nov 2014 13:00:26 -0500 (EST)
+Subject: [PATCH] ARM: b.L: fix unmet dependency for CPU_PM
+In-Reply-To: <20141113174837.GB4042@n2100.arm.linux.org.uk>
+References: <1415857098-16928-1-git-send-email-pankaj.dubey@samsung.com>
+ <alpine.LFD.2.11.1411131231060.11690@knanqh.ubzr>
+ <20141113174837.GB4042@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.11.1411131259330.11690@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 13 Nov 2014, Russell King - ARM Linux wrote:
 
-On 11/13/2014 05:46 PM, Maxime Ripard wrote:
-> Hi,
+> On Thu, Nov 13, 2014 at 12:44:22PM -0500, Nicolas Pitre wrote:
+> > On Thu, 13 Nov 2014, Pankaj Dubey wrote:
+> > 
+> > > If BL_SWITCHER is enabled but SUSPEND and CPU_IDLE is not enabled
+> > > we are getting following config warning.
+> > > 
+> > > warning: (BL_SWITCHER) selects CPU_PM which has unmet direct
+> > > dependencies (SUSPEND || CPU_IDLE)
+> > > 
+> > > So BL_SWITCHER should enable CPU_PM only if either of SUSPEND or
+> > > CPU_IDLE is selected.
+> > > 
+> > > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> > > ---
+> > >  arch/arm/Kconfig |    2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > > index 9d580d0..fe3d969 100644
+> > > --- a/arch/arm/Kconfig
+> > > +++ b/arch/arm/Kconfig
+> > > @@ -1417,7 +1417,7 @@ config BL_SWITCHER
+> > >  	bool "big.LITTLE switcher support"
+> > >  	depends on BIG_LITTLE && MCPM && HOTPLUG_CPU
+> > >  	select ARM_CPU_SUSPEND
+> > > -	select CPU_PM
+> > > +	select CPU_PM if (SUSPEND || CPU_IDLE)
+> > 
+> > NAK.  You just broke the code by doing this. CPU_PM is a requirement 
+> > here.  The dependencies for CPU_PM is lacking.
 > 
-> On Thu, Nov 13, 2014 at 10:31:46AM +0100, Hans de Goede wrote:
->> Add a simplefb template node for u-boot to further fill and activate.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>  arch/arm/boot/dts/sun6i-a31.dtsi | 10 ++++++++++
->>  1 file changed, 10 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
->> index 543f895..438952e 100644
->> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
->> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
->> @@ -62,6 +62,16 @@
->>  		ethernet0 = &gmac;
->>  	};
->>  
->> +	chosen {
->> +		#address-cells = <1>;
->> +		#size-cells = <1>;
->> +		ranges;
->> +
->> +		framebuffer0 {
->> +			compatible = "simple-framebuffer";
->> +			status = "disabled";
-> 
-> Aren't we suppose to have clocks in there too?
+> Is there any real technical reason that CPU_PM depends on SUSPEND ||
+> CPU_IDLE ?  If not, those dependencies should be killed.
 
-I deliberately left them out as they are not needed on sun6i, once the blocks
-are setup ahb access is not necessary, but it seems that the ahb_gate bits
-in sun4i / sun5i / sun7i double as a reset. Toggling them on / off / on breaks
-the mode, while toggling module clocks on / off / on only causes a glitch.
+Those dependencies look artificial to me.
 
-Since the sun6i has a separate reset controller, the clock gates seem to really
-only control ahb access which is not necessary once the mode has been set up.
 
-Regards,
-
-Hans
+Nicolas
