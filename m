@@ -1,62 +1,70 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 13 Nov 2014 10:31:12 +0000
-Subject: [PATCH 3/4] simplefb: Change simplefb_init from module_init to
- fs_initcall
-In-Reply-To: <CACxGe6u8B854PEWw8XzwhyX8joMWwOsHOOXtmBmC1TgCGjGtdg@mail.gmail.com>
-References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
- <1415830124-28787-3-git-send-email-hdegoede@redhat.com>
- <20141113085238.GE20972@lukather> <546478B5.2040002@redhat.com>
- <CACxGe6u8B854PEWw8XzwhyX8joMWwOsHOOXtmBmC1TgCGjGtdg@mail.gmail.com>
-Message-ID: <CACxGe6sYD-Ow2wcwAKuXpR3A9VZozo2sgz=eEcWXi5ayKd2jWQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 13 Nov 2014 10:34:51 +0000
+Subject: [PATCHv3 4/5] arm64: Emulate CP15 Barrier instructions
+In-Reply-To: <9hhk3372duw.fsf@e105922-lin.cambridge.arm.com>
+References: <1414435207-30240-1-git-send-email-punit.agrawal@arm.com>
+ <1414435207-30240-6-git-send-email-punit.agrawal@arm.com>
+ <20141105130513.GH32700@e104818-lin.cambridge.arm.com>
+ <9hhk3372duw.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <20141113103450.GD20652@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 13, 2014 at 10:29 AM, Grant Likely <grant.likely@linaro.org> wrote:
-> On Thu, Nov 13, 2014 at 9:24 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
->>
->> On 11/13/2014 09:52 AM, Maxime Ripard wrote:
->>> On Wed, Nov 12, 2014 at 11:08:43PM +0100, Hans de Goede wrote:
->>>> One of the reasons for having the simplefb nodes in /chosen, and doing
->>>> explicit enumeration of the nodes there, is too allow enumerating them sooner,
->>>> so that we get a console earlier on.
->>>>
->>>> Doing this earlier then fs_initcall is not useful, since the fb only turns into
->>>> a console when fbcon intializes, which is a fs_initcall too.
->>>>
->>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>> ---
->>>>  drivers/video/fbdev/simplefb.c | 6 +++++-
->>>>  1 file changed, 5 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
->>>> index be7d288..8c0c972 100644
->>>> --- a/drivers/video/fbdev/simplefb.c
->>>> +++ b/drivers/video/fbdev/simplefb.c
->>>> @@ -415,7 +415,11 @@ static void __exit simplefb_exit(void)
->>>>      platform_driver_unregister(&simplefb_driver);
->>>>  }
->>>>
->>>> -module_init(simplefb_init);
->>>> +/*
->>>> + * While this can be a module, if builtin it's most likely the console
->>>> + * So let's leave module_exit but move module_init to an earlier place
->>>> + */
->>>
->>> Not really related to this patch itself, but do we want to support
->>> simplefb as a module? It seems like it's going to be most of the time
->>> broken.
->>
->> A valid point, my mean reasoning here is that some may see not being able to
->> use it as a module as a regression, so I just kept things as is, but I do
->> agree that it is advisable to just build it in.
->
-> Like a lot of things, if it is made a modules, and it breaks for the
-> user, the user gets to keep the pieces. There are potentially some
-> valid scenarios where it is fine to have it as a module. I don't
-> recommend changing this unless is actually starts causing problems.
+On Fri, Nov 07, 2014 at 04:07:51PM +0000, Punit Agrawal wrote:
+> Catalin Marinas <catalin.marinas@arm.com> writes:
+> > On Mon, Oct 27, 2014 at 06:40:06PM +0000, Punit Agrawal wrote:
+> >> diff --git a/Documentation/arm64/legacy_instructions.txt b/Documentation/arm64/legacy_instructions.txt
+> >> index 5ab5861..a3b3da2 100644
+> >> --- a/Documentation/arm64/legacy_instructions.txt
+> >> +++ b/Documentation/arm64/legacy_instructions.txt
+> >> @@ -38,3 +38,8 @@ Supported legacy instructions
+> >>  Node: /proc/sys/abi/swp
+> >>  Status: Obsolete
+> >>  Default: Undef (0)
+> >> +
+> >> +* CP15 Barriers
+> >> +Node: /proc/sys/abi/cp15_barrier
+> >> +Status: Deprecated
+> >> +Default: Emulate (1)
+> >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> >> index 6ae8079..2f7026e 100644
+> >> --- a/arch/arm64/Kconfig
+> >> +++ b/arch/arm64/Kconfig
+> >> @@ -199,6 +199,21 @@ config SWP_EMULATION
+> >>  
+> >>  	  If unsure, say N
+> >>  
+> >> +config CP15_BARRIER_EMULATION
+> >> +	bool "Emulate CP15 Barrier instructions"
+> >> +	help
+> >> +	  The CP15 barrier instructions - CP15ISB, CP15DSB, and
+> >> +	  CP15DMB - are deprecated in ARMv8 (and ARMv7). It is
+> >> +	  strongly recommended to use the ISB, DSB, and DMB
+> >> +	  instructions instead.
+> >> +
+> >> +	  Say Y here to enable software emulation of these
+> >> +	  instructions for AArch32 userspace code. When this option is
+> >> +	  enabled, CP15 barrier usage is traced which can help
+> >> +	  identify software that needs updating.
+> >> +
+> >> +	  If unsure, say N
+> >> +
+> >>  endif
+> >
+> > default y (I think we had a discussion in private whether deprecated
+> > should default to y and obsolete to y or n but I don't remember the
+> > conclusion; it's worth adding it to the Documentation/ file).
+> 
+> Based on the outcome of the discussion, I've documented the runtime
+> defaults ('undef' for obsolete and 'emulation' for deprecated instructions)
+> in the previous patch (3/5).
+> 
+> As for Kconfig, the conclusion was to keep them off by default. The
+> rationale was that they can be enabled quite easily and would form
+> another way to communicate that certain features are deprecated and
+> software might need updating.
 
-I assume that you've tested this and it actually makes a difference,
-correct? If so,
+Sounds fine.
 
-Acked-by: Grant Likely <grant.likely@linaro.org>
+-- 
+Catalin
