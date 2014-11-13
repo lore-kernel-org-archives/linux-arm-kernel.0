@@ -1,28 +1,85 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 13 Nov 2014 11:12:40 -0700
-Subject: [PATCH 0/3] miscellaneous fixes in coresight
-In-Reply-To: <1415868169-13325-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1415868169-13325-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <CANLsYkyPnVJ75-TYYionMtd2KJzs29UK9LD3Fj4vk=Apvfh0Gw@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 13 Nov 2014 19:16:50 +0100
+Subject: [PATCH v2 1/3] dt-bindings: Add I2C bindings for mt65xx/mt81xx.
+In-Reply-To: <1415078977-18374-2-git-send-email-xudong.chen@mediatek.com>
+References: <1415078977-18374-1-git-send-email-xudong.chen@mediatek.com>
+ <1415078977-18374-2-git-send-email-xudong.chen@mediatek.com>
+Message-ID: <20141113181649.GG1275@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 November 2014 01:42, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
-> This patch series fixes some typo and minor issues in coresight which
-> I observed while going through this driver.
->
-> Pankaj Dubey (3):
->   coresight: fix typo in comment in coresight-priv.h
->   coresight: fixed comments in coresight.h
->   coresight-replicator: remove .owner field for driver
->
->  drivers/coresight/coresight-priv.h       |    2 +-
->  drivers/coresight/coresight-replicator.c |    1 -
->  include/linux/coresight.h                |    6 +++---
->  3 files changed, 4 insertions(+), 5 deletions(-)
->
-> --
-> 1.7.9.5
->
+On Tue, Nov 04, 2014 at 01:29:35PM +0800, Xudong Chen wrote:
+> Add devicetree bindings for Mediatek Soc I2C driver.
+> 
+> Signed-off-by: Xudong Chen <xudong.chen@mediatek.com>
+> ---
+>  .../devicetree/bindings/i2c/i2c-mt6577.txt         | 39 ++++++++++++++++++++++
+>  1 file changed, 39 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+> new file mode 100644
+> index 0000000..733e65e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+> @@ -0,0 +1,39 @@
+> +* Mediatek's I2C controller
+> +
+> +The Mediatek's I2C controller is used to interface with I2C devices.
+> +
+> +Required properties:
+> +  - compatible: value should be either of the following.
+> +      (a) "mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
+> +      (b) "mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
+> +      (c) "mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
+> +      (d) "mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
+> +  - reg: physical base address of the controller and dma base, length of memory mapped
+> +    region.
+> +  - interrupts: interrupt number to the cpu.
+> +  - clock-div: the fixed value for frequency divider of clock source in i2c module.
+> +    Each IC may be different.
 
-Applied all 3 patches - thanks
+? Doesn't that platform have CCF and can't we derive an I2C clock there?
+
+> +  - clocks: clock name from clock manager
+> +  - clock-names: clock name used in i2c driver probe
+
+This needs names of the clocks. Check other binding documentation for
+examples.
+
+> +Optional properties:
+> +  - clock-frequency: Frequency in Hz of the bus when transfer, the default value is 100000.
+> +  - mediatek,have-pmic: platform can control i2c form special pmic side.
+> +    Only mt6589 and mt8135 support this feature.
+> +  - mediatek,have-dcm: platform has DCM(hardware digital clock manager) property.
+> +  - mediatek,use-push-pull: IO use push-pull mode.
+
+About the last 3 ones: Can't we encode this in the driver? Like, if the
+compatible is "mediatek,mt6589-i2c" we know it has this and that but not
+this?
+
+> +
+> +Example:
+> +
+> +	i2c0: i2c at 1100d000 {
+> +			compatible = "mediatek,mt6577-i2c";
+> +			reg = <0x1100d000 0x70>,
+> +			      <0x11000300 0x80>;
+> +			interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_LOW>;
+> +			clock-frequency = <100000>;
+> +			mediatek,have-pmic;
+> +			clock-div = <16>;
+> +			clocks = <&i2c0_ck>, <&ap_dma_ck>;
+> +			clock-names = "main", "dma";
+> +	};
+> +
+> -- 
+> 1.8.1.1.dirty
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/a1f4b64a/attachment.sig>
