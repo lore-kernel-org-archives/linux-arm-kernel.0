@@ -1,42 +1,43 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Nov 2014 10:20:04 +0900
-Subject: [PATCH 13/25] ARM: shmobile: lager: Sound DMA support via BUSIF on DTS
+Date: Thu, 13 Nov 2014 10:20:03 +0900
+Subject: [PATCH 12/25] ARM: shmobile: lager: Sound DMA support on DTS
 In-Reply-To: <cover.1415755881.git.horms+renesas@verge.net.au>
 References: <cover.1415755881.git.horms+renesas@verge.net.au>
-Message-ID: <59bd80f145e21ed9eca2648d8c59b1983a1bd74f.1415755881.git.horms+renesas@verge.net.au>
+Message-ID: <ec4c73c6ca47c08289b77577682c462453529aa5.1415755881.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-DMA transfer to/from SSIU
+DMA transfer to/from SSI
 
      DMA
-[MEM] -> [SSIU] -> [SSI]
+[MEM] -> [SSI]
 
      DMA
-[MEM] <- [SSIU] <- [SSI]
+[MEM] <- [SSI]
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm/boot/dts/r8a7790-lager.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 93630d0..0634fff 100644
+index c2b4f65..93630d0 100644
 --- a/arch/arm/boot/dts/r8a7790-lager.dts
 +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -575,11 +575,6 @@
- 	};
+@@ -576,10 +576,10 @@
  };
  
--&ssi0 {
--	no-busif;
--};
--
+ &ssi0 {
+-	pio-transfer;
++	no-busif;
+ };
+ 
  &ssi1 {
--	no-busif;
+-	pio-transfer;
++	no-busif;
  	shared-pin;
  };
 -- 
