@@ -1,41 +1,37 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 13 Nov 2014 11:34:03 +0900
-Subject: [PATCHv2 0/2] ARM: dts: Fix the number of DMA channels for
- Exynos3250/4
-In-Reply-To: <5462F24E.7030100@samsung.com>
-References: <1415760629-1531-1-git-send-email-cw00.choi@samsung.com>
- <5462F24E.7030100@samsung.com>
-Message-ID: <5464189B.1020305@samsung.com>
+Date: Thu, 13 Nov 2014 11:40:05 +0900
+Subject: [PATCH] ARM: EXYNOS: fix typo in static struct name
+ "exynos5_list_diable_wfi_wfe"
+In-Reply-To: <CABxcv==Hjfi+-Mt63YQaCtC3Wj12WFfU6biwmiVEFQvqAp3DBA@mail.gmail.com>
+References: <1414489832-28011-1-git-send-email-pankaj.dubey@samsung.com>
+ <CABxcv=nJ7-NoF-0EqCL=rk6hX2688iV98g=CiDADKT7QTNWBrw@mail.gmail.com>
+ <CABxcv==Hjfi+-Mt63YQaCtC3Wj12WFfU6biwmiVEFQvqAp3DBA@mail.gmail.com>
+Message-ID: <54641A05.9030107@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/14 14:38, Chanwoo Choi wrote:
-> Dear Kukjin,
+On 11/11/14 18:54, Javier Martinez Canillas wrote:
+> Hello Kukjin,
 >
-> Please ignore this patchset because this patchset are wrong.
+>>
+>> After this patch, "[PATCH v9 1/2] ARM: EXYNOS: Add platform driver
+>> support for Exynos PMU" [0] does not apply cleanly anymore.
+>>
 >
-OK.
+> I see that you already picked all the Exynos S2R patches on your
+> v3.19-next/mach-exynos branch and also resolved that conflict.
+>
+Yes, but I couldn't merge it into -next because of some conflicts 
+between for-next and mach-exynos branch at that time.
+
+Note I've merged into -next just now, so if any problems in -next, 
+please let us know.
+
+> Is just that this branch was not merged in your for-next branch and
+> that's why I didn't see the patches in linux-next.
+>
+> Sorry for the noise.
+
+No problem, thanks.
 
 - Kukjin
-
-> Best Regards,
-> Chanwoo Choi
->
-> On 11/12/2014 11:50 AM, Chanwoo Choi wrote:
->> This patch fix minor issuse to correct the number of DMA channels for
->> Exynos3250 and Exynos4 series. The PL330 DMA of Exynos3250/Exynos4 support
->> 16 channels simultaneously but, PL330 DMA driver don't use 'dma-channels'
->> property directly. This patchset fix the correct information
->> of Exynos3250/Exynos4's PL330 DMA simply.
->>
->> Changes from v1:
->> - Fix the nubmer for DMA channesl for Exynos4415
->>
->> Chanwoo Choi (2):
->>    ARM: dts: Fix the number of DMA channels for Exynos3250
->>    ARM: dts: Fix the number of DMA channels for Exynos4
->>
->>   arch/arm/boot/dts/exynos3250.dtsi | 4 ++--
->>   arch/arm/boot/dts/exynos4.dtsi    | 4 ++--
->>   arch/arm/boot/dts/exynos4415.dtsi | 4 ++--
->>   3 files changed, 6 insertions(+), 6 deletions(-)
