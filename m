@@ -1,66 +1,33 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 13 Nov 2014 10:37:09 +0100
-Subject: [PATCH] ARM: at91: remove unused CONFIG_ARCH_AT91SAM9G45 option
-In-Reply-To: <1415871190-32244-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1415617517.4862.44.camel@x220>
- <1415871190-32244-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20141113103709.35b053ad@bbrezillon>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 13 Nov 2014 10:38:58 +0100
+Subject: [PATCHv3 3/5] ARM: mvebu: remove unused register offset definition
+In-Reply-To: <1415871540-20302-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1415871540-20302-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1415871540-20302-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Nov 2014 10:33:10 +0100
-Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+Since commit b21dcafea36d ("arm: mvebu: remove dependency of SMP init
+on static I/O mapping"), the COHERENCY_FABRIC_CFG_OFFSET register
+offset definition is no longer used, so this commit removes it.
 
-> The CONFIG_ARCH_AT91SAM9G45 config option was removed by ("ARM: at91: remove
-> at91sam9g45/9m10 legacy board support") so cleanup the use of it.
-> 
-> Reported-by: Paul Bolle <pebolle@tiscali.nl>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/coherency.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-> ---
->  arch/arm/mach-at91/Makefile.boot | 6 ------
->  arch/arm/mach-at91/board.h       | 4 ----
->  2 files changed, 10 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/Makefile.boot b/arch/arm/mach-at91/Makefile.boot
-> index 5309f9b6aabc..29ed0fa374ca 100644
-> --- a/arch/arm/mach-at91/Makefile.boot
-> +++ b/arch/arm/mach-at91/Makefile.boot
-> @@ -3,12 +3,6 @@
->  #   PARAMS_PHYS must be within 4MB of ZRELADDR
->  #   INITRD_PHYS must be in RAM
->  
-> -ifeq ($(CONFIG_ARCH_AT91SAM9G45),y)
-> -   zreladdr-y	+= 0x70008000
-> -params_phys-y	:= 0x70000100
-> -initrd_phys-y	:= 0x70410000
-> -else
->     zreladdr-y	+= 0x20008000
->  params_phys-y	:= 0x20000100
->  initrd_phys-y	:= 0x20410000
-> -endif
-> diff --git a/arch/arm/mach-at91/board.h b/arch/arm/mach-at91/board.h
-> index 836e9a537e0c..d268ec3781dd 100644
-> --- a/arch/arm/mach-at91/board.h
-> +++ b/arch/arm/mach-at91/board.h
-> @@ -56,11 +56,7 @@ extern void __init at91_add_device_usbh_ehci(struct at91_usbh_data *data);
->  extern void __init at91_add_device_nand(struct atmel_nand_data *data);
->  
->   /* I2C*/
-> -#if defined(CONFIG_ARCH_AT91SAM9G45)
-> -extern void __init at91_add_device_i2c(short i2c_id, struct i2c_board_info *devices, int nr_devices);
-> -#else
->  extern void __init at91_add_device_i2c(struct i2c_board_info *devices, int nr_devices);
-> -#endif
->  
->   /* SPI */
->  extern void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices);
-
-
-
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index c31f4c0..db2f5bd 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -42,8 +42,6 @@ void __iomem *coherency_base;
+ static void __iomem *coherency_cpu_base;
+ 
+ /* Coherency fabric registers */
+-#define COHERENCY_FABRIC_CFG_OFFSET		   0x4
+-
+ #define IO_SYNC_BARRIER_CTL_OFFSET		   0x0
+ 
+ enum {
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.0.0
