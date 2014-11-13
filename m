@@ -1,28 +1,54 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 13 Nov 2014 07:38:38 +0000
-Subject: [PATCH v5 0/5] simplefb: add clock handling code
-In-Reply-To: <1415808952-23549-1-git-send-email-hdegoede@redhat.com>
-References: <1415808952-23549-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CACxGe6ua8OF5+SNjgO3Nc5ZSVvaic3OzrFES-5=f+bsj-fvE3g@mail.gmail.com>
+From: ankit.jindal@linaro.org (Ankit Jindal)
+Date: Thu, 13 Nov 2014 13:15:16 +0530
+Subject: [PATCH v4 0/6] UIO driver for APM X-Gene QMTM
+Message-ID: <1415864722-2800-1-git-send-email-ankit.jindal@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 12, 2014 at 4:15 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi Tomi,
->
-> Here is v5 of my simplefb patch-set, this time with an Ack from
-> Grant Likely for the dt-bindings bits, which should end all controversy
-> surrounding that patch.
->
-> For changes since the original postings please see the per patch changelogs
-> in the patch commit messages.
->
-> Please merge this into your tree for 3.19.
+This patchset enables user space access to APM X-Gene QMTM
+using UIO framework.
 
-Hi Tomi,
+The patchset also introduces new type UIO_MEM_PHYS_CACHE
+for mem regions because APM X-Gene QMTM device supports
+cache coherency with CPU caches.
 
-I'm discussing this with Rob today. Please hold off 24 hours before
-merging. If you don't hear anything to the contrary by tomorrow then
-go ahead and merge.
+Changes since v3:
+ - Renamed qpool to qpool-memory in dt-binding.
+ - Some cleanups in dt-binding documentation.
 
-g.
+Changes since v2:
+ - Formatting cleanups.
+ - Remove qmtm_cleanup().
+
+Changes since v1:
+ - Factor-out formating related change in uio/uio.c as separate patch.
+ - Use devm_xxx() APIs where appilicable.
+ - Some cleanups and buggy loop fixed in qmtm_reset().
+ - Removed open and release functions.
+ - Use phandle for specifying QMTM qpool resource.
+ - Removed "uio" from the compatible string.
+ - Added more information about QMTM in binding documentation.
+
+Ankit Jindal (6):
+  uio: code style cleanup
+  uio: Add new UIO_MEM_PHYS_CACHE type for mem regions
+  Documentation: Update documentation for UIO_MEM_PHYS_CACHE
+  uio: Add X-Gene QMTM UIO driver
+  Documentation: dt-bindings: Add binding info for X-Gene QMTM UIO
+    driver
+  MAINTAINERS: Add entry for APM X-Gene QMTM UIO driver
+
+ Documentation/DocBook/uio-howto.tmpl               |    5 +-
+ .../devicetree/bindings/uio/uio_xgene_qmtm.txt     |   51 ++++
+ MAINTAINERS                                        |    7 +
+ drivers/uio/Kconfig                                |    8 +
+ drivers/uio/Makefile                               |    1 +
+ drivers/uio/uio.c                                  |   23 +-
+ drivers/uio/uio_xgene_qmtm.c                       |  271 ++++++++++++++++++++
+ include/linux/uio_driver.h                         |    1 +
+ 8 files changed, 356 insertions(+), 11 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt
+ create mode 100644 drivers/uio/uio_xgene_qmtm.c
+
+-- 
+1.7.9.5
