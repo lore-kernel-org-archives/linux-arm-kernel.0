@@ -1,76 +1,73 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 13 Nov 2014 17:11:13 +0100
-Subject: [PATCH v6 2/4] ARM: mediatek: add dts for mt6592-evb
-In-Reply-To: <1415808457-4030-2-git-send-email-ibanezchen@gmail.com>
-References: <1415808457-4030-1-git-send-email-ibanezchen@gmail.com>
- <1415808457-4030-2-git-send-email-ibanezchen@gmail.com>
-Message-ID: <CABuKBeKvhJPQOSoViCtdB_UYKDkwgtQ3XF8fD0fhs+36nFjQbA@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 13 Nov 2014 17:15:37 +0100
+Subject: [GIT PULL] ARM: tegra: Device tree fixes for v3.18-rc5
+Message-ID: <20141113161530.GA3613@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-12 17:07 GMT+01:00 Howard Chen <ibanezchen@gmail.com>:
-> The mt6592-evb is an evaluation board based on the MT6592 SoC.
->
-> Signed-off-by: Howard Chen <ibanezchen@gmail.com>
-> ---
->  arch/arm/boot/dts/Makefile       |  3 ++-
->  arch/arm/boot/dts/mt6592-evb.dts | 25 +++++++++++++++++++++++++
->  2 files changed, 27 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/mt6592-evb.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index ab63751..0ce0d9e 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -532,7 +532,8 @@ dtb-$(CONFIG_MACH_DOVE) += dove-cm-a510.dtb \
->         dove-d2plug.dtb \
->         dove-d3plug.dtb \
->         dove-dove-db.dtb
-> -dtb-$(CONFIG_ARCH_MEDIATEK) += mt6589-aquaris5.dtb
-> +dtb-$(CONFIG_ARCH_MEDIATEK) += mt6589-aquaris5.dtb \
-> +       mt6592-evb.dtb
->
->  endif
->
-> diff --git a/arch/arm/boot/dts/mt6592-evb.dts b/arch/arm/boot/dts/mt6592-evb.dts
-> new file mode 100644
-> index 0000000..4750c4c
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/mt6592-evb.dts
-> @@ -0,0 +1,25 @@
-> +/*
-> + * Copyright (c) 2014 MediaTek Inc.
-> + * Author: Howard Chen <ibanezchen@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +/dts-v1/;
-> +#include "mt6592.dtsi"
-> +
-> +/ {
-> +       model = "mt6592 evb";
-> +       compatible = "mediatek,mt6592-evb", "mediatek,mt6592";
-> +
-> +       memory {
-> +               reg = <0x80000000 0x08000000>;
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-Does the eval board only have 128 MB? Maybe there is a zero missing (2GB)?
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
 
-> +       };
-> +};
-> --
-> 1.9.1
->
+are available in the git repository at:
 
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-3.18-fixes-for-rc5
 
+for you to fetch changes up to 221b9bf42b26a22e6904d20f35c53aec2e73a646:
 
--- 
-motzblog.wordpress.com
+  ARM: tegra: roth: Fix SD card VDD_IO regulator (2014-11-13 16:58:53 +0100)
+
+Thierry
+
+----------------------------------------------------------------
+ARM: tegra: Device tree fixes for v3.18-rc5
+
+This contains the serial port numbering fixes that are required for the
+serial port numbering to stay the same with or without the serial core
+making use of the aliases defined in DT.
+
+eMMC is also fixed for TN7 and Roth boards which were using the wrong
+regulators.
+
+----------------------------------------------------------------
+Alexandre Courbot (2):
+      ARM: tegra: Remove eMMC vmmc property for roth/tn7
+      ARM: tegra: roth: Fix SD card VDD_IO regulator
+
+Lucas Stach (1):
+      ARM: tegra: Add serial port labels to Tegra124 DT
+
+Olof Johansson (1):
+      ARM: dts: tegra: move serial aliases to per-board
+
+ arch/arm/boot/dts/tegra114-dalmore.dts        | 1 +
+ arch/arm/boot/dts/tegra114-roth.dts           | 9 +++++----
+ arch/arm/boot/dts/tegra114-tn7.dts            | 5 ++++-
+ arch/arm/boot/dts/tegra114.dtsi               | 7 -------
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts     | 1 +
+ arch/arm/boot/dts/tegra124-nyan-big.dts       | 1 +
+ arch/arm/boot/dts/tegra124-venice2.dts        | 1 +
+ arch/arm/boot/dts/tegra124.dtsi               | 8 ++++----
+ arch/arm/boot/dts/tegra20-harmony.dts         | 1 +
+ arch/arm/boot/dts/tegra20-iris-512.dts        | 5 +++++
+ arch/arm/boot/dts/tegra20-medcom-wide.dts     | 4 ++++
+ arch/arm/boot/dts/tegra20-paz00.dts           | 2 ++
+ arch/arm/boot/dts/tegra20-seaboard.dts        | 1 +
+ arch/arm/boot/dts/tegra20-tamonten.dtsi       | 1 +
+ arch/arm/boot/dts/tegra20-trimslice.dts       | 1 +
+ arch/arm/boot/dts/tegra20-ventana.dts         | 1 +
+ arch/arm/boot/dts/tegra20-whistler.dts        | 1 +
+ arch/arm/boot/dts/tegra20.dtsi                | 8 --------
+ arch/arm/boot/dts/tegra30-apalis-eval.dts     | 4 ++++
+ arch/arm/boot/dts/tegra30-beaver.dts          | 1 +
+ arch/arm/boot/dts/tegra30-cardhu.dtsi         | 2 ++
+ arch/arm/boot/dts/tegra30-colibri-eval-v3.dts | 3 +++
+ arch/arm/boot/dts/tegra30.dtsi                | 8 --------
+ 23 files changed, 44 insertions(+), 32 deletions(-)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/dc19ff2b/attachment-0001.sig>
