@@ -1,109 +1,137 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 13 Nov 2014 13:29:37 +0100
-Subject: [PATCH v2 1/4] dt-bindings: simplefb: Specify node location and
- handoff related properties
-In-Reply-To: <CACxGe6uPKcZ4XqdiPQtia-0D+BnqjDE3eW-oDCR+byUrVtNpSg@mail.gmail.com>
-References: <1415868610-13297-1-git-send-email-hdegoede@redhat.com>
- <CACxGe6uX7V-TcZfM0vP4SvjxKx3T_RGByX8wFqTdFo4LEzP2Yg@mail.gmail.com>
- <CACxGe6uPKcZ4XqdiPQtia-0D+BnqjDE3eW-oDCR+byUrVtNpSg@mail.gmail.com>
-Message-ID: <5464A431.2050706@redhat.com>
+From: n.nikolaev@virtualopensystems.com (Nikolay Nikolaev)
+Date: Thu, 13 Nov 2014 14:29:58 +0200
+Subject: [RFC PATCH 1/4] ARM: KVM: on unhandled IO mem abort, route the
+ call to the KVM MMIO bus
+In-Reply-To: <54649B9A.20605@arm.com>
+References: <1394726249-1547-1-git-send-email-a.motakis@virtualopensystems.com>
+ <1394726249-1547-2-git-send-email-a.motakis@virtualopensystems.com>
+ <20140328190913.GJ25519@cbox>
+ <CADDJ2=Opx2d5ex0hWSXYJjs6uLifR9wZVsahUHzZ7zytSj7ZSg@mail.gmail.com>
+ <20141110162736.GA16054@cbox>
+ <CADDJ2=PTM0fJ0RFfWdVQ1-471xqaJmj0vP1f5-pf57xOV5jgig@mail.gmail.com>
+ <20141113112012.GO19598@cbox> <546497E4.8040100@arm.com>
+ <54649B9A.20605@arm.com>
+Message-ID: <CADDJ2=Nk7hCNqghgsH81gQ5_offWjeM6wPgGwzixN+wbnj8zSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 11/13/2014 01:03 PM, Grant Likely wrote:
-> On Thu, Nov 13, 2014 at 11:02 AM, Grant Likely <grant.likely@linaro.org> wrote:
->> On Thu, Nov 13, 2014 at 8:50 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->>> Since simplefb nodes do not relate directly to hw typically they have been
->>> placed in the root of the devicetree. As the represent runtime information
->>> having them as sub-nodes of /chosen is more logical, specify this.
->>>
->>> Also specify when to set the chosen stdout-path property to a simplefb node.
->>>
->>> For reliable handover to a hardware specific driver, that driver needs to
->>> know which simplefb to unregister when taking over, specify how the hw driver
->>> can find the matching simplefb node.
->>>
->>> Last add some advice on how to fill and use simplefb nodes from a firmware
->>> pov.
->>>
->>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
->>> --
->>> Changes in v2:
->>> -Add stdout-path to the example code
->>> ---
->>>  .../bindings/video/simple-framebuffer.txt          | 38 +++++++++++++++++++++-
->>>  1 file changed, 37 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
->>> index 8f35718..8b7ecf6 100644
->>> --- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
->>> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
->>> @@ -4,6 +4,26 @@ A simple frame-buffer describes a frame-buffer setup by firmware or
->>>  the bootloader, with the assumption that the display hardware has already
->>>  been set up to scan out from the memory pointed to by the reg property.
->>>
->>> +Since simplefb nodes represent runtime information they must be sub-nodes of
->>> +the chosen node (*). The primary display node must be named framebuffer0,
->>> +additional nodes must be called framebuffer1, etc.
+On Thu, Nov 13, 2014 at 1:52 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+> Hi Nikolay,
+>
+> On 13/11/14 11:37, Marc Zyngier wrote:
+>> [fixing Andre's email address]
 >>
->> Thinking more about our conversation yesterday, the preferred name
->> should still be framebuffer@<address>. There is no reason to break
->> with established convention, and as mentioned in my reply on patch #2,
->> using the name is not the preferred way to identify a device node. So,
->> my recommendation is to prefer the name "framebuffer@<addr>", but if
->> it is inconvenient because the address isn't known, then
->> "framebuffer#" is acceptable. Then use /aliases for actual enumeration
->> which has the advantage of also working for framebuffers that aren't
->> in /chosen.
-> 
-> Some more thoughts about aliases.
-> 
-> There is a natural tension between enumerate framebuffers or
-> enumerating displays. There is precedence for displays to be named
-> 'display...' and to use /aliases/display* to enumerate them. What do
-> we do for framebuffers? Does it make sense to have a separate
-> /aliases/framebuffer* enumeration, or would it be better to have a
-> single 'display' namespace so that the same name is used right
-> through?
-> 
-> Right now I'm leaning towards using /aliases/display* for everything,
-> and making simplefb understand that /aliases/display# could either
-> point directly to the framebuffer when there is not node for the
-> hardware, or point to the display node. This would make it easy to
-> have consistent names for display. For example, with the kexec
-> scenario, if /aliases/display0 points at the display node then the
-> alias won't need to be changed between first boot when firmware sets
-> up a framebuffer, and kexec boot after the kernel has torn down the
-> original framebuffer. If /aliases/display0 points to the framebuffer
-> node directly, then the linkage from /aliases/display0 to the HW
-> display node will be lost when the framebuffer gets torn down.
-> 
-> Doing it this way does make two assumptions though. It assumes that
-> each display will have its own node somewhere so that no two
-> framebuffers will point to the same node. Second, it assumes that we
-> have a mechanism to handoff a display name (/dev/fb*)? from simplefb
-> to another device. I don't know enough about the fbdev subsystem to
-> know whether or not this will be a problem. Or if there are any
-> namespace conflicts between fbdev and drm.
-> 
-> Implementation would be simple to do. If the simple framebuffer node
-> has a 'display' property, then it will call of_alias_get_id() on the
-> target of that phandle. Otherwise it will call of_alias_get_id() on
-> itself.
-> 
-> Thoughts?
+>> On 13/11/14 11:20, Christoffer Dall wrote:
+>>> On Thu, Nov 13, 2014 at 12:45:42PM +0200, Nikolay Nikolaev wrote:
+>>>
+>>> [...]
+>>>
+>>>>>>
+>>>>>> Going through the vgic_handle_mmio we see that it will require large
+>>>>>> refactoring:
+>>>>>>  - there are 15 MMIO ranges for the vgic now - each should be
+>>>>>> registered as a separate device
+>>>>>>  - the handler of each range should be split into read and write
+>>>>>>  - all handlers take 'struct kvm_exit_mmio', and pass it to
+>>>>>> 'vgic_reg_access', 'mmio_data_read' and 'mmio_data_read'
+>>>>>>
+>>>>>> To sum up - if we do this refactoring of vgic's MMIO handling +
+>>>>>> kvm_io_bus_ API getting 'vcpu" argument we'll get a 'much' cleaner
+>>>>>> vgic code and as a bonus we'll get 'ioeventfd' capabilities.
+>>>>>>
+>>>>>> We have 3 questions:
+>>>>>>  - is the kvm_io_bus_ getting 'vcpu' argument acceptable for the other
+>>>>>> architectures too?
+>>>>>>  - is this huge vgic MMIO handling redesign acceptable/desired (it
+>>>>>> touches a lot of code)?
+>>>>>>  - is there a way that ioeventfd is accepted leaving vgic.c in it's
+>>>>>> current state?
+>>>>>>
+>>>>> Not sure how the latter question is relevant to this, but check with
+>>>>> Andre who recently looked at this as well and decided that for GICv3 the
+>>>>> only sane thing was to remove that comment for the gic.
+>>>> @Andre - what's your experience with the GICv3 and MMIO handling,
+>>>> anything specific?
+>>>>>
+>>>>> I don't recall the details of what you were trying to accomplish here
+>>>>> (it's been 8 months or so) but the surely the vgic handling code should
+>>>>> *somehow* be integrated into the handle_kernel_mmio (like Paolo
+>>>>> suggested), unless you come back and tell me that that would involve a
+>>>>> complete rewrite of the vgic code.
+>>>> I'm experimenting now - it's not exactly rewrite of whole vgic code,
+>>>> but it will touch a lot of it  - all MMIO access handlers and the
+>>>> supporting functions.
+>>>> We're ready to spend the effort. My question is  - is this acceptable?
+>>>>
+>>> I certainly appreciate the offer to do this work, but it's hard to say
+>>> at this point if it is worth it.
+>>>
+>>> What I was trying to say above is that Andre looked at this, and came to
+>>> the conclusion that it is not worth it.
+>>>
+>>> Marc, what are your thoughts?
+>>
+>> Same here, I rely on Andre's view that it was not very useful. Now, it
+>> would be good to see a mock-up of the patches and find out:
+>
+> Seconded, can you send a pointer to the VGIC rework patches mentioned?
+They are still in WiP state - not exactly working. I'm still exploring
+what the status is.
 
-Re-using display# aliases, and specifying that if the simplefb node has
-a display property, that then the id of the node the display property
-points to should be used, and otherwise the id of the simplefb node itself
-sounds like a good idea.
+Our major target is having ioeventfd suport in ARM. For this we need
+to support kvm_io_bus_ mechanisms for MMIO access (cause ioevent fd
+device is registered this way). Then this subject of integrating vgic
+with the kvm_io_bus_ APIs came up.
+My personal opinion - they should be able to coexist in peace.
 
-I'll go work on a v3 and put this in (and update the example for this
-as well).
+>
+>> - if it is a major improvement for the general quality of the code
+>> - if that allow us to *delete* a lot of code (if it is just churn, I'm
+>> not really interested)
+>> - if it helps or hinders further developments that are currently in the
+>> pipeline
+>>
+>> Andre, can you please share your findings? I don't remember the
+>> specifics of the discussion we had a few months ago...
+>
+> 1) Given the date in the reply I sense that your patches are from March
+> this year or earlier. So this is based on VGIC code from March, which
+> predates Marc's vgic_dyn changes that just went in 3.18-rc1? His patches
+> introduced another member to struct mmio_range to check validity of
+> accesses with a reduced number of SPIs supported (.bits_per_irq).
+> So is this covered in your rework?
+Still no (rebased to 3.17) - didn't see it, but should not be an issue.
+>
+> 2)
+>>>>  - there are 15 MMIO ranges for the vgic now - each should be
+>
+> Well, the GICv3 emulation adds 41 new ranges. Not sure if this still fits.
+>
+>>>> registered as a separate device
+>
+> I found this fact a show-stopper when looking at this a month ago.
+> Somehow it feels wrong to register a bunch of pseudo-devices. I could go
+> with registering a small number of regions (one distributor, two
+> redistributor regions for instance), but not handling every single of
+> the 41 + 15 register "groups" as a device.
+Do you sense performance issues, or just "it's not right"?
+Maybe kvm_io_bus_ needs some extesion to hanlde a device with multiple regions?
 
-Regards,
+>
+> Also I wasn't sure if we had to expose some of the vGIC structures to
+> the other KVM code layers.
+I don't see such a need. Can you point some example?
+>
+> But I am open to any suggestions (as long as they go in _after_ my
+> vGICv3 series ;-)  - so looking forward to some repo to see how it looks
+> like.
+There is still nothing much to show - but if there is interest we may
+prepare something that shows the idea.
+BTW, where is your repo (sorry I don't follow so close) with the vGICv3?
 
-Hans
+>
+> Cheers,
+> Andre.
+
+regards,
+Nikolay Nikolaev
