@@ -1,38 +1,72 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 13 Nov 2014 15:32:28 +0000
-Subject: [PATCH 2/2] PCI: generic: Add set_msi_parent callback
-In-Reply-To: <54622C58.1040701@amd.com>
-References: <1415647480-3320-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1415647480-3320-3-git-send-email-suravee.suthikulpanit@amd.com>
- <20141111112424.GB16265@arm.com> <54622C58.1040701@amd.com>
-Message-ID: <20141113153228.GC9726@red-moon>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 13 Nov 2014 21:00:55 +0530
+Subject: [PATCH v4 00/58] dmaengine: Implement generic slave
+ capabilities retrieval
+In-Reply-To: <20141112131502.GN14919@lukather>
+References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20141106143349.GL2989@lukather> <20141112112529.GK24582@intel.com>
+ <20141112131502.GN14919@lukather>
+Message-ID: <20141113153055.GN24582@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[CC'ing Arnd and RobH]
-
-On Tue, Nov 11, 2014 at 03:33:44PM +0000, Suravee Suthikulpanit wrote:
-> On 11/11/14 18:24, Will Deacon wrote:
-> >> @@ -313,6 +324,9 @@ static int gen_pci_probe(struct platform_device *pdev)
-> >> >  		return err;
-> >> >  	}
-> >> >
-> >> >+	pci->mchip = of_pci_find_msi_chip_by_node(of_parse_phandle(np,
-> >> >+						  "msi-parent", 0));
-> > This bit should be in the generic of_pci.c code and not duplicated for
-> > each host controller.
-> >
-> > Will
+On Wed, Nov 12, 2014 at 02:15:02PM +0100, Maxime Ripard wrote:
+> Hi,
 > 
-> I forgot to mention and include in the patch that we are also 
-> introducing "msi-parent" binding to the generic host controller. I'll do 
-> that in v2.
+> On Wed, Nov 12, 2014 at 04:55:29PM +0530, Vinod Koul wrote:
+> > On Thu, Nov 06, 2014 at 03:33:49PM +0100, Maxime Ripard wrote:
+> > > Hi Vinod,
+> > > 
+> > > On Tue, Oct 28, 2014 at 10:25:15PM +0100, Maxime Ripard wrote:
+> > > > Hi,
+> > > > 
+> > > > As we discussed a couple of weeks ago, this is the third attempt at
+> > > > creating a generic behaviour for slave capabilities retrieval so that
+> > > > generic layers using dmaengine can actually rely on that.
+> > > > 
+> > > > That has been done mostly through two steps: by moving out the
+> > > > sub-commands of the device_control callback, so that the dmaengine
+> > > > core can then infer from that wether a sub-command is implemented, and
+> > > > then by moving the slave properties, such as the supported buswidth,
+> > > > to the structure dma_device itself.
+> > > > 
+> > > > Comments are as usual appreciated!
+> > > 
+> > > How can we move forward on this?
+> > > 
+> > > I didn't have any comments on this version, and gathered quite a lot
+> > > of Acked-by already.
+> > > 
+> > > Do you want me to rebase on top of your current next branch and send
+> > > you a pull request?
+> > 
+> > Hi Maxime,
+> > 
+> > Thanks for the huge cleanup work
+> > 
+> > I quickly looked thru the series and looks okay. I will do a detailed review
+> > in next couple of days and then host it on a topic branch so that Feng's
+> > robot can test it before merging it.
 > 
-> Unless this is something that we would like to add to the generic OF 
-> binding for PCI, I think it should be in the pci-host-generic.c.
+> I know that it will break, because of the Atmel's XDMAC driver that
+> has been merged since. This is why I mentionned rebasing it ;)
+Okay then pls resend :)
+I will keep couple of days reserved next week for it so that we merge it
+quickly
 
-Is there a reason why we do *not* want to add this property to generic OF
-PCI binding ?
+> 
+> FWIW, the branch I was using for this serie has been published like 3
+> weeks ago, and my git repo is built by Feng's bot, so there shouldn't
+> be any compiling issues.
+Thats good indeed :)
 
-Thanks,
-Lorenzo
+-- 
+~Vinod
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/6339ba64/attachment.sig>
