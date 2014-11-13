@@ -1,33 +1,30 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 13 Nov 2014 16:34:46 +0200
-Subject: [PATCH v3 4/4] fbcon: Change fbcon_init from module_init to
- fs_initcall
-In-Reply-To: <1415885645-24613-4-git-send-email-hdegoede@redhat.com>
-References: <1415885645-24613-1-git-send-email-hdegoede@redhat.com>
- <1415885645-24613-4-git-send-email-hdegoede@redhat.com>
-Message-ID: <5464C186.8030806@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 13 Nov 2014 15:30:50 +0100
+Subject: [PATCH 1/2] dmaengine: at_xdmac: correct destination abbreviation
+In-Reply-To: <1415888096-22090-2-git-send-email-ludovic.desroches@atmel.com>
+References: <1415888096-22090-1-git-send-email-ludovic.desroches@atmel.com>
+ <1415888096-22090-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20141113143050.GJ20972@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/11/14 15:34, Hans de Goede wrote:
-> Various fb drivers register themselves before module_init so as to have a
-> console as early as possible, this is of little use if fbcon does not initialze
-> early too.
+On Thu, Nov 13, 2014 at 03:14:55PM +0100, Ludovic Desroches wrote:
+> TODO
 > 
-> Fbcon cannot initialize earlier then fs_initcall, because then the creation
-> of /sys/class/graphics/fbcon will fail.
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Not related to this series, but makes me wonder how difficult it would
-be to get fbcon and simplefb initialize at even earlier stage. Well,
-something for the future.
+Folded in the relevant patch, thanks!
 
- Tomi
+Maxime
 
-
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/be9f184e/attachment.sig>
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/16ab32b2/attachment.sig>
