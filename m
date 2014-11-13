@@ -1,52 +1,30 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 13 Nov 2014 12:03:20 +0200
-Subject: [PATCHv6 4/5] hwspinlock/core: add common OF helpers
-In-Reply-To: <5463B5B6.8040709@ti.com>
-References: <1410553499-55951-1-git-send-email-s-anna@ti.com>
- <1410553499-55951-5-git-send-email-s-anna@ti.com>
- <CAK=WgbamdqAufjC4Xb5moERRBSB-cO6c1RPTE=f+dp75F+Eh7A@mail.gmail.com>
- <5463B5B6.8040709@ti.com>
-Message-ID: <CAK=WgbbatPTiz3efDWHVEcuug_UQfkCViMoK0zcfUg3JwB2oTA@mail.gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 13 Nov 2014 11:04:56 +0100
+Subject: [PATCH V4 1/3] can: add can_is_canfd_skb() API
+In-Reply-To: <1415349914-9145-1-git-send-email-b29396@freescale.com>
+References: <1415349914-9145-1-git-send-email-b29396@freescale.com>
+Message-ID: <54648248.1020400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+On 11/07/2014 09:45 AM, Dong Aisheng wrote:
+> The CAN device drivers can use it to check if the frame to send is on
+> CAN FD mode or normal CAN mode.
 
-On Wed, Nov 12, 2014 at 9:32 PM, Suman Anna <s-anna@ti.com> wrote:
->> Is this the validation you mentioned which requires the existence of
->> "hwspinlock/core: maintain a list of registered hwspinlock banks" ?
->
-> Well, not exactly. The validation is on the following segment,
->
-> +       id = of_hwspin_lock_simple_xlate(bank, &args);
-> +       if (id < 0 || id >= bank->num_locks) {
-> +               ret = -EINVAL;
-> +               goto out;
-> +       }
+Applied patches 1 and 3.
 
-I'm not entirely convinced that this justifies adding the proposed
-linked list. Can't we can get the base_id and number of locks by
-traversing the DT?
+Marc
 
-> That said, it is also needed to provide the support for deferred probing
-> without changing the return code conventions on the existing API.
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-Here too, adding a data structure maintaining memory objects and
-taking care of it life cycle seems a bit overkill for anything to do
-with return values.
-
-> Yes, and wouldn't that require that the id is validated? It just cannot
-> return any return value, and expect it will be verified somewhere else
-> or in a following API call. Not doing the validation unnecessarily
-> complicates the system usage of a lock as you are sharing an invalid
-> lock to a remote processor and then you have two validation failure
-> paths on different processors.
-
-Validation is great but I'm still not convinced it can't be done
-without maintaining another data structure.
-
-Please show me specific technical issues that can't be resolved
-without adding the proposed linked list.
-
-Thanks,
-Ohad.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/7bf986df/attachment.sig>
