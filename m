@@ -1,50 +1,129 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 13 Nov 2014 21:45:09 +0200
-Subject: [PATCHv6 4/5] hwspinlock/core: add common OF helpers
-In-Reply-To: <5464EC7A.7050603@ti.com>
-References: <1410553499-55951-1-git-send-email-s-anna@ti.com>
- <1410553499-55951-5-git-send-email-s-anna@ti.com>
- <CAK=WgbamdqAufjC4Xb5moERRBSB-cO6c1RPTE=f+dp75F+Eh7A@mail.gmail.com>
- <5463B5B6.8040709@ti.com>
- <CAK=WgbbatPTiz3efDWHVEcuug_UQfkCViMoK0zcfUg3JwB2oTA@mail.gmail.com>
- <5464EC7A.7050603@ti.com>
-Message-ID: <CAK=WgbbodS8GsUxQbkyCp6hAG+Ko4LMirx+pUa8_fUdxWFasvw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 13 Nov 2014 19:46:01 +0000
+Subject: [Patch V1 6/6] PCI, MSI: Provide mechanism to alloc/free MSI/MSIX
+ interrupt from irqdomain
+In-Reply-To: <1415879029-20098-8-git-send-email-jiang.liu@linux.intel.com>
+References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
+ <1415879029-20098-8-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <54650A79.1020408@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+Hi Jiang,
 
-On Thu, Nov 13, 2014 at 7:38 PM, Suman Anna <s-anna@ti.com> wrote:
-> No, not always, because, either of them can be optional between
-> different platform implementations. For example, on OMAP, the number of
-> locks is read from an IP register, and not coded in DT. Similarly,
-> base_id can be optional on SoCs that don't have multiple IP instances.
+On 13/11/14 11:43, Jiang Liu wrote:
+> Provide mechanism to directly alloc/free MSI/MSIX interrupt from
+> irqdomain, which will be used to replace arch_setup_msi_irq()/
+> arch_setup_msi_irqs()/arch_teardown_msi_irq()/arch_teardown_msi_irqs().
+> 
+> To kill weak functions, this patch introduce a new weak function
+> arch_get_pci_msi_domain(), which is to retrieve the MSI irqdomain
+> for a PCI device. This weak function could be killed once we get
+> a common way to associate MSI domain with PCI device.
+> 
+> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+> ---
+>  drivers/pci/msi.c   |   60 +++++++++++++++++++++++++++++++++++++++++++++++----
+>  include/linux/msi.h |    3 +++
+>  2 files changed, 59 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+> index 0319c21dd208..6f8a2f93187a 100644
+> --- a/drivers/pci/msi.c
+> +++ b/drivers/pci/msi.c
+> @@ -27,8 +27,41 @@ static int pci_msi_enable = 1;
+>  
+>  #define msix_table_size(flags)	((flags & PCI_MSIX_FLAGS_QSIZE) + 1)
+>  
+> -/* Arch hooks */
+> +#ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
+> +static struct irq_domain *pci_msi_default_domain;
+> +
+> +struct irq_domain * __weak arch_get_pci_msi_domain(struct pci_dev *dev)
+> +{
+> +	return pci_msi_default_domain;
+> +}
+> +
+> +static int pci_msi_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+> +{
+> +	struct irq_domain *domain;
+>  
+> +	domain = arch_get_pci_msi_domain(dev);
+> +	if (domain)
+> +		return pci_msi_domain_alloc_irqs(domain, type, dev);
+> +
+> +	return arch_setup_msi_irqs(dev, nvec, type);
+> +}
+> +
+> +static void pci_msi_teardown_msi_irqs(struct pci_dev *dev)
+> +{
+> +	struct irq_domain *domain;
+> +
+> +	domain = arch_get_pci_msi_domain(dev);
+> +	if (domain)
+> +		pci_msi_domain_free_irqs(domain, dev);
+> +	else
+> +		arch_teardown_msi_irqs(dev);
+> +}
+> +#else
+> +#define pci_msi_setup_msi_irqs		arch_setup_msi_irqs
+> +#define pci_msi_teardown_msi_irqs	arch_teardown_msi_irqs
+> +#endif
+> +
+> +/* Arch hooks */
+>  int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+>  {
+>  	struct msi_chip *chip = dev->bus->msi;
+> @@ -329,7 +362,7 @@ static void free_msi_irqs(struct pci_dev *dev)
+>  			for (i = 0; i < entry->nvec_used; i++)
+>  				BUG_ON(irq_has_action(entry->irq + i));
+>  
+> -	arch_teardown_msi_irqs(dev);
+> +	pci_msi_teardown_msi_irqs(dev);
+>  
+>  	list_for_each_entry_safe(entry, tmp, &dev->msi_list, list) {
+>  		if (entry->msi_attrib.is_msix) {
+> @@ -581,7 +614,7 @@ static int msi_capability_init(struct pci_dev *dev, int nvec)
+>  	list_add_tail(&entry->list, &dev->msi_list);
+>  
+>  	/* Configure MSI capability structure */
+> -	ret = arch_setup_msi_irqs(dev, nvec, PCI_CAP_ID_MSI);
+> +	ret = pci_msi_setup_msi_irqs(dev, nvec, PCI_CAP_ID_MSI);
+>  	if (ret) {
+>  		msi_mask_irq(entry, mask, ~mask);
+>  		free_msi_irqs(dev);
+> @@ -696,7 +729,7 @@ static int msix_capability_init(struct pci_dev *dev,
+>  	if (ret)
+>  		return ret;
+>  
+> -	ret = arch_setup_msi_irqs(dev, nvec, PCI_CAP_ID_MSIX);
+> +	ret = pci_msi_setup_msi_irqs(dev, nvec, PCI_CAP_ID_MSIX);
+>  	if (ret)
+>  		goto out_avail;
+>  
+> @@ -1183,4 +1216,23 @@ void pci_msi_domain_free_irqs(struct irq_domain *domain, struct pci_dev *dev)
+>  {
+>  	msi_domain_free_irqs(domain, &dev->dev);
+>  }
+> +
+> +struct irq_domain *pci_msi_create_default_irq_domain(struct device_node *node,
+> +		 struct msi_domain_info *info, struct irq_domain *parent)
+> +{
+> +	struct irq_domain *domain;
+> +	static DEFINE_MUTEX(pci_msi_domain_lock);
+> +
+> +	mutex_lock(&pci_msi_domain_lock);
+> +	if (pci_msi_default_domain) {
+> +		pr_err("PCI: default irq domain for PCI MSI has already been created.\n");
+> +		domain = NULL;
+> +	} else {
+> +		domain = msi_create_irq_domain(node, info, parent);
 
-It can, but base_id isn't optional today --- it must be provided via
-platform_data --- and I'm not sure we should implicitly change this
-semantics while moving to DT. We never guessed the base_id before,
-even if there was only a single IP instance, and I'm not convinced we
-should start doing it now.
-
-About the number of locks - why do we even need it at this point? the
-global lock id should just be base_id + the lock index.
-
-> IMHO, this life cycle management is not that complicated
-
-It's always very easy to add code, really. It is never complicated.
-But then gradually the code becomes harder to maintain, debug, and
-change.
-
-On the contrary, achieving the same functionality with less code is
-always harder. But when we get there, the results are pretty
-satisfying.
-
-In this case I still feel the extra linked list is redundant.
-
-Please try it: ditch the "hwspinlock/core: maintain a list of
-registered hwspinlock banks" patch, and replace of_hwspin_lock_get_id
-with a slim method that just returns the base_id + the lock index. Let
-me know if it works for you.
+Surely this needs to be a call to pci_msi_create_irq_domain().
+Otherwise, not much is working on the PCI side...
 
 Thanks,
-Ohad.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
