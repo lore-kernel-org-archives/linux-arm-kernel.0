@@ -1,176 +1,67 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 13 Nov 2014 12:03:52 +0000
-Subject: [PATCH v2 1/4] dt-bindings: simplefb: Specify node location and
- handoff related properties
-In-Reply-To: <CACxGe6uX7V-TcZfM0vP4SvjxKx3T_RGByX8wFqTdFo4LEzP2Yg@mail.gmail.com>
-References: <1415868610-13297-1-git-send-email-hdegoede@redhat.com>
- <CACxGe6uX7V-TcZfM0vP4SvjxKx3T_RGByX8wFqTdFo4LEzP2Yg@mail.gmail.com>
-Message-ID: <CACxGe6uPKcZ4XqdiPQtia-0D+BnqjDE3eW-oDCR+byUrVtNpSg@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 13 Nov 2014 13:04:51 +0100
+Subject: [PATCH] ARM: dts: tegra: move serial aliases to per-board
+In-Reply-To: <5463A390.2040609@wwwdotorg.org>
+References: <1415738970-7963-1-git-send-email-olof@lixom.net>
+ <20141112122017.GC30821@ulmo.nvidia.com>
+ <5463A390.2040609@wwwdotorg.org>
+Message-ID: <20141113120449.GD23422@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 13, 2014 at 11:02 AM, Grant Likely <grant.likely@linaro.org> wrote:
-> On Thu, Nov 13, 2014 at 8:50 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Since simplefb nodes do not relate directly to hw typically they have been
->> placed in the root of the devicetree. As the represent runtime information
->> having them as sub-nodes of /chosen is more logical, specify this.
->>
->> Also specify when to set the chosen stdout-path property to a simplefb node.
->>
->> For reliable handover to a hardware specific driver, that driver needs to
->> know which simplefb to unregister when taking over, specify how the hw driver
->> can find the matching simplefb node.
->>
->> Last add some advice on how to fill and use simplefb nodes from a firmware
->> pov.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
->> --
->> Changes in v2:
->> -Add stdout-path to the example code
->> ---
->>  .../bindings/video/simple-framebuffer.txt          | 38 +++++++++++++++++++++-
->>  1 file changed, 37 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
->> index 8f35718..8b7ecf6 100644
->> --- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
->> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
->> @@ -4,6 +4,26 @@ A simple frame-buffer describes a frame-buffer setup by firmware or
->>  the bootloader, with the assumption that the display hardware has already
->>  been set up to scan out from the memory pointed to by the reg property.
->>
->> +Since simplefb nodes represent runtime information they must be sub-nodes of
->> +the chosen node (*). The primary display node must be named framebuffer0,
->> +additional nodes must be called framebuffer1, etc.
->
-> Thinking more about our conversation yesterday, the preferred name
-> should still be framebuffer@<address>. There is no reason to break
-> with established convention, and as mentioned in my reply on patch #2,
-> using the name is not the preferred way to identify a device node. So,
-> my recommendation is to prefer the name "framebuffer@<addr>", but if
-> it is inconvenient because the address isn't known, then
-> "framebuffer#" is acceptable. Then use /aliases for actual enumeration
-> which has the advantage of also working for framebuffers that aren't
-> in /chosen.
+On Wed, Nov 12, 2014 at 11:14:40AM -0700, Stephen Warren wrote:
+> On 11/12/2014 05:20 AM, Thierry Reding wrote:
+> >On Tue, Nov 11, 2014 at 12:49:30PM -0800, Olof Johansson wrote:
+> >>There are general changes pending to make the /aliases/serial* entries
+> >>number the serial ports on the system. On tegra, so far the ports have been
+> >>just numbered dynamically as they are configured so that makes them change.
+> >>
+> >>To avoid this, add specific aliases per board to keep the old numbers. This
+> >>allows us to change the numbering by default on future SoCs while keeping the
+> >>numbering on existing boards.
+> ...
+> >I have applied this to the for-3.19/dt branch. So for anything that is
+> >post Tegra124 the new rule shall be to add aliases to the SoC .dtsi and
+> >then use consistent numbering of UART ports across boards?
+> >
+> >The alternative is to remain consistent with what this patch does, which
+> >would be to make the serial port numbering a property of the board. That
+> >doesn't sound too bad to me either since it'll hide all the unused ports
+> >on a given board.
+> 
+> For new SoCs, I think board-specific aliases would make most sense. That
+> would be consistent with this patch. The only question I had was for
+> existing SoCs, should we make the switch this patch does, or leave the
+> aliases inactive there? New SoCs should use more sensible aliases.
 
-Some more thoughts about aliases.
+I can't think of a way to keep backwards compatibility. I mean once a
+patch is merged to apply aliases as specified in the DTB it'll change
+behaviour on older DTBs. The best we could achieve is to update DTBs
+with a flag to say that the aliases are to be ignored. But given that
+no such flag exists in old DTBs, ABI would still be broken.
 
-There is a natural tension between enumerate framebuffers or
-enumerating displays. There is precedence for displays to be named
-'display...' and to use /aliases/display* to enumerate them. What do
-we do for framebuffers? Does it make sense to have a separate
-/aliases/framebuffer* enumeration, or would it be better to have a
-single 'display' namespace so that the same name is used right
-through?
+So I think it's fair to say that aliases have been buggy up to now and
+therefore relying on deterministic serial port naming is broken, too.
+Also there's precedent for this kind of thing. Ethernet device names
+have undergone similar changes and I think people have dealt with it
+just fine.
 
-Right now I'm leaning towards using /aliases/display* for everything,
-and making simplefb understand that /aliases/display# could either
-point directly to the framebuffer when there is not node for the
-hardware, or point to the display node. This would make it easy to
-have consistent names for display. For example, with the kexec
-scenario, if /aliases/display0 points at the display node then the
-alias won't need to be changed between first boot when firmware sets
-up a framebuffer, and kexec boot after the kernel has torn down the
-original framebuffer. If /aliases/display0 points to the framebuffer
-node directly, then the linkage from /aliases/display0 to the HW
-display node will be lost when the framebuffer gets torn down.
+Also since the aliases haven't been used up to now it isn't really the
+DT breaking ABI, but rather the kernel, and this patch actually fixes
+things up. I think the lesson to be learned from this is that it is a
+mistake to add DT content that isn't used.
 
-Doing it this way does make two assumptions though. It assumes that
-each display will have its own node somewhere so that no two
-framebuffers will point to the same node. Second, it assumes that we
-have a mechanism to handoff a display name (/dev/fb*)? from simplefb
-to another device. I don't know enough about the fbdev subsystem to
-know whether or not this will be a problem. Or if there are any
-namespace conflicts between fbdev and drm.
+That said, I guess there is one way to preserve the existing naming
+after all. The driver could be patched to special-case Tegra20 through
+Tegra124 and ignore aliases there. But I suspect that there are other
+SoCs that have the same issue, so this is likely going to be a rather
+big table.
 
-Implementation would be simple to do. If the simple framebuffer node
-has a 'display' property, then it will call of_alias_get_id() on the
-target of that phandle. Otherwise it will call of_alias_get_id() on
-itself.
-
-Thoughts?
-
-g.
-
->
->> +
->> +If a simplefb node represents the preferred console for user interaction,
->> +then the chosen node's stdout-path property must point to it.
->> +
->> +If the devicetree contains nodes for the display hardware used by a simplefb,
->> +then one of the hw nodes must have a property called "framebuffer" pointing to
->> +the framebuffer# node in chosen, so that the operating system knows which
->> +simplefb to disable when handing over control to a driver for the real
->> +hardware. The bindings for the hw nodes must specify which node contains the
->> +framebuffer property.
->
-> I've also been thinking about this. When we talked yesterday I said I
-> didn't have a preference as to which direction the link between the
-> framebuffer and the display hardware pointed. Thinking about it now,
-> between the two nodes, the HW node is pretty much static, but the FB
-> node is dynamic and in most scenarios will be enabled by firmware, and
-> then disabled by the operating system. If the framebuffer property is
-> in the HW node, then that means the firmware needs to modify two nodes
-> to set up the linkage correctly. It needs to enable the framebuffer,
-> and then add the link. If one of several possible FB nodes was enabled
-> by the firmware, it need to modify the display controller node to
-> match. And, when the framebuffer is disabled, the HW node is left with
-> a dangling link that kexec won't necessarily know how to fix up.
->
-> If instead the link goes the other way, as a property in the
-> framebuffer node pointing to display controller, all of the
-> functionality still stays the same, but the display controller node
-> never needs to change when framebuffers are
-> enabled/disabled/added/removed. Since the location and/or compatible
-> value of framebuffers is always well known, (aside from the fact that
-> the simplefb driver binds to them), we can have a single API that will
-> return all the framebuffers associated to a given display controller
-> node. The real HW driver will be able to use that to find its
-> framebuffers and coordinate handover between them.
->
-> g.
->
->> +
->> +It is advised that devicetree files contain pre-filled, disabled framebuffer#
->> +nodes, so that the firmware only needs to update the mode information and
->> +enable them. This way if e.g. later on support for more display clocks get
->> +added, the simplefb nodes will already contain this info and the firmware
->> +does not need to be updated.
->> +
->>  Required properties:
->>  - compatible: "simple-framebuffer"
->>  - reg: Should contain the location and size of the framebuffer memory.
->> @@ -22,11 +42,27 @@ Optional properties:
->>
->>  Example:
->>
->> -       framebuffer {
->> +chosen {
->> +       framebuffer0 {
->>                 compatible = "simple-framebuffer";
->>                 reg = <0x1d385000 (1600 * 1200 * 2)>;
->>                 width = <1600>;
->>                 height = <1200>;
->>                 stride = <(1600 * 2)>;
->>                 format = "r5g6b5";
->> +               clocks = <&ahb_gates 36>, <&ahb_gates 43>, <&ahb_gates 44>;
->>         };
->> +       stdout-path = &framebuffer0;
->> +};
->> +
->> +soc at 01c00000 {
->> +       lcdc0: lcdc at 1c0c000 {
->> +               compatible = "allwinner,sun4i-a10-lcdc";
->> +               framebuffer = <&framebuffer0>;
->> +       };
->> +};
->> +
->> +
->> +*) Older devicetree files may have a compatible = "simple-framebuffer" node
->> +in a different place, operating systems must first enumerate any framebuffer#
->> +nodes found under chosen and then check for other compatible nodes.
->> --
->> 2.1.0
->>
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/a9429825/attachment.sig>
