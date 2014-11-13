@@ -1,73 +1,81 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 13 Nov 2014 11:44:20 +0000
-Subject: [PATCH] efi: Fix free_end build warning
-In-Reply-To: <1415824050.15847.9.camel@smoke>
-References: <1415824050.15847.9.camel@smoke>
-Message-ID: <20141113114420.GF13350@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 13 Nov 2014 11:45:35 +0000
+Subject: [PATCH v3 16/19] arm/arm64: KVM: add virtual GICv3 distributor
+ emulation / PART 2
+In-Reply-To: <20141113111808.GN19598@cbox>
+References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
+ <1414776414-13426-17-git-send-email-andre.przywara@arm.com>
+ <20141107143040.GR16132@cbox> <546354E9.3000108@arm.com>
+ <20141113111808.GN19598@cbox>
+Message-ID: <546499DF.50208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
-
-On Wed, Nov 12, 2014 at 08:27:30PM +0000, Geoff Levand wrote:
-> Initialize the free_end variable to zero.  Fixes build warnings
-> like these:
+On 13/11/14 11:18, Christoffer Dall wrote:
+> On Wed, Nov 12, 2014 at 12:39:05PM +0000, Andre Przywara wrote:
+>> Hej Christoffer,
+>>
+>> the promised part 2 of the reply:
+>>
+>> On 07/11/14 14:30, Christoffer Dall wrote:
+>>> On Fri, Oct 31, 2014 at 05:26:51PM +0000, Andre Przywara wrote:
+>>>> With everything separated and prepared, we implement a model of a
+>>>> GICv3 distributor and redistributors by using the existing framework
+>>>> to provide handler functions for each register group.
+>>
+>> [...]
+>>
+>>>> +
+>>>> +static const struct mmio_range vgic_dist_ranges[] = {
+>>
+>> [...]
+>>
+>>>> +     /* the next three blocks are RES0 if ARE=1 */
+>>>
+>>> probably nicer to just have a comment for each register where this
+>>> applies.
+>>
+>> Done.
+>>
+>>>
+>>>> +     {
+>>>> +             .base           = GICD_SGIR,
+>>>> +             .len            = 4,
+>>>> +             .handle_mmio    = handle_mmio_raz_wi,
+>>>> +     },
+>>>> +     {
+>>>> +             .base           = GICD_CPENDSGIR,
+>>>> +             .len            = 0x10,
+>>>> +             .handle_mmio    = handle_mmio_raz_wi,
+>>>> +     },
+>>>> +     {
+>>>> +             .base           = GICD_SPENDSGIR,
+>>>> +             .len            = 0x10,
+>>>> +             .handle_mmio    = handle_mmio_raz_wi,
+>>>> +     },
+>>>> +     {
+>>>> +             .base           = GICD_IROUTER,
+>>>> +             .len            = 0x2000,
+>>>
+>>> shouldn't this be 0x1ee0?
+>>
+>> The limit of 0x7FD8 in the spec seems to come from 1020 - 32 SPIs.
+>> However all the other registers always claim 1024 IRQs supported (with
+>> non-implemented SPIs being RAZ/WI anyway).
+>> So I wonder if this is just a inconsistency in the spec.
+>> Marc, can you comment?
 > 
->   arch/arm64/kernel/efi.c: warning: ?free_end? may be used uninitialized in this function
+> The spec's memory map clearly indicates that the space at 0x6100 +
+> 0x1edc an onwards is reserverd, so it feels weird to define IROUTER
+> registers here.
 > 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> ---
-> Got this with the latest arm64/for-next/core branch.  Please consider.
-> 
-> -Geoff 
-> 
->  arch/arm64/kernel/efi.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index 4f39a18..83fc53c 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -239,6 +239,7 @@ static void __init free_boot_services(void)
->  	 * want to keep for UEFI.
->  	 */
->  
-> +	free_end = 0;
->  	keep_end = 0;
->  	free_start = 0;
+> Indeed you guys should check what the true intention is.
 
-Do you have any idea how GCC arrives at this conclusion? I can't see a
-path through that function where we use free_end without initialising it.
+Indeed, the spec is very clear about the range 0x7fdc-0xbffc to be
+reserved. Andre, can you please update this?
 
-Does something like the patch below help?
+Thanks,
 
-Will
-
---->8
-
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 95c49ebc660d..4c577b538d1c 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -271,17 +271,16 @@ static void __init free_boot_services(void)
-                size = npages << PAGE_SHIFT;
- 
-                if (free_start) {
--                       if (paddr <= free_end)
--                               free_end = paddr + size;
--                       else {
-+                       if (paddr > free_end) {
-                                total_freed += free_region(free_start, free_end);
-                                free_start = paddr;
--                               free_end = paddr + size;
-                        }
-                } else {
-                        free_start = paddr;
--                       free_end = paddr + size;
-                }
-+
-+               free_end = paddr + size;
-+
-                if (free_start < keep_end) {
-                        free_start += PAGE_SIZE;
-                        if (free_start >= free_end)
+	M.
+-- 
+Jazz is not dead. It just smells funny...
