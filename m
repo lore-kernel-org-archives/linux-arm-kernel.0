@@ -1,340 +1,114 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 13 Nov 2014 13:51:31 +0200
-Subject: [PATCH v2 1/5] video: omapdss: Add opa362 driver
-In-Reply-To: <1415830247-31633-2-git-send-email-marek@goldelico.com>
-References: <1415830247-31633-1-git-send-email-marek@goldelico.com>
- <1415830247-31633-2-git-send-email-marek@goldelico.com>
-Message-ID: <54649B43.1000801@ti.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 13 Nov 2014 11:52:58 +0000
+Subject: [RFC PATCH 1/4] ARM: KVM: on unhandled IO mem abort, route the
+ call to the KVM MMIO bus
+In-Reply-To: <546497E4.8040100@arm.com>
+References: <1394726249-1547-1-git-send-email-a.motakis@virtualopensystems.com>
+ <1394726249-1547-2-git-send-email-a.motakis@virtualopensystems.com>
+ <20140328190913.GJ25519@cbox>
+ <CADDJ2=Opx2d5ex0hWSXYJjs6uLifR9wZVsahUHzZ7zytSj7ZSg@mail.gmail.com>
+ <20141110162736.GA16054@cbox>
+ <CADDJ2=PTM0fJ0RFfWdVQ1-471xqaJmj0vP1f5-pf57xOV5jgig@mail.gmail.com>
+ <20141113112012.GO19598@cbox> <546497E4.8040100@arm.com>
+Message-ID: <54649B9A.20605@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/11/14 00:10, Marek Belisko wrote:
-> opa362 is amplifier for video and can be connected to the tvout pads
-> of the OMAP3. It has one gpio control for enable/disable of the output
-> (high impedance).
+Hi Nikolay,
+
+On 13/11/14 11:37, Marc Zyngier wrote:
+> [fixing Andre's email address]
 > 
-> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
-> ---
->  drivers/video/fbdev/omap2/displays-new/Kconfig     |   6 +
->  drivers/video/fbdev/omap2/displays-new/Makefile    |   1 +
->  .../fbdev/omap2/displays-new/amplifier-opa362.c    | 343 +++++++++++++++++++++
-
-I think it would be better to rename this to encoder-opa362.c. It's not
-encoder as such, but it falls into the same category.
-
->  include/video/omap-panel-data.h                    |  12 +
->  4 files changed, 362 insertions(+)
->  create mode 100644 drivers/video/fbdev/omap2/displays-new/amplifier-opa362.c
+> On 13/11/14 11:20, Christoffer Dall wrote:
+>> On Thu, Nov 13, 2014 at 12:45:42PM +0200, Nikolay Nikolaev wrote:
+>>
+>> [...]
+>>
+>>>>>
+>>>>> Going through the vgic_handle_mmio we see that it will require large
+>>>>> refactoring:
+>>>>>  - there are 15 MMIO ranges for the vgic now - each should be
+>>>>> registered as a separate device
+>>>>>  - the handler of each range should be split into read and write
+>>>>>  - all handlers take 'struct kvm_exit_mmio', and pass it to
+>>>>> 'vgic_reg_access', 'mmio_data_read' and 'mmio_data_read'
+>>>>>
+>>>>> To sum up - if we do this refactoring of vgic's MMIO handling +
+>>>>> kvm_io_bus_ API getting 'vcpu" argument we'll get a 'much' cleaner
+>>>>> vgic code and as a bonus we'll get 'ioeventfd' capabilities.
+>>>>>
+>>>>> We have 3 questions:
+>>>>>  - is the kvm_io_bus_ getting 'vcpu' argument acceptable for the other
+>>>>> architectures too?
+>>>>>  - is this huge vgic MMIO handling redesign acceptable/desired (it
+>>>>> touches a lot of code)?
+>>>>>  - is there a way that ioeventfd is accepted leaving vgic.c in it's
+>>>>> current state?
+>>>>>
+>>>> Not sure how the latter question is relevant to this, but check with
+>>>> Andre who recently looked at this as well and decided that for GICv3 the
+>>>> only sane thing was to remove that comment for the gic.
+>>> @Andre - what's your experience with the GICv3 and MMIO handling,
+>>> anything specific?
+>>>>
+>>>> I don't recall the details of what you were trying to accomplish here
+>>>> (it's been 8 months or so) but the surely the vgic handling code should
+>>>> *somehow* be integrated into the handle_kernel_mmio (like Paolo
+>>>> suggested), unless you come back and tell me that that would involve a
+>>>> complete rewrite of the vgic code.
+>>> I'm experimenting now - it's not exactly rewrite of whole vgic code,
+>>> but it will touch a lot of it  - all MMIO access handlers and the
+>>> supporting functions.
+>>> We're ready to spend the effort. My question is  - is this acceptable?
+>>>
+>> I certainly appreciate the offer to do this work, but it's hard to say
+>> at this point if it is worth it.
+>>
+>> What I was trying to say above is that Andre looked at this, and came to
+>> the conclusion that it is not worth it.
+>>
+>> Marc, what are your thoughts?
 > 
-> diff --git a/drivers/video/fbdev/omap2/displays-new/Kconfig b/drivers/video/fbdev/omap2/displays-new/Kconfig
-> index e6cfc38..211b3ec 100644
-> --- a/drivers/video/fbdev/omap2/displays-new/Kconfig
-> +++ b/drivers/video/fbdev/omap2/displays-new/Kconfig
-> @@ -1,6 +1,12 @@
->  menu "OMAP Display Device Drivers (new device model)"
->          depends on OMAP2_DSS
->  
-> +config DISPLAY_AMPLIFIER_OPA362
+> Same here, I rely on Andre's view that it was not very useful. Now, it
+> would be good to see a mock-up of the patches and find out:
 
-Here also use ENCODER instead.
+Seconded, can you send a pointer to the VGIC rework patches mentioned?
 
-> +        tristate "external analog amplifier with output disable/high-Z (e.g. OPA362)"
-> +	help
-> +	  Driver to enable an external analog TV amplifier (e.g. OPA362)
-> +	  through a GPIO.
+> - if it is a major improvement for the general quality of the code
+> - if that allow us to *delete* a lot of code (if it is just churn, I'm
+> not really interested)
+> - if it helps or hinders further developments that are currently in the
+> pipeline
+> 
+> Andre, can you please share your findings? I don't remember the
+> specifics of the discussion we had a few months ago...
 
-The indentation above seems funny.
+1) Given the date in the reply I sense that your patches are from March
+this year or earlier. So this is based on VGIC code from March, which
+predates Marc's vgic_dyn changes that just went in 3.18-rc1? His patches
+introduced another member to struct mmio_range to check validity of
+accesses with a reduced number of SPIs supported (.bits_per_irq).
+So is this covered in your rework?
 
-The text looks a bit odd. So is this a driver for OPA362, or is this a
-generic driver for any similar devices? Most of the names and code makes
-me think this is a driver for OPA362, but the text above quite clearly
-gives the impression that this is a driver for any analog video amp,
-with single enable gpio.
+2)
+>>>  - there are 15 MMIO ranges for the vgic now - each should be
 
-> +
->  config DISPLAY_ENCODER_TFP410
->          tristate "TFP410 DPI to DVI Encoder"
->  	help
-> diff --git a/drivers/video/fbdev/omap2/displays-new/Makefile b/drivers/video/fbdev/omap2/displays-new/Makefile
-> index 0323a8a..b311542 100644
-> --- a/drivers/video/fbdev/omap2/displays-new/Makefile
-> +++ b/drivers/video/fbdev/omap2/displays-new/Makefile
-> @@ -1,3 +1,4 @@
-> +obj-$(CONFIG_DISPLAY_AMPLIFIER_OPA362) += amplifier-opa362.o
->  obj-$(CONFIG_DISPLAY_ENCODER_TFP410) += encoder-tfp410.o
->  obj-$(CONFIG_DISPLAY_ENCODER_TPD12S015) += encoder-tpd12s015.o
->  obj-$(CONFIG_DISPLAY_CONNECTOR_DVI) += connector-dvi.o
-> diff --git a/drivers/video/fbdev/omap2/displays-new/amplifier-opa362.c b/drivers/video/fbdev/omap2/displays-new/amplifier-opa362.c
-> new file mode 100644
-> index 0000000..8065a28
-> --- /dev/null
-> +++ b/drivers/video/fbdev/omap2/displays-new/amplifier-opa362.c
-> @@ -0,0 +1,343 @@
-> +/*
-> + * OPA362 analog video amplifier with output/power control
-> + *
-> + * Copyright (C) 2014 Golden Delicious Computers
-> + * Author: H. Nikolaus Schaller <hns@goldelico.com>
-> + *
-> + * based on encoder-tfp410
-> + *
-> + * Copyright (C) 2013 Texas Instruments
-> + * Author: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License version 2 as published by
-> + * the Free Software Foundation.
-> + */
-> +
-> +#include <linux/gpio.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +#include <linux/of_gpio.h>
-> +
-> +#include <video/omapdss.h>
-> +#include <video/omap-panel-data.h>
-> +
-> +struct panel_drv_data {
-> +	struct omap_dss_device dssdev;
-> +	struct omap_dss_device *in;
-> +
-> +	int enable_gpio;
-> +
-> +	struct omap_video_timings timings;
-> +};
-> +
-> +#define to_panel_data(x) container_of(x, struct panel_drv_data, dssdev)
-> +
-> +static int opa362_connect(struct omap_dss_device *dssdev,
-> +		struct omap_dss_device *dst)
-> +{
-> +	struct panel_drv_data *ddata = to_panel_data(dssdev);
-> +	struct omap_dss_device *in = ddata->in;
-> +	int r;
-> +
-> +	dev_dbg(dssdev->dev, "connect\n");
-> +
-> +	if (omapdss_device_is_connected(dssdev))
-> +		return -EBUSY;
-> +
-> +	r = in->ops.atv->connect(in, dssdev);
-> +	if (r)
-> +		return r;
-> +
-> +	dst->src = dssdev;
-> +	dssdev->dst = dst;
-> +
-> +	return 0;
-> +}
-> +
-> +static void opa362_disconnect(struct omap_dss_device *dssdev,
-> +		struct omap_dss_device *dst)
-> +{
-> +	struct panel_drv_data *ddata = to_panel_data(dssdev);
-> +	struct omap_dss_device *in = ddata->in;
-> +
-> +	dev_dbg(dssdev->dev, "disconnect\n");
-> +
-> +	WARN_ON(!omapdss_device_is_connected(dssdev));
-> +	if (!omapdss_device_is_connected(dssdev))
-> +		return;
-> +
-> +	WARN_ON(dst != dssdev->dst);
-> +	if (dst != dssdev->dst)
-> +		return;
-> +
-> +	dst->src = NULL;
-> +	dssdev->dst = NULL;
-> +
-> +	in->ops.atv->disconnect(in, &ddata->dssdev);
-> +}
-> +
-> +static int opa362_enable(struct omap_dss_device *dssdev)
-> +{
-> +	struct panel_drv_data *ddata = to_panel_data(dssdev);
-> +	struct omap_dss_device *in = ddata->in;
-> +	int r;
-> +
-> +	dev_dbg(dssdev->dev, "enable\n");
-> +
-> +	if (!omapdss_device_is_connected(dssdev))
-> +		return -ENODEV;
-> +
-> +	if (omapdss_device_is_enabled(dssdev))
-> +		return 0;
-> +
-> +	in->ops.atv->set_timings(in, &ddata->timings);
-> +	/* fixme: should we receive the invert from our consumer, i.e. the connector? */
-> +	in->ops.atv->invert_vid_out_polarity(in, true);
+Well, the GICv3 emulation adds 41 new ranges. Not sure if this still fits.
 
-Well this does seem to be broken. I don't know what the answer to the
-question above is, but the code doesn't work properly.
+>>> registered as a separate device
 
-In the opa362_invert_vid_out_polarity function below, you get the invert
-boolean from the connector. This you pass to the OMAP venc. However,
-above you always override that value in venc with true.
+I found this fact a show-stopper when looking at this a month ago.
+Somehow it feels wrong to register a bunch of pseudo-devices. I could go
+with registering a small number of regions (one distributor, two
+redistributor regions for instance), but not handling every single of
+the 41 + 15 register "groups" as a device.
 
-So, either the invert_vid_out_polarity value has to be always true or
-false, because _OPA362_ requires it to be true or false, OR you need use
-the value from the connector.
+Also I wasn't sure if we had to expose some of the vGIC structures to
+the other KVM code layers.
 
-Seeing the comment in opa362_invert_vid_out_polarity, my guess is the
-latter, and the call above should be removed.
+But I am open to any suggestions (as long as they go in _after_ my
+vGICv3 series ;-)  - so looking forward to some repo to see how it looks
+like.
 
-> +
-> +	r = in->ops.atv->enable(in);
-> +	if (r)
-> +		return r;
-> +
-> +	if (gpio_is_valid(ddata->enable_gpio))
-> +		gpio_set_value_cansleep(ddata->enable_gpio, 1);
-> +
-> +	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
-> +
-> +	return 0;
-> +}
-> +
-> +static void opa362_disable(struct omap_dss_device *dssdev)
-> +{
-> +	struct panel_drv_data *ddata = to_panel_data(dssdev);
-> +	struct omap_dss_device *in = ddata->in;
-> +
-> +	dev_dbg(dssdev->dev, "disable\n");
-> +
-> +	if (!omapdss_device_is_enabled(dssdev))
-> +		return;
-> +
-> +	if (gpio_is_valid(ddata->enable_gpio))
-> +		gpio_set_value_cansleep(ddata->enable_gpio, 0);
-> +
-> +	in->ops.atv->disable(in);
-> +
-> +	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
-> +}
-> +
-> +static void opa362_set_timings(struct omap_dss_device *dssdev,
-> +		struct omap_video_timings *timings)
-> +{
-> +	struct panel_drv_data *ddata = to_panel_data(dssdev);
-> +	struct omap_dss_device *in = ddata->in;
-> +
-> +	dev_dbg(dssdev->dev, "set_timings\n");
-> +
-> +	ddata->timings = *timings;
-> +	dssdev->panel.timings = *timings;
-> +
-> +	in->ops.atv->set_timings(in, timings);
-> +}
-> +
-> +static void opa362_get_timings(struct omap_dss_device *dssdev,
-> +		struct omap_video_timings *timings)
-> +{
-> +	struct panel_drv_data *ddata = to_panel_data(dssdev);
-> +
-> +	dev_dbg(dssdev->dev, "get_timings\n");
-> +
-> +	*timings = ddata->timings;
-> +}
-> +
-> +static int opa362_check_timings(struct omap_dss_device *dssdev,
-> +		struct omap_video_timings *timings)
-> +{
-> +	struct panel_drv_data *ddata = to_panel_data(dssdev);
-> +	struct omap_dss_device *in = ddata->in;
-> +
-> +	dev_dbg(dssdev->dev, "check_timings\n");
-> +
-> +	return in->ops.atv->check_timings(in, timings);
-> +}
-> +
-> +static void opa362_set_type(struct omap_dss_device *dssdev,
-> +		enum omap_dss_venc_type type)
-> +{
-> +	/* we can only drive a COMPOSITE output */
-> +	WARN_ON(type != OMAP_DSS_VENC_TYPE_COMPOSITE);
-> +
-> +}
-> +
-> +static void opa362_invert_vid_out_polarity(struct omap_dss_device *dssdev,
-> +		bool invert_polarity)
-> +{
-> +	struct panel_drv_data *ddata = to_panel_data(dssdev);
-> +	struct omap_dss_device *in = ddata->in;
-> +
-> +	/* OPA362 inverts the polarity */
-> +	in->ops.atv->invert_vid_out_polarity(in, !invert_polarity);
-> +}
-> +
-> +static const struct omapdss_atv_ops opa362_atv_ops = {
-> +	.connect	= opa362_connect,
-> +	.disconnect	= opa362_disconnect,
-> +
-> +	.enable		= opa362_enable,
-> +	.disable	= opa362_disable,
-> +
-> +	.check_timings	= opa362_check_timings,
-> +	.set_timings	= opa362_set_timings,
-> +	.get_timings	= opa362_get_timings,
-> +
-> +	.set_type	= opa362_set_type,
-> +	.invert_vid_out_polarity	= opa362_invert_vid_out_polarity,
-> +};
-> +
-> +static int opa362_probe_pdata(struct platform_device *pdev)
-> +{
-> +	struct panel_drv_data *ddata = platform_get_drvdata(pdev);
-> +	struct amplifier_opa362_platform_data *pdata;
-> +	struct omap_dss_device *dssdev, *in;
-> +
-> +	pdata = dev_get_platdata(&pdev->dev);
-> +
-> +	ddata->enable_gpio = pdata->enable_gpio;
-> +
-> +	in = omap_dss_find_output(pdata->source);
-> +	if (in == NULL) {
-> +		dev_err(&pdev->dev, "Failed to find video source\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	ddata->in = in;
-> +
-> +	dssdev = &ddata->dssdev;
-> +	dssdev->name = pdata->name;
-> +
-> +	return 0;
-> +}
-
-We are going to support only DT boot at some point. Thus I think the
-whole platform data code should be left out.
-
-> +
-> +static int opa362_probe_of(struct platform_device *pdev)
-> +{
-> +	struct panel_drv_data *ddata = platform_get_drvdata(pdev);
-> +	struct device_node *node = pdev->dev.of_node;
-> +	struct omap_dss_device *in;
-> +	int gpio;
-> +
-> +	gpio = of_get_gpio(node, 0);
-> +
-> +	if (gpio_is_valid(gpio) || gpio == -ENOENT) {
-> +		ddata->enable_gpio = gpio;
-> +	} else {
-> +		dev_err(&pdev->dev, "failed to parse enable gpio\n");
-> +		return gpio;
-> +	}
-
-You should use the new GPIO API to get full support from the DT data.
-For an example, see panel-dpi.c's enable_gpio.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/86a8daae/attachment-0001.sig>
+Cheers,
+Andre.
