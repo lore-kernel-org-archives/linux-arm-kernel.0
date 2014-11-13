@@ -1,116 +1,128 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 12 Nov 2014 16:35:37 -0800
-Subject: [PATCH V2 00/13] clk: mmp: clock device tree support
-In-Reply-To: <CAN1soZyqWtKUajbW_R-_uTwSbN4Apo0+NJ9WupS+YLOP_nGJ3w@mail.gmail.com>
-References: <1414721633-29508-1-git-send-email-chao.xie@marvell.com>
- <CAN1soZyqWtKUajbW_R-_uTwSbN4Apo0+NJ9WupS+YLOP_nGJ3w@mail.gmail.com>
-Message-ID: <20141113003537.25314.19238@quantum>
+Date: Wed, 12 Nov 2014 16:38:55 -0800
+Subject: [PATCH v7 1/5] clk: rockchip: RK3288: add suspend and resume
+In-Reply-To: <1415368177-6637-2-git-send-email-zyw@rock-chips.com>
+References: <1415368177-6637-1-git-send-email-zyw@rock-chips.com>
+ <1415368177-6637-2-git-send-email-zyw@rock-chips.com>
+Message-ID: <20141113003855.25314.67230@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Haojian Zhuang (2014-11-04 00:15:55)
-> On Fri, Oct 31, 2014 at 10:13 AM, Chao Xie <chao.xie@marvell.com> wrote:
-> > From: Chao Xie <chao.xie@marvell.com>
-> >
-> > The patch set focuses at support device tree for clock.
-> >
-> > The first part of the patches
-> >   clk: mmp: add prefix "mmp" for structures defined for clk-frac
-> >   clk: mmp: add spin lock for clk-frac
-> >   clk: mmp: add init callback for clk-frac
-> >   clk: mmp: move definiton of mmp_clk_frac to clk.h It enhances the clk-frac.
-> >
-> > The second part of the patches
-> >   clk: mmp: add clock type mix
-> >   clk: mmp: add mmp private gate clock
-> >
-> > The third part of the patches
-> >   clk: mmp: add basic support functions for DT support
-> >   clk: mmp: add reset support
-> >   clk: mmp: add pxa168 DT support for clock driver
-> >   clk: mmp: add pxa910 DT support for clock driver
-> >   clk: mmp: add mmp2 DT support for clock driver
-> > It add the device tree support for pxa168, pxa910 and mmp2.
-> >
-> > V1 -> V2:
-> >   Add reset support for the clocks that have reset bit.
-> >
-> > Chao Xie (13):
-> >   clk: mmp: add prefix "mmp" for structures defined for clk-frac
-> >   clk: mmp: add spin lock for clk-frac
-> >   clk: mmp: add init callback for clk-frac
-> >   clk: mmp: move definiton of mmp_clk_frac to clk.h
-> >   clk: mmp: add clock type mix
-> >   clk: mmp: add mmp private gate clock
-> >   clk: mmp: add basic support functions for DT support
-> >   clk: mmp: add reset support
-> >   clk: mmp: add pxa168 DT support for clock driver
-> >   clk: mmp: add pxa910 DT support for clock driver
-> >   clk: mmp: add mmp2 DT support for clock driver
-> >   arm: mmp: Make all the dts file to be compiled by Makefile
-> >   arm: mmp: Make use of the DT supported clock
-> >
-> >  .../devicetree/bindings/clock/marvell,mmp2.txt     |  21 +
-> >  .../devicetree/bindings/clock/marvell,pxa168.txt   |  21 +
-> >  .../devicetree/bindings/clock/marvell,pxa910.txt   |  21 +
-> >  arch/arm/boot/dts/Makefile                         |   3 +
-> >  arch/arm/boot/dts/mmp2-brownstone.dts              |   2 +-
-> >  arch/arm/boot/dts/mmp2.dtsi                        |  29 +-
-> >  arch/arm/boot/dts/pxa168-aspenite.dts              |   2 +-
-> >  arch/arm/boot/dts/pxa168.dtsi                      |  27 +-
-> >  arch/arm/boot/dts/pxa910-dkb.dts                   |   2 +-
-> >  arch/arm/boot/dts/pxa910.dtsi                      |  28 +-
-> >  arch/arm/mach-mmp/Kconfig                          |  12 +-
-> >  arch/arm/mach-mmp/mmp-dt.c                         |  57 +--
-> >  arch/arm/mach-mmp/mmp2-dt.c                        |  26 +-
-> >  drivers/clk/mmp/Makefile                           |   7 +-
-> >  drivers/clk/mmp/clk-frac.c                         |  74 ++-
-> >  drivers/clk/mmp/clk-gate.c                         | 133 ++++++
-> >  drivers/clk/mmp/clk-mix.c                          | 513 +++++++++++++++++++++
-> >  drivers/clk/mmp/clk-mmp2.c                         |   6 +-
-> >  drivers/clk/mmp/clk-of-mmp2.c                      | 334 ++++++++++++++
-> >  drivers/clk/mmp/clk-of-pxa168.c                    | 279 +++++++++++
-> >  drivers/clk/mmp/clk-of-pxa910.c                    | 301 ++++++++++++
-> >  drivers/clk/mmp/clk-pxa168.c                       |   6 +-
-> >  drivers/clk/mmp/clk-pxa910.c                       |   6 +-
-> >  drivers/clk/mmp/clk.c                              | 192 ++++++++
-> >  drivers/clk/mmp/clk.h                              | 226 ++++++++-
-> >  drivers/clk/mmp/reset.c                            |  99 ++++
-> >  drivers/clk/mmp/reset.h                            |  31 ++
-> >  include/dt-bindings/clock/marvell,mmp2.h           |  74 +++
-> >  include/dt-bindings/clock/marvell,pxa168.h         |  57 +++
-> >  include/dt-bindings/clock/marvell,pxa910.h         |  54 +++
-> >  30 files changed, 2538 insertions(+), 105 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/clock/marvell,mmp2.txt
-> >  create mode 100644 Documentation/devicetree/bindings/clock/marvell,pxa168.txt
-> >  create mode 100644 Documentation/devicetree/bindings/clock/marvell,pxa910.txt
-> >  create mode 100644 drivers/clk/mmp/clk-gate.c
-> >  create mode 100644 drivers/clk/mmp/clk-mix.c
-> >  create mode 100644 drivers/clk/mmp/clk-of-mmp2.c
-> >  create mode 100644 drivers/clk/mmp/clk-of-pxa168.c
-> >  create mode 100644 drivers/clk/mmp/clk-of-pxa910.c
-> >  create mode 100644 drivers/clk/mmp/clk.c
-> >  create mode 100644 drivers/clk/mmp/reset.c
-> >  create mode 100644 drivers/clk/mmp/reset.h
-> >  create mode 100644 include/dt-bindings/clock/marvell,mmp2.h
-> >  create mode 100644 include/dt-bindings/clock/marvell,pxa168.h
-> >  create mode 100644 include/dt-bindings/clock/marvell,pxa910.h
-> >
-> > --
-> > 1.8.3.2
-> >
+Quoting Chris Zhong (2014-11-07 05:49:33)
+> save and restore some clks, which might be changed in suspend.
 > 
-> Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-> 
-> Mike,
-> Please merge all mach-mmp patches with clock together. Otherwise, it
-> may result in build issue.
+> Signed-off-by: Tony Xie <xxx@rock-chips.com>
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
+> Tested-by: Doug Anderson <dianders@chromium.org>
 
-Can patches #12 & #13 go through arm-soc?
+Looks good to me.
 
 Regards,
 Mike
 
 > 
-> Best Regards
-> Haojian
+> ---
+> 
+> Changes in v7: None
+> Changes in v6:
+> - modify comments
+> 
+> Changes in v5:
+> - modify comments
+> 
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2:
+> - __raw_readl/__raw_writel replaced by readl_relaxed/writel_relaxed
+> 
+>  drivers/clk/rockchip/clk-rk3288.c | 60 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 60 insertions(+)
+> 
+> diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+> index 2327829..66a9cb0 100644
+> --- a/drivers/clk/rockchip/clk-rk3288.c
+> +++ b/drivers/clk/rockchip/clk-rk3288.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/clk-provider.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+> +#include <linux/syscore_ops.h>
+>  #include <dt-bindings/clock/rk3288-cru.h>
+>  #include "clk.h"
+>  
+> @@ -762,6 +763,64 @@ static const char *rk3288_critical_clocks[] __initconst = {
+>         "hclk_peri",
+>  };
+>  
+> +#ifdef CONFIG_PM_SLEEP
+> +static void __iomem *rk3288_cru_base;
+> +
+> +/* Some CRU registers will be reset in maskrom when the system
+> + * wakes up from fastboot.
+> + * So save them before suspend, restore them after resume.
+> + */
+> +static const int rk3288_saved_cru_reg_ids[] = {
+> +       RK3288_MODE_CON,
+> +       RK3288_CLKSEL_CON(0),
+> +       RK3288_CLKSEL_CON(1),
+> +       RK3288_CLKSEL_CON(10),
+> +       RK3288_CLKSEL_CON(33),
+> +       RK3288_CLKSEL_CON(37),
+> +};
+> +
+> +static u32 rk3288_saved_cru_regs[ARRAY_SIZE(rk3288_saved_cru_reg_ids)];
+> +
+> +static int rk3288_clk_suspend(void)
+> +{
+> +       int i, reg_id;
+> +
+> +       for (i = 0; i < ARRAY_SIZE(rk3288_saved_cru_reg_ids); i++) {
+> +               reg_id = rk3288_saved_cru_reg_ids[i];
+> +
+> +               rk3288_saved_cru_regs[i] =
+> +                               readl_relaxed(rk3288_cru_base + reg_id);
+> +       }
+> +       return 0;
+> +}
+> +
+> +static void rk3288_clk_resume(void)
+> +{
+> +       int i, reg_id;
+> +
+> +       for (i = ARRAY_SIZE(rk3288_saved_cru_reg_ids) - 1; i >= 0; i--) {
+> +               reg_id = rk3288_saved_cru_reg_ids[i];
+> +
+> +               writel_relaxed(rk3288_saved_cru_regs[i] | 0xffff0000,
+> +                              rk3288_cru_base + reg_id);
+> +       }
+> +}
+> +
+> +static struct syscore_ops rk3288_clk_syscore_ops = {
+> +       .suspend = rk3288_clk_suspend,
+> +       .resume = rk3288_clk_resume,
+> +};
+> +
+> +static void rk3288_clk_sleep_init(void __iomem *reg_base)
+> +{
+> +       rk3288_cru_base = reg_base;
+> +       register_syscore_ops(&rk3288_clk_syscore_ops);
+> +}
+> +
+> +#else /* CONFIG_PM_SLEEP */
+> +static void rk3288_clk_sleep_init(void __iomem *reg_base) {}
+> +#endif
+> +
+>  static void __init rk3288_clk_init(struct device_node *np)
+>  {
+>         void __iomem *reg_base;
+> @@ -810,5 +869,6 @@ static void __init rk3288_clk_init(struct device_node *np)
+>                                   ROCKCHIP_SOFTRST_HIWORD_MASK);
+>  
+>         rockchip_register_restart_notifier(RK3288_GLB_SRST_FST);
+> +       rk3288_clk_sleep_init(reg_base);
+>  }
+>  CLK_OF_DECLARE(rk3288_cru, "rockchip,rk3288-cru", rk3288_clk_init);
+> -- 
+> 1.9.1
+> 
