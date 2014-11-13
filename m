@@ -1,7 +1,7 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 13 Nov 2014 18:25:21 +0530
+Date: Thu, 13 Nov 2014 18:26:16 +0530
 Subject: [RFC PATCH 0/3] DRA72: MMC HS200 support
-Message-ID: <1415883324-19591-1-git-send-email-kishon@ti.com>
+Message-ID: <1415883379-19654-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
