@@ -1,42 +1,61 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 13 Nov 2014 11:00:10 +0000
-Subject: [PATCH v2 07/14] ARM: STi: DT: STiH407: Add usb2 picophy dt nodes
+Date: Thu, 13 Nov 2014 11:00:12 +0000
+Subject: [PATCH v2 09/14] ARM: STi: DT: STiH410: Add pinctl config for usb
+ controllers.
 In-Reply-To: <1415876417-28728-1-git-send-email-peter.griffin@linaro.org>
 References: <1415876417-28728-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1415876417-28728-8-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1415876417-28728-10-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the dt nodes for the usb2 picophy found on the stih407
-device family. It is used on stih407 by the dwc3 usb3 controller when
-controlling usb2/1.1 devices.
+This patch adds the required pin configiguration for the extra usb
+controllers found on the stih410 device.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- arch/arm/boot/dts/stih407.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/stih410-pinctrl.dtsi | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+ create mode 100644 arch/arm/boot/dts/stih410-pinctrl.dtsi
 
-diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
-index 50637f5..4ce1f07 100644
---- a/arch/arm/boot/dts/stih407.dtsi
-+++ b/arch/arm/boot/dts/stih407.dtsi
-@@ -275,5 +275,17 @@
- 
- 			status = "disabled";
- 		};
+diff --git a/arch/arm/boot/dts/stih410-pinctrl.dtsi b/arch/arm/boot/dts/stih410-pinctrl.dtsi
+new file mode 100644
+index 0000000..b3e9dfc
+--- /dev/null
++++ b/arch/arm/boot/dts/stih410-pinctrl.dtsi
+@@ -0,0 +1,34 @@
++/*
++ * Copyright (C) 2014 STMicroelectronics Limited.
++ * Author: Peter Griffin <peter.griffin@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * publishhed by the Free Software Foundation.
++ */
++#include "st-pincfg.h"
++/ {
 +
-+		usb2_picophy0: usbpicophy at 0 {
-+			compatible = "st,stih407-usb2-phy";
-+			reg = <0xf8 0x04>,	/* syscfg 5062 */
-+			      <0xf4 0x04>;	/* syscfg 5061 */
-+			reg-names = "param", "ctrl";
-+			#phy-cells = <0>;
-+			st,syscfg = <&syscfg_core>;
-+			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
-+				 <&picophyreset STIH407_PICOPHY0_RESET>;
-+			reset-names = "global", "port";
++	soc {
++		pin-controller-rear {
++
++			usb0 {
++				pinctrl_usb0: usb2-0 {
++					st,pins {
++						usb-oc-detect = <&pio35 0 ALT1 IN>;
++						usb-pwr-enable = <&pio35 1 ALT1 OUT>;
++					};
++				};
++			};
++
++			usb1 {
++				pinctrl_usb1: usb2-1 {
++					st,pins {
++						usb-oc-detect = <&pio35 2 ALT1 IN>;
++						usb-pwr-enable = <&pio35 3 ALT1 OUT>;
++					};
++				};
++			};
 +		};
- 	};
- };
++	};
++};
 -- 
 1.9.1
