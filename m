@@ -1,76 +1,67 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 13 Nov 2014 10:24:41 +0000
-Subject: [linux-sunxi] [PATCH 2/4] simplefb: Add support for enumerating
- simplefb dt nodes in /chosen
-In-Reply-To: <CAGRGNgW_Q6oghpe5Mw-8aYPVVj1YZ6R3iaqOQzCE9dSD1nYSyA@mail.gmail.com>
-References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
- <1415830124-28787-2-git-send-email-hdegoede@redhat.com>
- <CAGRGNgW_Q6oghpe5Mw-8aYPVVj1YZ6R3iaqOQzCE9dSD1nYSyA@mail.gmail.com>
-Message-ID: <CACxGe6uegSdZFhqx8J0MEPr4PPTw9pDMqH45cBka5qk4mkHW6g@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 13 Nov 2014 10:25:40 +0000
+Subject: [PATCH v3 3/6] mfd: ti_am335x_tscadc: Remove unwanted
+ reg_se_cache save
+In-Reply-To: <71C24A547111EA4E84AE759B748D9EAE4B976C@DBDE04.ent.ti.com>
+References: <1415694844-11230-1-git-send-email-vigneshr@ti.com>
+ <1415694844-11230-4-git-send-email-vigneshr@ti.com>
+ <20141111122623.GA24004@x1>
+ <71C24A547111EA4E84AE759B748D9EAE4B976C@DBDE04.ent.ti.com>
+Message-ID: <20141113102540.GJ24004@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 12, 2014 at 11:39 PM, Julian Calaby <julian.calaby@gmail.com> wrote:
-> Hi Hans,
->
-> On Thu, Nov 13, 2014 at 9:08 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Update simplefb to support the new preferred location for simplefb dt nodes
->> under /chosen.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>  drivers/video/fbdev/simplefb.c | 33 ++++++++++++++++++++++++++++++++-
->>  1 file changed, 32 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
->> index cd96edd..be7d288 100644
->> --- a/drivers/video/fbdev/simplefb.c
->> +++ b/drivers/video/fbdev/simplefb.c
->> @@ -27,6 +27,7 @@
->>  #include <linux/platform_data/simplefb.h>
->>  #include <linux/platform_device.h>
->>  #include <linux/clk-provider.h>
->> +#include <linux/of_platform.h>
->>
->>  static struct fb_fix_screeninfo simplefb_fix = {
->>         .id             = "simple",
->> @@ -385,7 +386,37 @@ static struct platform_driver simplefb_driver = {
->>         .probe = simplefb_probe,
->>         .remove = simplefb_remove,
->>  };
->> -module_platform_driver(simplefb_driver);
->> +
->> +static int __init simplefb_init(void)
->> +{
->> +       int i, ret;
->> +       char name[16];
->> +       struct device_node *np;
->> +
->> +       ret = platform_driver_register(&simplefb_driver);
->> +       if (ret)
->> +               return ret;
->> +
->> +       for (i = 0; ; i++) {
->> +               snprintf(name, sizeof(name), "framebuffer%d", i);
->
-> This smells like an infinite loop: we can be pretty sure that no
-> hardware will ever exist with more than 9999 (I think?) framebuffers,
-> however if that ever happens this'll loop until it runs out of RAM.
-> Maybe add a suitably high limit to the for loop?
+On Tue, 11 Nov 2014, R, Vignesh wrote:
+> On Tue, 11 Nov 2014, Vignesh R wrote:
+> > In one shot mode, sequencer automatically disables all enabled steps 
+> > at the end of each cycle. (both ADC steps and TSC steps) Hence these 
+> > steps need not be saved in reg_se_cache for clearing these steps at a 
+> > later stage.
+> > Also, when ADC wakes up Sequencer should not be busy executing any of 
+> > the config steps except for the charge step. Previously charge step 
+> > was 1 ADC clock cycle and hence it was ignored.
+> > 
+> > Signed-off-by: Vignesh R <vigneshr@ti.com>
+> > ---
 
-Unlikely, but the loop is wrong anyway. The loop should be:
+[...]
 
-for_each_child_of_node(of_chosen, child)
-        if (of_device_is_compatible(child, "simple-framebuffer");
-                of_platform_device_create(np, NULL, NULL);
+> > -	tsadc->reg_se_cache |= val;
+> 
+> You didn't answer my question about this?
+> I did reply to the question in the previous thread.  
+> 
+> Previously, TSC did not reliably re-enable its steps as the TSC irq handler received 
+> false pen up events. Hence, in order to use TSC after ADC operation, it was necessary to
+>  save and re-enable TSC steps (basically, to keep TSC steps enabled always).
+> The change was more of a workaround to overcome limitation of TSC irq handler. With 
+> this series of patches, TSC irq handler is very reliable and the workaround is no longer required.
 
-Then make the probe hook choose an appropriate FB number. It looks
-like you structured the code the way you did to get the framebuffers
-to register in a particular order, and therefore implicitly get the
-right numbers, but that is a fragile way to go about it.
+Okay, thanks for the explanation.
 
-Using /aliases really is the right way to get specific framebuffer
-numbers. We already use it for UARTs, so we should do the same here.
-Use of_alias_get_id(, "framebuffer") to get the framebuffer number.
+By the way, your mailer doesn't appear to quote previous messages.  Is
+there any way to fix that?
 
-g.
+> >  	am335x_tscadc_need_adc(tsadc);
+> >  
+> >  	tscadc_writel(tsadc, REG_SE, val);
+> > diff --git a/include/linux/mfd/ti_am335x_tscadc.h 
+> > b/include/linux/mfd/ti_am335x_tscadc.h
+> > index c99be5dc0f5c..fcce182e4a35 100644
+> > --- a/include/linux/mfd/ti_am335x_tscadc.h
+> > +++ b/include/linux/mfd/ti_am335x_tscadc.h
+> > @@ -128,6 +128,7 @@
+> >  
+> >  /* Sequencer Status */
+> >  #define SEQ_STATUS BIT(5)
+> > +#define CHARGE_STEP		0x11
+> >  
+> >  #define ADC_CLK			3000000
+> >  #define TOTAL_STEPS		16
+> 
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
