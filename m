@@ -1,33 +1,32 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 13 Nov 2014 15:46:28 +0100
-Subject: [linux-sunxi] Re: [PATCH v3 1/4] dt-bindings: simplefb: Specify
- node location and handoff related properties
-In-Reply-To: <5464C026.7030300@ti.com>
+Date: Thu, 13 Nov 2014 15:47:31 +0100
+Subject: [PATCH v3 3/4] simplefb: Change simplefb_init from module_init
+ to fs_initcall
+In-Reply-To: <5464C10A.30709@ti.com>
 References: <1415885645-24613-1-git-send-email-hdegoede@redhat.com>
- <5464C026.7030300@ti.com>
-Message-ID: <5464C444.4050101@redhat.com>
+ <1415885645-24613-3-git-send-email-hdegoede@redhat.com>
+ <5464C10A.30709@ti.com>
+Message-ID: <5464C483.4040507@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 11/13/2014 03:28 PM, Tomi Valkeinen wrote:
+On 11/13/2014 03:32 PM, Tomi Valkeinen wrote:
 > On 13/11/14 15:34, Hans de Goede wrote:
+>> One of the reasons for having the simplefb nodes in /chosen, and doing
+>> explicit enumeration of the nodes there, is too allow enumerating them sooner,
+>> so that we get a console earlier on.
+>>
+>> Doing this earlier then fs_initcall is not useful, since the fb only turns into
+>> a console when fbcon intializes, which is a fs_initcall too.
 > 
->> +chosen {
->> +	framebuffer0: framebuffer at 5fc00000 {
->>  		compatible = "simple-framebuffer";
->> -		reg = <0x1d385000 (1600 * 1200 * 2)>;
->> +		reg = <0x5fc00000 (4096 * 1024)>;
-> 
-> Was there a reason for this change?
+> The above text is slightly confusing, as fbcon initializes at
+> module_init time. You only change it in the next patch. I can move the
+> fbcon change to be the first patch when applying, if there are no more
+> versions sent.
 
-I changed the node name to match the new bindings text which
-specifies that the node name must be framebuffer@<address>,
-while at it I've taken a real world address range.
-
-I assume you refer to the bit where the size of the reg property
-is changed ? That indeed is not really necessary.
+True, feel free to swap them when applying.
 
 Regards,
 
