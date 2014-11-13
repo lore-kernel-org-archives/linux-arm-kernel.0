@@ -1,77 +1,89 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 13 Nov 2014 13:37:42 +0100
-Subject: [PATCH v2 1/4] dt-bindings: simplefb: Specify node location and
- handoff related properties
-In-Reply-To: <CACxGe6tra-G3-FV0FJcfXNEVgJNdsR+NvzALM34_XymP93icGg@mail.gmail.com>
-References: <1415868610-13297-1-git-send-email-hdegoede@redhat.com>
- <CACxGe6uX7V-TcZfM0vP4SvjxKx3T_RGByX8wFqTdFo4LEzP2Yg@mail.gmail.com>
- <5464A0A2.1080503@redhat.com>
- <CACxGe6tra-G3-FV0FJcfXNEVgJNdsR+NvzALM34_XymP93icGg@mail.gmail.com>
-Message-ID: <5464A616.5020708@redhat.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Thu, 13 Nov 2014 20:39:42 +0800
+Subject: [Patch V1 0/6] Refine generic/PCI MSI irqodmian interfaces
+In-Reply-To: <5464A3F8.1000807@huawei.com>
+References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
+ <5464A3F8.1000807@huawei.com>
+Message-ID: <5464A68E.4010004@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 11/13/2014 01:36 PM, Grant Likely wrote:
-> On Thu, Nov 13, 2014 at 12:14 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
+
+On 2014/11/13 20:28, Yijing Wang wrote:
+> On 2014/11/13 19:43, Jiang Liu wrote:
+>> This patch set is based on tip/irq/irqdomain and tries to refine
+>> interfaces to support irqdomain for generic MSI and PCI MSI.
 >>
->> On 11/13/2014 12:02 PM, Grant Likely wrote:
->>> On Thu, Nov 13, 2014 at 8:50 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->>>> Since simplefb nodes do not relate directly to hw typically they have been
->>>> placed in the root of the devicetree. As the represent runtime information
->>>> having them as sub-nodes of /chosen is more logical, specify this.
->>>>
->>>> Also specify when to set the chosen stdout-path property to a simplefb node.
->>>>
->>>> For reliable handover to a hardware specific driver, that driver needs to
->>>> know which simplefb to unregister when taking over, specify how the hw driver
->>>> can find the matching simplefb node.
->>>>
->>>> Last add some advice on how to fill and use simplefb nodes from a firmware
->>>> pov.
->>>>
->>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
->>>> --
->>>> Changes in v2:
->>>> -Add stdout-path to the example code
->>>> ---
->>>>  .../bindings/video/simple-framebuffer.txt          | 38 +++++++++++++++++++++-
->>>>  1 file changed, 37 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
->>>> index 8f35718..8b7ecf6 100644
->>>> --- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
->>>> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
->>>> @@ -4,6 +4,26 @@ A simple frame-buffer describes a frame-buffer setup by firmware or
->>>>  the bootloader, with the assumption that the display hardware has already
->>>>  been set up to scan out from the memory pointed to by the reg property.
->>>>
->>>> +Since simplefb nodes represent runtime information they must be sub-nodes of
->>>> +the chosen node (*). The primary display node must be named framebuffer0,
->>>> +additional nodes must be called framebuffer1, etc.
->>>
->>> Thinking more about our conversation yesterday, the preferred name
->>> should still be framebuffer@<address>. There is no reason to break
->>> with established convention, and as mentioned in my reply on patch #2,
->>> using the name is not the preferred way to identify a device node. So,
->>> my recommendation is to prefer the name "framebuffer@<addr>", but if
->>> it is inconvenient because the address isn't known, then
->>> "framebuffer#" is acceptable.
+>> Patch 1 is just minor fixes for tip/irq/irqdomain.
 >>
->> Since we want to use pre-filled simplefb nodes already present in the devicetree,
->> and u-boot is the one chosing the framebuffer address we don't know the
->> address to put in the dts file beforehand, so framebuffer# it is.
+>> Patch 2 introduces some helpers to hide struct msi_desc implementation
+>> details, so later we could move msi_list from struct pci_dev into
+>> struct device to enable generic MSI support.
 > 
-> fdt_set_name() is available to U-Boot to rename a node. :-)
+> Hi Gerry,
+>    I tried to move msi info(eg. msi_list) into struct device, but I found
+> DMAR fault interrupt is initialized before the driver core init. And I don't
+> know whether there are other devices like ARM consolidator(introduced in GIC v3)
+> need to be initialized before driver core. What do you think about this ?
+Hi Yijing,
+	DMAR interrupt doesn't make use of msi_desc, so has no
+dependency on msi_list.
+	Actually there are two levels of generic MSI sharing. The first
+level is to share common irq_chip/irqdomain code, such as HPET, DMAR and
+HT_IRQ. The second level is to share msi_desc, such as some device
+on ARM side as you have mentioned.
+	With this patch set applied, we achieve level one sharing. For
+level two sharing, we need to move msi_list into struct device, refactor
+struct msi_desc, and provide a generic pci_enable_msix_range alike
+user interfaces. I'm still working on this part, so we could cooperate
+with each other.
+Thanks!
+Gerry
+
 > 
-> Prepopulating with /chosen/framebuffer#, and then renaming to
-> /chosen/framebuffer@<addr> is perfectly reasonable.
-
-Ok, that works for me.
-
-Regards,
-
-Hans
+> Thanks!
+> Yijing.
+> 
+>>
+>> Patch 3 introduces msi_domain_{alloc|free}_irqs() which generalize
+>> pci_msi_domain_alloc_irqs() to support generic MSI.
+>>
+>> Patch 4 introduces default data structures and callback implementations
+>> to support msi_domain_alloc_irqs(), so reduce burden on generic MSI
+>> users.
+>>
+>> Patch 5 converts PCI MSI to use generic MSI interfaces, and also
+>> implement default callbacks for PCI MSI.
+>>
+>> Patch 6 introduces a mechanism to replace arch_setup_msi_irq()/
+>> arch_setup_msi_irqs()/arch_teardown_msi_irq()/arch_teardown_msi_irqs().
+>>
+>> With this patch set applied, the generic MSI and PCI MSI interfaces
+>> are much easier to use. For extreme case, you only need to define
+>> a "struct msi_domain_info" and don't need to implement any callbacks,
+>> just using the default callbacks is OK:)
+>>
+>> This patch set is also a preparation for:
+>> 1) Kill all weak functions in drivers/pci/msi.c
+>> 2) Implement support for non-PCI-compliant MSI device
+>>
+>> It has been tested on x86 platforms, comments are welcomed!
+>>
+>> Jiang Liu (6):
+>>   PCI, MSI: Fix errors caused by commit e5f1a59c4e12
+>>   PCI, MSI: Introduce helpers to hide struct msi_desc implemenation
+>>     details
+>>   genirq: Introduce msi_domain_{alloc|free}_irqs()
+>>   genirq: Provide default callbacks for msi_domain_ops
+>>   PCI, MSI: Refine irqdomain interfaces to simplify its usage
+>>   PCI, MSI: Provide mechanism to alloc/free MSI/MSIX interrupt from
+>>     irqdomain
+>>
+>>  drivers/pci/msi.c   |  170 ++++++++++++++++++++++++++++++++++++++++-----------
+>>  include/linux/msi.h |   90 ++++++++++++++++++++++++---
+>>  kernel/irq/msi.c    |  150 ++++++++++++++++++++++++++++++++++++++++++++-
+>>  3 files changed, 366 insertions(+), 44 deletions(-)
+>>
+> 
+> 
