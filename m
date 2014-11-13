@@ -1,59 +1,48 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 13 Nov 2014 09:38:58 +0100
-Subject: [PATCH 1/4] dt-bindings: simplefb: Specify node location and
- handoff related properties
-In-Reply-To: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
-References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAMuHMdU4YTwyMrD5U1i3DYy=cvpocmzXqajySUfgBKVRhcAJVw@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 13 Nov 2014 09:40:35 +0100
+Subject: [linux-sunxi] [PATCH 2/4] simplefb: Add support for enumerating
+ simplefb dt nodes in /chosen
+In-Reply-To: <CAMuHMdVSfYyHc52Tdu_wzb6ZYPzeZtOzweUwADHxiJLypuBQNw@mail.gmail.com>
+References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>	<1415830124-28787-2-git-send-email-hdegoede@redhat.com>	<CAGRGNgW_Q6oghpe5Mw-8aYPVVj1YZ6R3iaqOQzCE9dSD1nYSyA@mail.gmail.com>	<54646B5B.1070604@redhat.com>
+ <CAMuHMdVSfYyHc52Tdu_wzb6ZYPzeZtOzweUwADHxiJLypuBQNw@mail.gmail.com>
+Message-ID: <54646E83.9070704@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 12, 2014 at 11:08 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Since simplefb nodes do not relate directly to hw typically they have been
-> placed in the root of the devicetree. As the represent runtime information
-> having them as sub-nodes of /chosen is more logical, specify this.
->
-> Also specify when to set the chosen stdout-path property to a simplefb node.
->
-> For reliable handover to a hardware specific driver, that driver needs to
-> know which simplefb to unregister when taking over, specify how the hw driver
-> can find the matching simplefb node.
->
-> Last add some advice on how to fill and use simplefb nodes from a firmware
-> pov.
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Hi,
 
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+On 11/13/2014 09:34 AM, Geert Uytterhoeven wrote:
+> Hi Hans,
+> 
+> On Thu, Nov 13, 2014 at 9:27 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>> +       char name[16];
+>>>> +       struct device_node *np;
+>>>> +
+>>>> +       ret = platform_driver_register(&simplefb_driver);
+>>>> +       if (ret)
+>>>> +               return ret;
+>>>> +
+>>>> +       for (i = 0; ; i++) {
+>>>> +               snprintf(name, sizeof(name), "framebuffer%d", i);
+>>>
+>>> This smells like an infinite loop: we can be pretty sure that no
+>>> hardware will ever exist with more than 9999 (I think?) framebuffers,
+>>> however if that ever happens this'll loop until it runs out of RAM.
+>>> Maybe add a suitably high limit to the for loop?
+>>
+>> The loop will stop as soon as there are no more framebuffer# nodes in chosen,
+>> so the loop is only infinite if there are infinite nodes in the devicetree,
+>> which would make the devicetree infinitely large, so this will never happen.
+> 
+> If there are 10000 frame buffers, the loop will continue beyond that,
+> as the index will be truncated to 4 digits due to the size of name[].
+> It will stop when (signed) i becomes negative, though ;-)
+> 
+> One solution is to increase the size of name[],
 
-> ---
->  .../bindings/video/simple-framebuffer.txt          | 37 +++++++++++++++++++++-
->  1 file changed, 36 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-> index 8f35718..95fe284 100644
-> --- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-> @@ -4,6 +4,26 @@ A simple frame-buffer describes a frame-buffer setup by firmware or
->  the bootloader, with the assumption that the display hardware has already
->  been set up to scan out from the memory pointed to by the reg property.
->
-> +Since simplefb nodes represent runtime information they must be sub-nodes of
-> +the chosen node (*). The primary display node must be named framebuffer0,
-> +additional nodes must be called framebuffer1, etc.
-> +
-> +If a simplefb node represents the preferred console for user interaction,
-> +then the chosen node's stdout-path property must point to it.
+This is probably never going to happen, but I'll increase the size of name in v2
+anyways.
 
-You may want to add an stdout-path property to the example.
+Regards,
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Hans
