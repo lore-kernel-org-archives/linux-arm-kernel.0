@@ -1,59 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
 Date: Thu, 13 Nov 2014 10:20:04 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC DT Fixes for v3.18
-Message-ID: <cover.1415756961.git.horms+renesas@verge.net.au>
+Subject: [PATCH 1/2] ARM: shmobile: r8a7790: Fix SD3CKCR address to device tree
+In-Reply-To: <cover.1415756961.git.horms+renesas@verge.net.au>
+References: <cover.1415756961.git.horms+renesas@verge.net.au>
+Message-ID: <edd7b938637701567a54306adb27cfb4345fedc5.1415756961.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
 
-Please consider these Renesas ARM based SoC DT fixes for v3.18.
-Or alternatively for v3.19 if you feel they are too late for v3.18.
-
-
-* ARM: shmobile: r8a7740 dtsi: Correct IIC0 parent clock
-
-  This problem was introduced when clock support was added DT for the
-  r8a7740 by d9ffd583bf345e2ea ("ARM: shmobile: r8a7740: add SoC clocks to
-  DTS") in v3.18-rc1.
-
-  I am not aware of any run-time effect of this problem.
-
-* ARM: shmobile: r8a7790: Fix SD3CKCR address to device tree
-
-  This problem was introduced when clock support was added DT for the
-  r8a7790 by 22a1f59547e1e63cd ("ARM: shmobile: r8a7790: Add clocks")
-  in v3.13.
-
-  As there is no SD card slot for SDHI3 on the lager board there is no
-  run-time effect of this problem on boards supported in mainline.
-
-
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-fixes-for-v3.18
-
-for you to fetch changes up to b89ff7c3c2dee189489a5f45eb8d72e106179299:
-
-  ARM: shmobile: r8a7740 dtsi: Correct IIC0 parent clock (2014-11-10 09:56:01 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC DT Fixes for v3.18
-
-* Correct IIC0 parent clock on r8a7740
-* Correct SD3CKCR address to device tree on r8a7790
-
-----------------------------------------------------------------
-Geert Uytterhoeven (1):
-      ARM: shmobile: r8a7740 dtsi: Correct IIC0 parent clock
-
-Shinobu Uehara (1):
-      ARM: shmobile: r8a7790: Fix SD3CKCR address to device tree
-
- arch/arm/boot/dts/r8a7740.dtsi | 2 +-
+Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/boot/dts/r8a7790.dtsi | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index d0e1773..e20affe 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -666,9 +666,9 @@
+ 			#clock-cells = <0>;
+ 			clock-output-names = "sd2";
+ 		};
+-		sd3_clk: sd3_clk at e615007c {
++		sd3_clk: sd3_clk at e615026c {
+ 			compatible = "renesas,r8a7790-div6-clock", "renesas,cpg-div6-clock";
+-			reg = <0 0xe615007c 0 4>;
++			reg = <0 0xe615026c 0 4>;
+ 			clocks = <&pll1_div2_clk>;
+ 			#clock-cells = <0>;
+ 			clock-output-names = "sd3";
+-- 
+2.1.1
