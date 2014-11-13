@@ -1,67 +1,65 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 13 Nov 2014 11:19:16 +0000
-Subject: [RFC PATCH v3 2/2] arm: kernel: fix pci_mmap_page_range() offset
- calculation
-In-Reply-To: <1415877558-8906-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1415877558-8906-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1415877558-8906-3-git-send-email-lorenzo.pieralisi@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 13 Nov 2014 12:20:12 +0100
+Subject: [RFC PATCH 1/4] ARM: KVM: on unhandled IO mem abort, route the
+ call to the KVM MMIO bus
+In-Reply-To: <CADDJ2=PTM0fJ0RFfWdVQ1-471xqaJmj0vP1f5-pf57xOV5jgig@mail.gmail.com>
+References: <1394726249-1547-1-git-send-email-a.motakis@virtualopensystems.com>
+ <1394726249-1547-2-git-send-email-a.motakis@virtualopensystems.com>
+ <20140328190913.GJ25519@cbox>
+ <CADDJ2=Opx2d5ex0hWSXYJjs6uLifR9wZVsahUHzZ7zytSj7ZSg@mail.gmail.com>
+ <20141110162736.GA16054@cbox>
+ <CADDJ2=PTM0fJ0RFfWdVQ1-471xqaJmj0vP1f5-pf57xOV5jgig@mail.gmail.com>
+Message-ID: <20141113112012.GO19598@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pci_mmap_page_range() API should be written to expect offset
-values representing PCI memory resource addresses as seen by user
-space, through the pci_resource_to_user() API.
+On Thu, Nov 13, 2014 at 12:45:42PM +0200, Nikolay Nikolaev wrote:
 
-ARM relies on the standard implementation of pci_resource_to_user()
-which actually is an identity map and exports to user space
-PCI memory resources as they are stored in PCI devices resources
-structures, which represent CPU physical addresses (fixed-up using
-BUS to CPU address conversions) not PCI bus addresses.
+[...]
 
-Therefore, on ARM platforms where the mapping between CPU and BUS
-address is not a 1:1 the current pci_mmap_page_range() implementation is
-erroneous, in that an additional shift is applied to an already fixed-up
-offset passed from userspace.
+> >>
+> >> Going through the vgic_handle_mmio we see that it will require large
+> >> refactoring:
+> >>  - there are 15 MMIO ranges for the vgic now - each should be
+> >> registered as a separate device
+> >>  - the handler of each range should be split into read and write
+> >>  - all handlers take 'struct kvm_exit_mmio', and pass it to
+> >> 'vgic_reg_access', 'mmio_data_read' and 'mmio_data_read'
+> >>
+> >> To sum up - if we do this refactoring of vgic's MMIO handling +
+> >> kvm_io_bus_ API getting 'vcpu" argument we'll get a 'much' cleaner
+> >> vgic code and as a bonus we'll get 'ioeventfd' capabilities.
+> >>
+> >> We have 3 questions:
+> >>  - is the kvm_io_bus_ getting 'vcpu' argument acceptable for the other
+> >> architectures too?
+> >>  - is this huge vgic MMIO handling redesign acceptable/desired (it
+> >> touches a lot of code)?
+> >>  - is there a way that ioeventfd is accepted leaving vgic.c in it's
+> >> current state?
+> >>
+> > Not sure how the latter question is relevant to this, but check with
+> > Andre who recently looked at this as well and decided that for GICv3 the
+> > only sane thing was to remove that comment for the gic.
+> @Andre - what's your experience with the GICv3 and MMIO handling,
+> anything specific?
+> >
+> > I don't recall the details of what you were trying to accomplish here
+> > (it's been 8 months or so) but the surely the vgic handling code should
+> > *somehow* be integrated into the handle_kernel_mmio (like Paolo
+> > suggested), unless you come back and tell me that that would involve a
+> > complete rewrite of the vgic code.
+> I'm experimenting now - it's not exactly rewrite of whole vgic code,
+> but it will touch a lot of it  - all MMIO access handlers and the
+> supporting functions.
+> We're ready to spend the effort. My question is  - is this acceptable?
+> 
+I certainly appreciate the offer to do this work, but it's hard to say
+at this point if it is worth it.
 
-Hence, this patch removes the mem_offset from the pgoff calculation
-since the offset as passed from user space already represents the CPU
-physical address corresponding to the resource to be mapped, ie no
-additional offset should be applied.
+What I was trying to say above is that Andre looked at this, and came to
+the conclusion that it is not worth it.
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- arch/arm/kernel/bios32.c | 10 ++--------
- 1 file changed, 2 insertions(+), 8 deletions(-)
+Marc, what are your thoughts?
 
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index 17a26c1..b56fa2d 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -626,21 +626,15 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
- int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
- 			enum pci_mmap_state mmap_state, int write_combine)
- {
--	struct pci_sys_data *root = dev->sysdata;
--	unsigned long phys;
--
--	if (mmap_state == pci_mmap_io) {
-+	if (mmap_state == pci_mmap_io)
- 		return -EINVAL;
--	} else {
--		phys = vma->vm_pgoff + (root->mem_offset >> PAGE_SHIFT);
--	}
- 
- 	/*
- 	 * Mark this as IO
- 	 */
- 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
- 
--	if (remap_pfn_range(vma, vma->vm_start, phys,
-+	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
- 			     vma->vm_end - vma->vm_start,
- 			     vma->vm_page_prot))
- 		return -EAGAIN;
--- 
-2.1.2
+-Christoffer
