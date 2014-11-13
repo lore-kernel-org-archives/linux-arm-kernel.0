@@ -1,73 +1,89 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 13 Nov 2014 13:01:36 +0100
-Subject: [PATCH 3/4] simplefb: Change simplefb_init from module_init to
- fs_initcall
-In-Reply-To: <CACxGe6sYD-Ow2wcwAKuXpR3A9VZozo2sgz=eEcWXi5ayKd2jWQ@mail.gmail.com>
-References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
- <1415830124-28787-3-git-send-email-hdegoede@redhat.com>
- <20141113085238.GE20972@lukather> <546478B5.2040002@redhat.com>
- <CACxGe6u8B854PEWw8XzwhyX8joMWwOsHOOXtmBmC1TgCGjGtdg@mail.gmail.com>
- <CACxGe6sYD-Ow2wcwAKuXpR3A9VZozo2sgz=eEcWXi5ayKd2jWQ@mail.gmail.com>
-Message-ID: <54649DA0.8060308@redhat.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 13 Nov 2014 13:02:20 +0100
+Subject: [PATCH v2 0/4] Hot plug support for the Armada 38x SoCs
+In-Reply-To: <1414669184-16785-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1414669184-16785-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <54649DCC.3000900@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jason,
 
-On 11/13/2014 11:31 AM, Grant Likely wrote:
-> On Thu, Nov 13, 2014 at 10:29 AM, Grant Likely <grant.likely@linaro.org> wrote:
->> On Thu, Nov 13, 2014 at 9:24 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->>> Hi,
->>>
->>> On 11/13/2014 09:52 AM, Maxime Ripard wrote:
->>>> On Wed, Nov 12, 2014 at 11:08:43PM +0100, Hans de Goede wrote:
->>>>> One of the reasons for having the simplefb nodes in /chosen, and doing
->>>>> explicit enumeration of the nodes there, is too allow enumerating them sooner,
->>>>> so that we get a console earlier on.
->>>>>
->>>>> Doing this earlier then fs_initcall is not useful, since the fb only turns into
->>>>> a console when fbcon intializes, which is a fs_initcall too.
->>>>>
->>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>>> ---
->>>>>  drivers/video/fbdev/simplefb.c | 6 +++++-
->>>>>  1 file changed, 5 insertions(+), 1 deletion(-)
->>>>>
->>>>> diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
->>>>> index be7d288..8c0c972 100644
->>>>> --- a/drivers/video/fbdev/simplefb.c
->>>>> +++ b/drivers/video/fbdev/simplefb.c
->>>>> @@ -415,7 +415,11 @@ static void __exit simplefb_exit(void)
->>>>>      platform_driver_unregister(&simplefb_driver);
->>>>>  }
->>>>>
->>>>> -module_init(simplefb_init);
->>>>> +/*
->>>>> + * While this can be a module, if builtin it's most likely the console
->>>>> + * So let's leave module_exit but move module_init to an earlier place
->>>>> + */
->>>>
->>>> Not really related to this patch itself, but do we want to support
->>>> simplefb as a module? It seems like it's going to be most of the time
->>>> broken.
->>>
->>> A valid point, my mean reasoning here is that some may see not being able to
->>> use it as a module as a regression, so I just kept things as is, but I do
->>> agree that it is advisable to just build it in.
->>
->> Like a lot of things, if it is made a modules, and it breaks for the
->> user, the user gets to keep the pieces. There are potentially some
->> valid scenarios where it is fine to have it as a module. I don't
->> recommend changing this unless is actually starts causing problems.
+On 30/10/2014 12:39, Gregory CLEMENT wrote:
+> Hi,
 > 
-> I assume that you've tested this and it actually makes a difference,
-> correct? If so,
+> This patch set is the second version of the series adding the hot plug
+> and also kexec support for the Armada 38x Socs.
 > 
-> Acked-by: Grant Likely <grant.likely@linaro.org>
+> If nobody object we could push them in linux-next.
+> 
+> The first patch was done in order to have the same code between Armada
+> XP and the Cortex A9 based mvebu SoCs. In order to ensure the the
+> backward compatibility for the device tree, it is only a preliminary
+> work for it.
+> 
+> The second patch moves the SCU power up sequence in a dedicated
+> assembly function. It was done in order to reuse it in the 3rd patch.
+> 
+> The third patch fixes the secondary startup for the cortex A9 mvebu
+> SoC. Indeed, the initial code was written with the assumption the SCU
+> will be always power on, which is not only true especially in the
+> kexec case.
+> 
+> These 2 patches may worth to be pushed to the stable kernel.
+> 
+> Then the last patch adds the CPU hotplug support for Armada 38x. I
+> tested the hotplug using the /sys/devices/system/cpu/cpu1/online
+> virtual file.  I also tested the kexec feature and managed to switch
+> to a new kernel using kexec.
+> 
+> Thanks,
+> 
+> Gregory
+> 
 
-Yes I've tested the entire set on 4 boards / 4 SoCs (A10, A10s, A20 and A31),
-and yes it makes a difference.
+This second series have been sent 2 weeks ago and it didn't receive more
+comments. The biggest part of this series is similar to what have been
+done for the Armada XP. Unless you have any comments, what about applying it
+on the mvebu branches?
 
-Regards,
+Thanks,
 
-Hans
+Gregory
+
+
+> Changelog:
+> 
+> v1 -> v2:
+> 
+> - Fix typo and improve the comment explaining why we need to keep the
+>   .smp filed in the 1st patch.
+> 
+> - Add a prefix to the function power_up_scu function to keep it
+>   private and not "pollute" the global namespace.
+> 
+> Gregory CLEMENT (4):
+>   ARM: mvebu: Clean-up the Armada XP support
+>   ARM: mvebu: Move SCU power up in a function
+>   ARM: mvebu: Fix the secondary startup for Cortex A9 SoC
+>   ARM: mvebu: Implement the CPU hotplug support for the Armada 38x SoCs
+> 
+>  arch/arm/mach-mvebu/armada-370-xp.h |  6 -----
+>  arch/arm/mach-mvebu/board-v7.c      |  5 ++++
+>  arch/arm/mach-mvebu/coherency.c     |  1 -
+>  arch/arm/mach-mvebu/cpu-reset.c     |  1 -
+>  arch/arm/mach-mvebu/headsmp-a9.S    |  1 +
+>  arch/arm/mach-mvebu/platsmp-a9.c    | 53 +++++++++++++++++++++++++++++++++++--
+>  arch/arm/mach-mvebu/platsmp.c       |  2 ++
+>  arch/arm/mach-mvebu/pmsu.c          |  3 +--
+>  arch/arm/mach-mvebu/pmsu.h          |  2 ++
+>  arch/arm/mach-mvebu/pmsu_ll.S       | 20 +++++++++-----
+>  10 files changed, 75 insertions(+), 19 deletions(-)
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
