@@ -1,91 +1,109 @@
-From: addy.ke@rock-chips.com (addy ke)
-Date: Thu, 13 Nov 2014 10:19:26 +0800
-Subject: [PATCH] mmc: dw_mmc: try pick the exact same voltage as vmmc
- for vqmmc
-In-Reply-To: <CAD=FV=VQHZ6YmcoeAb1OEVLYRrYBnc_dM5Kjt1TZX_CQJC=EfA@mail.gmail.com>
-References: <1415109789-7046-1-git-send-email-addy.ke@rock-chips.com>	<1415678573-6093-1-git-send-email-addy.ke@rock-chips.com>	<CAPDyKFqUoBjhsbz8rkLa9PY_dpgMxnimz3k7OoA5WVhi7MacPQ@mail.gmail.com>
- <CAD=FV=VQHZ6YmcoeAb1OEVLYRrYBnc_dM5Kjt1TZX_CQJC=EfA@mail.gmail.com>
-Message-ID: <5464152E.7040209@rock-chips.com>
+From: gang.chen.5i5j@gmail.com (Chen Gang)
+Date: Thu, 13 Nov 2014 10:34:14 +0800
+Subject: [PATCH] virt: kvm: arm: vgic: Return failure code '-EBUSY' when
+ mutex_trylock() fails
+In-Reply-To: <20141112194144.GK19598@cbox>
+References: <546376F7.90502@gmail.com> <20141112194144.GK19598@cbox>
+Message-ID: <546418A6.3000904@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/13 02:04, Doug Anderson wrote:
-> Ulf,
+On 11/13/14 3:41, Christoffer Dall wrote:
+> On Wed, Nov 12, 2014 at 11:04:23PM +0800, Chen Gang wrote:
+>> When mutex_trylock() fails, kvm_vgic_create() will not create 'vgic', so
+>> it need return failure code '-EBUSY' instead of '0' to let outside know
+>> about it.
 > 
-> On Tue, Nov 11, 2014 at 12:52 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> On 11 November 2014 05:02, Addy Ke <addy.ke@rock-chips.com> wrote:
->>> SD2.0 cards need vqmmc and vmmc to be the same.
->>
->> No, that's not correct.
->>
->> If I remember the spec correctly, the bus signal threshold is 0.75 * VDD.
+> I already sent a patch for the -EBUSY:
+> https://lists.cs.columbia.edu/pipermail/kvmarm/2014-November/011936.html
 > 
-> As usual, I will first state my utter lack of knowledge of all things mmc.
-> 
-> Now that's out of the way, on two separate board with two separate
-> SoCs I've heard stories of cards that don't work when there's a big
-> gap between vmmc and vqmmc.
-> 
-> If my memory serves, previously I heard of problems with vmmc=3.3V and
-> vqmmc=2.8V.  That means there were problems with .85 * VDD.  Certainly
-> Addy seems to have a card that has problems with vmmc=3.3V and
-> vqmmc=2.7V (but worked with vmmc=3.3V and vqmmc=2.8V).  That is .82 *
-> VDD.
-> 
-> I have no idea if these old cards are "to spec", but they exist and it
-> would be nice to support them.
-> 
-> It seems like the absolute safest thing would be to try to keep vmmc
-> and vqmmc matching if possible, especially during card probe.  Once
-> voltage negotiation happened then the vqmmc could go down.
-> 
-> 
->>> But vqmmc call regulator_set_voltage to set min_uv(2.7v) as far as possible.
->>
->> I guess you want to do that to save as much power as possible.
-> 
-> I don't think it's Addy wanting it, I think it's the regulator framework.
-> 
-> If a regulator is current 1.8V and you request 2.7 - 3.3V, the
-> framework needs to pick one of those voltages.  I believe it will pick
-> 2.7V.
-> 
-> ...so I think we get into trouble only when the 2.0 card is plugged in
-> after a UHS card has negotiated down the voltage, but I could be
-> wrong.  Maybe Addy can clarify.
-> 
-Sure
-If the first card is sd2.0 since startup, dw_mci_switch_voltage will not be called,
-and card can be identified. But if UHS card is pulgged in first, the vqmmc will be down to 1.8v.
 
-when sd2.0 card is pulgged in, mmc core will call dw_mci_switch_voltage to change vqmmc to 3.3v
-(MMC_SINGLE_VOTAGE_330). So vqmmc will be set 2.7v, if we request 2.7-3.6v.
+Yeah, really it is.
 
-But vmmc is always 3.3v,becuase it be set min_volt = max_volt = 3.3v in dt tables.
-
-So the result:
-vmmc = 3.3v and vqmmc = 2.7v, and sd2.0 card is failed to identify in my test.
-
-> 
->>> @@ -1163,8 +1163,14 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
->>>          */
->>>         uhs = mci_readl(host, UHS_REG);
->>>         if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
->>> -               min_uv = 2700000;
->>> -               max_uv = 3600000;
->>> +               /* try pick the exact same voltage as vmmc for vqmmc */
 >>
->> This seems like a generic SD protocol issue.
+>> Also simplify the code within kvm_vgic_create():
 >>
->> Should we maybe provide some helper function from the mmc core, which
->> in principle take the negotiated card->ocr into account while
->> calculating the signal voltage level. Typically min_uv should be 0.75
->> x (card->ocr), for these cases.
+>>  - kvm_for_each_vcpu() scanning once is enough for current case.
+>>
+>>  - Remove redundant variable 'vcpu_lock_idx'.
 > 
-> Yes, if there are ways to make the solution more generic I would
-> certainly support that.
+> I don't like using the iterator variable for this kind of thing because
+> it can really break in languages where i is out-of-scope after the loop
+> and it is too easy to reuse the iterator variable in later versions of
+> the code.
 > 
-> -Doug
+
+For me, what you said is OK, we can still keep it no touch.
+
+> That being said, the scanning once is slightly prettier I guess,
+> but I'd rather not introduce the churn unless others (Marc) think this
+> is a big win.
 > 
+
+If only merge the 2 scanning loops, it will not change much. And also
+can let code simpler and clearer for readers (both are for processing
+and checking '-EBUSY').
+
+If possible, after your patch merges into linux next tree, I will send
+the related improving patch for it.
+
+Thanks.
+
+> -Christoffer
 > 
-> 
+>>
+>>
+>> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
+>> ---
+>>  virt/kvm/arm/vgic.c | 15 +++++++--------
+>>  1 file changed, 7 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>> index 3aaca49..5846725 100644
+>> --- a/virt/kvm/arm/vgic.c
+>> +++ b/virt/kvm/arm/vgic.c
+>> @@ -1933,7 +1933,7 @@ out:
+>>  
+>>  int kvm_vgic_create(struct kvm *kvm)
+>>  {
+>> -	int i, vcpu_lock_idx = -1, ret = 0;
+>> +	int i, ret = 0;
+>>  	struct kvm_vcpu *vcpu;
+>>  
+>>  	mutex_lock(&kvm->lock);
+>> @@ -1949,13 +1949,12 @@ int kvm_vgic_create(struct kvm *kvm)
+>>  	 * that no other VCPUs are run while we create the vgic.
+>>  	 */
+>>  	kvm_for_each_vcpu(i, vcpu, kvm) {
+>> -		if (!mutex_trylock(&vcpu->mutex))
+>> +		if (!mutex_trylock(&vcpu->mutex)) {
+>> +			ret = -EBUSY;
+>>  			goto out_unlock;
+>> -		vcpu_lock_idx = i;
+>> -	}
+>> -
+>> -	kvm_for_each_vcpu(i, vcpu, kvm) {
+>> +		}
+>>  		if (vcpu->arch.has_run_once) {
+>> +			mutex_unlock(&vcpu->mutex);
+>>  			ret = -EBUSY;
+>>  			goto out_unlock;
+>>  		}
+>> @@ -1968,8 +1967,8 @@ int kvm_vgic_create(struct kvm *kvm)
+>>  	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
+>>  
+>>  out_unlock:
+>> -	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
+>> -		vcpu = kvm_get_vcpu(kvm, vcpu_lock_idx);
+>> +	while (i-- > 0) {
+>> +		vcpu = kvm_get_vcpu(kvm, i);
+>>  		mutex_unlock(&vcpu->mutex);
+>>  	}
+>>  
+>> -- 
+>> 1.9.3
+
+-- 
+Chen Gang
+
+Open, share, and attitude like air, water, and life which God blessed
