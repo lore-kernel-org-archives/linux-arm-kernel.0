@@ -1,41 +1,57 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Thu, 13 Nov 2014 12:40:40 +0200
-Subject: [PATCH v7 00/12] NVIDIA Tegra memory controller and IOMMU support
-In-Reply-To: <1550140.Lb4KHPOqX1@wuerfel>
-References: <1415871157-21968-1-git-send-email-thierry.reding@gmail.com>
- <1550140.Lb4KHPOqX1@wuerfel>
-Message-ID: <54648AA8.2020509@kapsi.fi>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 13 Nov 2014 11:42:03 +0100
+Subject: [PATCH 3/4] simplefb: Change simplefb_init from module_init to
+ fs_initcall
+In-Reply-To: <CACxGe6u8B854PEWw8XzwhyX8joMWwOsHOOXtmBmC1TgCGjGtdg@mail.gmail.com>
+References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
+ <1415830124-28787-3-git-send-email-hdegoede@redhat.com>
+ <20141113085238.GE20972@lukather> <546478B5.2040002@redhat.com>
+ <CACxGe6u8B854PEWw8XzwhyX8joMWwOsHOOXtmBmC1TgCGjGtdg@mail.gmail.com>
+Message-ID: <20141113104203.GF20972@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/13/2014 12:12 PM, Arnd Bergmann wrote:
-> On Thursday 13 November 2014 10:32:25 Thierry Reding wrote:
->> From: Thierry Reding <treding@nvidia.com>
->>
->> This is the sixth installment in the Tegra IOMMU and memory controller
->> support series. This version addresses the final outstanding comments from
->> Olof about using proper Kconfig symbols to track the dependencies. It also
->> splits up the driver into one part that implements the memory controller
->> only and a second part that implements the SMMU. This plays nicely with
->> the new Kconfig options introduced.
->>
->> Patch 1 is a preparatory patch that exposes the memory controller clock.
->>
->> Patches 2 and 3 is a pair of precursory patches needed to make this all
->> work on 64-bit ARM in the future.
->>
->> The device tree binding for the Tegra memory controller is added in patch
->> 4 and patch 5 is the bulk of the series that move the existing memory
->> controller and IOMMU drivers into the new unified driver that supports
->> Tegra30, Tegra114 and Tegra124.
->
-> I just noticed that patch 5 has never made it into my inbox in any of the
-> submissions. Did it get filtered by the mailing list?
+On Thu, Nov 13, 2014 at 10:29:52AM +0000, Grant Likely wrote:
+> On Thu, Nov 13, 2014 at 9:24 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> > On 11/13/2014 09:52 AM, Maxime Ripard wrote:
+> >>> +/*
+> >>> + * While this can be a module, if builtin it's most likely the console
+> >>> + * So let's leave module_exit but move module_init to an earlier place
+> >>> + */
+> >>
+> >> Not really related to this patch itself, but do we want to support
+> >> simplefb as a module? It seems like it's going to be most of the time
+> >> broken.
+> >
+> > A valid point, my mean reasoning here is that some may see not being able to
+> > use it as a module as a regression, so I just kept things as is, but I do
+> > agree that it is advisable to just build it in.
+> 
+> Like a lot of things, if it is made a modules, and it breaks for the
+> user, the user gets to keep the pieces. There are potentially some
+> valid scenarios where it is fine to have it as a module. I don't
+> recommend changing this unless is actually starts causing problems.
 
-I have received patch 5 just fine through linux-tegra. The patch is 
-rather long though, so something filtering it wouldn't be that surprising.
+I don't really agree here. If it's broken because the clocks, reset,
+memory, or whatever resource has been reclaimed by the kernel before
+the module even had a chance to probe, the only thing that the user
+will get is that there's no chance it's ever going to work, and that
+it's just unreliable.
 
->
-> 	Arnd
+If we know that it's going to break, and that there's no way it can be
+reliable (as in on all the SoCs reliable), keeping it as a module is
+just asking for trouble.
 
-Mikko
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/27f6b3c0/attachment-0001.sig>
