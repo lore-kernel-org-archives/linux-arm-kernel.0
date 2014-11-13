@@ -1,71 +1,115 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 13 Nov 2014 20:23:12 +0100
-Subject: [PATCH v4 2/4] simplefb: Add support for enumerating simplefb dt
- nodes in /chosen
-In-Reply-To: <1415906594-2461-1-git-send-email-hdegoede@redhat.com>
-References: <1415906594-2461-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1415906594-2461-2-git-send-email-hdegoede@redhat.com>
+Date: Thu, 13 Nov 2014 20:23:11 +0100
+Subject: [PATCH v4 1/4] dt-bindings: simplefb: Specify node location and
+ handoff related properties
+Message-ID: <1415906594-2461-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update simplefb to support the new preferred location for simplefb dt nodes
-under /chosen.
+Since simplefb nodes do not relate directly to hw typically they have been
+placed in the root of the devicetree. As the represent runtime information
+having them as sub-nodes of /chosen is more logical, specify this.
+
+Also specify when to set the chosen stdout-path property to a simplefb node.
+
+For reliable handover to a hardware specific driver, that driver needs to
+know which simplefb to unregister when taking over, specify how the hw driver
+can find the matching simplefb node.
+
+Last add some advice on how to fill and use simplefb nodes from a firmware
+pov.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 --
 Changes in v2:
--Make name array larger in case we ever encounter more then 10000 framebuffers
+-Add stdout-path to the example code
 Changes in v3:
--Switch to for_each_child_of_node to loop over the nodes under chosen
+-Specify that the node name must be "framebuffer@<address>"
+-Specify that the link to link simplefb node and display hw nodes to one
+ another for handover goes into the simplefb node, and must be called "display"
+-Specify how aliases may be used to tell the OS how to number displays
+-Update the example to reflect these changes
 Changes in v4:
--Wrap the chosen enumeration code in #ifdef CONFIG_OF, as simplefb is used on
- non devicetree platforms too
--simplefb can only be built-in, so drop the module_exit function calling
- platform_driver_unregister
+-Keep the size of the reg property in the example as it was before
 ---
- drivers/video/fbdev/simplefb.c | 23 ++++++++++++++++++++++-
- 1 file changed, 22 insertions(+), 1 deletion(-)
+ .../bindings/video/simple-framebuffer.txt          | 49 +++++++++++++++++++++-
+ 1 file changed, 48 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-index 868099a..e381a53 100644
---- a/drivers/video/fbdev/simplefb.c
-+++ b/drivers/video/fbdev/simplefb.c
-@@ -27,6 +27,7 @@
- #include <linux/platform_data/simplefb.h>
- #include <linux/platform_device.h>
- #include <linux/clk-provider.h>
-+#include <linux/of_platform.h>
+diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+index 8f35718..c548f33 100644
+--- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
++++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+@@ -4,6 +4,31 @@ A simple frame-buffer describes a frame-buffer setup by firmware or
+ the bootloader, with the assumption that the display hardware has already
+ been set up to scan out from the memory pointed to by the reg property.
  
- static struct fb_fix_screeninfo simplefb_fix = {
- 	.id		= "simple",
-@@ -390,7 +391,27 @@ static struct platform_driver simplefb_driver = {
- 	.probe = simplefb_probe,
- 	.remove = simplefb_remove,
- };
--module_platform_driver(simplefb_driver);
++Since simplefb nodes represent runtime information they must be sub-nodes of
++the chosen node (*). Simplefb nodes must be named "framebuffer@<address>".
 +
-+static int __init simplefb_init(void)
-+{
-+	int ret;
-+	struct device_node __maybe_unused *np;
++If a simplefb node represents the preferred console for user interaction,
++then the chosen node's stdout-path property must point to it.
 +
-+	ret = platform_driver_register(&simplefb_driver);
-+	if (ret)
-+		return ret;
++If the devicetree contains nodes for the display hardware used by a simplefb,
++then the simplefb node must contain a property called "display", which
++contains a phandle pointing to the primary display hw node, so that the OS
++knows which simplefb to disable when handing over control to a driver for the
++real hardware. The bindings for the hw nodes must specify which node is
++considered the primary node.
 +
-+#ifdef CONFIG_OF
-+	for_each_child_of_node(of_chosen, np) {
-+		if (of_device_is_compatible(np, "simple-framebuffer"))
-+			of_platform_device_create(np, NULL, NULL);
-+	}
-+#endif
++It is advised to add display# aliases to help the OS determine how to number
++things. If display# aliases are used, then if the simplefb node contains a
++"display" property then the /aliases/display# path must point to the display
++hw node the "display" property points to, otherwise it must point directly
++to the simplefb node.
 +
-+	return 0;
++It is advised that devicetree files contain pre-filled, disabled framebuffer
++nodes, so that the firmware only needs to update the mode information and
++enable them. This way if e.g. later on support for more display clocks get
++added, the simplefb nodes will already contain this info and the firmware
++does not need to be updated.
++
+ Required properties:
+ - compatible: "simple-framebuffer"
+ - reg: Should contain the location and size of the framebuffer memory.
+@@ -19,14 +44,36 @@ Optional properties:
+            are expected to already be configured correctly. The OS must
+            ensure these clocks are not modified or disabled while the
+            simple framebuffer remains active.
++- display : phandle pointing to the primary display hardware node
+ 
+ Example:
+ 
+-	framebuffer {
++aliases {
++	display0 = &lcdc0;
 +}
 +
-+module_init(simplefb_init);
- 
- MODULE_AUTHOR("Stephen Warren <swarren@wwwdotorg.org>");
- MODULE_DESCRIPTION("Simple framebuffer driver");
++chosen {
++	framebuffer0: framebuffer at 1d385000 {
+ 		compatible = "simple-framebuffer";
+ 		reg = <0x1d385000 (1600 * 1200 * 2)>;
+ 		width = <1600>;
+ 		height = <1200>;
+ 		stride = <(1600 * 2)>;
+ 		format = "r5g6b5";
++		clocks = <&ahb_gates 36>, <&ahb_gates 43>, <&ahb_gates 44>;
++		display = <&lcdc0>;
++	};
++	stdout-path = &framebuffer0;
++};
++
++soc at 01c00000 {
++	lcdc0: lcdc at 1c0c000 {
++		compatible = "allwinner,sun4i-a10-lcdc";
++		...
+ 	};
++};
++
++
++*) Older devicetree files may have a compatible = "simple-framebuffer" node
++in a different place, operating systems must first enumerate any compatible
++nodes found under chosen and then check for other compatible nodes.
 -- 
 2.1.0
