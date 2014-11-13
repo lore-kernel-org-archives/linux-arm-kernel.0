@@ -1,41 +1,124 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Thu, 13 Nov 2014 13:59:03 +0900
-Subject: [PATCH 2/2] ARM: tegra: roth: Fix SD card VDD_IO regulator
-In-Reply-To: <1415854743-11670-1-git-send-email-acourbot@nvidia.com>
-References: <1415854743-11670-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1415854743-11670-2-git-send-email-acourbot@nvidia.com>
+Date: Thu, 13 Nov 2014 14:25:50 +0900
+Subject: [PATCH v4 REPOST 1/5] of: Add descriptions of thermtrip properties
+ to Tegra PMC bindings
+In-Reply-To: <54635B97.3030701@kapsi.fi>
+References: <1415625137-4791-1-git-send-email-mikko.perttunen@kapsi.fi>
+ <1415625137-4791-2-git-send-email-mikko.perttunen@kapsi.fi>
+ <5461AEB7.70507@nvidia.com> <54634D97.9050500@kapsi.fi>
+ <20141112122951.GD30821@ulmo.nvidia.com> <54635B97.3030701@kapsi.fi>
+Message-ID: <546440DE.30503@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vddio_sdmmc3 is a vdd_io, and thus should be under the vqmmc-supply
-property, not vmmc-supply.
+On 11/12/2014 10:07 PM, Mikko Perttunen wrote:
+> On 11/12/2014 02:29 PM, Thierry Reding wrote:
+>> On Wed, Nov 12, 2014 at 02:07:51PM +0200, Mikko Perttunen wrote:
+>>> On 11/11/2014 08:37 AM, Alexandre Courbot wrote:
+>>>> On 11/10/2014 10:12 PM, Mikko Perttunen wrote:
+>>>>> From: Mikko Perttunen <mperttunen@nvidia.com>
+>>>>>
+>>>>> Hardware-triggered thermal reset requires configuring the I2C
+>>>>> reset procedure. This configuration is read from the device tree,
+>>>>> so document the relevant properties in the binding documentation.
+>>>>>
+>>>>> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+>>>>> Reviewed-by: Wei Ni <wni@nvidia.com>
+>>>>> Tested-by: Wei Ni <wni@nvidia.com>
+>>>>> ---
+>>>>>   .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      | 24
+>>>>> ++++++++++++++++++++++
+>>>>>   1 file changed, 24 insertions(+)
+>>>>>
+>>>>> diff --git
+>>>>> a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+>>>>> b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+>>>>> index 68ac65f..dc13fb0 100644
+>>>>> ---
+>>>>> a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+>>>>> +++
+>>>>> b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+>>>>> @@ -47,6 +47,21 @@ Required properties when nvidia,suspend-mode=<0>:
+>>>>>     sleep mode, the warm boot code will restore some PLLs, clocks and
+>>>>> then
+>>>>>     bring up CPU0 for resuming the system.
+>>>>>
+>>>>> +Hardware-triggered thermal reset:
+>>>>> +On Tegra30, Tegra114 and Tegra124, if the 'i2c-thermtrip' subnode
+>>>>> exists,
+>>>>> +hardware-triggered thermal reset will be enabled.
+>>>>> +
+>>>>> +Required properties for hardware-triggered thermal reset (inside
+>>>>> 'i2c-thermtrip'):
+>>>>> +- nvidia,i2c-bus : Phandle to I2C bus containing the PMU
+>>>>> +- nvidia,bus-addr : Bus address of the PMU on the I2C bus
+>>>>> +- nvidia,reg-addr : I2C register address to write poweroff command to
+>>>>> +- nvidia,reg-data : Poweroff command to write to PMU
+>>>>
+>>>> This binding is taking two different routes to provide values to the
+>>>> driver:
+>>>>
+>>>> 1) It uses a phandle for i2c-bus (which must then be provided by
+>>>> another
+>>>> binding implemented in the two following patches)
+>>>>
+>>>> 2) It uses direct values for bus-addr, reg-addr and reg-data.
+>>>>
+>>>> Do we need to use both approaches? bus-addr could just as well be
+>>>> obtained through a phandle to the i2c device and reading its reg
+>>>> property. From this phandle you could also go back up to the bus,
+>>>> making
+>>>> the i2c-bus property unnecessary. reg-addr and reg-data cannot be
+>>>> specified that way, obviously.
+>>>
+>>> This was in fact how I used to implement this, but Stephen or Thierry
+>>> pointed out that the reg property actually might not contain the correct
+>>> address (I think because the PMIC could have multiple addresses, and
+>>> the one
+>>> in DT might not be the one that accepts the reset command).
+>>>
+>>> The workaround for that was to either add this integer property for
+>>> bus-addr
+>>> or add a new PMIC API for querying. I went for this as it is much
+>>> simpler.
+>>>
+>>>>
+>>>> Actually I think I'd prefer to see i2c-bus become an integer property
+>>>> instead of a phandle, because at the end of the day it is a value field
+>>>> of a particular register and the reference is only used to retrieve
+>>>> that
+>>>> value. It is not like we are actually going to call functions on the
+>>>> bus
+>>>> instance or change its state. And for the single purpose of retrieving
+>>>> that value, this binding requires the addition of a new property on the
+>>>> bus node that will probably never be used for something else.
+>>>
+>>> And this was how I used to implement this even earlier, but Thierry
+>>> objected
+>>> to that since it was duplicating information :)
+>>
+>> If I remember correctly what I was asking for was to derive as much as
+>> possible from simply a phandle. That is, what I was after is a phandle
+>> to the PMU and ideally a way for the PMU to pass back information about
+>> the register and value for the power off command.
+>>
+>> Given the lack of a PMU abstraction and how this is probably very Tegra
+>> specific I was okay with leaving reg-addr and reg-data in the DT. But if
+>> we can't derive even the slave address from a phandle along with the I2C
+>> bus master, then I think there remains little point in doing it this way
+>> at all.
+>>
+>> If we're going to duplicate three properties, adding a fourth isn't
+>> going to make it much worse.
+>>
+>> Thierry
+>>
+>
+> Yeah, I guess that's sensible. I'll change the phandle to an integer if
+> that's preferred.
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
----
- arch/arm/boot/dts/tegra114-roth.dts | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/tegra114-roth.dts b/arch/arm/boot/dts/tegra114-roth.dts
-index 1f6eaba92f67..10f42553831f 100644
---- a/arch/arm/boot/dts/tegra114-roth.dts
-+++ b/arch/arm/boot/dts/tegra114-roth.dts
-@@ -916,8 +916,6 @@
- 						regulator-name = "vddio-sdmmc3";
- 						regulator-min-microvolt = <1800000>;
- 						regulator-max-microvolt = <3300000>;
--						regulator-always-on;
--						regulator-boot-on;
- 					};
- 
- 					ldousb {
-@@ -962,7 +960,7 @@
- 	sdhci at 78000400 {
- 		status = "okay";
- 		bus-width = <4>;
--		vmmc-supply = <&vddio_sdmmc3>;
-+		vqmmc-supply = <&vddio_sdmmc3>;
- 		cd-gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_LOW>;
- 		power-gpios = <&gpio TEGRA_GPIO(H, 0) GPIO_ACTIVE_HIGH>;
- 	};
--- 
-2.1.3
+As far as I'm concerned, definitely - at the end of the day these values 
+are really here just to be written into a register, and not because we 
+plan to do fancy things with the PMU. So to me it is really not an issue 
+if the DT bindings reflect that fact (not to mention doing otherwise 
+would be uselessly cumbersome).
