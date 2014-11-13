@@ -1,64 +1,30 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 13 Nov 2014 17:20:58 +0200
-Subject: [PATCH v5 0/5] simplefb: add clock handling code
-In-Reply-To: <1415808952-23549-1-git-send-email-hdegoede@redhat.com>
-References: <1415808952-23549-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <5464CC5A.7010508@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 13 Nov 2014 15:21:15 +0000
+Subject: [PATCH] arm64: __clear_user: handle exceptions on strb
+In-Reply-To: <20141113151407.GG6869@redacted.bos.redhat.com>
+References: <20141112210744.GC6869@redacted.bos.redhat.com>
+ <20141113150624.GB18494@e104818-lin.cambridge.arm.com>
+ <20141113151407.GG6869@redacted.bos.redhat.com>
+Message-ID: <20141113152115.GB22361@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/14 18:15, Hans de Goede wrote:
-> Hi Tomi,
+On Thu, Nov 13, 2014 at 03:14:08PM +0000, Kyle McMartin wrote:
+> On Thu, Nov 13, 2014 at 03:06:25PM +0000, Catalin Marinas wrote:
+> > On Wed, Nov 12, 2014 at 09:07:44PM +0000, Kyle McMartin wrote:
+> > > ARM64 currently doesn't fix up faults on the single-byte (strb) case of
+> > > __clear_user... which means that we can cause a nasty kernel panic as an
+> > > ordinary user with any multiple PAGE_SIZE+1 read from /dev/zero.
+> > > i.e.: dd if=/dev/zero of=foo ibs=1 count=1 (or ibs=65537, etc.)
+> > 
+> > Thanks for this, it's been like this for a while. Applied.
+> > 
 > 
-> Here is v5 of my simplefb patch-set, this time with an Ack from
-> Grant Likely for the dt-bindings bits, which should end all controversy
-> surrounding that patch.
-> 
-> For changes since the original postings please see the per patch changelogs
-> in the patch commit messages.
-> 
-> Please merge this into your tree for 3.19.
+> Thanks Catalin, if it's not too late, I forgot to add a
+> Reported-by: Milo? Prchl?k <mprchlik@redhat.com>
+> for the initial report of the panic.
 
-I applied this and the "dt-bindings: simplefb: Specify node location and
-handoff related properties" v3 series to my test branch, compiled for
-x64 and:
+I'll add this, I haven't pushed it out yet.
 
-drivers/video/fbdev/simplefb.c: In function ?simplefb_clocks_init?:
-drivers/video/fbdev/simplefb.c:204:2: error: implicit declaration of
-function ?of_clk_get_parent_count? [-Werror=implicit-function-declaration]
-  par->clk_count = of_clk_get_parent_count(np);
-  ^
-In file included from include/linux/i2c.h:33:0,
-                 from include/uapi/linux/fb.h:5,
-                 from include/linux/fb.h:5,
-                 from drivers/video/fbdev/simplefb.c:24:
-drivers/video/fbdev/simplefb.c: In function ?simplefb_init?:
-drivers/video/fbdev/simplefb.c:399:25: error: ?of_chosen? undeclared
-(first use in this function)
-  for_each_child_of_node(of_chosen, np) {
-                         ^
-include/linux/of.h:736:33: note: in definition of macro
-?for_each_child_of_node?
-  for (child = of_get_next_child(parent, NULL); child != NULL; \
-                                 ^
-drivers/video/fbdev/simplefb.c:399:25: note: each undeclared identifier
-is reported only once for each function it appears in
-  for_each_child_of_node(of_chosen, np) {
-                         ^
-include/linux/of.h:736:33: note: in definition of macro
-?for_each_child_of_node?
-  for (child = of_get_next_child(parent, NULL); child != NULL; \
-                                 ^
-
-We need "depends on OF"?
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/dec60d24/attachment.sig>
+-- 
+Catalin
