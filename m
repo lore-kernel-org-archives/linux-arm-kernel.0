@@ -1,109 +1,39 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 13 Nov 2014 15:22:43 +0000
-Subject: [PATCH 2/2] PCI: generic: Add set_msi_parent callback
-In-Reply-To: <20141111115227.GF12037@e106497-lin.cambridge.arm.com>
-References: <1415647480-3320-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1415647480-3320-3-git-send-email-suravee.suthikulpanit@amd.com>
- <20141111112424.GB16265@arm.com>
- <20141111115227.GF12037@e106497-lin.cambridge.arm.com>
-Message-ID: <20141113152243.GB9726@red-moon>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 13 Nov 2014 16:28:19 +0100
+Subject: [PATCH 0/5] Minor fixes for Marvell Armada 38x SoC.
+In-Reply-To: <20141113090249.1ab69b4d@free-electrons.com>
+References: <1415835600-97188-1-git-send-email-mw@semihalf.com>
+ <20141113090249.1ab69b4d@free-electrons.com>
+Message-ID: <20141113152819.GD2001@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 11, 2014 at 11:52:27AM +0000, Liviu Dudau wrote:
-> On Tue, Nov 11, 2014 at 11:24:24AM +0000, Will Deacon wrote:
-> > Hi Suravee,
-> > 
-> > On Mon, Nov 10, 2014 at 07:24:40PM +0000, suravee.suthikulpanit at amd.com wrote:
-> > > From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> > > 
-> > > This patch implement set_msi_parent callback for PCI generic host controller.
-> > > 
-> > > Cc: Bjorn Helgass <bhelgaas@google.com>
-> > > Cc: Liviu Dudau <liviu.dudau@arm.com>
-> > > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> > > ---
-> > >  drivers/pci/host/pci-host-generic.c | 14 ++++++++++++++
-> > >  1 file changed, 14 insertions(+)
-> > > 
-> > > diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> > > index 036ab1b..f9bb97a 100644
-> > > --- a/drivers/pci/host/pci-host-generic.c
-> > > +++ b/drivers/pci/host/pci-host-generic.c
-> > > @@ -42,6 +42,7 @@ struct gen_pci {
-> > >  	struct pci_host_bridge			host;
-> > >  	struct gen_pci_cfg_windows		cfg;
-> > >  	struct list_head			resources;
-> > > +	struct msi_chip				*mchip;
-> > >  };
-> > >  
-> > >  #ifdef CONFIG_ARM
-> > > @@ -128,9 +129,19 @@ static int gen_pci_config_write(struct pci_bus *bus, unsigned int devfn,
-> > >  	return PCIBIOS_SUCCESSFUL;
-> > >  }
-> > >  
-> > > +static int gen_pci_set_msi_parent(struct pci_bus *bus)
-> > > +{
-> > > +	struct gen_pci *pci = bus_to_gen_pci(bus);
-> > > +
-> > > +	bus->msi = pci->mchip;
-> > > +
-> > > +	return PCIBIOS_SUCCESSFUL;
-> > > +}
-> > 
-> > I don't think this makes much sense a host controller callback. Why can't
-> > bus->msi be set in generic code?
+On Thu, Nov 13, 2014 at 09:02:49AM +0100, Thomas Petazzoni wrote:
+> Dear Marcin Wojtas,
 > 
-> Because of the current way in which a bus gets created and them immediately used for
-> scanning devices if you use pci_scan_root_bus(). Alternative is to use pci_create_root_bus()
-> and increase your code size with the body of pci_scan_root_bus().
-> 
-> Solution is to have pci_host_bridge holding the msi_chip pointer and that gets created
-> before root bus, with pci_scan_root_bus() now having all the info needed to do successful
-> setup of scanned devices.
-
-Why can't we add a hook like pci_bus_assign_domain_nr(), say:
-
-pci_bus_msi_init()
-
-in pci_create_root_bus() that does what Suravee wants in a generic way ?
-
-What am I missing ?
-
-Lorenzo
-
-> 
-> Best regards,
-> Liviu
-> 
+> On Thu, 13 Nov 2014 00:39:55 +0100, Marcin Wojtas wrote:
+> > This patchset adds minor fixes for Armada 38x SoC around SDHCI interface. It
+> > also enables usage of I2C char-device and adjusts ethernet aliases for
+> > bootloader's needs. Any feedback is welcome.
 > > 
-> > >  static struct pci_ops gen_pci_ops = {
-> > >  	.read	= gen_pci_config_read,
-> > >  	.write	= gen_pci_config_write,
-> > > +	.set_msi_parent = gen_pci_set_msi_parent,
-> > >  };
-> > >  
-> > >  static const struct of_device_id gen_pci_of_match[] = {
-> > > @@ -313,6 +324,9 @@ static int gen_pci_probe(struct platform_device *pdev)
-> > >  		return err;
-> > >  	}
-> > >  
-> > > +	pci->mchip = of_pci_find_msi_chip_by_node(of_parse_phandle(np,
-> > > +						  "msi-parent", 0));
-> > 
-> > This bit should be in the generic of_pci.c code and not duplicated for
-> > each host controller.
-> > 
-> > Will
-> > 
+> > Marcin Wojtas (5):
+> >   ARM: mvebu: re-enable SDHCI driver for Armada 38x SoC in v7 defconfig
+> >   ARM: mvebu: enable no-1-8-v flag for Armada 385 DB SDHCI interface
+> >   ARM: mvebu: remove clock-frequency from Armada 38x SDHCI Device Tree
+> >     node
+> >   ARM: mvebu: adjust ethernet aliases according to U-Boot requirements
+> >     for A38x
+> >   ARM: mvebu: enable i2c device in mvebu_v7_defconfig
 > 
-> -- 
-> ====================
-> | I would like to |
-> | fix the world,  |
-> | but they're not |
-> | giving me the   |
->  \ source code!  /
->   ---------------
->     ?\_(?)_/?
+> On the entire series, you forgot to Cc some of the mvebu maintainers,
+> namely Andrew Lunn and Sebastian Hesselbarth. I've added them in Cc of
+> the cover letter, so that they get notified about this patch series.
+
+Hi Marcin
+
+I don't think the patches made it to linux-arm-kernel. And i cannot
+find them with google.
+
+You might need to repost them before i can review them.
+
+    Andrew
