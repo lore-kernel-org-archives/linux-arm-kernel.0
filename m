@@ -1,66 +1,41 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 13 Nov 2014 14:54:19 +0000
-Subject: [PATCH v2 13/14] ARM: STi: DT: STiH410: Add usb2 picophy dt nodes
-In-Reply-To: <3348806.YN8XP4V4uc@wuerfel>
-References: <1415876417-28728-1-git-send-email-peter.griffin@linaro.org>
- <1415876417-28728-14-git-send-email-peter.griffin@linaro.org>
- <3348806.YN8XP4V4uc@wuerfel>
-Message-ID: <20141113145419.GA30296@griffinp-ThinkPad-X1-Carbon-2nd>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Thu, 13 Nov 2014 15:55:31 +0100
+Subject: [PATCH 4/5] ARM: mvebu: adjust ethernet aliases according to
+ U-Boot requirements for A38x
+In-Reply-To: <20141113091427.31113495@free-electrons.com>
+References: <1415835600-97188-1-git-send-email-mw@semihalf.com>
+ <1415835600-97188-5-git-send-email-mw@semihalf.com>
+ <20141113091427.31113495@free-electrons.com>
+Message-ID: <CAPv3WKdjaMF--GQTF42Zk=kYOYpyvBONrOALG3nnhh25a0_72w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
++Andrew Lunn, Sebastian Hesselbarth
 
-Thanks for reviewing.
+Dear Thomas,
 
-On Thu, 13 Nov 2014, Arnd Bergmann wrote:
+2014-11-13 9:14 GMT+01:00 Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com>:
+> Dear Marcin Wojtas,
+>
+> On Thu, 13 Nov 2014 00:39:59 +0100, Marcin Wojtas wrote:
+>> The vendor bootloader provided for Armada 38x boards expects an
+>> alias for the ethernet nodes, which is used to fixup the MAC address.
+>> The alias format naming is strict.
+>
+> I believe this needs a bit more explanation: why would we care about
+> the "vendor bootloader" ? What are expecting the mainline versions of
+> popular bootloaders like U-Boot and Barebox ? What are other platforms
+> supported in the mainline doing ?
 
-> On Thursday 13 November 2014 11:00:16 Peter Griffin wrote:
-> > +       soc {
-> > +               usb2_picophy0: usbpicophy at 0 {
-> > +                       compatible = "st,stih407-usb2-phy";
-> > +                       reg = <0xf8 0x04>,      /* syscfg 5062 */
-> > +                             <0xf4 0x04>;      /* syscfg 5061 */
-> > 
-> 
-> I think the node name for the phy should be "phy at f8" instead of usbpicophy at 0
-> by common convention. I notice that there are some existing instances of
-> this, you can probably change them as well. Linux doesn't normally care
-> about the node names.
+In order to update MAC address entry in Device Tree both mainline U-Boot
+(in function fdt_fixup_ethernet) and Barebox (in function eth_of_fixup)
+accept same (and the only one) format of eth aliases, which is 'ethernetX',
+where X stands for interface number.
+Other platforms in the mainline Linux, that comprise ethernet references in
+'/aliases' node (like various flavours of imx or sunXi), follow the naming
+scheme described above.
+Is this explanation sufficient? Do you think I should extend the commit log?
 
-Ok will fix in v3
-
-> 
-> It also seems that you have put the node in the wrong place, as the reg
-> property apparently refers to a different address space. Did you mean
-> to put this under the syscfg_core node?
-
-Your correct in that it refers to the syscfg_core address space.
-However I intentionaly didn't put it under the syscfg_core node.
-
-The phy is more unique than most other devices in that in this instance it
-is only controlled from two syscfg_core registers which happen to be in the same
-sysconf bank.
-
-However most other devices tend to have a combination of some memory mapped
-registers and also some sysconfig registers which does then create a conflict
-over where the dt node should live.
-
-Currently I can't find an example but there is also no guarentee that a
-device will not have some configuration bits in syscfg_core and some
-other bits in syscfg_rear/front registers. The phy for example could
-have had one register in each, which would make deciding where to put
-it difficult.
-
-So to create coherency / conformity we decided to put all the IP blocks under the soc node.
-
-Also its worth pointing if your not already aware that sysconf_core/rear/front isn't
-really a device, it's just a regmap abstraction of some memory mapped configuration
-registers where a bunch of seemingly random control bits get stuffed.
-
-Of course if you feel strongly about it I can of course change it like you suggested,
-but that is the reasoning / rationale of why it was done like this initially.
-
-regards,
-
-Peter.
+Best regards,
+Marcin Wojtas
