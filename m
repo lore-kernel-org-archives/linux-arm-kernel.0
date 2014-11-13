@@ -1,117 +1,42 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 13 Nov 2014 10:38:57 +0100
-Subject: [PATCHv3 2/5] ARM: mvebu: disable I/O coherency on non-SMP situations
- on Armada 370/375/38x/XP
+Date: Thu, 13 Nov 2014 10:39:00 +0100
+Subject: [PATCHv3 5/5] ARM: mvebu: update comments in coherency.c
 In-Reply-To: <1415871540-20302-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1415871540-20302-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1415871540-20302-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1415871540-20302-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabling the hardware I/O coherency on Armada 370, Armada 375, Armada
-38x and Armada XP requires a certain number of conditions:
-
- - On Armada 370, the cache policy must be set to write-allocate.
-
- - On Armada 375, 38x and XP, the cache policy must be set to
-   write-allocate, the pages must be mapped with the shareable
-   attribute, and the SMP bit must be set
-
-Currently, on Armada XP, when CONFIG_SMP is enabled, those conditions
-are met. However, when Armada XP is used in a !CONFIG_SMP kernel, none
-of these conditions are met. With Armada 370, the situation is worse:
-since the processor is single core, regardless of whether CONFIG_SMP
-or !CONFIG_SMP is used, the cache policy will be set to write-back by
-the kernel and not write-allocate.
-
-Since solving this problem turns out to be quite complicated, and we
-don't want to let users with a mainline kernel known to have
-infrequent but existing data corruptions, this commit proposes to
-simply disable hardware I/O coherency in situations where it is known
-not to work.
-
-And basically, the is_smp() function of the kernel tells us whether it
-is OK to enable hardware I/O coherency or not, so this commit slightly
-refactors the coherency_type() function to return
-COHERENCY_FABRIC_TYPE_NONE when is_smp() is false, or the appropriate
-type of the coherency fabric in the other case.
-
-Thanks to this, the I/O coherency fabric will no longer be used at all
-in !CONFIG_SMP configurations. It will continue to be used in
-CONFIG_SMP configurations on Armada XP, Armada 375 and Armada 38x
-(which are multiple cores processors), but will no longer be used on
-Armada 370 (which is a single core processor).
-
-In the process, it simplifies the implementation of the
-coherency_type() function, and adds a missing call to of_node_put().
+The coherency.c top-level comment mentions that it supports the
+coherency fabric for Armada 370 and XP, but it also supports the
+coherency fabric on Armada 375 and 38x, so this commit updates the
+comment accordingly.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Fixes: e60304f8cb7bb545e79fe62d9b9762460c254ec2 ("arm: mvebu: Add hardware I/O Coherency support")
-Cc: <stable@vger.kernel.org> # v3.8+
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/coherency.c | 44 ++++++++++++++++++++++++++++-------------
- 1 file changed, 30 insertions(+), 14 deletions(-)
+ arch/arm/mach-mvebu/coherency.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 044b511..c31f4c0 100644
+index e568b2e..c18da36 100644
 --- a/arch/arm/mach-mvebu/coherency.c
 +++ b/arch/arm/mach-mvebu/coherency.c
-@@ -361,25 +361,41 @@ static int coherency_type(void)
- {
- 	struct device_node *np;
- 	const struct of_device_id *match;
-+	int type;
- 
--	np = of_find_matching_node_and_match(NULL, of_coherency_table, &match);
--	if (np) {
--		int type = (int) match->data;
-+	/*
-+	 * The coherency fabric is needed:
-+	 * - For coherency between processors on Armada XP, so only
-+	 *   when SMP is enabled.
-+	 * - For coherency between the processor and I/O devices, but
-+	 *   this coherency requires many pre-requisites (write
-+	 *   allocate cache policy, shareable pages, SMP bit set) that
-+	 *   are only meant in SMP situations.
-+	 *
-+	 * Note that this means that on Armada 370, there is currently
-+	 * no way to use hardware I/O coherency, because even when
-+	 * CONFIG_SMP is enabled, is_smp() returns false due to the
-+	 * Armada 370 being a single-core processor. To lift this
-+	 * limitation, we would have to find a way to make the cache
-+	 * policy set to write-allocate (on all Armada SoCs), and to
-+	 * set the shareable attribute in page tables (on all Armada
-+	 * SoCs except the Armada 370). Unfortunately, such decisions
-+	 * are taken very early in the kernel boot process, at a point
-+	 * where we don't know yet on which SoC we are running.
- 
--		/* Armada 370/XP coherency works in both UP and SMP */
--		if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
--			return type;
-+	 */
-+	if (!is_smp())
-+		return COHERENCY_FABRIC_TYPE_NONE;
- 
--		/* Armada 375 coherency works only on SMP */
--		else if (type == COHERENCY_FABRIC_TYPE_ARMADA_375 && is_smp())
--			return type;
-+	np = of_find_matching_node_and_match(NULL, of_coherency_table, &match);
-+	if (!np)
-+		return COHERENCY_FABRIC_TYPE_NONE;
- 
--		/* Armada 380 coherency works only on SMP */
--		else if (type == COHERENCY_FABRIC_TYPE_ARMADA_380 && is_smp())
--			return type;
--	}
-+	type = (int) match->data;
-+
-+	of_node_put(np);
- 
--	return COHERENCY_FABRIC_TYPE_NONE;
-+	return type;
- }
- 
- int coherency_available(void)
+@@ -1,5 +1,6 @@
+ /*
+- * Coherency fabric (Aurora) support for Armada 370 and XP platforms.
++ * Coherency fabric (Aurora) support for Armada 370, 375, 38x and XP
++ * platforms.
+  *
+  * Copyright (C) 2012 Marvell
+  *
+@@ -11,7 +12,7 @@
+  * License version 2.  This program is licensed "as is" without any
+  * warranty of any kind, whether express or implied.
+  *
+- * The Armada 370 and Armada XP SOCs have a coherency fabric which is
++ * The Armada 370, 375, 38x and XP SOCs have a coherency fabric which is
+  * responsible for ensuring hardware coherency between all CPUs and between
+  * CPUs and I/O masters. This file initializes the coherency fabric and
+  * supplies basic routines for configuring and controlling hardware coherency
 -- 
 2.0.0
