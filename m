@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Nov 2014 10:19:57 +0900
-Subject: [PATCH 06/25] ARM: shmobile: r8a7790: sound enables Audio DMAC entry
+Date: Thu, 13 Nov 2014 10:19:58 +0900
+Subject: [PATCH 07/25] ARM: shmobile: r8a7791: sound enables Audio DMAC entry
  on DTSI
 In-Reply-To: <cover.1415755881.git.horms+renesas@verge.net.au>
 References: <cover.1415755881.git.horms+renesas@verge.net.au>
-Message-ID: <ec7c568a944cd76ea9b3d7aeb849f353023fa807.1415755881.git.horms+renesas@verge.net.au>
+Message-ID: <2a1873bc09509e7e9871254ed6360104091f1bae.1415755881.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,14 +13,14 @@ From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 44 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/r8a7791.dtsi | 44 ++++++++++++++++++++++++++++++++++++++++++
  1 file changed, 44 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 146f918..70daf91 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -1417,6 +1417,50 @@
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 379e1a5..e856afa 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -1399,6 +1399,50 @@
  				"dvc.0", "dvc.1",
  				"clk_a", "clk_b", "clk_c", "clk_i";
  
