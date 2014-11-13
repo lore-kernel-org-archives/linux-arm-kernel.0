@@ -1,69 +1,107 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 13 Nov 2014 18:45:16 +0100
-Subject: [GIT PULL] at91: cleanup for 3.18 #2
-Message-ID: <1415900716-20882-1-git-send-email-nicolas.ferre@atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 13 Nov 2014 09:45:36 -0800
+Subject: N900 modem support in 3.18-rc1
+In-Reply-To: <20141113162155.GA8512@xo-6d-61-c0.localdomain>
+References: <20141104205117.GA17606@amd> <201411052137.31452@pali>
+ <20141105203918.GA29199@amd> <201411052206.05379@pali>
+ <20141105220359.GA32052@amd> <20141105234555.GA7097@earth.universe>
+ <20141106124711.GA26944@amd>
+ <20141106180335.GA21513@earth.universe>
+ <20141113162155.GA8512@xo-6d-61-c0.localdomain>
+Message-ID: <20141113174534.GO26481@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+* Pavel Machek <pavel@ucw.cz> [141113 08:23]:
+> Hi!
+> 
+> > > I actually had pm=0 on the command line, but I removed it now, and no
+> > > change: [...]
+> > > 
+> > > Let me try with explicit =1. .. aha, that helps. Thanks!
+> > 
+> > mh seems I actually missed to make 1 the default value. I will
+> > prepare a patch for that.
+> > 
+> > I assume, that the example ofono commands work for you now?
+> 
+> Yes, it now works great.
+> 
+> > > Do you have an example client that can talk to ofonod?
+> > 
+> > I have not yet played with userland stuff. You could try
+> > telepathy-ring, which integrates the ofono into the telepathy
+> > framework.
+> 
+> Ok, I took a look, and telepathy-ring is not in debian, and has
+> a lot of dependencies.
+> 
+> OTOH ofono seems pretty reasonable. So I played a bit, and result
+> is python/pygtk gui which can receive an sms, initiate a call, and
+> report missed call. If someone wants to play, source is at
+> 
+> https://gitorious.org/tui/tui/source/b6141107e9341a1412720aed4b0d09143dfa2f4e:ofone
 
-Little pull-request with some fixes following the legacy board removal done
-earlier. I integrated the patch that Olof wrote in this branch before this series:
-please tell me if it works on your side or if I need to do things differently.
-The move of header files out of include/mach is useful for reset and memory
-drivers.
-More legacy code removal is in progress, but I didn't want to mix with this.
-So, bigger cleanup to come...
+Pavel, care to fill in the the following type patch with some
+instructions in the description now that you got it working?
 
-Thanks, best regards,
+I did not have luck yet when I tried. I got the /dev/cmt/*
+entries after adding pm=1 param, but no luck scanning any networks.
 
-The following changes since commit 7d7ef547d3fa47ac0df667a6e399eb1ebc60ec2d:
+Regards,
 
-  ARM: at91: fix build breakage due to legacy board removals (2014-11-10 10:38:00 +0100)
+Tony
 
-are available in the git repository at:
+8< -----------------
+ARM: omap2plus_defconfig: Enable n900 modem as loadable modules
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-cleanup2
-
-for you to fetch changes up to f0a0a58e6f46c2dded813ee860b9cbd795b4e571:
-
-  ARM: at91: move sdramc/ddrsdr header to include/soc/at91 (2014-11-13 12:03:44 +0100)
-
-----------------------------------------------------------------
-Second batch of cleanup/SoC for 3.19:
-- fixes following legacy board removal
-- removal of an unused config option CONFIG_MACH_SAMA5_DT
-- move of some header files out of include/mach directory
-
-----------------------------------------------------------------
-Alexandre Belloni (2):
-      ARM: at91: remove CONFIG_MACH_SAMA5_DT
-      ARM: at91: move sdramc/ddrsdr header to include/soc/at91
-
-Boris Brezillon (1):
-      ARM: at91: remove useless init_time for DT-only SoCs
-
-Nicolas Ferre (1):
-      ARM: at91: remove unused CONFIG_ARCH_AT91SAM9G45 option
-
- MAINTAINERS                                                    |  1 +
- arch/arm/configs/sama5_defconfig                               |  1 -
- arch/arm/mach-at91/Kconfig                                     | 10 +---------
- arch/arm/mach-at91/Makefile                                    |  2 +-
- arch/arm/mach-at91/Makefile.boot                               |  6 ------
- arch/arm/mach-at91/at91sam9g45.c                               |  7 -------
- arch/arm/mach-at91/at91sam9rl.c                                |  7 -------
- arch/arm/mach-at91/board.h                                     |  4 ----
- arch/arm/mach-at91/include/mach/at91_ramc.h                    |  6 +++---
- arch/arm/mach-at91/pm.h                                        |  1 -
- drivers/power/reset/at91-reset.c                               |  4 ++--
- .../include/mach => include/soc/at91}/at91rm9200_sdramc.h      |  0
- .../include/mach => include/soc/at91}/at91sam9_ddrsdr.h        |  0
- .../include/mach => include/soc/at91}/at91sam9_sdramc.h        |  0
- 14 files changed, 8 insertions(+), 41 deletions(-)
- rename {arch/arm/mach-at91/include/mach => include/soc/at91}/at91rm9200_sdramc.h (100%)
- rename {arch/arm/mach-at91/include/mach => include/soc/at91}/at91sam9_ddrsdr.h (100%)
- rename {arch/arm/mach-at91/include/mach => include/soc/at91}/at91sam9_sdramc.h (100%)
-
--- 
-Nicolas Ferre
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -88,6 +88,7 @@ CONFIG_IP_PNP_BOOTP=y
+ CONFIG_IP_PNP_RARP=y
+ # CONFIG_INET_LRO is not set
+ CONFIG_NETFILTER=y
++CONFIG_PHONET=m
+ CONFIG_CAN=m
+ CONFIG_CAN_C_CAN=m
+ CONFIG_CAN_C_CAN_PLATFORM=m
+@@ -158,6 +159,7 @@ CONFIG_USB_ALI_M5632=y
+ CONFIG_USB_AN2720=y
+ CONFIG_USB_EPSON2888=y
+ CONFIG_USB_KC2190=y
++CONFIG_USB_CDC_PHONET=m
+ CONFIG_LIBERTAS=m
+ CONFIG_LIBERTAS_USB=m
+ CONFIG_LIBERTAS_SDIO=m
+@@ -197,6 +199,11 @@ CONFIG_HW_RANDOM=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_SPI=y
+ CONFIG_SPI_OMAP24XX=y
++CONFIG_HSI=m
++CONFIG_OMAP_SSI=m
++CONFIG_NOKIA_MODEM=m
++CONFIG_SSI_PROTOCOL=m
++CONFIG_HSI_CHAR=m
+ CONFIG_PINCTRL_SINGLE=y
+ CONFIG_DEBUG_GPIO=y
+ CONFIG_GPIO_SYSFS=y
+@@ -312,9 +319,11 @@ CONFIG_USB_CONFIGFS_ECM=y
+ CONFIG_USB_CONFIGFS_ECM_SUBSET=y
+ CONFIG_USB_CONFIGFS_RNDIS=y
+ CONFIG_USB_CONFIGFS_EEM=y
++CONFIG_USB_CONFIGFS_PHONET=y
+ CONFIG_USB_CONFIGFS_MASS_STORAGE=y
+ CONFIG_USB_CONFIGFS_F_LB_SS=y
+ CONFIG_USB_CONFIGFS_F_FS=y
++CONFIG_USB_G_NOKIA=m
+ CONFIG_MMC=y
+ CONFIG_SDIO_UART=y
+ CONFIG_MMC_OMAP=y
+@@ -359,6 +368,7 @@ CONFIG_MSDOS_FS=y
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
+ CONFIG_TMPFS_POSIX_ACL=y
++CONFIG_CONFIGFS_FS=y
+ CONFIG_JFFS2_FS=y
+ CONFIG_JFFS2_SUMMARY=y
+ CONFIG_JFFS2_FS_XATTR=y
