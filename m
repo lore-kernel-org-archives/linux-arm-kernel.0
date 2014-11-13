@@ -1,42 +1,60 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 13 Nov 2014 10:39:00 +0100
-Subject: [PATCHv3 5/5] ARM: mvebu: update comments in coherency.c
-In-Reply-To: <1415871540-20302-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1415871540-20302-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1415871540-20302-6-git-send-email-thomas.petazzoni@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 13 Nov 2014 10:48:03 +0100
+Subject: [PATCH 1/3] ARM: at91: Add Special Function Registers binding
+ documentation
+In-Reply-To: <1415632471-14672-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1415632471-14672-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20141113104803.179a7529@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The coherency.c top-level comment mentions that it supports the
-coherency fabric for Armada 370 and XP, but it also supports the
-coherency fabric on Armada 375 and 38x, so this commit updates the
-comment accordingly.
+On Mon, 10 Nov 2014 16:14:29 +0100
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mach-mvebu/coherency.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+> The special function registers gather some registers that allow to tweak
+> features provided by IPs controlled through another register range.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index e568b2e..c18da36 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -1,5 +1,6 @@
- /*
-- * Coherency fabric (Aurora) support for Armada 370 and XP platforms.
-+ * Coherency fabric (Aurora) support for Armada 370, 375, 38x and XP
-+ * platforms.
-  *
-  * Copyright (C) 2012 Marvell
-  *
-@@ -11,7 +12,7 @@
-  * License version 2.  This program is licensed "as is" without any
-  * warranty of any kind, whether express or implied.
-  *
-- * The Armada 370 and Armada XP SOCs have a coherency fabric which is
-+ * The Armada 370, 375, 38x and XP SOCs have a coherency fabric which is
-  * responsible for ensuring hardware coherency between all CPUs and between
-  * CPUs and I/O masters. This file initializes the coherency fabric and
-  * supplies basic routines for configuring and controlling hardware coherency
+Once you've fixed your dtsi you can add my
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+on the whole series.
+
+> ---
+>  Documentation/devicetree/bindings/arm/atmel-at91.txt | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> index 562cda9d86d9..a6427de45785 100644
+> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> @@ -136,3 +136,20 @@ Example:
+>  		compatible = "atmel,at91sam9260-rstc";
+>  		reg = <0xfffffd00 0x10>;
+>  	};
+> +
+> +Special Function Registers (SFR)
+> +
+> +Special Function Registers (SFR) manage specific aspects of the integrated
+> +memory, bridge implementations, processor and other functionality not controlled
+> +elsewhere.
+> +
+> +required properties:
+> +- compatible: Should be "atmel,<chip>-sfr", "syscon".
+> +  <chip> can be "at91sam9260", "at91sam9rl" or "at91sam9x5".
+> +- reg: Should contain registers location and length
+> +
+> +	sfr at f0038000 {
+> +		compatible = "atmel,sama5d3-sfr", "syscon";
+> +		reg = <0xf0038000 0x4000>;
+> +	};
+> +
+
+
+
 -- 
-2.0.0
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
