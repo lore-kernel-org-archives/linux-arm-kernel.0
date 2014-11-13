@@ -1,53 +1,39 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 13 Nov 2014 10:32:34 +0100
-Subject: [PATCH v7 09/12] ARM: tegra: Enable IOMMU for display controllers on
- Tegra30
-In-Reply-To: <1415871157-21968-1-git-send-email-thierry.reding@gmail.com>
-References: <1415871157-21968-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1415871157-21968-10-git-send-email-thierry.reding@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Nov 2014 09:48:26 +0000
+Subject: [PATCH 5/6] iommu/arm-smmu: support buggy implementations with
+ invalidate-on-map
+In-Reply-To: <vnkwy4rg5jqu.fsf@mitchelh-linux.qualcomm.com>
+References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
+ <1407891099-24641-6-git-send-email-mitchelh@codeaurora.org>
+ <20141112182642.GH26437@arm.com>
+ <vnkwy4rg5jqu.fsf@mitchelh-linux.qualcomm.com>
+Message-ID: <20141113094826.GA13350@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On Wed, Nov 12, 2014 at 06:58:17PM +0000, Mitchel Humpherys wrote:
+> On Wed, Nov 12 2014 at 10:26:43 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, Aug 13, 2014 at 01:51:38AM +0100, Mitchel Humpherys wrote:
+> >> Add a workaround for some buggy hardware that requires a TLB invalidate
+> >> operation to occur at map time. Activate the feature with the
+> >> qcom,smmu-invalidate-on-map boolean DT property.
+> >
+> > I'm digging up an old thread here, but I've been working on a new page-table
+> > allocator for the SMMU and looked into implementing this workaround for you
+> > in there. When I do the TLBI on map after installing the new PTE, can I just
+> > invalidate the range mapped by that PTE, or does it need to be a full TLBI?
+> 
+> I'm not totally sure on the history of the hardware errata but I believe
+> it's just the range mapped by that pte.  We use SMMU_CBn_TLBIVA in the
+> our smmu driver.
+> 
+> However, let's actually just drop this...  It's looking like the targets
+> we have that will use the arm-smmu driver thankfully won't need this
+> workaround.  Thanks for keeping this in mind though :)
 
-Add iommus properties to the device tree nodes for the two display
-controllers found on Tegra30. This will allow the display controllers to
-map physically non-contiguous buffers to I/O virtual contiguous address
-spaces so that they can be used for scan-out.
+Ha, damn, then I don't have a user of the shiny new quirks field I added!
+I don't think I'll go as far as removing it altogether though...
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- arch/arm/boot/dts/tegra30.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+Cheers,
 
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 0d20058afe9d..99475f6e76a3 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -1,5 +1,6 @@
- #include <dt-bindings/clock/tegra30-car.h>
- #include <dt-bindings/gpio/tegra-gpio.h>
-+#include <dt-bindings/memory/tegra30-mc.h>
- #include <dt-bindings/pinctrl/pinctrl-tegra.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- 
-@@ -166,6 +167,8 @@
- 			resets = <&tegra_car 27>;
- 			reset-names = "dc";
- 
-+			iommus = <&mc TEGRA_SWGROUP_DC>;
-+
- 			nvidia,head = <0>;
- 
- 			rgb {
-@@ -183,6 +186,8 @@
- 			resets = <&tegra_car 26>;
- 			reset-names = "dc";
- 
-+			iommus = <&mc TEGRA_SWGROUP_DCB>;
-+
- 			nvidia,head = <1>;
- 
- 			rgb {
--- 
-2.1.3
+Will
