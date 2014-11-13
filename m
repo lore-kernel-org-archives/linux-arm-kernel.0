@@ -1,31 +1,41 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 13 Nov 2014 14:12:49 +0530
-Subject: [PATCH 3/3] coresight-replicator: remove .owner field for driver
-In-Reply-To: <1415868169-13325-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1415868169-13325-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1415868169-13325-4-git-send-email-pankaj.dubey@samsung.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 13 Nov 2014 09:50:09 +0100
+Subject: [PATCH v2 3/4] simplefb: Change simplefb_init from module_init to
+ fs_initcall
+In-Reply-To: <1415868610-13297-1-git-send-email-hdegoede@redhat.com>
+References: <1415868610-13297-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1415868610-13297-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need of .owner field for driver using
-module_platform_driver.
+One of the reasons for having the simplefb nodes in /chosen, and doing
+explicit enumeration of the nodes there, is too allow enumerating them sooner,
+so that we get a console earlier on.
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Doing this earlier then fs_initcall is not useful, since the fb only turns into
+a console when fbcon intializes, which is a fs_initcall too.
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/coresight/coresight-replicator.c |    1 -
- 1 file changed, 1 deletion(-)
+ drivers/video/fbdev/simplefb.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/coresight/coresight-replicator.c b/drivers/coresight/coresight-replicator.c
-index c879039..a2dfcf9 100644
---- a/drivers/coresight/coresight-replicator.c
-+++ b/drivers/coresight/coresight-replicator.c
-@@ -117,7 +117,6 @@ static struct platform_driver replicator_driver = {
- 	.remove         = replicator_remove,
- 	.driver         = {
- 		.name   = "coresight-replicator",
--		.owner	= THIS_MODULE,
- 		.of_match_table = replicator_match,
- 	},
- };
+diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
+index 2705af8..48e292a 100644
+--- a/drivers/video/fbdev/simplefb.c
++++ b/drivers/video/fbdev/simplefb.c
+@@ -415,7 +415,11 @@ static void __exit simplefb_exit(void)
+ 	platform_driver_unregister(&simplefb_driver);
+ }
+ 
+-module_init(simplefb_init);
++/*
++ * While this can be a module, if builtin it's most likely the console
++ * So let's leave module_exit but move module_init to an earlier place
++ */
++fs_initcall(simplefb_init);
+ module_exit(simplefb_exit);
+ 
+ MODULE_AUTHOR("Stephen Warren <swarren@wwwdotorg.org>");
 -- 
-1.7.9.5
+2.1.0
