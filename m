@@ -1,23 +1,55 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 13 Nov 2014 18:10:02 +0000
-Subject: [PATCH 1/4 V3] ASoC: ALC5631/RT5631: Add device tree binding
- documentation
-In-Reply-To: <1415880864-2246-2-git-send-email-krishna.md@samsung.com>
-References: <1415880864-2246-1-git-send-email-krishna.md@samsung.com>
- <1415880864-2246-2-git-send-email-krishna.md@samsung.com>
-Message-ID: <20141113181002.GM3815@sirena.org.uk>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 13 Nov 2014 11:11:48 -0700
+Subject: [patch] coresight-etm: unlock on error paths in mode_store()
+In-Reply-To: <20141112112202.GA28836@mwanda>
+References: <20141112112202.GA28836@mwanda>
+Message-ID: <CANLsYkycD_fmvqKs=bFa7E3VGAFyjKJLU659aTZWhiMuFgoBWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 13, 2014 at 05:44:21PM +0530, Krishna Mohan Dani wrote:
-> Document the device tree binding for the ALC5631 codec and update vendor
-> specific prefix for the Realtek.
+On 12 November 2014 04:22, Dan Carpenter <dan.carpenter@oracle.com> wrote:
+> There are some missing unlocks on the error paths.
+>
+> Fixes: a939fc5a71ad ('coresight-etm: add CoreSight ETM/PTM driver')
+> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+> ---
+> I don't have a cross compiler set up so I haven't compiled this.  But
+> I think it doesn't have any typos.  :)
+>
+> diff --git a/drivers/coresight/coresight-etm3x.c b/drivers/coresight/coresight-etm3x.c
+> index d9e3ed6..369cac0 100644
+> --- a/drivers/coresight/coresight-etm3x.c
+> +++ b/drivers/coresight/coresight-etm3x.c
+> @@ -573,7 +573,8 @@ static ssize_t mode_store(struct device *dev,
+>         if (drvdata->mode & ETM_MODE_STALL) {
+>                 if (!(drvdata->etmccr & ETMCCR_FIFOFULL)) {
+>                         dev_warn(drvdata->dev, "stall mode not supported\n");
+> -                       return -EINVAL;
+> +                       ret = -EINVAL;
+> +                       goto err_unlock;
+>                 }
+>                 drvdata->ctrl |= ETMCR_STALL_MODE;
+>          } else
+> @@ -582,7 +583,8 @@ static ssize_t mode_store(struct device *dev,
+>         if (drvdata->mode & ETM_MODE_TIMESTAMP) {
+>                 if (!(drvdata->etmccer & ETMCCER_TIMESTAMP)) {
+>                         dev_warn(drvdata->dev, "timestamp not supported\n");
+> -                       return -EINVAL;
+> +                       ret = -EINVAL;
+> +                       goto err_unlock;
+>                 }
+>                 drvdata->ctrl |= ETMCR_TIMESTAMP_EN;
+>         } else
+> @@ -595,6 +597,10 @@ static ssize_t mode_store(struct device *dev,
+>         spin_unlock(&drvdata->spinlock);
+>
+>         return size;
+> +
+> +err_unlock:
+> +       spin_unlock(&drvdata->spinlock);
+> +       return ret;
+>  }
+>  static DEVICE_ATTR_RW(mode);
+>
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/4039aa87/attachment.sig>
+Applied - thanks
