@@ -1,30 +1,29 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 13 Nov 2014 09:07:17 +0100
-Subject: [PATCH 2/5] ARM: mvebu: enable no-1-8-v flag for Armada 385 DB
- SDHCI interface
-In-Reply-To: <1415835600-97188-3-git-send-email-mw@semihalf.com>
+Date: Thu, 13 Nov 2014 09:12:39 +0100
+Subject: [PATCH 5/5] ARM: mvebu: enable i2c device in mvebu_v7_defconfig
+In-Reply-To: <1415835600-97188-6-git-send-email-mw@semihalf.com>
 References: <1415835600-97188-1-git-send-email-mw@semihalf.com>
- <1415835600-97188-3-git-send-email-mw@semihalf.com>
-Message-ID: <20141113090717.5fc5d163@free-electrons.com>
+ <1415835600-97188-6-git-send-email-mw@semihalf.com>
+Message-ID: <20141113091239.671bc152@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Marcin Wojtas,
 
-On Thu, 13 Nov 2014 00:39:57 +0100, Marcin Wojtas wrote:
-> The Marvell Armada 38x SoC's SDHCI interface is capable of using 1.8v voltage,
-> needed for driving "UHS-I" SD cards at their full speed. It is not, however,
-> possible on the DB board. Due to physical connectivity connector supply is tied
-> to 3v and any attempt of changing voltage in order to operate in the fastest UHS
-> modes fails.
-> 
-> This patch enables equivalent SDHCI quirk in order to adjust controller
-> operation to system capabilities.
+On Thu, 13 Nov 2014 00:40:00 +0100, Marcin Wojtas wrote:
+> This commit enables user-space access to I2C bus using char device.
 > 
 > Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+Even though not directly tied to HW capabilities, having userspace
+access to I2C devices is quite useful in development-related defconfigs.
+
+Best regards,
+
+Thomas
 -- 
 Thomas Petazzoni, CTO, Free Electrons
 Embedded Linux, Kernel and Android engineering
