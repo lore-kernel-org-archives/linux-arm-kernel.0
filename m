@@ -1,137 +1,73 @@
-From: n.nikolaev@virtualopensystems.com (Nikolay Nikolaev)
-Date: Thu, 13 Nov 2014 14:29:58 +0200
-Subject: [RFC PATCH 1/4] ARM: KVM: on unhandled IO mem abort, route the
- call to the KVM MMIO bus
-In-Reply-To: <54649B9A.20605@arm.com>
-References: <1394726249-1547-1-git-send-email-a.motakis@virtualopensystems.com>
- <1394726249-1547-2-git-send-email-a.motakis@virtualopensystems.com>
- <20140328190913.GJ25519@cbox>
- <CADDJ2=Opx2d5ex0hWSXYJjs6uLifR9wZVsahUHzZ7zytSj7ZSg@mail.gmail.com>
- <20141110162736.GA16054@cbox>
- <CADDJ2=PTM0fJ0RFfWdVQ1-471xqaJmj0vP1f5-pf57xOV5jgig@mail.gmail.com>
- <20141113112012.GO19598@cbox> <546497E4.8040100@arm.com>
- <54649B9A.20605@arm.com>
-Message-ID: <CADDJ2=Nk7hCNqghgsH81gQ5_offWjeM6wPgGwzixN+wbnj8zSw@mail.gmail.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Thu, 13 Nov 2014 20:28:40 +0800
+Subject: [Patch V1 0/6] Refine generic/PCI MSI irqodmian interfaces
+In-Reply-To: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
+References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <5464A3F8.1000807@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 13, 2014 at 1:52 PM, Andre Przywara <andre.przywara@arm.com> wrote:
-> Hi Nikolay,
->
-> On 13/11/14 11:37, Marc Zyngier wrote:
->> [fixing Andre's email address]
->>
->> On 13/11/14 11:20, Christoffer Dall wrote:
->>> On Thu, Nov 13, 2014 at 12:45:42PM +0200, Nikolay Nikolaev wrote:
->>>
->>> [...]
->>>
->>>>>>
->>>>>> Going through the vgic_handle_mmio we see that it will require large
->>>>>> refactoring:
->>>>>>  - there are 15 MMIO ranges for the vgic now - each should be
->>>>>> registered as a separate device
->>>>>>  - the handler of each range should be split into read and write
->>>>>>  - all handlers take 'struct kvm_exit_mmio', and pass it to
->>>>>> 'vgic_reg_access', 'mmio_data_read' and 'mmio_data_read'
->>>>>>
->>>>>> To sum up - if we do this refactoring of vgic's MMIO handling +
->>>>>> kvm_io_bus_ API getting 'vcpu" argument we'll get a 'much' cleaner
->>>>>> vgic code and as a bonus we'll get 'ioeventfd' capabilities.
->>>>>>
->>>>>> We have 3 questions:
->>>>>>  - is the kvm_io_bus_ getting 'vcpu' argument acceptable for the other
->>>>>> architectures too?
->>>>>>  - is this huge vgic MMIO handling redesign acceptable/desired (it
->>>>>> touches a lot of code)?
->>>>>>  - is there a way that ioeventfd is accepted leaving vgic.c in it's
->>>>>> current state?
->>>>>>
->>>>> Not sure how the latter question is relevant to this, but check with
->>>>> Andre who recently looked at this as well and decided that for GICv3 the
->>>>> only sane thing was to remove that comment for the gic.
->>>> @Andre - what's your experience with the GICv3 and MMIO handling,
->>>> anything specific?
->>>>>
->>>>> I don't recall the details of what you were trying to accomplish here
->>>>> (it's been 8 months or so) but the surely the vgic handling code should
->>>>> *somehow* be integrated into the handle_kernel_mmio (like Paolo
->>>>> suggested), unless you come back and tell me that that would involve a
->>>>> complete rewrite of the vgic code.
->>>> I'm experimenting now - it's not exactly rewrite of whole vgic code,
->>>> but it will touch a lot of it  - all MMIO access handlers and the
->>>> supporting functions.
->>>> We're ready to spend the effort. My question is  - is this acceptable?
->>>>
->>> I certainly appreciate the offer to do this work, but it's hard to say
->>> at this point if it is worth it.
->>>
->>> What I was trying to say above is that Andre looked at this, and came to
->>> the conclusion that it is not worth it.
->>>
->>> Marc, what are your thoughts?
->>
->> Same here, I rely on Andre's view that it was not very useful. Now, it
->> would be good to see a mock-up of the patches and find out:
->
-> Seconded, can you send a pointer to the VGIC rework patches mentioned?
-They are still in WiP state - not exactly working. I'm still exploring
-what the status is.
+On 2014/11/13 19:43, Jiang Liu wrote:
+> This patch set is based on tip/irq/irqdomain and tries to refine
+> interfaces to support irqdomain for generic MSI and PCI MSI.
+> 
+> Patch 1 is just minor fixes for tip/irq/irqdomain.
+> 
+> Patch 2 introduces some helpers to hide struct msi_desc implementation
+> details, so later we could move msi_list from struct pci_dev into
+> struct device to enable generic MSI support.
 
-Our major target is having ioeventfd suport in ARM. For this we need
-to support kvm_io_bus_ mechanisms for MMIO access (cause ioevent fd
-device is registered this way). Then this subject of integrating vgic
-with the kvm_io_bus_ APIs came up.
-My personal opinion - they should be able to coexist in peace.
+Hi Gerry,
+   I tried to move msi info(eg. msi_list) into struct device, but I found
+DMAR fault interrupt is initialized before the driver core init. And I don't
+know whether there are other devices like ARM consolidator(introduced in GIC v3)
+need to be initialized before driver core. What do you think about this ?
 
->
->> - if it is a major improvement for the general quality of the code
->> - if that allow us to *delete* a lot of code (if it is just churn, I'm
->> not really interested)
->> - if it helps or hinders further developments that are currently in the
->> pipeline
->>
->> Andre, can you please share your findings? I don't remember the
->> specifics of the discussion we had a few months ago...
->
-> 1) Given the date in the reply I sense that your patches are from March
-> this year or earlier. So this is based on VGIC code from March, which
-> predates Marc's vgic_dyn changes that just went in 3.18-rc1? His patches
-> introduced another member to struct mmio_range to check validity of
-> accesses with a reduced number of SPIs supported (.bits_per_irq).
-> So is this covered in your rework?
-Still no (rebased to 3.17) - didn't see it, but should not be an issue.
->
-> 2)
->>>>  - there are 15 MMIO ranges for the vgic now - each should be
->
-> Well, the GICv3 emulation adds 41 new ranges. Not sure if this still fits.
->
->>>> registered as a separate device
->
-> I found this fact a show-stopper when looking at this a month ago.
-> Somehow it feels wrong to register a bunch of pseudo-devices. I could go
-> with registering a small number of regions (one distributor, two
-> redistributor regions for instance), but not handling every single of
-> the 41 + 15 register "groups" as a device.
-Do you sense performance issues, or just "it's not right"?
-Maybe kvm_io_bus_ needs some extesion to hanlde a device with multiple regions?
+Thanks!
+Yijing.
 
->
-> Also I wasn't sure if we had to expose some of the vGIC structures to
-> the other KVM code layers.
-I don't see such a need. Can you point some example?
->
-> But I am open to any suggestions (as long as they go in _after_ my
-> vGICv3 series ;-)  - so looking forward to some repo to see how it looks
-> like.
-There is still nothing much to show - but if there is interest we may
-prepare something that shows the idea.
-BTW, where is your repo (sorry I don't follow so close) with the vGICv3?
+> 
+> Patch 3 introduces msi_domain_{alloc|free}_irqs() which generalize
+> pci_msi_domain_alloc_irqs() to support generic MSI.
+> 
+> Patch 4 introduces default data structures and callback implementations
+> to support msi_domain_alloc_irqs(), so reduce burden on generic MSI
+> users.
+> 
+> Patch 5 converts PCI MSI to use generic MSI interfaces, and also
+> implement default callbacks for PCI MSI.
+> 
+> Patch 6 introduces a mechanism to replace arch_setup_msi_irq()/
+> arch_setup_msi_irqs()/arch_teardown_msi_irq()/arch_teardown_msi_irqs().
+> 
+> With this patch set applied, the generic MSI and PCI MSI interfaces
+> are much easier to use. For extreme case, you only need to define
+> a "struct msi_domain_info" and don't need to implement any callbacks,
+> just using the default callbacks is OK:)
+> 
+> This patch set is also a preparation for:
+> 1) Kill all weak functions in drivers/pci/msi.c
+> 2) Implement support for non-PCI-compliant MSI device
+> 
+> It has been tested on x86 platforms, comments are welcomed!
+> 
+> Jiang Liu (6):
+>   PCI, MSI: Fix errors caused by commit e5f1a59c4e12
+>   PCI, MSI: Introduce helpers to hide struct msi_desc implemenation
+>     details
+>   genirq: Introduce msi_domain_{alloc|free}_irqs()
+>   genirq: Provide default callbacks for msi_domain_ops
+>   PCI, MSI: Refine irqdomain interfaces to simplify its usage
+>   PCI, MSI: Provide mechanism to alloc/free MSI/MSIX interrupt from
+>     irqdomain
+> 
+>  drivers/pci/msi.c   |  170 ++++++++++++++++++++++++++++++++++++++++-----------
+>  include/linux/msi.h |   90 ++++++++++++++++++++++++---
+>  kernel/irq/msi.c    |  150 ++++++++++++++++++++++++++++++++++++++++++++-
+>  3 files changed, 366 insertions(+), 44 deletions(-)
+> 
 
->
-> Cheers,
-> Andre.
 
-regards,
-Nikolay Nikolaev
+-- 
+Thanks!
+Yijing
