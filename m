@@ -1,47 +1,50 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 13 Nov 2014 17:21:44 +0100
-Subject: [PATCH v6 4/4] DTS: serial: Add bindings documention for the
- Mediatek UARTs
-In-Reply-To: <1415808457-4030-4-git-send-email-ibanezchen@gmail.com>
-References: <1415808457-4030-1-git-send-email-ibanezchen@gmail.com>
- <1415808457-4030-4-git-send-email-ibanezchen@gmail.com>
-Message-ID: <CABuKBeJXwrEQgttj=wVYJz5E_pdn-2D4DP2=iqtPAuMcFWM5GQ@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 13 Nov 2014 17:21:55 +0100
+Subject: N900 modem support in 3.18-rc1
+In-Reply-To: <20141106180335.GA21513@earth.universe>
+References: <20141104205117.GA17606@amd> <201411052137.31452@pali>
+ <20141105203918.GA29199@amd> <201411052206.05379@pali>
+ <20141105220359.GA32052@amd> <20141105234555.GA7097@earth.universe>
+ <20141106124711.GA26944@amd>
+ <20141106180335.GA21513@earth.universe>
+Message-ID: <20141113162155.GA8512@xo-6d-61-c0.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-12 17:07 GMT+01:00 Howard Chen <ibanezchen@gmail.com>:
-> This patch add s devicetree document for Mediatek UART.
->
-> Signed-off-by: Howard Chen <ibanezchen@gmail.com>
-> ---
->  Documentation/devicetree/bindings/serial/mtk-uart.txt | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/serial/mtk-uart.txt b/Documentation/devicetree/bindings/serial/mtk-uart.txt
-> index 48358a3..e2864b7 100644
-> --- a/Documentation/devicetree/bindings/serial/mtk-uart.txt
-> +++ b/Documentation/devicetree/bindings/serial/mtk-uart.txt
-> @@ -2,9 +2,10 @@
->
->  Required properties:
->  - compatible should contain:
-> +  * "mediatek,mt6592-uart" for MT6592 compatible UARTS
->    * "mediatek,mt6589-uart" for MT6589 compatible UARTS
->    * "mediatek,mt6582-uart" for MT6582 compatible UARTS
-> -  * "mediatek,mt6577-uart" for all compatible UARTS (MT6589, MT6582, MT6577)
-> +  * "mediatek,mt6577-uart" for all compatible UARTS on MT65xx
+Hi!
 
-This patch should be send when we can add the uart driver to the SoC.
-Sorry I didn't realize in my last review.
+> > I actually had pm=0 on the command line, but I removed it now, and no
+> > change: [...]
+> > 
+> > Let me try with explicit =1. .. aha, that helps. Thanks!
+> 
+> mh seems I actually missed to make 1 the default value. I will
+> prepare a patch for that.
+> 
+> I assume, that the example ofono commands work for you now?
 
->
->  - reg: The base address of the UART register bank.
->
-> --
-> 1.9.1
->
+Yes, it now works great.
+
+> > Do you have an example client that can talk to ofonod?
+> 
+> I have not yet played with userland stuff. You could try
+> telepathy-ring, which integrates the ofono into the telepathy
+> framework.
+
+Ok, I took a look, and telepathy-ring is not in debian, and has
+a lot of dependencies.
+
+OTOH ofono seems pretty reasonable. So I played a bit, and result
+is python/pygtk gui which can receive an sms, initiate a call, and
+report missed call. If someone wants to play, source is at
+
+https://gitorious.org/tui/tui/source/b6141107e9341a1412720aed4b0d09143dfa2f4e:ofone
+
+Best regards,
+									Pavel
 
 
 
 -- 
-motzblog.wordpress.com
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
