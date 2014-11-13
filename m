@@ -1,41 +1,32 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 13 Nov 2014 11:17:30 +0100
-Subject: [PATCHv3 2/5] ARM: mvebu: disable I/O coherency on non-SMP
- situations on Armada 370/375/38x/XP
-In-Reply-To: <5650402.1KVMxKcjQn@wuerfel>
-References: <1415871540-20302-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1415871540-20302-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <5650402.1KVMxKcjQn@wuerfel>
-Message-ID: <20141113111730.705f9ca1@free-electrons.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Thu, 13 Nov 2014 10:19:31 +0000
+Subject: [PATCH 0/2] dma: pl330: Fixes for DMA memcpy
+In-Reply-To: <20141112093158.GB24582@intel.com>
+References: <1415383518-29327-1-git-send-email-tixy@linaro.org>
+ <20141112093158.GB24582@intel.com>
+Message-ID: <1415873971.1725.2.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
+On Wed, 2014-11-12 at 15:01 +0530, Vinod Koul wrote:
+> On Fri, Nov 07, 2014 at 06:05:16PM +0000, Jon Medhurst wrote:
+> > This is a couple of patches I produced when trying to get dmatest to run
+> > with the pl330 driver. The second one is actually a theoretical fix
+> > because the FIFO on the platform I was using is too large for the tests
+> > to hit the limit, but the datasheet says the device can lockup if all
+> > the FIFO entries are exhausted, so it seems like a sensible precaution.
+> >
+> Applied, thanks
+>
+> Please ensure you use the right subsystem name for the patch header
 
-On Thu, 13 Nov 2014 11:10:07 +0100, Arnd Bergmann wrote:
+I originally created the patch when working on Linux 3.14 and most
+previous updates to the file used 'dma', I see now in recent versions
+that the preferred name is 'dmaengine' (and matches the mailing list
+name) so will use that in future.
 
-> Seems fine to me. I was hoping to solve this with the introduction
-> of the CONFIG_ARCH_MULTIPLATFORM_STRICT or CONFIG_BROKEN_MULTIPLATFORM
-> setting that would allow us to have a compile-time setting to make it
-> work on UP (while possibly breaking or slowing down other machines
-> in a multiplatform kernel), but Russell didn't like the idea.
+BTW, though I was working on 3.14 I have retested the patches on a
+3.18-rc
 
-Right. Unfortunately, I don't currently see a good way of handling such
-a case, other than having the C code at some point in the
-initialization re-create all the page tables that were set up by the
-assembly code. The basic problem here is that I need access to an
-information located in the Device Tree at a moment where the DT isn't
-available. So there are two options: 1/ make the DT available earlier,
-but it really seems impractical to manipulate the DT in the
-early assembly code, or 2/ make sure that the initialization done in
-the assembly code can be overridden later.
-
-What do you think?
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Tixy
