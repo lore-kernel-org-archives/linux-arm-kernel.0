@@ -1,37 +1,31 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 13 Nov 2014 11:40:05 +0900
-Subject: [PATCH] ARM: EXYNOS: fix typo in static struct name
- "exynos5_list_diable_wfi_wfe"
-In-Reply-To: <CABxcv==Hjfi+-Mt63YQaCtC3Wj12WFfU6biwmiVEFQvqAp3DBA@mail.gmail.com>
-References: <1414489832-28011-1-git-send-email-pankaj.dubey@samsung.com>
- <CABxcv=nJ7-NoF-0EqCL=rk6hX2688iV98g=CiDADKT7QTNWBrw@mail.gmail.com>
- <CABxcv==Hjfi+-Mt63YQaCtC3Wj12WFfU6biwmiVEFQvqAp3DBA@mail.gmail.com>
-Message-ID: <54641A05.9030107@samsung.com>
+Date: Thu, 13 Nov 2014 11:44:01 +0900
+Subject: [PATCH] ARM: EXYNOS: Remove unused static iomapping
+In-Reply-To: <1415683022-21771-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1415683022-21771-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <54641AF1.50105@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/14 18:54, Javier Martinez Canillas wrote:
-> Hello Kukjin,
+On 11/11/14 14:17, Pankaj Dubey wrote:
+> This patch removes all unused static iomapping from
+> exynos4/5_iodesc table, and at the same time removes
+> related macros from map.h and map-s5p.h.
+> All such mappings are present in exynos.c but not currently
+> there are no users of these mappings, so its safe to remove these.
 >
->>
->> After this patch, "[PATCH v9 1/2] ARM: EXYNOS: Add platform driver
->> support for Exynos PMU" [0] does not apply cleanly anymore.
->>
+> Signed-off-by: Pankaj Dubey<pankaj.dubey@samsung.com>
+> ---
+> This patch has been compiled tested for exynos_defconfig; multi_v7_defconfig;
+> s5pv210_defconfig; s3c6400_defconfig; and s3c2410_defconfig.
 >
-> I see that you already picked all the Exynos S2R patches on your
-> v3.19-next/mach-exynos branch and also resolved that conflict.
+> I have verified system booting on SMDK5250 and Exynos3250 based board.
 >
-Yes, but I couldn't merge it into -next because of some conflicts 
-between for-next and mach-exynos branch at that time.
+>   arch/arm/mach-exynos/exynos.c                |   50 --------------------------
+>   arch/arm/mach-exynos/include/mach/map.h      |   23 ------------
+>   arch/arm/plat-samsung/include/plat/map-s5p.h |   21 -----------
+>   3 files changed, 94 deletions(-)
 
-Note I've merged into -next just now, so if any problems in -next, 
-please let us know.
-
-> Is just that this branch was not merged in your for-next branch and
-> that's why I didn't see the patches in linux-next.
->
-> Sorry for the noise.
-
-No problem, thanks.
+Applied, thanks.
 
 - Kukjin
