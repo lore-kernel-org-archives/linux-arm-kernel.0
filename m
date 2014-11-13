@@ -1,81 +1,73 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 13 Nov 2014 12:01:40 +0000
-Subject: [PATCH v3 16/19] arm/arm64: KVM: add virtual GICv3 distributor
- emulation / PART 2
-In-Reply-To: <546499DF.50208@arm.com>
-References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
- <1414776414-13426-17-git-send-email-andre.przywara@arm.com>
- <20141107143040.GR16132@cbox> <546354E9.3000108@arm.com>
- <20141113111808.GN19598@cbox> <546499DF.50208@arm.com>
-Message-ID: <54649DA4.4040500@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 13 Nov 2014 13:01:36 +0100
+Subject: [PATCH 3/4] simplefb: Change simplefb_init from module_init to
+ fs_initcall
+In-Reply-To: <CACxGe6sYD-Ow2wcwAKuXpR3A9VZozo2sgz=eEcWXi5ayKd2jWQ@mail.gmail.com>
+References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
+ <1415830124-28787-3-git-send-email-hdegoede@redhat.com>
+ <20141113085238.GE20972@lukather> <546478B5.2040002@redhat.com>
+ <CACxGe6u8B854PEWw8XzwhyX8joMWwOsHOOXtmBmC1TgCGjGtdg@mail.gmail.com>
+ <CACxGe6sYD-Ow2wcwAKuXpR3A9VZozo2sgz=eEcWXi5ayKd2jWQ@mail.gmail.com>
+Message-ID: <54649DA0.8060308@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/11/14 11:45, Marc Zyngier wrote:
-> On 13/11/14 11:18, Christoffer Dall wrote:
->> On Wed, Nov 12, 2014 at 12:39:05PM +0000, Andre Przywara wrote:
->>> Hej Christoffer,
->>>
->>> the promised part 2 of the reply:
->>>
->>> On 07/11/14 14:30, Christoffer Dall wrote:
->>>> On Fri, Oct 31, 2014 at 05:26:51PM +0000, Andre Przywara wrote:
->>>>> With everything separated and prepared, we implement a model of a
->>>>> GICv3 distributor and redistributors by using the existing framework
->>>>> to provide handler functions for each register group.
->>>
->>> [...]
->>>
->>>>> +
->>>>> +static const struct mmio_range vgic_dist_ranges[] = {
->>>
->>> [...]
->>>
->>>>> +     /* the next three blocks are RES0 if ARE=1 */
->>>>
->>>> probably nicer to just have a comment for each register where this
->>>> applies.
->>>
->>> Done.
->>>
->>>>
->>>>> +     {
->>>>> +             .base           = GICD_SGIR,
->>>>> +             .len            = 4,
->>>>> +             .handle_mmio    = handle_mmio_raz_wi,
->>>>> +     },
->>>>> +     {
->>>>> +             .base           = GICD_CPENDSGIR,
->>>>> +             .len            = 0x10,
->>>>> +             .handle_mmio    = handle_mmio_raz_wi,
->>>>> +     },
->>>>> +     {
->>>>> +             .base           = GICD_SPENDSGIR,
->>>>> +             .len            = 0x10,
->>>>> +             .handle_mmio    = handle_mmio_raz_wi,
->>>>> +     },
->>>>> +     {
->>>>> +             .base           = GICD_IROUTER,
->>>>> +             .len            = 0x2000,
->>>>
->>>> shouldn't this be 0x1ee0?
->>>
->>> The limit of 0x7FD8 in the spec seems to come from 1020 - 32 SPIs.
->>> However all the other registers always claim 1024 IRQs supported (with
->>> non-implemented SPIs being RAZ/WI anyway).
->>> So I wonder if this is just a inconsistency in the spec.
->>> Marc, can you comment?
->>
->> The spec's memory map clearly indicates that the space at 0x6100 +
->> 0x1edc an onwards is reserverd, so it feels weird to define IROUTER
->> registers here.
->>
->> Indeed you guys should check what the true intention is.
-> 
-> Indeed, the spec is very clear about the range 0x7fdc-0xbffc to be
-> reserved. Andre, can you please update this?
+Hi,
 
-Ah, yes I skipped this, sorry. Will fix it.
+On 11/13/2014 11:31 AM, Grant Likely wrote:
+> On Thu, Nov 13, 2014 at 10:29 AM, Grant Likely <grant.likely@linaro.org> wrote:
+>> On Thu, Nov 13, 2014 at 9:24 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>> Hi,
+>>>
+>>> On 11/13/2014 09:52 AM, Maxime Ripard wrote:
+>>>> On Wed, Nov 12, 2014 at 11:08:43PM +0100, Hans de Goede wrote:
+>>>>> One of the reasons for having the simplefb nodes in /chosen, and doing
+>>>>> explicit enumeration of the nodes there, is too allow enumerating them sooner,
+>>>>> so that we get a console earlier on.
+>>>>>
+>>>>> Doing this earlier then fs_initcall is not useful, since the fb only turns into
+>>>>> a console when fbcon intializes, which is a fs_initcall too.
+>>>>>
+>>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>>> ---
+>>>>>  drivers/video/fbdev/simplefb.c | 6 +++++-
+>>>>>  1 file changed, 5 insertions(+), 1 deletion(-)
+>>>>>
+>>>>> diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
+>>>>> index be7d288..8c0c972 100644
+>>>>> --- a/drivers/video/fbdev/simplefb.c
+>>>>> +++ b/drivers/video/fbdev/simplefb.c
+>>>>> @@ -415,7 +415,11 @@ static void __exit simplefb_exit(void)
+>>>>>      platform_driver_unregister(&simplefb_driver);
+>>>>>  }
+>>>>>
+>>>>> -module_init(simplefb_init);
+>>>>> +/*
+>>>>> + * While this can be a module, if builtin it's most likely the console
+>>>>> + * So let's leave module_exit but move module_init to an earlier place
+>>>>> + */
+>>>>
+>>>> Not really related to this patch itself, but do we want to support
+>>>> simplefb as a module? It seems like it's going to be most of the time
+>>>> broken.
+>>>
+>>> A valid point, my mean reasoning here is that some may see not being able to
+>>> use it as a module as a regression, so I just kept things as is, but I do
+>>> agree that it is advisable to just build it in.
+>>
+>> Like a lot of things, if it is made a modules, and it breaks for the
+>> user, the user gets to keep the pieces. There are potentially some
+>> valid scenarios where it is fine to have it as a module. I don't
+>> recommend changing this unless is actually starts causing problems.
+> 
+> I assume that you've tested this and it actually makes a difference,
+> correct? If so,
+> 
+> Acked-by: Grant Likely <grant.likely@linaro.org>
+
+Yes I've tested the entire set on 4 boards / 4 SoCs (A10, A10s, A20 and A31),
+and yes it makes a difference.
 
 Regards,
-Andre.
+
+Hans
