@@ -1,147 +1,142 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 13 Nov 2014 10:32:54 +0100
-Subject: [PATCH 2/4] ARM: integrator: move debug LEDs to syscon LED driver
+Date: Thu, 13 Nov 2014 10:32:55 +0100
+Subject: [PATCH 3/4] ARM: integrator: move core module LED to device tree
 In-Reply-To: <1415871176-11368-1-git-send-email-linus.walleij@linaro.org>
 References: <1415871176-11368-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1415871176-11368-2-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1415871176-11368-3-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Integrator debug block is a simple set of registers, make
-it a syscon and register the four LEDs on the Integrator/AP
-baseboard as syscon LEDs.
+This gets rid of the custom LED driver in the Integrator directory
+altogether and switches us over to using the syscon LEDs for this.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/integrator.dtsi | 36 +++++++++++++++++++++++++++++
- arch/arm/mach-integrator/leds.c   | 48 ++-------------------------------------
- 2 files changed, 38 insertions(+), 46 deletions(-)
+ arch/arm/boot/dts/integrator.dtsi | 10 +++++
+ arch/arm/mach-integrator/Makefile |  2 +-
+ arch/arm/mach-integrator/leds.c   | 80 ---------------------------------------
+ 3 files changed, 11 insertions(+), 81 deletions(-)
+ delete mode 100644 arch/arm/mach-integrator/leds.c
 
 diff --git a/arch/arm/boot/dts/integrator.dtsi b/arch/arm/boot/dts/integrator.dtsi
-index 5546630c4fd2..5d27087d5248 100644
+index 5d27087d5248..28e38f8c6b0f 100644
 --- a/arch/arm/boot/dts/integrator.dtsi
 +++ b/arch/arm/boot/dts/integrator.dtsi
-@@ -82,5 +82,41 @@
- 			reg = <0x19000000 0x1000>;
- 			interrupts = <4>;
- 		};
+@@ -8,6 +8,16 @@
+ 	core-module at 10000000 {
+ 		compatible = "arm,core-module-integrator", "syscon";
+ 		reg = <0x10000000 0x200>;
 +
-+		syscon {
-+			/* Debug registers mapped as syscon */
-+			compatible = "syscon";
-+			reg = <0x1a000000 0x10>;
-+
-+			led at 04.0 {
-+				compatible = "register-bit-led";
-+				offset = <0x04>;
-+				mask = <0x01>;
-+				label = "integrator:green0";
-+				linux,default-trigger = "heartbeat";
-+				default-state = "on";
-+			};
-+			led at 04.1 {
-+				compatible = "register-bit-led";
-+				offset = <0x04>;
-+				mask = <0x02>;
-+				label = "integrator:yellow";
-+				default-state = "off";
-+			};
-+			led at 04.2 {
-+				compatible = "register-bit-led";
-+				offset = <0x04>;
-+				mask = <0x04>;
-+				label = "integrator:red";
-+				default-state = "off";
-+			};
-+			led at 04.3 {
-+				compatible = "register-bit-led";
-+				offset = <0x04>;
-+				mask = <0x08>;
-+				label = "integrator:green1";
-+				default-state = "off";
-+			};
++		/* Use core module LED to indicate CPU load */
++		led at 0c.0 {
++			compatible = "register-bit-led";
++			offset = <0x0c>;
++			mask = <0x01>;
++			label = "integrator:core_module";
++			linux,default-trigger = "cpu0";
++			default-state = "on";
 +		};
  	};
- };
+ 
+ 	ebi at 12000000 {
+diff --git a/arch/arm/mach-integrator/Makefile b/arch/arm/mach-integrator/Makefile
+index ec759ded7b60..1ebe45356b09 100644
+--- a/arch/arm/mach-integrator/Makefile
++++ b/arch/arm/mach-integrator/Makefile
+@@ -4,7 +4,7 @@
+ 
+ # Object file lists.
+ 
+-obj-y					:= core.o lm.o leds.o
++obj-y					:= core.o lm.o
+ obj-$(CONFIG_ARCH_INTEGRATOR_AP)	+= integrator_ap.o
+ obj-$(CONFIG_ARCH_INTEGRATOR_CP)	+= integrator_cp.o
+ 
 diff --git a/arch/arm/mach-integrator/leds.c b/arch/arm/mach-integrator/leds.c
-index f1dcb57a59e2..56f243744b98 100644
+deleted file mode 100644
+index 56f243744b98..000000000000
 --- a/arch/arm/mach-integrator/leds.c
-+++ b/arch/arm/mach-integrator/leds.c
-@@ -16,12 +16,8 @@
- 
- #if defined(CONFIG_NEW_LEDS) && defined(CONFIG_LEDS_CLASS)
- 
--#define ALPHA_REG __io_address(INTEGRATOR_DBG_BASE)
--#define LEDREG	(__io_address(INTEGRATOR_DBG_BASE) + INTEGRATOR_DBG_LEDS_OFFSET)
++++ /dev/null
+@@ -1,80 +0,0 @@
+-/*
+- * Driver for the 4 user LEDs found on the Integrator AP/CP baseboard
+- * Based on Versatile and RealView machine LED code
+- *
+- * License terms: GNU General Public License (GPL) version 2
+- * Author: Bryan Wu <bryan.wu@canonical.com>
+- */
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/io.h>
+-#include <linux/slab.h>
+-#include <linux/leds.h>
 -
- struct integrator_led {
- 	struct led_classdev	cdev;
--	u8			mask;
- };
- 
- /*
-@@ -32,40 +28,9 @@ static const struct {
- 	const char *name;
- 	const char *trigger;
- } integrator_leds[] = {
--	{ "integrator:green0", "heartbeat", },
--	{ "integrator:yellow", },
--	{ "integrator:red", },
--	{ "integrator:green1", },
- 	{ "integrator:core_module", "cpu0", },
- };
- 
--static void integrator_led_set(struct led_classdev *cdev,
+-#include "hardware.h"
+-#include "cm.h"
+-
+-#if defined(CONFIG_NEW_LEDS) && defined(CONFIG_LEDS_CLASS)
+-
+-struct integrator_led {
+-	struct led_classdev	cdev;
+-};
+-
+-/*
+- * The triggers lines up below will only be used if the
+- * LED triggers are compiled in.
+- */
+-static const struct {
+-	const char *name;
+-	const char *trigger;
+-} integrator_leds[] = {
+-	{ "integrator:core_module", "cpu0", },
+-};
+-
+-static void cm_led_set(struct led_classdev *cdev,
 -			      enum led_brightness b)
 -{
--	struct integrator_led *led = container_of(cdev,
--						 struct integrator_led, cdev);
--	u32 reg = __raw_readl(LEDREG);
--
 -	if (b != LED_OFF)
--		reg |= led->mask;
+-		cm_control(CM_CTRL_LED, CM_CTRL_LED);
 -	else
--		reg &= ~led->mask;
--
--	while (__raw_readl(ALPHA_REG) & 1)
--		cpu_relax();
--
--	__raw_writel(reg, LEDREG);
+-		cm_control(CM_CTRL_LED, 0);
 -}
 -
--static enum led_brightness integrator_led_get(struct led_classdev *cdev)
+-static enum led_brightness cm_led_get(struct led_classdev *cdev)
 -{
--	struct integrator_led *led = container_of(cdev,
--						 struct integrator_led, cdev);
--	u32 reg = __raw_readl(LEDREG);
+-	u32 reg = cm_get();
 -
--	return (reg & led->mask) ? LED_FULL : LED_OFF;
+-	return (reg & CM_CTRL_LED) ? LED_FULL : LED_OFF;
 -}
 -
- static void cm_led_set(struct led_classdev *cdev,
- 			      enum led_brightness b)
- {
-@@ -93,19 +58,10 @@ static int __init integrator_leds_init(void)
- 		if (!led)
- 			break;
- 
+-static int __init integrator_leds_init(void)
+-{
+-	int i;
 -
- 		led->cdev.name = integrator_leds[i].name;
+-	for (i = 0; i < ARRAY_SIZE(integrator_leds); i++) {
+-		struct integrator_led *led;
 -
--		if (i == 4) { /* Setting for LED in core module */
--			led->cdev.brightness_set = cm_led_set;
--			led->cdev.brightness_get = cm_led_get;
--		} else {
--			led->cdev.brightness_set = integrator_led_set;
--			led->cdev.brightness_get = integrator_led_get;
+-		led = kzalloc(sizeof(*led), GFP_KERNEL);
+-		if (!led)
+-			break;
+-
+-		led->cdev.name = integrator_leds[i].name;
+-		led->cdev.brightness_set = cm_led_set;
+-		led->cdev.brightness_get = cm_led_get;
+-		led->cdev.default_trigger = integrator_leds[i].trigger;
+-
+-		if (led_classdev_register(NULL, &led->cdev) < 0) {
+-			kfree(led);
+-			break;
 -		}
+-	}
 -
-+		led->cdev.brightness_set = cm_led_set;
-+		led->cdev.brightness_get = cm_led_get;
- 		led->cdev.default_trigger = integrator_leds[i].trigger;
--		led->mask = BIT(i);
- 
- 		if (led_classdev_register(NULL, &led->cdev) < 0) {
- 			kfree(led);
+-	return 0;
+-}
+-
+-/*
+- * Since we may have triggers on any subsystem, defer registration
+- * until after subsystem_init.
+- */
+-fs_initcall(integrator_leds_init);
+-#endif
 -- 
 1.9.3
