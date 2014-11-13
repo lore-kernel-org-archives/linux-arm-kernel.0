@@ -1,37 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 13 Nov 2014 17:47:49 +0100
-Subject: [PATCH 6/7] ARM: dts: sun6i: Add EHCI support for the M9 board
-In-Reply-To: <1415871109-28332-6-git-send-email-hdegoede@redhat.com>
-References: <1415871109-28332-1-git-send-email-hdegoede@redhat.com>
- <1415871109-28332-6-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141113164749.GN20972@lukather>
+From: socketcan@hartkopp.net (Oliver Hartkopp)
+Date: Thu, 13 Nov 2014 17:56:55 +0100
+Subject: [PATCH V4 2/3] can: m_can: update to support CAN FD features
+In-Reply-To: <54648382.9080105@pengutronix.de>
+References: <1415349914-9145-1-git-send-email-b29396@freescale.com>
+ <1415349914-9145-2-git-send-email-b29396@freescale.com>
+ <54648382.9080105@pengutronix.de>
+Message-ID: <5464E2D7.7010906@hartkopp.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 13, 2014 at 10:31:48AM +0100, Hans de Goede wrote:
-> The Mele M9 / A1000G quad uses both usb-ports, one goes to an internal
-> usb wifi card, the other to a build-in usb-hub, so neither need their
-> OHCI companion controller to be enabled since the are always connected at
-> USB-2 speeds.
+On 11/13/2014 11:10 AM, Marc Kleine-Budde wrote:
+> On 11/07/2014 09:45 AM, Dong Aisheng wrote:
+
+>>  
+>> -	if (id & RX_BUF_RTR) {
+>> +	if (id & RX_BUF_ESI) {
+>> +		cf->flags |= CANFD_ESI;
+>> +		netdev_dbg(dev, "ESI Error\n");
+>> +	}
+>> +
+>> +	if (!(dlc & RX_BUF_EDL) && (id & RX_BUF_RTR)) {
+>>  		cf->can_id |= CAN_RTR_FLAG;
 > 
-> The controller which is attached to the wifi also does not need a vbus
-> regulator.
+> I just noticed, that you don't set the cf->dlc (or cf->len) in the RTR
+> case. Please create a separate patch that fixes this problem.
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>  	} else {
+>>  		id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DLC);
+>> -		cf->can_dlc = get_can_dlc((id >> 16) & 0x0F);
+>> -		*(u32 *)(cf->data + 0) = m_can_fifo_read(priv, fgi,
+>> -							 M_CAN_FIFO_DATA(0));
+>> -		*(u32 *)(cf->data + 4) = m_can_fifo_read(priv, fgi,
+>> -							 M_CAN_FIFO_DATA(1));
+>> +		if (dlc & RX_BUF_EDL)
+>> +			cf->len = can_dlc2len((id >> 16) & 0x0F);
+>> +		else
+>> +			cf->len = get_can_dlc((id >> 16) & 0x0F);
+>> +
 
-Applied, with a newline before the pinctrl node.
+Grr. I missed that one too :-(
 
-Thanks!
-Maxime
+Thanks for catching it.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/4e452451/attachment-0001.sig>
+As you committed patch 1 & 3 you expect a new single patch containing the
+(fixed) content of this patch 2, right?
+
+Regards,
+Oliver
