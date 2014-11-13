@@ -1,39 +1,68 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 13 Nov 2014 15:50:48 -0800
-Subject: [PATCH 00/10] arm64 kexec kernel patches V5
-In-Reply-To: <20141113083706.GA8615@darkstar.nay.redhat.com>
-References: <cover.1414099246.git.geoff@infradead.org>
- <20141031075209.GH3290@darkstar.nay.redhat.com>
- <1414797939.23621.38.camel@smoke>
- <20141113083706.GA8615@darkstar.nay.redhat.com>
-Message-ID: <1415922648.15847.107.camel@smoke>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Nov 2014 23:53:22 +0000
+Subject: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
+In-Reply-To: <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D103E010D18261@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18264@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18265@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18266@CNBJMBX05.corpusers.net>
+ <20141030120127.GC32589@arm.com>
+ <CAKv+Gu9g5Q6fjPUy+P8YxkeDrH+bdO4kKGnxTQZRFhQpgPxaPA@mail.gmail.com>
+ <20141030135749.GE32589@arm.com>
+ <35FD53F367049845BC99AC72306C23D103E010D18272@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
+Message-ID: <20141113235322.GC4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-11-13 at 16:37 +0800, Dave Young wrote:
-> In your kexec-tools code, by default it will create dtb1 from procfs, as for external
-> --dtb it will be dtb2 for comparing with dtb1.
+On Fri, Oct 31, 2014 at 01:42:44PM +0800, Wang, Yalin wrote:
+> This patch add bitrev.h file to support rbit instruction,
+> so that we can do bitrev operation by hardware.
+> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
+> ---
+>  arch/arm/Kconfig              |  1 +
+>  arch/arm/include/asm/bitrev.h | 21 +++++++++++++++++++++
+>  2 files changed, 22 insertions(+)
+>  create mode 100644 arch/arm/include/asm/bitrev.h
 > 
-> Since dtb1 is a must so it will not work without /proc/device-tree.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 89c4b5c..be92b3b 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -28,6 +28,7 @@ config ARM
+>  	select HANDLE_DOMAIN_IRQ
+>  	select HARDIRQS_SW_RESEND
+>  	select HAVE_ARCH_AUDITSYSCALL if (AEABI && !OABI_COMPAT)
+> +	select HAVE_ARCH_BITREVERSE if (CPU_V7M || CPU_V7)
 
-I changed that to allow for no /proc/device-tree if --dtb is passed
-since it will also allow a kernel built with CONFIG_PROC_FS=n to do
-kexec re-boot.
+Looking at this, this is just wrong.  Take a moment to consider what
+happens if we build a kernel which supports both ARMv6 _and_ ARMv7 CPUs.
+What happens if an ARMv6 CPU tries to execute an rbit instruction?
 
-Please try it and let me know.
+Second point (which isn't obvious from your submissions on-list) is that
+you've loaded the patch system up with patches for other parts of the
+kernel tree for which I am not responsible for.  As such, I can't take
+those patches without the sub-tree maintainer acking them.  Also, the
+commit text in those patches look weird:
 
-> There had some discussion about this in the thread. But I think we have no
-> conclusion where to go.
-> 
-> There maybe below possibilities:
-> 1) unflattern dtb both for EFI/acpi booting even if acpi boot does not need it.
-> 
-> 2) copy the bootloader passed dtb stub to somewhere, and export the stub to
->  userspace ie. in debugfs or procfs
->  like /proc/saved_dtb 
-> 
-> Thoughts to continue the discuss?
+6fire: Convert byte_rev_table uses to bitrev8
 
-Some progress has been made, let's see what they come up with.
+Use the inline function instead of directly indexing the array.
 
--Geoff
+This allows some architectures with hardware instructions for bit
+reversals to eliminate the array.
+
+Signed-off-by: Joe Perches <(address hidden)>
+Signed-off-by: Yalin Wang <(address hidden)>
+
+Why is Joe signing off on these patches?  As his is the first sign-off,
+one assumes that he was responsible for creating the patch in the first
+place, but there is no From: line marking him as the author.  Shouldn't
+his entry be an Acked-by: ?
+
+Confused.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
