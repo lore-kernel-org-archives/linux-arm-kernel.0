@@ -1,129 +1,117 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 13 Nov 2014 20:55:28 +0000
-Subject: [PATCH v4 1/2] of: Rename "poweroff-source" property to
- "system-power-controller"
-In-Reply-To: <1415885699-1465-2-git-send-email-user@radxa>
-References: <1415885699-1465-1-git-send-email-user@radxa>
- <1415885699-1465-2-git-send-email-user@radxa>
-Message-ID: <20141113205528.77414C40BC2@trevor.secretlab.ca>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 13 Nov 2014 21:00:18 +0000
+Subject: [Patch V1 0/6] Refine generic/PCI MSI irqodmian interfaces
+In-Reply-To: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
+References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <54651BE2.9080008@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Nov 2014 13:34:58 +0000
-, Auto Configured <romain.perier@gmail.com>
- wrote:
-> From: Romain Perier <romain.perier@gmail.com>
+On 13/11/14 11:43, Jiang Liu wrote:
+> This patch set is based on tip/irq/irqdomain and tries to refine
+> interfaces to support irqdomain for generic MSI and PCI MSI.
 > 
-> It reverts commit a4b4e0461ec5 ("of: Add standard property for poweroff capability").
-> As discussed on the mailing list, it makes more sense to rename back to the
-> old established property name, without the vendor prefix. Problem being that
-> the word "source" usually tends to be used for inputs and that is out of control
-> of the OS. The poweroff capability is an output which simply turns the
-> system-power off. Also, this property might be used by drivers which power-off
-> the system and power back on subsequent RTC alarms. This seems to suggest to
-> remove "poweroff" from the property name and to choose "system-power-controller"
-> as the more generic name. This patchs adds the required renaming changes and
-> defines an helper function which is compatible with both properties, the old one
-> which was only used by tps65910 and the new one without vendor-prefix.
+> Patch 1 is just minor fixes for tip/irq/irqdomain.
 > 
-> Signed-off-by: Romain Perier <romain.perier@gmail.com>
-
-Acked-by: Grant Likely <grant.likely@linaro.org>
-
-Please merge via whichever tree needs this change.
-
-g.
-
-> ---
->  .../bindings/power/{poweroff.txt => power-controller.txt}        | 0
->  .../devicetree/bindings/regulator/act8865-regulator.txt          | 4 ++--
->  drivers/mfd/tps65910.c                                           | 9 ++++++++-
->  drivers/regulator/act8865-regulator.c                            | 2 +-
->  include/linux/of.h                                               | 6 +++---
->  5 files changed, 14 insertions(+), 7 deletions(-)
->  rename Documentation/devicetree/bindings/power/{poweroff.txt => power-controller.txt} (100%)
+> Patch 2 introduces some helpers to hide struct msi_desc implementation
+> details, so later we could move msi_list from struct pci_dev into
+> struct device to enable generic MSI support.
 > 
-> diff --git a/Documentation/devicetree/bindings/power/poweroff.txt b/Documentation/devicetree/bindings/power/power-controller.txt
-> similarity index 100%
-> rename from Documentation/devicetree/bindings/power/poweroff.txt
-> rename to Documentation/devicetree/bindings/power/power-controller.txt
-> diff --git a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-> index 01a5b07..dad6358 100644
-> --- a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-> +++ b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-> @@ -6,8 +6,8 @@ Required properties:
->  - reg: I2C slave address
->  
->  Optional properties:
-> -- poweroff-source: Telling whether or not this pmic is controlling
-> -  the system power. See Documentation/devicetree/bindings/power/poweroff.txt .
-> +- system-power-controller: Telling whether or not this pmic is controlling
-> +  the system power. See Documentation/devicetree/bindings/power/power-controller.txt .
->  
->  Any standard regulator properties can be used to configure the single regulator.
->  
-> diff --git a/drivers/mfd/tps65910.c b/drivers/mfd/tps65910.c
-> index b8dca8a..3a796a5 100644
-> --- a/drivers/mfd/tps65910.c
-> +++ b/drivers/mfd/tps65910.c
-> @@ -386,6 +386,13 @@ static const struct of_device_id tps65910_of_match[] = {
->  };
->  MODULE_DEVICE_TABLE(of, tps65910_of_match);
->  
-> +static inline bool tps65910_is_pm_off_found(struct device_node *np)
-> +{
-> +	if (of_property_read_bool(np, "ti,system-power-controller"))
-> +		return true;
-> +	return of_is_system_power_controller(np);
-> +}
-> +
->  static struct tps65910_board *tps65910_parse_dt(struct i2c_client *client,
->  						unsigned long *chip_id)
->  {
-> @@ -423,7 +430,7 @@ static struct tps65910_board *tps65910_parse_dt(struct i2c_client *client,
->  
->  	board_info->irq = client->irq;
->  	board_info->irq_base = -1;
-> -	board_info->pm_off = of_system_has_poweroff_source(np);
-> +	board_info->pm_off = tps65910_is_pm_off_found(np);
->  
->  	return board_info;
->  }
-> diff --git a/drivers/regulator/act8865-regulator.c b/drivers/regulator/act8865-regulator.c
-> index 76301ed..435aba1 100644
-> --- a/drivers/regulator/act8865-regulator.c
-> +++ b/drivers/regulator/act8865-regulator.c
-> @@ -365,7 +365,7 @@ static int act8865_pmic_probe(struct i2c_client *client,
->  		return ret;
->  	}
->  
-> -	if (of_system_has_poweroff_source(dev->of_node)) {
-> +	if (of_is_system_power_controller(dev->of_node)) {
->  		if (!pm_power_off) {
->  			act8865_i2c_client = client;
->  			act8865->off_reg = off_reg;
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index d933717..f9541bc 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -965,14 +965,14 @@ static inline int of_changeset_update_property(struct of_changeset *ocs,
->  extern int of_resolve_phandles(struct device_node *tree);
->  
->  /**
-> - * of_system_has_poweroff_source - Tells if poweroff-source is found for device_node
-> + * of_is_system_power_controller - Tells if system-power-controller is found for device_node
->   * @np: Pointer to the given device_node
->   *
->   * return true if present false otherwise
->   */
-> -static inline bool of_system_has_poweroff_source(const struct device_node *np)
-> +static inline bool of_is_system_power_controller(const struct device_node *np)
->  {
-> -	return of_property_read_bool(np, "poweroff-source");
-> +	return of_property_read_bool(np, "system-power-controller");
->  }
->  
->  #endif /* _LINUX_OF_H */
-> -- 
-> 1.9.1
+> Patch 3 introduces msi_domain_{alloc|free}_irqs() which generalize
+> pci_msi_domain_alloc_irqs() to support generic MSI.
 > 
+> Patch 4 introduces default data structures and callback implementations
+> to support msi_domain_alloc_irqs(), so reduce burden on generic MSI
+> users.
+> 
+> Patch 5 converts PCI MSI to use generic MSI interfaces, and also
+> implement default callbacks for PCI MSI.
+> 
+> Patch 6 introduces a mechanism to replace arch_setup_msi_irq()/
+> arch_setup_msi_irqs()/arch_teardown_msi_irq()/arch_teardown_msi_irqs().
+> 
+> With this patch set applied, the generic MSI and PCI MSI interfaces
+> are much easier to use. For extreme case, you only need to define
+> a "struct msi_domain_info" and don't need to implement any callbacks,
+> just using the default callbacks is OK:)
+> 
+> This patch set is also a preparation for:
+> 1) Kill all weak functions in drivers/pci/msi.c
+> 2) Implement support for non-PCI-compliant MSI device
+
+I've rebased (once more!) the GICv3 ITS driver on top of this, and this
+is definitely a major improvement. This is basically the first version
+I can use without having to hack into the core code (apart from the
+couple of nits I've mentioned earlier).
+
+Now, Thomas' idea of putting the irq_domain close to the bus is very
+appealing, and I've tweaked an earlier patch in order to do this:
+
+>From f73c2df2f1e66fd13902b2c6bb5773df6538b7df Mon Sep 17 00:00:00 2001
+From: Marc Zyngier <marc.zyngier@arm.com>
+Date: Wed, 12 Nov 2014 10:32:46 +0000
+Subject: [PATCH] PCI/MSI: Allow an msi_chip to be associated to an irq domain
+
+With the new stacked irq domains, it becomes pretty tempting
+to allocate an MSI domain per PCI bus, which would remove
+the requirement of either relying on arch-specific code, or
+a default PCI MSI domain.
+
+By allowing the msi_chip structure to carry a pointer to
+an irq_domain, we can easily use this in pci_msi_setup_msi_irqs.
+The existing code can still be used as a fallback if the MSI driver
+does not populate the domain field.
+
+Tested on arm64 with the GICv3 ITS driver.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/pci/msi.c   | 9 +++++++--
+ include/linux/msi.h | 3 +++
+ 2 files changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index 9947fb4..1752537 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -86,9 +86,14 @@ int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+ 
+ static int pci_msi_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+ {
+-	struct irq_domain *domain;
++	struct irq_domain *domain = NULL;
+ 
+-	domain = arch_get_pci_msi_domain(dev);
++#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
++	if (dev->bus->msi)
++		domain = dev->bus->msi->domain;
++#endif
++	if (!domain)
++		domain = arch_get_pci_msi_domain(dev);
+ 	if (domain)
+ 		return pci_msi_domain_alloc_irqs(domain, type, dev);
+ 
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index 9b2e73e..2325950 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -89,6 +89,9 @@ struct msi_chip {
+ 	struct device *dev;
+ 	struct device_node *of_node;
+ 	struct list_head list;
++#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
++	struct irq_domain *domain;
++#endif
+ 
+ 	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
+ 			 struct msi_desc *desc);
+-- 
+2.0.4
+
+Thoughts?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
