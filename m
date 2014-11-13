@@ -1,97 +1,109 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Thu, 13 Nov 2014 17:53:17 +0530
-Subject: [PATCH 0/4] Touchscreen performance related fixes
-In-Reply-To: <CAJKbBDDyShaJkzzfdFs07EK5gDUfwqWiv39Qi4FVSvRrfc6_fA@mail.gmail.com>
-References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>	<20141103180920.GA20779@localhost.localdomain>	<545B2651.4090905@ti.com>
- <CAJKbBDDyShaJkzzfdFs07EK5gDUfwqWiv39Qi4FVSvRrfc6_fA@mail.gmail.com>
-Message-ID: <5464A2B5.3020207@ti.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 13 Nov 2014 13:29:37 +0100
+Subject: [PATCH v2 1/4] dt-bindings: simplefb: Specify node location and
+ handoff related properties
+In-Reply-To: <CACxGe6uPKcZ4XqdiPQtia-0D+BnqjDE3eW-oDCR+byUrVtNpSg@mail.gmail.com>
+References: <1415868610-13297-1-git-send-email-hdegoede@redhat.com>
+ <CACxGe6uX7V-TcZfM0vP4SvjxKx3T_RGByX8wFqTdFo4LEzP2Yg@mail.gmail.com>
+ <CACxGe6uPKcZ4XqdiPQtia-0D+BnqjDE3eW-oDCR+byUrVtNpSg@mail.gmail.com>
+Message-ID: <5464A431.2050706@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wednesday 12 November 2014 06:30 PM, Johannes Pointner wrote:
-> Hello Vignesh,
+On 11/13/2014 01:03 PM, Grant Likely wrote:
+> On Thu, Nov 13, 2014 at 11:02 AM, Grant Likely <grant.likely@linaro.org> wrote:
+>> On Thu, Nov 13, 2014 at 8:50 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>> Since simplefb nodes do not relate directly to hw typically they have been
+>>> placed in the root of the devicetree. As the represent runtime information
+>>> having them as sub-nodes of /chosen is more logical, specify this.
+>>>
+>>> Also specify when to set the chosen stdout-path property to a simplefb node.
+>>>
+>>> For reliable handover to a hardware specific driver, that driver needs to
+>>> know which simplefb to unregister when taking over, specify how the hw driver
+>>> can find the matching simplefb node.
+>>>
+>>> Last add some advice on how to fill and use simplefb nodes from a firmware
+>>> pov.
+>>>
+>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+>>> --
+>>> Changes in v2:
+>>> -Add stdout-path to the example code
+>>> ---
+>>>  .../bindings/video/simple-framebuffer.txt          | 38 +++++++++++++++++++++-
+>>>  1 file changed, 37 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+>>> index 8f35718..8b7ecf6 100644
+>>> --- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+>>> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+>>> @@ -4,6 +4,26 @@ A simple frame-buffer describes a frame-buffer setup by firmware or
+>>>  the bootloader, with the assumption that the display hardware has already
+>>>  been set up to scan out from the memory pointed to by the reg property.
+>>>
+>>> +Since simplefb nodes represent runtime information they must be sub-nodes of
+>>> +the chosen node (*). The primary display node must be named framebuffer0,
+>>> +additional nodes must be called framebuffer1, etc.
+>>
+>> Thinking more about our conversation yesterday, the preferred name
+>> should still be framebuffer@<address>. There is no reason to break
+>> with established convention, and as mentioned in my reply on patch #2,
+>> using the name is not the preferred way to identify a device node. So,
+>> my recommendation is to prefer the name "framebuffer@<addr>", but if
+>> it is inconvenient because the address isn't known, then
+>> "framebuffer#" is acceptable. Then use /aliases for actual enumeration
+>> which has the advantage of also working for framebuffers that aren't
+>> in /chosen.
 > 
-> I tried your patch version 3 on a customized board and had some
-> behavior I couldn't explain.
-> If I only use the touchscreen it works fine but if I also read values
-> from the ADCs then I get a lot of pen_up events even if I am still
-> touching the screen.
-> For the test I read via
-> # cat /sys/bus/iio/devices/iio\:device0/in_voltage5_raw
-> values from the ADC in an busy loop as you explained in an email
-> before. Did you also experience such behavior or do you know what
-> causes it?
+> Some more thoughts about aliases.
+> 
+> There is a natural tension between enumerate framebuffers or
+> enumerating displays. There is precedence for displays to be named
+> 'display...' and to use /aliases/display* to enumerate them. What do
+> we do for framebuffers? Does it make sense to have a separate
+> /aliases/framebuffer* enumeration, or would it be better to have a
+> single 'display' namespace so that the same name is used right
+> through?
+> 
+> Right now I'm leaning towards using /aliases/display* for everything,
+> and making simplefb understand that /aliases/display# could either
+> point directly to the framebuffer when there is not node for the
+> hardware, or point to the display node. This would make it easy to
+> have consistent names for display. For example, with the kexec
+> scenario, if /aliases/display0 points at the display node then the
+> alias won't need to be changed between first boot when firmware sets
+> up a framebuffer, and kexec boot after the kernel has torn down the
+> original framebuffer. If /aliases/display0 points to the framebuffer
+> node directly, then the linkage from /aliases/display0 to the HW
+> display node will be lost when the framebuffer gets torn down.
+> 
+> Doing it this way does make two assumptions though. It assumes that
+> each display will have its own node somewhere so that no two
+> framebuffers will point to the same node. Second, it assumes that we
+> have a mechanism to handoff a display name (/dev/fb*)? from simplefb
+> to another device. I don't know enough about the fbdev subsystem to
+> know whether or not this will be a problem. Or if there are any
+> namespace conflicts between fbdev and drm.
+> 
+> Implementation would be simple to do. If the simple framebuffer node
+> has a 'display' property, then it will call of_alias_get_id() on the
+> target of that phandle. Otherwise it will call of_alias_get_id() on
+> itself.
+> 
+> Thoughts?
 
-Thanks for testing. I was able to fix this issue. Will post version 4
-shortly.
+Re-using display# aliases, and specifying that if the simplefb node has
+a display property, that then the id of the node the display property
+points to should be used, and otherwise the id of the simplefb node itself
+sounds like a good idea.
 
-Regards
-Vignesh
+I'll go work on a v3 and put this in (and update the example for this
+as well).
 
-> 
-> Without the patches the touchscreen works fine during the iio test.
-> 
-> Thanks,
-> Hannes
-> 
-> 2014-11-06 8:42 GMT+01:00 Vignesh R <vigneshr@ti.com>:
->>
->>
->> On Monday 03 November 2014 11:39 PM, Richard Cochran wrote:
->>> On Mon, Oct 27, 2014 at 04:38:27PM +0530, Vignesh R wrote:
->>>> This series of patches fix TSC defects related to lag in touchscreen
->>>> performance and cursor jump at touch release. The lag was result of
->>>> udelay in TSC interrupt handler. Cursor jump due to false pen-up event.
->>>> The patches implement Advisory 1.0.31 in silicon errata of am335x-evm
->>>> to avoid false pen-up events and remove udelay.
->>>
->>> That advisory has two workarounds. You have chosen the second one?
->>
->> Work around one. Hence 5 wire design is not broken.
->>
->>>
->>> The text of the second workaround says it only works on 4 wire setups,
->>> so I wonder how 5 wire designs will be affected.
->>>
->>>> The advisory says to use
->>>> steps 1 to 4 for ADC and 5 to 16 for TSC (assuming 4 wire TSC and 4 channel
->>>> ADC).
->>>
->>> No, it doesn't say that. (sprz360f.pdf)
->>
->> The pen up event detection happens immediately after charge step. Hence,
->> interchanging ADC and TSC steps makes sure that sampling of touch
->> co-ordinates and pen events are done one after the other. This
->> workaround was suggested by internal hardware folks. Earlier ADC steps
->> intervened between sampling of co-ordinates and pen event detection
->> which is not desirable.
->>
->>>
->>>> Further the X co-ordinate must be the last one to be sampled just
->>>> before charge step. The first two patches implement the required changes.
->>>
->>> FWIW, I implemented the first workaround and removed the udelay not
->>> too long ago. Like Sebastian, I saw the TSC unit hang after about
->>> 50000 interrupts when running with the workaround.
->>>
->>> Did you test you patch for very long?
->>
->> Yes, I tested for about 200000 interrupts and I didn't see any hang.
->> This patch series does not just implement workaround but also does some
->> minor changes, such as interchanging ADC and TSC steps etc, which makes
->> TSC driver more robust. Let me know if you encounter any issues with my
->> patch series.
->>
->> Regards
->> Vignesh
->>
->>>
->>> Thanks,
->>> Richard
->>>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Regards,
+
+Hans
