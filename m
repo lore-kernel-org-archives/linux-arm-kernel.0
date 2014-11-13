@@ -1,120 +1,81 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 13 Nov 2014 11:26:34 +0000
-Subject: [PATCH] ARM: cacheflush: disallow pending signals during
- cacheflush
-In-Reply-To: <1415863793-6219-1-git-send-email-chanho.min@lge.com>
-References: <1415863793-6219-1-git-send-email-chanho.min@lge.com>
-Message-ID: <20141113112633.GE13350@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 13 Nov 2014 12:27:07 +0100
+Subject: [PATCH] ARM: dts: tegra: move serial aliases to per-board
+In-Reply-To: <CAOesGMjmVJuaiFZf6msFtsGiQn6TOPatZ7V3p-KfaPqpXnrYmA@mail.gmail.com>
+References: <1415738970-7963-1-git-send-email-olof@lixom.net>
+ <20141112122017.GC30821@ulmo.nvidia.com>
+ <CAOesGMjmVJuaiFZf6msFtsGiQn6TOPatZ7V3p-KfaPqpXnrYmA@mail.gmail.com>
+Message-ID: <20141113112706.GC23422@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-[adding linux-api, linux-man]
-
-On Thu, Nov 13, 2014 at 07:29:53AM +0000, Chanho Min wrote:
-> Since commit 28256d612726 ("ARM: cacheflush: split user cache-flushing
-> into interruptible chunks"), cacheflush can be interrupted by signal.
-> 
-> But, cacheflush doesn't resume from where we left off if process has
-> user-defined signal handlers. It returns -EINTR then cacheflush
-> should be re-invoked from the start of address until cache-flushing
-> of whole address ranges is completed (restart_syscall isn't available
-> in userspace). It may cause regression. So I suggest to disallow
-> pending signals during cacheflush.
-> 
-> This partially reverts commit 28256d612726a28a8b9d3c49f2b74198c4423d6a.
-
-Whilst I don't think this is the correct solution, I agree that there's
-a potential issue here. We could change the restart return value to
--ERESTARTNOINTR instead, but I can imagine something like a periodic
-SIGALRM which could prevent a large cacheflush from ever completing.
-Do we actually care about making forward progress in such a scenario?
-
-It is interesting to note that this change has been in mainline since
-May last year without any reported issues. That could be down to a number
-of reasons:
-
-  (1) People are using old kernels on ARM
-
-  (2) Code doesn't check the return value from the cacheflush system call,
-      because it historically always returned 0
-
-  (3) People are getting lucky with timing, as this is likely difficult
-      to hit
-
-Related to (2) is that a `man cacheflush' invocation returns something
-about the MIPs system call, that doesn't match what we do for ARM. The
-(relatively recent) history of the system call on ARM is:
-
-  < v3.5 [*]
-
-    - Always returns 0
-    - Restricts virtual address range to a single VMA
-    - Page-aligns the region limits (over flushing for smaller ranges)
-    - Terminates on the first fault
-    - Flags are ignored but must "ALWAYS be passed as ZERO"
-
-  v3.5 - v3.12
-    - Returns -EINVAL if flags is set or if end < start
-    - Returns -EINVAL if we couldn't find a vma
-    - Terminates on the first fault and returns -EFAULT
-
-  v3.12 - HEAD
-
-    - No longer page-aligns region
-    - Removes VMA checking as this had a deadlock bug with mmap_sem
-      and we could handle faults by this point anyway
-    - Returns -EINVAL if !access_ok for the range
-    - Splits the range into PAGE_SIZE chunks, checking for reschedule
-      and pending signals to avoid DoSing the system (the hardware can
-      only clean by cacheline). This is where the -ERESTART_RESTARTBLOCK
-      behaviour came in, potentially returning -EINTR to userspace.
-
-This leaves me with the following questions:
-
-  - Has this change been shown to break anything in practice?
-  - Can we change the internal return value to -ERESTARTNOINTR?
-  - What do we do about kernels that *do* return -EINTR? (>=3.12?)
-  - Can we get a manpage put together to describe this mess?
-
-Cheers,
-
-Will
-
-[*] rmk may have some more ancient history kicking around, if you like!
-
-> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> index abd2fc0..275e086 100644
-> --- a/arch/arm/kernel/traps.c
-> +++ b/arch/arm/kernel/traps.c
-> @@ -521,25 +521,6 @@ __do_cache_op(unsigned long start, unsigned long end)
->  	do {
->  		unsigned long chunk = min(PAGE_SIZE, end - start);
->  
-> -		if (signal_pending(current)) {
-> -			struct thread_info *ti = current_thread_info();
-> -
-> -			ti->restart_block = (struct restart_block) {
-> -				.fn	= do_cache_op_restart,
-> -			};
-> -
-> -			ti->arm_restart_block = (struct arm_restart_block) {
-> -				{
-> -					.cache = {
-> -						.start	= start,
-> -						.end	= end,
-> -					},
-> -				},
-> -			};
-> -
-> -			return -ERESTART_RESTARTBLOCK;
-> -		}
-> -
->  		ret = flush_cache_user_range(start, start + chunk);
->  		if (ret)
->  			return ret;
-> -- 
-> 1.7.9.5
+On Wed, Nov 12, 2014 at 09:07:20AM -0800, Olof Johansson wrote:
+> Hi Thierry,
 > 
 > 
+> 
+> On Wed, Nov 12, 2014 at 4:20 AM, Thierry Reding
+> <thierry.reding@gmail.com> wrote:
+> > On Tue, Nov 11, 2014 at 12:49:30PM -0800, Olof Johansson wrote:
+> >> There are general changes pending to make the /aliases/serial* entries
+> >> number the serial ports on the system. On tegra, so far the ports have been
+> >> just numbered dynamically as they are configured so that makes them change.
+> >>
+> >> To avoid this, add specific aliases per board to keep the old numbers. This
+> >> allows us to change the numbering by default on future SoCs while keeping the
+> >> numbering on existing boards.
+> >>
+> >> Signed-off-by: Olof Johansson <olof@lixom.net>
+> >> ---
+> >>
+> >> Stephen/Thierry/Alex, as noticed this week we really should try to get
+> >> this in before the 3.19 merge window so that the global aliases change
+> >> can happen there without regression.
+> >>
+> >> If you have more fixes queued up, feel free to add this to the next pull
+> >> request. If not, a review and ack would be appreciated.
+> >>
+> >>  arch/arm/boot/dts/tegra114-dalmore.dts        |    1 +
+> >>  arch/arm/boot/dts/tegra114-roth.dts           |    4 ++++
+> >>  arch/arm/boot/dts/tegra114-tn7.dts            |    4 ++++
+> >>  arch/arm/boot/dts/tegra114.dtsi               |    7 -------
+> >>  arch/arm/boot/dts/tegra124-jetson-tk1.dts     |    1 +
+> >>  arch/arm/boot/dts/tegra124-nyan-big.dts       |    1 +
+> >>  arch/arm/boot/dts/tegra124-venice2.dts        |    1 +
+> >>  arch/arm/boot/dts/tegra124.dtsi               |    7 -------
+> >>  arch/arm/boot/dts/tegra20-harmony.dts         |    1 +
+> >>  arch/arm/boot/dts/tegra20-iris-512.dts        |    5 +++++
+> >>  arch/arm/boot/dts/tegra20-medcom-wide.dts     |    4 ++++
+> >>  arch/arm/boot/dts/tegra20-paz00.dts           |    2 ++
+> >>  arch/arm/boot/dts/tegra20-seaboard.dts        |    1 +
+> >>  arch/arm/boot/dts/tegra20-tamonten.dtsi       |    1 +
+> >>  arch/arm/boot/dts/tegra20-trimslice.dts       |    1 +
+> >>  arch/arm/boot/dts/tegra20-ventana.dts         |    1 +
+> >>  arch/arm/boot/dts/tegra20-whistler.dts        |    1 +
+> >>  arch/arm/boot/dts/tegra20.dtsi                |    8 --------
+> >>  arch/arm/boot/dts/tegra30-apalis-eval.dts     |    4 ++++
+> >>  arch/arm/boot/dts/tegra30-beaver.dts          |    1 +
+> >>  arch/arm/boot/dts/tegra30-cardhu.dtsi         |    2 ++
+> >>  arch/arm/boot/dts/tegra30-colibri-eval-v3.dts |    3 +++
+> >>  arch/arm/boot/dts/tegra30.dtsi                |    8 --------
+> >>  23 files changed, 39 insertions(+), 30 deletions(-)
+> >
+> > I have applied this to the for-3.19/dt branch.
+> 
+> Maybe I wasn't entirely clear -- I was proposing to include this in
+> the next batch of fixes for 3.18 so that the aliases processing code
+> can go in for 3.19. If we hold this until the merge window we run the
+> risk of having largeish parts of the merge window unbisectable (more
+> than if we merge this as part of the next/dt contents).
+
+Alex sent out two patches today that should go into 3.18, so let me
+prepare a pull request include those and your patch.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/36337dde/attachment-0001.sig>
