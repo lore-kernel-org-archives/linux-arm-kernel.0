@@ -1,102 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 13 Nov 2014 15:45:52 -0800
-Subject: [PATCH V3 3/3] mfd: palmas: Add support for optional wakeup
-In-Reply-To: <alpine.DEB.2.11.1411132251170.3935@nanos>
-References: <alpine.DEB.2.10.1409190710320.5612@nanos>
- <20140919161927.GA28613@kahuna>
- <alpine.DEB.2.10.1409191027330.5612@nanos>
- <20140919191649.GQ14505@atomide.com>
- <alpine.DEB.2.10.1409191233590.4213@nanos>
- <20141002034345.GH3122@atomide.com>
- <20141106204629.GF31454@atomide.com>
- <alpine.DEB.2.11.1411131053050.3935@nanos>
- <20141113174030.GM26481@atomide.com>
- <alpine.DEB.2.11.1411132251170.3935@nanos>
-Message-ID: <20141113234551.GR26481@atomide.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Thu, 13 Nov 2014 15:50:48 -0800
+Subject: [PATCH 00/10] arm64 kexec kernel patches V5
+In-Reply-To: <20141113083706.GA8615@darkstar.nay.redhat.com>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <20141031075209.GH3290@darkstar.nay.redhat.com>
+ <1414797939.23621.38.camel@smoke>
+ <20141113083706.GA8615@darkstar.nay.redhat.com>
+Message-ID: <1415922648.15847.107.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Thomas Gleixner <tglx@linutronix.de> [141113 14:27]:
-> On Thu, 13 Nov 2014, Tony Lindgren wrote:
-> > Oops thanks for catching that. As the devres stuff is separate, I've
-> > updated the patch to keep it that way by adding a minimal manage.h.
-> > This avoids including internals.h in devres.c. Does that seem usable
-> > for you?
+On Thu, 2014-11-13 at 16:37 +0800, Dave Young wrote:
+> In your kexec-tools code, by default it will create dtb1 from procfs, as for external
+> --dtb it will be dtb2 for comparing with dtb1.
 > 
-> What's wrong with internals.h? devres.c is core code, so it is not
-> affected of the ban to include internals.h :)
+> Since dtb1 is a must so it will not work without /proc/device-tree.
 
-No problem, just that we need to bring in few other includes and
-devres.c is currently free of any core irq stuff :) I can switch to
-internals.h no problem if you prefer that.
-  
-> > + *	So if replaying the lost device interrupts is absolutely needed from the
-> > + *	hardware point of view, it's probably best to set up a completely
-> > + *	separate wake-up interrupt handler for the wake-up interrupt in the
-> > + *	device driver because of the reasons above.
-> 
-> Can we please kill this last paragraph? I'm already seeing the
-> gazillion of "I think it is required to do so for my soooo special
-> chip" implementations in random drivers which all get it wrong again.
+I changed that to allow for no /proc/device-tree if --dtb is passed
+since it will also allow a kernel built with CONFIG_PROC_FS=n to do
+kexec re-boot.
 
-OK :)
- 
-> So I'd rather provide a mechanism upfront which lets the driver know
-> that the wakeup interrupt originated from that device, i.e. let the
-> wake up handler call
-> 
->      pm_wakeup_irq(dev);
-> 
-> which calls:
-> 
->       pm_runtime_mark_last_busy(dev);
->       pm_request_resume(dev);
-> 
-> and aside of that tells the device via a flag or preferrably a
-> sequence counter that the wakeup irq has been triggered. So affected
-> devices can handle it based on that information w/o implementing the
-> next broken variant of wakeup irq handlers.
+Please try it and let me know.
 
-OK I'll take a look if we can just set some pm_runtime flag and use
-the pm_runtime counters for that.
-
-> That also allows to remove the wakeflags check for level/edge.
+> There had some discussion about this in the thread. But I think we have no
+> conclusion where to go.
 > 
-> > + */
-> > +int init_disabled_wakeirq(struct device *dev, unsigned int wakeirq,
-> > +			  unsigned long wakeflags)
-> > +{
-> > +	if (!(dev && wakeirq)) {
+> There maybe below possibilities:
+> 1) unflattern dtb both for EFI/acpi booting even if acpi boot does not need it.
 > 
-> This is the second time I stumbled over this. While it is correct it
-> would be simpler to parse 
+> 2) copy the bootloader passed dtb stub to somewhere, and export the stub to
+>  userspace ie. in debugfs or procfs
+>  like /proc/saved_dtb 
 > 
->       if (!dev || !wakeirq) {
-> 
-> At least for my review damaged brain :)
+> Thoughts to continue the discuss?
 
-Heh !!true.
- 
-> > +		pr_err("Missing device or wakeirq for %s irq %d\n",
-> > +		       dev_name(dev), wakeirq);
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	if (!(wakeflags & IRQF_ONESHOT)) {
-> > +		pr_err("Invalid wakeirq for %s irq %d, must be oneshot\n",
-> > +		       dev_name(dev), wakeirq);
-> > +		return -EINVAL;
-> > +	}
-> 
-> Is there a reason why we force the wakeirq into a threaded handler?
+Some progress has been made, let's see what they come up with.
 
-Yes the drivers may need to restore hardware state in the pm_runtime
-calls and who knows what else drivers will be doing. So that too might
-be a good reason to just set a flag in pm_runtime land.
-
-Anyways, thanks for your comments. I'll post a complete series after
-looking into the wake-up counters a bit.
-
-Regards,
-
-Tony
+-Geoff
