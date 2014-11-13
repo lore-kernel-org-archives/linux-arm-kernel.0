@@ -1,48 +1,59 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Thu, 13 Nov 2014 16:37:06 +0800
-Subject: [PATCH 00/10] arm64 kexec kernel patches V5
-In-Reply-To: <1414797939.23621.38.camel@smoke>
-References: <cover.1414099246.git.geoff@infradead.org>
- <20141031075209.GH3290@darkstar.nay.redhat.com>
- <1414797939.23621.38.camel@smoke>
-Message-ID: <20141113083706.GA8615@darkstar.nay.redhat.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 13 Nov 2014 09:38:58 +0100
+Subject: [PATCH 1/4] dt-bindings: simplefb: Specify node location and
+ handoff related properties
+In-Reply-To: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
+References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAMuHMdU4YTwyMrD5U1i3DYy=cvpocmzXqajySUfgBKVRhcAJVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/14 at 04:25pm, Geoff Levand wrote:
-> Hi Dave,
-> 
-> Thanks for testing.
-> 
-> On Fri, 2014-10-31 at 15:52 +0800, Dave Young wrote:
-> > I tested your patches. The macihne is using spin-table cpu enable method
-> > so I tried maxcpus=1 as you suggested.
-> > 
-> > There's below issues for me, thoughts?
-> > 
-> > 1. For acpi booting there's no /proc/device-tree so kexec can not find dtb
-> > to use.
-> 
-> You can supply a DTB with the kexec --dtb option, then kexec will not need
-> /proc/device-tree.  Please try if you can and let me know what happens.
-> 
+On Wed, Nov 12, 2014 at 11:08 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Since simplefb nodes do not relate directly to hw typically they have been
+> placed in the root of the devicetree. As the represent runtime information
+> having them as sub-nodes of /chosen is more logical, specify this.
+>
+> Also specify when to set the chosen stdout-path property to a simplefb node.
+>
+> For reliable handover to a hardware specific driver, that driver needs to
+> know which simplefb to unregister when taking over, specify how the hw driver
+> can find the matching simplefb node.
+>
+> Last add some advice on how to fill and use simplefb nodes from a firmware
+> pov.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-In your kexec-tools code, by default it will create dtb1 from procfs, as for external
---dtb it will be dtb2 for comparing with dtb1.
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-Since dtb1 is a must so it will not work without /proc/device-tree.
+> ---
+>  .../bindings/video/simple-framebuffer.txt          | 37 +++++++++++++++++++++-
+>  1 file changed, 36 insertions(+), 1 deletion(-)
+>
+> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+> index 8f35718..95fe284 100644
+> --- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+> @@ -4,6 +4,26 @@ A simple frame-buffer describes a frame-buffer setup by firmware or
+>  the bootloader, with the assumption that the display hardware has already
+>  been set up to scan out from the memory pointed to by the reg property.
+>
+> +Since simplefb nodes represent runtime information they must be sub-nodes of
+> +the chosen node (*). The primary display node must be named framebuffer0,
+> +additional nodes must be called framebuffer1, etc.
+> +
+> +If a simplefb node represents the preferred console for user interaction,
+> +then the chosen node's stdout-path property must point to it.
 
-There had some discussion about this in the thread. But I think we have no
-conclusion where to go.
+You may want to add an stdout-path property to the example.
 
-There maybe below possibilities:
-1) unflattern dtb both for EFI/acpi booting even if acpi boot does not need it.
+Gr{oetje,eeting}s,
 
-2) copy the bootloader passed dtb stub to somewhere, and export the stub to
- userspace ie. in debugfs or procfs
- like /proc/saved_dtb 
+                        Geert
 
-Thoughts to continue the discuss?
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Thanks
-Dave
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
