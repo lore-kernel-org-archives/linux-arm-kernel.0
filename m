@@ -1,37 +1,31 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 13 Nov 2014 15:25:06 +0100
-Subject: [PATCH 1/2] dmaengine: at_xdmac: correct destination abbreviation
-In-Reply-To: <1415888096-22090-2-git-send-email-ludovic.desroches@atmel.com>
-References: <1415888096-22090-1-git-send-email-ludovic.desroches@atmel.com>
- <1415888096-22090-2-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20141113142506.GT3639@ldesroches-Latitude-E6320>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 13 Nov 2014 16:28:54 +0200
+Subject: [PATCH v3 1/4] dt-bindings: simplefb: Specify node location and
+ handoff related properties
+In-Reply-To: <1415885645-24613-1-git-send-email-hdegoede@redhat.com>
+References: <1415885645-24613-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <5464C026.7030300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 13, 2014 at 03:14:55PM +0100, Ludovic Desroches wrote:
-> TODO
+On 13/11/14 15:34, Hans de Goede wrote:
 
-No commit message since it will be merge into Maxime's patch :p
+> +chosen {
+> +	framebuffer0: framebuffer at 5fc00000 {
+>  		compatible = "simple-framebuffer";
+> -		reg = <0x1d385000 (1600 * 1200 * 2)>;
+> +		reg = <0x5fc00000 (4096 * 1024)>;
 
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->  drivers/dma/at_xdmac.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-> index b60d77a..ff67466 100644
-> --- a/drivers/dma/at_xdmac.c
-> +++ b/drivers/dma/at_xdmac.c
-> @@ -1229,7 +1229,7 @@ static int at_xdmac_device_slave_caps(struct dma_chan *dchan,
->  {
->  
->  	caps->src_addr_widths = AT_XDMAC_DMA_BUSWIDTHS;
-> -	caps->dstn_addr_widths = AT_XDMAC_DMA_BUSWIDTHS;
-> +	caps->dst_addr_widths = AT_XDMAC_DMA_BUSWIDTHS;
->  	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
->  	caps->cmd_pause = true;
->  	caps->cmd_terminate = true;
-> -- 
-> 2.0.3
-> 
+Was there a reason for this change? The former version seems much more
+obvious to me, especially as this is an example.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141113/8460e95f/attachment.sig>
