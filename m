@@ -1,55 +1,42 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 13 Nov 2014 11:52:39 +0100
-Subject: [PATCH 1/7] dmaengine: at_xdmac: prefer usage of readl/writel_relaxed
-In-Reply-To: <1415875965-6905-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1415875965-6905-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1415875965-6905-2-git-send-email-ludovic.desroches@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 13 Nov 2014 11:53:19 +0100
+Subject: [PATCHv3 2/5] ARM: mvebu: disable I/O coherency on non-SMP
+ situations on Armada 370/375/38x/XP
+In-Reply-To: <20141113111730.705f9ca1@free-electrons.com>
+References: <1415871540-20302-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <5650402.1KVMxKcjQn@wuerfel> <20141113111730.705f9ca1@free-electrons.com>
+Message-ID: <1582668.V5SXEARn2a@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-_relaxed version of readl and writel are not implemented on all
-architecture so COMPILE_TEST has to be removed in order to not cause
-some build failures.
+On Thursday 13 November 2014 11:17:30 Thomas Petazzoni wrote:
+> On Thu, 13 Nov 2014 11:10:07 +0100, Arnd Bergmann wrote:
+> 
+> > Seems fine to me. I was hoping to solve this with the introduction
+> > of the CONFIG_ARCH_MULTIPLATFORM_STRICT or CONFIG_BROKEN_MULTIPLATFORM
+> > setting that would allow us to have a compile-time setting to make it
+> > work on UP (while possibly breaking or slowing down other machines
+> > in a multiplatform kernel), but Russell didn't like the idea.
+> 
+> Right. Unfortunately, I don't currently see a good way of handling such
+> a case, other than having the C code at some point in the
+> initialization re-create all the page tables that were set up by the
+> assembly code. The basic problem here is that I need access to an
+> information located in the Device Tree at a moment where the DT isn't
+> available. So there are two options: 1/ make the DT available earlier,
+> but it really seems impractical to manipulate the DT in the
+> early assembly code, or 2/ make sure that the initialization done in
+> the assembly code can be overridden later.
+> 
+> What do you think?
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/dma/Kconfig    | 2 +-
- drivers/dma/at_xdmac.c | 8 ++++----
- 2 files changed, 5 insertions(+), 5 deletions(-)
+IIRC there is still an unsolved problem on mach-keystone that is somewhat
+related, they also have to change the page tables and the current method
+appears to be racy. Once that is solved, you might be able to do 2.
 
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index aef8b9d..f2b2c4e 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -109,7 +109,7 @@ config AT_HDMAC
- 
- config AT_XDMAC
- 	tristate "Atmel XDMA support"
--	depends on (ARCH_AT91 || COMPILE_TEST)
-+	depends on ARCH_AT91
- 	select DMA_ENGINE
- 	help
- 	  Support the Atmel XDMA controller.
-diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-index 89c43be..1f53d92 100644
---- a/drivers/dma/at_xdmac.c
-+++ b/drivers/dma/at_xdmac.c
-@@ -248,12 +248,12 @@ static inline void __iomem *at_xdmac_chan_reg_base(struct at_xdmac *atxdmac, uns
- 	return atxdmac->regs + (AT_XDMAC_CHAN_REG_BASE + chan_nb * 0x40);
- }
- 
--#define at_xdmac_read(atxdmac, reg) readl((atxdmac)->regs + (reg))
-+#define at_xdmac_read(atxdmac, reg) readl_relaxed((atxdmac)->regs + (reg))
- #define at_xdmac_write(atxdmac, reg, value) \
--	writel((value), (atxdmac)->regs + (reg))
-+	writel_relaxed((value), (atxdmac)->regs + (reg))
- 
--#define at_xdmac_chan_read(atchan, reg) readl((atchan)->ch_regs + (reg))
--#define at_xdmac_chan_write(atchan, reg, value) writel((value), (atchan)->ch_regs + (reg))
-+#define at_xdmac_chan_read(atchan, reg) readl_relaxed((atchan)->ch_regs + (reg))
-+#define at_xdmac_chan_write(atchan, reg, value) writel_relaxed((value), (atchan)->ch_regs + (reg))
- 
- static inline struct at_xdmac_chan *to_at_xdmac_chan(struct dma_chan *dchan)
- {
--- 
-2.0.3
+The approach I had in mind was much simpler, introducing a compile-time
+option that hardcodes the behavior you need for Armada-370 when set,
+knowing that you should not set that on any kernel that is supposed to
+run on other platforms.
+
+	Arnd
