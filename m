@@ -1,41 +1,36 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Thu, 13 Nov 2014 14:00:21 -0800
-Subject: exynos5250/arndale: failed to set cpu voltage
-Message-ID: <CANMBJr4ZgEZDAtdfuLhCXppCGHnHhgmT1aFUi+=kJb2PdkqhGg@mail.gmail.com>
+From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
+Date: Thu, 13 Nov 2014 17:08:23 -0500
+Subject: [PATCH 11/13] arm: dts: dra7: add DMA properties for UART
+In-Reply-To: <5464F9A1.9080901@linutronix.de>
+References: <20141104172117.GC24112@csclub.uwaterloo.ca>
+ <20141104183315.GD24112@csclub.uwaterloo.ca>
+ <20141104210315.GF24112@csclub.uwaterloo.ca>
+ <20141105011506.GG24112@csclub.uwaterloo.ca>
+ <5459DBB7.1090702@linutronix.de>
+ <20141105153307.GN24110@csclub.uwaterloo.ca>
+ <20141105162024.GH24112@csclub.uwaterloo.ca>
+ <545A50BB.2020307@linutronix.de>
+ <20141105194323.GI24112@csclub.uwaterloo.ca>
+ <5464F9A1.9080901@linutronix.de>
+Message-ID: <20141113220823.GK24112@csclub.uwaterloo.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In recent upstream kernels, exynos5420-based arndale boards have been
-producing boot-time errors due to the fact they failed to set the cpu
-voltage. These message flood the serial console even after userspace
-has been loaded, yielding the console unusable without forcing a lower
-log level. These errors are produced _only_ with the
-multi_v7_defconfig and they are _not_ present
-with exynos_defconfig. Here are some recent boot logs showing the boot errors:
+On Thu, Nov 13, 2014 at 07:34:09PM +0100, Sebastian Andrzej Siewior wrote:
+> misaligned dma? I haven't seen any alignment requirement for SDMA/EDMA
+> and I haven't seen this error on beagle board, am335x-evm or dra7-evm.
 
-mainline/v3.18-rc4-65-g2c54396:
-    multi_v7_defconfig:
-        http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc4-65-g2c54396/arm-multi_v7_defconfig/boot-exynos5250-arndale.html
-    exynos_defconfig:
-        http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc4-65-g2c54396/arm-exynos_defconfig/boot-exynos5250-arndale.html
+Well I am using the am5728, so it should be the same as the dra7-evm.
 
-next/next-20141113:
-    multi_v7_defconfig:
-        http://storage.armcloud.us/kernel-ci/next/next-20141113/arm-multi_v7_defconfig/boot-exynos5250-arndale.html
-    exynos_defconfig:
-        http://storage.armcloud.us/kernel-ci/next/next-20141113/arm-exynos_defconfig/boot-exynos5250-arndale.html
+> So basically what you are saying is that DMA (no matter which channel)
+> gives you this error and without DMA it works fine?
 
-arm-soc/v3.18-rc4-185-gbfcf8f9:
-    multi_v7_defconfig:
-        http://storage.armcloud.us/kernel-ci/arm-soc/v3.18-rc4-185-gbfcf8f9/arm-multi_v7_defconfig/boot-exynos5250-arndale.html
-    exynos_defconfig:
-        http://storage.armcloud.us/kernel-ci/arm-soc/v3.18-rc4-185-gbfcf8f9/arm-exynos_defconfig/boot-exynos5250-arndale.html
+Yes.
 
-Cheers,
+I am trying to get the 3.14 kernel tree going, just as soon as I figure
+out which config setting makes the timer probe not crash (it works
+with the default config that enables every omap ever made, but I want
+a cleaner build than that).
 
 -- 
-Tyler Baker
-Tech Lead, LAVA
-Linaro.org | Open source software for ARM SoCs
-Follow Linaro: http://www.facebook.com/pages/Linaro
-http://twitter.com/#!/linaroorg - http://www.linaro.org/linaro-blog
+Len Sorensen
