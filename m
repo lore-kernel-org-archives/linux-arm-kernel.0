@@ -1,56 +1,89 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Thu, 13 Nov 2014 10:52:04 +0800
-Subject: [PATCH] clk: rockchip: ensure HCLK_VIO2_H2P and PCLK_VIO2_H2P
- stay enabled
-In-Reply-To: <20141112213845.GA14153@dtor-ws>
-References: <20141112213845.GA14153@dtor-ws>
-Message-ID: <54641CD4.9070901@rock-chips.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Thu, 13 Nov 2014 09:57:29 +0530
+Subject: [PATCH] ARM: EXYNOS: fix typo in static struct name
+ "exynos5_list_diable_wfi_wfe"
+In-Reply-To: <54641A05.9030107@samsung.com>
+References: <1414489832-28011-1-git-send-email-pankaj.dubey@samsung.com>
+ <CABxcv=nJ7-NoF-0EqCL=rk6hX2688iV98g=CiDADKT7QTNWBrw@mail.gmail.com>
+ <CABxcv==Hjfi+-Mt63YQaCtC3Wj12WFfU6biwmiVEFQvqAp3DBA@mail.gmail.com>
+ <54641A05.9030107@samsung.com>
+Message-ID: <000d01cffefa$3688d550$a39a7ff0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+Hi Kukijin,
 
-On 11/13/2014 05:38 AM, Dmitry Torokhov wrote:
-> Currently there is no driver owning these clocks and they have to stay
-> up for the system to function properly, so let's mark them as
-> CLK_IGNORE_UNUSED.
->
-> Without this patch we have trouble with suspend/resume and we have
-> trouble turning the eDP back on if it ever idles off.
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Dmitry Torokhov <dtor@chromium.org>
-> ---
->   drivers/clk/rockchip/clk-rk3288.c | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-> index 2327829..d79d52f 100644
-> --- a/drivers/clk/rockchip/clk-rk3288.c
-> +++ b/drivers/clk/rockchip/clk-rk3288.c
-> @@ -724,14 +724,14 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
->   	GATE(HCLK_VIP, "hclk_vip", "hclk_vio", 0, RK3288_CLKGATE_CON(15), 15, GFLAGS),
->   	GATE(HCLK_IEP, "hclk_iep", "hclk_vio", 0, RK3288_CLKGATE_CON(15), 3, GFLAGS),
->   	GATE(HCLK_ISP, "hclk_isp", "hclk_vio", 0, RK3288_CLKGATE_CON(16), 1, GFLAGS),
-> -	GATE(HCLK_VIO2_H2P, "hclk_vio2_h2p", "hclk_vio", 0, RK3288_CLKGATE_CON(16), 10, GFLAGS),
-> +	GATE(HCLK_VIO2_H2P, "hclk_vio2_h2p", "hclk_vio", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(16), 10, GFLAGS),
->   	GATE(PCLK_MIPI_DSI0, "pclk_mipi_dsi0", "hclk_vio", 0, RK3288_CLKGATE_CON(16), 4, GFLAGS),
->   	GATE(PCLK_MIPI_DSI1, "pclk_mipi_dsi1", "hclk_vio", 0, RK3288_CLKGATE_CON(16), 5, GFLAGS),
->   	GATE(PCLK_MIPI_CSI, "pclk_mipi_csi", "hclk_vio", 0, RK3288_CLKGATE_CON(16), 6, GFLAGS),
->   	GATE(PCLK_LVDS_PHY, "pclk_lvds_phy", "hclk_vio", 0, RK3288_CLKGATE_CON(16), 7, GFLAGS),
->   	GATE(PCLK_EDP_CTRL, "pclk_edp_ctrl", "hclk_vio", 0, RK3288_CLKGATE_CON(16), 8, GFLAGS),
->   	GATE(PCLK_HDMI_CTRL, "pclk_hdmi_ctrl", "hclk_vio", 0, RK3288_CLKGATE_CON(16), 9, GFLAGS),
-> -	GATE(PCLK_VIO2_H2P, "pclk_vio2_h2p", "hclk_vio", 0, RK3288_CLKGATE_CON(16), 11, GFLAGS),
-> +	GATE(PCLK_VIO2_H2P, "pclk_vio2_h2p", "hclk_vio", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(16), 11, GFLAGS),
->   
->   	/* aclk_vio0 gates */
->   	GATE(ACLK_VOP0, "aclk_vop0", "aclk_vio0", 0, RK3288_CLKGATE_CON(15), 5, GFLAGS),
-The H/PCLK_VIO2_H2P is some kind of bus clock for a ahb2apb bridge 
-inside the VIO,
-it should be on when some of VIO logic is working, but it is not easy to 
-assign these
-two clocks to module driver. I think it is reasonable to mark with 
-CLK_IGNORE_UNUSED
-tag so far.
+On Thursday, November 13, 2014 8:10 AM, Kukjin Kim wrote:
+> Subject: Re: [PATCH] ARM: EXYNOS: fix typo in static struct name
+> "exynos5_list_diable_wfi_wfe"
+> 
+> On 11/11/14 18:54, Javier Martinez Canillas wrote:
+> > Hello Kukjin,
+> >
+> >>
+> >> After this patch, "[PATCH v9 1/2] ARM: EXYNOS: Add platform driver
+> >> support for Exynos PMU" [0] does not apply cleanly anymore.
+> >>
+> >
+> > I see that you already picked all the Exynos S2R patches on your
+> > v3.19-next/mach-exynos branch and also resolved that conflict.
+> >
+> Yes, but I couldn't merge it into -next because of some conflicts between
+for-next and
+> mach-exynos branch at that time.
+> 
+> Note I've merged into -next just now, so if any problems in -next, please
+let us know.
+> 
 
-Reviewed-by: Kever Yang <kever.yang@rock-chips.com>
+I just checked and your for-next failed to compile for exynos_defconfig. I
+got following error:
+----------
+<stdin>:1247:2: warning: #warning syscall bpf not implemented [-Wcpp]
+  CHK     include/generated/compile.h
+  CC      arch/arm/mach-exynos/platsmp.o
+arch/arm/mach-exynos/platsmp.c:448:13: error: static declaration of
+'exynos_cpu_die' follows non-static declaration
+ static void exynos_cpu_die(unsigned int cpu)
+             ^
+In file included from arch/arm/mach-exynos/platsmp.c:32:0:
+arch/arm/mach-exynos/common.h:142:13: note: previous declaration of
+'exynos_cpu_die' was here
+ extern void exynos_cpu_die(unsigned int cpu);
+             ^
+make[1]: *** [arch/arm/mach-exynos/platsmp.o] Error 1
+make: *** [arch/arm/mach-exynos] Error 2
+make: *** Waiting for unfinished jobs....
+--------------------------
+
+With following fix I am able to build the for-next. 
+----------------------------------------------------------------------------
+--
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 2ce225b..472417c 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -139,7 +139,6 @@ extern struct smp_operations exynos_smp_ops;
+ extern void exynos_cpu_resume(void);
+ extern void exynos_cpu_resume_ns(void);
+ 
+-extern void exynos_cpu_die(unsigned int cpu);
+ extern void exynos_cpu_power_down(int cpu);
+ extern void exynos_cpu_power_up(int cpu);
+ extern int  exynos_cpu_power_state(int cpu);
+-------------------------------------------------------------------------
+
+Let me know if I have to do something? else please update according to 
+above change.
+
+Thanks,
+Pankaj Dubey
+
+> > Is just that this branch was not merged in your for-next branch and
+> > that's why I didn't see the patches in linux-next.
+> >
+> > Sorry for the noise.
+> 
+> No problem, thanks.
+> 
+> - Kukjin
