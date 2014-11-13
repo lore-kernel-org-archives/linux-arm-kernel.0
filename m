@@ -1,50 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 13 Nov 2014 18:41:56 +0100
-Subject: [PATCH v2 13/14] ARM: STi: DT: STiH410: Add usb2 picophy dt nodes
-In-Reply-To: <20141113145419.GA30296@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1415876417-28728-1-git-send-email-peter.griffin@linaro.org>
- <3348806.YN8XP4V4uc@wuerfel>
- <20141113145419.GA30296@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <2401196.5cvW5dPSz2@wuerfel>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 13 Nov 2014 12:44:22 -0500 (EST)
+Subject: [PATCH] ARM: b.L: fix unmet dependency for CPU_PM
+In-Reply-To: <1415857098-16928-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1415857098-16928-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <alpine.LFD.2.11.1411131231060.11690@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 November 2014 14:54:19 Peter Griffin wrote:
-> 
-> > 
-> > It also seems that you have put the node in the wrong place, as the reg
-> > property apparently refers to a different address space. Did you mean
-> > to put this under the syscfg_core node?
-> 
-> Your correct in that it refers to the syscfg_core address space.
-> However I intentionaly didn't put it under the syscfg_core node.
-> 
-> The phy is more unique than most other devices in that in this instance it
-> is only controlled from two syscfg_core registers which happen to be in the same
-> sysconf bank.
->
-> However most other devices tend to have a combination of some memory mapped
-> registers and also some sysconfig registers which does then create a conflict
-> over where the dt node should live.
-> 
-> Currently I can't find an example but there is also no guarentee that a
-> device will not have some configuration bits in syscfg_core and some
-> other bits in syscfg_rear/front registers. The phy for example could
-> have had one register in each, which would make deciding where to put
-> it difficult.
-> 
-> So to create coherency / conformity we decided to put all the IP blocks under the soc node.
-> 
-> Also its worth pointing if your not already aware that sysconf_core/rear/front isn't
-> really a device, it's just a regmap abstraction of some memory mapped configuration
-> registers where a bunch of seemingly random control bits get stuffed.
-> 
-> Of course if you feel strongly about it I can of course change it like you suggested,
-> but that is the reasoning / rationale of why it was done like this initially.
+On Thu, 13 Nov 2014, Pankaj Dubey wrote:
 
-The problem is your use of the 'reg' property. If it doesn't refer to the
-node's address space, it shouldn't be called 'reg'.
+> If BL_SWITCHER is enabled but SUSPEND and CPU_IDLE is not enabled
+> we are getting following config warning.
+> 
+> warning: (BL_SWITCHER) selects CPU_PM which has unmet direct
+> dependencies (SUSPEND || CPU_IDLE)
+> 
+> So BL_SWITCHER should enable CPU_PM only if either of SUSPEND or
+> CPU_IDLE is selected.
+> 
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/Kconfig |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 9d580d0..fe3d969 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1417,7 +1417,7 @@ config BL_SWITCHER
+>  	bool "big.LITTLE switcher support"
+>  	depends on BIG_LITTLE && MCPM && HOTPLUG_CPU
+>  	select ARM_CPU_SUSPEND
+> -	select CPU_PM
+> +	select CPU_PM if (SUSPEND || CPU_IDLE)
 
-Please fix the binding.
+NAK.  You just broke the code by doing this. CPU_PM is a requirement 
+here.  The dependencies for CPU_PM is lacking.
 
-	Arnd
+
+Nicolas
