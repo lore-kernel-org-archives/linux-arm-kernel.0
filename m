@@ -1,73 +1,54 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 13 Nov 2014 10:32:29 +0100
-Subject: [PATCH v7 04/12] of: Add NVIDIA Tegra memory controller binding
-In-Reply-To: <1415871157-21968-1-git-send-email-thierry.reding@gmail.com>
-References: <1415871157-21968-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1415871157-21968-5-git-send-email-thierry.reding@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 13 Nov 2014 10:33:10 +0100
+Subject: [PATCH] ARM: at91: remove unused CONFIG_ARCH_AT91SAM9G45 option
+In-Reply-To: <1415617517.4862.44.camel@x220>
+References: <1415617517.4862.44.camel@x220>
+Message-ID: <1415871190-32244-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+The CONFIG_ARCH_AT91SAM9G45 config option was removed by ("ARM: at91: remove
+at91sam9g45/9m10 legacy board support") so cleanup the use of it.
 
-The memory controller on NVIDIA Tegra exposes various knobs that can be
-used to tune the behaviour of the clients attached to it.
-
-In addition, the memory controller implements an SMMU (IOMMU) which can
-translate I/O virtual addresses to physical addresses for clients. This
-is useful for scatter-gather operation on devices that don't support it
-natively and for virtualization or process separation.
-
-Signed-off-by: Thierry Reding <treding@nvidia.com>
+Reported-by: Paul Bolle <pebolle@tiscali.nl>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
-Changes in v3:
-- add missing clocks and clock-names properties
-- add example
+ arch/arm/mach-at91/Makefile.boot | 6 ------
+ arch/arm/mach-at91/board.h       | 4 ----
+ 2 files changed, 10 deletions(-)
 
- .../memory-controllers/nvidia,tegra-mc.txt         | 36 ++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/memory-controllers/nvidia,tegra-mc.txt
-
-diff --git a/Documentation/devicetree/bindings/memory-controllers/nvidia,tegra-mc.txt b/Documentation/devicetree/bindings/memory-controllers/nvidia,tegra-mc.txt
-new file mode 100644
-index 000000000000..f3db93c85eea
---- /dev/null
-+++ b/Documentation/devicetree/bindings/memory-controllers/nvidia,tegra-mc.txt
-@@ -0,0 +1,36 @@
-+NVIDIA Tegra Memory Controller device tree bindings
-+===================================================
-+
-+Required properties:
-+- compatible: Should be "nvidia,tegra<chip>-mc"
-+- reg: Physical base address and length of the controller's registers.
-+- clocks: Must contain an entry for each entry in clock-names.
-+  See ../clocks/clock-bindings.txt for details.
-+- clock-names: Must include the following entries:
-+  - mc: the module's clock input
-+- interrupts: The interrupt outputs from the controller.
-+- #iommu-cells: Should be 1. The single cell of the IOMMU specifier defines
-+  the SWGROUP of the master.
-+
-+This device implements an IOMMU that complies with the generic IOMMU binding.
-+See ../iommu/iommu.txt for details.
-+
-+Example:
-+--------
-+
-+	mc: memory-controller at 0,70019000 {
-+		compatible = "nvidia,tegra124-mc";
-+		reg = <0x0 0x70019000 0x0 0x1000>;
-+		clocks = <&tegra_car TEGRA124_CLK_MC>;
-+		clock-names = "mc";
-+
-+		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		#iommu-cells = <1>;
-+	};
-+
-+	sdhci at 0,700b0000 {
-+		compatible = "nvidia,tegra124-sdhci";
-+		...
-+		iommus = <&mc TEGRA_SWGROUP_SDMMC1A>;
-+	};
+diff --git a/arch/arm/mach-at91/Makefile.boot b/arch/arm/mach-at91/Makefile.boot
+index 5309f9b6aabc..29ed0fa374ca 100644
+--- a/arch/arm/mach-at91/Makefile.boot
++++ b/arch/arm/mach-at91/Makefile.boot
+@@ -3,12 +3,6 @@
+ #   PARAMS_PHYS must be within 4MB of ZRELADDR
+ #   INITRD_PHYS must be in RAM
+ 
+-ifeq ($(CONFIG_ARCH_AT91SAM9G45),y)
+-   zreladdr-y	+= 0x70008000
+-params_phys-y	:= 0x70000100
+-initrd_phys-y	:= 0x70410000
+-else
+    zreladdr-y	+= 0x20008000
+ params_phys-y	:= 0x20000100
+ initrd_phys-y	:= 0x20410000
+-endif
+diff --git a/arch/arm/mach-at91/board.h b/arch/arm/mach-at91/board.h
+index 836e9a537e0c..d268ec3781dd 100644
+--- a/arch/arm/mach-at91/board.h
++++ b/arch/arm/mach-at91/board.h
+@@ -56,11 +56,7 @@ extern void __init at91_add_device_usbh_ehci(struct at91_usbh_data *data);
+ extern void __init at91_add_device_nand(struct atmel_nand_data *data);
+ 
+  /* I2C*/
+-#if defined(CONFIG_ARCH_AT91SAM9G45)
+-extern void __init at91_add_device_i2c(short i2c_id, struct i2c_board_info *devices, int nr_devices);
+-#else
+ extern void __init at91_add_device_i2c(struct i2c_board_info *devices, int nr_devices);
+-#endif
+ 
+  /* SPI */
+ extern void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices);
 -- 
-2.1.3
+1.8.2.2
