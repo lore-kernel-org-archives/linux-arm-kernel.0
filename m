@@ -1,42 +1,35 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 13 Nov 2014 11:53:11 +0000
-Subject: [PATCH] arm64: compat: align cacheflush syscall with arch/arm
-In-Reply-To: <20141113114743.GG13350@arm.com>
-References: <1415789238-4573-1-git-send-email-vladimir.murzin@arm.com>
- <20141113114743.GG13350@arm.com>
-Message-ID: <54649BA7.5000809@arm.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 13 Nov 2014 12:56:02 +0100
+Subject: [PATCH] dmaengine: fsl-edma: fix calculation of remaining bytes
+Message-ID: <1415879762-12177-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/11/14 11:47, Will Deacon wrote:
-> Hi Vladimir,
-> 
-> On Wed, Nov 12, 2014 at 10:47:18AM +0000, Vladimir Murzin wrote:
->> Update handling of cacheflush syscall with changes made in arch/arm
->> counterpart:
->>  - return error to userspace when flushing syscall fails
->>  - split user cache-flushing into interruptible chunks
->>  - don't bother rounding to nearest vma
->>
->> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->> Acked-by: Will Deacon <will.deacon@arm.com>
->> ---
->>  arch/arm64/include/asm/cacheflush.h  |    2 +-
->>  arch/arm64/include/asm/thread_info.h |   12 ++++++
->>  arch/arm64/kernel/sys_compat.c       |   77 ++++++++++++++++++++++++----------
->>  arch/arm64/mm/cache.S                |    6 ++-
->>  4 files changed, 74 insertions(+), 23 deletions(-)
-> 
-> We should hold off on this patch until the EINTR issue has been resolved:
-> 
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/302105.html
-> 
+If the current transfer control descriptor (TCD) was not yet started,
+the address will be the same as the initial address. Hence test if the
+current address is less than or equal to the start address of each TCD.
 
-Sure, no problem.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+This bug was discovered during development on a AC97 capable SAI driver,
+I don't think that this is currently a issue since only a few drivers
+use DMA on Vybrid so far and don't use the remaining bytes information.
 
-Vladimir
+ drivers/dma/fsl-edma.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> Will
-> 
-> 
-> 
+diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
+index 3c5711d..58c6fc7 100644
+--- a/drivers/dma/fsl-edma.c
++++ b/drivers/dma/fsl-edma.c
+@@ -386,7 +386,7 @@ static size_t fsl_edma_desc_residue(struct fsl_edma_chan *fsl_chan,
+ 					&(edesc->tcd[i].vtcd->daddr));
+ 
+ 		len -= size;
+-		if (cur_addr > dma_addr && cur_addr < dma_addr + size) {
++		if (cur_addr >= dma_addr && cur_addr < dma_addr + size) {
+ 			len += dma_addr + size - cur_addr;
+ 			break;
+ 		}
+-- 
+2.1.3
