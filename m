@@ -1,76 +1,35 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 13 Nov 2014 02:33:42 +0100
-Subject: [PATCH] PM / Domains: restore calling of .suspend/resume_noirq()
- callbacks
-In-Reply-To: <1415808047-23455-1-git-send-email-grygorii.strashko@ti.com>
-References: <1415808047-23455-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <2997289.NEH22PNoYM@vostro.rjw.lan>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 13 Nov 2014 10:19:32 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Boards Updates for v3.19
+Message-ID: <cover.1415756816.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 12, 2014 06:00:47 PM Grygorii Strashko wrote:
-> Now .suspend/resume_noirq() callbacks will not be called during
-> system wide suspend/resume for devices which belongs to some GPD.
-> It seems, that this change was accidently introduced by
-> commit d23b9b00cdde ("PM / Domains: Rework system suspend callback
->  routines (v2)").
+Hi Olof, Hi Kevin, Hi Arnd,
 
-I'm not sure if that was really accidentally.
+Please consider these Renesas ARM based SoC boards updates for v3.19.
 
-Can you describe the problem that the change below is attempting to
-address, without going to much into the history?  IOW, what's that
-doesn't work right now?
 
-> This patch restores calling of .suspend/resume_noirq() callbacks
-> for devices from GPD during system wide suspend/resume.
-> 
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
->  drivers/base/power/domain.c | 14 +++++++++++---
->  1 file changed, 11 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index fb83d4a..f8c70e6 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -1014,6 +1014,7 @@ static int pm_genpd_suspend_late(struct device *dev)
->  static int pm_genpd_suspend_noirq(struct device *dev)
->  {
->  	struct generic_pm_domain *genpd;
-> +	int ret;
->  
->  	dev_dbg(dev, "%s()\n", __func__);
->  
-> @@ -1021,8 +1022,14 @@ static int pm_genpd_suspend_noirq(struct device *dev)
->  	if (IS_ERR(genpd))
->  		return -EINVAL;
->  
-> -	if (genpd->suspend_power_off
-> -	    || (dev->power.wakeup_path && genpd_dev_active_wakeup(genpd, dev)))
-> +	if (genpd->suspend_power_off)
-> +		return 0;
-> +
-> +	ret = pm_generic_suspend_noirq(dev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	if (dev->power.wakeup_path && genpd_dev_active_wakeup(genpd, dev))
->  		return 0;
->  
->  	genpd_stop_dev(genpd, dev);
-> @@ -1065,8 +1072,9 @@ static int pm_genpd_resume_noirq(struct device *dev)
->  	 */
->  	pm_genpd_sync_poweron(genpd);
->  	genpd->suspended_count--;
-> +	genpd_start_dev(genpd, dev);
->  
-> -	return genpd_start_dev(genpd, dev);
-> +	return pm_generic_resume_noirq(dev);
->  }
->  
->  /**
-> 
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards-for-v3.19
+
+for you to fetch changes up to 534547c036afad3f23d49d8352896f5d05709685:
+
+  ARM: shmobile: kzm9g-reference: Add restart callback (2014-11-10 10:16:35 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Boards Updates for v3.19
+
+* Add restart callback to kzm9g
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: shmobile: kzm9g-reference: Add restart callback
+
+ arch/arm/mach-shmobile/board-kzm9g-reference.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
