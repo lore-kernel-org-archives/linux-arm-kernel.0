@@ -1,32 +1,39 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 13 Nov 2014 11:52:44 +0100
-Subject: [PATCH 6/7] ARM: dts: at_xdmac: fix bad value of dma-cells in
- documentation
+Date: Thu, 13 Nov 2014 11:52:45 +0100
+Subject: [PATCH 7/7] dmaengine: at_xdmac: Add DMA_PRIVATE
 In-Reply-To: <1415875965-6905-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1415875965-6905-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1415875965-6905-7-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1415875965-6905-8-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dma-cells value in the example was 2 instead of 1.
+same issue as commit 7f5ae3553685:
+"Without DMA_PRIVATE the driver is not able to allocate more than one channel.
+Since it uses dma_get_any_slave_channel that calls private_candidate, the
+second allocation fails at
+/* some channels are already publicly allocated */
+"
 
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
- Documentation/devicetree/bindings/dma/atmel-xdma.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/dma/at_xdmac.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/dma/atmel-xdma.txt b/Documentation/devicetree/bindings/dma/atmel-xdma.txt
-index e75c128..0eb2b32 100644
---- a/Documentation/devicetree/bindings/dma/atmel-xdma.txt
-+++ b/Documentation/devicetree/bindings/dma/atmel-xdma.txt
-@@ -22,7 +22,7 @@ dma1: dma-controller at f0004000 {
- 	compatible = "atmel,sama5d4-dma";
- 	reg = <0xf0004000 0x200>;
- 	interrupts = <50 4 0>;
--	#dma-cells = <2>;
-+	#dma-cells = <1>;
- };
- 
- 
+diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+index 586275f..b60d77a 100644
+--- a/drivers/dma/at_xdmac.c
++++ b/drivers/dma/at_xdmac.c
+@@ -1394,6 +1394,11 @@ static int at_xdmac_probe(struct platform_device *pdev)
+ 	dma_cap_set(DMA_CYCLIC, atxdmac->dma.cap_mask);
+ 	dma_cap_set(DMA_MEMCPY, atxdmac->dma.cap_mask);
+ 	dma_cap_set(DMA_SLAVE, atxdmac->dma.cap_mask);
++	/*
++	 * Without DMA_PRIVATE the driver is not able to allocate more than
++	 * one channel, second allocation fails in private_candidate.
++	 */
++	dma_cap_set(DMA_PRIVATE, atxdmac->dma.cap_mask);
+ 	atxdmac->dma.dev				= &pdev->dev;
+ 	atxdmac->dma.device_alloc_chan_resources	= at_xdmac_alloc_chan_resources;
+ 	atxdmac->dma.device_free_chan_resources		= at_xdmac_free_chan_resources;
 -- 
 2.0.3
