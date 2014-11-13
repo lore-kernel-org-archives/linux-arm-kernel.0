@@ -1,60 +1,48 @@
 From: horms+renesas@verge.net.au (Simon Horman)
 Date: Thu, 13 Nov 2014 10:20:26 +0900
-Subject: [GIT PULL] Third Round of Renesas ARM Based Soc Updates for v3.19
-Message-ID: <cover.1415841454.git.horms+renesas@verge.net.au>
+Subject: [PATCH 1/2] ARM: shmobile: sh73a0: Add restart callback
+In-Reply-To: <cover.1415841454.git.horms+renesas@verge.net.au>
+References: <cover.1415841454.git.horms+renesas@verge.net.au>
+Message-ID: <cad900819fba01760833c6c6ed89f464f9c93690.1415841454.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these third round of Renesas ARM based soc updates for v3.19.
+Port the sh73a0 restart handling from the kzm9g-legacy board code to the
+generic sh73a0 code.
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-soc2-for-v3.19,
-which I have already sent a pull-request for.
-
-This pull request is based on the previous round of
-such requests, tagged as renesas-soc2-for-v3.19,
-which I have already sent a pull-request for.
-
-Please note that "ARM: shmobile: always build rcar setup for armv7"
-corrects a build failure in allmodconfig caused by "ARM: shmobile:
-rcar-gen2: Add CA7 arch_timer initialization for r8a7794" which
-is included in the first round of Renesas ARM Based SoC Soc Updates for
-v3.19, tagged as renesas-soc2-for-v3.19, which I have previously sent
-a pull-request for.
-
-To be clear, this pull request is based on renesas-soc2-for-v3.19 which
-is in turn based on renesas-soc2-for-v3.19.
-
-
-The following changes since commit 950a3f0e7dd32c372c9957d5c050b08de7ec9e56:
-
-  ARM: shmobile: Enable PCI domains for R-Car Gen2 devices (2014-11-05 14:50:17 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc3-for-v3.19
-
-for you to fetch changes up to e3d163329753b3b473f40c9be71561ed8eb98aea:
-
-  ARM: shmobile: always build rcar setup for armv7 (2014-11-12 18:14:42 +0900)
-
-----------------------------------------------------------------
-Third Round of Renesas ARM Based Soc Updates for v3.19
-
-* Always build rcar setup for armv7
-  - Fixes allmodconfig build fauilre caused by
-    "ARM: shmobile: always build rcar setup for armv7"
-* Add restart callback to sh73a0
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      ARM: shmobile: always build rcar setup for armv7
-
-Geert Uytterhoeven (1):
-      ARM: shmobile: sh73a0: Add restart callback
-
- arch/arm/mach-shmobile/Makefile       | 1 +
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/mach-shmobile/setup-sh73a0.c | 8 ++++++++
- 2 files changed, 9 insertions(+)
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index b7bd8e5..3447ca7 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -775,6 +775,13 @@ void __init sh73a0_add_standard_devices_dt(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
++#define RESCNT2 IOMEM(0xe6188020)
++static void sh73a0_restart(enum reboot_mode mode, const char *cmd)
++{
++	/* Do soft power on reset */
++	writel((1 << 31), RESCNT2);
++}
++
+ static const char *sh73a0_boards_compat_dt[] __initdata = {
+ 	"renesas,sh73a0",
+ 	NULL,
+@@ -786,6 +793,7 @@ DT_MACHINE_START(SH73A0_DT, "Generic SH73A0 (Flattened Device Tree)")
+ 	.init_early	= sh73a0_init_delay,
+ 	.init_machine	= sh73a0_add_standard_devices_dt,
+ 	.init_late	= shmobile_init_late,
++	.restart	= sh73a0_restart,
+ 	.dt_compat	= sh73a0_boards_compat_dt,
+ MACHINE_END
+ #endif /* CONFIG_USE_OF */
+-- 
+2.1.1
