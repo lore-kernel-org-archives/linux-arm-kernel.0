@@ -1,85 +1,195 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 14 Nov 2014 12:00:45 +0100
-Subject: [PATCH v4 2/4] simplefb: Add support for enumerating simplefb
- dt nodes in /chosen
-In-Reply-To: <CACxGe6u3_GJA6pbDGX6puDhyJ2E9T+WujmzASw2VE+5-x9q9sA@mail.gmail.com>
-References: <1415906594-2461-1-git-send-email-hdegoede@redhat.com>
- <1415906594-2461-2-git-send-email-hdegoede@redhat.com>
- <CACxGe6u3_GJA6pbDGX6puDhyJ2E9T+WujmzASw2VE+5-x9q9sA@mail.gmail.com>
-Message-ID: <5465E0DD.6070005@redhat.com>
+Date: Fri, 14 Nov 2014 12:03:02 +0100
+Subject: [PATCH v7] simplefb: add clock handling code
+Message-ID: <1415962982-31667-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Luc Verhaegen <libv@skynet.be>
 
-On 11/14/2014 10:28 AM, Grant Likely wrote:
-> On Thu, Nov 13, 2014 at 7:23 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Update simplefb to support the new preferred location for simplefb dt nodes
->> under /chosen.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> --
->> Changes in v2:
->> -Make name array larger in case we ever encounter more then 10000 framebuffers
->> Changes in v3:
->> -Switch to for_each_child_of_node to loop over the nodes under chosen
->> Changes in v4:
->> -Wrap the chosen enumeration code in #ifdef CONFIG_OF, as simplefb is used on
->>  non devicetree platforms too
->> -simplefb can only be built-in, so drop the module_exit function calling
->>  platform_driver_unregister
->> ---
->>  drivers/video/fbdev/simplefb.c | 23 ++++++++++++++++++++++-
->>  1 file changed, 22 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
->> index 868099a..e381a53 100644
->> --- a/drivers/video/fbdev/simplefb.c
->> +++ b/drivers/video/fbdev/simplefb.c
->> @@ -27,6 +27,7 @@
->>  #include <linux/platform_data/simplefb.h>
->>  #include <linux/platform_device.h>
->>  #include <linux/clk-provider.h>
->> +#include <linux/of_platform.h>
->>
->>  static struct fb_fix_screeninfo simplefb_fix = {
->>         .id             = "simple",
->> @@ -390,7 +391,27 @@ static struct platform_driver simplefb_driver = {
->>         .probe = simplefb_probe,
->>         .remove = simplefb_remove,
->>  };
->> -module_platform_driver(simplefb_driver);
->> +
->> +static int __init simplefb_init(void)
->> +{
->> +       int ret;
->> +       struct device_node __maybe_unused *np;
->> +
->> +       ret = platform_driver_register(&simplefb_driver);
->> +       if (ret)
->> +               return ret;
->> +
->> +#ifdef CONFIG_OF
->> +       for_each_child_of_node(of_chosen, np) {
->> +               if (of_device_is_compatible(np, "simple-framebuffer"))
->> +                       of_platform_device_create(np, NULL, NULL);
->> +       }
->> +#endif
-> 
-> Nit: Kind of ugly. This should work instead:
-> 
->         if (IS_ENABLED(CONFIG_OF_PLATFORM) && of_chosen) {
->                 for_each_child_of_node(of_chosen, np)
->                         if (of_device_is_compatible(np, "simple-framebuffer"))
->                                 of_platform_device_create(np, NULL, NULL);
->         }
-> 
-> And move the forward declaration of of_chosen in include/linux/of.h up
-> 5 lines so that it is always declared. gcc will optimize it out, but
-> it will still get properly syntax checked on every build.
+This claims and enables clocks listed in the simple framebuffer dt node.
+This is needed so that the display engine, in case the required clocks
+are known by the kernel code and are described in the dt, will remain
+properly enabled.
 
-Ok, fixed for v5.
+Signed-off-by: Luc Verhaegen <libv@skynet.be>
+[hdegoede at redhat.com: Change clks from list to dynamic array]
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Reviewed-by: David Herrmann <dh.herrmann@gmail.com>
+Acked-by: Grant Likely <grant.likely@linaro.org>
+--
+Changes in v4:
+-change clks from linkedlist to dynamic allocated array
+-propagate EPROBE_DEFER up from simplefb_clocks_init to simplefb_probe
+Changes in v6:
+-Wrap the clock code in #ifdef CONFIG_OF, as simplefb is used on non
+ devicetree platforms too
+Changes in v7:
+-Put function return type and the rest of the prototype on the same line
+-Cleanup #ifdef CONFIG_OF handling
+---
+ drivers/video/fbdev/simplefb.c | 108 ++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 107 insertions(+), 1 deletion(-)
 
-Regards,
-
-Hans
+diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
+index cdcf1fe..d192946 100644
+--- a/drivers/video/fbdev/simplefb.c
++++ b/drivers/video/fbdev/simplefb.c
+@@ -26,6 +26,7 @@
+ #include <linux/module.h>
+ #include <linux/platform_data/simplefb.h>
+ #include <linux/platform_device.h>
++#include <linux/clk-provider.h>
+ 
+ static struct fb_fix_screeninfo simplefb_fix = {
+ 	.id		= "simple",
+@@ -167,8 +168,105 @@ static int simplefb_parse_pd(struct platform_device *pdev,
+ 
+ struct simplefb_par {
+ 	u32 palette[PSEUDO_PALETTE_SIZE];
++#ifdef CONFIG_OF
++	int clk_count;
++	struct clk **clks;
++#endif
+ };
+ 
++#ifdef CONFIG_OF
++/*
++ * Clock handling code.
++ *
++ * Here we handle the clocks property of our "simple-framebuffer" dt node.
++ * This is necessary so that we can make sure that any clocks needed by
++ * the display engine that the bootloader set up for us (and for which it
++ * provided a simplefb dt node), stay up, for the life of the simplefb
++ * driver.
++ *
++ * When the driver unloads, we cleanly disable, and then release the clocks.
++ *
++ * We only complain about errors here, no action is taken as the most likely
++ * error can only happen due to a mismatch between the bootloader which set
++ * up simplefb, and the clock definitions in the device tree. Chances are
++ * that there are no adverse effects, and if there are, a clean teardown of
++ * the fb probe will not help us much either. So just complain and carry on,
++ * and hope that the user actually gets a working fb at the end of things.
++ */
++static int simplefb_clocks_init(struct simplefb_par *par,
++				struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct clk *clock;
++	int i, ret;
++
++	if (dev_get_platdata(&pdev->dev) || !np)
++		return 0;
++
++	par->clk_count = of_clk_get_parent_count(np);
++	if (par->clk_count <= 0)
++		return 0;
++
++	par->clks = kcalloc(par->clk_count, sizeof(struct clk *), GFP_KERNEL);
++	if (!par->clks)
++		return -ENOMEM;
++
++	for (i = 0; i < par->clk_count; i++) {
++		clock = of_clk_get(np, i);
++		if (IS_ERR(clock)) {
++			if (PTR_ERR(clock) == -EPROBE_DEFER) {
++				while (--i >= 0) {
++					if (par->clks[i])
++						clk_put(par->clks[i]);
++				}
++				kfree(par->clks);
++				return -EPROBE_DEFER;
++			}
++			dev_err(&pdev->dev, "%s: clock %d not found: %ld\n",
++				__func__, i, PTR_ERR(clock));
++			continue;
++		}
++		par->clks[i] = clock;
++	}
++
++	for (i = 0; i < par->clk_count; i++) {
++		if (par->clks[i]) {
++			ret = clk_prepare_enable(par->clks[i]);
++			if (ret) {
++				dev_err(&pdev->dev,
++					"%s: failed to enable clock %d: %d\n",
++					__func__, i, ret);
++				clk_put(par->clks[i]);
++				par->clks[i] = NULL;
++			}
++		}
++	}
++
++	return 0;
++}
++
++static void simplefb_clocks_destroy(struct simplefb_par *par)
++{
++	int i;
++
++	if (!par->clks)
++		return;
++
++	for (i = 0; i < par->clk_count; i++) {
++		if (par->clks[i]) {
++			clk_disable_unprepare(par->clks[i]);
++			clk_put(par->clks[i]);
++		}
++	}
++
++	kfree(par->clks);
++}
++#else
++static int simplefb_clocks_init(struct simplefb_par *par,
++	struct platform_device *pdev) { return 0; }
++static void simplefb_clocks_destroy(struct simplefb_par *par) { }
++#endif
++
+ static int simplefb_probe(struct platform_device *pdev)
+ {
+ 	int ret;
+@@ -236,6 +334,10 @@ static int simplefb_probe(struct platform_device *pdev)
+ 	}
+ 	info->pseudo_palette = par->palette;
+ 
++	ret = simplefb_clocks_init(par, pdev);
++	if (ret < 0)
++		goto error_unmap;
++
+ 	dev_info(&pdev->dev, "framebuffer at 0x%lx, 0x%x bytes, mapped to 0x%p\n",
+ 			     info->fix.smem_start, info->fix.smem_len,
+ 			     info->screen_base);
+@@ -247,13 +349,15 @@ static int simplefb_probe(struct platform_device *pdev)
+ 	ret = register_framebuffer(info);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "Unable to register simplefb: %d\n", ret);
+-		goto error_unmap;
++		goto error_clocks;
+ 	}
+ 
+ 	dev_info(&pdev->dev, "fb%d: simplefb registered!\n", info->node);
+ 
+ 	return 0;
+ 
++error_clocks:
++	simplefb_clocks_destroy(par);
+ error_unmap:
+ 	iounmap(info->screen_base);
+ error_fb_release:
+@@ -264,8 +368,10 @@ error_fb_release:
+ static int simplefb_remove(struct platform_device *pdev)
+ {
+ 	struct fb_info *info = platform_get_drvdata(pdev);
++	struct simplefb_par *par = info->par;
+ 
+ 	unregister_framebuffer(info);
++	simplefb_clocks_destroy(par);
+ 	framebuffer_release(info);
+ 
+ 	return 0;
+-- 
+2.1.0
