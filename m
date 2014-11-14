@@ -1,85 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 Nov 2014 09:58:12 +0000
-Subject: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103E010D1829B@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D103E010D18265@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18266@CNBJMBX05.corpusers.net>
- <20141030120127.GC32589@arm.com>
- <CAKv+Gu9g5Q6fjPUy+P8YxkeDrH+bdO4kKGnxTQZRFhQpgPxaPA@mail.gmail.com>
- <20141030135749.GE32589@arm.com>
- <35FD53F367049845BC99AC72306C23D103E010D18272@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
- <20141113235322.GC4042@n2100.arm.linux.org.uk>
- <35FD53F367049845BC99AC72306C23D103E010D1829B@CNBJMBX05.corpusers.net>
-Message-ID: <20141114095812.GG4042@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 14 Nov 2014 11:01:47 +0100
+Subject: preferable method for pinctrl driver
+In-Reply-To: <545C9C41.1090300@rempel-privat.de>
+References: <54379C10.3050004@rempel-privat.de>
+ <CACRpkdYG6sNEfKNJBdbYCn4AbGiX2OfQAVJorR64cbB_gsWDbw@mail.gmail.com>
+ <545C846C.6090502@rempel-privat.de>
+ <545C9C41.1090300@rempel-privat.de>
+Message-ID: <CACRpkdZMX=HSpusLtPREufJpXuHOwH2MCtHrViASDR7Vbu_eMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 14, 2014 at 10:01:34AM +0800, Wang, Yalin wrote:
-> > -----Original Message-----
-> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> > Sent: Friday, November 14, 2014 7:53 AM
-> > To: Wang, Yalin
-> > > On Fri, Oct 31, 2014 at 01:42:44PM +0800, Wang, Yalin wrote:
-> > > This patch add bitrev.h file to support rbit instruction, so that we
-> > > can do bitrev operation by hardware.
-> > > Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
-> > > ---
-> > >  arch/arm/Kconfig              |  1 +
-> > >  arch/arm/include/asm/bitrev.h | 21 +++++++++++++++++++++
-> > >  2 files changed, 22 insertions(+)
-> > >  create mode 100644 arch/arm/include/asm/bitrev.h
-> > >
-> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig index
-> > > 89c4b5c..be92b3b 100644
-> > > --- a/arch/arm/Kconfig
-> > > +++ b/arch/arm/Kconfig
-> > > @@ -28,6 +28,7 @@ config ARM
-> > >  	select HANDLE_DOMAIN_IRQ
-> > >  	select HARDIRQS_SW_RESEND
-> > >  	select HAVE_ARCH_AUDITSYSCALL if (AEABI && !OABI_COMPAT)
-> > > +	select HAVE_ARCH_BITREVERSE if (CPU_V7M || CPU_V7)
-> > 
-> > Looking at this, this is just wrong.  Take a moment to consider what
-> > happens if we build a kernel which supports both ARMv6 _and_ ARMv7 CPUs.
-> > What happens if an ARMv6 CPU tries to execute an rbit instruction?
-> 
-> Is it possible to build a kernel that support both CPU_V6 and CPU_V7?
+On Fri, Nov 7, 2014 at 11:17 AM, Oleksij Rempel <linux@rempel-privat.de> wrote:
 
-Absolutely it is.
+>> thank you for your previous response. One more question: how pins should
+>> be numbered? Continuous or register offsets can be used?
+>> Documentations for this soc use pin names encoded like this
+>> #NAME_#BANK_#PIN. Register offset can be calculated by ((bank) * 32 +
+>> (pin) * 4)
+>> In this case i need to have extra array to convert pin number to offset,
+>> or use offset as pin number.
+>
+> Never mind, i think i found the answer:
+> This enumeration was arbitrarily chosen, in practice you need to think
+> through your numbering system so that it matches the layout of registers
+> and such things in your driver, or the code may become complicated. You
+> must also consider matching of offsets to the GPIO ranges that may be
+> handled by the pin controller.
 
-> I mean in Kconfig, CPU_V6 = y and CPU_V7 = y ?
+Yeah you're right :)
 
-Yes.
+There is some resoning in Documentation/pinctrl.txt but it needs some
+intuition etc.
 
-> If there is problem like you said,
-> How about this solution:
-> select HAVE_ARCH_BITREVERSE if ((CPU_V7M || CPU_V7) && !CPU_V6)  
-
-That would work.
-
-> For this patch,
-> I just cherry-pick from Joe,
-> If you are not responsible for this part,
-> I will submit to the maintainers for these patches .
-> Sorry for that .
-
-I think you need to discuss with Joe how Joe would like his patches
-handled.  However, it seems that Joe already sent his patches to the
-appropriate maintainers, and they have been applying those patches
-themselves.
-
-Since your generic ARM changes depend on these patches being accepted
-first, this means is that I can't apply the generic ARM changes until
-those other patches have hit mainline, otherwise things are going to
-break.  So, when you come to submit the latest set of patches to the
-patch system, please do so only after these dependent patches have
-been merged into mainline so that they don't get accidentally applied
-before hand and break the two drivers that Joe mentioned.
-
-Thanks.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Yours,
+Linus Walleij
