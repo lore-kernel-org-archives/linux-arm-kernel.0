@@ -1,43 +1,65 @@
 From: c.hemp@phytec.de (Christian Hemp)
-Date: Fri, 14 Nov 2014 14:32:24 +0100
-Subject: [PATCH 3/5] ARM:dts:imx6:phyFLEX: Set correct interrupt for pmic
+Date: Fri, 14 Nov 2014 14:32:26 +0100
+Subject: [PATCH 5/5] ARM:dts:imx6:phyFLEX: Add CAN support
 In-Reply-To: <1415971946-48975-1-git-send-email-c.hemp@phytec.de>
 References: <1415971946-48975-1-git-send-email-c.hemp@phytec.de>
-Message-ID: <1415971946-48975-4-git-send-email-c.hemp@phytec.de>
+Message-ID: <1415971946-48975-6-git-send-email-c.hemp@phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PMIC interrupt was changed from modul revision 1 to 2. Revision 1 was
-declared as a prototype and is not in series by any customers.
+Add CAN support for Phytec phyFLEX-i.MX6 (PFL-A-02 and PBA-B-01).
 
 Signed-off-by: Christian Hemp <c.hemp@phytec.de>
 ---
- arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi |  4 ++++
+ arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi | 13 +++++++++++++
+ 2 files changed, 17 insertions(+)
 
+diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
+index 7634cc1..585b4f6 100644
+--- a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
+@@ -101,6 +101,10 @@
+ 	};
+ };
+ 
++&can1 {
++	status = "okay";
++};
++
+ &fec {
+ 	status = "okay";
+ };
 diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-index af30653..8d718b5 100644
+index 2d72109..19cc269 100644
 --- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-@@ -107,8 +107,8 @@
- 	pmic at 58 {
- 		compatible = "dlg,da9063";
- 		reg = <0x58>;
--		interrupt-parent = <&gpio4>;
--		interrupts = <17 0x8>; /* active-low GPIO4_17 */
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <9 0x8>; /* active-low GPIO2_9 */
+@@ -64,6 +64,12 @@
+ 	status = "disabled";
+ };
  
- 		regulators {
- 			vddcore_reg: bcore1 {
-@@ -205,7 +205,7 @@
- 			fsl,pins = <
- 				MX6QDL_PAD_EIM_D23__GPIO3_IO23 0x80000000
- 				MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24 0x80000000 /* SPI NOR chipselect */
--				MX6QDL_PAD_DI0_PIN15__GPIO4_IO17  0x80000000 /* PMIC interrupt */
-+				MX6QDL_PAD_SD4_DAT1__GPIO2_IO09  0x80000000 /* PMIC interrupt */
- 				MX6QDL_PAD_ENET_TXD0__GPIO1_IO30 0x80000000 /* Green LED */
- 				MX6QDL_PAD_EIM_EB3__GPIO2_IO31 0x80000000 /* Red LED */
++&can1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan1>;
++	status = "disabled";
++};
++
+ &ecspi3 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_ecspi3>;
+@@ -240,6 +246,13 @@
  			>;
+ 		};
+ 
++		pinctrl_flexcan1: flexcan1grp {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX	0x1b0b0
++				MX6QDL_PAD_KEY_COL2__FLEXCAN1_TX	0x1b0b0
++			>;
++		};
++
+ 		pinctrl_gpmi_nand: gpminandgrp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_NANDF_CLE__NAND_CLE		0xb0b1
 -- 
 1.9.1
