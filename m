@@ -1,45 +1,44 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 14 Nov 2014 21:47:11 +0300
-Subject: [PATCH v7 11/13] ARM: dts: Berlin: enable USB on the BG2Q DMP
-In-Reply-To: <1415978763-27345-12-git-send-email-antoine.tenart@free-electrons.com>
-References: <1415978763-27345-1-git-send-email-antoine.tenart@free-electrons.com>
- <1415978763-27345-12-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <54664E2F.6070701@cogentembedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 14 Nov 2014 10:47:20 -0800
+Subject: [GIT PULL] ARM: OMAP2+: some clock/hwmod patches for v3.19
+In-Reply-To: <alpine.DEB.2.02.1411132249550.17030@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1411132249550.17030@utopia.booyaka.com>
+Message-ID: <20141114184719.GA7046@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+* Paul Walmsley <paul@pwsan.com> [141113 14:52]:
+> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+> 
+>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.19/omap-a
+> 
+> for you to fetch changes up to 79005fbd3e1d671d08c45c9140ee9826efdc367c:
+> 
+>   ARM: OMAP2+: hwmod: drop unnecessary list initialization (2014-11-13 09:36:55 -0700)
+> 
+> ----------------------------------------------------------------
+> Some OMAP clock/hwmod patches for v3.19.
+> 
+> Most of the patches are clock-related.  The DPLL implementation is
+> changed to better align to the common clock framework.
+> There is also a patch that removes a few lines from the hwmod code -
+> this patch should have no functional effect.
+> 
+> Basic build, boot, and PM test logs for these patches can be found here:
+> 
+> http://www.pwsan.com/omap/testlogs/omap-a-for-v3.19/20141113094101/
 
-On 11/14/2014 06:26 PM, Antoine Tenart wrote:
+Pulling into omap-for-v3.19/soc thanks. FYI, looks like there are
+few more open hwmod related threads you may want to look at:
 
-> Enable the 2 available USB PHY and USB nodes on the Marvell Berlin BG2Q
-> DMP.
+[PATCH v2 0/3] Add support for ADC on am437x-gp and am43x-epos-evm
+[RFC PATCH 0/6] ARM: OMAP4+: hwmod: fixing omap4+ DSS hwmods
+[PATCH] ARM: DRA7: hwmod data: Add missing UART hwmod data
 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
->   arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 53 ++++++++++++++++++++++++++++++
->   1 file changed, 53 insertions(+)
+Regards,
 
-> diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-> index ea1f99b8eed6..f7c25580e122 100644
-> --- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-> +++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-[...]
-> @@ -21,6 +23,39 @@
->   	choosen {
->   		bootargs = "console=ttyS0,115200 earlyprintk";
->   	};
-> +
-> +	regulators {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		reg_usb0_vbus: regulator at 0 {
-
-    Erm, I'm not seeing the "reg" prop. The <unit-address> part of the name 
-shouldn't be used without the "reg" prop.
-
-[...]
-
-WBR, Sergei
+Tony
