@@ -1,52 +1,31 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 14 Nov 2014 16:35:05 +0100
-Subject: [PATCH v2] can: Fix bug in suspend/resume
-In-Reply-To: <8d29d376aa02429dabd754b505fb336d@BN1BFFO11FD041.protection.gbl>
-References: <e7070431858e49e29cd03d76fd7a66c3@BN1AFFO11FD055.protection.gbl>
- <5465C34D.4030805@pengutronix.de>
- <e5f5913b51a54222aa1bb0680a77e56d@BN1AFFO11FD055.protection.gbl>
- <54661B2F.2000704@pengutronix.de>
- <8d29d376aa02429dabd754b505fb336d@BN1BFFO11FD041.protection.gbl>
-Message-ID: <54662129.3020907@pengutronix.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 14 Nov 2014 16:36:50 +0100
+Subject: [PATCH v7 03/13] ARM: Berlin: select the reset controller
+In-Reply-To: <3287202.nx0cnO5WUI@wuerfel>
+References: <1415978763-27345-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1415978763-27345-4-git-send-email-antoine.tenart@free-electrons.com>
+ <3287202.nx0cnO5WUI@wuerfel>
+Message-ID: <54662192.6000403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/2014 04:20 PM, S?ren Brinkmann wrote:
->>>> Please look the at suspend/resume code and count the
->>>> clock_enable/disable manually. After a suspend/resume cycle, you have
->>>> enabled the clock twice, but disabled it once.
->>>>
->>>> I think you have to abstract the clock handling behind runtime PM. I
->>>> haven't done this myself yet, but the strong feeling that this is a
->>>> possible solution to your problem. These links might help:
->>>
->>> I agree, the clock handling looks weird. Also the clk_disable calls in
->>> xcan_get_berr_counter() look suspicious to me, but I might be wrong.
->>> I think you can take a look at gpio-zynq for an example for runtime_pm
->>> usage. I think the usage model in that driver is similar to here.
->>
->> The xcan_get_berr_counter() function is correct, when doing manual (i.e.
->> non runtime-pm) clock handling. This function might be called if the
->> interface is down, this means clocks are disabled.
-> 
-> I see, thanks for the clarification. Guess that should become
-> pm_runtime_get_sync() and pm_runtime_put() when converting to
-> runtime_pm.
+On 11/14/2014 04:33 PM, Arnd Bergmann wrote:
+> On Friday 14 November 2014 16:25:53 Antoine Tenart wrote:
+>>   menuconfig ARCH_BERLIN
+>>          bool "Marvell Berlin SoCs" if ARCH_MULTI_V7
+>> +       select ARCH_HAS_RESET_CONTROLLER
+>>          select ARCH_REQUIRE_GPIOLIB
+>>          select ARM_GIC
+>>          select GENERIC_IRQ_CHIP
+>>          select DW_APB_ICTL
+>>          select DW_APB_TIMER_OF
+>>          select PINCTRL
+>> +       select RESET_CONTROLLER
+>
+> RESET_CONTROLLER is meant to be user-selectable, don't add a 'select' here,
+> but instead make the driver 'depends on RESET_CONTROLLER'.
 
-Yes, as far as I understand runtime pm.
+It already went into arm-soc for v3.19 - ergo, we need an extra
+patch for removing the current 'select'.
 
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141114/9605cd8f/attachment.sig>
+Sebastian
