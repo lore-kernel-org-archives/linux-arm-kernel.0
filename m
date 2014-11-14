@@ -1,48 +1,66 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 14 Nov 2014 16:53:58 +0100
-Subject: [PATCH 2/2] ARM: nspire: Remove unneeded nspire_map_io()
-In-Reply-To: <1415980438-12939-1-git-send-email-geert+renesas@glider.be>
-References: <1415980438-12939-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1415980438-12939-2-git-send-email-geert+renesas@glider.be>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 14 Nov 2014 16:54:04 +0100
+Subject: [GIT PULL] ARM: mediatek: Add support for mt6592, mt8127 and mt8135
+Message-ID: <CABuKBeLBdAaKyiOhVOUcvE9_ATYeMtccNP3zv_tdFvpgtxoMNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-nspire_map_io() just calls debug_ll_io_init().
+Hi Arnd and Olof,
 
-If machine_desc.map_io is not set, devicemaps_init() in the
-common ARM code will call debug_ll_io_init(), so nspire_map_io() and the
-initialization of .map_io can be removed.
+Here comes the pull request which introduces basic support for
+Mediatek SoCs mt6592, mt8127 and mt8135.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+The patches for the mt81xx got merged in the late tree for v3.18 but
+were not be merged at the end. They got a small fix regarding the
+compatible and model string in the dts files.
+
+Cheers,
+Matthias
+
 ---
-Untested
 
- arch/arm/mach-nspire/nspire.c | 6 ------
- 1 file changed, 6 deletions(-)
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-diff --git a/arch/arm/mach-nspire/nspire.c b/arch/arm/mach-nspire/nspire.c
-index 3d24ebf120953d93..1b7bd7bc62390fc1 100644
---- a/arch/arm/mach-nspire/nspire.c
-+++ b/arch/arm/mach-nspire/nspire.c
-@@ -35,11 +35,6 @@ static const char *nspire_dt_match[] __initconst = {
- 	NULL,
- };
- 
--static void __init nspire_map_io(void)
--{
--	debug_ll_io_init();
--}
--
- static struct clcd_board nspire_clcd_data = {
- 	.name		= "LCD",
- 	.caps		= CLCD_CAP_5551 | CLCD_CAP_565,
-@@ -74,7 +69,6 @@ static void nspire_restart(enum reboot_mode mode, const char *cmd)
- 
- DT_MACHINE_START(NSPIRE, "TI-NSPIRE")
- 	.dt_compat	= nspire_dt_match,
--	.map_io		= nspire_map_io,
- 	.init_machine	= nspire_init,
- 	.restart	= nspire_restart,
- MACHINE_END
--- 
-1.9.1
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+
+are available in the git repository at:
+
+  https://github.com/mbgg/linux-mediatek.git tags/v3.19-next-dts
+
+for you to fetch changes up to 256e7653c8bac60f1ccf9e0a58cc45b01a7954b9:
+
+  dt-bindings: add documentation for Mediatek SoC (2014-11-14 13:50:47 +0100)
+
+----------------------------------------------------------------
+Add support for mt6592, mt8127 and mt8135 Socs from Mediatek.
+
+----------------------------------------------------------------
+Howard Chen (3):
+      ARM: mediatek: Add basic support for mt6592
+      ARM: mediatek: add dts for mt6592-evb
+      dt-bindings: add documentation for Mediatek SoC
+
+Joe.C (6):
+      ARM: mediatek: Add basic support for mt8127
+      ARM: mediatek: add dts for 8127 Moose board
+      ARM: mediatek: Add basic support for mt8135
+      ARM: mediatek: add dts for MT8135 evaluation board.
+      ARM: dts: Build dtb for mt8127 & mt8135
+      dt-bindings: add more chips in documentation for Mediatek SoC
+
+ Documentation/devicetree/bindings/arm/mediatek.txt |  19 +++-
+ arch/arm/boot/dts/Makefile                         |   5 +-
+ arch/arm/boot/dts/mt6592-evb.dts                   |  26 +++++
+ arch/arm/boot/dts/mt6592.dtsi                      |  98 +++++++++++++++++
+ arch/arm/boot/dts/mt8127-moose.dts                 |  25 +++++
+ arch/arm/boot/dts/mt8127.dtsi                      |  94 +++++++++++++++++
+ arch/arm/boot/dts/mt8135-evbp1.dts                 |  25 +++++
+ arch/arm/boot/dts/mt8135.dtsi                      | 116 +++++++++++++++++++++
+ arch/arm/mach-mediatek/mediatek.c                  |   3 +
+ 9 files changed, 407 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/boot/dts/mt6592-evb.dts
+ create mode 100644 arch/arm/boot/dts/mt6592.dtsi
+ create mode 100644 arch/arm/boot/dts/mt8127-moose.dts
+ create mode 100644 arch/arm/boot/dts/mt8127.dtsi
+ create mode 100644 arch/arm/boot/dts/mt8135-evbp1.dts
+ create mode 100644 arch/arm/boot/dts/mt8135.dtsi
