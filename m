@@ -1,77 +1,90 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 14 Nov 2014 10:08:00 +0000
-Subject: [PATCH v4 16/19] arm64: GICv3: introduce symbolic names for GICv3
- ICC_SGI1R_EL1 fields
+Date: Fri, 14 Nov 2014 10:07:50 +0000
+Subject: [PATCH v4 06/19] arm/arm64: KVM: move kvm_register_device_ops() into
+ vGIC probing
 In-Reply-To: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
 References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1415959683-26027-17-git-send-email-andre.przywara@arm.com>
+Message-ID: <1415959683-26027-7-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gic_send_sgi() function used hardcoded bit shift values to
-generate the ICC_SGI1R_EL1 register value.
-Replace this with symbolic names to allow reusing them later.
+Currently we unconditionally register the GICv2 emulation device
+during the host's KVM initialization. Since with GICv3 support we
+may end up with only v2 or only v3 or both supported, we move the
+registration into the GIC probing function, where we will later know
+which combination is valid.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
 Changelog v3...v4:
-- (new patch)
+- add Acked-by
 
- drivers/irqchip/irq-gic-v3.c       |   14 +++++++++-----
- include/linux/irqchip/arm-gic-v3.h |   12 ++++++++++++
- 2 files changed, 21 insertions(+), 5 deletions(-)
+ include/linux/kvm_host.h |    1 +
+ virt/kvm/arm/vgic-v2.c   |    2 ++
+ virt/kvm/arm/vgic-v3.c   |    1 +
+ virt/kvm/arm/vgic.c      |    5 ++---
+ 4 files changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index aa17ae8..e163749 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -467,15 +467,19 @@ out:
- 	return tlist;
+diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+index ea53b04..326ba7a 100644
+--- a/include/linux/kvm_host.h
++++ b/include/linux/kvm_host.h
+@@ -1084,6 +1084,7 @@ void kvm_unregister_device_ops(u32 type);
+ 
+ extern struct kvm_device_ops kvm_mpic_ops;
+ extern struct kvm_device_ops kvm_xics_ops;
++extern struct kvm_device_ops kvm_arm_vgic_v2_ops;
+ 
+ #ifdef CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT
+ 
+diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
+index 2935405..e1cd3cb 100644
+--- a/virt/kvm/arm/vgic-v2.c
++++ b/virt/kvm/arm/vgic-v2.c
+@@ -229,6 +229,8 @@ int vgic_v2_probe(struct device_node *vgic_node,
+ 		goto out_unmap;
+ 	}
+ 
++	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
++
+ 	vgic->vcpu_base = vcpu_res.start;
+ 
+ 	kvm_info("%s@%llx IRQ%d\n", vgic_node->name,
+diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+index 1c2c8ee..d14c75f 100644
+--- a/virt/kvm/arm/vgic-v3.c
++++ b/virt/kvm/arm/vgic-v3.c
+@@ -230,6 +230,7 @@ int vgic_v3_probe(struct device_node *vgic_node,
+ 		ret = -ENXIO;
+ 		goto out;
+ 	}
++	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
+ 
+ 	vgic->vcpu_base = vcpu_res.start;
+ 	vgic->vctrl_base = NULL;
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 963b84e..e8003ca 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -2540,7 +2540,7 @@ static int vgic_create(struct kvm_device *dev, u32 type)
+ 	return kvm_vgic_create(dev->kvm, type);
  }
  
-+#define MPIDR_TO_SGI_AFFINITY(cluster_id, level) \
-+	(MPIDR_AFFINITY_LEVEL(cluster_id, level) \
-+		<< ICC_SGI1R_AFFINITY_## level ##_SHIFT)
-+
- static void gic_send_sgi(u64 cluster_id, u16 tlist, unsigned int irq)
- {
- 	u64 val;
+-static struct kvm_device_ops kvm_arm_vgic_v2_ops = {
++struct kvm_device_ops kvm_arm_vgic_v2_ops = {
+ 	.name = "kvm-arm-vgic",
+ 	.create = vgic_create,
+ 	.destroy = vgic_destroy,
+@@ -2619,8 +2619,7 @@ int kvm_vgic_hyp_init(void)
  
--	val = (MPIDR_AFFINITY_LEVEL(cluster_id, 3) << 48	|
--	       MPIDR_AFFINITY_LEVEL(cluster_id, 2) << 32	|
--	       irq << 24			    		|
--	       MPIDR_AFFINITY_LEVEL(cluster_id, 1) << 16	|
--	       tlist);
-+	val = (MPIDR_TO_SGI_AFFINITY(cluster_id, 3)	|
-+	       MPIDR_TO_SGI_AFFINITY(cluster_id, 2)	|
-+	       irq << ICC_SGI1R_SGI_ID_SHIFT		|
-+	       MPIDR_TO_SGI_AFFINITY(cluster_id, 1)	|
-+	       tlist << ICC_SGI1R_TARGET_LIST_SHIFT);
+ 	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
  
- 	pr_debug("CPU%d: ICC_SGI1R_EL1 %llx\n", smp_processor_id(), val);
- 	gic_write_sgi1r(val);
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 726d898..b7946c3 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -174,6 +174,18 @@
- #define ICC_SRE_EL2_SRE			(1 << 0)
- #define ICC_SRE_EL2_ENABLE		(1 << 3)
+-	return kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
+-				       KVM_DEV_TYPE_ARM_VGIC_V2);
++	return 0;
  
-+#define ICC_SGI1R_TARGET_LIST_SHIFT	0
-+#define ICC_SGI1R_TARGET_LIST_MASK	(0xffff << ICC_SGI1R_TARGET_LIST_SHIFT)
-+#define ICC_SGI1R_AFFINITY_1_SHIFT	16
-+#define ICC_SGI1R_AFFINITY_1_MASK	(0xff << ICC_SGI1R_AFFINITY_1_SHIFT)
-+#define ICC_SGI1R_SGI_ID_SHIFT		24
-+#define ICC_SGI1R_SGI_ID_MASK		(0xff << ICC_SGI1R_SGI_ID_SHIFT)
-+#define ICC_SGI1R_AFFINITY_2_SHIFT	32
-+#define ICC_SGI1R_AFFINITY_2_MASK	(0xffULL << ICC_SGI1R_AFFINITY_1_SHIFT)
-+#define ICC_SGI1R_IRQ_ROUTING_MODE_BIT	40
-+#define ICC_SGI1R_AFFINITY_3_SHIFT	48
-+#define ICC_SGI1R_AFFINITY_3_MASK	(0xffULL << ICC_SGI1R_AFFINITY_1_SHIFT)
-+
- /*
-  * System register definitions
-  */
+ out_free_irq:
+ 	free_percpu_irq(vgic->maint_irq, kvm_get_running_vcpus());
 -- 
 1.7.9.5
