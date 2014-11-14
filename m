@@ -1,126 +1,29 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 14 Nov 2014 09:33:32 -0700
-Subject: [PATCH v9 1/9] qcom: scm: scm_set_warm_boot_addr() to set the
- warmboot address
-In-Reply-To: <5465BD97.5070506@linaro.org>
-References: <1414194024-55547-1-git-send-email-lina.iyer@linaro.org>
- <1414194024-55547-2-git-send-email-lina.iyer@linaro.org>
- <5465BD97.5070506@linaro.org>
-Message-ID: <20141114163332.GF45276@linaro.org>
+From: carlo@caione.org (Carlo Caione)
+Date: Fri, 14 Nov 2014 17:38:32 +0100
+Subject: [PATCH] DTS: meson: Add forgotten compatible in board DTS
+Message-ID: <1415983112-11064-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 14 2014 at 01:30 -0700, Daniel Lezcano wrote:
->On 10/25/2014 01:40 AM, Lina Iyer wrote:
->>Set the warmboot address using an SCM call, only if the new address is
->>different than the old one.
->
->Please could you elaborate why a new address can be changed ?
->
-Hotplug could have a different warmboot address.
+The board DTS is missing the machine compatible.
 
+Signed-off-by: Carlo Caione <carlo@caione.org>
+---
+ arch/arm/boot/dts/meson6-atv1200.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
->>Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->>---
->>  drivers/soc/qcom/scm-boot.c | 22 ++++++++++++++++++++++
->>  include/soc/qcom/scm-boot.h |  1 +
->>  2 files changed, 23 insertions(+)
->>
->>diff --git a/drivers/soc/qcom/scm-boot.c b/drivers/soc/qcom/scm-boot.c
->>index 60ff7b4..5710967 100644
->>--- a/drivers/soc/qcom/scm-boot.c
->>+++ b/drivers/soc/qcom/scm-boot.c
->>@@ -37,3 +37,25 @@ int scm_set_boot_addr(phys_addr_t addr, int flags)
->>  			&cmd, sizeof(cmd), NULL, 0);
->>  }
->>  EXPORT_SYMBOL(scm_set_boot_addr);
->>+
->>+
->
->extra line.
->
->>+int scm_set_warm_boot_addr(void *entry, int cpu)
->>+{
->>+	static int flags[NR_CPUS] = {
->>+		SCM_FLAG_WARMBOOT_CPU0,
->>+		SCM_FLAG_WARMBOOT_CPU1,
->>+		SCM_FLAG_WARMBOOT_CPU2,
->>+		SCM_FLAG_WARMBOOT_CPU3,
->>+	};
->
->Please do not do that, you don't know what NR_CPUS value could be in 
->the future with the single kernel image and that could lead to a bug 
->very hard to find. The kernel stack is 4096.
->
->Move this out of the function:
->
->static int scm_flags[] = {
->	SCM_FLAG_WARMBOOT_CPU0,
->	SCM_FLAG_WARMBOOT_CPU1,
->	SCM_FLAG_WARMBOOT_CPU2,
->	SCM_FLAG_WARMBOOT_CPU3,
->};
-Sure.
->
->>+	static DEFINE_PER_CPU(void *, last_known_entry);
->
->It sounds odd to add those static declaration here even if I 
->understand that is to encapsulate them.
->
-Sure.
->>+	int ret;
->>+
->>+	if (entry == per_cpu(last_known_entry, cpu))
->>+		return 0;
->
->My question is: why scm_set_warm_boot_addr could be called with 
->different addresses ?
->
->If this is really needed, please replace the per_cpu variable by:
->
->struct scm_boot_addr {
->	int flag;
->	phys_addr_t entry;
->};
->
->static struct scm_boot_addr scm_flags[] = {
->	{ SCM_FLAG_WARMBOOT_CPU0, },
->	{ SCM_FLAG_WARMBOOT_CPU1, },
->	{ SCM_FLAG_WARMBOOT_CPU2, },
->	{ SCM_FLAG_WARMBOOT_CPU3, },
->};
->
-Hmm.. OK.
-
->>+	ret = scm_set_boot_addr(virt_to_phys(entry), flags[cpu]);
->>+	if (!ret)
->>+		per_cpu(last_known_entry, cpu) = entry;
->>+
->>+	return ret;
->>+}
->>diff --git a/include/soc/qcom/scm-boot.h b/include/soc/qcom/scm-boot.h
->>index 02b445c..100938b 100644
->>--- a/include/soc/qcom/scm-boot.h
->>+++ b/include/soc/qcom/scm-boot.h
->>@@ -22,5 +22,6 @@
->>  #define SCM_FLAG_WARMBOOT_CPU3		0x40
->
->By the way, if you look for encapsulation, perhaps these macros could 
->be moved into scm-boot.c, no ?
->
-Dont think anybody outside the file needs it.
-
->>  int scm_set_boot_addr(phys_addr_t addr, int flags);
->>+int scm_set_warm_boot_addr(void *entry, int cpu);
->>
->>  #endif
->>
->
->
->-- 
-> <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->
->Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-><http://twitter.com/#!/linaroorg> Twitter |
-><http://www.linaro.org/linaro-blog/> Blog
->
+diff --git a/arch/arm/boot/dts/meson6-atv1200.dts b/arch/arm/boot/dts/meson6-atv1200.dts
+index dc2541f..d7d351a 100644
+--- a/arch/arm/boot/dts/meson6-atv1200.dts
++++ b/arch/arm/boot/dts/meson6-atv1200.dts
+@@ -50,7 +50,7 @@
+ 
+ / {
+ 	model = "Geniatech ATV1200";
+-	compatible = "geniatech,atv1200";
++	compatible = "geniatech,atv1200", "amlogic,meson6";
+ 
+ 	aliases {
+ 		serial0 = &uart_AO;
+-- 
+1.9.1
