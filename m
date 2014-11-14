@@ -1,50 +1,98 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 14 Nov 2014 16:48:12 +0400
-Subject: [PATCH 02/15] GPIO: port LoCoMo gpio support from old driver
-In-Reply-To: <CACRpkdZiari6CtWq1kBCvX3cwwatJiHAuWUb40WSUEfjZjk+Lg@mail.gmail.com>
-References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
- <1414454528-24240-3-git-send-email-dbaryshkov@gmail.com>
- <CACRpkdY7tRadod2vQfEytmw-ubaMAvr_=XTczD5bUMkqie0xkg@mail.gmail.com>
- <CALT56yOgMUA7o2dzfHph=S2zkDV4zERzMh4ishpPwpAx7Cqj6Q@mail.gmail.com>
- <CACRpkdb7v3LmOhbhQ9TPk1_bnLnpwizawW6RQvhQRLSjRewAaQ@mail.gmail.com>
- <CALT56yO9f8wzaArnmfQSDzCM3S+2oT+62anH5kbFY3WdEt_HZg@mail.gmail.com>
- <20141106060335.GR8509@sirena.org.uk>
- <CALT56yPr42FV66USngocw=eWPt81d5R2MJxmzBnv02HOMmXAkA@mail.gmail.com>
- <CACRpkdZiari6CtWq1kBCvX3cwwatJiHAuWUb40WSUEfjZjk+Lg@mail.gmail.com>
-Message-ID: <CALT56yNh=orC+-iq--6MJv5swc_EjgG=n=0zJf-css8jdWGVFw@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 14 Nov 2014 13:49:04 +0100
+Subject: [PATCH] ahci_sunxi: Drop AHCI_HFLAG_NO_PMP flag
+In-Reply-To: <037f97ce-468b-4b91-9616-51a3301c5be6@googlegroups.com>
+References: <1415874256-6580-1-git-send-email-hdegoede@redhat.com>
+ <20141113222952.GI2598@htj.dyndns.org>
+ <037f97ce-468b-4b91-9616-51a3301c5be6@googlegroups.com>
+Message-ID: <5465FA40.8000508@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-14 13:11 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Tue, Nov 11, 2014 at 2:16 PM, Dmitry Eremin-Solenikov
-> <dbaryshkov@gmail.com> wrote:
->
->> Just to better understand your suggestions: do you want me to convert
->> to regmap only gpio driver or do you suggest to convert all LoCoMo drivers?
->
-> Um... I was just thinking about this one usecase.
+Hi,
 
-I ended up converting all drivers. It allowed me to clean up several points
-in the driver.
+On 11/14/2014 12:56 PM, Hans de Goede wrote:
+> Hi,
+> 
+> On Thursday, November 13, 2014 11:29:56 PM UTC+1, Tejun Heo wrote:
+>>
+>> On Thu, Nov 13, 2014 at 11:24:16AM +0100, Hans de Goede wrote: 
+>>> This is something which we inherited from the Allwinner android kernel 
+>> sources, 
+>>> and I've always wanted to test if this is really necessary. 
+>>>
+>>> So recently I've bought a sata port multiplexer, and I've given this a 
+>> test 
+>>> spin on both A10 and A20 devices, and it seems to work fine: 
+>>>
+>>> [    2.154456] ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300) 
+>>> [    2.161092] ata1.15: Port Multiplier 1.2, 0x197b:0x0325 r0, 5 ports, 
+>> feat 0x5/0xf 
+>>> [    2.175511] ata1.00: hard resetting link 
+>>> [    2.524929] ata1.00: SATA link up 3.0 Gbps (SStatus 123 SControl 320) 
+>>> [    2.531430] ata1.01: hard resetting link 
+>>> [    2.974465] ata1.01: link resume succeeded after 1 retries 
+>>> [    3.094932] ata1.01: SATA link up 3.0 Gbps (SStatus 123 SControl 300) 
+>>> [    3.101431] ata1.02: hard resetting link 
+>>> [    4.174466] ata1.02: failed to resume link (SControl 0) 
+>>> [    4.180065] ata1.02: SATA link down (SStatus 0 SControl 0) 
+>>> (and the same for links 3 and 4) 
+>>>
+>>> Once the NO_PMP flag is removed it correctly sees the 2 disks which I've 
+>>> attached, and I can mount and use them just fine, so lets drop the flag. 
+>>>
+>>> Signed-off-by: Hans de Goede <hdeg...@redhat.com <javascript:>> 
+>>
+>> Applied to libata/for-3.18-fixes. 
+>>
+> 
+> I just found out why Allwinner added that AHCI_HFLAG_NO_PMP flag, after 
+> putting the system I used to test the port multiplexer back together this 
+> morning, it seems that probing for a port multiplexer being present breaks 
+> the no-port-multiplexer (so direct attached disk) case :(  I guess I should 
+> have tested for that before sending the patch, but the thought of it 
+> breaking normal usage did not cross my mind.
+> 
+> So self NACK. If it is not too late, can you please drop this from your 
+> tree ?
+> 
+> Let me know if you want me to send a revert instead.
+> 
+> I'll look into fixing this another way, maybe with a quirk + an extra reset 
+> after failed pmp testing, and it that does not work a module option.
 
->
-> It's no big deal, the other review comments are more important.
+Ok, so the problem seems to be that the controller fails to do a soft-reset
+when attached directly to a normal device rather then to a pmp.
 
-Fixed most of the comments. Last remaining issue is factoring out m62332
-interface.
+If I comment out this block of code in libata-core.c:
 
->> That is doable, of course, but the amount of changes is overwhelming.
->> Also I'm concerned about the performance impact from going through
->> regmap layers.
->
-> Is it on a critical path? The current locking isn't any less invasive
-> AFAICT.
->
-> Yours,
-> Linus Walleij
+        if (sata_pmp_supported(link->ap) && ata_is_host_link(link)) {
+                /* If PMP is supported, we have to do follow-up SRST.
+                 * Some PMPs don't send D2H Reg FIS after hardreset if
+                 * the first port is empty.  Wait only for
+                 * ATA_TMOUT_PMP_SRST_WAIT.
+                 */
+                if (check_ready) {
+                        unsigned long pmp_deadline;
 
+                        pmp_deadline = ata_deadline(jiffies,
+                                                    ATA_TMOUT_PMP_SRST_WAIT);
+                        if (time_after(pmp_deadline, deadline))
+                                pmp_deadline = deadline;
+                        ata_wait_ready(link, pmp_deadline, check_ready);
+                }
+                rc = -EAGAIN;
+                goto out;
+        }
 
+Then things work again. This code looks like it is a must have for
+pmp use, so I'll do a follow up patch to my initial patch dropping the
+AHCI_HFLAG_NO_PMP flag, which re-adds it based on a module option
+(defaulting to the non-pmp case).
 
--- 
-With best wishes
-Dmitry
+This way you don't have to do a forced-push to your tree to drop the
+original patch (or revert it).
+
+Regards,
+
+Hans
