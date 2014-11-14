@@ -1,70 +1,64 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 14 Nov 2014 17:42:31 +0300
-Subject: [PATCH 7/8] arm64/kexec: Add checks for KVM and EFI
-In-Reply-To: <b7b2f48822a563bafe2888d7ac8e863731159796.1415926876.git.geoff@infradead.org>
-References: <cover.1415926876.git.geoff@infradead.org>
- <b7b2f48822a563bafe2888d7ac8e863731159796.1415926876.git.geoff@infradead.org>
-Message-ID: <546614D7.8080401@cogentembedded.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 14 Nov 2014 15:43:30 +0100
+Subject: [GIT PULL] at91: drivers for 3.19 #1
+Message-ID: <1415976210-3665-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Arnd, Olof, Kevin,
 
-On 11/14/2014 4:22 AM, Geoff Levand wrote:
+This is a pull-request about AT91-related drivers that are easier to take via
+arm-soc.
 
-> Add runtime checks that fail the arm64 kexec syscall for situations that would
-> result in system instability do to problems in the KVM and EFI kernel support.
-> These checks should be removed when the KVM and EFI problems are fixed.
+There is a little merge conflict with the "cleanup" branch because of removal
+of at91sam9g45 and at91sam9rl legacy code. The resolution is pretty simple but
+you can have a look at the resolution example here:
+https://git.kernel.org/cgit/linux/kernel/git/nferre/linux-at91.git/log/?h=at91-next
 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> ---
->   arch/arm64/kernel/machine_kexec.c | 22 ++++++++++++++++++++++
->   1 file changed, 22 insertions(+)
+Thanks, best regards,
 
-> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> index 775bcc3..5b62bd1f 100644
-> --- a/arch/arm64/kernel/machine_kexec.c
-> +++ b/arch/arm64/kernel/machine_kexec.c
-> @@ -16,6 +16,12 @@
->   #include <asm/cacheflush.h>
->   #include <asm/system_misc.h>
+The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
 
-> +/* TODO: Remove this include when KVM can support a kexc reboot. */
+  Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
 
-    s/kexc/kexec/ here and below.
+are available in the git repository at:
 
-> +#include <asm/virt.h>
-> +
-> +/* TODO: Remove this include when EFI can support a kexc reboot. */
-> +#include <linux/efi.h>
-> +
->   /* Global variables for the relocate_kernel routine. */
->   extern const unsigned char relocate_new_kernel[];
->   extern const unsigned long relocate_new_kernel_size;
-> @@ -101,6 +107,22 @@ int machine_kexec_prepare(struct kimage *image)
->
->   	kexec_image_info(image);
->
-> +	/* TODO: Remove this message when KVM can support a kexc reboot. */
-> +	if (IS_ENABLED(CONFIG_KVM) && is_hyp_mode_available()) {
-> +		pr_err("%s: Your kernel is configued with KVM support "
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-drivers
 
-    Configured.
+for you to fetch changes up to 2c91e61dc97cce57ffd9dd654a6ee284e1f45a1f:
 
-> +			"(CONFIG_KVM=y) which currently does not allow for "
-> +			"kexec re-boot.\n", __func__);
-> +		return -ENOSYS;
-> +	}
-> +
-> +	/* TODO: Remove this message when EFI can support a kexc reboot. */
-> +	if (efi_enabled(EFI_BOOT)) {
-> +		pr_err("%s: Your kernel is using the Extensible Firmware "
-> +			"Interface (EFI) which currently does not allow for "
-> +			"kexec re-boot.\n", __func__);
-> +		return -ENOSYS;
-> +	}
-> +
->   	return 0;
->   }
+  rtc: at91sam9: add DT bindings documentation (2014-11-13 16:08:48 +0100)
 
-WBR, Sergei
+----------------------------------------------------------------
+First batch of drivers for 3.19:
+It is only about a not so recent driver for old platforms: RTT as RTC driver:
+- RTT as RTC driver enhancements and machine specific include files removal
+- RTT as RTC driver conversion to device tree
+
+----------------------------------------------------------------
+Boris BREZILLON (9):
+      rtc: at91sam9: remove references to mach specific headers
+      rtc: at91sam9: use standard readl/writel functions instead of raw versions
+      rtc: at91sam9: replace devm_ioremap by devm_ioremap_resource
+      rtc: at91sam9: add DT support
+      rtc: at91sam9: make use of syscon/regmap to access GPBR registers
+      rtc: at91sam9: rework the Kconfig description
+      ARM: at91: add clk_lookup entry for RTT devices
+      rtc: at91sam9: use clk API instead of relying on AT91_SLOW_CLOCK
+      rtc: at91sam9: add DT bindings documentation
+
+ .../devicetree/bindings/rtc/atmel,at91sam9-rtc.txt |  23 ++++
+ arch/arm/mach-at91/at91sam9260.c                   |   2 +
+ arch/arm/mach-at91/at91sam9261.c                   |   2 +
+ arch/arm/mach-at91/at91sam9263.c                   |   4 +
+ arch/arm/mach-at91/at91sam9g45.c                   |   2 +
+ arch/arm/mach-at91/at91sam9rl.c                    |   2 +
+ arch/arm/mach-at91/clock.c                         |   2 +-
+ arch/arm/mach-at91/clock.h                         |   1 +
+ drivers/rtc/Kconfig                                |  24 ++--
+ drivers/rtc/rtc-at91sam9.c                         | 138 ++++++++++++++++-----
+ 10 files changed, 162 insertions(+), 38 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
+
+-- 
+Nicolas Ferre
