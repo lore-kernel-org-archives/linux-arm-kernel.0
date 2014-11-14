@@ -1,42 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Nov 2014 17:23:41 +0100
-Subject: [PATCH v4 0/2] ARM: shmobile: Add early debugging support using
- SCIF(A)
-In-Reply-To: <1415980187-12683-1-git-send-email-geert+renesas@glider.be>
-References: <1415980187-12683-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1602253.050FQygs2a@wuerfel>
+From: carlo@caione.org (Carlo Caione)
+Date: Fri, 14 Nov 2014 17:25:50 +0100
+Subject: [PATCH RESEND 0/3] ARM: Meson6: enable SMP
+Message-ID: <1415982353-9293-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 November 2014 16:49:45 Geert Uytterhoeven wrote:
->         Hi Simon, Magnus, Arnd,
-> 
-> This patch series adds serial port debug macros for the SCIF(A) serial ports.
-> This includes all supported shmobile SoCs, except for EMEV2.
-> 
-> It contains 2 patches, which are two alternative versions:
->   - The first patch keeps on using the identity mapping set up by .map_io()
->     on platforms I cannot test myself (sh7372 and r8a7779),
->   - The second one converts the remaining platforms to use debug_ll_io_init(),
->     which allowed to get rid of the #ifdef in renesas-scif.S, and consolidate
->     more config options.
-> 
-> Both versions work fine on r8a7791/koelsch (multiplatform), r8a7740/armadillo
-> (legacy and reference), and sh73a0/kzm9g (legacy, reference, and
-> multiplatform), also with a multiplatform kernel based on shmobile_defconfig.
-> 
-> I'd appreciate if you could test the second one on sh7372 and r8a7779,
-> and if it works, apply it.
-> 
-> Else, please apply the first version. We can do incremental conversions later,
-> as discussed before.
+Amlogic Meson6 is a dual-core Cortex-A9. This patchset adds all the necessary
+pieces to boot the secondary CPU.
 
-Both versions look good to me,
+---
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+This is a resend of a patchset already submitted a while ago 
+http://www.spinics.net/lists/arm-kernel/msg366787.html
 
-I do notice that strictly speaking you break alphabetical ordering by putting
-DEBUG_R8A* and DEBUG_RCAR* after DEBUG_RK*, but it does seem way more reasonable
-like this.
+Carlo Caione (3):
+  ARM: Meson6: docs: document bindings
+  ARM: Meson6: Add SMP support for Amlogic Meson6
+  ARM: Meson6: enable SMP in DTS/DTSI
 
-	Arnd
+ .../bindings/arm/meson/amlogic,meson6-cpuconfig    | 16 +++++
+ .../bindings/arm/meson/amlogic,meson6-smp          | 26 +++++++
+ arch/arm/boot/dts/meson.dtsi                       |  5 ++
+ arch/arm/boot/dts/meson6.dtsi                      |  6 ++
+ arch/arm/mach-meson/Kconfig                        |  1 +
+ arch/arm/mach-meson/Makefile                       |  1 +
+ arch/arm/mach-meson/headsmp.S                      |  7 ++
+ arch/arm/mach-meson/platsmp.c                      | 80 ++++++++++++++++++++++
+ 8 files changed, 142 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/meson/amlogic,meson6-cpuconfig
+ create mode 100644 Documentation/devicetree/bindings/arm/meson/amlogic,meson6-smp
+ create mode 100644 arch/arm/mach-meson/headsmp.S
+ create mode 100644 arch/arm/mach-meson/platsmp.c
+
+-- 
+1.9.1
