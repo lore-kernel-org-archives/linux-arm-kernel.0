@@ -1,19 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 14 Nov 2014 17:50:04 -0200
-Subject: [PATCH 1/4] of: Add vendor prefix for Chips&Media, Inc.
-In-Reply-To: <1402679641-868-1-git-send-email-p.zabel@pengutronix.de>
-References: <1402679641-868-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <CAOMZO5ALspYUOhxKw2K4vZ5ufN87VF5r7-5EbVd5BeHBVendxw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Nov 2014 20:58:43 +0100
+Subject: [PATCH V2 1/7] arm64: dts: Add APM X-Gene USB DTS node
+In-Reply-To: <CAL85gmCXBFCs6dNQXDLh4HAgZ4SN7Wwnon_D3a4q_Rq3oz-Vvg@mail.gmail.com>
+References: <1415924401-3013-1-git-send-email-fkan@apm.com>
+ <2126031.OOHBs2pzVu@wuerfel>
+ <CAL85gmCXBFCs6dNQXDLh4HAgZ4SN7Wwnon_D3a4q_Rq3oz-Vvg@mail.gmail.com>
+Message-ID: <13891778.lvGnz7oB4J@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+On Friday 14 November 2014 11:17:38 Feng Kan wrote:
+> On Fri, Nov 14, 2014 at 7:04 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 13 November 2014 16:19:55 Feng Kan wrote:
+> >>
+> >> +               usb0: dwusb at 19000000 {
+> >> +                       status = "disabled";
+> >> +                       compatible = "xhci-platform";
+> >> +                       reg =  <0x0 0x19000000 0x0 0x100000>;
+> >> +                       interrupts = <0x0 0x89 0x4>;
+> >> +                       dma-coherent;
+> >> +               };
+> >> +
+> >> +               usb1: dwusb at 19800000 {
+> >> +                       status = "disabled";
+> >> +                       compatible = "xhci-platform";
+> >> +                       reg =  <0x0 0x19800000 0x0 0x100000>;
+> >> +                       interrupts = <0x0 0x8a 0x4>;
+> >> +                       dma-coherent;
+> >> +               };
+> >>
+> >
+> > Call the nodes 'usb', not 'dwusb'.
+> This was a deliberate change on our part to make sure backward
+> compatibility with a older bootloader.
 
-On Fri, Jun 13, 2014 at 2:13 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> Chips&Media is a developer of Video Codec IP cores.
->
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Ok, then add a comment above the nodes explaining this, to prevent
+people from cleaning it up and accidentally breaking your boot loader
+later.
 
-4/4 is in Shawn's tree now. Could you please resend patches 1,2 and 3?
-
-Thanks
+	Arnd
