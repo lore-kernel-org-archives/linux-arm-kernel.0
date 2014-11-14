@@ -1,142 +1,62 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Fri, 14 Nov 2014 17:25:52 +0100
-Subject: [PATCH RESEND 2/3] ARM: Meson6: Add SMP support for Amlogic Meson6
-In-Reply-To: <1415982353-9293-1-git-send-email-carlo@caione.org>
-References: <1415982353-9293-1-git-send-email-carlo@caione.org>
-Message-ID: <1415982353-9293-3-git-send-email-carlo@caione.org>
+From: gang.chen.5i5j@gmail.com (Chen Gang)
+Date: Sat, 15 Nov 2014 00:30:11 +0800
+Subject: [PATCH v2] virt: kvm: arm: vgic: Process the failure case when
+ kvm_register_device_ops() fails
+In-Reply-To: <546625F8.6060900@arm.com>
+References: <54661D5F.3060304@gmail.com> <546625F8.6060900@arm.com>
+Message-ID: <54662E13.2010507@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amlogic Meson6 is a dual core Cortex-A9. This patch adds the logic to
-boot up the second CPU.
 
-Signed-off-by: Carlo Caione <carlo@caione.org>
----
- arch/arm/mach-meson/Kconfig   |  1 +
- arch/arm/mach-meson/Makefile  |  1 +
- arch/arm/mach-meson/headsmp.S |  7 ++++
- arch/arm/mach-meson/platsmp.c | 80 +++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 89 insertions(+)
- create mode 100644 arch/arm/mach-meson/headsmp.S
- create mode 100644 arch/arm/mach-meson/platsmp.c
+According to your taste, we need improve 2 contents below:
 
-diff --git a/arch/arm/mach-meson/Kconfig b/arch/arm/mach-meson/Kconfig
-index 2c1154e..4e96de4 100644
---- a/arch/arm/mach-meson/Kconfig
-+++ b/arch/arm/mach-meson/Kconfig
-@@ -2,6 +2,7 @@ menuconfig ARCH_MESON
- 	bool "Amlogic Meson SoCs" if ARCH_MULTI_V7
- 	select GENERIC_IRQ_CHIP
- 	select ARM_GIC
-+	select HAVE_ARM_SCU if SMP
- 
- if ARCH_MESON
- 
-diff --git a/arch/arm/mach-meson/Makefile b/arch/arm/mach-meson/Makefile
-index 9d7380e..4691966 100644
---- a/arch/arm/mach-meson/Makefile
-+++ b/arch/arm/mach-meson/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_ARCH_MESON) += meson.o
-+obj-$(CONFIG_SMP) += platsmp.o headsmp.o
-diff --git a/arch/arm/mach-meson/headsmp.S b/arch/arm/mach-meson/headsmp.S
-new file mode 100644
-index 0000000..3347d88
---- /dev/null
-+++ b/arch/arm/mach-meson/headsmp.S
-@@ -0,0 +1,7 @@
-+#include <linux/linkage.h>
-+#include <linux/init.h>
-+
-+ENTRY(meson_secondary_startup)
-+        bl	v7_invalidate_l1
-+        b       secondary_startup
-+ENDPROC(meson_secondary_startup)
-diff --git a/arch/arm/mach-meson/platsmp.c b/arch/arm/mach-meson/platsmp.c
-new file mode 100644
-index 0000000..3d4d0cd
---- /dev/null
-+++ b/arch/arm/mach-meson/platsmp.c
-@@ -0,0 +1,80 @@
-+#include <linux/init.h>
-+#include <linux/smp.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/delay.h>
-+#include <asm/smp_scu.h>
-+#include <asm/smp_plat.h>
-+#include <asm/cacheflush.h>
-+
-+#define MESON_CPU_CONTROL_REG		0x0
-+#define MESON_CPU1_CONTROL_ADDR_REG	0x4
-+
-+#define MESON_CPU_CONTROL_ID(cpu)	((1 << (cpu)) | 1)
-+
-+static void __iomem *cpucfg_membase;
-+static void __iomem *scu_membase;
-+
-+static DEFINE_SPINLOCK(cpu_lock);
-+
-+extern void meson_secondary_startup(void);
-+
-+static void __init meson6_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	struct device_node *node;
-+
-+	node = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
-+	if (!node) {
-+		pr_err("Missing Meson6 SCU node\n");
-+		return;
-+	}
-+
-+	scu_membase = of_iomap(node, 0);
-+	if (!scu_membase) {
-+		pr_err("Couln't map Meson6 SCU registers\n");
-+		return;
-+	}
-+
-+	node = of_find_compatible_node(NULL, NULL, "amlogic,meson6-cpuconfig");
-+	if (!node) {
-+		pr_err("Missing Meson6 CPU config node\n");
-+		return;
-+	}
-+
-+	cpucfg_membase = of_iomap(node, 0);
-+	if (!cpucfg_membase) {
-+		pr_err("Couldn't map Meson6 CPU config registers\n");
-+		return;
-+	}
-+
-+	scu_enable(scu_membase);
-+}
-+
-+static int meson6_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	if (!cpucfg_membase)
-+		return -EFAULT;
-+
-+	spin_lock(&cpu_lock);
-+
-+	writel(virt_to_phys(meson_secondary_startup), cpucfg_membase +
-+		MESON_CPU1_CONTROL_ADDR_REG);
-+	writel(MESON_CPU_CONTROL_ID(cpu), cpucfg_membase +
-+		MESON_CPU_CONTROL_REG);
-+
-+	smp_wmb();
-+
-+	dsb_sev();
-+
-+	spin_unlock(&cpu_lock);
-+
-+	return 0;
-+}
-+
-+static struct smp_operations meson6_smp_ops __initdata = {
-+	.smp_prepare_cpus	= meson6_smp_prepare_cpus,
-+	.smp_boot_secondary	= meson6_smp_boot_secondary,
-+};
-+
-+CPU_METHOD_OF_DECLARE(meson6_smp, "amlogic,meson6-smp", &meson6_smp_ops);
+On 11/14/2014 11:55 PM, Marc Zyngier wrote:
+> 
+> No. This is completely overdesigned, and fixes something that really
+> cannot happen. What is wrong with:
+> 
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 3aaca49..b7dffa80 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -2465,13 +2465,17 @@ int kvm_vgic_hyp_init(void)
+>  		goto out_free_irq;
+>  	}
+>  
+> +	ret = kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
+> +				       KVM_DEV_TYPE_ARM_VGIC_V2);
+> +	if (ret)
+> +		goto out_free_irq;
+> +
+
+Need call __unregister_cpu_notifier(), since __register_cpu_notifier()
+is already successfully called.
+
+Need print some information for failure via kvm_err().
+
+Thanks.
+>  	/* Callback into for arch code for setup */
+>  	vgic_arch_setup(vgic);
+>  
+>  	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
+>  
+> -	return kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
+> -				       KVM_DEV_TYPE_ARM_VGIC_V2);
+> +	return 0;
+>  
+>  out_free_irq:
+>  	free_percpu_irq(vgic->maint_irq, kvm_get_running_vcpus());
+> 
+> This achieves the exact same effect.
+> 
+> Thanks,
+> 
+> 	M.
+> 
+
+
 -- 
-1.9.1
+Chen Gang
+
+Open share and attitude like air water and life which God blessed
