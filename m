@@ -1,185 +1,38 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Fri, 14 Nov 2014 11:03:55 +0100
-Subject: [PATCH v14 3/7] KVM: x86: switch to kvm_get_dirty_log_protect
-In-Reply-To: <546563BF.9060407@samsung.com>
-References: <1415930268-7674-1-git-send-email-m.smarduch@samsung.com>
- <1415930268-7674-4-git-send-email-m.smarduch@samsung.com>
- <546563BF.9060407@samsung.com>
-Message-ID: <5465D38B.1090605@redhat.com>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Fri, 14 Nov 2014 11:03:25 +0100
+Subject: [RESEND PATCH 2/2] ARM: dts: exynos4412-trats2: Enable TMU support at
+ Trats2
+In-Reply-To: <1415959405-14157-1-git-send-email-l.majewski@samsung.com>
+References: <1381300194-13134-5-git-send-email-l.majewski@samsung.com>
+ <1415959405-14157-1-git-send-email-l.majewski@samsung.com>
+Message-ID: <1415959405-14157-2-git-send-email-l.majewski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch enables support for TMU at Exynos4412 based Trats2 board.
 
+Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
+ arch/arm/boot/dts/exynos4412-trats2.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-On 14/11/2014 03:06, Mario Smarduch wrote:
-> Hi Paolo,
-> 
->   I changed your patch a little to use a Kconfig symbol,
-> hope that's fine with you.
-
-Of course, thanks.
-
-Paolo
-
-> - Mario
-> 
-> On 11/13/2014 05:57 PM, Mario Smarduch wrote:
->> From: Paolo Bonzini <pbonzini@redhat.com>
->>
->> We now have a generic function that does most of the work of
->> kvm_vm_ioctl_get_dirty_log, now use it.
->>
->> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->> ---
->>  arch/x86/include/asm/kvm_host.h |    3 --
->>  arch/x86/kvm/Kconfig            |    1 +
->>  arch/x86/kvm/mmu.c              |    4 +--
->>  arch/x86/kvm/x86.c              |   64 ++++++---------------------------------
->>  4 files changed, 12 insertions(+), 60 deletions(-)
->>
->> diff --git a/arch/x86/include/asm/kvm_host.h b/arch/x86/include/asm/kvm_host.h
->> index 7c492ed..934dc24 100644
->> --- a/arch/x86/include/asm/kvm_host.h
->> +++ b/arch/x86/include/asm/kvm_host.h
->> @@ -805,9 +805,6 @@ void kvm_mmu_set_mask_ptes(u64 user_mask, u64 accessed_mask,
->>  
->>  void kvm_mmu_reset_context(struct kvm_vcpu *vcpu);
->>  void kvm_mmu_slot_remove_write_access(struct kvm *kvm, int slot);
->> -void kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
->> -				     struct kvm_memory_slot *slot,
->> -				     gfn_t gfn_offset, unsigned long mask);
->>  void kvm_mmu_zap_all(struct kvm *kvm);
->>  void kvm_mmu_invalidate_mmio_sptes(struct kvm *kvm);
->>  unsigned int kvm_mmu_calculate_mmu_pages(struct kvm *kvm);
->> diff --git a/arch/x86/kvm/Kconfig b/arch/x86/kvm/Kconfig
->> index f9d16ff..d073594 100644
->> --- a/arch/x86/kvm/Kconfig
->> +++ b/arch/x86/kvm/Kconfig
->> @@ -39,6 +39,7 @@ config KVM
->>  	select PERF_EVENTS
->>  	select HAVE_KVM_MSI
->>  	select HAVE_KVM_CPU_RELAX_INTERCEPT
->> +	select KVM_GENERIC_DIRTYLOG_READ_PROTECT
->>  	select KVM_VFIO
->>  	---help---
->>  	  Support hosting fully virtualized guest machines using hardware
->> diff --git a/arch/x86/kvm/mmu.c b/arch/x86/kvm/mmu.c
->> index 9314678..bf6b82c 100644
->> --- a/arch/x86/kvm/mmu.c
->> +++ b/arch/x86/kvm/mmu.c
->> @@ -1224,7 +1224,7 @@ static bool __rmap_write_protect(struct kvm *kvm, unsigned long *rmapp,
->>  }
->>  
->>  /**
->> - * kvm_mmu_write_protect_pt_masked - write protect selected PT level pages
->> + * kvm_arch_mmu_write_protect_pt_masked - write protect selected PT level pages
->>   * @kvm: kvm instance
->>   * @slot: slot to protect
->>   * @gfn_offset: start of the BITS_PER_LONG pages we care about
->> @@ -1233,7 +1233,7 @@ static bool __rmap_write_protect(struct kvm *kvm, unsigned long *rmapp,
->>   * Used when we do not need to care about huge page mappings: e.g. during dirty
->>   * logging we do not have any such mappings.
->>   */
->> -void kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
->> +void kvm_arch_mmu_write_protect_pt_masked(struct kvm *kvm,
->>  				     struct kvm_memory_slot *slot,
->>  				     gfn_t gfn_offset, unsigned long mask)
->>  {
->> diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
->> index 8f1e22d..9f8ae9a 100644
->> --- a/arch/x86/kvm/x86.c
->> +++ b/arch/x86/kvm/x86.c
->> @@ -3606,77 +3606,31 @@ static int kvm_vm_ioctl_reinject(struct kvm *kvm,
->>   *
->>   *   1. Take a snapshot of the bit and clear it if needed.
->>   *   2. Write protect the corresponding page.
->> - *   3. Flush TLB's if needed.
->> - *   4. Copy the snapshot to the userspace.
->> + *   3. Copy the snapshot to the userspace.
->> + *   4. Flush TLB's if needed.
->>   *
->> - * Between 2 and 3, the guest may write to the page using the remaining TLB
->> - * entry.  This is not a problem because the page will be reported dirty at
->> - * step 4 using the snapshot taken before and step 3 ensures that successive
->> - * writes will be logged for the next call.
->> + * Between 2 and 4, the guest may write to the page using the remaining TLB
->> + * entry.  This is not a problem because the page is reported dirty using
->> + * the snapshot taken before and step 4 ensures that writes done after
->> + * exiting to userspace will be logged for the next call.
->>   */
->>  int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
->>  {
->> -	int r;
->> -	struct kvm_memory_slot *memslot;
->> -	unsigned long n, i;
->> -	unsigned long *dirty_bitmap;
->> -	unsigned long *dirty_bitmap_buffer;
->>  	bool is_dirty = false;
->> +	int r;
->>  
->>  	mutex_lock(&kvm->slots_lock);
->>  
->> -	r = -EINVAL;
->> -	if (log->slot >= KVM_USER_MEM_SLOTS)
->> -		goto out;
->> -
->> -	memslot = id_to_memslot(kvm->memslots, log->slot);
->> -
->> -	dirty_bitmap = memslot->dirty_bitmap;
->> -	r = -ENOENT;
->> -	if (!dirty_bitmap)
->> -		goto out;
->> -
->> -	n = kvm_dirty_bitmap_bytes(memslot);
->> -
->> -	dirty_bitmap_buffer = dirty_bitmap + n / sizeof(long);
->> -	memset(dirty_bitmap_buffer, 0, n);
->> -
->> -	spin_lock(&kvm->mmu_lock);
->> -
->> -	for (i = 0; i < n / sizeof(long); i++) {
->> -		unsigned long mask;
->> -		gfn_t offset;
->> -
->> -		if (!dirty_bitmap[i])
->> -			continue;
->> -
->> -		is_dirty = true;
->> -
->> -		mask = xchg(&dirty_bitmap[i], 0);
->> -		dirty_bitmap_buffer[i] = mask;
->> -
->> -		offset = i * BITS_PER_LONG;
->> -		kvm_mmu_write_protect_pt_masked(kvm, memslot, offset, mask);
->> -	}
->> -
->> -	spin_unlock(&kvm->mmu_lock);
->> -
->> -	/* See the comments in kvm_mmu_slot_remove_write_access(). */
->> -	lockdep_assert_held(&kvm->slots_lock);
->> +	r = kvm_get_dirty_log_protect(kvm, log, &is_dirty);
->>  
->>  	/*
->>  	 * All the TLBs can be flushed out of mmu lock, see the comments in
->>  	 * kvm_mmu_slot_remove_write_access().
->>  	 */
->> +	lockdep_assert_held(&kvm->slots_lock);
->>  	if (is_dirty)
->>  		kvm_flush_remote_tlbs(kvm);
->>  
->> -	r = -EFAULT;
->> -	if (copy_to_user(log->dirty_bitmap, dirty_bitmap_buffer, n))
->> -		goto out;
->> -
->> -	r = 0;
->> -out:
->>  	mutex_unlock(&kvm->slots_lock);
->>  	return r;
->>  }
->>
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index 5e066cd..121430d 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -551,6 +551,11 @@
+ 		status = "okay";
+ 	};
+ 
++	tmu at 100C0000 {
++		vtmu-supply = <&ldo10_reg>;
++		status = "okay";
++	};
++
+ 	i2c_ak8975: i2c-gpio-0 {
+ 		compatible = "i2c-gpio";
+ 		gpios = <&gpy2 4 0>, <&gpy2 5 0>;
+-- 
+2.0.0.rc2
