@@ -1,163 +1,87 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 14 Nov 2014 15:54:10 +0000
-Subject: [PATCH 4/6] arm64: add Cortex-A53 cache errata workaround
-In-Reply-To: <1415980452-20366-1-git-send-email-andre.przywara@arm.com>
-References: <1415980452-20366-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1415980452-20366-5-git-send-email-andre.przywara@arm.com>
+Date: Fri, 14 Nov 2014 15:54:06 +0000
+Subject: [PATCH 0/6] arm64: alternatives runtime patching
+Message-ID: <1415980452-20366-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM errata 819472, 826319, 827319 and 824069 define the same
-workaround for these hardware issues in certain Cortex-A53 parts.
-Use the new alternatives framework and the CPU MIDR detection to
-patch "cache clean" into "cache clean and invalidate" instructions if
-an affected CPU is detected at runtime.
+This series introduces alternatives runtime patching to arm64.
+This allows to patch assembly instruction at runtime to either
+fix hardware bugs or optimize for certain hardware features. Look
+at patch 5/6 for an example on how to use this.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- arch/arm64/include/asm/alternative-asm.h |   13 ++++++++++++
- arch/arm64/include/asm/cpufeature.h      |    8 +++++++-
- arch/arm64/include/asm/cputype.h         |    5 +++++
- arch/arm64/kernel/cpu_errata.c           |   32 +++++++++++++++++++++++++++++-
- arch/arm64/mm/cache.S                    |    4 +++-
- 5 files changed, 59 insertions(+), 3 deletions(-)
+The code is heavily based on the x86 implementation.
+Currently this is focussed on fixing CPU errata, but in the future
+runtime optimizations for new CPU features are planned.
 
-diff --git a/arch/arm64/include/asm/alternative-asm.h b/arch/arm64/include/asm/alternative-asm.h
-index 5ee9340..919a678 100644
---- a/arch/arm64/include/asm/alternative-asm.h
-+++ b/arch/arm64/include/asm/alternative-asm.h
-@@ -11,6 +11,19 @@
- 	.byte \alt_len
- .endm
- 
-+.macro alternative_insn insn1 insn2 cap
-+661:	\insn1
-+662:	.pushsection .altinstructions, "a"
-+	altinstruction_entry 661b, 663f, \cap, 662b-661b, 664f-663f
-+	.popsection
-+	.pushsection .altinstr_replacement, "ax"
-+663:	\insn2
-+664:	.popsection
-+	.if ((664b-663b) != (662b-661b))
-+		.error "Alternatives instruction length mismatch"
-+	.endif
-+.endm
-+
- #endif  /*  __ASSEMBLY__  */
- 
- #endif /* __ASM_ALTERNATIVE_ASM_H */
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 744eaf7..92b6ee4 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -21,7 +21,11 @@
- #define MAX_CPU_FEATURES	(8 * sizeof(elf_hwcap))
- #define cpu_feature(x)		ilog2(HWCAP_ ## x)
- 
--#define NCAPS			0
-+#define ARM64_WORKAROUND_CLEAN_CACHE	0
-+
-+#define NCAPS				1
-+
-+#ifndef __ASSEMBLY__
- 
- extern DECLARE_BITMAP(cpu_hwcaps, NCAPS);
- 
-@@ -48,4 +52,6 @@ static inline void cpus_set_cap(unsigned int num)
- 
- void check_local_cpu_errata(void);
- 
-+#endif /* __ASSEMBLY__ */
-+
- #endif
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index 379d0b8..8adb986 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -57,6 +57,11 @@
- #define MIDR_IMPLEMENTOR(midr)	\
- 	(((midr) & MIDR_IMPLEMENTOR_MASK) >> MIDR_IMPLEMENTOR_SHIFT)
- 
-+#define MIDR_CPU_PART(imp, partnum) \
-+	(((imp)			<< MIDR_IMPLEMENTOR_SHIFT) | \
-+	(0xf			<< MIDR_ARCHITECTURE_SHIFT) | \
-+	((partnum)		<< MIDR_PARTNUM_SHIFT))
-+
- #define ARM_CPU_IMP_ARM		0x41
- #define ARM_CPU_IMP_APM		0x50
- 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 9332cf7..875fb2c 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -23,6 +23,8 @@
- #include <asm/cputype.h>
- #include <asm/cpufeature.h>
- 
-+#define MIDR_CORTEX_A53 MIDR_CPU_PART(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
-+
- /*
-  * Add a struct or another datatype to the union below if you need
-  * different means to detect an affected CPU.
-@@ -39,8 +41,36 @@ struct arm64_cpu_capabilities {
- 	};
- };
- 
-+#define CPU_MODEL_MASK (MIDR_IMPLEMENTOR_MASK | MIDR_PARTNUM_MASK | \
-+			MIDR_ARCHITECTURE_MASK)
-+
-+static bool is_affected_midr_range(struct arm64_cpu_capabilities *entry)
-+{
-+	u32 midr = read_cpuid_id();
-+
-+	if ((midr & CPU_MODEL_MASK) != entry->midr_model)
-+		return false;
-+
-+	midr &= MIDR_REVISION_MASK | MIDR_VARIANT_MASK;
-+
-+	return (midr >= entry->midr_range_min && midr <= entry->midr_range_max);
-+}
-+
-+#define MIDR_RANGE(model, min, max) \
-+	.is_affected = is_affected_midr_range, \
-+	.midr_model = model, \
-+	.midr_range_min = min, \
-+	.midr_range_max = max
-+
- struct arm64_cpu_capabilities arm64_errata[] = {
--	{}
-+	{
-+	/* Cortex-A53 r0p[012] */
-+		.desc = "ARM errata 826319, 827319, 824069",
-+		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
-+		MIDR_RANGE(MIDR_CORTEX_A53, 0x00, 0x02),
-+	},
-+	{
-+	}
- };
- 
- void check_local_cpu_errata(void)
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index 2366383..8eaf185 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -20,6 +20,8 @@
- #include <linux/linkage.h>
- #include <linux/init.h>
- #include <asm/assembler.h>
-+#include <asm/cpufeature.h>
-+#include <asm/alternative-asm.h>
- 
- #include "proc-macros.S"
- 
-@@ -210,7 +212,7 @@ __dma_clean_range:
- 	dcache_line_size x2, x3
- 	sub	x3, x2, #1
- 	bic	x0, x0, x3
--1:	dc	cvac, x0			// clean D / U line
-+1:	alternative_insn "dc cvac, x0", "dc civac, x0", ARM64_WORKAROUND_CLEAN_CACHE
- 	add	x0, x0, x2
- 	cmp	x0, x1
- 	b.lo	1b
+Patch 1/6 introduces a new cpu_hwcaps bitmap, which holds kernel
+internal CPU feature flags. Since elf_hwcaps is also a userspace ABI,
+I refrained from tinkering with this (tried this, gets messy).
+
+Based on bits in this bitmap, in patch 2/6 we provide a macro to
+replace (inline) assembly instructions at runtime with alternative
+instructions. As on x86, those bits go into separate ELF sections.
+The patching is done using stop_machine() to avoid mayhem in SMP.
+
+Patch 3/6 introduces means to set cpu_hwcaps bits based on detecting
+a certain CPU revision. Currently this is based on the architectural
+bits in the MIDR register, but the code is flexible enough to easily
+introduce more advanced criteria.
+To support a heterogenous CPU setup (e.g. big.LITTLE), we scan all
+CPUs in the system.
+
+Patch 4 and 5 use the new framework to introduce workarounds for two
+ARM-Cortex errata. Patch 4 introduces some more framework for the
+detection, while patch 5 should be used as a blueprint for how to add
+workarounds for CPU errata in the future.
+
+Patch 6/6 finally introduces Kconfig entries for the bugs.
+Those are meant to
+a) document the errata and workarounds and
+b) to allow system vendors to remove certain workarounds for custom
+build kernels.
+Though this shouldn't be strictly necessary, experience shows that
+people will do b) anyway and I deem it better to provide official
+means rather than provoking random hacks.
+
+The code can be found also in the alternatives/v1 branch of:
+http://www.linux-arm.org/git?p=linux-ap.git
+git://linux-arm.org/linux-ap.git
+
+
+Please review and comment!
+
+Cheers,
+Andre.
+
+Andre Przywara (6):
+  arm64: add cpu_capabilities bitmap
+  arm64: add alternative runtime patching
+  arm64: detect silicon revisions and set cap bits accordingly
+  arm64: add Cortex-A53 cache errata workaround
+  arm64: add Cortex-A57 erratum 832075 workaround
+  arm64: protect alternatives workarounds with Kconfig options
+
+ arch/arm64/Kconfig                       |  107 +++++++++++++++++++++++++++++
+ arch/arm64/include/asm/alternative-asm.h |   29 ++++++++
+ arch/arm64/include/asm/alternative.h     |   43 ++++++++++++
+ arch/arm64/include/asm/cpufeature.h      |   29 ++++++++
+ arch/arm64/include/asm/cputype.h         |    5 ++
+ arch/arm64/include/asm/io.h              |   23 +++++--
+ arch/arm64/kernel/Makefile               |    2 +-
+ arch/arm64/kernel/alternative.c          |   64 +++++++++++++++++
+ arch/arm64/kernel/cpu_errata.c           |  110 ++++++++++++++++++++++++++++++
+ arch/arm64/kernel/cpuinfo.c              |    3 +
+ arch/arm64/kernel/setup.c                |    3 +
+ arch/arm64/kernel/smp.c                  |    2 +
+ arch/arm64/kernel/vmlinux.lds.S          |   11 +++
+ arch/arm64/mm/cache.S                    |    4 +-
+ arch/arm64/mm/init.c                     |    2 +
+ 15 files changed, 431 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm64/include/asm/alternative-asm.h
+ create mode 100644 arch/arm64/include/asm/alternative.h
+ create mode 100644 arch/arm64/kernel/alternative.c
+ create mode 100644 arch/arm64/kernel/cpu_errata.c
+
 -- 
 1.7.9.5
