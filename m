@@ -1,40 +1,23 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 14 Nov 2014 07:05:14 -0800
-Subject: [PATCH v2] can: Fix bug in suspend/resume
-In-Reply-To: <5465C34D.4030805@pengutronix.de>
-References: <e7070431858e49e29cd03d76fd7a66c3@BN1AFFO11FD055.protection.gbl>
- <5465C34D.4030805@pengutronix.de>
-Message-ID: <e5f5913b51a54222aa1bb0680a77e56d@BN1AFFO11FD055.protection.gbl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Nov 2014 16:06:15 +0100
+Subject: [PATCH V2 4/7] arm64: dts: Add Designware GPIO dts binding to APM
+ X-Gene platform
+In-Reply-To: <1415924401-3013-5-git-send-email-fkan@apm.com>
+References: <1415924401-3013-1-git-send-email-fkan@apm.com>
+ <1415924401-3013-5-git-send-email-fkan@apm.com>
+Message-ID: <1829495.FoDfH1G36W@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-11-14 at 09:54AM +0100, Marc Kleine-Budde wrote:
-> On 11/14/2014 09:16 AM, Kedareswara rao Appana wrote:
-> > The drvdata in the suspend/resume is of type struct net_device,
-> > not the platform device.Enable the clocks in the suspend before
-> > accessing the registers of the CAN.
-> > 
-> > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> > ---
-> > Changes for v2:
-> >   - Removed the struct platform_device* from suspend/resume
-> >     as suggest by Lothar.
-> >   - The clocks are getting disabled and un prepared at the end of the probe. 
-> >     In the suspend the driver is doing a register write.In order
-> >     To do that register write we have to again enable and prepare the clocks.
+On Thursday 13 November 2014 16:19:58 Feng Kan wrote:
+> +               dwgpio: dwgpio at 1c024000 {
+> +                       compatible = "snps,dw-apb-gpio";
+> +                       reg = <0x0 0x1c024000 0x0 0x1000>;
+> +                       reg-io-width = <4>;
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
 > 
-> Please look the at suspend/resume code and count the
-> clock_enable/disable manually. After a suspend/resume cycle, you have
-> enabled the clock twice, but disabled it once.
-> 
-> I think you have to abstract the clock handling behind runtime PM. I
-> haven't done this myself yet, but the strong feeling that this is a
-> possible solution to your problem. These links might help:
 
-I agree, the clock handling looks weird. Also the clk_disable calls in
-xcan_get_berr_counter() look suspicious to me, but I might be wrong.
-I think you can take a look at gpio-zynq for an example for runtime_pm
-usage. I think the usage model in that driver is similar to here.
+Same comment as patch 1: make the node name 'gpio', not 'dwgpio'.
 
-	Thanks,
-	S?ren
+	Arnd
