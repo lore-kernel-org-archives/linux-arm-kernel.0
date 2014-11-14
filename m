@@ -1,29 +1,32 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 14 Nov 2014 16:59:55 +0400
-Subject: [PATCH RESEND] ARM: sa1100 collie: use gpio-charger instead of
- pda-power
-In-Reply-To: <1415258831-17239-1-git-send-email-dbaryshkov@gmail.com>
-References: <1415258831-17239-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <CALT56yM_Z2FzUfvtRfvUTgHCH4yvuSbt0xdPn=tDt_uByTYt=A@mail.gmail.com>
+Date: Fri, 14 Nov 2014 17:01:52 +0400
+Subject: [PATCH RESEND V2] ARM: debug: move StrongARM debug include to
+ arch/arm/include/debug
+In-Reply-To: <1415258423-17022-1-git-send-email-dbaryshkov@gmail.com>
+References: <1415258423-17022-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <CALT56yOEtt4G-_CzbDMXtWPoZL3ErnY8VrfEV+DyBJGPp_r8YA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-06 10:27 GMT+03:00 Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>:
-> Use gpio-charger driver instead of pda-power: it automatically cares
-> about used gpio and since collie does not differentiate between usb and
-> ac chargers, pda-power is an overkill for it.
->
-> As a bonus this allows us to remove gpio_to_irq calls from machine init
-> call - it is fragile. These gpio_to_irq calls will fail if gpios are
-> registered later, via device driver mechanisms.
+2014-11-06 10:20 GMT+03:00 Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>:
+> StrongARM debug-macro.S is quite standalone thing, depending only on
+> register mappings. Move it to proper place and add Kconfig entry.
 >
 > Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 > ---
->  arch/arm/mach-sa1100/collie.c | 55 ++++++-------------------------------------
->  1 file changed, 7 insertions(+), 48 deletions(-)
+> [Changes since V1: keep Kconfig.debug sorted alphabetically]
+>
+>  arch/arm/Kconfig.debug                                         |  9 +++++++++
+>  .../include/mach/debug-macro.S => include/debug/sa1100.S}      | 10 ++++++++--
+>  2 files changed, 17 insertions(+), 2 deletions(-)
+>  rename arch/arm/{mach-sa1100/include/mach/debug-macro.S => include/debug/sa1100.S} (83%)
 
-Russell, still no reaction from your side. Can I submit this patch to
-your patch tracker?
+Dear Russell,
+
+Is it ok to merge this patch? Would you like to pick it on your own?
+Would you like
+for Arnd to take it through arm-soc? Would you like for me to throw it
+out (and why)?
 
 -- 
 With best wishes
