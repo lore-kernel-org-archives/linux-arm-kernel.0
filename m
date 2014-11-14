@@ -1,40 +1,35 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 14 Nov 2014 11:08:52 +0100
-Subject: [PATCH 4/4] ARM: at91/dt: enable the RTT block on the
- at91sam9m10g45ek board
-In-Reply-To: <1415959732-13591-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1415959732-13591-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1415959732-13591-5-git-send-email-boris.brezillon@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 14 Nov 2014 11:11:51 +0100
+Subject: [PATCH 02/15] GPIO: port LoCoMo gpio support from old driver
+In-Reply-To: <CALT56yPr42FV66USngocw=eWPt81d5R2MJxmzBnv02HOMmXAkA@mail.gmail.com>
+References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
+ <1414454528-24240-3-git-send-email-dbaryshkov@gmail.com>
+ <CACRpkdY7tRadod2vQfEytmw-ubaMAvr_=XTczD5bUMkqie0xkg@mail.gmail.com>
+ <CALT56yOgMUA7o2dzfHph=S2zkDV4zERzMh4ishpPwpAx7Cqj6Q@mail.gmail.com>
+ <CACRpkdb7v3LmOhbhQ9TPk1_bnLnpwizawW6RQvhQRLSjRewAaQ@mail.gmail.com>
+ <CALT56yO9f8wzaArnmfQSDzCM3S+2oT+62anH5kbFY3WdEt_HZg@mail.gmail.com>
+ <20141106060335.GR8509@sirena.org.uk>
+ <CALT56yPr42FV66USngocw=eWPt81d5R2MJxmzBnv02HOMmXAkA@mail.gmail.com>
+Message-ID: <CACRpkdZiari6CtWq1kBCvX3cwwatJiHAuWUb40WSUEfjZjk+Lg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the RTT and GPBR devices and specify the general purpose register
-used to store the current time.
+On Tue, Nov 11, 2014 at 2:16 PM, Dmitry Eremin-Solenikov
+<dbaryshkov@gmail.com> wrote:
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- arch/arm/boot/dts/at91sam9m10g45ek.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
+> Just to better understand your suggestions: do you want me to convert
+> to regmap only gpio driver or do you suggest to convert all LoCoMo drivers?
 
-diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-index d8dd226..33ce7ca 100644
---- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-+++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-@@ -161,6 +161,15 @@
- 				pinctrl-0 = <&pinctrl_pwm_leds>;
- 			};
- 
-+			rtc at fffffd20 {
-+				atmel,rtt-rtc-time-reg = <&gpbr 0x0>;
-+				status = "okay";
-+			};
-+
-+			gpbr: syscon at fffffd60 {
-+				status = "okay";
-+			};
-+
- 			rtc at fffffdb0 {
- 				status = "okay";
- 			};
--- 
-1.9.1
+Um... I was just thinking about this one usecase.
+
+It's no big deal, the other review comments are more important.
+
+> That is doable, of course, but the amount of changes is overwhelming.
+> Also I'm concerned about the performance impact from going through
+> regmap layers.
+
+Is it on a critical path? The current locking isn't any less invasive
+AFAICT.
+
+Yours,
+Linus Walleij
