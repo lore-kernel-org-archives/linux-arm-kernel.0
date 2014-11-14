@@ -1,98 +1,149 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 14 Nov 2014 13:49:04 +0100
-Subject: [PATCH] ahci_sunxi: Drop AHCI_HFLAG_NO_PMP flag
-In-Reply-To: <037f97ce-468b-4b91-9616-51a3301c5be6@googlegroups.com>
-References: <1415874256-6580-1-git-send-email-hdegoede@redhat.com>
- <20141113222952.GI2598@htj.dyndns.org>
- <037f97ce-468b-4b91-9616-51a3301c5be6@googlegroups.com>
-Message-ID: <5465FA40.8000508@redhat.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 14 Nov 2014 13:55:51 +0100
+Subject: [PATCH v7 1/3] ARM: mediatek: Add basic support for mt6592
+In-Reply-To: <1415942094-11451-1-git-send-email-ibanezchen@gmail.com>
+References: <1415942094-11451-1-git-send-email-ibanezchen@gmail.com>
+Message-ID: <CABuKBeKiXn6=xdTYKWea3M=w6+0FfLeWFZtjVkfdyUSR3SfNsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2014-11-14 6:14 GMT+01:00 Howard Chen <ibanezchen@gmail.com>:
+> * A dtsi for boards based on Mediatek MT6592 SoCs
+> * Compatible string in arch/arm/mach-mediatek/mediatek.c
+>
+> Signed-off-by: Howard Chen <ibanezchen@gmail.com>
 
-On 11/14/2014 12:56 PM, Hans de Goede wrote:
-> Hi,
-> 
-> On Thursday, November 13, 2014 11:29:56 PM UTC+1, Tejun Heo wrote:
->>
->> On Thu, Nov 13, 2014 at 11:24:16AM +0100, Hans de Goede wrote: 
->>> This is something which we inherited from the Allwinner android kernel 
->> sources, 
->>> and I've always wanted to test if this is really necessary. 
->>>
->>> So recently I've bought a sata port multiplexer, and I've given this a 
->> test 
->>> spin on both A10 and A20 devices, and it seems to work fine: 
->>>
->>> [    2.154456] ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300) 
->>> [    2.161092] ata1.15: Port Multiplier 1.2, 0x197b:0x0325 r0, 5 ports, 
->> feat 0x5/0xf 
->>> [    2.175511] ata1.00: hard resetting link 
->>> [    2.524929] ata1.00: SATA link up 3.0 Gbps (SStatus 123 SControl 320) 
->>> [    2.531430] ata1.01: hard resetting link 
->>> [    2.974465] ata1.01: link resume succeeded after 1 retries 
->>> [    3.094932] ata1.01: SATA link up 3.0 Gbps (SStatus 123 SControl 300) 
->>> [    3.101431] ata1.02: hard resetting link 
->>> [    4.174466] ata1.02: failed to resume link (SControl 0) 
->>> [    4.180065] ata1.02: SATA link down (SStatus 0 SControl 0) 
->>> (and the same for links 3 and 4) 
->>>
->>> Once the NO_PMP flag is removed it correctly sees the 2 disks which I've 
->>> attached, and I can mount and use them just fine, so lets drop the flag. 
->>>
->>> Signed-off-by: Hans de Goede <hdeg...@redhat.com <javascript:>> 
->>
->> Applied to libata/for-3.18-fixes. 
->>
-> 
-> I just found out why Allwinner added that AHCI_HFLAG_NO_PMP flag, after 
-> putting the system I used to test the port multiplexer back together this 
-> morning, it seems that probing for a port multiplexer being present breaks 
-> the no-port-multiplexer (so direct attached disk) case :(  I guess I should 
-> have tested for that before sending the patch, but the thought of it 
-> breaking normal usage did not cross my mind.
-> 
-> So self NACK. If it is not too late, can you please drop this from your 
-> tree ?
-> 
-> Let me know if you want me to send a revert instead.
-> 
-> I'll look into fixing this another way, maybe with a quirk + an extra reset 
-> after failed pmp testing, and it that does not work a module option.
+I applied the whole series [0].
+Thanks.
 
-Ok, so the problem seems to be that the controller fails to do a soft-reset
-when attached directly to a normal device rather then to a pmp.
+[0] https://github.com/mbgg/linux-mediatek/commits/v3.19-next/dts
 
-If I comment out this block of code in libata-core.c:
+> ---
+>  arch/arm/boot/dts/mt6592.dtsi     | 97 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mediatek/mediatek.c |  1 +
+>  2 files changed, 98 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/mt6592.dtsi
+>
+> diff --git a/arch/arm/boot/dts/mt6592.dtsi b/arch/arm/boot/dts/mt6592.dtsi
+> new file mode 100644
+> index 0000000..65aa81b
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/mt6592.dtsi
+> @@ -0,0 +1,97 @@
+> +/*
+> + * Copyright (c) 2014 MediaTek Inc.
+> + * Author: Howard Chen <ibanezchen@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include "skeleton.dtsi"
+> +
+> +/ {
+> +       compatible = "mediatek,mt6592";
+> +       interrupt-parent = <&gic>;
+> +
+> +       cpus {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               cpu at 0 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x0>;
+> +               };
+> +               cpu at 1 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x1>;
+> +               };
+> +               cpu at 2 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x2>;
+> +               };
+> +               cpu at 3 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x3>;
+> +               };
+> +               cpu at 4 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x4>;
+> +               };
+> +               cpu at 5 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x5>;
+> +               };
+> +               cpu at 6 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x6>;
+> +               };
+> +               cpu at 7 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x7>;
+> +               };
+> +       };
+> +
+> +       system_clk: dummy13m {
+> +               compatible = "fixed-clock";
+> +               clock-frequency = <13000000>;
+> +               #clock-cells = <0>;
+> +       };
+> +
+> +       rtc_clk: dummy32k {
+> +               compatible = "fixed-clock";
+> +               clock-frequency = <32000>;
+> +               #clock-cells = <0>;
+> +       };
+> +
+> +       timer: timer at 10008000 {
+> +               compatible = "mediatek,mt6577-timer";
+> +               reg = <0x10008000 0x80>;
+> +               interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
+> +               clocks = <&system_clk>, <&rtc_clk>;
+> +               clock-names = "system-clk", "rtc-clk";
+> +       };
+> +
+> +       gic: interrupt-controller at 10211000 {
+> +               compatible = "arm,cortex-a7-gic";
+> +               interrupt-controller;
+> +               #interrupt-cells = <3>;
+> +               reg = <0x10211000 0x1000>,
+> +                     <0x10212000 0x1000>;
+> +       };
+> +
+> +};
+> diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+> index f2acf07..88e4626 100644
+> --- a/arch/arm/mach-mediatek/mediatek.c
+> +++ b/arch/arm/mach-mediatek/mediatek.c
+> @@ -19,6 +19,7 @@
+>
+>  static const char * const mediatek_board_dt_compat[] = {
+>         "mediatek,mt6589",
+> +       "mediatek,mt6592",
+>         NULL,
+>  };
+>
+> --
+> 1.9.1
+>
 
-        if (sata_pmp_supported(link->ap) && ata_is_host_link(link)) {
-                /* If PMP is supported, we have to do follow-up SRST.
-                 * Some PMPs don't send D2H Reg FIS after hardreset if
-                 * the first port is empty.  Wait only for
-                 * ATA_TMOUT_PMP_SRST_WAIT.
-                 */
-                if (check_ready) {
-                        unsigned long pmp_deadline;
 
-                        pmp_deadline = ata_deadline(jiffies,
-                                                    ATA_TMOUT_PMP_SRST_WAIT);
-                        if (time_after(pmp_deadline, deadline))
-                                pmp_deadline = deadline;
-                        ata_wait_ready(link, pmp_deadline, check_ready);
-                }
-                rc = -EAGAIN;
-                goto out;
-        }
 
-Then things work again. This code looks like it is a must have for
-pmp use, so I'll do a follow up patch to my initial patch dropping the
-AHCI_HFLAG_NO_PMP flag, which re-adds it based on a module option
-(defaulting to the non-pmp case).
-
-This way you don't have to do a forced-push to your tree to drop the
-original patch (or revert it).
-
-Regards,
-
-Hans
+-- 
+motzblog.wordpress.com
