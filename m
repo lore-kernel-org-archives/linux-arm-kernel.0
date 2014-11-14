@@ -1,31 +1,55 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 14 Nov 2014 12:53:44 -0800
-Subject: [PATCH 2/2 v2] MAINTAINERS: add entry for the GISB arbiter driver
-In-Reply-To: <1415998424-20304-1-git-send-email-f.fainelli@gmail.com>
-References: <1415998424-20304-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1415998424-20304-3-git-send-email-f.fainelli@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 14 Nov 2014 13:06:45 -0800
+Subject: [GIT PULL 1/2] omap soc changes for v3.19
+Message-ID: <pull-1415999057-591605>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GISB bus arbiter driver is relevant for BCM7xxx (brcmstb) platforms,
-add an entry to cover this file.
+The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+  Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 530ac3cb1fea..7081ec6a294d 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2103,6 +2103,7 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-bcm/*brcmstb*
- F:	arch/arm/boot/dts/bcm7*.dts*
-+F:	drivers/bus/brcmstb_gisb.c
- 
- BROADCOM TG3 GIGABIT ETHERNET DRIVER
- M:	Prashant Sreedharan <prashant@broadcom.com>
--- 
-1.9.1
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.19/clocks-and-pm
+
+for you to fetch changes up to 9889278181bcdbae882664d8cee5bb0e064397e4:
+
+  Merge tag 'for-v3.19/omap-a' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.19/soc (2014-11-14 10:25:12 -0800)
+
+----------------------------------------------------------------
+SoC related changes for omaps. Mostly to make PM easier to use for
+omap4 and later, and to fix clock DPLL fixes by adding determine_rate
+and set_rate_and_parent.
+
+----------------------------------------------------------------
+Felipe Balbi (1):
+      ARM: OMAP2+: hwmod: drop unnecessary list initialization
+
+Nishanth Menon (3):
+      ARM: OMAP4: PM: Only do static dependency configuration in omap4_init_static_deps
+      ARM: OMAP4+: PM: Centralize static dependency mapping table
+      ARM: OMAP4+: PM: Program CPU logic power state
+
+Tero Kristo (5):
+      ARM: OMAP3: clock: use clk_features flags for omap3 DPLL4 checks
+      ARM: OMAP3: clock: add new rate changing logic support for noncore DPLLs
+      ARM: OMAP4: clock: add support for determine_rate for omap4 regm4xen DPLL
+      ARM: OMAP3: clock: add support for dpll4_set_rate_and_parent
+      ARM: OMAP3+: DPLL: use determine_rate() and set_rate_and_parent()
+
+Tony Lindgren (1):
+      Merge tag 'for-v3.19/omap-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.19/soc
+
+ arch/arm/mach-omap2/cclock3xxx_data.c     |   6 +
+ arch/arm/mach-omap2/clock.c               |   4 +
+ arch/arm/mach-omap2/clock.h               |   1 +
+ arch/arm/mach-omap2/clock3xxx.c           |  38 ++++++-
+ arch/arm/mach-omap2/dpll3xxx.c            | 179 ++++++++++++++++++++----------
+ arch/arm/mach-omap2/dpll44xx.c            |  41 +++++++
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |   4 +-
+ arch/arm/mach-omap2/omap_hwmod.c          |   2 -
+ arch/arm/mach-omap2/pm44xx.c              | 146 +++++++++++-------------
+ drivers/clk/ti/dpll.c                     |  15 +++
+ include/linux/clk/ti.h                    |  15 +++
+ 11 files changed, 307 insertions(+), 144 deletions(-)
