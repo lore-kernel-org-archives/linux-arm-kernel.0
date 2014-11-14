@@ -1,60 +1,75 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Fri, 14 Nov 2014 09:39:16 +0800
-Subject: [Patch V1 0/6] Refine generic/PCI MSI irqodmian interfaces
-In-Reply-To: <alpine.DEB.2.11.1411140211480.3935@nanos>
-References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
- <54651BE2.9080008@arm.com> <54654C10.2040102@linux.intel.com>
- <54655632.2040209@huawei.com> <alpine.DEB.2.11.1411140211480.3935@nanos>
-Message-ID: <54655D44.1070703@linux.intel.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 14 Nov 2014 10:40:14 +0900
+Subject: [RFC] ptrace: add generic SET_SYSCALL request
+In-Reply-To: <1472197.o98pKNTkBz@wuerfel>
+References: <1415346443-28915-1-git-send-email-takahiro.akashi@linaro.org>
+ <3899236.yrOvvrZHD6@wuerfel>
+ <OF152076B7.38277C08-ONC1257D8F.0050C2DF-C1257D8F.00516BF2@de.ibm.com>
+ <1472197.o98pKNTkBz@wuerfel>
+Message-ID: <54655D7E.1000301@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/14 9:31, Thomas Gleixner wrote:
-> On Fri, 14 Nov 2014, Yijing Wang wrote:
-> 
-> Could you please use a mail client which does proper line wraps or
-> configure yours to do so?
-> 
->> Associate the irq domain and PCI bus is not necessary, because all
->> PCI buses under same host bridge always share same MSI chip/irq
->> domain, we only need associate them and pci host bridge.
->>
->> I'm refactoring the pci_host_bridge, make it be a generic one, rip
->> out of the pci root bus creation, so we could put the irq domain and
->> pci domain etc.. in it. Finally, we could eliminate lots platform
->> arch functions. I will post it out within one week.
-> 
-> That's a completely orthogonal problem. From the MSI/interrupt
-> handling POV it does not matter at all where that information is
-> stored. All we care about is that it is retrievable via the (pci)
-> device which tries to setup MSI[X].
-> 
-> So we can store/retrieve it via generic functions into/from whatever
-> is available right now. If the irq side has generic interfaces to do
-> so then this wont conflict with your decisions to change the final
-> storage point because all it takes is to tweak the storage/retrieve
-> functions.
-> 
-> So all we need at the moment is an agreed on way to store/retrieve
-> that information which is based on the current shared infrastructure,
-> aka. Linus tree. If we can utilize that you are completely free to
-> change the association mechanism underneath.
-Hi Thomas,
-	So we need something like:
-struct msi_chip *pci_get_msi_chip(struct pci_dev *);
-or:
-struct irq_domain *pci_get_msi_domain(struct pci_dev *);
+Ulrich, Arnd, thank you for your discussions:
 
-BTW, there's a conflict when merging tip/irq/irqdomain into
-tip/x86/apic. It's my first time to deal with merging conflicts,
-what's the preferred way? Is it working like this?
-1) I merge the two branch
-2) I rebase my x86 irqdomain patch sets and send them to you
-3) You merge the two branch and apply my patch set.
-Regards!
-Gerry
-> 
-> Thanks,
-> 
-> 	tglx
-> 
+On 11/14/2014 07:25 AM, Arnd Bergmann wrote:
+> On Thursday 13 November 2014 15:49:20 Ulrich Weigand wrote:
+>> Arnd Bergmann <arnd@arndb.de> wrote on 13.11.2014 11:21:28:
+>>
+>>> I have to admit that I don't really understand gdb internals, but from
+>>> a first look I get the impression that it will just do the right thing
+>>> if you reuse NT_S390_SYSTEM_CALL on ARM64 with the same semantics.
+>>
+>> There's an interface between BFD and GDB proper involved here.  BFD will
+>> detect the presence of register set notes in the core dump, and will
+>> translate them into virtual sections; GDB will then simply look up such
+>> sections under well-known names.
+>>
+>> In particular, the NT_S390_SYSTEM_CALL note will be translated by BFD
+>> into a virtual section named ".reg-s390-system-call"; GDB platform-
+>> specific code will look for sections of this particular name.
+>>
+>> So if you were to create notes using the same note type, by default it
+>> would do nothing on ARM64.  You might add code to the ARM64 back-end
+>> to also look for a section ".reg-s390-system-call", but that would be
+>> somewhat confusing.  Using a new, platform-specific note type for ARM64
+>> would appear to fit better with existing precedent.
+
+I implemented a regset of NT_SYSTEM_CALL(=NT_S390_SYSTEM_CALL) experimentally,
+and checked a generated core file:
+
+ >$ aarch64-linux-gnu-readelf -Wn <...>/tmp/nulltest/core
+ >
+ >Displaying notes found at file offset 0x000003c0 with length 0x00000a68:
+ >  Owner                 Data size    Description
+ >  CORE                 0x00000188    NT_PRSTATUS (prstatus structure)
+ >  CORE                 0x00000088    NT_PRPSINFO (prpsinfo structure)
+ >  CORE                 0x00000080    NT_SIGINFO (siginfo_t data)
+ >  CORE                 0x00000130    NT_AUXV (auxiliary vector)
+ >  CORE                 0x000001b4    NT_FILE (mapped files)
+ >    Page size: 4096
+ >                 Start                 End         Page Offset
+ >[snip]...
+ >  CORE                 0x00000210    NT_FPREGSET (floating point registers)
+ >  LINUX                0x00000008    NT_ARM_TLS (AArch TLS registers)
+ >  LINUX                0x00000108    NT_ARM_HW_BREAK (AArch hardware breakpoint registers)
+ >  LINUX                0x00000108    NT_ARM_HW_WATCH (AArch hardware watchpoint registers)
+ >  LINUX                0x00000004    NT_S390_SYSTEM_CALL (s390 system call restart data)
+
+Looks funny:)
+
+> Ok, thanks a lot for your insight and for confirming what Takahiro AKASHI
+> said. Let's use a new NT_ARM64_SYSTEM_CALL type with a different
+> number then.
+
+We will use NT_ARM_SYSTEM_CALL(=0x404) as other NT_ARM_*, except NT_ARM_VFP,
+are also shared by arch/arm and arch/arm64.
+
+Anyhow, gdb (and/or binutils?) should be updated as well once my coming patch is merged.
+My next question is who should know this?
+
+Thanks,
+-Takahiro AKASHI
+
+> 	Arnd
+>
