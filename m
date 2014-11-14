@@ -1,62 +1,30 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 14 Nov 2014 21:22:00 +0100
-Subject: [PATCH] ARM: mvebu: fix ordering in Armada 370 .dtsi
-In-Reply-To: <1415993776-3469-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1415993776-3469-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20141114202200.GI2001@lunn.ch>
+From: fabf@skynet.be (Fabian Frederick)
+Date: Fri, 14 Nov 2014 21:34:37 +0100
+Subject: [PATCH 1/1 linux-next] ARM: edma: remove unnecessary sizeof(s8)
+Message-ID: <1415997277-4521-1-git-send-email-fabf@skynet.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 14, 2014 at 08:36:16PM +0100, Uwe Kleine-K?nig wrote:
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+sizeof(s8) is always 1
 
-It is normal to have something in the changelog, even if it is the
-same as the subject said differently.
+Signed-off-by: Fabian Frederick <fabf@skynet.be>
+---
+ arch/arm/common/edma.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Here you could say something like:
-
-Commit a095b1c78a35f05755 "ARM: mvebu: sort DT nodes by address"
-missed placing the system-controller in the correct order.
-
-> ---
->  arch/arm/boot/dts/armada-370.dtsi | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-> index 6b3c23b1e138..7513410f7b89 100644
-> --- a/arch/arm/boot/dts/armada-370.dtsi
-> +++ b/arch/arm/boot/dts/armada-370.dtsi
-> @@ -106,11 +106,6 @@
->  				reg = <0x11100 0x20>;
->  			};
->  
-> -			system-controller at 18200 {
-> -				compatible = "marvell,armada-370-xp-system-controller";
-> -				reg = <0x18200 0x100>;
-> -			};
-> -
->  			pinctrl {
->  				compatible = "marvell,mv88f6710-pinctrl";
->  				reg = <0x18000 0x38>;
-> @@ -205,6 +200,11 @@
->  				interrupts = <91>;
->  			};
->  
-> +			system-controller at 18200 {
-> +				compatible = "marvell,armada-370-xp-system-controller";
-> +				reg = <0x18200 0x100>;
-> +			};
-> +
->  			gateclk: clock-gating-control at 18220 {
->  				compatible = "marvell,armada-370-gating-clock";
->  				reg = <0x18220 0x4>;
-
-Humm.
-
-Now we have things in the right order, we see that the
-system-controller and the clock-gating-controller overlap.
-
-I know the HW engineers have gone a bit crazy around here, so maybe we
-have no choice?
-
-     Andrew
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 72041f0..d6659fd 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -1486,8 +1486,7 @@ static int edma_setup_from_hw(struct device *dev, struct edma_soc_info *pdata,
+ 	 * priority. So Q0 is the highest priority queue and the last queue has
+ 	 * the lowest priority.
+ 	 */
+-	queue_priority_map = devm_kzalloc(dev,
+-					  (edma_cc->num_tc + 1) * sizeof(s8),
++	queue_priority_map = devm_kzalloc(dev, edma_cc->num_tc + 1,
+ 					  GFP_KERNEL);
+ 	if (!queue_priority_map)
+ 		return -ENOMEM;
+-- 
+1.9.3
