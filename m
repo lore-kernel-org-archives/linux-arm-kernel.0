@@ -1,81 +1,154 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Fri, 14 Nov 2014 10:01:34 +0800
-Subject: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
-In-Reply-To: <20141113235322.GC4042@n2100.arm.linux.org.uk>
-References: <35FD53F367049845BC99AC72306C23D103E010D18261@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18264@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18265@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18266@CNBJMBX05.corpusers.net>
- <20141030120127.GC32589@arm.com>
- <CAKv+Gu9g5Q6fjPUy+P8YxkeDrH+bdO4kKGnxTQZRFhQpgPxaPA@mail.gmail.com>
- <20141030135749.GE32589@arm.com>
- <35FD53F367049845BC99AC72306C23D103E010D18272@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
- <20141113235322.GC4042@n2100.arm.linux.org.uk>
-Message-ID: <35FD53F367049845BC99AC72306C23D103E010D1829B@CNBJMBX05.corpusers.net>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Thu, 13 Nov 2014 17:57:48 -0800
+Subject: [PATCH v14 7/7] KVM: arm: page logging 2nd stage fault handling
+In-Reply-To: <1415930268-7674-1-git-send-email-m.smarduch@samsung.com>
+References: <1415930268-7674-1-git-send-email-m.smarduch@samsung.com>
+Message-ID: <1415930268-7674-8-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Friday, November 14, 2014 7:53 AM
-> To: Wang, Yalin
-> > On Fri, Oct 31, 2014 at 01:42:44PM +0800, Wang, Yalin wrote:
-> > This patch add bitrev.h file to support rbit instruction, so that we
-> > can do bitrev operation by hardware.
-> > Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
-> > ---
-> >  arch/arm/Kconfig              |  1 +
-> >  arch/arm/include/asm/bitrev.h | 21 +++++++++++++++++++++
-> >  2 files changed, 22 insertions(+)
-> >  create mode 100644 arch/arm/include/asm/bitrev.h
-> >
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig index
-> > 89c4b5c..be92b3b 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -28,6 +28,7 @@ config ARM
-> >  	select HANDLE_DOMAIN_IRQ
-> >  	select HARDIRQS_SW_RESEND
-> >  	select HAVE_ARCH_AUDITSYSCALL if (AEABI && !OABI_COMPAT)
-> > +	select HAVE_ARCH_BITREVERSE if (CPU_V7M || CPU_V7)
-> 
-> Looking at this, this is just wrong.  Take a moment to consider what
-> happens if we build a kernel which supports both ARMv6 _and_ ARMv7 CPUs.
-> What happens if an ARMv6 CPU tries to execute an rbit instruction?
+This patch adds support for handling 2nd stage page faults during migration,
+it disables faulting in huge pages, and dissolves huge pages to page tables.
+In case migration is canceled huge pages are used again.
 
-Is it possible to build a kernel that support both CPU_V6 and CPU_V7?
-I mean in Kconfig, CPU_V6 = y and CPU_V7 = y ?
-If there is problem like you said,
-How about this solution:
-select HAVE_ARCH_BITREVERSE if ((CPU_V7M || CPU_V7) && !CPU_V6)  
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+---
+ arch/arm/kvm/mmu.c |   56 ++++++++++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 48 insertions(+), 8 deletions(-)
 
-
-> Second point (which isn't obvious from your submissions on-list) is that
-> you've loaded the patch system up with patches for other parts of the
-> kernel tree for which I am not responsible for.  As such, I can't take
-> those patches without the sub-tree maintainer acking them.  Also, the
-> commit text in those patches look weird:
-> 
-> 6fire: Convert byte_rev_table uses to bitrev8
-> 
-> Use the inline function instead of directly indexing the array.
-> 
-> This allows some architectures with hardware instructions for bit reversals
-> to eliminate the array.
-> 
-> Signed-off-by: Joe Perches <(address hidden)>
-> Signed-off-by: Yalin Wang <(address hidden)>
-> 
-> Why is Joe signing off on these patches?  As his is the first sign-off, one
-> assumes that he was responsible for creating the patch in the first place,
-> but there is no From: line marking him as the author.  Shouldn't his entry
-> be an Acked-by: ?
-> 
-> Confused.
-For this patch,
-I just cherry-pick from Joe,
-If you are not responsible for this part,
-I will submit to the maintainers for these patches .
-Sorry for that .
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 8137455..ff88e5b 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -47,6 +47,20 @@ static phys_addr_t hyp_idmap_vector;
+ #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
+ #define kvm_pud_huge(_x)	pud_huge(_x)
+ 
++#define IOMAP_ATTR		0x1
++#define LOGGING_ACTIVE		0x2
++#define SET_SPTE_FLAGS(l, i)	((l) << (LOGGING_ACTIVE - 1) | \
++				 (i) << (IOMAP_ATTR - 1))
++
++static bool kvm_get_logging_state(struct kvm_memory_slot *memslot)
++{
++#ifdef CONFIG_ARM
++	return !!memslot->dirty_bitmap;
++#else
++	return false;
++#endif
++}
++
+ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ {
+ 	/*
+@@ -626,10 +640,13 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+ }
+ 
+ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+-			  phys_addr_t addr, const pte_t *new_pte, bool iomap)
++			  phys_addr_t addr, const pte_t *new_pte,
++			  unsigned long flags)
+ {
+ 	pmd_t *pmd;
+ 	pte_t *pte, old_pte;
++	bool iomap = flags & IOMAP_ATTR;
++	bool logging_active = flags & LOGGING_ACTIVE;
+ 
+ 	/* Create stage-2 page table mapping - Level 1 */
+ 	pmd = stage2_get_pmd(kvm, cache, addr);
+@@ -641,6 +658,18 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+ 		return 0;
+ 	}
+ 
++	/*
++	 * While dirty memory logging, clear PMD entry for huge page and split
++	 * into smaller pages, to track dirty memory at page granularity.
++	 */
++	if (logging_active && kvm_pmd_huge(*pmd)) {
++		phys_addr_t ipa = pmd_pfn(*pmd) << PAGE_SHIFT;
++
++		pmd_clear(pmd);
++		kvm_tlb_flush_vmid_ipa(kvm, ipa);
++		put_page(virt_to_page(pmd));
++	}
++
+ 	/* Create stage-2 page mappings - Level 2 */
+ 	if (pmd_none(*pmd)) {
+ 		if (!cache)
+@@ -693,7 +722,7 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+ 		if (ret)
+ 			goto out;
+ 		spin_lock(&kvm->mmu_lock);
+-		ret = stage2_set_pte(kvm, &cache, addr, &pte, true);
++		ret = stage2_set_pte(kvm, &cache, addr, &pte, IOMAP_ATTR);
+ 		spin_unlock(&kvm->mmu_lock);
+ 		if (ret)
+ 			goto out;
+@@ -908,6 +937,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	struct vm_area_struct *vma;
+ 	pfn_t pfn;
+ 	pgprot_t mem_type = PAGE_S2;
++	bool logging_active = kvm_get_logging_state(memslot);
+ 
+ 	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
+ 	if (fault_status == FSC_PERM && !write_fault) {
+@@ -918,7 +948,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	/* Let's check if we will get back a huge page backed by hugetlbfs */
+ 	down_read(&current->mm->mmap_sem);
+ 	vma = find_vma_intersection(current->mm, hva, hva + 1);
+-	if (is_vm_hugetlb_page(vma)) {
++	if (is_vm_hugetlb_page(vma) && !logging_active) {
+ 		hugetlb = true;
+ 		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+ 	} else {
+@@ -964,7 +994,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	spin_lock(&kvm->mmu_lock);
+ 	if (mmu_notifier_retry(kvm, mmu_seq))
+ 		goto out_unlock;
+-	if (!hugetlb && !force_pte)
++	if (!hugetlb && !force_pte && !logging_active)
+ 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+ 
+ 	if (hugetlb) {
+@@ -978,16 +1008,18 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+ 	} else {
+ 		pte_t new_pte = pfn_pte(pfn, mem_type);
++		unsigned long flags = SET_SPTE_FLAGS(logging_active,
++				mem_type == PAGE_S2_DEVICE);
+ 		if (writable) {
+ 			kvm_set_s2pte_writable(&new_pte);
+ 			kvm_set_pfn_dirty(pfn);
+ 		}
+ 		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE);
+-		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
+-				     mem_type == PAGE_S2_DEVICE);
++		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, flags);
+ 	}
+ 
+-
++	if (write_fault)
++		mark_page_dirty(kvm, gfn);
+ out_unlock:
+ 	spin_unlock(&kvm->mmu_lock);
+ 	kvm_release_pfn_clean(pfn);
+@@ -1137,7 +1169,15 @@ static void kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
+ {
+ 	pte_t *pte = (pte_t *)data;
+ 
+-	stage2_set_pte(kvm, NULL, gpa, pte, false);
++	/*
++	 * We can always call stage2_set_pte with logging_active == false,
++	 * because MMU notifiers will have unmapped a huge PMD before calling
++	 * ->change_pte() (which in turn calls kvm_set_spte_hva()) and therefore
++	 * stage2_set_pte() never needs to clear out a huge PMD through this
++	 * calling path.
++	 */
++
++	stage2_set_pte(kvm, NULL, gpa, pte, 0);
+ }
+ 
+ 
+-- 
+1.7.9.5
