@@ -1,36 +1,68 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 14 Nov 2014 12:05:29 +0100
-Subject: [PATCH v10 0/2] pwm: add support for atmel-hlcdc-pwm device
-In-Reply-To: <20141103095427.3f385b9d@bbrezillon>
-References: <1412689095-14259-1-git-send-email-boris.brezillon@free-electrons.com>
- <20141103095427.3f385b9d@bbrezillon>
-Message-ID: <20141114120529.41bf908d@bbrezillon>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 14 Nov 2014 12:07:20 +0100
+Subject: [PATCH v4 15/19] arm/arm64: KVM: add virtual GICv3 distributor
+ emulation
+In-Reply-To: <1415959683-26027-16-git-send-email-andre.przywara@arm.com>
+References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
+ <1415959683-26027-16-git-send-email-andre.przywara@arm.com>
+Message-ID: <20141114110720.GP19598@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 3 Nov 2014 09:54:27 +0100
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-
-> Hi Thierry,
+On Fri, Nov 14, 2014 at 10:07:59AM +0000, Andre Przywara wrote:
+> With everything separated and prepared, we implement a model of a
+> GICv3 distributor and redistributors by using the existing framework
+> to provide handler functions for each register group.
 > 
-> On Tue,  7 Oct 2014 15:38:13 +0200
-> Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+> Currently we limit the emulation to a model enforcing a single
+> security state, with SRE==1 (forcing system register access) and
+> ARE==1 (allowing more than 8 VCPUs).
 > 
-> > Hi Thierry,
-> > 
-> > This patch series adds support for the atmel-hlcdc-pwm device provided
-> > by the atmel-hlcdc MFD driver.
+> We share some of the functions provided for GICv2 emulation, but take
+> the different ways of addressing (v)CPUs into account.
+> Save and restore is currently not implemented.
 > 
-> You seemed to be happy with this version but never told that you would
-> take it into your tree.
+> Similar to the split-off of the GICv2 specific code, the new emulation
+> code goes into a new file (vgic-v3-emul.c).
 > 
-> Is there anything missing (I'd really like to have the atmel-hlcdc
-> drivers in 3.19...) ?
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-Ping.
+??...??
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 335ffe0..b7de0f8 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1249,7 +1249,7 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+>  	struct kvm_vcpu *vcpu;
+>  	int edge_triggered, level_triggered;
+>  	int enabled;
+> -	bool ret = true;
+> +	bool ret = true, can_inject = true;
+>  
+>  	spin_lock(&dist->lock);
+>  
+> @@ -1264,6 +1264,11 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+>  
+>  	if (irq_num >= VGIC_NR_PRIVATE_IRQS) {
+>  		cpuid = dist->irq_spi_cpu[irq_num - VGIC_NR_PRIVATE_IRQS];
+> +		if (cpuid == VCPU_NOT_ALLOCATED) {
+> +			/* Pretend we use CPU0, and prevent injection */
+> +			cpuid = 0;
+> +			can_inject = false;
+> +		}
+>  		vcpu = kvm_get_vcpu(kvm, cpuid);
+>  	}
+>  
+> @@ -1285,7 +1290,7 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+>  
+>  	enabled = vgic_irq_is_enabled(vcpu, irq_num);
+>  
+> -	if (!enabled) {
+> +	if (!enabled || !can_inject) {
+>  		ret = false;
+>  		goto out;
+>  	}
 
+As I wrote, I think this is wrong.  What happened here?
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+-Christoffer
