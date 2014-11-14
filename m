@@ -1,34 +1,49 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 14 Nov 2014 11:08:48 +0100
-Subject: [PATCH 0/4] ARM: at91/dt: define RTT nodes
-Message-ID: <1415959732-13591-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Fri, 14 Nov 2014 11:08:51 +0100
+Subject: [PATCH 3/4] ARM: at91/dt: enable the RTT block on the sam9g20ek board
+In-Reply-To: <1415959732-13591-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1415959732-13591-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1415959732-13591-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Enable the RTT and GPBR devices and specify the general purpose register
+used to store the current time.
 
-This patch series define RTT and GPBR devices on all at91 SoCs
-embedding those blocks and enable them on the at91sam9g20ek and
-at91sam9m10g45ek boards (which are the boards I tested on).
+Enable wakeup on RTT event on the shutdown controller device.
 
-Best Regards,
-
-Boris
-
-Boris Brezillon (4):
-  ARM: at91/dt: add RTT nodes to at91 dtsis
-  ARM: at91/dt: add GPBR nodes
-  ARM: at91/dt: enable the RTT block on the sam9g20ek board
-  ARM: at91/dt: enable the RTT block on the at91sam9m10g45ek board
-
- arch/arm/boot/dts/at91sam9260.dtsi          | 14 ++++++++++++++
- arch/arm/boot/dts/at91sam9261.dtsi          | 14 ++++++++++++++
- arch/arm/boot/dts/at91sam9263.dtsi          | 21 +++++++++++++++++++++
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
  arch/arm/boot/dts/at91sam9g20ek_common.dtsi | 14 ++++++++++++++
- arch/arm/boot/dts/at91sam9g45.dtsi          | 14 ++++++++++++++
- arch/arm/boot/dts/at91sam9m10g45ek.dts      |  9 +++++++++
- arch/arm/boot/dts/at91sam9rl.dtsi           | 14 ++++++++++++++
- 7 files changed, 100 insertions(+)
+ 1 file changed, 14 insertions(+)
 
+diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+index d291910..dfaacb1 100644
+--- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+@@ -112,9 +112,23 @@
+ 				};
+ 			};
+ 
++			shdwc at fffffd10 {
++				atmel,wakeup-counter = <10>;
++				atmel,wakeup-rtt-timer;
++			};
++
++			rtc at fffffd20 {
++				atmel,rtt-rtc-time-reg = <&gpbr 0x0>;
++				status = "okay";
++			};
++
+ 			watchdog at fffffd40 {
+ 				status = "okay";
+ 			};
++
++			gpbr: syscon at fffffd50 {
++				status = "okay";
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
 -- 
 1.9.1
