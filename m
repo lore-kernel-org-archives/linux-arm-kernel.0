@@ -1,75 +1,66 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 14 Nov 2014 09:43:16 -0800
-Subject: [PATCH] tty: serial: msm_serial: Use DT aliases
-In-Reply-To: <54655409.6030604@codeaurora.org> (Stephen Boyd's message of
- "Thu, 13 Nov 2014 16:59:53 -0800")
-References: <1414024381-12204-1-git-send-email-sboyd@codeaurora.org>
- <CAMAWPa_f1K1qUG_UTmM0w8Sz8wed7+CQkK9tc8t1W=CTJvdjyw@mail.gmail.com>
- <5461150B.2010907@codeaurora.org> <54616CB3.5000405@gmail.com>
- <54616F74.5010408@codeaurora.org> <54618077.9000108@gmail.com>
- <5463A381.9060305@gmail.com> <5465072F.6040509@codeaurora.org>
- <546550FF.2080409@gmail.com> <54655409.6030604@codeaurora.org>
-Message-ID: <7htx217k5n.fsf@deeprootsystems.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 14 Nov 2014 10:01:04 -0800
+Subject: [PATCH 4/4] arm: dts: omap3-gta04: Add static configuration for
+ devconf1 register
+In-Reply-To: <5465AFF6.506@ti.com>
+References: <1415051968-4878-1-git-send-email-marek@goldelico.com>
+ <1415051968-4878-5-git-send-email-marek@goldelico.com>
+ <5463585D.9070209@ti.com> <20141112150210.GC26481@atomide.com>
+ <5464969F.30708@ti.com> <20141113182848.GQ26481@atomide.com>
+ <alpine.DEB.2.02.1411132251320.17030@utopia.booyaka.com>
+ <20141113235840.GS26481@atomide.com> <5465AFF6.506@ti.com>
+Message-ID: <20141114180104.GT31250@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Boyd <sboyd@codeaurora.org> writes:
+* Tero Kristo <t-kristo@ti.com> [141113 23:33]:
+> On 11/14/2014 01:58 AM, Tony Lindgren wrote:
+> 
+> The PRCM/clock cleanups that I have under work basically splits the clock
+> inits under their respective IP blocks; currently everything is registered
+> under generic PRCM. System control module will be one of the clock providers
+> (and is going to look like a driver), which will be registering its own
+> clocks.
 
-> On 11/13/2014 04:46 PM, Frank Rowand wrote:
->> On 11/13/2014 11:31 AM, Stephen Boyd wrote:
->>> Sorry, I'm sort of lost. If there are serial aliases in the dts file,
->>> then we should alias all of the serial ports. If there aren't aliases
->>> then we're backwards compatible with the dts we have now and we'll do
->>> dynamic generation. Putting code into the driver to validate that
->>> this is true is not the job of the driver. If anything, it should
->>> validated when the dts file is created. If one day we screw up and
->>> have a dts file with such a bad configuration we'll have to work
->>> around it, but until that day comes I'd rather not think about it. 
->> Maybe I did not understand when you said "Perhaps we should use an ida".
->> That sentence led me to think the driver should check for misconfiguration.
->> The case I was trying to handle was if there was at least one serialN
->> alias and at least one UART without an alias.  For example, if there
->> are three UARTs (serial_a, serial_b, serial_c, probed in that order)
->> and one alias (serial0 = &serial_c;) then the result would be:
->>
->>    serial_a  line 0 (from msm_uart_next_id)
->>    serial_b  line 1 (from msm_uart_next_id)
->>    serial_c  line 0 (from the alias)
->>
->>    Two UARTs probed with line == 0.  This is an error.
->>
->> Most of the serial drivers don't check for this type of bad configuration.
->> Some drivers keep a bit map of which lines have been used.  I'm not sure
->> what they do in case of a conflict (I did not read to that level of detail).
->>
->> I thought you were suggesting the driver check for the bad configuration,
->> so I was proposing a somewhat simple way of forcing a boot error for the
->> bad configuration.
->>
->> Since you are not suggesting the driver check for the bad configuration,
->> you can ignore my proposal.  I agree that it is ok for the driver to
->> expect the board dts to be correct.  The problem should be detected by
->> the dts author on first boot as part of normal bring up testing, and
->> then corrected.
->>
->
-> Ah ok. I was just saying we could use an ida instead of an atomic
-> increment so that this driver works properly with driver
-> binding/unbinding, otherwise the line number keeps increasing and
-> quickly goes beyond the static array of ports (which I still don't
-> understand why we have at all btw).
+Yes that's nice. The clock modules in the SCM should probably use the
+syscon mapping unless there's a clear separate IO area for them. And
+then use pinctrl for registers that are muxes for external pins unless
+they are in some dedicated clock register area.
 
-Due to the length of the thread, I haven't followed all the details, and
-I suspect Greg hasn't either, so I'm not sure if you're discssuing what
-the right fix is for what's in -next (still broken[1], or what should be done
-with the device board files.
+> This doesn't change the fact that pinctrl is directly mapping its
+> own register space atm though, it might be possible to re-route this to use
+> the generic system control module if need be though.
 
-If the fix from earlier in this thread is still the right one for fixing
--next, could you repost it separately for Greg to queue/squash and for
-me to re-test (if needed.)
+Mapping dedicated IO areas to individual drivers is not a problem. These
+drivers can eventually be children of a core SCM driver if needed.
+ 
+> I guess its just a political decision which way we want to go, currently we
+> have lots of system control clocks under the clock data (for
+> AM33xx,AM43xx,OMAP3), but we can remove these easily if need be. In some
+> cases it is nicer to have the data in the clock tree though, the drivers
+> don't need to care if they are touching a clock or a pinctrl entity. Some
+> people have been converting additional stuff to CCF outside of PRCM, like
+> Archit did some work to try and get control module clock support for DRA7,
+> and Tomi has been talking to convert some of the DSS internal clocks to CCF
+> also.
 
-Thanks,
+Setting up CCF drivers for SCM makes sense to me. I suggest the
+following guidelines:
 
-Kevin
+1. If there's a clear separate dedicated IO area in SCM, it can be
+   a driver implementing a Linux generic framework for CCF, regulators,
+   pinctrl, or PHY.
 
-[1] http://lists.linaro.org/pipermail/kernel-build-reports/2014-November/006298.html
+2. For the random control registers, we should use syscon or
+   pinctrl-single to implement Linux generic framwork functions for
+   CCF, regulators, pinctrl or PHY.
+
+3. For resource management, we can have a core SCM driver that takes
+   care of the save and restore of registers and clocking if needed.
+   I believe currently SCM clocks are always enabled though. We can
+   set the drivers in #1 and #2 abobe to be childer of the core SCM
+   driver if we ever need to manage clocks during runtime.
+
+Regards,
+
+Tony
