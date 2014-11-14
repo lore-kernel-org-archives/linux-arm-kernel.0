@@ -1,29 +1,36 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Fri, 14 Nov 2014 15:08:38 -0800
-Subject: [PATCH 5/6] iommu/arm-smmu: support buggy implementations with
- invalidate-on-map
-In-Reply-To: <20141113094826.GA13350@arm.com> (Will Deacon's message of "Thu,
- 13 Nov 2014 09:48:26 +0000")
-References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
- <1407891099-24641-6-git-send-email-mitchelh@codeaurora.org>
- <20141112182642.GH26437@arm.com>
- <vnkwy4rg5jqu.fsf@mitchelh-linux.qualcomm.com>
- <20141113094826.GA13350@arm.com>
-Message-ID: <vnkwtx21s7m1.fsf@mitchelh-linux.qualcomm.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 15 Nov 2014 00:35:14 +0100
+Subject: [PATCH 3/3] ACPI / processor: Rename acpi_(un)map_lsapic() to
+ acpi_(un)map_cpu()
+In-Reply-To: <10283319.F5QMI6fbWn@vostro.rjw.lan>
+References: <1414662780-2147-1-git-send-email-hanjun.guo@linaro.org>
+ <5452CE9D.6000403@linaro.org> <10283319.F5QMI6fbWn@vostro.rjw.lan>
+Message-ID: <1820875.eppNBckBcQ@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 13 2014 at 01:48:26 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Ha, damn, then I don't have a user of the shiny new quirks field I added!
-> I don't think I'll go as far as removing it altogether though...
+On Friday, October 31, 2014 11:55:46 PM Rafael J. Wysocki wrote:
+> On Friday, October 31, 2014 07:49:49 AM Hanjun Guo wrote:
+> > On 2014?10?31? 04:12, Rafael J. Wysocki wrote:
+> > > On Thursday, October 30, 2014 05:53:00 PM Hanjun Guo wrote:
+> > >> acpi_map_lsapic() will allocate a logical CPU number and map it to
+> > >> physical CPU id (such as APIC id) for the hot-added CPU, it will also
+> > >> do some mapping for NUMA node id and etc, acpi_unmap_lsapic() will
+> > >> do the reverse.
+> > >>
+> > >> We can see that the name of the function is a little bit confusing and
+> > >> arch dependent so rename them as acpi_(un)map_map() to make arch
+> > >
+> > > That's acpi_(un)map_cpu() I guess?
+> > 
+> > ah, yes, typos, it should be acpi_(un)map_cpu(), my fault.
+> > should I send another version?
+> 
+> No, I can fix this up.
 
-I'm sure we'll be making liberal use of that field soon enough ;)
+I've queued up the series for 3.19, thanks!
 
-
-
--Mitch
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
