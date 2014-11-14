@@ -1,68 +1,93 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 14 Nov 2014 12:07:20 +0100
-Subject: [PATCH v4 15/19] arm/arm64: KVM: add virtual GICv3 distributor
- emulation
-In-Reply-To: <1415959683-26027-16-git-send-email-andre.przywara@arm.com>
-References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
- <1415959683-26027-16-git-send-email-andre.przywara@arm.com>
-Message-ID: <20141114110720.GP19598@cbox>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 14 Nov 2014 12:07:01 +0100
+Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
+In-Reply-To: <5183639.cXydHclPsr@amdc1032>
+References: <1406052070-6207-1-git-send-email-olof@lixom.net>
+ <CAOesGMihWucg0HJ1ecdq_98j+hR=C=DhU8cyjrC+5s7rUJM2MQ@mail.gmail.com>
+ <5183639.cXydHclPsr@amdc1032>
+Message-ID: <6058477.BlGFZybvcG@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 14, 2014 at 10:07:59AM +0000, Andre Przywara wrote:
-> With everything separated and prepared, we implement a model of a
-> GICv3 distributor and redistributors by using the existing framework
-> to provide handler functions for each register group.
-> 
-> Currently we limit the emulation to a model enforcing a single
-> security state, with SRE==1 (forcing system register access) and
-> ARE==1 (allowing more than 8 VCPUs).
-> 
-> We share some of the functions provided for GICv2 emulation, but take
-> the different ways of addressing (v)CPUs into account.
-> Save and restore is currently not implemented.
-> 
-> Similar to the split-off of the GICv2 specific code, the new emulation
-> code goes into a new file (vgic-v3-emul.c).
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-??...??
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 335ffe0..b7de0f8 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1249,7 +1249,7 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
->  	struct kvm_vcpu *vcpu;
->  	int edge_triggered, level_triggered;
->  	int enabled;
-> -	bool ret = true;
-> +	bool ret = true, can_inject = true;
->  
->  	spin_lock(&dist->lock);
->  
-> @@ -1264,6 +1264,11 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
->  
->  	if (irq_num >= VGIC_NR_PRIVATE_IRQS) {
->  		cpuid = dist->irq_spi_cpu[irq_num - VGIC_NR_PRIVATE_IRQS];
-> +		if (cpuid == VCPU_NOT_ALLOCATED) {
-> +			/* Pretend we use CPU0, and prevent injection */
-> +			cpuid = 0;
-> +			can_inject = false;
-> +		}
->  		vcpu = kvm_get_vcpu(kvm, cpuid);
->  	}
->  
-> @@ -1285,7 +1290,7 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
->  
->  	enabled = vgic_irq_is_enabled(vcpu, irq_num);
->  
-> -	if (!enabled) {
-> +	if (!enabled || !can_inject) {
->  		ret = false;
->  		goto out;
->  	}
+Hi,
 
-As I wrote, I think this is wrong.  What happened here?
+On Wednesday, August 27, 2014 09:59:37 AM Bartlomiej Zolnierkiewicz wrote:
+> 
+> Hi Olof,
+> 
+> On Sunday, August 10, 2014 08:05:23 PM Olof Johansson wrote:
+> > On Tue, Jul 22, 2014 at 1:28 PM, Olof Johansson <olof@lixom.net> wrote:
+> > > On Tue, Jul 22, 2014 at 11:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > >> On Tuesday 22 July 2014 11:01:10 Olof Johansson wrote:
+> > >>> This is a major refresh of the multi_v7_defconfig:
+> > >>>
+> > >>> - Bring over a bunch of Samsung drivers to make ODROID-U3 and Chromebooks usable
+> > >>>  * Enable big.LITTLE
+> > >>>  * MCPM
+> > >>>  * CYAPA touchpad
+> > >>>  * Samsung-related MTD/regulator/clk/pinmux drivers
+> > >>>  * Add some of the CrOS EC drivers
+> > >>> - Turn on TPM, HW_RANDOM
+> > >>> - OMAP_USB3 -> TI_PIPE3 option rename
+> > >>> - Enable MCPM/b.L for VEXPRESS
+> > >>> - Add new CONFIG_MTD_SPI_NOR since it otherwise masks off SPI NOR drivers
+> > >>> - CONFIG_LOGO, because penguins.
+> > >>>
+> > >>> I took care to keep the new options that have been added for whose the
+> > >>> drivers are not yet in our for-next branch. This was pretty awkward so
+> > >>> we should sort out how to handle those better in the future.
+> > >>
+> > >> Since you've already done all those, how about enabling THUMB2_KERNEL?
+> > >> For the multi_v7_defconfig, it should actually give some benefits,
+> > >> since it's rather large, and it would be good to have some more testing
+> > >> with this option enabled.
+> > >>
+> > >> I guess the first step would be to enable it and just see if your
+> > >> boot farm survives the change.
+> > >
+> > > Good point, I'll definitely give that a go once the current issues are resolved.
+> > >
+> > > Which are: These changes make 5250-based machines (snow and arndale)
+> > > break. Lots of i2c timeouts on SATA and hdmi-phy. Looks like arndale
+> > > might be missing pinctrl setups for it?
+> > >
+> > > Tushar, Kukjin, any chance you can investigate from your end? I'd like
+> > > to get this change in since it allows for better multiplatform
+> > > coverage, but the Exynos breakage must be fixed...
+> > 
+> > This is still broken on 5250:
+> > http://arm-soc.lixom.net/bootlogs/misc/v3.16-10143-gccefc7a/ is with
+> > this patch applied on top of current mainline and the few fixes we
+> > have queued up.
+> > 
+> > I2C_S3C2410 is enabled with that config now.
+> > 
+> > Tushar is no longer on a Linaro landing team, so he's not looking
+> > after Arndale. Kukjin?
+> 
+> I'm not responsible for Arndale but I took a look at the issue and
+> managed to fix it on my setup.
+> 
+> Please see:
+> 
+>   https://lkml.org/lkml/2014/8/27/116
+> 
+> for details.
 
--Christoffer
+Vivek's USB patches are now in Linus' tree:
+
+  46c1cda88c6e "usb: host: ehci-exynos: Remove unnecessary usb-phy support"
+  2db941623d5c "usb: host: ohci-exynos: Remove unnecessary usb-phy support"
+  2f7f41c7a73c "usb: ehci/ohci-exynos: Fix PHY getting sequence"
+
+so the Exynos5250 Arndale issue should be fixed.
+
+Olof, could you please ressurect and merge your multi_v7_defconfig refresh
+patch (it contains a lot of useful changes for Exynos platforms)?
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
