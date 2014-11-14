@@ -1,39 +1,44 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 13 Nov 2014 17:26:34 -0800
-Subject: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
-In-Reply-To: <20141114011832.GE4042@n2100.arm.linux.org.uk>
-References: <20141030120127.GC32589@arm.com>
- <CAKv+Gu9g5Q6fjPUy+P8YxkeDrH+bdO4kKGnxTQZRFhQpgPxaPA@mail.gmail.com>
- <20141030135749.GE32589@arm.com>
- <35FD53F367049845BC99AC72306C23D103E010D18272@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
- <20141113235322.GC4042@n2100.arm.linux.org.uk>
- <1415923530.4223.17.camel@perches.com>
- <20141114001720.GD4042@n2100.arm.linux.org.uk>
- <1415925943.4141.1.camel@perches.com>
- <20141114011832.GE4042@n2100.arm.linux.org.uk>
-Message-ID: <1415928394.4141.3.camel@perches.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 14 Nov 2014 02:31:23 +0100 (CET)
+Subject: [Patch V1 0/6] Refine generic/PCI MSI irqodmian interfaces
+In-Reply-To: <54655632.2040209@huawei.com>
+References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
+ <54651BE2.9080008@arm.com> <54654C10.2040102@linux.intel.com>
+ <54655632.2040209@huawei.com>
+Message-ID: <alpine.DEB.2.11.1411140211480.3935@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-11-14 at 01:18 +0000, Russell King - ARM Linux wrote:
-> On Thu, Nov 13, 2014 at 04:45:43PM -0800, Joe Perches wrote:
-> > I think you shouldn't apply these patches or updated
-> > ones either until all the current uses are converted.
-> 
-> Where are the dependencies mentioned?
+On Fri, 14 Nov 2014, Yijing Wang wrote:
 
-I mentioned it when these patches (which are not
-mine btw), were submitted the second time.
+Could you please use a mail client which does proper line wraps or
+configure yours to do so?
 
-https://lkml.org/lkml/2014/10/27/69
+> Associate the irq domain and PCI bus is not necessary, because all
+> PCI buses under same host bridge always share same MSI chip/irq
+> domain, we only need associate them and pci host bridge.
+>
+> I'm refactoring the pci_host_bridge, make it be a generic one, rip
+> out of the pci root bus creation, so we could put the irq domain and
+> pci domain etc.. in it. Finally, we could eliminate lots platform
+> arch functions. I will post it out within one week.
 
-> How do I get to know when all
-> the dependencies are met?
+That's a completely orthogonal problem. From the MSI/interrupt
+handling POV it does not matter at all where that information is
+stored. All we care about is that it is retrievable via the (pci)
+device which tries to setup MSI[X].
 
-No idea.
+So we can store/retrieve it via generic functions into/from whatever
+is available right now. If the irq side has generic interfaces to do
+so then this wont conflict with your decisions to change the final
+storage point because all it takes is to tweak the storage/retrieve
+functions.
 
-> Who is tracking the dependencies?
+So all we need at the moment is an agreed on way to store/retrieve
+that information which is based on the current shared infrastructure,
+aka. Linus tree. If we can utilize that you are completely free to
+change the association mechanism underneath.
 
-Not me.
+Thanks,
+
+	tglx
