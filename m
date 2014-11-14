@@ -1,37 +1,35 @@
 From: fkan@apm.com (Feng Kan)
-Date: Thu, 13 Nov 2014 16:19:59 -0800
-Subject: [PATCH V2 5/7] arm64: dts: Add APM X-Gene SoC GFC GPIO controller DTS
- entries
+Date: Thu, 13 Nov 2014 16:20:01 -0800
+Subject: [PATCH V2 7/7] arm64: dts: Add PMU node for APM X-Gene Storm SOC
 In-Reply-To: <1415924401-3013-1-git-send-email-fkan@apm.com>
 References: <1415924401-3013-1-git-send-email-fkan@apm.com>
-Message-ID: <1415924401-3013-6-git-send-email-fkan@apm.com>
+Message-ID: <1415924401-3013-8-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the flash controller muxed gpio dts node for APM X-Gene SoC platform.
+This patch adds the PMU device tree node for APM X-Gene Storm SOC.
 
+Signed-off-by: Vinayak Kale <vkale@apm.com>
 Signed-off-by: Feng Kan <fkan@apm.com>
 ---
- arch/arm64/boot/dts/apm-storm.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/boot/dts/apm-storm.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index 35f66fe..59f752a 100644
+index 59f752a..cbf21d4 100644
 --- a/arch/arm64/boot/dts/apm-storm.dtsi
 +++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -540,6 +540,13 @@
- 			};
- 		};
+@@ -97,6 +97,11 @@
+ 		clock-frequency = <50000000>;
+ 	};
  
-+		gfcgpio: gpio0 at 1701c000 {
-+			compatible = "apm,xgene-gpio";
-+			reg = <0x0 0x1701c000 0x0 0x40>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+		};
++	pmu {
++		compatible = "apm,potenza-pmu", "arm,armv8-pmuv3";
++		interrupts = <1 12 0xff04>;
++	};
 +
- 		phy1: phy at 1f21a000 {
- 			compatible = "apm,xgene-phy";
- 			reg = <0x0 0x1f21a000 0x0 0x100>;
+ 	soc {
+ 		compatible = "simple-bus";
+ 		#address-cells = <2>;
 -- 
 1.9.1
