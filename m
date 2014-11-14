@@ -1,61 +1,58 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 13 Nov 2014 16:59:53 -0800
-Subject: [PATCH] tty: serial: msm_serial: Use DT aliases
-In-Reply-To: <546550FF.2080409@gmail.com>
-References: <1414024381-12204-1-git-send-email-sboyd@codeaurora.org>
- <CAMAWPa_f1K1qUG_UTmM0w8Sz8wed7+CQkK9tc8t1W=CTJvdjyw@mail.gmail.com>
- <5461150B.2010907@codeaurora.org> <54616CB3.5000405@gmail.com>
- <54616F74.5010408@codeaurora.org> <54618077.9000108@gmail.com>
- <5463A381.9060305@gmail.com> <5465072F.6040509@codeaurora.org>
- <546550FF.2080409@gmail.com>
-Message-ID: <54655409.6030604@codeaurora.org>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Fri, 14 Nov 2014 09:09:06 +0800
+Subject: [Patch V1 0/6] Refine generic/PCI MSI irqodmian interfaces
+In-Reply-To: <54654C10.2040102@linux.intel.com>
+References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
+ <54651BE2.9080008@arm.com> <54654C10.2040102@linux.intel.com>
+Message-ID: <54655632.2040209@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/13/2014 04:46 PM, Frank Rowand wrote:
-> On 11/13/2014 11:31 AM, Stephen Boyd wrote:
->> Sorry, I'm sort of lost. If there are serial aliases in the dts file,
->> then we should alias all of the serial ports. If there aren't aliases
->> then we're backwards compatible with the dts we have now and we'll do
->> dynamic generation. Putting code into the driver to validate that
->> this is true is not the job of the driver. If anything, it should
->> validated when the dts file is created. If one day we screw up and
->> have a dts file with such a bad configuration we'll have to work
->> around it, but until that day comes I'd rather not think about it. 
-> Maybe I did not understand when you said "Perhaps we should use an ida".
-> That sentence led me to think the driver should check for misconfiguration.
-> The case I was trying to handle was if there was at least one serialN
-> alias and at least one UART without an alias.  For example, if there
-> are three UARTs (serial_a, serial_b, serial_c, probed in that order)
-> and one alias (serial0 = &serial_c;) then the result would be:
->
->    serial_a  line 0 (from msm_uart_next_id)
->    serial_b  line 1 (from msm_uart_next_id)
->    serial_c  line 0 (from the alias)
->
->    Two UARTs probed with line == 0.  This is an error.
->
-> Most of the serial drivers don't check for this type of bad configuration.
-> Some drivers keep a bit map of which lines have been used.  I'm not sure
-> what they do in case of a conflict (I did not read to that level of detail).
->
-> I thought you were suggesting the driver check for the bad configuration,
-> so I was proposing a somewhat simple way of forcing a boot error for the
-> bad configuration.
->
-> Since you are not suggesting the driver check for the bad configuration,
-> you can ignore my proposal.  I agree that it is ok for the driver to
-> expect the board dts to be correct.  The problem should be detected by
-> the dts author on first boot as part of normal bring up testing, and
-> then corrected.
->
+On 2014/11/14 8:25, Jiang Liu wrote:
+> On 2014/11/14 5:00, Marc Zyngier wrote:
+>> On 13/11/14 11:43, Jiang Liu wrote:
+>>> This patch set is based on tip/irq/irqdomain and tries to refine
+>>> interfaces to support irqdomain for generic MSI and PCI MSI.
+>>>
+>>> With this patch set applied, the generic MSI and PCI MSI interfaces
+>>> are much easier to use. For extreme case, you only need to define
+>>> a "struct msi_domain_info" and don't need to implement any callbacks,
+>>> just using the default callbacks is OK:)
+>>>
+>>> This patch set is also a preparation for:
+>>> 1) Kill all weak functions in drivers/pci/msi.c
+>>> 2) Implement support for non-PCI-compliant MSI device
+>>
+>> I've rebased (once more!) the GICv3 ITS driver on top of this, and this
+>> is definitely a major improvement. This is basically the first version
+>> I can use without having to hack into the core code (apart from the
+>> couple of nits I've mentioned earlier).
+> Sorry for the rebasing, but I hope it worthy rebasing:)
+> 
+>>
+>> Now, Thomas' idea of putting the irq_domain close to the bus is very
+>> appealing, and I've tweaked an earlier patch in order to do this:
+> I feel that's the right direction. There are other threads discussing
+> associating an MSI controller structure with each PCI bus (at least
+> root bus).
+> http://www.spinics.net/lists/arm-kernel/msg376328.html
 
-Ah ok. I was just saying we could use an ida instead of an atomic
-increment so that this driver works properly with driver
-binding/unbinding, otherwise the line number keeps increasing and
-quickly goes beyond the static array of ports (which I still don't
-understand why we have at all btw).
+Associate the irq domain and PCI bus is not necessary, because all PCI buses under same host bridge
+always share same MSI chip/irq domain, we only need associate them and pci host bridge.
+I'm refactoring the pci_host_bridge, make it be a generic one, rip out of the pci root bus
+creation, so we could put the irq domain and pci domain etc.. in it. Finally, we could
+eliminate lots platform arch functions. I will post it out within one week.
+
+Thanks!
+Yijing.
+
+> Regards!
+> Gerry
+> 
+> .
+> 
+
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks!
+Yijing
