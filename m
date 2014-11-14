@@ -1,115 +1,300 @@
-From: Mingkai.Hu@freescale.com (Mingkai.Hu at freescale.com)
-Date: Fri, 14 Nov 2014 11:30:48 +0000
-Subject: [PATCH v2] PCI: designware: Add support 4 ATUs assignment
-In-Reply-To: <1415959338.4445.1.camel@pengutronix.de>
-References: <1415682444-24911-1-git-send-email-Minghuan.Lian@freescale.com>
- <CA+mB=1+4Dzxhbin6z0PUENvjUz-y8bq-K09FXTnSepFvVfe9HQ@mail.gmail.com>
- <546308DD.40109@freescale.com>
- <CA+mB=1K=Oyzdb2yfBvPRG9DHi-PFjRPtVS_dY9JMOz6dQog8QQ@mail.gmail.com>
- <546331E7.5060003@freescale.com>
- <CA+mB=1KObT9O783SMcvHy8nJGQPnxyKgP332r5bHx-K_D+LhVg@mail.gmail.com>
- <1415809929.2876.5.camel@pengutronix.de> <546481A3.5050700@freescale.com>
- <1415874015.2420.5.camel@pengutronix.de> <54648D61.6050704@freescale.com>
- <1415876988.2420.7.camel@pengutronix.de> <5465C19D.3060801@freescale.com>
- <1415959338.4445.1.camel@pengutronix.de>
-Message-ID: <ceb189ef55cf44588b212cc44bb19ef5@BN3PR0301MB1249.namprd03.prod.outlook.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Fri, 14 Nov 2014 11:37:57 +0000
+Subject: [PATCH V3] arm64: percpu: Implement this_cpu operations
+In-Reply-To: <20141107135205.GA7591@linaro.org>
+References: <20141107135205.GA7591@linaro.org>
+Message-ID: <1415965077-10495-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The generic this_cpu operations disable interrupts to ensure that the
+requested operation is protected from pre-emption. For arm64, this is
+overkill and can hurt throughput and latency.
 
+This patch provides arm64 specific implementations for the this_cpu
+operations. Rather than disable interrupts, we use the exclusive
+monitor or atomic operations as appropriate.
 
-> -----Original Message-----
-> From: Lucas Stach [mailto:l.stach at pengutronix.de]
-> Sent: Friday, November 14, 2014 6:02 PM
-> To: Lian Minghuan-B31939
-> Cc: Srikanth Thokala; Lian Minghuan-B31939; linux-pci at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; Zang Roy-R61911; Hu Mingkai-B21284;
-> Bjorn Helgaas
-> Subject: Re: [PATCH v2] PCI: designware: Add support 4 ATUs assignment
-> 
-> Am Freitag, den 14.11.2014, 16:47 +0800 schrieb Lian Minghuan-B31939:
-> > Hi Lucas and all,
-> >
-> > On 2014?11?13? 19:09, Lucas Stach wrote:
-> > > Am Donnerstag, den 13.11.2014, 18:52 +0800 schrieb Lian Minghuan-
-> B31939:
-> > >> Hi Lucas,
-> > >>
-> > >> On 2014?11?13? 18:20, Lucas Stach wrote:
-> > >>> Am Donnerstag, den 13.11.2014, 18:02 +0800 schrieb Lian Minghuan-
-> B31939:
-> > >>>> Hi Lucas,
-> > >>>>
-> > >>>> Please see my comments inline.
-> > >>>>
-> > >>>> Thanks,
-> > >>>> Minghuan
-> > >>>>
-> > >>>> On 2014?11?13? 00:32, Lucas Stach wrote:
-> > >>>>> Am Mittwoch, den 12.11.2014, 21:53 +0530 schrieb Srikanth Thokala:
-> > >>>>>> Hi Minghuan,
-> > >>> [...]
-> > >>>
-> > >>>>> Using a smaller type complicates the DT for little to no
-> > >>>>> benefit. I think it's ok to use u32 here, which is a common
-> > >>>>> standard for integer values in DT.
-> > >>>>>
-> > >>>>> Though this discussion lead me to the question if we even need
-> > >>>>> to have this property in the DT at all. Isn't this a property
-> > >>>>> that is fixed for a specific silicon implementation of the DW
-> > >>>>> core? In that case we could just infer the number of ATUs from
-> > >>>>> the DT compatible, so this should probably just be added to
-> > >>>>> struct pcie_port and properly initialized by the SoC glue drivers.
-> > >>>> [Minghuan]  As far as I know, exynos implements only 2 ATUs, this
-> > >>>> is why pcie-designware only supports 2 ATU. iMX implements 4 ATUs
-> > >>>> and LS1021A implements 6 ATUs.
-> > >>>>
-> > >>> Right so we don't need an additional property in the DT at all.
-> > >>> The number of ATUs is fixed for a specific core compatible and can
-> > >>> be passed in by the respective exynos, imx and ls1021 glue drivers.
-> > >>>
-> > >>> You may ask the Keystone and Spear maintainers to get the correct
-> > >>> number of ATUs for those implementations.
- > >>>
-> > >>> Regards,
-> > >>> Lucas
-> > >> [Minghuan] Yes. This a way that specific core driver passes the ATU
-> > >> number to pci-designware. But I perfer to adding dts node for the
-> > >> following reasons:
-> > >> 1. ATU number is hardware attribute, so it can be added to DTS.
-> > > But it is a duplication of information that can be inferred from the
-> > > DT compatible alone, which is usually frowned upon.
-> > >
-> > > Also in contrast to the num-lanes property I don't see a use-case to
-> > > reduce the number of used ATUs in a specific system, so num-atus is
-> > > basically fixed for a specific implementation.
-> > [Minghuan] 4ATUs provides better support for multiple-function and
-> > SR-IOV PCIe devices.
-> > Can anyone tell me if there is the company will increase ATUs number?
-> > If yes, we should avoid the following code:
-> >
-> > if (of_device_is_compatible(pcie->dev->of_node, "xxx,r1-pcie"))
-> >      atu_num = 2;
-> >
-> > if (of_device_is_compatible(pcie->dev->of_node, "xxx,r2-pcie"))
-> >      atu_num = 4;
-> >
-> The number of ATUs is fixed for a specific implementation. If the number
-> of ATUs changes in a newer implementation of a SoC then the silicon
-> implementation of the DW PCIe core changed, so it should get a new
-> compatible anyway.
-> 
+The following operations are implemented: add, add_return, and, or,
+read, write, xchg. We also wire up a cmpxchg implementation from
+cmpxchg.h.
 
-If there are multiple platforms to use the same SoC driver, there will be
-multiple cases for different platforms as Minghuan has pointed out.
+Testing was performed using the percpu_test module and hackbench on a
+Juno board running 3.18-rc4.
 
-For the platform that only has 2 ATUs, ATU0 is used for CFG0 and MEM and
-there will be conflict when MEM and CFG0 are accessed simultaneously which
-has cause the SATA link issue. I think more ATUs will be added in the 
-future design, then one driver maybe need to handle multiple platforms.
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+Having thought more about it, I will send out a separate patch to
+implement local.h for arm64 as it's logically separate.
 
-DTS is designed for to describe the hardware property, it's a general way
-to put hardware related property into DTS.
+Changed in V3: use cmpxchg_local rather than cmpxchg for
+this_cpu_cmpxchg.
 
-Thanks,
-Mingkai
+Changed in V2: corrected address constraint for __percpu_read and
+__percpu_write.
+---
+ arch/arm64/include/asm/cmpxchg.h |   6 +-
+ arch/arm64/include/asm/percpu.h  | 231 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 235 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
+index 3e02245..9248066 100644
+--- a/arch/arm64/include/asm/cmpxchg.h
++++ b/arch/arm64/include/asm/cmpxchg.h
+@@ -237,8 +237,10 @@ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
+ 	__ret; \
+ })
+ 
+-#define this_cpu_cmpxchg_8(ptr, o, n) \
+-	cmpxchg(raw_cpu_ptr(&(ptr)), o, n);
++#define this_cpu_cmpxchg_1(ptr, o, n) cmpxchg_local(raw_cpu_ptr(&(ptr)), o, n)
++#define this_cpu_cmpxchg_2(ptr, o, n) cmpxchg_local(raw_cpu_ptr(&(ptr)), o, n)
++#define this_cpu_cmpxchg_4(ptr, o, n) cmpxchg_local(raw_cpu_ptr(&(ptr)), o, n)
++#define this_cpu_cmpxchg_8(ptr, o, n) cmpxchg_local(raw_cpu_ptr(&(ptr)), o, n)
+ 
+ #define this_cpu_cmpxchg_double_8(ptr1, ptr2, o1, o2, n1, n2) \
+ 	cmpxchg_double(raw_cpu_ptr(&(ptr1)), raw_cpu_ptr(&(ptr2)), \
+diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
+index 5279e57..30b84f2 100644
+--- a/arch/arm64/include/asm/percpu.h
++++ b/arch/arm64/include/asm/percpu.h
+@@ -44,6 +44,237 @@ static inline unsigned long __my_cpu_offset(void)
+ 
+ #endif /* CONFIG_SMP */
+ 
++#define PERCPU_OP(op, asm_op)						\
++static inline unsigned long __percpu_##op(void *ptr,			\
++			unsigned long val, int size)			\
++{									\
++	unsigned long loop, ret;					\
++									\
++	switch (size) {							\
++	case 1:								\
++		do {							\
++			asm ("//__per_cpu_" #op "_1\n"			\
++			"ldxrb	  %w[ret], %[ptr]\n"			\
++			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
++			"stxrb	  %w[loop], %w[ret], %[ptr]\n"		\
++			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
++			  [ptr] "+Q"(*(u8 *)ptr)			\
++			: [val] "Ir" (val));				\
++		} while (loop);						\
++		break;							\
++	case 2:								\
++		do {							\
++			asm ("//__per_cpu_" #op "_2\n"			\
++			"ldxrh	  %w[ret], %[ptr]\n"			\
++			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
++			"stxrh	  %w[loop], %w[ret], %[ptr]\n"		\
++			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
++			  [ptr]  "+Q"(*(u16 *)ptr)			\
++			: [val] "Ir" (val));				\
++		} while (loop);						\
++		break;							\
++	case 4:								\
++		do {							\
++			asm ("//__per_cpu_" #op "_4\n"			\
++			"ldxr	  %w[ret], %[ptr]\n"			\
++			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
++			"stxr	  %w[loop], %w[ret], %[ptr]\n"		\
++			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
++			  [ptr] "+Q"(*(u32 *)ptr)			\
++			: [val] "Ir" (val));				\
++		} while (loop);						\
++		break;							\
++	case 8:								\
++		do {							\
++			asm ("//__per_cpu_" #op "_8\n"			\
++			"ldxr	  %[ret], %[ptr]\n"			\
++			#asm_op " %[ret], %[ret], %[val]\n"		\
++			"stxr	  %w[loop], %[ret], %[ptr]\n"		\
++			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
++			  [ptr] "+Q"(*(u64 *)ptr)			\
++			: [val] "Ir" (val));				\
++		} while (loop);						\
++		break;							\
++	default:							\
++		BUILD_BUG();						\
++	}								\
++									\
++	return ret;							\
++}
++
++PERCPU_OP(add, add)
++PERCPU_OP(and, and)
++PERCPU_OP(or, orr)
++#undef PERCPU_OP
++
++static inline unsigned long __percpu_read(void *ptr, int size)
++{
++	unsigned long ret;
++
++	switch (size) {
++	case 1:
++		asm ("//__per_cpu_read_1\n"
++			"ldrb %w[ret], %[ptr]\n" :
++			[ret] "=&r"(ret) : [ptr] "Q"(*(u8 *)ptr));
++		break;
++	case 2:
++		asm ("//__per_cpu_read_2\n"
++			"ldrh %w[ret], %[ptr]\n" :
++			[ret] "=&r"(ret) : [ptr] "Q"(*(u16 *)ptr));
++		break;
++	case 4:
++		asm ("//__per_cpu_read_4\n"
++			"ldr %w[ret], %[ptr]\n" :
++			[ret] "=&r"(ret) : [ptr] "Q"(*(u32 *)ptr));
++		break;
++	case 8:
++		asm ("//__per_cpu_read_8\n"
++			"ldr %[ret], %[ptr]\n" :
++			[ret] "=&r"(ret) : [ptr] "Q"(*(u64 *)ptr));
++		break;
++	default:
++		BUILD_BUG();
++	}
++
++	return ret;
++}
++
++static inline void __percpu_write(void *ptr, unsigned long val, int size)
++{
++	switch (size) {
++	case 1:
++		asm ("//__per_cpu_write_1\n"
++			"strb %w[val], %[ptr]\n" :
++			[ptr] "=Q"(*(u8 *)ptr) : [val] "r"(val));
++		break;
++	case 2:
++		asm ("//__per_cpu_write_2\n"
++			"strh %w[val], %[ptr]\n" :
++			[ptr] "=Q"(*(u16 *)ptr) : [val] "r"(val));
++		break;
++	case 4:
++		asm ("//__per_cpu_write_4\n"
++			"str %w[val], %[ptr]\n" :
++			[ptr] "=Q"(*(u32 *)ptr) : [val] "r"(val));
++		break;
++	case 8:
++		asm ("//__per_cpu_write_8\n"
++			"str %[val], %[ptr]\n" :
++			[ptr] "=Q"(*(u64 *)ptr) : [val] "r"(val));
++		break;
++	default:
++		BUILD_BUG();
++	}
++}
++
++static inline unsigned long __percpu_xchg(void *ptr, unsigned long val,
++						int size)
++{
++	unsigned long ret, loop;
++
++	switch (size) {
++	case 1:
++		do {
++			asm ("//__percpu_xchg_1\n"
++			"ldxrb %w[ret], %[ptr]\n"
++			"stxrb %w[loop], %w[val], %[ptr]\n"
++			: [loop] "=&r"(loop), [ret] "=&r"(ret),
++			  [ptr] "+Q"(*(u8 *)ptr)
++			: [val] "r" (val));
++		} while (loop);
++		break;
++	case 2:
++		do {
++			asm ("//__percpu_xchg_2\n"
++			"ldxrh %w[ret], %[ptr]\n"
++			"stxrh %w[loop], %w[val], %[ptr]\n"
++			: [loop] "=&r"(loop), [ret] "=&r"(ret),
++			  [ptr] "+Q"(*(u16 *)ptr)
++			: [val] "r" (val));
++		} while (loop);
++		break;
++	case 4:
++		do {
++			asm ("//__percpu_xchg_4\n"
++			"ldxr %w[ret], %[ptr]\n"
++			"stxr %w[loop], %w[val], %[ptr]\n"
++			: [loop] "=&r"(loop), [ret] "=&r"(ret),
++			  [ptr] "+Q"(*(u32 *)ptr)
++			: [val] "r" (val));
++		} while (loop);
++		break;
++	case 8:
++		do {
++			asm ("//__percpu_xchg_8\n"
++			"ldxr %[ret], %[ptr]\n"
++			"stxr %w[loop], %[val], %[ptr]\n"
++			: [loop] "=&r"(loop), [ret] "=&r"(ret),
++			  [ptr] "+Q"(*(u64 *)ptr)
++			: [val] "r" (val));
++		} while (loop);
++		break;
++	default:
++		BUILD_BUG();
++	}
++
++	return ret;
++}
++
++#define _percpu_add(pcp, val) \
++	__percpu_add(raw_cpu_ptr(&(pcp)), val, sizeof(pcp))
++
++#define _percpu_add_return(pcp, val) (typeof(pcp)) (_percpu_add(pcp, val))
++
++#define _percpu_and(pcp, val) \
++	__percpu_and(raw_cpu_ptr(&(pcp)), val, sizeof(pcp))
++
++#define _percpu_or(pcp, val) \
++	__percpu_or(raw_cpu_ptr(&(pcp)), val, sizeof(pcp))
++
++#define _percpu_read(pcp) (typeof(pcp))	\
++	(__percpu_read(raw_cpu_ptr(&(pcp)), sizeof(pcp)))
++
++#define _percpu_write(pcp, val) \
++	__percpu_write(raw_cpu_ptr(&(pcp)), (unsigned long)(val), sizeof(pcp))
++
++#define _percpu_xchg(pcp, val) (typeof(pcp)) \
++	(__percpu_xchg(raw_cpu_ptr(&(pcp)), (unsigned long)(val), sizeof(pcp)))
++
++#define this_cpu_add_1(pcp, val) _percpu_add(pcp, val)
++#define this_cpu_add_2(pcp, val) _percpu_add(pcp, val)
++#define this_cpu_add_4(pcp, val) _percpu_add(pcp, val)
++#define this_cpu_add_8(pcp, val) _percpu_add(pcp, val)
++
++#define this_cpu_add_return_1(pcp, val) _percpu_add_return(pcp, val)
++#define this_cpu_add_return_2(pcp, val) _percpu_add_return(pcp, val)
++#define this_cpu_add_return_4(pcp, val) _percpu_add_return(pcp, val)
++#define this_cpu_add_return_8(pcp, val) _percpu_add_return(pcp, val)
++
++#define this_cpu_and_1(pcp, val) _percpu_and(pcp, val)
++#define this_cpu_and_2(pcp, val) _percpu_and(pcp, val)
++#define this_cpu_and_4(pcp, val) _percpu_and(pcp, val)
++#define this_cpu_and_8(pcp, val) _percpu_and(pcp, val)
++
++#define this_cpu_or_1(pcp, val) _percpu_or(pcp, val)
++#define this_cpu_or_2(pcp, val) _percpu_or(pcp, val)
++#define this_cpu_or_4(pcp, val) _percpu_or(pcp, val)
++#define this_cpu_or_8(pcp, val) _percpu_or(pcp, val)
++
++#define this_cpu_read_1(pcp) _percpu_read(pcp)
++#define this_cpu_read_2(pcp) _percpu_read(pcp)
++#define this_cpu_read_4(pcp) _percpu_read(pcp)
++#define this_cpu_read_8(pcp) _percpu_read(pcp)
++
++#define this_cpu_write_1(pcp, val) _percpu_write(pcp, val)
++#define this_cpu_write_2(pcp, val) _percpu_write(pcp, val)
++#define this_cpu_write_4(pcp, val) _percpu_write(pcp, val)
++#define this_cpu_write_8(pcp, val) _percpu_write(pcp, val)
++
++#define this_cpu_xchg_1(pcp, val) _percpu_xchg(pcp, val)
++#define this_cpu_xchg_2(pcp, val) _percpu_xchg(pcp, val)
++#define this_cpu_xchg_4(pcp, val) _percpu_xchg(pcp, val)
++#define this_cpu_xchg_8(pcp, val) _percpu_xchg(pcp, val)
++
+ #include <asm-generic/percpu.h>
+ 
+ #endif /* __ASM_PERCPU_H */
+-- 
+1.9.3
