@@ -1,136 +1,37 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 14 Nov 2014 09:19:32 +0000
-Subject: [PATCH v4 1/4] dt-bindings: simplefb: Specify node location and
- handoff related properties
-In-Reply-To: <1415906594-2461-1-git-send-email-hdegoede@redhat.com>
-References: <1415906594-2461-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CACxGe6uJhyyAfXDEk5a9fR+RtiRbAO4qYzOrStcanJxUuc1GiQ@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 14 Nov 2014 10:21:53 +0100
+Subject: [PATCH] ARM: zynq: Remove secondary_startup() declaration from header
+Message-ID: <f8646bfc1a5c6bd86103cc237dca2dec2ca9efa6.1415956908.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 13, 2014 at 7:23 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Since simplefb nodes do not relate directly to hw typically they have been
-> placed in the root of the devicetree. As the represent runtime information
-> having them as sub-nodes of /chosen is more logical, specify this.
->
-> Also specify when to set the chosen stdout-path property to a simplefb node.
->
-> For reliable handover to a hardware specific driver, that driver needs to
-> know which simplefb to unregister when taking over, specify how the hw driver
-> can find the matching simplefb node.
->
-> Last add some advice on how to fill and use simplefb nodes from a firmware
-> pov.
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> --
-> Changes in v2:
-> -Add stdout-path to the example code
-> Changes in v3:
-> -Specify that the node name must be "framebuffer@<address>"
-> -Specify that the link to link simplefb node and display hw nodes to one
->  another for handover goes into the simplefb node, and must be called "display"
-> -Specify how aliases may be used to tell the OS how to number displays
-> -Update the example to reflect these changes
-> Changes in v4:
-> -Keep the size of the reg property in the example as it was before
-> ---
->  .../bindings/video/simple-framebuffer.txt          | 49 +++++++++++++++++++++-
->  1 file changed, 48 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-> index 8f35718..c548f33 100644
-> --- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-> @@ -4,6 +4,31 @@ A simple frame-buffer describes a frame-buffer setup by firmware or
->  the bootloader, with the assumption that the display hardware has already
->  been set up to scan out from the memory pointed to by the reg property.
->
-> +Since simplefb nodes represent runtime information they must be sub-nodes of
-> +the chosen node (*). Simplefb nodes must be named "framebuffer@<address>".
-> +
-> +If a simplefb node represents the preferred console for user interaction,
-> +then the chosen node's stdout-path property must point to it.
+secondary_startup() in the header is not needed at all.
 
-Since we've decided to point the display aliases at the display node
-instead of the framebuffer, the stdout-path property should also point
-to the display node. The simplefb driver can still work out which
-framebuffer to use for stdout path in the same way that it figures out
-how to resolve the display alias. This way the stdout details aren't
-lost when the framebuffer is disabled and It also means that
-stdout-path can be merely set to the alias ("display0") instead of the
-full path ("/full/path/to/node").
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-> +
-> +If the devicetree contains nodes for the display hardware used by a simplefb,
-> +then the simplefb node must contain a property called "display", which
-> +contains a phandle pointing to the primary display hw node, so that the OS
-> +knows which simplefb to disable when handing over control to a driver for the
-> +real hardware. The bindings for the hw nodes must specify which node is
-> +considered the primary node.
-> +
-> +It is advised to add display# aliases to help the OS determine how to number
-> +things. If display# aliases are used, then if the simplefb node contains a
+ arch/arm/mach-zynq/common.h | 1 -
+ 1 file changed, 1 deletion(-)
 
-s/then if/and if/
+diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
+index 2bc71273c73c..382c60e9aa16 100644
+--- a/arch/arm/mach-zynq/common.h
++++ b/arch/arm/mach-zynq/common.h
+@@ -29,7 +29,6 @@ extern void zynq_slcr_cpu_state_write(int cpu, bool die);
+ extern u32 zynq_slcr_get_device_id(void);
 
-> +"display" property then the /aliases/display# path must point to the display
-> +hw node the "display" property points to, otherwise it must point directly
-> +to the simplefb node.
-> +
-> +It is advised that devicetree files contain pre-filled, disabled framebuffer
-> +nodes, so that the firmware only needs to update the mode information and
-> +enable them. This way if e.g. later on support for more display clocks get
-> +added, the simplefb nodes will already contain this info and the firmware
-> +does not need to be updated.
+ #ifdef CONFIG_SMP
+-extern void secondary_startup(void);
+ extern char zynq_secondary_trampoline;
+ extern char zynq_secondary_trampoline_jump;
+ extern char zynq_secondary_trampoline_end;
+--
+1.8.2.3
 
-You should merge your guidance of naming pre-filled framebuffer nodes
-into this patch. There is no need to have it separate.
-
-> +
->  Required properties:
->  - compatible: "simple-framebuffer"
->  - reg: Should contain the location and size of the framebuffer memory.
-> @@ -19,14 +44,36 @@ Optional properties:
->             are expected to already be configured correctly. The OS must
->             ensure these clocks are not modified or disabled while the
->             simple framebuffer remains active.
-> +- display : phandle pointing to the primary display hardware node
->
->  Example:
->
-> -       framebuffer {
-> +aliases {
-> +       display0 = &lcdc0;
-> +}
-> +
-> +chosen {
-> +       framebuffer0: framebuffer at 1d385000 {
->                 compatible = "simple-framebuffer";
->                 reg = <0x1d385000 (1600 * 1200 * 2)>;
->                 width = <1600>;
->                 height = <1200>;
->                 stride = <(1600 * 2)>;
->                 format = "r5g6b5";
-> +               clocks = <&ahb_gates 36>, <&ahb_gates 43>, <&ahb_gates 44>;
-> +               display = <&lcdc0>;
-> +       };
-> +       stdout-path = &framebuffer0;
-> +};
-> +
-> +soc at 01c00000 {
-> +       lcdc0: lcdc at 1c0c000 {
-> +               compatible = "allwinner,sun4i-a10-lcdc";
-> +               ...
->         };
-> +};
-> +
-> +
-> +*) Older devicetree files may have a compatible = "simple-framebuffer" node
-> +in a different place, operating systems must first enumerate any compatible
-> +nodes found under chosen and then check for other compatible nodes.
-> --
-> 2.1.0
->
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141114/b89ac4b8/attachment.sig>
