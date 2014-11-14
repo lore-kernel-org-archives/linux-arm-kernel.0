@@ -1,62 +1,41 @@
-From: gang.chen.5i5j@gmail.com (Chen Gang)
-Date: Sat, 15 Nov 2014 00:30:11 +0800
-Subject: [PATCH v2] virt: kvm: arm: vgic: Process the failure case when
- kvm_register_device_ops() fails
-In-Reply-To: <546625F8.6060900@arm.com>
-References: <54661D5F.3060304@gmail.com> <546625F8.6060900@arm.com>
-Message-ID: <54662E13.2010507@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 14 Nov 2014 16:31:24 +0000
+Subject: [PATCH 0/6] arm64: alternatives runtime patching
+In-Reply-To: <2041011.PXfvHs4Xp7@wuerfel>
+References: <1415980452-20366-1-git-send-email-andre.przywara@arm.com>
+ <2041011.PXfvHs4Xp7@wuerfel>
+Message-ID: <20141114163123.GC6755@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-According to your taste, we need improve 2 contents below:
-
-On 11/14/2014 11:55 PM, Marc Zyngier wrote:
+On Fri, Nov 14, 2014 at 04:20:10PM +0000, Arnd Bergmann wrote:
+> On Friday 14 November 2014 15:54:06 Andre Przywara wrote:
+> > This series introduces alternatives runtime patching to arm64.
+> > This allows to patch assembly instruction at runtime to either
+> > fix hardware bugs or optimize for certain hardware features. Look
+> > at patch 5/6 for an example on how to use this.
 > 
-> No. This is completely overdesigned, and fixes something that really
-> cannot happen. What is wrong with:
-> 
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 3aaca49..b7dffa80 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -2465,13 +2465,17 @@ int kvm_vgic_hyp_init(void)
->  		goto out_free_irq;
->  	}
->  
-> +	ret = kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
-> +				       KVM_DEV_TYPE_ARM_VGIC_V2);
-> +	if (ret)
-> +		goto out_free_irq;
-> +
+> Does it provide a measurable performance benefit? The implementation
+> seems ok, but we should only add the complexity for things that
+> actually need it and can't be handled just as well with a run-time
+> conditional.
 
-Need call __unregister_cpu_notifier(), since __register_cpu_notifier()
-is already successfully called.
+I'm not a fan of run-time code patching, however, I'm not sure we can
+avoid them long term in an optimal way.
 
-Need print some information for failure via kvm_err().
+One example is errata workarounds we cannot predict. They may require
+changing of a critical code path.
 
-Thanks.
->  	/* Callback into for arch code for setup */
->  	vgic_arch_setup(vgic);
->  
->  	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
->  
-> -	return kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
-> -				       KVM_DEV_TYPE_ARM_VGIC_V2);
-> +	return 0;
->  
->  out_free_irq:
->  	free_percpu_irq(vgic->maint_irq, kvm_get_running_vcpus());
-> 
-> This achieves the exact same effect.
-> 
-> Thanks,
-> 
-> 	M.
-> 
+Another example is code like local_irq_disable which at some point we
+may want to implement using GICv3 priority mask rather than PSTATE.I bit
+change to allow NMI via standard IRQ.
 
+And another big use-case I can't yet talk openly about is architecture
+extensions.
+
+What I would like to see at some point is a way to choose alternatives
+at run-time via branches rather than code patching or even deciding at
+compile time what features we have. These would help with debugging.
 
 -- 
-Chen Gang
-
-Open share and attitude like air water and life which God blessed
+Catalin
