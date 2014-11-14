@@ -1,10 +1,10 @@
 From: gang.chen.5i5j@gmail.com (Chen Gang)
-Date: Fri, 14 Nov 2014 22:05:10 +0800
+Date: Fri, 14 Nov 2014 22:05:38 +0800
 Subject: [PATCH] virt: kvm: arm: vgic: Process the failure case when
  kvm_register_device_ops() fails
 In-Reply-To: <5464CE9A.6050209@arm.com>
 References: <5464C865.90504@gmail.com> <5464CE9A.6050209@arm.com>
-Message-ID: <54660C16.6080107@gmail.com>
+Message-ID: <54660C32.6090602@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
