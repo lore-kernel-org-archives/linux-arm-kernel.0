@@ -1,128 +1,40 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 14 Nov 2014 12:03:12 +0100
-Subject: [PATCH v5 1/5] dt-bindings: simplefb: Specify node location and
- handoff related properties
-Message-ID: <1415962996-31712-1-git-send-email-hdegoede@redhat.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 14 Nov 2014 12:58:37 +0100
+Subject: [PATCH] ARM: exynos_defconfig: Use 16 minors per MMC block device
+Message-ID: <1415966317-11170-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since simplefb nodes do not relate directly to hw typically they have been
-placed in the root of the devicetree. As the represent runtime information
-having them as sub-nodes of /chosen is more logical, specify this.
+16 minors per MMC block device are required to boot Rinato (Gear 2)
+board because up to 15 partitions are used.
 
-Also specify when to set the chosen stdout-path property to a simplefb node.
+With default 8 minors booting failed with:
+[    1.329092] mmcblk0: mmc0:0001 F5X5MA 3.64 GiB
+[    1.329448] mmcblk0boot0: mmc0:0001 F5X5MA partition 1 4.00 MiB
+[    1.329627] mmcblk0boot1: mmc0:0001 F5X5MA partition 2 4.00 MiB
+[    1.329808] mmcblk0rpmb: mmc0:0001 F5X5MA partition 3 512 KiB
+[    1.335717]  mmcblk0: p1 p2 p3 p4 p5 p6 p7
+[    1.436553] Waiting for root device /dev/mmcblk0p15...
 
-For reliable handover to a hardware specific driver, that driver needs to
-know which simplefb to unregister when taking over, specify how the hw driver
-can find the matching simplefb node.
+while the correct list of partitions on mmcblk0 for Gear 2 is:
+[    1.436651]  mmcblk0: p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
 
-Last add some advice on how to fill and use simplefb nodes from a firmware
-pov.
-
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
---
-Changes in v2:
--Add stdout-path to the example code
-Changes in v3:
--Specify that the node name must be "framebuffer@<address>"
--Specify that the link to link simplefb node and display hw nodes to one
- another for handover goes into the simplefb node, and must be called "display"
--Specify how aliases may be used to tell the OS how to number displays
--Update the example to reflect these changes
-Changes in v4:
--Keep the size of the reg property in the example as it was before
-Changes in v5:
--Specify that stdout-path property should work the same way as the aliases,
- or just point to an alias
--Document naming scheme for pre-populated simplefb nodes
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- .../bindings/video/simple-framebuffer.txt          | 58 +++++++++++++++++++++-
- 1 file changed, 57 insertions(+), 1 deletion(-)
+ arch/arm/configs/exynos_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-index 8f35718..f8fb7e6 100644
---- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-+++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-@@ -4,6 +4,40 @@ A simple frame-buffer describes a frame-buffer setup by firmware or
- the bootloader, with the assumption that the display hardware has already
- been set up to scan out from the memory pointed to by the reg property.
- 
-+Since simplefb nodes represent runtime information they must be sub-nodes of
-+the chosen node (*). Simplefb nodes must be named "framebuffer@<address>".
-+
-+If the devicetree contains nodes for the display hardware used by a simplefb,
-+then the simplefb node must contain a property called "display", which
-+contains a phandle pointing to the primary display hw node, so that the OS
-+knows which simplefb to disable when handing over control to a driver for the
-+real hardware. The bindings for the hw nodes must specify which node is
-+considered the primary node.
-+
-+It is advised to add display# aliases to help the OS determine how to number
-+things. If display# aliases are used, then if the simplefb node contains a
-+"display" property then the /aliases/display# path must point to the display
-+hw node the "display" property points to, otherwise it must point directly
-+to the simplefb node.
-+
-+If a simplefb node represents the preferred console for user interaction,
-+then the chosen node's stdout-path property should point to it, or to the
-+primary display hw node, as with display# aliases. If display aliases are
-+used then it should be set to the alias instead.
-+
-+It is advised that devicetree files contain pre-filled, disabled framebuffer
-+nodes, so that the firmware only needs to update the mode information and
-+enable them. This way if e.g. later on support for more display clocks get
-+added, the simplefb nodes will already contain this info and the firmware
-+does not need to be updated.
-+
-+If pre-filled framebuffer nodes are used, they should be named
-+"framebuffer#-<output>", e.g. "framebuffer0-hdmi". The output should be
-+included in the name since different outputs typically require different
-+clocks and the clocks are part of the pre-populated nodes. The firmware must
-+rename the nodes to the standard "framebuffer@<address>" name using the
-+runtime chosen address when enabling the nodes.
-+
- Required properties:
- - compatible: "simple-framebuffer"
- - reg: Should contain the location and size of the framebuffer memory.
-@@ -19,14 +53,36 @@ Optional properties:
-            are expected to already be configured correctly. The OS must
-            ensure these clocks are not modified or disabled while the
-            simple framebuffer remains active.
-+- display : phandle pointing to the primary display hardware node
- 
- Example:
- 
--	framebuffer {
-+aliases {
-+	display0 = &lcdc0;
-+}
-+
-+chosen {
-+	framebuffer0: framebuffer at 1d385000 {
- 		compatible = "simple-framebuffer";
- 		reg = <0x1d385000 (1600 * 1200 * 2)>;
- 		width = <1600>;
- 		height = <1200>;
- 		stride = <(1600 * 2)>;
- 		format = "r5g6b5";
-+		clocks = <&ahb_gates 36>, <&ahb_gates 43>, <&ahb_gates 44>;
-+		display = <&lcdc0>;
-+	};
-+	stdout-path = "display0";
-+};
-+
-+soc at 01c00000 {
-+	lcdc0: lcdc at 1c0c000 {
-+		compatible = "allwinner,sun4i-a10-lcdc";
-+		...
- 	};
-+};
-+
-+
-+*) Older devicetree files may have a compatible = "simple-framebuffer" node
-+in a different place, operating systems must first enumerate any compatible
-+nodes found under chosen and then check for other compatible nodes.
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 72058b8a6f4d..aa32931bdd30 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -134,6 +134,7 @@ CONFIG_USB_STORAGE=y
+ CONFIG_USB_DWC3=y
+ CONFIG_USB_HSIC_USB3503=y
+ CONFIG_MMC=y
++CONFIG_MMC_BLOCK_MINORS=16
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_S3C=y
+ CONFIG_MMC_SDHCI_S3C_DMA=y
 -- 
-2.1.0
+1.9.1
