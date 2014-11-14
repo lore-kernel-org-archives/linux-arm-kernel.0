@@ -1,44 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 14 Nov 2014 10:22:55 +0000
-Subject: [PATCH] efi: Fix free_end build warning
-In-Reply-To: <1415824050.15847.9.camel@smoke>
-References: <1415824050.15847.9.camel@smoke>
-Message-ID: <20141114102254.GB27963@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 14 Nov 2014 11:24:17 +0100
+Subject: [PATCH 4/7] ARM: dts: sun6i: Add simplefb node
+In-Reply-To: <5464EFF9.9010203@redhat.com>
+References: <1415871109-28332-1-git-send-email-hdegoede@redhat.com>
+ <1415871109-28332-4-git-send-email-hdegoede@redhat.com>
+ <20141113164606.GM20972@lukather> <5464EFF9.9010203@redhat.com>
+Message-ID: <20141114102417.GY20972@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding original authors]
+On Thu, Nov 13, 2014 at 06:52:57PM +0100, Hans de Goede wrote:
+> Hi,
+> 
+> On 11/13/2014 05:46 PM, Maxime Ripard wrote:
+> > Hi,
+> > 
+> > On Thu, Nov 13, 2014 at 10:31:46AM +0100, Hans de Goede wrote:
+> >> Add a simplefb template node for u-boot to further fill and activate.
+> >>
+> >> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >> ---
+> >>  arch/arm/boot/dts/sun6i-a31.dtsi | 10 ++++++++++
+> >>  1 file changed, 10 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+> >> index 543f895..438952e 100644
+> >> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+> >> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+> >> @@ -62,6 +62,16 @@
+> >>  		ethernet0 = &gmac;
+> >>  	};
+> >>  
+> >> +	chosen {
+> >> +		#address-cells = <1>;
+> >> +		#size-cells = <1>;
+> >> +		ranges;
+> >> +
+> >> +		framebuffer0 {
+> >> +			compatible = "simple-framebuffer";
+> >> +			status = "disabled";
+> > 
+> > Aren't we suppose to have clocks in there too?
+> 
+> I deliberately left them out as they are not needed on sun6i, once the blocks
+> are setup ahb access is not necessary, but it seems that the ahb_gate bits
+> in sun4i / sun5i / sun7i double as a reset. Toggling them on / off / on breaks
+> the mode, while toggling module clocks on / off / on only causes a glitch.
+> 
+> Since the sun6i has a separate reset controller, the clock gates seem to really
+> only control ahb access which is not necessary once the mode has been set up.
 
-On Wed, Nov 12, 2014 at 08:27:30PM +0000, Geoff Levand wrote:
-> Initialize the free_end variable to zero.  Fixes build warnings
-> like these:
-> 
->   arch/arm64/kernel/efi.c: warning: ?free_end? may be used uninitialized in this function
-> 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> ---
-> Got this with the latest arm64/for-next/core branch.  Please consider.
-> 
-> -Geoff 
-> 
->  arch/arm64/kernel/efi.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index 4f39a18..83fc53c 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -239,6 +239,7 @@ static void __init free_boot_services(void)
->  	 * want to keep for UEFI.
->  	 */
->  
-> +	free_end = 0;
->  	keep_end = 0;
->  	free_start = 0;
+Ok. That can always be changed in the future if we ever find we need
+them anyway.
 
-Whilst I can't see how free_end gets used uninitialized in this function,
-the code is really hard to read and I'd like to get an Ack from one of the
-people on CC before merging this, just in case GCC is actually telling us
-something useful for a change.
+I'll merge these four patches as soon as the bindings doc is
+acked-by/merged by Grant or any other DT maintainer.
 
-Will
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141114/ccbf2455/attachment.sig>
