@@ -1,9 +1,9 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 14 Nov 2014 16:34:35 +0100
-Subject: [PATCH v2 2/4] ARM: dts: sun5i: Add simplefb node
+Date: Fri, 14 Nov 2014 16:34:37 +0100
+Subject: [PATCH v2 4/4] ARM: dts: sun7i: Add simplefb node
 In-Reply-To: <1415979277-20861-1-git-send-email-hdegoede@redhat.com>
 References: <1415979277-20861-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1415979277-20861-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <1415979277-20861-5-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,15 +11,15 @@ Add a simplefb template node for u-boot to further fill and activate.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun5i-a10s.dtsi | 12 ++++++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi | 12 ++++++++++++
  1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index 7089284..aee7f25 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -24,6 +24,18 @@
- 		serial3 = &uart3;
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 81d4e55..58c1573 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -64,6 +64,18 @@
+ 		serial7 = &uart7;
  	};
  
 +	chosen {
@@ -35,7 +35,7 @@ index 7089284..aee7f25 100644
 +	};
 +
  	cpus {
- 		cpu at 0 {
- 			compatible = "arm,cortex-a8";
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
 -- 
 2.1.0
