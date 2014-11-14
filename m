@@ -1,89 +1,47 @@
-From: B31939@freescale.com (Lian Minghuan-B31939)
-Date: Fri, 14 Nov 2014 17:36:19 +0800
-Subject: [PATCH v2] PCI: designware: Add support 4 ATUs assignment
-In-Reply-To: <CA+mB=1KObT9O783SMcvHy8nJGQPnxyKgP332r5bHx-K_D+LhVg@mail.gmail.com>
-References: <1415682444-24911-1-git-send-email-Minghuan.Lian@freescale.com>
- <CA+mB=1+4Dzxhbin6z0PUENvjUz-y8bq-K09FXTnSepFvVfe9HQ@mail.gmail.com>
- <546308DD.40109@freescale.com>
- <CA+mB=1K=Oyzdb2yfBvPRG9DHi-PFjRPtVS_dY9JMOz6dQog8QQ@mail.gmail.com>
- <546331E7.5060003@freescale.com>
- <CA+mB=1KObT9O783SMcvHy8nJGQPnxyKgP332r5bHx-K_D+LhVg@mail.gmail.com>
-Message-ID: <5465CD13.9010608@freescale.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 14 Nov 2014 10:35:56 +0100
+Subject: [alsa-devel] [PATCH v3] of: replace Asahi Kasei Corp venter prefix
+In-Reply-To: <87k32yd0bd.wl%kuninori.morimoto.gx@renesas.com>
+References: <878ulzx6hr.wl%kuninori.morimoto.gx@gmail.com>
+ <20140922130026.GK3290@leverpostej>
+ <CAMuHMdX22z97SbGS1HDiYfJ1PXxyEN2S8D7w4sr+4bUwD+mJZw@mail.gmail.com>
+ <20140922132743.GM3290@leverpostej>
+ <87y4rfhmgl.wl%kuninori.morimoto.gx@renesas.com>
+ <1415845309.4269.6.camel@perches.com>
+ <20141113025105.GA16652@verge.net.au>
+ <87vbmjhj00.wl%kuninori.morimoto.gx@renesas.com>
+ <20141113110740.GE3815@sirena.org.uk>
+ <87k32yd0bd.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20141114093554.GC3810@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Nov 14, 2014 at 01:43:03AM +0000, Kuninori Morimoto wrote:
+> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> 
+> Current vendor-prefixes.txt already has
+> "ak" prefix for Asahi Kasei Corp by
+> ae8c4209af2cec065fef15d200a42a04130799f7
 
-On 2014?11?13? 00:23, Srikanth Thokala wrote:
-> Hi Minghuan,
->
-> On Wed, Nov 12, 2014 at 3:39 PM, Lian Minghuan-B31939
-> <B31939@freescale.com> wrote:
-> [...]
->            return ret;
-> @@ -770,6 +793,10 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
->            u32 membase;
->            u32 memlimit;
->
-> +       /* set ATUs setting for MEM and IO */
-> +       dw_pcie_prog_viewport_mem_outbound(pp);
-> +       dw_pcie_prog_viewport_io_outbound(pp);
-> +
->>>>> I see from the code, these settings are required for the calls other
->>>>> than
->>>>> dw_pcie_(rd/wr)_other_conf, is it correct? If it is so, I feel this
->>>>> change
->>>>> is
->>>>> independent of this patch and should go as a separte patch?
->>>> [Minghuan] dw_pcie(rd/wr)_other_confg only calls the
->>>> dw_pcie_prog_viewport_mem/io_outbound when
->>>> we only use 2 ATUs.
->>>> The patch is to support 4ATUs. If no the calls, ATU2(MEM) and ATU3 will
->>>> not be initialized, and PCIe device driver will be broken.
->>> When you have only 2 ATUs (CFG0=MEM & CFG1=IO), you are calling
->>> mem/io_outbound() twice with the same writes which is not the case in the
->>> original driver. So, I mentioned it should go as a separate patch.
->> [Minghuan] Sorry, I do not understand what you mean.
->> How to separate patch?
->> A patch is to add the following code based on original code
->>
->> +       /* set ATUs setting for MEM and IO */
->> +       dw_pcie_prog_viewport_mem_outbound(pp);
->> +       dw_pcie_prog_viewport_io_outbound(pp);
->> +
->>
->> But why add this patch? 2 ATUs does not need them.
->>
->> Only 4 ATUs support needs them.
-> Then you may have to add a condition here, num_atus >= 4?
->
->> And them are also ok for 2 ATUs.
-> You are just re-writing them anyway, so I don't see a place for them here.
->
-> So, this fragment should just work,
->
-> +++
-> if (num_atus >=4 ) {
->    dw_pcie_prog_viewport_mem_outbound(pp);
->    dw_pcie_prog_viewport_io_outbound(pp);
-> }
-> +++
->
-> Is that correct? Am I still missing?
-[Minghuan]  For 2 ATUs, ATU0 is for MEM as default, ATU1 for IO.
-When to access CFG0/CFG1, ATU will temporarily to be changed to
-CFG0/CFG1, then will be changed back to MEM/IO.
-So the mem/io initialization I added will not bring any harm for 2 ATUs.
-Why do we need the judgement 'num_atus >=4'.
->> For 2 ATUs, mem/io will be initialized every time read/write PCI device
->> configuration.
-> Just out of curiosity, is it really required to initialize mem/io everytime
-> there is a config read/write? Would it not work when initialized just once like
-> for the case of 4 ATUs?
-[Minghuan] For 2 ATUs, CFG0 and MEM share ATU0. So when access PCIe 
-device configuration
-ATU0 will be changed to CFG0 setting, and then be changed to MEM setting 
-for MEM support.
-> - Srikanth
->
->>
->>
+It's usually enough to show the first 12 (or so) characters of the SHA1
+here. git will show you the right one if you do something like:
+
+	git log --abbrev=12 --abbrev-commit
+
+It's probably useful to "git config core.abbrev 12" for Linux kernel
+repositories.
+
+Other than that it seems like you're being overly careful about not
+exceeding 72 characters. Your lines seem to wrap at around less than
+50 columns. However, making lines too short results in equally hard to
+read commit messages, so please try to shoot for 72 columns for maximum
+readability.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141114/b6f807cf/attachment.sig>
