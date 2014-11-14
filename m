@@ -1,21 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 Nov 2014 16:02:05 +0000
-Subject: [PATCH 1/2] ARM: imx: Remove unneeded .map_io initialization
-In-Reply-To: <1415980438-12939-1-git-send-email-geert+renesas@glider.be>
-References: <1415980438-12939-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20141114160205.GH4042@n2100.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 14 Nov 2014 16:03:41 +0000
+Subject: [Patch V1 0/6] Refine generic/PCI MSI irqodmian interfaces
+In-Reply-To: <54661ED9.8090901@linux.intel.com>
+References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
+ <54651BE2.9080008@arm.com> <54654C10.2040102@linux.intel.com>
+ <54655632.2040209@huawei.com> <alpine.DEB.2.11.1411140211480.3935@nanos>
+ <54655D44.1070703@linux.intel.com> <54660D7F.70702@gmail.com>
+ <54661103.8000707@linux.intel.com> <54661CB8.2070704@arm.com>
+ <54661ED9.8090901@linux.intel.com>
+Message-ID: <546627DD.2050200@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 14, 2014 at 04:53:57PM +0100, Geert Uytterhoeven wrote:
-> If machine_desc.map_io is not set, devicemaps_init() in the common ARM
-> code will call debug_ll_io_init().
+On 14/11/14 15:25, Jiang Liu wrote:
+> On 2014/11/14 23:16, Marc Zyngier wrote:
+>> On 14/11/14 14:26, Jiang Liu wrote:
+>>> On 2014/11/14 22:11, Yijing Wang wrote:
+>>>>
+>>> We have achieved 1 and 2. And seems we could also achieve 3 by
+>>> converting all arch specific PCI MSI code to use hierarchy
+>>> irqdomain. But not sure whether we could achieve 4, not familiar
+>>> with ARM world:)
+>>
+>> Killing all the weak functions shouldn't be a problem for ARM, we're
+>> trying very hard not to rely on them.
+>>
+>> Killing msi_chip is a different story, as this is what we use to match a
+>> PCI host controller with its MSI controller (that's what the of_node
+>> field in msi_chip is for). See drivers/of/of_pci.c for details.
+>>
+>> Also, we use msi_chip directly in the MSI drivers as a way to go from a
+>> pci_dev to the MSI controller specific structure:
+>>
+>> http://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/tree/drivers/irqchip/irq-gic-v3-its.c?h=irq/stacked-its-v2#n1143
+>>
+>> If we're going to kill msi_chip, we must make sure we have mechanisms
+>> that allow the conversion of the existing code.
+> Hi Marc,
+> 	Seem it doesn't worth the effort to remove irq_chip,
+> so I will focus on killing all weak functions first:)
+> After that, we may kill setup_irq and teardown_irq in irq_chip,
+> but seems irq_chip still has other usages, so I won't try to
+> kill irq_chip.
 
-How about a WARN_ON(mdesc->map_io == debug_ll_io_init) ?  This can only
-really be done when CONFIG_DEBUG_LL is defined because otherwise it's an
-inline function, but it may help to stop these from appearing in the
-first place.
+I assume you mean msi_chip! ;-)
 
+Killing setup/teardown_irq is going to require some work. There are a
+few users in the tree (I can see three in drivers/pci/host and one in
+drivers/irqchip).
+
+Hopefully, we can get the maintainers to convert them.
+
+Thanks,
+
+	M.
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Jazz is not dead. It just smells funny...
