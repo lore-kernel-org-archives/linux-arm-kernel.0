@@ -1,63 +1,57 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 14 Nov 2014 10:50:42 +0100
-Subject: [PATCH] dt-bindings: simplefb: Document naming scheme for
- pre-populated simplefb nodes
-In-Reply-To: <CACxGe6txgJKsybuSrCXzCn8sPJYZVwo-wm+pV5KuTmP=YHiA2g@mail.gmail.com>
-References: <1415955751-6316-1-git-send-email-hdegoede@redhat.com>
- <CACxGe6txgJKsybuSrCXzCn8sPJYZVwo-wm+pV5KuTmP=YHiA2g@mail.gmail.com>
-Message-ID: <5465D072.1000407@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 14 Nov 2014 09:52:06 +0000
+Subject: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
+In-Reply-To: <1415928394.4141.3.camel@perches.com>
+References: <20141030135749.GE32589@arm.com>
+ <35FD53F367049845BC99AC72306C23D103E010D18272@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
+ <20141113235322.GC4042@n2100.arm.linux.org.uk>
+ <1415923530.4223.17.camel@perches.com>
+ <20141114001720.GD4042@n2100.arm.linux.org.uk>
+ <1415925943.4141.1.camel@perches.com>
+ <20141114011832.GE4042@n2100.arm.linux.org.uk>
+ <1415928394.4141.3.camel@perches.com>
+Message-ID: <20141114095205.GF4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 11/14/2014 10:12 AM, Grant Likely wrote:
-> On Fri, Nov 14, 2014 at 9:02 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Since we advice to use pre-populated simeplfb nodes in dt files, where the
->> firmware then only needs to fill in the mode info + address and enable it,
->> we should also specify how these pre-populated nodes should be named so
->> that the firmware can find and enable the right one.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>  Documentation/devicetree/bindings/video/simple-framebuffer.txt | 7 +++++++
->>  1 file changed, 7 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
->> index c548f33..01dc948 100644
->> --- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
->> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
->> @@ -29,6 +29,13 @@ enable them. This way if e.g. later on support for more display clocks get
->>  added, the simplefb nodes will already contain this info and the firmware
->>  does not need to be updated.
->>
->> +If pre-filled framebuffer nodes are used, they should be named
->> +"framebuffer#-<output>", e.g. "framebuffer0-hdmi". The output should be
->> +included in the name since different outputs typically require different
->> +clocks and the clocks are part of the pre-populated nodes. The firmware must
->> +rename the nodes to the standard "framebuffer@<address>" using the runtime
->> +chosen address when enabling the nodes.
+On Thu, Nov 13, 2014 at 05:26:34PM -0800, Joe Perches wrote:
+> On Fri, 2014-11-14 at 01:18 +0000, Russell King - ARM Linux wrote:
+> > On Thu, Nov 13, 2014 at 04:45:43PM -0800, Joe Perches wrote:
+> > > I think you shouldn't apply these patches or updated
+> > > ones either until all the current uses are converted.
+> > 
+> > Where are the dependencies mentioned?
 > 
-> -<output> should be optional, an only used when there are multiple options.
+> I mentioned it when these patches (which are not
+> mine btw), were submitted the second time.
 
-Right, notice the "should be named", I would rather leave it at that then
-complicate the wording by adding something about only use -output when there
-are multiple options.
+Yes, I'm well aware that the author of the ARM patches are Yalin Wang.
 
-> Something we've not talked about is how to handle a framebuffer that
-> has been set up with mirrored displays. Does that case matter?
-
-It is bound to happen sooner or later I guess, but it is still just a single
-framebuffer, so from the simplefb kernel driver pov it does not matter, it really
-is just another variant on the -<output> theme where there happen to be 2 outputs
-active at the same time.
-
-Regards,
-
-Hans
-
-
-
+> https://lkml.org/lkml/2014/10/27/69
 > 
-> g.
+> > How do I get to know when all
+> > the dependencies are met?
 > 
+> No idea.
+> 
+> > Who is tracking the dependencies?
+> 
+> Not me.
+
+Right, what that means is that no one is doing that.  What you've also
+said in this thread now is that the ARM patches should not be applied
+until all the other users are converted.  As those patches are going via
+other trees, that means the ARM patches can only be applied _after_ the
+next merge window _if_ all maintainers pick up the previous set.
+
+As I'm not tracking the status of what other maintainers do, I'm simply
+going to avoid applying these patches until after the next merge window
+and hope that the other maintainers pick the dependent patches up and get
+them in during the next merge window.  If not, I guess we'll see compile
+breakage.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
