@@ -1,64 +1,75 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 14 Nov 2014 16:21:22 +0100
-Subject: [PATCHv2 02/16] ARM: mvebu: enable strex backoff delay
+Date: Fri, 14 Nov 2014 16:21:24 +0100
+Subject: [PATCHv2 04/16] clocksource: time-armada-370-xp: add suspend/resume
+ support
 In-Reply-To: <1415978496-9334-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1415978496-9334-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1415978496-9334-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1415978496-9334-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nadav Haklai <nadavh@marvell.com>
-
-Under extremely rare conditions, in an MPCore node consisting of at
-least 3 CPUs, two CPUs trying to perform a STREX to data on the same
-shared cache line can enter a livelock situation.
-
-This patch enables the HW mechanism that overcomes the bug. This fixes
-the incorrect setup of the STREX backoff delay bit due to a wrong
-description in the specification.
-
-Note that enabling the STREX backoff delay mechanism is done by
-leaving the bit *cleared*, while the bit was currently being set by
-the proc-v7.S code.
-
-[Thomas: adapt to latest mainline, slightly reword the commit log, add
-stable markers.]
-
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: <stable@vger.kernel.org> # v3.8+
-Fixes: de4901933f6d ("arm: mm: Add support for PJ4B cpu and init routines")
-Signed-off-by: Nadav Haklai <nadavh@marvell.com>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
-This patch is submitted as part of the suspend/resume work, because
-the suspend/resume path is triggering this rare bug in a very
-reproducible fashion.
+This commit adds a set of suspend/resume syscore_ops to respectively
+save and restore a number of timer registers, in order to make sure
+the clockevent and clocksource devices continue to work properly
+across a suspend/resume cycle.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/mm/proc-v7.S | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/clocksource/time-armada-370-xp.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index b3a9478..22ac2a6 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -270,7 +270,6 @@ __v7_pj4b_setup:
- /* Auxiliary Debug Modes Control 1 Register */
- #define PJ4B_STATIC_BP (1 << 2) /* Enable Static BP */
- #define PJ4B_INTER_PARITY (1 << 8) /* Disable Internal Parity Handling */
--#define PJ4B_BCK_OFF_STREX (1 << 5) /* Enable the back off of STREX instr */
- #define PJ4B_CLEAN_LINE (1 << 16) /* Disable data transfer for clean line */
+diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+index 0451e62..ff37d3a 100644
+--- a/drivers/clocksource/time-armada-370-xp.c
++++ b/drivers/clocksource/time-armada-370-xp.c
+@@ -43,6 +43,7 @@
+ #include <linux/module.h>
+ #include <linux/sched_clock.h>
+ #include <linux/percpu.h>
++#include <linux/syscore_ops.h>
  
- /* Auxiliary Debug Modes Control 2 Register */
-@@ -293,7 +292,6 @@ __v7_pj4b_setup:
- 	/* Auxiliary Debug Modes Control 1 Register */
- 	mrc	p15, 1,	r0, c15, c1, 1
- 	orr     r0, r0, #PJ4B_CLEAN_LINE
--	orr     r0, r0, #PJ4B_BCK_OFF_STREX
- 	orr     r0, r0, #PJ4B_INTER_PARITY
- 	bic	r0, r0, #PJ4B_STATIC_BP
- 	mcr	p15, 1,	r0, c15, c1, 1
+ /*
+  * Timer block registers.
+@@ -223,6 +224,28 @@ static struct notifier_block armada_370_xp_timer_cpu_nb = {
+ 	.notifier_call = armada_370_xp_timer_cpu_notify,
+ };
+ 
++static u32 timer0_ctrl_reg, timer0_local_ctrl_reg;
++
++static int armada_370_xp_timer_suspend(void)
++{
++	timer0_ctrl_reg = readl(timer_base + TIMER_CTRL_OFF);
++	timer0_local_ctrl_reg = readl(local_base + TIMER_CTRL_OFF);
++	return 0;
++}
++
++static void armada_370_xp_timer_resume(void)
++{
++	writel(0xffffffff, timer_base + TIMER0_VAL_OFF);
++	writel(0xffffffff, timer_base + TIMER0_RELOAD_OFF);
++	writel(timer0_ctrl_reg, timer_base + TIMER_CTRL_OFF);
++	writel(timer0_local_ctrl_reg, local_base + TIMER_CTRL_OFF);
++}
++
++struct syscore_ops armada_370_xp_timer_syscore_ops = {
++	.suspend	= armada_370_xp_timer_suspend,
++	.resume		= armada_370_xp_timer_resume,
++};
++
+ static void __init armada_370_xp_timer_common_init(struct device_node *np)
+ {
+ 	u32 clr = 0, set = 0;
+@@ -285,6 +308,8 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
+ 	/* Immediately configure the timer on the boot CPU */
+ 	if (!res)
+ 		armada_370_xp_timer_setup(this_cpu_ptr(armada_370_xp_evt));
++
++	register_syscore_ops(&armada_370_xp_timer_syscore_ops);
+ }
+ 
+ static void __init armada_xp_timer_init(struct device_node *np)
 -- 
 2.1.0
