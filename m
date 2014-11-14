@@ -1,39 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 14 Nov 2014 13:06:46 -0800
-Subject: [GIT PULL 2/2] omap driver changes for v3.19
-In-Reply-To: <pull-1415999057-591605>
-References: <pull-1415999057-591605>
-Message-ID: <pull-1415999057-591605-2>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 14 Nov 2014 15:08:32 -0600
+Subject: [PATCH v7 08/13] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <1415978763-27345-9-git-send-email-antoine.tenart@free-electrons.com>
+References: <1415978763-27345-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1415978763-27345-9-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20141114210832.GE16388@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
+On Fri, Nov 14, 2014 at 04:25:58PM +0100, Antoine Tenart wrote:
+> Add a USB2 ChipIdea driver for ci13xxx, with optional PHY, clock
+> and DMA mask, to support USB2 ChipIdea controllers that don't need
+> specific functions.
+> 
+> Tested on the Marvell Berlin SoCs USB controllers.
+> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+>  drivers/usb/chipidea/Makefile       |   1 +
+>  drivers/usb/chipidea/ci_hdrc_usb2.c | 117 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 118 insertions(+)
+>  create mode 100644 drivers/usb/chipidea/ci_hdrc_usb2.c
+> 
+> diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+> index 2f099c7df7b5..1fc86a2ca22d 100644
+> --- a/drivers/usb/chipidea/Makefile
+> +++ b/drivers/usb/chipidea/Makefile
+> @@ -10,6 +10,7 @@ ci_hdrc-$(CONFIG_USB_OTG_FSM)		+= otg_fsm.o
+>  
+>  # Glue/Bridge layers go here
+>  
+> +obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_usb2.o
 
-  Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
+usb2 is too generic, you should call it ci_hdcr_marvell, or something
+like that.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.19/w1-and-l3-noc
-
-for you to fetch changes up to c4cf0935a2d8fe6d186bf4253ea3c4b4a8a8a710:
-
-  bus: omap_l3_noc: Correct returning IRQ_HANDLED unconditionally in the irq handler (2014-11-12 07:16:27 -0800)
-
-----------------------------------------------------------------
-Few omap driver changes to add minimal device tree support
-for the omap 1w driver, and to fix resume and interrupt issues
-on the l3-noc driver.
-
-----------------------------------------------------------------
-Keerthy (2):
-      bus: omap_l3_noc: Add resume hook to restore context
-      bus: omap_l3_noc: Correct returning IRQ_HANDLED unconditionally in the irq handler
-
-NeilBrown (1):
-      w1: omap-hdq: support device probing with device-tree
-
- Documentation/devicetree/bindings/w1/omap-hdq.txt | 17 ++++++
- drivers/bus/omap_l3_noc.c                         | 63 ++++++++++++++++++++++-
- drivers/w1/masters/omap_hdq.c                     |  7 +++
- 3 files changed, 85 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/w1/omap-hdq.txt
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141114/1643ad17/attachment-0001.sig>
