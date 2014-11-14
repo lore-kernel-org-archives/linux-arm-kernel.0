@@ -1,137 +1,244 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 14 Nov 2014 10:07:47 +0000
-Subject: [PATCH v4 03/19] arm/arm64: KVM: refactor vgic_handle_mmio() function
+Date: Fri, 14 Nov 2014 10:07:54 +0000
+Subject: [PATCH v4 10/19] arm/arm64: KVM: refactor MMIO accessors
 In-Reply-To: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
 References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1415959683-26027-4-git-send-email-andre.przywara@arm.com>
+Message-ID: <1415959683-26027-11-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we only need to deal with one MMIO region for the GIC
-emulation, but we soon need to extend this. Refactor the existing
-code to allow easier addition of different ranges without code
-duplication.
+The MMIO accessors for GICD_I[CS]ENABLER, GICD_I[CS]PENDR and
+GICD_ICFGR behave very similar for GICv2 and GICv3, although the way
+the affected VCPU is determined differs.
+Since we need them to access the registers from three different
+places in the future, we factor out a generic, backend-facing
+implementation and use small wrappers in the current GICv2 emulation.
+This will ease adding GICv3 accessors later.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
 Changelog v3...v4:
-- simplify is_in_range()
-- added Reviewed-by:
+- improve commit message
+- add Reviewed-by
 
- virt/kvm/arm/vgic.c |   75 ++++++++++++++++++++++++++++++++++++---------------
- 1 file changed, 54 insertions(+), 21 deletions(-)
+ virt/kvm/arm/vgic.c |  126 ++++++++++++++++++++++++++++++---------------------
+ 1 file changed, 74 insertions(+), 52 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 2403d72..5eee3de 100644
+index 4c72c66..d324054 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -1032,37 +1032,28 @@ static bool vgic_validate_access(const struct vgic_dist *dist,
- 	return true;
+@@ -491,64 +491,66 @@ static bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu,
+ 	return false;
  }
  
--/**
-- * vgic_handle_mmio - handle an in-kernel MMIO access
-+/*
-+ * vgic_handle_mmio_range - handle an in-kernel MMIO access
-  * @vcpu:	pointer to the vcpu performing the access
-  * @run:	pointer to the kvm_run structure
-  * @mmio:	pointer to the data describing the access
-+ * @ranges:	pointer to the register defining structure
-+ * @mmio_base:	base address for this mapping
-  *
-- * returns true if the MMIO access has been performed in kernel space,
-- * and false if it needs to be emulated in user space.
-+ * returns true if the MMIO access could be performed
-  */
--bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
--		      struct kvm_exit_mmio *mmio)
-+static bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
-+			    struct kvm_exit_mmio *mmio,
-+			    const struct mmio_range *ranges,
-+			    unsigned long mmio_base)
+-static bool handle_mmio_set_enable_reg(struct kvm_vcpu *vcpu,
+-				       struct kvm_exit_mmio *mmio,
+-				       phys_addr_t offset)
++static bool vgic_handle_enable_reg(struct kvm *kvm, struct kvm_exit_mmio *mmio,
++				   phys_addr_t offset, int vcpu_id, int access)
  {
- 	const struct mmio_range *range;
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
--	unsigned long base = dist->vgic_dist_base;
- 	bool updated_state;
- 	unsigned long offset;
+-	u32 *reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_enabled,
+-				       vcpu->vcpu_id, offset);
+-	vgic_reg_access(mmio, reg, offset,
+-			ACCESS_READ_VALUE | ACCESS_WRITE_SETBIT);
++	u32 *reg;
++	int mode = ACCESS_READ_VALUE | access;
++	struct kvm_vcpu *target_vcpu = kvm_get_vcpu(kvm, vcpu_id);
++
++	reg = vgic_bitmap_get_reg(&kvm->arch.vgic.irq_enabled, vcpu_id, offset);
++	vgic_reg_access(mmio, reg, offset, mode);
+ 	if (mmio->is_write) {
+-		vgic_update_state(vcpu->kvm);
++		if (access & ACCESS_WRITE_CLEARBIT) {
++			if (offset < 4) /* Force SGI enabled */
++				*reg |= 0xffff;
++			vgic_retire_disabled_irqs(target_vcpu);
++		}
++		vgic_update_state(kvm);
+ 		return true;
+ 	}
  
--	if (!irqchip_in_kernel(vcpu->kvm) ||
--	    mmio->phys_addr < base ||
--	    (mmio->phys_addr + mmio->len) > (base + KVM_VGIC_V2_DIST_SIZE))
--		return false;
--
--	/* We don't support ldrd / strd or ldm / stm to the emulated vgic */
--	if (mmio->len > 4) {
--		kvm_inject_dabt(vcpu, mmio->phys_addr);
+ 	return false;
+ }
+ 
++static bool handle_mmio_set_enable_reg(struct kvm_vcpu *vcpu,
++				       struct kvm_exit_mmio *mmio,
++				       phys_addr_t offset)
++{
++	return vgic_handle_enable_reg(vcpu->kvm, mmio, offset,
++				      vcpu->vcpu_id, ACCESS_WRITE_SETBIT);
++}
++
+ static bool handle_mmio_clear_enable_reg(struct kvm_vcpu *vcpu,
+ 					 struct kvm_exit_mmio *mmio,
+ 					 phys_addr_t offset)
+ {
+-	u32 *reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_enabled,
+-				       vcpu->vcpu_id, offset);
+-	vgic_reg_access(mmio, reg, offset,
+-			ACCESS_READ_VALUE | ACCESS_WRITE_CLEARBIT);
+-	if (mmio->is_write) {
+-		if (offset < 4) /* Force SGI enabled */
+-			*reg |= 0xffff;
+-		vgic_retire_disabled_irqs(vcpu);
+-		vgic_update_state(vcpu->kvm);
 -		return true;
 -	}
 -
--	offset = mmio->phys_addr - base;
--	range = find_matching_range(vgic_dist_ranges, mmio, offset);
-+	offset = mmio->phys_addr - mmio_base;
-+	range = find_matching_range(ranges, mmio, offset);
- 	if (unlikely(!range || !range->handle_mmio)) {
- 		pr_warn("Unhandled access %d %08llx %d\n",
- 			mmio->is_write, mmio->phys_addr, mmio->len);
-@@ -1070,7 +1061,7 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	}
- 
- 	spin_lock(&vcpu->kvm->arch.vgic.lock);
--	offset = mmio->phys_addr - range->base - base;
-+	offset -= range->base;
- 	if (vgic_validate_access(dist, range, offset)) {
- 		updated_state = range->handle_mmio(vcpu, mmio, offset);
- 	} else {
-@@ -1088,6 +1079,48 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	return true;
+-	return false;
++	return vgic_handle_enable_reg(vcpu->kvm, mmio, offset,
++				      vcpu->vcpu_id, ACCESS_WRITE_CLEARBIT);
  }
  
-+static inline bool is_in_range(phys_addr_t addr, unsigned long len,
-+			       phys_addr_t baseaddr, unsigned long size)
-+{
-+	return (addr >= baseaddr) && (addr + len <= baseaddr + size);
-+}
-+
-+static bool vgic_v2_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-+				struct kvm_exit_mmio *mmio)
-+{
-+	unsigned long base = vcpu->kvm->arch.vgic.vgic_dist_base;
-+
-+	if (!is_in_range(mmio->phys_addr, mmio->len, base,
-+			 KVM_VGIC_V2_DIST_SIZE))
-+		return false;
-+
-+	/* GICv2 does not support accesses wider than 32 bits */
-+	if (mmio->len > 4) {
-+		kvm_inject_dabt(vcpu, mmio->phys_addr);
-+		return true;
-+	}
-+
-+	return vgic_handle_mmio_range(vcpu, run, mmio, vgic_dist_ranges, base);
-+}
-+
-+/**
-+ * vgic_handle_mmio - handle an in-kernel MMIO access for the GIC emulation
-+ * @vcpu:      pointer to the vcpu performing the access
-+ * @run:       pointer to the kvm_run structure
-+ * @mmio:      pointer to the data describing the access
-+ *
-+ * returns true if the MMIO access has been performed in kernel space,
-+ * and false if it needs to be emulated in user space.
-+ */
-+bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-+		      struct kvm_exit_mmio *mmio)
-+{
-+	if (!irqchip_in_kernel(vcpu->kvm))
-+		return false;
-+
-+	return vgic_v2_handle_mmio(vcpu, run, mmio);
-+}
-+
- static u8 *vgic_get_sgi_sources(struct vgic_dist *dist, int vcpu_id, int sgi)
+-static bool handle_mmio_set_pending_reg(struct kvm_vcpu *vcpu,
++static bool vgic_handle_set_pending_reg(struct kvm *kvm,
+ 					struct kvm_exit_mmio *mmio,
+-					phys_addr_t offset)
++					phys_addr_t offset, int vcpu_id)
  {
- 	return dist->irq_sgi_sources + vcpu_id * VGIC_NR_SGIS + sgi;
+ 	u32 *reg, orig;
+ 	u32 level_mask;
+-	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
++	int mode = ACCESS_READ_VALUE | ACCESS_WRITE_SETBIT;
++	struct vgic_dist *dist = &kvm->arch.vgic;
+ 
+-	reg = vgic_bitmap_get_reg(&dist->irq_cfg, vcpu->vcpu_id, offset);
++	reg = vgic_bitmap_get_reg(&dist->irq_cfg, vcpu_id, offset);
+ 	level_mask = (~(*reg));
+ 
+ 	/* Mark both level and edge triggered irqs as pending */
+-	reg = vgic_bitmap_get_reg(&dist->irq_pending, vcpu->vcpu_id, offset);
++	reg = vgic_bitmap_get_reg(&dist->irq_pending, vcpu_id, offset);
+ 	orig = *reg;
+-	vgic_reg_access(mmio, reg, offset,
+-			ACCESS_READ_VALUE | ACCESS_WRITE_SETBIT);
++	vgic_reg_access(mmio, reg, offset, mode);
+ 
+ 	if (mmio->is_write) {
+ 		/* Set the soft-pending flag only for level-triggered irqs */
+ 		reg = vgic_bitmap_get_reg(&dist->irq_soft_pend,
+-					  vcpu->vcpu_id, offset);
+-		vgic_reg_access(mmio, reg, offset,
+-				ACCESS_READ_VALUE | ACCESS_WRITE_SETBIT);
++					  vcpu_id, offset);
++		vgic_reg_access(mmio, reg, offset, mode);
+ 		*reg &= level_mask;
+ 
+ 		/* Ignore writes to SGIs */
+@@ -557,31 +559,30 @@ static bool handle_mmio_set_pending_reg(struct kvm_vcpu *vcpu,
+ 			*reg |= orig & 0xffff;
+ 		}
+ 
+-		vgic_update_state(vcpu->kvm);
++		vgic_update_state(kvm);
+ 		return true;
+ 	}
+ 
+ 	return false;
+ }
+ 
+-static bool handle_mmio_clear_pending_reg(struct kvm_vcpu *vcpu,
++static bool vgic_handle_clear_pending_reg(struct kvm *kvm,
+ 					  struct kvm_exit_mmio *mmio,
+-					  phys_addr_t offset)
++					  phys_addr_t offset, int vcpu_id)
+ {
+ 	u32 *level_active;
+ 	u32 *reg, orig;
+-	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
++	int mode = ACCESS_READ_VALUE | ACCESS_WRITE_CLEARBIT;
++	struct vgic_dist *dist = &kvm->arch.vgic;
+ 
+-	reg = vgic_bitmap_get_reg(&dist->irq_pending, vcpu->vcpu_id, offset);
++	reg = vgic_bitmap_get_reg(&dist->irq_pending, vcpu_id, offset);
+ 	orig = *reg;
+-	vgic_reg_access(mmio, reg, offset,
+-			ACCESS_READ_VALUE | ACCESS_WRITE_CLEARBIT);
++	vgic_reg_access(mmio, reg, offset, mode);
+ 	if (mmio->is_write) {
+ 		/* Re-set level triggered level-active interrupts */
+ 		level_active = vgic_bitmap_get_reg(&dist->irq_level,
+-					  vcpu->vcpu_id, offset);
+-		reg = vgic_bitmap_get_reg(&dist->irq_pending,
+-					  vcpu->vcpu_id, offset);
++					  vcpu_id, offset);
++		reg = vgic_bitmap_get_reg(&dist->irq_pending, vcpu_id, offset);
+ 		*reg |= *level_active;
+ 
+ 		/* Ignore writes to SGIs */
+@@ -592,17 +593,31 @@ static bool handle_mmio_clear_pending_reg(struct kvm_vcpu *vcpu,
+ 
+ 		/* Clear soft-pending flags */
+ 		reg = vgic_bitmap_get_reg(&dist->irq_soft_pend,
+-					  vcpu->vcpu_id, offset);
+-		vgic_reg_access(mmio, reg, offset,
+-				ACCESS_READ_VALUE | ACCESS_WRITE_CLEARBIT);
++					  vcpu_id, offset);
++		vgic_reg_access(mmio, reg, offset, mode);
+ 
+-		vgic_update_state(vcpu->kvm);
++		vgic_update_state(kvm);
+ 		return true;
+ 	}
+-
+ 	return false;
+ }
+ 
++static bool handle_mmio_set_pending_reg(struct kvm_vcpu *vcpu,
++					struct kvm_exit_mmio *mmio,
++					phys_addr_t offset)
++{
++	return vgic_handle_set_pending_reg(vcpu->kvm, mmio, offset,
++					   vcpu->vcpu_id);
++}
++
++static bool handle_mmio_clear_pending_reg(struct kvm_vcpu *vcpu,
++					  struct kvm_exit_mmio *mmio,
++					  phys_addr_t offset)
++{
++	return vgic_handle_clear_pending_reg(vcpu->kvm, mmio, offset,
++					     vcpu->vcpu_id);
++}
++
+ static bool handle_mmio_priority_reg(struct kvm_vcpu *vcpu,
+ 				     struct kvm_exit_mmio *mmio,
+ 				     phys_addr_t offset)
+@@ -725,14 +740,10 @@ static u16 vgic_cfg_compress(u32 val)
+  * LSB is always 0. As such, we only keep the upper bit, and use the
+  * two above functions to compress/expand the bits
+  */
+-static bool handle_mmio_cfg_reg(struct kvm_vcpu *vcpu,
+-				struct kvm_exit_mmio *mmio, phys_addr_t offset)
++static bool vgic_handle_cfg_reg(u32 *reg, struct kvm_exit_mmio *mmio,
++				phys_addr_t offset)
+ {
+ 	u32 val;
+-	u32 *reg;
+-
+-	reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_cfg,
+-				  vcpu->vcpu_id, offset >> 1);
+ 
+ 	if (offset & 4)
+ 		val = *reg >> 16;
+@@ -761,6 +772,17 @@ static bool handle_mmio_cfg_reg(struct kvm_vcpu *vcpu,
+ 	return false;
+ }
+ 
++static bool handle_mmio_cfg_reg(struct kvm_vcpu *vcpu,
++				struct kvm_exit_mmio *mmio, phys_addr_t offset)
++{
++	u32 *reg;
++
++	reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_cfg,
++				  vcpu->vcpu_id, offset >> 1);
++
++	return vgic_handle_cfg_reg(reg, mmio, offset);
++}
++
+ static bool handle_mmio_sgi_reg(struct kvm_vcpu *vcpu,
+ 				struct kvm_exit_mmio *mmio, phys_addr_t offset)
+ {
 -- 
 1.7.9.5
