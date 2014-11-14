@@ -1,66 +1,163 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 14 Nov 2014 16:54:04 +0100
-Subject: [GIT PULL] ARM: mediatek: Add support for mt6592, mt8127 and mt8135
-Message-ID: <CABuKBeLBdAaKyiOhVOUcvE9_ATYeMtccNP3zv_tdFvpgtxoMNw@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 14 Nov 2014 15:54:10 +0000
+Subject: [PATCH 4/6] arm64: add Cortex-A53 cache errata workaround
+In-Reply-To: <1415980452-20366-1-git-send-email-andre.przywara@arm.com>
+References: <1415980452-20366-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1415980452-20366-5-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+The ARM errata 819472, 826319, 827319 and 824069 define the same
+workaround for these hardware issues in certain Cortex-A53 parts.
+Use the new alternatives framework and the CPU MIDR detection to
+patch "cache clean" into "cache clean and invalidate" instructions if
+an affected CPU is detected at runtime.
 
-Here comes the pull request which introduces basic support for
-Mediatek SoCs mt6592, mt8127 and mt8135.
-
-The patches for the mt81xx got merged in the late tree for v3.18 but
-were not be merged at the end. They got a small fix regarding the
-compatible and model string in the dts files.
-
-Cheers,
-Matthias
-
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
+ arch/arm64/include/asm/alternative-asm.h |   13 ++++++++++++
+ arch/arm64/include/asm/cpufeature.h      |    8 +++++++-
+ arch/arm64/include/asm/cputype.h         |    5 +++++
+ arch/arm64/kernel/cpu_errata.c           |   32 +++++++++++++++++++++++++++++-
+ arch/arm64/mm/cache.S                    |    4 +++-
+ 5 files changed, 59 insertions(+), 3 deletions(-)
 
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-
-are available in the git repository at:
-
-  https://github.com/mbgg/linux-mediatek.git tags/v3.19-next-dts
-
-for you to fetch changes up to 256e7653c8bac60f1ccf9e0a58cc45b01a7954b9:
-
-  dt-bindings: add documentation for Mediatek SoC (2014-11-14 13:50:47 +0100)
-
-----------------------------------------------------------------
-Add support for mt6592, mt8127 and mt8135 Socs from Mediatek.
-
-----------------------------------------------------------------
-Howard Chen (3):
-      ARM: mediatek: Add basic support for mt6592
-      ARM: mediatek: add dts for mt6592-evb
-      dt-bindings: add documentation for Mediatek SoC
-
-Joe.C (6):
-      ARM: mediatek: Add basic support for mt8127
-      ARM: mediatek: add dts for 8127 Moose board
-      ARM: mediatek: Add basic support for mt8135
-      ARM: mediatek: add dts for MT8135 evaluation board.
-      ARM: dts: Build dtb for mt8127 & mt8135
-      dt-bindings: add more chips in documentation for Mediatek SoC
-
- Documentation/devicetree/bindings/arm/mediatek.txt |  19 +++-
- arch/arm/boot/dts/Makefile                         |   5 +-
- arch/arm/boot/dts/mt6592-evb.dts                   |  26 +++++
- arch/arm/boot/dts/mt6592.dtsi                      |  98 +++++++++++++++++
- arch/arm/boot/dts/mt8127-moose.dts                 |  25 +++++
- arch/arm/boot/dts/mt8127.dtsi                      |  94 +++++++++++++++++
- arch/arm/boot/dts/mt8135-evbp1.dts                 |  25 +++++
- arch/arm/boot/dts/mt8135.dtsi                      | 116 +++++++++++++++++++++
- arch/arm/mach-mediatek/mediatek.c                  |   3 +
- 9 files changed, 407 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/boot/dts/mt6592-evb.dts
- create mode 100644 arch/arm/boot/dts/mt6592.dtsi
- create mode 100644 arch/arm/boot/dts/mt8127-moose.dts
- create mode 100644 arch/arm/boot/dts/mt8127.dtsi
- create mode 100644 arch/arm/boot/dts/mt8135-evbp1.dts
- create mode 100644 arch/arm/boot/dts/mt8135.dtsi
+diff --git a/arch/arm64/include/asm/alternative-asm.h b/arch/arm64/include/asm/alternative-asm.h
+index 5ee9340..919a678 100644
+--- a/arch/arm64/include/asm/alternative-asm.h
++++ b/arch/arm64/include/asm/alternative-asm.h
+@@ -11,6 +11,19 @@
+ 	.byte \alt_len
+ .endm
+ 
++.macro alternative_insn insn1 insn2 cap
++661:	\insn1
++662:	.pushsection .altinstructions, "a"
++	altinstruction_entry 661b, 663f, \cap, 662b-661b, 664f-663f
++	.popsection
++	.pushsection .altinstr_replacement, "ax"
++663:	\insn2
++664:	.popsection
++	.if ((664b-663b) != (662b-661b))
++		.error "Alternatives instruction length mismatch"
++	.endif
++.endm
++
+ #endif  /*  __ASSEMBLY__  */
+ 
+ #endif /* __ASM_ALTERNATIVE_ASM_H */
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 744eaf7..92b6ee4 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -21,7 +21,11 @@
+ #define MAX_CPU_FEATURES	(8 * sizeof(elf_hwcap))
+ #define cpu_feature(x)		ilog2(HWCAP_ ## x)
+ 
+-#define NCAPS			0
++#define ARM64_WORKAROUND_CLEAN_CACHE	0
++
++#define NCAPS				1
++
++#ifndef __ASSEMBLY__
+ 
+ extern DECLARE_BITMAP(cpu_hwcaps, NCAPS);
+ 
+@@ -48,4 +52,6 @@ static inline void cpus_set_cap(unsigned int num)
+ 
+ void check_local_cpu_errata(void);
+ 
++#endif /* __ASSEMBLY__ */
++
+ #endif
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 379d0b8..8adb986 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -57,6 +57,11 @@
+ #define MIDR_IMPLEMENTOR(midr)	\
+ 	(((midr) & MIDR_IMPLEMENTOR_MASK) >> MIDR_IMPLEMENTOR_SHIFT)
+ 
++#define MIDR_CPU_PART(imp, partnum) \
++	(((imp)			<< MIDR_IMPLEMENTOR_SHIFT) | \
++	(0xf			<< MIDR_ARCHITECTURE_SHIFT) | \
++	((partnum)		<< MIDR_PARTNUM_SHIFT))
++
+ #define ARM_CPU_IMP_ARM		0x41
+ #define ARM_CPU_IMP_APM		0x50
+ 
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 9332cf7..875fb2c 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -23,6 +23,8 @@
+ #include <asm/cputype.h>
+ #include <asm/cpufeature.h>
+ 
++#define MIDR_CORTEX_A53 MIDR_CPU_PART(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
++
+ /*
+  * Add a struct or another datatype to the union below if you need
+  * different means to detect an affected CPU.
+@@ -39,8 +41,36 @@ struct arm64_cpu_capabilities {
+ 	};
+ };
+ 
++#define CPU_MODEL_MASK (MIDR_IMPLEMENTOR_MASK | MIDR_PARTNUM_MASK | \
++			MIDR_ARCHITECTURE_MASK)
++
++static bool is_affected_midr_range(struct arm64_cpu_capabilities *entry)
++{
++	u32 midr = read_cpuid_id();
++
++	if ((midr & CPU_MODEL_MASK) != entry->midr_model)
++		return false;
++
++	midr &= MIDR_REVISION_MASK | MIDR_VARIANT_MASK;
++
++	return (midr >= entry->midr_range_min && midr <= entry->midr_range_max);
++}
++
++#define MIDR_RANGE(model, min, max) \
++	.is_affected = is_affected_midr_range, \
++	.midr_model = model, \
++	.midr_range_min = min, \
++	.midr_range_max = max
++
+ struct arm64_cpu_capabilities arm64_errata[] = {
+-	{}
++	{
++	/* Cortex-A53 r0p[012] */
++		.desc = "ARM errata 826319, 827319, 824069",
++		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
++		MIDR_RANGE(MIDR_CORTEX_A53, 0x00, 0x02),
++	},
++	{
++	}
+ };
+ 
+ void check_local_cpu_errata(void)
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index 2366383..8eaf185 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -20,6 +20,8 @@
+ #include <linux/linkage.h>
+ #include <linux/init.h>
+ #include <asm/assembler.h>
++#include <asm/cpufeature.h>
++#include <asm/alternative-asm.h>
+ 
+ #include "proc-macros.S"
+ 
+@@ -210,7 +212,7 @@ __dma_clean_range:
+ 	dcache_line_size x2, x3
+ 	sub	x3, x2, #1
+ 	bic	x0, x0, x3
+-1:	dc	cvac, x0			// clean D / U line
++1:	alternative_insn "dc cvac, x0", "dc civac, x0", ARM64_WORKAROUND_CLEAN_CACHE
+ 	add	x0, x0, x2
+ 	cmp	x0, x1
+ 	b.lo	1b
+-- 
+1.7.9.5
