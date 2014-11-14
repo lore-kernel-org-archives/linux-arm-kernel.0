@@ -1,58 +1,69 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 14 Nov 2014 11:29:59 +0100
-Subject: [PATCH] efi: Fix free_end build warning
-In-Reply-To: <20141114102254.GB27963@arm.com>
-References: <1415824050.15847.9.camel@smoke> <20141114102254.GB27963@arm.com>
-Message-ID: <CAKv+Gu8JrX4WBThhi5fWN5RuUDV3tui=Ey87himRCbXhyXbvEg@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 14 Nov 2014 11:30:09 +0100
+Subject: [PATCH 4/7] ARM: dts: sun6i: Add simplefb node
+In-Reply-To: <20141114102417.GY20972@lukather>
+References: <1415871109-28332-1-git-send-email-hdegoede@redhat.com>
+ <1415871109-28332-4-git-send-email-hdegoede@redhat.com>
+ <20141113164606.GM20972@lukather> <5464EFF9.9010203@redhat.com>
+ <20141114102417.GY20972@lukather>
+Message-ID: <5465D9B1.8010707@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 November 2014 11:22, Will Deacon <will.deacon@arm.com> wrote:
-> [Adding original authors]
->
-> On Wed, Nov 12, 2014 at 08:27:30PM +0000, Geoff Levand wrote:
->> Initialize the free_end variable to zero.  Fixes build warnings
->> like these:
->>
->>   arch/arm64/kernel/efi.c: warning: ?free_end? may be used uninitialized in this function
->>
->> Signed-off-by: Geoff Levand <geoff@infradead.org>
->> ---
->> Got this with the latest arm64/for-next/core branch.  Please consider.
->>
->> -Geoff
->>
->>  arch/arm64/kernel/efi.c | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
->> index 4f39a18..83fc53c 100644
->> --- a/arch/arm64/kernel/efi.c
->> +++ b/arch/arm64/kernel/efi.c
->> @@ -239,6 +239,7 @@ static void __init free_boot_services(void)
->>        * want to keep for UEFI.
->>        */
->>
->> +     free_end = 0;
->>       keep_end = 0;
->>       free_start = 0;
->
-> Whilst I can't see how free_end gets used uninitialized in this function,
-> the code is really hard to read and I'd like to get an Ack from one of the
-> people on CC before merging this, just in case GCC is actually telling us
-> something useful for a change.
->
+Hi,
 
-We are planning to remove this code entirely in the 3.20 timeframe.
-Freeing boot services will not be necessary any longer once we stop
-reserving it in the first place, and I agree that the function is hard
-to read. Also, it depends on the UEFI memory map being sorted, which
-is not mandated by the spec so we can't actually rely on it. (Even if
-it usually is the case)
+On 11/14/2014 11:24 AM, Maxime Ripard wrote:
+> On Thu, Nov 13, 2014 at 06:52:57PM +0100, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 11/13/2014 05:46 PM, Maxime Ripard wrote:
+>>> Hi,
+>>>
+>>> On Thu, Nov 13, 2014 at 10:31:46AM +0100, Hans de Goede wrote:
+>>>> Add a simplefb template node for u-boot to further fill and activate.
+>>>>
+>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>> ---
+>>>>  arch/arm/boot/dts/sun6i-a31.dtsi | 10 ++++++++++
+>>>>  1 file changed, 10 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+>>>> index 543f895..438952e 100644
+>>>> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+>>>> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+>>>> @@ -62,6 +62,16 @@
+>>>>  		ethernet0 = &gmac;
+>>>>  	};
+>>>>  
+>>>> +	chosen {
+>>>> +		#address-cells = <1>;
+>>>> +		#size-cells = <1>;
+>>>> +		ranges;
+>>>> +
+>>>> +		framebuffer0 {
+>>>> +			compatible = "simple-framebuffer";
+>>>> +			status = "disabled";
+>>>
+>>> Aren't we suppose to have clocks in there too?
+>>
+>> I deliberately left them out as they are not needed on sun6i, once the blocks
+>> are setup ahb access is not necessary, but it seems that the ahb_gate bits
+>> in sun4i / sun5i / sun7i double as a reset. Toggling them on / off / on breaks
+>> the mode, while toggling module clocks on / off / on only causes a glitch.
+>>
+>> Since the sun6i has a separate reset controller, the clock gates seem to really
+>> only control ahb access which is not necessary once the mode has been set up.
+> 
+> Ok. That can always be changed in the future if we ever find we need
+> them anyway.
+> 
+> I'll merge these four patches as soon as the bindings doc is
+> acked-by/merged by Grant or any other DT maintainer.
 
-So I don't object to this patch, if the warning is bothering people,
-but perhaps we can just wait for the warning to go away once the new
-stuff lands.
+Note these patches are using framebuffer0 rather then framebuffer0-hdmi as node
+name, which may cause issues if we later want to add lcd support. So I've a v2
+coming which changes the name to framebuffer0-hdmi, please merge that instead.
 
--- 
-Ard.
+Regards,
+
+Hans
