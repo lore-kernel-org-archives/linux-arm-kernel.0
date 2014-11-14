@@ -1,64 +1,70 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 14 Nov 2014 15:43:30 +0100
-Subject: [GIT PULL] at91: drivers for 3.19 #1
-Message-ID: <1415976210-3665-1-git-send-email-nicolas.ferre@atmel.com>
+Date: Fri, 14 Nov 2014 15:46:23 +0100
+Subject: [RESEND PATCH 1/2] mmc: atmel-mci: remove compat for non DT board
+ when requesting dma chan
+In-Reply-To: <1415975785-30303-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1415975785-30303-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <546615BF.4040608@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On 14/11/2014 15:36, Ludovic Desroches :
+> All boards with a dma controller have DT support so using
+> dma_request_slave_channel_compat is no more needed.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-This is a pull-request about AT91-related drivers that are easier to take via
-arm-soc.
+Yes, sure.
 
-There is a little merge conflict with the "cleanup" branch because of removal
-of at91sam9g45 and at91sam9rl legacy code. The resolution is pretty simple but
-you can have a look at the resolution example here:
-https://git.kernel.org/cgit/linux/kernel/git/nferre/linux-at91.git/log/?h=at91-next
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Thanks, best regards,
+> ---
+> 
+> Sorry for the noise, typo in cc list.
+> 
+>  drivers/mmc/host/atmel-mci.c | 20 +-------------------
+>  1 file changed, 1 insertion(+), 19 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index a7b59ba..de2287c 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -2272,23 +2272,6 @@ static void atmci_cleanup_slot(struct atmel_mci_slot *slot,
+>  	mmc_free_host(slot->mmc);
+>  }
+>  
+> -static bool atmci_filter(struct dma_chan *chan, void *pdata)
+> -{
+> -	struct mci_platform_data *sl_pdata = pdata;
+> -	struct mci_dma_data *sl;
+> -
+> -	if (!sl_pdata)
+> -		return false;
+> -
+> -	sl = sl_pdata->dma_slave;
+> -	if (sl && find_slave_dev(sl) == chan->device->dev) {
+> -		chan->private = slave_data_ptr(sl);
+> -		return true;
+> -	} else {
+> -		return false;
+> -	}
+> -}
+> -
+>  static bool atmci_configure_dma(struct atmel_mci *host)
+>  {
+>  	struct mci_platform_data	*pdata;
+> @@ -2302,8 +2285,7 @@ static bool atmci_configure_dma(struct atmel_mci *host)
+>  	dma_cap_zero(mask);
+>  	dma_cap_set(DMA_SLAVE, mask);
+>  
+> -	host->dma.chan = dma_request_slave_channel_compat(mask, atmci_filter, pdata,
+> -							  &host->pdev->dev, "rxtx");
+> +	host->dma.chan = dma_request_slave_channel(&host->pdev->dev, "rxtx");
+>  	if (!host->dma.chan) {
+>  		dev_warn(&host->pdev->dev, "no DMA channel available\n");
+>  		return false;
+> 
 
-The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
-
-  Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-drivers
-
-for you to fetch changes up to 2c91e61dc97cce57ffd9dd654a6ee284e1f45a1f:
-
-  rtc: at91sam9: add DT bindings documentation (2014-11-13 16:08:48 +0100)
-
-----------------------------------------------------------------
-First batch of drivers for 3.19:
-It is only about a not so recent driver for old platforms: RTT as RTC driver:
-- RTT as RTC driver enhancements and machine specific include files removal
-- RTT as RTC driver conversion to device tree
-
-----------------------------------------------------------------
-Boris BREZILLON (9):
-      rtc: at91sam9: remove references to mach specific headers
-      rtc: at91sam9: use standard readl/writel functions instead of raw versions
-      rtc: at91sam9: replace devm_ioremap by devm_ioremap_resource
-      rtc: at91sam9: add DT support
-      rtc: at91sam9: make use of syscon/regmap to access GPBR registers
-      rtc: at91sam9: rework the Kconfig description
-      ARM: at91: add clk_lookup entry for RTT devices
-      rtc: at91sam9: use clk API instead of relying on AT91_SLOW_CLOCK
-      rtc: at91sam9: add DT bindings documentation
-
- .../devicetree/bindings/rtc/atmel,at91sam9-rtc.txt |  23 ++++
- arch/arm/mach-at91/at91sam9260.c                   |   2 +
- arch/arm/mach-at91/at91sam9261.c                   |   2 +
- arch/arm/mach-at91/at91sam9263.c                   |   4 +
- arch/arm/mach-at91/at91sam9g45.c                   |   2 +
- arch/arm/mach-at91/at91sam9rl.c                    |   2 +
- arch/arm/mach-at91/clock.c                         |   2 +-
- arch/arm/mach-at91/clock.h                         |   1 +
- drivers/rtc/Kconfig                                |  24 ++--
- drivers/rtc/rtc-at91sam9.c                         | 138 ++++++++++++++++-----
- 10 files changed, 162 insertions(+), 38 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
 
 -- 
 Nicolas Ferre
