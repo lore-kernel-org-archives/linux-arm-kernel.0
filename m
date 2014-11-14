@@ -1,90 +1,234 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Fri, 14 Nov 2014 01:43:03 +0000
-Subject: [PATCH v3] of: replace Asahi Kasei Corp venter prefix
-In-Reply-To: <20141113110740.GE3815@sirena.org.uk>
-References: <5398AB07.4040304@wwwdotorg.org>
- <87sinbdk44.wl%kuninori.morimoto.gx@renesas.com>
- <878ulzx6hr.wl%kuninori.morimoto.gx@gmail.com>
- <20140922130026.GK3290@leverpostej>
- <CAMuHMdX22z97SbGS1HDiYfJ1PXxyEN2S8D7w4sr+4bUwD+mJZw@mail.gmail.com>
- <20140922132743.GM3290@leverpostej>
- <87y4rfhmgl.wl%kuninori.morimoto.gx@renesas.com>
- <1415845309.4269.6.camel@perches.com>
- <20141113025105.GA16652@verge.net.au>
- <87vbmjhj00.wl%kuninori.morimoto.gx@renesas.com>
- <20141113110740.GE3815@sirena.org.uk>
-Message-ID: <87k32yd0bd.wl%kuninori.morimoto.gx@renesas.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 13 Nov 2014 17:53:56 -0800
+Subject: [PATCH v7 01/12] clk: tegra: Implement memory-controller clock
+In-Reply-To: <1415871157-21968-2-git-send-email-thierry.reding@gmail.com>
+References: <1415871157-21968-1-git-send-email-thierry.reding@gmail.com>
+ <1415871157-21968-2-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20141114015356.25314.26550@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Quoting Thierry Reding (2014-11-13 01:32:26)
+> From: Thierry Reding <treding@nvidia.com>
+> 
+> The memory controller clock runs either at half or the same frequency as
+> the EMC clock.
+> 
+> Reviewed-By: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
+> Mike, as I said in the cover letter there are tight dependencies between the
+> patches in this series, so I'd like to get your Acked-by on this one so I can
+> take it through the Tegra tree along with the others.
 
-Current vendor-prefixes.txt already has
-"ak" prefix for Asahi Kasei Corp by
-ae8c4209af2cec065fef15d200a42a04130799f7
-(of: Add vendor prefix for Asahi Kasei Corp.)
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
-It went through the appropriate review process.
-But, almost all Asahi Kasei chip drivers are
-using "asahi-kasei" prefix today.
-(arch/arm/boot/dts/tegra20-seaboard.dts only is
-using "ak,ak8975", but there are instances of
-"asahi-kasei,ak8975" in other dts files.
-And drivers/iio/magnetometer/ak8975.c
-doesn't support "ak,ak8975")
-So, we made a mistake there.
-
-In addition, checkpatch.pl reports WARNING
-if it is using "asahi-kasei" prerfix in DT file.
-(DT compatible string vendor "asahi-kasei" appears un-documented)
-
-Marking it deprecated and warning with checkpatch
-is certainly preferable.
-So, this patch replace "ak" to "asahi-kasei" in
-vendor-prefixes.txt. (and fixup tegra20-seaboard)
-
-OTOH, Asahi Kasei is usually referred to as "AKM",
-but this patch doesn't care about it.
-Because no DT is using that today.
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
----
- .../devicetree/bindings/vendor-prefixes.txt        |    2 +-
- arch/arm/boot/dts/tegra20-seaboard.dts             |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 723999d..ddcb4cd 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -9,7 +9,6 @@ ad	Avionic Design GmbH
- adapteva	Adapteva, Inc.
- adi	Analog Devices, Inc.
- aeroflexgaisler	Aeroflex Gaisler AB
--ak	Asahi Kasei Corp.
- allwinner	Allwinner Technology Co., Ltd.
- altr	Altera Corp.
- amcc	Applied Micro Circuits Corporation (APM, formally AMCC)
-@@ -20,6 +19,7 @@ amstaos	AMS-Taos Inc.
- apm	Applied Micro Circuits Corporation (APM)
- arm	ARM Ltd.
- armadeus	ARMadeus Systems SARL
-+asahi-kasei	Asahi Kasei Corp.
- atmel	Atmel Corporation
- auo	AU Optronics Corporation
- avago	Avago Technologies
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index a1d4bf9..7f5cf80 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -405,7 +405,7 @@
- 		clock-frequency = <400000>;
- 
- 		magnetometer at c {
--			compatible = "ak,ak8975";
-+			compatible = "asahi-kasei,ak8975";
- 			reg = <0xc>;
- 			interrupt-parent = <&gpio>;
- 			interrupts = <TEGRA_GPIO(N, 5) IRQ_TYPE_LEVEL_HIGH>;
--- 
-1.7.9.5
+> 
+> Thanks,
+> Thierry
+> 
+> Changes in v4:
+> - use name and parent name parameters passed in when registering clock
+> 
+> Changes in v3:
+> - split registration into a separate function that can be reused for all
+>   SoC generations, but pass in the name and parent parameters for
+>   clarity as well as the register address (in case it ever changes) and
+>   the EMC spin-lock since it isn't globally available
+> 
+>  drivers/clk/tegra/clk-divider.c          | 13 +++++++++++++
+>  drivers/clk/tegra/clk-tegra114.c         |  7 ++++++-
+>  drivers/clk/tegra/clk-tegra124.c         |  7 ++++++-
+>  drivers/clk/tegra/clk-tegra20.c          |  8 +++++++-
+>  drivers/clk/tegra/clk-tegra30.c          |  7 ++++++-
+>  drivers/clk/tegra/clk.h                  |  2 ++
+>  include/dt-bindings/clock/tegra114-car.h |  2 +-
+>  include/dt-bindings/clock/tegra124-car.h |  2 +-
+>  include/dt-bindings/clock/tegra20-car.h  |  2 +-
+>  9 files changed, 43 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/clk/tegra/clk-divider.c b/drivers/clk/tegra/clk-divider.c
+> index 290f9c1a3749..59a5714dfe18 100644
+> --- a/drivers/clk/tegra/clk-divider.c
+> +++ b/drivers/clk/tegra/clk-divider.c
+> @@ -185,3 +185,16 @@ struct clk *tegra_clk_register_divider(const char *name,
+>  
+>         return clk;
+>  }
+> +
+> +static const struct clk_div_table mc_div_table[] = {
+> +       { .val = 0, .div = 2 },
+> +       { .val = 1, .div = 1 },
+> +       { .val = 0, .div = 0 },
+> +};
+> +
+> +struct clk *tegra_clk_register_mc(const char *name, const char *parent_name,
+> +                                 void __iomem *reg, spinlock_t *lock)
+> +{
+> +       return clk_register_divider_table(NULL, name, parent_name, 0, reg,
+> +                                         16, 1, 0, mc_div_table, lock);
+> +}
+> diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+> index f760f31d05c4..0b03d2cf7264 100644
+> --- a/drivers/clk/tegra/clk-tegra114.c
+> +++ b/drivers/clk/tegra/clk-tegra114.c
+> @@ -173,6 +173,7 @@ static DEFINE_SPINLOCK(pll_d_lock);
+>  static DEFINE_SPINLOCK(pll_d2_lock);
+>  static DEFINE_SPINLOCK(pll_u_lock);
+>  static DEFINE_SPINLOCK(pll_re_lock);
+> +static DEFINE_SPINLOCK(emc_lock);
+>  
+>  static struct div_nmp pllxc_nmp = {
+>         .divm_shift = 0,
+> @@ -1228,7 +1229,11 @@ static __init void tegra114_periph_clk_init(void __iomem *clk_base,
+>                                ARRAY_SIZE(mux_pllmcp_clkm),
+>                                CLK_SET_RATE_NO_REPARENT,
+>                                clk_base + CLK_SOURCE_EMC,
+> -                              29, 3, 0, NULL);
+> +                              29, 3, 0, &emc_lock);
+> +
+> +       clk = tegra_clk_register_mc("mc", "emc_mux", clk_base + CLK_SOURCE_EMC,
+> +                                   &emc_lock);
+> +       clks[TEGRA114_CLK_MC] = clk;
+>  
+>         for (i = 0; i < ARRAY_SIZE(tegra_periph_clk_list); i++) {
+>                 data = &tegra_periph_clk_list[i];
+> diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
+> index e3a85842ce0c..f5f9baca7bb6 100644
+> --- a/drivers/clk/tegra/clk-tegra124.c
+> +++ b/drivers/clk/tegra/clk-tegra124.c
+> @@ -132,6 +132,7 @@ static DEFINE_SPINLOCK(pll_d2_lock);
+>  static DEFINE_SPINLOCK(pll_e_lock);
+>  static DEFINE_SPINLOCK(pll_re_lock);
+>  static DEFINE_SPINLOCK(pll_u_lock);
+> +static DEFINE_SPINLOCK(emc_lock);
+>  
+>  /* possible OSC frequencies in Hz */
+>  static unsigned long tegra124_input_freq[] = {
+> @@ -1127,7 +1128,11 @@ static __init void tegra124_periph_clk_init(void __iomem *clk_base,
+>         clk = clk_register_mux(NULL, "emc_mux", mux_pllmcp_clkm,
+>                                ARRAY_SIZE(mux_pllmcp_clkm), 0,
+>                                clk_base + CLK_SOURCE_EMC,
+> -                              29, 3, 0, NULL);
+> +                              29, 3, 0, &emc_lock);
+> +
+> +       clk = tegra_clk_register_mc("mc", "emc_mux", clk_base + CLK_SOURCE_EMC,
+> +                                   &emc_lock);
+> +       clks[TEGRA124_CLK_MC] = clk;
+>  
+>         /* cml0 */
+>         clk = clk_register_gate(NULL, "cml0", "pll_e", 0, clk_base + PLLE_AUX,
+> diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
+> index dace2b1b5ae6..41272dcc9e22 100644
+> --- a/drivers/clk/tegra/clk-tegra20.c
+> +++ b/drivers/clk/tegra/clk-tegra20.c
+> @@ -140,6 +140,8 @@ static struct cpu_clk_suspend_context {
+>  static void __iomem *clk_base;
+>  static void __iomem *pmc_base;
+>  
+> +static DEFINE_SPINLOCK(emc_lock);
+> +
+>  #define TEGRA_INIT_DATA_MUX(_name, _parents, _offset,  \
+>                             _clk_num, _gate_flags, _clk_id)     \
+>         TEGRA_INIT_DATA(_name, NULL, NULL, _parents, _offset,   \
+> @@ -819,11 +821,15 @@ static void __init tegra20_periph_clk_init(void)
+>                                ARRAY_SIZE(mux_pllmcp_clkm),
+>                                CLK_SET_RATE_NO_REPARENT,
+>                                clk_base + CLK_SOURCE_EMC,
+> -                              30, 2, 0, NULL);
+> +                              30, 2, 0, &emc_lock);
+>         clk = tegra_clk_register_periph_gate("emc", "emc_mux", 0, clk_base, 0,
+>                                     57, periph_clk_enb_refcnt);
+>         clks[TEGRA20_CLK_EMC] = clk;
+>  
+> +       clk = tegra_clk_register_mc("mc", "emc_mux", clk_base + CLK_SOURCE_EMC,
+> +                                   &emc_lock);
+> +       clks[TEGRA20_CLK_MC] = clk;
+> +
+>         /* dsi */
+>         clk = tegra_clk_register_periph_gate("dsi", "pll_d", 0, clk_base, 0,
+>                                     48, periph_clk_enb_refcnt);
+> diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
+> index 5bbacd01094f..4b9d8bd3d0bf 100644
+> --- a/drivers/clk/tegra/clk-tegra30.c
+> +++ b/drivers/clk/tegra/clk-tegra30.c
+> @@ -177,6 +177,7 @@ static unsigned long input_freq;
+>  
+>  static DEFINE_SPINLOCK(cml_lock);
+>  static DEFINE_SPINLOCK(pll_d_lock);
+> +static DEFINE_SPINLOCK(emc_lock);
+>  
+>  #define TEGRA_INIT_DATA_MUX(_name, _parents, _offset,  \
+>                             _clk_num, _gate_flags, _clk_id)     \
+> @@ -1157,11 +1158,15 @@ static void __init tegra30_periph_clk_init(void)
+>                                ARRAY_SIZE(mux_pllmcp_clkm),
+>                                CLK_SET_RATE_NO_REPARENT,
+>                                clk_base + CLK_SOURCE_EMC,
+> -                              30, 2, 0, NULL);
+> +                              30, 2, 0, &emc_lock);
+>         clk = tegra_clk_register_periph_gate("emc", "emc_mux", 0, clk_base, 0,
+>                                     57, periph_clk_enb_refcnt);
+>         clks[TEGRA30_CLK_EMC] = clk;
+>  
+> +       clk = tegra_clk_register_mc("mc", "emc_mux", clk_base + CLK_SOURCE_EMC,
+> +                                   &emc_lock);
+> +       clks[TEGRA30_CLK_MC] = clk;
+> +
+>         /* cml0 */
+>         clk = clk_register_gate(NULL, "cml0", "pll_e", 0, clk_base + PLLE_AUX,
+>                                 0, 0, &cml_lock);
+> diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
+> index 16ec8d6bb87f..4e458aa8d45c 100644
+> --- a/drivers/clk/tegra/clk.h
+> +++ b/drivers/clk/tegra/clk.h
+> @@ -86,6 +86,8 @@ struct clk *tegra_clk_register_divider(const char *name,
+>                 const char *parent_name, void __iomem *reg,
+>                 unsigned long flags, u8 clk_divider_flags, u8 shift, u8 width,
+>                 u8 frac_width, spinlock_t *lock);
+> +struct clk *tegra_clk_register_mc(const char *name, const char *parent_name,
+> +                                 void __iomem *reg, spinlock_t *lock);
+>  
+>  /*
+>   * Tegra PLL:
+> diff --git a/include/dt-bindings/clock/tegra114-car.h b/include/dt-bindings/clock/tegra114-car.h
+> index fc12621fb432..534c03f8ad72 100644
+> --- a/include/dt-bindings/clock/tegra114-car.h
+> +++ b/include/dt-bindings/clock/tegra114-car.h
+> @@ -49,7 +49,7 @@
+>  #define TEGRA114_CLK_I2S0 30
+>  /* 31 */
+>  
+> -/* 32 */
+> +#define TEGRA114_CLK_MC 32
+>  /* 33 */
+>  #define TEGRA114_CLK_APBDMA 34
+>  /* 35 */
+> diff --git a/include/dt-bindings/clock/tegra124-car.h b/include/dt-bindings/clock/tegra124-car.h
+> index 6bac637fd635..af9bc9a3ddbc 100644
+> --- a/include/dt-bindings/clock/tegra124-car.h
+> +++ b/include/dt-bindings/clock/tegra124-car.h
+> @@ -48,7 +48,7 @@
+>  #define TEGRA124_CLK_I2S0 30
+>  /* 31 */
+>  
+> -/* 32 */
+> +#define TEGRA124_CLK_MC 32
+>  /* 33 */
+>  #define TEGRA124_CLK_APBDMA 34
+>  /* 35 */
+> diff --git a/include/dt-bindings/clock/tegra20-car.h b/include/dt-bindings/clock/tegra20-car.h
+> index 9406207cfac8..04500b243a4d 100644
+> --- a/include/dt-bindings/clock/tegra20-car.h
+> +++ b/include/dt-bindings/clock/tegra20-car.h
+> @@ -49,7 +49,7 @@
+>  /* 30 */
+>  #define TEGRA20_CLK_CACHE2 31
+>  
+> -#define TEGRA20_CLK_MEM 32
+> +#define TEGRA20_CLK_MC 32
+>  #define TEGRA20_CLK_AHBDMA 33
+>  #define TEGRA20_CLK_APBDMA 34
+>  /* 35 */
+> -- 
+> 2.1.3
+> 
