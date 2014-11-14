@@ -1,108 +1,47 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Fri, 14 Nov 2014 08:03:01 +0100
-Subject: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
-In-Reply-To: <1415948109.5912.12.camel@perches.com>
-References: <35FD53F367049845BC99AC72306C23D103E010D18261@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18264@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18265@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18266@CNBJMBX05.corpusers.net>
- <20141030120127.GC32589@arm.com>
- <CAKv+Gu9g5Q6fjPUy+P8YxkeDrH+bdO4kKGnxTQZRFhQpgPxaPA@mail.gmail.com>
- <20141030135749.GE32589@arm.com>
- <35FD53F367049845BC99AC72306C23D103E010D18272@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
- <20141113235322.GC4042@n2100.arm.linux.org.uk>
- <1415923530.4223.17.camel@perches.com>
- <s5hd28qp9t2.wl-tiwai@suse.de>
- <1415948109.5912.12.camel@perches.com>
-Message-ID: <s5h7fyyp8m2.wl-tiwai@suse.de>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Fri, 14 Nov 2014 09:04:23 +0200
+Subject: N900 modem support in 3.18-rc1
+In-Reply-To: <20141113162420.GB8512@xo-6d-61-c0.localdomain>
+References: <20141104205117.GA17606@amd>
+ <20141106180335.GA21513@earth.universe> <20141106225005.GA14002@amd>
+ <201411070001.46481@pali> <545C6F14.8050303@gmail.com>
+ <20141113162420.GB8512@xo-6d-61-c0.localdomain>
+Message-ID: <5465A977.4030605@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Thu, 13 Nov 2014 22:55:09 -0800,
-Joe Perches wrote:
-> 
-> On Fri, 2014-11-14 at 07:37 +0100, Takashi Iwai wrote:
-> > At Thu, 13 Nov 2014 16:05:30 -0800,
-> > Joe Perches wrote:
-> > > 
-> > > On Thu, 2014-11-13 at 23:53 +0000, Russell King - ARM Linux wrote:
-> > > > On Fri, Oct 31, 2014 at 01:42:44PM +0800, Wang, Yalin wrote:
-> > > > > This patch add bitrev.h file to support rbit instruction,
-> > > > > so that we can do bitrev operation by hardware.
-> > > > > Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
-> > > > > ---
-> > > > >  arch/arm/Kconfig              |  1 +
-> > > > >  arch/arm/include/asm/bitrev.h | 21 +++++++++++++++++++++
-> > > > >  2 files changed, 22 insertions(+)
-> > > > >  create mode 100644 arch/arm/include/asm/bitrev.h
-> > > > > 
-> > > > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > > > > index 89c4b5c..be92b3b 100644
-> > > > > --- a/arch/arm/Kconfig
-> > > > > +++ b/arch/arm/Kconfig
-> > > > > @@ -28,6 +28,7 @@ config ARM
-> > > > >  	select HANDLE_DOMAIN_IRQ
-> > > > >  	select HARDIRQS_SW_RESEND
-> > > > >  	select HAVE_ARCH_AUDITSYSCALL if (AEABI && !OABI_COMPAT)
-> > > > > +	select HAVE_ARCH_BITREVERSE if (CPU_V7M || CPU_V7)
-> > > > 
-> > > > Looking at this, this is just wrong.  Take a moment to consider what
-> > > > happens if we build a kernel which supports both ARMv6 _and_ ARMv7 CPUs.
-> > > > What happens if an ARMv6 CPU tries to execute an rbit instruction?
-> > > > 
-> > > > Second point (which isn't obvious from your submissions on-list) is that
-> > > > you've loaded the patch system up with patches for other parts of the
-> > > > kernel tree for which I am not responsible for.  As such, I can't take
-> > > > those patches without the sub-tree maintainer acking them.  Also, the
-> > > > commit text in those patches look weird:
-> > > > 
-> > > > 6fire: Convert byte_rev_table uses to bitrev8
-> > > > 
-> > > > Use the inline function instead of directly indexing the array.
-> > > > 
-> > > > This allows some architectures with hardware instructions for bit
-> > > > reversals to eliminate the array.
-> > > > 
-> > > > Signed-off-by: Joe Perches <(address hidden)>
-> > > > Signed-off-by: Yalin Wang <(address hidden)>
-> > > > 
-> > > > Why is Joe signing off on these patches?
-> > > > Shouldn't his entry be an Acked-by: ?
-> > > 
-> > > I didn't sign off on or ack the "add bitrev.h" patch.
-> > > 
-> > > I created 2 patches that converted direct uses of byte_rev_table
-> > > to that bitrev8 static inline.  One of them is already in -next
-> > > 
-> > > 7a1283d8f5298437a454ec477384dcd9f9f88bac carl9170: Convert byte_rev_table uses to bitrev8
-> > > 
-> > > The other hasn't been applied.
-> > > 
-> > > https://lkml.org/lkml/2014/10/28/1056
-> > > 
-> > > Maybe Takashi Iwai will get around to it one day.
-> > 
-> > It was not clear to me whether I should apply it individually from
-> > others in the whole thread.  Your description looked as if it makes
-> > sense only with ARM's bitrev8 support.
-> > 
-> > So, again: should I apply this now to my tree?
-> 
-> I it would be good to apply even if the
-> bitrev patch for arm is never applied.
-> 
-> $ git grep -w bitrev8 | wc -l
-> 110
-> 
-> vs
-> 
-> this last direct use of byte_rev_table.
-
-Alright, I picked up your original patch and merged.
 
 
-thanks,
+On 13.11.2014 18:24, Pavel Machek wrote:
+> On Fri 2014-11-07 09:04:52, Ivaylo Dimitrov wrote:
+>
+> Sebastian is quiet, can we have the patch? :-).
 
-Takashi
+Sure, why not :)
+
+https://gitorious.org/linux-n900/freemangordons-linux-n900/commits/30e9a5c498a89cea4c29523f69e436bf0af3c631
+
+commits 89ce13b, b81d80d, ec4d0dc, 91256e2 and 8022a6d - e29f558 (no 
+idea why gitorious shows those mixed with SGX stuff, on my local tree it 
+is contiguous patch series)
+
+didn't test against the current upstream, but I see no reason why those 
+should not apply, build and run.
+
+>
+>> About the pulseaudio stuff - we're still in process of REing it, so
+>> far there are 2 out of 3 closed Nokia modules ready
+>> (https://gitorious.org/pulseaudio-nokia), but the last one, which is
+>> the one used for voice calls is still not ready and will take it a
+>> while :).
+>
+> Ok, is there a way I could help? Pretty much everything else works with
+> opensource drivers...
+>
+
+There is, though I am not sure you'll like it much - fire up IDA and 
+join the party :P. Ping me on IRC for more details in case you're 
+interested.
+
+Regards,
+Ivo
