@@ -1,58 +1,68 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 14 Nov 2014 16:03:41 +0000
-Subject: [Patch V1 0/6] Refine generic/PCI MSI irqodmian interfaces
-In-Reply-To: <54661ED9.8090901@linux.intel.com>
-References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
- <54651BE2.9080008@arm.com> <54654C10.2040102@linux.intel.com>
- <54655632.2040209@huawei.com> <alpine.DEB.2.11.1411140211480.3935@nanos>
- <54655D44.1070703@linux.intel.com> <54660D7F.70702@gmail.com>
- <54661103.8000707@linux.intel.com> <54661CB8.2070704@arm.com>
- <54661ED9.8090901@linux.intel.com>
-Message-ID: <546627DD.2050200@arm.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Fri, 14 Nov 2014 17:12:53 +0100
+Subject: [PATCH 1/2] spi: atmel: remove compat for non DT board when
+ requesting dma chan
+Message-ID: <1415981574-11165-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/11/14 15:25, Jiang Liu wrote:
-> On 2014/11/14 23:16, Marc Zyngier wrote:
->> On 14/11/14 14:26, Jiang Liu wrote:
->>> On 2014/11/14 22:11, Yijing Wang wrote:
->>>>
->>> We have achieved 1 and 2. And seems we could also achieve 3 by
->>> converting all arch specific PCI MSI code to use hierarchy
->>> irqdomain. But not sure whether we could achieve 4, not familiar
->>> with ARM world:)
->>
->> Killing all the weak functions shouldn't be a problem for ARM, we're
->> trying very hard not to rely on them.
->>
->> Killing msi_chip is a different story, as this is what we use to match a
->> PCI host controller with its MSI controller (that's what the of_node
->> field in msi_chip is for). See drivers/of/of_pci.c for details.
->>
->> Also, we use msi_chip directly in the MSI drivers as a way to go from a
->> pci_dev to the MSI controller specific structure:
->>
->> http://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/tree/drivers/irqchip/irq-gic-v3-its.c?h=irq/stacked-its-v2#n1143
->>
->> If we're going to kill msi_chip, we must make sure we have mechanisms
->> that allow the conversion of the existing code.
-> Hi Marc,
-> 	Seem it doesn't worth the effort to remove irq_chip,
-> so I will focus on killing all weak functions first:)
-> After that, we may kill setup_irq and teardown_irq in irq_chip,
-> but seems irq_chip still has other usages, so I won't try to
-> kill irq_chip.
+All boards with a dma controller have DT support so using
+dma_request_slave_channel_compat is no more needed.
 
-I assume you mean msi_chip! ;-)
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ drivers/spi/spi-atmel.c | 25 ++-----------------------
+ 1 file changed, 2 insertions(+), 23 deletions(-)
 
-Killing setup/teardown_irq is going to require some work. There are a
-few users in the tree (I can see three in drivers/pci/host and one in
-drivers/irqchip).
-
-Hopefully, we can get the maintainers to convert them.
-
-Thanks,
-
-	M.
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 649dcb5..f1760fa 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -414,23 +414,6 @@ static int atmel_spi_dma_slave_config(struct atmel_spi *as,
+ 	return err;
+ }
+ 
+-static bool filter(struct dma_chan *chan, void *pdata)
+-{
+-	struct atmel_spi_dma *sl_pdata = pdata;
+-	struct at_dma_slave *sl;
+-
+-	if (!sl_pdata)
+-		return false;
+-
+-	sl = &sl_pdata->dma_slave;
+-	if (sl->dma_dev == chan->device->dev) {
+-		chan->private = sl;
+-		return true;
+-	} else {
+-		return false;
+-	}
+-}
+-
+ static int atmel_spi_configure_dma(struct atmel_spi *as)
+ {
+ 	struct dma_slave_config	slave_config;
+@@ -441,9 +424,7 @@ static int atmel_spi_configure_dma(struct atmel_spi *as)
+ 	dma_cap_zero(mask);
+ 	dma_cap_set(DMA_SLAVE, mask);
+ 
+-	as->dma.chan_tx = dma_request_slave_channel_compat(mask, filter,
+-							   &as->dma,
+-							   dev, "tx");
++	as->dma.chan_tx = dma_request_slave_channel(dev, "tx");
+ 	if (!as->dma.chan_tx) {
+ 		dev_err(dev,
+ 			"DMA TX channel not available, SPI unable to use DMA\n");
+@@ -451,9 +432,7 @@ static int atmel_spi_configure_dma(struct atmel_spi *as)
+ 		goto error;
+ 	}
+ 
+-	as->dma.chan_rx = dma_request_slave_channel_compat(mask, filter,
+-							   &as->dma,
+-							   dev, "rx");
++	as->dma.chan_rx = dma_request_slave_channel(dev, "rx");
+ 
+ 	if (!as->dma.chan_rx) {
+ 		dev_err(dev,
 -- 
-Jazz is not dead. It just smells funny...
+2.0.3
