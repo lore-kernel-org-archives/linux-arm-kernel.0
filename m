@@ -1,79 +1,56 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Fri, 14 Nov 2014 11:40:06 +0530
-Subject: [PATCH] ARM: b.L: fix unmet dependency for CPU_PM
-In-Reply-To: <alpine.LFD.2.11.1411131259330.11690@knanqh.ubzr>
-References: <1415857098-16928-1-git-send-email-pankaj.dubey@samsung.com>
- <alpine.LFD.2.11.1411131231060.11690@knanqh.ubzr>
- <20141113174837.GB4042@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1411131259330.11690@knanqh.ubzr>
-Message-ID: <001401cfffd1$ae9df930$0bd9eb90$@samsung.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Fri, 14 Nov 2014 07:28:12 +0100
+Subject: [PATCH v5 0/7] Per-user clock constraints
+In-Reply-To: <20141031113358.GY32045@tbergstrom-lnx.Nvidia.com>
+References: <1414666135-14313-1-git-send-email-tomeu.vizoso@collabora.com>
+ <20141031113358.GY32045@tbergstrom-lnx.Nvidia.com>
+Message-ID: <CAAObsKARz=Y3J74Fm+MVOuH-ftK6yGSxWnNtd3LpHZjebKCGsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+CC: Colin Cross, James Hogan
+On 31 October 2014 12:33, Peter De Schrijver <pdeschrijver@nvidia.com> wrote:
+> On Thu, Oct 30, 2014 at 11:48:26AM +0100, Tomeu Vizoso wrote:
+>> Hello,
+>>
+>> this fifth version of the series has just one change, suggested by Stephen:
 
-On Thursday, November 13, 2014 11:30 PM, Nicolas Pitre wrote:
-> To: Russell King - ARM Linux
-> Cc: Pankaj Dubey; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org
-> Subject: Re: [PATCH] ARM: b.L: fix unmet dependency for CPU_PM
-> 
-> On Thu, 13 Nov 2014, Russell King - ARM Linux wrote:
-> 
-> > On Thu, Nov 13, 2014 at 12:44:22PM -0500, Nicolas Pitre wrote:
-> > > On Thu, 13 Nov 2014, Pankaj Dubey wrote:
-> > >
-> > > > If BL_SWITCHER is enabled but SUSPEND and CPU_IDLE is not enabled
-> > > > we are getting following config warning.
-> > > >
-> > > > warning: (BL_SWITCHER) selects CPU_PM which has unmet direct
-> > > > dependencies (SUSPEND || CPU_IDLE)
-> > > >
-> > > > So BL_SWITCHER should enable CPU_PM only if either of SUSPEND or
-> > > > CPU_IDLE is selected.
-> > > >
-> > > > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> > > > ---
-> > > >  arch/arm/Kconfig |    2 +-
-> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > >
-> > > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig index
-> > > > 9d580d0..fe3d969 100644
-> > > > --- a/arch/arm/Kconfig
-> > > > +++ b/arch/arm/Kconfig
-> > > > @@ -1417,7 +1417,7 @@ config BL_SWITCHER
-> > > >  	bool "big.LITTLE switcher support"
-> > > >  	depends on BIG_LITTLE && MCPM && HOTPLUG_CPU
-> > > >  	select ARM_CPU_SUSPEND
-> > > > -	select CPU_PM
-> > > > +	select CPU_PM if (SUSPEND || CPU_IDLE)
-> > >
-> > > NAK.  You just broke the code by doing this. CPU_PM is a requirement
-> > > here.  The dependencies for CPU_PM is lacking.
-> >
+Hi Mike, how is this looking for 3.19?
 
-OK, got it. Even though compilation worked, but as you mentioned by doing
-this way
-bL_switcher functionality may broke.
+Regards,
 
-> > Is there any real technical reason that CPU_PM depends on SUSPEND ||
-> > CPU_IDLE ?  If not, those dependencies should be killed.
-> 
-> Those dependencies look artificial to me.
-> 
+Tomeu
 
-For me also it looks like these dependencies are artificial.
-As far as I can see CONFIG_CPU_PM compiles following two files 
-1: kernel/cpu_pm.c - I can't see any dependency of SUSPEND or CPU_IDLE in
-this file.
-2: arch/mips/kernel/pm.c: A quick look does not show any dependency of
-SUSPEND or
-   CPU_IDLE here too.
-
-So for me it looks like it is OK to kill these dependencies of CPU_PM. 
-Still safer side I am CCing this to author of these files for confirmation.
-
-Thanks,
-Pankaj Dubey
-> 
-> Nicolas
+>> * Initialize clk.ceiling_constraint to ULONG_MAX and warn about new floor
+>> constraints being higher than the existing ceiling.
+>>
+>> The first five patches are just cleanups that should be desirable on their own,
+>> and that should make easier to review the actual per-user clock patch.
+>>
+>> The sixth patch actually moves the per-clock data that was stored in struct
+>> clk to a new struct clk_core and adds references to it from both struct clk and
+>> struct clk_hw. struct clk is now ready to contain information that is specific
+>> to a given clk consumer.
+>>
+>> The seventh patch adds API for setting floor and ceiling constraints and stores
+>> that information on the per-user struct clk, which is iterable from struct
+>> clk_core.
+>>
+>> They are based on top of 3.18-rc1.
+>>
+>> http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=per-user-clk-constraints-v5
+>>
+>
+> Acked-By: Peter De Schrijver <pdeschrijver@nvidia.com>
+>
+> Mike,
+>
+> Do you think this will be merged for 3.19?
+>
+> Thanks,
+>
+> Peter.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
