@@ -1,23 +1,82 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Nov 2014 16:06:15 +0100
-Subject: [PATCH V2 4/7] arm64: dts: Add Designware GPIO dts binding to APM
- X-Gene platform
-In-Reply-To: <1415924401-3013-5-git-send-email-fkan@apm.com>
-References: <1415924401-3013-1-git-send-email-fkan@apm.com>
- <1415924401-3013-5-git-send-email-fkan@apm.com>
-Message-ID: <1829495.FoDfH1G36W@wuerfel>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 14 Nov 2014 16:09:31 +0100
+Subject: [PATCH] ahci_sunxi: Make AHCI_HFLAG_NO_PMP flag configurable with a
+ module option
+Message-ID: <1415977771-5909-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 November 2014 16:19:58 Feng Kan wrote:
-> +               dwgpio: dwgpio at 1c024000 {
-> +                       compatible = "snps,dw-apb-gpio";
-> +                       reg = <0x0 0x1c024000 0x0 0x1000>;
-> +                       reg-io-width = <4>;
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> 
+The use of the AHCI_HFLAG_NO_PMP flag is something which we inherited from
+the Allwinner android kernel sources, and I've always wanted to test if this
+is really necessary.
 
-Same comment as patch 1: make the node name 'gpio', not 'dwgpio'.
+So recently I've bought a sata port multiplexer, and I've given this a test
+spin on both A10 and A20 devices, and it seems to work fine:
 
-	Arnd
+[    2.154456] ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
+[    2.161092] ata1.15: Port Multiplier 1.2, 0x197b:0x0325 r0, 5 ports, feat 0x5/0xf
+[    2.175511] ata1.00: hard resetting link
+[    2.524929] ata1.00: SATA link up 3.0 Gbps (SStatus 123 SControl 320)
+[    2.531430] ata1.01: hard resetting link
+[    2.974465] ata1.01: link resume succeeded after 1 retries
+[    3.094932] ata1.01: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
+[    3.101431] ata1.02: hard resetting link
+[    4.174466] ata1.02: failed to resume link (SControl 0)
+[    4.180065] ata1.02: SATA link down (SStatus 0 SControl 0)
+(and the same for links 3 and 4)
+
+Once the NO_PMP flag is removed it correctly sees the 2 disks which I've
+attached, and I can mount and use them just fine.
+
+Unfortunately when I then directly attached a disk to the sata port on the
+sunxi SoC, and booted a kernel without the AHCI_HFLAG_NO_PMP flag, it would
+not recognize that disk.
+
+It turns out that the sata controller in the sunxi SoCs fails to handle
+soft-resets issued to directly attached disks, and when pmp support is
+enabled the kernel will always issue a soft-reset.
+
+So add a module parameter to enable pmp usage, and default this to off, so
+that directly attached disks keep working normally.
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/ata/ahci_sunxi.c | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/ata/ahci_sunxi.c b/drivers/ata/ahci_sunxi.c
+index e44d675..b5aedca 100644
+--- a/drivers/ata/ahci_sunxi.c
++++ b/drivers/ata/ahci_sunxi.c
+@@ -27,6 +27,12 @@
+ #include <linux/regulator/consumer.h>
+ #include "ahci.h"
+ 
++/* Insmod parameters */
++static bool enable_pmp;
++module_param(enable_pmp, bool, 0);
++MODULE_PARM_DESC(enable_pmp,
++	"Enable support for sata port multipliers, only use if you use a pmp!");
++
+ #define AHCI_BISTAFR	0x00a0
+ #define AHCI_BISTCR	0x00a4
+ #define AHCI_BISTFCTR	0x00a8
+@@ -184,7 +190,15 @@ static int ahci_sunxi_probe(struct platform_device *pdev)
+ 		goto disable_resources;
+ 
+ 	hpriv->flags = AHCI_HFLAG_32BIT_ONLY | AHCI_HFLAG_NO_MSI |
+-		       AHCI_HFLAG_NO_PMP | AHCI_HFLAG_YES_NCQ;
++		       AHCI_HFLAG_YES_NCQ;
++
++	/*
++	 * The sunxi sata controller seems to be unable to successfully do a
++	 * soft reset if no pmp is attached, so disable pmp use unless
++	 * requested, otherwise directly attached disks do not work.
++	 */
++	if (!enable_pmp)
++		hpriv->flags |= AHCI_HFLAG_NO_PMP;
+ 
+ 	rc = ahci_platform_init_host(pdev, hpriv, &ahci_sunxi_port_info);
+ 	if (rc)
+-- 
+2.1.0
