@@ -1,103 +1,38 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Fri, 14 Nov 2014 16:58:26 +0800
-Subject: [PATCH 0/5] clk: rockchip: add full support for HDMI clock on
- rk3288
-In-Reply-To: <20141114014605.25314.49766@quantum>
-References: <1415087559-19444-1-git-send-email-kever.yang@rock-chips.com>
- <48806799.thBSifdUp8@diego> <54647142.4080800@rock-chips.com>
- <CAD=FV=Vzec3Qm-kc6zZ4VxSREoZbzVkWbzp-noHYdcEVrLYYSw@mail.gmail.com>
- <20141114014605.25314.49766@quantum>
-Message-ID: <5465C432.4050202@rock-chips.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 14 Nov 2014 10:02:31 +0100
+Subject: [PATCH] dt-bindings: simplefb: Document naming scheme for
+ pre-populated simplefb nodes
+Message-ID: <1415955751-6316-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Since we advice to use pre-populated simeplfb nodes in dt files, where the
+firmware then only needs to fill in the mode info + address and enable it,
+we should also specify how these pre-populated nodes should be named so
+that the firmware can find and enable the right one.
 
-On 11/14/2014 09:46 AM, Mike Turquette wrote:
->>>> Looking through the clock-tree there are a lot more components possibly
->>>> > >>using
->>>> > >>(or wanting to use) the npll: of course the VOPs, the edp, hdmi, isp,
->>>> > >>hevc,
->>>> > >>gpu, tsp uart0 and gmac. So I'm slightly uncomfortable with somehow
->>>> > >>reserving
->>>> > >>the npll for VOP0 alone.
-I understand the concern for other module clocks which may use NPLL as
-parent, we have to make sure all these clocks can get what they want even
-if NPLL is not available for them. So, let's have a look at them(without 
-NPLL):
-with CPLL 400M and GPLL 594M,
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ Documentation/devicetree/bindings/video/simple-framebuffer.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-GPU/HEVC/ISP/TSP can get 100/200/400 from CPLL, and ~300/600 from GPLL,
-        and ~500 from usbphy480m, these should be enough for those modules.
-
-DCLK_VOP1 for eDP/MIPI/LVDS, these clock can accept maybe more than 5%
-margin, we can get enough frequency for them now, we can change the CPLL
-to 800MHz for more option if it's needed one day.
-
-GMAC can get 50M from CPLL, usually we use external clock for GMAC.
-
-uart0 have frac divider, so we don't need to worry too much for it.
-
-
-
->>> > >
->>> > >It's true that I customized the usage of npll for VOP0 when we need some
->>> > >very special frequency, but it doesn't means other modules can't use the
->>> > >npll, it will always decided by clock core for module clocks that which
->>> > >parent
->>> > >is the best.
->> >
->> >We will just need to be very careful.  As I've mentioned in the past
->> >we'll need to think about what happens to other clocks that happen to
->> >be parented by NPLL whenever we change it.
->> >
->> >So if we do this:
->> >
->> >1. NPLL happens to be 500MHz.
->> >2. We set GPU to be 500MHz and it picks NPLL.
->> >3. We change NPLL to a different speed (like 600MHz).
->> >
->> >...I believe in this scenario the GPU would start running at 600MHz
->> >immediately.  We'd need to add special code to watch out for this and
->> >pick an alternate clock for the GPU (like the USB 480) before the NPLL
->> >change.  If NPLL later changes back to 500MHz and the GPU still wanted
->> >500MHz, we'd have to decide what to do.
->> >
->> >
->> >The summary is: it's pretty complicated
-It's complicated if there are more than one clock share the PLL and
-one of the clock wants to change the PLL output rate.
-
-Most of module clocks can't be changed during they are work, and it
-is better to route those clocks to a parent that would not change.
-
-Some of PLLs should not be changed after system initialized and they
-can be source for most of module clocks while some of PLLs have to
-change for some special requirement like HDMI that we can know
-the required frequency only when the device is plug in at run time.
-
-To make it simple, we can use the NPLL exclusively for HDMI/VOP0,
-just like what we do for APLL for cpu and DPLL for DDR, although what
-I though was share NPLL with other clocks in most of time, maybe we
-can use this case in the product like OTT BOX which will always have
-HDMI pluged.
-
-Maybe we can add an attribute for clock like NPLL in this way?
-There is an owner children for NPLL(for example VOP0) which can change 
-NPLL's rate,
-and there it a fixed_rate attribute to describe if this clock is fixed 
-or not.
-
-If VOP0 is not enabled, NPLL output is unfixed, other children clock can
-decide if they want to use a parent with unfixed output or another 
-parent with
-fixed output.
-
-If VOP0 is enabled, then the NPLL's output has decide by the VOP0 and it 
-become
-a fixed output parent.
-
-> +Stephen Boyd & Tomeu Vizoso
->
-> Managing shared clocks is a subset of the general problems with clock
-> constraints. Maybe Stephen or Tomeu have some comment here?
+diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+index c548f33..01dc948 100644
+--- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
++++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+@@ -29,6 +29,13 @@ enable them. This way if e.g. later on support for more display clocks get
+ added, the simplefb nodes will already contain this info and the firmware
+ does not need to be updated.
+ 
++If pre-filled framebuffer nodes are used, they should be named
++"framebuffer#-<output>", e.g. "framebuffer0-hdmi". The output should be
++included in the name since different outputs typically require different
++clocks and the clocks are part of the pre-populated nodes. The firmware must
++rename the nodes to the standard "framebuffer@<address>" using the runtime
++chosen address when enabling the nodes.
++
+ Required properties:
+ - compatible: "simple-framebuffer"
+ - reg: Should contain the location and size of the framebuffer memory.
+-- 
+2.1.0
