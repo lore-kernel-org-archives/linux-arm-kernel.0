@@ -1,82 +1,115 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 14 Nov 2014 09:39:17 +0100
-Subject: [PATCH 1/6] clk: sunxi: Add support for sun9i a80 usb clocks and
- resets
-In-Reply-To: <CAGb2v66Riu43PEzR2vLbg9r_WvZDLvxWtwAc3z43FkF57O2ksg@mail.gmail.com>
-References: <1415074039-16590-1-git-send-email-wens@csie.org>
- <1415074039-16590-2-git-send-email-wens@csie.org>
- <20141104165733.GI26729@lukather>
- <CAGb2v65VojZVEijdjXYGkMud7dMFzMzagfN=_4S3msZygu3YPQ@mail.gmail.com>
- <20141105100912.GD27686@lukather>
- <CAGb2v64RT4PKTji2KfDTFfc8b_kiTk0Vh49nEE9ZJukum7h2_Q@mail.gmail.com>
- <20141106085424.GF2989@lukather>
- <CAGb2v66Riu43PEzR2vLbg9r_WvZDLvxWtwAc3z43FkF57O2ksg@mail.gmail.com>
-Message-ID: <20141114083917.GT20972@lukather>
+From: timo.kokkonen@offcode.fi (Timo Kokkonen)
+Date: Fri, 14 Nov 2014 10:40:46 +0200
+Subject: [PATCH] at91sam9_wdt: Allow watchdog to reset device at early boot
+In-Reply-To: <54647608.1050504@atmel.com>
+References: <1414060846-17306-1-git-send-email-timo.kokkonen@offcode.fi>
+ <54631869.9070709@offcode.fi> <54647608.1050504@atmel.com>
+Message-ID: <5465C00E.4030808@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Sorry for the belated answer.
+On 11/13/14 11:12, Nicolas Ferre wrote:
+> On 12/11/2014 09:20, Timo Kokkonen :
+>> Hi,
+>>
+>>
+>> Any thoughts on this one? Should I resend this with some more people or
+>> lists to get someone to comment or review this patch?
+>
+> I would like to know if this property added to the device-tree is
+> already defined by another watchdog timer.
 
-On Thu, Nov 06, 2014 at 05:19:24PM +0800, Chen-Yu Tsai wrote:
-> On Thu, Nov 6, 2014 at 4:54 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Thu, Nov 06, 2014 at 10:09:27AM +0800, Chen-Yu Tsai wrote:
-> >> >> >> +static void __init sun9i_a80_usb_mod_setup(struct device_node *node)
-> >> >> >> +{
-> >> >> >> +     /* AHB1 gate must be enabled to access registers */
-> >> >> >> +     struct clk *ahb = of_clk_get(node, 0);
-> >> >> >> +
-> >> >> >> +     WARN_ON(IS_ERR(ahb));
-> >> >> >> +     clk_prepare_enable(ahb);
-> >> >> >
-> >> >> > Hmmmm. That look off.
-> >> >> >
-> >> >> > Why do you need the clock to be enabled all the time? Isn't the CCF
-> >> >> > already taking care of enabling the parent clock whenever it needs to
-> >> >> > access any register?
-> >> >>
-> >> >> There are also resets in the same block. That and I couldn't get it
-> >> >> working without enabling the clock beforehand.
-> >> >
-> >> > Ah, right.
-> >> >
-> >> > What happens if you just enable and disable the clocks in the
-> >> > reset_assert and reset_deassert right before and after accessing the
-> >> > registers?
-> >>
-> >> That doesn't work either. I forgot to mention that most of the clock
-> >> gates have the peripheral pll as their parent, not the ahb clock gate.
-> >
-> > Why it doesn't work? The clock needs more time to stabilize? The reset
-> > line is set back in reset if the clocks are disabled?
-> 
-> Let me clarify, what you proposed will work for the resets.
-> 
-> However the clock gates won't work if we use the generic clk-gate driver.
-> The problem is most of the gates don't have the ahb gate as their parent,
-> but pll4 (peripheral pll). When we enable the clock, the ahb gate isn't
-> its parent, and doesn't get enabled as a result. This is especially true
-> for the usb phy clocks: all of them use pll4 as their parent.
+As far as I know, no. And I didn't even think about it. But after taking 
+a quick look at Documentation/devicetree/bindings/watchdog directory, it 
+seems there are only a few bindings that are commong among the watchdog 
+drivers..
 
-I'm not sure I get this right. You mean that this USB clock needs
-*both* pll4 and its AHB gates to be enabled in order to run properly?
+> Indeed, it seems a pretty generic behavior and I am surprised it doesn't
+> have an already existing implementation.
 
-Or that the PHY needs its AHB gate to be enabled?
+Yeah, I think it would be a good idea to use a generic property name for 
+it. I don't think it makes sense to make any changes to the watchdog 
+core driver for this, it is quite hardware specific thing after all. But 
+the policy is generic and could be supported with other drivers too. 
+There are other products out there that have this kind of requirement 
+already and I guess they all just hack the driver to keep the watchdog 
+running to make sure the device gets reset if user space did not open 
+the device for some reason.
 
-Both ways, I still don't think it's the right thing to do.
+If we are about to go with a generic property name, I think it needs to 
+be something more descriptive with respect to the desired policy. So, 
+how about a property name "enable-early-reset". If set to 1, the 
+watchdog HW is left running and reset will happen unless user space does 
+something about it. If left undefined or has value 0, act just like now?
 
-Maxime
+How about that?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141114/4934bbf4/attachment.sig>
+-Timo
+
+>
+> ...
+>
+>>> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+>>> ---
+>>>    Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 4 ++++
+>>>    drivers/watchdog/at91sam9_wdt.c                          | 6 +++++-
+>>>    2 files changed, 9 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>>> index f90e294..1b9289e 100644
+>>> --- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>>> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+>>> @@ -28,6 +28,10 @@ Optional properties:
+>>>    	entering idle state.
+>>>    - atmel,dbg-halt : Should be present if you want to stop the watchdog when
+>>>    	entering debug state.
+>>> +- atmel,no-early-timer : Should be present if you want to let the
+>>> +	watchdog timer to expire even before user space has opened the
+>>> +	device. If not set, a kernel timer will keep on pinging the
+>>> +	watchdog until it is opened.
+>>>
+>>>    Example:
+>>>    	watchdog at fffffd40 {
+>>> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
+>>> index 489729b..8cac712 100644
+>>> --- a/drivers/watchdog/at91sam9_wdt.c
+>>> +++ b/drivers/watchdog/at91sam9_wdt.c
+>>> @@ -89,6 +89,7 @@ struct at91wdt {
+>>>    	u32 mr_mask;
+>>>    	unsigned long heartbeat;	/* WDT heartbeat in jiffies */
+>>>    	bool nowayout;
+>>> +	bool no_early_timer;
+>>>    	unsigned int irq;
+>>>    };
+>>>
+>>> @@ -122,7 +123,7 @@ static void at91_ping(unsigned long data)
+>>>    {
+>>>    	struct at91wdt *wdt = (struct at91wdt *)data;
+>>>    	if (time_before(jiffies, wdt->next_heartbeat) ||
+>>> -	    !watchdog_active(&wdt->wdd)) {
+>>> +		(!watchdog_active(&wdt->wdd) && !wdt->no_early_timer)) {
+>
+> ... Nitpicking: there seems to be a indentation mismatch here: use tab +
+> spaces to align to previous line...
+>
+>>>    		at91_wdt_reset(wdt);
+>>>    		mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
+>>>    	} else {
+>>> @@ -316,6 +317,9 @@ static int of_at91wdt_init(struct device_node *np, struct at91wdt *wdt)
+>>>
+>>>    	wdt->mr |= max | ((max - min) << 16);
+>>>
+>>> +	if (of_property_read_bool(np, "atmel,no-early-timer"))
+>>> +		wdt->no_early_timer = 1;
+>>> +
+>>>    	return 0;
+>>>    }
+>>>    #else
+>
+> Otherwise, it seems clean. Can you please re-send a version with the
+> Device tree maintainer in CC?
+>
+> Best regards,
+>
