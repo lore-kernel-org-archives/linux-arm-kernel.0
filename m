@@ -1,84 +1,95 @@
-From: ccross@android.com (Colin Cross)
-Date: Fri, 14 Nov 2014 14:06:59 -0800
-Subject: [PATCH] ARM: b.L: fix unmet dependency for CPU_PM
-In-Reply-To: <001401cfffd1$ae9df930$0bd9eb90$@samsung.com>
-References: <1415857098-16928-1-git-send-email-pankaj.dubey@samsung.com>
- <alpine.LFD.2.11.1411131231060.11690@knanqh.ubzr>
- <20141113174837.GB4042@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1411131259330.11690@knanqh.ubzr>
- <001401cfffd1$ae9df930$0bd9eb90$@samsung.com>
-Message-ID: <CAMbhsRT-H=6sXumPwhFHVufaDPNM=7rD=r_qQ0QGaF=zYseFiw@mail.gmail.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Fri, 14 Nov 2014 14:07:15 -0800
+Subject: [PATCH]  tty: serial: msm_serial: document DT alias
+Message-ID: <54667D13.2070105@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 13, 2014 at 10:10 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
-> +CC: Colin Cross, James Hogan
->
-> On Thursday, November 13, 2014 11:30 PM, Nicolas Pitre wrote:
->> To: Russell King - ARM Linux
->> Cc: Pankaj Dubey; linux-arm-kernel at lists.infradead.org; linux-
->> kernel at vger.kernel.org
->> Subject: Re: [PATCH] ARM: b.L: fix unmet dependency for CPU_PM
->>
->> On Thu, 13 Nov 2014, Russell King - ARM Linux wrote:
->>
->> > On Thu, Nov 13, 2014 at 12:44:22PM -0500, Nicolas Pitre wrote:
->> > > On Thu, 13 Nov 2014, Pankaj Dubey wrote:
->> > >
->> > > > If BL_SWITCHER is enabled but SUSPEND and CPU_IDLE is not enabled
->> > > > we are getting following config warning.
->> > > >
->> > > > warning: (BL_SWITCHER) selects CPU_PM which has unmet direct
->> > > > dependencies (SUSPEND || CPU_IDLE)
->> > > >
->> > > > So BL_SWITCHER should enable CPU_PM only if either of SUSPEND or
->> > > > CPU_IDLE is selected.
->> > > >
->> > > > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> > > > ---
->> > > >  arch/arm/Kconfig |    2 +-
->> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
->> > > >
->> > > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig index
->> > > > 9d580d0..fe3d969 100644
->> > > > --- a/arch/arm/Kconfig
->> > > > +++ b/arch/arm/Kconfig
->> > > > @@ -1417,7 +1417,7 @@ config BL_SWITCHER
->> > > >         bool "big.LITTLE switcher support"
->> > > >         depends on BIG_LITTLE && MCPM && HOTPLUG_CPU
->> > > >         select ARM_CPU_SUSPEND
->> > > > -       select CPU_PM
->> > > > +       select CPU_PM if (SUSPEND || CPU_IDLE)
->> > >
->> > > NAK.  You just broke the code by doing this. CPU_PM is a requirement
->> > > here.  The dependencies for CPU_PM is lacking.
->> >
->
-> OK, got it. Even though compilation worked, but as you mentioned by doing
-> this way
-> bL_switcher functionality may broke.
->
->> > Is there any real technical reason that CPU_PM depends on SUSPEND ||
->> > CPU_IDLE ?  If not, those dependencies should be killed.
->>
->> Those dependencies look artificial to me.
->>
->
-> For me also it looks like these dependencies are artificial.
-> As far as I can see CONFIG_CPU_PM compiles following two files
-> 1: kernel/cpu_pm.c - I can't see any dependency of SUSPEND or CPU_IDLE in
-> this file.
-> 2: arch/mips/kernel/pm.c: A quick look does not show any dependency of
-> SUSPEND or
->    CPU_IDLE here too.
->
-> So for me it looks like it is OK to kill these dependencies of CPU_PM.
-> Still safer side I am CCing this to author of these files for confirmation.
->
-> Thanks,
-> Pankaj Dubey
->>
->> Nicolas
->
+From: Frank Rowand <frank.rowand@sonymobile.com>
 
-I agree, the dependencies in kernel/power/Kconfig should be removed.
+Update devicetree binding for msm_serial to reflect msm_serial_probe()
+getting line id (port number) from the serialN alias.
+
+Signed-off-by: Frank Rowand <frank.rowand@sonymobile.com>
+---
+ Documentation/devicetree/bindings/serial/qcom,msm-uartdm.txt |   15 +++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
+
+Index: linux/Documentation/devicetree/bindings/serial/qcom,msm-uartdm.txt
+===================================================================
+--- linux.orig/Documentation/devicetree/bindings/serial/qcom,msm-uartdm.txt
++++ linux/Documentation/devicetree/bindings/serial/qcom,msm-uartdm.txt
+@@ -27,27 +27,52 @@ Optional properties:
+ - dmas: Should contain dma specifiers for transmit and receive channels
+ - dma-names: Should contain "tx" for transmit and "rx" for receive channels
+ 
++Note: Aliases may be defined to ensure the correct ordering of the UARTs.
++The alias serialN will result in the UART being assigned port N.  If any
++serialN alias exists, then an alias must exist for each enabled UART.  The
++serialN aliases should be in a .dts file instead of in a .dtsi file.
++
+ Examples:
+ 
+-A uartdm v1.4 device with dma capabilities.
++- A uartdm v1.4 device with dma capabilities.
++
++	serial at f991e000 {
++		compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
++		reg = <0xf991e000 0x1000>;
++		interrupts = <0 108 0x0>;
++		clocks = <&blsp1_uart2_apps_cxc>, <&blsp1_ahb_cxc>;
++		clock-names = "core", "iface";
++		dmas = <&dma0 0>, <&dma0 1>;
++		dma-names = "tx", "rx";
++	};
++
++- A uartdm v1.3 device without dma capabilities and part of a GSBI complex.
++
++	serial at 19c40000 {
++		compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
++		reg = <0x19c40000 0x1000>,
++	      	<0x19c00000 0x1000>;
++		interrupts = <0 195 0x0>;
++		clocks = <&gsbi5_uart_cxc>, <&gsbi5_ahb_cxc>;
++		clock-names = "core", "iface";
++	};
++
++- serialN alias.
++
++	aliases {
++		serial0 = &uarta;
++		serial1 = &uartc;
++		serial2 = &uartb;
++	};
++
++	uarta: serial at 12490000 {
++		status = "ok";
++	};
++
++	uartb: serial at 16340000 {
++		status = "ok";
++	};
+ 
+-serial at f991e000 {
+-	compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
+-	reg = <0xf991e000 0x1000>;
+-	interrupts = <0 108 0x0>;
+-	clocks = <&blsp1_uart2_apps_cxc>, <&blsp1_ahb_cxc>;
+-	clock-names = "core", "iface";
+-	dmas = <&dma0 0>, <&dma0 1>;
+-	dma-names = "tx", "rx";
+-};
+-
+-A uartdm v1.3 device without dma capabilities and part of a GSBI complex.
+-
+-serial at 19c40000 {
+-	compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
+-	reg = <0x19c40000 0x1000>,
+-	      <0x19c00000 0x1000>;
+-	interrupts = <0 195 0x0>;
+-	clocks = <&gsbi5_uart_cxc>, <&gsbi5_ahb_cxc>;
+-	clock-names = "core", "iface";
+-};
++	uartc: serial at 1a240000 {
++		status = "ok";
++	};
