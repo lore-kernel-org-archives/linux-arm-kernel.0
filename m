@@ -1,64 +1,82 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 14 Nov 2014 10:30:17 +0100
-Subject: [PATCH v3] of: replace Asahi Kasei Corp venter prefix
-In-Reply-To: <5465BFA2.9050706@nvidia.com>
-References: <20140922130026.GK3290@leverpostej>
- <CAMuHMdX22z97SbGS1HDiYfJ1PXxyEN2S8D7w4sr+4bUwD+mJZw@mail.gmail.com>
- <20140922132743.GM3290@leverpostej>
- <87y4rfhmgl.wl%kuninori.morimoto.gx@renesas.com>
- <1415845309.4269.6.camel@perches.com>
- <20141113025105.GA16652@verge.net.au>
- <87vbmjhj00.wl%kuninori.morimoto.gx@renesas.com>
- <20141113110740.GE3815@sirena.org.uk>
- <87k32yd0bd.wl%kuninori.morimoto.gx@renesas.com>
- <5465BFA2.9050706@nvidia.com>
-Message-ID: <20141114093016.GB3810@ulmo>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Fri, 14 Nov 2014 09:31:42 +0000
+Subject: [PATCH] ARM: imx: temporarily remove CONFIG_SOC_FSL from LS1021A
+In-Reply-To: <3302008.ezqrZf1odh@wuerfel>
+References: <1414746073-12394-1-git-send-email-jingchang.lu@freescale.com>
+ <1727581.y25NQPsRIm@wuerfel> <20141112104239.GJ2704@dragon>
+ <3302008.ezqrZf1odh@wuerfel>
+Message-ID: <7b9de442bdd34acbb4398efe92a64a4f@BN3PR0301MB1236.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 14, 2014 at 05:38:58PM +0900, Alexandre Courbot wrote:
-> On 11/14/2014 10:43 AM, Kuninori Morimoto wrote:
-[...]
-> >diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-> >index a1d4bf9..7f5cf80 100644
-> >--- a/arch/arm/boot/dts/tegra20-seaboard.dts
-> >+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-> >@@ -405,7 +405,7 @@
-> >  		clock-frequency = <400000>;
-> >
-> >  		magnetometer at c {
-> >-			compatible = "ak,ak8975";
-> >+			compatible = "asahi-kasei,ak8975";
-> 
-> Mmm. So does this mean this device was never probed because the driver did
-> not recognize its compatible property?
+>-----Original Message-----
+>From: Arnd Bergmann [mailto:arnd at arndb.de]
+>Sent: Wednesday, November 12, 2014 7:05 PM
+>To: linux-arm-kernel at lists.infradead.org
+>Cc: Shawn Guo; mark.rutland at arm.com; devicetree at vger.kernel.org; Lu
+>Jingchang-B35083
+>Subject: Re: [PATCH] ARM: imx: temporarily remove CONFIG_SOC_FSL from
+>LS1021A
+>
+>On Wednesday 12 November 2014 18:42:41 Shawn Guo wrote:
+>>
+>> I noticed the issue from 0-DAY testing and was trying to drop the patch.
+>> Jingchang said someone is trying to fixing the issues from driver code.
+>> But it seems to take some time.  So I agree with this partial reverting.
+>>
+>> Patch applied.  Thanks Arnd.
+>
+>Thanks a lot!
+>
+>Jingchang, can you say which of the drivers that are currently depending
+>on FSL_SOC are reused on LS1021A? I see these ones in the source tree:
+>
+>drivers/ata/sata_fsl.c
+>drivers/crypto/caam/
+>drivers/crypto/talitos.c
+>drivers/dma/fsldma.c
+>drivers/memory/fsl_ifc.c
+>drivers/misc/carma/
+>drivers/mtd/nand/fsl_ifc_nand.c
+>drivers/net/ethernet/freescale/fsl_pq_mdio.c
+>drivers/net/ethernet/freescale/gianfar*
+>drivers/net/ethernet/freescale/xgmac_mdio.c
+>drivers/spi/spi-fsl-cpm.c
+>drivers/spi/spi-fsl-dspi.c
+>drivers/spi/spi-fsl-espi.c
+>drivers/usb/host/ehci-fsl.c
+>drivers/video/fbdev/fsl-diu-fb.c
+>drivers/virt/fsl_hypervisor.c
+>sound/soc/fsl/mpc*
+>
+>I suspect that you only want a small subset of these, but I have no idea
+>which.
+>
+>	Arnd
 
-I2C (like SPI) has a fallback in case the OF table yields no match. The
-of_modalias_node() that it uses extracts the module name from the device
-tree node's compatible string by skipping the vendor prefix. The
-resulting string is then set as the I2C client's name and causes the I2C
-standard ID matching to succeed (see of_i2c_register_devices() for how
-this is done in detail).
+Hi, Arnd and Shawn,
 
-> I cannot find "ak,ak8975" anywhere else in the kernel.
-> 
-> If so,
-> 
-> Acked-by: Alexandre Courbot <acourbot@nvidia.com>
+  Many thanks for your work on resolving the FSL_SOC breaking allmodconfig.
 
-Technically this is breaking backwards-compatibility from a DT
-perspective, but I think it's safe to do because the Linux kernel has a
-way of dealing with this and other operating systems should be able to
-deal with this in a similar way (or even easier by letting the driver
-match on the ak prefix as well for this particular chip).
+  Formerly many drivers on PPC depend on a FSL_SOC configuration, when they
+are shared on our ARM platform, I add this configuration internally for
+quick reference and also some internal developers' requirement, thus I
+also add it into my upstream code.
 
-So:
+ Yes, only a subset of these drivers are shared between our ARM and PPC
+platforms. Since there will be allmodconfig breaking fault due to the
+FSL_SOC configuration, we will try to fix this or select another dependency,
+I will also inform our driver owners about this.
+ 
+Below drivers are shared on LS1021A platform currently:
 
-Acked-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141114/28fd4c1a/attachment.sig>
+drivers/crypto/caam/
+drivers/memory/fsl_ifc.c
+drivers/mtd/nand/fsl_ifc_nand.c
+drivers/net/ethernet/freescale/fsl_pq_mdio.c
+drivers/net/ethernet/freescale/gianfar*
+drivers/spi/spi-fsl-dspi.c
+
+
+Thanks and Best Regards,
+Jingchang
