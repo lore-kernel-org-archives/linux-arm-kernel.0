@@ -1,161 +1,82 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Fri, 14 Nov 2014 13:54:44 -0800
-Subject: [RESEND PATCH v14 7/7] KVM: arm: page logging 2nd stage fault handling
-Message-ID: <1416002084-9928-1-git-send-email-m.smarduch@samsung.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Fri, 14 Nov 2014 22:57:50 +0100
+Subject: N900 modem support in 3.18-rc1
+In-Reply-To: <54665E02.8050108@gmail.com>
+References: <20141104205117.GA17606@amd>
+ <20141106180335.GA21513@earth.universe>
+ <20141106225005.GA14002@amd> <201411070001.46481@pali>
+ <545C6F14.8050303@gmail.com>
+ <20141113162420.GB8512@xo-6d-61-c0.localdomain>
+ <5465A977.4030605@gmail.com>
+ <20141114172008.GB12250@earth.universe>
+ <54665E02.8050108@gmail.com>
+Message-ID: <20141114215749.GA19023@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for handling 2nd stage page faults during migration,
-it disables faulting in huge pages, and dissolves huge pages to page tables.
-In case migration is canceled huge pages are used again.
+Hi,
 
-Resending to addresse Marc's comments to simplify stage2_set_pte() handling 
-of logging, and mapping device memory - flags.
+On Fri, Nov 14, 2014 at 09:54:42PM +0200, Ivaylo Dimitrov wrote:
+> On 14.11.2014 19:20, Sebastian Reichel wrote:
+> >The patch looks ok. It does not cleanup the cmt-speech driver for
+> >mainline usage, but it should work. Before adding this driver to the
+> >mainline kernel there should be open source userspace support anyway.
+> 
+> I am aware of that(patch not ready), it's one of the reasons this
+> patch still sits on gitorious IMO.
+> 
+> libcmtspeechdata was opened by Nokia long ago, so I don't understand what
+> userspace support (for inclusion of the driver in the mainline kernel that
+> is) is needed. see https://gitorious.org/meego-cellular/libcmtspeechdata/source/7f8f3ce357513e4849e1bf6d657980a514529c1a:
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
----
- arch/arm/kvm/mmu.c |   61 +++++++++++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 53 insertions(+), 8 deletions(-)
+ah cool. I assumed, that userland stuff is mostly closed.
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 8137455..d29de77 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -47,6 +47,18 @@ static phys_addr_t hyp_idmap_vector;
- #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
- #define kvm_pud_huge(_x)	pud_huge(_x)
- 
-+#define KVM_S2PTE_FLAG_IS_IOMAP		(1UL << 0)
-+#define KVM_S2PTE_FLAG_LOGGING_ACTIVE	(1UL << 1)
-+
-+static bool kvm_get_logging_state(struct kvm_memory_slot *memslot)
-+{
-+#ifdef CONFIG_ARM
-+	return !!memslot->dirty_bitmap;
-+#else
-+	return false;
-+#endif
-+}
-+
- static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- {
- 	/*
-@@ -626,10 +638,13 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
- }
- 
- static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
--			  phys_addr_t addr, const pte_t *new_pte, bool iomap)
-+			  phys_addr_t addr, const pte_t *new_pte,
-+			  unsigned long flags)
- {
- 	pmd_t *pmd;
- 	pte_t *pte, old_pte;
-+	unsigned long iomap = flags & KVM_S2PTE_FLAG_IS_IOMAP;
-+	unsigned long logging_active = flags & KVM_S2PTE_FLAG_LOGGING_ACTIVE;
- 
- 	/* Create stage-2 page table mapping - Level 1 */
- 	pmd = stage2_get_pmd(kvm, cache, addr);
-@@ -641,6 +656,18 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
- 		return 0;
- 	}
- 
-+	/*
-+	 * While dirty memory logging, clear PMD entry for huge page and split
-+	 * into smaller pages, to track dirty memory at page granularity.
-+	 */
-+	if (logging_active && kvm_pmd_huge(*pmd)) {
-+		phys_addr_t ipa = pmd_pfn(*pmd) << PAGE_SHIFT;
-+
-+		pmd_clear(pmd);
-+		kvm_tlb_flush_vmid_ipa(kvm, ipa);
-+		put_page(virt_to_page(pmd));
-+	}
-+
- 	/* Create stage-2 page mappings - Level 2 */
- 	if (pmd_none(*pmd)) {
- 		if (!cache)
-@@ -693,7 +720,8 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
- 		if (ret)
- 			goto out;
- 		spin_lock(&kvm->mmu_lock);
--		ret = stage2_set_pte(kvm, &cache, addr, &pte, true);
-+		ret = stage2_set_pte(kvm, &cache, addr, &pte,
-+						KVM_S2PTE_FLAG_IS_IOMAP);
- 		spin_unlock(&kvm->mmu_lock);
- 		if (ret)
- 			goto out;
-@@ -908,6 +936,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	struct vm_area_struct *vma;
- 	pfn_t pfn;
- 	pgprot_t mem_type = PAGE_S2;
-+	unsigned long logging_active = 0;
-+
-+	if (kvm_get_logging_state(memslot))
-+		logging_active = KVM_S2PTE_FLAG_LOGGING_ACTIVE;
- 
- 	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
- 	if (fault_status == FSC_PERM && !write_fault) {
-@@ -918,7 +950,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	/* Let's check if we will get back a huge page backed by hugetlbfs */
- 	down_read(&current->mm->mmap_sem);
- 	vma = find_vma_intersection(current->mm, hva, hva + 1);
--	if (is_vm_hugetlb_page(vma)) {
-+	if (is_vm_hugetlb_page(vma) && !logging_active) {
- 		hugetlb = true;
- 		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
- 	} else {
-@@ -964,7 +996,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	spin_lock(&kvm->mmu_lock);
- 	if (mmu_notifier_retry(kvm, mmu_seq))
- 		goto out_unlock;
--	if (!hugetlb && !force_pte)
-+	if (!hugetlb && !force_pte && !logging_active)
- 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
- 
- 	if (hugetlb) {
-@@ -978,16 +1010,21 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
- 	} else {
- 		pte_t new_pte = pfn_pte(pfn, mem_type);
-+		unsigned long flags = logging_active;
-+
-+		if (mem_type == PAGE_S2_DEVICE)
-+			flags |= KVM_S2PTE_FLAG_IS_IOMAP;
-+
- 		if (writable) {
- 			kvm_set_s2pte_writable(&new_pte);
- 			kvm_set_pfn_dirty(pfn);
- 		}
- 		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE);
--		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
--				     mem_type == PAGE_S2_DEVICE);
-+		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, flags);
- 	}
- 
--
-+	if (write_fault)
-+		mark_page_dirty(kvm, gfn);
- out_unlock:
- 	spin_unlock(&kvm->mmu_lock);
- 	kvm_release_pfn_clean(pfn);
-@@ -1137,7 +1174,15 @@ static void kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
- {
- 	pte_t *pte = (pte_t *)data;
- 
--	stage2_set_pte(kvm, NULL, gpa, pte, false);
-+	/*
-+	 * We can always call stage2_set_pte with logging_active == false,
-+	 * because MMU notifiers will have unmapped a huge PMD before calling
-+	 * ->change_pte() (which in turn calls kvm_set_spte_hva()) and therefore
-+	 * stage2_set_pte() never needs to clear out a huge PMD through this
-+	 * calling path.
-+	 */
-+
-+	stage2_set_pte(kvm, NULL, gpa, pte, 0);
- }
- 
- 
--- 
-1.7.9.5
+> REed pulseaudio modules that use cmtspeech will be ready sooner than later
+> (I believe in 2-3 monts from now), see on gitorious how fast we progressed
+> with -record and -music modules. Sure, -voice module is way more
+> complicated, but lots of it is already opensourced, we just need to figure
+> out a couple of DSP algorithms(drc, agc, aec, etc) related to call quality.
+> But I don't think the driver should wait for those modules to be REed, they
+> can be used as is even now, in their closed form for testing.
+
+https://gitorious.org/pulseaudio-modules-nemo/jusas-tanuk2-mer-packaging/source/6ed34611b49c99b007f614d9dff4d58369876345:
+https://github.com/nemomobile/pulseaudio-module-cmtspeech-n9xx/commits/master
+
+It seems there is already cmtspeech code for pulseaudio?
+
+> Unfortunately all my spare time is dedicated to that PA stuff, so
+> I simply can't cleanup cmtspeech driver and send a patch for
+> upstreaming. (Pavel, what about you?)
+
+If somebody gets audio working with your driver and documents the
+steps needed in userland I will take care of upstreaming the driver.
+
+> >Btw. I am aware that this would break existing pulse audio stuff,
+> >but wouldn't it make sense to export a V4L2 device instead of the
+> >custom /dev/cmt_speech ABI?
+> 
+> Not to say that I agree with Pali's reply that working userspace should not
+> be broken just for the sake of it.
+
+Actually the mainline kernel never implemented that interface, so
+there is no regression/break and I don't think introducing userspace
+ABI's should be done carelessly - especially when there is also a
+standardized interface.
+
+> Nokia PA guys did a great job integrating lots of things related to audio
+> and honestly, I don't see a reason why should we reinvent the wheel. There
+> is lot more behind the scenes than simple PCM streaming (like audio policies
+> and routing, sideband audio, speakers protection, etc) and reiplementing all
+> this using different API wouldn't worth it IMO.
+
+What has speaker protection to do with the modem interface?
+Shouldn't this be two different PA modules?
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141114/0ecb4cb2/attachment.sig>
