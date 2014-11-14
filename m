@@ -1,107 +1,71 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 14 Nov 2014 11:52:04 +0100
-Subject: [PATCH v4 3/6] ARM: zynq: Move slcr.h and smp.h to generic location
+Date: Fri, 14 Nov 2014 11:52:05 +0100
+Subject: [PATCH v4 4/6] ARM: zynq: Extend SLCR driver to read OCM configuration
 In-Reply-To: <cover.1415962281.git.michal.simek@xilinx.com>
 References: <cover.1415962281.git.michal.simek@xilinx.com>
-Message-ID: <104ae4ce194398e02f5e031365269c4054339391.1415962281.git.michal.simek@xilinx.com>
+Message-ID: <1b945376f9979a3b3e7c1231ea7ecead78026b07.1415962281.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-include/soc/zynq/ is the right location for this header
-to be able to share information from this header with other
-drivers which require it.
+Get OCM configuration from SLCR.
 
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
 Changes in v4:
-- Move only slcr.h and smp.h and keep common.h in platform
-  which is not needed by OCMC driver
-  Based on Arnd request: https://lkml.org/lkml/2014/10/20/268
-  Not all symbols from slcr.h/smp.h will be used by OCMC driver
-  - no problem to remove them if it is needed
-- Add record to MAINTAINERS file
+- slcr.h has moved to soc/include/ folder. Move definition there too.
 
 Changes in v3: None
-Changes in v2:
-- Update pm.c added in 3.17 too - Soren pointed on it
+Changes in v2: None
 
- MAINTAINERS                                     | 1 +
- arch/arm/mach-zynq/common.c                     | 4 ++--
- arch/arm/mach-zynq/platsmp.c                    | 5 +++--
- arch/arm/mach-zynq/slcr.c                       | 3 ++-
- {arch/arm/mach-zynq => include/soc/zynq}/slcr.h | 0
- {arch/arm/mach-zynq => include/soc/zynq}/smp.h  | 0
- 6 files changed, 8 insertions(+), 5 deletions(-)
- rename {arch/arm/mach-zynq => include/soc/zynq}/slcr.h (100%)
- rename {arch/arm/mach-zynq => include/soc/zynq}/smp.h (100%)
+ arch/arm/mach-zynq/slcr.c | 15 +++++++++++++++
+ include/soc/zynq/slcr.h   |  1 +
+ 2 files changed, 16 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 60b1163dba28..279e87eef71c 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1551,6 +1551,7 @@ S:	Supported
- F:	arch/arm/mach-zynq/
- F:	drivers/cpuidle/cpuidle-zynq.c
- F:	drivers/block/xsysace.c
-+F:	include/soc/zynq/
- N:	zynq
- N:	xilinx
- F:	drivers/clocksource/cadence_ttc_timer.c
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 947e72b79496..d30ecc1a7641 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -43,8 +43,8 @@
- #include <asm/hardware/cache-l2x0.h>
-
- #include "common.h"
--#include "slcr.h"
--#include "smp.h"
-+#include <soc/zynq/slcr.h>
-+#include <soc/zynq/smp.h>
-
- #define ZYNQ_DEVCFG_MCTRL		0x80
- #define ZYNQ_DEVCFG_PS_VERSION_SHIFT	28
-diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
-index 717ba2b922b1..6d2b8a16b6c3 100644
---- a/arch/arm/mach-zynq/platsmp.c
-+++ b/arch/arm/mach-zynq/platsmp.c
-@@ -25,9 +25,10 @@
- #include <asm/cacheflush.h>
- #include <asm/smp_scu.h>
- #include <linux/irqchip/arm-gic.h>
-+
- #include "common.h"
--#include "slcr.h"
--#include "smp.h"
-+#include <soc/zynq/slcr.h>
-+#include <soc/zynq/smp.h>
-
- /*
-  * Store number of cores in the system
 diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
-index 40f8d7420334..b77e42d999c8 100644
+index b77e42d999c8..f7c606e57525 100644
 --- a/arch/arm/mach-zynq/slcr.c
 +++ b/arch/arm/mach-zynq/slcr.c
-@@ -20,7 +20,8 @@
- #include <linux/regmap.h>
- #include <linux/clk/zynq.h>
- #include "common.h"
--#include "slcr.h"
-+#include <soc/zynq/slcr.h>
-+#include <soc/zynq/smp.h>
+@@ -29,6 +29,7 @@
+ #define SLCR_A9_CPU_RST_CTRL_OFFSET	0x244 /* CPU Software Reset Control */
+ #define SLCR_REBOOT_STATUS_OFFSET	0x258 /* PS Reboot Status */
+ #define SLCR_PSS_IDCODE			0x530 /* PS IDCODE */
++#define SLCR_OCM_CFG_OFFSET		0x910 /* OCM Address Mapping */
 
- /* register offsets */
- #define SLCR_UNLOCK_OFFSET		0x8   /* SCLR unlock register */
-diff --git a/arch/arm/mach-zynq/slcr.h b/include/soc/zynq/slcr.h
-similarity index 100%
-rename from arch/arm/mach-zynq/slcr.h
-rename to include/soc/zynq/slcr.h
-diff --git a/arch/arm/mach-zynq/smp.h b/include/soc/zynq/smp.h
-similarity index 100%
-rename from arch/arm/mach-zynq/smp.h
-rename to include/soc/zynq/smp.h
+ #define SLCR_UNLOCK_MAGIC		0xDF0D
+ #define SLCR_A9_CPU_CLKSTOP		0x10
+@@ -128,6 +129,20 @@ void zynq_slcr_system_reset(void)
+ }
+
+ /**
++ * zynq_slcr_get_ocm_config - Get SLCR OCM config
++ *
++ * Return:	OCM config bits
++ */
++u32 zynq_slcr_get_ocm_config(void)
++{
++	u32 val;
++
++	zynq_slcr_read(&val, SLCR_OCM_CFG_OFFSET);
++
++	return val;
++}
++
++/**
+  * zynq_slcr_cpu_start - Start cpu
+  * @cpu:	cpu number
+  */
+diff --git a/include/soc/zynq/slcr.h b/include/soc/zynq/slcr.h
+index 7b4edab666ee..639723c4f90c 100644
+--- a/include/soc/zynq/slcr.h
++++ b/include/soc/zynq/slcr.h
+@@ -25,5 +25,6 @@ extern void zynq_slcr_cpu_start(int cpu);
+ extern bool zynq_slcr_cpu_state_read(int cpu);
+ extern void zynq_slcr_cpu_state_write(int cpu, bool die);
+ extern u32 zynq_slcr_get_device_id(void);
++extern u32 zynq_slcr_get_ocm_config(void);
+
+ #endif
 --
 1.8.2.3
 
@@ -111,4 +75,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141114/97a071e8/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141114/93b85101/attachment.sig>
