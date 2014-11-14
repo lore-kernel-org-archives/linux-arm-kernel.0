@@ -1,57 +1,62 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 14 Nov 2014 15:13:34 -0600
-Subject: [PATCH v7 08/13] usb: chipidea: add a usb2 driver for ci13xxx
-In-Reply-To: <20141114211052.GA8105@kwain>
-References: <1415978763-27345-1-git-send-email-antoine.tenart@free-electrons.com>
- <1415978763-27345-9-git-send-email-antoine.tenart@free-electrons.com>
- <20141114210832.GE16388@saruman> <20141114211052.GA8105@kwain>
-Message-ID: <20141114211334.GF16388@saruman>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 14 Nov 2014 22:14:38 +0100
+Subject: N900 modem support in 3.18-rc1
+In-Reply-To: <54665E02.8050108@gmail.com>
+References: <20141104205117.GA17606@amd>
+ <20141106180335.GA21513@earth.universe>
+ <20141106225005.GA14002@amd> <201411070001.46481@pali>
+ <545C6F14.8050303@gmail.com>
+ <20141113162420.GB8512@xo-6d-61-c0.localdomain>
+ <5465A977.4030605@gmail.com>
+ <20141114172008.GB12250@earth.universe>
+ <54665E02.8050108@gmail.com>
+Message-ID: <20141114211438.GA6658@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 14, 2014 at 10:10:52PM +0100, Antoine Tenart wrote:
-> Felipe,
-> 
-> On Fri, Nov 14, 2014 at 03:08:32PM -0600, Felipe Balbi wrote:
-> > On Fri, Nov 14, 2014 at 04:25:58PM +0100, Antoine Tenart wrote:
-> > > Add a USB2 ChipIdea driver for ci13xxx, with optional PHY, clock
-> > > and DMA mask, to support USB2 ChipIdea controllers that don't need
-> > > specific functions.
-> > > 
-> > > Tested on the Marvell Berlin SoCs USB controllers.
-> > > 
-> > > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> > > ---
-> > >  drivers/usb/chipidea/Makefile       |   1 +
-> > >  drivers/usb/chipidea/ci_hdrc_usb2.c | 117 ++++++++++++++++++++++++++++++++++++
-> > >  2 files changed, 118 insertions(+)
-> > >  create mode 100644 drivers/usb/chipidea/ci_hdrc_usb2.c
-> > > 
-> > > diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-> > > index 2f099c7df7b5..1fc86a2ca22d 100644
-> > > --- a/drivers/usb/chipidea/Makefile
-> > > +++ b/drivers/usb/chipidea/Makefile
-> > > @@ -10,6 +10,7 @@ ci_hdrc-$(CONFIG_USB_OTG_FSM)		+= otg_fsm.o
-> > >  
-> > >  # Glue/Bridge layers go here
-> > >  
-> > > +obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_usb2.o
-> > 
-> > usb2 is too generic, you should call it ci_hdcr_marvell, or something
-> > like that.
-> 
-> This driver is generic, and not only for Marvell Berlin SoCs. It is part
-> of the Berlin USB series as it is the first SoC to use it but Xilinx can
-> also use it for example.
+Hi!
 
-then how about ci_hdrc_generic.c ?
+On Fri 2014-11-14 21:54:42, Ivaylo Dimitrov wrote:
+> On 14.11.2014 19:20, Sebastian Reichel wrote:
+> >
+> >The patch looks ok. It does not cleanup the cmt-speech driver for
+> >mainline usage, but it should work. Before adding this driver to the
+> >mainline kernel there should be open source userspace support anyway.
+> >
+> 
+> I am aware of that(patch not ready), it's one of the reasons this patch
+> still sits on gitorious IMO.
+> 
+> libcmtspeechdata was opened by Nokia long ago, so I don't understand what
+> userspace support (for inclusion of the driver in the mainline kernel that
+> is) is needed. see https://gitorious.org/meego-cellular/libcmtspeechdata/source/7f8f3ce357513e4849e1bf6d657980a514529c1a:
+> 
+> REed pulseaudio modules that use cmtspeech will be ready sooner than later
+> (I believe in 2-3 monts from now), see on gitorious how fast we progressed
+> with -record and -music modules. Sure, -voice module is way more
+> complicated, but lots of it is already opensourced, we just need to figure
+> out a couple of DSP algorithms(drc, agc, aec, etc) related to call quality.
+> But I don't think the driver should wait for those modules to be REed, they
+> can be used as is even now, in their closed form for testing. Unfortunately
+> all my spare time is dedicated to that PA stuff, so I simply can't cleanup
+> cmtspeech driver and send a patch for upstreaming. (Pavel, what
+>about you?)
 
+Hey, I can try.
+
+But there are two things I'd like to understand, first:
+
+a) how did Mer people solve this? Or did they just ship nokia
+binaries?
+
+b) do we really need those DSP algorithms? Can we just take data from
+microphone and send it down the GSM line, and take data from GSM line
+and put it to the speaker? If it will not work in the speakerphone
+mode, I can live with that... It should somehow work in normal-phone
+mode, and be definitely feasible with wired handsfree, no?
+
+Thanks,
+									Pavel
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141114/f5226d72/attachment.sig>
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
