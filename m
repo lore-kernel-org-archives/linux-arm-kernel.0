@@ -1,36 +1,92 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 14 Nov 2014 11:01:47 +0100
-Subject: preferable method for pinctrl driver
-In-Reply-To: <545C9C41.1090300@rempel-privat.de>
-References: <54379C10.3050004@rempel-privat.de>
- <CACRpkdYG6sNEfKNJBdbYCn4AbGiX2OfQAVJorR64cbB_gsWDbw@mail.gmail.com>
- <545C846C.6090502@rempel-privat.de>
- <545C9C41.1090300@rempel-privat.de>
-Message-ID: <CACRpkdZMX=HSpusLtPREufJpXuHOwH2MCtHrViASDR7Vbu_eMw@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 14 Nov 2014 11:02:18 +0100
+Subject: [PATCH v2] PCI: designware: Add support 4 ATUs assignment
+In-Reply-To: <5465C19D.3060801@freescale.com>
+References: <1415682444-24911-1-git-send-email-Minghuan.Lian@freescale.com>
+ <CA+mB=1+4Dzxhbin6z0PUENvjUz-y8bq-K09FXTnSepFvVfe9HQ@mail.gmail.com>
+ <546308DD.40109@freescale.com>
+ <CA+mB=1K=Oyzdb2yfBvPRG9DHi-PFjRPtVS_dY9JMOz6dQog8QQ@mail.gmail.com>
+ <546331E7.5060003@freescale.com>
+ <CA+mB=1KObT9O783SMcvHy8nJGQPnxyKgP332r5bHx-K_D+LhVg@mail.gmail.com>
+ <1415809929.2876.5.camel@pengutronix.de> <546481A3.5050700@freescale.com>
+ <1415874015.2420.5.camel@pengutronix.de> <54648D61.6050704@freescale.com>
+ <1415876988.2420.7.camel@pengutronix.de> <5465C19D.3060801@freescale.com>
+Message-ID: <1415959338.4445.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 7, 2014 at 11:17 AM, Oleksij Rempel <linux@rempel-privat.de> wrote:
+Am Freitag, den 14.11.2014, 16:47 +0800 schrieb Lian Minghuan-B31939:
+> Hi Lucas and all,
+> 
+> On 2014?11?13? 19:09, Lucas Stach wrote:
+> > Am Donnerstag, den 13.11.2014, 18:52 +0800 schrieb Lian Minghuan-B31939:
+> >> Hi Lucas,
+> >>
+> >> On 2014?11?13? 18:20, Lucas Stach wrote:
+> >>> Am Donnerstag, den 13.11.2014, 18:02 +0800 schrieb Lian Minghuan-B31939:
+> >>>> Hi Lucas,
+> >>>>
+> >>>> Please see my comments inline.
+> >>>>
+> >>>> Thanks,
+> >>>> Minghuan
+> >>>>
+> >>>> On 2014?11?13? 00:32, Lucas Stach wrote:
+> >>>>> Am Mittwoch, den 12.11.2014, 21:53 +0530 schrieb Srikanth Thokala:
+> >>>>>> Hi Minghuan,
+> >>> [...]
+> >>>
+> >>>>> Using a smaller type complicates the DT for little to no benefit. I
+> >>>>> think it's ok to use u32 here, which is a common standard for integer
+> >>>>> values in DT.
+> >>>>>
+> >>>>> Though this discussion lead me to the question if we even need to have
+> >>>>> this property in the DT at all. Isn't this a property that is fixed for
+> >>>>> a specific silicon implementation of the DW core? In that case we could
+> >>>>> just infer the number of ATUs from the DT compatible, so this should
+> >>>>> probably just be added to struct pcie_port and properly initialized by
+> >>>>> the SoC glue drivers.
+> >>>> [Minghuan]  As far as I know, exynos implements only 2 ATUs, this is why
+> >>>> pcie-designware only supports 2 ATU. iMX implements 4 ATUs and LS1021A
+> >>>> implements 6 ATUs.
+> >>>>
+> >>> Right so we don't need an additional property in the DT at all. The
+> >>> number of ATUs is fixed for a specific core compatible and can be passed
+> >>> in by the respective exynos, imx and ls1021 glue drivers.
+> >>>
+> >>> You may ask the Keystone and Spear maintainers to get the correct number
+> >>> of ATUs for those implementations.
+> >>>
+> >>> Regards,
+> >>> Lucas
+> >> [Minghuan] Yes. This a way that specific core driver passes the ATU
+> >> number to
+> >> pci-designware. But I perfer to adding dts node for the following reasons:
+> >> 1. ATU number is hardware attribute, so it can be added to DTS.
+> > But it is a duplication of information that can be inferred from the DT
+> > compatible alone, which is usually frowned upon.
+> >
+> > Also in contrast to the num-lanes property I don't see a use-case to
+> > reduce the number of used ATUs in a specific system, so num-atus is
+> > basically fixed for a specific implementation.
+> [Minghuan] 4ATUs provides better support for multiple-function and 
+> SR-IOV PCIe devices.
+> Can anyone tell me if there is the company will increase ATUs number?
+> If yes, we should avoid the following code:
+> 
+> if (of_device_is_compatible(pcie->dev->of_node, "xxx,r1-pcie"))
+>      atu_num = 2;
+> 
+> if (of_device_is_compatible(pcie->dev->of_node, "xxx,r2-pcie"))
+>      atu_num = 4;
+> 
+The number of ATUs is fixed for a specific implementation. If the number
+of ATUs changes in a newer implementation of a SoC then the silicon
+implementation of the DW PCIe core changed, so it should get a new
+compatible anyway.
 
->> thank you for your previous response. One more question: how pins should
->> be numbered? Continuous or register offsets can be used?
->> Documentations for this soc use pin names encoded like this
->> #NAME_#BANK_#PIN. Register offset can be calculated by ((bank) * 32 +
->> (pin) * 4)
->> In this case i need to have extra array to convert pin number to offset,
->> or use offset as pin number.
->
-> Never mind, i think i found the answer:
-> This enumeration was arbitrarily chosen, in practice you need to think
-> through your numbering system so that it matches the layout of registers
-> and such things in your driver, or the code may become complicated. You
-> must also consider matching of offsets to the GPIO ranges that may be
-> handled by the pin controller.
-
-Yeah you're right :)
-
-There is some resoning in Documentation/pinctrl.txt but it needs some
-intuition etc.
-
-Yours,
-Linus Walleij
+Regards,
+Lucas 
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
