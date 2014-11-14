@@ -1,97 +1,34 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri, 14 Nov 2014 16:26:01 +0100
-Subject: [PATCH v7 11/13] ARM: dts: Berlin: enable USB on the BG2Q DMP
+Date: Fri, 14 Nov 2014 16:26:03 +0100
+Subject: [PATCH v7 13/13] ARM: dts: berlin: enable USB on the Google Chromecast
 In-Reply-To: <1415978763-27345-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1415978763-27345-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1415978763-27345-12-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1415978763-27345-14-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the 2 available USB PHY and USB nodes on the Marvell Berlin BG2Q
-DMP.
+From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
+Enable usb1 on Google Chromecast which is connected to micro-USB
+plug used for external power supply, too.
+
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 53 ++++++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+ arch/arm/boot/dts/berlin2cd-google-chromecast.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-index ea1f99b8eed6..f7c25580e122 100644
---- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-+++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-@@ -7,6 +7,8 @@
-  */
- 
- /dts-v1/;
-+
-+#include <dt-bindings/gpio/gpio.h>
- #include "berlin2q.dtsi"
- 
- / {
-@@ -21,6 +23,39 @@
- 	choosen {
- 		bootargs = "console=ttyS0,115200 earlyprintk";
- 	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg_usb0_vbus: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "usb0_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&portb 8 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+		};
-+
-+		reg_usb1_vbus: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "usb1_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&portb 10 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+		};
-+
-+		reg_usb2_vbus: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "usb2_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&portb 12 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+		};
-+	};
+diff --git a/arch/arm/boot/dts/berlin2cd-google-chromecast.dts b/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
+index bcd81ffc495d..5c42c3bfb613 100644
+--- a/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
++++ b/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
+@@ -27,3 +27,7 @@
  };
  
- &sdhci1 {
-@@ -46,6 +81,24 @@
- 	status = "okay";
- };
- 
-+&usb_phy0 {
-+	status = "okay";
-+};
+ &uart0 { status = "okay"; };
 +
-+&usb_phy2 {
-+	status = "okay";
-+};
++&usb_phy1 { status = "okay"; };
 +
-+&usb0 {
-+	vbus-supply = <&reg_usb0_vbus>;
-+	status = "okay";
-+};
-+
-+&usb2 {
-+	vbus-supply = <&reg_usb2_vbus>;
-+	status = "okay";
-+};
-+
- &eth0 {
- 	status = "okay";
- };
++&usb1 { status = "okay"; };
 -- 
 2.1.0
