@@ -1,68 +1,45 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 14 Nov 2014 14:47:59 +0100
-Subject: [PATCH] i2c: at91: introduce probe deferring
-Message-ID: <1415972879-26509-1-git-send-email-ludovic.desroches@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 14 Nov 2014 13:55:31 +0000
+Subject: some question about TCR setting
+In-Reply-To: <CAOVJa8Fx4yiSU0O7HTaYEKOrRdtWve4JGeN0cWRXDsBMyV_8Mg@mail.gmail.com>
+References: <CAOVJa8HBYkTMCJFKC=+UwjgPp4odm5UV-oUQXu17ctv2+HkpRg@mail.gmail.com>
+ <20141114104246.GA25828@leverpostej>
+ <CAOVJa8Fx4yiSU0O7HTaYEKOrRdtWve4JGeN0cWRXDsBMyV_8Mg@mail.gmail.com>
+Message-ID: <20141114135531.GA27768@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Return probe defer if requesting a dma channel without a dma controller probed.
+On Fri, Nov 14, 2014 at 01:13:12PM +0000, vichy wrote:
+> hi Mark:
+> > The CPU can't read the attributes from the page tables, because in order
+> > to do so it would need to know the attributes to access the page tables
+> > with. Additionally, the page tables might not always be mapped into the
+> > virtual address space.
+> Per your explanation, if the page table base address in TTBR is
+> 0x1000000, {SH,ORGN,IRGN}{1,0} tell cpu how to access this part of
+> physical address, right?
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/i2c/busses/i2c-at91.c | 22 ++++++++++++++++------
- 1 file changed, 16 insertions(+), 6 deletions(-)
+If that were TTBR0_ELx {SH,ORGN,IRGN}0 would apply, and for TTBR1_ELx
+{SH,ORGN,IRGN}1 would apply. 
 
-diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-index 77fb647..df3f4c4 100644
---- a/drivers/i2c/busses/i2c-at91.c
-+++ b/drivers/i2c/busses/i2c-at91.c
-@@ -679,14 +679,21 @@ static int at91_twi_configure_dma(struct at91_twi_dev *dev, u32 phy_addr)
- 	dma_cap_zero(mask);
- 	dma_cap_set(DMA_SLAVE, mask);
- 
--	dma->chan_tx = dma_request_slave_channel_compat(mask, filter, pdata,
--							dev->dev, "tx");
--	if (!dma->chan_tx) {
-+	dma->chan_tx = dma_request_slave_channel_reason(dev->dev, "tx");
-+	if (IS_ERR(dma->chan_tx)) {
-+		ret = PTR_ERR(dma->chan_tx);
-+		if (ret == -EPROBE_DEFER) {
-+			dev_warn(dev->dev, "no DMA channel available at the moment\n");
-+			return ret;
-+		}
- 		dev_err(dev->dev, "can't get a DMA channel for tx\n");
--		ret = -EBUSY;
- 		goto error;
- 	}
- 
-+	/*
-+	 * No reason to check EPROBE_DEFER here since we have already request
-+	 * tx channel. If it fails here, it's for another reason.
-+	 */
- 	dma->chan_rx = dma_request_slave_channel_compat(mask, filter, pdata,
- 							dev->dev, "rx");
- 	if (!dma->chan_rx) {
-@@ -722,7 +729,7 @@ error:
- 	dev_info(dev->dev, "can't use DMA\n");
- 	if (dma->chan_rx)
- 		dma_release_channel(dma->chan_rx);
--	if (dma->chan_tx)
-+	if (!IS_ERR(dma->chan_tx))
- 		dma_release_channel(dma->chan_tx);
- 	return ret;
- }
-@@ -788,8 +795,11 @@ static int at91_twi_probe(struct platform_device *pdev)
- 	clk_prepare_enable(dev->clk);
- 
- 	if (dev->pdata->has_dma_support) {
--		if (at91_twi_configure_dma(dev, phy_addr) == 0)
-+		rc = at91_twi_configure_dma(dev, phy_addr);
-+		if (rc == 0)
- 			dev->use_dma = true;
-+		else if (rc == -EPROBE_DEFER)
-+			return rc;
- 	}
- 
- 	rc = of_property_read_u32(dev->dev->of_node, "clock-frequency",
--- 
-2.0.3
+> if so, I have some questions:
+> 1. The processor use {SH,ORGN,IRGN}{1,0} in TCR to access all the
+> following page directories?
+
+Yes.
+
+> 2. under what circumstance, the page tables might not always be mapped
+> into the virtual address space.
+
+Consider CONFIG_HIGHPTE. The physical address space can be larger than
+the virtual address space, in which case not everything can be
+permanently mapped.
+
+> 3. if the {SH,ORGN,IRGN}{1,0} of block/page descriptor is conflict
+> with that one in TCR. Will that make cache maintenance issue.
+
+If page tables are accessed with different attributes from those used to
+walk them (i.e. those programmed into the TCR), the usual coherency
+issues would apply.
+
+Mark.
