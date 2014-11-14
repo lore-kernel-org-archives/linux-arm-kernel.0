@@ -1,115 +1,118 @@
-From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Fri, 14 Nov 2014 10:40:46 +0200
-Subject: [PATCH] at91sam9_wdt: Allow watchdog to reset device at early boot
-In-Reply-To: <54647608.1050504@atmel.com>
-References: <1414060846-17306-1-git-send-email-timo.kokkonen@offcode.fi>
- <54631869.9070709@offcode.fi> <54647608.1050504@atmel.com>
-Message-ID: <5465C00E.4030808@offcode.fi>
+From: chanho.min@lge.com (Chanho Min)
+Date: Fri, 14 Nov 2014 17:40:49 +0900
+Subject: [PATCH] ARM: cacheflush: disallow pending signals during
+ cacheflush
+In-Reply-To: <20141113112633.GE13350@arm.com>
+References: <1415863793-6219-1-git-send-email-chanho.min@lge.com>
+ <20141113112633.GE13350@arm.com>
+Message-ID: <010401cfffe6$b1adebc0$1509c340$@min@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
 
-On 11/13/14 11:12, Nicolas Ferre wrote:
-> On 12/11/2014 09:20, Timo Kokkonen :
->> Hi,
->>
->>
->> Any thoughts on this one? Should I resend this with some more people or
->> lists to get someone to comment or review this patch?
->
-> I would like to know if this property added to the device-tree is
-> already defined by another watchdog timer.
+> Whilst I don't think this is the correct solution, I agree that there's
+> a potential issue here. We could change the restart return value to
+> -ERESTARTNOINTR instead, but I can imagine something like a periodic
+> SIGALRM which could prevent a large cacheflush from ever completing.
+> Do we actually care about making forward progress in such a scenario?
+It's not complete solution. But, I don't think this is incorrect solution
+as well. Potential issue could be more serious than improvement of signal
+responsiveness.
 
-As far as I know, no. And I didn't even think about it. But after taking 
-a quick look at Documentation/devicetree/bindings/watchdog directory, it 
-seems there are only a few bindings that are commong among the watchdog 
-drivers..
+> 
+> It is interesting to note that this change has been in mainline since
+> May last year without any reported issues. That could be down to a number
+> of reasons:
+> 
+>   (1) People are using old kernels on ARM
+> 
+>   (2) Code doesn't check the return value from the cacheflush system call,
+>       because it historically always returned 0
+> 
+>   (3) People are getting lucky with timing, as this is likely difficult
+>       to hit
+> 
+> Related to (2) is that a `man cacheflush' invocation returns something
+> about the MIPs system call, that doesn't match what we do for ARM. The
+> (relatively recent) history of the system call on ARM is:
+> 
+>   < v3.5 [*]
+> 
+>     - Always returns 0
+>     - Restricts virtual address range to a single VMA
+>     - Page-aligns the region limits (over flushing for smaller ranges)
+>     - Terminates on the first fault
+>     - Flags are ignored but must "ALWAYS be passed as ZERO"
+> 
+>   v3.5 - v3.12
+>     - Returns -EINVAL if flags is set or if end < start
+>     - Returns -EINVAL if we couldn't find a vma
+>     - Terminates on the first fault and returns -EFAULT
+> 
+>   v3.12 - HEAD
+> 
+>     - No longer page-aligns region
+>     - Removes VMA checking as this had a deadlock bug with mmap_sem
+>       and we could handle faults by this point anyway
+>     - Returns -EINVAL if !access_ok for the range
+>     - Splits the range into PAGE_SIZE chunks, checking for reschedule
+>       and pending signals to avoid DoSing the system (the hardware can
+>       only clean by cacheline). This is where the -ERESTART_RESTARTBLOCK
+>       behaviour came in, potentially returning -EINTR to userspace.
+> 
+> This leaves me with the following questions:
+> 
+>   - Has this change been shown to break anything in practice?
+In practice, node.js (Currently, It doesn't check -EINTR of cacheflush)
+crashes occasionally and non-reproducibly at some point some while after
+the cacheflush call. At that time, strace tells cacheflush returns -EINTR.
 
-> Indeed, it seems a pretty generic behavior and I am surprised it doesn't
-> have an already existing implementation.
+>   - Can we change the internal return value to -ERESTARTNOINTR?
+In worst case, I can imagine that periodic signal interrupts cacheflush
+and it repeats restart of syscall from start of address with unlucky timing.
 
-Yeah, I think it would be a good idea to use a generic property name for 
-it. I don't think it makes sense to make any changes to the watchdog 
-core driver for this, it is quite hardware specific thing after all. But 
-the policy is generic and could be supported with other drivers too. 
-There are other products out there that have this kind of requirement 
-already and I guess they all just hack the driver to keep the watchdog 
-running to make sure the device gets reset if user space did not open 
-the device for some reason.
-
-If we are about to go with a generic property name, I think it needs to 
-be something more descriptive with respect to the desired policy. So, 
-how about a property name "enable-early-reset". If set to 1, the 
-watchdog HW is left running and reset will happen unless user space does 
-something about it. If left undefined or has value 0, act just like now?
-
-How about that?
-
--Timo
-
->
-> ...
->
->>> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
->>> ---
->>>    Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 4 ++++
->>>    drivers/watchdog/at91sam9_wdt.c                          | 6 +++++-
->>>    2 files changed, 9 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
->>> index f90e294..1b9289e 100644
->>> --- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
->>> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
->>> @@ -28,6 +28,10 @@ Optional properties:
->>>    	entering idle state.
->>>    - atmel,dbg-halt : Should be present if you want to stop the watchdog when
->>>    	entering debug state.
->>> +- atmel,no-early-timer : Should be present if you want to let the
->>> +	watchdog timer to expire even before user space has opened the
->>> +	device. If not set, a kernel timer will keep on pinging the
->>> +	watchdog until it is opened.
->>>
->>>    Example:
->>>    	watchdog at fffffd40 {
->>> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
->>> index 489729b..8cac712 100644
->>> --- a/drivers/watchdog/at91sam9_wdt.c
->>> +++ b/drivers/watchdog/at91sam9_wdt.c
->>> @@ -89,6 +89,7 @@ struct at91wdt {
->>>    	u32 mr_mask;
->>>    	unsigned long heartbeat;	/* WDT heartbeat in jiffies */
->>>    	bool nowayout;
->>> +	bool no_early_timer;
->>>    	unsigned int irq;
->>>    };
->>>
->>> @@ -122,7 +123,7 @@ static void at91_ping(unsigned long data)
->>>    {
->>>    	struct at91wdt *wdt = (struct at91wdt *)data;
->>>    	if (time_before(jiffies, wdt->next_heartbeat) ||
->>> -	    !watchdog_active(&wdt->wdd)) {
->>> +		(!watchdog_active(&wdt->wdd) && !wdt->no_early_timer)) {
->
-> ... Nitpicking: there seems to be a indentation mismatch here: use tab +
-> spaces to align to previous line...
->
->>>    		at91_wdt_reset(wdt);
->>>    		mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
->>>    	} else {
->>> @@ -316,6 +317,9 @@ static int of_at91wdt_init(struct device_node *np, struct at91wdt *wdt)
->>>
->>>    	wdt->mr |= max | ((max - min) << 16);
->>>
->>> +	if (of_property_read_bool(np, "atmel,no-early-timer"))
->>> +		wdt->no_early_timer = 1;
->>> +
->>>    	return 0;
->>>    }
->>>    #else
->
-> Otherwise, it seems clean. Can you please re-send a version with the
-> Device tree maintainer in CC?
->
-> Best regards,
->
+>   - What do we do about kernels that *do* return -EINTR? (>=3.12?)
+>   - Can we get a manpage put together to describe this mess?
+> 
+> Cheers,
+> 
+> Will
+> 
+> [*] rmk may have some more ancient history kicking around, if you like!
+> 
+> > diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+> > index abd2fc0..275e086 100644
+> > --- a/arch/arm/kernel/traps.c
+> > +++ b/arch/arm/kernel/traps.c
+> > @@ -521,25 +521,6 @@ __do_cache_op(unsigned long start, unsigned long end)
+> >  	do {
+> >  		unsigned long chunk = min(PAGE_SIZE, end - start);
+> >
+> > -		if (signal_pending(current)) {
+> > -			struct thread_info *ti = current_thread_info();
+> > -
+> > -			ti->restart_block = (struct restart_block) {
+> > -				.fn	= do_cache_op_restart,
+> > -			};
+> > -
+> > -			ti->arm_restart_block = (struct arm_restart_block) {
+> > -				{
+> > -					.cache = {
+> > -						.start	= start,
+> > -						.end	= end,
+> > -					},
+> > -				},
+> > -			};
+> > -
+> > -			return -ERESTART_RESTARTBLOCK;
+> > -		}
+> > -
+> >  		ret = flush_cache_user_range(start, start + chunk);
+> >  		if (ret)
+> >  			return ret;
+> > --
+> > 1.7.9.5
+> >
+> >
