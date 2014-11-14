@@ -1,32 +1,51 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Fri, 14 Nov 2014 18:00:54 +0530
-Subject: [PATCH] arm64: enable ARCH_HAS_BANDGAP config
-Message-ID: <1415968254-5182-1-git-send-email-a.kesavan@samsung.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 14 Nov 2014 12:33:01 +0000
+Subject: [PATCH] DMA: Fix allocation size for PL330 data buffer depth.
+In-Reply-To: <20141112093952.GD24582@intel.com>
+References: <1415294412-13818-1-git-send-email-Liviu.Dudau@arm.com>
+ <20141112093952.GD24582@intel.com>
+Message-ID: <20141114123301.GK12037@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of the existing thermal drivers (ti and exynos) have a dependency on
-ARCH_HAS_BANDGAP. Activate ARCH_HAS_BANDGAP config entry for ARM64 so that
-these drivers may be re-used.
+On Wed, Nov 12, 2014 at 09:39:52AM +0000, Vinod Koul wrote:
+> On Thu, Nov 06, 2014 at 05:20:12PM +0000, Liviu Dudau wrote:
+> > The datasheet for PL330 says that the data buffer value in the CRD
+> > register is 10bits wide. However, the value stored is "minus one",
+> > which the driver corrects for. Maximum value that the data buffer
+> > depth can have is 1024 lines, which requires 11 bits for storage.
+> > 
+> > While making updates I found printing the peripheral ID as a hex
+> > value to be more useful as the datasheet shows the values that way.
+> 
+> Applied, thanks
 
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
----
- arch/arm64/Kconfig |    3 +++
- 1 file changed, 3 insertions(+)
+Thanks!
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 5bb1900..7c452e4 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -139,6 +139,9 @@ config KERNEL_MODE_NEON
- config FIX_EARLYCON_MEM
- 	def_bool y
- 
-+config ARCH_HAS_BANDGAP
-+	def_bool y
-+
- source "init/Kconfig"
- 
- source "kernel/Kconfig.freezer"
+> 
+> Please snure you use the right subsytem name
+
+Sorry about that. Just for clarity, it should've been 'dmaengine', right?
+
+Best regards,
+Liviu
+
+> 
+> -- 
+> ~Vinod
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
 -- 
-1.7.9.5
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
