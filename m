@@ -1,53 +1,31 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 14 Nov 2014 11:52:07 +0100
-Subject: [PATCH v4 6/6] ARM: zynq: DT: Add OCM controller node
-In-Reply-To: <cover.1415962281.git.michal.simek@xilinx.com>
-References: <cover.1415962281.git.michal.simek@xilinx.com>
-Message-ID: <0a88d52b5e71fb220ca619180ec9ca746edad2b1.1415962281.git.michal.simek@xilinx.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Nov 2014 11:56:35 +0100
+Subject: [PATCH] ARM: imx: temporarily remove CONFIG_SOC_FSL from LS1021A
+In-Reply-To: <7b9de442bdd34acbb4398efe92a64a4f@BN3PR0301MB1236.namprd03.prod.outlook.com>
+References: <1414746073-12394-1-git-send-email-jingchang.lu@freescale.com>
+ <3302008.ezqrZf1odh@wuerfel>
+ <7b9de442bdd34acbb4398efe92a64a4f@BN3PR0301MB1236.namprd03.prod.outlook.com>
+Message-ID: <3531768.l2njma3NbB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the on-chip-memory controller node to the Zynq devicetree.
+On Friday 14 November 2014 09:31:42 Jingchang Lu wrote:
+>  Yes, only a subset of these drivers are shared between our ARM and PPC
+> platforms. Since there will be allmodconfig breaking fault due to the
+> FSL_SOC configuration, we will try to fix this or select another dependency,
+> I will also inform our driver owners about this.
+>  
+> Below drivers are shared on LS1021A platform currently:
+> 
+> drivers/crypto/caam/
+> drivers/memory/fsl_ifc.c
+> drivers/mtd/nand/fsl_ifc_nand.c
+> drivers/net/ethernet/freescale/fsl_pq_mdio.c
+> drivers/net/ethernet/freescale/gianfar*
+> drivers/spi/spi-fsl-dspi.c
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+Ok, since this is only a small subset of the FSL_SOC drivers, I'd
+suggest you make these depend on (FSL_SOC || ARCH_IMX) after
+verifying that they build without warnings on ARM.
 
-Changes in v4:
-- Use memory-controller at ... instead of ocmc at ...
-
-Changes in v3:
-- Extract from OCM driver
-
-Changes in v2: None
-
- arch/arm/boot/dts/zynq-7000.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index ce2ef5bec4f2..e217fb1c1169 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -150,6 +150,13 @@
- 			reg = <0xf8006000 0x1000>;
- 		};
-
-+		ocmc: memory-controller at f800c000 {
-+			compatible = "xlnx,zynq-ocmc-1.0";
-+			interrupt-parent = <&intc>;
-+			interrupts = <0 3 4>;
-+			reg = <0xf800c000 0x1000>;
-+		};
-+
- 		uart0: serial at e0000000 {
- 			compatible = "xlnx,xuartps", "cdns,uart-r1p8";
- 			status = "disabled";
---
-1.8.2.3
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141114/85f332b2/attachment.sig>
+	Arnd
