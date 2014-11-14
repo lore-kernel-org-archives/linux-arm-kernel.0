@@ -1,90 +1,85 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 14 Nov 2014 09:56:21 +0000
-Subject: [PATCH v2 13/14] ARM: STi: DT: STiH410: Add usb2 picophy dt nodes
-In-Reply-To: <2401196.5cvW5dPSz2@wuerfel>
-References: <1415876417-28728-1-git-send-email-peter.griffin@linaro.org>
- <3348806.YN8XP4V4uc@wuerfel>
- <20141113145419.GA30296@griffinp-ThinkPad-X1-Carbon-2nd>
- <2401196.5cvW5dPSz2@wuerfel>
-Message-ID: <20141114095621.GA1648@griffinp-ThinkPad-X1-Carbon-2nd>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 14 Nov 2014 09:58:12 +0000
+Subject: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
+In-Reply-To: <35FD53F367049845BC99AC72306C23D103E010D1829B@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D103E010D18265@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18266@CNBJMBX05.corpusers.net>
+ <20141030120127.GC32589@arm.com>
+ <CAKv+Gu9g5Q6fjPUy+P8YxkeDrH+bdO4kKGnxTQZRFhQpgPxaPA@mail.gmail.com>
+ <20141030135749.GE32589@arm.com>
+ <35FD53F367049845BC99AC72306C23D103E010D18272@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
+ <20141113235322.GC4042@n2100.arm.linux.org.uk>
+ <35FD53F367049845BC99AC72306C23D103E010D1829B@CNBJMBX05.corpusers.net>
+Message-ID: <20141114095812.GG4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Thu, 13 Nov 2014, Arnd Bergmann wrote:
-
-> On Thursday 13 November 2014 14:54:19 Peter Griffin wrote:
+On Fri, Nov 14, 2014 at 10:01:34AM +0800, Wang, Yalin wrote:
+> > -----Original Message-----
+> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> > Sent: Friday, November 14, 2014 7:53 AM
+> > To: Wang, Yalin
+> > > On Fri, Oct 31, 2014 at 01:42:44PM +0800, Wang, Yalin wrote:
+> > > This patch add bitrev.h file to support rbit instruction, so that we
+> > > can do bitrev operation by hardware.
+> > > Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
+> > > ---
+> > >  arch/arm/Kconfig              |  1 +
+> > >  arch/arm/include/asm/bitrev.h | 21 +++++++++++++++++++++
+> > >  2 files changed, 22 insertions(+)
+> > >  create mode 100644 arch/arm/include/asm/bitrev.h
+> > >
+> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig index
+> > > 89c4b5c..be92b3b 100644
+> > > --- a/arch/arm/Kconfig
+> > > +++ b/arch/arm/Kconfig
+> > > @@ -28,6 +28,7 @@ config ARM
+> > >  	select HANDLE_DOMAIN_IRQ
+> > >  	select HARDIRQS_SW_RESEND
+> > >  	select HAVE_ARCH_AUDITSYSCALL if (AEABI && !OABI_COMPAT)
+> > > +	select HAVE_ARCH_BITREVERSE if (CPU_V7M || CPU_V7)
 > > 
-> > > 
-> > > It also seems that you have put the node in the wrong place, as the reg
-> > > property apparently refers to a different address space. Did you mean
-> > > to put this under the syscfg_core node?
-> > 
-> > Your correct in that it refers to the syscfg_core address space.
-> > However I intentionaly didn't put it under the syscfg_core node.
-> > 
-> > The phy is more unique than most other devices in that in this instance it
-> > is only controlled from two syscfg_core registers which happen to be in the same
-> > sysconf bank.
-> >
-> > However most other devices tend to have a combination of some memory mapped
-> > registers and also some sysconfig registers which does then create a conflict
-> > over where the dt node should live.
-> > 
-> > Currently I can't find an example but there is also no guarentee that a
-> > device will not have some configuration bits in syscfg_core and some
-> > other bits in syscfg_rear/front registers. The phy for example could
-> > have had one register in each, which would make deciding where to put
-> > it difficult.
-> > 
-> > So to create coherency / conformity we decided to put all the IP blocks under the soc node.
-> > 
-> > Also its worth pointing if your not already aware that sysconf_core/rear/front isn't
-> > really a device, it's just a regmap abstraction of some memory mapped configuration
-> > registers where a bunch of seemingly random control bits get stuffed.
-> > 
-> > Of course if you feel strongly about it I can of course change it like you suggested,
-> > but that is the reasoning / rationale of why it was done like this initially.
+> > Looking at this, this is just wrong.  Take a moment to consider what
+> > happens if we build a kernel which supports both ARMv6 _and_ ARMv7 CPUs.
+> > What happens if an ARMv6 CPU tries to execute an rbit instruction?
 > 
-> The problem is your use of the 'reg' property. If it doesn't refer to the
-> node's address space, it shouldn't be called 'reg'.
-> 
-> Please fix the binding.
+> Is it possible to build a kernel that support both CPU_V6 and CPU_V7?
 
-I'll appologize in advance as I'm not sure I've understood you correctly, definately your answer
-has given me a bunch more questions to clarify my understanding...
+Absolutely it is.
 
-In the case of this particular node, then both reg properties refer to the syscfg_core address space
-as both <0xf8 0x04> and <0xf4 0x04> are offsets into syscfg_core registers. So moving it under
-the syscfg_core like you originaly suggested I believe would meet the definition of 'reg' ("describes the
-address of the device's resources within the address space defined by its parent bus").
+> I mean in Kconfig, CPU_V6 = y and CPU_V7 = y ?
 
-Or maybe you meant, if I want to keep the picophy node where it is (under soc), I need to stop using the reg
-property?
+Yes.
 
-The other problem I was describing is a device with some memory mapped registers and some
-sysconfig registers you can find examples already upstream in stih416.dtsi file with the
-ethernet0 and miphy365x_phy nodes.
+> If there is problem like you said,
+> How about this solution:
+> select HAVE_ARCH_BITREVERSE if ((CPU_V7M || CPU_V7) && !CPU_V6)  
 
-Here the first 1/2 reg properties are expressed as a 32 bit physical address and size (meets the spec definition),
-and the last is expressed as a sysconfig offset and size (which AFAIK doesn't match the spec definition).
-This change in address space is however documented in the bindings documentation.
+That would work.
 
-How should devices which have multiple address spaces ideally be handled?
+> For this patch,
+> I just cherry-pick from Joe,
+> If you are not responsible for this part,
+> I will submit to the maintainers for these patches .
+> Sorry for that .
 
->From looking around in the source I see a few different ways people have done this: -
+I think you need to discuss with Joe how Joe would like his patches
+handled.  However, it seems that Joe already sent his patches to the
+appropriate maintainers, and they have been applying those patches
+themselves.
 
-1) Some drivers encode the data statically into the source and make a decision based on compatible string.
-2) Some drivers add a couple of extra dt properties to encode the offset (spifsm in stih416)
-3) Some drivers mix address spaces in the reg properties (examples given above) 
-3) Probably some other ways I've not found yet
+Since your generic ARM changes depend on these patches being accepted
+first, this means is that I can't apply the generic ARM changes until
+those other patches have hit mainline, otherwise things are going to
+break.  So, when you come to submit the latest set of patches to the
+patch system, please do so only after these dependent patches have
+been merged into mainline so that they don't get accidentally applied
+before hand and break the two drivers that Joe mentioned.
 
-Is there a blessed way of doing this? It would be nice at least for all the drivers in STI to be doing
-it the same as currently there seems to be a mix of implementations.
+Thanks.
 
-For the moment I think we can forget the third example in my previous email as it is currently hypothetical.
-
-regards,
-
-Peter.
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
