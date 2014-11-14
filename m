@@ -1,46 +1,49 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 14 Nov 2014 16:47:00 +0400
-Subject: [PATCH 01/15] mfd: add new driver for Sharp LoCoMo
-In-Reply-To: <20141105202405.GJ8509@sirena.org.uk>
+Date: Fri, 14 Nov 2014 16:48:12 +0400
+Subject: [PATCH 02/15] GPIO: port LoCoMo gpio support from old driver
+In-Reply-To: <CACRpkdZiari6CtWq1kBCvX3cwwatJiHAuWUb40WSUEfjZjk+Lg@mail.gmail.com>
 References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
- <1414454528-24240-2-git-send-email-dbaryshkov@gmail.com>
- <CACRpkdbW3NA00zMZr216ZeZpgVkXwKUo30biTVd5kcHKGGtkHg@mail.gmail.com>
- <CALT56yNX8v4mZn=o1ZoVLHPmg6wq0dgFNowpqNuFtU=eCc+d8w@mail.gmail.com>
- <CACRpkdaKUZjbSEH75M9xudTF9HefwOCVEe5otv9-9f2UG8=hVg@mail.gmail.com>
- <CALT56yM8B3ffYb0=EZVbRRGDZSxMci2sRp9XVtjQuLa5abN+cg@mail.gmail.com>
- <20141105202405.GJ8509@sirena.org.uk>
-Message-ID: <CALT56yOtjNbYOWM4ba5yP8pz7bNLY5BWpkkpfmv5QZU-7Y5u_g@mail.gmail.com>
+ <1414454528-24240-3-git-send-email-dbaryshkov@gmail.com>
+ <CACRpkdY7tRadod2vQfEytmw-ubaMAvr_=XTczD5bUMkqie0xkg@mail.gmail.com>
+ <CALT56yOgMUA7o2dzfHph=S2zkDV4zERzMh4ishpPwpAx7Cqj6Q@mail.gmail.com>
+ <CACRpkdb7v3LmOhbhQ9TPk1_bnLnpwizawW6RQvhQRLSjRewAaQ@mail.gmail.com>
+ <CALT56yO9f8wzaArnmfQSDzCM3S+2oT+62anH5kbFY3WdEt_HZg@mail.gmail.com>
+ <20141106060335.GR8509@sirena.org.uk>
+ <CALT56yPr42FV66USngocw=eWPt81d5R2MJxmzBnv02HOMmXAkA@mail.gmail.com>
+ <CACRpkdZiari6CtWq1kBCvX3cwwatJiHAuWUb40WSUEfjZjk+Lg@mail.gmail.com>
+Message-ID: <CALT56yNh=orC+-iq--6MJv5swc_EjgG=n=0zJf-css8jdWGVFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-2014-11-05 23:24 GMT+03:00 Mark Brown <broonie@kernel.org>:
-> On Thu, Nov 06, 2014 at 12:02:49AM +0400, Dmitry Eremin-Solenikov wrote:
->> 2014-11-03 16:41 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
+2014-11-14 13:11 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Tue, Nov 11, 2014 at 2:16 PM, Dmitry Eremin-Solenikov
+> <dbaryshkov@gmail.com> wrote:
 >
->> > The point is still the same: no unrelated code in drivers/mfd,
->> > then either use IIO DAC as a middle layer or sink the DAC handling
->> > into respective subdriver, i.e. push it into the backlight or
->> > volume directly then.
+>> Just to better understand your suggestions: do you want me to convert
+>> to regmap only gpio driver or do you suggest to convert all LoCoMo drivers?
 >
->> The problem is that the DAC is equally used by backlight and by sound
->> device (WIP).
->> What about true i2c device driver sitting in drivers/misc and exporting a regmap
->> of 2 8-bit registers?
+> Um... I was just thinking about this one usecase.
+
+I ended up converting all drivers. It allowed me to clean up several points
+in the driver.
+
 >
-> If it can just export registers that sounds like a MFD.  If it needs to
-> export functionality then like Linus says the IIO subsystem abstracts
-> DACs.
+> It's no big deal, the other review comments are more important.
 
-I took a look at IIO subsystem. Thanks for the pointer. Indeed max517 driver
-can drive m62332 DAC with minimal modifications. However write support
-of the consumer interface is non-existing yet (which would be required
-to support DACs in unified manner).
+Fixed most of the comments. Last remaining issue is factoring out m62332
+interface.
 
-I'm actually looking at the regulator interface. Since this DAC serves mostly
-like a (semi-)constant voltage interface, would it be rather logical to use
-regulator subsystem to drive it?
+>> That is doable, of course, but the amount of changes is overwhelming.
+>> Also I'm concerned about the performance impact from going through
+>> regmap layers.
+>
+> Is it on a critical path? The current locking isn't any less invasive
+> AFAICT.
+>
+> Yours,
+> Linus Walleij
+
+
 
 -- 
 With best wishes
