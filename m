@@ -1,87 +1,124 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 14 Nov 2014 15:54:06 +0000
-Subject: [PATCH 0/6] arm64: alternatives runtime patching
-Message-ID: <1415980452-20366-1-git-send-email-andre.przywara@arm.com>
+Date: Fri, 14 Nov 2014 15:54:11 +0000
+Subject: [PATCH 5/6] arm64: add Cortex-A57 erratum 832075 workaround
+In-Reply-To: <1415980452-20366-1-git-send-email-andre.przywara@arm.com>
+References: <1415980452-20366-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1415980452-20366-6-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series introduces alternatives runtime patching to arm64.
-This allows to patch assembly instruction at runtime to either
-fix hardware bugs or optimize for certain hardware features. Look
-at patch 5/6 for an example on how to use this.
+The ARM erratum 832075 applies to certain revisions of Cortex-A57,
+one of the workarounds is to change device loads into using
+load-aquire semantics.
+This is achieved using the alternatives framework.
 
-The code is heavily based on the x86 implementation.
-Currently this is focussed on fixing CPU errata, but in the future
-runtime optimizations for new CPU features are planned.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ arch/arm64/include/asm/cpufeature.h |    5 +++--
+ arch/arm64/include/asm/io.h         |   23 +++++++++++++++++++----
+ arch/arm64/kernel/cpu_errata.c      |    7 +++++++
+ 3 files changed, 29 insertions(+), 6 deletions(-)
 
-Patch 1/6 introduces a new cpu_hwcaps bitmap, which holds kernel
-internal CPU feature flags. Since elf_hwcaps is also a userspace ABI,
-I refrained from tinkering with this (tried this, gets messy).
-
-Based on bits in this bitmap, in patch 2/6 we provide a macro to
-replace (inline) assembly instructions at runtime with alternative
-instructions. As on x86, those bits go into separate ELF sections.
-The patching is done using stop_machine() to avoid mayhem in SMP.
-
-Patch 3/6 introduces means to set cpu_hwcaps bits based on detecting
-a certain CPU revision. Currently this is based on the architectural
-bits in the MIDR register, but the code is flexible enough to easily
-introduce more advanced criteria.
-To support a heterogenous CPU setup (e.g. big.LITTLE), we scan all
-CPUs in the system.
-
-Patch 4 and 5 use the new framework to introduce workarounds for two
-ARM-Cortex errata. Patch 4 introduces some more framework for the
-detection, while patch 5 should be used as a blueprint for how to add
-workarounds for CPU errata in the future.
-
-Patch 6/6 finally introduces Kconfig entries for the bugs.
-Those are meant to
-a) document the errata and workarounds and
-b) to allow system vendors to remove certain workarounds for custom
-build kernels.
-Though this shouldn't be strictly necessary, experience shows that
-people will do b) anyway and I deem it better to provide official
-means rather than provoking random hacks.
-
-The code can be found also in the alternatives/v1 branch of:
-http://www.linux-arm.org/git?p=linux-ap.git
-git://linux-arm.org/linux-ap.git
-
-
-Please review and comment!
-
-Cheers,
-Andre.
-
-Andre Przywara (6):
-  arm64: add cpu_capabilities bitmap
-  arm64: add alternative runtime patching
-  arm64: detect silicon revisions and set cap bits accordingly
-  arm64: add Cortex-A53 cache errata workaround
-  arm64: add Cortex-A57 erratum 832075 workaround
-  arm64: protect alternatives workarounds with Kconfig options
-
- arch/arm64/Kconfig                       |  107 +++++++++++++++++++++++++++++
- arch/arm64/include/asm/alternative-asm.h |   29 ++++++++
- arch/arm64/include/asm/alternative.h     |   43 ++++++++++++
- arch/arm64/include/asm/cpufeature.h      |   29 ++++++++
- arch/arm64/include/asm/cputype.h         |    5 ++
- arch/arm64/include/asm/io.h              |   23 +++++--
- arch/arm64/kernel/Makefile               |    2 +-
- arch/arm64/kernel/alternative.c          |   64 +++++++++++++++++
- arch/arm64/kernel/cpu_errata.c           |  110 ++++++++++++++++++++++++++++++
- arch/arm64/kernel/cpuinfo.c              |    3 +
- arch/arm64/kernel/setup.c                |    3 +
- arch/arm64/kernel/smp.c                  |    2 +
- arch/arm64/kernel/vmlinux.lds.S          |   11 +++
- arch/arm64/mm/cache.S                    |    4 +-
- arch/arm64/mm/init.c                     |    2 +
- 15 files changed, 431 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm64/include/asm/alternative-asm.h
- create mode 100644 arch/arm64/include/asm/alternative.h
- create mode 100644 arch/arm64/kernel/alternative.c
- create mode 100644 arch/arm64/kernel/cpu_errata.c
-
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 92b6ee4..0362f80 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -21,9 +21,10 @@
+ #define MAX_CPU_FEATURES	(8 * sizeof(elf_hwcap))
+ #define cpu_feature(x)		ilog2(HWCAP_ ## x)
+ 
+-#define ARM64_WORKAROUND_CLEAN_CACHE	0
++#define ARM64_WORKAROUND_CLEAN_CACHE		0
++#define ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE	1
+ 
+-#define NCAPS				1
++#define NCAPS					2
+ 
+ #ifndef __ASSEMBLY__
+ 
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 79f1d519..75825b6 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -28,6 +28,8 @@
+ #include <asm/barrier.h>
+ #include <asm/pgtable.h>
+ #include <asm/early_ioremap.h>
++#include <asm/alternative.h>
++#include <asm/cpufeature.h>
+ 
+ #include <xen/xen.h>
+ 
+@@ -57,28 +59,41 @@ static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
+ static inline u8 __raw_readb(const volatile void __iomem *addr)
+ {
+ 	u8 val;
+-	asm volatile("ldrb %w0, [%1]" : "=r" (val) : "r" (addr));
++	asm volatile(ALTERNATIVE("ldrb %w0, [%1]",
++				 "ldarb %w0, [%1]",
++				 ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE)
++		     : "=r" (val) : "r" (addr));
+ 	return val;
+ }
+ 
+ static inline u16 __raw_readw(const volatile void __iomem *addr)
+ {
+ 	u16 val;
+-	asm volatile("ldrh %w0, [%1]" : "=r" (val) : "r" (addr));
++
++	asm volatile(ALTERNATIVE("ldrh %w0, [%1]",
++				 "ldarh %w0, [%1]",
++				 ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE)
++		     : "=r" (val) : "r" (addr));
+ 	return val;
+ }
+ 
+ static inline u32 __raw_readl(const volatile void __iomem *addr)
+ {
+ 	u32 val;
+-	asm volatile("ldr %w0, [%1]" : "=r" (val) : "r" (addr));
++	asm volatile(ALTERNATIVE("ldr %w0, [%1]",
++				 "ldar %w0, [%1]",
++				 ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE)
++		     : "=r" (val) : "r" (addr));
+ 	return val;
+ }
+ 
+ static inline u64 __raw_readq(const volatile void __iomem *addr)
+ {
+ 	u64 val;
+-	asm volatile("ldr %0, [%1]" : "=r" (val) : "r" (addr));
++	asm volatile(ALTERNATIVE("ldr %0, [%1]",
++				 "ldar %0, [%1]",
++				 ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE)
++		     : "=r" (val) : "r" (addr));
+ 	return val;
+ }
+ 
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 875fb2c..f232849 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -24,6 +24,7 @@
+ #include <asm/cpufeature.h>
+ 
+ #define MIDR_CORTEX_A53 MIDR_CPU_PART(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
++#define MIDR_CORTEX_A57 MIDR_CPU_PART(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
+ 
+ /*
+  * Add a struct or another datatype to the union below if you need
+@@ -70,6 +71,12 @@ struct arm64_cpu_capabilities arm64_errata[] = {
+ 		MIDR_RANGE(MIDR_CORTEX_A53, 0x00, 0x02),
+ 	},
+ 	{
++	/* Cortex-A57 r0p0 - r1p2 */
++		.desc = "ARM erratum 832075",
++		.capability = ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE,
++		MIDR_RANGE(MIDR_CORTEX_A57, 0x00, 0x12),
++	},
++	{
+ 	}
+ };
+ 
 -- 
 1.7.9.5
