@@ -1,35 +1,36 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Fri, 14 Nov 2014 16:29:27 +0100
-Subject: [PATCH v2] ARM: mvebu: re-enable SDHCI driver for Armada 38x SoC in
- v7 defconfig
-Message-ID: <1415978967-7350-1-git-send-email-mw@semihalf.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Fri, 14 Nov 2014 19:30:22 +0400
+Subject: [PATCH 01/15] mfd: add new driver for Sharp LoCoMo
+In-Reply-To: <20141114151000.GC3815@sirena.org.uk>
+References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
+ <1414454528-24240-2-git-send-email-dbaryshkov@gmail.com>
+ <CACRpkdbW3NA00zMZr216ZeZpgVkXwKUo30biTVd5kcHKGGtkHg@mail.gmail.com>
+ <CALT56yNX8v4mZn=o1ZoVLHPmg6wq0dgFNowpqNuFtU=eCc+d8w@mail.gmail.com>
+ <CACRpkdaKUZjbSEH75M9xudTF9HefwOCVEe5otv9-9f2UG8=hVg@mail.gmail.com>
+ <CALT56yM8B3ffYb0=EZVbRRGDZSxMci2sRp9XVtjQuLa5abN+cg@mail.gmail.com>
+ <20141105202405.GJ8509@sirena.org.uk>
+ <CALT56yOtjNbYOWM4ba5yP8pz7bNLY5BWpkkpfmv5QZU-7Y5u_g@mail.gmail.com>
+ <20141114151000.GC3815@sirena.org.uk>
+Message-ID: <CALT56yPkKO=_FYyQvgvnCBA4XU6ETZk_3NNjRu-0mhHy-4aSAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the recent update of mvebu_v7_defconfig a config that enables sdhci-pxav3
-driver, that supports SDHCI interface of Armada 38x SoC, disappeared.
+2014-11-14 18:10 GMT+03:00 Mark Brown <broonie@kernel.org>:
+> On Fri, Nov 14, 2014 at 04:47:00PM +0400, Dmitry Eremin-Solenikov wrote:
+>
+>> I'm actually looking at the regulator interface. Since this DAC serves mostly
+>> like a (semi-)constant voltage interface, would it be rather logical to use
+>> regulator subsystem to drive it?
+>
+> Possibly...  it's mostly a function of what the consumers of the
+> functionality look like - if that code looks weird calling into the
+> regulator API then it's bad, if that code looks OK it's fine.  I haven't
+> looked at the hardware at all so don't have strong feelings either way
+> so long as the result looks tasteful.
 
-This commit enables CONFIG_MMC_SDHCI_PXAV3 back.
+The DAC is used in backlight driver (control brightness) and in ASoC
+machine driver (master joined volume).
 
-Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Fixes fc9fa8714a75 ("ARM: mvebu: update v7 defconfig with useful options")
----
- arch/arm/configs/mvebu_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index ed0a0d1..9d55170 100644
---- a/arch/arm/configs/mvebu_v7_defconfig
-+++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -96,6 +96,7 @@ CONFIG_MMC=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_DOVE=y
-+CONFIG_MMC_SDHCI_PXAV3=y
- CONFIG_MMC_MVSDIO=y
- CONFIG_LEDS_GPIO=y
- CONFIG_LEDS_CLASS=y
 -- 
-1.8.3.1
+With best wishes
+Dmitry
