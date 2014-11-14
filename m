@@ -1,123 +1,108 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 14 Nov 2014 11:52:03 +0100
-Subject: [PATCH v4 2/6] ARM: zynq: Extract slcr related functions out of
- common.h
-In-Reply-To: <cover.1415962281.git.michal.simek@xilinx.com>
-References: <cover.1415962281.git.michal.simek@xilinx.com>
-Message-ID: <f3d0bb91f0cc7c9e735f756b6e664ea8aad921a9.1415962281.git.michal.simek@xilinx.com>
+Date: Fri, 14 Nov 2014 11:52:01 +0100
+Subject: [PATCH v4 0/6] Xilinx Zynq OCM support
+Message-ID: <cover.1415962281.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create topic headers not to share all functions.
+Hi,
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+this is the next attepmt to add support for On Chip Memory
+configuration via On Chip Memory Controller.
+OCM can be divided into 4 independend blocks and placed to
+two locations which this driver detects.
+
+For everybody on-chip SRAM driver "mmio-sram"
+is missing parity IRQ handling not sure how to write
+in generic way and also the memory layout
+can be changed at run time (not currently supported by this driver)
+
+smp-sram trampoline allocation can be used from mmio-sram
+and size allocated via DT but currently no reason for using
+it.
+
+Creating mmio-sram node with setting at run time based on current setting
+is possible but it won't look good.
+One way how to do it is here
+"ARM: mvebu: Add quirk for i2c for the OpenBlocks AX3-4 board"
+(sha1: 85e618a1be2b2092318178d1d66bdad49cbbeeeb)
+but creating nodes at run-time or changing compact strings
+will be just more hacky code.
+
+Using device-tree overlays is another option but SMP
+trampoline code is placed there and it will be used by PM code
+that's why driver should be there before user-space.
+
+Next option is to create driver which just create platform device
+at run-time. This is doable but I expect sram driver has to be
+updated.
+
+Thanks,
+Michal
+
 
 Changes in v4:
 - New patch in this series
+- New patch in this series
+- Move only slcr.h and smp.h and keep common.h in platform
+  which is not needed by OCMC driver
+  Based on Arnd request: https://lkml.org/lkml/2014/10/20/268
+  Not all symbols from slcr.h/smp.h will be used by OCMC driver
+  - no problem to remove them if it is needed
+- Add record to MAINTAINERS file
+- slcr.h has moved to soc/include/ folder. Move definition there too.
+- Use }; instead of } ; in doc
+- Use memory-controller at ... instead of ocmc at ...
+- Create Kconfig entry for OCMC driver - enable GENERIC_ALLOCATOR here
+- Add entry to MAINTAINERS file
+- Use memory-controller at ... instead of ocmc at ...
 
-Changes in v3: None
-Changes in v2: None
+Changes in v3:
+- Move OCM to drivers/soc
+- Update year
+- Extract DTS node to be able to apply it out of driver
+- Remove generic allocator enabling
+- Extract SLCR part
+- Use const in of_device_id
+- OCM->OCMC
+- Use ocmc-1.0 compatible string
+- Extract from OCM driver
 
- arch/arm/mach-zynq/common.c  |  1 +
- arch/arm/mach-zynq/common.h  |  9 ---------
- arch/arm/mach-zynq/platsmp.c |  1 +
- arch/arm/mach-zynq/slcr.c    |  1 +
- arch/arm/mach-zynq/slcr.h    | 29 +++++++++++++++++++++++++++++
- 5 files changed, 32 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm/mach-zynq/slcr.h
+Changes in v2:
+- Update pm.c added in 3.17 too - Soren pointed on it
+- Change compatibility string to be in xilinx format
+- Fix kernel-doc format
 
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 45cb778b344d..947e72b79496 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -43,6 +43,7 @@
- #include <asm/hardware/cache-l2x0.h>
+Michal Simek (6):
+  ARM: zynq: Extract smp related functions out of common.h
+  ARM: zynq: Extract slcr related functions out of common.h
+  ARM: zynq: Move slcr.h and smp.h to generic location
+  ARM: zynq: Extend SLCR driver to read OCM configuration
+  ARM: zynq: Add OCM controller driver
+  ARM: zynq: DT: Add OCM controller node
 
- #include "common.h"
-+#include "slcr.h"
- #include "smp.h"
+ .../bindings/arm/zynq/xlnx,zynq-ocmc.txt           |  17 ++
+ MAINTAINERS                                        |   2 +
+ arch/arm/boot/dts/zynq-7000.dtsi                   |   7 +
+ arch/arm/mach-zynq/common.c                        |   2 +
+ arch/arm/mach-zynq/common.h                        |  19 --
+ arch/arm/mach-zynq/platsmp.c                       |   3 +
+ arch/arm/mach-zynq/slcr.c                          |  17 ++
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/zynq/Kconfig                           |  13 ++
+ drivers/soc/zynq/Makefile                          |   1 +
+ drivers/soc/zynq/zynq_ocmc.c                       | 247 +++++++++++++++++++++
+ include/soc/zynq/slcr.h                            |  30 +++
+ include/soc/zynq/smp.h                             |  30 +++
+ 14 files changed, 371 insertions(+), 19 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocmc.txt
+ create mode 100644 drivers/soc/zynq/Kconfig
+ create mode 100644 drivers/soc/zynq/Makefile
+ create mode 100644 drivers/soc/zynq/zynq_ocmc.c
+ create mode 100644 include/soc/zynq/slcr.h
+ create mode 100644 include/soc/zynq/smp.h
 
- #define ZYNQ_DEVCFG_MCTRL		0x80
-diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
-index 0667cc79f179..5557de83058a 100644
---- a/arch/arm/mach-zynq/common.h
-+++ b/arch/arm/mach-zynq/common.h
-@@ -17,15 +17,6 @@
- #ifndef __MACH_ZYNQ_COMMON_H__
- #define __MACH_ZYNQ_COMMON_H__
-
--extern int zynq_slcr_init(void);
--extern int zynq_early_slcr_init(void);
--extern void zynq_slcr_system_reset(void);
--extern void zynq_slcr_cpu_stop(int cpu);
--extern void zynq_slcr_cpu_start(int cpu);
--extern bool zynq_slcr_cpu_state_read(int cpu);
--extern void zynq_slcr_cpu_state_write(int cpu, bool die);
--extern u32 zynq_slcr_get_device_id(void);
--
- extern void __iomem *zynq_scu_base;
-
- void zynq_pm_late_init(void);
-diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
-index 5aa6b9ee95fc..717ba2b922b1 100644
---- a/arch/arm/mach-zynq/platsmp.c
-+++ b/arch/arm/mach-zynq/platsmp.c
-@@ -26,6 +26,7 @@
- #include <asm/smp_scu.h>
- #include <linux/irqchip/arm-gic.h>
- #include "common.h"
-+#include "slcr.h"
- #include "smp.h"
-
- /*
-diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
-index d4cb50cf97c0..40f8d7420334 100644
---- a/arch/arm/mach-zynq/slcr.c
-+++ b/arch/arm/mach-zynq/slcr.c
-@@ -20,6 +20,7 @@
- #include <linux/regmap.h>
- #include <linux/clk/zynq.h>
- #include "common.h"
-+#include "slcr.h"
-
- /* register offsets */
- #define SLCR_UNLOCK_OFFSET		0x8   /* SCLR unlock register */
-diff --git a/arch/arm/mach-zynq/slcr.h b/arch/arm/mach-zynq/slcr.h
-new file mode 100644
-index 000000000000..7b4edab666ee
---- /dev/null
-+++ b/arch/arm/mach-zynq/slcr.h
-@@ -0,0 +1,29 @@
-+/*
-+ * This file contains common function prototypes to avoid externs
-+ * in the c files.
-+ *
-+ * Copyright (C) 2014 Xilinx
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __MACH_ZYNQ_SLCR_H__
-+#define __MACH_ZYNQ_SLCR_H__
-+
-+extern int zynq_slcr_init(void);
-+extern int zynq_early_slcr_init(void);
-+extern void zynq_slcr_system_reset(void);
-+extern void zynq_slcr_cpu_stop(int cpu);
-+extern void zynq_slcr_cpu_start(int cpu);
-+extern bool zynq_slcr_cpu_state_read(int cpu);
-+extern void zynq_slcr_cpu_state_write(int cpu, bool die);
-+extern u32 zynq_slcr_get_device_id(void);
-+
-+#endif
 --
 1.8.2.3
 
@@ -127,4 +112,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141114/c3236f33/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141114/8d52f967/attachment-0001.sig>
