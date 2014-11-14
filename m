@@ -1,77 +1,109 @@
-From: wangyijing0307@gmail.com (Yijing Wang)
-Date: Fri, 14 Nov 2014 22:11:11 +0800
-Subject: [Patch V1 0/6] Refine generic/PCI MSI irqodmian interfaces
-In-Reply-To: <54655D44.1070703@linux.intel.com>
-References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
- <54651BE2.9080008@arm.com> <54654C10.2040102@linux.intel.com>
- <54655632.2040209@huawei.com> <alpine.DEB.2.11.1411140211480.3935@nanos>
- <54655D44.1070703@linux.intel.com>
-Message-ID: <54660D7F.70702@gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 14 Nov 2014 15:11:58 +0100
+Subject: [PATCH v8 0/7] Enable L2 cache support on Exynos4210/4x12 SoCs
+In-Reply-To: <1415884694-5868-1-git-send-email-m.szyprowski@samsung.com>
+References: <1415884694-5868-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <54660DAE.9090601@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
-? 2014/11/14 9:39, Jiang Liu ??:
-> On 2014/11/14 9:31, Thomas Gleixner wrote:
->> On Fri, 14 Nov 2014, Yijing Wang wrote:
->>
->> Could you please use a mail client which does proper line wraps or
->> configure yours to do so?
->>
->>> Associate the irq domain and PCI bus is not necessary, because all
->>> PCI buses under same host bridge always share same MSI chip/irq
->>> domain, we only need associate them and pci host bridge.
->>>
->>> I'm refactoring the pci_host_bridge, make it be a generic one, rip
->>> out of the pci root bus creation, so we could put the irq domain and
->>> pci domain etc.. in it. Finally, we could eliminate lots platform
->>> arch functions. I will post it out within one week.
->> That's a completely orthogonal problem. From the MSI/interrupt
->> handling POV it does not matter at all where that information is
->> stored. All we care about is that it is retrievable via the (pci)
->> device which tries to setup MSI[X].
->>
->> So we can store/retrieve it via generic functions into/from whatever
->> is available right now. If the irq side has generic interfaces to do
->> so then this wont conflict with your decisions to change the final
->> storage point because all it takes is to tweak the storage/retrieve
->> functions.
->>
->> So all we need at the moment is an agreed on way to store/retrieve
->> that information which is based on the current shared infrastructure,
->> aka. Linus tree. If we can utilize that you are completely free to
->> change the association mechanism underneath.
-> Hi Thomas,
-> 	So we need something like:
-> struct msi_chip *pci_get_msi_chip(struct pci_dev *);
-> or:
-> struct irq_domain *pci_get_msi_domain(struct pci_dev *);
-
-Hi Gerry,
-what about associate the platform specific  struct msi_chip 
-*pci_get_msi_chip(struct pci_dev *)
-with struct pci_host_bridge. we could provide the private 
-"pci_get_msi_chip()" in the PCI
-host drivers.
-
-Thanks!
-Yijing.
-
+On 2014-11-13 14:18, Marek Szyprowski wrote:
+> This is an updated patchset, which intends to add support for L2 cache
+> on Exynos4 SoCs on boards running under secure firmware, which requires
+> certain initialization steps to be done with help of firmware, as
+> selected registers are writable only from secure mode.
 >
-> BTW, there's a conflict when merging tip/irq/irqdomain into
-> tip/x86/apic. It's my first time to deal with merging conflicts,
-> what's the preferred way? Is it working like this?
-> 1) I merge the two branch
-> 2) I rebase my x86 irqdomain patch sets and send them to you
-> 3) You merge the two branch and apply my patch set.
-> Regards!
-> Gerry
->> Thanks,
->>
->> 	tglx
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> First four patches extend existing support for secure write in L2C driver
+> to account for design of secure firmware running on Exynos. Namely:
+>   1) direct read access to certain registers is needed on Exynos, because
+>      secure firmware calls set several registers at once,
+>   2) not all boards are running secure firmware, so .write_sec callback
+>      needs to be installed in Exynos firmware ops initialization code,
+>   3) write access to {DATA,TAG}_LATENCY_CTRL registers fron non-secure world
+>      is not allowed and so must use l2c_write_sec as well,
+>   4) on certain boards, default value of prefetch register is incorrect
+>      and must be overridden at L2C initialization.
+> For boards running with firmware that provides access to individual
+> L2C registers this series should introduce no functional changes. However
+> since the driver is widely used on other platforms I'd like to kindly ask
+> any interested people for testing.
 >
+> Further three patches add implementation of .write_sec and .configure
+> callbacks for Exynos secure firmware and necessary DT nodes to enable
+> L2 cache.
+>
+> Changes in this version tested on Exynos4412-based TRATS2 and OdroidU3+
+> boards (both with secure firmware). There should be no functional change
+> for Exynos boards running without secure firmware. I do not have access
+> to affected non-Exynos boards, so I could not test on them.
+>
+>
+> Depends on:
+>   - [PATCH v3 0/5] Firmware-assisted suspend/resume of Exynos SoCs
+>     (https://lkml.org/lkml/2014/8/26/445)
+>     available in samsung/pm2 branch in
+>     git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+>   - L2C patches merged to v3.18-rc3
+
+I assume that after all comments from previous versions, no more changes 
+are needed
+to this patchset and I would really like to have it queued to v3.19.
+
+Arnd, Olof: could you take this patchset thought arm-soc tree? It already
+contains all dependencies.
+
+Kukjin: could you ack this patchset?
+
+> Changelog:
+> Changes since v7:
+> (https://lkml.org/lkml/2014/10/29/158)
+> - rebased onto arm-soc/for-next kernel tree (depends on patches merged to
+>    v3.18-rc3 and arm-soc/samsung/pm2 branch)
+> - removed 'ARM: l2c: unify L2C-310 OF initialization error messages' patch
+>    (no longer needed)
+>
+> Changes since v6:
+> (https://lkml.org/lkml/2014/10/27/233)
+> - changed PL310 to L2C-310 prefix in error messages
+> - added patch shortening the error message about incorrect associativity
+>
+> Changes since v5:
+> (https://lkml.org/lkml/2014/9/24/364)
+> - rebased onto v3.18-rc2
+> - added error message about missing properties values
+>
+> Changes since v4:
+> (https://lkml.org/lkml/2014/8/26/461)
+>   - rewrote the code accessing l2x0_saved_regs from assembly code
+>   - added comment and reworked unconditional call to SMC_CMD_L2X0INVALL
+>
+>
+> Patch summary:
+>
+> Tomasz Figa (7):
+>    ARM: l2c: Refactor the driver to use commit-like interface
+>    ARM: l2c: Add interface to ask hypervisor to configure L2C
+>    ARM: l2c: Get outer cache .write_sec callback from mach_desc only if
+>      not NULL
+>    ARM: l2c: Add support for overriding prefetch settings
+>    ARM: EXYNOS: Add .write_sec outer cache callback for L2C-310
+>    ARM: EXYNOS: Add support for non-secure L2X0 resume
+>    ARM: dts: exynos4: Add nodes for L2 cache controller
+>
+>   Documentation/devicetree/bindings/arm/l2cc.txt |  10 +
+>   arch/arm/boot/dts/exynos4210.dtsi              |   9 +
+>   arch/arm/boot/dts/exynos4x12.dtsi              |  14 ++
+>   arch/arm/include/asm/outercache.h              |   3 +
+>   arch/arm/kernel/irq.c                          |   3 +-
+>   arch/arm/mach-exynos/firmware.c                |  50 +++++
+>   arch/arm/mach-exynos/sleep.S                   |  46 +++++
+>   arch/arm/mm/cache-l2x0.c                       | 270 ++++++++++++++++---------
+>   8 files changed, 309 insertions(+), 96 deletions(-)
+>
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
