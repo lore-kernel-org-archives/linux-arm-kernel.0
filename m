@@ -1,75 +1,98 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sat, 15 Nov 2014 00:07:05 +0100
-Subject: [PATCHv1 4/6] rtc: rtc-isl12057: fix isil vs isl naming for intersil
+Date: Sat, 15 Nov 2014 00:07:17 +0100
+Subject: [PATCHv1 5/6] rtc: rtc-isl12057: report error code upon failure in
+ dev_err() calls
 In-Reply-To: <cover.1416006090.git.arno@natisbad.org>
 References: <cover.1416006090.git.arno@natisbad.org>
-Message-ID: <3dde5b6adfc9c953e0c943b0b40ccd2177508030.1416006090.git.arno@natisbad.org>
+Message-ID: <7ff908c71200e28b65afbcca1a183233246803cf.1416006090.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-When Intersil ISL12057 driver was introduced by commit 70e123373c05
-("rtc: Add support for Intersil ISL12057 I2C RTC chip"), the vendor
-prefix 'isl' was used instead of the expected 'isil' (Intersil
-NASDAQ symbol). Recently, a patch from Philip Zabel (7a6540ca856a,
-"ARM: mvebu: Change vendor prefix for Intersil Corporation to isil")
-fixed that prefix in ReadyNAS devices .dts files (AFAICT, the only
-users).
+As pointed by Mark, it is generally useful to log the error code when
+reporting a failure. This patch improves existing calls to dev_err()
+in ISL12057 driver to also report error code.
 
-That patch completes that work to change the remaining values in:
-
- - Intersil ISL12057 driver (compatible string) and also associated
-   Documentation/devicetree/bindings/i2c/trivial-devices.txt file
-   to reflect the changes introduced by previous commit from Philip
- - Documentation/devicetree/bindings/vendor-prefixes.txt files to
-   avoid future mistakes
-
+Suggested-by: Mark Brown <broonie@kernel.org>
 Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 ---
- Documentation/devicetree/bindings/i2c/trivial-devices.txt | 2 +-
- Documentation/devicetree/bindings/vendor-prefixes.txt     | 2 +-
- drivers/rtc/rtc-isl12057.c                                | 3 ++-
- 3 files changed, 4 insertions(+), 3 deletions(-)
+ drivers/rtc/rtc-isl12057.c | 22 ++++++++++++++--------
+ 1 file changed, 14 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-index fbde415078e6..edac97c0f756 100644
---- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-+++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-@@ -55,7 +55,7 @@ fsl,sgtl5000		SGTL5000: Ultra Low-Power Audio Codec
- gmt,g751		G751: Digital Temperature Sensor and Thermal Watchdog with Two-Wire Interface
- infineon,slb9635tt	Infineon SLB9635 (Soft-) I2C TPM (old protocol, max 100khz)
- infineon,slb9645tt	Infineon SLB9645 I2C TPM (new protocol, max 400khz)
--isl,isl12057		Intersil ISL12057 I2C RTC Chip
-+isil,isl12057		Intersil ISL12057 I2C RTC Chip
- maxim,ds1050		5 Bit Programmable, Pulse-Width Modulator
- maxim,max1237		Low-Power, 4-/12-Channel, 2-Wire Serial, 12-Bit ADCs
- maxim,max6625		9-Bit/12-Bit Temperature Sensors with I?C-Compatible Serial Interface
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 723999d73744..84193ecdc41c 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -77,7 +77,7 @@ innolux	Innolux Corporation
- intel	Intel Corporation
- intercontrol	Inter Control Group
- isee	ISEE 2007 S.L.
--isl	Intersil
-+isil	Intersil
- karo	Ka-Ro electronics GmbH
- keymile	Keymile GmbH
- lacie	LaCie
 diff --git a/drivers/rtc/rtc-isl12057.c b/drivers/rtc/rtc-isl12057.c
-index fe562820a54a..31eaa6a9c2b2 100644
+index 31eaa6a9c2b2..a783e16cfd2f 100644
 --- a/drivers/rtc/rtc-isl12057.c
 +++ b/drivers/rtc/rtc-isl12057.c
-@@ -310,7 +310,8 @@ static int isl12057_probe(struct i2c_client *client,
+@@ -170,8 +170,8 @@ static int isl12057_rtc_read_time(struct device *dev, struct rtc_time *tm)
+ 	mutex_lock(&data->lock);
+ 	ret = regmap_read(data->regmap, ISL12057_REG_SR, &sr);
+ 	if (ret) {
+-		dev_err(dev, "%s: unable to read oscillator status flag\n",
+-			__func__);
++		dev_err(dev, "%s: unable to read oscillator status flag (%d)\n",
++			__func__, ret);
+ 		goto out;
+ 	} else {
+ 		if (sr & ISL12057_REG_SR_OSF) {
+@@ -183,7 +183,8 @@ static int isl12057_rtc_read_time(struct device *dev, struct rtc_time *tm)
+ 	ret = regmap_bulk_read(data->regmap, ISL12057_REG_RTC_SC, regs,
+ 			       ISL12057_RTC_SEC_LEN);
+ 	if (ret)
+-		dev_err(dev, "%s: unable to read RTC time\n", __func__);
++		dev_err(dev, "%s: unable to read RTC time section (%d)\n",
++			__func__, ret);
  
- #ifdef CONFIG_OF
- static const struct of_device_id isl12057_dt_match[] = {
--	{ .compatible = "isl,isl12057" },
-+	{ .compatible = "isl,isl12057" },  /* obsolete */
-+	{ .compatible = "isil,isl12057" },
- 	{ },
- };
- #endif
+ out:
+ 	mutex_unlock(&data->lock);
+@@ -210,7 +211,8 @@ static int isl12057_rtc_set_time(struct device *dev, struct rtc_time *tm)
+ 	ret = regmap_bulk_write(data->regmap, ISL12057_REG_RTC_SC, regs,
+ 				ISL12057_RTC_SEC_LEN);
+ 	if (ret) {
+-		dev_err(dev, "%s: writing RTC time failed\n", __func__);
++		dev_err(dev, "%s: unable to write RTC time section (%d)\n",
++			__func__, ret);
+ 		goto out;
+ 	}
+ 
+@@ -221,7 +223,8 @@ static int isl12057_rtc_set_time(struct device *dev, struct rtc_time *tm)
+ 	ret = regmap_update_bits(data->regmap, ISL12057_REG_SR,
+ 				 ISL12057_REG_SR_OSF, 0);
+ 	if (ret < 0)
+-		dev_err(dev, "Unable to clear oscillator failure bit\n");
++		dev_err(dev, "%s: unable to clear osc. failure bit (%d)\n",
++			__func__, ret);
+ 
+ out:
+ 	mutex_unlock(&data->lock);
+@@ -242,7 +245,8 @@ static int isl12057_check_rtc_status(struct device *dev, struct regmap *regmap)
+ 	ret = regmap_update_bits(regmap, ISL12057_REG_INT,
+ 				 ISL12057_REG_INT_EOSC, 0);
+ 	if (ret < 0) {
+-		dev_err(dev, "Unable to enable oscillator\n");
++		dev_err(dev, "%s: unable to enable oscillator (%d)\n",
++			__func__, ret);
+ 		return ret;
+ 	}
+ 
+@@ -250,7 +254,8 @@ static int isl12057_check_rtc_status(struct device *dev, struct regmap *regmap)
+ 	ret = regmap_update_bits(regmap, ISL12057_REG_SR,
+ 				 ISL12057_REG_SR_A1F, 0);
+ 	if (ret < 0) {
+-		dev_err(dev, "Unable to clear alarm bit\n");
++		dev_err(dev, "%s: unable to clear alarm bit (%d)\n",
++			__func__, ret);
+ 		return ret;
+ 	}
+ 
+@@ -284,7 +289,8 @@ static int isl12057_probe(struct i2c_client *client,
+ 	regmap = devm_regmap_init_i2c(client, &isl12057_rtc_regmap_config);
+ 	if (IS_ERR(regmap)) {
+ 		ret = PTR_ERR(regmap);
+-		dev_err(dev, "regmap allocation failed: %d\n", ret);
++		dev_err(dev, "%s: regmap allocation failed (%d)\n",
++			__func__, ret);
+ 		return ret;
+ 	}
+ 
 -- 
 2.1.1
