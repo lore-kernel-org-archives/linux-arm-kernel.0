@@ -1,74 +1,146 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 14 Nov 2014 09:19:53 +0800
-Subject: [PATCH V2 0/2] PCI: generic: Assiging msi-controller to PCI
- hostbridge
-In-Reply-To: <20141113180959.GR5064@google.com>
-References: <1415733454-24322-1-git-send-email-suravee.suthikulpanit@amd.com>
- <20141113180959.GR5064@google.com>
-Message-ID: <546558B9.1020708@huawei.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Fri, 14 Nov 2014 01:22:15 +0000
+Subject: [PATCH 0/8] arm64 kexec kernel patches V6
+Message-ID: <cover.1415926876.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/14 2:09, Bjorn Helgaas wrote:
-> [+cc Yijing]
+Hi All,
 
-Hi, I'm doing the same thing to associate MSI_controller and PCI host bridge(not PCI bus),
-In my working series, I go one step further, rip out pci host bridge of pci root bus creation.
-And we could put the common things in the generic pci host bridge. I will post it out these
-days. :)
+This series adds the core support for kexec re-boots on arm64.  I have tested
+with the ARM VE fast model, the ARM Base model and the ARM Foundation
+model with various kernel config options for both the first and second stage
+kernels.
 
-Thanks!
-Yijing.
+To load a second stage kernel and execute a kexec re-boot on arm64 my patches to
+kexec-tools [2], which have not yet been merged upstream, are needed.
 
-> 
-> On Tue, Nov 11, 2014 at 01:17:32PM -0600, suravee.suthikulpanit at amd.com wrote:
->> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>
->> This patch set introduces a new callback function to allow PCI host drivers
->> to specify MSI controller to be used for the child buses / devices.
-> 
-> Hi Suravee, 
-> 
-> As Srikanth mentioned, there's a series of MSI-related stuff from Yijing.
-> I recently put them on my pci/msi branch, and they overlap a bit with
-> what you're doing here.
-> 
-> So I'll drop these for now.  Maybe there's a way you can accomplish what
-> you need by implementing pcibios_msi_controller(), which Yijing added?
-> 
-> Also note that "msi-controller" is already being used in device tree (see
-> Documentation/devicetree/bindings/interrupt-controller/marvell), so maybe
-> you can do the name.
-> 
-> Bjorn
-> 
->> This is reabased from:
->>     git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git pci/host-generic
->>
->> Changes from V1:
->>     - Adding "msi-parent" device tree binding in documentation.
->>     - Rebase the patch to get rid of artifacts from other precursor patch
->>       accidently applied to the developement tree. This should now apply cleanly
->>       to the pci/host-generic branch.
->>
->> Suravee Suthikulpanit (2):
->>   PCI: Add new pci_ops for setting MSI parent for PCI bus
->>   PCI: generic: Add set_msi_parent callback
->>
->>  Documentation/devicetree/bindings/pci/host-generic-pci.txt |  3 +++
->>  drivers/pci/host/pci-host-generic.c                        | 13 +++++++++++++
->>  drivers/pci/probe.c                                        |  3 +++
->>  include/linux/pci.h                                        |  1 +
->>  4 files changed, 20 insertions(+)
->>
->> -- 
->> 1.9.3
->>
-> 
-> .
-> 
+Patches 1-3 rework the arm64 hcall mechanism to give the arm64 soft_restart()
+routine the ability to switch exception levels from EL1 to EL2 for kernels that
+were entered in EL2.
 
+Patch 4 moves proc-macros.S from arm64/mm to arm64/include/asm so that the
+dcache_line_size macro it defines can be uesd by kexec's relocate kernel
+routine.
+
+Patches 5-8 add the actual kexec support.
+
+Please consider all patches for inclusion.  Any comments or suggestions on how 
+to improve are welcome.
+
+[1]  https://git.linaro.org/people/geoff.levand/linux-kexec.git
+[2]  https://git.linaro.org/people/geoff.levand/kexec-tools.git
+
+Several things are known to have problems on kexec re-boot:
+
+spin-table
+----------
+
+PROBLEM: The spin-table enable method does not implement all the methods needed
+for CPU hot-plug, so the first stage kernel cannot be shutdown properly.
+
+WORK-AROUND: Upgrade to system firmware that provides PSCI enable method
+support, OR build the first stage kernel with CONFIG_SMP=n, OR pass 'maxcpus=1'
+on the first stage kernel command line.
+
+FIX: Upgrade system firmware to provide PSCI enable method support or add
+missing spin-table support to the kernel.
+
+KVM
+---
+
+PROBLEM: KVM acquires hypervisor resources on startup, but does not free those
+resources on shutdown, so the first stage kernel cannot be shutdown properly.
+
+WORK-AROUND:  Build the first stage kernel with CONFIG_KVM=n.
+
+FIX: Fix KVM to support soft_restart().  KVM needs to restore default exception
+vectors, etc.
+
+UEFI
+----
+
+PROBLEM: UEFI does not manage its runtime services virtual mappings in a way
+that is compatible with a kexec re-boot, so the second stage kernel hangs on
+boot-up.
+
+WORK-AROUND: Disable UEFI in firmware, OR use EFI uboot emulation if provided
+by your firmware.
+
+FIX: Fix kernel to manage UEFI virtual mappings properly.
+
+/memreserve/
+----------
+
+PROBLEM: The use of device tree /memreserve/ entries is not compatible with
+kexec re-boot.  The second stage kernel will use the reserved regions and the
+system will become unstable.
+
+WORK-AROUND: Pass a user specified DTB using the kexec --dtb option.
+
+FIX: Convert device tree source files (.dts) and/or bootloaders to use device
+tree reserved-memory nodes to specify reserved memory or provide an in kernel
+mechanism to export the /memreserve/ entries to user space.
+
+ACPI
+----
+
+PROBLEM: The kernel for ACPI based systems does not export a device tree to the
+standard user space location of 'proc/device-tree'.  Current applications
+expect to access device tree information from this standard location.
+
+WORK-AROUND: Disable ACPI in firmware, OR pass 'acpi=off' on the first stage
+kernel command line, OR pass a user specified DTB using the kexec --dtb option.
+
+FIX: Fix ACPI kernel support to export device tree information suitable for a
+kexec re-boot, and if this information is exported to somewhere other than
+'proc/device-tree' update existing kexec user applications to use this new
+interface.
+
+----------------------------------------------------------------
+The following changes since commit 302cd37c417d59549d073a8986fd028998409cb9:
+
+  arm64: kvm: eliminate literal pool entries (2014-11-07 15:04:54 +0000)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/geoff.levand/linux-kexec.git kexec-v6
+
+for you to fetch changes up to 3fc5a4ba22342ccd8e7e5a09620b00f4b81667a6:
+
+  arm64/kexec: Enable kexec in the arm64 defconfig (2014-11-13 16:52:16 -0800)
+
+----------------------------------------------------------------
+Geoff Levand (8):
+      arm64: Convert hcalls to use ISS field
+      arm64: Add new hcall HVC_CALL_FUNC
+      arm64: Add EL2 switch to soft_restart
+      arm64: Move proc-macros.S to include/asm
+      arm64/kexec: Add core kexec support
+      arm64/kexec: Add pr_devel output
+      arm64/kexec: Add checks for KVM and EFI
+      arm64/kexec: Enable kexec in the arm64 defconfig
+
+ arch/arm64/Kconfig                           |   9 ++
+ arch/arm64/configs/defconfig                 |   1 +
+ arch/arm64/include/asm/kexec.h               |  47 ++++++
+ arch/arm64/include/asm/proc-fns.h            |   4 +-
+ arch/arm64/{mm => include/asm}/proc-macros.S |   0
+ arch/arm64/include/asm/virt.h                |  33 ++++
+ arch/arm64/kernel/Makefile                   |   1 +
+ arch/arm64/kernel/hyp-stub.S                 |  45 ++++--
+ arch/arm64/kernel/machine_kexec.c            | 232 +++++++++++++++++++++++++++
+ arch/arm64/kernel/process.c                  |  10 +-
+ arch/arm64/kernel/relocate_kernel.S          | 160 ++++++++++++++++++
+ arch/arm64/kvm/hyp.S                         |  18 ++-
+ arch/arm64/mm/cache.S                        |   3 +-
+ arch/arm64/mm/proc.S                         |  50 ++++--
+ include/uapi/linux/kexec.h                   |   1 +
+ 15 files changed, 576 insertions(+), 38 deletions(-)
+ create mode 100644 arch/arm64/include/asm/kexec.h
+ rename arch/arm64/{mm => include/asm}/proc-macros.S (100%)
+ create mode 100644 arch/arm64/kernel/machine_kexec.c
+ create mode 100644 arch/arm64/kernel/relocate_kernel.S
 
 -- 
-Thanks!
-Yijing
+1.9.1
