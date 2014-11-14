@@ -1,78 +1,119 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 14 Nov 2014 18:56:35 +0000
-Subject: [RFC PATCH v4 6/8] dma-mapping: set dma segment properties in
- of_dma_configure
+Date: Fri, 14 Nov 2014 18:56:33 +0000
+Subject: [RFC PATCH v4 4/8] iommu: provide helper function to configure an
+ IOMMU for an of master
 In-Reply-To: <1415991397-9618-1-git-send-email-will.deacon@arm.com>
 References: <1415991397-9618-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1415991397-9618-7-git-send-email-will.deacon@arm.com>
+Message-ID: <1415991397-9618-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_dma_configure determines the size of the DMA range for a device by
-either parsing the dma-ranges property or inspecting the coherent DMA
-mask. This same information can be used to initialise the max segment
-size and boundary_mask to a default value.
+The generic IOMMU device-tree bindings can be used to add arbitrary OF
+masters to an IOMMU with a compliant binding.
+
+This patch introduces of_iommu_configure, which does exactly that.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/of/platform.c           | 4 ++++
- include/linux/amba/bus.h        | 1 +
- include/linux/platform_device.h | 2 ++
- 3 files changed, 7 insertions(+)
+ drivers/iommu/Kconfig    |  2 +-
+ drivers/iommu/of_iommu.c | 33 +++++++++++++++++++++++++++++++++
+ include/linux/of_iommu.h |  6 ++++++
+ 3 files changed, 40 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index b89caf8c7586..0a2842d91db4 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -191,6 +191,8 @@ static void of_dma_configure(struct device *dev)
- 		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
- 	}
- 	dev->dma_pfn_offset = offset;
-+	dma_set_max_seg_size(dev, size);
-+	dma_set_seg_boundary(dev, size);
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index dd5112265cc9..6d13f962f156 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -15,7 +15,7 @@ if IOMMU_SUPPORT
  
- 	coherent = of_dma_is_coherent(dev->of_node);
- 	dev_dbg(dev, "device is%sdma coherent\n",
-@@ -236,6 +238,7 @@ static struct platform_device *of_platform_device_create_pdata(
+ config OF_IOMMU
+        def_bool y
+-       depends on OF
++       depends on OF && IOMMU_API
  
- 	dev->dev.bus = &platform_bus_type;
- 	dev->dev.platform_data = platform_data;
-+	dev->dev.dma_parms = &dev->dma_parms;
- 	of_dma_configure(&dev->dev);
+ config FSL_PAMU
+ 	bool "Freescale IOMMU support"
+diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+index 89b903406968..73236d3cc955 100644
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -18,6 +18,7 @@
+  */
  
- 	if (of_device_add(dev) != 0) {
-@@ -295,6 +298,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
- 	dev->dev.of_node = of_node_get(node);
- 	dev->dev.parent = parent;
- 	dev->dev.platform_data = platform_data;
-+	dev->dev.dma_parms = &dev->dma_parms;
- 	if (bus_id)
- 		dev_set_name(&dev->dev, "%s", bus_id);
- 	else
-diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
-index c324f5700d1a..9b232eeb6c20 100644
---- a/include/linux/amba/bus.h
-+++ b/include/linux/amba/bus.h
-@@ -32,6 +32,7 @@ struct amba_device {
- 	struct clk		*pclk;
- 	unsigned int		periphid;
- 	unsigned int		irq[AMBA_NR_IRQS];
-+	struct device_dma_parameters dma_parms;
- };
+ #include <linux/export.h>
++#include <linux/iommu.h>
+ #include <linux/limits.h>
+ #include <linux/of.h>
+ #include <linux/of_iommu.h>
+@@ -93,6 +94,38 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
+ }
+ EXPORT_SYMBOL_GPL(of_get_dma_window);
  
- struct amba_driver {
-diff --git a/include/linux/platform_device.h b/include/linux/platform_device.h
-index 153d303af7eb..8dc48487b34b 100644
---- a/include/linux/platform_device.h
-+++ b/include/linux/platform_device.h
-@@ -27,6 +27,8 @@ struct platform_device {
- 	u32		num_resources;
- 	struct resource	*resource;
- 
-+	struct device_dma_parameters dma_parms;
++struct iommu_ops *of_iommu_configure(struct device *dev)
++{
++	struct of_phandle_args iommu_spec;
++	struct device_node *np;
++	struct iommu_ops *ops = NULL;
++	int idx = 0;
 +
- 	const struct platform_device_id	*id_entry;
- 	char *driver_override; /* Driver name to force a match */
++	/*
++	 * We don't currently walk up the tree looking for a parent IOMMU.
++	 * See the `Notes:' section of
++	 * Documentation/devicetree/bindings/iommu/iommu.txt
++	 */
++	while (!of_parse_phandle_with_args(dev->of_node, "iommus",
++					   "#iommu-cells", idx,
++					   &iommu_spec)) {
++		np = iommu_spec.np;
++		ops = of_iommu_get_ops(np);
++
++		if (!ops || !ops->of_xlate || ops->of_xlate(dev, &iommu_spec))
++			goto err_put_node;
++
++		of_node_put(np);
++		idx++;
++	}
++
++	return ops;
++
++err_put_node:
++	of_node_put(np);
++	return NULL;
++}
++
+ void __init of_iommu_init(void)
+ {
+ 	struct device_node *np;
+diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+index 81447e0f68b5..7ded21c0ccdf 100644
+--- a/include/linux/of_iommu.h
++++ b/include/linux/of_iommu.h
+@@ -1,6 +1,7 @@
+ #ifndef __OF_IOMMU_H
+ #define __OF_IOMMU_H
+ 
++#include <linux/device.h>
+ #include <linux/iommu.h>
+ #include <linux/of.h>
+ 
+@@ -11,6 +12,7 @@ extern int of_get_dma_window(struct device_node *dn, const char *prefix,
+ 			     size_t *size);
+ 
+ extern void of_iommu_init(void);
++extern struct iommu_ops *of_iommu_configure(struct device *dev);
+ 
+ #else
+ 
+@@ -22,6 +24,10 @@ static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+ }
+ 
+ static inline void of_iommu_init(void) { }
++static inline struct iommu_ops *of_iommu_configure(struct device *dev)
++{
++	return NULL;
++}
+ 
+ #endif	/* CONFIG_OF_IOMMU */
  
 -- 
 2.1.1
