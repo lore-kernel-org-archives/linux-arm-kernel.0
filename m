@@ -1,68 +1,87 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 14 Nov 2014 10:24:23 +0100
-Subject: [PATCH V4 2/3] can: m_can: update to support CAN FD features
-In-Reply-To: <5464E2D7.7010906@hartkopp.net>
-References: <1415349914-9145-1-git-send-email-b29396@freescale.com>
- <1415349914-9145-2-git-send-email-b29396@freescale.com>
- <54648382.9080105@pengutronix.de> <5464E2D7.7010906@hartkopp.net>
-Message-ID: <5465CA47.4020802@pengutronix.de>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Fri, 14 Nov 2014 09:28:25 +0000
+Subject: [PATCH v4 2/4] simplefb: Add support for enumerating simplefb dt
+ nodes in /chosen
+In-Reply-To: <1415906594-2461-2-git-send-email-hdegoede@redhat.com>
+References: <1415906594-2461-1-git-send-email-hdegoede@redhat.com>
+ <1415906594-2461-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <CACxGe6u3_GJA6pbDGX6puDhyJ2E9T+WujmzASw2VE+5-x9q9sA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/13/2014 05:56 PM, Oliver Hartkopp wrote:
-> On 11/13/2014 11:10 AM, Marc Kleine-Budde wrote:
->> On 11/07/2014 09:45 AM, Dong Aisheng wrote:
-> 
->>>  
->>> -	if (id & RX_BUF_RTR) {
->>> +	if (id & RX_BUF_ESI) {
->>> +		cf->flags |= CANFD_ESI;
->>> +		netdev_dbg(dev, "ESI Error\n");
->>> +	}
->>> +
->>> +	if (!(dlc & RX_BUF_EDL) && (id & RX_BUF_RTR)) {
->>>  		cf->can_id |= CAN_RTR_FLAG;
->>
->> I just noticed, that you don't set the cf->dlc (or cf->len) in the RTR
->> case. Please create a separate patch that fixes this problem.
->>
->>>  	} else {
->>>  		id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DLC);
->>> -		cf->can_dlc = get_can_dlc((id >> 16) & 0x0F);
->>> -		*(u32 *)(cf->data + 0) = m_can_fifo_read(priv, fgi,
->>> -							 M_CAN_FIFO_DATA(0));
->>> -		*(u32 *)(cf->data + 4) = m_can_fifo_read(priv, fgi,
->>> -							 M_CAN_FIFO_DATA(1));
->>> +		if (dlc & RX_BUF_EDL)
->>> +			cf->len = can_dlc2len((id >> 16) & 0x0F);
->>> +		else
->>> +			cf->len = get_can_dlc((id >> 16) & 0x0F);
->>> +
-> 
-> Grr. I missed that one too :-(
-> 
-> Thanks for catching it.
-> 
-> As you committed patch 1 & 3 you expect a new single patch containing the
-> (fixed) content of this patch 2, right?
+On Thu, Nov 13, 2014 at 7:23 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Update simplefb to support the new preferred location for simplefb dt nodes
+> under /chosen.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> --
+> Changes in v2:
+> -Make name array larger in case we ever encounter more then 10000 framebuffers
+> Changes in v3:
+> -Switch to for_each_child_of_node to loop over the nodes under chosen
+> Changes in v4:
+> -Wrap the chosen enumeration code in #ifdef CONFIG_OF, as simplefb is used on
+>  non devicetree platforms too
+> -simplefb can only be built-in, so drop the module_exit function calling
+>  platform_driver_unregister
+> ---
+>  drivers/video/fbdev/simplefb.c | 23 ++++++++++++++++++++++-
+>  1 file changed, 22 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
+> index 868099a..e381a53 100644
+> --- a/drivers/video/fbdev/simplefb.c
+> +++ b/drivers/video/fbdev/simplefb.c
+> @@ -27,6 +27,7 @@
+>  #include <linux/platform_data/simplefb.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/clk-provider.h>
+> +#include <linux/of_platform.h>
+>
+>  static struct fb_fix_screeninfo simplefb_fix = {
+>         .id             = "simple",
+> @@ -390,7 +391,27 @@ static struct platform_driver simplefb_driver = {
+>         .probe = simplefb_probe,
+>         .remove = simplefb_remove,
+>  };
+> -module_platform_driver(simplefb_driver);
+> +
+> +static int __init simplefb_init(void)
+> +{
+> +       int ret;
+> +       struct device_node __maybe_unused *np;
+> +
+> +       ret = platform_driver_register(&simplefb_driver);
+> +       if (ret)
+> +               return ret;
+> +
+> +#ifdef CONFIG_OF
+> +       for_each_child_of_node(of_chosen, np) {
+> +               if (of_device_is_compatible(np, "simple-framebuffer"))
+> +                       of_platform_device_create(np, NULL, NULL);
+> +       }
+> +#endif
 
-No, please make it two patches:
+Nit: Kind of ugly. This should work instead:
 
-First the Bugfix: One setting the cf->dlc in the RTR case, too.
-Then the new feature: The other one adding CAN-FD support.
+        if (IS_ENABLED(CONFIG_OF_PLATFORM) && of_chosen) {
+                for_each_child_of_node(of_chosen, np)
+                        if (of_device_is_compatible(np, "simple-framebuffer"))
+                                of_platform_device_create(np, NULL, NULL);
+        }
 
-Marc
+And move the forward declaration of of_chosen in include/linux/of.h up
+5 lines so that it is always declared. gcc will optimize it out, but
+it will still get properly syntax checked on every build.
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141114/16d2ef11/attachment.sig>
+> +
+> +       return 0;
+> +}
+> +
+> +module_init(simplefb_init);
+>
+>  MODULE_AUTHOR("Stephen Warren <swarren@wwwdotorg.org>");
+>  MODULE_DESCRIPTION("Simple framebuffer driver");
+> --
+> 2.1.0
+>
