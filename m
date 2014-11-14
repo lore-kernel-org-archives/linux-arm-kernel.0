@@ -1,40 +1,38 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Fri, 14 Nov 2014 16:57:27 +0100
-Subject: [PATCH v3 0/5] Minor fixes for Marvell Armada 38x SoC.
-Message-ID: <1415980652-7429-1-git-send-email-mw@semihalf.com>
+Date: Fri, 14 Nov 2014 16:57:28 +0100
+Subject: [PATCH v3 1/5] ARM: mvebu: re-enable SDHCI driver for Armada 38x SoC
+ in v7 defconfig
+In-Reply-To: <1415980652-7429-1-git-send-email-mw@semihalf.com>
+References: <1415980652-7429-1-git-send-email-mw@semihalf.com>
+Message-ID: <1415980652-7429-2-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+In the recent update of mvebu_v7_defconfig a config that enables sdhci-pxav3
+driver, that supports SDHCI interface of Armada 38x SoC, disappeared.
 
-It seems that my server at work is not properly configured to be accepted by
-LAKML. Now everything should be ok.
+This commit enables CONFIG_MMC_SDHCI_PXAV3 back.
 
-Changes from v2:
-* Add 'Acked-by: Andrew Lunn <andrew@lunn.ch>' information to the commit logs
+Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Andrew Lunn <andrew@lunn.ch>
+Fixes fc9fa8714a75 ("ARM: mvebu: update v7 defconfig with useful options")
+---
+ arch/arm/configs/mvebu_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Changes from v1:
-* Improve commit log with better justification for changing ethernet
-  aliases format in Armada 38x Device Tree
-
-This patchset adds minor fixes for Armada 38x SoC around SDHCI interface. It
-also enables usage of I2C char-device and adjusts ethernet aliases for
-bootloader's needs. Any feedback is welcome.
-
-
-Marcin Wojtas (5):
-  ARM: mvebu: re-enable SDHCI driver for Armada 38x SoC in v7 defconfig
-  ARM: mvebu: enable no-1-8-v flag for Armada 385 DB SDHCI interface
-  ARM: mvebu: remove clock-frequency from Armada 38x SDHCI Device Tree
-    node
-  ARM: mvebu: adjust ethernet aliases according to U-Boot requirements
-    for A38x
-  ARM: mvebu: enable i2c device in mvebu_v7_defconfig
-
- arch/arm/boot/dts/armada-385-db.dts | 2 +-
- arch/arm/boot/dts/armada-38x.dtsi   | 6 +++---
- arch/arm/configs/mvebu_v7_defconfig | 2 ++
- 3 files changed, 6 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
+index ed0a0d1..9d55170 100644
+--- a/arch/arm/configs/mvebu_v7_defconfig
++++ b/arch/arm/configs/mvebu_v7_defconfig
+@@ -96,6 +96,7 @@ CONFIG_MMC=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_DOVE=y
++CONFIG_MMC_SDHCI_PXAV3=y
+ CONFIG_MMC_MVSDIO=y
+ CONFIG_LEDS_GPIO=y
+ CONFIG_LEDS_CLASS=y
 -- 
 1.8.3.1
