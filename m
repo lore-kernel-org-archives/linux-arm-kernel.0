@@ -1,71 +1,38 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 14 Nov 2014 17:12:54 +0100
-Subject: [PATCH 2/2] spi: atmel: introduce probe deferring
-In-Reply-To: <1415981574-11165-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1415981574-11165-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1415981574-11165-2-git-send-email-ludovic.desroches@atmel.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Fri, 14 Nov 2014 16:57:30 +0100
+Subject: [PATCH v3 3/5] ARM: mvebu: remove clock-frequency from Armada 38x
+ SDHCI Device Tree node
+In-Reply-To: <1415980652-7429-1-git-send-email-mw@semihalf.com>
+References: <1415980652-7429-1-git-send-email-mw@semihalf.com>
+Message-ID: <1415980652-7429-4-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Return probe defer if requesting a dma channel without a dma controller
-probed.
+For proper operation of Armada 38x SDHCI controller proper 'clocks' property
+is sufficient. Therefore it is not useful to keep an additional
+'clock-frequency' property in SDHCI controller node of board-level Device Tree
+file for Armada 385 DB.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+This commit gets rid of useless 'clock-frequency' property.
+
+Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 ---
- drivers/spi/spi-atmel.c | 20 ++++++++++++++++----
- 1 file changed, 16 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/armada-385-db.dts | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index f1760fa..62c293d 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -424,14 +424,23 @@ static int atmel_spi_configure_dma(struct atmel_spi *as)
- 	dma_cap_zero(mask);
- 	dma_cap_set(DMA_SLAVE, mask);
+diff --git a/arch/arm/boot/dts/armada-385-db.dts b/arch/arm/boot/dts/armada-385-db.dts
+index b125712..2aaa9d2 100644
+--- a/arch/arm/boot/dts/armada-385-db.dts
++++ b/arch/arm/boot/dts/armada-385-db.dts
+@@ -116,7 +116,6 @@
+ 			};
  
--	as->dma.chan_tx = dma_request_slave_channel(dev, "tx");
--	if (!as->dma.chan_tx) {
-+	as->dma.chan_tx = dma_request_slave_channel_reason(dev, "tx");
-+	if (IS_ERR(as->dma.chan_tx)) {
-+		err = PTR_ERR(as->dma.chan_tx);
-+		if (err == -EPROBE_DEFER) {
-+			dev_warn(dev, "no DMA channel available at the moment\n");
-+			return err;
-+		}
- 		dev_err(dev,
- 			"DMA TX channel not available, SPI unable to use DMA\n");
- 		err = -EBUSY;
- 		goto error;
- 	}
- 
-+	/*
-+	 * No reason to check EPROBE_DEFER here since we have already requested
-+	 * tx channel. If it fails here, it's for another reason.
-+	 */
- 	as->dma.chan_rx = dma_request_slave_channel(dev, "rx");
- 
- 	if (!as->dma.chan_rx) {
-@@ -453,7 +462,7 @@ static int atmel_spi_configure_dma(struct atmel_spi *as)
- error:
- 	if (as->dma.chan_rx)
- 		dma_release_channel(as->dma.chan_rx);
--	if (as->dma.chan_tx)
-+	if (!IS_ERR(as->dma.chan_tx))
- 		dma_release_channel(as->dma.chan_tx);
- 	return err;
- }
-@@ -1324,8 +1333,11 @@ static int atmel_spi_probe(struct platform_device *pdev)
- 	as->use_dma = false;
- 	as->use_pdc = false;
- 	if (as->caps.has_dma_support) {
--		if (atmel_spi_configure_dma(as) == 0)
-+		ret = atmel_spi_configure_dma(as);
-+		if (ret == 0)
- 			as->use_dma = true;
-+		else if (ret == -EPROBE_DEFER)
-+			return ret;
- 	} else {
- 		as->use_pdc = true;
- 	}
+ 			sdhci at d8000 {
+-				clock-frequency = <200000000>;
+ 				broken-cd;
+ 				wp-inverted;
+ 				bus-width = <8>;
 -- 
-2.0.3
+1.8.3.1
