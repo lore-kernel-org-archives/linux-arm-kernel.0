@@ -1,27 +1,58 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 14 Nov 2014 08:58:39 +0100
-Subject: [PATCH v6] simplefb: add clock handling code
-In-Reply-To: <CAMuHMdW-6Eb9DSE=JQm7xWMhJUpt1xxLqS=6KU+=ZDMsmtiBag@mail.gmail.com>
-References: <1415906546-2408-1-git-send-email-hdegoede@redhat.com>
- <CAMuHMdW-6Eb9DSE=JQm7xWMhJUpt1xxLqS=6KU+=ZDMsmtiBag@mail.gmail.com>
-Message-ID: <5465B62F.1000306@redhat.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Fri, 14 Nov 2014 16:00:30 +0800
+Subject: [PATCH v2 0/3] ARM: mediatek: Add driver for Mediatek I2C
+ controller
+In-Reply-To: <1415934752.2152.58.camel@mhfsdcap03>
+References: <1415078977-18374-1-git-send-email-xudong.chen@mediatek.com>
+ <20141113183122.GH1275@katana>  <1415934752.2152.58.camel@mhfsdcap03>
+Message-ID: <1415952030.17958.129.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 2014-11-14 at 11:12 +0800, xudong chen wrote:
+> On Thu, 2014-11-13 at 19:31 +0100, Wolfram Sang wrote:
+> > > MT8135 and MT6589 can control I2C pins on PMIC(MT6397) by setting the i2c
+> > > registers in MT8135 side.
+> > 
+> > I still didn't get this, even after reading the mail thread of old
+> > series. Can someone maybe draw me a nice ASCII picture showing the setup
+> > which is going on here?
+> > 
+> 
+> 1. The DIR_PATH register is in MT8135.
+> 2. All the registers used in the driver are in MT8135.
+> 3. If want I2C wave go/from PMIC need to set the DIR_PATH register bit^0
+> to 1 extra.
+
 Hi,
 
-On 11/13/2014 08:39 PM, Geert Uytterhoeven wrote:
-> On Thu, Nov 13, 2014 at 8:22 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->> changes in v6:
->> -Wrap the clock code in #ifdef CONFIG_OF, as simplefb is used on non
->>  devicetree platforms too
-> 
-> With clocks?
+Some supplemental, I hope this make it more clear.
 
-No, the existing users are in arch/x86/kernel/sysfb*.c so no clock support.
+    +---------------+
+    |     MT8135    |
+    |               |
+    |    +----------|
+    |    |I2C       |___SDA
+    |    |controller|___SCL
+    |    +----------|
+    |               |      +-------+
+    |    +----------|      | MT6397|
+    |    |  pwrap   |      |       |___SDA_pmic
+    |    |          |<---->|       |___SCL_pmic
+    +---------------+      +-------+
 
-And any new users which need clocks should use devicetree.
+This is the simplified block diagram of mt8135 and mt6397. MT8135 can
+works with MTK PMIC MT6397. On MT8135, it use pwrap module to control
+/communicate with the PMIC. Pwrap is a hardware communicate with pmic
+through MTK proprietary interface.
 
-Regards,
+There are several PMIC functionality that is controlled by registers
+and controllers on MT8135, I2C is one of them.
 
-Hans
+On MT8135, I2C controller can control I2C pins on MT8135 and MT6397.
+When you set I2C DIR_PATH register on MT8135, i2c controller will
+control PMIC pins(through pwrap) to send i2c signal. Because the
+i2c controllers are on 8135, it can still do DMA from system memory.
+So it kinds of like these 2 works like a virtual SoC.
+
+Joe.C
