@@ -1,42 +1,63 @@
-From: ibanezchen@gmail.com (Howard Chen)
-Date: Fri, 14 Nov 2014 13:14:54 +0800
-Subject: [PATCH v7 3/3] dt-bindings: add documentation for Mediatek SoC
-In-Reply-To: <1415942094-11451-1-git-send-email-ibanezchen@gmail.com>
-References: <1415942094-11451-1-git-send-email-ibanezchen@gmail.com>
-Message-ID: <1415942094-11451-3-git-send-email-ibanezchen@gmail.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Fri, 14 Nov 2014 10:37:25 +0530
+Subject: [PATCH v4 0/6] Touchscreen performance related fixes
+Message-ID: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a DT binding documentation for the MT6592 SoC from Mediatek.
+This series of patches fix TSC defects related to lag in touchscreen
+performance and cursor jump at touch release. The lag was result of
+udelay in TSC interrupt handler. Cursor jump due to false pen-up event.
+The patches implement Advisory 1.0.31 in silicon errata of am335x-evm
+to avoid false pen-up events and remove udelay. The advisory says to use
+steps 1 to 4 for ADC and 5 to 16 for TSC (assuming 4 wire TSC and 4 channel
+ADC). Further the X co-ordinate must be the last one to be sampled just
+before charge step. The first two patches implement the required changes.
 
-Signed-off-by: Howard Chen <ibanezchen@gmail.com>
----
- Documentation/devicetree/bindings/arm/mediatek.txt | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+A DT parameter to configure the duration of tsc charge step. It represents
+number of ADC clock cycles to wait between applying the step configuration
+registers and going back to the IDLE state. The charge delay value can vary
+across boards. Configuring correct value of charge delay is important to avoid
+false pen-up events. Hence it is necessary to expose charge-delay value as
+DT parameter. The pen-up detection happens immediately after the charge step
+so this does in fact function as a hardware knob for adjusting the amount of
+settling time.
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-index fa25226..1d2d151 100644
---- a/Documentation/devicetree/bindings/arm/mediatek.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-@@ -1,10 +1,10 @@
- Mediatek MT6589 Platforms Device Tree Bindings
- 
--Boards with a SoC of the Mediatek MT6589 shall have the following property:
-+Boards with a SoC from Mediatek shall have the following property:
- 
- Required root node property:
- 
--compatible: must contain "mediatek,mt6589"
-+compatible: must contain one of "mediatek,mt6589", "mediatek,mt6592"
- 
- 
- Supported boards:
-@@ -12,3 +12,6 @@ Supported boards:
- - bq Aquaris5 smart phone:
-     Required root node properties:
-       - compatible = "mundoreader,bq-aquaris5", "mediatek,mt6589";
-+
-+- Evaluation board for MT6592:
-+      - compatible = "mediatek,mt6592-evb", "mediatek,mt6592";
+After applying these changes false pen-up events have not be observed and
+smooth circles can be drawn on touch screen. The performance is much better
+in recognizing quick movement across the screen. No lag or cursor jump is
+observed.
+
+Change log:
+
+v3:
+ - Replace delta filtering logic in TSC driver with median filtering
+   as suggested by Richard.
+ - Addressed Lee Jones comments.
+
+v2:
+ - Addressed comments by Hartmut Knaack
+ - patch 2 was split into two as per Lee Jones comment
+
+Brad Griffis (2):
+  input: touchscreen: ti_am335x_tsc Interchange touchscreen and ADC
+    steps
+  input: touchscreen: ti_am335x_tsc: Remove udelay in interrupt handler
+
+Vignesh R (4):
+  mfd: ti_am335x_tscadc: Remove unwanted reg_se_cache save
+  ARM: dts: AM335x: Make charge delay a DT parameter for TSC
+  input: touchscreen: ti_am335x_tsc: Use charge delay DT parameter
+  input: touchscreen: ti_am335x_tsc: Replace delta filtering with median
+    filtering
+
+ .../bindings/input/touchscreen/ti-tsc-adc.txt      |  15 ++
+ arch/arm/boot/dts/am335x-evm.dts                   |   1 +
+ drivers/iio/adc/ti_am335x_adc.c                    |   5 +-
+ drivers/input/touchscreen/ti_am335x_tsc.c          | 186 +++++++++++----------
+ drivers/mfd/ti_am335x_tscadc.c                     |   7 +-
+ include/linux/mfd/ti_am335x_tscadc.h               |   4 +-
+ 6 files changed, 127 insertions(+), 91 deletions(-)
+
 -- 
 1.9.1
