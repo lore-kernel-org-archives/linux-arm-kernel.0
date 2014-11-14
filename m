@@ -1,84 +1,47 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 14 Nov 2014 12:35:43 +0000
-Subject: [PATCH 3.18-rc3 v8 4/4] arm: smp: Handle ipi_cpu_backtrace() using
- FIQ (if available)
-In-Reply-To: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
-References: <1415183260-6389-1-git-send-email-daniel.thompson@linaro.org>
- <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1415968543-29469-5-git-send-email-daniel.thompson@linaro.org>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Fri, 14 Nov 2014 16:47:00 +0400
+Subject: [PATCH 01/15] mfd: add new driver for Sharp LoCoMo
+In-Reply-To: <20141105202405.GJ8509@sirena.org.uk>
+References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
+ <1414454528-24240-2-git-send-email-dbaryshkov@gmail.com>
+ <CACRpkdbW3NA00zMZr216ZeZpgVkXwKUo30biTVd5kcHKGGtkHg@mail.gmail.com>
+ <CALT56yNX8v4mZn=o1ZoVLHPmg6wq0dgFNowpqNuFtU=eCc+d8w@mail.gmail.com>
+ <CACRpkdaKUZjbSEH75M9xudTF9HefwOCVEe5otv9-9f2UG8=hVg@mail.gmail.com>
+ <CALT56yM8B3ffYb0=EZVbRRGDZSxMci2sRp9XVtjQuLa5abN+cg@mail.gmail.com>
+ <20141105202405.GJ8509@sirena.org.uk>
+Message-ID: <CALT56yOtjNbYOWM4ba5yP8pz7bNLY5BWpkkpfmv5QZU-7Y5u_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previous changes have introduced both a replacement default FIQ handler
-and an implementation of arch_trigger_all_cpu_backtrace for ARM but
-these are currently independent of each other.
+Hello,
 
-This patch plumbs together these features making it possible, on platforms
-that support it, to trigger backtrace using FIQ.
+2014-11-05 23:24 GMT+03:00 Mark Brown <broonie@kernel.org>:
+> On Thu, Nov 06, 2014 at 12:02:49AM +0400, Dmitry Eremin-Solenikov wrote:
+>> 2014-11-03 16:41 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
+>
+>> > The point is still the same: no unrelated code in drivers/mfd,
+>> > then either use IIO DAC as a middle layer or sink the DAC handling
+>> > into respective subdriver, i.e. push it into the backlight or
+>> > volume directly then.
+>
+>> The problem is that the DAC is equally used by backlight and by sound
+>> device (WIP).
+>> What about true i2c device driver sitting in drivers/misc and exporting a regmap
+>> of 2 8-bit registers?
+>
+> If it can just export registers that sounds like a MFD.  If it needs to
+> export functionality then like Linus says the IIO subsystem abstracts
+> DACs.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm/include/asm/smp.h | 3 +++
- arch/arm/kernel/smp.c      | 4 +++-
- arch/arm/kernel/traps.c    | 3 +++
- 3 files changed, 9 insertions(+), 1 deletion(-)
+I took a look at IIO subsystem. Thanks for the pointer. Indeed max517 driver
+can drive m62332 DAC with minimal modifications. However write support
+of the consumer interface is non-existing yet (which would be required
+to support DACs in unified manner).
 
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index 18f5a554134f..b076584ac0fa 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -18,6 +18,8 @@
- # error "<asm/smp.h> included in non-SMP build"
- #endif
- 
-+#define SMP_IPI_FIQ_MASK 0x0100
-+
- #define raw_smp_processor_id() (current_thread_info()->cpu)
- 
- struct seq_file;
-@@ -79,6 +81,7 @@ extern void arch_send_call_function_single_ipi(int cpu);
- extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
- extern void arch_send_wakeup_ipi_mask(const struct cpumask *mask);
- 
-+extern void ipi_cpu_backtrace(struct pt_regs *regs);
- extern int register_ipi_completion(struct completion *completion, int cpu);
- 
- struct smp_operations {
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 14c594a12bef..e923843562d9 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -539,7 +539,7 @@ static void ipi_cpu_stop(unsigned int cpu)
- 		cpu_relax();
- }
- 
--static void ipi_cpu_backtrace(struct pt_regs *regs)
-+void ipi_cpu_backtrace(struct pt_regs *regs)
- {
- 	int cpu = smp_processor_id();
- 
-@@ -580,6 +580,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 	unsigned int cpu = smp_processor_id();
- 	struct pt_regs *old_regs = set_irq_regs(regs);
- 
-+	BUILD_BUG_ON(SMP_IPI_FIQ_MASK != BIT(IPI_CPU_BACKTRACE));
-+
- 	if ((unsigned)ipinr < NR_IPI) {
- 		trace_ipi_entry(ipi_types[ipinr]);
- 		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 4dc45b38e56e..9eb05be9526e 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -483,6 +483,9 @@ asmlinkage void __exception_irq_entry handle_fiq_as_nmi(struct pt_regs *regs)
- #ifdef CONFIG_ARM_GIC
- 	gic_handle_fiq_ipi();
- #endif
-+#ifdef CONFIG_SMP
-+	ipi_cpu_backtrace(regs);
-+#endif
- 
- 	nmi_exit();
- 
+I'm actually looking at the regulator interface. Since this DAC serves mostly
+like a (semi-)constant voltage interface, would it be rather logical to use
+regulator subsystem to drive it?
+
 -- 
-1.9.3
+With best wishes
+Dmitry
