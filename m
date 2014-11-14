@@ -1,56 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 Nov 2014 18:07:07 +0000
-Subject: [RFC PATCH 2/3] mmc: omap_hsmmc: add tuning support
-In-Reply-To: <20141114174152.GM11538@saruman>
-References: <1415883379-19654-1-git-send-email-kishon@ti.com>
- <1415883379-19654-3-git-send-email-kishon@ti.com>
- <20141114174152.GM11538@saruman>
-Message-ID: <20141114180707.GC4047@n2100.arm.linux.org.uk>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 14 Nov 2014 10:12:28 -0800
+Subject: [PATCH 0/2] clk: at91: usb: rate calculation fixes
+In-Reply-To: <54648F17.6030601@atmel.com>
+References: <1415179995-25062-1-git-send-email-boris.brezillon@free-electrons.com>
+ <54648F17.6030601@atmel.com>
+Message-ID: <20141114181228.25314.88538@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 14, 2014 at 11:41:52AM -0600, Felipe Balbi wrote:
-> Hi,
+Quoting Nicolas Ferre (2014-11-13 02:59:35)
+> On 05/11/2014 10:33, Boris Brezillon :
+> > Hello,
+> > 
+> > Here are a few more fixes for the at91 usb clk driver.
+> > 
+> > These bugs are related to rate calculation, and have been reported by
+> > Andreas.
+> > 
+> > As this is not my first mistake in this rate calculation algorithm, I'd
+> > really like to have reviews/feedback on this fixes to avoid potential
+> > regressions.
+> > 
+> > Mike, when/if we agree on these fixes, can we make them go into one of
+> > the 3.18-rc cycle ?
 > 
-> On Thu, Nov 13, 2014 at 06:26:18PM +0530, Kishon Vijay Abraham I wrote:
-> > @@ -233,6 +263,48 @@ struct omap_mmc_of_data {
-> >  	u8 controller_flags;
-> >  };
-> >  
-> > +static const u32 ref_tuning_4bits[] = {
-> > +	0x00FF0FFF, 0xCCC3CCFF, 0xFFCC3CC3, 0xEFFEFFFE,
-> > +	0xDDFFDFFF, 0xFBFFFBFF, 0xFF7FFFBF, 0xEFBDF777,
-> > +	0xF0FFF0FF, 0x3CCCFC0F, 0xCFCC33CC, 0xEEFFEFFF,
-> > +	0xFDFFFDFF, 0xFFBFFFDF, 0xFFF7FFBB, 0xDE7B7FF7
-> > +};
-> > +
-> > +static const u32 ref_tuning_8bits[] = {
-> > +	0xFF00FFFF, 0x0000FFFF, 0xCCCCFFFF, 0xCCCC33CC,
-> > +	0xCC3333CC, 0xFFFFCCCC, 0xFFFFEEFF, 0xFFEEEEFF,
-> > +	0xFFDDFFFF, 0xDDDDFFFF, 0xBBFFFFFF, 0xBBFFFFFF,
-> > +	0xFFFFFFBB, 0XFFFFFF77, 0x77FF7777, 0xFFEEDDBB,
-> > +	0x00FFFFFF, 0x00FFFFFF, 0xCCFFFF00, 0xCC33CCCC,
-> > +	0x3333CCCC, 0xFFCCCCCC, 0xFFEEFFFF, 0xEEEEFFFF,
-> > +	0xDDFFFFFF, 0xDDFFFFFF, 0xFFFFFFDD, 0XFFFFFFBB,
-> > +	0xFFFFBBBB, 0xFFFF77FF, 0xFF7777FF, 0xEEDDBB77
-> > +};
+> With Alex modifications, you can add my:
 > 
-> yet another feature we would've gotten for free if we were already using
-> sdhci. This is just a copy of what's on sdhci-msm.c, probably because
-> they license the same IP we do.
-> 
-> It would be much better to just convert omap-hsmmc.c into sdhci-omap.c
-> much like it was done for 8250-omap.c, with the added benefit that this
-> will incur no userland regressions due to devnode names.
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-If someone does do that, sdhci needs more of the quirks killing - sdhci.c
-/really/ needs to become a library which all these drivers use, rather
-than interposing itself between the MMC core and the actual driver, and
-the more that can be done the better.  All the time that people expand
-on the current disaster, that job is just going to get harder and harder
-(because there'll be more and more sub-drivers, with more and more
-sub-driver specific quirks.)
+Yes, I'll take them in for the next -rc once V2 comes out.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Mike
+
+> 
+> To your next series.
+> 
+> Bye,
+> 
+> 
+> > Boris Brezillon (2):
+> >   clk: at91: usb: fix at91rm9200 round and set rate
+> >   clk: at91: usb: fix at91sam9x5 recalc, round and set rate
+> > 
+> >  drivers/clk/at91/clk-usb.c | 35 ++++++++++++++++++++---------------
+> >  1 file changed, 20 insertions(+), 15 deletions(-)
+> > 
+> 
+> 
+> -- 
+> Nicolas Ferre
