@@ -1,61 +1,71 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 14 Nov 2014 10:16:55 +0800
-Subject: [Patch V1 0/6] Refine generic/PCI MSI irqodmian interfaces
-In-Reply-To: <alpine.DEB.2.11.1411140211480.3935@nanos>
-References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
- <54651BE2.9080008@arm.com> <54654C10.2040102@linux.intel.com>
- <54655632.2040209@huawei.com> <alpine.DEB.2.11.1411140211480.3935@nanos>
-Message-ID: <54656617.7090000@huawei.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Fri, 14 Nov 2014 08:20:12 +0530
+Subject: exynos5250/arndale: failed to set cpu voltage
+In-Reply-To: <CANMBJr4ZgEZDAtdfuLhCXppCGHnHhgmT1aFUi+=kJb2PdkqhGg@mail.gmail.com>
+References: <CANMBJr4ZgEZDAtdfuLhCXppCGHnHhgmT1aFUi+=kJb2PdkqhGg@mail.gmail.com>
+Message-ID: <CAM4voamPyTpv5TPtN1Z=ZL3Qmy806qFxrAaU0kiqJmV56cyJiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/14 9:31, Thomas Gleixner wrote:
-> On Fri, 14 Nov 2014, Yijing Wang wrote:
-> 
-> Could you please use a mail client which does proper line wraps or
-> configure yours to do so?
-> 
->> Associate the irq domain and PCI bus is not necessary, because all
->> PCI buses under same host bridge always share same MSI chip/irq
->> domain, we only need associate them and pci host bridge.
->>
->> I'm refactoring the pci_host_bridge, make it be a generic one, rip
->> out of the pci root bus creation, so we could put the irq domain and
->> pci domain etc.. in it. Finally, we could eliminate lots platform
->> arch functions. I will post it out within one week.
-> 
-> That's a completely orthogonal problem. From the MSI/interrupt
-> handling POV it does not matter at all where that information is
-> stored. All we care about is that it is retrievable via the (pci)
-> device which tries to setup MSI[X].
-> 
-> So we can store/retrieve it via generic functions into/from whatever
-> is available right now. If the irq side has generic interfaces to do
-> so then this wont conflict with your decisions to change the final
-> storage point because all it takes is to tweak the storage/retrieve
-> functions.
-> 
-> So all we need at the moment is an agreed on way to store/retrieve
-> that information which is based on the current shared infrastructure,
-> aka. Linus tree. If we can utilize that you are completely free to
-> change the association mechanism underneath.
+Hello Tyler,
 
-Hi Thomas, thanks for your explanation. Now I got it,
-I will consider more about it.
+On Fri, Nov 14, 2014 at 3:30 AM, Tyler Baker <tyler.baker@linaro.org> wrote:
+> In recent upstream kernels, exynos5420-based arndale boards have been
 
-Thanks!
-Yijing.
+Boot logs are only for 5250, typo ?
 
+> producing boot-time errors due to the fact they failed to set the cpu
+> voltage. These message flood the serial console even after userspace
+> has been loaded, yielding the console unusable without forcing a lower
+> log level. These errors are produced _only_ with the
+> multi_v7_defconfig and they are _not_ present
+> with exynos_defconfig. Here are some recent boot logs showing the boot errors:
+>
+> mainline/v3.18-rc4-65-g2c54396:
+>     multi_v7_defconfig:
+>         http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc4-65-g2c54396/arm-multi_v7_defconfig/boot-exynos5250-arndale.html
+>     exynos_defconfig:
+>         http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc4-65-g2c54396/arm-exynos_defconfig/boot-exynos5250-arndale.html
 
-> 
-> Thanks,
-> 
-> 	tglx
-> 
-> .
-> 
+>From the boot logs it appears that the S5M8767 regulator does not get
+probed with multi_v7_defconfig and you get the following messages:
 
+[    1.147412] deviceless supply vdd_arm not found, using dummy regulator
+[    1.152669] exynos-cpufreq exynos-cpufreq: failed to set cpu
+voltage to 1300000
+[    1.159771] cpufreq: __target_index: Failed to change cpu frequency: -22
 
--- 
-Thanks!
-Yijing
+Both multi_v7_defconfig and exynos_defconfig have the S5M8767
+regulator enabled. However multi_v7_defconfig does not have the S3C
+I2C controller enabled while exynos_defconfig does.
+Can you re-check after enabling CONFIG_I2C_S3C2410 ?
+
+Regards,
+Abhilash
+
+>
+> next/next-20141113:
+>     multi_v7_defconfig:
+>         http://storage.armcloud.us/kernel-ci/next/next-20141113/arm-multi_v7_defconfig/boot-exynos5250-arndale.html
+>     exynos_defconfig:
+>         http://storage.armcloud.us/kernel-ci/next/next-20141113/arm-exynos_defconfig/boot-exynos5250-arndale.html
+>
+> arm-soc/v3.18-rc4-185-gbfcf8f9:
+>     multi_v7_defconfig:
+>         http://storage.armcloud.us/kernel-ci/arm-soc/v3.18-rc4-185-gbfcf8f9/arm-multi_v7_defconfig/boot-exynos5250-arndale.html
+>     exynos_defconfig:
+>         http://storage.armcloud.us/kernel-ci/arm-soc/v3.18-rc4-185-gbfcf8f9/arm-exynos_defconfig/boot-exynos5250-arndale.html
+>
+> Cheers,
+>
+> --
+> Tyler Baker
+> Tech Lead, LAVA
+> Linaro.org | Open source software for ARM SoCs
+> Follow Linaro: http://www.facebook.com/pages/Linaro
+> http://twitter.com/#!/linaroorg - http://www.linaro.org/linaro-blog
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
