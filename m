@@ -1,51 +1,80 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Fri, 14 Nov 2014 16:46:06 +0530
-Subject: [PATCH] spi: s3c64xx: add support for exynos7 SPI controller
-In-Reply-To: <CAAgF-Bd=S7-PoA7GZoy87W9Dem3OXVhc1tL-eyWEAHvF0LPTKQ@mail.gmail.com>
-References: <1415267509-16653-1-git-send-email-padma.v@samsung.com>
- <20141106102636.GT8509@sirena.org.uk>
- <CAAgF-BfGwcNzMx0meFVkJqNMTbQ4_PP1PZ3i6edOm6U3bc26_Q@mail.gmail.com>
- <20141107101310.GA8509@sirena.org.uk>
- <CAAgF-Bd=S7-PoA7GZoy87W9Dem3OXVhc1tL-eyWEAHvF0LPTKQ@mail.gmail.com>
-Message-ID: <CAAgF-BcARoRZv=BPqQWyp6rJQQ=CE0FEUz_2vgQSpeZyLwbkBw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 14 Nov 2014 12:21:01 +0100
+Subject: [PATCH 4/7] ARM: dts: sun6i: Add simplefb node
+In-Reply-To: <5465D9B1.8010707@redhat.com>
+References: <1415871109-28332-1-git-send-email-hdegoede@redhat.com>
+ <1415871109-28332-4-git-send-email-hdegoede@redhat.com>
+ <20141113164606.GM20972@lukather> <5464EFF9.9010203@redhat.com>
+ <20141114102417.GY20972@lukather> <5465D9B1.8010707@redhat.com>
+Message-ID: <20141114112101.GC20972@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Fri, Nov 14, 2014 at 11:30:09AM +0100, Hans de Goede wrote:
+> Hi,
+> 
+> On 11/14/2014 11:24 AM, Maxime Ripard wrote:
+> > On Thu, Nov 13, 2014 at 06:52:57PM +0100, Hans de Goede wrote:
+> >> Hi,
+> >>
+> >> On 11/13/2014 05:46 PM, Maxime Ripard wrote:
+> >>> Hi,
+> >>>
+> >>> On Thu, Nov 13, 2014 at 10:31:46AM +0100, Hans de Goede wrote:
+> >>>> Add a simplefb template node for u-boot to further fill and activate.
+> >>>>
+> >>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>>> ---
+> >>>>  arch/arm/boot/dts/sun6i-a31.dtsi | 10 ++++++++++
+> >>>>  1 file changed, 10 insertions(+)
+> >>>>
+> >>>> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+> >>>> index 543f895..438952e 100644
+> >>>> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+> >>>> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+> >>>> @@ -62,6 +62,16 @@
+> >>>>  		ethernet0 = &gmac;
+> >>>>  	};
+> >>>>  
+> >>>> +	chosen {
+> >>>> +		#address-cells = <1>;
+> >>>> +		#size-cells = <1>;
+> >>>> +		ranges;
+> >>>> +
+> >>>> +		framebuffer0 {
+> >>>> +			compatible = "simple-framebuffer";
+> >>>> +			status = "disabled";
+> >>>
+> >>> Aren't we suppose to have clocks in there too?
+> >>
+> >> I deliberately left them out as they are not needed on sun6i, once the blocks
+> >> are setup ahb access is not necessary, but it seems that the ahb_gate bits
+> >> in sun4i / sun5i / sun7i double as a reset. Toggling them on / off / on breaks
+> >> the mode, while toggling module clocks on / off / on only causes a glitch.
+> >>
+> >> Since the sun6i has a separate reset controller, the clock gates seem to really
+> >> only control ahb access which is not necessary once the mode has been set up.
+> > 
+> > Ok. That can always be changed in the future if we ever find we need
+> > them anyway.
+> > 
+> > I'll merge these four patches as soon as the bindings doc is
+> > acked-by/merged by Grant or any other DT maintainer.
+> 
+> Note these patches are using framebuffer0 rather then framebuffer0-hdmi as node
+> name, which may cause issues if we later want to add lcd support. So I've a v2
+> coming which changes the name to framebuffer0-hdmi, please merge that instead.
 
-On 11/10/14, Padma Venkat <padma.kvr@gmail.com> wrote:
-> Hi Mark,
->
-> On 11/7/14, Mark Brown <broonie@kernel.org> wrote:
->> On Fri, Nov 07, 2014 at 02:01:57PM +0530, Padma Venkat wrote:
->>
->>> CS can also be controlled automatically by setting AUTO_N_MANUAL to 1
->>> in CS_CFG. When it is auto CS automatically toggles between packet to
->>> packet. NCS_TIME_COUNT in CS_CFG controls the inactive period. The
->>> driver by default uses manual mode. But on exynos7 the manual mode is
->>> removed.
->>
->> OK, but what's a packet here?
->
-> Packet is either 1 byte or 4 bytes size depends on width of the SPI
-> channel.
->
->>
->>> I tested the driver with wm5110 codec.
->>
->> Did you try firmware downloads or something else that generates multiple
->> transfers in a message?  Normal register writes will use a single
->> transfer so I'd expect them to just work.
->>
->
-> OK. I don't have provision to test on this board. I will try to test
-> on older boards by disabling manual mode.
->
+Ok :)
 
-I tested on exynos5420 peach-pit by enabling auto mode. I used dd
-command to read 1MB data from spi flash and I compared the result with
-manual mode. Both are same.
-
-> Thanks
-> padma
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141114/a59d0473/attachment.sig>
