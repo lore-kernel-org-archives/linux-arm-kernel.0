@@ -1,7 +1,7 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Fri, 14 Nov 2014 07:37:13 +0100
+From: joe@perches.com (Joe Perches)
+Date: Thu, 13 Nov 2014 22:55:09 -0800
 Subject: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
-In-Reply-To: <1415923530.4223.17.camel@perches.com>
+In-Reply-To: <s5hd28qp9t2.wl-tiwai@suse.de>
 References: <35FD53F367049845BC99AC72306C23D103E010D18261@CNBJMBX05.corpusers.net>
  <35FD53F367049845BC99AC72306C23D103E010D18264@CNBJMBX05.corpusers.net>
  <35FD53F367049845BC99AC72306C23D103E010D18265@CNBJMBX05.corpusers.net>
@@ -13,76 +13,86 @@ References: <35FD53F367049845BC99AC72306C23D103E010D18261@CNBJMBX05.corpusers.ne
  <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
  <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
  <20141113235322.GC4042@n2100.arm.linux.org.uk>
- <1415923530.4223.17.camel@perches.com>
-Message-ID: <s5hd28qp9t2.wl-tiwai@suse.de>
+ <1415923530.4223.17.camel@perches.com> <s5hd28qp9t2.wl-tiwai@suse.de>
+Message-ID: <1415948109.5912.12.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Thu, 13 Nov 2014 16:05:30 -0800,
-Joe Perches wrote:
-> 
-> On Thu, 2014-11-13 at 23:53 +0000, Russell King - ARM Linux wrote:
-> > On Fri, Oct 31, 2014 at 01:42:44PM +0800, Wang, Yalin wrote:
-> > > This patch add bitrev.h file to support rbit instruction,
-> > > so that we can do bitrev operation by hardware.
-> > > Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
-> > > ---
-> > >  arch/arm/Kconfig              |  1 +
-> > >  arch/arm/include/asm/bitrev.h | 21 +++++++++++++++++++++
-> > >  2 files changed, 22 insertions(+)
-> > >  create mode 100644 arch/arm/include/asm/bitrev.h
+On Fri, 2014-11-14 at 07:37 +0100, Takashi Iwai wrote:
+> At Thu, 13 Nov 2014 16:05:30 -0800,
+> Joe Perches wrote:
+> > 
+> > On Thu, 2014-11-13 at 23:53 +0000, Russell King - ARM Linux wrote:
+> > > On Fri, Oct 31, 2014 at 01:42:44PM +0800, Wang, Yalin wrote:
+> > > > This patch add bitrev.h file to support rbit instruction,
+> > > > so that we can do bitrev operation by hardware.
+> > > > Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
+> > > > ---
+> > > >  arch/arm/Kconfig              |  1 +
+> > > >  arch/arm/include/asm/bitrev.h | 21 +++++++++++++++++++++
+> > > >  2 files changed, 22 insertions(+)
+> > > >  create mode 100644 arch/arm/include/asm/bitrev.h
+> > > > 
+> > > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > > > index 89c4b5c..be92b3b 100644
+> > > > --- a/arch/arm/Kconfig
+> > > > +++ b/arch/arm/Kconfig
+> > > > @@ -28,6 +28,7 @@ config ARM
+> > > >  	select HANDLE_DOMAIN_IRQ
+> > > >  	select HARDIRQS_SW_RESEND
+> > > >  	select HAVE_ARCH_AUDITSYSCALL if (AEABI && !OABI_COMPAT)
+> > > > +	select HAVE_ARCH_BITREVERSE if (CPU_V7M || CPU_V7)
 > > > 
-> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > > index 89c4b5c..be92b3b 100644
-> > > --- a/arch/arm/Kconfig
-> > > +++ b/arch/arm/Kconfig
-> > > @@ -28,6 +28,7 @@ config ARM
-> > >  	select HANDLE_DOMAIN_IRQ
-> > >  	select HARDIRQS_SW_RESEND
-> > >  	select HAVE_ARCH_AUDITSYSCALL if (AEABI && !OABI_COMPAT)
-> > > +	select HAVE_ARCH_BITREVERSE if (CPU_V7M || CPU_V7)
+> > > Looking at this, this is just wrong.  Take a moment to consider what
+> > > happens if we build a kernel which supports both ARMv6 _and_ ARMv7 CPUs.
+> > > What happens if an ARMv6 CPU tries to execute an rbit instruction?
+> > > 
+> > > Second point (which isn't obvious from your submissions on-list) is that
+> > > you've loaded the patch system up with patches for other parts of the
+> > > kernel tree for which I am not responsible for.  As such, I can't take
+> > > those patches without the sub-tree maintainer acking them.  Also, the
+> > > commit text in those patches look weird:
+> > > 
+> > > 6fire: Convert byte_rev_table uses to bitrev8
+> > > 
+> > > Use the inline function instead of directly indexing the array.
+> > > 
+> > > This allows some architectures with hardware instructions for bit
+> > > reversals to eliminate the array.
+> > > 
+> > > Signed-off-by: Joe Perches <(address hidden)>
+> > > Signed-off-by: Yalin Wang <(address hidden)>
+> > > 
+> > > Why is Joe signing off on these patches?
+> > > Shouldn't his entry be an Acked-by: ?
 > > 
-> > Looking at this, this is just wrong.  Take a moment to consider what
-> > happens if we build a kernel which supports both ARMv6 _and_ ARMv7 CPUs.
-> > What happens if an ARMv6 CPU tries to execute an rbit instruction?
+> > I didn't sign off on or ack the "add bitrev.h" patch.
 > > 
-> > Second point (which isn't obvious from your submissions on-list) is that
-> > you've loaded the patch system up with patches for other parts of the
-> > kernel tree for which I am not responsible for.  As such, I can't take
-> > those patches without the sub-tree maintainer acking them.  Also, the
-> > commit text in those patches look weird:
+> > I created 2 patches that converted direct uses of byte_rev_table
+> > to that bitrev8 static inline.  One of them is already in -next
 > > 
-> > 6fire: Convert byte_rev_table uses to bitrev8
+> > 7a1283d8f5298437a454ec477384dcd9f9f88bac carl9170: Convert byte_rev_table uses to bitrev8
 > > 
-> > Use the inline function instead of directly indexing the array.
+> > The other hasn't been applied.
 > > 
-> > This allows some architectures with hardware instructions for bit
-> > reversals to eliminate the array.
+> > https://lkml.org/lkml/2014/10/28/1056
 > > 
-> > Signed-off-by: Joe Perches <(address hidden)>
-> > Signed-off-by: Yalin Wang <(address hidden)>
-> > 
-> > Why is Joe signing off on these patches?
-> > Shouldn't his entry be an Acked-by: ?
+> > Maybe Takashi Iwai will get around to it one day.
 > 
-> I didn't sign off on or ack the "add bitrev.h" patch.
+> It was not clear to me whether I should apply it individually from
+> others in the whole thread.  Your description looked as if it makes
+> sense only with ARM's bitrev8 support.
 > 
-> I created 2 patches that converted direct uses of byte_rev_table
-> to that bitrev8 static inline.  One of them is already in -next
-> 
-> 7a1283d8f5298437a454ec477384dcd9f9f88bac carl9170: Convert byte_rev_table uses to bitrev8
-> 
-> The other hasn't been applied.
-> 
-> https://lkml.org/lkml/2014/10/28/1056
-> 
-> Maybe Takashi Iwai will get around to it one day.
+> So, again: should I apply this now to my tree?
 
-It was not clear to me whether I should apply it individually from
-others in the whole thread.  Your description looked as if it makes
-sense only with ARM's bitrev8 support.
+I it would be good to apply even if the
+bitrev patch for arm is never applied.
 
-So, again: should I apply this now to my tree?
+$ git grep -w bitrev8 | wc -l
+110
 
+vs
 
-Takashi
+this last direct use of byte_rev_table.
+
+cheers, Joe
