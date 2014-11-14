@@ -1,103 +1,121 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 14 Nov 2014 11:08:50 +0100
-Subject: [PATCH 2/4] ARM: at91/dt: add GPBR nodes
+Date: Fri, 14 Nov 2014 11:08:49 +0100
+Subject: [PATCH 1/4] ARM: at91/dt: add RTT nodes to at91 dtsis
 In-Reply-To: <1415959732-13591-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1415959732-13591-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1415959732-13591-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1415959732-13591-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add GPBR (General Purpose Block Backup Registers) nodes.
+at91sam926x, at91sam9g45 and at91sam9rl SoCs all have at least one RTT
+block.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- arch/arm/boot/dts/at91sam9260.dtsi | 6 ++++++
- arch/arm/boot/dts/at91sam9261.dtsi | 6 ++++++
- arch/arm/boot/dts/at91sam9263.dtsi | 6 ++++++
- arch/arm/boot/dts/at91sam9g45.dtsi | 6 ++++++
- arch/arm/boot/dts/at91sam9rl.dtsi  | 6 ++++++
- 5 files changed, 30 insertions(+)
+ arch/arm/boot/dts/at91sam9260.dtsi |  8 ++++++++
+ arch/arm/boot/dts/at91sam9261.dtsi |  8 ++++++++
+ arch/arm/boot/dts/at91sam9263.dtsi | 15 +++++++++++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi |  8 ++++++++
+ arch/arm/boot/dts/at91sam9rl.dtsi  |  8 ++++++++
+ 5 files changed, 47 insertions(+)
 
 diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index 9ea824e..dd1313c 100644
+index cb100b0..9ea824e 100644
 --- a/arch/arm/boot/dts/at91sam9260.dtsi
 +++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -974,6 +974,12 @@
- 				atmel,idle-halt;
- 				status = "disabled";
+@@ -956,6 +956,14 @@
+ 				};
  			};
-+
-+			gpbr: syscon at fffffd50 {
-+				compatible = "atmel,at91sam9260-gpbr", "syscon";
-+				reg = <0xfffffd50 0x10>;
+ 
++			rtc at fffffd20 {
++				compatible = "atmel,at91sam9260-rtt";
++				reg = <0xfffffd20 0x10>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				clocks = <&clk32k>;
 +				status = "disabled";
 +			};
- 		};
- 
- 		nand0: nand at 40000000 {
++
+ 			watchdog at fffffd40 {
+ 				compatible = "atmel,at91sam9260-wdt";
+ 				reg = <0xfffffd40 0x10>;
 diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
-index 06b11fc..cdb9ed6 100644
+index a81aab4..06b11fc 100644
 --- a/arch/arm/boot/dts/at91sam9261.dtsi
 +++ b/arch/arm/boot/dts/at91sam9261.dtsi
-@@ -842,6 +842,12 @@
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
- 				status = "disabled";
+@@ -828,6 +828,14 @@
+ 				clocks = <&mck>;
  			};
-+
-+			gpbr: syscon at fffffd50 {
-+				compatible = "atmel,at91sam9260-gpbr", "syscon";
-+				reg = <0xfffffd50 0x10>;
+ 
++			rtc at fffffd20 {
++				compatible = "atmel,at91sam9260-rtt";
++				reg = <0xfffffd20 0x10>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				clocks = <&slow_xtal>;
 +				status = "disabled";
 +			};
- 		};
- 	};
- 
++
+ 			watchdog at fffffd40 {
+ 				compatible = "atmel,at91sam9260-wdt";
+ 				reg = <0xfffffd40 0x10>;
 diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index 7f37b7e..1467750 100644
+index 653e439..7f37b7e 100644
 --- a/arch/arm/boot/dts/at91sam9263.dtsi
 +++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -939,6 +939,12 @@
- 				clocks = <&slow_xtal>;
- 				status = "disabled";
- 			};
+@@ -922,6 +922,21 @@
+ 				pinctrl-0 = <&pinctrl_can_rx_tx>;
+ 				clocks = <&can_clk>;
+ 				clock-names = "can_clk";
++			};
 +
-+			gpbr: syscon at fffffd60 {
-+				compatible = "atmel,at91sam9260-gpbr", "syscon";
-+				reg = <0xfffffd60 0x50>;
++			rtc at fffffd20 {
++				compatible = "atmel,at91sam9260-rtt";
++				reg = <0xfffffd20 0x10>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				clocks = <&slow_xtal>;
 +				status = "disabled";
 +			};
++
++			rtc at fffffd50 {
++				compatible = "atmel,at91sam9260-rtt";
++				reg = <0xfffffd50 0x10>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				clocks = <&slow_xtal>;
+ 				status = "disabled";
+ 			};
  		};
- 
- 		fb0: fb at 0x00700000 {
 diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 3771088..18453d9 100644
+index d3f6513..3771088 100644
 --- a/arch/arm/boot/dts/at91sam9g45.dtsi
 +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -1206,6 +1206,12 @@
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
- 				status = "disabled";
+@@ -1192,6 +1192,14 @@
+ 				};
  			};
-+
-+			gpbr: syscon at fffffd60 {
-+				compatible = "atmel,at91sam9260-gpbr", "syscon";
-+				reg = <0xfffffd60 0x10>;
+ 
++			rtc at fffffd20 {
++				compatible = "atmel,at91sam9260-rtt";
++				reg = <0xfffffd20 0x10>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				clocks = <&clk32k>;
 +				status = "disabled";
 +			};
- 		};
- 
- 		fb0: fb at 0x00500000 {
++
+ 			rtc at fffffdb0 {
+ 				compatible = "atmel,at91rm9200-rtc";
+ 				reg = <0xfffffdb0 0x30>;
 diff --git a/arch/arm/boot/dts/at91sam9rl.dtsi b/arch/arm/boot/dts/at91sam9rl.dtsi
-index 6d77b02..2ff072b 100644
+index f0b4352..6d77b02 100644
 --- a/arch/arm/boot/dts/at91sam9rl.dtsi
 +++ b/arch/arm/boot/dts/at91sam9rl.dtsi
-@@ -1067,6 +1067,12 @@
- 				clocks = <&clk32k>;
- 				status = "disabled";
+@@ -1059,6 +1059,14 @@
+ 					clocks = <&slow_rc_osc &slow_osc>;
+ 				};
  			};
 +
-+			gpbr: syscon at fffffd60 {
-+				compatible = "atmel,at91sam9260-gpbr", "syscon";
-+				reg = <0xfffffd60 0x10>;
++			rtc at fffffd20 {
++				compatible = "atmel,at91sam9260-rtt";
++				reg = <0xfffffd20 0x10>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				clocks = <&clk32k>;
 +				status = "disabled";
 +			};
  		};
