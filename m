@@ -1,115 +1,67 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 14 Nov 2014 16:21:23 +0100
-Subject: [PATCHv2 03/16] irqchip: irq-armada-370-xp: suspend/resume support
+Date: Fri, 14 Nov 2014 16:21:34 +0100
+Subject: [PATCHv2 14/16] ARM: mvebu: add suspend/resume DT information for
+ Armada XP GP
 In-Reply-To: <1415978496-9334-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1415978496-9334-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1415978496-9334-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1415978496-9334-15-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds suspend/resume support to the irqchip driver used on
-Armada XP platforms (amongst others). It does so by adding a set of
-suspend/resume syscore_ops, that will respectively save and restore
-the necessary registers to ensure interrupts continue to work after
-resume.
-
-It is worth mentioning that the affinity is lost during a
-suspend/resume cycle, because when a secondary CPU is brought
-off-line, all interrupts that are assigned to this CPU in terms of
-affinity gets re-assigned to a still running CPU. Therefore, right
-before entering suspend, all interrupts are assigned to the boot CPU.
+This commit improves the Armada XP GP Device Tree description to
+describe the 3 GPIOs that are used to connect the SoC to the PIC
+micro-controller that we talk to shutdown the SoC when entering
+suspend to RAM.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: linux-kernel at vger.kernel.org
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/irqchip/irq-armada-370-xp.c | 52 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+ arch/arm/boot/dts/armada-xp-gp.dts | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index 3e238cd..4ec137b 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -26,6 +26,7 @@
- #include <linux/of_pci.h>
- #include <linux/irqdomain.h>
- #include <linux/slab.h>
-+#include <linux/syscore_ops.h>
- #include <linux/msi.h>
- #include <asm/mach/arch.h>
- #include <asm/exception.h>
-@@ -66,6 +67,7 @@
- static void __iomem *per_cpu_int_base;
- static void __iomem *main_int_base;
- static struct irq_domain *armada_370_xp_mpic_domain;
-+static u32 doorbell_mask_reg;
- #ifdef CONFIG_PCI_MSI
- static struct irq_domain *armada_370_xp_msi_domain;
- static DECLARE_BITMAP(msi_used, PCI_MSI_DOORBELL_NR);
-@@ -474,6 +476,54 @@ armada_370_xp_handle_irq(struct pt_regs *regs)
- 	} while (1);
- }
+diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+index 0478c55..ea86736 100644
+--- a/arch/arm/boot/dts/armada-xp-gp.dts
++++ b/arch/arm/boot/dts/armada-xp-gp.dts
+@@ -23,6 +23,7 @@
+  */
  
-+static int armada_370_xp_mpic_suspend(void)
-+{
-+	doorbell_mask_reg = readl(per_cpu_int_base +
-+				  ARMADA_370_XP_IN_DRBEL_MSK_OFFS);
-+	return 0;
-+}
-+
-+static void armada_370_xp_mpic_resume(void)
-+{
-+	int nirqs;
-+	irq_hw_number_t irq;
-+
-+	/* Re-enable interrupts */
-+	nirqs = (readl(main_int_base + ARMADA_370_XP_INT_CONTROL) >> 2) & 0x3ff;
-+	for (irq = 0; irq < nirqs; irq++) {
-+		struct irq_data *data;
-+		int virq;
-+
-+		virq = irq_linear_revmap(armada_370_xp_mpic_domain, irq);
-+		if (virq == 0)
-+			continue;
-+
-+		if (irq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
-+			writel(irq, per_cpu_int_base +
-+			       ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
-+		else
-+			writel(irq, main_int_base +
-+			       ARMADA_370_XP_INT_SET_ENABLE_OFFS);
-+
-+		data = irq_get_irq_data(virq);
-+		if (!irqd_irq_disabled(data))
-+			armada_370_xp_irq_unmask(data);
-+	}
-+
-+	/* Reconfigure doorbells for IPIs and MSIs */
-+	writel(doorbell_mask_reg,
-+	       per_cpu_int_base + ARMADA_370_XP_IN_DRBEL_MSK_OFFS);
-+	if (doorbell_mask_reg & IPI_DOORBELL_MASK)
-+		writel(0, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
-+	if (doorbell_mask_reg & PCI_MSI_DOORBELL_MASK)
-+		writel(1, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
-+}
-+
-+struct syscore_ops armada_370_xp_mpic_syscore_ops = {
-+	.suspend	= armada_370_xp_mpic_suspend,
-+	.resume		= armada_370_xp_mpic_resume,
-+};
-+
- static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 					     struct device_node *parent)
- {
-@@ -530,6 +580,8 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 					armada_370_xp_mpic_handle_cascade_irq);
- 	}
+ /dts-v1/;
++#include <dt-bindings/gpio/gpio.h>
+ #include "armada-xp-mv78460.dtsi"
  
-+	register_syscore_ops(&armada_370_xp_mpic_syscore_ops);
-+
- 	return 0;
- }
+ / {
+@@ -48,6 +49,14 @@
+ 		      <0x00000001 0x00000000 0x00000001 0x00000000>;
+ 	};
  
++	cpus {
++		pm_pic {
++			ctrl-gpios = <&gpio0 16 GPIO_ACTIVE_LOW>,
++				     <&gpio0 17 GPIO_ACTIVE_LOW>,
++				     <&gpio0 18 GPIO_ACTIVE_LOW>;
++		};
++	};
++
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+ 			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+@@ -115,7 +124,15 @@
+ 			serial@12300 {
+ 				status = "okay";
+ 			};
+-
++			pinctrl {
++				pinctrl-0 = <&pic_pins>;
++				pinctrl-names = "default";
++				pic_pins: pic-pins-0 {
++					marvell,pins = "mpp16", "mpp17",
++						       "mpp18";
++					marvell,function = "gpio";
++				};
++			};
+ 			sata at a0000 {
+ 				nr-ports = <2>;
+ 				status = "okay";
 -- 
 2.1.0
