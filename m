@@ -1,56 +1,62 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Fri, 14 Nov 2014 21:54:42 +0200
-Subject: N900 modem support in 3.18-rc1
-In-Reply-To: <20141114172008.GB12250@earth.universe>
-References: <20141104205117.GA17606@amd>
- <20141106180335.GA21513@earth.universe> <20141106225005.GA14002@amd>
- <201411070001.46481@pali> <545C6F14.8050303@gmail.com>
- <20141113162420.GB8512@xo-6d-61-c0.localdomain> <5465A977.4030605@gmail.com>
- <20141114172008.GB12250@earth.universe>
-Message-ID: <54665E02.8050108@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Nov 2014 21:01:56 +0100
+Subject: [RFC PATCH v4 0/8] Introduce automatic DMA configuration for
+ IOMMU masters
+In-Reply-To: <20141114192754.GB9291@arm.com>
+References: <1415991397-9618-1-git-send-email-will.deacon@arm.com>
+ <3630936.HRExZgJGyp@wuerfel> <20141114192754.GB9291@arm.com>
+Message-ID: <2043949.GdM3BkS8d4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Friday 14 November 2014 19:27:54 Will Deacon wrote:
+> 
+> > At the moment, iommu_ops is a structure that can get used for any
+> > number of iommus of the same type, but by putting per-device private
+> > data into the same structure you have to duplicate it per instance.
+> 
+> I'm not sure I agree -- the pgsize_bitmap, for example, could vary between
+> different implementations of the same IOMMU. I think we already have this in
+> Juno (some SMMUs can only do 64k pages, whilst others can do 4k and 64k).
 
+Ah, I hadn't noticed that, it should be in the 'struct iommu' then of course,
+not in iommu_ops.
 
-On 14.11.2014 19:20, Sebastian Reichel wrote:
->
-> The patch looks ok. It does not cleanup the cmt-speech driver for
-> mainline usage, but it should work. Before adding this driver to the
-> mainline kernel there should be open source userspace support anyway.
->
+> > I think rather than adding a .priv pointer to iommu_ops, we should do
+> > the same thing that a lot of other subsystems have:
+> > 
+> > /* generic structure */
+> > struct iommu {
+> >       struct iommu_ops *ops;
+> >       /* possibly other generic per-instance members */
+> > };
+> > 
+> > /* driver specific structure */
+> > struct arm_smmu {
+> >       struct iommu iommu;
+> > 
+> >       /* smmu specific members */
+> > };
+> > static inline struct arm_smmu *to_arm_smmu(struct iommu *iommu)
+> > {
+> >       return container_of(iommu, struct arm_smmu, iommu);
+> > }
+> 
+> Regardless of the arguments above, I think this layout is cleaner. We could
+> also move the pgsize_bitmap into struct iommu in that case, however, that
+> would be a more invasive patch series than I what I currently have.
 
-I am aware of that(patch not ready), it's one of the reasons this patch 
-still sits on gitorious IMO.
+Right, it can be done as a follow-up. It's certainly not urgent.
+ 
+> If I do another version of the patch, I can easily add a struct iommu and
+> stash that in the device_node data for the IOMMU instead of directly
+> putting the ops there. That's at least a step in the right direction.
 
-libcmtspeechdata was opened by Nokia long ago, so I don't understand 
-what userspace support (for inclusion of the driver in the mainline 
-kernel that is) is needed. see 
-https://gitorious.org/meego-cellular/libcmtspeechdata/source/7f8f3ce357513e4849e1bf6d657980a514529c1a:
+Sounds good, yes. Alternatively, why not do the pointer in the opposite
+direction and put a 'struct device_node *dn' and a list_head into
+'struct iommu'. This means you will have to traverse the list of iommus
+in of_iommu_get_ops, but I think it's safe to assume this is a short
+list and it gets walked rarely. It would be somewhat cleaner not to have
+to use device_node->data this way.
 
-REed pulseaudio modules that use cmtspeech will be ready sooner than 
-later (I believe in 2-3 monts from now), see on gitorious how fast we 
-progressed with -record and -music modules. Sure, -voice module is way 
-more complicated, but lots of it is already opensourced, we just need to 
-figure out a couple of DSP algorithms(drc, agc, aec, etc) related to 
-call quality. But I don't think the driver should wait for those modules 
-to be REed, they can be used as is even now, in their closed form for 
-testing. Unfortunately all my spare time is dedicated to that PA stuff, 
-so I simply can't cleanup cmtspeech driver and send a patch for 
-upstreaming. (Pavel, what about you?)
-
-> Btw. I am aware that this would break existing pulse audio stuff,
-> but wouldn't it make sense to export a V4L2 device instead of the
-> custom /dev/cmt_speech ABI?
->
-
-Nokia PA guys did a great job integrating lots of things related to 
-audio and honestly, I don't see a reason why should we reinvent the 
-wheel. There is lot more behind the scenes than simple PCM streaming 
-(like audio policies and routing, sideband audio, speakers protection, 
-etc) and reiplementing all this using different API wouldn't worth it IMO.
-
-Not to say that I agree with Pali's reply that working userspace should 
-not be broken just for the sake of it.
-
-Ivo
+	Arnd
