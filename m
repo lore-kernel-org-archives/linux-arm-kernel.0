@@ -1,156 +1,121 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 14 Nov 2014 16:21:25 +0100
-Subject: [PATCHv2 05/16] gpio: mvebu: add suspend/resume support
+Date: Fri, 14 Nov 2014 16:21:28 +0100
+Subject: [PATCHv2 08/16] clk: mvebu: add suspend/resume for gatable clocks
 In-Reply-To: <1415978496-9334-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1415978496-9334-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1415978496-9334-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1415978496-9334-9-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the implementation of ->suspend() and ->resume()
-platform_driver hooks in order to save and restore the state of the
-GPIO configuration. In order to achieve that, additional fields are
-added to the mvebu_gpio_chip structure.
+This commit adds suspend/resume support for the gatable clock driver
+used on Marvell EBU platforms. When getting out of suspend, the
+Marvell EBU platforms go through the bootloader, which re-enables all
+gatable clocks. However, upon resume, the clock framework will not
+disable again all gatable clocks that are not used.
+
+Therefore, if the clock driver does not save/restore the state of the
+gatable clocks, all gatable clocks that are not claimed by any device
+driver will remain enabled after a resume. This is why this driver
+saves and restores the state of those clocks.
+
+Since clocks aren't real devices, we don't have the normal ->suspend()
+and ->resume() of the device model, and have to use the ->suspend()
+and ->resume() hooks of the syscore_ops mechanism. This mechanism has
+the unfortunate idea of not providing a way of passing private data,
+which requires us to change the driver to make the assumption that
+there is only once instance of the gatable clock control structure.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Alexandre Courbot <gnurou@gmail.com>
-Cc: linux-gpio at vger.kernel.org
-Acked-by: Alexandre Courbot <acourbot@nvidia.com>
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: linux-kernel at vger.kernel.org
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/gpio/gpio-mvebu.c | 99 +++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 99 insertions(+)
+ drivers/clk/mvebu/common.c | 30 ++++++++++++++++++++++++++++--
+ 1 file changed, 28 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
-index 418e386..dd5545c 100644
---- a/drivers/gpio/gpio-mvebu.c
-+++ b/drivers/gpio/gpio-mvebu.c
-@@ -83,6 +83,14 @@ struct mvebu_gpio_chip {
- 	int		   irqbase;
- 	struct irq_domain *domain;
- 	int                soc_variant;
-+
-+	/* Used to preserve GPIO registers accross suspend/resume */
-+	u32                out_reg;
-+	u32                io_conf_reg;
-+	u32                blink_en_reg;
-+	u32                in_pol_reg;
-+	u32                edge_mask_regs[4];
-+	u32                level_mask_regs[4];
+diff --git a/drivers/clk/mvebu/common.c b/drivers/clk/mvebu/common.c
+index b7fcb46..8799fb8 100644
+--- a/drivers/clk/mvebu/common.c
++++ b/drivers/clk/mvebu/common.c
+@@ -19,6 +19,7 @@
+ #include <linux/io.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/syscore_ops.h>
+ 
+ #include "common.h"
+ 
+@@ -177,14 +178,18 @@ struct clk_gating_ctrl {
+ 	spinlock_t *lock;
+ 	struct clk **gates;
+ 	int num_gates;
++	struct syscore_ops syscore_ops;
++	void __iomem *base;
++	u32 saved_reg;
  };
  
- /*
-@@ -554,6 +562,93 @@ static const struct of_device_id mvebu_gpio_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, mvebu_gpio_of_match);
+ #define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
  
-+static int mvebu_gpio_suspend(struct platform_device *pdev, pm_message_t state)
-+{
-+	struct mvebu_gpio_chip *mvchip = platform_get_drvdata(pdev);
-+	int i;
++static struct clk_gating_ctrl *ctrl;
 +
-+	mvchip->out_reg = readl(mvebu_gpioreg_out(mvchip));
-+	mvchip->io_conf_reg = readl(mvebu_gpioreg_io_conf(mvchip));
-+	mvchip->blink_en_reg = readl(mvebu_gpioreg_blink(mvchip));
-+	mvchip->in_pol_reg = readl(mvebu_gpioreg_in_pol(mvchip));
-+
-+	switch (mvchip->soc_variant) {
-+	case MVEBU_GPIO_SOC_VARIANT_ORION:
-+		mvchip->edge_mask_regs[0] =
-+			readl(mvchip->membase + GPIO_EDGE_MASK_OFF);
-+		mvchip->level_mask_regs[0] =
-+			readl(mvchip->membase + GPIO_LEVEL_MASK_OFF);
-+		break;
-+	case MVEBU_GPIO_SOC_VARIANT_MV78200:
-+		for (i = 0; i < 2; i++) {
-+			mvchip->edge_mask_regs[i] =
-+				readl(mvchip->membase +
-+				      GPIO_EDGE_MASK_MV78200_OFF(i));
-+			mvchip->level_mask_regs[i] =
-+				readl(mvchip->membase +
-+				      GPIO_LEVEL_MASK_MV78200_OFF(i));
-+		}
-+		break;
-+	case MVEBU_GPIO_SOC_VARIANT_ARMADAXP:
-+		for (i = 0; i < 4; i++) {
-+			mvchip->edge_mask_regs[i] =
-+				readl(mvchip->membase +
-+				      GPIO_EDGE_MASK_ARMADAXP_OFF(i));
-+			mvchip->level_mask_regs[i] =
-+				readl(mvchip->membase +
-+				      GPIO_LEVEL_MASK_ARMADAXP_OFF(i));
-+		}
-+		break;
-+	default:
-+		BUG();
-+	}
-+
-+	return 0;
-+}
-+
-+static int mvebu_gpio_resume(struct platform_device *pdev)
-+{
-+	struct mvebu_gpio_chip *mvchip = platform_get_drvdata(pdev);
-+	int i;
-+
-+	writel(mvchip->out_reg, mvebu_gpioreg_out(mvchip));
-+	writel(mvchip->io_conf_reg, mvebu_gpioreg_io_conf(mvchip));
-+	writel(mvchip->blink_en_reg, mvebu_gpioreg_blink(mvchip));
-+	writel(mvchip->in_pol_reg, mvebu_gpioreg_in_pol(mvchip));
-+
-+	switch (mvchip->soc_variant) {
-+	case MVEBU_GPIO_SOC_VARIANT_ORION:
-+		writel(mvchip->edge_mask_regs[0],
-+		       mvchip->membase + GPIO_EDGE_MASK_OFF);
-+		writel(mvchip->level_mask_regs[0],
-+		       mvchip->membase + GPIO_LEVEL_MASK_OFF);
-+		break;
-+	case MVEBU_GPIO_SOC_VARIANT_MV78200:
-+		for (i = 0; i < 2; i++) {
-+			writel(mvchip->edge_mask_regs[i],
-+			       mvchip->membase + GPIO_EDGE_MASK_MV78200_OFF(i));
-+			writel(mvchip->level_mask_regs[i],
-+			       mvchip->membase +
-+			       GPIO_LEVEL_MASK_MV78200_OFF(i));
-+		}
-+		break;
-+	case MVEBU_GPIO_SOC_VARIANT_ARMADAXP:
-+		for (i = 0; i < 4; i++) {
-+			writel(mvchip->edge_mask_regs[i],
-+			       mvchip->membase +
-+			       GPIO_EDGE_MASK_ARMADAXP_OFF(i));
-+			writel(mvchip->level_mask_regs[i],
-+			       mvchip->membase +
-+			       GPIO_LEVEL_MASK_ARMADAXP_OFF(i));
-+		}
-+		break;
-+	default:
-+		BUG();
-+	}
-+
-+	return 0;
-+}
-+
- static int mvebu_gpio_probe(struct platform_device *pdev)
+ static struct clk *clk_gating_get_src(
+ 	struct of_phandle_args *clkspec, void *data)
  {
- 	struct mvebu_gpio_chip *mvchip;
-@@ -577,6 +672,8 @@ static int mvebu_gpio_probe(struct platform_device *pdev)
- 	if (!mvchip)
- 		return -ENOMEM;
+-	struct clk_gating_ctrl *ctrl = (struct clk_gating_ctrl *)data;
+ 	int n;
  
-+	platform_set_drvdata(pdev, mvchip);
+ 	if (clkspec->args_count < 1)
+@@ -199,15 +204,30 @@ static struct clk *clk_gating_get_src(
+ 	return ERR_PTR(-ENODEV);
+ }
+ 
++static int mvebu_clk_gating_suspend(void)
++{
++	ctrl->saved_reg = readl(ctrl->base);
++	return 0;
++}
 +
- 	if (of_property_read_u32(pdev->dev.of_node, "ngpios", &ngpios)) {
- 		dev_err(&pdev->dev, "Missing ngpios OF property\n");
- 		return -ENODEV;
-@@ -735,5 +832,7 @@ static struct platform_driver mvebu_gpio_driver = {
- 		.of_match_table = mvebu_gpio_of_match,
- 	},
- 	.probe		= mvebu_gpio_probe,
-+	.suspend        = mvebu_gpio_suspend,
-+	.resume         = mvebu_gpio_resume,
- };
- module_platform_driver(mvebu_gpio_driver);
++static void mvebu_clk_gating_resume(void)
++{
++	writel(ctrl->saved_reg, ctrl->base);
++}
++
+ void __init mvebu_clk_gating_setup(struct device_node *np,
+ 				   const struct clk_gating_soc_desc *desc)
+ {
+-	struct clk_gating_ctrl *ctrl;
+ 	struct clk *clk;
+ 	void __iomem *base;
+ 	const char *default_parent = NULL;
+ 	int n;
+ 
++	if (ctrl) {
++		pr_err("mvebu-clk-gating: cannot instantiate more than one gatable clock device\n");
++		return;
++	}
++
+ 	base = of_iomap(np, 0);
+ 	if (WARN_ON(!base))
+ 		return;
+@@ -225,6 +245,10 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
+ 	/* lock must already be initialized */
+ 	ctrl->lock = &ctrl_gating_lock;
+ 
++	ctrl->base = base;
++	ctrl->syscore_ops.suspend = mvebu_clk_gating_suspend;
++	ctrl->syscore_ops.resume = mvebu_clk_gating_resume;
++
+ 	/* Count, allocate, and register clock gates */
+ 	for (n = 0; desc[n].name;)
+ 		n++;
+@@ -246,6 +270,8 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
+ 
+ 	of_clk_add_provider(np, clk_gating_get_src, ctrl);
+ 
++	register_syscore_ops(&ctrl->syscore_ops);
++
+ 	return;
+ gates_out:
+ 	kfree(ctrl);
 -- 
 2.1.0
