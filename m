@@ -1,74 +1,26 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 14 Nov 2014 18:30:10 +0000
-Subject: [PATCH v6 3/6] irqchip: gic: Support hierarchy irq domain.
-In-Reply-To: <1415893029-2971-4-git-send-email-yingjoe.chen@mediatek.com>
-References: <1415893029-2971-1-git-send-email-yingjoe.chen@mediatek.com>
- <1415893029-2971-4-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <54664A32.5070200@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 14 Nov 2014 18:32:41 +0000
+Subject: [PATCHv4 4/5] arm64: Emulate CP15 Barrier instructions
+In-Reply-To: <1415792692-11189-5-git-send-email-punit.agrawal@arm.com>
+References: <1415792692-11189-1-git-send-email-punit.agrawal@arm.com>
+ <1415792692-11189-5-git-send-email-punit.agrawal@arm.com>
+Message-ID: <20141114183240.GF6755@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/11/14 15:37, Yingjoe Chen wrote:
-> Add support to use gic as a parent for stacked irq domain.
+On Wed, Nov 12, 2014 at 11:44:51AM +0000, Punit Agrawal wrote:
+> The CP15 barrier instructions (CP15ISB, CP15DSB and CP15DMB) are
+> deprecated in the ARMv7 architecture, superseded by ISB, DSB and DMB
+> instructions respectively. Some implementations may provide the
+> ability to disable the CP15 barriers by disabling the CP15BEN bit in
+> SCTLR_EL1. If not enabled, the encodings for these instructions become
+> undefined.
 > 
-> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> ---
->  drivers/irqchip/Kconfig   |  1 +
->  drivers/irqchip/irq-gic.c | 80 ++++++++++++++++++++++++++++++++---------------
->  2 files changed, 55 insertions(+), 26 deletions(-)
+> To support legacy software using these instructions, this patch
+> register hooks to -
+> * emulate CP15 barriers and warn the user about their use
+> * toggle CP15BEN in SCTLR_EL1
 > 
-> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> index b21f12f..7f34138 100644
-> --- a/drivers/irqchip/Kconfig
-> +++ b/drivers/irqchip/Kconfig
-> @@ -5,6 +5,7 @@ config IRQCHIP
->  config ARM_GIC
->  	bool
->  	select IRQ_DOMAIN
-> +	select IRQ_DOMAIN_HIERARCHY
->  	select MULTI_IRQ_HANDLER
->  
->  config GIC_NON_BANKED
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 38493ff..fe9ab93 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -788,17 +788,16 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
->  {
->  	if (hw < 32) {
->  		irq_set_percpu_devid(irq);
-> -		irq_set_chip_and_handler(irq, &gic_chip,
-> -					 handle_percpu_devid_irq);
-> +		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
-> +				    handle_percpu_devid_irq, NULL, NULL);
->  		set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
->  	} else {
-> -		irq_set_chip_and_handler(irq, &gic_chip,
-> -					 handle_fasteoi_irq);
-> +		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
-> +				    handle_fasteoi_irq, NULL, NULL);
->  		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
->  
->  		gic_routable_irq_domain_ops->map(d, irq, hw);
->  	}
-> -	irq_set_chip_data(irq, d->host_data);
->  	return 0;
->  }
->  
-> @@ -814,8 +813,6 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
->  {
->  	unsigned long ret = 0;
->  
-> -	if (d->of_node != controller)
-> -		return -EINVAL;
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 
-I'm not sure if removing that check is the right thing to do. You had to
-remove it because your sysirq driver passes its own of_phandle_args
-directly to the GIC code. I think that's a bad idea, and you should fix
-the sysirq layer instead.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
