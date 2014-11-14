@@ -1,64 +1,214 @@
-From: j.uzycki@elproma.com.pl (Janusz Uzycki)
-Date: Fri, 14 Nov 2014 23:27:06 +0100
-Subject: [PATCH] gpio: mxs: implement get_direction callback
-Message-ID: <1416004026-9667-1-git-send-email-j.uzycki@elproma.com.pl>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 14 Nov 2014 14:46:20 -0800
+Subject: [PATCH v9 2/9] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <1414194024-55547-3-git-send-email-lina.iyer@linaro.org>
+References: <1414194024-55547-1-git-send-email-lina.iyer@linaro.org>
+ <1414194024-55547-3-git-send-email-lina.iyer@linaro.org>
+Message-ID: <20141114224620.GD11808@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Function gpiod_get_direction() of gpiolib calls get_direction()
-callback. If chip doesn't implement it EINVAL error is returned.
-The function doesn't use for returned value shadowed FLAG_IS_OUT
-bit of gpio_desc.flags field so the callback is required.
-The patch implements the missing callback.
+On 10/24, Lina Iyer wrote:
+> diff --git a/drivers/soc/qcom/spm.c b/drivers/soc/qcom/spm.c
+> new file mode 100644
+> index 0000000..ee2e3ca
+> --- /dev/null
+> +++ b/drivers/soc/qcom/spm.c
+> +#include <linux/module.h>
+> +#include <linux/kernel.h>
+> +#include <linux/delay.h>
 
-Inspired from arch/arm/mach-at91/gpio.c
-Required to get the patch "serial: mxs-auart: enable PPS support" working.
+Is this used?
 
-Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
----
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/slab.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_device.h>
+> +#include <linux/err.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/cpuidle.h>
+> +#include <linux/cpu_pm.h>
+> +
+> +#include <asm/proc-fns.h>
+> +#include <asm/suspend.h>
+> +
+> +#include <soc/qcom/pm.h>
+> +#include <soc/qcom/pm.h>
+> +#include <soc/qcom/scm.h>
+> +#include <soc/qcom/scm-boot.h>
+> +
+> +
+> +#define SCM_CMD_TERMINATE_PC	(0x2)
+> +#define SCM_FLUSH_FLAG_MASK	(0x3)
+> +#define SCM_L2_ON		(0x0)
+> +#define SCM_L2_OFF		(0x1)
+> +#define MAX_PMIC_DATA 2
+> +#define MAX_SEQ_DATA 64
+> +
+> +#define SPM_CTL_INDEX 0x7f
+> +#define SPM_CTL_INDEX_SHIFT 4
+> +#define SPM_CTL_EN BIT(0)
 
-Two patches were missed during movements between our internal repos.
-The 2/2 patch is required against commits:
-  f9e42397d79b ("serial: mxs-auart: add interrupts for modem control lines")
-  36a262782b04 ("serial: mxs-auart: enable PPS support")
-I've done build-test for the next only before.
-I should have done hardware test also for the next, sorry.
-Now it is tested for the next on real hardware too.
+Nitpick, why aren't these also tabbed out?
 
----
- drivers/gpio/gpio-mxs.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+> +
+> +/**
+> + * spm_set_low_power_mode() - Configure SPM start address for low power mode
+> + * @mode: SPM LPM mode to enter
+> + */
+> +int qcom_spm_set_low_power_mode(enum pm_sleep_mode mode)
 
-diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
-index 8ffdd7d..56052c2 100644
---- a/drivers/gpio/gpio-mxs.c
-+++ b/drivers/gpio/gpio-mxs.c
-@@ -227,6 +227,18 @@ static int mxs_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
- 	return irq_find_mapping(port->domain, offset);
- }
- 
-+static int mxs_gpio_get_direction(struct gpio_chip *gc, unsigned offset)
-+{
-+	struct bgpio_chip *bgc = to_bgpio_chip(gc);
-+	struct mxs_gpio_port *port =
-+		container_of(bgc, struct mxs_gpio_port, bgc);
-+	u32 mask = 1 << offset;
-+	u32 dir;
-+
-+	dir = readl(port->base + PINCTRL_DOE(port));
-+	return !(dir & mask);
-+}
-+
- static struct platform_device_id mxs_gpio_ids[] = {
- 	{
- 		.name = "imx23-gpio",
-@@ -320,6 +332,7 @@ static int mxs_gpio_probe(struct platform_device *pdev)
- 		goto out_irqdesc_free;
- 
- 	port->bgc.gc.to_irq = mxs_gpio_to_irq;
-+	port->bgc.gc.get_direction = mxs_gpio_get_direction;
- 	port->bgc.gc.base = port->id * 32;
- 
- 	err = gpiochip_add(&port->bgc.gc);
+static?
+
+> +{
+> +	struct spm_driver_data *drv = this_cpu_ptr(&cpu_spm_drv);
+> +	u32 start_index;
+> +	u32 ctl_val;
+> +
+> +	if (!drv->available)
+> +		return -ENXIO;
+
+It would be nice if we didn't need this by only registering the
+cpuidle device for this CPU once we've initialized the SPM
+hardware.
+
+> +
+> +	start_index = drv->reg_data->start_index[mode];
+> +
+> +	ctl_val = spm_register_read(drv, SPM_REG_SPM_CTL);
+> +	ctl_val &= ~(SPM_CTL_INDEX << SPM_CTL_INDEX_SHIFT);
+> +	ctl_val |= start_index << SPM_CTL_INDEX_SHIFT;
+> +	ctl_val |= SPM_CTL_EN;
+> +	spm_register_write(drv, SPM_REG_SPM_CTL, ctl_val);
+> +
+> +	/* Ensure we have written the start address */
+> +	wmb();
+> +
+> +	return 0;
+> +}
+> +
+> +static int qcom_pm_collapse(unsigned long int unused)
+> +{
+> +	int ret;
+> +	u32 flag;
+> +	int cpu = smp_processor_id();
+> +
+> +	ret = scm_set_warm_boot_addr(cpu_resume, cpu);
+> +	if (ret) {
+> +		pr_err("Failed to set warm boot address for cpu %d\n", cpu);
+
+Do we want this print? Won't it start spamming the log if we go
+idle and we can't set the flag? Maybe we should just be silent
+and return an error.
+
+> +		return ret;
+> +	}
+> +
+> +	flag = SCM_L2_ON & SCM_FLUSH_FLAG_MASK;
+> +	scm_call_atomic1(SCM_SVC_BOOT, SCM_CMD_TERMINATE_PC, flag);
+> +
+> +	/**
+> +	 *  Returns here only if there was a pending interrupt and we did not
+> +	 *  power down as a result.
+> +	 */
+> +	return 0;
+> +}
+[...]
+> +
+> +static struct qcom_cpu_pm_ops lpm_ops = {
+
+const?
+
+> +	.standby = qcom_cpu_standby,
+> +	.spc = qcom_cpu_spc,
+> +};
+> +
+> +struct platform_device qcom_cpuidle_device = {
+> +	.name              = "qcom_cpuidle",
+> +	.id                = -1,
+> +	.dev.platform_data = &lpm_ops,
+> +};
+
+This can be created dynamically instead of living statically.
+
+> +
+> +static int spm_dev_probe(struct platform_device *pdev)
+> +{
+[...]
+> +
+> +	match_id = of_match_node(spm_match_table, pdev->dev.of_node);
+> +	if (!match_id)
+> +		return -ENODEV;
+> +
+> +	drv->reg_data = match_id->data;
+> +	if (!drv->reg_data)
+> +		return -EINVAL;
+
+This check seems useless. We control the .data field right above
+this function so there better be some reg_data.
+
+> +
+> +	/* Write the SPM sequences, first.. */
+> +	addr = drv->reg_base + drv->reg_data->reg_offset[SPM_REG_SEQ_ENTRY];
+> +	seq_data = (const u32 *)drv->reg_data->seq;
+
+Why do we need a cast?
+
+> +	__iowrite32_copy(addr, seq_data, ARRAY_SIZE(drv->reg_data->seq)/4);
+
+nitpick: space around that / please.
+
+> +
+> +	/* ..and then, the control registers.
+> +	 * On some SoC's if the control registers are written first and if the
+> +	 * CPU was held in reset, the reset signal could trigger the SPM state
+> +	 * machine, before the sequences are completely written.
+> +	 */
+> +	spm_register_write(drv, SPM_REG_CFG, drv->reg_data->spm_cfg);
+> +	spm_register_write(drv, SPM_REG_DLY, drv->reg_data->spm_dly);
+> +	spm_register_write(drv, SPM_REG_PMIC_DLY, drv->reg_data->pmic_dly);
+> +
+> +	spm_register_write(drv, SPM_REG_PMIC_DATA_0,
+> +				drv->reg_data->pmic_data[0]);
+> +	spm_register_write(drv, SPM_REG_PMIC_DATA_1,
+> +				drv->reg_data->pmic_data[1]);
+> +
+> +	/**
+> +	 * Ensure all observers see the above register writes before the
+> +	 * cpuidle driver is allowed to use the SPM.
+> +	 */
+> +	wmb();
+> +	drv->available = true;
+> +
+> +	if ((cpu > -1) && !cpuidle_drv_init) {
+
+Nitpick: () are unnecessary.
+
+> +		platform_device_register(&qcom_cpuidle_device);
+> +		cpuidle_drv_init = true;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver spm_driver = {
+> +	.probe = spm_dev_probe,
+> +	.driver = {
+> +		.name = "qcom,spm",
+
+This is an odd driver name with the "qcom," part. Maybe call it "spm" or "saw"?
+
+> +		.of_match_table = spm_match_table,
+> +	},
+> +};
+> +
+> +module_platform_driver(spm_driver);
+
+MODULE_LICENSE()?
+MODULE_ALIAS()?
+
 -- 
-1.7.11.3
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
