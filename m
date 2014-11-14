@@ -1,124 +1,172 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 14 Nov 2014 10:07:53 +0000
-Subject: [PATCH v4 09/19] arm/arm64: KVM: make the value of ICC_SRE_EL1 a
- per-VM variable
+Date: Fri, 14 Nov 2014 10:08:02 +0000
+Subject: [PATCH v4 18/19] arm/arm64: KVM: enable kernel side of GICv3 emulation
 In-Reply-To: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
 References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1415959683-26027-10-git-send-email-andre.przywara@arm.com>
+Message-ID: <1415959683-26027-19-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ICC_SRE_EL1 is a system register allowing msr/mrs accesses to the
-GIC CPU interface for EL1 (guests). Currently we force it to 0, but
-for proper GICv3 support we have to allow guests to use it (depending
-on their selected virtual GIC model).
-So add ICC_SRE_EL1 to the list of saved/restored registers on a
-world switch, but actually disallow a guest to change it by only
-restoring a fixed, once-initialized value.
-This value depends on the GIC model userland has chosen for a guest.
+With all the necessary GICv3 emulation code in place, we can now
+connect the code to the GICv3 backend in the kernel.
+The LR register handling is different depending on the emulated GIC
+model, so provide different implementations for each.
+Also allow non-v2-compatible GICv3 implementations (which don't
+provide MMIO regions for the virtual CPU interface in the DT), but
+restrict those hosts to support GICv3 guests only.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
 Changelog v3...v4:
-- initialize variable on declaration
+- handle differences between GICv2-on-v3 and GICv3-on-v3 in existing functions
+- remove init_*_emul() functions
+- remove max_vcpus setting (done in earlier patches now)
+- adapt to new vgic_v<n>_init_emulation behaviour
 
- arch/arm64/kernel/asm-offsets.c |    1 +
- arch/arm64/kvm/vgic-v3-switch.S |   14 +++++++++-----
- include/kvm/arm_vgic.h          |    1 +
- virt/kvm/arm/vgic-v3.c          |    8 ++++++--
- 4 files changed, 17 insertions(+), 7 deletions(-)
+ virt/kvm/arm/vgic-v3.c |   83 ++++++++++++++++++++++++++++++++----------------
+ virt/kvm/arm/vgic.c    |    5 +++
+ 2 files changed, 60 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 9a9fce0..9d34486 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -140,6 +140,7 @@ int main(void)
-   DEFINE(VGIC_V2_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_v2.vgic_elrsr));
-   DEFINE(VGIC_V2_CPU_APR,	offsetof(struct vgic_cpu, vgic_v2.vgic_apr));
-   DEFINE(VGIC_V2_CPU_LR,	offsetof(struct vgic_cpu, vgic_v2.vgic_lr));
-+  DEFINE(VGIC_V3_CPU_SRE,	offsetof(struct vgic_cpu, vgic_v3.vgic_sre));
-   DEFINE(VGIC_V3_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_hcr));
-   DEFINE(VGIC_V3_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_vmcr));
-   DEFINE(VGIC_V3_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v3.vgic_misr));
-diff --git a/arch/arm64/kvm/vgic-v3-switch.S b/arch/arm64/kvm/vgic-v3-switch.S
-index d160469..617a012 100644
---- a/arch/arm64/kvm/vgic-v3-switch.S
-+++ b/arch/arm64/kvm/vgic-v3-switch.S
-@@ -148,17 +148,18 @@
-  * x0: Register pointing to VCPU struct
-  */
- .macro	restore_vgic_v3_state
--	// Disable SRE_EL1 access. Necessary, otherwise
--	// ICH_VMCR_EL2.VFIQEn becomes one, and FIQ happens...
--	msr_s	ICC_SRE_EL1, xzr
--	isb
--
- 	// Compute the address of struct vgic_cpu
- 	add	x3, x0, #VCPU_VGIC_CPU
- 
- 	// Restore all interesting registers
- 	ldr	w4, [x3, #VGIC_V3_CPU_HCR]
- 	ldr	w5, [x3, #VGIC_V3_CPU_VMCR]
-+	ldr	w25, [x3, #VGIC_V3_CPU_SRE]
-+
-+	msr_s	ICC_SRE_EL1, x25
-+
-+	// make sure SRE is valid before writing the other registers
-+	isb
- 
- 	msr_s	ICH_HCR_EL2, x4
- 	msr_s	ICH_VMCR_EL2, x5
-@@ -244,9 +245,12 @@
- 	dsb	sy
- 
- 	// Prevent the guest from touching the GIC system registers
-+	// if SRE isn't enabled for GICv3 emulation
-+	cbnz	x25, 1f
- 	mrs_s	x5, ICC_SRE_EL2
- 	and	x5, x5, #~ICC_SRE_EL2_ENABLE
- 	msr_s	ICC_SRE_EL2, x5
-+1:
- .endm
- 
- ENTRY(__save_vgic_v3_state)
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 09344ac..421833f 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -243,6 +243,7 @@ struct vgic_v3_cpu_if {
- #ifdef CONFIG_ARM_GIC_V3
- 	u32		vgic_hcr;
- 	u32		vgic_vmcr;
-+	u32		vgic_sre;	/* Restored only, change ignored */
- 	u32		vgic_misr;	/* Saved only */
- 	u32		vgic_eisr;	/* Saved only */
- 	u32		vgic_elrsr;	/* Saved only */
 diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-index acd256c7..a04d208 100644
+index a04d208..4894c59 100644
 --- a/virt/kvm/arm/vgic-v3.c
 +++ b/virt/kvm/arm/vgic-v3.c
-@@ -145,15 +145,19 @@ static void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+@@ -34,6 +34,7 @@
+ #define GICH_LR_VIRTUALID		(0x3ffUL << 0)
+ #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
+ #define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
++#define ICH_LR_VIRTUALID_MASK		(BIT_ULL(32) - 1)
  
- static void vgic_v3_enable(struct kvm_vcpu *vcpu)
+ /*
+  * LRs are stored in reverse order in memory. make sure we index them
+@@ -48,12 +49,17 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+ 	struct vgic_lr lr_desc;
+ 	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)];
+ 
+-	lr_desc.irq	= val & GICH_LR_VIRTUALID;
+-	if (lr_desc.irq <= 15)
+-		lr_desc.source	= (val >> GICH_LR_PHYSID_CPUID_SHIFT) & 0x7;
++	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
++		lr_desc.irq = val & ICH_LR_VIRTUALID_MASK;
+ 	else
+-		lr_desc.source = 0;
+-	lr_desc.state	= 0;
++		lr_desc.irq = val & GICH_LR_VIRTUALID;
++
++	lr_desc.source = 0;
++	if (lr_desc.irq <= 15 &&
++	    vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2)
++		lr_desc.source	= (val >> GICH_LR_PHYSID_CPUID_SHIFT) & 0x7;
++
++	lr_desc.state   = 0;
+ 
+ 	if (val & ICH_LR_PENDING_BIT)
+ 		lr_desc.state |= LR_STATE_PENDING;
+@@ -68,8 +74,20 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+ static void vgic_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
+ 			   struct vgic_lr lr_desc)
  {
-+	struct vgic_v3_cpu_if *vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
+-	u64 lr_val = (((u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT) |
+-		      lr_desc.irq);
++	u64 lr_val;
 +
- 	/*
- 	 * By forcing VMCR to zero, the GIC will restore the binary
- 	 * points to their reset values. Anything else resets to zero
- 	 * anyway.
++	lr_val = lr_desc.irq;
++
++	/*
++	 * currently all guest IRQs are Group1, as Group0 would result
++	 * in a FIQ in the guest, which it wouldn't expect.
++	 * Eventually we want to make this configurable, so we may revisit
++	 * this in the future.
++	 */
++	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
++		lr_val |= ICH_LR_GROUP;
++	else
++		lr_val |= (u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT;
+ 
+ 	if (lr_desc.state & LR_STATE_PENDING)
+ 		lr_val |= ICH_LR_PENDING_BIT;
+@@ -154,7 +172,14 @@ static void vgic_v3_enable(struct kvm_vcpu *vcpu)
  	 */
--	vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr = 0;
-+	vgic_v3->vgic_vmcr = 0;
-+
-+	vgic_v3->vgic_sre = 0;
+ 	vgic_v3->vgic_vmcr = 0;
+ 
+-	vgic_v3->vgic_sre = 0;
++	/*
++	 * Set the SRE_EL1 value depending on the configured
++	 * emulated vGIC model.
++	 */
++	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
++		vgic_v3->vgic_sre = ICC_SRE_EL1_SRE;
++	else
++		vgic_v3->vgic_sre = 0;
  
  	/* Get the show on the road... */
--	vcpu->arch.vgic_cpu.vgic_v3.vgic_hcr = ICH_HCR_EN;
-+	vgic_v3->vgic_hcr = ICH_HCR_EN;
- }
+ 	vgic_v3->vgic_hcr = ICH_HCR_EN;
+@@ -215,28 +240,30 @@ int vgic_v3_probe(struct device_node *vgic_node,
  
- static const struct vgic_ops vgic_v3_ops = {
+ 	gicv_idx += 3; /* Also skip GICD, GICC, GICH */
+ 	if (of_address_to_resource(vgic_node, gicv_idx, &vcpu_res)) {
+-		kvm_err("Cannot obtain GICV region\n");
+-		ret = -ENXIO;
+-		goto out;
+-	}
+-
+-	if (!PAGE_ALIGNED(vcpu_res.start)) {
+-		kvm_err("GICV physical address 0x%llx not page aligned\n",
+-			(unsigned long long)vcpu_res.start);
+-		ret = -ENXIO;
+-		goto out;
+-	}
+-
+-	if (!PAGE_ALIGNED(resource_size(&vcpu_res))) {
+-		kvm_err("GICV size 0x%llx not a multiple of page size 0x%lx\n",
+-			(unsigned long long)resource_size(&vcpu_res),
+-			PAGE_SIZE);
+-		ret = -ENXIO;
+-		goto out;
++		kvm_info("GICv3: GICv2 emulation not available\n");
++		vgic->vcpu_base = 0;
++	} else {
++		if (!PAGE_ALIGNED(vcpu_res.start)) {
++			kvm_err("GICV physical address 0x%llx not page aligned\n",
++				(unsigned long long)vcpu_res.start);
++			ret = -ENXIO;
++			goto out;
++		}
++
++		if (!PAGE_ALIGNED(resource_size(&vcpu_res))) {
++			kvm_err("GICV size 0x%llx not a multiple of page size 0x%lx\n",
++				(unsigned long long)resource_size(&vcpu_res),
++				PAGE_SIZE);
++			ret = -ENXIO;
++			goto out;
++		}
++
++		vgic->vcpu_base = vcpu_res.start;
++		kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
++					KVM_DEV_TYPE_ARM_VGIC_V2);
+ 	}
+-	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
++	kvm_register_device_ops(&kvm_arm_vgic_v3_ops, KVM_DEV_TYPE_ARM_VGIC_V3);
+ 
+-	vgic->vcpu_base = vcpu_res.start;
+ 	vgic->vctrl_base = NULL;
+ 	vgic->type = VGIC_V3;
+ 	vgic->max_hw_vcpus = KVM_MAX_VCPUS;
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index b7de0f8..1dbaeb5 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1577,6 +1577,11 @@ static int init_vgic_model(struct kvm *kvm, int type)
+ 	case KVM_DEV_TYPE_ARM_VGIC_V2:
+ 		ret = vgic_v2_init_emulation(kvm);
+ 		break;
++#ifdef CONFIG_ARM_GIC_V3
++	case KVM_DEV_TYPE_ARM_VGIC_V3:
++		ret = vgic_v3_init_emulation(kvm);
++		break;
++#endif
+ 	default:
+ 		ret = -ENODEV;
+ 		break;
 -- 
 1.7.9.5
