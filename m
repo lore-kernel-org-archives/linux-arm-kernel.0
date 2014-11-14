@@ -1,41 +1,34 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri, 14 Nov 2014 22:05:07 +0200
-Subject: [PATCHv6 4/5] hwspinlock/core: add common OF helpers
-In-Reply-To: <5466373B.2070808@ti.com>
-References: <1410553499-55951-1-git-send-email-s-anna@ti.com>
- <1410553499-55951-5-git-send-email-s-anna@ti.com>
- <CAK=WgbamdqAufjC4Xb5moERRBSB-cO6c1RPTE=f+dp75F+Eh7A@mail.gmail.com>
- <5463B5B6.8040709@ti.com>
- <CAK=WgbbatPTiz3efDWHVEcuug_UQfkCViMoK0zcfUg3JwB2oTA@mail.gmail.com>
- <5464EC7A.7050603@ti.com>
- <CAK=WgbbodS8GsUxQbkyCp6hAG+Ko4LMirx+pUa8_fUdxWFasvw@mail.gmail.com>
- <54651C48.90809@ti.com>
- <CAK=WgbYMM19-rWLOBjix+TA3fF_Pb25ia1rutDxYSUg9SV0efg@mail.gmail.com>
- <5466373B.2070808@ti.com>
-Message-ID: <CAK=WgbYEQPwPH-i_kfF8-h6uOH9q4rcT1+W0smG3e=chDg833Q@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 14 Nov 2014 21:10:36 +0100
+Subject: [PATCH] MAINTAINERS: add pattern for respective device tree
+ files to Armada entry
+In-Reply-To: <1415994009-3548-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1415994009-3548-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20141114201036.GH2001@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 14, 2014 at 7:09 PM, Suman Anna <s-anna@ti.com> wrote:
->> It seems to me that hwspin_lock_request_specific failures should be
->> used by clients to defer their probing. Why wouldn't such a simple
->> solution work?
+On Fri, Nov 14, 2014 at 08:40:09PM +0100, Uwe Kleine-K?nig wrote:
+> This makes it more likely that changes to these files are addressed to the
+> right maintainers.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  MAINTAINERS | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 60b1163dba28..282e5427209c 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1136,6 +1136,7 @@ M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  S:	Maintained
+>  F:	arch/arm/mach-mvebu/
+> +F:	arch/arm/boot/dts/armada-*
 
-> Because the API always returns NULL on failures and there is no way for
-> the clients to figure out if the lock id passed is invalid or the bank
-> containing the lock is not registered.
+Hi Uwe
 
-It seems to me this may always be the case - lock ids may be wrong and
-there's no way to fully validate them.
+Maybe also add kirkwood-* and dove-*
 
-Let's start with the simpler approach where
-hwspin_lock_request_specific failures are used by clients to defer
-their probing.
-
-If a real use case will require changes we can always do that later,
-though it seems to me the only gain by changing this API is to catch a
-small subset of fatal DT mistakes which will anyway be caught very
-early in the development.
-
-Thanks,
-Ohad.
+      Andrew
