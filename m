@@ -1,73 +1,56 @@
-From: gang.chen.5i5j@gmail.com (Chen Gang)
-Date: Fri, 14 Nov 2014 22:27:03 +0800
-Subject: [PATCH] virt: kvm: arm: vgic: Process the failure case when
- kvm_register_device_ops() fails
-In-Reply-To: <54660D33.5090309@arm.com>
-References: <5464C865.90504@gmail.com> <5464CE9A.6050209@arm.com>
- <54660C32.6090602@gmail.com> <54660D33.5090309@arm.com>
-Message-ID: <54661137.4000806@gmail.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Fri, 14 Nov 2014 15:33:39 +0100
+Subject: [PATCH 1/2] mmc: atmel-mci: remove compat for non DT board when
+ requesting dma chan
+Message-ID: <1415975620-30140-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/2014 10:09 PM, Marc Zyngier wrote:
-> On 14/11/14 14:05, Chen Gang wrote:
->> On 11/13/2014 11:30 PM, Marc Zyngier wrote:
->>> On 13/11/14 15:04, Chen Gang wrote:
->>>> When kvm_register_device_ops() fails, also need call free_percpu_irq()
->>>> just like others have down within kvm_vgic_hyp_init().
->>>>
->>>> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
->>>> ---
->>>>  virt/kvm/arm/vgic.c | 10 ++++++++--
->>>>  1 file changed, 8 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->>>> index 3aaca49..b799f17 100644
->>>> --- a/virt/kvm/arm/vgic.c
->>>> +++ b/virt/kvm/arm/vgic.c
->>>> @@ -2470,8 +2470,14 @@ int kvm_vgic_hyp_init(void)
->>>>  
->>>>  	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
->>>>  
->>>> -	return kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
->>>> -				       KVM_DEV_TYPE_ARM_VGIC_V2);
->>>> +	ret = kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
->>>> +				      KVM_DEV_TYPE_ARM_VGIC_V2);
->>>> +	if (ret) {
->>>> +		kvm_err("Cannot register device ops\n");
->>>> +		goto out_free_irq;
->>>> +	}
->>>> +
->>>> +	return 0;
->>>>  
->>>>  out_free_irq:
->>>>  	free_percpu_irq(vgic->maint_irq, kvm_get_running_vcpus());
->>>>
->>>
->>> Awesome. You're now freeing a per-cpu interrupt after just after having
->>> enabled it on all CPUs. What could possibly go wrong?
->>>
->>
->> OK, thanks. What you said sound reasonable to me. Need call on_each_cpu
->> for disable_percpu_irq(). Also need call __unregister_cpu_notifier(),
->> and need a new function vgic_arch_unsetup() for arm64.
-> 
-> No. Just look at the code. Why don't you just move the
-> kvm_register_device_ops call *before* enabling the interrupt?
-> 
+All boards with a dma controller have DT support so using
+dma_request_slave_channel_compat is no more needed.
 
-Only based on the current code, what you said is reasonable to me.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ drivers/mmc/host/atmel-mci.c | 20 +-------------------
+ 1 file changed, 1 insertion(+), 19 deletions(-)
 
-But in the normal initializing sequence, firstly for architecture
-dependence features, then for common cpu features, at last for other
-devices (at least, other devices need be the last).
-
-So for me, we need still remain current initializing sequence for
-extensible in the future.
-
-
-Thanks.
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index a7b59ba..de2287c 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -2272,23 +2272,6 @@ static void atmci_cleanup_slot(struct atmel_mci_slot *slot,
+ 	mmc_free_host(slot->mmc);
+ }
+ 
+-static bool atmci_filter(struct dma_chan *chan, void *pdata)
+-{
+-	struct mci_platform_data *sl_pdata = pdata;
+-	struct mci_dma_data *sl;
+-
+-	if (!sl_pdata)
+-		return false;
+-
+-	sl = sl_pdata->dma_slave;
+-	if (sl && find_slave_dev(sl) == chan->device->dev) {
+-		chan->private = slave_data_ptr(sl);
+-		return true;
+-	} else {
+-		return false;
+-	}
+-}
+-
+ static bool atmci_configure_dma(struct atmel_mci *host)
+ {
+ 	struct mci_platform_data	*pdata;
+@@ -2302,8 +2285,7 @@ static bool atmci_configure_dma(struct atmel_mci *host)
+ 	dma_cap_zero(mask);
+ 	dma_cap_set(DMA_SLAVE, mask);
+ 
+-	host->dma.chan = dma_request_slave_channel_compat(mask, atmci_filter, pdata,
+-							  &host->pdev->dev, "rxtx");
++	host->dma.chan = dma_request_slave_channel(&host->pdev->dev, "rxtx");
+ 	if (!host->dma.chan) {
+ 		dev_warn(&host->pdev->dev, "no DMA channel available\n");
+ 		return false;
 -- 
-Chen Gang
-
-Open share and attitude like air water and life which God blessed
+2.0.3
