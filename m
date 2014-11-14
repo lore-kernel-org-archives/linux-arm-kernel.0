@@ -1,151 +1,79 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Fri, 14 Nov 2014 10:37:31 +0530
-Subject: [PATCH v4 6/6] input: touchscreen: ti_am335x_tsc: Replace delta
- filtering with median filtering
-In-Reply-To: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
-References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
-Message-ID: <1415941651-28962-7-git-send-email-vigneshr@ti.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Fri, 14 Nov 2014 11:40:06 +0530
+Subject: [PATCH] ARM: b.L: fix unmet dependency for CPU_PM
+In-Reply-To: <alpine.LFD.2.11.1411131259330.11690@knanqh.ubzr>
+References: <1415857098-16928-1-git-send-email-pankaj.dubey@samsung.com>
+ <alpine.LFD.2.11.1411131231060.11690@knanqh.ubzr>
+ <20141113174837.GB4042@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1411131259330.11690@knanqh.ubzr>
+Message-ID: <001401cfffd1$ae9df930$0bd9eb90$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously, delta filtering was applied TSC co-ordinate readouts before
-reporting a single value to user space. This patch replaces delta filtering
-with median filtering. Median filtering sorts co-ordinate readouts, drops min
-and max values, and reports the average of remaining values. This method is
-more sensible than delta filering. Median filtering is applied only if number
-of readouts is greater than 3 else just average of co-ordinate readouts is
-reported.
++CC: Colin Cross, James Hogan
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- drivers/input/touchscreen/ti_am335x_tsc.c | 91 +++++++++++++++++--------------
- 1 file changed, 51 insertions(+), 40 deletions(-)
+On Thursday, November 13, 2014 11:30 PM, Nicolas Pitre wrote:
+> To: Russell King - ARM Linux
+> Cc: Pankaj Dubey; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org
+> Subject: Re: [PATCH] ARM: b.L: fix unmet dependency for CPU_PM
+> 
+> On Thu, 13 Nov 2014, Russell King - ARM Linux wrote:
+> 
+> > On Thu, Nov 13, 2014 at 12:44:22PM -0500, Nicolas Pitre wrote:
+> > > On Thu, 13 Nov 2014, Pankaj Dubey wrote:
+> > >
+> > > > If BL_SWITCHER is enabled but SUSPEND and CPU_IDLE is not enabled
+> > > > we are getting following config warning.
+> > > >
+> > > > warning: (BL_SWITCHER) selects CPU_PM which has unmet direct
+> > > > dependencies (SUSPEND || CPU_IDLE)
+> > > >
+> > > > So BL_SWITCHER should enable CPU_PM only if either of SUSPEND or
+> > > > CPU_IDLE is selected.
+> > > >
+> > > > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> > > > ---
+> > > >  arch/arm/Kconfig |    2 +-
+> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > >
+> > > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig index
+> > > > 9d580d0..fe3d969 100644
+> > > > --- a/arch/arm/Kconfig
+> > > > +++ b/arch/arm/Kconfig
+> > > > @@ -1417,7 +1417,7 @@ config BL_SWITCHER
+> > > >  	bool "big.LITTLE switcher support"
+> > > >  	depends on BIG_LITTLE && MCPM && HOTPLUG_CPU
+> > > >  	select ARM_CPU_SUSPEND
+> > > > -	select CPU_PM
+> > > > +	select CPU_PM if (SUSPEND || CPU_IDLE)
+> > >
+> > > NAK.  You just broke the code by doing this. CPU_PM is a requirement
+> > > here.  The dependencies for CPU_PM is lacking.
+> >
 
-diff --git a/drivers/input/touchscreen/ti_am335x_tsc.c b/drivers/input/touchscreen/ti_am335x_tsc.c
-index e64055a8cd48..b84493fc8a78 100644
---- a/drivers/input/touchscreen/ti_am335x_tsc.c
-+++ b/drivers/input/touchscreen/ti_am335x_tsc.c
-@@ -26,6 +26,7 @@
- #include <linux/delay.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/sort.h>
- 
- #include <linux/mfd/ti_am335x_tscadc.h>
- 
-@@ -204,56 +205,61 @@ static void titsc_step_config(struct titsc *ts_dev)
- 	am335x_tsc_se_set_cache(ts_dev->mfd_tscadc, ts_dev->step_mask);
- }
- 
-+static int titsc_cmp_coord(const void *a, const void *b)
-+{
-+	return *(int *)a - *(int *)b;
-+}
-+
- static void titsc_read_coordinates(struct titsc *ts_dev,
- 		u32 *x, u32 *y, u32 *z1, u32 *z2)
- {
--	unsigned int fifocount = titsc_readl(ts_dev, REG_FIFO0CNT);
--	unsigned int prev_val_x = ~0, prev_val_y = ~0;
--	unsigned int prev_diff_x = ~0, prev_diff_y = ~0;
--	unsigned int read, diff;
--	unsigned int i, channel;
-+	unsigned int yvals[7], xvals[7];
-+	unsigned int i, xsum = 0, ysum = 0;
- 	unsigned int creads = ts_dev->coordinate_readouts;
--	unsigned int first_step = TOTAL_STEPS - (creads * 2 + 2);
- 
--	*z1 = *z2 = 0;
--	if (fifocount % (creads * 2 + 2))
--		fifocount -= fifocount % (creads * 2 + 2);
--	/*
--	 * Delta filter is used to remove large variations in sampled
--	 * values from ADC. The filter tries to predict where the next
--	 * coordinate could be. This is done by taking a previous
--	 * coordinate and subtracting it form current one. Further the
--	 * algorithm compares the difference with that of a present value,
--	 * if true the value is reported to the sub system.
--	 */
--	for (i = 0; i < fifocount; i++) {
--		read = titsc_readl(ts_dev, REG_FIFO0);
--
--		channel = (read & 0xf0000) >> 16;
--		read &= 0xfff;
--		if (channel > first_step + creads + 2) {
--			diff = abs(read - prev_val_x);
--			if (diff < prev_diff_x) {
--				prev_diff_x = diff;
--				*x = read;
--			}
--			prev_val_x = read;
-+	for (i = 0; i < creads; i++) {
-+		yvals[i] = titsc_readl(ts_dev, REG_FIFO0);
-+		yvals[i] &= 0xfff;
-+	}
- 
--		} else if (channel == first_step + creads + 1) {
--			*z1 = read;
-+	*z1 = titsc_readl(ts_dev, REG_FIFO0);
-+	*z1 &= 0xfff;
-+	*z2 = titsc_readl(ts_dev, REG_FIFO0);
-+	*z2 &= 0xfff;
- 
--		} else if (channel == first_step + creads + 2) {
--			*z2 = read;
-+	for (i = 0; i < creads; i++) {
-+		xvals[i] = titsc_readl(ts_dev, REG_FIFO0);
-+		xvals[i] &= 0xfff;
-+	}
- 
--		} else if (channel > first_step) {
--			diff = abs(read - prev_val_y);
--			if (diff < prev_diff_y) {
--				prev_diff_y = diff;
--				*y = read;
--			}
--			prev_val_y = read;
-+	/*
-+	 * If co-ordinates readouts is less than 4 then
-+	 * report the average. In case of 4 or more
-+	 * readouts, sort the co-ordinate samples, drop
-+	 * min and max values and report the average of
-+	 * remaining values.
-+	 */
-+	if (creads <=  3) {
-+		for (i = 0; i < creads; i++) {
-+			ysum += yvals[i];
-+			xsum += xvals[i];
- 		}
-+		ysum /= creads;
-+		xsum /= creads;
-+	} else {
-+		sort(yvals, creads, sizeof(unsigned int),
-+		     titsc_cmp_coord, NULL);
-+		sort(xvals, creads, sizeof(unsigned int),
-+		     titsc_cmp_coord, NULL);
-+		for (i = 1; i < creads - 1; i++) {
-+			ysum += yvals[i];
-+			xsum += xvals[i];
-+		}
-+		ysum /= creads - 2;
-+		xsum /= creads - 2;
- 	}
-+	*y = ysum;
-+	*x = xsum;
- }
- 
- static irqreturn_t titsc_irq(int irq, void *dev)
-@@ -367,6 +373,11 @@ static int titsc_parse_dt(struct platform_device *pdev,
- 	if (err < 0)
- 		return err;
- 
-+	if (ts_dev->coordinate_readouts <= 0) {
-+		dev_warn(&pdev->dev, "invalid co-ordinate readouts, resetting it to 5\n");
-+		ts_dev->coordinate_readouts = 5;
-+	}
-+
- 	err = of_property_read_u32(node, "ti,charge-delay",
- 				   &ts_dev->charge_delay);
- 	if (err < 0)
--- 
-1.9.1
+OK, got it. Even though compilation worked, but as you mentioned by doing
+this way
+bL_switcher functionality may broke.
+
+> > Is there any real technical reason that CPU_PM depends on SUSPEND ||
+> > CPU_IDLE ?  If not, those dependencies should be killed.
+> 
+> Those dependencies look artificial to me.
+> 
+
+For me also it looks like these dependencies are artificial.
+As far as I can see CONFIG_CPU_PM compiles following two files 
+1: kernel/cpu_pm.c - I can't see any dependency of SUSPEND or CPU_IDLE in
+this file.
+2: arch/mips/kernel/pm.c: A quick look does not show any dependency of
+SUSPEND or
+   CPU_IDLE here too.
+
+So for me it looks like it is OK to kill these dependencies of CPU_PM. 
+Still safer side I am CCing this to author of these files for confirmation.
+
+Thanks,
+Pankaj Dubey
+> 
+> Nicolas
