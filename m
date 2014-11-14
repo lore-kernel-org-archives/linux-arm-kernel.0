@@ -1,74 +1,60 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 14 Nov 2014 01:22:15 +0000
-Subject: [PATCH 2/8] arm64: Add new hcall HVC_CALL_FUNC
+Date: Fri, 14 Nov 2014 01:22:16 +0000
+Subject: [PATCH 7/8] arm64/kexec: Add checks for KVM and EFI
 In-Reply-To: <cover.1415926876.git.geoff@infradead.org>
 References: <cover.1415926876.git.geoff@infradead.org>
-Message-ID: <c7d0933936e3fde4f0861d1f6350bcfffadf5189.1415926876.git.geoff@infradead.org>
+Message-ID: <b7b2f48822a563bafe2888d7ac8e863731159796.1415926876.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the new hcall HVC_CALL_FUNC that allows execution of a function at EL2.
-During CPU reset the CPU must be brought to the exception level it had on
-entry to the kernel.  The HVC_CALL_FUNC hcall will provide the mechanism
-needed for this exception level switch.
+Add runtime checks that fail the arm64 kexec syscall for situations that would
+result in system instability do to problems in the KVM and EFI kernel support.
+These checks should be removed when the KVM and EFI problems are fixed.
 
 Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
- arch/arm64/include/asm/virt.h | 13 +++++++++++++
- arch/arm64/kernel/hyp-stub.S  | 17 ++++++++++++++---
- 2 files changed, 27 insertions(+), 3 deletions(-)
+ arch/arm64/kernel/machine_kexec.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index 99c319c..055e8d8 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -41,6 +41,19 @@
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index 775bcc3..5b62bd1f 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -16,6 +16,12 @@
+ #include <asm/cacheflush.h>
+ #include <asm/system_misc.h>
  
- #define HVC_CALL_HYP 3
- 
-+/*
-+ * HVC_CALL_FUNC - Execute a function at EL2.
-+ *
-+ * @x0: Physical address of the funtion to be executed.
-+ * @x1: Passed as the first argument to the function.
-+ * @x2: Passed as the second argument to the function.
-+ * @x3: Passed as the third argument to the function.
-+ *
-+ * The called function must preserve the contents of register x18.
-+ */
++/* TODO: Remove this include when KVM can support a kexc reboot. */
++#include <asm/virt.h>
 +
-+#define HVC_CALL_FUNC 4
++/* TODO: Remove this include when EFI can support a kexc reboot. */
++#include <linux/efi.h>
 +
- #ifndef __ASSEMBLY__
+ /* Global variables for the relocate_kernel routine. */
+ extern const unsigned char relocate_new_kernel[];
+ extern const unsigned long relocate_new_kernel_size;
+@@ -101,6 +107,22 @@ int machine_kexec_prepare(struct kimage *image)
  
- /*
-diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index 9ce8746..719c726 100644
---- a/arch/arm64/kernel/hyp-stub.S
-+++ b/arch/arm64/kernel/hyp-stub.S
-@@ -66,9 +66,20 @@ el1_sync:
- 	mrs	x0, vbar_el2
- 	b	2f
+ 	kexec_image_info(image);
  
--1:	cmp	x18, #HVC_SET_VECTORS
--	b.ne	2f
--	msr	vbar_el2, x0
-+1:	cmp     x18, #HVC_SET_VECTORS
-+	b.ne    1f
-+	msr     vbar_el2, x0
-+	b       2f
++	/* TODO: Remove this message when KVM can support a kexc reboot. */
++	if (IS_ENABLED(CONFIG_KVM) && is_hyp_mode_available()) {
++		pr_err("%s: Your kernel is configued with KVM support "
++			"(CONFIG_KVM=y) which currently does not allow for "
++			"kexec re-boot.\n", __func__);
++		return -ENOSYS;
++	}
 +
-+1:	cmp     x18, #HVC_CALL_FUNC
-+	b.ne    2f
-+	mov     x18, lr
-+	mov     lr, x0
-+	mov     x0, x1
-+	mov     x1, x2
-+	mov     x2, x3
-+	blr     lr
-+	mov     lr, x18
++	/* TODO: Remove this message when EFI can support a kexc reboot. */
++	if (efi_enabled(EFI_BOOT)) {
++		pr_err("%s: Your kernel is using the Extensible Firmware "
++			"Interface (EFI) which currently does not allow for "
++			"kexec re-boot.\n", __func__);
++		return -ENOSYS;
++	}
++
+ 	return 0;
+ }
  
- 2:	eret
- ENDPROC(el1_sync)
 -- 
 1.9.1
