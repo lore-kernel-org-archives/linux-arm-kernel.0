@@ -1,114 +1,108 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 14 Nov 2014 09:30:15 +0100
-Subject: [PATCH v9 1/9] qcom: scm: scm_set_warm_boot_addr() to set the
- warmboot address
-In-Reply-To: <1414194024-55547-2-git-send-email-lina.iyer@linaro.org>
-References: <1414194024-55547-1-git-send-email-lina.iyer@linaro.org>
- <1414194024-55547-2-git-send-email-lina.iyer@linaro.org>
-Message-ID: <5465BD97.5070506@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 14 Nov 2014 09:37:17 +0100
+Subject: [RFC PATCH 1/2] pinctrl: Add output-disable
+In-Reply-To: <CAD=FV=VLvoNw5pu5P_iny5a-3-f1XMqGwgQLBp4QmoAM6WPWAA@mail.gmail.com>
+References: <1414529835-16207-1-git-send-email-dianders@chromium.org>
+ <CACRpkdagHFAaPmQptsm7pz_JqYUCbU-0FoH45vrXo8pG6mTAxA@mail.gmail.com>
+ <CAD=FV=VLvoNw5pu5P_iny5a-3-f1XMqGwgQLBp4QmoAM6WPWAA@mail.gmail.com>
+Message-ID: <CACRpkda3QZNoy0RYYYnmc4DY0mhDF0QxREyVi=c_diKnD5rwTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2014 01:40 AM, Lina Iyer wrote:
-> Set the warmboot address using an SCM call, only if the new address is
-> different than the old one.
+On Mon, Nov 3, 2014 at 10:09 PM, Doug Anderson <dianders@chromium.org> wrote:
+> On Fri, Oct 31, 2014 at 1:49 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-Please could you elaborate why a new address can be changed ?
-
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> ---
->   drivers/soc/qcom/scm-boot.c | 22 ++++++++++++++++++++++
->   include/soc/qcom/scm-boot.h |  1 +
->   2 files changed, 23 insertions(+)
+>> Figure out the exact electronic meaning of what happens when you do
+>> "output disable" in your hardware, I think it is very likely that
+>> PIN_CONFIG_BIAS_HIGH_IMPEDANCE is what you are really
+>> after here.
 >
-> diff --git a/drivers/soc/qcom/scm-boot.c b/drivers/soc/qcom/scm-boot.c
-> index 60ff7b4..5710967 100644
-> --- a/drivers/soc/qcom/scm-boot.c
-> +++ b/drivers/soc/qcom/scm-boot.c
-> @@ -37,3 +37,25 @@ int scm_set_boot_addr(phys_addr_t addr, int flags)
->   			&cmd, sizeof(cmd), NULL, 0);
->   }
->   EXPORT_SYMBOL(scm_set_boot_addr);
-> +
-> +
+> OK, that seems plausible.  ...so it is OK to set both
+> "bias-high-impedance" _and_ "bias-pull-up" on a pin?  That seemed
+> weird to me but if that's right I can do that and try to implement
+> "bias-high-impedance" on Rockchip...
 
-extra line.
+I don't quite get the question. What this patch does is add something
+called "output disable" which I think is analogous to high impedance.
 
-> +int scm_set_warm_boot_addr(void *entry, int cpu)
-> +{
-> +	static int flags[NR_CPUS] = {
-> +		SCM_FLAG_WARMBOOT_CPU0,
-> +		SCM_FLAG_WARMBOOT_CPU1,
-> +		SCM_FLAG_WARMBOOT_CPU2,
-> +		SCM_FLAG_WARMBOOT_CPU3,
-> +	};
+If you enable both as the same time something is likely wrong
+because it doesn't make electronic sense, high impedance and
+pull up are kind of mutually exclusive. High impedance is also
+know as "tristate" and means the line will assume the level of
+whatever it is connected to, not try to pull things up.
 
-Please do not do that, you don't know what NR_CPUS value could be in the 
-future with the single kernel image and that could lead to a bug very 
-hard to find. The kernel stack is 4096.
+So either:
 
-Move this out of the function:
+- This is the wrong terminology, "output disable" means something
+  else. Like "disconnect the driver stages" or something, so pull-up
+  can be enabled.
 
-static int scm_flags[] = {
-	SCM_FLAG_WARMBOOT_CPU0,
-	SCM_FLAG_WARMBOOT_CPU1,
-	SCM_FLAG_WARMBOOT_CPU2,
-	SCM_FLAG_WARMBOOT_CPU3,
-};
+- Stuff has been programmed in a bad way all the time.
 
-> +	static DEFINE_PER_CPU(void *, last_known_entry);
+Understanding the hardware is paramount...
 
-It sounds odd to add those static declaration here even if I understand 
-that is to encapsulate them.
-
-> +	int ret;
-> +
-> +	if (entry == per_cpu(last_known_entry, cpu))
-> +		return 0;
-
-My question is: why scm_set_warm_boot_addr could be called with 
-different addresses ?
-
-If this is really needed, please replace the per_cpu variable by:
-
-struct scm_boot_addr {
-	int flag;
-	phys_addr_t entry;
-};
-
-static struct scm_boot_addr scm_flags[] = {
-	{ SCM_FLAG_WARMBOOT_CPU0, },
-	{ SCM_FLAG_WARMBOOT_CPU1, },
-	{ SCM_FLAG_WARMBOOT_CPU2, },
-	{ SCM_FLAG_WARMBOOT_CPU3, },
-};
-
-> +	ret = scm_set_boot_addr(virt_to_phys(entry), flags[cpu]);
-> +	if (!ret)
-> +		per_cpu(last_known_entry, cpu) = entry;
-> +
-> +	return ret;
-> +}
-> diff --git a/include/soc/qcom/scm-boot.h b/include/soc/qcom/scm-boot.h
-> index 02b445c..100938b 100644
-> --- a/include/soc/qcom/scm-boot.h
-> +++ b/include/soc/qcom/scm-boot.h
-> @@ -22,5 +22,6 @@
->   #define SCM_FLAG_WARMBOOT_CPU3		0x40
-
-By the way, if you look for encapsulation, perhaps these macros could be 
-moved into scm-boot.c, no ?
-
->   int scm_set_boot_addr(phys_addr_t addr, int flags);
-> +int scm_set_warm_boot_addr(void *entry, int cpu);
+> Maybe better to explain the problem.  I have a pin that I wish to
+> drive high weakly (using a pullup rather than actually pushing
+> output-high to the pin).  The firmware has left the pin configured as
+> an output with no pull.
 >
->   #endif
+> I can configure the pin like this:
+>   rockchip,pins = <7 12 RK_FUNC_GPIO &pcfg_pull_up>;
 >
+>   pcfg_pull_up: pcfg-pull-up {
+>     bias-pull-up;
+>   };
 
+This makes perfect sense.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> When I do this the current Rockchip pinctrl driver will _not_
+> configure me as an input.  It will happily flip the "pullup" bit in
+> hardware and leave the pin configured as an output.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+You seem to imply that the pins registers work such that
+input needs to be enabled for pull-up to work.
+
+This is a hardware pecularity. Just enable input in the hardware
+whenever pull-up is requested then, as that is how that hardware
+has to work. If you want to be explicit there is always
+PIN_CONFIG_INPUT_ENABLE (input-enable;)
+
+> I could certainly reach into the GPIO controller part of things
+> whenever I see "bias-pull-up" and configure the pin as an input.
+
+I think you should. This is a side effect of combined hardware
+and expected.
+
+>  I
+> guess that wouldn't actually hurt to do even if the pin wasn't
+> configured as a GPIO...
+
+This is why we have the callbacks:
+
+pinctrl_request_gpio()
+pinctrl_free_gpio()
+pinctrl_gpio_direction_input()
+pinctrl_gpio_direction_output()
+
+By letting the GPIO driver side call these to set direction, we
+can leave the control over direction status and incommensurable
+states to the pin control driver.
+
+Not that I have all things in my head, but if you're not using
+the above calls in your GPIO driver, I suggest doing so and leaving
+the pin direction status for the pinctrl side to handle.
+
+> A third option that would work in my case (and actually be sorta
+> clean) would be to implement a faux open-drain output.  The hardware
+> itself doesn't have a concept of open drain (unlike some SoCs) but I
+> could implement it by swapping between "input pulled up" and "output
+> driven low".
+
+Uhm. Not following this. Probably you are better at electronics than
+I am.
+
+Anyway, I think the answers above is what you actually need to
+keep working on this.
+
+Yours,
+Linus Walleij
