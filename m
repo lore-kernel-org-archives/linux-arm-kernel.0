@@ -1,36 +1,33 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 14 Nov 2014 10:14:48 +0100
-Subject: [PATCH v7 01/12] clk: tegra: Implement memory-controller clock
-In-Reply-To: <20141114015356.25314.26550@quantum>
-References: <1415871157-21968-1-git-send-email-thierry.reding@gmail.com>
- <1415871157-21968-2-git-send-email-thierry.reding@gmail.com>
- <20141114015356.25314.26550@quantum>
-Message-ID: <20141114091447.GA3810@ulmo>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Nov 2014 10:16:18 +0100
+Subject: [PATCH v3] of: replace Asahi Kasei Corp venter prefix
+In-Reply-To: <5465BFA2.9050706@nvidia.com>
+References: <5398AB07.4040304@wwwdotorg.org>
+ <87k32yd0bd.wl%kuninori.morimoto.gx@renesas.com>
+ <5465BFA2.9050706@nvidia.com>
+Message-ID: <2984171.bo9yu8oQT6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 13, 2014 at 05:53:56PM -0800, Mike Turquette wrote:
-> Quoting Thierry Reding (2014-11-13 01:32:26)
-> > From: Thierry Reding <treding@nvidia.com>
-> > 
-> > The memory controller clock runs either at half or the same frequency as
-> > the EMC clock.
-> > 
-> > Reviewed-By: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> > ---
-> > Mike, as I said in the cover letter there are tight dependencies between the
-> > patches in this series, so I'd like to get your Acked-by on this one so I can
-> > take it through the Tegra tree along with the others.
+On Friday 14 November 2014 17:38:58 Alexandre Courbot wrote:
+> > diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
+> > index a1d4bf9..7f5cf80 100644
+> > --- a/arch/arm/boot/dts/tegra20-seaboard.dts
+> > +++ b/arch/arm/boot/dts/tegra20-seaboard.dts
+> > @@ -405,7 +405,7 @@
+> >               clock-frequency = <400000>;
+> >
+> >               magnetometer at c {
+> > -                     compatible = "ak,ak8975";
+> > +                     compatible = "asahi-kasei,ak8975";
 > 
-> Acked-by: Mike Turquette <mturquette@linaro.org>
+> Mmm. So does this mean this device was never probed because the driver 
+> did not recognize its compatible property? I cannot find "ak,ak8975" 
+> anywhere else in the kernel.
+> 
 
-Thanks Mike,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141114/c5fd22f2/attachment-0001.sig>
+No, the i2c bus behaves in a special way by matching the "ak8975"
+i2c driver name with any "*,ak8975" DT compatible string. Both
+of the above will work with existing kernels.
+
+	Arnd
