@@ -1,75 +1,90 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 14 Nov 2014 10:40:14 +0900
-Subject: [RFC] ptrace: add generic SET_SYSCALL request
-In-Reply-To: <1472197.o98pKNTkBz@wuerfel>
-References: <1415346443-28915-1-git-send-email-takahiro.akashi@linaro.org>
- <3899236.yrOvvrZHD6@wuerfel>
- <OF152076B7.38277C08-ONC1257D8F.0050C2DF-C1257D8F.00516BF2@de.ibm.com>
- <1472197.o98pKNTkBz@wuerfel>
-Message-ID: <54655D7E.1000301@linaro.org>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Fri, 14 Nov 2014 01:43:03 +0000
+Subject: [PATCH v3] of: replace Asahi Kasei Corp venter prefix
+In-Reply-To: <20141113110740.GE3815@sirena.org.uk>
+References: <5398AB07.4040304@wwwdotorg.org>
+ <87sinbdk44.wl%kuninori.morimoto.gx@renesas.com>
+ <878ulzx6hr.wl%kuninori.morimoto.gx@gmail.com>
+ <20140922130026.GK3290@leverpostej>
+ <CAMuHMdX22z97SbGS1HDiYfJ1PXxyEN2S8D7w4sr+4bUwD+mJZw@mail.gmail.com>
+ <20140922132743.GM3290@leverpostej>
+ <87y4rfhmgl.wl%kuninori.morimoto.gx@renesas.com>
+ <1415845309.4269.6.camel@perches.com>
+ <20141113025105.GA16652@verge.net.au>
+ <87vbmjhj00.wl%kuninori.morimoto.gx@renesas.com>
+ <20141113110740.GE3815@sirena.org.uk>
+Message-ID: <87k32yd0bd.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulrich, Arnd, thank you for your discussions:
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-On 11/14/2014 07:25 AM, Arnd Bergmann wrote:
-> On Thursday 13 November 2014 15:49:20 Ulrich Weigand wrote:
->> Arnd Bergmann <arnd@arndb.de> wrote on 13.11.2014 11:21:28:
->>
->>> I have to admit that I don't really understand gdb internals, but from
->>> a first look I get the impression that it will just do the right thing
->>> if you reuse NT_S390_SYSTEM_CALL on ARM64 with the same semantics.
->>
->> There's an interface between BFD and GDB proper involved here.  BFD will
->> detect the presence of register set notes in the core dump, and will
->> translate them into virtual sections; GDB will then simply look up such
->> sections under well-known names.
->>
->> In particular, the NT_S390_SYSTEM_CALL note will be translated by BFD
->> into a virtual section named ".reg-s390-system-call"; GDB platform-
->> specific code will look for sections of this particular name.
->>
->> So if you were to create notes using the same note type, by default it
->> would do nothing on ARM64.  You might add code to the ARM64 back-end
->> to also look for a section ".reg-s390-system-call", but that would be
->> somewhat confusing.  Using a new, platform-specific note type for ARM64
->> would appear to fit better with existing precedent.
+Current vendor-prefixes.txt already has
+"ak" prefix for Asahi Kasei Corp by
+ae8c4209af2cec065fef15d200a42a04130799f7
+(of: Add vendor prefix for Asahi Kasei Corp.)
 
-I implemented a regset of NT_SYSTEM_CALL(=NT_S390_SYSTEM_CALL) experimentally,
-and checked a generated core file:
+It went through the appropriate review process.
+But, almost all Asahi Kasei chip drivers are
+using "asahi-kasei" prefix today.
+(arch/arm/boot/dts/tegra20-seaboard.dts only is
+using "ak,ak8975", but there are instances of
+"asahi-kasei,ak8975" in other dts files.
+And drivers/iio/magnetometer/ak8975.c
+doesn't support "ak,ak8975")
+So, we made a mistake there.
 
- >$ aarch64-linux-gnu-readelf -Wn <...>/tmp/nulltest/core
- >
- >Displaying notes found at file offset 0x000003c0 with length 0x00000a68:
- >  Owner                 Data size    Description
- >  CORE                 0x00000188    NT_PRSTATUS (prstatus structure)
- >  CORE                 0x00000088    NT_PRPSINFO (prpsinfo structure)
- >  CORE                 0x00000080    NT_SIGINFO (siginfo_t data)
- >  CORE                 0x00000130    NT_AUXV (auxiliary vector)
- >  CORE                 0x000001b4    NT_FILE (mapped files)
- >    Page size: 4096
- >                 Start                 End         Page Offset
- >[snip]...
- >  CORE                 0x00000210    NT_FPREGSET (floating point registers)
- >  LINUX                0x00000008    NT_ARM_TLS (AArch TLS registers)
- >  LINUX                0x00000108    NT_ARM_HW_BREAK (AArch hardware breakpoint registers)
- >  LINUX                0x00000108    NT_ARM_HW_WATCH (AArch hardware watchpoint registers)
- >  LINUX                0x00000004    NT_S390_SYSTEM_CALL (s390 system call restart data)
+In addition, checkpatch.pl reports WARNING
+if it is using "asahi-kasei" prerfix in DT file.
+(DT compatible string vendor "asahi-kasei" appears un-documented)
 
-Looks funny:)
+Marking it deprecated and warning with checkpatch
+is certainly preferable.
+So, this patch replace "ak" to "asahi-kasei" in
+vendor-prefixes.txt. (and fixup tegra20-seaboard)
 
-> Ok, thanks a lot for your insight and for confirming what Takahiro AKASHI
-> said. Let's use a new NT_ARM64_SYSTEM_CALL type with a different
-> number then.
+OTOH, Asahi Kasei is usually referred to as "AKM",
+but this patch doesn't care about it.
+Because no DT is using that today.
 
-We will use NT_ARM_SYSTEM_CALL(=0x404) as other NT_ARM_*, except NT_ARM_VFP,
-are also shared by arch/arm and arch/arm64.
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+---
+ .../devicetree/bindings/vendor-prefixes.txt        |    2 +-
+ arch/arm/boot/dts/tegra20-seaboard.dts             |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Anyhow, gdb (and/or binutils?) should be updated as well once my coming patch is merged.
-My next question is who should know this?
-
-Thanks,
--Takahiro AKASHI
-
-> 	Arnd
->
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 723999d..ddcb4cd 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -9,7 +9,6 @@ ad	Avionic Design GmbH
+ adapteva	Adapteva, Inc.
+ adi	Analog Devices, Inc.
+ aeroflexgaisler	Aeroflex Gaisler AB
+-ak	Asahi Kasei Corp.
+ allwinner	Allwinner Technology Co., Ltd.
+ altr	Altera Corp.
+ amcc	Applied Micro Circuits Corporation (APM, formally AMCC)
+@@ -20,6 +19,7 @@ amstaos	AMS-Taos Inc.
+ apm	Applied Micro Circuits Corporation (APM)
+ arm	ARM Ltd.
+ armadeus	ARMadeus Systems SARL
++asahi-kasei	Asahi Kasei Corp.
+ atmel	Atmel Corporation
+ auo	AU Optronics Corporation
+ avago	Avago Technologies
+diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
+index a1d4bf9..7f5cf80 100644
+--- a/arch/arm/boot/dts/tegra20-seaboard.dts
++++ b/arch/arm/boot/dts/tegra20-seaboard.dts
+@@ -405,7 +405,7 @@
+ 		clock-frequency = <400000>;
+ 
+ 		magnetometer at c {
+-			compatible = "ak,ak8975";
++			compatible = "asahi-kasei,ak8975";
+ 			reg = <0xc>;
+ 			interrupt-parent = <&gpio>;
+ 			interrupts = <TEGRA_GPIO(N, 5) IRQ_TYPE_LEVEL_HIGH>;
+-- 
+1.7.9.5
