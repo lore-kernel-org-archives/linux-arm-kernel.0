@@ -1,234 +1,97 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 13 Nov 2014 17:53:56 -0800
-Subject: [PATCH v7 01/12] clk: tegra: Implement memory-controller clock
-In-Reply-To: <1415871157-21968-2-git-send-email-thierry.reding@gmail.com>
-References: <1415871157-21968-1-git-send-email-thierry.reding@gmail.com>
- <1415871157-21968-2-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20141114015356.25314.26550@quantum>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Thu, 13 Nov 2014 17:57:41 -0800
+Subject: [PATCH v14 0/7] KVM/arm/x86: dirty page logging for ARMv7 (3.17.0-rc1)
+Message-ID: <1415930268-7674-1-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Thierry Reding (2014-11-13 01:32:26)
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> The memory controller clock runs either at half or the same frequency as
-> the EMC clock.
-> 
-> Reviewed-By: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
-> Mike, as I said in the cover letter there are tight dependencies between the
-> patches in this series, so I'd like to get your Acked-by on this one so I can
-> take it through the Tegra tree along with the others.
+Patch series adds support for ARMv7 and generic dirty page logging support. 
+As we try to move towards generic dirty page logging additional logic is moved 
+to generic code. Initially x86, armv7 KVM_GET_DIRTY_LOG reuses generic 
+code, shortly followed by armv8 patches.
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+Testing:
+- Generally live migration + checksumming of source/destination memory regions 
+  is used to validate correctness.
+- ARMv7 - qemu machvirt, VExpress - Exynos 5440, FastModels - lmbench + dirty 
+  guest memory cycling. On FastModels you must set 'migrate_set_downtime=1'
+  for higher dirty rate (for example 2000 pges/100mS).
 
-> 
-> Thanks,
-> Thierry
-> 
-> Changes in v4:
-> - use name and parent name parameters passed in when registering clock
-> 
-> Changes in v3:
-> - split registration into a separate function that can be reused for all
->   SoC generations, but pass in the name and parent parameters for
->   clarity as well as the register address (in case it ever changes) and
->   the EMC spin-lock since it isn't globally available
-> 
->  drivers/clk/tegra/clk-divider.c          | 13 +++++++++++++
->  drivers/clk/tegra/clk-tegra114.c         |  7 ++++++-
->  drivers/clk/tegra/clk-tegra124.c         |  7 ++++++-
->  drivers/clk/tegra/clk-tegra20.c          |  8 +++++++-
->  drivers/clk/tegra/clk-tegra30.c          |  7 ++++++-
->  drivers/clk/tegra/clk.h                  |  2 ++
->  include/dt-bindings/clock/tegra114-car.h |  2 +-
->  include/dt-bindings/clock/tegra124-car.h |  2 +-
->  include/dt-bindings/clock/tegra20-car.h  |  2 +-
->  9 files changed, 43 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/clk/tegra/clk-divider.c b/drivers/clk/tegra/clk-divider.c
-> index 290f9c1a3749..59a5714dfe18 100644
-> --- a/drivers/clk/tegra/clk-divider.c
-> +++ b/drivers/clk/tegra/clk-divider.c
-> @@ -185,3 +185,16 @@ struct clk *tegra_clk_register_divider(const char *name,
->  
->         return clk;
->  }
-> +
-> +static const struct clk_div_table mc_div_table[] = {
-> +       { .val = 0, .div = 2 },
-> +       { .val = 1, .div = 1 },
-> +       { .val = 0, .div = 0 },
-> +};
-> +
-> +struct clk *tegra_clk_register_mc(const char *name, const char *parent_name,
-> +                                 void __iomem *reg, spinlock_t *lock)
-> +{
-> +       return clk_register_divider_table(NULL, name, parent_name, 0, reg,
-> +                                         16, 1, 0, mc_div_table, lock);
-> +}
-> diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
-> index f760f31d05c4..0b03d2cf7264 100644
-> --- a/drivers/clk/tegra/clk-tegra114.c
-> +++ b/drivers/clk/tegra/clk-tegra114.c
-> @@ -173,6 +173,7 @@ static DEFINE_SPINLOCK(pll_d_lock);
->  static DEFINE_SPINLOCK(pll_d2_lock);
->  static DEFINE_SPINLOCK(pll_u_lock);
->  static DEFINE_SPINLOCK(pll_re_lock);
-> +static DEFINE_SPINLOCK(emc_lock);
->  
->  static struct div_nmp pllxc_nmp = {
->         .divm_shift = 0,
-> @@ -1228,7 +1229,11 @@ static __init void tegra114_periph_clk_init(void __iomem *clk_base,
->                                ARRAY_SIZE(mux_pllmcp_clkm),
->                                CLK_SET_RATE_NO_REPARENT,
->                                clk_base + CLK_SOURCE_EMC,
-> -                              29, 3, 0, NULL);
-> +                              29, 3, 0, &emc_lock);
-> +
-> +       clk = tegra_clk_register_mc("mc", "emc_mux", clk_base + CLK_SOURCE_EMC,
-> +                                   &emc_lock);
-> +       clks[TEGRA114_CLK_MC] = clk;
->  
->         for (i = 0; i < ARRAY_SIZE(tegra_periph_clk_list); i++) {
->                 data = &tegra_periph_clk_list[i];
-> diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
-> index e3a85842ce0c..f5f9baca7bb6 100644
-> --- a/drivers/clk/tegra/clk-tegra124.c
-> +++ b/drivers/clk/tegra/clk-tegra124.c
-> @@ -132,6 +132,7 @@ static DEFINE_SPINLOCK(pll_d2_lock);
->  static DEFINE_SPINLOCK(pll_e_lock);
->  static DEFINE_SPINLOCK(pll_re_lock);
->  static DEFINE_SPINLOCK(pll_u_lock);
-> +static DEFINE_SPINLOCK(emc_lock);
->  
->  /* possible OSC frequencies in Hz */
->  static unsigned long tegra124_input_freq[] = {
-> @@ -1127,7 +1128,11 @@ static __init void tegra124_periph_clk_init(void __iomem *clk_base,
->         clk = clk_register_mux(NULL, "emc_mux", mux_pllmcp_clkm,
->                                ARRAY_SIZE(mux_pllmcp_clkm), 0,
->                                clk_base + CLK_SOURCE_EMC,
-> -                              29, 3, 0, NULL);
-> +                              29, 3, 0, &emc_lock);
-> +
-> +       clk = tegra_clk_register_mc("mc", "emc_mux", clk_base + CLK_SOURCE_EMC,
-> +                                   &emc_lock);
-> +       clks[TEGRA124_CLK_MC] = clk;
->  
->         /* cml0 */
->         clk = clk_register_gate(NULL, "cml0", "pll_e", 0, clk_base + PLLE_AUX,
-> diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
-> index dace2b1b5ae6..41272dcc9e22 100644
-> --- a/drivers/clk/tegra/clk-tegra20.c
-> +++ b/drivers/clk/tegra/clk-tegra20.c
-> @@ -140,6 +140,8 @@ static struct cpu_clk_suspend_context {
->  static void __iomem *clk_base;
->  static void __iomem *pmc_base;
->  
-> +static DEFINE_SPINLOCK(emc_lock);
-> +
->  #define TEGRA_INIT_DATA_MUX(_name, _parents, _offset,  \
->                             _clk_num, _gate_flags, _clk_id)     \
->         TEGRA_INIT_DATA(_name, NULL, NULL, _parents, _offset,   \
-> @@ -819,11 +821,15 @@ static void __init tegra20_periph_clk_init(void)
->                                ARRAY_SIZE(mux_pllmcp_clkm),
->                                CLK_SET_RATE_NO_REPARENT,
->                                clk_base + CLK_SOURCE_EMC,
-> -                              30, 2, 0, NULL);
-> +                              30, 2, 0, &emc_lock);
->         clk = tegra_clk_register_periph_gate("emc", "emc_mux", 0, clk_base, 0,
->                                     57, periph_clk_enb_refcnt);
->         clks[TEGRA20_CLK_EMC] = clk;
->  
-> +       clk = tegra_clk_register_mc("mc", "emc_mux", clk_base + CLK_SOURCE_EMC,
-> +                                   &emc_lock);
-> +       clks[TEGRA20_CLK_MC] = clk;
-> +
->         /* dsi */
->         clk = tegra_clk_register_periph_gate("dsi", "pll_d", 0, clk_base, 0,
->                                     48, periph_clk_enb_refcnt);
-> diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
-> index 5bbacd01094f..4b9d8bd3d0bf 100644
-> --- a/drivers/clk/tegra/clk-tegra30.c
-> +++ b/drivers/clk/tegra/clk-tegra30.c
-> @@ -177,6 +177,7 @@ static unsigned long input_freq;
->  
->  static DEFINE_SPINLOCK(cml_lock);
->  static DEFINE_SPINLOCK(pll_d_lock);
-> +static DEFINE_SPINLOCK(emc_lock);
->  
->  #define TEGRA_INIT_DATA_MUX(_name, _parents, _offset,  \
->                             _clk_num, _gate_flags, _clk_id)     \
-> @@ -1157,11 +1158,15 @@ static void __init tegra30_periph_clk_init(void)
->                                ARRAY_SIZE(mux_pllmcp_clkm),
->                                CLK_SET_RATE_NO_REPARENT,
->                                clk_base + CLK_SOURCE_EMC,
-> -                              30, 2, 0, NULL);
-> +                              30, 2, 0, &emc_lock);
->         clk = tegra_clk_register_periph_gate("emc", "emc_mux", 0, clk_base, 0,
->                                     57, periph_clk_enb_refcnt);
->         clks[TEGRA30_CLK_EMC] = clk;
->  
-> +       clk = tegra_clk_register_mc("mc", "emc_mux", clk_base + CLK_SOURCE_EMC,
-> +                                   &emc_lock);
-> +       clks[TEGRA30_CLK_MC] = clk;
-> +
->         /* cml0 */
->         clk = clk_register_gate(NULL, "cml0", "pll_e", 0, clk_base + PLLE_AUX,
->                                 0, 0, &cml_lock);
-> diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
-> index 16ec8d6bb87f..4e458aa8d45c 100644
-> --- a/drivers/clk/tegra/clk.h
-> +++ b/drivers/clk/tegra/clk.h
-> @@ -86,6 +86,8 @@ struct clk *tegra_clk_register_divider(const char *name,
->                 const char *parent_name, void __iomem *reg,
->                 unsigned long flags, u8 clk_divider_flags, u8 shift, u8 width,
->                 u8 frac_width, spinlock_t *lock);
-> +struct clk *tegra_clk_register_mc(const char *name, const char *parent_name,
-> +                                 void __iomem *reg, spinlock_t *lock);
->  
->  /*
->   * Tegra PLL:
-> diff --git a/include/dt-bindings/clock/tegra114-car.h b/include/dt-bindings/clock/tegra114-car.h
-> index fc12621fb432..534c03f8ad72 100644
-> --- a/include/dt-bindings/clock/tegra114-car.h
-> +++ b/include/dt-bindings/clock/tegra114-car.h
-> @@ -49,7 +49,7 @@
->  #define TEGRA114_CLK_I2S0 30
->  /* 31 */
->  
-> -/* 32 */
-> +#define TEGRA114_CLK_MC 32
->  /* 33 */
->  #define TEGRA114_CLK_APBDMA 34
->  /* 35 */
-> diff --git a/include/dt-bindings/clock/tegra124-car.h b/include/dt-bindings/clock/tegra124-car.h
-> index 6bac637fd635..af9bc9a3ddbc 100644
-> --- a/include/dt-bindings/clock/tegra124-car.h
-> +++ b/include/dt-bindings/clock/tegra124-car.h
-> @@ -48,7 +48,7 @@
->  #define TEGRA124_CLK_I2S0 30
->  /* 31 */
->  
-> -/* 32 */
-> +#define TEGRA124_CLK_MC 32
->  /* 33 */
->  #define TEGRA124_CLK_APBDMA 34
->  /* 35 */
-> diff --git a/include/dt-bindings/clock/tegra20-car.h b/include/dt-bindings/clock/tegra20-car.h
-> index 9406207cfac8..04500b243a4d 100644
-> --- a/include/dt-bindings/clock/tegra20-car.h
-> +++ b/include/dt-bindings/clock/tegra20-car.h
-> @@ -49,7 +49,7 @@
->  /* 30 */
->  #define TEGRA20_CLK_CACHE2 31
->  
-> -#define TEGRA20_CLK_MEM 32
-> +#define TEGRA20_CLK_MC 32
->  #define TEGRA20_CLK_AHBDMA 33
->  #define TEGRA20_CLK_APBDMA 34
->  /* 35 */
-> -- 
-> 2.1.3
-> 
+See https://github.com/mjsmar/arm-dirtylog-tests for details.
+
+In addition to ARMv7 patch series was compiled for:
+- x86_64 - defconfig 
+- ia64 - ia64-linux-gcc4.6.3 - defconfig, ia64 Kconfig defines BROKEN worked 
+  around that to make sure new changes don't break build. Eventually build
+  breaks due to other reasons.
+- mips - mips64-linux-gcc4.6.3 - malta_kvm_defconfig
+- ppc - powerpc64-linux-gcc4.6.3 - pseries_defconfig
+- s390 - s390x-linux-gcc4.6.3 - defconfig
+- armv8 - aarch64-linux-gnu-gcc4.8.1 - defconfig
+
+ARMv7 Dirty page logging implementation overivew-
+- initially write protects memory region pages 2nd stage page tables
+- add support to read dirty page log and again write protect dirty pages 
+  for next pass.
+- second stage huge page are dissolved into small page tables to keep track of
+  dirty pages at page granularity. Tracking at huge page granularity limits
+  migration to an almost idle system. Small page size logging supports higher
+  memory dirty rates.
+- In the event migration is canceled, normal behavior is resumed huge pages
+  are rebuilt over time.
+
+Changes since v13:
+- Addressed comments from Cornelia, Paolo, Marc, and Christoffer
+- Most signifcant change is reduce number of arguments to stage2_set_pte
+- Another is introduce Kconfig symbol for generic kvm_get_dirty_log_protect()
+
+Changes since v12:
+- Added Paolos and James Hogan's comments to extend kvm_get_dirty_log() to
+  make it further generic by adding write protection in addition to dirty bit
+  map handling. This led to new generic function kvm_get_dirty_log_protect().
+
+Changes since v11:
+- Implemented Alex's comments to simplify generic layer.
+
+Changes since v10:
+- addressed wanghaibin comments 
+- addressed Christoffers comments
+
+Changes since v9:
+- Split patches into generic and architecture specific variants for TLB Flushing
+  and dirty log read (patches 1,2 & 3,4,5,6)
+- rebased to 3.16.0-rc1
+- Applied Christoffers comments.
+
+ 
+
+Mario Smarduch (6):
+  KVM: Add architecture-defined TLB flush support
+  KVM: Add generic support for dirty page logging
+  KVM: arm: Add ARMv7 API to flush TLBs
+  KVM: arm: Add initial dirty page locking support
+  KVM: arm: dirty logging write protect support
+  KVM: arm: page logging 2nd stage fault handling
+
+Paolo Bonzini (1):
+  KVM: x86: switch to kvm_get_dirty_log_protect
+
+ arch/arm/include/asm/kvm_asm.h        |    1 +
+ arch/arm/include/asm/kvm_host.h       |   14 +++
+ arch/arm/include/asm/kvm_mmu.h        |   20 +++
+ arch/arm/include/asm/pgtable-3level.h |    1 +
+ arch/arm/kvm/Kconfig                  |    2 +
+ arch/arm/kvm/arm.c                    |   46 +++++++
+ arch/arm/kvm/interrupts.S             |   11 ++
+ arch/arm/kvm/mmu.c                    |  216 +++++++++++++++++++++++++++++++--
+ arch/x86/include/asm/kvm_host.h       |    3 -
+ arch/x86/kvm/Kconfig                  |    1 +
+ arch/x86/kvm/mmu.c                    |    4 +-
+ arch/x86/kvm/x86.c                    |   64 ++--------
+ include/linux/kvm_host.h              |    9 ++
+ virt/kvm/Kconfig                      |    9 ++
+ virt/kvm/kvm_main.c                   |   82 +++++++++++++
+ 15 files changed, 415 insertions(+), 68 deletions(-)
+
+-- 
+1.7.9.5
