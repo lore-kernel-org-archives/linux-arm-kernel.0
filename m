@@ -1,29 +1,29 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 14 Nov 2014 08:08:23 -0500
-Subject: [PATCH] ahci_sunxi: Drop AHCI_HFLAG_NO_PMP flag
-In-Reply-To: <5465FA40.8000508@redhat.com>
-References: <1415874256-6580-1-git-send-email-hdegoede@redhat.com>
- <20141113222952.GI2598@htj.dyndns.org>
- <037f97ce-468b-4b91-9616-51a3301c5be6@googlegroups.com>
- <5465FA40.8000508@redhat.com>
-Message-ID: <20141114130823.GA21209@htj.dyndns.org>
+From: vichy.kuo@gmail.com (vichy)
+Date: Fri, 14 Nov 2014 21:13:12 +0800
+Subject: some question about TCR setting
+In-Reply-To: <20141114104246.GA25828@leverpostej>
+References: <CAOVJa8HBYkTMCJFKC=+UwjgPp4odm5UV-oUQXu17ctv2+HkpRg@mail.gmail.com>
+ <20141114104246.GA25828@leverpostej>
+Message-ID: <CAOVJa8Fx4yiSU0O7HTaYEKOrRdtWve4JGeN0cWRXDsBMyV_8Mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 14, 2014 at 01:49:04PM +0100, Hans de Goede wrote:
-> > I just found out why Allwinner added that AHCI_HFLAG_NO_PMP flag, after 
-> > putting the system I used to test the port multiplexer back together this 
-> > morning, it seems that probing for a port multiplexer being present breaks 
-> > the no-port-multiplexer (so direct attached disk) case :(  I guess I should 
-> > have tested for that before sending the patch, but the thought of it 
-> > breaking normal usage did not cross my mind.
-> > 
-> > So self NACK. If it is not too late, can you please drop this from your 
-> > tree ?
+hi Mark:
+> The CPU can't read the attributes from the page tables, because in order
+> to do so it would need to know the attributes to access the page tables
+> with. Additionally, the page tables might not always be mapped into the
+> virtual address space.
+Per your explanation, if the page table base address in TTBR is
+0x1000000, {SH,ORGN,IRGN}{1,0} tell cpu how to access this part of
+physical address, right?
 
-I popped the commit from libata/for-3.18-fixes.
+if so, I have some questions:
+1. The processor use {SH,ORGN,IRGN}{1,0} in TCR to access all the
+following page directories?
+2. under what circumstance, the page tables might not always be mapped
+into the virtual address space.
+3. if the {SH,ORGN,IRGN}{1,0} of block/page descriptor is conflict
+with that one in TCR. Will that make cache maintenance issue. Or there
+are separate cache for page table walking?
 
-Thanks.
-
--- 
-tejun
+Sincerely appreciate your kind help,
