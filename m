@@ -1,86 +1,77 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Fri, 14 Nov 2014 15:10:12 +0100
-Subject: [RFC PATCH 4/4] arm64, acpi, pci: Provide arch-specific calls
- for PCI host bridge dirver (PNP0A03).
-In-Reply-To: <4474363.kMvYSLl2Ev@wuerfel>
-References: <1415366876-30811-1-git-send-email-tomasz.nowicki@linaro.org>
- <1415366876-30811-5-git-send-email-tomasz.nowicki@linaro.org>
- <4474363.kMvYSLl2Ev@wuerfel>
-Message-ID: <54660D44.9020406@linaro.org>
+From: wangyijing0307@gmail.com (Yijing Wang)
+Date: Fri, 14 Nov 2014 22:11:11 +0800
+Subject: [Patch V1 0/6] Refine generic/PCI MSI irqodmian interfaces
+In-Reply-To: <54655D44.1070703@linux.intel.com>
+References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
+ <54651BE2.9080008@arm.com> <54654C10.2040102@linux.intel.com>
+ <54655632.2040209@huawei.com> <alpine.DEB.2.11.1411140211480.3935@nanos>
+ <54655D44.1070703@linux.intel.com>
+Message-ID: <54660D7F.70702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.11.2014 15:24, Arnd Bergmann wrote:
-> On Friday 07 November 2014 14:27:56 Tomasz Nowicki wrote:
+
+? 2014/11/14 9:39, Jiang Liu ??:
+> On 2014/11/14 9:31, Thomas Gleixner wrote:
+>> On Fri, 14 Nov 2014, Yijing Wang wrote:
 >>
->>   #ifdef CONFIG_PCI
->> +struct pci_controller {
->> +	struct acpi_device *companion;
->> +	int segment;
->> +	int node;		/* nearest node with memory or NUMA_NO_NODE for global allocation */
->> +};
->> +
->> +#define PCI_CONTROLLER(busdev) ((struct pci_controller *) busdev->sysdata)
->> +
->
-> Don't use busdev->sysdata in architecture specific code, it belongs to the
-> host bridge driver with the new model. For ACPI you don't have a host bridge
-> driver, but it's better to keep these separate.
->
-> The segment is always the same as the domain number, so just use that.
-> The node and companion members here can get added to struct pci_host_bridge.
-
-The reason why I put segment field to struct pci_controller is to 
-initialize domain_nr of struct pci_bus being in pci_create_root_bus(), 
-domain_nr can be used later on though. Correct me I am wrong.
-
-Honestly I do not see the way to create root bus without e.g. 
-sysdata.segment here.
-
->
->> @@ -43,7 +53,8 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
->>    */
->>   int pcibios_add_device(struct pci_dev *dev)
->>   {
->> -	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
->> +	if (acpi_disabled)
->> +		dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+>> Could you please use a mail client which does proper line wraps or
+>> configure yours to do so?
 >>
->>   	return 0;
->>   }
->
-> How do you assign the irq number with ACPI? Do you only support MSI?
+>>> Associate the irq domain and PCI bus is not necessary, because all
+>>> PCI buses under same host bridge always share same MSI chip/irq
+>>> domain, we only need associate them and pci host bridge.
+>>>
+>>> I'm refactoring the pci_host_bridge, make it be a generic one, rip
+>>> out of the pci root bus creation, so we could put the irq domain and
+>>> pci domain etc.. in it. Finally, we could eliminate lots platform
+>>> arch functions. I will post it out within one week.
+>> That's a completely orthogonal problem. From the MSI/interrupt
+>> handling POV it does not matter at all where that information is
+>> stored. All we care about is that it is retrievable via the (pci)
+>> device which tries to setup MSI[X].
+>>
+>> So we can store/retrieve it via generic functions into/from whatever
+>> is available right now. If the irq side has generic interfaces to do
+>> so then this wont conflict with your decisions to change the final
+>> storage point because all it takes is to tweak the storage/retrieve
+>> functions.
+>>
+>> So all we need at the moment is an agreed on way to store/retrieve
+>> that information which is based on the current shared infrastructure,
+>> aka. Linus tree. If we can utilize that you are completely free to
+>> change the association mechanism underneath.
+> Hi Thomas,
+> 	So we need something like:
+> struct msi_chip *pci_get_msi_chip(struct pci_dev *);
+> or:
+> struct irq_domain *pci_get_msi_domain(struct pci_dev *);
 
-I missed that, will add in next ver.
+Hi Gerry,
+what about associate the platform specific  struct msi_chip 
+*pci_get_msi_chip(struct pci_dev *)
+with struct pci_host_bridge. we could provide the private 
+"pci_get_msi_chip()" in the PCI
+host drivers.
+
+Thanks!
+Yijing.
 
 >
->>   /*
->>    * raw_pci_read/write - Platform-specific PCI config space access.
->> - *
->> - * Default empty implementation.  Replace with an architecture-specific setup
->> - * routine, if necessary.
->>    */
->>   int raw_pci_read(unsigned int domain, unsigned int bus,
->>   		  unsigned int devfn, int reg, int len, u32 *val)
->>   {
->> -	return -EINVAL;
->> +	char __iomem *addr;
->> +
->> +	if (unlikely((bus > 255) || (devfn > 255) || (reg > 4095))) {
->> +err:		*val = -1;
->> +		return -EINVAL;
->> +	}
->> +
->> +	rcu_read_lock();
->> +	addr = pci_dev_base(domain, bus, devfn);
->> +	if (!addr) {
->> +		rcu_read_unlock();
->> +		goto err;
->> +	}
+> BTW, there's a conflict when merging tip/irq/irqdomain into
+> tip/x86/apic. It's my first time to deal with merging conflicts,
+> what's the preferred way? Is it working like this?
+> 1) I merge the two branch
+> 2) I rebase my x86 irqdomain patch sets and send them to you
+> 3) You merge the two branch and apply my patch set.
+> Regards!
+> Gerry
+>> Thanks,
+>>
+>> 	tglx
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >
-> The config space accessors should probably be shared with
-> drivers/pci/host/pci-host-generic.c, e.g. by moving the rest of
-> the new code in there as well, or by moving the config space
-> accessors from that file to drivers/pci/mmconfig.c.
-
-Tomasz
