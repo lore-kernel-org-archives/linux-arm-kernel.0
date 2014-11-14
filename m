@@ -1,56 +1,132 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Fri, 14 Nov 2014 23:54:02 +0800
-Subject: [Patch V1 0/6] Refine generic/PCI MSI irqodmian interfaces
-In-Reply-To: <5465227E.6000309@arm.com>
-References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
- <54651BE2.9080008@arm.com> <alpine.DEB.2.11.1411132207470.3935@nanos>
- <5465227E.6000309@arm.com>
-Message-ID: <5466259A.7060505@linux.intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 14 Nov 2014 15:55:36 +0000
+Subject: [PATCH v2] virt: kvm: arm: vgic: Process the failure case when
+ kvm_register_device_ops() fails
+In-Reply-To: <54661D5F.3060304@gmail.com>
+References: <54661D5F.3060304@gmail.com>
+Message-ID: <546625F8.6060900@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/14 5:28, Marc Zyngier wrote:
-> On 13/11/14 21:11, Thomas Gleixner wrote:
->> On Thu, 13 Nov 2014, Marc Zyngier wrote:
->>> With the new stacked irq domains, it becomes pretty tempting
->>> to allocate an MSI domain per PCI bus, which would remove
->>> the requirement of either relying on arch-specific code, or
->>> a default PCI MSI domain.
->>
->> Right. That's what I roughly had in mind. And that would solve the
->> multi-iommu issue on x86 nicely as well. We establish the association
->> at the time where the bus gets populated. So the whole lookup magic
->> simply goes away.
+On 14/11/14 15:18, Chen Gang wrote:
+> When kvm_register_device_ops() fails, need disable_percpu_irq(), need
+> vgic_arch_unsetup(), need __unregister_cpu_notifier(), and also need
+> free_percpu_irq().
 > 
-> Great. I've pushed the whole thing out with this patch, the couple
-> of fixes I mentioned earlier, as well as the whole ITS code:
+> At present, there is no vgic_arch_unsetup(), so add it for resetting
+> '__vgic_sr_vectors'.
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/stacked-its-v2
-Hi Marc,
-	I have looked at the code, and found some issues.
-1) With my next version, no need to implemeent its_pci_msi_free()
-anymore. msi_domain_free_irqs() will reset desc->irq to zero
-for all architectures.
+> 
+> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
+> ---
+>  arch/arm/include/asm/kvm_host.h   |  1 +
+>  arch/arm64/include/asm/kvm_host.h |  8 ++++++++
+>  virt/kvm/arm/vgic.c               | 19 +++++++++++++++++--
+>  3 files changed, 26 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 53036e2..f68e302 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -232,6 +232,7 @@ static inline void vgic_arch_setup(const struct vgic_params *vgic)
+>  {
+>  	BUG_ON(vgic->type != VGIC_V2);
+>  }
+> +static inline void vgic_arch_unsetup(void) {}
+>  
+>  int kvm_perf_init(void);
+>  int kvm_perf_teardown(void);
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 2012c4b..597500c 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -248,6 +248,14 @@ static inline void vgic_arch_setup(const struct vgic_params *vgic)
+>  	}
+>  }
+>  
+> +static inline void vgic_arch_unsetup(void)
+> +{
+> +	extern struct vgic_sr_vectors __vgic_sr_vectors;
+> +
+> +	__vgic_sr_vectors.save_vgic	= 0;
+> +	__vgic_sr_vectors.restore_vgic	= 0;
+> +}
+> +
+>  static inline void kvm_arch_hardware_disable(void) {}
+>  static inline void kvm_arch_hardware_unsetup(void) {}
+>  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 3aaca49..bab81f7 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -2405,6 +2405,11 @@ static void vgic_init_maintenance_interrupt(void *info)
+>  	enable_percpu_irq(vgic->maint_irq, 0);
+>  }
+>  
+> +static void vgic_uninit_maintenance_interrupt(void *info)
+> +{
+> +	disable_percpu_irq(vgic->maint_irq);
+> +}
+> +
+>  static int vgic_cpu_notify(struct notifier_block *self,
+>  			   unsigned long action, void *cpu)
+>  {
+> @@ -2470,9 +2475,19 @@ int kvm_vgic_hyp_init(void)
+>  
+>  	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
+>  
+> -	return kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
+> -				       KVM_DEV_TYPE_ARM_VGIC_V2);
+> +	ret = kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
+> +				      KVM_DEV_TYPE_ARM_VGIC_V2);
+> +	if (ret) {
+> +		kvm_err("Cannot register device ops\n");
+> +		goto out_disable_irq;
+> +	}
+> +
+> +	return 0;
+>  
+> +out_disable_irq:
+> +	on_each_cpu(vgic_uninit_maintenance_interrupt, NULL, 1);
+> +	vgic_arch_unsetup();
+> +	__unregister_cpu_notifier(&vgic_cpu_nb);
+>  out_free_irq:
+>  	free_percpu_irq(vgic->maint_irq, kvm_get_running_vcpus());
+>  	return ret;
+> 
 
-2) This piece of code in its_msi_prepare() may run into trouble
-for PCI device with both MSI and MSIX capability. I will change
-msi_prepare() prototype to pass in the "nvec" parameter. And you
-may access first_pci_msi_entry()->msi_attrib.is_msix to get
-allocation type if needed.
-	nvec = pci_msix_vec_count(pdev);
-	if (nvec < 0)
-		nvec = pci_msi_vec_count(pdev);
-	if (nvec < 0)
-		return nvec;
+No. This is completely overdesigned, and fixes something that really
+cannot happen. What is wrong with:
 
-3) Do we need to increase the default of NUM_MSI_ALLOC_SCRATCHPAD_REGS
-to 4? 2 is a little too limited.
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 3aaca49..b7dffa80 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -2465,13 +2465,17 @@ int kvm_vgic_hyp_init(void)
+ 		goto out_free_irq;
+ 	}
+ 
++	ret = kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
++				       KVM_DEV_TYPE_ARM_VGIC_V2);
++	if (ret)
++		goto out_free_irq;
++
+ 	/* Callback into for arch code for setup */
+ 	vgic_arch_setup(vgic);
+ 
+ 	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
+ 
+-	return kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
+-				       KVM_DEV_TYPE_ARM_VGIC_V2);
++	return 0;
+ 
+ out_free_irq:
+ 	free_percpu_irq(vgic->maint_irq, kvm_get_running_vcpus());
 
-Regards!
-Gerry
+This achieves the exact same effect.
 
-> 
-> Time to go home.
-> 
-> 	M.
-> 
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
