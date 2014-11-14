@@ -1,85 +1,56 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 15 Nov 2014 03:58:53 +0800
-Subject: [linux-sunxi] Re: [PATCH 1/6] clk: sunxi: Add support for sun9i
- a80 usb clocks and resets
-In-Reply-To: <20141114083917.GT20972@lukather>
-References: <1415074039-16590-1-git-send-email-wens@csie.org>
- <1415074039-16590-2-git-send-email-wens@csie.org>
- <20141104165733.GI26729@lukather>
- <CAGb2v65VojZVEijdjXYGkMud7dMFzMzagfN=_4S3msZygu3YPQ@mail.gmail.com>
- <20141105100912.GD27686@lukather>
- <CAGb2v64RT4PKTji2KfDTFfc8b_kiTk0Vh49nEE9ZJukum7h2_Q@mail.gmail.com>
- <20141106085424.GF2989@lukather>
- <CAGb2v66Riu43PEzR2vLbg9r_WvZDLvxWtwAc3z43FkF57O2ksg@mail.gmail.com>
- <20141114083917.GT20972@lukather>
-Message-ID: <CAGb2v64_SkD3=xV+o4hK7fV0DusCDmPYgatWXQYrexa65k2Zjg@mail.gmail.com>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Fri, 14 Nov 2014 21:54:42 +0200
+Subject: N900 modem support in 3.18-rc1
+In-Reply-To: <20141114172008.GB12250@earth.universe>
+References: <20141104205117.GA17606@amd>
+ <20141106180335.GA21513@earth.universe> <20141106225005.GA14002@amd>
+ <201411070001.46481@pali> <545C6F14.8050303@gmail.com>
+ <20141113162420.GB8512@xo-6d-61-c0.localdomain> <5465A977.4030605@gmail.com>
+ <20141114172008.GB12250@earth.universe>
+Message-ID: <54665E02.8050108@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Fri, Nov 14, 2014 at 4:39 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
+
+On 14.11.2014 19:20, Sebastian Reichel wrote:
 >
-> Sorry for the belated answer.
+> The patch looks ok. It does not cleanup the cmt-speech driver for
+> mainline usage, but it should work. Before adding this driver to the
+> mainline kernel there should be open source userspace support anyway.
 >
-> On Thu, Nov 06, 2014 at 05:19:24PM +0800, Chen-Yu Tsai wrote:
->> On Thu, Nov 6, 2014 at 4:54 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > On Thu, Nov 06, 2014 at 10:09:27AM +0800, Chen-Yu Tsai wrote:
->> >> >> >> +static void __init sun9i_a80_usb_mod_setup(struct device_node *node)
->> >> >> >> +{
->> >> >> >> +     /* AHB1 gate must be enabled to access registers */
->> >> >> >> +     struct clk *ahb = of_clk_get(node, 0);
->> >> >> >> +
->> >> >> >> +     WARN_ON(IS_ERR(ahb));
->> >> >> >> +     clk_prepare_enable(ahb);
->> >> >> >
->> >> >> > Hmmmm. That look off.
->> >> >> >
->> >> >> > Why do you need the clock to be enabled all the time? Isn't the CCF
->> >> >> > already taking care of enabling the parent clock whenever it needs to
->> >> >> > access any register?
->> >> >>
->> >> >> There are also resets in the same block. That and I couldn't get it
->> >> >> working without enabling the clock beforehand.
->> >> >
->> >> > Ah, right.
->> >> >
->> >> > What happens if you just enable and disable the clocks in the
->> >> > reset_assert and reset_deassert right before and after accessing the
->> >> > registers?
->> >>
->> >> That doesn't work either. I forgot to mention that most of the clock
->> >> gates have the peripheral pll as their parent, not the ahb clock gate.
->> >
->> > Why it doesn't work? The clock needs more time to stabilize? The reset
->> > line is set back in reset if the clocks are disabled?
->>
->> Let me clarify, what you proposed will work for the resets.
->>
->> However the clock gates won't work if we use the generic clk-gate driver.
->> The problem is most of the gates don't have the ahb gate as their parent,
->> but pll4 (peripheral pll). When we enable the clock, the ahb gate isn't
->> its parent, and doesn't get enabled as a result. This is especially true
->> for the usb phy clocks: all of them use pll4 as their parent.
+
+I am aware of that(patch not ready), it's one of the reasons this patch 
+still sits on gitorious IMO.
+
+libcmtspeechdata was opened by Nokia long ago, so I don't understand 
+what userspace support (for inclusion of the driver in the mainline 
+kernel that is) is needed. see 
+https://gitorious.org/meego-cellular/libcmtspeechdata/source/7f8f3ce357513e4849e1bf6d657980a514529c1a:
+
+REed pulseaudio modules that use cmtspeech will be ready sooner than 
+later (I believe in 2-3 monts from now), see on gitorious how fast we 
+progressed with -record and -music modules. Sure, -voice module is way 
+more complicated, but lots of it is already opensourced, we just need to 
+figure out a couple of DSP algorithms(drc, agc, aec, etc) related to 
+call quality. But I don't think the driver should wait for those modules 
+to be REed, they can be used as is even now, in their closed form for 
+testing. Unfortunately all my spare time is dedicated to that PA stuff, 
+so I simply can't cleanup cmtspeech driver and send a patch for 
+upstreaming. (Pavel, what about you?)
+
+> Btw. I am aware that this would break existing pulse audio stuff,
+> but wouldn't it make sense to export a V4L2 device instead of the
+> custom /dev/cmt_speech ABI?
 >
-> I'm not sure I get this right. You mean that this USB clock needs
-> *both* pll4 and its AHB gates to be enabled in order to run properly?
->
-> Or that the PHY needs its AHB gate to be enabled?
 
-What I meant was the USB clocks should have some backing PLL.
-But let's just use the AHB gate for all the parents and keep
-it simple for now. We can model it accurately after we get
-documentation.
+Nokia PA guys did a great job integrating lots of things related to 
+audio and honestly, I don't see a reason why should we reinvent the 
+wheel. There is lot more behind the scenes than simple PCM streaming 
+(like audio policies and routing, sideband audio, speakers protection, 
+etc) and reiplementing all this using different API wouldn't worth it IMO.
 
-> Both ways, I still don't think it's the right thing to do.
+Not to say that I agree with Pali's reply that working userspace should 
+not be broken just for the sake of it.
 
-As said above, I'll just use ahb gate as the parent, and do
-what you said earlier about the reset controls (toggle the
-gate before and after touching the register).
-
-
-ChenYu
+Ivo
