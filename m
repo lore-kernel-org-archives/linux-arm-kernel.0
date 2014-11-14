@@ -1,71 +1,286 @@
-From: mk@drkrebs.de (Markus Krebs)
-Date: Fri, 14 Nov 2014 16:01:29 +0100
-Subject: Network timing (?) problems since kernel 3.12
-In-Reply-To: <5463C356.50505@drkrebs.de>
-References: <545F852D.5040209@drkrebs.de> <20141109155502.GA10013@lunn.ch>
- <545F9CC5.6070709@drkrebs.de> <20141112194805.GA27092@schnuecks.de>
- <5463C356.50505@drkrebs.de>
-Message-ID: <54661949.3010905@drkrebs.de>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Fri, 14 Nov 2014 15:03:33 +0000
+Subject: [PATCH V4] arm64: percpu: Implement this_cpu operations
+In-Reply-To: <20141114134644.GD27963@arm.com>
+References: <20141114134644.GD27963@arm.com>
+Message-ID: <1415977413-17642-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 12.11.2014 um 21:30 schrieb Markus Krebs:
-> Am 12.11.2014 um 20:48 schrieb Simon Baatz:
->> Hi Markus,
->>
->> On Sun, Nov 09, 2014 at 05:56:37PM +0100, Markus Krebs wrote:
->>> Am 09.11.2014 um 16:55 schrieb Andrew Lunn:
->>>
->>>>> I'm using a Sheevaplug (Marvell Kirkwood) with an USB-Stick for
->>>>> storage as a server. Since kernel 3.12 I'm experiencing various
->>>>> erratic problems when transferring files, especially large or many
->>>>> files at the same time, over the network (ssh complaining about
->>>>> "Corrupted MAC on input" or Windows [over Samba] about corrupt
->>>>> files).
->>>>> Turning "offload check summing" off with ethtool didn't really help.
->>>>
->>>> Try turning off gso.
->>>
->>> Thanks, Andrew; I've tried now but that didn't do the trick either.
->>
->> I am not able to provoke this behaviour on my Sheevaplug using a
->> stock 3.12.32 kernel (but that does not mean much.  Just did some
->> quick tests by copying large files from an USB stick using ssh or
->> netcat).
->>
->> Could you elaborate on the actual kernel and config you are using?
->> Is there a simple testcase that reliably reproduces the behaviour on
->> your box?
->>
->> - Simon
->>
->
-> Hi Simon,
->
-> the actual working kernel I'm using is "3.11-2-kirkwood #1 Debian
-> 3.11.10-1 (2013-12-04) armv5tel". It never fails on anything.
->
-> When I upgrade to a newer kernel (3.15, 3.16, 3.17 ..), my testcase
-> is/was to do a unison synchronisation run: I synchronize a large
-> directory on the server with a backup directory on a Windows machine.
-> Unison is invoked from Windows, while the Linux unison server is
-> waiting, over ssh. Immediately after invoking unison from Windows, it
-> crashes, when the server runs a newer kernel. This is reproduceable.
-> Being curious what could be the problem, I have synchronized two Linux
-> servers with unison, again over ssh. It then gave the error "Corrupted
-> MAC on input".
-> This "unison over ssh"-scenario is my testcase, as when copying files,
-> the error is not consistently reproduceable.
->
-> - Markus
->
->
+The generic this_cpu operations disable interrupts to ensure that the
+requested operation is protected from pre-emption. For arm64, this is
+overkill and can hurt throughput and latency.
 
-Hi all,
+This patch provides arm64 specific implementations for the this_cpu
+operations. Rather than disable interrupts, we use the exclusive
+monitor or atomic operations as appropriate.
 
-I don't know what has changed, but with the newest Debian kernel 
-[3.16.0-4-kirkwood #1 Debian 3.16.7-2 (2014-11-06)] things seems to work 
-better. No errors so far!
-Thank you for your investigations!
+The following operations are implemented: add, add_return, and, or,
+read, write, xchg. We also wire up a cmpxchg implementation from
+cmpxchg.h.
 
-- Markus
+Testing was performed using the percpu_test module and hackbench on a
+Juno board running 3.18-rc4.
+
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+Changed in V4: rebased to allow for merge in Will's for-next branch.
+(I had erroneously changed my cmpxchg_double patch).
+
+Changed the read/write accessors to use ACCESS_ONCE rather than asm.
+
+Changed in V3: use cmpxchg_local rather than cmpxchg for
+this_cpu_cmpxchg.
+
+Changed in V2: corrected address constraint for __percpu_read and
+__percpu_write.
+---
+ arch/arm64/include/asm/cmpxchg.h |   6 +-
+ arch/arm64/include/asm/percpu.h  | 215 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 219 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
+index 89e397b..cb95930 100644
+--- a/arch/arm64/include/asm/cmpxchg.h
++++ b/arch/arm64/include/asm/cmpxchg.h
+@@ -246,8 +246,10 @@ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
+ 	__ret; \
+ })
+ 
+-#define this_cpu_cmpxchg_8(ptr, o, n) \
+-	cmpxchg_local(raw_cpu_ptr(&(ptr)), o, n)
++#define this_cpu_cmpxchg_1(ptr, o, n) cmpxchg_local(raw_cpu_ptr(&(ptr)), o, n)
++#define this_cpu_cmpxchg_2(ptr, o, n) cmpxchg_local(raw_cpu_ptr(&(ptr)), o, n)
++#define this_cpu_cmpxchg_4(ptr, o, n) cmpxchg_local(raw_cpu_ptr(&(ptr)), o, n)
++#define this_cpu_cmpxchg_8(ptr, o, n) cmpxchg_local(raw_cpu_ptr(&(ptr)), o, n)
+ 
+ #define this_cpu_cmpxchg_double_8(ptr1, ptr2, o1, o2, n1, n2) \
+ 	cmpxchg_double_local(raw_cpu_ptr(&(ptr1)), raw_cpu_ptr(&(ptr2)), \
+diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
+index 5279e57..b8b2c8a 100644
+--- a/arch/arm64/include/asm/percpu.h
++++ b/arch/arm64/include/asm/percpu.h
+@@ -44,6 +44,221 @@ static inline unsigned long __my_cpu_offset(void)
+ 
+ #endif /* CONFIG_SMP */
+ 
++#define PERCPU_OP(op, asm_op)						\
++static inline unsigned long __percpu_##op(void *ptr,			\
++			unsigned long val, int size)			\
++{									\
++	unsigned long loop, ret;					\
++									\
++	switch (size) {							\
++	case 1:								\
++		do {							\
++			asm ("//__per_cpu_" #op "_1\n"			\
++			"ldxrb	  %w[ret], %[ptr]\n"			\
++			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
++			"stxrb	  %w[loop], %w[ret], %[ptr]\n"		\
++			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
++			  [ptr] "+Q"(*(u8 *)ptr)			\
++			: [val] "Ir" (val));				\
++		} while (loop);						\
++		break;							\
++	case 2:								\
++		do {							\
++			asm ("//__per_cpu_" #op "_2\n"			\
++			"ldxrh	  %w[ret], %[ptr]\n"			\
++			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
++			"stxrh	  %w[loop], %w[ret], %[ptr]\n"		\
++			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
++			  [ptr]  "+Q"(*(u16 *)ptr)			\
++			: [val] "Ir" (val));				\
++		} while (loop);						\
++		break;							\
++	case 4:								\
++		do {							\
++			asm ("//__per_cpu_" #op "_4\n"			\
++			"ldxr	  %w[ret], %[ptr]\n"			\
++			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
++			"stxr	  %w[loop], %w[ret], %[ptr]\n"		\
++			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
++			  [ptr] "+Q"(*(u32 *)ptr)			\
++			: [val] "Ir" (val));				\
++		} while (loop);						\
++		break;							\
++	case 8:								\
++		do {							\
++			asm ("//__per_cpu_" #op "_8\n"			\
++			"ldxr	  %[ret], %[ptr]\n"			\
++			#asm_op " %[ret], %[ret], %[val]\n"		\
++			"stxr	  %w[loop], %[ret], %[ptr]\n"		\
++			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
++			  [ptr] "+Q"(*(u64 *)ptr)			\
++			: [val] "Ir" (val));				\
++		} while (loop);						\
++		break;							\
++	default:							\
++		BUILD_BUG();						\
++	}								\
++									\
++	return ret;							\
++}
++
++PERCPU_OP(add, add)
++PERCPU_OP(and, and)
++PERCPU_OP(or, orr)
++#undef PERCPU_OP
++
++static inline unsigned long __percpu_read(void *ptr, int size)
++{
++	unsigned long ret;
++
++	switch (size) {
++	case 1:
++		ret = ACCESS_ONCE(*(u8 *)ptr);
++		break;
++	case 2:
++		ret = ACCESS_ONCE(*(u16 *)ptr);
++		break;
++	case 4:
++		ret = ACCESS_ONCE(*(u32 *)ptr);
++		break;
++	case 8:
++		ret = ACCESS_ONCE(*(u64 *)ptr);
++		break;
++	default:
++		BUILD_BUG();
++	}
++
++	return ret;
++}
++
++static inline void __percpu_write(void *ptr, unsigned long val, int size)
++{
++	switch (size) {
++	case 1:
++		ACCESS_ONCE(*((u8 *)ptr)) = (u8) val;
++		break;
++	case 2:
++		ACCESS_ONCE(*((u16 *)ptr)) = (u16) val;
++		break;
++	case 4:
++		ACCESS_ONCE(*((u32 *)ptr)) = (u32) val;
++		break;
++	case 8:
++		ACCESS_ONCE(*((u64 *)ptr)) = (u64) val;
++		break;
++	default:
++		BUILD_BUG();
++	}
++}
++
++static inline unsigned long __percpu_xchg(void *ptr, unsigned long val,
++						int size)
++{
++	unsigned long ret, loop;
++
++	switch (size) {
++	case 1:
++		do {
++			asm ("//__percpu_xchg_1\n"
++			"ldxrb %w[ret], %[ptr]\n"
++			"stxrb %w[loop], %w[val], %[ptr]\n"
++			: [loop] "=&r"(loop), [ret] "=&r"(ret),
++			  [ptr] "+Q"(*(u8 *)ptr)
++			: [val] "r" (val));
++		} while (loop);
++		break;
++	case 2:
++		do {
++			asm ("//__percpu_xchg_2\n"
++			"ldxrh %w[ret], %[ptr]\n"
++			"stxrh %w[loop], %w[val], %[ptr]\n"
++			: [loop] "=&r"(loop), [ret] "=&r"(ret),
++			  [ptr] "+Q"(*(u16 *)ptr)
++			: [val] "r" (val));
++		} while (loop);
++		break;
++	case 4:
++		do {
++			asm ("//__percpu_xchg_4\n"
++			"ldxr %w[ret], %[ptr]\n"
++			"stxr %w[loop], %w[val], %[ptr]\n"
++			: [loop] "=&r"(loop), [ret] "=&r"(ret),
++			  [ptr] "+Q"(*(u32 *)ptr)
++			: [val] "r" (val));
++		} while (loop);
++		break;
++	case 8:
++		do {
++			asm ("//__percpu_xchg_8\n"
++			"ldxr %[ret], %[ptr]\n"
++			"stxr %w[loop], %[val], %[ptr]\n"
++			: [loop] "=&r"(loop), [ret] "=&r"(ret),
++			  [ptr] "+Q"(*(u64 *)ptr)
++			: [val] "r" (val));
++		} while (loop);
++		break;
++	default:
++		BUILD_BUG();
++	}
++
++	return ret;
++}
++
++#define _percpu_add(pcp, val) \
++	__percpu_add(raw_cpu_ptr(&(pcp)), val, sizeof(pcp))
++
++#define _percpu_add_return(pcp, val) (typeof(pcp)) (_percpu_add(pcp, val))
++
++#define _percpu_and(pcp, val) \
++	__percpu_and(raw_cpu_ptr(&(pcp)), val, sizeof(pcp))
++
++#define _percpu_or(pcp, val) \
++	__percpu_or(raw_cpu_ptr(&(pcp)), val, sizeof(pcp))
++
++#define _percpu_read(pcp) (typeof(pcp))	\
++	(__percpu_read(raw_cpu_ptr(&(pcp)), sizeof(pcp)))
++
++#define _percpu_write(pcp, val) \
++	__percpu_write(raw_cpu_ptr(&(pcp)), (unsigned long)(val), sizeof(pcp))
++
++#define _percpu_xchg(pcp, val) (typeof(pcp)) \
++	(__percpu_xchg(raw_cpu_ptr(&(pcp)), (unsigned long)(val), sizeof(pcp)))
++
++#define this_cpu_add_1(pcp, val) _percpu_add(pcp, val)
++#define this_cpu_add_2(pcp, val) _percpu_add(pcp, val)
++#define this_cpu_add_4(pcp, val) _percpu_add(pcp, val)
++#define this_cpu_add_8(pcp, val) _percpu_add(pcp, val)
++
++#define this_cpu_add_return_1(pcp, val) _percpu_add_return(pcp, val)
++#define this_cpu_add_return_2(pcp, val) _percpu_add_return(pcp, val)
++#define this_cpu_add_return_4(pcp, val) _percpu_add_return(pcp, val)
++#define this_cpu_add_return_8(pcp, val) _percpu_add_return(pcp, val)
++
++#define this_cpu_and_1(pcp, val) _percpu_and(pcp, val)
++#define this_cpu_and_2(pcp, val) _percpu_and(pcp, val)
++#define this_cpu_and_4(pcp, val) _percpu_and(pcp, val)
++#define this_cpu_and_8(pcp, val) _percpu_and(pcp, val)
++
++#define this_cpu_or_1(pcp, val) _percpu_or(pcp, val)
++#define this_cpu_or_2(pcp, val) _percpu_or(pcp, val)
++#define this_cpu_or_4(pcp, val) _percpu_or(pcp, val)
++#define this_cpu_or_8(pcp, val) _percpu_or(pcp, val)
++
++#define this_cpu_read_1(pcp) _percpu_read(pcp)
++#define this_cpu_read_2(pcp) _percpu_read(pcp)
++#define this_cpu_read_4(pcp) _percpu_read(pcp)
++#define this_cpu_read_8(pcp) _percpu_read(pcp)
++
++#define this_cpu_write_1(pcp, val) _percpu_write(pcp, val)
++#define this_cpu_write_2(pcp, val) _percpu_write(pcp, val)
++#define this_cpu_write_4(pcp, val) _percpu_write(pcp, val)
++#define this_cpu_write_8(pcp, val) _percpu_write(pcp, val)
++
++#define this_cpu_xchg_1(pcp, val) _percpu_xchg(pcp, val)
++#define this_cpu_xchg_2(pcp, val) _percpu_xchg(pcp, val)
++#define this_cpu_xchg_4(pcp, val) _percpu_xchg(pcp, val)
++#define this_cpu_xchg_8(pcp, val) _percpu_xchg(pcp, val)
++
+ #include <asm-generic/percpu.h>
+ 
+ #endif /* __ASM_PERCPU_H */
+-- 
+1.9.3
