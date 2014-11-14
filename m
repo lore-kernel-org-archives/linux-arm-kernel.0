@@ -1,95 +1,40 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Fri, 14 Nov 2014 14:07:15 -0800
-Subject: [PATCH]  tty: serial: msm_serial: document DT alias
-Message-ID: <54667D13.2070105@gmail.com>
+From: dtor@chromium.org (Dmitry Torokhov)
+Date: Fri, 14 Nov 2014 14:09:50 -0800
+Subject: [PATCH] [media] exynos4-is: fix error handling of irq_of_parse_and_map
+Message-ID: <20141114220950.GA34576@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Rowand <frank.rowand@sonymobile.com>
+Return value of irq_of_parse_and_map() is unsigned int, with 0
+indicating failure, so testing for negative result never works.
 
-Update devicetree binding for msm_serial to reflect msm_serial_probe()
-getting line id (port number) from the serialN alias.
-
-Signed-off-by: Frank Rowand <frank.rowand@sonymobile.com>
+Signed-off-by: Dmitry Torokhov <dtor@chromium.org>
 ---
- Documentation/devicetree/bindings/serial/qcom,msm-uartdm.txt |   15 +++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
 
-Index: linux/Documentation/devicetree/bindings/serial/qcom,msm-uartdm.txt
-===================================================================
---- linux.orig/Documentation/devicetree/bindings/serial/qcom,msm-uartdm.txt
-+++ linux/Documentation/devicetree/bindings/serial/qcom,msm-uartdm.txt
-@@ -27,27 +27,52 @@ Optional properties:
- - dmas: Should contain dma specifiers for transmit and receive channels
- - dma-names: Should contain "tx" for transmit and "rx" for receive channels
+Not tested, found by casual code inspection.
+
+ drivers/media/platform/exynos4-is/fimc-is.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/media/platform/exynos4-is/fimc-is.c b/drivers/media/platform/exynos4-is/fimc-is.c
+index 94c6b47..0fdca86 100644
+--- a/drivers/media/platform/exynos4-is/fimc-is.c
++++ b/drivers/media/platform/exynos4-is/fimc-is.c
+@@ -814,9 +814,9 @@ static int fimc_is_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
  
-+Note: Aliases may be defined to ensure the correct ordering of the UARTs.
-+The alias serialN will result in the UART being assigned port N.  If any
-+serialN alias exists, then an alias must exist for each enabled UART.  The
-+serialN aliases should be in a .dts file instead of in a .dtsi file.
-+
- Examples:
+ 	is->irq = irq_of_parse_and_map(dev->of_node, 0);
+-	if (is->irq < 0) {
++	if (!is->irq) {
+ 		dev_err(dev, "no irq found\n");
+-		return is->irq;
++		return -EINVAL;
+ 	}
  
--A uartdm v1.4 device with dma capabilities.
-+- A uartdm v1.4 device with dma capabilities.
-+
-+	serial at f991e000 {
-+		compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
-+		reg = <0xf991e000 0x1000>;
-+		interrupts = <0 108 0x0>;
-+		clocks = <&blsp1_uart2_apps_cxc>, <&blsp1_ahb_cxc>;
-+		clock-names = "core", "iface";
-+		dmas = <&dma0 0>, <&dma0 1>;
-+		dma-names = "tx", "rx";
-+	};
-+
-+- A uartdm v1.3 device without dma capabilities and part of a GSBI complex.
-+
-+	serial at 19c40000 {
-+		compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
-+		reg = <0x19c40000 0x1000>,
-+	      	<0x19c00000 0x1000>;
-+		interrupts = <0 195 0x0>;
-+		clocks = <&gsbi5_uart_cxc>, <&gsbi5_ahb_cxc>;
-+		clock-names = "core", "iface";
-+	};
-+
-+- serialN alias.
-+
-+	aliases {
-+		serial0 = &uarta;
-+		serial1 = &uartc;
-+		serial2 = &uartb;
-+	};
-+
-+	uarta: serial at 12490000 {
-+		status = "ok";
-+	};
-+
-+	uartb: serial at 16340000 {
-+		status = "ok";
-+	};
- 
--serial at f991e000 {
--	compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
--	reg = <0xf991e000 0x1000>;
--	interrupts = <0 108 0x0>;
--	clocks = <&blsp1_uart2_apps_cxc>, <&blsp1_ahb_cxc>;
--	clock-names = "core", "iface";
--	dmas = <&dma0 0>, <&dma0 1>;
--	dma-names = "tx", "rx";
--};
--
--A uartdm v1.3 device without dma capabilities and part of a GSBI complex.
--
--serial at 19c40000 {
--	compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
--	reg = <0x19c40000 0x1000>,
--	      <0x19c00000 0x1000>;
--	interrupts = <0 195 0x0>;
--	clocks = <&gsbi5_uart_cxc>, <&gsbi5_ahb_cxc>;
--	clock-names = "core", "iface";
--};
-+	uartc: serial at 1a240000 {
-+		status = "ok";
-+	};
+ 	ret = fimc_is_get_clocks(is);
+-- 
+2.1.0.rc2.206.gedb03e5
+
+
+-- 
+Dmitry
