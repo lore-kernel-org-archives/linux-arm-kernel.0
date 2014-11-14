@@ -1,118 +1,92 @@
-From: chanho.min@lge.com (Chanho Min)
-Date: Fri, 14 Nov 2014 17:40:49 +0900
-Subject: [PATCH] ARM: cacheflush: disallow pending signals during
- cacheflush
-In-Reply-To: <20141113112633.GE13350@arm.com>
-References: <1415863793-6219-1-git-send-email-chanho.min@lge.com>
- <20141113112633.GE13350@arm.com>
-Message-ID: <010401cfffe6$b1adebc0$1509c340$@min@lge.com>
+From: B31939@freescale.com (Lian Minghuan-B31939)
+Date: Fri, 14 Nov 2014 16:47:25 +0800
+Subject: [PATCH v2] PCI: designware: Add support 4 ATUs assignment
+In-Reply-To: <1415876988.2420.7.camel@pengutronix.de>
+References: <1415682444-24911-1-git-send-email-Minghuan.Lian@freescale.com>
+ <CA+mB=1+4Dzxhbin6z0PUENvjUz-y8bq-K09FXTnSepFvVfe9HQ@mail.gmail.com>
+ <546308DD.40109@freescale.com>
+ <CA+mB=1K=Oyzdb2yfBvPRG9DHi-PFjRPtVS_dY9JMOz6dQog8QQ@mail.gmail.com>
+ <546331E7.5060003@freescale.com>
+ <CA+mB=1KObT9O783SMcvHy8nJGQPnxyKgP332r5bHx-K_D+LhVg@mail.gmail.com>
+ <1415809929.2876.5.camel@pengutronix.de> <546481A3.5050700@freescale.com>
+ <1415874015.2420.5.camel@pengutronix.de> <54648D61.6050704@freescale.com>
+ <1415876988.2420.7.camel@pengutronix.de>
+Message-ID: <5465C19D.3060801@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Will Deacon [mailto:will.deacon at arm.com]
+Hi Lucas and all,
 
-> Whilst I don't think this is the correct solution, I agree that there's
-> a potential issue here. We could change the restart return value to
-> -ERESTARTNOINTR instead, but I can imagine something like a periodic
-> SIGALRM which could prevent a large cacheflush from ever completing.
-> Do we actually care about making forward progress in such a scenario?
-It's not complete solution. But, I don't think this is incorrect solution
-as well. Potential issue could be more serious than improvement of signal
-responsiveness.
+On 2014?11?13? 19:09, Lucas Stach wrote:
+> Am Donnerstag, den 13.11.2014, 18:52 +0800 schrieb Lian Minghuan-B31939:
+>> Hi Lucas,
+>>
+>> On 2014?11?13? 18:20, Lucas Stach wrote:
+>>> Am Donnerstag, den 13.11.2014, 18:02 +0800 schrieb Lian Minghuan-B31939:
+>>>> Hi Lucas,
+>>>>
+>>>> Please see my comments inline.
+>>>>
+>>>> Thanks,
+>>>> Minghuan
+>>>>
+>>>> On 2014?11?13? 00:32, Lucas Stach wrote:
+>>>>> Am Mittwoch, den 12.11.2014, 21:53 +0530 schrieb Srikanth Thokala:
+>>>>>> Hi Minghuan,
+>>> [...]
+>>>
+>>>>> Using a smaller type complicates the DT for little to no benefit. I
+>>>>> think it's ok to use u32 here, which is a common standard for integer
+>>>>> values in DT.
+>>>>>
+>>>>> Though this discussion lead me to the question if we even need to have
+>>>>> this property in the DT at all. Isn't this a property that is fixed for
+>>>>> a specific silicon implementation of the DW core? In that case we could
+>>>>> just infer the number of ATUs from the DT compatible, so this should
+>>>>> probably just be added to struct pcie_port and properly initialized by
+>>>>> the SoC glue drivers.
+>>>> [Minghuan]  As far as I know, exynos implements only 2 ATUs, this is why
+>>>> pcie-designware only supports 2 ATU. iMX implements 4 ATUs and LS1021A
+>>>> implements 6 ATUs.
+>>>>
+>>> Right so we don't need an additional property in the DT at all. The
+>>> number of ATUs is fixed for a specific core compatible and can be passed
+>>> in by the respective exynos, imx and ls1021 glue drivers.
+>>>
+>>> You may ask the Keystone and Spear maintainers to get the correct number
+>>> of ATUs for those implementations.
+>>>
+>>> Regards,
+>>> Lucas
+>> [Minghuan] Yes. This a way that specific core driver passes the ATU
+>> number to
+>> pci-designware. But I perfer to adding dts node for the following reasons:
+>> 1. ATU number is hardware attribute, so it can be added to DTS.
+> But it is a duplication of information that can be inferred from the DT
+> compatible alone, which is usually frowned upon.
+>
+> Also in contrast to the num-lanes property I don't see a use-case to
+> reduce the number of used ATUs in a specific system, so num-atus is
+> basically fixed for a specific implementation.
+[Minghuan] 4ATUs provides better support for multiple-function and 
+SR-IOV PCIe devices.
+Can anyone tell me if there is the company will increase ATUs number?
+If yes, we should avoid the following code:
 
-> 
-> It is interesting to note that this change has been in mainline since
-> May last year without any reported issues. That could be down to a number
-> of reasons:
-> 
->   (1) People are using old kernels on ARM
-> 
->   (2) Code doesn't check the return value from the cacheflush system call,
->       because it historically always returned 0
-> 
->   (3) People are getting lucky with timing, as this is likely difficult
->       to hit
-> 
-> Related to (2) is that a `man cacheflush' invocation returns something
-> about the MIPs system call, that doesn't match what we do for ARM. The
-> (relatively recent) history of the system call on ARM is:
-> 
->   < v3.5 [*]
-> 
->     - Always returns 0
->     - Restricts virtual address range to a single VMA
->     - Page-aligns the region limits (over flushing for smaller ranges)
->     - Terminates on the first fault
->     - Flags are ignored but must "ALWAYS be passed as ZERO"
-> 
->   v3.5 - v3.12
->     - Returns -EINVAL if flags is set or if end < start
->     - Returns -EINVAL if we couldn't find a vma
->     - Terminates on the first fault and returns -EFAULT
-> 
->   v3.12 - HEAD
-> 
->     - No longer page-aligns region
->     - Removes VMA checking as this had a deadlock bug with mmap_sem
->       and we could handle faults by this point anyway
->     - Returns -EINVAL if !access_ok for the range
->     - Splits the range into PAGE_SIZE chunks, checking for reschedule
->       and pending signals to avoid DoSing the system (the hardware can
->       only clean by cacheline). This is where the -ERESTART_RESTARTBLOCK
->       behaviour came in, potentially returning -EINTR to userspace.
-> 
-> This leaves me with the following questions:
-> 
->   - Has this change been shown to break anything in practice?
-In practice, node.js (Currently, It doesn't check -EINTR of cacheflush)
-crashes occasionally and non-reproducibly at some point some while after
-the cacheflush call. At that time, strace tells cacheflush returns -EINTR.
+if (of_device_is_compatible(pcie->dev->of_node, "xxx,r1-pcie"))
+     atu_num = 2;
 
->   - Can we change the internal return value to -ERESTARTNOINTR?
-In worst case, I can imagine that periodic signal interrupts cacheflush
-and it repeats restart of syscall from start of address with unlucky timing.
+if (of_device_is_compatible(pcie->dev->of_node, "xxx,r2-pcie"))
+     atu_num = 4;
 
->   - What do we do about kernels that *do* return -EINTR? (>=3.12?)
->   - Can we get a manpage put together to describe this mess?
-> 
-> Cheers,
-> 
-> Will
-> 
-> [*] rmk may have some more ancient history kicking around, if you like!
-> 
-> > diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> > index abd2fc0..275e086 100644
-> > --- a/arch/arm/kernel/traps.c
-> > +++ b/arch/arm/kernel/traps.c
-> > @@ -521,25 +521,6 @@ __do_cache_op(unsigned long start, unsigned long end)
-> >  	do {
-> >  		unsigned long chunk = min(PAGE_SIZE, end - start);
-> >
-> > -		if (signal_pending(current)) {
-> > -			struct thread_info *ti = current_thread_info();
-> > -
-> > -			ti->restart_block = (struct restart_block) {
-> > -				.fn	= do_cache_op_restart,
-> > -			};
-> > -
-> > -			ti->arm_restart_block = (struct arm_restart_block) {
-> > -				{
-> > -					.cache = {
-> > -						.start	= start,
-> > -						.end	= end,
-> > -					},
-> > -				},
-> > -			};
-> > -
-> > -			return -ERESTART_RESTARTBLOCK;
-> > -		}
-> > -
-> >  		ret = flush_cache_user_range(start, start + chunk);
-> >  		if (ret)
-> >  			return ret;
-> > --
-> > 1.7.9.5
-> >
-> >
+
+>> 2. That pci-designware common code parses the 'num-atus' can avoid every
+>> specific controller driver to define and pass num-atus, so can reduce
+>> code size and simplify the specific controller driver implementation.
+>>
+> I don't think the code reduction matters here and the simplification is
+> minimal.
+>
+> Regards,
+> Lucas
+>
