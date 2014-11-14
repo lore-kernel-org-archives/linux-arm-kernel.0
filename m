@@ -1,39 +1,71 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 14 Nov 2014 12:03:16 +0100
-Subject: [PATCH v5 5/5] simplefb: Change simplefb_init from module_init to
- fs_initcall
+Date: Fri, 14 Nov 2014 12:03:14 +0100
+Subject: [PATCH v5 3/5] simplefb: Add support for enumerating simplefb dt
+ nodes in /chosen
 In-Reply-To: <1415962996-31712-1-git-send-email-hdegoede@redhat.com>
 References: <1415962996-31712-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1415962996-31712-5-git-send-email-hdegoede@redhat.com>
+Message-ID: <1415962996-31712-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One of the reasons for having the simplefb nodes in /chosen, and doing
-explicit enumeration of the nodes there, is too allow enumerating them sooner,
-so that we get a console earlier on.
-
-Doing this earlier then fs_initcall is not useful, since the fb only turns
-into a console when fbcon intializes, which is a fs_initcall too.
+Update simplefb to support the new preferred location for simplefb dt nodes
+under /chosen.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 --
-Changes in v4 (of the patch-set):
--Drop the comment about using fs_initcall vs module_exit, as we no longer have
- a module_exit
+Changes in v2:
+-Make name array larger in case we ever encounter more then 10000 framebuffers
+Changes in v3:
+-Switch to for_each_child_of_node to loop over the nodes under chosen
+Changes in v4:
+-Wrap the chosen enumeration code in #ifdef CONFIG_OF, as simplefb is used on
+ non devicetree platforms too
+-simplefb can only be built-in, so drop the module_exit function calling
+ platform_driver_unregister
+Changes in v5:
+-Cleanup #ifdef CONFIG_OF handling
 ---
- drivers/video/fbdev/simplefb.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/video/fbdev/simplefb.c | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-index 74c5edd..8be9754 100644
+index d192946..74c5edd 100644
 --- a/drivers/video/fbdev/simplefb.c
 +++ b/drivers/video/fbdev/simplefb.c
-@@ -413,7 +413,7 @@ static int __init simplefb_init(void)
- 	return 0;
- }
+@@ -27,6 +27,7 @@
+ #include <linux/platform_data/simplefb.h>
+ #include <linux/platform_device.h>
+ #include <linux/clk-provider.h>
++#include <linux/of_platform.h>
  
--module_init(simplefb_init);
-+fs_initcall(simplefb_init);
+ static struct fb_fix_screeninfo simplefb_fix = {
+ 	.id		= "simple",
+@@ -392,7 +393,27 @@ static struct platform_driver simplefb_driver = {
+ 	.probe = simplefb_probe,
+ 	.remove = simplefb_remove,
+ };
+-module_platform_driver(simplefb_driver);
++
++static int __init simplefb_init(void)
++{
++	int ret;
++	struct device_node *np;
++
++	ret = platform_driver_register(&simplefb_driver);
++	if (ret)
++		return ret;
++
++	if (IS_ENABLED(CONFIG_OF) && of_chosen) {
++		for_each_child_of_node(of_chosen, np) {
++			if (of_device_is_compatible(np, "simple-framebuffer"))
++				of_platform_device_create(np, NULL, NULL);
++		}
++	}
++
++	return 0;
++}
++
++module_init(simplefb_init);
  
  MODULE_AUTHOR("Stephen Warren <swarren@wwwdotorg.org>");
  MODULE_DESCRIPTION("Simple framebuffer driver");
