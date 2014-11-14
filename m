@@ -1,60 +1,137 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Fri, 14 Nov 2014 17:53:24 +0100
-Subject: N900 modem support in 3.18-rc1
-In-Reply-To: <20141114073756.GA5336@amd>
-References: <201411052137.31452@pali> <20141105203918.GA29199@amd>
- <201411052206.05379@pali> <20141105220359.GA32052@amd>
- <20141105234555.GA7097@earth.universe> <20141106124711.GA26944@amd>
- <20141106180335.GA21513@earth.universe>
- <20141113162155.GA8512@xo-6d-61-c0.localdomain>
- <20141113174534.GO26481@atomide.com> <20141114073756.GA5336@amd>
-Message-ID: <20141114165324.GA12250@earth.universe>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 14 Nov 2014 22:33:23 +0530
+Subject: [PATCH v9] ARM: omap: edma: add suspend resume hook
+In-Reply-To: <1409043173-24357-1-git-send-email-zonque@gmail.com>
+References: <1409043173-24357-1-git-send-email-zonque@gmail.com>
+Message-ID: <546635DB.4020202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 14, 2014 at 08:37:56AM +0100, Pavel Machek wrote:
-> I'm using nfsroot (no modules), .config is attached. Debian v7.7,
-> ofono installed.
+On Tuesday 26 August 2014 02:22 PM, Daniel Mack wrote:
+> This patch makes the edma driver resume correctly after suspend. Tested
+> on an AM33xx platform with cyclic audio streams and omap_hsmmc.
 > 
-> To launch ofono, I'm using:
+> All information can be reconstructed by already known runtime
+> information.
 > 
-> rmdir /dev/cmt
-> ln -s /sys/bus/hsi/devices/n900-modem/ /dev/cmt
+> As we now use some functions that were previously only used from __init
+> context, annotations had to be dropped.
+> 
+> [nm at ti.com: added error handling for runtime + suspend_late/early_resume]
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> Tested-by: Joel Fernandes <joelf@ti.com>
+> Acked-by: Joel Fernandes <joelf@ti.com>
+> ---
+> Changes from v8:
+> 
+> 	* Drop the edma_suspend hook altogether. Even though back then
+> 	  when I wrote the code I was sure disabling the interrupts
+> 	  during suspend is necessary, tests now show it in fact isn't.
+> 	  My test setup still works if that code is omitted.
+> 	* Use SET_LATE_SYSTEM_SLEEP_PM_OPS in the dev_pm_ops
+> 	  declaration.
+> 
+> 	Thanks to Sekhar for pointing out the above.
+> 
+>  arch/arm/common/edma.c | 60 ++++++++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 58 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+> index 485be42..c623dd0 100644
+> --- a/arch/arm/common/edma.c
+> +++ b/arch/arm/common/edma.c
+> @@ -244,6 +244,8 @@ struct edma {
+>  	/* list of channels with no even trigger; terminated by "-1" */
+>  	const s8	*noevent;
+>  
+> +	struct edma_soc_info *info;
+> +
+>  	/* The edma_inuse bit for each PaRAM slot is clear unless the
+>  	 * channel is in use ... by ARM or DSP, for QDMA, or whatever.
+>  	 */
+> @@ -295,7 +297,7 @@ static void map_dmach_queue(unsigned ctlr, unsigned ch_no,
+>  			~(0x7 << bit), queue_no << bit);
+>  }
+>  
+> -static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
+> +static void assign_priority_to_queue(unsigned ctlr, int queue_no,
+>  		int priority)
+>  {
+>  	int bit = queue_no * 4;
+> @@ -314,7 +316,7 @@ static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
+>   * included in that particular EDMA variant (Eg : dm646x)
+>   *
+>   */
+> -static void __init map_dmach_param(unsigned ctlr)
+> +static void map_dmach_param(unsigned ctlr)
+>  {
+>  	int i;
+>  	for (i = 0; i < EDMA_MAX_DMACH; i++)
+> @@ -1762,15 +1764,69 @@ static int edma_probe(struct platform_device *pdev)
+>  			edma_write_array2(j, EDMA_DRAE, i, 1, 0x0);
+>  			edma_write_array(j, EDMA_QRAE, i, 0x0);
+>  		}
+> +		edma_cc[j]->info = info[j];
+>  		arch_num_cc++;
+>  	}
+>  
+>  	return 0;
+>  }
+>  
+> +static int edma_pm_resume(struct device *dev)
+> +{
+> +	int i, j, r;
+> +
+> +	r = pm_runtime_get_sync(dev);
 
-At least with Debian as base you can add this to your /etc/rc.local
-and be happy, since the link will be created before ofono starts via
-/etc/init.d/ ;)
+I think I have asked this before, and I am still not sure why this call 
+to pm_runtime_get_sync() is needed here. From my testing today, this 
+does seem to be a a no-op and this call returns from rpm_resume() 
+because of this check:
 
-I did not send ofono guys a patch to use
-/sys/bus/hsi/devices/n900-modem/, since the kernel is supposed to
-handle the PM, so there will be another, simpler interface (I plan
-to use pm=2 for that).
+	else if (dev->power.disable_depth == 1 && dev->power.is_suspended
+	    && dev->power.runtime_status == RPM_ACTIVE)
+		retval = 1;
 
-> killall  ofonod
-> sleep .1
-> ofonod --nodetach --debug &
+So, AFAICS, the net effect is an increment of dev->power.usage_count
+(which is already greater than 0) and its subsequent decrement at the
+end of the function.
 
-or just use "/etc/init.d/ofono restart". The above is mostly useful
-for getting debug output from ofono.
+After removing this call I did not see any EDMA malfunction as well 
+(can access MMC/SD just fine after suspend/resume cycle).
 
-> [...]
+So, any objections to merging this patch with the attached hunk 
+applied?
 
-The short description for .config: CONFIG_NOKIA_MODEM must not be
-disabled. It should depend on everything else needed:
+Thanks,
+Sekhar
 
-CONFIG_PHONET
-CONFIG_HSI
-CONFIG_OMAP_SSI
-CONFIG_OMAP_SSI_PORT
-CONFIG_SSI_PROTOCOL
-CONFIG_NOKIA_MODEM
-
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141114/9e8497dc/attachment.sig>
+---8<---
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 1f492d5be9c0..79de6a23047b 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -1803,13 +1803,7 @@ static int edma_probe(struct platform_device *pdev)
+ 
+ static int edma_pm_resume(struct device *dev)
+ {
+-       int i, j, r;
+-
+-       r = pm_runtime_get_sync(dev);
+-       if (r < 0) {
+-               dev_err(dev, "%s: get_sync returned %d\n", __func__, r);
+-               return r;
+-       }
++       int i, j;
+ 
+        for (j = 0; j < arch_num_cc; j++) {
+                struct edma *cc = edma_cc[j];
+@@ -1844,8 +1838,6 @@ static int edma_pm_resume(struct device *dev)
+                }
+        }
+ 
+-       pm_runtime_put_sync(dev);
+-
+        return 0;
+ }
