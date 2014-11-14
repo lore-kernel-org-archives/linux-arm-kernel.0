@@ -1,29 +1,181 @@
-From: vichy.kuo@gmail.com (vichy)
-Date: Fri, 14 Nov 2014 21:13:12 +0800
-Subject: some question about TCR setting
-In-Reply-To: <20141114104246.GA25828@leverpostej>
-References: <CAOVJa8HBYkTMCJFKC=+UwjgPp4odm5UV-oUQXu17ctv2+HkpRg@mail.gmail.com>
- <20141114104246.GA25828@leverpostej>
-Message-ID: <CAOVJa8Fx4yiSU0O7HTaYEKOrRdtWve4JGeN0cWRXDsBMyV_8Mg@mail.gmail.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 14 Nov 2014 22:18:24 +0900
+Subject: [PATCH] mmc: dw_mmc: add quirk for data over interrupt timeout
+In-Reply-To: <1415970338-2637-1-git-send-email-addy.ke@rock-chips.com>
+References: <1415970338-2637-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <54660120.50305@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Mark:
-> The CPU can't read the attributes from the page tables, because in order
-> to do so it would need to know the attributes to access the page tables
-> with. Additionally, the page tables might not always be mapped into the
-> virtual address space.
-Per your explanation, if the page table base address in TTBR is
-0x1000000, {SH,ORGN,IRGN}{1,0} tell cpu how to access this part of
-physical address, right?
+Hi, Addy.
 
-if so, I have some questions:
-1. The processor use {SH,ORGN,IRGN}{1,0} in TCR to access all the
-following page directories?
-2. under what circumstance, the page tables might not always be mapped
-into the virtual address space.
-3. if the {SH,ORGN,IRGN}{1,0} of block/page descriptor is conflict
-with that one in TCR. Will that make cache maintenance issue. Or there
-are separate cache for page table walking?
+Did you use the DW_MCI_QUIRK_IDMAC_DTO?
+I'm not sure, but i wonder if you get what result when you use above quirk.
 
-Sincerely appreciate your kind help,
+And i will check more this patch at next week.
+
+Thanks for your efforts.
+
+Best Regards,
+Jaehoon Chung
+
+On 11/14/2014 10:05 PM, Addy Ke wrote:
+> From: Addy <addy.ke@rock-chips.com>
+> 
+> This patch add a new quirk to notify the driver to teminate
+> current transfer and report a data timeout to the core,
+> if data over interrupt does NOT come within the given time.
+> 
+> dw_mmc call mmc_request_done func to finish transfer depends on
+> data over interrupt. If data over interrupt does not come in
+> sending data state, the current transfer will be blocked.
+> 
+> But this case really exists, when driver reads tuning data from
+> card on rk3288-pink2 board. I measured waveforms by oscilloscope
+> and found that card clock was always on and data lines were always
+> holded high level in sending data state. This is the cause that
+> card does NOT send data to host.
+> 
+> According to synopsys designware databook, the timeout counter is
+> started only after the card clock is stopped.
+> 
+> So if card clock is always on, data read timeout interrupt will NOT come,
+> and if data lines are always holded high level, all data-related
+> interrupt such as start-bit error, data crc error, data over interrupt,
+> end-bit error, and so on, will NOT come too.
+> 
+> So driver can't get the current state, it can do nothing but wait for.
+> 
+> This patch is based on https://patchwork.kernel.org/patch/5227941/
+> 
+> Signed-off-by: Addy <addy.ke@rock-chips.com>
+> ---
+>  drivers/mmc/host/dw_mmc.c  | 47 +++++++++++++++++++++++++++++++++++++++++++++-
+>  include/linux/mmc/dw_mmc.h |  5 +++++
+>  2 files changed, 51 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index b4c3044..3960fc3 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -1448,6 +1448,17 @@ static int dw_mci_data_complete(struct dw_mci *host, struct mmc_data *data)
+>  	return data->error;
+>  }
+>  
+> +static inline void dw_mci_dto_start_monitor(struct dw_mci *host)
+> +{
+> +	unsigned int data_tmout_clks;
+> +	unsigned int data_tmout_ms;
+> +
+> +	data_tmout_clks = (mci_readl(host, TMOUT) >> 8);
+> +	data_tmout_ms = (data_tmout_clks * 1000 / host->bus_hz) + 250;
+> +
+> +	mod_timer(&host->dto_timer, jiffies + msecs_to_jiffies(data_tmout_ms));
+> +}
+> +
+>  static void dw_mci_tasklet_func(unsigned long priv)
+>  {
+>  	struct dw_mci *host = (struct dw_mci *)priv;
+> @@ -1522,8 +1533,11 @@ static void dw_mci_tasklet_func(unsigned long priv)
+>  			}
+>  
+>  			if (!test_and_clear_bit(EVENT_XFER_COMPLETE,
+> -						&host->pending_events))
+> +						&host->pending_events)) {
+> +				if (host->quirks & DW_MCI_QUIRK_DTO_TIMER)
+> +					dw_mci_dto_start_monitor(host);
+>  				break;
+> +			}
+>  
+>  			set_bit(EVENT_XFER_COMPLETE, &host->completed_events);
+>  
+> @@ -2115,6 +2129,9 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
+>  		}
+>  
+>  		if (pending & SDMMC_INT_DATA_OVER) {
+> +			if (host->quirks & DW_MCI_QUIRK_DTO_TIMER)
+> +				del_timer(&host->dto_timer);
+> +
+>  			mci_writel(host, RINTSTS, SDMMC_INT_DATA_OVER);
+>  			if (!host->data_status)
+>  				host->data_status = pending;
+> @@ -2502,6 +2519,28 @@ ciu_out:
+>  	return ret;
+>  }
+>  
+> +static void dw_mci_dto_timer(unsigned long arg)
+> +{
+> +	struct dw_mci *host = (struct dw_mci *)arg;
+> +
+> +	switch (host->state) {
+> +	case STATE_SENDING_DATA:
+> +	case STATE_DATA_BUSY:
+> +		/*
+> +		* If data over interrupt does NOT come in sending data state,
+> +		* we should notify the driver to teminate current transfer
+> +		* and report a data timeout to the core.
+> +		*/
+> +		host->data_status = SDMMC_INT_DRTO;
+> +		set_bit(EVENT_DATA_ERROR, &host->pending_events);
+> +		set_bit(EVENT_DATA_COMPLETE, &host->pending_events);
+> +		tasklet_schedule(&host->tasklet);
+> +		break;
+> +	default:
+> +		break;
+> +	}
+> +}
+> +
+>  #ifdef CONFIG_OF
+>  static struct dw_mci_of_quirks {
+>  	char *quirk;
+> @@ -2513,6 +2552,9 @@ static struct dw_mci_of_quirks {
+>  	}, {
+>  		.quirk	= "disable-wp",
+>  		.id	= DW_MCI_QUIRK_NO_WRITE_PROTECT,
+> +	}, {
+> +		.quirk	= "dto-timer",
+> +		.id	= DW_MCI_QUIRK_DTO_TIMER,
+>  	},
+>  };
+>  
+> @@ -2654,6 +2696,9 @@ int dw_mci_probe(struct dw_mci *host)
+>  
+>  	spin_lock_init(&host->lock);
+>  	INIT_LIST_HEAD(&host->queue);
+> +	if (host->quirks & DW_MCI_QUIRK_DTO_TIMER)
+> +		setup_timer(&host->dto_timer,
+> +			    dw_mci_dto_timer, (unsigned long)host);
+>  
+>  	/*
+>  	 * Get the host data width - this assumes that HCON has been set with
+> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+> index 42b724e..2477813 100644
+> --- a/include/linux/mmc/dw_mmc.h
+> +++ b/include/linux/mmc/dw_mmc.h
+> @@ -98,6 +98,7 @@ struct mmc_data;
+>   * @irq_flags: The flags to be passed to request_irq.
+>   * @irq: The irq value to be passed to request_irq.
+>   * @sdio_id0: Number of slot0 in the SDIO interrupt registers.
+> + * @dto_timer: Timer for data over interrupt timeout.
+>   *
+>   * Locking
+>   * =======
+> @@ -196,6 +197,8 @@ struct dw_mci {
+>  	int			irq;
+>  
+>  	int			sdio_id0;
+> +
+> +	struct timer_list	dto_timer;
+>  };
+>  
+>  /* DMA ops for Internal/External DMAC interface */
+> @@ -220,6 +223,8 @@ struct dw_mci_dma_ops {
+>  #define DW_MCI_QUIRK_BROKEN_CARD_DETECTION	BIT(3)
+>  /* No write protect */
+>  #define DW_MCI_QUIRK_NO_WRITE_PROTECT		BIT(4)
+> +/* Timer for data over interrupt timeout */
+> +#define DW_MCI_QUIRK_DTO_TIMER			BIT(5)
+>  
+>  /* Slot level quirks */
+>  /* This slot has no write protect */
+> 
