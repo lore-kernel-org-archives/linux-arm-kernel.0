@@ -1,171 +1,61 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 13 Nov 2014 18:06:55 -0800
-Subject: [PATCH v14 3/7] KVM: x86: switch to kvm_get_dirty_log_protect
-In-Reply-To: <1415930268-7674-4-git-send-email-m.smarduch@samsung.com>
-References: <1415930268-7674-1-git-send-email-m.smarduch@samsung.com>
- <1415930268-7674-4-git-send-email-m.smarduch@samsung.com>
-Message-ID: <546563BF.9060407@samsung.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Fri, 14 Nov 2014 10:16:55 +0800
+Subject: [Patch V1 0/6] Refine generic/PCI MSI irqodmian interfaces
+In-Reply-To: <alpine.DEB.2.11.1411140211480.3935@nanos>
+References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
+ <54651BE2.9080008@arm.com> <54654C10.2040102@linux.intel.com>
+ <54655632.2040209@huawei.com> <alpine.DEB.2.11.1411140211480.3935@nanos>
+Message-ID: <54656617.7090000@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo,
+On 2014/11/14 9:31, Thomas Gleixner wrote:
+> On Fri, 14 Nov 2014, Yijing Wang wrote:
+> 
+> Could you please use a mail client which does proper line wraps or
+> configure yours to do so?
+> 
+>> Associate the irq domain and PCI bus is not necessary, because all
+>> PCI buses under same host bridge always share same MSI chip/irq
+>> domain, we only need associate them and pci host bridge.
+>>
+>> I'm refactoring the pci_host_bridge, make it be a generic one, rip
+>> out of the pci root bus creation, so we could put the irq domain and
+>> pci domain etc.. in it. Finally, we could eliminate lots platform
+>> arch functions. I will post it out within one week.
+> 
+> That's a completely orthogonal problem. From the MSI/interrupt
+> handling POV it does not matter at all where that information is
+> stored. All we care about is that it is retrievable via the (pci)
+> device which tries to setup MSI[X].
+> 
+> So we can store/retrieve it via generic functions into/from whatever
+> is available right now. If the irq side has generic interfaces to do
+> so then this wont conflict with your decisions to change the final
+> storage point because all it takes is to tweak the storage/retrieve
+> functions.
+> 
+> So all we need at the moment is an agreed on way to store/retrieve
+> that information which is based on the current shared infrastructure,
+> aka. Linus tree. If we can utilize that you are completely free to
+> change the association mechanism underneath.
 
-  I changed your patch a little to use a Kconfig symbol,
-hope that's fine with you.
+Hi Thomas, thanks for your explanation. Now I got it,
+I will consider more about it.
 
-- Mario
+Thanks!
+Yijing.
 
-On 11/13/2014 05:57 PM, Mario Smarduch wrote:
-> From: Paolo Bonzini <pbonzini@redhat.com>
+
 > 
-> We now have a generic function that does most of the work of
-> kvm_vm_ioctl_get_dirty_log, now use it.
+> Thanks,
 > 
-> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> ---
->  arch/x86/include/asm/kvm_host.h |    3 --
->  arch/x86/kvm/Kconfig            |    1 +
->  arch/x86/kvm/mmu.c              |    4 +--
->  arch/x86/kvm/x86.c              |   64 ++++++---------------------------------
->  4 files changed, 12 insertions(+), 60 deletions(-)
+> 	tglx
 > 
-> diff --git a/arch/x86/include/asm/kvm_host.h b/arch/x86/include/asm/kvm_host.h
-> index 7c492ed..934dc24 100644
-> --- a/arch/x86/include/asm/kvm_host.h
-> +++ b/arch/x86/include/asm/kvm_host.h
-> @@ -805,9 +805,6 @@ void kvm_mmu_set_mask_ptes(u64 user_mask, u64 accessed_mask,
->  
->  void kvm_mmu_reset_context(struct kvm_vcpu *vcpu);
->  void kvm_mmu_slot_remove_write_access(struct kvm *kvm, int slot);
-> -void kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
-> -				     struct kvm_memory_slot *slot,
-> -				     gfn_t gfn_offset, unsigned long mask);
->  void kvm_mmu_zap_all(struct kvm *kvm);
->  void kvm_mmu_invalidate_mmio_sptes(struct kvm *kvm);
->  unsigned int kvm_mmu_calculate_mmu_pages(struct kvm *kvm);
-> diff --git a/arch/x86/kvm/Kconfig b/arch/x86/kvm/Kconfig
-> index f9d16ff..d073594 100644
-> --- a/arch/x86/kvm/Kconfig
-> +++ b/arch/x86/kvm/Kconfig
-> @@ -39,6 +39,7 @@ config KVM
->  	select PERF_EVENTS
->  	select HAVE_KVM_MSI
->  	select HAVE_KVM_CPU_RELAX_INTERCEPT
-> +	select KVM_GENERIC_DIRTYLOG_READ_PROTECT
->  	select KVM_VFIO
->  	---help---
->  	  Support hosting fully virtualized guest machines using hardware
-> diff --git a/arch/x86/kvm/mmu.c b/arch/x86/kvm/mmu.c
-> index 9314678..bf6b82c 100644
-> --- a/arch/x86/kvm/mmu.c
-> +++ b/arch/x86/kvm/mmu.c
-> @@ -1224,7 +1224,7 @@ static bool __rmap_write_protect(struct kvm *kvm, unsigned long *rmapp,
->  }
->  
->  /**
-> - * kvm_mmu_write_protect_pt_masked - write protect selected PT level pages
-> + * kvm_arch_mmu_write_protect_pt_masked - write protect selected PT level pages
->   * @kvm: kvm instance
->   * @slot: slot to protect
->   * @gfn_offset: start of the BITS_PER_LONG pages we care about
-> @@ -1233,7 +1233,7 @@ static bool __rmap_write_protect(struct kvm *kvm, unsigned long *rmapp,
->   * Used when we do not need to care about huge page mappings: e.g. during dirty
->   * logging we do not have any such mappings.
->   */
-> -void kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
-> +void kvm_arch_mmu_write_protect_pt_masked(struct kvm *kvm,
->  				     struct kvm_memory_slot *slot,
->  				     gfn_t gfn_offset, unsigned long mask)
->  {
-> diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
-> index 8f1e22d..9f8ae9a 100644
-> --- a/arch/x86/kvm/x86.c
-> +++ b/arch/x86/kvm/x86.c
-> @@ -3606,77 +3606,31 @@ static int kvm_vm_ioctl_reinject(struct kvm *kvm,
->   *
->   *   1. Take a snapshot of the bit and clear it if needed.
->   *   2. Write protect the corresponding page.
-> - *   3. Flush TLB's if needed.
-> - *   4. Copy the snapshot to the userspace.
-> + *   3. Copy the snapshot to the userspace.
-> + *   4. Flush TLB's if needed.
->   *
-> - * Between 2 and 3, the guest may write to the page using the remaining TLB
-> - * entry.  This is not a problem because the page will be reported dirty at
-> - * step 4 using the snapshot taken before and step 3 ensures that successive
-> - * writes will be logged for the next call.
-> + * Between 2 and 4, the guest may write to the page using the remaining TLB
-> + * entry.  This is not a problem because the page is reported dirty using
-> + * the snapshot taken before and step 4 ensures that writes done after
-> + * exiting to userspace will be logged for the next call.
->   */
->  int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
->  {
-> -	int r;
-> -	struct kvm_memory_slot *memslot;
-> -	unsigned long n, i;
-> -	unsigned long *dirty_bitmap;
-> -	unsigned long *dirty_bitmap_buffer;
->  	bool is_dirty = false;
-> +	int r;
->  
->  	mutex_lock(&kvm->slots_lock);
->  
-> -	r = -EINVAL;
-> -	if (log->slot >= KVM_USER_MEM_SLOTS)
-> -		goto out;
-> -
-> -	memslot = id_to_memslot(kvm->memslots, log->slot);
-> -
-> -	dirty_bitmap = memslot->dirty_bitmap;
-> -	r = -ENOENT;
-> -	if (!dirty_bitmap)
-> -		goto out;
-> -
-> -	n = kvm_dirty_bitmap_bytes(memslot);
-> -
-> -	dirty_bitmap_buffer = dirty_bitmap + n / sizeof(long);
-> -	memset(dirty_bitmap_buffer, 0, n);
-> -
-> -	spin_lock(&kvm->mmu_lock);
-> -
-> -	for (i = 0; i < n / sizeof(long); i++) {
-> -		unsigned long mask;
-> -		gfn_t offset;
-> -
-> -		if (!dirty_bitmap[i])
-> -			continue;
-> -
-> -		is_dirty = true;
-> -
-> -		mask = xchg(&dirty_bitmap[i], 0);
-> -		dirty_bitmap_buffer[i] = mask;
-> -
-> -		offset = i * BITS_PER_LONG;
-> -		kvm_mmu_write_protect_pt_masked(kvm, memslot, offset, mask);
-> -	}
-> -
-> -	spin_unlock(&kvm->mmu_lock);
-> -
-> -	/* See the comments in kvm_mmu_slot_remove_write_access(). */
-> -	lockdep_assert_held(&kvm->slots_lock);
-> +	r = kvm_get_dirty_log_protect(kvm, log, &is_dirty);
->  
->  	/*
->  	 * All the TLBs can be flushed out of mmu lock, see the comments in
->  	 * kvm_mmu_slot_remove_write_access().
->  	 */
-> +	lockdep_assert_held(&kvm->slots_lock);
->  	if (is_dirty)
->  		kvm_flush_remote_tlbs(kvm);
->  
-> -	r = -EFAULT;
-> -	if (copy_to_user(log->dirty_bitmap, dirty_bitmap_buffer, n))
-> -		goto out;
-> -
-> -	r = 0;
-> -out:
->  	mutex_unlock(&kvm->slots_lock);
->  	return r;
->  }
+> .
 > 
+
+
+-- 
+Thanks!
+Yijing
