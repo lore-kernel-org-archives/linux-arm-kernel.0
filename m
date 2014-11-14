@@ -1,43 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Nov 2014 15:59:51 +0100
-Subject: [PATCH v2 13/14] ARM: STi: DT: STiH410: Add usb2 picophy dt nodes
-In-Reply-To: <20141114133425.GA28680@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1415876417-28728-1-git-send-email-peter.griffin@linaro.org>
- <1546892.RCPeXgVQNJ@wuerfel>
- <20141114133425.GA28680@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <3480005.rnSDFdcTbG@wuerfel>
+From: mk@drkrebs.de (Markus Krebs)
+Date: Fri, 14 Nov 2014 16:01:29 +0100
+Subject: Network timing (?) problems since kernel 3.12
+In-Reply-To: <5463C356.50505@drkrebs.de>
+References: <545F852D.5040209@drkrebs.de> <20141109155502.GA10013@lunn.ch>
+ <545F9CC5.6070709@drkrebs.de> <20141112194805.GA27092@schnuecks.de>
+ <5463C356.50505@drkrebs.de>
+Message-ID: <54661949.3010905@drkrebs.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 November 2014 13:34:25 Peter Griffin wrote:
-> > 
-> > > From looking around in the source I see a few different ways people have done this: -
-> > > 
-> > > 1) Some drivers encode the data statically into the source and make a decision based on compatible string.
-> > > 2) Some drivers add a couple of extra dt properties to encode the offset (spifsm in stih416)
-> > > 3) Some drivers mix address spaces in the reg properties (examples given above) 
-> > > 3) Probably some other ways I've not found yet
-> > >
-> > > Is there a blessed way of doing this? It would be nice at least for all the drivers in STI to be doing
-> > > it the same as currently there seems to be a mix of implementations.
-> > 
-> > You can do 1 or 2, not 3.
-> 
-> Yep got it.
-> 
-> One last question, what are the rules about updating ethernet and miphy365 over
-> to using this method for there sysconfig registers? 
+Am 12.11.2014 um 21:30 schrieb Markus Krebs:
+> Am 12.11.2014 um 20:48 schrieb Simon Baatz:
+>> Hi Markus,
+>>
+>> On Sun, Nov 09, 2014 at 05:56:37PM +0100, Markus Krebs wrote:
+>>> Am 09.11.2014 um 16:55 schrieb Andrew Lunn:
+>>>
+>>>>> I'm using a Sheevaplug (Marvell Kirkwood) with an USB-Stick for
+>>>>> storage as a server. Since kernel 3.12 I'm experiencing various
+>>>>> erratic problems when transferring files, especially large or many
+>>>>> files at the same time, over the network (ssh complaining about
+>>>>> "Corrupted MAC on input" or Windows [over Samba] about corrupt
+>>>>> files).
+>>>>> Turning "offload check summing" off with ethtool didn't really help.
+>>>>
+>>>> Try turning off gso.
+>>>
+>>> Thanks, Andrew; I've tried now but that didn't do the trick either.
+>>
+>> I am not able to provoke this behaviour on my Sheevaplug using a
+>> stock 3.12.32 kernel (but that does not mean much.  Just did some
+>> quick tests by copying large files from an USB stick using ssh or
+>> netcat).
+>>
+>> Could you elaborate on the actual kernel and config you are using?
+>> Is there a simple testcase that reliably reproduces the behaviour on
+>> your box?
+>>
+>> - Simon
+>>
+>
+> Hi Simon,
+>
+> the actual working kernel I'm using is "3.11-2-kirkwood #1 Debian
+> 3.11.10-1 (2013-12-04) armv5tel". It never fails on anything.
+>
+> When I upgrade to a newer kernel (3.15, 3.16, 3.17 ..), my testcase
+> is/was to do a unison synchronisation run: I synchronize a large
+> directory on the server with a backup directory on a Windows machine.
+> Unison is invoked from Windows, while the Linux unison server is
+> waiting, over ssh. Immediately after invoking unison from Windows, it
+> crashes, when the server runs a newer kernel. This is reproduceable.
+> Being curious what could be the problem, I have synchronized two Linux
+> servers with unison, again over ssh. It then gave the error "Corrupted
+> MAC on input".
+> This "unison over ssh"-scenario is my testcase, as when copying files,
+> the error is not consistently reproduceable.
+>
+> - Markus
+>
+>
 
-It depends on whether you have any machines that rely on this for backwards
-compatibility. If the platform support is still work in progress and you
-wouldn't be able to run a machine with an upstream kernel yet, just say
-in the patch description that this breaks compatibility and why it is ok
-in this particular case.
+Hi all,
 
-If you have existing users that rely on these properties, make the
-driver code handle the existing dtb files but print a warning if you
-encounter them. In the documentation, you should list the new method
-as required then, but you can mention that the old method might be
-accepted for backwards compatibility.
+I don't know what has changed, but with the newest Debian kernel 
+[3.16.0-4-kirkwood #1 Debian 3.16.7-2 (2014-11-06)] things seems to work 
+better. No errors so far!
+Thank you for your investigations!
 
-	Arnd
+- Markus
