@@ -1,52 +1,60 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 14 Nov 2014 11:49:40 -0500
-Subject: [PATCH] ahci_sunxi: Make AHCI_HFLAG_NO_PMP flag configurable
- with a module option
-In-Reply-To: <1415977771-5909-1-git-send-email-hdegoede@redhat.com>
-References: <1415977771-5909-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141114164940.GA25889@htj.dyndns.org>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Fri, 14 Nov 2014 17:53:24 +0100
+Subject: N900 modem support in 3.18-rc1
+In-Reply-To: <20141114073756.GA5336@amd>
+References: <201411052137.31452@pali> <20141105203918.GA29199@amd>
+ <201411052206.05379@pali> <20141105220359.GA32052@amd>
+ <20141105234555.GA7097@earth.universe> <20141106124711.GA26944@amd>
+ <20141106180335.GA21513@earth.universe>
+ <20141113162155.GA8512@xo-6d-61-c0.localdomain>
+ <20141113174534.GO26481@atomide.com> <20141114073756.GA5336@amd>
+Message-ID: <20141114165324.GA12250@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 14, 2014 at 04:09:31PM +0100, Hans de Goede wrote:
-> The use of the AHCI_HFLAG_NO_PMP flag is something which we inherited from
-> the Allwinner android kernel sources, and I've always wanted to test if this
-> is really necessary.
+On Fri, Nov 14, 2014 at 08:37:56AM +0100, Pavel Machek wrote:
+> I'm using nfsroot (no modules), .config is attached. Debian v7.7,
+> ofono installed.
 > 
-> So recently I've bought a sata port multiplexer, and I've given this a test
-> spin on both A10 and A20 devices, and it seems to work fine:
+> To launch ofono, I'm using:
 > 
-> [    2.154456] ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
-> [    2.161092] ata1.15: Port Multiplier 1.2, 0x197b:0x0325 r0, 5 ports, feat 0x5/0xf
-> [    2.175511] ata1.00: hard resetting link
-> [    2.524929] ata1.00: SATA link up 3.0 Gbps (SStatus 123 SControl 320)
-> [    2.531430] ata1.01: hard resetting link
-> [    2.974465] ata1.01: link resume succeeded after 1 retries
-> [    3.094932] ata1.01: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
-> [    3.101431] ata1.02: hard resetting link
-> [    4.174466] ata1.02: failed to resume link (SControl 0)
-> [    4.180065] ata1.02: SATA link down (SStatus 0 SControl 0)
-> (and the same for links 3 and 4)
-> 
-> Once the NO_PMP flag is removed it correctly sees the 2 disks which I've
-> attached, and I can mount and use them just fine.
-> 
-> Unfortunately when I then directly attached a disk to the sata port on the
-> sunxi SoC, and booted a kernel without the AHCI_HFLAG_NO_PMP flag, it would
-> not recognize that disk.
-> 
-> It turns out that the sata controller in the sunxi SoCs fails to handle
-> soft-resets issued to directly attached disks, and when pmp support is
-> enabled the kernel will always issue a soft-reset.
-> 
-> So add a module parameter to enable pmp usage, and default this to off, so
-> that directly attached disks keep working normally.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> rmdir /dev/cmt
+> ln -s /sys/bus/hsi/devices/n900-modem/ /dev/cmt
 
-Applied to libata/for-3.19.
+At least with Debian as base you can add this to your /etc/rc.local
+and be happy, since the link will be created before ofono starts via
+/etc/init.d/ ;)
 
-Thanks.
+I did not send ofono guys a patch to use
+/sys/bus/hsi/devices/n900-modem/, since the kernel is supposed to
+handle the PM, so there will be another, simpler interface (I plan
+to use pm=2 for that).
 
--- 
-tejun
+> killall  ofonod
+> sleep .1
+> ofonod --nodetach --debug &
+
+or just use "/etc/init.d/ofono restart". The above is mostly useful
+for getting debug output from ofono.
+
+> [...]
+
+The short description for .config: CONFIG_NOKIA_MODEM must not be
+disabled. It should depend on everything else needed:
+
+CONFIG_PHONET
+CONFIG_HSI
+CONFIG_OMAP_SSI
+CONFIG_OMAP_SSI_PORT
+CONFIG_SSI_PROTOCOL
+CONFIG_NOKIA_MODEM
+
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141114/9e8497dc/attachment.sig>
