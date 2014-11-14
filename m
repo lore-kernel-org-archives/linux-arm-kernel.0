@@ -1,214 +1,229 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 14 Nov 2014 14:46:20 -0800
-Subject: [PATCH v9 2/9] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <1414194024-55547-3-git-send-email-lina.iyer@linaro.org>
-References: <1414194024-55547-1-git-send-email-lina.iyer@linaro.org>
- <1414194024-55547-3-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20141114224620.GD11808@codeaurora.org>
+From: george.mccollister@gmail.com (George McCollister)
+Date: Fri, 14 Nov 2014 16:47:02 -0600
+Subject: [PATCH 2/2] ARM: dts: Add devicetree for NovaTech OrionLXm
+In-Reply-To: <20141113005908.GA27381@saruman>
+References: <1415832094-20991-1-git-send-email-george.mccollister@gmail.com>
+ <1415832094-20991-2-git-send-email-george.mccollister@gmail.com>
+ <20141113005908.GA27381@saruman>
+Message-ID: <CAFSKS=PvoibYvP8fauFT8J7t_pRDK56-ZbRvOovu=Q5mrw9wpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24, Lina Iyer wrote:
-> diff --git a/drivers/soc/qcom/spm.c b/drivers/soc/qcom/spm.c
-> new file mode 100644
-> index 0000000..ee2e3ca
-> --- /dev/null
-> +++ b/drivers/soc/qcom/spm.c
-> +#include <linux/module.h>
-> +#include <linux/kernel.h>
-> +#include <linux/delay.h>
+Felipe,
 
-Is this used?
+Thank you for your reply.
 
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/slab.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_device.h>
-> +#include <linux/err.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/cpuidle.h>
-> +#include <linux/cpu_pm.h>
-> +
-> +#include <asm/proc-fns.h>
-> +#include <asm/suspend.h>
-> +
-> +#include <soc/qcom/pm.h>
-> +#include <soc/qcom/pm.h>
-> +#include <soc/qcom/scm.h>
-> +#include <soc/qcom/scm-boot.h>
-> +
-> +
-> +#define SCM_CMD_TERMINATE_PC	(0x2)
-> +#define SCM_FLUSH_FLAG_MASK	(0x3)
-> +#define SCM_L2_ON		(0x0)
-> +#define SCM_L2_OFF		(0x1)
-> +#define MAX_PMIC_DATA 2
-> +#define MAX_SEQ_DATA 64
-> +
-> +#define SPM_CTL_INDEX 0x7f
-> +#define SPM_CTL_INDEX_SHIFT 4
-> +#define SPM_CTL_EN BIT(0)
+>> +     vbat: fixedregulator at 0 {
+>> +             compatible = "regulator-fixed";
+>> +             regulator-name = "vbat";
+>> +             regulator-min-microvolt = <5000000>;
+>> +             regulator-max-microvolt = <5000000>;
+>> +             regulator-boot-on;
+>> +     };
+>
+> I suppose this is the 5V on a power jack, or something like that ?
 
-Nitpick, why aren't these also tabbed out?
+It comes with one of three different power supplies (24 - 250VDC, 120
+- 240VAC, 12VDC input) all of which ultimately supply a fixed 5V and
+3.3V.
 
-> +
-> +/**
-> + * spm_set_low_power_mode() - Configure SPM start address for low power mode
-> + * @mode: SPM LPM mode to enter
-> + */
-> +int qcom_spm_set_low_power_mode(enum pm_sleep_mode mode)
+>
+>> +     vmmcsd_fixed: fixedregulator at 0 {
+>> +             compatible = "regulator-fixed";
+>> +             regulator-name = "vmmcsd_fixed";
+>> +             regulator-min-microvolt = <3300000>;
+>> +             regulator-max-microvolt = <3300000>;
+>
+> but this... I know every other board devices this as a fixed regulator,
+> but is it really a fixed regulator or is supplied by one of the LDOs on
+> the PMIC ?
+>
 
-static?
+It's actually fixed (not from TP65910).
 
-> +{
-> +	struct spm_driver_data *drv = this_cpu_ptr(&cpu_spm_drv);
-> +	u32 start_index;
-> +	u32 ctl_val;
-> +
-> +	if (!drv->available)
-> +		return -ENXIO;
+>> +     };
+>> +};
+>> +
+>> +&am33xx_pinmux {
+>> +     mmc1_pins: pinmux_mmc1_pins {
+>> +             pinctrl-single,pins = <
+>> +                     0xf0 (PIN_INPUT_PULLUP | MUX_MODE0)     /* mmc0_dat3 */
+>> +                     0xf4 (PIN_INPUT_PULLUP | MUX_MODE0)     /* mmc0_dat2 */
+>> +                     0xf8 (PIN_INPUT_PULLUP | MUX_MODE0)     /* mmc0_dat1 */
+>> +                     0xfc (PIN_INPUT_PULLUP | MUX_MODE0)     /* mmc0_dat0 */
+>> +                     0x100 (PIN_INPUT_PULLUP | MUX_MODE0)    /* mmc0_clk */
+>> +                     0x104 (PIN_INPUT_PULLUP | MUX_MODE0)    /* mmc0_cmd */
+>> +             >;
+>> +     };
+>> +
+>> +     i2c0_pins: pinmux_i2c0_pins {
+>> +             pinctrl-single,pins = <
+>> +                     0x188 (PIN_INPUT_PULLUP | MUX_MODE0)    /* i2c0_sda.i2c0_sda */
+>> +                     0x18c (PIN_INPUT_PULLUP | MUX_MODE0)    /* i2c0_scl.i2c0_scl */
+>> +             >;
+>> +     };
+>> +
+>> +     i2c2_pins: pinmux_i2c2_pins {
+>> +             pinctrl-single,pins = <
+>> +                     0x178 (PIN_INPUT_PULLUP | MUX_MODE3)    /* uart1_ctsn.i2c2_sda */
+>> +                     0x17c (PIN_INPUT_PULLUP | MUX_MODE3)    /* uart1_rtsn.i2c2_scl */
+>
+> on thing to keep in mind, if you already have external pullups, you
+> might not want to add internal pullups as you'd end up with both
+> resistors in parallel. For I2C the danger is minimal (unless you have a
+> ton of bus capacitance, then it changes high/low time), but it's best to
+> write a more "pristine" DTS. (and sure, I know pretty much every board
+> makes this mistake, but it's best if we don't proliferate the error)
 
-It would be nice if we didn't need this by only registering the
-cpuidle device for this CPU once we've initialized the SPM
-hardware.
+I'll make sure this is correct and include any required changes in the
+next version of the patch series.
 
-> +
-> +	start_index = drv->reg_data->start_index[mode];
-> +
-> +	ctl_val = spm_register_read(drv, SPM_REG_SPM_CTL);
-> +	ctl_val &= ~(SPM_CTL_INDEX << SPM_CTL_INDEX_SHIFT);
-> +	ctl_val |= start_index << SPM_CTL_INDEX_SHIFT;
-> +	ctl_val |= SPM_CTL_EN;
-> +	spm_register_write(drv, SPM_REG_SPM_CTL, ctl_val);
-> +
-> +	/* Ensure we have written the start address */
-> +	wmb();
-> +
-> +	return 0;
-> +}
-> +
-> +static int qcom_pm_collapse(unsigned long int unused)
-> +{
-> +	int ret;
-> +	u32 flag;
-> +	int cpu = smp_processor_id();
-> +
-> +	ret = scm_set_warm_boot_addr(cpu_resume, cpu);
-> +	if (ret) {
-> +		pr_err("Failed to set warm boot address for cpu %d\n", cpu);
+>
+>> +&i2c0 {
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&i2c0_pins>;
+>> +
+>> +     status = "okay";
+>> +     clock-frequency = <400000>;
+>> +
+>> +     serial_config1: serial_config1 at 20 {
+>> +             compatible = "nxp,pca9539";
+>> +             reg = <0x20>;
+>> +     };
+>> +
+>> +     serial_config2: serial_config2 at 21 {
+>> +             compatible = "nxp,pca9539";
+>> +             reg = <0x21>;
+>> +     };
+>> +
+>> +     tps: tps at 2d {
+>> +             reg = <0x2d>;
+>
+> which TPS device ? no compatible ?
+>
+>> +/include/ "tps65910.dtsi"
+>
+> oh... okay.
 
-Do we want this print? Won't it start spamming the log if we go
-idle and we can't set the flag? Maybe we should just be silent
-and return an error.
+I'm assuming that means you're okay with this (if not please elaborate
+on how to improve it).
 
-> +		return ret;
-> +	}
-> +
-> +	flag = SCM_L2_ON & SCM_FLUSH_FLAG_MASK;
-> +	scm_call_atomic1(SCM_SVC_BOOT, SCM_CMD_TERMINATE_PC, flag);
-> +
-> +	/**
-> +	 *  Returns here only if there was a pending interrupt and we did not
-> +	 *  power down as a result.
-> +	 */
-> +	return 0;
-> +}
-[...]
-> +
-> +static struct qcom_cpu_pm_ops lpm_ops = {
+>
+>> +&tps {
+>> +     vcc1-supply = <&vbat>;
+>> +     vcc2-supply = <&vbat>;
+>> +     vcc3-supply = <&vbat>;
+>> +     vcc4-supply = <&vbat>;
+>> +     vcc5-supply = <&vbat>;
+>> +     vcc6-supply = <&vbat>;
+>> +     vcc7-supply = <&vbat>;
+>> +     vccio-supply = <&vbat>;
+>> +
+>> +     regulators {
+>> +             vrtc_reg: regulator at 0 {
+>> +                     regulator-always-on;
+>
+> this should not be always on, you want to pass this as supply to the RTC
+> module so it can manage it. It's also best to give names to all
+> regulators, so people know what they're used for.
 
-const?
+I think we may actually be able to turn this one and possibly two
+others off, I will investigate.
 
-> +	.standby = qcom_cpu_standby,
-> +	.spc = qcom_cpu_spc,
-> +};
-> +
-> +struct platform_device qcom_cpuidle_device = {
-> +	.name              = "qcom_cpuidle",
-> +	.id                = -1,
-> +	.dev.platform_data = &lpm_ops,
-> +};
+I've come up with names for all of the regulators being used and will
+include the changes in the next version of the patch series.
 
-This can be created dynamically instead of living statically.
+>
+>> +             };
+>> +
+>> +             vio_reg: regulator at 1 {
+>> +                     regulator-always-on;
+>> +             };
+>> +
+>> +             vdd1_reg: regulator at 2 {
+>> +                     regulator-name = "vdd_mpu";
+>> +                     regulator-min-microvolt = <600000>;
+>> +                     regulator-max-microvolt = <1500000>;
+>> +                     regulator-boot-on;
+>> +                     regulator-always-on;
+>> +             };
+>> +
+>> +             vdd2_reg: regulator at 3 {
+>> +                     regulator-always-on;
+>> +             };
+>> +
+>> +             vdd3_reg: regulator at 4 {
+>> +                     regulator-always-on;
+>> +             };
+>> +
+>> +             vdig1_reg: regulator at 5 {
+>> +                     regulator-always-on;
+>> +             };
+>> +
+>> +             vdig2_reg: regulator at 6 {
+>> +                     regulator-always-on;
+>> +             };
+>> +
+>> +             vpll_reg: regulator at 7 {
+>> +                     regulator-always-on;
+>> +             };
+>> +
+>> +             vdac_reg: regulator at 8 {
+>> +                     regulator-always-on;
+>> +             };
+>> +
+>> +             vaux1_reg: regulator at 9 {
+>> +                     regulator-always-on;
+>> +             };
+>> +
+>> +             vaux2_reg: regulator at 10 {
+>> +                     regulator-always-on;
+>> +             };
+>> +
+>> +             vaux33_reg: regulator at 11 {
+>
+> isn't this the supply to the other MMC slot ?
 
-> +
-> +static int spm_dev_probe(struct platform_device *pdev)
-> +{
-[...]
-> +
-> +	match_id = of_match_node(spm_match_table, pdev->dev.of_node);
-> +	if (!match_id)
-> +		return -ENODEV;
-> +
-> +	drv->reg_data = match_id->data;
-> +	if (!drv->reg_data)
-> +		return -EINVAL;
+no, it's actually being used for the USB PHY. As I said above I will
+name all regulators being used.
 
-This check seems useless. We control the .data field right above
-this function so there better be some reg_data.
+>
+>> +                     regulator-always-on;
+>> +             };
+>> +
+>> +             vmmc_reg: regulator at 12 {
+>> +                     regulator-min-microvolt = <3300000>;
+>> +                     regulator-max-microvolt = <3300000>;
+>> +                     regulator-always-on;
+>> +             };
+>> +     };
+>> +};
+>> +
+>> +&sham {
+>> +     status = "okay";
+>> +};
+>> +
+>> +&aes {
+>> +     status = "okay";
+>> +};
+>
+> just making sure, are you really using them ?
 
-> +
-> +	/* Write the SPM sequences, first.. */
-> +	addr = drv->reg_base + drv->reg_data->reg_offset[SPM_REG_SEQ_ENTRY];
-> +	seq_data = (const u32 *)drv->reg_data->seq;
+We may need them at some point, I'd like to keep them enabled.
 
-Why do we need a cast?
+>
+>> +&mmc1 {
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&mmc1_pins>;
+>> +     bus-width = <4>;
+>> +     status = "okay";
+>> +     vmmc-supply = <&vmmc_reg>;
+>> +     ti,vcc-aux-disable-is-sleep;
+>
+> this binding isn't documented anywhere. What was it supposed to do ?
 
-> +	__iowrite32_copy(addr, seq_data, ARRAY_SIZE(drv->reg_data->seq)/4);
+I mentioned in the commit message that there is a micro SD slot.
 
-nitpick: space around that / please.
-
-> +
-> +	/* ..and then, the control registers.
-> +	 * On some SoC's if the control registers are written first and if the
-> +	 * CPU was held in reset, the reset signal could trigger the SPM state
-> +	 * machine, before the sequences are completely written.
-> +	 */
-> +	spm_register_write(drv, SPM_REG_CFG, drv->reg_data->spm_cfg);
-> +	spm_register_write(drv, SPM_REG_DLY, drv->reg_data->spm_dly);
-> +	spm_register_write(drv, SPM_REG_PMIC_DLY, drv->reg_data->pmic_dly);
-> +
-> +	spm_register_write(drv, SPM_REG_PMIC_DATA_0,
-> +				drv->reg_data->pmic_data[0]);
-> +	spm_register_write(drv, SPM_REG_PMIC_DATA_1,
-> +				drv->reg_data->pmic_data[1]);
-> +
-> +	/**
-> +	 * Ensure all observers see the above register writes before the
-> +	 * cpuidle driver is allowed to use the SPM.
-> +	 */
-> +	wmb();
-> +	drv->available = true;
-> +
-> +	if ((cpu > -1) && !cpuidle_drv_init) {
-
-Nitpick: () are unnecessary.
-
-> +		platform_device_register(&qcom_cpuidle_device);
-> +		cpuidle_drv_init = true;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver spm_driver = {
-> +	.probe = spm_dev_probe,
-> +	.driver = {
-> +		.name = "qcom,spm",
-
-This is an odd driver name with the "qcom," part. Maybe call it "spm" or "saw"?
-
-> +		.of_match_table = spm_match_table,
-> +	},
-> +};
-> +
-> +module_platform_driver(spm_driver);
-
-MODULE_LICENSE()?
-MODULE_ALIAS()?
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>
+> --
+> balbi
