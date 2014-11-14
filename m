@@ -1,132 +1,87 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 14 Nov 2014 15:36:25 +0100
-Subject: [RESEND PATCH 2/2] mmc: atmel-mci: introduce probe deferring
-In-Reply-To: <1415975785-30303-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1415975785-30303-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1415975785-30303-2-git-send-email-ludovic.desroches@atmel.com>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Fri, 14 Nov 2014 16:36:58 +0200
+Subject: [PATCH 4/4] arm: dts: omap3-gta04: Add static configuration for
+ devconf1 register
+In-Reply-To: <20141113235840.GS26481@atomide.com>
+References: <1415051968-4878-1-git-send-email-marek@goldelico.com>
+ <1415051968-4878-5-git-send-email-marek@goldelico.com>
+ <5463585D.9070209@ti.com> <20141112150210.GC26481@atomide.com>
+ <5464969F.30708@ti.com> <20141113182848.GQ26481@atomide.com>
+ <alpine.DEB.2.02.1411132251320.17030@utopia.booyaka.com>
+ <20141113235840.GS26481@atomide.com>
+Message-ID: <CANOLnONkQu-BBvZH5nb+VngCxq=xnk60JkTd6Jha1uFt2j8gJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Return probe defer if requesting a dma channel without a dma controller
-probed. Using late_initcall is no more needing.
+On Fri, Nov 14, 2014 at 1:58 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Paul Walmsley <paul@pwsan.com> [141113 15:01]:
+>> Hi
+>>
+>> On Thu, 13 Nov 2014, Tony Lindgren wrote:
+>>
+>> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [141113 03:33]:
+>> > > On 12/11/14 17:02, Tony Lindgren wrote:
+>> > >
+>> > > >> And, with a quick grep, I see CONTROL_DEVCONF1 touched in multiple
+>> > > >> places in the kernel. I wonder if adding a pinmux entry for it could
+>> > > >> cause some rather odd problems.
+>> > > >
+>> > > > They can all use pinctrl-single no problem.
+>> > >
+>> > > Can, but don't. That's my worry. If we touch the DEVCONF1 via pinmux,
+>> > > and we have code in mach-omap2 that also touch DEVCONF1, without any
+>> > > knowledge (and locking) between those...
+>> >
+>> > Hmm yeah the McBSP clock mux could be racy as the mux register for
+>> > McBSP is treated as a clock. This register muxes the clock between
+>> > external pin and internal clock. Considering that this should be
+>> > selectable at board level as the external clock probably needs to be
+>> > used if level shifters are being used, it should be really handled by
+>> > pinctrl-single.
+>> >
+>> > The other use for hsmmc.c and pdata-quirks.c for the one time mux for
+>> > MMC clock from the MMC clock pin. That can be done with pinctrl-single
+>> > from the MMC driver too for DT based booting.
+>> >
+>> > Then we just have the save and restore of the registers for
+>> > off-idle.
+>> >
+>> > > So _maybe_ that's not an issue, as the pinmux config we have here is
+>> > > fixed, and done once at boot time, and maybe the code in mach-omap2 that
+>> > > touch DEVCONF1 is also ran just once and not at the same time as the
+>> > > pinmux. But I don't know if that's so.
+>> >
+>> > It seems we could just do a read-only check for McBSP in the clock
+>> > code for the mux register, or even completely drop that code from
+>> > cclock3xxx_data.c and start using the pinctrl for that mux.
+>> >
+>> > Paul & Tero, got any comments here?
+>>
+>> It's best to move all of the SCM register reads/writes to an SCM IP block
+>> driver.  This driver would be the only entity that would touch the SCM IP
+>> block registers - no other code on the system would touch it (perhaps
+>> aside from anything needed for early init).  The SCM driver would enforce
+>> mutual exclusion via a spinlock, so concurrent SCM register modifications
+>> wouldn't flake out.  Then the SCM driver would register clocks with the
+>> CCF, register pins with the pinctrl subsystem, etc. etc.
+>
+> We actually do have that with pinctrl-single + syscon. We certainly
+> need to implement more Linux framework drivers for the SCM registers.
+> Things like regulators, clocks, and PHYs, but they should use
+> pinctrl-single + syscon. See the the pbias-regulator.c for example.
+>
+> Looking at the McBSP clock handling, threre's yet more handling of
+> the same DEVCONF1 mux register in omap2_mcbsp_set_clks_src that gets
+> alled from omap_mcbsp_dai_set_dai_sysclk.
+>
+> To me it seems that if we handle the DEVCONF with pinctrl-single, we
+> don't need most of the McBSP fck code or the omap2_mcbsp_set_clks_src.
+> Having the mux register as the clock enable register is not nice..
+> Who knows what the clock coming from the external pin might be :)
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
+How will audio do dynamic muxing without that code?
+The pin must be remuxed back to internal clock when audio stops, or
+else PM breaks.
 
-Sorry for the noise, typo in cc list.
 
- drivers/mmc/host/atmel-mci.c | 52 +++++++++++++++++++++++++-------------------
- 1 file changed, 30 insertions(+), 22 deletions(-)
-
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index de2287c..caddbbd 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -2272,37 +2272,40 @@ static void atmci_cleanup_slot(struct atmel_mci_slot *slot,
- 	mmc_free_host(slot->mmc);
- }
- 
--static bool atmci_configure_dma(struct atmel_mci *host)
-+static int atmci_configure_dma(struct atmel_mci *host)
- {
- 	struct mci_platform_data	*pdata;
- 	dma_cap_mask_t mask;
-+	int ret = 0;
- 
- 	if (host == NULL)
--		return false;
-+		return -EINVAL;
- 
- 	pdata = host->pdev->dev.platform_data;
- 
- 	dma_cap_zero(mask);
- 	dma_cap_set(DMA_SLAVE, mask);
- 
--	host->dma.chan = dma_request_slave_channel(&host->pdev->dev, "rxtx");
--	if (!host->dma.chan) {
--		dev_warn(&host->pdev->dev, "no DMA channel available\n");
--		return false;
--	} else {
--		dev_info(&host->pdev->dev,
--					"using %s for DMA transfers\n",
--					dma_chan_name(host->dma.chan));
--
--		host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
--		host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
--		host->dma_conf.src_maxburst = 1;
--		host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
--		host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
--		host->dma_conf.dst_maxburst = 1;
--		host->dma_conf.device_fc = false;
--		return true;
-+	host->dma.chan = dma_request_slave_channel_reason(&host->pdev->dev, "rxtx");
-+	if (IS_ERR(host->dma.chan)) {
-+		ret = PTR_ERR(host->dma.chan);
-+		if (ret != -EPROBE_DEFER)
-+			dev_warn(&host->pdev->dev, "no DMA channel available\n");
-+		return ret;
- 	}
-+
-+	dev_info(&host->pdev->dev,
-+			"using %s for DMA transfers\n",
-+			dma_chan_name(host->dma.chan));
-+
-+	host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
-+	host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	host->dma_conf.src_maxburst = 1;
-+	host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
-+	host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	host->dma_conf.dst_maxburst = 1;
-+	host->dma_conf.device_fc = false;
-+	return ret;
- }
- 
- /*
-@@ -2419,7 +2422,10 @@ static int __init atmci_probe(struct platform_device *pdev)
- 
- 	/* Get MCI capabilities and set operations according to it */
- 	atmci_get_cap(host);
--	if (atmci_configure_dma(host)) {
-+	ret = atmci_configure_dma(host);
-+	if (ret == -EPROBE_DEFER)
-+		goto err_dma_probe_defer;
-+	if (ret == 0) {
- 		host->prepare_data = &atmci_prepare_data_dma;
- 		host->submit_data = &atmci_submit_data_dma;
- 		host->stop_transfer = &atmci_stop_transfer_dma;
-@@ -2506,6 +2512,7 @@ err_init_slot:
- 	del_timer_sync(&host->timer);
- 	if (host->dma.chan)
- 		dma_release_channel(host->dma.chan);
-+err_dma_probe_defer:
- 	free_irq(irq, host);
- 	return ret;
- }
-@@ -2573,6 +2580,7 @@ static const struct dev_pm_ops atmci_dev_pm_ops = {
- };
- 
- static struct platform_driver atmci_driver = {
-+	.probe		= atmci_probe,
- 	.remove		= __exit_p(atmci_remove),
- 	.driver		= {
- 		.name		= "atmel_mci",
-@@ -2583,7 +2591,7 @@ static struct platform_driver atmci_driver = {
- 
- static int __init atmci_init(void)
- {
--	return platform_driver_probe(&atmci_driver, atmci_probe);
-+	return platform_driver_register(&atmci_driver);
- }
- 
- static void __exit atmci_exit(void)
-@@ -2591,7 +2599,7 @@ static void __exit atmci_exit(void)
- 	platform_driver_unregister(&atmci_driver);
- }
- 
--late_initcall(atmci_init); /* try to load after dma driver when built-in */
-+subsys_initcall(atmci_init);
- module_exit(atmci_exit);
- 
- MODULE_DESCRIPTION("Atmel Multimedia Card Interface driver");
--- 
-2.0.3
+Gra?vydas
