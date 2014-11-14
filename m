@@ -1,84 +1,141 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 14 Nov 2014 14:53:51 +0000
-Subject: [PATCH] virt: kvm: arm: vgic: Process the failure case when
- kvm_register_device_ops() fails
-In-Reply-To: <54661137.4000806@gmail.com>
-References: <5464C865.90504@gmail.com> <5464CE9A.6050209@arm.com>
- <54660C32.6090602@gmail.com> <54660D33.5090309@arm.com>
- <54661137.4000806@gmail.com>
-Message-ID: <5466177F.8070704@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 14 Nov 2014 15:55:13 +0100
+Subject: [RESEND PATCH 2/2] mmc: atmel-mci: introduce probe deferring
+In-Reply-To: <1415975785-30303-2-git-send-email-ludovic.desroches@atmel.com>
+References: <1415975785-30303-1-git-send-email-ludovic.desroches@atmel.com>
+ <1415975785-30303-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <546617D1.5060904@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/11/14 14:27, Chen Gang wrote:
-> On 11/14/2014 10:09 PM, Marc Zyngier wrote:
->> On 14/11/14 14:05, Chen Gang wrote:
->>> On 11/13/2014 11:30 PM, Marc Zyngier wrote:
->>>> On 13/11/14 15:04, Chen Gang wrote:
->>>>> When kvm_register_device_ops() fails, also need call free_percpu_irq()
->>>>> just like others have down within kvm_vgic_hyp_init().
->>>>>
->>>>> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
->>>>> ---
->>>>>  virt/kvm/arm/vgic.c | 10 ++++++++--
->>>>>  1 file changed, 8 insertions(+), 2 deletions(-)
->>>>>
->>>>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->>>>> index 3aaca49..b799f17 100644
->>>>> --- a/virt/kvm/arm/vgic.c
->>>>> +++ b/virt/kvm/arm/vgic.c
->>>>> @@ -2470,8 +2470,14 @@ int kvm_vgic_hyp_init(void)
->>>>>  
->>>>>  	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
->>>>>  
->>>>> -	return kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
->>>>> -				       KVM_DEV_TYPE_ARM_VGIC_V2);
->>>>> +	ret = kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
->>>>> +				      KVM_DEV_TYPE_ARM_VGIC_V2);
->>>>> +	if (ret) {
->>>>> +		kvm_err("Cannot register device ops\n");
->>>>> +		goto out_free_irq;
->>>>> +	}
->>>>> +
->>>>> +	return 0;
->>>>>  
->>>>>  out_free_irq:
->>>>>  	free_percpu_irq(vgic->maint_irq, kvm_get_running_vcpus());
->>>>>
->>>>
->>>> Awesome. You're now freeing a per-cpu interrupt after just after having
->>>> enabled it on all CPUs. What could possibly go wrong?
->>>>
->>>
->>> OK, thanks. What you said sound reasonable to me. Need call on_each_cpu
->>> for disable_percpu_irq(). Also need call __unregister_cpu_notifier(),
->>> and need a new function vgic_arch_unsetup() for arm64.
->>
->> No. Just look at the code. Why don't you just move the
->> kvm_register_device_ops call *before* enabling the interrupt?
->>
+On 14/11/2014 15:36, Ludovic Desroches :
+> Return probe defer if requesting a dma channel without a dma controller
+> probed. Using late_initcall is no more needing.
 > 
-> Only based on the current code, what you said is reasonable to me.
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
 > 
-> But in the normal initializing sequence, firstly for architecture
-> dependence features, then for common cpu features, at last for other
-> devices (at least, other devices need be the last).
+> Sorry for the noise, typo in cc list.
 > 
-> So for me, we need still remain current initializing sequence for
-> extensible in the future.
+>  drivers/mmc/host/atmel-mci.c | 52 +++++++++++++++++++++++++-------------------
+>  1 file changed, 30 insertions(+), 22 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index de2287c..caddbbd 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -2272,37 +2272,40 @@ static void atmci_cleanup_slot(struct atmel_mci_slot *slot,
+>  	mmc_free_host(slot->mmc);
+>  }
+>  
+> -static bool atmci_configure_dma(struct atmel_mci *host)
+> +static int atmci_configure_dma(struct atmel_mci *host)
+>  {
+>  	struct mci_platform_data	*pdata;
+>  	dma_cap_mask_t mask;
+> +	int ret = 0;
+>  
+>  	if (host == NULL)
+> -		return false;
+> +		return -EINVAL;
+>  
+>  	pdata = host->pdev->dev.platform_data;
+>  
+>  	dma_cap_zero(mask);
+>  	dma_cap_set(DMA_SLAVE, mask);
+>  
+> -	host->dma.chan = dma_request_slave_channel(&host->pdev->dev, "rxtx");
+> -	if (!host->dma.chan) {
+> -		dev_warn(&host->pdev->dev, "no DMA channel available\n");
+> -		return false;
+> -	} else {
+> -		dev_info(&host->pdev->dev,
+> -					"using %s for DMA transfers\n",
+> -					dma_chan_name(host->dma.chan));
+> -
+> -		host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
+> -		host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+> -		host->dma_conf.src_maxburst = 1;
+> -		host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
+> -		host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+> -		host->dma_conf.dst_maxburst = 1;
+> -		host->dma_conf.device_fc = false;
+> -		return true;
+> +	host->dma.chan = dma_request_slave_channel_reason(&host->pdev->dev, "rxtx");
+> +	if (IS_ERR(host->dma.chan)) {
+> +		ret = PTR_ERR(host->dma.chan);
+> +		if (ret != -EPROBE_DEFER)
+> +			dev_warn(&host->pdev->dev, "no DMA channel available\n");
+> +		return ret;
+>  	}
+> +
+> +	dev_info(&host->pdev->dev,
+> +			"using %s for DMA transfers\n",
+> +			dma_chan_name(host->dma.chan));
+> +
+> +	host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
+> +	host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+> +	host->dma_conf.src_maxburst = 1;
+> +	host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
+> +	host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+> +	host->dma_conf.dst_maxburst = 1;
+> +	host->dma_conf.device_fc = false;
+> +	return ret;
+>  }
+>  
+>  /*
+> @@ -2419,7 +2422,10 @@ static int __init atmci_probe(struct platform_device *pdev)
+>  
+>  	/* Get MCI capabilities and set operations according to it */
+>  	atmci_get_cap(host);
+> -	if (atmci_configure_dma(host)) {
+> +	ret = atmci_configure_dma(host);
+> +	if (ret == -EPROBE_DEFER)
+> +		goto err_dma_probe_defer;
+> +	if (ret == 0) {
+>  		host->prepare_data = &atmci_prepare_data_dma;
+>  		host->submit_data = &atmci_submit_data_dma;
+>  		host->stop_transfer = &atmci_stop_transfer_dma;
+> @@ -2506,6 +2512,7 @@ err_init_slot:
+>  	del_timer_sync(&host->timer);
+>  	if (host->dma.chan)
+>  		dma_release_channel(host->dma.chan);
+> +err_dma_probe_defer:
+>  	free_irq(irq, host);
+>  	return ret;
+>  }
+> @@ -2573,6 +2580,7 @@ static const struct dev_pm_ops atmci_dev_pm_ops = {
+>  };
+>  
+>  static struct platform_driver atmci_driver = {
+> +	.probe		= atmci_probe,
+>  	.remove		= __exit_p(atmci_remove),
+>  	.driver		= {
+>  		.name		= "atmel_mci",
+> @@ -2583,7 +2591,7 @@ static struct platform_driver atmci_driver = {
+>  
+>  static int __init atmci_init(void)
+>  {
+> -	return platform_driver_probe(&atmci_driver, atmci_probe);
+> +	return platform_driver_register(&atmci_driver);
+>  }
+>  
+>  static void __exit atmci_exit(void)
+> @@ -2591,7 +2599,7 @@ static void __exit atmci_exit(void)
+>  	platform_driver_unregister(&atmci_driver);
+>  }
+>  
+> -late_initcall(atmci_init); /* try to load after dma driver when built-in */
+> +subsys_initcall(atmci_init);
 
-Well, the current code is what matters to me, not some hypothetical
-consideration about how things should (or should not) be.
+If deferring probe is activated, so I don't know why a special initcall
+function is still needed.
 
-If you plan to add some code that will require such a refactor, then
-post the code together with whatever you want to see changed, and we can
-talk about it.
+>  module_exit(atmci_exit);
+>  
+>  MODULE_DESCRIPTION("Atmel Multimedia Card Interface driver");
+> 
 
-Until then, I'm not willing to take something that looks over-designed
-in place of a 4 line fix.
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Nicolas Ferre
