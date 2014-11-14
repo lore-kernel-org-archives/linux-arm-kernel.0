@@ -1,62 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Nov 2014 21:01:56 +0100
-Subject: [RFC PATCH v4 0/8] Introduce automatic DMA configuration for
- IOMMU masters
-In-Reply-To: <20141114192754.GB9291@arm.com>
-References: <1415991397-9618-1-git-send-email-will.deacon@arm.com>
- <3630936.HRExZgJGyp@wuerfel> <20141114192754.GB9291@arm.com>
-Message-ID: <2043949.GdM3BkS8d4@wuerfel>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Fri, 14 Nov 2014 22:05:07 +0200
+Subject: [PATCHv6 4/5] hwspinlock/core: add common OF helpers
+In-Reply-To: <5466373B.2070808@ti.com>
+References: <1410553499-55951-1-git-send-email-s-anna@ti.com>
+ <1410553499-55951-5-git-send-email-s-anna@ti.com>
+ <CAK=WgbamdqAufjC4Xb5moERRBSB-cO6c1RPTE=f+dp75F+Eh7A@mail.gmail.com>
+ <5463B5B6.8040709@ti.com>
+ <CAK=WgbbatPTiz3efDWHVEcuug_UQfkCViMoK0zcfUg3JwB2oTA@mail.gmail.com>
+ <5464EC7A.7050603@ti.com>
+ <CAK=WgbbodS8GsUxQbkyCp6hAG+Ko4LMirx+pUa8_fUdxWFasvw@mail.gmail.com>
+ <54651C48.90809@ti.com>
+ <CAK=WgbYMM19-rWLOBjix+TA3fF_Pb25ia1rutDxYSUg9SV0efg@mail.gmail.com>
+ <5466373B.2070808@ti.com>
+Message-ID: <CAK=WgbYEQPwPH-i_kfF8-h6uOH9q4rcT1+W0smG3e=chDg833Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 November 2014 19:27:54 Will Deacon wrote:
-> 
-> > At the moment, iommu_ops is a structure that can get used for any
-> > number of iommus of the same type, but by putting per-device private
-> > data into the same structure you have to duplicate it per instance.
-> 
-> I'm not sure I agree -- the pgsize_bitmap, for example, could vary between
-> different implementations of the same IOMMU. I think we already have this in
-> Juno (some SMMUs can only do 64k pages, whilst others can do 4k and 64k).
+On Fri, Nov 14, 2014 at 7:09 PM, Suman Anna <s-anna@ti.com> wrote:
+>> It seems to me that hwspin_lock_request_specific failures should be
+>> used by clients to defer their probing. Why wouldn't such a simple
+>> solution work?
 
-Ah, I hadn't noticed that, it should be in the 'struct iommu' then of course,
-not in iommu_ops.
+> Because the API always returns NULL on failures and there is no way for
+> the clients to figure out if the lock id passed is invalid or the bank
+> containing the lock is not registered.
 
-> > I think rather than adding a .priv pointer to iommu_ops, we should do
-> > the same thing that a lot of other subsystems have:
-> > 
-> > /* generic structure */
-> > struct iommu {
-> >       struct iommu_ops *ops;
-> >       /* possibly other generic per-instance members */
-> > };
-> > 
-> > /* driver specific structure */
-> > struct arm_smmu {
-> >       struct iommu iommu;
-> > 
-> >       /* smmu specific members */
-> > };
-> > static inline struct arm_smmu *to_arm_smmu(struct iommu *iommu)
-> > {
-> >       return container_of(iommu, struct arm_smmu, iommu);
-> > }
-> 
-> Regardless of the arguments above, I think this layout is cleaner. We could
-> also move the pgsize_bitmap into struct iommu in that case, however, that
-> would be a more invasive patch series than I what I currently have.
+It seems to me this may always be the case - lock ids may be wrong and
+there's no way to fully validate them.
 
-Right, it can be done as a follow-up. It's certainly not urgent.
- 
-> If I do another version of the patch, I can easily add a struct iommu and
-> stash that in the device_node data for the IOMMU instead of directly
-> putting the ops there. That's at least a step in the right direction.
+Let's start with the simpler approach where
+hwspin_lock_request_specific failures are used by clients to defer
+their probing.
 
-Sounds good, yes. Alternatively, why not do the pointer in the opposite
-direction and put a 'struct device_node *dn' and a list_head into
-'struct iommu'. This means you will have to traverse the list of iommus
-in of_iommu_get_ops, but I think it's safe to assume this is a short
-list and it gets walked rarely. It would be somewhat cleaner not to have
-to use device_node->data this way.
+If a real use case will require changes we can always do that later,
+though it seems to me the only gain by changing this API is to catch a
+small subset of fatal DT mistakes which will anyway be caught very
+early in the development.
 
-	Arnd
+Thanks,
+Ohad.
