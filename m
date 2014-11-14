@@ -1,58 +1,93 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 14 Nov 2014 09:09:06 +0800
-Subject: [Patch V1 0/6] Refine generic/PCI MSI irqodmian interfaces
-In-Reply-To: <54654C10.2040102@linux.intel.com>
-References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
- <54651BE2.9080008@arm.com> <54654C10.2040102@linux.intel.com>
-Message-ID: <54655632.2040209@huawei.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 14 Nov 2014 01:18:32 +0000
+Subject: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
+In-Reply-To: <1415925943.4141.1.camel@perches.com>
+References: <20141030120127.GC32589@arm.com>
+ <CAKv+Gu9g5Q6fjPUy+P8YxkeDrH+bdO4kKGnxTQZRFhQpgPxaPA@mail.gmail.com>
+ <20141030135749.GE32589@arm.com>
+ <35FD53F367049845BC99AC72306C23D103E010D18272@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
+ <20141113235322.GC4042@n2100.arm.linux.org.uk>
+ <1415923530.4223.17.camel@perches.com>
+ <20141114001720.GD4042@n2100.arm.linux.org.uk>
+ <1415925943.4141.1.camel@perches.com>
+Message-ID: <20141114011832.GE4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/14 8:25, Jiang Liu wrote:
-> On 2014/11/14 5:00, Marc Zyngier wrote:
->> On 13/11/14 11:43, Jiang Liu wrote:
->>> This patch set is based on tip/irq/irqdomain and tries to refine
->>> interfaces to support irqdomain for generic MSI and PCI MSI.
->>>
->>> With this patch set applied, the generic MSI and PCI MSI interfaces
->>> are much easier to use. For extreme case, you only need to define
->>> a "struct msi_domain_info" and don't need to implement any callbacks,
->>> just using the default callbacks is OK:)
->>>
->>> This patch set is also a preparation for:
->>> 1) Kill all weak functions in drivers/pci/msi.c
->>> 2) Implement support for non-PCI-compliant MSI device
->>
->> I've rebased (once more!) the GICv3 ITS driver on top of this, and this
->> is definitely a major improvement. This is basically the first version
->> I can use without having to hack into the core code (apart from the
->> couple of nits I've mentioned earlier).
-> Sorry for the rebasing, but I hope it worthy rebasing:)
+On Thu, Nov 13, 2014 at 04:45:43PM -0800, Joe Perches wrote:
+> On Fri, 2014-11-14 at 00:17 +0000, Russell King - ARM Linux wrote:
+> > On Thu, Nov 13, 2014 at 04:05:30PM -0800, Joe Perches wrote:
+> > > On Thu, 2014-11-13 at 23:53 +0000, Russell King - ARM Linux wrote:
+> > > > On Fri, Oct 31, 2014 at 01:42:44PM +0800, Wang, Yalin wrote:
+> > > > > This patch add bitrev.h file to support rbit instruction,
+> > > > > so that we can do bitrev operation by hardware.
+> > > > > Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
+> > > > > ---
+> > > > >  arch/arm/Kconfig              |  1 +
+> > > > >  arch/arm/include/asm/bitrev.h | 21 +++++++++++++++++++++
+> > > > >  2 files changed, 22 insertions(+)
+> > > > >  create mode 100644 arch/arm/include/asm/bitrev.h
+> > > > > 
+> > > > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > > > > index 89c4b5c..be92b3b 100644
+> > > > > --- a/arch/arm/Kconfig
+> > > > > +++ b/arch/arm/Kconfig
+> > > > > @@ -28,6 +28,7 @@ config ARM
+> > > > >  	select HANDLE_DOMAIN_IRQ
+> > > > >  	select HARDIRQS_SW_RESEND
+> > > > >  	select HAVE_ARCH_AUDITSYSCALL if (AEABI && !OABI_COMPAT)
+> > > > > +	select HAVE_ARCH_BITREVERSE if (CPU_V7M || CPU_V7)
+> > > > 
+> > > > Looking at this, this is just wrong.  Take a moment to consider what
+> > > > happens if we build a kernel which supports both ARMv6 _and_ ARMv7 CPUs.
+> > > > What happens if an ARMv6 CPU tries to execute an rbit instruction?
+> > > > 
+> > > > Second point (which isn't obvious from your submissions on-list) is that
+> > > > you've loaded the patch system up with patches for other parts of the
+> > > > kernel tree for which I am not responsible for.  As such, I can't take
+> > > > those patches without the sub-tree maintainer acking them.  Also, the
+> > > > commit text in those patches look weird:
+> > > > 
+> > > > 6fire: Convert byte_rev_table uses to bitrev8
+> > > > 
+> > > > Use the inline function instead of directly indexing the array.
+> > > > 
+> > > > This allows some architectures with hardware instructions for bit
+> > > > reversals to eliminate the array.
+> > > > 
+> > > > Signed-off-by: Joe Perches <(address hidden)>
+> > > > Signed-off-by: Yalin Wang <(address hidden)>
+> > > > 
+> > > > Why is Joe signing off on these patches?
+> > > > Shouldn't his entry be an Acked-by: ?
+> > > 
+> > > I didn't sign off on or ack the "add bitrev.h" patch.
+> > 
+> > Correct, I never said you did.  Please read my message a bit more carefully
+> > next time, huh?
 > 
->>
->> Now, Thomas' idea of putting the irq_domain close to the bus is very
->> appealing, and I've tweaked an earlier patch in order to do this:
-> I feel that's the right direction. There are other threads discussing
-> associating an MSI controller structure with each PCI bus (at least
-> root bus).
-> http://www.spinics.net/lists/arm-kernel/msg376328.html
+> You've no reason to write that Russell.
 
-Associate the irq domain and PCI bus is not necessary, because all PCI buses under same host bridge
-always share same MSI chip/irq domain, we only need associate them and pci host bridge.
-I'm refactoring the pci_host_bridge, make it be a generic one, rip out of the pci root bus
-creation, so we could put the irq domain and pci domain etc.. in it. Finally, we could
-eliminate lots platform arch functions. I will post it out within one week.
+Absolutely I have, but I'm not going to discuss it because I'll just
+end up flaming you because in my mind you are the one who is completely
+mistaken with your comments.
 
-Thanks!
-Yijing.
+In case it hasn't been realised, I hardly read this mailing list anymore,
+or messages that I'm Cc'd on.  I do read most messages that I'm in the
+To: line, but generally not if they're DT changes (which always end up
+being marked To: me.)
 
-> Regards!
-> Gerry
+> > Great, so I can just discard these that were incorrectly submitted to me
+> > then.
 > 
-> .
-> 
+> I think you shouldn't apply these patches or updated
+> ones either until all the current uses are converted.
 
+Where are the dependencies mentioned?  How do I get to know when all
+the dependencies are met?  Who is tracking the dependencies?
 
 -- 
-Thanks!
-Yijing
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
