@@ -1,99 +1,65 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 14 Nov 2014 01:22:16 +0000
-Subject: [PATCH 6/8] arm64/kexec: Add pr_devel output
-In-Reply-To: <cover.1415926876.git.geoff@infradead.org>
-References: <cover.1415926876.git.geoff@infradead.org>
-Message-ID: <2b08174dd201077d4e7f6ec6c107650b22688723.1415926876.git.geoff@infradead.org>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Fri, 14 Nov 2014 09:22:30 +0800
+Subject: [Patch V1 0/6] Refine generic/PCI MSI irqodmian interfaces
+In-Reply-To: <54655632.2040209@huawei.com>
+References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
+ <54651BE2.9080008@arm.com> <54654C10.2040102@linux.intel.com>
+ <54655632.2040209@huawei.com>
+Message-ID: <54655956.10402@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To aid in debugging kexec problems or when adding new functionality to kexec add
-a new routine kexec_image_info() and several inline pr_devel statements.
+On 2014/11/14 9:09, Yijing Wang wrote:
+> On 2014/11/14 8:25, Jiang Liu wrote:
+>> On 2014/11/14 5:00, Marc Zyngier wrote:
+>>> On 13/11/14 11:43, Jiang Liu wrote:
+>>>> This patch set is based on tip/irq/irqdomain and tries to refine
+>>>> interfaces to support irqdomain for generic MSI and PCI MSI.
+>>>>
+>>>> With this patch set applied, the generic MSI and PCI MSI interfaces
+>>>> are much easier to use. For extreme case, you only need to define
+>>>> a "struct msi_domain_info" and don't need to implement any callbacks,
+>>>> just using the default callbacks is OK:)
+>>>>
+>>>> This patch set is also a preparation for:
+>>>> 1) Kill all weak functions in drivers/pci/msi.c
+>>>> 2) Implement support for non-PCI-compliant MSI device
+>>>
+>>> I've rebased (once more!) the GICv3 ITS driver on top of this, and this
+>>> is definitely a major improvement. This is basically the first version
+>>> I can use without having to hack into the core code (apart from the
+>>> couple of nits I've mentioned earlier).
+>> Sorry for the rebasing, but I hope it worthy rebasing:)
+>>
+>>>
+>>> Now, Thomas' idea of putting the irq_domain close to the bus is very
+>>> appealing, and I've tweaked an earlier patch in order to do this:
+>> I feel that's the right direction. There are other threads discussing
+>> associating an MSI controller structure with each PCI bus (at least
+>> root bus).
+>> http://www.spinics.net/lists/arm-kernel/msg376328.html
+> 
+> Associate the irq domain and PCI bus is not necessary, because all PCI buses under same host bridge
+> always share same MSI chip/irq domain, we only need associate them and pci host bridge.
+> I'm refactoring the pci_host_bridge, make it be a generic one, rip out of the pci root bus
+> creation, so we could put the irq domain and pci domain etc.. in it. Finally, we could
+> eliminate lots platform arch functions. I will post it out within one week.
+Hi Yijing,
+	Theoretically, it's not true on x86 when interrupt remapping
+is enabled. There may be multiple IOMMU(interrupt remapping) units
+serving the same host bridge, so we need different MSI domains
+to serve different PCI devices.
+Regards!
+Gerry
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
----
- arch/arm64/kernel/machine_kexec.c | 55 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
-
-diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-index b0e5d76..775bcc3 100644
---- a/arch/arm64/kernel/machine_kexec.c
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -35,6 +35,38 @@ static bool kexec_is_dtb(const void *dtb)
- }
- 
- /**
-+ * kexec_image_info - For debugging output.
-+ */
-+#define kexec_image_info(_i) _kexec_image_info(__func__, __LINE__, _i)
-+static void _kexec_image_info(const char *func, int line,
-+	const struct kimage *image)
-+{
-+	unsigned long i;
-+
-+#if !defined(DEBUG)
-+	return;
-+#endif
-+	pr_devel("%s:%d:\n", func, line);
-+	pr_devel("  kexec image info:\n");
-+	pr_devel("    type:        %d\n", image->type);
-+	pr_devel("    start:       %lx\n", image->start);
-+	pr_devel("    head:        %lx\n", image->head);
-+	pr_devel("    nr_segments: %lu\n", image->nr_segments);
-+
-+	for (i = 0; i < image->nr_segments; i++) {
-+		pr_devel("      segment[%lu]: %016lx - %016lx, "
-+			"%lx bytes, %lu pages%s\n",
-+			i,
-+			image->segment[i].mem,
-+			image->segment[i].mem + image->segment[i].memsz,
-+			image->segment[i].memsz,
-+			image->segment[i].memsz /  PAGE_SIZE,
-+			(kexec_is_dtb(image->segment[i].buf) ?
-+				", dtb segment" : ""));
-+	}
-+}
-+
-+/**
-  * kexec_find_dtb_seg - Helper routine to find the dtb segment.
-  */
- static const struct kexec_segment *kexec_find_dtb_seg(
-@@ -67,6 +99,8 @@ int machine_kexec_prepare(struct kimage *image)
- 	arm64_kexec_dtb_addr = dtb_seg ? dtb_seg->mem : 0;
- 	arm64_kexec_kimage_start = image->start;
- 
-+	kexec_image_info(image);
-+
- 	return 0;
- }
- 
-@@ -121,6 +155,27 @@ void machine_kexec(struct kimage *image)
- 	reboot_code_buffer_phys = page_to_phys(image->control_code_page);
- 	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
- 
-+	kexec_image_info(image);
-+
-+	pr_devel("%s:%d: control_code_page:        %p\n", __func__, __LINE__,
-+		image->control_code_page);
-+	pr_devel("%s:%d: reboot_code_buffer_phys:  %pa\n", __func__, __LINE__,
-+		&reboot_code_buffer_phys);
-+	pr_devel("%s:%d: reboot_code_buffer:       %p\n", __func__, __LINE__,
-+		reboot_code_buffer);
-+	pr_devel("%s:%d: relocate_new_kernel:      %p\n", __func__, __LINE__,
-+		relocate_new_kernel);
-+	pr_devel("%s:%d: relocate_new_kernel_size: 0x%lx(%lu) bytes\n",
-+		__func__, __LINE__, relocate_new_kernel_size,
-+		relocate_new_kernel_size);
-+
-+	pr_devel("%s:%d: kexec_dtb_addr:           %lx\n", __func__, __LINE__,
-+		arm64_kexec_dtb_addr);
-+	pr_devel("%s:%d: kexec_kimage_head:        %lx\n", __func__, __LINE__,
-+		arm64_kexec_kimage_head);
-+	pr_devel("%s:%d: kexec_kimage_start:       %lx\n", __func__, __LINE__,
-+		arm64_kexec_kimage_start);
-+
- 	/*
- 	 * Copy relocate_new_kernel to the reboot_code_buffer for use
- 	 * after the kernel is shut down.
--- 
-1.9.1
+> 
+> Thanks!
+> Yijing.
+> 
+>> Regards!
+>> Gerry
+>>
+>> .
+>>
+> 
+> 
