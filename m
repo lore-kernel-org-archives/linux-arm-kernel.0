@@ -1,91 +1,71 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 14 Nov 2014 11:09:15 -0600
-Subject: [PATCHv6 4/5] hwspinlock/core: add common OF helpers
-In-Reply-To: <CAK=WgbYMM19-rWLOBjix+TA3fF_Pb25ia1rutDxYSUg9SV0efg@mail.gmail.com>
-References: <1410553499-55951-1-git-send-email-s-anna@ti.com>
- <1410553499-55951-5-git-send-email-s-anna@ti.com>
- <CAK=WgbamdqAufjC4Xb5moERRBSB-cO6c1RPTE=f+dp75F+Eh7A@mail.gmail.com>
- <5463B5B6.8040709@ti.com>
- <CAK=WgbbatPTiz3efDWHVEcuug_UQfkCViMoK0zcfUg3JwB2oTA@mail.gmail.com>
- <5464EC7A.7050603@ti.com>
- <CAK=WgbbodS8GsUxQbkyCp6hAG+Ko4LMirx+pUa8_fUdxWFasvw@mail.gmail.com>
- <54651C48.90809@ti.com>
- <CAK=WgbYMM19-rWLOBjix+TA3fF_Pb25ia1rutDxYSUg9SV0efg@mail.gmail.com>
-Message-ID: <5466373B.2070808@ti.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 14 Nov 2014 18:11:09 +0100
+Subject: [Patch V1 0/6] Refine generic/PCI MSI irqodmian interfaces
+In-Reply-To: <546627DD.2050200@arm.com>
+References: <1415879029-20098-1-git-send-email-jiang.liu@linux.intel.com>
+ <54651BE2.9080008@arm.com> <54654C10.2040102@linux.intel.com>
+ <54655632.2040209@huawei.com> <alpine.DEB.2.11.1411140211480.3935@nanos>
+ <54655D44.1070703@linux.intel.com> <54660D7F.70702@gmail.com>
+ <54661103.8000707@linux.intel.com> <54661CB8.2070704@arm.com>
+ <54661ED9.8090901@linux.intel.com> <546627DD.2050200@arm.com>
+Message-ID: <1415985069.4445.6.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+Am Freitag, den 14.11.2014, 16:03 +0000 schrieb Marc Zyngier:
+> On 14/11/14 15:25, Jiang Liu wrote:
+> > On 2014/11/14 23:16, Marc Zyngier wrote:
+> >> On 14/11/14 14:26, Jiang Liu wrote:
+> >>> On 2014/11/14 22:11, Yijing Wang wrote:
+> >>>>
+> >>> We have achieved 1 and 2. And seems we could also achieve 3 by
+> >>> converting all arch specific PCI MSI code to use hierarchy
+> >>> irqdomain. But not sure whether we could achieve 4, not familiar
+> >>> with ARM world:)
+> >>
+> >> Killing all the weak functions shouldn't be a problem for ARM, we're
+> >> trying very hard not to rely on them.
+> >>
+> >> Killing msi_chip is a different story, as this is what we use to match a
+> >> PCI host controller with its MSI controller (that's what the of_node
+> >> field in msi_chip is for). See drivers/of/of_pci.c for details.
+> >>
+> >> Also, we use msi_chip directly in the MSI drivers as a way to go from a
+> >> pci_dev to the MSI controller specific structure:
+> >>
+> >> http://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/tree/drivers/irqchip/irq-gic-v3-its.c?h=irq/stacked-its-v2#n1143
+> >>
+> >> If we're going to kill msi_chip, we must make sure we have mechanisms
+> >> that allow the conversion of the existing code.
+> > Hi Marc,
+> > 	Seem it doesn't worth the effort to remove irq_chip,
+> > so I will focus on killing all weak functions first:)
+> > After that, we may kill setup_irq and teardown_irq in irq_chip,
+> > but seems irq_chip still has other usages, so I won't try to
+> > kill irq_chip.
+> 
+> I assume you mean msi_chip! ;-)
+> 
+> Killing setup/teardown_irq is going to require some work. There are a
+> few users in the tree (I can see three in drivers/pci/host and one in
+> drivers/irqchip).
+> 
+> Hopefully, we can get the maintainers to convert them.
+> 
 
-On 11/14/2014 01:11 AM, Ohad Ben-Cohen wrote:
-> Hi Suman,
-> 
-> On Thu, Nov 13, 2014 at 11:02 PM, Suman Anna <s-anna@ti.com> wrote:
->> OK, lets take an example. I have say 2 device instances, say
->>         hwlock1: hwlock at 0 {
->>                 hwlock-num-locks = <32>
->>                 hwlock-base-id = <0>;
->>                 #hwlock-cells = <1>;
->>         };
->>         hwlock2: hwlock at 0 {
->>                 hwlock-num-locks = <32>
->>                 hwlock-base-id = <32>;
->>                 #hwlock-cells = <1>;
->>         };
->>
->>         some-client {
->>                 hwlocks = <&hwlock1 32>, <&hwlock2 0>;
->>         };
->>
->> The first args value is incorrect, and I expect the API to return an
->> error. I don't think the API can make assumptions that all passed in
->> values will be correct. What do you suggest that the API do here?
-> 
-> I think this is just one example of many potential mistakes the DT
-> developer can have, and that there's nothing really special about it.
-> 
-> What if the '5' digit below is a typo, and the actual hardware
-> assignment was supposed to be '4' ?
-> 
->          some-client {
->                  hwlocks = <&hwlock1 5>, <&hwlock2 5>;
->          };
-> 
-> I don't see how much different this mistake is from the one you
-> mentioned above. There's a limit to how much we can really catch DT
-> mistakes in the code, just like we couldn't really catch past mistakes
-> in the platform data structures.
-> 
-> If we can easily add some validations then great, but if we have to go
-> to great lengths just to gain very limited validations, then I'd vote
-> against doing so.
+I can help with both the Designware and Tegra host bridge drivers.
 
-OK, personally, I am not too comfortable to not perform any validation
-on an API.
+But that requires:
+1. CCing patches to me, so I know what is going on
+2. Providing good descriptions on what is done in the patchset and how
+the msi_chip users should adjust
 
-> 
->> One solution to handle #1 is to also make the hwlock-num-locks property
->> also mandatory (even though it could have been read from a register
-> 
-> Yeah, this is awkward. We shouldn't impose this on implementations
-> like OMAP which don't need it.
-> 
-> Again I think for the very limited validation this buys us - it's not worth it.
-> 
->> And, how do you propose we solve the problem of deferred probing?
-> 
-> It seems to me that hwspin_lock_request_specific failures should be
-> used by clients to defer their probing. Why wouldn't such a simple
-> solution work?
+With all the MSI changes by various people going on in parallel it's
+hard to follow for someone not looking at this stuff every day.
 
-Because the API always returns NULL on failures and there is no way for
-the clients to figure out if the lock id passed is invalid or the bank
-containing the lock is not registered. This was an old discussion on v4
-[1], and you insisted that we don't change the return code convention on
-the API. I had couple of patches on v5 that dealt with this, but even
-that requires the list of registered devices.
+Regards,
+Lucas
 
-regards
-Suman
-
-[1] https://patchwork.kernel.org/patch/3481331/
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
