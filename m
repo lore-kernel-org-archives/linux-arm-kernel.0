@@ -1,33 +1,47 @@
 From: fkan@apm.com (Feng Kan)
-Date: Thu, 13 Nov 2014 16:19:54 -0800
-Subject: [PATCH V2 0/7] APM X-Gene SoC platform device tree cleanup
-Message-ID: <1415924401-3013-1-git-send-email-fkan@apm.com>
+Date: Thu, 13 Nov 2014 16:19:55 -0800
+Subject: [PATCH V2 1/7] arm64: dts: Add APM X-Gene USB DTS node
+In-Reply-To: <1415924401-3013-1-git-send-email-fkan@apm.com>
+References: <1415924401-3013-1-git-send-email-fkan@apm.com>
+Message-ID: <1415924401-3013-2-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This sums up the dts changes of the recent committed drivers into the kernel.
-This will grant PMU, reboot, USB and gpio functionalities to the platform.
-These patches are all based on existing and approved driver that is in the
-kernel tree today.
+This parch adds the device tree nodes for APM X-Gnene USB host controller.
+Since X-Gene SOC supports maximum 2 USB ports, 2 dts node are added.
 
-V2 Changes:
-	- add dma-coherent attribute for usb node.
+Signed-off-by: Bao Truong <btruong@apm.com>
+Signed-off-by: Feng Kan <fkan@apm.com>
+---
+ arch/arm64/boot/dts/apm-storm.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Feng Kan (7):
-  arm64: dts: Add APM X-Gene USB DTS node
-  Documentation: arm64: add SCU dts binding documentation to linux
-    kernel
-  arm64: dts: Add X-Gene reboot driver dts node
-  arm64: dts: Add Designware GPIO dts binding to APM X-Gene platform
-  arm64: dts: Add APM X-Gene SoC GFC GPIO controller DTS entries
-  Documentation: arm: pmu: Add Potenza PMU binding
-  arm64: dts: Add PMU node for APM X-Gene Storm SOC
-
- Documentation/devicetree/bindings/arm/apm/scu.txt | 17 +++++++
- Documentation/devicetree/bindings/arm/pmu.txt     |  1 +
- arch/arm64/boot/dts/apm-storm.dtsi                | 55 +++++++++++++++++++++++
- 3 files changed, 73 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/apm/scu.txt
-
+diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+index 295c72d..6b4c577 100644
+--- a/arch/arm64/boot/dts/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm-storm.dtsi
+@@ -587,6 +587,22 @@
+ 			phy-names = "sata-phy";
+ 		};
+ 
++		usb0: dwusb at 19000000 {
++			status = "disabled";
++			compatible = "xhci-platform";
++			reg =  <0x0 0x19000000 0x0 0x100000>;
++			interrupts = <0x0 0x89 0x4>;
++			dma-coherent;
++		};
++
++		usb1: dwusb at 19800000 {
++			status = "disabled";
++			compatible = "xhci-platform";
++			reg =  <0x0 0x19800000 0x0 0x100000>;
++			interrupts = <0x0 0x8a 0x4>;
++			dma-coherent;
++		};
++
+ 		rtc: rtc at 10510000 {
+ 			compatible = "apm,xgene-rtc";
+ 			reg = <0x0 0x10510000 0x0 0x400>;
 -- 
 1.9.1
