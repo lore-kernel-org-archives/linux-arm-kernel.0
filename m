@@ -1,70 +1,92 @@
 From: m.smarduch@samsung.com (m.smarduch at samsung.com)
-Date: Sat, 15 Nov 2014 00:19:07 -0800
-Subject: [PATCH v2 0/3] arm/arm64: Add dirty page logging for ARMv8
- (3.17.0-rc1)
-Message-ID: <1416039550-28125-1-git-send-email-m.smarduch@samsung.com>
+Date: Sat, 15 Nov 2014 00:19:08 -0800
+Subject: [PATCH v2 1/3] KVM: arm64: ARMv8 header changes for page logging
+In-Reply-To: <1416039550-28125-1-git-send-email-m.smarduch@samsung.com>
+References: <1416039550-28125-1-git-send-email-m.smarduch@samsung.com>
+Message-ID: <1416039550-28125-2-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mario Smarduch <m.smarduch@samsung.com>
 
-This patch series adds support for ARMv8 dirty page logging. It applies on top
-of ARMv7 patch series. This feature hooks into generic dirty page logging,
-and reuses earlier ARMv7 architecture support added with few ARMv8 additions.
+This patch adds arm64 helpers to write protect pmds/ptes and retrieve 
+permissions while logging dirty pages. Also adds prototype to write protect 
+a memory slot and adds a pmd define to check for read-only pmds.
 
-Testing:
---------
-- ARMv8 - Tested on Foundation Model.
-- ARMv7 - retested on Exynos 5440 development board.
-
-Test Description:
-- Added mmio device to QEMU 'machvirt' with on board memory (1MB in this case),
-  Device memory is Posix shared memory segment visible to host. Enabled
-  dirty logging for that memslot.
-- Added memslot migration thread to export dirty bit map to host.
-- Implemented memory migration thread on host.
-
-Operation:
-  o On Guest application mmaps() the region (via /dev/mem) and dirties pages.
-  o The host migration thread does a pre-copy of /dev/shm/aeshmem to a host
-    file, repeatedly requests QEMU for memory region dirty page log,
-    incrementally copies dirty pages from /dev/shm/aeshmem to host file.
-  o Guest application is stopped and both /dev/shm/aeshmem and host file are
-    checksummed to check for match to validate dirty page log applied
-    incremental updates, validating logging.
-
-See https://github.com/mjsmar/arm-dirtylog-tests 'v8' subfolder
-
-ARMv7/v8 Dirty page logging implementation overivew-
-- initially write protects memory region pages 2nd stage page tables
-- add support to read dirty page log and again write protect dirty pages 
-  for next pass.
-- second stage huge page are dissolved into small page tables to keep track of
-  dirty pages at page granularity. Tracking at huge page granularity limits
-  migration to an almost idle system. Small page size logging supports higher
-  memory dirty rates.
-- In the event migration is canceled, normal behavior is resumed huge pages
-  are rebuilt over time.
-
-Changes Since (v1):
-- Rebased to ARMv7 version
-- Addressed Christoffers review comments.
-
-Mario Smarduch (3):
-  KVM: arm64: ARMv8 header changes for page logging
-  KVM: arm64: Add HYP interface to flush VM Stage 1/2nd TLB entires
-  KVM: arm/arm64: Enable Dirty Page logging for ARMv8
-
- arch/arm/include/asm/kvm_host.h        | 12 ------------
- arch/arm/kvm/arm.c                     |  4 ----
- arch/arm/kvm/mmu.c                     | 20 +++++++++++---------
+Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+---
  arch/arm64/include/asm/kvm_asm.h       |  1 +
  arch/arm64/include/asm/kvm_host.h      |  1 +
  arch/arm64/include/asm/kvm_mmu.h       | 20 ++++++++++++++++++++
  arch/arm64/include/asm/pgtable-hwdef.h |  1 +
- arch/arm64/kvm/Kconfig                 |  2 ++
- arch/arm64/kvm/hyp.S                   | 22 ++++++++++++++++++++++
- 9 files changed, 58 insertions(+), 25 deletions(-)
+ 4 files changed, 23 insertions(+)
 
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index 4838421..4f7310f 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -126,6 +126,7 @@ extern char __kvm_hyp_vector[];
+ 
+ extern void __kvm_flush_vm_context(void);
+ extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
++extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+ 
+ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+ 
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index e10c45a..7548dbc 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -196,6 +196,7 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+ struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
+ 
+ u64 kvm_call_hyp(void *hypfn, ...);
++void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+ 
+ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		int exception_index);
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 8e138c7..8b0ffe3 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -121,6 +121,26 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+ 	pmd_val(*pmd) |= PMD_S2_RDWR;
+ }
+ 
++static inline void kvm_set_s2pte_readonly(pte_t *pte)
++{
++	pte_val(*pte) = (pte_val(*pte) & ~PTE_S2_RDWR) | PTE_S2_RDONLY;
++}
++
++static inline bool kvm_s2pte_readonly(pte_t *pte)
++{
++	return (pte_val(*pte) & PTE_S2_RDWR) == PTE_S2_RDONLY;
++}
++
++static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
++{
++	pmd_val(*pmd) = (pmd_val(*pmd) & ~PMD_S2_RDWR) | PMD_S2_RDONLY;
++}
++
++static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
++{
++	return (pmd_val(*pmd) & PMD_S2_RDWR) == PMD_S2_RDONLY;
++}
++
+ #define kvm_pgd_addr_end(addr, end)	pgd_addr_end(addr, end)
+ #define kvm_pud_addr_end(addr, end)	pud_addr_end(addr, end)
+ #define kvm_pmd_addr_end(addr, end)	pmd_addr_end(addr, end)
+diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+index 88174e0..5f930cc 100644
+--- a/arch/arm64/include/asm/pgtable-hwdef.h
++++ b/arch/arm64/include/asm/pgtable-hwdef.h
+@@ -119,6 +119,7 @@
+ #define PTE_S2_RDONLY		(_AT(pteval_t, 1) << 6)   /* HAP[2:1] */
+ #define PTE_S2_RDWR		(_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
+ 
++#define PMD_S2_RDONLY		(_AT(pmdval_t, 1) << 6)   /* HAP[2:1] */
+ #define PMD_S2_RDWR		(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
+ 
+ /*
 -- 
 1.9.1
