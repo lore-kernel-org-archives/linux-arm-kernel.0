@@ -1,26 +1,34 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sat, 15 Nov 2014 16:06:22 +0400
-Subject: [PATCH] arm: xscale: correct auxiliary register in suspend/resume
-In-Reply-To: <87zjbssmt0.fsf@free.fr>
-References: <1415479134-19999-1-git-send-email-dbaryshkov@gmail.com>
- <87oasgv1nc.fsf@free.fr>
- <CALT56yMg53Dd0iKc-8zwSeRaAJbTnsx9akod_V+X=1t5VN+VKA@mail.gmail.com>
- <87k334uu61.fsf@free.fr> <87zjbssmt0.fsf@free.fr>
-Message-ID: <CALT56yNR7aOQWzWUNZWj5hzE70TGM6im5xvDZFsUEWrYifgTKA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 15 Nov 2014 13:40:42 +0000
+Subject: [PATCH] arm64: topology: Fix handling of multi-level cluster
+ MPIDR-based detection
+In-Reply-To: <20141112150756.GA30300@e102568-lin.cambridge.arm.com>
+References: <1408462379-27968-1-git-send-email-broonie@kernel.org>
+ <CAFpQJXWkL_ge8XT9y6vSNwgQgXcvQtUh4PaWxdH1dK0QhFWu2A@mail.gmail.com>
+ <20141003163715.GB13939@e102568-lin.cambridge.arm.com>
+ <20141008205628.GO4609@sirena.org.uk>
+ <20141112150756.GA30300@e102568-lin.cambridge.arm.com>
+Message-ID: <20141115134042.GM3815@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-15 14:52 GMT+03:00 Robert Jarzmik <robert.jarzmik@free.fr>:
-> Robert Jarzmik <robert.jarzmik@free.fr> writes:
->
->> Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
->> In a couple of days, if you don't have any other comments, yes please.
->
-> I think you can send it. Don't forget to put Russell in the To: and have his
-> ack, as this will probably go through his patch system.
+On Wed, Nov 12, 2014 at 03:07:56PM +0000, Lorenzo Pieralisi wrote:
+> On Wed, Oct 08, 2014 at 09:56:28PM +0100, Mark Brown wrote:
 
-Done
+> > > I think that's what we should do, squash the upper MPIDR levels (for
+> > > the non SMT case too). Please stick a proper comment for that to the code.
+> > > We can always rely on DT to fix other cases that can't be treated
+> > > properly with code above.
 
--- 
-With best wishes
-Dmitry
+> > OK, I'll send a patch.
+
+> do you have time to send it ?
+
+Should do.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141115/faa8b71d/attachment.sig>
