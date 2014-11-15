@@ -1,139 +1,49 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sat, 15 Nov 2014 14:53:52 +0300
-Subject: [PATCH 6/6] ARM: sa1100: switch to hwirq usage
-In-Reply-To: <1416052432-26192-1-git-send-email-dbaryshkov@gmail.com>
-References: <1416052432-26192-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1416052432-26192-7-git-send-email-dbaryshkov@gmail.com>
+Date: Sat, 15 Nov 2014 15:05:53 +0300
+Subject: [PATCH] ARM: xscale: correct auxiliary register in suspend/resume
+Message-ID: <1416053153-27491-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch internally to using hardware irq numbers (hwirq). In case of GPIO
-interrupts, hwirq is equal to GPIO number. In case of system interrupts,
-hwirq is equal to interrupt number in the interrupt controller.
+According to the manuals I have, XScale auxiliary register should be
+reached with opc_2 = 1 instead of crn = 1. cpu_xscale_proc_init
+correctly uses c1, c0, 1 arguments, but cpu_xscale_do_suspend and
+cpu_xscale_do_resume use c1, c1, 0. Correct suspend/resume functions to
+also use c1, c0, 1.
 
+The issue was primarily noticed thanks to qemu reporing "unsupported
+instruction" on the pxa suspend path. Confirmed in PXA210/250 and PXA255
+XScale Core manuals and in PXA270 and PXA320 Developers Guides.
+
+Harware tested by me on tosa (pxa255). Robert confirmed on pxa270 board.
+
+Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- arch/arm/mach-sa1100/irq.c | 37 ++++++++++++++-----------------------
- 1 file changed, 14 insertions(+), 23 deletions(-)
+ arch/arm/mm/proc-xscale.S | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/irq.c b/arch/arm/mach-sa1100/irq.c
-index 36dd45e..c88d9c3 100644
---- a/arch/arm/mach-sa1100/irq.c
-+++ b/arch/arm/mach-sa1100/irq.c
-@@ -35,20 +35,11 @@ static int GPIO_IRQ_rising_edge;
- static int GPIO_IRQ_falling_edge;
- static int GPIO_IRQ_mask = (1 << 11) - 1;
- 
--/*
-- * To get the GPIO number from an IRQ number
-- */
--#define GPIO_11_27_IRQ(i)	((i) - 21)
--#define GPIO11_27_MASK(irq)	(1 << GPIO_11_27_IRQ(irq))
--
- static int sa1100_gpio_type(struct irq_data *d, unsigned int type)
- {
- 	unsigned int mask;
- 
--	if (d->irq <= 10)
--		mask = 1 << d->irq;
--	else
--		mask = GPIO11_27_MASK(d->irq);
-+	mask = BIT(d->hwirq);
- 
- 	if (type == IRQ_TYPE_PROBE) {
- 		if ((GPIO_IRQ_rising_edge | GPIO_IRQ_falling_edge) & mask)
-@@ -76,25 +67,25 @@ static int sa1100_gpio_type(struct irq_data *d, unsigned int type)
-  */
- static void sa1100_low_gpio_ack(struct irq_data *d)
- {
--	GEDR = (1 << d->irq);
-+	GEDR = BIT(d->hwirq);
- }
- 
- static void sa1100_low_gpio_mask(struct irq_data *d)
- {
--	ICMR &= ~(1 << d->irq);
-+	ICMR &= ~BIT(d->hwirq);
- }
- 
- static void sa1100_low_gpio_unmask(struct irq_data *d)
- {
--	ICMR |= 1 << d->irq;
-+	ICMR |= BIT(d->hwirq);
- }
- 
- static int sa1100_low_gpio_wake(struct irq_data *d, unsigned int on)
- {
- 	if (on)
--		PWER |= 1 << d->irq;
-+		PWER |= BIT(d->hwirq);
- 	else
--		PWER &= ~(1 << d->irq);
-+		PWER &= ~BIT(d->hwirq);
- 	return 0;
- }
- 
-@@ -162,14 +153,14 @@ sa1100_high_gpio_handler(unsigned int irq, struct irq_desc *desc)
-  */
- static void sa1100_high_gpio_ack(struct irq_data *d)
- {
--	unsigned int mask = GPIO11_27_MASK(d->irq);
-+	unsigned int mask = BIT(d->hwirq);
- 
- 	GEDR = mask;
- }
- 
- static void sa1100_high_gpio_mask(struct irq_data *d)
- {
--	unsigned int mask = GPIO11_27_MASK(d->irq);
-+	unsigned int mask = BIT(d->hwirq);
- 
- 	GPIO_IRQ_mask &= ~mask;
- 
-@@ -179,7 +170,7 @@ static void sa1100_high_gpio_mask(struct irq_data *d)
- 
- static void sa1100_high_gpio_unmask(struct irq_data *d)
- {
--	unsigned int mask = GPIO11_27_MASK(d->irq);
-+	unsigned int mask = BIT(d->hwirq);
- 
- 	GPIO_IRQ_mask |= mask;
- 
-@@ -190,9 +181,9 @@ static void sa1100_high_gpio_unmask(struct irq_data *d)
- static int sa1100_high_gpio_wake(struct irq_data *d, unsigned int on)
- {
- 	if (on)
--		PWER |= GPIO11_27_MASK(d->irq);
-+		PWER |= BIT(d->hwirq);
- 	else
--		PWER &= ~GPIO11_27_MASK(d->irq);
-+		PWER &= ~BIT(d->hwirq);
- 	return 0;
- }
- 
-@@ -228,12 +219,12 @@ static struct irq_domain *sa1100_high_gpio_irqdomain;
-  */
- static void sa1100_mask_irq(struct irq_data *d)
- {
--	ICMR &= ~(1 << d->irq);
-+	ICMR &= ~BIT(d->hwirq);
- }
- 
- static void sa1100_unmask_irq(struct irq_data *d)
- {
--	ICMR |= (1 << d->irq);
-+	ICMR |= BIT(d->hwirq);
- }
- 
- /*
-@@ -241,7 +232,7 @@ static void sa1100_unmask_irq(struct irq_data *d)
-  */
- static int sa1100_set_wake(struct irq_data *d, unsigned int on)
- {
--	if (d->irq == IRQ_RTCAlrm) {
-+	if (d->hwirq == IRQ_RTCAlrm) {
- 		if (on)
- 			PWER |= PWER_RTC;
- 		else
+diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
+index 23259f1..afa2b3c 100644
+--- a/arch/arm/mm/proc-xscale.S
++++ b/arch/arm/mm/proc-xscale.S
+@@ -535,7 +535,7 @@ ENTRY(cpu_xscale_do_suspend)
+ 	mrc	p15, 0, r5, c15, c1, 0	@ CP access reg
+ 	mrc	p15, 0, r6, c13, c0, 0	@ PID
+ 	mrc	p15, 0, r7, c3, c0, 0	@ domain ID
+-	mrc	p15, 0, r8, c1, c1, 0	@ auxiliary control reg
++	mrc	p15, 0, r8, c1, c0, 1	@ auxiliary control reg
+ 	mrc	p15, 0, r9, c1, c0, 0	@ control reg
+ 	bic	r4, r4, #2		@ clear frequency change bit
+ 	stmia	r0, {r4 - r9}		@ store cp regs
+@@ -552,7 +552,7 @@ ENTRY(cpu_xscale_do_resume)
+ 	mcr	p15, 0, r6, c13, c0, 0	@ PID
+ 	mcr	p15, 0, r7, c3, c0, 0	@ domain ID
+ 	mcr	p15, 0, r1, c2, c0, 0	@ translation table base addr
+-	mcr	p15, 0, r8, c1, c1, 0	@ auxiliary control reg
++	mcr	p15, 0, r8, c1, c0, 1	@ auxiliary control reg
+ 	mov	r0, r9			@ control register
+ 	b	cpu_resume_mmu
+ ENDPROC(cpu_xscale_do_resume)
 -- 
 2.1.1
