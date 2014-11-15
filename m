@@ -1,49 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 15 Nov 2014 12:15:31 +0100
-Subject: [PATCH v5 0/6] ARM64: Add support for FSL's LS2085A SoC
-In-Reply-To: <bf2f6ea889034e288f3d4a976df9d16f@BY1PR0301MB1303.namprd03.prod.outlook.com>
-References: <1416048391-7557-1-git-send-email-bhupesh.sharma@freescale.com>
- <1482989.i0U06CvWpS@wuerfel>
- <bf2f6ea889034e288f3d4a976df9d16f@BY1PR0301MB1303.namprd03.prod.outlook.com>
-Message-ID: <4825970.YSq0Ouk2Yk@wuerfel>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sat, 15 Nov 2014 12:32:00 +0100
+Subject: [PATCH] PM / Domains: Change prototype for the ->attach_dev()
+ callback
+In-Reply-To: <1442757.2EcII903db@vostro.rjw.lan>
+References: <1414670569-3002-1-git-send-email-ulf.hansson@linaro.org>
+ <3267963.fqUYb7m9Rv@vostro.rjw.lan>
+ <7hsihx1bvo.fsf@deeprootsystems.com>
+ <1442757.2EcII903db@vostro.rjw.lan>
+Message-ID: <CAMuHMdXHhcvar2RWVVXKwvqr1dbTnnZqbBYic53U3E8-EkcAjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 15 November 2014 11:06:42 bhupesh.sharma at freescale.com wrote:
-> 
-> > -----Original Message-----
-> > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > Sent: Saturday, November 15, 2014 4:32 PM
-> > To: Sharma Bhupesh-B45370
-> > Cc: Catalin.Marinas at arm.com; mark.rutland at arm.com; linux-arm-
-> > kernel at lists.infradead.org; grant.likely at secretlab.ca;
-> > marc.zyngier at arm.com; rob.herring at linaro.org;
-> > bhupesh.sharma at freescal.com; Yoder Stuart-B08248;
-> > arnab_basu at rocketmail.com
-> > Subject: Re: [PATCH v5 0/6] ARM64: Add support for FSL's LS2085A SoC
-> > 
-> > On Saturday 15 November 2014 16:16:25 Bhupesh Sharma wrote:
-> > > This patchset adds the support for FSL's LS2085A SoC which is based on
-> > > ARMv8 architecture.
-> > >
-> > > This patchset also has patches which address DT compatible strings for
-> > > nodes which appear un-documented.
-> > >
-> > > The enable-method for the CPU nodes is left for the bootloader (u-boot
-> > > or UEFI) to patch-up which is expected to be PSCI v0.2
-> > >
-> > 
-> > Looks all good to me. Are you planning to send a pull request to
-> > arm at kernel.org, or should we pick up the patches directly (provided no
-> > more new review comments)?
-> > 
-> 
-> It would be great if you can pick the patches directly (ofcourse, if there are
-> no new comments).
-> 
-> 
+Hi Rafael,
 
-Ok, let's wait a few more days then, once everyone is happy please send
-them "To: arm at kernel.org" with a request for us to merge them.
+On Sat, Nov 15, 2014 at 12:48 AM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> Subject: [PATCH] PM / Domains: Change prototype for the attach and detach
+>>  callbacks
+>>
+>> Convert the prototypes to return an int in order to support error
+>> handling in these callbacks.
+>>
+>> Also, as suggested by Dmitry Torokhov, pass the domain pointer for use
+>> inside the callbacks, and so that they match the existing
+>> power_on/power_off callbacks which currently take the domain pointer.
+>>
+>> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+>> [khilman: added domain as parameter to callbacks, as suggested by Dmitry]
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+>
+> That's in the Linus' tree now.
 
-	Arnd
+Thank you very much.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
