@@ -1,75 +1,63 @@
-From: ajaykumar.rs@samsung.com (Ajay Kumar)
-Date: Sat, 15 Nov 2014 15:25:08 +0530
-Subject: [PATCH V8 13/14] ARM: dts: snow: represent the connection between
- bridge and panel using videoport and endpoints
-In-Reply-To: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
-References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <1416045309-13359-14-git-send-email-ajaykumar.rs@samsung.com>
+From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
+Date: Sat, 15 Nov 2014 16:16:25 +0530
+Subject: [PATCH v5 0/6] ARM64: Add support for FSL's LS2085A SoC
+Message-ID: <1416048391-7557-1-git-send-email-bhupesh.sharma@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define videoports and use endpoints to describe the connection between
-the encoder, bridge and the panel, instead of using phandles.
+This patchset adds the support for FSL's LS2085A SoC which is based on
+ARMv8 architecture.
 
-Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
----
- arch/arm/boot/dts/exynos5250-snow.dts |   30 ++++++++++++++++++++++++++++--
- 1 file changed, 28 insertions(+), 2 deletions(-)
+This patchset also has patches which address DT compatible strings for
+nodes which appear un-documented.
 
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index e51fcef..877117f 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -254,7 +254,20 @@
- 			powerdown-gpios = <&gpy2 5 GPIO_ACTIVE_HIGH>;
- 			reset-gpios = <&gpx1 5 GPIO_ACTIVE_HIGH>;
- 			edid-emulation = <5>;
--			panel = <&panel>;
-+
-+			ports {
-+				port at 0 {
-+					bridge_out: endpoint {
-+						remote-endpoint = <&panel_in>;
-+					};
-+				};
-+
-+				port at 1 {
-+					bridge_in: endpoint {
-+						remote-endpoint = <&dp_out>;
-+					};
-+				};
-+			};
- 		};
- 	};
- 
-@@ -328,6 +341,12 @@
- 		compatible = "auo,b116xw03";
- 		power-supply = <&fet6>;
- 		backlight = <&backlight>;
-+
-+		port {
-+			panel_in: endpoint {
-+				remote-endpoint = <&bridge_out>;
-+			};
-+		};
- 	};
- 
- 	dp-controller at 145B0000 {
-@@ -341,7 +360,14 @@
- 		samsung,link-rate = <0x0a>;
- 		samsung,lane-count = <2>;
- 		samsung,hpd-gpio = <&gpx0 7 0>;
--		bridge = <&ptn3460>;
-+
-+		ports {
-+			port at 0 {
-+				dp_out: endpoint {
-+					remote-endpoint = <&bridge_in>;
-+				};
-+			};
-+		};
- 	};
- };
- 
+The enable-method for the CPU nodes is left for the bootloader (u-boot or UEFI)
+to patch-up which is expected to be PSCI v0.2
+
+This patchset has been tested with the following patches which add PSCI
+v0.2 support in ARMv8 u-boot:
+http://patchwork.ozlabs.org/patch/383556/
+http://patchwork.ozlabs.org/patch/383555/
+http://patchwork.ozlabs.org/patch/383557/
+http://patchwork.ozlabs.org/patch/383558/
+http://patchwork.ozlabs.org/patch/383559/
+http://patchwork.ozlabs.org/patch/383560/
+http://patchwork.ozlabs.org/patch/383561/
+http://patchwork.ozlabs.org/patch/383562/
+
+Rebased against v3.18-rc4
+
+Changes from v4:
+----------------
+* Addressed review comments:
+	- Multi-line comment style fix.
+	- Rebasing related changes.
+	- Added Mark's Acked-by for patch 1/6
+* Note that optional GIC-500 regs like GICC, GICH and GICV are currently
+  not tested and hence are not part of the DTS patch.
+
+[1] https://patchwork.ozlabs.org/patch/385246/
+
+Bhupesh Sharma (6):
+  Documentation: DT: Add bindings for FSL NS16550A UART
+  Documentation: DT: Add entry for FSL LS2085A SoC and Simulator model
+  Documentation: DT: Add entry for FSL Management Complex
+  arm64: Add DTS support for FSL's LS2085A SoC
+  arm64: dts/Makefile: Add support for FSL's LS2085A simulator model
+  arm64: Add support for FSL's LS2085A SoC in Kconfig and defconfig
+
+ Documentation/devicetree/bindings/arm/fsl.txt      |    8 +
+ .../devicetree/bindings/misc/fsl,qoriq-mc.txt      |   40 +++++
+ .../devicetree/bindings/serial/of-serial.txt       |   12 ++
+ arch/arm64/Kconfig                                 |    5 +
+ arch/arm64/boot/dts/Makefile                       |    1 +
+ arch/arm64/boot/dts/fsl-ls2085a-simu.dts           |   65 ++++++++
+ arch/arm64/boot/dts/fsl-ls2085a.dtsi               |  163 ++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |    1 +
+ 8 files changed, 295 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
+ create mode 100644 arch/arm64/boot/dts/fsl-ls2085a-simu.dts
+ create mode 100644 arch/arm64/boot/dts/fsl-ls2085a.dtsi
+
 -- 
 1.7.9.5
