@@ -1,51 +1,170 @@
 From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Sat, 15 Nov 2014 22:24:03 +0800
-Subject: [Patch V2 5/9] PCI,
- MSI: Introduce helpers to hide struct msi_desc implementation details
+Date: Sat, 15 Nov 2014 22:24:04 +0800
+Subject: [Patch V2 6/9] genirq: Introduce msi_domain_{alloc|free}_irqs()
 In-Reply-To: <1416061447-9472-1-git-send-email-jiang.liu@linux.intel.com>
 References: <1416061447-9472-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1416061447-9472-6-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1416061447-9472-7-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce helpers to hide struct msi_desc implementation details,
-so we could easily support non-PCI-compliant MSI devices later by
-moving msi_list into struct device.
+Introduce msi_domain_{alloc|free}_irqs() to alloc/free interrupts
+from generic MSI irqdomain.
 
 Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
 ---
- include/linux/msi.h |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ include/linux/msi.h |   39 +++++++++++++++++++++++++++++++++
+ kernel/irq/msi.c    |   60 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 99 insertions(+)
 
 diff --git a/include/linux/msi.h b/include/linux/msi.h
-index 190c7abbec84..714716a3ffdd 100644
+index 714716a3ffdd..7283e155afef 100644
 --- a/include/linux/msi.h
 +++ b/include/linux/msi.h
-@@ -44,6 +44,25 @@ struct msi_desc {
- 	struct msi_msg msg;
+@@ -3,6 +3,7 @@
+ 
+ #include <linux/kobject.h>
+ #include <linux/list.h>
++#include <asm/hw_irq.h>		/* for msi_alloc_info_t */
+ 
+ struct msi_msg {
+ 	u32	address_lo;	/* low 32 bits of msi message address */
+@@ -100,7 +101,29 @@ struct irq_chip;
+ struct device_node;
+ struct msi_domain_info;
+ 
++#ifndef NUM_MSI_ALLOC_SCRATCHPAD_REGS
++#define NUM_MSI_ALLOC_SCRATCHPAD_REGS	2
++#endif
++
++/*
++ * Default structure for MSI interrupt allocation.
++ * Arch may overwrite it by defining msi_alloc_info_t.
++ */
++struct msi_alloc_info {
++	struct msi_desc			*desc;
++	irq_hw_number_t			hwirq;
++	union {
++		unsigned long		ul;
++		void			*ptr;
++	} scratchpad[NUM_MSI_ALLOC_SCRATCHPAD_REGS];
++};
++
++#ifndef msi_alloc_info_t
++typedef struct msi_alloc_info msi_alloc_info_t;
++#endif
++
+ struct msi_domain_ops {
++	/* Callbacks for msi_create_irq_domain() */
+ 	void		(*calc_hwirq)(struct msi_domain_info *info, void *arg,
+ 				      struct msi_desc *desc);
+ 	irq_hw_number_t	(*get_hwirq)(struct msi_domain_info *info, void *arg);
+@@ -111,6 +134,19 @@ struct msi_domain_ops {
+ 	void		(*msi_free)(struct irq_domain *domain,
+ 				    struct msi_domain_info *info,
+ 				    unsigned int virq);
++
++	/* Callbacks for msi_irq_domain_alloc_irqs() based on msi_descs */
++	int		(*msi_check)(struct irq_domain *domain,
++				     struct msi_domain_info *info,
++				     struct device *dev);
++	int		(*msi_prepare)(struct irq_domain *domain,
++				       struct device *dev, int nvec,
++				       msi_alloc_info_t *arg);
++	void		(*msi_finish)(msi_alloc_info_t *arg, int retval);
++	void		(*set_desc)(msi_alloc_info_t *arg,
++				    struct msi_desc *desc);
++	int		(*handle_error)(struct irq_domain *domain,
++					struct msi_desc *desc, int error);
  };
  
-+/* Helpers to hide struct msi_desc implementation details */
-+#define msi_desc_to_dev(desc)		(&(desc)->dev.dev)
-+#define dev_to_msi_list(dev)		(&to_pci_dev((dev))->msi_list)
-+#define first_msi_entry(dev)		\
-+	list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
-+#define for_each_msi_entry(desc, dev)	\
-+	list_for_each_entry((desc), dev_to_msi_list((dev)), list)
+ struct msi_domain_info {
+@@ -125,6 +161,9 @@ int msi_domain_set_affinity(struct irq_data *data, const struct cpumask *mask,
+ struct irq_domain *msi_create_irq_domain(struct device_node *of_node,
+ 					 struct msi_domain_info *info,
+ 					 struct irq_domain *parent);
++int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
++			  int nvec);
++void msi_domain_free_irqs(struct irq_domain *domain, struct device *dev);
+ struct msi_domain_info *msi_get_domain_info(struct irq_domain *domain);
+ 
+ #endif /* CONFIG_GENERIC_MSI_IRQ_DOMAIN */
+diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+index 94d6d87ee23e..ce054566edf5 100644
+--- a/kernel/irq/msi.c
++++ b/kernel/irq/msi.c
+@@ -13,6 +13,9 @@
+ #include <linux/irqdomain.h>
+ #include <linux/msi.h>
+ 
++/* Temparory solution for building, will be removed later */
++#include <linux/pci.h>
 +
-+#ifdef CONFIG_PCI_MSI
-+#define first_pci_msi_entry(pdev)	first_msi_entry(&(pdev)->dev)
-+#define for_each_pci_msi_entry(desc, pdev)	\
-+	for_each_msi_entry((desc), &(pdev)->dev)
-+
-+static inline struct pci_dev *msi_desc_to_pci_dev(struct msi_desc *desc)
+ void __get_cached_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
+ {
+ 	*msg = entry->msg;
+@@ -124,6 +127,63 @@ struct irq_domain *msi_create_irq_domain(struct device_node *of_node,
+ 	return domain;
+ }
+ 
++int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
++			  int nvec)
 +{
-+	return desc->dev;
-+}
-+#endif /* CONFIG_PCI_MSI */
++	int i, ret, virq = -1;
++	msi_alloc_info_t arg;
++	struct msi_desc *desc;
++	struct msi_domain_info *info = domain->host_data;
++	struct msi_domain_ops *ops = info->ops;
 +
- void __pci_read_msi_msg(struct msi_desc *entry, struct msi_msg *msg);
- void __pci_write_msi_msg(struct msi_desc *entry, struct msi_msg *msg);
- void pci_write_msi_msg(unsigned int irq, struct msi_msg *msg);
++	ret = ops->msi_check(domain, info, dev);
++	if (ret == 0)
++		ret = ops->msi_prepare(domain, dev, nvec, &arg);
++	if (ret)
++		return ret;
++
++	for_each_msi_entry(desc, dev) {
++		ops->set_desc(&arg, desc);
++
++		virq = __irq_domain_alloc_irqs(domain, -1, desc->nvec_used,
++					       dev_to_node(dev), &arg, false);
++		if (virq < 0) {
++			ret = -ENOSPC;
++			if (ops->handle_error)
++				ret = ops->handle_error(domain, desc, ret);
++			if (ops->msi_finish)
++				ops->msi_finish(&arg, ret);
++			return ret;
++		}
++
++		for (i = 0; i < desc->nvec_used; i++)
++			irq_set_msi_desc_off(virq, i, desc);
++	}
++
++	if (ops->msi_finish)
++		ops->msi_finish(&arg, 0);
++
++	for_each_msi_entry(desc, dev) {
++		if (desc->nvec_used == 1)
++			dev_dbg(dev, "irq %d for MSI\n", virq);
++		else
++			dev_dbg(dev, "irq [%d-%d] for MSI\n",
++				virq, virq + desc->nvec_used - 1);
++	}
++
++	return 0;
++}
++
++void msi_domain_free_irqs(struct irq_domain *domain, struct device *dev)
++{
++	struct msi_desc *desc;
++
++	for_each_msi_entry(desc, dev) {
++		irq_domain_free_irqs(desc->irq, desc->nvec_used);
++		desc->irq = 0;
++	}
++}
++
+ struct msi_domain_info *msi_get_domain_info(struct irq_domain *domain)
+ {
+ 	return (struct msi_domain_info *)domain->host_data;
 -- 
 1.7.10.4
