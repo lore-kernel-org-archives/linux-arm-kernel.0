@@ -1,130 +1,145 @@
 From: ajaykumar.rs@samsung.com (Ajay Kumar)
-Date: Sat, 15 Nov 2014 15:24:57 +0530
-Subject: [PATCH V8 02/14] drm/bridge: do not pass drm_bridge_funcs to
- drm_bridge_init
+Date: Sat, 15 Nov 2014 15:25:00 +0530
+Subject: [PATCH V8 05/14] drm/exynos: dp: support drm_bridge
 In-Reply-To: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
 References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <1416045309-13359-3-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <1416045309-13359-6-git-send-email-ajaykumar.rs@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Assign the pointer to bridge ops structure(drm_bridge_funcs) in
-the bridge driver itself, instead of passing it to drm_bridge_init.
-
-This will allow bridge driver developer to pack bridge private
-information inside the bridge object and pass only the drm-relevant
-information to drm_bridge_init.
+Modify driver to support drm_bridge.
 
 Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
 ---
- drivers/gpu/drm/bridge/ptn3460.c       |    3 ++-
- drivers/gpu/drm/drm_crtc.c             |    5 +----
- drivers/gpu/drm/msm/hdmi/hdmi_bridge.c |    3 ++-
- drivers/gpu/drm/sti/sti_hda.c          |    3 ++-
- drivers/gpu/drm/sti/sti_hdmi.c         |    3 ++-
- include/drm/drm_crtc.h                 |    3 +--
- 6 files changed, 10 insertions(+), 10 deletions(-)
+ .../devicetree/bindings/video/exynos_dp.txt        |   12 +++++++
+ drivers/gpu/drm/exynos/exynos_dp_core.c            |   37 ++++++++++++++++----
+ drivers/gpu/drm/exynos/exynos_dp_core.h            |    1 +
+ 3 files changed, 44 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/gpu/drm/bridge/ptn3460.c b/drivers/gpu/drm/bridge/ptn3460.c
-index 4db38e1..a2ddc8d 100644
---- a/drivers/gpu/drm/bridge/ptn3460.c
-+++ b/drivers/gpu/drm/bridge/ptn3460.c
-@@ -313,7 +313,8 @@ int ptn3460_init(struct drm_device *dev, struct drm_encoder *encoder,
- 		goto err;
- 	}
+diff --git a/Documentation/devicetree/bindings/video/exynos_dp.txt b/Documentation/devicetree/bindings/video/exynos_dp.txt
+index 53dbccf..7a3a9cd 100644
+--- a/Documentation/devicetree/bindings/video/exynos_dp.txt
++++ b/Documentation/devicetree/bindings/video/exynos_dp.txt
+@@ -66,6 +66,10 @@ Optional properties for dp-controller:
+ 		Hotplug detect GPIO.
+ 			Indicates which GPIO should be used for hotplug
+ 			detection
++	-video interfaces: Device node can contain video interface port
++			    nodes according to [1].
++
++[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
  
--	ret = drm_bridge_init(dev, &ptn_bridge->bridge, &ptn3460_bridge_funcs);
-+	ptn_bridge->bridge.funcs = &ptn3460_bridge_funcs;
-+	ret = drm_bridge_init(dev, &ptn_bridge->bridge);
- 	if (ret) {
- 		DRM_ERROR("Failed to initialize bridge with drm\n");
- 		goto err;
-diff --git a/drivers/gpu/drm/drm_crtc.c b/drivers/gpu/drm/drm_crtc.c
-index e79c8d3..408c053 100644
---- a/drivers/gpu/drm/drm_crtc.c
-+++ b/drivers/gpu/drm/drm_crtc.c
-@@ -1011,7 +1011,6 @@ EXPORT_SYMBOL(drm_connector_unplug_all);
-  * drm_bridge_init - initialize a drm transcoder/bridge
-  * @dev: drm device
-  * @bridge: transcoder/bridge to set up
-- * @funcs: bridge function table
-  *
-  * Initialises a preallocated bridge. Bridges should be
-  * subclassed as part of driver connector objects.
-@@ -1019,8 +1018,7 @@ EXPORT_SYMBOL(drm_connector_unplug_all);
-  * Returns:
-  * Zero on success, error code on failure.
-  */
--int drm_bridge_init(struct drm_device *dev, struct drm_bridge *bridge,
--		const struct drm_bridge_funcs *funcs)
-+int drm_bridge_init(struct drm_device *dev, struct drm_bridge *bridge)
+ Example:
+ 
+@@ -105,4 +109,12 @@ Board Specific portion:
+ 				vsync-len = <6>;
+ 			};
+ 		};
++
++		ports {
++			port at 0 {
++				dp_out: endpoint {
++					remote-endpoint = <&bridge_in>;
++				};
++			};
++		};
+ 	};
+diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.c b/drivers/gpu/drm/exynos/exynos_dp_core.c
+index 5025b70..d30c748 100644
+--- a/drivers/gpu/drm/exynos/exynos_dp_core.c
++++ b/drivers/gpu/drm/exynos/exynos_dp_core.c
+@@ -18,6 +18,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/of.h>
+ #include <linux/of_gpio.h>
++#include <linux/of_graph.h>
+ #include <linux/gpio.h>
+ #include <linux/component.h>
+ #include <linux/phy/phy.h>
+@@ -989,9 +990,19 @@ static struct drm_connector_helper_funcs exynos_dp_connector_helper_funcs = {
+ };
+ 
+ /* returns the number of bridges attached */
+-static int exynos_drm_attach_lcd_bridge(struct drm_device *dev,
++static int exynos_drm_attach_lcd_bridge(struct exynos_dp_device *dp,
+ 		struct drm_encoder *encoder)
  {
++	int ret;
++
++	encoder->bridge = dp->bridge;
++	dp->bridge->encoder = encoder;
++	ret = drm_bridge_attach(encoder->dev, dp->bridge);
++	if (ret) {
++		DRM_ERROR("Failed to attach bridge to drm\n");
++		return ret;
++	}
++
+ 	return 0;
+ }
+ 
+@@ -1005,9 +1016,11 @@ static int exynos_dp_create_connector(struct exynos_drm_display *display,
+ 	dp->encoder = encoder;
+ 
+ 	/* Pre-empt DP connector creation if there's a bridge */
+-	ret = exynos_drm_attach_lcd_bridge(dp->drm_dev, encoder);
+-	if (ret)
+-		return 0;
++	if (dp->bridge) {
++		ret = exynos_drm_attach_lcd_bridge(dp, encoder);
++		if (!ret)
++			return 0;
++	}
+ 
+ 	connector->polled = DRM_CONNECTOR_POLL_HPD;
+ 
+@@ -1259,7 +1272,7 @@ static int exynos_dp_bind(struct device *dev, struct device *master, void *data)
+ 	if (ret)
+ 		return ret;
+ 
+-	if (!dp->panel) {
++	if (!dp->panel && !dp->bridge) {
+ 		ret = exynos_dp_dt_parse_panel(dp);
+ 		if (ret)
+ 			return ret;
+@@ -1345,7 +1358,7 @@ static const struct component_ops exynos_dp_ops = {
+ static int exynos_dp_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+-	struct device_node *panel_node;
++	struct device_node *panel_node, *bridge_node, *endpoint;
+ 	struct exynos_dp_device *dp;
  	int ret;
  
-@@ -1031,7 +1029,6 @@ int drm_bridge_init(struct drm_device *dev, struct drm_bridge *bridge,
- 		goto out;
+@@ -1367,6 +1380,18 @@ static int exynos_dp_probe(struct platform_device *pdev)
+ 			return -EPROBE_DEFER;
+ 	}
  
- 	bridge->dev = dev;
--	bridge->funcs = funcs;
++	endpoint = of_graph_get_next_endpoint(dev->of_node, NULL);
++	if (endpoint) {
++		bridge_node = of_graph_get_remote_port_parent(endpoint);
++		if (bridge_node) {
++			dp->bridge = of_drm_find_bridge(bridge_node);
++			of_node_put(bridge_node);
++			if (!dp->bridge)
++				return -EPROBE_DEFER;
++		} else
++			return -EPROBE_DEFER;
++	}
++
+ 	exynos_dp_display.ctx = dp;
  
- 	list_add_tail(&bridge->head, &dev->mode_config.bridge_list);
- 	dev->mode_config.num_bridge++;
-diff --git a/drivers/gpu/drm/msm/hdmi/hdmi_bridge.c b/drivers/gpu/drm/msm/hdmi/hdmi_bridge.c
-index f6cf745..0309539 100644
---- a/drivers/gpu/drm/msm/hdmi/hdmi_bridge.c
-+++ b/drivers/gpu/drm/msm/hdmi/hdmi_bridge.c
-@@ -221,8 +221,9 @@ struct drm_bridge *hdmi_bridge_init(struct hdmi *hdmi)
- 	hdmi_bridge->hdmi = hdmi_reference(hdmi);
- 
- 	bridge = &hdmi_bridge->base;
-+	bridge->funcs = &hdmi_bridge_funcs;
- 
--	drm_bridge_init(hdmi->dev, bridge, &hdmi_bridge_funcs);
-+	drm_bridge_init(hdmi->dev, bridge);
- 
- 	return bridge;
- 
-diff --git a/drivers/gpu/drm/sti/sti_hda.c b/drivers/gpu/drm/sti/sti_hda.c
-index 2ae9a9b..6cf145d 100644
---- a/drivers/gpu/drm/sti/sti_hda.c
-+++ b/drivers/gpu/drm/sti/sti_hda.c
-@@ -664,7 +664,8 @@ static int sti_hda_bind(struct device *dev, struct device *master, void *data)
- 		return -ENOMEM;
- 
- 	bridge->driver_private = hda;
--	drm_bridge_init(drm_dev, bridge, &sti_hda_bridge_funcs);
-+	bridge->funcs = &sti_hda_bridge_funcs;
-+	drm_bridge_init(drm_dev, bridge);
- 
- 	encoder->bridge = bridge;
- 	connector->encoder = encoder;
-diff --git a/drivers/gpu/drm/sti/sti_hdmi.c b/drivers/gpu/drm/sti/sti_hdmi.c
-index b22968c..285f723 100644
---- a/drivers/gpu/drm/sti/sti_hdmi.c
-+++ b/drivers/gpu/drm/sti/sti_hdmi.c
-@@ -628,7 +628,8 @@ static int sti_hdmi_bind(struct device *dev, struct device *master, void *data)
- 		return -ENOMEM;
- 
- 	bridge->driver_private = hdmi;
--	drm_bridge_init(drm_dev, bridge, &sti_hdmi_bridge_funcs);
-+	bridge->funcs = &sti_hdmi_bridge_funcs;
-+	drm_bridge_init(drm_dev, bridge);
- 
- 	encoder->bridge = bridge;
- 	connector->encoder = encoder;
-diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
-index c40070a..5a3bce17 100644
---- a/include/drm/drm_crtc.h
-+++ b/include/drm/drm_crtc.h
-@@ -912,8 +912,7 @@ extern unsigned int drm_connector_index(struct drm_connector *connector);
- /* helper to unplug all connectors from sysfs for device */
- extern void drm_connector_unplug_all(struct drm_device *dev);
- 
--extern int drm_bridge_init(struct drm_device *dev, struct drm_bridge *bridge,
--			   const struct drm_bridge_funcs *funcs);
-+extern int drm_bridge_init(struct drm_device *dev, struct drm_bridge *bridge);
- extern void drm_bridge_cleanup(struct drm_bridge *bridge);
- 
- extern int drm_encoder_init(struct drm_device *dev,
+ 	ret = component_add(&pdev->dev, &exynos_dp_ops);
+diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.h b/drivers/gpu/drm/exynos/exynos_dp_core.h
+index a1aee69..3b0ba93 100644
+--- a/drivers/gpu/drm/exynos/exynos_dp_core.h
++++ b/drivers/gpu/drm/exynos/exynos_dp_core.h
+@@ -150,6 +150,7 @@ struct exynos_dp_device {
+ 	struct drm_connector	connector;
+ 	struct drm_encoder	*encoder;
+ 	struct drm_panel	*panel;
++	struct drm_bridge	*bridge;
+ 	struct clk		*clock;
+ 	unsigned int		irq;
+ 	void __iomem		*reg_base;
 -- 
 1.7.9.5
