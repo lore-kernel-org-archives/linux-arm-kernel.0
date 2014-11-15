@@ -1,71 +1,94 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Sat, 15 Nov 2014 19:49:17 +0200
-Subject: [PATCH 1/3] staging: imx-drm: document internal HDMI I2C master
- controller DT binding
-In-Reply-To: <1416073759-19939-1-git-send-email-vladimir_zapolskiy@mentor.com>
-References: <1416073759-19939-1-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <1416073759-19939-2-git-send-email-vladimir_zapolskiy@mentor.com>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Sat, 15 Nov 2014 10:42:57 -0800
+Subject: exynos5250/arndale: failed to set cpu voltage
+In-Reply-To: <CAM4voamPyTpv5TPtN1Z=ZL3Qmy806qFxrAaU0kiqJmV56cyJiw@mail.gmail.com>
+References: <CANMBJr4ZgEZDAtdfuLhCXppCGHnHhgmT1aFUi+=kJb2PdkqhGg@mail.gmail.com>
+ <CAM4voamPyTpv5TPtN1Z=ZL3Qmy806qFxrAaU0kiqJmV56cyJiw@mail.gmail.com>
+Message-ID: <CANMBJr5nLOJ4O=+TLMO9uryH79nBQwQKZu_nmRaPne9DE3GvWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide information about how to bind internal iMX6Q/DL HDMI DDC I2C
-master controller. The property is set as optional one, because iMX6
-HDMI DDC bus may be represented by one of general purpose I2C busses
-found on SoC.
+Hi Abhilash,
 
-Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-Cc: Wolfram Sang <wsa@the-dreams.de>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: devicetree at vger.kernel.org
-Cc: linux-media at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-i2c at vger.kernel.org
----
- Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt |   10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+On 13 November 2014 18:50, Abhilash Kesavan <kesavan.abhilash@gmail.com> wrote:
+> Hello Tyler,
+>
+> On Fri, Nov 14, 2014 at 3:30 AM, Tyler Baker <tyler.baker@linaro.org> wrote:
+>> In recent upstream kernels, exynos5420-based arndale boards have been
+>
+> Boot logs are only for 5250, typo ?
 
-diff --git a/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt b/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
-index 1b756cf..43c8924 100644
---- a/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
-+++ b/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
-@@ -10,6 +10,8 @@ Required properties:
-  - #address-cells : should be <1>
-  - #size-cells : should be <0>
-  - compatible : should be "fsl,imx6q-hdmi" or "fsl,imx6dl-hdmi".
-+   If internal HDMI DDC I2C master controller is supposed to be used,
-+   then "simple-bus" should be added to compatible value.
-  - gpr : should be <&gpr>.
-    The phandle points to the iomuxc-gpr region containing the HDMI
-    multiplexer control register.
-@@ -22,6 +24,7 @@ Required properties:
- 
- Optional properties:
-  - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
-+ - ddc: internal HDMI DDC I2C master controller
- 
- example:
- 
-@@ -32,7 +35,7 @@ example:
-         hdmi: hdmi at 0120000 {
-                 #address-cells = <1>;
-                 #size-cells = <0>;
--                compatible = "fsl,imx6q-hdmi";
-+                compatible = "fsl,imx6q-hdmi", "simple-bus";
-                 reg = <0x00120000 0x9000>;
-                 interrupts = <0 115 0x04>;
-                 gpr = <&gpr>;
-@@ -40,6 +43,11 @@ example:
-                 clock-names = "iahb", "isfr";
-                 ddc-i2c-bus = <&i2c2>;
- 
-+                hdmi_ddc: ddc {
-+                        compatible = "fsl,imx6q-hdmi-ddc";
-+                        status = "disabled";
-+                };
-+
-                 port at 0 {
-                         reg = <0>;
- 
+Apologies, this is a typo. Should have been 5250 as you mentioned.
+
+>
+>> producing boot-time errors due to the fact they failed to set the cpu
+>> voltage. These message flood the serial console even after userspace
+>> has been loaded, yielding the console unusable without forcing a lower
+>> log level. These errors are produced _only_ with the
+>> multi_v7_defconfig and they are _not_ present
+>> with exynos_defconfig. Here are some recent boot logs showing the boot errors:
+>>
+>> mainline/v3.18-rc4-65-g2c54396:
+>>     multi_v7_defconfig:
+>>         http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc4-65-g2c54396/arm-multi_v7_defconfig/boot-exynos5250-arndale.html
+>>     exynos_defconfig:
+>>         http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc4-65-g2c54396/arm-exynos_defconfig/boot-exynos5250-arndale.html
+>
+> From the boot logs it appears that the S5M8767 regulator does not get
+> probed with multi_v7_defconfig and you get the following messages:
+>
+> [    1.147412] deviceless supply vdd_arm not found, using dummy regulator
+> [    1.152669] exynos-cpufreq exynos-cpufreq: failed to set cpu
+> voltage to 1300000
+> [    1.159771] cpufreq: __target_index: Failed to change cpu frequency: -22
+>
+> Both multi_v7_defconfig and exynos_defconfig have the S5M8767
+> regulator enabled. However multi_v7_defconfig does not have the S3C
+> I2C controller enabled while exynos_defconfig does.
+> Can you re-check after enabling CONFIG_I2C_S3C2410 ?
+
+I have retested my two arndale boards with
+multi_v7_defconfg+CONFIG_I2C_S3C2410=y on mainline, next, and arm-soc.
+Enabling S3C I2C controller does resolve the issue I have reported
+above. It seems reasonable to patch the multi_v7_defconfig to enable
+this option by default, thoughts?
+
+>
+> Regards,
+> Abhilash
+>
+>>
+>> next/next-20141113:
+>>     multi_v7_defconfig:
+>>         http://storage.armcloud.us/kernel-ci/next/next-20141113/arm-multi_v7_defconfig/boot-exynos5250-arndale.html
+>>     exynos_defconfig:
+>>         http://storage.armcloud.us/kernel-ci/next/next-20141113/arm-exynos_defconfig/boot-exynos5250-arndale.html
+>>
+>> arm-soc/v3.18-rc4-185-gbfcf8f9:
+>>     multi_v7_defconfig:
+>>         http://storage.armcloud.us/kernel-ci/arm-soc/v3.18-rc4-185-gbfcf8f9/arm-multi_v7_defconfig/boot-exynos5250-arndale.html
+>>     exynos_defconfig:
+>>         http://storage.armcloud.us/kernel-ci/arm-soc/v3.18-rc4-185-gbfcf8f9/arm-exynos_defconfig/boot-exynos5250-arndale.html
+>>
+>> Cheers,
+>>
+>> --
+>> Tyler Baker
+>> Tech Lead, LAVA
+>> Linaro.org | Open source software for ARM SoCs
+>> Follow Linaro: http://www.facebook.com/pages/Linaro
+>> http://twitter.com/#!/linaroorg - http://www.linaro.org/linaro-blog
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+Cheers,
+
 -- 
-1.7.10.4
+Tyler Baker
+Tech Lead, LAVA
+Linaro.org | Open source software for ARM SoCs
+Follow Linaro: http://www.facebook.com/pages/Linaro
+http://twitter.com/#!/linaroorg - http://www.linaro.org/linaro-blog
