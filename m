@@ -1,32 +1,24 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 15 Nov 2014 10:49:11 +0000
-Subject: [PATCH 0/2] Stacked domains and MSI improvements
-Message-ID: <1416048553-29289-1-git-send-email-marc.zyngier@arm.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 15 Nov 2014 11:58:30 +0100
+Subject: Pxa25x clocks for v3.19
+Message-ID: <87d28ou3vt.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This short series builds upon Jiang Liu's MSI stacked domain and tries
-to clean up a couple of points:
+Hi Mike,
 
-- Patch 1 allows an msi_chip to carry a pointer to its irq domain.
-  When populated by the MSI driver, this allow the PCI bus to be
-  associated with an irq domain, removing most of the need for arch
-  specific code in the case of multiple PCI busses.
+The pxa25x clocks v3 patch was posted here :
+    http://www.gossamer-threads.com/lists/linux/kernel/2046264
 
-- Patch 2 tries to work around a limitation of __irq_set_handler when
-  called with an interrupt belongging to a stacked domain.
+Even if it would remain dead code for v3.19, I'd need it to get in in that
+window so that I can activate at the same time pxa25x and pxa27x for v3.20, and
+prevent defconfigs breakage.
 
-This has been tested on arm64, together with the GICv3 ITS.
+Could this code make it for v3.19 ?
 
-Marc Zyngier (2):
-  PCI/MSI: Allow an msi_chip to be associated to an irq domain
-  genirq: Work around __irq_set_handler vs stacked domains ordering
-    issues
-
- drivers/pci/msi.c   | 16 +++++++++++++++-
- include/linux/msi.h |  3 +++
- kernel/irq/chip.c   | 11 ++++++++++-
- 3 files changed, 28 insertions(+), 2 deletions(-)
+Cheers.
 
 -- 
-2.1.0
+Robert
+
+PS: The code has been tested on lubbock and tosa hardwares.
