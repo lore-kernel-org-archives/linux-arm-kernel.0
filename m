@@ -1,22 +1,20 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 15 Nov 2014 22:15:20 +0100
-Subject: [PATCH] ASoC: pxa: prepare/unprepare clocks in pxa-ssp
-In-Reply-To: <1416081106-28324-1-git-send-email-dbaryshkov@gmail.com> (Dmitry
- Eremin-Solenikov's message of "Sat, 15 Nov 2014 22:51:46 +0300")
-References: <1416081106-28324-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <874mu0f9nb.fsf@free.fr>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sun, 16 Nov 2014 00:03:33 +0100
+Subject: [PATCH] clk: rockchip: fix clk_usbphy480m_gate bit location in
+ register
+In-Reply-To: <1415863161-15495-1-git-send-email-kever.yang@rock-chips.com>
+References: <1415863161-15495-1-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <1455255.dvOV4oYdNo@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
+Am Donnerstag, 13. November 2014, 15:19:21 schrieb Kever Yang:
+> According to rk3288 trm, the clk_usbphy480m_gate is locate at
+> bit 14 of CRU_CLKGATE5_CON register.
+> 
+> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
 
-> Change clk_enable/disable() calls to clk_prepare_enable() and
-> clk_disable_unrepapre().
-  clk_disable_unprepare() (typo)
+applied this to my clk branch.
 
-Otherwise, look good to me, ack.
 
-Cheers.
-
---
-Robert
+Heiko
