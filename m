@@ -1,306 +1,628 @@
 From: ajaykumar.rs@samsung.com (Ajay Kumar)
-Date: Sat, 15 Nov 2014 15:24:56 +0530
-Subject: [PATCH V8 01/14] drm/bridge: ptn3460: Few trivial cleanups
+Date: Sat, 15 Nov 2014 15:24:58 +0530
+Subject: [PATCH V8 03/14] drm/bridge: make bridge registration independent of
+ drm flow
 In-Reply-To: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
 References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <1416045309-13359-2-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <1416045309-13359-4-git-send-email-ajaykumar.rs@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch does the following changes:
-	-- Use usleep_range instead of udelay.
-	-- Remove driver_private member from ptn3460 structure.
-	-- Make all possible functions and structures static.
-	-- Use dev_err for non-DRM errors.
-	-- Arrange header files alphabetically.
-	-- s/edid/EDID in all error messages.
+Currently, third party bridge drivers(ptn3460) are dependent
+on the corresponding encoder driver init, since bridge driver
+needs a drm_device pointer to finish drm initializations.
+The encoder driver passes the drm_device pointer to the
+bridge driver. Because of this dependency, third party drivers
+like ptn3460 doesn't adhere to the driver model.
+
+In this patch, we reframe the bridge registration framework
+so that bridge initialization is split into 2 steps, and
+bridge registration happens independent of drm flow:
+--Step 1: gather all the bridge settings independent of drm and
+	  add the bridge onto a global list of bridges.
+--Step 2: when the encoder driver is probed, call drm_bridge_attach
+	  for the corresponding bridge so that the bridge receives
+	  drm_device pointer and continues with connector and other
+	  drm initializations.
+
+The old set of bridge helpers are removed, and a set of new helpers
+are added to accomplish the 2 step initialization.
+
+The bridge devices register themselves onto global list of bridges
+when they get probed by calling "drm_bridge_add".
+
+The parent encoder driver waits till the bridge is available
+in the lookup table(by calling "of_drm_find_bridge") and then
+continues with its initialization.
+
+The encoder driver should also call "drm_bridge_attach" to pass
+on the drm_device to the bridge object.
+
+drm_bridge_attach inturn calls "bridge->funcs->attach" so that
+bridge can continue with drm related initializations.
 
 Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
 ---
- drivers/gpu/drm/bridge/ptn3460.c |   95 +++++++++++++++++++-------------------
- 1 file changed, 48 insertions(+), 47 deletions(-)
+ drivers/gpu/drm/Makefile               |    2 +-
+ drivers/gpu/drm/bridge/ptn3460.c       |   27 +++++-----
+ drivers/gpu/drm/drm_bridge.c           |   91 ++++++++++++++++++++++++++++++++
+ drivers/gpu/drm/drm_crtc.c             |   65 -----------------------
+ drivers/gpu/drm/msm/hdmi/hdmi.c        |    7 +--
+ drivers/gpu/drm/msm/hdmi/hdmi.h        |    1 +
+ drivers/gpu/drm/msm/hdmi/hdmi_bridge.c |    7 ++-
+ drivers/gpu/drm/sti/sti_hda.c          |   10 +---
+ drivers/gpu/drm/sti/sti_hdmi.c         |   10 +---
+ include/drm/bridge/ptn3460.h           |    8 +++
+ include/drm/drm_crtc.h                 |   26 ++++-----
+ 11 files changed, 136 insertions(+), 118 deletions(-)
+ create mode 100644 drivers/gpu/drm/drm_bridge.c
 
+diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
+index 9292a76..00f97a5 100644
+--- a/drivers/gpu/drm/Makefile
++++ b/drivers/gpu/drm/Makefile
+@@ -14,7 +14,7 @@ drm-y       :=	drm_auth.o drm_bufs.o drm_cache.o \
+ 		drm_info.o drm_debugfs.o drm_encoder_slave.o \
+ 		drm_trace_points.o drm_global.o drm_prime.o \
+ 		drm_rect.o drm_vma_manager.o drm_flip_work.o \
+-		drm_modeset_lock.o
++		drm_modeset_lock.o drm_bridge.o
+ 
+ drm-$(CONFIG_COMPAT) += drm_ioc32.o
+ drm-$(CONFIG_DRM_GEM_CMA_HELPER) += drm_gem_cma_helper.o
 diff --git a/drivers/gpu/drm/bridge/ptn3460.c b/drivers/gpu/drm/bridge/ptn3460.c
-index d466696..4db38e1 100644
+index a2ddc8d..4a818c1 100644
 --- a/drivers/gpu/drm/bridge/ptn3460.c
 +++ b/drivers/gpu/drm/bridge/ptn3460.c
-@@ -13,19 +13,19 @@
-  * GNU General Public License for more details.
-  */
+@@ -176,24 +176,11 @@ static void ptn3460_post_disable(struct drm_bridge *bridge)
+ {
+ }
  
-+#include <linux/delay.h>
-+#include <linux/gpio.h>
-+#include <linux/i2c.h>
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_gpio.h>
--#include <linux/i2c.h>
--#include <linux/gpio.h>
--#include <linux/delay.h>
- 
--#include "drmP.h"
--#include "drm_edid.h"
-+#include "bridge/ptn3460.h"
-+
- #include "drm_crtc.h"
- #include "drm_crtc_helper.h"
+-static void ptn3460_bridge_destroy(struct drm_bridge *bridge)
+-{
+-	struct ptn3460_bridge *ptn_bridge = bridge_to_ptn3460(bridge);
 -
--#include "bridge/ptn3460.h"
-+#include "drm_edid.h"
-+#include "drmP.h"
- 
- #define PTN3460_EDID_ADDR			0x0
- #define PTN3460_EDID_EMULATION_ADDR		0x84
-@@ -37,7 +37,7 @@ struct ptn3460_bridge {
- 	struct drm_connector connector;
- 	struct i2c_client *client;
- 	struct drm_encoder *encoder;
--	struct drm_bridge *bridge;
-+	struct drm_bridge bridge;
- 	struct edid *edid;
- 	int gpio_pd_n;
- 	int gpio_rst_n;
-@@ -45,6 +45,18 @@ struct ptn3460_bridge {
- 	bool enabled;
- };
- 
-+static inline struct ptn3460_bridge *
-+		bridge_to_ptn3460(struct drm_bridge *bridge)
-+{
-+	return container_of(bridge, struct ptn3460_bridge, bridge);
-+}
-+
-+static inline struct ptn3460_bridge *
-+		connector_to_ptn3460(struct drm_connector *connector)
-+{
-+	return container_of(connector, struct ptn3460_bridge, connector);
-+}
-+
- static int ptn3460_read_bytes(struct ptn3460_bridge *ptn_bridge, char addr,
- 		u8 *buf, int len)
- {
-@@ -92,7 +104,7 @@ static int ptn3460_select_edid(struct ptn3460_bridge *ptn_bridge)
- 	ret = ptn3460_write_byte(ptn_bridge, PTN3460_EDID_SRAM_LOAD_ADDR,
- 			ptn_bridge->edid_emulation);
- 	if (ret) {
--		DRM_ERROR("Failed to transfer edid to sram, ret=%d\n", ret);
-+		DRM_ERROR("Failed to transfer EDID to sram, ret=%d\n", ret);
- 		return ret;
- 	}
- 
-@@ -102,7 +114,7 @@ static int ptn3460_select_edid(struct ptn3460_bridge *ptn_bridge)
- 
- 	ret = ptn3460_write_byte(ptn_bridge, PTN3460_EDID_EMULATION_ADDR, val);
- 	if (ret) {
--		DRM_ERROR("Failed to write edid value, ret=%d\n", ret);
-+		DRM_ERROR("Failed to write EDID value, ret=%d\n", ret);
- 		return ret;
- 	}
- 
-@@ -111,7 +123,7 @@ static int ptn3460_select_edid(struct ptn3460_bridge *ptn_bridge)
- 
- static void ptn3460_pre_enable(struct drm_bridge *bridge)
- {
--	struct ptn3460_bridge *ptn_bridge = bridge->driver_private;
-+	struct ptn3460_bridge *ptn_bridge = bridge_to_ptn3460(bridge);
- 	int ret;
- 
- 	if (ptn_bridge->enabled)
-@@ -122,7 +134,7 @@ static void ptn3460_pre_enable(struct drm_bridge *bridge)
- 
- 	if (gpio_is_valid(ptn_bridge->gpio_rst_n)) {
- 		gpio_set_value(ptn_bridge->gpio_rst_n, 0);
--		udelay(10);
-+		usleep_range(10, 20);
- 		gpio_set_value(ptn_bridge->gpio_rst_n, 1);
- 	}
- 
-@@ -135,7 +147,7 @@ static void ptn3460_pre_enable(struct drm_bridge *bridge)
- 
- 	ret = ptn3460_select_edid(ptn_bridge);
- 	if (ret)
--		DRM_ERROR("Select edid failed ret=%d\n", ret);
-+		DRM_ERROR("Select EDID failed ret=%d\n", ret);
- 
- 	ptn_bridge->enabled = true;
- }
-@@ -146,7 +158,7 @@ static void ptn3460_enable(struct drm_bridge *bridge)
- 
- static void ptn3460_disable(struct drm_bridge *bridge)
- {
--	struct ptn3460_bridge *ptn_bridge = bridge->driver_private;
-+	struct ptn3460_bridge *ptn_bridge = bridge_to_ptn3460(bridge);
- 
- 	if (!ptn_bridge->enabled)
- 		return;
-@@ -164,9 +176,9 @@ static void ptn3460_post_disable(struct drm_bridge *bridge)
- {
- }
- 
--void ptn3460_bridge_destroy(struct drm_bridge *bridge)
-+static void ptn3460_bridge_destroy(struct drm_bridge *bridge)
- {
--	struct ptn3460_bridge *ptn_bridge = bridge->driver_private;
-+	struct ptn3460_bridge *ptn_bridge = bridge_to_ptn3460(bridge);
- 
- 	drm_bridge_cleanup(bridge);
- 	if (gpio_is_valid(ptn_bridge->gpio_pd_n))
-@@ -176,7 +188,7 @@ void ptn3460_bridge_destroy(struct drm_bridge *bridge)
- 	/* Nothing else to free, we've got devm allocated memory */
- }
- 
--struct drm_bridge_funcs ptn3460_bridge_funcs = {
-+static struct drm_bridge_funcs ptn3460_bridge_funcs = {
+-	drm_bridge_cleanup(bridge);
+-	if (gpio_is_valid(ptn_bridge->gpio_pd_n))
+-		gpio_free(ptn_bridge->gpio_pd_n);
+-	if (gpio_is_valid(ptn_bridge->gpio_rst_n))
+-		gpio_free(ptn_bridge->gpio_rst_n);
+-	/* Nothing else to free, we've got devm allocated memory */
+-}
+-
+ static struct drm_bridge_funcs ptn3460_bridge_funcs = {
  	.pre_enable = ptn3460_pre_enable,
  	.enable = ptn3460_enable,
  	.disable = ptn3460_disable,
-@@ -184,24 +196,24 @@ struct drm_bridge_funcs ptn3460_bridge_funcs = {
- 	.destroy = ptn3460_bridge_destroy,
+ 	.post_disable = ptn3460_post_disable,
+-	.destroy = ptn3460_bridge_destroy,
  };
  
--int ptn3460_get_modes(struct drm_connector *connector)
-+static int ptn3460_get_modes(struct drm_connector *connector)
- {
- 	struct ptn3460_bridge *ptn_bridge;
- 	u8 *edid;
--	int ret, num_modes;
-+	int ret, num_modes = 0;
- 	bool power_off;
- 
--	ptn_bridge = container_of(connector, struct ptn3460_bridge, connector);
-+	ptn_bridge = connector_to_ptn3460(connector);
- 
- 	if (ptn_bridge->edid)
- 		return drm_add_edid_modes(connector, ptn_bridge->edid);
- 
- 	power_off = !ptn_bridge->enabled;
--	ptn3460_pre_enable(ptn_bridge->bridge);
-+	ptn3460_pre_enable(&ptn_bridge->bridge);
- 
- 	edid = kmalloc(EDID_LENGTH, GFP_KERNEL);
- 	if (!edid) {
--		DRM_ERROR("Failed to allocate edid\n");
-+		DRM_ERROR("Failed to allocate EDID\n");
- 		return 0;
+ static int ptn3460_get_modes(struct drm_connector *connector)
+@@ -314,7 +301,7 @@ int ptn3460_init(struct drm_device *dev, struct drm_encoder *encoder,
  	}
  
-@@ -209,7 +221,6 @@ int ptn3460_get_modes(struct drm_connector *connector)
- 			EDID_LENGTH);
- 	if (ret) {
- 		kfree(edid);
--		num_modes = 0;
- 		goto out;
- 	}
- 
-@@ -220,37 +231,35 @@ int ptn3460_get_modes(struct drm_connector *connector)
- 
- out:
- 	if (power_off)
--		ptn3460_disable(ptn_bridge->bridge);
-+		ptn3460_disable(&ptn_bridge->bridge);
- 
- 	return num_modes;
- }
- 
--struct drm_encoder *ptn3460_best_encoder(struct drm_connector *connector)
-+static struct drm_encoder *ptn3460_best_encoder(struct drm_connector *connector)
- {
--	struct ptn3460_bridge *ptn_bridge;
--
--	ptn_bridge = container_of(connector, struct ptn3460_bridge, connector);
-+	struct ptn3460_bridge *ptn_bridge = connector_to_ptn3460(connector);
- 
- 	return ptn_bridge->encoder;
- }
- 
--struct drm_connector_helper_funcs ptn3460_connector_helper_funcs = {
-+static struct drm_connector_helper_funcs ptn3460_connector_helper_funcs = {
- 	.get_modes = ptn3460_get_modes,
- 	.best_encoder = ptn3460_best_encoder,
- };
- 
--enum drm_connector_status ptn3460_detect(struct drm_connector *connector,
-+static enum drm_connector_status ptn3460_detect(struct drm_connector *connector,
- 		bool force)
- {
- 	return connector_status_connected;
- }
- 
--void ptn3460_connector_destroy(struct drm_connector *connector)
-+static void ptn3460_connector_destroy(struct drm_connector *connector)
- {
- 	drm_connector_cleanup(connector);
- }
- 
--struct drm_connector_funcs ptn3460_connector_funcs = {
-+static struct drm_connector_funcs ptn3460_connector_funcs = {
- 	.dpms = drm_helper_connector_dpms,
- 	.fill_modes = drm_helper_probe_single_connector_modes,
- 	.detect = ptn3460_detect,
-@@ -261,30 +270,22 @@ int ptn3460_init(struct drm_device *dev, struct drm_encoder *encoder,
- 		struct i2c_client *client, struct device_node *node)
- {
- 	int ret;
--	struct drm_bridge *bridge;
- 	struct ptn3460_bridge *ptn_bridge;
- 
--	bridge = devm_kzalloc(dev->dev, sizeof(*bridge), GFP_KERNEL);
--	if (!bridge) {
--		DRM_ERROR("Failed to allocate drm bridge\n");
--		return -ENOMEM;
--	}
--
- 	ptn_bridge = devm_kzalloc(dev->dev, sizeof(*ptn_bridge), GFP_KERNEL);
- 	if (!ptn_bridge) {
--		DRM_ERROR("Failed to allocate ptn bridge\n");
- 		return -ENOMEM;
- 	}
- 
- 	ptn_bridge->client = client;
- 	ptn_bridge->encoder = encoder;
--	ptn_bridge->bridge = bridge;
- 	ptn_bridge->gpio_pd_n = of_get_named_gpio(node, "powerdown-gpio", 0);
- 	if (gpio_is_valid(ptn_bridge->gpio_pd_n)) {
- 		ret = gpio_request_one(ptn_bridge->gpio_pd_n,
- 				GPIOF_OUT_INIT_HIGH, "PTN3460_PD_N");
- 		if (ret) {
--			DRM_ERROR("Request powerdown-gpio failed (%d)\n", ret);
-+			dev_err(&client->dev,
-+				"Request powerdown-gpio failed (%d)\n", ret);
- 			return ret;
- 		}
- 	}
-@@ -298,7 +299,8 @@ int ptn3460_init(struct drm_device *dev, struct drm_encoder *encoder,
- 		ret = gpio_request_one(ptn_bridge->gpio_rst_n,
- 				GPIOF_OUT_INIT_LOW, "PTN3460_RST_N");
- 		if (ret) {
--			DRM_ERROR("Request reset-gpio failed (%d)\n", ret);
-+			dev_err(&client->dev,
-+				"Request reset-gpio failed (%d)\n", ret);
- 			gpio_free(ptn_bridge->gpio_pd_n);
- 			return ret;
- 		}
-@@ -307,18 +309,17 @@ int ptn3460_init(struct drm_device *dev, struct drm_encoder *encoder,
- 	ret = of_property_read_u32(node, "edid-emulation",
- 			&ptn_bridge->edid_emulation);
- 	if (ret) {
--		DRM_ERROR("Can't read edid emulation value\n");
-+		dev_err(&client->dev, "Can't read EDID emulation value\n");
- 		goto err;
- 	}
- 
--	ret = drm_bridge_init(dev, bridge, &ptn3460_bridge_funcs);
-+	ret = drm_bridge_init(dev, &ptn_bridge->bridge, &ptn3460_bridge_funcs);
+ 	ptn_bridge->bridge.funcs = &ptn3460_bridge_funcs;
+-	ret = drm_bridge_init(dev, &ptn_bridge->bridge);
++	ret = drm_bridge_attach(dev, &ptn_bridge->bridge);
  	if (ret) {
  		DRM_ERROR("Failed to initialize bridge with drm\n");
  		goto err;
+@@ -343,3 +330,15 @@ err:
+ 	return ret;
+ }
+ EXPORT_SYMBOL(ptn3460_init);
++
++void ptn3460_destroy(struct drm_bridge *bridge)
++{
++	struct ptn3460_bridge *ptn_bridge = bridge->driver_private;
++
++	if (gpio_is_valid(ptn_bridge->gpio_pd_n))
++		gpio_free(ptn_bridge->gpio_pd_n);
++	if (gpio_is_valid(ptn_bridge->gpio_rst_n))
++		gpio_free(ptn_bridge->gpio_rst_n);
++	/* Nothing else to free, we've got devm allocated memory */
++}
++EXPORT_SYMBOL(ptn3460_destroy);
+diff --git a/drivers/gpu/drm/drm_bridge.c b/drivers/gpu/drm/drm_bridge.c
+new file mode 100644
+index 0000000..d1187e5
+--- /dev/null
++++ b/drivers/gpu/drm/drm_bridge.c
+@@ -0,0 +1,91 @@
++/*
++ * Copyright (c) 2014 Samsung Electronics Co., Ltd
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a
++ * copy of this software and associated documentation files (the "Software"),
++ * to deal in the Software without restriction, including without limitation
++ * the rights to use, copy, modify, merge, publish, distribute, sub license,
++ * and/or sell copies of the Software, and to permit persons to whom the
++ * Software is furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice (including the
++ * next paragraph) shall be included in all copies or substantial portions
++ * of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL
++ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
++ * DEALINGS IN THE SOFTWARE.
++ */
++
++#include <linux/err.h>
++#include <linux/module.h>
++
++#include <drm/drm_crtc.h>
++
++#include "drm/drmP.h"
++
++static DEFINE_MUTEX(bridge_lock);
++static LIST_HEAD(bridge_list);
++
++int drm_bridge_add(struct drm_bridge *bridge)
++{
++	mutex_lock(&bridge_lock);
++	list_add_tail(&bridge->list, &bridge_list);
++	mutex_unlock(&bridge_lock);
++
++	return 0;
++}
++EXPORT_SYMBOL(drm_bridge_add);
++
++void drm_bridge_remove(struct drm_bridge *bridge)
++{
++	mutex_lock(&bridge_lock);
++	list_del_init(&bridge->list);
++	mutex_unlock(&bridge_lock);
++}
++EXPORT_SYMBOL(drm_bridge_remove);
++
++extern int drm_bridge_attach(struct drm_device *dev, struct drm_bridge *bridge)
++{
++	if (!dev || !bridge)
++		return -EINVAL;
++
++	if (bridge->dev)
++		return -EBUSY;
++
++	bridge->dev = dev;
++
++	if (bridge->funcs->attach)
++		return bridge->funcs->attach(bridge);
++
++	return 0;
++}
++EXPORT_SYMBOL(drm_bridge_attach);
++
++#ifdef CONFIG_OF
++struct drm_bridge *of_drm_find_bridge(struct device_node *np)
++{
++	struct drm_bridge *bridge;
++
++	mutex_lock(&bridge_lock);
++
++	list_for_each_entry(bridge, &bridge_list, list) {
++		if (bridge->of_node == np) {
++			mutex_unlock(&bridge_lock);
++			return bridge;
++		}
++	}
++
++	mutex_unlock(&bridge_lock);
++	return NULL;
++}
++EXPORT_SYMBOL(of_drm_find_bridge);
++#endif
++
++MODULE_AUTHOR("Ajay Kumar <ajaykumar.rs@samsung.com>");
++MODULE_DESCRIPTION("DRM bridge infrastructure");
++MODULE_LICENSE("GPL and additional rights");
+diff --git a/drivers/gpu/drm/drm_crtc.c b/drivers/gpu/drm/drm_crtc.c
+index 408c053..39d6100 100644
+--- a/drivers/gpu/drm/drm_crtc.c
++++ b/drivers/gpu/drm/drm_crtc.c
+@@ -1008,56 +1008,6 @@ void drm_connector_unplug_all(struct drm_device *dev)
+ EXPORT_SYMBOL(drm_connector_unplug_all);
+ 
+ /**
+- * drm_bridge_init - initialize a drm transcoder/bridge
+- * @dev: drm device
+- * @bridge: transcoder/bridge to set up
+- *
+- * Initialises a preallocated bridge. Bridges should be
+- * subclassed as part of driver connector objects.
+- *
+- * Returns:
+- * Zero on success, error code on failure.
+- */
+-int drm_bridge_init(struct drm_device *dev, struct drm_bridge *bridge)
+-{
+-	int ret;
+-
+-	drm_modeset_lock_all(dev);
+-
+-	ret = drm_mode_object_get(dev, &bridge->base, DRM_MODE_OBJECT_BRIDGE);
+-	if (ret)
+-		goto out;
+-
+-	bridge->dev = dev;
+-
+-	list_add_tail(&bridge->head, &dev->mode_config.bridge_list);
+-	dev->mode_config.num_bridge++;
+-
+- out:
+-	drm_modeset_unlock_all(dev);
+-	return ret;
+-}
+-EXPORT_SYMBOL(drm_bridge_init);
+-
+-/**
+- * drm_bridge_cleanup - cleans up an initialised bridge
+- * @bridge: bridge to cleanup
+- *
+- * Cleans up the bridge but doesn't free the object.
+- */
+-void drm_bridge_cleanup(struct drm_bridge *bridge)
+-{
+-	struct drm_device *dev = bridge->dev;
+-
+-	drm_modeset_lock_all(dev);
+-	drm_mode_object_put(dev, &bridge->base);
+-	list_del(&bridge->head);
+-	dev->mode_config.num_bridge--;
+-	drm_modeset_unlock_all(dev);
+-}
+-EXPORT_SYMBOL(drm_bridge_cleanup);
+-
+-/**
+  * drm_encoder_init - Init a preallocated encoder
+  * @dev: drm device
+  * @encoder: the encoder to init
+@@ -1539,7 +1489,6 @@ static int drm_mode_group_init(struct drm_device *dev, struct drm_mode_group *gr
+ 	total_objects += dev->mode_config.num_crtc;
+ 	total_objects += dev->mode_config.num_connector;
+ 	total_objects += dev->mode_config.num_encoder;
+-	total_objects += dev->mode_config.num_bridge;
+ 
+ 	group->id_list = kzalloc(total_objects * sizeof(uint32_t), GFP_KERNEL);
+ 	if (!group->id_list)
+@@ -1548,7 +1497,6 @@ static int drm_mode_group_init(struct drm_device *dev, struct drm_mode_group *gr
+ 	group->num_crtcs = 0;
+ 	group->num_connectors = 0;
+ 	group->num_encoders = 0;
+-	group->num_bridges = 0;
+ 	return 0;
+ }
+ 
+@@ -1568,7 +1516,6 @@ int drm_mode_group_init_legacy_group(struct drm_device *dev,
+ 	struct drm_crtc *crtc;
+ 	struct drm_encoder *encoder;
+ 	struct drm_connector *connector;
+-	struct drm_bridge *bridge;
+ 	int ret;
+ 
+ 	if ((ret = drm_mode_group_init(dev, group)))
+@@ -1585,11 +1532,6 @@ int drm_mode_group_init_legacy_group(struct drm_device *dev,
+ 		group->id_list[group->num_crtcs + group->num_encoders +
+ 			       group->num_connectors++] = connector->base.id;
+ 
+-	list_for_each_entry(bridge, &dev->mode_config.bridge_list, head)
+-		group->id_list[group->num_crtcs + group->num_encoders +
+-			       group->num_connectors + group->num_bridges++] =
+-					bridge->base.id;
+-
+ 	return 0;
+ }
+ EXPORT_SYMBOL(drm_mode_group_init_legacy_group);
+@@ -5088,7 +5030,6 @@ void drm_mode_config_init(struct drm_device *dev)
+ 	INIT_LIST_HEAD(&dev->mode_config.fb_list);
+ 	INIT_LIST_HEAD(&dev->mode_config.crtc_list);
+ 	INIT_LIST_HEAD(&dev->mode_config.connector_list);
+-	INIT_LIST_HEAD(&dev->mode_config.bridge_list);
+ 	INIT_LIST_HEAD(&dev->mode_config.encoder_list);
+ 	INIT_LIST_HEAD(&dev->mode_config.property_list);
+ 	INIT_LIST_HEAD(&dev->mode_config.property_blob_list);
+@@ -5128,7 +5069,6 @@ void drm_mode_config_cleanup(struct drm_device *dev)
+ 	struct drm_connector *connector, *ot;
+ 	struct drm_crtc *crtc, *ct;
+ 	struct drm_encoder *encoder, *enct;
+-	struct drm_bridge *bridge, *brt;
+ 	struct drm_framebuffer *fb, *fbt;
+ 	struct drm_property *property, *pt;
+ 	struct drm_property_blob *blob, *bt;
+@@ -5139,11 +5079,6 @@ void drm_mode_config_cleanup(struct drm_device *dev)
+ 		encoder->funcs->destroy(encoder);
  	}
  
--	bridge->driver_private = ptn_bridge;
--	encoder->bridge = bridge;
-+	encoder->bridge = &ptn_bridge->bridge;
+-	list_for_each_entry_safe(bridge, brt,
+-				 &dev->mode_config.bridge_list, head) {
+-		bridge->funcs->destroy(bridge);
+-	}
+-
+ 	list_for_each_entry_safe(connector, ot,
+ 				 &dev->mode_config.connector_list, head) {
+ 		connector->funcs->destroy(connector);
+diff --git a/drivers/gpu/drm/msm/hdmi/hdmi.c b/drivers/gpu/drm/msm/hdmi/hdmi.c
+index 9d00dcb..e4f249b 100644
+--- a/drivers/gpu/drm/msm/hdmi/hdmi.c
++++ b/drivers/gpu/drm/msm/hdmi/hdmi.c
+@@ -65,6 +65,9 @@ void hdmi_destroy(struct kref *kref)
+ 	if (hdmi->i2c)
+ 		hdmi_i2c_destroy(hdmi->i2c);
  
- 	ret = drm_connector_init(dev, &ptn_bridge->connector,
- 			&ptn3460_connector_funcs, DRM_MODE_CONNECTOR_LVDS);
++	if (hdmi->bridge)
++		hdmi_bridge_destroy(hdmi->bridge);
++
+ 	platform_set_drvdata(hdmi->pdev, NULL);
+ }
+ 
+@@ -234,9 +237,7 @@ struct hdmi *hdmi_init(struct drm_device *dev, struct drm_encoder *encoder)
+ 
+ fail:
+ 	if (hdmi) {
+-		/* bridge/connector are normally destroyed by drm: */
+-		if (hdmi->bridge)
+-			hdmi->bridge->funcs->destroy(hdmi->bridge);
++		/* bridge is normally destroyed by drm: */
+ 		if (hdmi->connector)
+ 			hdmi->connector->funcs->destroy(hdmi->connector);
+ 		hdmi_destroy(&hdmi->refcount);
+diff --git a/drivers/gpu/drm/msm/hdmi/hdmi.h b/drivers/gpu/drm/msm/hdmi/hdmi.h
+index b981995..d2cf7f4 100644
+--- a/drivers/gpu/drm/msm/hdmi/hdmi.h
++++ b/drivers/gpu/drm/msm/hdmi/hdmi.h
+@@ -163,6 +163,7 @@ void hdmi_audio_set_sample_rate(struct hdmi *hdmi, int rate);
+  */
+ 
+ struct drm_bridge *hdmi_bridge_init(struct hdmi *hdmi);
++void hdmi_bridge_destroy(struct drm_bridge *bridge);
+ 
+ /*
+  * hdmi connector:
+diff --git a/drivers/gpu/drm/msm/hdmi/hdmi_bridge.c b/drivers/gpu/drm/msm/hdmi/hdmi_bridge.c
+index 0309539..26657a0 100644
+--- a/drivers/gpu/drm/msm/hdmi/hdmi_bridge.c
++++ b/drivers/gpu/drm/msm/hdmi/hdmi_bridge.c
+@@ -23,11 +23,11 @@ struct hdmi_bridge {
+ };
+ #define to_hdmi_bridge(x) container_of(x, struct hdmi_bridge, base)
+ 
+-static void hdmi_bridge_destroy(struct drm_bridge *bridge)
++void hdmi_bridge_destroy(struct drm_bridge *bridge)
+ {
+ 	struct hdmi_bridge *hdmi_bridge = to_hdmi_bridge(bridge);
++
+ 	hdmi_unreference(hdmi_bridge->hdmi);
+-	drm_bridge_cleanup(bridge);
+ 	kfree(hdmi_bridge);
+ }
+ 
+@@ -201,7 +201,6 @@ static const struct drm_bridge_funcs hdmi_bridge_funcs = {
+ 		.disable = hdmi_bridge_disable,
+ 		.post_disable = hdmi_bridge_post_disable,
+ 		.mode_set = hdmi_bridge_mode_set,
+-		.destroy = hdmi_bridge_destroy,
+ };
+ 
+ 
+@@ -223,7 +222,7 @@ struct drm_bridge *hdmi_bridge_init(struct hdmi *hdmi)
+ 	bridge = &hdmi_bridge->base;
+ 	bridge->funcs = &hdmi_bridge_funcs;
+ 
+-	drm_bridge_init(hdmi->dev, bridge);
++	drm_bridge_attach(hdmi->dev, bridge);
+ 
+ 	return bridge;
+ 
+diff --git a/drivers/gpu/drm/sti/sti_hda.c b/drivers/gpu/drm/sti/sti_hda.c
+index 6cf145d..a9bbb08 100644
+--- a/drivers/gpu/drm/sti/sti_hda.c
++++ b/drivers/gpu/drm/sti/sti_hda.c
+@@ -508,19 +508,12 @@ static void sti_hda_bridge_nope(struct drm_bridge *bridge)
+ 	/* do nothing */
+ }
+ 
+-static void sti_hda_brigde_destroy(struct drm_bridge *bridge)
+-{
+-	drm_bridge_cleanup(bridge);
+-	kfree(bridge);
+-}
+-
+ static const struct drm_bridge_funcs sti_hda_bridge_funcs = {
+ 	.pre_enable = sti_hda_pre_enable,
+ 	.enable = sti_hda_bridge_nope,
+ 	.disable = sti_hda_disable,
+ 	.post_disable = sti_hda_bridge_nope,
+ 	.mode_set = sti_hda_set_mode,
+-	.destroy = sti_hda_brigde_destroy,
+ };
+ 
+ static int sti_hda_connector_get_modes(struct drm_connector *connector)
+@@ -665,7 +658,7 @@ static int sti_hda_bind(struct device *dev, struct device *master, void *data)
+ 
+ 	bridge->driver_private = hda;
+ 	bridge->funcs = &sti_hda_bridge_funcs;
+-	drm_bridge_init(drm_dev, bridge);
++	drm_bridge_attach(drm_dev, bridge);
+ 
+ 	encoder->bridge = bridge;
+ 	connector->encoder = encoder;
+@@ -694,7 +687,6 @@ static int sti_hda_bind(struct device *dev, struct device *master, void *data)
+ err_sysfs:
+ 	drm_connector_unregister(drm_connector);
+ err_connector:
+-	drm_bridge_cleanup(bridge);
+ 	drm_connector_cleanup(drm_connector);
+ 	return -EINVAL;
+ }
+diff --git a/drivers/gpu/drm/sti/sti_hdmi.c b/drivers/gpu/drm/sti/sti_hdmi.c
+index 285f723..bf4cdb8 100644
+--- a/drivers/gpu/drm/sti/sti_hdmi.c
++++ b/drivers/gpu/drm/sti/sti_hdmi.c
+@@ -463,19 +463,12 @@ static void sti_hdmi_bridge_nope(struct drm_bridge *bridge)
+ 	/* do nothing */
+ }
+ 
+-static void sti_hdmi_brigde_destroy(struct drm_bridge *bridge)
+-{
+-	drm_bridge_cleanup(bridge);
+-	kfree(bridge);
+-}
+-
+ static const struct drm_bridge_funcs sti_hdmi_bridge_funcs = {
+ 	.pre_enable = sti_hdmi_pre_enable,
+ 	.enable = sti_hdmi_bridge_nope,
+ 	.disable = sti_hdmi_disable,
+ 	.post_disable = sti_hdmi_bridge_nope,
+ 	.mode_set = sti_hdmi_set_mode,
+-	.destroy = sti_hdmi_brigde_destroy,
+ };
+ 
+ static int sti_hdmi_connector_get_modes(struct drm_connector *connector)
+@@ -629,7 +622,7 @@ static int sti_hdmi_bind(struct device *dev, struct device *master, void *data)
+ 
+ 	bridge->driver_private = hdmi;
+ 	bridge->funcs = &sti_hdmi_bridge_funcs;
+-	drm_bridge_init(drm_dev, bridge);
++	drm_bridge_attach(drm_dev, bridge);
+ 
+ 	encoder->bridge = bridge;
+ 	connector->encoder = encoder;
+@@ -661,7 +654,6 @@ static int sti_hdmi_bind(struct device *dev, struct device *master, void *data)
+ err_sysfs:
+ 	drm_connector_unregister(drm_connector);
+ err_connector:
+-	drm_bridge_cleanup(bridge);
+ 	drm_connector_cleanup(drm_connector);
+ 	return -EINVAL;
+ }
+diff --git a/include/drm/bridge/ptn3460.h b/include/drm/bridge/ptn3460.h
+index ff62344..b11f8e1 100644
+--- a/include/drm/bridge/ptn3460.h
++++ b/include/drm/bridge/ptn3460.h
+@@ -15,6 +15,7 @@
+ #define _DRM_BRIDGE_PTN3460_H_
+ 
+ struct drm_device;
++struct drm_bridge;
+ struct drm_encoder;
+ struct i2c_client;
+ struct device_node;
+@@ -23,6 +24,9 @@ struct device_node;
+ 
+ int ptn3460_init(struct drm_device *dev, struct drm_encoder *encoder,
+ 		struct i2c_client *client, struct device_node *node);
++
++void ptn3460_destroy(struct drm_bridge *bridge);
++
+ #else
+ 
+ static inline int ptn3460_init(struct drm_device *dev,
+@@ -32,6 +36,10 @@ static inline int ptn3460_init(struct drm_device *dev,
+ 	return 0;
+ }
+ 
++static inline void ptn3460_destroy(struct drm_bridge *bridge)
++{
++}
++
+ #endif
+ 
+ #endif
+diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
+index 5a3bce17..da2beaf 100644
+--- a/include/drm/drm_crtc.h
++++ b/include/drm/drm_crtc.h
+@@ -633,15 +633,16 @@ struct drm_plane {
+ 
+ /**
+  * drm_bridge_funcs - drm_bridge control functions
++ * @attach: Called during drm_bridge_attach
+  * @mode_fixup: Try to fixup (or reject entirely) proposed mode for this bridge
+  * @disable: Called right before encoder prepare, disables the bridge
+  * @post_disable: Called right after encoder prepare, for lockstepped disable
+  * @mode_set: Set this mode to the bridge
+  * @pre_enable: Called right before encoder commit, for lockstepped commit
+  * @enable: Called right after encoder commit, enables the bridge
+- * @destroy: make object go away
+  */
+ struct drm_bridge_funcs {
++	int (*attach)(struct drm_bridge *bridge);
+ 	bool (*mode_fixup)(struct drm_bridge *bridge,
+ 			   const struct drm_display_mode *mode,
+ 			   struct drm_display_mode *adjusted_mode);
+@@ -652,22 +653,24 @@ struct drm_bridge_funcs {
+ 			 struct drm_display_mode *adjusted_mode);
+ 	void (*pre_enable)(struct drm_bridge *bridge);
+ 	void (*enable)(struct drm_bridge *bridge);
+-	void (*destroy)(struct drm_bridge *bridge);
+ };
+ 
+ /**
+  * drm_bridge - central DRM bridge control structure
+  * @dev: DRM device this bridge belongs to
+- * @head: list management
++ * @of_node: device node pointer to the bridge
++ * @list: to keep track of all added bridges
+  * @base: base mode object
+  * @funcs: control functions
+  * @driver_private: pointer to the bridge driver's internal context
+  */
+ struct drm_bridge {
+ 	struct drm_device *dev;
+-	struct list_head head;
+-
+-	struct drm_mode_object base;
++	struct drm_encoder *encoder;
++#ifdef CONFIG_OF
++	struct device_node *of_node;
++#endif
++	struct list_head list;
+ 
+ 	const struct drm_bridge_funcs *funcs;
+ 	void *driver_private;
+@@ -733,7 +736,6 @@ struct drm_mode_group {
+ 	uint32_t num_crtcs;
+ 	uint32_t num_encoders;
+ 	uint32_t num_connectors;
+-	uint32_t num_bridges;
+ 
+ 	/* list of object IDs for this group */
+ 	uint32_t *id_list;
+@@ -748,8 +750,6 @@ struct drm_mode_group {
+  * @fb_list: list of framebuffers available
+  * @num_connector: number of connectors on this device
+  * @connector_list: list of connector objects
+- * @num_bridge: number of bridges on this device
+- * @bridge_list: list of bridge objects
+  * @num_encoder: number of encoders on this device
+  * @encoder_list: list of encoder objects
+  * @num_crtc: number of CRTCs on this device
+@@ -789,8 +789,6 @@ struct drm_mode_config {
+ 
+ 	int num_connector;
+ 	struct list_head connector_list;
+-	int num_bridge;
+-	struct list_head bridge_list;
+ 	int num_encoder;
+ 	struct list_head encoder_list;
+ 
+@@ -912,8 +910,10 @@ extern unsigned int drm_connector_index(struct drm_connector *connector);
+ /* helper to unplug all connectors from sysfs for device */
+ extern void drm_connector_unplug_all(struct drm_device *dev);
+ 
+-extern int drm_bridge_init(struct drm_device *dev, struct drm_bridge *bridge);
+-extern void drm_bridge_cleanup(struct drm_bridge *bridge);
++extern int drm_bridge_add(struct drm_bridge *bridge);
++extern void drm_bridge_remove(struct drm_bridge *bridge);
++extern struct drm_bridge *of_drm_find_bridge(struct device_node *np);
++extern int drm_bridge_attach(struct drm_device *dev, struct drm_bridge *bridge);
+ 
+ extern int drm_encoder_init(struct drm_device *dev,
+ 			    struct drm_encoder *encoder,
 -- 
 1.7.9.5
