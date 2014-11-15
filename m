@@ -1,69 +1,28 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sat, 15 Nov 2014 14:53:48 +0300
-Subject: [PATCH 2/6] ARM: sa1100: drop entry-macro.S
+Date: Sat, 15 Nov 2014 14:53:49 +0300
+Subject: [PATCH 3/6] ARM: sa1100: enable IRQ domains
 In-Reply-To: <1416052432-26192-1-git-send-email-dbaryshkov@gmail.com>
 References: <1416052432-26192-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1416052432-26192-3-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1416052432-26192-4-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dmitry Eremin-Solenikov <dmitry_eremin@mentor.com>
-
-As mach-sa1100 was converted to MULTI_IRQ_HANDLER, drop now-unused
-entry-macro.S file.
-
-Signed-off-by: Dmitry Eremin-Solenikov <dmitry_eremin@mentor.com>
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- arch/arm/mach-sa1100/include/mach/entry-macro.S | 41 -------------------------
- 1 file changed, 41 deletions(-)
- delete mode 100644 arch/arm/mach-sa1100/include/mach/entry-macro.S
+ arch/arm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-sa1100/include/mach/entry-macro.S b/arch/arm/mach-sa1100/include/mach/entry-macro.S
-deleted file mode 100644
-index 8cf7630..0000000
---- a/arch/arm/mach-sa1100/include/mach/entry-macro.S
-+++ /dev/null
-@@ -1,41 +0,0 @@
--/*
-- * arch/arm/mach-sa1100/include/mach/entry-macro.S
-- *
-- * Low-level IRQ helper macros for SA1100-based platforms
-- *
-- * This file is licensed under  the terms of the GNU General Public
-- * License version 2. This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--		.macro  get_irqnr_preamble, base, tmp
--		mov	\base, #0xfa000000		@ ICIP = 0xfa050000
--		add	\base, \base, #0x00050000
--		.endm
--
--		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
--		ldr	\irqstat, [\base]		@ get irqs
--		ldr	\irqnr, [\base, #4]		@ ICMR = 0xfa050004
--		ands	\irqstat, \irqstat, \irqnr
--		mov	\irqnr, #0
--		beq	1001f
--		tst	\irqstat, #0xff
--		moveq	\irqstat, \irqstat, lsr #8
--		addeq	\irqnr, \irqnr, #8
--		tsteq	\irqstat, #0xff
--		moveq	\irqstat, \irqstat, lsr #8
--		addeq	\irqnr, \irqnr, #8
--		tsteq	\irqstat, #0xff
--		moveq	\irqstat, \irqstat, lsr #8
--		addeq	\irqnr, \irqnr, #8
--		tst	\irqstat, #0x0f
--		moveq	\irqstat, \irqstat, lsr #4
--		addeq	\irqnr, \irqnr, #4
--		tst	\irqstat, #0x03
--		moveq	\irqstat, \irqstat, lsr #2
--		addeq	\irqnr, \irqnr, #2
--		tst	\irqstat, #0x01
--		addeqs	\irqnr, \irqnr, #1
--1001:
--		.endm
--
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2f3f132..622e364 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -702,6 +702,7 @@ config ARCH_SA1100
+ 	select CPU_SA1100
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_IDE
++	select IRQ_DOMAIN
+ 	select ISA
+ 	select MULTI_IRQ_HANDLER
+ 	select NEED_MACH_MEMORY_H
 -- 
 2.1.1
