@@ -1,50 +1,75 @@
-From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
-Date: Sat, 15 Nov 2014 16:16:31 +0530
-Subject: [PATCH v5 6/6] arm64: Add support for FSL's LS2085A SoC in Kconfig
- and defconfig
-In-Reply-To: <1416048391-7557-1-git-send-email-bhupesh.sharma@freescale.com>
-References: <1416048391-7557-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <1416048391-7557-7-git-send-email-bhupesh.sharma@freescale.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 15 Nov 2014 10:49:12 +0000
+Subject: [PATCH 1/2] PCI/MSI: Allow an msi_chip to be associated to an irq
+ domain
+In-Reply-To: <1416048553-29289-1-git-send-email-marc.zyngier@arm.com>
+References: <1416048553-29289-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1416048553-29289-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for FSL's LS2085A SoC in the arm64 Kconfig
-and defconfig files.
+With the new stacked irq domains, it becomes pretty tempting
+to allocate an MSI domain per PCI bus, which would remove
+the requirement of either relying on arch-specific code, or
+a default PCI MSI domain.
 
-Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-Signed-off-by: Arnab Basu <arnab_basu@rocketmail.com>
+By allowing the msi_chip structure to carry a pointer to
+an irq_domain, we can easily use this in pci_msi_setup_msi_irqs.
+The existing code can still be used as a fallback if the MSI driver
+does not populate the domain field.
+
+Tested on arm64 with the GICv3 ITS driver.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/Kconfig           |    5 +++++
- arch/arm64/configs/defconfig |    1 +
- 2 files changed, 6 insertions(+)
+ drivers/pci/msi.c   | 16 +++++++++++++++-
+ include/linux/msi.h |  3 +++
+ 2 files changed, 18 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 9532f8d..aefcdd2 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -142,6 +142,11 @@ source "kernel/Kconfig.freezer"
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index af66b95..aa3b720 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -84,11 +84,25 @@ int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+ 	return 0;
+ }
  
- menu "Platform selection"
- 
-+config ARCH_FSL_LS2085A
-+	bool "Freescale LS2085A SOC"
-+	help
-+	  This enables support for Freescale LS2085A SOC.
++static struct irq_domain *pci_msi_get_domain(struct pci_dev *dev)
++{
++	struct irq_domain *domain = NULL;
 +
- config ARCH_THUNDER
- 	bool "Cavium Inc. Thunder SoC Family"
- 	help
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index dd301be..76fc77e 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -32,6 +32,7 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
-+CONFIG_ARCH_FSL_LS2085A=y
- CONFIG_ARCH_THUNDER=y
- CONFIG_ARCH_VEXPRESS=y
- CONFIG_ARCH_XGENE=y
++#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
++	if (dev->bus->msi)
++		domain = dev->bus->msi->domain;
++#endif
++	if (!domain)
++		domain = arch_get_pci_msi_domain(dev);
++
++	return domain;
++}
++
+ static int pci_msi_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+ {
+ 	struct irq_domain *domain;
+ 
+-	domain = arch_get_pci_msi_domain(dev);
++	domain = pci_msi_get_domain(dev);
+ 	if (domain)
+ 		return pci_msi_domain_alloc_irqs(domain, type, dev);
+ 
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index 8b4a69b..a8d309a 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -89,6 +89,9 @@ struct msi_chip {
+ 	struct device *dev;
+ 	struct device_node *of_node;
+ 	struct list_head list;
++#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
++	struct irq_domain *domain;
++#endif
+ 
+ 	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
+ 			 struct msi_desc *desc);
 -- 
-1.7.9.5
+2.1.0
