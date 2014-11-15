@@ -1,28 +1,45 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 14 Nov 2014 21:48:19 -0500
-Subject: [PATCH v2] ARM: mvebu: re-enable SDHCI driver for Armada 38x
- SoC in v7 defconfig
-In-Reply-To: <1415978967-7350-1-git-send-email-mw@semihalf.com>
-References: <1415978967-7350-1-git-send-email-mw@semihalf.com>
-Message-ID: <20141115024819.GM3698@titan.lakedaemon.net>
+Date: Fri, 14 Nov 2014 22:13:05 -0500
+Subject: [GIT PULL] ARM: mvebu: Fixes for v3.18
+In-Reply-To: <20141109225155.GC3698@titan.lakedaemon.net>
+References: <20141101222033.GA3698@titan.lakedaemon.net>
+ <20141109034131.GQ3698@titan.lakedaemon.net>
+ <CAOesGMiq_1vOOqMaV6Fma__d9vkTbLeEYeNuyF2jt7YNXM9ECA@mail.gmail.com>
+ <20141109225155.GC3698@titan.lakedaemon.net>
+Message-ID: <20141115031305.GN3698@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marcin,
-
-On Fri, Nov 14, 2014 at 04:29:27PM +0100, Marcin Wojtas wrote:
-> In the recent update of mvebu_v7_defconfig a config that enables sdhci-pxav3
-> driver, that supports SDHCI interface of Armada 38x SoC, disappeared.
+On Sun, Nov 09, 2014 at 05:51:55PM -0500, Jason Cooper wrote:
+> On Sun, Nov 09, 2014 at 11:29:55AM -0800, Olof Johansson wrote:
+> > Hi Jason,
+> > 
+> > On Sat, Nov 8, 2014 at 7:41 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> > > On Sat, Nov 01, 2014 at 06:20:33PM -0400, Jason Cooper wrote:
+> > >> Guys,
+> > >>
+> > >> Here's a couple of fixes I've gathered so far for mvebu, nothing
+> > >> exciting as these are quite old and were in -next for several weeks.
+> > >>
+> > >> Please pull.
+> > >
+> > > Gentle ping?
+> > 
+> > Whoops, I've missed this one. Partially becaose you've forgotten to cc
+> > arm at kernel.org, which is how I usually keep track of pull requests.
 > 
-> This commit enables CONFIG_MMC_SDHCI_PXAV3 back.
+> Yep, my mistake.  Bit scattered atm.
 > 
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Fixes fc9fa8714a75 ("ARM: mvebu: update v7 defconfig with useful options")
+> > I sent the pull request to Linus last night, I'll include this for -rc5.
+> 
+> No problem.
 
-Please don't forget to Cc the maintainers.  ;-)  No need to resend, I
-have it queued up.
+Well, looks like it's a good thing this hasn't been pulled yet.  Please
+hold off for a v2.  Arnd pointed me to the fact that the top of this
+branch clashed with genirq changes in irqchip/core.  I'll squash in a
+fix shortly and resend.
+
+Yes, I'm aware of the irony :-P
 
 thx,
 
