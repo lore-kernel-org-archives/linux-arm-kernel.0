@@ -1,71 +1,99 @@
-From: dalias@libc.org (Rich Felker)
-Date: Sun, 16 Nov 2014 00:56:56 -0500
-Subject: ARM atomics overhaul for musl
-Message-ID: <20141116055656.GA13940@brightrain.aerifal.cx>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Sun, 16 Nov 2014 16:01:15 +0900
+Subject: [PATCH v7 0/7] Enable support for Samsung Exynos7 SoC
+In-Reply-To: <CAM4voa=DT80ceZf3P8g5+80hoBKQrviSCHcc1qj--RLJkFxbyQ@mail.gmail.com>
+References: <1415506834-8180-1-git-send-email-a.kesavan@samsung.com>
+ <CAM4voanLYH+aEhKq_P+pTde5XL4dS0ZjvXta-2U4k0CdV6vYKQ@mail.gmail.com>
+ <CAM4voa=DT80ceZf3P8g5+80hoBKQrviSCHcc1qj--RLJkFxbyQ@mail.gmail.com>
+Message-ID: <000e01d0016b$1eef44b0$5ccdce10$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One item on the agenda for this release cycle is overhauling the way
-atomics are done on ARM. I'm cc'ing people who have been involved in
-this discussion in the past in case anyone's not on the musl list and
-has opinions about what should be done.
+Abhilash Kesavan wrote:
+> 
+> Hi Olof and Arnd
+> 
+Hi
 
-The current situation looks like the following:
+> On Tue, Nov 11, 2014 at 7:59 PM, Abhilash Kesavan
+> <kesavan.abhilash@gmail.com> wrote:
+> > Hello Olof and Arnd,
+> >
+> > On Sun, Nov 9, 2014 at 9:50 AM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
+> >> These were originally part of 2 patchsets[1][2] adding support for Exynos7.
+> >>  The clock and pinctrl patches are going through the respective maintainer's
+> >> tree; hence the remaining dt related patches have been consolidated and are
+> >> being posted here as a separate series.
+> >>
+> >> This patchset has build dependencies on the following patches:
+> >> a] "[GIT PULL] Samsung clock changes for 3.19" - specifically the clock dt
+> >>    bindings header.
+> >>    http://comments.gmane.org/gmane.linux.kernel.samsung-soc/39142
+> >> b] "tty: serial: samsung: Clean-up selection of number of available UARTs"
+> >>    http://www.spinics.net/lists/linux-samsung-soc/msg37418.html
+> >> c] "dts, kbuild: Implement support for dtb vendor subdirs"(merged in linux-next)
+> >>    https://lkml.org/lkml/2014/10/21/654
+> >>
+> >> [1] arch: arm64: Enable support for Samsung Exynos7 SoC
+> >> http://www.spinics.net/lists/linux-samsung-soc/msg37047.html
+> >> [2] Add clock and DT support for a few IPs on Exynos7
+> >> http://www.spinics.net/lists/linux-samsung-soc/msg37973.html
+> >>
+> >> Changes since v6:
+> >>         - Fixed the platform ordering (exynos before thunder) in Kconfig file.
+> >>         - Fixed the ordering of reg and enable-method properties in cpu node
+> >>         as per Lorenzo Pieralisi's comment.
+> >
+> >
+> > Do you have any comments on this patchset ?
+> 
+> A gentle reminder regarding this patch set. Kindly review.
+> 
+As I commented before, looks good to me, so shall I queue this in samsung tree
+with dependencies such as clock stuff? I'm happy with either way samsung tree
+or arm-soc tree directly though.
 
-Pre-v6: Hard-coded to use cas from kuser_helper page (0xffff0fc0)
+Thanks,
+Kukjin
 
-v6: Hard-coded to use ldrex/strex with mcr-based barrier
-
-v7+: Hard-coded to use ldrex/strex with dmb-based barrier
-
-In the cases where ldrex/strex are used directly, they're still not
-used optimally; all the non-cas primitives like atomic inc/dec are
-built on top of cas and thus have more loop complexity and probably
-more barriers than they should.
-
-Aside from that, the only case among the above that's "right" already
-is v7+. Hard-coding the mcr-based barrier on v6 is wrong because it's
-deprecated (future models may not support the instruction, and
-although the kernel could trap and emulate it this would be horribly
-slow) and hard-coding kuser helper on pre-v6 is wrong because pre-v6
-binaries might run on v6+ hardware and kernel where the kernel has
-been built with the kuser_helper page removed for security.
-
-My main goals for this overhaul are:
-
-1. Make baseline (pre-v6) binaries truely universal so they run even
-   on kernels with kuser_helper removed.
-
-2. Make v7+ perform competitively. This means optimal code sequences
-   for a_cas, a_swap, a_fetch_add, a_store, etc. rather than just
-   doing everything with a_cas.
-
-What's still not entirely clear is what to do with v6, and how goal #1
-should be achieved. The options are basically:
-
-A. Prefer using ldrex/strex and an appropriate barrier directly, but
-   fall back to kuser_helper (assuming it's present) if the hwcap or
-   similar does not indicate availability of atomics.
-
-B. Prefer kuser_helper and and only fallback to using atomics and an
-   appropriate barrier directly if kuser_helper page is missing.
-
-Of these two approaches, A seems easier, because it's easier to know
-that atomics are available (via HWCAP_TLS) than that kuser_helper is
-(which requires some sort of probe for the mapping if we want to
-support grsec kernels where the mapping is completely missing; if not,
-we can just check the kuser version number at a fixed address).
-However neither is really very easy because it seems impossible to
-detect whether the mcr-based barrier or the dmb-based barrier should
-be used -- there's no hwcap flag to indicate support for the latter.
-This also complicates what to do in builds for v6.
-
-Before proceeding, I think we need some sort of proposed way to detect
-the availability of dmb. If there really is none, we probably need to
-go with option B (prefer kuser_helper) for both pre-v6 and v6 (i.e.
-only use atomics directly on v7+) and choose what to do when
-kuser_helper is missing: either assume v7+ and use dmb, or assume that
-the mcr barrier is still working and use it. I think I would lean
-towards the latter.
-
-Rich
+> Abhilash
+> >>
+> >> Abhilash Kesavan (2):
+> >>   arm64: dts: Add PMU DT node for exynos7 SoC
+> >>   arm64: dts: Add nodes for mmc, i2c, rtc, watchdog, adc on Exynos7
+> >>
+> >> Alim Akhtar (2):
+> >>   arm64: exynos7: Enable ARMv8 based Exynos7 (SoC) support
+> >>   arm64: Enable Exynos7 SOC in the defconfig
+> >>
+> >> Naveen Krishna Ch (2):
+> >>   arm64: dts: Add initial device tree support for EXYNOS7
+> >>   arm64: dts: Add initial pinctrl support to EXYNOS7
+> >>
+> >> Pankaj Dubey (1):
+> >>   arm64: dts: add <dt-bindings/> symlink
+> >>
+> >>  .../devicetree/bindings/arm/samsung/pmu.txt        |   1 +
+> >>  arch/arm64/Kconfig                                 |  17 +
+> >>  arch/arm64/boot/dts/Makefile                       |   1 +
+> >>  arch/arm64/boot/dts/exynos/Makefile                |   5 +
+> >>  arch/arm64/boot/dts/exynos/exynos7-espresso.dts    |  84 +++
+> >>  arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi    | 588 +++++++++++++++++++++
+> >>  arch/arm64/boot/dts/exynos/exynos7.dtsi            | 530 +++++++++++++++++++
+> >>  arch/arm64/boot/dts/include/dt-bindings            |   1 +
+> >>  arch/arm64/configs/defconfig                       |   4 +
+> >>  9 files changed, 1231 insertions(+)
+> >>  create mode 100644 arch/arm64/boot/dts/exynos/Makefile
+> >>  create mode 100644 arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+> >>  create mode 100644 arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
+> >>  create mode 100644 arch/arm64/boot/dts/exynos/exynos7.dtsi
+> >>  create mode 120000 arch/arm64/boot/dts/include/dt-bindings
+> >>
+> >> --
+> >> 2.1.0
+> >>
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
