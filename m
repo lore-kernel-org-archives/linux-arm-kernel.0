@@ -1,28 +1,22 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 16 Nov 2014 11:02:47 +0100
-Subject: [PATCH RESEND] ARM: sunxi: make sun6i SMP ops static
-In-Reply-To: <1416095618-2900-1-git-send-email-emilio@elopez.com.ar>
-References: <1416095618-2900-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <20141116100247.GE6414@lukather>
+Date: Sun, 16 Nov 2014 11:04:12 +0100
+Subject: [PATCH v2 0/4] ARM: dts: sunxi: Add simplefb nodes
+In-Reply-To: <1415979277-20861-1-git-send-email-hdegoede@redhat.com>
+References: <1415979277-20861-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20141116100412.GF6414@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 15, 2014 at 08:53:38PM -0300, Emilio L?pez wrote:
-> The sun6i SMP ops are currently not marked as static, as reported by
-> sparse. Let's mark it as such.
+On Fri, Nov 14, 2014 at 04:34:33PM +0100, Hans de Goede wrote:
+> Hi Maxime,
 > 
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> ---
+> Here is v2 of these patches, now with the node names suffixed with -hdmi.
 > 
-> Here's an oldish patch that never made it to mainline. I rediscovered it
-> today while I was cleaning up stuff and running a sparse build of -rc4.
+> Regards,
 > 
-> Cheers!
-> 
-> Emilio
+> Hans
 
 Merged, thanks!
-
 Maxime
 
 -- 
@@ -35,4 +29,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141116/59fee241/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141116/48ac2f84/attachment.sig>
