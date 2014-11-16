@@ -1,89 +1,37 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 16 Nov 2014 02:09:33 +0100
-Subject: [PATCHv1 1/3] arm: mvebu: add uartX labels for Armada SoC serial
- nodes
-In-Reply-To: <ee5646b8e097b266f51a68f489644256d7c3df33.1416095841.git.arno@natisbad.org>
-References: <cover.1416095841.git.arno@natisbad.org>
- <ee5646b8e097b266f51a68f489644256d7c3df33.1416095841.git.arno@natisbad.org>
-Message-ID: <20141116010933.GB15870@lunn.ch>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Sun, 16 Nov 2014 10:17:14 +0900
+Subject: [PATCH] ARM: dts: Explicitly set dr_mode on exynos5250-snow
+In-Reply-To: <CABxcv=k6rkatN0NSq-gkGA+ZS1chS-bcXu=Nxk+Uf=WuPrKR5w@mail.gmail.com>
+References: <1415994379-29165-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <CABxcv=k6rkatN0NSq-gkGA+ZS1chS-bcXu=Nxk+Uf=WuPrKR5w@mail.gmail.com>
+Message-ID: <00ee01d0013b$0f4ac140$2de043c0$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 16, 2014 at 01:04:12AM +0100, Arnaud Ebalard wrote:
+Javier Martinez Canillas wrote:
 > 
-> This patch adds uartX labels for Armada SoC serial nodes. This is
-> a preliminary work to be able to easily reference the serial lines
-> in Device Tree files. One expected future use is when providing
-> stdout-path property for barebox.
+> Hello Sjoerd,
 > 
-> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+Hi,
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
-
-Not a must, but it would be nice to make use of these in
-armada-xp-lenovo-ix4-300d.dts, which currently has:
-
-      	     stdout-path = "/soc/internal-regs/serial at 12000";
-
-	  Andrew
-
-> ---
->  arch/arm/boot/dts/armada-370-xp.dtsi | 5 +++--
->  arch/arm/boot/dts/armada-xp.dtsi     | 5 +++--
->  2 files changed, 6 insertions(+), 4 deletions(-)
+> On Fri, Nov 14, 2014 at 8:46 PM, Sjoerd Simons
+> <sjoerd.simons@collabora.co.uk> wrote:
+> > Explicitly set the dr_mode for the dwc3 controller on the
+> > Snow board to host mode. This is required to ensure the
+> > controller is initialized in the right mode if the kernel is
+> > build with USB gadget support.
 > 
-> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-> index 83286ec9702c..2be9723bcdf3 100644
-> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-> @@ -151,7 +151,7 @@
->  				status = "disabled";
->  			};
->  
-> -			serial at 12000 {
-> +			uart0: serial at 12000 {
->  				compatible = "snps,dw-apb-uart";
->  				reg = <0x12000 0x100>;
->  				reg-shift = <2>;
-> @@ -160,7 +160,8 @@
->  				clocks = <&coreclk 0>;
->  				status = "disabled";
->  			};
-> -			serial at 12100 {
-> +
-> +			uart1: serial at 12100 {
->  				compatible = "snps,dw-apb-uart";
->  				reg = <0x12100 0x100>;
->  				reg-shift = <2>;
-> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-> index bff9f6c18db1..a68f5b837536 100644
-> --- a/arch/arm/boot/dts/armada-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp.dtsi
-> @@ -52,7 +52,7 @@
->  				reg = <0x11100 0x100>;
->  			};
->  
-> -			serial at 12200 {
-> +			uart2: serial at 12200 {
->  				compatible = "snps,dw-apb-uart";
->  				reg = <0x12200 0x100>;
->  				reg-shift = <2>;
-> @@ -61,7 +61,8 @@
->  				clocks = <&coreclk 0>;
->  				status = "disabled";
->  			};
-> -			serial at 12300 {
-> +
-> +			uart3: serial at 12300 {
->  				compatible = "snps,dw-apb-uart";
->  				reg = <0x12300 0x100>;
->  				reg-shift = <2>;
-> -- 
-> 2.1.1
+> The patch looks good to me.
 > 
+> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 > 
+> Kukjin,
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I think $subject is -rc material since this issue is seen after commit
+> 508423b ("ARM: exynos_defconfig: enable USB gadget support") which
+> landed in 3.18.
+> 
+Yeah, you're right. I'll queue this into -fixes for 3.18.
+
+Thanks,
+Kukjin
