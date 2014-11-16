@@ -1,51 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 16 Nov 2014 16:52:11 +0000
-Subject: some question about TCR setting
-In-Reply-To: <CAOVJa8GB=pk4SFEArcEGWF8g12105F_9YUL0hH5k+WW6=WWOBg@mail.gmail.com>
-References: <CAOVJa8HBYkTMCJFKC=+UwjgPp4odm5UV-oUQXu17ctv2+HkpRg@mail.gmail.com>
- <20141114104246.GA25828@leverpostej>
- <CAOVJa8Fx4yiSU0O7HTaYEKOrRdtWve4JGeN0cWRXDsBMyV_8Mg@mail.gmail.com>
- <20141114135531.GA27768@leverpostej>
- <CAOVJa8GB=pk4SFEArcEGWF8g12105F_9YUL0hH5k+WW6=WWOBg@mail.gmail.com>
-Message-ID: <20141116165211.GL4042@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 16 Nov 2014 17:56:49 +0100
+Subject: [PATCH v2] ARM: dts: sunxi: Add de_be0 clk parent pll to
+ simplefb node
+In-Reply-To: <1416154172-4116-1-git-send-email-hdegoede@redhat.com>
+References: <1416154172-4116-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20141116165649.GI6414@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 16, 2014 at 06:53:57PM +0800, vichy wrote:
-> hi Mark:
+On Sun, Nov 16, 2014 at 05:09:32PM +0100, Hans de Goede wrote:
+> Avoid the parent pll for the mod-clk for de_be0 getting disabled when non of
+> the other users are enabled (which can happen when none of i2c, spi and mmc
+> are in use).
 > 
-> > Consider CONFIG_HIGHPTE. The physical address space can be larger than
-> > the virtual address space, in which case not everything can be
-> > permanently mapped.
-> if those page tables are not mapped into the virtual address space,
-> how OS create them?
-> (AFAIK, once System.M is enabled, the processor cannot access where
-> page table doesn't map to)
-> except those page tables are created before System.M enabled.
+> Note for now we point directly to the parent rather then to the de_be0 mod-clk
+> as that is not modelled in our devicetree yet.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-The OS temporarily maps the page tables into virtual space to update
-them.  Once updated, the OS unmaps the page tables.
+Applied, thanks.
 
-However, forget this detail - the MMU page table walker knows nothing
-about the virtual address space: MMU page table walks do not happen in
-the virtual address space, they happen in the physical address space.
-So, it makes no odds what so ever whether the table is mapped or not.
-
-> BTW, why we need to set page table walk attribute as sharable and
-> inner/outer cacheable?
-
-The access type is included on the bus along with the address and other
-attributes.  This includes whether it's sharable, and the cache attributes.
-A MMU page walker may be implemented such that it is capable of accessing
-L2 cache.
-
-In that case, we would want the MMU page walker to be able to read from
-the L2 cache, which would need the access to be marked as "normal memory,
-cacheable" so that the cache is searched for a matching line.  This in
-turn means that software does not have to flush page table updates all
-the way back to the physical memory - merely flushing them out of the L1
-cache is sufficient.
+Maxime
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141116/b0a82eef/attachment-0001.sig>
