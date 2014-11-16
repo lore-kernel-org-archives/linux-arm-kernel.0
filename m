@@ -1,73 +1,38 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 16 Nov 2014 13:29:50 +0100
-Subject: N900 modem support in 3.18-rc1
-In-Reply-To: <20141116101248.GA32483@amd> (Pavel Machek's message of "Sun, 16
- Nov 2014 11:12:48 +0100")
-References: <201411052137.31452@pali> <20141105203918.GA29199@amd>
- <201411052206.05379@pali> <20141105220359.GA32052@amd>
- <20141105234555.GA7097@earth.universe> <20141106124711.GA26944@amd>
- <20141106180335.GA21513@earth.universe>
- <20141113162155.GA8512@xo-6d-61-c0.localdomain>
- <20141113174534.GO26481@atomide.com>
- <20141113181803.GB984@fuloong-minipc.musicnaut.iki.fi>
- <20141116101248.GA32483@amd>
-Message-ID: <87vbmf1g75.fsf@free.fr>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Sun, 16 Nov 2014 13:34:10 +0100
+Subject: [PATCHv1 1/3] arm: mvebu: add uartX labels for Armada SoC serial
+ nodes
+In-Reply-To: <20141116010933.GB15870@lunn.ch> (Andrew Lunn's message of "Sun,
+ 16 Nov 2014 02:09:33 +0100")
+References: <cover.1416095841.git.arno@natisbad.org>
+ <ee5646b8e097b266f51a68f489644256d7c3df33.1416095841.git.arno@natisbad.org>
+ <20141116010933.GB15870@lunn.ch>
+Message-ID: <87h9xzb9z1.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pavel Machek <pavel@ucw.cz> writes:
+Hi Andrew,
 
-> On Thu 2014-11-13 20:18:04, Aaro Koskinen wrote:
->> Hi,
+Andrew Lunn <andrew@lunn.ch> writes:
+
+> On Sun, Nov 16, 2014 at 01:04:12AM +0100, Arnaud Ebalard wrote:
 >> 
->> On Thu, Nov 13, 2014 at 09:45:36AM -0800, Tony Lindgren wrote:
->> > * Pavel Machek <pavel@ucw.cz> [141113 08:23]:
->> > > OTOH ofono seems pretty reasonable. So I played a bit, and result
->> > > is python/pygtk gui which can receive an sms, initiate a call, and
->> > > report missed call. If someone wants to play, source is at
->> > > 
->> > > https://gitorious.org/tui/tui/source/b6141107e9341a1412720aed4b0d09143dfa2f4e:ofone
->> > 
->> > Pavel, care to fill in the the following type patch with some
->> > instructions in the description now that you got it working?
+>> This patch adds uartX labels for Armada SoC serial nodes. This is
+>> a preliminary work to be able to easily reference the serial lines
+>> in Device Tree files. One expected future use is when providing
+>> stdout-path property for barebox.
 >> 
->> Could we even have some "permanent" instructions under Documentation/?
+>> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 >
-> Something like this?
+> Acked-by: Andrew Lunn <andrew@lunn.ch>
 >
-> commit 375d8d9f17433ade6afae91d4f34e170f0af04c4
-> Author: Pavel <pavel@ucw.cz>
-> Date:   Sun Nov 16 11:10:59 2014 +0100
+> Not a must, but it would be nice to make use of these in
+> armada-xp-lenovo-ix4-300d.dts, which currently has:
 >
-> Add basic documentation for n900 testing.
->
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
->
-> diff --git a/Documentation/cellphones.txt b/Documentation/cellphones.txt
-> new file mode 100644
-> index 0000000..d7e8e7a
-> --- /dev/null
-> +++ b/Documentation/cellphones.txt
-> @@ -0,0 +1,90 @@
-> +Running Linux on Cellphones
-> +===========================
-> +
-> +At this moment (2014), there are no cellphones completely supported by
-> +mainline kernel. Another problem is lack of hackable userspace to run
-> +on cellphone, even when kernel support is available.
-Hi Pavel,
+>       	     stdout-path = "/soc/internal-regs/serial at 12000";
 
-There is the Mitac Mio A701. Very old but still it is there, with the kernel
-part maintained.
+Will add a patch to the series to do that.
 
-Userspace was based on QTopia in 2008. I don't maintain that part anymore
-though.
+Thanks.
 
-The GSM part relies on a simple ttyS device (modem has its internal flash), no
-real data at that time, or rather 2G only, but the 07.10 mux support was never
-included in Qtopia ...
-
-Cheers.
-
--- 
-Robert
+a+
