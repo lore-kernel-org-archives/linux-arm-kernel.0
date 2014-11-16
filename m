@@ -1,22 +1,27 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 16 Nov 2014 17:56:49 +0100
-Subject: [PATCH v2] ARM: dts: sunxi: Add de_be0 clk parent pll to
- simplefb node
-In-Reply-To: <1416154172-4116-1-git-send-email-hdegoede@redhat.com>
-References: <1416154172-4116-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141116165649.GI6414@lukather>
+Date: Sun, 16 Nov 2014 17:57:55 +0100
+Subject: [PATCH v3 1/6] clk: sunxi: Specify number of child clocks for
+ divs clocks
+In-Reply-To: <1415815715-31791-2-git-send-email-wens@csie.org>
+References: <1415815715-31791-1-git-send-email-wens@csie.org>
+ <1415815715-31791-2-git-send-email-wens@csie.org>
+Message-ID: <20141116165755.GJ6414@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 16, 2014 at 05:09:32PM +0100, Hans de Goede wrote:
-> Avoid the parent pll for the mod-clk for de_be0 getting disabled when non of
-> the other users are enabled (which can happen when none of i2c, spi and mmc
-> are in use).
+On Thu, Nov 13, 2014 at 02:08:30AM +0800, Chen-Yu Tsai wrote:
+> Currently sunxi_divs_clk_setup assumes the number of child clocks
+> to be the same as the number of clock-output-names, and a maximum
+> of SUNXI_DIVS_MAX_QTY child clocks.
 > 
-> Note for now we point directly to the parent rather then to the de_be0 mod-clk
-> as that is not modelled in our devicetree yet.
+> On sun6i, PLL6 only has 1 child clock, but the parent would be used
+> as well, thereby also having it's own clock-output-names entry. This
+> results in an extra bogus clock being registered.
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> This patch adds an entry for the number of child clocks alongside
+> the data structures for them.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
 Applied, thanks.
 
@@ -32,4 +37,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141116/b0a82eef/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141116/72558d4d/attachment.sig>
