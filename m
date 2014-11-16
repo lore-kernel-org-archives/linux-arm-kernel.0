@@ -1,88 +1,78 @@
-From: dalias@libc.org (Rich Felker)
-Date: Sun, 16 Nov 2014 14:02:28 -0500
-Subject: ARM atomics overhaul for musl
-In-Reply-To: <20141116171055.GM4042@n2100.arm.linux.org.uk>
-References: <20141116055656.GA13940@brightrain.aerifal.cx>
- <20141116163355.GK4042@n2100.arm.linux.org.uk>
- <20141116165017.GT22465@brightrain.aerifal.cx>
- <20141116171055.GM4042@n2100.arm.linux.org.uk>
-Message-ID: <20141116190228.GW22465@brightrain.aerifal.cx>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 17 Nov 2014 03:04:29 +0800
+Subject: [PATCH v3 4/6] clk: sunxi: unify sun6i AHB1 clock with proper
+ PLL6 pre-divider
+In-Reply-To: <20141116170224.GK6414@lukather>
+References: <1415815715-31791-1-git-send-email-wens@csie.org>
+ <1415815715-31791-5-git-send-email-wens@csie.org>
+ <20141116170224.GK6414@lukather>
+Message-ID: <CAGb2v65zx7C-LAB80oLDhWmEdn7fD=Mzxsg5g5MRRb2eo2TA3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 16, 2014 at 05:10:55PM +0000, Russell King - ARM Linux wrote:
-> > > There's two ways to get that - firstly, the uname syscall, which gives
-> > > a string in the form "armv..." which gives the CPU architecture.  The
-> > 
-> > Isn't it clear from the "Windows 10" fiasco that strcmp on a version
-> > string is NOT an acceptable way to determine version/capabilities?
-> 
-> Would there be a "Windows 10" fiasco if there had been better control of
-> the version numbering?  No.
-> 
-> However, this is already in use as a CPU architecture thing.  It's had a
-> /very/ long history of being used by package managers to detect which
-> packages are suitable for installation on a platform, whether it be an
-> x86 platform, PowerPC, or ARM platform.
+Hi,
 
-Use by package managers (which can be upgraded independently, and
-which can, in the worst case, be overridden anyway) and by program
-binaries for which you might not even have source are very different
-issues.
+On Mon, Nov 17, 2014 at 1:02 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Thu, Nov 13, 2014 at 02:08:33AM +0800, Chen-Yu Tsai wrote:
+>> This patch unifies the sun6i AHB1 clock, originally supported
+>> with separate mux and divider clks. It also adds support for
+>> the pre-divider on the PLL6 input, thus allowing the clock to
+>> be muxed to PLL6 with proper clock rate calculation.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>> This patch produces a warning on of_io_request_and_map complaining
+>> about dropping the const modifier. I have a separate patch for fixing
+>> of_io_request_and_map.
+>> ---
+>>  Documentation/devicetree/bindings/clock/sunxi.txt |   2 +-
+>>  drivers/clk/sunxi/clk-sunxi.c                     | 208 ++++++++++++++++++++++
+>>  2 files changed, 209 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> index 67b2b99..9dc4f55 100644
+>> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+>> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> @@ -26,7 +26,7 @@ Required properties:
+>>       "allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
+>>       "allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
+>>       "allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
+>> -     "allwinner,sun6i-a31-ahb1-mux-clk" - for the AHB1 multiplexer on A31
+>> +     "allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
+>>       "allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+>>       "allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
+>>       "allwinner,sun9i-a80-ahb0-gates-clk" - for the AHB0 gates on A80
+>> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+>> index 5702025..2bb769f 100644
+>> --- a/drivers/clk/sunxi/clk-sunxi.c
+>> +++ b/drivers/clk/sunxi/clk-sunxi.c
+>> @@ -20,6 +20,7 @@
+>>  #include <linux/of_address.h>
+>>  #include <linux/reset-controller.h>
+>>  #include <linux/spinlock.h>
+>> +#include <linux/log2.h>
+>
+> Why is this needed?
+>
 
-> In both of these cases, we know that:
-> - ARMv1-ARMv3 is no longer supported (for several years)
-> - ARMv4 and ARMv5 do not have either the MCR or DMB instructions.
-> - ARMv6 has the MCR instruction only
-> - ARMv7 has the MCR instruction and the DMB instruction.
-> - ARMv8 has the DMB instruction, and MCR emulation.
-> 
-> A safe bet would be that DMB is going to be there in the future (if that
-> goes, then the ARM architecture will be regarded as even more of a toy
-> architecture by Linus than he already regards it today, and he'll probably
-> stop giving a damn about whether any changes break ARM.)
+For __roundup_pow_of_two.
 
-Yes, I think that's reasonable.
+>>  #include "clk-factors.h"
+>>
+>> @@ -1233,3 +1234,210 @@ static void __init sun9i_init_clocks(struct device_node *node)
+>>       sunxi_init_clocks(NULL, 0);
+>>  }
+>>  CLK_OF_DECLARE(sun9i_a80_clk_init, "allwinner,sun9i-a80", sun9i_init_clocks);
+>> +
+>> +/**
+>> + * sun6i_a31_ahb1_clk_setup() - Setup function for a31 ahb1 composite clk
+>> + */
+>
+> Why is that added to the A80 clock file ?
 
-> Now, there is a twist here: ARM64 decided to use an ELF platform string
-> of "aarch64" for everything, which means that rather than encoding the
-> CPU architecture (like with every other Linux architecture), we have a
-> string which encodes the kernel architecture instead, which is absurd.
-> Obviously, the plan for ARM64 is that there will never be an ARMv9
-> architecture, and ARMv8 is the perfect architecture for the future. :p
+This is the clk-sunxi.c file.
 
-I'm confused. Does this mean that 32-bit binaries running on a 64-bit
-kernel are going to see "aarch64" here?
-
-> So, a reasonable parsing of this would be:
-> 
-> 	const char *ptr;
-> 	int architecture;
-> 
-> 	ptr = (const char *)(uintptr_t)getauxval(AT_PLATFORM);
-> 	assert(ptr);
-> 
-> 	if (!strncmp(ptr, "aarch64", 7))
-> 		architecture = 8;
-> 	else
-> 		assert(sscanf(ptr, "v%d", &architecture) == 1);
-> 
-> 	switch (architecture) {
-> 	case 4:
-> 	case 5:
-> 		no_mcr_dmb;
-> 		break;
-> 	case 6:
-> 		use_mcr;
-> 		break;
-> 	default:
-> 		use_dmb;
-> 		break;
-> 	}
-
-Is (ptr[1]=='6' && !isdigit(ptr[2])) a safe condition for v6? v4/v5
-(and original v6 without the k) don't need to be detected at all since
-kuser is mandatory for them and already indicated by !(hwcap &
-HWCAP_TLS).
-
-Rich
+ChenYu
