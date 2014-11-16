@@ -1,31 +1,38 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 16 Nov 2014 10:38:35 +0100
-Subject: dtb size limit? was Re: Tiny dts change breaks boot on n900
-In-Reply-To: <20141110125806.GA16650@amd>
-References: <20141110123118.GA31134@amd>
-	<20141110125806.GA16650@amd>
-Message-ID: <CAMuHMdUPxSZNPb=sv=OKfr5_PcHrBph=v5RVBb5Pp5DiW0pP9g@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 16 Nov 2014 11:02:47 +0100
+Subject: [PATCH RESEND] ARM: sunxi: make sun6i SMP ops static
+In-Reply-To: <1416095618-2900-1-git-send-email-emilio@elopez.com.ar>
+References: <1416095618-2900-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <20141116100247.GE6414@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 10, 2014 at 1:58 PM, Pavel Machek <pavel@ucw.cz> wrote:
-> Breaks the boot. I'm using dtb append option. Any ideas? Nonbooting
-> dtb is 68910 bytes.
+On Sat, Nov 15, 2014 at 08:53:38PM -0300, Emilio L?pez wrote:
+> The sun6i SMP ops are currently not marked as static, as reported by
+> sparse. Let's mark it as such.
+> 
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> ---
+> 
+> Here's an oldish patch that never made it to mainline. I rediscovered it
+> today while I was cleaning up stuff and running a sparse build of -rc4.
+> 
+> Cheers!
+> 
+> Emilio
 
-Perhaps because it's not a multiple of 4?
+Merged, thanks!
 
-$ factor 68910
-68910: 2 3 5 2297
+Maxime
 
-Does padding some property with 2 bytes help?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141116/59fee241/attachment.sig>
