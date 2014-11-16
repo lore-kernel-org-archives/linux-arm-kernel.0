@@ -1,122 +1,77 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Sun, 16 Nov 2014 13:10:49 -0800
-Subject: [PATCH] serial: samsung: Fix serial config dependencies for
- exynos7
-In-Reply-To: <CAM4voano5bzV-ufNqX6zhQniZE-aYf-hM77tuBAxzVECQfQaZw@mail.gmail.com>
-References: <1411967817-8423-1-git-send-email-a.kesavan@samsung.com>
- <5429DF69.8000201@gmail.com>
- <CAM4voam9jEuYvwDUnAZzU4Q-aZdF-P+KUuSm=x-9beobpyeR1w@mail.gmail.com>
- <CAM4voakuXfeBNKVjEiLrAg5LmQg=adQ8yB36atAzoPVczwhRnA@mail.gmail.com>
- <CAM4voano5bzV-ufNqX6zhQniZE-aYf-hM77tuBAxzVECQfQaZw@mail.gmail.com>
-Message-ID: <20141116211049.GA18834@kroah.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 16 Nov 2014 22:10:34 +0100
+Subject: [PATCHv2 5/8] arm: mvebu: add common uart0 and spi0 pintcrl
+ entries for Armada 370
+In-Reply-To: <d550094896837ac921e5d2a69fc5aae9b287a98a.1416158990.git.arno@natisbad.org>
+References: <cover.1416158990.git.arno@natisbad.org>
+ <d550094896837ac921e5d2a69fc5aae9b287a98a.1416158990.git.arno@natisbad.org>
+Message-ID: <20141116211034.GJ15870@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 16, 2014 at 07:47:02AM +0530, Abhilash Kesavan wrote:
-> Hello Greg,
+On Sun, Nov 16, 2014 at 06:37:33PM +0100, Arnaud Ebalard wrote:
 > 
-> On Tue, Nov 11, 2014 at 7:55 PM, Abhilash Kesavan
-> <kesavan.abhilash@gmail.com> wrote:
-> > Hi Greg,
-> >
-> > On Tue, Sep 30, 2014 at 8:02 PM, Abhilash Kesavan
-> > <kesavan.abhilash@gmail.com> wrote:
-> >> Hi Tomasz,
-> >>
-> >> On Tue, Sep 30, 2014 at 4:08 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> >>> Hi Abhilash,
-> >>>
-> >>> The patch itself seems fine, but I wonder if those config options aren't
-> >>> really just leftovers from the past and couldn't be completely removed.
-> >>>
-> >>> On 29.09.2014 07:16, Abhilash Kesavan wrote:
-> >>>> From: Pankaj Dubey <pankaj.dubey@samsung.com>
-> >>>>
-> >>>> Exynos7 has a similar serial controller to that present in older Samsung
-> >>>> SoCs. To re-use the existing serial driver on Exynos7 we need to have
-> >>>> SERIAL_SAMSUNG_UARTS_4 and SERIAL_SAMSUNG_UARTS selected. This is not
-> >>>> possible because these symbols are dependent on PLAT_SAMSUNG which is
-> >>>> not present for the ARMv8 based exynos7.
-> >>>>
-> >>>> Change the dependency of these symbols from PLAT_SAMSUNG to the serial
-> >>>> driver thus making it available on exynos7. As the existing platform
-> >>>> specific code making use of these symbols is related to uart driver this
-> >>>> change in dependency should not cause any issues.
-> >>>>
-> >>>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> >>>> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> >>>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> >>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> >>>> ---
-> >>>> Build tested with s3c6400_defconfig, exynos_defconfig and arm64's defconfig
-> >>>> with and without the serial driver enabled.
-> >>>>
-> >>>>  drivers/tty/serial/Kconfig |    4 ++--
-> >>>>  1 file changed, 2 insertions(+), 2 deletions(-)
-> >>>>
-> >>>> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> >>>> index 81f6ee7..e6c0bcb 100644
-> >>>> --- a/drivers/tty/serial/Kconfig
-> >>>> +++ b/drivers/tty/serial/Kconfig
-> >>>> @@ -249,14 +249,14 @@ config SERIAL_SAMSUNG
-> >>>>
-> >>>>  config SERIAL_SAMSUNG_UARTS_4
-> >>>>       bool
-> >>>> -     depends on PLAT_SAMSUNG
-> >>>> +     depends on SERIAL_SAMSUNG
-> >>>>       default y if !(CPU_S3C2410 || CPU_S3C2412 || CPU_S3C2440 || CPU_S3C2442)
-> >>>>       help
-> >>>>         Internal node for the common case of 4 Samsung compatible UARTs
-> >>>
-> >>> The only place where this symbol is used is below.
-> >>>
-> >>>>
-> >>>>  config SERIAL_SAMSUNG_UARTS
-> >>>>       int
-> >>>> -     depends on PLAT_SAMSUNG
-> >>>> +     depends on SERIAL_SAMSUNG
-> >>>>       default 4 if SERIAL_SAMSUNG_UARTS_4 || CPU_S3C2416
-> >>>>       default 3
-> >>>>       help
-> >>>>
-> >>>
-> >>> With this symbol the situation isn't that easy, but still should be
-> >>> manageable.
-> >>>
-> >>> Looking at the serial-samsung driver, all occurrences of
-> >>> CONFIG_SERIAL_SAMSUNG_UARTS could be simply replaced with a locally
-> >>> defined number equal to the maximum value - in this case 4.
-> >>>
-> >>> There are also two places in arch/arm where this symbol is used:
-> >>>
-> >>> 1) In arch/arm/mach-s3c64xx/irq-pm.c it's used as the number of serial
-> >>> ports which need suspend/resume handling. Since on s3c64xx the number is
-> >>> always 4, it can be simply defined locally as a constant.
-> >>>
-> >>> 2) In arch/arm/plat-samsung/init.c it is used to determine size of a
-> >>> static array of UART ports and to check whether the UART driver is
-> >>> enabled. In former case I believe it should be safe to hardcode it to 4
-> >>> as well, in latter CONFIG_SERIAL_SAMSUNG can be used.
-> >>
-> >> I will post patches removing these two symbols.
-> >
-> > I posted a couple of patches handling Tomasz' comments but Kukjin
-> > prefers the approach in this patch (Discussion here:
-> > http://www.spinics.net/lists/linux-samsung-soc/msg38742.html).
-> > Can you please review the patch.
+> pinctrl entries for uart0 using MPP0-1 and spi0 using MPP33-36 are
+> common configurations. Instead of replicating them in each .dts file,
+> put those in armada-370.dtsi file so that they can be referenced.
 > 
-> This is a gentle reminder. The patch is required for serial enablement
-> on the new exynos7 SoC, kindly take a look.
+> Suggested-by: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+> ---
+>  arch/arm/boot/dts/armada-370.dtsi | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+> index 6b3c23b1e138..d9f5d59e463e 100644
+> --- a/arch/arm/boot/dts/armada-370.dtsi
+> +++ b/arch/arm/boot/dts/armada-370.dtsi
+> @@ -115,6 +115,17 @@
+>  				compatible = "marvell,mv88f6710-pinctrl";
+>  				reg = <0x18000 0x38>;
+>  
+> +				uart0_pins: uart0-pins {
+> +					marvell,pins = "mpp0", "mpp1";
+> +					marvell,function = "uart0";
+> +				};
 
-What patch?  I fail to see anything in my inboxes that I can apply, only
-this long thread that makes no sense at all.
+Thanks for these.
 
-Please resend anything that you want to have applied, in a format that I
-can apply it, _AND_ get everyone to agree that it is the correct
-solution.
+We can go one stage further. kirkwood.dts has:
 
-Asking me to go look up random web archives, of mailing list threads I
-was never copied on, is a sure way to get your email ignored, as again,
-there is nothing I can do with it.  You know better than this.
+                uart0: serial at 12000 {
+                        compatible = "ns16550a";
+                        reg = <0x12000 0x100>;
+                        reg-shift = <2>;
+                        interrupts = <33>;
+                        clocks = <&gate_clk 7>;
+                        pinctrl-0 = <&pmx_uart0>;
+                        pinctrl-names = "default";
+                        status = "disabled";
+                };
 
-greg k-h
+i.e actually references them. This is safe because a board .dts file
+can override the pins if needed.
+
+We should do the same here, both for 370 and XP.
+
+   Andrew
+
+> +
+> +				spi0_pins: spi0-pins {
+> +					marvell,pins = "mpp33", "mpp34",
+> +						       "mpp35", "mpp36";
+> +					marvell,function = "spi0";
+> +				};
+> +
+>  				sdio_pins1: sdio-pins1 {
+>  					marvell,pins = "mpp9",  "mpp11", "mpp12",
+>  							"mpp13", "mpp14", "mpp15";
+> -- 
+> 2.1.1
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
