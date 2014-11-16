@@ -1,50 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 16 Nov 2014 15:09:27 -0800
-Subject: [GIT PULL] Xilinx Zynq fix for v3.18
-In-Reply-To: <546087F4.3090600@monstr.eu>
-References: <5459E081.8000903@monstr.eu>
- <20141109005655.GD13855@quad.lixom.net>
- <546087F4.3090600@monstr.eu>
-Message-ID: <20141116230927.GB14929@quad.lixom.net>
+Date: Sun, 16 Nov 2014 15:10:48 -0800
+Subject: [GIT PULL] omap fixes against v3.18-rc4
+In-Reply-To: <20141111165357.GB26481@atomide.com>
+References: <20141111165357.GB26481@atomide.com>
+Message-ID: <20141116231048.GC14929@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 10, 2014 at 10:40:04AM +0100, Michal Simek wrote:
-> Hi,
+On Tue, Nov 11, 2014 at 08:53:58AM -0800, Tony Lindgren wrote:
+> The following changes since commit 4b91f7f3c8b20e073b7bfc098625b37f99789508:
 > 
-> On 11/09/2014 01:56 AM, Olof Johansson wrote:
-> > Hi,
-> > 
-> > On Wed, Nov 05, 2014 at 09:32:01AM +0100, Michal Simek wrote:
-> >> Hi guys,
-> >>
-> >> please add this fix to your tree.
-> >>
-> >> Thanks,
-> >> Michal
-> >>
-> >>
-> >> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-> >>
-> >>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-> >>
-> >> are available in the git repository at:
-> >>
-> >>   https://github.com/Xilinx/linux-xlnx.git tags/zynq-fixes-for-3.18
-> >>
-> >> for you to fetch changes up to 2de4752d6923d7dcc6e68c23be6a52d5f0896f9d:
-> >>
-> >>   ARM: zynq: Actually remove hotplug.c (2014-10-20 20:53:26 +0200)
-> > 
-> > Did you forget to push this tag out? I can't find it in that repo.
+>   ARM: OMAP2+: Warn about deprecated legacy booting mode (2014-10-29 12:19:20 -0700)
 > 
-> Unfortunately yes. I forgot to push this tag out.
-> Interesting is that git didn't tell me that.
+> are available in the git repository at:
 > 
-> Anyway tag is out there and please consider to pull it.
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-against-v3.18-rc4
+> 
+> for you to fetch changes up to 73b3a6657a88ef5348a0d69c9a8107d6f01ae862:
+> 
+>   pinctrl: dra: dt-bindings: Fix output pull up/down (2014-11-10 14:29:20 -0800)
+> 
+> ----------------------------------------------------------------
+> Few omap fixes for hangs and wrong pinctrl defines, and update
+> MAINTAINERS file to avoid missing PMIC and SoC related patches:
+> 
+> - Fix random hangs on am437x because of incorrect default
+>   value for the DDR regulator
+> 
+> - Fix wrong partition name for NAND on am335x-evm
+> 
+> - Fix wrong pinctrl defines for dra7xx
+> 
+> - Update maintainers entries for PMICs and SoCs
 
-
-Hmm, still not seeing it there.
+Merged. Might miss today's -rc though.
 
 
 -Olof
