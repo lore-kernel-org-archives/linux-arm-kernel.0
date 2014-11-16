@@ -1,51 +1,38 @@
-From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
-Date: Sun, 16 Nov 2014 11:51:54 +0100
-Subject: [PATCH v4 6/6] ARM: zynq: DT: Add OCM controller node
-In-Reply-To: <0a88d52b5e71fb220ca619180ec9ca746edad2b1.1415962281.git.michal.simek@xilinx.com>
-References: <cover.1415962281.git.michal.simek@xilinx.com>
- <0a88d52b5e71fb220ca619180ec9ca746edad2b1.1415962281.git.michal.simek@xilinx.com>
-Message-ID: <546881CA.2020801@suse.de>
+From: vichy.kuo@gmail.com (vichy)
+Date: Sun, 16 Nov 2014 18:53:57 +0800
+Subject: some question about TCR setting
+In-Reply-To: <20141114135531.GA27768@leverpostej>
+References: <CAOVJa8HBYkTMCJFKC=+UwjgPp4odm5UV-oUQXu17ctv2+HkpRg@mail.gmail.com>
+ <20141114104246.GA25828@leverpostej>
+ <CAOVJa8Fx4yiSU0O7HTaYEKOrRdtWve4JGeN0cWRXDsBMyV_8Mg@mail.gmail.com>
+ <20141114135531.GA27768@leverpostej>
+Message-ID: <CAOVJa8GB=pk4SFEArcEGWF8g12105F_9YUL0hH5k+WW6=WWOBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+hi Mark:
 
-Am 14.11.2014 um 11:52 schrieb Michal Simek:
-> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> index ce2ef5bec4f2..e217fb1c1169 100644
-> --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> @@ -150,6 +150,13 @@
->  			reg = <0xf8006000 0x1000>;
->  		};
-> 
-> +		ocmc: memory-controller at f800c000 {
-> +			compatible = "xlnx,zynq-ocmc-1.0";
-> +			interrupt-parent = <&intc>;
-> +			interrupts = <0 3 4>;
-> +			reg = <0xf800c000 0x1000>;
-> +		};
-> +
->  		uart0: serial at e0000000 {
->  			compatible = "xlnx,xuartps", "cdns,uart-r1p8";
->  			status = "disabled";
+> Consider CONFIG_HIGHPTE. The physical address space can be larger than
+> the virtual address space, in which case not everything can be
+> permanently mapped.
+if those page tables are not mapped into the virtual address space,
+how OS create them?
+(AFAIK, once System.M is enabled, the processor cannot access where
+page table doesn't map to)
+except those page tables are created before System.M enabled.
 
-Not directly related to this patch: As one can see here, the node order
-is quite a mess... According to Olof, nodes should be ordered by unit
-address, whereas here some but not all seem ordered by node name. Would
-you welcome a cleanup patch, or can you fix that yourself?
+>
+>> 3. if the {SH,ORGN,IRGN}{1,0} of block/page descriptor is conflict
+>> with that one in TCR. Will that make cache maintenance issue.
+>
+> If page tables are accessed with different attributes from those used to
+> walk them (i.e. those programmed into the TCR), the usual coherency
+> issues would apply.
+BTW, why we need to set page table walk attribute as sharable and
+inner/outer cacheable?
+Does that mean if core0's page table doesn't contain physical address
+0x200000, but core1's page table did and set its attribute as
+sharable.
+Core0 can access this area without page fault?
 
-Regards,
-Andreas
-
--- 
-SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 21284 AG N?rnberg
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141116/ca28033d/attachment.sig>
+Sincerely appreciate your kind help,
