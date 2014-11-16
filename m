@@ -1,78 +1,46 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 17 Nov 2014 03:04:29 +0800
-Subject: [PATCH v3 4/6] clk: sunxi: unify sun6i AHB1 clock with proper
- PLL6 pre-divider
-In-Reply-To: <20141116170224.GK6414@lukather>
-References: <1415815715-31791-1-git-send-email-wens@csie.org>
- <1415815715-31791-5-git-send-email-wens@csie.org>
- <20141116170224.GK6414@lukather>
-Message-ID: <CAGb2v65zx7C-LAB80oLDhWmEdn7fD=Mzxsg5g5MRRb2eo2TA3Q@mail.gmail.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Sun, 16 Nov 2014 11:32:23 -0800
+Subject: [PATCH v4 6/6] ARM: zynq: DT: Add OCM controller node
+In-Reply-To: <546881CA.2020801@suse.de>
+References: <cover.1415962281.git.michal.simek@xilinx.com>
+ <0a88d52b5e71fb220ca619180ec9ca746edad2b1.1415962281.git.michal.simek@xilinx.com>
+ <546881CA.2020801@suse.de>
+Message-ID: <c52187589f5c4cc6b908d899c2b9f7a6@BN1BFFO11FD036.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, 2014-11-16 at 11:51AM +0100, Andreas F?rber wrote:
+> Hi Michal,
+> 
+> Am 14.11.2014 um 11:52 schrieb Michal Simek:
+> > diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> > index ce2ef5bec4f2..e217fb1c1169 100644
+> > --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> > +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> > @@ -150,6 +150,13 @@
+> >  			reg = <0xf8006000 0x1000>;
+> >  		};
+> > 
+> > +		ocmc: memory-controller at f800c000 {
+> > +			compatible = "xlnx,zynq-ocmc-1.0";
+> > +			interrupt-parent = <&intc>;
+> > +			interrupts = <0 3 4>;
+> > +			reg = <0xf800c000 0x1000>;
+> > +		};
+> > +
+> >  		uart0: serial at e0000000 {
+> >  			compatible = "xlnx,xuartps", "cdns,uart-r1p8";
+> >  			status = "disabled";
+> 
+> Not directly related to this patch: As one can see here, the node order
+> is quite a mess... According to Olof, nodes should be ordered by unit
+> address, whereas here some but not all seem ordered by node name. Would
+> you welcome a cleanup patch, or can you fix that yourself?
 
-On Mon, Nov 17, 2014 at 1:02 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Thu, Nov 13, 2014 at 02:08:33AM +0800, Chen-Yu Tsai wrote:
->> This patch unifies the sun6i AHB1 clock, originally supported
->> with separate mux and divider clks. It also adds support for
->> the pre-divider on the PLL6 input, thus allowing the clock to
->> be muxed to PLL6 with proper clock rate calculation.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->> This patch produces a warning on of_io_request_and_map complaining
->> about dropping the const modifier. I have a separate patch for fixing
->> of_io_request_and_map.
->> ---
->>  Documentation/devicetree/bindings/clock/sunxi.txt |   2 +-
->>  drivers/clk/sunxi/clk-sunxi.c                     | 208 ++++++++++++++++++++++
->>  2 files changed, 209 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
->> index 67b2b99..9dc4f55 100644
->> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
->> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
->> @@ -26,7 +26,7 @@ Required properties:
->>       "allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
->>       "allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
->>       "allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
->> -     "allwinner,sun6i-a31-ahb1-mux-clk" - for the AHB1 multiplexer on A31
->> +     "allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
->>       "allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
->>       "allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
->>       "allwinner,sun9i-a80-ahb0-gates-clk" - for the AHB0 gates on A80
->> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
->> index 5702025..2bb769f 100644
->> --- a/drivers/clk/sunxi/clk-sunxi.c
->> +++ b/drivers/clk/sunxi/clk-sunxi.c
->> @@ -20,6 +20,7 @@
->>  #include <linux/of_address.h>
->>  #include <linux/reset-controller.h>
->>  #include <linux/spinlock.h>
->> +#include <linux/log2.h>
->
-> Why is this needed?
->
+I wouldn't say it's a mess, just a different property to sort the nodes
+by. For humans reading the DT, searching for nodes, alphabetical order
+helps finding the right node, IMHO. What advantage would sorting by
+address have?
 
-For __roundup_pow_of_two.
-
->>  #include "clk-factors.h"
->>
->> @@ -1233,3 +1234,210 @@ static void __init sun9i_init_clocks(struct device_node *node)
->>       sunxi_init_clocks(NULL, 0);
->>  }
->>  CLK_OF_DECLARE(sun9i_a80_clk_init, "allwinner,sun9i-a80", sun9i_init_clocks);
->> +
->> +/**
->> + * sun6i_a31_ahb1_clk_setup() - Setup function for a31 ahb1 composite clk
->> + */
->
-> Why is that added to the A80 clock file ?
-
-This is the clk-sunxi.c file.
-
-ChenYu
+	Thanks,
+	S?ren
