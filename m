@@ -1,70 +1,45 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sun, 16 Nov 2014 18:37:16 +0100
-Subject: [PATCHv2 3/8] arm: mvebu: add uartX labels for Armada SoC serial nodes
+Date: Sun, 16 Nov 2014 18:37:33 +0100
+Subject: [PATCHv2 5/8] arm: mvebu: add common uart0 and spi0 pintcrl entries
+ for Armada 370
 In-Reply-To: <cover.1416158990.git.arno@natisbad.org>
 References: <cover.1416158990.git.arno@natisbad.org>
-Message-ID: <833968f4add3449ec9cd7909f558cc6debed521b.1416158990.git.arno@natisbad.org>
+Message-ID: <d550094896837ac921e5d2a69fc5aae9b287a98a.1416158990.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-This patch adds uartX labels for Armada SoC serial nodes. This is
-a preliminary work to be able to easily reference the serial lines
-in Device Tree files. One expected use is when providing stdout-path
-property for barebox.
+pinctrl entries for uart0 using MPP0-1 and spi0 using MPP33-36 are
+common configurations. Instead of replicating them in each .dts file,
+put those in armada-370.dtsi file so that they can be referenced.
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+Suggested-by: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 ---
- arch/arm/boot/dts/armada-370-xp.dtsi | 5 +++--
- arch/arm/boot/dts/armada-xp.dtsi     | 5 +++--
- 2 files changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/armada-370.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 83286ec9702c..2be9723bcdf3 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -151,7 +151,7 @@
- 				status = "disabled";
- 			};
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index 6b3c23b1e138..d9f5d59e463e 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -115,6 +115,17 @@
+ 				compatible = "marvell,mv88f6710-pinctrl";
+ 				reg = <0x18000 0x38>;
  
--			serial at 12000 {
-+			uart0: serial at 12000 {
- 				compatible = "snps,dw-apb-uart";
- 				reg = <0x12000 0x100>;
- 				reg-shift = <2>;
-@@ -160,7 +160,8 @@
- 				clocks = <&coreclk 0>;
- 				status = "disabled";
- 			};
--			serial at 12100 {
++				uart0_pins: uart0-pins {
++					marvell,pins = "mpp0", "mpp1";
++					marvell,function = "uart0";
++				};
 +
-+			uart1: serial at 12100 {
- 				compatible = "snps,dw-apb-uart";
- 				reg = <0x12100 0x100>;
- 				reg-shift = <2>;
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index bff9f6c18db1..a68f5b837536 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -52,7 +52,7 @@
- 				reg = <0x11100 0x100>;
- 			};
- 
--			serial at 12200 {
-+			uart2: serial at 12200 {
- 				compatible = "snps,dw-apb-uart";
- 				reg = <0x12200 0x100>;
- 				reg-shift = <2>;
-@@ -61,7 +61,8 @@
- 				clocks = <&coreclk 0>;
- 				status = "disabled";
- 			};
--			serial at 12300 {
++				spi0_pins: spi0-pins {
++					marvell,pins = "mpp33", "mpp34",
++						       "mpp35", "mpp36";
++					marvell,function = "spi0";
++				};
 +
-+			uart3: serial at 12300 {
- 				compatible = "snps,dw-apb-uart";
- 				reg = <0x12300 0x100>;
- 				reg-shift = <2>;
+ 				sdio_pins1: sdio-pins1 {
+ 					marvell,pins = "mpp9",  "mpp11", "mpp12",
+ 							"mpp13", "mpp14", "mpp15";
 -- 
 2.1.1
