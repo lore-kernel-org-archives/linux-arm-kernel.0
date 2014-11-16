@@ -1,90 +1,106 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sun, 16 Nov 2014 23:29:00 +0100
-Subject: [PATCHv2 5/8] arm: mvebu: add common uart0 and spi0 pintcrl
- entries for Armada 370
-In-Reply-To: <20141116211034.GJ15870@lunn.ch> (Andrew Lunn's message of "Sun,
- 16 Nov 2014 22:10:34 +0100")
-References: <cover.1416158990.git.arno@natisbad.org>
- <d550094896837ac921e5d2a69fc5aae9b287a98a.1416158990.git.arno@natisbad.org>
- <20141116211034.GJ15870@lunn.ch>
-Message-ID: <874mtyok43.fsf@natisbad.org>
+From: chris.packham@alliedtelesis.co.nz (Chris Packham)
+Date: Mon, 17 Nov 2014 11:40:07 +1300
+Subject: [RFC PATCHv3] ARM: mvebu: Let the device-tree determine smp_ops
+In-Reply-To: <1415327626-16079-1-git-send-email-chris.packham@alliedtelesis.co.nz>
+References: <1415327626-16079-1-git-send-email-chris.packham@alliedtelesis.co.nz>
+Message-ID: <1416177607-11305-1-git-send-email-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The machine specific SMP operations can be configured either via
+setup_arch or via arm_dt_init_cpu_maps. For the ARMADA_370_XP_DT devices
+both of these are called and setup_arch wins because it is called last.
+This means that it is not possible to substitute a different set of SMP
+operations via the device-tree.
+
+Add a new smp_ops_is_set API that tells us if something else has already
+set smp_ops. Use this new API in a smp_init function for the
+ARMADA_370_XP_DT compatible devices to prevent setup_arch from
+overriding the operations configured earlier.
+
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+---
 Hi,
 
-Andrew Lunn <andrew@lunn.ch> writes:
+I didn't see any comment's on v2[1]. I'm not sure if I should take this as
+disapproval with that approach or just a sign that people are busy.
 
-> On Sun, Nov 16, 2014 at 06:37:33PM +0100, Arnaud Ebalard wrote:
->> 
->> pinctrl entries for uart0 using MPP0-1 and spi0 using MPP33-36 are
->> common configurations. Instead of replicating them in each .dts file,
->> put those in armada-370.dtsi file so that they can be referenced.
->> 
->> Suggested-by: Andrew Lunn <andrew@lunn.ch>
->> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
->> ---
->>  arch/arm/boot/dts/armada-370.dtsi | 11 +++++++++++
->>  1 file changed, 11 insertions(+)
->> 
->> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
->> index 6b3c23b1e138..d9f5d59e463e 100644
->> --- a/arch/arm/boot/dts/armada-370.dtsi
->> +++ b/arch/arm/boot/dts/armada-370.dtsi
->> @@ -115,6 +115,17 @@
->>  				compatible = "marvell,mv88f6710-pinctrl";
->>  				reg = <0x18000 0x38>;
->>  
->> +				uart0_pins: uart0-pins {
->> +					marvell,pins = "mpp0", "mpp1";
->> +					marvell,function = "uart0";
->> +				};
->
-> Thanks for these.
->
-> We can go one stage further. kirkwood.dts has:
->
->                 uart0: serial at 12000 {
->                         compatible = "ns16550a";
->                         reg = <0x12000 0x100>;
->                         reg-shift = <2>;
->                         interrupts = <33>;
->                         clocks = <&gate_clk 7>;
->                         pinctrl-0 = <&pmx_uart0>;
->                         pinctrl-names = "default";
->                         status = "disabled";
->                 };
->
-> i.e actually references them. This is safe because a board .dts file
-> can override the pins if needed.
->
-> We should do the same here, both for 370 and XP.
+This is an alternative solution that addresses one issue I had with the v2
+implementation namely we now know whether smp_ops have been set or not and can
+use this information to avoid setting them again. The downside is I'm now
+modifying core code.
 
-Just to be sure I understand: for uart0 and uart1, I think this can only
-be done for Armada 370 (on XP, uart0/1 rx/tx are not mpp).
+Thanks,
+Chris
+--
+[1] - http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/300480.html
 
-This only a matter of adding the following in armada-370.dtsi for uart0: 
+ arch/arm/include/asm/smp.h     |  1 +
+ arch/arm/kernel/smp.c          | 10 +++++++++-
+ arch/arm/mach-mvebu/board-v7.c |  6 ++++++
+ 3 files changed, 16 insertions(+), 1 deletion(-)
 
- 		 /*
-		  * Default UART pinctrl setting without RTS/CTS, can
-		  * be overwritten on board level.
-                  */
-                 uart0: serial at 12000 {
-                         pinctrl-0 = <&uart0_pins>;
-                         pinctrl-names = "default";
-                 };
-
-For uart1, it's not obvious because there are 6 different MPP which can
-be configured to act as uart1 TXD. Same for RXD. If I remove the ones
-overlapping w/ RGMII pins for GbE interfaces, which one should be
-selected as default: 41/42, 55/57, 60/61?
-
-Now, regarding armada XP, uart2 and uart3 txd/rxd MPP are 42/43 and
-44/45. Best we can do is put the same as above in each specific
-armada-xp-mv78XXX.dtsi file, where pinctrl node is, after adding
-uart2-pins and uart3-pins. Unless I am missing something, this cannot
-be done in armada-xp.dtsi.
-
-Cheers,
-
-a+
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index 18f5a55..aa55889 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -122,5 +122,6 @@ struct of_cpu_method {
+  * set platform specific SMP operations
+  */
+ extern void smp_set_ops(struct smp_operations *);
++extern bool smp_ops_is_set(void);
+ 
+ #endif /* ifndef __ASM_ARM_SMP_H */
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 13396d3..f303655 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -77,13 +77,21 @@ enum ipi_msg_type {
+ static DECLARE_COMPLETION(cpu_running);
+ 
+ static struct smp_operations smp_ops;
++static bool smp_ops_set = false;
+ 
+ void __init smp_set_ops(struct smp_operations *ops)
+ {
+-	if (ops)
++	if (ops) {
+ 		smp_ops = *ops;
++		smp_ops_set = true;
++	}
+ };
+ 
++bool smp_ops_is_set(void)
++{
++	return smp_ops_set;
++}
++
+ static unsigned long get_arch_pgd(pgd_t *pgd)
+ {
+ 	phys_addr_t pgdir = virt_to_idmap(pgd);
+diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+index 6478626..86b4b5d 100644
+--- a/arch/arm/mach-mvebu/board-v7.c
++++ b/arch/arm/mach-mvebu/board-v7.c
+@@ -198,6 +198,11 @@ static void __init mvebu_dt_init(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
++static bool __init armada_smp_init(void)
++{
++	return smp_ops_is_set();
++}
++
+ static const char * const armada_370_xp_dt_compat[] = {
+ 	"marvell,armada-370-xp",
+ 	NULL,
+@@ -206,6 +211,7 @@ static const char * const armada_370_xp_dt_compat[] = {
+ DT_MACHINE_START(ARMADA_370_XP_DT, "Marvell Armada 370/XP (Device Tree)")
+ 	.l2c_aux_val	= 0,
+ 	.l2c_aux_mask	= ~0,
++	.smp_init	= armada_smp_init,
+ 	.smp		= smp_ops(armada_xp_smp_ops),
+ 	.init_machine	= mvebu_dt_init,
+ 	.init_irq       = mvebu_init_irq,
+-- 
+2.2.0.rc0
