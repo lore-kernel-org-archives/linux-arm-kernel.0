@@ -1,55 +1,174 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 16 Nov 2014 13:56:57 +0100
-Subject: [PATCH] clk: sunxi: gmac-tx-clk mux is not a CLK_MUX_INDEX_BIT mux
-Message-ID: <1416142617-4094-1-git-send-email-hdegoede@redhat.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Sun, 16 Nov 2014 14:14:29 +0100
+Subject: [PATCHv1 2/3] arm: mvebu: add .dts file for Synology DS213j
+In-Reply-To: <20141116020024.GC15870@lunn.ch> (Andrew Lunn's message of "Sun,
+ 16 Nov 2014 03:00:24 +0100")
+References: <cover.1416095841.git.arno@natisbad.org>
+ <1eb26f8c1946622910a7e2318c895a7082fea7e5.1416095841.git.arno@natisbad.org>
+ <20141116020024.GC15870@lunn.ch>
+Message-ID: <87d28nb83u.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A CLK_MUX_INDEX_BIT mux has one bit per parent, but the sun7i-a20-gmac-clk
-has 2 bits selecting between 3 possible parents using values of 0, 1, 2,
-which makes it a regular mux which should not have CLK_MUX_INDEX_BIT set in
-its flag.
+Hi Andrew,
 
-However we do not support parent 1 (an external clock), so use a table to
-select parent 0 or 2, which are the 2 parents we support.
+Andrew Lunn <andrew@lunn.ch> writes:
 
-Note this has not been causing any issues sofar, because we start with a
-parent setting of parent 0, and only ever re-parent to parent 2 (for which
-we use an index of 1 as we skip parent 1) and with CLK_MUX_INDEX_BIT set
-we write a value of 2 for index 1.
+>> +		internal-regs {
+>> +
+>> +			sata at a0000 {
+>> +				nr-ports = <2>;
+>> +				status = "okay";
+>> +			};
+>> +
+>> +			pinctrl {
+>> +				pmx_ge0: pmx-ge0 {
+>> +					marvell,pins = "mpp5", "mpp6", "mpp7", "mpp8",
+>> +						       "mpp9", "mpp10", "mpp11", "mpp12",
+>> +						       "mpp13", "mpp14", "mpp15", "mpp16";
+>> +					marvell,function = "ge0";
+>> +				};
+>
+> This is already available in armada-370.dtsi as ge0_rgmii_pins.
 
-Tested on both a cubietruck (which uses rgmii mode) as well as a cs908
-(an a31s board which uses mii mode).
+Will use armada-370.dtsi ones.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/clk/sunxi/clk-a20-gmac.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/sunxi/clk-a20-gmac.c b/drivers/clk/sunxi/clk-a20-gmac.c
-index 5296fd6..0dcf4f2 100644
---- a/drivers/clk/sunxi/clk-a20-gmac.c
-+++ b/drivers/clk/sunxi/clk-a20-gmac.c
-@@ -53,6 +53,11 @@ static DEFINE_SPINLOCK(gmac_lock);
- #define SUN7I_A20_GMAC_MASK	0x3
- #define SUN7I_A20_GMAC_PARENTS	2
- 
-+static u32 sun7i_a20_gmac_mux_table[SUN7I_A20_GMAC_PARENTS] = {
-+	0x00, /* Select mii_phy_tx_clk */
-+	0x02, /* Select gmac_int_tx_clk */
-+};
-+
- static void __init sun7i_a20_gmac_clk_setup(struct device_node *node)
- {
- 	struct clk *clk;
-@@ -90,7 +95,7 @@ static void __init sun7i_a20_gmac_clk_setup(struct device_node *node)
- 	gate->lock = &gmac_lock;
- 	mux->reg = reg;
- 	mux->mask = SUN7I_A20_GMAC_MASK;
--	mux->flags = CLK_MUX_INDEX_BIT;
-+	mux->table = sun7i_a20_gmac_mux_table;
- 	mux->lock = &gmac_lock;
- 
- 	clk = clk_register_composite(NULL, clk_name,
--- 
-2.1.0
+>> +
+>> +				pmx_uart0: pmx-uart0 {
+>> +					marvell,pins = "mpp0", "mpp1";
+>> +					marvell,function = "uart0";
+>> +				};
+>
+> This however does not seem to be in armada-370.dtsi. This is probably
+> because there are a few options:
+>
+>            MPP_FUNCTION(0x0, "gpio", NULL),
+>            MPP_FUNCTION(0x1, "uart0", "rxd")),
+>         MPP_MODE(1,
+>            MPP_FUNCTION(0x0, "gpo", NULL),
+>            MPP_FUNCTION(0x1, "uart0", "txd")),
+>         MPP_MODE(2,
+>            MPP_FUNCTION(0x0, "gpio", NULL),
+>            MPP_FUNCTION(0x1, "i2c0", "sck"),
+>            MPP_FUNCTION(0x2, "uart0", "txd")),
+>         MPP_MODE(3,
+>            MPP_FUNCTION(0x0, "gpio", NULL),
+>            MPP_FUNCTION(0x1, "i2c0", "sda"),
+>            MPP_FUNCTION(0x2, "uart0", "rxd")),
+>
+> What we found with Kirkwood, is that everybody picks the
+> same. Probably because of Marvell's RDK and U-boot etc.  It is not
+> clear from the current 370 boards what is being used. I should go look
+> at Mirabox and 370 RD. If they are all mpp0 & mpp1, i suggest we put
+> this into armada-370.dtsi
+
+Will do.
+
+
+>> +
+>> +				pmx_i2c: pmx-i2c {
+>> +					marvell,pins = "mpp2", "mpp3";
+>> +					marvell,function = "i2c0";
+>> +				};
+>
+> i2c0_pins
+
+ack. will also rename everything to -/_pins instead of pmx_/-
+
+
+>> +				pmx_spi: pmx-spi {
+>> +					marvell,pins = "mpp33", "mpp34",
+>> +						       "mpp35", "mpp36";
+>> +					marvell,function = "spi0";
+>> +				};
+>
+> Again, we might want to put this in armada-370.dtsi.
+
+will do.
+
+
+>> +				pmx_smi: pmx-smi {
+>> +					marvell,pins = "mpp17", "mpp18";
+>> +					marvell,function = "ge";
+>> +				};
+>
+> mdio_pins
+
+ack.
+
+
+>> +					 * if you do a 'saveenv' under u-boot, your modified
+>> +					 * environment be saved will at 1MB after the start
+>
+> 					 * environment will be saved at 1MB after the start
+>
+>
+>> +					 * of the flash, i.e. in the middle of the uImage.
+>> +					 * For that reason, it is strongly advised not to
+>> +					 * change default environment, unless you know what
+>
+>  					 * change the default environment, unless you know what
+
+ack.
+
+
+>> +				compatible = "marvell,mv64xxx-i2c";
+>> +				clock-frequency = <400000>;
+>> +				status = "okay";
+>> +
+>> +				/* Main device RTC chip */
+>> +				s35390a: s35390a at 30 {
+>> +					 compatible = "ssi,s35390a";
+>
+> sii not ssi.
+
+My bad. I reused what I found in kirkwood files w/o checking
+trivial-devices.txt or vendor-prefixes.txt. Do you want me to add an
+additional patch for kirkwood files too?
+
+>> +					 reg = <0x30>;
+>> +				};
+>> +			};
+>> +
+>> +			/* RTC provided by Seiko S-35390A above */
+>> +			rtc at 10300 {
+>> +				status = "disabled";
+>> +			};
+>> +
+>> +			/* Connected to a header on device's PCB */
+>> +			serial at 12000 {
+>> +				status = "okay";
+>> +			};
+>> +
+>> +			/* Connected to a TI MSP430F2111 for power control */
+>> +			serial at 12100 {
+>> +				status = "okay";
+>> +			};
+>> +
+>> +			poweroff at 12100 {
+>> +				compatible = "synology,power-off";
+>> +				reg = <0x12100 0x100>;
+>> +				clocks = <&coreclk 0>;
+>> +			};
+>> +		};
+>> +	};
+>> +
+>> +	gpio-fan-100-32-35 {
+>
+> There is some logic to this naming, but i don't remember what it is.
+> Did you check this is appropriate?
+
+The 32-35 is for the MPP i.e. fan uses mpp32 to mpp35 (3 MPP for speed,
+one for alarm). I don't know what the 100 part means. What I did is I
+googled to see which fan supported kirkwood models have and noticed
+that the DS212j uses the exact same fan, i.e. Y.S.Tech FD129225LL-N so
+I opted for the same naming.
+
+On that aspect, you may be able to explain why the speed-map for this
+fan goes up to 5000 RPM. This fan is supposed to operate at 1900RPM.
+Note that it does not matter in practice.
+
+Cheers,
+
+a+
