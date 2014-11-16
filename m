@@ -1,35 +1,36 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sun, 16 Nov 2014 18:36:57 +0100
-Subject: [PATCHv2 1/8] of: add "micron" vendor prefix for Micron
+Date: Sun, 16 Nov 2014 18:37:06 +0100
+Subject: [PATCHv2 2/8] arm: mvebu: fix vendor prefix typo in
+ kirkwood-synology.dtsi
 In-Reply-To: <cover.1416158990.git.arno@natisbad.org>
 References: <cover.1416158990.git.arno@natisbad.org>
-Message-ID: <1ec61e2819e349ee8e5e5892997315951024d6c4.1416158990.git.arno@natisbad.org>
+Message-ID: <a7156a5d47c1f9adf7448e3d4999d68a3428c3d6.1416158990.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Micron vendor prefix is not listed yet in vendor-prefixes.txt file. Even
-if the expected vendor prefix should be the NASDAQ symbol ("mu" in that
-case), it seems reasonable to use "micron" here because it is what is
-already found at various locations inside the kernel (see files under
-arch/arm/boot/dts/ for instance).
+As reported by Andrew, the vendor prefix for Seiko Instruments, Inc.
+S-35390A I2C RTC chip in kirkwood-synology.dtsi has a typo (ssi
+instead of sii). This patches fixes it.
 
+Reported-by: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/kirkwood-synology.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 723999d73744..55a3a7f19063 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -96,6 +96,7 @@ mitsubishi	Mitsubishi Electric Corporation
- mosaixtech	Mosaix Technologies, Inc.
- moxa	Moxa
- mpl	MPL AG
-+micron	Micron Technology, Inc.
- mundoreader	Mundo Reader S.L.
- murata	Murata Manufacturing Co., Ltd.
- mxicy	Macronix International Co., Ltd.
+diff --git a/arch/arm/boot/dts/kirkwood-synology.dtsi b/arch/arm/boot/dts/kirkwood-synology.dtsi
+index 811e0971fc58..8be5b2e4626e 100644
+--- a/arch/arm/boot/dts/kirkwood-synology.dtsi
++++ b/arch/arm/boot/dts/kirkwood-synology.dtsi
+@@ -266,7 +266,7 @@
+ 
+ 			s35390a: s35390a at 30 {
+ 				status = "disabled";
+-				compatible = "ssi,s35390a";
++				compatible = "sii,s35390a";
+ 				reg = <0x30>;
+ 			};
+ 		};
 -- 
 2.1.1
