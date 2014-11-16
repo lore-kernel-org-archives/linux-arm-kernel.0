@@ -1,38 +1,59 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sun, 16 Nov 2014 13:34:10 +0100
-Subject: [PATCHv1 1/3] arm: mvebu: add uartX labels for Armada SoC serial
- nodes
-In-Reply-To: <20141116010933.GB15870@lunn.ch> (Andrew Lunn's message of "Sun,
- 16 Nov 2014 02:09:33 +0100")
-References: <cover.1416095841.git.arno@natisbad.org>
- <ee5646b8e097b266f51a68f489644256d7c3df33.1416095841.git.arno@natisbad.org>
- <20141116010933.GB15870@lunn.ch>
-Message-ID: <87h9xzb9z1.fsf@natisbad.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 16 Nov 2014 13:34:46 +0100
+Subject: Bug in clk_mux_set_parent for CLK_MUX_INDEX_BIT muxes ?
+Message-ID: <546899E6.6040306@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hi,
 
-Andrew Lunn <andrew@lunn.ch> writes:
+While looking at what I believe is a bug in the sunxi gmac clk code
+(more on that later), I believe I've also found a bug in
 
-> On Sun, Nov 16, 2014 at 01:04:12AM +0100, Arnaud Ebalard wrote:
->> 
->> This patch adds uartX labels for Armada SoC serial nodes. This is
->> a preliminary work to be able to easily reference the serial lines
->> in Device Tree files. One expected future use is when providing
->> stdout-path property for barebox.
->> 
->> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
->
-> Acked-by: Andrew Lunn <andrew@lunn.ch>
->
-> Not a must, but it would be nice to make use of these in
-> armada-xp-lenovo-ix4-300d.dts, which currently has:
->
->       	     stdout-path = "/soc/internal-regs/serial at 12000";
+clk_mux_set_parent for the CLK_MUX_INDEX_BIT case.
 
-Will add a patch to the series to do that.
+AFAIK if CLK_MUX_INDEX_BIT is set, then each bit turns
+on / off a single parent, so theoretically multiple
+parents could be enabled at the same time, but in practice
+only one bit should ever be 1. So to select parent 0, set
+the register (*) to 0x01, to select parent 1 set it 0x02,
+parent 2, 0x04, parent 3, 0x08, etc.
 
-Thanks.
+Correct ?
 
-a+
+Assuming I got that right, then this bit of code in
+clk_mux_set_parent is wrong:
+
+                if (mux->flags & CLK_MUX_INDEX_BIT)
+                        index = (1 << ffs(index));
+
+For an input index of 0, ffs returns 0, so we set the register
+to 0x01, ok.
+
+For an input index of 1, ffs returns 1, so we set the register
+to 0x02, ok.
+
+For an input index of 2, ffs returns 2, so we set the register
+to 0x04, ok.
+
+For an input index of 3, ffs returns 1, so we set the register
+to 0x02, not good!
+
+I believe this code should simply be:
+
+                if (mux->flags & CLK_MUX_INDEX_BIT)
+                        index = 1 << index;
+
+I guess we've been getting away by this because the input index
+so far has never gotten above 2.
+
+If I'm right about this, I can whip up a patch to fix this. Note
+I don't really have hardware to properly exercise this code-path
+AFAIK.
+
+Regards,
+
+Hans
+
+
+*) This assumes a shift of 0
