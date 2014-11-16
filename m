@@ -1,32 +1,45 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 16 Nov 2014 18:13:52 +0100
-Subject: [PATCH] clk: sunxi: gmac-tx-clk mux is not a CLK_MUX_INDEX_BIT mux
-In-Reply-To: <1416142617-4094-1-git-send-email-hdegoede@redhat.com>
-References: <1416142617-4094-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141116171352.GO6414@lukather>
+Date: Sun, 16 Nov 2014 18:13:14 +0100
+Subject: [PATCH v5 4/4] crypto: Add Allwinner Security System crypto
+ accelerator
+In-Reply-To: <20141106143217.GA3636@gondor.apana.org.au>
+References: <20141030171933.GR21251@lukather>
+ <20141031072030.GA7563@gondor.apana.org.au>
+ <20141031081323.GS21251@lukather>
+ <20141031081803.GA8012@gondor.apana.org.au>
+ <20141031095706.GA8054@lukather>
+ <20141031100522.GA8655@gondor.apana.org.au>
+ <20141103093446.GG11263@lukather>
+ <20141103103528.GA30154@gondor.apana.org.au>
+ <20141106142633.GK2989@lukather>
+ <20141106143217.GA3636@gondor.apana.org.au>
+Message-ID: <20141116171314.GN6414@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 16, 2014 at 01:56:57PM +0100, Hans de Goede wrote:
-> A CLK_MUX_INDEX_BIT mux has one bit per parent, but the sun7i-a20-gmac-clk
-> has 2 bits selecting between 3 possible parents using values of 0, 1, 2,
-> which makes it a regular mux which should not have CLK_MUX_INDEX_BIT set in
-> its flag.
+On Thu, Nov 06, 2014 at 10:32:18PM +0800, Herbert Xu wrote:
+> On Thu, Nov 06, 2014 at 03:26:33PM +0100, Maxime Ripard wrote:
+> > 
+> > But you still haven't explain why the driver, while it doesn't handle
+> > the user space buffer at any time, should be worried that the data the
+> > framework has given him are actually mapped.
 > 
-> However we do not support parent 1 (an external clock), so use a table to
-> select parent 0 or 2, which are the 2 parents we support.
-> 
-> Note this has not been causing any issues sofar, because we start with a
-> parent setting of parent 0, and only ever re-parent to parent 2 (for which
-> we use an index of 1 as we skip parent 1) and with CLK_MUX_INDEX_BIT set
-> we write a value of 2 for index 1.
-> 
-> Tested on both a cubietruck (which uses rgmii mode) as well as a cs908
-> (an a31s board which uses mii mode).
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Encryption is used by IPsec and SKBs can be allocated in highmem.
+> algif also exposes all ciphers to user-space memory which can also
+> be in highmem.
 
-Applied, thanks.
+Ok. We keep going in circles here.
+
+I know that algif handles userspace memory that can be in
+highmem. What I don't get, is that just like a *driver* doesn't have
+to call copy_from_user, why would it need to call kmap...
+
+That's something that should be in the framework itself, not the
+driver. And the argument that most drivers use DMA seems like a broken
+assumption.
+
+But hey, you're the one that will maintain this mess, so I guess you
+have the final word.
 
 Maxime
 
@@ -40,4 +53,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141116/52e0c7d9/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141116/d38a98f2/attachment.sig>
