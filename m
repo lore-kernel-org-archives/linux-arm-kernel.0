@@ -1,52 +1,81 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sun, 16 Nov 2014 14:24:03 +0100
-Subject: [PATCHv1 0/3] arm: mvebu: add Synology DS213j and DS414 .dts files
-In-Reply-To: <20141116022035.GE15870@lunn.ch> (Andrew Lunn's message of "Sun,
- 16 Nov 2014 03:20:35 +0100")
-References: <cover.1416095841.git.arno@natisbad.org>
- <20141116022035.GE15870@lunn.ch>
-Message-ID: <874mtzb7nw.fsf@natisbad.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 16 Nov 2014 17:09:32 +0100
+Subject: [PATCH v2] ARM: dts: sunxi: Add de_be0 clk parent pll to simplefb node
+Message-ID: <1416154172-4116-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Avoid the parent pll for the mod-clk for de_be0 getting disabled when non of
+the other users are enabled (which can happen when none of i2c, spi and mmc
+are in use).
 
-Andrew Lunn <andrew@lunn.ch> writes:
+Note for now we point directly to the parent rather then to the de_be0 mod-clk
+as that is not modelled in our devicetree yet.
 
->> Andrew, in this v1, the two .dts files are still separate w/o any common
->> .dtsi. I took a quick look it seems there are small differences between
->> the two which make me wonder if its worth the trouble:
->> 
->>  - DS414 fans are not handled by the SoC
->>  - various pinctrl variations
->>  - a tiny difference in SPI flash partitioning
->>  - phy-mode for ethernet interfaces
->>  - different comments associated w/ same nodes (e.g. uart1)
->>  - etc
->
-> O.K, lets wait for the moment. It could be that there is more in
-> common between different 370 devices, and between different XP
-> devices, but less in common across 370 and XP.
->
-> We can refactor it later when a pattern starts to appear.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v2:
+-Fix typos in commit message
+---
+ arch/arm/boot/dts/sun4i-a10.dtsi  | 3 ++-
+ arch/arm/boot/dts/sun5i-a10s.dtsi | 3 ++-
+ arch/arm/boot/dts/sun6i-a31.dtsi  | 1 +
+ arch/arm/boot/dts/sun7i-a20.dtsi  | 3 ++-
+ 4 files changed, 7 insertions(+), 3 deletions(-)
 
-ok.
-
-
->>  - Added a comment in the .dts file about the bootloader screwing the kernel
->>    if the environment is saved.
->
-> Is this well know in the forums? Do you think Synology knows about it?
-> It would be nice if it was fixed. Maybe not for these products, but
-> for the next generation.
-
-I never went to synology forum to check if someone had broken her NAS
-doing a saveenv under u-boot. But I doubt that: doing a 'synology saveenv'
-search on google gives DS213j .dts submission (with the comment on the
-issue) as 10th link.
-
-If you have some contact to provide, I can report it.
-
-Cheers,
-
-a+
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index cdb4708..92d8aa6 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -34,7 +34,8 @@
+ 
+ 		framebuffer0-hdmi {
+ 			compatible = "simple-framebuffer";
+-			clocks = <&ahb_gates 36>, <&ahb_gates 43>, <&ahb_gates 44>;
++			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
++				 <&ahb_gates 44>;
+ 			status = "disabled";
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index aee7f25..c678e56 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -31,7 +31,8 @@
+ 
+ 		framebuffer0-hdmi {
+ 			compatible = "simple-framebuffer";
+-			clocks = <&ahb_gates 36>, <&ahb_gates 43>, <&ahb_gates 44>;
++			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
++				 <&ahb_gates 44>;
+ 			status = "disabled";
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 04a5cb3..ccc03f3 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -69,6 +69,7 @@
+ 
+ 		framebuffer0-hdmi {
+ 			compatible = "simple-framebuffer";
++			clocks = <&pll6>;
+ 			status = "disabled";
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 58c1573..89766cb 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -71,7 +71,8 @@
+ 
+ 		framebuffer0-hdmi {
+ 			compatible = "simple-framebuffer";
+-			clocks = <&ahb_gates 36>, <&ahb_gates 43>, <&ahb_gates 44>;
++			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
++				 <&ahb_gates 44>;
+ 			status = "disabled";
+ 		};
+ 	};
+-- 
+2.1.0
