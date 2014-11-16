@@ -1,99 +1,231 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Sun, 16 Nov 2014 16:01:15 +0900
-Subject: [PATCH v7 0/7] Enable support for Samsung Exynos7 SoC
-In-Reply-To: <CAM4voa=DT80ceZf3P8g5+80hoBKQrviSCHcc1qj--RLJkFxbyQ@mail.gmail.com>
-References: <1415506834-8180-1-git-send-email-a.kesavan@samsung.com>
- <CAM4voanLYH+aEhKq_P+pTde5XL4dS0ZjvXta-2U4k0CdV6vYKQ@mail.gmail.com>
- <CAM4voa=DT80ceZf3P8g5+80hoBKQrviSCHcc1qj--RLJkFxbyQ@mail.gmail.com>
-Message-ID: <000e01d0016b$1eef44b0$5ccdce10$@kernel.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 16 Nov 2014 08:59:28 +0100
+Subject: [RFC] adp1653: Add device tree bindings for LED controller
+Message-ID: <20141116075928.GA9763@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abhilash Kesavan wrote:
-> 
-> Hi Olof and Arnd
-> 
-Hi
+For device tree people: Yes, I know I'll have to create file in
+documentation, but does the binding below look acceptable?
 
-> On Tue, Nov 11, 2014 at 7:59 PM, Abhilash Kesavan
-> <kesavan.abhilash@gmail.com> wrote:
-> > Hello Olof and Arnd,
-> >
-> > On Sun, Nov 9, 2014 at 9:50 AM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
-> >> These were originally part of 2 patchsets[1][2] adding support for Exynos7.
-> >>  The clock and pinctrl patches are going through the respective maintainer's
-> >> tree; hence the remaining dt related patches have been consolidated and are
-> >> being posted here as a separate series.
-> >>
-> >> This patchset has build dependencies on the following patches:
-> >> a] "[GIT PULL] Samsung clock changes for 3.19" - specifically the clock dt
-> >>    bindings header.
-> >>    http://comments.gmane.org/gmane.linux.kernel.samsung-soc/39142
-> >> b] "tty: serial: samsung: Clean-up selection of number of available UARTs"
-> >>    http://www.spinics.net/lists/linux-samsung-soc/msg37418.html
-> >> c] "dts, kbuild: Implement support for dtb vendor subdirs"(merged in linux-next)
-> >>    https://lkml.org/lkml/2014/10/21/654
-> >>
-> >> [1] arch: arm64: Enable support for Samsung Exynos7 SoC
-> >> http://www.spinics.net/lists/linux-samsung-soc/msg37047.html
-> >> [2] Add clock and DT support for a few IPs on Exynos7
-> >> http://www.spinics.net/lists/linux-samsung-soc/msg37973.html
-> >>
-> >> Changes since v6:
-> >>         - Fixed the platform ordering (exynos before thunder) in Kconfig file.
-> >>         - Fixed the ordering of reg and enable-method properties in cpu node
-> >>         as per Lorenzo Pieralisi's comment.
-> >
-> >
-> > Do you have any comments on this patchset ?
-> 
-> A gentle reminder regarding this patch set. Kindly review.
-> 
-As I commented before, looks good to me, so shall I queue this in samsung tree
-with dependencies such as clock stuff? I'm happy with either way samsung tree
-or arm-soc tree directly though.
+I'll clean up driver code a bit more, remove the printks. Anything
+else obviously wrong?
+
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
 Thanks,
-Kukjin
+								Pavel
 
-> Abhilash
-> >>
-> >> Abhilash Kesavan (2):
-> >>   arm64: dts: Add PMU DT node for exynos7 SoC
-> >>   arm64: dts: Add nodes for mmc, i2c, rtc, watchdog, adc on Exynos7
-> >>
-> >> Alim Akhtar (2):
-> >>   arm64: exynos7: Enable ARMv8 based Exynos7 (SoC) support
-> >>   arm64: Enable Exynos7 SOC in the defconfig
-> >>
-> >> Naveen Krishna Ch (2):
-> >>   arm64: dts: Add initial device tree support for EXYNOS7
-> >>   arm64: dts: Add initial pinctrl support to EXYNOS7
-> >>
-> >> Pankaj Dubey (1):
-> >>   arm64: dts: add <dt-bindings/> symlink
-> >>
-> >>  .../devicetree/bindings/arm/samsung/pmu.txt        |   1 +
-> >>  arch/arm64/Kconfig                                 |  17 +
-> >>  arch/arm64/boot/dts/Makefile                       |   1 +
-> >>  arch/arm64/boot/dts/exynos/Makefile                |   5 +
-> >>  arch/arm64/boot/dts/exynos/exynos7-espresso.dts    |  84 +++
-> >>  arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi    | 588 +++++++++++++++++++++
-> >>  arch/arm64/boot/dts/exynos/exynos7.dtsi            | 530 +++++++++++++++++++
-> >>  arch/arm64/boot/dts/include/dt-bindings            |   1 +
-> >>  arch/arm64/configs/defconfig                       |   4 +
-> >>  9 files changed, 1231 insertions(+)
-> >>  create mode 100644 arch/arm64/boot/dts/exynos/Makefile
-> >>  create mode 100644 arch/arm64/boot/dts/exynos/exynos7-espresso.dts
-> >>  create mode 100644 arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
-> >>  create mode 100644 arch/arm64/boot/dts/exynos/exynos7.dtsi
-> >>  create mode 120000 arch/arm64/boot/dts/include/dt-bindings
-> >>
-> >> --
-> >> 2.1.0
-> >>
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+index 739fcf2..ed0bfc1 100644
+--- a/arch/arm/boot/dts/omap3-n900.dts
++++ b/arch/arm/boot/dts/omap3-n900.dts
+@@ -553,6 +561,18 @@
+ 
+ 		ti,usb-charger-detection = <&isp1704>;
+ 	};
++
++	adp1653: adp1653 at 30 {
++		compatible = "ad,adp1653";
++		reg = <0x30>;
++
++		max-flash-timeout-usec = <500000>;
++		max-flash-intensity-uA    = <320000>;
++		max-torch-intensity-uA     = <50000>;
++		max-indicator-intensity-uA = <17500>;
++
++		gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>; /* Want 88 */
++	};
+ };
+ 
+ &i2c3 {
+diff --git a/drivers/media/i2c/adp1653.c b/drivers/media/i2c/adp1653.c
+index 873fe19..e21ed02 100644
+--- a/drivers/media/i2c/adp1653.c
++++ b/drivers/media/i2c/adp1653.c
+@@ -8,6 +8,7 @@
+  * Contributors:
+  *	Sakari Ailus <sakari.ailus@iki.fi>
+  *	Tuukka Toivonen <tuukkat76@gmail.com>
++ *      Pavel Machek <pavel@ucw.cz>
+  *
+  * This program is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU General Public License
+@@ -34,9 +35,12 @@
+ #include <linux/module.h>
+ #include <linux/i2c.h>
+ #include <linux/slab.h>
++#include <linux/of_gpio.h>
+ #include <media/adp1653.h>
+ #include <media/v4l2-device.h>
+ 
++#include <linux/gpio.h>
++
+ #define TIMEOUT_MAX		820000
+ #define TIMEOUT_STEP		54600
+ #define TIMEOUT_MIN		(TIMEOUT_MAX - ADP1653_REG_CONFIG_TMR_SET_MAX \
+@@ -308,7 +316,16 @@ __adp1653_set_power(struct adp1653_flash *flash, int on)
+ {
+ 	int ret;
+ 
+-	ret = flash->platform_data->power(&flash->subdev, on);
++	if (flash->platform_data->power)
++		ret = flash->platform_data->power(&flash->subdev, on);
++	else {
++		gpio_set_value(flash->platform_data->power_gpio, on);
++		if (on) {
++			/* Some delay is apparently required. */
++			udelay(20);
++		}
++	}
++			
+ 	if (ret < 0)
+ 		return ret;
+ 
+@@ -316,8 +333,13 @@ __adp1653_set_power(struct adp1653_flash *flash, int on)
+ 		return 0;
+ 
+ 	ret = adp1653_init_device(flash);
+-	if (ret < 0)
++	if (ret >= 0)
++		return ret;
++
++	if (flash->platform_data->power)
+ 		flash->platform_data->power(&flash->subdev, 0);
++	else
++		gpio_set_value(flash->platform_data->power_gpio, 0);
+ 
+ 	return ret;
+ }
+@@ -407,21 +429,87 @@ static int adp1653_resume(struct device *dev)
+ 
+ #endif /* CONFIG_PM */
+ 
++
++
++
++
++
++
++
++
++
++
++
++
++
++static int adp1653_of_init(struct i2c_client *client, struct adp1653_flash *flash, 
++			   struct device_node *node)
++{
++	u32 val;
++	struct adp1653_platform_data *pd;
++	enum of_gpio_flags flags;
++	int gpio;
++
++	if (!node)
++		return -EINVAL;
++
++	printk("adp1653: no platform data\n");
++	pd = devm_kzalloc(&client->dev, sizeof(*pd), GFP_KERNEL);
++	if (!pd)
++		return -ENOMEM;
++	flash->platform_data = pd;
++
++
++
++
++
++
++
++	if (of_property_read_u32(node, "max-flash-timeout-usec", &val)) return -EINVAL;
++	pd->max_flash_timeout = val;
++	if (of_property_read_u32(node, "max-flash-intensity-uA", &val)) return -EINVAL;
++	pd->max_flash_intensity = val/1000;
++	if (of_property_read_u32(node, "max-torch-intensity-uA", &val)) return -EINVAL;
++	pd->max_torch_intensity = val/1000;
++	if (of_property_read_u32(node, "max-indicator-intensity-uA", &val)) return -EINVAL;
++	pd->max_indicator_intensity = val;
++
++	if (!of_find_property(node, "gpios", NULL)) {
++		printk("No gpio node\n");
++		return -EINVAL;
++	}
++
++	gpio = of_get_gpio_flags(node, 0, &flags);
++	if (gpio < 0) {
++		printk("Error getting GPIO\n"); 
++		return -EINVAL;
++	}
++
++	pd->power_gpio = gpio;
++
++	return 0;
++}
++
++
+ static int adp1653_probe(struct i2c_client *client,
+ 			 const struct i2c_device_id *devid)
+ {
+ 	struct adp1653_flash *flash;
+ 	int ret;
+ 
+-	/* we couldn't work without platform data */
+-	if (client->dev.platform_data == NULL)
+-		return -ENODEV;
++	printk("adp1653: probe\n");
+ 
+ 	flash = devm_kzalloc(&client->dev, sizeof(*flash), GFP_KERNEL);
+ 	if (flash == NULL)
+ 		return -ENOMEM;
+ 
+-	flash->platform_data = client->dev.platform_data;
++	/* we couldn't work without platform data */
++	if (client->dev.platform_data == NULL) {
++		ret = adp1653_of_init(client, flash, client->dev.of_node);
++		if (ret)
++			return ret;
++	} else
++		flash->platform_data = client->dev.platform_data;
+ 
+ 	mutex_init(&flash->power_lock);
+ 
+@@ -439,9 +527,15 @@ static int adp1653_probe(struct i2c_client *client,
+ 
+ 	flash->subdev.entity.type = MEDIA_ENT_T_V4L2_SUBDEV_FLASH;
+ 
++	__adp1653_set_power(flash, 1);
++
++	__adp1653_set_power(flash, 0);
++	printk("Flash should have blinked\n");
++
+ 	return 0;
+ 
+ free_and_quit:
++	printk("adp1653: something failed registering\n");
+ 	v4l2_ctrl_handler_free(&flash->ctrls);
+ 	return ret;
+ }
+diff --git a/include/media/adp1653.h b/include/media/adp1653.h
+index 1d9b48a..b556580 100644
+--- a/include/media/adp1653.h
++++ b/include/media/adp1653.h
+@@ -100,9 +100,11 @@ struct adp1653_platform_data {
+ 	int (*power)(struct v4l2_subdev *sd, int on);
+ 
+ 	u32 max_flash_timeout;		/* flash light timeout in us */
+-	u32 max_flash_intensity;	/* led intensity, flash mode */
+-	u32 max_torch_intensity;	/* led intensity, torch mode */
+-	u32 max_indicator_intensity;	/* indicator led intensity */
++	u32 max_flash_intensity;	/* led intensity, flash mode, mA */
++	u32 max_torch_intensity;	/* led intensity, torch mode, mA */
++	u32 max_indicator_intensity;	/* indicator led intensity, uA */
++
++	int power_gpio;			/* for device-tree based boot */
+ };
+ 
+ #define to_adp1653_flash(sd)	container_of(sd, struct adp1653_flash, subdev)
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
