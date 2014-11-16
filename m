@@ -1,65 +1,21 @@
-From: peter.crosthwaite@xilinx.com (Peter Crosthwaite)
-Date: Mon, 17 Nov 2014 09:00:02 +1000
-Subject: [PATCH v4 6/6] ARM: zynq: DT: Add OCM controller node
-In-Reply-To: <c52187589f5c4cc6b908d899c2b9f7a6@BN1BFFO11FD036.protection.gbl>
-References: <cover.1415962281.git.michal.simek@xilinx.com>
- <0a88d52b5e71fb220ca619180ec9ca746edad2b1.1415962281.git.michal.simek@xilinx.com>
- <546881CA.2020801@suse.de>
- <c52187589f5c4cc6b908d899c2b9f7a6@BN1BFFO11FD036.protection.gbl>
-Message-ID: <CAEgOgz7j3jFbf1HxtimzPDMQ3oRu8AAHhHAUtg1boYjOUV5ygA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 16 Nov 2014 15:07:57 -0800
+Subject: [GIT PULL] ARM: mvebu: Fixes for v3.18
+In-Reply-To: <20141101222033.GA3698@titan.lakedaemon.net>
+References: <20141101222033.GA3698@titan.lakedaemon.net>
+Message-ID: <20141116230757.GA14929@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 5:32 AM, S?ren Brinkmann
-<soren.brinkmann@xilinx.com> wrote:
-> On Sun, 2014-11-16 at 11:51AM +0100, Andreas F?rber wrote:
->> Hi Michal,
->>
->> Am 14.11.2014 um 11:52 schrieb Michal Simek:
->> > diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
->> > index ce2ef5bec4f2..e217fb1c1169 100644
->> > --- a/arch/arm/boot/dts/zynq-7000.dtsi
->> > +++ b/arch/arm/boot/dts/zynq-7000.dtsi
->> > @@ -150,6 +150,13 @@
->> >                     reg = <0xf8006000 0x1000>;
->> >             };
->> >
->> > +           ocmc: memory-controller at f800c000 {
->> > +                   compatible = "xlnx,zynq-ocmc-1.0";
->> > +                   interrupt-parent = <&intc>;
->> > +                   interrupts = <0 3 4>;
->> > +                   reg = <0xf800c000 0x1000>;
->> > +           };
->> > +
->> >             uart0: serial at e0000000 {
->> >                     compatible = "xlnx,xuartps", "cdns,uart-r1p8";
->> >                     status = "disabled";
->>
->> Not directly related to this patch: As one can see here, the node order
->> is quite a mess... According to Olof, nodes should be ordered by unit
->> address, whereas here some but not all seem ordered by node name. Would
->> you welcome a cleanup patch, or can you fix that yourself?
->
-> I wouldn't say it's a mess, just a different property to sort the nodes
-> by. For humans reading the DT, searching for nodes, alphabetical order
-> helps finding the right node, IMHO.
+On Sat, Nov 01, 2014 at 06:20:33PM -0400, Jason Cooper wrote:
+> Guys,
+> 
+> Here's a couple of fixes I've gathered so far for mvebu, nothing
+> exciting as these are quite old and were in -next for several weeks.
+> 
+> Please pull.
 
-I do generally find myself asking "whats that thing at that address"
-more than I find myself asking the "wheres that piece of hardware" so
-Andreas' sorting scheme makes more sense to me. Vertically scanning a
-DT to give yourself an overview of the system level address map is
-good too. Wheras alphabetic sorting doesn't mean to much.
+Pulled. Might miss today's -rc.
 
-Regards,
-Peter
 
-What advantage would sorting by
-> address have?
->
->         Thanks,
->         S?ren
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+-Olof
