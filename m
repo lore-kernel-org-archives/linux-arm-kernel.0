@@ -1,41 +1,42 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 17 Nov 2014 14:35:41 +0100
-Subject: [PATCH v8 07/13] usb: chipidea: fix phy handling
+Date: Mon, 17 Nov 2014 14:35:40 +0100
+Subject: [PATCH v8 06/13] Documentation: bindings: add doc for the Berlin USB
+ PHY
 In-Reply-To: <1416231347-27193-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1416231347-27193-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1416231347-27193-8-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1416231347-27193-7-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic plaftorm device for ChipIdea drivers is probed by calling
-ci_hdrc_probe. The device structure used is not the one of the specific
-ChipIdea driver but the one of the generic ChipIdea platform device.
-
-This results in not being able to probe the PHYs as we're not using the
-right device structure. Since all ChipIdea drivers are retrieving their
-PHYs in their specific driver code, this didn't impact any of them yet.
-
-Fixes it using the right device structure (dev->parent).
+Document the bindings of the Marvell Berlin USB PHY driver.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/usb/chipidea/core.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/phy/berlin-usb-phy.txt | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/berlin-usb-phy.txt
 
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index de1e4a84aa93..068e0c6acc3f 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -686,8 +686,8 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 	} else if (ci->platdata->usb_phy) {
- 		ci->usb_phy = ci->platdata->usb_phy;
- 	} else {
--		ci->phy = devm_phy_get(dev, "usb-phy");
--		ci->usb_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
-+		ci->phy = devm_phy_get(dev->parent, "usb-phy");
-+		ci->usb_phy = devm_usb_get_phy(dev->parent, USB_PHY_TYPE_USB2);
- 
- 		/* if both generic PHY and USB PHY layers aren't enabled */
- 		if (PTR_ERR(ci->phy) == -ENOSYS &&
+diff --git a/Documentation/devicetree/bindings/phy/berlin-usb-phy.txt b/Documentation/devicetree/bindings/phy/berlin-usb-phy.txt
+new file mode 100644
+index 000000000000..be33780f668e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/berlin-usb-phy.txt
+@@ -0,0 +1,16 @@
++* Marvell Berlin USB PHY
++
++Required properties:
++- compatible: "marvell,berlin2-usb-phy" or "marvell,berlin2cd-usb-phy"
++- reg: base address and length of the registers
++- #phys-cells: should be 0
++- resets: reference to the reset controller
++
++Example:
++
++	usb-phy at f774000 {
++		compatible = "marvell,berlin2-usb-phy";
++		reg = <0xf774000 0x128>;
++		#phy-cells = <0>;
++		resets = <&chip 0x104 14>;
++	};
 -- 
 2.1.0
