@@ -1,92 +1,124 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 17 Nov 2014 11:14:16 -0800
-Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
-In-Reply-To: <1600093.60yAP0Qpua@wuerfel> (Arnd Bergmann's message of "Mon, 10
- Nov 2014 21:36:55 +0100")
-References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
- <5331397.OQCQmJO78C@wuerfel> <5460F806.3040305@ti.com>
- <1600093.60yAP0Qpua@wuerfel>
-Message-ID: <7h389h3aif.fsf@deeprootsystems.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 17 Nov 2014 11:15:15 -0800
+Subject: [PATCH] clk-divider: Fix READ_ONLY when divider > 1
+In-Reply-To: <1415979129-21325-1-git-send-email-james.hogan@imgtec.com>
+References: <1415979129-21325-1-git-send-email-james.hogan@imgtec.com>
+Message-ID: <20141117191515.25314.22524@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Quoting James Hogan (2014-11-14 07:32:09)
+> Commit 79c6ab509558 (clk: divider: add CLK_DIVIDER_READ_ONLY flag) in
+> v3.16 introduced the CLK_DIVIDER_READ_ONLY flag which caused the
+> recalc_rate() and round_rate() clock callbacks to be omitted.
+> 
+> However using this flag has the unfortunate side effect of causing the
+> clock recalculation code when a clock rate change is attempted to always
+> treat it as a pass-through clock, i.e. with a fixed divide of 1, which
+> may not be the case. Child clock rates are then recalculated using the
+> wrong parent rate.
+> 
+> Therefore instead of dropping the recalc_rate() and round_rate()
+> callbacks, alter clk_divider_bestdiv() to always report the current
+> divider as the best divider so that it is never altered.
+> 
+> For me the read only clock was the system clock, which divided the PLL
+> rate by 2, from which both the UART and the SPI clocks were divided.
+> Initial setting of the UART rate set it correctly, but when the SPI
+> clock was set, the other child clocks were miscalculated. The UART clock
+> was recalculated using the PLL rate as the parent rate, resulting in a
+> UART new_rate of double what it should be, and a UART which spewed forth
+> garbage when the rate changes were propagated.
 
-> On Monday 10 November 2014 19:38:14 Grygorii Strashko wrote:
->> Hi Arnd,
->> 
->> On 11/10/2014 05:06 PM, Arnd Bergmann wrote:
->> > On Monday 10 November 2014 16:59:16 Grygorii Strashko wrote:
->> >> --- /dev/null
->> >> +++ b/Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt
->> >> @@ -0,0 +1,31 @@
->> >> +* TI Keystone 2 Generic PM Controller
->> >> +
->> >> +The TI Keystone 2 Generic PM Controller is responsible for Clock gating
->> >> +for each controlled IP module.
->> >> +
->> >> +Required properties:
->> >> +- compatible: Should be "ti,keystone-powerdomain"
->> >> +- #power-domain-cells: Should be 0, see below:
->> >> +
->> >> +The PM Controller node is a PM domain as documented in
->> >> +Documentation/devicetree/bindings/power/power_domain.txt.
->> >> +
->> >> +Example:
->> >> +
->> >> +       pm_controller: pm-controller {
->> >> +               compatible = "ti,keystone-powerdomain";
->> >> +               #power-domain-cells = <0>;
->> >> +       };
->> >> +
->> >> +       netcp: netcp at 2090000 {
->> >> +               reg = <0x2620110 0x8>;
->> >> +               reg-names = "efuse";
->> >> +               ...
->> >> +               #address-cells = <1>;
->> >> +               #size-cells = <1>;
->> >> +               ranges;
->> >> +               power-domains = <&pm_controller>;
->> >> +
->> >> +               clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>;
->> >> +               dma-coherent;
->> >> +       }
->> > 
->> > I don't get it. What keystone specific about a "ti,keystone-powerdomain"
->> > device? It seems that the device has no registers whatsoever and the
->> > driver doesn't really do anything that relates to the platform.
->> 
->> That's true. but it was the only one acceptable way  to enable
->> Generic clock manipulation PM callbacks for the DT-boot case.
->> After several unsuccessful attempts the idea to use GPD
->> was introduced by Kevin there:
->>   https://lkml.org/lkml/2014/9/8/643
->> 
->> So, The Keystone 2 Generic PM Controller is just a proxy PM layer here between
->> device and Generic clock manipulation PM callbacks.
->> It fills per-device clock list when device is attached to GPD and
->> ensures that all clocks from that list enabled/disabled when device is
->> started/stopped.
->
-> The idea of such a generic power domain implementation sounds useful, but
-> it has absolutely no business in platform specific code.
+Applied to clk-fixes towards -rc6.
 
-Yes it does.  This isn't a generic power domain implementation, but
-rather just the platform-specific glue that hooks up the clocks to the
-right devices and power-domains so that the generic power-domain and
-generic pm_clocks code does the right thing.
+Thanks,
+Mike
 
-> I suggest you either remove the power domain proxy from your drivers
-> and use the clocks directly, 
-
-No.  That's a step in the wrong direction.  This change isn't affecting
-drivers directly.  It's the runtime PM and generic power domain layers
-that handle this, and runtime PM adapted drivers don't need any changes.
- 
-> or come up with an implementation that can be used across other
-> platforms and CPU architectures.
-
-We already have those in the generic power domain and the pm_clock
-layers.  This series is just hooking those up for Keystone.
-
-Kevin
+> 
+> Signed-off-by: James Hogan <james.hogan@imgtec.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Thomas Abraham <thomas.ab@samsung.com>
+> Cc: Tomasz Figa <t.figa@samsung.com>
+> Cc: Max Schwarz <max.schwarz@online.de>
+> Cc: <stable@vger.kernel.org> # v3.16+
+> ---
+>  drivers/clk/clk-divider.c    | 18 +++++++++---------
+>  drivers/clk/rockchip/clk.c   |  4 +---
+>  include/linux/clk-provider.h |  1 -
+>  3 files changed, 10 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index 18a9de29df0e..c0a842b335c5 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -263,6 +263,14 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+>         if (!rate)
+>                 rate = 1;
+>  
+> +       /* if read only, just return current value */
+> +       if (divider->flags & CLK_DIVIDER_READ_ONLY) {
+> +               bestdiv = readl(divider->reg) >> divider->shift;
+> +               bestdiv &= div_mask(divider);
+> +               bestdiv = _get_div(divider, bestdiv);
+> +               return bestdiv;
+> +       }
+> +
+>         maxdiv = _get_maxdiv(divider);
+>  
+>         if (!(__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT)) {
+> @@ -361,11 +369,6 @@ const struct clk_ops clk_divider_ops = {
+>  };
+>  EXPORT_SYMBOL_GPL(clk_divider_ops);
+>  
+> -const struct clk_ops clk_divider_ro_ops = {
+> -       .recalc_rate = clk_divider_recalc_rate,
+> -};
+> -EXPORT_SYMBOL_GPL(clk_divider_ro_ops);
+> -
+>  static struct clk *_register_divider(struct device *dev, const char *name,
+>                 const char *parent_name, unsigned long flags,
+>                 void __iomem *reg, u8 shift, u8 width,
+> @@ -391,10 +394,7 @@ static struct clk *_register_divider(struct device *dev, const char *name,
+>         }
+>  
+>         init.name = name;
+> -       if (clk_divider_flags & CLK_DIVIDER_READ_ONLY)
+> -               init.ops = &clk_divider_ro_ops;
+> -       else
+> -               init.ops = &clk_divider_ops;
+> +       init.ops = &clk_divider_ops;
+>         init.flags = flags | CLK_IS_BASIC;
+>         init.parent_names = (parent_name ? &parent_name: NULL);
+>         init.num_parents = (parent_name ? 1 : 0);
+> diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
+> index 1e68bff481b8..880a266f0143 100644
+> --- a/drivers/clk/rockchip/clk.c
+> +++ b/drivers/clk/rockchip/clk.c
+> @@ -90,9 +90,7 @@ static struct clk *rockchip_clk_register_branch(const char *name,
+>                 div->width = div_width;
+>                 div->lock = lock;
+>                 div->table = div_table;
+> -               div_ops = (div_flags & CLK_DIVIDER_READ_ONLY)
+> -                                               ? &clk_divider_ro_ops
+> -                                               : &clk_divider_ops;
+> +               div_ops = &clk_divider_ops;
+>         }
+>  
+>         clk = clk_register_composite(NULL, name, parent_names, num_parents,
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index be21af149f11..2839c639f092 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -352,7 +352,6 @@ struct clk_divider {
+>  #define CLK_DIVIDER_READ_ONLY          BIT(5)
+>  
+>  extern const struct clk_ops clk_divider_ops;
+> -extern const struct clk_ops clk_divider_ro_ops;
+>  struct clk *clk_register_divider(struct device *dev, const char *name,
+>                 const char *parent_name, unsigned long flags,
+>                 void __iomem *reg, u8 shift, u8 width,
+> -- 
+> 2.0.4
+> 
