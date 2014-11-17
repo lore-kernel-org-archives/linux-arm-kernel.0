@@ -1,155 +1,64 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:54 +0100
-Subject: [PATCH v5 60/61] dmaengine: Remove device_control and
- device_slave_caps
+Date: Mon, 17 Nov 2014 14:42:48 +0100
+Subject: [PATCH v5 54/61] dmaengine: nbpfaxi: Declare slave capabilities for
+ the generic code
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-61-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-55-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that device_control has been split into several functions, and
-device_slave_caps rendered useless, we can safely remove them.
+Now that the generic slave caps code can make use of the device assigned
+capabilities, instead of relying on a callback to be implemented.
+
+Make use of this code.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- include/linux/dmaengine.h | 52 ++++++-----------------------------------------
- 1 file changed, 6 insertions(+), 46 deletions(-)
+ drivers/dma/nbpfaxi.c | 17 ++++-------------
+ 1 file changed, 4 insertions(+), 13 deletions(-)
 
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index be9e60aa8f5e..b01b7a7c581b 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -189,25 +189,6 @@ enum dma_ctrl_flags {
- };
+diff --git a/drivers/dma/nbpfaxi.c b/drivers/dma/nbpfaxi.c
+index 9f151dcd4f73..6a963928e958 100644
+--- a/drivers/dma/nbpfaxi.c
++++ b/drivers/dma/nbpfaxi.c
+@@ -1069,18 +1069,6 @@ static void nbpf_free_chan_resources(struct dma_chan *dchan)
+ 	}
+ }
  
- /**
-- * enum dma_ctrl_cmd - DMA operations that can optionally be exercised
-- * on a running channel.
-- * @DMA_TERMINATE_ALL: terminate all ongoing transfers
-- * @DMA_PAUSE: pause ongoing transfers
-- * @DMA_RESUME: resume paused transfer
-- * @DMA_SLAVE_CONFIG: this command is only implemented by DMA controllers
-- * that need to runtime reconfigure the slave channels (as opposed to passing
-- * configuration data in statically from the platform). An additional
-- * argument of struct dma_slave_config must be passed in with this
-- * command.
-- */
--enum dma_ctrl_cmd {
--	DMA_TERMINATE_ALL,
--	DMA_PAUSE,
--	DMA_RESUME,
--	DMA_SLAVE_CONFIG,
--};
--
--/**
-  * enum sum_check_bits - bit position of pq_check_flags
-  */
- enum sum_check_bits {
-@@ -336,9 +317,8 @@ enum dma_slave_buswidth {
-  * This struct is passed in as configuration data to a DMA engine
-  * in order to set up a certain channel for DMA transport at runtime.
-  * The DMA device/engine has to provide support for an additional
-- * command in the channel config interface, DMA_SLAVE_CONFIG
-- * and this struct will then be passed in as an argument to the
-- * DMA engine device_control() function.
-+ * callback in the dma_device structure, device_config and this struct
-+ * will then be passed in as an argument to the function.
-  *
-  * The rationale for adding configuration information to this struct is as
-  * follows: if it is likely that more than one DMA slave controllers in
-@@ -617,8 +597,6 @@ struct dma_tx_state {
-  * @device_prep_interleaved_dma: Transfer expression in a generic way.
-  * @device_config: Pushes a new configuration to a channel, return 0 or an error
-  *	code
-- * @device_control: manipulate all pending operations on a channel, returns
-- *	zero or error code
-  * @device_pause: Pauses any transfer happening on a channel. Returns
-  *	0 or an error code
-  * @device_resume: Resumes any transfer on a channel previously
-@@ -630,7 +608,6 @@ struct dma_tx_state {
-  *	struct with auxiliary transfer status information, otherwise the call
-  *	will just return a simple status code
-  * @device_issue_pending: push pending transactions to hardware
-- * @device_slave_caps: return the slave channel capabilities
-  */
- struct dma_device {
- 
-@@ -697,8 +674,6 @@ struct dma_device {
- 
- 	int (*device_config)(struct dma_chan *chan,
- 			     struct dma_slave_config *config);
--	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--		unsigned long arg);
- 	int (*device_pause)(struct dma_chan *chan);
- 	int (*device_resume)(struct dma_chan *chan);
- 	int (*device_terminate_all)(struct dma_chan *chan);
-@@ -707,27 +682,15 @@ struct dma_device {
- 					    dma_cookie_t cookie,
- 					    struct dma_tx_state *txstate);
- 	void (*device_issue_pending)(struct dma_chan *chan);
--	int (*device_slave_caps)(struct dma_chan *chan, struct dma_slave_caps *caps);
- };
- 
--static inline int dmaengine_device_control(struct dma_chan *chan,
--					   enum dma_ctrl_cmd cmd,
--					   unsigned long arg)
+-static int nbpf_slave_caps(struct dma_chan *dchan,
+-			   struct dma_slave_caps *caps)
 -{
--	if (chan->device->device_control)
--		return chan->device->device_control(chan, cmd, arg);
+-	caps->src_addr_widths = NBPF_DMA_BUSWIDTHS;
+-	caps->dst_addr_widths = NBPF_DMA_BUSWIDTHS;
+-	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+-	caps->cmd_pause = false;
+-	caps->cmd_terminate = true;
 -
--	return -ENOSYS;
+-	return 0;
 -}
 -
- static inline int dmaengine_slave_config(struct dma_chan *chan,
- 					  struct dma_slave_config *config)
+ static struct dma_chan *nbpf_of_xlate(struct of_phandle_args *dma_spec,
+ 				      struct of_dma *ofdma)
  {
- 	if (chan->device->device_config)
- 		return chan->device->device_config(chan, config);
+@@ -1411,7 +1399,6 @@ static int nbpf_probe(struct platform_device *pdev)
+ 	dma_dev->device_prep_dma_memcpy = nbpf_prep_memcpy;
+ 	dma_dev->device_tx_status = nbpf_tx_status;
+ 	dma_dev->device_issue_pending = nbpf_issue_pending;
+-	dma_dev->device_slave_caps = nbpf_slave_caps;
  
--	return dmaengine_device_control(chan, DMA_SLAVE_CONFIG,
--			(unsigned long)config);
-+	return -ENOSYS;
- }
- 
- static inline bool is_slave_direction(enum dma_transfer_direction direction)
-@@ -807,9 +770,6 @@ static inline int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_cap
- 	if (!test_bit(DMA_SLAVE, device->cap_mask.bits))
- 		return -ENXIO;
- 
--	if (device->device_slave_caps)
--		return device->device_slave_caps(chan, caps);
--
  	/*
- 	 * Check whether it reports it uses the generic slave
- 	 * capabilities, if not, that means it doesn't support any
-@@ -834,7 +794,7 @@ static inline int dmaengine_terminate_all(struct dma_chan *chan)
- 	if (chan->device->device_terminate_all)
- 		return chan->device->device_terminate_all(chan);
+ 	 * If we drop support for unaligned MEMCPY buffer addresses and / or
+@@ -1427,6 +1414,10 @@ static int nbpf_probe(struct platform_device *pdev)
+ 	dma_dev->device_pause = nbpf_pause;
+ 	dma_dev->device_terminate_all = nbpf_terminate_all;
  
--	return dmaengine_device_control(chan, DMA_TERMINATE_ALL, 0);
-+	return -ENOSYS;
- }
++	dma_dev->src_addr_widths = NBPF_DMA_BUSWIDTHS;
++	dma_dev->dst_addr_widths = NBPF_DMA_BUSWIDTHS;
++	dma_dev->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
++
+ 	platform_set_drvdata(pdev, nbpf);
  
- static inline int dmaengine_pause(struct dma_chan *chan)
-@@ -842,7 +802,7 @@ static inline int dmaengine_pause(struct dma_chan *chan)
- 	if (chan->device->device_pause)
- 		return chan->device->device_pause(chan);
- 
--	return dmaengine_device_control(chan, DMA_PAUSE, 0);
-+	return -ENOSYS;
- }
- 
- static inline int dmaengine_resume(struct dma_chan *chan)
-@@ -850,7 +810,7 @@ static inline int dmaengine_resume(struct dma_chan *chan)
- 	if (chan->device->device_resume)
- 		return chan->device->device_resume(chan);
- 
--	return dmaengine_device_control(chan, DMA_RESUME, 0);
-+	return -ENOSYS;
- }
- 
- static inline enum dma_status dmaengine_tx_status(struct dma_chan *chan,
+ 	ret = clk_prepare_enable(nbpf->clk);
 -- 
 2.1.1
