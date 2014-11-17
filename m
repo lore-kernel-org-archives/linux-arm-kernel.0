@@ -1,171 +1,46 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 17 Nov 2014 11:25:08 +0100
-Subject: [PATCH v2] PCI: designware: Add support 4 ATUs assignment
-In-Reply-To: <5469643A.6040906@freescale.com>
-References: <1415682444-24911-1-git-send-email-Minghuan.Lian@freescale.com>
- <CA+mB=1+4Dzxhbin6z0PUENvjUz-y8bq-K09FXTnSepFvVfe9HQ@mail.gmail.com>
- <546308DD.40109@freescale.com>
- <CA+mB=1K=Oyzdb2yfBvPRG9DHi-PFjRPtVS_dY9JMOz6dQog8QQ@mail.gmail.com>
- <546331E7.5060003@freescale.com>
- <CA+mB=1KObT9O783SMcvHy8nJGQPnxyKgP332r5bHx-K_D+LhVg@mail.gmail.com>
- <1415809929.2876.5.camel@pengutronix.de> <546481A3.5050700@freescale.com>
- <1415874015.2420.5.camel@pengutronix.de> <54648D61.6050704@freescale.com>
- <1415876988.2420.7.camel@pengutronix.de> <5465C19D.3060801@freescale.com>
- <1415959338.4445.1.camel@pengutronix.de>
- <ceb189ef55cf44588b212cc44bb19ef5@BN3PR0301MB1249.namprd03.prod.outlook.com>
- <1415965321.4445.4.camel@pengutronix.de> <5469643A.6040906@freescale.com>
-Message-ID: <1416219908.2734.1.camel@pengutronix.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 17 Nov 2014 13:26:15 +0300
+Subject: [PATCH v4] of: replace Asahi Kasei Corp venter prefix
+In-Reply-To: <87y4ra8xac.wl%kuninori.morimoto.gx@renesas.com>
+References: <878ulzx6hr.wl%kuninori.morimoto.gx@gmail.com>	<20140922130026.GK3290@leverpostej>	<CAMuHMdX22z97SbGS1HDiYfJ1PXxyEN2S8D7w4sr+4bUwD+mJZw@mail.gmail.com>	<20140922132743.GM3290@leverpostej>	<87y4rfhmgl.wl%kuninori.morimoto.gx@renesas.com>	<1415845309.4269.6.camel@perches.com>	<20141113025105.GA16652@verge.net.au>	<87vbmjhj00.wl%kuninori.morimoto.gx@renesas.com>	<20141113110740.GE3815@sirena.org.uk>	<87k32yd0bd.wl%kuninori.morimoto.gx@renesas.com>	<20141114093554.GC3810@ulmo>
+ <87y4ra8xac.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <5469CD47.3040409@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob, Mark, Kumar, Ian,
+Hello.
 
-could I please get your opinion on the following matter? Thanks.
+On 11/17/2014 3:51 AM, Kuninori Morimoto wrote:
 
-Am Montag, den 17.11.2014, 10:58 +0800 schrieb Lian Minghuan-B31939:
-> Hi Lucas,
-> 
-> On 2014?11?14? 19:42, Lucas Stach wrote:
-> > Am Freitag, den 14.11.2014, 11:30 +0000 schrieb
-> > Mingkai.Hu at freescale.com:
-> >>
-> >>> -----Original Message-----
-> >>> From: Lucas Stach [mailto:l.stach at pengutronix.de]
-> >>> Sent: Friday, November 14, 2014 6:02 PM
-> >>> To: Lian Minghuan-B31939
-> >>> Cc: Srikanth Thokala; Lian Minghuan-B31939; linux-pci at vger.kernel.org;
-> >>> linux-arm-kernel at lists.infradead.org; Zang Roy-R61911; Hu Mingkai-B21284;
-> >>> Bjorn Helgaas
-> >>> Subject: Re: [PATCH v2] PCI: designware: Add support 4 ATUs assignment
-> >>>
-> >>> Am Freitag, den 14.11.2014, 16:47 +0800 schrieb Lian Minghuan-B31939:
-> >>>> Hi Lucas and all,
-> >>>>
-> >>>> On 2014?11?13? 19:09, Lucas Stach wrote:
-> >>>>> Am Donnerstag, den 13.11.2014, 18:52 +0800 schrieb Lian Minghuan-
-> >>> B31939:
-> >>>>>> Hi Lucas,
-> >>>>>>
-> >>>>>> On 2014?11?13? 18:20, Lucas Stach wrote:
-> >>>>>>> Am Donnerstag, den 13.11.2014, 18:02 +0800 schrieb Lian Minghuan-
-> >>> B31939:
-> >>>>>>>> Hi Lucas,
-> >>>>>>>>
-> >>>>>>>> Please see my comments inline.
-> >>>>>>>>
-> >>>>>>>> Thanks,
-> >>>>>>>> Minghuan
-> >>>>>>>>
-> >>>>>>>> On 2014?11?13? 00:32, Lucas Stach wrote:
-> >>>>>>>>> Am Mittwoch, den 12.11.2014, 21:53 +0530 schrieb Srikanth Thokala:
-> >>>>>>>>>> Hi Minghuan,
-> >>>>>>> [...]
-> >>>>>>>
-> >>>>>>>>> Using a smaller type complicates the DT for little to no
-> >>>>>>>>> benefit. I think it's ok to use u32 here, which is a common
-> >>>>>>>>> standard for integer values in DT.
-> >>>>>>>>>
-> >>>>>>>>> Though this discussion lead me to the question if we even need
-> >>>>>>>>> to have this property in the DT at all. Isn't this a property
-> >>>>>>>>> that is fixed for a specific silicon implementation of the DW
-> >>>>>>>>> core? In that case we could just infer the number of ATUs from
-> >>>>>>>>> the DT compatible, so this should probably just be added to
-> >>>>>>>>> struct pcie_port and properly initialized by the SoC glue drivers.
-> >>>>>>>> [Minghuan]  As far as I know, exynos implements only 2 ATUs, this
-> >>>>>>>> is why pcie-designware only supports 2 ATU. iMX implements 4 ATUs
-> >>>>>>>> and LS1021A implements 6 ATUs.
-> >>>>>>>>
-> >>>>>>> Right so we don't need an additional property in the DT at all.
-> >>>>>>> The number of ATUs is fixed for a specific core compatible and can
-> >>>>>>> be passed in by the respective exynos, imx and ls1021 glue drivers.
-> >>>>>>>
-> >>>>>>> You may ask the Keystone and Spear maintainers to get the correct
-> >>>>>>> number of ATUs for those implementations.
-> >>   > >>>
-> >>>>>>> Regards,
-> >>>>>>> Lucas
-> >>>>>> [Minghuan] Yes. This a way that specific core driver passes the ATU
-> >>>>>> number to pci-designware. But I perfer to adding dts node for the
-> >>>>>> following reasons:
-> >>>>>> 1. ATU number is hardware attribute, so it can be added to DTS.
-> >>>>> But it is a duplication of information that can be inferred from the
-> >>>>> DT compatible alone, which is usually frowned upon.
-> >>>>>
-> >>>>> Also in contrast to the num-lanes property I don't see a use-case to
-> >>>>> reduce the number of used ATUs in a specific system, so num-atus is
-> >>>>> basically fixed for a specific implementation.
-> >>>> [Minghuan] 4ATUs provides better support for multiple-function and
-> >>>> SR-IOV PCIe devices.
-> >>>> Can anyone tell me if there is the company will increase ATUs number?
-> >>>> If yes, we should avoid the following code:
-> >>>>
-> >>>> if (of_device_is_compatible(pcie->dev->of_node, "xxx,r1-pcie"))
-> >>>>       atu_num = 2;
-> >>>>
-> >>>> if (of_device_is_compatible(pcie->dev->of_node, "xxx,r2-pcie"))
-> >>>>       atu_num = 4;
-> >>>>
-> >>> The number of ATUs is fixed for a specific implementation. If the number
-> >>> of ATUs changes in a newer implementation of a SoC then the silicon
-> >>> implementation of the DW PCIe core changed, so it should get a new
-> >>> compatible anyway.
-> >>>
-> >> If there are multiple platforms to use the same SoC driver, there will be
-> >> multiple cases for different platforms as Minghuan has pointed out.
-> >>
-> >> For the platform that only has 2 ATUs, ATU0 is used for CFG0 and MEM and
-> >> there will be conflict when MEM and CFG0 are accessed simultaneously which
-> >> has cause the SATA link issue. I think more ATUs will be added in the
-> >> future design, then one driver maybe need to handle multiple platforms.
-> >>
-> >> DTS is designed for to describe the hardware property, it's a general way
-> >> to put hardware related property into DTS.
-> >>
-> > If another platform uses the same driver you should still have a
-> > specific compatible for that platform. Exactly to differentiate those
-> > silicon implementation differences.
-> >
-> > If you add 2 more ATUs to the layerscape pcie in a future design it is
-> > not fsl,ls1021a-pcie anymore, but for example fsl,ls1100-pcie. Also you
-> > don't need the code construct as seen above. The number of ATU can be
-> > added to implementation specific data.
-> > Please look at the Tegra PCI driver and especially struct
-> > tegra_pcie_soc_data on how to properly abstract properties that are
-> > defined by a specific silicon implementation of a core.
-> [Minghuan] Yes, we can added specific data for different implementation.
-> But we need to add hard coded information and assignment statement to
-> the layerscape PCIe driver even to every PCIe driver based on 
-> pcie-designware.c.
-> 
-> Why not use dts?  Nothing needs to be added to specific implementation 
-> driver code.
-> 
+> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This is an implementation detail of the Linux driver. We generally don't
-decide about the DT layout based on implementation details.
+    s/venter/vendor/ in the subject. Sorry for a late comment.
 
-> The Device Tree is a data structure for describing hardware. Rather than 
-> hard coding every detail of a device into an operating system, many 
-> aspect of the hardware can be described in a data structure that is 
-> passed to the operating system at boot time.
-> 
-Because in my view this is a duplication of information. I would argue
-that we should not put any properties into the DT that can be easily
-inferred from the device compatible alone.
+> Current vendor-prefixes.txt already has "ak" prefix for Asahi Kasei Corp
+> by ae8c4209af2c(of: Add vendor prefix for Asahi Kasei Corp.)
 
-I can already see problems with DT backwards compatibility for this
-property. You can not make the property mandatory as it this would break
-old DTs. You now assume that if the property isn't present it means that
-2 ATUs are implemented. While it isn't strictly breaking anything having
-the property in the DT means that only systems with a new DTB will set
-the right number of ATUs (4) for i.MX6. This could be easily avoided if
-we just infer the property from the compatible.
+> It went through the appropriate review process. But, almost all
+> Asahi Kasei chip drivers are using "asahi-kasei" prefix today.
+> (arch/arm/boot/dts/tegra20-seaboard.dts only is using "ak,ak8975",
+>   but there are instances of "asahi-kasei,ak8975" in other dts files.
+>   And drivers/iio/magnetometer/ak8975.c doesn't support "ak,ak8975")
+> So, we made a mistake there.
 
-But I'm no authority on DT decisions, let's get the proper people on CC
-so we can get to an agreement here.
+> In addition, checkpatch.pl reports WARNING if it is using "asahi-kasei"
+> prerfix in DT file.
+> (DT compatible string vendor "asahi-kasei" appears un-documented)
 
-Regards,
-Lucas
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+> Marking it deprecated and warning with checkpatch is certainly
+> preferable. So, this patch replace "ak" to "asahi-kasei" in
+> vendor-prefixes.txt. (and fixup tegra20-seaboard)
+
+> OTOH, Asahi Kasei is usually referred to as "AKM", but this patch
+> doesn't care about it. Because no DT is using that today.
+
+> Acked-by: Thierry Reding <treding@nvidia.com>
+> Acked-by: Alexandre Courbot <acourbot@nvidia.com>
+> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+
+    One normally places ACKs after his own sign-off.
+
+WBR, Sergei
