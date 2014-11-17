@@ -1,35 +1,34 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 17 Nov 2014 20:29:55 +0000
-Subject: [PATCH 3/8] ARM: drop nwfpe initialisation message from warning to
- info level
+Date: Mon, 17 Nov 2014 20:30:00 +0000
+Subject: [PATCH 4/8] ARM: reduce "Booted secondary processor" message to debug
+ level
 In-Reply-To: <20141117202911.GZ4042@n2100.arm.linux.org.uk>
 References: <20141117202911.GZ4042@n2100.arm.linux.org.uk>
-Message-ID: <E1XqSvr-0002EN-Ac@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1XqSvw-0002ER-Ds@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-nwfpe's initialisation message is not a warning, it is purely
-informational.  Print it at the appropriate message level.
+Drop the "CPUn: Booted secondary processor" message from info to debug
+level.  We later print how many CPUs came online, so listing each one
+is redundant, and when using hotplug, can be quite noisy.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/nwfpe/fpmodule.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/kernel/smp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/nwfpe/fpmodule.c b/arch/arm/nwfpe/fpmodule.c
-index b2a9182acf14..ec717c190e2c 100644
---- a/arch/arm/nwfpe/fpmodule.c
-+++ b/arch/arm/nwfpe/fpmodule.c
-@@ -98,8 +98,8 @@ static int __init fpe_init(void)
- 		return 0;
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 3138d8ea9e55..7b18a1be179c 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -351,7 +351,7 @@ asmlinkage void secondary_start_kernel(void)
  
- 	/* Display title, version and copyright information. */
--	printk(KERN_WARNING "NetWinder Floating Point Emulator V0.97 ("
--	       NWFPE_BITS " precision)\n");
-+	pr_info("NetWinder Floating Point Emulator V0.97 ("
-+	        NWFPE_BITS " precision)\n");
+ 	cpu_init();
  
- 	thread_register_notifier(&nwfpe_notifier_block);
+-	pr_info("CPU%u: Booted secondary processor\n", cpu);
++	pr_debug("CPU%u: Booted secondary processor\n", cpu);
  
+ 	preempt_disable();
+ 	trace_hardirqs_off();
 -- 
 1.8.3.1
