@@ -1,57 +1,52 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:46 +0100
-Subject: [PATCH v5 52/61] dmaengine: fsl-edma: Declare slave capabilities for
- the generic code
+Date: Mon, 17 Nov 2014 14:42:42 +0100
+Subject: [PATCH v5 48/61] dmaengine: txx9: Rename device_control
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-53-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-49-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the generic slave caps code can make use of the device assigned
-capabilities, instead of relying on a callback to be implemented.
-
-Make use of this code.
+Rename the device_control callback of the TXX9 DMA driver to terminate_all
+since it's all it's really doing. That will eventually be used to retrieve
+slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/fsl-edma.c | 17 ++++-------------
- 1 file changed, 4 insertions(+), 13 deletions(-)
+ drivers/dma/txx9dmac.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
-index b5b7474f8859..1382332e7e49 100644
---- a/drivers/dma/fsl-edma.c
-+++ b/drivers/dma/fsl-edma.c
-@@ -784,18 +784,6 @@ static void fsl_edma_free_chan_resources(struct dma_chan *chan)
- 	fsl_chan->tcd_pool = NULL;
+diff --git a/drivers/dma/txx9dmac.c b/drivers/dma/txx9dmac.c
+index 17686caf64d5..cb24d3efe3a2 100644
+--- a/drivers/dma/txx9dmac.c
++++ b/drivers/dma/txx9dmac.c
+@@ -901,17 +901,12 @@ txx9dmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 	return &first->txd;
  }
  
--static int fsl_dma_device_slave_caps(struct dma_chan *dchan,
--		struct dma_slave_caps *caps)
--{
--	caps->src_addr_widths = FSL_EDMA_BUSWIDTHS;
--	caps->dst_addr_widths = FSL_EDMA_BUSWIDTHS;
--	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
--	caps->cmd_pause = true;
--	caps->cmd_terminate = true;
--
--	return 0;
--}
--
- static int
- fsl_edma_irq_init(struct platform_device *pdev, struct fsl_edma_engine *fsl_edma)
+-static int txx9dmac_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-			    unsigned long arg)
++static int txx9dmac_terminate_all(struct dma_chan *chan)
  {
-@@ -926,7 +914,10 @@ static int fsl_edma_probe(struct platform_device *pdev)
- 	fsl_edma->dma_dev.device_resume = fsl_edma_resume;
- 	fsl_edma->dma_dev.device_terminate_all = fsl_edma_terminate_all;
- 	fsl_edma->dma_dev.device_issue_pending = fsl_edma_issue_pending;
--	fsl_edma->dma_dev.device_slave_caps = fsl_dma_device_slave_caps;
-+
-+	fsl_edma->dma_dev.src_addr_widths = FSL_EDMA_BUSWIDTHS;
-+	fsl_edma->dma_dev.dst_addr_widths = FSL_EDMA_BUSWIDTHS;
-+	fsl_edma->dma_dev.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+ 	struct txx9dmac_chan *dc = to_txx9dmac_chan(chan);
+ 	struct txx9dmac_desc *desc, *_desc;
+ 	LIST_HEAD(list);
  
- 	platform_set_drvdata(pdev, fsl_edma);
+-	/* Only supports DMA_TERMINATE_ALL */
+-	if (cmd != DMA_TERMINATE_ALL)
+-		return -EINVAL;
+-
+ 	dev_vdbg(chan2dev(chan), "terminate_all\n");
+ 	spin_lock_bh(&dc->lock);
  
+@@ -1109,7 +1104,7 @@ static int __init txx9dmac_chan_probe(struct platform_device *pdev)
+ 	dc->dma.dev = &pdev->dev;
+ 	dc->dma.device_alloc_chan_resources = txx9dmac_alloc_chan_resources;
+ 	dc->dma.device_free_chan_resources = txx9dmac_free_chan_resources;
+-	dc->dma.device_control = txx9dmac_control;
++	dc->dma.device_terminate_all = txx9dmac_terminate_all;
+ 	dc->dma.device_tx_status = txx9dmac_tx_status;
+ 	dc->dma.device_issue_pending = txx9dmac_issue_pending;
+ 	if (pdata && pdata->memcpy_chan == ch) {
 -- 
 2.1.1
