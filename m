@@ -1,67 +1,59 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Mon, 17 Nov 2014 14:43:46 +0000
-Subject: [Xen-devel] [RFC] add a struct page* parameter to
- dma_map_ops.unmap_page
-In-Reply-To: <alpine.DEB.2.02.1411111644490.26318@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1411111644490.26318@kaball.uk.xensource.com>
-Message-ID: <546A09A2.9090704@citrix.com>
+From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
+Date: Mon, 17 Nov 2014 15:45:00 +0100
+Subject: [PATCH] gpio: mxs: implement get_direction callback
+In-Reply-To: <CACQ1gAjpXnnUPOj3paMGeB=NeQWR_7p6k8WPdxS9YzLakphBhw@mail.gmail.com>
+References: <1416004026-9667-1-git-send-email-j.uzycki@elproma.com.pl>
+ <20141114232601.GW27002@pengutronix.de> <5467A980.5090204@elproma.com.pl>
+ <20141116214239.GX27002@pengutronix.de> <54693A51.5080907@elproma.com.pl>
+ <CACQ1gAjpXnnUPOj3paMGeB=NeQWR_7p6k8WPdxS9YzLakphBhw@mail.gmail.com>
+Message-ID: <546A09EC.8080809@elproma.com.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/11/14 14:11, Stefano Stabellini wrote:
-> Hi all,
-> I am writing this email to ask for your advice.
-> 
-> On architectures where dma addresses are different from physical
-> addresses, it can be difficult to retrieve the physical address of a
-> page from its dma address.
-> 
-> Specifically this is the case for Xen on arm and arm64 but I think that
-> other architectures might have the same issue.
-> 
-> Knowing the physical address is necessary to be able to issue any
-> required cache maintenance operations when unmap_page,
-> sync_single_for_cpu and sync_single_for_device are called.
-> 
-> Adding a struct page* parameter to unmap_page, sync_single_for_cpu and
-> sync_single_for_device would make Linux dma handling on Xen on arm and
-> arm64 much easier and quicker.
 
-Using an opaque handle instead of struct page * would be more beneficial
-for the Intel IOMMU driver.  e.g.,
+W dniu 2014-11-17 o 10:26, Richard Genoud pisze:
+> 2014-11-17 0:59 GMT+01:00 Janusz U?ycki <j.uzycki@elproma.com.pl>:
+>> W dniu 2014-11-16 o 22:42, Uwe Kleine-K?nig pisze:
+>>
+>> Thanks Uwe. I fully agree with you.
+>> a) was just a starter to your suggestion. My options were too conservative -
+>> I just
+>> wanted to avoid tests on hardware I don't have.
+>> I don't understand why gpiod_get_direction() always requires the callback
+>> and b) would be broken (I'm not so familiar with gpiolib) but I don't need
+>> it now.
+>>
+>> So, it looks we can drop the gpio-mxs patch, yes?
+>> And, I or Richard should submit a patch for
+>> mctrl_gpio/atmel_serial/mxs-auart
+>> to introduce the irq helper, yes?
+> You're welcome to do it !
+> At the time the mctrl_helpers were introduced, there was only one user
+> (atmel_serial), so the line between specific code and factorizable
+> code was not so clear.
+> But clearly, the more we factorize, the better !
+>
+>> You wrote passing uart_port is enough. Argument "name" for request_irq() can
+>> be
+>> recovered from dev_name(dev) or dev_driver_string(dev)  where dev =
+>> port_uart->dev.
+> And, honestly, I'm not sure dev_name(dev) is a good name.
+> Having something like dev_name(dev)_port_id_CTS may be better.
+>
 
-typedef dma_addr_t dma_handle_t;
+For names other than device's or driver's name I would need to allocate
+string. Is it so important? You can simple check the interrupt and 
+corresponding port:
+cat /proc/interrupts
+  50:          0  gpio-mxs  21  80072000.serial
+  80:          0  gpio-mxs  18  8006c000.serial
+  81:          0  gpio-mxs  19  8006c000.serial
+  83:          0  gpio-mxs  21  8006c000.serial
+  84:          0  gpio-mxs  22  8006c000.serial
 
-dma_handle_t dma_map_single(struct device *dev,
-                            void *va, size_t size,
-                            enum dma_data_direction dir);
-void dma_unmap_single(struct device *dev,
-                      dma_handle_t handle, size_t size,
-                      enum dma_data_direction dir);
+best regards
+Janusz
 
-etc.
-
-Drivers would then use:
-
-dma_addr_t dma_addr(dma_handle_t handle);
-
-To obtain the bus address from the handle.
-
-> I think that other drivers have similar problems, such as the Intel
-> IOMMU driver having to call find_iova and walking down an rbtree to get
-> the physical address in its implementation of unmap_page.
-> 
-> Callers have the struct page* in their hands already from the previous
-> map_page call so it shouldn't be an issue for them.  A problem does
-> exist however: there are about 280 callers of dma_unmap_page and
-> pci_unmap_page. We have even more callers of the dma_sync_single_for_*
-> functions.
-
-You will also need to fix dma_unmap_single() and pci_unmap_single()
-(another 1000+ callers).
-
-You may need to consider a parallel set of map/unmap API calls that
-return/accept a handle, and then converting drivers one-by-one as
-required, instead of trying to convert every single driver at once.
-
-David
+> Seems ok !
+>
+> Richard.
