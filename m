@@ -1,157 +1,111 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 17 Nov 2014 10:26:17 +0100
-Subject: [PATCH] gpio: mxs: implement get_direction callback
-In-Reply-To: <54693A51.5080907@elproma.com.pl>
-References: <1416004026-9667-1-git-send-email-j.uzycki@elproma.com.pl>
- <20141114232601.GW27002@pengutronix.de> <5467A980.5090204@elproma.com.pl>
- <20141116214239.GX27002@pengutronix.de> <54693A51.5080907@elproma.com.pl>
-Message-ID: <CACQ1gAjpXnnUPOj3paMGeB=NeQWR_7p6k8WPdxS9YzLakphBhw@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 17 Nov 2014 10:28:47 +0100
+Subject: [PATCHv2 5/8] arm: mvebu: add common uart0 and spi0 pintcrl
+ entries for Armada 370
+In-Reply-To: <20141117005532.GK15870@lunn.ch>
+References: <cover.1416158990.git.arno@natisbad.org>
+ <d550094896837ac921e5d2a69fc5aae9b287a98a.1416158990.git.arno@natisbad.org>
+ <20141116211034.GJ15870@lunn.ch> <874mtyok43.fsf@natisbad.org>
+ <20141117005532.GK15870@lunn.ch>
+Message-ID: <5469BFCF.9060307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-17 0:59 GMT+01:00 Janusz U?ycki <j.uzycki@elproma.com.pl>:
->
-> W dniu 2014-11-16 o 22:42, Uwe Kleine-K?nig pisze:
+On 11/17/2014 01:55 AM, Andrew Lunn wrote:
+> On Sun, Nov 16, 2014 at 11:29:00PM +0100, Arnaud Ebalard wrote:
+>> Hi,
 >>
->> Hello Janusz,
+>> Andrew Lunn <andrew@lunn.ch> writes:
 >>
->>
->> On Fri, Nov 14, 2014 at 11:27:06PM +0100, Janusz Uzycki wrote:
->>>>>
->>>>> Function gpiod_get_direction() of gpiolib calls get_direction()
->>>>> callback. If chip doesn't implement it EINVAL error is returned.
->>>>> The function doesn't use for returned value shadowed FLAG_IS_OUT
->>>>> bit of gpio_desc.flags field so the callback is required.
+>>> On Sun, Nov 16, 2014 at 06:37:33PM +0100, Arnaud Ebalard wrote:
 >>>>
->>>> This sounds like a bugfix but "required" is wrong as AFAIR this call is
->>>> optional and hardly used. Or did that change? The only drawback is that
->>>> the debug output for (by Linux) uninitialized gpios is wrong.
+>>>> pinctrl entries for uart0 using MPP0-1 and spi0 using MPP33-36 are
+>>>> common configurations. Instead of replicating them in each .dts file,
+>>>> put those in armada-370.dtsi file so that they can be referenced.
+>>>>
+>>>> Suggested-by: Andrew Lunn <andrew@lunn.ch>
+>>>> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+>>>> ---
+>>>>   arch/arm/boot/dts/armada-370.dtsi | 11 +++++++++++
+>>>>   1 file changed, 11 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+>>>> index 6b3c23b1e138..d9f5d59e463e 100644
+>>>> --- a/arch/arm/boot/dts/armada-370.dtsi
+>>>> +++ b/arch/arm/boot/dts/armada-370.dtsi
+>>>> @@ -115,6 +115,17 @@
+>>>>   				compatible = "marvell,mv88f6710-pinctrl";
+>>>>   				reg = <0x18000 0x38>;
+>>>>
+>>>> +				uart0_pins: uart0-pins {
+>>>> +					marvell,pins = "mpp0", "mpp1";
+>>>> +					marvell,function = "uart0";
+>>>> +				};
 >>>
->>> Yes, the callback is optional but gpiod_get_direction() doesn't work
->>> without it.
->>> gpiod_get_direction() doesn't seem optional,
->>> Documentation/gpio/consumer.txt:
->>> "A driver can also query the current direction of a GPIO:
->>>           int gpiod_get_direction(const struct gpio_desc *desc)
->>> This function will return either GPIOF_DIR_IN or GPIOF_DIR_OUT.
->>> Be aware that there is no default direction for GPIOs. Therefore,
->>> **using a GPIO
->>> without setting its direction first is illegal and will result in
->>> undefined
->>> behavior!**"
->>> There is nothing about EINVAL error. It happens despite direction was
->>> set before. The reason is undefined get_direction callback.
->>
->> I still think you must not rely on gpiod_get_direction working. Some
->> controllers might not be able to provide this info and if you know that
->> the direction was set before, there is no need to ask the framework.
->> (Although I admit it might be comfortable at times.)
->>
->>> The commit f9e42397d79b6e810437ba1130b0b4b594f5e56c
->>> ("serial: mxs-auart: add interrupts for modem control lines")
->>> is based on Richard's commit ab5e4e4108ca5d8326cb6b4b3a21b096a002f68f
->>> ("tty/serial: at91: add interrupts for modem control lines").
->>> Both patches use the condition:
->>> "if (gpiod && (gpiod_get_direction(gpiod) == GPIOF_DIR_IN))"
->>
->> This is broken. Actually you want to loop only over the functions in
->> mctrl_gpios_desc that are inputs (i.e. CTS, DSR, DCD and RNG) and don't
->> depend on the hardware state and/or a working gpiod_get_direction.
->>
->> For that another mctrl_ helper function would be nice that does the
->> required request_irqs for a given struct mctrl_gpios pointer. That would
->> be more valuable than adding the same boilerplate to another driver.
->> Also note that there is nothing special required in the irq handler in
->> this case, just passing your struct uart_port is enough. That also has
->> the nice side effect that not the complete driver's logic to dissect the
->> irq reason is needed and so probably all drivers using that mctrl_gpio
->> stuff could be simplified.
->>
->> [...]
->>
->>
->>> at91 had defined get_direction() callback, mxs platform not.
->>> The condition helps to find gpio-inputs to set them as interrupts.
+>>> Thanks for these.
 >>>
->>> Likely gpiod_get_direction() was used because
->>> drivers/tty/serial/serial_mctrl_gpio.c
->>> has no function to read back "dir_out" from mctrl_gpios_desc table.
+>>> We can go one stage further. kirkwood.dts has:
 >>>
->>> There were the ways to fix it:
->>> a) add to serial_mctrl_gpio.c function to read the "dir_out" and use
->>> it instead of
->>>      gpiod_get_direction()
->>> if gpiod_get_direction() still used in the condition:
->>> b) modify gpiod_get_direction() implementation in gpiolib.c:
->>>      if get_direction() callback is not defined use shadow flag
->>> (FLAG_IS_OUT)
+>>>                  uart0: serial at 12000 {
+>>>                          compatible = "ns16550a";
+>>>                          reg = <0x12000 0x100>;
+>>>                          reg-shift = <2>;
+>>>                          interrupts = <33>;
+>>>                          clocks = <&gate_clk 7>;
+>>>                          pinctrl-0 = <&pmx_uart0>;
+>>>                          pinctrl-names = "default";
+>>>                          status = "disabled";
+>>>                  };
+>>>
+>>> i.e actually references them. This is safe because a board .dts file
+>>> can override the pins if needed.
+>>>
+>>> We should do the same here, both for 370 and XP.
 >>
->> That would be broken.
->>
->>> c) modify drivers/gpio/gpio-generic.c:
->>>     bgpio_init() could assign to get_direction default callback
->>>     if BGPIOF_UNREADABLE_REG_DIR is not set
->>
->> Not sure this would be correct. I pass the question to Linus.
->>
->>> d) implement get_direction callback in gpio-mxs.c
->>
->> My suggestion isn't included in your list and IMHO is the best.
->>
->>> Solution d) was selected because it is safe for other drivers.
->>
->> That's a poor argument. Sure, implementing a generic solution that is
->> used on several platforms is not "safe" as you probably cannot test them
->> all. But the result is better: More generic code, more people using it
->> and so find the bugs in it.
->>
->>> Although a) and b)
->>> are also nice the patch doesn't modify neither serial_mctrl_gpio.c and
->>> atmel_serial.c nor gpiolib.c. It focuses on mxs platform as needed for
->>> the commit "serial: mxs-auart: add interrupts for modem control lines".
->>
->> I wouldn't call a) nice because in the presence of my suggested solution
->> there is no need for a driver to use this function. b) is broken and so
->> cannot be nice.
+>> Just to be sure I understand: for uart0 and uart1, I think this can only
+>> be done for Armada 370 (on XP, uart0/1 rx/tx are not mpp).
+>
+> I must admit, i did not look at the datasheet for XP. So you can
+> ignore XP.
 >
 >
-> Thanks Uwe. I fully agree with you.
-> a) was just a starter to your suggestion. My options were too conservative -
-> I just
-> wanted to avoid tests on hardware I don't have.
-> I don't understand why gpiod_get_direction() always requires the callback
-> and b) would be broken (I'm not so familiar with gpiolib) but I don't need
-> it now.
+>> This only a matter of adding the following in armada-370.dtsi for uart0:
+>>
+>>   		 /*
+>> 		  * Default UART pinctrl setting without RTS/CTS, can
+>> 		  * be overwritten on board level.
+>>                    */
+>>                   uart0: serial at 12000 {
+>>                           pinctrl-0 = <&uart0_pins>;
+>>                           pinctrl-names = "default";
+>>                   };
 >
-> So, it looks we can drop the gpio-mxs patch, yes?
-> And, I or Richard should submit a patch for
-> mctrl_gpio/atmel_serial/mxs-auart
-> to introduce the irq helper, yes?
-You're welcome to do it !
-At the time the mctrl_helpers were introduced, there was only one user
-(atmel_serial), so the line between specific code and factorizable
-code was not so clear.
-But clearly, the more we factorize, the better !
+> Looks good.
+>
+>> For uart1, it's not obvious because there are 6 different MPP which can
+>> be configured to act as uart1 TXD.
+>
+> That is too many configurations. So lets leave it per board.
+>
+>> Now, regarding armada XP, uart2 and uart3 txd/rxd MPP are 42/43 and
+>> 44/45. Best we can do is put the same as above in each specific
+>> armada-xp-mv78XXX.dtsi file, where pinctrl node is, after adding
+>> uart2-pins and uart3-pins. Unless I am missing something, this cannot
+>> be done in armada-xp.dtsi.
 
-> You wrote passing uart_port is enough. Argument "name" for request_irq() can
-> be
-> recovered from dev_name(dev) or dev_driver_string(dev)  where dev =
-> port_uart->dev.
-And, honestly, I'm not sure dev_name(dev) is a good name.
-Having something like dev_name(dev)_port_id_CTS may be better.
+It would make sense to have a basic pinctrl node in armada-370-xp.dtsi
+already. It will only have the reg property set, which is IIRC the same
+for all SoCs. Each of the more specific dtsi will set what is common
+below that, i.e. armada-370.dtsi will have the compatible + 370 specific
+pinmux settings. For XP, the common pinmux settings will be in
+armada-xp.dtsi while the compatible is set later in each of the XP
+variant dtsi files.
 
-> But irqhandler and mctrl_gpios must be passed to mctrl_gpio_request_irqs()
-> helper.
-> The gpio_irq table could be hidden and moved into struct mctrl_gpios. Then
-> a second helper function is required: mctrl_gpio_free_irqs().
-> gpio_irq table initialized in mctrl_gpio_request_irqs().
->
-> So finally the prototypes would be:
-> int mctrl_gpio_request_irqs(struct mctrl_gpios*, struct uart_port*,
-> irqhandler_t);
-> void mctrl_gpio_free_irqs(struct mctrl_gpios*);
->
-> Richard, what do you think about?
-Seems ok !
+Sebastian
 
-Richard.
+> Actually, i think it can. But i could be wrong.
+>
+> armada-370-xp.dtsi declares uart0 and uart1.  armada-xp.dtsi then
+> defined another two uart's, uart2 and uart3. You should be able to
+> define the pinctrl nodes for the serial ports there, even if the main
+> pinctrl node is in the SoC specific .dtsi file.
