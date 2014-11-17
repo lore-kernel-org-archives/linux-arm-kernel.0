@@ -1,53 +1,56 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:43 +0100
-Subject: [PATCH v5 49/61] dmaengine: rapidio: tsi721: Rename device_control
+Date: Mon, 17 Nov 2014 14:42:45 +0100
+Subject: [PATCH v5 51/61] dmaengine: bcm2835: Declare slave capabilities for
+ the generic code
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-50-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-52-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename the device_control callback of the TXX9 DMA driver to terminate_all
-since it's all it's really doing. That will eventually be used to retrieve
-slave capabilities.
+Now that the generic slave caps code can make use of the device assigned
+capabilities, instead of relying on a callback to be implemented.
+
+Make use of this code.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
- drivers/rapidio/devices/tsi721_dma.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ drivers/dma/bcm2835-dma.c | 15 +++------------
+ 1 file changed, 3 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/rapidio/devices/tsi721_dma.c b/drivers/rapidio/devices/tsi721_dma.c
-index f64c5decb747..47295940a868 100644
---- a/drivers/rapidio/devices/tsi721_dma.c
-+++ b/drivers/rapidio/devices/tsi721_dma.c
-@@ -815,8 +815,7 @@ struct dma_async_tx_descriptor *tsi721_prep_rio_sg(struct dma_chan *dchan,
- 	return txd;
+diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
+index 13b05c1673b1..0723096fb50a 100644
+--- a/drivers/dma/bcm2835-dma.c
++++ b/drivers/dma/bcm2835-dma.c
+@@ -550,18 +550,6 @@ static struct dma_chan *bcm2835_dma_xlate(struct of_phandle_args *spec,
+ 	return chan;
  }
  
--static int tsi721_device_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
--			     unsigned long arg)
-+static int tsi721_terminate_all(struct dma_chan *dchan)
- {
- 	struct tsi721_bdma_chan *bdma_chan = to_tsi721_chan(dchan);
- 	struct tsi721_tx_desc *desc, *_d;
-@@ -825,9 +824,6 @@ static int tsi721_device_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
- 
- 	dev_dbg(dchan->device->dev, "%s: Entry\n", __func__);
- 
--	if (cmd != DMA_TERMINATE_ALL)
--		return -ENOSYS;
+-static int bcm2835_dma_device_slave_caps(struct dma_chan *dchan,
+-	struct dma_slave_caps *caps)
+-{
+-	caps->src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
+-	caps->dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
+-	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+-	caps->cmd_pause = false;
+-	caps->cmd_terminate = true;
 -
- 	spin_lock_bh(&bdma_chan->lock);
- 
- 	bdma_chan->active = false;
-@@ -901,7 +897,7 @@ int tsi721_register_dma(struct tsi721_device *priv)
- 	mport->dma.device_tx_status = tsi721_tx_status;
- 	mport->dma.device_issue_pending = tsi721_issue_pending;
- 	mport->dma.device_prep_slave_sg = tsi721_prep_rio_sg;
--	mport->dma.device_control = tsi721_device_control;
-+	mport->dma.device_terminate_all = tsi721_terminate_all;
- 
- 	err = dma_async_device_register(&mport->dma);
- 	if (err)
+-	return 0;
+-}
+-
+ static int bcm2835_dma_probe(struct platform_device *pdev)
+ {
+ 	struct bcm2835_dmadev *od;
+@@ -603,6 +591,9 @@ static int bcm2835_dma_probe(struct platform_device *pdev)
+ 	od->ddev.device_prep_dma_cyclic = bcm2835_dma_prep_dma_cyclic;
+ 	od->ddev.device_config = bcm2835_dma_slave_config;
+ 	od->ddev.device_terminate_all = bcm2835_dma_terminate_all;
++	od->ddev.src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
++	od->ddev.dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
++	od->ddev.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+ 	od->ddev.dev = &pdev->dev;
+ 	INIT_LIST_HEAD(&od->ddev.channels);
+ 	spin_lock_init(&od->lock);
 -- 
 2.1.1
