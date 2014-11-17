@@ -1,34 +1,54 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 17 Nov 2014 11:34:16 -0800
-Subject: Pxa25x clocks for v3.19
-In-Reply-To: <87d28ou3vt.fsf@free.fr>
-References: <87d28ou3vt.fsf@free.fr>
-Message-ID: <20141117193416.25314.75395@quantum>
+Date: Mon, 17 Nov 2014 11:39:02 -0800
+Subject: [PATCH v2 1/2] clk: rockchip: add bindings for the mmc clock
+ phases
+In-Reply-To: <1416009604-31545-2-git-send-email-amstan@chromium.org>
+References: <1416009604-31545-1-git-send-email-amstan@chromium.org>
+ <1416009604-31545-2-git-send-email-amstan@chromium.org>
+Message-ID: <20141117193902.25314.97687@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Robert Jarzmik (2014-11-15 02:58:30)
-> Hi Mike,
+Quoting Alexandru M Stan (2014-11-14 16:00:03)
+> This will be used in a later patch for clock phase tuning.
 > 
-> The pxa25x clocks v3 patch was posted here :
->     http://www.gossamer-threads.com/lists/linux/kernel/2046264
+> Suggested-by: Heiko Stuebner <heiko@sntech.de>
+> Signed-off-by: Alexandru M Stan <amstan@chromium.org>
+> ---
+> Changes in v2: None
 > 
-> Even if it would remain dead code for v3.19, I'd need it to get in in that
-> window so that I can activate at the same time pxa25x and pxa27x for v3.20, and
-> prevent defconfigs breakage.
+>  include/dt-bindings/clock/rk3288-cru.h | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
-> Could this code make it for v3.19 ?
+> diff --git a/include/dt-bindings/clock/rk3288-cru.h b/include/dt-bindings/clock/rk3288-cru.h
+> index 100a08c..465d0f6 100644
+> --- a/include/dt-bindings/clock/rk3288-cru.h
+> +++ b/include/dt-bindings/clock/rk3288-cru.h
+> @@ -72,6 +72,16 @@
+>  #define SCLK_HEVC_CABAC                111
+>  #define SCLK_HEVC_CORE         112
+>  
+> +#define SCLK_SDMMC_DRV_PHASE   113
+> +#define SCLK_SDIO0_DRV_PHASE   114
+> +#define SCLK_SDIO1_DRV_PHASE   115
+> +#define SCLK_EMMC_DRV_PHASE    116
+> +
+> +#define SCLK_SDMMC_SAMPLE_PHASE        117
+> +#define SCLK_SDIO0_SAMPLE_PHASE        118
+> +#define SCLK_SDIO1_SAMPLE_PHASE        119
+> +#define SCLK_EMMC_SAMPLE_PHASE 120
 
-Yes, I've applied it towards 3.19. I guess the missing piece is pxa3xx.
-Do you have plans to tackle that for 3.20?
+It looks like you are adding new clocks to handle the phase requirement.
+Is that the right thing to do? Don't these clks already exist (e.g.
+SCLK_SDMMC)?
 
-Thanks,
+Regards,
 Mike
 
-> 
-> Cheers.
-> 
+> +
+>  #define DCLK_VOP0              190
+>  #define DCLK_VOP1              191
+>  
 > -- 
-> Robert
+> 2.1.0.rc2.206.gedb03e5
 > 
-> PS: The code has been tested on lubbock and tosa hardwares.
