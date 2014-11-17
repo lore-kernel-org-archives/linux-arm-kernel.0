@@ -1,84 +1,191 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 17 Nov 2014 14:02:38 -0800
-Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
- completes
-In-Reply-To: <Pine.LNX.4.44L0.1411171641170.855-100000@iolanthe.rowland.org>
-References: <20141117211117.GD5258@dtor-ws>
- <Pine.LNX.4.44L0.1411171641170.855-100000@iolanthe.rowland.org>
-Message-ID: <20141117220238.GE5258@dtor-ws>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Mon, 17 Nov 2014 14:06:12 -0800
+Subject: [PATCH RESEND v8] iopoll: Introduce memory-mapped IO polling macros
+Message-ID: <1416261972-2756-1-git-send-email-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 04:44:56PM -0500, Alan Stern wrote:
-> On Mon, 17 Nov 2014, Dmitry Torokhov wrote:
-> 
-> > > When the runtime PM core invokes a power domain's callback routine,
-> > > what does the domain's routine usually do?  Does it go ahead and invoke
-> > > the driver's callback?  Or does it try to invoke the subsystem's
-> > > callback?
-> > > 
-> > > Obviously this depends on how the power domain code is written.  But
-> > > suppose every power domain would always use the same strategy as the PM
-> > > core: Invoke the subsystem's callback if there is one; otherwise invoke
-> > > the driver's callback.
-> > > 
-> > > Then there wouldn't be a problem.  Even when a runtime-resume went via
-> > > the power domain, the subsystem would still be able to protect the
-> > > not-yet-bound driver from being called.
-> > > 
-> > > (... Unless the subsystem itself was incapable of doing this the right 
-> > > way.  But subsystems can be fixed.)
-> > 
-> > The genpd code currently starts by powering on the domain (if it is not
-> > on already) and then does "device restore" which is:
-> > 
-> > /**
-> >  * pm_genpd_default_restore_state - Default PM domians "restore device state".
-> >  * @dev: Device to handle.
-> >  */
-> > static int pm_genpd_default_restore_state(struct device *dev)
-> > {
-> > 	int (*cb)(struct device *__dev);
-> > 
-> > 	cb = dev_gpd_data(dev)->ops.restore_state;
-> > 	if (cb)
-> > 		return cb(dev);
-> > 
-> > 	if (dev->type && dev->type->pm)
-> > 		cb = dev->type->pm->runtime_resume;
-> > 	else if (dev->class && dev->class->pm)
-> > 		cb = dev->class->pm->runtime_resume;
-> > 	else if (dev->bus && dev->bus->pm)
-> > 		cb = dev->bus->pm->runtime_resume;
-> > 	else
-> > 		cb = NULL;
-> > 
-> > 	if (!cb && dev->driver && dev->driver->pm)
-> > 		cb = dev->driver->pm->runtime_resume;
-> > 
-> > 	return cb ? cb(dev) : 0;
-> > }
-> > 
-> > So I guess bus (or class or type) can take care of it.
-> 
-> The bus could.  I don't think the class or type knows when a driver is 
-> being probed.
-> 
-> >  Except buses
-> > usually call pm_generic_runtime_resume() which ends up fetching driver's
-> > callbacks. Maybe pm_generic_runtime_*() need be a bit smarter?
-> 
-> No, the bus subsystem needs to be smarter.  It shouldn't call 
-> pm_generic_runtime_resume() if the driver hasn't been probed yet, or if 
-> the driver has already been unbound from the device.
+From: Matt Wagantall <mattw@codeaurora.org>
 
-But that code wold be exactly the same for all buses, right? So why
-can't pm_generic_runtime_resume() be smarter?
+It is sometimes necessary to poll a memory-mapped register until its value
+satisfies some condition. Introduce a family of convenience macros that do
+this. Tight-looping, sleeping, and timing out can all be accomplished using
+these macros.
 
-However, is it allowed to call pm_runtime_get_sync() on devices that
-didn't issue pm_runtime_enable()?
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+---
+Sorry for any confusion regarding the genesis of this patch.  Let me try to
+clarify the history here.  This patch was originally part of a series [1]
+for adding support for IOMMU address translations through an ARM SMMU
+hardware register.  The other patch in the series (the one that actually
+uses these macros and implements said hardware address translations) was
+Ack'd by the driver maintainer there (Will Deacon) so I've pulled this
+patch out to avoid resending an already Ack'd patch over and over again.
 
-Thanks.
+In short, please see [1] for previous discussion and the first user of
+these macros.
 
+[1] http://thread.gmane.org/gmane.linux.kernel.iommu/7140
+
+Changes since v7:
+  - sorted helper macros by size (b, w, l, q)
+  - removed some of the more esoteric (or flat-out bogus) helper macros
+---
+ include/linux/iopoll.h | 140 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 140 insertions(+)
+ create mode 100644 include/linux/iopoll.h
+
+diff --git a/include/linux/iopoll.h b/include/linux/iopoll.h
+new file mode 100644
+index 0000000000..bd161dae2d
+--- /dev/null
++++ b/include/linux/iopoll.h
+@@ -0,0 +1,140 @@
++/*
++ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef _LINUX_IOPOLL_H
++#define _LINUX_IOPOLL_H
++
++#include <linux/kernel.h>
++#include <linux/types.h>
++#include <linux/hrtimer.h>
++#include <linux/delay.h>
++#include <linux/errno.h>
++#include <linux/io.h>
++
++/**
++ * readx_poll_timeout - Periodically poll an address until a condition is met or a timeout occurs
++ * @op: accessor function (takes @addr as its only argument)
++ * @addr: Address to poll
++ * @val: Variable to read the value into
++ * @cond: Break condition (usually involving @val)
++ * @sleep_us: Maximum time to sleep between reads in us (0 tight-loops)
++ * @timeout_us: Timeout in us, 0 means never timeout
++ *
++ * Returns 0 on success and -ETIMEDOUT upon a timeout. In either
++ * case, the last read value at @addr is stored in @val. Must not
++ * be called from atomic context if sleep_us or timeout_us are used.
++ *
++ * When available, you'll probably want to use one of the specialized
++ * macros defined below rather than this macro directly.
++ */
++#define readx_poll_timeout(op, addr, val, cond, sleep_us, timeout_us)	\
++({ \
++	ktime_t timeout = ktime_add_us(ktime_get(), timeout_us); \
++	might_sleep_if(sleep_us); \
++	for (;;) { \
++		(val) = op(addr); \
++		if (cond) \
++			break; \
++		if (timeout_us && ktime_compare(ktime_get(), timeout) > 0) { \
++			(val) = op(addr); \
++			break; \
++		} \
++		if (sleep_us) \
++			usleep_range((sleep_us >> 2) + 1, sleep_us); \
++	} \
++	(cond) ? 0 : -ETIMEDOUT; \
++})
++
++/**
++ * readx_poll_timeout_atomic - Periodically poll an address until a condition is met or a timeout occurs
++ * @op: accessor function (takes @addr as its only argument)
++ * @addr: Address to poll
++ * @val: Variable to read the value into
++ * @cond: Break condition (usually involving @val)
++ * @delay_us: Time to udelay between reads in us (0 tight-loops)
++ * @timeout_us: Timeout in us, 0 means never timeout
++ *
++ * Returns 0 on success and -ETIMEDOUT upon a timeout. In either
++ * case, the last read value at @addr is stored in @val.
++ *
++ * When available, you'll probably want to use one of the specialized
++ * macros defined below rather than this macro directly.
++ */
++#define readx_poll_timeout_atomic(op, addr, val, cond, delay_us, timeout_us) \
++({ \
++	ktime_t timeout = ktime_add_us(ktime_get(), timeout_us); \
++	for (;;) { \
++		(val) = op(addr); \
++		if (cond) \
++			break; \
++		if (timeout_us && ktime_compare(ktime_get(), timeout) > 0) { \
++			(val) = op(addr); \
++			break; \
++		} \
++		if (delay_us) \
++			udelay(delay_us);	\
++	} \
++	(cond) ? 0 : -ETIMEDOUT; \
++})
++
++
++#define readb_poll_timeout(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout(readb, addr, val, cond, delay_us, timeout_us)
++
++#define readb_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout_atomic(readb, addr, val, cond, delay_us, timeout_us)
++
++#define readw_poll_timeout(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout(readw, addr, val, cond, delay_us, timeout_us)
++
++#define readw_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout_atomic(readw, addr, val, cond, delay_us, timeout_us)
++
++#define readl_poll_timeout(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout(readl, addr, val, cond, delay_us, timeout_us)
++
++#define readl_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout_atomic(readl, addr, val, cond, delay_us, timeout_us)
++
++#define readq_poll_timeout(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout(readq, addr, val, cond, delay_us, timeout_us)
++
++#define readq_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout_atomic(readq, addr, val, cond, delay_us, timeout_us)
++
++#define readb_relaxed_poll_timeout(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout(readb_relaxed, addr, val, cond, delay_us, timeout_us)
++
++#define readb_relaxed_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout_atomic(readb_relaxed, addr, val, cond, delay_us, timeout_us)
++
++#define readw_relaxed_poll_timeout(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout(readw_relaxed, addr, val, cond, delay_us, timeout_us)
++
++#define readw_relaxed_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout_atomic(readw_relaxed, addr, val, cond, delay_us, timeout_us)
++
++#define readl_relaxed_poll_timeout(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout(readl_relaxed, addr, val, cond, delay_us, timeout_us)
++
++#define readl_relaxed_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout_atomic(readl_relaxed, addr, val, cond, delay_us, timeout_us)
++
++#define readq_relaxed_poll_timeout(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout(readq_relaxed, addr, val, cond, delay_us, timeout_us)
++
++#define readq_relaxed_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
++	readx_poll_timeout_atomic(readq_relaxed, addr, val, cond, delay_us, timeout_us)
++
++#endif /* _LINUX_IOPOLL_H */
 -- 
-Dmitry
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
