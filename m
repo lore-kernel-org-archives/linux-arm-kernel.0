@@ -1,60 +1,39 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 17 Nov 2014 12:34:46 +0100
-Subject: [PATCH 2/2] dt-bindings: simplefb-sunxi: Add sunxi simplefb extensions
-In-Reply-To: <1416224086-5698-1-git-send-email-hdegoede@redhat.com>
-References: <1416224086-5698-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1416224086-5698-3-git-send-email-hdegoede@redhat.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Mon, 17 Nov 2014 19:37:37 +0800
+Subject: [Patch V3 6/9] genirq: Introduce msi_domain_{alloc|free}_irqs()
+In-Reply-To: <alpine.DEB.2.11.1411171230090.3909@nanos>
+References: <1416222202-28002-1-git-send-email-jiang.liu@linux.intel.com>
+ <1416222202-28002-7-git-send-email-jiang.liu@linux.intel.com>
+ <alpine.DEB.2.11.1411171230090.3909@nanos>
+Message-ID: <5469DE01.6030308@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If pre-filled framebuffer nodes are used, the firmware may need extra
-properties to find the right node. This documents the properties to use
-for this on sunxi platforms.
-
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- .../bindings/video/simple-framebuffer-sunxi.txt    | 33 ++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
-
-diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
-new file mode 100644
-index 0000000..84ca264
---- /dev/null
-+++ b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
-@@ -0,0 +1,33 @@
-+Sunxi specific Simple Framebuffer bindings
-+
-+This binding documents sunxi specific extensions to the simple-framebuffer
-+bindings. The sunxi simplefb u-boot code relies on the devicetree containing
-+pre-populated simplefb nodes.
-+
-+These extensions are intended so that u-boot can select the right node based
-+on which pipeline and output is being used. As such they are solely intended
-+for firmware / bootloader use, and the OS should ignore them.
-+
-+Required properties:
-+- compatible: "sunxi,framebuffer"
-+- sunxi,pipeline:
-+  <0> for the de_be0 -> lcdc0 -> output pipeline
-+  <1> for the de_be1 -> lcdc1 -> output pipeline
-+- sunxi,output: One of: "hdmi", "lcd", "vga", and "composite"  
-+
-+Example:
-+
-+chosen {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	ranges;
-+
-+	framebuffer at 0 {
-+		compatible = "sunxi,framebuffer", "simple-framebuffer";
-+		sunxi,pipeline = <0>;
-+		sunxi,output = "hdmi";
-+		clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
-+			 <&ahb_gates 44>;
-+		status = "disabled";
-+	};
-+};
--- 
-2.1.0
+On 2014/11/17 19:30, Thomas Gleixner wrote:
+> On Mon, 17 Nov 2014, Jiang Liu wrote:
+>> +
+>> +/*
+>> + * Default structure for MSI interrupt allocation.
+>> + * Arch may overwrite it by defining msi_alloc_info_t.
+>> + */
+>> +struct msi_alloc_info {
+>> +	struct msi_desc			*desc;
+>> +	irq_hw_number_t			hwirq;
+>> +	union {
+>> +		unsigned long		ul;
+>> +		void			*ptr;
+>> +	} scratchpad[NUM_MSI_ALLOC_SCRATCHPAD_REGS];
+>> +};
+>> +
+>> +#ifndef msi_alloc_info_t
+>> +typedef struct msi_alloc_info msi_alloc_info_t;
+>> +#endif
+> 
+> Hmm. Do we really need that?
+Hi Thomas,
+	Do you mean msi_alloc_info_t? It acts as a flag
+to use common struct msi_alloc_info or architecture specific
+data structures. For most architecture, they will use the default
+struct msi_alloc_info. But for x86, it will use struct irq_alloc_info.
+Regards!
+Gerry
