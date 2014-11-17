@@ -1,7 +1,9 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Mon, 17 Nov 2014 18:07:39 +0300
-Subject: [PATCH V2 1/5] serial: pxa: prepare/unprepare clocks
-Message-ID: <1416236863-20898-1-git-send-email-dbaryshkov@gmail.com>
+Date: Mon, 17 Nov 2014 18:07:40 +0300
+Subject: [PATCH V2 2/5] i2c: pxa: prepare/unprepare clocks
+In-Reply-To: <1416236863-20898-1-git-send-email-dbaryshkov@gmail.com>
+References: <1416236863-20898-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1416236863-20898-2-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,30 +12,30 @@ clk_disable_unprepare().
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- drivers/tty/serial/pxa.c | 4 ++--
+ drivers/i2c/busses/i2c-pxa.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/tty/serial/pxa.c b/drivers/tty/serial/pxa.c
-index 21b7d8b8..2f4c329 100644
---- a/drivers/tty/serial/pxa.c
-+++ b/drivers/tty/serial/pxa.c
-@@ -647,7 +647,7 @@ serial_pxa_console_write(struct console *co, const char *s, unsigned int count)
- 	unsigned long flags;
- 	int locked = 1;
+diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+index be671f7..2e75375 100644
+--- a/drivers/i2c/busses/i2c-pxa.c
++++ b/drivers/i2c/busses/i2c-pxa.c
+@@ -1297,7 +1297,7 @@ static int i2c_pxa_suspend_noirq(struct device *dev)
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct pxa_i2c *i2c = platform_get_drvdata(pdev);
  
--	clk_enable(up->clk);
-+	clk_prepare_enable(up->clk);
- 	local_irq_save(flags);
- 	if (up->port.sysrq)
- 		locked = 0;
-@@ -674,7 +674,7 @@ serial_pxa_console_write(struct console *co, const char *s, unsigned int count)
- 	if (locked)
- 		spin_unlock(&up->port.lock);
- 	local_irq_restore(flags);
--	clk_disable(up->clk);
-+	clk_disable_unprepare(up->clk);
+-	clk_disable(i2c->clk);
++	clk_disable_unprepare(i2c->clk);
  
+ 	return 0;
  }
+@@ -1307,7 +1307,7 @@ static int i2c_pxa_resume_noirq(struct device *dev)
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct pxa_i2c *i2c = platform_get_drvdata(pdev);
  
+-	clk_enable(i2c->clk);
++	clk_prepare_enable(i2c->clk);
+ 	i2c_pxa_reset(i2c);
+ 
+ 	return 0;
 -- 
 2.1.1
