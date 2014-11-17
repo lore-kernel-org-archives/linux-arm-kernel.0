@@ -1,71 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 17 Nov 2014 12:09:52 +0000
-Subject: some question about TCR setting
-In-Reply-To: <20141116165211.GL4042@n2100.arm.linux.org.uk>
-References: <CAOVJa8HBYkTMCJFKC=+UwjgPp4odm5UV-oUQXu17ctv2+HkpRg@mail.gmail.com>
- <20141114104246.GA25828@leverpostej>
- <CAOVJa8Fx4yiSU0O7HTaYEKOrRdtWve4JGeN0cWRXDsBMyV_8Mg@mail.gmail.com>
- <20141114135531.GA27768@leverpostej>
- <CAOVJa8GB=pk4SFEArcEGWF8g12105F_9YUL0hH5k+WW6=WWOBg@mail.gmail.com>
- <20141116165211.GL4042@n2100.arm.linux.org.uk>
-Message-ID: <20141117120952.GA23769@leverpostej>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 17 Nov 2014 15:17:46 +0300
+Subject: [PATCH] ARM: dts: DRA7: Add node for RTC
+In-Reply-To: <1416199509-3977-1-git-send-email-lokeshvutla@ti.com>
+References: <1416199509-3977-1-git-send-email-lokeshvutla@ti.com>
+Message-ID: <5469E76A.7020105@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello.
 
-The below applies to ARMv8 (and also ARMv7). Prior versions of the ARM
-architecture do not provide the same guarantees.
+On 11/17/2014 7:45 AM, Lokesh Vutla wrote:
 
-On Sun, Nov 16, 2014 at 04:52:11PM +0000, Russell King - ARM Linux wrote:
-> On Sun, Nov 16, 2014 at 06:53:57PM +0800, vichy wrote:
-> > hi Mark:
-> > 
-> > > Consider CONFIG_HIGHPTE. The physical address space can be larger than
-> > > the virtual address space, in which case not everything can be
-> > > permanently mapped.
-> > if those page tables are not mapped into the virtual address space,
-> > how OS create them?
-> > (AFAIK, once System.M is enabled, the processor cannot access where
-> > page table doesn't map to)
-> > except those page tables are created before System.M enabled.
-> 
-> The OS temporarily maps the page tables into virtual space to update
-> them.  Once updated, the OS unmaps the page tables.
-> 
-> However, forget this detail - the MMU page table walker knows nothing
-> about the virtual address space: MMU page table walks do not happen in
-> the virtual address space, they happen in the physical address space.
-> So, it makes no odds what so ever whether the table is mapped or not.
-> 
-> > BTW, why we need to set page table walk attribute as sharable and
-> > inner/outer cacheable?
-> 
-> The access type is included on the bus along with the address and other
-> attributes.  This includes whether it's sharable, and the cache attributes.
-> A MMU page walker may be implemented such that it is capable of accessing
-> L2 cache.
+> Add node for RTC.
 
-Or L1, depending on the implementation of the memory system. The logic
-which walks the page tables is essentially another coherent observer, so
-it doesn't necessarily matter precisely where it is attached.
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> [nm at ti.com: update with rtc crossbar number]
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+>   arch/arm/boot/dts/dra7.dtsi | 9 +++++++++
+>   1 file changed, 9 insertions(+)
 
-> In that case, we would want the MMU page walker to be able to read from
-> the L2 cache, which would need the access to be marked as "normal memory,
-> cacheable" so that the cache is searched for a matching line.  This in
-> turn means that software does not have to flush page table updates all
-> the way back to the physical memory - merely flushing them out of the L1
-> cache is sufficient.
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 9cc9843..f98f9f0 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -1075,6 +1075,15 @@
+>   			status = "disabled";
+>   		};
+>
+> +		rtc: rtcss at 48838000 {
 
-To further this point, provided the TCR is programmed with the same
-attributes the kernel uses to access the page tables, no cache
-maintenance is necessary, as the CPU(s) and page table walker(s) are
-coherent.
+    Please just name the node "rtc at 48838000", in accordance with ePAPR.
 
-Barriers are necessary to ensure visibility of any page table
-modifications prior to explicit memory accesses and/or TLB maintenance.
+> +			compatible = "ti,am3352-rtc";
+> +			reg = <0x48838000 0x100>;
+> +			interrupts = <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>;
 
-This is what we do for ARMv7 and arm64.
+    2 similar interrupts?
 
-Thanks,
-Mark.
+[...]
+
+WBR, Sergei
