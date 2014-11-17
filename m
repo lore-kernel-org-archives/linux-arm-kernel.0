@@ -1,62 +1,92 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 17 Nov 2014 16:37:05 +0100
-Subject: [PATCH v2 2/2] dt-bindings: simplefb-sunxi: Add sunxi simplefb
- extensions
-In-Reply-To: <1416238625-28590-1-git-send-email-hdegoede@redhat.com>
-References: <1416238625-28590-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1416238625-28590-3-git-send-email-hdegoede@redhat.com>
+Date: Mon, 17 Nov 2014 16:40:16 +0100
+Subject: [PATCH] ARM: dts: sunxi: Update simplfb nodes so that u-boot can find
+ them
+Message-ID: <1416238816-29627-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If pre-filled framebuffer nodes are used, the firmware may need extra
-properties to find the right node. This documents the properties to use
-for this on sunxi platforms.
+Review of the u-boot sunxi simplefb patches has led to the decision that
+u-boot should not use a specific path to find the nodes as this goes contrary
+to how devicetree usually works.
+
+Instead a platform specific compatible + properties should be used for this.
+
+The simplefb bindings have already been updated to reflect this, this patch
+brings the sunxi devicetree files in line with the new binding, and the
+actual u-boot implementation as it is going upstream.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Acked-by: Grant Likely <grant.likely@linaro.org>
 ---
- .../bindings/video/simple-framebuffer-sunxi.txt    | 33 ++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+ arch/arm/boot/dts/sun4i-a10.dtsi  | 5 +++--
+ arch/arm/boot/dts/sun5i-a10s.dtsi | 5 +++--
+ arch/arm/boot/dts/sun6i-a31.dtsi  | 5 +++--
+ arch/arm/boot/dts/sun7i-a20.dtsi  | 5 +++--
+ 4 files changed, 12 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
-new file mode 100644
-index 0000000..4188606
---- /dev/null
-+++ b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
-@@ -0,0 +1,33 @@
-+Sunxi specific Simple Framebuffer bindings
-+
-+This binding documents sunxi specific extensions to the simple-framebuffer
-+bindings. The sunxi simplefb u-boot code relies on the devicetree containing
-+pre-populated simplefb nodes.
-+
-+These extensions are intended so that u-boot can select the right node based
-+on which pipeline is being used. As such they are solely intended for
-+firmware / bootloader use, and the OS should ignore them.
-+
-+Required properties:
-+- compatible: "sunxi,framebuffer"
-+- sunxi,pipeline, one of:
-+  "de_be0-lcd0"
-+  "de_be1-lcd1"
-+  "de_be0-lcd0-hdmi"
-+  "de_be1-lcd1-hdmi"
-+
-+Example:
-+
-+chosen {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	ranges;
-+
-+	framebuffer at 0 {
-+		compatible = "sunxi,framebuffer", "simple-framebuffer";
-+		sunxi,pipeline = "de_be0-lcd0-hdmi";
-+		clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
-+			 <&ahb_gates 44>;
-+		status = "disabled";
-+	};
-+};
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 92d8aa6..bbc366f 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -32,8 +32,9 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
+-		framebuffer0-hdmi {
+-			compatible = "simple-framebuffer";
++		framebuffer at 0 {
++			compatible = "sunxi,framebuffer", "simple-framebuffer";
++			sunxi,pipeline = "de_be0-lcd0-hdmi";
+ 			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
+ 				 <&ahb_gates 44>;
+ 			status = "disabled";
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index c678e56..20509d7 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -29,8 +29,9 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
+-		framebuffer0-hdmi {
+-			compatible = "simple-framebuffer";
++		framebuffer at 0 {
++			compatible = "sunxi,framebuffer", "simple-framebuffer";
++			sunxi,pipeline = "de_be0-lcd0-hdmi";
+ 			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
+ 				 <&ahb_gates 44>;
+ 			status = "disabled";
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index ccc03f3..3b1c735 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -67,8 +67,9 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
+-		framebuffer0-hdmi {
+-			compatible = "simple-framebuffer";
++		framebuffer at 0 {
++			compatible = "sunxi,framebuffer", "simple-framebuffer";
++			sunxi,pipeline = "de_be0-lcd0-hdmi";
+ 			clocks = <&pll6>;
+ 			status = "disabled";
+ 		};
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 89766cb..0c9c216 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -69,8 +69,9 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
+-		framebuffer0-hdmi {
+-			compatible = "simple-framebuffer";
++		framebuffer at 0 {
++			compatible = "sunxi,framebuffer", "simple-framebuffer";
++			sunxi,pipeline = "de_be0-lcd0-hdmi";
+ 			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
+ 				 <&ahb_gates 44>;
+ 			status = "disabled";
 -- 
 2.1.0
