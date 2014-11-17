@@ -1,46 +1,421 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 17 Nov 2014 14:17:00 -0800
-Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
- completes
-In-Reply-To: <Pine.LNX.4.44L0.1411171708010.4838-100000@iolanthe.rowland.org>
-References: <20141117220238.GE5258@dtor-ws>
- <Pine.LNX.4.44L0.1411171708010.4838-100000@iolanthe.rowland.org>
-Message-ID: <20141117221700.GA2049@dtor-ws>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Mon, 17 Nov 2014 14:18:30 -0800
+Subject: [PATCHv2] arm64: add support to dump the kernel page tables
+Message-ID: <1416262710-7798-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 05:12:35PM -0500, Alan Stern wrote:
-> On Mon, 17 Nov 2014, Dmitry Torokhov wrote:
-> 
-> > > >  Except buses
-> > > > usually call pm_generic_runtime_resume() which ends up fetching driver's
-> > > > callbacks. Maybe pm_generic_runtime_*() need be a bit smarter?
-> > > 
-> > > No, the bus subsystem needs to be smarter.  It shouldn't call 
-> > > pm_generic_runtime_resume() if the driver hasn't been probed yet, or if 
-> > > the driver has already been unbound from the device.
-> > 
-> > But that code wold be exactly the same for all buses, right? So why
-> > can't pm_generic_runtime_resume() be smarter?
-> 
-> It would not be the same for all buses.  Each bus will have its own way 
-> of recognizing whether or not a driver has been probed (i.e., by 
-> checking some field in the bus-specific part of the device structure).
-> 
-> > However, is it allowed to call pm_runtime_get_sync() on devices that
-> > didn't issue pm_runtime_enable()?
-> 
-> Yes.  But the bus has to issue pm_runtime_enable() before probing the 
-> driver, because the driver will expect runtime PM to work properly 
-> while its probe routine runs.  For example, the probe routine might 
-> want to leave the device in a runtime-suspended state.  It can't do 
-> that if the device isn't enabled for runtime PM.
+In a similar manner to arm, it's useful to be able to dump the page
+tables to verify permissions and memory types. Add a debugfs file
+to check the page tables.
 
-That means that runtime PM will be enabled for all devices on given bus
-while up till now drivers were deciding if their devices should be
-runtime-pm-managed or not. I do not think we are quite ready for this.
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+v2: Addressed comments from Mark Rutland. Made the logic a bit more
+consistent between functions. Now tested on 4K and 64K pages.
+---
+ arch/arm64/Kconfig.debug |  12 ++
+ arch/arm64/mm/Makefile   |   1 +
+ arch/arm64/mm/dump.c     | 358 +++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 371 insertions(+)
+ create mode 100644 arch/arm64/mm/dump.c
 
-Thanks.
-
+diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+index 0a12933..5fdd6dc 100644
+--- a/arch/arm64/Kconfig.debug
++++ b/arch/arm64/Kconfig.debug
+@@ -6,6 +6,18 @@ config FRAME_POINTER
+ 	bool
+ 	default y
+ 
++config ARM64_PTDUMP
++	bool "Export kernel pagetable layout to userspace via debugfs"
++	depends on DEBUG_KERNEL
++	select DEBUG_FS
++        help
++	  Say Y here if you want to show the kernel pagetable layout in a
++	  debugfs file. This information is only useful for kernel developers
++	  who are working in architecture specific areas of the kernel.
++	  It is probably not a good idea to enable this feature in a production
++	  kernel.
++	  If in doubt, say "N"
++
+ config STRICT_DEVMEM
+ 	bool "Filter access to /dev/mem"
+ 	depends on MMU
+diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
+index c56179e..773d37a 100644
+--- a/arch/arm64/mm/Makefile
++++ b/arch/arm64/mm/Makefile
+@@ -3,3 +3,4 @@ obj-y				:= dma-mapping.o extable.o fault.o init.o \
+ 				   ioremap.o mmap.o pgd.o mmu.o \
+ 				   context.o proc.o pageattr.o
+ obj-$(CONFIG_HUGETLB_PAGE)	+= hugetlbpage.o
++obj-$(CONFIG_ARM64_PTDUMP)	+= dump.o
+diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+new file mode 100644
+index 0000000..57dcee4
+--- /dev/null
++++ b/arch/arm64/mm/dump.c
+@@ -0,0 +1,358 @@
++/*
++ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
++ * Debug helper to dump the current kernel pagetables of the system
++ * so that we can see what the various memory ranges are set to.
++ *
++ * Derived from x86 and arm implementation:
++ * (C) Copyright 2008 Intel Corporation
++ *
++ * Author: Arjan van de Ven <arjan@linux.intel.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; version 2
++ * of the License.
++ */
++#include <linux/debugfs.h>
++#include <linux/fs.h>
++#include <linux/mm.h>
++#include <linux/seq_file.h>
++
++#include <asm/pgtable.h>
++
++#define LOWEST_ADDR	(UL(0xffffffffffffffff) << VA_BITS)
++
++struct addr_marker {
++	unsigned long start_address;
++	const char *name;
++};
++
++static struct addr_marker address_markers[] = {
++	{ 0,			"vmalloc() Area" },
++	{ VMALLOC_END,		"vmalloc() End" },
++	{ MODULES_VADDR,	"Modules" },
++	{ PAGE_OFFSET,		"Kernel Mapping" },
++	{ -1,			NULL },
++};
++
++struct pg_state {
++	struct seq_file *seq;
++	const struct addr_marker *marker;
++	unsigned long start_address;
++	unsigned level;
++	u64 current_prot;
++};
++
++struct prot_bits {
++	u64		mask;
++	u64		val;
++	const char	*set;
++	const char	*clear;
++};
++
++static const struct prot_bits pte_bits[] = {
++	{
++		.mask	= PTE_USER,
++		.val	= PTE_USER,
++		.set	= "USR",
++		.clear	= "   ",
++	}, {
++		.mask	= PTE_RDONLY,
++		.val	= PTE_RDONLY,
++		.set	= "ro",
++		.clear	= "RW",
++	}, {
++		.mask	= PTE_PXN,
++		.val	= PTE_PXN,
++		.set	= "NX",
++		.clear	= "x ",
++	}, {
++		.mask	= PTE_SHARED,
++		.val	= PTE_SHARED,
++		.set	= "SHD",
++		.clear	= "   ",
++	}, {
++		.mask	= PTE_AF,
++		.val	= PTE_AF,
++		.set	= "AF",
++		.clear	= "  ",
++	}, {
++		.mask	= PTE_NG,
++		.val	= PTE_NG,
++		.set	= "NG",
++		.clear	= "  ",
++	}, {
++		.mask	= PTE_UXN,
++		.val	= PTE_UXN,
++		.set	= "UXN",
++	}, {
++		.mask	= PTE_ATTRINDX_MASK,
++		.val	= PTE_ATTRINDX(MT_DEVICE_nGnRnE),
++		.set	= "DEVICE/nGnRnE",
++	}, {
++		.mask	= PTE_ATTRINDX_MASK,
++		.val	= PTE_ATTRINDX(MT_DEVICE_nGnRE),
++		.set	= "DEVICE/nGnRE",
++	}, {
++		.mask	= PTE_ATTRINDX_MASK,
++		.val	= PTE_ATTRINDX(MT_DEVICE_GRE),
++		.set	= "DEVICE/GRE",
++	}, {
++		.mask	= PTE_ATTRINDX_MASK,
++		.val	= PTE_ATTRINDX(MT_NORMAL_NC),
++		.set	= "MEM/BUFFERABLE",
++	}, {
++		.mask	= PTE_ATTRINDX_MASK,
++		.val	= PTE_ATTRINDX(MT_NORMAL),
++		.set	= "MEM/NORMAL",
++	}
++};
++
++static const struct prot_bits section_bits[] = {
++	{
++		.mask	= PMD_SECT_USER,
++		.val	= PMD_SECT_USER,
++		.set	= "USR",
++		.clear	= "   ",
++	}, {
++		.mask	= PMD_SECT_RDONLY,
++		.val	= PMD_SECT_RDONLY,
++		.set	= "ro",
++		.clear	= "RW",
++	}, {
++		.mask	= PMD_SECT_PXN,
++		.val	= PMD_SECT_PXN,
++		.set	= "NX",
++		.clear	= "x ",
++	}, {
++		.mask	= PMD_SECT_S,
++		.val	= PMD_SECT_S,
++		.set	= "SHD",
++		.clear	= "   ",
++	}, {
++		.mask	= PMD_SECT_AF,
++		.val	= PMD_SECT_AF,
++		.set	= "AF",
++		.clear	= "  ",
++	}, {
++		.mask	= PMD_SECT_NG,
++		.val	= PMD_SECT_NG,
++		.set	= "NG",
++		.clear	= "  ",
++	}, {
++		.mask	= PMD_SECT_UXN,
++		.val	= PMD_SECT_UXN,
++		.set	= "UXN",
++	}, {
++		.mask	= PTE_ATTRINDX_MASK,
++		.val	= PTE_ATTRINDX(MT_DEVICE_nGnRnE),
++		.set	= "DEVICE/nGnRnE",
++	}, {
++		.mask	= PTE_ATTRINDX_MASK,
++		.val	= PTE_ATTRINDX(MT_DEVICE_nGnRE),
++		.set	= "DEVICE/nGnRE",
++	}, {
++		.mask	= PTE_ATTRINDX_MASK,
++		.val	= PTE_ATTRINDX(MT_DEVICE_GRE),
++		.set	= "DEVICE/GRE",
++	}, {
++		.mask	= PTE_ATTRINDX_MASK,
++		.val	= PTE_ATTRINDX(MT_NORMAL_NC),
++		.set	= "MEM/BUFFERABLE",
++	}, {
++		.mask	= PTE_ATTRINDX_MASK,
++		.val	= PTE_ATTRINDX(MT_NORMAL),
++		.set	= "MEM/NORMAL",
++	}
++};
++
++struct pg_level {
++	const struct prot_bits *bits;
++	size_t num;
++	u64 mask;
++};
++
++static struct pg_level pg_level[] = {
++	{
++	}, { /* pgd */
++		.bits	= pte_bits,
++		.num	= ARRAY_SIZE(pte_bits),
++	}, { /* pud */
++		.bits	= pte_bits,
++		.num	= ARRAY_SIZE(pte_bits),
++	}, { /* pmd */
++		.bits	= section_bits,
++		.num	= ARRAY_SIZE(section_bits),
++	}, { /* pte */
++		.bits	= pte_bits,
++		.num	= ARRAY_SIZE(pte_bits),
++	},
++};
++
++static void dump_prot(struct pg_state *st, const struct prot_bits *bits,
++			size_t num)
++{
++	unsigned i;
++
++	for (i = 0; i < num; i++, bits++) {
++		const char *s;
++
++		if ((st->current_prot & bits->mask) == bits->val)
++			s = bits->set;
++		else
++			s = bits->clear;
++
++		if (s)
++			seq_printf(st->seq, " %s", s);
++	}
++}
++
++static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
++				u64 val)
++{
++	static const char units[] = "KMGTPE";
++	u64 prot = val & pg_level[level].mask;
++
++	if (addr < LOWEST_ADDR)
++		return;
++
++	if (!st->level) {
++		st->level = level;
++		st->current_prot = prot;
++		st->start_address = addr;
++		seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
++	} else if (prot != st->current_prot || level != st->level ||
++		   addr >= st->marker[1].start_address) {
++		const char *unit = units;
++		unsigned long delta;
++
++		if (st->current_prot) {
++			seq_printf(st->seq, "0x%16lx-0x%16lx   ",
++				   st->start_address, addr);
++
++			delta = (addr - st->start_address) >> 10;
++			while (!(delta & 1023) && unit[1]) {
++				delta >>= 10;
++				unit++;
++			}
++			seq_printf(st->seq, "%9lu%c", delta, *unit);
++			if (pg_level[st->level].bits)
++				dump_prot(st, pg_level[st->level].bits,
++					  pg_level[st->level].num);
++			seq_puts(st->seq, "\n");
++		}
++
++		if (addr >= st->marker[1].start_address) {
++			st->marker++;
++			seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
++		}
++		st->start_address = addr;
++		st->current_prot = prot;
++		st->level = level;
++	}
++}
++
++static void walk_pte(struct pg_state *st, pmd_t *pmd, unsigned long start)
++{
++	pte_t *pte = pte_offset_kernel(pmd, 0);
++	unsigned long addr;
++	unsigned i;
++
++	for (i = 0; i < PTRS_PER_PTE; i++, pte++) {
++		addr = start + i * PAGE_SIZE;
++		note_page(st, addr, 4, pte_val(*pte));
++	}
++}
++
++static void walk_pmd(struct pg_state *st, pud_t *pud, unsigned long start)
++{
++	pmd_t *pmd = pmd_offset(pud, 0);
++	unsigned long addr;
++	unsigned i;
++
++	for (i = 0; i < PTRS_PER_PMD; i++, pmd++) {
++		addr = start + i * PMD_SIZE;
++		if (pmd_none(*pmd) || pmd_sect(*pmd) || pmd_bad(*pmd))
++			note_page(st, addr, 3, pmd_val(*pmd));
++		else
++			walk_pte(st, pmd, addr);
++	}
++}
++
++static void walk_pud(struct pg_state *st, pgd_t *pgd, unsigned long start)
++{
++	pud_t *pud = pud_offset(pgd, 0);
++	unsigned long addr;
++	unsigned i;
++
++	for (i = 0; i < PTRS_PER_PUD; i++, pud++) {
++		addr = start + i * PUD_SIZE;
++		if (pud_none(*pud) || pud_sect(*pud) || pud_bad(*pud))
++			note_page(st, addr, 2, pud_val(*pud));
++		else
++			walk_pmd(st, pud, addr);
++	}
++}
++
++static unsigned long normalize_addr(unsigned long u)
++{
++	return u | LOWEST_ADDR;
++}
++
++static void walk_pgd(struct pg_state *st, pgd_t *pgd, unsigned long start)
++{
++	unsigned i;
++	unsigned long addr;
++
++	for (i = 0; i < PTRS_PER_PGD; i++, pgd++) {
++		addr = normalize_addr(start + i * PGDIR_SIZE);
++		if (pgd_none(*pgd) || pgd_bad(*pgd))
++			note_page(st, addr, 1, pgd_val(*pgd));
++		else
++			walk_pud(st, pgd, addr);
++	}
++}
++
++static int ptdump_show(struct seq_file *m, void *v)
++{
++	struct pg_state st;
++
++	memset(&st, 0, sizeof(st));
++	st.seq = m;
++	st.marker = address_markers;
++
++	walk_pgd(&st, swapper_pg_dir, 0);
++
++	note_page(&st, 0, 0, 0);
++	return 0;
++}
++
++static int ptdump_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, ptdump_show, NULL);
++}
++
++static const struct file_operations ptdump_fops = {
++	.open		= ptdump_open,
++	.read		= seq_read,
++	.llseek		= seq_lseek,
++	.release	= single_release,
++};
++
++static int ptdump_init(void)
++{
++	struct dentry *pe;
++	unsigned i, j;
++
++	for (i = 0; i < ARRAY_SIZE(pg_level); i++)
++		if (pg_level[i].bits)
++			for (j = 0; j < pg_level[i].num; j++)
++				pg_level[i].mask |= pg_level[i].bits[j].mask;
++
++	address_markers[0].start_address = VMALLOC_START;
++
++	pe = debugfs_create_file("kernel_page_tables", 0400, NULL, NULL,
++				 &ptdump_fops);
++	return pe ? 0 : -ENOMEM;
++}
++device_initcall(ptdump_init);
 -- 
-Dmitry
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
