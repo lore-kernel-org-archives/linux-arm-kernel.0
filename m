@@ -1,51 +1,34 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:40 +0100
-Subject: [PATCH v5 46/61] dmaengine: pch-dma: Rename device_control
+Date: Mon, 17 Nov 2014 14:42:03 +0100
+Subject: [PATCH v5 09/61] dmaengine: Remove the need to declare device_control
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-47-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-10-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename the device_control callback of the Intel PCH DMA driver to terminate_all
-since it's all it's really doing. That will eventually be used to retrieve
-slave capabilities.
+In order to migrate the drivers without triggering a BUG_ON for the converted
+drivers, which would cause bisectability issues, we need to remove that check
+before removing the device_control function entirely.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- drivers/dma/pch_dma.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ drivers/dma/dmaengine.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/drivers/dma/pch_dma.c b/drivers/dma/pch_dma.c
-index 9f9ca9fe5ce6..d03b9c93ccab 100644
---- a/drivers/dma/pch_dma.c
-+++ b/drivers/dma/pch_dma.c
-@@ -665,16 +665,12 @@ err_desc_get:
- 	return NULL;
- }
+diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+index 9b2cd74b8f2e..98e9431f85ec 100644
+--- a/drivers/dma/dmaengine.c
++++ b/drivers/dma/dmaengine.c
+@@ -820,8 +820,6 @@ int dma_async_device_register(struct dma_device *device)
+ 		!device->device_prep_dma_sg);
+ 	BUG_ON(dma_has_cap(DMA_CYCLIC, device->cap_mask) &&
+ 		!device->device_prep_dma_cyclic);
+-	BUG_ON(dma_has_cap(DMA_SLAVE, device->cap_mask) &&
+-		!device->device_control);
+ 	BUG_ON(dma_has_cap(DMA_INTERLEAVE, device->cap_mask) &&
+ 		!device->device_prep_interleaved_dma);
  
--static int pd_device_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--			     unsigned long arg)
-+static int pd_device_terminate_all(struct dma_chan *chan)
- {
- 	struct pch_dma_chan *pd_chan = to_pd_chan(chan);
- 	struct pch_dma_desc *desc, *_d;
- 	LIST_HEAD(list);
- 
--	if (cmd != DMA_TERMINATE_ALL)
--		return -ENXIO;
--
- 	spin_lock_irq(&pd_chan->lock);
- 
- 	pdc_set_mode(&pd_chan->chan, DMA_CTL0_DISABLE);
-@@ -932,7 +928,7 @@ static int pch_dma_probe(struct pci_dev *pdev,
- 	pd->dma.device_tx_status = pd_tx_status;
- 	pd->dma.device_issue_pending = pd_issue_pending;
- 	pd->dma.device_prep_slave_sg = pd_prep_slave_sg;
--	pd->dma.device_control = pd_device_control;
-+	pd->dma.device_terminate_all = pd_device_terminate_all;
- 
- 	err = dma_async_device_register(&pd->dma);
- 	if (err) {
 -- 
 2.1.1
