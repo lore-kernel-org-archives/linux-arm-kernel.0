@@ -1,71 +1,30 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 18 Nov 2014 00:27:16 +0100
-Subject: [PATCHv3 03/12] arm: mvebu: add uartX labels for Armada SoC serial
- nodes
-In-Reply-To: <cover.1416266432.git.arno@natisbad.org>
-References: <cover.1416266432.git.arno@natisbad.org>
-Message-ID: <2eb960fa12bba9d298c8b984dcceeb5814412c8c.1416266432.git.arno@natisbad.org>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 18 Nov 2014 00:25:10 +0100
+Subject: exynos boot falures in linux-next
+In-Reply-To: <7hlhn9zcse.fsf@deeprootsystems.com>
+References: <E1XqKYI-0000pQ-4b@ip-10-35-177-41.ec2.internal>	<7hoas54y7k.fsf@deeprootsystems.com>
+ <7hlhn9zcse.fsf@deeprootsystems.com>
+Message-ID: <546A83D6.9060504@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Kevin,
 
-This patch adds uartX labels for Armada SoC serial nodes. This is
-a preliminary work to be able to easily reference the serial lines
-in Device Tree files. One expected use is when providing stdout-path
-property for barebox.
+On 11/17/2014 11:24 PM, Kevin Hilman wrote:
+> 
+> As might have been expected, reverting the change that enables the
+> DRM/display options in exynos_defconfig fixes the problem.
+> 
+> Kevin
+>
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
----
- arch/arm/boot/dts/armada-370-xp.dtsi | 5 +++--
- arch/arm/boot/dts/armada-xp.dtsi     | 5 +++--
- 2 files changed, 6 insertions(+), 4 deletions(-)
+I'm sorry for causing a boot failure but when I first posted that patch,
+the Exynos DRM driver was working correctly (at least on the Exynos boards
+I've access to) so it seems the regression was introduced while the patch
+was posted but not yet picked.
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 83286ec9702c..2be9723bcdf3 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -151,7 +151,7 @@
- 				status = "disabled";
- 			};
- 
--			serial at 12000 {
-+			uart0: serial at 12000 {
- 				compatible = "snps,dw-apb-uart";
- 				reg = <0x12000 0x100>;
- 				reg-shift = <2>;
-@@ -160,7 +160,8 @@
- 				clocks = <&coreclk 0>;
- 				status = "disabled";
- 			};
--			serial at 12100 {
-+
-+			uart1: serial at 12100 {
- 				compatible = "snps,dw-apb-uart";
- 				reg = <0x12100 0x100>;
- 				reg-shift = <2>;
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index bff9f6c18db1..a68f5b837536 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -52,7 +52,7 @@
- 				reg = <0x11100 0x100>;
- 			};
- 
--			serial at 12200 {
-+			uart2: serial at 12200 {
- 				compatible = "snps,dw-apb-uart";
- 				reg = <0x12200 0x100>;
- 				reg-shift = <2>;
-@@ -61,7 +61,8 @@
- 				clocks = <&coreclk 0>;
- 				status = "disabled";
- 			};
--			serial at 12300 {
-+
-+			uart3: serial at 12300 {
- 				compatible = "snps,dw-apb-uart";
- 				reg = <0x12300 0x100>;
- 				reg-shift = <2>;
--- 
-2.1.1
+I'm not sure what is the correct step in this case but I'm OK with
+reverting the patch until the Exynos DRM driver bug is fixed.
+
+Best regards,
+Javier
