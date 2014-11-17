@@ -1,123 +1,100 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 17 Nov 2014 15:01:46 +0000
-Subject: [PATCH 07/11] arm: perf: document PMU affinity binding
-In-Reply-To: <CAL_Jsq+u9--tP-pYBut0V6oAnRDbwqpaJ9UMyW55AhCNFV10sA@mail.gmail.com>
+Date: Mon, 17 Nov 2014 15:02:53 +0000
+Subject: [PATCH 08/11] arm: perf: add functions to parse affinity from dt
+In-Reply-To: <20141117111625.GE18061@arm.com>
 References: <1415377536-12841-1-git-send-email-mark.rutland@arm.com>
- <1415377536-12841-8-git-send-email-mark.rutland@arm.com>
- <CAL_Jsq+u9--tP-pYBut0V6oAnRDbwqpaJ9UMyW55AhCNFV10sA@mail.gmail.com>
-Message-ID: <20141117150145.GA25416@leverpostej>
+ <1415377536-12841-9-git-send-email-mark.rutland@arm.com>
+ <20141117111625.GE18061@arm.com>
+Message-ID: <20141117150253.GB25416@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-I appear to have typo'd your address when posting this. Sorry about
-that; I'll make sure it doesn't happen again.
-
-On Mon, Nov 17, 2014 at 02:32:57PM +0000, Rob Herring wrote:
-> On Fri, Nov 7, 2014 at 10:25 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > To describe the various ways CPU PMU interrupts might be wired up, we
-> > can refer to the topology information in the device tree.
-> >
-> > This patch adds a new property to the PMU binding, interrupts-affinity,
-> > which describes the relationship between CPUs and interrupts. This
-> > information is necessary to handle systems with heterogeneous PMU
-> > implementations (e.g. big.LITTLE). Documentation is added describing the
-> > use of said property.
-> >
+On Mon, Nov 17, 2014 at 11:16:25AM +0000, Will Deacon wrote:
+> On Fri, Nov 07, 2014 at 04:25:33PM +0000, Mark Rutland wrote:
+> > Depending on hardware configuration, some devices may only be accessible
+> > from certain CPUs, may have interrupts wired up to a subset of CPUs, or
+> > may have operations which affect subsets of CPUs. To handle these
+> > devices it is necessary to describe this affinity information in
+> > devicetree.
+> > 
+> > This patch adds functions to handle parsing the CPU affinity of
+> > properties from devicetree, based on Lorenzo's topology binding,
+> > allowing subsets of CPUs to be associated with interrupts, hardware
+> > ports, etc. The functions can be used to build cpumasks and also to test
+> > whether an affinity property only targets one CPU independent of the
+> > current configuration (e.g. when the kernel supports fewer CPUs than are
+> > physically present). This is useful for dealing with mixed SPI/PPI
+> > devices.
+> > 
+> > A device may have an arbitrary number of affinity properties, the
+> > meaning of which is device-specific and should be specified in a given
+> > device's binding document.
+> > 
+> > For example, an affinity property describing interrupt routing may
+> > consist of a phandle pointing to a subtree of the topology nodes,
+> > indicating the set of CPUs an interrupt originates from or may be taken
+> > on. Bindings may have restrictions on the topology nodes referenced -
+> > for describing coherency controls an affinity property may indicate a
+> > whole cluster (including any non-CPU logic it contains) is affected by
+> > some configuration.
+> > 
 > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Grant Likely <grant.likely@linaro.org>
+> > Cc: Rob Herring <rob.herring@kernel.org>
 > > ---
-> >  Documentation/devicetree/bindings/arm/pmu.txt | 104 +++++++++++++++++++++++++-
-> >  1 file changed, 103 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
-> > index 75ef91d..23a0675 100644
-> > --- a/Documentation/devicetree/bindings/arm/pmu.txt
-> > +++ b/Documentation/devicetree/bindings/arm/pmu.txt
-> > @@ -24,12 +24,114 @@ Required properties:
-> >
-> >  Optional properties:
-> >
-> > +- interrupts-affinity : A list of phandles to topology nodes (see topology.txt) describing
-> > +            the set of CPUs associated with the interrupt at the same index.
+> >  arch/arm/kernel/perf_event_cpu.c | 127 +++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 127 insertions(+)
+> > 
+> > diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+> > index ce35149..dfcaba5 100644
+> > --- a/arch/arm/kernel/perf_event_cpu.c
+> > +++ b/arch/arm/kernel/perf_event_cpu.c
+> > @@ -22,6 +22,7 @@
+> >  #include <linux/export.h>
+> >  #include <linux/kernel.h>
+> >  #include <linux/of.h>
+> > +#include <linux/of_device.h>
+> >  #include <linux/platform_device.h>
+> >  #include <linux/slab.h>
+> >  #include <linux/spinlock.h>
+> > @@ -294,6 +295,132 @@ static int probe_current_pmu(struct arm_pmu *pmu)
+> >  	return ret;
+> >  }
+> >  
+> > +/*
+> > + * Test if the node is within the topology tree.
+> > + * Walk up to the root, keeping refcounts balanced.
+> > + */
+> > +static bool is_topology_node(struct device_node *node)
+> > +{
+> > +	struct device_node *np, *cpu_map;
+> > +	bool ret = false;
+> > +
+> > +	cpu_map = of_find_node_by_path("/cpus/cpu-map");
+> > +	if (!cpu_map)
+> > +		return false;
+> > +
+> > +	/*
+> > +	 * of_get_next_parent decrements the refcount of the provided node.
+> > +	 * Increment it first to keep things balanced.
+> > +	 */
+> > +	for (np = of_node_get(node); np; np = of_get_next_parent(np)) {
+> > +		if (np != cpu_map)
+> > +			continue;
+> > +
+> > +		ret = true;
+> > +		break;
+> > +	}
+> > +
+> > +	of_node_put(np);
+> > +	of_node_put(cpu_map);
+> > +	return ret;
+> > +}
 > 
-> Are there cases beyond PMUs we need to handle? I would think so, so we
-> should document this generically.
+> Wouldn't this be more at home in topology.c, or somewhere where others can
+> make use of it?
 
-That was what I tried way back when I first tried to upstream all of
-this, but in the mean time I've not encountered other devices which are
-really CPU-affine which use SPIs and hence need a CPU<->IRQ relationship
-described.
+Perhaps. I'll need this for arm64 too and I don't know where that should
+live.
 
-That said, I'm happy to document whatever approach for referring to a
-set of CPUs that we settle on, if that seems more general than PMU IRQ
-mapping.
-
-> > -Example:
-> > +Example 1 (A single CPU):
-> 
-> Isn't this a single cluster of 2 cpus?
-
-Yes, it is. My bad.
-
-> >  pmu {
-> >          compatible = "arm,cortex-a9-pmu";
-> >          interrupts = <100 101>;
-> >  };
-> > +
-> > +Example 2 (Multiple clusters with single interrupts):
-> 
-> The meaning of single could be made a bit more clear especially if you
-> consider Will's case. But I haven't really thought of better
-> wording...
-
-How about "A cluster of homogeneous CPUs"?
-
-> > +
-> > +cpus {
-> > +       #address-cells = <1>;
-> > +       #size-cells = <1>;
-> > +
-> > +       CPU0: cpu at 0 {
-> > +               reg = <0x0>;
-> > +               compatible = "arm,cortex-a15-pmu";
-> > +       };
-> > +
-> > +       CPU1: cpu at 1 {
-> > +               reg = <0x1>;
-> > +               compatible = "arm,cotex-a15-pmu";
-> > +       };
-> > +
-> > +       CPU100: cpu at 100 {
-> > +               reg = <0x100>;
-> > +               compatible = "arm,cortex-a7-pmu";
-> > +       };
-> > +
-> > +       cpu-map {
-> > +               cluster0 {
-> > +                       CORE_0_0: core0 {
-> > +                               cpu = <&CPU0>;
-> > +                       };
-> > +                       CORE_0_1: core1 {
-> > +                               cpu = <&CPU1>;
-> > +                       };
-> > +               };
-> > +               cluster1 {
-> > +                       CORE_1_0: core0 {
-> > +                               cpu = <&CPU100>;
-> > +                       };
-> > +               };
-> > +       };
-> > +};
-> > +
-> > +pmu_a15 {
-> > +       compatible = "arm,cortex-a15-pmu";
-> > +       interrupts = <100>, <101>;
-> > +       interrupts-affinity = <&CORE0>, <&CORE1>;
-> 
-> The phandle names are wrong here.
-
-Whoops. I've fixed that up locally now.
-
-Thanks,
 Mark.
