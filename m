@@ -1,49 +1,27 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 17 Nov 2014 14:49:10 +0000
-Subject: [PATCH v13 9/9] arm: Fix DEBUG_LL for multi-platform kernels (without
- PL01X)
-In-Reply-To: <1416235750-4766-1-git-send-email-daniel.thompson@linaro.org>
-References: <1416235750-4766-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1416235750-4766-10-git-send-email-daniel.thompson@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 17 Nov 2014 14:52:30 +0000
+Subject: [PATCH] ASoC: rt5631: Fixing compilation warning when DT is
+ disabled
+In-Reply-To: <1416232589-31319-1-git-send-email-krishna.md@samsung.com>
+References: <1416232589-31319-1-git-send-email-krishna.md@samsung.com>
+Message-ID: <20141117145230.GD2722@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building a multi_v7_defconfig kernel it is not possible to configure
-DEBUG_LL to use any serial device except a ARM Primecell PL01X, or more
-accurately and worse, it is possible to configure a different serial
-device but KConfig does not honour this request. In fact this also
-overrides the user selection for some of the single platform kernels, for
-example I don't think DEBUG_LL can be targeted at ICE or semihosted
-supervisor for ARCH_VERSATILE.
+On Mon, Nov 17, 2014 at 07:26:29PM +0530, Krishna Mohan Dani wrote:
+> Fixes the following compilation warning:
+> Warning: 'rt5631_i2c_dt_ids' defined but not used - when DT is not used.
+> 
+> Signed-off-by: Claude Youn <claude.youn@gmail.com>
+> Signed-off-by: Krishna Mohan Dani <krishna.md@samsung.com>
 
-This happens because DEBUG_UART_PL01X is automatically enabled by
-some architectures and this means user decisions made regarding
-the DEBUG_LL backend will be overridden. Problem is fixed by removing the
-automatic enabling of this option.
-
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/Kconfig.debug | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 612bdab25f70..43a5942ed60a 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1160,12 +1160,7 @@ config DEBUG_LL_INCLUDE
- 
- # Compatibility options for PL01x
- config DEBUG_UART_PL01X
--	def_bool ARCH_EP93XX || \
--		ARCH_INTEGRATOR || \
--		ARCH_SPEAR3XX || \
--		ARCH_SPEAR6XX || \
--		ARCH_SPEAR13XX || \
--		ARCH_VERSATILE
-+	bool
- 
- # Compatibility options for 8250
- config DEBUG_UART_8250
--- 
-1.9.3
+Applied, thanks.  It's really weird that such a trivial patch would have
+multiple authors, if you're forwarding on a patch from someone else
+please preserve their authorship as well as signoff.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/f5ad631d/attachment.sig>
