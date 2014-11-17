@@ -1,148 +1,287 @@
-From: chrisp@alliedtelesis.co.nz (Chris Packham)
-Date: Tue, 18 Nov 2014 12:34:41 +1300 (NZDT)
-Subject: [RFC PATCHv2] ARM: mvebu: Let the device-tree determine
- smp_ops
-In-Reply-To: <20141117095640.03e25d17@free-electrons.com>
-References: <20141106201603.GF4974@lunn.ch>
- <1415327626-16079-1-git-send-email-chris.packham@alliedtelesis.co.nz>
- <20141117095640.03e25d17@free-electrons.com>
-Message-ID: <alpine.DEB.2.10.1411181233160.902@chrisp-dl.ws.atlnz.lc>
+From: fkan@apm.com (Feng Kan)
+Date: Mon, 17 Nov 2014 15:39:59 -0800
+Subject: [PATCH 4/6] i2c: busses: add SLIMpro I2C device driver on APM
+ X-Gene platform
+In-Reply-To: <20141111203237.GB6443@katana>
+References: <1412726809-7525-1-git-send-email-fkan@apm.com>
+ <1412726809-7525-5-git-send-email-fkan@apm.com>
+ <20141111203237.GB6443@katana>
+Message-ID: <CAL85gmBq8B8kA0r=PC9V1fO85OQ1xzetvxipPpMHg+zbpVwaeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas, Maxime
-
-On Mon, 17 Nov 2014, Thomas Petazzoni wrote:
-
-> Dear Chris Packham,
->
-> On Fri,  7 Nov 2014 15:33:46 +1300, Chris Packham wrote:
->> The machine specific SMP operations can be configured either via
->> setup_arch or via arm_dt_init_cpu_maps. For the ARMADA_370_XP_DT devices
->> both of these are called and setup_arch wins because it is called last.
->> This means that it is not possible to substitute a different set of SMP
->> operations via the device-tree.
+On Tue, Nov 11, 2014 at 12:32 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> On Tue, Oct 07, 2014 at 05:06:47PM -0700, Feng Kan wrote:
+>> Add SLIMpro I2C device driver on APM X-Gene platform. This I2C
+>> device driver use the SLIMpro Mailbox driver to tunnel message to
+>> the SLIMpro coprocessor to do the work of accessing I2C components.
 >>
->> For the ARMADA_370_XP_DT compatible devices add a smp_init function that
->> detects if the device tree has an enable-method defined. If it does
->> return true to indicate that the smp_ops have already been set which
->> will prevent setup_arch from overriding them.
+>> Signed-off-by: Feng Kan <fkan@apm.com>
+>> Signed-off-by: Hieu Le <hnle@apm.com>
+>
+> Thank you for this submission!
+>
+>> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+>> index 2e45ae3..a03042c 100644
+>> --- a/drivers/i2c/busses/Kconfig
+>> +++ b/drivers/i2c/busses/Kconfig
+>> @@ -1009,6 +1009,15 @@ config I2C_CROS_EC_TUNNEL
+>>         connected there. This will work whatever the interface used to
+>>         talk to the EC (SPI, I2C or LPC).
 >>
->> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+>> +config I2C_XGENE_SLIMPRO
+>> +     tristate "APM X-Gene SoC I2C SLIMpro devices support"
+>> +     depends on ARCH_XGENE && XGENE_SLIMPRO_MBOX
+>> +     help
+>> +       Enable I2C bus access using the APM X-Gene SoC SLIMpro
+>> +       co-processor. The I2C device access the I2C bus via the X-Gene
+>> +       to SLIMpro (On chip coprocessor) mailbox mechanism.
+>> +       If unsure, say N.
+>> +
 >
-> My colleague Maxime Ripard (in Cc) rightfully suggests exploring a
-> different option: what about getting rid completely of the .smp field
-> of the DT_MACHINE structure, and instead have some code run early
-> enough that looks if an enable-method is defined, and if not, defines
-> it to the default value. This way, we continue to be backward
-> compatible in terms of DT, but we always use the enable-method from the
-> DT, and not sometimes from DT, sometimes from the DT_MACHINE structure.
+> I guess this is a driver for embedded? If so, please sort it properly.
+This is a SoC chip but not for embedded platform. Also the fact that this
+is not a traditional I2C driver, but one that tunnels to the helper cpu using
+mailbox to obtain I2C information. Do you still want me to group it with the
+embedded drivers?
 >
-> Unfortunately, it will have to be done on the flattened DT, because the
-> DT is unflattened right before the enable-method properties are looked
-> up:
+>>  config SCx200_ACB
+>>       tristate "Geode ACCESS.bus support"
+>>       depends on X86_32 && PCI
+>> diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
+>> index 49bf07e..22b5f0c 100644
+>> --- a/drivers/i2c/busses/Makefile
+>> +++ b/drivers/i2c/busses/Makefile
+>> @@ -99,6 +99,7 @@ obj-$(CONFIG_I2C_CROS_EC_TUNNEL)    += i2c-cros-ec-tunnel.o
+>>  obj-$(CONFIG_I2C_ELEKTOR)    += i2c-elektor.o
+>>  obj-$(CONFIG_I2C_PCA_ISA)    += i2c-pca-isa.o
+>>  obj-$(CONFIG_I2C_SIBYTE)     += i2c-sibyte.o
+>> +obj-$(CONFIG_I2C_XGENE_SLIMPRO) += i2c-xgene-slimpro.o
 >
->        unflatten_device_tree();
+> Ditto.
 >
->        arm_dt_init_cpu_maps();
+>>  obj-$(CONFIG_SCx200_ACB)     += scx200_acb.o
+>>
+>>  ccflags-$(CONFIG_I2C_DEBUG_BUS) := -DDEBUG
+>> diff --git a/drivers/i2c/busses/i2c-xgene-slimpro.c b/drivers/i2c/busses/i2c-xgene-slimpro.c
+>> new file mode 100644
+>> index 0000000..2cf6c33
+>> --- /dev/null
+>> +++ b/drivers/i2c/busses/i2c-xgene-slimpro.c
+>> @@ -0,0 +1,531 @@
+>> +/*
+>> + * X-Gene SLIMpro I2C Driver
+>> + *
+>> + * Copyright (c) 2014, Applied Micro Circuits Corporation
+>> + * Author: Feng Kan <fkan@apm.com>
+>> + * Author: Hieu Le <hnle@apm.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License as
+>> + * published by the Free Software Foundation; either version 2 of
+>> + * the License, or (at your option) any later version.
 >
-> And manipulating the DT in its flattened format, while possible in
-> ->dt_fixup(), is a pain, and probably doesn't allow adding new
-> properties anyway.
+> The license preamble and MODULE_LICENSE do not match!
 >
-> So, in the end, maybe this idea doesn't work, I haven't checked
-> completely.
+>> +#include <linux/module.h>
+>> +#include <linux/version.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/of.h>
+>> +#include <linux/i2c.h>
+>> +#include <linux/mailbox_client.h>
+>> +#include <linux/delay.h>
+>> +#include <linux/spinlock.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/dma-mapping.h>
 >
-
-So yeah it's tricky to work with the flattened dt. Not impossible the 
-powerpc arch code does quite a lot with it. Arm does less but still uses 
-it in atags_to_fdt.c. Below is a rough attempt at an implementation that 
-seems to work. Because of the flattened dt it's harder to iterate through 
-the cpu nodes so I haven't implemented anything to look for an 
-enable-method attached to them.
-
----- 8< ----
-Subject: [PATCH] ARM: mvebu: use dt_fixup to provide fallback for
-  enable-method
-
-When the device tree doesn't define an enable-method insert a property
-into the flattened device tree. arm_dt_init_cpu_maps() will then parse
-this an set smp_ops appropriately. Now that we have this fallback it is
-no longer necessary to set .smp in the DT_MACHINE definition.
-
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
----
-  arch/arm/mach-mvebu/Makefile   |  2 ++
-  arch/arm/mach-mvebu/board-v7.c | 23 ++++++++++++++++++++++-
-  2 files changed, 24 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-index 1636cdb..f818eaf 100644
---- a/arch/arm/mach-mvebu/Makefile
-+++ b/arch/arm/mach-mvebu/Makefile
-@@ -14,3 +14,5 @@ endif
-
-  obj-$(CONFIG_MACH_DOVE)		 += dove.o
-  obj-$(CONFIG_MACH_KIRKWOOD)	 += kirkwood.o kirkwood-pm.o
-+
-+CFLAGS_board-v7.o = -I$(src)/../../../scripts/dtc/libfdt
-\ No newline at end of file
-diff --git a/arch/arm/mach-mvebu/board-v7.c 
-b/arch/arm/mach-mvebu/board-v7.c
-index b2524d6..45851a2 100644
---- a/arch/arm/mach-mvebu/board-v7.c
-+++ b/arch/arm/mach-mvebu/board-v7.c
-@@ -17,6 +17,8 @@
-  #include <linux/clk-provider.h>
-  #include <linux/of_address.h>
-  #include <linux/of_platform.h>
-+#include <linux/of_fdt.h>
-+#include <linux/libfdt.h>
-  #include <linux/io.h>
-  #include <linux/clocksource.h>
-  #include <linux/dma-mapping.h>
-@@ -184,6 +186,25 @@ static void __init mvebu_dt_init(void)
-  	of_platform_populate(NULL, of_default_bus_match_table, NULL, 
-NULL);
-  }
-
-+static void __init armada_370_xp_dt_fixup(void)
-+{
-+	void *prop;
-+	int offset;
-+	int len;
-+
-+	offset = fdt_path_offset(initial_boot_params, "/cpus");
-+	prop = fdt_getprop(initial_boot_params, offset, "enable-method", 
-&len);
-+
-+	if (!prop) {
-+		pr_info("No enable-method defined. "
-+			"Falling back to \"marvell,armada-xp-smp\"\n");
-+
-+		fdt_appendprop(initial_boot_params, offset, 
-"enable-method",
-+			       "marvell,armada-xp-smp",
-+			       sizeof("marvell,armada-xp-smp"));
-+	}
-+}
-+
-  static const char * const armada_370_xp_dt_compat[] = {
-  	"marvell,armada-370-xp",
-  	NULL,
-@@ -192,11 +213,11 @@ static const char * const armada_370_xp_dt_compat[] 
-= {
-  DT_MACHINE_START(ARMADA_370_XP_DT, "Marvell Armada 370/XP (Device Tree)")
-  	.l2c_aux_val	= 0,
-  	.l2c_aux_mask	= ~0,
--	.smp		= smp_ops(armada_xp_smp_ops),
-  	.init_machine	= mvebu_dt_init,
-  	.init_irq       = mvebu_init_irq,
-  	.restart	= mvebu_restart,
-  	.dt_compat	= armada_370_xp_dt_compat,
-+	.dt_fixup	= armada_370_xp_dt_fixup,
-  MACHINE_END
-
-  static const char * const armada_375_dt_compat[] = {
--- 
-2.2.0.rc0
+> Please sort the includes.
+>
+>> +
+>> +#define XGENE_SLIMPRO_I2C            "xgene-slimpro-i2c"
+>
+> Only used once, not really needed
+>
+>> +
+>> +#define SLIMPRO_I2C_WAIT_COUNT               10000
+>> +
+>> +#define SLIMPRO_OP_TO_MS             1000    /* Operation time out in ms */
+>
+> *_TOUT_* or *_TIMEOUT_*. TO sounds like a conversion, from op to ms :)
+>
+>> +#define SLIMPRO_IIC_BUS                      1
+>
+> What does this '1' mean?
+>
+>> +static int start_i2c_msg_xfer(struct slimpro_i2c_dev *ctx)
+>> +{
+>> +     int count;
+>> +     unsigned long flags;
+>> +
+>> +     if (ctx->mbox_client.tx_block) {
+>> +             if (!wait_for_completion_timeout(&ctx->rd_complete,
+>> +                                              msecs_to_jiffies
+>> +                                              (SLIMPRO_OP_TO_MS)))
+>> +                     return -EIO;
+>
+> That should be -ETIMEDOUT, no?
+>
+>> +     } else {
+>> +             spin_lock_irqsave(&ctx->lock, flags);
+>> +             ctx->i2c_rx_poll = 1;
+>> +             for (count = SLIMPRO_I2C_WAIT_COUNT; count > 0; count--) {
+>> +                     if (ctx->i2c_rx_poll == 0)
+>> +                             break;
+>> +                     udelay(100);
+>> +             }
+>> +
+>> +             if (count == 0) {
+>> +                     ctx->i2c_rx_poll = 0;
+>> +                     ctx->mbox_client.tx_block = true;
+>> +                     spin_unlock_irqrestore(&ctx->lock, flags);
+>> +                     return -EIO;
+>
+> ditto.
+>
+>> +             }
+>> +             ctx->mbox_client.tx_block = true;
+>> +             spin_unlock_irqrestore(&ctx->lock, flags);
+>> +     }
+>> +
+>> +     /* Check of invalid data or no device */
+>> +     if (*ctx->resp_msg == 0xffffffff)
+>> +             return -ENODEV;
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int slimpro_i2c_blkrd(struct slimpro_i2c_dev *ctx, u32 chip, u32 addr,
+>> +                             u32 addrlen, u32 protocol, u32 readlen,
+>> +                             u32 with_data_len, void *data)
+>> +{
+>> +     dma_addr_t paddr;
+>> +     u32 msg[3];
+>> +     int rc;
+>> +
+>> +     paddr = dma_map_single(ctx->dev, ctx->dma_buffer, readlen,
+>> +                            DMA_FROM_DEVICE);
+>> +     if (dma_mapping_error(ctx->dev, paddr)) {
+>> +             dev_err(&ctx->adapter.dev, "Error in mapping dma buffer %p\n",
+>> +                     ctx->dma_buffer);
+>> +             rc = -EIO;
+>
+> Return the err value from dma_mapping_error?
+>
+>> +             goto err;
+>> +     }
+>> +
+>> +     if (irqs_disabled())
+>> +             ctx->mbox_client.tx_block = false;
+>> +
+>> +     msg[0] = SLIMPRO_IIC_ENCODE_MSG(SLIMPRO_IIC_BUS, chip,
+>> +                                     SLIMPRO_IIC_READ, protocol, addrlen,
+>> +                                     readlen);
+>> +     msg[1] = SLIMPRO_IIC_ENCODE_FLAG_BUFADDR |
+>> +              SLIMPRO_IIC_ENCODE_FLAG_WITH_DATA_LEN(with_data_len) |
+>> +              SLIMPRO_IIC_ENCODE_UPPER_BUFADDR(paddr) |
+>> +              SLIMPRO_IIC_ENCODE_ADDR(addr);
+>> +     msg[2] = (u32) paddr;
+>> +     ctx->resp_msg = msg;
+>> +
+>> +     if (ctx->mbox_client.tx_block)
+>> +             init_completion(&ctx->rd_complete);
+>
+> reinit_completion? and init_completion in probe?
+>
+>> +
+>> +     rc = mbox_send_message(ctx->mbox_chan, &msg);
+>> +     if (rc < 0)
+>> +             goto err_unmap;
+>> +
+>> +     rc = start_i2c_msg_xfer(ctx);
+>> +
+>> +     /* Copy to destination */
+>> +     memcpy(data, ctx->dma_buffer, readlen);
+>> +
+>> +err_unmap:
+>> +     dma_unmap_single(ctx->dev, paddr, readlen, DMA_FROM_DEVICE);
+>> +err:
+>> +     ctx->resp_msg = NULL;
+>> +     return rc;
+>> +}
+>> +
+>> +static int slimpro_i2c_blkwr(struct slimpro_i2c_dev *ctx, u32 chip,
+>> +                          u32 addr, u32 addrlen, u32 protocol, u32 writelen,
+>> +                          void *data)
+>> +{
+>> +     dma_addr_t paddr;
+>> +     u32 msg[3];
+>> +     int rc;
+>> +
+>> +     memcpy(ctx->dma_buffer, data, writelen);
+>> +     paddr = dma_map_single(ctx->dev, ctx->dma_buffer, writelen,
+>> +                            DMA_TO_DEVICE);
+>> +     if (dma_mapping_error(ctx->dev, paddr)) {
+>> +             dev_err(&ctx->adapter.dev, "Error in mapping dma buffer %p\n",
+>> +                     ctx->dma_buffer);
+>> +             rc = -EIO;
+>
+> same as above
+>
+>> +             goto err;
+>> +     }
+>> +
+>> +     if (irqs_disabled())
+>> +             ctx->mbox_client.tx_block = false;
+>> +
+>> +     msg[0] = SLIMPRO_IIC_ENCODE_MSG(SLIMPRO_IIC_BUS, chip,
+>> +                                     SLIMPRO_IIC_WRITE, protocol, addrlen,
+>> +                                     writelen);
+>> +     msg[1] = SLIMPRO_IIC_ENCODE_FLAG_BUFADDR |
+>> +              SLIMPRO_IIC_ENCODE_UPPER_BUFADDR(paddr) |
+>> +              SLIMPRO_IIC_ENCODE_ADDR(addr);
+>> +     msg[2] = (u32) paddr;
+>> +     ctx->resp_msg = msg;
+>> +
+>> +     if (ctx->mbox_client.tx_block)
+>> +             init_completion(&ctx->rd_complete);
+>
+> ditto
+>
+>> +
+>> +     rc = mbox_send_message(ctx->mbox_chan, &msg);
+>> +     if (rc < 0)
+>> +             goto err_unmap;
+>> +
+>> +     rc = start_i2c_msg_xfer(ctx);
+>> +
+>> +err_unmap:
+>> +     dma_unmap_single(ctx->dev, paddr, writelen, DMA_TO_DEVICE);
+>> +err:
+>> +     ctx->resp_msg = NULL;
+>> +     return rc;
+>> +}
+>> +
+>> +static struct platform_driver xgene_slimpro_i2c_driver = {
+>> +     .probe  = xgene_slimpro_i2c_probe,
+>> +     .remove = xgene_slimpro_i2c_remove,
+>> +     .driver = {
+>> +             .name   = XGENE_SLIMPRO_I2C,
+>> +             .owner  = THIS_MODULE,
+>
+> Not needed.
+>
+>> +             .of_match_table = of_match_ptr(xgene_slimpro_i2c_id)
+>> +     },
+>> +};
+>> +
+>> +module_platform_driver(xgene_slimpro_i2c_driver);
+>> +
+>> +MODULE_DESCRIPTION("APM X-Gene SLIMpro I2C driver");
+>> +MODULE_LICENSE("GPL v2");
+>
+> So, only minor stuff. Looking good already to me.
+>
+> Thanks,
+>
+>    Wolfram
+>
