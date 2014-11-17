@@ -1,76 +1,44 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 17 Nov 2014 16:53:00 +0100
-Subject: [PATCH] gpio: mxs: implement get_direction callback
-In-Reply-To: <CACQ1gAje6OA_n37jE_WnSqg4R+U5tr-bGnnfxpGM5NE9c=dAVg@mail.gmail.com>
-References: <20141114232601.GW27002@pengutronix.de>
- <5467A980.5090204@elproma.com.pl>
- <20141116214239.GX27002@pengutronix.de>
- <54693A51.5080907@elproma.com.pl> <54695654.3070209@elproma.com.pl>
- <20141117082848.GZ27002@pengutronix.de>
- <5469BBBD.30003@elproma.com.pl>
- <CACQ1gAha1MuroyB35zN_BuwRNGS_J3Xh1htiHJda_2_19qh31g@mail.gmail.com>
- <20141117095909.GH27002@pengutronix.de>
- <CACQ1gAje6OA_n37jE_WnSqg4R+U5tr-bGnnfxpGM5NE9c=dAVg@mail.gmail.com>
-Message-ID: <20141117155300.GI27002@pengutronix.de>
+Date: Mon, 17 Nov 2014 16:56:17 +0100
+Subject: [PATCH] ASoC: rt5631: Fixing compilation warning when DT is
+ disabled
+In-Reply-To: <1416232589-31319-1-git-send-email-krishna.md@samsung.com>
+References: <1416232589-31319-1-git-send-email-krishna.md@samsung.com>
+Message-ID: <20141117155617.GJ27002@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Mon, Nov 17, 2014 at 11:05:51AM +0100, Richard Genoud wrote:
-> 2014-11-17 10:59 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > Hello Richard,
-> >
-> >> >>>> So finally the prototypes would be:
-> >> >>>> int mctrl_gpio_request_irqs(struct mctrl_gpios*, struct
-> >> >>>> uart_port*, irqhandler_t);
-> >> >>>> void mctrl_gpio_free_irqs(struct mctrl_gpios*);
-> >> >>
-> >> >> I think:
-> >> >>
-> >> >>         struct mctrl_gpios {
-> >> >>                 struct uart_port *port;
-> >> >>                 struct {
-> >> >>                         gpio_desc *gpio;
-> >> >>                         unsigned int irq;
-> >> I think it's just "int irq;" there
-> > irqs are unsigned. Some functions returning an irq use "int", but
-> > depending on who you ask this only for error reporting or a relict.
-> > Use 0 for invalid/unused in mctrl_gpio*.
-> >
-> >> > Yes. I tried to assign irq value in mctrl_gpio_init() only.
-> >> > There was another issue if CONFIG_GPIOLIB is not defined but it looks mctrl_
-> >> > disable/enable_ms()
-> >> > and mctrl_ irq handler solve the problem.
-> >> >
-> >> >>   Not sure there is a corresponding request_irq variant for that.
-> >> >
-> >> >
-> >> > What would you propose?
-> >> In atmel_request_gpio_irq(), the function irq_set_status_flags(irq,
-> >> IRQ_NOAUTOEN); is used before request_irq to prevent the irq from
-> >> being enabled when requested.
-> > I'm not sure this is allowed. How do you handle request_irq failing? (I
-> > just checked: you don't.) Consider another thread just doing
-> > request_irq($yourirq, ...) between
-> >
-> >         irq_set_status_flags(irq[i], IRQ_NOAUTOEN);
-> >
-> > and
-> >
-> >         err = request_irq(irq[i], ...
+On Mon, Nov 17, 2014 at 07:26:29PM +0530, Krishna Mohan Dani wrote:
+> Fixes the following compilation warning:
+> Warning: 'rt5631_i2c_dt_ids' defined but not used - when DT is not used.
 > 
-> well, in this case, request_irq() will fail and all the previously
-> requested irqs will be freed:
->     /*
->      * If something went wrong, rollback.
->      */
->     while (err && (--i >= 0))
->         if (irq[i] >= 0)
->             free_irq(irq[i], port);
-Just in case you didn't notice: Your statement is right, but for the
-other caller to request_irq there is something fishy. He gets
-IRQ_NOAUTOEN without being able to notice ...
+> Signed-off-by: Claude Youn <claude.youn@gmail.com>
+> Signed-off-by: Krishna Mohan Dani <krishna.md@samsung.com>
+> ---
+>  sound/soc/codecs/rt5631.c |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/sound/soc/codecs/rt5631.c b/sound/soc/codecs/rt5631.c
+> index 3b7d5e4..9425545 100644
+> --- a/sound/soc/codecs/rt5631.c
+> +++ b/sound/soc/codecs/rt5631.c
+> @@ -1691,12 +1691,14 @@ static const struct i2c_device_id rt5631_i2c_id[] = {
+>  };
+>  MODULE_DEVICE_TABLE(i2c, rt5631_i2c_id);
+>  
+> +#ifdef CONFIG_OF
+>  static struct of_device_id rt5631_i2c_dt_ids[] = {
+>  	{ .compatible = "realtek,rt5631"},
+>  	{ .compatible = "realtek,alc5631"},
+>  	{ }
+>  };
+>  MODULE_DEVICE_TABLE(of, rt5631_i2c_dt_ids);
+> +#endif
+
+An (IMHO nicer) alternative is:
+
+-static struct of_device_id rt5631_i2c_dt_ids[] = {
++static struct of_device_id rt5631_i2c_dt_ids[] __maybe_unused = {
 
 Best regards
 Uwe
