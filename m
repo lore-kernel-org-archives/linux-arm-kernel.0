@@ -1,170 +1,73 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 17 Nov 2014 14:35:35 +0100
-Subject: [PATCH v8 01/13] reset: add the Berlin reset controller driver
-In-Reply-To: <1416231347-27193-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1416231347-27193-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1416231347-27193-2-git-send-email-antoine.tenart@free-electrons.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Mon, 17 Nov 2014 13:39:18 +0000
+Subject: [PATCH 2/2] dt-bindings: simplefb-sunxi: Add sunxi simplefb
+ extensions
+In-Reply-To: <20141117124721.GQ6414@lukather>
+References: <1416224086-5698-1-git-send-email-hdegoede@redhat.com>
+ <1416224086-5698-3-git-send-email-hdegoede@redhat.com>
+ <20141117124721.GQ6414@lukather>
+Message-ID: <CACxGe6vqiC08sP+o3bduGfvUdwRtHm8+_7EdZccJjS86qVKvxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a reset controller for Marvell Berlin SoCs which is used by the
-USB PHYs drivers (for now).
+On Mon, Nov 17, 2014 at 12:47 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Mon, Nov 17, 2014 at 12:34:46PM +0100, Hans de Goede wrote:
+>> If pre-filled framebuffer nodes are used, the firmware may need extra
+>> properties to find the right node. This documents the properties to use
+>> for this on sunxi platforms.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>  .../bindings/video/simple-framebuffer-sunxi.txt    | 33 ++++++++++++++++++++++
+>>  1 file changed, 33 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+>> new file mode 100644
+>> index 0000000..84ca264
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+>> @@ -0,0 +1,33 @@
+>> +Sunxi specific Simple Framebuffer bindings
+>> +
+>> +This binding documents sunxi specific extensions to the simple-framebuffer
+>> +bindings. The sunxi simplefb u-boot code relies on the devicetree containing
+>> +pre-populated simplefb nodes.
+>> +
+>> +These extensions are intended so that u-boot can select the right node based
+>> +on which pipeline and output is being used. As such they are solely intended
+>> +for firmware / bootloader use, and the OS should ignore them.
+>> +
+>> +Required properties:
+>> +- compatible: "sunxi,framebuffer"
+>> +- sunxi,pipeline:
+>> +  <0> for the de_be0 -> lcdc0 -> output pipeline
+>> +  <1> for the de_be1 -> lcdc1 -> output pipeline
+>> +- sunxi,output: One of: "hdmi", "lcd", "vga", and "composite"
+>> +
+>> +Example:
+>> +
+>> +chosen {
+>> +     #address-cells = <1>;
+>> +     #size-cells = <1>;
+>> +     ranges;
+>> +
+>> +     framebuffer at 0 {
+>> +             compatible = "sunxi,framebuffer", "simple-framebuffer";
+>> +             sunxi,pipeline = <0>;
+>> +             sunxi,output = "hdmi";
+>> +             clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
+>> +                      <&ahb_gates 44>;
+>
+> If we're going that way, then maybe having to specify clock-names
+> would be better in order to know which clock is what?
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- drivers/reset/Makefile       |   1 +
- drivers/reset/reset-berlin.c | 131 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 132 insertions(+)
- create mode 100644 drivers/reset/reset-berlin.c
+I wouldn't go that way with this binding since the driver has no need
+to differentiate between the clocks, and driver authors shouldn't be
+encouraged to do so. The purpose of the clocks in this node is only
+for itemizing dependencies, not for how to configure the clocks.
+Firmware shouldn't care at all about the clocks list, it only needs to
+find the correct pre-populated node to fill in and enable.
 
-diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index 60fed3d7820b..157d421f755b 100644
---- a/drivers/reset/Makefile
-+++ b/drivers/reset/Makefile
-@@ -1,4 +1,5 @@
- obj-$(CONFIG_RESET_CONTROLLER) += core.o
- obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
-+obj-$(CONFIG_ARCH_BERLIN) += reset-berlin.o
- obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
- obj-$(CONFIG_ARCH_STI) += sti/
-diff --git a/drivers/reset/reset-berlin.c b/drivers/reset/reset-berlin.c
-new file mode 100644
-index 000000000000..f8b48a13cf0b
---- /dev/null
-+++ b/drivers/reset/reset-berlin.c
-@@ -0,0 +1,131 @@
-+/*
-+ * Copyright (C) 2014 Marvell Technology Group Ltd.
-+ *
-+ * Antoine Tenart <antoine.tenart@free-electrons.com>
-+ * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/reset-controller.h>
-+#include <linux/slab.h>
-+#include <linux/types.h>
-+
-+#define BERLIN_MAX_RESETS	32
-+
-+#define to_berlin_reset_priv(p)		\
-+	container_of((p), struct berlin_reset_priv, rcdev)
-+
-+struct berlin_reset_priv {
-+	void __iomem			*base;
-+	unsigned int			size;
-+	struct reset_controller_dev	rcdev;
-+};
-+
-+static int berlin_reset_reset(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	struct berlin_reset_priv *priv = to_berlin_reset_priv(rcdev);
-+	int offset = id >> 8;
-+	int mask = BIT(id & 0x1f);
-+
-+	writel(mask, priv->base + offset);
-+
-+	/* let the reset be effective */
-+	udelay(10);
-+
-+	return 0;
-+}
-+
-+static struct reset_control_ops berlin_reset_ops = {
-+	.reset	= berlin_reset_reset,
-+};
-+
-+static int berlin_reset_xlate(struct reset_controller_dev *rcdev,
-+			      const struct of_phandle_args *reset_spec)
-+{
-+	struct berlin_reset_priv *priv = to_berlin_reset_priv(rcdev);
-+	unsigned offset, bit;
-+
-+	if (WARN_ON(reset_spec->args_count != rcdev->of_reset_n_cells))
-+		return -EINVAL;
-+
-+	offset = reset_spec->args[0];
-+	bit = reset_spec->args[1];
-+
-+	if (offset >= priv->size)
-+		return -EINVAL;
-+
-+	if (bit >= BERLIN_MAX_RESETS)
-+		return -EINVAL;
-+
-+	return (offset << 8) | bit;
-+}
-+
-+static int __berlin_reset_init(struct device_node *np)
-+{
-+	struct berlin_reset_priv *priv;
-+	struct resource res;
-+	resource_size_t size;
-+	int ret;
-+
-+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	ret = of_address_to_resource(np, 0, &res);
-+	if (ret)
-+		goto err;
-+
-+	size = resource_size(&res);
-+	priv->base = ioremap(res.start, size);
-+	if (!priv->base) {
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+	priv->size = size;
-+
-+	priv->rcdev.owner = THIS_MODULE;
-+	priv->rcdev.ops = &berlin_reset_ops;
-+	priv->rcdev.of_node = np;
-+	priv->rcdev.of_reset_n_cells = 2;
-+	priv->rcdev.of_xlate = berlin_reset_xlate;
-+
-+	reset_controller_register(&priv->rcdev);
-+
-+	return 0;
-+
-+err:
-+	kfree(priv);
-+	return ret;
-+}
-+
-+static const struct of_device_id berlin_reset_of_match[] __initconst = {
-+	{ .compatible = "marvell,berlin2-chip-ctrl" },
-+	{ .compatible = "marvell,berlin2cd-chip-ctrl" },
-+	{ .compatible = "marvell,berlin2q-chip-ctrl" },
-+	{ },
-+};
-+
-+static int __init berlin_reset_init(void)
-+{
-+	struct device_node *np;
-+	int ret;
-+
-+	for_each_matching_node(np, berlin_reset_of_match) {
-+		ret = __berlin_reset_init(np);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+arch_initcall(berlin_reset_init);
--- 
-2.1.0
+g.
