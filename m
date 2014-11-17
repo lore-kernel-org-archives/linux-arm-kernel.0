@@ -1,64 +1,31 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 17 Nov 2014 18:43:03 +0100
-Subject: [PATCH 2/3] ARM: dts: Add spidev registration to exynos5250-snow
+Date: Mon, 17 Nov 2014 18:43:04 +0100
+Subject: [PATCH 3/3] ARM: exynos_defconfig: Enable user mode SPI device support
 In-Reply-To: <1416246184-29071-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1416246184-29071-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1416246184-29071-3-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1416246184-29071-4-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Doug Anderson <dianders@chromium.org>
+Some Exynos boards have SPI devices such as flash memories that can be
+accessed from user-space. Enable support for the SPI usermode interface.
 
-Exynos5250 Snow machine has a SPI flash memory that is used to store
-firmware data and different system parameters.
-
-Add a spidev node so the flash chip can be accessed by user-space tools.
-
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-Reviewed-by: Olof Johansson <olofj@chromium.org>
-[javier.martinez: Extend commit message]
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
- arch/arm/boot/dts/exynos5250-snow.dts | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/configs/exynos_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index f9bc04b..bb0e04e 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -554,6 +554,13 @@
- 		samsung,pin-drv = <0>;
- 	};
- 
-+	spi_cs: spi-cs {
-+		samsung,pins = "gpa2-5";
-+		samsung,pin-function = <1>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <3>;
-+	};
-+
- 	tps65090_irq: tps65090-irq {
- 		samsung,pins = "gpx2-6";
- 		samsung,pin-function = <0>;
-@@ -622,6 +629,19 @@
- 	status = "okay";
- 	samsung,spi-src-clk = <0>;
- 	num-cs = <1>;
-+	cs-gpios = <&gpa2 5 0>;
-+
-+	spidev at 0 {
-+		compatible = "spidev";
-+		reg = <0>;
-+		spi-max-frequency = <10000000>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&spi_cs>;
-+
-+		controller-data {
-+			samsung,spi-feedback-delay = <2>;
-+		};
-+	};
- };
- 
- &usbdrd_phy {
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index da7e9cf..5de8b58 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -80,6 +80,7 @@ CONFIG_I2C_CROS_EC_TUNNEL=y
+ CONFIG_SPI=y
+ CONFIG_SPI_S3C64XX=y
+ CONFIG_I2C_S3C2410=y
++CONFIG_SPI_SPIDEV=y
+ CONFIG_DEBUG_GPIO=y
+ CONFIG_POWER_SUPPLY=y
+ CONFIG_BATTERY_SBS=y
 -- 
 2.1.0
