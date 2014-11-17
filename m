@@ -1,55 +1,40 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 17 Nov 2014 19:26:46 +0100
-Subject: [PATCH V2 2/5] i2c: pxa: prepare/unprepare clocks
-In-Reply-To: <1416236863-20898-2-git-send-email-dbaryshkov@gmail.com>
-References: <1416236863-20898-1-git-send-email-dbaryshkov@gmail.com>
- <1416236863-20898-2-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <20141117182646.GD12644@katana>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 17 Nov 2014 21:26:25 +0300
+Subject: [PATCH v8 10/13] ARM: dts: berlin: add BG2Q nodes for USB support
+In-Reply-To: <1416231347-27193-11-git-send-email-antoine.tenart@free-electrons.com>
+References: <1416231347-27193-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1416231347-27193-11-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <546A3DD1.8020209@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 06:07:40PM +0300, Dmitry Eremin-Solenikov wrote:
-> Change clk_enable/disable() calls to clk_prepare_enable() and
-> clk_disable_unprepare().
+Hello.
 
-You describe what is done but we can see that from the patch. Please
-describe here why the change is needed.
+On 11/17/2014 04:35 PM, Antoine Tenart wrote:
 
-> 
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> Adds nodes describing the Marvell Berlin BG2Q USB PHY and USB. The BG2Q
+> SoC has 3 USB host controller, compatible with ChipIdea.
+
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 > ---
->  drivers/i2c/busses/i2c-pxa.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-> index be671f7..2e75375 100644
-> --- a/drivers/i2c/busses/i2c-pxa.c
-> +++ b/drivers/i2c/busses/i2c-pxa.c
-> @@ -1297,7 +1297,7 @@ static int i2c_pxa_suspend_noirq(struct device *dev)
->  	struct platform_device *pdev = to_platform_device(dev);
->  	struct pxa_i2c *i2c = platform_get_drvdata(pdev);
->  
-> -	clk_disable(i2c->clk);
-> +	clk_disable_unprepare(i2c->clk);
->  
->  	return 0;
->  }
-> @@ -1307,7 +1307,7 @@ static int i2c_pxa_resume_noirq(struct device *dev)
->  	struct platform_device *pdev = to_platform_device(dev);
->  	struct pxa_i2c *i2c = platform_get_drvdata(pdev);
->  
-> -	clk_enable(i2c->clk);
-> +	clk_prepare_enable(i2c->clk);
->  	i2c_pxa_reset(i2c);
->  
->  	return 0;
-> -- 
-> 2.1.1
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/7086b8e0/attachment.sig>
+>   arch/arm/boot/dts/berlin2q.dtsi | 55 +++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 55 insertions(+)
+
+> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+> index 2de8d6f8973c..834142bdfbb1 100644
+> --- a/arch/arm/boot/dts/berlin2q.dtsi
+> +++ b/arch/arm/boot/dts/berlin2q.dtsi
+[...]
+> @@ -457,5 +511,6 @@
+>   				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+>   			};
+>   		};
+> +
+
+    Random whitespace change?
+
+>   	};
+>   };
+>
+
+WBR, Sergei
