@@ -1,109 +1,94 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Mon, 17 Nov 2014 17:09:45 +0530
-Subject: [PATCH 0/4] Touchscreen performance related fixes
-In-Reply-To: <5464A2B5.3020207@ti.com>
-References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>	<20141103180920.GA20779@localhost.localdomain>	<545B2651.4090905@ti.com>
- <CAJKbBDDyShaJkzzfdFs07EK5gDUfwqWiv39Qi4FVSvRrfc6_fA@mail.gmail.com>
- <5464A2B5.3020207@ti.com>
-Message-ID: <5469DE81.9030009@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 17 Nov 2014 11:41:36 +0000
+Subject: [RFC PATCH v4 8/8] arm: dma-mapping: plumb our iommu mapping ops
+ into arch_setup_dma_ops
+In-Reply-To: <5469DC13.6040700@arm.com>
+References: <1415991397-9618-1-git-send-email-will.deacon@arm.com>
+ <1415991397-9618-9-git-send-email-will.deacon@arm.com>
+ <5469DC13.6040700@arm.com>
+Message-ID: <20141117114135.GI18061@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Nov 17, 2014 at 11:29:23AM +0000, Robin Murphy wrote:
+> On 14/11/14 18:56, Will Deacon wrote:
+> > This patch plumbs the existing ARM IOMMU DMA infrastructure (which isn't
+> > actually called outside of a few drivers) into arch_setup_dma_ops, so
+> > that we can use IOMMUs for DMA transfers in a more generic fashion.
+> >
+> > Since this significantly complicates the arch_setup_dma_ops function,
+> > it is moved out of line into dma-mapping.c. If CONFIG_ARM_DMA_USE_IOMMU
+> > is not set, the iommu parameter is ignored and the normal ops are used
+> > instead.
+> >
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> 
+> [...]
+> 
+> > +static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
+> > +				    struct iommu_ops *iommu)
+> > +{
+> > +	struct dma_iommu_mapping *mapping;
+> > +
+> > +	mapping = arm_iommu_create_mapping(dev->bus, dma_base, size);
+> > +	if (IS_ERR(mapping)) {
+> > +		pr_warn("Failed to create %llu-byte IOMMU mapping for device %s\n",
+> > +				size, dev_name(dev));
+> > +		return false;
+> > +	}
+> > +
+> > +	if (arm_iommu_attach_device(dev, mapping)) {
+> > +		pr_warn("Failed to attached device %s to IOMMU_mapping\n",
+> > +				dev_name(dev));
+> > +		arm_iommu_release_mapping(mapping);
+> > +		return false;
+> > +	}
+> > +
+> > +	return true;
+> > +}
+> > +
+> > +static void arm_teardown_iommu_dma_ops(struct device *dev)
+> > +{
+> > +	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
+> > +
+> > +	arm_iommu_detach_device(dev);
+> > +	arm_iommu_release_mapping(mapping);
+> > +}
+> > +
+> > +#else
+> > +
+> > +static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
+> > +				    struct iommu_ops *iommu)
+> > +{
+> > +	return false;
+> > +}
+> > +
+> > +static void arm_teardown_iommu_dma_ops(struct device *dev) { }
+> > +
+> > +#define arm_get_iommu_dma_map_ops arm_get_dma_map_ops
+> > +
+> > +#endif	/* CONFIG_ARM_DMA_USE_IOMMU */
+> > +
+> > +static struct dma_map_ops *arm_get_dma_map_ops(bool coherent)
+> > +{
+> > +	return coherent ? &arm_coherent_dma_ops : &arm_dma_ops;
+> > +}
+> > +
+> > +void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+> > +			struct iommu_ops *iommu, bool coherent)
+> > +{
+> > +	struct dma_map_ops *dma_ops;
+> > +
+> > +	if (arm_setup_iommu_dma_ops(dev, dma_base, size, iommu))
+> 
+> Is the loss of a null check on iommu (compared to previous versions) 
+> intentional? It looks like you're always going to call 
+> arm_setup_iommu_dma_ops here for everything regardless, and given that 
+> that doesn't even look at the iommu parameter, relying on it to somehow 
+> fail correctly smells a bit off.
 
-On Thursday 13 November 2014 05:53 PM, Vignesh R wrote:
-> Hi,
-> 
-> On Wednesday 12 November 2014 06:30 PM, Johannes Pointner wrote:
->> Hello Vignesh,
->>
->> I tried your patch version 3 on a customized board and had some
->> behavior I couldn't explain.
->> If I only use the touchscreen it works fine but if I also read values
->> from the ADCs then I get a lot of pen_up events even if I am still
->> touching the screen.
->> For the test I read via
->> # cat /sys/bus/iio/devices/iio\:device0/in_voltage5_raw
->> values from the ADC in an busy loop as you explained in an email
->> before. Did you also experience such behavior or do you know what
->> causes it?
-> 
-> Thanks for testing. I was able to fix this issue. Will post version 4
-> shortly.
-> 
+Thanks, I'll fix that. I started writing a full implementation based off
+a hypothetical ->get_default_domain callback (as suggested by Joerg), so
+this is a hangover from that experiment.
 
-Were you able to test the v4 patch series on your board? Is the issue fixed?
-
-> Regards
-> Vignesh
-> 
->>
->> Without the patches the touchscreen works fine during the iio test.
->>
->> Thanks,
->> Hannes
->>
->> 2014-11-06 8:42 GMT+01:00 Vignesh R <vigneshr@ti.com>:
->>>
->>>
->>> On Monday 03 November 2014 11:39 PM, Richard Cochran wrote:
->>>> On Mon, Oct 27, 2014 at 04:38:27PM +0530, Vignesh R wrote:
->>>>> This series of patches fix TSC defects related to lag in touchscreen
->>>>> performance and cursor jump at touch release. The lag was result of
->>>>> udelay in TSC interrupt handler. Cursor jump due to false pen-up event.
->>>>> The patches implement Advisory 1.0.31 in silicon errata of am335x-evm
->>>>> to avoid false pen-up events and remove udelay.
->>>>
->>>> That advisory has two workarounds. You have chosen the second one?
->>>
->>> Work around one. Hence 5 wire design is not broken.
->>>
->>>>
->>>> The text of the second workaround says it only works on 4 wire setups,
->>>> so I wonder how 5 wire designs will be affected.
->>>>
->>>>> The advisory says to use
->>>>> steps 1 to 4 for ADC and 5 to 16 for TSC (assuming 4 wire TSC and 4 channel
->>>>> ADC).
->>>>
->>>> No, it doesn't say that. (sprz360f.pdf)
->>>
->>> The pen up event detection happens immediately after charge step. Hence,
->>> interchanging ADC and TSC steps makes sure that sampling of touch
->>> co-ordinates and pen events are done one after the other. This
->>> workaround was suggested by internal hardware folks. Earlier ADC steps
->>> intervened between sampling of co-ordinates and pen event detection
->>> which is not desirable.
->>>
->>>>
->>>>> Further the X co-ordinate must be the last one to be sampled just
->>>>> before charge step. The first two patches implement the required changes.
->>>>
->>>> FWIW, I implemented the first workaround and removed the udelay not
->>>> too long ago. Like Sebastian, I saw the TSC unit hang after about
->>>> 50000 interrupts when running with the workaround.
->>>>
->>>> Did you test you patch for very long?
->>>
->>> Yes, I tested for about 200000 interrupts and I didn't see any hang.
->>> This patch series does not just implement workaround but also does some
->>> minor changes, such as interchanging ADC and TSC steps etc, which makes
->>> TSC driver more robust. Let me know if you encounter any issues with my
->>> patch series.
->>>
->>> Regards
->>> Vignesh
->>>
->>>>
->>>> Thanks,
->>>> Richard
->>>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Will
