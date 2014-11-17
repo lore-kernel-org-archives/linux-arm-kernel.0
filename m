@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:45 +0100
-Subject: [PATCH v5 51/61] dmaengine: bcm2835: Declare slave capabilities for
+Date: Mon, 17 Nov 2014 14:42:46 +0100
+Subject: [PATCH v5 52/61] dmaengine: fsl-edma: Declare slave capabilities for
  the generic code
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-52-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-53-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,43 +14,44 @@ capabilities, instead of relying on a callback to be implemented.
 Make use of this code.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
- drivers/dma/bcm2835-dma.c | 15 +++------------
- 1 file changed, 3 insertions(+), 12 deletions(-)
+ drivers/dma/fsl-edma.c | 17 ++++-------------
+ 1 file changed, 4 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-index 13b05c1673b1..0723096fb50a 100644
---- a/drivers/dma/bcm2835-dma.c
-+++ b/drivers/dma/bcm2835-dma.c
-@@ -550,18 +550,6 @@ static struct dma_chan *bcm2835_dma_xlate(struct of_phandle_args *spec,
- 	return chan;
+diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
+index b5b7474f8859..1382332e7e49 100644
+--- a/drivers/dma/fsl-edma.c
++++ b/drivers/dma/fsl-edma.c
+@@ -784,18 +784,6 @@ static void fsl_edma_free_chan_resources(struct dma_chan *chan)
+ 	fsl_chan->tcd_pool = NULL;
  }
  
--static int bcm2835_dma_device_slave_caps(struct dma_chan *dchan,
--	struct dma_slave_caps *caps)
+-static int fsl_dma_device_slave_caps(struct dma_chan *dchan,
+-		struct dma_slave_caps *caps)
 -{
--	caps->src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
--	caps->dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
+-	caps->src_addr_widths = FSL_EDMA_BUSWIDTHS;
+-	caps->dst_addr_widths = FSL_EDMA_BUSWIDTHS;
 -	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
--	caps->cmd_pause = false;
+-	caps->cmd_pause = true;
 -	caps->cmd_terminate = true;
 -
 -	return 0;
 -}
 -
- static int bcm2835_dma_probe(struct platform_device *pdev)
+ static int
+ fsl_edma_irq_init(struct platform_device *pdev, struct fsl_edma_engine *fsl_edma)
  {
- 	struct bcm2835_dmadev *od;
-@@ -603,6 +591,9 @@ static int bcm2835_dma_probe(struct platform_device *pdev)
- 	od->ddev.device_prep_dma_cyclic = bcm2835_dma_prep_dma_cyclic;
- 	od->ddev.device_config = bcm2835_dma_slave_config;
- 	od->ddev.device_terminate_all = bcm2835_dma_terminate_all;
-+	od->ddev.src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
-+	od->ddev.dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
-+	od->ddev.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
- 	od->ddev.dev = &pdev->dev;
- 	INIT_LIST_HEAD(&od->ddev.channels);
- 	spin_lock_init(&od->lock);
+@@ -926,7 +914,10 @@ static int fsl_edma_probe(struct platform_device *pdev)
+ 	fsl_edma->dma_dev.device_resume = fsl_edma_resume;
+ 	fsl_edma->dma_dev.device_terminate_all = fsl_edma_terminate_all;
+ 	fsl_edma->dma_dev.device_issue_pending = fsl_edma_issue_pending;
+-	fsl_edma->dma_dev.device_slave_caps = fsl_dma_device_slave_caps;
++
++	fsl_edma->dma_dev.src_addr_widths = FSL_EDMA_BUSWIDTHS;
++	fsl_edma->dma_dev.dst_addr_widths = FSL_EDMA_BUSWIDTHS;
++	fsl_edma->dma_dev.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+ 
+ 	platform_set_drvdata(pdev, fsl_edma);
+ 
 -- 
 2.1.1
