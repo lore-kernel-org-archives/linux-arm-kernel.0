@@ -1,7 +1,7 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 17 Nov 2014 12:47:54 +0100
+Date: Mon, 17 Nov 2014 12:48:22 +0100
 Subject: [PATCH v9 0/7] Enable L2 cache support on Exynos4210/4x12 SoCs
-Message-ID: <1416224881-4227-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1416224909-4290-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
