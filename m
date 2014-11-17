@@ -1,37 +1,21 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Nov 2014 12:17:16 +0100
-Subject: [PATCH v5 5/6] Documentation: dt-bindings: Add binding info for
- X-Gene QMTM UIO driver
-In-Reply-To: <1416220572-13381-6-git-send-email-ankit.jindal@linaro.org>
-References: <1416220572-13381-1-git-send-email-ankit.jindal@linaro.org>
- <1416220572-13381-6-git-send-email-ankit.jindal@linaro.org>
-Message-ID: <2279061.naADrHDgyn@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 17 Nov 2014 11:01:17 +0000
+Subject: [PATCH] ASoC: pxa: prepare/unprepare clocks in pxa-ssp
+In-Reply-To: <1416081106-28324-1-git-send-email-dbaryshkov@gmail.com>
+References: <1416081106-28324-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <20141117110117.GW2722@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 November 2014 16:06:11 Ankit Jindal wrote:
-> +
-> +       qmtm1_uio: qmtm_uio at 1f200000 {
-> +               compatible = "apm,xgene-qmtm";
-> +               status = "disabled";
-> +               reg = <0x0 0x1f200000 0x0 0x10000>,
-> +                     <0x0 0x1b000000 0x0 0x400000>;
-> +               reg-names = "csr", "fabric";
-> +               qpool-memory = <&qmtm1_uio_qpool>;
-> +               clocks = <&qmtm1clk 0>;
-> +               num-queues = <0x400>;
-> +               devid = <1>;
-> +       };
-> +
+On Sat, Nov 15, 2014 at 10:51:46PM +0300, Dmitry Eremin-Solenikov wrote:
+> Change clk_enable/disable() calls to clk_prepare_enable() and
+> clk_disable_unrepapre().
 
-To make my previous review comments clearer:
-
-NAK
-
-Do not create device nodes that are meant for a specific use case in
-software and that are not usable for the common case. I don't think
-it makes any sense to keep on submitting a UIO driver for this until
-we have a proper network driver that uses this so we can make sure we
-have a working binding.
-
-	Arnd
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/fd175792/attachment.sig>
