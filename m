@@ -1,270 +1,131 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 17 Nov 2014 18:21:36 +0800
-Subject: [RFC PATCH 02/16] PCI: Use pci_scan_root_bus() instead of
- pci_scan_bus()
-In-Reply-To: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
-References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1416219710-26088-3-git-send-email-wangyijing@huawei.com>
+From: caesar.wang@rock-chips.com (Caesar Wang)
+Date: Mon, 17 Nov 2014 17:50:38 +0800
+Subject: [PATCH v12 0/3] ARM: rk3288: Add PM Domain support
+Message-ID: <1416217842-4716-1-git-send-email-caesar.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yijing Wang <wangyijing0307@gmail.com>
+    Add power domain drivers based on generic power domain for
+    Rockchip platform, and support RK3288.
 
-Now we could use pci_scan_root_bus() instead of
-pci_scan_bus(), pass NULL resources means use the default
-io/mem.
+    https://chromium-review.googlesource.com/#/c/220253/9
+    This is the GPU driver, add the following information in DT,
+    and it can support the PMDOMAIN
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
----
- arch/alpha/include/asm/pci.h      |    2 +-
- arch/alpha/kernel/sys_nautilus.c  |    2 +-
- arch/cris/include/asm/pci.h       |    2 +-
- arch/ia64/include/asm/pci.h       |    2 +-
- arch/m68k/coldfire/pci.c          |    2 +-
- arch/mips/include/asm/pci.h       |    2 +-
- arch/mn10300/include/asm/pci.h    |    2 +-
- arch/sh/include/asm/pci.h         |    2 +-
- arch/sparc/include/asm/pci_32.h   |    2 +-
- arch/sparc/include/asm/pci_64.h   |    2 +-
- arch/sparc/kernel/pcic.c          |    3 ++-
- arch/unicore32/kernel/pci.c       |    2 +-
- arch/x86/include/asm/pci.h        |    2 +-
- arch/x86/pci/amd_bus.c            |    2 +-
- arch/xtensa/include/asm/pci.h     |    2 +-
- drivers/parisc/dino.c             |    4 ++--
- drivers/pci/hotplug/ibmphp_core.c |    2 +-
- 17 files changed, 19 insertions(+), 18 deletions(-)
+gpu: gpu at ffa30000 {
+    compatible = "arm,malit764",
+                 "arm,malit76x",
+                 "arm,malit7xx",
+                 "arm,mali-midgard";
+    reg = <0xffa30000 0x10000>;
+    interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+                 <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
+                 <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+    interrupt-names = "JOB", "MMU", "GPU";
+    clocks = <&cru ACLK_GPU>;
+    clock-names = "aclk_gpu";
+    operating-points = <
+                /* KHz uV */
+                100000 800000
+                200000 850000
+                300000 950000
+                400000 1000000
+                600000 1150000
+    >;
+    power-domains = <&power RK3288_PD_GPU>;
+    status = "disabled";
+};
 
-diff --git a/arch/alpha/include/asm/pci.h b/arch/alpha/include/asm/pci.h
-index f7f680f..157925a 100644
---- a/arch/alpha/include/asm/pci.h
-+++ b/arch/alpha/include/asm/pci.h
-@@ -49,7 +49,7 @@ struct pci_controller {
- 	void *sysdata;
- };
- 
--/* Override the logic in pci_scan_bus for skipping already-configured
-+/* Override the logic in pci_scan_root_bus for skipping already-configured
-    bus numbers.  */
- 
- #define pcibios_assign_all_busses()	1
-diff --git a/arch/alpha/kernel/sys_nautilus.c b/arch/alpha/kernel/sys_nautilus.c
-index 837c0fa..1047ab3 100644
---- a/arch/alpha/kernel/sys_nautilus.c
-+++ b/arch/alpha/kernel/sys_nautilus.c
-@@ -206,7 +206,7 @@ nautilus_init_pci(void)
- 	unsigned long memtop = max_low_pfn << PAGE_SHIFT;
- 
- 	/* Scan our single hose.  */
--	bus = pci_scan_bus(0, alpha_mv.pci_ops, hose);
-+	bus = pci_scan_root_bus(NULL, 0, alpha_mv.pci_ops, hose, NULL);
- 	hose->bus = bus;
- 	pcibios_claim_one_bus(bus);
- 
-diff --git a/arch/cris/include/asm/pci.h b/arch/cris/include/asm/pci.h
-index cc2399c..96b33a6 100644
---- a/arch/cris/include/asm/pci.h
-+++ b/arch/cris/include/asm/pci.h
-@@ -5,7 +5,7 @@
- #ifdef __KERNEL__
- #include <linux/mm.h>		/* for struct page */
- 
--/* Can be used to override the logic in pci_scan_bus for skipping
-+/* Can be used to override the logic in pci_scan_root_bus for skipping
-    already-configured bus numbers - to be used for buggy BIOSes
-    or architectures with incomplete PCI setup by the loader */
- 
-diff --git a/arch/ia64/include/asm/pci.h b/arch/ia64/include/asm/pci.h
-index 52af5ed..64b34d6 100644
---- a/arch/ia64/include/asm/pci.h
-+++ b/arch/ia64/include/asm/pci.h
-@@ -20,7 +20,7 @@ struct pci_vector_struct {
- };
- 
- /*
-- * Can be used to override the logic in pci_scan_bus for skipping already-configured bus
-+ * Can be used to override the logic in pci_scan_root_bus for skipping already-configured bus
-  * numbers - to be used for buggy BIOSes or architectures with incomplete PCI setup by the
-  * loader.
-  */
-diff --git a/arch/m68k/coldfire/pci.c b/arch/m68k/coldfire/pci.c
-index df96792..4d242fb 100644
---- a/arch/m68k/coldfire/pci.c
-+++ b/arch/m68k/coldfire/pci.c
-@@ -312,7 +312,7 @@ static int __init mcf_pci_init(void)
- 	set_current_state(TASK_UNINTERRUPTIBLE);
- 	schedule_timeout(msecs_to_jiffies(200));
- 
--	rootbus = pci_scan_bus(0, &mcf_pci_ops, NULL);
-+	rootbus = pci_scan_root_bus(NULL, 0, &mcf_pci_ops, NULL, NULL);
- 	rootbus->resource[0] = &mcf_pci_io;
- 	rootbus->resource[1] = &mcf_pci_mem;
- 
-diff --git a/arch/mips/include/asm/pci.h b/arch/mips/include/asm/pci.h
-index 974b0e3..212030a 100644
---- a/arch/mips/include/asm/pci.h
-+++ b/arch/mips/include/asm/pci.h
-@@ -60,7 +60,7 @@ extern void register_pci_controller(struct pci_controller *hose);
- extern int pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin);
- 
- 
--/* Can be used to override the logic in pci_scan_bus for skipping
-+/* Can be used to override the logic in pci_scan_root_bus for skipping
-    already-configured bus numbers - to be used for buggy BIOSes
-    or architectures with incomplete PCI setup by the loader */
- 
-diff --git a/arch/mn10300/include/asm/pci.h b/arch/mn10300/include/asm/pci.h
-index 5f70af2..6305f14 100644
---- a/arch/mn10300/include/asm/pci.h
-+++ b/arch/mn10300/include/asm/pci.h
-@@ -33,7 +33,7 @@ do {							\
- #define __pcidebug(FMT, BUS, DEVFN, WHERE, ...)	do {} while (0)
- #endif
- 
--/* Can be used to override the logic in pci_scan_bus for skipping
-+/* Can be used to override the logic in pci_scan_root_bus for skipping
-  * already-configured bus numbers - to be used for buggy BIOSes or
-  * architectures with incomplete PCI setup by the loader */
- 
-diff --git a/arch/sh/include/asm/pci.h b/arch/sh/include/asm/pci.h
-index 5b45115..69bcb78 100644
---- a/arch/sh/include/asm/pci.h
-+++ b/arch/sh/include/asm/pci.h
-@@ -3,7 +3,7 @@
- 
- #ifdef __KERNEL__
- 
--/* Can be used to override the logic in pci_scan_bus for skipping
-+/* Can be used to override the logic in pci_scan_root_bus for skipping
-    already-configured bus numbers - to be used for buggy BIOSes
-    or architectures with incomplete PCI setup by the loader */
- 
-diff --git a/arch/sparc/include/asm/pci_32.h b/arch/sparc/include/asm/pci_32.h
-index 53e9b49..4ef6064 100644
---- a/arch/sparc/include/asm/pci_32.h
-+++ b/arch/sparc/include/asm/pci_32.h
-@@ -5,7 +5,7 @@
- 
- #include <linux/dma-mapping.h>
- 
--/* Can be used to override the logic in pci_scan_bus for skipping
-+/* Can be used to override the logic in pci_scan_root_bus for skipping
-  * already-configured bus numbers - to be used for buggy BIOSes
-  * or architectures with incomplete PCI setup by the loader.
-  */
-diff --git a/arch/sparc/include/asm/pci_64.h b/arch/sparc/include/asm/pci_64.h
-index bd00a62..6e017f9 100644
---- a/arch/sparc/include/asm/pci_64.h
-+++ b/arch/sparc/include/asm/pci_64.h
-@@ -5,7 +5,7 @@
- 
- #include <linux/dma-mapping.h>
- 
--/* Can be used to override the logic in pci_scan_bus for skipping
-+/* Can be used to override the logic in pci_scan_root_bus for skipping
-  * already-configured bus numbers - to be used for buggy BIOSes
-  * or architectures with incomplete PCI setup by the loader.
-  */
-diff --git a/arch/sparc/kernel/pcic.c b/arch/sparc/kernel/pcic.c
-index 6cc78c2..64aafac 100644
---- a/arch/sparc/kernel/pcic.c
-+++ b/arch/sparc/kernel/pcic.c
-@@ -390,7 +390,8 @@ static void __init pcic_pbm_scan_bus(struct linux_pcic *pcic)
- {
- 	struct linux_pbm_info *pbm = &pcic->pbm;
- 
--	pbm->pci_bus = pci_scan_bus(pbm->pci_first_busno, &pcic_ops, pbm);
-+	pbm->pci_bus = pci_scan_root_bus(NULL, pbm->pci_first_busno, 
-+			&pcic_ops, pbm, NULL);
- #if 0 /* deadwood transplanted from sparc64 */
- 	pci_fill_in_pbm_cookies(pbm->pci_bus, pbm, pbm->prom_node);
- 	pci_record_assignments(pbm, pbm->pci_bus);
-diff --git a/arch/unicore32/kernel/pci.c b/arch/unicore32/kernel/pci.c
-index 374a055..be0f261 100644
---- a/arch/unicore32/kernel/pci.c
-+++ b/arch/unicore32/kernel/pci.c
-@@ -258,7 +258,7 @@ static int __init pci_common_init(void)
- 
- 	pci_puv3_preinit();
- 
--	puv3_bus = pci_scan_bus(0, &pci_puv3_ops, NULL);
-+	puv3_bus = pci_scan_root_bus(NULL, 0, &pci_puv3_ops, NULL, NULL);
- 
- 	if (!puv3_bus)
- 		panic("PCI: unable to scan bus!");
-diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
-index 0892ea0..0540ff7 100644
---- a/arch/x86/include/asm/pci.h
-+++ b/arch/x86/include/asm/pci.h
-@@ -41,7 +41,7 @@ static inline int pci_proc_domain(struct pci_bus *bus)
- }
- #endif
- 
--/* Can be used to override the logic in pci_scan_bus for skipping
-+/* Can be used to override the logic in pci_scan_root_bus for skipping
-    already-configured bus numbers - to be used for buggy BIOSes
-    or architectures with incomplete PCI setup by the loader */
- 
-diff --git a/arch/x86/pci/amd_bus.c b/arch/x86/pci/amd_bus.c
-index c20d2cc..baf6209 100644
---- a/arch/x86/pci/amd_bus.c
-+++ b/arch/x86/pci/amd_bus.c
-@@ -52,7 +52,7 @@ static struct pci_root_info __init *find_pci_root_info(int node, int link)
- 
- /**
-  * early_root_info_init()
-- * called before pcibios_scan_root and pci_scan_bus
-+ * called before pcibios_scan_root and pci_scan_root_bus
-  * fills the mp_bus_to_cpumask array based according
-  * to the LDT Bus Number Registers found in the northbridge.
-  */
-diff --git a/arch/xtensa/include/asm/pci.h b/arch/xtensa/include/asm/pci.h
-index 5d52dc4..377fae9 100644
---- a/arch/xtensa/include/asm/pci.h
-+++ b/arch/xtensa/include/asm/pci.h
-@@ -13,7 +13,7 @@
- 
- #ifdef __KERNEL__
- 
--/* Can be used to override the logic in pci_scan_bus for skipping
-+/* Can be used to override the logic in pci_scan_root_bus for skipping
-  * already-configured bus numbers - to be used for buggy BIOSes
-  * or architectures with incomplete PCI setup by the loader
-  */
-diff --git a/drivers/parisc/dino.c b/drivers/parisc/dino.c
-index a0580af..67c31bd 100644
---- a/drivers/parisc/dino.c
-+++ b/drivers/parisc/dino.c
-@@ -74,7 +74,7 @@
- ** assigned a PCI bus number based on "when" it's discovered.
- **
- ** The "secondary" bus number is set to this before calling
--** pci_scan_bus(). If any PPB's are present, the scan will
-+** pci_scan_root_bus(). If any PPB's are present, the scan will
- ** discover them and update the "secondary" and "subordinate"
- ** fields in Dino's pci_bus structure.
- **
-@@ -787,7 +787,7 @@ static int __init dino_common_init(struct parisc_device *dev,
- 
- 	pcibios_register_hba(&dino_dev->hba);
- 
--	pci_bios = &dino_bios_ops;   /* used by pci_scan_bus() */
-+	pci_bios = &dino_bios_ops;   
- 	pci_port = &dino_port_ops;
- 
- 	/*
-diff --git a/drivers/pci/hotplug/ibmphp_core.c b/drivers/pci/hotplug/ibmphp_core.c
-index 3efaf4c..b486432 100644
---- a/drivers/pci/hotplug/ibmphp_core.c
-+++ b/drivers/pci/hotplug/ibmphp_core.c
-@@ -767,7 +767,7 @@ static u8 bus_structure_fixup(u8 busno)
- 					(l != 0x0000) && (l != 0xffff)) {
- 			debug("%s - Inside bus_structure_fixup()\n",
- 							__func__);
--			pci_scan_bus(busno, ibmphp_pci_bus->ops, NULL);
-+			pci_scan_root_bus(NULL, busno, ibmphp_pci_bus->ops, NULL, NULL);
- 			break;
- 		}
- 	}
+Based on:
+    - [PATCH v4 1/3] PM / clock_ops: Add pm_clk_add_clk()
+    http://patchwork.kernel.org/patch/5242121/
+
+Changes in v12:
+    - fix the title doamin->domain.
+    - updated device_attach and device_detach API,otherwise it will compile
+      fail on next kernel.
+    - Remove essential clocks from rk3288 PD_VIO domain,
+      Some clocks are essential for the system health and should not be
+      turned down. However there is no owner for them so if they listed as
+      belonging to power domain we'll try toggling them up and down during
+      power domain transition. As a result we either fail to suspend or resume
+      the system.
+
+Changes in v11:
+    - fix pm_genpd_init(&pd->genpd, NULL, false);
+
+Changes in v10:
+    - this switches over domain infos to use masks instead of recomputing
+      them each time and also gets rid of custom domain translator and
+      uses standard onecell on.
+    - fix missing the #include <dt-bindings/power-domain/rk3288.h>
+    - remove the notes
+
+Changes in v9:
+    - add document decription
+    - fix v8 changes as follows:
+    - This reconciles the v2 and v7 code so that we power domain have
+      lists of clocks they toggle on and off during power transitions and
+      independently from power domains clocks we attach clocks to devices
+      comprising power domain and prepare them so they are turn on and off
+      by runtime PM.
+    - add rockchip_pm_add_one_domain() to control domains.
+    - add pd_start/pd_stop interface to control clocks
+    - add decription for power-doamin node
+
+Changes in v8:
+    - document go back to v2
+    - This reconciles the v2 and v7 code so that we power domain have
+      lists of clocks they toggle on and off during power transitions and
+      independently from power domains clocks we attach clocks to devices
+      comprising power domain and prepare them so they are turn on and off
+      by runtime PM.
+    - DTS go back to v2
+
+Changes in v7:
+    - Delete unused variables
+
+Changes in v6:
+    - delete pmu_lock
+    - modify dev_lock using mutex
+    - pm_clk_resume(pd->dev) change to pm_clk_resume(ed->dev)
+    - pm_clk_suspend(pd->dev) change to pm_clk_suspend(ed->dev)
+    - add devm_kfree(pd->dev, de) in rockchip_pm_domain_detach_dev
+
+Changes in v5:
+    - delete idle_lock
+    - add timeout in rockchip_pmu_set_idle_request()
+
+Changes in v4:
+    - use list storage dev
+
+Changes in v3:
+    - DT structure has changed
+    - change use pm_clk_resume() and pm_clk_suspend()
+    - Decomposition power-controller, changed to multiple controller
+    (gpu-power-controller, hevc-power-controller)
+
+Changes in v2:
+    - move clocks to "optional"
+    - remove the "pd->pd.of_node = np"
+    - make pd_vio clocks all one entry per line and alphabetize.
+    - power: power-controller move back to pinctrl: pinctrl.
+
+Caesar Wang (3):
+  dt-bindings: add document of Rockchip power domain
+  power-domain: rockchip: add power domain driver
+  ARM: dts: add rk3288 power-domain node
+
+ .../bindings/arm/rockchip/power_domain.txt         |  48 +++
+ arch/arm/boot/dts/rk3288.dtsi                      |  59 +++
+ arch/arm/mach-rockchip/Kconfig                     |   1 +
+ arch/arm/mach-rockchip/Makefile                    |   1 +
+ arch/arm/mach-rockchip/pm_domains.c                | 472 +++++++++++++++++++++
+ include/dt-bindings/power-domain/rk3288.h          |  11 +
+ 6 files changed, 592 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
+ create mode 100644 arch/arm/mach-rockchip/pm_domains.c
+ create mode 100644 include/dt-bindings/power-domain/rk3288.h
+
 -- 
-1.7.1
+1.9.1
