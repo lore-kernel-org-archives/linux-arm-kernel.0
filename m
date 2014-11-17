@@ -1,65 +1,69 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:11 +0100
-Subject: [PATCH v5 17/61] dmaengine: jz4740: Split device_control
+Date: Mon, 17 Nov 2014 14:41:59 +0100
+Subject: [PATCH v5 05/61] dmaengine: Make channel allocation callbacks optional
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-18-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-6-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the JZ4740 DMA driver to make use of the
-newly introduced callbacks, that will eventually be used to retrieve slave
-capabilities.
+Nowadays, some drivers don't have anything in there channel allocation
+callbacks anymore.
+
+Remove the BUG_ON if those callbacks aren't implemented, in order to allow
+drivers to not implement them.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- drivers/dma/dma-jz4740.c | 20 +++-----------------
- 1 file changed, 3 insertions(+), 17 deletions(-)
+ drivers/dma/dmaengine.c | 18 +++++++++++-------
+ 1 file changed, 11 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/dma/dma-jz4740.c b/drivers/dma/dma-jz4740.c
-index bdeafeefa5f6..4527a3ebeac4 100644
---- a/drivers/dma/dma-jz4740.c
-+++ b/drivers/dma/dma-jz4740.c
-@@ -210,7 +210,7 @@ static enum jz4740_dma_transfer_size jz4740_dma_maxburst(u32 maxburst)
+diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+index 72f10e2f5c32..9b2cd74b8f2e 100644
+--- a/drivers/dma/dmaengine.c
++++ b/drivers/dma/dmaengine.c
+@@ -235,9 +235,11 @@ static int dma_chan_get(struct dma_chan *chan)
+ 		return -ENODEV;
+ 
+ 	/* allocate upon first client reference */
+-	ret = chan->device->device_alloc_chan_resources(chan);
+-	if (ret < 0)
+-		goto err_out;
++	if (chan->device->device_alloc_chan_resources) {
++		ret = chan->device->device_alloc_chan_resources(chan);
++		if (ret < 0)
++			goto err_out;
++	}
+ 
+ 	if (!dma_has_cap(DMA_PRIVATE, chan->device->cap_mask))
+ 		balance_ref_count(chan);
+@@ -259,11 +261,15 @@ err_out:
+  */
+ static void dma_chan_put(struct dma_chan *chan)
+ {
++	/* This channel is not in use, bail out */
+ 	if (!chan->client_count)
+-		return; /* this channel failed alloc_chan_resources */
++		return;
++
+ 	chan->client_count--;
+ 	module_put(dma_chan_to_owner(chan));
+-	if (chan->client_count == 0)
++
++	/* This channel is not in use anymore, free it */
++	if (!chan->client_count && chan->device->device_free_chan_resources)
+ 		chan->device->device_free_chan_resources(chan);
  }
  
- static int jz4740_dma_slave_config(struct dma_chan *c,
--	const struct dma_slave_config *config)
-+				   struct dma_slave_config *config)
- {
- 	struct jz4740_dmaengine_chan *chan = to_jz4740_dma_chan(c);
- 	struct jz4740_dma_dev *dmadev = jz4740_dma_chan_get_dev(chan);
-@@ -290,21 +290,6 @@ static int jz4740_dma_terminate_all(struct dma_chan *c)
- 	return 0;
- }
+@@ -819,8 +825,6 @@ int dma_async_device_register(struct dma_device *device)
+ 	BUG_ON(dma_has_cap(DMA_INTERLEAVE, device->cap_mask) &&
+ 		!device->device_prep_interleaved_dma);
  
--static int jz4740_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--	unsigned long arg)
--{
--	struct dma_slave_config *config = (struct dma_slave_config *)arg;
--
--	switch (cmd) {
--	case DMA_SLAVE_CONFIG:
--		return jz4740_dma_slave_config(chan, config);
--	case DMA_TERMINATE_ALL:
--		return jz4740_dma_terminate_all(chan);
--	default:
--		return -ENOSYS;
--	}
--}
--
- static int jz4740_dma_start_transfer(struct jz4740_dmaengine_chan *chan)
- {
- 	struct jz4740_dma_dev *dmadev = jz4740_dma_chan_get_dev(chan);
-@@ -561,7 +546,8 @@ static int jz4740_dma_probe(struct platform_device *pdev)
- 	dd->device_issue_pending = jz4740_dma_issue_pending;
- 	dd->device_prep_slave_sg = jz4740_dma_prep_slave_sg;
- 	dd->device_prep_dma_cyclic = jz4740_dma_prep_dma_cyclic;
--	dd->device_control = jz4740_dma_control;
-+	dd->device_config = jz4740_dma_slave_config;
-+	dd->device_terminate_all = jz4740_dma_terminate_all;
- 	dd->dev = &pdev->dev;
- 	INIT_LIST_HEAD(&dd->channels);
- 
+-	BUG_ON(!device->device_alloc_chan_resources);
+-	BUG_ON(!device->device_free_chan_resources);
+ 	BUG_ON(!device->device_tx_status);
+ 	BUG_ON(!device->device_issue_pending);
+ 	BUG_ON(!device->dev);
 -- 
 2.1.1
