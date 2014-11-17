@@ -1,60 +1,51 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 17 Nov 2014 11:17:55 -0800
-Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
- completes
-In-Reply-To: <Pine.LNX.4.44L0.1411171400540.885-100000@iolanthe.rowland.org>
-References: <7hd28l3clz.fsf@deeprootsystems.com>
- <Pine.LNX.4.44L0.1411171400540.885-100000@iolanthe.rowland.org>
-Message-ID: <20141117191755.GA5258@dtor-ws>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 17 Nov 2014 11:25:55 -0800
+Subject: [PATCH v1 1/5] clk: pxa: fix pxa27x CCCR bit usage
+In-Reply-To: <1412636881-6211-2-git-send-email-robert.jarzmik@free.fr>
+References: <1412636881-6211-1-git-send-email-robert.jarzmik@free.fr>
+ <1412636881-6211-2-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <20141117192555.25314.18664@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Quoting Robert Jarzmik (2014-10-06 16:07:57)
+> Trivial fix to check the A bit of CCCR for memory frequency
+> calculations, where the shift of the bit index was missing, triggering a
+> wrong calculation of memory frequency.
+> 
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
+Applied to clk-fixes towards -rc6.
 
-On Mon, Nov 17, 2014 at 11:06 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Mon, 17 Nov 2014, Kevin Hilman wrote:
->
->> Ulf Hansson <ulf.hansson@linaro.org> writes:
->>
->> > The amba bus, amba drivers and a vast amount of platform drivers which
->> > enables runtime PM, don't invoke a pm_runtime_get_sync() while probing
->> > their devices.
->> >
->> > Instead, once they have turned on their PM resourses during ->probe()
->> > and are ready to handle I/O, these invokes pm_runtime_set_active() to
->> > synchronize its state towards the runtime PM core.
->> >
->> > From a runtime PM point of view this behavior is perfectly acceptable,
->>
->> In the context of PM domains that can be dynamically powered on/off, I'm
->> not so sure it's perfectly acceptable anymore.
->>
->> Why doesn't the bus do a _get_sync() instead of a _get_noresume()
->> followed by a _set_active().
->>
->> By using the _get_noresume() you're bypassing the paths that would bring
->> up your PM domain.
->
-> This probably comes about because devices that are part of a power
-> domain need special treatment.  Before the driver's probe routine gets
-> called, the bus ought to resume the entire power domain.  For that,
-> some sort of _get_sync() is needed.
->
-> For devices that aren't part of a power domain, things are simpler.
-> The bus does _get_noresume() to make sure the device won't be runtime
-> suspended while the probe routine is running.  It doesn't do
-> _get_sync(), because that would end up calling the driver's
-> runtime_resume routine before the driver was bound to the device.  (The
-> bus could prevent that from happening by taking special precautions,
-> like PCI does, but in general it's a nuisance.)
+Regards,
+Mike
 
-That's why I think we need some new call that would mean "make sure the
-device is powered" which would properly handle power domain and bus, but
-ignore all driver stuff since it may not be initialized yet. And similar
-call for asking to put device and maybe domain in powered down state in
-case probing failed.
-
-Thanks.
-
--- 
-Dmitry
+> ---
+>  drivers/clk/pxa/clk-pxa27x.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/pxa/clk-pxa27x.c b/drivers/clk/pxa/clk-pxa27x.c
+> index b345cc7..88b9fe1 100644
+> --- a/drivers/clk/pxa/clk-pxa27x.c
+> +++ b/drivers/clk/pxa/clk-pxa27x.c
+> @@ -322,7 +322,7 @@ static unsigned long clk_pxa27x_memory_get_rate(struct clk_hw *hw,
+>         unsigned long ccsr = CCSR;
+>  
+>         osc_forced = ccsr & (1 << CCCR_CPDIS_BIT);
+> -       a = cccr & CCCR_A_BIT;
+> +       a = cccr & (1 << CCCR_A_BIT);
+>         l  = ccsr & CCSR_L_MASK;
+>  
+>         if (osc_forced || a)
+> @@ -341,7 +341,7 @@ static u8 clk_pxa27x_memory_get_parent(struct clk_hw *hw)
+>         unsigned long ccsr = CCSR;
+>  
+>         osc_forced = ccsr & (1 << CCCR_CPDIS_BIT);
+> -       a = cccr & CCCR_A_BIT;
+> +       a = cccr & (1 << CCCR_A_BIT);
+>         if (osc_forced)
+>                 return PXA_MEM_13Mhz;
+>         if (a)
+> -- 
+> 2.1.0
+> 
