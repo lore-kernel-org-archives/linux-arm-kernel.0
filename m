@@ -1,126 +1,243 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Mon, 17 Nov 2014 09:38:46 -0800
-Subject: ARM atomics overhaul for musl
-In-Reply-To: <20141117143905.GQ4042@n2100.arm.linux.org.uk>
-References: <20141116055656.GA13940@brightrain.aerifal.cx>
- <20141116163355.GK4042@n2100.arm.linux.org.uk>
- <20141116165017.GT22465@brightrain.aerifal.cx>
- <20141116171055.GM4042@n2100.arm.linux.org.uk>
- <20141117135412.GC29595@e104818-lin.cambridge.arm.com>
- <20141117143905.GQ4042@n2100.arm.linux.org.uk>
-Message-ID: <CALCETrUAtAJ1CmuxOFiiu53kAWwofUpFaBeFAZF7Th2VXPbHZg@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 17 Nov 2014 17:39:51 +0000
+Subject: [PATCH v9 6/9] qcom: cpuidle: Add cpuidle driver for QCOM cpus
+In-Reply-To: <1414194024-55547-7-git-send-email-lina.iyer@linaro.org>
+References: <1414194024-55547-1-git-send-email-lina.iyer@linaro.org>
+ <1414194024-55547-7-git-send-email-lina.iyer@linaro.org>
+Message-ID: <20141117173950.GA24304@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Nov 17, 2014 6:39 AM, "Russell King - ARM Linux"
-<linux@arm.linux.org.uk> wrote:
->
-> On Mon, Nov 17, 2014 at 01:54:13PM +0000, Catalin Marinas wrote:
-> > On Sun, Nov 16, 2014 at 05:10:55PM +0000, Russell King - ARM Linux wrote:
-> > > which means that rather than encoding the
-> > > CPU architecture (like with every other Linux architecture), we have a
-> > > string which encodes the kernel architecture instead, which is absurd.
-> >
-> > Just like x86_64 vs i686?
->
-> That is still valid, but let's wait and see what happens when a new
-> "version" of x86_64 comes along.
->
-> However, the issue on x86 is far less of a problem: userspace (even
-> kernel space) does not have to play these games because the CPUs aren't
-> designed by people intent on removing old instructions from the
-> instruction set, thereby stopping existing binaries working without
-> kernel emulation of the missing instructions.
->
-> > > Obviously, the plan for ARM64 is that there will never be an ARMv9
-> > > architecture, and ARMv8 is the perfect architecture for the future. :p
-> >
-> > If you haven't noticed, the distinction between ARMv6 and ARMv7 has been
-> > blurred enough (guess why cpu_architecture() reports ARMv7 for
-> > ARM11MPCore). ARM is trying to move away from architecture version
-> > numbers, which are rather useful for marketing, to proper feature
-> > detection based on CPUID. Whether there is an ARMv9 or not, it's
-> > irrelevant to what Linux should do (i.e. use CPUID rather than guess
-> > features based on architecture version numbers).
->
-> That may be what is desired, but unfortunately we have no way to export
-> all the intricate feature registers to userspace.  No, elf hwcaps don't
-> support it, there's only 64 bits split between two words there, and
-> there are many more than just 64 bits of feature registers.
+On Sat, Oct 25, 2014 at 12:40:21AM +0100, Lina Iyer wrote:
+> Add cpuidle driver interface to allow cpus to go into C-States. Use the
+> cpuidle DT interface, common across ARM architectures, to provide the
+> C-State information to the cpuidle framework.
 
-That's a ridiculous argument.  Linux can freely add bits.
+"idle states", this is not ACPI.
 
-You could add AT_ARM_FEATURES that points to a length followed by the
-indicated number of words, or you could just keep adding new HWCAP
-fields as needed.  This is expandable forever.
+> Supported modes at this time are Standby and Standalone Power Collapse.
+> 
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> ---
+>  .../bindings/arm/msm/qcom,idle-state.txt           | 81 ++++++++++++++++++++++
+>  drivers/cpuidle/Kconfig.arm                        |  7 ++
+>  drivers/cpuidle/Makefile                           |  1 +
+>  drivers/cpuidle/cpuidle-qcom.c                     | 72 +++++++++++++++++++
+>  4 files changed, 161 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+>  create mode 100644 drivers/cpuidle/cpuidle-qcom.c
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt b/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+> new file mode 100644
+> index 0000000..ae1b07f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+> @@ -0,0 +1,81 @@
+> +QCOM Idle States for cpuidle driver
+> +
+> +ARM provides idle-state node to define the cpuidle states, as defined in [1].
+> +cpuidle-qcom is the cpuidle driver for Qualcomm SoCs and uses these idle
+> +states. Idle states have different enter/exit latency and residency values.
+> +The idle states supported by the QCOM SoC are defined as -
+> +
+> +    * Standby
+> +    * Retention
+> +    * Standalone Power Collapse (Standalone PC or SPC)
+> +    * Power Collapse (PC)
+> +
+> +Standby: Standby does a little more in addition to architectural clock gating.
+> +When the WFI instruction is executed the ARM core would gate its internal
+> +clocks. In addition to gating the clocks, QCOM cpus use this instruction as a
+> +trigger to execute the SPM state machine. The SPM state machine waits for the
+> +interrupt to trigger the core back in to active. This triggers the cache
+> +hierarchy to enter standby states, when all cpus are idle. An interrupt brings
+> +the SPM state machine out of its wait, the next step is to ensure that the
+> +cache hierarchy is also out of standby, and then the cpu is allowed to resume
+> +execution.
+> +
+> +Retention: Retention is a low power state where the core is clock gated and
+> +the memory and the registers associated with the core are retained. The
+> +voltage may be reduced to the minimum value needed to keep the processor
+> +registers active. The SPM should be configured to execute the retention
+> +sequence and would wait for interrupt, before restoring the cpu to execution
+> +state. Retention may have a slightly higher latency than Standby.
+> +
+> +Standalone PC: A cpu can power down and warmboot if there is a sufficient time
+> +between the time it enters idle and the next known wake up. SPC mode is used
+> +to indicate a core entering a power down state without consulting any other
+> +cpu or the system resources. This helps save power only on that core.  The SPM
+> +sequence for this idle state is programmed to power down the supply to the
+> +core, wait for the interrupt, restore power to the core, and ensure the
+> +system state including cache hierarchy is ready before allowing core to
+> +resume. Applying power and resetting the core causes the core to warmboot
+> +back into Elevation Level (EL) which trampolines the control back to the
+> +kernel. Entering a power down state for the cpu, needs to be done by trapping
+> +into a EL. Failing to do so, would result in a crash enforced by the warm boot
+> +code in the EL for the SoC. On SoCs with write-back L1 cache, the cache has to
+> +be flushed in s/w, before powering down the core.
+> +
+> +Power Collapse: This state is similar to the SPC mode, but distinguishes
+> +itself in that the cpu acknowledges and permits the SoC to enter deeper sleep
+> +modes. In a hierarchical power domain SoC, this means L2 and other caches can
+> +be flushed, system bus, clocks - lowered, and SoC main XO clock gated and
+> +voltages reduced, provided all cpus enter this state.  Since the span of low
+> +power modes possible at this state is vast, the exit latency and the residency
+> +of this low power mode would be considered high even though at a cpu level,
+> +this essentially is cpu power down. The SPM in this state also may handshake
+> +with the Resource power manager processor in the SoC to indicate a complete
+> +application processor subsystem shut down.
+> +
+> +The idle-state for QCOM SoCs are distinguished by the compatible property of
+> +the idle-states device node.
+> +The devicetree representation of the idle state should be -
+> +
+> +Required properties:
+> +
+> +- compatible: Must be one of -
+> +			"qcom,idle-state-stby",
+> +			"qcom,idle-state-ret",
+> +			"qcom,idle-state-spc",
+> +			"qcom,idle-state-pc",
+> +		and "arm,idle-state".
+> +
+> +Other required and optional properties are specified in [1].
+> +
+> +Example:
+> +
+> +	idle-states {
+> +		CPU_SPC: spc {
+> +			compatible = "qcom,idle-state-spc", "arm,idle-state";
+> +			entry-latency-us = <150>;
+> +			exit-latency-us = <200>;
+> +			min-residency-us = <2000>;
+> +		};
+> +	};
+> +
+> +[1]. Documentation/devicetree/bindings/arm/idle-states.txt
+> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+> index 8c16ab2..13c7c1f 100644
+> --- a/drivers/cpuidle/Kconfig.arm
+> +++ b/drivers/cpuidle/Kconfig.arm
+> @@ -63,3 +63,10 @@ config ARM_MVEBU_V7_CPUIDLE
+>  	depends on ARCH_MVEBU
+>  	help
+>  	  Select this to enable cpuidle on Armada 370, 38x and XP processors.
+> +
+> +config ARM_QCOM_CPUIDLE
+> +	bool "CPU Idle drivers for Qualcomm processors"
+> +	depends on QCOM_PM
+> +	select DT_IDLE_STATES
+> +	help
+> +	  Select this to enable cpuidle for QCOM processors
+> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+> index 4d177b9..6c222d5 100644
+> --- a/drivers/cpuidle/Makefile
+> +++ b/drivers/cpuidle/Makefile
+> @@ -17,6 +17,7 @@ obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
+>  obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
+>  obj-$(CONFIG_ARM_AT91_CPUIDLE)          += cpuidle-at91.o
+>  obj-$(CONFIG_ARM_EXYNOS_CPUIDLE)        += cpuidle-exynos.o
+> +obj-$(CONFIG_ARM_QCOM_CPUIDLE)		+= cpuidle-qcom.o
+>  
+>  ###############################################################################
+>  # MIPS drivers
+> diff --git a/drivers/cpuidle/cpuidle-qcom.c b/drivers/cpuidle/cpuidle-qcom.c
+> new file mode 100644
+> index 0000000..1c1dcbc
+> --- /dev/null
+> +++ b/drivers/cpuidle/cpuidle-qcom.c
+> @@ -0,0 +1,72 @@
+> +/*
+> + * Copyright (c) 2014, Linaro Limited.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +
+> +#include <linux/cpuidle.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +
+> +#include <soc/qcom/pm.h>
+> +#include "dt_idle_states.h"
+> +
+> +static struct qcom_cpu_pm_ops *lpm_ops;
+> +
+> +static int qcom_cpu_stby(struct cpuidle_device *dev,
+> +				struct cpuidle_driver *drv, int index)
+> +{
+> +	lpm_ops->standby(NULL);
+> +
+> +	return index;
+> +}
+> +
+> +static int qcom_cpu_spc(struct cpuidle_device *dev,
+> +				struct cpuidle_driver *drv, int index)
+> +{
+> +	lpm_ops->spc(NULL);
+> +
+> +	return index;
+> +}
+> +
 
-As an x86 person and a complete ARM outsider, this situation is
-totally nuts.  There is no good reason *not* to have feature bits, and
-even in x86 land, relying on the architecture version is dangerous.
-(Intel seems to be reinstating version 5 right now with Quark, and
-even that is having minor issues since it's not really quite a version
-5 chip.)
+I can't have a look at this and avoid thinking that this should look
+something like:
 
->
-> Given that even cocked these up (just as what happened with the cache
-> type register) decoding of the feature type registers depends on the
-> underlying CPU architecture.
->
-> So, even _if_ we exported the feature registers to userspace, you still
-> need to know the CPU architecture to decode them properly, so you still
-> need to parse the AT_PLATFORM string to get that information.
->
+static qcom_cpu_idle(...., int index)
+{
+	lpm_ops[index].enter_idle(...);
+	return index;
+}
 
-There's no need to expose the hardware feature registers as is.
-Define your own sensible feature bits just for Linux.
+Before jumping to conclusions, see below.
 
-Yes, libc implementations will need a fallback for old kernels, but at
-least the set of legacy configurations that need to be supported that
-way will stop increasing at some point.
+> +static struct cpuidle_driver qcom_cpuidle_driver = {
+> +	.name	= "qcom_cpuidle",
+> +};
+> +
+> +static const struct of_device_id qcom_idle_state_match[] = {
+> +	{ .compatible = "qcom,idle-state-stby", .data = qcom_cpu_stby},
+> +	{ .compatible = "qcom,idle-state-spc", .data = qcom_cpu_spc },
+> +	{ },
+> +};
+> +
+> +static int qcom_cpuidle_probe(struct platform_device *pdev)
+> +{
+> +	struct cpuidle_driver *drv = &qcom_cpuidle_driver;
+> +	int ret;
+> +
+> +	lpm_ops = pdev->dev.platform_data;
+> +
+> +	/* Probe for other states, including standby */
+> +	ret = dt_init_idle_driver(drv, qcom_idle_state_match, 0);
 
---Andy
+This driver will be DT only. If an idle state is parsed correctly,
+it is initialized, otherwise it is skipped. Now, if we added glue
+code in arch arm (as arm64 does) that allows us to link an idle state
+index with the functions above (a DT idle state contains all information
+required to initialize its enter function, more so now that we are adding
+power domains to the picture), what would be the issue in defining a
+common API that just passes the index to the arch back-end ? No pointers
+to pass, no platform drivers required and still no arch/soc code in
+drivers/cpuidle.
 
-> > > So, a reasonable parsing of this would be:
-> > >
-> > >     const char *ptr;
-> > >     int architecture;
-> > >
-> > >     ptr = (const char *)(uintptr_t)getauxval(AT_PLATFORM);
-> > >     assert(ptr);
-> > >
-> > >     if (!strncmp(ptr, "aarch64", 7))
-> > >             architecture = 8;
-> > >     else
-> > >             assert(sscanf(ptr, "v%d", &architecture) == 1);
-> >
-> > Oh, have you even bothered trying 32-bit (compat) getauxval(AT_PLATFORM)
-> > on an aarch64 kernel? It reports "v8l", so please don't confuse others.
->
-> Right, I see that now - I'm not knowledgable of the compat code, because
-> ARM32 has nothing to do with it, and I missed COMPAT_ELF_PLATFORM.
->
-> As for "bothered trying" - tell me how I could possibly try that.  You
-> know full well that I have /no/ 64-bit hardware, and you also know that
-> I have *nothing* capable of running, let alone building a 64-bit ARM
-> kernel.
->
-> Please, next time you decide to make accusations, bear that in mind - my
-> "guesses" as to what ARM64 does are based upon reading your code,
-> sometimes for the first time, and not through any kind of experience of
-> actually running the damned stuff.
->
-> Now, think about what /you/ have said.  Think about your assertion about
-> that "v8l" string.  How does the code react to that?  Oh my, it sets
-> "architecture" to 8 !  Oh lookie, it's the right value.  Oh look, the
-> code works correctly.
->
-> So, counter to your crap about me confusing others, maybe you should
-> make that same accusation of yourself!
->
-> Maybe ARM and yourself should have tried to be more inclusive with ARMv8
-> in general, rather than trying to push me away with accusations and the
-> like (like you're doing right now) every time I say something about it.
->
-> --
-> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-> according to speedtest.net.
+I am obviously talking about DT CPUidle drivers only.
+
+If the idle state is parsed correctly and the backend initializer (let's
+call it arm_cpu_init_idle(cpu)) is successful (which means that DT idle
+states contain valid information and the enter functions could be
+initialized from DT properly) I do not see what's the problem, give it
+some thought.
+
+Anyway, I will put together an RFC to start the discussion when patch is
+merged and patch the relevant code as an example, you can go ahead with
+current code, I am reviewing it.
+
+Lorenzo
