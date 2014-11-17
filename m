@@ -1,207 +1,174 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:35 +0100
-Subject: [PATCH v5 41/61] dmaengine: sun6i: Split device_control
+Date: Mon, 17 Nov 2014 14:42:29 +0100
+Subject: [PATCH v5 35/61] dmaengine: pl330: Split device_control
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-42-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-36-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Allwinner A31 DMA driver to make use
+Split the device_control callback of the AMBA PL330 DMA driver to make use
 of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/sun6i-dma.c | 150 +++++++++++++++++++++++++-----------------------
- 1 file changed, 78 insertions(+), 72 deletions(-)
+ drivers/dma/pl330.c | 108 ++++++++++++++++++++++++++--------------------------
+ 1 file changed, 53 insertions(+), 55 deletions(-)
 
-diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index 77fb124dad67..4ef76bc22da4 100644
---- a/drivers/dma/sun6i-dma.c
-+++ b/drivers/dma/sun6i-dma.c
-@@ -355,38 +355,6 @@ static void sun6i_dma_free_desc(struct virt_dma_desc *vd)
- 	kfree(txd);
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 3c9f715cb8d7..c2db237e455b 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -2062,72 +2062,69 @@ static int pl330_alloc_chan_resources(struct dma_chan *chan)
+ 	return 1;
  }
  
--static int sun6i_dma_terminate_all(struct sun6i_vchan *vchan)
--{
--	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(vchan->vc.chan.device);
--	struct sun6i_pchan *pchan = vchan->phy;
--	unsigned long flags;
--	LIST_HEAD(head);
--
--	spin_lock(&sdev->lock);
--	list_del_init(&vchan->node);
--	spin_unlock(&sdev->lock);
--
--	spin_lock_irqsave(&vchan->vc.lock, flags);
--
--	vchan_get_all_descriptors(&vchan->vc, &head);
--
--	if (pchan) {
--		writel(DMA_CHAN_ENABLE_STOP, pchan->base + DMA_CHAN_ENABLE);
--		writel(DMA_CHAN_PAUSE_RESUME, pchan->base + DMA_CHAN_PAUSE);
--
--		vchan->phy = NULL;
--		pchan->vchan = NULL;
--		pchan->desc = NULL;
--		pchan->done = NULL;
--	}
--
--	spin_unlock_irqrestore(&vchan->vc.lock, flags);
--
--	vchan_dma_desc_free_list(&vchan->vc, &head);
--
--	return 0;
--}
--
- static int sun6i_dma_start_desc(struct sun6i_vchan *vchan)
- {
- 	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(vchan->vc.chan.device);
-@@ -675,57 +643,92 @@ err_lli_free:
- 	return NULL;
- }
- 
--static int sun6i_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--		       unsigned long arg)
-+static int sun6i_dma_config(struct dma_chan *chan,
-+			    struct dma_slave_config *config)
+-static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd, unsigned long arg)
++static int pl330_config(struct dma_chan *chan,
++			struct dma_slave_config *slave_config)
 +{
-+	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
++	struct dma_pl330_chan *pch = to_pchan(chan);
 +
-+	memcpy(&vchan->cfg, config, sizeof(*config));
-+
-+	return 0;
-+}
-+
-+static int sun6i_dma_pause(struct dma_chan *chan)
-+{
-+	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(chan->device);
-+	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
-+	struct sun6i_pchan *pchan = vchan->phy;
-+
-+	dev_dbg(chan2dev(chan), "vchan %p: pause\n", &vchan->vc);
-+
-+	if (pchan) {
-+		writel(DMA_CHAN_PAUSE_PAUSE,
-+		       pchan->base + DMA_CHAN_PAUSE);
-+	} else {
-+		spin_lock(&sdev->lock);
-+		list_del_init(&vchan->node);
-+		spin_unlock(&sdev->lock);
++	if (slave_config->direction == DMA_MEM_TO_DEV) {
++		if (slave_config->dst_addr)
++			pch->fifo_addr = slave_config->dst_addr;
++		if (slave_config->dst_addr_width)
++			pch->burst_sz = __ffs(slave_config->dst_addr_width);
++		if (slave_config->dst_maxburst)
++			pch->burst_len = slave_config->dst_maxburst;
++	} else if (slave_config->direction == DMA_DEV_TO_MEM) {
++		if (slave_config->src_addr)
++			pch->fifo_addr = slave_config->src_addr;
++		if (slave_config->src_addr_width)
++			pch->burst_sz = __ffs(slave_config->src_addr_width);
++		if (slave_config->src_maxburst)
++			pch->burst_len = slave_config->src_maxburst;
 +	}
 +
 +	return 0;
 +}
 +
-+static int sun6i_dma_resume(struct dma_chan *chan)
++static int pl330_terminate_all(struct dma_chan *chan)
  {
- 	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(chan->device);
- 	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
- 	struct sun6i_pchan *pchan = vchan->phy;
+ 	struct dma_pl330_chan *pch = to_pchan(chan);
+ 	struct dma_pl330_desc *desc;
  	unsigned long flags;
--	int ret = 0;
+ 	struct pl330_dmac *pl330 = pch->dmac;
+-	struct dma_slave_config *slave_config;
+ 	LIST_HEAD(list);
  
 -	switch (cmd) {
--	case DMA_RESUME:
--		dev_dbg(chan2dev(chan), "vchan %p: resume\n", &vchan->vc);
-+	dev_dbg(chan2dev(chan), "vchan %p: resume\n", &vchan->vc);
+-	case DMA_TERMINATE_ALL:
+-		spin_lock_irqsave(&pch->lock, flags);
+-
+-		spin_lock(&pl330->lock);
+-		_stop(pch->thread);
+-		spin_unlock(&pl330->lock);
++	spin_lock_irqsave(&pch->lock, flags);
  
--		spin_lock_irqsave(&vchan->vc.lock, flags);
-+	spin_lock_irqsave(&vchan->vc.lock, flags);
+-		pch->thread->req[0].desc = NULL;
+-		pch->thread->req[1].desc = NULL;
+-		pch->thread->req_running = -1;
++	spin_lock(&pl330->lock);
++	_stop(pch->thread);
++	spin_unlock(&pl330->lock);
  
--		if (pchan) {
--			writel(DMA_CHAN_PAUSE_RESUME,
--			       pchan->base + DMA_CHAN_PAUSE);
--		} else if (!list_empty(&vchan->vc.desc_issued)) {
--			spin_lock(&sdev->lock);
--			list_add_tail(&vchan->node, &sdev->pending);
--			spin_unlock(&sdev->lock);
+-		/* Mark all desc done */
+-		list_for_each_entry(desc, &pch->submitted_list, node) {
+-			desc->status = FREE;
+-			dma_cookie_complete(&desc->txd);
 -		}
-+	if (pchan) {
-+		writel(DMA_CHAN_PAUSE_RESUME,
-+		       pchan->base + DMA_CHAN_PAUSE);
-+	} else if (!list_empty(&vchan->vc.desc_issued)) {
-+		spin_lock(&sdev->lock);
-+		list_add_tail(&vchan->node, &sdev->pending);
-+		spin_unlock(&sdev->lock);
++	pch->thread->req[0].desc = NULL;
++	pch->thread->req[1].desc = NULL;
++	pch->thread->req_running = -1;
+ 
+-		list_for_each_entry(desc, &pch->work_list , node) {
+-			desc->status = FREE;
+-			dma_cookie_complete(&desc->txd);
+-		}
++	/* Mark all desc done */
++	list_for_each_entry(desc, &pch->submitted_list, node) {
++		desc->status = FREE;
++		dma_cookie_complete(&desc->txd);
 +	}
  
--		spin_unlock_irqrestore(&vchan->vc.lock, flags);
--		break;
-+	spin_unlock_irqrestore(&vchan->vc.lock, flags);
- 
--	case DMA_PAUSE:
--		dev_dbg(chan2dev(chan), "vchan %p: pause\n", &vchan->vc);
-+	return 0;
-+}
- 
--		if (pchan) {
--			writel(DMA_CHAN_PAUSE_PAUSE,
--			       pchan->base + DMA_CHAN_PAUSE);
--		} else {
--			spin_lock(&sdev->lock);
--			list_del_init(&vchan->node);
--			spin_unlock(&sdev->lock);
+-		list_for_each_entry(desc, &pch->completed_list , node) {
+-			desc->status = FREE;
+-			dma_cookie_complete(&desc->txd);
 -		}
--		break;
--
--	case DMA_TERMINATE_ALL:
--		ret = sun6i_dma_terminate_all(vchan);
++	list_for_each_entry(desc, &pch->work_list , node) {
++		desc->status = FREE;
++		dma_cookie_complete(&desc->txd);
++	}
+ 
+-		list_splice_tail_init(&pch->submitted_list, &pl330->desc_pool);
+-		list_splice_tail_init(&pch->work_list, &pl330->desc_pool);
+-		list_splice_tail_init(&pch->completed_list, &pl330->desc_pool);
+-		spin_unlock_irqrestore(&pch->lock, flags);
 -		break;
 -	case DMA_SLAVE_CONFIG:
--		memcpy(&vchan->cfg, (void *)arg, sizeof(struct dma_slave_config));
+-		slave_config = (struct dma_slave_config *)arg;
+-
+-		if (slave_config->direction == DMA_MEM_TO_DEV) {
+-			if (slave_config->dst_addr)
+-				pch->fifo_addr = slave_config->dst_addr;
+-			if (slave_config->dst_addr_width)
+-				pch->burst_sz = __ffs(slave_config->dst_addr_width);
+-			if (slave_config->dst_maxburst)
+-				pch->burst_len = slave_config->dst_maxburst;
+-		} else if (slave_config->direction == DMA_DEV_TO_MEM) {
+-			if (slave_config->src_addr)
+-				pch->fifo_addr = slave_config->src_addr;
+-			if (slave_config->src_addr_width)
+-				pch->burst_sz = __ffs(slave_config->src_addr_width);
+-			if (slave_config->src_maxburst)
+-				pch->burst_len = slave_config->src_maxburst;
+-		}
 -		break;
 -	default:
--		ret = -ENXIO;
--		break;
-+static int sun6i_dma_terminate_all(struct dma_chan *chan)
-+{
-+	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(chan->device);
-+	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
-+	struct sun6i_pchan *pchan = vchan->phy;
-+	unsigned long flags;
-+	LIST_HEAD(head);
-+
-+	spin_lock(&sdev->lock);
-+	list_del_init(&vchan->node);
-+	spin_unlock(&sdev->lock);
-+
-+	spin_lock_irqsave(&vchan->vc.lock, flags);
-+
-+	vchan_get_all_descriptors(&vchan->vc, &head);
-+
-+	if (pchan) {
-+		writel(DMA_CHAN_ENABLE_STOP, pchan->base + DMA_CHAN_ENABLE);
-+		writel(DMA_CHAN_PAUSE_RESUME, pchan->base + DMA_CHAN_PAUSE);
-+
-+		vchan->phy = NULL;
-+		pchan->vchan = NULL;
-+		pchan->desc = NULL;
-+		pchan->done = NULL;
+-		dev_err(pch->dmac->ddma.dev, "Not supported command.\n");
+-		return -ENXIO;
++	list_for_each_entry(desc, &pch->completed_list , node) {
++		desc->status = FREE;
++		dma_cookie_complete(&desc->txd);
  	}
--	return ret;
+ 
++	list_splice_tail_init(&pch->submitted_list, &pl330->desc_pool);
++	list_splice_tail_init(&pch->work_list, &pl330->desc_pool);
++	list_splice_tail_init(&pch->completed_list, &pl330->desc_pool);
++	spin_unlock_irqrestore(&pch->lock, flags);
 +
-+	spin_unlock_irqrestore(&vchan->vc.lock, flags);
-+
-+	vchan_dma_desc_free_list(&vchan->vc, &head);
-+
-+	return 0;
+ 	return 0;
  }
  
- static enum dma_status sun6i_dma_tx_status(struct dma_chan *chan,
-@@ -960,7 +963,10 @@ static int sun6i_dma_probe(struct platform_device *pdev)
- 	sdc->slave.device_issue_pending		= sun6i_dma_issue_pending;
- 	sdc->slave.device_prep_slave_sg		= sun6i_dma_prep_slave_sg;
- 	sdc->slave.device_prep_dma_memcpy	= sun6i_dma_prep_dma_memcpy;
--	sdc->slave.device_control		= sun6i_dma_control;
-+	sdc->slave.device_config		= sun6i_dma_config;
-+	sdc->slave.device_pause			= sun6i_dma_pause;
-+	sdc->slave.device_resume		= sun6i_dma_resume;
-+	sdc->slave.device_terminate_all		= sun6i_dma_terminate_all;
- 	sdc->slave.copy_align			= 4;
- 	sdc->slave.dev = &pdev->dev;
+@@ -2714,7 +2711,8 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 	pd->device_prep_dma_cyclic = pl330_prep_dma_cyclic;
+ 	pd->device_tx_status = pl330_tx_status;
+ 	pd->device_prep_slave_sg = pl330_prep_slave_sg;
+-	pd->device_control = pl330_control;
++	pd->device_config = pl330_config;
++	pd->device_terminate_all = pl330_terminate_all;
+ 	pd->device_issue_pending = pl330_issue_pending;
+ 	pd->device_slave_caps = pl330_dma_device_slave_caps;
  
+@@ -2762,7 +2760,7 @@ probe_err3:
+ 
+ 		/* Flush the channel */
+ 		if (pch->thread) {
+-			pl330_control(&pch->chan, DMA_TERMINATE_ALL, 0);
++			pl330_terminate_all(&pch->chan);
+ 			pl330_free_chan_resources(&pch->chan);
+ 		}
+ 	}
+@@ -2791,7 +2789,7 @@ static int pl330_remove(struct amba_device *adev)
+ 
+ 		/* Flush the channel */
+ 		if (pch->thread) {
+-			pl330_control(&pch->chan, DMA_TERMINATE_ALL, 0);
++			pl330_terminate_all(&pch->chan);
+ 			pl330_free_chan_resources(&pch->chan);
+ 		}
+ 	}
 -- 
 2.1.1
