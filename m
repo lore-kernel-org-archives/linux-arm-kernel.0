@@ -1,74 +1,47 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 17 Nov 2014 12:57:21 +0000
-Subject: [PATCH] MAINTAINERS: update email address and cleanup for exynos
- entry
-In-Reply-To: <1415951697-5991-1-git-send-email-kgene@kernel.org>
-References: <1415951697-5991-1-git-send-email-kgene@kernel.org>
-Message-ID: <5469F0B1.6010907@codethink.co.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Nov 2014 13:03:06 +0000
+Subject: some question about TCR setting
+In-Reply-To: <20141117120952.GA23769@leverpostej>
+References: <CAOVJa8HBYkTMCJFKC=+UwjgPp4odm5UV-oUQXu17ctv2+HkpRg@mail.gmail.com>
+ <20141114104246.GA25828@leverpostej>
+ <CAOVJa8Fx4yiSU0O7HTaYEKOrRdtWve4JGeN0cWRXDsBMyV_8Mg@mail.gmail.com>
+ <20141114135531.GA27768@leverpostej>
+ <CAOVJa8GB=pk4SFEArcEGWF8g12105F_9YUL0hH5k+WW6=WWOBg@mail.gmail.com>
+ <20141116165211.GL4042@n2100.arm.linux.org.uk>
+ <20141117120952.GA23769@leverpostej>
+Message-ID: <20141117130306.GP4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/11/14 07:54, Kukjin Kim wrote:
-> Use kernel.org account instead of samsung.com and cleanup for Samsung
-> s3c, s5p and exynos SoCs.
+On Mon, Nov 17, 2014 at 12:09:52PM +0000, Mark Rutland wrote:
+> On Sun, Nov 16, 2014 at 04:52:11PM +0000, Russell King - ARM Linux wrote:
+> > The access type is included on the bus along with the address and other
+> > attributes.  This includes whether it's sharable, and the cache attributes.
+> > A MMU page walker may be implemented such that it is capable of accessing
+> > L2 cache.
 > 
-> Cc: Ben Dooks <ben.dooks@codethink.co.uk>
+> Or L1, depending on the implementation of the memory system. The logic
+> which walks the page tables is essentially another coherent observer, so
+> it doesn't necessarily matter precisely where it is attached.
+...
+> To further this point, provided the TCR is programmed with the same
+> attributes the kernel uses to access the page tables, no cache
+> maintenance is necessary, as the CPU(s) and page table walker(s) are
+> coherent.
 
-I do wish these would be sent to the mail address I use for
-Linux related issues. I only want to see work related Linux
-issues to my <ben.dooks@codethink.co.uk> address.
+That depends on the implementation - whether the MMU page table walker
+can read from the L1 cache.  If you were correct in all cases, we could
+get rid of:
 
-It is sad to see my entries removed, but I no longer have time
-to maintain these.
+        ALT_UP (mcr     p15, 0, r0, c7, c10, 1)         @ flush_pte
 
-> Signed-off-by: Kukjin Kim <kgene@kernel.org>
-Acked-by: Ben Dooks <ben-linux@fluff.org>
-> ---
->  MAINTAINERS |   16 ++++------------
->  1 files changed, 4 insertions(+), 12 deletions(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 60b1163..b1e27bf 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1308,30 +1308,22 @@ F:	drivers/*/*rockchip*
->  F:	drivers/*/*/*rockchip*
->  F:	sound/soc/rockchip/
->  
-> -ARM/SAMSUNG ARM ARCHITECTURES
-> -M:	Ben Dooks <ben-linux@fluff.org>
-> -M:	Kukjin Kim <kgene.kim@samsung.com>
-> +ARM/SAMSUNG EXYNOS ARM ARCHITECTURES
-> +M:	Kukjin Kim <kgene@kernel.org>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
-> -W:	http://www.fluff.org/ben/linux/
->  S:	Maintained
->  F:	arch/arm/boot/dts/s3c*
->  F:	arch/arm/boot/dts/exynos*
->  F:	arch/arm/plat-samsung/
->  F:	arch/arm/mach-s3c24*/
->  F:	arch/arm/mach-s3c64xx/
-> +F:	arch/arm/mach-s5p*/
-> +F:	arch/arm/mach-exynos*/
->  F:	drivers/*/*s3c2410*
->  F:	drivers/*/*/*s3c2410*
->  F:	drivers/spi/spi-s3c*
->  F:	sound/soc/samsung/*
-> -
-> -ARM/S5P EXYNOS ARM ARCHITECTURES
-> -M:	Kukjin Kim <kgene.kim@samsung.com>
-> -L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> -L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
-> -S:	Maintained
-> -F:	arch/arm/mach-s5p*/
-> -F:	arch/arm/mach-exynos*/
->  N:	exynos
->  
->  ARM/SAMSUNG MOBILE MACHINE SUPPORT
-> 
+in proc-v7-2level.S - but obviously we think that ARMv7 is unable to read
+from L1 when walking the page tables.
 
+> This is what we do for ARMv7 and arm64.
+
+>From the code, it looks like we don't for ARMv7.
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
