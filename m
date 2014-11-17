@@ -1,76 +1,35 @@
-From: j.uzycki@elproma.com.pl (Janusz Uzycki)
-Date: Mon, 17 Nov 2014 11:47:36 +0100
-Subject: [PATCH v2] gpio: mxs: implement get_direction callback
-Message-ID: <1416221256-11671-1-git-send-email-j.uzycki@elproma.com.pl>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Mon, 17 Nov 2014 11:51:29 +0100
+Subject: [PATCH v4 1/2] of: Rename "poweroff-source" property to
+ "system-power-controller"
+In-Reply-To: <CABgxDoL-N9bitxTU0=pD_69DLBovXPSKhHjmArVOHFdokvnEJA@mail.gmail.com>
+References: <1415885699-1465-1-git-send-email-user@radxa>
+ <1415885699-1465-2-git-send-email-user@radxa>
+ <20141113205528.77414C40BC2@trevor.secretlab.ca>
+ <CABgxDoL-N9bitxTU0=pD_69DLBovXPSKhHjmArVOHFdokvnEJA@mail.gmail.com>
+Message-ID: <CABgxDoK=Maxzw-=+pHZ4gdgBSJbdkgx_Q7rHNcwEBywBE3btCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gpiolib's gpiod_get_direction() function returns the EINVAL error
-if .get_direction callback is not defined.
-The patch implements the callback for mxs chip what is useful
-for debugging.
+@Most of the people who were ranting about this serie:  could you send
+feedbacks please ?
 
-Commit f9e42397d79b
-("serial: mxs-auart: add interrupts for modem control lines")
-as based on commit ab5e4e4108ca
-("tty/serial: at91: add interrupts for modem control lines")
-uses the gpiod_get_direction() function.
-
-Inspired from arch/arm/mach-at91/gpio.c
-
-Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
----
-
-Changes since v1:
-- Fix the explanation why the patch is needed
-
-Two patches were missed during movements between our internal repos.
-The 2/2 patch is required against commits:
-  f9e42397d79b ("serial: mxs-auart: add interrupts for modem control lines")
-  36a262782b04 ("serial: mxs-auart: enable PPS support")
-I've done build-test for the next only before.
-I should have done hardware test also for the next, sorry.
-Now it is tested for the next on real hardware too.
-
-On the moment the patch is required to get the patch
-"serial: mxs-auart: enable PPS support" working.
-It is planned to introduce new mctrl_gpio helpers to avoid
-gpiod_get_direction() function.
-
----
- drivers/gpio/gpio-mxs.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
-index 8ffdd7d..56052c2 100644
---- a/drivers/gpio/gpio-mxs.c
-+++ b/drivers/gpio/gpio-mxs.c
-@@ -227,6 +227,18 @@ static int mxs_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
- 	return irq_find_mapping(port->domain, offset);
- }
- 
-+static int mxs_gpio_get_direction(struct gpio_chip *gc, unsigned offset)
-+{
-+	struct bgpio_chip *bgc = to_bgpio_chip(gc);
-+	struct mxs_gpio_port *port =
-+		container_of(bgc, struct mxs_gpio_port, bgc);
-+	u32 mask = 1 << offset;
-+	u32 dir;
-+
-+	dir = readl(port->base + PINCTRL_DOE(port));
-+	return !(dir & mask);
-+}
-+
- static struct platform_device_id mxs_gpio_ids[] = {
- 	{
- 		.name = "imx23-gpio",
-@@ -320,6 +332,7 @@ static int mxs_gpio_probe(struct platform_device *pdev)
- 		goto out_irqdesc_free;
- 
- 	port->bgc.gc.to_irq = mxs_gpio_to_irq;
-+	port->bgc.gc.get_direction = mxs_gpio_get_direction;
- 	port->bgc.gc.base = port->id * 32;
- 
- 	err = gpiochip_add(&port->bgc.gc);
--- 
-1.7.11.3
+2014-11-14 8:22 GMT+01:00 Romain Perier <romain.perier@gmail.com>:
+> Hi,
+>
+> Who should merge this serie ? as Mark merged the previous one it would
+> probably make sense to do the same here (at least, in my opinion)
+>
+> Thanks for your feedbacks.
+>
+> Have a nice day,
+> Romain
+>
+> 2014-11-13 21:55 GMT+01:00 Grant Likely <grant.likely@linaro.org>:
+> igned-off-by: Romain Perier <romain.perier@gmail.com>
+>>
+>> Acked-by: Grant Likely <grant.likely@linaro.org>
+>>
+>> Please merge via whichever tree needs this change.
+>>
+>> g.
