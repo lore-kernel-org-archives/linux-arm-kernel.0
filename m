@@ -1,115 +1,39 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 17 Nov 2014 03:33:05 +0000 (UTC)
-Subject: OMAP baseline test results for v3.18-rc4
-Message-ID: <alpine.DEB.2.02.1411170331420.3210@utopia.booyaka.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Mon, 17 Nov 2014 11:49:12 +0800
+Subject: [PATCH 00/10] arm64 kexec kernel patches V5
+In-Reply-To: <1415922648.15847.107.camel@smoke>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <20141031075209.GH3290@darkstar.nay.redhat.com>
+ <1414797939.23621.38.camel@smoke>
+ <20141113083706.GA8615@darkstar.nay.redhat.com>
+ <1415922648.15847.107.camel@smoke>
+Message-ID: <20141117034912.GB3160@darkstar.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 11/13/14 at 03:50pm, Geoff Levand wrote:
+> On Thu, 2014-11-13 at 16:37 +0800, Dave Young wrote:
+> > In your kexec-tools code, by default it will create dtb1 from procfs, as for external
+> > --dtb it will be dtb2 for comparing with dtb1.
+> > 
+> > Since dtb1 is a must so it will not work without /proc/device-tree.
+> 
+> I changed that to allow for no /proc/device-tree if --dtb is passed
+> since it will also allow a kernel built with CONFIG_PROC_FS=n to do
+> kexec re-boot.
+> 
+> Please try it and let me know.
 
-Here are some basic OMAP test results for Linux v3.18-rc4.
-Logs and other details at:
+Tested the master branch or your kexec-tools, I got below with
+"mount -o bind /root /proc" because there's some other issues for my customized
+kernel to boot: 
 
-    http://www.pwsan.com/omap/testlogs/test_v3.18-rc4/20141110160915/
+arch_process_options:95: initrd: (null)
+arch_process_options:96: dtb: apm-mustang.dtb
+arch_process_options:97: lite: 1
+arch_process_options:99: port: 0x0
+kernel: 0x3ff9cbb0010 kernel_size: 0x602c947
+unrecoverable error: could not scan "/proc/device-tree/": No such file or directory
 
-
-Test summary
-------------
-
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Build: uImage+dtb:
-    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/omap4-var-som,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig_n800_only_a/omap2420-n800,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-sbc-t3517,
-		  omap2plus_defconfig/omap5-uevm,
-		  omap2plus_defconfig/omap5-sbc-t54
-
-Build: zImage:
-    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
-
-Boot to userspace:
-    FAIL ( 1/17): 2430sdp
-    skip ( 3/17): 5912osk, 3517evm, 4430es2panda
-    Pass (13/17): am335xbonelt, am335xbone, 4460pandaes, 4460varsomom,
-		  37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
-		  3730es12beaglexm, cmt3517, 5430es2uevm,
-		  5430es2sbct54, 2420n800
-
-PM: chip retention via suspend:
-    FAIL ( 5/11): am335xbonelt, 4460varsomom, 2430sdp, 5430es2uevm,
-		  5430es2sbct54
-    Pass ( 6/11): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm
-
-PM: chip retention via dynamic idle:
-    FAIL ( 6/11): am335xbonelt, 4460pandaes, 4460varsomom, 2430sdp,
-		  5430es2uevm, 5430es2sbct54
-    Pass ( 5/11): 37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
-		  3730es12beaglexm
-
-PM: chip off (except CORE, due to errata) via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off (except CORE, due to errata) via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730es12beaglexm
-
-PM: chip off via dynamic idle:
-    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730es12beaglexm
-
-
-vmlinux object size
-(delta in bytes from test_v3.18-rc3 (0df1f2487d2f0d04703f142813d53615d62a1da4)):
-   text     data      bss    total  kernel
-   +448        0        0     +448  omap1_defconfig
-   +448        0        0     +448  omap1_defconfig_1510innovator_only
-   +448        0        0     +448  omap1_defconfig_5912osk_only
-  +1175      -88      +64    +1151  multi_v7_defconfig
-   +355        0        0     +355  omap2plus_defconfig
-   +319        0        0     +319  omap2plus_defconfig_2430sdp_only
-   +355       +8        0     +363  omap2plus_defconfig_am33xx_only
-   +419       +8        0     +427  omap2plus_defconfig_am43xx_only
-   +355      -24        0     +331  omap2plus_defconfig_cpupm
-   +351       +8        0     +359  omap2plus_defconfig_dra7xx_only
-   +359       +8        0     +367  omap2plus_defconfig_n800_multi_omap2xxx
-   +327       +8        0     +335  omap2plus_defconfig_n800_only_a
-   +295        0        0     +295  omap2plus_defconfig_no_pm
-   +299       +8        0     +307  omap2plus_defconfig_omap2_4_only
-   +359       +8        0     +367  omap2plus_defconfig_omap3_4_only
-   +351       +8        0     +359  omap2plus_defconfig_omap5_only
-   +360      -24      -32     +304  rmk_omap3430_ldp_allnoconfig
-   +347       +8        0     +355  rmk_omap3430_ldp_oldconfig
-   +316      -20      -24     +272  rmk_omap4430_sdp_allnoconfig
-   +371      +16        0     +387  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.18-rc3 (0df1f2487d2f0d04703f142813d53615d62a1da4))
-  avail  rsrvd   high  freed  board          kconfig
-  (no differences)
+Thanks
+Dave
