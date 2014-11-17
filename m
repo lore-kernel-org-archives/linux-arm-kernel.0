@@ -1,45 +1,27 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 17 Nov 2014 15:18:39 +0100
-Subject: mvebu: tclk detection for armada-xp and marvell packet processor
- with integrated CPU
-In-Reply-To: <20141117093437.0ca5a3ef@free-electrons.com>
-References: <546959A3.9040206@alliedtelesis.co.nz>
- <20141117093437.0ca5a3ef@free-electrons.com>
-Message-ID: <20141117141839.GM2001@lunn.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Nov 2014 15:23:14 +0100
+Subject: [PATCH 2/4] ARM: shmobile: r8a7740: Migrate to generic l2c OF
+ initialization
+In-Reply-To: <1416232388-2611-3-git-send-email-geert+renesas@glider.be>
+References: <1416232388-2611-1-git-send-email-geert+renesas@glider.be>
+ <1416232388-2611-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <1829825.nytgIBNlTf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 09:34:37AM +0100, Thomas Petazzoni wrote:
-> Dear Chris Packham,
-> 
-> On Mon, 17 Nov 2014 02:12:51 +0000, Chris Packham wrote:
-> 
-> > One of the first problems I encountered looking at the Marvell Packet 
-> > Processor with integrated CPU (I'll refer to that as 'the PP' throughout 
-> > the rest of this email) was that it has a different TCLK to the armada-xp.
-> > 
-> > It appears that for both the PP and the armada-xp the TCLK is hard-coded 
-> > (to 200MHz and 250MHz respectively) and cannot be detected as far as I 
-> > can see from the various data-sheets. I was hoping to re-use 
-> > drivers/clk/mvebu/armada-xp.c but I need to figure out how to make 
-> > axp_get_tclk_freq() give me an appropriate answer depending on the SoC. 
-> > If this were in the mach-mvebu code I could just use mvebu_get_soc_id() 
-> > to fetch the device id. Is there an equivalent I could use in generic code?
-> > 
-> > One option would be to use a different compatible string in the dts. 
-> > That would also give me a way of handling other differences (the 
-> > clock-gating is a subset of what's available on the armada-xp). How 
-> > different would things have to be before it's worth spinning the PP code 
-> > out into a file of it's own?
-> 
-> To me, it indeed seems like you need a different compatible string
-> here. Whether a separate file from drivers/clk/mvebu/armada-xp.c is
-> needed or not will depend on whether only the tclk frequency differs,
-> or whether also the ratios with other clocks differ.
+On Monday 17 November 2014 14:53:06 Geert Uytterhoeven wrote:
+>  DT_MACHINE_START(R8A7740_DT, "Generic R8A7740 (Flattened Device Tree)")
+> +       /* Shared attribute override enable, 32K*8way */
+> +       .l2c_aux_val    = 0x00400000,
+> +       .l2c_aux_mask   = 0xc20f0fff,
+>         .map_io         = r8a7740_map_io,
+>         .init_early     = shmobile_init_delay,
+>         .init_irq       = r8a7740_init_irq_of,
 
-I agree here about the compatibility string. The Kirkwood PP also has
-a different compat string for some drivers and an .dtsi file.
+You are only now adding it to DT, so you should have enough freedom
+to put the correct values in it.
 
-kirkwood-98dx4122.dtsi
+Please use the 0/0xffffffff settings here and use the generic
+code to set up the L2X0.
 
-	Andrew
+	Arnd
