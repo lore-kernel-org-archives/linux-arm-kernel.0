@@ -1,151 +1,163 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:24 +0100
-Subject: [PATCH v5 30/61] dmaengine: fsl-dma: Split device_control
+Date: Mon, 17 Nov 2014 14:42:25 +0100
+Subject: [PATCH v5 31/61] dmaengine: mpc512x: Split device_control
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-31-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-32-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Freescale Elo DMA driver to make use
-of the newly introduced callbacks, that will eventually be used to retrieve
+Split the device_control callback of the Freescale MPC512x DMA driver to make
+use of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
-
-While we're at it, remove the useless prep_sg callback.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/fsldma.c | 91 ++++++++++++++++++----------------------------------
- 1 file changed, 32 insertions(+), 59 deletions(-)
+ drivers/dma/mpc512x_dma.c | 111 +++++++++++++++++++++-------------------------
+ 1 file changed, 51 insertions(+), 60 deletions(-)
 
-diff --git a/drivers/dma/fsldma.c b/drivers/dma/fsldma.c
-index 3d8feb5e4c2f..676555776a46 100644
---- a/drivers/dma/fsldma.c
-+++ b/drivers/dma/fsldma.c
-@@ -941,37 +941,8 @@ fail:
+diff --git a/drivers/dma/mpc512x_dma.c b/drivers/dma/mpc512x_dma.c
+index 01bec4023de2..57d2457545f3 100644
+--- a/drivers/dma/mpc512x_dma.c
++++ b/drivers/dma/mpc512x_dma.c
+@@ -800,79 +800,69 @@ err_prep:
  	return NULL;
  }
  
--/**
-- * fsl_dma_prep_slave_sg - prepare descriptors for a DMA_SLAVE transaction
-- * @chan: DMA channel
-- * @sgl: scatterlist to transfer to/from
-- * @sg_len: number of entries in @scatterlist
-- * @direction: DMA direction
-- * @flags: DMAEngine flags
-- * @context: transaction context (ignored)
-- *
-- * Prepare a set of descriptors for a DMA_SLAVE transaction. Following the
-- * DMA_SLAVE API, this gets the device-specific information from the
-- * chan->private variable.
-- */
--static struct dma_async_tx_descriptor *fsl_dma_prep_slave_sg(
--	struct dma_chan *dchan, struct scatterlist *sgl, unsigned int sg_len,
--	enum dma_transfer_direction direction, unsigned long flags,
--	void *context)
--{
--	/*
--	 * This operation is not supported on the Freescale DMA controller
--	 *
--	 * However, we need to provide the function pointer to allow the
--	 * device_control() method to work.
--	 */
--	return NULL;
--}
--
--static int fsl_dma_device_control(struct dma_chan *dchan,
--				  enum dma_ctrl_cmd cmd, unsigned long arg)
-+static int fsl_dma_device_terminate_all(struct dma_chan *dchan)
+-static int mpc_dma_device_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-							unsigned long arg)
++static int mpc_dma_device_config(struct dma_chan *chan,
++				 struct dma_slave_config *cfg)
  {
--	struct dma_slave_config *config;
- 	struct fsldma_chan *chan;
- 	int size;
+-	struct mpc_dma_chan *mchan;
+-	struct mpc_dma *mdma;
+-	struct dma_slave_config *cfg;
++	struct mpc_dma_chan *mchan = dma_chan_to_mpc_dma_chan(chan);
+ 	unsigned long flags;
  
-@@ -980,45 +951,47 @@ static int fsl_dma_device_control(struct dma_chan *dchan,
- 
- 	chan = to_fsl_chan(dchan);
- 
+-	mchan = dma_chan_to_mpc_dma_chan(chan);
 -	switch (cmd) {
 -	case DMA_TERMINATE_ALL:
--		spin_lock_bh(&chan->desc_lock);
+-		/* Disable channel requests */
+-		mdma = dma_chan_to_mpc_dma(chan);
 -
--		/* Halt the DMA engine */
--		dma_halt(chan);
-+	spin_lock_bh(&chan->desc_lock);
+-		spin_lock_irqsave(&mchan->lock, flags);
+-
+-		out_8(&mdma->regs->dmacerq, chan->chan_id);
+-		list_splice_tail_init(&mchan->prepared, &mchan->free);
+-		list_splice_tail_init(&mchan->queued, &mchan->free);
+-		list_splice_tail_init(&mchan->active, &mchan->free);
+-
+-		spin_unlock_irqrestore(&mchan->lock, flags);
++	/*
++	 * Software constraints:
++	 *  - only transfers between a peripheral device and
++	 *     memory are supported;
++	 *  - only peripheral devices with 4-byte FIFO access register
++	 *     are supported;
++	 *  - minimal transfer chunk is 4 bytes and consequently
++	 *     source and destination addresses must be 4-byte aligned
++	 *     and transfer size must be aligned on (4 * maxburst)
++	 *     boundary;
++	 *  - during the transfer RAM address is being incremented by
++	 *     the size of minimal transfer chunk;
++	 *  - peripheral port's address is constant during the transfer.
++	 */
  
--		/* Remove and free all of the descriptors in the LD queue */
--		fsldma_free_desc_list(chan, &chan->ld_pending);
--		fsldma_free_desc_list(chan, &chan->ld_running);
--		fsldma_free_desc_list(chan, &chan->ld_completed);
--		chan->idle = true;
-+	/* Halt the DMA engine */
-+	dma_halt(chan);
- 
--		spin_unlock_bh(&chan->desc_lock);
 -		return 0;
-+	/* Remove and free all of the descriptors in the LD queue */
-+	fsldma_free_desc_list(chan, &chan->ld_pending);
-+	fsldma_free_desc_list(chan, &chan->ld_running);
-+	fsldma_free_desc_list(chan, &chan->ld_completed);
-+	chan->idle = true;
++	if (cfg->src_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES ||
++	    cfg->dst_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES ||
++	    !IS_ALIGNED(cfg->src_addr, 4) ||
++	    !IS_ALIGNED(cfg->dst_addr, 4)) {
++		return -EINVAL;
++	}
  
 -	case DMA_SLAVE_CONFIG:
--		config = (struct dma_slave_config *)arg;
-+	spin_unlock_bh(&chan->desc_lock);
+-		/*
+-		 * Software constraints:
+-		 *  - only transfers between a peripheral device and
+-		 *     memory are supported;
+-		 *  - only peripheral devices with 4-byte FIFO access register
+-		 *     are supported;
+-		 *  - minimal transfer chunk is 4 bytes and consequently
+-		 *     source and destination addresses must be 4-byte aligned
+-		 *     and transfer size must be aligned on (4 * maxburst)
+-		 *     boundary;
+-		 *  - during the transfer RAM address is being incremented by
+-		 *     the size of minimal transfer chunk;
+-		 *  - peripheral port's address is constant during the transfer.
+-		 */
++	spin_lock_irqsave(&mchan->lock, flags);
+ 
+-		cfg = (void *)arg;
++	mchan->src_per_paddr = cfg->src_addr;
++	mchan->src_tcd_nunits = cfg->src_maxburst;
++	mchan->dst_per_paddr = cfg->dst_addr;
++	mchan->dst_tcd_nunits = cfg->dst_maxburst;
+ 
+-		if (cfg->src_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES ||
+-		    cfg->dst_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES ||
+-		    !IS_ALIGNED(cfg->src_addr, 4) ||
+-		    !IS_ALIGNED(cfg->dst_addr, 4)) {
+-			return -EINVAL;
+-		}
++	/* Apply defaults */
++	if (mchan->src_tcd_nunits == 0)
++		mchan->src_tcd_nunits = 1;
++	if (mchan->dst_tcd_nunits == 0)
++		mchan->dst_tcd_nunits = 1;
+ 
+-		spin_lock_irqsave(&mchan->lock, flags);
++	spin_unlock_irqrestore(&mchan->lock, flags);
+ 
+-		mchan->src_per_paddr = cfg->src_addr;
+-		mchan->src_tcd_nunits = cfg->src_maxburst;
+-		mchan->dst_per_paddr = cfg->dst_addr;
+-		mchan->dst_tcd_nunits = cfg->dst_maxburst;
 +	return 0;
 +}
  
--		/* make sure the channel supports setting burst size */
--		if (!chan->set_request_count)
--			return -ENXIO;
-+static int fsl_dma_device_config(struct dma_chan *dchan,
-+				 struct dma_slave_config *config)
+-		/* Apply defaults */
+-		if (mchan->src_tcd_nunits == 0)
+-			mchan->src_tcd_nunits = 1;
+-		if (mchan->dst_tcd_nunits == 0)
+-			mchan->dst_tcd_nunits = 1;
++static int mpc_dma_device_terminate_all(struct dma_chan *chan)
 +{
-+	struct fsldma_chan *chan;
-+	int size;
++	struct mpc_dma_chan *mchan = dma_chan_to_mpc_dma_chan(chan);
++	struct mpc_dma *mdma = dma_chan_to_mpc_dma(chan);
++	unsigned long flags;
  
--		/* we set the controller burst size depending on direction */
--		if (config->direction == DMA_MEM_TO_DEV)
--			size = config->dst_addr_width * config->dst_maxburst;
--		else
--			size = config->src_addr_width * config->src_maxburst;
-+	if (!dchan)
-+		return -EINVAL;
+-		spin_unlock_irqrestore(&mchan->lock, flags);
++	/* Disable channel requests */
++	spin_lock_irqsave(&mchan->lock, flags);
  
--		chan->set_request_count(chan, size);
 -		return 0;
-+	chan = to_fsl_chan(dchan);
++	out_8(&mdma->regs->dmacerq, chan->chan_id);
++	list_splice_tail_init(&mchan->prepared, &mchan->free);
++	list_splice_tail_init(&mchan->queued, &mchan->free);
++	list_splice_tail_init(&mchan->active, &mchan->free);
  
 -	default:
-+	/* make sure the channel supports setting burst size */
-+	if (!chan->set_request_count)
- 		return -ENXIO;
+-		/* Unknown command */
+-		break;
 -	}
++	spin_unlock_irqrestore(&mchan->lock, flags);
  
-+	/* we set the controller burst size depending on direction */
-+	if (config->direction == DMA_MEM_TO_DEV)
-+		size = config->dst_addr_width * config->dst_maxburst;
-+	else
-+		size = config->src_addr_width * config->src_maxburst;
-+
-+	chan->set_request_count(chan, size);
- 	return 0;
+-	return -ENXIO;
++	return 0;
  }
  
-+
- /**
-  * fsl_dma_memcpy_issue_pending - Issue the DMA start command
-  * @chan : Freescale DMA channel
-@@ -1395,8 +1368,8 @@ static int fsldma_of_probe(struct platform_device *op)
- 	fdev->common.device_prep_dma_sg = fsl_dma_prep_sg;
- 	fdev->common.device_tx_status = fsl_tx_status;
- 	fdev->common.device_issue_pending = fsl_dma_memcpy_issue_pending;
--	fdev->common.device_prep_slave_sg = fsl_dma_prep_slave_sg;
--	fdev->common.device_control = fsl_dma_device_control;
-+	fdev->common.device_config = fsl_dma_device_config;
-+	fdev->common.device_terminate_all = fsl_dma_device_terminate_all;
- 	fdev->common.dev = &op->dev;
+ static int mpc_dma_probe(struct platform_device *op)
+@@ -963,7 +953,8 @@ static int mpc_dma_probe(struct platform_device *op)
+ 	dma->device_tx_status = mpc_dma_tx_status;
+ 	dma->device_prep_dma_memcpy = mpc_dma_prep_memcpy;
+ 	dma->device_prep_slave_sg = mpc_dma_prep_slave_sg;
+-	dma->device_control = mpc_dma_device_control;
++	dma->device_config = mpc_dma_device_config;
++	dma->device_terminate_all = mpc_dma_device_terminate_all;
  
- 	dma_set_mask(&(op->dev), DMA_BIT_MASK(36));
+ 	INIT_LIST_HEAD(&dma->channels);
+ 	dma_cap_set(DMA_MEMCPY, dma->cap_mask);
 -- 
 2.1.1
