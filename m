@@ -1,163 +1,153 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:25 +0100
-Subject: [PATCH v5 31/61] dmaengine: mpc512x: Split device_control
+Date: Mon, 17 Nov 2014 14:42:22 +0100
+Subject: [PATCH v5 28/61] dmaengine: mmp-tdma: Split device_control
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-32-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-29-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Freescale MPC512x DMA driver to make
-use of the newly introduced callbacks, that will eventually be used to retrieve
+Split the device_control callback of the Marvell MMP TDMA driver to make use
+of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/mpc512x_dma.c | 111 +++++++++++++++++++++-------------------------
- 1 file changed, 51 insertions(+), 60 deletions(-)
+ drivers/dma/mmp_tdma.c | 82 +++++++++++++++++++++++++++-----------------------
+ 1 file changed, 44 insertions(+), 38 deletions(-)
 
-diff --git a/drivers/dma/mpc512x_dma.c b/drivers/dma/mpc512x_dma.c
-index 01bec4023de2..57d2457545f3 100644
---- a/drivers/dma/mpc512x_dma.c
-+++ b/drivers/dma/mpc512x_dma.c
-@@ -800,79 +800,69 @@ err_prep:
+diff --git a/drivers/dma/mmp_tdma.c b/drivers/dma/mmp_tdma.c
+index bfb46957c3dc..a8a79b1763d5 100644
+--- a/drivers/dma/mmp_tdma.c
++++ b/drivers/dma/mmp_tdma.c
+@@ -164,33 +164,46 @@ static void mmp_tdma_enable_chan(struct mmp_tdma_chan *tdmac)
+ 	tdmac->status = DMA_IN_PROGRESS;
+ }
+ 
+-static void mmp_tdma_disable_chan(struct mmp_tdma_chan *tdmac)
++static int mmp_tdma_disable_chan(struct dma_chan *chan)
+ {
++	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
++
+ 	writel(readl(tdmac->reg_base + TDCR) & ~TDCR_CHANEN,
+ 					tdmac->reg_base + TDCR);
+ 
+ 	tdmac->status = DMA_COMPLETE;
++
++	return 0;
+ }
+ 
+-static void mmp_tdma_resume_chan(struct mmp_tdma_chan *tdmac)
++static int mmp_tdma_resume_chan(struct dma_chan *chan)
+ {
++	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
++
+ 	writel(readl(tdmac->reg_base + TDCR) | TDCR_CHANEN,
+ 					tdmac->reg_base + TDCR);
+ 	tdmac->status = DMA_IN_PROGRESS;
++
++	return 0;
+ }
+ 
+-static void mmp_tdma_pause_chan(struct mmp_tdma_chan *tdmac)
++static int mmp_tdma_pause_chan(struct dma_chan *chan)
+ {
++	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
++
+ 	writel(readl(tdmac->reg_base + TDCR) & ~TDCR_CHANEN,
+ 					tdmac->reg_base + TDCR);
+ 	tdmac->status = DMA_PAUSED;
++
++	return 0;
+ }
+ 
+-static int mmp_tdma_config_chan(struct mmp_tdma_chan *tdmac)
++static int mmp_tdma_config_chan(struct dma_chan *chan)
+ {
++	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
+ 	unsigned int tdcr = 0;
+ 
+-	mmp_tdma_disable_chan(tdmac);
++	mmp_tdma_disable_chan(chan);
+ 
+ 	if (tdmac->dir == DMA_MEM_TO_DEV)
+ 		tdcr = TDCR_DSTDIR_ADDR_HOLD | TDCR_SRCDIR_ADDR_INC;
+@@ -452,42 +465,32 @@ err_out:
  	return NULL;
  }
  
--static int mpc_dma_device_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--							unsigned long arg)
-+static int mpc_dma_device_config(struct dma_chan *chan,
-+				 struct dma_slave_config *cfg)
+-static int mmp_tdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-		unsigned long arg)
++static int mmp_tdma_terminate_all(struct dma_chan *chan)
  {
--	struct mpc_dma_chan *mchan;
--	struct mpc_dma *mdma;
--	struct dma_slave_config *cfg;
-+	struct mpc_dma_chan *mchan = dma_chan_to_mpc_dma_chan(chan);
- 	unsigned long flags;
- 
--	mchan = dma_chan_to_mpc_dma_chan(chan);
+ 	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
+-	struct dma_slave_config *dmaengine_cfg = (void *)arg;
+-	int ret = 0;
+-
 -	switch (cmd) {
 -	case DMA_TERMINATE_ALL:
--		/* Disable channel requests */
--		mdma = dma_chan_to_mpc_dma(chan);
--
--		spin_lock_irqsave(&mchan->lock, flags);
--
--		out_8(&mdma->regs->dmacerq, chan->chan_id);
--		list_splice_tail_init(&mchan->prepared, &mchan->free);
--		list_splice_tail_init(&mchan->queued, &mchan->free);
--		list_splice_tail_init(&mchan->active, &mchan->free);
--
--		spin_unlock_irqrestore(&mchan->lock, flags);
-+	/*
-+	 * Software constraints:
-+	 *  - only transfers between a peripheral device and
-+	 *     memory are supported;
-+	 *  - only peripheral devices with 4-byte FIFO access register
-+	 *     are supported;
-+	 *  - minimal transfer chunk is 4 bytes and consequently
-+	 *     source and destination addresses must be 4-byte aligned
-+	 *     and transfer size must be aligned on (4 * maxburst)
-+	 *     boundary;
-+	 *  - during the transfer RAM address is being incremented by
-+	 *     the size of minimal transfer chunk;
-+	 *  - peripheral port's address is constant during the transfer.
-+	 */
- 
--		return 0;
-+	if (cfg->src_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES ||
-+	    cfg->dst_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES ||
-+	    !IS_ALIGNED(cfg->src_addr, 4) ||
-+	    !IS_ALIGNED(cfg->dst_addr, 4)) {
-+		return -EINVAL;
-+	}
- 
--	case DMA_SLAVE_CONFIG:
--		/*
--		 * Software constraints:
--		 *  - only transfers between a peripheral device and
--		 *     memory are supported;
--		 *  - only peripheral devices with 4-byte FIFO access register
--		 *     are supported;
--		 *  - minimal transfer chunk is 4 bytes and consequently
--		 *     source and destination addresses must be 4-byte aligned
--		 *     and transfer size must be aligned on (4 * maxburst)
--		 *     boundary;
--		 *  - during the transfer RAM address is being incremented by
--		 *     the size of minimal transfer chunk;
--		 *  - peripheral port's address is constant during the transfer.
--		 */
-+	spin_lock_irqsave(&mchan->lock, flags);
- 
--		cfg = (void *)arg;
-+	mchan->src_per_paddr = cfg->src_addr;
-+	mchan->src_tcd_nunits = cfg->src_maxburst;
-+	mchan->dst_per_paddr = cfg->dst_addr;
-+	mchan->dst_tcd_nunits = cfg->dst_maxburst;
- 
--		if (cfg->src_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES ||
--		    cfg->dst_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES ||
--		    !IS_ALIGNED(cfg->src_addr, 4) ||
--		    !IS_ALIGNED(cfg->dst_addr, 4)) {
--			return -EINVAL;
--		}
-+	/* Apply defaults */
-+	if (mchan->src_tcd_nunits == 0)
-+		mchan->src_tcd_nunits = 1;
-+	if (mchan->dst_tcd_nunits == 0)
-+		mchan->dst_tcd_nunits = 1;
- 
--		spin_lock_irqsave(&mchan->lock, flags);
-+	spin_unlock_irqrestore(&mchan->lock, flags);
- 
--		mchan->src_per_paddr = cfg->src_addr;
--		mchan->src_tcd_nunits = cfg->src_maxburst;
--		mchan->dst_per_paddr = cfg->dst_addr;
--		mchan->dst_tcd_nunits = cfg->dst_maxburst;
-+	return 0;
-+}
- 
--		/* Apply defaults */
--		if (mchan->src_tcd_nunits == 0)
--			mchan->src_tcd_nunits = 1;
--		if (mchan->dst_tcd_nunits == 0)
--			mchan->dst_tcd_nunits = 1;
-+static int mpc_dma_device_terminate_all(struct dma_chan *chan)
-+{
-+	struct mpc_dma_chan *mchan = dma_chan_to_mpc_dma_chan(chan);
-+	struct mpc_dma *mdma = dma_chan_to_mpc_dma(chan);
-+	unsigned long flags;
- 
--		spin_unlock_irqrestore(&mchan->lock, flags);
-+	/* Disable channel requests */
-+	spin_lock_irqsave(&mchan->lock, flags);
- 
--		return 0;
-+	out_8(&mdma->regs->dmacerq, chan->chan_id);
-+	list_splice_tail_init(&mchan->prepared, &mchan->free);
-+	list_splice_tail_init(&mchan->queued, &mchan->free);
-+	list_splice_tail_init(&mchan->active, &mchan->free);
- 
--	default:
--		/* Unknown command */
+-		mmp_tdma_disable_chan(tdmac);
+-		/* disable interrupt */
+-		mmp_tdma_enable_irq(tdmac, false);
 -		break;
--	}
-+	spin_unlock_irqrestore(&mchan->lock, flags);
+-	case DMA_PAUSE:
+-		mmp_tdma_pause_chan(tdmac);
+-		break;
+-	case DMA_RESUME:
+-		mmp_tdma_resume_chan(tdmac);
+-		break;
+-	case DMA_SLAVE_CONFIG:
+-		if (dmaengine_cfg->direction == DMA_DEV_TO_MEM) {
+-			tdmac->dev_addr = dmaengine_cfg->src_addr;
+-			tdmac->burst_sz = dmaengine_cfg->src_maxburst;
+-			tdmac->buswidth = dmaengine_cfg->src_addr_width;
+-		} else {
+-			tdmac->dev_addr = dmaengine_cfg->dst_addr;
+-			tdmac->burst_sz = dmaengine_cfg->dst_maxburst;
+-			tdmac->buswidth = dmaengine_cfg->dst_addr_width;
+-		}
+-		tdmac->dir = dmaengine_cfg->direction;
+-		return mmp_tdma_config_chan(tdmac);
+-	default:
+-		ret = -ENOSYS;
++
++	mmp_tdma_disable_chan(chan);
++	/* disable interrupt */
++	mmp_tdma_enable_irq(tdmac, false);
++}
++
++static int mmp_tdma_config(struct dma_chan *chan,
++			   struct dma_slave_config *dmaengine_cfg)
++{
++	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
++
++	if (dmaengine_cfg->direction == DMA_DEV_TO_MEM) {
++		tdmac->dev_addr = dmaengine_cfg->src_addr;
++		tdmac->burst_sz = dmaengine_cfg->src_maxburst;
++		tdmac->buswidth = dmaengine_cfg->src_addr_width;
++	} else {
++		tdmac->dev_addr = dmaengine_cfg->dst_addr;
++		tdmac->burst_sz = dmaengine_cfg->dst_maxburst;
++		tdmac->buswidth = dmaengine_cfg->dst_addr_width;
+ 	}
++	tdmac->dir = dmaengine_cfg->direction;
  
--	return -ENXIO;
-+	return 0;
+-	return ret;
++	return mmp_tdma_config_chan(chan);
  }
  
- static int mpc_dma_probe(struct platform_device *op)
-@@ -963,7 +953,8 @@ static int mpc_dma_probe(struct platform_device *op)
- 	dma->device_tx_status = mpc_dma_tx_status;
- 	dma->device_prep_dma_memcpy = mpc_dma_prep_memcpy;
- 	dma->device_prep_slave_sg = mpc_dma_prep_slave_sg;
--	dma->device_control = mpc_dma_device_control;
-+	dma->device_config = mpc_dma_device_config;
-+	dma->device_terminate_all = mpc_dma_device_terminate_all;
+ static enum dma_status mmp_tdma_tx_status(struct dma_chan *chan,
+@@ -668,7 +671,10 @@ static int mmp_tdma_probe(struct platform_device *pdev)
+ 	tdev->device.device_prep_dma_cyclic = mmp_tdma_prep_dma_cyclic;
+ 	tdev->device.device_tx_status = mmp_tdma_tx_status;
+ 	tdev->device.device_issue_pending = mmp_tdma_issue_pending;
+-	tdev->device.device_control = mmp_tdma_control;
++	tdev->device.device_config = mmp_tdma_config;
++	tdev->device.device_pause = mmp_tdma_pause_chan;
++	tdev->device.device_resume = mmp_tdma_resume_chan;
++	tdev->device.device_terminate_all = mmp_tdma_terminate_all;
+ 	tdev->device.copy_align = TDMA_ALIGNMENT;
  
- 	INIT_LIST_HEAD(&dma->channels);
- 	dma_cap_set(DMA_MEMCPY, dma->cap_mask);
+ 	dma_set_mask(&pdev->dev, DMA_BIT_MASK(64));
 -- 
 2.1.1
