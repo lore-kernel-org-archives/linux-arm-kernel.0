@@ -1,55 +1,44 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 17 Nov 2014 14:53:07 +0100
-Subject: [PATCH 3/4] ARM: shmobile: armadillo legacy: Migrate to generic l2c
- OF initialization
+Date: Mon, 17 Nov 2014 14:53:08 +0100
+Subject: [PATCH 4/4] ARM: shmobile: r8a7740: Remove mapping of L2 cache
+ controller registers
 In-Reply-To: <1416232388-2611-1-git-send-email-geert+renesas@glider.be>
 References: <1416232388-2611-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1416232388-2611-4-git-send-email-geert+renesas@glider.be>
+Message-ID: <1416232388-2611-5-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate the generic r8a7740 platform from calling l2x0_of_init() to the
-generic l2c OF initialization.
+Now all r8a7740-based platforms have been migrated to the generic l2c OF
+initialization, it's no longer needed to map the L2 cache controller
+registers from .map_io().
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/board-armadillo800eva.c | 10 +++-------
- 1 file changed, 3 insertions(+), 7 deletions(-)
+ arch/arm/mach-shmobile/setup-r8a7740.c | 12 ------------
+ 1 file changed, 12 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index 6d949f1c850bda8b..11feea1da28a03b1 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -41,7 +41,6 @@
- #include <linux/usb/renesas_usbhs.h>
- #include <linux/videodev2.h>
- 
--#include <asm/hardware/cache-l2x0.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -1309,12 +1308,6 @@ static void __init eva_init(void)
- 		sdhi1 = &sdhi1_device;
- 	}
- 
--
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index f4a2997f55c0c4a4..e872b8ea99badbce 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -50,18 +50,6 @@ static struct map_desc r8a7740_io_desc[] __initdata = {
+ 		.length		= 160 << 20,
+ 		.type		= MT_DEVICE_NONSHARED
+ 	},
 -#ifdef CONFIG_CACHE_L2X0
--	/* Shared attribute override enable, 32K*8way */
--	l2x0_init(IOMEM(0xf0002000), 0x00400000, 0xc20f0fff);
+-	/*
+-	 * for l2x0_init()
+-	 * 0xf0100000-0xf0101000 -> 0xf0002000-0xf0003000
+-	 */
+-	{
+-		.virtual	= 0xf0002000,
+-		.pfn		= __phys_to_pfn(0xf0100000),
+-		.length		= PAGE_SIZE,
+-		.type		= MT_DEVICE_NONSHARED
+-	},
 -#endif
--
- 	i2c_register_board_info(0, i2c0_devices, ARRAY_SIZE(i2c0_devices));
- 	i2c_register_board_info(2, i2c2_devices, ARRAY_SIZE(i2c2_devices));
- 
-@@ -1355,6 +1348,9 @@ static const char *eva_boards_compat_dt[] __initdata = {
  };
  
- DT_MACHINE_START(ARMADILLO800EVA_DT, "armadillo800eva")
-+	/* Shared attribute override enable, 32K*8way */
-+	.l2c_aux_val	= 0x00400000,
-+	.l2c_aux_mask	= 0xc20f0fff,
- 	.map_io		= r8a7740_map_io,
- 	.init_early	= r8a7740_add_early_devices,
- 	.init_irq	= r8a7740_init_irq_of,
+ void __init r8a7740_map_io(void)
 -- 
 1.9.1
