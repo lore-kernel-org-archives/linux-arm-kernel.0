@@ -1,97 +1,77 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 17 Nov 2014 14:35:45 +0100
-Subject: [PATCH v8 11/13] ARM: dts: Berlin: enable USB on the BG2Q DMP
+Date: Mon, 17 Nov 2014 14:35:46 +0100
+Subject: [PATCH v8 12/13] ARM: dts: berlin: add BG2CD nodes for USB support
 In-Reply-To: <1416231347-27193-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1416231347-27193-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1416231347-27193-12-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1416231347-27193-13-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the 2 available USB PHY and USB nodes on the Marvell Berlin BG2Q
-DMP.
+From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
+Adds nodes describing the Marvell Berlin BG2CD USB PHY and USB. The BG2CD
+SoC has 2 USB ChipIdea controllers, with usb0 host-only and usb1 dual-role
+capable.
+
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 53 ++++++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+ arch/arm/boot/dts/berlin2cd.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-index ea1f99b8eed6..f7c25580e122 100644
---- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-+++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-@@ -7,6 +7,8 @@
-  */
+diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
+index 68f7032b4686..af5e628547ce 100644
+--- a/arch/arm/boot/dts/berlin2cd.dtsi
++++ b/arch/arm/boot/dts/berlin2cd.dtsi
+@@ -66,6 +66,22 @@
+ 			clocks = <&chip CLKID_TWD>;
+ 		};
  
- /dts-v1/;
-+
-+#include <dt-bindings/gpio/gpio.h>
- #include "berlin2q.dtsi"
- 
- / {
-@@ -21,6 +23,39 @@
- 	choosen {
- 		bootargs = "console=ttyS0,115200 earlyprintk";
- 	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg_usb0_vbus: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "usb0_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&portb 8 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
++		usb_phy0: usb-phy at b74000 {
++			compatible = "marvell,berlin2cd-usb-phy";
++			reg = <0xb74000 0x128>;
++			#phy-cells = <0>;
++			resets = <&chip 0x178 23>;
++			status = "disabled";
 +		};
 +
-+		reg_usb1_vbus: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "usb1_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&portb 10 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
++		usb_phy1: usb-phy at b78000 {
++			compatible = "marvell,berlin2cd-usb-phy";
++			reg = <0xb78000 0x128>;
++			#phy-cells = <0>;
++			resets = <&chip 0x178 24>;
++			status = "disabled";
 +		};
 +
-+		reg_usb2_vbus: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "usb2_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&portb 12 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
+ 		apb at e80000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
+@@ -242,6 +258,26 @@
+ 			};
+ 		};
+ 
++		usb0: usb at ed0000 {
++			compatible = "chipidea,usb2";
++			reg = <0xed0000 0x200>;
++			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&chip CLKID_USB0>;
++			phys = <&usb_phy0>;
++			phy-names = "usb-phy";
++			status = "disabled";
 +		};
-+	};
- };
- 
- &sdhci1 {
-@@ -46,6 +81,24 @@
- 	status = "okay";
- };
- 
-+&usb_phy0 {
-+	status = "okay";
-+};
 +
-+&usb_phy2 {
-+	status = "okay";
-+};
++		usb1: usb at ee0000 {
++			compatible = "chipidea,usb2";
++			reg = <0xee0000 0x200>;
++			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&chip CLKID_USB1>;
++			phys = <&usb_phy1>;
++			phy-names = "usb-phy";
++			status = "disabled";
++		};
 +
-+&usb0 {
-+	vbus-supply = <&reg_usb0_vbus>;
-+	status = "okay";
-+};
-+
-+&usb2 {
-+	vbus-supply = <&reg_usb2_vbus>;
-+	status = "okay";
-+};
-+
- &eth0 {
- 	status = "okay";
- };
+ 		apb at fc0000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
 -- 
 2.1.0
