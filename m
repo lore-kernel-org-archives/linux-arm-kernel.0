@@ -1,43 +1,62 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 17 Nov 2014 16:37:04 +0100
-Subject: [PATCH v2 1/2] dt-bindings: simplefb: Drop the advice about using a
- specific path for nodes
+Date: Mon, 17 Nov 2014 16:37:05 +0100
+Subject: [PATCH v2 2/2] dt-bindings: simplefb-sunxi: Add sunxi simplefb
+ extensions
 In-Reply-To: <1416238625-28590-1-git-send-email-hdegoede@redhat.com>
 References: <1416238625-28590-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1416238625-28590-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1416238625-28590-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This goes contrary to how devicetree usually works, so drop it. Instead if
-the firmware needs to be able to find a specific node it should use a
-platform specific compatible + properties for this.
+If pre-filled framebuffer nodes are used, the firmware may need extra
+properties to find the right node. This documents the properties to use
+for this on sunxi platforms.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 Acked-by: Grant Likely <grant.likely@linaro.org>
 ---
- Documentation/devicetree/bindings/video/simple-framebuffer.txt | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+ .../bindings/video/simple-framebuffer-sunxi.txt    | 33 ++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
 
-diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-index f8fb7e6..4474ef6 100644
---- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-+++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-@@ -31,12 +31,10 @@ enable them. This way if e.g. later on support for more display clocks get
- added, the simplefb nodes will already contain this info and the firmware
- does not need to be updated.
- 
--If pre-filled framebuffer nodes are used, they should be named
--"framebuffer#-<output>", e.g. "framebuffer0-hdmi". The output should be
--included in the name since different outputs typically require different
--clocks and the clocks are part of the pre-populated nodes. The firmware must
--rename the nodes to the standard "framebuffer@<address>" name using the
--runtime chosen address when enabling the nodes.
-+If pre-filled framebuffer nodes are used, the firmware may need extra
-+information to find the right node. In that case an extra platform specific
-+compatible and platform specific properties should be used and documented,
-+see e.g. simple-framebuffer-sunxi.txt .
- 
- Required properties:
- - compatible: "simple-framebuffer"
+diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+new file mode 100644
+index 0000000..4188606
+--- /dev/null
++++ b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+@@ -0,0 +1,33 @@
++Sunxi specific Simple Framebuffer bindings
++
++This binding documents sunxi specific extensions to the simple-framebuffer
++bindings. The sunxi simplefb u-boot code relies on the devicetree containing
++pre-populated simplefb nodes.
++
++These extensions are intended so that u-boot can select the right node based
++on which pipeline is being used. As such they are solely intended for
++firmware / bootloader use, and the OS should ignore them.
++
++Required properties:
++- compatible: "sunxi,framebuffer"
++- sunxi,pipeline, one of:
++  "de_be0-lcd0"
++  "de_be1-lcd1"
++  "de_be0-lcd0-hdmi"
++  "de_be1-lcd1-hdmi"
++
++Example:
++
++chosen {
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges;
++
++	framebuffer at 0 {
++		compatible = "sunxi,framebuffer", "simple-framebuffer";
++		sunxi,pipeline = "de_be0-lcd0-hdmi";
++		clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
++			 <&ahb_gates 44>;
++		status = "disabled";
++	};
++};
 -- 
 2.1.0
