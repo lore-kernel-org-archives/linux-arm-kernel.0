@@ -1,69 +1,81 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 18 Nov 2014 03:50:37 +0400
-Subject: [PATCH V2 3/5] usb: gadget: pxa25x_udc: prepare/unprepare clocks
- in pxa-ssp
-In-Reply-To: <CALT56yMCJ4R6KN2BUW61YaUz2bb6s_aJteKYBSVmvRPKacKCLw@mail.gmail.com>
-References: <1416236863-20898-1-git-send-email-dbaryshkov@gmail.com>
- <1416236863-20898-3-git-send-email-dbaryshkov@gmail.com>
- <878uj98y5v.fsf@free.fr>
- <CALT56yMCJ4R6KN2BUW61YaUz2bb6s_aJteKYBSVmvRPKacKCLw@mail.gmail.com>
-Message-ID: <CALT56yO8tktrXo0rfRd91AtXBE4F5vYfYjm9AL+7dcoam6Oq9Q@mail.gmail.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Mon, 17 Nov 2014 15:51:29 -0800
+Subject: [PATCH V5 09/12] usb: xhci: Add NVIDIA Tegra xHCI host-controller
+ driver
+In-Reply-To: <20141117231240.GB9716@saruman>
+References: <1416264102-1323-1-git-send-email-abrestic@chromium.org>
+ <1416264102-1323-10-git-send-email-abrestic@chromium.org>
+ <20141117231240.GB9716@saruman>
+Message-ID: <CAL1qeaG1=g39gsRHPrmCTBFbn3XQmW_2N7rm7uWa=-xOzDiDHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-17 23:05 GMT+03:00 Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>:
-> 2014-11-17 21:44 GMT+03:00 Robert Jarzmik <robert.jarzmik@free.fr>:
->> Guess what, Russell's remark on i2c and serial made me cross-check.  And there
->> is a case where this will be called in irq context too ...
->>
->> See :
->> -> do_IRQ
->>   -> lubbock_vbus_irq()
->>     -> pxa25x_udc_vbus_session()
->>       -> pullup()
->>         -> clk_prepare_enable()
->>           -> CRACK
->>
->> Note that your patch is not really the faulty one, I think a threaded irq
->> instead of the "raw" irq should do the trick. And it is granted on UDC api that
->> vbus function is called in a "sleeping" context (Felipe correct me if I'm
->> wrong), so a patch to fix this before your current code would be fine.
+Hi Felipe,
+
+On Mon, Nov 17, 2014 at 3:12 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
 >
-> OK, I will take a look. It seems the correct way would be to strip this code
-> away to a phy, like gpio-vbus or nop phys. Do you have access to lubbock
-> (or maybe Daniel, Haojian or Russell has?)?
+> On Mon, Nov 17, 2014 at 02:41:39PM -0800, Andrew Bresticker wrote:
+>> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+>> index a3ca137..e2415d3 100644
+>> --- a/drivers/usb/host/Kconfig
+>> +++ b/drivers/usb/host/Kconfig
+>> @@ -50,6 +50,15 @@ config USB_XHCI_RCAR
+>>         Say 'Y' to enable the support for the xHCI host controller
+>>         found in Renesas R-Car ARM SoCs.
+>>
+>> +config USB_XHCI_TEGRA
+>> +     tristate "xHCI support for NVIDIA Tegra SoCs"
+>> +     depends on ARCH_TEGRA
+>
+> it would be nice if you could still leave || COMPILE_TEST here.
 
-I have sketched a compile-tested only PHY for the Lubbock platform. Could you
-please take a look and test.
-The following changes since commit fc14f9c1272f62c3e8d01300f52467c0d9af50f9:
+Sure.
 
-  Linux 3.18-rc5 (2014-11-16 16:36:20 -0800)
+>> +static const struct {
+>> +     const char *name;
+>> +     unsigned int num;
+>> +} tegra_xhci_phy_types[] = {
+>> +     {
+>> +             .name = "usb3",
+>> +             .num = TEGRA_XUSB_USB3_PHYS,
+>> +     }, {
+>> +             .name = "utmi",
+>> +             .num = TEGRA_XUSB_UTMI_PHYS,
+>> +     }, {
+>> +             .name = "hsic",
+>> +             .num = TEGRA_XUSB_HSIC_PHYS,
+>> +     },
+>
+> these should be using the generic PHY subsystem (drivers/phy).
 
-are available in the git repository at:
+This driver does use the generic PHY subsystem, see patch 7 in this series :).
 
-  git://git.infradead.org/users/dbaryshkov/zaurus.git lubbock
+>> +static int tegra_xhci_load_firmware(struct tegra_xhci_hcd *tegra)
+>> +{
+>> +     struct device *dev = tegra->dev;
+>> +     struct tegra_xhci_fw_cfgtbl *cfg_tbl;
+>> +     struct tm fw_tm;
+>> +     u32 val, code_tag_blocks, code_size_blocks;
+>> +     u64 fw_base;
+>> +     time_t fw_time;
+>> +     unsigned long timeout;
+>> +
+>> +     if (csb_readl(tegra, XUSB_CSB_MP_ILOAD_BASE_LO) != 0) {
+>> +             dev_info(dev, "Firmware already loaded, Falcon state 0x%x\n",
+>> +                      csb_readl(tegra, XUSB_FALC_CPUCTL));
+>> +             return 0;
+>> +     }
+>
+> won't this prevent rmmod && insmod from succeeding ? Maybe not, as you
+> return 0 anyway, but if the firmware side craps out, it might be useful
+> to reload the firmware and reset that block. I wonder if this prevents
+> that.
 
-for you to fetch changes up to 67d7e1e57af0a42d86476cd2e73fd154b590d3f8:
-
-  usb: gadget: drop lubbock-specific code from pxa25x_udc (2014-11-18
-02:43:03 +0300)
-
-----------------------------------------------------------------
-Dmitry Eremin-Solenikov (3):
-      ARM: pxa: lubbock: add declaration of vbus tranceiver
-      usb: phy: add lubbock phy driver
-      usb: gadget: drop lubbock-specific code from pxa25x_udc
-
- arch/arm/mach-pxa/lubbock.c         |   6 +++
- drivers/usb/gadget/udc/pxa25x_udc.c |  61 -----------------------
- drivers/usb/phy/Kconfig             |  10 ++++
- drivers/usb/phy/Makefile            |   1 +
- drivers/usb/phy/phy-lubbock.c       | 225
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 242 insertions(+), 61 deletions(-)
- create mode 100644 drivers/usb/phy/phy-lubbock.c
-
-
--- 
-With best wishes
-Dmitry
+rmmod && insmod does work with the above since, as you mentioned, we
+return successfully if the controller is already running.  Attempting
+to re-load the firmware if the controller is already running won't
+work - it requires a full power-gate/ungate sequence of the
+controller.  Unfortunately, that sequence is rather complicated and I
+haven't had a chance to implement it yet.  it will hopefully be coming
+later, though.
