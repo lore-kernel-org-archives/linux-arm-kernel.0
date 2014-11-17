@@ -1,74 +1,46 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 17 Nov 2014 11:32:11 -0800
-Subject: [PATCH v1 3/5] clk: pxa: keep clocks initialization separated per
- variant
-In-Reply-To: <1412636881-6211-4-git-send-email-robert.jarzmik@free.fr>
-References: <1412636881-6211-1-git-send-email-robert.jarzmik@free.fr>
- <1412636881-6211-4-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <20141117193211.25314.45151@quantum>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 17 Nov 2014 20:32:54 +0100 (CET)
+Subject: [PATCH] opp: convert dev_warn() to dev_dbg() for duplicate OPPs
+In-Reply-To: <7017fa592bdaf73c260ad001a2b7abdc8d14f08a.1416211616.git.viresh.kumar@linaro.org>
+References: <7017fa592bdaf73c260ad001a2b7abdc8d14f08a.1416211616.git.viresh.kumar@linaro.org>
+Message-ID: <1496616289.267768.1416252774816.JavaMail.open-xchange@oxbaltgw08.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Robert Jarzmik (2014-10-06 16:07:59)
-> Have each pxa variant (pxa25x, pxa27x, pxa3xx) have its own device-tree
-> clock initializing function, to be able to register its own specific
-> core clocks.
-> 
-> Apply that change specifically to pxa27x.
-> 
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Hi Viresh,
 
-Patches #2 & #3 applied to clk-next.
+> Viresh Kumar <viresh.kumar@linaro.org> hat am 17. November 2014 um 09:08
+> geschrieben:
+>
+> [...]
+>
+> Now the question is: Should we destroy these OPPs?
+>
+> Logically kernel drivers *must* free resources they acquired. But in this
+> particular case, the OPPs are created using a static list present in device
+> tree. Destroying and then allocating them again isn't of much benefit. The
+> only
+> benefit of removing OPPs is to save some space if the driver isn't loaded
+> again.
+>
+> This has its own complications. OPPs can be created either from DT (static) or
+> platform code (dynamic). Driver should only remove static OPPs and not the
+> dynamic ones as they are controlled from platform code. But there is no field
+> in
+> 'struct dev_pm_opp' which has this information to distinguish between
+> different
+> kind of OPPs.
+>
+> Because of all this, I wasn't sure if drivers should remove static OPPs during
+> their removal. And so just fixing the reported issue by issuing a dev_dbg()
+> instead of dev_warn().
 
-Regards,
-Mike
+how about adding some kind of FIXME?
 
-> ---
->  drivers/clk/pxa/clk-pxa.c    | 3 +--
->  drivers/clk/pxa/clk-pxa.h    | 1 +
->  drivers/clk/pxa/clk-pxa27x.c | 7 +++++++
->  3 files changed, 9 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/pxa/clk-pxa.c b/drivers/clk/pxa/clk-pxa.c
-> index 994fd6f..4e83475 100644
-> --- a/drivers/clk/pxa/clk-pxa.c
-> +++ b/drivers/clk/pxa/clk-pxa.c
-> @@ -102,8 +102,7 @@ int __init clk_pxa_cken_init(const struct desc_clk_cken *clks, int nb_clks)
->         return 0;
->  }
->  
-> -static void __init pxa_dt_clocks_init(struct device_node *np)
-> +void __init clk_pxa_dt_common_init(struct device_node *np)
->  {
->         of_clk_add_provider(np, of_clk_src_onecell_get, &onecell_data);
->  }
-> -CLK_OF_DECLARE(pxa_clks, "marvell,pxa-clocks", pxa_dt_clocks_init);
-> diff --git a/drivers/clk/pxa/clk-pxa.h b/drivers/clk/pxa/clk-pxa.h
-> index 7b8d48e..3239654 100644
-> --- a/drivers/clk/pxa/clk-pxa.h
-> +++ b/drivers/clk/pxa/clk-pxa.h
-> @@ -103,5 +103,6 @@ static int dummy_clk_set_parent(struct clk_hw *hw, u8 index)
->  extern void clkdev_pxa_register(int ckid, const char *con_id,
->                                 const char *dev_id, struct clk *clk);
->  extern int clk_pxa_cken_init(const struct desc_clk_cken *clks, int nb_clks);
-> +void clk_pxa_dt_common_init(struct device_node *np);
->  
->  #endif
-> diff --git a/drivers/clk/pxa/clk-pxa27x.c b/drivers/clk/pxa/clk-pxa27x.c
-> index 32d3e02..5f9b54b 100644
-> --- a/drivers/clk/pxa/clk-pxa27x.c
-> +++ b/drivers/clk/pxa/clk-pxa27x.c
-> @@ -368,3 +368,10 @@ static int __init pxa27x_clocks_init(void)
->         return clk_pxa_cken_init(pxa27x_clocks, ARRAY_SIZE(pxa27x_clocks));
->  }
->  postcore_initcall(pxa27x_clocks_init);
-> +
-> +static void __init pxa27x_dt_clocks_init(struct device_node *np)
-> +{
-> +       pxa27x_clocks_init();
-> +       clk_pxa_dt_common_init(np);
-> +}
-> +CLK_OF_DECLARE(pxa_clks, "marvell,pxa270-clocks", pxa27x_dt_clocks_init);
-> -- 
-> 2.1.0
-> 
+beside that
+
+Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+
+Thanks
+
+Stefan
