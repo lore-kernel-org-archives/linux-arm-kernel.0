@@ -1,47 +1,34 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 17 Nov 2014 12:01:23 +0100
-Subject: [PATCH v10 0/2] pwm: add support for atmel-hlcdc-pwm device
-In-Reply-To: <1412689095-14259-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1412689095-14259-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20141117110122.GA25699@ulmo>
+Date: Mon, 17 Nov 2014 12:07:16 +0100
+Subject: [PATCH V3] ARM: tegra: Re-add removed SoC id macro to
+ tegra_resume()
+In-Reply-To: <1412947487-24287-1-git-send-email-digetx@gmail.com>
+References: <1412947487-24287-1-git-send-email-digetx@gmail.com>
+Message-ID: <20141117110715.GB25699@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 07, 2014 at 03:38:13PM +0200, Boris Brezillon wrote:
-> Hi Thierry,
+On Fri, Oct 10, 2014 at 05:24:47PM +0400, Dmitry Osipenko wrote:
+> Commit d127e9c ("ARM: tegra: make tegra_resume can work with current and later
+> chips") removed tegra_get_soc_id macro leaving used cpu register corrupted after
+> branching to v7_invalidate_l1() and as result causing execution of unintended
+> code on tegra20. Possibly it was expected that r6 would be SoC id func argument
+> since common cpu reset handler is setting r6 before branching to tegra_resume(),
+> but neither tegra20_lp1_reset() nor tegra30_lp1_reset() aren't setting r6
+> register before jumping to resume function. Fix it by re-adding macro.
 > 
-> This patch series adds support for the atmel-hlcdc-pwm device provided
-> by the atmel-hlcdc MFD driver.
+> Fixes: d127e9c (ARM: tegra: make tegra_resume can work with current and later chips)
+> Cc: <stable@vger.kernel.org> # v3.13+
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
+> ---
+> V2: added Cc's for lakml and stable, added "Reviewed-by:" Felipe Balbi
+> V3: changed commit description, tested on real hw
 > 
-> Best Regards,
+> PS: It wasn't a bug in my emulator :)
 > 
-> Boris
-> 
-> Changes since v9:
->  - replace select by depends on
->  - rework commit messages
->  - rework Kconfig description
-> 
-> Changes since v8:
->  - rework the enable/disable waiting loop
->  - check return code of regmap functions
->  - fix DT binding doc
-> 
-> Changes since v7:
->  - addressed several coding style issues
-> 
-> 
-> Boris Brezillon (2):
->   pwm: add support for atmel-hlcdc-pwm device
->   pwm: add DT bindings documentation for atmel-hlcdc-pwm driver
-> 
->  .../devicetree/bindings/pwm/atmel-hlcdc-pwm.txt    |  29 +++
->  drivers/pwm/Kconfig                                |  11 +
->  drivers/pwm/Makefile                               |   1 +
->  drivers/pwm/pwm-atmel-hlcdc.c                      | 259 +++++++++++++++++++++
->  4 files changed, 300 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
->  create mode 100644 drivers/pwm/pwm-atmel-hlcdc.c
+>  arch/arm/mach-tegra/reset-handler.S | 1 +
+>  1 file changed, 1 insertion(+)
 
 Applied, thanks.
 
@@ -52,4 +39,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/fc5caccc/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/48b17ba4/attachment.sig>
