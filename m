@@ -1,55 +1,87 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Mon, 17 Nov 2014 09:57:05 +0530
-Subject: [PATCH v4 2/6] input: touchscreen: ti_am335x_tsc: Remove udelay
- in interrupt handler
-In-Reply-To: <20141115192739.GA18766@localhost.localdomain>
-References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
- <1415941651-28962-3-git-send-email-vigneshr@ti.com>
- <20141115192739.GA18766@localhost.localdomain>
-Message-ID: <54697919.5030302@ti.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Mon, 17 Nov 2014 10:13:22 +0530
+Subject: [RFC PATCH] ARM: DRA: hwmod: RTC: Add reset function for RTC
+Message-ID: <1416199402-3865-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+RTC IP have kicker feature which prevents spurious writes to its registers.
+In order to write into any of the RTC registers, KICK values has te be
+written to KICK registers. Currently hwmod is updating the IDLEMODE in rtc
+sysconfig register without writing into any kick register which is a noop.
+When autoidle is allowed for rtc, interruts are not received until IDLEMODE
+is set to SIDLE_SMART_WKUP.
+Adding a reset function to unlock RTC registers so that IDLEMODE is
+updated.
 
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.h          |  1 +
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  1 +
+ arch/arm/mach-omap2/omap_hwmod_reset.c    | 23 +++++++++++++++++++++++
+ 3 files changed, 25 insertions(+)
 
-On Sunday 16 November 2014 12:57 AM, Richard Cochran wrote:
-> On Fri, Nov 14, 2014 at 10:37:27AM +0530, Vignesh R wrote:
->> From: Brad Griffis <bgriffis@ti.com>
->>
->> TSC interrupt handler had udelay to avoid reporting of false pen-up
->> interrupt to user space. This patch implements workaround suggesting in
->> Advisory 1.0.31 of silicon errata for am335x, thus eliminating udelay
->> and touchscreen lag. This also improves performance of touchscreen and
->> eliminates sudden jump of cursor at touch release.
-> 
-> I back ported this series onto v3.15.1 in order to try this out on a
-> custom, beaglebone-like board. With this series, the touch is really
-> broken. (I had fixed the pen up problem in a totally different way for
-> a customer, and so I wanted to try out your solution.)
-> 
-> I will try to port the board code to a more recent kernel to try your
-> series again. With which kernel version did you test your patches?
-> 
-> And which board?
-> 
-Thanks for testing these patches.
-
-My patches are based on v3.18rc2. I tested my patches on am335x-evm
-using tslib.
-If you are encountering false pen-ups, charge-delay parameter needs to
-be tuned to your board. In some custom setups charge-delay of 0xB000
-provided better performance.
-If you are using ts_test (from tslib) for testing try
-# ts_test > /dev/null
-for better performance.
-
-Please explain "touch is broken"? What is the behaviour of TSC?
-Which ADC channels are being used for TSC?
-
-Regards
-Vignesh
-
-> Thanks,
-> Richard
-> 
-> 
+diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
+index 512f809..3703f99 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.h
++++ b/arch/arm/mach-omap2/omap_hwmod.h
+@@ -744,6 +744,7 @@ const char *omap_hwmod_get_main_clk(struct omap_hwmod *oh);
+  */
+ 
+ extern int omap_hwmod_aess_preprogram(struct omap_hwmod *oh);
++int omap_hwmod_rtc_unlock(struct omap_hwmod *oh);
+ 
+ /*
+  * Chip variant-specific hwmod init routines - XXX should be converted
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index 5684f11..90e1df4 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -1584,6 +1584,7 @@ static struct omap_hwmod_class_sysconfig dra7xx_rtcss_sysc = {
+ static struct omap_hwmod_class dra7xx_rtcss_hwmod_class = {
+ 	.name	= "rtcss",
+ 	.sysc	= &dra7xx_rtcss_sysc,
++	.reset	= &omap_hwmod_rtc_unlock,
+ };
+ 
+ /* rtcss */
+diff --git a/arch/arm/mach-omap2/omap_hwmod_reset.c b/arch/arm/mach-omap2/omap_hwmod_reset.c
+index 65e186c..b825a28 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_reset.c
++++ b/arch/arm/mach-omap2/omap_hwmod_reset.c
+@@ -30,6 +30,12 @@
+ 
+ #include "omap_hwmod.h"
+ 
++#define RTC_KICK0_REG_OFFSET	0x6c
++#define RTC_KICK1_REG_OFFSET	0x70
++
++#define RTC_KICK0_VALUE		0x83E70B13
++#define RTC_KICK1_VALUE		0x95A4F1E0
++
+ /**
+  * omap_hwmod_aess_preprogram - enable AESS internal autogating
+  * @oh: struct omap_hwmod *
+@@ -51,3 +57,20 @@ int omap_hwmod_aess_preprogram(struct omap_hwmod *oh)
+ 
+ 	return 0;
+ }
++
++/**
++ * omap_hwmod_rtc_unlock - Reset and unlock the Kicker mechanism.
++ * @oh: struct omap_hwmod *
++ *
++ * RTC IP have kicker feature.  This prevents spurious writes to its registers.
++ * In order to write into any of the RTC registers, KICK values has te be
++ * written in respective KICK registers. This is needed for hwmod to write into
++ * sysconfig register.
++ */
++int omap_hwmod_rtc_unlock(struct omap_hwmod *oh)
++{
++	omap_hwmod_write(RTC_KICK0_VALUE, oh, RTC_KICK0_REG_OFFSET);
++	omap_hwmod_write(RTC_KICK1_VALUE, oh, RTC_KICK1_REG_OFFSET);
++
++	return 0;
++}
+-- 
+1.9.1
