@@ -1,95 +1,114 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 17 Nov 2014 14:30:39 +0100
-Subject: [PATCH v5 3/8] ARM: shmobile: R-Mobile: Use
- generic_pm_domain.attach_dev() for pm_clk setup
-In-Reply-To: <1416231044-1903-1-git-send-email-geert+renesas@glider.be>
-References: <1416231044-1903-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1416231044-1903-4-git-send-email-geert+renesas@glider.be>
+Date: Mon, 17 Nov 2014 14:30:36 +0100
+Subject: [PATCH v5 0/8] ARM: shmobile: R-Mobile: DT PM domain support
+Message-ID: <1416231044-1903-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the just introduced genpd attach/detach callbacks to register the
-devices' module clocks, instead of doing it directly, to make it
-DT-proof.
+	Hi Simon, Magnus, Rafael,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
----
-v5:
+This patch series enables DT support for PM domains on Renesas R-Mobile SoCs.
+
+Currently it's limited to R-Mobile A1 (r8a7740), but given the similarity of
+the SYSC System-Controller on the various SH-Mobile/R-Mobile SoCs, and the
+abstraction of PM domains in DT, it should be sufficiently generic to handle
+other SoCs in the future (e.g. SH-Mobile AP4 (sh7372), SH-Mobile AG5 (sh73a0),
+R-Mobile APE6 (r8a73a4)).
+
+Functionality-wise, this behaves the same as the legacy (non-DT) version
+(modulo missing DT support in some device drivers).
+
+Dependencies:
+  - This is based on Simon Horman's renesas-devel-20141117-v3.18-rc5, as
+    v3.18-rc5 has commit c16561e8df7a6476 ("PM / Domains: Change prototype
+    for the attach and detach callbacks").
+
+Notes:
+  - Rafael: I believe Simon needs your ack for "[1/8] PM / Domains: Add DT
+    bindings for power-on/off latencies", or needs to know you will take it
+    yourself?
+
+  - I kept "[4/8] ARM: shmobile: R-Mobile: Enable module clocks if
+    !CONFIG_PM_RUNTIME", as commit 9cdd5fd742e684ee ("PM / domains: Kconfig:
+    always enable PM_RUNTIME when genpd enabled") is not yet upstream, and
+    needs some rework (recursive Kconfig dependency PM_GENERIC_DOMAINS <->
+    PM_RUNTIME).
+
+Changes compared to v4:
   - Update for {at,de}tach_dev() taking a generic_pm_domain pointer
     again,
-v4:
-  - Add Reviewed-by,
-  - Add missing pm_clk_create()/pm_clk_destroy() calls,
-  - Update for attach_dev() returning an error code again,
-v3:
-  - Update for callback signature changes,
-v2:
-  - New.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/mach-shmobile/pm-rmobile.c | 34 ++++++++++++++++++++++++++++++++--
- 1 file changed, 32 insertions(+), 2 deletions(-)
+Changes compared to v3 (more detailed changelogs in the individual patches):
+  - I dropped the patch to add preliminary PM domain latencies, as I want to do
+    more measurements for PM domains that are currently never powered off.
+    Values seem to range between 8.5 and 26 us, depending on the PM domain.
+  - I dropped all patches related to QoS device latencies, as these need more
+    discussion,
+  - The power-{on,off}-latency properties have been changed from a single value
+    to a list,
+  - Device save/restore state latencies have been dropped, as they're Linux
+    driver-specific, and thus don't belong in DT,
+  - Use proper pm_clk_create()/pm_clk_destroy(), and update for attach_dev()
+    returning an error code again,
+  - New patch to enable module clocks if !CONFIG_PM_RUNTIME,
+  - Always keep D4 powered, until the new Coresight code handles runtime
+    PM,
+  - Remove bogus power-domains properties from clock nodes, as these will not
+    be instantiated as platform devices,
+  - Add power-domains properties to the recently added TMU nodes,
+  - Added Acked-by, Reviewed-by.
 
-diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
-index 717e6413d29cb998..168046c355fc8368 100644
---- a/arch/arm/mach-shmobile/pm-rmobile.c
-+++ b/arch/arm/mach-shmobile/pm-rmobile.c
-@@ -101,6 +101,36 @@ static bool rmobile_pd_active_wakeup(struct device *dev)
- 	return true;
- }
- 
-+static int rmobile_pd_attach_dev(struct generic_pm_domain *domain,
-+				 struct device *dev)
-+{
-+	int error;
-+
-+	error = pm_clk_create(dev);
-+	if (error) {
-+		dev_err(dev, "pm_clk_create failed %d\n", error);
-+		return error;
-+	}
-+
-+	error = pm_clk_add(dev, NULL);
-+	if (error) {
-+		dev_err(dev, "pm_clk_add failed %d\n", error);
-+		goto fail;
-+	}
-+
-+	return 0;
-+
-+fail:
-+	pm_clk_destroy(dev);
-+	return error;
-+}
-+
-+static void rmobile_pd_detach_dev(struct generic_pm_domain *domain,
-+				  struct device *dev)
-+{
-+	pm_clk_destroy(dev);
-+}
-+
- static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
- {
- 	struct generic_pm_domain *genpd = &rmobile_pd->genpd;
-@@ -112,6 +142,8 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
- 	genpd->dev_ops.active_wakeup	= rmobile_pd_active_wakeup;
- 	genpd->power_off		= rmobile_pd_power_down;
- 	genpd->power_on			= rmobile_pd_power_up;
-+	genpd->attach_dev		= rmobile_pd_attach_dev;
-+	genpd->detach_dev		= rmobile_pd_detach_dev;
- 	__rmobile_pd_power_up(rmobile_pd, false);
- }
- 
-@@ -130,8 +162,6 @@ void rmobile_add_device_to_domain_td(const char *domain_name,
- 	struct device *dev = &pdev->dev;
- 
- 	__pm_genpd_name_add_device(domain_name, dev, td);
--	if (pm_clk_no_clocks(dev))
--		pm_clk_add(dev, NULL);
- }
- 
- void rmobile_add_devices_to_domains(struct pm_domain_device data[],
+Changes compared to v2 (more detailed changelogs in the individual patches):
+  - Minor changes to attach/detach callbacks,
+  - Really add the A4MP and D4 PM domains, as fixes are available (see
+    dependencies below),
+  - Scan DT topology to identify special PM domains (CPUs and console),
+  - Move PM domain power-on/off latencies to a separate patch.
+
+Changes compared to v1 (more detailed changelogs in the individual patches):
+  - Several new patches: PM QoS device latencies in DT, attach/detach
+    callbacks,
+  - Run-Time management of the module clocks, making the hack in
+    drivers/sh/pm_runtime.c obsolete for DT platforms using genpd,
+  - Addition of PM QoS device latencies, specified from DT,
+  - Addition of build glue, so this builds and runs without additional
+    changes, incl. s2ram.
+
+Please apply, thanks!
+
+Geert Uytterhoeven (8):
+  PM / Domains: Add DT bindings for power-on/off latencies
+  PM / Domains: Add DT bindings for the R-Mobile System Controller
+  ARM: shmobile: R-Mobile: Use generic_pm_domain.attach_dev() for pm_clk
+    setup
+  ARM: shmobile: R-Mobile: Enable module clocks if !CONFIG_PM_RUNTIME
+  ARM: shmobile: R-Mobile: Store SYSC base address in rmobile_pm_domain
+  ARM: shmobile: R-Mobile: Add DT support for PM domains
+  ARM: shmobile: r8a7740 dtsi: Add PM domain support
+  drivers: sh: Disable PM runtime for multi-platform r8a7740 with genpd
+
+ .../devicetree/bindings/power/power_domain.txt     |  14 +-
+ .../bindings/power/renesas,sysc-rmobile.txt        | 107 ++++++++
+ arch/arm/boot/dts/r8a7740.dtsi                     |  99 +++++++
+ arch/arm/mach-shmobile/Kconfig                     |   3 +-
+ arch/arm/mach-shmobile/pm-r8a7740.c                |  14 +
+ arch/arm/mach-shmobile/pm-rmobile.c                | 286 +++++++++++++++++++--
+ arch/arm/mach-shmobile/pm-rmobile.h                |   3 +-
+ arch/arm/mach-shmobile/pm-sh7372.c                 |  11 +
+ drivers/sh/pm_runtime.c                            |   2 +
+ 9 files changed, 520 insertions(+), 19 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
+
 -- 
 1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
