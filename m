@@ -1,90 +1,115 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Sun, 16 Nov 2014 19:59:14 -0700
-Subject: [PATCH 00/10] Save MSI chip in pci_sys_data
-In-Reply-To: <20141112042359.GK28161@google.com>
-References: <1414396127-30023-1-git-send-email-wangyijing@huawei.com>
- <20141112042359.GK28161@google.com>
-Message-ID: <20141117025914.GC4280@google.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 17 Nov 2014 03:33:05 +0000 (UTC)
+Subject: OMAP baseline test results for v3.18-rc4
+Message-ID: <alpine.DEB.2.02.1411170331420.3210@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Marc, Yingjoe]
 
-On Tue, Nov 11, 2014 at 09:23:59PM -0700, Bjorn Helgaas wrote:
-> On Mon, Oct 27, 2014 at 03:48:37PM +0800, Yijing Wang wrote:
-> > Now PCI host bridge drivers in arm associate MSI chip and
-> > PCI bus by adding .add_bus(), and assign MSI chip pointer
-> > to every PCI bus. Associating MSI chip and every PCI bus
-> > is not necessary. All PCI busses under same PCI host brdige
-> > share the same MSI chip. So saving MSI chip in pci_sys_data
-> > is a better solution, it make PCI host bridge drivers clean.
-> > Because we still need to provide arch spec pcibios_msi_controller()
-> > to extract MSI controller pointer, a better solution is to
-> > refactor PCI host bridge, make a generic pci_host_bridge, and
-> > save common info like PCI domain number, MSI chip, resources
-> > in it. We will do that work in another series as soon.
-> > 
-> > To Bjorn: Because struct msi_chip defined in struct hw_pci and pci_sys_data
-> > is under the #ifdef CONFIG_PCI_MSI, if we use if(IS_ENABLED(CONFIG_PCI_MSI))
-> > in PCI host bridge drivers, it will cause build errors when the CONFIG_PCI_MSI
-> > is off. So I keep #ifdef CONFIG_PCI_MSI in this series.
-> > 
-> > Yijing Wang (10):
-> >   MSI: Rename msi_chip to msi_controller for better readability
-> >   PCI/MSI: Introduce weak pcibios_msi_controller()
-> >   arm/MSI: Save MSI controller in pci_sys_data
-> >   PCI: tegra: Save MSI controller in pci_sys_data
-> >   PCI: designware: Save MSI controller in pci_sys_data
-> >   PCI: rcar: Save MSI controller in pci_sys_data
-> >   PCI: mvebu: Save MSI controller in pci_sys_data
-> >   PCI: xilinx: Save MSI controller in pci_sys_data
-> >   arm/PCI: Clean unused pcibios_add_bus() and pcibios_remove_bus()
-> >   PCI/MSI: Remove useless bus->msi assignment
-> > 
-> >  arch/arm/include/asm/mach/pci.h     |   10 +++++---
-> >  arch/arm/kernel/bios32.c            |   28 ++++++++++--------------
-> >  drivers/irqchip/irq-armada-370-xp.c |   22 +++++++++---------
-> >  drivers/of/of_pci.c                 |   40 +++++++++++++++++-----------------
-> >  drivers/pci/host/pci-keystone-dw.c  |    4 +-
-> >  drivers/pci/host/pci-keystone.h     |    2 +-
-> >  drivers/pci/host/pci-mvebu.c        |   14 ++++-------
-> >  drivers/pci/host/pci-tegra.c        |   37 +++++++++++++-------------------
-> >  drivers/pci/host/pcie-designware.c  |   25 +++++++--------------
-> >  drivers/pci/host/pcie-designware.h  |    2 +-
-> >  drivers/pci/host/pcie-rcar.c        |   37 +++++++++++++-------------------
-> >  drivers/pci/host/pcie-xilinx.c      |   27 +++++++----------------
-> >  drivers/pci/msi.c                   |   22 ++++++++++++++-----
-> >  drivers/pci/probe.c                 |    1 -
-> >  include/linux/msi.h                 |    6 ++--
-> >  include/linux/of_pci.h              |   14 ++++++------
-> >  include/linux/pci.h                 |    2 +-
-> >  17 files changed, 132 insertions(+), 161 deletions(-)
-> > 
-> 
-> Applied to pci/msi for v3.19, thanks.
+Here are some basic OMAP test results for Linux v3.18-rc4.
+Logs and other details at:
 
-This series is currently in the pci "next" branch, but the fact that there
-are so many MSI-related changes from so many people makes me worry that
-we're heading for a merge problem.
+    http://www.pwsan.com/omap/testlogs/test_v3.18-rc4/20141110160915/
 
-Here are the outstanding IRQ- and MSI-related things I've seen:
 
-  Marc   10/25 [00/03] genirq: Add support for "split-EOI" irqchips
-  Yijing 10/27 [00/10] Save MSI chip in pci_sys_data
-  Yijing 10/27 [00/16] Use MSI controller framework to configure MSI/MSI-X
-  Jiang  10/27 [Part1 v3 00/20] Prepare for enabling hierarchy irqdomain on x86
-  Jiang  11/02 [v8 00/18] Enable support of IOAPIC hotplug on x86 platforms
-  Jiang  11/06 [Part2 v5 00/31] Enable hierarchy irqdomian on x86 platforms
-  Jiang  11/09 [Part3 v3 00/38] Enable hierarchy irqdomian on x86 platforms
-  Marc   11/11 [00/15] arm64: PCI/MSI: GICv3 ITS support (stacked domain edition)
-  Thomas 11/12 [00/16] genirq: Hierarchical irq domains and generic MSI interrupt code
-  Jiang  11/15 [V2 00/09] Refine generic/PCI MSI irqodmian interfaces
-  Marc   11/15 [00/02] Stacked domains and MSI improvements
+Test summary
+------------
 
-PCI is only a minor participant, and I certainly don't have the expertise
-to deal with all this, so I suspect that I should just drop these from the
-PCI tree and let Thomas deal with them.  It seems like it would make more
-sense to get all this stuff merged together in a single tree rather than
-having some come via PCI and others come from via other trees.
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
 
-Bjorn
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-som,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
+
+Build: zImage:
+    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
+
+Boot to userspace:
+    FAIL ( 1/17): 2430sdp
+    skip ( 3/17): 5912osk, 3517evm, 4430es2panda
+    Pass (13/17): am335xbonelt, am335xbone, 4460pandaes, 4460varsomom,
+		  37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
+		  3730es12beaglexm, cmt3517, 5430es2uevm,
+		  5430es2sbct54, 2420n800
+
+PM: chip retention via suspend:
+    FAIL ( 5/11): am335xbonelt, 4460varsomom, 2430sdp, 5430es2uevm,
+		  5430es2sbct54
+    Pass ( 6/11): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 6/11): am335xbonelt, 4460pandaes, 4460varsomom, 2430sdp,
+		  5430es2uevm, 5430es2sbct54
+    Pass ( 5/11): 37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
+		  3730es12beaglexm
+
+PM: chip off (except CORE, due to errata) via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off (except CORE, due to errata) via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
+
+PM: chip off via dynamic idle:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
+
+
+vmlinux object size
+(delta in bytes from test_v3.18-rc3 (0df1f2487d2f0d04703f142813d53615d62a1da4)):
+   text     data      bss    total  kernel
+   +448        0        0     +448  omap1_defconfig
+   +448        0        0     +448  omap1_defconfig_1510innovator_only
+   +448        0        0     +448  omap1_defconfig_5912osk_only
+  +1175      -88      +64    +1151  multi_v7_defconfig
+   +355        0        0     +355  omap2plus_defconfig
+   +319        0        0     +319  omap2plus_defconfig_2430sdp_only
+   +355       +8        0     +363  omap2plus_defconfig_am33xx_only
+   +419       +8        0     +427  omap2plus_defconfig_am43xx_only
+   +355      -24        0     +331  omap2plus_defconfig_cpupm
+   +351       +8        0     +359  omap2plus_defconfig_dra7xx_only
+   +359       +8        0     +367  omap2plus_defconfig_n800_multi_omap2xxx
+   +327       +8        0     +335  omap2plus_defconfig_n800_only_a
+   +295        0        0     +295  omap2plus_defconfig_no_pm
+   +299       +8        0     +307  omap2plus_defconfig_omap2_4_only
+   +359       +8        0     +367  omap2plus_defconfig_omap3_4_only
+   +351       +8        0     +359  omap2plus_defconfig_omap5_only
+   +360      -24      -32     +304  rmk_omap3430_ldp_allnoconfig
+   +347       +8        0     +355  rmk_omap3430_ldp_oldconfig
+   +316      -20      -24     +272  rmk_omap4430_sdp_allnoconfig
+   +371      +16        0     +387  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.18-rc3 (0df1f2487d2f0d04703f142813d53615d62a1da4))
+  avail  rsrvd   high  freed  board          kconfig
+  (no differences)
