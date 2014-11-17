@@ -1,118 +1,170 @@
 From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Mon, 17 Nov 2014 12:06:31 +0530
+Date: Mon, 17 Nov 2014 12:08:53 +0530
 Subject: [PATCH v7 1/2] usb: host: xhci-plat: Get PHYs for xhci's hcds
-In-Reply-To: <545393CE.8070102@cogentembedded.com>
+In-Reply-To: <1414761989-21088-2-git-send-email-gautam.vivek@samsung.com>
 References: <1414761989-21088-1-git-send-email-gautam.vivek@samsung.com>
  <1414761989-21088-2-git-send-email-gautam.vivek@samsung.com>
- <545393CE.8070102@cogentembedded.com>
-Message-ID: <CAFp+6iG37uE1uB5Z8B-hM3nKyBeR6Vxb-YKegd7MrRB3wuA9xw@mail.gmail.com>
+Message-ID: <CAFp+6iE8BNoZZLho2apHZA-e9_XkUuVbAq798kc8y+E8wb=i7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Felipe,
 
 
-On Fri, Oct 31, 2014 at 7:21 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Hello.
->
-> On 10/31/2014 4:26 PM, Vivek Gautam wrote:
->
->> The host controller by itself may sometimes need to handle PHY
->> and re-initialize it to re-configure some of the PHY parameters
->> to get full support out of the PHY controller.
->> Therefore, facilitate getting the two possible PHYs, viz.
->> USB 2.0 type (UTMI+) and USB 3.0 type (PIPE3), and initialize them.
->
->
->> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->> ---
->>   drivers/usb/host/xhci-plat.c |   74
->> ++++++++++++++++++++++++++++++++++++++++++
->>   1 file changed, 74 insertions(+)
->
->
->> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
->> index 3d78b0c..5207d5b 100644
->> --- a/drivers/usb/host/xhci-plat.c
->> +++ b/drivers/usb/host/xhci-plat.c
->
-> [...]
->>
->> @@ -129,10 +130,41 @@ static int xhci_plat_probe(struct platform_device
->> *pdev)
->>                         goto put_hcd;
->>         }
->>
->> +       /* Get possile USB 2.0 type PHY (UTMI+) available with xhci */
->> +       hcd->phy = devm_phy_get(&pdev->dev, "usb2-phy");
->> +       if (IS_ERR(hcd->phy)) {
->> +               ret = PTR_ERR(hcd->phy);
->> +               if (ret == -EPROBE_DEFER) {
->> +                       goto disable_clk;
->> +               } else if (ret != -ENOSYS && ret != -ENODEV) {
->
->
->    Asking to be a *switch* statement instead...
 
-Sure, will change this to *switch* statement. That will improve the
-readability.
+On Fri, Oct 31, 2014 at 6:56 PM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+> The host controller by itself may sometimes need to handle PHY
+> and re-initialize it to re-configure some of the PHY parameters
+> to get full support out of the PHY controller.
+> Therefore, facilitate getting the two possible PHYs, viz.
+> USB 2.0 type (UTMI+) and USB 3.0 type (PIPE3), and initialize them.
+>
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> ---
+>  drivers/usb/host/xhci-plat.c |   74 ++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 74 insertions(+)
+>
+> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+> index 3d78b0c..5207d5b 100644
+> --- a/drivers/usb/host/xhci-plat.c
+> +++ b/drivers/usb/host/xhci-plat.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/phy/phy.h>
+>  #include <linux/slab.h>
+>  #include <linux/usb/xhci_pdriver.h>
+>
+> @@ -129,10 +130,41 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>                         goto put_hcd;
+>         }
+>
+> +       /* Get possile USB 2.0 type PHY (UTMI+) available with xhci */
+> +       hcd->phy = devm_phy_get(&pdev->dev, "usb2-phy");
+> +       if (IS_ERR(hcd->phy)) {
+> +               ret = PTR_ERR(hcd->phy);
+> +               if (ret == -EPROBE_DEFER) {
+> +                       goto disable_clk;
+> +               } else if (ret != -ENOSYS && ret != -ENODEV) {
+> +                       hcd->phy = NULL;
+> +                       dev_warn(&pdev->dev,
+> +                                "Error retrieving usb2 phy: %d\n", ret);
+> +               }
+> +       }
+> +
+>         ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+>         if (ret)
+>                 goto disable_clk;
+>
+> +       /*
+> +        * Initialize and power-on USB 2.0 PHY
+> +        * FIXME: Isn't this a hacky way of initializing the PHY again ?
+> +        * xhci's parent would have already initialized the PHY, but we
+> +        * wanna do it again.
+> +        */
 
->
->> +                       hcd->phy = NULL;
->> +                       dev_warn(&pdev->dev,
->> +                                "Error retrieving usb2 phy: %d\n", ret);
->> +               }
->> +       }
->> +
->
-> [...]
->>
->> @@ -158,12 +190,41 @@ static int xhci_plat_probe(struct platform_device
->> *pdev)
->>         if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
->>                 xhci->shared_hcd->can_do_streams = 1;
->>
->> +       /* Get possile USB 3.0 type PHY (PIPE3) available with xhci */
->> +       xhci->shared_hcd->phy = devm_phy_get(&pdev->dev, "usb3-phy");
->> +       if (IS_ERR(xhci->shared_hcd->phy)) {
->> +               ret = PTR_ERR(xhci->shared_hcd->phy);
->> +               if (ret == -EPROBE_DEFER) {
->> +                       goto put_usb3_hcd;
->> +               } else if (ret != -ENOSYS && ret != -ENODEV) {
->
->
->    Likewise...
+Does this change looks anywhere close to what you suggested to
+re-initialize PHYs in XHCI even after DWC3 has initialized them once,
+in order to avoid adding phy_calibration() callback ? ;-)
 
-ok
-
+> +       hcd->phy->init_count = 0;
+> +       ret = phy_init(hcd->phy);
+> +       if (ret)
+> +               goto dealloc_usb2_hcd;
+> +
+> +       hcd->phy->power_count = 0;
+> +       ret = phy_power_on(hcd->phy);
+> +       if (ret) {
+> +               phy_exit(hcd->phy);
+> +               goto dealloc_usb2_hcd;
+> +       }
+> +
+>         device_wakeup_enable(hcd->self.controller);
 >
->> +                       xhci->shared_hcd->phy = NULL;
->> +                       dev_warn(&pdev->dev,
->> +                                "Error retrieving usb3 phy: %d\n", ret);
->> +               }
->> +       }
->> +
+>         /* USB 2.0 roothub is stored in the platform_device now. */
+> @@ -158,12 +190,41 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>         if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
+>                 xhci->shared_hcd->can_do_streams = 1;
 >
-> [...]
->>
->> @@ -204,6 +271,8 @@ static int xhci_plat_suspend(struct device *dev)
->>         struct usb_hcd  *hcd = dev_get_drvdata(dev);
->>         struct xhci_hcd *xhci = hcd_to_xhci(hcd);
->>
->> +       phy_exit(hcd->phy);
+> +       /* Get possile USB 3.0 type PHY (PIPE3) available with xhci */
+> +       xhci->shared_hcd->phy = devm_phy_get(&pdev->dev, "usb3-phy");
+> +       if (IS_ERR(xhci->shared_hcd->phy)) {
+> +               ret = PTR_ERR(xhci->shared_hcd->phy);
+> +               if (ret == -EPROBE_DEFER) {
+> +                       goto put_usb3_hcd;
+> +               } else if (ret != -ENOSYS && ret != -ENODEV) {
+> +                       xhci->shared_hcd->phy = NULL;
+> +                       dev_warn(&pdev->dev,
+> +                                "Error retrieving usb3 phy: %d\n", ret);
+> +               }
+> +       }
+> +
+>         ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
+>         if (ret)
+>                 goto put_usb3_hcd;
 >
+> +       /* Initialize and power-on USB 3.0 PHY */
+> +       xhci->shared_hcd->phy->init_count = 0;
+> +       ret = phy_init(xhci->shared_hcd->phy);
+> +       if (ret)
+> +               goto dealloc_usb3_hcd;
+> +
+> +       xhci->shared_hcd->phy->power_count = 0;
+> +       ret = phy_power_on(xhci->shared_hcd->phy);
+> +       if (ret) {
+> +               phy_exit(xhci->shared_hcd->phy);
+> +               goto dealloc_usb3_hcd;
+> +       }
+> +
+>         return 0;
 >
->    Hm, in the suspend() method?
-
-phy_exit() should eventually be suspending the PHY and put it to
-low power state.
-phy_init() in resume() will then take up the task of activating the
-PHY again.
-
-phy_power_on() and phy_power_off() are called at xhci_probe() and remove() time.
-
-Does this makes sense ?
+> +dealloc_usb3_hcd:
+> +       usb_remove_hcd(xhci->shared_hcd);
+> +
+>  put_usb3_hcd:
+>         usb_put_hcd(xhci->shared_hcd);
+>
+> @@ -186,9 +247,15 @@ static int xhci_plat_remove(struct platform_device *dev)
+>         struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+>         struct clk *clk = xhci->clk;
+>
+> +       phy_power_off(xhci->shared_hcd->phy);
+> +       phy_exit(xhci->shared_hcd->phy);
+> +
+>         usb_remove_hcd(xhci->shared_hcd);
+>         usb_put_hcd(xhci->shared_hcd);
+>
+> +       phy_power_off(hcd->phy);
+> +       phy_exit(hcd->phy);
+> +
+>         usb_remove_hcd(hcd);
+>         if (!IS_ERR(clk))
+>                 clk_disable_unprepare(clk);
+> @@ -204,6 +271,8 @@ static int xhci_plat_suspend(struct device *dev)
+>         struct usb_hcd  *hcd = dev_get_drvdata(dev);
+>         struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+>
+> +       phy_exit(hcd->phy);
+> +
+>         return xhci_suspend(xhci);
+>  }
+>
+> @@ -211,6 +280,11 @@ static int xhci_plat_resume(struct device *dev)
+>  {
+>         struct usb_hcd  *hcd = dev_get_drvdata(dev);
+>         struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+> +       int ret;
+> +
+> +       ret = phy_init(hcd->phy);
+> +       if (ret)
+> +               return ret;
+>
+>         return xhci_resume(xhci, 0);
+>  }
+> --
+> 1.7.10.4
+>
 
 
 
