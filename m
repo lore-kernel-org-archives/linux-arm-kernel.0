@@ -1,153 +1,173 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:16 +0100
-Subject: [PATCH v5 22/61] dmaengine: imx: Split device_control
-In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-23-git-send-email-maxime.ripard@free-electrons.com>
+Date: Mon, 17 Nov 2014 14:41:54 +0100
+Subject: [PATCH v5 00/61] dmaengine: Implement generic slave capabilities
+ retrieval
+Message-ID: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Freescale IMX DMA driver to make use
-of the newly introduced callbacks, that will eventually be used to retrieve
-slave capabilities.
+Hi,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/dma/imx-dma.c | 103 +++++++++++++++++++++++++-------------------------
- 1 file changed, 51 insertions(+), 52 deletions(-)
+As we discussed a couple of weeks ago, this is the third attempt at
+creating a generic behaviour for slave capabilities retrieval so that
+generic layers using dmaengine can actually rely on that.
 
-diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-index 9d2c9e7374dc..dfd1557384ca 100644
---- a/drivers/dma/imx-dma.c
-+++ b/drivers/dma/imx-dma.c
-@@ -669,69 +669,67 @@ out:
- 
- }
- 
--static int imxdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--		unsigned long arg)
-+static int imxdma_terminate_all(struct dma_chan *chan)
- {
- 	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
--	struct dma_slave_config *dmaengine_cfg = (void *)arg;
- 	struct imxdma_engine *imxdma = imxdmac->imxdma;
- 	unsigned long flags;
--	unsigned int mode = 0;
--
--	switch (cmd) {
--	case DMA_TERMINATE_ALL:
--		imxdma_disable_hw(imxdmac);
- 
--		spin_lock_irqsave(&imxdma->lock, flags);
--		list_splice_tail_init(&imxdmac->ld_active, &imxdmac->ld_free);
--		list_splice_tail_init(&imxdmac->ld_queue, &imxdmac->ld_free);
--		spin_unlock_irqrestore(&imxdma->lock, flags);
--		return 0;
--	case DMA_SLAVE_CONFIG:
--		if (dmaengine_cfg->direction == DMA_DEV_TO_MEM) {
--			imxdmac->per_address = dmaengine_cfg->src_addr;
--			imxdmac->watermark_level = dmaengine_cfg->src_maxburst;
--			imxdmac->word_size = dmaengine_cfg->src_addr_width;
--		} else {
--			imxdmac->per_address = dmaengine_cfg->dst_addr;
--			imxdmac->watermark_level = dmaengine_cfg->dst_maxburst;
--			imxdmac->word_size = dmaengine_cfg->dst_addr_width;
--		}
--
--		switch (imxdmac->word_size) {
--		case DMA_SLAVE_BUSWIDTH_1_BYTE:
--			mode = IMX_DMA_MEMSIZE_8;
--			break;
--		case DMA_SLAVE_BUSWIDTH_2_BYTES:
--			mode = IMX_DMA_MEMSIZE_16;
--			break;
--		default:
--		case DMA_SLAVE_BUSWIDTH_4_BYTES:
--			mode = IMX_DMA_MEMSIZE_32;
--			break;
--		}
-+	imxdma_disable_hw(imxdmac);
- 
--		imxdmac->hw_chaining = 0;
-+	spin_lock_irqsave(&imxdma->lock, flags);
-+	list_splice_tail_init(&imxdmac->ld_active, &imxdmac->ld_free);
-+	list_splice_tail_init(&imxdmac->ld_queue, &imxdmac->ld_free);
-+	spin_unlock_irqrestore(&imxdma->lock, flags);
-+	return 0;
-+}
- 
--		imxdmac->ccr_from_device = (mode | IMX_DMA_TYPE_FIFO) |
--			((IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR) << 2) |
--			CCR_REN;
--		imxdmac->ccr_to_device =
--			(IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR) |
--			((mode | IMX_DMA_TYPE_FIFO) << 2) | CCR_REN;
--		imx_dmav1_writel(imxdma, imxdmac->dma_request,
--				 DMA_RSSR(imxdmac->channel));
-+static int imxdma_config(struct dma_chan *chan,
-+			 struct dma_slave_config *dmaengine_cfg)
-+{
-+	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
-+	struct imxdma_engine *imxdma = imxdmac->imxdma;
-+	unsigned int mode = 0;
- 
--		/* Set burst length */
--		imx_dmav1_writel(imxdma, imxdmac->watermark_level *
--				imxdmac->word_size, DMA_BLR(imxdmac->channel));
-+	if (dmaengine_cfg->direction == DMA_DEV_TO_MEM) {
-+		imxdmac->per_address = dmaengine_cfg->src_addr;
-+		imxdmac->watermark_level = dmaengine_cfg->src_maxburst;
-+		imxdmac->word_size = dmaengine_cfg->src_addr_width;
-+	} else {
-+		imxdmac->per_address = dmaengine_cfg->dst_addr;
-+		imxdmac->watermark_level = dmaengine_cfg->dst_maxburst;
-+		imxdmac->word_size = dmaengine_cfg->dst_addr_width;
-+	}
- 
--		return 0;
-+	switch (imxdmac->word_size) {
-+	case DMA_SLAVE_BUSWIDTH_1_BYTE:
-+		mode = IMX_DMA_MEMSIZE_8;
-+		break;
-+	case DMA_SLAVE_BUSWIDTH_2_BYTES:
-+		mode = IMX_DMA_MEMSIZE_16;
-+		break;
- 	default:
--		return -ENOSYS;
-+	case DMA_SLAVE_BUSWIDTH_4_BYTES:
-+		mode = IMX_DMA_MEMSIZE_32;
-+		break;
- 	}
- 
--	return -EINVAL;
-+	imxdmac->hw_chaining = 0;
-+
-+	imxdmac->ccr_from_device = (mode | IMX_DMA_TYPE_FIFO) |
-+		((IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR) << 2) |
-+		CCR_REN;
-+	imxdmac->ccr_to_device =
-+		(IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR) |
-+		((mode | IMX_DMA_TYPE_FIFO) << 2) | CCR_REN;
-+	imx_dmav1_writel(imxdma, imxdmac->dma_request,
-+			 DMA_RSSR(imxdmac->channel));
-+
-+	/* Set burst length */
-+	imx_dmav1_writel(imxdma, imxdmac->watermark_level *
-+			 imxdmac->word_size, DMA_BLR(imxdmac->channel));
-+
-+	return 0;
- }
- 
- static enum dma_status imxdma_tx_status(struct dma_chan *chan,
-@@ -1184,7 +1182,8 @@ static int __init imxdma_probe(struct platform_device *pdev)
- 	imxdma->dma_device.device_prep_dma_cyclic = imxdma_prep_dma_cyclic;
- 	imxdma->dma_device.device_prep_dma_memcpy = imxdma_prep_dma_memcpy;
- 	imxdma->dma_device.device_prep_interleaved_dma = imxdma_prep_dma_interleaved;
--	imxdma->dma_device.device_control = imxdma_control;
-+	imxdma->dma_device.device_config = imxdma_config;
-+	imxdma->dma_device.device_terminate_all = imxdma_terminate_all;
- 	imxdma->dma_device.device_issue_pending = imxdma_issue_pending;
- 
- 	platform_set_drvdata(pdev, imxdma);
+That has been done mostly through two steps: by moving out the
+sub-commands of the device_control callback, so that the dmaengine
+core can then infer from that wether a sub-command is implemented, and
+then by moving the slave properties, such as the supported buswidth,
+to the structure dma_device itself.
+
+Comments are as usual appreciated!
+
+Thanks,
+Maxime
+
+Changes from v4:
+  - Rebased on top of current dma/next
+  - Converted AT91 XDMAC driver to the new API
+  - Updated the documentation to reflect our changes
+
+Changes from v3:
+  - Removed the generic_slave_caps flag
+  - Merged the patch introducing a generic slave caps functions with
+    the one introducing the dma_device capabilities
+
+Changes from v2:
+  - Reworked dma_chan_get/dma_chan_put in order to optionally use
+    device_alloc_chan_resources/device_free_chan_resources
+  - Modified a few client drivers that were still calling
+    device_control directly to use the dmaengine API instead
+  - Totally remove device_control and device_slave_config
+  - Move device_control BUG_ON removal earlier in the patch set to
+    avoid breaking the bisectability
+  - Converted rapidio tsi721 driver too.
+  - Minor cosmetics changes and fixes suggested by Laurent Pinchart
+    and Andy Shevchenko
+  - Fixed a few build warnings
+  - Collected the various Acked-by
+  - Rebased on top of 3.18-rc1
+
+Changes from v1:
+  - Add a flag to trigger the generic slave caps mechanism
+  - Add a warning whenever this flag is not set, or when a
+    device_control callback is still defined
+  - Migrate all existing users to use the new callbacks, and the
+    generic slave capabilities
+
+Ludovic Desroches (2):
+  dmaengine: at_xdmac: split device_control
+  dmaengine: at_xdmac: Declare slave capabilities for the generic code
+
+Maxime Ripard (59):
+  serial: at91: Use dmaengine_slave_config API
+  crypto: ux500: Use dmaengine_terminate_all API
+  dmaengine: Make the destination abbreviation coherent
+  dmaengine: Rework dma_chan_get
+  dmaengine: Make channel allocation callbacks optional
+  dmaengine: Introduce a device_config callback
+  dmaengine: split out pause/resume operations from device_control
+  dmaengine: Add device_terminate_all callback
+  dmaengine: Remove the need to declare device_control
+  dmaengine: Create a generic dma_slave_caps callback
+  dmaengine: pl08x: Split device_control
+  dmaengine: hdmac: Split device_control
+  dmaengine: bcm2835: Split device_control
+  dmaengine: coh901318: Split device_control
+  dmaengine: cppi41: Split device_control
+  dmaengine: jz4740: Split device_control
+  dmaengine: dw: Split device_control
+  dmaengine: edma: Split device_control
+  dmaengine: ep93xx: Split device_control
+  dmaengine: fsl-edma: Split device_control
+  dmaengine: imx: Split device_control
+  dmaengine: imx-sdma: Split device_control
+  dmaengine: intel-mid-dma: Split device_control
+  dmaengine: ipu-idmac: Split device_control
+  dmaengine: k3: Split device_control
+  dmaengine: mmp-pdma: Split device_control
+  dmaengine: mmp-tdma: Split device_control
+  dmaengine: moxart: Split device_control
+  dmaengine: fsl-dma: Split device_control
+  dmaengine: mpc512x: Split device_control
+  dmaengine: mxs: Split device_control
+  dmaengine: nbpfaxi: Split device_control
+  dmaengine: omap: Split device_control
+  dmaengine: pl330: Split device_control
+  dmaengine: bam-dma: Split device_control
+  dmaengine: s3c24xx: Split device_control
+  dmaengine: sa11x0: Split device_control
+  dmaengine: sh: Split device_control
+  dmaengine: sirf: Split device_control
+  dmaengine: sun6i: Split device_control
+  dmaengine: d40: Split device_control
+  dmaengine: tegra20: Split device_control
+  dmaengine: xilinx: Split device_control
+  dmaengine: mv_xor: Remove device_control
+  dmaengine: pch-dma: Rename device_control
+  dmaengine: td: Rename device_control
+  dmaengine: txx9: Rename device_control
+  dmaengine: rapidio: tsi721: Rename device_control
+  dmaengine: bcm2835: Declare slave capabilities for the generic code
+  dmaengine: fsl-edma: Declare slave capabilities for the generic code
+  dmaengine: edma: Declare slave capabilities for the generic code
+  dmaengine: nbpfaxi: Declare slave capabilities for the generic code
+  dmaengine: omap: Declare slave capabilities for the generic code
+  dmaengine: pl330: Declare slave capabilities for the generic code
+  dmaengine: sirf: Declare slave capabilities for the generic code
+  dmaengine: sun6i: Declare slave capabilities for the generic code
+  dmaengine: Add a warning for drivers not using the generic slave caps
+    retrieval
+  dmaengine: Remove device_control and device_slave_caps
+  Documentation: dmaengine: Update the documentation
+
+ Documentation/dmaengine/provider.txt  |  93 ++++++++--------
+ drivers/crypto/ux500/cryp/cryp_core.c |   4 +-
+ drivers/crypto/ux500/hash/hash_core.c |   2 +-
+ drivers/dma/amba-pl08x.c              | 156 +++++++++++++++------------
+ drivers/dma/at_hdmac.c                | 121 ++++++++++++---------
+ drivers/dma/at_xdmac.c                | 127 ++++++++++++----------
+ drivers/dma/bcm2835-dma.c             |  46 ++------
+ drivers/dma/coh901318.c               | 137 +++++++++++------------
+ drivers/dma/cppi41.c                  |  30 +-----
+ drivers/dma/dma-jz4740.c              |  20 +---
+ drivers/dma/dmaengine.c               |  51 +++++----
+ drivers/dma/dw/core.c                 |  82 +++++++-------
+ drivers/dma/edma.c                    |  70 ++++--------
+ drivers/dma/ep93xx_dma.c              |  41 ++-----
+ drivers/dma/fsl-edma.c                | 123 ++++++++++-----------
+ drivers/dma/fsldma.c                  |  91 ++++++----------
+ drivers/dma/imx-dma.c                 | 103 +++++++++---------
+ drivers/dma/imx-sdma.c                |  66 ++++++------
+ drivers/dma/intel_mid_dma.c           |  25 ++---
+ drivers/dma/ipu/ipu_idmac.c           |  96 +++++++++--------
+ drivers/dma/k3dma.c                   | 197 ++++++++++++++++++----------------
+ drivers/dma/mmp_pdma.c                | 109 ++++++++++---------
+ drivers/dma/mmp_tdma.c                |  82 +++++++-------
+ drivers/dma/moxart-dma.c              |  25 +----
+ drivers/dma/mpc512x_dma.c             | 111 +++++++++----------
+ drivers/dma/mv_xor.c                  |   9 --
+ drivers/dma/mxs-dma.c                 |  59 ++++------
+ drivers/dma/nbpfaxi.c                 | 110 +++++++++----------
+ drivers/dma/omap-dma.c                |  69 ++++--------
+ drivers/dma/pch_dma.c                 |   8 +-
+ drivers/dma/pl330.c                   | 126 ++++++++++------------
+ drivers/dma/qcom_bam_dma.c            |  85 +++++++--------
+ drivers/dma/s3c24xx-dma.c             |  75 +++++++------
+ drivers/dma/sa11x0-dma.c              | 158 ++++++++++++++-------------
+ drivers/dma/sh/shdma-base.c           |  72 ++++++-------
+ drivers/dma/sirf-dma.c                |  59 +++-------
+ drivers/dma/ste_dma40.c               |  60 +++++------
+ drivers/dma/sun6i-dma.c               | 159 ++++++++++++++-------------
+ drivers/dma/tegra20-apb-dma.c         |  22 +---
+ drivers/dma/timb_dma.c                |   8 +-
+ drivers/dma/txx9dmac.c                |   9 +-
+ drivers/dma/xilinx/xilinx_vdma.c      |  29 ++---
+ drivers/rapidio/devices/tsi721_dma.c  |   8 +-
+ drivers/tty/serial/atmel_serial.c     |  10 +-
+ include/linux/dmaengine.h             | 121 ++++++++++++---------
+ sound/soc/soc-generic-dmaengine-pcm.c |   2 +-
+ 46 files changed, 1520 insertions(+), 1746 deletions(-)
+
 -- 
 2.1.1
