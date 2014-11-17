@@ -1,68 +1,78 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Mon, 17 Nov 2014 20:46:28 +0000
-Subject: [RFC PATCHv2] ARM: mvebu: Let the device-tree determine smp_ops
-In-Reply-To: <20141117095640.03e25d17@free-electrons.com>
-References: <20141106201603.GF4974@lunn.ch>
- <1415327626-16079-1-git-send-email-chris.packham@alliedtelesis.co.nz>
- <20141117095640.03e25d17@free-electrons.com>
-Message-ID: <546A5E9F.6080309@alliedtelesis.co.nz>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 17 Nov 2014 15:49:14 -0500 (EST)
+Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
+ completes
+In-Reply-To: <20141117202855.GB5258@dtor-ws>
+Message-ID: <Pine.LNX.4.44L0.1411171542001.1747-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Mon, 17 Nov 2014, Dmitry Torokhov wrote:
 
-On 11/17/2014 09:56 PM, Thomas Petazzoni wrote:
-> Dear Chris Packham,
->
-> On Fri,  7 Nov 2014 15:33:46 +1300, Chris Packham wrote:
->> The machine specific SMP operations can be configured either via
->> setup_arch or via arm_dt_init_cpu_maps. For the ARMADA_370_XP_DT devices
->> both of these are called and setup_arch wins because it is called last.
->> This means that it is not possible to substitute a different set of SMP
->> operations via the device-tree.
->>
->> For the ARMADA_370_XP_DT compatible devices add a smp_init function that
->> detects if the device tree has an enable-method defined. If it does
->> return true to indicate that the smp_ops have already been set which
->> will prevent setup_arch from overriding them.
->>
->> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->
-> My colleague Maxime Ripard (in Cc) rightfully suggests exploring a
-> different option: what about getting rid completely of the .smp field
-> of the DT_MACHINE structure, and instead have some code run early
-> enough that looks if an enable-method is defined, and if not, defines
-> it to the default value. This way, we continue to be backward
-> compatible in terms of DT, but we always use the enable-method from the
-> DT, and not sometimes from DT, sometimes from the DT_MACHINE structure.
->
-> Unfortunately, it will have to be done on the flattened DT, because the
-> DT is unflattened right before the enable-method properties are looked
-> up:
->
->          unflatten_device_tree();
->
->          arm_dt_init_cpu_maps();
+> On Mon, Nov 17, 2014 at 02:54:53PM -0500, Alan Stern wrote:
+> > On Mon, 17 Nov 2014, Dmitry Torokhov wrote:
+> > 
+> > > > For devices that aren't part of a power domain, things are simpler.
+> > > > The bus does _get_noresume() to make sure the device won't be runtime
+> > > > suspended while the probe routine is running.  It doesn't do
+> > > > _get_sync(), because that would end up calling the driver's
+> > > > runtime_resume routine before the driver was bound to the device.  (The
+> > > > bus could prevent that from happening by taking special precautions,
+> > > > like PCI does, but in general it's a nuisance.)
+> > > 
+> > > That's why I think we need some new call that would mean "make sure the
+> > > device is powered" which would properly handle power domain and bus, but
+> > > ignore all driver stuff since it may not be initialized yet. And similar
+> > > call for asking to put device and maybe domain in powered down state in
+> > > case probing failed.
+> > 
+> > I can't imagine how such a call would work.
+> > 
+> > The PM core invokes the subsystem's runtime_suspend/resume callback, 
+> > and then the subsystem's routine is responsible for invoking the 
+> > driver's callback (or _not_ invoking it, in this case).
+> > 
+> > Thus, the PM core has no way to tell the subsystem's callback not to
+> > invoke the driver's routine, and adding a new runtime PM call wouldn't
+> > change that.  You'd have to add a new pair of callbacks instead, which 
+> > IMO would be a tremendous waste.
+> > 
+> > Furthermore, the subsystem already _knows_ when the driver gets probed, 
+> > because probing works in the same sort of way: The subsystem's probe 
+> > routine gets invoked, and it is responsible for invoking the driver's 
+> > probe routine.  Therefore the PM core doesn't _need_ to provide this 
+> > extra information to the subsystem.  Rather, the subsystem just needs 
+> > to keep track of the information it already has available.
+> 
+> You are missing concept of power domains in this picture. True,
+> subsystem knows when it probes but power domain does not. Subsystem has
+> no knowledge of power domain (devices in the same subsystem can come
+> from different domains).
 
-That probably wouldn't be too hard because set_smp_ops_by_method() tells 
-us if it's actually set something. We'd just need to propagate that up a 
-few levels. We could either propagate this result through to setup_arch 
-or move the smp_set_ops() call from setup_arch to something that gets 
-invoked based on the return from set_smp_ops_by_method() or 
-arm_dt_init_cpu_maps().
+Okay, I take your point.
 
-I'm a little hesitant because this is core code and I don't have access 
-to a large set of devices to test (plus the whole newbie thing). But I 
-could give it a go and see how far I get.
+> We need to have either subsystem or device core to indicate to power
+> management core that we do not need "full" runtime resume, but rather a
+> "partial" one since driver is not ready yet.
+> 
+> We would not need new callbacks here I think, we just need to be able to
+> select appropriate set of callbacks, depending on the binding state.
 
-> And manipulating the DT in its flattened format, while possible in
-> ->dt_fixup(), is a pain, and probably doesn't allow adding new
-> properties anyway.
->
-> So, in the end, maybe this idea doesn't work, I haven't checked
-> completely.
->
-> Best regards,
->
-> Thomas
->
+When the runtime PM core invokes a power domain's callback routine,
+what does the domain's routine usually do?  Does it go ahead and invoke
+the driver's callback?  Or does it try to invoke the subsystem's
+callback?
+
+Obviously this depends on how the power domain code is written.  But
+suppose every power domain would always use the same strategy as the PM
+core: Invoke the subsystem's callback if there is one; otherwise invoke
+the driver's callback.
+
+Then there wouldn't be a problem.  Even when a runtime-resume went via
+the power domain, the subsystem would still be able to protect the
+not-yet-bound driver from being called.
+
+(... Unless the subsystem itself was incapable of doing this the right 
+way.  But subsystems can be fixed.)
+
+Alan Stern
