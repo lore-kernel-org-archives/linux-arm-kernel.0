@@ -1,72 +1,54 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 17 Nov 2014 13:38:00 +0530
-Subject: [PATCH] opp: convert dev_warn() to dev_dbg() for duplicate OPPs
-Message-ID: <7017fa592bdaf73c260ad001a2b7abdc8d14f08a.1416211616.git.viresh.kumar@linaro.org>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Mon, 17 Nov 2014 09:25:15 +0100
+Subject: [PATCHv1 2/3] arm: mvebu: add .dts file for Synology DS213j
+In-Reply-To: <546931E1.5070909@killerwolves.net> (Ben Peddell's message of
+ "Mon, 17 Nov 2014 09:23:13 +1000")
+References: <cover.1416095841.git.arno@natisbad.org>
+ <1eb26f8c1946622910a7e2318c895a7082fea7e5.1416095841.git.arno@natisbad.org>
+ <20141116020024.GC15870@lunn.ch> <87d28nb83u.fsf@natisbad.org>
+ <546931E1.5070909@killerwolves.net>
+Message-ID: <878ujas07o.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Giving a warning in case we add duplicate OPPs doesn't workout that great. For
-example just playing with cpufreq-dt driver as a module results in this:
+Hi,
 
-$ modprobe cpufreq-dt
-$ modprobe -r cpufreq-dt
-$ modprobe cpufreq-dt
+Ben Peddell <klightspeed@killerwolves.net> writes:
 
-cpu cpu0: dev_pm_opp_add: duplicate OPPs detected. Existing:
-freq: 261819000, volt: 1350000, enabled: 1. New: freq: 261819000, volt: 1350000,
-enabled: 1
-cpu cpu0: dev_pm_opp_add: duplicate OPPs detected. Existing:
-freq: 360000000, volt: 1350000, enabled: 1. New: freq: 360000000, volt: 1350000,
-enabled: 1
-cpu cpu0: dev_pm_opp_add: duplicate OPPs detected. Existing:
-freq: 392728000, volt: 1450000, enabled: 1. New: freq: 392728000, volt: 1450000,
-enabled: 1
-cpu cpu0: dev_pm_opp_add: duplicate OPPs detected. Existing:
-freq: 454737000, volt: 1550000, enabled: 1. New: freq: 454737000, volt: 1550000,
-enabled: 1
+> On 16/11/2014 11:14 PM, Arnaud Ebalard wrote:
+>>>> +	gpio-fan-100-32-35 {
+>>> There is some logic to this naming, but i don't remember what it is.
+>>> Did you check this is appropriate?
+>> The 32-35 is for the MPP i.e. fan uses mpp32 to mpp35 (3 MPP for speed,
+>> one for alarm). I don't know what the 100 part means. What I did is I
+>> googled to see which fan supported kirkwood models have and noticed
+>> that the DS212j uses the exact same fan, i.e. Y.S.Tech FD129225LL-N so
+>> I opted for the same naming.
+>>
+>> On that aspect, you may be able to explain why the speed-map for this
+>> fan goes up to 5000 RPM. This fan is supposed to operate at 1900RPM.
+>> Note that it does not matter in practice.
+>
+> On the Kirkwood Diskstations, the first number (100, 120 or 150) refers
+> to the middle of the three fan speed resistors,
 
-This happens because we don't destroy OPPs (created during ->init()) while
-unloading modules.
+Would not have found that alone ;-) Thanks for clarifying.
 
-Now the question is: Should we destroy these OPPs?
+> the second number (15 or
+> 32) refers to the first fan control pin, and the third number (18 or 35)
+> refers to the first fan alarm pin.
+>
+> i.e. the 100-32-35 uses fan speed resistors of 33, 100 and 150 ohms,
+> uses pins 32-34 for fan control, and uses pin 35 for the fan alarm.
+>
+> The 5000RPM was interpolated from my measured RPM pulse rate (4200PPM)
+> of the 80mm fan in my DS211j (which uses the 150-32-35 fan config) at
+> maximum RPM.
 
-Logically kernel drivers *must* free resources they acquired. But in this
-particular case, the OPPs are created using a static list present in device
-tree. Destroying and then allocating them again isn't of much benefit. The only
-benefit of removing OPPs is to save some space if the driver isn't loaded again.
+Then, I think I need to change the speed map to have 1900 RPM as max
+speed. Out of curiosity, how did you measured the RPM pulse rate
+exactly?
 
-This has its own complications. OPPs can be created either from DT (static) or
-platform code (dynamic). Driver should only remove static OPPs and not the
-dynamic ones as they are controlled from platform code. But there is no field in
-'struct dev_pm_opp' which has this information to distinguish between different
-kind of OPPs.
+Cheers,
 
-Because of all this, I wasn't sure if drivers should remove static OPPs during
-their removal. And so just fixing the reported issue by issuing a dev_dbg()
-instead of dev_warn().
-
-Reported-by: Stefan Wahren <stefan.wahren@i2se.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/base/power/opp.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
-index 89ced95..490e9db 100644
---- a/drivers/base/power/opp.c
-+++ b/drivers/base/power/opp.c
-@@ -466,9 +466,9 @@ int dev_pm_opp_add(struct device *dev, unsigned long freq, unsigned long u_volt)
- 		int ret = opp->available && new_opp->u_volt == opp->u_volt ?
- 			0 : -EEXIST;
- 
--		dev_warn(dev, "%s: duplicate OPPs detected. Existing: freq: %lu, volt: %lu, enabled: %d. New: freq: %lu, volt: %lu, enabled: %d\n",
--			 __func__, opp->rate, opp->u_volt, opp->available,
--			 new_opp->rate, new_opp->u_volt, new_opp->available);
-+		dev_dbg(dev, "%s: duplicate OPPs detected. Existing: freq: %lu, volt: %lu, enabled: %d. New: freq: %lu, volt: %lu, enabled: %d\n",
-+			__func__, opp->rate, opp->u_volt, opp->available,
-+			new_opp->rate, new_opp->u_volt, new_opp->available);
- 		mutex_unlock(&dev_opp_list_lock);
- 		kfree(new_opp);
- 		return ret;
--- 
-2.0.3.693.g996b0fd
+a+
