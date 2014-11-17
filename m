@@ -1,76 +1,98 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:41:58 +0100
-Subject: [PATCH v5 04/61] dmaengine: Rework dma_chan_get
-In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-5-git-send-email-maxime.ripard@free-electrons.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 17 Nov 2014 14:35:44 +0100
+Subject: [PATCH v8 10/13] ARM: dts: berlin: add BG2Q nodes for USB support
+In-Reply-To: <1416231347-27193-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1416231347-27193-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1416231347-27193-11-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dma_chan_get uses a rather interesting error handling and code path.
+Adds nodes describing the Marvell Berlin BG2Q USB PHY and USB. The BG2Q
+SoC has 3 USB host controller, compatible with ChipIdea.
 
-Change it to something more usual in the kernel.
-
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/dma/dmaengine.c | 36 +++++++++++++++++++-----------------
- 1 file changed, 19 insertions(+), 17 deletions(-)
+ arch/arm/boot/dts/berlin2q.dtsi | 55 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
-diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-index 24bfaf0b92ba..72f10e2f5c32 100644
---- a/drivers/dma/dmaengine.c
-+++ b/drivers/dma/dmaengine.c
-@@ -222,31 +222,33 @@ static void balance_ref_count(struct dma_chan *chan)
-  */
- static int dma_chan_get(struct dma_chan *chan)
- {
--	int err = -ENODEV;
- 	struct module *owner = dma_chan_to_owner(chan);
-+	int ret;
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index 2de8d6f8973c..834142bdfbb1 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -114,6 +114,40 @@
+ 			#interrupt-cells = <3>;
+ 		};
  
-+	/* The channel is already in use, update client count */
- 	if (chan->client_count) {
- 		__module_get(owner);
--		err = 0;
--	} else if (try_module_get(owner))
--		err = 0;
-+		goto out;
-+	}
- 
--	if (err == 0)
--		chan->client_count++;
-+	if (!try_module_get(owner))
-+		return -ENODEV;
- 
- 	/* allocate upon first client reference */
--	if (chan->client_count == 1 && err == 0) {
--		int desc_cnt = chan->device->device_alloc_chan_resources(chan);
--
--		if (desc_cnt < 0) {
--			err = desc_cnt;
--			chan->client_count = 0;
--			module_put(owner);
--		} else if (!dma_has_cap(DMA_PRIVATE, chan->device->cap_mask))
--			balance_ref_count(chan);
--	}
-+	ret = chan->device->device_alloc_chan_resources(chan);
-+	if (ret < 0)
-+		goto err_out;
- 
--	return err;
-+	if (!dma_has_cap(DMA_PRIVATE, chan->device->cap_mask))
-+		balance_ref_count(chan);
++		usb_phy2: phy at a2f400 {
++			compatible = "marvell,berlin2-usb-phy";
++			reg = <0xa2f400 0x128>;
++			#phy-cells = <0>;
++			resets = <&chip 0x104 14>;
++			status = "disabled";
++		};
 +
-+out:
-+	chan->client_count++;
-+	return 0;
++		usb2: usb at a30000 {
++			compatible = "chipidea,usb2";
++			reg = <0xa30000 0x10000>;
++			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&chip CLKID_USB2>;
++			phys = <&usb_phy2>;
++			phy-names = "usb-phy";
++			status = "disabled";
++		};
 +
-+err_out:
-+	module_put(owner);
-+	return ret;
- }
++		usb_phy0: phy at b74000 {
++			compatible = "marvell,berlin2-usb-phy";
++			reg = <0xb74000 0x128>;
++			#phy-cells = <0>;
++			resets = <&chip 0x104 12>;
++			status = "disabled";
++		};
++
++		usb_phy1: phy at b78000 {
++			compatible = "marvell,berlin2-usb-phy";
++			reg = <0xb78000 0x128>;
++			#phy-cells = <0>;
++			resets = <&chip 0x104 13>;
++			status = "disabled";
++		};
++
+ 		eth0: ethernet at b90000 {
+ 			compatible = "marvell,pxa168-eth";
+ 			reg = <0xb90000 0x10000>;
+@@ -365,6 +399,26 @@
+ 			};
+ 		};
  
- /**
++		usb0: usb at ed0000 {
++			compatible = "chipidea,usb2";
++			reg = <0xed0000 0x10000>;
++			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&chip CLKID_USB0>;
++			phys = <&usb_phy0>;
++			phy-names = "usb-phy";
++			status = "disabled";
++		};
++
++		usb1: usb at ee0000 {
++			compatible = "chipidea,usb2";
++			reg = <0xee0000 0x10000>;
++			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&chip CLKID_USB1>;
++			phys = <&usb_phy1>;
++			phy-names = "usb-phy";
++			status = "disabled";
++		};
++
+ 		apb at fc0000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
+@@ -457,5 +511,6 @@
+ 				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
+ 		};
++
+ 	};
+ };
 -- 
-2.1.1
+2.1.0
