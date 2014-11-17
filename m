@@ -1,34 +1,135 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:03 +0100
-Subject: [PATCH v5 09/61] dmaengine: Remove the need to declare device_control
+Date: Mon, 17 Nov 2014 14:42:36 +0100
+Subject: [PATCH v5 42/61] dmaengine: d40: Split device_control
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-10-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-43-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to migrate the drivers without triggering a BUG_ON for the converted
-drivers, which would cause bisectability issues, we need to remove that check
-before removing the device_control function entirely.
+Split the device_control callback of the ST-Ericsson DMA 40 driver to make use
+of the newly introduced callbacks, that will eventually be used to retrieve
+slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/dma/dmaengine.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/dma/ste_dma40.c | 60 +++++++++++++++++++++++--------------------------
+ 1 file changed, 28 insertions(+), 32 deletions(-)
 
-diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-index 9b2cd74b8f2e..98e9431f85ec 100644
---- a/drivers/dma/dmaengine.c
-+++ b/drivers/dma/dmaengine.c
-@@ -820,8 +820,6 @@ int dma_async_device_register(struct dma_device *device)
- 		!device->device_prep_dma_sg);
- 	BUG_ON(dma_has_cap(DMA_CYCLIC, device->cap_mask) &&
- 		!device->device_prep_dma_cyclic);
--	BUG_ON(dma_has_cap(DMA_SLAVE, device->cap_mask) &&
--		!device->device_control);
- 	BUG_ON(dma_has_cap(DMA_INTERLEAVE, device->cap_mask) &&
- 		!device->device_prep_interleaved_dma);
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index 5fe59335e247..b781c988b592 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -1429,11 +1429,17 @@ static bool d40_tx_is_linked(struct d40_chan *d40c)
+ 	return is_link;
+ }
+ 
+-static int d40_pause(struct d40_chan *d40c)
++static int d40_pause(struct dma_chan *chan)
+ {
++	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
+ 	int res = 0;
+ 	unsigned long flags;
+ 
++	if (d40c->phy_chan == NULL) {
++		chan_err(d40c, "Channel is not allocated!\n");
++		return -EINVAL;
++	}
++
+ 	if (!d40c->busy)
+ 		return 0;
+ 
+@@ -1448,11 +1454,17 @@ static int d40_pause(struct d40_chan *d40c)
+ 	return res;
+ }
+ 
+-static int d40_resume(struct d40_chan *d40c)
++static int d40_resume(struct dma_chan *chan)
+ {
++	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
+ 	int res = 0;
+ 	unsigned long flags;
+ 
++	if (d40c->phy_chan == NULL) {
++		chan_err(d40c, "Channel is not allocated!\n");
++		return -EINVAL;
++	}
++
+ 	if (!d40c->busy)
+ 		return 0;
+ 
+@@ -2610,6 +2622,11 @@ static void d40_terminate_all(struct dma_chan *chan)
+ 	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
+ 	int ret;
+ 
++	if (d40c->phy_chan == NULL) {
++		chan_err(d40c, "Channel is not allocated!\n");
++		return -EINVAL;
++	}
++
+ 	spin_lock_irqsave(&d40c->lock, flags);
+ 
+ 	pm_runtime_get_sync(d40c->base->dev);
+@@ -2673,6 +2690,11 @@ static int d40_set_runtime_config(struct dma_chan *chan,
+ 	u32 src_maxburst, dst_maxburst;
+ 	int ret;
+ 
++	if (d40c->phy_chan == NULL) {
++		chan_err(d40c, "Channel is not allocated!\n");
++		return -EINVAL;
++	}
++
+ 	src_addr_width = config->src_addr_width;
+ 	src_maxburst = config->src_maxburst;
+ 	dst_addr_width = config->dst_addr_width;
+@@ -2781,35 +2803,6 @@ static int d40_set_runtime_config(struct dma_chan *chan,
+ 	return 0;
+ }
+ 
+-static int d40_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-		       unsigned long arg)
+-{
+-	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
+-
+-	if (d40c->phy_chan == NULL) {
+-		chan_err(d40c, "Channel is not allocated!\n");
+-		return -EINVAL;
+-	}
+-
+-	switch (cmd) {
+-	case DMA_TERMINATE_ALL:
+-		d40_terminate_all(chan);
+-		return 0;
+-	case DMA_PAUSE:
+-		return d40_pause(d40c);
+-	case DMA_RESUME:
+-		return d40_resume(d40c);
+-	case DMA_SLAVE_CONFIG:
+-		return d40_set_runtime_config(chan,
+-			(struct dma_slave_config *) arg);
+-	default:
+-		break;
+-	}
+-
+-	/* Other commands are unimplemented */
+-	return -ENXIO;
+-}
+-
+ /* Initialization functions */
+ 
+ static void __init d40_chan_init(struct d40_base *base, struct dma_device *dma,
+@@ -2870,7 +2863,10 @@ static void d40_ops_init(struct d40_base *base, struct dma_device *dev)
+ 	dev->device_free_chan_resources = d40_free_chan_resources;
+ 	dev->device_issue_pending = d40_issue_pending;
+ 	dev->device_tx_status = d40_tx_status;
+-	dev->device_control = d40_control;
++	dev->device_config = d40_set_runtime_config;
++	dev->device_pause = d40_pause;
++	dev->device_resume = d40_resume;
++	dev->device_terminate_all = d40_terminate_all;
+ 	dev->dev = base->dev;
+ }
  
 -- 
 2.1.1
