@@ -1,32 +1,31 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 17 Nov 2014 14:33:11 +0100
-Subject: [PATCH 1/2] phy: berlin_usb: depends on RESET_CONTROLLER
+Date: Mon, 17 Nov 2014 14:33:12 +0100
+Subject: [PATCH 2/2] ARM: berlin: do not select RESET_CONTROLLER
 In-Reply-To: <1416231192-27056-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1416231192-27056-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1416231192-27056-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1416231192-27056-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Berlin USB PHY driver uses the Berlin reset controller
-unconditionally. Make it depending on RESET_CONTROLLER.
+RESET_CONTROLLER is meant to be user-selectable. To respect that,
+do not select it automatically when using ARCH_BERLIN.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/phy/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-berlin/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index b6da75f563e7..38ca6ff00aef 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -17,7 +17,7 @@ config GENERIC_PHY
+diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
+index 5803f773a065..51582c73a53f 100644
+--- a/arch/arm/mach-berlin/Kconfig
++++ b/arch/arm/mach-berlin/Kconfig
+@@ -7,7 +7,6 @@ menuconfig ARCH_BERLIN
+ 	select DW_APB_ICTL
+ 	select DW_APB_TIMER_OF
+ 	select PINCTRL
+-	select RESET_CONTROLLER
  
- config PHY_BERLIN_USB
- 	tristate "Marvell Berlin USB PHY Driver"
--	depends on ARCH_BERLIN && HAS_IOMEM && OF
-+	depends on ARCH_BERLIN && RESET_CONTROLLER && HAS_IOMEM && OF
- 	select GENERIC_PHY
- 	help
- 	  Enable this to support the USB PHY on Marvell Berlin SoCs.
+ if ARCH_BERLIN
+ 
 -- 
 2.1.0
