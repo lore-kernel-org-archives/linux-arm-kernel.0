@@ -1,33 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Nov 2014 13:21:03 +0100
-Subject: ARM atomics overhaul for musl
-In-Reply-To: <20141117114832.GB29595@e104818-lin.cambridge.arm.com>
-References: <20141116055656.GA13940@brightrain.aerifal.cx>
- <20141116163355.GK4042@n2100.arm.linux.org.uk>
- <20141117114832.GB29595@e104818-lin.cambridge.arm.com>
-Message-ID: <4211926.t6Cc7quoTR@wuerfel>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Mon, 17 Nov 2014 12:22:34 +0000
+Subject: [PATCH 2/2] dt-bindings: simplefb-sunxi: Add sunxi simplefb
+ extensions
+In-Reply-To: <1416224086-5698-3-git-send-email-hdegoede@redhat.com>
+References: <1416224086-5698-1-git-send-email-hdegoede@redhat.com>
+ <1416224086-5698-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <1416226954.5466.8.camel@hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 November 2014 11:48:33 Catalin Marinas wrote:
-> On Sun, Nov 16, 2014 at 04:33:56PM +0000, Russell King - ARM Linux wrote:
-> > On Sun, Nov 16, 2014 at 12:56:56AM -0500, Rich Felker wrote:
-> > > Aside from that, the only case among the above that's "right" already
-> > > is v7+. Hard-coding the mcr-based barrier on v6 is wrong because it's
-> > 
-> > I don't think it's wrong at all.  The instruction isn't going away from
-> > ARMv7, because ARMv7 deprecates it, but it _still_ has to be implemented
-> > by a CPU conforming to ARMv7.  As ARMv7 is going to be the last 32-bit
-> > ARM architecture, we aren't going to see the MCR instruction disappearing
-> > on 32-bit CPUs.
-> 
-> You are wrong here. ARMv8-A supports 32-bit at all levels. ARMv8-R is
-> 32-bit only (and it even has an MMU at EL1). And there is a slight
-> chance that we may even see 32-bit only ARMv8-A implementations (I'm not
-> really giving a hint and I'm not aware of any but I don't see anything
-> preventing this, it's all marketing driven).
+On Mon, 2014-11-17 at 12:34 +0100, Hans de Goede wrote:
+> +- sunxi,pipeline:
+> +  <0> for the de_be0 -> lcdc0 -> output pipeline
+> +  <1> for the de_be1 -> lcdc1 -> output pipeline
 
-FWIW, both Samsung EXYNOS and Qualcomm Snapdragon SoCs based on Cortex-A53
-have been shipped in 32-bit only devices.
+Can we express this as a more descriptive string rather than a number,
+to better handle future developments?
 
-	Arnd
+Otherwise both patches in this series look good to me.
+
+> +- sunxi,output: One of: "hdmi", "lcd", "vga", and "composite"  
+> +
+> +Example:
+> +
+> +chosen {
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	ranges;
+> +
+> +	framebuffer at 0 {
+> +		compatible = "sunxi,framebuffer", "simple-framebuffer";
+> +		sunxi,pipeline = <0>;
+> +		sunxi,output = "hdmi";
+> +		clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
+> +			 <&ahb_gates 44>;
+> +		status = "disabled";
+> +	};
+> +};
