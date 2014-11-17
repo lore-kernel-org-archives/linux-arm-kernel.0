@@ -1,21 +1,42 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 17 Nov 2014 12:34:44 +0100
-Subject: [PATCH 0/2] dt-bindings: simplefb: Drop the advice about using a
+Date: Mon, 17 Nov 2014 12:34:45 +0100
+Subject: [PATCH 1/2] dt-bindings: simplefb: Drop the advice about using a
  specific path for nodes
-Message-ID: <1416224086-5698-1-git-send-email-hdegoede@redhat.com>
+In-Reply-To: <1416224086-5698-1-git-send-email-hdegoede@redhat.com>
+References: <1416224086-5698-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1416224086-5698-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+This goes contrary to how devicetree usually works, so drop it. Instead if
+the firmware needs to be able to find a specific node it should use a
+platform specific compatible + properties for this.
 
-Review of the u-boot sunxi simplefb patches has lead to the decision that
-u-boot should not use a specific path to find the nodes as this goes contrary
-to how devicetree usually works.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ Documentation/devicetree/bindings/video/simple-framebuffer.txt | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-Instead a platform specific compatible + properties should be used for this.
-
-This series updates the simplefb bindings reflect this.
-
-Regards,
-
-Hans
+diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+index f8fb7e6..4474ef6 100644
+--- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
++++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+@@ -31,12 +31,10 @@ enable them. This way if e.g. later on support for more display clocks get
+ added, the simplefb nodes will already contain this info and the firmware
+ does not need to be updated.
+ 
+-If pre-filled framebuffer nodes are used, they should be named
+-"framebuffer#-<output>", e.g. "framebuffer0-hdmi". The output should be
+-included in the name since different outputs typically require different
+-clocks and the clocks are part of the pre-populated nodes. The firmware must
+-rename the nodes to the standard "framebuffer@<address>" name using the
+-runtime chosen address when enabling the nodes.
++If pre-filled framebuffer nodes are used, the firmware may need extra
++information to find the right node. In that case an extra platform specific
++compatible and platform specific properties should be used and documented,
++see e.g. simple-framebuffer-sunxi.txt .
+ 
+ Required properties:
+ - compatible: "simple-framebuffer"
+-- 
+2.1.0
