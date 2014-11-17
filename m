@@ -1,128 +1,88 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 17 Nov 2014 08:45:37 -0800
-Subject: [PATCH v4 1/2] clk: samsung: exynos5440: move restart code into
- clock driver
-In-Reply-To: <1416223273-1279-2-git-send-email-pankaj.dubey@samsung.com>
-References: <1416223273-1279-1-git-send-email-pankaj.dubey@samsung.com>
- <1416223273-1279-2-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <20141117164537.GB28915@roeck-us.net>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon, 17 Nov 2014 16:47:53 +0000
+Subject: [PATCH v3 00/11] Add stih410 SoC/board and USB2/1.1 support for
+ stih416
+Message-ID: <1416242884-5261-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 04:51:12PM +0530, Pankaj Dubey wrote:
-> Let's register restart handler for Exynos5440 from it's clock driver
-> for reboot functionality. So that we can cleanup restart hooks from
-> machine specific file.
-> 
-> CC: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> CC: Tomasz Figa <tomasz.figa@gmail.com>
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Hi folks,
 
-reboot->restart, and consider using pr_warn instead of pr_err.
+This series adds the required device tree nodes to enable the usb2/1.1 phy
+and usb2/1.1 controllers on the stih416-b2120 board.
 
-Since those are nitpicks
+It additionally re-works and adds support for the new stih410 SoC which is
+very similar to the stih407 SoC, by abstracting out the common parts
+into common dt files.
 
-Acked-by: Guenter Roeck <linux@roeck-us.net>
+After Arnds feedback regarding mixing address spaces in the stih407-picophy
+dt nodes, I've tempoarily removed these patches from the series until the
+underlying driver has been fixed, as ideally I would like to get the rest
+of this series into 3.19
 
-> ---
->  arch/arm/mach-exynos/exynos.c        |   19 +------------------
->  drivers/clk/samsung/clk-exynos5440.c |   29 ++++++++++++++++++++++++++++-
->  2 files changed, 29 insertions(+), 19 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index 8f638ad..8f995b7 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -89,24 +89,7 @@ static struct map_desc exynos5_iodesc[] __initdata = {
->  
->  static void exynos_restart(enum reboot_mode mode, const char *cmd)
->  {
-> -	struct device_node *np;
-> -	u32 val = 0x1;
-> -	void __iomem *addr = pmu_base_addr + EXYNOS_SWRESET;
-> -
-> -	if (of_machine_is_compatible("samsung,exynos5440")) {
-> -		u32 status;
-> -		np = of_find_compatible_node(NULL, NULL, "samsung,exynos5440-clock");
-> -
-> -		addr = of_iomap(np, 0) + 0xbc;
-> -		status = __raw_readl(addr);
-> -
-> -		addr = of_iomap(np, 0) + 0xcc;
-> -		val = __raw_readl(addr);
-> -
-> -		val = (val & 0xffff0000) | (status & 0xffff);
-> -	}
-> -
-> -	__raw_writel(val, addr);
-> +	__raw_writel(0x1, pmu_base_addr + EXYNOS_SWRESET);
->  }
->  
->  static struct platform_device exynos_cpuidle = {
-> diff --git a/drivers/clk/samsung/clk-exynos5440.c b/drivers/clk/samsung/clk-exynos5440.c
-> index 00d1d00..f43b925 100644
-> --- a/drivers/clk/samsung/clk-exynos5440.c
-> +++ b/drivers/clk/samsung/clk-exynos5440.c
-> @@ -15,6 +15,8 @@
->  #include <linux/clk-provider.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
-> +#include <linux/notifier.h>
-> +#include <linux/reboot.h>
->  
->  #include "clk.h"
->  #include "clk-pll.h"
-> @@ -23,6 +25,8 @@
->  #define CPU_CLK_STATUS		0xfc
->  #define MISC_DOUT1		0x558
->  
-> +static void __iomem *reg_base;
-> +
->  /* parent clock name list */
->  PNAME(mout_armclk_p)	= { "cplla", "cpllb" };
->  PNAME(mout_spi_p)	= { "div125", "div200" };
-> @@ -89,10 +93,30 @@ static const struct of_device_id ext_clk_match[] __initconst = {
->  	{},
->  };
->  
-> +static int exynos5440_clk_restart_notify(struct notifier_block *this,
-> +		unsigned long code, void *unused)
-> +{
-> +	u32 val, status;
-> +
-> +	status = readl_relaxed(reg_base + 0xbc);
-> +	val = readl_relaxed(reg_base + 0xcc);
-> +	val = (val & 0xffff0000) | (status & 0xffff);
-> +	writel_relaxed(val, reg_base + 0xcc);
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
-> +/*
-> + * Exynos5440 Clock reboot notifier, handles reboot functionality
-> + */
-> +static struct notifier_block exynos5440_clk_restart_handler = {
-> +	.notifier_call = exynos5440_clk_restart_notify,
-> +	.priority = 128,
-> +};
-> +
->  /* register exynos5440 clocks */
->  static void __init exynos5440_clk_init(struct device_node *np)
->  {
-> -	void __iomem *reg_base;
->  	struct samsung_clk_provider *ctx;
->  
->  	reg_base = of_iomap(np, 0);
-> @@ -125,6 +149,9 @@ static void __init exynos5440_clk_init(struct device_node *np)
->  
->  	samsung_clk_of_add_provider(np, ctx);
->  
-> +	if (register_restart_handler(&exynos5440_clk_restart_handler))
-> +		pr_err("exynos5440 clock can't register restart handler\n");
-> +
->  	pr_info("Exynos5440: arm_clk = %ldHz\n", _get_rate("arm_clk"));
->  	pr_info("exynos5440 clock initialization complete\n");
->  }
-> -- 
-> 1.7.9.5
-> 
+As well as adding dt nodes it also enables the relevant drivers in the 
+multi_v7_defconfig.
+
+Finally we update the default bootargs for stih407-b2120 and stih410-b2120
+to boot with the clk_ignore_unused kernel parameter so as not to hang
+the SoC when the (as yet) unreferenced interconnect clocks get disabled
+by CCF (this is a tempoary solution).
+
+This series has been tested on stih416-b2020 and stih410-b2120 SoC/boards.
+
+Changes since v1:
+- Leave bootargs & memory dt nodes in board files (Arnd)
+- Remove '0x' from the unit address in all instances. (Arnd)
+- Remove 'status="okay"' from some nodes (Arnd)
+- Remove some legacy extra nodes which only contain status property (Arnd)
+- Fix stih410 commit description (Maxime)
+- Add a stih410.dtsi and stih410-pinctrl.dtsi files (Maxime)
+- Remove superflous '\n' (Lee)
+- Add a '\n' between the sentries and #include (Lee)
+
+Changes since v2:
+- Remove picophy and ehci/ohci dt nodes for stih407 / stih410 until reg binding is fixed
+- Update miphy365 over to common convention of phy@ (Arnd)
+
+Peter Griffin (11):
+  ARM: STi: DT: STiH416: Add pinctl setup for usb controllers.
+  ARM: STi: DT: STiH416: Add DT node for the stih415/6 usb2 phy
+  ARM: STi: DT: STiH416: Add DT nodes for the ehci and ohci usb
+    controllers.
+  ARM: multi_v7_defconfig: Enable st ohci and ehci HCD drivers.
+  ARM: multi_v7_defconfig: Enable stih415/6 usb2 phy driver.
+  ARM: STi: DT: STiH410: Add defines for STiH410 DT clocks
+  ARM: STi: DT: STiH410:  Add pinctl config for usb controllers.
+  ARM: STi: DT: STih407: Abstract common dt nodes into shared files.
+  ARM: STi: DT: STiH410: Add STiH410 SoC and b2120 board support.
+  ARM: STi: DT: STih407: STih410: Add clk_ignore_unused to kernel
+    bootargs
+  ARM: STi: DT: STiH416: Change miphy356 node name to phy at fe382000
+
+ arch/arm/boot/dts/Makefile               |   1 +
+ arch/arm/boot/dts/stih407-b2120.dts      |  55 +----
+ arch/arm/boot/dts/stih407-family.dtsi    | 278 +++++++++++++++++++++++++
+ arch/arm/boot/dts/stih407.dtsi           | 279 -------------------------
+ arch/arm/boot/dts/stih410-b2120.dts      |  29 +++
+ arch/arm/boot/dts/stih410-clock.dtsi     | 338 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/stih410-pinctrl.dtsi   |  34 ++++
+ arch/arm/boot/dts/stih410.dtsi           |  14 ++
+ arch/arm/boot/dts/stih416-b2020.dts      |   2 +-
+ arch/arm/boot/dts/stih416-b2020e.dts     |   2 +-
+ arch/arm/boot/dts/stih416-pinctrl.dtsi   |  34 ++++
+ arch/arm/boot/dts/stih416.dtsi           | 131 +++++++++++-
+ arch/arm/boot/dts/stihxxx-b2120.dtsi     |  59 ++++++
+ arch/arm/configs/multi_v7_defconfig      |   3 +
+ include/dt-bindings/clock/stih410-clks.h |  25 +++
+ 15 files changed, 951 insertions(+), 333 deletions(-)
+ create mode 100644 arch/arm/boot/dts/stih407-family.dtsi
+ delete mode 100644 arch/arm/boot/dts/stih407.dtsi
+ create mode 100644 arch/arm/boot/dts/stih410-b2120.dts
+ create mode 100644 arch/arm/boot/dts/stih410-clock.dtsi
+ create mode 100644 arch/arm/boot/dts/stih410-pinctrl.dtsi
+ create mode 100644 arch/arm/boot/dts/stih410.dtsi
+ create mode 100644 arch/arm/boot/dts/stihxxx-b2120.dtsi
+ create mode 100644 include/dt-bindings/clock/stih410-clks.h
+
+-- 
+1.9.1
