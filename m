@@ -1,70 +1,80 @@
-From: rf@opensource.wolfsonmicro.com (Richard Fitzgerald)
-Date: Mon, 17 Nov 2014 10:57:54 +0000
-Subject: [PATCH] ASoC: samsung-i2s: Add 192kHz config option
-Message-ID: <1416221874-22092-1-git-send-email-rf@opensource.wolfsonmicro.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Mon, 17 Nov 2014 19:03:13 +0800
+Subject: [Patch V3 0/9] Refine generic/PCI MSI irqodmian interfaces
+Message-ID: <1416222202-28002-1-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds QUIRK_SUPPORTS_192KHZ to allow 192kHz rate
-to be selected for hardware that supports it.
 
-Signed-off-by: Richard Fitzgerald <rf@opensource.wolfsonmicro.com>
----
- .../devicetree/bindings/sound/samsung-i2s.txt      |    2 ++
- include/linux/platform_data/asoc-s3c.h             |    1 +
- sound/soc/samsung/i2s.c                            |    8 ++++++++
- 3 files changed, 11 insertions(+), 0 deletions(-)
+This patch set is based on tip/irq/irqdomain and tries to refine
+interfaces to support irqdomain for generic MSI and PCI MSI.
 
-diff --git a/Documentation/devicetree/bindings/sound/samsung-i2s.txt b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-index d188296..c3f3950 100644
---- a/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-+++ b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-@@ -40,6 +40,8 @@ Optional SoC Specific Properties:
-   sub system(used in secondary sound source).
- - pinctrl-0: Should specify pin control groups used for this controller.
- - pinctrl-names: Should contain only one value - "default".
-+- samsung,supports-192khz: specify this (without a value) if you want to allow
-+    192000 sample rate over the I2S link.
- 
- Example:
- 
-diff --git a/include/linux/platform_data/asoc-s3c.h b/include/linux/platform_data/asoc-s3c.h
-index 5e0bc77..6d0702d 100644
---- a/include/linux/platform_data/asoc-s3c.h
-+++ b/include/linux/platform_data/asoc-s3c.h
-@@ -28,6 +28,7 @@ struct samsung_i2s {
- #define QUIRK_NEED_RSTCLR	(1 << 3)
- #define QUIRK_SUPPORTS_TDM	(1 << 4)
- #define QUIRK_SUPPORTS_IDMA	(1 << 5)
-+#define QUIRK_SUPPORTS_192KHZ	(1 << 6)
- 	/* Quirks of the I2S controller */
- 	u32 quirks;
- 	dma_addr_t idma_addr;
-diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index 947352d..f688e89 100644
---- a/sound/soc/samsung/i2s.c
-+++ b/sound/soc/samsung/i2s.c
-@@ -1219,6 +1219,9 @@ static int samsung_i2s_probe(struct platform_device *pdev)
- 						"specified");
- 			}
- 		}
-+
-+		if (of_find_property(np, "samsung,supports-192khz", NULL))
-+			quirks |= QUIRK_SUPPORTS_192KHZ;
- 	}
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -1247,6 +1250,11 @@ static int samsung_i2s_probe(struct platform_device *pdev)
- 	if (quirks & QUIRK_PRI_6CHAN)
- 		pri_dai->i2s_dai_drv.playback.channels_max = 6;
- 
-+	if (quirks & QUIRK_SUPPORTS_192KHZ) {
-+		pri_dai->i2s_dai_drv.playback.rates |= SNDRV_PCM_RATE_192000;
-+		pri_dai->i2s_dai_drv.capture.rates |= SNDRV_PCM_RATE_192000;
-+	}
-+
- 	if (quirks & QUIRK_SEC_DAI) {
- 		sec_dai = i2s_alloc_dai(pdev, true);
- 		if (!sec_dai) {
+Patch 1 is just minor fixes for tip/irq/irqdomain.
+
+Patch 2-4 introduce mechanisms to help reduce irqdomain users' code size.
+When converting XEN to use hierarchy irqdomain, I found the code size
+increases about 100 lines. So we still need helpers to reduce code size.
+
+Patch 5 introduces some helpers to hide struct msi_desc implementation
+details, so later we could move msi_list from struct pci_dev into
+struct device to enable generic MSI support.
+
+Patch 6 introduces msi_domain_{alloc|free}_irqs() which generalize
+pci_msi_domain_alloc_irqs() to support generic MSI.
+
+Patch 7 introduces default data structures and callback implementations
+to support msi_domain_alloc_irqs(), so reduce burden on generic MSI
+users.
+
+Patch 8 converts PCI MSI to use generic MSI interfaces, and also
+implement default callbacks for PCI MSI.
+
+Patch 9 introduces a mechanism to replace arch_setup_msi_irq()/
+arch_setup_msi_irqs()/arch_teardown_msi_irq()/arch_teardown_msi_irqs().
+
+With this patch set applied, the generic MSI and PCI MSI interfaces
+are much easier to use. For extreme case, you only need to define
+a "struct msi_domain_info" and don't need to implement any callbacks,
+just using the default callbacks is OK:)
+
+This patch set is also a preparation for:
+1) Kill all weak functions in drivers/pci/msi.c
+2) Implement support for non-PCI-compliant MSI device
+
+It has been tested on x86 platforms, comments are welcomed!
+
+V2->V3:
+1) Refine msi_domain_ops.set_desc() and msi_domain_ops.handle_error()
+   interfaces.
+V1->V2:
+1) Fix bugs reported by Marc
+2) Rename MSI_FLAG_USE_DEF_OPS as MSI_FLAG_USE_DEF_DOM_OPS
+3) Add support of MSI_FLAG_USE_DEF_CHIP_OPS
+4) Include linxu/irqhandler.h to use irq_flow_handler_t instead of "void *"
+5) Change iterfaces to pass in "nvect" to msi_domain_ops.msi_prepare()
+6) Add new interfaces/flags to help reduce irqdomain users' code size
+Jiang Liu (8):
+  PCI, MSI: Fix errors caused by commit e5f1a59c4e12
+  irqdomain: Implement a method to automatically call parent domain's
+    alloc/free
+  irqdomain: Introduce helper function irq_domain_add_hierarchy()
+  PCI, MSI: Introduce helpers to hide struct msi_desc implementation
+    details
+  genirq: Introduce msi_domain_{alloc|free}_irqs()
+  genirq: Provide default callbacks for msi_domain_ops
+  PCI, MSI: Refine irqdomain interfaces to simplify its usage
+  PCI, MSI: Provide mechanism to alloc/free MSI/MSIX interrupt from
+    irqdomain
+
+Yingjoe Chen (1):
+  irqdomain: Use consistent prototype for irq_domain_free_irqs_*
+
+ drivers/pci/msi.c         |  183 ++++++++++++++++++++++++++++++++++++---------
+ include/linux/irqdomain.h |   33 ++++----
+ include/linux/msi.h       |   99 +++++++++++++++++++++---
+ kernel/irq/irqdomain.c    |   93 +++++++++++++++++++++--
+ kernel/irq/msi.c          |  175 +++++++++++++++++++++++++++++++++++++++++--
+ 5 files changed, 510 insertions(+), 73 deletions(-)
+
 -- 
-1.7.2.5
+1.7.10.4
