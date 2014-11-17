@@ -1,57 +1,71 @@
-From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
-Date: Mon, 17 Nov 2014 18:07:53 +0100
-Subject: [PATCH] gpio: mxs: implement get_direction callback
-In-Reply-To: <546A29B9.5030104@elproma.com.pl>
-References: <1416004026-9667-1-git-send-email-j.uzycki@elproma.com.pl>
- <20141114232601.GW27002@pengutronix.de> <5467A980.5090204@elproma.com.pl>
- <20141116214239.GX27002@pengutronix.de> <54693A51.5080907@elproma.com.pl>
- <54695654.3070209@elproma.com.pl> <20141117082848.GZ27002@pengutronix.de>
- <546A29B9.5030104@elproma.com.pl>
-Message-ID: <546A2B69.4010409@elproma.com.pl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Nov 2014 17:07:28 +0000
+Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
+ completes
+In-Reply-To: <546A2854.3020204@ti.com>
+References: <1416237550-31092-1-git-send-email-ulf.hansson@linaro.org>
+ <20141117153257.GS4042@n2100.arm.linux.org.uk>
+ <546A2854.3020204@ti.com>
+Message-ID: <20141117170728.GX4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Nov 17, 2014 at 06:54:44PM +0200, Grygorii Strashko wrote:
+> I'd be very appreciated if you would be able to clarify one point to me as
+> I'm not familiar with amba hw?
+> 
+> I've found at least 2 AMBA drivers where secondary clock is used 
+> to enable/disable device in addition to "apb_pclk":
+>  - drivers/mmc/host/mmci.c 
+>  - drivers/spi/spi-pl022.c
+> So, form the code point of view, the assumption that "unbound AMBA
+> devices are already powered up" is not always true. And "apb_pclk"
+> is just an interface clock in such cases. 
 
-W dniu 2014-11-17 o 18:00, Janusz U?ycki pisze:
->
-> W dniu 2014-11-17 o 09:28, Uwe Kleine-K?nig pisze:
->> I think:
->>
->>     struct mctrl_gpios {
->>         struct uart_port *port;
->>         struct {
->>             gpio_desc *gpio;
->>             unsigned int irq;
->>         } mctrl_line[UART_GPIO_MAX];
->>     };
->>
->>     struct mctrl_gpios *mctrl_gpio_init(struct uart_port *port, 
->> unsigned int idx_if_needed);
->>     int mctrl_gpio_enable_ms(struct mctrl_gpios *gpios);
->>     int mctrl_gpio_disable_ms(struct mctrl_gpios *gpios);
->>     void mctrl_gpio_free(struct mctrl_gpios *gpios);
->
-> It looks there could be one more helper useful.
-> Both atmel_serial.c and mxs-auart.c checks if the line is supported by 
-> mctrl_gpio.
-> One time it is eg.:
-> (s->gpio_irq[UART_GPIO_DCD] > 0)
-> another time it is eg.:
-> IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(s->gpios, UART_GPIO_RTS))
->
-> The first one is no possible now. The second seems rude.
-> bool mctrl_gpio_is_gpio((struct mctrl_gpios *gpios, enum 
-> mctrl_gpio_idx gidx);
-> The name is hard. Moreover the implementation could be very similar
-> to mctrl_gpio_to_gpiod(). Any ideas?
+Right, what we're talking about here is that the device is accessible
+to the CPU - that it is powered up and the bus clock to it is running,
+so that accesses to the device will not cause a bus fault.
 
-The differences:
-- faster
-- not exported
-- used mainly in uart's interrupt
-- assumes that struct mctrl_gpios *gpios exists
+It does not mean that the external interface to the outside world is
+functional - for example, there's no suggestion that the clock to the
+SD/MMC card attached to MMCI would be running, or that the SD/MMC card
+itself would be powered up, and the same goes for the clocks supplied
+as functional clocks.  The driver is expected to manage these clocks
+(see below.)
 
-Just inline function?
+How this all works in the AMBA context is:
 
-best regards
-Janusz
+- we ensure that the apb_pclk is running by getting it, preparing and
+  enabling it.
+
+- the bus code calls pm_runtime_get_noresume() which increments the
+  usage counter without calling the (as yet not bound) driver.
+
+- if a PM domain is attached to the device, it should already be active
+  and powered up.
+
+- the device is marked active (as it should now be powered and bus-clocked.)
+
+- runtime PM is enabled.
+
+At this point, the device must be accessible to the CPU.
+
+- the driver probe function is called, and it can go around getting any
+  additional clocks it needs, and enabling or disabling them as it
+  requires.  (For example, in the case of MMCI, a card may not be inserted
+  in the slot, so the driver may decide to keep the functional MMCICLK
+  disabled.)
+
+- if the driver wishes to take part in runtime PM, it calls pm_runtime_put()
+  or an equivalent function.  This balances the pm_runtime_get_noresume()
+  above, and allows the runtime PM infrastructure to consider the device
+  idle, and a candidate for runtime suspend.
+
+Should the device runtime suspend, it's up to the driver to deal with the
+functional clocks it is managing, because only it knows whether it kept
+those clocks running, and disabling an already disabled clock is not
+permitted.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
