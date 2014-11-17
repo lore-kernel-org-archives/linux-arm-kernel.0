@@ -1,57 +1,77 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 18 Nov 2014 00:28:26 +0100
-Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
- completes
-In-Reply-To: <20141117221700.GA2049@dtor-ws>
-References: <20141117220238.GE5258@dtor-ws>
- <Pine.LNX.4.44L0.1411171708010.4838-100000@iolanthe.rowland.org>
- <20141117221700.GA2049@dtor-ws>
-Message-ID: <9731926.0Og5ZNPBtE@vostro.rjw.lan>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 17 Nov 2014 17:12:40 -0600
+Subject: [PATCH V5 09/12] usb: xhci: Add NVIDIA Tegra xHCI
+ host-controller driver
+In-Reply-To: <1416264102-1323-10-git-send-email-abrestic@chromium.org>
+References: <1416264102-1323-1-git-send-email-abrestic@chromium.org>
+ <1416264102-1323-10-git-send-email-abrestic@chromium.org>
+Message-ID: <20141117231240.GB9716@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 17, 2014 02:17:00 PM Dmitry Torokhov wrote:
-> On Mon, Nov 17, 2014 at 05:12:35PM -0500, Alan Stern wrote:
-> > On Mon, 17 Nov 2014, Dmitry Torokhov wrote:
-> > 
-> > > > >  Except buses
-> > > > > usually call pm_generic_runtime_resume() which ends up fetching driver's
-> > > > > callbacks. Maybe pm_generic_runtime_*() need be a bit smarter?
-> > > > 
-> > > > No, the bus subsystem needs to be smarter.  It shouldn't call 
-> > > > pm_generic_runtime_resume() if the driver hasn't been probed yet, or if 
-> > > > the driver has already been unbound from the device.
-> > > 
-> > > But that code wold be exactly the same for all buses, right? So why
-> > > can't pm_generic_runtime_resume() be smarter?
-> > 
-> > It would not be the same for all buses.  Each bus will have its own way 
-> > of recognizing whether or not a driver has been probed (i.e., by 
-> > checking some field in the bus-specific part of the device structure).
-> > 
-> > > However, is it allowed to call pm_runtime_get_sync() on devices that
-> > > didn't issue pm_runtime_enable()?
-> > 
-> > Yes.  But the bus has to issue pm_runtime_enable() before probing the 
-> > driver, because the driver will expect runtime PM to work properly 
-> > while its probe routine runs.  For example, the probe routine might 
-> > want to leave the device in a runtime-suspended state.  It can't do 
-> > that if the device isn't enabled for runtime PM.
-> 
-> That means that runtime PM will be enabled for all devices on given bus
-> while up till now drivers were deciding if their devices should be
-> runtime-pm-managed or not.
+Hi,
 
-That's not the case for PCI drivers.
+On Mon, Nov 17, 2014 at 02:41:39PM -0800, Andrew Bresticker wrote:
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index a3ca137..e2415d3 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -50,6 +50,15 @@ config USB_XHCI_RCAR
+>  	  Say 'Y' to enable the support for the xHCI host controller
+>  	  found in Renesas R-Car ARM SoCs.
+>  
+> +config USB_XHCI_TEGRA
+> +	tristate "xHCI support for NVIDIA Tegra SoCs"
+> +	depends on ARCH_TEGRA
 
-> I do not think we are quite ready for this.
+it would be nice if you could still leave || COMPILE_TEST here.
 
-We have to do that if power domains are in use, however, because if at least
-one device in a power domain in enabled for runtime PM, that will affect the
-other devices in that domain.
+[snip]
 
-We could make a rule to keep a domail always up if at least one device in it
-has runtime PM disabled, but that is equivalent to enabling runtime PM for
-that device, powering the domain up and bumping up the device's usage counter.
+> +static const struct {
+> +	const char *name;
+> +	unsigned int num;
+> +} tegra_xhci_phy_types[] = {
+> +	{
+> +		.name = "usb3",
+> +		.num = TEGRA_XUSB_USB3_PHYS,
+> +	}, {
+> +		.name = "utmi",
+> +		.num = TEGRA_XUSB_UTMI_PHYS,
+> +	}, {
+> +		.name = "hsic",
+> +		.num = TEGRA_XUSB_HSIC_PHYS,
+> +	},
 
-Rafael
+these should be using the generic PHY subsystem (drivers/phy).
+
+> +static int tegra_xhci_load_firmware(struct tegra_xhci_hcd *tegra)
+> +{
+> +	struct device *dev = tegra->dev;
+> +	struct tegra_xhci_fw_cfgtbl *cfg_tbl;
+> +	struct tm fw_tm;
+> +	u32 val, code_tag_blocks, code_size_blocks;
+> +	u64 fw_base;
+> +	time_t fw_time;
+> +	unsigned long timeout;
+> +
+> +	if (csb_readl(tegra, XUSB_CSB_MP_ILOAD_BASE_LO) != 0) {
+> +		dev_info(dev, "Firmware already loaded, Falcon state 0x%x\n",
+> +			 csb_readl(tegra, XUSB_FALC_CPUCTL));
+> +		return 0;
+> +	}
+
+won't this prevent rmmod && insmod from succeeding ? Maybe not, as you
+return 0 anyway, but if the firmware side craps out, it might be useful
+to reload the firmware and reset that block. I wonder if this prevents
+that.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/daf8af31/attachment.sig>
