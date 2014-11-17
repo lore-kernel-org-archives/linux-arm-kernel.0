@@ -1,44 +1,67 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 17 Nov 2014 15:17:46 +0300
-Subject: [PATCH] ARM: dts: DRA7: Add node for RTC
-In-Reply-To: <1416199509-3977-1-git-send-email-lokeshvutla@ti.com>
-References: <1416199509-3977-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <5469E76A.7020105@cogentembedded.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Mon, 17 Nov 2014 12:18:14 +0000
+Subject: [PATCH 2/2] dt-bindings: simplefb-sunxi: Add sunxi simplefb
+ extensions
+In-Reply-To: <1416224086-5698-3-git-send-email-hdegoede@redhat.com>
+References: <1416224086-5698-1-git-send-email-hdegoede@redhat.com>
+ <1416224086-5698-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <CACxGe6vaWbs558W4cjvSdDeujH_1qYPAoo9+AP-wUb1MUSd76w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 11/17/2014 7:45 AM, Lokesh Vutla wrote:
-
-> Add node for RTC.
-
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> [nm at ti.com: update with rtc crossbar number]
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
->   arch/arm/boot/dts/dra7.dtsi | 9 +++++++++
->   1 file changed, 9 insertions(+)
-
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index 9cc9843..f98f9f0 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -1075,6 +1075,15 @@
->   			status = "disabled";
->   		};
+On Mon, Nov 17, 2014 at 11:34 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> If pre-filled framebuffer nodes are used, the firmware may need extra
+> properties to find the right node. This documents the properties to use
+> for this on sunxi platforms.
 >
-> +		rtc: rtcss at 48838000 {
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-    Please just name the node "rtc at 48838000", in accordance with ePAPR.
+Acked-by: Grant Likely <grant.likely@linaro.org>
 
-> +			compatible = "ti,am3352-rtc";
-> +			reg = <0x48838000 0x100>;
-> +			interrupts = <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>;
-
-    2 similar interrupts?
-
-[...]
-
-WBR, Sergei
+> ---
+>  .../bindings/video/simple-framebuffer-sunxi.txt    | 33 ++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+>
+> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+> new file mode 100644
+> index 0000000..84ca264
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+> @@ -0,0 +1,33 @@
+> +Sunxi specific Simple Framebuffer bindings
+> +
+> +This binding documents sunxi specific extensions to the simple-framebuffer
+> +bindings. The sunxi simplefb u-boot code relies on the devicetree containing
+> +pre-populated simplefb nodes.
+> +
+> +These extensions are intended so that u-boot can select the right node based
+> +on which pipeline and output is being used. As such they are solely intended
+> +for firmware / bootloader use, and the OS should ignore them.
+> +
+> +Required properties:
+> +- compatible: "sunxi,framebuffer"
+> +- sunxi,pipeline:
+> +  <0> for the de_be0 -> lcdc0 -> output pipeline
+> +  <1> for the de_be1 -> lcdc1 -> output pipeline
+> +- sunxi,output: One of: "hdmi", "lcd", "vga", and "composite"
+> +
+> +Example:
+> +
+> +chosen {
+> +       #address-cells = <1>;
+> +       #size-cells = <1>;
+> +       ranges;
+> +
+> +       framebuffer at 0 {
+> +               compatible = "sunxi,framebuffer", "simple-framebuffer";
+> +               sunxi,pipeline = <0>;
+> +               sunxi,output = "hdmi";
+> +               clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
+> +                        <&ahb_gates 44>;
+> +               status = "disabled";
+> +       };
+> +};
+> --
+> 2.1.0
+>
