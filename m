@@ -1,53 +1,71 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 17 Nov 2014 10:27:26 +0900
-Subject: [PATCH v4 0/2] ARM: shmobile: Add early debugging support using
- SCIF(A)
-In-Reply-To: <1415980187-12683-1-git-send-email-geert+renesas@glider.be>
-References: <1415980187-12683-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20141117012726.GI11143@verge.net.au>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 17 Nov 2014 02:29:06 +0100
+Subject: [PATCHv2 7/8] arm: mvebu: add .dts file for Synology DS213j
+In-Reply-To: <9a6ba2383c1a4ce9fad3f7c15b23050e67409178.1416158990.git.arno@natisbad.org>
+References: <cover.1416158990.git.arno@natisbad.org>
+ <9a6ba2383c1a4ce9fad3f7c15b23050e67409178.1416158990.git.arno@natisbad.org>
+Message-ID: <20141117012906.GA23536@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 14, 2014 at 04:49:45PM +0100, Geert Uytterhoeven wrote:
-> 	Hi Simon, Magnus, Arnd,
-> 
-> This patch series adds serial port debug macros for the SCIF(A) serial ports.
-> This includes all supported shmobile SoCs, except for EMEV2.
-> 
-> It contains 2 patches, which are two alternative versions:
->   - The first patch keeps on using the identity mapping set up by .map_io()
->     on platforms I cannot test myself (sh7372 and r8a7779),
->   - The second one converts the remaining platforms to use debug_ll_io_init(),
->     which allowed to get rid of the #ifdef in renesas-scif.S, and consolidate
->     more config options.
-> 
-> Both versions work fine on r8a7791/koelsch (multiplatform), r8a7740/armadillo
-> (legacy and reference), and sh73a0/kzm9g (legacy, reference, and
-> multiplatform), also with a multiplatform kernel based on shmobile_defconfig.
-> 
-> I'd appreciate if you could test the second one on sh7372 and r8a7779,
-> and if it works, apply it.
+On Sun, Nov 16, 2014 at 06:37:54PM +0100, Arnaud Ebalard wrote:
+> +				sata1_pres_pin: sata1-pres-pin {
+> +					marvell,pins = "mpp60";
+> +					marvell,function = "gpio";
+> +				};
+> +
+> +				sata2_pres_pin: sata2-pres-pin {
+> +					marvell,pins = "mpp48";
+> +					marvell,function = "gpio";
+> +				};
 
-Done. I have satisfied myself that 4b works on those SoCs and have
-queued-up 4b accordingly.
+Hi Arnaud
 
-> Else, please apply the first version. We can do incremental conversions later,
-> as discussed before.
-> 
-> Thanks!
-> 
-> Gr{oetje,eeting}s,
-> 
-> 						Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
-> 							    -- Linus Torvalds
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Are they above correct?
+
+       MPP_MODE(48,
+           MPP_FUNCTION(0x0, "gpio", NULL),
+           MPP_FUNCTION(0x1, "dev", "ad9"),
+           MPP_FUNCTION(0x2, "uart0", "rts"),
+           MPP_FUNCTION(0x3, "sd0", "cmd"),
+           MPP_FUNCTION(0x4, "sata1", "prsnt"),
+           MPP_FUNCTION(0x5, "spi0", "cs1")),
+
+and
+
+        MPP_MODE(60,
+           MPP_FUNCTION(0x0, "gpio", NULL),
+           MPP_FUNCTION(0x1, "dev", "ale1"),
+           MPP_FUNCTION(0x2, "uart1", "rxd"),
+           MPP_FUNCTION(0x3, "sata0", "prsnt"),
+           MPP_FUNCTION(0x4, "pcie", "rst-out"),
+           MPP_FUNCTION(0x5, "audio", "sdi")),
+
+Seems like function sata[01] would be better than gpio.
+
+Also, i don't see you using these anywhere.
+
+There are a few files in /sys which you might find interesting.
+
+/sys/kernel/debug/pinctrl/f1018000.pinctrl/pinconf-groups shows you
+how pins are currently defined. These can be how Linux has set them,
+or if Linux has not touched them, how the boot loader set them.
+
+/sys/kernel/debug/pinctrl/f1018000.pinctrl/pinmux-pins shows you what
+has been claimed by Linux, either as a gpio or for a specific
+function.
+
+There are two schools of thoughts for pinctl. One is to leave the
+bootloader to configure the pins, and Linux should use them as they
+are. The other is that Linux should not trust the bootloader and
+configure the pins itself. With kirkwood we have tried to configure
+everything in Linux. I also think for these two boards, we should
+configure everything. The reason being the broken bootloader. I
+suspect because of the saveenv corruption, more than average are going
+to install a new uboot, or barebox image. A generic uboot might not
+get the pinctl correct, and a barebox image will be using the dtb blob
+to configure the pins. So it would be good to see that all pins which
+are used and claimed by a driver.
+
+Thanks
+	Andrew
