@@ -1,80 +1,61 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 17 Nov 2014 09:54:30 -0700
-Subject: [PATCH 00/10] Save MSI chip in pci_sys_data
-In-Reply-To: <alpine.DEB.2.11.1411171035270.3909@nanos>
-References: <1414396127-30023-1-git-send-email-wangyijing@huawei.com>
- <20141112042359.GK28161@google.com> <20141117025914.GC4280@google.com>
- <alpine.DEB.2.11.1411171035270.3909@nanos>
-Message-ID: <CAErSpo46d0OJbO6tuDUXb2q7+00BUuHzJdsCr+aOhY4we+zn=w@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 17 Nov 2014 18:54:44 +0200
+Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
+ completes
+In-Reply-To: <20141117153257.GS4042@n2100.arm.linux.org.uk>
+References: <1416237550-31092-1-git-send-email-ulf.hansson@linaro.org>
+ <20141117153257.GS4042@n2100.arm.linux.org.uk>
+Message-ID: <546A2854.3020204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 2:38 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> On Sun, 16 Nov 2014, Bjorn Helgaas wrote:
->> On Tue, Nov 11, 2014 at 09:23:59PM -0700, Bjorn Helgaas wrote:
->> > On Mon, Oct 27, 2014 at 03:48:37PM +0800, Yijing Wang wrote:
->> > > Yijing Wang (10):
->> > >   MSI: Rename msi_chip to msi_controller for better readability
->> > >   PCI/MSI: Introduce weak pcibios_msi_controller()
->> > >   arm/MSI: Save MSI controller in pci_sys_data
->> > >   PCI: tegra: Save MSI controller in pci_sys_data
->> > >   PCI: designware: Save MSI controller in pci_sys_data
->> > >   PCI: rcar: Save MSI controller in pci_sys_data
->> > >   PCI: mvebu: Save MSI controller in pci_sys_data
->> > >   PCI: xilinx: Save MSI controller in pci_sys_data
->> > >   arm/PCI: Clean unused pcibios_add_bus() and pcibios_remove_bus()
->> > >   PCI/MSI: Remove useless bus->msi assignment
->> >
->> > Applied to pci/msi for v3.19, thanks.
+Hi Russell,
+
+On 11/17/2014 05:32 PM, Russell King - ARM Linux wrote:
+> On Mon, Nov 17, 2014 at 04:19:10PM +0100, Ulf Hansson wrote:
+>> The amba bus, amba drivers and a vast amount of platform drivers which
+>> enables runtime PM, don't invoke a pm_runtime_get_sync() while probing
+>> their devices.
 >>
->> This series is currently in the pci "next" branch, but the fact that there
->> are so many MSI-related changes from so many people makes me worry that
->> we're heading for a merge problem.
->>
->> Here are the outstanding IRQ- and MSI-related things I've seen:
->>
->>   Marc   10/25 [00/03] genirq: Add support for "split-EOI" irqchips
->>   Yijing 10/27 [00/10] Save MSI chip in pci_sys_data
->>   Yijing 10/27 [00/16] Use MSI controller framework to configure MSI/MSI-X
->>   Jiang  10/27 [Part1 v3 00/20] Prepare for enabling hierarchy irqdomain on x86
->>   Jiang  11/02 [v8 00/18] Enable support of IOAPIC hotplug on x86 platforms
->>   Jiang  11/06 [Part2 v5 00/31] Enable hierarchy irqdomian on x86 platforms
->>   Jiang  11/09 [Part3 v3 00/38] Enable hierarchy irqdomian on x86 platforms
->>   Marc   11/11 [00/15] arm64: PCI/MSI: GICv3 ITS support (stacked domain edition)
->>   Thomas 11/12 [00/16] genirq: Hierarchical irq domains and generic MSI interrupt code
->>   Jiang  11/15 [V2 00/09] Refine generic/PCI MSI irqodmian interfaces
->>   Marc   11/15 [00/02] Stacked domains and MSI improvements
->>
->> PCI is only a minor participant, and I certainly don't have the expertise
->> to deal with all this, so I suspect that I should just drop these from the
->> PCI tree and let Thomas deal with them.  It seems like it would make more
->> sense to get all this stuff merged together in a single tree rather than
->> having some come via PCI and others come from via other trees.
->
-> The simplest way to dead with it is that I pull in pci/msi (assuming
-> that it contains only the above) and base the rest of it on top, so I
-> can deal with the resulting conflicts. So you still can keep that in
-> your pile and no matter who sends the pull request first everything
-> will just fall in place.
+>> Instead, once they have turned on their PM resourses during ->probe()
+>> and are ready to handle I/O, these invokes pm_runtime_set_active() to
+>> synchronize its state towards the runtime PM core.
+> 
+> The above is misleading for amba.  The code sequence is:
+> 
+>                  pm_runtime_get_noresume(dev);
+>                  pm_runtime_set_active(dev);
+>                  pm_runtime_enable(dev);
+> 
+>                  ret = pcdrv->probe(pcdev, id);
+> 
+> AMBA drivers should never call pm_runtime_set_active(), as the runtime PM
+> state has already been initialised by the bus code.  Platform drivers are
+> different; the platform code provides zero help for runtime PM.
+> 
+> The sequence used by AMBA bus code is the sequence which was used by PCI
+> (as per commit f3ec4f87d607) at the time the runtime PM support was
+> written for AMBA.  PCI assumes that unbound devices are already powered
+> up, and as far as I'm aware, that's also true of AMBA devices as well.
+> I have yet to have access to a platform where this isn't true, neither
+> has anyone reported that such a platform exists.
+> 
 
-In addition to the ("Save MSI chip in pci_sys_data") series, my
-pci/msi branch contains these:
+I'd be very appreciated if you would be able to clarify one point to me as
+I'm not familiar with amba hw?
 
-  f83386942702 s390/MSI: Use __msi_mask_irq() instead of default_msi_mask_irq()
-  03f56e42d03e Revert "PCI: Add x86_msi.msi_mask_irq() and msix_mask_irq()"
-  38737d82f9f0 PCI/MSI: Add pci_msi_ignore_mask to prevent writes to
-MSI/MSI-X Mask Bits
+I've found at least 2 AMBA drivers where secondary clock is used 
+to enable/disable device in addition to "apb_pclk":
+ - drivers/mmc/host/mmci.c 
+ - drivers/spi/spi-pl022.c
+So, form the code point of view, the assumption that "unbound AMBA devices are
+already powered up" is not always true. And "apb_pclk" is just an interface clock
+in such cases. 
+>From another side above statement is true for mailbox/pl320-ipc.c which seems like
+is simple device.
+Am I wrong?
 
-but I don't think it will hurt if you pull in those as well.
+Thanks in advance. 
 
-The bigger problem might be the first patch of the "Save MSI chip in
-pci_sys_data", which renames "struct msi_chip" to "struct
-msi_controller".  I asked Yijing to do that because I didn't think
-"_chip" really conveyed any information.  I didn't know we were going
-to have quite this many MSI-related patches to fix up.
-
-So I'll just leave my pci/msi branch as-is for now.  If the rename is
-too painful, let me know and I'll drop the branch and we can rework
-the rest of the "Save MSI chip in pci_sys_data" series to match.
-
-Bjorn
+regards,
+-grygorii
