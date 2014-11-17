@@ -1,51 +1,33 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Mon, 17 Nov 2014 17:48:43 +0530
-Subject: [PATCH 0/4] Touchscreen performance related fixes
-In-Reply-To: <5458C87F.80409@linutronix.de>
-References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
- <544E821D.5040004@linutronix.de>
- <912A29987EAE174BA6CF187D7CDFA9CE26F46B2B@DLEE08.ent.ti.com>
- <54577258.9080508@linutronix.de> <5458BC0B.1040803@ti.com>
- <5458C87F.80409@linutronix.de>
-Message-ID: <5469E7A3.2000303@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Nov 2014 13:18:42 +0100
+Subject: For the problem when using swiotlb
+In-Reply-To: <5469E26B.2010905@huawei.com>
+References: <5469E26B.2010905@huawei.com>
+Message-ID: <1650523.IrjSXzxF5O@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday 17 November 2014 19:56:27 Ding Tianhong wrote:
+> Hi Catalin:
+>         The commit 3690951fc6d42f3a0903987677d0e592c49dd8db(arm64: Use swiotlb late initialisation)
+> switches the DMA mapping code to swiotlb_tlb_late_init_with_default_size(), this will occur a problem
+> when I run the scsi stress tests, the message as below:
+> 
+>         sas_controller b1000000.sas: swiotlb buffer is full (sz: 65536 bytes)..
+>         DMA: Out of SW-IOMMU space for 65536 bytes at device b1000000.sas
+> 
+> The reason is that the swiotlb_tlb_late_init_with_default_size() could only alloc 16M memory for DMA-mapping,
+> and the param in cmdline "swiotlb=xxx" is useless because the get_free_pages() only use the buddy to assigned a
+> maximum memory of 16M(The MAX_ORDER is 13 for 4k pages), obviously 16M is too small in many scenes, but
+> the swiotlb_init() which could reserved a bigger memory as wished could work well for most drivers.
+> 
+> I could not get a better way to fix this problem except to revert this patch, so could you please give me some
+> advise and help me, thanks very much.
 
+In general, you should not need to use swiotlb for most devices, in
+particular for high-performance devices like network or block.
 
-On Tuesday 04 November 2014 06:07 PM, Sebastian Andrzej Siewior wrote:
-> On 11/04/2014 12:44 PM, Vignesh R wrote:
-> 
->> I ran following commands
->> $ evtest /dev/input/touchscreen0 &
->> (with heavy item on touchscreen)
->>  and
->> $ cat /sys/bus/iio/devices/iio\:device0/scan_elements/in_voltage4_en
->> (in a busy loop)
->> I tried above experiment on my board but I didn't hit any problem even
->> after running for close to 30 minutes. I was unable to reproduce failure
-> 
-> Just to make sure: You had the touchscreen and iio command running in
-> parallel and you saw evtest output while there was iio operation?
-> 
->> The problem may be in configuring correct charge-delay value. Please run:
->> $ ts_test > /dev/null
->> and let me know if pen events are being detected properly.
-> 
-> Well I get the touch events but not while busy loop on iio interface is
-> running (I get maybe one event every 5 seconds or so).
-> After all, it is the same HW you have.
+Please make sure that you have set up the dma-ranges properties in
+your DT properly to allow 64-bit DMA if the device supports it.
 
-Were you able to test the latest version (v4) of this patch series?
-Please let me know if the performance is satisfactory.
-
-Regards
-Vignesh
-
-> 
-> Sebastian
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+	Arnd
