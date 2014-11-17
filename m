@@ -1,37 +1,59 @@
-From: ankit.jindal@linaro.org (Ankit Jindal)
-Date: Mon, 17 Nov 2014 16:06:12 +0530
-Subject: [PATCH v5 6/6] MAINTAINERS: Add entry for APM X-Gene QMTM UIO driver
-In-Reply-To: <1416220572-13381-1-git-send-email-ankit.jindal@linaro.org>
-References: <1416220572-13381-1-git-send-email-ankit.jindal@linaro.org>
-Message-ID: <1416220572-13381-7-git-send-email-ankit.jindal@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 17 Nov 2014 10:40:11 +0000
+Subject: [PATCH V4] arm64: percpu: Implement this_cpu operations
+In-Reply-To: <1415977413-17642-1-git-send-email-steve.capper@linaro.org>
+References: <20141114134644.GD27963@arm.com>
+ <1415977413-17642-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <20141117104010.GB18061@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add entry to maintainer list for APM X-Gene QMTM UIO driver.
+Hi Steve,
 
-Signed-off-by: Ankit Jindal <ankit.jindal@linaro.org>
-Signed-off-by: Tushar Jagad <tushar.jagad@linaro.org>
----
- MAINTAINERS |    7 +++++++
- 1 file changed, 7 insertions(+)
+On Fri, Nov 14, 2014 at 03:03:33PM +0000, Steve Capper wrote:
+> The generic this_cpu operations disable interrupts to ensure that the
+> requested operation is protected from pre-emption. For arm64, this is
+> overkill and can hurt throughput and latency.
+> 
+> This patch provides arm64 specific implementations for the this_cpu
+> operations. Rather than disable interrupts, we use the exclusive
+> monitor or atomic operations as appropriate.
+> 
+> The following operations are implemented: add, add_return, and, or,
+> read, write, xchg. We also wire up a cmpxchg implementation from
+> cmpxchg.h.
+> 
+> Testing was performed using the percpu_test module and hackbench on a
+> Juno board running 3.18-rc4.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 5e7866a..138663f 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -727,6 +727,13 @@ S:	Supported
- F:	drivers/net/ethernet/apm/xgene/
- F:	Documentation/devicetree/bindings/net/apm-xgene-enet.txt
- 
-+APPLIED MICRO (APM) X-GENE QMTM UIO DRIVER
-+M:	Ankit Jindal <ankit.jindal@linaro.org>
-+M:	Tushar Jagad <tushar.jagad@linaro.org>
-+S:	Supported
-+F:	drivers/uio/uio_xgene_qmtm.c
-+F:	Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt
-+
- APTINA CAMERA SENSOR PLL
- M:	Laurent Pinchart <Laurent.pinchart@ideasonboard.com>
- L:	linux-media at vger.kernel.org
--- 
-1.7.9.5
+Looks good. I notice that this change drops the compiler barriers too,
+which we used to get via local_irq_{enable/disable}. I *think* that's fine
+(at least, I couldn't find a place that breaks due to that) but it would be
+nice to know that it was deliberate :)
+
+> +static inline void __percpu_write(void *ptr, unsigned long val, int size)
+> +{
+> +	switch (size) {
+> +	case 1:
+> +		ACCESS_ONCE(*((u8 *)ptr)) = (u8) val;
+> +		break;
+> +	case 2:
+> +		ACCESS_ONCE(*((u16 *)ptr)) = (u16) val;
+> +		break;
+> +	case 4:
+> +		ACCESS_ONCE(*((u32 *)ptr)) = (u32) val;
+> +		break;
+> +	case 8:
+> +		ACCESS_ONCE(*((u64 *)ptr)) = (u64) val;
+> +		break;
+
+I think you've gone a bit overboard with brackets and spacing here. Can't
+you just do something like:
+
+  ACCESS_ONCE(*(u64 *)ptr) = (u64)val;
+
+Anyway:
+
+  Reviewed-by: Will Deacon <will.deacon@arm.com>
+
+Will
