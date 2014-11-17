@@ -1,45 +1,53 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 17 Nov 2014 14:53:05 +0100
-Subject: [PATCH 1/4] ARM: shmobile: r8a7740 dtsi: Add cache-controller node
-In-Reply-To: <1416232388-2611-1-git-send-email-geert+renesas@glider.be>
-References: <1416232388-2611-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1416232388-2611-2-git-send-email-geert+renesas@glider.be>
+Date: Mon, 17 Nov 2014 14:53:04 +0100
+Subject: [PATCH 0/4] ARM: shmobile: r8a7740/armadillo: Migrate to generic l2c
+ OF
+Message-ID: <1416232388-2611-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the missing cache-controller node. This will allow migration to the
-generic l2c OF initialization.
+	Hi Simon, Magnus,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: devicetree at vger.kernel.org
----
-Note: This depends on "[PATCH v5 7/8] ARM: shmobile: r8a7740 dtsi: Add
-      PM domain support" due to the pd_a3sm reference.
----
- arch/arm/boot/dts/r8a7740.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+This patch series migrates the DT-based generic r8a7740 platform and the
+armadillo legacy platform from calling l2x0_of_init() to the generic l2c OF
+initialization.
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index e2c9496c2c325a1f..a9c7a986c0e9eca6 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -37,6 +37,17 @@
- 		      <0xc2000000 0x1000>;
- 	};
- 
-+	L2: cache-controller {
-+		compatible = "arm,pl310-cache";
-+		reg = <0xf0100000 0x1000>;
-+		interrupts = <84>;
-+		power-domains = <&pd_a3sm>;
-+		arm,data-latency = <3 3 3>;
-+		arm,tag-latency = <2 2 2>;
-+		cache-unified;
-+		cache-level = <2>;
-+	};
-+
- 	pmu {
- 		compatible = "arm,cortex-a9-pmu";
- 		interrupts = <0 83 IRQ_TYPE_LEVEL_HIGH>;
+Dependencies:
+  - The first patch depends on "[PATCH v5 7/8] ARM: shmobile: r8a7740 dtsi: Add
+    PM domain support", due to the pd_a3sm reference.
+    However, that line can just be removed if the dependency is postponed.
+  - Although there are separate patches for dtsi, SoC code, and board code,
+    there are dependencies among the individual patches: patches 2 and 3 depend
+    on patch 1, and patch 4 depends on patches 2 and 3 (and thus 1).
+
+Note that this conversion should be applied to sh73a0, r8a7778, and r8a7779,
+too. More about sh73a0 later.
+
+Thanks!
+	    
+Geert Uytterhoeven (4):
+  ARM: shmobile: r8a7740 dtsi: Add cache-controller node
+  ARM: shmobile: r8a7740: Migrate to generic l2c OF initialization
+  ARM: shmobile: armadillo legacy: Migrate to generic l2c OF
+    initialization
+  ARM: shmobile: r8a7740: Remove mapping of L2 cache controller
+    registers
+
+ arch/arm/boot/dts/r8a7740.dtsi                 | 11 +++++++++++
+ arch/arm/mach-shmobile/board-armadillo800eva.c | 10 +++-------
+ arch/arm/mach-shmobile/setup-r8a7740.c         | 20 +++-----------------
+ 3 files changed, 17 insertions(+), 24 deletions(-)
+
 -- 
 1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
