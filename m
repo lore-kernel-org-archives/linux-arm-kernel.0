@@ -1,42 +1,100 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 17 Nov 2014 12:07:16 +0100
-Subject: [PATCH V3] ARM: tegra: Re-add removed SoC id macro to
- tegra_resume()
-In-Reply-To: <1412947487-24287-1-git-send-email-digetx@gmail.com>
-References: <1412947487-24287-1-git-send-email-digetx@gmail.com>
-Message-ID: <20141117110715.GB25699@ulmo>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 17 Nov 2014 11:14:50 +0000
+Subject: [PATCH 07/11] arm: perf: document PMU affinity binding
+In-Reply-To: <1415377536-12841-8-git-send-email-mark.rutland@arm.com>
+References: <1415377536-12841-1-git-send-email-mark.rutland@arm.com>
+ <1415377536-12841-8-git-send-email-mark.rutland@arm.com>
+Message-ID: <20141117111450.GD18061@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 10, 2014 at 05:24:47PM +0400, Dmitry Osipenko wrote:
-> Commit d127e9c ("ARM: tegra: make tegra_resume can work with current and later
-> chips") removed tegra_get_soc_id macro leaving used cpu register corrupted after
-> branching to v7_invalidate_l1() and as result causing execution of unintended
-> code on tegra20. Possibly it was expected that r6 would be SoC id func argument
-> since common cpu reset handler is setting r6 before branching to tegra_resume(),
-> but neither tegra20_lp1_reset() nor tegra30_lp1_reset() aren't setting r6
-> register before jumping to resume function. Fix it by re-adding macro.
-> 
-> Fixes: d127e9c (ARM: tegra: make tegra_resume can work with current and later chips)
-> Cc: <stable@vger.kernel.org> # v3.13+
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
-> ---
-> V2: added Cc's for lakml and stable, added "Reviewed-by:" Felipe Balbi
-> V3: changed commit description, tested on real hw
-> 
-> PS: It wasn't a bug in my emulator :)
-> 
->  arch/arm/mach-tegra/reset-handler.S | 1 +
->  1 file changed, 1 insertion(+)
+Hi Mark,
 
-Applied, thanks.
+On Fri, Nov 07, 2014 at 04:25:32PM +0000, Mark Rutland wrote:
+> To describe the various ways CPU PMU interrupts might be wired up, we
+> can refer to the topology information in the device tree.
+> 
+> This patch adds a new property to the PMU binding, interrupts-affinity,
+> which describes the relationship between CPUs and interrupts. This
+> information is necessary to handle systems with heterogeneous PMU
+> implementations (e.g. big.LITTLE). Documentation is added describing the
+> use of said property.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/48b17ba4/attachment.sig>
+I'm not entirely comfortable with using interrupt affinity to convey
+PMU affinity. It seems perfectly plausible for somebody to play the usual
+trick of ORing all the irq lines together, despite having a big/little
+PMU configuration.
+
+Can you describe such a system with this binding?
+
+> +Example 2 (Multiple clusters with single interrupts):
+> +
+> +cpus {
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +
+> +	CPU0: cpu at 0 {
+> +		reg = <0x0>;
+> +		compatible = "arm,cortex-a15-pmu";
+> +	};
+> +
+> +	CPU1: cpu at 1 {
+> +		reg = <0x1>;
+> +		compatible = "arm,cotex-a15-pmu";
+
+cortex
+
+> +	};
+> +
+> +	CPU100: cpu at 100 {
+> +		reg = <0x100>;
+> +		compatible = "arm,cortex-a7-pmu";
+> +	};
+> +
+> +	cpu-map {
+> +		cluster0 {
+> +			CORE_0_0: core0 {
+> +				cpu = <&CPU0>;
+> +			};
+> +			CORE_0_1: core1 {
+> +				cpu = <&CPU1>;
+> +			};
+> +		};
+> +		cluster1 {
+> +			CORE_1_0: core0 {
+> +				cpu = <&CPU100>;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +pmu_a15 {
+> +	compatible = "arm,cortex-a15-pmu";
+> +	interrupts = <100>, <101>;
+> +	interrupts-affinity = <&CORE0>, <&CORE1>;
+> +};
+> +
+> +pmu_a7 {
+> +	compatible = "arm,cortex-a7-pmu";
+> +	interrupts = <105>;
+> +	interrupts-affinity = <&CORE_1_0>;
+> +};
+> +
+> +Example 3 (Multiple clusters with per-cpu interrupts):
+> +
+> +cpus {
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +
+> +	CPU0: cpu at 0 {
+> +		reg = <0x0>;
+> +		compatible = "arm,cortex-a15-pmu";
+> +	};
+> +
+> +	CPU1: cpu at 1 {
+> +		reg = <0x1>;
+> +		compatible = "arm,cotex-a15-pmu";
+
+Same here.
+
+Will
