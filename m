@@ -1,168 +1,94 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 17 Nov 2014 08:32:57 -0600
-Subject: [PATCH 07/11] arm: perf: document PMU affinity binding
-In-Reply-To: <1415377536-12841-8-git-send-email-mark.rutland@arm.com>
-References: <1415377536-12841-1-git-send-email-mark.rutland@arm.com>
- <1415377536-12841-8-git-send-email-mark.rutland@arm.com>
-Message-ID: <CAL_Jsq+u9--tP-pYBut0V6oAnRDbwqpaJ9UMyW55AhCNFV10sA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 17 Nov 2014 14:34:03 +0000
+Subject: ARM atomics overhaul for musl
+In-Reply-To: <20141117133035.GF10829@port70.net>
+References: <20141116055656.GA13940@brightrain.aerifal.cx>
+ <20141116163355.GK4042@n2100.arm.linux.org.uk>
+ <20141117114832.GB29595@e104818-lin.cambridge.arm.com>
+ <4211926.t6Cc7quoTR@wuerfel> <20141117133035.GF10829@port70.net>
+Message-ID: <20141117143403.GD29595@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 7, 2014 at 10:25 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> To describe the various ways CPU PMU interrupts might be wired up, we
-> can refer to the topology information in the device tree.
->
-> This patch adds a new property to the PMU binding, interrupts-affinity,
-> which describes the relationship between CPUs and interrupts. This
-> information is necessary to handle systems with heterogeneous PMU
-> implementations (e.g. big.LITTLE). Documentation is added describing the
-> use of said property.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> ---
->  Documentation/devicetree/bindings/arm/pmu.txt | 104 +++++++++++++++++++++++++-
->  1 file changed, 103 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
-> index 75ef91d..23a0675 100644
-> --- a/Documentation/devicetree/bindings/arm/pmu.txt
-> +++ b/Documentation/devicetree/bindings/arm/pmu.txt
-> @@ -24,12 +24,114 @@ Required properties:
->
->  Optional properties:
->
-> +- interrupts-affinity : A list of phandles to topology nodes (see topology.txt) describing
-> +            the set of CPUs associated with the interrupt at the same index.
+On Mon, Nov 17, 2014 at 01:30:35PM +0000, Szabolcs Nagy wrote:
+> * Arnd Bergmann <arnd@arndb.de> [2014-11-17 13:21:03 +0100]:
+> > On Monday 17 November 2014 11:48:33 Catalin Marinas wrote:
+> > > On Sun, Nov 16, 2014 at 04:33:56PM +0000, Russell King - ARM Linux wrote:
+> > > > On Sun, Nov 16, 2014 at 12:56:56AM -0500, Rich Felker wrote:
+> > > > > Aside from that, the only case among the above that's "right" already
+> > > > > is v7+. Hard-coding the mcr-based barrier on v6 is wrong because it's
+> > > > 
+> > > > I don't think it's wrong at all.  The instruction isn't going away from
+> > > > ARMv7, because ARMv7 deprecates it, but it _still_ has to be implemented
+> > > > by a CPU conforming to ARMv7.  As ARMv7 is going to be the last 32-bit
+> > > > ARM architecture, we aren't going to see the MCR instruction disappearing
+> > > > on 32-bit CPUs.
+> > > 
+> > > You are wrong here. ARMv8-A supports 32-bit at all levels. ARMv8-R is
+> > > 32-bit only (and it even has an MMU at EL1). And there is a slight
+> > > chance that we may even see 32-bit only ARMv8-A implementations (I'm not
+> > > really giving a hint and I'm not aware of any but I don't see anything
+> > > preventing this, it's all marketing driven).
+> > 
+> > FWIW, both Samsung EXYNOS and Qualcomm Snapdragon SoCs based on Cortex-A53
+> > have been shipped in 32-bit only devices.
+> 
+> ARMv8-A manual talks about two execution sates:
+> - aarch64 with 64 bit registers and A64 instruction set
+> - aarch32 with 32 bit registers and A32 or T32 instruction sets
+> 
+> (i thought an armv8-a cpu must support both but that is not
+> relevant to userspace)
 
-Are there cases beyond PMUs we need to handle? I would think so, so we
-should document this generically.
+I'm not sure there is a clear statement that both must be supported.
+Even if they are, an SoC manufacturer may decide to hardwire the EL3
+register width (external pin) to 32-bit only which makes the CPU a
+32-bit one (as Arnd already mentioned).
 
->  - qcom,no-pc-write : Indicates that this PMU doesn't support the 0xc and 0xd
->                       events.
->
-> -Example:
-> +Example 1 (A single CPU):
+> for userspace the two states are different architectures
+> so i guess for libc aarch32 backward compatibility is the
+> interesting question (does armv7 instructions, syscalls, elf
+> abi work on aarch32) and how to recognize it when its new
+> features can be used in the libc
 
-Isn't this a single cluster of 2 cpus?
+The AT_PLATFORM on an AArch32 kernel running on ARMv8 would report
+"v7l". An AArch64 kernel would report "v8l" to _compat_ tasks.
 
->
->  pmu {
->          compatible = "arm,cortex-a9-pmu";
->          interrupts = <100 101>;
->  };
-> +
-> +Example 2 (Multiple clusters with single interrupts):
+The AArch32 kernel could (and I think it should) be aligned to ARMv8 as
+well. This is a trivial patch adding the corresponding proc_info in
+proc-v7.S for Cortex-A53 etc. (we don't really need a proc-v8.S).
 
-The meaning of single could be made a bit more clear especially if you
-consider Will's case. But I haven't really thought of better
-wording...
+The differences between AArch32 binaries running on ARMv7 and ARMv8 are
+around /proc/cpuinfo and uname (the latter matches x86 behaviour
+already but for the former we wrongly thought people would just use
+HWCAP). 32-bit binaries would need to use PER_LINUX32 personality for
+uname and /proc/cpuinfo (the latter from 3.19) if they want the
+ARMv7-like information.
 
-> +
-> +cpus {
-> +       #address-cells = <1>;
-> +       #size-cells = <1>;
-> +
-> +       CPU0: cpu at 0 {
-> +               reg = <0x0>;
-> +               compatible = "arm,cortex-a15-pmu";
-> +       };
-> +
-> +       CPU1: cpu at 1 {
-> +               reg = <0x1>;
-> +               compatible = "arm,cotex-a15-pmu";
-> +       };
-> +
-> +       CPU100: cpu at 100 {
-> +               reg = <0x100>;
-> +               compatible = "arm,cortex-a7-pmu";
-> +       };
-> +
-> +       cpu-map {
-> +               cluster0 {
-> +                       CORE_0_0: core0 {
-> +                               cpu = <&CPU0>;
-> +                       };
-> +                       CORE_0_1: core1 {
-> +                               cpu = <&CPU1>;
-> +                       };
-> +               };
-> +               cluster1 {
-> +                       CORE_1_0: core0 {
-> +                               cpu = <&CPU100>;
-> +                       };
-> +               };
-> +       };
-> +};
-> +
-> +pmu_a15 {
-> +       compatible = "arm,cortex-a15-pmu";
-> +       interrupts = <100>, <101>;
-> +       interrupts-affinity = <&CORE0>, <&CORE1>;
+The other things like syscall, HWCAP, AT_PLATFORM are all provided in a
+compatible way to 32-bit binaries.
 
-The phandle names are wrong here.
+> if aarch32 has cp15 barrier then that is an option for portable
+> binaries and the other approach is runtime dispatch but then libc
+> needs a reliable check for >=armv7
 
-> +};
-> +
-> +pmu_a7 {
-> +       compatible = "arm,cortex-a7-pmu";
-> +       interrupts = <105>;
-> +       interrupts-affinity = <&CORE_1_0>;
-> +};
-> +
-> +Example 3 (Multiple clusters with per-cpu interrupts):
-> +
-> +cpus {
-> +       #address-cells = <1>;
-> +       #size-cells = <1>;
-> +
-> +       CPU0: cpu at 0 {
-> +               reg = <0x0>;
-> +               compatible = "arm,cortex-a15-pmu";
-> +       };
-> +
-> +       CPU1: cpu at 1 {
-> +               reg = <0x1>;
-> +               compatible = "arm,cotex-a15-pmu";
-> +       };
-> +
-> +       CPU100: cpu at 100 {
-> +               reg = <0x100>;
-> +               compatible = "arm,cortex-a7-pmu";
-> +       };
-> +
-> +       cpu-map {
-> +               CLUSTER0: cluster0 {
-> +                       core0 {
-> +                               cpu = <&CPU0>;
-> +                       };
-> +                       core1 {
-> +                               cpu = <&CPU1>;
-> +                       };
-> +               };
-> +               CLUSTER1: cluster1 {
-> +                        core0 {
-> +                               cpu = <&CPU100>;
-> +                       };
-> +               };
-> +       };
-> +};
-> +
-> +pmu_a15 {
-> +       compatible = "arm,cortex-a15-pmu";
-> +       interrupts = <100>;
-> +       interrupts-affinity = <&CLUSTER0>;
-> +};
-> +
-> +pmu_a7 {
-> +       compatible = "arm,cortex-a7-pmu";
-> +       interrupts = <105>;
-> +       interrupts-affinity = <&CLUSTER1>;
-> +};
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+AT_PLATFORM should work. We could also add a HWCAP bit for the presence
+of DMB/DSB/ISB as well but it does not solve the problem of older
+kernels, so I wouldn't recommend it.
+
+We've had a long thread about deprecated/obsolete instructions and how
+we inform user space about them. My proposal is here:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/269675.html
+
+which means that for CP15 barriers, we emulate the instructions even
+though they are present to give an advanced warning to user space that
+these may no longer be optimal at some point (e.g. emulated). As a
+consequence, see the thread below implementing emulation, with the
+possibility of quick hardware execution if available (e.g. for CP15
+barriers, though defaulting to emulation):
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/297448.html
+
+-- 
+Catalin
