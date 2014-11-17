@@ -1,175 +1,177 @@
-From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Mon, 17 Nov 2014 12:08:53 +0530
-Subject: [PATCH v7 1/2] usb: host: xhci-plat: Get PHYs for xhci's hcds
-In-Reply-To: <1414761989-21088-2-git-send-email-gautam.vivek@samsung.com>
-References: <1414761989-21088-1-git-send-email-gautam.vivek@samsung.com>
- <1414761989-21088-2-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <CAFp+6iE8BNoZZLho2apHZA-e9_XkUuVbAq798kc8y+E8wb=i7Q@mail.gmail.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Mon, 17 Nov 2014 13:40:22 +0800
+Subject: [PATCH v7 08/13] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <1415978763-27345-9-git-send-email-antoine.tenart@free-electrons.com>
+References: <1415978763-27345-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1415978763-27345-9-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20141117054021.GB30017@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+On Fri, Nov 14, 2014 at 04:25:58PM +0100, Antoine Tenart wrote:
+> Add a USB2 ChipIdea driver for ci13xxx, with optional PHY, clock
+> and DMA mask, to support USB2 ChipIdea controllers that don't need
+> specific functions.
+> 
+> Tested on the Marvell Berlin SoCs USB controllers.
+> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
+I remember someone tested it before, you can add his tested-by if you
+can find it.
 
-
-On Fri, Oct 31, 2014 at 6:56 PM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
-> The host controller by itself may sometimes need to handle PHY
-> and re-initialize it to re-configure some of the PHY parameters
-> to get full support out of the PHY controller.
-> Therefore, facilitate getting the two possible PHYs, viz.
-> USB 2.0 type (UTMI+) and USB 3.0 type (PIPE3), and initialize them.
->
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
 > ---
->  drivers/usb/host/xhci-plat.c |   74 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 74 insertions(+)
->
-> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> index 3d78b0c..5207d5b 100644
-> --- a/drivers/usb/host/xhci-plat.c
-> +++ b/drivers/usb/host/xhci-plat.c
-> @@ -16,6 +16,7 @@
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/platform_device.h>
+>  drivers/usb/chipidea/Makefile       |   1 +
+>  drivers/usb/chipidea/ci_hdrc_usb2.c | 117 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 118 insertions(+)
+>  create mode 100644 drivers/usb/chipidea/ci_hdrc_usb2.c
+> 
+> diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+> index 2f099c7df7b5..1fc86a2ca22d 100644
+> --- a/drivers/usb/chipidea/Makefile
+> +++ b/drivers/usb/chipidea/Makefile
+> @@ -10,6 +10,7 @@ ci_hdrc-$(CONFIG_USB_OTG_FSM)		+= otg_fsm.o
+>  
+>  # Glue/Bridge layers go here
+>  
+> +obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_usb2.o
+>  obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_msm.o
+>  obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_zevio.o
+>  
+> diff --git a/drivers/usb/chipidea/ci_hdrc_usb2.c b/drivers/usb/chipidea/ci_hdrc_usb2.c
+> new file mode 100644
+> index 000000000000..15a0947483b8
+> --- /dev/null
+> +++ b/drivers/usb/chipidea/ci_hdrc_usb2.c
+> @@ -0,0 +1,117 @@
+> +/*
+> + * Copyright (C) 2014 Marvell Technology Group Ltd.
+> + *
+> + * Antoine Tenart <antoine.tenart@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
 > +#include <linux/phy/phy.h>
->  #include <linux/slab.h>
->  #include <linux/usb/xhci_pdriver.h>
->
-> @@ -129,10 +130,41 @@ static int xhci_plat_probe(struct platform_device *pdev)
->                         goto put_hcd;
->         }
->
-> +       /* Get possile USB 2.0 type PHY (UTMI+) available with xhci */
-> +       hcd->phy = devm_phy_get(&pdev->dev, "usb2-phy");
-> +       if (IS_ERR(hcd->phy)) {
-> +               ret = PTR_ERR(hcd->phy);
-> +               if (ret == -EPROBE_DEFER) {
-> +                       goto disable_clk;
-> +               } else if (ret != -ENOSYS && ret != -ENODEV) {
-> +                       hcd->phy = NULL;
-> +                       dev_warn(&pdev->dev,
-> +                                "Error retrieving usb2 phy: %d\n", ret);
-> +               }
-> +       }
+> +#include <linux/platform_device.h>
+> +#include <linux/usb/chipidea.h>
+> +#include <linux/usb/hcd.h>
+> +#include <linux/usb/ulpi.h>
 > +
->         ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
->         if (ret)
->                 goto disable_clk;
->
-> +       /*
-> +        * Initialize and power-on USB 2.0 PHY
-> +        * FIXME: Isn't this a hacky way of initializing the PHY again ?
-> +        * xhci's parent would have already initialized the PHY, but we
-> +        * wanna do it again.
-> +        */
+> +#include "ci.h"
+> +
+> +struct ci_hdrc_usb2_priv {
+> +	struct platform_device	*ci_pdev;
+> +	struct clk		*clk;
+> +};
+> +
+> +static struct ci_hdrc_platform_data ci_default_pdata = {
+> +	.capoffset	= DEF_CAPOFFSET,
+> +	.flags		= CI_HDRC_REQUIRE_TRANSCEIVER |
+> +			  CI_HDRC_DISABLE_STREAMING,
+> +};
+> +
 
-Does this change looks anywhere close to what you suggested to
-re-initialize PHYs in XHCI even after DWC3 has initialized them once,
-in order to avoid adding phy_calibration() callback ? ;-)
+"CI_HDRC_REQUIRE_TRANSCEIVER" is deleted, have you rebased my next tree?
 
-> +       hcd->phy->init_count = 0;
-> +       ret = phy_init(hcd->phy);
-> +       if (ret)
-> +               goto dealloc_usb2_hcd;
-> +
-> +       hcd->phy->power_count = 0;
-> +       ret = phy_power_on(hcd->phy);
-> +       if (ret) {
-> +               phy_exit(hcd->phy);
-> +               goto dealloc_usb2_hcd;
-> +       }
-> +
->         device_wakeup_enable(hcd->self.controller);
->
->         /* USB 2.0 roothub is stored in the platform_device now. */
-> @@ -158,12 +190,41 @@ static int xhci_plat_probe(struct platform_device *pdev)
->         if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
->                 xhci->shared_hcd->can_do_streams = 1;
->
-> +       /* Get possile USB 3.0 type PHY (PIPE3) available with xhci */
-> +       xhci->shared_hcd->phy = devm_phy_get(&pdev->dev, "usb3-phy");
-> +       if (IS_ERR(xhci->shared_hcd->phy)) {
-> +               ret = PTR_ERR(xhci->shared_hcd->phy);
-> +               if (ret == -EPROBE_DEFER) {
-> +                       goto put_usb3_hcd;
-> +               } else if (ret != -ENOSYS && ret != -ENODEV) {
-> +                       xhci->shared_hcd->phy = NULL;
-> +                       dev_warn(&pdev->dev,
-> +                                "Error retrieving usb3 phy: %d\n", ret);
-> +               }
-> +       }
-> +
->         ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
->         if (ret)
->                 goto put_usb3_hcd;
->
-> +       /* Initialize and power-on USB 3.0 PHY */
-> +       xhci->shared_hcd->phy->init_count = 0;
-> +       ret = phy_init(xhci->shared_hcd->phy);
-> +       if (ret)
-> +               goto dealloc_usb3_hcd;
-> +
-> +       xhci->shared_hcd->phy->power_count = 0;
-> +       ret = phy_power_on(xhci->shared_hcd->phy);
-> +       if (ret) {
-> +               phy_exit(xhci->shared_hcd->phy);
-> +               goto dealloc_usb3_hcd;
-> +       }
-> +
->         return 0;
->
-> +dealloc_usb3_hcd:
-> +       usb_remove_hcd(xhci->shared_hcd);
-> +
->  put_usb3_hcd:
->         usb_put_hcd(xhci->shared_hcd);
->
-> @@ -186,9 +247,15 @@ static int xhci_plat_remove(struct platform_device *dev)
->         struct xhci_hcd *xhci = hcd_to_xhci(hcd);
->         struct clk *clk = xhci->clk;
->
-> +       phy_power_off(xhci->shared_hcd->phy);
-> +       phy_exit(xhci->shared_hcd->phy);
-> +
->         usb_remove_hcd(xhci->shared_hcd);
->         usb_put_hcd(xhci->shared_hcd);
->
-> +       phy_power_off(hcd->phy);
-> +       phy_exit(hcd->phy);
-> +
->         usb_remove_hcd(hcd);
->         if (!IS_ERR(clk))
->                 clk_disable_unprepare(clk);
-> @@ -204,6 +271,8 @@ static int xhci_plat_suspend(struct device *dev)
->         struct usb_hcd  *hcd = dev_get_drvdata(dev);
->         struct xhci_hcd *xhci = hcd_to_xhci(hcd);
->
-> +       phy_exit(hcd->phy);
-> +
->         return xhci_suspend(xhci);
->  }
->
-> @@ -211,6 +280,11 @@ static int xhci_plat_resume(struct device *dev)
->  {
->         struct usb_hcd  *hcd = dev_get_drvdata(dev);
->         struct xhci_hcd *xhci = hcd_to_xhci(hcd);
-> +       int ret;
-> +
-> +       ret = phy_init(hcd->phy);
-> +       if (ret)
-> +               return ret;
->
->         return xhci_resume(xhci, 0);
->  }
-> --
-> 1.7.10.4
->
+> +static int ci_hdrc_usb2_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct ci_hdrc_usb2_priv *priv;
+> +	struct ci_hdrc_platform_data *ci_pdata = dev_get_platdata(&pdev->dev);
 
+You can dev instead of &pdev->dev.
 
+> +	int ret;
+> +
+> +	if (!ci_pdata)
+> +		ci_pdata = &ci_default_pdata;
+> +
+> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	priv->clk = devm_clk_get(dev, NULL);
+> +	if (!IS_ERR(priv->clk)) {
+> +		ret = clk_prepare_enable(priv->clk);
+> +		if (ret) {
+> +			dev_err(dev, "failed to enable the clock: %d\n", ret);
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+> +	if (ret)
+> +		goto clk_err;
+> +
+> +	ci_pdata->name = dev_name(&pdev->dev);
+> +
+> +	priv->ci_pdev = ci_hdrc_add_device(dev, pdev->resource,
+> +					   pdev->num_resources, ci_pdata);
+> +	if (IS_ERR(priv->ci_pdev)) {
+> +		ret = PTR_ERR(priv->ci_pdev);
+> +		if (ret != -EPROBE_DEFER)
+> +			dev_err(dev,
+> +				"failed to register ci_hdrc platform device: %d\n",
+> +				ret);
+> +		goto clk_err;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, priv);
+> +
+> +	pm_runtime_no_callbacks(dev);
+> +	pm_runtime_enable(dev);
+> +
+> +	return 0;
+> +
+> +clk_err:
+> +	if (!IS_ERR(priv->clk))
+> +		clk_disable_unprepare(priv->clk);
+> +	return ret;
+> +}
+> +
+> +static int ci_hdrc_usb2_remove(struct platform_device *pdev)
+> +{
+> +	struct ci_hdrc_usb2_priv *priv = platform_get_drvdata(pdev);
+> +
+> +	pm_runtime_disable(&pdev->dev);
+> +	ci_hdrc_remove_device(priv->ci_pdev);
+> +	clk_disable_unprepare(priv->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id ci_hdrc_usb2_of_match[] = {
+> +	{ .compatible = "chipidea,usb2" },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, ci_hdrc_usb2_of_match);
+> +
+> +static struct platform_driver ci_hdrc_usb2_driver = {
+> +	.probe	= ci_hdrc_usb2_probe,
+> +	.remove	= ci_hdrc_usb2_remove,
+> +	.driver	= {
+> +		.name		= "chipidea-usb2",
+> +		.owner		= THIS_MODULE,
+> +		.of_match_table	= of_match_ptr(ci_hdrc_usb2_of_match),
+> +	},
+> +};
+> +module_platform_driver(ci_hdrc_usb2_driver);
+> +
+> +MODULE_DESCRIPTION("ChipIdea HDRC USB2 binding for ci13xxx");
+> +MODULE_AUTHOR("Antoine Tenart <antoine.tenart@free-electrons.com>");
+> +MODULE_LICENSE("GPL");
+> -- 
+> 2.1.0
+> 
 
 -- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+
+Best Regards,
+Peter Chen
