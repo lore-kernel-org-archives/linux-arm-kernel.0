@@ -1,53 +1,33 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon, 17 Nov 2014 16:47:59 +0000
-Subject: [PATCH v3 06/11] ARM: STi: DT: STiH410: Add defines for STiH410 DT
- clocks
+Date: Mon, 17 Nov 2014 16:47:58 +0000
+Subject: [PATCH v3 05/11] ARM: multi_v7_defconfig: Enable stih415/6 usb2 phy
+ driver.
 In-Reply-To: <1416242884-5261-1-git-send-email-peter.griffin@linaro.org>
 References: <1416242884-5261-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1416242884-5261-7-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1416242884-5261-6-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although most clock outputs are the same as stih407 SoC, stih410
-also has some additional new clock outputs.
+This driver is used by the ehci / ohci usb controllers on stih415/6 SoCs.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
 Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- include/dt-bindings/clock/stih410-clks.h | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
- create mode 100644 include/dt-bindings/clock/stih410-clks.h
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/include/dt-bindings/clock/stih410-clks.h b/include/dt-bindings/clock/stih410-clks.h
-new file mode 100644
-index 0000000..2097a4b
---- /dev/null
-+++ b/include/dt-bindings/clock/stih410-clks.h
-@@ -0,0 +1,25 @@
-+/*
-+ * This header provides constants clk index STMicroelectronics
-+ * STiH410 SoC.
-+ */
-+#ifndef _DT_BINDINGS_CLK_STIH410
-+#define _DT_BINDINGS_CLK_STIH410
-+
-+#include "stih407-clks.h"
-+
-+/* STiH410 introduces new clock outputs compared to STiH407 */
-+
-+/* CLOCKGEN C0 */
-+#define CLK_TX_ICN_HADES	32
-+#define CLK_RX_ICN_HADES	33
-+#define CLK_ICN_REG_16		34
-+#define CLK_PP_HADES		35
-+#define CLK_CLUST_HADES		36
-+#define CLK_HWPE_HADES		37
-+#define CLK_FC_HADES		38
-+
-+/* CLOCKGEN D0 */
-+#define CLK_PCMR10_MASTER	4
-+#define CLK_USB2_PHY		5
-+
-+#endif
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index c7a9517..e13ab7e 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -426,6 +426,7 @@ CONFIG_PWM_VT8500=y
+ CONFIG_OMAP_USB2=y
+ CONFIG_TI_PIPE3=y
+ CONFIG_PHY_MIPHY365X=y
++CONFIG_PHY_STIH41X_USB=y
+ CONFIG_PHY_SUN4I_USB=y
+ CONFIG_EXT4_FS=y
+ CONFIG_VFAT_FS=y
 -- 
 1.9.1
