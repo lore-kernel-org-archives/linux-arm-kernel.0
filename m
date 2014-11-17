@@ -1,164 +1,157 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:26 +0100
-Subject: [PATCH v5 32/61] dmaengine: mxs: Split device_control
+Date: Mon, 17 Nov 2014 14:42:21 +0100
+Subject: [PATCH v5 27/61] dmaengine: mmp-pdma: Split device_control
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-33-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-28-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Freescale MXS DMA driver to make use
+Split the device_control callback of the Marvell MMP PDMA driver to make use
 of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/mxs-dma.c | 59 ++++++++++++++++++++-------------------------------
- 1 file changed, 23 insertions(+), 36 deletions(-)
+ drivers/dma/mmp_pdma.c | 109 +++++++++++++++++++++++++------------------------
+ 1 file changed, 56 insertions(+), 53 deletions(-)
 
-diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-index 5ea61201dbf0..834041e5a769 100644
---- a/drivers/dma/mxs-dma.c
-+++ b/drivers/dma/mxs-dma.c
-@@ -202,8 +202,9 @@ static struct mxs_dma_chan *to_mxs_dma_chan(struct dma_chan *chan)
- 	return container_of(chan, struct mxs_dma_chan, chan);
- }
- 
--static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
-+static void mxs_dma_reset_chan(struct dma_chan *chan)
- {
-+	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
- 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
- 	int chan_id = mxs_chan->chan.chan_id;
- 
-@@ -250,8 +251,9 @@ static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
- 	mxs_chan->status = DMA_COMPLETE;
- }
- 
--static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
-+static void mxs_dma_enable_chan(struct dma_chan *chan)
- {
-+	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
- 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
- 	int chan_id = mxs_chan->chan.chan_id;
- 
-@@ -272,13 +274,16 @@ static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
- 	mxs_chan->reset = false;
- }
- 
--static void mxs_dma_disable_chan(struct mxs_dma_chan *mxs_chan)
-+static void mxs_dma_disable_chan(struct dma_chan *chan)
- {
-+	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
-+
- 	mxs_chan->status = DMA_COMPLETE;
- }
- 
--static void mxs_dma_pause_chan(struct mxs_dma_chan *mxs_chan)
-+static void mxs_dma_pause_chan(struct dma_chan *chan)
- {
-+	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
- 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
- 	int chan_id = mxs_chan->chan.chan_id;
- 
-@@ -293,8 +298,9 @@ static void mxs_dma_pause_chan(struct mxs_dma_chan *mxs_chan)
- 	mxs_chan->status = DMA_PAUSED;
- }
- 
--static void mxs_dma_resume_chan(struct mxs_dma_chan *mxs_chan)
-+static void mxs_dma_resume_chan(struct dma_chan *chan)
- {
-+	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
- 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
- 	int chan_id = mxs_chan->chan.chan_id;
- 
-@@ -383,7 +389,7 @@ static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
- 			"%s: error in channel %d\n", __func__,
- 			chan);
- 		mxs_chan->status = DMA_ERROR;
--		mxs_dma_reset_chan(mxs_chan);
-+		mxs_dma_reset_chan(mxs_chan->chan);
- 	} else if (mxs_chan->status != DMA_COMPLETE) {
- 		if (mxs_chan->flags & MXS_DMA_SG_LOOP) {
- 			mxs_chan->status = DMA_IN_PROGRESS;
-@@ -432,7 +438,7 @@ static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
- 	if (ret)
- 		goto err_clk;
- 
--	mxs_dma_reset_chan(mxs_chan);
-+	mxs_dma_reset_chan(chan);
- 
- 	dma_async_tx_descriptor_init(&mxs_chan->desc, chan);
- 	mxs_chan->desc.tx_submit = mxs_dma_tx_submit;
-@@ -456,7 +462,7 @@ static void mxs_dma_free_chan_resources(struct dma_chan *chan)
- 	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
- 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
- 
--	mxs_dma_disable_chan(mxs_chan);
-+	mxs_dma_disable_chan(chan);
- 
- 	free_irq(mxs_chan->chan_irq, mxs_dma);
- 
-@@ -651,28 +657,14 @@ err_out:
+diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
+index 8b8952f35e6c..8926f271904e 100644
+--- a/drivers/dma/mmp_pdma.c
++++ b/drivers/dma/mmp_pdma.c
+@@ -683,68 +683,70 @@ fail:
  	return NULL;
  }
  
--static int mxs_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--		unsigned long arg)
-+static int mxs_dma_terminate_all(struct dma_chan *chan)
+-static int mmp_pdma_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
+-			    unsigned long arg)
++static int mmp_pdma_config(struct dma_chan *dchan,
++			   struct dma_slave_config *cfg)
  {
- 	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
--	int ret = 0;
--
+ 	struct mmp_pdma_chan *chan = to_mmp_pdma_chan(dchan);
+-	struct dma_slave_config *cfg = (void *)arg;
+-	unsigned long flags;
+ 	u32 maxburst = 0, addr = 0;
+ 	enum dma_slave_buswidth width = DMA_SLAVE_BUSWIDTH_UNDEFINED;
+ 
+ 	if (!dchan)
+ 		return -EINVAL;
+ 
 -	switch (cmd) {
 -	case DMA_TERMINATE_ALL:
--		mxs_dma_reset_chan(mxs_chan);
--		mxs_dma_disable_chan(mxs_chan);
+-		disable_chan(chan->phy);
+-		mmp_pdma_free_phy(chan);
+-		spin_lock_irqsave(&chan->desc_lock, flags);
+-		mmp_pdma_free_desc_list(chan, &chan->chain_pending);
+-		mmp_pdma_free_desc_list(chan, &chan->chain_running);
+-		spin_unlock_irqrestore(&chan->desc_lock, flags);
+-		chan->idle = true;
 -		break;
--	case DMA_PAUSE:
--		mxs_dma_pause_chan(mxs_chan);
--		break;
--	case DMA_RESUME:
--		mxs_dma_resume_chan(mxs_chan);
+-	case DMA_SLAVE_CONFIG:
+-		if (cfg->direction == DMA_DEV_TO_MEM) {
+-			chan->dcmd = DCMD_INCTRGADDR | DCMD_FLOWSRC;
+-			maxburst = cfg->src_maxburst;
+-			width = cfg->src_addr_width;
+-			addr = cfg->src_addr;
+-		} else if (cfg->direction == DMA_MEM_TO_DEV) {
+-			chan->dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
+-			maxburst = cfg->dst_maxburst;
+-			width = cfg->dst_addr_width;
+-			addr = cfg->dst_addr;
+-		}
+-
+-		if (width == DMA_SLAVE_BUSWIDTH_1_BYTE)
+-			chan->dcmd |= DCMD_WIDTH1;
+-		else if (width == DMA_SLAVE_BUSWIDTH_2_BYTES)
+-			chan->dcmd |= DCMD_WIDTH2;
+-		else if (width == DMA_SLAVE_BUSWIDTH_4_BYTES)
+-			chan->dcmd |= DCMD_WIDTH4;
+-
+-		if (maxburst == 8)
+-			chan->dcmd |= DCMD_BURST8;
+-		else if (maxburst == 16)
+-			chan->dcmd |= DCMD_BURST16;
+-		else if (maxburst == 32)
+-			chan->dcmd |= DCMD_BURST32;
+-
+-		chan->dir = cfg->direction;
+-		chan->dev_addr = addr;
+-		/* FIXME: drivers should be ported over to use the filter
+-		 * function. Once that's done, the following two lines can
+-		 * be removed.
+-		 */
+-		if (cfg->slave_id)
+-			chan->drcmr = cfg->slave_id;
 -		break;
 -	default:
--		ret = -ENOSYS;
--	}
+-		return -ENOSYS;
++	if (cfg->direction == DMA_DEV_TO_MEM) {
++		chan->dcmd = DCMD_INCTRGADDR | DCMD_FLOWSRC;
++		maxburst = cfg->src_maxburst;
++		width = cfg->src_addr_width;
++		addr = cfg->src_addr;
++	} else if (cfg->direction == DMA_MEM_TO_DEV) {
++		chan->dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
++		maxburst = cfg->dst_maxburst;
++		width = cfg->dst_addr_width;
++		addr = cfg->dst_addr;
+ 	}
  
--	return ret;
-+	mxs_dma_reset_chan(chan);
-+	mxs_dma_disable_chan(chan);
++	if (width == DMA_SLAVE_BUSWIDTH_1_BYTE)
++		chan->dcmd |= DCMD_WIDTH1;
++	else if (width == DMA_SLAVE_BUSWIDTH_2_BYTES)
++		chan->dcmd |= DCMD_WIDTH2;
++	else if (width == DMA_SLAVE_BUSWIDTH_4_BYTES)
++		chan->dcmd |= DCMD_WIDTH4;
++
++	if (maxburst == 8)
++		chan->dcmd |= DCMD_BURST8;
++	else if (maxburst == 16)
++		chan->dcmd |= DCMD_BURST16;
++	else if (maxburst == 32)
++		chan->dcmd |= DCMD_BURST32;
++
++	chan->dir = cfg->direction;
++	chan->dev_addr = addr;
++	/* FIXME: drivers should be ported over to use the filter
++	 * function. Once that's done, the following two lines can
++	 * be removed.
++	 */
++	if (cfg->slave_id)
++		chan->drcmr = cfg->slave_id;
 +
 +	return 0;
++}
++
++static int mmp_pdma_terminate_all(struct dma_chan *dchan)
++{
++	struct mmp_pdma_chan *chan = to_mmp_pdma_chan(dchan);
++	unsigned long flags;
++
++	if (!dchan)
++		return -EINVAL;
++
++	disable_chan(chan->phy);
++	mmp_pdma_free_phy(chan);
++	spin_lock_irqsave(&chan->desc_lock, flags);
++	mmp_pdma_free_desc_list(chan, &chan->chain_pending);
++	mmp_pdma_free_desc_list(chan, &chan->chain_running);
++	spin_unlock_irqrestore(&chan->desc_lock, flags);
++	chan->idle = true;
++
+ 	return 0;
  }
  
- static enum dma_status mxs_dma_tx_status(struct dma_chan *chan,
-@@ -701,13 +693,6 @@ static enum dma_status mxs_dma_tx_status(struct dma_chan *chan,
- 	return mxs_chan->status;
- }
+@@ -1061,7 +1063,8 @@ static int mmp_pdma_probe(struct platform_device *op)
+ 	pdev->device.device_prep_slave_sg = mmp_pdma_prep_slave_sg;
+ 	pdev->device.device_prep_dma_cyclic = mmp_pdma_prep_dma_cyclic;
+ 	pdev->device.device_issue_pending = mmp_pdma_issue_pending;
+-	pdev->device.device_control = mmp_pdma_control;
++	pdev->device.device_config = mmp_pdma_config;
++	pdev->device.device_terminate_all = mmp_pdma_terminate_all;
+ 	pdev->device.copy_align = PDMA_ALIGNMENT;
  
--static void mxs_dma_issue_pending(struct dma_chan *chan)
--{
--	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
--
--	mxs_dma_enable_chan(mxs_chan);
--}
--
- static int __init mxs_dma_init(struct mxs_dma_engine *mxs_dma)
- {
- 	int ret;
-@@ -860,8 +845,10 @@ static int __init mxs_dma_probe(struct platform_device *pdev)
- 	mxs_dma->dma_device.device_tx_status = mxs_dma_tx_status;
- 	mxs_dma->dma_device.device_prep_slave_sg = mxs_dma_prep_slave_sg;
- 	mxs_dma->dma_device.device_prep_dma_cyclic = mxs_dma_prep_dma_cyclic;
--	mxs_dma->dma_device.device_control = mxs_dma_control;
--	mxs_dma->dma_device.device_issue_pending = mxs_dma_issue_pending;
-+	mxs_dma->dma_device.device_pause = mxs_dma_pause_chan;
-+	mxs_dma->dma_device.device_resume = mxs_dma_resume_chan;
-+	mxs_dma->dma_device.device_terminate_all = mxs_dma_terminate_all;
-+	mxs_dma->dma_device.device_issue_pending = mxs_dma_enable_chan;
- 
- 	ret = dma_async_device_register(&mxs_dma->dma_device);
- 	if (ret) {
+ 	if (pdev->dev->coherent_dma_mask)
 -- 
 2.1.1
