@@ -1,21 +1,102 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 17 Nov 2014 11:01:17 +0000
-Subject: [PATCH] ASoC: pxa: prepare/unprepare clocks in pxa-ssp
-In-Reply-To: <1416081106-28324-1-git-send-email-dbaryshkov@gmail.com>
-References: <1416081106-28324-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <20141117110117.GW2722@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 17 Nov 2014 11:20:35 +0000
+Subject: [PATCH 09/11] arm: perf: parse cpu affinity from dt
+In-Reply-To: <1415377536-12841-10-git-send-email-mark.rutland@arm.com>
+References: <1415377536-12841-1-git-send-email-mark.rutland@arm.com>
+ <1415377536-12841-10-git-send-email-mark.rutland@arm.com>
+Message-ID: <20141117112033.GF18061@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 15, 2014 at 10:51:46PM +0300, Dmitry Eremin-Solenikov wrote:
-> Change clk_enable/disable() calls to clk_prepare_enable() and
-> clk_disable_unrepapre().
+On Fri, Nov 07, 2014 at 04:25:34PM +0000, Mark Rutland wrote:
+> The current way we read interrupts form devicetree assumes that
+> interrupts are in increasing order of logical cpu id (MPIDR.Aff{2,1,0}),
+> and that these logical ids are in a contiguous block. This may not be
+> the case in general - after a kexec cpu ids may be arbitrarily assigned,
+> and multi-cluster systems do not have a contiguous range of cpu ids.
+> 
+> This patch parses cpu affinity information for interrupts from an
+> optional "interrupts-affinity" devicetree property described in the
+> devicetree binding document. Support for existing dts and board files
+> remains.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> ---
+>  arch/arm/include/asm/pmu.h       |  12 +++
+>  arch/arm/kernel/perf_event_cpu.c | 196 +++++++++++++++++++++++++++++----------
+>  2 files changed, 161 insertions(+), 47 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+> index b630a44..92fc1da 100644
+> --- a/arch/arm/include/asm/pmu.h
+> +++ b/arch/arm/include/asm/pmu.h
+> @@ -12,6 +12,7 @@
+>  #ifndef __ARM_PMU_H__
+>  #define __ARM_PMU_H__
+>  
+> +#include <linux/cpumask.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/perf_event.h>
+>  
+> @@ -89,6 +90,15 @@ struct pmu_hw_events {
+>  	struct arm_pmu		*percpu_pmu;
+>  };
+>  
+> +/*
+> + * For systems with heterogeneous PMUs, we need to know which CPUs each
+> + * (possibly percpu) IRQ targets. Map between them with an array of these.
+> + */
+> +struct cpu_irq {
+> +	cpumask_t cpus;
+> +	int irq;
+> +};
+> +
+>  struct arm_pmu {
+>  	struct pmu	pmu;
+>  	cpumask_t	active_irqs;
+> @@ -118,6 +128,8 @@ struct arm_pmu {
+>  	struct platform_device	*plat_device;
+>  	struct pmu_hw_events	__percpu *hw_events;
+>  	struct notifier_block	hotplug_nb;
+> +	int		nr_irqs;
+> +	struct cpu_irq *irq_map;
+>  };
+>  
+>  #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
+> diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+> index dfcaba5..f09c8a0 100644
+> --- a/arch/arm/kernel/perf_event_cpu.c
+> +++ b/arch/arm/kernel/perf_event_cpu.c
+> @@ -85,20 +85,27 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
+>  	struct platform_device *pmu_device = cpu_pmu->plat_device;
+>  	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
+>  
+> -	irqs = min(pmu_device->num_resources, num_possible_cpus());
+> +	irqs = cpu_pmu->nr_irqs;
+>  
+> -	irq = platform_get_irq(pmu_device, 0);
+> -	if (irq >= 0 && irq_is_percpu(irq)) {
+> -		on_each_cpu(cpu_pmu_disable_percpu_irq, &irq, 1);
+> -		free_percpu_irq(irq, &hw_events->percpu_pmu);
+> -	} else {
+> -		for (i = 0; i < irqs; ++i) {
+> -			if (!cpumask_test_and_clear_cpu(i, &cpu_pmu->active_irqs))
+> -				continue;
+> -			irq = platform_get_irq(pmu_device, i);
+> -			if (irq >= 0)
+> -				free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, i));
+> +	for (i = 0; i < irqs; i++) {
+> +		struct cpu_irq *map = &cpu_pmu->irq_map[i];
+> +		irq = map->irq;
+> +
+> +		if (irq <= 0)
+> +			continue;
+> +
+> +		if (irq_is_percpu(irq)) {
+> +			on_each_cpu(cpu_pmu_disable_percpu_irq, &irq, 1);
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/fd175792/attachment.sig>
+Hmm, ok, so we're assuming that all the PMUs will be wired with PPIs in this
+case. I have a patch allowing per-cpu interrupts to be requested for a
+cpumask, but I suppose that can wait until it's actually needed.
+
+Will
