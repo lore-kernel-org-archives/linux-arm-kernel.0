@@ -1,39 +1,45 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 17 Nov 2014 19:21:46 +0100
-Subject: mirabox boot fails in linux-next (was: next boot: 94 boots: 79
- pass, 13 fail, 2 untried (next-20141117))
-In-Reply-To: <7h61ed4xm3.fsf@deeprootsystems.com>
-References: <E1XqKYI-0000pQ-4b@ip-10-35-177-41.ec2.internal>
- <7h61ed4xm3.fsf@deeprootsystems.com>
-Message-ID: <20141117192146.23df4006@free-electrons.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 17 Nov 2014 19:24:13 +0100
+Subject: [PATCH v10 3/3] i2c: imx: add DMA support for freescale i2c driver
+In-Reply-To: <1416220836-7666-4-git-send-email-yao.yuan@freescale.com>
+References: <1416220836-7666-1-git-send-email-yao.yuan@freescale.com>
+ <1416220836-7666-4-git-send-email-yao.yuan@freescale.com>
+Message-ID: <20141117182413.GC12644@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kevin Hilman,
-
-On Mon, 17 Nov 2014 08:09:56 -0800, Kevin Hilman wrote:
-> FYI...
+On Mon, Nov 17, 2014 at 06:40:36PM +0800, Yuan Yao wrote:
+> Add dma support for i2c. This function depend on DMA driver.
+> You can turn on it by write both the dmas and dma-name properties in dts node.
+> DMA is optional, even DMA request unsuccessfully, i2c can also work well.
 > 
-> armada-370-mirabox started failing boot tests in linux-next as of
-> next-20141117.  Excerpt of boot report below, or you can see all the recent
-> boots of mirabox here:
-> 
->    http://status.armcloud.us/boot/?mirabox
-> 
-> I bisected it down to a PCI commit[2], but it didn't revert cleanly on
-> top of next/master so didn't fully verify it is the root cause.  I'll
-> let one of you MVEBU maintainers take it the next step.
+> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
 
-Thanks a lot for the report, very useful. I haven't yet looked at the
-PCI commit itself, but reading the commit log indicates that it plays
-with sizing the BARs, and we're doing some fairly funky stuff with this
-in pci-mvebu, so I'm not entirely surprised such a commit can break
-stuff. I'll have a look tomorrow.
+gcc found a bug:
 
-Thanks!
+drivers/i2c/busses/i2c-imx.c:703:7: warning: 'orig_jiffies' may be used uninitialized in this function [-Wuninitialized]
+drivers/i2c/busses/i2c-imx.c:672:16: note: 'orig_jiffies' was declared here
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> +	result = wait_for_completion_interruptible_timeout(
+> +				&i2c_imx->dma->cmd_complete,
+> +				msecs_to_jiffies(DMA_TIMEOUT));
+
+And are you sure you want to use
+wait_for_completion_interruptible_timeout() instead of
+wait_for_completion_timeout() here? Unless you confirm you tested it a
+lot with signals, I really cannot recommend the *_interruptible_*
+version.
+
+Other than that, good. I liked the logfile of what you tested very much!
+
+Thanks,
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/9356d51e/attachment.sig>
