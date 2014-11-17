@@ -1,72 +1,155 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 18 Nov 2014 00:28:14 +0100
-Subject: [PATCHv3 10/12] arm: mvebu: define and use common Armada XP SPI
- pinctrl setting
+Date: Tue, 18 Nov 2014 00:28:07 +0100
+Subject: [PATCHv3 09/12] arm: mvebu: define and use ge0/1 rgmii pinctrl
+ settings for armada XP
 In-Reply-To: <cover.1416266432.git.arno@natisbad.org>
 References: <cover.1416266432.git.arno@natisbad.org>
-Message-ID: <aca62306a1fc94cb9db68c656d92e5026bdfe842.1416266432.git.arno@natisbad.org>
+Message-ID: <9cb4b81e1d0f160af4c7db8ec35870ba6dcaa985.1416266432.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-This patch defines common Armada XP pinctrl settings in armada-xp.dtsi
-for the supported SPI interface (MPP36-39) and use it as default
-for Armada XP spi interface.
-
-Note: this patch has the potential to break out-of-tree users w/o
-specific pinctrl settings for their spi interfaces if the default
-above does not match their config (i.e. if they do not use CS0).
+Armada XP AXWiFiAP has local definitions for ge0/1 rgmii pinctrl
+settings which can be be used by other boards. This patch moves
+those definitions to armada-xp.dtsi file and then reference those
+pinctrl entries in all current .dts files using ge0/1 interface
+in rgmii-id mode for their PHY.
 
 Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 ---
- arch/arm/boot/dts/armada-xp-axpwifiap.dts |  7 -------
- arch/arm/boot/dts/armada-xp.dtsi          | 11 +++++++++++
- 2 files changed, 11 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/armada-xp-axpwifiap.dts       | 18 ++----------------
+ arch/arm/boot/dts/armada-xp-db.dts              |  4 ++++
+ arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts |  4 ++++
+ arch/arm/boot/dts/armada-xp-netgear-rn2120.dts  |  4 ++++
+ arch/arm/boot/dts/armada-xp.dtsi                | 14 ++++++++++++++
+ 5 files changed, 28 insertions(+), 16 deletions(-)
 
 diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-index 7a6e50632a1f..804496edac9a 100644
+index a55a97a70505..7a6e50632a1f 100644
 --- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
 +++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-@@ -69,11 +69,6 @@
- 					marvell,function = "gpio";
- 				};
+@@ -64,20 +64,6 @@
+ 				pinctrl-0 = <&pmx_phy_int>;
+ 				pinctrl-names = "default";
  
--				pmx_spi: pmx-spi {
--					marvell,pins = "mpp36", "mpp37", "mpp38", "mpp39";
--					marvell,function = "spi";
+-				pmx_ge0: pmx-ge0 {
+-					marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
+-						       "mpp4", "mpp5", "mpp6", "mpp7",
+-						       "mpp8", "mpp9", "mpp10", "mpp11";
+-					marvell,function = "ge0";
 -				};
 -
- 				pmx_phy_int: pmx-phy-int {
- 					marvell,pins = "mpp32";
+-				pmx_ge1: pmx-ge1 {
+-					marvell,pins = "mpp12", "mpp13", "mpp14", "mpp15",
+-						       "mpp16", "mpp17", "mpp18", "mpp19",
+-						       "mpp20", "mpp21", "mpp22", "mpp23";
+-					marvell,function = "ge1";
+-				};
+-
+ 				pmx_keys: pmx-keys {
+ 					marvell,pins = "mpp33";
  					marvell,function = "gpio";
-@@ -120,8 +115,6 @@
+@@ -118,14 +104,14 @@
+ 			};
  
- 			spi0: spi at 10600 {
+ 			ethernet at 70000 {
+-				pinctrl-0 = <&pmx_ge0>;
++				pinctrl-0 = <&ge0_rgmii_pins>;
+ 				pinctrl-names = "default";
  				status = "okay";
--				pinctrl-0 = <&pmx_spi>;
--				pinctrl-names = "default";
+ 				phy = <&phy0>;
+ 				phy-mode = "rgmii-id";
+ 			};
+ 			ethernet at 74000 {
+-				pinctrl-0 = <&pmx_ge1>;
++				pinctrl-0 = <&ge1_rgmii_pins>;
+ 				pinctrl-names = "default";
+ 				status = "okay";
+ 				phy = <&phy1>;
+diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+index 42ddb2864365..bc28691161f4 100644
+--- a/arch/arm/boot/dts/armada-xp-db.dts
++++ b/arch/arm/boot/dts/armada-xp-db.dts
+@@ -142,11 +142,15 @@
+ 			};
  
- 				spi-flash at 0 {
- 					#address-cells = <1>;
+ 			ethernet at 70000 {
++				pinctrl-0 = <&ge0_rgmii_pins>;
++				pinctrl-names = "default";
+ 				status = "okay";
+ 				phy = <&phy0>;
+ 				phy-mode = "rgmii-id";
+ 			};
+ 			ethernet at 74000 {
++				pinctrl-0 = <&ge1_rgmii_pins>;
++				pinctrl-names = "default";
+ 				status = "okay";
+ 				phy = <&phy1>;
+ 				phy-mode = "rgmii-id";
+diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+index cccf54784c4c..8560047ce426 100644
+--- a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
++++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+@@ -97,12 +97,16 @@
+ 			};
+ 
+ 			ethernet at 70000 {
++				pinctrl-0 = <&ge0_rgmii_pins>;
++				pinctrl-names = "default";
+ 				status = "okay";
+ 				phy = <&phy0>;
+ 				phy-mode = "rgmii-id";
+ 			};
+ 
+ 			ethernet at 74000 {
++				pinctrl-0 = <&ge1_rgmii_pins>;
++				pinctrl-names = "default";
+ 				status = "okay";
+ 				phy = <&phy1>;
+ 				phy-mode = "rgmii-id";
+diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+index 7d8f32873e82..d61caf829b8b 100644
+--- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
++++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+@@ -152,12 +152,16 @@
+ 			};
+ 
+ 			ethernet at 70000 {
++				pinctrl-0 = <&ge0_rgmii_pins>;
++				pinctrl-names = "default";
+ 				status = "okay";
+ 				phy = <&phy0>;
+ 				phy-mode = "rgmii-id";
+ 			};
+ 
+ 			ethernet at 74000 {
++				pinctrl-0 = <&ge1_rgmii_pins>;
++				pinctrl-names = "default";
+ 				status = "okay";
+ 				phy = <&phy1>;
+ 				phy-mode = "rgmii-id";
 diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 4f685f7ec273..51454de322b1 100644
+index c7449f652fb5..4f685f7ec273 100644
 --- a/arch/arm/boot/dts/armada-xp.dtsi
 +++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -72,6 +72,17 @@
- 						       "mpp20", "mpp21", "mpp22", "mpp23";
- 					marvell,function = "ge1";
+@@ -58,6 +58,20 @@
+ 					marvell,pins = "mpp44", "mpp45";
+ 					marvell,function = "uart3";
  				};
 +
-+				spi0_pins: spi0-pins {
-+					marvell,pins = "mpp36", "mpp37",
-+						       "mpp38", "mpp39";
-+					marvell,function = "spi";
++				ge0_rgmii_pins: ge0-rgmii-pins {
++					marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
++						       "mpp4", "mpp5", "mpp6", "mpp7",
++						       "mpp8", "mpp9", "mpp10", "mpp11";
++					marvell,function = "ge0";
 +				};
-+			};
 +
-+			spi0: spi at 10600 {
-+				pinctrl-0 = <&spi0_pins>;
-+				pinctrl-names = "default";
++				ge1_rgmii_pins: ge1-rgmii-pins {
++					marvell,pins = "mpp12", "mpp13", "mpp14", "mpp15",
++						       "mpp16", "mpp17", "mpp18", "mpp19",
++						       "mpp20", "mpp21", "mpp22", "mpp23";
++					marvell,function = "ge1";
++				};
  			};
  
  			i2c0: i2c at 11000 {
