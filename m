@@ -1,94 +1,96 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 17 Nov 2014 11:41:36 +0000
-Subject: [RFC PATCH v4 8/8] arm: dma-mapping: plumb our iommu mapping ops
- into arch_setup_dma_ops
-In-Reply-To: <5469DC13.6040700@arm.com>
-References: <1415991397-9618-1-git-send-email-will.deacon@arm.com>
- <1415991397-9618-9-git-send-email-will.deacon@arm.com>
- <5469DC13.6040700@arm.com>
-Message-ID: <20141117114135.GI18061@arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 17 Nov 2014 12:47:54 +0100
+Subject: [PATCH v9 0/7] Enable L2 cache support on Exynos4210/4x12 SoCs
+Message-ID: <1416224881-4227-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 11:29:23AM +0000, Robin Murphy wrote:
-> On 14/11/14 18:56, Will Deacon wrote:
-> > This patch plumbs the existing ARM IOMMU DMA infrastructure (which isn't
-> > actually called outside of a few drivers) into arch_setup_dma_ops, so
-> > that we can use IOMMUs for DMA transfers in a more generic fashion.
-> >
-> > Since this significantly complicates the arch_setup_dma_ops function,
-> > it is moved out of line into dma-mapping.c. If CONFIG_ARM_DMA_USE_IOMMU
-> > is not set, the iommu parameter is ignored and the normal ops are used
-> > instead.
-> >
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
-> [...]
-> 
-> > +static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> > +				    struct iommu_ops *iommu)
-> > +{
-> > +	struct dma_iommu_mapping *mapping;
-> > +
-> > +	mapping = arm_iommu_create_mapping(dev->bus, dma_base, size);
-> > +	if (IS_ERR(mapping)) {
-> > +		pr_warn("Failed to create %llu-byte IOMMU mapping for device %s\n",
-> > +				size, dev_name(dev));
-> > +		return false;
-> > +	}
-> > +
-> > +	if (arm_iommu_attach_device(dev, mapping)) {
-> > +		pr_warn("Failed to attached device %s to IOMMU_mapping\n",
-> > +				dev_name(dev));
-> > +		arm_iommu_release_mapping(mapping);
-> > +		return false;
-> > +	}
-> > +
-> > +	return true;
-> > +}
-> > +
-> > +static void arm_teardown_iommu_dma_ops(struct device *dev)
-> > +{
-> > +	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
-> > +
-> > +	arm_iommu_detach_device(dev);
-> > +	arm_iommu_release_mapping(mapping);
-> > +}
-> > +
-> > +#else
-> > +
-> > +static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> > +				    struct iommu_ops *iommu)
-> > +{
-> > +	return false;
-> > +}
-> > +
-> > +static void arm_teardown_iommu_dma_ops(struct device *dev) { }
-> > +
-> > +#define arm_get_iommu_dma_map_ops arm_get_dma_map_ops
-> > +
-> > +#endif	/* CONFIG_ARM_DMA_USE_IOMMU */
-> > +
-> > +static struct dma_map_ops *arm_get_dma_map_ops(bool coherent)
-> > +{
-> > +	return coherent ? &arm_coherent_dma_ops : &arm_dma_ops;
-> > +}
-> > +
-> > +void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> > +			struct iommu_ops *iommu, bool coherent)
-> > +{
-> > +	struct dma_map_ops *dma_ops;
-> > +
-> > +	if (arm_setup_iommu_dma_ops(dev, dma_base, size, iommu))
-> 
-> Is the loss of a null check on iommu (compared to previous versions) 
-> intentional? It looks like you're always going to call 
-> arm_setup_iommu_dma_ops here for everything regardless, and given that 
-> that doesn't even look at the iommu parameter, relying on it to somehow 
-> fail correctly smells a bit off.
+This is an updated patchset, which intends to add support for L2 cache
+on Exynos4 SoCs on boards running under secure firmware, which requires
+certain initialization steps to be done with help of firmware, as
+selected registers are writable only from secure mode.
 
-Thanks, I'll fix that. I started writing a full implementation based off
-a hypothetical ->get_default_domain callback (as suggested by Joerg), so
-this is a hangover from that experiment.
+First four patches extend existing support for secure write in L2C driver
+to account for design of secure firmware running on Exynos. Namely:
+ 1) direct read access to certain registers is needed on Exynos, because
+    secure firmware calls set several registers at once,
+ 2) not all boards are running secure firmware, so .write_sec callback
+    needs to be installed in Exynos firmware ops initialization code,
+ 3) write access to {DATA,TAG}_LATENCY_CTRL registers fron non-secure world
+    is not allowed and so must use l2c_write_sec as well,
+ 4) on certain boards, default value of prefetch register is incorrect
+    and must be overridden at L2C initialization.
+For boards running with firmware that provides access to individual
+L2C registers this series should introduce no functional changes. However
+since the driver is widely used on other platforms I'd like to kindly ask
+any interested people for testing.
 
-Will
+Further three patches add implementation of .write_sec and .configure
+callbacks for Exynos secure firmware and necessary DT nodes to enable
+L2 cache.
+
+Changes in this version tested on Exynos4412-based TRATS2 and OdroidU3+
+boards (both with secure firmware). There should be no functional change
+for Exynos boards running without secure firmware. I do not have access
+to affected non-Exynos boards, so I could not test on them.
+
+Depends on:
+- v3.18-rc3
+
+Changelog:
+
+Changes since v8:
+(http://lkml.org/lkml/2014/11/13/263)
+- Rebased onto vanilla v3.18-rc3 and added required includes, which were
+  previously added by other patches
+- Added Acked-by tags for Exynos part
+
+Changes since v7:
+(https://lkml.org/lkml/2014/10/29/158)
+- rebased onto arm-soc/for-next kernel tree (depends on patches merged to
+  v3.18-rc3 and arm-soc/samsung/pm2 branch)
+- removed 'ARM: l2c: unify L2C-310 OF initialization error messages' patch
+  (no longer needed)
+
+Changes since v6:
+(https://lkml.org/lkml/2014/10/27/233)
+- changed PL310 to L2C-310 prefix in error messages
+- added patch shortening the error message about incorrect associativity
+
+Changes since v5:
+(https://lkml.org/lkml/2014/9/24/364)
+- rebased onto v3.18-rc2
+- added error message about missing properties values
+
+Changes since v4:
+(https://lkml.org/lkml/2014/8/26/461)
+ - rewrote the code accessing l2x0_saved_regs from assembly code
+ - added comment and reworked unconditional call to SMC_CMD_L2X0INVALL
+
+
+Patch summary:
+
+Tomasz Figa (7):
+  ARM: l2c: Refactor the driver to use commit-like interface
+  ARM: l2c: Add interface to ask hypervisor to configure L2C
+  ARM: l2c: Get outer cache .write_sec callback from mach_desc only if
+    not NULL
+  ARM: l2c: Add support for overriding prefetch settings
+  ARM: EXYNOS: Add .write_sec outer cache callback for L2C-310
+  ARM: EXYNOS: Add support for non-secure L2X0 resume
+  ARM: dts: exynos4: Add nodes for L2 cache controller
+
+ Documentation/devicetree/bindings/arm/l2cc.txt |  10 +
+ arch/arm/boot/dts/exynos4210.dtsi              |   9 +
+ arch/arm/boot/dts/exynos4x12.dtsi              |  14 ++
+ arch/arm/include/asm/outercache.h              |   3 +
+ arch/arm/kernel/irq.c                          |   3 +-
+ arch/arm/mach-exynos/Makefile                  |   1 +
+ arch/arm/mach-exynos/firmware.c                |  51 +++++
+ arch/arm/mach-exynos/sleep.S                   |  48 +++++
+ arch/arm/mach-exynos/smc.h                     |   4 +
+ arch/arm/mm/cache-l2x0.c                       | 270 ++++++++++++++++---------
+ 10 files changed, 317 insertions(+), 96 deletions(-)
+
+-- 
+1.9.2
