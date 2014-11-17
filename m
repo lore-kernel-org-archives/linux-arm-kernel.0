@@ -1,32 +1,44 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 17 Nov 2014 10:20:28 +0100
-Subject: [PATCH] serial: 8250_dw: Handle no_console_suspend when uart
- loses state
-In-Reply-To: <5469B828.90401@intel.com>
-References: <1416011556-23422-1-git-send-email-dianders@chromium.org>
- <5469B828.90401@intel.com>
-Message-ID: <4280750.Abh5aXOcW7@diego>
+From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
+Date: Mon, 17 Nov 2014 18:25:13 +0900
+Subject: [PATCH] ARM: shmobile: r8a7790: add USBDMAC{0,1} clocks to device tree
+Message-ID: <5469BEF9.4010504@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 17. November 2014, 09:56:08 schrieb Loic Poulain:
-> > In certain suspend modes on certain boards the 8250 UART may lose
-> > state when the device goes to suspend.  If we're using
-> > no_console_suspend this can cause lots of problems during resume.
-> > 
-> > Let's cache the basic UART config registers at suspend time and if we
-> > notice that the UART loses state (by looking at a canary stored in the
-> > scratch register) we'll restore it.
-> 
-> If I'm not wrong, it's already done in acpi_lpss suspend/resume (for
-> 8250_dw).
-> Commit c78b0830667a7e7c1f0ca65b76b33166a84806b3.
+Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+---
+ At the moment, usb-dmac driver for r8a7790 doesn't exist. But I would like
+ to enable these clock settings for future development.
 
-It looks like it, but of course only takes into account devices probed via 
-acpi, missing the devices probed via devicetree.
+ arch/arm/boot/dts/r8a7790.dtsi |    7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-So it looks like we need Doug's solution somehow, question would be if it 
-should be excluded on acpi platforms.
-
-
-Heiko
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 14df425..d4ac978 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -1103,17 +1103,20 @@
+ 			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
+ 			clocks = <&hp_clk>, <&cp_clk>, <&mmc1_clk>, <&sd3_clk>,
+ 				 <&sd2_clk>, <&cpg_clocks R8A7790_CLK_SD1>, <&cpg_clocks R8A7790_CLK_SD0>, <&mmc0_clk>,
+-				 <&hp_clk>, <&mp_clk>, <&hp_clk>, <&mp_clk>, <&rclk_clk>;
++				 <&hp_clk>, <&mp_clk>, <&hp_clk>, <&mp_clk>, <&rclk_clk>,
++				 <&hp_clk>, <&hp_clk>;
+ 			#clock-cells = <1>;
+ 			renesas,clock-indices = <
+ 				R8A7790_CLK_IIC2 R8A7790_CLK_TPU0 R8A7790_CLK_MMCIF1 R8A7790_CLK_SDHI3
+ 				R8A7790_CLK_SDHI2 R8A7790_CLK_SDHI1 R8A7790_CLK_SDHI0 R8A7790_CLK_MMCIF0
+ 				R8A7790_CLK_IIC0 R8A7790_CLK_PCIEC R8A7790_CLK_IIC1 R8A7790_CLK_SSUSB R8A7790_CLK_CMT1
++				R8A7790_CLK_USBDMAC0 R8A7790_CLK_USBDMAC1
+ 			>;
+ 			clock-output-names =
+ 				"iic2", "tpu0", "mmcif1", "sdhi3",
+ 				"sdhi2", "sdhi1", "sdhi0", "mmcif0",
+-				"iic0", "pciec", "iic1", "ssusb", "cmt1";
++				"iic0", "pciec", "iic1", "ssusb", "cmt1",
++				"usbdmac0", "usbdmac1";
+ 		};
+ 		mstp5_clks: mstp5_clks at e6150144 {
+ 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
+-- 
+1.7.9.5
