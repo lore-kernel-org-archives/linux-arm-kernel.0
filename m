@@ -1,147 +1,67 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:27 +0100
-Subject: [PATCH v5 33/61] dmaengine: nbpfaxi: Split device_control
+Date: Mon, 17 Nov 2014 14:42:01 +0100
+Subject: [PATCH v5 07/61] dmaengine: split out pause/resume operations from
+ device_control
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-34-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-8-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the NBPF AXI DMA driver to make use
-of the newly introduced callbacks, that will eventually be used to retrieve
-slave capabilities.
+Split out the pause and resume operations to callbacks of their own. In order
+to preserve some backwark compatibility, the dmaengine_pause/dmaengine_resume
+are still falling back on dmaengine_device_control.
+
+Eventually, that will allow to get the device capabilities in a generic way,
+removing the need to implement device_slave_caps.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- drivers/dma/nbpfaxi.c | 93 +++++++++++++++++++++++++--------------------------
- 1 file changed, 46 insertions(+), 47 deletions(-)
+ include/linux/dmaengine.h | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/dma/nbpfaxi.c b/drivers/dma/nbpfaxi.c
-index 9d20de73ebae..9f151dcd4f73 100644
---- a/drivers/dma/nbpfaxi.c
-+++ b/drivers/dma/nbpfaxi.c
-@@ -565,13 +565,6 @@ static void nbpf_configure(struct nbpf_device *nbpf)
- 	nbpf_write(nbpf, NBPF_CTRL, NBPF_CTRL_LVINT);
- }
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index f797cb81355f..4583c55f3355 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -611,6 +611,10 @@ struct dma_tx_state {
+  *	code
+  * @device_control: manipulate all pending operations on a channel, returns
+  *	zero or error code
++ * @device_pause: Pauses any transfer happening on a channel. Returns
++ *	0 or an error code
++ * @device_resume: Resumes any transfer on a channel previously
++ *	paused. Returns 0 or an error code
+  * @device_tx_status: poll for transaction completion, the optional
+  *	txstate parameter can be supplied with a pointer to get a
+  *	struct with auxiliary transfer status information, otherwise the call
+@@ -680,6 +684,8 @@ struct dma_device {
+ 			     struct dma_slave_config *config);
+ 	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 		unsigned long arg);
++	int (*device_pause)(struct dma_chan *chan);
++	int (*device_resume)(struct dma_chan *chan);
  
--static void nbpf_pause(struct nbpf_channel *chan)
--{
--	nbpf_chan_write(chan, NBPF_CHAN_CTRL, NBPF_CHAN_CTRL_SETSUS);
--	/* See comment in nbpf_prep_one() */
--	nbpf_chan_write(chan, NBPF_CHAN_CTRL, NBPF_CHAN_CTRL_CLREN);
--}
--
- /*		Generic part			*/
+ 	enum dma_status (*device_tx_status)(struct dma_chan *chan,
+ 					    dma_cookie_t cookie,
+@@ -794,11 +800,17 @@ static inline int dmaengine_terminate_all(struct dma_chan *chan)
  
- /* DMA ENGINE functions */
-@@ -837,54 +830,58 @@ static void nbpf_chan_idle(struct nbpf_channel *chan)
- 	}
- }
- 
--static int nbpf_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
--			unsigned long arg)
-+static int nbpf_pause(struct dma_chan *dchan)
+ static inline int dmaengine_pause(struct dma_chan *chan)
  {
- 	struct nbpf_channel *chan = nbpf_to_chan(dchan);
--	struct dma_slave_config *config;
- 
--	dev_dbg(dchan->device->dev, "Entry %s(%d)\n", __func__, cmd);
-+	dev_dbg(dchan->device->dev, "Entry %s\n", __func__);
- 
--	switch (cmd) {
--	case DMA_TERMINATE_ALL:
--		dev_dbg(dchan->device->dev, "Terminating\n");
--		nbpf_chan_halt(chan);
--		nbpf_chan_idle(chan);
--		break;
-+	chan->paused = true;
-+	nbpf_chan_write(chan, NBPF_CHAN_CTRL, NBPF_CHAN_CTRL_SETSUS);
-+	/* See comment in nbpf_prep_one() */
-+	nbpf_chan_write(chan, NBPF_CHAN_CTRL, NBPF_CHAN_CTRL_CLREN);
- 
--	case DMA_SLAVE_CONFIG:
--		if (!arg)
--			return -EINVAL;
--		config = (struct dma_slave_config *)arg;
-+	return 0;
-+}
- 
--		/*
--		 * We could check config->slave_id to match chan->terminal here,
--		 * but with DT they would be coming from the same source, so
--		 * such a check would be superflous
--		 */
-+static int nbpf_terminate_all(struct dma_chan *dchan)
-+{
-+	struct nbpf_channel *chan = nbpf_to_chan(dchan);
- 
--		chan->slave_dst_addr = config->dst_addr;
--		chan->slave_dst_width = nbpf_xfer_size(chan->nbpf,
--						       config->dst_addr_width, 1);
--		chan->slave_dst_burst = nbpf_xfer_size(chan->nbpf,
--						       config->dst_addr_width,
--						       config->dst_maxburst);
--		chan->slave_src_addr = config->src_addr;
--		chan->slave_src_width = nbpf_xfer_size(chan->nbpf,
--						       config->src_addr_width, 1);
--		chan->slave_src_burst = nbpf_xfer_size(chan->nbpf,
--						       config->src_addr_width,
--						       config->src_maxburst);
--		break;
-+	dev_dbg(dchan->device->dev, "Entry %s\n", __func__);
-+	dev_dbg(dchan->device->dev, "Terminating\n");
- 
--	case DMA_PAUSE:
--		chan->paused = true;
--		nbpf_pause(chan);
--		break;
-+	nbpf_chan_halt(chan);
-+	nbpf_chan_idle(chan);
- 
--	default:
--		return -ENXIO;
--	}
-+	return 0;
-+}
++	if (chan->device->device_pause)
++		return chan->device->device_pause(chan);
 +
-+static int nbpf_config(struct dma_chan *dchan,
-+		       struct dma_slave_config *config)
-+{
-+	struct nbpf_channel *chan = nbpf_to_chan(dchan);
-+
-+	dev_dbg(dchan->device->dev, "Entry %s\n", __func__);
-+
-+	/*
-+	 * We could check config->slave_id to match chan->terminal here,
-+	 * but with DT they would be coming from the same source, so
-+	 * such a check would be superflous
-+	 */
-+
-+	chan->slave_dst_addr = config->dst_addr;
-+	chan->slave_dst_width = nbpf_xfer_size(chan->nbpf,
-+					       config->dst_addr_width, 1);
-+	chan->slave_dst_burst = nbpf_xfer_size(chan->nbpf,
-+					       config->dst_addr_width,
-+					       config->dst_maxburst);
-+	chan->slave_src_addr = config->src_addr;
-+	chan->slave_src_width = nbpf_xfer_size(chan->nbpf,
-+					       config->src_addr_width, 1);
-+	chan->slave_src_burst = nbpf_xfer_size(chan->nbpf,
-+					       config->src_addr_width,
-+					       config->src_maxburst);
- 
- 	return 0;
+ 	return dmaengine_device_control(chan, DMA_PAUSE, 0);
  }
-@@ -1426,7 +1423,9 @@ static int nbpf_probe(struct platform_device *pdev)
  
- 	/* Compulsory for DMA_SLAVE fields */
- 	dma_dev->device_prep_slave_sg = nbpf_prep_slave_sg;
--	dma_dev->device_control = nbpf_control;
-+	dma_dev->device_config = nbpf_config;
-+	dma_dev->device_pause = nbpf_pause;
-+	dma_dev->device_terminate_all = nbpf_terminate_all;
- 
- 	platform_set_drvdata(pdev, nbpf);
+ static inline int dmaengine_resume(struct dma_chan *chan)
+ {
++	if (chan->device->device_resume)
++		return chan->device->device_resume(chan);
++
+ 	return dmaengine_device_control(chan, DMA_RESUME, 0);
+ }
  
 -- 
 2.1.1
