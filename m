@@ -1,42 +1,67 @@
-From: radek.dostal@streamunlimited.com (Radek Dostal)
-Date: Mon, 17 Nov 2014 15:41:18 +0100
-Subject: [PATCH RESEND] ARM: dts: bcm63138: change "interupts" to "interrupts"
-In-Reply-To: <5460F9EF.5010605@gmail.com>
-References: <5460F9EF.5010605@gmail.com>
-Message-ID: <1416235278-15759-1-git-send-email-radek.dostal@streamunlimited.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Mon, 17 Nov 2014 14:43:46 +0000
+Subject: [Xen-devel] [RFC] add a struct page* parameter to
+ dma_map_ops.unmap_page
+In-Reply-To: <alpine.DEB.2.02.1411111644490.26318@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1411111644490.26318@kaball.uk.xensource.com>
+Message-ID: <546A09A2.9090704@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-all other nodes in bcm63138.dtsi use "interrupts", this had to be just a typo
-which never got noticed, even it may have quite some consequences.
+On 17/11/14 14:11, Stefano Stabellini wrote:
+> Hi all,
+> I am writing this email to ask for your advice.
+> 
+> On architectures where dma addresses are different from physical
+> addresses, it can be difficult to retrieve the physical address of a
+> page from its dma address.
+> 
+> Specifically this is the case for Xen on arm and arm64 but I think that
+> other architectures might have the same issue.
+> 
+> Knowing the physical address is necessary to be able to issue any
+> required cache maintenance operations when unmap_page,
+> sync_single_for_cpu and sync_single_for_device are called.
+> 
+> Adding a struct page* parameter to unmap_page, sync_single_for_cpu and
+> sync_single_for_device would make Linux dma handling on Xen on arm and
+> arm64 much easier and quicker.
 
-Signed-off-by: Radek Dostal <radek.dostal@streamunlimited.com>
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
----
- Dear all,
+Using an opaque handle instead of struct page * would be more beneficial
+for the Intel IOMMU driver.  e.g.,
 
- resending the previous patch with added Acked-by from Florian Fainelli. I
- did not hear anything back for almost a week. Additionally CC to
- trivial at kernel.org as it may qualify for it.
+typedef dma_addr_t dma_handle_t;
 
- Thanks,
- Radek
+dma_handle_t dma_map_single(struct device *dev,
+                            void *va, size_t size,
+                            enum dma_data_direction dir);
+void dma_unmap_single(struct device *dev,
+                      dma_handle_t handle, size_t size,
+                      enum dma_data_direction dir);
 
- arch/arm/boot/dts/bcm63138.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+etc.
 
-diff --git a/arch/arm/boot/dts/bcm63138.dtsi b/arch/arm/boot/dts/bcm63138.dtsi
-index f3bb2dd..d2d8e94 100644
---- a/arch/arm/boot/dts/bcm63138.dtsi
-+++ b/arch/arm/boot/dts/bcm63138.dtsi
-@@ -102,7 +102,7 @@
- 		twd_watchdog: watchdog at 1e620 {
- 			compatible = "arm,cortex-a9-twd-wdt";
- 			reg = <0x1e620 0x20>;
--			interupts = <GIC_PPI 14 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts = <GIC_PPI 14 IRQ_TYPE_LEVEL_HIGH>;
- 		};
- 	};
- 
--- 
-1.7.9.5
+Drivers would then use:
+
+dma_addr_t dma_addr(dma_handle_t handle);
+
+To obtain the bus address from the handle.
+
+> I think that other drivers have similar problems, such as the Intel
+> IOMMU driver having to call find_iova and walking down an rbtree to get
+> the physical address in its implementation of unmap_page.
+> 
+> Callers have the struct page* in their hands already from the previous
+> map_page call so it shouldn't be an issue for them.  A problem does
+> exist however: there are about 280 callers of dma_unmap_page and
+> pci_unmap_page. We have even more callers of the dma_sync_single_for_*
+> functions.
+
+You will also need to fix dma_unmap_single() and pci_unmap_single()
+(another 1000+ callers).
+
+You may need to consider a parallel set of map/unmap API calls that
+return/accept a handle, and then converting drivers one-by-one as
+required, instead of trying to convert every single driver at once.
+
+David
