@@ -1,67 +1,93 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 18 Nov 2014 00:27:51 +0100
-Subject: [PATCHv3 07/12] arm: mvebu: define and use common Armada 370 UART
+Date: Tue, 18 Nov 2014 00:27:42 +0100
+Subject: [PATCHv3 06/12] arm: mvebu: define and use common Armada 370 SPI
  pinctrl settings
 In-Reply-To: <cover.1416266432.git.arno@natisbad.org>
 References: <cover.1416266432.git.arno@natisbad.org>
-Message-ID: <d76ce42c3c580e39e366e6efd16b8764d3f3d372.1416266432.git.arno@natisbad.org>
+Message-ID: <153bdd2b24b1760a264e5f2b5db83da1939a1306.1416266432.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-This patch defines common Armada 370 pinctrl settings for uart0 and
-uart1 interfaces:
+This patch defines common Armada 370 pinctrl settings for spi0 and spi1
+interfaces:
 
- uart0: MPP0-1 as default
- uart1: MPP41-42 as default
+ spi0: MPP33-36 as default, MPP32,63-65 as available alternate config
+ spi1: MPP49-52 as default
+
+Currently, the Armada 370 DB .dts file has no explicit pinctrl info
+for the spi0 interface used to access the flash on the board. The
+patch fixes that by also adding explicit pinctrl info (MPP32,63-65)
+for this SPI interface.
 
 Note: this patch has the potential to break out-of-tree users w/o
-specific pinctrl settings for their uart interfaces if the default
+specific pinctrl settings for their spi interfaces if the default
 above does not match their config.
 
 Suggested-by: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 ---
- arch/arm/boot/dts/armada-370.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/armada-370-db.dts |  2 ++
+ arch/arm/boot/dts/armada-370.dtsi   | 32 ++++++++++++++++++++++++++++++++
+ 2 files changed, 34 insertions(+)
 
+diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
+index a495e5821ab8..c73fe9a91e59 100644
+--- a/arch/arm/boot/dts/armada-370-db.dts
++++ b/arch/arm/boot/dts/armada-370-db.dts
+@@ -135,6 +135,8 @@
+ 			};
+ 
+ 			spi0: spi at 10600 {
++				pinctrl-0 = <&spi0_pins2>;
++				pinctrl-names = "default";
+ 				status = "okay";
+ 
+ 				spi-flash at 0 {
 diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 901806f35f40..84ab0f23b857 100644
+index 2040da11462b..901806f35f40 100644
 --- a/arch/arm/boot/dts/armada-370.dtsi
 +++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -126,6 +126,16 @@
- 					marvell,function = "spi0";
- 				};
+@@ -114,6 +114,24 @@
+ 			pinctrl {
+ 				compatible = "marvell,mv88f6710-pinctrl";
  
-+				uart0_pins: uart0-pins {
-+					marvell,pins = "mpp0", "mpp1";
-+					marvell,function = "uart0";
++				spi0_pins1: spi0-pins1 {
++					marvell,pins = "mpp33", "mpp34",
++						       "mpp35", "mpp36";
++					marvell,function = "spi0";
 +				};
 +
-+				uart1_pins: uart1-pins {
-+					marvell,pins = "mpp41", "mpp42";
-+					marvell,function = "uart1";
++				spi0_pins2: spi0_pins2 {
++					marvell,pins = "mpp32", "mpp63",
++						       "mpp64", "mpp65";
++					marvell,function = "spi0";
 +				};
 +
- 				spi1_pins: spi1-pins {
- 					marvell,pins = "mpp49", "mpp50",
- 						       "mpp51", "mpp52";
-@@ -288,6 +298,21 @@
- 				pinctrl-names = "default";
++				spi1_pins: spi1-pins {
++					marvell,pins = "mpp49", "mpp50",
++						       "mpp51", "mpp52";
++					marvell,function = "spi1";
++				};
++
+ 				sdio_pins1: sdio-pins1 {
+ 					marvell,pins = "mpp9",  "mpp11", "mpp12",
+ 							"mpp13", "mpp14", "mpp15";
+@@ -256,6 +274,20 @@
+ 				status = "disabled";
  			};
  
 +			/*
-+			 * Default UART pinctrl setting without RTS/CTS, can
-+			 * be overwritten on board level if a different
-+			 * configuration is used.
++			 * Default SPI pinctrl setting, can be overwritten on
++			 * board level if a different configuration is used.
 +			 */
-+			uart0: serial at 12000 {
-+				pinctrl-0 = <&uart0_pins>;
++			spi0: spi at 10600 {
++				pinctrl-0 = <&spi0_pins1>;
 +				pinctrl-names = "default";
 +			};
 +
-+			uart1: serial at 12100 {
-+				pinctrl-0 = <&uart1_pins>;
++			spi1: spi at 10680 {
++				pinctrl-0 = <&spi1_pins>;
 +				pinctrl-names = "default";
 +			};
 +
