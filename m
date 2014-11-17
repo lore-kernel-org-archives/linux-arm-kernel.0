@@ -1,28 +1,41 @@
-From: loic.poulain@intel.com (Loic Poulain)
-Date: Mon, 17 Nov 2014 09:56:08 +0100
-Subject: [PATCH] serial: 8250_dw: Handle no_console_suspend when uart
- loses state
-In-Reply-To: <1416011556-23422-1-git-send-email-dianders@chromium.org>
-References: <1416011556-23422-1-git-send-email-dianders@chromium.org>
-Message-ID: <5469B828.90401@intel.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 17 Nov 2014 11:53:36 +0300
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gZ3BpbzogbXhzOiBpbXBsZW1lbnQgZ2V0X2RpcmVjdGlv?=
+ =?UTF-8?B?biBjYWxsYmFjaw==?=
+In-Reply-To: <20141117084410.GD27002@pengutronix.de>
+References: <1416004026-9667-1-git-send-email-j.uzycki@elproma.com.pl>
+ <1416213534.761947189@f70.i.mail.ru>
+ <20141117084410.GD27002@pengutronix.de>
+Message-ID: <1416214416.941104920@f40.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> In certain suspend modes on certain boards the 8250 UART may lose
-> state when the device goes to suspend.  If we're using
-> no_console_suspend this can cause lots of problems during resume.
->
-> Let's cache the basic UART config registers at suspend time and if we
-> notice that the UART loses state (by looking at a canary stored in the
-> scratch register) we'll restore it.
+Mon, 17 Nov 2014 09:44:10 +0100 ?? Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello Alexander,
+> 
+> On Mon, Nov 17, 2014 at 11:38:54AM +0300, Alexander Shiyan wrote:
+> > Hello.
+> > 
+> > ...
+> > > > struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int
+> > > > idx, int *irqs)
+> > > What is idx about? I see it already in the mctrl_gpio API, but there is
+> > > no documentation about how it's used. Is it always 0?
+> > 
+> > This could be used for drivers with several UARTs, which registered at once.
+> Then what about:
+> 
+> 	/**
+> 	 * Document what idx is about here.
+> 	 */
+> 	struct mctrl_gpios *mctrl_gpio_init_index(struct uart_port *port, unsigned int idx);
+> 	static inline struct mctrl_gpios *mctrl_gpio_init(struct uart_port *port)
+> 	{
+> 		return mctrl_gpio_init_index(port, 0);
+> 	}
+> 
+> ? That matches how gpio and of functions use the indexed variants.
 
-If I'm not wrong, it's already done in acpi_lpss suspend/resume (for 
-8250_dw).
-Commit c78b0830667a7e7c1f0ca65b76b33166a84806b3.
+This is planned by me for "sccnxp" driver at least.
 
-Regards,
-Loic
-
--- 
-Intel Open Source Technology Center
-http://oss.intel.com/
+---
