@@ -1,56 +1,76 @@
-From: klightspeed@killerwolves.net (Ben Peddell)
-Date: Tue, 18 Nov 2014 08:41:27 +1000
-Subject: [PATCHv1 2/3] arm: mvebu: add .dts file for Synology DS213j
-In-Reply-To: <878ujas07o.fsf@natisbad.org>
-References: <cover.1416095841.git.arno@natisbad.org>	<1eb26f8c1946622910a7e2318c895a7082fea7e5.1416095841.git.arno@natisbad.org>	<20141116020024.GC15870@lunn.ch>
- <87d28nb83u.fsf@natisbad.org>	<546931E1.5070909@killerwolves.net>
- <878ujas07o.fsf@natisbad.org>
-Message-ID: <546A7997.1040603@killerwolves.net>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Mon, 17 Nov 2014 14:41:31 -0800
+Subject: [PATCH V5 01/12] xhci: Set shared HCD's hcd_priv in xhci_gen_setup
+In-Reply-To: <1416264102-1323-1-git-send-email-abrestic@chromium.org>
+References: <1416264102-1323-1-git-send-email-abrestic@chromium.org>
+Message-ID: <1416264102-1323-2-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/11/14 18:25, Arnaud Ebalard wrote:
-> Hi,
-> 
-> Ben Peddell <klightspeed@killerwolves.net> writes:
-> 
->> On 16/11/2014 11:14 PM, Arnaud Ebalard wrote:
->>>>> +	gpio-fan-100-32-35 {
->>>> There is some logic to this naming, but i don't remember what it is.
->>>> Did you check this is appropriate?
->>> The 32-35 is for the MPP i.e. fan uses mpp32 to mpp35 (3 MPP for speed,
->>> one for alarm). I don't know what the 100 part means. What I did is I
->>> googled to see which fan supported kirkwood models have and noticed
->>> that the DS212j uses the exact same fan, i.e. Y.S.Tech FD129225LL-N so
->>> I opted for the same naming.
->>>
->>> On that aspect, you may be able to explain why the speed-map for this
->>> fan goes up to 5000 RPM. This fan is supposed to operate at 1900RPM.
->>> Note that it does not matter in practice.
->>
->> On the Kirkwood Diskstations, the first number (100, 120 or 150) refers
->> to the middle of the three fan speed resistors,
-> 
-> Would not have found that alone ;-) Thanks for clarifying.
-> 
->> the second number (15 or
->> 32) refers to the first fan control pin, and the third number (18 or 35)
->> refers to the first fan alarm pin.
->>
->> i.e. the 100-32-35 uses fan speed resistors of 33, 100 and 150 ohms,
->> uses pins 32-34 for fan control, and uses pin 35 for the fan alarm.
->>
->> The 5000RPM was interpolated from my measured RPM pulse rate (4200PPM)
->> of the 80mm fan in my DS211j (which uses the 150-32-35 fan config) at
->> maximum RPM.
-> 
-> Then, I think I need to change the speed map to have 1900 RPM as max
-> speed. Out of curiosity, how did you measured the RPM pulse rate
-> exactly?
+xhci_gen_setup() sets the hcd_priv field for the primary HCD, but not
+for the shared HCD, requiring xHCI host-controller drivers to set it
+between usb_create_shared_hcd() and usb_add_hcd().  There's no reason
+xhci_gen_setup() can't set the shared HCD's hcd_priv as well, so move
+that bit out of the host-controller drivers and into xhci_gen_setup().
 
-I hooked a logic analyzer to the sense pin and measured the pulse rate.
+Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+---
+New for v5.
+Peviously posted here: https://lkml.org/lkml/2014/10/30/726
+---
+ drivers/usb/host/xhci-pci.c  | 5 -----
+ drivers/usb/host/xhci-plat.c | 5 -----
+ drivers/usb/host/xhci.c      | 6 +++---
+ 3 files changed, 3 insertions(+), 13 deletions(-)
 
-Looking at the specifications of the fan in this unit (an EC7025L12ER),
-it has a maximum fan speed of 3000RPM, so it looks like it uses two
-pulses per revolution and not one as I had assumed when I created the
-speed map.
+diff --git a/drivers/usb/host/xhci-pci.c b/drivers/usb/host/xhci-pci.c
+index 9a69b1f..31025e4 100644
+--- a/drivers/usb/host/xhci-pci.c
++++ b/drivers/usb/host/xhci-pci.c
+@@ -221,11 +221,6 @@ static int xhci_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
+ 		goto dealloc_usb2_hcd;
+ 	}
+ 
+-	/* Set the xHCI pointer before xhci_pci_setup() (aka hcd_driver.reset)
+-	 * is called by usb_add_hcd().
+-	 */
+-	*((struct xhci_hcd **) xhci->shared_hcd->hcd_priv) = xhci;
+-
+ 	retval = usb_add_hcd(xhci->shared_hcd, dev->irq,
+ 			IRQF_SHARED);
+ 	if (retval)
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index 3d78b0c..5bc33bc 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -149,11 +149,6 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	if ((node && of_property_read_bool(node, "usb3-lpm-capable")) ||
+ 			(pdata && pdata->usb3_lpm_capable))
+ 		xhci->quirks |= XHCI_LPM_SUPPORT;
+-	/*
+-	 * Set the xHCI pointer before xhci_plat_setup() (aka hcd_driver.reset)
+-	 * is called by usb_add_hcd().
+-	 */
+-	*((struct xhci_hcd **) xhci->shared_hcd->hcd_priv) = xhci;
+ 
+ 	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
+ 		xhci->shared_hcd->can_do_streams = 1;
+diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
+index 2a5d45b..ae05471 100644
+--- a/drivers/usb/host/xhci.c
++++ b/drivers/usb/host/xhci.c
+@@ -4843,9 +4843,9 @@ int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
+ 		 */
+ 		hcd->has_tt = 1;
+ 	} else {
+-		/* xHCI private pointer was set in xhci_pci_probe for the second
+-		 * registered roothub.
+-		 */
++		xhci = hcd_to_xhci(hcd->primary_hcd);
++		*((struct xhci_hcd **) hcd->hcd_priv) = xhci;
++
+ 		return 0;
+ 	}
+ 
+-- 
+2.1.0.rc2.206.gedb03e5
