@@ -1,124 +1,54 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:33 +0100
-Subject: [PATCH v5 39/61] dmaengine: sh: Split device_control
+Date: Mon, 17 Nov 2014 14:42:02 +0100
+Subject: [PATCH v5 08/61] dmaengine: Add device_terminate_all callback
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-40-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-9-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Super-H DMA driver to make use of the
-newly introduced callbacks, that will eventually be used to retrieve slave
-capabilities.
+Split out the terminate_all command from device_control to a dma_device
+callback. In order to preserve backward capability, still rely on
+device_control if no such callback has been implemented.
+
+Eventually, this will allow to create a generic dma_slave_caps callback.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- drivers/dma/sh/shdma-base.c | 72 +++++++++++++++++++++------------------------
- 1 file changed, 33 insertions(+), 39 deletions(-)
+ include/linux/dmaengine.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/dma/sh/shdma-base.c b/drivers/dma/sh/shdma-base.c
-index 3a2adb131d46..8ee383d339a5 100644
---- a/drivers/dma/sh/shdma-base.c
-+++ b/drivers/dma/sh/shdma-base.c
-@@ -729,57 +729,50 @@ static struct dma_async_tx_descriptor *shdma_prep_dma_cyclic(
- 	return desc;
- }
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index 4583c55f3355..b0efc805937a 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -615,6 +615,8 @@ struct dma_tx_state {
+  *	0 or an error code
+  * @device_resume: Resumes any transfer on a channel previously
+  *	paused. Returns 0 or an error code
++ * @device_terminate_all: Aborts all transfers on a channel. Returns 0
++ *	or an error code
+  * @device_tx_status: poll for transaction completion, the optional
+  *	txstate parameter can be supplied with a pointer to get a
+  *	struct with auxiliary transfer status information, otherwise the call
+@@ -686,6 +688,7 @@ struct dma_device {
+ 		unsigned long arg);
+ 	int (*device_pause)(struct dma_chan *chan);
+ 	int (*device_resume)(struct dma_chan *chan);
++	int (*device_terminate_all)(struct dma_chan *chan);
  
--static int shdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--			  unsigned long arg)
-+static int shdma_terminate_all(struct dma_chan *chan)
+ 	enum dma_status (*device_tx_status)(struct dma_chan *chan,
+ 					    dma_cookie_t cookie,
+@@ -795,6 +798,9 @@ static inline int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_cap
+ 
+ static inline int dmaengine_terminate_all(struct dma_chan *chan)
  {
- 	struct shdma_chan *schan = to_shdma_chan(chan);
- 	struct shdma_dev *sdev = to_shdma_dev(chan->device);
- 	const struct shdma_ops *ops = sdev->ops;
--	struct dma_slave_config *config;
- 	unsigned long flags;
--	int ret;
- 
--	switch (cmd) {
--	case DMA_TERMINATE_ALL:
--		spin_lock_irqsave(&schan->chan_lock, flags);
--		ops->halt_channel(schan);
-+	spin_lock_irqsave(&schan->chan_lock, flags);
-+	ops->halt_channel(schan);
- 
--		if (ops->get_partial && !list_empty(&schan->ld_queue)) {
--			/* Record partial transfer */
--			struct shdma_desc *desc = list_first_entry(&schan->ld_queue,
--						struct shdma_desc, node);
--			desc->partial = ops->get_partial(schan, desc);
--		}
-+	if (ops->get_partial && !list_empty(&schan->ld_queue)) {
-+		/* Record partial transfer */
-+		struct shdma_desc *desc = list_first_entry(&schan->ld_queue,
-+							   struct shdma_desc, node);
-+		desc->partial = ops->get_partial(schan, desc);
-+	}
- 
--		spin_unlock_irqrestore(&schan->chan_lock, flags);
-+	spin_unlock_irqrestore(&schan->chan_lock, flags);
- 
--		shdma_chan_ld_cleanup(schan, true);
--		break;
--	case DMA_SLAVE_CONFIG:
--		/*
--		 * So far only .slave_id is used, but the slave drivers are
--		 * encouraged to also set a transfer direction and an address.
--		 */
--		if (!arg)
--			return -EINVAL;
--		/*
--		 * We could lock this, but you shouldn't be configuring the
--		 * channel, while using it...
--		 */
--		config = (struct dma_slave_config *)arg;
--		ret = shdma_setup_slave(schan, config->slave_id,
--					config->direction == DMA_DEV_TO_MEM ?
--					config->src_addr : config->dst_addr);
--		if (ret < 0)
--			return ret;
--		break;
--	default:
--		return -ENXIO;
--	}
-+	shdma_chan_ld_cleanup(schan, true);
- 
- 	return 0;
++	if (chan->device->device_terminate_all)
++		return chan->device->device_terminate_all(chan);
++
+ 	return dmaengine_device_control(chan, DMA_TERMINATE_ALL, 0);
  }
- 
-+static int shdma_config(struct dma_chan *chan,
-+			struct dma_slave_config *config)
-+{
-+	struct shdma_chan *schan = to_shdma_chan(chan);
-+
-+	/*
-+	 * So far only .slave_id is used, but the slave drivers are
-+	 * encouraged to also set a transfer direction and an address.
-+	 */
-+	if (!config)
-+		return -EINVAL;
-+	/*
-+	 * We could lock this, but you shouldn't be configuring the
-+	 * channel, while using it...
-+	 */
-+	return shdma_setup_slave(schan, config->slave_id,
-+				 config->direction == DMA_DEV_TO_MEM ?
-+				 config->src_addr : config->dst_addr);
-+}
-+
- static void shdma_issue_pending(struct dma_chan *chan)
- {
- 	struct shdma_chan *schan = to_shdma_chan(chan);
-@@ -1002,7 +995,8 @@ int shdma_init(struct device *dev, struct shdma_dev *sdev,
- 	/* Compulsory for DMA_SLAVE fields */
- 	dma_dev->device_prep_slave_sg = shdma_prep_slave_sg;
- 	dma_dev->device_prep_dma_cyclic = shdma_prep_dma_cyclic;
--	dma_dev->device_control = shdma_control;
-+	dma_dev->device_config = shdma_config;
-+	dma_dev->device_terminate_all = shdma_terminate_all;
- 
- 	dma_dev->dev = dev;
  
 -- 
 2.1.1
