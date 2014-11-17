@@ -1,37 +1,101 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 17 Nov 2014 13:16:06 -0800
-Subject: [PATCH v2 1/2] clk: rockchip: add bindings for the mmc clock
- phases
-In-Reply-To: <CAHNYxRwGWqbznVybmE+tpyghEoQwVFK_V2ubFRKXasvsPS+R7Q@mail.gmail.com>
-References: <1416009604-31545-1-git-send-email-amstan@chromium.org>
- <1416009604-31545-2-git-send-email-amstan@chromium.org>
- <20141117193902.25314.97687@quantum>
- <CAHNYxRwGWqbznVybmE+tpyghEoQwVFK_V2ubFRKXasvsPS+R7Q@mail.gmail.com>
-Message-ID: <20141117211606.25314.43161@quantum>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 17 Nov 2014 14:27:57 -0700
+Subject: [PATCH 00/10] Save MSI chip in pci_sys_data
+In-Reply-To: <alpine.DEB.2.11.1411172138191.3909@nanos>
+References: <1414396127-30023-1-git-send-email-wangyijing@huawei.com>
+ <20141112042359.GK28161@google.com> <20141117025914.GC4280@google.com>
+ <alpine.DEB.2.11.1411171035270.3909@nanos>
+ <CAErSpo46d0OJbO6tuDUXb2q7+00BUuHzJdsCr+aOhY4we+zn=w@mail.gmail.com>
+ <alpine.DEB.2.11.1411172138191.3909@nanos>
+Message-ID: <CAErSpo7hH=v15w2UgG3mWc_B=YQNA-ZXj_VO_9dHZ3oFrk_yjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Alexandru Stan (2014-11-17 11:50:51)
-> Sorry for my previous mail, I sent it as HTML and also top posted.
-> Here it goes again:
-> 
-> On Mon, Nov 17, 2014 at 11:39 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> > It looks like you are adding new clocks to handle the phase requirement.
-> > Is that the right thing to do? Don't these clks already exist (e.g.
-> > SCLK_SDMMC)?
-> I actually need to control 2 phases, one of them is used when
-> outputting data, the other when sampling. Sunxi does something
-> similar: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/273273.html
-> 
-> Another reason it wouldn't work is because the upstream clock(eg
-> SCLK_SDMMC) is twice as fast as the real clock(see RK3288_CLKGEN_DIV
-> in drivers/mmc/host/dw_mmc-rockchip.c), since that clock goes to a /2
-> divider to be able to do the 90 degree clock phases.
+On Mon, Nov 17, 2014 at 2:02 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> On Mon, 17 Nov 2014, Bjorn Helgaas wrote:
+>> On Mon, Nov 17, 2014 at 2:38 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
+>> > The simplest way to dead with it is that I pull in pci/msi (assuming
+>> > that it contains only the above) and base the rest of it on top, so I
+>> > can deal with the resulting conflicts. So you still can keep that in
+>> > your pile and no matter who sends the pull request first everything
+>> > will just fall in place.
+>>
+>> In addition to the ("Save MSI chip in pci_sys_data") series, my
+>> pci/msi branch contains these:
+>>
+>>   f83386942702 s390/MSI: Use __msi_mask_irq() instead of default_msi_mask_irq()
+>>   03f56e42d03e Revert "PCI: Add x86_msi.msi_mask_irq() and msix_mask_irq()"
+>>   38737d82f9f0 PCI/MSI: Add pci_msi_ignore_mask to prevent writes to
+>> MSI/MSI-X Mask Bits
+>>
+>> but I don't think it will hurt if you pull in those as well.
+>
+> They are blessed by you, so I don't worry :)
+>
+>> The bigger problem might be the first patch of the "Save MSI chip in
+>> pci_sys_data", which renames "struct msi_chip" to "struct
+>> msi_controller".  I asked Yijing to do that because I didn't think
+>> "_chip" really conveyed any information.  I didn't know we were going
+>> to have quite this many MSI-related patches to fix up.
+>
+> Not a big deal at all. I pulled your branch and fixed up the pending
+> mess on top of it. Not a really big deal.
+>
+>> So I'll just leave my pci/msi branch as-is for now.  If the rename is
+>> too painful, let me know and I'll drop the branch and we can rework
+>> the rest of the "Save MSI chip in pci_sys_data" series to match.
+>
+> No, not a problem at all. If I can carry your branch and it is
+> immutable then I think we are fine.
+>
+> The changes we have stashed on top of this which touch linux/msi.h and
+> pci/msi.c are at the end of this mail. But most of this is
+> selfcontained and wont hurt anything which does not enable the
+> required config options. The diffstat is:
+>
+>  drivers/pci/msi.c   |  334 +++++++++++++++++++++++++++++++++++++++++-----------
+>  include/linux/msi.h |  158 +++++++++++++++++++++++-
+>  2 files changed, 422 insertions(+), 70 deletions(-)
+>
+> Looks large, but it provides common infrastructure which allows ARM64
+> to implement MSI support w/o any of the gazillion weak arch
+> callbacks. Jiangs x86 work distangles the convoluted mess we have with
+> irq remapping etc. and we can have non PCI based MSI interrupts as a
+> bonus.
+>
+> So I'm pretty happy with the outcome now. The stacked irqdomains
+> really worked out well so far. I don't think that the pci/msi.c side
+> will see much updates on that in the next weeks. Though based on that
+> we'll try to get rid of the whole weak arch_xxx in the long run, but
+> that's a different issue and nothing we need to worry about now.
+>
+> I'm going to push out the current state of affairs soon and will ask
+> all involved folks to have a look on that. If I don't hear someone
+> crying murder I'm going to make the branch immutable and push it into
+> next so that ARM and x86 can follow up with their stuff which depends
+> on that whole endavour.
+>
+> If you have updates to your pci/msi stuff before the merge window then
+> please let me know, so we can coordinate on the procedure.
 
-Thanks for the explanation.
+Super.  Thank you very much for taking care of this; it's a big weight
+off my mind.
 
-Regards,
-Mike
+You can add my Acked-by to these patches if you want it.  I would
+suggest a minor comment expansion here, just because the code *looks
+like* it's setting up something to match a hardware device:
 
-> 
-> Alexandru Stan
+> +/**
+> + * pci_msi_domain_calc_hwirq - Generate a unique ID for an MSI source
+> + * @dev:       Pointer to the PCI device
+> + * @desc:      Pointer to the msi descriptor
+> + *
+> + * The ID number is only used within the irqdomain.
+
+Maybe include something like:
+
+  This "irq_hw_number_t" is an opaque identifier used only by the
+irqdomain code.
+  It does not correspond to any hardware implementation or register encoding.
+
+Bjorn
