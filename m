@@ -1,51 +1,89 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 17 Nov 2014 18:21:43 +0800
-Subject: [RFC PATCH 09/16] PCI: Associate .get_msi_ctrl() with pci_host_bridge
+Date: Mon, 17 Nov 2014 18:21:39 +0800
+Subject: [RFC PATCH 05/16] PCI: Use pci_scan_root_bus() instead of
+ pci_scan_bus_parented()
 In-Reply-To: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
 References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1416219710-26088-10-git-send-email-wangyijing@huawei.com>
+Message-ID: <1416219710-26088-6-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yijing Wang <wangyijing0307@gmail.com>
+Now we can remove the deprecated pci_scan_bus_parented(),
+and use pci_scan_root_bus() instead.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- drivers/pci/host-bridge.c |    1 +
- include/linux/pci.h       |    2 ++
- 2 files changed, 3 insertions(+), 0 deletions(-)
+ drivers/pci/probe.c        |   19 -------------------
+ drivers/pci/xen-pcifront.c |    6 +++---
+ include/linux/pci.h        |    2 --
+ 3 files changed, 3 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-index 49b6c21..872cae1 100644
---- a/drivers/pci/host-bridge.c
-+++ b/drivers/pci/host-bridge.c
-@@ -58,6 +58,7 @@ struct pci_host_bridge *pci_create_host_bridge(
- 	host->dev.parent = parent;
- 	INIT_LIST_HEAD(&host->windows);
- 	host->dev.release = pci_release_host_bridge_dev;
-+	host->get_msi_ctrl = info->get_msi_ctrl;
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 97711f3..623bfff 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -2105,25 +2105,6 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
+ }
+ EXPORT_SYMBOL(pci_scan_root_bus);
  
- 	/* this is hack, just for build, will be removed later*/
- 	b = kzalloc(sizeof(*b), GFP_KERNEL);
+-/* Deprecated; use pci_scan_root_bus() instead */
+-struct pci_bus *pci_scan_bus_parented(struct device *parent,
+-		int bus, struct pci_ops *ops, void *sysdata)
+-{
+-	LIST_HEAD(resources);
+-	struct pci_bus *b;
+-
+-	pci_add_resource(&resources, &ioport_resource);
+-	pci_add_resource(&resources, &iomem_resource);
+-	pci_add_resource(&resources, &busn_resource);
+-	b = pci_create_root_bus(parent, bus, ops, sysdata, &resources);
+-	if (b)
+-		pci_scan_child_bus(b);
+-	else
+-		pci_free_resource_list(&resources);
+-	return b;
+-}
+-EXPORT_SYMBOL(pci_scan_bus_parented);
+-
+ /**
+  * pci_rescan_bus_bridge_resize - scan a PCI bus for devices.
+  * @bridge: PCI bridge for the bus to scan
+diff --git a/drivers/pci/xen-pcifront.c b/drivers/pci/xen-pcifront.c
+index 116ca37..fa2e312 100644
+--- a/drivers/pci/xen-pcifront.c
++++ b/drivers/pci/xen-pcifront.c
+@@ -474,8 +474,8 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+ 
+ 	pci_lock_rescan_remove();
+ 
+-	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
+-				  &pcifront_bus_ops, sd);
++	b = pci_scan_root_bus(&pdev->xdev->dev, bus,
++				  &pcifront_bus_ops, sd, NULL);
+ 	if (!b) {
+ 		dev_err(&pdev->xdev->dev,
+ 			"Error creating PCI Frontend Bus!\n");
+@@ -488,7 +488,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+ 
+ 	list_add(&bus_entry->list, &pdev->root_buses);
+ 
+-	/* pci_scan_bus_parented skips devices which do not have a have
++	/* pci_scan_root_bus skips devices which do not have a have
+ 	* devfn==0. The pcifront_scan_bus enumerates all devfn. */
+ 	err = pcifront_scan_bus(pdev, domain, bus, b);
+ 
 diff --git a/include/linux/pci.h b/include/linux/pci.h
-index a51f5f5..af1ee86 100644
+index f8045d6..4daef65 100644
 --- a/include/linux/pci.h
 +++ b/include/linux/pci.h
-@@ -408,6 +408,7 @@ struct pci_host_bridge {
- 	int domain;
- 	void *sysdata;
- 	struct pci_ops *ops;
-+	struct msi_controller *(*get_msi_ctrl)(struct pci_dev *pdev);
- 	void (*release_fn)(struct pci_host_bridge *);
- 	void *release_data;
- };
-@@ -416,6 +417,7 @@ struct pci_host_info {
- 	u8 res_type;
- 	void *arg;
- 	struct list_head *resources; /*just for build, will clean up later */
-+	struct msi_controller *(*get_msi_ctrl)(struct pci_dev *pdev);
- 	int (*init_res)(struct pci_host_bridge *host, 
- 			struct pci_host_info *info);
- };
+@@ -767,8 +767,6 @@ void pcibios_bus_to_resource(struct pci_bus *bus, struct resource *res,
+ void pcibios_scan_specific_bus(int busn);
+ struct pci_bus *pci_find_bus(int domain, int busnr);
+ void pci_bus_add_devices(const struct pci_bus *bus);
+-struct pci_bus *pci_scan_bus_parented(struct device *parent, int bus,
+-				      struct pci_ops *ops, void *sysdata);
+ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ 				    struct pci_ops *ops, void *sysdata,
+ 				    struct list_head *resources);
 -- 
 1.7.1
