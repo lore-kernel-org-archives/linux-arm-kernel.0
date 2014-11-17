@@ -1,139 +1,75 @@
-From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
-Date: Mon, 17 Nov 2014 13:40:40 +0100
-Subject: [PATCH] gpio: mxs: implement get_direction callback
-In-Reply-To: <CACQ1gAha1MuroyB35zN_BuwRNGS_J3Xh1htiHJda_2_19qh31g@mail.gmail.com>
-References: <1416004026-9667-1-git-send-email-j.uzycki@elproma.com.pl>
- <20141114232601.GW27002@pengutronix.de> <5467A980.5090204@elproma.com.pl>
- <20141116214239.GX27002@pengutronix.de> <54693A51.5080907@elproma.com.pl>
- <54695654.3070209@elproma.com.pl> <20141117082848.GZ27002@pengutronix.de>
- <5469BBBD.30003@elproma.com.pl>
- <CACQ1gAha1MuroyB35zN_BuwRNGS_J3Xh1htiHJda_2_19qh31g@mail.gmail.com>
-Message-ID: <5469ECC8.3080301@elproma.com.pl>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 17 Nov 2014 13:47:21 +0100
+Subject: [PATCH 2/2] dt-bindings: simplefb-sunxi: Add sunxi simplefb
+ extensions
+In-Reply-To: <1416224086-5698-3-git-send-email-hdegoede@redhat.com>
+References: <1416224086-5698-1-git-send-email-hdegoede@redhat.com>
+ <1416224086-5698-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <20141117124721.GQ6414@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Nov 17, 2014 at 12:34:46PM +0100, Hans de Goede wrote:
+> If pre-filled framebuffer nodes are used, the firmware may need extra
+> properties to find the right node. This documents the properties to use
+> for this on sunxi platforms.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  .../bindings/video/simple-framebuffer-sunxi.txt    | 33 ++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+> new file mode 100644
+> index 0000000..84ca264
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+> @@ -0,0 +1,33 @@
+> +Sunxi specific Simple Framebuffer bindings
+> +
+> +This binding documents sunxi specific extensions to the simple-framebuffer
+> +bindings. The sunxi simplefb u-boot code relies on the devicetree containing
+> +pre-populated simplefb nodes.
+> +
+> +These extensions are intended so that u-boot can select the right node based
+> +on which pipeline and output is being used. As such they are solely intended
+> +for firmware / bootloader use, and the OS should ignore them.
+> +
+> +Required properties:
+> +- compatible: "sunxi,framebuffer"
+> +- sunxi,pipeline:
+> +  <0> for the de_be0 -> lcdc0 -> output pipeline
+> +  <1> for the de_be1 -> lcdc1 -> output pipeline
+> +- sunxi,output: One of: "hdmi", "lcd", "vga", and "composite"  
+> +
+> +Example:
+> +
+> +chosen {
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	ranges;
+> +
+> +	framebuffer at 0 {
+> +		compatible = "sunxi,framebuffer", "simple-framebuffer";
+> +		sunxi,pipeline = <0>;
+> +		sunxi,output = "hdmi";
+> +		clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
+> +			 <&ahb_gates 44>;
 
-W dniu 2014-11-17 o 10:46, Richard Genoud pisze:
-> 2014-11-17 10:11 GMT+01:00 Janusz U?ycki <j.uzycki@elproma.com.pl>:
->> W dniu 2014-11-17 o 09:28, Uwe Kleine-K?nig pisze:
->>
->>>>> I don't understand why gpiod_get_direction() always requires the
->>>>> callback
->>>>> and b) would be broken (I'm not so familiar with gpiolib) but I
->>>>> don't need it now.
->>>>>
->>>>> So, it looks we can drop the gpio-mxs patch, yes?
->>> That patch is not wrong, just its motivation. IMHO the only valid
->>> usecase for .get_direction is debugging.
->>
->> OK, I will submit v2.
->>
->> [...]
->>> You don't need irqhandler. struct mctrl_gpios is needed of course.
->>
->> request_irq() needs a irqhandler. Do you thing about a mctrl_ handler for
->> gpios?
->>
->>>>> mctrl_gpio_request_irqs() helper.
->>>>> The gpio_irq table could be hidden and moved into struct
->>>>> mctrl_gpios. Then
->>>>> a second helper function is required: mctrl_gpio_free_irqs().
->>> yes.
->>>
->>>> After some coding...
->>>> gpio_irq cannot be hidden - it is used by disable/enable_ms() and
->>>> not only :/
->>> mctrl_gpio_enable_ms(struct mctrl_gpios *gpios);
->>
->> This makes unable to combine gpio's and chip's lines but it could be
->> advantage
->> to separate them.
->>
->> [...]
->>> There is no need to pass an output parameter for irqs. Just save them in
->>> struct mctrl_gpios.
->>>
->>> I'd go and change all struct device * parameters of the mctrl_gpio API
->>> to struct uart_port for consistency or add struct uart_port to struct
->>> mctrl_gpios.
->>>
->>>>> So finally the prototypes would be:
->>>>> int mctrl_gpio_request_irqs(struct mctrl_gpios*, struct
->>>>> uart_port*, irqhandler_t);
->>>>> void mctrl_gpio_free_irqs(struct mctrl_gpios*);
->>> I think:
->>>
->>>          struct mctrl_gpios {
->>>                  struct uart_port *port;
->>>                  struct {
->>>                          gpio_desc *gpio;
->>>                          unsigned int irq;
-> I think it's just "int irq;" there
->>>                  } mctrl_line[UART_GPIO_MAX];
->>>          };
->>
->> Looks good. Richard, do you agree?
-> yes, seems ok too me !
+If we're going that way, then maybe having to specify clock-names
+would be better in order to know which clock is what?
 
-What do you prefer?
+Maxime
 
-struct mctrl_gpios {
-         struct uart_port *port;
-         struct {
-                 struct gpio_desc *gpio;
-                 unsigned int irq;
-         } mline[UART_GPIO_MAX];
-};
-
-or
-
-struct mctrl_gpios {
-         struct uart_port *port;
-         struct gpio_desc *gpio[UART_GPIO_MAX];
-         unsigned int irq[UART_GPIO_MAX];
-};
-
-The second one allows to save a lot of current code and make the code
-shorter.
-
-best regards
-Janusz
-
->
->>>          struct mctrl_gpios *mctrl_gpio_init(struct uart_port *port,
->>> unsigned int idx_if_needed);
->>>          int mctrl_gpio_enable_ms(struct mctrl_gpios *gpios);
->>>          int mctrl_gpio_disable_ms(struct mctrl_gpios *gpios);
->>>          void mctrl_gpio_free(struct mctrl_gpios *gpios);
->>>
->>> I think mctrl_gpio_init should request the needed irqs, but not enable
->>> them.
->>
->> Yes. I tried to assign irq value in mctrl_gpio_init() only.
->> There was another issue if CONFIG_GPIOLIB is not defined but it looks mctrl_
->> disable/enable_ms()
->> and mctrl_ irq handler solve the problem.
->>
->>>    Not sure there is a corresponding request_irq variant for that.
->>
->> What would you propose?
-> In atmel_request_gpio_irq(), the function irq_set_status_flags(irq,
-> IRQ_NOAUTOEN); is used before request_irq to prevent the irq from
-> being enabled when requested.
->
->>> Another open issue is how mctrl_gpio_init should find out about which
->>> gpios to use if there is no device tree. This doesn't necessarily needs
->>> to be solved now, but maybe rename mctrl_gpio_init to
->>> mctrl_gpio_init_dt?
->>
->> Right
->>
->>
->> best regards
->> Janusz
->>
->>> Best regards
->>> Uwe
->>>
->
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/310b97ea/attachment.sig>
