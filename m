@@ -1,101 +1,39 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Mon, 17 Nov 2014 14:41:38 -0800
-Subject: [PATCH V5 08/12] of: Add NVIDIA Tegra xHCI controller binding
+Date: Mon, 17 Nov 2014 14:41:40 -0800
+Subject: [PATCH V5 10/12] ARM: tegra: Add Tegra124 XUSB mailbox and xHCI
+ controller
 In-Reply-To: <1416264102-1323-1-git-send-email-abrestic@chromium.org>
 References: <1416264102-1323-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1416264102-1323-9-git-send-email-abrestic@chromium.org>
+Message-ID: <1416264102-1323-11-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device-tree binding documentation for the xHCI controller present
-on Tegra124 and later SoCs.
+Add nodes for the Tegra XUSB mailbox and Tegra xHCI controller and
+add the PHY mailbox channel to the XUSB padctl node.
 
 Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 Reviewed-by: Stephen Warren <swarren@nvidia.com>
 ---
-Changes from v4:
- - Updated regulator names, as suggested by Thierry.
+No changes from v4.
 No changes from v3.
 Changes from v2:
- - Added mbox-names property.
+ - Dropped channel specifier from mailbox bindings.
+ - Added mbox-names properties.
 Changes from v1:
  - Updated to use common mailbox bindings.
- - Added remaining XUSB-related clocks and resets.
- - Updated list of power supplies to be more accurate wrt to the hardware.
+ - Added remaining clocks/resets.
 ---
- .../bindings/usb/nvidia,tegra124-xhci.txt          | 104 +++++++++++++++++++++
- 1 file changed, 104 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/usb/nvidia,tegra124-xhci.txt
+ arch/arm/boot/dts/tegra124.dtsi | 41 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/usb/nvidia,tegra124-xhci.txt b/Documentation/devicetree/bindings/usb/nvidia,tegra124-xhci.txt
-new file mode 100644
-index 0000000..0047311
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/nvidia,tegra124-xhci.txt
-@@ -0,0 +1,104 @@
-+NVIDIA Tegra xHCI controller
-+============================
-+
-+The Tegra xHCI controller supports both USB2 and USB3 interfaces exposed
-+by the Tegra XUSB pad controller.
-+
-+Required properties:
-+--------------------
-+ - compatible: Should be "nvidia,tegra124-xhci".
-+ - reg: Address and length of the register sets.  There should be three
-+   entries in the following order: xHCI host registers, FPCI registers, and
-+   IPFS registers.
-+ - interrupts: xHCI host interrupt.
-+ - clocks: Must contain an entry for each entry in clock-names.
-+   See ../clock/clock-bindings.txt for details.
-+ - clock-names: Must include the following entries:
-+    - xusb_host
-+    - xusb_host_src
-+    - xusb_dev
-+    - xusb_dev_src
-+    - xusb_falcon_src
-+    - xusb_ss
-+    - xusb_ss_src
-+    - xusb_ss_div2
-+    - xusb_hs_src
-+    - xusb_fs_src
-+    - pll_u_480m
-+    - clk_m
-+    - pll_e
-+ - resets: Must contain an entry for each entry in reset-names.
-+   See ../reset/reset.txt for details.
-+ - reset-names: Must include the following entries:
-+   - xusb_host
-+   - xusb_dev
-+   - xusb_ss
-+   - xusb
-+   Note that xusb_dev is the shared reset for xusb_dev and xusb_dev_src and
-+   that xusb is the shared reset for xusb_{ss,hs,fs,falcon,host}_src.
-+ - mboxes: Must contain an entry for the XUSB mailbox channel.
-+   See ../mailbox/mailbox.txt for details.
-+ - mbox-names: Must include the following entries:
-+   - xusb
-+ - avddio-pex-supply: PCIe/USB3 analog logic power supply.  Must supply 1.05V.
-+ - dvddio-pex-supply: PCIe/USB3 digital logic power supply.  Must supply 1.05V.
-+ - avdd-usb-supply: USB controller power supply.  Must supply 3.3V.
-+ - avdd-pll-utmip-supply: UTMI PLL power supply.  Must supply 1.8V.
-+ - avdd-pll-erefe-supply: PLLE reference PLL power supply.  Must supply 1.05V.
-+ - avdd-usb-ss-pll-supply: PCIe/USB3 PLL power supply.  Must supply 1.05V.
-+ - hvdd-usb-ss-supply: High-voltage PCIe/USB3 power supply.  Must supply 3.3V.
-+ - hvdd-usb-ss-pll-e-supply: High-voltage PLLE power supply.  Must supply 3.3V.
-+
-+Optional properties:
-+--------------------
-+ - phys: Must contain an entry for each entry in phy-names.
-+   See ../phy/phy-bindings.txt for details.
-+ - phy-names: Should include an entry for each PHY used by the controller.
-+   May be a subset of the following:
-+    - utmi-{0,1,2}
-+    - hsic-{0,1}
-+    - usb3-{0,1}
-+
-+Example:
-+--------
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index 478c555..73bc7a4 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -591,11 +591,52 @@
+ 		status = "disabled";
+ 	};
+ 
 +	usb at 0,70090000 {
 +		compatible = "nvidia,tegra124-xhci";
 +		reg = <0x0 0x70090000 0x0 0x8000>,
@@ -124,18 +62,26 @@ index 0000000..0047311
 +		reset-names = "xusb_host", "xusb_dev", "xusb_ss", "xusb";
 +		mboxes = <&xusb_mbox>;
 +		mbox-names = "xusb";
-+		phys = <&padctl TEGRA_XUSB_PADCTL_UTMI_P1>, /* mini-PCIe USB */
-+		       <&padctl TEGRA_XUSB_PADCTL_UTMI_P2>, /* USB A */
-+		       <&padctl TEGRA_XUSB_PADCTL_USB3_P0>; /* USB A */
-+		phy-names = "utmi-1", "utmi-2", "usb3-0";
-+		avddio-pex-supply = <&vdd_1v05_run>;
-+		dvddio-pex-supply = <&vdd_1v05_run>;
-+		avdd-usb-supply = <&vdd_3v3_lp0>;
-+		avdd-pll-utmip-supply = <&vddio_1v8>;
-+		avdd-pll-erefe-supply = <&avdd_1v05_run>;
-+		avdd-usb-ss-pll-supply = <&vdd_1v05_run>;
-+		hvdd-usb-ss-supply = <&vdd_3v3_lp0>;
-+		hvdd-usb-ss-pll-e-supply = <&vdd_3v3_lp0>;
++		status = "disabled";
 +	};
++
++	xusb_mbox: mailbox at 0,70098000 {
++		compatible = "nvidia,tegra124-xusb-mbox";
++		reg = <0x0 0x70098000 0x0 0x1000>;
++		interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
++
++		#mbox-cells = <0>;
++	};
++
+ 	padctl: padctl at 0,7009f000 {
+ 		compatible = "nvidia,tegra124-xusb-padctl";
+ 		reg = <0x0 0x7009f000 0x0 0x1000>;
+ 		resets = <&tegra_car 142>;
+ 		reset-names = "padctl";
++		mboxes = <&xusb_mbox>;
++		mbox-names = "xusb";
+ 
+ 		#phy-cells = <1>;
+ 	};
 -- 
 2.1.0.rc2.206.gedb03e5
