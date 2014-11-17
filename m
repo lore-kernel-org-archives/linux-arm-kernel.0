@@ -1,104 +1,131 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:04 +0100
-Subject: [PATCH v5 10/61] dmaengine: Create a generic dma_slave_caps callback
-In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-11-git-send-email-maxime.ripard@free-electrons.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 17 Nov 2014 14:54:13 +0100
+Subject: [PATCH] mmc: sdhci-sirf: add sirf tuning function (cmd 19)
+In-Reply-To: <CAGsJ_4yOCwt1YYd6UuAXjeO2iWhQB4XtouyriX1YsK7BnyNNLA@mail.gmail.com>
+References: <1415720864-3936-1-git-send-email-21cnbao@gmail.com>
+ <CAPDyKFopdcLXVCuoifd7K8NaRY4UXDbDmNJvyFeUQZs62or9Ag@mail.gmail.com>
+ <CAGsJ_4yOCwt1YYd6UuAXjeO2iWhQB4XtouyriX1YsK7BnyNNLA@mail.gmail.com>
+Message-ID: <CAPDyKFprzeMS7Di7XUYTeZx-WE2UT+zmNKZM_8kHYhOLSoTfLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dma_slave_caps is very important to the generic layers that might interact with
-dmaengine, such as ASoC. Unfortunately, it has been added as yet another
-dma_device callback, and most of the existing drivers haven't implemented it,
-reducing its reliability.
+On 17 November 2014 10:30, Barry Song <21cnbao@gmail.com> wrote:
+> 2014-11-12 17:35 GMT+08:00 Ulf Hansson <ulf.hansson@linaro.org>:
+>> On 11 November 2014 16:47, Barry Song <21cnbao@gmail.com> wrote:
+>>> From: Minda Chen <Minda.Chen@csr.com>
+>>>
+>>> Add manual tuning function in CSR atlas7 SoC. It is mainly used
+>>> for the UHS-I SD card working SDR50 SDR104 mode.
+>>>
+>>> The tuning principle can be seen in SD spec part1 v3.01 4.2.4.5
+>>> (tuning command).
+>>>
+>>> SD host send the cmd19 and set the delay value(0-127).
+>>> and the sdcard return 64 bytes data. If the data is same with
+>>> the tuning data. The delay value is valid. Execute this commmand
+>>> 128 times. And calculate the longest window of the valid values.
+>>> The value in the middle of this window is the best value.
+>>>
+>>> Signed-off-by: Minda Chen <Minda.Chen@csr.com>
+>>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>>> ---
+>>>  drivers/mmc/host/sdhci-sirf.c | 105 +++++++++++++++++++++++++++++++++++++++++-
+>>>  1 file changed, 104 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
+>>> index dd29d47..c71cf4e 100644
+>>> --- a/drivers/mmc/host/sdhci-sirf.c
+>>> +++ b/drivers/mmc/host/sdhci-sirf.c
+>>> @@ -8,14 +8,18 @@
+>>>
+>>>  #include <linux/delay.h>
+>>>  #include <linux/device.h>
+>>> -#include <linux/mmc/host.h>
+>>>  #include <linux/module.h>
+>>>  #include <linux/of.h>
+>>>  #include <linux/of_gpio.h>
+>>> +#include <linux/slab.h>
+>>> +#include <linux/mmc/host.h>
+>>> +#include <linux/mmc/mmc.h>
+>>>  #include <linux/mmc/slot-gpio.h>
+>>>  #include "sdhci-pltfm.h"
+>>>
+>>> +#define SDHCI_CLK_DELAY_SETTING 0x4C
+>>>  #define SDHCI_SIRF_8BITBUS BIT(3)
+>>> +#define SIRF_TUNING_COUNT 128
+>>>
+>>>  struct sdhci_sirf_priv {
+>>>         struct clk *clk;
+>>> @@ -49,7 +53,106 @@ static void sdhci_sirf_set_bus_width(struct sdhci_host *host, int width)
+>>>         sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
+>>>  }
+>>>
+>>> +static int sdhci_sirf_execute_tuning(struct sdhci_host *host, u32 opcode)
+>>> +{
+>>> +       int tuning_seq_cnt = 3;
+>>> +       u8 phase, *data_buf, tuned_phases[SIRF_TUNING_COUNT];
+>>> +       u8 tuned_phase_cnt = 0;
+>>> +       const u8 *tuning_block_pattern = tuning_blk_pattern_4bit;
+>>> +       int size = sizeof(tuning_blk_pattern_4bit);
+>>> +       int rc, longest_range = 0;
+>>> +       int start = -1, end, tuning_value = -1, range = 0;
+>>> +       u16 clock_setting;
+>>> +       struct mmc_host *mmc = host->mmc;
+>>> +
+>>> +       data_buf = kmalloc(size, GFP_KERNEL);
+>>> +       if (!data_buf)
+>>> +               return -ENOMEM;
+>>> +
+>>> +       clock_setting = sdhci_readw(host, SDHCI_CLK_DELAY_SETTING);
+>>> +       clock_setting &= ~0x3fff;
+>>> +
+>>> +retry:
+>>> +       phase = 0;
+>>> +       do {
+>>> +               struct mmc_command cmd = { 0 };
+>>> +               struct mmc_data data = { 0 };
+>>> +               struct mmc_request mrq = {
+>>> +                       .cmd = &cmd,
+>>> +                       .data = &data
+>>> +               };
+>>> +               struct scatterlist sg;
+>>> +
+>>> +               sdhci_writel(host,
+>>> +                       clock_setting | phase | (phase << 7) | (phase << 16),
+>>> +                       SDHCI_CLK_DELAY_SETTING);
+>>> +
+>>> +               cmd.opcode = opcode;
+>>> +               cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
+>>> +
+>>> +               data.blksz = size;
+>>> +               data.blocks = 1;
+>>> +               data.flags = MMC_DATA_READ;
+>>> +               data.timeout_ns = NSEC_PER_SEC; /* 1 second */
+>>> +
+>>> +               data.sg = &sg;
+>>> +               data.sg_len = 1;
+>>> +               sg_init_one(&sg, data_buf, size);
+>>> +               memset(data_buf, 0, size);
+>>> +               mmc_wait_for_req(mmc, &mrq);
+>>
+>> These piece of code, which sends the tuning command don't belong in
+>> the host driver. Instead I would like this to be handled from a helper
+>> function from the mmc core.
+>>
+>> I realize that there already a few existing host drivers that
+>> implemented similar code and I don't like it. We should convert them
+>> to use a common helper function from the core instead.
+> yes. that is fine.
+>
+> our engineering is currently very busy and might have no time to
+> handle this for this moment.
+> do you think we can move your requirement to a new refine task of next
+> window after you pick up this in this window?
 
-Introduce a generic behaviour to implement this, that rely on both the split of
-device_control to derive which functions are supported and on new variables to
-be set in the dma_device structure.
+No.
 
-These variables holds what used to be the capabilities, that were set
-per-channel. However, this proved to be a bit overkill, since every driver
-filling these so far were hardcoding it, disregarding which channel was
-actually given.
+You don't have to adopt the other host drivers at this point, only to
+fix yours accordingly. The rest we can take care of later.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
----
- include/linux/dmaengine.h | 41 +++++++++++++++++++++++++++++++++++++----
- 1 file changed, 37 insertions(+), 4 deletions(-)
-
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index b0efc805937a..be9e60aa8f5e 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -593,6 +593,14 @@ struct dma_tx_state {
-  * @fill_align: alignment shift for memset operations
-  * @dev_id: unique device ID
-  * @dev: struct device reference for dma mapping api
-+ * @src_addr_widths: bit mask of src addr widths the device supports
-+ * @dst_addr_widths: bit mask of dst addr widths the device supports
-+ * @directions: bit mask of slave direction the device supports since
-+ * 	the enum dma_transfer_direction is not defined as bits for
-+ * 	each type of direction, the dma controller should fill (1 <<
-+ * 	<TYPE>) and same should be checked by controller as well
-+ * @residue_granularity: granularity of the transfer residue reported
-+ *	by tx_status
-  * @device_alloc_chan_resources: allocate resources and return the
-  *	number of allocated descriptors
-  * @device_free_chan_resources: release DMA channel's resources
-@@ -642,6 +650,11 @@ struct dma_device {
- 	int dev_id;
- 	struct device *dev;
- 
-+	u32 src_addr_widths;
-+	u32 dst_addr_widths;
-+	u32 directions;
-+	enum dma_residue_granularity residue_granularity;
-+
- 	int (*device_alloc_chan_resources)(struct dma_chan *chan);
- 	void (*device_free_chan_resources)(struct dma_chan *chan);
- 
-@@ -783,17 +796,37 @@ static inline struct dma_async_tx_descriptor *dmaengine_prep_dma_sg(
- 
- static inline int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_caps *caps)
- {
-+	struct dma_device *device;
-+
- 	if (!chan || !caps)
- 		return -EINVAL;
- 
-+	device = chan->device;
-+
- 	/* check if the channel supports slave transactions */
--	if (!test_bit(DMA_SLAVE, chan->device->cap_mask.bits))
-+	if (!test_bit(DMA_SLAVE, device->cap_mask.bits))
-+		return -ENXIO;
-+
-+	if (device->device_slave_caps)
-+		return device->device_slave_caps(chan, caps);
-+
-+	/*
-+	 * Check whether it reports it uses the generic slave
-+	 * capabilities, if not, that means it doesn't support any
-+	 * kind of slave capabilities reporting.
-+	 */
-+	if (!device->directions)
- 		return -ENXIO;
- 
--	if (chan->device->device_slave_caps)
--		return chan->device->device_slave_caps(chan, caps);
-+	caps->src_addr_widths = device->src_addr_widths;
-+	caps->dst_addr_widths = device->dst_addr_widths;
-+	caps->directions = device->directions;
-+	caps->residue_granularity = device->residue_granularity;
-+
-+	caps->cmd_pause = !!device->device_pause;
-+	caps->cmd_terminate = !!device->device_terminate_all;
- 
--	return -ENXIO;
-+	return 0;
- }
- 
- static inline int dmaengine_terminate_all(struct dma_chan *chan)
--- 
-2.1.1
+Br
+Uffe
