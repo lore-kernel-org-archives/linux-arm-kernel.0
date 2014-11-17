@@ -1,151 +1,53 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon, 17 Nov 2014 16:47:56 +0000
-Subject: [PATCH v3 03/11] ARM: STi: DT: STiH416: Add DT nodes for the ehci and
- ohci usb controllers.
+Date: Mon, 17 Nov 2014 16:47:59 +0000
+Subject: [PATCH v3 06/11] ARM: STi: DT: STiH410: Add defines for STiH410 DT
+ clocks
 In-Reply-To: <1416242884-5261-1-git-send-email-peter.griffin@linaro.org>
 References: <1416242884-5261-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1416242884-5261-4-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1416242884-5261-7-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the DT nodes for the 4 usb ehci and ohci usb controllers
-on the stih416 SoC.
+Although most clock outputs are the same as stih407 SoC, stih410
+also has some additional new clock outputs.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stih416.dtsi | 121 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 121 insertions(+)
+ include/dt-bindings/clock/stih410-clks.h | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+ create mode 100644 include/dt-bindings/clock/stih410-clks.h
 
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index ff2ad35..2bdda52 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -324,5 +324,126 @@
- 			clocks = <&clk_sysin>;
- 			clock-names = "osc_phy";
- 		};
+diff --git a/include/dt-bindings/clock/stih410-clks.h b/include/dt-bindings/clock/stih410-clks.h
+new file mode 100644
+index 0000000..2097a4b
+--- /dev/null
++++ b/include/dt-bindings/clock/stih410-clks.h
+@@ -0,0 +1,25 @@
++/*
++ * This header provides constants clk index STMicroelectronics
++ * STiH410 SoC.
++ */
++#ifndef _DT_BINDINGS_CLK_STIH410
++#define _DT_BINDINGS_CLK_STIH410
 +
-+		ehci0: usb at fe1ffe00 {
-+			compatible = "st,st-ehci-300x";
-+			reg = <0xfe1ffe00 0x100>;
-+			interrupts = <GIC_SPI 148 IRQ_TYPE_NONE>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb0>;
-+			clocks = <&clk_s_a1_ls 0>,
-+				 <&clockgen_b0 0>;
-+			clock-names = "ic", "clk48";
-+			phys = <&usb2_phy>;
-+			phy-names = "usb";
-+			resets = <&powerdown STIH416_USB0_POWERDOWN>,
-+				 <&softreset STIH416_USB0_SOFTRESET>;
-+			reset-names = "power", "softreset";
-+		};
++#include "stih407-clks.h"
 +
-+		ohci0: usb at fe1ffc00 {
-+			compatible = "st,st-ohci-300x";
-+			reg = <0xfe1ffc00 0x100>;
-+			interrupts = <GIC_SPI 149 IRQ_TYPE_NONE>;
-+			clocks = <&clk_s_a1_ls 0>,
-+				 <&clockgen_b0 0>;
-+			clock-names = "ic", "clk48";
-+			phys = <&usb2_phy>;
-+			phy-names = "usb";
-+			status = "okay";
-+			resets = <&powerdown STIH416_USB0_POWERDOWN>,
-+				 <&softreset STIH416_USB0_SOFTRESET>;
-+			reset-names = "power", "softreset";
-+		};
++/* STiH410 introduces new clock outputs compared to STiH407 */
 +
-+		ehci1: usb at fe203e00 {
-+			compatible = "st,st-ehci-300x";
-+			reg = <0xfe203e00 0x100>;
-+			interrupts = <GIC_SPI 150 IRQ_TYPE_NONE>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb1>;
-+			clocks = <&clk_s_a1_ls 0>,
-+				 <&clockgen_b0 0>;
-+			clock-names = "ic", "clk48";
-+			phys = <&usb2_phy>;
-+			phy-names = "usb";
-+			resets = <&powerdown STIH416_USB1_POWERDOWN>,
-+				 <&softreset STIH416_USB1_SOFTRESET>;
-+			reset-names = "power", "softreset";
-+		};
++/* CLOCKGEN C0 */
++#define CLK_TX_ICN_HADES	32
++#define CLK_RX_ICN_HADES	33
++#define CLK_ICN_REG_16		34
++#define CLK_PP_HADES		35
++#define CLK_CLUST_HADES		36
++#define CLK_HWPE_HADES		37
++#define CLK_FC_HADES		38
 +
-+		ohci1: usb at fe203c00 {
-+			compatible = "st,st-ohci-300x";
-+			reg = <0xfe203c00 0x100>;
-+			interrupts = <GIC_SPI 151 IRQ_TYPE_NONE>;
-+			clocks = <&clk_s_a1_ls 0>,
-+				 <&clockgen_b0 0>;
-+			clock-names = "ic", "clk48";
-+			phys = <&usb2_phy>;
-+			phy-names = "usb";
-+			resets = <&powerdown STIH416_USB1_POWERDOWN>,
-+				 <&softreset STIH416_USB1_SOFTRESET>;
-+			reset-names = "power", "softreset";
-+		};
++/* CLOCKGEN D0 */
++#define CLK_PCMR10_MASTER	4
++#define CLK_USB2_PHY		5
 +
-+		ehci2: usb at fe303e00 {
-+			compatible = "st,st-ehci-300x";
-+			reg = <0xfe303e00 0x100>;
-+			interrupts = <GIC_SPI 152 IRQ_TYPE_NONE>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb2>;
-+			clocks = <&clk_s_a1_ls 0>,
-+				 <&clockgen_b0 0>;
-+			clock-names = "ic", "clk48";
-+			phys = <&usb2_phy>;
-+			phy-names = "usb";
-+			resets = <&powerdown STIH416_USB2_POWERDOWN>,
-+				 <&softreset STIH416_USB2_SOFTRESET>;
-+			reset-names = "power", "softreset";
-+		};
-+
-+		ohci2: usb at fe303c00 {
-+			compatible = "st,st-ohci-300x";
-+			reg = <0xfe303c00 0x100>;
-+			interrupts = <GIC_SPI 153 IRQ_TYPE_NONE>;
-+			clocks = <&clk_s_a1_ls 0>,
-+				 <&clockgen_b0 0>;
-+			clock-names = "ic", "clk48";
-+			phys = <&usb2_phy>;
-+			phy-names = "usb";
-+			resets = <&powerdown STIH416_USB2_POWERDOWN>,
-+				 <&softreset STIH416_USB2_SOFTRESET>;
-+			reset-names = "power", "softreset";
-+		};
-+
-+		ehci3: usb at fe343e00 {
-+			compatible = "st,st-ehci-300x";
-+			reg = <0xfe343e00 0x100>;
-+			interrupts = <GIC_SPI 154 IRQ_TYPE_NONE>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb3>;
-+			clocks = <&clk_s_a1_ls 0>,
-+				 <&clockgen_b0 0>;
-+			clock-names = "ic", "clk48";
-+			phys = <&usb2_phy>;
-+			phy-names = "usb";
-+			resets = <&powerdown STIH416_USB3_POWERDOWN>,
-+				 <&softreset STIH416_USB3_SOFTRESET>;
-+			reset-names = "power", "softreset";
-+		};
-+
-+		ohci3: usb at fe343c00 {
-+			compatible = "st,st-ohci-300x";
-+			reg = <0xfe343c00 0x100>;
-+			interrupts = <GIC_SPI 155 IRQ_TYPE_NONE>;
-+			clocks = <&clk_s_a1_ls 0>,
-+				 <&clockgen_b0 0>;
-+			clock-names = "ic", "clk48";
-+			phys = <&usb2_phy>;
-+			phy-names = "usb";
-+			resets = <&powerdown STIH416_USB3_POWERDOWN>,
-+				 <&softreset STIH416_USB3_SOFTRESET>;
-+			reset-names = "power", "softreset";
-+		};
- 	};
- };
++#endif
 -- 
 1.9.1
