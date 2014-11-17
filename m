@@ -1,33 +1,530 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 17 Nov 2014 20:30:10 +0000
-Subject: [PATCH 6/8] ARM: add machine name to stack dump output
+Date: Mon, 17 Nov 2014 20:30:15 +0000
+Subject: [PATCH 7/8] ARM: move ftrace assembly code to separate file
 In-Reply-To: <20141117202911.GZ4042@n2100.arm.linux.org.uk>
 References: <20141117202911.GZ4042@n2100.arm.linux.org.uk>
-Message-ID: <E1XqSw6-0002EZ-Kc@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1XqSwB-0002Ef-Ns@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic dump_stack() code provides the facility to include the
-machine name in the stack dump, which can be useful information.  Add
-a call to dump_stack_set_arch_desc() for the generic code to print
-this information.
+The ftrace assembly code doesn't need to live in entry-common.S and
+be surrounded with #ifdef CONFIG_FUNCTION_TRACER.  Instead, move it
+to its own file and conditionally assemble it.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/kernel/setup.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/kernel/Makefile       |   1 +
+ arch/arm/kernel/entry-common.S | 235 ---------------------------------------
+ arch/arm/kernel/entry-ftrace.S | 243 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 244 insertions(+), 235 deletions(-)
+ create mode 100644 arch/arm/kernel/entry-ftrace.S
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index c03106378b49..8361652b6dab 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -900,6 +900,7 @@ void __init setup_arch(char **cmdline_p)
- 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
- 	machine_desc = mdesc;
- 	machine_name = mdesc->name;
-+	dump_stack_set_arch_desc("%s", mdesc->name);
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 38ddd9f83d0e..738ebe5a91e6 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -47,6 +47,7 @@ endif
+ obj-$(CONFIG_HAVE_ARM_SCU)	+= smp_scu.o
+ obj-$(CONFIG_HAVE_ARM_TWD)	+= smp_twd.o
+ obj-$(CONFIG_ARM_ARCH_TIMER)	+= arch_timer.o
++obj-$(CONFIG_FUNCTION_TRACER)	+= entry-ftrace.o
+ obj-$(CONFIG_DYNAMIC_FTRACE)	+= ftrace.o insn.o
+ obj-$(CONFIG_FUNCTION_GRAPH_TRACER)	+= ftrace.o insn.o
+ obj-$(CONFIG_JUMP_LABEL)	+= jump_label.o insn.o patch.o
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 6bb09d4abdea..f8ccc21fa032 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -109,241 +109,6 @@ ENDPROC(ret_from_fork)
+ #undef CALL
+ #define CALL(x) .long x
  
- 	if (mdesc->reboot_mode != REBOOT_HARD)
- 		reboot_mode = mdesc->reboot_mode;
+-#ifdef CONFIG_FUNCTION_TRACER
+-/*
+- * When compiling with -pg, gcc inserts a call to the mcount routine at the
+- * start of every function.  In mcount, apart from the function's address (in
+- * lr), we need to get hold of the function's caller's address.
+- *
+- * Older GCCs (pre-4.4) inserted a call to a routine called mcount like this:
+- *
+- *	bl	mcount
+- *
+- * These versions have the limitation that in order for the mcount routine to
+- * be able to determine the function's caller's address, an APCS-style frame
+- * pointer (which is set up with something like the code below) is required.
+- *
+- *	mov     ip, sp
+- *	push    {fp, ip, lr, pc}
+- *	sub     fp, ip, #4
+- *
+- * With EABI, these frame pointers are not available unless -mapcs-frame is
+- * specified, and if building as Thumb-2, not even then.
+- *
+- * Newer GCCs (4.4+) solve this problem by introducing a new version of mcount,
+- * with call sites like:
+- *
+- *	push	{lr}
+- *	bl	__gnu_mcount_nc
+- *
+- * With these compilers, frame pointers are not necessary.
+- *
+- * mcount can be thought of as a function called in the middle of a subroutine
+- * call.  As such, it needs to be transparent for both the caller and the
+- * callee: the original lr needs to be restored when leaving mcount, and no
+- * registers should be clobbered.  (In the __gnu_mcount_nc implementation, we
+- * clobber the ip register.  This is OK because the ARM calling convention
+- * allows it to be clobbered in subroutines and doesn't use it to hold
+- * parameters.)
+- *
+- * When using dynamic ftrace, we patch out the mcount call by a "mov r0, r0"
+- * for the mcount case, and a "pop {lr}" for the __gnu_mcount_nc case (see
+- * arch/arm/kernel/ftrace.c).
+- */
+-
+-#ifndef CONFIG_OLD_MCOUNT
+-#if (__GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 4))
+-#error Ftrace requires CONFIG_FRAME_POINTER=y with GCC older than 4.4.0.
+-#endif
+-#endif
+-
+-.macro mcount_adjust_addr rd, rn
+-	bic	\rd, \rn, #1		@ clear the Thumb bit if present
+-	sub	\rd, \rd, #MCOUNT_INSN_SIZE
+-.endm
+-
+-.macro __mcount suffix
+-	mcount_enter
+-	ldr	r0, =ftrace_trace_function
+-	ldr	r2, [r0]
+-	adr	r0, .Lftrace_stub
+-	cmp	r0, r2
+-	bne	1f
+-
+-#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-	ldr     r1, =ftrace_graph_return
+-	ldr     r2, [r1]
+-	cmp     r0, r2
+-	bne     ftrace_graph_caller\suffix
+-
+-	ldr     r1, =ftrace_graph_entry
+-	ldr     r2, [r1]
+-	ldr     r0, =ftrace_graph_entry_stub
+-	cmp     r0, r2
+-	bne     ftrace_graph_caller\suffix
+-#endif
+-
+-	mcount_exit
+-
+-1: 	mcount_get_lr	r1			@ lr of instrumented func
+-	mcount_adjust_addr	r0, lr		@ instrumented function
+-	adr	lr, BSYM(2f)
+-	mov	pc, r2
+-2:	mcount_exit
+-.endm
+-
+-.macro __ftrace_caller suffix
+-	mcount_enter
+-
+-	mcount_get_lr	r1			@ lr of instrumented func
+-	mcount_adjust_addr	r0, lr		@ instrumented function
+-
+-	.globl ftrace_call\suffix
+-ftrace_call\suffix:
+-	bl	ftrace_stub
+-
+-#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-	.globl ftrace_graph_call\suffix
+-ftrace_graph_call\suffix:
+-	mov	r0, r0
+-#endif
+-
+-	mcount_exit
+-.endm
+-
+-.macro __ftrace_graph_caller
+-	sub	r0, fp, #4		@ &lr of instrumented routine (&parent)
+-#ifdef CONFIG_DYNAMIC_FTRACE
+-	@ called from __ftrace_caller, saved in mcount_enter
+-	ldr	r1, [sp, #16]		@ instrumented routine (func)
+-	mcount_adjust_addr	r1, r1
+-#else
+-	@ called from __mcount, untouched in lr
+-	mcount_adjust_addr	r1, lr	@ instrumented routine (func)
+-#endif
+-	mov	r2, fp			@ frame pointer
+-	bl	prepare_ftrace_return
+-	mcount_exit
+-.endm
+-
+-#ifdef CONFIG_OLD_MCOUNT
+-/*
+- * mcount
+- */
+-
+-.macro mcount_enter
+-	stmdb	sp!, {r0-r3, lr}
+-.endm
+-
+-.macro mcount_get_lr reg
+-	ldr	\reg, [fp, #-4]
+-.endm
+-
+-.macro mcount_exit
+-	ldr	lr, [fp, #-4]
+-	ldmia	sp!, {r0-r3, pc}
+-.endm
+-
+-ENTRY(mcount)
+-#ifdef CONFIG_DYNAMIC_FTRACE
+-	stmdb	sp!, {lr}
+-	ldr	lr, [fp, #-4]
+-	ldmia	sp!, {pc}
+-#else
+-	__mcount _old
+-#endif
+-ENDPROC(mcount)
+-
+-#ifdef CONFIG_DYNAMIC_FTRACE
+-ENTRY(ftrace_caller_old)
+-	__ftrace_caller _old
+-ENDPROC(ftrace_caller_old)
+-#endif
+-
+-#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-ENTRY(ftrace_graph_caller_old)
+-	__ftrace_graph_caller
+-ENDPROC(ftrace_graph_caller_old)
+-#endif
+-
+-.purgem mcount_enter
+-.purgem mcount_get_lr
+-.purgem mcount_exit
+-#endif
+-
+-/*
+- * __gnu_mcount_nc
+- */
+-
+-.macro mcount_enter
+-/*
+- * This pad compensates for the push {lr}@the call site.  Note that we are
+- * unable to unwind through a function which does not otherwise save its lr.
+- */
+- UNWIND(.pad	#4)
+-	stmdb	sp!, {r0-r3, lr}
+- UNWIND(.save	{r0-r3, lr})
+-.endm
+-
+-.macro mcount_get_lr reg
+-	ldr	\reg, [sp, #20]
+-.endm
+-
+-.macro mcount_exit
+-	ldmia	sp!, {r0-r3, ip, lr}
+-	ret	ip
+-.endm
+-
+-ENTRY(__gnu_mcount_nc)
+-UNWIND(.fnstart)
+-#ifdef CONFIG_DYNAMIC_FTRACE
+-	mov	ip, lr
+-	ldmia	sp!, {lr}
+-	ret	ip
+-#else
+-	__mcount
+-#endif
+-UNWIND(.fnend)
+-ENDPROC(__gnu_mcount_nc)
+-
+-#ifdef CONFIG_DYNAMIC_FTRACE
+-ENTRY(ftrace_caller)
+-UNWIND(.fnstart)
+-	__ftrace_caller
+-UNWIND(.fnend)
+-ENDPROC(ftrace_caller)
+-#endif
+-
+-#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-ENTRY(ftrace_graph_caller)
+-UNWIND(.fnstart)
+-	__ftrace_graph_caller
+-UNWIND(.fnend)
+-ENDPROC(ftrace_graph_caller)
+-#endif
+-
+-.purgem mcount_enter
+-.purgem mcount_get_lr
+-.purgem mcount_exit
+-
+-#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-	.globl return_to_handler
+-return_to_handler:
+-	stmdb	sp!, {r0-r3}
+-	mov	r0, fp			@ frame pointer
+-	bl	ftrace_return_to_handler
+-	mov	lr, r0			@ r0 has real ret addr
+-	ldmia	sp!, {r0-r3}
+-	ret	lr
+-#endif
+-
+-ENTRY(ftrace_stub)
+-.Lftrace_stub:
+-	ret	lr
+-ENDPROC(ftrace_stub)
+-
+-#endif /* CONFIG_FUNCTION_TRACER */
+-
+ /*=============================================================================
+  * SWI handler
+  *-----------------------------------------------------------------------------
+diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
+new file mode 100644
+index 000000000000..fe57c73e70a4
+--- /dev/null
++++ b/arch/arm/kernel/entry-ftrace.S
+@@ -0,0 +1,243 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <asm/assembler.h>
++#include <asm/ftrace.h>
++#include <asm/unwind.h>
++
++#include "entry-header.S"
++
++/*
++ * When compiling with -pg, gcc inserts a call to the mcount routine at the
++ * start of every function.  In mcount, apart from the function's address (in
++ * lr), we need to get hold of the function's caller's address.
++ *
++ * Older GCCs (pre-4.4) inserted a call to a routine called mcount like this:
++ *
++ *	bl	mcount
++ *
++ * These versions have the limitation that in order for the mcount routine to
++ * be able to determine the function's caller's address, an APCS-style frame
++ * pointer (which is set up with something like the code below) is required.
++ *
++ *	mov     ip, sp
++ *	push    {fp, ip, lr, pc}
++ *	sub     fp, ip, #4
++ *
++ * With EABI, these frame pointers are not available unless -mapcs-frame is
++ * specified, and if building as Thumb-2, not even then.
++ *
++ * Newer GCCs (4.4+) solve this problem by introducing a new version of mcount,
++ * with call sites like:
++ *
++ *	push	{lr}
++ *	bl	__gnu_mcount_nc
++ *
++ * With these compilers, frame pointers are not necessary.
++ *
++ * mcount can be thought of as a function called in the middle of a subroutine
++ * call.  As such, it needs to be transparent for both the caller and the
++ * callee: the original lr needs to be restored when leaving mcount, and no
++ * registers should be clobbered.  (In the __gnu_mcount_nc implementation, we
++ * clobber the ip register.  This is OK because the ARM calling convention
++ * allows it to be clobbered in subroutines and doesn't use it to hold
++ * parameters.)
++ *
++ * When using dynamic ftrace, we patch out the mcount call by a "mov r0, r0"
++ * for the mcount case, and a "pop {lr}" for the __gnu_mcount_nc case (see
++ * arch/arm/kernel/ftrace.c).
++ */
++
++#ifndef CONFIG_OLD_MCOUNT
++#if (__GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 4))
++#error Ftrace requires CONFIG_FRAME_POINTER=y with GCC older than 4.4.0.
++#endif
++#endif
++
++.macro mcount_adjust_addr rd, rn
++	bic	\rd, \rn, #1		@ clear the Thumb bit if present
++	sub	\rd, \rd, #MCOUNT_INSN_SIZE
++.endm
++
++.macro __mcount suffix
++	mcount_enter
++	ldr	r0, =ftrace_trace_function
++	ldr	r2, [r0]
++	adr	r0, .Lftrace_stub
++	cmp	r0, r2
++	bne	1f
++
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++	ldr     r1, =ftrace_graph_return
++	ldr     r2, [r1]
++	cmp     r0, r2
++	bne     ftrace_graph_caller\suffix
++
++	ldr     r1, =ftrace_graph_entry
++	ldr     r2, [r1]
++	ldr     r0, =ftrace_graph_entry_stub
++	cmp     r0, r2
++	bne     ftrace_graph_caller\suffix
++#endif
++
++	mcount_exit
++
++1: 	mcount_get_lr	r1			@ lr of instrumented func
++	mcount_adjust_addr	r0, lr		@ instrumented function
++	adr	lr, BSYM(2f)
++	mov	pc, r2
++2:	mcount_exit
++.endm
++
++.macro __ftrace_caller suffix
++	mcount_enter
++
++	mcount_get_lr	r1			@ lr of instrumented func
++	mcount_adjust_addr	r0, lr		@ instrumented function
++
++	.globl ftrace_call\suffix
++ftrace_call\suffix:
++	bl	ftrace_stub
++
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++	.globl ftrace_graph_call\suffix
++ftrace_graph_call\suffix:
++	mov	r0, r0
++#endif
++
++	mcount_exit
++.endm
++
++.macro __ftrace_graph_caller
++	sub	r0, fp, #4		@ &lr of instrumented routine (&parent)
++#ifdef CONFIG_DYNAMIC_FTRACE
++	@ called from __ftrace_caller, saved in mcount_enter
++	ldr	r1, [sp, #16]		@ instrumented routine (func)
++	mcount_adjust_addr	r1, r1
++#else
++	@ called from __mcount, untouched in lr
++	mcount_adjust_addr	r1, lr	@ instrumented routine (func)
++#endif
++	mov	r2, fp			@ frame pointer
++	bl	prepare_ftrace_return
++	mcount_exit
++.endm
++
++#ifdef CONFIG_OLD_MCOUNT
++/*
++ * mcount
++ */
++
++.macro mcount_enter
++	stmdb	sp!, {r0-r3, lr}
++.endm
++
++.macro mcount_get_lr reg
++	ldr	\reg, [fp, #-4]
++.endm
++
++.macro mcount_exit
++	ldr	lr, [fp, #-4]
++	ldmia	sp!, {r0-r3, pc}
++.endm
++
++ENTRY(mcount)
++#ifdef CONFIG_DYNAMIC_FTRACE
++	stmdb	sp!, {lr}
++	ldr	lr, [fp, #-4]
++	ldmia	sp!, {pc}
++#else
++	__mcount _old
++#endif
++ENDPROC(mcount)
++
++#ifdef CONFIG_DYNAMIC_FTRACE
++ENTRY(ftrace_caller_old)
++	__ftrace_caller _old
++ENDPROC(ftrace_caller_old)
++#endif
++
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++ENTRY(ftrace_graph_caller_old)
++	__ftrace_graph_caller
++ENDPROC(ftrace_graph_caller_old)
++#endif
++
++.purgem mcount_enter
++.purgem mcount_get_lr
++.purgem mcount_exit
++#endif
++
++/*
++ * __gnu_mcount_nc
++ */
++
++.macro mcount_enter
++/*
++ * This pad compensates for the push {lr}@the call site.  Note that we are
++ * unable to unwind through a function which does not otherwise save its lr.
++ */
++ UNWIND(.pad	#4)
++	stmdb	sp!, {r0-r3, lr}
++ UNWIND(.save	{r0-r3, lr})
++.endm
++
++.macro mcount_get_lr reg
++	ldr	\reg, [sp, #20]
++.endm
++
++.macro mcount_exit
++	ldmia	sp!, {r0-r3, ip, lr}
++	ret	ip
++.endm
++
++ENTRY(__gnu_mcount_nc)
++UNWIND(.fnstart)
++#ifdef CONFIG_DYNAMIC_FTRACE
++	mov	ip, lr
++	ldmia	sp!, {lr}
++	ret	ip
++#else
++	__mcount
++#endif
++UNWIND(.fnend)
++ENDPROC(__gnu_mcount_nc)
++
++#ifdef CONFIG_DYNAMIC_FTRACE
++ENTRY(ftrace_caller)
++UNWIND(.fnstart)
++	__ftrace_caller
++UNWIND(.fnend)
++ENDPROC(ftrace_caller)
++#endif
++
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++ENTRY(ftrace_graph_caller)
++UNWIND(.fnstart)
++	__ftrace_graph_caller
++UNWIND(.fnend)
++ENDPROC(ftrace_graph_caller)
++#endif
++
++.purgem mcount_enter
++.purgem mcount_get_lr
++.purgem mcount_exit
++
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++	.globl return_to_handler
++return_to_handler:
++	stmdb	sp!, {r0-r3}
++	mov	r0, fp			@ frame pointer
++	bl	ftrace_return_to_handler
++	mov	lr, r0			@ r0 has real ret addr
++	ldmia	sp!, {r0-r3}
++	ret	lr
++#endif
++
++ENTRY(ftrace_stub)
++.Lftrace_stub:
++	ret	lr
++ENDPROC(ftrace_stub)
 -- 
 1.8.3.1
