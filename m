@@ -1,39 +1,56 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:53 +0100
-Subject: [PATCH v5 59/61] dmaengine: Add a warning for drivers not using the
- generic slave caps retrieval
+Date: Mon, 17 Nov 2014 14:42:51 +0100
+Subject: [PATCH v5 57/61] dmaengine: sirf: Declare slave capabilities for the
+ generic code
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-60-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-58-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the slave caps retrieval to be really useful, most drivers need to
-implement it.
+Now that the generic slave caps code can make use of the device assigned
+capabilities, instead of relying on a callback to be implemented.
 
-Hence, we need to be slightly more aggressive, and trigger a warning at
-registration time for drivers that don't fill their caps infos in order to
-encourage them to implement it.
+Make use of this code.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- drivers/dma/dmaengine.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/dma/sirf-dma.c | 16 +++-------------
+ 1 file changed, 3 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-index 98e9431f85ec..300c8cd2786c 100644
---- a/drivers/dma/dmaengine.c
-+++ b/drivers/dma/dmaengine.c
-@@ -827,6 +827,9 @@ int dma_async_device_register(struct dma_device *device)
- 	BUG_ON(!device->device_issue_pending);
- 	BUG_ON(!device->dev);
+diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
+index eeb2af440b9f..2f56d3d66d5d 100644
+--- a/drivers/dma/sirf-dma.c
++++ b/drivers/dma/sirf-dma.c
+@@ -628,18 +628,6 @@ EXPORT_SYMBOL(sirfsoc_dma_filter_id);
+ 	BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) | \
+ 	BIT(DMA_SLAVE_BUSWIDTH_8_BYTES))
  
-+	WARN(dma_has_cap(DMA_SLAVE, device->cap_mask) && !device->directions,
-+	     "this driver doesn't support generic slave capabilities reporting\n");
-+
- 	/* note: this only matters in the
- 	 * CONFIG_ASYNC_TX_ENABLE_CHANNEL_SWITCH=n case
- 	 */
+-static int sirfsoc_dma_device_slave_caps(struct dma_chan *dchan,
+-	struct dma_slave_caps *caps)
+-{
+-	caps->src_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
+-	caps->dst_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
+-	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+-	caps->cmd_pause = true;
+-	caps->cmd_terminate = true;
+-
+-	return 0;
+-}
+-
+ static struct dma_chan *of_dma_sirfsoc_xlate(struct of_phandle_args *dma_spec,
+ 	struct of_dma *ofdma)
+ {
+@@ -726,7 +714,9 @@ static int sirfsoc_dma_probe(struct platform_device *op)
+ 	dma->device_tx_status = sirfsoc_dma_tx_status;
+ 	dma->device_prep_interleaved_dma = sirfsoc_dma_prep_interleaved;
+ 	dma->device_prep_dma_cyclic = sirfsoc_dma_prep_cyclic;
+-	dma->device_slave_caps = sirfsoc_dma_device_slave_caps;
++	dma->src_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
++	dma->dst_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
++	dma->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+ 
+ 	INIT_LIST_HEAD(&dma->channels);
+ 	dma_cap_set(DMA_SLAVE, dma->cap_mask);
 -- 
 2.1.1
