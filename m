@@ -1,174 +1,176 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:29 +0100
-Subject: [PATCH v5 35/61] dmaengine: pl330: Split device_control
+Date: Mon, 17 Nov 2014 14:42:19 +0100
+Subject: [PATCH v5 25/61] dmaengine: ipu-idmac: Split device_control
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-36-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-26-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the AMBA PL330 DMA driver to make use
+Split the device_control callback of the IPU IDMAC driver to make use
 of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/pl330.c | 108 ++++++++++++++++++++++++++--------------------------
- 1 file changed, 53 insertions(+), 55 deletions(-)
+ drivers/dma/ipu/ipu_idmac.c | 96 ++++++++++++++++++++++++---------------------
+ 1 file changed, 51 insertions(+), 45 deletions(-)
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 3c9f715cb8d7..c2db237e455b 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -2062,72 +2062,69 @@ static int pl330_alloc_chan_resources(struct dma_chan *chan)
- 	return 1;
+diff --git a/drivers/dma/ipu/ipu_idmac.c b/drivers/dma/ipu/ipu_idmac.c
+index bbf62927bd72..b36f5a47578a 100644
+--- a/drivers/dma/ipu/ipu_idmac.c
++++ b/drivers/dma/ipu/ipu_idmac.c
+@@ -1398,76 +1398,81 @@ static void idmac_issue_pending(struct dma_chan *chan)
+ 	 */
  }
  
--static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd, unsigned long arg)
-+static int pl330_config(struct dma_chan *chan,
-+			struct dma_slave_config *slave_config)
-+{
-+	struct dma_pl330_chan *pch = to_pchan(chan);
-+
-+	if (slave_config->direction == DMA_MEM_TO_DEV) {
-+		if (slave_config->dst_addr)
-+			pch->fifo_addr = slave_config->dst_addr;
-+		if (slave_config->dst_addr_width)
-+			pch->burst_sz = __ffs(slave_config->dst_addr_width);
-+		if (slave_config->dst_maxburst)
-+			pch->burst_len = slave_config->dst_maxburst;
-+	} else if (slave_config->direction == DMA_DEV_TO_MEM) {
-+		if (slave_config->src_addr)
-+			pch->fifo_addr = slave_config->src_addr;
-+		if (slave_config->src_addr_width)
-+			pch->burst_sz = __ffs(slave_config->src_addr_width);
-+		if (slave_config->src_maxburst)
-+			pch->burst_len = slave_config->src_maxburst;
-+	}
-+
-+	return 0;
-+}
-+
-+static int pl330_terminate_all(struct dma_chan *chan)
+-static int __idmac_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-			   unsigned long arg)
++static int idmac_pause(struct dma_chan *chan)
  {
- 	struct dma_pl330_chan *pch = to_pchan(chan);
- 	struct dma_pl330_desc *desc;
+ 	struct idmac_channel *ichan = to_idmac_chan(chan);
+ 	struct idmac *idmac = to_idmac(chan->device);
+ 	struct ipu *ipu = to_ipu(idmac);
+ 	struct list_head *list, *tmp;
  	unsigned long flags;
- 	struct pl330_dmac *pl330 = pch->dmac;
--	struct dma_slave_config *slave_config;
- 	LIST_HEAD(list);
+-	int i;
  
 -	switch (cmd) {
--	case DMA_TERMINATE_ALL:
--		spin_lock_irqsave(&pch->lock, flags);
--
--		spin_lock(&pl330->lock);
--		_stop(pch->thread);
--		spin_unlock(&pl330->lock);
-+	spin_lock_irqsave(&pch->lock, flags);
+-	case DMA_PAUSE:
+-		spin_lock_irqsave(&ipu->lock, flags);
+-		ipu_ic_disable_task(ipu, chan->chan_id);
++	mutex_lock(&ichan->chan_mutex);
  
--		pch->thread->req[0].desc = NULL;
--		pch->thread->req[1].desc = NULL;
--		pch->thread->req_running = -1;
-+	spin_lock(&pl330->lock);
-+	_stop(pch->thread);
-+	spin_unlock(&pl330->lock);
+-		/* Return all descriptors into "prepared" state */
+-		list_for_each_safe(list, tmp, &ichan->queue)
+-			list_del_init(list);
++	spin_lock_irqsave(&ipu->lock, flags);
++	ipu_ic_disable_task(ipu, chan->chan_id);
  
--		/* Mark all desc done */
--		list_for_each_entry(desc, &pch->submitted_list, node) {
--			desc->status = FREE;
--			dma_cookie_complete(&desc->txd);
--		}
-+	pch->thread->req[0].desc = NULL;
-+	pch->thread->req[1].desc = NULL;
-+	pch->thread->req_running = -1;
+-		ichan->sg[0] = NULL;
+-		ichan->sg[1] = NULL;
++	/* Return all descriptors into "prepared" state */
++	list_for_each_safe(list, tmp, &ichan->queue)
++		list_del_init(list);
  
--		list_for_each_entry(desc, &pch->work_list , node) {
--			desc->status = FREE;
--			dma_cookie_complete(&desc->txd);
--		}
-+	/* Mark all desc done */
-+	list_for_each_entry(desc, &pch->submitted_list, node) {
-+		desc->status = FREE;
-+		dma_cookie_complete(&desc->txd);
-+	}
+-		spin_unlock_irqrestore(&ipu->lock, flags);
++	ichan->sg[0] = NULL;
++	ichan->sg[1] = NULL;
  
--		list_for_each_entry(desc, &pch->completed_list , node) {
--			desc->status = FREE;
--			dma_cookie_complete(&desc->txd);
--		}
-+	list_for_each_entry(desc, &pch->work_list , node) {
-+		desc->status = FREE;
-+		dma_cookie_complete(&desc->txd);
-+	}
- 
--		list_splice_tail_init(&pch->submitted_list, &pl330->desc_pool);
--		list_splice_tail_init(&pch->work_list, &pl330->desc_pool);
--		list_splice_tail_init(&pch->completed_list, &pl330->desc_pool);
--		spin_unlock_irqrestore(&pch->lock, flags);
+-		ichan->status = IPU_CHANNEL_INITIALIZED;
 -		break;
--	case DMA_SLAVE_CONFIG:
--		slave_config = (struct dma_slave_config *)arg;
--
--		if (slave_config->direction == DMA_MEM_TO_DEV) {
--			if (slave_config->dst_addr)
--				pch->fifo_addr = slave_config->dst_addr;
--			if (slave_config->dst_addr_width)
--				pch->burst_sz = __ffs(slave_config->dst_addr_width);
--			if (slave_config->dst_maxburst)
--				pch->burst_len = slave_config->dst_maxburst;
--		} else if (slave_config->direction == DMA_DEV_TO_MEM) {
--			if (slave_config->src_addr)
--				pch->fifo_addr = slave_config->src_addr;
--			if (slave_config->src_addr_width)
--				pch->burst_sz = __ffs(slave_config->src_addr_width);
--			if (slave_config->src_maxburst)
--				pch->burst_len = slave_config->src_maxburst;
--		}
+-	case DMA_TERMINATE_ALL:
+-		ipu_disable_channel(idmac, ichan,
+-				    ichan->status >= IPU_CHANNEL_ENABLED);
++	spin_unlock_irqrestore(&ipu->lock, flags);
+ 
+-		tasklet_disable(&ipu->tasklet);
++	ichan->status = IPU_CHANNEL_INITIALIZED;
+ 
+-		/* ichan->queue is modified in ISR, have to spinlock */
+-		spin_lock_irqsave(&ichan->lock, flags);
+-		list_splice_init(&ichan->queue, &ichan->free_list);
++	mutex_unlock(&ichan->chan_mutex);
+ 
+-		if (ichan->desc)
+-			for (i = 0; i < ichan->n_tx_desc; i++) {
+-				struct idmac_tx_desc *desc = ichan->desc + i;
+-				if (list_empty(&desc->list))
+-					/* Descriptor was prepared, but not submitted */
+-					list_add(&desc->list, &ichan->free_list);
++	return 0;
++}
+ 
+-				async_tx_clear_ack(&desc->txd);
+-			}
++static int __idmac_terminate_all(struct dma_chan *chan)
++{
++	struct idmac_channel *ichan = to_idmac_chan(chan);
++	struct idmac *idmac = to_idmac(chan->device);
++	struct ipu *ipu = to_ipu(idmac);
++	unsigned long flags;
++	int i;
+ 
+-		ichan->sg[0] = NULL;
+-		ichan->sg[1] = NULL;
+-		spin_unlock_irqrestore(&ichan->lock, flags);
++	ipu_disable_channel(idmac, ichan,
++			    ichan->status >= IPU_CHANNEL_ENABLED);
+ 
+-		tasklet_enable(&ipu->tasklet);
++	tasklet_disable(&ipu->tasklet);
+ 
+-		ichan->status = IPU_CHANNEL_INITIALIZED;
 -		break;
 -	default:
--		dev_err(pch->dmac->ddma.dev, "Not supported command.\n");
--		return -ENXIO;
-+	list_for_each_entry(desc, &pch->completed_list , node) {
-+		desc->status = FREE;
-+		dma_cookie_complete(&desc->txd);
- 	}
- 
-+	list_splice_tail_init(&pch->submitted_list, &pl330->desc_pool);
-+	list_splice_tail_init(&pch->work_list, &pl330->desc_pool);
-+	list_splice_tail_init(&pch->completed_list, &pl330->desc_pool);
-+	spin_unlock_irqrestore(&pch->lock, flags);
+-		return -ENOSYS;
+-	}
++	/* ichan->queue is modified in ISR, have to spinlock */
++	spin_lock_irqsave(&ichan->lock, flags);
++	list_splice_init(&ichan->queue, &ichan->free_list);
 +
++	if (ichan->desc)
++		for (i = 0; i < ichan->n_tx_desc; i++) {
++			struct idmac_tx_desc *desc = ichan->desc + i;
++			if (list_empty(&desc->list))
++				/* Descriptor was prepared, but not submitted */
++				list_add(&desc->list, &ichan->free_list);
++
++			async_tx_clear_ack(&desc->txd);
++		}
++
++	ichan->sg[0] = NULL;
++	ichan->sg[1] = NULL;
++	spin_unlock_irqrestore(&ichan->lock, flags);
++
++	tasklet_enable(&ipu->tasklet);
++
++	ichan->status = IPU_CHANNEL_INITIALIZED;
+ 
  	return 0;
  }
  
-@@ -2714,7 +2711,8 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 	pd->device_prep_dma_cyclic = pl330_prep_dma_cyclic;
- 	pd->device_tx_status = pl330_tx_status;
- 	pd->device_prep_slave_sg = pl330_prep_slave_sg;
--	pd->device_control = pl330_control;
-+	pd->device_config = pl330_config;
-+	pd->device_terminate_all = pl330_terminate_all;
- 	pd->device_issue_pending = pl330_issue_pending;
- 	pd->device_slave_caps = pl330_dma_device_slave_caps;
+-static int idmac_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-			 unsigned long arg)
++static int idmac_terminate_all(struct dma_chan *chan)
+ {
+ 	struct idmac_channel *ichan = to_idmac_chan(chan);
+ 	int ret;
  
-@@ -2762,7 +2760,7 @@ probe_err3:
+ 	mutex_lock(&ichan->chan_mutex);
  
- 		/* Flush the channel */
- 		if (pch->thread) {
--			pl330_control(&pch->chan, DMA_TERMINATE_ALL, 0);
-+			pl330_terminate_all(&pch->chan);
- 			pl330_free_chan_resources(&pch->chan);
- 		}
+-	ret = __idmac_control(chan, cmd, arg);
++	ret = __idmac_terminate_all(chan);
+ 
+ 	mutex_unlock(&ichan->chan_mutex);
+ 
+@@ -1568,7 +1573,7 @@ static void idmac_free_chan_resources(struct dma_chan *chan)
+ 
+ 	mutex_lock(&ichan->chan_mutex);
+ 
+-	__idmac_control(chan, DMA_TERMINATE_ALL, 0);
++	__idmac_terminate_all(chan);
+ 
+ 	if (ichan->status > IPU_CHANNEL_FREE) {
+ #ifdef DEBUG
+@@ -1622,7 +1627,8 @@ static int __init ipu_idmac_init(struct ipu *ipu)
+ 
+ 	/* Compulsory for DMA_SLAVE fields */
+ 	dma->device_prep_slave_sg		= idmac_prep_slave_sg;
+-	dma->device_control			= idmac_control;
++	dma->device_pause			= idmac_pause;
++	dma->device_terminate_all		= idmac_terminate_all;
+ 
+ 	INIT_LIST_HEAD(&dma->channels);
+ 	for (i = 0; i < IPU_CHANNELS_NUM; i++) {
+@@ -1655,7 +1661,7 @@ static void ipu_idmac_exit(struct ipu *ipu)
+ 	for (i = 0; i < IPU_CHANNELS_NUM; i++) {
+ 		struct idmac_channel *ichan = ipu->channel + i;
+ 
+-		idmac_control(&ichan->dma_chan, DMA_TERMINATE_ALL, 0);
++		idmac_terminate_all(&ichan->dma_chan);
  	}
-@@ -2791,7 +2789,7 @@ static int pl330_remove(struct amba_device *adev)
  
- 		/* Flush the channel */
- 		if (pch->thread) {
--			pl330_control(&pch->chan, DMA_TERMINATE_ALL, 0);
-+			pl330_terminate_all(&pch->chan);
- 			pl330_free_chan_resources(&pch->chan);
- 		}
- 	}
+ 	dma_async_device_unregister(&idmac->dma);
 -- 
 2.1.1
