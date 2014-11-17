@@ -1,39 +1,42 @@
 From: dyoung@redhat.com (Dave Young)
-Date: Mon, 17 Nov 2014 11:49:12 +0800
-Subject: [PATCH 00/10] arm64 kexec kernel patches V5
-In-Reply-To: <1415922648.15847.107.camel@smoke>
+Date: Mon, 17 Nov 2014 11:52:44 +0800
+Subject: [PATCH 08/10] arm64/kexec: Add core kexec support
+In-Reply-To: <1415829281.15847.16.camel@smoke>
 References: <cover.1414099246.git.geoff@infradead.org>
- <20141031075209.GH3290@darkstar.nay.redhat.com>
- <1414797939.23621.38.camel@smoke>
- <20141113083706.GA8615@darkstar.nay.redhat.com>
- <1415922648.15847.107.camel@smoke>
-Message-ID: <20141117034912.GB3160@darkstar.redhat.com>
+ <c8e8a3378f028e54e21931bc7f3d62c48725d5c7.1414099246.git.geoff@infradead.org>
+ <CAFdej022x_XxqR3NJJkXD60wQHt8Yvs3vZ7nbMQczHP+hWXfCA@mail.gmail.com>
+ <1415829281.15847.16.camel@smoke>
+Message-ID: <20141117035243.GC3160@darkstar.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/13/14 at 03:50pm, Geoff Levand wrote:
-> On Thu, 2014-11-13 at 16:37 +0800, Dave Young wrote:
-> > In your kexec-tools code, by default it will create dtb1 from procfs, as for external
-> > --dtb it will be dtb2 for comparing with dtb1.
+On 11/12/14 at 01:54pm, Geoff Levand wrote:
+> Hi Arun, Dave,
+> 
+> On Fri, 2014-11-07 at 16:31 +0530, Arun Chandran wrote:
+> > I have issue in flushing with L3 cache on . kexec does not reboot with L3.
+> > Is the above logic of flushing (clean + invalidate) after copying the
+> > image data is correct? Is there exist the danger of image data being
+> > overwritten by invalid cache lines?
 > > 
-> > Since dtb1 is a must so it will not work without /proc/device-tree.
+> > I tried with only invalidate(dc ivac); but that also not seems to be
+> > working.
+> > 
+> > Finally I moved the entire flushing logic before copying then
+> > things started working. Please see the code change below.
 > 
-> I changed that to allow for no /proc/device-tree if --dtb is passed
-> since it will also allow a kernel built with CONFIG_PROC_FS=n to do
-> kexec re-boot.
-> 
-> Please try it and let me know.
+> I added this with some minor changes.  Please let me know if
+> it works for you.
 
-Tested the master branch or your kexec-tools, I got below with
-"mount -o bind /root /proc" because there's some other issues for my customized
-kernel to boot: 
+I did not got a full boot log due to efi issues, but I think it works for me
+as for this cache issue.
 
-arch_process_options:95: initrd: (null)
-arch_process_options:96: dtb: apm-mustang.dtb
-arch_process_options:97: lite: 1
-arch_process_options:99: port: 0x0
-kernel: 0x3ff9cbb0010 kernel_size: 0x602c947
-unrecoverable error: could not scan "/proc/device-tree/": No such file or directory
+For UEFI, seems you applied Ard's original efi stable mapping patch, but he
+has an update version which solves fw_vendor panic etc. I tried but the patchset
+can not apply on your tree.
+
+I will have no time to test and work on kexec issues this week. Will try next week
+with more testing.
 
 Thanks
 Dave
