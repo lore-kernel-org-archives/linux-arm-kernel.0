@@ -1,124 +1,60 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 17 Nov 2014 11:15:15 -0800
-Subject: [PATCH] clk-divider: Fix READ_ONLY when divider > 1
-In-Reply-To: <1415979129-21325-1-git-send-email-james.hogan@imgtec.com>
-References: <1415979129-21325-1-git-send-email-james.hogan@imgtec.com>
-Message-ID: <20141117191515.25314.22524@quantum>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 17 Nov 2014 11:17:55 -0800
+Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
+ completes
+In-Reply-To: <Pine.LNX.4.44L0.1411171400540.885-100000@iolanthe.rowland.org>
+References: <7hd28l3clz.fsf@deeprootsystems.com>
+ <Pine.LNX.4.44L0.1411171400540.885-100000@iolanthe.rowland.org>
+Message-ID: <20141117191755.GA5258@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting James Hogan (2014-11-14 07:32:09)
-> Commit 79c6ab509558 (clk: divider: add CLK_DIVIDER_READ_ONLY flag) in
-> v3.16 introduced the CLK_DIVIDER_READ_ONLY flag which caused the
-> recalc_rate() and round_rate() clock callbacks to be omitted.
-> 
-> However using this flag has the unfortunate side effect of causing the
-> clock recalculation code when a clock rate change is attempted to always
-> treat it as a pass-through clock, i.e. with a fixed divide of 1, which
-> may not be the case. Child clock rates are then recalculated using the
-> wrong parent rate.
-> 
-> Therefore instead of dropping the recalc_rate() and round_rate()
-> callbacks, alter clk_divider_bestdiv() to always report the current
-> divider as the best divider so that it is never altered.
-> 
-> For me the read only clock was the system clock, which divided the PLL
-> rate by 2, from which both the UART and the SPI clocks were divided.
-> Initial setting of the UART rate set it correctly, but when the SPI
-> clock was set, the other child clocks were miscalculated. The UART clock
-> was recalculated using the PLL rate as the parent rate, resulting in a
-> UART new_rate of double what it should be, and a UART which spewed forth
-> garbage when the rate changes were propagated.
 
-Applied to clk-fixes towards -rc6.
 
-Thanks,
-Mike
+On Mon, Nov 17, 2014 at 11:06 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Mon, 17 Nov 2014, Kevin Hilman wrote:
+>
+>> Ulf Hansson <ulf.hansson@linaro.org> writes:
+>>
+>> > The amba bus, amba drivers and a vast amount of platform drivers which
+>> > enables runtime PM, don't invoke a pm_runtime_get_sync() while probing
+>> > their devices.
+>> >
+>> > Instead, once they have turned on their PM resourses during ->probe()
+>> > and are ready to handle I/O, these invokes pm_runtime_set_active() to
+>> > synchronize its state towards the runtime PM core.
+>> >
+>> > From a runtime PM point of view this behavior is perfectly acceptable,
+>>
+>> In the context of PM domains that can be dynamically powered on/off, I'm
+>> not so sure it's perfectly acceptable anymore.
+>>
+>> Why doesn't the bus do a _get_sync() instead of a _get_noresume()
+>> followed by a _set_active().
+>>
+>> By using the _get_noresume() you're bypassing the paths that would bring
+>> up your PM domain.
+>
+> This probably comes about because devices that are part of a power
+> domain need special treatment.  Before the driver's probe routine gets
+> called, the bus ought to resume the entire power domain.  For that,
+> some sort of _get_sync() is needed.
+>
+> For devices that aren't part of a power domain, things are simpler.
+> The bus does _get_noresume() to make sure the device won't be runtime
+> suspended while the probe routine is running.  It doesn't do
+> _get_sync(), because that would end up calling the driver's
+> runtime_resume routine before the driver was bound to the device.  (The
+> bus could prevent that from happening by taking special precautions,
+> like PCI does, but in general it's a nuisance.)
 
-> 
-> Signed-off-by: James Hogan <james.hogan@imgtec.com>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Cc: Tomasz Figa <t.figa@samsung.com>
-> Cc: Max Schwarz <max.schwarz@online.de>
-> Cc: <stable@vger.kernel.org> # v3.16+
-> ---
->  drivers/clk/clk-divider.c    | 18 +++++++++---------
->  drivers/clk/rockchip/clk.c   |  4 +---
->  include/linux/clk-provider.h |  1 -
->  3 files changed, 10 insertions(+), 13 deletions(-)
-> 
-> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> index 18a9de29df0e..c0a842b335c5 100644
-> --- a/drivers/clk/clk-divider.c
-> +++ b/drivers/clk/clk-divider.c
-> @@ -263,6 +263,14 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
->         if (!rate)
->                 rate = 1;
->  
-> +       /* if read only, just return current value */
-> +       if (divider->flags & CLK_DIVIDER_READ_ONLY) {
-> +               bestdiv = readl(divider->reg) >> divider->shift;
-> +               bestdiv &= div_mask(divider);
-> +               bestdiv = _get_div(divider, bestdiv);
-> +               return bestdiv;
-> +       }
-> +
->         maxdiv = _get_maxdiv(divider);
->  
->         if (!(__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT)) {
-> @@ -361,11 +369,6 @@ const struct clk_ops clk_divider_ops = {
->  };
->  EXPORT_SYMBOL_GPL(clk_divider_ops);
->  
-> -const struct clk_ops clk_divider_ro_ops = {
-> -       .recalc_rate = clk_divider_recalc_rate,
-> -};
-> -EXPORT_SYMBOL_GPL(clk_divider_ro_ops);
-> -
->  static struct clk *_register_divider(struct device *dev, const char *name,
->                 const char *parent_name, unsigned long flags,
->                 void __iomem *reg, u8 shift, u8 width,
-> @@ -391,10 +394,7 @@ static struct clk *_register_divider(struct device *dev, const char *name,
->         }
->  
->         init.name = name;
-> -       if (clk_divider_flags & CLK_DIVIDER_READ_ONLY)
-> -               init.ops = &clk_divider_ro_ops;
-> -       else
-> -               init.ops = &clk_divider_ops;
-> +       init.ops = &clk_divider_ops;
->         init.flags = flags | CLK_IS_BASIC;
->         init.parent_names = (parent_name ? &parent_name: NULL);
->         init.num_parents = (parent_name ? 1 : 0);
-> diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
-> index 1e68bff481b8..880a266f0143 100644
-> --- a/drivers/clk/rockchip/clk.c
-> +++ b/drivers/clk/rockchip/clk.c
-> @@ -90,9 +90,7 @@ static struct clk *rockchip_clk_register_branch(const char *name,
->                 div->width = div_width;
->                 div->lock = lock;
->                 div->table = div_table;
-> -               div_ops = (div_flags & CLK_DIVIDER_READ_ONLY)
-> -                                               ? &clk_divider_ro_ops
-> -                                               : &clk_divider_ops;
-> +               div_ops = &clk_divider_ops;
->         }
->  
->         clk = clk_register_composite(NULL, name, parent_names, num_parents,
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index be21af149f11..2839c639f092 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -352,7 +352,6 @@ struct clk_divider {
->  #define CLK_DIVIDER_READ_ONLY          BIT(5)
->  
->  extern const struct clk_ops clk_divider_ops;
-> -extern const struct clk_ops clk_divider_ro_ops;
->  struct clk *clk_register_divider(struct device *dev, const char *name,
->                 const char *parent_name, unsigned long flags,
->                 void __iomem *reg, u8 shift, u8 width,
-> -- 
-> 2.0.4
-> 
+That's why I think we need some new call that would mean "make sure the
+device is powered" which would properly handle power domain and bus, but
+ignore all driver stuff since it may not be initialized yet. And similar
+call for asking to put device and maybe domain in powered down state in
+case probing failed.
+
+Thanks.
+
+-- 
+Dmitry
