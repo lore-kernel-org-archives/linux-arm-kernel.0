@@ -1,62 +1,59 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 17 Nov 2014 12:28:55 -0800
-Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
- completes
-In-Reply-To: <Pine.LNX.4.44L0.1411171447390.851-100000@iolanthe.rowland.org>
-References: <20141117191755.GA5258@dtor-ws>
- <Pine.LNX.4.44L0.1411171447390.851-100000@iolanthe.rowland.org>
-Message-ID: <20141117202855.GB5258@dtor-ws>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Nov 2014 20:29:11 +0000
+Subject: [PATCH 0/8] ARM cleanups
+Message-ID: <20141117202911.GZ4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 02:54:53PM -0500, Alan Stern wrote:
-> On Mon, 17 Nov 2014, Dmitry Torokhov wrote:
-> 
-> > > For devices that aren't part of a power domain, things are simpler.
-> > > The bus does _get_noresume() to make sure the device won't be runtime
-> > > suspended while the probe routine is running.  It doesn't do
-> > > _get_sync(), because that would end up calling the driver's
-> > > runtime_resume routine before the driver was bound to the device.  (The
-> > > bus could prevent that from happening by taking special precautions,
-> > > like PCI does, but in general it's a nuisance.)
-> > 
-> > That's why I think we need some new call that would mean "make sure the
-> > device is powered" which would properly handle power domain and bus, but
-> > ignore all driver stuff since it may not be initialized yet. And similar
-> > call for asking to put device and maybe domain in powered down state in
-> > case probing failed.
-> 
-> I can't imagine how such a call would work.
-> 
-> The PM core invokes the subsystem's runtime_suspend/resume callback, 
-> and then the subsystem's routine is responsible for invoking the 
-> driver's callback (or _not_ invoking it, in this case).
-> 
-> Thus, the PM core has no way to tell the subsystem's callback not to
-> invoke the driver's routine, and adding a new runtime PM call wouldn't
-> change that.  You'd have to add a new pair of callbacks instead, which 
-> IMO would be a tremendous waste.
-> 
-> Furthermore, the subsystem already _knows_ when the driver gets probed, 
-> because probing works in the same sort of way: The subsystem's probe 
-> routine gets invoked, and it is responsible for invoking the driver's 
-> probe routine.  Therefore the PM core doesn't _need_ to provide this 
-> extra information to the subsystem.  Rather, the subsystem just needs 
-> to keep track of the information it already has available.
+The following series is partly a result of reviewing differences
+between ARM and ARM64, and cleans up ARM with some of the changes
+made to ARM64.  Many of these changes are trivial cleanups.
 
-You are missing concept of power domains in this picture. True,
-subsystem knows when it probes but power domain does not. Subsystem has
-no knowledge of power domain (devices in the same subsystem can come
-from different domains).
+I've also dropped some of the kernel boot messages - removing the
+"SMP: Total of %d processors activated" message which was redundant,
+and dropping a couple of others to debug level.
 
-We need to have either subsystem or device core to indicate to power
-management core that we do not need "full" runtime resume, but rather a
-"partial" one since driver is not ready yet.
+I've moved the ftrace assembly code to its own separate file, just
+like on ARM64.
 
-We would not need new callbacks here I think, we just need to be able to
-select appropriate set of callbacks, depending on the binding state.
+I've been running stuff with this for a number of weeks now, and
+haven't noticed any regressions.
 
-Thanks.
+ arch/arm/common/sa1111.c        |  13 +--
+ arch/arm/kernel/Makefile        |   1 +
+ arch/arm/kernel/atags_compat.c  |   6 +-
+ arch/arm/kernel/atags_parse.c   |   5 +-
+ arch/arm/kernel/atags_proc.c    |   4 +-
+ arch/arm/kernel/bios32.c        |   2 +-
+ arch/arm/kernel/dma-isa.c       |   4 +-
+ arch/arm/kernel/dma.c           |  26 ++---
+ arch/arm/kernel/entry-common.S  | 235 --------------------------------------
+ arch/arm/kernel/entry-ftrace.S  | 243 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/etm.c           |  12 +-
+ arch/arm/kernel/fiq.c           |   2 +-
+ arch/arm/kernel/io.c            |   5 +-
+ arch/arm/kernel/irq.c           |   8 +-
+ arch/arm/kernel/machine_kexec.c |   6 +-
+ arch/arm/kernel/module.c        |   2 +-
+ arch/arm/kernel/setup.c         |   1 +
+ arch/arm/kernel/smp.c           |  15 +--
+ arch/arm/kernel/smp_twd.c       |   4 +-
+ arch/arm/kernel/swp_emulate.c   |   2 +-
+ arch/arm/kernel/thumbee.c       |   2 +-
+ arch/arm/kernel/topology.c      |   4 +-
+ arch/arm/kernel/traps.c         |  42 +++----
+ arch/arm/kernel/xscale-cp0.c    |   7 +-
+ arch/arm/mm/alignment.c         |  10 +-
+ arch/arm/mm/cache-feroceon-l2.c |   6 +-
+ arch/arm/mm/cache-tauros2.c     |  12 +-
+ arch/arm/mm/fault-armv.c        |   6 +-
+ arch/arm/mm/fault.c             |  31 +++--
+ arch/arm/mm/init.c              |   4 +-
+ arch/arm/mm/mmu.c               |  38 +++----
+ arch/arm/nwfpe/fpmodule.c       |   8 +-
+ arch/arm/vfp/vfpsingle.c        |   2 +-
+ 33 files changed, 378 insertions(+), 390 deletions(-)
 
 -- 
-Dmitry
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
