@@ -1,51 +1,137 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 17 Nov 2014 10:51:54 +0100
-Subject: request an irq without enabling? [Was: Re: [PATCH] gpio: mxs:
- implement get_direction callback]
-In-Reply-To: <5469BBBD.30003@elproma.com.pl>
-References: <1416004026-9667-1-git-send-email-j.uzycki@elproma.com.pl>
- <20141114232601.GW27002@pengutronix.de>
- <5467A980.5090204@elproma.com.pl>
- <20141116214239.GX27002@pengutronix.de>
- <54693A51.5080907@elproma.com.pl> <54695654.3070209@elproma.com.pl>
- <20141117082848.GZ27002@pengutronix.de>
- <5469BBBD.30003@elproma.com.pl>
-Message-ID: <20141117095154.GG27002@pengutronix.de>
+From: caesar.wang@rock-chips.com (Caesar Wang)
+Date: Mon, 17 Nov 2014 17:50:41 +0800
+Subject: [PATCH v12 3/3] ARM: dts: add rk3288 power-domain node
+In-Reply-To: <1416217842-4716-1-git-send-email-caesar.wang@rock-chips.com>
+References: <1416217842-4716-1-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <1416217842-4716-4-git-send-email-caesar.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch add the needed clocks into power-controller.
 
-Sorry for the just sent unfinished mail. I pressed "send" instead of
-"reedit" after adding tglx to the recipients. Apart from the topic
-handled in this mail it's complete though.
+why need we do so that?
 
-On Mon, Nov 17, 2014 at 10:11:25AM +0100, Janusz U?ycki wrote:
-> W dniu 2014-11-17 o 09:28, Uwe Kleine-K?nig pisze:
-> >I think mctrl_gpio_init should request the needed irqs, but not enable
-> >them. Not sure there is a corresponding request_irq variant for that.
-> 
-> What would you propose?
-Thomas: Is there something available among the irq functions for that.
-The use case is that when probing an uart driver the modem control irqs
-should only be enabled when the enable_ms callback is called by the
-tty/serial framework. So we'd like to have something like
-request_irq_noenable. This way the enable_ms callback would just need
-to call enable_irq without first checking if the handler is already
-setup.
+Firstly, we always be needed turn off clocks to save power when
+the system enter suspend.So we need to enumerate the clocks are needed
+to switch power doamin no and off.
 
-The less nice alternatives are:
+Secondly, Rk3288 reset circuit should be syncchronous reset and
+then sync revoked.so we need to enable clocks of all devices.
 
- - use request_irq(..); disable_irq(); and handle the short window where
-   irqs are on but not yet desired.
- - only request_irq in the enable_ms callback, and free_irq in
-   disable_ms.
+Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
+Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
+Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
 
-Any ideas?
+---
 
-Best regards
-Uwe
+Changes in v12:
+    - Remove essential clocks from rk3288 PD_VIO domain,
+      Some clocks are essential for the system health and should not be
+      turned down. However there is no owner for them so if they listed as
+      belonging to power domain we'll try toggling them up and down during
+      power domain transition. As a result we either fail to suspend or resume
+      the system.
 
+Changes in v11: None
+Changes in v10:
+    - fix missing the #include <dt-bindings/power-domain/rk3288.h>
+    - remove the notes
+
+Changes in v9:
+    - add decription for power-doamin node
+
+Changes in v8:
+    - DTS go back to v2
+
+Changes in v7: None
+Changes in v6: None
+Changes in v5: None
+Changes in v4: None
+Changes in v3:
+    - Decomposition power-controller, changed to multiple controller
+    (gpu-power-controller, hevc-power-controller)
+
+Changes in v2:
+    - make pd_vio clocks all one entry per line and alphabetize.
+    - power: power-controller move back to pinctrl: pinctrl.
+
+ arch/arm/boot/dts/rk3288.dtsi | 59 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index cb18bb4..d9cd8c0 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -15,6 +15,7 @@
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/pinctrl/rockchip.h>
+ #include <dt-bindings/clock/rk3288-cru.h>
++#include <dt-bindings/power-domain/rk3288.h>
+ #include "skeleton.dtsi"
+ 
+ / {
+@@ -989,4 +990,62 @@
+ 			};
+ 		};
+ 	};
++
++	power: power-controller {
++		compatible = "rockchip,rk3288-power-controller";
++		#power-domain-cells = <1>;
++		rockchip,pmu = <&pmu>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		pd_gpu {
++			reg = <RK3288_PD_GPU>;
++			clocks = <&cru ACLK_GPU>;
++		};
++
++		pd_hevc {
++			reg = <RK3288_PD_HEVC>;
++			clocks = <&cru ACLK_HEVC>,
++				 <&cru SCLK_HEVC_CABAC>,
++				 <&cru SCLK_HEVC_CORE>,
++				 <&cru HCLK_HEVC>;
++		};
++
++		pd_vio {
++			reg = <RK3288_PD_VIO>;
++			clocks = <&cru ACLK_IEP>,
++				 <&cru ACLK_ISP>,
++				 <&cru ACLK_RGA>,
++				 <&cru ACLK_VIP>,
++				 <&cru ACLK_VOP0>,
++				 <&cru ACLK_VOP1>,
++				 <&cru DCLK_VOP0>,
++				 <&cru DCLK_VOP1>,
++				 <&cru HCLK_IEP>,
++				 <&cru HCLK_ISP>,
++				 <&cru HCLK_RGA>,
++				 <&cru HCLK_VIP>,
++				 <&cru HCLK_VOP0>,
++				 <&cru HCLK_VOP1>,
++				 <&cru PCLK_EDP_CTRL>,
++				 <&cru PCLK_HDMI_CTRL>,
++				 <&cru PCLK_LVDS_PHY>,
++				 <&cru PCLK_MIPI_CSI>,
++				 <&cru PCLK_MIPI_DSI0>,
++				 <&cru PCLK_MIPI_DSI1>,
++				 <&cru SCLK_EDP_24M>,
++				 <&cru SCLK_EDP>,
++				 <&cru SCLK_HDMI_CEC>,
++				 <&cru SCLK_HDMI_HDCP>,
++				 <&cru SCLK_ISP_JPE>,
++				 <&cru SCLK_ISP>,
++				 <&cru SCLK_RGA>;
++		};
++
++		pd_video {
++			reg = <RK3288_PD_VIDEO>;
++			clocks = <&cru ACLK_VCODEC>,
++				 <&cru HCLK_VCODEC>;
++		};
++	};
+ };
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.9.1
