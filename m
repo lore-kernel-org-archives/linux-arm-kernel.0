@@ -1,137 +1,37 @@
-From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Mon, 17 Nov 2014 17:50:41 +0800
-Subject: [PATCH v12 3/3] ARM: dts: add rk3288 power-domain node
-In-Reply-To: <1416217842-4716-1-git-send-email-caesar.wang@rock-chips.com>
-References: <1416217842-4716-1-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <1416217842-4716-4-git-send-email-caesar.wang@rock-chips.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 17 Nov 2014 10:49:15 +0100
+Subject: [PATCH] ARM: mvebu: fix ordering in Armada 370 .dtsi
+In-Reply-To: <20141114202200.GI2001@lunn.ch>
+References: <1415993776-3469-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20141114202200.GI2001@lunn.ch>
+Message-ID: <20141117104915.0c16e554@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the needed clocks into power-controller.
+Dear Andrew Lunn,
 
-why need we do so that?
+On Fri, 14 Nov 2014 21:22:00 +0100, Andrew Lunn wrote:
 
-Firstly, we always be needed turn off clocks to save power when
-the system enter suspend.So we need to enumerate the clocks are needed
-to switch power doamin no and off.
+> Humm.
+> 
+> Now we have things in the right order, we see that the
+> system-controller and the clock-gating-controller overlap.
+> 
+> I know the HW engineers have gone a bit crazy around here, so maybe we
+> have no choice?
 
-Secondly, Rk3288 reset circuit should be syncchronous reset and
-then sync revoked.so we need to enable clocks of all devices.
+Not nice indeed. All those "system-level" registers that do not belong
+to clearly identified hardware blocks are really a mess. Maybe it's
+time to use the 'syscon' infrastructure to deal with those registers?
 
-Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
-Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
-Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+Unfortunately, due to the major pain caused by DT backward
+compatibility, switching completely and properly to syscon is probably
+going to be difficult if we don't want to break old Device Tree files.
 
----
+Best regards,
 
-Changes in v12:
-    - Remove essential clocks from rk3288 PD_VIO domain,
-      Some clocks are essential for the system health and should not be
-      turned down. However there is no owner for them so if they listed as
-      belonging to power domain we'll try toggling them up and down during
-      power domain transition. As a result we either fail to suspend or resume
-      the system.
-
-Changes in v11: None
-Changes in v10:
-    - fix missing the #include <dt-bindings/power-domain/rk3288.h>
-    - remove the notes
-
-Changes in v9:
-    - add decription for power-doamin node
-
-Changes in v8:
-    - DTS go back to v2
-
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3:
-    - Decomposition power-controller, changed to multiple controller
-    (gpu-power-controller, hevc-power-controller)
-
-Changes in v2:
-    - make pd_vio clocks all one entry per line and alphabetize.
-    - power: power-controller move back to pinctrl: pinctrl.
-
- arch/arm/boot/dts/rk3288.dtsi | 59 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index cb18bb4..d9cd8c0 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -15,6 +15,7 @@
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/pinctrl/rockchip.h>
- #include <dt-bindings/clock/rk3288-cru.h>
-+#include <dt-bindings/power-domain/rk3288.h>
- #include "skeleton.dtsi"
- 
- / {
-@@ -989,4 +990,62 @@
- 			};
- 		};
- 	};
-+
-+	power: power-controller {
-+		compatible = "rockchip,rk3288-power-controller";
-+		#power-domain-cells = <1>;
-+		rockchip,pmu = <&pmu>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		pd_gpu {
-+			reg = <RK3288_PD_GPU>;
-+			clocks = <&cru ACLK_GPU>;
-+		};
-+
-+		pd_hevc {
-+			reg = <RK3288_PD_HEVC>;
-+			clocks = <&cru ACLK_HEVC>,
-+				 <&cru SCLK_HEVC_CABAC>,
-+				 <&cru SCLK_HEVC_CORE>,
-+				 <&cru HCLK_HEVC>;
-+		};
-+
-+		pd_vio {
-+			reg = <RK3288_PD_VIO>;
-+			clocks = <&cru ACLK_IEP>,
-+				 <&cru ACLK_ISP>,
-+				 <&cru ACLK_RGA>,
-+				 <&cru ACLK_VIP>,
-+				 <&cru ACLK_VOP0>,
-+				 <&cru ACLK_VOP1>,
-+				 <&cru DCLK_VOP0>,
-+				 <&cru DCLK_VOP1>,
-+				 <&cru HCLK_IEP>,
-+				 <&cru HCLK_ISP>,
-+				 <&cru HCLK_RGA>,
-+				 <&cru HCLK_VIP>,
-+				 <&cru HCLK_VOP0>,
-+				 <&cru HCLK_VOP1>,
-+				 <&cru PCLK_EDP_CTRL>,
-+				 <&cru PCLK_HDMI_CTRL>,
-+				 <&cru PCLK_LVDS_PHY>,
-+				 <&cru PCLK_MIPI_CSI>,
-+				 <&cru PCLK_MIPI_DSI0>,
-+				 <&cru PCLK_MIPI_DSI1>,
-+				 <&cru SCLK_EDP_24M>,
-+				 <&cru SCLK_EDP>,
-+				 <&cru SCLK_HDMI_CEC>,
-+				 <&cru SCLK_HDMI_HDCP>,
-+				 <&cru SCLK_ISP_JPE>,
-+				 <&cru SCLK_ISP>,
-+				 <&cru SCLK_RGA>;
-+		};
-+
-+		pd_video {
-+			reg = <RK3288_PD_VIDEO>;
-+			clocks = <&cru ACLK_VCODEC>,
-+				 <&cru HCLK_VCODEC>;
-+		};
-+	};
- };
+Thomas
 -- 
-1.9.1
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
