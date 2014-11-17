@@ -1,73 +1,44 @@
-From: yao.yuan@freescale.com (Yao Yuan)
-Date: Mon, 17 Nov 2014 10:41:56 +0000
-Subject: [PATCH v9 3/3] i2c: imx: add DMA support for freescale i2c driver
-In-Reply-To: <20141108173513.GA4900@katana>
-References: <1413025032-14958-1-git-send-email-yao.yuan@freescale.com>
- <1413025032-14958-4-git-send-email-yao.yuan@freescale.com>
- <20141108173513.GA4900@katana>
-Message-ID: <BL2PR03MB33877C76779D5588D1B3E30838B0@BL2PR03MB338.namprd03.prod.outlook.com>
+From: yao.yuan@freescale.com (Yuan Yao)
+Date: Mon, 17 Nov 2014 18:40:35 +0800
+Subject: [PATCH v10 2/3] Documentation:add DMA support for freescale i2c driver
+In-Reply-To: <1416220836-7666-1-git-send-email-yao.yuan@freescale.com>
+References: <1416220836-7666-1-git-send-email-yao.yuan@freescale.com>
+Message-ID: <1416220836-7666-3-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for your review.
-Your suggestions is really helpful.
+Add i2c dts node properties for eDMA support, them depend on the eDMA driver.
 
-I will correct them in v10.
+Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+---
+ Documentation/devicetree/bindings/i2c/i2c-imx.txt | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-Best Regards,
-Yuan Yao
-
-> -----Original Message-----
-> From: Wolfram Sang [mailto:wsa at the-dreams.de]
-> Sent: Sunday, November 09, 2014 1:35 AM
-> To: Yuan Yao-B46683
-> Cc: marex at denx.de; LW at KARO-electronics.de; mark.rutland at arm.com; Duan
-> Fugang-B38611; shawn.guo at linaro.org; linux-kernel at vger.kernel.org; linux-
-> arm-kernel at lists.infradead.org; linux-i2c at vger.kernel.org
-> Subject: Re: [PATCH v9 3/3] i2c: imx: add DMA support for freescale i2c
-> driver
-> 
-> Hi,
-> 
-> mostly looking good...
-> 
-> > +#define IMX_I2C_DMA_THRESHOLD	16
-> 
-> Have you guessed or measured this value? A comment about this value would
-> be nice.
-> 
-> >
-> > +struct imx_i2c_dma {
-> > +	struct dma_chan		*chan_tx;
-> > +	struct dma_chan		*chan_rx;
-> > +	struct dma_chan		*chan_using;
-> > +	struct completion	cmd_complete;
-> > +	dma_addr_t		dma_buf;
-> > +	unsigned int		dma_len;
-> > +	unsigned int		dma_transfer_dir;
-> > +	unsigned int		dma_data_dir;
-> 
-> Please use proper types as there are things like 'enum
-> dma_data_direction' and the likes...
-> 
-> > +	dmaengine_submit(txdesc);
-> 
-> This can fail, too. Use dma_submit_error() to check.
-> 
-> > +	result = wait_for_completion_interruptible_timeout(
-> > +				&i2c_imx->dma->cmd_complete,
-> > +				msecs_to_jiffies(IMX_I2C_DMA_TIMEOUT));
-> 
-> Have you tested signals extensively? I can't really recommend the
-> _intrruptible_ here. I don't see any cleaning up to get the bus to a
-> consistent state again. Most people drop the interruptible sooner or
-> later.
-> 
-> > +	/* Init DMA config if support*/
-> > +	i2c_imx_dma_request(i2c_imx, phy_addr);
-> 
-> Make this function void? DMA is optional anyhow.
-> 
-> Thanks,
-> 
->    Wolfram
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-imx.txt b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
+index 4a8513e..52d37fd 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-imx.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
+@@ -11,6 +11,8 @@ Required properties:
+ Optional properties:
+ - clock-frequency : Constains desired I2C/HS-I2C bus clock frequency in Hz.
+   The absence of the propoerty indicates the default frequency 100 kHz.
++- dmas: A list of two dma specifiers, one for each entry in dma-names.
++- dma-names: should contain "tx" and "rx".
+ 
+ Examples:
+ 
+@@ -26,3 +28,12 @@ i2c at 70038000 { /* HS-I2C on i.MX51 */
+ 	interrupts = <64>;
+ 	clock-frequency = <400000>;
+ };
++
++i2c0: i2c at 40066000 { /* i2c0 on vf610 */
++	compatible = "fsl,vf610-i2c";
++	reg = <0x40066000 0x1000>;
++	interrupts =<0 71 0x04>;
++	dmas = <&edma0 0 50>,
++		<&edma0 0 51>;
++	dma-names = "rx","tx";
++};
+-- 
+2.1.0.27.g96db324
