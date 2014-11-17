@@ -1,70 +1,44 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 17 Nov 2014 12:48:29 +0100
-Subject: [PATCH v9 7/7] ARM: dts: exynos4: Add nodes for L2 cache controller
-In-Reply-To: <1416224909-4290-1-git-send-email-m.szyprowski@samsung.com>
-References: <1416224909-4290-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1416224909-4290-8-git-send-email-m.szyprowski@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 17 Nov 2014 11:48:33 +0000
+Subject: ARM atomics overhaul for musl
+In-Reply-To: <20141116163355.GK4042@n2100.arm.linux.org.uk>
+References: <20141116055656.GA13940@brightrain.aerifal.cx>
+ <20141116163355.GK4042@n2100.arm.linux.org.uk>
+Message-ID: <20141117114832.GB29595@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <t.figa@samsung.com>
+On Sun, Nov 16, 2014 at 04:33:56PM +0000, Russell King - ARM Linux wrote:
+> On Sun, Nov 16, 2014 at 12:56:56AM -0500, Rich Felker wrote:
+> > Aside from that, the only case among the above that's "right" already
+> > is v7+. Hard-coding the mcr-based barrier on v6 is wrong because it's
+> 
+> I don't think it's wrong at all.  The instruction isn't going away from
+> ARMv7, because ARMv7 deprecates it, but it _still_ has to be implemented
+> by a CPU conforming to ARMv7.  As ARMv7 is going to be the last 32-bit
+> ARM architecture, we aren't going to see the MCR instruction disappearing
+> on 32-bit CPUs.
 
-This patch adds device tree nodes for L2 cache controller present on
-Exynos4 SoCs.
+You are wrong here. ARMv8-A supports 32-bit at all levels. ARMv8-R is
+32-bit only (and it even has an MMU at EL1). And there is a slight
+chance that we may even see 32-bit only ARMv8-A implementations (I'm not
+really giving a hint and I'm not aware of any but I don't see anything
+preventing this, it's all marketing driven).
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/boot/dts/exynos4210.dtsi |  9 +++++++++
- arch/arm/boot/dts/exynos4x12.dtsi | 14 ++++++++++++++
- 2 files changed, 23 insertions(+)
+http://www.arm.com/products/processors/instruction-set-architectures/armv8-r-architecture.php
 
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index 807bb5bf91fc..8a182c43e314 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -64,6 +64,15 @@
- 		reg = <0x10023CA0 0x20>;
- 	};
- 
-+	l2c: l2-cache-controller at 10502000 {
-+		compatible = "arm,pl310-cache";
-+		reg = <0x10502000 0x1000>;
-+		cache-unified;
-+		cache-level = <2>;
-+		arm,tag-latency = <2 2 1>;
-+		arm,data-latency = <2 2 1>;
-+	};
-+
- 	gic: interrupt-controller at 10490000 {
- 		cpu-offset = <0x8000>;
- 	};
-diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-index 861bb919f6d3..c7adfd60ad3a 100644
---- a/arch/arm/boot/dts/exynos4x12.dtsi
-+++ b/arch/arm/boot/dts/exynos4x12.dtsi
-@@ -54,6 +54,20 @@
- 		reg = <0x10023CA0 0x20>;
- 	};
- 
-+	l2c: l2-cache-controller at 10502000 {
-+		compatible = "arm,pl310-cache";
-+		reg = <0x10502000 0x1000>;
-+		cache-unified;
-+		cache-level = <2>;
-+		arm,tag-latency = <2 2 1>;
-+		arm,data-latency = <3 2 1>;
-+		arm,double-linefill = <1>;
-+		arm,double-linefill-incr = <0>;
-+		arm,double-linefill-wrap = <1>;
-+		arm,prefetch-drop = <1>;
-+		arm,prefetch-offset = <7>;
-+	};
-+
- 	clock: clock-controller at 10030000 {
- 		compatible = "samsung,exynos4412-clock";
- 		reg = <0x10030000 0x20000>;
+> On ARMv8, it may have been removed, but we have already decided that the
+> kernel _must_ provide emulation for this op-code, because otherwise we
+> are breaking existing userspace, which is just not permissible.  However,
+> you are absolutely right that running on ARMv8 should use the new
+> instruction where possible.
+
+Even on ARMv8 we could enable CP15 barriers in hardware, they are just
+deprecated but haven't been removed (yet). What I'm pushing for, though
+it's not easy, is that the hardware just deprecates such instructions
+for performance rather than removing them entirely. This would make them
+faster than emulation but I fully agree with you that the new
+instructions should be used where possible.
+
 -- 
-1.9.2
+Catalin
