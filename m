@@ -1,40 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 17 Nov 2014 18:09:47 +0000
-Subject: For the problem when using swiotlb
-In-Reply-To: <1650523.IrjSXzxF5O@wuerfel>
-References: <5469E26B.2010905@huawei.com>
- <1650523.IrjSXzxF5O@wuerfel>
-Message-ID: <20141117180947.GI29595@e104818-lin.cambridge.arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 17 Nov 2014 19:21:46 +0100
+Subject: mirabox boot fails in linux-next (was: next boot: 94 boots: 79
+ pass, 13 fail, 2 untried (next-20141117))
+In-Reply-To: <7h61ed4xm3.fsf@deeprootsystems.com>
+References: <E1XqKYI-0000pQ-4b@ip-10-35-177-41.ec2.internal>
+ <7h61ed4xm3.fsf@deeprootsystems.com>
+Message-ID: <20141117192146.23df4006@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 12:18:42PM +0000, Arnd Bergmann wrote:
-> On Monday 17 November 2014 19:56:27 Ding Tianhong wrote:
-> >         The commit 3690951fc6d42f3a0903987677d0e592c49dd8db(arm64: Use swiotlb late initialisation)
-> > switches the DMA mapping code to swiotlb_tlb_late_init_with_default_size(), this will occur a problem
-> > when I run the scsi stress tests, the message as below:
-> > 
-> >         sas_controller b1000000.sas: swiotlb buffer is full (sz: 65536 bytes)..
-> >         DMA: Out of SW-IOMMU space for 65536 bytes at device b1000000.sas
-> > 
-> > The reason is that the swiotlb_tlb_late_init_with_default_size() could only alloc 16M memory for DMA-mapping,
-> > and the param in cmdline "swiotlb=xxx" is useless because the get_free_pages() only use the buddy to assigned a
-> > maximum memory of 16M(The MAX_ORDER is 13 for 4k pages), obviously 16M is too small in many scenes, but
-> > the swiotlb_init() which could reserved a bigger memory as wished could work well for most drivers.
-> > 
-> > I could not get a better way to fix this problem except to revert this patch, so could you please give me some
-> > advise and help me, thanks very much.
-> 
-> In general, you should not need to use swiotlb for most devices, in
-> particular for high-performance devices like network or block.
-> 
-> Please make sure that you have set up the dma-ranges properties in
-> your DT properly to allow 64-bit DMA if the device supports it.
+Dear Kevin Hilman,
 
-That's the problem indeed, the DMA API ends up using swiotlb bounce
-buffers because the physical address of the pages passed to (or
-allocated by) the driver are beyond 32-bit limit (which is the default
-dma mask).
+On Mon, 17 Nov 2014 08:09:56 -0800, Kevin Hilman wrote:
+> FYI...
+> 
+> armada-370-mirabox started failing boot tests in linux-next as of
+> next-20141117.  Excerpt of boot report below, or you can see all the recent
+> boots of mirabox here:
+> 
+>    http://status.armcloud.us/boot/?mirabox
+> 
+> I bisected it down to a PCI commit[2], but it didn't revert cleanly on
+> top of next/master so didn't fully verify it is the root cause.  I'll
+> let one of you MVEBU maintainers take it the next step.
 
+Thanks a lot for the report, very useful. I haven't yet looked at the
+PCI commit itself, but reading the commit log indicates that it plays
+with sizing the BARs, and we're doing some fairly funky stuff with this
+in pci-mvebu, so I'm not entirely surprised such a commit can break
+stuff. I'll have a look tomorrow.
+
+Thanks!
+
+Thomas
 -- 
-Catalin
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
