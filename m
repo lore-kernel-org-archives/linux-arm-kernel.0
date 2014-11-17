@@ -1,35 +1,148 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 17 Nov 2014 23:31:58 +0000
-Subject: [PATCH 4/7] dt-bindings: Add document for MT6397 MFD
-In-Reply-To: <1416210027-5562-5-git-send-email-flora.fu@mediatek.com>
-References: <1416210027-5562-1-git-send-email-flora.fu@mediatek.com>
- <1416210027-5562-5-git-send-email-flora.fu@mediatek.com>
-Message-ID: <20141117233158.GD22111@sirena.org.uk>
+From: chrisp@alliedtelesis.co.nz (Chris Packham)
+Date: Tue, 18 Nov 2014 12:34:41 +1300 (NZDT)
+Subject: [RFC PATCHv2] ARM: mvebu: Let the device-tree determine
+ smp_ops
+In-Reply-To: <20141117095640.03e25d17@free-electrons.com>
+References: <20141106201603.GF4974@lunn.ch>
+ <1415327626-16079-1-git-send-email-chris.packham@alliedtelesis.co.nz>
+ <20141117095640.03e25d17@free-electrons.com>
+Message-ID: <alpine.DEB.2.10.1411181233160.902@chrisp-dl.ws.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 03:40:24PM +0800, Flora Fu wrote:
+Hi Thomas, Maxime
 
-> +		pmic {
-> +			compatible = "mediatek,mt6397";
-> +	}
+On Mon, 17 Nov 2014, Thomas Petazzoni wrote:
 
-This looks like it's missing a closing brace and is just generally weird
-(having a subnode like this).
+> Dear Chris Packham,
+>
+> On Fri,  7 Nov 2014 15:33:46 +1300, Chris Packham wrote:
+>> The machine specific SMP operations can be configured either via
+>> setup_arch or via arm_dt_init_cpu_maps. For the ARMADA_370_XP_DT devices
+>> both of these are called and setup_arch wins because it is called last.
+>> This means that it is not possible to substitute a different set of SMP
+>> operations via the device-tree.
+>>
+>> For the ARMADA_370_XP_DT compatible devices add a smp_init function that
+>> detects if the device tree has an enable-method defined. If it does
+>> return true to indicate that the smp_ops have already been set which
+>> will prevent setup_arch from overriding them.
+>>
+>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+>
+> My colleague Maxime Ripard (in Cc) rightfully suggests exploring a
+> different option: what about getting rid completely of the .smp field
+> of the DT_MACHINE structure, and instead have some code run early
+> enough that looks if an enable-method is defined, and if not, defines
+> it to the default value. This way, we continue to be backward
+> compatible in terms of DT, but we always use the enable-method from the
+> DT, and not sometimes from DT, sometimes from the DT_MACHINE structure.
+>
+> Unfortunately, it will have to be done on the flattened DT, because the
+> DT is unflattened right before the enable-method properties are looked
+> up:
+>
+>        unflatten_device_tree();
+>
+>        arm_dt_init_cpu_maps();
+>
+> And manipulating the DT in its flattened format, while possible in
+> ->dt_fixup(), is a pain, and probably doesn't allow adding new
+> properties anyway.
+>
+> So, in the end, maybe this idea doesn't work, I haven't checked
+> completely.
+>
 
-> +- regulators : The regulators of mt6397
-> +	regulators {
-> +		regulator constratints.
-> +		refer Documentation/devicetree/bindings/regulator/regulator.txt
-> +	};
+So yeah it's tricky to work with the flattened dt. Not impossible the 
+powerpc arch code does quite a lot with it. Arm does less but still uses 
+it in atags_to_fdt.c. Below is a rough attempt at an implementation that 
+seems to work. Because of the flattened dt it's harder to iterate through 
+the cpu nodes so I haven't implemented anything to look for an 
+enable-method attached to them.
 
-You need to define the set of valid regulator names and how that maps
-onto the physical device, look at other regulator binding documents for
-examples.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/80be6512/attachment.sig>
+---- 8< ----
+Subject: [PATCH] ARM: mvebu: use dt_fixup to provide fallback for
+  enable-method
+
+When the device tree doesn't define an enable-method insert a property
+into the flattened device tree. arm_dt_init_cpu_maps() will then parse
+this an set smp_ops appropriately. Now that we have this fallback it is
+no longer necessary to set .smp in the DT_MACHINE definition.
+
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+---
+  arch/arm/mach-mvebu/Makefile   |  2 ++
+  arch/arm/mach-mvebu/board-v7.c | 23 ++++++++++++++++++++++-
+  2 files changed, 24 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index 1636cdb..f818eaf 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -14,3 +14,5 @@ endif
+
+  obj-$(CONFIG_MACH_DOVE)		 += dove.o
+  obj-$(CONFIG_MACH_KIRKWOOD)	 += kirkwood.o kirkwood-pm.o
++
++CFLAGS_board-v7.o = -I$(src)/../../../scripts/dtc/libfdt
+\ No newline at end of file
+diff --git a/arch/arm/mach-mvebu/board-v7.c 
+b/arch/arm/mach-mvebu/board-v7.c
+index b2524d6..45851a2 100644
+--- a/arch/arm/mach-mvebu/board-v7.c
++++ b/arch/arm/mach-mvebu/board-v7.c
+@@ -17,6 +17,8 @@
+  #include <linux/clk-provider.h>
+  #include <linux/of_address.h>
+  #include <linux/of_platform.h>
++#include <linux/of_fdt.h>
++#include <linux/libfdt.h>
+  #include <linux/io.h>
+  #include <linux/clocksource.h>
+  #include <linux/dma-mapping.h>
+@@ -184,6 +186,25 @@ static void __init mvebu_dt_init(void)
+  	of_platform_populate(NULL, of_default_bus_match_table, NULL, 
+NULL);
+  }
+
++static void __init armada_370_xp_dt_fixup(void)
++{
++	void *prop;
++	int offset;
++	int len;
++
++	offset = fdt_path_offset(initial_boot_params, "/cpus");
++	prop = fdt_getprop(initial_boot_params, offset, "enable-method", 
+&len);
++
++	if (!prop) {
++		pr_info("No enable-method defined. "
++			"Falling back to \"marvell,armada-xp-smp\"\n");
++
++		fdt_appendprop(initial_boot_params, offset, 
+"enable-method",
++			       "marvell,armada-xp-smp",
++			       sizeof("marvell,armada-xp-smp"));
++	}
++}
++
+  static const char * const armada_370_xp_dt_compat[] = {
+  	"marvell,armada-370-xp",
+  	NULL,
+@@ -192,11 +213,11 @@ static const char * const armada_370_xp_dt_compat[] 
+= {
+  DT_MACHINE_START(ARMADA_370_XP_DT, "Marvell Armada 370/XP (Device Tree)")
+  	.l2c_aux_val	= 0,
+  	.l2c_aux_mask	= ~0,
+-	.smp		= smp_ops(armada_xp_smp_ops),
+  	.init_machine	= mvebu_dt_init,
+  	.init_irq       = mvebu_init_irq,
+  	.restart	= mvebu_restart,
+  	.dt_compat	= armada_370_xp_dt_compat,
++	.dt_fixup	= armada_370_xp_dt_fixup,
+  MACHINE_END
+
+  static const char * const armada_375_dt_compat[] = {
+-- 
+2.2.0.rc0
