@@ -1,64 +1,36 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 17 Nov 2014 19:44:28 +0100
-Subject: [PATCH V2 3/5] usb: gadget: pxa25x_udc: prepare/unprepare clocks
- in pxa-ssp
-In-Reply-To: <1416236863-20898-3-git-send-email-dbaryshkov@gmail.com> (Dmitry
- Eremin-Solenikov's message of "Mon, 17 Nov 2014 18:07:41 +0300")
-References: <1416236863-20898-1-git-send-email-dbaryshkov@gmail.com>
- <1416236863-20898-3-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <878uj98y5v.fsf@free.fr>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 17 Nov 2014 10:57:45 -0800
+Subject: [PATCH v3 0/3] Amlogic Meson pinctrl driver
+In-Reply-To: <1416168856-12747-1-git-send-email-b.galvani@gmail.com>
+References: <1416168856-12747-1-git-send-email-b.galvani@gmail.com>
+Message-ID: <7d408e1ab6ad46b9ba9010dd18b0df54@BY2FFO11FD038.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
+Hi Beniamino,
 
-> Change clk_enable/disable() calls to clk_prepare_enable() and
-> clk_disable_unprepare().
->
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> ---
->  drivers/usb/gadget/udc/pxa25x_udc.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/usb/gadget/udc/pxa25x_udc.c b/drivers/usb/gadget/udc/pxa25x_udc.c
-> index 42f7eeb..e4964ee 100644
-> --- a/drivers/usb/gadget/udc/pxa25x_udc.c
-> +++ b/drivers/usb/gadget/udc/pxa25x_udc.c
-> @@ -103,8 +103,8 @@ static const char ep0name [] = "ep0";
->  
->  /* IXP doesn't yet support <linux/clk.h> */
->  #define clk_get(dev,name)	NULL
-> -#define clk_enable(clk)		do { } while (0)
-> -#define clk_disable(clk)	do { } while (0)
-> +#define clk_prepare_enable(clk)	do { } while (0)
-> +#define clk_disable_unprepare(clk)	do { } while (0)
->  #define clk_put(clk)		do { } while (0)
->  
->  #endif
-> @@ -932,7 +932,7 @@ static int pullup(struct pxa25x_udc *udc)
->  		if (!udc->active) {
->  			udc->active = 1;
->  			/* Enable clock for USB device */
-> -			clk_enable(udc->clk);
-> +			clk_prepare_enable(udc->clk);
+On Sun, 2014-11-16 at 09:14PM +0100, Beniamino Galvani wrote:
+> Hi,
+> 
+> this is the third version of the pinctrl driver for Amlogic Meson. It
+> provides a common infrastructure than can be used by all the SoCs of
+> the family and configuration data specific for Meson8. Adding support
+> for other SoCs should be only matter of defining new pins and banks.
+> 
+> The driver uses generic DT properties for the definition of mux and
+> configuration nodes; since there is an ongoing effort to centralize
+> the parsing to generic code, I've reused the patch "pinctrl:
+> pinconf-generic: Infer map type from DT property" [1] posted a few
+> days ago by Soren Brinkmann. I will update the series if that patch is
+> going to change after the mailing list discussion.
 
-Guess what, Russell's remark on i2c and serial made me cross-check.  And there
-is a case where this will be called in irq context too ...
+Looks really nice to me and it's great that you use my patch as basis.
+Looks like it works for more people than just me :)
+I hope we can convince Linus to take that patch more or less as is. Even
+though "kludgy" I don't see an easy way for addressing Linus' comments
+without breaking current users of the interface. It may be easier/better
+to gradually migrate to the newly defined bindings and remove the
+kludgyness as user that rely on the current behavior disappear.
 
-See :
--> do_IRQ
-  -> lubbock_vbus_irq()
-    -> pxa25x_udc_vbus_session()
-      -> pullup()
-        -> clk_prepare_enable()
-          -> CRACK
-
-Note that your patch is not really the faulty one, I think a threaded irq
-instead of the "raw" irq should do the trick. And it is granted on UDC api that
-vbus function is called in a "sleeping" context (Felipe correct me if I'm
-wrong), so a patch to fix this before your current code would be fine.
-
-Cheers.
-
---
-Robert
+	Thanks,
+	S?ren
