@@ -1,112 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 17 Nov 2014 15:08:04 +0000
-Subject: [PATCH 09/11] arm: perf: parse cpu affinity from dt
-In-Reply-To: <20141117112033.GF18061@arm.com>
-References: <1415377536-12841-1-git-send-email-mark.rutland@arm.com>
- <1415377536-12841-10-git-send-email-mark.rutland@arm.com>
- <20141117112033.GF18061@arm.com>
-Message-ID: <20141117150804.GC25416@leverpostej>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Nov 2014 15:12:41 +0000
+Subject: ARM: shmobile: sh73a0: CPU1 failed to come online (Re: [PATCH
+ 0/4] ARM: shmobile: r8a7740/armadillo: Migrate to generic l2c OF)
+In-Reply-To: <CAMuHMdWyUJ81G2CLpYScm9qB0KMia0PReBQ8oXdu+Z2P6AWWNg@mail.gmail.com>
+References: <CAMuHMdWyUJ81G2CLpYScm9qB0KMia0PReBQ8oXdu+Z2P6AWWNg@mail.gmail.com>
+Message-ID: <20141117151241.GR4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 11:20:35AM +0000, Will Deacon wrote:
-> On Fri, Nov 07, 2014 at 04:25:34PM +0000, Mark Rutland wrote:
-> > The current way we read interrupts form devicetree assumes that
-> > interrupts are in increasing order of logical cpu id (MPIDR.Aff{2,1,0}),
-> > and that these logical ids are in a contiguous block. This may not be
-> > the case in general - after a kexec cpu ids may be arbitrarily assigned,
-> > and multi-cluster systems do not have a contiguous range of cpu ids.
-> > 
-> > This patch parses cpu affinity information for interrupts from an
-> > optional "interrupts-affinity" devicetree property described in the
-> > devicetree binding document. Support for existing dts and board files
-> > remains.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > ---
-> >  arch/arm/include/asm/pmu.h       |  12 +++
-> >  arch/arm/kernel/perf_event_cpu.c | 196 +++++++++++++++++++++++++++++----------
-> >  2 files changed, 161 insertions(+), 47 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-> > index b630a44..92fc1da 100644
-> > --- a/arch/arm/include/asm/pmu.h
-> > +++ b/arch/arm/include/asm/pmu.h
-> > @@ -12,6 +12,7 @@
-> >  #ifndef __ARM_PMU_H__
-> >  #define __ARM_PMU_H__
-> >  
-> > +#include <linux/cpumask.h>
-> >  #include <linux/interrupt.h>
-> >  #include <linux/perf_event.h>
-> >  
-> > @@ -89,6 +90,15 @@ struct pmu_hw_events {
-> >  	struct arm_pmu		*percpu_pmu;
-> >  };
-> >  
-> > +/*
-> > + * For systems with heterogeneous PMUs, we need to know which CPUs each
-> > + * (possibly percpu) IRQ targets. Map between them with an array of these.
-> > + */
-> > +struct cpu_irq {
-> > +	cpumask_t cpus;
-> > +	int irq;
-> > +};
-> > +
-> >  struct arm_pmu {
-> >  	struct pmu	pmu;
-> >  	cpumask_t	active_irqs;
-> > @@ -118,6 +128,8 @@ struct arm_pmu {
-> >  	struct platform_device	*plat_device;
-> >  	struct pmu_hw_events	__percpu *hw_events;
-> >  	struct notifier_block	hotplug_nb;
-> > +	int		nr_irqs;
-> > +	struct cpu_irq *irq_map;
-> >  };
-> >  
-> >  #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
-> > diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-> > index dfcaba5..f09c8a0 100644
-> > --- a/arch/arm/kernel/perf_event_cpu.c
-> > +++ b/arch/arm/kernel/perf_event_cpu.c
-> > @@ -85,20 +85,27 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
-> >  	struct platform_device *pmu_device = cpu_pmu->plat_device;
-> >  	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
-> >  
-> > -	irqs = min(pmu_device->num_resources, num_possible_cpus());
-> > +	irqs = cpu_pmu->nr_irqs;
-> >  
-> > -	irq = platform_get_irq(pmu_device, 0);
-> > -	if (irq >= 0 && irq_is_percpu(irq)) {
-> > -		on_each_cpu(cpu_pmu_disable_percpu_irq, &irq, 1);
-> > -		free_percpu_irq(irq, &hw_events->percpu_pmu);
-> > -	} else {
-> > -		for (i = 0; i < irqs; ++i) {
-> > -			if (!cpumask_test_and_clear_cpu(i, &cpu_pmu->active_irqs))
-> > -				continue;
-> > -			irq = platform_get_irq(pmu_device, i);
-> > -			if (irq >= 0)
-> > -				free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, i));
-> > +	for (i = 0; i < irqs; i++) {
-> > +		struct cpu_irq *map = &cpu_pmu->irq_map[i];
-> > +		irq = map->irq;
-> > +
-> > +		if (irq <= 0)
-> > +			continue;
-> > +
-> > +		if (irq_is_percpu(irq)) {
-> > +			on_each_cpu(cpu_pmu_disable_percpu_irq, &irq, 1);
+On Mon, Nov 17, 2014 at 02:57:46PM +0100, Geert Uytterhoeven wrote:
+> I tried to convert sh73a0, but it doesn't work, due to problems
+> bringing up the second
+> CPU core.
 > 
-> Hmm, ok, so we're assuming that all the PMUs will be wired with PPIs in this
-> case. I have a patch allowing per-cpu interrupts to be requested for a
-> cpumask, but I suppose that can wait until it's actually needed.
+> Details:
+>   - l2x0_of_init() is called much earlier than l2x0_init().
+>     When the L2 cache is enabled, initialization of the second CPU core of
+>     sh73a0 (Dual-core Cortex-A9) fails.
 
-I wasn't too keen on assuming all CPUs, but I didn't have the facility
-to request a PPI on a subset of CPUs. If you can point me at your patch,
-I'd be happy to take a look.
+Missing L2 cache flushes for (any) the secondary core data/trampoline?
 
-I should have the target CPU mask decoded from whatever the binding
-settles on, so at this point it's just plumbing.
+>   - As jiffies are not yet incrementing at that point (they are on r8a7791?),
+>     timeouts don't work, and the kernel hangs at the
+>     wait_for_completion_timeout() call in arch/arm/kernel/smp.c:__cpu_up().
 
-Thanks,
-Mark.
+That sounds bad:
+
+start_kernel() -> rest_init() -> kernel_thread(kernel_init)
+
+kernel_init() -> kernel_init_freeable() -> smp_init() -> (for each CPU) cpu_up()
+
+By the time we get to rest_init(), init_IRQ(), time_init(),
+local_irq_enable(), late_time_init(), calibrate_delay(), etc have all
+been called, so if jiffies is not incrementing in __cpu_up(), that's
+a big problem.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
