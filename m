@@ -1,87 +1,60 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:08 +0100
-Subject: [PATCH v5 14/61] dmaengine: bcm2835: Split device_control
+Date: Mon, 17 Nov 2014 14:42:47 +0100
+Subject: [PATCH v5 53/61] dmaengine: edma: Declare slave capabilities for the
+ generic code
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-15-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-54-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Broadcom BCM2835 DMA driver to make
-use of the newly introduced callbacks, that will eventually be used to retrieve
-slave capabilities.
+Now that the generic slave caps code can make use of the device assigned
+capabilities, instead of relying on a callback to be implemented.
+
+Make use of this code.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
- drivers/dma/bcm2835-dma.c | 31 ++++++++-----------------------
- 1 file changed, 8 insertions(+), 23 deletions(-)
+ drivers/dma/edma.c | 20 ++++++--------------
+ 1 file changed, 6 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-index 3feba6c25836..13b05c1673b1 100644
---- a/drivers/dma/bcm2835-dma.c
-+++ b/drivers/dma/bcm2835-dma.c
-@@ -436,9 +436,11 @@ static struct dma_async_tx_descriptor *bcm2835_dma_prep_dma_cyclic(
- 	return vchan_tx_prep(&c->vc, &d->vd, flags);
- }
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index 56735a0aa3a8..7aaa59048e2d 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -971,19 +971,6 @@ static void __init edma_chan_init(struct edma_cc *ecc,
+ 				 BIT(DMA_SLAVE_BUSWIDTH_3_BYTES) | \
+ 				 BIT(DMA_SLAVE_BUSWIDTH_4_BYTES))
  
--static int bcm2835_dma_slave_config(struct bcm2835_chan *c,
--		struct dma_slave_config *cfg)
-+static int bcm2835_dma_slave_config(struct dma_chan *chan,
-+				    struct dma_slave_config *cfg)
- {
-+	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
-+
- 	if ((cfg->direction == DMA_DEV_TO_MEM &&
- 	     cfg->src_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES) ||
- 	    (cfg->direction == DMA_MEM_TO_DEV &&
-@@ -452,8 +454,9 @@ static int bcm2835_dma_slave_config(struct bcm2835_chan *c,
- 	return 0;
- }
- 
--static int bcm2835_dma_terminate_all(struct bcm2835_chan *c)
-+static int bcm2835_dma_terminate_all(struct dma_chan *chan)
- {
-+	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
- 	struct bcm2835_dmadev *d = to_bcm2835_dma_dev(c->vc.chan.device);
- 	unsigned long flags;
- 	int timeout = 10000;
-@@ -495,24 +498,6 @@ static int bcm2835_dma_terminate_all(struct bcm2835_chan *c)
- 	return 0;
- }
- 
--static int bcm2835_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--	unsigned long arg)
+-static int edma_dma_device_slave_caps(struct dma_chan *dchan,
+-				      struct dma_slave_caps *caps)
 -{
--	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
+-	caps->src_addr_widths = EDMA_DMA_BUSWIDTHS;
+-	caps->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
+-	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+-	caps->cmd_pause = true;
+-	caps->cmd_terminate = true;
+-	caps->residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
 -
--	switch (cmd) {
--	case DMA_SLAVE_CONFIG:
--		return bcm2835_dma_slave_config(c,
--				(struct dma_slave_config *)arg);
--
--	case DMA_TERMINATE_ALL:
--		return bcm2835_dma_terminate_all(c);
--
--	default:
--		return -ENXIO;
--	}
+-	return 0;
 -}
 -
- static int bcm2835_dma_chan_init(struct bcm2835_dmadev *d, int chan_id, int irq)
+ static void edma_dma_init(struct edma_cc *ecc, struct dma_device *dma,
+ 			  struct device *dev)
  {
- 	struct bcm2835_chan *c;
-@@ -615,9 +600,9 @@ static int bcm2835_dma_probe(struct platform_device *pdev)
- 	od->ddev.device_free_chan_resources = bcm2835_dma_free_chan_resources;
- 	od->ddev.device_tx_status = bcm2835_dma_tx_status;
- 	od->ddev.device_issue_pending = bcm2835_dma_issue_pending;
--	od->ddev.device_slave_caps = bcm2835_dma_device_slave_caps;
- 	od->ddev.device_prep_dma_cyclic = bcm2835_dma_prep_dma_cyclic;
--	od->ddev.device_control = bcm2835_dma_control;
-+	od->ddev.device_config = bcm2835_dma_slave_config;
-+	od->ddev.device_terminate_all = bcm2835_dma_terminate_all;
- 	od->ddev.dev = &pdev->dev;
- 	INIT_LIST_HEAD(&od->ddev.channels);
- 	spin_lock_init(&od->lock);
+@@ -998,7 +985,12 @@ static void edma_dma_init(struct edma_cc *ecc, struct dma_device *dma,
+ 	dma->device_pause = edma_dma_pause;
+ 	dma->device_resume = edma_dma_resume;
+ 	dma->device_terminate_all = edma_terminate_all;
+-	dma->device_slave_caps = edma_dma_device_slave_caps;
++
++	dma->src_addr_widths = EDMA_DMA_BUSWIDTHS;
++	dma->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
++	dma->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
++	dma->residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
++
+ 	dma->dev = dev;
+ 
+ 	/*
 -- 
 2.1.1
