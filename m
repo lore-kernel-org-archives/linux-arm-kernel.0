@@ -1,48 +1,51 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:41:55 +0100
-Subject: [PATCH v5 01/61] serial: at91: Use dmaengine_slave_config API
-In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-2-git-send-email-maxime.ripard@free-electrons.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 17 Nov 2014 14:35:43 +0100
+Subject: [PATCH v8 09/13] Documentation: bindings: add doc for the USB2
+ ChipIdea USB driver
+In-Reply-To: <1416231347-27193-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1416231347-27193-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1416231347-27193-10-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are removing the dmaengine_device_control API, that shouldn't even have been
-exposed in the first place. Change the callers to use the proper API.
+Document the USB2 ChipIdea driver (ci13xxx) bindings.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Acked-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/tty/serial/atmel_serial.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+ .../devicetree/bindings/usb/ci-hdrc-usb2.txt       | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index edde3eca055d..10e6b382d68f 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -862,9 +862,8 @@ static int atmel_prepare_tx_dma(struct uart_port *port)
- 	config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
- 	config.dst_addr = port->mapbase + ATMEL_US_THR;
- 
--	ret = dmaengine_device_control(atmel_port->chan_tx,
--					DMA_SLAVE_CONFIG,
--					(unsigned long)&config);
-+	ret = dmaengine_slave_config(atmel_port->chan_tx,
-+				     &config);
- 	if (ret) {
- 		dev_err(port->dev, "DMA tx slave configuration failed\n");
- 		goto chan_err;
-@@ -1026,9 +1025,8 @@ static int atmel_prepare_rx_dma(struct uart_port *port)
- 	config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
- 	config.src_addr = port->mapbase + ATMEL_US_RHR;
- 
--	ret = dmaengine_device_control(atmel_port->chan_rx,
--					DMA_SLAVE_CONFIG,
--					(unsigned long)&config);
-+	ret = dmaengine_slave_config(atmel_port->chan_rx,
-+				     &config);
- 	if (ret) {
- 		dev_err(port->dev, "DMA rx slave configuration failed\n");
- 		goto chan_err;
+diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
+new file mode 100644
+index 000000000000..27f8b1e5ee46
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
+@@ -0,0 +1,24 @@
++* USB2 ChipIdea USB controller for ci13xxx
++
++Required properties:
++- compatible: should be "chipidea,usb2"
++- reg: base address and length of the registers
++- interrupts: interrupt for the USB controller
++
++Optional properties:
++- clocks: reference to the USB clock
++- phys: reference to the USB PHY
++- phy-names: should be "usb-phy"
++- vbus-supply: reference to the VBUS regulator
++
++Example:
++
++	usb at f7ed0000 {
++		compatible = "chipidea,usb2";
++		reg = <0xf7ed0000 0x10000>;
++		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&chip CLKID_USB0>;
++		phys = <&usb_phy0>;
++		phy-names = "usb-phy";
++		vbus-supply = <&reg_usb0_vbus>;
++	};
 -- 
-2.1.1
+2.1.0
