@@ -1,153 +1,155 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:22 +0100
-Subject: [PATCH v5 28/61] dmaengine: mmp-tdma: Split device_control
+Date: Mon, 17 Nov 2014 14:42:54 +0100
+Subject: [PATCH v5 60/61] dmaengine: Remove device_control and
+ device_slave_caps
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-29-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-61-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Marvell MMP TDMA driver to make use
-of the newly introduced callbacks, that will eventually be used to retrieve
-slave capabilities.
+Now that device_control has been split into several functions, and
+device_slave_caps rendered useless, we can safely remove them.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- drivers/dma/mmp_tdma.c | 82 +++++++++++++++++++++++++++-----------------------
- 1 file changed, 44 insertions(+), 38 deletions(-)
+ include/linux/dmaengine.h | 52 ++++++-----------------------------------------
+ 1 file changed, 6 insertions(+), 46 deletions(-)
 
-diff --git a/drivers/dma/mmp_tdma.c b/drivers/dma/mmp_tdma.c
-index bfb46957c3dc..a8a79b1763d5 100644
---- a/drivers/dma/mmp_tdma.c
-+++ b/drivers/dma/mmp_tdma.c
-@@ -164,33 +164,46 @@ static void mmp_tdma_enable_chan(struct mmp_tdma_chan *tdmac)
- 	tdmac->status = DMA_IN_PROGRESS;
- }
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index be9e60aa8f5e..b01b7a7c581b 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -189,25 +189,6 @@ enum dma_ctrl_flags {
+ };
  
--static void mmp_tdma_disable_chan(struct mmp_tdma_chan *tdmac)
-+static int mmp_tdma_disable_chan(struct dma_chan *chan)
- {
-+	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
-+
- 	writel(readl(tdmac->reg_base + TDCR) & ~TDCR_CHANEN,
- 					tdmac->reg_base + TDCR);
- 
- 	tdmac->status = DMA_COMPLETE;
-+
-+	return 0;
- }
- 
--static void mmp_tdma_resume_chan(struct mmp_tdma_chan *tdmac)
-+static int mmp_tdma_resume_chan(struct dma_chan *chan)
- {
-+	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
-+
- 	writel(readl(tdmac->reg_base + TDCR) | TDCR_CHANEN,
- 					tdmac->reg_base + TDCR);
- 	tdmac->status = DMA_IN_PROGRESS;
-+
-+	return 0;
- }
- 
--static void mmp_tdma_pause_chan(struct mmp_tdma_chan *tdmac)
-+static int mmp_tdma_pause_chan(struct dma_chan *chan)
- {
-+	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
-+
- 	writel(readl(tdmac->reg_base + TDCR) & ~TDCR_CHANEN,
- 					tdmac->reg_base + TDCR);
- 	tdmac->status = DMA_PAUSED;
-+
-+	return 0;
- }
- 
--static int mmp_tdma_config_chan(struct mmp_tdma_chan *tdmac)
-+static int mmp_tdma_config_chan(struct dma_chan *chan)
- {
-+	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
- 	unsigned int tdcr = 0;
- 
--	mmp_tdma_disable_chan(tdmac);
-+	mmp_tdma_disable_chan(chan);
- 
- 	if (tdmac->dir == DMA_MEM_TO_DEV)
- 		tdcr = TDCR_DSTDIR_ADDR_HOLD | TDCR_SRCDIR_ADDR_INC;
-@@ -452,42 +465,32 @@ err_out:
- 	return NULL;
- }
- 
--static int mmp_tdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--		unsigned long arg)
-+static int mmp_tdma_terminate_all(struct dma_chan *chan)
- {
- 	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
--	struct dma_slave_config *dmaengine_cfg = (void *)arg;
--	int ret = 0;
+ /**
+- * enum dma_ctrl_cmd - DMA operations that can optionally be exercised
+- * on a running channel.
+- * @DMA_TERMINATE_ALL: terminate all ongoing transfers
+- * @DMA_PAUSE: pause ongoing transfers
+- * @DMA_RESUME: resume paused transfer
+- * @DMA_SLAVE_CONFIG: this command is only implemented by DMA controllers
+- * that need to runtime reconfigure the slave channels (as opposed to passing
+- * configuration data in statically from the platform). An additional
+- * argument of struct dma_slave_config must be passed in with this
+- * command.
+- */
+-enum dma_ctrl_cmd {
+-	DMA_TERMINATE_ALL,
+-	DMA_PAUSE,
+-	DMA_RESUME,
+-	DMA_SLAVE_CONFIG,
+-};
 -
--	switch (cmd) {
--	case DMA_TERMINATE_ALL:
--		mmp_tdma_disable_chan(tdmac);
--		/* disable interrupt */
--		mmp_tdma_enable_irq(tdmac, false);
--		break;
--	case DMA_PAUSE:
--		mmp_tdma_pause_chan(tdmac);
--		break;
--	case DMA_RESUME:
--		mmp_tdma_resume_chan(tdmac);
--		break;
--	case DMA_SLAVE_CONFIG:
--		if (dmaengine_cfg->direction == DMA_DEV_TO_MEM) {
--			tdmac->dev_addr = dmaengine_cfg->src_addr;
--			tdmac->burst_sz = dmaengine_cfg->src_maxburst;
--			tdmac->buswidth = dmaengine_cfg->src_addr_width;
--		} else {
--			tdmac->dev_addr = dmaengine_cfg->dst_addr;
--			tdmac->burst_sz = dmaengine_cfg->dst_maxburst;
--			tdmac->buswidth = dmaengine_cfg->dst_addr_width;
--		}
--		tdmac->dir = dmaengine_cfg->direction;
--		return mmp_tdma_config_chan(tdmac);
--	default:
--		ret = -ENOSYS;
-+
-+	mmp_tdma_disable_chan(chan);
-+	/* disable interrupt */
-+	mmp_tdma_enable_irq(tdmac, false);
-+}
-+
-+static int mmp_tdma_config(struct dma_chan *chan,
-+			   struct dma_slave_config *dmaengine_cfg)
-+{
-+	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
-+
-+	if (dmaengine_cfg->direction == DMA_DEV_TO_MEM) {
-+		tdmac->dev_addr = dmaengine_cfg->src_addr;
-+		tdmac->burst_sz = dmaengine_cfg->src_maxburst;
-+		tdmac->buswidth = dmaengine_cfg->src_addr_width;
-+	} else {
-+		tdmac->dev_addr = dmaengine_cfg->dst_addr;
-+		tdmac->burst_sz = dmaengine_cfg->dst_maxburst;
-+		tdmac->buswidth = dmaengine_cfg->dst_addr_width;
- 	}
-+	tdmac->dir = dmaengine_cfg->direction;
+-/**
+  * enum sum_check_bits - bit position of pq_check_flags
+  */
+ enum sum_check_bits {
+@@ -336,9 +317,8 @@ enum dma_slave_buswidth {
+  * This struct is passed in as configuration data to a DMA engine
+  * in order to set up a certain channel for DMA transport at runtime.
+  * The DMA device/engine has to provide support for an additional
+- * command in the channel config interface, DMA_SLAVE_CONFIG
+- * and this struct will then be passed in as an argument to the
+- * DMA engine device_control() function.
++ * callback in the dma_device structure, device_config and this struct
++ * will then be passed in as an argument to the function.
+  *
+  * The rationale for adding configuration information to this struct is as
+  * follows: if it is likely that more than one DMA slave controllers in
+@@ -617,8 +597,6 @@ struct dma_tx_state {
+  * @device_prep_interleaved_dma: Transfer expression in a generic way.
+  * @device_config: Pushes a new configuration to a channel, return 0 or an error
+  *	code
+- * @device_control: manipulate all pending operations on a channel, returns
+- *	zero or error code
+  * @device_pause: Pauses any transfer happening on a channel. Returns
+  *	0 or an error code
+  * @device_resume: Resumes any transfer on a channel previously
+@@ -630,7 +608,6 @@ struct dma_tx_state {
+  *	struct with auxiliary transfer status information, otherwise the call
+  *	will just return a simple status code
+  * @device_issue_pending: push pending transactions to hardware
+- * @device_slave_caps: return the slave channel capabilities
+  */
+ struct dma_device {
  
--	return ret;
-+	return mmp_tdma_config_chan(chan);
+@@ -697,8 +674,6 @@ struct dma_device {
+ 
+ 	int (*device_config)(struct dma_chan *chan,
+ 			     struct dma_slave_config *config);
+-	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-		unsigned long arg);
+ 	int (*device_pause)(struct dma_chan *chan);
+ 	int (*device_resume)(struct dma_chan *chan);
+ 	int (*device_terminate_all)(struct dma_chan *chan);
+@@ -707,27 +682,15 @@ struct dma_device {
+ 					    dma_cookie_t cookie,
+ 					    struct dma_tx_state *txstate);
+ 	void (*device_issue_pending)(struct dma_chan *chan);
+-	int (*device_slave_caps)(struct dma_chan *chan, struct dma_slave_caps *caps);
+ };
+ 
+-static inline int dmaengine_device_control(struct dma_chan *chan,
+-					   enum dma_ctrl_cmd cmd,
+-					   unsigned long arg)
+-{
+-	if (chan->device->device_control)
+-		return chan->device->device_control(chan, cmd, arg);
+-
+-	return -ENOSYS;
+-}
+-
+ static inline int dmaengine_slave_config(struct dma_chan *chan,
+ 					  struct dma_slave_config *config)
+ {
+ 	if (chan->device->device_config)
+ 		return chan->device->device_config(chan, config);
+ 
+-	return dmaengine_device_control(chan, DMA_SLAVE_CONFIG,
+-			(unsigned long)config);
++	return -ENOSYS;
  }
  
- static enum dma_status mmp_tdma_tx_status(struct dma_chan *chan,
-@@ -668,7 +671,10 @@ static int mmp_tdma_probe(struct platform_device *pdev)
- 	tdev->device.device_prep_dma_cyclic = mmp_tdma_prep_dma_cyclic;
- 	tdev->device.device_tx_status = mmp_tdma_tx_status;
- 	tdev->device.device_issue_pending = mmp_tdma_issue_pending;
--	tdev->device.device_control = mmp_tdma_control;
-+	tdev->device.device_config = mmp_tdma_config;
-+	tdev->device.device_pause = mmp_tdma_pause_chan;
-+	tdev->device.device_resume = mmp_tdma_resume_chan;
-+	tdev->device.device_terminate_all = mmp_tdma_terminate_all;
- 	tdev->device.copy_align = TDMA_ALIGNMENT;
+ static inline bool is_slave_direction(enum dma_transfer_direction direction)
+@@ -807,9 +770,6 @@ static inline int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_cap
+ 	if (!test_bit(DMA_SLAVE, device->cap_mask.bits))
+ 		return -ENXIO;
  
- 	dma_set_mask(&pdev->dev, DMA_BIT_MASK(64));
+-	if (device->device_slave_caps)
+-		return device->device_slave_caps(chan, caps);
+-
+ 	/*
+ 	 * Check whether it reports it uses the generic slave
+ 	 * capabilities, if not, that means it doesn't support any
+@@ -834,7 +794,7 @@ static inline int dmaengine_terminate_all(struct dma_chan *chan)
+ 	if (chan->device->device_terminate_all)
+ 		return chan->device->device_terminate_all(chan);
+ 
+-	return dmaengine_device_control(chan, DMA_TERMINATE_ALL, 0);
++	return -ENOSYS;
+ }
+ 
+ static inline int dmaengine_pause(struct dma_chan *chan)
+@@ -842,7 +802,7 @@ static inline int dmaengine_pause(struct dma_chan *chan)
+ 	if (chan->device->device_pause)
+ 		return chan->device->device_pause(chan);
+ 
+-	return dmaengine_device_control(chan, DMA_PAUSE, 0);
++	return -ENOSYS;
+ }
+ 
+ static inline int dmaengine_resume(struct dma_chan *chan)
+@@ -850,7 +810,7 @@ static inline int dmaengine_resume(struct dma_chan *chan)
+ 	if (chan->device->device_resume)
+ 		return chan->device->device_resume(chan);
+ 
+-	return dmaengine_device_control(chan, DMA_RESUME, 0);
++	return -ENOSYS;
+ }
+ 
+ static inline enum dma_status dmaengine_tx_status(struct dma_chan *chan,
 -- 
 2.1.1
