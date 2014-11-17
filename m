@@ -1,54 +1,38 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Mon, 17 Nov 2014 10:14:51 +0530
-Subject: [PATCH RESEND] serial: samsung: Fix serial config dependencies for
- exynos7
-Message-ID: <1416199491-4841-1-git-send-email-a.kesavan@samsung.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Mon, 17 Nov 2014 10:15:09 +0530
+Subject: [PATCH] ARM: dts: DRA7: Add node for RTC
+Message-ID: <1416199509-3977-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pankaj Dubey <pankaj.dubey@samsung.com>
+Add node for RTC.
 
-Exynos7 has a similar serial controller to that present in older Samsung
-SoCs. To re-use the existing serial driver on Exynos7 we need to have
-SERIAL_SAMSUNG_UARTS_4 and SERIAL_SAMSUNG_UARTS selected. This is not
-possible because these symbols are dependent on PLAT_SAMSUNG which is
-not present for the ARMv8 based exynos7.
-
-Change the dependency of these symbols from PLAT_SAMSUNG to the serial
-driver thus making it available on exynos7. As the existing platform
-specific code making use of these symbols is related to uart driver this
-change in dependency should not cause any issues.
-
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+[nm at ti.com: update with rtc crossbar number]
+Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
-Re-sending as the previous version did not reach Greg KH.
+ arch/arm/boot/dts/dra7.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
- drivers/tty/serial/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index e71a28b..d0ce88c 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -249,14 +249,14 @@ config SERIAL_SAMSUNG
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 9cc9843..f98f9f0 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -1075,6 +1075,15 @@
+ 			status = "disabled";
+ 		};
  
- config SERIAL_SAMSUNG_UARTS_4
- 	bool
--	depends on PLAT_SAMSUNG
-+	depends on SERIAL_SAMSUNG
- 	default y if !(CPU_S3C2410 || CPU_S3C2412 || CPU_S3C2440 || CPU_S3C2442)
- 	help
- 	  Internal node for the common case of 4 Samsung compatible UARTs
- 
- config SERIAL_SAMSUNG_UARTS
- 	int
--	depends on PLAT_SAMSUNG
-+	depends on SERIAL_SAMSUNG
- 	default 4 if SERIAL_SAMSUNG_UARTS_4 || CPU_S3C2416
- 	default 3
- 	help
++		rtc: rtcss at 48838000 {
++			compatible = "ti,am3352-rtc";
++			reg = <0x48838000 0x100>;
++			interrupts = <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>;
++			ti,hwmods = "rtcss";
++			clocks = <&sys_32k_ck>;
++		};
++
+ 		omap_control_usb2phy1: control-phy at 4a002300 {
+ 			compatible = "ti,control-phy-usb2";
+ 			reg = <0x4a002300 0x4>;
 -- 
-2.1.0
+1.9.1
