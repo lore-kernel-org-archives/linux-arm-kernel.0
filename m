@@ -1,21 +1,84 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 17 Nov 2014 22:55:43 +0100
-Subject: mvebu: tclk detection for armada-xp and marvell packet processor
- with integrated CPU
-In-Reply-To: <546A5714.2090100@alliedtelesis.co.nz>
-References: <546959A3.9040206@alliedtelesis.co.nz>
- <20141117093437.0ca5a3ef@free-electrons.com>
- <546A5714.2090100@alliedtelesis.co.nz>
-Message-ID: <20141117215543.GC4080@lunn.ch>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 17 Nov 2014 14:02:38 -0800
+Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
+ completes
+In-Reply-To: <Pine.LNX.4.44L0.1411171641170.855-100000@iolanthe.rowland.org>
+References: <20141117211117.GD5258@dtor-ws>
+ <Pine.LNX.4.44L0.1411171641170.855-100000@iolanthe.rowland.org>
+Message-ID: <20141117220238.GE5258@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Yeah I'm still trying to wrestle that information out of Marvell. What I 
-> do know is for the eval board I've got the armada register SAR (offset 
-> 0x18230) is all zeros. I'm not sure if this is because everything really 
-> strapped low or because this register is unused on the PP.
+On Mon, Nov 17, 2014 at 04:44:56PM -0500, Alan Stern wrote:
+> On Mon, 17 Nov 2014, Dmitry Torokhov wrote:
+> 
+> > > When the runtime PM core invokes a power domain's callback routine,
+> > > what does the domain's routine usually do?  Does it go ahead and invoke
+> > > the driver's callback?  Or does it try to invoke the subsystem's
+> > > callback?
+> > > 
+> > > Obviously this depends on how the power domain code is written.  But
+> > > suppose every power domain would always use the same strategy as the PM
+> > > core: Invoke the subsystem's callback if there is one; otherwise invoke
+> > > the driver's callback.
+> > > 
+> > > Then there wouldn't be a problem.  Even when a runtime-resume went via
+> > > the power domain, the subsystem would still be able to protect the
+> > > not-yet-bound driver from being called.
+> > > 
+> > > (... Unless the subsystem itself was incapable of doing this the right 
+> > > way.  But subsystems can be fixed.)
+> > 
+> > The genpd code currently starts by powering on the domain (if it is not
+> > on already) and then does "device restore" which is:
+> > 
+> > /**
+> >  * pm_genpd_default_restore_state - Default PM domians "restore device state".
+> >  * @dev: Device to handle.
+> >  */
+> > static int pm_genpd_default_restore_state(struct device *dev)
+> > {
+> > 	int (*cb)(struct device *__dev);
+> > 
+> > 	cb = dev_gpd_data(dev)->ops.restore_state;
+> > 	if (cb)
+> > 		return cb(dev);
+> > 
+> > 	if (dev->type && dev->type->pm)
+> > 		cb = dev->type->pm->runtime_resume;
+> > 	else if (dev->class && dev->class->pm)
+> > 		cb = dev->class->pm->runtime_resume;
+> > 	else if (dev->bus && dev->bus->pm)
+> > 		cb = dev->bus->pm->runtime_resume;
+> > 	else
+> > 		cb = NULL;
+> > 
+> > 	if (!cb && dev->driver && dev->driver->pm)
+> > 		cb = dev->driver->pm->runtime_resume;
+> > 
+> > 	return cb ? cb(dev) : 0;
+> > }
+> > 
+> > So I guess bus (or class or type) can take care of it.
+> 
+> The bus could.  I don't think the class or type knows when a driver is 
+> being probed.
+> 
+> >  Except buses
+> > usually call pm_generic_runtime_resume() which ends up fetching driver's
+> > callbacks. Maybe pm_generic_runtime_*() need be a bit smarter?
+> 
+> No, the bus subsystem needs to be smarter.  It shouldn't call 
+> pm_generic_runtime_resume() if the driver hasn't been probed yet, or if 
+> the driver has already been unbound from the device.
 
-Do the CPU SAR pins even make it out of the package? It could be when
-the synthesised the CPU they hard coded it all and throw away the SAR.
+But that code wold be exactly the same for all buses, right? So why
+can't pm_generic_runtime_resume() be smarter?
 
-    Andrew
+However, is it allowed to call pm_runtime_get_sync() on devices that
+didn't issue pm_runtime_enable()?
+
+Thanks.
+
+-- 
+Dmitry
