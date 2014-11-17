@@ -1,43 +1,31 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 17 Nov 2014 22:32:18 +0100
-Subject: [PATCH v9 2/9] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <1414194024-55547-3-git-send-email-lina.iyer@linaro.org>
-References: <1414194024-55547-1-git-send-email-lina.iyer@linaro.org>
- <1414194024-55547-3-git-send-email-lina.iyer@linaro.org>
-Message-ID: <546A6962.9090801@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 17 Nov 2014 22:32:43 +0100
+Subject: mvebu: tclk detection for armada-xp and marvell packet processor
+ with integrated CPU
+In-Reply-To: <546A5832.6020008@alliedtelesis.co.nz>
+References: <546959A3.9040206@alliedtelesis.co.nz>
+ <20141117093437.0ca5a3ef@free-electrons.com>
+ <20141117141839.GM2001@lunn.ch>
+ <546A5832.6020008@alliedtelesis.co.nz>
+Message-ID: <20141117213243.GA4080@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2014 01:40 AM, Lina Iyer wrote:
+> > kirkwood-98dx4122.dtsi
+> 
+> Off topic but, cool bobcat1 support (err, I mean I recognize that 
+> official part number).
 
-Hi Lina,
+It is very minimal support. I wish there was more, and i would love to
+play with this chip, or the one you have, but the datasheets is not
+available.
+ 
+> We have existing products using this and others with a proper kirkwood. 
+> Unfortunately they all have fdt unaware bootloaders.
 
-[ ... ]
+You can use appended dt. Put the blob on the end of the kernel, and
+with the right options turn on, it will find it. Also, keymile, how
+did most of the 98dx4122 work contributed to uboot. So you can
+probably use a mainline uboot.
 
-> +static inline void spm_register_write(struct spm_driver_data *drv,
-> +					enum spm_reg reg, u32 val)
-> +{
-> +	if (drv->reg_data->reg_offset[reg])
-> +		writel_relaxed(val, drv->reg_base +
-> +				drv->reg_data->reg_offset[reg]);
-
-Why not use writel and don't use 'wmb' below ?
-
-> +}
-> +
-
-[ ... ]
-
-> +	spm_register_write(drv, SPM_REG_SPM_CTL, ctl_val);
-> +
-> +	/* Ensure we have written the start address */
-> +	wmb();
-
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+	 Andrew
