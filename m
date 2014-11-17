@@ -1,81 +1,56 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 17 Nov 2014 14:24:01 -0800
-Subject: exynos boot falures in linux-next
-In-Reply-To: <7hoas54y7k.fsf@deeprootsystems.com> (Kevin Hilman's message of
- "Mon, 17 Nov 2014 07:57:03 -0800")
-References: <E1XqKYI-0000pQ-4b@ip-10-35-177-41.ec2.internal>
- <7hoas54y7k.fsf@deeprootsystems.com>
-Message-ID: <7hlhn9zcse.fsf@deeprootsystems.com>
+From: klightspeed@killerwolves.net (Ben Peddell)
+Date: Tue, 18 Nov 2014 08:41:27 +1000
+Subject: [PATCHv1 2/3] arm: mvebu: add .dts file for Synology DS213j
+In-Reply-To: <878ujas07o.fsf@natisbad.org>
+References: <cover.1416095841.git.arno@natisbad.org>	<1eb26f8c1946622910a7e2318c895a7082fea7e5.1416095841.git.arno@natisbad.org>	<20141116020024.GC15870@lunn.ch>
+ <87d28nb83u.fsf@natisbad.org>	<546931E1.5070909@killerwolves.net>
+ <878ujas07o.fsf@natisbad.org>
+Message-ID: <546A7997.1040603@killerwolves.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@kernel.org> writes:
-
-> FYI...
->
-> Various new exynos5 boot failures starting next-20141117.  Looking in
-> the boot logs, the boot stops during DRM initialization.
->
-> Note that the boot failures are only on exynos_defconfig, and not
-> multi_v7_defconfig.
-
-As might have been expected, reverting the change that enables the
-DRM/display options in exynos_defconfig fixes the problem.
-
-Kevin
-
-> Excerpt from boot report below, or recent exynos boots can also be
-> explored here:
->
->    http://status.armcloud.us/boot/?exynos
->
-> Kevin
->
->
-> Kevin's boot bot <khilman@kernel.org> writes:
->
->> Full Build report: http://status.armcloud.us/build/next/kernel/next-20141117/
->> Full Boot report:  http://status.armcloud.us/boot/all/job/next/kernel/next-20141117/
+On 17/11/14 18:25, Arnaud Ebalard wrote:
+> Hi,
+> 
+> Ben Peddell <klightspeed@killerwolves.net> writes:
+> 
+>> On 16/11/2014 11:14 PM, Arnaud Ebalard wrote:
+>>>>> +	gpio-fan-100-32-35 {
+>>>> There is some logic to this naming, but i don't remember what it is.
+>>>> Did you check this is appropriate?
+>>> The 32-35 is for the MPP i.e. fan uses mpp32 to mpp35 (3 MPP for speed,
+>>> one for alarm). I don't know what the 100 part means. What I did is I
+>>> googled to see which fan supported kirkwood models have and noticed
+>>> that the DS212j uses the exact same fan, i.e. Y.S.Tech FD129225LL-N so
+>>> I opted for the same naming.
+>>>
+>>> On that aspect, you may be able to explain why the speed-map for this
+>>> fan goes up to 5000 RPM. This fan is supposed to operate at 1900RPM.
+>>> Note that it does not matter in practice.
 >>
->> Tree/Branch: next
->> Git describe: next-20141117
+>> On the Kirkwood Diskstations, the first number (100, 120 or 150) refers
+>> to the middle of the three fan speed resistors,
+> 
+> Would not have found that alone ;-) Thanks for clarifying.
+> 
+>> the second number (15 or
+>> 32) refers to the first fan control pin, and the third number (18 or 35)
+>> refers to the first fan alarm pin.
 >>
->> Failed boot tests
->> =================
->
-> [...]
->
->>            exynos5422-odroid-xu3:     FAIL:    arm-exynos_defconfig
->>                                       http://storage.armcloud.us/kernel-ci/next/next-20141117/arm-exynos_defconfig/boot-exynos5422-odroid-xu3.html
->>               exynos5250-arndale:     FAIL:    arm-exynos_defconfig
->>                                       http://storage.armcloud.us/kernel-ci/next/next-20141117/arm-exynos_defconfig/boot-exynos5250-arndale.html
->>              exynos5800-peach-pi:     FAIL:    arm-exynos_defconfig
->>                                       http://storage.armcloud.us/kernel-ci/next/next-20141117/arm-exynos_defconfig/boot-exynos5800-peach-pi.html
+>> i.e. the 100-32-35 uses fan speed resistors of 33, 100 and 150 ohms,
+>> uses pins 32-34 for fan control, and uses pin 35 for the fan alarm.
+>>
+>> The 5000RPM was interpolated from my measured RPM pulse rate (4200PPM)
+>> of the 80mm fan in my DS211j (which uses the 150-32-35 fan config) at
+>> maximum RPM.
+> 
+> Then, I think I need to change the speed map to have 1900 RPM as max
+> speed. Out of curiosity, how did you measured the RPM pulse rate
+> exactly?
 
-[1]
-commit 0ef76aea7a344ac520b02822a8080797fa06124c
-Author: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Date:   Thu Nov 13 11:51:42 2014 +0900
+I hooked a logic analyzer to the sense pin and measured the pulse rate.
 
-    ARM: exynos_defconfig: Enable options for display panel support
-
-    Many Exynos devices have a display panel. Most of them just have
-    a simple panel while others have more complex configurations that
-    requires an embedded DisplayPort (eDP) to LVDS bridges.
-
-    This patch enables the following features to be built in the kernel
-    image to support both setups:
-
-    - Direct Rendering Manager (DRM)
-    - DRM bridge registration and lookup framework
-    - Parade ps8622/ps8625 eDP/LVDS bridge
-    - NXP ptn3460 eDP/LVDS bridge
-    - Exynos Fully Interactive Mobile Display controller (FIMD)
-    - Panel registration and lookup framework
-    - Simple panels
-    - Backlight & LCD device support
-
-    Signed-off-by: Javier Martinez Canillas
-    <javier.martinez@collabora.co.uk>
-    Tested-by: Kevin Hilman <khilman@linaro.org>
-    Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Looking at the specifications of the fan in this unit (an EC7025L12ER),
+it has a maximum fan speed of 3000RPM, so it looks like it uses two
+pulses per revolution and not one as I had assumed when I created the
+speed map.
