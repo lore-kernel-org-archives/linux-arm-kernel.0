@@ -1,176 +1,121 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:19 +0100
-Subject: [PATCH v5 25/61] dmaengine: ipu-idmac: Split device_control
+Date: Mon, 17 Nov 2014 14:42:28 +0100
+Subject: [PATCH v5 34/61] dmaengine: omap: Split device_control
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-26-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-35-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the IPU IDMAC driver to make use
+Split the device_control callback of the TI OMAP DMA driver to make use
 of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/ipu/ipu_idmac.c | 96 ++++++++++++++++++++++++---------------------
- 1 file changed, 51 insertions(+), 45 deletions(-)
+ drivers/dma/omap-dma.c | 51 +++++++++++++++-----------------------------------
+ 1 file changed, 15 insertions(+), 36 deletions(-)
 
-diff --git a/drivers/dma/ipu/ipu_idmac.c b/drivers/dma/ipu/ipu_idmac.c
-index bbf62927bd72..b36f5a47578a 100644
---- a/drivers/dma/ipu/ipu_idmac.c
-+++ b/drivers/dma/ipu/ipu_idmac.c
-@@ -1398,76 +1398,81 @@ static void idmac_issue_pending(struct dma_chan *chan)
- 	 */
+diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+index a8aa5b6bb5e2..1cadf812f3b3 100644
+--- a/drivers/dma/omap-dma.c
++++ b/drivers/dma/omap-dma.c
+@@ -948,8 +948,10 @@ static struct dma_async_tx_descriptor *omap_dma_prep_dma_cyclic(
+ 	return vchan_tx_prep(&c->vc, &d->vd, flags);
  }
  
--static int __idmac_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--			   unsigned long arg)
-+static int idmac_pause(struct dma_chan *chan)
+-static int omap_dma_slave_config(struct omap_chan *c, struct dma_slave_config *cfg)
++static int omap_dma_slave_config(struct dma_chan *chan, struct dma_slave_config *cfg)
  {
- 	struct idmac_channel *ichan = to_idmac_chan(chan);
- 	struct idmac *idmac = to_idmac(chan->device);
- 	struct ipu *ipu = to_ipu(idmac);
- 	struct list_head *list, *tmp;
- 	unsigned long flags;
--	int i;
- 
--	switch (cmd) {
--	case DMA_PAUSE:
--		spin_lock_irqsave(&ipu->lock, flags);
--		ipu_ic_disable_task(ipu, chan->chan_id);
-+	mutex_lock(&ichan->chan_mutex);
- 
--		/* Return all descriptors into "prepared" state */
--		list_for_each_safe(list, tmp, &ichan->queue)
--			list_del_init(list);
-+	spin_lock_irqsave(&ipu->lock, flags);
-+	ipu_ic_disable_task(ipu, chan->chan_id);
- 
--		ichan->sg[0] = NULL;
--		ichan->sg[1] = NULL;
-+	/* Return all descriptors into "prepared" state */
-+	list_for_each_safe(list, tmp, &ichan->queue)
-+		list_del_init(list);
- 
--		spin_unlock_irqrestore(&ipu->lock, flags);
-+	ichan->sg[0] = NULL;
-+	ichan->sg[1] = NULL;
- 
--		ichan->status = IPU_CHANNEL_INITIALIZED;
--		break;
--	case DMA_TERMINATE_ALL:
--		ipu_disable_channel(idmac, ichan,
--				    ichan->status >= IPU_CHANNEL_ENABLED);
-+	spin_unlock_irqrestore(&ipu->lock, flags);
- 
--		tasklet_disable(&ipu->tasklet);
-+	ichan->status = IPU_CHANNEL_INITIALIZED;
- 
--		/* ichan->queue is modified in ISR, have to spinlock */
--		spin_lock_irqsave(&ichan->lock, flags);
--		list_splice_init(&ichan->queue, &ichan->free_list);
-+	mutex_unlock(&ichan->chan_mutex);
- 
--		if (ichan->desc)
--			for (i = 0; i < ichan->n_tx_desc; i++) {
--				struct idmac_tx_desc *desc = ichan->desc + i;
--				if (list_empty(&desc->list))
--					/* Descriptor was prepared, but not submitted */
--					list_add(&desc->list, &ichan->free_list);
-+	return 0;
-+}
- 
--				async_tx_clear_ack(&desc->txd);
--			}
-+static int __idmac_terminate_all(struct dma_chan *chan)
-+{
-+	struct idmac_channel *ichan = to_idmac_chan(chan);
-+	struct idmac *idmac = to_idmac(chan->device);
-+	struct ipu *ipu = to_ipu(idmac);
-+	unsigned long flags;
-+	int i;
- 
--		ichan->sg[0] = NULL;
--		ichan->sg[1] = NULL;
--		spin_unlock_irqrestore(&ichan->lock, flags);
-+	ipu_disable_channel(idmac, ichan,
-+			    ichan->status >= IPU_CHANNEL_ENABLED);
- 
--		tasklet_enable(&ipu->tasklet);
-+	tasklet_disable(&ipu->tasklet);
- 
--		ichan->status = IPU_CHANNEL_INITIALIZED;
--		break;
--	default:
--		return -ENOSYS;
--	}
-+	/* ichan->queue is modified in ISR, have to spinlock */
-+	spin_lock_irqsave(&ichan->lock, flags);
-+	list_splice_init(&ichan->queue, &ichan->free_list);
++	struct omap_chan *c = to_omap_dma_chan(chan);
 +
-+	if (ichan->desc)
-+		for (i = 0; i < ichan->n_tx_desc; i++) {
-+			struct idmac_tx_desc *desc = ichan->desc + i;
-+			if (list_empty(&desc->list))
-+				/* Descriptor was prepared, but not submitted */
-+				list_add(&desc->list, &ichan->free_list);
-+
-+			async_tx_clear_ack(&desc->txd);
-+		}
-+
-+	ichan->sg[0] = NULL;
-+	ichan->sg[1] = NULL;
-+	spin_unlock_irqrestore(&ichan->lock, flags);
-+
-+	tasklet_enable(&ipu->tasklet);
-+
-+	ichan->status = IPU_CHANNEL_INITIALIZED;
- 
+ 	if (cfg->src_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES ||
+ 	    cfg->dst_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES)
+ 		return -EINVAL;
+@@ -959,8 +961,9 @@ static int omap_dma_slave_config(struct omap_chan *c, struct dma_slave_config *c
  	return 0;
  }
  
--static int idmac_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--			 unsigned long arg)
-+static int idmac_terminate_all(struct dma_chan *chan)
+-static int omap_dma_terminate_all(struct omap_chan *c)
++static int omap_dma_terminate_all(struct dma_chan *chan)
  {
- 	struct idmac_channel *ichan = to_idmac_chan(chan);
- 	int ret;
++	struct omap_chan *c = to_omap_dma_chan(chan);
+ 	struct omap_dmadev *d = to_omap_dma_dev(c->vc.chan.device);
+ 	unsigned long flags;
+ 	LIST_HEAD(head);
+@@ -996,8 +999,10 @@ static int omap_dma_terminate_all(struct omap_chan *c)
+ 	return 0;
+ }
  
- 	mutex_lock(&ichan->chan_mutex);
+-static int omap_dma_pause(struct omap_chan *c)
++static int omap_dma_pause(struct dma_chan *chan)
+ {
++	struct omap_chan *c = to_omap_dma_chan(chan);
++
+ 	/* Pause/Resume only allowed with cyclic mode */
+ 	if (!c->cyclic)
+ 		return -EINVAL;
+@@ -1010,8 +1015,10 @@ static int omap_dma_pause(struct omap_chan *c)
+ 	return 0;
+ }
  
--	ret = __idmac_control(chan, cmd, arg);
-+	ret = __idmac_terminate_all(chan);
+-static int omap_dma_resume(struct omap_chan *c)
++static int omap_dma_resume(struct dma_chan *chan)
+ {
++	struct omap_chan *c = to_omap_dma_chan(chan);
++
+ 	/* Pause/Resume only allowed with cyclic mode */
+ 	if (!c->cyclic)
+ 		return -EINVAL;
+@@ -1029,37 +1036,6 @@ static int omap_dma_resume(struct omap_chan *c)
+ 	return 0;
+ }
  
- 	mutex_unlock(&ichan->chan_mutex);
- 
-@@ -1568,7 +1573,7 @@ static void idmac_free_chan_resources(struct dma_chan *chan)
- 
- 	mutex_lock(&ichan->chan_mutex);
- 
--	__idmac_control(chan, DMA_TERMINATE_ALL, 0);
-+	__idmac_terminate_all(chan);
- 
- 	if (ichan->status > IPU_CHANNEL_FREE) {
- #ifdef DEBUG
-@@ -1622,7 +1627,8 @@ static int __init ipu_idmac_init(struct ipu *ipu)
- 
- 	/* Compulsory for DMA_SLAVE fields */
- 	dma->device_prep_slave_sg		= idmac_prep_slave_sg;
--	dma->device_control			= idmac_control;
-+	dma->device_pause			= idmac_pause;
-+	dma->device_terminate_all		= idmac_terminate_all;
- 
- 	INIT_LIST_HEAD(&dma->channels);
- 	for (i = 0; i < IPU_CHANNELS_NUM; i++) {
-@@ -1655,7 +1661,7 @@ static void ipu_idmac_exit(struct ipu *ipu)
- 	for (i = 0; i < IPU_CHANNELS_NUM; i++) {
- 		struct idmac_channel *ichan = ipu->channel + i;
- 
--		idmac_control(&ichan->dma_chan, DMA_TERMINATE_ALL, 0);
-+		idmac_terminate_all(&ichan->dma_chan);
- 	}
- 
- 	dma_async_device_unregister(&idmac->dma);
+-static int omap_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-	unsigned long arg)
+-{
+-	struct omap_chan *c = to_omap_dma_chan(chan);
+-	int ret;
+-
+-	switch (cmd) {
+-	case DMA_SLAVE_CONFIG:
+-		ret = omap_dma_slave_config(c, (struct dma_slave_config *)arg);
+-		break;
+-
+-	case DMA_TERMINATE_ALL:
+-		ret = omap_dma_terminate_all(c);
+-		break;
+-
+-	case DMA_PAUSE:
+-		ret = omap_dma_pause(c);
+-		break;
+-
+-	case DMA_RESUME:
+-		ret = omap_dma_resume(c);
+-		break;
+-
+-	default:
+-		ret = -ENXIO;
+-		break;
+-	}
+-
+-	return ret;
+-}
+-
+ static int omap_dma_chan_init(struct omap_dmadev *od, int dma_sig)
+ {
+ 	struct omap_chan *c;
+@@ -1136,7 +1112,10 @@ static int omap_dma_probe(struct platform_device *pdev)
+ 	od->ddev.device_issue_pending = omap_dma_issue_pending;
+ 	od->ddev.device_prep_slave_sg = omap_dma_prep_slave_sg;
+ 	od->ddev.device_prep_dma_cyclic = omap_dma_prep_dma_cyclic;
+-	od->ddev.device_control = omap_dma_control;
++	od->ddev.device_config = omap_dma_config;
++	od->ddev.device_pause = omap_dma_pause;
++	od->ddev.device_resume = omap_dma_resume;
++	od->ddev.device_terminate_all = omap_dma_terminate_all;
+ 	od->ddev.device_slave_caps = omap_dma_device_slave_caps;
+ 	od->ddev.dev = &pdev->dev;
+ 	INIT_LIST_HEAD(&od->ddev.channels);
 -- 
 2.1.1
