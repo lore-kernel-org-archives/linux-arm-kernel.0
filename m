@@ -1,161 +1,173 @@
 From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Mon, 17 Nov 2014 19:03:16 +0800
-Subject: [Patch V3 3/9] irqdomain: Implement a method to automatically call
- parent domain's alloc/free
+Date: Mon, 17 Nov 2014 19:03:19 +0800
+Subject: [Patch V3 6/9] genirq: Introduce msi_domain_{alloc|free}_irqs()
 In-Reply-To: <1416222202-28002-1-git-send-email-jiang.liu@linux.intel.com>
 References: <1416222202-28002-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1416222202-28002-4-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1416222202-28002-7-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a flags to irq_domain.flags to control whether the irqdomain core
-should automatically call parent irqdomain's alloc/free callbacks. It
-help to reduce hierarchy irqdomains users' code size.
+Introduce msi_domain_{alloc|free}_irqs() to alloc/free interrupts
+from generic MSI irqdomain.
 
 Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
 ---
- include/linux/irqdomain.h |   24 ++++++-----------
- kernel/irq/irqdomain.c    |   66 +++++++++++++++++++++++++++++++++++++++++++--
- 2 files changed, 72 insertions(+), 18 deletions(-)
+ include/linux/msi.h |   39 +++++++++++++++++++++++++++++++
+ kernel/irq/msi.c    |   63 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 102 insertions(+)
 
-diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index fbe542967c20..ad92b0b15945 100644
---- a/include/linux/irqdomain.h
-+++ b/include/linux/irqdomain.h
-@@ -130,6 +130,8 @@ struct irq_domain {
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index 714716a3ffdd..243c4eb485a6 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -3,6 +3,7 @@
+ 
+ #include <linux/kobject.h>
+ #include <linux/list.h>
++#include <asm/hw_irq.h>		/* for msi_alloc_info_t */
+ 
+ struct msi_msg {
+ 	u32	address_lo;	/* low 32 bits of msi message address */
+@@ -100,7 +101,29 @@ struct irq_chip;
+ struct device_node;
+ struct msi_domain_info;
+ 
++#ifndef NUM_MSI_ALLOC_SCRATCHPAD_REGS
++#define NUM_MSI_ALLOC_SCRATCHPAD_REGS	2
++#endif
++
++/*
++ * Default structure for MSI interrupt allocation.
++ * Arch may overwrite it by defining msi_alloc_info_t.
++ */
++struct msi_alloc_info {
++	struct msi_desc			*desc;
++	irq_hw_number_t			hwirq;
++	union {
++		unsigned long		ul;
++		void			*ptr;
++	} scratchpad[NUM_MSI_ALLOC_SCRATCHPAD_REGS];
++};
++
++#ifndef msi_alloc_info_t
++typedef struct msi_alloc_info msi_alloc_info_t;
++#endif
++
+ struct msi_domain_ops {
++	/* Callbacks for msi_create_irq_domain() */
+ 	void		(*calc_hwirq)(struct msi_domain_info *info, void *arg,
+ 				      struct msi_desc *desc);
+ 	irq_hw_number_t	(*get_hwirq)(struct msi_domain_info *info, void *arg);
+@@ -111,6 +134,19 @@ struct msi_domain_ops {
+ 	void		(*msi_free)(struct irq_domain *domain,
+ 				    struct msi_domain_info *info,
+ 				    unsigned int virq);
++
++	/* Callbacks for msi_irq_domain_alloc_irqs() based on msi_descs */
++	int		(*msi_check)(struct irq_domain *domain,
++				     struct msi_domain_info *info,
++				     struct device *dev);
++	int		(*msi_prepare)(struct irq_domain *domain,
++				       struct device *dev, int nvec,
++				       msi_alloc_info_t *arg);
++	void		(*msi_finish)(msi_alloc_info_t *arg, int retval);
++	int		(*set_desc)(msi_alloc_info_t *arg,
++				    struct msi_desc *desc);
++	int		(*handle_error)(msi_alloc_info_t *arg,
++					struct msi_desc *desc, int error);
  };
  
- #define	IRQ_DOMAIN_FLAG_HIERARCHY	0x1
-+/* Framework automatically calls parent domain's alloc()/free() */
-+#define	IRQ_DOMAIN_FLAG_AUTO_RECURSIVE	0x2
- #define	IRQ_DOMAIN_FLAG_ARCH1		0x10000
+ struct msi_domain_info {
+@@ -125,6 +161,9 @@ int msi_domain_set_affinity(struct irq_data *data, const struct cpumask *mask,
+ struct irq_domain *msi_create_irq_domain(struct device_node *of_node,
+ 					 struct msi_domain_info *info,
+ 					 struct irq_domain *parent);
++int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
++			  int nvec);
++void msi_domain_free_irqs(struct irq_domain *domain, struct device *dev);
+ struct msi_domain_info *msi_get_domain_info(struct irq_domain *domain);
  
- #ifdef CONFIG_IRQ_DOMAIN
-@@ -274,22 +276,12 @@ extern void irq_domain_free_irqs_common(struct irq_domain *domain,
- 					unsigned int nr_irqs);
- extern void irq_domain_free_irqs_top(struct irq_domain *domain,
- 				     unsigned int virq, unsigned int nr_irqs);
--
--static inline int irq_domain_alloc_irqs_parent(struct irq_domain *domain,
--			unsigned int irq_base, unsigned int nr_irqs, void *arg)
--{
--	if (domain->parent && domain->parent->ops->alloc)
--		return domain->parent->ops->alloc(domain->parent, irq_base,
--						  nr_irqs, arg);
--	return -ENOSYS;
--}
--
--static inline void irq_domain_free_irqs_parent(struct irq_domain *domain,
--				unsigned int irq_base, unsigned int nr_irqs)
--{
--	if (domain->parent && domain->parent->ops->free)
--		domain->parent->ops->free(domain->parent, irq_base, nr_irqs);
--}
-+extern int irq_domain_alloc_irqs_parent(struct irq_domain *domain,
-+					unsigned int irq_base,
-+					unsigned int nr_irqs, void *arg);
-+extern void irq_domain_free_irqs_parent(struct irq_domain *domain,
-+					unsigned int irq_base,
-+					unsigned int nr_irqs);
+ #endif /* CONFIG_GENERIC_MSI_IRQ_DOMAIN */
+diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+index 94d6d87ee23e..586cd8b3a174 100644
+--- a/kernel/irq/msi.c
++++ b/kernel/irq/msi.c
+@@ -13,6 +13,9 @@
+ #include <linux/irqdomain.h>
+ #include <linux/msi.h>
  
- static inline bool irq_domain_is_hierarchy(struct irq_domain *domain)
++/* Temparory solution for building, will be removed later */
++#include <linux/pci.h>
++
+ void __get_cached_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
  {
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 705fb573e509..03fc7d018324 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -925,6 +925,43 @@ void irq_domain_free_irqs_top(struct irq_domain *domain, unsigned int virq,
- 	irq_domain_free_irqs_common(domain, virq, nr_irqs);
+ 	*msg = entry->msg;
+@@ -124,6 +127,66 @@ struct irq_domain *msi_create_irq_domain(struct device_node *of_node,
+ 	return domain;
  }
  
-+static bool irq_domain_is_auto_recursive(struct irq_domain *domain)
++int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
++			  int nvec)
 +{
-+	return domain->flags & IRQ_DOMAIN_FLAG_AUTO_RECURSIVE;
++	int i, ret, virq = -1;
++	msi_alloc_info_t arg;
++	struct msi_desc *desc;
++	struct msi_domain_info *info = domain->host_data;
++	struct msi_domain_ops *ops = info->ops;
++
++	ret = ops->msi_check(domain, info, dev);
++	if (ret == 0)
++		ret = ops->msi_prepare(domain, dev, nvec, &arg);
++	if (ret)
++		return ret;
++
++	for_each_msi_entry(desc, dev) {
++		ret = ops->set_desc(&arg, desc);
++		if (ret)
++			goto handle_error;
++
++		virq = __irq_domain_alloc_irqs(domain, -1, desc->nvec_used,
++					       dev_to_node(dev), &arg, false);
++		if (virq >= 0) {
++			for (i = 0; i < desc->nvec_used; i++)
++				irq_set_msi_desc_off(virq, i, desc);
++			continue;
++		}
++		ret = -ENOSPC;
++handle_error:
++		if (ops->handle_error)
++			ret = ops->handle_error(&arg, desc, ret);
++		if (ops->msi_finish)
++			ops->msi_finish(&arg, ret);
++		return ret;
++	}
++
++	if (ops->msi_finish)
++		ops->msi_finish(&arg, 0);
++
++	for_each_msi_entry(desc, dev) {
++		if (desc->nvec_used == 1)
++			dev_dbg(dev, "irq %d for MSI\n", virq);
++		else
++			dev_dbg(dev, "irq [%d-%d] for MSI\n",
++				virq, virq + desc->nvec_used - 1);
++	}
++
++	return 0;
 +}
 +
-+static void irq_domain_free_irqs_recursive(struct irq_domain *domain,
-+					   unsigned int irq_base,
-+					   unsigned int nr_irqs)
++void msi_domain_free_irqs(struct irq_domain *domain, struct device *dev)
 +{
-+	domain->ops->free(domain, irq_base, nr_irqs);
-+	if (irq_domain_is_auto_recursive(domain)) {
-+		BUG_ON(!domain->parent);
-+		irq_domain_free_irqs_recursive(domain->parent, irq_base,
-+					       nr_irqs);
++	struct msi_desc *desc;
++
++	for_each_msi_entry(desc, dev) {
++		irq_domain_free_irqs(desc->irq, desc->nvec_used);
++		desc->irq = 0;
 +	}
 +}
 +
-+static int irq_domain_alloc_irqs_recursive(struct irq_domain *domain,
-+					   unsigned int irq_base,
-+					   unsigned int nr_irqs, void *arg)
-+{
-+	int ret = 0;
-+	struct irq_domain *parent = domain->parent;
-+	bool recursive = irq_domain_is_auto_recursive(domain);
-+
-+	BUG_ON(recursive && !parent);
-+	if (recursive)
-+		ret = irq_domain_alloc_irqs_recursive(parent, irq_base,
-+						      nr_irqs, arg);
-+	if (ret >= 0)
-+		ret = domain->ops->alloc(domain, irq_base, nr_irqs, arg);
-+	if (ret < 0 && recursive)
-+		irq_domain_free_irqs_recursive(parent, irq_base, nr_irqs);
-+
-+	return ret;
-+}
-+
- /**
-  * __irq_domain_alloc_irqs - Allocate IRQs from domain
-  * @domain: domain to allocate from
-@@ -981,7 +1018,7 @@ int __irq_domain_alloc_irqs(struct irq_domain *domain, int irq_base,
- 	}
- 
- 	mutex_lock(&irq_domain_mutex);
--	ret = domain->ops->alloc(domain, virq, nr_irqs, arg);
-+	ret = irq_domain_alloc_irqs_recursive(domain, virq, nr_irqs, arg);
- 	if (ret < 0) {
- 		mutex_unlock(&irq_domain_mutex);
- 		goto out_free_irq_data;
-@@ -1016,13 +1053,38 @@ void irq_domain_free_irqs(unsigned int virq, unsigned int nr_irqs)
- 	mutex_lock(&irq_domain_mutex);
- 	for (i = 0; i < nr_irqs; i++)
- 		irq_domain_remove_irq(virq + i);
--	data->domain->ops->free(data->domain, virq, nr_irqs);
-+	irq_domain_free_irqs_recursive(data->domain, virq, nr_irqs);
- 	mutex_unlock(&irq_domain_mutex);
- 
- 	irq_domain_free_irq_data(virq, nr_irqs);
- 	irq_free_descs(virq, nr_irqs);
- }
- 
-+int irq_domain_alloc_irqs_parent(struct irq_domain *domain,
-+				 unsigned int irq_base, unsigned int nr_irqs,
-+				 void *arg)
-+{
-+	/* irq_domain_alloc_irqs_recursive() has called parent's alloc() */
-+	if (irq_domain_is_auto_recursive(domain))
-+		return 0;
-+
-+	domain = domain->parent;
-+	if (domain)
-+		return irq_domain_alloc_irqs_recursive(domain, irq_base,
-+						       nr_irqs, arg);
-+
-+	return -ENOSYS;
-+}
-+
-+void irq_domain_free_irqs_parent(struct irq_domain *domain,
-+				 unsigned int irq_base, unsigned int nr_irqs)
-+{
-+	/* irq_domain_free_irqs_recursive() will call parent's free */
-+	if (!irq_domain_is_auto_recursive(domain))
-+		irq_domain_free_irqs_recursive(domain->parent, irq_base,
-+					       nr_irqs);
-+}
-+
- /**
-  * irq_domain_activate_irq - Call domain_ops->activate recursively to activate
-  *			     interrupt
+ struct msi_domain_info *msi_get_domain_info(struct irq_domain *domain)
+ {
+ 	return (struct msi_domain_info *)domain->host_data;
 -- 
 1.7.10.4
