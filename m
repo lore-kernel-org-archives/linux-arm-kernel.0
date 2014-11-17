@@ -1,79 +1,112 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 17 Nov 2014 18:21:44 +0800
-Subject: [RFC PATCH 10/16] PCI: Add of_scan_bus() to pci_host_info
+Date: Mon, 17 Nov 2014 18:21:40 +0800
+Subject: [RFC PATCH 06/16] PCI: Use u32 type to combine PCI domain and bus
+ number
 In-Reply-To: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
 References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1416219710-26088-11-git-send-email-wangyijing@huawei.com>
+Message-ID: <1416219710-26088-7-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add of_scan_bus() to support some platforms
-scan bus by of_node.
+Currently, we use int type for bus number in
+pci_create_root_bus() and pci_scan_root_bus().
+Because bus number is <= 255, so we could
+change the bus number argument type to u32,
+and combine PCI domain and bus number, we will
+save the domain number in pci_host_bridge in
+later patch, and eliminate the arch specific
+pci_domain_nr().
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- drivers/pci/host-bridge.c |    1 +
- drivers/pci/probe.c       |   10 +++++++---
- include/linux/pci.h       |    3 +++
- 3 files changed, 11 insertions(+), 3 deletions(-)
+ drivers/pci/probe.c      |   11 ++++++-----
+ include/linux/pci.h      |    4 ++--
+ include/uapi/linux/pci.h |    3 +++
+ 3 files changed, 11 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-index 872cae1..1a1f81b 100644
---- a/drivers/pci/host-bridge.c
-+++ b/drivers/pci/host-bridge.c
-@@ -52,6 +52,7 @@ struct pci_host_bridge *pci_create_host_bridge(
- 		return NULL;
- 
- 	host->sysdata = info->arg;
-+	host->node = info->node;
- 	host->busnum = PCI_BUSNUM(db);
- 	host->domain = PCI_DOMAIN(db);
- 	host->ops = ops;
 diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 42158fd..2729c41 100644
+index 623bfff..adf4d09 100644
 --- a/drivers/pci/probe.c
 +++ b/drivers/pci/probe.c
-@@ -2126,9 +2126,13 @@ struct pci_host_bridge *pci_scan_host_bridge(
- 		pci_bus_insert_busn_res(host->bus, host->busnum, 255);
+@@ -1895,7 +1895,7 @@ void __weak pcibios_remove_bus(struct pci_bus *bus)
+ {
+ }
+ 
+-struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
++struct pci_bus *pci_create_root_bus(struct device *parent, u32 db,
+ 		struct pci_ops *ops, void *sysdata, struct list_head *resources)
+ {
+ 	int error;
+@@ -1906,6 +1906,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ 	resource_size_t offset;
+ 	char bus_addr[64];
+ 	char *fmt;
++	u8	bus = PCI_BUSNUM(db);
+ 
+ 	b = pci_alloc_bus(NULL);
+ 	if (!b)
+@@ -2063,7 +2064,7 @@ void pci_bus_release_busn_res(struct pci_bus *b)
+ 			res, ret ? "can not be" : "is");
+ }
+ 
+-struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
++struct pci_bus *pci_scan_root_bus(struct device *parent, u32 db,
+ 		struct pci_ops *ops, void *sysdata, struct list_head *resources)
+ {
+ 	struct pci_host_bridge_window *window;
+@@ -2084,7 +2085,7 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
+ 			}
  	}
  
--	max = pci_scan_child_bus(host->bus);
--	if (!found)
--		pci_bus_update_busn_res_end(host->bus, max);
-+	if (info->of_scan_bus) {
-+		info->of_scan_bus(host);
-+	} else {
-+		max = pci_scan_child_bus(host->bus);
-+		if (!found)
-+			pci_bus_update_busn_res_end(host->bus, max);
-+	}
+-	b = pci_create_root_bus(parent, bus, ops, sysdata, 
++	b = pci_create_root_bus(parent, db, ops, sysdata, 
+ 			resources ? resources : &default_res);
+ 	if (!b)
+ 		return NULL;
+@@ -2092,8 +2093,8 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
+ 	if (!found) {
+ 		dev_info(&b->dev,
+ 		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
+-			bus);
+-		pci_bus_insert_busn_res(b, bus, 255);
++			PCI_BUSNUM(db));
++		pci_bus_insert_busn_res(b, PCI_BUSNUM(db), 255);
+ 	}
  
- 	return host;
- 
+ 	max = pci_scan_child_bus(b);
 diff --git a/include/linux/pci.h b/include/linux/pci.h
-index af1ee86..c4f4438 100644
+index 4daef65..8b11b38 100644
 --- a/include/linux/pci.h
 +++ b/include/linux/pci.h
-@@ -407,6 +407,7 @@ struct pci_host_bridge {
- 	int busnum;
- 	int domain;
- 	void *sysdata;
-+	struct device_node *node;
- 	struct pci_ops *ops;
- 	struct msi_controller *(*get_msi_ctrl)(struct pci_dev *pdev);
- 	void (*release_fn)(struct pci_host_bridge *);
-@@ -416,10 +417,12 @@ struct pci_host_bridge {
- struct pci_host_info {
- 	u8 res_type;
- 	void *arg;
-+	struct device_node *node;
- 	struct list_head *resources; /*just for build, will clean up later */
- 	struct msi_controller *(*get_msi_ctrl)(struct pci_dev *pdev);
- 	int (*init_res)(struct pci_host_bridge *host, 
- 			struct pci_host_info *info);
-+	void (*of_scan_bus)(struct pci_host_bridge *host);
- };
+@@ -767,13 +767,13 @@ void pcibios_bus_to_resource(struct pci_bus *bus, struct resource *res,
+ void pcibios_scan_specific_bus(int busn);
+ struct pci_bus *pci_find_bus(int domain, int busnr);
+ void pci_bus_add_devices(const struct pci_bus *bus);
+-struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
++struct pci_bus *pci_create_root_bus(struct device *parent, u32 bus,
+ 				    struct pci_ops *ops, void *sysdata,
+ 				    struct list_head *resources);
+ int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int busmax);
+ int pci_bus_update_busn_res_end(struct pci_bus *b, int busmax);
+ void pci_bus_release_busn_res(struct pci_bus *b);
+-struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
++struct pci_bus *pci_scan_root_bus(struct device *parent, u32 bus,
+ 					     struct pci_ops *ops, void *sysdata,
+ 					     struct list_head *resources);
+ struct pci_bus *pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev,
+diff --git a/include/uapi/linux/pci.h b/include/uapi/linux/pci.h
+index 3c292bc..89c6f15 100644
+--- a/include/uapi/linux/pci.h
++++ b/include/uapi/linux/pci.h
+@@ -30,6 +30,9 @@
+ #define PCI_DEVFN(slot, func)	((((slot) & 0x1f) << 3) | ((func) & 0x07))
+ #define PCI_SLOT(devfn)		(((devfn) >> 3) & 0x1f)
+ #define PCI_FUNC(devfn)		((devfn) & 0x07)
++#define PCI_DOMAIN(db)		((db) >> 16)
++#define PCI_BUSNUM(db)		((db) & 0xffff)
++#define PCI_DOMBUS(domain, bus)		(((domain) << 16) | (bus))
  
- static inline void init_pci_host_info(struct pci_host_info *info)
+ /* Ioctls for /proc/bus/pci/X/Y nodes. */
+ #define PCIIOC_BASE		('P' << 24 | 'C' << 16 | 'I' << 8)
 -- 
 1.7.1
