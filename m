@@ -1,39 +1,109 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Mon, 17 Nov 2014 19:37:37 +0800
-Subject: [Patch V3 6/9] genirq: Introduce msi_domain_{alloc|free}_irqs()
-In-Reply-To: <alpine.DEB.2.11.1411171230090.3909@nanos>
-References: <1416222202-28002-1-git-send-email-jiang.liu@linux.intel.com>
- <1416222202-28002-7-git-send-email-jiang.liu@linux.intel.com>
- <alpine.DEB.2.11.1411171230090.3909@nanos>
-Message-ID: <5469DE01.6030308@linux.intel.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Mon, 17 Nov 2014 17:09:45 +0530
+Subject: [PATCH 0/4] Touchscreen performance related fixes
+In-Reply-To: <5464A2B5.3020207@ti.com>
+References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>	<20141103180920.GA20779@localhost.localdomain>	<545B2651.4090905@ti.com>
+ <CAJKbBDDyShaJkzzfdFs07EK5gDUfwqWiv39Qi4FVSvRrfc6_fA@mail.gmail.com>
+ <5464A2B5.3020207@ti.com>
+Message-ID: <5469DE81.9030009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/17 19:30, Thomas Gleixner wrote:
-> On Mon, 17 Nov 2014, Jiang Liu wrote:
->> +
->> +/*
->> + * Default structure for MSI interrupt allocation.
->> + * Arch may overwrite it by defining msi_alloc_info_t.
->> + */
->> +struct msi_alloc_info {
->> +	struct msi_desc			*desc;
->> +	irq_hw_number_t			hwirq;
->> +	union {
->> +		unsigned long		ul;
->> +		void			*ptr;
->> +	} scratchpad[NUM_MSI_ALLOC_SCRATCHPAD_REGS];
->> +};
->> +
->> +#ifndef msi_alloc_info_t
->> +typedef struct msi_alloc_info msi_alloc_info_t;
->> +#endif
+Hi,
+
+On Thursday 13 November 2014 05:53 PM, Vignesh R wrote:
+> Hi,
 > 
-> Hmm. Do we really need that?
-Hi Thomas,
-	Do you mean msi_alloc_info_t? It acts as a flag
-to use common struct msi_alloc_info or architecture specific
-data structures. For most architecture, they will use the default
-struct msi_alloc_info. But for x86, it will use struct irq_alloc_info.
-Regards!
-Gerry
+> On Wednesday 12 November 2014 06:30 PM, Johannes Pointner wrote:
+>> Hello Vignesh,
+>>
+>> I tried your patch version 3 on a customized board and had some
+>> behavior I couldn't explain.
+>> If I only use the touchscreen it works fine but if I also read values
+>> from the ADCs then I get a lot of pen_up events even if I am still
+>> touching the screen.
+>> For the test I read via
+>> # cat /sys/bus/iio/devices/iio\:device0/in_voltage5_raw
+>> values from the ADC in an busy loop as you explained in an email
+>> before. Did you also experience such behavior or do you know what
+>> causes it?
+> 
+> Thanks for testing. I was able to fix this issue. Will post version 4
+> shortly.
+> 
+
+Were you able to test the v4 patch series on your board? Is the issue fixed?
+
+> Regards
+> Vignesh
+> 
+>>
+>> Without the patches the touchscreen works fine during the iio test.
+>>
+>> Thanks,
+>> Hannes
+>>
+>> 2014-11-06 8:42 GMT+01:00 Vignesh R <vigneshr@ti.com>:
+>>>
+>>>
+>>> On Monday 03 November 2014 11:39 PM, Richard Cochran wrote:
+>>>> On Mon, Oct 27, 2014 at 04:38:27PM +0530, Vignesh R wrote:
+>>>>> This series of patches fix TSC defects related to lag in touchscreen
+>>>>> performance and cursor jump at touch release. The lag was result of
+>>>>> udelay in TSC interrupt handler. Cursor jump due to false pen-up event.
+>>>>> The patches implement Advisory 1.0.31 in silicon errata of am335x-evm
+>>>>> to avoid false pen-up events and remove udelay.
+>>>>
+>>>> That advisory has two workarounds. You have chosen the second one?
+>>>
+>>> Work around one. Hence 5 wire design is not broken.
+>>>
+>>>>
+>>>> The text of the second workaround says it only works on 4 wire setups,
+>>>> so I wonder how 5 wire designs will be affected.
+>>>>
+>>>>> The advisory says to use
+>>>>> steps 1 to 4 for ADC and 5 to 16 for TSC (assuming 4 wire TSC and 4 channel
+>>>>> ADC).
+>>>>
+>>>> No, it doesn't say that. (sprz360f.pdf)
+>>>
+>>> The pen up event detection happens immediately after charge step. Hence,
+>>> interchanging ADC and TSC steps makes sure that sampling of touch
+>>> co-ordinates and pen events are done one after the other. This
+>>> workaround was suggested by internal hardware folks. Earlier ADC steps
+>>> intervened between sampling of co-ordinates and pen event detection
+>>> which is not desirable.
+>>>
+>>>>
+>>>>> Further the X co-ordinate must be the last one to be sampled just
+>>>>> before charge step. The first two patches implement the required changes.
+>>>>
+>>>> FWIW, I implemented the first workaround and removed the udelay not
+>>>> too long ago. Like Sebastian, I saw the TSC unit hang after about
+>>>> 50000 interrupts when running with the workaround.
+>>>>
+>>>> Did you test you patch for very long?
+>>>
+>>> Yes, I tested for about 200000 interrupts and I didn't see any hang.
+>>> This patch series does not just implement workaround but also does some
+>>> minor changes, such as interchanging ADC and TSC steps etc, which makes
+>>> TSC driver more robust. Let me know if you encounter any issues with my
+>>> patch series.
+>>>
+>>> Regards
+>>> Vignesh
+>>>
+>>>>
+>>>> Thanks,
+>>>> Richard
+>>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
