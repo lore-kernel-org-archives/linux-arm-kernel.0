@@ -1,39 +1,38 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Mon, 17 Nov 2014 09:27:09 +0100
-Subject: [PATCH 0/2] initial suport for Alphascale ASM9260
-In-Reply-To: <1414401792-7445-1-git-send-email-linux@rempel-privat.de>
-References: <1414401792-7445-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <5469B15D.8020502@rempel-privat.de>
+From: c.hemp@phytec.de (Christian Hemp)
+Date: Mon, 17 Nov 2014 09:27:37 +0100
+Subject: [PATCH 2/5] ARM:dts:imx6:phyFLEX: Enable gpmi in module file
+In-Reply-To: <1445555.ZBLGLeHvnl@wuerfel>
+References: <1415971946-48975-1-git-send-email-c.hemp@phytec.de>
+ <1415971946-48975-3-git-send-email-c.hemp@phytec.de>
+ <1445555.ZBLGLeHvnl@wuerfel>
+Message-ID: <3652599.ahZEGyuIxZ@lws-hemp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping
+Hello Arnd,
 
-Am 27.10.2014 um 10:23 schrieb Oleksij Rempel:
-> This is reduced patchset to provide initial support for Alpascale ASM9260.
+Am Freitag, 14. November 2014, 15:55:11 schrieb Arnd Bergmann:
+> On Friday 14 November 2014 14:32:23 Christian Hemp wrote:
+> > --- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+> > +++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+> > @@ -91,7 +91,7 @@
+> > 
+> >         pinctrl-names = "default";
+> >         pinctrl-0 = <&pinctrl_gpmi_nand>;
+> >         nand-on-flash-bbt;
+> > 
+> > -       status = "disabled";
+> > +       status = "okay";
+> > 
+> >  };
 > 
-> 
-> Oleksij Rempel (2):
->   ARM: add mach-asm9260
->   ARM: add lolevel debug support for asm9260
-> 
->  arch/arm/Kconfig                 |  2 ++
->  arch/arm/Kconfig.debug           | 33 ++++++++++++++++++++++++++++++---
->  arch/arm/include/debug/asm9260.S | 31 +++++++++++++++++++++++++++++++
->  arch/arm/mach-asm9260/Kconfig    |  6 ++++++
->  4 files changed, 69 insertions(+), 3 deletions(-)
->  create mode 100644 arch/arm/include/debug/asm9260.S
->  create mode 100644 arch/arm/mach-asm9260/Kconfig
-> 
+> No need for the property unless you are overriding a 'status="disabled"'
+> from another file. Just remove this property here.
 
--- 
-Regards,
-Oleksij
+the status is disabled in 'arch/arm/boot/dts/imx6qdl.dtsi'. 
+That why I enabled it in the 'arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi'.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 213 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/7b4353f3/attachment.sig>
+	Christian
+
+> 
+> 	Arnd
