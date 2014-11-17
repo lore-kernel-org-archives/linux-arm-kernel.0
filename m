@@ -1,153 +1,78 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:15 +0100
-Subject: [PATCH v5 21/61] dmaengine: fsl-edma: Split device_control
+Date: Mon, 17 Nov 2014 14:42:18 +0100
+Subject: [PATCH v5 24/61] dmaengine: intel-mid-dma: Split device_control
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-22-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-25-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Freescale EDMA driver to make use
+Split the device_control callback of the Intel MID DMA driver to make use
 of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/fsl-edma.c | 106 +++++++++++++++++++++++++++----------------------
- 1 file changed, 58 insertions(+), 48 deletions(-)
+ drivers/dma/intel_mid_dma.c | 25 ++++++-------------------
+ 1 file changed, 6 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
-index 13df85a16438..b5b7474f8859 100644
---- a/drivers/dma/fsl-edma.c
-+++ b/drivers/dma/fsl-edma.c
-@@ -292,62 +292,69 @@ static void fsl_edma_free_desc(struct virt_dma_desc *vdesc)
- 	kfree(fsl_desc);
+diff --git a/drivers/dma/intel_mid_dma.c b/drivers/dma/intel_mid_dma.c
+index 1aab8130efa1..5aaead9b56f7 100644
+--- a/drivers/dma/intel_mid_dma.c
++++ b/drivers/dma/intel_mid_dma.c
+@@ -492,10 +492,10 @@ static enum dma_status intel_mid_dma_tx_status(struct dma_chan *chan,
+ 	return ret;
  }
  
--static int fsl_edma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--		unsigned long arg)
-+static int fsl_edma_terminate_all(struct dma_chan *chan)
+-static int dma_slave_control(struct dma_chan *chan, unsigned long arg)
++static int intel_mid_dma_config(struct dma_chan *chan,
++				struct dma_slave_config *slave)
  {
- 	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
--	struct dma_slave_config *cfg = (void *)arg;
- 	unsigned long flags;
- 	LIST_HEAD(head);
+ 	struct intel_mid_dma_chan	*midc = to_intel_mid_dma_chan(chan);
+-	struct dma_slave_config  *slave = (struct dma_slave_config *)arg;
+ 	struct intel_mid_dma_slave *mid_slave;
  
--	switch (cmd) {
--	case DMA_TERMINATE_ALL:
--		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
-+	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
-+	fsl_edma_disable_request(fsl_chan);
-+	fsl_chan->edesc = NULL;
-+	vchan_get_all_descriptors(&fsl_chan->vchan, &head);
-+	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
-+	vchan_dma_desc_free_list(&fsl_chan->vchan, &head);
-+	return 0;
-+}
-+
-+static int fsl_edma_pause(struct dma_chan *chan)
-+{
-+	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
-+	if (fsl_chan->edesc) {
- 		fsl_edma_disable_request(fsl_chan);
--		fsl_chan->edesc = NULL;
--		vchan_get_all_descriptors(&fsl_chan->vchan, &head);
--		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
--		vchan_dma_desc_free_list(&fsl_chan->vchan, &head);
--		return 0;
--
--	case DMA_SLAVE_CONFIG:
--		fsl_chan->fsc.dir = cfg->direction;
--		if (cfg->direction == DMA_DEV_TO_MEM) {
--			fsl_chan->fsc.dev_addr = cfg->src_addr;
--			fsl_chan->fsc.addr_width = cfg->src_addr_width;
--			fsl_chan->fsc.burst = cfg->src_maxburst;
--			fsl_chan->fsc.attr = fsl_edma_get_tcd_attr(cfg->src_addr_width);
--		} else if (cfg->direction == DMA_MEM_TO_DEV) {
--			fsl_chan->fsc.dev_addr = cfg->dst_addr;
--			fsl_chan->fsc.addr_width = cfg->dst_addr_width;
--			fsl_chan->fsc.burst = cfg->dst_maxburst;
--			fsl_chan->fsc.attr = fsl_edma_get_tcd_attr(cfg->dst_addr_width);
--		} else {
--			return -EINVAL;
--		}
--		return 0;
-+		fsl_chan->status = DMA_PAUSED;
-+	}
-+	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
-+	return 0;
-+}
- 
--	case DMA_PAUSE:
--		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
--		if (fsl_chan->edesc) {
--			fsl_edma_disable_request(fsl_chan);
--			fsl_chan->status = DMA_PAUSED;
--		}
--		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
--		return 0;
--
--	case DMA_RESUME:
--		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
--		if (fsl_chan->edesc) {
--			fsl_edma_enable_request(fsl_chan);
--			fsl_chan->status = DMA_IN_PROGRESS;
--		}
--		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
--		return 0;
-+static int fsl_edma_resume(struct dma_chan *chan)
-+{
-+	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
-+	unsigned long flags;
- 
--	default:
--		return -ENXIO;
-+	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
-+	if (fsl_chan->edesc) {
-+		fsl_edma_enable_request(fsl_chan);
-+		fsl_chan->status = DMA_IN_PROGRESS;
- 	}
-+	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
-+	return 0;
-+}
-+
-+static int fsl_edma_slave_config(struct dma_chan *chan,
-+				 struct dma_slave_config *cfg)
-+{
-+	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
-+
-+	fsl_chan->fsc.dir = cfg->direction;
-+	if (cfg->direction == DMA_DEV_TO_MEM) {
-+		fsl_chan->fsc.dev_addr = cfg->src_addr;
-+		fsl_chan->fsc.addr_width = cfg->src_addr_width;
-+		fsl_chan->fsc.burst = cfg->src_maxburst;
-+		fsl_chan->fsc.attr = fsl_edma_get_tcd_attr(cfg->src_addr_width);
-+	} else if (cfg->direction == DMA_MEM_TO_DEV) {
-+		fsl_chan->fsc.dev_addr = cfg->dst_addr;
-+		fsl_chan->fsc.addr_width = cfg->dst_addr_width;
-+		fsl_chan->fsc.burst = cfg->dst_maxburst;
-+		fsl_chan->fsc.attr = fsl_edma_get_tcd_attr(cfg->dst_addr_width);
-+	} else {
-+			return -EINVAL;
-+	}
-+	return 0;
+ 	BUG_ON(!midc);
+@@ -509,28 +509,14 @@ static int dma_slave_control(struct dma_chan *chan, unsigned long arg)
+ 	midc->mid_slave = mid_slave;
+ 	return 0;
  }
+-/**
+- * intel_mid_dma_device_control -	DMA device control
+- * @chan: chan for DMA control
+- * @cmd: control cmd
+- * @arg: cmd arg value
+- *
+- * Perform DMA control command
+- */
+-static int intel_mid_dma_device_control(struct dma_chan *chan,
+-			enum dma_ctrl_cmd cmd, unsigned long arg)
++
++static int intel_mid_dma_terminate_all(struct dma_chan *chan)
+ {
+ 	struct intel_mid_dma_chan	*midc = to_intel_mid_dma_chan(chan);
+ 	struct middma_device	*mid = to_middma_device(chan->device);
+ 	struct intel_mid_dma_desc	*desc, *_desc;
+ 	union intel_mid_dma_cfg_lo cfg_lo;
  
- static size_t fsl_edma_desc_residue(struct fsl_edma_chan *fsl_chan,
-@@ -914,7 +921,10 @@ static int fsl_edma_probe(struct platform_device *pdev)
- 	fsl_edma->dma_dev.device_tx_status = fsl_edma_tx_status;
- 	fsl_edma->dma_dev.device_prep_slave_sg = fsl_edma_prep_slave_sg;
- 	fsl_edma->dma_dev.device_prep_dma_cyclic = fsl_edma_prep_dma_cyclic;
--	fsl_edma->dma_dev.device_control = fsl_edma_control;
-+	fsl_edma->dma_dev.device_config = fsl_edma_slave_config;
-+	fsl_edma->dma_dev.device_pause = fsl_edma_pause;
-+	fsl_edma->dma_dev.device_resume = fsl_edma_resume;
-+	fsl_edma->dma_dev.device_terminate_all = fsl_edma_terminate_all;
- 	fsl_edma->dma_dev.device_issue_pending = fsl_edma_issue_pending;
- 	fsl_edma->dma_dev.device_slave_caps = fsl_dma_device_slave_caps;
+-	if (cmd == DMA_SLAVE_CONFIG)
+-		return dma_slave_control(chan, arg);
+-
+-	if (cmd != DMA_TERMINATE_ALL)
+-		return -ENXIO;
+-
+ 	spin_lock_bh(&midc->lock);
+ 	if (midc->busy == false) {
+ 		spin_unlock_bh(&midc->lock);
+@@ -1148,7 +1134,8 @@ static int mid_setup_dma(struct pci_dev *pdev)
+ 	dma->common.device_prep_dma_memcpy = intel_mid_dma_prep_memcpy;
+ 	dma->common.device_issue_pending = intel_mid_dma_issue_pending;
+ 	dma->common.device_prep_slave_sg = intel_mid_dma_prep_slave_sg;
+-	dma->common.device_control = intel_mid_dma_device_control;
++	dma->common.device_config = intel_mid_dma_config;
++	dma->common.device_terminate_all = intel_mid_dma_terminate_all;
  
+ 	/*enable dma cntrl*/
+ 	iowrite32(REG_BIT0, dma->dma_base + DMA_CFG);
 -- 
 2.1.1
