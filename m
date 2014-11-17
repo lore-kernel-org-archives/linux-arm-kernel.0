@@ -1,34 +1,56 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Mon, 17 Nov 2014 22:55:38 +0800
-Subject: [RFC PATCH 2/2] arm: dts: rockchip: select npll as parent of DCLK_VOP0
-In-Reply-To: <1416236138-11010-1-git-send-email-kever.yang@rock-chips.com>
-References: <1416236138-11010-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <1416236138-11010-3-git-send-email-kever.yang@rock-chips.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 17 Nov 2014 06:55:46 -0800
+Subject: [RFC] adp1653: Add device tree bindings for LED controller
+In-Reply-To: <20141117101553.GA21151@amd>
+References: <20141116075928.GA9763@amd> <201411170943.20810@pali>
+ <20141117100519.GA4353@amd> <201411171109.47795@pali>
+ <20141117101553.GA21151@amd>
+Message-ID: <20141117145545.GC7046@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DCLK_VOP0 will change the parent clock's rate, we don't want
-to change the PLLs rate other than npll. So we select the npll
-as parent directly.
+* Pavel Machek <pavel@ucw.cz> [141117 02:17]:
+> On Mon 2014-11-17 11:09:45, Pali Roh?r wrote:
+> > On Monday 17 November 2014 11:05:19 Pavel Machek wrote:
+> > > Hi!
+> > > 
+> > > On Mon 2014-11-17 09:43:19, Pali Roh?r wrote:
+> > > > On Sunday 16 November 2014 08:59:28 Pavel Machek wrote:
+> > > > > For device tree people: Yes, I know I'll have to create
+> > > > > file in documentation, but does the binding below look
+> > > > > acceptable?
+> > > > > 
+> > > > > I'll clean up driver code a bit more, remove the printks.
+> > > > > Anything else obviously wrong?
+> > > > 
+> > > > I think that this patch is probably not good and specially
+> > > > not for n900. adp1653 should be registered throw omap3 isp
+> > > > camera subsystem which does not have DT support yet.
+> > > 
+> > > Can you explain?
+> > > 
+> > > adp1653 is independend device on i2c bus, and we have kernel
+> > > driver for it (unlike rest of n900 camera system). Just now
+> > > it is unusable due to lack of DT binding. It has two
+> > > functions, LED light and a camera flash; yes, the second one
+> > > should be integrated to the rest of camera system, but that
+> > > is not yet merged. That should not prevent us from merging DT
+> > > support for the flash, so that this part can be
+> > > tested/maintained.
+> > > 
+> > 
+> > Ok. When ISP camera subsystem has DT support somebody will modify 
+> > n900 DT to add camera flash from adp1653 to ISP... I believe it 
+> > will not be hard.
+> 
+> Exactly. And yes, I'd like to get complete camera support for n900
+> merged. But first step is "make sure existing support does not break".
 
-Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
----
+There's nothing stopping us from initializing the camera code from
+pdata-quirks.c for now to keep it working. Certainly the binding
+should be added to the driver, but that removes a dependency to
+the legacy booting mode if things are otherwise working.
 
- arch/arm/boot/dts/rk3288.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+Regards,
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index c3190f7..6ea6125 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -573,6 +573,8 @@
- 		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&cru ACLK_VOP0>, <&cru DCLK_VOP0>, <&cru HCLK_VOP0>;
- 		clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
-+		assigned-clocks = <&cru DCLK_VOP0>;
-+		assigned-clock-parents = <3>;
- 		resets = <&cru SRST_LCDC0_AXI>, <&cru SRST_LCDC0_AHB>, <&cru SRST_LCDC0_DCLK>;
- 		reset-names = "axi", "ahb", "dclk";
- 		iommus = <&vopb_mmu>;
--- 
-1.9.1
+Tony
