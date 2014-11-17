@@ -1,108 +1,57 @@
 From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
-Date: Mon, 17 Nov 2014 18:00:41 +0100
+Date: Mon, 17 Nov 2014 18:07:53 +0100
 Subject: [PATCH] gpio: mxs: implement get_direction callback
-In-Reply-To: <20141117082848.GZ27002@pengutronix.de>
+In-Reply-To: <546A29B9.5030104@elproma.com.pl>
 References: <1416004026-9667-1-git-send-email-j.uzycki@elproma.com.pl>
  <20141114232601.GW27002@pengutronix.de> <5467A980.5090204@elproma.com.pl>
  <20141116214239.GX27002@pengutronix.de> <54693A51.5080907@elproma.com.pl>
  <54695654.3070209@elproma.com.pl> <20141117082848.GZ27002@pengutronix.de>
-Message-ID: <546A29B9.5030104@elproma.com.pl>
+ <546A29B9.5030104@elproma.com.pl>
+Message-ID: <546A2B69.4010409@elproma.com.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-W dniu 2014-11-17 o 09:28, Uwe Kleine-K?nig pisze:
-> Hello Janusz,
+W dniu 2014-11-17 o 18:00, Janusz U?ycki pisze:
 >
-> On Mon, Nov 17, 2014 at 02:58:44AM +0100, Janusz U?ycki wrote:
->> W dniu 2014-11-17 o 00:59, Janusz U?ycki pisze:
->>> W dniu 2014-11-16 o 22:42, Uwe Kleine-K?nig pisze:
->>> Thanks Uwe. I fully agree with you.
->>> a) was just a starter to your suggestion. My options were too
->>> conservative - I just
->>> wanted to avoid tests on hardware I don't have.
-> That's something you have to live with and that's why there is a merge
-> window.
+> W dniu 2014-11-17 o 09:28, Uwe Kleine-K?nig pisze:
+>> I think:
+>>
+>>     struct mctrl_gpios {
+>>         struct uart_port *port;
+>>         struct {
+>>             gpio_desc *gpio;
+>>             unsigned int irq;
+>>         } mctrl_line[UART_GPIO_MAX];
+>>     };
+>>
+>>     struct mctrl_gpios *mctrl_gpio_init(struct uart_port *port, 
+>> unsigned int idx_if_needed);
+>>     int mctrl_gpio_enable_ms(struct mctrl_gpios *gpios);
+>>     int mctrl_gpio_disable_ms(struct mctrl_gpios *gpios);
+>>     void mctrl_gpio_free(struct mctrl_gpios *gpios);
 >
->>> I don't understand why gpiod_get_direction() always requires the callback
->>> and b) would be broken (I'm not so familiar with gpiolib) but I
->>> don't need it now.
->>>
->>> So, it looks we can drop the gpio-mxs patch, yes?
-> That patch is not wrong, just its motivation. IMHO the only valid
-> usecase for .get_direction is debugging.
+> It looks there could be one more helper useful.
+> Both atmel_serial.c and mxs-auart.c checks if the line is supported by 
+> mctrl_gpio.
+> One time it is eg.:
+> (s->gpio_irq[UART_GPIO_DCD] > 0)
+> another time it is eg.:
+> IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(s->gpios, UART_GPIO_RTS))
 >
->>> And, I or Richard should submit a patch for
->>> mctrl_gpio/atmel_serial/mxs-auart
->>> to introduce the irq helper, yes?
->>>
->>> You wrote passing uart_port is enough. Argument "name" for
->>> request_irq() can be
->>> recovered from dev_name(dev) or dev_driver_string(dev)  where dev
->>> = port_uart->dev.
->>> But irqhandler and mctrl_gpios must be passed to
-> You don't need irqhandler. struct mctrl_gpios is needed of course.
->
->>> mctrl_gpio_request_irqs() helper.
->>> The gpio_irq table could be hidden and moved into struct
->>> mctrl_gpios. Then
->>> a second helper function is required: mctrl_gpio_free_irqs().
-> yes.
->
->> After some coding...
->> gpio_irq cannot be hidden - it is used by disable/enable_ms() and
->> not only :/
-> mctrl_gpio_enable_ms(struct mctrl_gpios *gpios);
->
->>> gpio_irq table initialized in mctrl_gpio_request_irqs().
->> or it could be nicely done in mctrl_gpio_init() but the problem is
->> next argument
->> for the function :/
->> eg.:
->> struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int
->> idx, int *irqs)
-> What is idx about? I see it already in the mctrl_gpio API, but there is
-> no documentation about how it's used. Is it always 0?
->
-> There is no need to pass an output parameter for irqs. Just save them in
-> struct mctrl_gpios.
->
-> I'd go and change all struct device * parameters of the mctrl_gpio API
-> to struct uart_port for consistency or add struct uart_port to struct
-> mctrl_gpios.
->
->>> So finally the prototypes would be:
->>> int mctrl_gpio_request_irqs(struct mctrl_gpios*, struct
->>> uart_port*, irqhandler_t);
->>> void mctrl_gpio_free_irqs(struct mctrl_gpios*);
-> I think:
->
-> 	struct mctrl_gpios {
-> 		struct uart_port *port;
-> 		struct {
-> 			gpio_desc *gpio;
-> 			unsigned int irq;
-> 		} mctrl_line[UART_GPIO_MAX];
-> 	};
->
-> 	struct mctrl_gpios *mctrl_gpio_init(struct uart_port *port, unsigned int idx_if_needed);
-> 	int mctrl_gpio_enable_ms(struct mctrl_gpios *gpios);
-> 	int mctrl_gpio_disable_ms(struct mctrl_gpios *gpios);
-> 	void mctrl_gpio_free(struct mctrl_gpios *gpios);
+> The first one is no possible now. The second seems rude.
+> bool mctrl_gpio_is_gpio((struct mctrl_gpios *gpios, enum 
+> mctrl_gpio_idx gidx);
+> The name is hard. Moreover the implementation could be very similar
+> to mctrl_gpio_to_gpiod(). Any ideas?
 
-It looks there could be one more helper useful.
-Both atmel_serial.c and mxs-auart.c checks if the line is supported by 
-mctrl_gpio.
-One time it is eg.:
-(s->gpio_irq[UART_GPIO_DCD] > 0)
-another time it is eg.:
-IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(s->gpios, UART_GPIO_RTS))
+The differences:
+- faster
+- not exported
+- used mainly in uart's interrupt
+- assumes that struct mctrl_gpios *gpios exists
 
-The first one is no possible now. The second seems rude.
-bool mctrl_gpio_is_gpio((struct mctrl_gpios *gpios, enum mctrl_gpio_idx 
-gidx);
-The name is hard. Moreover the implementation could be very similar
-to mctrl_gpio_to_gpiod(). Any ideas?
+Just inline function?
 
 best regards
 Janusz
