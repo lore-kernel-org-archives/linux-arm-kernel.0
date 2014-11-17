@@ -1,57 +1,65 @@
-From: vichy.kuo@gmail.com (vichy)
-Date: Mon, 17 Nov 2014 10:37:18 +0800
-Subject: some question about TCR setting
-In-Reply-To: <20141116165211.GL4042@n2100.arm.linux.org.uk>
-References: <CAOVJa8HBYkTMCJFKC=+UwjgPp4odm5UV-oUQXu17ctv2+HkpRg@mail.gmail.com>
- <20141114104246.GA25828@leverpostej>
- <CAOVJa8Fx4yiSU0O7HTaYEKOrRdtWve4JGeN0cWRXDsBMyV_8Mg@mail.gmail.com>
- <20141114135531.GA27768@leverpostej>
- <CAOVJa8GB=pk4SFEArcEGWF8g12105F_9YUL0hH5k+WW6=WWOBg@mail.gmail.com>
- <20141116165211.GL4042@n2100.arm.linux.org.uk>
-Message-ID: <CAOVJa8EaX2khQ6C05WwERgGaMUwPctZFe8zU0RYdz6Q9nZqT1w@mail.gmail.com>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Mon, 17 Nov 2014 10:38:58 +0800
+Subject: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
+In-Reply-To: <20141114095812.GG4042@n2100.arm.linux.org.uk>
+References: <35FD53F367049845BC99AC72306C23D103E010D18265@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18266@CNBJMBX05.corpusers.net>
+ <20141030120127.GC32589@arm.com>
+ <CAKv+Gu9g5Q6fjPUy+P8YxkeDrH+bdO4kKGnxTQZRFhQpgPxaPA@mail.gmail.com>
+ <20141030135749.GE32589@arm.com>
+ <35FD53F367049845BC99AC72306C23D103E010D18272@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
+ <20141113235322.GC4042@n2100.arm.linux.org.uk>
+ <35FD53F367049845BC99AC72306C23D103E010D1829B@CNBJMBX05.corpusers.net>
+ <20141114095812.GG4042@n2100.arm.linux.org.uk>
+Message-ID: <35FD53F367049845BC99AC72306C23D103E688B313C6@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Russel:
->> if those page tables are not mapped into the virtual address space,
->> how OS create them?
->> (AFAIK, once System.M is enabled, the processor cannot access where
->> page table doesn't map to)
->> except those page tables are created before System.M enabled.
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Friday, November 14, 2014 5:58 PM
+> To: Wang, Yalin
+> Cc: 'Will Deacon'; 'Ard Biesheuvel'; 'linux-kernel at vger.kernel.org';
+> 'akinobu.mita at gmail.com'; 'linux-mm at kvack.org'; 'Joe Perches'; 'linux-arm-
+> kernel at lists.infradead.org'
+> Subject: Re: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
 >
-> The OS temporarily maps the page tables into virtual space to update
-> them.  Once updated, the OS unmaps the page tables.
->
-> However, forget this detail - the MMU page table walker knows nothing
-> about the virtual address space: MMU page table walks do not happen in
-> the virtual address space, they happen in the physical address space.
-> So, it makes no odds what so ever whether the table is mapped or not.
+> > Is it possible to build a kernel that support both CPU_V6 and CPU_V7?
+> 
+> Absolutely it is.
+> 
+> > I mean in Kconfig, CPU_V6 = y and CPU_V7 = y ?
+> 
+> Yes.
+> 
+> > If there is problem like you said,
+> > How about this solution:
+> > select HAVE_ARCH_BITREVERSE if ((CPU_V7M || CPU_V7) && !CPU_V6)
+> 
+> That would work.
+> 
+OK, I will submit a patch for this change.
 
-For some processors, if the type of L1 cache is VIPT, does that mean
-MMU page table will not be cached in this level of cache?
+> > For this patch,
+> > I just cherry-pick from Joe,
+> > If you are not responsible for this part, I will submit to the
+> > maintainers for these patches .
+> > Sorry for that .
+> 
+> I think you need to discuss with Joe how Joe would like his patches handled.
+> However, it seems that Joe already sent his patches to the appropriate
+> maintainers, and they have been applying those patches themselves.
+> 
+> Since your generic ARM changes depend on these patches being accepted first,
+> this means is that I can't apply the generic ARM changes until those other
+> patches have hit mainline, otherwise things are going to break.  So, when
+> you come to submit the latest set of patches to the patch system, please do
+> so only after these dependent patches have been merged into mainline so
+> that they don't get accidentally applied before hand and break the two
+> drivers that Joe mentioned.
 
->
->> BTW, why we need to set page table walk attribute as sharable and
->> inner/outer cacheable?
->
-> The access type is included on the bus along with the address and other
-> attributes.  This includes whether it's sharable, and the cache attributes.
-> A MMU page walker may be implemented such that it is capable of accessing
-> L2 cache.
->
-> In that case, we would want the MMU page walker to be able to read from
-> the L2 cache, which would need the access to be marked as "normal memory,
-> cacheable" so that the cache is searched for a matching line.  This in
-> turn means that software does not have to flush page table updates all
-> the way back to the physical memory - merely flushing them out of the L1
-> cache is sufficient.
-so Inner/outer attributes are use to determine whether it is cached in
-L1 or L2 cache, right?
-how about sharable?
-AFAIK, sharable means for a particular domain it requires hardware to
-ensure that
-the location is coherent for all agents in that domain.
-Since page table is unique to each processor, why we need to share it
-between other cores?
+Joe has submitted patches to maintainers,
+So we need wait for them to be accepted .
 
-Sincerely Appreciate your kind help,
+Thanks
