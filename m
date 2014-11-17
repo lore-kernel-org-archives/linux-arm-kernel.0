@@ -1,64 +1,53 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 17 Nov 2014 09:31:21 +0100
-Subject: [PATCH] gpio: mxs: implement get_direction callback
-In-Reply-To: <20141116214239.GX27002@pengutronix.de>
-References: <1416004026-9667-1-git-send-email-j.uzycki@elproma.com.pl>
- <20141114232601.GW27002@pengutronix.de> <5467A980.5090204@elproma.com.pl>
- <20141116214239.GX27002@pengutronix.de>
-Message-ID: <CACQ1gAjjQuiThoTP9D3igmrZyCDpyH7iWCnP5T29K4b-n4FXVg@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 17 Nov 2014 14:04:00 +0530
+Subject: [PATCH 1/7] dmaengine: at_xdmac: prefer usage of
+ readl/writel_relaxed
+In-Reply-To: <20141113154551.GV3639@ldesroches-Latitude-E6320>
+References: <1415875965-6905-1-git-send-email-ludovic.desroches@atmel.com>
+ <1415875965-6905-2-git-send-email-ludovic.desroches@atmel.com>
+ <2791155.z0l2TZezWO@wuerfel> <20141113153449.GO24582@intel.com>
+ <20141113154551.GV3639@ldesroches-Latitude-E6320>
+Message-ID: <20141117083400.GS24582@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Thu, Nov 13, 2014 at 04:45:51PM +0100, Ludovic Desroches wrote:
+> On Thu, Nov 13, 2014 at 09:04:49PM +0530, Vinod Koul wrote:
+> > On Thu, Nov 13, 2014 at 12:01:49PM +0100, Arnd Bergmann wrote:
+> > > On Thursday 13 November 2014 11:52:39 Ludovic Desroches wrote:
+> > > > _relaxed version of readl and writel are not implemented on all
+> > > > architecture so COMPILE_TEST has to be removed in order to not cause
+> > > > some build failures.
+> > > > 
+> > > > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > > > ---
+> > > > 
+> > > 
+> > > I've queued up Will Deacon's series to enable the relaxed accessors
+> > > on all architectures, so the Kconfig change should no longer
+> > > be required in 3.19.
+> > And why is _relaxed() version required for thsi driver. Why cant readl(),
+> > writel() with barriers do?
+> 
+> Required not but preferred to my mind. I don't need a barrier for all
+> read and write I am performing. Barriers have been added when needed.
+> 
+> When you have fixed my code because of the compilation breakage on other
+> architecture, you only change the read and write macros. Currently, there are
+> some redundancies because of the barriers added in the code.
+> 
+> To be honest, I have no idea about the performance impact between the
+> use of read/write and read/write_relaxed. Then two choices:
+> - go back to relaxed version, good new can keep COMPILE_TEST thanks to
+>   Will Deacon
+But that would merged after merge window. This was also reported on next.
+So lets keep this patch for now and you can enabled COMPILE_TEST after next
+merge window.
+> - remove barrier since they are no more needed if using readl/writel
+I think that should be right fix along with checking performance of driver and
+optimize/stress it
 
-2014-11-16 22:42 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello Janusz,
->
-> On Sat, Nov 15, 2014 at 08:29:04PM +0100, Janusz U?ycki wrote:
->> W dniu 2014-11-15 o 00:26, Uwe Kleine-K?nig pisze:
->> >Hello,
->> >
->> >On Fri, Nov 14, 2014 at 11:27:06PM +0100, Janusz Uzycki wrote:
->> >>Function gpiod_get_direction() of gpiolib calls get_direction()
->> >>callback. If chip doesn't implement it EINVAL error is returned.
->> >>The function doesn't use for returned value shadowed FLAG_IS_OUT
->> >>bit of gpio_desc.flags field so the callback is required.
->> >This sounds like a bugfix but "required" is wrong as AFAIR this call is
->> >optional and hardly used. Or did that change? The only drawback is that
->> >the debug output for (by Linux) uninitialized gpios is wrong.
->>
->> Yes, the callback is optional but gpiod_get_direction() doesn't work
->> without it.
->> gpiod_get_direction() doesn't seem optional,
->> Documentation/gpio/consumer.txt:
->> "A driver can also query the current direction of a GPIO:
->>          int gpiod_get_direction(const struct gpio_desc *desc)
->> This function will return either GPIOF_DIR_IN or GPIOF_DIR_OUT.
->> Be aware that there is no default direction for GPIOs. Therefore,
->> **using a GPIO
->> without setting its direction first is illegal and will result in undefined
->> behavior!**"
->> There is nothing about EINVAL error. It happens despite direction was
->> set before. The reason is undefined get_direction callback.
-> I still think you must not rely on gpiod_get_direction working. Some
-> controllers might not be able to provide this info and if you know that
-> the direction was set before, there is no need to ask the framework.
-> (Although I admit it might be comfortable at times.)
->
->> The commit f9e42397d79b6e810437ba1130b0b4b594f5e56c
->> ("serial: mxs-auart: add interrupts for modem control lines")
->> is based on Richard's commit ab5e4e4108ca5d8326cb6b4b3a21b096a002f68f
->> ("tty/serial: at91: add interrupts for modem control lines").
->> Both patches use the condition:
->> "if (gpiod && (gpiod_get_direction(gpiod) == GPIOF_DIR_IN))"
-> This is broken. Actually you want to loop only over the functions in
-> mctrl_gpios_desc that are inputs (i.e. CTS, DSR, DCD and RNG) and don't
-> depend on the hardware state and/or a working gpiod_get_direction.
-Yes, it seemed a convenient test to locate inputs in atmel_serial's
-probe function.
-But you're right, looping on a
-enum mctrl_gpio_idx [] = {
-        UART_GPIO_CTS, UART_GPIO_DSR,
-        UART_GPIO_DCD, UART_GPIO_RNG, UART_GPIO_RI
-};
-Would better describe what is done, without using gpiod_get_direction().
+So for now, I am applying this whole series.
+
+-- 
+~Vinod
