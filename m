@@ -1,39 +1,77 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 17 Nov 2014 17:16:26 -0600
-Subject: [PATCH 0/8] ARM cleanups
-In-Reply-To: <20141117202911.GZ4042@n2100.arm.linux.org.uk>
-References: <20141117202911.GZ4042@n2100.arm.linux.org.uk>
-Message-ID: <20141117231626.GC9716@saruman>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 18 Nov 2014 00:39:32 +0100
+Subject: [PATCH] opp: convert dev_warn() to dev_dbg() for duplicate OPPs
+In-Reply-To: <7017fa592bdaf73c260ad001a2b7abdc8d14f08a.1416211616.git.viresh.kumar@linaro.org>
+References: <7017fa592bdaf73c260ad001a2b7abdc8d14f08a.1416211616.git.viresh.kumar@linaro.org>
+Message-ID: <2808463.UGmrrQ79Aq@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Nov 17, 2014 at 08:29:11PM +0000, Russell King - ARM Linux wrote:
-> The following series is partly a result of reviewing differences
-> between ARM and ARM64, and cleans up ARM with some of the changes
-> made to ARM64.  Many of these changes are trivial cleanups.
+On Monday, November 17, 2014 01:38:00 PM Viresh Kumar wrote:
+> Giving a warning in case we add duplicate OPPs doesn't workout that great. For
+> example just playing with cpufreq-dt driver as a module results in this:
 > 
-> I've also dropped some of the kernel boot messages - removing the
-> "SMP: Total of %d processors activated" message which was redundant,
-> and dropping a couple of others to debug level.
+> $ modprobe cpufreq-dt
+> $ modprobe -r cpufreq-dt
+> $ modprobe cpufreq-dt
 > 
-> I've moved the ftrace assembly code to its own separate file, just
-> like on ARM64.
+> cpu cpu0: dev_pm_opp_add: duplicate OPPs detected. Existing:
+> freq: 261819000, volt: 1350000, enabled: 1. New: freq: 261819000, volt: 1350000,
+> enabled: 1
+> cpu cpu0: dev_pm_opp_add: duplicate OPPs detected. Existing:
+> freq: 360000000, volt: 1350000, enabled: 1. New: freq: 360000000, volt: 1350000,
+> enabled: 1
+> cpu cpu0: dev_pm_opp_add: duplicate OPPs detected. Existing:
+> freq: 392728000, volt: 1450000, enabled: 1. New: freq: 392728000, volt: 1450000,
+> enabled: 1
+> cpu cpu0: dev_pm_opp_add: duplicate OPPs detected. Existing:
+> freq: 454737000, volt: 1550000, enabled: 1. New: freq: 454737000, volt: 1550000,
+> enabled: 1
 > 
-> I've been running stuff with this for a number of weeks now, and
-> haven't noticed any regressions.
+> This happens because we don't destroy OPPs (created during ->init()) while
+> unloading modules.
+> 
+> Now the question is: Should we destroy these OPPs?
+> 
+> Logically kernel drivers *must* free resources they acquired. But in this
+> particular case, the OPPs are created using a static list present in device
+> tree. Destroying and then allocating them again isn't of much benefit. The only
+> benefit of removing OPPs is to save some space if the driver isn't loaded again.
+> 
+> This has its own complications. OPPs can be created either from DT (static) or
+> platform code (dynamic). Driver should only remove static OPPs and not the
+> dynamic ones as they are controlled from platform code. But there is no field in
+> 'struct dev_pm_opp' which has this information to distinguish between different
+> kind of OPPs.
+> 
+> Because of all this, I wasn't sure if drivers should remove static OPPs during
+> their removal. And so just fixing the reported issue by issuing a dev_dbg()
+> instead of dev_warn().
+> 
+> Reported-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  drivers/base/power/opp.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
+> index 89ced95..490e9db 100644
+> --- a/drivers/base/power/opp.c
+> +++ b/drivers/base/power/opp.c
+> @@ -466,9 +466,9 @@ int dev_pm_opp_add(struct device *dev, unsigned long freq, unsigned long u_volt)
+>  		int ret = opp->available && new_opp->u_volt == opp->u_volt ?
+>  			0 : -EEXIST;
+>  
+> -		dev_warn(dev, "%s: duplicate OPPs detected. Existing: freq: %lu, volt: %lu, enabled: %d. New: freq: %lu, volt: %lu, enabled: %d\n",
+> -			 __func__, opp->rate, opp->u_volt, opp->available,
+> -			 new_opp->rate, new_opp->u_volt, new_opp->available);
+> +		dev_dbg(dev, "%s: duplicate OPPs detected. Existing: freq: %lu, volt: %lu, enabled: %d. New: freq: %lu, volt: %lu, enabled: %d\n",
+> +			__func__, opp->rate, opp->u_volt, opp->available,
+> +			new_opp->rate, new_opp->u_volt, new_opp->available);
+>  		mutex_unlock(&dev_opp_list_lock);
+>  		kfree(new_opp);
+>  		return ret;
 
-Have you got a branch with these in for convenience of testing ?
-Otherwise I'll just pick them all up and add to my TODO list for
-tomorrow, got a couple boards here to run these against.
+Don't you think that this may hide real bugs?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/8c1f4e5a/attachment.sig>
+Rafael
