@@ -1,67 +1,91 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 16:59:25 +0100
-Subject: [PATCH] ARM: dts: sunxi: Update simplfb nodes so that u-boot can
- find them
-In-Reply-To: <1416238816-29627-1-git-send-email-hdegoede@redhat.com>
-References: <1416238816-29627-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141117155925.GV6414@lukather>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 17 Nov 2014 17:02:46 +0100
+Subject: [PATCH] gpio: mxs: implement get_direction callback
+In-Reply-To: <546A1B17.4010600@elproma.com.pl>
+References: <20141116214239.GX27002@pengutronix.de>
+ <54693A51.5080907@elproma.com.pl> <54695654.3070209@elproma.com.pl>
+ <20141117082848.GZ27002@pengutronix.de>
+ <5469BBBD.30003@elproma.com.pl>
+ <CACQ1gAha1MuroyB35zN_BuwRNGS_J3Xh1htiHJda_2_19qh31g@mail.gmail.com>
+ <20141117095909.GH27002@pengutronix.de>
+ <CACQ1gAje6OA_n37jE_WnSqg4R+U5tr-bGnnfxpGM5NE9c=dAVg@mail.gmail.com>
+ <20141117155300.GI27002@pengutronix.de>
+ <546A1B17.4010600@elproma.com.pl>
+Message-ID: <20141117160246.GL27002@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-On Mon, Nov 17, 2014 at 04:40:16PM +0100, Hans de Goede wrote:
-> Review of the u-boot sunxi simplefb patches has led to the decision that
-> u-boot should not use a specific path to find the nodes as this goes contrary
-> to how devicetree usually works.
+On Mon, Nov 17, 2014 at 04:58:15PM +0100, Janusz U?ycki wrote:
 > 
-> Instead a platform specific compatible + properties should be used for this.
+> W dniu 2014-11-17 o 16:53, Uwe Kleine-K?nig pisze:
+> >Hello,
+> >
+> >On Mon, Nov 17, 2014 at 11:05:51AM +0100, Richard Genoud wrote:
+> >>2014-11-17 10:59 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> >>>Hello Richard,
+> >>>
+> >>>>>>>>So finally the prototypes would be:
+> >>>>>>>>int mctrl_gpio_request_irqs(struct mctrl_gpios*, struct
+> >>>>>>>>uart_port*, irqhandler_t);
+> >>>>>>>>void mctrl_gpio_free_irqs(struct mctrl_gpios*);
+> >>>>>>I think:
+> >>>>>>
+> >>>>>>         struct mctrl_gpios {
+> >>>>>>                 struct uart_port *port;
+> >>>>>>                 struct {
+> >>>>>>                         gpio_desc *gpio;
+> >>>>>>                         unsigned int irq;
+> >>>>I think it's just "int irq;" there
+> >>>irqs are unsigned. Some functions returning an irq use "int", but
+> >>>depending on who you ask this only for error reporting or a relict.
+> >>>Use 0 for invalid/unused in mctrl_gpio*.
+> >>>
+> >>>>>Yes. I tried to assign irq value in mctrl_gpio_init() only.
+> >>>>>There was another issue if CONFIG_GPIOLIB is not defined but it looks mctrl_
+> >>>>>disable/enable_ms()
+> >>>>>and mctrl_ irq handler solve the problem.
+> >>>>>
+> >>>>>>   Not sure there is a corresponding request_irq variant for that.
+> >>>>>
+> >>>>>What would you propose?
+> >>>>In atmel_request_gpio_irq(), the function irq_set_status_flags(irq,
+> >>>>IRQ_NOAUTOEN); is used before request_irq to prevent the irq from
+> >>>>being enabled when requested.
+> >>>I'm not sure this is allowed. How do you handle request_irq failing? (I
+> >>>just checked: you don't.) Consider another thread just doing
+> >>>request_irq($yourirq, ...) between
+> >>>
+> >>>         irq_set_status_flags(irq[i], IRQ_NOAUTOEN);
+> >>>
+> >>>and
+> >>>
+> >>>         err = request_irq(irq[i], ...
+> >>well, in this case, request_irq() will fail and all the previously
+> >>requested irqs will be freed:
+> >>     /*
+> >>      * If something went wrong, rollback.
+> >>      */
+> >>     while (err && (--i >= 0))
+> >>         if (irq[i] >= 0)
+> >>             free_irq(irq[i], port);
+> >Just in case you didn't notice: Your statement is right, but for the
+> >other caller to request_irq there is something fishy. He gets
+> >IRQ_NOAUTOEN without being able to notice ...
 > 
-> The simplefb bindings have already been updated to reflect this, this patch
-> brings the sunxi devicetree files in line with the new binding, and the
-> actual u-boot implementation as it is going upstream.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  arch/arm/boot/dts/sun4i-a10.dtsi  | 5 +++--
->  arch/arm/boot/dts/sun5i-a10s.dtsi | 5 +++--
->  arch/arm/boot/dts/sun6i-a31.dtsi  | 5 +++--
->  arch/arm/boot/dts/sun7i-a20.dtsi  | 5 +++--
->  4 files changed, 12 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-> index 92d8aa6..bbc366f 100644
-> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
-> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-> @@ -32,8 +32,9 @@
->  		#size-cells = <1>;
->  		ranges;
->  
-> -		framebuffer0-hdmi {
-> -			compatible = "simple-framebuffer";
-> +		framebuffer at 0 {
-> +			compatible = "sunxi,framebuffer", "simple-framebuffer";
+> Likely the gpio interrupts will never shared. We can say mctrl_gpio
+> is the only owner
+> of a gpio after a request.
+Right. The important part of your sentence is: "after a request". So at
+the time irq_set_status_flags(..., IRQ_NOAUTOEN) is called, you're not
+yet owning it. At a minimum you must clear the flag in the error path.
 
-This compatible isn't following the
-standard. allwinner,sunxi-framebuffer would be more appropriate.
+I'd like to have a statement from Thomas here if this is considered OK.
 
-I must say I'm also a bit concerned that this whole binding thing is
-not stabilizing while we are quite close from the end of the ARM merge
-window.
-
-I wouldn't be very pleased to merge any more patch modifying again
-this binding.
-
-Maxime
+Best regards
+Uwe
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/c5cf1920/attachment.sig>
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
