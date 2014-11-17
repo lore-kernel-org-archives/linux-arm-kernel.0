@@ -1,48 +1,35 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 17 Nov 2014 14:24:43 +0000
-Subject: [PATCH v12 11/15] arm: omap1: Migrate debug_ll macros to use
- 8250.S
-In-Reply-To: <5469BAD8.3090006@linaro.org>
-References: <1414148076-12685-1-git-send-email-daniel.thompson@linaro.org>
- <1414148076-12685-12-git-send-email-daniel.thompson@linaro.org>
- <20141116002956.GA13220@fuloong-minipc.musicnaut.iki.fi>
- <5469BAD8.3090006@linaro.org>
-Message-ID: <546A052B.5050100@linaro.org>
+From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
+Date: Mon, 17 Nov 2014 15:29:30 +0100
+Subject: [PATCH] gpio: mxs: implement get_direction callback
+In-Reply-To: <CACQ1gAje6OA_n37jE_WnSqg4R+U5tr-bGnnfxpGM5NE9c=dAVg@mail.gmail.com>
+References: <1416004026-9667-1-git-send-email-j.uzycki@elproma.com.pl>
+ <20141114232601.GW27002@pengutronix.de> <5467A980.5090204@elproma.com.pl>
+ <20141116214239.GX27002@pengutronix.de> <54693A51.5080907@elproma.com.pl>
+ <54695654.3070209@elproma.com.pl> <20141117082848.GZ27002@pengutronix.de>
+ <5469BBBD.30003@elproma.com.pl>
+ <CACQ1gAha1MuroyB35zN_BuwRNGS_J3Xh1htiHJda_2_19qh31g@mail.gmail.com>
+ <20141117095909.GH27002@pengutronix.de>
+ <CACQ1gAje6OA_n37jE_WnSqg4R+U5tr-bGnnfxpGM5NE9c=dAVg@mail.gmail.com>
+Message-ID: <546A064A.5060304@elproma.com.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/11/14 09:07, Daniel Thompson wrote:
-> On 16/11/14 00:29, Aaro Koskinen wrote:
->> Hi,
->>
->> On Fri, Oct 24, 2014 at 11:54:32AM +0100, Daniel Thompson wrote:
->>> +	config DEBUG_OMAP1UART1
->>> +		bool "Kernel low-level debugging via OMAP1 UART1"
->>> +		depends on ARCH_OMAP1
->>> +		select DEBUG_UART_8250
->>> +		help
->>> +		  Say Y here if you want kernel low-level debugging support
->>> +		  on OMAP1 based platforms (expect OMAP730) on the UART1.
->> [...]
->>> +		  on OMAP1 based platforms (expect OMAP730) on the UART2.
->> [...]
->>> +		  on OMAP1 based platforms (expect OMAP730) on the UART3.
->>                                             ^^^^^^
->>
->> Spelling again wrong. I think it was already corrected in v11?
-> 
-> Sorry and, yes, you're right this was corrected in v11.
-> 
-> I was travelling when I posted v11 so I guess I must have forgot to pull
-> the right branches to my main machine. I will dig it and diff shortly to
-> make sure I didn't miss anything else.
+Hi Richard,
 
-Just as well I did the diff. v12 was derived from v9 rather than v11 as
-it should have been, so apologies to Aaro and Paul Bolle for dropping
-changes they asked for.
+W dniu 2014-11-17 o 11:05, Richard Genoud pisze:
+> 2014-11-17 10:59 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+>
+> well, in this case, request_irq() will fail and all the previously
+> requested irqs will be freed:
+>      /*
+>       * If something went wrong, rollback.
+>       */
+>      while (err && (--i >= 0))
+>          if (irq[i] >= 0)
+>              free_irq(irq[i], port);
 
-I will try to change how I keep track of things when I go travelling in
-future...
+I hesitate if use the rollback or just call mctrl_gpio_free_irqs().
+Let's note that "i" is enum and the loop ends on i < 0.
 
-
-Daniel.
+best regards
+Janusz
