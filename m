@@ -1,53 +1,47 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:41 +0100
-Subject: [PATCH v5 47/61] dmaengine: td: Rename device_control
+Date: Mon, 17 Nov 2014 14:42:39 +0100
+Subject: [PATCH v5 45/61] dmaengine: mv_xor: Remove device_control
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-48-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-46-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename the device_control callback of the Timberdal DMA driver to terminate_all
-since it's all it's really doing. That will eventually be used to retrieve
-slave capabilities.
+The Marvell XOR engine doesn't allow any operations that use to be defined in
+device_control, it shouldn't need to be defined. Since it's going to be
+deprecated, remove it altogether.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/timb_dma.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ drivers/dma/mv_xor.c | 9 ---------
+ 1 file changed, 9 deletions(-)
 
-diff --git a/drivers/dma/timb_dma.c b/drivers/dma/timb_dma.c
-index 2407ccf1a64b..c4c3d93fdd1b 100644
---- a/drivers/dma/timb_dma.c
-+++ b/drivers/dma/timb_dma.c
-@@ -561,8 +561,7 @@ static struct dma_async_tx_descriptor *td_prep_slave_sg(struct dma_chan *chan,
- 	return &td_desc->txd;
+diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+index a63837ca1410..10d6dd8b8ee4 100644
+--- a/drivers/dma/mv_xor.c
++++ b/drivers/dma/mv_xor.c
+@@ -928,14 +928,6 @@ out:
+ 	return err;
  }
  
--static int td_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--		      unsigned long arg)
-+static int td_terminate_all(struct dma_chan *chan)
- {
- 	struct timb_dma_chan *td_chan =
- 		container_of(chan, struct timb_dma_chan, chan);
-@@ -570,9 +569,6 @@ static int td_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 
- 	dev_dbg(chan2dev(chan), "%s: Entry\n", __func__);
- 
--	if (cmd != DMA_TERMINATE_ALL)
--		return -ENXIO;
+-/* This driver does not implement any of the optional DMA operations. */
+-static int
+-mv_xor_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-	       unsigned long arg)
+-{
+-	return -ENOSYS;
+-}
 -
- 	/* first the easy part, put the queue into the free list */
- 	spin_lock_bh(&td_chan->lock);
- 	list_for_each_entry_safe(td_desc, _td_desc, &td_chan->queue,
-@@ -697,7 +693,7 @@ static int td_probe(struct platform_device *pdev)
- 	dma_cap_set(DMA_SLAVE, td->dma.cap_mask);
- 	dma_cap_set(DMA_PRIVATE, td->dma.cap_mask);
- 	td->dma.device_prep_slave_sg = td_prep_slave_sg;
--	td->dma.device_control = td_control;
-+	td->dma.device_terminate_all = td_terminate_all;
+ static int mv_xor_channel_remove(struct mv_xor_chan *mv_chan)
+ {
+ 	struct dma_chan *chan, *_chan;
+@@ -1008,7 +1000,6 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
+ 	dma_dev->device_free_chan_resources = mv_xor_free_chan_resources;
+ 	dma_dev->device_tx_status = mv_xor_status;
+ 	dma_dev->device_issue_pending = mv_xor_issue_pending;
+-	dma_dev->device_control = mv_xor_control;
+ 	dma_dev->dev = &pdev->dev;
  
- 	td->dma.dev = &pdev->dev;
- 
+ 	/* set prep routines based on capability */
 -- 
 2.1.1
