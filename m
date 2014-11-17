@@ -1,27 +1,28 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 17 Nov 2014 14:52:30 +0000
-Subject: [PATCH] ASoC: rt5631: Fixing compilation warning when DT is
- disabled
-In-Reply-To: <1416232589-31319-1-git-send-email-krishna.md@samsung.com>
-References: <1416232589-31319-1-git-send-email-krishna.md@samsung.com>
-Message-ID: <20141117145230.GD2722@sirena.org.uk>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Mon, 17 Nov 2014 22:55:36 +0800
+Subject: [RFC PATCH 0/2] clk: rockchip: leave npll for DCLK_VOP0(HDMI) only
+Message-ID: <1416236138-11010-1-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 07:26:29PM +0530, Krishna Mohan Dani wrote:
-> Fixes the following compilation warning:
-> Warning: 'rt5631_i2c_dt_ids' defined but not used - when DT is not used.
-> 
-> Signed-off-by: Claude Youn <claude.youn@gmail.com>
-> Signed-off-by: Krishna Mohan Dani <krishna.md@samsung.com>
+To support all kinds of frequency requirement for HDMI on rk3288,
+we need a PLL that can change rate at run time.
 
-Applied, thanks.  It's really weird that such a trivial patch would have
-multiple authors, if you're forwarding on a patch from someone else
-please preserve their authorship as well as signoff.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/f5ad631d/attachment.sig>
+There are some discussion before at [0], I think we can just leave
+the npll for HDMI(DCLK_VOP0) used to make it simple.
+
+Comments are welcome.
+
+[0] https://lkml.org/lkml/2014/11/4/58
+
+
+Kever Yang (2):
+  clk: rockchip: leave npll for VOP0 only
+  arm: dts: rockchip: select npll as parent of DCLK_VOP0
+
+ arch/arm/boot/dts/rk3288.dtsi     |  2 ++
+ drivers/clk/rockchip/clk-rk3288.c | 24 ++++++++++++------------
+ 2 files changed, 14 insertions(+), 12 deletions(-)
+
+-- 
+1.9.1
