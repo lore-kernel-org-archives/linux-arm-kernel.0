@@ -1,99 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Nov 2014 11:56:36 +0100
-Subject: [RFC PATCH 07/16] PCI: Separate pci_host_bridge creation out of
- pci_create_root_bus()
-In-Reply-To: <1416219710-26088-8-git-send-email-wangyijing@huawei.com>
-References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
- <1416219710-26088-8-git-send-email-wangyijing@huawei.com>
-Message-ID: <2507218.mHliopJb05@wuerfel>
+From: rf@opensource.wolfsonmicro.com (Richard Fitzgerald)
+Date: Mon, 17 Nov 2014 10:57:54 +0000
+Subject: [PATCH] ASoC: samsung-i2s: Add 192kHz config option
+Message-ID: <1416221874-22092-1-git-send-email-rf@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 November 2014 18:21:41 Yijing Wang wrote:
-> There are some common PCI infos like domain, msi_controller, these
-> infos are saved in arch PCI sysdata, and lots arch specific functions
-> like pci_domain_nr() and pcibios_msi_controller() required.
-> We could separate pci_host_bridge creation out of pci_create_root_bus(),
-> then we could put the common infos in, then we could eliminate
-> the arch specifc functions.
-> 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> ---
->  drivers/pci/host-bridge.c |   99 +++++++++++++++++++++++++++++++++
->  drivers/pci/probe.c       |  134 ++++++++++++++++----------------------------
->  include/linux/pci.h       |   11 +++-
->  3 files changed, 158 insertions(+), 86 deletions(-)
-> 
-> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-> index 0e5f3c9..e31604f 100644
-> --- a/drivers/pci/host-bridge.c
-> +++ b/drivers/pci/host-bridge.c
-> @@ -8,6 +8,105 @@
->  
->  #include "pci.h"
->  
-> +LIST_HEAD(pci_host_bridge_list);
-> +DECLARE_RWSEM(pci_host_bridge_sem);
+Adds QUIRK_SUPPORTS_192KHZ to allow 192kHz rate
+to be selected for hardware that supports it.
 
-Unless the pci_host_bridge_sem is accessed thousands of times per second,
-it's normally better to use a simple mutex instead.
+Signed-off-by: Richard Fitzgerald <rf@opensource.wolfsonmicro.com>
+---
+ .../devicetree/bindings/sound/samsung-i2s.txt      |    2 ++
+ include/linux/platform_data/asoc-s3c.h             |    1 +
+ sound/soc/samsung/i2s.c                            |    8 ++++++++
+ 3 files changed, 11 insertions(+), 0 deletions(-)
 
-> +static struct resource busn_resource = {
-> +	.name	= "PCI busn",
-> +	.start	= 0,
-> +	.end	= 255,
-> +	.flags	= IORESOURCE_BUS,
-> +};
-
-I think it would be better to require callers to pass the bus resource
-down to the function.
-
-> +struct pci_host_bridge *pci_create_host_bridge(
-> +		struct device *parent, u32 db, 
-> +		struct pci_ops *ops, void *sysdata, 
-> +		struct list_head *resources)
-> +{
-
-Do we still need to pass the 'sysdata' in here? If we are guaranteed to
-have a device pointer, we should always be able to get the driver
-private data from dev_get_drvdata(host->dev->parent).
-
-> +	host = kzalloc(sizeof(*host), GFP_KERNEL);
-> +	if (!host)
-> +		return NULL;
-
-devm_kzalloc maybe?
-
-> +	if (!resources) {
-> +		/* Use default IO/MEM/BUS resources*/
-> +		pci_add_resource(&host->windows, &ioport_resource);
-> +		pci_add_resource(&host->windows, &iomem_resource);
-> +		pci_add_resource(&host->windows, &busn_resource);
-> +	} else {
-> +		list_for_each_entry_safe(window, n, resources, list)
-> +			list_move_tail(&window->list, &host->windows);
-> +	}
-
-I think we should assume that the correct resources are passed. You
-could add a wrapper around this function to convert old platforms
-though.
-
-> +EXPORT_SYMBOL(pci_create_host_bridge);
-
-EXPORT_SYMBOL_GPL() maybe?
-
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 8b11b38..daa7f40 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -402,7 +402,12 @@ struct pci_host_bridge_window {
->  struct pci_host_bridge {
->  	struct device dev;
->  	struct pci_bus *bus;		/* root bus */
-> +	struct list_head list;
->  	struct list_head windows;	/* pci_host_bridge_windows */
-> +	int busnum;
-
-The busnum should already be implied through the bus resource.
-
-	Arnd
+diff --git a/Documentation/devicetree/bindings/sound/samsung-i2s.txt b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
+index d188296..c3f3950 100644
+--- a/Documentation/devicetree/bindings/sound/samsung-i2s.txt
++++ b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
+@@ -40,6 +40,8 @@ Optional SoC Specific Properties:
+   sub system(used in secondary sound source).
+ - pinctrl-0: Should specify pin control groups used for this controller.
+ - pinctrl-names: Should contain only one value - "default".
++- samsung,supports-192khz: specify this (without a value) if you want to allow
++    192000 sample rate over the I2S link.
+ 
+ Example:
+ 
+diff --git a/include/linux/platform_data/asoc-s3c.h b/include/linux/platform_data/asoc-s3c.h
+index 5e0bc77..6d0702d 100644
+--- a/include/linux/platform_data/asoc-s3c.h
++++ b/include/linux/platform_data/asoc-s3c.h
+@@ -28,6 +28,7 @@ struct samsung_i2s {
+ #define QUIRK_NEED_RSTCLR	(1 << 3)
+ #define QUIRK_SUPPORTS_TDM	(1 << 4)
+ #define QUIRK_SUPPORTS_IDMA	(1 << 5)
++#define QUIRK_SUPPORTS_192KHZ	(1 << 6)
+ 	/* Quirks of the I2S controller */
+ 	u32 quirks;
+ 	dma_addr_t idma_addr;
+diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+index 947352d..f688e89 100644
+--- a/sound/soc/samsung/i2s.c
++++ b/sound/soc/samsung/i2s.c
+@@ -1219,6 +1219,9 @@ static int samsung_i2s_probe(struct platform_device *pdev)
+ 						"specified");
+ 			}
+ 		}
++
++		if (of_find_property(np, "samsung,supports-192khz", NULL))
++			quirks |= QUIRK_SUPPORTS_192KHZ;
+ 	}
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -1247,6 +1250,11 @@ static int samsung_i2s_probe(struct platform_device *pdev)
+ 	if (quirks & QUIRK_PRI_6CHAN)
+ 		pri_dai->i2s_dai_drv.playback.channels_max = 6;
+ 
++	if (quirks & QUIRK_SUPPORTS_192KHZ) {
++		pri_dai->i2s_dai_drv.playback.rates |= SNDRV_PCM_RATE_192000;
++		pri_dai->i2s_dai_drv.capture.rates |= SNDRV_PCM_RATE_192000;
++	}
++
+ 	if (quirks & QUIRK_SEC_DAI) {
+ 		sec_dai = i2s_alloc_dai(pdev, true);
+ 		if (!sec_dai) {
+-- 
+1.7.2.5
