@@ -1,41 +1,55 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 17 Nov 2014 11:53:36 +0300
-Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gZ3BpbzogbXhzOiBpbXBsZW1lbnQgZ2V0X2RpcmVjdGlv?=
- =?UTF-8?B?biBjYWxsYmFjaw==?=
-In-Reply-To: <20141117084410.GD27002@pengutronix.de>
-References: <1416004026-9667-1-git-send-email-j.uzycki@elproma.com.pl>
- <1416213534.761947189@f70.i.mail.ru>
- <20141117084410.GD27002@pengutronix.de>
-Message-ID: <1416214416.941104920@f40.i.mail.ru>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 17 Nov 2014 09:56:28 +0100
+Subject: [GIT PULL] at91: fixes for 3.18 #2
+In-Reply-To: <20141116231244.GD14929@quad.lixom.net>
+References: <1415963482-16582-1-git-send-email-nicolas.ferre@atmel.com>
+ <20141116231244.GD14929@quad.lixom.net>
+Message-ID: <5469B83C.7080004@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mon, 17 Nov 2014 09:44:10 +0100 ?? Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello Alexander,
+On 17/11/2014 00:12, Olof Johansson :
+> On Fri, Nov 14, 2014 at 12:11:22PM +0100, Nicolas Ferre wrote:
+>> Arnd, Olof, Kevin,
+>>
+>> I don't have more for the moment, so here is trivial at91 material for 3.18.
+>>
+>> Thanks, best regards,
+>>
+>> The following changes since commit 106c67af2fb938880edbf43b49dabbd8d2534839:
+>>
+>>   ARM: at91/dt: sam9263: fix PLLB frequencies (2014-10-22 10:08:22 +0200)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-fixes2
+>>
+>> for you to fetch changes up to c4e4bbcee9fa37024a2d4cdcaa5fe89a2c5c7a05:
+>>
+>>   ARM: at91/dt: Fix sama5d3x typos (2014-11-13 12:37:44 +0100)
+>>
+>> ----------------------------------------------------------------
+>> Tiny typo fixes for this second batch for 3.18
+>>
+>> ----------------------------------------------------------------
+>> Ludovic Desroches (1):
+>>       ARM: at91/dt: sama5d4: use macro instead of numeric value
 > 
-> On Mon, Nov 17, 2014 at 11:38:54AM +0300, Alexander Shiyan wrote:
-> > Hello.
-> > 
-> > ...
-> > > > struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int
-> > > > idx, int *irqs)
-> > > What is idx about? I see it already in the mctrl_gpio API, but there is
-> > > no documentation about how it's used. Is it always 0?
-> > 
-> > This could be used for drivers with several UARTs, which registered at once.
-> Then what about:
-> 
-> 	/**
-> 	 * Document what idx is about here.
-> 	 */
-> 	struct mctrl_gpios *mctrl_gpio_init_index(struct uart_port *port, unsigned int idx);
-> 	static inline struct mctrl_gpios *mctrl_gpio_init(struct uart_port *port)
-> 	{
-> 		return mctrl_gpio_init_index(port, 0);
-> 	}
-> 
-> ? That matches how gpio and of functions use the indexed variants.
+> I don't consider this to be a fix at this time in the release, please
+> include in your 3.19 material.
 
-This is planned by me for "sccnxp" driver at least.
+Ok, taken in at91-3.19-dt branch that I will sent to you soon.
 
----
+>> Peter Rosin (1):
+>>       ARM: at91/dt: Fix sama5d3x typos
+>>
+> 
+> I did cherry-pick this one in though.
+> 
+> Not sure if I'll make today's -rc with my fixes pull request. :)
+
+It did it. Thanks.
+
+Bye,
+-- 
+Nicolas Ferre
