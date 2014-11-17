@@ -1,66 +1,97 @@
-From: ydroneaud@opteya.com (Yann Droneaud)
-Date: Tue, 18 Nov 2014 00:02:19 +0100
-Subject: [PATCH] arm64/mm: Remove hack in mmap randomize layout
-Message-ID: <1416265339-8138-1-git-send-email-ydroneaud@opteya.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 17 Nov 2014 17:04:30 -0600
+Subject: [PATCH V5 01/12] xhci: Set shared HCD's hcd_priv in xhci_gen_setup
+In-Reply-To: <1416264102-1323-2-git-send-email-abrestic@chromium.org>
+References: <1416264102-1323-1-git-send-email-abrestic@chromium.org>
+ <1416264102-1323-2-git-send-email-abrestic@chromium.org>
+Message-ID: <20141117230430.GA9716@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 8a0a9bd4db63 ('random: make get_random_int() more
-random'), get_random_int() returns a random value for each call,
-so comment and hack introduced in mmap_rnd() as part of commit
-1d18c47c735e ('arm64: MMU fault handling and page table management')
-are incorrects.
+On Mon, Nov 17, 2014 at 02:41:31PM -0800, Andrew Bresticker wrote:
+> xhci_gen_setup() sets the hcd_priv field for the primary HCD, but not
+> for the shared HCD, requiring xHCI host-controller drivers to set it
+> between usb_create_shared_hcd() and usb_add_hcd().  There's no reason
+> xhci_gen_setup() can't set the shared HCD's hcd_priv as well, so move
+> that bit out of the host-controller drivers and into xhci_gen_setup().
+> 
+> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 
-Commit 1d18c47c735e seems to use the same hack introduced by
-commit a5adc91a4b44 ('powerpc: Ensure random space between stack
-and mmaps'), latter copied in commit 5a0efea09f42 ('sparc64: Sharpen
-address space randomization calculations.').
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-But both architectures were cleaned up as part of commit
-fa8cbaaf5a68 ('powerpc+sparc64/mm: Remove hack in mmap randomize
-layout') as hack is no more needed since commit 8a0a9bd4db63.
+> ---
+> New for v5.
+> Peviously posted here: https://lkml.org/lkml/2014/10/30/726
+> ---
+>  drivers/usb/host/xhci-pci.c  | 5 -----
+>  drivers/usb/host/xhci-plat.c | 5 -----
+>  drivers/usb/host/xhci.c      | 6 +++---
+>  3 files changed, 3 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/usb/host/xhci-pci.c b/drivers/usb/host/xhci-pci.c
+> index 9a69b1f..31025e4 100644
+> --- a/drivers/usb/host/xhci-pci.c
+> +++ b/drivers/usb/host/xhci-pci.c
+> @@ -221,11 +221,6 @@ static int xhci_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
+>  		goto dealloc_usb2_hcd;
+>  	}
+>  
+> -	/* Set the xHCI pointer before xhci_pci_setup() (aka hcd_driver.reset)
+> -	 * is called by usb_add_hcd().
+> -	 */
+> -	*((struct xhci_hcd **) xhci->shared_hcd->hcd_priv) = xhci;
+> -
+>  	retval = usb_add_hcd(xhci->shared_hcd, dev->irq,
+>  			IRQF_SHARED);
+>  	if (retval)
+> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+> index 3d78b0c..5bc33bc 100644
+> --- a/drivers/usb/host/xhci-plat.c
+> +++ b/drivers/usb/host/xhci-plat.c
+> @@ -149,11 +149,6 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>  	if ((node && of_property_read_bool(node, "usb3-lpm-capable")) ||
+>  			(pdata && pdata->usb3_lpm_capable))
+>  		xhci->quirks |= XHCI_LPM_SUPPORT;
+> -	/*
+> -	 * Set the xHCI pointer before xhci_plat_setup() (aka hcd_driver.reset)
+> -	 * is called by usb_add_hcd().
+> -	 */
+> -	*((struct xhci_hcd **) xhci->shared_hcd->hcd_priv) = xhci;
+>  
+>  	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
+>  		xhci->shared_hcd->can_do_streams = 1;
+> diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
+> index 2a5d45b..ae05471 100644
+> --- a/drivers/usb/host/xhci.c
+> +++ b/drivers/usb/host/xhci.c
+> @@ -4843,9 +4843,9 @@ int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
+>  		 */
+>  		hcd->has_tt = 1;
+>  	} else {
+> -		/* xHCI private pointer was set in xhci_pci_probe for the second
+> -		 * registered roothub.
+> -		 */
+> +		xhci = hcd_to_xhci(hcd->primary_hcd);
+> +		*((struct xhci_hcd **) hcd->hcd_priv) = xhci;
+> +
+>  		return 0;
+>  	}
+>  
+> -- 
+> 2.1.0.rc2.206.gedb03e5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
-So the present patch removes the comment and the hack around
-get_random_int() on AArch64's mmap_rnd().
-
-Cc: Dan McGee <dpmcgee@gmail.com>
-Cc: David S. Miller <davem@davemloft.net>
-Cc: Anton Blanchard <anton@samba.org>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Fixes: 1d18c47c735e ('arm64: MMU fault handling and page table management')
-Signed-off-by: Yann Droneaud <ydroneaud@opteya.com>
----
- arch/arm64/mm/mmap.c | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
-index 1d73662f00ff..54922d1275b8 100644
---- a/arch/arm64/mm/mmap.c
-+++ b/arch/arm64/mm/mmap.c
-@@ -47,22 +47,14 @@ static int mmap_is_legacy(void)
- 	return sysctl_legacy_va_layout;
- }
- 
--/*
-- * Since get_random_int() returns the same value within a 1 jiffy window, we
-- * will almost always get the same randomisation for the stack and mmap
-- * region. This will mean the relative distance between stack and mmap will be
-- * the same.
-- *
-- * To avoid this we can shift the randomness by 1 bit.
-- */
- static unsigned long mmap_rnd(void)
- {
- 	unsigned long rnd = 0;
- 
- 	if (current->flags & PF_RANDOMIZE)
--		rnd = (long)get_random_int() & (STACK_RND_MASK >> 1);
-+		rnd = (long)get_random_int() & STACK_RND_MASK;
- 
--	return rnd << (PAGE_SHIFT + 1);
-+	return rnd << PAGE_SHIFT;
- }
- 
- static unsigned long mmap_base(void)
 -- 
-1.9.3
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/b8f02b46/attachment.sig>
