@@ -1,68 +1,112 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Mon, 17 Nov 2014 18:07:43 +0300
-Subject: [PATCH V2 5/5] mfd: tc6387xb: prepare/unprepare clocks
-In-Reply-To: <1416236863-20898-1-git-send-email-dbaryshkov@gmail.com>
-References: <1416236863-20898-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1416236863-20898-5-git-send-email-dbaryshkov@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 17 Nov 2014 15:08:04 +0000
+Subject: [PATCH 09/11] arm: perf: parse cpu affinity from dt
+In-Reply-To: <20141117112033.GF18061@arm.com>
+References: <1415377536-12841-1-git-send-email-mark.rutland@arm.com>
+ <1415377536-12841-10-git-send-email-mark.rutland@arm.com>
+ <20141117112033.GF18061@arm.com>
+Message-ID: <20141117150804.GC25416@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change clk_enable/disable() calls to clk_prepare_enable() and
-clk_disable_unprepare().
+On Mon, Nov 17, 2014 at 11:20:35AM +0000, Will Deacon wrote:
+> On Fri, Nov 07, 2014 at 04:25:34PM +0000, Mark Rutland wrote:
+> > The current way we read interrupts form devicetree assumes that
+> > interrupts are in increasing order of logical cpu id (MPIDR.Aff{2,1,0}),
+> > and that these logical ids are in a contiguous block. This may not be
+> > the case in general - after a kexec cpu ids may be arbitrarily assigned,
+> > and multi-cluster systems do not have a contiguous range of cpu ids.
+> > 
+> > This patch parses cpu affinity information for interrupts from an
+> > optional "interrupts-affinity" devicetree property described in the
+> > devicetree binding document. Support for existing dts and board files
+> > remains.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > ---
+> >  arch/arm/include/asm/pmu.h       |  12 +++
+> >  arch/arm/kernel/perf_event_cpu.c | 196 +++++++++++++++++++++++++++++----------
+> >  2 files changed, 161 insertions(+), 47 deletions(-)
+> > 
+> > diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+> > index b630a44..92fc1da 100644
+> > --- a/arch/arm/include/asm/pmu.h
+> > +++ b/arch/arm/include/asm/pmu.h
+> > @@ -12,6 +12,7 @@
+> >  #ifndef __ARM_PMU_H__
+> >  #define __ARM_PMU_H__
+> >  
+> > +#include <linux/cpumask.h>
+> >  #include <linux/interrupt.h>
+> >  #include <linux/perf_event.h>
+> >  
+> > @@ -89,6 +90,15 @@ struct pmu_hw_events {
+> >  	struct arm_pmu		*percpu_pmu;
+> >  };
+> >  
+> > +/*
+> > + * For systems with heterogeneous PMUs, we need to know which CPUs each
+> > + * (possibly percpu) IRQ targets. Map between them with an array of these.
+> > + */
+> > +struct cpu_irq {
+> > +	cpumask_t cpus;
+> > +	int irq;
+> > +};
+> > +
+> >  struct arm_pmu {
+> >  	struct pmu	pmu;
+> >  	cpumask_t	active_irqs;
+> > @@ -118,6 +128,8 @@ struct arm_pmu {
+> >  	struct platform_device	*plat_device;
+> >  	struct pmu_hw_events	__percpu *hw_events;
+> >  	struct notifier_block	hotplug_nb;
+> > +	int		nr_irqs;
+> > +	struct cpu_irq *irq_map;
+> >  };
+> >  
+> >  #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
+> > diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+> > index dfcaba5..f09c8a0 100644
+> > --- a/arch/arm/kernel/perf_event_cpu.c
+> > +++ b/arch/arm/kernel/perf_event_cpu.c
+> > @@ -85,20 +85,27 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
+> >  	struct platform_device *pmu_device = cpu_pmu->plat_device;
+> >  	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
+> >  
+> > -	irqs = min(pmu_device->num_resources, num_possible_cpus());
+> > +	irqs = cpu_pmu->nr_irqs;
+> >  
+> > -	irq = platform_get_irq(pmu_device, 0);
+> > -	if (irq >= 0 && irq_is_percpu(irq)) {
+> > -		on_each_cpu(cpu_pmu_disable_percpu_irq, &irq, 1);
+> > -		free_percpu_irq(irq, &hw_events->percpu_pmu);
+> > -	} else {
+> > -		for (i = 0; i < irqs; ++i) {
+> > -			if (!cpumask_test_and_clear_cpu(i, &cpu_pmu->active_irqs))
+> > -				continue;
+> > -			irq = platform_get_irq(pmu_device, i);
+> > -			if (irq >= 0)
+> > -				free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, i));
+> > +	for (i = 0; i < irqs; i++) {
+> > +		struct cpu_irq *map = &cpu_pmu->irq_map[i];
+> > +		irq = map->irq;
+> > +
+> > +		if (irq <= 0)
+> > +			continue;
+> > +
+> > +		if (irq_is_percpu(irq)) {
+> > +			on_each_cpu(cpu_pmu_disable_percpu_irq, &irq, 1);
+> 
+> Hmm, ok, so we're assuming that all the PMUs will be wired with PPIs in this
+> case. I have a patch allowing per-cpu interrupts to be requested for a
+> cpumask, but I suppose that can wait until it's actually needed.
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- drivers/mfd/tc6387xb.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+I wasn't too keen on assuming all CPUs, but I didn't have the facility
+to request a PPI on a subset of CPUs. If you can point me at your patch,
+I'd be happy to take a look.
 
-diff --git a/drivers/mfd/tc6387xb.c b/drivers/mfd/tc6387xb.c
-index e71f880..85fab37 100644
---- a/drivers/mfd/tc6387xb.c
-+++ b/drivers/mfd/tc6387xb.c
-@@ -52,7 +52,7 @@ static int tc6387xb_suspend(struct platform_device *dev, pm_message_t state)
- 
- 	if (pdata && pdata->suspend)
- 		pdata->suspend(dev);
--	clk_disable(tc6387xb->clk32k);
-+	clk_disable_unprepare(tc6387xb->clk32k);
- 
- 	return 0;
- }
-@@ -62,7 +62,7 @@ static int tc6387xb_resume(struct platform_device *dev)
- 	struct tc6387xb *tc6387xb = platform_get_drvdata(dev);
- 	struct tc6387xb_platform_data *pdata = dev_get_platdata(&dev->dev);
- 
--	clk_enable(tc6387xb->clk32k);
-+	clk_prepare_enable(tc6387xb->clk32k);
- 	if (pdata && pdata->resume)
- 		pdata->resume(dev);
- 
-@@ -100,7 +100,7 @@ static int tc6387xb_mmc_enable(struct platform_device *mmc)
- 	struct platform_device *dev      = to_platform_device(mmc->dev.parent);
- 	struct tc6387xb *tc6387xb = platform_get_drvdata(dev);
- 
--	clk_enable(tc6387xb->clk32k);
-+	clk_prepare_enable(tc6387xb->clk32k);
- 
- 	tmio_core_mmc_enable(tc6387xb->scr + 0x200, 0,
- 		tc6387xb_mmc_resources[0].start & 0xfffe);
-@@ -113,7 +113,7 @@ static int tc6387xb_mmc_disable(struct platform_device *mmc)
- 	struct platform_device *dev      = to_platform_device(mmc->dev.parent);
- 	struct tc6387xb *tc6387xb = platform_get_drvdata(dev);
- 
--	clk_disable(tc6387xb->clk32k);
-+	clk_disable_unprepare(tc6387xb->clk32k);
- 
- 	return 0;
- }
-@@ -214,7 +214,7 @@ static int tc6387xb_remove(struct platform_device *dev)
- 	mfd_remove_devices(&dev->dev);
- 	iounmap(tc6387xb->scr);
- 	release_resource(&tc6387xb->rscr);
--	clk_disable(tc6387xb->clk32k);
-+	clk_disable_unprepare(tc6387xb->clk32k);
- 	clk_put(tc6387xb->clk32k);
- 	kfree(tc6387xb);
- 
--- 
-2.1.1
+I should have the target CPU mask decoded from whatever the binding
+settles on, so at this point it's just plumbing.
+
+Thanks,
+Mark.
