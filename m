@@ -1,136 +1,63 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 18 Nov 2014 00:27:34 +0100
-Subject: [PATCHv3 05/12] arm: mvebu: remove duplications in pinctrl nodes for
- Armada 370/XP
-In-Reply-To: <cover.1416266432.git.arno@natisbad.org>
-References: <cover.1416266432.git.arno@natisbad.org>
-Message-ID: <fa0686a71376365a52f9b2526dac6fec0cdec90b.1416266432.git.arno@natisbad.org>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 17 Nov 2014 15:26:04 -0800
+Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
+ completes
+In-Reply-To: <9731926.0Og5ZNPBtE@vostro.rjw.lan>
+References: <20141117220238.GE5258@dtor-ws>
+ <Pine.LNX.4.44L0.1411171708010.4838-100000@iolanthe.rowland.org>
+ <20141117221700.GA2049@dtor-ws> <9731926.0Og5ZNPBtE@vostro.rjw.lan>
+Message-ID: <20141117232604.GB2049@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 18, 2014 at 12:28:26AM +0100, Rafael J. Wysocki wrote:
+> On Monday, November 17, 2014 02:17:00 PM Dmitry Torokhov wrote:
+> > On Mon, Nov 17, 2014 at 05:12:35PM -0500, Alan Stern wrote:
+> > > On Mon, 17 Nov 2014, Dmitry Torokhov wrote:
+> > > 
+> > > > > >  Except buses
+> > > > > > usually call pm_generic_runtime_resume() which ends up fetching driver's
+> > > > > > callbacks. Maybe pm_generic_runtime_*() need be a bit smarter?
+> > > > > 
+> > > > > No, the bus subsystem needs to be smarter.  It shouldn't call 
+> > > > > pm_generic_runtime_resume() if the driver hasn't been probed yet, or if 
+> > > > > the driver has already been unbound from the device.
+> > > > 
+> > > > But that code wold be exactly the same for all buses, right? So why
+> > > > can't pm_generic_runtime_resume() be smarter?
+> > > 
+> > > It would not be the same for all buses.  Each bus will have its own way 
+> > > of recognizing whether or not a driver has been probed (i.e., by 
+> > > checking some field in the bus-specific part of the device structure).
+> > > 
+> > > > However, is it allowed to call pm_runtime_get_sync() on devices that
+> > > > didn't issue pm_runtime_enable()?
+> > > 
+> > > Yes.  But the bus has to issue pm_runtime_enable() before probing the 
+> > > driver, because the driver will expect runtime PM to work properly 
+> > > while its probe routine runs.  For example, the probe routine might 
+> > > want to leave the device in a runtime-suspended state.  It can't do 
+> > > that if the device isn't enabled for runtime PM.
+> > 
+> > That means that runtime PM will be enabled for all devices on given bus
+> > while up till now drivers were deciding if their devices should be
+> > runtime-pm-managed or not.
+> 
+> That's not the case for PCI drivers.
+> 
+> > I do not think we are quite ready for this.
+> 
+> We have to do that if power domains are in use, however, because if at least
+> one device in a power domain in enabled for runtime PM, that will affect the
+> other devices in that domain.
+> 
+> We could make a rule to keep a domail always up if at least one device in it
+> has runtime PM disabled, but that is equivalent to enabling runtime PM for
+> that device, powering the domain up and bumping up the device's usage counter.
 
-As suggested by Sebastian and Andrew, it is possible to refactor and
-remove duplications in pinctrl nodes for Armada 370/XP in the
-following way:
+What will driver will see if it tries to check pm_runtime_active()?
+Would not it get unexpected result if the driver did not call
+pm_runtime_enable() on it's device?
 
- 1) define a pinctrl node in armada-370-xp.dtsi w/ only the reg property
-    defined (same for all 370/XP SoCs)
- 2) remove now redundant reg properties in armada-370.dtsi and
-    armada-xp-mv*.dtsi files
- 3) move identical and redundant SDIO pins definitions found in
-    armada-xp-mv*.dtsi to a newly created pinctrl node in armada-xp.dtsi
-
-Suggested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Suggested-by: Andrew Lunn <andrew@lunn.ch>
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
----
- arch/arm/boot/dts/armada-370-xp.dtsi     | 4 ++++
- arch/arm/boot/dts/armada-370.dtsi        | 1 -
- arch/arm/boot/dts/armada-xp-mv78230.dtsi | 7 -------
- arch/arm/boot/dts/armada-xp-mv78260.dtsi | 7 -------
- arch/arm/boot/dts/armada-xp-mv78460.dtsi | 7 -------
- arch/arm/boot/dts/armada-xp.dtsi         | 8 ++++++++
- 6 files changed, 12 insertions(+), 22 deletions(-)
-
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 2be9723bcdf3..02df61a6a11b 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -103,6 +103,10 @@
- 			#size-cells = <1>;
- 			ranges = <0 MBUS_ID(0xf0, 0x01) 0 0x100000>;
- 
-+			pinctrl {
-+				reg = <0x18000 0x38>;
-+			};
-+
- 			rtc at 10300 {
- 				compatible = "marvell,orion-rtc";
- 				reg = <0x10300 0x20>;
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 6b3c23b1e138..2040da11462b 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -113,7 +113,6 @@
- 
- 			pinctrl {
- 				compatible = "marvell,mv88f6710-pinctrl";
--				reg = <0x18000 0x38>;
- 
- 				sdio_pins1: sdio-pins1 {
- 					marvell,pins = "mpp9",  "mpp11", "mpp12",
-diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-index 2592e1c13560..b5933aa9ab50 100644
---- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-@@ -169,13 +169,6 @@
- 		internal-regs {
- 			pinctrl {
- 				compatible = "marvell,mv78230-pinctrl";
--				reg = <0x18000 0x38>;
--
--				sdio_pins: sdio-pins {
--					marvell,pins = "mpp30", "mpp31", "mpp32",
--						       "mpp33", "mpp34", "mpp35";
--					marvell,function = "sd0";
--				};
- 			};
- 
- 			gpio0: gpio at 18100 {
-diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-index 480e237a870f..5954b362180c 100644
---- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-@@ -253,13 +253,6 @@
- 		internal-regs {
- 			pinctrl {
- 				compatible = "marvell,mv78260-pinctrl";
--				reg = <0x18000 0x38>;
--
--				sdio_pins: sdio-pins {
--					marvell,pins = "mpp30", "mpp31", "mpp32",
--						       "mpp33", "mpp34", "mpp35";
--					marvell,function = "sd0";
--				};
- 			};
- 
- 			gpio0: gpio at 18100 {
-diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-index 2c7b1fef4703..735924d62e12 100644
---- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-@@ -291,13 +291,6 @@
- 		internal-regs {
- 			pinctrl {
- 				compatible = "marvell,mv78460-pinctrl";
--				reg = <0x18000 0x38>;
--
--				sdio_pins: sdio-pins {
--					marvell,pins = "mpp30", "mpp31", "mpp32",
--						       "mpp33", "mpp34", "mpp35";
--					marvell,function = "sd0";
--				};
- 			};
- 
- 			gpio0: gpio at 18100 {
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index a68f5b837536..83bf32344a60 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -42,6 +42,14 @@
- 				wt-override;
- 			};
- 
-+			pinctrl {
-+				sdio_pins: sdio-pins {
-+					marvell,pins = "mpp30", "mpp31", "mpp32",
-+						       "mpp33", "mpp34", "mpp35";
-+					marvell,function = "sd0";
-+				};
-+			};
-+
- 			i2c0: i2c at 11000 {
- 				compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
- 				reg = <0x11000 0x100>;
 -- 
-2.1.1
+Dmitry
