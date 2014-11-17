@@ -1,67 +1,39 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Mon, 17 Nov 2014 14:41:34 -0800
-Subject: [PATCH V5 04/12] of: Add NVIDIA Tegra XUSB mailbox binding
-In-Reply-To: <1416264102-1323-1-git-send-email-abrestic@chromium.org>
-References: <1416264102-1323-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1416264102-1323-5-git-send-email-abrestic@chromium.org>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Mon, 17 Nov 2014 23:47:51 +0100
+Subject: [PATCH v2 4/4] ARM: dts: meson: add node for SPIFC
+In-Reply-To: <1416264471-774-1-git-send-email-b.galvani@gmail.com>
+References: <1416264471-774-1-git-send-email-b.galvani@gmail.com>
+Message-ID: <1416264471-774-5-git-send-email-b.galvani@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device-tree bindings for the Tegra XUSB mailbox which will be used
-for communication between the Tegra xHCI controller's firmware and the
-host processor.
+This adds a node for the SPI Flash Controller to the Amlogic Meson
+DTS.
 
-Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
+Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+Acked-by: Mark Brown <broonie@kernel.org>
 ---
-No changes from v3/v4.
-Changes from v2:
- - Dropped channel specifier.
- - Added pointer to mailbox documentation.
-Changes from v1:
- - Updated to use common mailbox bindings.
----
- .../bindings/mailbox/nvidia,tegra124-xusb-mbox.txt | 32 ++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt
+ arch/arm/boot/dts/meson.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt b/Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt
-new file mode 100644
-index 0000000..b35ea6e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt
-@@ -0,0 +1,32 @@
-+NVIDIA Tegra XUSB mailbox
-+=========================
+diff --git a/arch/arm/boot/dts/meson.dtsi b/arch/arm/boot/dts/meson.dtsi
+index e6539ea..d28b16e 100644
+--- a/arch/arm/boot/dts/meson.dtsi
++++ b/arch/arm/boot/dts/meson.dtsi
+@@ -106,5 +106,14 @@
+ 			clocks = <&clk81>;
+ 			status = "disabled";
+ 		};
 +
-+The Tegra XUSB mailbox is used by the Tegra xHCI controller's firmware to
-+communicate requests to the host and PHY drivers.
-+
-+Refer to ./mailbox.txt for generic information about mailbox device-tree
-+bindings.
-+
-+Required properties:
-+--------------------
-+ - compatible: Should be "nvidia,tegra124-xusb-mbox".
-+ - reg: Address and length of the XUSB FPCI registers.
-+ - interrupts: XUSB mailbox interrupt.
-+ - #mbox-cells: Should be 0.  There is only one physical channel.
-+
-+Example:
-+--------
-+	xusb_mbox: mailbox at 0,70098000 {
-+		compatible = "nvidia,tegra124-xusb-mbox";
-+		reg = <0x0 0x70098000 0x0 0x1000>;
-+		interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		#mbox-cells = <0>;
-+	};
-+
-+	usb at 0,70090000 {
-+		...
-+		mboxes = <&xusb_mbox>;
-+		mbox-names = "xusb";
-+		...
-+	};
++		spifc: spi at c1108c80 {
++			compatible = "amlogic,meson6-spifc";
++			reg = <0xc1108c80 0x80>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			clocks = <&clk81>;
++			status = "disabled";
++		};
+ 	};
+ }; /* end of / */
 -- 
-2.1.0.rc2.206.gedb03e5
+1.9.1
