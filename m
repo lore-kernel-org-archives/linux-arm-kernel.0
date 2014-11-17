@@ -1,96 +1,39 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 17 Nov 2014 09:23:37 +0100
-Subject: [PATCH v4 2/6] input: touchscreen: ti_am335x_tsc: Remove udelay
- in interrupt handler
-In-Reply-To: <54697919.5030302@ti.com>
-References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
- <1415941651-28962-3-git-send-email-vigneshr@ti.com>
- <20141115192739.GA18766@localhost.localdomain>
- <54697919.5030302@ti.com>
-Message-ID: <20141117082337.GA3946@localhost.localdomain>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Mon, 17 Nov 2014 09:27:09 +0100
+Subject: [PATCH 0/2] initial suport for Alphascale ASM9260
+In-Reply-To: <1414401792-7445-1-git-send-email-linux@rempel-privat.de>
+References: <1414401792-7445-1-git-send-email-linux@rempel-privat.de>
+Message-ID: <5469B15D.8020502@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 09:57:05AM +0530, Vignesh R wrote:
-> My patches are based on v3.18rc2. I tested my patches on am335x-evm
-> using tslib.
+ping
 
-No beaglebone + cape testing?
+Am 27.10.2014 um 10:23 schrieb Oleksij Rempel:
+> This is reduced patchset to provide initial support for Alpascale ASM9260.
+> 
+> 
+> Oleksij Rempel (2):
+>   ARM: add mach-asm9260
+>   ARM: add lolevel debug support for asm9260
+> 
+>  arch/arm/Kconfig                 |  2 ++
+>  arch/arm/Kconfig.debug           | 33 ++++++++++++++++++++++++++++++---
+>  arch/arm/include/debug/asm9260.S | 31 +++++++++++++++++++++++++++++++
+>  arch/arm/mach-asm9260/Kconfig    |  6 ++++++
+>  4 files changed, 69 insertions(+), 3 deletions(-)
+>  create mode 100644 arch/arm/include/debug/asm9260.S
+>  create mode 100644 arch/arm/mach-asm9260/Kconfig
+> 
 
-> Please explain "touch is broken"? What is the behaviour of TSC?
+-- 
+Regards,
+Oleksij
 
-With plain v3.17 plus your series, the cursor is almost never near the
-pen. Mostly it jitters around the right hand edge.
-
-My customer had already changed the step delay (I think by trial and
-error, not sure) in order to get the cursor near the pen. I ported
-this change onto your series (see patch, below), but still the pen up
-event causes a huge cursor jump.
-
-(Again, I did solve the pen up issue, but in a totally different
-way. I never posted the fix, because I could not be sure that it would
-work on a wide variety of boards.)
-
-> Which ADC channels are being used for TSC?
-
-&tscadc {
-	status = "okay";
-	tsc {
-		ti,wires = <4>;
-		ti,x-plate-resistance = <300>;
-		ti,coordinate-readouts = <5>;
-		ti,wire-config = <0x00 0x11 0x23 0x32>;
-	};
-
-	adc {
-		ti,adc-channels = <5 6 7>;
-	};
-};
-
-So for this particular design, your series really does not help, not
-even a little. You did not test the series on many boards. I am
-concerned that this series only works on the one board you did test,
-and that it may break functionality on other people's boards.
-
-Thanks,
-Richard
-
----
-diff --git a/drivers/input/touchscreen/ti_am335x_tsc.c b/drivers/input/touchscreen/ti_am335x_tsc.c
-index b84493f..77a4883 100644
---- a/drivers/input/touchscreen/ti_am335x_tsc.c
-+++ b/drivers/input/touchscreen/ti_am335x_tsc.c
-@@ -148,7 +148,7 @@ static void titsc_step_config(struct titsc *ts_dev)
- 	end_step = first_step + tsc_steps;
- 	for (i = end_step - ts_dev->coordinate_readouts; i < end_step; i++) {
- 		titsc_writel(ts_dev, REG_STEPCONFIG(i), config);
--		titsc_writel(ts_dev, REG_STEPDELAY(i), STEPCONFIG_OPENDLY);
-+		titsc_writel(ts_dev, REG_STEPDELAY(i), STEPCONFIG_OPENDLY | STEPDELAY_SAMPLE(20));
- 	}
- 
- 	config = 0;
-@@ -172,7 +172,7 @@ static void titsc_step_config(struct titsc *ts_dev)
- 	end_step = first_step + ts_dev->coordinate_readouts;
- 	for (i = first_step; i < end_step; i++) {
- 		titsc_writel(ts_dev, REG_STEPCONFIG(i), config);
--		titsc_writel(ts_dev, REG_STEPDELAY(i), STEPCONFIG_OPENDLY);
-+		titsc_writel(ts_dev, REG_STEPDELAY(i), STEPCONFIG_OPENDLY | STEPDELAY_SAMPLE(20));
- 	}
- 
- 	/* Make CHARGECONFIG same as IDLECONFIG */
-@@ -188,13 +188,13 @@ static void titsc_step_config(struct titsc *ts_dev)
- 			STEPCONFIG_INP(ts_dev->inp_xp);
- 	titsc_writel(ts_dev, REG_STEPCONFIG(end_step), config);
- 	titsc_writel(ts_dev, REG_STEPDELAY(end_step),
--			STEPCONFIG_OPENDLY);
-+			STEPCONFIG_OPENDLY | STEPDELAY_SAMPLE(20));
- 
- 	end_step++;
- 	config |= STEPCONFIG_INP(ts_dev->inp_yn);
- 	titsc_writel(ts_dev, REG_STEPCONFIG(end_step), config);
- 	titsc_writel(ts_dev, REG_STEPDELAY(end_step),
--			STEPCONFIG_OPENDLY);
-+			STEPCONFIG_OPENDLY | STEPDELAY_SAMPLE(20));
- 
- 	/* The steps end ... end - readouts * 2 + 2 and bit 0 for TS_Charge */
- 	stepenable = 1;
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/7b4353f3/attachment.sig>
