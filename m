@@ -1,54 +1,29 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 17 Nov 2014 11:39:02 -0800
+From: amstan@chromium.org (Alexandru Stan)
+Date: Mon, 17 Nov 2014 11:50:51 -0800
 Subject: [PATCH v2 1/2] clk: rockchip: add bindings for the mmc clock
  phases
-In-Reply-To: <1416009604-31545-2-git-send-email-amstan@chromium.org>
+In-Reply-To: <20141117193902.25314.97687@quantum>
 References: <1416009604-31545-1-git-send-email-amstan@chromium.org>
  <1416009604-31545-2-git-send-email-amstan@chromium.org>
-Message-ID: <20141117193902.25314.97687@quantum>
+ <20141117193902.25314.97687@quantum>
+Message-ID: <CAHNYxRwGWqbznVybmE+tpyghEoQwVFK_V2ubFRKXasvsPS+R7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Alexandru M Stan (2014-11-14 16:00:03)
-> This will be used in a later patch for clock phase tuning.
-> 
-> Suggested-by: Heiko Stuebner <heiko@sntech.de>
-> Signed-off-by: Alexandru M Stan <amstan@chromium.org>
-> ---
-> Changes in v2: None
-> 
->  include/dt-bindings/clock/rk3288-cru.h | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/include/dt-bindings/clock/rk3288-cru.h b/include/dt-bindings/clock/rk3288-cru.h
-> index 100a08c..465d0f6 100644
-> --- a/include/dt-bindings/clock/rk3288-cru.h
-> +++ b/include/dt-bindings/clock/rk3288-cru.h
-> @@ -72,6 +72,16 @@
->  #define SCLK_HEVC_CABAC                111
->  #define SCLK_HEVC_CORE         112
->  
-> +#define SCLK_SDMMC_DRV_PHASE   113
-> +#define SCLK_SDIO0_DRV_PHASE   114
-> +#define SCLK_SDIO1_DRV_PHASE   115
-> +#define SCLK_EMMC_DRV_PHASE    116
-> +
-> +#define SCLK_SDMMC_SAMPLE_PHASE        117
-> +#define SCLK_SDIO0_SAMPLE_PHASE        118
-> +#define SCLK_SDIO1_SAMPLE_PHASE        119
-> +#define SCLK_EMMC_SAMPLE_PHASE 120
+Sorry for my previous mail, I sent it as HTML and also top posted.
+Here it goes again:
 
-It looks like you are adding new clocks to handle the phase requirement.
-Is that the right thing to do? Don't these clks already exist (e.g.
-SCLK_SDMMC)?
+On Mon, Nov 17, 2014 at 11:39 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> It looks like you are adding new clocks to handle the phase requirement.
+> Is that the right thing to do? Don't these clks already exist (e.g.
+> SCLK_SDMMC)?
+I actually need to control 2 phases, one of them is used when
+outputting data, the other when sampling. Sunxi does something
+similar: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/273273.html
 
-Regards,
-Mike
+Another reason it wouldn't work is because the upstream clock(eg
+SCLK_SDMMC) is twice as fast as the real clock(see RK3288_CLKGEN_DIV
+in drivers/mmc/host/dw_mmc-rockchip.c), since that clock goes to a /2
+divider to be able to do the 90 degree clock phases.
 
-> +
->  #define DCLK_VOP0              190
->  #define DCLK_VOP1              191
->  
-> -- 
-> 2.1.0.rc2.206.gedb03e5
-> 
+Alexandru Stan
