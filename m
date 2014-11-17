@@ -1,107 +1,69 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 17 Nov 2014 15:46:31 -0800
-Subject: [PATCH v4 15/19] arm/arm64: KVM: add virtual GICv3 distributor
- emulation
-In-Reply-To: <5469FEED.5010706@arm.com>
-References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
- <1415959683-26027-16-git-send-email-andre.przywara@arm.com>
- <20141114110720.GP19598@cbox> <5469FEED.5010706@arm.com>
-Message-ID: <20141117234536.GA10703@lvm>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Tue, 18 Nov 2014 03:50:37 +0400
+Subject: [PATCH V2 3/5] usb: gadget: pxa25x_udc: prepare/unprepare clocks
+ in pxa-ssp
+In-Reply-To: <CALT56yMCJ4R6KN2BUW61YaUz2bb6s_aJteKYBSVmvRPKacKCLw@mail.gmail.com>
+References: <1416236863-20898-1-git-send-email-dbaryshkov@gmail.com>
+ <1416236863-20898-3-git-send-email-dbaryshkov@gmail.com>
+ <878uj98y5v.fsf@free.fr>
+ <CALT56yMCJ4R6KN2BUW61YaUz2bb6s_aJteKYBSVmvRPKacKCLw@mail.gmail.com>
+Message-ID: <CALT56yO8tktrXo0rfRd91AtXBE4F5vYfYjm9AL+7dcoam6Oq9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 01:58:05PM +0000, Andre Przywara wrote:
-> Hej Christoffer,
-> 
-> maybe I just don't see the wood for the trees, so I will explain my view
-> on the things below. Please correct me / explain your view!
+2014-11-17 23:05 GMT+03:00 Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>:
+> 2014-11-17 21:44 GMT+03:00 Robert Jarzmik <robert.jarzmik@free.fr>:
+>> Guess what, Russell's remark on i2c and serial made me cross-check.  And there
+>> is a case where this will be called in irq context too ...
+>>
+>> See :
+>> -> do_IRQ
+>>   -> lubbock_vbus_irq()
+>>     -> pxa25x_udc_vbus_session()
+>>       -> pullup()
+>>         -> clk_prepare_enable()
+>>           -> CRACK
+>>
+>> Note that your patch is not really the faulty one, I think a threaded irq
+>> instead of the "raw" irq should do the trick. And it is granted on UDC api that
+>> vbus function is called in a "sleeping" context (Felipe correct me if I'm
+>> wrong), so a patch to fix this before your current code would be fine.
+>
+> OK, I will take a look. It seems the correct way would be to strip this code
+> away to a phy, like gpio-vbus or nop phys. Do you have access to lubbock
+> (or maybe Daniel, Haojian or Russell has?)?
 
-I think this argument should have taken place as a reply to my e-mail on
-the last version of this patch, but ok.
+I have sketched a compile-tested only PHY for the Lubbock platform. Could you
+please take a look and test.
+The following changes since commit fc14f9c1272f62c3e8d01300f52467c0d9af50f9:
 
-> 
-> On 14/11/14 11:07, Christoffer Dall wrote:
-> > On Fri, Nov 14, 2014 at 10:07:59AM +0000, Andre Przywara wrote:
-> >> With everything separated and prepared, we implement a model of a
-> >> GICv3 distributor and redistributors by using the existing framework
-> >> to provide handler functions for each register group.
-> >>
-> >> Currently we limit the emulation to a model enforcing a single
-> >> security state, with SRE==1 (forcing system register access) and
-> >> ARE==1 (allowing more than 8 VCPUs).
-> >>
-> >> We share some of the functions provided for GICv2 emulation, but take
-> >> the different ways of addressing (v)CPUs into account.
-> >> Save and restore is currently not implemented.
-> >>
-> >> Similar to the split-off of the GICv2 specific code, the new emulation
-> >> code goes into a new file (vgic-v3-emul.c).
-> >>
-> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> > 
-> > ??...??
-> >> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> >> index 335ffe0..b7de0f8 100644
-> >> --- a/virt/kvm/arm/vgic.c
-> >> +++ b/virt/kvm/arm/vgic.c
-> >> @@ -1249,7 +1249,7 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
-> >>  	struct kvm_vcpu *vcpu;
-> >>  	int edge_triggered, level_triggered;
-> >>  	int enabled;
-> >> -	bool ret = true;
-> >> +	bool ret = true, can_inject = true;
-> >>  
-> >>  	spin_lock(&dist->lock);
-> >>  
-> >> @@ -1264,6 +1264,11 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
-> >>  
-> >>  	if (irq_num >= VGIC_NR_PRIVATE_IRQS) {
-> >>  		cpuid = dist->irq_spi_cpu[irq_num - VGIC_NR_PRIVATE_IRQS];
-> >> +		if (cpuid == VCPU_NOT_ALLOCATED) {
-> >> +			/* Pretend we use CPU0, and prevent injection */
-> >> +			cpuid = 0;
-> >> +			can_inject = false;
-> >> +		}
-> >>  		vcpu = kvm_get_vcpu(kvm, cpuid);
-> >>  	}
-> >>  
-> >> @@ -1285,7 +1290,7 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
-> >>  
-> >>  	enabled = vgic_irq_is_enabled(vcpu, irq_num);
-> >>  
-> >> -	if (!enabled) {
-> >> +	if (!enabled || !can_inject) {
-> >>  		ret = false;
-> >>  		goto out;
-> >>  	}
-> > 
-> > As I wrote, I think this is wrong.  What happened here?
-> 
-> can_inject is just a way for stopping "non-targeted" SPIs to be
-> _injected_. The spec says in "5.3.4. GICD_IROUTERn":
-> 
-> "If this register is programmed to forward the corresponding interrupt
-> to a specific processor (i.e. IRM is zero) and the affinity path does
-> not correspond to an implemented processor, then if the corresponding
-> interrupt becomes pending it will not be forwarded to any processor and
-> will remain pending."
-> 
-> So we can happily make these SPIs pending, but an illegal irq_spi_cpu[]
-> entry will just avoid it to be injected, right?
-> 
-> What am I missing?
-> 
-> Do you want a comment here explaining this?
-> 
-No, I missed something.  What I missed was that we consider
-irq_spi_target in the compute_pending_for_cpu() so that this actually
-ends up working.
+  Linux 3.18-rc5 (2014-11-16 16:36:20 -0800)
 
-We really shouldn't be trying to take this "precompute cpu pending
-bitmaps instead of calling compute_pending_for_cpu()" shortcut here, at
-least I'm beginning to have troubles following the flow.  That's for
-another time and place though.
+are available in the git repository at:
 
-I'll review the rest of this version of the series when I get some cycles.
+  git://git.infradead.org/users/dbaryshkov/zaurus.git lubbock
 
--Christoffer
+for you to fetch changes up to 67d7e1e57af0a42d86476cd2e73fd154b590d3f8:
+
+  usb: gadget: drop lubbock-specific code from pxa25x_udc (2014-11-18
+02:43:03 +0300)
+
+----------------------------------------------------------------
+Dmitry Eremin-Solenikov (3):
+      ARM: pxa: lubbock: add declaration of vbus tranceiver
+      usb: phy: add lubbock phy driver
+      usb: gadget: drop lubbock-specific code from pxa25x_udc
+
+ arch/arm/mach-pxa/lubbock.c         |   6 +++
+ drivers/usb/gadget/udc/pxa25x_udc.c |  61 -----------------------
+ drivers/usb/phy/Kconfig             |  10 ++++
+ drivers/usb/phy/Makefile            |   1 +
+ drivers/usb/phy/phy-lubbock.c       | 225
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 242 insertions(+), 61 deletions(-)
+ create mode 100644 drivers/usb/phy/phy-lubbock.c
+
+
+-- 
+With best wishes
+Dmitry
