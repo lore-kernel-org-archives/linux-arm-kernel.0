@@ -1,36 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Nov 2014 09:29:34 +0100
-Subject: [PATCH 2/5] ARM:dts:imx6:phyFLEX: Enable gpmi in module file
-In-Reply-To: <3652599.ahZEGyuIxZ@lws-hemp>
-References: <1415971946-48975-1-git-send-email-c.hemp@phytec.de>
- <1445555.ZBLGLeHvnl@wuerfel> <3652599.ahZEGyuIxZ@lws-hemp>
-Message-ID: <4491159.MZR4lFNflh@wuerfel>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Mon, 17 Nov 2014 09:31:21 +0100
+Subject: [PATCH] gpio: mxs: implement get_direction callback
+In-Reply-To: <20141116214239.GX27002@pengutronix.de>
+References: <1416004026-9667-1-git-send-email-j.uzycki@elproma.com.pl>
+ <20141114232601.GW27002@pengutronix.de> <5467A980.5090204@elproma.com.pl>
+ <20141116214239.GX27002@pengutronix.de>
+Message-ID: <CACQ1gAjjQuiThoTP9D3igmrZyCDpyH7iWCnP5T29K4b-n4FXVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 November 2014 09:27:37 Christian Hemp wrote:
-> Am Freitag, 14. November 2014, 15:55:11 schrieb Arnd Bergmann:
-> > On Friday 14 November 2014 14:32:23 Christian Hemp wrote:
-> > > --- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-> > > +++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-> > > @@ -91,7 +91,7 @@
-> > > 
-> > >         pinctrl-names = "default";
-> > >         pinctrl-0 = <&pinctrl_gpmi_nand>;
-> > >         nand-on-flash-bbt;
-> > > 
-> > > -       status = "disabled";
-> > > +       status = "okay";
-> > > 
-> > >  };
-> > 
-> > No need for the property unless you are overriding a 'status="disabled"'
-> > from another file. Just remove this property here.
-> 
-> the status is disabled in 'arch/arm/boot/dts/imx6qdl.dtsi'. 
-> That why I enabled it in the 'arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi'.
-> 
+Hi all,
 
-Ok, makes sense. Thanks for the clarification.
-
-	Arnd
+2014-11-16 22:42 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello Janusz,
+>
+> On Sat, Nov 15, 2014 at 08:29:04PM +0100, Janusz U?ycki wrote:
+>> W dniu 2014-11-15 o 00:26, Uwe Kleine-K?nig pisze:
+>> >Hello,
+>> >
+>> >On Fri, Nov 14, 2014 at 11:27:06PM +0100, Janusz Uzycki wrote:
+>> >>Function gpiod_get_direction() of gpiolib calls get_direction()
+>> >>callback. If chip doesn't implement it EINVAL error is returned.
+>> >>The function doesn't use for returned value shadowed FLAG_IS_OUT
+>> >>bit of gpio_desc.flags field so the callback is required.
+>> >This sounds like a bugfix but "required" is wrong as AFAIR this call is
+>> >optional and hardly used. Or did that change? The only drawback is that
+>> >the debug output for (by Linux) uninitialized gpios is wrong.
+>>
+>> Yes, the callback is optional but gpiod_get_direction() doesn't work
+>> without it.
+>> gpiod_get_direction() doesn't seem optional,
+>> Documentation/gpio/consumer.txt:
+>> "A driver can also query the current direction of a GPIO:
+>>          int gpiod_get_direction(const struct gpio_desc *desc)
+>> This function will return either GPIOF_DIR_IN or GPIOF_DIR_OUT.
+>> Be aware that there is no default direction for GPIOs. Therefore,
+>> **using a GPIO
+>> without setting its direction first is illegal and will result in undefined
+>> behavior!**"
+>> There is nothing about EINVAL error. It happens despite direction was
+>> set before. The reason is undefined get_direction callback.
+> I still think you must not rely on gpiod_get_direction working. Some
+> controllers might not be able to provide this info and if you know that
+> the direction was set before, there is no need to ask the framework.
+> (Although I admit it might be comfortable at times.)
+>
+>> The commit f9e42397d79b6e810437ba1130b0b4b594f5e56c
+>> ("serial: mxs-auart: add interrupts for modem control lines")
+>> is based on Richard's commit ab5e4e4108ca5d8326cb6b4b3a21b096a002f68f
+>> ("tty/serial: at91: add interrupts for modem control lines").
+>> Both patches use the condition:
+>> "if (gpiod && (gpiod_get_direction(gpiod) == GPIOF_DIR_IN))"
+> This is broken. Actually you want to loop only over the functions in
+> mctrl_gpios_desc that are inputs (i.e. CTS, DSR, DCD and RNG) and don't
+> depend on the hardware state and/or a working gpiod_get_direction.
+Yes, it seemed a convenient test to locate inputs in atmel_serial's
+probe function.
+But you're right, looping on a
+enum mctrl_gpio_idx [] = {
+        UART_GPIO_CTS, UART_GPIO_DSR,
+        UART_GPIO_DCD, UART_GPIO_RNG, UART_GPIO_RI
+};
+Would better describe what is done, without using gpiod_get_direction().
