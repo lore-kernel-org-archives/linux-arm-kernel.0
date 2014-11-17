@@ -1,55 +1,56 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 17 Nov 2014 09:56:28 +0100
-Subject: [GIT PULL] at91: fixes for 3.18 #2
-In-Reply-To: <20141116231244.GD14929@quad.lixom.net>
-References: <1415963482-16582-1-git-send-email-nicolas.ferre@atmel.com>
- <20141116231244.GD14929@quad.lixom.net>
-Message-ID: <5469B83C.7080004@atmel.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 17 Nov 2014 09:56:40 +0100
+Subject: [RFC PATCHv2] ARM: mvebu: Let the device-tree determine smp_ops
+In-Reply-To: <1415327626-16079-1-git-send-email-chris.packham@alliedtelesis.co.nz>
+References: <20141106201603.GF4974@lunn.ch>
+ <1415327626-16079-1-git-send-email-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20141117095640.03e25d17@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/11/2014 00:12, Olof Johansson :
-> On Fri, Nov 14, 2014 at 12:11:22PM +0100, Nicolas Ferre wrote:
->> Arnd, Olof, Kevin,
->>
->> I don't have more for the moment, so here is trivial at91 material for 3.18.
->>
->> Thanks, best regards,
->>
->> The following changes since commit 106c67af2fb938880edbf43b49dabbd8d2534839:
->>
->>   ARM: at91/dt: sam9263: fix PLLB frequencies (2014-10-22 10:08:22 +0200)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-fixes2
->>
->> for you to fetch changes up to c4e4bbcee9fa37024a2d4cdcaa5fe89a2c5c7a05:
->>
->>   ARM: at91/dt: Fix sama5d3x typos (2014-11-13 12:37:44 +0100)
->>
->> ----------------------------------------------------------------
->> Tiny typo fixes for this second batch for 3.18
->>
->> ----------------------------------------------------------------
->> Ludovic Desroches (1):
->>       ARM: at91/dt: sama5d4: use macro instead of numeric value
+Dear Chris Packham,
+
+On Fri,  7 Nov 2014 15:33:46 +1300, Chris Packham wrote:
+> The machine specific SMP operations can be configured either via
+> setup_arch or via arm_dt_init_cpu_maps. For the ARMADA_370_XP_DT devices
+> both of these are called and setup_arch wins because it is called last.
+> This means that it is not possible to substitute a different set of SMP
+> operations via the device-tree.
 > 
-> I don't consider this to be a fix at this time in the release, please
-> include in your 3.19 material.
-
-Ok, taken in at91-3.19-dt branch that I will sent to you soon.
-
->> Peter Rosin (1):
->>       ARM: at91/dt: Fix sama5d3x typos
->>
+> For the ARMADA_370_XP_DT compatible devices add a smp_init function that
+> detects if the device tree has an enable-method defined. If it does
+> return true to indicate that the smp_ops have already been set which
+> will prevent setup_arch from overriding them.
 > 
-> I did cherry-pick this one in though.
-> 
-> Not sure if I'll make today's -rc with my fixes pull request. :)
+> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 
-It did it. Thanks.
+My colleague Maxime Ripard (in Cc) rightfully suggests exploring a
+different option: what about getting rid completely of the .smp field
+of the DT_MACHINE structure, and instead have some code run early
+enough that looks if an enable-method is defined, and if not, defines
+it to the default value. This way, we continue to be backward
+compatible in terms of DT, but we always use the enable-method from the
+DT, and not sometimes from DT, sometimes from the DT_MACHINE structure.
 
-Bye,
+Unfortunately, it will have to be done on the flattened DT, because the
+DT is unflattened right before the enable-method properties are looked
+up:
+
+        unflatten_device_tree();
+
+        arm_dt_init_cpu_maps();
+
+And manipulating the DT in its flattened format, while possible in
+->dt_fixup(), is a pain, and probably doesn't allow adding new
+properties anyway.
+
+So, in the end, maybe this idea doesn't work, I haven't checked
+completely.
+
+Best regards,
+
+Thomas
 -- 
-Nicolas Ferre
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
