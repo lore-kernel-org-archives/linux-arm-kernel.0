@@ -1,111 +1,123 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 17 Nov 2014 10:28:47 +0100
-Subject: [PATCHv2 5/8] arm: mvebu: add common uart0 and spi0 pintcrl
- entries for Armada 370
-In-Reply-To: <20141117005532.GK15870@lunn.ch>
-References: <cover.1416158990.git.arno@natisbad.org>
- <d550094896837ac921e5d2a69fc5aae9b287a98a.1416158990.git.arno@natisbad.org>
- <20141116211034.GJ15870@lunn.ch> <874mtyok43.fsf@natisbad.org>
- <20141117005532.GK15870@lunn.ch>
-Message-ID: <5469BFCF.9060307@gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 17 Nov 2014 17:30:45 +0800
+Subject: [PATCH] mmc: sdhci-sirf: add sirf tuning function (cmd 19)
+In-Reply-To: <CAPDyKFopdcLXVCuoifd7K8NaRY4UXDbDmNJvyFeUQZs62or9Ag@mail.gmail.com>
+References: <1415720864-3936-1-git-send-email-21cnbao@gmail.com>
+ <CAPDyKFopdcLXVCuoifd7K8NaRY4UXDbDmNJvyFeUQZs62or9Ag@mail.gmail.com>
+Message-ID: <CAGsJ_4yOCwt1YYd6UuAXjeO2iWhQB4XtouyriX1YsK7BnyNNLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/17/2014 01:55 AM, Andrew Lunn wrote:
-> On Sun, Nov 16, 2014 at 11:29:00PM +0100, Arnaud Ebalard wrote:
->> Hi,
+2014-11-12 17:35 GMT+08:00 Ulf Hansson <ulf.hansson@linaro.org>:
+> On 11 November 2014 16:47, Barry Song <21cnbao@gmail.com> wrote:
+>> From: Minda Chen <Minda.Chen@csr.com>
 >>
->> Andrew Lunn <andrew@lunn.ch> writes:
+>> Add manual tuning function in CSR atlas7 SoC. It is mainly used
+>> for the UHS-I SD card working SDR50 SDR104 mode.
 >>
->>> On Sun, Nov 16, 2014 at 06:37:33PM +0100, Arnaud Ebalard wrote:
->>>>
->>>> pinctrl entries for uart0 using MPP0-1 and spi0 using MPP33-36 are
->>>> common configurations. Instead of replicating them in each .dts file,
->>>> put those in armada-370.dtsi file so that they can be referenced.
->>>>
->>>> Suggested-by: Andrew Lunn <andrew@lunn.ch>
->>>> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
->>>> ---
->>>>   arch/arm/boot/dts/armada-370.dtsi | 11 +++++++++++
->>>>   1 file changed, 11 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
->>>> index 6b3c23b1e138..d9f5d59e463e 100644
->>>> --- a/arch/arm/boot/dts/armada-370.dtsi
->>>> +++ b/arch/arm/boot/dts/armada-370.dtsi
->>>> @@ -115,6 +115,17 @@
->>>>   				compatible = "marvell,mv88f6710-pinctrl";
->>>>   				reg = <0x18000 0x38>;
->>>>
->>>> +				uart0_pins: uart0-pins {
->>>> +					marvell,pins = "mpp0", "mpp1";
->>>> +					marvell,function = "uart0";
->>>> +				};
->>>
->>> Thanks for these.
->>>
->>> We can go one stage further. kirkwood.dts has:
->>>
->>>                  uart0: serial at 12000 {
->>>                          compatible = "ns16550a";
->>>                          reg = <0x12000 0x100>;
->>>                          reg-shift = <2>;
->>>                          interrupts = <33>;
->>>                          clocks = <&gate_clk 7>;
->>>                          pinctrl-0 = <&pmx_uart0>;
->>>                          pinctrl-names = "default";
->>>                          status = "disabled";
->>>                  };
->>>
->>> i.e actually references them. This is safe because a board .dts file
->>> can override the pins if needed.
->>>
->>> We should do the same here, both for 370 and XP.
+>> The tuning principle can be seen in SD spec part1 v3.01 4.2.4.5
+>> (tuning command).
 >>
->> Just to be sure I understand: for uart0 and uart1, I think this can only
->> be done for Armada 370 (on XP, uart0/1 rx/tx are not mpp).
->
-> I must admit, i did not look at the datasheet for XP. So you can
-> ignore XP.
->
->
->> This only a matter of adding the following in armada-370.dtsi for uart0:
+>> SD host send the cmd19 and set the delay value(0-127).
+>> and the sdcard return 64 bytes data. If the data is same with
+>> the tuning data. The delay value is valid. Execute this commmand
+>> 128 times. And calculate the longest window of the valid values.
+>> The value in the middle of this window is the best value.
 >>
->>   		 /*
->> 		  * Default UART pinctrl setting without RTS/CTS, can
->> 		  * be overwritten on board level.
->>                    */
->>                   uart0: serial at 12000 {
->>                           pinctrl-0 = <&uart0_pins>;
->>                           pinctrl-names = "default";
->>                   };
+>> Signed-off-by: Minda Chen <Minda.Chen@csr.com>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>> ---
+>>  drivers/mmc/host/sdhci-sirf.c | 105 +++++++++++++++++++++++++++++++++++++++++-
+>>  1 file changed, 104 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
+>> index dd29d47..c71cf4e 100644
+>> --- a/drivers/mmc/host/sdhci-sirf.c
+>> +++ b/drivers/mmc/host/sdhci-sirf.c
+>> @@ -8,14 +8,18 @@
+>>
+>>  #include <linux/delay.h>
+>>  #include <linux/device.h>
+>> -#include <linux/mmc/host.h>
+>>  #include <linux/module.h>
+>>  #include <linux/of.h>
+>>  #include <linux/of_gpio.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/mmc/host.h>
+>> +#include <linux/mmc/mmc.h>
+>>  #include <linux/mmc/slot-gpio.h>
+>>  #include "sdhci-pltfm.h"
+>>
+>> +#define SDHCI_CLK_DELAY_SETTING 0x4C
+>>  #define SDHCI_SIRF_8BITBUS BIT(3)
+>> +#define SIRF_TUNING_COUNT 128
+>>
+>>  struct sdhci_sirf_priv {
+>>         struct clk *clk;
+>> @@ -49,7 +53,106 @@ static void sdhci_sirf_set_bus_width(struct sdhci_host *host, int width)
+>>         sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
+>>  }
+>>
+>> +static int sdhci_sirf_execute_tuning(struct sdhci_host *host, u32 opcode)
+>> +{
+>> +       int tuning_seq_cnt = 3;
+>> +       u8 phase, *data_buf, tuned_phases[SIRF_TUNING_COUNT];
+>> +       u8 tuned_phase_cnt = 0;
+>> +       const u8 *tuning_block_pattern = tuning_blk_pattern_4bit;
+>> +       int size = sizeof(tuning_blk_pattern_4bit);
+>> +       int rc, longest_range = 0;
+>> +       int start = -1, end, tuning_value = -1, range = 0;
+>> +       u16 clock_setting;
+>> +       struct mmc_host *mmc = host->mmc;
+>> +
+>> +       data_buf = kmalloc(size, GFP_KERNEL);
+>> +       if (!data_buf)
+>> +               return -ENOMEM;
+>> +
+>> +       clock_setting = sdhci_readw(host, SDHCI_CLK_DELAY_SETTING);
+>> +       clock_setting &= ~0x3fff;
+>> +
+>> +retry:
+>> +       phase = 0;
+>> +       do {
+>> +               struct mmc_command cmd = { 0 };
+>> +               struct mmc_data data = { 0 };
+>> +               struct mmc_request mrq = {
+>> +                       .cmd = &cmd,
+>> +                       .data = &data
+>> +               };
+>> +               struct scatterlist sg;
+>> +
+>> +               sdhci_writel(host,
+>> +                       clock_setting | phase | (phase << 7) | (phase << 16),
+>> +                       SDHCI_CLK_DELAY_SETTING);
+>> +
+>> +               cmd.opcode = opcode;
+>> +               cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
+>> +
+>> +               data.blksz = size;
+>> +               data.blocks = 1;
+>> +               data.flags = MMC_DATA_READ;
+>> +               data.timeout_ns = NSEC_PER_SEC; /* 1 second */
+>> +
+>> +               data.sg = &sg;
+>> +               data.sg_len = 1;
+>> +               sg_init_one(&sg, data_buf, size);
+>> +               memset(data_buf, 0, size);
+>> +               mmc_wait_for_req(mmc, &mrq);
 >
-> Looks good.
+> These piece of code, which sends the tuning command don't belong in
+> the host driver. Instead I would like this to be handled from a helper
+> function from the mmc core.
 >
->> For uart1, it's not obvious because there are 6 different MPP which can
->> be configured to act as uart1 TXD.
->
-> That is too many configurations. So lets leave it per board.
->
->> Now, regarding armada XP, uart2 and uart3 txd/rxd MPP are 42/43 and
->> 44/45. Best we can do is put the same as above in each specific
->> armada-xp-mv78XXX.dtsi file, where pinctrl node is, after adding
->> uart2-pins and uart3-pins. Unless I am missing something, this cannot
->> be done in armada-xp.dtsi.
+> I realize that there already a few existing host drivers that
+> implemented similar code and I don't like it. We should convert them
+> to use a common helper function from the core instead.
+yes. that is fine.
 
-It would make sense to have a basic pinctrl node in armada-370-xp.dtsi
-already. It will only have the reg property set, which is IIRC the same
-for all SoCs. Each of the more specific dtsi will set what is common
-below that, i.e. armada-370.dtsi will have the compatible + 370 specific
-pinmux settings. For XP, the common pinmux settings will be in
-armada-xp.dtsi while the compatible is set later in each of the XP
-variant dtsi files.
+our engineering is currently very busy and might have no time to
+handle this for this moment.
+do you think we can move your requirement to a new refine task of next
+window after you pick up this in this window?
 
-Sebastian
-
-> Actually, i think it can. But i could be wrong.
->
-> armada-370-xp.dtsi declares uart0 and uart1.  armada-xp.dtsi then
-> defined another two uart's, uart2 and uart3. You should be able to
-> define the pinctrl nodes for the serial ports there, even if the main
-> pinctrl node is in the SoC specific .dtsi file.
+-barry
