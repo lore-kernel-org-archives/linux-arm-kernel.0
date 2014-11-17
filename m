@@ -1,173 +1,153 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:41:54 +0100
-Subject: [PATCH v5 00/61] dmaengine: Implement generic slave capabilities
- retrieval
-Message-ID: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Mon, 17 Nov 2014 14:42:15 +0100
+Subject: [PATCH v5 21/61] dmaengine: fsl-edma: Split device_control
+In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-22-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Split the device_control callback of the Freescale EDMA driver to make use
+of the newly introduced callbacks, that will eventually be used to retrieve
+slave capabilities.
 
-As we discussed a couple of weeks ago, this is the third attempt at
-creating a generic behaviour for slave capabilities retrieval so that
-generic layers using dmaengine can actually rely on that.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/dma/fsl-edma.c | 106 +++++++++++++++++++++++++++----------------------
+ 1 file changed, 58 insertions(+), 48 deletions(-)
 
-That has been done mostly through two steps: by moving out the
-sub-commands of the device_control callback, so that the dmaengine
-core can then infer from that wether a sub-command is implemented, and
-then by moving the slave properties, such as the supported buswidth,
-to the structure dma_device itself.
-
-Comments are as usual appreciated!
-
-Thanks,
-Maxime
-
-Changes from v4:
-  - Rebased on top of current dma/next
-  - Converted AT91 XDMAC driver to the new API
-  - Updated the documentation to reflect our changes
-
-Changes from v3:
-  - Removed the generic_slave_caps flag
-  - Merged the patch introducing a generic slave caps functions with
-    the one introducing the dma_device capabilities
-
-Changes from v2:
-  - Reworked dma_chan_get/dma_chan_put in order to optionally use
-    device_alloc_chan_resources/device_free_chan_resources
-  - Modified a few client drivers that were still calling
-    device_control directly to use the dmaengine API instead
-  - Totally remove device_control and device_slave_config
-  - Move device_control BUG_ON removal earlier in the patch set to
-    avoid breaking the bisectability
-  - Converted rapidio tsi721 driver too.
-  - Minor cosmetics changes and fixes suggested by Laurent Pinchart
-    and Andy Shevchenko
-  - Fixed a few build warnings
-  - Collected the various Acked-by
-  - Rebased on top of 3.18-rc1
-
-Changes from v1:
-  - Add a flag to trigger the generic slave caps mechanism
-  - Add a warning whenever this flag is not set, or when a
-    device_control callback is still defined
-  - Migrate all existing users to use the new callbacks, and the
-    generic slave capabilities
-
-Ludovic Desroches (2):
-  dmaengine: at_xdmac: split device_control
-  dmaengine: at_xdmac: Declare slave capabilities for the generic code
-
-Maxime Ripard (59):
-  serial: at91: Use dmaengine_slave_config API
-  crypto: ux500: Use dmaengine_terminate_all API
-  dmaengine: Make the destination abbreviation coherent
-  dmaengine: Rework dma_chan_get
-  dmaengine: Make channel allocation callbacks optional
-  dmaengine: Introduce a device_config callback
-  dmaengine: split out pause/resume operations from device_control
-  dmaengine: Add device_terminate_all callback
-  dmaengine: Remove the need to declare device_control
-  dmaengine: Create a generic dma_slave_caps callback
-  dmaengine: pl08x: Split device_control
-  dmaengine: hdmac: Split device_control
-  dmaengine: bcm2835: Split device_control
-  dmaengine: coh901318: Split device_control
-  dmaengine: cppi41: Split device_control
-  dmaengine: jz4740: Split device_control
-  dmaengine: dw: Split device_control
-  dmaengine: edma: Split device_control
-  dmaengine: ep93xx: Split device_control
-  dmaengine: fsl-edma: Split device_control
-  dmaengine: imx: Split device_control
-  dmaengine: imx-sdma: Split device_control
-  dmaengine: intel-mid-dma: Split device_control
-  dmaengine: ipu-idmac: Split device_control
-  dmaengine: k3: Split device_control
-  dmaengine: mmp-pdma: Split device_control
-  dmaengine: mmp-tdma: Split device_control
-  dmaengine: moxart: Split device_control
-  dmaengine: fsl-dma: Split device_control
-  dmaengine: mpc512x: Split device_control
-  dmaengine: mxs: Split device_control
-  dmaengine: nbpfaxi: Split device_control
-  dmaengine: omap: Split device_control
-  dmaengine: pl330: Split device_control
-  dmaengine: bam-dma: Split device_control
-  dmaengine: s3c24xx: Split device_control
-  dmaengine: sa11x0: Split device_control
-  dmaengine: sh: Split device_control
-  dmaengine: sirf: Split device_control
-  dmaengine: sun6i: Split device_control
-  dmaengine: d40: Split device_control
-  dmaengine: tegra20: Split device_control
-  dmaengine: xilinx: Split device_control
-  dmaengine: mv_xor: Remove device_control
-  dmaengine: pch-dma: Rename device_control
-  dmaengine: td: Rename device_control
-  dmaengine: txx9: Rename device_control
-  dmaengine: rapidio: tsi721: Rename device_control
-  dmaengine: bcm2835: Declare slave capabilities for the generic code
-  dmaengine: fsl-edma: Declare slave capabilities for the generic code
-  dmaengine: edma: Declare slave capabilities for the generic code
-  dmaengine: nbpfaxi: Declare slave capabilities for the generic code
-  dmaengine: omap: Declare slave capabilities for the generic code
-  dmaengine: pl330: Declare slave capabilities for the generic code
-  dmaengine: sirf: Declare slave capabilities for the generic code
-  dmaengine: sun6i: Declare slave capabilities for the generic code
-  dmaengine: Add a warning for drivers not using the generic slave caps
-    retrieval
-  dmaengine: Remove device_control and device_slave_caps
-  Documentation: dmaengine: Update the documentation
-
- Documentation/dmaengine/provider.txt  |  93 ++++++++--------
- drivers/crypto/ux500/cryp/cryp_core.c |   4 +-
- drivers/crypto/ux500/hash/hash_core.c |   2 +-
- drivers/dma/amba-pl08x.c              | 156 +++++++++++++++------------
- drivers/dma/at_hdmac.c                | 121 ++++++++++++---------
- drivers/dma/at_xdmac.c                | 127 ++++++++++++----------
- drivers/dma/bcm2835-dma.c             |  46 ++------
- drivers/dma/coh901318.c               | 137 +++++++++++------------
- drivers/dma/cppi41.c                  |  30 +-----
- drivers/dma/dma-jz4740.c              |  20 +---
- drivers/dma/dmaengine.c               |  51 +++++----
- drivers/dma/dw/core.c                 |  82 +++++++-------
- drivers/dma/edma.c                    |  70 ++++--------
- drivers/dma/ep93xx_dma.c              |  41 ++-----
- drivers/dma/fsl-edma.c                | 123 ++++++++++-----------
- drivers/dma/fsldma.c                  |  91 ++++++----------
- drivers/dma/imx-dma.c                 | 103 +++++++++---------
- drivers/dma/imx-sdma.c                |  66 ++++++------
- drivers/dma/intel_mid_dma.c           |  25 ++---
- drivers/dma/ipu/ipu_idmac.c           |  96 +++++++++--------
- drivers/dma/k3dma.c                   | 197 ++++++++++++++++++----------------
- drivers/dma/mmp_pdma.c                | 109 ++++++++++---------
- drivers/dma/mmp_tdma.c                |  82 +++++++-------
- drivers/dma/moxart-dma.c              |  25 +----
- drivers/dma/mpc512x_dma.c             | 111 +++++++++----------
- drivers/dma/mv_xor.c                  |   9 --
- drivers/dma/mxs-dma.c                 |  59 ++++------
- drivers/dma/nbpfaxi.c                 | 110 +++++++++----------
- drivers/dma/omap-dma.c                |  69 ++++--------
- drivers/dma/pch_dma.c                 |   8 +-
- drivers/dma/pl330.c                   | 126 ++++++++++------------
- drivers/dma/qcom_bam_dma.c            |  85 +++++++--------
- drivers/dma/s3c24xx-dma.c             |  75 +++++++------
- drivers/dma/sa11x0-dma.c              | 158 ++++++++++++++-------------
- drivers/dma/sh/shdma-base.c           |  72 ++++++-------
- drivers/dma/sirf-dma.c                |  59 +++-------
- drivers/dma/ste_dma40.c               |  60 +++++------
- drivers/dma/sun6i-dma.c               | 159 ++++++++++++++-------------
- drivers/dma/tegra20-apb-dma.c         |  22 +---
- drivers/dma/timb_dma.c                |   8 +-
- drivers/dma/txx9dmac.c                |   9 +-
- drivers/dma/xilinx/xilinx_vdma.c      |  29 ++---
- drivers/rapidio/devices/tsi721_dma.c  |   8 +-
- drivers/tty/serial/atmel_serial.c     |  10 +-
- include/linux/dmaengine.h             | 121 ++++++++++++---------
- sound/soc/soc-generic-dmaengine-pcm.c |   2 +-
- 46 files changed, 1520 insertions(+), 1746 deletions(-)
-
+diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
+index 13df85a16438..b5b7474f8859 100644
+--- a/drivers/dma/fsl-edma.c
++++ b/drivers/dma/fsl-edma.c
+@@ -292,62 +292,69 @@ static void fsl_edma_free_desc(struct virt_dma_desc *vdesc)
+ 	kfree(fsl_desc);
+ }
+ 
+-static int fsl_edma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-		unsigned long arg)
++static int fsl_edma_terminate_all(struct dma_chan *chan)
+ {
+ 	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
+-	struct dma_slave_config *cfg = (void *)arg;
+ 	unsigned long flags;
+ 	LIST_HEAD(head);
+ 
+-	switch (cmd) {
+-	case DMA_TERMINATE_ALL:
+-		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
++	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
++	fsl_edma_disable_request(fsl_chan);
++	fsl_chan->edesc = NULL;
++	vchan_get_all_descriptors(&fsl_chan->vchan, &head);
++	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
++	vchan_dma_desc_free_list(&fsl_chan->vchan, &head);
++	return 0;
++}
++
++static int fsl_edma_pause(struct dma_chan *chan)
++{
++	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
++	unsigned long flags;
++
++	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
++	if (fsl_chan->edesc) {
+ 		fsl_edma_disable_request(fsl_chan);
+-		fsl_chan->edesc = NULL;
+-		vchan_get_all_descriptors(&fsl_chan->vchan, &head);
+-		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
+-		vchan_dma_desc_free_list(&fsl_chan->vchan, &head);
+-		return 0;
+-
+-	case DMA_SLAVE_CONFIG:
+-		fsl_chan->fsc.dir = cfg->direction;
+-		if (cfg->direction == DMA_DEV_TO_MEM) {
+-			fsl_chan->fsc.dev_addr = cfg->src_addr;
+-			fsl_chan->fsc.addr_width = cfg->src_addr_width;
+-			fsl_chan->fsc.burst = cfg->src_maxburst;
+-			fsl_chan->fsc.attr = fsl_edma_get_tcd_attr(cfg->src_addr_width);
+-		} else if (cfg->direction == DMA_MEM_TO_DEV) {
+-			fsl_chan->fsc.dev_addr = cfg->dst_addr;
+-			fsl_chan->fsc.addr_width = cfg->dst_addr_width;
+-			fsl_chan->fsc.burst = cfg->dst_maxburst;
+-			fsl_chan->fsc.attr = fsl_edma_get_tcd_attr(cfg->dst_addr_width);
+-		} else {
+-			return -EINVAL;
+-		}
+-		return 0;
++		fsl_chan->status = DMA_PAUSED;
++	}
++	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
++	return 0;
++}
+ 
+-	case DMA_PAUSE:
+-		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
+-		if (fsl_chan->edesc) {
+-			fsl_edma_disable_request(fsl_chan);
+-			fsl_chan->status = DMA_PAUSED;
+-		}
+-		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
+-		return 0;
+-
+-	case DMA_RESUME:
+-		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
+-		if (fsl_chan->edesc) {
+-			fsl_edma_enable_request(fsl_chan);
+-			fsl_chan->status = DMA_IN_PROGRESS;
+-		}
+-		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
+-		return 0;
++static int fsl_edma_resume(struct dma_chan *chan)
++{
++	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
++	unsigned long flags;
+ 
+-	default:
+-		return -ENXIO;
++	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
++	if (fsl_chan->edesc) {
++		fsl_edma_enable_request(fsl_chan);
++		fsl_chan->status = DMA_IN_PROGRESS;
+ 	}
++	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
++	return 0;
++}
++
++static int fsl_edma_slave_config(struct dma_chan *chan,
++				 struct dma_slave_config *cfg)
++{
++	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
++
++	fsl_chan->fsc.dir = cfg->direction;
++	if (cfg->direction == DMA_DEV_TO_MEM) {
++		fsl_chan->fsc.dev_addr = cfg->src_addr;
++		fsl_chan->fsc.addr_width = cfg->src_addr_width;
++		fsl_chan->fsc.burst = cfg->src_maxburst;
++		fsl_chan->fsc.attr = fsl_edma_get_tcd_attr(cfg->src_addr_width);
++	} else if (cfg->direction == DMA_MEM_TO_DEV) {
++		fsl_chan->fsc.dev_addr = cfg->dst_addr;
++		fsl_chan->fsc.addr_width = cfg->dst_addr_width;
++		fsl_chan->fsc.burst = cfg->dst_maxburst;
++		fsl_chan->fsc.attr = fsl_edma_get_tcd_attr(cfg->dst_addr_width);
++	} else {
++			return -EINVAL;
++	}
++	return 0;
+ }
+ 
+ static size_t fsl_edma_desc_residue(struct fsl_edma_chan *fsl_chan,
+@@ -914,7 +921,10 @@ static int fsl_edma_probe(struct platform_device *pdev)
+ 	fsl_edma->dma_dev.device_tx_status = fsl_edma_tx_status;
+ 	fsl_edma->dma_dev.device_prep_slave_sg = fsl_edma_prep_slave_sg;
+ 	fsl_edma->dma_dev.device_prep_dma_cyclic = fsl_edma_prep_dma_cyclic;
+-	fsl_edma->dma_dev.device_control = fsl_edma_control;
++	fsl_edma->dma_dev.device_config = fsl_edma_slave_config;
++	fsl_edma->dma_dev.device_pause = fsl_edma_pause;
++	fsl_edma->dma_dev.device_resume = fsl_edma_resume;
++	fsl_edma->dma_dev.device_terminate_all = fsl_edma_terminate_all;
+ 	fsl_edma->dma_dev.device_issue_pending = fsl_edma_issue_pending;
+ 	fsl_edma->dma_dev.device_slave_caps = fsl_dma_device_slave_caps;
+ 
 -- 
 2.1.1
