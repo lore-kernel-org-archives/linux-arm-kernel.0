@@ -1,46 +1,34 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 17 Nov 2014 20:32:54 +0100 (CET)
-Subject: [PATCH] opp: convert dev_warn() to dev_dbg() for duplicate OPPs
-In-Reply-To: <7017fa592bdaf73c260ad001a2b7abdc8d14f08a.1416211616.git.viresh.kumar@linaro.org>
-References: <7017fa592bdaf73c260ad001a2b7abdc8d14f08a.1416211616.git.viresh.kumar@linaro.org>
-Message-ID: <1496616289.267768.1416252774816.JavaMail.open-xchange@oxbaltgw08.schlund.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 17 Nov 2014 11:34:16 -0800
+Subject: Pxa25x clocks for v3.19
+In-Reply-To: <87d28ou3vt.fsf@free.fr>
+References: <87d28ou3vt.fsf@free.fr>
+Message-ID: <20141117193416.25314.75395@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+Quoting Robert Jarzmik (2014-11-15 02:58:30)
+> Hi Mike,
+> 
+> The pxa25x clocks v3 patch was posted here :
+>     http://www.gossamer-threads.com/lists/linux/kernel/2046264
+> 
+> Even if it would remain dead code for v3.19, I'd need it to get in in that
+> window so that I can activate at the same time pxa25x and pxa27x for v3.20, and
+> prevent defconfigs breakage.
+> 
+> Could this code make it for v3.19 ?
 
-> Viresh Kumar <viresh.kumar@linaro.org> hat am 17. November 2014 um 09:08
-> geschrieben:
->
-> [...]
->
-> Now the question is: Should we destroy these OPPs?
->
-> Logically kernel drivers *must* free resources they acquired. But in this
-> particular case, the OPPs are created using a static list present in device
-> tree. Destroying and then allocating them again isn't of much benefit. The
-> only
-> benefit of removing OPPs is to save some space if the driver isn't loaded
-> again.
->
-> This has its own complications. OPPs can be created either from DT (static) or
-> platform code (dynamic). Driver should only remove static OPPs and not the
-> dynamic ones as they are controlled from platform code. But there is no field
-> in
-> 'struct dev_pm_opp' which has this information to distinguish between
-> different
-> kind of OPPs.
->
-> Because of all this, I wasn't sure if drivers should remove static OPPs during
-> their removal. And so just fixing the reported issue by issuing a dev_dbg()
-> instead of dev_warn().
+Yes, I've applied it towards 3.19. I guess the missing piece is pxa3xx.
+Do you have plans to tackle that for 3.20?
 
-how about adding some kind of FIXME?
+Thanks,
+Mike
 
-beside that
-
-Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
-
-Thanks
-
-Stefan
+> 
+> Cheers.
+> 
+> -- 
+> Robert
+> 
+> PS: The code has been tested on lubbock and tosa hardwares.
