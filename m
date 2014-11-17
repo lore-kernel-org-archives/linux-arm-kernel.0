@@ -1,34 +1,35 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 17 Nov 2014 20:30:00 +0000
-Subject: [PATCH 4/8] ARM: reduce "Booted secondary processor" message to debug
- level
+Date: Mon, 17 Nov 2014 20:30:05 +0000
+Subject: [PATCH 5/8] ARM: remove "SMP: Total of %d processors activated."
+ message
 In-Reply-To: <20141117202911.GZ4042@n2100.arm.linux.org.uk>
 References: <20141117202911.GZ4042@n2100.arm.linux.org.uk>
-Message-ID: <E1XqSvw-0002ER-Ds@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1XqSw1-0002EV-HN@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop the "CPUn: Booted secondary processor" message from info to debug
-level.  We later print how many CPUs came online, so listing each one
-is redundant, and when using hotplug, can be quite noisy.
+The "SMP: Total of %d processors activated." message which we print in
+smp_cpus_done() provides no further information than the message in
+genreic code in smp_announce().  Kill it.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/kernel/smp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/kernel/smp.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
 diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 3138d8ea9e55..7b18a1be179c 100644
+index 7b18a1be179c..5e6052e18850 100644
 --- a/arch/arm/kernel/smp.c
 +++ b/arch/arm/kernel/smp.c
-@@ -351,7 +351,7 @@ asmlinkage void secondary_start_kernel(void)
+@@ -387,9 +387,6 @@ asmlinkage void secondary_start_kernel(void)
  
- 	cpu_init();
+ void __init smp_cpus_done(unsigned int max_cpus)
+ {
+-	pr_info("SMP: Total of %d processors activated.\n",
+-		num_online_cpus());
+-
+ 	hyp_mode_check();
+ }
  
--	pr_info("CPU%u: Booted secondary processor\n", cpu);
-+	pr_debug("CPU%u: Booted secondary processor\n", cpu);
- 
- 	preempt_disable();
- 	trace_hardirqs_off();
 -- 
 1.8.3.1
