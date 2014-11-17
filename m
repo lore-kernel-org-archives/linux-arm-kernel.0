@@ -1,51 +1,260 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 17 Nov 2014 14:00:06 +0000
-Subject: some question about TCR setting
-In-Reply-To: <20141117130306.GP4042@n2100.arm.linux.org.uk>
-References: <CAOVJa8HBYkTMCJFKC=+UwjgPp4odm5UV-oUQXu17ctv2+HkpRg@mail.gmail.com>
- <20141114104246.GA25828@leverpostej>
- <CAOVJa8Fx4yiSU0O7HTaYEKOrRdtWve4JGeN0cWRXDsBMyV_8Mg@mail.gmail.com>
- <20141114135531.GA27768@leverpostej>
- <CAOVJa8GB=pk4SFEArcEGWF8g12105F_9YUL0hH5k+WW6=WWOBg@mail.gmail.com>
- <20141116165211.GL4042@n2100.arm.linux.org.uk>
- <20141117120952.GA23769@leverpostej>
- <20141117130306.GP4042@n2100.arm.linux.org.uk>
-Message-ID: <20141117140006.GB23769@leverpostej>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 17 Nov 2014 14:42:20 +0100
+Subject: [PATCH v5 26/61] dmaengine: k3: Split device_control
+In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-27-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 01:03:06PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 17, 2014 at 12:09:52PM +0000, Mark Rutland wrote:
-> > On Sun, Nov 16, 2014 at 04:52:11PM +0000, Russell King - ARM Linux wrote:
-> > > The access type is included on the bus along with the address and other
-> > > attributes.  This includes whether it's sharable, and the cache attributes.
-> > > A MMU page walker may be implemented such that it is capable of accessing
-> > > L2 cache.
-> > 
-> > Or L1, depending on the implementation of the memory system. The logic
-> > which walks the page tables is essentially another coherent observer, so
-> > it doesn't necessarily matter precisely where it is attached.
-> ...
-> > To further this point, provided the TCR is programmed with the same
-> > attributes the kernel uses to access the page tables, no cache
-> > maintenance is necessary, as the CPU(s) and page table walker(s) are
-> > coherent.
-> 
-> That depends on the implementation - whether the MMU page table walker
-> can read from the L1 cache.  If you were correct in all cases, we could
-> get rid of:
-> 
->         ALT_UP (mcr     p15, 0, r0, c7, c10, 1)         @ flush_pte
-> 
-> in proc-v7-2level.S - but obviously we think that ARMv7 is unable to read
-> from L1 when walking the page tables.
-> 
-> > This is what we do for ARMv7 and arm64.
-> 
-> From the code, it looks like we don't for ARMv7.
+Split the device_control callback of the Hisilicon K3 DMA driver to make use
+of the newly introduced callbacks, that will eventually be used to retrieve
+slave capabilities.
 
-My bad, I was assuming ARMv7 with the multiprocessor extensions rather
-than baseline ARMv7.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/dma/k3dma.c | 197 ++++++++++++++++++++++++++++------------------------
+ 1 file changed, 107 insertions(+), 90 deletions(-)
 
-Thanks,
-Mark,
+diff --git a/drivers/dma/k3dma.c b/drivers/dma/k3dma.c
+index a1de14ab2c51..49be7f687c4c 100644
+--- a/drivers/dma/k3dma.c
++++ b/drivers/dma/k3dma.c
+@@ -441,7 +441,7 @@ static struct dma_async_tx_descriptor *k3_dma_prep_memcpy(
+ 	num = 0;
+ 
+ 	if (!c->ccfg) {
+-		/* default is memtomem, without calling device_control */
++		/* default is memtomem, without calling device_config */
+ 		c->ccfg = CX_CFG_SRCINCR | CX_CFG_DSTINCR | CX_CFG_EN;
+ 		c->ccfg |= (0xf << 20) | (0xf << 24);	/* burst = 16 */
+ 		c->ccfg |= (0x3 << 12) | (0x3 << 16);	/* width = 64 bit */
+@@ -523,112 +523,126 @@ static struct dma_async_tx_descriptor *k3_dma_prep_slave_sg(
+ 	return vchan_tx_prep(&c->vc, &ds->vd, flags);
+ }
+ 
+-static int k3_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-	unsigned long arg)
++static int k3_dma_config(struct dma_chan *chan,
++			 struct dma_slave_config *cfg)
++{
++	struct k3_dma_chan *c = to_k3_chan(chan);
++	u32 maxburst = 0, val = 0;
++	enum dma_slave_buswidth width = DMA_SLAVE_BUSWIDTH_UNDEFINED;
++
++	if (cfg == NULL)
++		return -EINVAL;
++	c->dir = cfg->direction;
++	if (c->dir == DMA_DEV_TO_MEM) {
++		c->ccfg = CX_CFG_DSTINCR;
++		c->dev_addr = cfg->src_addr;
++		maxburst = cfg->src_maxburst;
++		width = cfg->src_addr_width;
++	} else if (c->dir == DMA_MEM_TO_DEV) {
++		c->ccfg = CX_CFG_SRCINCR;
++		c->dev_addr = cfg->dst_addr;
++		maxburst = cfg->dst_maxburst;
++		width = cfg->dst_addr_width;
++	}
++	switch (width) {
++	case DMA_SLAVE_BUSWIDTH_1_BYTE:
++	case DMA_SLAVE_BUSWIDTH_2_BYTES:
++	case DMA_SLAVE_BUSWIDTH_4_BYTES:
++	case DMA_SLAVE_BUSWIDTH_8_BYTES:
++		val =  __ffs(width);
++		break;
++	default:
++		val = 3;
++		break;
++	}
++	c->ccfg |= (val << 12) | (val << 16);
++
++	if ((maxburst == 0) || (maxburst > 16))
++		val = 16;
++	else
++		val = maxburst - 1;
++	c->ccfg |= (val << 20) | (val << 24);
++	c->ccfg |= CX_CFG_MEM2PER | CX_CFG_EN;
++
++	/* specific request line */
++	c->ccfg |= c->vc.chan.chan_id << 4;
++
++	return 0;
++}
++
++static int k3_dma_terminate_all(struct dma_chan *chan)
+ {
+ 	struct k3_dma_chan *c = to_k3_chan(chan);
+ 	struct k3_dma_dev *d = to_k3_dma(chan->device);
+-	struct dma_slave_config *cfg = (void *)arg;
+ 	struct k3_dma_phy *p = c->phy;
+ 	unsigned long flags;
+-	u32 maxburst = 0, val = 0;
+-	enum dma_slave_buswidth width = DMA_SLAVE_BUSWIDTH_UNDEFINED;
+ 	LIST_HEAD(head);
+ 
+-	switch (cmd) {
+-	case DMA_SLAVE_CONFIG:
+-		if (cfg == NULL)
+-			return -EINVAL;
+-		c->dir = cfg->direction;
+-		if (c->dir == DMA_DEV_TO_MEM) {
+-			c->ccfg = CX_CFG_DSTINCR;
+-			c->dev_addr = cfg->src_addr;
+-			maxburst = cfg->src_maxburst;
+-			width = cfg->src_addr_width;
+-		} else if (c->dir == DMA_MEM_TO_DEV) {
+-			c->ccfg = CX_CFG_SRCINCR;
+-			c->dev_addr = cfg->dst_addr;
+-			maxburst = cfg->dst_maxburst;
+-			width = cfg->dst_addr_width;
+-		}
+-		switch (width) {
+-		case DMA_SLAVE_BUSWIDTH_1_BYTE:
+-		case DMA_SLAVE_BUSWIDTH_2_BYTES:
+-		case DMA_SLAVE_BUSWIDTH_4_BYTES:
+-		case DMA_SLAVE_BUSWIDTH_8_BYTES:
+-			val =  __ffs(width);
+-			break;
+-		default:
+-			val = 3;
+-			break;
+-		}
+-		c->ccfg |= (val << 12) | (val << 16);
++	dev_dbg(d->slave.dev, "vchan %p: terminate all\n", &c->vc);
+ 
+-		if ((maxburst == 0) || (maxburst > 16))
+-			val = 16;
+-		else
+-			val = maxburst - 1;
+-		c->ccfg |= (val << 20) | (val << 24);
+-		c->ccfg |= CX_CFG_MEM2PER | CX_CFG_EN;
++	/* Prevent this channel being scheduled */
++	spin_lock(&d->lock);
++	list_del_init(&c->node);
++	spin_unlock(&d->lock);
+ 
+-		/* specific request line */
+-		c->ccfg |= c->vc.chan.chan_id << 4;
+-		break;
++	/* Clear the tx descriptor lists */
++	spin_lock_irqsave(&c->vc.lock, flags);
++	vchan_get_all_descriptors(&c->vc, &head);
++	if (p) {
++		/* vchan is assigned to a pchan - stop the channel */
++		k3_dma_terminate_chan(p, d);
++		c->phy = NULL;
++		p->vchan = NULL;
++		p->ds_run = p->ds_done = NULL;
++	}
++	spin_unlock_irqrestore(&c->vc.lock, flags);
++	vchan_dma_desc_free_list(&c->vc, &head);
+ 
+-	case DMA_TERMINATE_ALL:
+-		dev_dbg(d->slave.dev, "vchan %p: terminate all\n", &c->vc);
++	return 0;
++}
+ 
+-		/* Prevent this channel being scheduled */
+-		spin_lock(&d->lock);
+-		list_del_init(&c->node);
+-		spin_unlock(&d->lock);
++static int k3_dma_pause(struct dma_chan *chan)
++{
++	struct k3_dma_chan *c = to_k3_chan(chan);
++	struct k3_dma_dev *d = to_k3_dma(chan->device);
++	struct k3_dma_phy *p = c->phy;
+ 
+-		/* Clear the tx descriptor lists */
+-		spin_lock_irqsave(&c->vc.lock, flags);
+-		vchan_get_all_descriptors(&c->vc, &head);
++	dev_dbg(d->slave.dev, "vchan %p: pause\n", &c->vc);
++	if (c->status == DMA_IN_PROGRESS) {
++		c->status = DMA_PAUSED;
+ 		if (p) {
+-			/* vchan is assigned to a pchan - stop the channel */
+-			k3_dma_terminate_chan(p, d);
+-			c->phy = NULL;
+-			p->vchan = NULL;
+-			p->ds_run = p->ds_done = NULL;
++			k3_dma_pause_dma(p, false);
++		} else {
++			spin_lock(&d->lock);
++			list_del_init(&c->node);
++			spin_unlock(&d->lock);
+ 		}
+-		spin_unlock_irqrestore(&c->vc.lock, flags);
+-		vchan_dma_desc_free_list(&c->vc, &head);
+-		break;
++	}
+ 
+-	case DMA_PAUSE:
+-		dev_dbg(d->slave.dev, "vchan %p: pause\n", &c->vc);
+-		if (c->status == DMA_IN_PROGRESS) {
+-			c->status = DMA_PAUSED;
+-			if (p) {
+-				k3_dma_pause_dma(p, false);
+-			} else {
+-				spin_lock(&d->lock);
+-				list_del_init(&c->node);
+-				spin_unlock(&d->lock);
+-			}
+-		}
+-		break;
++	return 0;
++}
+ 
+-	case DMA_RESUME:
+-		dev_dbg(d->slave.dev, "vchan %p: resume\n", &c->vc);
+-		spin_lock_irqsave(&c->vc.lock, flags);
+-		if (c->status == DMA_PAUSED) {
+-			c->status = DMA_IN_PROGRESS;
+-			if (p) {
+-				k3_dma_pause_dma(p, true);
+-			} else if (!list_empty(&c->vc.desc_issued)) {
+-				spin_lock(&d->lock);
+-				list_add_tail(&c->node, &d->chan_pending);
+-				spin_unlock(&d->lock);
+-			}
++static int k3_dma_resume(struct dma_chan *chan)
++{
++	struct k3_dma_chan *c = to_k3_chan(chan);
++	struct k3_dma_dev *d = to_k3_dma(chan->device);
++	struct k3_dma_phy *p = c->phy;
++	unsigned long flags;
++
++	dev_dbg(d->slave.dev, "vchan %p: resume\n", &c->vc);
++	spin_lock_irqsave(&c->vc.lock, flags);
++	if (c->status == DMA_PAUSED) {
++		c->status = DMA_IN_PROGRESS;
++		if (p) {
++			k3_dma_pause_dma(p, true);
++		} else if (!list_empty(&c->vc.desc_issued)) {
++			spin_lock(&d->lock);
++			list_add_tail(&c->node, &d->chan_pending);
++			spin_unlock(&d->lock);
+ 		}
+-		spin_unlock_irqrestore(&c->vc.lock, flags);
+-		break;
+-	default:
+-		return -ENXIO;
+ 	}
++	spin_unlock_irqrestore(&c->vc.lock, flags);
++
+ 	return 0;
+ }
+ 
+@@ -720,7 +734,10 @@ static int k3_dma_probe(struct platform_device *op)
+ 	d->slave.device_prep_dma_memcpy = k3_dma_prep_memcpy;
+ 	d->slave.device_prep_slave_sg = k3_dma_prep_slave_sg;
+ 	d->slave.device_issue_pending = k3_dma_issue_pending;
+-	d->slave.device_control = k3_dma_control;
++	d->slave.device_config = k3_dma_config;
++	d->slave.device_pause = k3_dma_pause;
++	d->slave.device_resume = k3_dma_resume;
++	d->slave.device_terminate_all = k3_dma_terminate_all;
+ 	d->slave.copy_align = DMA_ALIGN;
+ 
+ 	/* init virtual channel */
+-- 
+2.1.1
