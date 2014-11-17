@@ -1,63 +1,130 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:23 +0100
-Subject: [PATCH v5 29/61] dmaengine: moxart: Split device_control
+Date: Mon, 17 Nov 2014 14:42:55 +0100
+Subject: [PATCH v5 61/61] Documentation: dmaengine: Update the documentation
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-30-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-62-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Moxart DMA driver to make use of the
-newly introduced callbacks, that will eventually be used to retrieve slave
-capabilities.
+Now that we have splitted device_control and removed device_slave_caps in favor
+of a few dma_device variables, update the documentation accordingly.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/moxart-dma.c | 25 ++-----------------------
- 1 file changed, 2 insertions(+), 23 deletions(-)
+ Documentation/dmaengine/provider.txt | 93 ++++++++++++++++++++----------------
+ 1 file changed, 51 insertions(+), 42 deletions(-)
 
-diff --git a/drivers/dma/moxart-dma.c b/drivers/dma/moxart-dma.c
-index 3258e484e4f6..35e1a3ab5fb8 100644
---- a/drivers/dma/moxart-dma.c
-+++ b/drivers/dma/moxart-dma.c
-@@ -263,28 +263,6 @@ static int moxart_slave_config(struct dma_chan *chan,
- 	return 0;
- }
+diff --git a/Documentation/dmaengine/provider.txt b/Documentation/dmaengine/provider.txt
+index 766658ccf235..2c391cfe37eb 100644
+--- a/Documentation/dmaengine/provider.txt
++++ b/Documentation/dmaengine/provider.txt
+@@ -113,6 +113,31 @@ need to initialize a few fields in there:
+   * channels:	should be initialized as a list using the
+ 		INIT_LIST_HEAD macro for example
  
--static int moxart_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--			  unsigned long arg)
--{
--	int ret = 0;
--
--	switch (cmd) {
--	case DMA_PAUSE:
--	case DMA_RESUME:
--		return -EINVAL;
--	case DMA_TERMINATE_ALL:
--		moxart_terminate_all(chan);
--		break;
--	case DMA_SLAVE_CONFIG:
--		ret = moxart_slave_config(chan, (struct dma_slave_config *)arg);
--		break;
--	default:
--		ret = -ENOSYS;
--	}
--
--	return ret;
--}
--
- static struct dma_async_tx_descriptor *moxart_prep_slave_sg(
- 	struct dma_chan *chan, struct scatterlist *sgl,
- 	unsigned int sg_len, enum dma_transfer_direction dir,
-@@ -531,7 +509,8 @@ static void moxart_dma_init(struct dma_device *dma, struct device *dev)
- 	dma->device_free_chan_resources		= moxart_free_chan_resources;
- 	dma->device_issue_pending		= moxart_issue_pending;
- 	dma->device_tx_status			= moxart_tx_status;
--	dma->device_control			= moxart_control;
-+	dma->device_config			= moxart_slave_config;
-+	dma->device_terminate_all		= moxart_terminate_all;
- 	dma->dev				= dev;
++  * src_addr_widths:
++    - should contain a bitmask of the supported source transfer width
++
++  * dst_addr_widths:
++    - should contain a bitmask of the supported destination transfer
++      width
++
++  * directions:
++    - should contain a bitmask of the supported slave directions
++      (i.e. excluding mem2mem transfers)
++
++  * residue_granularity:
++    - Granularity of the transfer residue reported to dma_set_residue.
++    - This can be either:
++      + Descriptor
++        -> Your device doesn't support any kind of residue
++           reporting. The framework will only know that a particular
++           transaction descriptor is done.
++      + Segment
++        -> Your device is able to report which chunks have been
++           transferred
++      + Burst
++        -> Your device is able to report which burst have been
++           transferred
++
+   * dev: 	should hold the pointer to the struct device associated
+ 		to your current driver instance.
  
- 	INIT_LIST_HEAD(&dma->channels);
+@@ -274,48 +299,32 @@ supported.
+        account the current period.
+      - This function can be called in an interrupt context.
+ 
+-   * device_control
+-     - Used by client drivers to control and configure the channel it
+-       has a handle on.
+-     - Called with a command and an argument
+-       + The command is one of the values listed by the enum
+-         dma_ctrl_cmd. The valid commands are:
+-         + DMA_PAUSE
+-           + Pauses a transfer on the channel
+-           + This command should operate synchronously on the channel,
+-             pausing right away the work of the given channel
+-         + DMA_RESUME
+-           + Restarts a transfer on the channel
+-           + This command should operate synchronously on the channel,
+-             resuming right away the work of the given channel
+-         + DMA_TERMINATE_ALL
+-           + Aborts all the pending and ongoing transfers on the
+-             channel
+-           + This command should operate synchronously on the channel,
+-             terminating right away all the channels
+-         + DMA_SLAVE_CONFIG
+-           + Reconfigures the channel with passed configuration
+-           + This command should NOT perform synchronously, or on any
+-             currently queued transfers, but only on subsequent ones
+-           + In this case, the function will receive a
+-             dma_slave_config structure pointer as an argument, that
+-             will detail which configuration to use.
+-           + Even though that structure contains a direction field,
+-             this field is deprecated in favor of the direction
+-             argument given to the prep_* functions
+-         + FSLDMA_EXTERNAL_START
+-           + TODO: Why does that even exist?
+-       + The argument is an opaque unsigned long. This actually is a
+-         pointer to a struct dma_slave_config that should be used only
+-         in the DMA_SLAVE_CONFIG.
+-
+-  * device_slave_caps
+-    - Called through the framework by client drivers in order to have
+-      an idea of what are the properties of the channel allocated to
+-      them.
+-    - Such properties are the buswidth, available directions, etc.
+-    - Required for every generic layer doing DMA transfers, such as
+-      ASoC.
++   * device_config
++     - Reconfigures the channel with the configuration given as
++       argument
++     - This command should NOT perform synchronously, or on any
++       currently queued transfers, but only on subsequent ones
++     - In this case, the function will receive a dma_slave_config
++       structure pointer as an argument, that will detail which
++       configuration to use.
++     - Even though that structure contains a direction field, this
++       field is deprecated in favor of the direction argument given to
++       the prep_* functions
++
++   * device_pause
++     - Pauses a transfer on the channel
++     - This command should operate synchronously on the channel,
++       pausing right away the work of the given channel
++
++   * device_resume
++     - Resumes a transfer on the channel
++     - This command should operate synchronously on the channel,
++       pausing right away the work of the given channel
++
++   * device_terminate_all
++     - Aborts all the pending and ongoing transfers on the channel
++     - This command should operate synchronously on the channel,
++       terminating right away all the channels
+ 
+ Misc notes (stuff that should be documented, but don't really know
+ where to put them)
 -- 
 2.1.1
