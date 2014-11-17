@@ -1,30 +1,37 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Mon, 17 Nov 2014 02:12:51 +0000
-Subject: mvebu: tclk detection for armada-xp and marvell packet processor
- with integrated CPU
-Message-ID: <546959A3.9040206@alliedtelesis.co.nz>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 17 Nov 2014 10:31:01 +0800
+Subject: [PATCH 3/3] ACPI / processor: Rename acpi_(un)map_lsapic() to
+ acpi_(un)map_cpu()
+In-Reply-To: <1820875.eppNBckBcQ@vostro.rjw.lan>
+References: <1414662780-2147-1-git-send-email-hanjun.guo@linaro.org>
+ <5452CE9D.6000403@linaro.org> <10283319.F5QMI6fbWn@vostro.rjw.lan>
+ <1820875.eppNBckBcQ@vostro.rjw.lan>
+Message-ID: <54695DE5.2080309@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2014-11-15 7:35, Rafael J. Wysocki wrote:
+> On Friday, October 31, 2014 11:55:46 PM Rafael J. Wysocki wrote:
+>> On Friday, October 31, 2014 07:49:49 AM Hanjun Guo wrote:
+>>> On 2014?10?31? 04:12, Rafael J. Wysocki wrote:
+>>>> On Thursday, October 30, 2014 05:53:00 PM Hanjun Guo wrote:
+>>>>> acpi_map_lsapic() will allocate a logical CPU number and map it to
+>>>>> physical CPU id (such as APIC id) for the hot-added CPU, it will also
+>>>>> do some mapping for NUMA node id and etc, acpi_unmap_lsapic() will
+>>>>> do the reverse.
+>>>>>
+>>>>> We can see that the name of the function is a little bit confusing and
+>>>>> arch dependent so rename them as acpi_(un)map_map() to make arch
+>>>>
+>>>> That's acpi_(un)map_cpu() I guess?
+>>>
+>>> ah, yes, typos, it should be acpi_(un)map_cpu(), my fault.
+>>> should I send another version?
+>>
+>> No, I can fix this up.
+> 
+> I've queued up the series for 3.19, thanks!
 
-One of the first problems I encountered looking at the Marvell Packet 
-Processor with integrated CPU (I'll refer to that as 'the PP' throughout 
-the rest of this email) was that it has a different TCLK to the armada-xp.
+Thanks!
 
-It appears that for both the PP and the armada-xp the TCLK is hard-coded 
-(to 200MHz and 250MHz respectively) and cannot be detected as far as I 
-can see from the various data-sheets. I was hoping to re-use 
-drivers/clk/mvebu/armada-xp.c but I need to figure out how to make 
-axp_get_tclk_freq() give me an appropriate answer depending on the SoC. 
-If this were in the mach-mvebu code I could just use mvebu_get_soc_id() 
-to fetch the device id. Is there an equivalent I could use in generic code?
-
-One option would be to use a different compatible string in the dts. 
-That would also give me a way of handling other differences (the 
-clock-gating is a subset of what's available on the armada-xp). How 
-different would things have to be before it's worth spinning the PP code 
-out into a file of it's own?
-
-Thanks,
-Chris
+Hanjun
