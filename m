@@ -1,75 +1,74 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 13:47:21 +0100
-Subject: [PATCH 2/2] dt-bindings: simplefb-sunxi: Add sunxi simplefb
- extensions
-In-Reply-To: <1416224086-5698-3-git-send-email-hdegoede@redhat.com>
-References: <1416224086-5698-1-git-send-email-hdegoede@redhat.com>
- <1416224086-5698-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141117124721.GQ6414@lukather>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 17 Nov 2014 12:57:21 +0000
+Subject: [PATCH] MAINTAINERS: update email address and cleanup for exynos
+ entry
+In-Reply-To: <1415951697-5991-1-git-send-email-kgene@kernel.org>
+References: <1415951697-5991-1-git-send-email-kgene@kernel.org>
+Message-ID: <5469F0B1.6010907@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 12:34:46PM +0100, Hans de Goede wrote:
-> If pre-filled framebuffer nodes are used, the firmware may need extra
-> properties to find the right node. This documents the properties to use
-> for this on sunxi platforms.
+On 14/11/14 07:54, Kukjin Kim wrote:
+> Use kernel.org account instead of samsung.com and cleanup for Samsung
+> s3c, s5p and exynos SoCs.
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Cc: Ben Dooks <ben.dooks@codethink.co.uk>
+
+I do wish these would be sent to the mail address I use for
+Linux related issues. I only want to see work related Linux
+issues to my <ben.dooks@codethink.co.uk> address.
+
+It is sad to see my entries removed, but I no longer have time
+to maintain these.
+
+> Signed-off-by: Kukjin Kim <kgene@kernel.org>
+Acked-by: Ben Dooks <ben-linux@fluff.org>
 > ---
->  .../bindings/video/simple-framebuffer-sunxi.txt    | 33 ++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+>  MAINTAINERS |   16 ++++------------
+>  1 files changed, 4 insertions(+), 12 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
-> new file mode 100644
-> index 0000000..84ca264
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
-> @@ -0,0 +1,33 @@
-> +Sunxi specific Simple Framebuffer bindings
-> +
-> +This binding documents sunxi specific extensions to the simple-framebuffer
-> +bindings. The sunxi simplefb u-boot code relies on the devicetree containing
-> +pre-populated simplefb nodes.
-> +
-> +These extensions are intended so that u-boot can select the right node based
-> +on which pipeline and output is being used. As such they are solely intended
-> +for firmware / bootloader use, and the OS should ignore them.
-> +
-> +Required properties:
-> +- compatible: "sunxi,framebuffer"
-> +- sunxi,pipeline:
-> +  <0> for the de_be0 -> lcdc0 -> output pipeline
-> +  <1> for the de_be1 -> lcdc1 -> output pipeline
-> +- sunxi,output: One of: "hdmi", "lcd", "vga", and "composite"  
-> +
-> +Example:
-> +
-> +chosen {
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +	ranges;
-> +
-> +	framebuffer at 0 {
-> +		compatible = "sunxi,framebuffer", "simple-framebuffer";
-> +		sunxi,pipeline = <0>;
-> +		sunxi,output = "hdmi";
-> +		clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
-> +			 <&ahb_gates 44>;
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 60b1163..b1e27bf 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1308,30 +1308,22 @@ F:	drivers/*/*rockchip*
+>  F:	drivers/*/*/*rockchip*
+>  F:	sound/soc/rockchip/
+>  
+> -ARM/SAMSUNG ARM ARCHITECTURES
+> -M:	Ben Dooks <ben-linux@fluff.org>
+> -M:	Kukjin Kim <kgene.kim@samsung.com>
+> +ARM/SAMSUNG EXYNOS ARM ARCHITECTURES
+> +M:	Kukjin Kim <kgene@kernel.org>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+> -W:	http://www.fluff.org/ben/linux/
+>  S:	Maintained
+>  F:	arch/arm/boot/dts/s3c*
+>  F:	arch/arm/boot/dts/exynos*
+>  F:	arch/arm/plat-samsung/
+>  F:	arch/arm/mach-s3c24*/
+>  F:	arch/arm/mach-s3c64xx/
+> +F:	arch/arm/mach-s5p*/
+> +F:	arch/arm/mach-exynos*/
+>  F:	drivers/*/*s3c2410*
+>  F:	drivers/*/*/*s3c2410*
+>  F:	drivers/spi/spi-s3c*
+>  F:	sound/soc/samsung/*
+> -
+> -ARM/S5P EXYNOS ARM ARCHITECTURES
+> -M:	Kukjin Kim <kgene.kim@samsung.com>
+> -L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> -L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+> -S:	Maintained
+> -F:	arch/arm/mach-s5p*/
+> -F:	arch/arm/mach-exynos*/
+>  N:	exynos
+>  
+>  ARM/SAMSUNG MOBILE MACHINE SUPPORT
+> 
 
-If we're going that way, then maybe having to specify clock-names
-would be better in order to know which clock is what?
-
-Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/310b97ea/attachment.sig>
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
