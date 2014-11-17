@@ -1,35 +1,149 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon, 17 Nov 2014 16:47:55 +0000
-Subject: [PATCH v3 02/11] ARM: STi: DT: STiH416: Add DT node for the stih415/6
- usb2 phy
+Date: Mon, 17 Nov 2014 16:47:56 +0000
+Subject: [PATCH v3 03/11] ARM: STi: DT: STiH416: Add DT nodes for the ehci and
+ ohci usb controllers.
 In-Reply-To: <1416242884-5261-1-git-send-email-peter.griffin@linaro.org>
 References: <1416242884-5261-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1416242884-5261-3-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1416242884-5261-4-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This usb picophy is found on stih415/6 SoC.
+This patch adds the DT nodes for the 4 usb ehci and ohci usb controllers
+on the stih416 SoC.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- arch/arm/boot/dts/stih416.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/stih416.dtsi | 121 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 121 insertions(+)
 
 diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index 1137bdf..ff2ad35 100644
+index ff2ad35..2bdda52 100644
 --- a/arch/arm/boot/dts/stih416.dtsi
 +++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -316,5 +316,13 @@
- 
- 			status	        = "disabled";
+@@ -324,5 +324,126 @@
+ 			clocks = <&clk_sysin>;
+ 			clock-names = "osc_phy";
  		};
 +
-+		usb2_phy: phy at 0 {
-+			compatible = "st,stih416-usb-phy";
-+			#phy-cells = <0>;
-+			st,syscfg = <&syscfg_rear>;
-+			clocks = <&clk_sysin>;
-+			clock-names = "osc_phy";
++		ehci0: usb at fe1ffe00 {
++			compatible = "st,st-ehci-300x";
++			reg = <0xfe1ffe00 0x100>;
++			interrupts = <GIC_SPI 148 IRQ_TYPE_NONE>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_usb0>;
++			clocks = <&clk_s_a1_ls 0>,
++				 <&clockgen_b0 0>;
++			clock-names = "ic", "clk48";
++			phys = <&usb2_phy>;
++			phy-names = "usb";
++			resets = <&powerdown STIH416_USB0_POWERDOWN>,
++				 <&softreset STIH416_USB0_SOFTRESET>;
++			reset-names = "power", "softreset";
++		};
++
++		ohci0: usb at fe1ffc00 {
++			compatible = "st,st-ohci-300x";
++			reg = <0xfe1ffc00 0x100>;
++			interrupts = <GIC_SPI 149 IRQ_TYPE_NONE>;
++			clocks = <&clk_s_a1_ls 0>,
++				 <&clockgen_b0 0>;
++			clock-names = "ic", "clk48";
++			phys = <&usb2_phy>;
++			phy-names = "usb";
++			status = "okay";
++			resets = <&powerdown STIH416_USB0_POWERDOWN>,
++				 <&softreset STIH416_USB0_SOFTRESET>;
++			reset-names = "power", "softreset";
++		};
++
++		ehci1: usb at fe203e00 {
++			compatible = "st,st-ehci-300x";
++			reg = <0xfe203e00 0x100>;
++			interrupts = <GIC_SPI 150 IRQ_TYPE_NONE>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_usb1>;
++			clocks = <&clk_s_a1_ls 0>,
++				 <&clockgen_b0 0>;
++			clock-names = "ic", "clk48";
++			phys = <&usb2_phy>;
++			phy-names = "usb";
++			resets = <&powerdown STIH416_USB1_POWERDOWN>,
++				 <&softreset STIH416_USB1_SOFTRESET>;
++			reset-names = "power", "softreset";
++		};
++
++		ohci1: usb at fe203c00 {
++			compatible = "st,st-ohci-300x";
++			reg = <0xfe203c00 0x100>;
++			interrupts = <GIC_SPI 151 IRQ_TYPE_NONE>;
++			clocks = <&clk_s_a1_ls 0>,
++				 <&clockgen_b0 0>;
++			clock-names = "ic", "clk48";
++			phys = <&usb2_phy>;
++			phy-names = "usb";
++			resets = <&powerdown STIH416_USB1_POWERDOWN>,
++				 <&softreset STIH416_USB1_SOFTRESET>;
++			reset-names = "power", "softreset";
++		};
++
++		ehci2: usb at fe303e00 {
++			compatible = "st,st-ehci-300x";
++			reg = <0xfe303e00 0x100>;
++			interrupts = <GIC_SPI 152 IRQ_TYPE_NONE>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_usb2>;
++			clocks = <&clk_s_a1_ls 0>,
++				 <&clockgen_b0 0>;
++			clock-names = "ic", "clk48";
++			phys = <&usb2_phy>;
++			phy-names = "usb";
++			resets = <&powerdown STIH416_USB2_POWERDOWN>,
++				 <&softreset STIH416_USB2_SOFTRESET>;
++			reset-names = "power", "softreset";
++		};
++
++		ohci2: usb at fe303c00 {
++			compatible = "st,st-ohci-300x";
++			reg = <0xfe303c00 0x100>;
++			interrupts = <GIC_SPI 153 IRQ_TYPE_NONE>;
++			clocks = <&clk_s_a1_ls 0>,
++				 <&clockgen_b0 0>;
++			clock-names = "ic", "clk48";
++			phys = <&usb2_phy>;
++			phy-names = "usb";
++			resets = <&powerdown STIH416_USB2_POWERDOWN>,
++				 <&softreset STIH416_USB2_SOFTRESET>;
++			reset-names = "power", "softreset";
++		};
++
++		ehci3: usb at fe343e00 {
++			compatible = "st,st-ehci-300x";
++			reg = <0xfe343e00 0x100>;
++			interrupts = <GIC_SPI 154 IRQ_TYPE_NONE>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_usb3>;
++			clocks = <&clk_s_a1_ls 0>,
++				 <&clockgen_b0 0>;
++			clock-names = "ic", "clk48";
++			phys = <&usb2_phy>;
++			phy-names = "usb";
++			resets = <&powerdown STIH416_USB3_POWERDOWN>,
++				 <&softreset STIH416_USB3_SOFTRESET>;
++			reset-names = "power", "softreset";
++		};
++
++		ohci3: usb at fe343c00 {
++			compatible = "st,st-ohci-300x";
++			reg = <0xfe343c00 0x100>;
++			interrupts = <GIC_SPI 155 IRQ_TYPE_NONE>;
++			clocks = <&clk_s_a1_ls 0>,
++				 <&clockgen_b0 0>;
++			clock-names = "ic", "clk48";
++			phys = <&usb2_phy>;
++			phy-names = "usb";
++			resets = <&powerdown STIH416_USB3_POWERDOWN>,
++				 <&softreset STIH416_USB3_SOFTRESET>;
++			reset-names = "power", "softreset";
 +		};
  	};
  };
