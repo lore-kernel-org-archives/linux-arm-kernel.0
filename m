@@ -1,442 +1,92 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 17 Nov 2014 13:09:00 -0600
-Subject: [PATCH v2 2/2] ARM: dts: Add devicetree for NovaTech OrionLXm
-In-Reply-To: <1416250957-11065-2-git-send-email-george.mccollister@gmail.com>
-References: <1416250957-11065-1-git-send-email-george.mccollister@gmail.com>
- <1416250957-11065-2-git-send-email-george.mccollister@gmail.com>
-Message-ID: <20141117190847.GA4857@saruman>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 17 Nov 2014 11:14:16 -0800
+Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
+In-Reply-To: <1600093.60yAP0Qpua@wuerfel> (Arnd Bergmann's message of "Mon, 10
+ Nov 2014 21:36:55 +0100")
+References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
+ <5331397.OQCQmJO78C@wuerfel> <5460F806.3040305@ti.com>
+ <1600093.60yAP0Qpua@wuerfel>
+Message-ID: <7h389h3aif.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 01:02:35PM -0600, George McCollister wrote:
-> This adds the NovaTech OrionLXm which is based on the AM335x SoC
-> http://www.novatechweb.com/substation-automation/orionlxm/
-> 
-> RAM: 512MiB
-> Flash: 4GB eMMC
-> Ethernet PHYs: 2x Micrel KSZ8041FTLI
-> USB ports are used internally by the expansion cards.
-> Internal micro SD slot is available.
-> 
-> Signed-off-by: George McCollister <george.mccollister@gmail.com>
+Arnd Bergmann <arnd@arndb.de> writes:
 
-this looks might better to my eyes:
+> On Monday 10 November 2014 19:38:14 Grygorii Strashko wrote:
+>> Hi Arnd,
+>> 
+>> On 11/10/2014 05:06 PM, Arnd Bergmann wrote:
+>> > On Monday 10 November 2014 16:59:16 Grygorii Strashko wrote:
+>> >> --- /dev/null
+>> >> +++ b/Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt
+>> >> @@ -0,0 +1,31 @@
+>> >> +* TI Keystone 2 Generic PM Controller
+>> >> +
+>> >> +The TI Keystone 2 Generic PM Controller is responsible for Clock gating
+>> >> +for each controlled IP module.
+>> >> +
+>> >> +Required properties:
+>> >> +- compatible: Should be "ti,keystone-powerdomain"
+>> >> +- #power-domain-cells: Should be 0, see below:
+>> >> +
+>> >> +The PM Controller node is a PM domain as documented in
+>> >> +Documentation/devicetree/bindings/power/power_domain.txt.
+>> >> +
+>> >> +Example:
+>> >> +
+>> >> +       pm_controller: pm-controller {
+>> >> +               compatible = "ti,keystone-powerdomain";
+>> >> +               #power-domain-cells = <0>;
+>> >> +       };
+>> >> +
+>> >> +       netcp: netcp at 2090000 {
+>> >> +               reg = <0x2620110 0x8>;
+>> >> +               reg-names = "efuse";
+>> >> +               ...
+>> >> +               #address-cells = <1>;
+>> >> +               #size-cells = <1>;
+>> >> +               ranges;
+>> >> +               power-domains = <&pm_controller>;
+>> >> +
+>> >> +               clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>;
+>> >> +               dma-coherent;
+>> >> +       }
+>> > 
+>> > I don't get it. What keystone specific about a "ti,keystone-powerdomain"
+>> > device? It seems that the device has no registers whatsoever and the
+>> > driver doesn't really do anything that relates to the platform.
+>> 
+>> That's true. but it was the only one acceptable way  to enable
+>> Generic clock manipulation PM callbacks for the DT-boot case.
+>> After several unsuccessful attempts the idea to use GPD
+>> was introduced by Kevin there:
+>>   https://lkml.org/lkml/2014/9/8/643
+>> 
+>> So, The Keystone 2 Generic PM Controller is just a proxy PM layer here between
+>> device and Generic clock manipulation PM callbacks.
+>> It fills per-device clock list when device is attached to GPD and
+>> ensures that all clocks from that list enabled/disabled when device is
+>> started/stopped.
+>
+> The idea of such a generic power domain implementation sounds useful, but
+> it has absolutely no business in platform specific code.
 
-Reviewed-by: Felipe Balbi <balbi@ti.com>
+Yes it does.  This isn't a generic power domain implementation, but
+rather just the platform-specific glue that hooks up the clocks to the
+right devices and power-domains so that the generic power-domain and
+generic pm_clocks code does the right thing.
 
-> ---
->  .../devicetree/bindings/arm/omap/omap.txt          |   3 +
->  arch/arm/boot/dts/Makefile                         |   3 +-
->  arch/arm/boot/dts/am335x-lxm.dts                   | 362 +++++++++++++++++++++
->  3 files changed, 367 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/am335x-lxm.dts
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> index ddd9bcd..4f6a82c 100644
-> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> @@ -132,6 +132,9 @@ Boards:
->  - AM335X Bone : Low cost community board
->    compatible = "ti,am335x-bone", "ti,am33xx", "ti,omap3"
->  
-> +- AM335X OrionLXm : Substation Automation Platform
-> +  compatible = "novatech,am335x-lxm", "ti,am33xx"
-> +
->  - OMAP5 EVM : Evaluation Module
->    compatible = "ti,omap5-evm", "ti,omap5"
->  
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 38c89ca..454ee6c 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -331,7 +331,8 @@ dtb-$(CONFIG_SOC_AM33XX) += am335x-base0033.dtb \
->  	am335x-evm.dtb \
->  	am335x-evmsk.dtb \
->  	am335x-nano.dtb \
-> -	am335x-pepper.dtb
-> +	am335x-pepper.dtb \
-> +	am335x-lxm.dtb
->  dtb-$(CONFIG_ARCH_OMAP4) += omap4-duovero-parlor.dtb \
->  	omap4-panda.dtb \
->  	omap4-panda-a4.dtb \
-> diff --git a/arch/arm/boot/dts/am335x-lxm.dts b/arch/arm/boot/dts/am335x-lxm.dts
-> new file mode 100644
-> index 0000000..7266a00
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/am335x-lxm.dts
-> @@ -0,0 +1,362 @@
-> +/*
-> + * Copyright (C) 2014 NovaTech LLC - http://www.novatechweb.com
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +/dts-v1/;
-> +
-> +#include "am33xx.dtsi"
-> +
-> +/ {
-> +	model = "NovaTech OrionLXm";
-> +	compatible = "novatech,am335x-lxm", "ti,am33xx";
-> +
-> +	cpus {
-> +		cpu at 0 {
-> +			cpu0-supply = <&vdd1_reg>;
-> +		};
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x80000000 0x20000000>; /* 512 MB */
-> +	};
-> +
-> +	/* Power supply provides a fixed 5V @2A */
-> +	vbat: fixedregulator at 0 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vbat";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		regulator-boot-on;
-> +	};
-> +
-> +	/* Power supply provides a fixed 3.3V @3A */
-> +	vmmcsd_fixed: fixedregulator at 1 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vmmcsd_fixed";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		regulator-boot-on;
-> +	};
-> +};
-> +
-> +&am33xx_pinmux {
-> +	mmc1_pins: pinmux_mmc1_pins {
-> +		pinctrl-single,pins = <
-> +			0xf0 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_dat3 */
-> +			0xf4 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_dat2 */
-> +			0xf8 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_dat1 */
-> +			0xfc (PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_dat0 */
-> +			0x100 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_clk */
-> +			0x104 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_cmd */
-> +		>;
-> +	};
-> +
-> +	i2c0_pins: pinmux_i2c0_pins {
-> +		pinctrl-single,pins = <
-> +			0x188 (PIN_INPUT | MUX_MODE0)	/* i2c0_sda.i2c0_sda */
-> +			0x18c (PIN_INPUT | MUX_MODE0)	/* i2c0_scl.i2c0_scl */
-> +		>;
-> +	};
-> +
-> +	cpsw_default: cpsw_default {
-> +		pinctrl-single,pins = <
-> +			/* Slave 1 */
-> +			0x64 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii1_int */
-> +			0x10c (PIN_INPUT_PULLDOWN | MUX_MODE1)	/* rmii1_crs_dv */
-> +			0x110 (PIN_INPUT_PULLDOWN | MUX_MODE1)	/* rmii1_rxer */
-> +			0x114 (PIN_OUTPUT_PULLDOWN | MUX_MODE1)	/* rmii1_txen */
-> +			0x124 (PIN_OUTPUT_PULLDOWN | MUX_MODE1)	/* rmii1_td1 */
-> +			0x128 (PIN_OUTPUT_PULLDOWN | MUX_MODE1)	/* rmii1_td0 */
-> +			0x13c (PIN_INPUT_PULLDOWN | MUX_MODE1)	/* rmii1_rd1 */
-> +			0x140 (PIN_INPUT_PULLDOWN | MUX_MODE1)	/* rmii1_rd0 */
-> +			0x144 (PIN_INPUT_PULLDOWN | MUX_MODE0)	/* rmii1_refclk */
-> +
-> +			/* Slave 2 */
-> +			0x40 (PIN_OUTPUT_PULLDOWN | MUX_MODE3)	/* rmii2_txen */
-> +			0x50 (PIN_OUTPUT_PULLDOWN | MUX_MODE3)	/* rmii2_td1 */
-> +			0x54 (PIN_OUTPUT_PULLDOWN | MUX_MODE3)	/* rmii2_td0 */
-> +			0x68 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* rmii2_rd1 */
-> +			0x6c (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* rmii2_rd0 */
-> +			0x70 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* rmii2_crs_dv */
-> +			0x74 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* rmii2_rxer */
-> +			0x78 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii2_int */
-> +			0x108 (PIN_INPUT_PULLDOWN | MUX_MODE1)	/* rmii2_refclk */
-> +		>;
-> +	};
-> +
-> +	cpsw_sleep: cpsw_sleep {
-> +		pinctrl-single,pins = <
-> +			/* Slave 1 reset value */
-> +			0x64 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii1_int */
-> +			0x10c (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii1_crs_dv */
-> +			0x110 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii1_rxer */
-> +			0x114 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii1_txen */
-> +			0x124 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii1_td1 */
-> +			0x128 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii1_td0 */
-> +			0x13c (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii1_rd1 */
-> +			0x140 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii1_rd0 */
-> +			0x144 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii1_refclk */
-> +
-> +			/* Slave 2 reset value*/
-> +			0x40 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii2_txen */
-> +			0x50 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii2_td1 */
-> +			0x54 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii2_td0 */
-> +			0x68 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii2_rd1 */
-> +			0x6c (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii2_rd0 */
-> +			0x70 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii2_crs_dv */
-> +			0x74 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii2_rxer */
-> +			0x78 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii2_int */
-> +			0x108 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* rmii2_refclk */
-> +		>;
-> +	};
-> +
-> +	davinci_mdio_default: davinci_mdio_default {
-> +		pinctrl-single,pins = <
-> +			/* MDIO */
-> +			0x148 (PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)	/* mdio_data.mdio_data */
-> +			0x14c (PIN_OUTPUT_PULLUP | MUX_MODE0)			/* mdio_clk.mdio_clk */
-> +		>;
-> +	};
-> +
-> +	davinci_mdio_sleep: davinci_mdio_sleep {
-> +		pinctrl-single,pins = <
-> +			/* MDIO reset value */
-> +			0x148 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-> +			0x14c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-> +		>;
-> +	};
-> +
-> +	emmc_pins: pinmux_emmc_pins {
-> +		pinctrl-single,pins = <
-> +			0x80 (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_csn1.mmc1_clk */
-> +			0x84 (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_csn2.mmc1_cmd */
-> +			0x00 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad0.mmc1_dat0 */
-> +			0x04 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad1.mmc1_dat1 */
-> +			0x08 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad2.mmc1_dat2 */
-> +			0x0c (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad3.mmc1_dat3 */
-> +			0x10 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad4.mmc1_dat4 */
-> +			0x14 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad5.mmc1_dat5 */
-> +			0x18 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad6.mmc1_dat6 */
-> +			0x1c (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad7.mmc1_dat7 */
-> +		>;
-> +	};
-> +
-> +	uart0_pins: pinmux_uart0_pins {
-> +		pinctrl-single,pins = <
-> +			0x170 (PIN_INPUT_PULLUP | MUX_MODE0)	/* uart0_rxd.uart0_rxd */
-> +			0x174 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* uart0_txd.uart0_txd */
-> +		>;
-> +	};
-> +};
-> +
-> +&i2c0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c0_pins>;
-> +
-> +	status = "okay";
-> +	clock-frequency = <400000>;
-> +
-> +	serial_config1: serial_config1 at 20 {
-> +		compatible = "nxp,pca9539";
-> +		reg = <0x20>;
-> +	};
-> +
-> +	serial_config2: serial_config2 at 21 {
-> +		compatible = "nxp,pca9539";
-> +		reg = <0x21>;
-> +	};
-> +
-> +	tps: tps at 2d {
-> +		compatible = "ti,tps65910";
-> +		reg = <0x2d>;
-> +	};
-> +};
-> +
-> +/include/ "tps65910.dtsi"
-> +
-> +&tps {
-> +	vcc1-supply = <&vbat>;
-> +	vcc2-supply = <&vbat>;
-> +	vcc3-supply = <&vbat>;
-> +	vcc4-supply = <&vbat>;
-> +	vcc5-supply = <&vbat>;
-> +	vcc6-supply = <&vbat>;
-> +	vcc7-supply = <&vbat>;
-> +	vccio-supply = <&vbat>;
-> +
-> +	regulators {
-> +		/* vrtc - unused */
-> +
-> +		vio_reg: regulator at 1 {
-> +			regulator-name = "vio_1v5,ddr";
-> +			regulator-min-microvolt = <1500000>;
-> +			regulator-max-microvolt = <1500000>;
-> +			regulator-boot-on;
-> +			regulator-always-on;
-> +		};
-> +
-> +		vdd1_reg: regulator at 2 {
-> +			regulator-name = "vdd1,mpu";
-> +			regulator-min-microvolt = <600000>;
-> +			regulator-max-microvolt = <1500000>;
-> +			regulator-boot-on;
-> +			regulator-always-on;
-> +		};
-> +
-> +		vdd2_reg: regulator at 3 {
-> +			regulator-name = "vdd2_1v1,core";
-> +			regulator-min-microvolt = <1100000>;
-> +			regulator-max-microvolt = <1100000>;
-> +			regulator-boot-on;
-> +			regulator-always-on;
-> +		};
-> +
-> +		/* vdd3 - unused */
-> +
-> +		/* vdig1 - unused */
-> +
-> +		vdig2_reg: regulator at 6 {
-> +			regulator-name = "vdig2_1v8,vdds_pll";
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <1800000>;
-> +			regulator-boot-on;
-> +			regulator-always-on;
-> +		};
-> +
-> +		/* vpll - unused */
-> +
-> +		vdac_reg: regulator at 8 {
-> +			regulator-name = "vdac_1v8,vdds";
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <1800000>;
-> +			regulator-boot-on;
-> +			regulator-always-on;
-> +		};
-> +
-> +		vaux1_reg: regulator at 9 {
-> +			regulator-name = "vaux1_1v8,usb";
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <1800000>;
-> +			regulator-boot-on;
-> +			regulator-always-on;
-> +		};
-> +
-> +		vaux2_reg: regulator at 10 {
-> +			regulator-name = "vaux2_3v3,io";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			regulator-boot-on;
-> +			regulator-always-on;
-> +		};
-> +
-> +		vaux33_reg: regulator at 11 {
-> +			regulator-name = "vaux33_3v3,usb";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			regulator-boot-on;
-> +			regulator-always-on;
-> +		};
-> +
-> +		vmmc_reg: regulator at 12 {
-> +			regulator-name = "vmmc_3v3,io";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			regulator-boot-on;
-> +			regulator-always-on;
-> +		};
-> +	};
-> +};
-> +
-> +&sham {
-> +	status = "okay";
-> +};
-> +
-> +&aes {
-> +	status = "okay";
-> +};
-> +
-> +&uart0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart0_pins>;
-> +
-> +	status = "okay";
-> +};
-> +
-> +&usb {
-> +	status = "okay";
-> +};
-> +
-> +&usb_ctrl_mod {
-> +	status = "okay";
-> +};
-> +
-> +&usb0_phy {
-> +	status = "okay";
-> +};
-> +
-> +&usb1_phy {
-> +	status = "okay";
-> +};
-> +
-> +&usb0 {
-> +	status = "okay";
-> +	dr_mode = "host";
-> +};
-> +
-> +&usb1 {
-> +	status = "okay";
-> +	dr_mode = "host";
-> +};
-> +
-> +&cppi41dma  {
-> +	status = "okay";
-> +};
-> +
-> +&cpsw_emac0 {
-> +	phy_id = <&davinci_mdio>, <5>;
-> +	phy-mode = "rmii";
-> +	dual_emac_res_vlan = <2>;
-> +};
-> +
-> +&cpsw_emac1 {
-> +	phy_id = <&davinci_mdio>, <4>;
-> +	phy-mode = "rmii";
-> +	dual_emac_res_vlan = <3>;
-> +};
-> +
-> +&mac {
-> +	pinctrl-names = "default", "sleep";
-> +	pinctrl-0 = <&cpsw_default>;
-> +	pinctrl-1 = <&cpsw_sleep>;
-> +	dual_emac = <1>;
-> +	status = "okay";
-> +};
-> +
-> +&davinci_mdio {
-> +	pinctrl-names = "default", "sleep";
-> +	pinctrl-0 = <&davinci_mdio_default>;
-> +	pinctrl-1 = <&davinci_mdio_sleep>;
-> +	status = "okay";
-> +};
-> +
-> +&mmc1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc1_pins>;
-> +	vmmc-supply = <&vmmcsd_fixed>;
-> +	bus-width = <4>;
-> +	status = "okay";
-> +};
-> +
-> +&mmc2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&emmc_pins>;
-> +	vmmc-supply = <&vmmcsd_fixed>;
-> +	bus-width = <8>;
-> +	ti,non-removable;
-> +	status = "okay";
-> +};
-> +
-> -- 
-> 2.1.0
-> 
+> I suggest you either remove the power domain proxy from your drivers
+> and use the clocks directly, 
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/4be311fc/attachment-0001.sig>
+No.  That's a step in the wrong direction.  This change isn't affecting
+drivers directly.  It's the runtime PM and generic power domain layers
+that handle this, and runtime PM adapted drivers don't need any changes.
+ 
+> or come up with an implementation that can be used across other
+> platforms and CPU architectures.
+
+We already have those in the generic power domain and the pm_clock
+layers.  This series is just hooking those up for Keystone.
+
+Kevin
