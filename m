@@ -1,107 +1,107 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 17 Nov 2014 23:40:12 +0000
-Subject: [PATCH 3/7] regulator: MT6397: Add support for MT6397 regulator
-In-Reply-To: <1416210027-5562-4-git-send-email-flora.fu@mediatek.com>
-References: <1416210027-5562-1-git-send-email-flora.fu@mediatek.com>
- <1416210027-5562-4-git-send-email-flora.fu@mediatek.com>
-Message-ID: <20141117234012.GE22111@sirena.org.uk>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 17 Nov 2014 15:46:31 -0800
+Subject: [PATCH v4 15/19] arm/arm64: KVM: add virtual GICv3 distributor
+ emulation
+In-Reply-To: <5469FEED.5010706@arm.com>
+References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
+ <1415959683-26027-16-git-send-email-andre.przywara@arm.com>
+ <20141114110720.GP19598@cbox> <5469FEED.5010706@arm.com>
+Message-ID: <20141117234536.GA10703@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 03:40:23PM +0800, Flora Fu wrote:
+On Mon, Nov 17, 2014 at 01:58:05PM +0000, Andre Przywara wrote:
+> Hej Christoffer,
+> 
+> maybe I just don't see the wood for the trees, so I will explain my view
+> on the things below. Please correct me / explain your view!
 
-This looks mostly good but there are a few fairly straightfoward things:
+I think this argument should have taken place as a reply to my e-mail on
+the last version of this patch, but ok.
 
-> @@ -725,5 +725,11 @@ config REGULATOR_WM8994
->  	  This driver provides support for the voltage regulators on the
->  	  WM8994 CODEC.
->  
-> +config REGULATOR_MT6397
-> +	tristate "MediaTek MT6397 PMIC"
-> +	depends on MFD_MT6397
-> +	help
-> +	   This driver provides support for the voltage regulators on the MediaTek MT6397 PMIC.
-> +
->  endif
+> 
+> On 14/11/14 11:07, Christoffer Dall wrote:
+> > On Fri, Nov 14, 2014 at 10:07:59AM +0000, Andre Przywara wrote:
+> >> With everything separated and prepared, we implement a model of a
+> >> GICv3 distributor and redistributors by using the existing framework
+> >> to provide handler functions for each register group.
+> >>
+> >> Currently we limit the emulation to a model enforcing a single
+> >> security state, with SRE==1 (forcing system register access) and
+> >> ARE==1 (allowing more than 8 VCPUs).
+> >>
+> >> We share some of the functions provided for GICv2 emulation, but take
+> >> the different ways of addressing (v)CPUs into account.
+> >> Save and restore is currently not implemented.
+> >>
+> >> Similar to the split-off of the GICv2 specific code, the new emulation
+> >> code goes into a new file (vgic-v3-emul.c).
+> >>
+> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> > 
+> > ??...??
+> >> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> >> index 335ffe0..b7de0f8 100644
+> >> --- a/virt/kvm/arm/vgic.c
+> >> +++ b/virt/kvm/arm/vgic.c
+> >> @@ -1249,7 +1249,7 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+> >>  	struct kvm_vcpu *vcpu;
+> >>  	int edge_triggered, level_triggered;
+> >>  	int enabled;
+> >> -	bool ret = true;
+> >> +	bool ret = true, can_inject = true;
+> >>  
+> >>  	spin_lock(&dist->lock);
+> >>  
+> >> @@ -1264,6 +1264,11 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+> >>  
+> >>  	if (irq_num >= VGIC_NR_PRIVATE_IRQS) {
+> >>  		cpuid = dist->irq_spi_cpu[irq_num - VGIC_NR_PRIVATE_IRQS];
+> >> +		if (cpuid == VCPU_NOT_ALLOCATED) {
+> >> +			/* Pretend we use CPU0, and prevent injection */
+> >> +			cpuid = 0;
+> >> +			can_inject = false;
+> >> +		}
+> >>  		vcpu = kvm_get_vcpu(kvm, cpuid);
+> >>  	}
+> >>  
+> >> @@ -1285,7 +1290,7 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+> >>  
+> >>  	enabled = vgic_irq_is_enabled(vcpu, irq_num);
+> >>  
+> >> -	if (!enabled) {
+> >> +	if (!enabled || !can_inject) {
+> >>  		ret = false;
+> >>  		goto out;
+> >>  	}
+> > 
+> > As I wrote, I think this is wrong.  What happened here?
+> 
+> can_inject is just a way for stopping "non-targeted" SPIs to be
+> _injected_. The spec says in "5.3.4. GICD_IROUTERn":
+> 
+> "If this register is programmed to forward the corresponding interrupt
+> to a specific processor (i.e. IRM is zero) and the affinity path does
+> not correspond to an implemented processor, then if the corresponding
+> interrupt becomes pending it will not be forwarded to any processor and
+> will remain pending."
+> 
+> So we can happily make these SPIs pending, but an illegal irq_spi_cpu[]
+> entry will just avoid it to be injected, right?
+> 
+> What am I missing?
+> 
+> Do you want a comment here explaining this?
+> 
+No, I missed something.  What I missed was that we consider
+irq_spi_target in the compute_pending_for_cpu() so that this actually
+ends up working.
 
-Keep this and the Makefile sorted.
+We really shouldn't be trying to take this "precompute cpu pending
+bitmaps instead of calling compute_pending_for_cpu()" shortcut here, at
+least I'm beginning to have troubles following the flow.  That's for
+another time and place though.
 
-> +static int mt6397_buck_set_voltage_sel(struct regulator_dev *rdev, unsigned sel)
-> +{
+I'll review the rest of this version of the series when I get some cycles.
 
-
-> +	vosel = info->buck_conf.vosel_reg;
-> +	voselon = info->buck_conf.voselon_reg;
-> +	vosel_mask = info->buck_conf.vosel_mask;
-
-Please use the standard way of specifying data even if you can't use the
-standard function.
-
-> +
-> +	ret = regmap_update_bits(rdev->regmap, vosel, vosel_mask, sel);
-> +	if (ret != 0) {
-> +		dev_err(&rdev->dev, "Failed to update vosel: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = regmap_update_bits(rdev->regmap, voselon, vosel_mask, sel);
-> +	if (ret != 0) {
-> +		dev_err(&rdev->dev, "Failed to update vosel_on: %d\n", ret);
-> +		return ret;
-> +	}
-> +	return 0;
-
-You should add comments here explaining what's going on - it's very
-strange to have to write the same value to two different registers and
-the names of the registers look suspicously like this is something to do
-with a suspend mode...
-
-Missing blank line before the return too.
-
-> +static int mt6397_buck_get_voltage_sel(struct regulator_dev *rdev)
-> +{
-
-You could use the regmap based helper for this.
-
-> +static int mt6397_ldo_set_voltage_sel(struct regulator_dev *rdev, unsigned sel)
-> +{
-
-The LDO operations appear to be identical to the standard regmap
-helpers, please use them.
-
-> +	if (is_fixed)
-> +		return 0;
-
-You should use the standard fixed voltage regulator support rather than 
-
-> +static int mt6397_regulator_is_enabled(struct regulator_dev *rdev)
-> +{
-
-Again this looks like it should be using helpers.
-
-> +#define MT6397_REGULATOR_OF_MATCH(_name, _id)			\
-> +[MT6397_ID_##_id] = {						\
-> +	.name = #_name,						\
-> +	.driver_data = &mt6397_regulators[MT6397_ID_##_id],	\
-> +}
-
-Define regulators_node and of_match in the regulator desc and you can
-remove both this table and all your DT matching code in the driver, the
-core will handle it for you.
-
-> +	if ((reg_value & 0xFF) == MT6397_REGULATOR_ID91) {
-> +		j = MT6397_ID_VCAMIO;
-> +		mt6397_regulator_matches[j].init_data->constraints.min_uV =
-> +		1000000;
-> +		mt6397_regulators[j].desc.volt_table = ldo_volt_table5_v2;
-> +	}
-
-Use a switch statement, that way other variants can be added more
-easily.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/852c230e/attachment.sig>
+-Christoffer
