@@ -1,67 +1,63 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Nov 2014 14:42:01 +0100
-Subject: [PATCH v5 07/61] dmaengine: split out pause/resume operations from
- device_control
+Date: Mon, 17 Nov 2014 14:42:23 +0100
+Subject: [PATCH v5 29/61] dmaengine: moxart: Split device_control
 In-Reply-To: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1416231775-31252-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1416231775-31252-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1416231775-31252-30-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split out the pause and resume operations to callbacks of their own. In order
-to preserve some backwark compatibility, the dmaengine_pause/dmaengine_resume
-are still falling back on dmaengine_device_control.
-
-Eventually, that will allow to get the device capabilities in a generic way,
-removing the need to implement device_slave_caps.
+Split the device_control callback of the Moxart DMA driver to make use of the
+newly introduced callbacks, that will eventually be used to retrieve slave
+capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- include/linux/dmaengine.h | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/dma/moxart-dma.c | 25 ++-----------------------
+ 1 file changed, 2 insertions(+), 23 deletions(-)
 
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index f797cb81355f..4583c55f3355 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -611,6 +611,10 @@ struct dma_tx_state {
-  *	code
-  * @device_control: manipulate all pending operations on a channel, returns
-  *	zero or error code
-+ * @device_pause: Pauses any transfer happening on a channel. Returns
-+ *	0 or an error code
-+ * @device_resume: Resumes any transfer on a channel previously
-+ *	paused. Returns 0 or an error code
-  * @device_tx_status: poll for transaction completion, the optional
-  *	txstate parameter can be supplied with a pointer to get a
-  *	struct with auxiliary transfer status information, otherwise the call
-@@ -680,6 +684,8 @@ struct dma_device {
- 			     struct dma_slave_config *config);
- 	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 		unsigned long arg);
-+	int (*device_pause)(struct dma_chan *chan);
-+	int (*device_resume)(struct dma_chan *chan);
- 
- 	enum dma_status (*device_tx_status)(struct dma_chan *chan,
- 					    dma_cookie_t cookie,
-@@ -794,11 +800,17 @@ static inline int dmaengine_terminate_all(struct dma_chan *chan)
- 
- static inline int dmaengine_pause(struct dma_chan *chan)
- {
-+	if (chan->device->device_pause)
-+		return chan->device->device_pause(chan);
-+
- 	return dmaengine_device_control(chan, DMA_PAUSE, 0);
+diff --git a/drivers/dma/moxart-dma.c b/drivers/dma/moxart-dma.c
+index 3258e484e4f6..35e1a3ab5fb8 100644
+--- a/drivers/dma/moxart-dma.c
++++ b/drivers/dma/moxart-dma.c
+@@ -263,28 +263,6 @@ static int moxart_slave_config(struct dma_chan *chan,
+ 	return 0;
  }
  
- static inline int dmaengine_resume(struct dma_chan *chan)
- {
-+	if (chan->device->device_resume)
-+		return chan->device->device_resume(chan);
-+
- 	return dmaengine_device_control(chan, DMA_RESUME, 0);
- }
+-static int moxart_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-			  unsigned long arg)
+-{
+-	int ret = 0;
+-
+-	switch (cmd) {
+-	case DMA_PAUSE:
+-	case DMA_RESUME:
+-		return -EINVAL;
+-	case DMA_TERMINATE_ALL:
+-		moxart_terminate_all(chan);
+-		break;
+-	case DMA_SLAVE_CONFIG:
+-		ret = moxart_slave_config(chan, (struct dma_slave_config *)arg);
+-		break;
+-	default:
+-		ret = -ENOSYS;
+-	}
+-
+-	return ret;
+-}
+-
+ static struct dma_async_tx_descriptor *moxart_prep_slave_sg(
+ 	struct dma_chan *chan, struct scatterlist *sgl,
+ 	unsigned int sg_len, enum dma_transfer_direction dir,
+@@ -531,7 +509,8 @@ static void moxart_dma_init(struct dma_device *dma, struct device *dev)
+ 	dma->device_free_chan_resources		= moxart_free_chan_resources;
+ 	dma->device_issue_pending		= moxart_issue_pending;
+ 	dma->device_tx_status			= moxart_tx_status;
+-	dma->device_control			= moxart_control;
++	dma->device_config			= moxart_slave_config;
++	dma->device_terminate_all		= moxart_terminate_all;
+ 	dma->dev				= dev;
  
+ 	INIT_LIST_HEAD(&dma->channels);
 -- 
 2.1.1
