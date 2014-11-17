@@ -1,63 +1,51 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 17 Nov 2014 11:01:09 +0100
-Subject: [PATCH v7 08/13] usb: chipidea: add a usb2 driver for ci13xxx
-In-Reply-To: <20141114211334.GF16388@saruman>
-References: <1415978763-27345-1-git-send-email-antoine.tenart@free-electrons.com>
- <1415978763-27345-9-git-send-email-antoine.tenart@free-electrons.com>
- <20141114210832.GE16388@saruman> <20141114211052.GA8105@kwain>
- <20141114211334.GF16388@saruman>
-Message-ID: <20141117100109.GA20934@kwain>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 17 Nov 2014 11:15:53 +0100
+Subject: [RFC] adp1653: Add device tree bindings for LED controller
+In-Reply-To: <201411171109.47795@pali>
+References: <20141116075928.GA9763@amd> <201411170943.20810@pali>
+ <20141117100519.GA4353@amd> <201411171109.47795@pali>
+Message-ID: <20141117101553.GA21151@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe,
-
-On Fri, Nov 14, 2014 at 03:13:34PM -0600, Felipe Balbi wrote:
-> On Fri, Nov 14, 2014 at 10:10:52PM +0100, Antoine Tenart wrote:
-> > On Fri, Nov 14, 2014 at 03:08:32PM -0600, Felipe Balbi wrote:
-> > > On Fri, Nov 14, 2014 at 04:25:58PM +0100, Antoine Tenart wrote:
-> > > > Add a USB2 ChipIdea driver for ci13xxx, with optional PHY, clock
-> > > > and DMA mask, to support USB2 ChipIdea controllers that don't need
-> > > > specific functions.
-> > > > 
-> > > > Tested on the Marvell Berlin SoCs USB controllers.
-> > > > 
-> > > > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> > > > ---
-> > > >  drivers/usb/chipidea/Makefile       |   1 +
-> > > >  drivers/usb/chipidea/ci_hdrc_usb2.c | 117 ++++++++++++++++++++++++++++++++++++
-> > > >  2 files changed, 118 insertions(+)
-> > > >  create mode 100644 drivers/usb/chipidea/ci_hdrc_usb2.c
-> > > > 
-> > > > diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-> > > > index 2f099c7df7b5..1fc86a2ca22d 100644
-> > > > --- a/drivers/usb/chipidea/Makefile
-> > > > +++ b/drivers/usb/chipidea/Makefile
-> > > > @@ -10,6 +10,7 @@ ci_hdrc-$(CONFIG_USB_OTG_FSM)		+= otg_fsm.o
-> > > >  
-> > > >  # Glue/Bridge layers go here
-> > > >  
-> > > > +obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_usb2.o
-> > > 
-> > > usb2 is too generic, you should call it ci_hdcr_marvell, or something
-> > > like that.
+On Mon 2014-11-17 11:09:45, Pali Roh?r wrote:
+> On Monday 17 November 2014 11:05:19 Pavel Machek wrote:
+> > Hi!
 > > 
-> > This driver is generic, and not only for Marvell Berlin SoCs. It is part
-> > of the Berlin USB series as it is the first SoC to use it but Xilinx can
-> > also use it for example.
+> > On Mon 2014-11-17 09:43:19, Pali Roh?r wrote:
+> > > On Sunday 16 November 2014 08:59:28 Pavel Machek wrote:
+> > > > For device tree people: Yes, I know I'll have to create
+> > > > file in documentation, but does the binding below look
+> > > > acceptable?
+> > > > 
+> > > > I'll clean up driver code a bit more, remove the printks.
+> > > > Anything else obviously wrong?
+> > > 
+> > > I think that this patch is probably not good and specially
+> > > not for n900. adp1653 should be registered throw omap3 isp
+> > > camera subsystem which does not have DT support yet.
+> > 
+> > Can you explain?
+> > 
+> > adp1653 is independend device on i2c bus, and we have kernel
+> > driver for it (unlike rest of n900 camera system). Just now
+> > it is unusable due to lack of DT binding. It has two
+> > functions, LED light and a camera flash; yes, the second one
+> > should be integrated to the rest of camera system, but that
+> > is not yet merged. That should not prevent us from merging DT
+> > support for the flash, so that this part can be
+> > tested/maintained.
+> > 
 > 
-> then how about ci_hdrc_generic.c ?
+> Ok. When ISP camera subsystem has DT support somebody will modify 
+> n900 DT to add camera flash from adp1653 to ISP... I believe it 
+> will not be hard.
 
-We had this discussion during in the v2 thread of this series[1]. I tend
-to prefer not using the 'generic' keyword. I think using 'usb2' is
-generic enough here.
+Exactly. And yes, I'd like to get complete camera support for n900
+merged. But first step is "make sure existing support does not break".
 
-
-Antoine
-
-[1] https://lkml.org/lkml/2014/6/24/197
-
+Best regards,
+								Pavel
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
