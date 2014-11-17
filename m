@@ -1,40 +1,43 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 17 Nov 2014 22:31:14 +0100 (CET)
-Subject: [PATCH 00/10] Save MSI chip in pci_sys_data
-In-Reply-To: <CAErSpo7hH=v15w2UgG3mWc_B=YQNA-ZXj_VO_9dHZ3oFrk_yjw@mail.gmail.com>
-References: <1414396127-30023-1-git-send-email-wangyijing@huawei.com>
- <20141112042359.GK28161@google.com> <20141117025914.GC4280@google.com>
- <alpine.DEB.2.11.1411171035270.3909@nanos>
- <CAErSpo46d0OJbO6tuDUXb2q7+00BUuHzJdsCr+aOhY4we+zn=w@mail.gmail.com>
- <alpine.DEB.2.11.1411172138191.3909@nanos>
- <CAErSpo7hH=v15w2UgG3mWc_B=YQNA-ZXj_VO_9dHZ3oFrk_yjw@mail.gmail.com>
-Message-ID: <alpine.DEB.2.11.1411172230010.3909@nanos>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 17 Nov 2014 22:32:18 +0100
+Subject: [PATCH v9 2/9] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <1414194024-55547-3-git-send-email-lina.iyer@linaro.org>
+References: <1414194024-55547-1-git-send-email-lina.iyer@linaro.org>
+ <1414194024-55547-3-git-send-email-lina.iyer@linaro.org>
+Message-ID: <546A6962.9090801@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Nov 2014, Bjorn Helgaas wrote:
-> Super.  Thank you very much for taking care of this; it's a big weight
-> off my mind.
-> 
-> You can add my Acked-by to these patches if you want it.  I would
-> suggest a minor comment expansion here, just because the code *looks
-> like* it's setting up something to match a hardware device:
-> 
-> > +/**
-> > + * pci_msi_domain_calc_hwirq - Generate a unique ID for an MSI source
-> > + * @dev:       Pointer to the PCI device
-> > + * @desc:      Pointer to the msi descriptor
-> > + *
-> > + * The ID number is only used within the irqdomain.
-> 
-> Maybe include something like:
-> 
->   This "irq_hw_number_t" is an opaque identifier used only by the
-> irqdomain code.
->   It does not correspond to any hardware implementation or register encoding.
+On 10/25/2014 01:40 AM, Lina Iyer wrote:
 
-Yes, that's really a way better description of it.
+Hi Lina,
 
-Thanks for having a look!
+[ ... ]
 
-       tglx
+> +static inline void spm_register_write(struct spm_driver_data *drv,
+> +					enum spm_reg reg, u32 val)
+> +{
+> +	if (drv->reg_data->reg_offset[reg])
+> +		writel_relaxed(val, drv->reg_base +
+> +				drv->reg_data->reg_offset[reg]);
+
+Why not use writel and don't use 'wmb' below ?
+
+> +}
+> +
+
+[ ... ]
+
+> +	spm_register_write(drv, SPM_REG_SPM_CTL, ctl_val);
+> +
+> +	/* Ensure we have written the start address */
+> +	wmb();
+
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
