@@ -1,25 +1,70 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Mon, 17 Nov 2014 19:56:27 +0800
-Subject: For the problem when using swiotlb
-Message-ID: <5469E26B.2010905@huawei.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 17 Nov 2014 12:08:39 +0000
+Subject: [RFC PATCH 14/16] arm/PCI: Introduce pci_get_domain_nr()
+In-Reply-To: <1416219710-26088-15-git-send-email-wangyijing@huawei.com>
+References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
+ <1416219710-26088-15-git-send-email-wangyijing@huawei.com>
+Message-ID: <20141117120839.GA22241@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin:
-	The commit 3690951fc6d42f3a0903987677d0e592c49dd8db(arm64: Use swiotlb late initialisation)
-switches the DMA mapping code to swiotlb_tlb_late_init_with_default_size(), this will occur a problem
-when I run the scsi stress tests, the message as below:
+On Mon, Nov 17, 2014 at 10:21:48AM +0000, Yijing Wang wrote:
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> ---
+>  arch/arm/include/asm/mach/pci.h |    9 +++++++++
+>  arch/arm/kernel/bios32.c        |    8 ++++++--
+>  2 files changed, 15 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+> index f19f627..370b3bd 100644
+> --- a/arch/arm/include/asm/mach/pci.h
+> +++ b/arch/arm/include/asm/mach/pci.h
+> @@ -90,6 +90,15 @@ extern void pci_map_io_early(unsigned long pfn);
+>  static inline void pci_map_io_early(unsigned long pfn) {}
+>  #endif
+>  
+> +#ifdef CONFIG_PCI_DOMAINS_GENERIC
+> +int pci_get_domain_nr(struct device *parent)
+> +#else
+> +static inline int pci_get_domain_nr(struct device *parent)
+> +{
+> +	return 0;
+> +}
+> +#endif
+> +
+>  /*
+>   * PCI controllers
+>   */
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index d8c2b4e..3fe56f1 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -513,7 +513,7 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+>  #ifdef CONFIG_PCI_DOMAINS_GENERIC
+>  static bool dt_domain_found;
+>  
+> -void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+> +int pci_get_domain_nr(struct device *parent)
+>  {
+>  	int domain = of_get_pci_domain_nr(parent->of_node);
+>  
+> @@ -526,8 +526,12 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+>  	} else {
+>  		domain = pci_get_new_domain_nr();
+>  	}
+> +	return domain;
+> +}
+>  
+> -	bus->domain_nr = domain;
+> +void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+> +{
+> +	bus->domain_nr = pci_get_domain_nr(parent);
+>  }
+>  #endif
 
-	sas_controller b1000000.sas: swiotlb buffer is full (sz: 65536 bytes)..
-	DMA: Out of SW-IOMMU space for 65536 bytes at device b1000000.sas
+This code is superseded by the last patches I sent to move the domain
+assignment to PCI core code.
 
-The reason is that the swiotlb_tlb_late_init_with_default_size() could only alloc 16M memory for DMA-mapping,
-and the param in cmdline "swiotlb=xxx" is useless because the get_free_pages() only use the buddy to assigned a
-maximum memory of 16M(The MAX_ORDER is 13 for 4k pages), obviously 16M is too small in many scenes, but
-the swiotlb_init() which could reserved a bigger memory as wished could work well for most drivers.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/301220.html
 
-I could not get a better way to fix this problem except to revert this patch, so could you please give me some
-advise and help me, thanks very much.
-
-Regards
-Ding
+Lorenzo
