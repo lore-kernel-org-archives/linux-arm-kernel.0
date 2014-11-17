@@ -1,49 +1,64 @@
-From: b.galvani@gmail.com (Beniamino Galvani)
-Date: Mon, 17 Nov 2014 23:47:49 +0100
-Subject: [PATCH v2 2/4] spi: meson: Add device tree bindings documentation for
- SPIFC
-In-Reply-To: <1416264471-774-1-git-send-email-b.galvani@gmail.com>
-References: <1416264471-774-1-git-send-email-b.galvani@gmail.com>
-Message-ID: <1416264471-774-3-git-send-email-b.galvani@gmail.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Mon, 17 Nov 2014 14:41:33 -0800
+Subject: [PATCH V5 03/12] mailbox: Fix up error handling in
+ mbox_request_channel()
+In-Reply-To: <1416264102-1323-1-git-send-email-abrestic@chromium.org>
+References: <1416264102-1323-1-git-send-email-abrestic@chromium.org>
+Message-ID: <1416264102-1323-4-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds documentation of device tree bindings for the Amlogic Meson
-SPIFC (SPI Flash Controller).
+From: Benson Leung <bleung@chromium.org>
 
-Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+mbox_request_channel() currently returns EBUSY in the event the controller
+is not present or if of_xlate() fails, but in neither case is EBUSY really
+appropriate.  Return EPROBE_DEFER if the controller is not yet present
+and change of_xlate() to return an ERR_PTR instead of NULL so that the
+error can be propagated back to the caller of mbox_request_channel().
+
+Signed-off-by: Benson Leung <bleung@chromium.org>
+Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 ---
- .../devicetree/bindings/spi/spi-meson.txt          | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/spi/spi-meson.txt
+New for v5.
+---
+ drivers/mailbox/mailbox.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-meson.txt b/Documentation/devicetree/bindings/spi/spi-meson.txt
-new file mode 100644
-index 0000000..bb52a86
---- /dev/null
-+++ b/Documentation/devicetree/bindings/spi/spi-meson.txt
-@@ -0,0 +1,22 @@
-+Amlogic Meson SPI controllers
+diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+index c281e55..7b1e258 100644
+--- a/drivers/mailbox/mailbox.c
++++ b/drivers/mailbox/mailbox.c
+@@ -318,7 +318,7 @@ struct mbox_chan *mbox_request_channel(struct mbox_client *cl, int index)
+ 		return ERR_PTR(-ENODEV);
+ 	}
+ 
+-	chan = NULL;
++	chan = ERR_PTR(-EPROBE_DEFER);
+ 	list_for_each_entry(mbox, &mbox_cons, node)
+ 		if (mbox->dev->of_node == spec.np) {
+ 			chan = mbox->of_xlate(mbox, &spec);
+@@ -327,7 +327,12 @@ struct mbox_chan *mbox_request_channel(struct mbox_client *cl, int index)
+ 
+ 	of_node_put(spec.np);
+ 
+-	if (!chan || chan->cl || !try_module_get(mbox->dev->driver->owner)) {
++	if (IS_ERR(chan)) {
++		mutex_unlock(&con_mutex);
++		return chan;
++	}
 +
-+* SPIFC (SPI Flash Controller)
-+
-+The Meson SPIFC is a controller optimized for communication with SPI
-+NOR memories, without DMA support and a 64-byte unified transmit /
-+receive buffer.
-+
-+Required properties:
-+ - compatible: should be "amlogic,meson6-spifc"
-+ - reg: physical base address and length of the controller registers
-+ - clocks: phandle of the input clock for the baud rate generator
-+ - #address-cells: should be 1
-+ - #size-cells: should be 0
-+
-+	spi at c1108c80 {
-+		compatible = "amlogic,meson6-spifc";
-+		reg = <0xc1108c80 0x80>;
-+		clocks = <&clk81>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
++	if (chan->cl || !try_module_get(mbox->dev->driver->owner)) {
+ 		dev_dbg(dev, "%s: mailbox not free\n", __func__);
+ 		mutex_unlock(&con_mutex);
+ 		return ERR_PTR(-EBUSY);
+@@ -390,7 +395,7 @@ of_mbox_index_xlate(struct mbox_controller *mbox,
+ 	int ind = sp->args[0];
+ 
+ 	if (ind >= mbox->num_chans)
+-		return NULL;
++		return ERR_PTR(-EINVAL);
+ 
+ 	return &mbox->chans[ind];
+ }
 -- 
-1.9.1
+2.1.0.rc2.206.gedb03e5
