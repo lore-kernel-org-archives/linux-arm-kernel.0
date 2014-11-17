@@ -1,35 +1,168 @@
-From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
-Date: Mon, 17 Nov 2014 15:29:30 +0100
-Subject: [PATCH] gpio: mxs: implement get_direction callback
-In-Reply-To: <CACQ1gAje6OA_n37jE_WnSqg4R+U5tr-bGnnfxpGM5NE9c=dAVg@mail.gmail.com>
-References: <1416004026-9667-1-git-send-email-j.uzycki@elproma.com.pl>
- <20141114232601.GW27002@pengutronix.de> <5467A980.5090204@elproma.com.pl>
- <20141116214239.GX27002@pengutronix.de> <54693A51.5080907@elproma.com.pl>
- <54695654.3070209@elproma.com.pl> <20141117082848.GZ27002@pengutronix.de>
- <5469BBBD.30003@elproma.com.pl>
- <CACQ1gAha1MuroyB35zN_BuwRNGS_J3Xh1htiHJda_2_19qh31g@mail.gmail.com>
- <20141117095909.GH27002@pengutronix.de>
- <CACQ1gAje6OA_n37jE_WnSqg4R+U5tr-bGnnfxpGM5NE9c=dAVg@mail.gmail.com>
-Message-ID: <546A064A.5060304@elproma.com.pl>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 17 Nov 2014 08:32:57 -0600
+Subject: [PATCH 07/11] arm: perf: document PMU affinity binding
+In-Reply-To: <1415377536-12841-8-git-send-email-mark.rutland@arm.com>
+References: <1415377536-12841-1-git-send-email-mark.rutland@arm.com>
+ <1415377536-12841-8-git-send-email-mark.rutland@arm.com>
+Message-ID: <CAL_Jsq+u9--tP-pYBut0V6oAnRDbwqpaJ9UMyW55AhCNFV10sA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
-
-W dniu 2014-11-17 o 11:05, Richard Genoud pisze:
-> 2014-11-17 10:59 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+On Fri, Nov 7, 2014 at 10:25 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> To describe the various ways CPU PMU interrupts might be wired up, we
+> can refer to the topology information in the device tree.
 >
-> well, in this case, request_irq() will fail and all the previously
-> requested irqs will be freed:
->      /*
->       * If something went wrong, rollback.
->       */
->      while (err && (--i >= 0))
->          if (irq[i] >= 0)
->              free_irq(irq[i], port);
+> This patch adds a new property to the PMU binding, interrupts-affinity,
+> which describes the relationship between CPUs and interrupts. This
+> information is necessary to handle systems with heterogeneous PMU
+> implementations (e.g. big.LITTLE). Documentation is added describing the
+> use of said property.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> ---
+>  Documentation/devicetree/bindings/arm/pmu.txt | 104 +++++++++++++++++++++++++-
+>  1 file changed, 103 insertions(+), 1 deletion(-)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
+> index 75ef91d..23a0675 100644
+> --- a/Documentation/devicetree/bindings/arm/pmu.txt
+> +++ b/Documentation/devicetree/bindings/arm/pmu.txt
+> @@ -24,12 +24,114 @@ Required properties:
+>
+>  Optional properties:
+>
+> +- interrupts-affinity : A list of phandles to topology nodes (see topology.txt) describing
+> +            the set of CPUs associated with the interrupt at the same index.
 
-I hesitate if use the rollback or just call mctrl_gpio_free_irqs().
-Let's note that "i" is enum and the loop ends on i < 0.
+Are there cases beyond PMUs we need to handle? I would think so, so we
+should document this generically.
 
-best regards
-Janusz
+>  - qcom,no-pc-write : Indicates that this PMU doesn't support the 0xc and 0xd
+>                       events.
+>
+> -Example:
+> +Example 1 (A single CPU):
+
+Isn't this a single cluster of 2 cpus?
+
+>
+>  pmu {
+>          compatible = "arm,cortex-a9-pmu";
+>          interrupts = <100 101>;
+>  };
+> +
+> +Example 2 (Multiple clusters with single interrupts):
+
+The meaning of single could be made a bit more clear especially if you
+consider Will's case. But I haven't really thought of better
+wording...
+
+> +
+> +cpus {
+> +       #address-cells = <1>;
+> +       #size-cells = <1>;
+> +
+> +       CPU0: cpu at 0 {
+> +               reg = <0x0>;
+> +               compatible = "arm,cortex-a15-pmu";
+> +       };
+> +
+> +       CPU1: cpu at 1 {
+> +               reg = <0x1>;
+> +               compatible = "arm,cotex-a15-pmu";
+> +       };
+> +
+> +       CPU100: cpu at 100 {
+> +               reg = <0x100>;
+> +               compatible = "arm,cortex-a7-pmu";
+> +       };
+> +
+> +       cpu-map {
+> +               cluster0 {
+> +                       CORE_0_0: core0 {
+> +                               cpu = <&CPU0>;
+> +                       };
+> +                       CORE_0_1: core1 {
+> +                               cpu = <&CPU1>;
+> +                       };
+> +               };
+> +               cluster1 {
+> +                       CORE_1_0: core0 {
+> +                               cpu = <&CPU100>;
+> +                       };
+> +               };
+> +       };
+> +};
+> +
+> +pmu_a15 {
+> +       compatible = "arm,cortex-a15-pmu";
+> +       interrupts = <100>, <101>;
+> +       interrupts-affinity = <&CORE0>, <&CORE1>;
+
+The phandle names are wrong here.
+
+> +};
+> +
+> +pmu_a7 {
+> +       compatible = "arm,cortex-a7-pmu";
+> +       interrupts = <105>;
+> +       interrupts-affinity = <&CORE_1_0>;
+> +};
+> +
+> +Example 3 (Multiple clusters with per-cpu interrupts):
+> +
+> +cpus {
+> +       #address-cells = <1>;
+> +       #size-cells = <1>;
+> +
+> +       CPU0: cpu at 0 {
+> +               reg = <0x0>;
+> +               compatible = "arm,cortex-a15-pmu";
+> +       };
+> +
+> +       CPU1: cpu at 1 {
+> +               reg = <0x1>;
+> +               compatible = "arm,cotex-a15-pmu";
+> +       };
+> +
+> +       CPU100: cpu at 100 {
+> +               reg = <0x100>;
+> +               compatible = "arm,cortex-a7-pmu";
+> +       };
+> +
+> +       cpu-map {
+> +               CLUSTER0: cluster0 {
+> +                       core0 {
+> +                               cpu = <&CPU0>;
+> +                       };
+> +                       core1 {
+> +                               cpu = <&CPU1>;
+> +                       };
+> +               };
+> +               CLUSTER1: cluster1 {
+> +                        core0 {
+> +                               cpu = <&CPU100>;
+> +                       };
+> +               };
+> +       };
+> +};
+> +
+> +pmu_a15 {
+> +       compatible = "arm,cortex-a15-pmu";
+> +       interrupts = <100>;
+> +       interrupts-affinity = <&CLUSTER0>;
+> +};
+> +
+> +pmu_a7 {
+> +       compatible = "arm,cortex-a7-pmu";
+> +       interrupts = <105>;
+> +       interrupts-affinity = <&CLUSTER1>;
+> +};
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
