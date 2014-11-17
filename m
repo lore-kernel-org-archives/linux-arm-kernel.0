@@ -1,46 +1,58 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 17 Nov 2014 13:26:15 +0300
-Subject: [PATCH v4] of: replace Asahi Kasei Corp venter prefix
-In-Reply-To: <87y4ra8xac.wl%kuninori.morimoto.gx@renesas.com>
-References: <878ulzx6hr.wl%kuninori.morimoto.gx@gmail.com>	<20140922130026.GK3290@leverpostej>	<CAMuHMdX22z97SbGS1HDiYfJ1PXxyEN2S8D7w4sr+4bUwD+mJZw@mail.gmail.com>	<20140922132743.GM3290@leverpostej>	<87y4rfhmgl.wl%kuninori.morimoto.gx@renesas.com>	<1415845309.4269.6.camel@perches.com>	<20141113025105.GA16652@verge.net.au>	<87vbmjhj00.wl%kuninori.morimoto.gx@renesas.com>	<20141113110740.GE3815@sirena.org.uk>	<87k32yd0bd.wl%kuninori.morimoto.gx@renesas.com>	<20141114093554.GC3810@ulmo>
- <87y4ra8xac.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <5469CD47.3040409@cogentembedded.com>
+From: ankit.jindal@linaro.org (Ankit Jindal)
+Date: Mon, 17 Nov 2014 16:06:06 +0530
+Subject: [PATCH v5 0/6] UIO driver for APM X-Gene QMTM
+Message-ID: <1416220572-13381-1-git-send-email-ankit.jindal@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+This patchset enables user space access to APM X-Gene QMTM
+using UIO framework.
 
-On 11/17/2014 3:51 AM, Kuninori Morimoto wrote:
+The patchset also introduces new type UIO_MEM_PHYS_CACHE
+for mem regions because APM X-Gene QMTM device supports
+cache coherency with CPU caches.
 
-> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Changes since v4:
+ - Fixed typos in dt-binding documentation.
 
-    s/venter/vendor/ in the subject. Sorry for a late comment.
+Changes since v3:
+ - Renamed qpool to qpool-memory in dt-binding.
+ - Some cleanups in dt-binding documentation.
 
-> Current vendor-prefixes.txt already has "ak" prefix for Asahi Kasei Corp
-> by ae8c4209af2c(of: Add vendor prefix for Asahi Kasei Corp.)
+Changes since v2:
+ - Formatting cleanups.
+ - Remove qmtm_cleanup().
 
-> It went through the appropriate review process. But, almost all
-> Asahi Kasei chip drivers are using "asahi-kasei" prefix today.
-> (arch/arm/boot/dts/tegra20-seaboard.dts only is using "ak,ak8975",
->   but there are instances of "asahi-kasei,ak8975" in other dts files.
->   And drivers/iio/magnetometer/ak8975.c doesn't support "ak,ak8975")
-> So, we made a mistake there.
+Changes since v1:
+ - Factor-out formating related change in uio/uio.c as separate patch.
+ - Use devm_xxx() APIs where appilicable.
+ - Some cleanups and buggy loop fixed in qmtm_reset().
+ - Removed open and release functions.
+ - Use phandle for specifying QMTM qpool resource.
+ - Removed "uio" from the compatible string.
+ - Added more information about QMTM in binding documentation.
 
-> In addition, checkpatch.pl reports WARNING if it is using "asahi-kasei"
-> prerfix in DT file.
-> (DT compatible string vendor "asahi-kasei" appears un-documented)
 
-> Marking it deprecated and warning with checkpatch is certainly
-> preferable. So, this patch replace "ak" to "asahi-kasei" in
-> vendor-prefixes.txt. (and fixup tegra20-seaboard)
+Ankit Jindal (6):
+  uio: code style cleanup
+  uio: Add new UIO_MEM_PHYS_CACHE type for mem regions
+  Documentation: Update documentation for UIO_MEM_PHYS_CACHE
+  uio: Add X-Gene QMTM UIO driver
+  Documentation: dt-bindings: Add binding info for X-Gene QMTM UIO
+    driver
+  MAINTAINERS: Add entry for APM X-Gene QMTM UIO driver
 
-> OTOH, Asahi Kasei is usually referred to as "AKM", but this patch
-> doesn't care about it. Because no DT is using that today.
+ Documentation/DocBook/uio-howto.tmpl               |    5 +-
+ .../devicetree/bindings/uio/uio_xgene_qmtm.txt     |   50 ++++
+ MAINTAINERS                                        |    7 +
+ drivers/uio/Kconfig                                |    8 +
+ drivers/uio/Makefile                               |    1 +
+ drivers/uio/uio.c                                  |   23 +-
+ drivers/uio/uio_xgene_qmtm.c                       |  271 ++++++++++++++++++++
+ include/linux/uio_driver.h                         |    1 +
+ 8 files changed, 355 insertions(+), 11 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt
+ create mode 100644 drivers/uio/uio_xgene_qmtm.c
 
-> Acked-by: Thierry Reding <treding@nvidia.com>
-> Acked-by: Alexandre Courbot <acourbot@nvidia.com>
-> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-
-    One normally places ACKs after his own sign-off.
-
-WBR, Sergei
+-- 
+1.7.9.5
