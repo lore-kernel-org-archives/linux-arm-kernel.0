@@ -1,65 +1,41 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 17 Nov 2014 10:59:09 +0100
-Subject: [PATCH] gpio: mxs: implement get_direction callback
-In-Reply-To: <CACQ1gAha1MuroyB35zN_BuwRNGS_J3Xh1htiHJda_2_19qh31g@mail.gmail.com>
-References: <1416004026-9667-1-git-send-email-j.uzycki@elproma.com.pl>
- <20141114232601.GW27002@pengutronix.de>
- <5467A980.5090204@elproma.com.pl>
- <20141116214239.GX27002@pengutronix.de>
- <54693A51.5080907@elproma.com.pl> <54695654.3070209@elproma.com.pl>
- <20141117082848.GZ27002@pengutronix.de>
- <5469BBBD.30003@elproma.com.pl>
- <CACQ1gAha1MuroyB35zN_BuwRNGS_J3Xh1htiHJda_2_19qh31g@mail.gmail.com>
-Message-ID: <20141117095909.GH27002@pengutronix.de>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 17 Nov 2014 11:05:19 +0100
+Subject: [RFC] adp1653: Add device tree bindings for LED controller
+In-Reply-To: <201411170943.20810@pali>
+References: <20141116075928.GA9763@amd>
+ <201411170943.20810@pali>
+Message-ID: <20141117100519.GA4353@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Richard,
+Hi!
 
-> >>>> So finally the prototypes would be:
-> >>>> int mctrl_gpio_request_irqs(struct mctrl_gpios*, struct
-> >>>> uart_port*, irqhandler_t);
-> >>>> void mctrl_gpio_free_irqs(struct mctrl_gpios*);
-> >>
-> >> I think:
-> >>
-> >>         struct mctrl_gpios {
-> >>                 struct uart_port *port;
-> >>                 struct {
-> >>                         gpio_desc *gpio;
-> >>                         unsigned int irq;
-> I think it's just "int irq;" there
-irqs are unsigned. Some functions returning an irq use "int", but
-depending on who you ask this only for error reporting or a relict.
-Use 0 for invalid/unused in mctrl_gpio*.
+On Mon 2014-11-17 09:43:19, Pali Roh?r wrote:
+> On Sunday 16 November 2014 08:59:28 Pavel Machek wrote:
+> > For device tree people: Yes, I know I'll have to create file
+> > in documentation, but does the binding below look acceptable?
+> > 
+> > I'll clean up driver code a bit more, remove the printks.
+> > Anything else obviously wrong?
 
-> > Yes. I tried to assign irq value in mctrl_gpio_init() only.
-> > There was another issue if CONFIG_GPIOLIB is not defined but it looks mctrl_
-> > disable/enable_ms()
-> > and mctrl_ irq handler solve the problem.
-> >
-> >>   Not sure there is a corresponding request_irq variant for that.
-> >
-> >
-> > What would you propose?
-> In atmel_request_gpio_irq(), the function irq_set_status_flags(irq,
-> IRQ_NOAUTOEN); is used before request_irq to prevent the irq from
-> being enabled when requested.
-I'm not sure this is allowed. How do you handle request_irq failing? (I
-just checked: you don't.) Consider another thread just doing
-request_irq($yourirq, ...) between
+> I think that this patch is probably not good and specially not 
+> for n900. adp1653 should be registered throw omap3 isp camera 
+> subsystem which does not have DT support yet.
 
-	irq_set_status_flags(irq[i], IRQ_NOAUTOEN);
+Can you explain?
 
-and
+adp1653 is independend device on i2c bus, and we have kernel driver
+for it (unlike rest of n900 camera system). Just now it is unusable
+due to lack of DT binding. It has two functions, LED light and a
+camera flash; yes, the second one should be integrated to the rest of
+camera system, but that is not yet merged. That should not prevent us
+from merging DT support for the flash, so that this part can be
+tested/maintained.
 
-	err = request_irq(irq[i], ...
+> See n900 legacy board camera code in file board-rx51-camera.c.
 
-.
-
-Best regards
-Uwe
-
+I have seen that.
+									Pavel
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
