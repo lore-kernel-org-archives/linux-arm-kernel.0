@@ -1,53 +1,56 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 17 Nov 2014 16:19:10 +0100
-Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
- completes
-Message-ID: <1416237550-31092-1-git-send-email-ulf.hansson@linaro.org>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Mon, 17 Nov 2014 16:21:53 +0100
+Subject: [RFC] adp1653: Add device tree bindings for LED controller
+In-Reply-To: <20141117150617.GD7046@atomide.com>
+References: <20141116075928.GA9763@amd> <201411171601.32311@pali>
+ <20141117150617.GD7046@atomide.com>
+Message-ID: <201411171621.54895@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The amba bus, amba drivers and a vast amount of platform drivers which
-enables runtime PM, don't invoke a pm_runtime_get_sync() while probing
-their devices.
+On Monday 17 November 2014 16:06:17 Tony Lindgren wrote:
+> * Pali Roh?r <pali.rohar@gmail.com> [141117 07:03]:
+> > On Monday 17 November 2014 15:55:46 Tony Lindgren wrote:
+> > > There's nothing stopping us from initializing the camera
+> > > code from pdata-quirks.c for now to keep it working.
+> > > Certainly the binding should be added to the driver, but
+> > > that removes a dependency to the legacy booting mode if
+> > > things are otherwise working.
+> > 
+> > Tony, legacy board code for n900 is not in mainline tree.
+> > And that omap3 camera subsystem for n900 is broken since
+> > 3.5 kernel... (both Front and Back camera on n900 show only
+> > green picture).
+> 
+> I'm still seeing the legacy board code for n900 in mainline
+> tree :) It's deprecated, but still there.
+> 
 
-Instead, once they have turned on their PM resourses during ->probe()
-and are ready to handle I/O, these invokes pm_runtime_set_active() to
-synchronize its state towards the runtime PM core.
+Yes, it is there because conversion from board code to DT is not 
+complete yet... It is slow progress but you can watch it on page 
+http://elinux.org/N900 (last two columns).
 
->From a runtime PM point of view this behavior is perfectly acceptable,
-but we encounter probe failures if their corresponding devices resides
-in the generic PM domain. The issues are observed for those devices,
-which requires its PM domain to stay powered during ->probe() since
-that's not being controlled.
+> Are you maybe talking about some other piece of platform_data
+> that's no longer in the mainline kernel?
+> 
 
-While using the generic OF-based PM domain look-up, a device's PM
-domain will be attached during the probe sequence. For this path, let's
-fix the probe failures, by simply power on the PM domain right after
-when it's been attached to the device.
+Yes, about platform_data which were never in mainline kernel. 
+Just only in other trees. That code is: camera subsystem (with 
+all other devices), cellular modem, bluetooth, radio.
 
-The generic PM domain stays powered until all of its devices becomes
-runtime PM enabled and runtime PM suspended.
+> No idea what might be wrong with the camera though.
+> 
+> Regards,
+> 
+> Tony
 
-The old SOCs which makes use of the generic PM domain but don't use the
-generic OF-based PM domain look-up, will not be affected from this
-change.
-
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/base/power/domain.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 3989eb6..1bfb54c 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -2235,6 +2235,7 @@ int genpd_dev_pm_attach(struct device *dev)
- 	}
- 
- 	dev->pm_domain->detach = genpd_dev_pm_detach;
-+	pm_genpd_poweron(pd);
- 
- 	return 0;
- }
 -- 
-1.9.1
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/a510ac35/attachment.sig>
