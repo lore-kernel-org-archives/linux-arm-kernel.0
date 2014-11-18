@@ -1,197 +1,131 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 18 Nov 2014 18:53:05 +0000
-Subject: [PATCH v2 10/13] irqchip: GICv3: ITS: DT probing and initialization
+Date: Tue, 18 Nov 2014 18:53:01 +0000
+Subject: [PATCH v2 06/13] irqchip: GICv3: ITS: LPI allocator
 In-Reply-To: <1416336788-22634-1-git-send-email-marc.zyngier@arm.com>
 References: <1416336788-22634-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1416336788-22634-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1416336788-22634-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the code that probes the ITS from the device tree,
-and initialize it.
+LPIs are the type of interrupts that are used by the ITS. Given
+the size of the namespace (anywhere between 16 and 32bit), interrupt
+IDs are allocated in chunks of 32.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 170 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 170 insertions(+)
+ drivers/irqchip/irq-gic-v3-its.c | 103 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 103 insertions(+)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index ff92aa4..3795422 100644
+index d24bebd..4154a16 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1234,3 +1234,173 @@ static const struct irq_domain_ops its_domain_ops = {
- 	.alloc			= its_irq_domain_alloc,
- 	.free			= its_irq_domain_free,
+@@ -586,3 +586,106 @@ static struct irq_chip its_irq_chip = {
+ 	.irq_eoi		= its_eoi_irq,
+ 	.irq_set_affinity	= its_set_affinity,
  };
 +
-+static int its_probe(struct device_node *node, struct irq_domain *parent)
++/*
++ * How we allocate LPIs:
++ *
++ * The GIC has id_bits bits for interrupt identifiers. From there, we
++ * must subtract 8192 which are reserved for SGIs/PPIs/SPIs. Then, as
++ * we allocate LPIs by chunks of 32, we can shift the whole thing by 5
++ * bits to the right.
++ *
++ * This gives us (((1UL << id_bits) - 8192) >> 5) possible allocations.
++ */
++#define IRQS_PER_CHUNK_SHIFT	5
++#define IRQS_PER_CHUNK		(1 << IRQS_PER_CHUNK_SHIFT)
++
++static unsigned long *lpi_bitmap;
++static u32 lpi_chunks;
++static DEFINE_SPINLOCK(lpi_lock);
++
++static int its_lpi_to_chunk(int lpi)
 +{
-+	struct resource res;
-+	struct its_node *its;
-+	void __iomem *its_base;
-+	u32 val;
-+	u64 baser, tmp;
-+	int err;
++	return (lpi - 8192) >> IRQS_PER_CHUNK_SHIFT;
++}
 +
-+	err = of_address_to_resource(node, 0, &res);
-+	if (err) {
-+		pr_warn("%s: no regs?\n", node->full_name);
-+		return -ENXIO;
-+	}
++static int its_chunk_to_lpi(int chunk)
++{
++	return (chunk << IRQS_PER_CHUNK_SHIFT) + 8192;
++}
 +
-+	its_base = ioremap(res.start, resource_size(&res));
-+	if (!its_base) {
-+		pr_warn("%s: unable to map registers\n", node->full_name);
++static int its_lpi_init(u32 id_bits)
++{
++	lpi_chunks = its_lpi_to_chunk(1UL << id_bits);
++
++	lpi_bitmap = kzalloc(BITS_TO_LONGS(lpi_chunks) * sizeof(long),
++			     GFP_KERNEL);
++	if (!lpi_bitmap) {
++		lpi_chunks = 0;
 +		return -ENOMEM;
 +	}
 +
-+	val = readl_relaxed(its_base + GITS_PIDR2) & GIC_PIDR2_ARCH_MASK;
-+	if (val != 0x30 && val != 0x40) {
-+		pr_warn("%s: no ITS detected, giving up\n", node->full_name);
-+		err = -ENODEV;
-+		goto out_unmap;
-+	}
++	pr_info("ITS: Allocated %d chunks for LPIs\n", (int)lpi_chunks);
++	return 0;
++}
 +
-+	pr_info("ITS: %s\n", node->full_name);
++static unsigned long *its_lpi_alloc_chunks(int nr_irqs, int *base, int *nr_ids)
++{
++	unsigned long *bitmap = NULL;
++	int chunk_id;
++	int nr_chunks;
++	int i;
 +
-+	its = kzalloc(sizeof(*its), GFP_KERNEL);
-+	if (!its) {
-+		err = -ENOMEM;
-+		goto out_unmap;
-+	}
++	nr_chunks = DIV_ROUND_UP(nr_irqs, IRQS_PER_CHUNK);
 +
-+	raw_spin_lock_init(&its->lock);
-+	INIT_LIST_HEAD(&its->entry);
-+	INIT_LIST_HEAD(&its->its_device_list);
-+	its->base = its_base;
-+	its->phys_base = res.start;
-+	its->msi_chip.of_node = node;
-+	its->ite_size = ((readl_relaxed(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
++	spin_lock(&lpi_lock);
 +
-+	its->cmd_base = kzalloc(ITS_CMD_QUEUE_SZ, GFP_KERNEL);
-+	if (!its->cmd_base) {
-+		err = -ENOMEM;
-+		goto out_free_its;
-+	}
-+	its->cmd_write = its->cmd_base;
++	do {
++		chunk_id = bitmap_find_next_zero_area(lpi_bitmap, lpi_chunks,
++						      0, nr_chunks, 0);
++		if (chunk_id < lpi_chunks)
++			break;
 +
-+	err = its_alloc_tables(its);
-+	if (err)
-+		goto out_free_cmd;
++		nr_chunks--;
++	} while (nr_chunks > 0);
 +
-+	err = its_alloc_collections(its);
-+	if (err)
-+		goto out_free_tables;
++	if (!nr_chunks)
++		goto out;
 +
-+	baser = (virt_to_phys(its->cmd_base)	|
-+		 GITS_CBASER_WaWb		|
-+		 GITS_CBASER_InnerShareable	|
-+		 (ITS_CMD_QUEUE_SZ / SZ_4K - 1)	|
-+		 GITS_CBASER_VALID);
++	bitmap = kzalloc(BITS_TO_LONGS(nr_chunks * IRQS_PER_CHUNK) * sizeof (long),
++			 GFP_ATOMIC);
++	if (!bitmap)
++		goto out;
 +
-+	writeq_relaxed(baser, its->base + GITS_CBASER);
-+	tmp = readq_relaxed(its->base + GITS_CBASER);
-+	writeq_relaxed(0, its->base + GITS_CWRITER);
-+	writel_relaxed(1, its->base + GITS_CTLR);
++	for (i = 0; i < nr_chunks; i++)
++		set_bit(chunk_id + i, lpi_bitmap);
 +
-+	if ((tmp ^ baser) & GITS_BASER_SHAREABILITY_MASK) {
-+		pr_info("ITS: using cache flushing for cmd queue\n");
-+		its->flags |= ITS_FLAGS_CMDQ_NEEDS_FLUSHING;
-+	}
++	*base = its_chunk_to_lpi(chunk_id);
++	*nr_ids = nr_chunks * IRQS_PER_CHUNK;
 +
-+	if (of_property_read_bool(its->msi_chip.of_node, "msi-controller")) {
-+		its->domain = irq_domain_add_tree(its->msi_chip.of_node,
-+						  &its_domain_ops, NULL);
-+		if (!its->domain) {
-+			err = -ENOMEM;
-+			goto out_free_tables;
++out:
++	spin_unlock(&lpi_lock);
++
++	return bitmap;
++}
++
++static void its_lpi_free(unsigned long *bitmap, int base, int nr_ids)
++{
++	int lpi;
++
++	spin_lock(&lpi_lock);
++
++	for (lpi = base; lpi < (base + nr_ids); lpi += IRQS_PER_CHUNK) {
++		int chunk = its_lpi_to_chunk(lpi);
++		BUG_ON(chunk > lpi_chunks);
++		if (test_bit(chunk, lpi_bitmap)) {
++			clear_bit(chunk, lpi_bitmap);
++		} else {
++			pr_err("Bad LPI chunk %d\n", chunk);
 +		}
-+
-+		its->domain->parent = parent;
-+
-+		its->msi_chip.domain = pci_msi_create_irq_domain(NULL,
-+								 &its_pci_msi_domain_info,
-+								 its->domain);
-+		if (!its->msi_chip.domain) {
-+			err = -ENOMEM;
-+			goto out_free_domains;
-+		}
-+
-+		err = of_pci_msi_chip_add(&its->msi_chip);
-+		if (err)
-+			goto out_free_domains;
 +	}
 +
-+	spin_lock(&its_lock);
-+	list_add(&its->entry, &its_nodes);
-+	spin_unlock(&its_lock);
++	spin_unlock(&lpi_lock);
 +
-+	return 0;
-+
-+out_free_domains:
-+	if (its->msi_chip.domain)
-+		irq_domain_remove(its->msi_chip.domain);
-+	if (its->domain)
-+		irq_domain_remove(its->domain);
-+out_free_tables:
-+	its_free_tables(its);
-+out_free_cmd:
-+	kfree(its->cmd_base);
-+out_free_its:
-+	kfree(its);
-+out_unmap:
-+	iounmap(its_base);
-+	pr_err("ITS: failed probing %s (%d)\n", node->full_name, err);
-+	return err;
-+}
-+
-+static bool gic_rdists_supports_plpis(void)
-+{
-+	return !!(readl_relaxed(gic_data_rdist_rd_base() + GICR_TYPER) & GICR_TYPER_PLPIS);
-+}
-+
-+int its_cpu_init(void)
-+{
-+	if (!gic_rdists_supports_plpis()) {
-+		pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
-+		return -ENXIO;
-+	}
-+
-+	if (!list_empty(&its_nodes)) {
-+		its_cpu_init_lpis();
-+		its_cpu_init_collection();
-+	}
-+
-+	return 0;
-+}
-+
-+static struct of_device_id its_device_id[] = {
-+	{	.compatible	= "arm,gic-v3-its",	},
-+	{},
-+};
-+
-+int its_init(struct device_node *node, struct rdists *rdists,
-+	     struct irq_domain *parent_domain)
-+{
-+	struct device_node *np;
-+
-+	for (np = of_find_matching_node(node, its_device_id); np;
-+	     np = of_find_matching_node(np, its_device_id)) {
-+		its_probe(np, parent_domain);
-+	}
-+
-+	if (list_empty(&its_nodes)) {
-+		pr_warn("ITS: No ITS available, not enabling LPIs\n");
-+		return -ENXIO;
-+	}
-+
-+	gic_rdists = rdists;
-+	gic_root_node = node;
-+
-+	its_alloc_lpi_tables();
-+	its_lpi_init(rdists->id_bits);
-+
-+	return 0;
++	kfree(bitmap);
 +}
 -- 
 2.1.3
