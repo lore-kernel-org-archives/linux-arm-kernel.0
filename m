@@ -1,57 +1,53 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Tue, 18 Nov 2014 10:50:21 +0200
-Subject: [PATCH 3/7] pinctrl: pinconf-generic: Allow driver to specify
- DT params
-In-Reply-To: <CACRpkdYfj2ydLQ4q_FKwXo73jzNsvj9u2Aem9EiuEw-OCvurrg@mail.gmail.com>
-References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
- <1415041531-15520-4-git-send-email-soren.brinkmann@xilinx.com>
- <CACRpkdYfj2ydLQ4q_FKwXo73jzNsvj9u2Aem9EiuEw-OCvurrg@mail.gmail.com>
-Message-ID: <1416300621.30131.6.camel@mm-sol.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 18 Nov 2014 09:50:13 +0100
+Subject: [RFC] adp1653: Add device tree bindings for LED controller
+In-Reply-To: <546AFEA5.9020000@samsung.com>
+References: <20141116075928.GA9763@amd>
+ <20141117145857.GO8907@valkosipuli.retiisi.org.uk>
+ <546AFEA5.9020000@samsung.com>
+Message-ID: <20141118085013.GD4059@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue 2014-11-18 09:09:09, Jacek Anaszewski wrote:
+> Hi Pavel, Sakari,
+> 
+> On 11/17/2014 03:58 PM, Sakari Ailus wrote:
+> >Hi Pavel,
+> >
+> >On Sun, Nov 16, 2014 at 08:59:28AM +0100, Pavel Machek wrote:
+> >>For device tree people: Yes, I know I'll have to create file in
+> >>documentation, but does the binding below look acceptable?
+> >>
+> >>I'll clean up driver code a bit more, remove the printks. Anything
+> >>else obviously wrong?
+> >
+> >Jacek Anaszewski is working on flash support for LED devices. I think it'd
+> >be good to sync the DT bindings for the two, as the types of devices
+> >supported by the LED API and the V4L2 flash API are quite similar.
+> >
+> >Cc Jacek.
+> 
+> I've already submitted a patch [1] that updates leds common bindings.
+> I hasn't been merged yet, as the related LED Flash class patch [2]
+> still needs some indicator leds related discussion [3].
+> 
+> I think this is a good moment to discuss the flash related led common
+> bindings.
+> 
+> [2] http://www.spinics.net/lists/linux-media/msg83100.html
 
-On Tue, 2014-11-11 at 15:53 +0100, Linus Walleij wrote:
-> On Mon, Nov 3, 2014 at 8:05 PM, Soren Brinkmann
-> brinkmann at xilinx.com> wrote:
-> 
-> > Additionally to the generic DT parameters, allow drivers to provide
-> > driver-specific DT parameters to be used with the generic parser
-> > infrastructure.
-> > 
-> > Signed-off-by: Soren Brinkmann brinkmann at xilinx.com>
-> 
-> I like the looks of this, but the patch description is a bit terse.
-> I'd like it to describe some of the refactorings being done
-> to the intrinsics, because I have a hard time following the patch.
-> 
-> First please rebase onto the "devel" branch in the pin control
-> tree, and notice that drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-> which is merged there is actually doing this already:
-> 
-> 
->         for_each_child_of_node(np_config, np) {
->                 ret = pinconf_generic_dt_subnode_to_map(pctldev, np, map,
->                                                         &reserv, nmaps, type);
->                 if (ret)
->                         break;
-> 
->                 ret = pmic_gpio_dt_subnode_to_map(pctldev, np, map, &reserv,
->                                                   nmaps, type);
->                 if (ret)
->                         break;
->         }
-> 
-> So it should be patched to illustrate the point of this code.
-> 
+Actually, would it be possible to do the patches the other way around?
 
-I like the idea, but have issues with implementations :-). 
- 
-It is supposed that additional parameters are not generic, 
-otherwise they will be part of enum pin_config_param, right?
+V4L2 api already knows about flash, torch and indicators. Provide
+glue, so that V4L2 torch automatically appears as two leds in the led
+subystem? (white and red in my case?)
 
-Probably it will be better if clients could pass array with
-driver specific dt bindings to pinconf_generic_dt_node_to_map()?
+[Well, I kind of like the LED class API more, but it appears both you
+and me really have two LEDs in one package, and V4L2 already knows
+about that so it is better match....?]
 
-Regards,
-Ivan
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
