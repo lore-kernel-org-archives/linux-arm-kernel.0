@@ -1,154 +1,76 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Tue, 18 Nov 2014 19:43:54 +0000
-Subject: [RFC PATCHv2] ARM: mvebu: Let the device-tree determine smp_ops
-In-Reply-To: <20141118082151.GX6414@lukather>
-References: <20141106201603.GF4974@lunn.ch>
- <1415327626-16079-1-git-send-email-chris.packham@alliedtelesis.co.nz>
- <20141117095640.03e25d17@free-electrons.com>
- <alpine.DEB.2.10.1411181233160.902@chrisp-dl.ws.atlnz.lc>
- <546A9378.2080907@alliedtelesis.co.nz> <20141118082151.GX6414@lukather>
-Message-ID: <546BA17A.40502@alliedtelesis.co.nz>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 18 Nov 2014 21:14:56 +0100
+Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
+ completes
+In-Reply-To: <20141118175515.GD3003@dtor-ws>
+References: <20141118171831.GC3003@dtor-ws>
+ <Pine.LNX.4.44L0.1411181234210.892-100000@iolanthe.rowland.org>
+ <20141118175515.GD3003@dtor-ws>
+Message-ID: <4282972.midaRTeXMU@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Tuesday, November 18, 2014 09:55:15 AM Dmitry Torokhov wrote:
+> On Tue, Nov 18, 2014 at 12:44:22PM -0500, Alan Stern wrote:
+> > On Tue, 18 Nov 2014, Dmitry Torokhov wrote:
+> > 
+> > > OK. Another question then: pm_runtime_get_noresume() does literally this:
+> > > 
+> > > 	atomic_inc(&dev->power.usage_count);
+> > > 
+> > > So who is responsible for actually waking up parent device and/or power
+> > > domain? Is it simply missing because we did not really have PM domains
+> > > before?
+> > 
+> > Ths bus is responsible for making sure that all the standard resources
+> > are available -- that is, all the resources that would be needed by a
+> > normal device on that bus.  Anything beyond that (such as
+> > special-purpose clocks) has to be set up by the driver.
+> > 
+> > Thus the bus would insure that the device was powered, its parent was
+> > resumed, and the usual clock inputs were enabled.  And of course, one
+> > mechanism for doing this is to runtime-resume the power domain.
+> 
+> This does not sound like anything bus-specific. Can we move powering on
+> the domain before probing into the driver core, similarly to the default
+> pin selection by pinctrl?
 
-On 11/18/2014 09:21 PM, Maxime Ripard wrote:
-> On Tue, Nov 18, 2014 at 12:31:52AM +0000, Chris Packham wrote:
->>
->>
->> On 11/18/2014 12:34 PM, Chris Packham wrote:
->>> Hi Thomas, Maxime
->>>
->>> On Mon, 17 Nov 2014, Thomas Petazzoni wrote:
->>>
->>>> Dear Chris Packham,
->>>>
->>>> On Fri,  7 Nov 2014 15:33:46 +1300, Chris Packham wrote:
->>>>> The machine specific SMP operations can be configured either via
->>>>> setup_arch or via arm_dt_init_cpu_maps. For the ARMADA_370_XP_DT devices
->>>>> both of these are called and setup_arch wins because it is called last.
->>>>> This means that it is not possible to substitute a different set of SMP
->>>>> operations via the device-tree.
->>>>>
->>>>> For the ARMADA_370_XP_DT compatible devices add a smp_init function that
->>>>> detects if the device tree has an enable-method defined. If it does
->>>>> return true to indicate that the smp_ops have already been set which
->>>>> will prevent setup_arch from overriding them.
->>>>>
->>>>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->>>>
->>>> My colleague Maxime Ripard (in Cc) rightfully suggests exploring a
->>>> different option: what about getting rid completely of the .smp field
->>>> of the DT_MACHINE structure, and instead have some code run early
->>>> enough that looks if an enable-method is defined, and if not, defines
->>>> it to the default value. This way, we continue to be backward
->>>> compatible in terms of DT, but we always use the enable-method from the
->>>> DT, and not sometimes from DT, sometimes from the DT_MACHINE structure.
->>>>
->>>> Unfortunately, it will have to be done on the flattened DT, because the
->>>> DT is unflattened right before the enable-method properties are looked
->>>> up:
->>>>
->>>>         unflatten_device_tree();
->>>>
->>>>         arm_dt_init_cpu_maps();
->>>>
->>>> And manipulating the DT in its flattened format, while possible in
->>>> ->dt_fixup(), is a pain, and probably doesn't allow adding new
->>>> properties anyway.
->>>>
->>>> So, in the end, maybe this idea doesn't work, I haven't checked
->>>> completely.
->>>>
->>>
->>> So yeah it's tricky to work with the flattened dt. Not impossible the
->>> powerpc arch code does quite a lot with it. Arm does less but still uses
->>> it in atags_to_fdt.c. Below is a rough attempt at an implementation that
->>> seems to work. Because of the flattened dt it's harder to iterate
->>> through the cpu nodes so I haven't implemented anything to look for an
->>> enable-method attached to them.
->>
->> (I really need to figure out how to tell Thunderbird how to wrap some
->> parts but not others)
->>
->>>
->>> ---- 8< ----
->>> Subject: [PATCH] ARM: mvebu: use dt_fixup to provide fallback for
->>>    enable-method
->>>
->>> When the device tree doesn't define an enable-method insert a property
->>> into the flattened device tree. arm_dt_init_cpu_maps() will then parse
->>> this an set smp_ops appropriately. Now that we have this fallback it is
->>> no longer necessary to set .smp in the DT_MACHINE definition.
->>>
->>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->>> ---
->>>    arch/arm/mach-mvebu/Makefile   |  2 ++
->>>    arch/arm/mach-mvebu/board-v7.c | 23 ++++++++++++++++++++++-
->>>    2 files changed, 24 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
->>> index 1636cdb..f818eaf 100644
->>> --- a/arch/arm/mach-mvebu/Makefile
->>> +++ b/arch/arm/mach-mvebu/Makefile
->>> @@ -14,3 +14,5 @@ endif
->>>
->>>    obj-$(CONFIG_MACH_DOVE)         += dove.o
->>>    obj-$(CONFIG_MACH_KIRKWOOD)     += kirkwood.o kirkwood-pm.o
->>> +
->>> +CFLAGS_board-v7.o = -I$(src)/../../../scripts/dtc/libfdt
->>> \ No newline at end of file
->>> diff --git a/arch/arm/mach-mvebu/board-v7.c
->>> b/arch/arm/mach-mvebu/board-v7.c
->>> index b2524d6..45851a2 100644
->>> --- a/arch/arm/mach-mvebu/board-v7.c
->>> +++ b/arch/arm/mach-mvebu/board-v7.c
->>> @@ -17,6 +17,8 @@
->>>    #include <linux/clk-provider.h>
->>>    #include <linux/of_address.h>
->>>    #include <linux/of_platform.h>
->>> +#include <linux/of_fdt.h>
->>> +#include <linux/libfdt.h>
->>>    #include <linux/io.h>
->>>    #include <linux/clocksource.h>
->>>    #include <linux/dma-mapping.h>
->>> @@ -184,6 +186,25 @@ static void __init mvebu_dt_init(void)
->>>        of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->>>    }
->>>
->>> +static void __init armada_370_xp_dt_fixup(void)
->>> +{
->>> +    void *prop;
->>> +    int offset;
->>> +    int len;
->>> +
->>> +    offset = fdt_path_offset(initial_boot_params, "/cpus");
->>> +    prop = fdt_getprop(initial_boot_params, offset, "enable-method",
->>> &len);
->>> +
->>> +    if (!prop) {
->>> +        pr_info("No enable-method defined. "
->>> +            "Falling back to \"marvell,armada-xp-smp\"\n");
->>> +
->>> +        fdt_appendprop(initial_boot_params, offset, "enable-method",
->>> +                   "marvell,armada-xp-smp",
->>> +                   sizeof("marvell,armada-xp-smp"));
->>
->> Instead of inserting something into the device tree I could just call
->> set_smp_ops here. That might be safer than trying to insert something
->> into the device tree.
->
-> I don't think this is necessary. Injecting something in the DT is
-> safe, u-boot does that at every boot :)
->
+We could do that for genpd if devices were added to domains before registering
+(those devices).  Otherwise, there's no guarantee that all has been set up yet.
 
-Actually I thought a bit more about this option this morning. What I'm 
-trying to do is provide a fallback that defines smp_ops when there isn't 
-an enable-method in the device tree. I don't actually need do do 
-anything to the incoming device tree, I don't even need to look at it. I 
-can unconditionally call set_smp_ops() and if the device tree has an 
-enable-method it will override whatever has been configured. If the 
-device tree doesn't define an enable-method it will use the default that 
-I've configured here. That's actually very little code and can all be 
-contained in board-v7.c.
+Note that this would only be the case for genpd, not for the ACPI PM domain
+in particular, for example.  The reason why is that the ACPI PM domain cannot
+be used along with bus types that provide non-trivial PM callbacks, so pretty
+much the bus type's ->probe needs to decide whether or not to use it.
+
+> I do not see why we want to have every
+> individual bus to implement this. I guess right now we can't because we
+> assign the domain to device in individual bus's probe function, but I do
+> not think this is proper place for that either: bus and pm domain are
+> orthogonal concepts IMO.
+
+For genpd, yes.  Not necessarily for other types of PM domains.  [A "PM domain"
+is just an override for bus type PM callbacks in general, genpd is only one
+use case here.]
+
+I think that the the general DT bindings for genpd are the source of the whole
+complication here.  Before, devices were added to domains in the board-specific
+code before registration, but now that can be done automatically if the
+appropriate bindings are present in the DT.
+
+> > Often the bus doesn't have to do anything special to resume the
+> > device's parent.  This is because the device gets probed when it is
+> > registered, which happens when it is discovered, and the discovery is
+> > done by the parent's driver as part of its normal activity.  Since the
+> > parent has to be powered up to carry out this normal activity, nothing 
+> > more is needed.
+> 
+> I think this only true for buses that support discovery.
+
+It may not be the case for the platform bus type or other "root kind" bus
+types where devices may not have a functional parent.  Otherwise it usually
+is the case.
+
+Anyway, that really depends on the bus type.
+
+Rafael
