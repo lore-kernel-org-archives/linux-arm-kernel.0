@@ -1,53 +1,24 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 18 Nov 2014 09:50:13 +0100
-Subject: [RFC] adp1653: Add device tree bindings for LED controller
-In-Reply-To: <546AFEA5.9020000@samsung.com>
-References: <20141116075928.GA9763@amd>
- <20141117145857.GO8907@valkosipuli.retiisi.org.uk>
- <546AFEA5.9020000@samsung.com>
-Message-ID: <20141118085013.GD4059@amd>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Nov 2014 09:53:55 +0100
+Subject: [PATCH v3 00/11] Add stih410 SoC/board and USB2/1.1 support for
+ stih416
+In-Reply-To: <546B07BD.4030400@st.com>
+References: <1416242884-5261-1-git-send-email-peter.griffin@linaro.org>
+ <546B07BD.4030400@st.com>
+Message-ID: <1795476.NaojQ17vPi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2014-11-18 09:09:09, Jacek Anaszewski wrote:
-> Hi Pavel, Sakari,
+On Tuesday 18 November 2014 09:47:57 Maxime Coquelin wrote:
 > 
-> On 11/17/2014 03:58 PM, Sakari Ailus wrote:
-> >Hi Pavel,
-> >
-> >On Sun, Nov 16, 2014 at 08:59:28AM +0100, Pavel Machek wrote:
-> >>For device tree people: Yes, I know I'll have to create file in
-> >>documentation, but does the binding below look acceptable?
-> >>
-> >>I'll clean up driver code a bit more, remove the printks. Anything
-> >>else obviously wrong?
-> >
-> >Jacek Anaszewski is working on flash support for LED devices. I think it'd
-> >be good to sync the DT bindings for the two, as the types of devices
-> >supported by the LED API and the V4L2 flash API are quite similar.
-> >
-> >Cc Jacek.
+> For the series,
 > 
-> I've already submitted a patch [1] that updates leds common bindings.
-> I hasn't been merged yet, as the related LED Flash class patch [2]
-> still needs some indicator leds related discussion [3].
+>      Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 > 
-> I think this is a good moment to discuss the flash related led common
-> bindings.
-> 
-> [2] http://www.spinics.net/lists/linux-media/msg83100.html
+>      If Arnd is fine with the series, these patches will be part of my 
+> next pull request.
 
-Actually, would it be possible to do the patches the other way around?
+Yes, it's all good. Just keep the defconfig change separate from the
+DT changes, as usual.
 
-V4L2 api already knows about flash, torch and indicators. Provide
-glue, so that V4L2 torch automatically appears as two leds in the led
-subystem? (white and red in my case?)
-
-[Well, I kind of like the LED class API more, but it appears both you
-and me really have two LEDs in one package, and V4L2 already knows
-about that so it is better match....?]
-
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+	Arnd
