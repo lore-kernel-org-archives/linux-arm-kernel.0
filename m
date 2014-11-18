@@ -1,45 +1,24 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 19 Nov 2014 08:14:38 +1100
-Subject: [PATCH] ARM: vfp: Silence mvfr0 unused variable warning
-In-Reply-To: <1416344191-20484-1-git-send-email-sboyd@codeaurora.org>
-References: <1416344191-20484-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20141119081438.3df66238@canb.auug.org.au>
+From: matthias.klein@linux.com (Matthias Klein)
+Date: Tue, 18 Nov 2014 22:15:59 +0100
+Subject: [PATCH v2] ARM: bcm2835: add device tree for Raspberry Pi model B+
+In-Reply-To: <545B031E.9070409@wwwdotorg.org>
+References: <1415231123-920-1-git-send-email-matthias.klein@linux.com>
+ <545B031E.9070409@wwwdotorg.org>
+Message-ID: <546BB70F.1080707@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
 
-On Tue, 18 Nov 2014 12:56:31 -0800 Stephen Boyd <sboyd@codeaurora.org> wrote:
+Am 06.11.2014 um 06:11 schrieb Stephen Warren:
+> On 11/05/2014 04:45 PM, Matthias Klein wrote:
+>> The model B and B+ differ in the GPIO lines for ACT and PWR leds, and the
+>> I2S interface.
+> Tested-by: Stephen Warren <swarren@nvidia.com>
 >
-> Stephen Rothwell reports that commit 3f4c9f8f0a20 ("ARM: 8197/1:
-> vfp: Fix VFPv3 hwcap detection on CPUID based cpus") introduced an
-> unused variable warning.
-> 
-> arch/arm/vfp/vfpmodule.c: In function 'vfp_init':
-> arch/arm/vfp/vfpmodule.c:725:6: warning: unused variable 'mvfr0'
-> [-Wunused-variable]
->   u32 mvfr0;
-> 
-> Silence this warning by using IS_ENABLED instead of ifdefs.
-> 
-> Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> (On a model B rev 2, UART, SD card, and enumeration of built-in USB
+> devices works fine)
+>
+> Lee, how do you want to handle patches - will you apply them to the git
+> repo?
 
-Looks good (though I haven't tested it).  One small nit below:
-
-> +		if (IS_ENABLED(CONFIG_VFPv3)) {
-> +			mvfr0 = fmrx(MVFR0);
-
-Now that you have a block here, you could move the declaration of mvfr0
-into this block, right?
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141119/6805172a/attachment-0001.sig>
+Can you accept the patch, or do I have to rework something?
