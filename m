@@ -1,94 +1,27 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 18 Nov 2014 14:54:54 +0100
-Subject: [PATCHv9 0/2] Add Allwinner SoCs PWM support
-In-Reply-To: <546B4DF5.9020100@schinagl.nl>
-References: <1415200545-26238-1-git-send-email-alexandre.belloni@free-electrons.com>
- <546B4DF5.9020100@schinagl.nl>
-Message-ID: <20141118135454.GD6414@lukather>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 18 Nov 2014 15:02:40 +0100
+Subject: [PATCH 2/2] ARM: dts: Add missing irq pinctrl for max77686 on
+ smdk5250
+In-Reply-To: <1416312509-11530-2-git-send-email-yadi.brar@samsung.com>
+References: <1416312509-11530-1-git-send-email-yadi.brar@samsung.com>
+ <1416312509-11530-2-git-send-email-yadi.brar@samsung.com>
+Message-ID: <CABxcv=moHWKCPsmOkk5w=L8EZeke+8TzPkW+vERKWBc5qRNb=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 02:47:33PM +0100, Olliver Schinagl wrote:
-> Hey Alexandre,
-> 
-> On 05-11-14 16:15, Alexandre Belloni wrote:
-> >Hi,
-> >
-> >This patch series adds support for the PWM controller found on the Allwinner
-> >SoCs.
-> >
-> >The first patch adds the driver itself.
-> >The second patch adds the DT binding documentation
-> >
-> >Changes in v8:
-> >  - renamed the driver sun4i as the PWM IP is different in the next sunxi SoCs
-> Why did you decide to rename it to sun4i? From your bindings document I
-> understand you still support sun4i and sun7i, what happened to sun5i?
-> 
-> I went over the datasheets of sun4i, sun5i and sun7i and the disp_lcd.c from
-> the latest linux-sunxi kernels and have to agree, they are all 4
-> inconsistent and messy, but I'm not sure what you mean with PWM IP is
-> different in next sunxi soc's. is sun5i different to sun4i? is sun7i
-> different? or is sun6i (A31), sun8i (a80) and sun9i (A23) different?
-> 
-> What I get from the datasheet is, that sun4i and sun5i are exactly the same,
-> with the exception that sun5i only has 1 PWM (~exposed~). I belive that is
-> easily solved with the bindings by having allwinner-sun4i and allwinner
-> sun5i bindings if I'm not mistaken.
-> 
-> As for sun7i compared to the other ones, according to disp_lcd.c sun5i and
-> sun7i should behave exactly the same. This is contradicting to the
-> datasheet, where sun4i and sun5i are the same.
-> 
-> So what are the major differences that I can see between the 3? sun4i
-> defines the PWM prescaler register value 0b1111 as being undefined, and
-> sun5i and sun7i as /1? Did you verify this (I haven't I admit, i bumped into
-> this while looking for your patch ;-) )? I wouldn't be supprised if it where
-> a typo on allwinners end in the datasheet ... disp_lcd.c stops at 72000 for
-> the last entry. We should just check sun4i, sun5i and sun7i hardware to see
-> if it behaves the same with a prescaler of 0b1111, which I would not be
-> totally surprised if it did.
-> 
-> The other difference I notice is that sun7i and sun5i use 16bit period
-> register where sun4i uses a 8bit register. This is probably the only reason
-> why they put a #ifdef in disp_lcd.c, calculations turn out differently. I
-> don't recognize this behavior at all in your driver however. I do think they
-> that there is a difference here, since they did split up the original driver
-> here because of this difference.
-> 
-> The pre-scaler bypass bit and pwm ready bit you all ready take care of :)
+Hello Yadwinder,
 
-A31 and later are using a different IP, that is not supported by this
-driver.
+On Tue, Nov 18, 2014 at 1:08 PM, Yadwinder Singh Brar
+<yadi.brar@samsung.com> wrote:
+> This patch adds pinctrl configuration for using configuring gpx3-2 as an
+> external interrupt from max77686. Though max77686 RTC is enabled and gets
+> probed by default, it doesnt work as its unable to get interrupt.
+>
 
-This driver only support the controller introduced with the A10, that
-only saw minor differences between SoCs, like you have shown.
+I'm not familiar with this board but the patch looks good to me
+assuming the IRQ is the correct one.
 
-> Finally, though I'm sure I should have replied to it inline in the actual
-> code, but hoping i can let it slip through here is that you define your
-> local data as:
-> 
-> + static const struct sun4i_pwm_data sun4i_pwm_data_a20 = {
-> 
-> which looks really strange to me, since there is no a20 using the sun4i
-> architecture :) I know it's just nitpicking, it just looks really odd. Maybe
-> the compatible naming works just as well? sun4i_pwm_data; sun7i_pwm_data
-> (and sun5i_pwm_data if you want to take care of only pwm0, only pwm1 (if we
-> ever encounter such a configuration, disabled pwm0, enabled pwm1) or both to
-> be used?)
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-This driver is name sun4i_pwm, hence the prefix.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141118/a7ac8abd/attachment.sig>
+Best regards,
+Javier
