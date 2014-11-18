@@ -1,94 +1,59 @@
-From: oliver@schinagl.nl (Olliver Schinagl)
-Date: Tue, 18 Nov 2014 14:47:33 +0100
-Subject: [PATCHv9 0/2] Add Allwinner SoCs PWM support
-In-Reply-To: <1415200545-26238-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1415200545-26238-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <546B4DF5.9020100@schinagl.nl>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 18 Nov 2014 21:51:25 +0800
+Subject: [PATCH v5 03/18] ACPI / table: Count matched and successfully
+ parsed entries without specifying max entries
+In-Reply-To: <1413553034-20956-4-git-send-email-hanjun.guo@linaro.org>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <1413553034-20956-4-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <546B4EDD.9050804@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Alexandre,
+Hi Rafael,
 
-On 05-11-14 16:15, Alexandre Belloni wrote:
-> Hi,
+On 2014?10?17? 21:36, Hanjun Guo wrote:
+> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 >
-> This patch series adds support for the PWM controller found on the Allwinner
-> SoCs.
+> It is very useful to traverse all available table entries without max
+> number of expected entries type. Current acpi_parse_entries()
+> implementation gives that feature but it does not count those entries,
+> it returns 0 instead, so fix it to count matched and successfully
+> entries and return it.
 >
-> The first patch adds the driver itself.
-> The second patch adds the DT binding documentation
+> NOTE: This change has no impact to x86 and ia64 archs since existing code
+> checks for error occurrence only (acpi_parse_entries(...,0) < 0).
 >
-> Changes in v8:
->   - renamed the driver sun4i as the PWM IP is different in the next sunxi SoCs
-Why did you decide to rename it to sun4i? From your bindings document I 
-understand you still support sun4i and sun7i, what happened to sun5i?
+> Acked-by: Grant Likely <grant.likely@linaro.org>
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-I went over the datasheets of sun4i, sun5i and sun7i and the disp_lcd.c 
-from the latest linux-sunxi kernels and have to agree, they are all 4 
-inconsistent and messy, but I'm not sure what you mean with PWM IP is 
-different in next sunxi soc's. is sun5i different to sun4i? is sun7i 
-different? or is sun6i (A31), sun8i (a80) and sun9i (A23) different?
+Patch 2 and patch 3 are only for ACPI cores, and have no harm to x86
+and IA64, could you merge first in 3.19?
 
+Thanks
+Hanjun
 
-What I get from the datasheet is, that sun4i and sun5i are exactly the 
-same, with the exception that sun5i only has 1 PWM (~exposed~). I belive 
-that is easily solved with the bindings by having allwinner-sun4i and 
-allwinner sun5i bindings if I'm not mistaken.
-
-As for sun7i compared to the other ones, according to disp_lcd.c sun5i 
-and sun7i should behave exactly the same. This is contradicting to the 
-datasheet, where sun4i and sun5i are the same.
-
-So what are the major differences that I can see between the 3? sun4i 
-defines the PWM prescaler register value 0b1111 as being undefined, and 
-sun5i and sun7i as /1? Did you verify this (I haven't I admit, i bumped 
-into this while looking for your patch ;-) )? I wouldn't be supprised if 
-it where a typo on allwinners end in the datasheet ... disp_lcd.c stops 
-at 72000 for the last entry. We should just check sun4i, sun5i and sun7i 
-hardware to see if it behaves the same with a prescaler of 0b1111, which 
-I would not be totally surprised if it did.
-
-The other difference I notice is that sun7i and sun5i use 16bit period 
-register where sun4i uses a 8bit register. This is probably the only 
-reason why they put a #ifdef in disp_lcd.c, calculations turn out 
-differently. I don't recognize this behavior at all in your driver 
-however. I do think they that there is a difference here, since they did 
-split up the original driver here because of this difference.
-
-The pre-scaler bypass bit and pwm ready bit you all ready take care of :)
-
-Finally, though I'm sure I should have replied to it inline in the 
-actual code, but hoping i can let it slip through here is that you 
-define your local data as:
-
-+ static const struct sun4i_pwm_data sun4i_pwm_data_a20 = {
-
-which looks really strange to me, since there is no a20 using the sun4i 
-architecture :) I know it's just nitpicking, it just looks really odd. 
-Maybe the compatible naming works just as well? sun4i_pwm_data; 
-sun7i_pwm_data (and sun5i_pwm_data if you want to take care of only 
-pwm0, only pwm1 (if we ever encounter such a configuration, disabled 
-pwm0, enabled pwm1) or both to be used?)
-
-Sorry for the long naggy mail, just looking for clarification as I'm 
-going to be using your patch ;)
-
-Olliver
-
->   - Took into account comments from Thierry
+> ---
+>   drivers/acpi/tables.c |    5 ++++-
+>   1 file changed, 4 insertions(+), 1 deletion(-)
 >
-> Changes in v9:
->   - moved from using a mutex to a spinlock
+> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
+> index 21ae521..b18e45e 100644
+> --- a/drivers/acpi/tables.c
+> +++ b/drivers/acpi/tables.c
+> @@ -225,10 +225,13 @@ acpi_parse_entries(unsigned long table_size,
+>   	while (((unsigned long)entry) + sizeof(struct acpi_subtable_header) <
+>   	       table_end) {
+>   		if (entry->type == entry_id
+> -		    && (!max_entries || count++ < max_entries))
+> +		    && (!max_entries || count < max_entries)) {
+>   			if (handler(entry, table_end))
+>   				return -EINVAL;
 >
-> Alexandre Belloni (2):
->    pwm: Add Allwinner SoC support
->    pwm: sunxi: document OF bindings
->
->   .../devicetree/bindings/pwm/pwm-sun4i.txt          |  20 ++
->   drivers/pwm/Kconfig                                |   9 +
->   drivers/pwm/Makefile                               |   1 +
->   drivers/pwm/pwm-sun4i.c                            | 366 +++++++++++++++++++++
->   4 files changed, 396 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sun4i.txt
->   create mode 100644 drivers/pwm/pwm-sun4i.c
+> +			count++;
+> +		}
+> +
+>   		/*
+>   		 * If entry->length is 0, break from this loop to avoid
+>   		 * infinite loop.
 >
