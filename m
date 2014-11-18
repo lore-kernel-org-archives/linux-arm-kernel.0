@@ -1,41 +1,107 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Tue, 18 Nov 2014 21:55:31 +0100
-Subject: [GIT PULL] ARM: meson: SoC related changes
-Message-ID: <20141118205531.GB19814@nuc>
+From: tthayer@opensource.altera.com (Thor Thayer)
+Date: Tue, 18 Nov 2014 14:56:26 -0600
+Subject: [RESEND PATCHv5 5/5] arm: dts: Add Altera L2 Cache and OCRAM EDAC
+In-Reply-To: <1415751263-1830-6-git-send-email-tthayer@opensource.altera.com>
+References: <1415751263-1830-1-git-send-email-tthayer@opensource.altera.com>
+ <1415751263-1830-6-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <546BB27A.20405@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
-this is the pull request for the SoC related changes for the 3.19.
-The support for Meson8 is added together with L2 cache management.
+Hi all,
 
+On 11/11/2014 06:14 PM, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer<tthayer@opensource.altera.com>
+>
+> Adding the device tree entries and bindings needed to support
+> the Altera L2 cache and On-Chip RAM EDAC. This patch relies upon
+> an earlier patch to declare and setup On-chip RAM properly.
+> http://www.spinics.net/lists/devicetree/msg51117.html
 
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+Any comments on these devicetree additions?
 
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-
-are available in the git repository at:
-
-  https://github.com/carlocaione/linux-meson tags/v3.19-meson-soc
-
-for you to fetch changes up to 7b6b0a455d98c7a314278e0fdca25ec6395a502a:
-
-  clocksource: meson6: Select CLKSRC_MMIO (2014-11-18 16:41:20 +0100)
-
-----------------------------------------------------------------
-- Add Meson8 support
-- Documentation for new compatible
-- L2 cache management
-
-----------------------------------------------------------------
-Beniamino Galvani (4):
-      ARM: meson: add meson8 support
-      ARM: meson: document meson8 compatible properties
-      ARM: meson: enable L2 cache
-      clocksource: meson6: Select CLKSRC_MMIO
-
- Documentation/devicetree/bindings/arm/amlogic.txt |  8 +++++---
- arch/arm/mach-meson/Kconfig                       |  6 ++++++
- arch/arm/mach-meson/meson.c                       | 10 ++++++----
- drivers/clocksource/Kconfig                       |  1 +
- 4 files changed, 18 insertions(+), 7 deletions(-)
+Thanks,
+Thor
+> Signed-off-by: Thor Thayer<tthayer@opensource.altera.com>
+> ---
+> v2: Remove OCRAM declaration and reference prior patch.
+>
+> v3-5: No Change
+> ---
+>   .../bindings/arm/altera/socfpga-l2-edac.txt        |   15 +++++++++++++++
+>   .../bindings/arm/altera/socfpga-ocram-edac.txt     |   16 ++++++++++++++++
+>   arch/arm/boot/dts/socfpga.dtsi                     |   15 ++++++++++++++-
+>   3 files changed, 45 insertions(+), 1 deletion(-)
+>   create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt
+>   create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt
+>
+> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt
+> new file mode 100644
+> index 0000000..35b19e3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt
+> @@ -0,0 +1,15 @@
+> +Altera SoCFPGA L2 cache Error Detection and Correction [EDAC]
+> +
+> +Required Properties:
+> +- compatible : Should be "altr,l2-edac"
+> +- reg : Address and size for ECC error interrupt clear registers.
+> +- interrupts : Should be single bit error interrupt, then double bit error
+> +	interrupt. Note the rising edge type.
+> +
+> +Example:
+> +
+> +	l2edac at ffd08140 {
+> +		compatible = "altr,l2-edac";
+> +		reg = <0xffd08140 0x4>;
+> +		interrupts = <0 36 1>, <0 37 1>;
+> +	};
+> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt
+> new file mode 100644
+> index 0000000..31ab205
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt
+> @@ -0,0 +1,16 @@
+> +Altera SoCFPGA On-Chip RAM Error Detection and Correction [EDAC]
+> +
+> +OCRAM ECC Required Properties:
+> +- compatible : Should be "altr,ocram-edac"
+> +- reg : Address and size for ECC error interrupt clear registers.
+> +- iram : phandle to On-Chip RAM definition.
+> +- interrupts : Should be single bit error interrupt, then double bit error
+> +	interrupt. Note the rising edge type.
+> +
+> +Example:
+> +	ocramedac at ffd08144 {
+> +		compatible = "altr,ocram-edac";
+> +		reg = <0xffd08144 0x4>;
+> +		iram = <&ocram>;
+> +		interrupts = <0 178 1>, <0 179 1>;
+> +	};
+> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> index 6af96ed..32c63a3 100644
+> --- a/arch/arm/boot/dts/socfpga.dtsi
+> +++ b/arch/arm/boot/dts/socfpga.dtsi
+> @@ -618,8 +618,21 @@
+>   			interrupts = <0 39 4>;
+>   		};
+>   
+> +		l2edac at ffd08140 {
+> +			compatible = "altr,l2-edac";
+> +			reg = <0xffd08140 0x4>;
+> +			interrupts = <0 36 1>, <0 37 1>;
+> +		};
+> +
+> +		ocramedac at ffd08144 {
+> +			compatible = "altr,ocram-edac";
+> +			reg = <0xffd08144 0x4>;
+> +			iram = <&ocram>;
+> +			interrupts = <0 178 1>, <0 179 1>;
+> +		};
+> +
+>   		L2: l2-cache at fffef000 {
+> -			compatible = "arm,pl310-cache";
+> +			compatible = "arm,pl310-cache", "syscon";
+>   			reg = <0xfffef000 0x1000>;
+>   			interrupts = <0 38 0x04>;
+>   			cache-unified;
