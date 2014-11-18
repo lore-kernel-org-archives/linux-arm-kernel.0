@@ -1,35 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 18 Nov 2014 14:06:58 +0000
-Subject: [PATCH v2 1/4] spi: Add 'last' flag to spi_transfer structure
-In-Reply-To: <1416264471-774-2-git-send-email-b.galvani@gmail.com>
-References: <1416264471-774-1-git-send-email-b.galvani@gmail.com>
- <1416264471-774-2-git-send-email-b.galvani@gmail.com>
-Message-ID: <20141118140658.GI22111@sirena.org.uk>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 18 Nov 2014 15:07:31 +0100
+Subject: [GIT PULL] ARM: STi: defconfig changes for v3.19, round 1
+Message-ID: <546B52A3.7020908@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 11:47:48PM +0100, Beniamino Galvani wrote:
+Hi Olof, Arnd and Kevin,
 
-> +	list_for_each_entry(xfer, &master->cur_msg->transfers, transfer_list) {
-> +		xfer->last = list_is_last(&xfer->transfer_list,
-> +					  &master->cur_msg->transfers);
-> +	}
+Please consider this first round of STi defconfig updates for v3.19 :
 
-It's incredibly sad to iterate through the entire list in order to find
-the last entry, especially given that it's a doubly linked list and this
-is a bit of a hot path.  We should look at the previous entry for the
-list head instead, or perhaps better yet by doing this as part of
-spi_validate() which already itereates over the entire list and is where
-we do other similar fixups.
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-Though looking at this I'm not sure that a flag is the best approach at
-all - why not just have the driver call list_is_last() in the transfer
-function or ideally provide an inline function that does that so that we
-can change the implementation later?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141118/e87d57a0/attachment.sig>
+   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+
+are available in the git repository at:
+
+   git://git.stlinux.com/devel/kernel/linux-sti.git 
+tags/sti-defconfig-for-v3.19-1
+
+for you to fetch changes up to 1d5b8b621e31e46f82ed9254af9cd1faa5b81dbb:
+
+   ARM: multi_v7_defconfig: Enable stih415/6 usb2 phy driver. 
+(2014-11-18 13:38:16 +0100)
+
+----------------------------------------------------------------
+STi defconfig updates for v3.19
+
+Highlights:
+-----------
+  - Enable ST EHCI and OHCI USB drivers
+  - Enable STiH416 and STiH415 USB2 PHY driver
+
+----------------------------------------------------------------
+Peter Griffin (2):
+       ARM: multi_v7_defconfig: Enable st ohci and ehci HCD drivers.
+       ARM: multi_v7_defconfig: Enable stih415/6 usb2 phy driver.
+
+  arch/arm/configs/multi_v7_defconfig | 3 +++
+  1 file changed, 3 insertions(+)
