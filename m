@@ -1,156 +1,81 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Tue, 18 Nov 2014 00:31:52 +0000
-Subject: [RFC PATCHv2] ARM: mvebu: Let the device-tree determine smp_ops
-In-Reply-To: <alpine.DEB.2.10.1411181233160.902@chrisp-dl.ws.atlnz.lc>
-References: <20141106201603.GF4974@lunn.ch>
- <1415327626-16079-1-git-send-email-chris.packham@alliedtelesis.co.nz>
- <20141117095640.03e25d17@free-electrons.com>
- <alpine.DEB.2.10.1411181233160.902@chrisp-dl.ws.atlnz.lc>
-Message-ID: <546A9378.2080907@alliedtelesis.co.nz>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 17 Nov 2014 18:33:05 -0600
+Subject: [PATCH V5 09/12] usb: xhci: Add NVIDIA Tegra xHCI
+ host-controller driver
+In-Reply-To: <CAL1qeaG1=g39gsRHPrmCTBFbn3XQmW_2N7rm7uWa=-xOzDiDHQ@mail.gmail.com>
+References: <1416264102-1323-1-git-send-email-abrestic@chromium.org>
+ <1416264102-1323-10-git-send-email-abrestic@chromium.org>
+ <20141117231240.GB9716@saruman>
+ <CAL1qeaG1=g39gsRHPrmCTBFbn3XQmW_2N7rm7uWa=-xOzDiDHQ@mail.gmail.com>
+Message-ID: <20141118003305.GB11280@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Mon, Nov 17, 2014 at 03:51:29PM -0800, Andrew Bresticker wrote:
+> >> +static const struct {
+> >> +     const char *name;
+> >> +     unsigned int num;
+> >> +} tegra_xhci_phy_types[] = {
+> >> +     {
+> >> +             .name = "usb3",
+> >> +             .num = TEGRA_XUSB_USB3_PHYS,
+> >> +     }, {
+> >> +             .name = "utmi",
+> >> +             .num = TEGRA_XUSB_UTMI_PHYS,
+> >> +     }, {
+> >> +             .name = "hsic",
+> >> +             .num = TEGRA_XUSB_HSIC_PHYS,
+> >> +     },
+> >
+> > these should be using the generic PHY subsystem (drivers/phy).
+> 
+> This driver does use the generic PHY subsystem, see patch 7 in this series :).
 
-On 11/18/2014 12:34 PM, Chris Packham wrote:
-> Hi Thomas, Maxime
->
-> On Mon, 17 Nov 2014, Thomas Petazzoni wrote:
->
->> Dear Chris Packham,
->>
->> On Fri,  7 Nov 2014 15:33:46 +1300, Chris Packham wrote:
->>> The machine specific SMP operations can be configured either via
->>> setup_arch or via arm_dt_init_cpu_maps. For the ARMADA_370_XP_DT devices
->>> both of these are called and setup_arch wins because it is called last.
->>> This means that it is not possible to substitute a different set of SMP
->>> operations via the device-tree.
->>>
->>> For the ARMADA_370_XP_DT compatible devices add a smp_init function that
->>> detects if the device tree has an enable-method defined. If it does
->>> return true to indicate that the smp_ops have already been set which
->>> will prevent setup_arch from overriding them.
->>>
->>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->>
->> My colleague Maxime Ripard (in Cc) rightfully suggests exploring a
->> different option: what about getting rid completely of the .smp field
->> of the DT_MACHINE structure, and instead have some code run early
->> enough that looks if an enable-method is defined, and if not, defines
->> it to the default value. This way, we continue to be backward
->> compatible in terms of DT, but we always use the enable-method from the
->> DT, and not sometimes from DT, sometimes from the DT_MACHINE structure.
->>
->> Unfortunately, it will have to be done on the flattened DT, because the
->> DT is unflattened right before the enable-method properties are looked
->> up:
->>
->>        unflatten_device_tree();
->>
->>        arm_dt_init_cpu_maps();
->>
->> And manipulating the DT in its flattened format, while possible in
->> ->dt_fixup(), is a pain, and probably doesn't allow adding new
->> properties anyway.
->>
->> So, in the end, maybe this idea doesn't work, I haven't checked
->> completely.
->>
->
-> So yeah it's tricky to work with the flattened dt. Not impossible the
-> powerpc arch code does quite a lot with it. Arm does less but still uses
-> it in atags_to_fdt.c. Below is a rough attempt at an implementation that
-> seems to work. Because of the flattened dt it's harder to iterate
-> through the cpu nodes so I haven't implemented anything to look for an
-> enable-method attached to them.
+true, I got misled by the fact that you added your phy provider to your
+pinctrl. Odd.
 
-(I really need to figure out how to tell Thunderbird how to wrap some 
-parts but not others)
+> >> +static int tegra_xhci_load_firmware(struct tegra_xhci_hcd *tegra)
+> >> +{
+> >> +     struct device *dev = tegra->dev;
+> >> +     struct tegra_xhci_fw_cfgtbl *cfg_tbl;
+> >> +     struct tm fw_tm;
+> >> +     u32 val, code_tag_blocks, code_size_blocks;
+> >> +     u64 fw_base;
+> >> +     time_t fw_time;
+> >> +     unsigned long timeout;
+> >> +
+> >> +     if (csb_readl(tegra, XUSB_CSB_MP_ILOAD_BASE_LO) != 0) {
+> >> +             dev_info(dev, "Firmware already loaded, Falcon state 0x%x\n",
+> >> +                      csb_readl(tegra, XUSB_FALC_CPUCTL));
+> >> +             return 0;
+> >> +     }
+> >
+> > won't this prevent rmmod && insmod from succeeding ? Maybe not, as you
+> > return 0 anyway, but if the firmware side craps out, it might be useful
+> > to reload the firmware and reset that block. I wonder if this prevents
+> > that.
+> 
+> rmmod && insmod does work with the above since, as you mentioned, we
+> return successfully if the controller is already running.  Attempting
+> to re-load the firmware if the controller is already running won't
+> work - it requires a full power-gate/ungate sequence of the
+> controller.  Unfortunately, that sequence is rather complicated and I
+> haven't had a chance to implement it yet.  it will hopefully be coming
+> later, though.
 
->
-> ---- 8< ----
-> Subject: [PATCH] ARM: mvebu: use dt_fixup to provide fallback for
->   enable-method
->
-> When the device tree doesn't define an enable-method insert a property
-> into the flattened device tree. arm_dt_init_cpu_maps() will then parse
-> this an set smp_ops appropriately. Now that we have this fallback it is
-> no longer necessary to set .smp in the DT_MACHINE definition.
->
-> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-> ---
->   arch/arm/mach-mvebu/Makefile   |  2 ++
->   arch/arm/mach-mvebu/board-v7.c | 23 ++++++++++++++++++++++-
->   2 files changed, 24 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-> index 1636cdb..f818eaf 100644
-> --- a/arch/arm/mach-mvebu/Makefile
-> +++ b/arch/arm/mach-mvebu/Makefile
-> @@ -14,3 +14,5 @@ endif
->
->   obj-$(CONFIG_MACH_DOVE)         += dove.o
->   obj-$(CONFIG_MACH_KIRKWOOD)     += kirkwood.o kirkwood-pm.o
-> +
-> +CFLAGS_board-v7.o = -I$(src)/../../../scripts/dtc/libfdt
-> \ No newline at end of file
-> diff --git a/arch/arm/mach-mvebu/board-v7.c
-> b/arch/arm/mach-mvebu/board-v7.c
-> index b2524d6..45851a2 100644
-> --- a/arch/arm/mach-mvebu/board-v7.c
-> +++ b/arch/arm/mach-mvebu/board-v7.c
-> @@ -17,6 +17,8 @@
->   #include <linux/clk-provider.h>
->   #include <linux/of_address.h>
->   #include <linux/of_platform.h>
-> +#include <linux/of_fdt.h>
-> +#include <linux/libfdt.h>
->   #include <linux/io.h>
->   #include <linux/clocksource.h>
->   #include <linux/dma-mapping.h>
-> @@ -184,6 +186,25 @@ static void __init mvebu_dt_init(void)
->       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->   }
->
-> +static void __init armada_370_xp_dt_fixup(void)
-> +{
-> +    void *prop;
-> +    int offset;
-> +    int len;
-> +
-> +    offset = fdt_path_offset(initial_boot_params, "/cpus");
-> +    prop = fdt_getprop(initial_boot_params, offset, "enable-method",
-> &len);
-> +
-> +    if (!prop) {
-> +        pr_info("No enable-method defined. "
-> +            "Falling back to \"marvell,armada-xp-smp\"\n");
-> +
-> +        fdt_appendprop(initial_boot_params, offset, "enable-method",
-> +                   "marvell,armada-xp-smp",
-> +                   sizeof("marvell,armada-xp-smp"));
+Alright, could you add a comment on the source code stating that ?
+Perhaps a REVISIT note or FIXME ?
 
-Instead of inserting something into the device tree I could just call 
-set_smp_ops here. That might be safer than trying to insert something 
-into the device tree.
+cheers
 
-> +    }
-> +}
-> +
->   static const char * const armada_370_xp_dt_compat[] = {
->       "marvell,armada-370-xp",
->       NULL,
-> @@ -192,11 +213,11 @@ static const char * const
-> armada_370_xp_dt_compat[] = {
->   DT_MACHINE_START(ARMADA_370_XP_DT, "Marvell Armada 370/XP (Device Tree)")
->       .l2c_aux_val    = 0,
->       .l2c_aux_mask    = ~0,
-> -    .smp        = smp_ops(armada_xp_smp_ops),
->       .init_machine    = mvebu_dt_init,
->       .init_irq       = mvebu_init_irq,
->       .restart    = mvebu_restart,
->       .dt_compat    = armada_370_xp_dt_compat,
-> +    .dt_fixup    = armada_370_xp_dt_fixup,
->   MACHINE_END
->
->   static const char * const armada_375_dt_compat[] = {
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/64507de2/attachment.sig>
