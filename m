@@ -1,40 +1,62 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 18 Nov 2014 08:55:45 +0100
-Subject: [PATCH v2] gpio: mxs: implement get_direction callback
-In-Reply-To: <1416221256-11671-1-git-send-email-j.uzycki@elproma.com.pl>
-References: <1416221256-11671-1-git-send-email-j.uzycki@elproma.com.pl>
-Message-ID: <20141118075545.GO27002@pengutronix.de>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 18 Nov 2014 08:56:29 +0100
+Subject: [PATCH v4 6/6] ARM: zynq: DT: Add OCM controller node
+In-Reply-To: <CAEgOgz7j3jFbf1HxtimzPDMQ3oRu8AAHhHAUtg1boYjOUV5ygA@mail.gmail.com>
+References: <cover.1415962281.git.michal.simek@xilinx.com>
+ <0a88d52b5e71fb220ca619180ec9ca746edad2b1.1415962281.git.michal.simek@xilinx.com>
+ <546881CA.2020801@suse.de>
+ <c52187589f5c4cc6b908d899c2b9f7a6@BN1BFFO11FD036.protection.gbl>
+ <CAEgOgz7j3jFbf1HxtimzPDMQ3oRu8AAHhHAUtg1boYjOUV5ygA@mail.gmail.com>
+Message-ID: <d7d71aa91adc49e5890fe3d64caed4bf@BN1BFFO11FD034.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Mon, Nov 17, 2014 at 11:47:36AM +0100, Janusz Uzycki wrote:
-> gpiolib's gpiod_get_direction() function returns the EINVAL error
-> if .get_direction callback is not defined.
-> The patch implements the callback for mxs chip what is useful
-s/what/which/
-
-> for debugging.
+On 11/17/2014 12:00 AM, Peter Crosthwaite wrote:
+> On Mon, Nov 17, 2014 at 5:32 AM, S?ren Brinkmann
+> <soren.brinkmann@xilinx.com> wrote:
+>> On Sun, 2014-11-16 at 11:51AM +0100, Andreas F?rber wrote:
+>>> Hi Michal,
+>>>
+>>> Am 14.11.2014 um 11:52 schrieb Michal Simek:
+>>>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+>>>> index ce2ef5bec4f2..e217fb1c1169 100644
+>>>> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+>>>> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+>>>> @@ -150,6 +150,13 @@
+>>>>                     reg = <0xf8006000 0x1000>;
+>>>>             };
+>>>>
+>>>> +           ocmc: memory-controller at f800c000 {
+>>>> +                   compatible = "xlnx,zynq-ocmc-1.0";
+>>>> +                   interrupt-parent = <&intc>;
+>>>> +                   interrupts = <0 3 4>;
+>>>> +                   reg = <0xf800c000 0x1000>;
+>>>> +           };
+>>>> +
+>>>>             uart0: serial at e0000000 {
+>>>>                     compatible = "xlnx,xuartps", "cdns,uart-r1p8";
+>>>>                     status = "disabled";
+>>>
+>>> Not directly related to this patch: As one can see here, the node order
+>>> is quite a mess... According to Olof, nodes should be ordered by unit
+>>> address, whereas here some but not all seem ordered by node name. Would
+>>> you welcome a cleanup patch, or can you fix that yourself?
+>>
+>> I wouldn't say it's a mess, just a different property to sort the nodes
+>> by. For humans reading the DT, searching for nodes, alphabetical order
+>> helps finding the right node, IMHO.
 > 
-> Commit f9e42397d79b
-> ("serial: mxs-auart: add interrupts for modem control lines")
-> as based on commit ab5e4e4108ca
-> ("tty/serial: at91: add interrupts for modem control lines")
-> uses the gpiod_get_direction() function.
-This paragraph is obsolete now that we agreed that .get_direction has
-nothing to do with mctrl_gpio, right?
-> 
-> Inspired from arch/arm/mach-at91/gpio.c
-s/from/by/ I think
+> I do generally find myself asking "whats that thing at that address"
+> more than I find myself asking the "wheres that piece of hardware" so
+> Andreas' sorting scheme makes more sense to me. Vertically scanning a
+> DT to give yourself an overview of the system level address map is
+> good too. Wheras alphabetic sorting doesn't mean to much.
 
-Other than that:
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+IMHO the reason why we have names in DT is that it is easily to read/understand them
+that's why name sorting seems to me more reasonable.
+Something like machine code and assembler - asm is also sorted by names not by opcode.
 
-Thanks
-Uwe
+Is this strict rule?
 
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks,
+Michal
