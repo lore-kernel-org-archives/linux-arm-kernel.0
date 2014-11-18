@@ -1,92 +1,156 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Tue, 18 Nov 2014 00:30:20 +0000
-Subject: [PATCH v5] of: replace Asahi Kasei Corp vendor prefix
-In-Reply-To: <5469CD47.3040409@cogentembedded.com>
-References: <878ulzx6hr.wl%kuninori.morimoto.gx@gmail.com>
- <20140922130026.GK3290@leverpostej>
- <CAMuHMdX22z97SbGS1HDiYfJ1PXxyEN2S8D7w4sr+4bUwD+mJZw@mail.gmail.com>
- <20140922132743.GM3290@leverpostej>
- <87y4rfhmgl.wl%kuninori.morimoto.gx@renesas.com>
- <1415845309.4269.6.camel@perches.com>
- <20141113025105.GA16652@verge.net.au>
- <87vbmjhj00.wl%kuninori.morimoto.gx@renesas.com>
- <20141113110740.GE3815@sirena.org.uk>
- <87k32yd0bd.wl%kuninori.morimoto.gx@renesas.com>
- <20141114093554.GC3810@ulmo>
- <87y4ra8xac.wl%kuninori.morimoto.gx@renesas.com>
- <5469CD47.3040409@cogentembedded.com>
-Message-ID: <877fytxsde.wl%kuninori.morimoto.gx@renesas.com>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Tue, 18 Nov 2014 00:31:52 +0000
+Subject: [RFC PATCHv2] ARM: mvebu: Let the device-tree determine smp_ops
+In-Reply-To: <alpine.DEB.2.10.1411181233160.902@chrisp-dl.ws.atlnz.lc>
+References: <20141106201603.GF4974@lunn.ch>
+ <1415327626-16079-1-git-send-email-chris.packham@alliedtelesis.co.nz>
+ <20141117095640.03e25d17@free-electrons.com>
+ <alpine.DEB.2.10.1411181233160.902@chrisp-dl.ws.atlnz.lc>
+Message-ID: <546A9378.2080907@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Current vendor-prefixes.txt already has "ak" prefix for Asahi Kasei Corp
-by ae8c4209af2c(of: Add vendor prefix for Asahi Kasei Corp.)
 
-It went through the appropriate review process. But, almost all
-Asahi Kasei chip drivers are using "asahi-kasei" prefix today.
-(arch/arm/boot/dts/tegra20-seaboard.dts only is using "ak,ak8975",
- but there are instances of "asahi-kasei,ak8975" in other dts files.
- And drivers/iio/magnetometer/ak8975.c doesn't support "ak,ak8975" prefix)
-So, we made a mistake there.
+On 11/18/2014 12:34 PM, Chris Packham wrote:
+> Hi Thomas, Maxime
+>
+> On Mon, 17 Nov 2014, Thomas Petazzoni wrote:
+>
+>> Dear Chris Packham,
+>>
+>> On Fri,  7 Nov 2014 15:33:46 +1300, Chris Packham wrote:
+>>> The machine specific SMP operations can be configured either via
+>>> setup_arch or via arm_dt_init_cpu_maps. For the ARMADA_370_XP_DT devices
+>>> both of these are called and setup_arch wins because it is called last.
+>>> This means that it is not possible to substitute a different set of SMP
+>>> operations via the device-tree.
+>>>
+>>> For the ARMADA_370_XP_DT compatible devices add a smp_init function that
+>>> detects if the device tree has an enable-method defined. If it does
+>>> return true to indicate that the smp_ops have already been set which
+>>> will prevent setup_arch from overriding them.
+>>>
+>>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+>>
+>> My colleague Maxime Ripard (in Cc) rightfully suggests exploring a
+>> different option: what about getting rid completely of the .smp field
+>> of the DT_MACHINE structure, and instead have some code run early
+>> enough that looks if an enable-method is defined, and if not, defines
+>> it to the default value. This way, we continue to be backward
+>> compatible in terms of DT, but we always use the enable-method from the
+>> DT, and not sometimes from DT, sometimes from the DT_MACHINE structure.
+>>
+>> Unfortunately, it will have to be done on the flattened DT, because the
+>> DT is unflattened right before the enable-method properties are looked
+>> up:
+>>
+>>        unflatten_device_tree();
+>>
+>>        arm_dt_init_cpu_maps();
+>>
+>> And manipulating the DT in its flattened format, while possible in
+>> ->dt_fixup(), is a pain, and probably doesn't allow adding new
+>> properties anyway.
+>>
+>> So, in the end, maybe this idea doesn't work, I haven't checked
+>> completely.
+>>
+>
+> So yeah it's tricky to work with the flattened dt. Not impossible the
+> powerpc arch code does quite a lot with it. Arm does less but still uses
+> it in atags_to_fdt.c. Below is a rough attempt at an implementation that
+> seems to work. Because of the flattened dt it's harder to iterate
+> through the cpu nodes so I haven't implemented anything to look for an
+> enable-method attached to them.
 
-In addition, checkpatch.pl reports WARNING if it is using "asahi-kasei"
-prerfix in DT file.
-(DT compatible string vendor "asahi-kasei" appears un-documented)
+(I really need to figure out how to tell Thunderbird how to wrap some 
+parts but not others)
 
-Marking it deprecated and warning with checkpatch is certainly
-preferable. So, this patch replace "ak" to "asahi-kasei" in
-vendor-prefixes.txt. (and fixup tegra20-seaboard)
+>
+> ---- 8< ----
+> Subject: [PATCH] ARM: mvebu: use dt_fixup to provide fallback for
+>   enable-method
+>
+> When the device tree doesn't define an enable-method insert a property
+> into the flattened device tree. arm_dt_init_cpu_maps() will then parse
+> this an set smp_ops appropriately. Now that we have this fallback it is
+> no longer necessary to set .smp in the DT_MACHINE definition.
+>
+> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+> ---
+>   arch/arm/mach-mvebu/Makefile   |  2 ++
+>   arch/arm/mach-mvebu/board-v7.c | 23 ++++++++++++++++++++++-
+>   2 files changed, 24 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+> index 1636cdb..f818eaf 100644
+> --- a/arch/arm/mach-mvebu/Makefile
+> +++ b/arch/arm/mach-mvebu/Makefile
+> @@ -14,3 +14,5 @@ endif
+>
+>   obj-$(CONFIG_MACH_DOVE)         += dove.o
+>   obj-$(CONFIG_MACH_KIRKWOOD)     += kirkwood.o kirkwood-pm.o
+> +
+> +CFLAGS_board-v7.o = -I$(src)/../../../scripts/dtc/libfdt
+> \ No newline at end of file
+> diff --git a/arch/arm/mach-mvebu/board-v7.c
+> b/arch/arm/mach-mvebu/board-v7.c
+> index b2524d6..45851a2 100644
+> --- a/arch/arm/mach-mvebu/board-v7.c
+> +++ b/arch/arm/mach-mvebu/board-v7.c
+> @@ -17,6 +17,8 @@
+>   #include <linux/clk-provider.h>
+>   #include <linux/of_address.h>
+>   #include <linux/of_platform.h>
+> +#include <linux/of_fdt.h>
+> +#include <linux/libfdt.h>
+>   #include <linux/io.h>
+>   #include <linux/clocksource.h>
+>   #include <linux/dma-mapping.h>
+> @@ -184,6 +186,25 @@ static void __init mvebu_dt_init(void)
+>       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>   }
+>
+> +static void __init armada_370_xp_dt_fixup(void)
+> +{
+> +    void *prop;
+> +    int offset;
+> +    int len;
+> +
+> +    offset = fdt_path_offset(initial_boot_params, "/cpus");
+> +    prop = fdt_getprop(initial_boot_params, offset, "enable-method",
+> &len);
+> +
+> +    if (!prop) {
+> +        pr_info("No enable-method defined. "
+> +            "Falling back to \"marvell,armada-xp-smp\"\n");
+> +
+> +        fdt_appendprop(initial_boot_params, offset, "enable-method",
+> +                   "marvell,armada-xp-smp",
+> +                   sizeof("marvell,armada-xp-smp"));
 
-OTOH, Asahi Kasei is usually referred to as "AKM", but this patch
-doesn't care about it. Because no DT is using that today.
+Instead of inserting something into the device tree I could just call 
+set_smp_ops here. That might be safer than trying to insert something 
+into the device tree.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Thierry Reding <treding@nvidia.com>
-Acked-by: Alexandre Courbot <acourbot@nvidia.com>
----
-v4 -> v5
-
- - venter -> vendor on Subject
- - fixup Acked-by ordering
-
- .../devicetree/bindings/vendor-prefixes.txt        |    2 +-
- arch/arm/boot/dts/tegra20-seaboard.dts             |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 723999d..ddcb4cd 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -9,7 +9,6 @@ ad	Avionic Design GmbH
- adapteva	Adapteva, Inc.
- adi	Analog Devices, Inc.
- aeroflexgaisler	Aeroflex Gaisler AB
--ak	Asahi Kasei Corp.
- allwinner	Allwinner Technology Co., Ltd.
- altr	Altera Corp.
- amcc	Applied Micro Circuits Corporation (APM, formally AMCC)
-@@ -20,6 +19,7 @@ amstaos	AMS-Taos Inc.
- apm	Applied Micro Circuits Corporation (APM)
- arm	ARM Ltd.
- armadeus	ARMadeus Systems SARL
-+asahi-kasei	Asahi Kasei Corp.
- atmel	Atmel Corporation
- auo	AU Optronics Corporation
- avago	Avago Technologies
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index a1d4bf9..7f5cf80 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -405,7 +405,7 @@
- 		clock-frequency = <400000>;
- 
- 		magnetometer at c {
--			compatible = "ak,ak8975";
-+			compatible = "asahi-kasei,ak8975";
- 			reg = <0xc>;
- 			interrupt-parent = <&gpio>;
- 			interrupts = <TEGRA_GPIO(N, 5) IRQ_TYPE_LEVEL_HIGH>;
--- 
-1.7.9.5
+> +    }
+> +}
+> +
+>   static const char * const armada_370_xp_dt_compat[] = {
+>       "marvell,armada-370-xp",
+>       NULL,
+> @@ -192,11 +213,11 @@ static const char * const
+> armada_370_xp_dt_compat[] = {
+>   DT_MACHINE_START(ARMADA_370_XP_DT, "Marvell Armada 370/XP (Device Tree)")
+>       .l2c_aux_val    = 0,
+>       .l2c_aux_mask    = ~0,
+> -    .smp        = smp_ops(armada_xp_smp_ops),
+>       .init_machine    = mvebu_dt_init,
+>       .init_irq       = mvebu_init_irq,
+>       .restart    = mvebu_restart,
+>       .dt_compat    = armada_370_xp_dt_compat,
+> +    .dt_fixup    = armada_370_xp_dt_fixup,
+>   MACHINE_END
+>
+>   static const char * const armada_375_dt_compat[] = {
