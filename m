@@ -1,108 +1,99 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 18 Nov 2014 11:36:17 +0100
-Subject: [PATCH v4 02/19] arm/arm64: KVM: pass down user space provided
- GIC type into vGIC code
-In-Reply-To: <1415959683-26027-3-git-send-email-andre.przywara@arm.com>
+Date: Tue, 18 Nov 2014 11:36:42 +0100
+Subject: [PATCH v4 04/19] arm/arm64: KVM: wrap 64 bit MMIO accesses with
+ two 32 bit ones
+In-Reply-To: <1415959683-26027-5-git-send-email-andre.przywara@arm.com>
 References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
- <1415959683-26027-3-git-send-email-andre.przywara@arm.com>
-Message-ID: <546B2121.5040602@linaro.org>
+ <1415959683-26027-5-git-send-email-andre.przywara@arm.com>
+Message-ID: <546B213A.6060808@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 11/14/2014 11:07 AM, Andre Przywara wrote:
-> With the introduction of a second emulated GIC model we need to let
-> userspace specify the GIC model to use for each VM. Pass the
-> userspace provided value down into the vGIC code and store it there
-> to differentiate later.
+> Some GICv3 registers can and will be accessed as 64 bit registers.
+> Currently the register handling code can only deal with 32 bit
+> accesses, so we do two consecutive calls to cover this.
 > 
 > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 > ---
 > Changelog v3...v4:
-> - added Acked-by
+> - add comment explaining little endian handling
 > 
->  arch/arm/kvm/arm.c     |    2 +-
->  include/kvm/arm_vgic.h |    7 +++++--
->  virt/kvm/arm/vgic.c    |    5 +++--
->  3 files changed, 9 insertions(+), 5 deletions(-)
+>  virt/kvm/arm/vgic.c |   51 ++++++++++++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 48 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index c2a5c69..8817fbd 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -753,7 +753,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
->  	switch (ioctl) {
->  	case KVM_CREATE_IRQCHIP: {
->  		if (vgic_present)
-> -			return kvm_vgic_create(kvm);
-> +			return kvm_vgic_create(kvm, KVM_DEV_TYPE_ARM_VGIC_V2);
->  		else
->  			return -ENXIO;
->  	}
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 206dcc3..dde5a00 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -140,6 +140,9 @@ struct vgic_dist {
->  	bool			in_kernel;
->  	bool			ready;
->  
-> +	/* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
-just a small question related to GICv2m, will it be considered as
-another model or is the same as GICv2 from a guest perspective?
-
-Eric
-> +	u32			vgic_model;
-> +
->  	int			nr_cpus;
->  	int			nr_irqs;
->  
-> @@ -275,7 +278,7 @@ struct kvm_exit_mmio;
->  int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
->  int kvm_vgic_hyp_init(void);
->  int kvm_vgic_init(struct kvm *kvm);
-> -int kvm_vgic_create(struct kvm *kvm);
-> +int kvm_vgic_create(struct kvm *kvm, u32 type);
->  void kvm_vgic_destroy(struct kvm *kvm);
->  void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu);
->  void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
-> @@ -326,7 +329,7 @@ static inline int kvm_vgic_init(struct kvm *kvm)
->  	return 0;
->  }
->  
-> -static inline int kvm_vgic_create(struct kvm *kvm)
-> +static inline int kvm_vgic_create(struct kvm *kvm, u32 type)
->  {
->  	return 0;
->  }
 > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 3aaca49..2403d72 100644
+> index 5eee3de..dba51e4 100644
 > --- a/virt/kvm/arm/vgic.c
 > +++ b/virt/kvm/arm/vgic.c
-> @@ -1931,7 +1931,7 @@ out:
->  	return ret;
+> @@ -1033,6 +1033,51 @@ static bool vgic_validate_access(const struct vgic_dist *dist,
 >  }
 >  
-> -int kvm_vgic_create(struct kvm *kvm)
-> +int kvm_vgic_create(struct kvm *kvm, u32 type)
->  {
->  	int i, vcpu_lock_idx = -1, ret = 0;
->  	struct kvm_vcpu *vcpu;
-> @@ -1963,6 +1963,7 @@ int kvm_vgic_create(struct kvm *kvm)
->  
->  	spin_lock_init(&kvm->arch.vgic.lock);
->  	kvm->arch.vgic.in_kernel = true;
-> +	kvm->arch.vgic.vgic_model = type;
->  	kvm->arch.vgic.vctrl_base = vgic->vctrl_base;
->  	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
->  	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
-> @@ -2388,7 +2389,7 @@ static void vgic_destroy(struct kvm_device *dev)
->  
->  static int vgic_create(struct kvm_device *dev, u32 type)
->  {
-> -	return kvm_vgic_create(dev->kvm);
-> +	return kvm_vgic_create(dev->kvm, type);
->  }
->  
->  static struct kvm_device_ops kvm_arm_vgic_v2_ops = {
+>  /*
+> + * Call the respective handler function for the given range.
+> + * We split up any 64 bit accesses into two consecutive 32 bit
+> + * handler calls and merge the result afterwards.
+> + * We do this in a little endian fashion regardless of the host's
+> + * or guest's endianness, because the GIC is always LE and the rest of
+> + * the code (vgic_reg_access) also puts it in a LE fashion already.*
+might be worth explaining the semantics of offset and range, related to
+1 range in the region that time.
+
+Eric
+> + */
+> +static bool call_range_handler(struct kvm_vcpu *vcpu,
+> +			       struct kvm_exit_mmio *mmio,
+> +			       unsigned long offset,
+> +			       const struct mmio_range *range)
+> +{
+> +	u32 *data32 = (void *)mmio->data;
+> +	struct kvm_exit_mmio mmio32;
+> +	bool ret;
+> +
+> +	if (likely(mmio->len <= 4))
+> +		return range->handle_mmio(vcpu, mmio, offset);
+> +
+> +	/*
+> +	 * Any access bigger than 4 bytes (that we currently handle in KVM)
+> +	 * is actually 8 bytes long, caused by a 64-bit access
+> +	 */
+> +
+> +	mmio32.len = 4;
+> +	mmio32.is_write = mmio->is_write;
+> +
+> +	mmio32.phys_addr = mmio->phys_addr + 4;
+> +	if (mmio->is_write)
+> +		*(u32 *)mmio32.data = data32[1];
+> +	ret = range->handle_mmio(vcpu, &mmio32, offset + 4);
+> +	if (!mmio->is_write)
+> +		data32[1] = *(u32 *)mmio32.data;
+> +
+> +	mmio32.phys_addr = mmio->phys_addr;
+> +	if (mmio->is_write)
+> +		*(u32 *)mmio32.data = data32[0];
+> +	ret |= range->handle_mmio(vcpu, &mmio32, offset);
+> +	if (!mmio->is_write)
+> +		data32[0] = *(u32 *)mmio32.data;
+> +
+> +	return ret;
+> +}
+> +
+> +/*
+>   * vgic_handle_mmio_range - handle an in-kernel MMIO access
+>   * @vcpu:	pointer to the vcpu performing the access
+>   * @run:	pointer to the kvm_run structure
+> @@ -1063,10 +1108,10 @@ static bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  	spin_lock(&vcpu->kvm->arch.vgic.lock);
+>  	offset -= range->base;
+>  	if (vgic_validate_access(dist, range, offset)) {
+> -		updated_state = range->handle_mmio(vcpu, mmio, offset);
+> +		updated_state = call_range_handler(vcpu, mmio, offset, range);
+>  	} else {
+> -		vgic_reg_access(mmio, NULL, offset,
+> -				ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
+> +		if (!mmio->is_write)
+> +			memset(mmio->data, 0, mmio->len);
+>  		updated_state = false;
+>  	}
+>  	spin_unlock(&vcpu->kvm->arch.vgic.lock);
 > 
