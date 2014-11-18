@@ -1,88 +1,46 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 18 Nov 2014 17:51:48 +0100
-Subject: [RFC] adp1653: Add device tree bindings for LED controller
-In-Reply-To: <546B6D86.8090701@samsung.com>
-References: <20141116075928.GA9763@amd>
- <20141117145857.GO8907@valkosipuli.retiisi.org.uk>
- <546AFEA5.9020000@samsung.com> <20141118084603.GC4059@amd>
- <546B19C8.2090008@samsung.com> <20141118113256.GA10022@amd>
- <546B40FA.2070409@samsung.com> <20141118132159.GA21089@amd>
- <546B6D86.8090701@samsung.com>
-Message-ID: <20141118165148.GA11711@amd>
+From: k.khlebnikov@samsung.com (Konstantin Khlebnikov)
+Date: Tue, 18 Nov 2014 19:53:19 +0400
+Subject: [PATCH RFC 2/3] ARM: enable TTBR0/TTBR1 split in short mode
+In-Reply-To: <20141118165313.9958.1242.stgit@buzz>
+References: <20141118165313.9958.1242.stgit@buzz>
+Message-ID: <20141118165319.9958.67009.stgit@buzz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+This feature was partially implemented long time ago. All cpus load
+swapper_pg_dir into TTBR1 since commit d427958a46af24f75d0017c45eadd172273bbf33
+("ARM: 6942/1: mm: make TTBR1 always point to swapper_pg_dir on ARMv6/7").
+But TTBRx split is never been enabled in TTBCR.
 
-> >If the hardware LED changes with one that needs different current, the
-> >block for the adp1653 stays the same, but white LED block should be
-> >updated with different value.
-> 
-> I think that you are talking about sub nodes. Indeed I am leaning
-> towards this type of design.
+This patch enables TTBRx split for 2Gb/2Gb and 1Gb/3Gb combinations.
+Area covered by TTBR0 must be power of two, thus 3Gb/1Gb mode is unsupported.
 
-I think I am :-).
+Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
+---
+ arch/arm/include/asm/pgtable-2level-hwdef.h |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-> >>I agree that flash-timeout should be per led - an array, similarly
-> >>as in case of iout's.
-> >
-> >Agreed about per-led, disagreed about the array. As all the fields
-> >would need arrays, and as LED system currently does not use arrays for
-> >label and linux,default-trigger, I believe we should follow existing
-> >design and model it as three devices. (It _is_ physically three devices.)
-> 
-> Right, I missed that the leds/common.txt describes child node.
-> 
-> I propose following modifications to the binding:
-> 
-> Optional properties for child nodes:
-> - iout-mode-led : 	maximum intensity in microamperes of the LED
-> 		  	(torch LED for flash devices)
-> - iout-mode-flash : 	initial intensity in microamperes of the
-> 			flash LED; it is required to enable support
-> 			for the flash led
-> - iout-mode-indicator : initial intensity in microamperes of the
-> 			indicator LED; it is required to enable support
-> 			for the indicator led
-> - max-iout-mode-led : 	maximum intensity in microamperes of the LED
-> 		  	(torch LED for flash devices)
-> - max-iout-mode-flash : maximum intensity in microamperes of the
-> 			flash LED
-> - max-iout-mode-indicator : maximum intensity in microamperes of the
-> 			indicator LED
-> - flash-timeout :	timeout in microseconds after which flash
-> 			led is turned off
-
-Ok, I took a look, and "iout" is notation I understand, but people may
-have trouble with and I don't see it used anywhere else.
-
-Also... do we need both "current" and "max-current" properties?
-
-But regulators already have "regulator-max-microamp" property. So what
-about:
-
-max-microamp : 	maximum intensity in microamperes of the LED
- 		  	(torch LED for flash devices)
-max-flash-microamp : 	initial intensity in microamperes of the
- 			flash LED; it is required to enable support
- 			for the flash led
-flash-timeout-microseconds : timeout in microseconds after which flash
- 			led is turned off
-
-If you had indicator on the same led, I guess
-
-indicator-microamp : recommended intensity in microamperes of the LED
-		         for indication
-
-...would do?
-
-> I propose to avoid name "torch", as for ordinary leds it would
-> be misleading.
-
-Agreed.
-
-Thanks,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+diff --git a/arch/arm/include/asm/pgtable-2level-hwdef.h b/arch/arm/include/asm/pgtable-2level-hwdef.h
+index c2ed1fa..605652c 100644
+--- a/arch/arm/include/asm/pgtable-2level-hwdef.h
++++ b/arch/arm/include/asm/pgtable-2level-hwdef.h
+@@ -90,6 +90,19 @@
+ 
+ #define PHYS_MASK		(~0UL)
+ 
++/*
++ * TTBR0/TTBR1 split (PAGE_OFFSET):
++ *   0x40000000: TTBCR.N = 2
++ *   0x80000000: TTBCR.N = 1
++ *   0xc0000000: TTBCR.N = 0 (not used)
++ */
++
++#ifdef CONFIG_VMSPLIT_1G
++#define TTBR1_SIZE	2
++#elif defined CONFIG_VMSPLIT_2G
++#define TTBR1_SIZE	1
++#elif defined CONFIG_VMSPLIT_3G
+ #define TTBR1_SIZE	0
++#endif
+ 
+ #endif
