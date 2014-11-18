@@ -1,61 +1,36 @@
-From: rob.herring@linaro.org (Rob Herring)
-Date: Tue, 18 Nov 2014 17:11:26 -0600
-Subject: [PATCH v5.5] of/fdt: export fdt blob as /sys/firmware/fdt
-In-Reply-To: <20141118221103.4ECB3C40966@trevor.secretlab.ca>
-References: <1415984735-32388-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141118165145.4F6A8C40966@trevor.secretlab.ca>
- <20141118172545.GC14323@leverpostej>
- <20141118221103.4ECB3C40966@trevor.secretlab.ca>
-Message-ID: <CABGGiswNc1jHWiCraKmEVWRn-aMndt8AfYA3GtmaDBVpZBd+aA@mail.gmail.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Wed, 19 Nov 2014 00:01:36 +0100
+Subject: [PATCHv4 01/10] arm: mvebu: fix vendor prefix typo in
+ kirkwood-synology.dtsi
+In-Reply-To: <cover.1416351425.git.arno@natisbad.org>
+References: <cover.1416351425.git.arno@natisbad.org>
+Message-ID: <e1c3f3fbd9f494fa228de3ee5928c771d33b072e.1416351426.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 4:11 PM, Grant Likely <grant.likely@linaro.org> wrote:
-> On Tue, 18 Nov 2014 17:25:45 +0000
-> , Mark Rutland <mark.rutland@arm.com>
->  wrote:
->> On Tue, Nov 18, 2014 at 04:51:45PM +0000, Grant Likely wrote:
->> > On Fri, 14 Nov 2014 18:05:35 +0100
->> > , Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >  wrote:
->> > > Create a new /sys entry '/sys/firmware/fdt' to export the FDT blob
->> > > that was passed to the kernel by the bootloader. This allows userland
->> > > applications such as kexec to access the raw binary.
 
-[...]
+As reported by Andrew, the vendor prefix for Seiko Instruments, Inc.
+S-35390A I2C RTC chip in kirkwood-synology.dtsi has a typo (ssi
+instead of sii). This patches fixes it.
 
->> > * It also helps with exposing the reserved map to userspace, but kexec
->> >   has done without that feature for years, and it is in the process of
->> >   being deprecated in favour of /reserved-memory anyway.
->>
->> This is the first I'd heard of the reserve map being deprecated, and
->> we're going to have DTs with reserved map entries for a long time going
->> forwards.
->
-> Deprecated, not removed or disabled. It will still work pretty much
-> forever, but users should be encouraged to move to the reserve-memory
-> tree.
+Reported-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+---
+ arch/arm/boot/dts/kirkwood-synology.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I thought you had said reserve map was still the right way for memory
-the kernel should never touch.
-
->> Can't we expose the header fields under something like
->> /sys/firmware/devicetree/dtb-header/, parallel to the usual
->> /sys/firmware/devicetree/base for nodes?
->
-> We could do that too.
->
-> Honestly though, I'm just unsure of what the best thing to do is. If you
-> and a few others tell me that, "no, exporting the raw dtb is the right
-> thing to do", then I'll be okay, merge the patch and sleep properly.
-
-I always sleep better when others can take the blame.
-
-What happens when we rev the dtb format? Is the ABI the blob or the
-format of the blob?
-
-I lean towards we should add this. This is providing what is "in the
-firmware" while /proc/devicetree provides the live tree state
-including overlays.
-
-Rob
+diff --git a/arch/arm/boot/dts/kirkwood-synology.dtsi b/arch/arm/boot/dts/kirkwood-synology.dtsi
+index 811e0971fc58..8be5b2e4626e 100644
+--- a/arch/arm/boot/dts/kirkwood-synology.dtsi
++++ b/arch/arm/boot/dts/kirkwood-synology.dtsi
+@@ -266,7 +266,7 @@
+ 
+ 			s35390a: s35390a at 30 {
+ 				status = "disabled";
+-				compatible = "ssi,s35390a";
++				compatible = "sii,s35390a";
+ 				reg = <0x30>;
+ 			};
+ 		};
+-- 
+2.1.1
