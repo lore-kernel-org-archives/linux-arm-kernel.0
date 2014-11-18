@@ -1,54 +1,51 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 18 Nov 2014 12:04:38 -0800
-Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
- completes
-In-Reply-To: <4282972.midaRTeXMU@vostro.rjw.lan>
-References: <20141118171831.GC3003@dtor-ws>
- <Pine.LNX.4.44L0.1411181234210.892-100000@iolanthe.rowland.org>
- <20141118175515.GD3003@dtor-ws> <4282972.midaRTeXMU@vostro.rjw.lan>
-Message-ID: <20141118200438.GG3003@dtor-ws>
+From: fkan@apm.com (Feng Kan)
+Date: Tue, 18 Nov 2014 12:05:17 -0800
+Subject: [PATCH v2 2/2] [usb] add support for ACPI identification to
+ xhci-platform
+In-Reply-To: <5464FA19.6030609@redhat.com>
+References: <1414692989-23128-2-git-send-email-mlangsdo@redhat.com>
+ <1415119833-9135-1-git-send-email-mlangsdo@redhat.com>
+ <1415119833-9135-2-git-send-email-mlangsdo@redhat.com>
+ <20141104171220.GA30385@kroah.com> <5464FA19.6030609@redhat.com>
+Message-ID: <CAL85gmDr14EHK+7-ojx5vxvc0ykUsTGxku4LWS=w8TFEh3Bw9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 09:14:56PM +0100, Rafael J. Wysocki wrote:
-> On Tuesday, November 18, 2014 09:55:15 AM Dmitry Torokhov wrote:
-> > On Tue, Nov 18, 2014 at 12:44:22PM -0500, Alan Stern wrote:
-> > > On Tue, 18 Nov 2014, Dmitry Torokhov wrote:
-> > > 
-> > > > OK. Another question then: pm_runtime_get_noresume() does literally this:
-> > > > 
-> > > > 	atomic_inc(&dev->power.usage_count);
-> > > > 
-> > > > So who is responsible for actually waking up parent device and/or power
-> > > > domain? Is it simply missing because we did not really have PM domains
-> > > > before?
-> > > 
-> > > Ths bus is responsible for making sure that all the standard resources
-> > > are available -- that is, all the resources that would be needed by a
-> > > normal device on that bus.  Anything beyond that (such as
-> > > special-purpose clocks) has to be set up by the driver.
-> > > 
-> > > Thus the bus would insure that the device was powered, its parent was
-> > > resumed, and the usual clock inputs were enabled.  And of course, one
-> > > mechanism for doing this is to runtime-resume the power domain.
-> > 
-> > This does not sound like anything bus-specific. Can we move powering on
-> > the domain before probing into the driver core, similarly to the default
-> > pin selection by pinctrl?
-> 
-> We could do that for genpd if devices were added to domains before registering
-> (those devices).  Otherwise, there's no guarantee that all has been set up yet.
-> 
-> Note that this would only be the case for genpd, not for the ACPI PM domain
-> in particular, for example.  The reason why is that the ACPI PM domain cannot
-> be used along with bus types that provide non-trivial PM callbacks, so pretty
-> much the bus type's ->probe needs to decide whether or not to use it.
+On Thu, Nov 13, 2014 at 10:36 AM, Mark Langsdorf <mlangsdo@redhat.com> wrote:
+> On 11/04/2014 11:12 AM, Greg KH wrote:
+>>
+>> On Tue, Nov 04, 2014 at 10:50:33AM -0600, Mark Langsdorf wrote:
+>
+>   #endif
+>>>
+>>>
+>>> +#ifdef CONFIG_ACPI
+>>> +static const struct acpi_device_id usb_xhci_acpi_match[] = {
+>>> +       /* APM X-Gene USB Controller */
+>>> +       { "PNP0D10", },
 
-In genpd code there is a notion of providers that match devices and
-domains. Can we do the same for ACPI and stuff all that knowledge into
-it's "provider"?
+Mark, would it be better to use PRP0001 instead as in this patch?
+https://lkml.org/lkml/2014/9/16/230
 
-IOW why ACPI is that special?
-
--- 
-Dmitry
+>>> +       { }
+>>> +};
+>>> +MODULE_DEVICE_TABLE(acpi, usb_xhci_acpi_match);
+>>> +#endif
+>>
+>>
+>> That looks like a very "generic" PNP value, are you sure it is assigned
+>> only to this specific device?
+>
+>
+> Although this is a generic PNP device, the specific implementation
+> I'm testing has issues with USB3. Is there a flag or function
+> call that will disable the USB3 host while keeping the USB2
+> host?? My naive attempts in finding one mostly hung the machine.
+>
+> --Mark Langsdorf
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
