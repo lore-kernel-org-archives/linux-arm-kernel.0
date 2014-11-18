@@ -1,37 +1,41 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Tue, 18 Nov 2014 11:13:15 +0200
-Subject: [PATCH 0/9] ARM: dts: sbc-t3x: add more features support
-Message-ID: <1416302004-22199-1-git-send-email-lifshitz@compulab.co.il>
+Date: Tue, 18 Nov 2014 11:13:16 +0200
+Subject: [PATCH 1/9] ARM: dts: cm-t3x: cleanup comments indentation
+In-Reply-To: <1416302004-22199-1-git-send-email-lifshitz@compulab.co.il>
+References: <1416302004-22199-1-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1416302004-22199-2-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for more SBC-T3x single board computers features:
+Fix comment style
 
-* CM-T3x CoM and SB-T35 baseboard EEPROMs
-* TV out
-* Touchscreen
-* CM-T3x30 audio
-* CM-T3x30 keypad
+Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
+---
+ arch/arm/boot/dts/omap3-cm-t3x.dtsi |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
 
-Dmitry Lifshitz (9):
-  ARM: dts: cm-t3x: cleanup comments indentation
-  ARM: dts: cm-t3x: add ADS7846 touchscreen support
-  ARM: OMAP2+: remove cm-t3x touchscreen pdata quirk
-  ARM: dts: cm-t3x: add EEPROM support
-  ARM: dts: sb-t35: add EEPROM support
-  ARM: dts: cm-t3x: add TV out support
-  ARM: dts: sbc-t3x: add TV out display alias
-  ARM: dts: sbc-t3x30: add audio support
-  ARM: dts: cm-t3x30: add keypad support
-
- arch/arm/boot/dts/omap3-cm-t3x.dtsi   |  119 +++++++++++++++++++++++++++++++--
- arch/arm/boot/dts/omap3-cm-t3x30.dtsi |   31 +++++++++
- arch/arm/boot/dts/omap3-sb-t35.dtsi   |   36 ++++++++++
- arch/arm/boot/dts/omap3-sbc-t3517.dts |    1 +
- arch/arm/boot/dts/omap3-sbc-t3530.dts |    1 +
- arch/arm/boot/dts/omap3-sbc-t3730.dts |    1 +
- arch/arm/mach-omap2/pdata-quirks.c    |    3 -
- 7 files changed, 183 insertions(+), 9 deletions(-)
-
+diff --git a/arch/arm/boot/dts/omap3-cm-t3x.dtsi b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
+index b074673..e4c0c56 100644
+--- a/arch/arm/boot/dts/omap3-cm-t3x.dtsi
++++ b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
+@@ -107,12 +107,12 @@
+ 
+ 	dss_dpi_pins_cm_t35x: pinmux_dss_dpi_pins_cm_t35x {
+ 		pinctrl-single,pins = <
+-			OMAP3_CORE1_IOPAD(0x20dc, PIN_OUTPUT | MUX_MODE0)		/* dss_data0.dss_data0 */
+-			OMAP3_CORE1_IOPAD(0x20de, PIN_OUTPUT | MUX_MODE0)		/* dss_data1.dss_data1 */
+-			OMAP3_CORE1_IOPAD(0x20e0, PIN_OUTPUT | MUX_MODE0)		/* dss_data2.dss_data2 */
+-			OMAP3_CORE1_IOPAD(0x20e2, PIN_OUTPUT | MUX_MODE0)		/* dss_data3.dss_data3 */
+-			OMAP3_CORE1_IOPAD(0x20e4, PIN_OUTPUT | MUX_MODE0)		/* dss_data4.dss_data4 */
+-			OMAP3_CORE1_IOPAD(0x20e6, PIN_OUTPUT | MUX_MODE0)		/* dss_data5.dss_data5 */
++			OMAP3_CORE1_IOPAD(0x20dc, PIN_OUTPUT | MUX_MODE0)	/* dss_data0.dss_data0 */
++			OMAP3_CORE1_IOPAD(0x20de, PIN_OUTPUT | MUX_MODE0)	/* dss_data1.dss_data1 */
++			OMAP3_CORE1_IOPAD(0x20e0, PIN_OUTPUT | MUX_MODE0)	/* dss_data2.dss_data2 */
++			OMAP3_CORE1_IOPAD(0x20e2, PIN_OUTPUT | MUX_MODE0)	/* dss_data3.dss_data3 */
++			OMAP3_CORE1_IOPAD(0x20e4, PIN_OUTPUT | MUX_MODE0)	/* dss_data4.dss_data4 */
++			OMAP3_CORE1_IOPAD(0x20e6, PIN_OUTPUT | MUX_MODE0)	/* dss_data5.dss_data5 */
+ 		>;
+ 	};
+ };
 -- 
 1.7.5.4
