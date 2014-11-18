@@ -1,131 +1,90 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 18 Nov 2014 18:53:01 +0000
-Subject: [PATCH v2 06/13] irqchip: GICv3: ITS: LPI allocator
+Date: Tue, 18 Nov 2014 18:53:08 +0000
+Subject: [PATCH v2 13/13] irqchip: GICv3: Binding updates for ITS
 In-Reply-To: <1416336788-22634-1-git-send-email-marc.zyngier@arm.com>
 References: <1416336788-22634-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1416336788-22634-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1416336788-22634-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LPIs are the type of interrupts that are used by the ITS. Given
-the size of the namespace (anywhere between 16 and 32bit), interrupt
-IDs are allocated in chunks of 32.
+Add the documentation for the bindings describing the GICv3 ITS.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 103 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 103 insertions(+)
+ Documentation/devicetree/bindings/arm/gic-v3.txt | 39 ++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index d24bebd..4154a16 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -586,3 +586,106 @@ static struct irq_chip its_irq_chip = {
- 	.irq_eoi		= its_eoi_irq,
- 	.irq_set_affinity	= its_set_affinity,
- };
+diff --git a/Documentation/devicetree/bindings/arm/gic-v3.txt b/Documentation/devicetree/bindings/arm/gic-v3.txt
+index 33cd05e..ddfade4 100644
+--- a/Documentation/devicetree/bindings/arm/gic-v3.txt
++++ b/Documentation/devicetree/bindings/arm/gic-v3.txt
+@@ -49,11 +49,29 @@ Optional
+   occupied by the redistributors. Required if more than one such
+   region is present.
+ 
++Sub-nodes:
 +
-+/*
-+ * How we allocate LPIs:
-+ *
-+ * The GIC has id_bits bits for interrupt identifiers. From there, we
-+ * must subtract 8192 which are reserved for SGIs/PPIs/SPIs. Then, as
-+ * we allocate LPIs by chunks of 32, we can shift the whole thing by 5
-+ * bits to the right.
-+ *
-+ * This gives us (((1UL << id_bits) - 8192) >> 5) possible allocations.
-+ */
-+#define IRQS_PER_CHUNK_SHIFT	5
-+#define IRQS_PER_CHUNK		(1 << IRQS_PER_CHUNK_SHIFT)
++GICv3 has one or more Interrupt Translation Services (ITS) that are
++used to route Message Signalled Interrupts (MSI) to the CPUs.
 +
-+static unsigned long *lpi_bitmap;
-+static u32 lpi_chunks;
-+static DEFINE_SPINLOCK(lpi_lock);
++These nodes must have the following properties:
++- compatible : Should at least contain  "arm,gic-v3-its".
++- msi-controller : Boolean property. Identifies the node as an MSI controller
++- reg: Specifies the base physical address and size of the ITS
++  registers.
 +
-+static int its_lpi_to_chunk(int lpi)
-+{
-+	return (lpi - 8192) >> IRQS_PER_CHUNK_SHIFT;
-+}
++The main GIC node must contain the appropriate #address-cells,
++#size-cells and ranges properties for the reg property of all ITS
++nodes.
 +
-+static int its_chunk_to_lpi(int chunk)
-+{
-+	return (chunk << IRQS_PER_CHUNK_SHIFT) + 8192;
-+}
+ Examples:
+ 
+ 	gic: interrupt-controller at 2cf00000 {
+ 		compatible = "arm,gic-v3";
+ 		#interrupt-cells = <3>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
+ 		interrupt-controller;
+ 		reg = <0x0 0x2f000000 0 0x10000>,	// GICD
+ 		      <0x0 0x2f100000 0 0x200000>,	// GICR
+@@ -61,11 +79,20 @@ Examples:
+ 		      <0x0 0x2c010000 0 0x2000>,	// GICH
+ 		      <0x0 0x2c020000 0 0x2000>;	// GICV
+ 		interrupts = <1 9 4>;
 +
-+static int its_lpi_init(u32 id_bits)
-+{
-+	lpi_chunks = its_lpi_to_chunk(1UL << id_bits);
++		gic-its at 2c200000 {
++			compatible = "arm,gic-v3-its";
++			msi-controller;
++			reg = <0x0 0x2c200000 0 0x200000>;
++		};
+ 	};
+ 
+ 	gic: interrupt-controller at 2c010000 {
+ 		compatible = "arm,gic-v3";
+ 		#interrupt-cells = <3>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
+ 		interrupt-controller;
+ 		redistributor-stride = <0x0 0x40000>;	// 256kB stride
+ 		#redistributor-regions = <2>;
+@@ -76,4 +103,16 @@ Examples:
+ 		      <0x0 0x2c060000 0 0x2000>,	// GICH
+ 		      <0x0 0x2c080000 0 0x2000>;	// GICV
+ 		interrupts = <1 9 4>;
 +
-+	lpi_bitmap = kzalloc(BITS_TO_LONGS(lpi_chunks) * sizeof(long),
-+			     GFP_KERNEL);
-+	if (!lpi_bitmap) {
-+		lpi_chunks = 0;
-+		return -ENOMEM;
-+	}
++		gic-its at 2c200000 {
++			compatible = "arm,gic-v3-its";
++			msi-controller;
++			reg = <0x0 0x2c200000 0 0x200000>;
++		};
 +
-+	pr_info("ITS: Allocated %d chunks for LPIs\n", (int)lpi_chunks);
-+	return 0;
-+}
-+
-+static unsigned long *its_lpi_alloc_chunks(int nr_irqs, int *base, int *nr_ids)
-+{
-+	unsigned long *bitmap = NULL;
-+	int chunk_id;
-+	int nr_chunks;
-+	int i;
-+
-+	nr_chunks = DIV_ROUND_UP(nr_irqs, IRQS_PER_CHUNK);
-+
-+	spin_lock(&lpi_lock);
-+
-+	do {
-+		chunk_id = bitmap_find_next_zero_area(lpi_bitmap, lpi_chunks,
-+						      0, nr_chunks, 0);
-+		if (chunk_id < lpi_chunks)
-+			break;
-+
-+		nr_chunks--;
-+	} while (nr_chunks > 0);
-+
-+	if (!nr_chunks)
-+		goto out;
-+
-+	bitmap = kzalloc(BITS_TO_LONGS(nr_chunks * IRQS_PER_CHUNK) * sizeof (long),
-+			 GFP_ATOMIC);
-+	if (!bitmap)
-+		goto out;
-+
-+	for (i = 0; i < nr_chunks; i++)
-+		set_bit(chunk_id + i, lpi_bitmap);
-+
-+	*base = its_chunk_to_lpi(chunk_id);
-+	*nr_ids = nr_chunks * IRQS_PER_CHUNK;
-+
-+out:
-+	spin_unlock(&lpi_lock);
-+
-+	return bitmap;
-+}
-+
-+static void its_lpi_free(unsigned long *bitmap, int base, int nr_ids)
-+{
-+	int lpi;
-+
-+	spin_lock(&lpi_lock);
-+
-+	for (lpi = base; lpi < (base + nr_ids); lpi += IRQS_PER_CHUNK) {
-+		int chunk = its_lpi_to_chunk(lpi);
-+		BUG_ON(chunk > lpi_chunks);
-+		if (test_bit(chunk, lpi_bitmap)) {
-+			clear_bit(chunk, lpi_bitmap);
-+		} else {
-+			pr_err("Bad LPI chunk %d\n", chunk);
-+		}
-+	}
-+
-+	spin_unlock(&lpi_lock);
-+
-+	kfree(bitmap);
-+}
++		gic-its at 2c400000 {
++			compatible = "arm,gic-v3-its";
++			msi-controller;
++			reg = <0x0 0x2c400000 0 0x200000>;
++		};
+ 	};
 -- 
 2.1.3
