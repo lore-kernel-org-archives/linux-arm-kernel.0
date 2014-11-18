@@ -1,48 +1,46 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 18 Nov 2014 09:50:40 +0900
-Subject: [PATCH 08/25] ARM: shmobile: r8a7790: sound enables Audio DMAC
- peri peri entry on DTSI
-In-Reply-To: <87a93pxtlr.wl%kuninori.morimoto.gx@renesas.com>
-References: <cover.1415755881.git.horms+renesas@verge.net.au>
- <cbfc0b77b0c5ac11282882bfd734716e47d20b45.1415755881.git.horms+renesas@verge.net.au>
- <1877842.49FtTfL2eK@wuerfel>
- <87a93pxtlr.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20141118005037.GE21518@verge.net.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 18 Nov 2014 09:51:12 +0900
+Subject: [GIT PULL] Third Round of Renesas ARM Based SoC DT Cleanups for v3.19
+Message-ID: <cover.1416271777.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 12:03:50AM +0000, Kuninori Morimoto wrote:
-> 
-> Hi Arnd
-> 
-> > >                                 "mem_src6",     "src6_mem",
-> > >                                 "mem_src7",     "src7_mem",
-> > >                                 "mem_src8",     "src8_mem",
-> > > -                               "mem_src9",     "src9_mem";
-> > > +                               "mem_src9",     "src9_mem",
-> > > +
-> > > +                               "src0_ssiu0",           "src1_ssiu0",           "src2_ssiu0",           "src3_ssiu0",           "src4_ssiu0",
-> > > +                               "src0_ssiu1",           "src1_ssiu1",           "src2_ssiu1",           "src3_ssiu1",           "src4_ssiu1",
-> > > +                               "src0_ssiu2",           "src1_ssiu2",           "src2_ssiu2",           "src3_ssiu2",           "src4_ssiu2",
-> > > 
-> > 
-> > I have to note that this looks rather weird and that none of the names
-> > are documented in the binding.
-> > 
-> > Can you explain why this device uses over 100 DMA channels and put the
-> > exact naming rules into the binding?
-> > Do you expect all channels to be in use simultaneously?
-> 
-> This device has 10 sound channels, and using 3 kind of IPs.
-> Then, data input/output needs DMA channel which needs specific ID to using.
-> Above name has ID pair for it, so there is much combination. 
-> These specific ID is based on SoC, not board.
-> Sound driver / DMAEngine can get specific ID from above.
-> 
-> Indeed binding itself was not documented yet.
-> I will add it ASAP.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Hi Arnd,
+Please consider these third round of Renesas ARM based SoC DT cleanups for
+v3.19.
 
-please let me know if a revised pull-request is in order.
-v3.18-rc6 is getting awfully close.
+This pull request is based on the previous round of
+such requests, tagged as renesas-dt-cleanups2-for-v3.19,
+which I have already sent a pull-request for.
+
+
+The following changes since commit 89aeff9989e87bb2d9d652994010bc18c68675d9:
+
+  ARM: shmobile: alt dts: Drop console= bootargs parameter (2014-11-05 14:54:10 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-cleanups3-for-v3.19
+
+for you to fetch changes up to 61f1fb47bdbcf145dd539d29cfa7f3294bd5e958:
+
+  ARM: shmobile: kzm9g-reference: Use keyboard as gpio-keys node name (2014-11-14 09:39:47 +0900)
+
+----------------------------------------------------------------
+Third Round of Renesas ARM Based SoC DT Cleanups for v3.19
+
+* Use keyboard as gpio-keys node name
+
+----------------------------------------------------------------
+Simon Horman (4):
+      ARM: shmobile: armadillo800eva: Use keyboard as gpio-keys node name
+      ARM: shmobile: lager: Use keyboard as gpio-keys node name
+      ARM: shmobile: koelsch: Use keyboard as gpio-keys node name
+      ARM: shmobile: kzm9g-reference: Use keyboard as gpio-keys node name
+
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 2 +-
+ arch/arm/boot/dts/r8a7790-lager.dts           | 2 +-
+ arch/arm/boot/dts/r8a7791-koelsch.dts         | 2 +-
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts  | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
