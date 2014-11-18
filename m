@@ -1,43 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Nov 2014 17:03:50 +0000
-Subject: [PATCH v5 01/18] ARM64: Move the init of cpu_logical_map(0)
- before unflatten_device_tree()
-In-Reply-To: <546B7B8D.1070201@arm.com>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <1413553034-20956-2-git-send-email-hanjun.guo@linaro.org>
- <546B4D8D.2020605@linaro.org>
- <20141118164312.GL28279@e104818-lin.cambridge.arm.com>
- <20141118165713.GT18842@arm.com> <546B7B8D.1070201@arm.com>
-Message-ID: <20141118170349.GU18842@arm.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 18 Nov 2014 09:12:40 -0800
+Subject: [PATCH v4 3/6] mfd: ti_am335x_tscadc: Remove unwanted
+ reg_se_cache save
+In-Reply-To: <20141118143005.GF24004@x1>
+References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
+ <1415941651-28962-4-git-send-email-vigneshr@ti.com>
+ <20141118143005.GF24004@x1>
+Message-ID: <20141118171240.GB3003@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 05:02:05PM +0000, Sudeep Holla wrote:
-> On 18/11/14 16:57, Will Deacon wrote:
-> > On Tue, Nov 18, 2014 at 04:43:13PM +0000, Catalin Marinas wrote:
-> >> On Tue, Nov 18, 2014 at 01:45:49PM +0000, Hanjun Guo wrote:
-> >>> On 2014?10?17? 21:36, Hanjun Guo wrote:
-> >>>> It always make sense to initialize CPU0's logical map entry from the
-> >>>> hardware values, so move the initialization of cpu_logical_map(0)
-> >>>> before unflatten_device_tree() which is needed by ACPI code later.
-> >>>>
-> >>>> Acked-by: Olof Johansson <olof@lixom.net>
-> >>>> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> >>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >>>
-> >>> Could you merge this patch first in 3.19? It was acked by Olof and
-> >>> Mark, and it will make sense without ACPI too.
-> >>
-> >> I think it can go in for 3.19 (it's Will's turn this time ;)).
-> >
-> > This patch doesn't apply on for-next/core, as it conflicts with some of
-> > Rutland's rework ("arm64: log physical ID of boot CPU").
-> >
+On Tue, Nov 18, 2014 at 02:30:05PM +0000, Lee Jones wrote:
+> On Fri, 14 Nov 2014, Vignesh R wrote:
 > 
-> It's actually not required anymore, as "arm64: log physical ID of boot
-> CPU" move it quite early in the sequence from setup_arch to
-> smp_setup_processor_id while this patch just moves it up in setup_arch.
+> > In one shot mode, sequencer automatically disables all enabled steps at
+> > the end of each cycle. (both ADC steps and TSC steps) Hence these steps
+> > need not be saved in reg_se_cache for clearing these steps at a later
+> > stage.
+> > Also, when ADC wakes up Sequencer should not be busy executing any of the
+> > config steps except for the charge step. Previously charge step was 1 ADC
+> > clock cycle and hence it was ignored.
+> > 
+> > Signed-off-by: Vignesh R <vigneshr@ti.com>
+> > ---
+> >  drivers/mfd/ti_am335x_tscadc.c       | 7 +++++--
+> >  include/linux/mfd/ti_am335x_tscadc.h | 1 +
+> >  2 files changed, 6 insertions(+), 2 deletions(-)
+> 
+> Code looks better now.
+> 
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> 
+> What's the plan for this series?
 
-Thanks Sudeep, I'd guessed as much :)
+I am waiting for the interested parties to provide more feedback. So far
+I have seen a few reports saying that they see issues with the series
+applied.
 
-Will
+-- 
+Dmitry
