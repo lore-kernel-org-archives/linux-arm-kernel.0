@@ -1,17 +1,18 @@
 From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Mon, 17 Nov 2014 22:03:34 -0600
-Subject: [GIT PULL 1/2] SOCFPGA update for v3.19
-Message-ID: <1416283415-6563-1-git-send-email-dinguyen@opensource.altera.com>
+Date: Mon, 17 Nov 2014 22:03:35 -0600
+Subject: [GIT PULL 2/2] SOCFPGA DTS updates for v3.19
+In-Reply-To: <1416283415-6563-1-git-send-email-dinguyen@opensource.altera.com>
+References: <1416283415-6563-1-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <1416283415-6563-2-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Kevin and Olof,
 
-Please consider pulling in this one patch for v3.19. The SOCFPGA chip has
-a quirk that causes it to consume more power when CPU1 is put in reset
-instead of WFI when it is hot-unplugged. This patch fixes this issue.
+Please consider pulling in these 4 patches for v3.19.
 
 Thanks,
+Dinh
 
 The following changes since commit 206c5f60a3d902bc4b56dab2de3e88de5eb06108:
 
@@ -19,22 +20,34 @@ The following changes since commit 206c5f60a3d902bc4b56dab2de3e88de5eb06108:
 
 are available in the git repository at:
 
-  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_update_for_v3.19
+  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_dts_updates_for_v3.19
 
-for you to fetch changes up to e15a11e885423aff12ed841677108fde4de40319:
+for you to fetch changes up to b313f03020db4ccb2e8254b5aa14286d7dd5172d:
 
-  socfpga: hotplug: put cpu1 in wfi (2014-11-17 15:23:42 -0600)
-
-----------------------------------------------------------------
-SoCFPGA update for v3.19
-
-Use WFI instead of putting CPU1 into reset will fix problem of increased
-power when unplugging CPU1.
+  arm: dts: socfpga: Add a base DTSI for Altera's Arria10 SOC (2014-11-17 15:09:46 -0600)
 
 ----------------------------------------------------------------
-Alan Tull (1):
-      socfpga: hotplug: put cpu1 in wfi
+SoCFPGA DTS updates for v3.19
 
- arch/arm/mach-socfpga/core.h    |  3 +++
- arch/arm/mach-socfpga/platsmp.c | 19 +++++++++++--------
- 2 files changed, 14 insertions(+), 8 deletions(-)
+- Add DTS support for a new chip in the SOCFPGA family, the Arria 10.
+- Enable watchdog node.
+- Add SPI nodes.
+- Add the OCRAM node.
+
+----------------------------------------------------------------
+Dinh Nguyen (3):
+      arm: dts: socfpga: Add OCRAM node
+      arm: dts: socfpga: enable watchdog for socfpga platform
+      arm: dts: socfpga: Add a base DTSI for Altera's Arria10 SOC
+
+Thor Thayer (1):
+      arm: dts: socfpga: Add SPI nodes to SOCFPGA DT.
+
+ arch/arm/boot/dts/Makefile                  |   1 +
+ arch/arm/boot/dts/socfpga.dtsi              |  27 ++
+ arch/arm/boot/dts/socfpga_arria10.dtsi      | 374 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/socfpga_arria10_socdk.dts |  48 ++++
+ arch/arm/boot/dts/socfpga_cyclone5.dtsi     |   4 +
+ 5 files changed, 454 insertions(+)
+ create mode 100644 arch/arm/boot/dts/socfpga_arria10.dtsi
+ create mode 100755 arch/arm/boot/dts/socfpga_arria10_socdk.dts
