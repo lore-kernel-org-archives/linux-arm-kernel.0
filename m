@@ -1,80 +1,106 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 18 Nov 2014 10:56:12 +0000
-Subject: ARM atomics overhaul for musl
-In-Reply-To: <CALCETrUAtAJ1CmuxOFiiu53kAWwofUpFaBeFAZF7Th2VXPbHZg@mail.gmail.com>
-References: <20141116055656.GA13940@brightrain.aerifal.cx>
- <20141116163355.GK4042@n2100.arm.linux.org.uk>
- <20141116165017.GT22465@brightrain.aerifal.cx>
- <20141116171055.GM4042@n2100.arm.linux.org.uk>
- <20141117135412.GC29595@e104818-lin.cambridge.arm.com>
- <20141117143905.GQ4042@n2100.arm.linux.org.uk>
- <CALCETrUAtAJ1CmuxOFiiu53kAWwofUpFaBeFAZF7Th2VXPbHZg@mail.gmail.com>
-Message-ID: <20141118105611.GC28279@e104818-lin.cambridge.arm.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Tue, 18 Nov 2014 11:58:14 +0100
+Subject: [PATCH v4 06/19] arm/arm64: KVM: move kvm_register_device_ops()
+ into vGIC probing
+In-Reply-To: <546B22C0.7030701@linaro.org>
+References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
+ <1415959683-26027-7-git-send-email-andre.przywara@arm.com>
+ <546B22C0.7030701@linaro.org>
+Message-ID: <546B2646.7060103@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 05:38:46PM +0000, Andy Lutomirski wrote:
-> On Nov 17, 2014 6:39 AM, "Russell King - ARM Linux"
-> <linux@arm.linux.org.uk> wrote:
-> >
-> > On Mon, Nov 17, 2014 at 01:54:13PM +0000, Catalin Marinas wrote:
-> > > If you haven't noticed, the distinction between ARMv6 and ARMv7 has been
-> > > blurred enough (guess why cpu_architecture() reports ARMv7 for
-> > > ARM11MPCore). ARM is trying to move away from architecture version
-> > > numbers, which are rather useful for marketing, to proper feature
-> > > detection based on CPUID. Whether there is an ARMv9 or not, it's
-> > > irrelevant to what Linux should do (i.e. use CPUID rather than guess
-> > > features based on architecture version numbers).
-> >
-> > That may be what is desired, but unfortunately we have no way to export
-> > all the intricate feature registers to userspace.  No, elf hwcaps don't
-> > support it, there's only 64 bits split between two words there, and
-> > there are many more than just 64 bits of feature registers.
+On 11/18/2014 11:43 AM, Eric Auger wrote:
+> On 11/14/2014 11:07 AM, Andre Przywara wrote:
+>> Currently we unconditionally register the GICv2 emulation device
+>> during the host's KVM initialization. Since with GICv3 support we
+>> may end up with only v2 or only v3 or both supported, we move the
+>> registration into the GIC probing function, where we will later know
+>> which combination is valid.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> ---
+>> Changelog v3...v4:
+>> - add Acked-by
+>>
+>>  include/linux/kvm_host.h |    1 +
+>>  virt/kvm/arm/vgic-v2.c   |    2 ++
+>>  virt/kvm/arm/vgic-v3.c   |    1 +
+>>  virt/kvm/arm/vgic.c      |    5 ++---
+>>  4 files changed, 6 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+>> index ea53b04..326ba7a 100644
+>> --- a/include/linux/kvm_host.h
+>> +++ b/include/linux/kvm_host.h
+>> @@ -1084,6 +1084,7 @@ void kvm_unregister_device_ops(u32 type);
+>>  
+>>  extern struct kvm_device_ops kvm_mpic_ops;
+>>  extern struct kvm_device_ops kvm_xics_ops;
+>> +extern struct kvm_device_ops kvm_arm_vgic_v2_ops;
+>>  
+>>  #ifdef CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT
+>>  
+>> diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
+>> index 2935405..e1cd3cb 100644
+>> --- a/virt/kvm/arm/vgic-v2.c
+>> +++ b/virt/kvm/arm/vgic-v2.c
+>> @@ -229,6 +229,8 @@ int vgic_v2_probe(struct device_node *vgic_node,
+>>  		goto out_unmap;
+>>  	}
+>>  
+>> +	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
+>> +
+>>  	vgic->vcpu_base = vcpu_res.start;
+>>  
+>>  	kvm_info("%s@%llx IRQ%d\n", vgic_node->name,
+>> diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+>> index 1c2c8ee..d14c75f 100644
+>> --- a/virt/kvm/arm/vgic-v3.c
+>> +++ b/virt/kvm/arm/vgic-v3.c
+>> @@ -230,6 +230,7 @@ int vgic_v3_probe(struct device_node *vgic_node,
+>>  		ret = -ENXIO;
+>>  		goto out;
+>>  	}
+>> +	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
+> I did not find any unregistration? I am wrong or isn't it relevant? If
+> confirmed might be added in kvm_arch_exit. Saw KVM-VFIO device ops
+> unregistration is done in kvm_exit/kvm_vfio_ops_exit.
+
+well forget that one. I guess it is not relevant for that device which
+is not going to be released.
+
+BR
+
+Eric
 > 
-> That's a ridiculous argument.  Linux can freely add bits.
+> Eric
+>>  
+>>  	vgic->vcpu_base = vcpu_res.start;
+>>  	vgic->vctrl_base = NULL;
+>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>> index 963b84e..e8003ca 100644
+>> --- a/virt/kvm/arm/vgic.c
+>> +++ b/virt/kvm/arm/vgic.c
+>> @@ -2540,7 +2540,7 @@ static int vgic_create(struct kvm_device *dev, u32 type)
+>>  	return kvm_vgic_create(dev->kvm, type);
+>>  }
+>>  
+>> -static struct kvm_device_ops kvm_arm_vgic_v2_ops = {
+>> +struct kvm_device_ops kvm_arm_vgic_v2_ops = {
+>>  	.name = "kvm-arm-vgic",
+>>  	.create = vgic_create,
+>>  	.destroy = vgic_destroy,
+>> @@ -2619,8 +2619,7 @@ int kvm_vgic_hyp_init(void)
+>>  
+>>  	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
+>>  
+>> -	return kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
+>> -				       KVM_DEV_TYPE_ARM_VGIC_V2);
+>> +	return 0;
+>>  
+>>  out_free_irq:
+>>  	free_percpu_irq(vgic->maint_irq, kvm_get_running_vcpus());
+>>
 > 
-> You could add AT_ARM_FEATURES that points to a length followed by the
-> indicated number of words, or you could just keep adding new HWCAP
-> fields as needed.  This is expandable forever.
-
-That's fine by me, I don't have a problem with more hwcap bits.
-
-> > Given that even cocked these up (just as what happened with the cache
-> > type register) decoding of the feature type registers depends on the
-> > underlying CPU architecture.
-> >
-> > So, even _if_ we exported the feature registers to userspace, you still
-> > need to know the CPU architecture to decode them properly, so you still
-> > need to parse the AT_PLATFORM string to get that information.
-> 
-> There's no need to expose the hardware feature registers as is.
-> Define your own sensible feature bits just for Linux.
-
-We get regular questions about direct access to the hardware feature
-bits, many using the x86 cpuid instruction as argument. So far we
-couldn't see good enough reasons, otherwise we would have pushed such
-instruction in the ARMv8 architecture. It's also not a simple direct
-hardware access since the kernel may want to mask some features it does
-not support, which pretty much requires HWCAP or some banked CPUID
-registers in hardware.
-
-There seems to be a category of software that can't access HWCAP or
-/proc/self/auxv. This is Android software, I'm not sure how the
-developers came to this conclusion but they think allowing
-/proc/cpuinfo access is ok but not /proc/self/auxv. I'm not sure direct
-cpuid access is a good enough argument for such scenario. To me it looks
-like something they should solve in their security implementation.
-
-Another class are dynamic loaders that don't yet have a C library
-loaded. However, as such loaders are the first entry point, I don't see
-why they couldn't access auxv directly. One particular scenario here is
-finding out which CPU micro-architecture (implementation) it is so that
-the dynamic loader could choose a more optimised library. CPUID would
-help partially here (get the actual MIDR identifying the CPU
-implementation rather than just features) but not on heterogeneous
-systems like big.LITTLE. Which means that we would still be better off
-with some extra features in auxv, maybe even listing the individual MIDR
-for all the CPUs in the system.
-
--- 
-Catalin
