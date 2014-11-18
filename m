@@ -1,149 +1,132 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 18 Nov 2014 13:44:44 +0100
-Subject: [PATCH 3/4] simplefb: Change simplefb_init from module_init to
- fs_initcall
-In-Reply-To: <546B31A7.9020804@redhat.com>
-References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
- <1415830124-28787-3-git-send-email-hdegoede@redhat.com>
- <20141113085238.GE20972@lukather>
- <CAMuHMdXZ4V4GHvyDLOP8FYvPuGArc5G0aO6NCE9FKHT24YRGPg@mail.gmail.com>
- <20141118101911.GA15769@ulmo> <546B26F4.50302@redhat.com>
- <20141118112123.GA3873@ulmo> <546B31A7.9020804@redhat.com>
-Message-ID: <546B3F3C.6050202@redhat.com>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Tue, 18 Nov 2014 13:52:10 +0100
+Subject: [RFC] adp1653: Add device tree bindings for LED controller
+In-Reply-To: <20141118113256.GA10022@amd>
+References: <20141116075928.GA9763@amd>
+ <20141117145857.GO8907@valkosipuli.retiisi.org.uk>
+ <546AFEA5.9020000@samsung.com> <20141118084603.GC4059@amd>
+ <546B19C8.2090008@samsung.com> <20141118113256.GA10022@amd>
+Message-ID: <546B40FA.2070409@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 11/18/2014 12:46 PM, Hans de Goede wrote:
-> Hi,
-> 
-> On 11/18/2014 12:21 PM, Thierry Reding wrote:
->> On Tue, Nov 18, 2014 at 12:01:08PM +0100, Hans de Goede wrote:
->>> Hi,
->>>
->>> On 11/18/2014 11:19 AM, Thierry Reding wrote:
->>>> On Thu, Nov 13, 2014 at 09:58:41AM +0100, Geert Uytterhoeven wrote:
->>>>> Hi Maxime,
->>>>>
->>>>> On Thu, Nov 13, 2014 at 9:52 AM, Maxime Ripard
->>>>> <maxime.ripard@free-electrons.com> wrote:
->>>>>>> -module_init(simplefb_init);
->>>>>>> +/*
->>>>>>> + * While this can be a module, if builtin it's most likely the console
->>>>>>> + * So let's leave module_exit but move module_init to an earlier place
->>>>>>> + */
->>>>>>
->>>>>> Not really related to this patch itself, but do we want to support
->>>>>> simplefb as a module? It seems like it's going to be most of the time
->>>>>> broken.
->>>>>
->>>>> If it depends on clocks, it won't work as a module, as CCF will have disabled
->>>>> all unused clocks at that point.
+On 11/18/2014 12:32 PM, Pavel Machek wrote:
+>
+>>>> I've already submitted a patch [1] that updates leds common bindings.
+>>>> I hasn't been merged yet, as the related LED Flash class patch [2]
+>>>> still needs some indicator leds related discussion [3].
 >>>>
->>>> If it does depend on anything beyond clocks it won't work at all. Clocks
->>>> are special because they get set up very early at boot time. If it turns
->>>> out that a simplefb ever needs a regulator to remain on, and that's even
->>>> quite likely to happen eventually, it's going to fail miserably, because
->>>> those regulators will typically be provided by a PMIC on an I2C bus. The
->>>> regulator won't be registered until very late into the boot process and
->>>> a regulator_get() call will almost certainly cause the simplefb driver
->>>> to defer probing.
+>>>> I think this is a good moment to discuss the flash related led common
+>>>> bindings.
 >>>
->>> Right, this has been discussed already and the plan is to have simplefb
->>> continue its probe function and return success from it if it encounters
->>> any -eprobe_defer errors, while tracking which resources it misses.
+>>> Part of problem is that adp1653 is not regarded as "LED" device by
+>>> current kernel driver.
+>>
+>> It doesn't prevent us from keeping the flash devices related
+>> DT bindings unified across kernel subsystems. The DT bindings
+>> docs for the adp1653 could just provide a reference to the
+>> led/common.txt bindings. In the future, when LED Flash
+>> class will be merged, all the V4L2 Flash drivers might be
+>> moved to the LED subsystem to gain the LED subsystem support.
+>
+> Yeah, that makses sense.
+>
+>>> @@ -19,5 +30,10 @@ Examples:
+>>>   system-status {
+>>>   	       label = "Status";
+>>>   	       linux,default-trigger = "heartbeat";
+>>> +	       iout-torch = <500 500>;
+>>> +	       iout-flash = <1000 1000>;
+>>> +	       iout-indicator = <100 100>;
+>>> +	       flash-timeout = <1000>;
+>>> +
+>>> 	...
+>>>   };
 >>>
->>> And then have a late_initcall which will claim any resources which failed
->>> with -eprobe beforehand.
+>>> I don't get it; system-status describes single LED, why are iout-torch
+>>> (and friends) arrays of two?
 >>
->> How do you ensure that the late_initcall gets run before any of the
->> other late_initcalls that disable the resources?
-> 
->> Also my recollection is
->> that deferred probing will first be triggered the first time from a
->> late_initcall, so chances aren't very high that all resources have shown
->> up by that time.
-> 
-> So I just looked up the relevant code, and your right, this means that
-> the whole model of "disable unused resources once probing is done" which
-> we use for e.g. clocks, is already somewhat broken since there is
-> no guarantee probing is really done when the cleanup code runs.
-> 
->>>> Now deferring probing is a real showstopper for simplefb, because not
->>>> only does it make the framebuffer useless as early boot console, once
->>>> probing is attempted again the clocks that it would have needed to
->>>> acquire to keep going will already have been switched off, too.
+>> Some devices can control more than one led. The array is for such
+>> purposes. The system-status should be probably renamed to
+>> something more generic for both common leds and flash leds,
+>> e.g. system-led.
+>
+> No, sorry. The Documentation/devicetree/bindings/leds/common.txt
+> describes binding for _one LED_. Yes, your device can have two leds,
+> so your devices should have two such blocks in the device tree... Each
+> led should have its own label and default trigger, for example. And I
+> guess flash-timeout be per-LED, too.
+
+I think that a device tree binding describes a single physical device.
+No matter how many sub-leds a device controls, it is still one
+piece of hardware.
+default-trigger property should also be an array of strings.
+I agree that flash-timeout should be per led - an array, similarly
+as in case of iout's.
+
+> Would it make sense to include "-uA" and "-usec" suffixes in the dt
+> property names?
+
+I don't see this type of naming anywhere. The documentation should
+contain the information about units. Nonetheless I am not a device tree
+specialist, so an opinion of the relevant maintainer will be welcome.
+
+>>> Also, at least on adp1653, these are actually two leds -- white and
+>>> red. Torch and flash is white led, indicator is red led.
+>>
+>> Then you should define three properties:
+>>
+>> iout-torch = <[uA]>;
+>> iout-flash = <[uA]>;
+>> iout-indicator = <[uA]>;
+>>
+>> iout-torch and iout-flash properties would determine the current
+>> for the white led in the torch and flash modes respectively and
+>> the iout-indicator property would determine the current for
+>> the indicator led.
+>
+> Yes, that would work. I have used
+>
+> +               max-flash-timeout-usec = <500000>;
+> +               max-flash-intensity-uA     = <320000>;
+> +               max-torch-intensity-uA     =  <50000>;
+> +               max-indicator-intensity-uA =  <17500>;
+>
+> . Which is pretty similar. (Actually, maybe the longer property names
+> are easier to understand for more people?) (And yes, I should probably
+> separate red and white led into separate groups).
+
+Documentation of a binding should provide sufficient explanation
+for the people to understand what a property is for.
+And I would stay by arrays as argued above.
+
+>>>> [2] http://www.spinics.net/lists/linux-media/msg83100.html
+>>>> [3] http://www.spinics.net/lists/linux-leds/msg02472.html
 >>>
->>> That is not true, even with the current implementation, if all necessary
->>> drivers are built in, then simplefb will come up later, but it will still
->>> come up before the late_initcall which disables the clocks.
+>>> What device are you using for testing? Can you cc me on future
+>>> patches?
 >>
->> Yes, in the current implementation because clocks typically are
->> registered very early and thus you don't hit the deferred probe. The
->> same is not true for other types of resources where it's actually quite
->> common to hit deferred probing (regulators is a very notorious one).
->>
->> It doesn't matter whether a driver is built-in or not, once you hit
->> deferred probing you lose.
->>
->>> Once we do the split probing described above (which is something which
->>> we plan to do when it becomes necessary), then simplefb will still come
->>> up early.
->>
->> It will come up early but won't have acquired all the resources that it
->> needs, so unless you somehow manage to order late_initcalls in exactly
->> the way that you need them, the frameworks will still turn off what you
->> haven't managed to claim yet.
-> 
-> If it is a resource which only shows up as a result of deferred probing,
-> then it may very well not have been probed & registered yet, when the
-> framework cleanup functions runs, and thus will not get turned off...
-> 
-> So yes you're right that deferred probing may cause issues, but it seems
-> that this is not something simplefb specific, but rather a generic problem
-> with deferred-probing vs subsys cleanup functions.
-> 
-> My view on this is simple, lets worry about this when we actually have
-> a board which hits these issues, and then we'll see from there.
+>> I am using max77693 [1] and aat1290 [2]. OK, I will add you on cc.
+>
+> Thanks for cc and thanks for links!
+>
+> I see max77693 has two different "white" leds, aat1290 has one "white"
+> led, and neither of them has secondary red led for indication?
 
-So thinking more about this, I think this is not that hard to fix.
+You're right.
 
-First lets fix the generic conflict between eprobedefer and subsys cleanup
-functions. This can be done by:
+>> The v4l2-flash sub-device registers with v4l2-async API
+>> in a media device. Exemplary support for v4l2-flash
+>> sub-devices is added to the exynos4-is driver in the patch [5].
+>
+> Thanks for the links. It seems that aside from moving adp1653 driver
+> to device tree, it should be moved to the LED framework, but that's a
+> topic for another patch.
 
-1) Having a linked list of subsys cleanup functions
-to call in drivers/base/dd.c
-
-2) Have subsystems register their cleanup function rather then using
-late_initcall to get it called
-
-3) Have deferred_probe_work_func iterate over the list and call the cleanup
-functions once deferred_probe_active_list goes empty. It should also remove
-them once called, so that they only get called the first time
-deferred_probe_active_list goes empty (iow when the deferred probing of'
-build-in drivers is done).
-
-This way cleanup functions actually get run when all probing of (buildin)
-drivers is done.
-
-Then when we move simplefb to a 2 fase probe, we can simply register the
-framebuffer at the first probe call, and claim any resources we get, but
-return -eprobe_defer if some resources returned that themselves.
-
-Then when simplefb_probe gets re-called, it can first check if it did not
-already register a fb, and if it did, it can use that and see which
-resources are missing, and only try to claim those. If some resources
-still return probe_defer, return eprobe_defer again, otherwise success.
-
-This way simplefb_probe will get called as long as resources are missing
-and other drivers are successfully completing deferred probes (if no
-driver successfully completes a deferred probe, deferred_probe_active_list
-will go empty).
-
-And then when the subsys cleanup functions run, simplefb will have been
-able to claim any resources registered by buildin drivers.
+Like I mentioned in the previous message the LED Flash class patch
+isn't in its final shape yet. Nonetheless I think that we should
+agree on the leds/common.txt documentation improvements and
+define DT documentation for adp1653 accordingly.
 
 Regards,
-
-Hans
+Jacek
