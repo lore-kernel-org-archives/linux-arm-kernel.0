@@ -1,42 +1,46 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 18 Nov 2014 14:51:42 +0000
-Subject: [PATCH v5 6/6] arm64: Trace emulation of AArch32 legacy
- instructions
-In-Reply-To: <20141118093239.46f9b655@gandalf.local.home> (Steven Rostedt's
- message of "Tue, 18 Nov 2014 09:32:39 -0500")
-References: <1416310887-14649-1-git-send-email-punit.agrawal@arm.com>
- <1416310887-14649-7-git-send-email-punit.agrawal@arm.com>
- <20141118093239.46f9b655@gandalf.local.home>
-Message-ID: <9hh8uj8v9xd.fsf@e105922-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 18 Nov 2014 14:52:29 +0000
+Subject: [PATCH v3 5/5] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
+In-Reply-To: <1416292375-29560-6-git-send-email-dave.long@linaro.org>
+References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
+ <1416292375-29560-6-git-send-email-dave.long@linaro.org>
+Message-ID: <20141118145228.GN18842@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Steven Rostedt <rostedt@goodmis.org> writes:
+Hi David,
 
-> On Tue, 18 Nov 2014 11:41:27 +0000
-> Punit Agrawal <punit.agrawal@arm.com> wrote:
->
->> Introduce an event to trace the usage of emulated instructions. The
->> trace event is intended to help identify and encourage the migration
->> of legacy software using the emulation features.
->> 
->> Use this event to trace usage of swp and CP15 barrier emulation.
->> 
->> Cc: Steven Rostedt <rostedt@goodmis.org>
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->> ---
->
-> For the tracing side:
->
-> Acked-by: Steven Rostedt <rostedt@goodmis.org>
+On Tue, Nov 18, 2014 at 06:32:55AM +0000, David Long wrote:
+> From: "David A. Long" <dave.long@linaro.org>
+> 
+> Add HAVE_REGS_AND_STACK_ACCESS_API feature for arm64.
 
-Cheers, Steve.
+[...]
 
->
-> -- Steve
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+> index d3e782a..24cc048 100644
+> --- a/arch/arm64/include/asm/ptrace.h
+> +++ b/arch/arm64/include/asm/ptrace.h
+> @@ -111,6 +111,8 @@ struct pt_regs {
+>  	u64 syscallno;
+>  };
+>  
+> +#define MAX_REG_OFFSET (offsetof(struct pt_regs, orig_x0))
+
+Is orig_x0 actually useful to this API? If not, we could instead operate on
+the user_pt_regs structure, and define the maximum offset in terms of sizeof
+that.
+
+> +#define ARM_cpsr	pstate
+> +#define ARM_pc		pc
+> +#define ARM_sp		sp
+> +#define ARM_lr		regs[30]
+> +#define ARM_fp		regs[29]
+> +#define ARM_x28		regs[28]
+> +#define ARM_x27		regs[27]
+
+[...]
+
+I don't think we need these #defines.
+
+Will
