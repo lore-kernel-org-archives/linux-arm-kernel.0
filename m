@@ -1,127 +1,72 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 18 Nov 2014 10:35:30 +0000
-Subject: [PATCHv5 3/7] arm64: Move cpu_resume into the text section
-In-Reply-To: <1416272105-14787-4-git-send-email-lauraa@codeaurora.org>
-References: <1416272105-14787-1-git-send-email-lauraa@codeaurora.org>
- <1416272105-14787-4-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20141118103530.GA2128@red-moon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Nov 2014 11:35:40 +0100
+Subject: [Linaro-acpi] [RFC PATCH 4/4] arm64, acpi,
+ pci: Provide arch-specific calls for PCI host bridge dirver (PNP0A03).
+In-Reply-To: <546B1CA6.1030300@linaro.org>
+References: <1415366876-30811-1-git-send-email-tomasz.nowicki@linaro.org>
+ <2009440.GJsvyI3SUN@wuerfel> <546B1CA6.1030300@linaro.org>
+Message-ID: <2257579.qvqyac3u3y@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 12:55:01AM +0000, Laura Abbott wrote:
-> The function cpu_resume currently lives in the .data section.
-> There's no reason for it to be there since we can use relative
-> instructions without a problem. Move a few cpu_resume data
-> structures out of the assembly file so the .data annotation
-> can be dropped completely and cpu_resume ends up in the read
-> only text section.
+On Tuesday 18 November 2014 11:17:10 Tomasz Nowicki wrote:
+> On 14.11.2014 15:53, Arnd Bergmann wrote:
+> > On Friday 14 November 2014 15:10:12 Tomasz Nowicki wrote:
+> >> On 07.11.2014 15:24, Arnd Bergmann wrote:
+> >>> On Friday 07 November 2014 14:27:56 Tomasz Nowicki wrote:
+> >>>>
+> >>>>    #ifdef CONFIG_PCI
+> >>>> +struct pci_controller {
+> >>>> +  struct acpi_device *companion;
+> >>>> +  int segment;
+> >>>> +  int node;               /* nearest node with memory or NUMA_NO_NODE for global allocation */
+> >>>> +};
+> >>>> +
+> >>>> +#define PCI_CONTROLLER(busdev) ((struct pci_controller *) busdev->sysdata)
+> >>>> +
+> >>>
+> >>> Don't use busdev->sysdata in architecture specific code, it belongs to the
+> >>> host bridge driver with the new model. For ACPI you don't have a host bridge
+> >>> driver, but it's better to keep these separate.
+> >>>
+> >>> The segment is always the same as the domain number, so just use that.
+> >>> The node and companion members here can get added to struct pci_host_bridge.
+> >>
+> >> The reason why I put segment field to struct pci_controller is to
+> >> initialize domain_nr of struct pci_bus being in pci_create_root_bus(),
+> >> domain_nr can be used later on though. Correct me I am wrong.
+> >>
+> >> Honestly I do not see the way to create root bus without e.g.
+> >> sysdata.segment here.
+> >
+> > See the patches that Liviu and Lorenzo have been posting recently. This
+> > should be straightforward in 3.19.
 > 
-> Reviewed-by: Kees Cook <keescook@chromium.org>
-> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> Tested-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> Hi Arnd,
+> 
+> I have been looking into patch (if that what you meant) :
+> [RFC PATCH v2] drivers: pci: move PCI domain assignment to generic PCI code
+> 
+> This is not enough for me since it gets domain number from its OF parent 
+> or just uses sequential increased domain number. In my case, I do not 
+> have parent so I need to get segment from ACPI node which is not 
+> available there.
+> 
+> On the other hand, patch set posted by Wang Yijing:
+> [RFC PATCH 00/16] Refine PCI host bridge scan interfaces
+> tends to solve that issue.
+> 
+> What would be the best way for this patch, keep busdev->sysdata usage 
+> and rebase once Wang Yijing patch set will be accepted?
 
-That's nice, thank you:
+I think the "Refine PCI host bridge scan interfaces" series is still in an
+early stage, you may need something sooner than that.
 
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+What I meant is that with "drivers: pci: move PCI domain assignment to
+generic PCI code", we already have a way to put the domain number into
+'struct pci_bus' and retrieve it from there without ever consulting
+the sysdata pointer. You should build on top of that and do it the same
+way. Of course you will have to put it in there differently, but you can
+get it out the same way.
 
-> ---
-> v5: Dropped the .data annoation completely per suggestion of
-> Lorenzo. Dropped mpidr_hash_ptr per suggestion of Ard.
-> Moved sleep_save_sp and sleep_idmap_phys from assembly per
-> suggestion of Mark.
-> 
-> Please let me know if your Tested-by/Reviewed-by/Acked-by
-> still stands.
-> ---
->  arch/arm64/kernel/sleep.S   | 29 ++++++-----------------------
->  arch/arm64/kernel/suspend.c |  4 ++--
->  2 files changed, 8 insertions(+), 25 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-> index a564b44..3f836b2 100644
-> --- a/arch/arm64/kernel/sleep.S
-> +++ b/arch/arm64/kernel/sleep.S
-> @@ -147,14 +147,12 @@ cpu_resume_after_mmu:
->  	ret
->  ENDPROC(cpu_resume_after_mmu)
->  
-> -	.data
->  ENTRY(cpu_resume)
->  	bl	el2_setup		// if in EL2 drop to EL1 cleanly
->  #ifdef CONFIG_SMP
->  	mrs	x1, mpidr_el1
-> -	adr	x4, mpidr_hash_ptr
-> -	ldr	x5, [x4]
-> -	add	x8, x4, x5		// x8 = struct mpidr_hash phys address
-> +	adrp	x8, mpidr_hash
-> +	add x8, x8, #:lo12:mpidr_hash // x8 = struct mpidr_hash phys address
->          /* retrieve mpidr_hash members to compute the hash */
->  	ldr	x2, [x8, #MPIDR_HASH_MASK]
->  	ldp	w3, w4, [x8, #MPIDR_HASH_SHIFTS]
-> @@ -164,14 +162,15 @@ ENTRY(cpu_resume)
->  #else
->  	mov	x7, xzr
->  #endif
-> -	adr	x0, sleep_save_sp
-> +	adrp	x0, sleep_save_sp
-> +	add	x0, x0, #:lo12:sleep_save_sp
->  	ldr	x0, [x0, #SLEEP_SAVE_SP_PHYS]
->  	ldr	x0, [x0, x7, lsl #3]
->  	/* load sp from context */
->  	ldr	x2, [x0, #CPU_CTX_SP]
-> -	adr	x1, sleep_idmap_phys
-> +	adrp	x1, sleep_idmap_phys
->  	/* load physical address of identity map page table in x1 */
-> -	ldr	x1, [x1]
-> +	ldr	x1, [x1, #:lo12:sleep_idmap_phys]
->  	mov	sp, x2
->  	/*
->  	 * cpu_do_resume expects x0 to contain context physical address
-> @@ -182,24 +181,8 @@ ENTRY(cpu_resume)
->  ENDPROC(cpu_resume)
->  
->  	.align 3
-> -mpidr_hash_ptr:
->  	/*
->  	 * offset of mpidr_hash symbol from current location
->  	 * used to obtain run-time mpidr_hash address with MMU off
->           */
->  	.quad	mpidr_hash - .
-> -/*
-> - * physical address of identity mapped page tables
-> - */
-> -	.type	sleep_idmap_phys, #object
-> -ENTRY(sleep_idmap_phys)
-> -	.quad	0
-> -/*
-> - * struct sleep_save_sp {
-> - *	phys_addr_t *save_ptr_stash;
-> - *	phys_addr_t save_ptr_stash_phys;
-> - * };
-> - */
-> -	.type	sleep_save_sp, #object
-> -ENTRY(sleep_save_sp)
-> -	.space	SLEEP_SAVE_SP_SZ	// struct sleep_save_sp
-> diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
-> index 13ad4db..3771b72 100644
-> --- a/arch/arm64/kernel/suspend.c
-> +++ b/arch/arm64/kernel/suspend.c
-> @@ -126,8 +126,8 @@ int __cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
->  	return ret;
->  }
->  
-> -extern struct sleep_save_sp sleep_save_sp;
-> -extern phys_addr_t sleep_idmap_phys;
-> +struct sleep_save_sp sleep_save_sp;
-> +phys_addr_t sleep_idmap_phys;
->  
->  static int __init cpu_suspend_init(void)
->  {
-> -- 
-> Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
-> 
-> 
+	Arnd
