@@ -1,104 +1,83 @@
-From: k.khlebnikov@samsung.com (Konstantin Khlebnikov)
-Date: Tue, 18 Nov 2014 21:13:56 +0300
-Subject: [PATCH RFC] ARM: option for loading modules into vmalloc area
-In-Reply-To: <20141118173413.GB4042@n2100.arm.linux.org.uk>
-References: <20141118172146.3784.81151.stgit@buzz>
- <20141118173413.GB4042@n2100.arm.linux.org.uk>
-Message-ID: <546B8C64.3010904@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 18 Nov 2014 18:14:25 +0000
+Subject: ARM atomics overhaul for musl
+In-Reply-To: <20141118105611.GC28279@e104818-lin.cambridge.arm.com>
+References: <20141116055656.GA13940@brightrain.aerifal.cx>
+ <20141116163355.GK4042@n2100.arm.linux.org.uk>
+ <20141116165017.GT22465@brightrain.aerifal.cx>
+ <20141116171055.GM4042@n2100.arm.linux.org.uk>
+ <20141117135412.GC29595@e104818-lin.cambridge.arm.com>
+ <20141117143905.GQ4042@n2100.arm.linux.org.uk>
+ <CALCETrUAtAJ1CmuxOFiiu53kAWwofUpFaBeFAZF7Th2VXPbHZg@mail.gmail.com>
+ <20141118105611.GC28279@e104818-lin.cambridge.arm.com>
+Message-ID: <20141118181425.GY18842@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+I was really hoping to avoid this thread, but I wanted to comment on the
+suitability of hwcap as a discovery mechanism.
 
-On 2014-11-18 20:34, Russell King - ARM Linux wrote:
-> On Tue, Nov 18, 2014 at 08:21:46PM +0400, Konstantin Khlebnikov wrote:
->> Usually modules are loaded into small area prior to the kernel
->> text because they are linked with the kernel using short calls.
->> Compile-time instrumentation like GCOV or KASAN bloats code a lot,
->> and as a result huge modules no longer fit into reserved area.
->>
->> This patch adds option CONFIG_MODULES_USE_VMALLOC which lifts
->> limitation on amount of loaded modules. It links modules using
->> long-calls (option -mlong-calls) and loads them into vmalloc area.
->>
->> In few places exported symbols are called from inline assembly.
->> This patch adds macro for such call sites: __asmbl and __asmbl_clobber.
->> Call turns into single 'bl' or sequence 'movw; movt; blx' depending on
->> context and state of config option.
->>
->> Unfortunately this option isn't compatible with CONFIG_FUNCTION_TRACER.
->> Compiler emits short calls to profiling function despite of -mlong-calls.
->> This is a bug in GCC, but ftrace anyway needs an update to handle this.
-> It also isn't compatible with the older architectures which don't have
-> "blx".
+On Tue, Nov 18, 2014 at 10:56:12AM +0000, Catalin Marinas wrote:
+> On Mon, Nov 17, 2014 at 05:38:46PM +0000, Andy Lutomirski wrote:
+> > On Nov 17, 2014 6:39 AM, "Russell King - ARM Linux"
+> > > Given that even cocked these up (just as what happened with the cache
+> > > type register) decoding of the feature type registers depends on the
+> > > underlying CPU architecture.
+> > >
+> > > So, even _if_ we exported the feature registers to userspace, you still
+> > > need to know the CPU architecture to decode them properly, so you still
+> > > need to parse the AT_PLATFORM string to get that information.
+> > 
+> > There's no need to expose the hardware feature registers as is.
+> > Define your own sensible feature bits just for Linux.
+> 
+> We get regular questions about direct access to the hardware feature
+> bits, many using the x86 cpuid instruction as argument. So far we
+> couldn't see good enough reasons, otherwise we would have pushed such
+> instruction in the ARMv8 architecture. It's also not a simple direct
+> hardware access since the kernel may want to mask some features it does
+> not support, which pretty much requires HWCAP or some banked CPUID
+> registers in hardware.
 
-Ok, I'll add "depends on CPU_V6 || CPU_V7" I don't think that it is 
-necessary for older cpus.
+Or trapping the undef exception from EL0 and emulating it in the kernel,
+which doesn't require any extra hardware, allows the kernel to mask out
+things it can't support and gives userspace the information it needs
+under any scenario.
 
->> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
->> index 9d2cdda..9e0c4f4 100644
->> --- a/arch/arm/mm/mmu.c
->> +++ b/arch/arm/mm/mmu.c
->> @@ -1161,16 +1161,15 @@ void __init sanity_check_meminfo(void)
->>   
->>   static inline void prepare_page_table(void)
->>   {
->> -	unsigned long addr;
->> +	unsigned long addr = 0;
->>   	phys_addr_t end;
->>   
->>   	/*
->>   	 * Clear out all the mappings below the kernel image.
->>   	 */
->> -	for (addr = 0; addr < MODULES_VADDR; addr += PMD_SIZE)
->> -		pmd_clear(pmd_off_k(addr));
->> -
->>   #ifdef CONFIG_XIP_KERNEL
->> +	for ( ; addr < MODULES_VADDR; addr += PMD_SIZE)
->> +		pmd_clear(pmd_off_k(addr));
->>   	/* The XIP kernel is mapped in the module area -- skip over it */
->>   	addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
->>   #endif
-> This seems to be an unrelated change.  In any case, it looks wrong to
-> me.  Please describe what you are trying to achieve here.
->
+> Another class are dynamic loaders that don't yet have a C library
+> loaded. However, as such loaders are the first entry point, I don't see
+> why they couldn't access auxv directly. One particular scenario here is
+> finding out which CPU micro-architecture (implementation) it is so that
+> the dynamic loader could choose a more optimised library. CPUID would
+> help partially here (get the actual MIDR identifying the CPU
+> implementation rather than just features) but not on heterogeneous
+> systems like big.LITTLE. Which means that we would still be better off
+> with some extra features in auxv, maybe even listing the individual MIDR
+> for all the CPUs in the system.
 
-My patch changes  MODULES_VADDR, if option enabled it becomes alias for 
-VMALLOC_START
+The only way I can see hwcap working is if we follow what the architecture
+allows for in ARMv8, which is 4 bits per feature over (currently) around
+10 32-bit registers. That would mean potentially exposing 1280 hwcaps,
+which is clearly insane.
 
-It's used as border between two loops, before patch this code looks like:
+Instead, we currently advertise a tiny subset of the information exposing
+in the ID registers and end up grouping it together in an ad-hoc way without
+any buy-in from the instruction set architects. For example, how the
+`asimd' hwcap on the arm64 kernel corresponds to feature bits in the MVFR
+registers is not at all clear, especially as those hardware registers are
+extended over time.
 
-     /*
-      * Clear out all the mappings below the kernel image.
-      */
-     for (addr = 0; addr < MODULES_VADDR; addr += PMD_SIZE)
-         pmd_clear(pmd_off_k(addr));
+We've done a bit better with the crypto extensions, where we provide
+fine-grained sha1, sha2 etc hwcaps, but this is based on the relavant 4-bit
+fields in ISAR5 being positive values. I can't find any architectural
+guarantees that this will work on future cores (e.g. bumping the 4-bit
+field to indicate a subset of previous functionality).
 
-#ifdef CONFIG_XIP_KERNEL
-     /* The XIP kernel is mapped in the module area -- skip over it */
-     addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
-#endif
-     for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
-         pmd_clear(pmd_off_k(addr));
+My position is that hwcap is trying to group fine-grained architectural
+features into higher level Linux features, but that's likely to lead to
+an unmaintainable mess as the feature diversity of real systems continues
+to grow. We can fix this easily by exposing the features to userspace in
+the form that is described by the architecture (probably with a single
+HWCAP to say that such an access won't result in SIGILL).
 
-It's written with assumption that MODULES_VADDR < PAGE_OFFSET,
-but this no longer true if modules are placed inside vmalloc area.
-
-
-After patch:
-
-     unsigned long addr = 0;
-
-     /*
-      * Clear out all the mappings below the kernel image.
-      */
-#ifdef CONFIG_XIP_KERNEL
-     for ( ; addr < MODULES_VADDR; addr += PMD_SIZE)
-         pmd_clear(pmd_off_k(addr));
-     /* The XIP kernel is mapped in the module area -- skip over it */
-     addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
-#endif
-     for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
-         pmd_clear(pmd_off_k(addr));
-
-
-Without XIP there is no reason for splitting it into two loops.
+Will
