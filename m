@@ -1,42 +1,36 @@
-From: xudong.chen@mediatek.com (xudong chen)
-Date: Tue, 18 Nov 2014 18:07:01 +0800
-Subject: [PATCH v2 0/3] ARM: mediatek: Add driver for Mediatek I2C
- controller
-In-Reply-To: <1415934752.2152.58.camel@mhfsdcap03>
-References: <1415078977-18374-1-git-send-email-xudong.chen@mediatek.com>
- <20141113183122.GH1275@katana> <1415934752.2152.58.camel@mhfsdcap03>
-Message-ID: <1416305221.4982.23.camel@mhfsdcap03>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 18 Nov 2014 11:12:05 +0100
+Subject: ARM: shmobile: ARCH_R8A7793?
+In-Reply-To: <CAMuHMdUFZo+r-N0Ofa1d6PHDtB6dqZfChpLgOz_XtruWD3_a3g@mail.gmail.com>
+References: <1416302641.7024.7.camel@x220>
+ <CAMuHMdUFZo+r-N0Ofa1d6PHDtB6dqZfChpLgOz_XtruWD3_a3g@mail.gmail.com>
+Message-ID: <1416305525.7024.15.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-11-14 at 11:12 +0800, xudong chen wrote:
-> On Thu, 2014-11-13 at 19:31 +0100, Wolfram Sang wrote:
-> > > MTK I2C HW has some limitation.
-> > > 1. If the i2c_msg number is more than one, STOP will be issued instead of
-> > > RS(Repeat Start) between each message.
-> > > 
-> > > 2. Mediatek I2C controller support WRRD(write then read) mode, in WRRD
-> > > mode the Repeat Start will be issued between 2 messages.
-> > > In this driver if 2 messages is first write then read, the driver will
-> > > combine 2 messages using Write-Read mode so the RS will be issued between
-> > > the 2 messages.
-> > > Ex: W/R/R, driver will combine first W/R and then R.
-> > > 
-> > > 3. Due to HW limitation, in this version the max transfer data length is 255
-> > > in one message.
-> > 
-> > This looks to me more like an SMBUS controller instead of I2C. Maybe you
-> > should populate smbus_xfer rather than master_xfer?
+On Tue, 2014-11-18 at 10:36 +0100, Geert Uytterhoeven wrote:
+> On Tue, Nov 18, 2014 at 10:24 AM, Paul Bolle <pebolle@tiscali.nl> wrote:
+> > Your commit 7a2071c58f36 ("ARM: shmobile: Add early debugging support
+> > using SCIF(A)") is included in today's linux-next (ie, next-20141118).
+> > It adds an (optional) dependency on the Kconfig symbol ARCH_R8A7793. But
+> > that symbol isn't part of next-20141118.
+> >
+> > Is a patch that adds this symbol queued somewhere?
 > 
-> This is the HW limitation, we will try to workaround this in the
-> separate patch.
-> 
-Except limited RS and limited length support, our HW follow I2C protocol
-spec.
-The length is compatible with most I2C devices, only a few I2C devices
-need transfer more than 255 bytes.
-The future Mediatek IC will fix the RS and length limitation.
+> Not yet. I was just a bit pro-active ;-)
 
-Thanks!
-> 
-> 
+My script will stay silent (as might future, proper, bots) if you don't
+add references to Kconfig symbols before adding the symbol itself.
+(Whether or not it's worth it to remove this dependency here and add it
+to the queue that adds this symbol is up to you, I guess.)
+
+Unless the symbol takes a long time to land I'll try not to bother you
+again.
+
+> However, there are already references to r8a7793 in DT binding documentation,
+> and in of_device_id arrays in drivers.
+
+I see.
+
+
+Paul Bolle
