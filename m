@@ -1,34 +1,47 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 18 Nov 2014 10:36:35 +0100
-Subject: ARM: shmobile: ARCH_R8A7793?
-In-Reply-To: <1416302641.7024.7.camel@x220>
-References: <1416302641.7024.7.camel@x220>
-Message-ID: <CAMuHMdUFZo+r-N0Ofa1d6PHDtB6dqZfChpLgOz_XtruWD3_a3g@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Nov 2014 10:36:34 +0100
+Subject: [RFC PATCH 01/16] PCI: Enhance pci_scan_root_bus() to support
+ default IO/MEM resources
+In-Reply-To: <546AF8D7.9010103@huawei.com>
+References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
+ <2732970.7HG94QvVBv@wuerfel> <546AF8D7.9010103@huawei.com>
+Message-ID: <2447172.ADYWdCTnMP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Tuesday 18 November 2014 15:44:23 Yijing Wang wrote:
+> On 2014/11/17 18:08, Arnd Bergmann wrote:
+> > On Monday 17 November 2014 18:21:35 Yijing Wang wrote:
+> >> -       list_for_each_entry(window, resources, list)
+> >> -               if (window->res->flags & IORESOURCE_BUS) {
+> >> -                       found = true;
+> >> -                       break;
+> >> -               }
+> >> +       if (!resources) {
+> >> +               pci_add_resource(&default_res, &ioport_resource);
+> >> +               pci_add_resource(&default_res, &iomem_resource);
+> >> +               pci_add_resource(&default_res, &busn_resource);
+> >> +       } else {
+> >>
+> > 
+> > Isn't it almost always wrong to do this? You are adding all of the
+> > I/O ports and memory to the host bridge, which will prevent you from
+> > adding another host bridge, and the iomem_resource normally
+> > includes a lot of addresses that are not accessible by the PCI host.
+> 
+> Hi Arnd, pci host bridge windows are the ranges allow child devices to setup
+> from. Add all of IO/MEM here just a limit to child devices, no request for these
+> resources, so it won't hurt another host bridge. Some platforms have no dts or ACPI
+> report host bridge resources, in this case, we directly assign ioport/iomem_resources
+> as the root resources of PCI devices.
 
-On Tue, Nov 18, 2014 at 10:24 AM, Paul Bolle <pebolle@tiscali.nl> wrote:
-> Your commit 7a2071c58f36 ("ARM: shmobile: Add early debugging support
-> using SCIF(A)") is included in today's linux-next (ie, next-20141118).
-> It adds an (optional) dependency on the Kconfig symbol ARCH_R8A7793. But
-> that symbol isn't part of next-20141118.
->
-> Is a patch that adds this symbol queued somewhere?
+But it would be wrong to allow hosts to allocate a device BAR that is not
+visible through the host bridge. I think we need to keep these separate
+from the general case: if you call any of the modern interfaces you have
+to provide the resources and a device. I notice that there is only one
+caller of pci_scan_bus_parented(), we should probably change that over to
+pci_scan_root_bus() or your new interface and remove the old one, but
+keep pci_scan_bus() as the only entry point for all of the legacy users
+that do not know about the resources.
 
-Not yet. I was just a bit pro-active ;-)
-
-However, there are already references to r8a7793 in DT binding documentation,
-and in of_device_id arrays in drivers.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	Arnd
