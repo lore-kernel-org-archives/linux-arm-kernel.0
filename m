@@ -1,44 +1,58 @@
 From: yao.yuan@freescale.com (Yuan Yao)
-Date: Tue, 18 Nov 2014 18:31:06 +0800
-Subject: [PATCH v11 2/3] Documentation:add DMA support for freescale i2c driver
+Date: Tue, 18 Nov 2014 18:31:05 +0800
+Subject: [PATCH v11 1/3] i2c: imx: Sort include headers alphabetically
 In-Reply-To: <1416306667-15673-1-git-send-email-yao.yuan@freescale.com>
 References: <1416306667-15673-1-git-send-email-yao.yuan@freescale.com>
-Message-ID: <1416306667-15673-3-git-send-email-yao.yuan@freescale.com>
+Message-ID: <1416306667-15673-2-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add i2c dts node properties for eDMA support, them depend on the eDMA driver.
+If the inlcude headers aren't sorted alphabetically, then the
+logical choice is to append new ones, however that creates a
+lot of potential for conflicts or duplicates because every change
+will then add new includes in the same location.
 
 Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
 ---
- Documentation/devicetree/bindings/i2c/i2c-imx.txt | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/i2c/busses/i2c-imx.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-imx.txt b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
-index 4a8513e..52d37fd 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-imx.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
-@@ -11,6 +11,8 @@ Required properties:
- Optional properties:
- - clock-frequency : Constains desired I2C/HS-I2C bus clock frequency in Hz.
-   The absence of the propoerty indicates the default frequency 100 kHz.
-+- dmas: A list of two dma specifiers, one for each entry in dma-names.
-+- dma-names: should contain "tx" and "rx".
+diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+index a7a2a79..d025c47 100644
+--- a/drivers/i2c/busses/i2c-imx.c
++++ b/drivers/i2c/busses/i2c-imx.c
+@@ -32,22 +32,22 @@
+ /** Includes *******************************************************************
+ *******************************************************************************/
  
- Examples:
+-#include <linux/init.h>
+-#include <linux/kernel.h>
+-#include <linux/module.h>
+-#include <linux/errno.h>
+-#include <linux/err.h>
+-#include <linux/interrupt.h>
++#include <linux/clk.h>
+ #include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/errno.h>
+ #include <linux/i2c.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
+ #include <linux/io.h>
+-#include <linux/sched.h>
+-#include <linux/platform_device.h>
+-#include <linux/clk.h>
+-#include <linux/slab.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/platform_data/i2c-imx.h>
++#include <linux/platform_device.h>
++#include <linux/sched.h>
++#include <linux/slab.h>
  
-@@ -26,3 +28,12 @@ i2c at 70038000 { /* HS-I2C on i.MX51 */
- 	interrupts = <64>;
- 	clock-frequency = <400000>;
- };
-+
-+i2c0: i2c at 40066000 { /* i2c0 on vf610 */
-+	compatible = "fsl,vf610-i2c";
-+	reg = <0x40066000 0x1000>;
-+	interrupts =<0 71 0x04>;
-+	dmas = <&edma0 0 50>,
-+		<&edma0 0 51>;
-+	dma-names = "rx","tx";
-+};
+ /** Defines ********************************************************************
+ *******************************************************************************/
 -- 
 2.1.0.27.g96db324
