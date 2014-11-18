@@ -1,62 +1,125 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Nov 2014 10:30:10 +0100
-Subject: [RFC PATCH 07/16] PCI: Separate pci_host_bridge creation out of
- pci_create_root_bus()
-In-Reply-To: <546B041A.4060403@huawei.com>
-References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
- <2507218.mHliopJb05@wuerfel> <546B041A.4060403@huawei.com>
-Message-ID: <1936415.emTbbPeHqx@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 18 Nov 2014 10:29:21 +0100
+Subject: [PATCH 2/2] dt-bindings: simplefb-sunxi: Add sunxi simplefb
+ extensions
+In-Reply-To: <546B0026.2010107@redhat.com>
+References: <1416224086-5698-1-git-send-email-hdegoede@redhat.com>
+ <1416224086-5698-3-git-send-email-hdegoede@redhat.com>
+ <20141117124721.GQ6414@lukather>
+ <CACxGe6vqiC08sP+o3bduGfvUdwRtHm8+_7EdZccJjS86qVKvxQ@mail.gmail.com>
+ <20141117155514.GU6414@lukather> <546B0026.2010107@redhat.com>
+Message-ID: <20141118092921.GZ6414@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 November 2014 16:32:26 Yijing Wang wrote:
-
-> >> +static struct resource busn_resource = {
-> >> +	.name	= "PCI busn",
-> >> +	.start	= 0,
-> >> +	.end	= 255,
-> >> +	.flags	= IORESOURCE_BUS,
-> >> +};
-> > 
-> > I think it would be better to require callers to pass the bus resource
-> > down to the function.
+On Tue, Nov 18, 2014 at 09:15:34AM +0100, Hans de Goede wrote:
+> Hi,
 > 
-> Hmm, I think most of caller will provide the bus resource, but some others
-> will not give any bus resource, extremely, no any resources :(. But we still
-> need properly configure their resources for compatibility.
-
-I think that is what the conversion to pci_scan_bus_parented() is about:
-The idea is that we add the correct bus resource to callers of
-pci_scan_bus_parented or pci_scan_bus and then change them to call
-pci_scan_root_bus instead.
-
-> >> +struct pci_host_bridge *pci_create_host_bridge(
-> >> +		struct device *parent, u32 db, 
-> >> +		struct pci_ops *ops, void *sysdata, 
-> >> +		struct list_head *resources)
-> >> +{
+> On 11/17/2014 04:55 PM, Maxime Ripard wrote:
+> > On Mon, Nov 17, 2014 at 01:39:18PM +0000, Grant Likely wrote:
+> >> On Mon, Nov 17, 2014 at 12:47 PM, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >>> On Mon, Nov 17, 2014 at 12:34:46PM +0100, Hans de Goede wrote:
+> >>>> If pre-filled framebuffer nodes are used, the firmware may need extra
+> >>>> properties to find the right node. This documents the properties to use
+> >>>> for this on sunxi platforms.
+> >>>>
+> >>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>>> ---
+> >>>>  .../bindings/video/simple-framebuffer-sunxi.txt    | 33 ++++++++++++++++++++++
+> >>>>  1 file changed, 33 insertions(+)
+> >>>>  create mode 100644 Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+> >>>>
+> >>>> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+> >>>> new file mode 100644
+> >>>> index 0000000..84ca264
+> >>>> --- /dev/null
+> >>>> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+> >>>> @@ -0,0 +1,33 @@
+> >>>> +Sunxi specific Simple Framebuffer bindings
+> >>>> +
+> >>>> +This binding documents sunxi specific extensions to the simple-framebuffer
+> >>>> +bindings. The sunxi simplefb u-boot code relies on the devicetree containing
+> >>>> +pre-populated simplefb nodes.
+> >>>> +
+> >>>> +These extensions are intended so that u-boot can select the right node based
+> >>>> +on which pipeline and output is being used. As such they are solely intended
+> >>>> +for firmware / bootloader use, and the OS should ignore them.
+> >>>> +
+> >>>> +Required properties:
+> >>>> +- compatible: "sunxi,framebuffer"
+> >>>> +- sunxi,pipeline:
+> >>>> +  <0> for the de_be0 -> lcdc0 -> output pipeline
+> >>>> +  <1> for the de_be1 -> lcdc1 -> output pipeline
+> >>>> +- sunxi,output: One of: "hdmi", "lcd", "vga", and "composite"
+> >>>> +
+> >>>> +Example:
+> >>>> +
+> >>>> +chosen {
+> >>>> +     #address-cells = <1>;
+> >>>> +     #size-cells = <1>;
+> >>>> +     ranges;
+> >>>> +
+> >>>> +     framebuffer at 0 {
+> >>>> +             compatible = "sunxi,framebuffer", "simple-framebuffer";
+> >>>> +             sunxi,pipeline = <0>;
+> >>>> +             sunxi,output = "hdmi";
+> >>>> +             clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
+> >>>> +                      <&ahb_gates 44>;
+> >>>
+> >>> If we're going that way, then maybe having to specify clock-names
+> >>> would be better in order to know which clock is what?
+> >>
+> >> I wouldn't go that way with this binding since the driver has no need
+> >> to differentiate between the clocks, and driver authors shouldn't be
+> >> encouraged to do so. The purpose of the clocks in this node is only
+> >> for itemizing dependencies, not for how to configure the clocks.
+> >> Firmware shouldn't care at all about the clocks list, it only needs to
+> >> find the correct pre-populated node to fill in and enable.
 > > 
-> > Do we still need to pass the 'sysdata' in here? If we are guaranteed to
-> > have a device pointer, we should always be able to get the driver
-> > private data from dev_get_drvdata(host->dev->parent).
+> > Well, if we want to play the "DT as an ABI" stuff, you have no
+> > guarantee that in the future, simplefb will still be the driver bound
+> > to "sunxi,framebuffer"
 > 
-> We need, some platforms pass NULL pointer as host bridge parent.
-
-But those don't have to use the new pci_create_host_bridge() function,
-right?
-
-> >> +	host = kzalloc(sizeof(*host), GFP_KERNEL);
-> >> +	if (!host)
-> >> +		return NULL;
-> > 
-> > devm_kzalloc maybe?
+> Huh? We do have that guarantee, or at least that a simplefb bindings
+> compatible driver is, the "sunxi,framebuffer" bindings live in:
 > 
-> I don't know much detail about devm_kzalloc(), but we have no pci host driver
-> here, and I found no devm_kzalloc() uses in core PCI code before.
+> Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+> 
+> With the filename already being a big hint, further more it states that:
 
-It also depends on having a valid device pointer. The idea is that the memory
-is automatically freed if the probe() function returns with an error, or
-the device driver gets unloaded. For the classic PCI hosts that are not
-connected to a device, that wouldn't work of course.
+Yeah, well, that can change. The compatible itself can't, but we're
+free to move around the drivers however we see fit (as long as the
+user-space is not impacted)
 
-	Arnd
+> "This binding documents sunxi specific extensions to the simple-framebuffer
+> bindings. The sunxi simplefb u-boot code relies on the devicetree containing
+> pre-populated simplefb nodes.
+> 
+> These extensions are intended so that u-boot can select the right node based
+> on which pipeline is being used. As such they are solely intended for
+> firmware / bootloader use, and the OS should ignore them."
+> 
+> Which to me seems to guarantee that we're talking about a simple-framebuffer
+> compatible node here. The scope of these extensions are very narrow, there
+> only purpose is to allow the bootloader to find the right pre-populated simplefb
+> node, everything else is specified by the simplefb bindings, not these
+> extensions.
+
+My point was that what we might need to know these clocks at some
+point in the future. But if you don't believe we will, it's fine for
+me.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141118/d53efffa/attachment-0001.sig>
