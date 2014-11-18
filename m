@@ -1,48 +1,62 @@
-From: ankit.jindal@linaro.org (Ankit Jindal)
-Date: Tue, 18 Nov 2014 14:59:54 +0530
-Subject: [PATCH v5 5/6] Documentation: dt-bindings: Add binding info for
- X-Gene QMTM UIO driver
-In-Reply-To: <2279061.naADrHDgyn@wuerfel>
-References: <1416220572-13381-1-git-send-email-ankit.jindal@linaro.org>
- <1416220572-13381-6-git-send-email-ankit.jindal@linaro.org>
- <2279061.naADrHDgyn@wuerfel>
-Message-ID: <CAPTm99WYNyxtY-NCVN8pB0HwNPn+EFx-7w7yEevaEK1z7-Zqxg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Nov 2014 10:30:10 +0100
+Subject: [RFC PATCH 07/16] PCI: Separate pci_host_bridge creation out of
+ pci_create_root_bus()
+In-Reply-To: <546B041A.4060403@huawei.com>
+References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
+ <2507218.mHliopJb05@wuerfel> <546B041A.4060403@huawei.com>
+Message-ID: <1936415.emTbbPeHqx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 November 2014 16:47, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 17 November 2014 16:06:11 Ankit Jindal wrote:
->> +
->> +       qmtm1_uio: qmtm_uio at 1f200000 {
->> +               compatible = "apm,xgene-qmtm";
->> +               status = "disabled";
->> +               reg = <0x0 0x1f200000 0x0 0x10000>,
->> +                     <0x0 0x1b000000 0x0 0x400000>;
->> +               reg-names = "csr", "fabric";
->> +               qpool-memory = <&qmtm1_uio_qpool>;
->> +               clocks = <&qmtm1clk 0>;
->> +               num-queues = <0x400>;
->> +               devid = <1>;
->> +       };
->> +
->
-> To make my previous review comments clearer:
->
-> NAK
->
-> Do not create device nodes that are meant for a specific use case in
-> software and that are not usable for the common case. I don't think
-> it makes any sense to keep on submitting a UIO driver for this until
-> we have a proper network driver that uses this so we can make sure we
-> have a working binding.
+On Tuesday 18 November 2014 16:32:26 Yijing Wang wrote:
 
-The dataplane frameworks like OpenDataPlane etc, need to have access
-to complete subsystem from the user space. Hence, we would like to
-have this driver and some other UIO drivers to be the part of kernel
-to have data plane frameworks working on our platform.
+> >> +static struct resource busn_resource = {
+> >> +	.name	= "PCI busn",
+> >> +	.start	= 0,
+> >> +	.end	= 255,
+> >> +	.flags	= IORESOURCE_BUS,
+> >> +};
+> > 
+> > I think it would be better to require callers to pass the bus resource
+> > down to the function.
+> 
+> Hmm, I think most of caller will provide the bus resource, but some others
+> will not give any bus resource, extremely, no any resources :(. But we still
+> need properly configure their resources for compatibility.
 
->
->         Arnd
+I think that is what the conversion to pci_scan_bus_parented() is about:
+The idea is that we add the correct bus resource to callers of
+pci_scan_bus_parented or pci_scan_bus and then change them to call
+pci_scan_root_bus instead.
 
-Thanks,
-Ankit
+> >> +struct pci_host_bridge *pci_create_host_bridge(
+> >> +		struct device *parent, u32 db, 
+> >> +		struct pci_ops *ops, void *sysdata, 
+> >> +		struct list_head *resources)
+> >> +{
+> > 
+> > Do we still need to pass the 'sysdata' in here? If we are guaranteed to
+> > have a device pointer, we should always be able to get the driver
+> > private data from dev_get_drvdata(host->dev->parent).
+> 
+> We need, some platforms pass NULL pointer as host bridge parent.
+
+But those don't have to use the new pci_create_host_bridge() function,
+right?
+
+> >> +	host = kzalloc(sizeof(*host), GFP_KERNEL);
+> >> +	if (!host)
+> >> +		return NULL;
+> > 
+> > devm_kzalloc maybe?
+> 
+> I don't know much detail about devm_kzalloc(), but we have no pci host driver
+> here, and I found no devm_kzalloc() uses in core PCI code before.
+
+It also depends on having a valid device pointer. The idea is that the memory
+is automatically freed if the probe() function returns with an error, or
+the device driver gets unloaded. For the classic PCI hosts that are not
+connected to a device, that wouldn't work of course.
+
+	Arnd
