@@ -1,210 +1,101 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 18 Nov 2014 17:04:55 +0100
-Subject: [PATCH 3/3] i2c: rcar: add slave support
-In-Reply-To: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
-References: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1416326695-13083-4-git-send-email-wsa@the-dreams.de>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 18 Nov 2014 16:10:38 +0000
+Subject: [PATCH] of/platform: Move platform devices
+ =?iso-8859-1?Q?under=0D?= /sys/devices/platform
+In-Reply-To: <546B2123.7060406@samsung.com>
+References: <1415097920-30014-1-git-send-email-grant.likely@linaro.org>
+ <546B2123.7060406@samsung.com>
+Message-ID: <20141118161038.192B7C40966@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+On Tue, 18 Nov 2014 11:36:19 +0100
+, Andrzej Hajda <a.hajda@samsung.com>
+ wrote:
+> On 11/04/2014 11:45 AM, Grant Likely wrote:
+> > Currently the devices created by drivers/of/platform.c get created at
+> > the root of /sys/devices. This goes against the typical pattern for
+> > sysfs where the top level /sys/devices structure contains categories of
+> > devices, and the structure of devices is placed below that. To fix this,
+> > make the code in drivers/of/platform.c follow the drivers/base/platform.c
+> > behaviour, and use &platform_bus as the default parent for all new
+> > platform_devices and amba_devices.
+> > 
+> > This change has been discussed for a long time, but nobody has actually
+> > acted on it. Userspace code that expects to find devices under a fixed
+> > /sys/devices/... path will be affected. It isn't /supposed/ to do that,
+> > but if anyone complains then I'll add a default-off workaround option to
+> > put them back into the root.
+> 
+> One of side effects of this change is that platform drivers registering
+> other platform drivers or devices in their probe callback can deadlock
+> due to double device_lock on platform device. This is for example case
+> of exynos_drm driver[1]. I guess it could/should be fixed in exynos_drm.
+> Anyway it can affect other drivers as well. At least grep shows few
+> possible candidates:
 
-The first I2C slave provider using the new generic interface.
+What on earth is that driver doing registering additional drivers in the
+probe hook?!? That's madness, and should be treated as a bug.
 
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
----
+g.
 
-Changes since RFC:
-* no runtime_pm for slaves
-* don't use NULL in i2c_slave_event
-
- drivers/i2c/busses/i2c-rcar.c | 125 +++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 116 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-rcar.c b/drivers/i2c/busses/i2c-rcar.c
-index d826e82dd997..369ef747fb81 100644
---- a/drivers/i2c/busses/i2c-rcar.c
-+++ b/drivers/i2c/busses/i2c-rcar.c
-@@ -48,6 +48,12 @@
- #define ICMAR	0x20	/* master address */
- #define ICRXTX	0x24	/* data port */
- 
-+/* ICSCR */
-+#define SDBS	(1 << 3)	/* slave data buffer select */
-+#define SIE	(1 << 2)	/* slave interface enable */
-+#define GCAE	(1 << 1)	/* general call address enable */
-+#define FNA	(1 << 0)	/* forced non acknowledgement */
-+
- /* ICMCR */
- #define MDBS	(1 << 7)	/* non-fifo mode switch */
- #define FSCL	(1 << 6)	/* override SCL pin */
-@@ -58,6 +64,15 @@
- #define FSB	(1 << 1)	/* force stop bit */
- #define ESG	(1 << 0)	/* en startbit gen */
- 
-+/* ICSSR (also for ICSIER) */
-+#define GCAR	(1 << 6)	/* general call received */
-+#define STM	(1 << 5)	/* slave transmit mode */
-+#define SSR	(1 << 4)	/* stop received */
-+#define SDE	(1 << 3)	/* slave data empty */
-+#define SDT	(1 << 2)	/* slave data transmitted */
-+#define SDR	(1 << 1)	/* slave data received */
-+#define SAR	(1 << 0)	/* slave addr received */
-+
- /* ICMSR (also for ICMIE) */
- #define MNR	(1 << 6)	/* nack received */
- #define MAL	(1 << 5)	/* arbitration lost */
-@@ -103,6 +118,7 @@ struct rcar_i2c_priv {
- 	u32 icccr;
- 	u32 flags;
- 	enum rcar_i2c_type devtype;
-+	struct i2c_client *slave;
- };
- 
- #define rcar_i2c_priv_to_dev(p)		((p)->adap.dev.parent)
-@@ -126,15 +142,6 @@ static u32 rcar_i2c_read(struct rcar_i2c_priv *priv, int reg)
- 
- static void rcar_i2c_init(struct rcar_i2c_priv *priv)
- {
--	/*
--	 * reset slave mode.
--	 * slave mode is not used on this driver
--	 */
--	rcar_i2c_write(priv, ICSIER, 0);
--	rcar_i2c_write(priv, ICSAR, 0);
--	rcar_i2c_write(priv, ICSCR, 0);
--	rcar_i2c_write(priv, ICSSR, 0);
--
- 	/* reset master mode */
- 	rcar_i2c_write(priv, ICMIER, 0);
- 	rcar_i2c_write(priv, ICMCR, 0);
-@@ -360,6 +367,63 @@ static int rcar_i2c_irq_recv(struct rcar_i2c_priv *priv, u32 msr)
- 	return 0;
- }
- 
-+static bool rcar_i2c_slave_irq(struct rcar_i2c_priv *priv)
-+{
-+	u32 ssr_raw, ssr_filtered;
-+	u8 value;
-+
-+	ssr_raw = rcar_i2c_read(priv, ICSSR) & 0xff;
-+	ssr_filtered = ssr_raw & rcar_i2c_read(priv, ICSIER);
-+
-+	if (!ssr_filtered)
-+		return false;
-+
-+	/* address detected */
-+	if (ssr_filtered & SAR) {
-+		/* read or write request */
-+		if (ssr_raw & STM) {
-+			i2c_slave_event(priv->slave, I2C_SLAVE_REQ_READ_START, &value);
-+			rcar_i2c_write(priv, ICRXTX, value);
-+			rcar_i2c_write(priv, ICSIER, SDE | SSR | SAR);
-+		} else {
-+			i2c_slave_event(priv->slave, I2C_SLAVE_REQ_WRITE_START, &value);
-+			rcar_i2c_read(priv, ICRXTX);	/* dummy read */
-+			rcar_i2c_write(priv, ICSIER, SDR | SSR | SAR);
-+		}
-+
-+		rcar_i2c_write(priv, ICSSR, ~SAR & 0xff);
-+	}
-+
-+	/* master sent stop */
-+	if (ssr_filtered & SSR) {
-+		i2c_slave_event(priv->slave, I2C_SLAVE_STOP, &value);
-+		rcar_i2c_write(priv, ICSIER, SAR | SSR);
-+		rcar_i2c_write(priv, ICSSR, ~SSR & 0xff);
-+	}
-+
-+	/* master wants to write to us */
-+	if (ssr_filtered & SDR) {
-+		int ret;
-+
-+		value = rcar_i2c_read(priv, ICRXTX);
-+		ret = i2c_slave_event(priv->slave, I2C_SLAVE_REQ_WRITE_END, &value);
-+		/* Send NACK in case of error */
-+		rcar_i2c_write(priv, ICSCR, SIE | SDBS | (ret < 0 ? FNA : 0));
-+		i2c_slave_event(priv->slave, I2C_SLAVE_REQ_WRITE_START, &value);
-+		rcar_i2c_write(priv, ICSSR, ~SDR & 0xff);
-+	}
-+
-+	/* master wants to read from us */
-+	if (ssr_filtered & SDE) {
-+		i2c_slave_event(priv->slave, I2C_SLAVE_REQ_READ_END, &value);
-+		i2c_slave_event(priv->slave, I2C_SLAVE_REQ_READ_START, &value);
-+		rcar_i2c_write(priv, ICRXTX, value);
-+		rcar_i2c_write(priv, ICSSR, ~SDE & 0xff);
-+	}
-+
-+	return true;
-+}
-+
- static irqreturn_t rcar_i2c_irq(int irq, void *ptr)
- {
- 	struct rcar_i2c_priv *priv = ptr;
-@@ -369,6 +433,9 @@ static irqreturn_t rcar_i2c_irq(int irq, void *ptr)
- 	/*-------------- spin lock -----------------*/
- 	spin_lock(&priv->lock);
- 
-+	if (rcar_i2c_slave_irq(priv))
-+		goto exit;
-+
- 	msr = rcar_i2c_read(priv, ICMSR);
- 
- 	/* Only handle interrupts that are currently enabled */
-@@ -499,6 +566,44 @@ out:
- 	return ret;
- }
- 
-+
-+static int rcar_reg_slave(struct i2c_client *slave)
-+{
-+	struct rcar_i2c_priv *priv = i2c_get_adapdata(slave->adapter);
-+
-+	if (priv->slave)
-+		return -EBUSY;
-+
-+	if (slave->flags & I2C_CLIENT_TEN)
-+		return -EAFNOSUPPORT;
-+
-+	pm_runtime_forbid(rcar_i2c_priv_to_dev(priv));
-+
-+	priv->slave = slave;
-+	rcar_i2c_write(priv, ICSAR, slave->addr);
-+	rcar_i2c_write(priv, ICSSR, 0);
-+	rcar_i2c_write(priv, ICSIER, SAR | SSR);
-+	rcar_i2c_write(priv, ICSCR, SIE | SDBS);
-+
-+	return 0;
-+}
-+
-+static int rcar_unreg_slave(struct i2c_client *slave)
-+{
-+	struct rcar_i2c_priv *priv = i2c_get_adapdata(slave->adapter);
-+
-+	WARN_ON(!priv->slave);
-+
-+	rcar_i2c_write(priv, ICSIER, 0);
-+	rcar_i2c_write(priv, ICSCR, 0);
-+
-+	priv->slave = NULL;
-+
-+	pm_runtime_allow(rcar_i2c_priv_to_dev(priv));
-+
-+	return 0;
-+}
-+
- static u32 rcar_i2c_func(struct i2c_adapter *adap)
- {
- 	/* This HW can't do SMBUS_QUICK and NOSTART */
-@@ -508,6 +613,8 @@ static u32 rcar_i2c_func(struct i2c_adapter *adap)
- static const struct i2c_algorithm rcar_i2c_algo = {
- 	.master_xfer	= rcar_i2c_master_xfer,
- 	.functionality	= rcar_i2c_func,
-+	.reg_slave	= rcar_reg_slave,
-+	.unreg_slave	= rcar_unreg_slave,
- };
- 
- static const struct of_device_id rcar_i2c_dt_ids[] = {
--- 
-2.1.1
+> 
+> $ git grep -p platform_driver_register | grep -A1 -P '_probe\(struct
+> platform_device'
+> 
+> drivers/gpu/drm/exynos/exynos_drm_drv.c=static int
+> exynos_drm_platform_probe(struct platform_device *pdev)
+> drivers/gpu/drm/exynos/exynos_drm_drv.c:	ret =
+> platform_driver_register(&fimd_driver);
+> --
+> drivers/gpu/drm/sti/sti_drm_drv.c=static int
+> sti_drm_platform_probe(struct platform_device *pdev)
+> drivers/gpu/drm/sti/sti_drm_drv.c:
+> platform_driver_register(&sti_drm_master_driver);
+> --
+> drivers/mtd/nand/atmel_nand.c=static int atmel_nand_probe(struct
+> platform_device *pdev)
+> drivers/mtd/nand/atmel_nand.c:	res =
+> platform_driver_register(&atmel_nand_nfc_driver);
+> 
+> 
+> [1]: http://permalink.gmane.org/gmane.comp.video.dri.devel/117727
+> 
+> Regards
+> Andrzej
+> 
+> 
+> > 
+> > Signed-off-by: Grant Likely <grant.likely@linaro.org>
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> > ---
+> >  drivers/of/platform.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> > index 3b64d0bf5bba..7c6771986c06 100644
+> > --- a/drivers/of/platform.c
+> > +++ b/drivers/of/platform.c
+> > @@ -138,7 +138,7 @@ struct platform_device *of_device_alloc(struct device_node *np,
+> >  	}
+> >  
+> >  	dev->dev.of_node = of_node_get(np);
+> > -	dev->dev.parent = parent;
+> > +	dev->dev.parent = parent ? : &platform_bus;
+> >  
+> >  	if (bus_id)
+> >  		dev_set_name(&dev->dev, "%s", bus_id);
+> > @@ -291,7 +291,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
+> >  
+> >  	/* setup generic device info */
+> >  	dev->dev.of_node = of_node_get(node);
+> > -	dev->dev.parent = parent;
+> > +	dev->dev.parent = parent ? : &platform_bus;
+> >  	dev->dev.platform_data = platform_data;
+> >  	if (bus_id)
+> >  		dev_set_name(&dev->dev, "%s", bus_id);
+> > 
+> 
