@@ -1,107 +1,95 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 18 Nov 2014 10:10:32 +0900
-Subject: [PATCH v8 0/6] arm64: add seccomp support
-Message-ID: <1416273038-15590-1-git-send-email-takahiro.akashi@linaro.org>
+Date: Tue, 18 Nov 2014 10:10:34 +0900
+Subject: [PATCH v8 2/6] arm64: ptrace: allow tracer to skip a system call
+In-Reply-To: <1416273038-15590-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1416273038-15590-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1416273038-15590-3-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series enables secure computing (system call filtering) on arm64,
-and contains related enhancements and bug fixes.
+If tracer specifies -1 as a syscall number, this traced system call should
+be skipped with a return value specified in x0.
+This patch implements this semantics, but there is one restriction here:
 
-  NOTE: This versions contain a workaround against possible BUG_ON() failure
-  at audit_syscall_exit(), but doesn't contain an extra optimization, as I
-  submitted for arm, of excluding syscall enter/exit tracing against invalid
-  system calls due to an issue that I reported in:
-       http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/292170.html
+    syscall(-1) always return ENOSYS whatever value is stored in x0
+    (a return value) at syscall entry.
 
-The code was tested on ARMv8 fast model with 64-bit/32-bit userspace using:
- * libseccomp v2.1.1 with modifications for arm64, especially its "live"
-   tests: No.20, 21 and 24.
- * modified version of Kees' seccomp test for 'changing/skipping a syscall'
-   and seccomp() system call
- * in-house tests for 'changing/skipping a system call' by tracing with
-   ptrace(SETREGSET, NT_SYSTEM_CALL) (that is, not via seccomp filter)'
-with and without audit tracing.
+Normally, with ptrace off, syscall(-1) returns -ENOSYS. With ptrace on,
+however, if a tracer didn't pay any attention to user-issued syscall(-1)
+and just let it go, it would return a value in x0 as in other system call
+cases. This means that this system call might succeed and yet see any bogus
+return value. This should be definitely avoided.
 
+Please also note:
+* syscall entry tracing and syscall exit tracing (ftrace tracepoint and
+  audit) are always executed, if enabled, even when skipping a system call
+  (that is, -1).
+  In this way, we can avoid a potential bug where audit_syscall_entry()
+  might be called without audit_syscall_exit() at the previous system call
+  being called, that would cause OOPs in audit_syscall_entry().
 
-Changes v7 -> v8:
-* changed an interface of changing a syscall number from ptrace(SET_SYSCALL)
-  to ptrace(SETREGSET, NT_ARM_SYSTEM_CALL) [1/6]
-* removed IS_SKILL_SYSCALL macro [2/6]
-* clarified comments in syscall_trace_enter() [2/6]
-* changed unsigned int to compat_uint_t in compat_siginfo._sigsys [5/6]
-* moved to a new calling interface of secure_computing(void) [6/6]
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+ arch/arm64/kernel/entry.S  |    3 +++
+ arch/arm64/kernel/ptrace.c |   18 ++++++++++++++++++
+ 2 files changed, 21 insertions(+)
 
-Changes v6 -> v7:
-* simplified the condition of checking for user-issued syscall(-1) at
-  syscall_trace_enter() [2/6]
-* defines __NR_seccomp_sigreturn only if arch-specific def doesn't exist.
-  As Kees suggests, this is necessary for x86 and others. [3/6]
-* removed "#ifdef __ARCH_SIGSYS" which is always true on arm64. [5/6]
-* changed to call syscall_trace_exit() even if secure_computing fails. [6/6]
-  In v6, syscall_trace_enter() returns RET_SYSCALL_SKIP_TRACE (== -2) and
-  skips syscall_trace_exit() to minimize the overhead, but this case can be
-  easily confused with user-issued (and invalid) syscall(-2).
-  Anyway, this is now a consistent behavior with arm and other archs.
-
-Changes v5 -> v6:
-* rebased to v3.17-rc
-* changed the interface of changing/skipping a system call from re-writing
-  x8 register [v5 1/3] to using dedicated PTRACE_SET_SYSCALL command
-  [1/6, 2/6]
-  Patch [1/6] contains a checkpatch error around a switch statement, but it
-  won't be fixed as in compat_arch_ptrace().
-* added a new system call, seccomp(), for compat task [4/6]
-* added SIGSYS siginfo for compat task [5/6]
-* changed to always execute audit exit tracing to avoid OOPs [2/6, 6/6]
-
-Changes v4 -> v5:
-* rebased to v3.16-rc
-* add patch [1/3] to allow ptrace to change a system call
-  (please note that this patch should be applied even without seccomp.)
-
-Changes v3 -> v4:
-* removed the following patch and moved it to "arm64: prerequisites for
-  audit and ftrace" patchset since it is required for audit and ftrace in
-  case of !COMPAT, too.
-  "arm64: is_compat_task is defined both in asm/compat.h and linux/compat.h"
-
-Changes v2 -> v3:
-* removed unnecessary 'type cast' operations [2/3]
-* check for a return value (-1) of secure_computing() explicitly [2/3]
-* aligned with the patch, "arm64: split syscall_trace() into separate
-  functions for enter/exit" [2/3]
-* changed default of CONFIG_SECCOMP to n [2/3]
-
-Changes v1 -> v2:
-* added generic seccomp.h for arm64 to utilize it [1,2/3] 
-* changed syscall_trace() to return more meaningful value (-EPERM)
-  on seccomp failure case [2/3]
-* aligned with the change in "arm64: make a single hook to syscall_trace()
-  for all syscall features" v2 [2/3]
-* removed is_compat_task() definition from compat.h [3/3]
-
-AKASHI Takahiro (6):
-  arm64: ptrace: add NT_ARM_SYSTEM_CALL regset
-  arm64: ptrace: allow tracer to skip a system call
-  asm-generic: add generic seccomp.h for secure computing mode 1
-  arm64: add seccomp syscall for compat task
-  arm64: add SIGSYS siginfo for compat task
-  arm64: add seccomp support
-
- arch/arm64/Kconfig                |   14 +++++++++
- arch/arm64/include/asm/compat.h   |    7 +++++
- arch/arm64/include/asm/seccomp.h  |   25 ++++++++++++++++
- arch/arm64/include/asm/unistd.h   |    3 ++
- arch/arm64/include/asm/unistd32.h |    3 +-
- arch/arm64/kernel/entry.S         |    3 ++
- arch/arm64/kernel/ptrace.c        |   58 +++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/signal32.c      |    6 ++++
- include/asm-generic/seccomp.h     |   30 +++++++++++++++++++
- include/uapi/linux/elf.h          |    1 +
- 10 files changed, 149 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/include/asm/seccomp.h
- create mode 100644 include/asm-generic/seccomp.h
-
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 726b910..01118b1 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -670,6 +670,8 @@ ENDPROC(el0_svc)
+ __sys_trace:
+ 	mov	x0, sp
+ 	bl	syscall_trace_enter
++	cmp	w0, #-1				// skip the syscall?
++	b.eq	__sys_trace_return_skipped
+ 	adr	lr, __sys_trace_return		// return address
+ 	uxtw	scno, w0			// syscall number (possibly new)
+ 	mov	x1, sp				// pointer to regs
+@@ -684,6 +686,7 @@ __sys_trace:
+ 
+ __sys_trace_return:
+ 	str	x0, [sp]			// save returned x0
++__sys_trace_return_skipped:
+ 	mov	x0, sp
+ 	bl	syscall_trace_exit
+ 	b	ret_to_user
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index 8b98781..34b1e85 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -1149,6 +1149,8 @@ static void tracehook_report_syscall(struct pt_regs *regs,
+ 
+ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+ {
++	int orig_syscallno = regs->syscallno;
++
+ 	if (test_thread_flag(TIF_SYSCALL_TRACE))
+ 		tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
+ 
+@@ -1158,6 +1160,22 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+ 	audit_syscall_entry(regs->syscallno, regs->orig_x0, regs->regs[1],
+ 			    regs->regs[2], regs->regs[3]);
+ 
++	if (((int)regs->syscallno == -1) && (orig_syscallno == -1)) {
++		/*
++		 * user-issued syscall(-1):
++		 * RESTRICTION: We always return ENOSYS whatever value is
++		 *   stored in x0 (a return value) at this point.
++		 * Normally, with ptrace off, syscall(-1) returns -ENOSYS.
++		 * With ptrace on, however, if a tracer didn't pay any
++		 * attention to user-issued syscall(-1) and just let it go
++		 * without a hack here, it would return a value in x0 as in
++		 * other system call cases. This means that this system call
++		 * might succeed and see any bogus return value.
++		 * This should be definitely avoided.
++		 */
++		regs->regs[0] = -ENOSYS;
++	}
++
+ 	return regs->syscallno;
+ }
+ 
 -- 
 1.7.9.5
