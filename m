@@ -1,48 +1,89 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Nov 2014 14:10:35 +0100
-Subject: [PATCH v5 5/6] Documentation: dt-bindings: Add binding info for
- X-Gene QMTM UIO driver
-In-Reply-To: <CAPTm99WYNyxtY-NCVN8pB0HwNPn+EFx-7w7yEevaEK1z7-Zqxg@mail.gmail.com>
-References: <1416220572-13381-1-git-send-email-ankit.jindal@linaro.org>
- <2279061.naADrHDgyn@wuerfel>
- <CAPTm99WYNyxtY-NCVN8pB0HwNPn+EFx-7w7yEevaEK1z7-Zqxg@mail.gmail.com>
-Message-ID: <1503477.DVdkExccIe@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 18 Nov 2014 13:14:34 +0000
+Subject: [PATCH V2 4/5] mfd: t7l66xb: prepare/unprepare clocks
+In-Reply-To: <1416236863-20898-4-git-send-email-dbaryshkov@gmail.com>
+References: <1416236863-20898-1-git-send-email-dbaryshkov@gmail.com>
+ <1416236863-20898-4-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <20141118131434.GA24004@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 November 2014 14:59:54 Ankit Jindal wrote:
-> On 17 November 2014 16:47, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday 17 November 2014 16:06:11 Ankit Jindal wrote:
-> >> +
-> >> +       qmtm1_uio: qmtm_uio at 1f200000 {
-> >> +               compatible = "apm,xgene-qmtm";
-> >> +               status = "disabled";
-> >> +               reg = <0x0 0x1f200000 0x0 0x10000>,
-> >> +                     <0x0 0x1b000000 0x0 0x400000>;
-> >> +               reg-names = "csr", "fabric";
-> >> +               qpool-memory = <&qmtm1_uio_qpool>;
-> >> +               clocks = <&qmtm1clk 0>;
-> >> +               num-queues = <0x400>;
-> >> +               devid = <1>;
-> >> +       };
-> >> +
-> >
-> > To make my previous review comments clearer:
-> >
-> > NAK
-> >
-> > Do not create device nodes that are meant for a specific use case in
-> > software and that are not usable for the common case. I don't think
-> > it makes any sense to keep on submitting a UIO driver for this until
-> > we have a proper network driver that uses this so we can make sure we
-> > have a working binding.
+On Mon, 17 Nov 2014, Dmitry Eremin-Solenikov wrote:
+
+> Change clk_enable/disable() calls to clk_prepare_enable() and
+> clk_disable_unprepare().
 > 
-> The dataplane frameworks like OpenDataPlane etc, need to have access
-> to complete subsystem from the user space. Hence, we would like to
-> have this driver and some other UIO drivers to be the part of kernel
-> to have data plane frameworks working on our platform.
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> ---
+>  drivers/mfd/t7l66xb.c | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
 
-Please work with the people that do the in-kernel QMTM driver to come
-up with a common binding then.
+Applied, thanks.
 
-	Arnd
+> diff --git a/drivers/mfd/t7l66xb.c b/drivers/mfd/t7l66xb.c
+> index 9e04a74..439d905 100644
+> --- a/drivers/mfd/t7l66xb.c
+> +++ b/drivers/mfd/t7l66xb.c
+> @@ -87,7 +87,7 @@ static int t7l66xb_mmc_enable(struct platform_device *mmc)
+>  	unsigned long flags;
+>  	u8 dev_ctl;
+>  
+> -	clk_enable(t7l66xb->clk32k);
+> +	clk_prepare_enable(t7l66xb->clk32k);
+>  
+>  	spin_lock_irqsave(&t7l66xb->lock, flags);
+>  
+> @@ -118,7 +118,7 @@ static int t7l66xb_mmc_disable(struct platform_device *mmc)
+>  
+>  	spin_unlock_irqrestore(&t7l66xb->lock, flags);
+>  
+> -	clk_disable(t7l66xb->clk32k);
+> +	clk_disable_unprepare(t7l66xb->clk32k);
+>  
+>  	return 0;
+>  }
+> @@ -285,7 +285,7 @@ static int t7l66xb_suspend(struct platform_device *dev, pm_message_t state)
+>  
+>  	if (pdata && pdata->suspend)
+>  		pdata->suspend(dev);
+> -	clk_disable(t7l66xb->clk48m);
+> +	clk_disable_unprepare(t7l66xb->clk48m);
+>  
+>  	return 0;
+>  }
+> @@ -295,7 +295,7 @@ static int t7l66xb_resume(struct platform_device *dev)
+>  	struct t7l66xb *t7l66xb = platform_get_drvdata(dev);
+>  	struct t7l66xb_platform_data *pdata = dev_get_platdata(&dev->dev);
+>  
+> -	clk_enable(t7l66xb->clk48m);
+> +	clk_prepare_enable(t7l66xb->clk48m);
+>  	if (pdata && pdata->resume)
+>  		pdata->resume(dev);
+>  
+> @@ -369,7 +369,7 @@ static int t7l66xb_probe(struct platform_device *dev)
+>  		goto err_ioremap;
+>  	}
+>  
+> -	clk_enable(t7l66xb->clk48m);
+> +	clk_prepare_enable(t7l66xb->clk48m);
+>  
+>  	if (pdata && pdata->enable)
+>  		pdata->enable(dev);
+> @@ -414,9 +414,9 @@ static int t7l66xb_remove(struct platform_device *dev)
+>  	int ret;
+>  
+>  	ret = pdata->disable(dev);
+> -	clk_disable(t7l66xb->clk48m);
+> +	clk_disable_unprepare(t7l66xb->clk48m);
+>  	clk_put(t7l66xb->clk48m);
+> -	clk_disable(t7l66xb->clk32k);
+> +	clk_disable_unprepare(t7l66xb->clk32k);
+>  	clk_put(t7l66xb->clk32k);
+>  	t7l66xb_detach_irq(dev);
+>  	iounmap(t7l66xb->scr);
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
