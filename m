@@ -1,36 +1,49 @@
 From: yadi.brar@samsung.com (Yadwinder Singh Brar)
-Date: Tue, 18 Nov 2014 17:38:28 +0530
-Subject: [PATCH 1/2] ARM: dts: Fix bootup issue on smdk5250
-Message-ID: <1416312509-11530-1-git-send-email-yadi.brar@samsung.com>
+Date: Tue, 18 Nov 2014 17:38:29 +0530
+Subject: [PATCH 2/2] ARM: dts: Add missing irq pinctrl for max77686 on smdk5250
+In-Reply-To: <1416312509-11530-1-git-send-email-yadi.brar@samsung.com>
+References: <1416312509-11530-1-git-send-email-yadi.brar@samsung.com>
+Message-ID: <1416312509-11530-2-git-send-email-yadi.brar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With default config on smdk5250 latest tree throws below message :
+This patch adds pinctrl configuration for using configuring gpx3-2 as an
+external interrupt from max77686. Though max77686 RTC is enabled and gets
+probed by default, it doesnt work as its unable to get interrupt.
 
-[    2.226049] thermal thermal_zone0: critical temperature reached(224 C),shutting down
-[    2.227840] reboot: Failed to start orderly shutdown: forcing the issue
-
-and hangs randomly because it reads wrong temperature value.
-
-I can't figure out any direct relation between LDO10 and TMU from board
-schematics which I have. So making LDO10 always-on to fix issue for now.
+This patch makes max77686 RTC work and also configures it as wakeup source.
 
 Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
 ---
- arch/arm/boot/dts/exynos5250-smdk5250.dts |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index bc27cc2..95b5b51 100644
+index 95b5b51..19cd918 100644
 --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
 +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -190,6 +190,7 @@
- 				regulator-name = "P1.8V_LDO_OUT10";
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
- 			};
+@@ -131,6 +131,9 @@
+ 		reg = <0x09>;
+ 		interrupt-parent = <&gpx3>;
+ 		interrupts = <2 IRQ_TYPE_NONE>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&max77686_irq>;
++		wakeup-source;
  
- 			ldo11_reg: LDO11 {
+ 		voltage-regulators {
+ 			ldo1_reg: LDO1 {
+@@ -411,3 +414,12 @@
+ 		};
+ 	};
+ };
++
++&pinctrl_0 {
++	max77686_irq: max77686-irq {
++		samsung,pins = "gpx3-2";
++		samsung,pin-function = <0xf>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++};
 -- 
 1.7.0.4
