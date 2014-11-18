@@ -1,19 +1,13 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Tue, 18 Nov 2014 21:55:20 +0100
-Subject: [GIT PULL] ARM: meson: DTS related changes
-Message-ID: <20141118205520.GA19814@nuc>
+Date: Tue, 18 Nov 2014 21:55:31 +0100
+Subject: [GIT PULL] ARM: meson: SoC related changes
+Message-ID: <20141118205531.GB19814@nuc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Olof,
-
-here is the pull request for the DT related changes for the 3.19.
-It's mainly the work done by Beniamino for the preliminary support of
-the Amlogic Meson8 SoC, the support for L2 cache and the I2C
-controller.
-Please note that the support for the Tronsmart S89 Elite TV box has not
-been included since the Meson8 development will be done now on a
-different dev board kindly provided by Amlogic.
+this is the pull request for the SoC related changes for the 3.19.
+The support for Meson8 is added together with L2 cache management.
 
 
 The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
@@ -22,30 +16,26 @@ The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
 are available in the git repository at:
 
-  https://github.com/carlocaione/linux-meson tags/v3.19-meson-dts
+  https://github.com/carlocaione/linux-meson tags/v3.19-meson-soc
 
-for you to fetch changes up to 8fba96fac1c48b242ff2b202332572b6eeef95cc:
+for you to fetch changes up to 7b6b0a455d98c7a314278e0fdca25ec6395a502a:
 
-  ARM: dts: meson: add I2C controller nodes (2014-11-18 17:22:18 +0100)
-
-----------------------------------------------------------------
-- Amlogic Meson8 support
-- Enabling L2 cache for MesonX SoCs
-- Add I2C controller nodes
-- Bug fixing
+  clocksource: meson6: Select CLKSRC_MMIO (2014-11-18 16:41:20 +0100)
 
 ----------------------------------------------------------------
-Beniamino Galvani (3):
-      ARM: dts: add dtsi for Amlogic Meson8 SoCs
-      ARM: meson: DTS: enable L2 cache
-      ARM: dts: meson: add I2C controller nodes
+- Add Meson8 support
+- Documentation for new compatible
+- L2 cache management
 
-Carlo Caione (1):
-      DTS: meson: Add forgotten compatible in board DTS
+----------------------------------------------------------------
+Beniamino Galvani (4):
+      ARM: meson: add meson8 support
+      ARM: meson: document meson8 compatible properties
+      ARM: meson: enable L2 cache
+      clocksource: meson6: Select CLKSRC_MMIO
 
- arch/arm/boot/dts/meson.dtsi         | 37 +++++++++++++++
- arch/arm/boot/dts/meson6-atv1200.dts |  2 +-
- arch/arm/boot/dts/meson6.dtsi        |  2 +
- arch/arm/boot/dts/meson8.dtsi        | 92 ++++++++++++++++++++++++++++++++++++
- 4 files changed, 132 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/meson8.dtsi
+ Documentation/devicetree/bindings/arm/amlogic.txt |  8 +++++---
+ arch/arm/mach-meson/Kconfig                       |  6 ++++++
+ arch/arm/mach-meson/meson.c                       | 10 ++++++----
+ drivers/clocksource/Kconfig                       |  1 +
+ 4 files changed, 18 insertions(+), 7 deletions(-)
