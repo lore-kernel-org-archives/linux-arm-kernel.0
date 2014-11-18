@@ -1,172 +1,210 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 18 Nov 2014 17:04:53 +0100
-Subject: [PATCH 1/3] i2c: core changes for slave support
+Date: Tue, 18 Nov 2014 17:04:55 +0100
+Subject: [PATCH 3/3] i2c: rcar: add slave support
 In-Reply-To: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
 References: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1416326695-13083-2-git-send-email-wsa@the-dreams.de>
+Message-ID: <1416326695-13083-4-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Finally(!), make Linux support being an I2C slave. Most of the existing
-infrastructure is reused. We mainly add i2c_slave_register/unregister()
-calls which tells i2c bus drivers to activate the slave mode. Then, they
-also get a callback to report slave events to.
+The first I2C slave provider using the new generic interface.
 
 Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
 
 Changes since RFC:
-* add slave mode kernel doc
-* lock adapter around slave registration
-* inline i2c_slave_event
+* no runtime_pm for slaves
+* don't use NULL in i2c_slave_event
 
- drivers/i2c/i2c-core.c | 49 +++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/i2c.h    | 29 +++++++++++++++++++++++++++++
- 2 files changed, 78 insertions(+)
+ drivers/i2c/busses/i2c-rcar.c | 125 +++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 116 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index f43b4e11647a..bbcf427bf123 100644
---- a/drivers/i2c/i2c-core.c
-+++ b/drivers/i2c/i2c-core.c
-@@ -24,6 +24,7 @@
-    (c) 2013  Wolfram Sang <wsa@the-dreams.de>
-    I2C ACPI code Copyright (C) 2014 Intel Corp
-    Author: Lan Tianyu <tianyu.lan@intel.com>
-+   I2C slave support (c) 2014 by Wolfram Sang <wsa@sang-engineering.com> 
-  */
+diff --git a/drivers/i2c/busses/i2c-rcar.c b/drivers/i2c/busses/i2c-rcar.c
+index d826e82dd997..369ef747fb81 100644
+--- a/drivers/i2c/busses/i2c-rcar.c
++++ b/drivers/i2c/busses/i2c-rcar.c
+@@ -48,6 +48,12 @@
+ #define ICMAR	0x20	/* master address */
+ #define ICRXTX	0x24	/* data port */
  
- #include <linux/module.h>
-@@ -2902,6 +2903,54 @@ trace:
++/* ICSCR */
++#define SDBS	(1 << 3)	/* slave data buffer select */
++#define SIE	(1 << 2)	/* slave interface enable */
++#define GCAE	(1 << 1)	/* general call address enable */
++#define FNA	(1 << 0)	/* forced non acknowledgement */
++
+ /* ICMCR */
+ #define MDBS	(1 << 7)	/* non-fifo mode switch */
+ #define FSCL	(1 << 6)	/* override SCL pin */
+@@ -58,6 +64,15 @@
+ #define FSB	(1 << 1)	/* force stop bit */
+ #define ESG	(1 << 0)	/* en startbit gen */
+ 
++/* ICSSR (also for ICSIER) */
++#define GCAR	(1 << 6)	/* general call received */
++#define STM	(1 << 5)	/* slave transmit mode */
++#define SSR	(1 << 4)	/* stop received */
++#define SDE	(1 << 3)	/* slave data empty */
++#define SDT	(1 << 2)	/* slave data transmitted */
++#define SDR	(1 << 1)	/* slave data received */
++#define SAR	(1 << 0)	/* slave addr received */
++
+ /* ICMSR (also for ICMIE) */
+ #define MNR	(1 << 6)	/* nack received */
+ #define MAL	(1 << 5)	/* arbitration lost */
+@@ -103,6 +118,7 @@ struct rcar_i2c_priv {
+ 	u32 icccr;
+ 	u32 flags;
+ 	enum rcar_i2c_type devtype;
++	struct i2c_client *slave;
+ };
+ 
+ #define rcar_i2c_priv_to_dev(p)		((p)->adap.dev.parent)
+@@ -126,15 +142,6 @@ static u32 rcar_i2c_read(struct rcar_i2c_priv *priv, int reg)
+ 
+ static void rcar_i2c_init(struct rcar_i2c_priv *priv)
+ {
+-	/*
+-	 * reset slave mode.
+-	 * slave mode is not used on this driver
+-	 */
+-	rcar_i2c_write(priv, ICSIER, 0);
+-	rcar_i2c_write(priv, ICSAR, 0);
+-	rcar_i2c_write(priv, ICSCR, 0);
+-	rcar_i2c_write(priv, ICSSR, 0);
+-
+ 	/* reset master mode */
+ 	rcar_i2c_write(priv, ICMIER, 0);
+ 	rcar_i2c_write(priv, ICMCR, 0);
+@@ -360,6 +367,63 @@ static int rcar_i2c_irq_recv(struct rcar_i2c_priv *priv, u32 msr)
+ 	return 0;
  }
- EXPORT_SYMBOL(i2c_smbus_xfer);
  
-+int i2c_slave_register(struct i2c_client *client, i2c_slave_cb_t slave_cb)
++static bool rcar_i2c_slave_irq(struct rcar_i2c_priv *priv)
 +{
-+	int ret;
++	u32 ssr_raw, ssr_filtered;
++	u8 value;
 +
-+	if (!client || !slave_cb)
-+		return -EINVAL;
++	ssr_raw = rcar_i2c_read(priv, ICSSR) & 0xff;
++	ssr_filtered = ssr_raw & rcar_i2c_read(priv, ICSIER);
 +
-+	if (!(client->flags & I2C_CLIENT_TEN)) {
-+		/* Enforce stricter address checking */
-+		ret = i2c_check_addr_validity(client->addr);
-+		if (ret)
-+			return ret;
++	if (!ssr_filtered)
++		return false;
++
++	/* address detected */
++	if (ssr_filtered & SAR) {
++		/* read or write request */
++		if (ssr_raw & STM) {
++			i2c_slave_event(priv->slave, I2C_SLAVE_REQ_READ_START, &value);
++			rcar_i2c_write(priv, ICRXTX, value);
++			rcar_i2c_write(priv, ICSIER, SDE | SSR | SAR);
++		} else {
++			i2c_slave_event(priv->slave, I2C_SLAVE_REQ_WRITE_START, &value);
++			rcar_i2c_read(priv, ICRXTX);	/* dummy read */
++			rcar_i2c_write(priv, ICSIER, SDR | SSR | SAR);
++		}
++
++		rcar_i2c_write(priv, ICSSR, ~SAR & 0xff);
 +	}
 +
-+	if (!client->adapter->algo->reg_slave)
-+		return -EOPNOTSUPP;
++	/* master sent stop */
++	if (ssr_filtered & SSR) {
++		i2c_slave_event(priv->slave, I2C_SLAVE_STOP, &value);
++		rcar_i2c_write(priv, ICSIER, SAR | SSR);
++		rcar_i2c_write(priv, ICSSR, ~SSR & 0xff);
++	}
 +
-+	client->slave_cb = slave_cb;
++	/* master wants to write to us */
++	if (ssr_filtered & SDR) {
++		int ret;
 +
-+	i2c_lock_adapter(client->adapter);
-+	ret = client->adapter->algo->reg_slave(client);
-+	i2c_unlock_adapter(client->adapter);
++		value = rcar_i2c_read(priv, ICRXTX);
++		ret = i2c_slave_event(priv->slave, I2C_SLAVE_REQ_WRITE_END, &value);
++		/* Send NACK in case of error */
++		rcar_i2c_write(priv, ICSCR, SIE | SDBS | (ret < 0 ? FNA : 0));
++		i2c_slave_event(priv->slave, I2C_SLAVE_REQ_WRITE_START, &value);
++		rcar_i2c_write(priv, ICSSR, ~SDR & 0xff);
++	}
 +
-+	if (ret)
-+		client->slave_cb = NULL;
++	/* master wants to read from us */
++	if (ssr_filtered & SDE) {
++		i2c_slave_event(priv->slave, I2C_SLAVE_REQ_READ_END, &value);
++		i2c_slave_event(priv->slave, I2C_SLAVE_REQ_READ_START, &value);
++		rcar_i2c_write(priv, ICRXTX, value);
++		rcar_i2c_write(priv, ICSSR, ~SDE & 0xff);
++	}
 +
-+	return ret;
++	return true;
 +}
-+EXPORT_SYMBOL_GPL(i2c_slave_register);
 +
-+int i2c_slave_unregister(struct i2c_client *client)
-+{
-+	int ret;
-+
-+	if (!client->adapter->algo->unreg_slave)
-+		return -EOPNOTSUPP;
-+
-+	i2c_lock_adapter(client->adapter);
-+	ret = client->adapter->algo->unreg_slave(client);
-+	i2c_unlock_adapter(client->adapter);
-+
-+	if (ret == 0)
-+		client->slave_cb = NULL;
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(i2c_slave_unregister);
-+
- MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
- MODULE_DESCRIPTION("I2C-Bus main module");
- MODULE_LICENSE("GPL");
-diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-index b556e0ab946f..0f1c5a61c931 100644
---- a/include/linux/i2c.h
-+++ b/include/linux/i2c.h
-@@ -46,6 +46,8 @@ struct i2c_client;
- struct i2c_driver;
- union i2c_smbus_data;
- struct i2c_board_info;
-+enum i2c_slave_event;
-+typedef int (*i2c_slave_cb_t)(struct i2c_client *, enum i2c_slave_event, u8 *);
+ static irqreturn_t rcar_i2c_irq(int irq, void *ptr)
+ {
+ 	struct rcar_i2c_priv *priv = ptr;
+@@ -369,6 +433,9 @@ static irqreturn_t rcar_i2c_irq(int irq, void *ptr)
+ 	/*-------------- spin lock -----------------*/
+ 	spin_lock(&priv->lock);
  
- struct module;
++	if (rcar_i2c_slave_irq(priv))
++		goto exit;
++
+ 	msr = rcar_i2c_read(priv, ICMSR);
  
-@@ -209,6 +211,8 @@ struct i2c_driver {
-  * @irq: indicates the IRQ generated by this device (if any)
-  * @detected: member of an i2c_driver.clients list or i2c-core's
-  *	userspace_devices list
-+ * @slave_cb: Callback when I2C slave mode of an adapter is used. The adapter
-+ * 	calls it to pass on slave events to the slave driver.
-  *
-  * An i2c_client identifies a single device (i.e. chip) connected to an
-  * i2c bus. The behaviour exposed to Linux is defined by the driver
-@@ -224,6 +228,7 @@ struct i2c_client {
- 	struct device dev;		/* the device structure		*/
- 	int irq;			/* irq issued by device		*/
- 	struct list_head detected;
-+	i2c_slave_cb_t slave_cb;	/* callback for slave mode	*/
- };
- #define to_i2c_client(d) container_of(d, struct i2c_client, dev)
- 
-@@ -246,6 +251,25 @@ static inline void i2c_set_clientdata(struct i2c_client *dev, void *data)
- 	dev_set_drvdata(&dev->dev, data);
+ 	/* Only handle interrupts that are currently enabled */
+@@ -499,6 +566,44 @@ out:
+ 	return ret;
  }
  
-+/* I2C slave support */
 +
-+enum i2c_slave_event {
-+	I2C_SLAVE_REQ_READ_START,
-+	I2C_SLAVE_REQ_READ_END,
-+	I2C_SLAVE_REQ_WRITE_START,
-+	I2C_SLAVE_REQ_WRITE_END,
-+	I2C_SLAVE_STOP,
-+};
-+
-+extern int i2c_slave_register(struct i2c_client *client, i2c_slave_cb_t slave_cb);
-+extern int i2c_slave_unregister(struct i2c_client *client);
-+
-+static inline int i2c_slave_event(struct i2c_client *client,
-+				  enum i2c_slave_event event, u8 *val)
++static int rcar_reg_slave(struct i2c_client *slave)
 +{
-+	return client->slave_cb(client, event, val);
++	struct rcar_i2c_priv *priv = i2c_get_adapdata(slave->adapter);
++
++	if (priv->slave)
++		return -EBUSY;
++
++	if (slave->flags & I2C_CLIENT_TEN)
++		return -EAFNOSUPPORT;
++
++	pm_runtime_forbid(rcar_i2c_priv_to_dev(priv));
++
++	priv->slave = slave;
++	rcar_i2c_write(priv, ICSAR, slave->addr);
++	rcar_i2c_write(priv, ICSSR, 0);
++	rcar_i2c_write(priv, ICSIER, SAR | SSR);
++	rcar_i2c_write(priv, ICSCR, SIE | SDBS);
++
++	return 0;
 +}
 +
- /**
-  * struct i2c_board_info - template for device creation
-  * @type: chip type, to initialize i2c_client.name
-@@ -352,6 +376,8 @@ i2c_register_board_info(int busnum, struct i2c_board_info const *info,
-  *   into I2C transfers instead.
-  * @functionality: Return the flags that this algorithm/adapter pair supports
-  *   from the I2C_FUNC_* flags.
-+ * @reg_slave: Register given client to I2C slave mode of this adapter
-+ * @unreg_slave: Unregister given client from I2C slave mode of this adapter
-  *
-  * The following structs are for those who like to implement new bus drivers:
-  * i2c_algorithm is the interface to a class of hardware solutions which can
-@@ -377,6 +403,9 @@ struct i2c_algorithm {
- 
- 	/* To determine what the adapter supports */
- 	u32 (*functionality) (struct i2c_adapter *);
++static int rcar_unreg_slave(struct i2c_client *slave)
++{
++	struct rcar_i2c_priv *priv = i2c_get_adapdata(slave->adapter);
 +
-+	int (*reg_slave)(struct i2c_client *client);
-+	int (*unreg_slave)(struct i2c_client *client);
++	WARN_ON(!priv->slave);
++
++	rcar_i2c_write(priv, ICSIER, 0);
++	rcar_i2c_write(priv, ICSCR, 0);
++
++	priv->slave = NULL;
++
++	pm_runtime_allow(rcar_i2c_priv_to_dev(priv));
++
++	return 0;
++}
++
+ static u32 rcar_i2c_func(struct i2c_adapter *adap)
+ {
+ 	/* This HW can't do SMBUS_QUICK and NOSTART */
+@@ -508,6 +613,8 @@ static u32 rcar_i2c_func(struct i2c_adapter *adap)
+ static const struct i2c_algorithm rcar_i2c_algo = {
+ 	.master_xfer	= rcar_i2c_master_xfer,
+ 	.functionality	= rcar_i2c_func,
++	.reg_slave	= rcar_reg_slave,
++	.unreg_slave	= rcar_unreg_slave,
  };
  
- /**
+ static const struct of_device_id rcar_i2c_dt_ids[] = {
 -- 
 2.1.1
