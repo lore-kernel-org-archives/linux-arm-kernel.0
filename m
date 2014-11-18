@@ -1,41 +1,66 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Tue, 18 Nov 2014 01:39:23 +0100
-Subject: mvebu: tclk detection for armada-xp and marvell packet processor
- with integrated CPU
-In-Reply-To: <546A71B8.3060606@alliedtelesis.co.nz>
-References: <546959A3.9040206@alliedtelesis.co.nz>
- <20141117093437.0ca5a3ef@free-electrons.com>
- <546A5714.2090100@alliedtelesis.co.nz>
- <20141117215543.GC4080@lunn.ch>
- <546A71B8.3060606@alliedtelesis.co.nz>
-Message-ID: <CAPv3WKd8_FP=Kc2XiM9u3K3x871LwpvmLiWJ4iaPBXvxag4DWQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 18 Nov 2014 01:50:25 +0100
+Subject: [GIT PULL] clk: rockchip: first batch for 3.19
+Message-ID: <2664317.ZRy0zABv1Y@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Chris,
+Hi Mike
 
-2014-11-17 23:07 GMT+01:00 Chris Packham <Chris.Packham@alliedtelesis.co.nz>:
->
->
-> On 11/18/2014 10:55 AM, Andrew Lunn wrote:
->>> Yeah I'm still trying to wrestle that information out of Marvell. What I
->>> do know is for the eval board I've got the armada register SAR (offset
->>> 0x18230) is all zeros. I'm not sure if this is because everything really
->>> strapped low or because this register is unused on the PP.
->>
->> Do the CPU SAR pins even make it out of the package? It could be when
->> the synthesised the CPU they hard coded it all and throw away the SAR.
->>
->
-> That's a possibility. The other thing that they may have done is
-> incorporated the SAR pins for the CPU with the SAR pins for the packet
-> processor. That could be a little tricky because then I'd have to start
-> opening up windows for the PP registers early in the kernel init.
+here is a first batch of rockchip related clock changes for 3.19 .
+Apart from various small fixes we also move away from marking
+all clocks as INGORE_UNUSED to letting the ccf handle disabling
+most of the unused clocks.
 
-Sorry to interfere, but is it possible to know what SoC (BobCat2 or
-AlleyCat3? Afair, those are the two dual-core pj4b-based ones.) and
-board model you exactly work on? I have some experience with this
-family, so I there is a chance I may help.
+So if this looks good, please pull
 
-Best regards,
-Marcin
+
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.19-rockchip-clk1
+
+for you to fetch changes up to 29e94468516cdf191ec839ee39f79e011817276d:
+
+  clk: rockchip: fix clock select order for rk3288 usbphy480m_src (2014-11-16 00:40:19 +0100)
+
+----------------------------------------------------------------
+- fixes for clock ordering/rate issues
+- do not keep all clocks enabled anymore
+- allow special pll rates for special cases
+
+----------------------------------------------------------------
+Chris Zhong (1):
+      clk: rockchip: rk3288: add suspend and resume
+
+Dmitry Torokhov (1):
+      clk: rockchip: ensure HCLK_VIO2_H2P and PCLK_VIO2_H2P stay enabled
+
+Doug Anderson (1):
+      clk: rockchip: Add CLK_SET_RATE_PARENT to aclk_cpu_pre
+
+Heiko St?bner (1):
+      clk: rockchip: fix rk3188 hsadc_frac definition
+
+Jianqun (1):
+      clk: rockchip: rk3288: removing the CLK_SET_RATE_PARENT from i2s_clkout
+
+Kever Yang (6):
+      clk: rockchip: add 400MHz and 500MHz for rk3288 clock rate
+      clk: rockchip: add npll to source of sclk_gpu
+      clk: rockchip: change PLL setting for better clock jitter
+      clk: rockchip: disable unused clocks
+      clk: rockchip: fix rk3288 clk_usbphy480m_gate bit location in register
+      clk: rockchip: fix clock select order for rk3288 usbphy480m_src
+
+Sonny Rao (1):
+      clk: rockchip: fix parent for spdif_8ch_frac on rk3288
+
+ drivers/clk/rockchip/clk-rk3188.c |  42 ++++----
+ drivers/clk/rockchip/clk-rk3288.c | 216 ++++++++++++++++++++++++--------------
+ drivers/clk/rockchip/clk.c        |   9 --
+ drivers/clk/rockchip/clk.h        |   9 ++
+ 4 files changed, 169 insertions(+), 107 deletions(-)
