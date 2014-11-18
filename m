@@ -1,37 +1,128 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 18 Nov 2014 20:28:35 +0100
-Subject: [PATCH 2/2] ARM: berlin: do not select RESET_CONTROLLER
-In-Reply-To: <1416231192-27056-3-git-send-email-antoine.tenart@free-electrons.com>
-References: <1416231192-27056-1-git-send-email-antoine.tenart@free-electrons.com>
- <1416231192-27056-3-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <546B9DE3.705@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Nov 2014 20:32:17 +0100
+Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
+In-Reply-To: <546B95EC.5000705@ti.com>
+References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
+ <7hsihhzecq.fsf@deeprootsystems.com> <546B95EC.5000705@ti.com>
+Message-ID: <1709760.E0jX3Myv0h@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.11.2014 14:33, Antoine Tenart wrote:
-> RESET_CONTROLLER is meant to be user-selectable. To respect that,
-> do not select it automatically when using ARCH_BERLIN.
->
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+On Tuesday 18 November 2014 20:54:36 Grygorii Strashko wrote:
+> Hi All,
+> 
+> Thank you for your comments.
+> 
+> On 11/17/2014 11:50 PM, Kevin Hilman wrote:
+> > Arnd Bergmann <arnd@arndb.de> writes:
+> > 
+> >> On Monday 17 November 2014 11:14:16 Kevin Hilman wrote:
+> >>>>>
+> >>>>> So, The Keystone 2 Generic PM Controller is just a proxy PM layer here between
+> >>>>> device and Generic clock manipulation PM callbacks.
+> >>>>> It fills per-device clock list when device is attached to GPD and
+> >>>>> ensures that all clocks from that list enabled/disabled when device is
+> >>>>> started/stopped.
+> >>>>
+> >>>> The idea of such a generic power domain implementation sounds useful, but
+> >>>> it has absolutely no business in platform specific code.
+> >>>
+> >>> Yes it does.  This isn't a generic power domain implementation, but
+> >>> rather just the platform-specific glue that hooks up the clocks to the
+> >>> right devices and power-domains so that the generic power-domain and
+> >>> generic pm_clocks code does the right thing.
+> >>
+> >> How would you do this on an arm64 version of keystone then? With
+> >> the current approach, you'd need to add a machine specific directory,
+> >> and that seems completely pointless since this is not even about
+> >> a hardware requirement.
+> > 
+> > Yeah, you're right.  I misunderstood you're original comment.
+> > 
+> >>>> I suggest you either remove the power domain proxy from your drivers
+> >>>> and use the clocks directly,
+> 
+> Hm. I've been thinking about this, but the problem is that Keystone 2
+> reuses a lot of IPs from Davinci and PM for Davinci is based on Generic clock
+> manipulation PM callbacks framework, but for non-DT case. So, I can't simply
+> use clocks directly.
 
-Applied to berlin/soc.
+I think you could get that to work without too much trouble, but as Kevin
+comments, the generic pmdomain code is helpful here, and we should find
+a way to make it work better.
 
-Thanks!
+> >>> No.  That's a step in the wrong direction.  This change isn't affecting
+> >>> drivers directly.  It's the runtime PM and generic power domain layers
+> >>> that handle this, and runtime PM adapted drivers don't need any changes.
+> >>>   
+> >>>> or come up with an implementation that can be used across other
+> >>>> platforms and CPU architectures.
+> >>>
+> >>> We already have those in the generic power domain and the pm_clock
+> >>> layers.  This series is just hooking those up for Keystone.
+> >>
+> >> Then why not add the missing piece to the generic power domain
+> >> code to avoid having to add infrastructure to the platform
+> >> for it?
+> > 
+> > Yes, good point.  There is nothing keystone-specific in this glue.
+> > 
+> > Grygorii, what about adding a feature to the generic domain parsing so
+> > that it can get clocks from device nodes that are part of the domain,
+> > and so it sets up pm_clk accordingly.
+> 
+> I'd like to mention few points here:
+> 1)  not all platforms may need this
+> 
+> 2)  not all platforms may allow to add ALL clocks from "clocks" property
+>    to pm_clk as some of them can be optional or have to be controlled by drivers only
+>    (for example, initially, it was the case for SH-mobile https://lkml.org/lkml/2014/4/24/197
+>     also now, last implementation for shmobile add only first clock from "clocks" property
+>     to pm_clk https://lkml.org/lkml/2014/11/17/272).
+> 
+> 3)  such functionality have to be enabled for devices selectively, for example
+>    now we are going to enable it for devices which a ready for runtime PM.
+> 
+> Current implementation cover 1 & 3, but also it allows to cover 2 too, because
+> it's platform specific implementation and .attach_dev() can be updated to skip some 
+> clocks or devices if needed.
 
-> ---
->   arch/arm/mach-berlin/Kconfig | 1 -
->   1 file changed, 1 deletion(-)
->
-> diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
-> index 5803f773a065..51582c73a53f 100644
-> --- a/arch/arm/mach-berlin/Kconfig
-> +++ b/arch/arm/mach-berlin/Kconfig
-> @@ -7,7 +7,6 @@ menuconfig ARCH_BERLIN
->   	select DW_APB_ICTL
->   	select DW_APB_TIMER_OF
->   	select PINCTRL
-> -	select RESET_CONTROLLER
->
->   if ARCH_BERLIN
->
->
+Well, not all drivers and not all platforms have to use it, I think it would
+just be good to make the case you are interested in really easy, and definitely
+work without platform specific code.
+
+> > I've recently seen other SoCs doing very similar, so this really should
+> > be generalized.
+> > 
+> > I've been looking at this primarily as a right incremental improvement
+> > from what is there for Keystone today, but Arnd is right.  This should
+> > be moved out of platform code.
+> 
+> I'm ready to do what ever you want, but I don't fully understand what exactly to do :(
+> Should I create some generic_pm_clk_domain.c?
+> - or - Do you mean to integrate it in domain.c (see no way to do it:()?
+> - or - smth. else
+> 
+> What about introduced DT bindings? For example, How will devices be
+> selected for attachment to Generic pm_clk domain if I'll introduce
+> generic_pm_clk_domain.c?
+
+I am not really familiar with the pmdomain code at all, but here is
+what I had thought the simplest generic pmdomain code would do:
+
+Have one pmdomain driver in the generic code that knows about clocks,
+possibly also regulators and pins and just turns them on when needed.
+You can have a "simple-pmdomain" or "generic-pmdomain" compatible
+string.
+
+I'm a bit surprised that your pmdomain code looks up the clocks from the
+respective device, rather than know about the clocks itself. There is
+probably a good reason for this, but I don't see it yet.
+
+Another option would be to have a special case for an empty
+"power-domains" property if this is the most common case: if that
+property exists but is empty, the pmdomain core could interpret
+it as an indication to control all the clocks/regulators/pins
+of a device.
+
+	Arnd
