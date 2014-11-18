@@ -1,72 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Nov 2014 12:33:11 +0100
-Subject: [PATCH] asm-generic: Add msi.h
-In-Reply-To: <alpine.DEB.2.11.1411181149350.3909@nanos>
-References: <alpine.DEB.2.11.1411181133080.3909@nanos>
- <1703620.E5bhVDQPHc@wuerfel> <alpine.DEB.2.11.1411181149350.3909@nanos>
-Message-ID: <5216496.erm7FtUABJ@wuerfel>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Tue, 18 Nov 2014 20:38:22 +0900
+Subject: [PATCH v8 1/2] kprobes: copy ainsn after alloc aggr kprobe
+In-Reply-To: <1416292359-75893-2-git-send-email-wangnan0@huawei.com>
+References: <1416292359-75893-1-git-send-email-wangnan0@huawei.com>
+ <1416292359-75893-2-git-send-email-wangnan0@huawei.com>
+Message-ID: <546B2FAE.7000104@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 November 2014 11:59:39 Thomas Gleixner wrote:
-> On Tue, 18 Nov 2014, Arnd Bergmann wrote:
+Hi Wang,
+
+(2014/11/18 15:32), Wang Nan wrote:
+> Copy old kprobe to newly alloced optimized_kprobe before
+> arch_prepare_optimized_kprobe(). Original kprove can brings more
+> information to optimizer.
+
+As I've asked you on the previous series, I prefer to transfer the
+original kprobes to arch_prepare_optimized_kprobe().
+
+OK, now I'll send you my patch. If you can agree, feel free to
+pick that into your series.
+
+Thank you,
+
 > 
-> > On Tuesday 18 November 2014 11:34:37 Thomas Gleixner wrote:
-> > > To support MSI irq domains we want a generic data structure for
-> > > allocation, but we need the option to provide an architecture specific
-> > > version of it. So instead of playing #ifdef games in linux/msi.h we
-> > > add a generic header file and let architectures decide whether to
-> > > include it or to provide their own implementation and provide the
-> > > required typedef.
-> > 
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > 
-> > for merging the asm-generic file
-> > 
-> > > I know that typedefs are not really nice, but in this case there are no
-> > > forward declarations required and it's the simplest solution.
-> > 
-> > I must be missing the obvious: what problem does the typedef solve
-> > that you would have with just a struct?
+> v1 -> v2:
+>  -  Bugfix: copy p->addr when alloc_aggr_kprobe.
 > 
-> It's not obvious. :)
+> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+> ---
+>  kernel/kprobes.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> The irqdomain stuff is pretty device tree centric, but the new stacked
-> irqdomains are to be used by x86 as well. So we made some of the
-> interfaces opaque, i.e. void *allocation_arg.
-> 
-> Now MSI is a bit differnet as it cannot be decribed by DT, so we want
-> a proper generic data structure for it and of course we want to have a
-> type for it.
-> 
-> Now x86 has a bit more convoluted requirements where we prefer for
-> simplicity reasons to reuse the allocation data structure which we
-> have alredy for the non MSI cases, so it can be handed down to the
-> opaque interfaces as well.
-> 
-> So we have the generic:
+> diff --git a/kernel/kprobes.c b/kernel/kprobes.c
+> index 3995f54..e9868ec 100644
+> --- a/kernel/kprobes.c
+> +++ b/kernel/kprobes.c
+> @@ -730,7 +730,13 @@ static struct kprobe *alloc_aggr_kprobe(struct kprobe *p)
+>  		return NULL;
 >  
-> struct msi_alloc_info {
->        ....
-> };
-> 
-> and 
-> 
-> struct x86_alloc_info {
->        ...
-> };
-> 
-> So we either can do in x86:
-> 
-> struct msi_alloc_info {
->        struct x86_alloc_info info;
-> };
-> 
-> or use a typedef which maps x86_alloc_info to msi_alloc_info_t.
-> 
-> I think the typedef is more sane in that case.
+>  	INIT_LIST_HEAD(&op->list);
+> +
+> +	/*
+> +	 * copy gives arch_prepare_optimized_kprobe
+> +	 * more information
+> +	 */
+>  	op->kp.addr = p->addr;
+> +	copy_kprobe(p, &op->kp);
+>  	arch_prepare_optimized_kprobe(op);
+>  
+>  	return &op->kp;
 > 
 
-Ok, makes sense.
 
-	Arnd
+-- 
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
