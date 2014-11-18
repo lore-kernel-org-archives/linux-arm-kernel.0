@@ -1,39 +1,54 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 18 Nov 2014 21:15:43 +0100
-Subject: [PATCH v5 03/18] ACPI / table: Count matched and successfully
- parsed entries without specifying max entries
-In-Reply-To: <546B4EDD.9050804@linaro.org>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <1413553034-20956-4-git-send-email-hanjun.guo@linaro.org>
- <546B4EDD.9050804@linaro.org>
-Message-ID: <7743567.TJcygJtKD3@vostro.rjw.lan>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 18 Nov 2014 12:04:38 -0800
+Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
+ completes
+In-Reply-To: <4282972.midaRTeXMU@vostro.rjw.lan>
+References: <20141118171831.GC3003@dtor-ws>
+ <Pine.LNX.4.44L0.1411181234210.892-100000@iolanthe.rowland.org>
+ <20141118175515.GD3003@dtor-ws> <4282972.midaRTeXMU@vostro.rjw.lan>
+Message-ID: <20141118200438.GG3003@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 18, 2014 09:51:25 PM Hanjun Guo wrote:
-> Hi Rafael,
+On Tue, Nov 18, 2014 at 09:14:56PM +0100, Rafael J. Wysocki wrote:
+> On Tuesday, November 18, 2014 09:55:15 AM Dmitry Torokhov wrote:
+> > On Tue, Nov 18, 2014 at 12:44:22PM -0500, Alan Stern wrote:
+> > > On Tue, 18 Nov 2014, Dmitry Torokhov wrote:
+> > > 
+> > > > OK. Another question then: pm_runtime_get_noresume() does literally this:
+> > > > 
+> > > > 	atomic_inc(&dev->power.usage_count);
+> > > > 
+> > > > So who is responsible for actually waking up parent device and/or power
+> > > > domain? Is it simply missing because we did not really have PM domains
+> > > > before?
+> > > 
+> > > Ths bus is responsible for making sure that all the standard resources
+> > > are available -- that is, all the resources that would be needed by a
+> > > normal device on that bus.  Anything beyond that (such as
+> > > special-purpose clocks) has to be set up by the driver.
+> > > 
+> > > Thus the bus would insure that the device was powered, its parent was
+> > > resumed, and the usual clock inputs were enabled.  And of course, one
+> > > mechanism for doing this is to runtime-resume the power domain.
+> > 
+> > This does not sound like anything bus-specific. Can we move powering on
+> > the domain before probing into the driver core, similarly to the default
+> > pin selection by pinctrl?
 > 
-> On 2014?10?17? 21:36, Hanjun Guo wrote:
-> > From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> >
-> > It is very useful to traverse all available table entries without max
-> > number of expected entries type. Current acpi_parse_entries()
-> > implementation gives that feature but it does not count those entries,
-> > it returns 0 instead, so fix it to count matched and successfully
-> > entries and return it.
-> >
-> > NOTE: This change has no impact to x86 and ia64 archs since existing code
-> > checks for error occurrence only (acpi_parse_entries(...,0) < 0).
-> >
-> > Acked-by: Grant Likely <grant.likely@linaro.org>
-> > Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> We could do that for genpd if devices were added to domains before registering
+> (those devices).  Otherwise, there's no guarantee that all has been set up yet.
 > 
-> Patch 2 and patch 3 are only for ACPI cores, and have no harm to x86
-> and IA64, could you merge first in 3.19?
+> Note that this would only be the case for genpd, not for the ACPI PM domain
+> in particular, for example.  The reason why is that the ACPI PM domain cannot
+> be used along with bus types that provide non-trivial PM callbacks, so pretty
+> much the bus type's ->probe needs to decide whether or not to use it.
 
-I can do that if that helps.
+In genpd code there is a notion of providers that match devices and
+domains. Can we do the same for ACPI and stuff all that knowledge into
+it's "provider"?
+
+IOW why ACPI is that special?
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Dmitry
