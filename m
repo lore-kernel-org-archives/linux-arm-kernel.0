@@ -1,202 +1,33 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 18 Nov 2014 12:05:30 -0600
-Subject: [PATCH] documentation: pinctrl bindings: Fix trivial typo
- 'abitrary'
-In-Reply-To: <1415288331-785-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1415288331-785-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <CAL_JsqLiek8Cg-6ZJJvo7E74boOkzyo=ckgKGMxRMpN_3BpS4A@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 18 Nov 2014 12:07:00 -0600
+Subject: [PATCH 02/10] arm: omap: omap2plus_defconfig: enable EDT FT5X06
+ touchscreen
+In-Reply-To: <1416334028-7766-1-git-send-email-balbi@ti.com>
+References: <1416334028-7766-1-git-send-email-balbi@ti.com>
+Message-ID: <1416334028-7766-2-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 6, 2014 at 9:38 AM, Soren Brinkmann
-<soren.brinkmann@xilinx.com> wrote:
-> A misspelled 'arbitrary' propagated to quite a few locations in the DT
-> binding documentation for pin-controllers. Fixing by:
->   git grep abitrary | cut -f1 -d: | xargs sed -i 's/abitrary/arbitrary/'
->
-> Reported-by: Andreas F?rber <afaerber@suse.de>
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+AM437x Starter Kit ships with EDT FT5306 touchscreen
+device. By enabling the driver we make sure touchscreen
+will work out of the box.
 
-Applied, thanks.
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/configs/omap2plus_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Rob
-
-> ---
->  Documentation/devicetree/bindings/pinctrl/img,tz1090-pdc-pinctrl.txt | 2 +-
->  Documentation/devicetree/bindings/pinctrl/img,tz1090-pinctrl.txt     | 2 +-
->  Documentation/devicetree/bindings/pinctrl/lantiq,falcon-pinumx.txt   | 2 +-
->  Documentation/devicetree/bindings/pinctrl/lantiq,xway-pinumx.txt     | 2 +-
->  Documentation/devicetree/bindings/pinctrl/nvidia,tegra20-pinmux.txt  | 2 +-
->  Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt           | 2 +-
->  Documentation/devicetree/bindings/pinctrl/pinctrl_spear.txt          | 2 +-
->  Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt   | 2 +-
->  Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt   | 2 +-
->  Documentation/devicetree/bindings/pinctrl/qcom,ipq8064-pinctrl.txt   | 2 +-
->  Documentation/devicetree/bindings/pinctrl/qcom,msm8960-pinctrl.txt   | 2 +-
->  Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt   | 2 +-
->  12 files changed, 12 insertions(+), 12 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/pinctrl/img,tz1090-pdc-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/img,tz1090-pdc-pinctrl.txt
-> index a186181c402b..51b943cc9770 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/img,tz1090-pdc-pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/img,tz1090-pdc-pinctrl.txt
-> @@ -9,7 +9,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
->  common pinctrl bindings used by client devices, including the meaning of the
->  phrase "pin configuration node".
->
-> -TZ1090-PDC's pin configuration nodes act as a container for an abitrary number
-> +TZ1090-PDC's pin configuration nodes act as a container for an arbitrary number
->  of subnodes. Each of these subnodes represents some desired configuration for a
->  pin, a group, or a list of pins or groups. This configuration can include the
->  mux function to select on those pin(s)/group(s), and various pin configuration
-> diff --git a/Documentation/devicetree/bindings/pinctrl/img,tz1090-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/img,tz1090-pinctrl.txt
-> index 4b27c99f7f9d..49d0e6050940 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/img,tz1090-pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/img,tz1090-pinctrl.txt
-> @@ -9,7 +9,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
->  common pinctrl bindings used by client devices, including the meaning of the
->  phrase "pin configuration node".
->
-> -TZ1090's pin configuration nodes act as a container for an abitrary number of
-> +TZ1090's pin configuration nodes act as a container for an arbitrary number of
->  subnodes. Each of these subnodes represents some desired configuration for a
->  pin, a group, or a list of pins or groups. This configuration can include the
->  mux function to select on those pin(s)/group(s), and various pin configuration
-> diff --git a/Documentation/devicetree/bindings/pinctrl/lantiq,falcon-pinumx.txt b/Documentation/devicetree/bindings/pinctrl/lantiq,falcon-pinumx.txt
-> index daa768956069..ac4da9fe07bd 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/lantiq,falcon-pinumx.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/lantiq,falcon-pinumx.txt
-> @@ -9,7 +9,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
->  common pinctrl bindings used by client devices, including the meaning of the
->  phrase "pin configuration node".
->
-> -Lantiq's pin configuration nodes act as a container for an abitrary number of
-> +Lantiq's pin configuration nodes act as a container for an arbitrary number of
->  subnodes. Each of these subnodes represents some desired configuration for a
->  pin, a group, or a list of pins or groups. This configuration can include the
->  mux function to select on those group(s), and two pin configuration parameters:
-> diff --git a/Documentation/devicetree/bindings/pinctrl/lantiq,xway-pinumx.txt b/Documentation/devicetree/bindings/pinctrl/lantiq,xway-pinumx.txt
-> index b5469db1d7ad..e89b4677567d 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/lantiq,xway-pinumx.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/lantiq,xway-pinumx.txt
-> @@ -9,7 +9,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
->  common pinctrl bindings used by client devices, including the meaning of the
->  phrase "pin configuration node".
->
-> -Lantiq's pin configuration nodes act as a container for an abitrary number of
-> +Lantiq's pin configuration nodes act as a container for an arbitrary number of
->  subnodes. Each of these subnodes represents some desired configuration for a
->  pin, a group, or a list of pins or groups. This configuration can include the
->  mux function to select on those group(s), and two pin configuration parameters:
-> diff --git a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra20-pinmux.txt b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra20-pinmux.txt
-> index 61e73cde9ae9..3c8ce28baad6 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra20-pinmux.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra20-pinmux.txt
-> @@ -9,7 +9,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
->  common pinctrl bindings used by client devices, including the meaning of the
->  phrase "pin configuration node".
->
-> -Tegra's pin configuration nodes act as a container for an abitrary number of
-> +Tegra's pin configuration nodes act as a container for an arbitrary number of
->  subnodes. Each of these subnodes represents some desired configuration for a
->  pin, a group, or a list of pins or groups. This configuration can include the
->  mux function to select on those pin(s)/group(s), and various pin configuration
-> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt
-> index c596a6ad3285..5f55be59d914 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt
-> @@ -13,7 +13,7 @@ Optional properties:
->  Please refer to pinctrl-bindings.txt in this directory for details of the common
->  pinctrl bindings used by client devices.
->
-> -SiRFprimaII's pinmux nodes act as a container for an abitrary number of subnodes.
-> +SiRFprimaII's pinmux nodes act as a container for an arbitrary number of subnodes.
->  Each of these subnodes represents some desired configuration for a group of pins.
->
->  Required subnode-properties:
-> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl_spear.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl_spear.txt
-> index b4480d5c3aca..458615596946 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/pinctrl_spear.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl_spear.txt
-> @@ -32,7 +32,7 @@ Required properties:
->  Please refer to pinctrl-bindings.txt in this directory for details of the common
->  pinctrl bindings used by client devices.
->
-> -SPEAr's pinmux nodes act as a container for an abitrary number of subnodes. Each
-> +SPEAr's pinmux nodes act as a container for an arbitrary number of subnodes. Each
->  of these subnodes represents muxing for a pin, a group, or a list of pins or
->  groups.
->
-> diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt
-> index 2fb90b37aa09..a7bde64798c7 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt
-> @@ -18,7 +18,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
->  common pinctrl bindings used by client devices, including the meaning of the
->  phrase "pin configuration node".
->
-> -Qualcomm's pin configuration nodes act as a container for an abitrary number of
-> +Qualcomm's pin configuration nodes act as a container for an arbitrary number of
->  subnodes. Each of these subnodes represents some desired configuration for a
->  pin, a group, or a list of pins or groups. This configuration can include the
->  mux function to select on those pin(s)/group(s), and various pin configuration
-> diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt
-> index ffafa1990a30..c4ea61ac56f2 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt
-> @@ -47,7 +47,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
->  common pinctrl bindings used by client devices, including the meaning of the
->  phrase "pin configuration node".
->
-> -The pin configuration nodes act as a container for an abitrary number of
-> +The pin configuration nodes act as a container for an arbitrary number of
->  subnodes. Each of these subnodes represents some desired configuration for a
->  pin, a group, or a list of pins or groups. This configuration can include the
->  mux function to select on those pin(s)/group(s), and various pin configuration
-> diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,ipq8064-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,ipq8064-pinctrl.txt
-> index e33e4dcdce79..6e88e91feb11 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/qcom,ipq8064-pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/qcom,ipq8064-pinctrl.txt
-> @@ -18,7 +18,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
->  common pinctrl bindings used by client devices, including the meaning of the
->  phrase "pin configuration node".
->
-> -Qualcomm's pin configuration nodes act as a container for an abitrary number of
-> +Qualcomm's pin configuration nodes act as a container for an arbitrary number of
->  subnodes. Each of these subnodes represents some desired configuration for a
->  pin, a group, or a list of pins or groups. This configuration can include the
->  mux function to select on those pin(s)/group(s), and various pin configuration
-> diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,msm8960-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,msm8960-pinctrl.txt
-> index 93b7de91b9f6..eb8d8aa41f20 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/qcom,msm8960-pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/qcom,msm8960-pinctrl.txt
-> @@ -47,7 +47,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
->  common pinctrl bindings used by client devices, including the meaning of the
->  phrase "pin configuration node".
->
-> -The pin configuration nodes act as a container for an abitrary number of
-> +The pin configuration nodes act as a container for an arbitrary number of
->  subnodes. Each of these subnodes represents some desired configuration for a
->  pin, a group, or a list of pins or groups. This configuration can include the
->  mux function to select on those pin(s)/group(s), and various pin configuration
-> diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt
-> index d2ea80dc43eb..e4d6a9d20f7d 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt
-> @@ -18,7 +18,7 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
->  common pinctrl bindings used by client devices, including the meaning of the
->  phrase "pin configuration node".
->
-> -Qualcomm's pin configuration nodes act as a container for an abitrary number of
-> +Qualcomm's pin configuration nodes act as a container for an arbitrary number of
->  subnodes. Each of these subnodes represents some desired configuration for a
->  pin, a group, or a list of pins or groups. This configuration can include the
->  mux function to select on those pin(s)/group(s), and various pin configuration
-> --
-> 2.1.3.1.ge241007
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index 24d6fe2..c893487 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -177,6 +177,7 @@ CONFIG_KEYBOARD_MATRIX=m
+ CONFIG_KEYBOARD_TWL4030=y
+ CONFIG_INPUT_TOUCHSCREEN=y
+ CONFIG_TOUCHSCREEN_ADS7846=m
++CONFIG_TOUCHSCREEN_EDT_FT5X06=m
+ CONFIG_TOUCHSCREEN_TSC2005=m
+ CONFIG_TOUCHSCREEN_TSC2007=m
+ CONFIG_INPUT_MISC=y
+-- 
+2.1.0.GIT
