@@ -1,211 +1,133 @@
-From: kernellwp@gmail.com (Wanpeng Li)
-Date: Tue, 18 Nov 2014 18:47:57 +0800
-Subject: [PATCH v8 03/10] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <1414745252-4895-4-git-send-email-vincent.guittot@linaro.org>
-References: <1414745252-4895-1-git-send-email-vincent.guittot@linaro.org>
- <1414745252-4895-4-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <546B23DD.4080804@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 18 Nov 2014 10:49:35 +0000
+Subject: [PATCHv5 3/7] arm64: Move cpu_resume into the text section
+In-Reply-To: <1416272105-14787-4-git-send-email-lauraa@codeaurora.org>
+References: <1416272105-14787-1-git-send-email-lauraa@codeaurora.org>
+ <1416272105-14787-4-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20141118104935.GA14323@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent,
-On 10/31/14, 4:47 PM, Vincent Guittot wrote:
-> When a CPU is used to handle a lot of IRQs or some RT tasks, the remaining
-> capacity for CFS tasks can be significantly reduced. Once we detect such
+Hi Laura,
 
-I see the cpu capacity will be reduced if RT tasks are running in 
-scale_rt_capacity(), could you point out where cpu capacity reduced due 
-to IRQs?
-
-Regards,
-Wanpeng Li
-
-> situation by comparing cpu_capacity_orig and cpu_capacity, we trig an idle
-> load balance to check if it's worth moving its tasks on an idle CPU.
->
-> Once the idle load_balance has selected the busiest CPU, it will look for an
-> active load balance for only two cases :
-> - there is only 1 task on the busiest CPU.
-> - we haven't been able to move a task of the busiest rq.
->
-> A CPU with a reduced capacity is included in the 1st case, and it's worth to
-> actively migrate its task if the idle CPU has got full capacity. This test has
-> been added in need_active_balance.
->
-> As a sidenote, this will note generate more spurious ilb because we already
-> trig an ilb if there is more than 1 busy cpu. If this cpu is the only one that
-> has a task, we will trig the ilb once for migrating the task.
->
-> The nohz_kick_needed function has been cleaned up a bit while adding the new
-> test
->
-> env.src_cpu and env.src_rq must be set unconditionnally because they are used
-> in need_active_balance which is called even if busiest->nr_running equals 1
->
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+On Tue, Nov 18, 2014 at 12:55:01AM +0000, Laura Abbott wrote:
+> The function cpu_resume currently lives in the .data section.
+> There's no reason for it to be there since we can use relative
+> instructions without a problem. Move a few cpu_resume data
+> structures out of the assembly file so the .data annotation
+> can be dropped completely and cpu_resume ends up in the read
+> only text section.
+> 
+> Reviewed-by: Kees Cook <keescook@chromium.org>
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> Tested-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 > ---
->   kernel/sched/fair.c | 86 ++++++++++++++++++++++++++++++++++++++++-------------
->   1 file changed, 65 insertions(+), 21 deletions(-)
->
-> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-> index bd214d2..54468f3 100644
-> --- a/kernel/sched/fair.c
-> +++ b/kernel/sched/fair.c
-> @@ -5889,6 +5889,18 @@ fix_small_capacity(struct sched_domain *sd, struct sched_group *group)
->   }
->   
->   /*
-> + * Check whether the capacity of the rq has been noticeably reduced by side
-> + * activity. The imbalance_pct is used for the threshold.
-> + * Return true is the capacity is reduced
-> + */
-> +static inline int
-> +check_cpu_capacity(struct rq *rq, struct sched_domain *sd)
-> +{
-> +	return ((rq->cpu_capacity * sd->imbalance_pct) <
-> +				(rq->cpu_capacity_orig * 100));
-> +}
-> +
-> +/*
->    * Group imbalance indicates (and tries to solve) the problem where balancing
->    * groups is inadequate due to tsk_cpus_allowed() constraints.
->    *
-> @@ -6562,6 +6574,28 @@ static int need_active_balance(struct lb_env *env)
->   			return 1;
->   	}
->   
-> +	/*
-> +	 * The dst_cpu is idle and the src_cpu CPU has only 1 CFS task.
-> +	 * It's worth migrating the task if the src_cpu's capacity is reduced
-> +	 * because of other sched_class or IRQs whereas capacity stays
-> +	 * available on dst_cpu.
-> +	 */
-> +	if ((env->idle != CPU_NOT_IDLE) &&
-> +			(env->src_rq->cfs.h_nr_running == 1)) {
-> +		unsigned long src_eff_capacity, dst_eff_capacity;
-> +
-> +		dst_eff_capacity = 100;
-> +		dst_eff_capacity *= capacity_of(env->dst_cpu);
-> +		dst_eff_capacity *= capacity_orig_of(env->src_cpu);
-> +
-> +		src_eff_capacity = sd->imbalance_pct;
-> +		src_eff_capacity *= capacity_of(env->src_cpu);
-> +		src_eff_capacity *= capacity_orig_of(env->dst_cpu);
-> +
-> +		if (src_eff_capacity < dst_eff_capacity)
-> +			return 1;
-> +	}
-> +
->   	return unlikely(sd->nr_balance_failed > sd->cache_nice_tries+2);
->   }
->   
-> @@ -6661,6 +6695,9 @@ static int load_balance(int this_cpu, struct rq *this_rq,
->   
->   	schedstat_add(sd, lb_imbalance[idle], env.imbalance);
->   
-> +	env.src_cpu = busiest->cpu;
-> +	env.src_rq = busiest;
-> +
->   	ld_moved = 0;
->   	if (busiest->nr_running > 1) {
->   		/*
-> @@ -6670,8 +6707,6 @@ static int load_balance(int this_cpu, struct rq *this_rq,
->   		 * correctly treated as an imbalance.
->   		 */
->   		env.flags |= LBF_ALL_PINNED;
-> -		env.src_cpu   = busiest->cpu;
-> -		env.src_rq    = busiest;
->   		env.loop_max  = min(sysctl_sched_nr_migrate, busiest->nr_running);
->   
->   more_balance:
-> @@ -7371,22 +7406,25 @@ static void nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type idle)
->   
->   /*
->    * Current heuristic for kicking the idle load balancer in the presence
-> - * of an idle cpu is the system.
-> + * of an idle cpu in the system.
->    *   - This rq has more than one task.
-> - *   - At any scheduler domain level, this cpu's scheduler group has multiple
-> - *     busy cpu's exceeding the group's capacity.
-> + *   - This rq has at least one CFS task and the capacity of the CPU is
-> + *     significantly reduced because of RT tasks or IRQs.
-> + *   - At parent of LLC scheduler domain level, this cpu's scheduler group has
-> + *     multiple busy cpu.
->    *   - For SD_ASYM_PACKING, if the lower numbered cpu's in the scheduler
->    *     domain span are idle.
->    */
-> -static inline int nohz_kick_needed(struct rq *rq)
-> +static inline bool nohz_kick_needed(struct rq *rq)
->   {
->   	unsigned long now = jiffies;
->   	struct sched_domain *sd;
->   	struct sched_group_capacity *sgc;
->   	int nr_busy, cpu = rq->cpu;
-> +	bool kick = false;
->   
->   	if (unlikely(rq->idle_balance))
-> -		return 0;
-> +		return false;
->   
->          /*
->   	* We may be recently in ticked or tickless idle mode. At the first
-> @@ -7400,38 +7438,44 @@ static inline int nohz_kick_needed(struct rq *rq)
->   	 * balancing.
->   	 */
->   	if (likely(!atomic_read(&nohz.nr_cpus)))
-> -		return 0;
-> +		return false;
->   
->   	if (time_before(now, nohz.next_balance))
-> -		return 0;
-> +		return false;
->   
->   	if (rq->nr_running >= 2)
-> -		goto need_kick;
-> +		return true;
->   
->   	rcu_read_lock();
->   	sd = rcu_dereference(per_cpu(sd_busy, cpu));
-> -
->   	if (sd) {
->   		sgc = sd->groups->sgc;
->   		nr_busy = atomic_read(&sgc->nr_busy_cpus);
->   
-> -		if (nr_busy > 1)
-> -			goto need_kick_unlock;
-> +		if (nr_busy > 1) {
-> +			kick = true;
-> +			goto unlock;
-> +		}
-> +
->   	}
->   
-> -	sd = rcu_dereference(per_cpu(sd_asym, cpu));
-> +	sd = rcu_dereference(rq->sd);
-> +	if (sd) {
-> +		if ((rq->cfs.h_nr_running >= 1) &&
-> +				check_cpu_capacity(rq, sd)) {
-> +			kick = true;
-> +			goto unlock;
-> +		}
-> +	}
->   
-> +	sd = rcu_dereference(per_cpu(sd_asym, cpu));
->   	if (sd && (cpumask_first_and(nohz.idle_cpus_mask,
->   				  sched_domain_span(sd)) < cpu))
-> -		goto need_kick_unlock;
-> +		kick = true;
->   
-> +unlock:
->   	rcu_read_unlock();
-> -	return 0;
-> -
-> -need_kick_unlock:
-> -	rcu_read_unlock();
-> -need_kick:
-> -	return 1;
-> +	return kick;
->   }
->   #else
->   static void nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type idle) { }
+> v5: Dropped the .data annoation completely per suggestion of
+> Lorenzo. Dropped mpidr_hash_ptr per suggestion of Ard.
+> Moved sleep_save_sp and sleep_idmap_phys from assembly per
+> suggestion of Mark.
+> 
+> Please let me know if your Tested-by/Reviewed-by/Acked-by
+> still stands.
+> ---
+>  arch/arm64/kernel/sleep.S   | 29 ++++++-----------------------
+>  arch/arm64/kernel/suspend.c |  4 ++--
+>  2 files changed, 8 insertions(+), 25 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+> index a564b44..3f836b2 100644
+> --- a/arch/arm64/kernel/sleep.S
+> +++ b/arch/arm64/kernel/sleep.S
+> @@ -147,14 +147,12 @@ cpu_resume_after_mmu:
+>  	ret
+>  ENDPROC(cpu_resume_after_mmu)
+>  
+> -	.data
+>  ENTRY(cpu_resume)
+>  	bl	el2_setup		// if in EL2 drop to EL1 cleanly
+>  #ifdef CONFIG_SMP
+>  	mrs	x1, mpidr_el1
+> -	adr	x4, mpidr_hash_ptr
+> -	ldr	x5, [x4]
+> -	add	x8, x4, x5		// x8 = struct mpidr_hash phys address
+> +	adrp	x8, mpidr_hash
+> +	add x8, x8, #:lo12:mpidr_hash // x8 = struct mpidr_hash phys address
+>          /* retrieve mpidr_hash members to compute the hash */
+>  	ldr	x2, [x8, #MPIDR_HASH_MASK]
+>  	ldp	w3, w4, [x8, #MPIDR_HASH_SHIFTS]
+> @@ -164,14 +162,15 @@ ENTRY(cpu_resume)
+>  #else
+>  	mov	x7, xzr
+>  #endif
+> -	adr	x0, sleep_save_sp
+> +	adrp	x0, sleep_save_sp
+> +	add	x0, x0, #:lo12:sleep_save_sp
+>  	ldr	x0, [x0, #SLEEP_SAVE_SP_PHYS]
+>  	ldr	x0, [x0, x7, lsl #3]
+>  	/* load sp from context */
+>  	ldr	x2, [x0, #CPU_CTX_SP]
+> -	adr	x1, sleep_idmap_phys
+> +	adrp	x1, sleep_idmap_phys
+>  	/* load physical address of identity map page table in x1 */
+> -	ldr	x1, [x1]
+> +	ldr	x1, [x1, #:lo12:sleep_idmap_phys]
+>  	mov	sp, x2
+>  	/*
+>  	 * cpu_do_resume expects x0 to contain context physical address
+> @@ -182,24 +181,8 @@ ENTRY(cpu_resume)
+>  ENDPROC(cpu_resume)
+>  
+>  	.align 3
+> -mpidr_hash_ptr:
+>  	/*
+>  	 * offset of mpidr_hash symbol from current location
+>  	 * used to obtain run-time mpidr_hash address with MMU off
+>           */
+>  	.quad	mpidr_hash - .
+
+The .align, comment and the .quad should go too, now the value is
+unused.
+
+Other than that this looks fine, and cpuidle still works on my Juno. My
+Reviewed-by still stands.
+
+Thanks,
+Mark.
+
+> -/*
+> - * physical address of identity mapped page tables
+> - */
+> -	.type	sleep_idmap_phys, #object
+> -ENTRY(sleep_idmap_phys)
+> -	.quad	0
+> -/*
+> - * struct sleep_save_sp {
+> - *	phys_addr_t *save_ptr_stash;
+> - *	phys_addr_t save_ptr_stash_phys;
+> - * };
+> - */
+> -	.type	sleep_save_sp, #object
+> -ENTRY(sleep_save_sp)
+> -	.space	SLEEP_SAVE_SP_SZ	// struct sleep_save_sp
+> diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
+> index 13ad4db..3771b72 100644
+> --- a/arch/arm64/kernel/suspend.c
+> +++ b/arch/arm64/kernel/suspend.c
+> @@ -126,8 +126,8 @@ int __cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+>  	return ret;
+>  }
+>  
+> -extern struct sleep_save_sp sleep_save_sp;
+> -extern phys_addr_t sleep_idmap_phys;
+> +struct sleep_save_sp sleep_save_sp;
+> +phys_addr_t sleep_idmap_phys;
+>  
+>  static int __init cpu_suspend_init(void)
+>  {
+> -- 
+> Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+> 
+> 
