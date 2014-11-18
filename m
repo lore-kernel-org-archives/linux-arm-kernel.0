@@ -1,15 +1,15 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 18 Nov 2014 13:44:33 -0800
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 18 Nov 2014 23:10:18 +0100
 Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
  completes
 In-Reply-To: <1824493.p8QbHUZx3Z@vostro.rjw.lan>
-References: <20141118171831.GC3003@dtor-ws> <2942471.O5C3bMgcxl@vostro.rjw.lan>
- <20141118210229.GI3003@dtor-ws> <1824493.p8QbHUZx3Z@vostro.rjw.lan>
-Message-ID: <20141118214433.GJ3003@dtor-ws>
+References: <20141118171831.GC3003@dtor-ws> <20141118210229.GI3003@dtor-ws>
+ <1824493.p8QbHUZx3Z@vostro.rjw.lan>
+Message-ID: <2146731.F0GMumVzg0@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 10:58:17PM +0100, Rafael J. Wysocki wrote:
+On Tuesday, November 18, 2014 10:58:17 PM Rafael J. Wysocki wrote:
 > On Tuesday, November 18, 2014 01:02:29 PM Dmitry Torokhov wrote:
 > > On Tue, Nov 18, 2014 at 10:17:46PM +0100, Rafael J. Wysocki wrote:
 > > > On Tuesday, November 18, 2014 10:03:18 PM Rafael J. Wysocki wrote:
@@ -101,9 +101,28 @@ On Tue, Nov 18, 2014 at 10:58:17PM +0100, Rafael J. Wysocki wrote:
 > definition of it AFAICS).
 > 
 > genpd is all about proper power domains, like you said.
+> 
+> That's why I'm saying that they are different and clamping them both
+> together was a mistake.  I overlooked that, my bad.
 
-OK, thank you for explaining this. Up until now I was blissfully
-oblivious to the majority of PM intricacies :)
+For completeness, please let me quote the changelog of commit
+564b905ab10d (PM / Domains: Rename struct dev_power_domain to struct dev_pm_domain)
+dealing with this particular thing:
 
--- 
-Dmitry
+    The naming convention used by commit 7538e3db6e015e890825fbd9f86599b
+    (PM: Add support for device power domains), which introduced the
+    struct dev_power_domain type for representing device power domains,
+    evidently confuses some developers who tend to think that objects
+    of this type must correspond to "power domains" as defined by
+    hardware, which is not the case.  Namely, at the kernel level, a
+    struct dev_power_domain object can represent arbitrary set of devices
+    that are mutually dependent power management-wise and need not belong
+    to one hardware power domain.  To avoid that confusion, rename struct
+    dev_power_domain to struct dev_pm_domain and rename the related
+    pointers in struct device and struct pm_clk_notifier_block from
+    pwr_domain to pm_domain.
+
+And that should be explicitly explained in the PM documentation which I'm going
+to do.
+
+Rafael
