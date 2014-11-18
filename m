@@ -1,106 +1,147 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 18 Nov 2014 09:15:34 +0100
-Subject: [PATCH 2/2] dt-bindings: simplefb-sunxi: Add sunxi simplefb
- extensions
-In-Reply-To: <20141117155514.GU6414@lukather>
-References: <1416224086-5698-1-git-send-email-hdegoede@redhat.com>
- <1416224086-5698-3-git-send-email-hdegoede@redhat.com>
- <20141117124721.GQ6414@lukather>
- <CACxGe6vqiC08sP+o3bduGfvUdwRtHm8+_7EdZccJjS86qVKvxQ@mail.gmail.com>
- <20141117155514.GU6414@lukather>
-Message-ID: <546B0026.2010107@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 18 Nov 2014 09:16:55 +0100
+Subject: [RFC PATCHv2] ARM: mvebu: Let the device-tree determine smp_ops
+In-Reply-To: <alpine.DEB.2.10.1411181233160.902@chrisp-dl.ws.atlnz.lc>
+References: <20141106201603.GF4974@lunn.ch>
+ <1415327626-16079-1-git-send-email-chris.packham@alliedtelesis.co.nz>
+ <20141117095640.03e25d17@free-electrons.com>
+ <alpine.DEB.2.10.1411181233160.902@chrisp-dl.ws.atlnz.lc>
+Message-ID: <20141118081655.GW6414@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 11/17/2014 04:55 PM, Maxime Ripard wrote:
-> On Mon, Nov 17, 2014 at 01:39:18PM +0000, Grant Likely wrote:
->> On Mon, Nov 17, 2014 at 12:47 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->>> On Mon, Nov 17, 2014 at 12:34:46PM +0100, Hans de Goede wrote:
->>>> If pre-filled framebuffer nodes are used, the firmware may need extra
->>>> properties to find the right node. This documents the properties to use
->>>> for this on sunxi platforms.
->>>>
->>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>> ---
->>>>  .../bindings/video/simple-framebuffer-sunxi.txt    | 33 ++++++++++++++++++++++
->>>>  1 file changed, 33 insertions(+)
->>>>  create mode 100644 Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
->>>> new file mode 100644
->>>> index 0000000..84ca264
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
->>>> @@ -0,0 +1,33 @@
->>>> +Sunxi specific Simple Framebuffer bindings
->>>> +
->>>> +This binding documents sunxi specific extensions to the simple-framebuffer
->>>> +bindings. The sunxi simplefb u-boot code relies on the devicetree containing
->>>> +pre-populated simplefb nodes.
->>>> +
->>>> +These extensions are intended so that u-boot can select the right node based
->>>> +on which pipeline and output is being used. As such they are solely intended
->>>> +for firmware / bootloader use, and the OS should ignore them.
->>>> +
->>>> +Required properties:
->>>> +- compatible: "sunxi,framebuffer"
->>>> +- sunxi,pipeline:
->>>> +  <0> for the de_be0 -> lcdc0 -> output pipeline
->>>> +  <1> for the de_be1 -> lcdc1 -> output pipeline
->>>> +- sunxi,output: One of: "hdmi", "lcd", "vga", and "composite"
->>>> +
->>>> +Example:
->>>> +
->>>> +chosen {
->>>> +     #address-cells = <1>;
->>>> +     #size-cells = <1>;
->>>> +     ranges;
->>>> +
->>>> +     framebuffer at 0 {
->>>> +             compatible = "sunxi,framebuffer", "simple-framebuffer";
->>>> +             sunxi,pipeline = <0>;
->>>> +             sunxi,output = "hdmi";
->>>> +             clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
->>>> +                      <&ahb_gates 44>;
->>>
->>> If we're going that way, then maybe having to specify clock-names
->>> would be better in order to know which clock is what?
->>
->> I wouldn't go that way with this binding since the driver has no need
->> to differentiate between the clocks, and driver authors shouldn't be
->> encouraged to do so. The purpose of the clocks in this node is only
->> for itemizing dependencies, not for how to configure the clocks.
->> Firmware shouldn't care at all about the clocks list, it only needs to
->> find the correct pre-populated node to fill in and enable.
+On Tue, Nov 18, 2014 at 12:34:41PM +1300, Chris Packham wrote:
+> Hi Thomas, Maxime
 > 
-> Well, if we want to play the "DT as an ABI" stuff, you have no
-> guarantee that in the future, simplefb will still be the driver bound
-> to "sunxi,framebuffer"
+> On Mon, 17 Nov 2014, Thomas Petazzoni wrote:
+> 
+> >Dear Chris Packham,
+> >
+> >On Fri,  7 Nov 2014 15:33:46 +1300, Chris Packham wrote:
+> >>The machine specific SMP operations can be configured either via
+> >>setup_arch or via arm_dt_init_cpu_maps. For the ARMADA_370_XP_DT devices
+> >>both of these are called and setup_arch wins because it is called last.
+> >>This means that it is not possible to substitute a different set of SMP
+> >>operations via the device-tree.
+> >>
+> >>For the ARMADA_370_XP_DT compatible devices add a smp_init function that
+> >>detects if the device tree has an enable-method defined. If it does
+> >>return true to indicate that the smp_ops have already been set which
+> >>will prevent setup_arch from overriding them.
+> >>
+> >>Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+> >
+> >My colleague Maxime Ripard (in Cc) rightfully suggests exploring a
+> >different option: what about getting rid completely of the .smp field
+> >of the DT_MACHINE structure, and instead have some code run early
+> >enough that looks if an enable-method is defined, and if not, defines
+> >it to the default value. This way, we continue to be backward
+> >compatible in terms of DT, but we always use the enable-method from the
+> >DT, and not sometimes from DT, sometimes from the DT_MACHINE structure.
+> >
+> >Unfortunately, it will have to be done on the flattened DT, because the
+> >DT is unflattened right before the enable-method properties are looked
+> >up:
+> >
+> >       unflatten_device_tree();
+> >
+> >       arm_dt_init_cpu_maps();
+> >
+> >And manipulating the DT in its flattened format, while possible in
+> >->dt_fixup(), is a pain, and probably doesn't allow adding new
+> >properties anyway.
+> >
+> >So, in the end, maybe this idea doesn't work, I haven't checked
+> >completely.
+> >
+> 
+> So yeah it's tricky to work with the flattened dt. Not impossible the
+> powerpc arch code does quite a lot with it. Arm does less but still uses it
+> in atags_to_fdt.c. Below is a rough attempt at an implementation that seems
+> to work. Because of the flattened dt it's harder to iterate through the cpu
+> nodes so I haven't implemented anything to look for an enable-method
+> attached to them.
+> 
+> ---- 8< ----
+> Subject: [PATCH] ARM: mvebu: use dt_fixup to provide fallback for
+>  enable-method
+> 
+> When the device tree doesn't define an enable-method insert a property
+> into the flattened device tree. arm_dt_init_cpu_maps() will then parse
+> this an set smp_ops appropriately. Now that we have this fallback it is
+> no longer necessary to set .smp in the DT_MACHINE definition.
+> 
+> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+> ---
+>  arch/arm/mach-mvebu/Makefile   |  2 ++
+>  arch/arm/mach-mvebu/board-v7.c | 23 ++++++++++++++++++++++-
+>  2 files changed, 24 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+> index 1636cdb..f818eaf 100644
+> --- a/arch/arm/mach-mvebu/Makefile
+> +++ b/arch/arm/mach-mvebu/Makefile
+> @@ -14,3 +14,5 @@ endif
+> 
+>  obj-$(CONFIG_MACH_DOVE)		 += dove.o
+>  obj-$(CONFIG_MACH_KIRKWOOD)	 += kirkwood.o kirkwood-pm.o
+> +
+> +CFLAGS_board-v7.o = -I$(src)/../../../scripts/dtc/libfdt
+> \ No newline at end of file
+> diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+> index b2524d6..45851a2 100644
+> --- a/arch/arm/mach-mvebu/board-v7.c
+> +++ b/arch/arm/mach-mvebu/board-v7.c
+> @@ -17,6 +17,8 @@
+>  #include <linux/clk-provider.h>
+>  #include <linux/of_address.h>
+>  #include <linux/of_platform.h>
+> +#include <linux/of_fdt.h>
+> +#include <linux/libfdt.h>
+>  #include <linux/io.h>
+>  #include <linux/clocksource.h>
+>  #include <linux/dma-mapping.h>
+> @@ -184,6 +186,25 @@ static void __init mvebu_dt_init(void)
+>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>  }
+> 
+> +static void __init armada_370_xp_dt_fixup(void)
+> +{
+> +	void *prop;
+> +	int offset;
+> +	int len;
+> +
+> +	offset = fdt_path_offset(initial_boot_params, "/cpus");
+> +	prop = fdt_getprop(initial_boot_params, offset, "enable-method", &len);
+> +
+> +	if (!prop) {
+> +		pr_info("No enable-method defined. "
+> +			"Falling back to \"marvell,armada-xp-smp\"\n");
+> +
+> +		fdt_appendprop(initial_boot_params, offset, "enable-method",
+> +			       "marvell,armada-xp-smp",
+> +			       sizeof("marvell,armada-xp-smp"));
+> +	}
+> +}
+> +
 
-Huh? We do have that guarantee, or at least that a simplefb bindings
-compatible driver is, the "sunxi,framebuffer" bindings live in:
+It's what I had in mind yes :)
 
-Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+I don't think you need to use fdt_appendprop though, fdt_setprop would
+be enough.
 
-With the filename already being a big hint, further more it states that:
+Maxime
 
-"This binding documents sunxi specific extensions to the simple-framebuffer
-bindings. The sunxi simplefb u-boot code relies on the devicetree containing
-pre-populated simplefb nodes.
-
-These extensions are intended so that u-boot can select the right node based
-on which pipeline is being used. As such they are solely intended for
-firmware / bootloader use, and the OS should ignore them."
-
-Which to me seems to guarantee that we're talking about a simple-framebuffer
-compatible node here. The scope of these extensions are very narrow, there
-only purpose is to allow the bootloader to find the right pre-populated simplefb
-node, everything else is specified by the simplefb bindings, not these
-extensions.
-
-Regards,
-
-Hans
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141118/ecb01da2/attachment.sig>
