@@ -1,34 +1,29 @@
-From: mlangsdo@redhat.com (Mark Langsdorf)
-Date: Tue, 18 Nov 2014 14:33:56 -0600
-Subject: [PATCH v2 2/2] [usb] add support for ACPI identification to
- xhci-platform
-In-Reply-To: <CAL85gmDr14EHK+7-ojx5vxvc0ykUsTGxku4LWS=w8TFEh3Bw9w@mail.gmail.com>
-References: <1414692989-23128-2-git-send-email-mlangsdo@redhat.com>	<1415119833-9135-1-git-send-email-mlangsdo@redhat.com>	<1415119833-9135-2-git-send-email-mlangsdo@redhat.com>	<20141104171220.GA30385@kroah.com>	<5464FA19.6030609@redhat.com>
- <CAL85gmDr14EHK+7-ojx5vxvc0ykUsTGxku4LWS=w8TFEh3Bw9w@mail.gmail.com>
-Message-ID: <546BAD34.8040206@redhat.com>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Tue, 18 Nov 2014 21:32:00 +0100
+Subject: [PATCH v3 3/3] ARM: dts: meson: add I2C controller nodes
+In-Reply-To: <CAOQ7t2Yw5h61xWf2MW11Zsz5_gnv==ihB7Swj=yqcYc=J166gw@mail.gmail.com>
+References: <1415907123-4318-1-git-send-email-b.galvani@gmail.com>
+ <1415907123-4318-4-git-send-email-b.galvani@gmail.com>
+ <20141118151927.GG30004@katana>
+ <CAOQ7t2Yw5h61xWf2MW11Zsz5_gnv==ihB7Swj=yqcYc=J166gw@mail.gmail.com>
+Message-ID: <20141118203200.GA26363@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2014 02:05 PM, Feng Kan wrote:
-> On Thu, Nov 13, 2014 at 10:36 AM, Mark Langsdorf <mlangsdo@redhat.com> wrote:
->> On 11/04/2014 11:12 AM, Greg KH wrote:
->>>
->>> On Tue, Nov 04, 2014 at 10:50:33AM -0600, Mark Langsdorf wrote:
->>
->>    #endif
->>>>
->>>>
->>>> +#ifdef CONFIG_ACPI
->>>> +static const struct acpi_device_id usb_xhci_acpi_match[] = {
->>>> +       /* APM X-Gene USB Controller */
->>>> +       { "PNP0D10", },
->
-> Mark, would it be better to use PRP0001 instead as in this patch?
-> https://lkml.org/lkml/2014/9/16/230
+On Tue, Nov 18, 2014 at 04:29:13PM +0100, Carlo Caione wrote:
+> On Tue, Nov 18, 2014 at 4:19 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> > On Thu, Nov 13, 2014 at 08:32:03PM +0100, Beniamino Galvani wrote:
+> >> Add nodes for I2C controllers A,B,AO, which are available in both
+> >> Meson6 and Meson8.
+> >>
+> >> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+> >> ---
+> >
+> > I usually don't take DTS patches. They should go via arm-soc. Please say
+> > so if there are reasons I should take it.
+> 
+> I'll take them.
 
-Quoting Arnd,
-"In this case, the device does have an official ACPI ID "PNP0D10",
-so we should use that for compatibility with other operating
-systems and with BIOS versions that provide the standard IDs."
+Thanks!
 
---Mark Langsdorf
+Beniamino
