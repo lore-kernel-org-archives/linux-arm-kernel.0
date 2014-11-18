@@ -1,53 +1,65 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Mon, 17 Nov 2014 22:03:35 -0600
-Subject: [GIT PULL 2/2] SOCFPGA DTS updates for v3.19
-In-Reply-To: <1416283415-6563-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1416283415-6563-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <1416283415-6563-2-git-send-email-dinguyen@opensource.altera.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Tue, 18 Nov 2014 10:31:04 +0530
+Subject: [PATCH] ARM: dts: DRA7: Add node for RTC
+In-Reply-To: <546A1E5E.1040909@cogentembedded.com>
+References: <1416199509-3977-1-git-send-email-lokeshvutla@ti.com>
+ <5469E76A.7020105@cogentembedded.com> <5469F271.9080102@ti.com>
+ <546A1E5E.1040909@cogentembedded.com>
+Message-ID: <546AD290.8080303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin and Olof,
+Hi,
+On Monday 17 November 2014 09:42 PM, Sergei Shtylyov wrote:
+> On 11/17/2014 4:04 PM, Lokesh Vutla wrote:
+> 
+>>> On 11/17/2014 7:45 AM, Lokesh Vutla wrote:
+> 
+>>>> Add node for RTC.
+> 
+>>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>>>> [nm at ti.com: update with rtc crossbar number]
+>>>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>>>> ---
+>>>>    arch/arm/boot/dts/dra7.dtsi | 9 +++++++++
+>>>>    1 file changed, 9 insertions(+)
+> 
+>>>> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+>>>> index 9cc9843..f98f9f0 100644
+>>>> --- a/arch/arm/boot/dts/dra7.dtsi
+>>>> +++ b/arch/arm/boot/dts/dra7.dtsi
+>>>> @@ -1075,6 +1075,15 @@
+>>>>                status = "disabled";
+>>>>            };
+>>>>
+>>>> +        rtc: rtcss at 48838000 {
+> 
+>>>     Please just name the node "rtc at 48838000", in accordance with ePAPR.
+> 
+>> Okay. will update it.
+> 
+>>>> +            compatible = "ti,am3352-rtc";
+>>>> +            reg = <0x48838000 0x100>;
+>>>> +            interrupts = <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>,
+>>>> +                     <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>;
+> 
+>>>     2 similar interrupts?
+> 
+>> both rtc timer and rtc alarm uses same interrupt on DRA7 Soc.
+>> Driver handles it accordingly.
+>> So passing the same interrupt.
+> 
+>    I think it would have been better if the driver just handled a single interrupt.
+There are certain SoCs with RTC IP where timer and alarm uses different interrupts.
+Driver has to take care of that scenario also. So it expects two interrupts from dt. 
 
-Please consider pulling in these 4 patches for v3.19.
-
-Thanks,
-Dinh
-
-The following changes since commit 206c5f60a3d902bc4b56dab2de3e88de5eb06108:
-
-  Linux 3.18-rc4 (2014-11-09 14:55:29 -0800)
-
-are available in the git repository at:
-
-  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_dts_updates_for_v3.19
-
-for you to fetch changes up to b313f03020db4ccb2e8254b5aa14286d7dd5172d:
-
-  arm: dts: socfpga: Add a base DTSI for Altera's Arria10 SOC (2014-11-17 15:09:46 -0600)
-
-----------------------------------------------------------------
-SoCFPGA DTS updates for v3.19
-
-- Add DTS support for a new chip in the SOCFPGA family, the Arria 10.
-- Enable watchdog node.
-- Add SPI nodes.
-- Add the OCRAM node.
-
-----------------------------------------------------------------
-Dinh Nguyen (3):
-      arm: dts: socfpga: Add OCRAM node
-      arm: dts: socfpga: enable watchdog for socfpga platform
-      arm: dts: socfpga: Add a base DTSI for Altera's Arria10 SOC
-
-Thor Thayer (1):
-      arm: dts: socfpga: Add SPI nodes to SOCFPGA DT.
-
- arch/arm/boot/dts/Makefile                  |   1 +
- arch/arm/boot/dts/socfpga.dtsi              |  27 ++
- arch/arm/boot/dts/socfpga_arria10.dtsi      | 374 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/socfpga_arria10_socdk.dts |  48 ++++
- arch/arm/boot/dts/socfpga_cyclone5.dtsi     |   4 +
- 5 files changed, 454 insertions(+)
- create mode 100644 arch/arm/boot/dts/socfpga_arria10.dtsi
- create mode 100755 arch/arm/boot/dts/socfpga_arria10_socdk.dts
+Thanks and regards,
+Lokesh 
+> 
+>> Thanks and regards,
+>> Lokesh
+> 
+>>> [...]
+> 
+> WBR, Sergei
+> 
