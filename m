@@ -1,87 +1,59 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Tue, 18 Nov 2014 19:52:56 +0900
-Subject: [BUG] blocked task after exynos_drm_init
-In-Reply-To: <546B228E.6030500@samsung.com>
-References: <1415264811.27478.4.camel@AMDC1943> <546B228E.6030500@samsung.com>
-Message-ID: <546B2508.8070409@samsung.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 18 Nov 2014 16:17:28 +0530
+Subject: [PATCH v5 0/2] Handle reboot for Exynos SoC via restart_handler
+Message-ID: <1416307650-15162-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014? 11? 18? 19:42, Andrzej Hajda wrote:
-> On 11/06/2014 10:06 AM, Krzysztof Kozlowski wrote:
->> Hi,
->>
->> On last next (next-20141104, next-20141105) booting locks after
->> initializing Exynos DRM (Trats2 board):
->>
->> [    2.028283] [drm] Initialized drm 1.1.0 20060810
->> [  240.505795] INFO: task swapper/0:1 blocked for more than 120 seconds.
->> [  240.510825]       Not tainted 3.18.0-rc3-next-20141105 #794
->> [  240.516418] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
->> [  240.524173] swapper/0       D c052534c     0     1      0 0x00000000
->> [  240.530527] [<c052534c>] (__schedule) from [<c0525b34>] (schedule_preempt_disabled+0x14/0x20)
->> [  240.539030] [<c0525b34>] (schedule_preempt_disabled) from [<c0526d44>] (mutex_lock_nested+0x1c4/0x464)
->> [  240.548320] [<c0526d44>] (mutex_lock_nested) from [<c02be908>] (__driver_attach+0x48/0x98)
->> [  240.556562] [<c02be908>] (__driver_attach) from [<c02bcc00>] (bus_for_each_dev+0x54/0x88)
->> [  240.564717] [<c02bcc00>] (bus_for_each_dev) from [<c02bdce0>] (bus_add_driver+0xe4/0x200)
->> [  240.572876] [<c02bdce0>] (bus_add_driver) from [<c02bef94>] (driver_register+0x78/0xf4)
->> [  240.580864] [<c02bef94>] (driver_register) from [<c029e99c>] (exynos_drm_platform_probe+0x34/0x234)
->> [  240.589890] [<c029e99c>] (exynos_drm_platform_probe) from [<c02bfcf0>] (platform_drv_probe+0x48/0xa4)
->> [  240.599090] [<c02bfcf0>] (platform_drv_probe) from [<c02be680>] (driver_probe_device+0x13c/0x37c)
->> [  240.607940] [<c02be680>] (driver_probe_device) from [<c02be954>] (__driver_attach+0x94/0x98)
->> [  240.616360] [<c02be954>] (__driver_attach) from [<c02bcc00>] (bus_for_each_dev+0x54/0x88)
->> [  240.624517] [<c02bcc00>] (bus_for_each_dev) from [<c02bdce0>] (bus_add_driver+0xe4/0x200)
->> [  240.632679] [<c02bdce0>] (bus_add_driver) from [<c02bef94>] (driver_register+0x78/0xf4)
->> [  240.640667] [<c02bef94>] (driver_register) from [<c029e938>] (exynos_drm_init+0x70/0xa0)
->> [  240.648739] [<c029e938>] (exynos_drm_init) from [<c00089b0>] (do_one_initcall+0xac/0x1f0)
->> [  240.656914] [<c00089b0>] (do_one_initcall) from [<c074bd90>] (kernel_init_freeable+0x10c/0x1d8)
->> [  240.665591] [<c074bd90>] (kernel_init_freeable) from [<c051eabc>] (kernel_init+0x8/0xec)
->> [  240.673661] [<c051eabc>] (kernel_init) from [<c000f268>] (ret_from_fork+0x14/0x2c)
->> [  240.681196] 3 locks held by swapper/0/1:
->> [  240.685091]  #0:  (&dev->mutex){......}, at: [<c02be908>] __driver_attach+0x48/0x98
->> [  240.692732]  #1:  (&dev->mutex){......}, at: [<c02be918>] __driver_attach+0x58/0x98
->> [  240.700367]  #2:  (&dev->mutex){......}, at: [<c02be908>] __driver_attach+0x48/0x98
-> 
-> 
-> This is caused by patch moving platform devices to
-> /sys/devices/platform[1]. Since this patch registering platform
-> drivers/devices in probe of platform device causes deadlocks. I guess
-> now all driver registration should be moved to exynos_drm_init and it
-> seems better location for it IMHO.
+This patch removes restart hook from machine_desc of Exynos, and moves
+respective code into restart_notifiers.
+Exynos5440 handles reboot via clock register so let's register a
+restart_handler in Exynos5440 clock driver.
+For rest Exynos SoC, reboot is handled via PMU SWRESET register so
+let's register a restart_handler in PMU driver for handling this.
 
-Thanks. It might be a chance that we could separate sub drivers of
-Exynos drm into independent modules so that they can be called
-independently because if we move them to exynos_drm_init then the
-deferred probe wouldn't work correctly.
+This patch is inspired and dependent on following patch series[1] from
+Geunter Roeck.
 
-Thanks,
-Inki Dae
+[1]: kernel: Add support for kernel restart handler call chain
+https://lkml.org/lkml/2014/8/19/652
 
-> 
-> Regards
-> Andrzej
-> 
-> [1]: http://www.spinics.net/lists/devicetree/msg56101.html
-> 
-> 
-> 
->>
->> Full dmesg and config attached.
->>
->> Best regards,
->> Krzysztof
->>
->>
->>
->> _______________________________________________
->> dri-devel mailing list
->> dri-devel at lists.freedesktop.org
->> http://lists.freedesktop.org/mailman/listinfo/dri-devel
->>
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+I have tested reboot functionality on Exynos3250 based board, on
+kgene/for-next as well as linux-next's next-20141114 tag.
+
+Patch v3 and related discussion can be found here
+http://www.spinics.net/lists/linux-samsung-soc/msg37600.html
+
+Changes since v4:
+  - Addressed review comments from Geunter Roeck.
+  - Added Geunter Roeck's Acked-by tag.
+
+Changes since v3:
+  - As v2 is causing conflict after recent changes in kgene/for-next,
+    rebased on top of kgene/for-next dated 2014-11-13.
+  - Removed dependency patch list from cover-letter as all dependencies 
+    are merged into kgene/for-next.
+
+Changes since v2:
+  - Used register_restart_handler instead of register_reboot_notifier.
+  - Updated notifier names and commit message accordingly.
+
+Changes since v1:
+  - Addressed review comments from Tomasz Figa. Removed usage of 
+    local variables where ever unnecessary.
+  - Make reg_base as global in clk-exynos5440.c file, to avoid 
+    iomapping it again in reboot_notifier handler.
+
+
+Pankaj Dubey (2):
+  clk: samsung: exynos5440: move restart code into clock driver
+  ARM: EXYNOS: PMU: move restart code into pmu driver
+
+ arch/arm/mach-exynos/common.h        |    1 -
+ arch/arm/mach-exynos/exynos.c        |   23 -----------------------
+ arch/arm/mach-exynos/pmu.c           |   23 +++++++++++++++++++++++
+ drivers/clk/samsung/clk-exynos5440.c |   29 ++++++++++++++++++++++++++++-
+ 4 files changed, 51 insertions(+), 25 deletions(-)
+
+-- 
+1.7.9.5
