@@ -1,125 +1,34 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 18 Nov 2014 10:29:21 +0100
-Subject: [PATCH 2/2] dt-bindings: simplefb-sunxi: Add sunxi simplefb
- extensions
-In-Reply-To: <546B0026.2010107@redhat.com>
-References: <1416224086-5698-1-git-send-email-hdegoede@redhat.com>
- <1416224086-5698-3-git-send-email-hdegoede@redhat.com>
- <20141117124721.GQ6414@lukather>
- <CACxGe6vqiC08sP+o3bduGfvUdwRtHm8+_7EdZccJjS86qVKvxQ@mail.gmail.com>
- <20141117155514.GU6414@lukather> <546B0026.2010107@redhat.com>
-Message-ID: <20141118092921.GZ6414@lukather>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 18 Nov 2014 10:36:35 +0100
+Subject: ARM: shmobile: ARCH_R8A7793?
+In-Reply-To: <1416302641.7024.7.camel@x220>
+References: <1416302641.7024.7.camel@x220>
+Message-ID: <CAMuHMdUFZo+r-N0Ofa1d6PHDtB6dqZfChpLgOz_XtruWD3_a3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 09:15:34AM +0100, Hans de Goede wrote:
-> Hi,
-> 
-> On 11/17/2014 04:55 PM, Maxime Ripard wrote:
-> > On Mon, Nov 17, 2014 at 01:39:18PM +0000, Grant Likely wrote:
-> >> On Mon, Nov 17, 2014 at 12:47 PM, Maxime Ripard
-> >> <maxime.ripard@free-electrons.com> wrote:
-> >>> On Mon, Nov 17, 2014 at 12:34:46PM +0100, Hans de Goede wrote:
-> >>>> If pre-filled framebuffer nodes are used, the firmware may need extra
-> >>>> properties to find the right node. This documents the properties to use
-> >>>> for this on sunxi platforms.
-> >>>>
-> >>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>>> ---
-> >>>>  .../bindings/video/simple-framebuffer-sunxi.txt    | 33 ++++++++++++++++++++++
-> >>>>  1 file changed, 33 insertions(+)
-> >>>>  create mode 100644 Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
-> >>>>
-> >>>> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
-> >>>> new file mode 100644
-> >>>> index 0000000..84ca264
-> >>>> --- /dev/null
-> >>>> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
-> >>>> @@ -0,0 +1,33 @@
-> >>>> +Sunxi specific Simple Framebuffer bindings
-> >>>> +
-> >>>> +This binding documents sunxi specific extensions to the simple-framebuffer
-> >>>> +bindings. The sunxi simplefb u-boot code relies on the devicetree containing
-> >>>> +pre-populated simplefb nodes.
-> >>>> +
-> >>>> +These extensions are intended so that u-boot can select the right node based
-> >>>> +on which pipeline and output is being used. As such they are solely intended
-> >>>> +for firmware / bootloader use, and the OS should ignore them.
-> >>>> +
-> >>>> +Required properties:
-> >>>> +- compatible: "sunxi,framebuffer"
-> >>>> +- sunxi,pipeline:
-> >>>> +  <0> for the de_be0 -> lcdc0 -> output pipeline
-> >>>> +  <1> for the de_be1 -> lcdc1 -> output pipeline
-> >>>> +- sunxi,output: One of: "hdmi", "lcd", "vga", and "composite"
-> >>>> +
-> >>>> +Example:
-> >>>> +
-> >>>> +chosen {
-> >>>> +     #address-cells = <1>;
-> >>>> +     #size-cells = <1>;
-> >>>> +     ranges;
-> >>>> +
-> >>>> +     framebuffer at 0 {
-> >>>> +             compatible = "sunxi,framebuffer", "simple-framebuffer";
-> >>>> +             sunxi,pipeline = <0>;
-> >>>> +             sunxi,output = "hdmi";
-> >>>> +             clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
-> >>>> +                      <&ahb_gates 44>;
-> >>>
-> >>> If we're going that way, then maybe having to specify clock-names
-> >>> would be better in order to know which clock is what?
-> >>
-> >> I wouldn't go that way with this binding since the driver has no need
-> >> to differentiate between the clocks, and driver authors shouldn't be
-> >> encouraged to do so. The purpose of the clocks in this node is only
-> >> for itemizing dependencies, not for how to configure the clocks.
-> >> Firmware shouldn't care at all about the clocks list, it only needs to
-> >> find the correct pre-populated node to fill in and enable.
-> > 
-> > Well, if we want to play the "DT as an ABI" stuff, you have no
-> > guarantee that in the future, simplefb will still be the driver bound
-> > to "sunxi,framebuffer"
-> 
-> Huh? We do have that guarantee, or at least that a simplefb bindings
-> compatible driver is, the "sunxi,framebuffer" bindings live in:
-> 
-> Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
-> 
-> With the filename already being a big hint, further more it states that:
+Hi Paul,
 
-Yeah, well, that can change. The compatible itself can't, but we're
-free to move around the drivers however we see fit (as long as the
-user-space is not impacted)
+On Tue, Nov 18, 2014 at 10:24 AM, Paul Bolle <pebolle@tiscali.nl> wrote:
+> Your commit 7a2071c58f36 ("ARM: shmobile: Add early debugging support
+> using SCIF(A)") is included in today's linux-next (ie, next-20141118).
+> It adds an (optional) dependency on the Kconfig symbol ARCH_R8A7793. But
+> that symbol isn't part of next-20141118.
+>
+> Is a patch that adds this symbol queued somewhere?
 
-> "This binding documents sunxi specific extensions to the simple-framebuffer
-> bindings. The sunxi simplefb u-boot code relies on the devicetree containing
-> pre-populated simplefb nodes.
-> 
-> These extensions are intended so that u-boot can select the right node based
-> on which pipeline is being used. As such they are solely intended for
-> firmware / bootloader use, and the OS should ignore them."
-> 
-> Which to me seems to guarantee that we're talking about a simple-framebuffer
-> compatible node here. The scope of these extensions are very narrow, there
-> only purpose is to allow the bootloader to find the right pre-populated simplefb
-> node, everything else is specified by the simplefb bindings, not these
-> extensions.
+Not yet. I was just a bit pro-active ;-)
 
-My point was that what we might need to know these clocks at some
-point in the future. But if you don't believe we will, it's fine for
-me.
+However, there are already references to r8a7793 in DT binding documentation,
+and in of_device_id arrays in drivers.
 
-Maxime
+Gr{oetje,eeting}s,
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141118/d53efffa/attachment-0001.sig>
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
