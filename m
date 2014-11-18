@@ -1,53 +1,61 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 19 Nov 2014 00:32:39 +0100
-Subject: [PATCH v2] cpu_pm: fix unmet dependency for CPU_PM
-In-Reply-To: <alpine.LFD.2.11.1411170128560.11690@knanqh.ubzr>
-References: <1416204764-8912-1-git-send-email-pankaj.dubey@samsung.com>
- <alpine.LFD.2.11.1411170128560.11690@knanqh.ubzr>
-Message-ID: <1978454.Vafaacm06c@vostro.rjw.lan>
+From: rob.herring@linaro.org (Rob Herring)
+Date: Tue, 18 Nov 2014 17:11:26 -0600
+Subject: [PATCH v5.5] of/fdt: export fdt blob as /sys/firmware/fdt
+In-Reply-To: <20141118221103.4ECB3C40966@trevor.secretlab.ca>
+References: <1415984735-32388-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20141118165145.4F6A8C40966@trevor.secretlab.ca>
+ <20141118172545.GC14323@leverpostej>
+ <20141118221103.4ECB3C40966@trevor.secretlab.ca>
+Message-ID: <CABGGiswNc1jHWiCraKmEVWRn-aMndt8AfYA3GtmaDBVpZBd+aA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 17, 2014 01:29:20 AM Nicolas Pitre wrote:
-> On Mon, 17 Nov 2014, Pankaj Dubey wrote:
-> 
-> > If BL_SWITCHER is enabled but SUSPEND and CPU_IDLE is not enabled
-> > we are getting following config warning.
-> > 
-> > warning: (BL_SWITCHER) selects CPU_PM which has unmet direct
-> > dependencies (SUSPEND || CPU_IDLE)
-> > 
-> > It has been noticed that CPU_PM dependencies in this file are not really
-> > required so let's remove these dependencies from CPU_PM.
-> > 
-> > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
+On Tue, Nov 18, 2014 at 4:11 PM, Grant Likely <grant.likely@linaro.org> wrote:
+> On Tue, 18 Nov 2014 17:25:45 +0000
+> , Mark Rutland <mark.rutland@arm.com>
+>  wrote:
+>> On Tue, Nov 18, 2014 at 04:51:45PM +0000, Grant Likely wrote:
+>> > On Fri, 14 Nov 2014 18:05:35 +0100
+>> > , Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> >  wrote:
+>> > > Create a new /sys entry '/sys/firmware/fdt' to export the FDT blob
+>> > > that was passed to the kernel by the bootloader. This allows userland
+>> > > applications such as kexec to access the raw binary.
 
-Patch queued up for 3.19-rc1, thanks!
+[...]
 
-> > ---
-> > This patch is second attempt to fix this config issue. Patch v1 and related
-> > discussion can be found here [1]
-> > 1: https://lkml.org/lkml/2014/11/14/673
-> > 
-> >  kernel/power/Kconfig |    1 -
-> >  1 file changed, 1 deletion(-)
-> > 
-> > diff --git a/kernel/power/Kconfig b/kernel/power/Kconfig
-> > index bbef57f..1eb7da7 100644
-> > --- a/kernel/power/Kconfig
-> > +++ b/kernel/power/Kconfig
-> > @@ -308,4 +308,3 @@ config PM_GENERIC_DOMAINS_OF
-> >  
-> >  config CPU_PM
-> >  	bool
-> > -	depends on SUSPEND || CPU_IDLE
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> > * It also helps with exposing the reserved map to userspace, but kexec
+>> >   has done without that feature for years, and it is in the process of
+>> >   being deprecated in favour of /reserved-memory anyway.
+>>
+>> This is the first I'd heard of the reserve map being deprecated, and
+>> we're going to have DTs with reserved map entries for a long time going
+>> forwards.
+>
+> Deprecated, not removed or disabled. It will still work pretty much
+> forever, but users should be encouraged to move to the reserve-memory
+> tree.
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+I thought you had said reserve map was still the right way for memory
+the kernel should never touch.
+
+>> Can't we expose the header fields under something like
+>> /sys/firmware/devicetree/dtb-header/, parallel to the usual
+>> /sys/firmware/devicetree/base for nodes?
+>
+> We could do that too.
+>
+> Honestly though, I'm just unsure of what the best thing to do is. If you
+> and a few others tell me that, "no, exporting the raw dtb is the right
+> thing to do", then I'll be okay, merge the patch and sleep properly.
+
+I always sleep better when others can take the blame.
+
+What happens when we rev the dtb format? Is the ABI the blob or the
+format of the blob?
+
+I lean towards we should add this. This is providing what is "in the
+firmware" while /proc/devicetree provides the live tree state
+including overlays.
+
+Rob
