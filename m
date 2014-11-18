@@ -1,67 +1,119 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 18 Nov 2014 12:01:08 +0100
-Subject: [PATCH 3/4] simplefb: Change simplefb_init from module_init to
- fs_initcall
-In-Reply-To: <20141118101911.GA15769@ulmo>
-References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
- <1415830124-28787-3-git-send-email-hdegoede@redhat.com>
- <20141113085238.GE20972@lukather>
- <CAMuHMdXZ4V4GHvyDLOP8FYvPuGArc5G0aO6NCE9FKHT24YRGPg@mail.gmail.com>
- <20141118101911.GA15769@ulmo>
-Message-ID: <546B26F4.50302@redhat.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 18 Nov 2014 11:03:19 +0000
+Subject: [PATCH v4 06/19] arm/arm64: KVM: move kvm_register_device_ops()
+ into vGIC probing
+In-Reply-To: <546B2646.7060103@linaro.org>
+References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
+ <1415959683-26027-7-git-send-email-andre.przywara@arm.com>
+ <546B22C0.7030701@linaro.org> <546B2646.7060103@linaro.org>
+Message-ID: <546B2777.1090706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Eric,
 
-On 11/18/2014 11:19 AM, Thierry Reding wrote:
-> On Thu, Nov 13, 2014 at 09:58:41AM +0100, Geert Uytterhoeven wrote:
->> Hi Maxime,
->>
->> On Thu, Nov 13, 2014 at 9:52 AM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->>>> -module_init(simplefb_init);
->>>> +/*
->>>> + * While this can be a module, if builtin it's most likely the console
->>>> + * So let's leave module_exit but move module_init to an earlier place
->>>> + */
+thanks for the review! Much appreciated.
+
+On 18/11/14 10:58, Eric Auger wrote:
+> On 11/18/2014 11:43 AM, Eric Auger wrote:
+>> On 11/14/2014 11:07 AM, Andre Przywara wrote:
+>>> Currently we unconditionally register the GICv2 emulation device
+>>> during the host's KVM initialization. Since with GICv3 support we
+>>> may end up with only v2 or only v3 or both supported, we move the
+>>> registration into the GIC probing function, where we will later know
+>>> which combination is valid.
 >>>
->>> Not really related to this patch itself, but do we want to support
->>> simplefb as a module? It seems like it's going to be most of the time
->>> broken.
->>
->> If it depends on clocks, it won't work as a module, as CCF will have disabled
->> all unused clocks at that point.
+>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>> ---
+>>> Changelog v3...v4:
+>>> - add Acked-by
+>>>
+>>>  include/linux/kvm_host.h |    1 +
+>>>  virt/kvm/arm/vgic-v2.c   |    2 ++
+>>>  virt/kvm/arm/vgic-v3.c   |    1 +
+>>>  virt/kvm/arm/vgic.c      |    5 ++---
+>>>  4 files changed, 6 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+>>> index ea53b04..326ba7a 100644
+>>> --- a/include/linux/kvm_host.h
+>>> +++ b/include/linux/kvm_host.h
+>>> @@ -1084,6 +1084,7 @@ void kvm_unregister_device_ops(u32 type);
+>>>  
+>>>  extern struct kvm_device_ops kvm_mpic_ops;
+>>>  extern struct kvm_device_ops kvm_xics_ops;
+>>> +extern struct kvm_device_ops kvm_arm_vgic_v2_ops;
+>>>  
+>>>  #ifdef CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT
+>>>  
+>>> diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
+>>> index 2935405..e1cd3cb 100644
+>>> --- a/virt/kvm/arm/vgic-v2.c
+>>> +++ b/virt/kvm/arm/vgic-v2.c
+>>> @@ -229,6 +229,8 @@ int vgic_v2_probe(struct device_node *vgic_node,
+>>>  		goto out_unmap;
+>>>  	}
+>>>  
+>>> +	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
+>>> +
+>>>  	vgic->vcpu_base = vcpu_res.start;
+>>>  
+>>>  	kvm_info("%s@%llx IRQ%d\n", vgic_node->name,
+>>> diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+>>> index 1c2c8ee..d14c75f 100644
+>>> --- a/virt/kvm/arm/vgic-v3.c
+>>> +++ b/virt/kvm/arm/vgic-v3.c
+>>> @@ -230,6 +230,7 @@ int vgic_v3_probe(struct device_node *vgic_node,
+>>>  		ret = -ENXIO;
+>>>  		goto out;
+>>>  	}
+>>> +	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
+>> I did not find any unregistration? I am wrong or isn't it relevant? If
+>> confirmed might be added in kvm_arch_exit. Saw KVM-VFIO device ops
+>> unregistration is done in kvm_exit/kvm_vfio_ops_exit.
 > 
-> If it does depend on anything beyond clocks it won't work at all. Clocks
-> are special because they get set up very early at boot time. If it turns
-> out that a simplefb ever needs a regulator to remain on, and that's even
-> quite likely to happen eventually, it's going to fail miserably, because
-> those regulators will typically be provided by a PMIC on an I2C bus. The
-> regulator won't be registered until very late into the boot process and
-> a regulator_get() call will almost certainly cause the simplefb driver
-> to defer probing.
+> well forget that one. I guess it is not relevant for that device which
+> is not going to be released.
 
-Right, this has been discussed already and the plan is to have simplefb
-continue its probe function and return success from it if it encounters
-any -eprobe_defer errors, while tracking which resources it misses.
+Yeah, I think that's due to the fact that we cannot remove KVM from the
+kernel on ARM (no modprobe -r).
 
-And then have a late_initcall which will claim any resources which failed
-with -eprobe beforehand.
+Cheers,
+Andre.
 
-> Now deferring probing is a real showstopper for simplefb, because not
-> only does it make the framebuffer useless as early boot console, once
-> probing is attempted again the clocks that it would have needed to
-> acquire to keep going will already have been switched off, too.
-
-That is not true, even with the current implementation, if all necessary
-drivers are built in, then simplefb will come up later, but it will still
-come up before the late_initcall which disables the clocks.
-
-Once we do the split probing described above (which is something which
-we plan to do when it becomes necessary), then simplefb will still come
-up early.
-
-Regards,
-
-Hans
+> BR
+> 
+> Eric
+>>
+>> Eric
+>>>  
+>>>  	vgic->vcpu_base = vcpu_res.start;
+>>>  	vgic->vctrl_base = NULL;
+>>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>>> index 963b84e..e8003ca 100644
+>>> --- a/virt/kvm/arm/vgic.c
+>>> +++ b/virt/kvm/arm/vgic.c
+>>> @@ -2540,7 +2540,7 @@ static int vgic_create(struct kvm_device *dev, u32 type)
+>>>  	return kvm_vgic_create(dev->kvm, type);
+>>>  }
+>>>  
+>>> -static struct kvm_device_ops kvm_arm_vgic_v2_ops = {
+>>> +struct kvm_device_ops kvm_arm_vgic_v2_ops = {
+>>>  	.name = "kvm-arm-vgic",
+>>>  	.create = vgic_create,
+>>>  	.destroy = vgic_destroy,
+>>> @@ -2619,8 +2619,7 @@ int kvm_vgic_hyp_init(void)
+>>>  
+>>>  	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
+>>>  
+>>> -	return kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
+>>> -				       KVM_DEV_TYPE_ARM_VGIC_V2);
+>>> +	return 0;
+>>>  
+>>>  out_free_irq:
+>>>  	free_percpu_irq(vgic->maint_irq, kvm_get_running_vcpus());
+>>>
+>>
+> 
+> 
