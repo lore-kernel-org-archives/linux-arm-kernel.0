@@ -1,89 +1,139 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Nov 2014 13:57:11 +0100
-Subject: [PATCH v3 12/13] efi: efistub: allow allocation alignment larger than
- EFI_PAGE_SIZE
+Date: Tue, 18 Nov 2014 13:57:10 +0100
+Subject: [PATCH v3 11/13] arm64/efi: use plain memblock API for adding and
+ removing reserved RAM
 In-Reply-To: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1416315432-8534-13-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1416315432-8534-12-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On systems with 64 KB pages, it is preferable for UEFI memory map
-entries to be 64 KB aligned multiples of 64 KB, because it relieves
-us of having to deal with the residues.
-So, if EFI_ALLOC_ALIGN is #define'd by the platform, use it to round
-up all memory allocations made.
+The memblock API is agnostic of page size, so we can use it on both
+4 KB and 64 KB granule kernels to install all UEFI memory regions
+(EFI_MEMORY_WB) using memblock_add(), and the memblock layer will stitch
+all unaligned regions together. Then we start punching holes in it for the
+reserved regions, this time taking the native page size into account.
+
+Finally, the reserved regions are memblock_remove()'d as well. This will
+ensure that the regions are accessible via mmap(/dev/mem), even when
+CONFIG_STRICT_DEVMEM is in effect.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/firmware/efi/libstub/efi-stub-helper.c | 25 +++++++++++++++++--------
- 1 file changed, 17 insertions(+), 8 deletions(-)
+ arch/arm64/kernel/efi.c        | 41 +++++++++--------------------------------
+ drivers/firmware/efi/virtmap.c | 15 +++++++++------
+ 2 files changed, 18 insertions(+), 38 deletions(-)
 
-diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
-index a920fec8fe88..e766df60fbfb 100644
---- a/drivers/firmware/efi/libstub/efi-stub-helper.c
-+++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
-@@ -32,6 +32,15 @@
- 
- static unsigned long __chunk_size = EFI_READ_CHUNK_SIZE;
- 
-+/*
-+ * Allow the platform to override the allocation granularity: this allows
-+ * systems that have the capability to run with a larger page size to deal
-+ * with the allocations for initrd and fdt more efficiently.
-+ */
-+#ifndef EFI_ALLOC_ALIGN
-+#define EFI_ALLOC_ALIGN		EFI_PAGE_SIZE
-+#endif
-+
- struct file_info {
- 	efi_file_handle_t *handle;
- 	u64 size;
-@@ -150,10 +159,10 @@ efi_status_t efi_high_alloc(efi_system_table_t *sys_table_arg,
- 	 * a specific address.  We are doing page-based allocations,
- 	 * so we must be aligned to a page.
- 	 */
--	if (align < EFI_PAGE_SIZE)
--		align = EFI_PAGE_SIZE;
-+	if (align < EFI_ALLOC_ALIGN)
-+		align = EFI_ALLOC_ALIGN;
- 
--	nr_pages = round_up(size, EFI_PAGE_SIZE) / EFI_PAGE_SIZE;
-+	nr_pages = round_up(size, EFI_ALLOC_ALIGN) / EFI_PAGE_SIZE;
- again:
- 	for (i = 0; i < map_size / desc_size; i++) {
- 		efi_memory_desc_t *desc;
-@@ -235,10 +244,10 @@ efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
- 	 * a specific address.  We are doing page-based allocations,
- 	 * so we must be aligned to a page.
- 	 */
--	if (align < EFI_PAGE_SIZE)
--		align = EFI_PAGE_SIZE;
-+	if (align < EFI_ALLOC_ALIGN)
-+		align = EFI_ALLOC_ALIGN;
- 
--	nr_pages = round_up(size, EFI_PAGE_SIZE) / EFI_PAGE_SIZE;
-+	nr_pages = round_up(size, EFI_ALLOC_ALIGN) / EFI_PAGE_SIZE;
- 	for (i = 0; i < map_size / desc_size; i++) {
- 		efi_memory_desc_t *desc;
- 		unsigned long m = (unsigned long)map;
-@@ -292,7 +301,7 @@ void efi_free(efi_system_table_t *sys_table_arg, unsigned long size,
- 	if (!size)
- 		return;
- 
--	nr_pages = round_up(size, EFI_PAGE_SIZE) / EFI_PAGE_SIZE;
-+	nr_pages = round_up(size, EFI_ALLOC_ALIGN) / EFI_PAGE_SIZE;
- 	efi_call_early(free_pages, addr, nr_pages);
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 3009c22e2620..2c0a858f699e 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -105,24 +105,6 @@ out:
+ 	return retval;
  }
  
-@@ -561,7 +570,7 @@ efi_status_t efi_relocate_kernel(efi_system_table_t *sys_table_arg,
- 	 * to the preferred address.  If that fails, allocate as low
- 	 * as possible while respecting the required alignment.
- 	 */
--	nr_pages = round_up(alloc_size, EFI_PAGE_SIZE) / EFI_PAGE_SIZE;
-+	nr_pages = round_up(alloc_size, EFI_ALLOC_ALIGN) / EFI_PAGE_SIZE;
- 	status = efi_call_early(allocate_pages,
- 				EFI_ALLOCATE_ADDRESS, EFI_LOADER_DATA,
- 				nr_pages, &efi_addr);
+-/*
+- * Return true for RAM regions we want to permanently reserve.
+- */
+-static __init int is_reserve_region(efi_memory_desc_t *md)
+-{
+-	switch (md->type) {
+-	case EFI_LOADER_CODE:
+-	case EFI_LOADER_DATA:
+-	case EFI_BOOT_SERVICES_CODE:
+-	case EFI_BOOT_SERVICES_DATA:
+-	case EFI_CONVENTIONAL_MEMORY:
+-		return 0;
+-	default:
+-		break;
+-	}
+-	return is_normal_ram(md);
+-}
+-
+ static __init void reserve_regions(void)
+ {
+ 	efi_memory_desc_t *md;
+@@ -134,31 +116,26 @@ static __init void reserve_regions(void)
+ 	for_each_efi_memory_desc(&memmap, md) {
+ 		paddr = md->phys_addr;
+ 		npages = md->num_pages;
++		size = npages << EFI_PAGE_SHIFT;
+ 
+ 		if (uefi_debug) {
+ 			char buf[64];
+ 
+-			pr_info("  0x%012llx-0x%012llx %s",
+-				paddr, paddr + (npages << EFI_PAGE_SHIFT) - 1,
++			pr_info("  0x%012llx-0x%012llx %s\n",
++				paddr, paddr + size - 1,
+ 				efi_md_typeattr_format(buf, sizeof(buf), md));
+ 		}
+ 
+-		memrange_efi_to_native(&paddr, &npages);
+-		size = npages << PAGE_SHIFT;
++		if (is_normal_ram(md)) {
++			memblock_add(paddr, size);
+ 
+-		if (is_normal_ram(md))
+-			early_init_dt_add_memory_arch(paddr, size);
+-
+-		if (is_reserve_region(md)) {
+-			memblock_reserve(paddr, size);
+-			if (uefi_debug)
+-				pr_cont("*");
++			if (!efi_mem_is_usable_region(md)) {
++				memrange_efi_to_native(&paddr, &npages);
++				memblock_reserve(paddr, npages << PAGE_SHIFT);
++			}
+ 		}
+ 
+-		if (uefi_debug)
+-			pr_cont("\n");
+ 	}
+-
+ 	set_bit(EFI_MEMMAP, &efi.flags);
+ }
+ 
+diff --git a/drivers/firmware/efi/virtmap.c b/drivers/firmware/efi/virtmap.c
+index 98735fb43581..4b6a5c31629f 100644
+--- a/drivers/firmware/efi/virtmap.c
++++ b/drivers/firmware/efi/virtmap.c
+@@ -8,6 +8,7 @@
+  */
+ 
+ #include <linux/efi.h>
++#include <linux/memblock.h>
+ #include <linux/mm_types.h>
+ #include <linux/rbtree.h>
+ #include <linux/rwsem.h>
+@@ -97,8 +98,15 @@ void __init efi_virtmap_init(void)
+ 		u64 paddr, npages, size;
+ 		pgprot_t prot;
+ 
+-		if (!efi_mem_is_usable_region(md))
++		paddr = md->phys_addr;
++		npages = md->num_pages;
++		memrange_efi_to_native(&paddr, &npages);
++		size = npages << PAGE_SHIFT;
++
++		if (!efi_mem_is_usable_region(md)) {
+ 			efi_register_mem_resource(md);
++			memblock_remove(paddr, size);
++		}
+ 		if (!(md->attribute & EFI_MEMORY_RUNTIME))
+ 			continue;
+ 		if (WARN(md->virt_addr == 0,
+@@ -106,11 +114,6 @@ void __init efi_virtmap_init(void)
+ 			 md->phys_addr))
+ 			return;
+ 
+-		paddr = md->phys_addr;
+-		npages = md->num_pages;
+-		memrange_efi_to_native(&paddr, &npages);
+-		size = npages << PAGE_SHIFT;
+-
+ 		pr_info("  EFI remap 0x%012llx => %p\n",
+ 			md->phys_addr, (void *)md->virt_addr);
+ 
 -- 
 1.8.3.2
