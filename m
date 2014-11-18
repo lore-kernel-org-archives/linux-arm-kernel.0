@@ -1,63 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Nov 2014 10:40:12 +0000
-Subject: [PATCH 09/11] arm: perf: parse cpu affinity from dt
-In-Reply-To: <20141117150804.GC25416@leverpostej>
-References: <1415377536-12841-1-git-send-email-mark.rutland@arm.com>
- <1415377536-12841-10-git-send-email-mark.rutland@arm.com>
- <20141117112033.GF18061@arm.com>
- <20141117150804.GC25416@leverpostej>
-Message-ID: <20141118104012.GF18842@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Nov 2014 11:39:20 +0100
+Subject: [PATCH] asm-generic: Add msi.h
+In-Reply-To: <alpine.DEB.2.11.1411181133080.3909@nanos>
+References: <alpine.DEB.2.11.1411181133080.3909@nanos>
+Message-ID: <1703620.E5bhVDQPHc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 03:08:04PM +0000, Mark Rutland wrote:
-> On Mon, Nov 17, 2014 at 11:20:35AM +0000, Will Deacon wrote:
-> > On Fri, Nov 07, 2014 at 04:25:34PM +0000, Mark Rutland wrote:
-> > > diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-> > > index dfcaba5..f09c8a0 100644
-> > > --- a/arch/arm/kernel/perf_event_cpu.c
-> > > +++ b/arch/arm/kernel/perf_event_cpu.c
-> > > @@ -85,20 +85,27 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
-> > >  	struct platform_device *pmu_device = cpu_pmu->plat_device;
-> > >  	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
-> > >  
-> > > -	irqs = min(pmu_device->num_resources, num_possible_cpus());
-> > > +	irqs = cpu_pmu->nr_irqs;
-> > >  
-> > > -	irq = platform_get_irq(pmu_device, 0);
-> > > -	if (irq >= 0 && irq_is_percpu(irq)) {
-> > > -		on_each_cpu(cpu_pmu_disable_percpu_irq, &irq, 1);
-> > > -		free_percpu_irq(irq, &hw_events->percpu_pmu);
-> > > -	} else {
-> > > -		for (i = 0; i < irqs; ++i) {
-> > > -			if (!cpumask_test_and_clear_cpu(i, &cpu_pmu->active_irqs))
-> > > -				continue;
-> > > -			irq = platform_get_irq(pmu_device, i);
-> > > -			if (irq >= 0)
-> > > -				free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, i));
-> > > +	for (i = 0; i < irqs; i++) {
-> > > +		struct cpu_irq *map = &cpu_pmu->irq_map[i];
-> > > +		irq = map->irq;
-> > > +
-> > > +		if (irq <= 0)
-> > > +			continue;
-> > > +
-> > > +		if (irq_is_percpu(irq)) {
-> > > +			on_each_cpu(cpu_pmu_disable_percpu_irq, &irq, 1);
-> > 
-> > Hmm, ok, so we're assuming that all the PMUs will be wired with PPIs in this
-> > case. I have a patch allowing per-cpu interrupts to be requested for a
-> > cpumask, but I suppose that can wait until it's actually needed.
-> 
-> I wasn't too keen on assuming all CPUs, but I didn't have the facility
-> to request a PPI on a subset of CPUs. If you can point me at your patch,
-> I'd be happy to take a look.
+On Tuesday 18 November 2014 11:34:37 Thomas Gleixner wrote:
+> To support MSI irq domains we want a generic data structure for
+> allocation, but we need the option to provide an architecture specific
+> version of it. So instead of playing #ifdef games in linux/msi.h we
+> add a generic header file and let architectures decide whether to
+> include it or to provide their own implementation and provide the
+> required typedef.
 
-The patch is here:
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/commit/?h=irq&id=774f7bc54577b6875d96e670ee34580077fc10be
+for merging the asm-generic file
 
-But I think we can avoid it until we find a platform that needs it. I can't
-see a DT/ABI issue with that, can you?
+> I know that typedefs are not really nice, but in this case there are no
+> forward declarations required and it's the simplest solution.
 
-Will
+I must be missing the obvious: what problem does the typedef solve
+that you would have with just a struct?
+
+	Arnd
