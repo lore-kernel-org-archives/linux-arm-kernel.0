@@ -1,103 +1,49 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 18 Nov 2014 20:37:12 +0100
-Subject: [PATCH v8 11/13] ARM: dts: Berlin: enable USB on the BG2Q DMP
-In-Reply-To: <1416231347-27193-12-git-send-email-antoine.tenart@free-electrons.com>
-References: <1416231347-27193-1-git-send-email-antoine.tenart@free-electrons.com>
- <1416231347-27193-12-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <546B9FE8.2010404@gmail.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Tue, 18 Nov 2014 21:37:18 +0200
+Subject: [PATCH v3 0/5] pwm: support backward compatibility of DTB extending
+ PWM args
+Message-ID: <1416339438-7867-1-git-send-email-vladimir_zapolskiy@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.11.2014 14:35, Antoine Tenart wrote:
-> Enable the 2 available USB PHY and USB nodes on the Marvell Berlin BG2Q
-> DMP.
->
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Please review this alternative in-house version of supporting backward
+compatibility of DTB files (new kernel/PWM driver and old DTS), overcoming
+a problem that pwms arguments of existing PWM drivers are to be extended
+with polarity field.
 
-Applied to berlin/dt.
+Unfortunately I've firstly created the change and only after that
+found that Lothar Wa?mann is working on his version, so I won't insist
+on formal preference, but still I like to share my variant since it
+technically different from Lothar's one.
 
-Thanks!
+Changes from v2 to v3:
+- improved commit messages
+- added two more patches removing of_pwm_xlate_with_flags()
 
-> ---
->   arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 53 ++++++++++++++++++++++++++++++
->   1 file changed, 53 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-> index ea1f99b8eed6..f7c25580e122 100644
-> --- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-> +++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-> @@ -7,6 +7,8 @@
->    */
->
->   /dts-v1/;
-> +
-> +#include <dt-bindings/gpio/gpio.h>
->   #include "berlin2q.dtsi"
->
->   / {
-> @@ -21,6 +23,39 @@
->   	choosen {
->   		bootargs = "console=ttyS0,115200 earlyprintk";
->   	};
-> +
-> +	regulators {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		reg_usb0_vbus: regulator at 0 {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "usb0_vbus";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			gpio = <&portb 8 GPIO_ACTIVE_HIGH>;
-> +			enable-active-high;
-> +		};
-> +
-> +		reg_usb1_vbus: regulator at 1 {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "usb1_vbus";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			gpio = <&portb 10 GPIO_ACTIVE_HIGH>;
-> +			enable-active-high;
-> +		};
-> +
-> +		reg_usb2_vbus: regulator at 2 {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "usb2_vbus";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			gpio = <&portb 12 GPIO_ACTIVE_HIGH>;
-> +			enable-active-high;
-> +		};
-> +	};
->   };
->
->   &sdhci1 {
-> @@ -46,6 +81,24 @@
->   	status = "okay";
->   };
->
-> +&usb_phy0 {
-> +	status = "okay";
-> +};
-> +
-> +&usb_phy2 {
-> +	status = "okay";
-> +};
-> +
-> +&usb0 {
-> +	vbus-supply = <&reg_usb0_vbus>;
-> +	status = "okay";
-> +};
-> +
-> +&usb2 {
-> +	vbus-supply = <&reg_usb2_vbus>;
-> +	status = "okay";
-> +};
-> +
->   &eth0 {
->   	status = "okay";
->   };
->
+Changes from v1 to v2:
+- corrected the proper kernel log level, thanks to Lothar Wa?mann.
+
+Vladimir Zapolskiy (5):
+  pwm: process pwm polarity argument in of_pwm_simple_xlate()
+  pwm: push up dynamic printk level on errors in of_pwm_get()
+  pwm: set the actual number of pwms arguments defined in board dts
+  pwm: do not set of_pwm_xlate_with_flags() as a callback
+  pwm: remove of_pwm_xlate_with_flags() function
+
+ drivers/pwm/core.c            |   42 ++++++++++++-----------------------------
+ drivers/pwm/pwm-atmel-hlcdc.c |    2 --
+ drivers/pwm/pwm-atmel-tcb.c   |    2 --
+ drivers/pwm/pwm-atmel.c       |    6 ------
+ drivers/pwm/pwm-bcm-kona.c    |    2 --
+ drivers/pwm/pwm-fsl-ftm.c     |    2 --
+ drivers/pwm/pwm-renesas-tpu.c |    2 --
+ drivers/pwm/pwm-rockchip.c    |    5 -----
+ drivers/pwm/pwm-samsung.c     |    3 ---
+ drivers/pwm/pwm-tiecap.c      |    2 --
+ drivers/pwm/pwm-tiehrpwm.c    |    2 --
+ drivers/pwm/pwm-vt8500.c      |    2 --
+ include/linux/pwm.h           |    3 ---
+ 13 files changed, 12 insertions(+), 63 deletions(-)
+
+-- 
+1.7.10.4
