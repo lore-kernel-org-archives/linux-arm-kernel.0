@@ -1,162 +1,339 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 18 Nov 2014 11:41:22 +0000
-Subject: [PATCH v5 1/6] arm64: Add support for hooks to handle undefined
- instructions
+Date: Tue, 18 Nov 2014 11:41:24 +0000
+Subject: [PATCH v5 3/6] arm64: Add framework for legacy instruction emulation
 In-Reply-To: <1416310887-14649-1-git-send-email-punit.agrawal@arm.com>
 References: <1416310887-14649-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <1416310887-14649-2-git-send-email-punit.agrawal@arm.com>
+Message-ID: <1416310887-14649-4-git-send-email-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to register hooks for undefined instructions. The handlers
-will be called when the undefined instruction and the processor state
-(as contained in pstate) match criteria used at registration.
+Typically, providing support for legacy instructions requires
+emulating the behaviour of instructions whose encodings have become
+undefined. If the instructions haven't been removed from the
+architecture, there maybe an option in the implementation to turn
+on/off the support for these instructions.
+
+Create common infrastructure to support legacy instruction
+emulation. In addition to emulation, also provide an option to support
+hardware execution when supported. The default execution mode (one of
+undef, emulate, hw exeuction) is dependent on the state of the
+instruction (deprecated or obsolete) in the architecture and
+can specified at the time of registering the instruction handlers. The
+runtime state of the emulation can be controlled by writing to
+individual nodes in sysctl. The expected default behaviour is
+documented as part of this patch.
 
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/insn.h  |  2 ++
- arch/arm64/include/asm/traps.h | 16 ++++++++++
- arch/arm64/kernel/insn.c       |  5 ++++
- arch/arm64/kernel/traps.c      | 66 ++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 89 insertions(+)
+ Documentation/arm64/legacy_instructions.txt |  33 +++++
+ arch/arm64/Kconfig                          |  18 +++
+ arch/arm64/kernel/Makefile                  |   1 +
+ arch/arm64/kernel/armv8_deprecated.c        | 216 ++++++++++++++++++++++++++++
+ 4 files changed, 268 insertions(+)
+ create mode 100644 Documentation/arm64/legacy_instructions.txt
+ create mode 100644 arch/arm64/kernel/armv8_deprecated.c
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index 56a9e63..1bb0430 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -354,6 +354,8 @@ bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
- int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
- int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
- int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
+diff --git a/Documentation/arm64/legacy_instructions.txt b/Documentation/arm64/legacy_instructions.txt
+new file mode 100644
+index 0000000..49d4867
+--- /dev/null
++++ b/Documentation/arm64/legacy_instructions.txt
+@@ -0,0 +1,33 @@
++The arm64 port of the Linux kernel provides infrastructure to support
++emulation of instructions which have been deprecated, or obsoleted in
++the architecture. The infrastructure code uses undefined instruction
++hooks to support emulation. Where available it also allows turning on
++the instruction execution in hardware.
 +
-+bool aarch32_insn_is_wide(u32 insn);
- #endif /* __ASSEMBLY__ */
++The emulation mode can be controlled by writing to sysctl nodes
++(/proc/sys/abi). The following explains the different execution
++behaviours and the corresponding values of the sysctl nodes -
++
++* Undef
++  Value: 0
++  Generates undefined instruction abort. Default for instructions that
++  have been obsoleted in the architecture, e.g., SWP
++
++* Emulate
++  Value: 1
++  Uses software emulation. To aid migration of software, in this mode
++  usage of emulated instruction is traced as well as rate limited
++  warnings are issued. This is the default for deprecated
++  instructions, .e.g., CP15 barriers
++
++* Hardware Execution
++  Value: 2
++  Although marked as deprecated, some implementations may support the
++  enabling/disabling of hardware support for the execution of these
++  instructions. Using hardware execution generally provides better
++  performance, but at the loss of ability to gather runtime statistics
++  about the use of the deprecated instructions.
++
++The default mode depends on the status of the instruction in the
++architecture. Deprecated instructions should default to emulation
++while obsolete instructions must be undefined by default.
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 9532f8d..c51edaf 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -162,6 +162,24 @@ config ARCH_XGENE
+ 	help
+ 	  This enables support for AppliedMicro X-Gene SOC Family
  
- #endif	/* __ASM_INSN_H */
-diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
-index 10ca8ff..232e4ba 100644
---- a/arch/arm64/include/asm/traps.h
-+++ b/arch/arm64/include/asm/traps.h
-@@ -18,6 +18,22 @@
- #ifndef __ASM_TRAP_H
- #define __ASM_TRAP_H
++comment "Processor Features"
++
++menuconfig ARMV8_DEPRECATED
++	bool "Emulate deprecated/obsolete ARMv8 instructions"
++	depends on COMPAT
++	help
++	  Legacy software support may require certain instructions
++	  that have been deprecated or obsoleted in the architecture.
++
++	  Enable this config to enable selective emulation of these
++	  features.
++
++	  If unsure, say Y
++
++if ARMV8_DEPRECATED
++
++endif
++
+ endmenu
  
+ menu "Bus support"
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index a4d8671..84e9e51 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -32,6 +32,7 @@ arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
+ arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
+ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
+ arm64-obj-$(CONFIG_PCI)			+= pci.o
++arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+ 
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+new file mode 100644
+index 0000000..db3b79d
+--- /dev/null
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -0,0 +1,216 @@
++/*
++ *  Copyright (C) 2014 ARM Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/init.h>
 +#include <linux/list.h>
++#include <linux/slab.h>
++#include <linux/sysctl.h>
 +
-+struct pt_regs;
++#include <asm/traps.h>
 +
-+struct undef_hook {
-+	struct list_head node;
-+	u32 instr_mask;
-+	u32 instr_val;
-+	u64 pstate_mask;
-+	u64 pstate_val;
-+	int (*fn)(struct pt_regs *regs, u32 instr);
++/*
++ * The runtime support for deprecated instruction support can be in one of
++ * following three states -
++ *
++ * 0 = undef
++ * 1 = emulate (software emulation)
++ * 2 = hw (supported in hardware)
++ */
++enum insn_emulation_mode {
++	INSN_UNDEF,
++	INSN_EMULATE,
++	INSN_HW,
 +};
 +
-+void register_undef_hook(struct undef_hook *hook);
-+void unregister_undef_hook(struct undef_hook *hook);
++enum legacy_insn_status {
++	INSN_DEPRECATED,
++	INSN_OBSOLETE,
++};
 +
- static inline int in_exception_text(unsigned long ptr)
- {
- 	extern char __exception_text_start[];
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index e007714..ab00eb5 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -959,3 +959,8 @@ u32 aarch64_insn_gen_logical_shifted_reg(enum aarch64_insn_register dst,
- 
- 	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_6, insn, shift);
- }
++struct insn_emulation_ops {
++	const char		*name;
++	enum legacy_insn_status	status;
++	struct undef_hook	*hooks;
++	int			(*set_hw_mode)(bool enable);
++};
 +
-+bool aarch32_insn_is_wide(u32 insn)
-+{
-+	return insn >= 0xe800;
-+}
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index de1b085..0a801e3 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -259,6 +259,69 @@ void arm64_notify_die(const char *str, struct pt_regs *regs,
- 	}
- }
- 
-+static LIST_HEAD(undef_hook);
-+static DEFINE_RAW_SPINLOCK(undef_lock);
++struct insn_emulation {
++	struct list_head node;
++	struct insn_emulation_ops *ops;
++	int current_mode;
++	int min;
++	int max;
++};
 +
-+void register_undef_hook(struct undef_hook *hook)
-+{
-+	unsigned long flags;
++static LIST_HEAD(insn_emulation);
++static int nr_insn_emulated;
++static DEFINE_RAW_SPINLOCK(insn_emulation_lock);
 +
-+	raw_spin_lock_irqsave(&undef_lock, flags);
-+	list_add(&hook->node, &undef_hook);
-+	raw_spin_unlock_irqrestore(&undef_lock, flags);
-+}
-+
-+void unregister_undef_hook(struct undef_hook *hook)
-+{
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&undef_lock, flags);
-+	list_del(&hook->node);
-+	raw_spin_unlock_irqrestore(&undef_lock, flags);
-+}
-+
-+static int call_undef_hook(struct pt_regs *regs)
++static void register_emulation_hooks(struct insn_emulation_ops *ops)
 +{
 +	struct undef_hook *hook;
-+	unsigned long flags;
-+	u32 instr;
-+	int (*fn)(struct pt_regs *regs, u32 instr) = NULL;
-+	void __user *pc = (void __user *)instruction_pointer(regs);
 +
-+	if (!user_mode(regs))
-+		return 1;
++	BUG_ON(!ops->hooks);
 +
-+	if (compat_thumb_mode(regs)) {
-+		/* 16-bit Thumb instruction */
-+		if (get_user(instr, (u16 __user *)pc))
-+			goto exit;
-+		instr = le16_to_cpu(instr);
-+		if (aarch32_insn_is_wide(instr)) {
-+			u32 instr2;
++	for (hook = ops->hooks; hook->instr_mask; hook++)
++		register_undef_hook(hook);
 +
-+			if (get_user(instr2, (u16 __user *)(pc + 2)))
-+				goto exit;
-+			instr2 = le16_to_cpu(instr2);
-+			instr = (instr << 16) | instr2;
-+		}
-+	} else {
-+		/* 32-bit ARM instruction */
-+		if (get_user(instr, (u32 __user *)pc))
-+			goto exit;
-+		instr = le32_to_cpu(instr);
-+	}
-+
-+	raw_spin_lock_irqsave(&undef_lock, flags);
-+	list_for_each_entry(hook, &undef_hook, node)
-+		if ((instr & hook->instr_mask) == hook->instr_val &&
-+			(regs->pstate & hook->pstate_mask) == hook->pstate_val)
-+			fn = hook->fn;
-+
-+	raw_spin_unlock_irqrestore(&undef_lock, flags);
-+exit:
-+	return fn ? fn(regs, instr) : 1;
++	pr_notice("Registered %s emulation handler\n", ops->name);
 +}
 +
- asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
- {
- 	siginfo_t info;
-@@ -268,6 +331,9 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
- 	if (!aarch32_break_handler(regs))
- 		return;
- 
-+	if (call_undef_hook(regs) == 0)
-+		return;
++static void remove_emulation_hooks(struct insn_emulation_ops *ops)
++{
++	struct undef_hook *hook;
 +
- 	if (show_unhandled_signals && unhandled_signal(current, SIGILL) &&
- 	    printk_ratelimit()) {
- 		pr_info("%s[%d]: undefined instruction: pc=%p\n",
++	BUG_ON(!ops->hooks);
++
++	for (hook = ops->hooks; hook->instr_mask; hook++)
++		unregister_undef_hook(hook);
++
++	pr_notice("Removed %s emulation handler\n", ops->name);
++}
++
++static int update_insn_emulation_mode(struct insn_emulation *insn,
++				       enum insn_emulation_mode prev)
++{
++	int ret = 0;
++
++	switch (prev) {
++	case INSN_UNDEF: /* Nothing to be done */
++		break;
++	case INSN_EMULATE:
++		remove_emulation_hooks(insn->ops);
++		break;
++	case INSN_HW:
++		if (insn->ops->set_hw_mode) {
++			insn->ops->set_hw_mode(false);
++			pr_notice("Disabled %s support\n", insn->ops->name);
++		}
++		break;
++	}
++
++	switch (insn->current_mode) {
++	case INSN_UNDEF:
++		break;
++	case INSN_EMULATE:
++		register_emulation_hooks(insn->ops);
++		break;
++	case INSN_HW:
++		if (insn->ops->set_hw_mode && insn->ops->set_hw_mode(true))
++			pr_notice("Enabled %s support\n", insn->ops->name);
++		else
++			ret = -EINVAL;
++		break;
++	}
++
++	return ret;
++}
++
++static void register_insn_emulation(struct insn_emulation_ops *ops)
++{
++	unsigned long flags;
++	struct insn_emulation *insn;
++
++	insn = kzalloc(sizeof(*insn), GFP_KERNEL);
++	insn->ops = ops;
++	insn->min = INSN_UNDEF;
++
++	switch (ops->status) {
++	case INSN_DEPRECATED:
++		insn->current_mode = INSN_EMULATE;
++		insn->max = INSN_HW;
++		break;
++	case INSN_OBSOLETE:
++		insn->current_mode = INSN_UNDEF;
++		insn->max = INSN_EMULATE;
++		break;
++	}
++
++	raw_spin_lock_irqsave(&insn_emulation_lock, flags);
++	list_add(&insn->node, &insn_emulation);
++	nr_insn_emulated++;
++	raw_spin_unlock_irqrestore(&insn_emulation_lock, flags);
++
++	/* Register any handlers if required */
++	update_insn_emulation_mode(insn, INSN_UNDEF);
++}
++
++static int emulation_proc_handler(struct ctl_table *table, int write,
++				  void __user *buffer, size_t *lenp,
++				  loff_t *ppos)
++{
++	int ret = 0;
++	struct insn_emulation *insn = (struct insn_emulation *) table->data;
++	enum insn_emulation_mode prev_mode = insn->current_mode;
++
++	table->data = &insn->current_mode;
++	ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
++
++	if (ret || !write || prev_mode == insn->current_mode)
++		goto ret;
++
++	ret = update_insn_emulation_mode(insn, prev_mode);
++	if (!ret) {
++		/* Mode change failed, revert to previous mode. */
++		insn->current_mode = prev_mode;
++		update_insn_emulation_mode(insn, INSN_UNDEF);
++	}
++ret:
++	table->data = insn;
++	return ret;
++}
++
++static struct ctl_table ctl_abi[] = {
++	{
++		.procname = "abi",
++		.mode = 0555,
++	},
++	{ }
++};
++
++static void register_insn_emulation_sysctl(struct ctl_table *table)
++{
++	unsigned long flags;
++	int i = 0;
++	struct insn_emulation *insn;
++	struct ctl_table *insns_sysctl, *sysctl;
++
++	insns_sysctl = kzalloc(sizeof(*sysctl) * (nr_insn_emulated + 1),
++			      GFP_KERNEL);
++
++	raw_spin_lock_irqsave(&insn_emulation_lock, flags);
++	list_for_each_entry(insn, &insn_emulation, node) {
++		sysctl = &insns_sysctl[i];
++
++		sysctl->mode = 0644;
++		sysctl->maxlen = sizeof(int);
++
++		sysctl->procname = insn->ops->name;
++		sysctl->data = insn;
++		sysctl->extra1 = &insn->min;
++		sysctl->extra2 = &insn->max;
++		sysctl->proc_handler = emulation_proc_handler;
++		i++;
++	}
++	raw_spin_unlock_irqrestore(&insn_emulation_lock, flags);
++
++	table->child = insns_sysctl;
++	register_sysctl_table(table);
++}
++
++/*
++ * Invoked as late_initcall, since not needed before init spawned.
++ */
++static int __init armv8_deprecated_init(void)
++{
++	register_insn_emulation_sysctl(ctl_abi);
++
++	return 0;
++}
++
++late_initcall(armv8_deprecated_init);
 -- 
 2.1.1
