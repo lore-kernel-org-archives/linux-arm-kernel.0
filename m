@@ -1,70 +1,87 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 18 Nov 2014 15:16:04 +0100
-Subject: [GIT PULL] ARM: STi: DT changes for v3.19, round 2
-Message-ID: <546B54A4.4050908@st.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Tue, 18 Nov 2014 14:23:54 +0000
+Subject: [RFC PATCH 01/16] PCI: Enhance pci_scan_root_bus() to support
+ default IO/MEM resources
+In-Reply-To: <546B317E.4090800@huawei.com>
+References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
+ <2732970.7HG94QvVBv@wuerfel> <546AF8D7.9010103@huawei.com>
+ <2447172.ADYWdCTnMP@wuerfel> <546B317E.4090800@huawei.com>
+Message-ID: <20141118142354.GH12037@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd and Kevin,
+On Tue, Nov 18, 2014 at 11:46:06AM +0000, Yijing Wang wrote:
+> On 2014/11/18 17:36, Arnd Bergmann wrote:
+> > On Tuesday 18 November 2014 15:44:23 Yijing Wang wrote:
+> >> On 2014/11/17 18:08, Arnd Bergmann wrote:
+> >>> On Monday 17 November 2014 18:21:35 Yijing Wang wrote:
+> >>>> -       list_for_each_entry(window, resources, list)
+> >>>> -               if (window->res->flags & IORESOURCE_BUS) {
+> >>>> -                       found = true;
+> >>>> -                       break;
+> >>>> -               }
+> >>>> +       if (!resources) {
+> >>>> +               pci_add_resource(&default_res, &ioport_resource);
+> >>>> +               pci_add_resource(&default_res, &iomem_resource);
+> >>>> +               pci_add_resource(&default_res, &busn_resource);
+> >>>> +       } else {
+> >>>>
+> >>>
+> >>> Isn't it almost always wrong to do this? You are adding all of the
+> >>> I/O ports and memory to the host bridge, which will prevent you from
+> >>> adding another host bridge, and the iomem_resource normally
+> >>> includes a lot of addresses that are not accessible by the PCI host.
+> >>
+> >> Hi Arnd, pci host bridge windows are the ranges allow child devices to setup
+> >> from. Add all of IO/MEM here just a limit to child devices, no request for these
+> >> resources, so it won't hurt another host bridge. Some platforms have no dts or ACPI
+> >> report host bridge resources, in this case, we directly assign ioport/iomem_resources
+> >> as the root resources of PCI devices.
+> > 
+> > But it would be wrong to allow hosts to allocate a device BAR that is not
+> > visible through the host bridge. I think we need to keep these separate
+> > from the general case: if you call any of the modern interfaces you have
+> > to provide the resources and a device. I notice that there is only one
+> > caller of pci_scan_bus_parented(), we should probably change that over to
+> > pci_scan_root_bus() or your new interface and remove the old one, but
+> > keep pci_scan_bus() as the only entry point for all of the legacy users
+> > that do not know about the resources.
+> 
+> Ok, I will move this out of the generic interface.
 
-Please consider this second round of STi DT updates for v3.19.
-It is based on tag sti-dt-for-v3.19-1, already merged in arm-soc's next/dt.
+My suggestion would actually be to trigger a warning/error if you detect that the resources
+are missing. That way we can force the drivers to clean up.
 
-The following changes since commit 43ca480c4e42f536fcf18118afcffad685e1292c:
+Best regards,
+Liviu
 
-   ARM: STi: DT: STiH407: Fix: clk-tmds-hdmi clock is missing 
-(2014-10-31 12:07:44 +0100)
+> 
+> Thanks!
+> Yijing.
+> 
+> > 
+> > 	Arnd
+> > 
+> > .
+> > 
+> 
+> 
+> -- 
+> Thanks!
+> Yijing
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 
-are available in the git repository at:
-
-   git://git.stlinux.com/devel/kernel/linux-sti.git tags/sti-dt-for-v3.19-2
-
-for you to fetch changes up to 3ece2c2be34f2fe6254b49dffa5815e2fc7f1b71:
-
-   ARM: STi: DT: STiH416: Change miphy356 node name to phy at fe382000 
-(2014-11-18 12:54:56 +0100)
-
-----------------------------------------------------------------
-STi DT updates for v3.19, round 2.
-
-Highlights:
------------
-  - Refactor STiH407 SoC and board to add STiH410 SoC support
-  - Add USB support to STiH416 SoC
-
-----------------------------------------------------------------
-Peter Griffin (9):
-       ARM: STi: DT: STiH416: Add pinctl setup for usb controllers.
-       ARM: STi: DT: STiH416: Add DT node for the stih415/6 usb2 phy
-       ARM: STi: DT: STiH416: Add DT nodes for the ehci and ohci usb 
-controllers.
-       ARM: STi: DT: STiH410: Add defines for STiH410 DT clocks
-       ARM: STi: DT: STiH410: Add pinctl config for usb controllers.
-       ARM: STi: DT: STih407: Abstract common dt nodes into shared files.
-       ARM: STi: DT: STiH410: Add STiH410 SoC and b2120 board support.
-       ARM: STi: DT: STih407: STih410: Add clk_ignore_unused to kernel 
-bootargs
-       ARM: STi: DT: STiH416: Change miphy356 node name to phy at fe382000
-
-  arch/arm/boot/dts/Makefile                         |   1 +
-  arch/arm/boot/dts/stih407-b2120.dts                |  55 +---
-  .../boot/dts/{stih407.dtsi => stih407-family.dtsi} |   1 -
-  arch/arm/boot/dts/stih410-b2120.dts                |  29 ++
-  arch/arm/boot/dts/stih410-clock.dtsi               | 338 
-+++++++++++++++++++++
-  arch/arm/boot/dts/stih410-pinctrl.dtsi             |  34 +++
-  arch/arm/boot/dts/stih410.dtsi                     |  14 +
-  arch/arm/boot/dts/stih416-b2020.dts                |   2 +-
-  arch/arm/boot/dts/stih416-b2020e.dts               |   2 +-
-  arch/arm/boot/dts/stih416-pinctrl.dtsi             |  34 +++
-  arch/arm/boot/dts/stih416.dtsi                     | 131 +++++++-
-  arch/arm/boot/dts/stihxxx-b2120.dtsi               |  59 ++++
-  include/dt-bindings/clock/stih410-clks.h           |  25 ++
-  13 files changed, 670 insertions(+), 55 deletions(-)
-  rename arch/arm/boot/dts/{stih407.dtsi => stih407-family.dtsi} (99%)
-  create mode 100644 arch/arm/boot/dts/stih410-b2120.dts
-  create mode 100644 arch/arm/boot/dts/stih410-clock.dtsi
-  create mode 100644 arch/arm/boot/dts/stih410-pinctrl.dtsi
-  create mode 100644 arch/arm/boot/dts/stih410.dtsi
-  create mode 100644 arch/arm/boot/dts/stihxxx-b2120.dtsi
-  create mode 100644 include/dt-bindings/clock/stih410-clks.h
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
