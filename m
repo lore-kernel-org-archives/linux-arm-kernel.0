@@ -1,36 +1,37 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 18 Nov 2014 20:39:10 +0100
-Subject: [PATCH 1/2] phy: berlin_usb: depends on RESET_CONTROLLER
-In-Reply-To: <1416231192-27056-2-git-send-email-antoine.tenart@free-electrons.com>
-References: <1416231192-27056-1-git-send-email-antoine.tenart@free-electrons.com>
- <1416231192-27056-2-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <546BA05E.4090605@gmail.com>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Tue, 18 Nov 2014 11:39:47 -0800
+Subject: [PATCH v9 2/9] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <546A6962.9090801@linaro.org>
+References: <1414194024-55547-1-git-send-email-lina.iyer@linaro.org>
+ <1414194024-55547-3-git-send-email-lina.iyer@linaro.org>
+ <546A6962.9090801@linaro.org>
+Message-ID: <CAJAp7OgjOiKNzPxBWYPNt15QCHqMd36w5xysRXRv_2iCMFrQZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.11.2014 14:33, Antoine Tenart wrote:
-> The Berlin USB PHY driver uses the Berlin reset controller
-> unconditionally. Make it depending on RESET_CONTROLLER.
+On Mon, Nov 17, 2014 at 1:32 PM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> On 10/25/2014 01:40 AM, Lina Iyer wrote:
 >
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> Hi Lina,
+>
+> [ ... ]
+>
+>> +static inline void spm_register_write(struct spm_driver_data *drv,
+>> +                                       enum spm_reg reg, u32 val)
+>> +{
+>> +       if (drv->reg_data->reg_offset[reg])
+>> +               writel_relaxed(val, drv->reg_base +
+>> +                               drv->reg_data->reg_offset[reg]);
+>
+>
+> Why not use writel and don't use 'wmb' below ?
+>
 
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Hi Daniel,
 
-> ---
->   drivers/phy/Kconfig | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index b6da75f563e7..38ca6ff00aef 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -17,7 +17,7 @@ config GENERIC_PHY
->
->   config PHY_BERLIN_USB
->   	tristate "Marvell Berlin USB PHY Driver"
-> -	depends on ARCH_BERLIN && HAS_IOMEM && OF
-> +	depends on ARCH_BERLIN && RESET_CONTROLLER && HAS_IOMEM && OF
->   	select GENERIC_PHY
->   	help
->   	  Enable this to support the USB PHY on Marvell Berlin SoCs.
->
+writel() provides ordering before the write, not after. Please have a
+look at the definition.
+
+Regards,
+Bjorn
