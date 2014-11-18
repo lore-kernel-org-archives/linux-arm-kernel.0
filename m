@@ -1,152 +1,245 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Tue, 18 Nov 2014 17:02:14 +0100
-Subject: [RFC] adp1653: Add device tree bindings for LED controller
-In-Reply-To: <20141118132159.GA21089@amd>
-References: <20141116075928.GA9763@amd>
- <20141117145857.GO8907@valkosipuli.retiisi.org.uk>
- <546AFEA5.9020000@samsung.com> <20141118084603.GC4059@amd>
- <546B19C8.2090008@samsung.com> <20141118113256.GA10022@amd>
- <546B40FA.2070409@samsung.com> <20141118132159.GA21089@amd>
-Message-ID: <546B6D86.8090701@samsung.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 18 Nov 2014 17:04:54 +0100
+Subject: [PATCH 2/3] i2c: slave-eeprom: add eeprom simulator driver
+In-Reply-To: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
+References: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <1416326695-13083-3-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-On 11/18/2014 02:21 PM, Pavel Machek wrote:
-> Hi!
->
->>>>> @@ -19,5 +30,10 @@ Examples:
->>>>>   system-status {
->>>>>   	       label = "Status";
->>>>>   	       linux,default-trigger = "heartbeat";
->>>>> +	       iout-torch = <500 500>;
->>>>> +	       iout-flash = <1000 1000>;
->>>>> +	       iout-indicator = <100 100>;
->>>>> +	       flash-timeout = <1000>;
->>>>> +
->>>>> 	...
->>>>>   };
->>>>>
->>>>> I don't get it; system-status describes single LED, why are iout-torch
->>>>> (and friends) arrays of two?
->>>>
->>>> Some devices can control more than one led. The array is for such
->>>> purposes. The system-status should be probably renamed to
->>>> something more generic for both common leds and flash leds,
->>>> e.g. system-led.
->>>
->>> No, sorry. The Documentation/devicetree/bindings/leds/common.txt
->>> describes binding for _one LED_. Yes, your device can have two leds,
->>> so your devices should have two such blocks in the device tree... Each
->>> led should have its own label and default trigger, for example. And I
->>> guess flash-timeout be per-LED, too.
->>
->> I think that a device tree binding describes a single physical device.
->> No matter how many sub-leds a device controls, it is still one
->> piece of hardware.
->
-> You got this wrong, sorry.
->
-> In my case, there are three physical devices:
->
-> adp1653
-> 	white LED
-> 	red LED
+The first user of the i2c-slave interface is an eeprom simulator. It is
+a shared memory which can be accessed by the remote master via I2C and
+locally via sysfs.
 
-You've mentioned that your white led is torch/flash and indicator
-is the red led. They are probably connected to the HPLED and
-ILED pins of the ADP1653 device respectively. The device is just
-a regulator, that delivers electric current to the leds connected
-to it. Kernel cannot directly activate leds, but has to talk
-to the device through I2C bus. One I2C device can have only one
-related device tree binding.
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+---
 
-> Each LED should have an label, and probably default trigger -- default
-> trigger for red one should be "we are recording video" and for white
-> should be "this is flash for default camera".
+Changes since RFC:
+* fix build error for modules
+* don't hardcode size
+* add boundary checks for sysfs access
+* use a spinlock
+* s/at24s/eeprom/g
+* add some docs
+* clean up exit paths
+* use size-variable instead of driver_data
 
-default-trigger is not mandatory, the device doesn't have to have
-associated led-trigger. I think that you should look at
-Documentation/leds/leds-class.txt and drivers/leds/triggers for
-more detailed information. In a nutshell triggers are kernel
-sources of led events. You can set e.g. "heartbeat", "timer"
-trigger etc.
-As for now the driver belongs to the V4L2 subsystem it doesn't
-support triggers. Moreover your event "we are recording a video"
-should be activated by setting V4L2_CID_FLASH_INDICATOR_INTENSITY
-v4l2 control followed by V4L2_FLASH_LED_MODE_TORCH. Your event
-"this is flash for default camera" seems to be flash strobe,
-that can be activated by setting V4L2_CID_FLASH_STROBE control.
-The driver by default sets the indicator current for both actions
-to the value previously set with V4L2_CID_FLASH_INDICATOR_INTENSITY.
+ drivers/i2c/Kconfig            |  10 +++
+ drivers/i2c/Makefile           |   1 +
+ drivers/i2c/i2c-slave-eeprom.c | 170 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 181 insertions(+)
+ create mode 100644 drivers/i2c/i2c-slave-eeprom.c
 
-> If the hardware LED changes with one that needs different current, the
-> block for the adp1653 stays the same, but white LED block should be
-> updated with different value.
-
-I think that you are talking about sub nodes. Indeed I am leaning
-towards this type of design.
-
->> default-trigger property should also be an array of strings.
->
-> That is not how it currently works.
-
-OK, I agree.
-
->
->> I agree that flash-timeout should be per led - an array, similarly
->> as in case of iout's.
->
-> Agreed about per-led, disagreed about the array. As all the fields
-> would need arrays, and as LED system currently does not use arrays for
-> label and linux,default-trigger, I believe we should follow existing
-> design and model it as three devices. (It _is_ physically three devices.)
-
-Right, I missed that the leds/common.txt describes child node.
-
-I propose following modifications to the binding:
-
-Optional properties for child nodes:
-- iout-mode-led : 	maximum intensity in microamperes of the LED
-		  	(torch LED for flash devices)
-- iout-mode-flash : 	initial intensity in microamperes of the
-			flash LED; it is required to enable support
-			for the flash led
-- iout-mode-indicator : initial intensity in microamperes of the
-			indicator LED; it is required to enable support
-			for the indicator led
-- max-iout-mode-led : 	maximum intensity in microamperes of the LED
-		  	(torch LED for flash devices)
-- max-iout-mode-flash : maximum intensity in microamperes of the
-			flash LED
-- max-iout-mode-indicator : maximum intensity in microamperes of the
-			indicator LED
-- flash-timeout :	timeout in microseconds after which flash
-			led is turned off
-
-system-status {
-         label = "max77693_1";
-         iout-mode-led = <500>;
-         max-iout-mode-led = <500>;
-         ...
-};
-
-camera-flash1 {
-         label = "max77693_2";
-         iout-mode-led = <500>;
-         iout-mode-flash = <1000>;
-	iout-mode-indicator = <100>;
-         max-iout-mode-led = <500>;
-         max-iout-mode-flash = <1000>;
-         max-iout-mode-indicator = <100>;
-         flash-timeout = <1000>;
-         ...
-};
-
-
-I propose to avoid name "torch", as for ordinary leds it would
-be misleading.
-
-Regards,
-Jacek
+diff --git a/drivers/i2c/Kconfig b/drivers/i2c/Kconfig
+index b51a402752c4..8c9e619f3026 100644
+--- a/drivers/i2c/Kconfig
++++ b/drivers/i2c/Kconfig
+@@ -110,6 +110,16 @@ config I2C_STUB
+ 
+ 	  If you don't know what to do here, definitely say N.
+ 
++config I2C_SLAVE
++	bool "I2C slave support"
++
++if I2C_SLAVE
++
++config I2C_SLAVE_EEPROM
++	tristate "I2C eeprom slave driver"
++
++endif
++
+ config I2C_DEBUG_CORE
+ 	bool "I2C Core debugging messages"
+ 	help
+diff --git a/drivers/i2c/Makefile b/drivers/i2c/Makefile
+index 1722f50f2473..45095b3d16a9 100644
+--- a/drivers/i2c/Makefile
++++ b/drivers/i2c/Makefile
+@@ -9,6 +9,7 @@ obj-$(CONFIG_I2C_CHARDEV)	+= i2c-dev.o
+ obj-$(CONFIG_I2C_MUX)		+= i2c-mux.o
+ obj-y				+= algos/ busses/ muxes/
+ obj-$(CONFIG_I2C_STUB)		+= i2c-stub.o
++obj-$(CONFIG_I2C_SLAVE_EEPROM)	+= i2c-slave-eeprom.o
+ 
+ ccflags-$(CONFIG_I2C_DEBUG_CORE) := -DDEBUG
+ CFLAGS_i2c-core.o := -Wno-deprecated-declarations
+diff --git a/drivers/i2c/i2c-slave-eeprom.c b/drivers/i2c/i2c-slave-eeprom.c
+new file mode 100644
+index 000000000000..6631400b5f02
+--- /dev/null
++++ b/drivers/i2c/i2c-slave-eeprom.c
+@@ -0,0 +1,170 @@
++/*
++ * I2C slave mode EEPROM simulator
++ *
++ * Copyright (C) 2014 by Wolfram Sang, Sang Engineering <wsa@sang-engineering.com>
++ * Copyright (C) 2014 by Renesas Electronics Corporation
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation; version 2 of the License.
++ *
++ * Because most IP blocks can only detect one I2C slave address anyhow, this
++ * driver does not support simulating EEPROM types which take more than one
++ * address. It is prepared to simulate bigger EEPROMs with an internal 16 bit
++ * pointer, yet implementation is deferred until the need actually arises.
++ */
++
++#include <linux/i2c.h>
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++#include <linux/sysfs.h>
++
++struct eeprom_data {
++	struct bin_attribute bin;
++	bool first_write;
++	spinlock_t buffer_lock;
++	u8 buffer_idx;
++	u8 buffer[];
++};
++
++static int i2c_slave_eeprom_slave_cb(struct i2c_client *client,
++				     enum i2c_slave_event event, u8 *val)
++{
++	struct eeprom_data *eeprom = i2c_get_clientdata(client);
++
++	switch (event) {
++	case I2C_SLAVE_REQ_WRITE_END:
++		if (eeprom->first_write) {
++			eeprom->buffer_idx = *val;
++			eeprom->first_write = false;
++		} else {
++			spin_lock(&eeprom->buffer_lock);
++			eeprom->buffer[eeprom->buffer_idx++] = *val;
++			spin_unlock(&eeprom->buffer_lock);
++		}
++		break;
++
++	case I2C_SLAVE_REQ_READ_START:
++		spin_lock(&eeprom->buffer_lock);
++		*val = eeprom->buffer[eeprom->buffer_idx];
++		spin_unlock(&eeprom->buffer_lock);
++		break;
++
++	case I2C_SLAVE_REQ_READ_END:
++		eeprom->buffer_idx++;
++		break;
++
++	case I2C_SLAVE_STOP:
++		eeprom->first_write = true;
++		break;
++
++	default:
++		break;
++	}
++
++	return 0;
++}
++
++static ssize_t i2c_slave_eeprom_bin_read(struct file *filp, struct kobject *kobj,
++		struct bin_attribute *attr, char *buf, loff_t off, size_t count)
++{
++	struct eeprom_data *eeprom;
++	unsigned long flags;
++
++	if (off + count >= attr->size)
++		return -EFBIG;
++
++	eeprom = dev_get_drvdata(container_of(kobj, struct device, kobj));
++
++	spin_lock_irqsave(&eeprom->buffer_lock, flags);
++	memcpy(buf, &eeprom->buffer[off], count);
++	spin_unlock_irqrestore(&eeprom->buffer_lock, flags);
++
++	return count;
++}
++
++static ssize_t i2c_slave_eeprom_bin_write(struct file *filp, struct kobject *kobj,
++		struct bin_attribute *attr, char *buf, loff_t off, size_t count)
++{
++	struct eeprom_data *eeprom;
++	unsigned long flags;
++
++	if (off + count >= attr->size)
++		return -EFBIG;
++
++	eeprom = dev_get_drvdata(container_of(kobj, struct device, kobj));
++
++	spin_lock_irqsave(&eeprom->buffer_lock, flags);
++	memcpy(&eeprom->buffer[off], buf, count);
++	spin_unlock_irqrestore(&eeprom->buffer_lock, flags);
++
++	return count;
++}
++
++static int i2c_slave_eeprom_probe(struct i2c_client *client, const struct i2c_device_id *id)
++{
++	struct eeprom_data *eeprom;
++	int ret;
++	unsigned size = id->driver_data;
++
++	eeprom = devm_kzalloc(&client->dev, sizeof(struct eeprom_data) + size, GFP_KERNEL);
++	if (!eeprom)
++		return -ENOMEM;
++
++	eeprom->first_write = true;
++	spin_lock_init(&eeprom->buffer_lock);
++	i2c_set_clientdata(client, eeprom);
++
++	sysfs_bin_attr_init(&eeprom->bin);
++	eeprom->bin.attr.name = "slave-eeprom";
++	eeprom->bin.attr.mode = S_IRUSR | S_IWUSR;
++	eeprom->bin.read = i2c_slave_eeprom_bin_read;
++	eeprom->bin.write = i2c_slave_eeprom_bin_write;
++	eeprom->bin.size = size;
++
++	ret = sysfs_create_bin_file(&client->dev.kobj, &eeprom->bin);
++	if (ret)
++		return ret;
++
++	ret = i2c_slave_register(client, i2c_slave_eeprom_slave_cb);
++	if (ret) {
++		sysfs_remove_bin_file(&client->dev.kobj, &eeprom->bin);
++		return ret;
++	}
++
++	return 0;
++};
++
++static int i2c_slave_eeprom_remove(struct i2c_client *client)
++{
++	struct eeprom_data *eeprom = i2c_get_clientdata(client);
++
++	i2c_slave_unregister(client);
++	sysfs_remove_bin_file(&client->dev.kobj, &eeprom->bin);
++
++	return 0;
++}
++
++static const struct i2c_device_id i2c_slave_eeprom_id[] = {
++	{ "slave-24c02", 2048 / 8 },
++	{ }
++};
++MODULE_DEVICE_TABLE(i2c, i2c_slave_eeprom_id);
++
++static struct i2c_driver i2c_slave_eeprom_driver = {
++	.driver = {
++		.name = "i2c-slave-eeprom",
++		.owner = THIS_MODULE,
++	},
++	.probe = i2c_slave_eeprom_probe,
++	.remove = i2c_slave_eeprom_remove,
++	.id_table = i2c_slave_eeprom_id,
++};
++module_i2c_driver(i2c_slave_eeprom_driver);
++
++MODULE_AUTHOR("Wolfram Sang <wsa@sang-engineering.com>");
++MODULE_DESCRIPTION("I2C slave mode EEPROM simulator");
++MODULE_LICENSE("GPL v2");
+-- 
+2.1.1
