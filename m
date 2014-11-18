@@ -1,92 +1,118 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 18 Nov 2014 12:21:24 +0100
-Subject: [PATCH 3/4] simplefb: Change simplefb_init from module_init to
- fs_initcall
-In-Reply-To: <546B26F4.50302@redhat.com>
-References: <1415830124-28787-1-git-send-email-hdegoede@redhat.com>
- <1415830124-28787-3-git-send-email-hdegoede@redhat.com>
- <20141113085238.GE20972@lukather>
- <CAMuHMdXZ4V4GHvyDLOP8FYvPuGArc5G0aO6NCE9FKHT24YRGPg@mail.gmail.com>
- <20141118101911.GA15769@ulmo> <546B26F4.50302@redhat.com>
-Message-ID: <20141118112123.GA3873@ulmo>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Nov 2014 12:30:11 +0100
+Subject: [RFC PATCH 00/16] Refine PCI host bridge scan interfaces
+In-Reply-To: <546B2ACC.90304@huawei.com>
+References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
+ <1463511.o4kE8TX3Bd@wuerfel> <546B2ACC.90304@huawei.com>
+Message-ID: <20535707.3sA6NjSINh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 12:01:08PM +0100, Hans de Goede wrote:
-> Hi,
-> 
-> On 11/18/2014 11:19 AM, Thierry Reding wrote:
-> > On Thu, Nov 13, 2014 at 09:58:41AM +0100, Geert Uytterhoeven wrote:
-> >> Hi Maxime,
+On Tuesday 18 November 2014 19:17:32 Yijing Wang wrote:
+> On 2014/11/17 22:13, Arnd Bergmann wrote:
+> > On Monday 17 November 2014 18:21:34 Yijing Wang wrote:
+> >> This series is based Linux 3.18-rc1 and Lorenzo Pieralisi's
+> >> arm PCI domain cleanup patches, link: 
+> >> https://patchwork.ozlabs.org/patch/407585/
 > >>
-> >> On Thu, Nov 13, 2014 at 9:52 AM, Maxime Ripard
-> >> <maxime.ripard@free-electrons.com> wrote:
-> >>>> -module_init(simplefb_init);
-> >>>> +/*
-> >>>> + * While this can be a module, if builtin it's most likely the console
-> >>>> + * So let's leave module_exit but move module_init to an earlier place
-> >>>> + */
-> >>>
-> >>> Not really related to this patch itself, but do we want to support
-> >>> simplefb as a module? It seems like it's going to be most of the time
-> >>> broken.
+> >> Current pci scan interfaces like pci_scan_root_bus() and directly
+> >> call pci_create_root_bus()/pci_scan_child_bus() lack flexiblity.
+> >> Some platform infos like PCI domain and msi_chip have to be
+> >> associated to PCI bus by some arch specific function.
+> >> We want to make a generic pci_host_bridge, and make it hold
+> >> the platform infos or hook. Then we could eliminate the lots
+> >> of arch pci_domain_nr, also we could associate some platform 
+> >> ops something like pci_get_msi_chip(struct pci_dev *dev)
+> >> with pci_host_bridge to avoid introduce arch weak functions.
 > >>
-> >> If it depends on clocks, it won't work as a module, as CCF will have disabled
-> >> all unused clocks at that point.
+> >> This RFC version not for all platforms, just applied the new
+> >> scan interface in x86/arm/powerpc/ia64, I will refresh other
+> >> platforms after the core pci scan interfaces are ok.
 > > 
-> > If it does depend on anything beyond clocks it won't work at all. Clocks
-> > are special because they get set up very early at boot time. If it turns
-> > out that a simplefb ever needs a regulator to remain on, and that's even
-> > quite likely to happen eventually, it's going to fail miserably, because
-> > those regulators will typically be provided by a PMIC on an I2C bus. The
-> > regulator won't be registered until very late into the boot process and
-> > a regulator_get() call will almost certainly cause the simplefb driver
-> > to defer probing.
+> > I think overall this is a good direction to take, in particular
+> > moving more things into struct pci_host_bridge so we can
+> > slim down the architecture specific code.
 > 
-> Right, this has been discussed already and the plan is to have simplefb
-> continue its probe function and return success from it if it encounters
-> any -eprobe_defer errors, while tracking which resources it misses.
+> Hi Arnd, thanks very much for your review and comments!
 > 
-> And then have a late_initcall which will claim any resources which failed
-> with -eprobe beforehand.
-
-How do you ensure that the late_initcall gets run before any of the
-other late_initcalls that disable the resources? Also my recollection is
-that deferred probing will first be triggered the first time from a
-late_initcall, so chances aren't very high that all resources have shown
-up by that time.
-
-> > Now deferring probing is a real showstopper for simplefb, because not
-> > only does it make the framebuffer useless as early boot console, once
-> > probing is attempted again the clocks that it would have needed to
-> > acquire to keep going will already have been switched off, too.
+> > 
+> > I don't particularly like the way you use the 'pci_host_info'
+> > to pass callback pointers and some of the generic information.
+> > This duplicates some of the issues we are currently trying
+> > to untangle in the arm32 code to make drivers easier to share
+> > between architectures.
 > 
-> That is not true, even with the current implementation, if all necessary
-> drivers are built in, then simplefb will come up later, but it will still
-> come up before the late_initcall which disables the clocks.
+> What arm32 code you are trying to untangle for example ?
 
-Yes, in the current implementation because clocks typically are
-registered very early and thus you don't hit the deferred probe. The
-same is not true for other types of resources where it's actually quite
-common to hit deferred probing (regulators is a very notorious one).
+We have a few problems that currently prevent us from using shared
+drivers across arm32 and arm64:
 
-It doesn't matter whether a driver is built-in or not, once you hit
-deferred probing you lose.
+- arm32 has an architecture-defined pci_sys_data structure, but
+  we really want to have one that is defined by the host bridge driver
+  and that is architecture independent. Some core functions depend
+  on this structure at the moment, which Lorenzo is trying to
+  undo
 
-> Once we do the split probing described above (which is something which
-> we plan to do when it becomes necessary), then simplefb will still come
-> up early.
+- The pci_common_init interface on arm32 doesn't work well on
+  loadable drivers, it does not return an error, and it is built
+  around the assumption that you probe all pci host bridges at
+  the same time, while the standard Linux driver model assumes
+  that you probe one at a time.
 
-It will come up early but won't have acquired all the resources that it
-needs, so unless you somehow manage to order late_initcalls in exactly
-the way that you need them, the frameworks will still turn off what you
-haven't managed to claim yet.
+- The way we pass a temporary structure (hw_pci) with function pointers
+  into the architecture code makes it relatively hard to follow
+  how the initialization sequence works.
+ 
+> Introduce pci_host_info here because I want to make the PCI scan interfaces
+> simple to host drviers, host drivers only need to call one scan
+> interface(pci_scan_host_bridge), but from your comments,
+> The combination pci_create_host_bridge() + pci_scan_xx()
+> seems to be more popular.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141118/8e76abb6/attachment.sig>
+Yes, I think a simpler interface structure would be better than trying
+to minimize the amount of code needed in drivers at the expense of
+interface complexity.
+
+> > As a general approach, I'd rather see generic helper functions
+> > being exported by the PCI core that a driver may or may not
+> > call. 
+> > The way you split the interface between things that happen
+> > before scanning the buses (pci_create_host_bridge) and
+> > the actual scanning (__pci_create_root_bus, pci_scan_child_bus)
+> > seems very helpful and I think we can expand that concept further:
+> > 
+> > - The normal pci_create_host_bridge() function can contain
+> >   all of the DT scanning functions (finding bus/mem/io resources, 
+> >   finding the msi-parent), while drivers that don't depend on DT
+> >   for this information can call the same function and fill the
+> >   same things after they have the pci_host_bridge pointer.
+> > 
+> > - If a driver needs to set up mapping windows, it can do that after
+> >   calling pci_create_host_bridge(). E.g. all the dw_pcie glue drivers
+> >   can call a dw_pcie_setup_windows() function that takes the resources
+> >   out of the pci_host_bridge pointer before the bus is scanned.
+> > 
+> > - The ACPI code can have a completely different way of creating
+> >   a struct pci_host_bridge, which is also passed into the same
+> >   bus scanning functions, but doesn't have to come from
+> >   pci_create_host_bridge.
+> 
+> I hope platforms with ACPI or DT could both use pci_create_host_bridge().
+> Why we need to use two different ways to process it ?
+
+These are completely different use cases:
+
+a) For DT, we want loadable device drivers that start by probing a host
+   bridge device which was added through the DT platform code. The
+   driver is self-contained, and eventually we want to be able to unload
+   it. We have lots of different per-soc drivers that require different
+   quirks
+
+b) For ACPI, the interface is defined in the ACPI spec across architectures
+   and SoCs, we don't have host bridge drivers and the code that initializes
+   the PCI is required early during boot and called from architecture
+   code. There is no parent device, as ACPI sees PCI as a fundamental building
+   block by itself, and there are no drivers because the firmware does
+   the initial hardware setup, so we only have to access the config space.
+
+	Arnd
