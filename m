@@ -1,49 +1,57 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Tue, 18 Nov 2014 11:10:53 -0800
-Subject: [PATCH] ARM: multi_v7_defconfig: fix failure setting CPU voltage by
- enabling dependent I2C controller
-Message-ID: <1416337853-1558-1-git-send-email-tyler.baker@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Nov 2014 19:19:36 +0000
+Subject: ARM atomics overhaul for musl
+In-Reply-To: <20141118181425.GY18842@arm.com>
+References: <20141116055656.GA13940@brightrain.aerifal.cx>
+ <20141116163355.GK4042@n2100.arm.linux.org.uk>
+ <20141116165017.GT22465@brightrain.aerifal.cx>
+ <20141116171055.GM4042@n2100.arm.linux.org.uk>
+ <20141117135412.GC29595@e104818-lin.cambridge.arm.com>
+ <20141117143905.GQ4042@n2100.arm.linux.org.uk>
+ <CALCETrUAtAJ1CmuxOFiiu53kAWwofUpFaBeFAZF7Th2VXPbHZg@mail.gmail.com>
+ <20141118105611.GC28279@e104818-lin.cambridge.arm.com>
+ <20141118181425.GY18842@arm.com>
+Message-ID: <20141118191936.GE4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a long standing issue introduced during the 3.16 merge window.
-Shortly after the merge, exynos5250-based arndale boards began to produce the 
-following errors:
+On Tue, Nov 18, 2014 at 06:14:25PM +0000, Will Deacon wrote:
+> The only way I can see hwcap working is if we follow what the architecture
+> allows for in ARMv8, which is 4 bits per feature over (currently) around
+> 10 32-bit registers. That would mean potentially exposing 1280 hwcaps,
+> which is clearly insane.
 
-kern.err kernel:  exynos-cpufreq exynos-cpufreq: failed to set cpu voltage
-kern.err kernel:  cpufreq: __target_index: Failed to change cpu frequency: -22
+Exactly my argument, which got called "rediculous" !  I'm glad that
+someone with a similar visibility of the problem has come to the
+same conclusion that I did.
 
-Further analysis revealed that the S5M8767 voltage regulator used on the 
-exynos5250-based arndale board utilizes the S3C2410 I2C controller. If the 
-S3C2410 I2C controller driver is not enabled, the S5M8767 voltage regulator 
-fails to probe. Therefore a dependency exists between these two drivers. 
-In the exynos_defconfig both CONFIG_REGULATOR_S5M8767 and CONFIG_I2C_S3C2410 
-options are enabled, and no errors are produced. However, in the 
-multi_v7_defconfig only the CONFIG_REGULATOR_S5M8767 option is enabled and the 
-errors are present. So let's enable the CONFIG_I2C_S3C2410 option in the 
-multi_v7_defconfig to allow the S5M8767 voltage regulator to probe.
+> We've done a bit better with the crypto extensions, where we provide
+> fine-grained sha1, sha2 etc hwcaps, but this is based on the relavant 4-bit
+> fields in ISAR5 being positive values. I can't find any architectural
+> guarantees that this will work on future cores (e.g. bumping the 4-bit
+> field to indicate a subset of previous functionality).
 
-Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
----
-This issue was reported [1]. I've also confirmed this fix on two different 
-arndale boards.
+This is the big problem.  An example of this is the barrier bits, which
+indicate whether dmb & dsb are present or not.  It's not a single bit,
+but a group of four.  If we provide a single bit for dmb, and another
+for dsb (to cater for a future possibility that dmb or dsb may be
+separately indicated by a future 4-bit binary pattern), that's fine,
+but should we then list every instruction which is conditional on any
+ISAR bit pattern?  That becomes a /very/ big space indeed.
 
-[1] https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg38765.html
+If we don't do this, and (eg) we use a single bit for both dmb and dsb,
+what if a future bit pattern indicates that (eg) dmb is obsolete, but
+dsb hasn't.
 
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Contary to what others assert, this is not a trivial problem, and it's
+not trivial to just add additional hwcap bits to solve it.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 3487046..9d7a32f 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -217,6 +217,7 @@ CONFIG_I2C_CADENCE=y
- CONFIG_I2C_DESIGNWARE_PLATFORM=y
- CONFIG_I2C_EXYNOS5=y
- CONFIG_I2C_MV64XXX=y
-+CONFIG_I2C_S3C2410=y
- CONFIG_I2C_SIRF=y
- CONFIG_I2C_TEGRA=y
- CONFIG_I2C_ST=y
+There's also the problem in /knowing/ what information to export to
+userspace, before userspace knows that they need it... which is exactly
+what's happened with DMB (and this is not the first time it's happened.)
+
+I suspect this won't be the last time either.
+
 -- 
-2.1.3
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
