@@ -1,486 +1,583 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 17 Nov 2014 16:55:02 -0800
-Subject: [PATCHv5 4/7] arm64: Move some head.text functions to executable
- section
+Date: Mon, 17 Nov 2014 16:55:05 -0800
+Subject: [PATCHv5 7/7] arm64: add better page protections to arm64
 In-Reply-To: <1416272105-14787-1-git-send-email-lauraa@codeaurora.org>
 References: <1416272105-14787-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1416272105-14787-5-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1416272105-14787-8-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The head.text section is intended to be run at early bootup
-before any of the regular kernel mappings have been setup.
-Parts of head.text may be freed back into the buddy allocator
-due to TEXT_OFFSET so for security requirements this memory
-must not be executable. The suspend/resume/hotplug code path
-requires some of these head.S functions to run however which
-means they need to be executable. Support these conflicting
-requirements by moving the few head.text functions that need
-to be executable to the text section which has the appropriate
-page table permissions.
+Add page protections for arm64 similar to those in arm.
+This is for security reasons to prevent certain classes
+of exploits. The current method:
+
+- Map all memory as either RWX or RW. We round to the nearest
+  section to avoid creating page tables before everything is mapped
+- Once everything is mapped, if either end of the RWX section should
+  not be X, we split the PMD and remap as necessary
+- When initmem is to be freed, we change the permissions back to
+  RW (using stop machine if necessary to flush the TLB)
+- If CONFIG_DEBUG_RODATA is set, the read only sections are set
+  read only.
 
 Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
-v5: Went back to the v3 version which moved everything around instead
-of adding annotations. Dropped the code duplication for head.text.
+v5:
+ -Dropped map_io from the alloc_init_* functions
+ -Fixed a bug in split_pud and cleaned it up per suggestions from Steve
+ -Aligned _etext up to SECTION_SIZE of DEBUG_ALIGN_RODATA is enabled to ensure
+  that the section mapping is actually kept and we don't leak any RWX regions
+ -Dropped some old ioremap code that somehow snuck in from the last rebase
+ -Fixed create_id_mapping to use the early mapping since efi_idmap_init is
+  called early
 ---
- arch/arm64/kernel/head.S        | 406 +++++++++++++++++++++-------------------
- arch/arm64/kernel/vmlinux.lds.S |   1 +
- 2 files changed, 210 insertions(+), 197 deletions(-)
+ arch/arm64/Kconfig.debug            |  23 +++
+ arch/arm64/include/asm/cacheflush.h |   4 +
+ arch/arm64/kernel/vmlinux.lds.S     |  20 +++
+ arch/arm64/mm/init.c                |   1 +
+ arch/arm64/mm/mm.h                  |   2 +
+ arch/arm64/mm/mmu.c                 | 289 +++++++++++++++++++++++++++++++-----
+ 6 files changed, 298 insertions(+), 41 deletions(-)
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 10f5cc0..a41560b 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -238,7 +238,13 @@ ENTRY(stext)
- 	mov	x0, x22
- 	bl	lookup_processor_type
- 	mov	x23, x0				// x23=current cpu_table
--	cbz	x23, __error_p			// invalid processor (x23=0)?
-+	/*
-+	 *	__error_p may end up out of range for cbz if text areas
-+	 *	are aligned up to section sizes
-+	 */
-+	cbnz	x23, 1f				// invalid processor (x23=0)?
-+	b	__error_p
-+1:
- 	bl	__vet_fdt
- 	bl	__create_page_tables		// x25=TTBR0, x26=TTBR1
- 	/*
-@@ -250,13 +256,213 @@ ENTRY(stext)
- 	 */
- 	ldr	x27, __switch_data		// address to jump to after
- 						// MMU has been enabled
--	adr	lr, __enable_mmu		// return (PIC) address
-+	adrp	lr, __enable_mmu		// return (PIC) address
-+	add	lr, lr, #:lo12:__enable_mmu
- 	ldr	x12, [x23, #CPU_INFO_SETUP]
- 	add	x12, x12, x28			// __virt_to_phys
- 	br	x12				// initialise processor
- ENDPROC(stext)
+diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+index 0a12933..867fe6f1 100644
+--- a/arch/arm64/Kconfig.debug
++++ b/arch/arm64/Kconfig.debug
+@@ -54,4 +54,27 @@ config DEBUG_SET_MODULE_RONX
+           against certain classes of kernel exploits.
+           If in doubt, say "N".
  
- /*
-+ * Determine validity of the x21 FDT pointer.
-+ * The dtb must be 8-byte aligned and live in the first 512M of memory.
-+ */
-+__vet_fdt:
-+	tst	x21, #0x7
-+	b.ne	1f
-+	cmp	x21, x24
-+	b.lt	1f
-+	mov	x0, #(1 << 29)
-+	add	x0, x0, x24
-+	cmp	x21, x0
-+	b.ge	1f
-+	ret
-+1:
-+	mov	x21, #0
-+	ret
-+ENDPROC(__vet_fdt)
-+/*
-+ * Macro to create a table entry to the next page.
-+ *
-+ *	tbl:	page table address
-+ *	virt:	virtual address
-+ *	shift:	#imm page table shift
-+ *	ptrs:	#imm pointers per table page
-+ *
-+ * Preserves:	virt
-+ * Corrupts:	tmp1, tmp2
-+ * Returns:	tbl -> next level table page address
-+ */
-+	.macro	create_table_entry, tbl, virt, shift, ptrs, tmp1, tmp2
-+	lsr	\tmp1, \virt, #\shift
-+	and	\tmp1, \tmp1, #\ptrs - 1	// table index
-+	add	\tmp2, \tbl, #PAGE_SIZE
-+	orr	\tmp2, \tmp2, #PMD_TYPE_TABLE	// address of next table and entry type
-+	str	\tmp2, [\tbl, \tmp1, lsl #3]
-+	add	\tbl, \tbl, #PAGE_SIZE		// next level table page
-+	.endm
++config DEBUG_RODATA
++	bool "Make kernel text and rodata read-only"
++	help
++	  If this is set, kernel text and rodata will be made read-only. This
++	  is to help catch accidental or malicious attempts to change the
++	  kernel's executable code. Additionally splits rodata from kernel
++	  text so it can be made explicitly non-executable.
 +
-+/*
-+ * Macro to populate the PGD (and possibily PUD) for the corresponding
-+ * block entry in the next level (tbl) for the given virtual address.
-+ *
-+ * Preserves:	tbl, next, virt
-+ * Corrupts:	tmp1, tmp2
-+ */
-+	.macro	create_pgd_entry, tbl, virt, tmp1, tmp2
-+	create_table_entry \tbl, \virt, PGDIR_SHIFT, PTRS_PER_PGD, \tmp1, \tmp2
-+#if SWAPPER_PGTABLE_LEVELS == 3
-+	create_table_entry \tbl, \virt, TABLE_SHIFT, PTRS_PER_PTE, \tmp1, \tmp2
++          If in doubt, say Y
++
++config DEBUG_ALIGN_RODATA
++	depends on DEBUG_RODATA && !ARM64_64K_PAGES
++	bool "Align linker sections up to SECTION_SIZE"
++	help
++	  If this option is enabled, sections that may potentially be marked as
++	  read only or non-executable will be aligned up to the section size of
++	  the kernel. This prevents sections from being split into pages and
++	  avoids a potential TLB penalty. The downside is an increase in
++	  alignment and potentially wasted space. Turn on this option if
++	  performance is more important than memory pressure.
++
++	  If in doubt, say N
++
+ endmenu
+diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+index 689b637..0014207 100644
+--- a/arch/arm64/include/asm/cacheflush.h
++++ b/arch/arm64/include/asm/cacheflush.h
+@@ -152,4 +152,8 @@ int set_memory_ro(unsigned long addr, int numpages);
+ int set_memory_rw(unsigned long addr, int numpages);
+ int set_memory_x(unsigned long addr, int numpages);
+ int set_memory_nx(unsigned long addr, int numpages);
++
++#ifdef CONFIG_DEBUG_RODATA
++void mark_rodata_ro(void);
 +#endif
-+	.endm
-+
-+/*
-+ * Macro to populate block entries in the page table for the start..end
-+ * virtual range (inclusive).
-+ *
-+ * Preserves:	tbl, flags
-+ * Corrupts:	phys, start, end, pstate
-+ */
-+	.macro	create_block_map, tbl, flags, phys, start, end
-+	lsr	\phys, \phys, #BLOCK_SHIFT
-+	lsr	\start, \start, #BLOCK_SHIFT
-+	and	\start, \start, #PTRS_PER_PTE - 1	// table index
-+	orr	\phys, \flags, \phys, lsl #BLOCK_SHIFT	// table entry
-+	lsr	\end, \end, #BLOCK_SHIFT
-+	and	\end, \end, #PTRS_PER_PTE - 1		// table end index
-+9999:	str	\phys, [\tbl, \start, lsl #3]		// store the entry
-+	add	\start, \start, #1			// next entry
-+	add	\phys, \phys, #BLOCK_SIZE		// next block
-+	cmp	\start, \end
-+	b.ls	9999b
-+	.endm
-+
-+/*
-+ * Setup the initial page tables. We only setup the barest amount which is
-+ * required to get the kernel running. The following sections are required:
-+ *   - identity mapping to enable the MMU (low address, TTBR0)
-+ *   - first few MB of the kernel linear mapping to jump to once the MMU has
-+ *     been enabled, including the FDT blob (TTBR1)
-+ *   - pgd entry for fixed mappings (TTBR1)
-+ */
-+__create_page_tables:
-+	pgtbl	x25, x26, x28			// idmap_pg_dir and swapper_pg_dir addresses
-+	mov	x27, lr
-+
-+	/*
-+	 * Invalidate the idmap and swapper page tables to avoid potential
-+	 * dirty cache lines being evicted.
-+	 */
-+	mov	x0, x25
-+	add	x1, x26, #SWAPPER_DIR_SIZE
-+	bl	__inval_cache_range
-+
-+	/*
-+	 * Clear the idmap and swapper page tables.
-+	 */
-+	mov	x0, x25
-+	add	x6, x26, #SWAPPER_DIR_SIZE
-+1:	stp	xzr, xzr, [x0], #16
-+	stp	xzr, xzr, [x0], #16
-+	stp	xzr, xzr, [x0], #16
-+	stp	xzr, xzr, [x0], #16
-+	cmp	x0, x6
-+	b.lo	1b
-+
-+	ldr	x7, =MM_MMUFLAGS
-+
-+	/*
-+	 * Create the identity mapping.
-+	 */
-+	mov	x0, x25				// idmap_pg_dir
-+	ldr	x3, =KERNEL_START
-+	add	x3, x3, x28			// __pa(KERNEL_START)
-+	create_pgd_entry x0, x3, x5, x6
-+	ldr	x6, =KERNEL_END
-+	mov	x5, x3				// __pa(KERNEL_START)
-+	add	x6, x6, x28			// __pa(KERNEL_END)
-+	create_block_map x0, x7, x3, x5, x6
-+
-+	/*
-+	 * Map the kernel image (starting with PHYS_OFFSET).
-+	 */
-+	mov	x0, x26				// swapper_pg_dir
-+	mov	x5, #PAGE_OFFSET
-+	create_pgd_entry x0, x5, x3, x6
-+	ldr	x6, =KERNEL_END
-+	mov	x3, x24				// phys offset
-+	create_block_map x0, x7, x3, x5, x6
-+
-+	/*
-+	 * Map the FDT blob (maximum 2MB; must be within 512MB of
-+	 * PHYS_OFFSET).
-+	 */
-+	mov	x3, x21				// FDT phys address
-+	and	x3, x3, #~((1 << 21) - 1)	// 2MB aligned
-+	mov	x6, #PAGE_OFFSET
-+	sub	x5, x3, x24			// subtract PHYS_OFFSET
-+	tst	x5, #~((1 << 29) - 1)		// within 512MB?
-+	csel	x21, xzr, x21, ne		// zero the FDT pointer
-+	b.ne	1f
-+	add	x5, x5, x6			// __va(FDT blob)
-+	add	x6, x5, #1 << 21		// 2MB for the FDT blob
-+	sub	x6, x6, #1			// inclusive range
-+	create_block_map x0, x7, x3, x5, x6
-+1:
-+	/*
-+	 * Since the page tables have been populated with non-cacheable
-+	 * accesses (MMU disabled), invalidate the idmap and swapper page
-+	 * tables again to remove any speculatively loaded cache lines.
-+	 */
-+	mov	x0, x25
-+	add	x1, x26, #SWAPPER_DIR_SIZE
-+	bl	__inval_cache_range
-+
-+	mov	lr, x27
-+	ret
-+ENDPROC(__create_page_tables)
-+	.ltorg
-+
-+	.align	3
-+	.type	__switch_data, %object
-+__switch_data:
-+	.quad	__mmap_switched
-+	.quad	__bss_start			// x6
-+	.quad	__bss_stop			// x7
-+	.quad	processor_id			// x4
-+	.quad	__fdt_pointer			// x5
-+	.quad	memstart_addr			// x6
-+	.quad	init_thread_union + THREAD_START_SP // sp
-+
-+/*
-+ * The following fragment of code is executed with the MMU on in MMU mode, and
-+ * uses absolute addresses; this is not position independent.
-+ */
-+__mmap_switched:
-+	adr	x3, __switch_data + 8
-+
-+	ldp	x6, x7, [x3], #16
-+1:	cmp	x6, x7
-+	b.hs	2f
-+	str	xzr, [x6], #8			// Clear BSS
-+	b	1b
-+2:
-+	ldp	x4, x5, [x3], #16
-+	ldr	x6, [x3], #8
-+	ldr	x16, [x3]
-+	mov	sp, x16
-+	str	x22, [x4]			// Save processor ID
-+	str	x21, [x5]			// Save FDT pointer
-+	str	x24, [x6]			// Save PHYS_OFFSET
-+	mov	x29, #0
-+	b	start_kernel
-+ENDPROC(__mmap_switched)
-+
-+/*
-+ * end 'true' head section, begin head section that can be read only
-+ */
-+	.section ".latehead.text","ax"
-+/*
-  * If we're fortunate enough to boot@EL2, ensure that the world is
-  * sane before dropping to EL1.
-  *
-@@ -493,183 +699,6 @@ ENDPROC(__calc_phys_offset)
- 	.quad	PAGE_OFFSET
- 
- /*
-- * Macro to create a table entry to the next page.
-- *
-- *	tbl:	page table address
-- *	virt:	virtual address
-- *	shift:	#imm page table shift
-- *	ptrs:	#imm pointers per table page
-- *
-- * Preserves:	virt
-- * Corrupts:	tmp1, tmp2
-- * Returns:	tbl -> next level table page address
-- */
--	.macro	create_table_entry, tbl, virt, shift, ptrs, tmp1, tmp2
--	lsr	\tmp1, \virt, #\shift
--	and	\tmp1, \tmp1, #\ptrs - 1	// table index
--	add	\tmp2, \tbl, #PAGE_SIZE
--	orr	\tmp2, \tmp2, #PMD_TYPE_TABLE	// address of next table and entry type
--	str	\tmp2, [\tbl, \tmp1, lsl #3]
--	add	\tbl, \tbl, #PAGE_SIZE		// next level table page
--	.endm
--
--/*
-- * Macro to populate the PGD (and possibily PUD) for the corresponding
-- * block entry in the next level (tbl) for the given virtual address.
-- *
-- * Preserves:	tbl, next, virt
-- * Corrupts:	tmp1, tmp2
-- */
--	.macro	create_pgd_entry, tbl, virt, tmp1, tmp2
--	create_table_entry \tbl, \virt, PGDIR_SHIFT, PTRS_PER_PGD, \tmp1, \tmp2
--#if SWAPPER_PGTABLE_LEVELS == 3
--	create_table_entry \tbl, \virt, TABLE_SHIFT, PTRS_PER_PTE, \tmp1, \tmp2
--#endif
--	.endm
--
--/*
-- * Macro to populate block entries in the page table for the start..end
-- * virtual range (inclusive).
-- *
-- * Preserves:	tbl, flags
-- * Corrupts:	phys, start, end, pstate
-- */
--	.macro	create_block_map, tbl, flags, phys, start, end
--	lsr	\phys, \phys, #BLOCK_SHIFT
--	lsr	\start, \start, #BLOCK_SHIFT
--	and	\start, \start, #PTRS_PER_PTE - 1	// table index
--	orr	\phys, \flags, \phys, lsl #BLOCK_SHIFT	// table entry
--	lsr	\end, \end, #BLOCK_SHIFT
--	and	\end, \end, #PTRS_PER_PTE - 1		// table end index
--9999:	str	\phys, [\tbl, \start, lsl #3]		// store the entry
--	add	\start, \start, #1			// next entry
--	add	\phys, \phys, #BLOCK_SIZE		// next block
--	cmp	\start, \end
--	b.ls	9999b
--	.endm
--
--/*
-- * Setup the initial page tables. We only setup the barest amount which is
-- * required to get the kernel running. The following sections are required:
-- *   - identity mapping to enable the MMU (low address, TTBR0)
-- *   - first few MB of the kernel linear mapping to jump to once the MMU has
-- *     been enabled, including the FDT blob (TTBR1)
-- *   - pgd entry for fixed mappings (TTBR1)
-- */
--__create_page_tables:
--	pgtbl	x25, x26, x28			// idmap_pg_dir and swapper_pg_dir addresses
--	mov	x27, lr
--
--	/*
--	 * Invalidate the idmap and swapper page tables to avoid potential
--	 * dirty cache lines being evicted.
--	 */
--	mov	x0, x25
--	add	x1, x26, #SWAPPER_DIR_SIZE
--	bl	__inval_cache_range
--
--	/*
--	 * Clear the idmap and swapper page tables.
--	 */
--	mov	x0, x25
--	add	x6, x26, #SWAPPER_DIR_SIZE
--1:	stp	xzr, xzr, [x0], #16
--	stp	xzr, xzr, [x0], #16
--	stp	xzr, xzr, [x0], #16
--	stp	xzr, xzr, [x0], #16
--	cmp	x0, x6
--	b.lo	1b
--
--	ldr	x7, =MM_MMUFLAGS
--
--	/*
--	 * Create the identity mapping.
--	 */
--	mov	x0, x25				// idmap_pg_dir
--	ldr	x3, =KERNEL_START
--	add	x3, x3, x28			// __pa(KERNEL_START)
--	create_pgd_entry x0, x3, x5, x6
--	ldr	x6, =KERNEL_END
--	mov	x5, x3				// __pa(KERNEL_START)
--	add	x6, x6, x28			// __pa(KERNEL_END)
--	create_block_map x0, x7, x3, x5, x6
--
--	/*
--	 * Map the kernel image (starting with PHYS_OFFSET).
--	 */
--	mov	x0, x26				// swapper_pg_dir
--	mov	x5, #PAGE_OFFSET
--	create_pgd_entry x0, x5, x3, x6
--	ldr	x6, =KERNEL_END
--	mov	x3, x24				// phys offset
--	create_block_map x0, x7, x3, x5, x6
--
--	/*
--	 * Map the FDT blob (maximum 2MB; must be within 512MB of
--	 * PHYS_OFFSET).
--	 */
--	mov	x3, x21				// FDT phys address
--	and	x3, x3, #~((1 << 21) - 1)	// 2MB aligned
--	mov	x6, #PAGE_OFFSET
--	sub	x5, x3, x24			// subtract PHYS_OFFSET
--	tst	x5, #~((1 << 29) - 1)		// within 512MB?
--	csel	x21, xzr, x21, ne		// zero the FDT pointer
--	b.ne	1f
--	add	x5, x5, x6			// __va(FDT blob)
--	add	x6, x5, #1 << 21		// 2MB for the FDT blob
--	sub	x6, x6, #1			// inclusive range
--	create_block_map x0, x7, x3, x5, x6
--1:
--	/*
--	 * Since the page tables have been populated with non-cacheable
--	 * accesses (MMU disabled), invalidate the idmap and swapper page
--	 * tables again to remove any speculatively loaded cache lines.
--	 */
--	mov	x0, x25
--	add	x1, x26, #SWAPPER_DIR_SIZE
--	bl	__inval_cache_range
--
--	mov	lr, x27
--	ret
--ENDPROC(__create_page_tables)
--	.ltorg
--
--	.align	3
--	.type	__switch_data, %object
--__switch_data:
--	.quad	__mmap_switched
--	.quad	__bss_start			// x6
--	.quad	__bss_stop			// x7
--	.quad	processor_id			// x4
--	.quad	__fdt_pointer			// x5
--	.quad	memstart_addr			// x6
--	.quad	init_thread_union + THREAD_START_SP // sp
--
--/*
-- * The following fragment of code is executed with the MMU on in MMU mode, and
-- * uses absolute addresses; this is not position independent.
-- */
--__mmap_switched:
--	adr	x3, __switch_data + 8
--
--	ldp	x6, x7, [x3], #16
--1:	cmp	x6, x7
--	b.hs	2f
--	str	xzr, [x6], #8			// Clear BSS
--	b	1b
--2:
--	ldp	x4, x5, [x3], #16
--	ldr	x6, [x3], #8
--	ldr	x16, [x3]
--	mov	sp, x16
--	str	x22, [x4]			// Save processor ID
--	str	x21, [x5]			// Save FDT pointer
--	str	x24, [x6]			// Save PHYS_OFFSET
--	mov	x29, #0
--	b	start_kernel
--ENDPROC(__mmap_switched)
--
--/*
-  * Exception handling. Something went wrong and we can't proceed. We ought to
-  * tell the user, but since we don't have any guarantee that we're even
-  * running on the right architecture, we do virtually nothing.
-@@ -717,21 +746,4 @@ __lookup_processor_type_data:
- 	.quad	cpu_table
- 	.size	__lookup_processor_type_data, . - __lookup_processor_type_data
- 
--/*
-- * Determine validity of the x21 FDT pointer.
-- * The dtb must be 8-byte aligned and live in the first 512M of memory.
-- */
--__vet_fdt:
--	tst	x21, #0x7
--	b.ne	1f
--	cmp	x21, x24
--	b.lt	1f
--	mov	x0, #(1 << 29)
--	add	x0, x0, x24
--	cmp	x21, x0
--	b.ge	1f
--	ret
--1:
--	mov	x21, #0
--	ret
--ENDPROC(__vet_fdt)
-+
+ #endif
 diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index edf8715..2d7e20a 100644
+index 2d7e20a..405820d 100644
 --- a/arch/arm64/kernel/vmlinux.lds.S
 +++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -56,6 +56,7 @@ SECTIONS
+@@ -8,6 +8,7 @@
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
+ #include <asm/page.h>
++#include <asm/pgtable.h>
+ 
+ #include "image.h"
+ 
+@@ -54,6 +55,9 @@ SECTIONS
+ 		_text = .;
+ 		HEAD_TEXT
  	}
++#ifdef CONFIG_DEBUG_ALIGN_RODATA
++	. = ALIGN(1<<SECTION_SHIFT);
++#endif
  	.text : {			/* Real text segment		*/
  		_stext = .;		/* Text and read-only data	*/
-+			*(.latehead.text)
- 			__exception_text_start = .;
- 			*(.exception.text)
- 			__exception_text_end = .;
+ 			*(.latehead.text)
+@@ -71,19 +75,35 @@ SECTIONS
+ 		*(.got)			/* Global offset table		*/
+ 	}
+ 
++#ifdef CONFIG_DEBUG_ALIGN_RODATA
++	. = ALIGN(1<<SECTION_SHIFT);
++#endif
+ 	RO_DATA(PAGE_SIZE)
+ 	EXCEPTION_TABLE(8)
+ 	NOTES
++#ifdef CONFIG_DEBUG_ALIGN_RODATA
++	. = ALIGN(1<<SECTION_SHIFT);
++#endif
+ 	_etext = .;			/* End of text and rodata section */
+ 
++#ifdef CONFIG_DEBUG_ALIGN_RODATA
++	. = ALIGN(1<<SECTION_SHIFT);
++#else
+ 	. = ALIGN(PAGE_SIZE);
++#endif
+ 	__init_begin = .;
+ 
+ 	INIT_TEXT_SECTION(8)
+ 	.exit.text : {
+ 		ARM_EXIT_KEEP(EXIT_TEXT)
+ 	}
++
++#ifdef CONFIG_DEBUG_ALIGN_RODATA
++	. = ALIGN(1<<SECTION_SHIFT);
++	__init_data_begin = .;
++#else
+ 	. = ALIGN(16);
++#endif
+ 	.init.data : {
+ 		INIT_DATA
+ 		INIT_SETUP(16)
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 494297c..61f44c7 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -324,6 +324,7 @@ void __init mem_init(void)
+ 
+ void free_initmem(void)
+ {
++	fixup_init();
+ 	free_initmem_default(0);
+ }
+ 
+diff --git a/arch/arm64/mm/mm.h b/arch/arm64/mm/mm.h
+index d519f4f..82347d8 100644
+--- a/arch/arm64/mm/mm.h
++++ b/arch/arm64/mm/mm.h
+@@ -1,2 +1,4 @@
+ extern void __init bootmem_init(void);
+ extern void __init arm64_swiotlb_init(void);
++
++void fixup_init(void);
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 6032f3e..dafde8e 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -26,6 +26,7 @@
+ #include <linux/memblock.h>
+ #include <linux/fs.h>
+ #include <linux/io.h>
++#include <linux/stop_machine.h>
+ 
+ #include <asm/cputype.h>
+ #include <asm/fixmap.h>
+@@ -137,17 +138,55 @@ static void __init *early_alloc(unsigned long sz)
+ 	return ptr;
+ }
+ 
+-static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
++/*
++ * remap a PMD into pages
++ */
++static noinline void __ref split_pmd(pmd_t *pmd, bool early)
++{
++	pte_t *pte, *start_pte;
++	unsigned long pfn;
++	int i = 0;
++
++	if (early)
++		start_pte = pte = early_alloc(PTRS_PER_PTE*sizeof(pte_t));
++	else
++		start_pte = pte = (pte_t *)__get_free_page(PGALLOC_GFP);
++
++	BUG_ON(!pte);
++
++	pfn = pmd_pfn(*pmd);
++
++	do {
++		/*
++		 * Need to have the least restrictive permissions available
++		 * permissions will be fixed up later
++		 */
++		set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
++		pfn++;
++	} while (pte++, i++, i < PTRS_PER_PTE);
++
++
++	__pmd_populate(pmd, __pa(start_pte), PMD_TYPE_TABLE);
++	flush_tlb_all();
++}
++
++static void __ref alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 				  unsigned long end, unsigned long pfn,
+-				  pgprot_t prot)
++				  pgprot_t prot, bool early)
+ {
+ 	pte_t *pte;
+ 
+ 	if (pmd_none(*pmd)) {
+-		pte = early_alloc(PTRS_PER_PTE * sizeof(pte_t));
++		if (early)
++			pte = early_alloc(PTRS_PER_PTE * sizeof(pte_t));
++		else
++			pte = (pte_t *)__get_free_page(PGALLOC_GFP);
++		BUG_ON(!pte);
+ 		__pmd_populate(pmd, __pa(pte), PMD_TYPE_TABLE);
+ 	}
+-	BUG_ON(pmd_bad(*pmd));
++
++	if (pmd_bad(*pmd))
++		split_pmd(pmd, early);
+ 
+ 	pte = pte_offset_kernel(pmd, addr);
+ 	do {
+@@ -156,29 +195,44 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 	} while (pte++, addr += PAGE_SIZE, addr != end);
+ }
+ 
+-static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
++void __ref split_pud(pud_t *old_pud, pmd_t *pmd)
++{
++	unsigned long addr = pud_pfn(*old_pud) << PAGE_SHIFT;
++	pgprot_t prot = __pgprot(pud_val(*old_pud) ^ pud_pfn(*old_pud));
++	int i = 0;
++
++	do {
++		set_pmd(pmd, __pmd(addr | prot));
++		addr += PMD_SIZE;
++	} while (pmd++, i++, i < PTRS_PER_PMD);
++}
++
++static void __ref alloc_init_pmd(pud_t *pud, unsigned long addr,
+ 				  unsigned long end, phys_addr_t phys,
+-				  int map_io)
++				  pgprot_t sect_prot, pgprot_t pte_prot,
++				  bool early)
+ {
+ 	pmd_t *pmd;
+ 	unsigned long next;
+-	pmdval_t prot_sect;
+-	pgprot_t prot_pte;
+-
+-	if (map_io) {
+-		prot_sect = PROT_SECT_DEVICE_nGnRE;
+-		prot_pte = __pgprot(PROT_DEVICE_nGnRE);
+-	} else {
+-		prot_sect = PROT_SECT_NORMAL_EXEC;
+-		prot_pte = PAGE_KERNEL_EXEC;
+-	}
+ 
+ 	/*
+ 	 * Check for initial section mappings in the pgd/pud and remove them.
+ 	 */
+ 	if (pud_none(*pud) || pud_bad(*pud)) {
+-		pmd = early_alloc(PTRS_PER_PMD * sizeof(pmd_t));
++		if (early)
++			pmd = early_alloc(PTRS_PER_PMD * sizeof(pmd_t));
++		else
++			pmd = pmd_alloc_one(&init_mm, addr);
++		BUG_ON(!pmd);
++		if (pud_sect(*pud)) {
++			/*
++			 * need to have the 1G of mappings continue to be
++			 * present
++			 */
++			split_pud(pud, pmd);
++		}
+ 		pud_populate(&init_mm, pud, pmd);
++		flush_tlb_all();
+ 	}
+ 
+ 	pmd = pmd_offset(pud, addr);
+@@ -186,8 +240,8 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+ 		next = pmd_addr_end(addr, end);
+ 		/* try section mapping first */
+ 		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
+-			pmd_t old_pmd =*pmd;
+-			set_pmd(pmd, __pmd(phys | prot_sect));
++			pmd_t old_pmd = *pmd;
++			set_pmd(pmd, __pmd(phys | sect_prot));
+ 			/*
+ 			 * Check for previous table entries created during
+ 			 * boot (__create_page_tables) and flush them.
+@@ -196,15 +250,39 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+ 				flush_tlb_all();
+ 		} else {
+ 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
+-				       prot_pte);
++					pte_prot, early);
+ 		}
+ 		phys += next - addr;
+ 	} while (pmd++, addr = next, addr != end);
+ }
+ 
+-static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+-				  unsigned long end, phys_addr_t phys,
+-				  int map_io)
++static inline bool use_1G_block(unsigned long addr, unsigned long next,
++			unsigned long phys, pgprot_t sect_prot,
++			pgprot_t pte_prot, bool early)
++{
++	if (!early)
++		return false;
++
++	if (PAGE_SHIFT != 12)
++		return false;
++
++	if (((addr | next | phys) & ~PUD_MASK) != 0)
++		return false;
++
++	/*
++	 * The assumption here is that if the memory is anything other
++	 * than normal we should not be using a block type
++	 */
++	return ((sect_prot & PMD_ATTRINDX_MASK) ==
++				PMD_ATTRINDX(MT_NORMAL)) &&
++			((pte_prot & PTE_ATTRINDX_MASK) ==
++				PTE_ATTRINDX(MT_NORMAL));
++}
++
++static void __ref alloc_init_pud(pgd_t *pgd, unsigned long addr,
++				  unsigned long end, unsigned long phys,
++				  pgprot_t sect_prot, pgprot_t pte_prot,
++				  bool early)
+ {
+ 	pud_t *pud;
+ 	unsigned long next;
+@@ -222,10 +300,9 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+ 		/*
+ 		 * For 4K granule only, attempt to put down a 1GB block
+ 		 */
+-		if (!map_io && (PAGE_SHIFT == 12) &&
+-		    ((addr | next | phys) & ~PUD_MASK) == 0) {
++		if (use_1G_block(addr, next, phys, sect_prot, pte_prot, early)) {
+ 			pud_t old_pud = *pud;
+-			set_pud(pud, __pud(phys | PROT_SECT_NORMAL_EXEC));
++			set_pud(pud, __pud(phys | sect_prot));
+ 
+ 			/*
+ 			 * If we have an old value for a pud, it will
+@@ -240,7 +317,8 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+ 				flush_tlb_all();
+ 			}
+ 		} else {
+-			alloc_init_pmd(pud, addr, next, phys, map_io);
++			alloc_init_pmd(pud, addr, next, phys, sect_prot,
++					pte_prot, early);
+ 		}
+ 		phys += next - addr;
+ 	} while (pud++, addr = next, addr != end);
+@@ -250,9 +328,11 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+  * Create the page directory entries and any necessary page tables for the
+  * mapping specified by 'md'.
+  */
+-static void __init __create_mapping(pgd_t *pgd, phys_addr_t phys,
+-				    unsigned long virt, phys_addr_t size,
+-				    int map_io)
++static void __ref __create_mapping(pgd_t *pgd, phys_addr_t phys,
++				  unsigned long virt,
++				  phys_addr_t size,
++				  pgprot_t sect_prot, pgprot_t pte_prot,
++				  bool early)
+ {
+ 	unsigned long addr, length, end, next;
+ 
+@@ -262,31 +342,102 @@ static void __init __create_mapping(pgd_t *pgd, phys_addr_t phys,
+ 	end = addr + length;
+ 	do {
+ 		next = pgd_addr_end(addr, end);
+-		alloc_init_pud(pgd, addr, next, phys, map_io);
++		alloc_init_pud(pgd, addr, next, phys, sect_prot, pte_prot,
++				early);
+ 		phys += next - addr;
+ 	} while (pgd++, addr = next, addr != end);
+ }
+ 
+-static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+-				  phys_addr_t size)
++void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
++{
++	pgprot_t sect_prot = PROT_SECT_NORMAL_EXEC;
++	pgprot_t pte_prot = PAGE_KERNEL_EXEC;
++
++	if ((addr >> PGDIR_SHIFT) >= ARRAY_SIZE(idmap_pg_dir)) {
++		pr_warn("BUG: not creating id mapping for %pa\n", &addr);
++		return;
++	}
++
++	if (map_io) {
++		sect_prot = PROT_SECT_DEVICE_nGnRE;
++		pte_prot = __pgprot(PROT_DEVICE_nGnRE);
++	}
++
++	__create_mapping(&idmap_pg_dir[pgd_index(addr)],
++			 addr, addr, size, sect_prot, pte_prot, true);
++}
++
++static void __ref create_mapping(phys_addr_t phys, unsigned long virt,
++				  phys_addr_t size,
++				  pgprot_t sect_prot, pgprot_t pte_prot)
+ {
+ 	if (virt < VMALLOC_START) {
+ 		pr_warn("BUG: not creating mapping for %pa@0x%016lx - outside kernel range\n",
+ 			&phys, virt);
+ 		return;
+ 	}
+-	__create_mapping(pgd_offset_k(virt & PAGE_MASK), phys, virt, size, 0);
++
++	return __create_mapping(pgd_offset_k(virt & PAGE_MASK), phys, virt,
++				size, sect_prot, pte_prot, true);
+ }
+ 
+-void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
++static void __ref create_mapping_late(phys_addr_t phys, unsigned long virt,
++				  phys_addr_t size,
++				  pgprot_t sect_prot, pgprot_t pte_prot)
+ {
+-	if ((addr >> PGDIR_SHIFT) >= ARRAY_SIZE(idmap_pg_dir)) {
+-		pr_warn("BUG: not creating id mapping for %pa\n", &addr);
++	if (virt < VMALLOC_START) {
++		pr_warn("BUG: not creating mapping for %pa@0x%016lx - outside kernel range\n",
++			&phys, virt);
+ 		return;
+ 	}
+-	__create_mapping(&idmap_pg_dir[pgd_index(addr)],
+-			 addr, addr, size, map_io);
++
++	return __create_mapping(pgd_offset_k(virt & PAGE_MASK), phys, virt,
++				size, sect_prot, pte_prot, false);
++}
++
++#ifdef CONFIG_DEBUG_RODATA
++static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
++{
++	/*
++	 * Set up the executable regions using the existing section mappings
++	 * for now. This will get more fine grained later once all memory
++	 * is mapped
++	 */
++	unsigned long kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
++	unsigned long kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
++
++	if (end < kernel_x_start) {
++		create_mapping(start, __phys_to_virt(start),
++			end - start, PROT_SECT_NORMAL, PAGE_KERNEL);
++	} else if (start >= kernel_x_end) {
++		create_mapping(start, __phys_to_virt(start),
++			end - start, PROT_SECT_NORMAL, PAGE_KERNEL);
++	} else {
++		if (start < kernel_x_start)
++			create_mapping(start, __phys_to_virt(start),
++				kernel_x_start - start,
++				PROT_SECT_NORMAL,
++				PAGE_KERNEL);
++		create_mapping(kernel_x_start,
++				__phys_to_virt(kernel_x_start),
++				kernel_x_end - kernel_x_start,
++				PROT_SECT_NORMAL_EXEC, PAGE_KERNEL_EXEC);
++		if (kernel_x_end < end)
++			create_mapping(kernel_x_end,
++				__phys_to_virt(kernel_x_end),
++				end - kernel_x_end,
++				PROT_SECT_NORMAL,
++				PAGE_KERNEL);
++	}
++
+ }
++#else
++static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
++{
++	create_mapping(start, __phys_to_virt(start), end - start,
++			PROT_SECT_NORMAL_EXEC, PAGE_KERNEL_EXEC);
++}
++#endif
+ 
+ static void __init map_mem(void)
+ {
+@@ -332,14 +483,69 @@ static void __init map_mem(void)
+ 			memblock_set_current_limit(limit);
+ 		}
+ #endif
+-
+-		create_mapping(start, __phys_to_virt(start), end - start);
++		__map_memblock(start, end);
+ 	}
+ 
+ 	/* Limit no longer required. */
+ 	memblock_set_current_limit(MEMBLOCK_ALLOC_ANYWHERE);
+ }
+ 
++void __init fixup_executable(void)
++{
++#ifdef CONFIG_DEBUG_RODATA
++	/* now that we are actually fully mapped, make the start/end more fine grained */
++	if (!IS_ALIGNED((unsigned long)_stext, SECTION_SIZE)) {
++		unsigned long aligned_start = round_down(__pa(_stext),
++							SECTION_SIZE);
++
++		create_mapping(aligned_start, __phys_to_virt(aligned_start),
++				__pa(_stext) - aligned_start,
++				PROT_SECT_NORMAL,
++				PAGE_KERNEL);
++	}
++
++	if (!IS_ALIGNED((unsigned long)__init_end, SECTION_SIZE)) {
++		unsigned long aligned_end = round_up(__pa(__init_end),
++							SECTION_SIZE);
++		create_mapping(__pa(__init_end), (unsigned long)__init_end,
++				aligned_end - __pa(__init_end),
++				PROT_SECT_NORMAL,
++				PAGE_KERNEL);
++	}
++#endif
++}
++
++#ifdef CONFIG_DEBUG_RODATA
++void mark_rodata_ro(void)
++{
++	create_mapping_late(__pa(_stext), (unsigned long)_stext,
++				(unsigned long)_etext - (unsigned long)_stext,
++				PROT_SECT_NORMAL_EXEC | PMD_SECT_RDONLY,
++				PAGE_KERNEL_EXEC | PTE_RDONLY);
++
++}
++#endif
++
++static int __flush_mappings(void *unused)
++{
++	flush_tlb_kernel_range((unsigned long)__init_begin,
++				(unsigned long)__init_end);
++	return 0;
++}
++
++void __ref fixup_init(void)
++{
++	phys_addr_t start = __pa(__init_begin);
++	phys_addr_t end = __pa(__init_end);
++
++	create_mapping_late(start, (unsigned long)__init_begin,
++			end - start,
++			PROT_SECT_NORMAL,
++			PAGE_KERNEL);
++	if (!IS_ALIGNED(start, SECTION_SIZE) || !IS_ALIGNED(end, SECTION_SIZE))
++		stop_machine(__flush_mappings, NULL, NULL);
++}
++
+ /*
+  * paging_init() sets up the page tables, initialises the zone memory
+  * maps and sets up the zero page.
+@@ -349,6 +555,7 @@ void __init paging_init(void)
+ 	void *zero_page;
+ 
+ 	map_mem();
++	fixup_executable();
+ 
+ 	/*
+ 	 * Finally flush the caches and tlb to ensure that we're in a
 -- 
 Qualcomm Innovation Center, Inc.
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
