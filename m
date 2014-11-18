@@ -1,66 +1,48 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 18 Nov 2014 01:50:25 +0100
-Subject: [GIT PULL] clk: rockchip: first batch for 3.19
-Message-ID: <2664317.ZRy0zABv1Y@diego>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 18 Nov 2014 09:50:40 +0900
+Subject: [PATCH 08/25] ARM: shmobile: r8a7790: sound enables Audio DMAC
+ peri peri entry on DTSI
+In-Reply-To: <87a93pxtlr.wl%kuninori.morimoto.gx@renesas.com>
+References: <cover.1415755881.git.horms+renesas@verge.net.au>
+ <cbfc0b77b0c5ac11282882bfd734716e47d20b45.1415755881.git.horms+renesas@verge.net.au>
+ <1877842.49FtTfL2eK@wuerfel>
+ <87a93pxtlr.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20141118005037.GE21518@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike
+On Tue, Nov 18, 2014 at 12:03:50AM +0000, Kuninori Morimoto wrote:
+> 
+> Hi Arnd
+> 
+> > >                                 "mem_src6",     "src6_mem",
+> > >                                 "mem_src7",     "src7_mem",
+> > >                                 "mem_src8",     "src8_mem",
+> > > -                               "mem_src9",     "src9_mem";
+> > > +                               "mem_src9",     "src9_mem",
+> > > +
+> > > +                               "src0_ssiu0",           "src1_ssiu0",           "src2_ssiu0",           "src3_ssiu0",           "src4_ssiu0",
+> > > +                               "src0_ssiu1",           "src1_ssiu1",           "src2_ssiu1",           "src3_ssiu1",           "src4_ssiu1",
+> > > +                               "src0_ssiu2",           "src1_ssiu2",           "src2_ssiu2",           "src3_ssiu2",           "src4_ssiu2",
+> > > 
+> > 
+> > I have to note that this looks rather weird and that none of the names
+> > are documented in the binding.
+> > 
+> > Can you explain why this device uses over 100 DMA channels and put the
+> > exact naming rules into the binding?
+> > Do you expect all channels to be in use simultaneously?
+> 
+> This device has 10 sound channels, and using 3 kind of IPs.
+> Then, data input/output needs DMA channel which needs specific ID to using.
+> Above name has ID pair for it, so there is much combination. 
+> These specific ID is based on SoC, not board.
+> Sound driver / DMAEngine can get specific ID from above.
+> 
+> Indeed binding itself was not documented yet.
+> I will add it ASAP.
 
-here is a first batch of rockchip related clock changes for 3.19 .
-Apart from various small fixes we also move away from marking
-all clocks as INGORE_UNUSED to letting the ccf handle disabling
-most of the unused clocks.
+Hi Arnd,
 
-So if this looks good, please pull
-
-
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.19-rockchip-clk1
-
-for you to fetch changes up to 29e94468516cdf191ec839ee39f79e011817276d:
-
-  clk: rockchip: fix clock select order for rk3288 usbphy480m_src (2014-11-16 00:40:19 +0100)
-
-----------------------------------------------------------------
-- fixes for clock ordering/rate issues
-- do not keep all clocks enabled anymore
-- allow special pll rates for special cases
-
-----------------------------------------------------------------
-Chris Zhong (1):
-      clk: rockchip: rk3288: add suspend and resume
-
-Dmitry Torokhov (1):
-      clk: rockchip: ensure HCLK_VIO2_H2P and PCLK_VIO2_H2P stay enabled
-
-Doug Anderson (1):
-      clk: rockchip: Add CLK_SET_RATE_PARENT to aclk_cpu_pre
-
-Heiko St?bner (1):
-      clk: rockchip: fix rk3188 hsadc_frac definition
-
-Jianqun (1):
-      clk: rockchip: rk3288: removing the CLK_SET_RATE_PARENT from i2s_clkout
-
-Kever Yang (6):
-      clk: rockchip: add 400MHz and 500MHz for rk3288 clock rate
-      clk: rockchip: add npll to source of sclk_gpu
-      clk: rockchip: change PLL setting for better clock jitter
-      clk: rockchip: disable unused clocks
-      clk: rockchip: fix rk3288 clk_usbphy480m_gate bit location in register
-      clk: rockchip: fix clock select order for rk3288 usbphy480m_src
-
-Sonny Rao (1):
-      clk: rockchip: fix parent for spdif_8ch_frac on rk3288
-
- drivers/clk/rockchip/clk-rk3188.c |  42 ++++----
- drivers/clk/rockchip/clk-rk3288.c | 216 ++++++++++++++++++++++++--------------
- drivers/clk/rockchip/clk.c        |   9 --
- drivers/clk/rockchip/clk.h        |   9 ++
- 4 files changed, 169 insertions(+), 107 deletions(-)
+please let me know if a revised pull-request is in order.
+v3.18-rc6 is getting awfully close.
