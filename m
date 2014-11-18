@@ -1,198 +1,159 @@
-From: j.uzycki@elproma.com.pl (Janusz Uzycki)
-Date: Tue, 18 Nov 2014 15:46:41 +0100
-Subject: [RFC PATCH] serial: mxs-auart: Take missing uart port locks
-Message-ID: <1416322001-28491-1-git-send-email-j.uzycki@elproma.com.pl>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Tue, 18 Nov 2014 14:48:19 +0000
+Subject: [RFC PATCH 07/16] PCI: Separate pci_host_bridge creation out of
+ pci_create_root_bus()
+In-Reply-To: <546B041A.4060403@huawei.com>
+References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
+ <1416219710-26088-8-git-send-email-wangyijing@huawei.com>
+ <2507218.mHliopJb05@wuerfel> <546B041A.4060403@huawei.com>
+Message-ID: <20141118144819.GK12037@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch adds missing spin-locks and allows to change termios
-settings during tx.
-The patch also fixes direct call its enable_ms() according to
-commit d41510ce2f07
-("serial: Take uart port lock for direct *_enable_ms()")
+On Tue, Nov 18, 2014 at 08:32:26AM +0000, Yijing Wang wrote:
+> 
+> >> +LIST_HEAD(pci_host_bridge_list);
+> >> +DECLARE_RWSEM(pci_host_bridge_sem);
+> > 
+> > Unless the pci_host_bridge_sem is accessed thousands of times per second,
+> > it's normally better to use a simple mutex instead.
+> 
+> OK, I will use simple mutex instead.
+> 
+> > 
+> >> +static struct resource busn_resource = {
+> >> +	.name	= "PCI busn",
+> >> +	.start	= 0,
+> >> +	.end	= 255,
+> >> +	.flags	= IORESOURCE_BUS,
+> >> +};
+> > 
+> > I think it would be better to require callers to pass the bus resource
+> > down to the function.
+> 
+> Hmm, I think most of caller will provide the bus resource, but some others
+> will not give any bus resource, extremely, no any resources :(. But we still
+> need properly configure their resources for compatibility.
+> 
+> > 
+> >> +struct pci_host_bridge *pci_create_host_bridge(
+> >> +		struct device *parent, u32 db, 
+> >> +		struct pci_ops *ops, void *sysdata, 
+> >> +		struct list_head *resources)
+> >> +{
+> > 
+> > Do we still need to pass the 'sysdata' in here? If we are guaranteed to
+> > have a device pointer, we should always be able to get the driver
+> > private data from dev_get_drvdata(host->dev->parent).
+> 
+> We need, some platforms pass NULL pointer as host bridge parent.
 
-The patch applies to next. Please test it with DMA enabled.
-Most lock places come from commit 332ec0558ca of the repo
-https://github.com/dgii/yocto-linux
-According to atmel_serial's code and other drivers code
-tty_flip_buffer_push() shouldn't be in lock - so I fixed it.
-However I'm not convinced they are right so RFC sent.
-The lock is not always used when auart's registers touched -
-is it ok?
+Yijing,
 
-Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
----
- drivers/tty/serial/mxs-auart.c | 35 +++++++++++++++++++++++++++-
- 1 file changed, 34 insertions(+), 1 deletion(-)
+May I suggest a different approach here? Rather than having to pass an opaque
+pointer that gets converted by the host bridge driver back to the private
+structure, what about promoting a new style of usage, that is similar to the
+way device drivers work? Lets try to promote the embedding of the generic
+pci_host_bridge structure in the host bridge specific structure! Then we can
+access the private data doing container_of().
 
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index 518eac6..7667c95 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -210,7 +210,9 @@ static void dma_tx_callback(void *param)
- {
- 	struct mxs_auart_port *s = param;
- 	struct circ_buf *xmit = &s->port.state->xmit;
-+	unsigned long flags;
- 
-+	spin_lock_irqsave(&s->port.lock, flags);
- 	dma_unmap_sg(s->dev, &s->tx_sgl, 1, DMA_TO_DEVICE);
- 
- 	/* clear the bit used to serialize the DMA tx. */
-@@ -220,6 +222,7 @@ static void dma_tx_callback(void *param)
- 	/* wake up the possible processes. */
- 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
- 		uart_write_wakeup(&s->port);
-+	spin_unlock_irqrestore(&s->port.lock, flags);
- 
- 	mxs_auart_tx_chars(s);
- }
-@@ -261,6 +264,7 @@ static int mxs_auart_dma_tx(struct mxs_auart_port *s, int size)
- static void mxs_auart_tx_chars(struct mxs_auart_port *s)
- {
- 	struct circ_buf *xmit = &s->port.state->xmit;
-+	unsigned long flags;
- 
- 	if (auart_dma_enabled(s)) {
- 		u32 i = 0;
-@@ -313,8 +317,11 @@ static void mxs_auart_tx_chars(struct mxs_auart_port *s)
- 		} else
- 			break;
- 	}
--	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-+	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS) {
-+		spin_lock_irqsave(&s->port.lock, flags);
- 		uart_write_wakeup(&s->port);
-+		spin_unlock_irqrestore(&s->port.lock, flags);
-+	}
- 
- 	if (uart_circ_empty(&(s->port.state->xmit)))
- 		writel(AUART_INTR_TXIEN,
-@@ -375,6 +382,7 @@ out:
- static void mxs_auart_rx_chars(struct mxs_auart_port *s)
- {
- 	u32 stat = 0;
-+	unsigned long flags;
- 
- 	for (;;) {
- 		stat = readl(s->port.membase + AUART_STAT);
-@@ -383,7 +391,9 @@ static void mxs_auart_rx_chars(struct mxs_auart_port *s)
- 		mxs_auart_rx_char(s);
- 	}
- 
-+	spin_lock_irqsave(&s->port.lock, flags);
- 	writel(stat, s->port.membase + AUART_STAT);
-+	spin_unlock_irqrestore(&s->port.lock, flags);
- 	tty_flip_buffer_push(&s->port.state->port);
- }
- 
-@@ -534,7 +544,9 @@ static void dma_rx_callback(void *arg)
- 	struct tty_port *port = &s->port.state->port;
- 	int count;
- 	u32 stat;
-+	unsigned long flags;
- 
-+	spin_lock_irqsave(&s->port.lock, flags);
- 	dma_unmap_sg(s->dev, &s->rx_sgl, 1, DMA_FROM_DEVICE);
- 
- 	stat = readl(s->port.membase + AUART_STAT);
-@@ -545,6 +557,7 @@ static void dma_rx_callback(void *arg)
- 	tty_insert_flip_string(port, s->rx_dma_buf, count);
- 
- 	writel(stat, s->port.membase + AUART_STAT);
-+	spin_unlock_irqrestore(&s->port.lock, flags);
- 	tty_flip_buffer_push(port);
- 
- 	/* start the next DMA for RX. */
-@@ -606,7 +619,9 @@ static void mxs_auart_dma_exit_channel(struct mxs_auart_port *s)
- 
- static void mxs_auart_dma_exit(struct mxs_auart_port *s)
- {
-+	unsigned long flags;
- 
-+	spin_lock_irqsave(&s->port.lock, flags);
- 	writel(AUART_CTRL2_TXDMAE | AUART_CTRL2_RXDMAE | AUART_CTRL2_DMAONERR,
- 		s->port.membase + AUART_CTRL2_CLR);
- 
-@@ -614,13 +629,17 @@ static void mxs_auart_dma_exit(struct mxs_auart_port *s)
- 	s->flags &= ~MXS_AUART_DMA_ENABLED;
- 	clear_bit(MXS_AUART_DMA_TX_SYNC, &s->flags);
- 	clear_bit(MXS_AUART_DMA_RX_READY, &s->flags);
-+	spin_unlock_irqrestore(&s->port.lock, flags);
- }
- 
- static int mxs_auart_dma_init(struct mxs_auart_port *s)
- {
-+	unsigned long flags;
-+
- 	if (auart_dma_enabled(s))
- 		return 0;
- 
-+	spin_lock_irqsave(&s->port.lock, flags);
- 	/* init for RX */
- 	s->rx_dma_chan = dma_request_slave_channel(s->dev, "rx");
- 	if (!s->rx_dma_chan)
-@@ -644,9 +663,12 @@ static int mxs_auart_dma_init(struct mxs_auart_port *s)
- 	/* The DMA buffer is now the FIFO the TTY subsystem can use */
- 	s->port.fifosize = UART_XMIT_SIZE;
- 
-+	spin_unlock_irqrestore(&s->port.lock, flags);
-+
- 	return 0;
- 
- err_out:
-+	spin_unlock_irqrestore(&s->port.lock, flags);
- 	mxs_auart_dma_exit_channel(s);
- 	return -EINVAL;
- 
-@@ -663,6 +685,7 @@ static void mxs_auart_settermios(struct uart_port *u,
- 	struct mxs_auart_port *s = to_auart_port(u);
- 	u32 bm, ctrl, ctrl2, div;
- 	unsigned int cflag, baud;
-+	unsigned long flags;
- 
- 	cflag = termios->c_cflag;
- 
-@@ -760,11 +783,15 @@ static void mxs_auart_settermios(struct uart_port *u,
- 	ctrl |= AUART_LINECTRL_BAUD_DIVFRAC(div & 0x3F);
- 	ctrl |= AUART_LINECTRL_BAUD_DIVINT(div >> 6);
- 
-+	spin_lock_irqsave(&s->port.lock, flags);
-+
- 	writel(ctrl, u->membase + AUART_LINECTRL);
- 	writel(ctrl2, u->membase + AUART_CTRL2);
- 
- 	uart_update_timeout(u, termios->c_cflag, baud);
- 
-+	spin_unlock_irqrestore(&s->port.lock, flags);
-+
- 	/* prepare for the DMA RX. */
- 	if (auart_dma_enabled(s) &&
- 		!test_and_set_bit(MXS_AUART_DMA_RX_READY, &s->flags)) {
-@@ -778,18 +805,24 @@ static void mxs_auart_settermios(struct uart_port *u,
- 		}
- 	}
- 
-+	spin_lock_irqsave(&s->port.lock, flags);
-+
- 	/* CTS flow-control and modem-status interrupts */
- 	if (UART_ENABLE_MS(u, termios->c_cflag))
- 		mxs_auart_enable_ms(u);
- 	else
- 		mxs_auart_disable_ms(u);
-+
-+	spin_unlock_irqrestore(&s->port.lock, flags);
- }
- 
- static void mxs_auart_set_ldisc(struct uart_port *port, int new)
- {
- 	if (new == N_PPS) {
- 		port->flags |= UPF_HARDPPS_CD;
-+		spin_lock_irq(&port->lock);
- 		mxs_auart_enable_ms(port);
-+		spin_unlock_irq(&port->lock);
- 	} else {
- 		port->flags &= ~UPF_HARDPPS_CD;
- 	}
+Something like this:
+
+struct pci_controller {
+	struct pci_host_bridge bridge;
+	/* private host bridge data here */
+	.....
+};
+
+#define PCI_CONTROLLER(bus)	({
+	struct pci_host_bridge *hb = to_pci_host_bridge(bus->bridge); \
+	container_of(hb, struct pci_controller, bridge); })
+
+
+Then we can retrieve the host bridge structure from everywhere we have a device.
+
+Best regards,
+Liviu
+
+> 
+> > 
+> >> +	host = kzalloc(sizeof(*host), GFP_KERNEL);
+> >> +	if (!host)
+> >> +		return NULL;
+> > 
+> > devm_kzalloc maybe?
+> 
+> I don't know much detail about devm_kzalloc(), but we have no pci host driver
+> here, and I found no devm_kzalloc() uses in core PCI code before.
+> 
+> > 
+> >> +	if (!resources) {
+> >> +		/* Use default IO/MEM/BUS resources*/
+> >> +		pci_add_resource(&host->windows, &ioport_resource);
+> >> +		pci_add_resource(&host->windows, &iomem_resource);
+> >> +		pci_add_resource(&host->windows, &busn_resource);
+> >> +	} else {
+> >> +		list_for_each_entry_safe(window, n, resources, list)
+> >> +			list_move_tail(&window->list, &host->windows);
+> >> +	}
+> > 
+> > I think we should assume that the correct resources are passed. You
+> > could add a wrapper around this function to convert old platforms
+> > though.
+> 
+> OK, I will move these code out of pci_create_host_bridge, and add a wrapper
+> to setup the default resources.
+> 
+> > 
+> >> +EXPORT_SYMBOL(pci_create_host_bridge);
+> > 
+> > EXPORT_SYMBOL_GPL() maybe?
+> 
+> OK, will update it.
+> 
+> > 
+> >> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> >> index 8b11b38..daa7f40 100644
+> >> --- a/include/linux/pci.h
+> >> +++ b/include/linux/pci.h
+> >> @@ -402,7 +402,12 @@ struct pci_host_bridge_window {
+> >>  struct pci_host_bridge {
+> >>  	struct device dev;
+> >>  	struct pci_bus *bus;		/* root bus */
+> >> +	struct list_head list;
+> >>  	struct list_head windows;	/* pci_host_bridge_windows */
+> >> +	int busnum;
+> > 
+> > The busnum should already be implied through the bus resource.
+> 
+> Yes, I will consider remove it and introduce a helper function to get the root bus number, thanks!
+> 
+> Thanks!
+> Yijing.
+> 
+> > 
+> > 	Arnd
+> > 
+> > .
+> > 
+> 
+> 
+> -- 
+> Thanks!
+> Yijing
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
 -- 
-1.7.11.3
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
