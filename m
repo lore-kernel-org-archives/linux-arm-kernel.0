@@ -1,72 +1,67 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 18 Nov 2014 11:41:25 +0000
-Subject: [PATCH v5 4/6] arm64: Port SWP/SWPB emulation support from arm
+Date: Tue, 18 Nov 2014 11:41:26 +0000
+Subject: [PATCH v5 5/6] arm64: Emulate CP15 Barrier instructions
 In-Reply-To: <1416310887-14649-1-git-send-email-punit.agrawal@arm.com>
 References: <1416310887-14649-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <1416310887-14649-5-git-send-email-punit.agrawal@arm.com>
+Message-ID: <1416310887-14649-6-git-send-email-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SWP instruction was deprecated in the ARMv6 architecture. The
-ARMv7 multiprocessing extensions mandate that SWP/SWPB instructions
-are treated as undefined from reset, with the ability to enable them
-through the System Control Register SW bit. With ARMv8, the option to
-enable these instructions through System Control Register was dropped
-as well.
+The CP15 barrier instructions (CP15ISB, CP15DSB and CP15DMB) are
+deprecated in the ARMv7 architecture, superseded by ISB, DSB and DMB
+instructions respectively. Some implementations may provide the
+ability to disable the CP15 barriers by disabling the CP15BEN bit in
+SCTLR_EL1. If not enabled, the encodings for these instructions become
+undefined.
 
-To support legacy applications using these instructions, port the
-emulation of the SWP and SWPB instructions from the arm port to arm64.
+To support legacy software using these instructions, this patch
+register hooks to -
+* emulate CP15 barriers and warn the user about their use
+* toggle CP15BEN in SCTLR_EL1
 
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- Documentation/arm64/legacy_instructions.txt |   7 +
- arch/arm64/Kconfig                          |  21 +++
- arch/arm64/include/asm/insn.h               |   6 +
- arch/arm64/kernel/armv8_deprecated.c        | 191 ++++++++++++++++++++++++++++
- arch/arm64/kernel/insn.c                    |   8 ++
- 5 files changed, 233 insertions(+)
+ Documentation/arm64/legacy_instructions.txt |   5 ++
+ arch/arm64/Kconfig                          |  15 ++++
+ arch/arm64/include/asm/insn.h               |   2 +
+ arch/arm64/kernel/armv8_deprecated.c        | 131 ++++++++++++++++++++++++++++
+ arch/arm64/kernel/insn.c                    |  13 +++
+ 5 files changed, 166 insertions(+)
 
 diff --git a/Documentation/arm64/legacy_instructions.txt b/Documentation/arm64/legacy_instructions.txt
-index 49d4867..5ab5861 100644
+index 5ab5861..a3b3da2 100644
 --- a/Documentation/arm64/legacy_instructions.txt
 +++ b/Documentation/arm64/legacy_instructions.txt
-@@ -31,3 +31,10 @@ behaviours and the corresponding values of the sysctl nodes -
- The default mode depends on the status of the instruction in the
- architecture. Deprecated instructions should default to emulation
- while obsolete instructions must be undefined by default.
+@@ -38,3 +38,8 @@ Supported legacy instructions
+ Node: /proc/sys/abi/swp
+ Status: Obsolete
+ Default: Undef (0)
 +
-+Supported legacy instructions
-+-----------------------------
-+* SWP{B}
-+Node: /proc/sys/abi/swp
-+Status: Obsolete
-+Default: Undef (0)
++* CP15 Barriers
++Node: /proc/sys/abi/cp15_barrier
++Status: Deprecated
++Default: Emulate (1)
 diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index c51edaf..2d59bfc 100644
+index 2d59bfc..250ca25 100644
 --- a/arch/arm64/Kconfig
 +++ b/arch/arm64/Kconfig
-@@ -178,6 +178,27 @@ menuconfig ARMV8_DEPRECATED
+@@ -199,6 +199,21 @@ config SWP_EMULATION
  
- if ARMV8_DEPRECATED
+ 	  If unsure, say Y
  
-+config SWP_EMULATION
-+	bool "Emulate SWP/SWPB instructions"
++config CP15_BARRIER_EMULATION
++	bool "Emulate CP15 Barrier instructions"
 +	help
-+	  ARMv8 obsoletes the use of A32 SWP/SWPB instructions such that
-+	  they are always undefined. Say Y here to enable software
-+	  emulation of these instructions for userspace using LDXR/STXR.
++	  The CP15 barrier instructions - CP15ISB, CP15DSB, and
++	  CP15DMB - are deprecated in ARMv8 (and ARMv7). It is
++	  strongly recommended to use the ISB, DSB, and DMB
++	  instructions instead.
 +
-+	  In some older versions of glibc [<=2.8] SWP is used during futex
-+	  trylock() operations with the assumption that the code will not
-+	  be preempted. This invalid assumption may be more likely to fail
-+	  with SWP emulation enabled, leading to deadlock of the user
-+	  application.
-+
-+	  NOTE: when accessing uncached shared regions, LDXR/STXR rely
-+	  on an external transaction monitoring block called a global
-+	  monitor to maintain update atomicity. If your system does not
-+	  implement a global monitor, this option can cause programs that
-+	  perform SWP operations to uncached memory to deadlock.
++	  Say Y here to enable software emulation of these
++	  instructions for AArch32 userspace code. When this option is
++	  enabled, CP15 barrier usage is traced which can help
++	  identify software that needs updating.
 +
 +	  If unsure, say Y
 +
@@ -74,155 +69,37 @@ index c51edaf..2d59bfc 100644
  
  endmenu
 diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index 1bb0430..3ecc57c 100644
+index 3ecc57c..e2ff32a 100644
 --- a/arch/arm64/include/asm/insn.h
 +++ b/arch/arm64/include/asm/insn.h
-@@ -356,6 +356,12 @@ int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
- int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
+@@ -362,6 +362,8 @@ bool aarch32_insn_is_wide(u32 insn);
+ #define A32_RT2_OFFSET	 0
  
- bool aarch32_insn_is_wide(u32 insn);
-+
-+#define A32_RN_OFFSET	16
-+#define A32_RT_OFFSET	12
-+#define A32_RT2_OFFSET	 0
-+
-+u32 aarch32_insn_extract_reg_num(u32 insn, int offset);
+ u32 aarch32_insn_extract_reg_num(u32 insn, int offset);
++u32 aarch32_insn_mcr_extract_opc2(u32 insn);
++u32 aarch32_insn_mcr_extract_crm(u32 insn);
  #endif /* __ASSEMBLY__ */
  
  #endif	/* __ASM_INSN_H */
 diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-index db3b79d..98865a7 100644
+index 98865a7..401c2e5 100644
 --- a/arch/arm64/kernel/armv8_deprecated.c
 +++ b/arch/arm64/kernel/armv8_deprecated.c
-@@ -8,10 +8,16 @@
+@@ -6,6 +6,7 @@
+  * published by the Free Software Foundation.
+  */
  
++#include <linux/cpu.h>
  #include <linux/init.h>
  #include <linux/list.h>
-+#include <linux/perf_event.h>
-+#include <linux/sched.h>
- #include <linux/slab.h>
- #include <linux/sysctl.h>
+ #include <linux/perf_event.h>
+@@ -391,6 +392,133 @@ static struct insn_emulation_ops swp_ops = {
+ 	.set_hw_mode = NULL,
+ };
  
-+#include <asm/insn.h>
-+#include <asm/opcodes.h>
-+#include <asm/system_misc.h>
- #include <asm/traps.h>
-+#include <asm/uaccess.h>
- 
- /*
-  * The runtime support for deprecated instruction support can be in one of
-@@ -204,10 +210,195 @@ static void register_insn_emulation_sysctl(struct ctl_table *table)
- }
- 
- /*
-+ *  Implement emulation of the SWP/SWPB instructions using load-exclusive and
-+ *  store-exclusive.
-+ *
-+ *  Syntax of SWP{B} instruction: SWP{B}<c> <Rt>, <Rt2>, [<Rn>]
-+ *  Where: Rt  = destination
-+ *	   Rt2 = source
-+ *	   Rn  = address
-+ */
-+
-+/*
-+ * Error-checking SWP macros implemented using ldxr{b}/stxr{b}
-+ */
-+#define __user_swpX_asm(data, addr, res, temp, B)		\
-+	__asm__ __volatile__(					\
-+	"	mov		%w2, %w1\n"			\
-+	"0:	ldxr"B"		%w1, [%3]\n"			\
-+	"1:	stxr"B"		%w0, %w2, [%3]\n"		\
-+	"	cbz		%w0, 2f\n"			\
-+	"	mov		%w0, %w4\n"			\
-+	"2:\n"							\
-+	"	.pushsection	 .fixup,\"ax\"\n"		\
-+	"	.align		2\n"				\
-+	"3:	mov		%w0, %w5\n"			\
-+	"	b		2b\n"				\
-+	"	.popsection"					\
-+	"	.pushsection	 __ex_table,\"a\"\n"		\
-+	"	.align		3\n"				\
-+	"	.quad		0b, 3b\n"			\
-+	"	.quad		1b, 3b\n"			\
-+	"	.popsection"					\
-+	: "=&r" (res), "+r" (data), "=&r" (temp)		\
-+	: "r" (addr), "i" (-EAGAIN), "i" (-EFAULT)		\
-+	: "memory")
-+
-+#define __user_swp_asm(data, addr, res, temp) \
-+	__user_swpX_asm(data, addr, res, temp, "")
-+#define __user_swpb_asm(data, addr, res, temp) \
-+	__user_swpX_asm(data, addr, res, temp, "b")
-+
-+/*
-+ * Bit 22 of the instruction encoding distinguishes between
-+ * the SWP and SWPB variants (bit set means SWPB).
-+ */
-+#define TYPE_SWPB (1 << 22)
-+
-+/*
-+ * Set up process info to signal segmentation fault - called on access error.
-+ */
-+static void set_segfault(struct pt_regs *regs, unsigned long addr)
++static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
 +{
-+	siginfo_t info;
-+
-+	down_read(&current->mm->mmap_sem);
-+	if (find_vma(current->mm, addr) == NULL)
-+		info.si_code = SEGV_MAPERR;
-+	else
-+		info.si_code = SEGV_ACCERR;
-+	up_read(&current->mm->mmap_sem);
-+
-+	info.si_signo = SIGSEGV;
-+	info.si_errno = 0;
-+	info.si_addr  = (void *) instruction_pointer(regs);
-+
-+	pr_debug("SWP{B} emulation: access caused memory abort!\n");
-+	arm64_notify_die("Illegal memory access", regs, &info, 0);
-+}
-+
-+static int emulate_swpX(unsigned int address, unsigned int *data,
-+			unsigned int type)
-+{
-+	unsigned int res = 0;
-+
-+	if ((type != TYPE_SWPB) && (address & 0x3)) {
-+		/* SWP to unaligned address not permitted */
-+		pr_debug("SWP instruction on unaligned pointer!\n");
-+		return -EFAULT;
-+	}
-+
-+	while (1) {
-+		unsigned long temp;
-+
-+		if (type == TYPE_SWPB)
-+			__user_swpb_asm(*data, address, res, temp);
-+		else
-+			__user_swp_asm(*data, address, res, temp);
-+
-+		if (likely(res != -EAGAIN) || signal_pending(current))
-+			break;
-+
-+		cond_resched();
-+	}
-+
-+	return res;
-+}
-+
-+/*
-+ * swp_handler logs the id of calling process, dissects the instruction, sanity
-+ * checks the memory location, calls emulate_swpX for the actual operation and
-+ * deals with fixup/error handling before returning
-+ */
-+static int swp_handler(struct pt_regs *regs, u32 instr)
-+{
-+	u32 destreg, data, type, address = 0;
-+	int rn, rt2, res = 0;
-+
 +	perf_sw_event(PERF_COUNT_SW_EMULATION_FAULTS, 1, regs, regs->pc);
-+
-+	type = instr & TYPE_SWPB;
 +
 +	switch (arm_check_condition(instr, regs->pstate)) {
 +	case ARM_OPCODE_CONDTEST_PASS:
@@ -231,97 +108,155 @@ index db3b79d..98865a7 100644
 +		/* Condition failed - return to next instruction */
 +		goto ret;
 +	case ARM_OPCODE_CONDTEST_UNCOND:
-+		/* If unconditional encoding - not a SWP, undef */
++		/* If unconditional encoding - not a barrier instruction */
 +		return -EFAULT;
 +	default:
 +		return -EINVAL;
 +	}
 +
-+	rn = aarch32_insn_extract_reg_num(instr, A32_RN_OFFSET);
-+	rt2 = aarch32_insn_extract_reg_num(instr, A32_RT2_OFFSET);
-+
-+	address = (u32)regs->user_regs.regs[rn];
-+	data	= (u32)regs->user_regs.regs[rt2];
-+	destreg = aarch32_insn_extract_reg_num(instr, A32_RT_OFFSET);
-+
-+	pr_debug("addr in r%d->0x%08x, dest is r%d, source in r%d->0x%08x)\n",
-+		rn, address, destreg,
-+		aarch32_insn_extract_reg_num(instr, A32_RT2_OFFSET), data);
-+
-+	/* Check access in reasonable access range for both SWP and SWPB */
-+	if (!access_ok(VERIFY_WRITE, (address & ~3), 4)) {
-+		pr_debug("SWP{B} emulation: access to 0x%08x not allowed!\n",
-+			address);
-+		goto fault;
++	switch (aarch32_insn_mcr_extract_crm(instr)) {
++	case 10:
++		/*
++		 * dmb - mcr p15, 0, Rt, c7, c10, 5
++		 * dsb - mcr p15, 0, Rt, c7, c10, 4
++		 */
++		if (aarch32_insn_mcr_extract_opc2(instr) == 5)
++			dmb(sy);
++		else
++			dsb(sy);
++		break;
++	case 5:
++		/*
++		 * isb - mcr p15, 0, Rt, c7, c5, 4
++		 *
++		 * Taking an exception or returning from one acts as an
++		 * instruction barrier. So no explicit barrier needed here.
++		 */
++		break;
 +	}
 +
-+	res = emulate_swpX(address, &data, type);
-+	if (res == -EFAULT)
-+		goto fault;
-+	else if (res == 0)
-+		regs->user_regs.regs[destreg] = data;
-+
 +ret:
-+	pr_warn_ratelimited("\"%s\" (%ld) uses obsolete SWP{B} instruction at 0x%llx\n",
++	pr_warn_ratelimited("\"%s\" (%ld) uses deprecated CP15 Barrier instruction at 0x%llx\n",
 +			current->comm, (unsigned long)current->pid, regs->pc);
 +
 +	regs->pc += 4;
 +	return 0;
-+
-+fault:
-+	set_segfault(regs, address);
-+
-+	return 0;
 +}
 +
-+/*
-+ * Only emulate SWP/SWPB executed in ARM state/User mode.
-+ * The kernel must be SWP free and SWP{B} does not exist in Thumb.
-+ */
-+static struct undef_hook swp_hooks[] = {
++#define SCTLR_EL1_CP15BEN (1 << 5)
++
++static inline void config_sctlr_el1(u32 clear, u32 set)
++{
++	u32 val;
++
++	asm volatile("mrs %0, sctlr_el1" : "=r" (val));
++	val &= ~clear;
++	val |= set;
++	asm volatile("msr sctlr_el1, %0" : : "r" (val));
++}
++
++static void enable_cp15_ben(void *info)
++{
++	config_sctlr_el1(0, SCTLR_EL1_CP15BEN);
++}
++
++static void disable_cp15_ben(void *info)
++{
++	config_sctlr_el1(SCTLR_EL1_CP15BEN, 0);
++}
++
++static int cpu_hotplug_notify(struct notifier_block *b,
++			      unsigned long action, void *hcpu)
++{
++	switch (action) {
++	case CPU_STARTING:
++	case CPU_STARTING_FROZEN:
++		enable_cp15_ben(NULL);
++		return NOTIFY_DONE;
++	case CPU_DYING:
++	case CPU_DYING_FROZEN:
++		disable_cp15_ben(NULL);
++		return NOTIFY_DONE;
++	}
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block cpu_hotplug_notifier = {
++	.notifier_call = cpu_hotplug_notify,
++};
++
++static int cp15_barrier_set_hw_mode(bool enable)
++{
++	if (enable) {
++		register_cpu_notifier(&cpu_hotplug_notifier);
++		on_each_cpu(enable_cp15_ben, NULL, true);
++	} else {
++		unregister_cpu_notifier(&cpu_hotplug_notifier);
++		on_each_cpu(disable_cp15_ben, NULL, true);
++	}
++
++	return true;
++}
++
++static struct undef_hook cp15_barrier_hooks[] = {
 +	{
-+		.instr_mask	= 0x0fb00ff0,
-+		.instr_val	= 0x01000090,
++		.instr_mask	= 0x0fff0fdf,
++		.instr_val	= 0x0e070f9a,
 +		.pstate_mask	= COMPAT_PSR_MODE_MASK,
 +		.pstate_val	= COMPAT_PSR_MODE_USR,
-+		.fn		= swp_handler
++		.fn		= cp15barrier_handler,
++	},
++	{
++		.instr_mask	= 0x0fff0fff,
++		.instr_val	= 0x0e070f95,
++		.pstate_mask	= COMPAT_PSR_MODE_MASK,
++		.pstate_val	= COMPAT_PSR_MODE_USR,
++		.fn		= cp15barrier_handler,
 +	},
 +	{ }
 +};
 +
-+static struct insn_emulation_ops swp_ops = {
-+	.name = "swp",
-+	.status = INSN_OBSOLETE,
-+	.hooks = swp_hooks,
-+	.set_hw_mode = NULL,
++static struct insn_emulation_ops cp15_barrier_ops = {
++	.name = "cp15_barrier",
++	.status = INSN_DEPRECATED,
++	.hooks = cp15_barrier_hooks,
++	.set_hw_mode = cp15_barrier_set_hw_mode,
 +};
 +
-+/*
+ /*
   * Invoked as late_initcall, since not needed before init spawned.
   */
- static int __init armv8_deprecated_init(void)
- {
-+	if (IS_ENABLED(CONFIG_SWP_EMULATION))
-+		register_insn_emulation(&swp_ops);
+@@ -399,6 +527,9 @@ static int __init armv8_deprecated_init(void)
+ 	if (IS_ENABLED(CONFIG_SWP_EMULATION))
+ 		register_insn_emulation(&swp_ops);
+ 
++	if (IS_ENABLED(CONFIG_CP15_BARRIER_EMULATION))
++		register_insn_emulation(&cp15_barrier_ops);
 +
  	register_insn_emulation_sysctl(ctl_abi);
  
  	return 0;
 diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index ab00eb5..63122dc 100644
+index 63122dc..819e409 100644
 --- a/arch/arm64/kernel/insn.c
 +++ b/arch/arm64/kernel/insn.c
-@@ -964,3 +964,11 @@ bool aarch32_insn_is_wide(u32 insn)
+@@ -972,3 +972,16 @@ u32 aarch32_insn_extract_reg_num(u32 insn, int offset)
  {
- 	return insn >= 0xe800;
+ 	return (insn & (0xf << offset)) >> offset;
  }
 +
-+/*
-+ * Macros/defines for extracting register numbers from instruction.
-+ */
-+u32 aarch32_insn_extract_reg_num(u32 insn, int offset)
++#define OPC2_MASK	0x7
++#define OPC2_OFFSET	5
++u32 aarch32_insn_mcr_extract_opc2(u32 insn)
 +{
-+	return (insn & (0xf << offset)) >> offset;
++	return (insn & (OPC2_MASK << OPC2_OFFSET)) >> OPC2_OFFSET;
++}
++
++#define CRM_MASK	0xf
++u32 aarch32_insn_mcr_extract_crm(u32 insn)
++{
++	return insn & CRM_MASK;
 +}
 -- 
 2.1.1
