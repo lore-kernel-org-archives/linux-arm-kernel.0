@@ -1,85 +1,158 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 18 Nov 2014 22:11:03 +0000
-Subject: [PATCH v5.5] of/fdt: export fdt blob as /sys/firmware/fdt
-In-Reply-To: <20141118172545.GC14323@leverpostej>
-References: <1415984735-32388-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141118165145.4F6A8C40966@trevor.secretlab.ca>
- <20141118172545.GC14323@leverpostej>
-Message-ID: <20141118221103.4ECB3C40966@trevor.secretlab.ca>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 18 Nov 2014 23:14:21 +0100
+Subject: [GIT PULL] Allwinner DT for 3.19
+Message-ID: <20141118221421.GA19415@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Nov 2014 17:25:45 +0000
-, Mark Rutland <mark.rutland@arm.com>
- wrote:
-> On Tue, Nov 18, 2014 at 04:51:45PM +0000, Grant Likely wrote:
-> > On Fri, 14 Nov 2014 18:05:35 +0100
-> > , Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >  wrote:
-> > > Create a new /sys entry '/sys/firmware/fdt' to export the FDT blob
-> > > that was passed to the kernel by the bootloader. This allows userland
-> > > applications such as kexec to access the raw binary.
-> > > 
-> > > The fact that this node does not reside under /sys/firmware/device-tree
-> > > is deliberate: FDT is also used on arm64 UEFI/ACPI systems to
-> > > communicate just the UEFI and ACPI entry points, but the FDT is never
-> > > unflattened and used to configure the system.
-> > > 
-> > > A CRC32 checksum is calculated over the entire FDT blob, and verified
-> > > at late_initcall time. The sysfs entry is instantiated only if the
-> > > checksum is valid, i.e., if the FDT blob has not been modified in the
-> > > mean time. Otherwise, a warning is printed.
-> > > 
-> > > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > 
-> > So, I have a doubt...
-> > 
-> > When this patch is merged, we have two separate ABIs for extracting the
-> > DT from the kernel. /proc/device-tree and /sys/firmware/fdt. Merging it
-> > into mainline means we're committed to supporting both interfaces.
-> > 
-> > The whole purpose of this patch is to support kexec. Specifically, kexec
-> > on ACPI platforms that don't currently unflatten the tree.*  Would it
-> > not be better to always unflatten the tree and have only one interface
-> > that kexec needs to use to obtain the tree?
-> 
-> The whole reasoning for not unflattening the DTB in the presence of ACPI
-> is that it's unlikely we can stop drivers using DTB information in
-> addition to ACPI, leaving us with a completely non-standard mess. We
-> really don't want people mixing the two, and it's going to be a struggle
-> if the information is readily available (even preventing probing based
-> on compatible string isn't enough because of some drivers which probe
-> from an initcall or look up magic paths).
-> 
-> So if we were to unflatten the tree in the ACPI case, at a minimum it
-> needs to be unflattened to a separate root that only exists for sysfs,
-> and is not at exposed to the mercy of the rest of the kernel.
+Hi Arnd, Kevin, Olof,
 
-Not setting the of_root pointer would do that. That should work.
+Here are the Allwinner DT changes for the 3.19 merge window.
 
-> > * It also helps with exposing the reserved map to userspace, but kexec
-> >   has done without that feature for years, and it is in the process of
-> >   being deprecated in favour of /reserved-memory anyway.
-> 
-> This is the first I'd heard of the reserve map being deprecated, and
-> we're going to have DTs with reserved map entries for a long time going
-> forwards.
+Thanks!
+Maxime
 
-Deprecated, not removed or disabled. It will still work pretty much
-forever, but users should be encouraged to move to the reserve-memory
-tree.
+The following changes since commit 532425a7a7738b479406496ca4ad6b3247688e44:
 
-> Can't we expose the header fields under something like
-> /sys/firmware/devicetree/dtb-header/, parallel to the usual
-> /sys/firmware/devicetree/base for nodes?
+  ARM: dts: sun6i: Re-parent ahb1_mux to pll6 as required by dma controller (2014-11-08 15:56:36 +0100)
 
-We could do that too.
+are available in the git repository at:
 
-Honestly though, I'm just unsure of what the best thing to do is. If you
-and a few others tell me that, "no, exporting the raw dtb is the right
-thing to do", then I'll be okay, merge the patch and sleep properly.
+  git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-3.19
 
-If you think my concerns have merit though, then say so and we'll do one
-of the above.
+for you to fetch changes up to 2f28e337651173680c6f045c3d598eaf17b764bb:
 
-g.
+  ARM: dts: sun6i: Add ethernet support to M9 board (2014-11-17 17:02:54 +0100)
+
+----------------------------------------------------------------
+Allwinner Device Tree Changes for 3.19
+
+A lot of things happened during that merge window, but mostly:
+  - Preliminary Support for the A80
+  - New Boards Support
+    + Mele M3
+    + Banana Pi
+    + Optimus
+    + OLinuXino Lime2
+  - Device Tree Relicensing to GPLv2/X11 dual license
+
+----------------------------------------------------------------
+Chen-Yu Tsai (11):
+      ARM: dts: sunxi: Add Allwinner A80 dtsi
+      ARM: dts: sun9i: Add A80 Optimus Board support
+      ARM: dts: sun9i: Add basic clocks and reset controls
+      ARM: dts: sun9i: Add i2c controller nodes to a80 dtsi
+      ARM: dts: sun9i: Add i2c3 pinmux setting for A80 SoC
+      ARM: dts: sun9i: Enable i2c3 on A80 Optimus board
+      ARM: dts: sun9i: Add GPIO LEDs for A80 Optimus board
+      ARM: dts: sun9i: Add uart4 pinmux setting for A80 SoC
+      ARM: dts: sun9i: Enable uart4 for A80 Optimus board
+      ARM: dts: sunxi: Use sun4i-a10-apb1-clk for sun6i/sun8i apb2 clocks.
+      ARM: sun6i: DT: Add PLL6 multiple outputs
+
+Emilio L?pez (1):
+      ARM: dts: sunxi: unify APB1 clock
+
+Hans de Goede (9):
+      ARM: dts: sun7i: Add spi0_pins_a pinctrl setting
+      ARM: dts: sun7i: Add uart3_pins_b pinctrl setting
+      ARM: dts: sun7i: Add Banana Pi board
+      ARM: dts: sun7i: Add mmc2_pins_a pinctrl definition
+      ARM: dts: sun7i: Add Mele M3 board
+      ARM: dts: sunxi: Add regulator-boot-on property to ahci-5v regulator
+      ARM: dts: sun6i: Add EHCI support for the M9 board
+      ARM: dts: sun6i: Add support for the status led
+      ARM: dts: sun6i: Add ethernet support to M9 board
+
+Iain Paton (1):
+      ARM: sun7i: add support for A20-OLinuXino-Lime2
+
+Karsten Merker (1):
+      ARM: dts: sunxi: Banana Pi: increase startup-delay for the GMAC PHY regulator
+
+Maxime Ripard (25):
+      ARM: sunxi: regulators: Relicense the device tree under GPLv2/X11
+      ARM: sun4i: ba10: Relicense the device tree under GPLv2/X11
+      ARM: sun4i: hackberry: Relicense the device tree under GPLv2/X11
+      ARM: sun4i: inet97fv2: Relicense the device tree under GPLv2/X11
+      ARM: sun4i: mini xplus: Relicense the device tree under GPLv2/X11
+      ARM: sun4i: olinuxino lime: Relicense the device tree under GPLv2/X11
+      ARM: sun5i: olinuxino micro: Relicense the device tree under GPLv2/X11
+      ARM: sun5i: r7: Relicense the device tree under GPLv2/X11
+      ARM: sun5i: olinuxino micro: Relicense the device tree under GPLv2/X11
+      ARM: sun6i: colombus: Relicense the device tree under GPLv2/X11
+      ARM: sun6i: hummingbird: Relicense the device tree under GPLv2/X11
+      ARM: sun6i: m9: Relicense the device tree under GPLv2/X11
+      ARM: sun7i: i12: Relicense the device tree under GPLv2/X11
+      ARM: sun8i: q8h: Relicense the device tree under GPLv2/X11
+      ARM: sun6i: app4: Relicense the device tree under GPLv2/X11
+      ARM: sunxi: Fix GPLv2 wording
+      ARM: sun4i: a1000: Relicense the device tree under GPLv2/X11
+      ARM: sun9i: Enable the A80 pinctrl driver
+      ARM: sun9i: optimus: Set UART0 muxing
+      ARM: sun7i: olinuxino lime: Relicense the device tree under GPLv2/X11
+      ARM: sun4i: pcduino: Relicense the device tree under GPLv2/X11
+      ARM: sun7i: pcduino3: Relicense the device tree under GPLv2/X11
+      ARM: sun4i: cubieboard: Relicense the device tree under GPLv2/X11
+      ARM: sun5i: olinuxino: Relicense the device tree under GPLv2/X11
+      Merge branch 'sunxi/fixes-for-3.18' into HEAD
+
+Roman Byshko (4):
+      ARM: dtsi: sunxi: add common VBUS regulator
+      ARM: sun7i: dtsi: add support for usbphy0
+      ARM: dts: sun7i: Cubietruck: override regulator pin
+      ARM: dts: sun7i: Cubietruck: add power supply regulator for USB OTG VBUS
+
+ arch/arm/boot/dts/Makefile                       |   5 +
+ arch/arm/boot/dts/sun4i-a10-a1000.dts            |  46 +-
+ arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts       |  46 +-
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts       |  46 +-
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts        |  46 +-
+ arch/arm/boot/dts/sun4i-a10-inet97fv2.dts        |  46 +-
+ arch/arm/boot/dts/sun4i-a10-mini-xplus.dts       |  46 +-
+ arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts   |  46 +-
+ arch/arm/boot/dts/sun4i-a10-pcduino.dts          |  46 +-
+ arch/arm/boot/dts/sun4i-a10.dtsi                 |  12 +-
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts |  46 +-
+ arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts    |  46 +-
+ arch/arm/boot/dts/sun5i-a10s.dtsi                |  12 +-
+ arch/arm/boot/dts/sun5i-a13-hsg-h702.dts         |   6 +-
+ arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts  |  48 ++-
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts        |  46 +-
+ arch/arm/boot/dts/sun5i-a13.dtsi                 |  12 +-
+ arch/arm/boot/dts/sun6i-a31-app4-evb1.dts        |  46 +-
+ arch/arm/boot/dts/sun6i-a31-colombus.dts         |  46 +-
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts      |  46 +-
+ arch/arm/boot/dts/sun6i-a31-m9.dts               | 103 ++++-
+ arch/arm/boot/dts/sun6i-a31.dtsi                 |  46 +-
+ arch/arm/boot/dts/sun7i-a20-bananapi.dts         | 214 ++++++++++
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts       |  14 +
+ arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts        |  46 +-
+ arch/arm/boot/dts/sun7i-a20-m3.dts               | 168 ++++++++
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts   |  46 +-
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts  | 228 ++++++++++
+ arch/arm/boot/dts/sun7i-a20-pcduino3.dts         |  46 +-
+ arch/arm/boot/dts/sun7i-a20.dtsi                 |  43 +-
+ arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts      |  46 +-
+ arch/arm/boot/dts/sun8i-a23.dtsi                 |  18 +-
+ arch/arm/boot/dts/sun9i-a80-optimus.dts          | 119 ++++++
+ arch/arm/boot/dts/sun9i-a80.dtsi                 | 514 +++++++++++++++++++++++
+ arch/arm/boot/dts/sunxi-common-regulators.dtsi   |  66 ++-
+ 35 files changed, 2261 insertions(+), 195 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-bananapi.dts
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-m3.dts
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+ create mode 100644 arch/arm/boot/dts/sun9i-a80-optimus.dts
+ create mode 100644 arch/arm/boot/dts/sun9i-a80.dtsi
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141118/3a1cc699/attachment.sig>
