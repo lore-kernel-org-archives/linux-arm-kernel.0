@@ -1,34 +1,78 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 18 Nov 2014 18:14:12 +0000
-Subject: [PATCH RFC 3/3] ARM: reduce size of page table directory for
- short mode
-In-Reply-To: <20141118165325.9958.84370.stgit@buzz>
-References: <20141118165313.9958.1242.stgit@buzz>
- <20141118165325.9958.84370.stgit@buzz>
-Message-ID: <20141118181412.GO28279@e104818-lin.cambridge.arm.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Tue, 18 Nov 2014 10:24:25 -0800
+Subject: ARM atomics overhaul for musl
+In-Reply-To: <20141118181425.GY18842@arm.com>
+References: <20141116055656.GA13940@brightrain.aerifal.cx>
+ <20141116163355.GK4042@n2100.arm.linux.org.uk>
+ <20141116165017.GT22465@brightrain.aerifal.cx>
+ <20141116171055.GM4042@n2100.arm.linux.org.uk>
+ <20141117135412.GC29595@e104818-lin.cambridge.arm.com>
+ <20141117143905.GQ4042@n2100.arm.linux.org.uk>
+ <CALCETrUAtAJ1CmuxOFiiu53kAWwofUpFaBeFAZF7Th2VXPbHZg@mail.gmail.com>
+ <20141118105611.GC28279@e104818-lin.cambridge.arm.com>
+ <20141118181425.GY18842@arm.com>
+Message-ID: <CALCETrX5_3qE0Jmiio6XMKgJ8e7hPnou1+RKGQOgKo5XYruqsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 03:53:25PM +0000, Konstantin Khlebnikov wrote:
-> Virtual memory above PAGE_OFFSET is covered by TTBR1 which always points
-> to swapper_pg_dir, thus size of the rest pgd tables might be reduced.
-> Of course idmap_pgd must be full 16k because it's used without split.
-> It seems nobody accesses pgd entries above PAGE_OFFSET via pgd_offset(),
-> all access is done via pgd_offset_k() which refers directly to init_mm.
+On Tue, Nov 18, 2014 at 10:14 AM, Will Deacon <will.deacon@arm.com> wrote:
+> I was really hoping to avoid this thread, but I wanted to comment on the
+> suitability of hwcap as a discovery mechanism.
+>
+> On Tue, Nov 18, 2014 at 10:56:12AM +0000, Catalin Marinas wrote:
+>> On Mon, Nov 17, 2014 at 05:38:46PM +0000, Andy Lutomirski wrote:
+>> > On Nov 17, 2014 6:39 AM, "Russell King - ARM Linux"
+>> > > Given that even cocked these up (just as what happened with the cache
+>> > > type register) decoding of the feature type registers depends on the
+>> > > underlying CPU architecture.
+>> > >
+>> > > So, even _if_ we exported the feature registers to userspace, you still
+>> > > need to know the CPU architecture to decode them properly, so you still
+>> > > need to parse the AT_PLATFORM string to get that information.
+>> >
+>> > There's no need to expose the hardware feature registers as is.
+>> > Define your own sensible feature bits just for Linux.
+>>
+>> We get regular questions about direct access to the hardware feature
+>> bits, many using the x86 cpuid instruction as argument. So far we
+>> couldn't see good enough reasons, otherwise we would have pushed such
+>> instruction in the ARMv8 architecture. It's also not a simple direct
+>> hardware access since the kernel may want to mask some features it does
+>> not support, which pretty much requires HWCAP or some banked CPUID
+>> registers in hardware.
+>
+> Or trapping the undef exception from EL0 and emulating it in the kernel,
+> which doesn't require any extra hardware, allows the kernel to mask out
+> things it can't support and gives userspace the information it needs
+> under any scenario.
+>
 
-We did a similar trick on arm64 with swapper_pg_dir only containing the
-kernel mappings while pgd_alloc() only allocates enough for the user
-memory map. We just need to sort out the potential A9 issue (I'll do
-some digging tomorrow).
+This only sounds reasonable to me if non-Linux architectures do it,
+too.  Otherwise using a syscall sounds more sensible.
 
-> This patch saves 8k per process for 2G/2G split (12k for 1G/3G split)
-> and kills source of frequent order-2 allocations. Unfortunately most
-> commonly used 3G/1G mode isn't supported, because first part must be
-> power of two. LPAE supports this mode, but it's pgd is already tiny.
+FWIW, I personally don't like the fact that x86 allows unprivileged
+code to use CPUID.  This can sort of be disabled on some recent Intel
+hardware, but last I checked that ability was explicitly not
+guaranteed to exist going forward.
 
-Actually, with LPAE you can save a pmd and pte allocated for the vectors
-page at 0xffff0000. So you can save 8K per task here. Similarly with the
-classic MMU, you can save another 4K for the vectors page pte.
+>> Another class are dynamic loaders that don't yet have a C library
+>> loaded. However, as such loaders are the first entry point, I don't see
+>> why they couldn't access auxv directly. One particular scenario here is
+>> finding out which CPU micro-architecture (implementation) it is so that
+>> the dynamic loader could choose a more optimised library. CPUID would
+>> help partially here (get the actual MIDR identifying the CPU
+>> implementation rather than just features) but not on heterogeneous
+>> systems like big.LITTLE. Which means that we would still be better off
+>> with some extra features in auxv, maybe even listing the individual MIDR
+>> for all the CPUs in the system.
+>
+> The only way I can see hwcap working is if we follow what the architecture
+> allows for in ARMv8, which is 4 bits per feature over (currently) around
+> 10 32-bit registers. That would mean potentially exposing 1280 hwcaps,
+> which is clearly insane.
 
--- 
-Catalin
+Stick it in the vdso?  /me snickers
+
+Out of curiosity, why are there 4 bits per feature?
+
+--Andy
