@@ -1,59 +1,63 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 18 Nov 2014 16:17:28 +0530
-Subject: [PATCH v5 0/2] Handle reboot for Exynos SoC via restart_handler
-Message-ID: <1416307650-15162-1-git-send-email-pankaj.dubey@samsung.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 18 Nov 2014 13:55:05 +0300
+Subject: [PATCH] ARM: dts: DRA7: Add node for RTC
+In-Reply-To: <546AD290.8080303@ti.com>
+References: <1416199509-3977-1-git-send-email-lokeshvutla@ti.com>
+ <5469E76A.7020105@cogentembedded.com> <5469F271.9080102@ti.com>
+ <546A1E5E.1040909@cogentembedded.com> <546AD290.8080303@ti.com>
+Message-ID: <546B2589.1090504@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes restart hook from machine_desc of Exynos, and moves
-respective code into restart_notifiers.
-Exynos5440 handles reboot via clock register so let's register a
-restart_handler in Exynos5440 clock driver.
-For rest Exynos SoC, reboot is handled via PMU SWRESET register so
-let's register a restart_handler in PMU driver for handling this.
+Hello.
 
-This patch is inspired and dependent on following patch series[1] from
-Geunter Roeck.
+On 11/18/2014 8:01 AM, Lokesh Vutla wrote:
 
-[1]: kernel: Add support for kernel restart handler call chain
-https://lkml.org/lkml/2014/8/19/652
+>>>>> Add node for RTC.
 
-I have tested reboot functionality on Exynos3250 based board, on
-kgene/for-next as well as linux-next's next-20141114 tag.
+>>>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>>>>> [nm at ti.com: update with rtc crossbar number]
+>>>>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>>>>> ---
+>>>>>     arch/arm/boot/dts/dra7.dtsi | 9 +++++++++
+>>>>>     1 file changed, 9 insertions(+)
 
-Patch v3 and related discussion can be found here
-http://www.spinics.net/lists/linux-samsung-soc/msg37600.html
+>>>>> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+>>>>> index 9cc9843..f98f9f0 100644
+>>>>> --- a/arch/arm/boot/dts/dra7.dtsi
+>>>>> +++ b/arch/arm/boot/dts/dra7.dtsi
+>>>>> @@ -1075,6 +1075,15 @@
+>>>>>                 status = "disabled";
+>>>>>             };
+>>>>>
+>>>>> +        rtc: rtcss at 48838000 {
 
-Changes since v4:
-  - Addressed review comments from Geunter Roeck.
-  - Added Geunter Roeck's Acked-by tag.
+>>>>      Please just name the node "rtc at 48838000", in accordance with ePAPR.
 
-Changes since v3:
-  - As v2 is causing conflict after recent changes in kgene/for-next,
-    rebased on top of kgene/for-next dated 2014-11-13.
-  - Removed dependency patch list from cover-letter as all dependencies 
-    are merged into kgene/for-next.
+>>> Okay. will update it.
 
-Changes since v2:
-  - Used register_restart_handler instead of register_reboot_notifier.
-  - Updated notifier names and commit message accordingly.
+>>>>> +            compatible = "ti,am3352-rtc";
+>>>>> +            reg = <0x48838000 0x100>;
+>>>>> +            interrupts = <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>,
+>>>>> +                     <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>;
 
-Changes since v1:
-  - Addressed review comments from Tomasz Figa. Removed usage of 
-    local variables where ever unnecessary.
-  - Make reg_base as global in clk-exynos5440.c file, to avoid 
-    iomapping it again in reboot_notifier handler.
+>>>>      2 similar interrupts?
 
+>>> both rtc timer and rtc alarm uses same interrupt on DRA7 Soc.
+>>> Driver handles it accordingly.
+>>> So passing the same interrupt.
 
-Pankaj Dubey (2):
-  clk: samsung: exynos5440: move restart code into clock driver
-  ARM: EXYNOS: PMU: move restart code into pmu driver
+>>     I think it would have been better if the driver just handled a single interrupt.
 
- arch/arm/mach-exynos/common.h        |    1 -
- arch/arm/mach-exynos/exynos.c        |   23 -----------------------
- arch/arm/mach-exynos/pmu.c           |   23 +++++++++++++++++++++++
- drivers/clk/samsung/clk-exynos5440.c |   29 ++++++++++++++++++++++++++++-
- 4 files changed, 51 insertions(+), 25 deletions(-)
+> There are certain SoCs with RTC IP where timer and alarm uses different interrupts.
 
--- 
-1.7.9.5
+    I understood.
+
+> Driver has to take care of that scenario also. So it expects two interrupts from dt.
+
+    You could also handle the missing second interrupt. I don't insist though...
+
+> Thanks and regards,
+> Lokesh
+
+WBR, Sergei
