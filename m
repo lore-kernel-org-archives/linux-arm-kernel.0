@@ -1,95 +1,104 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 18 Nov 2014 12:07:04 -0600
-Subject: [PATCH 06/10] input: touchscreen: edt-ft5x06: fix driver autoprobing
-In-Reply-To: <1416334028-7766-1-git-send-email-balbi@ti.com>
-References: <1416334028-7766-1-git-send-email-balbi@ti.com>
-Message-ID: <1416334028-7766-6-git-send-email-balbi@ti.com>
+From: k.khlebnikov@samsung.com (Konstantin Khlebnikov)
+Date: Tue, 18 Nov 2014 21:13:56 +0300
+Subject: [PATCH RFC] ARM: option for loading modules into vmalloc area
+In-Reply-To: <20141118173413.GB4042@n2100.arm.linux.org.uk>
+References: <20141118172146.3784.81151.stgit@buzz>
+ <20141118173413.GB4042@n2100.arm.linux.org.uk>
+Message-ID: <546B8C64.3010904@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i2c devices match against struct i2c_device_id
-even for CONFIG_OF case, so adding a struct of_device_id
-doesn't change anything. As a result, currently, edt-ft5x06
-will not autoprobe if built as a module.
 
-To fix the issue and still maintain backwards compatibility
-with all DTS files currently in tree, we're just moving
-all ids from of_device_id to i2c_device_id while also
-adding the following specific ids which should be used
-from now on:
+On 2014-11-18 20:34, Russell King - ARM Linux wrote:
+> On Tue, Nov 18, 2014 at 08:21:46PM +0400, Konstantin Khlebnikov wrote:
+>> Usually modules are loaded into small area prior to the kernel
+>> text because they are linked with the kernel using short calls.
+>> Compile-time instrumentation like GCOV or KASAN bloats code a lot,
+>> and as a result huge modules no longer fit into reserved area.
+>>
+>> This patch adds option CONFIG_MODULES_USE_VMALLOC which lifts
+>> limitation on amount of loaded modules. It links modules using
+>> long-calls (option -mlong-calls) and loads them into vmalloc area.
+>>
+>> In few places exported symbols are called from inline assembly.
+>> This patch adds macro for such call sites: __asmbl and __asmbl_clobber.
+>> Call turns into single 'bl' or sequence 'movw; movt; blx' depending on
+>> context and state of config option.
+>>
+>> Unfortunately this option isn't compatible with CONFIG_FUNCTION_TRACER.
+>> Compiler emits short calls to profiling function despite of -mlong-calls.
+>> This is a bug in GCC, but ftrace anyway needs an update to handle this.
+> It also isn't compatible with the older architectures which don't have
+> "blx".
 
-	{ "edt-ft5206", 0, }
-	{ "edt-ft5306", 0, }
-	{ "edt-ft5406", 0, }
+Ok, I'll add "depends on CPU_V6 || CPU_V7" I don't think that it is 
+necessary for older cpus.
 
-Cc: Lothar Wa?mann <lw@karo-electronics.de>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: <devicetree@vger.kernel.org>
-Cc: <linux-input@vger.kernel.org>
-Cc: <stable@vger.kernel.org> # v3.15+
-Fixes: dac90dc2 (Input: edt-ft5x06 - add DT support)
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- .../bindings/input/touchscreen/edt-ft5x06.txt           |  9 ++++++---
- drivers/input/touchscreen/edt-ft5x06.c                  | 17 ++++++-----------
- 2 files changed, 12 insertions(+), 14 deletions(-)
+>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+>> index 9d2cdda..9e0c4f4 100644
+>> --- a/arch/arm/mm/mmu.c
+>> +++ b/arch/arm/mm/mmu.c
+>> @@ -1161,16 +1161,15 @@ void __init sanity_check_meminfo(void)
+>>   
+>>   static inline void prepare_page_table(void)
+>>   {
+>> -	unsigned long addr;
+>> +	unsigned long addr = 0;
+>>   	phys_addr_t end;
+>>   
+>>   	/*
+>>   	 * Clear out all the mappings below the kernel image.
+>>   	 */
+>> -	for (addr = 0; addr < MODULES_VADDR; addr += PMD_SIZE)
+>> -		pmd_clear(pmd_off_k(addr));
+>> -
+>>   #ifdef CONFIG_XIP_KERNEL
+>> +	for ( ; addr < MODULES_VADDR; addr += PMD_SIZE)
+>> +		pmd_clear(pmd_off_k(addr));
+>>   	/* The XIP kernel is mapped in the module area -- skip over it */
+>>   	addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
+>>   #endif
+> This seems to be an unrelated change.  In any case, it looks wrong to
+> me.  Please describe what you are trying to achieve here.
+>
 
-diff --git a/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt b/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
-index 76db967..50bd5d2 100644
---- a/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
-+++ b/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
-@@ -14,9 +14,12 @@ bindings.
- 
- 
- Required properties:
-- - compatible:  "edt,edt-ft5206"
--           or:  "edt,edt-ft5306"
--           or:  "edt,edt-ft5406"
-+ - compatible:  "edt-ft5206"
-+	   or:  "edt-ft5306"
-+	   or:  "edt-ft5406"
-+	   or:  "edt,edt-ft5206" (deprecated)
-+           or:  "edt,edt-ft5306" (deprecated)
-+           or:  "edt,edt-ft5406" (deprecated)
- 
-  - reg:         I2C slave address of the chip (0x38)
-  - interrupt-parent: a phandle pointing to the interrupt controller
-diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
-index ee3434f..f161ff9 100644
---- a/drivers/input/touchscreen/edt-ft5x06.c
-+++ b/drivers/input/touchscreen/edt-ft5x06.c
-@@ -1119,25 +1119,20 @@ static SIMPLE_DEV_PM_OPS(edt_ft5x06_ts_pm_ops,
- 
- static const struct i2c_device_id edt_ft5x06_ts_id[] = {
- 	{ "edt-ft5x06", 0, },
-+	{ "edt-ft5206", 0, },
-+	{ "edt-ft5306", 0, },
-+	{ "edt-ft5406", 0, },
-+	{ "edt,edt-ft5206", 0, },
-+	{ "edt,edt-ft5306", 0, },
-+	{ "edt,edt-ft5406", 0, },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(i2c, edt_ft5x06_ts_id);
- 
--#ifdef CONFIG_OF
--static const struct of_device_id edt_ft5x06_of_match[] = {
--	{ .compatible = "edt,edt-ft5206", },
--	{ .compatible = "edt,edt-ft5306", },
--	{ .compatible = "edt,edt-ft5406", },
--	{ /* sentinel */ }
--};
--MODULE_DEVICE_TABLE(of, edt_ft5x06_of_match);
--#endif
--
- static struct i2c_driver edt_ft5x06_ts_driver = {
- 	.driver = {
- 		.owner = THIS_MODULE,
- 		.name = "edt_ft5x06",
--		.of_match_table = of_match_ptr(edt_ft5x06_of_match),
- 		.pm = &edt_ft5x06_ts_pm_ops,
- 	},
- 	.id_table = edt_ft5x06_ts_id,
--- 
-2.1.0.GIT
+My patch changes  MODULES_VADDR, if option enabled it becomes alias for 
+VMALLOC_START
+
+It's used as border between two loops, before patch this code looks like:
+
+     /*
+      * Clear out all the mappings below the kernel image.
+      */
+     for (addr = 0; addr < MODULES_VADDR; addr += PMD_SIZE)
+         pmd_clear(pmd_off_k(addr));
+
+#ifdef CONFIG_XIP_KERNEL
+     /* The XIP kernel is mapped in the module area -- skip over it */
+     addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
+#endif
+     for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
+         pmd_clear(pmd_off_k(addr));
+
+It's written with assumption that MODULES_VADDR < PAGE_OFFSET,
+but this no longer true if modules are placed inside vmalloc area.
+
+
+After patch:
+
+     unsigned long addr = 0;
+
+     /*
+      * Clear out all the mappings below the kernel image.
+      */
+#ifdef CONFIG_XIP_KERNEL
+     for ( ; addr < MODULES_VADDR; addr += PMD_SIZE)
+         pmd_clear(pmd_off_k(addr));
+     /* The XIP kernel is mapped in the module area -- skip over it */
+     addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
+#endif
+     for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
+         pmd_clear(pmd_off_k(addr));
+
+
+Without XIP there is no reason for splitting it into two loops.
