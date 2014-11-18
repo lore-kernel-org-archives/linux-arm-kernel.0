@@ -1,37 +1,30 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Nov 2014 15:30:35 +0100
-Subject: ARM: mvebu: ethernet packets corruption and I/O coherency
-In-Reply-To: <20141118142520.GD24819@dev0.local>
-References: <20141118142520.GD24819@dev0.local>
-Message-ID: <20141118153035.757fe0fc@free-electrons.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 18 Nov 2014 09:32:39 -0500
+Subject: [PATCH v5 6/6] arm64: Trace emulation of AArch32 legacy
+ instructions
+In-Reply-To: <1416310887-14649-7-git-send-email-punit.agrawal@arm.com>
+References: <1416310887-14649-1-git-send-email-punit.agrawal@arm.com>
+ <1416310887-14649-7-git-send-email-punit.agrawal@arm.com>
+Message-ID: <20141118093239.46f9b655@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Francesco Dolcini,
+On Tue, 18 Nov 2014 11:41:27 +0000
+Punit Agrawal <punit.agrawal@arm.com> wrote:
 
-On Tue, 18 Nov 2014 15:25:20 +0100, Francesco Dolcini wrote:
-
-> I have seen your patches ("ARM: mvebu: no I/O coherency on non-SMP and
-> related updates") regarding I/O coherency and I think it might be
-> related to a problem I am experiencing.
+> Introduce an event to trace the usage of emulated instructions. The
+> trace event is intended to help identify and encourage the migration
+> of legacy software using the emulation features.
 > 
-> I do have a custom board based on Marvell Armada 370 running kernel
-> 3.13.11 and I see random outgoing ethernet packet corruption (about 1
-> packet every some million) using mvneta driver.
+> Use this event to trace usage of swp and CP15 barrier emulation.
 > 
-> I have tried linux kernel 3.17 without any improvement.
-> 
-> What do you think? Can you backport the fix to 3.13 kernel?
+> Cc: Steven Rostedt <rostedt@goodmis.org>
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
 
-It could indeed be related. I have marked the relevant patches in the 
-"ARM: mvebu: no I/O coherency on non-SMP and related updates" series as
-to be backported to stable up to v3.8, so when they get accepted, I'll
-take care of backporting them.
+For the tracing side:
 
-Best regards,
+Acked-by: Steven Rostedt <rostedt@goodmis.org>
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+-- Steve
