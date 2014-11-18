@@ -1,34 +1,32 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 18 Nov 2014 12:07:05 -0600
-Subject: [PATCH 07/10] arm: boot: dts: am437x-sk: switch over to new
- edt-ft5306 compatible
+Date: Tue, 18 Nov 2014 12:07:01 -0600
+Subject: [PATCH 03/10] arm: omap: omap2plus_defconfig: enable AM33XX SoC sound
 In-Reply-To: <1416334028-7766-1-git-send-email-balbi@ti.com>
 References: <1416334028-7766-1-git-send-email-balbi@ti.com>
-Message-ID: <1416334028-7766-7-git-send-email-balbi@ti.com>
+Message-ID: <1416334028-7766-3-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-now that we have the new vendor-less edt-ft5306
-i2c_device_id, we can use it
+Without this, sound on AM437x Starter Kit will
+not work.
 
-Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/boot/dts/am437x-sk-evm.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/configs/omap2plus_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
-index 859ff3d..26133cb 100644
---- a/arch/arm/boot/dts/am437x-sk-evm.dts
-+++ b/arch/arm/boot/dts/am437x-sk-evm.dts
-@@ -404,7 +404,7 @@
- 
- 	edt-ft5306 at 38 {
- 		status = "okay";
--		compatible = "edt,edt-ft5306", "edt,edt-ft5x06";
-+		compatible = "edt-ft5306", "edt-ft5x06";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&edt_ft5306_ts_pins>;
- 
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index c893487..a5abc67 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -281,6 +281,8 @@ CONFIG_SND_VERBOSE_PRINTK=y
+ CONFIG_SND_DEBUG=y
+ CONFIG_SND_USB_AUDIO=m
+ CONFIG_SND_SOC=m
++CONFIG_SND_EDMA_SOC=m
++CONFIG_SND_AM33XX_SOC_EVM=m
+ CONFIG_SND_OMAP_SOC=m
+ CONFIG_SND_OMAP_SOC_OMAP_TWL4030=m
+ CONFIG_SND_OMAP_SOC_OMAP_ABE_TWL6040=m
 -- 
 2.1.0.GIT
