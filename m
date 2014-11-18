@@ -1,208 +1,424 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 18 Nov 2014 17:25:45 +0000
-Subject: [PATCH v5.5] of/fdt: export fdt blob as /sys/firmware/fdt
-In-Reply-To: <20141118165145.4F6A8C40966@trevor.secretlab.ca>
-References: <1415984735-32388-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141118165145.4F6A8C40966@trevor.secretlab.ca>
-Message-ID: <20141118172545.GC14323@leverpostej>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 18 Nov 2014 18:34:41 +0100
+Subject: [PATCH v4] ARM: EXYNOS: add Exynos3250 PMU support
+Message-ID: <1908469.QaqIJlesoD@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 04:51:45PM +0000, Grant Likely wrote:
-> On Fri, 14 Nov 2014 18:05:35 +0100
-> , Ard Biesheuvel <ard.biesheuvel@linaro.org>
->  wrote:
-> > Create a new /sys entry '/sys/firmware/fdt' to export the FDT blob
-> > that was passed to the kernel by the bootloader. This allows userland
-> > applications such as kexec to access the raw binary.
-> > 
-> > The fact that this node does not reside under /sys/firmware/device-tree
-> > is deliberate: FDT is also used on arm64 UEFI/ACPI systems to
-> > communicate just the UEFI and ACPI entry points, but the FDT is never
-> > unflattened and used to configure the system.
-> > 
-> > A CRC32 checksum is calculated over the entire FDT blob, and verified
-> > at late_initcall time. The sysfs entry is instantiated only if the
-> > checksum is valid, i.e., if the FDT blob has not been modified in the
-> > mean time. Otherwise, a warning is printed.
-> > 
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> 
-> So, I have a doubt...
-> 
-> When this patch is merged, we have two separate ABIs for extracting the
-> DT from the kernel. /proc/device-tree and /sys/firmware/fdt. Merging it
-> into mainline means we're committed to supporting both interfaces.
-> 
-> The whole purpose of this patch is to support kexec. Specifically, kexec
-> on ACPI platforms that don't currently unflatten the tree.*  Would it
-> not be better to always unflatten the tree and have only one interface
-> that kexec needs to use to obtain the tree?
+This patch prepares the PMU code for the future:
+- suspend/resume (S2R) support
+- cpuidle AFTR/W-AFTR modes support
+on Exynos3250.
 
-The whole reasoning for not unflattening the DTB in the presence of ACPI
-is that it's unlikely we can stop drivers using DTB information in
-addition to ACPI, leaving us with a completely non-standard mess. We
-really don't want people mixing the two, and it's going to be a struggle
-if the information is readily available (even preventing probing based
-on compatible string isn't enough because of some drivers which probe
-from an initcall or look up magic paths).
+Cc: Pankaj Dubey <pankaj.dubey@samsung.com>
+Cc: Vikas Sajjan <vikas.sajjan@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+v4:
+- rebased on top of next-20141114 branch of linux-next kernel tree
+  (it also applies fine to for-next branch of linux-samsung.git)
+- removed writing to undocumented CORE2 and CORE3 related registers
+- fixed values used for EXYNOS3_[G3D,LCD]_SYS_PWR_REG registers
+- added defines for values used for EXYNOS3_*_DURATION registers
+- removed redundat pr_info("EXYNOS3250 PMU Initialize\n")
 
-So if we were to unflatten the tree in the ACPI case, at a minimum it
-needs to be unflattened to a separate root that only exists for sysfs,
-and is not at exposed to the mercy of the rest of the kernel.
+v3:
+- rebased on top of for-next branch of linux-samsung.git and
+  [PATCH v7] mfd: syscon: Decouple syscon interface from platform devices
+  (https://lkml.org/lkml/2014/9/30/156)
+  [PATCH v9 0/2] ARM: Exynos: Convert PMU implementation into a platform driver
+  (https://lkml.org/lkml/2014/10/6/89)
+  [PATCH v9 0/2] Adds PMU and S2R support for exynos5420
+  (http://www.spinics.net/lists/arm-kernel/msg368207.html)
 
-> * It also helps with exposing the reserved map to userspace, but kexec
->   has done without that feature for years, and it is in the process of
->   being deprecated in favour of /reserved-memory anyway.
+v2:
+- rebased on top of next-20140708 and
+  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32410.html
+  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg33660.html
+  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg33675.html
 
-This is the first I'd heard of the reserve map being deprecated, and
-we're going to have DTs with reserved map entries for a long time going
-forwards.
+  this patch also applies fine after/before Exynos5800 PMU support:
+  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg33835.html
 
-There are also other kernels (e.g. Xen) using DT that I believe handle
-reserve map entries but not (currently) reserved-memory nodes, and I'd
-rather we didn't have the kernel rewrite things they understand into
-things they didn't. For debugging on a production kernel I'd also like
-to have as close to the original information provided as possible
-exposed to userspace.
+ arch/arm/mach-exynos/pmu.c      | 167 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/regs-pmu.h | 128 ++++++++++++++++++++++++++++++
+ 2 files changed, 295 insertions(+)
 
-Can't we expose the header fields under something like
-/sys/firmware/devicetree/dtb-header/, parallel to the usual
-/sys/firmware/devicetree/base for nodes?
-
-Mark.
-
-> 
-> g.
-> 
-> (side comment: I just realized that if I do merge this patch, it needs
-> to include documentation of the ABI in /Documentation/ABI/*/sysfs-8)
-> 
-> > ---
-> > 
-> > v5.5: based on Grant's changes
-> > """
-> > Actually, I made a couple of changes when I merged it. I removed the
-> > older debugfs interface since it overlaps, and I added tests for
-> > initial_boot_params to make sure it doesn't try to run on an invalid
-> > FDT
-> > """
-> > but I removed the second fdt_check_header() again in the late init code, as it
-> > would result in a corrupted FDT to be silently ignored. Note that
-> > initial_boot_params can only be set if fdt_check_header() succeeded the first
-> > time, so a failure occurring the second time should produce a warning, and
-> > the CRC check will catch it anyway. The CRC check itself is fixed to use the
-> > API as it is supposed to. I also moved the CRC variable definition inside the
-> > #ifdef OF_EARLY_FLATTREE region.
-> > 
-> > v4: use pr_warn() instead of WARN()
-> > v3: keep checksum instead of copying the entire blob, and WARN on mismatch
-> > 
-> >  drivers/of/Kconfig |  1 +
-> >  drivers/of/fdt.c   | 43 +++++++++++++++++++++++++++----------------
-> >  2 files changed, 28 insertions(+), 16 deletions(-)
-> > 
-> > diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-> > index 1a13f5b722c5..0348c208343c 100644
-> > --- a/drivers/of/Kconfig
-> > +++ b/drivers/of/Kconfig
-> > @@ -23,6 +23,7 @@ config OF_FLATTREE
-> >  	bool
-> >  	select DTC
-> >  	select LIBFDT
-> > +	select CRC32
-> >  
-> >  config OF_EARLY_FLATTREE
-> >  	bool
-> > diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> > index d1ffca8b34ea..2bbda0775f57 100644
-> > --- a/drivers/of/fdt.c
-> > +++ b/drivers/of/fdt.c
-> > @@ -9,6 +9,7 @@
-> >   * version 2 as published by the Free Software Foundation.
-> >   */
-> >  
-> > +#include <linux/crc32.h>
-> >  #include <linux/kernel.h>
-> >  #include <linux/initrd.h>
-> >  #include <linux/memblock.h>
-> > @@ -22,6 +23,7 @@
-> >  #include <linux/libfdt.h>
-> >  #include <linux/debugfs.h>
-> >  #include <linux/serial_core.h>
-> > +#include <linux/sysfs.h>
-> >  
-> >  #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
-> >  #include <asm/page.h>
-> > @@ -425,6 +427,8 @@ void *initial_boot_params;
-> >  
-> >  #ifdef CONFIG_OF_EARLY_FLATTREE
-> >  
-> > +static u32 of_fdt_crc32;
-> > +
-> >  /**
-> >   * res_mem_reserve_reg() - reserve all memory described in 'reg' property
-> >   */
-> > @@ -996,6 +1000,8 @@ bool __init early_init_dt_verify(void *params)
-> >  
-> >  	/* Setup flat device-tree pointer */
-> >  	initial_boot_params = params;
-> > +	of_fdt_crc32 = crc32_be(~0, initial_boot_params,
-> > +				fdt_totalsize(initial_boot_params));
-> >  
-> >  	/* check device tree validity */
-> >  	if (fdt_check_header(params)) {
-> > @@ -1080,27 +1086,32 @@ void __init unflatten_and_copy_device_tree(void)
-> >  	unflatten_device_tree();
-> >  }
-> >  
-> > -#if defined(CONFIG_DEBUG_FS) && defined(DEBUG)
-> > -static struct debugfs_blob_wrapper flat_dt_blob;
-> > -
-> > -static int __init of_flat_dt_debugfs_export_fdt(void)
-> > +#ifdef CONFIG_SYSFS
-> > +static ssize_t of_fdt_raw_read(struct file *filp, struct kobject *kobj,
-> > +			       struct bin_attribute *bin_attr,
-> > +			       char *buf, loff_t off, size_t count)
-> >  {
-> > -	struct dentry *d = debugfs_create_dir("device-tree", NULL);
-> > -
-> > -	if (!d)
-> > -		return -ENOENT;
-> > +	memcpy(buf, initial_boot_params + off, count);
-> > +	return count;
-> > +}
-> >  
-> > -	flat_dt_blob.data = initial_boot_params;
-> > -	flat_dt_blob.size = fdt_totalsize(initial_boot_params);
-> > +static int __init of_fdt_raw_init(void)
-> > +{
-> > +	static struct bin_attribute of_fdt_raw_attr =
-> > +		__BIN_ATTR(fdt, S_IRUSR, of_fdt_raw_read, NULL, 0);
-> >  
-> > -	d = debugfs_create_blob("flat-device-tree", S_IFREG | S_IRUSR,
-> > -				d, &flat_dt_blob);
-> > -	if (!d)
-> > -		return -ENOENT;
-> > +	if (!initial_boot_params)
-> > +		return 0;
-> >  
-> > -	return 0;
-> > +	if (of_fdt_crc32 != crc32_be(~0, initial_boot_params,
-> > +				     fdt_totalsize(initial_boot_params))) {
-> > +		pr_warn("fdt: not creating '/sys/firmware/fdt': CRC check failed\n");
-> > +		return 0;
-> > +	}
-> > +	of_fdt_raw_attr.size = fdt_totalsize(initial_boot_params);
-> > +	return sysfs_create_bin_file(firmware_kobj, &of_fdt_raw_attr);
-> >  }
-> > -module_init(of_flat_dt_debugfs_export_fdt);
-> > +late_initcall(of_fdt_raw_init);
-> >  #endif
-> >  
-> >  #endif /* CONFIG_OF_EARLY_FLATTREE */
-> > -- 
-> > 1.8.3.2
-> > 
-> 
-> 
+diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+index 6c8a76d..673723f 100644
+--- a/arch/arm/mach-exynos/pmu.c
++++ b/arch/arm/mach-exynos/pmu.c
+@@ -31,6 +31,7 @@ struct exynos_pmu_data {
+ 
+ 	void (*pmu_init)(void);
+ 	void (*powerdown_conf)(enum sys_powerdown);
++	void (*powerdown_conf_extra)(enum sys_powerdown);
+ };
+ 
+ struct exynos_pmu_context {
+@@ -51,6 +52,92 @@ static inline u32 pmu_raw_readl(u32 offset)
+ 	return readl_relaxed(pmu_base_addr + offset);
+ }
+ 
++static struct exynos_pmu_conf exynos3250_pmu_config[] = {
++	/* { .offset = offset, .val = { AFTR, W-AFTR, SLEEP } */
++	{ EXYNOS3_ARM_CORE0_SYS_PWR_REG,		{ 0x0, 0x0, 0x2} },
++	{ EXYNOS3_DIS_IRQ_ARM_CORE0_LOCAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0} },
++	{ EXYNOS3_DIS_IRQ_ARM_CORE0_CENTRAL_SYS_PWR_REG,{ 0x0, 0x0, 0x0} },
++	{ EXYNOS3_ARM_CORE1_SYS_PWR_REG,		{ 0x0, 0x0, 0x2} },
++	{ EXYNOS3_DIS_IRQ_ARM_CORE1_LOCAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0} },
++	{ EXYNOS3_DIS_IRQ_ARM_CORE1_CENTRAL_SYS_PWR_REG,{ 0x0, 0x0, 0x0} },
++	{ EXYNOS3_ISP_ARM_SYS_PWR_REG,			{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_DIS_IRQ_ISP_ARM_LOCAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0} },
++	{ EXYNOS3_DIS_IRQ_ISP_ARM_CENTRAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0} },
++	{ EXYNOS3_ARM_COMMON_SYS_PWR_REG,		{ 0x0, 0x0, 0x2} },
++	{ EXYNOS3_ARM_L2_SYS_PWR_REG,			{ 0x0, 0x0, 0x3} },
++	{ EXYNOS3_CMU_ACLKSTOP_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_CMU_SCLKSTOP_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_CMU_RESET_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_DRAM_FREQ_DOWN_SYS_PWR_REG,		{ 0x1, 0x1, 0x1} },
++	{ EXYNOS3_DDRPHY_DLLOFF_SYS_PWR_REG,		{ 0x1, 0x1, 0x1} },
++	{ EXYNOS3_LPDDR_PHY_DLL_LOCK_SYS_PWR_REG,	{ 0x1, 0x1, 0x1} },
++	{ EXYNOS3_CMU_ACLKSTOP_COREBLK_SYS_PWR_REG,	{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_CMU_SCLKSTOP_COREBLK_SYS_PWR_REG,	{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_CMU_RESET_COREBLK_SYS_PWR_REG,	{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_APLL_SYSCLK_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_MPLL_SYSCLK_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_BPLL_SYSCLK_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_VPLL_SYSCLK_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_EPLL_SYSCLK_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_UPLL_SYSCLK_SYS_PWR_REG,		{ 0x1, 0x1, 0x1} },
++	{ EXYNOS3_EPLLUSER_SYSCLK_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_MPLLUSER_SYSCLK_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_BPLLUSER_SYSCLK_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_CMU_CLKSTOP_CAM_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_CMU_CLKSTOP_MFC_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_CMU_CLKSTOP_G3D_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_CMU_CLKSTOP_LCD0_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_CMU_CLKSTOP_ISP_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_CMU_CLKSTOP_MAUDIO_SYS_PWR_REG,	{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_CMU_RESET_CAM_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_CMU_RESET_MFC_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_CMU_RESET_G3D_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_CMU_RESET_LCD0_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_CMU_RESET_ISP_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_CMU_RESET_MAUDIO_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS3_TOP_BUS_SYS_PWR_REG,			{ 0x3, 0x0, 0x0} },
++	{ EXYNOS3_TOP_RETENTION_SYS_PWR_REG,		{ 0x1, 0x1, 0x1} },
++	{ EXYNOS3_TOP_PWR_SYS_PWR_REG,			{ 0x3, 0x3, 0x3} },
++	{ EXYNOS3_TOP_BUS_COREBLK_SYS_PWR_REG,		{ 0x3, 0x0, 0x0} },
++	{ EXYNOS3_TOP_RETENTION_COREBLK_SYS_PWR_REG,	{ 0x1, 0x1, 0x1} },
++	{ EXYNOS3_TOP_PWR_COREBLK_SYS_PWR_REG,		{ 0x3, 0x3, 0x3} },
++	{ EXYNOS3_LOGIC_RESET_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_OSCCLK_GATE_SYS_PWR_REG,		{ 0x1, 0x1, 0x1} },
++	{ EXYNOS3_LOGIC_RESET_COREBLK_SYS_PWR_REG,	{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_OSCCLK_GATE_COREBLK_SYS_PWR_REG,	{ 0x1, 0x0, 0x1} },
++	{ EXYNOS3_PAD_RETENTION_DRAM_SYS_PWR_REG,	{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_PAD_RETENTION_MAUDIO_SYS_PWR_REG,	{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_PAD_RETENTION_GPIO_SYS_PWR_REG,	{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_PAD_RETENTION_UART_SYS_PWR_REG,	{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_PAD_RETENTION_MMC0_SYS_PWR_REG,	{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_PAD_RETENTION_MMC1_SYS_PWR_REG,	{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_PAD_RETENTION_MMC2_SYS_PWR_REG,	{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_PAD_RETENTION_SPI_SYS_PWR_REG,	{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_PAD_RETENTION_EBIA_SYS_PWR_REG,	{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_PAD_RETENTION_EBIB_SYS_PWR_REG,	{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_PAD_RETENTION_JTAG_SYS_PWR_REG,	{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_PAD_ISOLATION_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_PAD_ALV_SEL_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_XUSBXTI_SYS_PWR_REG,			{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_XXTI_SYS_PWR_REG,			{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_EXT_REGULATOR_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_EXT_REGULATOR_COREBLK_SYS_PWR_REG,	{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_GPIO_MODE_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_GPIO_MODE_MAUDIO_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_TOP_ASB_RESET_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_TOP_ASB_ISOLATION_SYS_PWR_REG,	{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_TOP_ASB_RESET_COREBLK_SYS_PWR_REG,	{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_TOP_ASB_ISOLATION_COREBLK_SYS_PWR_REG,{ 0x1, 0x1, 0x0} },
++	{ EXYNOS3_CAM_SYS_PWR_REG,			{ 0x7, 0x0, 0x0} },
++	{ EXYNOS3_MFC_SYS_PWR_REG,			{ 0x7, 0x0, 0x0} },
++	{ EXYNOS3_G3D_SYS_PWR_REG,			{ 0x7, 0x0, 0x0} },
++	{ EXYNOS3_LCD0_SYS_PWR_REG,			{ 0x7, 0x0, 0x0} },
++	{ EXYNOS3_ISP_SYS_PWR_REG,			{ 0x7, 0x0, 0x0} },
++	{ EXYNOS3_MAUDIO_SYS_PWR_REG,			{ 0x7, 0x0, 0x0} },
++	{ EXYNOS3_CMU_SYSCLK_ISP_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ PMU_TABLE_END,},
++};
++
+ static const struct exynos_pmu_conf exynos4210_pmu_config[] = {
+ 	/* { .offset = offset, .val = { AFTR, LPA, SLEEP } */
+ 	{ S5P_ARM_CORE0_LOWPWR,			{ 0x0, 0x0, 0x2 } },
+@@ -495,6 +582,44 @@ static struct exynos_pmu_conf exynos5420_pmu_config[] = {
+ 	{ PMU_TABLE_END,},
+ };
+ 
++static unsigned int const exynos3250_list_feed[] = {
++	EXYNOS3_ARM_CORE_OPTION(0),
++	EXYNOS3_ARM_CORE_OPTION(1),
++	EXYNOS3_ARM_CORE_OPTION(2),
++	EXYNOS3_ARM_CORE_OPTION(3),
++	EXYNOS3_ARM_COMMON_OPTION,
++	EXYNOS3_TOP_PWR_OPTION,
++	EXYNOS3_CORE_TOP_PWR_OPTION,
++	S5P_CAM_OPTION,
++	S5P_MFC_OPTION,
++	S5P_G3D_OPTION,
++	S5P_LCD0_OPTION,
++	S5P_ISP_OPTION,
++};
++
++static void exynos3250_powerdown_conf_extra(enum sys_powerdown mode)
++{
++	unsigned int i;
++	unsigned int tmp;
++
++	/* Enable only SC_FEEDBACK */
++	for (i = 0; i < ARRAY_SIZE(exynos3250_list_feed); i++) {
++		tmp = pmu_raw_readl(exynos3250_list_feed[i]);
++		tmp &= ~(EXYNOS3_OPTION_USE_SC_COUNTER);
++		tmp |= EXYNOS3_OPTION_USE_SC_FEEDBACK;
++		pmu_raw_writel(tmp, exynos3250_list_feed[i]);
++	}
++
++	if (mode != SYS_SLEEP)
++		return;
++
++	pmu_raw_writel(XUSBXTI_DURATION, EXYNOS3_XUSBXTI_DURATION);
++	pmu_raw_writel(XXTI_DURATION, EXYNOS3_XXTI_DURATION);
++	pmu_raw_writel(EXT_REGULATOR_DURATION, EXYNOS3_EXT_REGULATOR_DURATION);
++	pmu_raw_writel(EXT_REGULATOR_COREBLK_DURATION,
++		       EXYNOS3_EXT_REGULATOR_COREBLK_DURATION);
++}
++
+ static unsigned int const exynos5_list_both_cnt_feed[] = {
+ 	EXYNOS5_ARM_CORE0_OPTION,
+ 	EXYNOS5_ARM_CORE1_OPTION,
+@@ -632,6 +757,9 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
+ 					pmu_data->pmu_config[i].offset);
+ 	}
+ 
++	if (pmu_data->powerdown_conf_extra)
++		pmu_data->powerdown_conf_extra(mode);
++
+ 	if (pmu_data->pmu_config_extra) {
+ 		for (i = 0; pmu_data->pmu_config_extra[i].offset != PMU_TABLE_END; i++)
+ 			pmu_raw_writel(pmu_data->pmu_config_extra[i].val[mode],
+@@ -639,6 +767,36 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
+ 	}
+ }
+ 
++static void exynos3250_pmu_init(void)
++{
++	unsigned int value;
++
++	/*
++	 * To prevent form issuing new bus request form L2 memory system
++	 * If core status is power down, should be set '1' to L2 power down
++	 */
++	value = pmu_raw_readl(EXYNOS3_ARM_COMMON_OPTION);
++	value |= EXYNOS3_OPTION_SKIP_DEACTIVATE_ACEACP_IN_PWDN;
++	pmu_raw_writel(value, EXYNOS3_ARM_COMMON_OPTION);
++
++	/* Enable USE_STANDBY_WFI for all CORE */
++	pmu_raw_writel(S5P_USE_STANDBY_WFI_ALL, S5P_CENTRAL_SEQ_OPTION);
++
++	/*
++	 * Set PSHOLD port for output high
++	 */
++	value = pmu_raw_readl(S5P_PS_HOLD_CONTROL);
++	value |= S5P_PS_HOLD_OUTPUT_HIGH;
++	pmu_raw_writel(value, S5P_PS_HOLD_CONTROL);
++
++	/*
++	 * Enable signal for PSHOLD port
++	 */
++	value = pmu_raw_readl(S5P_PS_HOLD_CONTROL);
++	value |= S5P_PS_HOLD_EN;
++	pmu_raw_writel(value, S5P_PS_HOLD_CONTROL);
++}
++
+ static void exynos5250_pmu_init(void)
+ {
+ 	unsigned int value;
+@@ -717,6 +875,12 @@ static void exynos5420_pmu_init(void)
+ }
+ 
+ 
++static const struct exynos_pmu_data exynos3250_pmu_data = {
++	.pmu_config	= exynos3250_pmu_config,
++	.pmu_init	= exynos3250_pmu_init,
++	.powerdown_conf_extra	= exynos3250_powerdown_conf_extra,
++};
++
+ static const struct exynos_pmu_data exynos4210_pmu_data = {
+ 	.pmu_config	= exynos4210_pmu_config,
+ };
+@@ -747,6 +911,9 @@ static struct exynos_pmu_data exynos5420_pmu_data = {
+  */
+ static const struct of_device_id exynos_pmu_of_device_ids[] = {
+ 	{
++		.compatible = "samsung,exynos3250-pmu",
++		.data = &exynos3250_pmu_data,
++	}, {
+ 		.compatible = "samsung,exynos4210-pmu",
+ 		.data = &exynos4210_pmu_data,
+ 	}, {
+diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+index 46b973b..d5a66e9 100644
+--- a/arch/arm/mach-exynos/regs-pmu.h
++++ b/arch/arm/mach-exynos/regs-pmu.h
+@@ -19,7 +19,20 @@
+ #define S5P_CENTRAL_SEQ_OPTION			0x0208
+ 
+ #define S5P_USE_STANDBY_WFI0			(1 << 16)
++#define S5P_USE_STANDBY_WFI1			(1 << 17)
++#define S5P_USE_STANDBY_WFI2			(1 << 19)
++#define S5P_USE_STANDBY_WFI3			(1 << 20)
+ #define S5P_USE_STANDBY_WFE0			(1 << 24)
++#define S5P_USE_STANDBY_WFE1			(1 << 25)
++#define S5P_USE_STANDBY_WFE2			(1 << 27)
++#define S5P_USE_STANDBY_WFE3			(1 << 28)
++
++#define S5P_USE_STANDBY_WFI_ALL \
++	(S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFI1 | \
++	 S5P_USE_STANDBY_WFI2 | S5P_USE_STANDBY_WFI3 | \
++	 S5P_USE_STANDBY_WFE0 | S5P_USE_STANDBY_WFE1 | \
++	 S5P_USE_STANDBY_WFE2 | S5P_USE_STANDBY_WFE3)
++
+ #define S5P_USE_DELAYED_RESET_ASSERTION		BIT(12)
+ 
+ #define EXYNOS_CORE_PO_RESET(n)			((1 << 4) << n)
+@@ -154,6 +167,17 @@
+ #define S5P_PAD_RET_EBIA_OPTION			0x3188
+ #define S5P_PAD_RET_EBIB_OPTION			0x31A8
+ 
++#define S5P_PS_HOLD_CONTROL			0x330C
++#define S5P_PS_HOLD_EN				(1 << 31)
++#define S5P_PS_HOLD_OUTPUT_HIGH			(3 << 8)
++
++#define S5P_CAM_OPTION				0x3C08
++#define S5P_MFC_OPTION				0x3C48
++#define S5P_G3D_OPTION				0x3C68
++#define S5P_LCD0_OPTION				0x3C88
++#define S5P_LCD1_OPTION				0x3CA8
++#define S5P_ISP_OPTION				S5P_LCD1_OPTION
++
+ #define S5P_CORE_LOCAL_PWR_EN			0x3
+ #define S5P_CORE_WAKEUP_FROM_LOCAL_CFG		(0x3 << 8)
+ 
+@@ -214,6 +238,110 @@
+ #define S5P_DIS_IRQ_CORE3			0x1034
+ #define S5P_DIS_IRQ_CENTRAL3			0x1038
+ 
++/* Only for EXYNOS3XXX */
++#define EXYNOS3_ARM_CORE0_SYS_PWR_REG			0x1000
++#define EXYNOS3_DIS_IRQ_ARM_CORE0_LOCAL_SYS_PWR_REG	0x1004
++#define EXYNOS3_DIS_IRQ_ARM_CORE0_CENTRAL_SYS_PWR_REG	0x1008
++#define EXYNOS3_ARM_CORE1_SYS_PWR_REG			0x1010
++#define EXYNOS3_DIS_IRQ_ARM_CORE1_LOCAL_SYS_PWR_REG	0x1014
++#define EXYNOS3_DIS_IRQ_ARM_CORE1_CENTRAL_SYS_PWR_REG	0x1018
++#define EXYNOS3_ISP_ARM_SYS_PWR_REG			0x1050
++#define EXYNOS3_DIS_IRQ_ISP_ARM_LOCAL_SYS_PWR_REG	0x1054
++#define EXYNOS3_DIS_IRQ_ISP_ARM_CENTRAL_SYS_PWR_REG	0x1058
++#define EXYNOS3_ARM_COMMON_SYS_PWR_REG			0x1080
++#define EXYNOS3_ARM_L2_SYS_PWR_REG			0x10C0
++#define EXYNOS3_CMU_ACLKSTOP_SYS_PWR_REG		0x1100
++#define EXYNOS3_CMU_SCLKSTOP_SYS_PWR_REG		0x1104
++#define EXYNOS3_CMU_RESET_SYS_PWR_REG			0x110C
++#define EXYNOS3_CMU_ACLKSTOP_COREBLK_SYS_PWR_REG	0x1110
++#define EXYNOS3_CMU_SCLKSTOP_COREBLK_SYS_PWR_REG	0x1114
++#define EXYNOS3_CMU_RESET_COREBLK_SYS_PWR_REG		0x111C
++#define EXYNOS3_APLL_SYSCLK_SYS_PWR_REG			0x1120
++#define EXYNOS3_MPLL_SYSCLK_SYS_PWR_REG			0x1124
++#define EXYNOS3_VPLL_SYSCLK_SYS_PWR_REG			0x1128
++#define EXYNOS3_EPLL_SYSCLK_SYS_PWR_REG			0x112C
++#define EXYNOS3_MPLLUSER_SYSCLK_SYS_PWR_REG		0x1130
++#define EXYNOS3_BPLLUSER_SYSCLK_SYS_PWR_REG		0x1134
++#define EXYNOS3_EPLLUSER_SYSCLK_SYS_PWR_REG		0x1138
++#define EXYNOS3_CMU_CLKSTOP_CAM_SYS_PWR_REG		0x1140
++#define EXYNOS3_CMU_CLKSTOP_MFC_SYS_PWR_REG		0x1148
++#define EXYNOS3_CMU_CLKSTOP_G3D_SYS_PWR_REG		0x114C
++#define EXYNOS3_CMU_CLKSTOP_LCD0_SYS_PWR_REG		0x1150
++#define EXYNOS3_CMU_CLKSTOP_ISP_SYS_PWR_REG		0x1154
++#define EXYNOS3_CMU_CLKSTOP_MAUDIO_SYS_PWR_REG		0x1158
++#define EXYNOS3_CMU_RESET_CAM_SYS_PWR_REG		0x1160
++#define EXYNOS3_CMU_RESET_MFC_SYS_PWR_REG		0x1168
++#define EXYNOS3_CMU_RESET_G3D_SYS_PWR_REG		0x116C
++#define EXYNOS3_CMU_RESET_LCD0_SYS_PWR_REG		0x1170
++#define EXYNOS3_CMU_RESET_ISP_SYS_PWR_REG		0x1174
++#define EXYNOS3_CMU_RESET_MAUDIO_SYS_PWR_REG		0x1178
++#define EXYNOS3_TOP_BUS_SYS_PWR_REG			0x1180
++#define EXYNOS3_TOP_RETENTION_SYS_PWR_REG		0x1184
++#define EXYNOS3_TOP_PWR_SYS_PWR_REG			0x1188
++#define EXYNOS3_TOP_BUS_COREBLK_SYS_PWR_REG		0x1190
++#define EXYNOS3_TOP_RETENTION_COREBLK_SYS_PWR_REG	0x1194
++#define EXYNOS3_TOP_PWR_COREBLK_SYS_PWR_REG		0x1198
++#define EXYNOS3_LOGIC_RESET_SYS_PWR_REG			0x11A0
++#define EXYNOS3_OSCCLK_GATE_SYS_PWR_REG			0x11A4
++#define EXYNOS3_LOGIC_RESET_COREBLK_SYS_PWR_REG		0x11B0
++#define EXYNOS3_OSCCLK_GATE_COREBLK_SYS_PWR_REG		0x11B4
++#define EXYNOS3_PAD_RETENTION_DRAM_SYS_PWR_REG		0x1200
++#define EXYNOS3_PAD_RETENTION_MAUDIO_SYS_PWR_REG	0x1204
++#define EXYNOS3_PAD_RETENTION_SPI_SYS_PWR_REG		0x1208
++#define EXYNOS3_PAD_RETENTION_MMC2_SYS_PWR_REG		0x1218
++#define EXYNOS3_PAD_RETENTION_GPIO_SYS_PWR_REG		0x1220
++#define EXYNOS3_PAD_RETENTION_UART_SYS_PWR_REG		0x1224
++#define EXYNOS3_PAD_RETENTION_MMC0_SYS_PWR_REG		0x1228
++#define EXYNOS3_PAD_RETENTION_MMC1_SYS_PWR_REG		0x122C
++#define EXYNOS3_PAD_RETENTION_EBIA_SYS_PWR_REG		0x1230
++#define EXYNOS3_PAD_RETENTION_EBIB_SYS_PWR_REG		0x1234
++#define EXYNOS3_PAD_RETENTION_JTAG_SYS_PWR_REG		0x1238
++#define EXYNOS3_PAD_ISOLATION_SYS_PWR_REG		0x1240
++#define EXYNOS3_PAD_ALV_SEL_SYS_PWR_REG			0x1260
++#define EXYNOS3_XUSBXTI_SYS_PWR_REG			0x1280
++#define EXYNOS3_XXTI_SYS_PWR_REG			0x1284
++#define EXYNOS3_EXT_REGULATOR_SYS_PWR_REG		0x12C0
++#define EXYNOS3_EXT_REGULATOR_COREBLK_SYS_PWR_REG	0x12C4
++#define EXYNOS3_GPIO_MODE_SYS_PWR_REG			0x1300
++#define EXYNOS3_GPIO_MODE_MAUDIO_SYS_PWR_REG		0x1340
++#define EXYNOS3_TOP_ASB_RESET_SYS_PWR_REG		0x1344
++#define EXYNOS3_TOP_ASB_ISOLATION_SYS_PWR_REG		0x1348
++#define EXYNOS3_TOP_ASB_RESET_COREBLK_SYS_PWR_REG	0x1350
++#define EXYNOS3_TOP_ASB_ISOLATION_COREBLK_SYS_PWR_REG	0x1354
++#define EXYNOS3_CAM_SYS_PWR_REG				0x1380
++#define EXYNOS3_MFC_SYS_PWR_REG				0x1388
++#define EXYNOS3_G3D_SYS_PWR_REG				0x138C
++#define EXYNOS3_LCD0_SYS_PWR_REG			0x1390
++#define EXYNOS3_ISP_SYS_PWR_REG				0x1394
++#define EXYNOS3_MAUDIO_SYS_PWR_REG			0x1398
++#define EXYNOS3_DRAM_FREQ_DOWN_SYS_PWR_REG		0x13B0
++#define EXYNOS3_DDRPHY_DLLOFF_SYS_PWR_REG		0x13B4
++#define EXYNOS3_CMU_SYSCLK_ISP_SYS_PWR_REG		0x13B8
++#define EXYNOS3_LPDDR_PHY_DLL_LOCK_SYS_PWR_REG		0x13C0
++#define EXYNOS3_BPLL_SYSCLK_SYS_PWR_REG			0x13C4
++#define EXYNOS3_UPLL_SYSCLK_SYS_PWR_REG			0x13C8
++
++#define EXYNOS3_ARM_CORE0_OPTION			0x2008
++#define EXYNOS3_ARM_CORE_OPTION(_nr)	\
++			(EXYNOS3_ARM_CORE0_OPTION + ((_nr) * 0x80))
++
++#define EXYNOS3_ARM_COMMON_OPTION			0x2408
++#define EXYNOS3_TOP_PWR_OPTION				0x2C48
++#define EXYNOS3_CORE_TOP_PWR_OPTION			0x2CA8
++#define EXYNOS3_XUSBXTI_DURATION			0x341C
++#define EXYNOS3_XXTI_DURATION				0x343C
++#define EXYNOS3_EXT_REGULATOR_DURATION			0x361C
++#define EXYNOS3_EXT_REGULATOR_COREBLK_DURATION		0x363C
++#define XUSBXTI_DURATION				0x00000BB8
++#define XXTI_DURATION					XUSBXTI_DURATION
++#define EXT_REGULATOR_DURATION				0x00001D4C
++#define EXT_REGULATOR_COREBLK_DURATION			EXT_REGULATOR_DURATION
++
++/* for XXX_OPTION */
++#define EXYNOS3_OPTION_USE_SC_COUNTER			(1 << 0)
++#define EXYNOS3_OPTION_USE_SC_FEEDBACK			(1 << 1)
++#define EXYNOS3_OPTION_SKIP_DEACTIVATE_ACEACP_IN_PWDN	(1 << 7)
++
+ /* For EXYNOS5 */
+ 
+ #define EXYNOS5_AUTO_WDTRESET_DISABLE				0x0408
+-- 
+1.8.2.3
