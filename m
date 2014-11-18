@@ -1,99 +1,27 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 18 Nov 2014 12:07:13 +0100
-Subject: [PATCH v2] ARM: dts: sunxi: Update simplfb nodes so that u-boot can
- find them
-Message-ID: <1416308833-26739-1-git-send-email-hdegoede@redhat.com>
+Date: Tue, 18 Nov 2014 12:10:49 +0100
+Subject: [PATCH v3 0/2] dt-bindings: simplefb: Drop the advice about using a
+ specific path for nodes
+Message-ID: <1416309051-26784-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Review of the u-boot sunxi simplefb patches has led to the decision that
-u-boot should not use a specific path to find the nodes as this goes contrary
-to how devicetree usually works.
+Hi Tomi,
 
-Instead a platform specific compatible + properties should be used for this.
+So it turns out we needed a v3, as I mistakenly went with "sunxi," as vendor
+prefix for the allwinner specific properties, but the registered vendor prefix
+for allwinner is "allwinnner,", this version fixes this.
 
-The simplefb bindings have already been updated to reflect this, this patch
-brings the sunxi devicetree files in line with the new binding, and the
-actual u-boot implementation as it is going upstream.
+Changes in v3: Use proper "allwinnner," for the compatible string and vendor
+specific properties.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes in v2:
--Use proper allwinner, vendor prefix instead of sunxi,
--Rename compatible to allwinner,simple-framebuffer to make clear these are
- vendor extensions to the simple-framebuffer bindings
+Changes in v2: Changed the simplefb-sunxi bindings to use a single
+sunxi,pipeline string property instead of a sunxi,pipeline int and a
+sunxi,output string property.
 
-foo
----
- arch/arm/boot/dts/sun4i-a10.dtsi  | 5 +++--
- arch/arm/boot/dts/sun5i-a10s.dtsi | 5 +++--
- arch/arm/boot/dts/sun6i-a31.dtsi  | 5 +++--
- arch/arm/boot/dts/sun7i-a20.dtsi  | 5 +++--
- 4 files changed, 12 insertions(+), 8 deletions(-)
+This patch set is all acked up, and a fix to the binding changes you've
+already queued for 3.19, so please queue these 2 patches for 3.19.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 92d8aa6..7eae1bc 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -32,8 +32,9 @@
- 		#size-cells = <1>;
- 		ranges;
- 
--		framebuffer0-hdmi {
--			compatible = "simple-framebuffer";
-+		framebuffer at 0 {
-+			compatible = "allwinner,simple-framebuffer", "simple-framebuffer";
-+			allwinner,pipeline = "de_be0-lcd0-hdmi";
- 			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
- 				 <&ahb_gates 44>;
- 			status = "disabled";
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index c678e56..431343f 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -29,8 +29,9 @@
- 		#size-cells = <1>;
- 		ranges;
- 
--		framebuffer0-hdmi {
--			compatible = "simple-framebuffer";
-+		framebuffer at 0 {
-+			compatible = "allwinner,simple-framebuffer", "simple-framebuffer";
-+			allwinner,pipeline = "de_be0-lcd0-hdmi";
- 			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
- 				 <&ahb_gates 44>;
- 			status = "disabled";
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index ccc03f3..a01b215 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -67,8 +67,9 @@
- 		#size-cells = <1>;
- 		ranges;
- 
--		framebuffer0-hdmi {
--			compatible = "simple-framebuffer";
-+		framebuffer at 0 {
-+			compatible = "allwinner,simple-framebuffer", "simple-framebuffer";
-+			allwinner,pipeline = "de_be0-lcd0-hdmi";
- 			clocks = <&pll6>;
- 			status = "disabled";
- 		};
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 89766cb..d605182d 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -69,8 +69,9 @@
- 		#size-cells = <1>;
- 		ranges;
- 
--		framebuffer0-hdmi {
--			compatible = "simple-framebuffer";
-+		framebuffer at 0 {
-+			compatible = "allwinner,simple-framebuffer", "simple-framebuffer";
-+			allwinner,pipeline = "de_be0-lcd0-hdmi";
- 			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
- 				 <&ahb_gates 44>;
- 			status = "disabled";
--- 
-2.1.0
+Thanks & Regards,
+
+Hans
