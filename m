@@ -1,73 +1,154 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 18 Nov 2014 09:21:45 +0100
-Subject: [PATCH] ARM: dts: sunxi: Update simplfb nodes so that u-boot
- can find them
-In-Reply-To: <20141117155925.GV6414@lukather>
-References: <1416238816-29627-1-git-send-email-hdegoede@redhat.com>
- <20141117155925.GV6414@lukather>
-Message-ID: <546B0199.2050609@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 18 Nov 2014 09:21:51 +0100
+Subject: [RFC PATCHv2] ARM: mvebu: Let the device-tree determine smp_ops
+In-Reply-To: <546A9378.2080907@alliedtelesis.co.nz>
+References: <20141106201603.GF4974@lunn.ch>
+ <1415327626-16079-1-git-send-email-chris.packham@alliedtelesis.co.nz>
+ <20141117095640.03e25d17@free-electrons.com>
+ <alpine.DEB.2.10.1411181233160.902@chrisp-dl.ws.atlnz.lc>
+ <546A9378.2080907@alliedtelesis.co.nz>
+Message-ID: <20141118082151.GX6414@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 11/17/2014 04:59 PM, Maxime Ripard wrote:
-> Hi,
+On Tue, Nov 18, 2014 at 12:31:52AM +0000, Chris Packham wrote:
 > 
-> On Mon, Nov 17, 2014 at 04:40:16PM +0100, Hans de Goede wrote:
->> Review of the u-boot sunxi simplefb patches has led to the decision that
->> u-boot should not use a specific path to find the nodes as this goes contrary
->> to how devicetree usually works.
->>
->> Instead a platform specific compatible + properties should be used for this.
->>
->> The simplefb bindings have already been updated to reflect this, this patch
->> brings the sunxi devicetree files in line with the new binding, and the
->> actual u-boot implementation as it is going upstream.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>  arch/arm/boot/dts/sun4i-a10.dtsi  | 5 +++--
->>  arch/arm/boot/dts/sun5i-a10s.dtsi | 5 +++--
->>  arch/arm/boot/dts/sun6i-a31.dtsi  | 5 +++--
->>  arch/arm/boot/dts/sun7i-a20.dtsi  | 5 +++--
->>  4 files changed, 12 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
->> index 92d8aa6..bbc366f 100644
->> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
->> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
->> @@ -32,8 +32,9 @@
->>  		#size-cells = <1>;
->>  		ranges;
->>  
->> -		framebuffer0-hdmi {
->> -			compatible = "simple-framebuffer";
->> +		framebuffer at 0 {
->> +			compatible = "sunxi,framebuffer", "simple-framebuffer";
 > 
-> This compatible isn't following the
-> standard. allwinner,sunxi-framebuffer would be more appropriate.
+> On 11/18/2014 12:34 PM, Chris Packham wrote:
+> > Hi Thomas, Maxime
+> >
+> > On Mon, 17 Nov 2014, Thomas Petazzoni wrote:
+> >
+> >> Dear Chris Packham,
+> >>
+> >> On Fri,  7 Nov 2014 15:33:46 +1300, Chris Packham wrote:
+> >>> The machine specific SMP operations can be configured either via
+> >>> setup_arch or via arm_dt_init_cpu_maps. For the ARMADA_370_XP_DT devices
+> >>> both of these are called and setup_arch wins because it is called last.
+> >>> This means that it is not possible to substitute a different set of SMP
+> >>> operations via the device-tree.
+> >>>
+> >>> For the ARMADA_370_XP_DT compatible devices add a smp_init function that
+> >>> detects if the device tree has an enable-method defined. If it does
+> >>> return true to indicate that the smp_ops have already been set which
+> >>> will prevent setup_arch from overriding them.
+> >>>
+> >>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+> >>
+> >> My colleague Maxime Ripard (in Cc) rightfully suggests exploring a
+> >> different option: what about getting rid completely of the .smp field
+> >> of the DT_MACHINE structure, and instead have some code run early
+> >> enough that looks if an enable-method is defined, and if not, defines
+> >> it to the default value. This way, we continue to be backward
+> >> compatible in terms of DT, but we always use the enable-method from the
+> >> DT, and not sometimes from DT, sometimes from the DT_MACHINE structure.
+> >>
+> >> Unfortunately, it will have to be done on the flattened DT, because the
+> >> DT is unflattened right before the enable-method properties are looked
+> >> up:
+> >>
+> >>        unflatten_device_tree();
+> >>
+> >>        arm_dt_init_cpu_maps();
+> >>
+> >> And manipulating the DT in its flattened format, while possible in
+> >> ->dt_fixup(), is a pain, and probably doesn't allow adding new
+> >> properties anyway.
+> >>
+> >> So, in the end, maybe this idea doesn't work, I haven't checked
+> >> completely.
+> >>
+> >
+> > So yeah it's tricky to work with the flattened dt. Not impossible the
+> > powerpc arch code does quite a lot with it. Arm does less but still uses
+> > it in atags_to_fdt.c. Below is a rough attempt at an implementation that
+> > seems to work. Because of the flattened dt it's harder to iterate
+> > through the cpu nodes so I haven't implemented anything to look for an
+> > enable-method attached to them.
+> 
+> (I really need to figure out how to tell Thunderbird how to wrap some 
+> parts but not others)
+> 
+> >
+> > ---- 8< ----
+> > Subject: [PATCH] ARM: mvebu: use dt_fixup to provide fallback for
+> >   enable-method
+> >
+> > When the device tree doesn't define an enable-method insert a property
+> > into the flattened device tree. arm_dt_init_cpu_maps() will then parse
+> > this an set smp_ops appropriately. Now that we have this fallback it is
+> > no longer necessary to set .smp in the DT_MACHINE definition.
+> >
+> > Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+> > ---
+> >   arch/arm/mach-mvebu/Makefile   |  2 ++
+> >   arch/arm/mach-mvebu/board-v7.c | 23 ++++++++++++++++++++++-
+> >   2 files changed, 24 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+> > index 1636cdb..f818eaf 100644
+> > --- a/arch/arm/mach-mvebu/Makefile
+> > +++ b/arch/arm/mach-mvebu/Makefile
+> > @@ -14,3 +14,5 @@ endif
+> >
+> >   obj-$(CONFIG_MACH_DOVE)         += dove.o
+> >   obj-$(CONFIG_MACH_KIRKWOOD)     += kirkwood.o kirkwood-pm.o
+> > +
+> > +CFLAGS_board-v7.o = -I$(src)/../../../scripts/dtc/libfdt
+> > \ No newline at end of file
+> > diff --git a/arch/arm/mach-mvebu/board-v7.c
+> > b/arch/arm/mach-mvebu/board-v7.c
+> > index b2524d6..45851a2 100644
+> > --- a/arch/arm/mach-mvebu/board-v7.c
+> > +++ b/arch/arm/mach-mvebu/board-v7.c
+> > @@ -17,6 +17,8 @@
+> >   #include <linux/clk-provider.h>
+> >   #include <linux/of_address.h>
+> >   #include <linux/of_platform.h>
+> > +#include <linux/of_fdt.h>
+> > +#include <linux/libfdt.h>
+> >   #include <linux/io.h>
+> >   #include <linux/clocksource.h>
+> >   #include <linux/dma-mapping.h>
+> > @@ -184,6 +186,25 @@ static void __init mvebu_dt_init(void)
+> >       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> >   }
+> >
+> > +static void __init armada_370_xp_dt_fixup(void)
+> > +{
+> > +    void *prop;
+> > +    int offset;
+> > +    int len;
+> > +
+> > +    offset = fdt_path_offset(initial_boot_params, "/cpus");
+> > +    prop = fdt_getprop(initial_boot_params, offset, "enable-method",
+> > &len);
+> > +
+> > +    if (!prop) {
+> > +        pr_info("No enable-method defined. "
+> > +            "Falling back to \"marvell,armada-xp-smp\"\n");
+> > +
+> > +        fdt_appendprop(initial_boot_params, offset, "enable-method",
+> > +                   "marvell,armada-xp-smp",
+> > +                   sizeof("marvell,armada-xp-smp"));
+> 
+> Instead of inserting something into the device tree I could just call 
+> set_smp_ops here. That might be safer than trying to insert something 
+> into the device tree.
 
-Oh, good catch, I'll respin this patch set and the bindings documentation
-patches to change this.
+I don't think this is necessary. Injecting something in the DT is
+safe, u-boot does that at every boot :)
 
-> I must say I'm also a bit concerned that this whole binding thing is
-> not stabilizing while we are quite close from the end of the ARM merge
-> window.
+Maxime
 
-I understand, it was presumed to be stable when I posted the first set of dts
-patches, but then it turned out Ian had some concerns about how we had
-decided u-boot would find the prepopulated nodes. Ian and Grant and I discussed
-this on irc yesterday and came up with a solution we all like. Unfortunately
-we all missed the "sunxi," should be "allwinnner," thing. I'll go and fix that
-right away, and then these bindings should be 100% stable.
-
-> I wouldn't be very pleased to merge any more patch modifying again
-> this binding.
-
-Understood, and I do not expect there be any such patch.
-
-Regards,
-
-Hans
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141118/4161b5d3/attachment.sig>
