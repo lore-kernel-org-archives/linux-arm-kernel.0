@@ -1,23 +1,22 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 18 Nov 2014 14:28:24 +0000
-Subject: [PATCH v2 3/4] spi: meson: Add support for Amlogic Meson SPIFC
-In-Reply-To: <1416264471-774-4-git-send-email-b.galvani@gmail.com>
-References: <1416264471-774-1-git-send-email-b.galvani@gmail.com>
- <1416264471-774-4-git-send-email-b.galvani@gmail.com>
-Message-ID: <20141118142824.GJ22111@sirena.org.uk>
+From: francesco@dolcini.it (Francesco Dolcini)
+Date: Tue, 18 Nov 2014 15:25:20 +0100
+Subject: ARM: mvebu: ethernet packets corruption and I/O coherency
+Message-ID: <20141118142520.GD24819@dev0.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 11:47:50PM +0100, Beniamino Galvani wrote:
-> This is a driver for the Amlogic Meson SPIFC (SPI flash controller),
-> which is one of the two SPI controllers available on the SoC. It
-> doesn't support DMA and has a 64-byte unified transmit/receive buffer.
+Hi Thomas and all,
+I have seen your patches ("ARM: mvebu: no I/O coherency on non-SMP and
+related updates") regarding I/O coherency and I think it might be
+related to a problem I am experiencing.
 
-This is all good.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141118/8ff574f9/attachment.sig>
+I do have a custom board based on Marvell Armada 370 running kernel
+3.13.11 and I see random outgoing ethernet packet corruption (about 1
+packet every some million) using mvneta driver.
+
+I have tried linux kernel 3.17 without any improvement.
+
+What do you think? Can you backport the fix to 3.13 kernel?
+
+Regards,
+	Francesco
