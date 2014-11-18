@@ -1,44 +1,117 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Tue, 18 Nov 2014 11:13:18 +0200
-Subject: [PATCH 3/9] ARM: OMAP2+: remove cm-t3x touchscreen pdata quirk
+Date: Tue, 18 Nov 2014 11:13:23 +0200
+Subject: [PATCH 8/9] ARM: dts: sbc-t3x30: add audio support
 In-Reply-To: <1416302004-22199-1-git-send-email-lifshitz@compulab.co.il>
 References: <1416302004-22199-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1416302004-22199-4-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1416302004-22199-9-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove ADS7846 touchscreen pdata quirk for CM-T3x CoMs
+Add audio related DT nodes
 
 Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
 ---
- arch/arm/mach-omap2/pdata-quirks.c |    3 ---
- 1 files changed, 0 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/omap3-cm-t3x.dtsi   |   16 ++++++++++++++++
+ arch/arm/boot/dts/omap3-cm-t3x30.dtsi |   14 ++++++++++++++
+ arch/arm/boot/dts/omap3-sb-t35.dtsi   |   16 ++++++++++++++++
+ 3 files changed, 46 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index e72f0fc..02080c0 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -131,13 +131,11 @@ static void __init omap3_sbc_t3730_legacy_init(void)
- {
- 	omap3_sbc_t3x_usb_hub_init(167, "sb-t35 usb hub");
- 	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 136);
--	omap_ads7846_init(1, 57, 0, NULL);
- }
+diff --git a/arch/arm/boot/dts/omap3-cm-t3x.dtsi b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
+index 1a8262c..7e510e0 100644
+--- a/arch/arm/boot/dts/omap3-cm-t3x.dtsi
++++ b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
+@@ -148,6 +148,15 @@
+ 			OMAP3_CORE1_IOPAD(0x21ce, PIN_INPUT_PULLDOWN | MUX_MODE0) /* mcspi1_cs0 */
+ 		>;
+ 	};
++
++	mcbsp2_pins: pinmux_mcbsp2_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x213c, PIN_INPUT | MUX_MODE0)	/* mcbsp2_fsx */
++			OMAP3_CORE1_IOPAD(0x213e, PIN_INPUT | MUX_MODE0)	/* mcbsp2_clkx */
++			OMAP3_CORE1_IOPAD(0x2140, PIN_INPUT | MUX_MODE0)	/* mcbsp2_dr */
++			OMAP3_CORE1_IOPAD(0x2142, PIN_OUTPUT | MUX_MODE0)	/* mcbsp2_dx */
++		>;
++	};
+ };
  
- static void __init omap3_sbc_t3530_legacy_init(void)
- {
- 	omap3_sbc_t3x_usb_hub_init(167, "sb-t35 usb hub");
--	omap_ads7846_init(1, 57, 0, NULL);
- }
+ &uart3 {
+@@ -238,3 +247,10 @@
+ 		};
+ 	};
+ };
++
++&mcbsp2 {
++	status = "ok";
++
++	pinctrl-names = "default";
++	pinctrl-0 = <&mcbsp2_pins>;
++};
+diff --git a/arch/arm/boot/dts/omap3-cm-t3x30.dtsi b/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
+index 25ba083..bcd896f 100644
+--- a/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
++++ b/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
+@@ -10,6 +10,14 @@
+ 			cpu0-supply = <&vcc>;
+ 		};
+ 	};
++
++	sound {
++		compatible = "ti,omap-twl4030";
++		ti,model = "cm-t35";
++
++		ti,mcbsp = <&mcbsp2>;
++		ti,codec = <&twl_audio>;
++	};
+ };
  
- struct ti_st_plat_data wilink_pdata = {
-@@ -249,7 +247,6 @@ static void __init omap3_sbc_t3517_legacy_init(void)
- 	hsmmc2_internal_input_clk();
- 	omap3_sbc_t3517_wifi_init();
- 	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 145);
--	omap_ads7846_init(1, 57, 0, NULL);
- }
+ &omap3_pmx_core {
+@@ -59,6 +67,12 @@
+ 		reg = <0x48>;
+ 		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+ 		interrupt-parent = <&intc>;
++
++		twl_audio: audio {
++			compatible = "ti,twl4030-audio";
++			codec {
++			};
++		};
+ 	};
+ };
  
- static void __init am3517_evm_legacy_init(void)
+diff --git a/arch/arm/boot/dts/omap3-sb-t35.dtsi b/arch/arm/boot/dts/omap3-sb-t35.dtsi
+index aff733e..827f614 100644
+--- a/arch/arm/boot/dts/omap3-sb-t35.dtsi
++++ b/arch/arm/boot/dts/omap3-sb-t35.dtsi
+@@ -43,6 +43,16 @@
+ 			};
+ 		};
+ 	};
++
++	audio_amp: audio_amp {
++		compatible = "regulator-fixed";
++		regulator-name = "audio_amp";
++		pinctrl-names = "default";
++		pinctrl-0 = <&sb_t35_audio_amp>;
++		gpio = <&gpio2 29 GPIO_ACTIVE_LOW>;   /* gpio_61 */
++		enable-active-low;
++		regulator-always-on;
++	};
+ };
+ 
+ &omap3_pmx_core {
+@@ -65,6 +75,12 @@
+ 			OMAP3_CORE1_IOPAD(0x21c4, PIN_INPUT_PULLUP | MUX_MODE0) /* i2c3_sda */
+ 		>;
+ 	};
++
++	sb_t35_audio_amp: pinmux_sb_t35_audio_amp {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x20c8, PIN_OUTPUT | MUX_MODE4) /* gpmc_nbe1.gpio_61 */
++		>;
++	};
+ };
+ 
+ &i2c3 {
 -- 
 1.7.5.4
