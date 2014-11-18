@@ -1,50 +1,38 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 18 Nov 2014 21:45:49 +0800
-Subject: [PATCH v5 01/18] ARM64: Move the init of cpu_logical_map(0) before
- unflatten_device_tree()
-In-Reply-To: <1413553034-20956-2-git-send-email-hanjun.guo@linaro.org>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <1413553034-20956-2-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <546B4D8D.2020605@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 18 Nov 2014 14:46:18 +0100
+Subject: [PATCH 2/7] mfd: MT6397: Add regmap for MT8135 and MT6397 SoC
+In-Reply-To: <20141118114645.GX24004@x1>
+References: <1416210027-5562-1-git-send-email-flora.fu@mediatek.com>
+ <1416210027-5562-3-git-send-email-flora.fu@mediatek.com>
+ <20141118114645.GX24004@x1>
+Message-ID: <20141118134618.GF30369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+On Tue, Nov 18, 2014 at 11:46:45AM +0000, Lee Jones wrote:
+> On Mon, 17 Nov 2014, Flora Fu wrote:
+> 
+> > Add PMIC wrapper of MT8135 to access MFD MT6397.
+> > This is regmap of MT6397 MFD.
+> > 
+> > Signed-off-by: Flora Fu <flora.fu@mediatek.com>
+> > ---
+> >  drivers/mfd/Kconfig            |   8 +
+> >  drivers/mfd/Makefile           |   1 +
+> >  drivers/mfd/mt8135-pmic-wrap.c | 847 +++++++++++++++++++++++++++++++++++++++++
+> 
+> All of the PMIC functionality needs removing from MFD and placed
+> somewhere else.  I suggest either drivers/power or drivers/regulator.
 
-On 2014?10?17? 21:36, Hanjun Guo wrote:
-> It always make sense to initialize CPU0's logical map entry from the
-> hardware values, so move the initialization of cpu_logical_map(0)
-> before unflatten_device_tree() which is needed by ACPI code later.
->
-> Acked-by: Olof Johansson <olof@lixom.net>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+This is no PMIC functionality. The MT8135 has a unit which is is used to
+access the PMIC (which is not only a PMIC, but also Touchscreen
+interface and other stuff). This unit is called pmic-wrapper in the
+docs. See the introductory mail for a nice picture.
 
-Could you merge this patch first in 3.19? It was acked by Olof and
-Mark, and it will make sense without ACPI too.
+Sascha
 
-Thanks
-Hanjun
-
-> ---
->   arch/arm64/kernel/setup.c |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index edb146d..8f33f72 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -393,11 +393,11 @@ void __init setup_arch(char **cmdline_p)
->
->   	efi_idmap_init();
->
-> +	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
->   	unflatten_device_tree();
->
->   	psci_init();
->
-> -	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
->   	cpu_read_bootcpu_ops();
->   #ifdef CONFIG_SMP
->   	smp_init_cpus();
->
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
