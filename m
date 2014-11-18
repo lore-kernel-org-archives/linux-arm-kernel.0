@@ -1,49 +1,45 @@
-From: fkan@apm.com (Feng Kan)
-Date: Tue, 18 Nov 2014 13:11:47 -0800
-Subject: [PATCH v2 2/2] [usb] add support for ACPI identification to
- xhci-platform
-In-Reply-To: <546BAD34.8040206@redhat.com>
-References: <1414692989-23128-2-git-send-email-mlangsdo@redhat.com>
- <1415119833-9135-1-git-send-email-mlangsdo@redhat.com>
- <1415119833-9135-2-git-send-email-mlangsdo@redhat.com>
- <20141104171220.GA30385@kroah.com> <5464FA19.6030609@redhat.com>
- <CAL85gmDr14EHK+7-ojx5vxvc0ykUsTGxku4LWS=w8TFEh3Bw9w@mail.gmail.com>
- <546BAD34.8040206@redhat.com>
-Message-ID: <CAL85gmAx366bsUa2LQihXQ921LKL6RDTrAai7iFMwo48OShLYw@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 19 Nov 2014 08:14:38 +1100
+Subject: [PATCH] ARM: vfp: Silence mvfr0 unused variable warning
+In-Reply-To: <1416344191-20484-1-git-send-email-sboyd@codeaurora.org>
+References: <1416344191-20484-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20141119081438.3df66238@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 12:33 PM, Mark Langsdorf <mlangsdo@redhat.com> wrote:
-> On 11/18/2014 02:05 PM, Feng Kan wrote:
->>
->> On Thu, Nov 13, 2014 at 10:36 AM, Mark Langsdorf <mlangsdo@redhat.com>
->> wrote:
->>>
->>> On 11/04/2014 11:12 AM, Greg KH wrote:
->>>>
->>>>
->>>> On Tue, Nov 04, 2014 at 10:50:33AM -0600, Mark Langsdorf wrote:
->>>
->>>
->>>    #endif
->>>>>
->>>>>
->>>>>
->>>>> +#ifdef CONFIG_ACPI
->>>>> +static const struct acpi_device_id usb_xhci_acpi_match[] = {
->>>>> +       /* APM X-Gene USB Controller */
->>>>> +       { "PNP0D10", },
->>
->>
->> Mark, would it be better to use PRP0001 instead as in this patch?
->> https://lkml.org/lkml/2014/9/16/230
+Hi Stephen,
+
+On Tue, 18 Nov 2014 12:56:31 -0800 Stephen Boyd <sboyd@codeaurora.org> wrote:
 >
->
-> Quoting Arnd,
->
-> "In this case, the device does have an official ACPI ID "PNP0D10",
-> so we should use that for compatibility with other operating
-> systems and with BIOS versions that provide the standard IDs."
->
-Yes, thanks. I missed that part, sorry for the spam then.
-> --Mark Langsdorf
+> Stephen Rothwell reports that commit 3f4c9f8f0a20 ("ARM: 8197/1:
+> vfp: Fix VFPv3 hwcap detection on CPUID based cpus") introduced an
+> unused variable warning.
+> 
+> arch/arm/vfp/vfpmodule.c: In function 'vfp_init':
+> arch/arm/vfp/vfpmodule.c:725:6: warning: unused variable 'mvfr0'
+> [-Wunused-variable]
+>   u32 mvfr0;
+> 
+> Silence this warning by using IS_ENABLED instead of ifdefs.
+> 
+> Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+
+Looks good (though I haven't tested it).  One small nit below:
+
+> +		if (IS_ENABLED(CONFIG_VFPv3)) {
+> +			mvfr0 = fmrx(MVFR0);
+
+Now that you have a block here, you could move the declaration of mvfr0
+into this block, right?
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141119/6805172a/attachment-0001.sig>
