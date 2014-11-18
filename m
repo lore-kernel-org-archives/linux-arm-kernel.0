@@ -1,34 +1,34 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 18 Nov 2014 12:07:08 -0600
-Subject: [PATCH 10/10] arm: boot: dts: imx6qdl-tx6: switch over to new
- edt-ft5x06 compatible
+Date: Tue, 18 Nov 2014 12:07:03 -0600
+Subject: [PATCH 05/10] arm: omap: omap2plus_defconfig: enable ECAP and EHRPWM
 In-Reply-To: <1416334028-7766-1-git-send-email-balbi@ti.com>
 References: <1416334028-7766-1-git-send-email-balbi@ti.com>
-Message-ID: <1416334028-7766-10-git-send-email-balbi@ti.com>
+Message-ID: <1416334028-7766-5-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-now that we have the new vendor-less edt-ft5x06
-i2c_device_id, we can use it
+Many of AM335x and AM437x hook backlight to
+one of these two devices. By enabling their
+drivers we make sure pwm-backlight can do
+its thing.
 
-Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/boot/dts/imx6qdl-tx6.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/configs/omap2plus_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-index f02b80b..5ecf3bf 100644
---- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-@@ -267,7 +267,7 @@
- 	};
- 
- 	polytouch: edt-ft5x06 at 38 {
--		compatible = "edt,edt-ft5x06";
-+		compatible = "edt-ft5x06";
- 		reg = <0x38>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_edt_ft5x06>;
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index 3837a3e..9be67b7 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -401,6 +401,8 @@ CONFIG_DMA_OMAP=y
+ CONFIG_EXTCON=y
+ CONFIG_EXTCON_PALMAS=y
+ CONFIG_PWM=y
++CONFIG_PWM_TIECAP=y
++CONFIG_PWM_TIEHRPWM=y
+ CONFIG_PWM_TWL=y
+ CONFIG_PWM_TWL_LED=y
+ CONFIG_OMAP_USB2=y
 -- 
 2.1.0.GIT
