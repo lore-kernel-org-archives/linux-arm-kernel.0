@@ -1,75 +1,197 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 17 Nov 2014 16:54:59 -0800
-Subject: [PATCHv5 1/7] arm64: Treat handle_arch_irq as a function pointer
+Date: Mon, 17 Nov 2014 16:55:04 -0800
+Subject: [PATCHv5 6/7] arm64: use fixmap for text patching when text is RO
 In-Reply-To: <1416272105-14787-1-git-send-email-lauraa@codeaurora.org>
 References: <1416272105-14787-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1416272105-14787-2-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1416272105-14787-7-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-handle_arch_irq isn't actually text, it's just a function pointer.
-It doesn't need to be stored in the text section and doing so
-causes problesm if we ever want to make the kernel text read only.
-Declare handle_arch_irq as a proper function pointer stored in
-the data section.
+When kernel text is marked as read only, it cannot be modified directly.
+Use a fixmap to modify the text instead in a similar manner to
+x86 and arm.
 
 Reviewed-by: Kees Cook <keescook@chromium.org>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
- arch/arm64/include/asm/irq.h | 1 -
- arch/arm64/kernel/entry.S    | 6 ++----
- arch/arm64/kernel/irq.c      | 2 ++
- 3 files changed, 4 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/fixmap.h |  1 +
+ arch/arm64/include/asm/insn.h   |  2 ++
+ arch/arm64/kernel/insn.c        | 72 +++++++++++++++++++++++++++++++++++++++--
+ arch/arm64/kernel/jump_label.c  |  2 +-
+ 4 files changed, 73 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-index e1f7ecd..1eebf5b 100644
---- a/arch/arm64/include/asm/irq.h
-+++ b/arch/arm64/include/asm/irq.h
-@@ -3,7 +3,6 @@
+diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+index db26a2f2..2cd4b0d 100644
+--- a/arch/arm64/include/asm/fixmap.h
++++ b/arch/arm64/include/asm/fixmap.h
+@@ -48,6 +48,7 @@ enum fixed_addresses {
  
- #include <asm-generic/irq.h>
+ 	FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
+ 	FIX_BTMAP_BEGIN = FIX_BTMAP_END + TOTAL_FIX_BTMAPS - 1,
++	FIX_TEXT_POKE0,
+ 	__end_of_fixed_addresses
+ };
  
--extern void (*handle_arch_irq)(struct pt_regs *);
- extern void migrate_irqs(void);
- extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index 56a9e63..f66853b 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -282,6 +282,7 @@ bool aarch64_insn_is_nop(u32 insn);
  
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 726b910..ee27f39 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -168,7 +168,8 @@ tsk	.req	x28		// current thread_info
-  * Interrupt handling.
-  */
- 	.macro	irq_handler
--	ldr	x1, handle_arch_irq
-+	adrp	x1, handle_arch_irq
-+	ldr	x1, [x1, #:lo12:handle_arch_irq]
- 	mov	x0, sp
- 	blr	x1
- 	.endm
-@@ -695,6 +696,3 @@ ENTRY(sys_rt_sigreturn_wrapper)
- 	mov	x0, sp
- 	b	sys_rt_sigreturn
- ENDPROC(sys_rt_sigreturn_wrapper)
--
--ENTRY(handle_arch_irq)
--	.quad	0
-diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-index 071a6ec..240b75c 100644
---- a/arch/arm64/kernel/irq.c
-+++ b/arch/arm64/kernel/irq.c
-@@ -40,6 +40,8 @@ int arch_show_interrupts(struct seq_file *p, int prec)
- 	return 0;
+ int aarch64_insn_read(void *addr, u32 *insnp);
+ int aarch64_insn_write(void *addr, u32 insn);
++int aarch64_insn_write_early(void *addr, u32 insn);
+ enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
+ u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+ 				  u32 insn, u64 imm);
+@@ -352,6 +353,7 @@ u32 aarch64_insn_gen_logical_shifted_reg(enum aarch64_insn_register dst,
+ bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+ 
+ int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
++int __aarch64_insn_patch_text_nosync(void *addr, u32 insn, bool early);
+ int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
+ int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
+ #endif /* __ASSEMBLY__ */
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index 8cd27fe..b2cad38 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -19,12 +19,15 @@
+ #include <linux/bitops.h>
+ #include <linux/compiler.h>
+ #include <linux/kernel.h>
++#include <linux/mm.h>
+ #include <linux/smp.h>
++#include <linux/spinlock.h>
+ #include <linux/stop_machine.h>
+ #include <linux/uaccess.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/debug-monitors.h>
++#include <asm/fixmap.h>
+ #include <asm/insn.h>
+ 
+ #define AARCH64_INSN_SF_BIT	BIT(31)
+@@ -72,6 +75,36 @@ bool __kprobes aarch64_insn_is_nop(u32 insn)
+ 	}
  }
  
-+void (*handle_arch_irq)(struct pt_regs *) = NULL;
++static DEFINE_SPINLOCK(patch_lock);
 +
- void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
++static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
++{
++	unsigned long uintaddr = (uintptr_t) addr;
++	bool module = !core_kernel_text(uintaddr);
++	struct page *page;
++
++	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
++		page = vmalloc_to_page(addr);
++	else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
++		page = virt_to_page(addr);
++	else
++		return addr;
++
++	if (flags)
++		spin_lock_irqsave(&patch_lock, *flags);
++
++	set_fixmap(fixmap, page_to_phys(page));
++
++	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
++}
++
++static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
++{
++	clear_fixmap(fixmap);
++
++	if (flags)
++		spin_unlock_irqrestore(&patch_lock, *flags);
++}
+ /*
+  * In ARMv8-A, A64 instructions have a fixed length of 32 bits and are always
+  * little-endian.
+@@ -88,10 +121,34 @@ int __kprobes aarch64_insn_read(void *addr, u32 *insnp)
+ 	return ret;
+ }
+ 
++static int __kprobes __aarch64_insn_write(void *addr, u32 insn, bool patch)
++{
++	void *waddr = addr;
++	unsigned long flags;
++	int ret;
++
++	if (patch)
++		waddr = patch_map(addr, FIX_TEXT_POKE0, &flags);
++
++	ret = probe_kernel_write(waddr, &insn, AARCH64_INSN_SIZE);
++
++	if (waddr != addr)
++		patch_unmap(FIX_TEXT_POKE0, &flags);
++
++	return ret;
++}
++
+ int __kprobes aarch64_insn_write(void *addr, u32 insn)
  {
- 	if (handle_arch_irq)
+ 	insn = cpu_to_le32(insn);
+-	return probe_kernel_write(addr, &insn, AARCH64_INSN_SIZE);
++	return __aarch64_insn_write(addr, insn, true);
++}
++
++int __kprobes aarch64_insn_write_early(void *addr, u32 insn)
++{
++	insn = cpu_to_le32(insn);
++	return __aarch64_insn_write(addr, insn, false);
++
+ }
+ 
+ static bool __kprobes __aarch64_insn_hotpatch_safe(u32 insn)
+@@ -124,7 +181,7 @@ bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
+ 	       __aarch64_insn_hotpatch_safe(new_insn);
+ }
+ 
+-int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
++int __kprobes __aarch64_insn_patch_text_nosync(void *addr, u32 insn, bool early)
+ {
+ 	u32 *tp = addr;
+ 	int ret;
+@@ -133,7 +190,11 @@ int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
+ 	if ((uintptr_t)tp & 0x3)
+ 		return -EINVAL;
+ 
+-	ret = aarch64_insn_write(tp, insn);
++	if (early)
++		ret = aarch64_insn_write_early(tp, insn);
++	else
++		ret = aarch64_insn_write(tp, insn);
++
+ 	if (ret == 0)
+ 		flush_icache_range((uintptr_t)tp,
+ 				   (uintptr_t)tp + AARCH64_INSN_SIZE);
+@@ -141,6 +202,11 @@ int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
+ 	return ret;
+ }
+ 
++int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
++{
++	return __aarch64_insn_patch_text_nosync(addr, insn, false);
++}
++
+ struct aarch64_insn_patch {
+ 	void		**text_addrs;
+ 	u32		*new_insns;
+diff --git a/arch/arm64/kernel/jump_label.c b/arch/arm64/kernel/jump_label.c
+index 263a166..9ac30bb 100644
+--- a/arch/arm64/kernel/jump_label.c
++++ b/arch/arm64/kernel/jump_label.c
+@@ -38,7 +38,7 @@ static void __arch_jump_label_transform(struct jump_entry *entry,
+ 	}
+ 
+ 	if (is_static)
+-		aarch64_insn_patch_text_nosync(addr, insn);
++		__aarch64_insn_patch_text_nosync(addr, insn, true);
+ 	else
+ 		aarch64_insn_patch_text(&addr, &insn, 1);
+ }
 -- 
 Qualcomm Innovation Center, Inc.
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
