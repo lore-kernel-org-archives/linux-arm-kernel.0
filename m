@@ -1,88 +1,21 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 18 Nov 2014 17:53:36 +0000
-Subject: [PATCH 00/10] Save MSI chip in pci_sys_data
-In-Reply-To: <alpine.DEB.2.11.1411172138191.3909@nanos> (Thomas Gleixner's
- message of "Mon, 17 Nov 2014 21:02:46 +0000")
-References: <1414396127-30023-1-git-send-email-wangyijing@huawei.com>
- <20141112042359.GK28161@google.com> <20141117025914.GC4280@google.com>
- <alpine.DEB.2.11.1411171035270.3909@nanos>
- <CAErSpo46d0OJbO6tuDUXb2q7+00BUuHzJdsCr+aOhY4we+zn=w@mail.gmail.com>
- <alpine.DEB.2.11.1411172138191.3909@nanos>
-Message-ID: <87tx1wcs4f.fsf@approximate.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 18 Nov 2014 18:04:19 +0000
+Subject: [PATCH RFC 2/3] ARM: enable TTBR0/TTBR1 split in short mode
+In-Reply-To: <20141118165319.9958.67009.stgit@buzz>
+References: <20141118165313.9958.1242.stgit@buzz>
+ <20141118165319.9958.67009.stgit@buzz>
+Message-ID: <20141118180418.GN28279@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17 2014 at  9:02:46 pm GMT, Thomas Gleixner <tglx@linutronix.de> wrote:
-> On Mon, 17 Nov 2014, Bjorn Helgaas wrote:
->> On Mon, Nov 17, 2014 at 2:38 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
->> > The simplest way to dead with it is that I pull in pci/msi (assuming
->> > that it contains only the above) and base the rest of it on top, so I
->> > can deal with the resulting conflicts. So you still can keep that in
->> > your pile and no matter who sends the pull request first everything
->> > will just fall in place.
->>
->> In addition to the ("Save MSI chip in pci_sys_data") series, my
->> pci/msi branch contains these:
->>
->>   f83386942702 s390/MSI: Use __msi_mask_irq() instead of default_msi_mask_irq()
->>   03f56e42d03e Revert "PCI: Add x86_msi.msi_mask_irq() and msix_mask_irq()"
->>   38737d82f9f0 PCI/MSI: Add pci_msi_ignore_mask to prevent writes to
->> MSI/MSI-X Mask Bits
->>
->> but I don't think it will hurt if you pull in those as well.
->
-> They are blessed by you, so I don't worry :)
->
->> The bigger problem might be the first patch of the "Save MSI chip in
->> pci_sys_data", which renames "struct msi_chip" to "struct
->> msi_controller".  I asked Yijing to do that because I didn't think
->> "_chip" really conveyed any information.  I didn't know we were going
->> to have quite this many MSI-related patches to fix up.
->
-> Not a big deal at all. I pulled your branch and fixed up the pending
-> mess on top of it. Not a really big deal.
->
->> So I'll just leave my pci/msi branch as-is for now.  If the rename is
->> too painful, let me know and I'll drop the branch and we can rework
->> the rest of the "Save MSI chip in pci_sys_data" series to match.
->
-> No, not a problem at all. If I can carry your branch and it is
-> immutable then I think we are fine.
->
-> The changes we have stashed on top of this which touch linux/msi.h and
-> pci/msi.c are at the end of this mail. But most of this is
-> selfcontained and wont hurt anything which does not enable the
-> required config options. The diffstat is:
->
->  drivers/pci/msi.c   |  334 +++++++++++++++++++++++++++++++++++++++++-----------
->  include/linux/msi.h |  158 +++++++++++++++++++++++-
->  2 files changed, 422 insertions(+), 70 deletions(-)
->
-> Looks large, but it provides common infrastructure which allows ARM64
-> to implement MSI support w/o any of the gazillion weak arch
-> callbacks. Jiangs x86 work distangles the convoluted mess we have with
-> irq remapping etc. and we can have non PCI based MSI interrupts as a
-> bonus.
->
-> So I'm pretty happy with the outcome now. The stacked irqdomains
-> really worked out well so far. I don't think that the pci/msi.c side
-> will see much updates on that in the next weeks. Though based on that
-> we'll try to get rid of the whole weak arch_xxx in the long run, but
-> that's a different issue and nothing we need to worry about now.
->
-> I'm going to push out the current state of affairs soon and will ask
-> all involved folks to have a look on that. If I don't hear someone
-> crying murder I'm going to make the branch immutable and push it into
-> next so that ARM and x86 can follow up with their stuff which depends
-> on that whole endavour.
+On Tue, Nov 18, 2014 at 03:53:19PM +0000, Konstantin Khlebnikov wrote:
+> This feature was partially implemented long time ago. All cpus load
+> swapper_pg_dir into TTBR1 since commit d427958a46af24f75d0017c45eadd172273bbf33
+> ("ARM: 6942/1: mm: make TTBR1 always point to swapper_pg_dir on ARMv6/7").
+> But TTBRx split is never been enabled in TTBCR.
 
-I rebased my ITS series on top of this, and gave it a good
-shake. Nothing fell out, so I'm inclined to say it is perfect.
+I recall there is an erratum on Cortex-A9 around the use of TTBR1 and at
+the time that stopped me from pushing such change.
 
-I'll post the updated series for everyone's enjoyment...
-
-Thanks for having put all that together!
-
-	M.
 -- 
-Jazz is not dead. It just smells funny.
+Catalin
