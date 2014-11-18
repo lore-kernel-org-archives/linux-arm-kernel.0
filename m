@@ -1,107 +1,88 @@
-From: tthayer@opensource.altera.com (Thor Thayer)
-Date: Tue, 18 Nov 2014 14:56:26 -0600
-Subject: [RESEND PATCHv5 5/5] arm: dts: Add Altera L2 Cache and OCRAM EDAC
-In-Reply-To: <1415751263-1830-6-git-send-email-tthayer@opensource.altera.com>
-References: <1415751263-1830-1-git-send-email-tthayer@opensource.altera.com>
- <1415751263-1830-6-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <546BB27A.20405@opensource.altera.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 18 Nov 2014 12:56:31 -0800
+Subject: [PATCH] ARM: vfp: Silence mvfr0 unused variable warning
+Message-ID: <1416344191-20484-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Stephen Rothwell reports that commit 3f4c9f8f0a20 ("ARM: 8197/1:
+vfp: Fix VFPv3 hwcap detection on CPUID based cpus") introduced an
+unused variable warning.
 
-On 11/11/2014 06:14 PM, tthayer at opensource.altera.com wrote:
-> From: Thor Thayer<tthayer@opensource.altera.com>
->
-> Adding the device tree entries and bindings needed to support
-> the Altera L2 cache and On-Chip RAM EDAC. This patch relies upon
-> an earlier patch to declare and setup On-chip RAM properly.
-> http://www.spinics.net/lists/devicetree/msg51117.html
+arch/arm/vfp/vfpmodule.c: In function 'vfp_init':
+arch/arm/vfp/vfpmodule.c:725:6: warning: unused variable 'mvfr0'
+[-Wunused-variable]
+  u32 mvfr0;
 
-Any comments on these devicetree additions?
+Silence this warning by using IS_ENABLED instead of ifdefs.
 
-Thanks,
-Thor
-> Signed-off-by: Thor Thayer<tthayer@opensource.altera.com>
-> ---
-> v2: Remove OCRAM declaration and reference prior patch.
->
-> v3-5: No Change
-> ---
->   .../bindings/arm/altera/socfpga-l2-edac.txt        |   15 +++++++++++++++
->   .../bindings/arm/altera/socfpga-ocram-edac.txt     |   16 ++++++++++++++++
->   arch/arm/boot/dts/socfpga.dtsi                     |   15 ++++++++++++++-
->   3 files changed, 45 insertions(+), 1 deletion(-)
->   create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt
->   create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt
->
-> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt
-> new file mode 100644
-> index 0000000..35b19e3
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt
-> @@ -0,0 +1,15 @@
-> +Altera SoCFPGA L2 cache Error Detection and Correction [EDAC]
-> +
-> +Required Properties:
-> +- compatible : Should be "altr,l2-edac"
-> +- reg : Address and size for ECC error interrupt clear registers.
-> +- interrupts : Should be single bit error interrupt, then double bit error
-> +	interrupt. Note the rising edge type.
-> +
-> +Example:
-> +
-> +	l2edac at ffd08140 {
-> +		compatible = "altr,l2-edac";
-> +		reg = <0xffd08140 0x4>;
-> +		interrupts = <0 36 1>, <0 37 1>;
-> +	};
-> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt
-> new file mode 100644
-> index 0000000..31ab205
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt
-> @@ -0,0 +1,16 @@
-> +Altera SoCFPGA On-Chip RAM Error Detection and Correction [EDAC]
-> +
-> +OCRAM ECC Required Properties:
-> +- compatible : Should be "altr,ocram-edac"
-> +- reg : Address and size for ECC error interrupt clear registers.
-> +- iram : phandle to On-Chip RAM definition.
-> +- interrupts : Should be single bit error interrupt, then double bit error
-> +	interrupt. Note the rising edge type.
-> +
-> +Example:
-> +	ocramedac at ffd08144 {
-> +		compatible = "altr,ocram-edac";
-> +		reg = <0xffd08144 0x4>;
-> +		iram = <&ocram>;
-> +		interrupts = <0 178 1>, <0 179 1>;
-> +	};
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index 6af96ed..32c63a3 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -618,8 +618,21 @@
->   			interrupts = <0 39 4>;
->   		};
->   
-> +		l2edac at ffd08140 {
-> +			compatible = "altr,l2-edac";
-> +			reg = <0xffd08140 0x4>;
-> +			interrupts = <0 36 1>, <0 37 1>;
-> +		};
-> +
-> +		ocramedac at ffd08144 {
-> +			compatible = "altr,ocram-edac";
-> +			reg = <0xffd08144 0x4>;
-> +			iram = <&ocram>;
-> +			interrupts = <0 178 1>, <0 179 1>;
-> +		};
-> +
->   		L2: l2-cache at fffef000 {
-> -			compatible = "arm,pl310-cache";
-> +			compatible = "arm,pl310-cache", "syscon";
->   			reg = <0xfffef000 0x1000>;
->   			interrupts = <0 38 0x04>;
->   			cache-unified;
+Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+
+If you apply and use git show -b you can see that most of the diff
+is indentation.
+
+ arch/arm/vfp/vfpmodule.c | 44 ++++++++++++++++++++++----------------------
+ 1 file changed, 22 insertions(+), 22 deletions(-)
+
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index 5002d002f6e3..216cd78f64aa 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -752,30 +752,30 @@ static int __init vfp_init(void)
+ 		 * precision floating point operations. Only check
+ 		 * for NEON if the hardware has the MVFR registers.
+ 		 */
+-#ifdef CONFIG_NEON
+-		if ((fmrx(MVFR1) & 0x000fff00) == 0x00011100)
++		if (IS_ENABLED(CONFIG_NEON) &&
++		   (fmrx(MVFR1) & 0x000fff00) == 0x00011100)
+ 			elf_hwcap |= HWCAP_NEON;
+-#endif
+-#ifdef CONFIG_VFPv3
+-		mvfr0 = fmrx(MVFR0);
+-		if (((mvfr0 & MVFR0_DP_MASK) >> MVFR0_DP_BIT) == 0x2 ||
+-		    ((mvfr0 & MVFR0_SP_MASK) >> MVFR0_SP_BIT) == 0x2) {
+-			elf_hwcap |= HWCAP_VFPv3;
+-			/*
+-			 * Check for VFPv3 D16 and VFPv4 D16.  CPUs in
+-			 * this configuration only have 16 x 64bit
+-			 * registers.
+-			 */
+-			if ((mvfr0 & MVFR0_A_SIMD_MASK) == 1)
+-				/* also v4-D16 */
+-				elf_hwcap |= HWCAP_VFPv3D16;
+-			else
+-				elf_hwcap |= HWCAP_VFPD32;
+-		}
+ 
+-		if ((fmrx(MVFR1) & 0xf0000000) == 0x10000000)
+-			elf_hwcap |= HWCAP_VFPv4;
+-#endif
++		if (IS_ENABLED(CONFIG_VFPv3)) {
++			mvfr0 = fmrx(MVFR0);
++			if (((mvfr0 & MVFR0_DP_MASK) >> MVFR0_DP_BIT) == 0x2 ||
++			    ((mvfr0 & MVFR0_SP_MASK) >> MVFR0_SP_BIT) == 0x2) {
++				elf_hwcap |= HWCAP_VFPv3;
++				/*
++				 * Check for VFPv3 D16 and VFPv4 D16.  CPUs in
++				 * this configuration only have 16 x 64bit
++				 * registers.
++				 */
++				if ((mvfr0 & MVFR0_A_SIMD_MASK) == 1)
++					/* also v4-D16 */
++					elf_hwcap |= HWCAP_VFPv3D16;
++				else
++					elf_hwcap |= HWCAP_VFPD32;
++			}
++
++			if ((fmrx(MVFR1) & 0xf0000000) == 0x10000000)
++				elf_hwcap |= HWCAP_VFPv4;
++		}
+ 	/* Extract the architecture version on pre-cpuid scheme */
+ 	} else {
+ 		if (vfpsid & FPSID_NODOUBLE) {
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
