@@ -1,91 +1,48 @@
-From: Andrew.Jackson@arm.com (Andrew Jackson)
-Date: Tue, 18 Nov 2014 17:41:26 +0000
-Subject: [PATCH] drm: i2c: tda998x: Retry fetching the EDID if it fails first
- time.
-Message-ID: <546B84C6.3090809@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 18 Nov 2014 17:43:11 +0000
+Subject: [RFC/PATCH] ARM: Expose cpuid registers to userspace
+In-Reply-To: <1414459152-32425-1-git-send-email-sboyd@codeaurora.org>
+References: <1414459152-32425-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20141118174310.GM28279@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fetching the EDID from a connected monitor is an automated thing
-with NXP TDA19988. But on some boards the fetching fails for the
-first time silently without any indication that an error has occured.
-More than that, subsequent fetches of the EDID succeed until the
-monitor(s) are unplugged.
+Stephen,
 
-Add a function to validate the read EDID and retry if the block
-retrieved is not valid.
+On Tue, Oct 28, 2014 at 01:19:12AM +0000, Stephen Boyd wrote:
+> Exporting all the different possible configurations of CPUID
+> registers to userspace via hwcaps is going to explode the hwcaps.
+> Emulate userspace cpuid register accesses and export a new
+> "cpuid" hwcap instead so that userspace can know to try to
+> read the cpuid registers itself.
 
-Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
----
- drivers/gpu/drm/i2c/tda998x_drv.c |   36 ++++++++++++++++++++++++++++--------
- 1 files changed, 28 insertions(+), 8 deletions(-)
+Since there is a parallel thread with the musl guys around CPU feature
+detection, I thought I would reply to your patch as well (I missed it
+when it first posted as I was on holiday).
 
-diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index d476279..025adc0 100644
---- a/drivers/gpu/drm/i2c/tda998x_drv.c
-+++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -1066,11 +1066,36 @@ static int read_edid_block(struct tda998x_priv *priv, uint8_t *buf, int blk)
- 	return 0;
- }
- 
-+static int
-+read_validate_edid_block(struct tda998x_priv *priv, uint8_t *buf, int blk)
-+{
-+	bool print_bad_edid = drm_debug & DRM_UT_KMS;
-+	int ret;
-+	int retries = 1;
-+
-+	do
-+	{
-+		bool print_bad = print_bad_edid && (retries == 0);
-+
-+		ret = read_edid_block(priv, buf, blk);
-+		/* Fail on I2C error */
-+		if (ret)
-+			break;
-+
-+		/* But retry checksum errored blocks */
-+		if (drm_edid_block_valid(buf, blk, print_bad))
-+			break;
-+		else
-+			ret = -EINVAL;
-+	} while (retries-- > 0);
-+
-+	return ret;
-+}
-+
- static uint8_t *do_get_edid(struct tda998x_priv *priv)
- {
- 	int j, valid_extensions = 0;
- 	uint8_t *block, *new;
--	bool print_bad_edid = drm_debug & DRM_UT_KMS;
- 
- 	if ((block = kmalloc(EDID_LENGTH, GFP_KERNEL)) == NULL)
- 		return NULL;
-@@ -1079,10 +1104,7 @@ static uint8_t *do_get_edid(struct tda998x_priv *priv)
- 		reg_clear(priv, REG_TX4, TX4_PD_RAM);
- 
- 	/* base block fetch */
--	if (read_edid_block(priv, block, 0))
--		goto fail;
--
--	if (!drm_edid_block_valid(block, 0, print_bad_edid))
-+	if (read_validate_edid_block(priv, block, 0))
- 		goto fail;
- 
- 	/* if there's no extensions, we're done */
-@@ -1096,10 +1118,8 @@ static uint8_t *do_get_edid(struct tda998x_priv *priv)
- 
- 	for (j = 1; j <= block[0x7e]; j++) {
- 		uint8_t *ext_block = block + (valid_extensions + 1) * EDID_LENGTH;
--		if (read_edid_block(priv, ext_block, j))
--			goto fail;
- 
--		if (!drm_edid_block_valid(ext_block, j, print_bad_edid))
-+		if (read_validate_edid_block(priv, ext_block, j))
- 			goto fail;
- 
- 		valid_extensions++;
+First of all, not all the features are relevant to user space, so we
+need to make sure the hwcap bits explosion is actually real. If it is
+real (I personally doubt it), we should only expose those fields which
+are relevant to user space - ID_ISAR*, part of ID_PFR*.
+
+The second issue is that you don't want to expose features which the
+kernel does not support (e.g. Neon disabled, crypto would also not be
+supported; debug/PMU is another example). So masking or downgrading bit
+fields is necessary.
+
+Thirdly, there are reserved bits in the CPUID registers which we don't
+want to expose. What if you run an older kernel on a newer hardware
+which actually has something to those bits but the kernel doesn't
+support them?
+
+Fourthly, there is an auxiliary feature register (ID_AFR0) which is
+implementation defined. I'm not sure what user space could do with this.
+It needs to be read in combination with MIDR to make any sense but even
+though you can't tell before whether the kernel should expose such
+information to users.
+
+And lastly, there are big.LITTLE systems, so the kernel needs to provide
+a common set of features.
+
 -- 
-1.7.1
+Catalin
