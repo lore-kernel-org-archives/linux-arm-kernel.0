@@ -1,39 +1,68 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 18 Nov 2014 10:38:47 -0800
-Subject: [PATCH 06/10] input: touchscreen: edt-ft5x06: fix driver
- autoprobing
-In-Reply-To: <1416334028-7766-6-git-send-email-balbi@ti.com>
-References: <1416334028-7766-1-git-send-email-balbi@ti.com>
- <1416334028-7766-6-git-send-email-balbi@ti.com>
-Message-ID: <20141118183847.GE3003@dtor-ws>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 18 Nov 2014 18:52:55 +0000
+Subject: [PATCH v2 00/13] arm64: PCI/MSI: GICv3 ITS support (stacked domain
+ edition)
+Message-ID: <1416336788-22634-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+The GICv3 architecture provides a way to implement support for
+MSI/MSI-X using a specific block called the ITS (Interrupt Translation
+Service).
 
-On Tue, Nov 18, 2014 at 12:07:04PM -0600, Felipe Balbi wrote:
-> i2c devices match against struct i2c_device_id
-> even for CONFIG_OF case, so adding a struct of_device_id
-> doesn't change anything. As a result, currently, edt-ft5x06
-> will not autoprobe if built as a module.
+The ITS can be accurately described as "page tables for
+interrupts". If you think this sounds scary, you're spot on. It uses a
+set of opaque memory tables that are manipulated through commands
+(software almost never touches the tables directly). In order to make
+it slightly easier to digest, the code has been split into (mostly)
+logical units.
 
-Why doe snot it autoprobe? We properly declare MODULE_DEVICE_TABLE for
-OF, is it because we are missing some data in device uevent?
+To make things more fun, this relies on Jiang Liu's stacked domain
+patch series as now merged in tip/irq/irqdomain:
 
-> 
-> To fix the issue and still maintain backwards compatibility
-> with all DTS files currently in tree, we're just moving
-> all ids from of_device_id to i2c_device_id while also
-> adding the following specific ids which should be used
-> from now on:
-> 
-> 	{ "edt-ft5206", 0, }
-> 	{ "edt-ft5306", 0, }
-> 	{ "edt-ft5406", 0, }
+- patch 1 imports the new asm-generic/msi.h file into arch/arm64
+- patches 2 to 13 are the bulk of the ITS driver.
 
-Is this a tee-wide change? Link to the discussion?
+This has been tested on arm64 with an FVP model, and is based on
+3.18-rc4 + tip/irq/irqdomain + a number of arm64-specific PCI
+patches. The whole thing is available at:
 
-Thanks.
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/stacked-its-v2
+
+	M.
+
+>From v1 [1]:
+- rebased on top of tip/irq/irqdomain
+- dropped the arm64-specific implementation of arch_setup_msi_irqs and co.
+- reworked the whole ITS/MSI setup to use the new MSI/PCI split
+
+[1]: http://lwn.net/Articles/619788/
+
+Marc Zyngier (13):
+  arm64: PCI/MSI: Use asm-generic/msi.h
+  irqchip: GICv3: Convert to domain hierarchy
+  irqchip: GICv3: rework redistributor structure
+  irqchip: GICv3: ITS command queue
+  irqchip: GICv3: ITS: irqchip implementation
+  irqchip: GICv3: ITS: LPI allocator
+  irqchip: GICv3: ITS: tables allocators
+  irqchip: GICv3: ITS: device allocation and configuration
+  irqchip: GICv3: ITS: MSI support
+  irqchip: GICv3: ITS: DT probing and initialization
+  irqchip: GICv3: ITS: plug ITS init into main GICv3 code
+  irqchip: GICv3: ITS: enable compilation of the ITS driver
+  irqchip: GICv3: Binding updates for ITS
+
+ Documentation/devicetree/bindings/arm/gic-v3.txt |   39 +
+ arch/arm64/Kconfig                               |    1 +
+ arch/arm64/include/asm/Kbuild                    |    1 +
+ drivers/irqchip/Kconfig                          |    5 +
+ drivers/irqchip/Makefile                         |    1 +
+ drivers/irqchip/irq-gic-v3-its.c                 | 1406 ++++++++++++++++++++++
+ drivers/irqchip/irq-gic-v3.c                     |  156 ++-
+ include/linux/irqchip/arm-gic-v3.h               |  128 ++
+ 8 files changed, 1697 insertions(+), 40 deletions(-)
+ create mode 100644 drivers/irqchip/irq-gic-v3-its.c
 
 -- 
-Dmitry
+2.1.3
