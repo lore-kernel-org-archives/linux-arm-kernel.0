@@ -1,197 +1,78 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Tue, 18 Nov 2014 09:50:03 -0500
-Subject: [PATCH v3 3/5] arm64: Add kernel return probes support(kretprobes)
-In-Reply-To: <1416292375-29560-4-git-send-email-dave.long@linaro.org>
-References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
- <1416292375-29560-4-git-send-email-dave.long@linaro.org>
-Message-ID: <546B5C9B.5040101@redhat.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 18 Nov 2014 09:49:09 -0600
+Subject: [PATCH V2 3/5] usb: gadget: pxa25x_udc: prepare/unprepare clocks
+ in pxa-ssp
+In-Reply-To: <CALT56yMCJ4R6KN2BUW61YaUz2bb6s_aJteKYBSVmvRPKacKCLw@mail.gmail.com>
+References: <1416236863-20898-1-git-send-email-dbaryshkov@gmail.com>
+ <1416236863-20898-3-git-send-email-dbaryshkov@gmail.com>
+ <878uj98y5v.fsf@free.fr>
+ <CALT56yMCJ4R6KN2BUW61YaUz2bb6s_aJteKYBSVmvRPKacKCLw@mail.gmail.com>
+Message-ID: <20141118154909.GG8223@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2014 01:32 AM, David Long wrote:
-> From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+On Tue, Nov 18, 2014 at 12:05:45AM +0400, Dmitry Eremin-Solenikov wrote:
+> Hello,
 > 
-> AArch64 ISA does not instructions to pop PC register value
-> from stack(like ARM v7 has ldmia {...,pc}) without using
-> one of the general purpose registers. This means return probes
-> cannot return to the actual return address directly without
-> modifying register context, and without trapping into debug exception.
+> 2014-11-17 21:44 GMT+03:00 Robert Jarzmik <robert.jarzmik@free.fr>:
+> > Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
+> >
+> >> Change clk_enable/disable() calls to clk_prepare_enable() and
+> >> clk_disable_unprepare().
+> >>
+> >> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> >> ---
+> >>  drivers/usb/gadget/udc/pxa25x_udc.c | 8 ++++----
+> >>  1 file changed, 4 insertions(+), 4 deletions(-)
+> >>
+> >> diff --git a/drivers/usb/gadget/udc/pxa25x_udc.c b/drivers/usb/gadget/udc/pxa25x_udc.c
+> >> index 42f7eeb..e4964ee 100644
+> >> --- a/drivers/usb/gadget/udc/pxa25x_udc.c
+> >> +++ b/drivers/usb/gadget/udc/pxa25x_udc.c
+> >> @@ -103,8 +103,8 @@ static const char ep0name [] = "ep0";
+> >>
+> >>  /* IXP doesn't yet support <linux/clk.h> */
+> >>  #define clk_get(dev,name)    NULL
+> >> -#define clk_enable(clk)              do { } while (0)
+> >> -#define clk_disable(clk)     do { } while (0)
+> >> +#define clk_prepare_enable(clk)      do { } while (0)
+> >> +#define clk_disable_unprepare(clk)   do { } while (0)
+> >>  #define clk_put(clk)         do { } while (0)
+> >>
+> >>  #endif
+> >> @@ -932,7 +932,7 @@ static int pullup(struct pxa25x_udc *udc)
+> >>               if (!udc->active) {
+> >>                       udc->active = 1;
+> >>                       /* Enable clock for USB device */
+> >> -                     clk_enable(udc->clk);
+> >> +                     clk_prepare_enable(udc->clk);
+> >
+> > Guess what, Russell's remark on i2c and serial made me cross-check.  And there
+> > is a case where this will be called in irq context too ...
+> >
+> > See :
+> > -> do_IRQ
+> >   -> lubbock_vbus_irq()
+> >     -> pxa25x_udc_vbus_session()
+> >       -> pullup()
+> >         -> clk_prepare_enable()
+> >           -> CRACK
+> >
+> > Note that your patch is not really the faulty one, I think a threaded irq
+> > instead of the "raw" irq should do the trick. And it is granted on UDC api that
+> > vbus function is called in a "sleeping" context (Felipe correct me if I'm
+> > wrong), so a patch to fix this before your current code would be fine.
 
-The first might read better with something like:
+Well, from the framework point of view, ->pullup() is only called
+outside of IRQ context. But I see you're calling it from vbus_irq(), so
+you brought this upon yourself :-)
 
-Unlike the ARMv7 (ldmia {...,pc}) the AArch64 ISA cannot directly pop the PC register value from the stack without using one of the general purpose registers.
-
--Will
-> 
-> So like many other architectures, we prepare a global routine
-> with NOPs, which serve as trampoline to hack away the
-> function return address, by placing an extra kprobe on the
-> trampoline entry.
-> 
-> The pre-handler of this special trampoline' kprobe execute return
-> probe handler functions and restore original return address in ELR_EL1,
-> this way, saved pt_regs still hold the original register context to be
-> carried back to the probed kernel function.
-> 
-> Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
-> Signed-off-by: David A. Long <dave.long@linaro.org>
-> ---
->  arch/arm64/Kconfig               |   1 +
->  arch/arm64/include/asm/kprobes.h |   1 +
->  arch/arm64/kernel/kprobes.c      | 114 ++++++++++++++++++++++++++++++++++++++-
->  3 files changed, 115 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 256ef90..02f31b7 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -61,6 +61,7 @@ config ARM64
->  	select HAVE_RCU_TABLE_FREE
->  	select HAVE_SYSCALL_TRACEPOINTS
->  	select HAVE_KPROBES if !XIP_KERNEL
-> +	select HAVE_KRETPROBES if HAVE_KPROBES
->  	select IRQ_DOMAIN
->  	select MODULES_USE_ELF_RELA
->  	select NO_BOOTMEM
-> diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
-> index b35d3b9..a2de3b8 100644
-> --- a/arch/arm64/include/asm/kprobes.h
-> +++ b/arch/arm64/include/asm/kprobes.h
-> @@ -56,5 +56,6 @@ void arch_remove_kprobe(struct kprobe *);
->  int kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr);
->  int kprobe_exceptions_notify(struct notifier_block *self,
->  			     unsigned long val, void *data);
-> +void kretprobe_trampoline(void);
->  
->  #endif /* _ARM_KPROBES_H */
-> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
-> index 789ab61..be7c330 100644
-> --- a/arch/arm64/kernel/kprobes.c
-> +++ b/arch/arm64/kernel/kprobes.c
-> @@ -569,6 +569,117 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
->  	return 0;
->  }
->  
-> +/*
-> + * Kretprobes: kernel return probes handling
-> + *
-> + * AArch64 mode does not support popping the PC value from the
-> + * stack like on ARM 32-bit (ldmia {..,pc}), so atleast one
-> + * register need to be used to achieve branching/return.
-> + * It means return probes cannot return back to the original
-> + * return address directly without modifying the register context.
-> + *
-> + * So like other architectures, we prepare a global routine
-> + * with NOPs, which serve as trampoline address that hack away the
-> + * function return, with the exact register context.
-> + * Placing a kprobe on trampoline routine entry will trap again to
-> + * execute return probe handlers and restore original return address
-> + * in ELR_EL1, this way saved pt_regs still hold the original
-> + * register values to be carried back to the caller.
-> + */
-> +static void __used kretprobe_trampoline_holder(void)
-> +{
-> +	asm volatile (".global kretprobe_trampoline\n"
-> +			"kretprobe_trampoline:\n"
-> +			"NOP\n\t"
-> +			"NOP\n\t");
-> +}
-> +
-> +static int __kprobes
-> +trampoline_probe_handler(struct kprobe *p, struct pt_regs *regs)
-> +{
-> +	struct kretprobe_instance *ri = NULL;
-> +	struct hlist_head *head, empty_rp;
-> +	struct hlist_node *tmp;
-> +	unsigned long flags, orig_ret_addr = 0;
-> +	unsigned long trampoline_address =
-> +		(unsigned long)&kretprobe_trampoline;
-> +
-> +	INIT_HLIST_HEAD(&empty_rp);
-> +	kretprobe_hash_lock(current, &head, &flags);
-> +
-> +	/*
-> +	 * It is possible to have multiple instances associated with a given
-> +	 * task either because multiple functions in the call path have
-> +	 * a return probe installed on them, and/or more than one return
-> +	 * probe was registered for a target function.
-> +	 *
-> +	 * We can handle this because:
-> +	 *     - instances are always inserted at the head of the list
-> +	 *     - when multiple return probes are registered for the same
-> +	 *       function, the first instance's ret_addr will point to the
-> +	 *       real return address, and all the rest will point to
-> +	 *       kretprobe_trampoline
-> +	 */
-> +	hlist_for_each_entry_safe(ri, tmp, head, hlist) {
-> +		if (ri->task != current)
-> +			/* another task is sharing our hash bucket */
-> +			continue;
-> +
-> +		if (ri->rp && ri->rp->handler) {
-> +			__this_cpu_write(current_kprobe, &ri->rp->kp);
-> +			get_kprobe_ctlblk()->kprobe_status = KPROBE_HIT_ACTIVE;
-> +			ri->rp->handler(ri, regs);
-> +			__this_cpu_write(current_kprobe, NULL);
-> +		}
-> +
-> +		orig_ret_addr = (unsigned long)ri->ret_addr;
-> +		recycle_rp_inst(ri, &empty_rp);
-> +
-> +		if (orig_ret_addr != trampoline_address)
-> +			/*
-> +			 * This is the real return address. Any other
-> +			 * instances associated with this task are for
-> +			 * other calls deeper on the call stack
-> +			 */
-> +			break;
-> +	}
-> +
-> +	kretprobe_assert(ri, orig_ret_addr, trampoline_address);
-> +	/* restore the original return address */
-> +	instruction_pointer(regs) = orig_ret_addr;
-> +	reset_current_kprobe();
-> +	kretprobe_hash_unlock(current, &flags);
-> +
-> +	hlist_for_each_entry_safe(ri, tmp, &empty_rp, hlist) {
-> +		hlist_del(&ri->hlist);
-> +		kfree(ri);
-> +	}
-> +
-> +	kprobes_restore_local_irqflag(regs);
-> +
-> +	/* return 1 so that post handlers not called */
-> +	return 1;
-> +}
-> +
-> +void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
-> +				      struct pt_regs *regs)
-> +{
-> +	ri->ret_addr = (kprobe_opcode_t *)regs->regs[30];
-> +
-> +	/* replace return addr (x30) with trampoline */
-> +	regs->regs[30] = (long)&kretprobe_trampoline;
-> +}
-> +
-> +static struct kprobe trampoline = {
-> +	.addr = (kprobe_opcode_t *) &kretprobe_trampoline,
-> +	.pre_handler = trampoline_probe_handler
-> +};
-> +
-> +int __kprobes arch_trampoline_kprobe(struct kprobe *p)
-> +{
-> +	return p->addr == (kprobe_opcode_t *) &kretprobe_trampoline;
-> +}
-> +
->  /* Break Handler hook */
->  static struct break_hook kprobes_break_hook = {
->  	.esr_mask = BRK64_ESR_MASK,
-> @@ -586,5 +697,6 @@ int __init arch_init_kprobes(void)
->  	register_break_hook(&kprobes_break_hook);
->  	register_step_hook(&kprobes_step_hook);
->  
-> -	return 0;
-> +	/* register trampoline for kret probe */
-> +	return register_kprobe(&trampoline);
->  }
-> 
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141118/34b182a1/attachment.sig>
