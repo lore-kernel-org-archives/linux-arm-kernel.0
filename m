@@ -1,20 +1,26 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 18 Nov 2014 16:41:48 +0100
-Subject: [PATCH] clk: rockchip: fix parent clock for rk3188 hclk_lcdc1
-In-Reply-To: <1416309043-29069-1-git-send-email-julien.chauveau@neo-technologies.fr>
-References: <1416309043-29069-1-git-send-email-julien.chauveau@neo-technologies.fr>
-Message-ID: <3112886.9YHa130KKH@diego>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 18 Nov 2014 21:08:29 +0530
+Subject: [PATCH] davinci: Use standard logging styles
+In-Reply-To: <1414803111.13647.13.camel@perches.com>
+References: <1414803111.13647.13.camel@perches.com>
+Message-ID: <546B67F5.20108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
-
-Am Dienstag, 18. November 2014, 12:10:43 schrieb Julien CHAUVEAU:
-> The parent clock for hclk_lcdc1 was set to aclk_cpu instead of hclk_cpu.
+On Saturday 01 November 2014 06:21 AM, Joe Perches wrote:
+> Convert printks to pr_<level> and pr_warning to pr_warn.
 > 
-> Signed-off-by: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
+> Other miscellanea:
+> 
+> o Coalesce formats
+> o Realign arguments
+> o Use %s, __func__ instead of embedded function names
+> o Add pr_fmt to mityomapl138 and mux
+> 
+> Signed-off-by: Joe Perches <joe@perches.com>
 
-thanks for catching this. I've applied it to my clk branch for 3.19
+Sending to ARM-SoC for v3.19. Prefixed subject line with ARM: as is the
+convention.
 
-
-Heiko
+Thanks,
+Sekhar
