@@ -1,65 +1,61 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Tue, 18 Nov 2014 10:31:04 +0530
-Subject: [PATCH] ARM: dts: DRA7: Add node for RTC
-In-Reply-To: <546A1E5E.1040909@cogentembedded.com>
-References: <1416199509-3977-1-git-send-email-lokeshvutla@ti.com>
- <5469E76A.7020105@cogentembedded.com> <5469F271.9080102@ti.com>
- <546A1E5E.1040909@cogentembedded.com>
-Message-ID: <546AD290.8080303@ti.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Tue, 18 Nov 2014 13:08:38 +0800
+Subject: [Patch V3 0/9] Refine generic/PCI MSI irqodmian interfaces
+In-Reply-To: <alpine.DEB.2.11.1411180133130.3909@nanos>
+References: <1416222202-28002-1-git-send-email-jiang.liu@linux.intel.com>
+ <alpine.DEB.2.11.1411180133130.3909@nanos>
+Message-ID: <546AD456.3030000@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On Monday 17 November 2014 09:42 PM, Sergei Shtylyov wrote:
-> On 11/17/2014 4:04 PM, Lokesh Vutla wrote:
+On 2014/11/18 8:59, Thomas Gleixner wrote:
+> On Mon, 17 Nov 2014, Jiang Liu wrote:
+>> This patch set is based on tip/irq/irqdomain and tries to refine
+>> interfaces to support irqdomain for generic MSI and PCI MSI.
 > 
->>> On 11/17/2014 7:45 AM, Lokesh Vutla wrote:
+> So to make progress on that matter I picked that up along with a few
+> other patches which affect the core code (more stacked irq callbacks
+> and Marcs workaround for the handler assignment issue).
 > 
->>>> Add node for RTC.
+> I rebased the whole lot on Bjorns pci/msi branch as discussed in this
+> thread: https://lkml.org/lkml/2014/11/16/292
 > 
->>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->>>> [nm at ti.com: update with rtc crossbar number]
->>>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>>> ---
->>>>    arch/arm/boot/dts/dra7.dtsi | 9 +++++++++
->>>>    1 file changed, 9 insertions(+)
+> After that I spent quite some time to reorder and fold back patches so
+> we have no obvious wreckage, but at the same time preserve at least
+> some of the development process for this.
 > 
->>>> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
->>>> index 9cc9843..f98f9f0 100644
->>>> --- a/arch/arm/boot/dts/dra7.dtsi
->>>> +++ b/arch/arm/boot/dts/dra7.dtsi
->>>> @@ -1075,6 +1075,15 @@
->>>>                status = "disabled";
->>>>            };
->>>>
->>>> +        rtc: rtcss at 48838000 {
-> 
->>>     Please just name the node "rtc at 48838000", in accordance with ePAPR.
-> 
->> Okay. will update it.
-> 
->>>> +            compatible = "ti,am3352-rtc";
->>>> +            reg = <0x48838000 0x100>;
->>>> +            interrupts = <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>,
->>>> +                     <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>;
-> 
->>>     2 similar interrupts?
-> 
->> both rtc timer and rtc alarm uses same interrupt on DRA7 Soc.
->> Driver handles it accordingly.
->> So passing the same interrupt.
-> 
->    I think it would have been better if the driver just handled a single interrupt.
-There are certain SoCs with RTC IP where timer and alarm uses different interrupts.
-Driver has to take care of that scenario also. So it expects two interrupts from dt. 
+> Finally I added docbook comments where missing (please provide them
+> next time yourself).
+Sure, need improvements on docs.
 
-Thanks and regards,
-Lokesh 
 > 
->> Thanks and regards,
->> Lokesh
+> Marc ran an initial smoketest on an early iteration which did not fall
+> into bits and pieces right away.
 > 
->>> [...]
+> The only major change is that I got rid of the ugly
 > 
-> WBR, Sergei
+> #ifndef msi_alloc_info_t
 > 
+> trickery by moving the generic version into include/asm-generic/msi.h
+> 
+> So if you want to use the generic version, you need to create your
+> arch/xxx/include/asm/msi.h file which includes asm-generic/msi.h.
+> 
+> For the ones who want to override it, create
+> arch/xxx/include/asm/msi.h, include whatever it takes and provide the
+> proper typedef.
+Two issues are solved by adding new header files, a good technique to
+improve code quality:)
+
+> 
+> I'll send that patch (7bde31a7969f) out tomorrow morning as I want to
+> have Arnds blessing for that.
+> 
+<snip>
+> I really rely on your cooperation here, as I don't want to end up with
+> an unexplainable mess when the stuff hits Linus tree and he starts
+> rumaging for his diving harpune ....
+I have rebased x86 changes onto tip/irq/irqdomain, it works perfectly:)
+
+Regards!
+Gerry
