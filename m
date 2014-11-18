@@ -1,32 +1,41 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 18 Nov 2014 09:51:15 +0900
-Subject: [PATCH 4/4] ARM: shmobile: kzm9g-reference: Use keyboard as gpio-keys
- node name
-In-Reply-To: <cover.1416271777.git.horms+renesas@verge.net.au>
-References: <cover.1416271777.git.horms+renesas@verge.net.au>
-Message-ID: <61f1fb47bdbcf145dd539d29cfa7f3294bd5e958.1416271777.git.horms+renesas@verge.net.au>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Mon, 17 Nov 2014 16:55:00 -0800
+Subject: [PATCHv5 2/7] arm64: Switch to adrp for loading the stub vectors
+In-Reply-To: <1416272105-14787-1-git-send-email-lauraa@codeaurora.org>
+References: <1416272105-14787-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1416272105-14787-3-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This appears to be the best match for ePAPR.
+The hyp stub vectors are currently loaded using adr. This
+instruction has a +/- 1MB range for the loading address. If
+the alignment for sections is changed the address may be more
+than 1MB away, resulting in reclocation errors. Switch to using
+adrp for getting the address to ensure we aren't affected by the
+location of the __hyp_stub_vectors.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/kernel/head.S | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index 8c913d9..3721cd4 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -113,7 +113,7 @@
- 		};
- 	};
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 0a6e4f9..10f5cc0 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -331,7 +331,8 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
+ 	msr	vttbr_el2, xzr
  
--	gpio-keys {
-+	keyboard {
- 		compatible = "gpio-keys";
+ 	/* Hypervisor stub */
+-	adr	x0, __hyp_stub_vectors
++	adrp	x0, __hyp_stub_vectors
++	add	x0, x0, #:lo12:__hyp_stub_vectors
+ 	msr	vbar_el2, x0
  
- 		back-key {
+ 	/* spsr */
 -- 
-2.1.1
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
