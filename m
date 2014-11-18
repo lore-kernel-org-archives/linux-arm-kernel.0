@@ -1,41 +1,50 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 17 Nov 2014 16:55:00 -0800
-Subject: [PATCHv5 2/7] arm64: Switch to adrp for loading the stub vectors
-In-Reply-To: <1416272105-14787-1-git-send-email-lauraa@codeaurora.org>
-References: <1416272105-14787-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1416272105-14787-3-git-send-email-lauraa@codeaurora.org>
+Date: Mon, 17 Nov 2014 16:54:58 -0800
+Subject: [PATCHv5 0/7] Better page protections for arm64
+Message-ID: <1416272105-14787-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The hyp stub vectors are currently loaded using adr. This
-instruction has a +/- 1MB range for the loading address. If
-the alignment for sections is changed the address may be more
-than 1MB away, resulting in reclocation errors. Switch to using
-adrp for getting the address to ensure we aren't affected by the
-location of the __hyp_stub_vectors.
+Hi,
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm64/kernel/head.S | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+This is v5 of the series to add stricter page protections for arm64.
+The goal is to have text be RO/NX and everything else be RW/NX.
+I finally got my hands on a Juno board so I was able to do more
+testing with both 4K and 64K pages although I still haven't tested
+with EFI. This is based off of 3.18-rc5.
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 0a6e4f9..10f5cc0 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -331,7 +331,8 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
- 	msr	vttbr_el2, xzr
- 
- 	/* Hypervisor stub */
--	adr	x0, __hyp_stub_vectors
-+	adrp	x0, __hyp_stub_vectors
-+	add	x0, x0, #:lo12:__hyp_stub_vectors
- 	msr	vbar_el2, x0
- 
- 	/* spsr */
+Thanks,
+Laura
+
+Laura Abbott (7):
+  arm64: Treat handle_arch_irq as a function pointer
+  arm64: Switch to adrp for loading the stub vectors
+  arm64: Move cpu_resume into the text section
+  arm64: Move some head.text functions to executable section
+  arm64: Factor out fixmap initialiation from ioremap
+  arm64: use fixmap for text patching when text is RO
+  arm64: add better page protections to arm64
+
+ arch/arm64/Kconfig.debug            |  23 ++
+ arch/arm64/include/asm/cacheflush.h |   4 +
+ arch/arm64/include/asm/fixmap.h     |   8 +-
+ arch/arm64/include/asm/insn.h       |   2 +
+ arch/arm64/include/asm/irq.h        |   1 -
+ arch/arm64/kernel/entry.S           |   6 +-
+ arch/arm64/kernel/head.S            | 409 +++++++++++++++++-----------------
+ arch/arm64/kernel/insn.c            |  72 +++++-
+ arch/arm64/kernel/irq.c             |   2 +
+ arch/arm64/kernel/jump_label.c      |   2 +-
+ arch/arm64/kernel/setup.c           |   1 +
+ arch/arm64/kernel/sleep.S           |  29 +--
+ arch/arm64/kernel/suspend.c         |   4 +-
+ arch/arm64/kernel/vmlinux.lds.S     |  21 ++
+ arch/arm64/mm/init.c                |   1 +
+ arch/arm64/mm/ioremap.c             |  93 +-------
+ arch/arm64/mm/mm.h                  |   2 +
+ arch/arm64/mm/mmu.c                 | 429 ++++++++++++++++++++++++++++++++----
+ 18 files changed, 743 insertions(+), 366 deletions(-)
+
 -- 
 Qualcomm Innovation Center, Inc.
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
