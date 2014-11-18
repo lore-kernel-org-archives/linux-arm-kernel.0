@@ -1,36 +1,63 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 18 Nov 2014 11:12:05 +0100
-Subject: ARM: shmobile: ARCH_R8A7793?
-In-Reply-To: <CAMuHMdUFZo+r-N0Ofa1d6PHDtB6dqZfChpLgOz_XtruWD3_a3g@mail.gmail.com>
-References: <1416302641.7024.7.camel@x220>
- <CAMuHMdUFZo+r-N0Ofa1d6PHDtB6dqZfChpLgOz_XtruWD3_a3g@mail.gmail.com>
-Message-ID: <1416305525.7024.15.camel@x220>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Tue, 18 Nov 2014 11:17:10 +0100
+Subject: [Linaro-acpi] [RFC PATCH 4/4] arm64, acpi,
+ pci: Provide arch-specific calls for PCI host bridge dirver (PNP0A03).
+In-Reply-To: <2009440.GJsvyI3SUN@wuerfel>
+References: <1415366876-30811-1-git-send-email-tomasz.nowicki@linaro.org>
+ <4474363.kMvYSLl2Ev@wuerfel> <54660D44.9020406@linaro.org>
+ <2009440.GJsvyI3SUN@wuerfel>
+Message-ID: <546B1CA6.1030300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-11-18 at 10:36 +0100, Geert Uytterhoeven wrote:
-> On Tue, Nov 18, 2014 at 10:24 AM, Paul Bolle <pebolle@tiscali.nl> wrote:
-> > Your commit 7a2071c58f36 ("ARM: shmobile: Add early debugging support
-> > using SCIF(A)") is included in today's linux-next (ie, next-20141118).
-> > It adds an (optional) dependency on the Kconfig symbol ARCH_R8A7793. But
-> > that symbol isn't part of next-20141118.
-> >
-> > Is a patch that adds this symbol queued somewhere?
-> 
-> Not yet. I was just a bit pro-active ;-)
+On 14.11.2014 15:53, Arnd Bergmann wrote:
+> On Friday 14 November 2014 15:10:12 Tomasz Nowicki wrote:
+>> On 07.11.2014 15:24, Arnd Bergmann wrote:
+>>> On Friday 07 November 2014 14:27:56 Tomasz Nowicki wrote:
+>>>>
+>>>>    #ifdef CONFIG_PCI
+>>>> +struct pci_controller {
+>>>> +	struct acpi_device *companion;
+>>>> +	int segment;
+>>>> +	int node;		/* nearest node with memory or NUMA_NO_NODE for global allocation */
+>>>> +};
+>>>> +
+>>>> +#define PCI_CONTROLLER(busdev) ((struct pci_controller *) busdev->sysdata)
+>>>> +
+>>>
+>>> Don't use busdev->sysdata in architecture specific code, it belongs to the
+>>> host bridge driver with the new model. For ACPI you don't have a host bridge
+>>> driver, but it's better to keep these separate.
+>>>
+>>> The segment is always the same as the domain number, so just use that.
+>>> The node and companion members here can get added to struct pci_host_bridge.
+>>
+>> The reason why I put segment field to struct pci_controller is to
+>> initialize domain_nr of struct pci_bus being in pci_create_root_bus(),
+>> domain_nr can be used later on though. Correct me I am wrong.
+>>
+>> Honestly I do not see the way to create root bus without e.g.
+>> sysdata.segment here.
+>
+> See the patches that Liviu and Lorenzo have been posting recently. This
+> should be straightforward in 3.19.
 
-My script will stay silent (as might future, proper, bots) if you don't
-add references to Kconfig symbols before adding the symbol itself.
-(Whether or not it's worth it to remove this dependency here and add it
-to the queue that adds this symbol is up to you, I guess.)
+Hi Arnd,
 
-Unless the symbol takes a long time to land I'll try not to bother you
-again.
+I have been looking into patch (if that what you meant) :
+[RFC PATCH v2] drivers: pci: move PCI domain assignment to generic PCI code
 
-> However, there are already references to r8a7793 in DT binding documentation,
-> and in of_device_id arrays in drivers.
+This is not enough for me since it gets domain number from its OF parent 
+or just uses sequential increased domain number. In my case, I do not 
+have parent so I need to get segment from ACPI node which is not 
+available there.
 
-I see.
+On the other hand, patch set posted by Wang Yijing:
+[RFC PATCH 00/16] Refine PCI host bridge scan interfaces
+tends to solve that issue.
 
+What would be the best way for this patch, keep busdev->sysdata usage 
+and rebase once Wang Yijing patch set will be accepted?
 
-Paul Bolle
+Regards,
+Tomasz
