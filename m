@@ -1,159 +1,42 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 18 Nov 2014 14:48:19 +0000
-Subject: [RFC PATCH 07/16] PCI: Separate pci_host_bridge creation out of
- pci_create_root_bus()
-In-Reply-To: <546B041A.4060403@huawei.com>
-References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
- <1416219710-26088-8-git-send-email-wangyijing@huawei.com>
- <2507218.mHliopJb05@wuerfel> <546B041A.4060403@huawei.com>
-Message-ID: <20141118144819.GK12037@e106497-lin.cambridge.arm.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 18 Nov 2014 14:51:42 +0000
+Subject: [PATCH v5 6/6] arm64: Trace emulation of AArch32 legacy
+ instructions
+In-Reply-To: <20141118093239.46f9b655@gandalf.local.home> (Steven Rostedt's
+ message of "Tue, 18 Nov 2014 09:32:39 -0500")
+References: <1416310887-14649-1-git-send-email-punit.agrawal@arm.com>
+ <1416310887-14649-7-git-send-email-punit.agrawal@arm.com>
+ <20141118093239.46f9b655@gandalf.local.home>
+Message-ID: <9hh8uj8v9xd.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 08:32:26AM +0000, Yijing Wang wrote:
-> 
-> >> +LIST_HEAD(pci_host_bridge_list);
-> >> +DECLARE_RWSEM(pci_host_bridge_sem);
-> > 
-> > Unless the pci_host_bridge_sem is accessed thousands of times per second,
-> > it's normally better to use a simple mutex instead.
-> 
-> OK, I will use simple mutex instead.
-> 
-> > 
-> >> +static struct resource busn_resource = {
-> >> +	.name	= "PCI busn",
-> >> +	.start	= 0,
-> >> +	.end	= 255,
-> >> +	.flags	= IORESOURCE_BUS,
-> >> +};
-> > 
-> > I think it would be better to require callers to pass the bus resource
-> > down to the function.
-> 
-> Hmm, I think most of caller will provide the bus resource, but some others
-> will not give any bus resource, extremely, no any resources :(. But we still
-> need properly configure their resources for compatibility.
-> 
-> > 
-> >> +struct pci_host_bridge *pci_create_host_bridge(
-> >> +		struct device *parent, u32 db, 
-> >> +		struct pci_ops *ops, void *sysdata, 
-> >> +		struct list_head *resources)
-> >> +{
-> > 
-> > Do we still need to pass the 'sysdata' in here? If we are guaranteed to
-> > have a device pointer, we should always be able to get the driver
-> > private data from dev_get_drvdata(host->dev->parent).
-> 
-> We need, some platforms pass NULL pointer as host bridge parent.
+Steven Rostedt <rostedt@goodmis.org> writes:
 
-Yijing,
+> On Tue, 18 Nov 2014 11:41:27 +0000
+> Punit Agrawal <punit.agrawal@arm.com> wrote:
+>
+>> Introduce an event to trace the usage of emulated instructions. The
+>> trace event is intended to help identify and encourage the migration
+>> of legacy software using the emulation features.
+>> 
+>> Use this event to trace usage of swp and CP15 barrier emulation.
+>> 
+>> Cc: Steven Rostedt <rostedt@goodmis.org>
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>> ---
+>
+> For the tracing side:
+>
+> Acked-by: Steven Rostedt <rostedt@goodmis.org>
 
-May I suggest a different approach here? Rather than having to pass an opaque
-pointer that gets converted by the host bridge driver back to the private
-structure, what about promoting a new style of usage, that is similar to the
-way device drivers work? Lets try to promote the embedding of the generic
-pci_host_bridge structure in the host bridge specific structure! Then we can
-access the private data doing container_of().
+Cheers, Steve.
 
-Something like this:
-
-struct pci_controller {
-	struct pci_host_bridge bridge;
-	/* private host bridge data here */
-	.....
-};
-
-#define PCI_CONTROLLER(bus)	({
-	struct pci_host_bridge *hb = to_pci_host_bridge(bus->bridge); \
-	container_of(hb, struct pci_controller, bridge); })
-
-
-Then we can retrieve the host bridge structure from everywhere we have a device.
-
-Best regards,
-Liviu
-
-> 
-> > 
-> >> +	host = kzalloc(sizeof(*host), GFP_KERNEL);
-> >> +	if (!host)
-> >> +		return NULL;
-> > 
-> > devm_kzalloc maybe?
-> 
-> I don't know much detail about devm_kzalloc(), but we have no pci host driver
-> here, and I found no devm_kzalloc() uses in core PCI code before.
-> 
-> > 
-> >> +	if (!resources) {
-> >> +		/* Use default IO/MEM/BUS resources*/
-> >> +		pci_add_resource(&host->windows, &ioport_resource);
-> >> +		pci_add_resource(&host->windows, &iomem_resource);
-> >> +		pci_add_resource(&host->windows, &busn_resource);
-> >> +	} else {
-> >> +		list_for_each_entry_safe(window, n, resources, list)
-> >> +			list_move_tail(&window->list, &host->windows);
-> >> +	}
-> > 
-> > I think we should assume that the correct resources are passed. You
-> > could add a wrapper around this function to convert old platforms
-> > though.
-> 
-> OK, I will move these code out of pci_create_host_bridge, and add a wrapper
-> to setup the default resources.
-> 
-> > 
-> >> +EXPORT_SYMBOL(pci_create_host_bridge);
-> > 
-> > EXPORT_SYMBOL_GPL() maybe?
-> 
-> OK, will update it.
-> 
-> > 
-> >> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> >> index 8b11b38..daa7f40 100644
-> >> --- a/include/linux/pci.h
-> >> +++ b/include/linux/pci.h
-> >> @@ -402,7 +402,12 @@ struct pci_host_bridge_window {
-> >>  struct pci_host_bridge {
-> >>  	struct device dev;
-> >>  	struct pci_bus *bus;		/* root bus */
-> >> +	struct list_head list;
-> >>  	struct list_head windows;	/* pci_host_bridge_windows */
-> >> +	int busnum;
-> > 
-> > The busnum should already be implied through the bus resource.
-> 
-> Yes, I will consider remove it and introduce a helper function to get the root bus number, thanks!
-> 
-> Thanks!
-> Yijing.
-> 
-> > 
-> > 	Arnd
-> > 
-> > .
-> > 
-> 
-> 
-> -- 
-> Thanks!
-> Yijing
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+>
+> -- Steve
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
