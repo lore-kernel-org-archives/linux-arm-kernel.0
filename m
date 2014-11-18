@@ -1,51 +1,62 @@
-From: j.uzycki@elproma.com.pl (Janusz Uzycki)
-Date: Tue, 18 Nov 2014 18:37:13 +0100
-Subject: [PATCH] serial: mxs-auart: fix tx_empty against shift register
-Message-ID: <1416332233-4143-1-git-send-email-j.uzycki@elproma.com.pl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Nov 2014 17:34:13 +0000
+Subject: [PATCH RFC] ARM: option for loading modules into vmalloc area
+In-Reply-To: <20141118172146.3784.81151.stgit@buzz>
+References: <20141118172146.3784.81151.stgit@buzz>
+Message-ID: <20141118173413.GB4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tx_empty() should test whether both the transmitter fifo and shifter
-for the port is empty, ie. the whole last char was transmitted.
-The shift register is empty if AUART_STAT_BUSY is cleared.
-The patch fixes the function against the shift register.
+On Tue, Nov 18, 2014 at 08:21:46PM +0400, Konstantin Khlebnikov wrote:
+> Usually modules are loaded into small area prior to the kernel
+> text because they are linked with the kernel using short calls.
+> Compile-time instrumentation like GCOV or KASAN bloats code a lot,
+> and as a result huge modules no longer fit into reserved area.
+> 
+> This patch adds option CONFIG_MODULES_USE_VMALLOC which lifts
+> limitation on amount of loaded modules. It links modules using
+> long-calls (option -mlong-calls) and loads them into vmalloc area.
+> 
+> In few places exported symbols are called from inline assembly.
+> This patch adds macro for such call sites: __asmbl and __asmbl_clobber.
+> Call turns into single 'bl' or sequence 'movw; movt; blx' depending on
+> context and state of config option.
+> 
+> Unfortunately this option isn't compatible with CONFIG_FUNCTION_TRACER.
+> Compiler emits short calls to profiling function despite of -mlong-calls.
+> This is a bug in GCC, but ftrace anyway needs an update to handle this.
 
-According to i.MX23 and i.MX28 Reference Manual:
-AUART_STAT_TXFE:
- TX FIFO or transmit holding register is empty.
+It also isn't compatible with the older architectures which don't have
+"blx".
 
-AUART_STAT_BUSY:
- AUART still transmits bits.
- The BUSY signal goes HIGH as soon as the data is written to the
- transmit FIFO (that is, the FIFO is non-empty) and remains asserted
- HIGH while data is being transmitted.
- BUSY is negated only when the transmit FIFO is empty, and the last
- character has been transmitted from the shift register, including
- the stop bits.
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index 9d2cdda..9e0c4f4 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -1161,16 +1161,15 @@ void __init sanity_check_meminfo(void)
+>  
+>  static inline void prepare_page_table(void)
+>  {
+> -	unsigned long addr;
+> +	unsigned long addr = 0;
+>  	phys_addr_t end;
+>  
+>  	/*
+>  	 * Clear out all the mappings below the kernel image.
+>  	 */
+> -	for (addr = 0; addr < MODULES_VADDR; addr += PMD_SIZE)
+> -		pmd_clear(pmd_off_k(addr));
+> -
+>  #ifdef CONFIG_XIP_KERNEL
+> +	for ( ; addr < MODULES_VADDR; addr += PMD_SIZE)
+> +		pmd_clear(pmd_off_k(addr));
+>  	/* The XIP kernel is mapped in the module area -- skip over it */
+>  	addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
+>  #endif
 
-Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
----
- drivers/tty/serial/mxs-auart.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+This seems to be an unrelated change.  In any case, it looks wrong to
+me.  Please describe what you are trying to achieve here.
 
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index 5ad18bd..4422dbb 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -889,10 +889,11 @@ static void mxs_auart_shutdown(struct uart_port *u)
- 
- static unsigned int mxs_auart_tx_empty(struct uart_port *u)
- {
--	if (readl(u->membase + AUART_STAT) & AUART_STAT_TXFE)
-+	if ((readl(u->membase + AUART_STAT) &
-+		 (AUART_STAT_TXFE | AUART_STAT_BUSY)) == AUART_STAT_TXFE)
- 		return TIOCSER_TEMT;
--	else
--		return 0;
-+
-+	return 0;
- }
- 
- static void mxs_auart_start_tx(struct uart_port *u)
 -- 
-1.7.11.3
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
