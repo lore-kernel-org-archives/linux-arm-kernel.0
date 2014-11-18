@@ -1,107 +1,106 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Tue, 18 Nov 2014 13:45:14 +0530
-Subject: exynos5250/arndale: failed to set cpu voltage
-In-Reply-To: <CANMBJr5nLOJ4O=+TLMO9uryH79nBQwQKZu_nmRaPne9DE3GvWw@mail.gmail.com>
-References: <CANMBJr4ZgEZDAtdfuLhCXppCGHnHhgmT1aFUi+=kJb2PdkqhGg@mail.gmail.com>
- <CAM4voamPyTpv5TPtN1Z=ZL3Qmy806qFxrAaU0kiqJmV56cyJiw@mail.gmail.com>
- <CANMBJr5nLOJ4O=+TLMO9uryH79nBQwQKZu_nmRaPne9DE3GvWw@mail.gmail.com>
-Message-ID: <CAM4voamnT+tOj6fFqzuY_yYHrYizVmeLh-C2zBB6Cn=6Gkdo0A@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 18 Nov 2014 09:15:34 +0100
+Subject: [PATCH 2/2] dt-bindings: simplefb-sunxi: Add sunxi simplefb
+ extensions
+In-Reply-To: <20141117155514.GU6414@lukather>
+References: <1416224086-5698-1-git-send-email-hdegoede@redhat.com>
+ <1416224086-5698-3-git-send-email-hdegoede@redhat.com>
+ <20141117124721.GQ6414@lukather>
+ <CACxGe6vqiC08sP+o3bduGfvUdwRtHm8+_7EdZccJjS86qVKvxQ@mail.gmail.com>
+ <20141117155514.GU6414@lukather>
+Message-ID: <546B0026.2010107@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
+Hi,
 
-On Sun, Nov 16, 2014 at 12:12 AM, Tyler Baker <tyler.baker@linaro.org> wrote:
-> Hi Abhilash,
->
-> On 13 November 2014 18:50, Abhilash Kesavan <kesavan.abhilash@gmail.com> wrote:
->> Hello Tyler,
->>
->> On Fri, Nov 14, 2014 at 3:30 AM, Tyler Baker <tyler.baker@linaro.org> wrote:
->>> In recent upstream kernels, exynos5420-based arndale boards have been
->>
->> Boot logs are only for 5250, typo ?
->
-> Apologies, this is a typo. Should have been 5250 as you mentioned.
->
->>
->>> producing boot-time errors due to the fact they failed to set the cpu
->>> voltage. These message flood the serial console even after userspace
->>> has been loaded, yielding the console unusable without forcing a lower
->>> log level. These errors are produced _only_ with the
->>> multi_v7_defconfig and they are _not_ present
->>> with exynos_defconfig. Here are some recent boot logs showing the boot errors:
+On 11/17/2014 04:55 PM, Maxime Ripard wrote:
+> On Mon, Nov 17, 2014 at 01:39:18PM +0000, Grant Likely wrote:
+>> On Mon, Nov 17, 2014 at 12:47 PM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>>> On Mon, Nov 17, 2014 at 12:34:46PM +0100, Hans de Goede wrote:
+>>>> If pre-filled framebuffer nodes are used, the firmware may need extra
+>>>> properties to find the right node. This documents the properties to use
+>>>> for this on sunxi platforms.
+>>>>
+>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>> ---
+>>>>  .../bindings/video/simple-framebuffer-sunxi.txt    | 33 ++++++++++++++++++++++
+>>>>  1 file changed, 33 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+>>>> new file mode 100644
+>>>> index 0000000..84ca264
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+>>>> @@ -0,0 +1,33 @@
+>>>> +Sunxi specific Simple Framebuffer bindings
+>>>> +
+>>>> +This binding documents sunxi specific extensions to the simple-framebuffer
+>>>> +bindings. The sunxi simplefb u-boot code relies on the devicetree containing
+>>>> +pre-populated simplefb nodes.
+>>>> +
+>>>> +These extensions are intended so that u-boot can select the right node based
+>>>> +on which pipeline and output is being used. As such they are solely intended
+>>>> +for firmware / bootloader use, and the OS should ignore them.
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible: "sunxi,framebuffer"
+>>>> +- sunxi,pipeline:
+>>>> +  <0> for the de_be0 -> lcdc0 -> output pipeline
+>>>> +  <1> for the de_be1 -> lcdc1 -> output pipeline
+>>>> +- sunxi,output: One of: "hdmi", "lcd", "vga", and "composite"
+>>>> +
+>>>> +Example:
+>>>> +
+>>>> +chosen {
+>>>> +     #address-cells = <1>;
+>>>> +     #size-cells = <1>;
+>>>> +     ranges;
+>>>> +
+>>>> +     framebuffer at 0 {
+>>>> +             compatible = "sunxi,framebuffer", "simple-framebuffer";
+>>>> +             sunxi,pipeline = <0>;
+>>>> +             sunxi,output = "hdmi";
+>>>> +             clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
+>>>> +                      <&ahb_gates 44>;
 >>>
->>> mainline/v3.18-rc4-65-g2c54396:
->>>     multi_v7_defconfig:
->>>         http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc4-65-g2c54396/arm-multi_v7_defconfig/boot-exynos5250-arndale.html
->>>     exynos_defconfig:
->>>         http://storage.armcloud.us/kernel-ci/mainline/v3.18-rc4-65-g2c54396/arm-exynos_defconfig/boot-exynos5250-arndale.html
+>>> If we're going that way, then maybe having to specify clock-names
+>>> would be better in order to know which clock is what?
 >>
->> From the boot logs it appears that the S5M8767 regulator does not get
->> probed with multi_v7_defconfig and you get the following messages:
->>
->> [    1.147412] deviceless supply vdd_arm not found, using dummy regulator
->> [    1.152669] exynos-cpufreq exynos-cpufreq: failed to set cpu
->> voltage to 1300000
->> [    1.159771] cpufreq: __target_index: Failed to change cpu frequency: -22
->>
->> Both multi_v7_defconfig and exynos_defconfig have the S5M8767
->> regulator enabled. However multi_v7_defconfig does not have the S3C
->> I2C controller enabled while exynos_defconfig does.
->> Can you re-check after enabling CONFIG_I2C_S3C2410 ?
->
-> I have retested my two arndale boards with
-> multi_v7_defconfg+CONFIG_I2C_S3C2410=y on mainline, next, and arm-soc.
-> Enabling S3C I2C controller does resolve the issue I have reported
-> above. It seems reasonable to patch the multi_v7_defconfig to enable
-> this option by default, thoughts?
+>> I wouldn't go that way with this binding since the driver has no need
+>> to differentiate between the clocks, and driver authors shouldn't be
+>> encouraged to do so. The purpose of the clocks in this node is only
+>> for itemizing dependencies, not for how to configure the clocks.
+>> Firmware shouldn't care at all about the clocks list, it only needs to
+>> find the correct pre-populated node to fill in and enable.
+> 
+> Well, if we want to play the "DT as an ABI" stuff, you have no
+> guarantee that in the future, simplefb will still be the driver bound
+> to "sunxi,framebuffer"
 
-Yes, I2C_S3C2410 should be enabled in multi_v7_defconfig. There was
-some work going on related to updating the multi_v7_defconfig [1] and
-maybe this could be part of it.
+Huh? We do have that guarantee, or at least that a simplefb bindings
+compatible driver is, the "sunxi,framebuffer" bindings live in:
+
+Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
+
+With the filename already being a big hint, further more it states that:
+
+"This binding documents sunxi specific extensions to the simple-framebuffer
+bindings. The sunxi simplefb u-boot code relies on the devicetree containing
+pre-populated simplefb nodes.
+
+These extensions are intended so that u-boot can select the right node based
+on which pipeline is being used. As such they are solely intended for
+firmware / bootloader use, and the OS should ignore them."
+
+Which to me seems to guarantee that we're talking about a simple-framebuffer
+compatible node here. The scope of these extensions are very narrow, there
+only purpose is to allow the bootloader to find the right pre-populated simplefb
+node, everything else is specified by the simplefb bindings, not these
+extensions.
 
 Regards,
-Abhilash
 
-[1] http://www.spinics.net/lists/arm-kernel/msg377544.html
->
->>
->> Regards,
->> Abhilash
->>
->>>
->>> next/next-20141113:
->>>     multi_v7_defconfig:
->>>         http://storage.armcloud.us/kernel-ci/next/next-20141113/arm-multi_v7_defconfig/boot-exynos5250-arndale.html
->>>     exynos_defconfig:
->>>         http://storage.armcloud.us/kernel-ci/next/next-20141113/arm-exynos_defconfig/boot-exynos5250-arndale.html
->>>
->>> arm-soc/v3.18-rc4-185-gbfcf8f9:
->>>     multi_v7_defconfig:
->>>         http://storage.armcloud.us/kernel-ci/arm-soc/v3.18-rc4-185-gbfcf8f9/arm-multi_v7_defconfig/boot-exynos5250-arndale.html
->>>     exynos_defconfig:
->>>         http://storage.armcloud.us/kernel-ci/arm-soc/v3.18-rc4-185-gbfcf8f9/arm-exynos_defconfig/boot-exynos5250-arndale.html
->>>
->>> Cheers,
->>>
->>> --
->>> Tyler Baker
->>> Tech Lead, LAVA
->>> Linaro.org | Open source software for ARM SoCs
->>> Follow Linaro: http://www.facebook.com/pages/Linaro
->>> http://twitter.com/#!/linaroorg - http://www.linaro.org/linaro-blog
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> Cheers,
->
-> --
-> Tyler Baker
-> Tech Lead, LAVA
-> Linaro.org | Open source software for ARM SoCs
-> Follow Linaro: http://www.facebook.com/pages/Linaro
-> http://twitter.com/#!/linaroorg - http://www.linaro.org/linaro-blog
+Hans
