@@ -1,61 +1,39 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 18 Nov 2014 09:55:15 -0800
-Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
- completes
-In-Reply-To: <Pine.LNX.4.44L0.1411181234210.892-100000@iolanthe.rowland.org>
-References: <20141118171831.GC3003@dtor-ws>
- <Pine.LNX.4.44L0.1411181234210.892-100000@iolanthe.rowland.org>
-Message-ID: <20141118175515.GD3003@dtor-ws>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Nov 2014 18:00:37 +0000
+Subject: [PATCH] drm/i2c: tda998x: Allow for different audio sample rates
+In-Reply-To: <546B8452.6030701@arm.com>
+References: <546B8452.6030701@arm.com>
+Message-ID: <20141118180036.GC4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 12:44:22PM -0500, Alan Stern wrote:
-> On Tue, 18 Nov 2014, Dmitry Torokhov wrote:
+On Tue, Nov 18, 2014 at 05:39:30PM +0000, Andrew Jackson wrote:
+> On HDMI, the audio data are carried across the HDMI link which is
+> driven by the TDMS clock. The TDMS clock is dependent on the video pixel
+> rate.
 > 
-> > OK. Another question then: pm_runtime_get_noresume() does literally this:
-> > 
-> > 	atomic_inc(&dev->power.usage_count);
-> > 
-> > So who is responsible for actually waking up parent device and/or power
-> > domain? Is it simply missing because we did not really have PM domains
-> > before?
-> 
-> Ths bus is responsible for making sure that all the standard resources
-> are available -- that is, all the resources that would be needed by a
-> normal device on that bus.  Anything beyond that (such as
-> special-purpose clocks) has to be set up by the driver.
-> 
-> Thus the bus would insure that the device was powered, its parent was
-> resumed, and the usual clock inputs were enabled.  And of course, one
-> mechanism for doing this is to runtime-resume the power domain.
+> This patch sets the denominator (Cycle Time Stamp) appropriately
+> allowing the driver to send audio to a wider range of HDMI sinks
+> (i.e. monitors).
 
-This does not sound like anything bus-specific. Can we move powering on
-the domain before probing into the driver core, similarly to the default
-pin selection by pinctrl? I do not see why we want to have every
-individual bus to implement this. I guess right now we can't because we
-assign the domain to device in individual bus's probe function, but I do
-not think this is proper place for that either: bus and pm domain are
-orthogonal concepts IMO.
+This is actually pointless, because we don't use "manual" CTS mode.
 
-> 
-> Often the bus doesn't have to do anything special to resume the
-> device's parent.  This is because the device gets probed when it is
-> registered, which happens when it is discovered, and the discovery is
-> done by the parent's driver as part of its normal activity.  Since the
-> parent has to be powered up to carry out this normal activity, nothing 
-> more is needed.
+If the clocks for the video and audio are coherent, then you can program
+both the N and CTS values to allow the sink to properly recover the
+synchronous audio clock.
 
-I think this only true for buses that support discovery.
+However, in most cases, the audio and video clocks are not coherent, and
+since the recovered audio clock has to match the source audio clock, the
+only way this can be done is by the TDA998x (or in fact other HDMI
+encoder) to measure the audio clock rate and generate the CTS value
+itself.
 
-> 
-> (Of course, devices can get probed at other times too, not just when
-> they are discovered.  For example, a device might get probed when a
-> driver module is loaded, and that can occur at any time.  So in general
-> it might indeed be necessary for the bus to wake up the parent before
-> calling the driver's probe routine.)
->
+This is the mode we drive the TDA998x - so the programmed CTS value is
+irrelevant.
 
-Thanks.
+See the HDMI spec, section 7.2 for a discussion about this, especially
+non-coherent clocks.
 
 -- 
-Dmitry
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
