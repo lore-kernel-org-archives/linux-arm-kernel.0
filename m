@@ -1,47 +1,172 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 18 Nov 2014 17:04:52 +0100
-Subject: [PATCH 0/3] i2c: slave support framework for Linux devices
-Message-ID: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
+Date: Tue, 18 Nov 2014 17:04:53 +0100
+Subject: [PATCH 1/3] i2c: core changes for slave support
+In-Reply-To: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
+References: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <1416326695-13083-2-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Finally, here is my take on the often desired feature that Linux can not only
-be an I2C master, but also an I2C slave. Since RFC, most open issues have been
-dealt with. Find details in the patch descriptions. Documentation is still
-missing and will come later this or next week, but surely early enough for
-the 3.19 release which this series wants to go in. Yet, I'd like to encourage
-code-review and build-testing already.
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Basically, an I2C slave is a standard I2C client providing a callback function.
-When registering as a slave, the connection to the I2C adapter is made which
-uses the callback when a slave event happens. That splits the HW support
-(enabling slave mode on the adapter) and SW support (here a generic eeprom
-simulator) nicely IMO.
+Finally(!), make Linux support being an I2C slave. Most of the existing
+infrastructure is reused. We mainly add i2c_slave_register/unregister()
+calls which tells i2c bus drivers to activate the slave mode. Then, they
+also get a callback to report slave events to.
 
-The patches have been tested with a Renesas R8A7790 based Lager board. They are
-based on top of 3.18-rc5, but will easily apply to renesas/devel. A git tree
-can be found here:
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+---
 
-git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/slave-support
+Changes since RFC:
+* add slave mode kernel doc
+* lock adapter around slave registration
+* inline i2c_slave_event
 
-Comments welcome! Thanks,
+ drivers/i2c/i2c-core.c | 49 +++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/i2c.h    | 29 +++++++++++++++++++++++++++++
+ 2 files changed, 78 insertions(+)
 
-   Wolfram
-
-
-Wolfram Sang (3):
-  i2c: core changes for slave support
-  i2c: slave-eeprom: add eeprom simulator driver
-  i2c: rcar: add slave support
-
- drivers/i2c/Kconfig            |  10 +++
- drivers/i2c/Makefile           |   1 +
- drivers/i2c/busses/i2c-rcar.c  | 125 +++++++++++++++++++++++++++---
- drivers/i2c/i2c-core.c         |  49 ++++++++++++
- drivers/i2c/i2c-slave-eeprom.c | 170 +++++++++++++++++++++++++++++++++++++++++
- include/linux/i2c.h            |  29 +++++++
- 6 files changed, 375 insertions(+), 9 deletions(-)
- create mode 100644 drivers/i2c/i2c-slave-eeprom.c
-
+diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+index f43b4e11647a..bbcf427bf123 100644
+--- a/drivers/i2c/i2c-core.c
++++ b/drivers/i2c/i2c-core.c
+@@ -24,6 +24,7 @@
+    (c) 2013  Wolfram Sang <wsa@the-dreams.de>
+    I2C ACPI code Copyright (C) 2014 Intel Corp
+    Author: Lan Tianyu <tianyu.lan@intel.com>
++   I2C slave support (c) 2014 by Wolfram Sang <wsa@sang-engineering.com> 
+  */
+ 
+ #include <linux/module.h>
+@@ -2902,6 +2903,54 @@ trace:
+ }
+ EXPORT_SYMBOL(i2c_smbus_xfer);
+ 
++int i2c_slave_register(struct i2c_client *client, i2c_slave_cb_t slave_cb)
++{
++	int ret;
++
++	if (!client || !slave_cb)
++		return -EINVAL;
++
++	if (!(client->flags & I2C_CLIENT_TEN)) {
++		/* Enforce stricter address checking */
++		ret = i2c_check_addr_validity(client->addr);
++		if (ret)
++			return ret;
++	}
++
++	if (!client->adapter->algo->reg_slave)
++		return -EOPNOTSUPP;
++
++	client->slave_cb = slave_cb;
++
++	i2c_lock_adapter(client->adapter);
++	ret = client->adapter->algo->reg_slave(client);
++	i2c_unlock_adapter(client->adapter);
++
++	if (ret)
++		client->slave_cb = NULL;
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(i2c_slave_register);
++
++int i2c_slave_unregister(struct i2c_client *client)
++{
++	int ret;
++
++	if (!client->adapter->algo->unreg_slave)
++		return -EOPNOTSUPP;
++
++	i2c_lock_adapter(client->adapter);
++	ret = client->adapter->algo->unreg_slave(client);
++	i2c_unlock_adapter(client->adapter);
++
++	if (ret == 0)
++		client->slave_cb = NULL;
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(i2c_slave_unregister);
++
+ MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
+ MODULE_DESCRIPTION("I2C-Bus main module");
+ MODULE_LICENSE("GPL");
+diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+index b556e0ab946f..0f1c5a61c931 100644
+--- a/include/linux/i2c.h
++++ b/include/linux/i2c.h
+@@ -46,6 +46,8 @@ struct i2c_client;
+ struct i2c_driver;
+ union i2c_smbus_data;
+ struct i2c_board_info;
++enum i2c_slave_event;
++typedef int (*i2c_slave_cb_t)(struct i2c_client *, enum i2c_slave_event, u8 *);
+ 
+ struct module;
+ 
+@@ -209,6 +211,8 @@ struct i2c_driver {
+  * @irq: indicates the IRQ generated by this device (if any)
+  * @detected: member of an i2c_driver.clients list or i2c-core's
+  *	userspace_devices list
++ * @slave_cb: Callback when I2C slave mode of an adapter is used. The adapter
++ * 	calls it to pass on slave events to the slave driver.
+  *
+  * An i2c_client identifies a single device (i.e. chip) connected to an
+  * i2c bus. The behaviour exposed to Linux is defined by the driver
+@@ -224,6 +228,7 @@ struct i2c_client {
+ 	struct device dev;		/* the device structure		*/
+ 	int irq;			/* irq issued by device		*/
+ 	struct list_head detected;
++	i2c_slave_cb_t slave_cb;	/* callback for slave mode	*/
+ };
+ #define to_i2c_client(d) container_of(d, struct i2c_client, dev)
+ 
+@@ -246,6 +251,25 @@ static inline void i2c_set_clientdata(struct i2c_client *dev, void *data)
+ 	dev_set_drvdata(&dev->dev, data);
+ }
+ 
++/* I2C slave support */
++
++enum i2c_slave_event {
++	I2C_SLAVE_REQ_READ_START,
++	I2C_SLAVE_REQ_READ_END,
++	I2C_SLAVE_REQ_WRITE_START,
++	I2C_SLAVE_REQ_WRITE_END,
++	I2C_SLAVE_STOP,
++};
++
++extern int i2c_slave_register(struct i2c_client *client, i2c_slave_cb_t slave_cb);
++extern int i2c_slave_unregister(struct i2c_client *client);
++
++static inline int i2c_slave_event(struct i2c_client *client,
++				  enum i2c_slave_event event, u8 *val)
++{
++	return client->slave_cb(client, event, val);
++}
++
+ /**
+  * struct i2c_board_info - template for device creation
+  * @type: chip type, to initialize i2c_client.name
+@@ -352,6 +376,8 @@ i2c_register_board_info(int busnum, struct i2c_board_info const *info,
+  *   into I2C transfers instead.
+  * @functionality: Return the flags that this algorithm/adapter pair supports
+  *   from the I2C_FUNC_* flags.
++ * @reg_slave: Register given client to I2C slave mode of this adapter
++ * @unreg_slave: Unregister given client from I2C slave mode of this adapter
+  *
+  * The following structs are for those who like to implement new bus drivers:
+  * i2c_algorithm is the interface to a class of hardware solutions which can
+@@ -377,6 +403,9 @@ struct i2c_algorithm {
+ 
+ 	/* To determine what the adapter supports */
+ 	u32 (*functionality) (struct i2c_adapter *);
++
++	int (*reg_slave)(struct i2c_client *client);
++	int (*unreg_slave)(struct i2c_client *client);
+ };
+ 
+ /**
 -- 
 2.1.1
