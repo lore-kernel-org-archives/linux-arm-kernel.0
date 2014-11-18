@@ -1,174 +1,48 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Nov 2014 13:57:01 +0100
-Subject: [PATCH v3 02/13] arm64/mm: add create_pgd_mapping() to create private
- page tables
-In-Reply-To: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1416315432-8534-3-git-send-email-ard.biesheuvel@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Nov 2014 14:10:35 +0100
+Subject: [PATCH v5 5/6] Documentation: dt-bindings: Add binding info for
+ X-Gene QMTM UIO driver
+In-Reply-To: <CAPTm99WYNyxtY-NCVN8pB0HwNPn+EFx-7w7yEevaEK1z7-Zqxg@mail.gmail.com>
+References: <1416220572-13381-1-git-send-email-ankit.jindal@linaro.org>
+ <2279061.naADrHDgyn@wuerfel>
+ <CAPTm99WYNyxtY-NCVN8pB0HwNPn+EFx-7w7yEevaEK1z7-Zqxg@mail.gmail.com>
+Message-ID: <1503477.DVdkExccIe@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For UEFI, we need to install the memory mappings used for Runtime Services
-in a dedicated set of page tables. Add create_pgd_mapping(), which allows
-us to allocate and install those page table entries early.
+On Tuesday 18 November 2014 14:59:54 Ankit Jindal wrote:
+> On 17 November 2014 16:47, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 17 November 2014 16:06:11 Ankit Jindal wrote:
+> >> +
+> >> +       qmtm1_uio: qmtm_uio at 1f200000 {
+> >> +               compatible = "apm,xgene-qmtm";
+> >> +               status = "disabled";
+> >> +               reg = <0x0 0x1f200000 0x0 0x10000>,
+> >> +                     <0x0 0x1b000000 0x0 0x400000>;
+> >> +               reg-names = "csr", "fabric";
+> >> +               qpool-memory = <&qmtm1_uio_qpool>;
+> >> +               clocks = <&qmtm1clk 0>;
+> >> +               num-queues = <0x400>;
+> >> +               devid = <1>;
+> >> +       };
+> >> +
+> >
+> > To make my previous review comments clearer:
+> >
+> > NAK
+> >
+> > Do not create device nodes that are meant for a specific use case in
+> > software and that are not usable for the common case. I don't think
+> > it makes any sense to keep on submitting a UIO driver for this until
+> > we have a proper network driver that uses this so we can make sure we
+> > have a working binding.
+> 
+> The dataplane frameworks like OpenDataPlane etc, need to have access
+> to complete subsystem from the user space. Hence, we would like to
+> have this driver and some other UIO drivers to be the part of kernel
+> to have data plane frameworks working on our platform.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/mmu.h     |  3 +++
- arch/arm64/include/asm/pgtable.h |  5 +++++
- arch/arm64/mm/mmu.c              | 43 ++++++++++++++++++++--------------------
- 3 files changed, 30 insertions(+), 21 deletions(-)
+Please work with the people that do the in-kernel QMTM driver to come
+up with a common binding then.
 
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index c2f006c48bdb..5fd40c43be80 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -33,5 +33,8 @@ extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
- extern void init_mem_pgprot(void);
- /* create an identity mapping for memory (or io if map_io is true) */
- extern void create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io);
-+extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
-+			       unsigned long virt, phys_addr_t size,
-+			       pgprot_t prot);
- 
- #endif
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 41a43bf26492..1abe4d08725b 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -264,6 +264,11 @@ static inline pmd_t pte_pmd(pte_t pte)
- 	return __pmd(pte_val(pte));
- }
- 
-+static inline pgprot_t mk_sect_prot(pgprot_t prot)
-+{
-+	return __pgprot(pgprot_val(prot) & ~PTE_TABLE_BIT);
-+}
-+
- /*
-  * THP definitions.
-  */
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 83e6713143a3..4d583aa9ff4e 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -157,20 +157,10 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 
- static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 				  unsigned long addr, unsigned long end,
--				  phys_addr_t phys, int map_io)
-+				  phys_addr_t phys, pgprot_t prot)
- {
- 	pmd_t *pmd;
- 	unsigned long next;
--	pmdval_t prot_sect;
--	pgprot_t prot_pte;
--
--	if (map_io) {
--		prot_sect = PROT_SECT_DEVICE_nGnRE;
--		prot_pte = __pgprot(PROT_DEVICE_nGnRE);
--	} else {
--		prot_sect = PROT_SECT_NORMAL_EXEC;
--		prot_pte = PAGE_KERNEL_EXEC;
--	}
- 
- 	/*
- 	 * Check for initial section mappings in the pgd/pud and remove them.
-@@ -186,7 +176,8 @@ static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 		/* try section mapping first */
- 		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
- 			pmd_t old_pmd =*pmd;
--			set_pmd(pmd, __pmd(phys | prot_sect));
-+			set_pmd(pmd, __pmd(phys |
-+					   pgprot_val(mk_sect_prot(prot))));
- 			/*
- 			 * Check for previous table entries created during
- 			 * boot (__create_page_tables) and flush them.
-@@ -195,7 +186,7 @@ static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 				flush_tlb_all();
- 		} else {
- 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
--				       prot_pte);
-+				       prot);
- 		}
- 		phys += next - addr;
- 	} while (pmd++, addr = next, addr != end);
-@@ -203,7 +194,7 @@ static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 
- static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- 				  unsigned long addr, unsigned long end,
--				  unsigned long phys, int map_io)
-+				  unsigned long phys, pgprot_t prot)
- {
- 	pud_t *pud;
- 	unsigned long next;
-@@ -221,10 +212,11 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- 		/*
- 		 * For 4K granule only, attempt to put down a 1GB block
- 		 */
--		if (!map_io && (PAGE_SHIFT == 12) &&
-+		if ((PAGE_SHIFT == 12) &&
- 		    ((addr | next | phys) & ~PUD_MASK) == 0) {
- 			pud_t old_pud = *pud;
--			set_pud(pud, __pud(phys | PROT_SECT_NORMAL_EXEC));
-+			set_pud(pud, __pud(phys |
-+					   pgprot_val(mk_sect_prot(prot))));
- 
- 			/*
- 			 * If we have an old value for a pud, it will
-@@ -239,7 +231,7 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- 				flush_tlb_all();
- 			}
- 		} else {
--			alloc_init_pmd(mm, pud, addr, next, phys, map_io);
-+			alloc_init_pmd(mm, pud, addr, next, phys, prot);
- 		}
- 		phys += next - addr;
- 	} while (pud++, addr = next, addr != end);
-@@ -251,7 +243,7 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
-  */
- static void __init __create_mapping(struct mm_struct *mm, pgd_t *pgd,
- 				    phys_addr_t phys, unsigned long virt,
--				    phys_addr_t size, int map_io)
-+				    phys_addr_t size, pgprot_t prot)
- {
- 	unsigned long addr, length, end, next;
- 
-@@ -261,7 +253,7 @@ static void __init __create_mapping(struct mm_struct *mm, pgd_t *pgd,
- 	end = addr + length;
- 	do {
- 		next = pgd_addr_end(addr, end);
--		alloc_init_pud(mm, pgd, addr, next, phys, map_io);
-+		alloc_init_pud(mm, pgd, addr, next, phys, prot);
- 		phys += next - addr;
- 	} while (pgd++, addr = next, addr != end);
- }
-@@ -275,7 +267,7 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
- 		return;
- 	}
- 	__create_mapping(&init_mm, pgd_offset_k(virt & PAGE_MASK), phys, virt,
--			 size, 0);
-+			 size, PAGE_KERNEL_EXEC);
- }
- 
- void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
-@@ -285,7 +277,16 @@ void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
- 		return;
- 	}
- 	__create_mapping(&init_mm, &idmap_pg_dir[pgd_index(addr)],
--			 addr, addr, size, map_io);
-+			 addr, addr, size,
-+			 map_io ? __pgprot(PROT_DEVICE_nGnRE)
-+				: PAGE_KERNEL_EXEC);
-+}
-+
-+void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
-+			       unsigned long virt, phys_addr_t size,
-+			       pgprot_t prot)
-+{
-+	__create_mapping(mm, pgd_offset(mm, virt), phys, virt, size, prot);
- }
- 
- static void __init map_mem(void)
--- 
-1.8.3.2
+	Arnd
