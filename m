@@ -1,46 +1,71 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Nov 2014 14:52:29 +0000
-Subject: [PATCH v3 5/5] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
-In-Reply-To: <1416292375-29560-6-git-send-email-dave.long@linaro.org>
+Date: Tue, 18 Nov 2014 14:56:44 +0000
+Subject: [PATCH v3 1/5] arm64: Kprobes with single stepping support
+In-Reply-To: <1416292375-29560-2-git-send-email-dave.long@linaro.org>
 References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
- <1416292375-29560-6-git-send-email-dave.long@linaro.org>
-Message-ID: <20141118145228.GN18842@arm.com>
+ <1416292375-29560-2-git-send-email-dave.long@linaro.org>
+Message-ID: <20141118145643.GO18842@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hello,
 
-On Tue, Nov 18, 2014 at 06:32:55AM +0000, David Long wrote:
-> From: "David A. Long" <dave.long@linaro.org>
+On Tue, Nov 18, 2014 at 06:32:51AM +0000, David Long wrote:
+> From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
 > 
-> Add HAVE_REGS_AND_STACK_ACCESS_API feature for arm64.
+> Add support for basic kernel probes(kprobes) and jump probes
+> (jprobes) for ARM64.
+> 
+> Kprobes will utilize software breakpoint and single step debug
+> exceptions supported on ARM v8.
+> 
+> software breakpoint is placed at the probe address to trap the
+> kernel execution into kprobe handler.
+> 
+> ARM v8 support single stepping to be enabled while exception return
+> (ERET) with next PC in exception return address (ELR_EL1).
+> kprobe handler prepares a executable memory slot for out-of-line
+> execution with the copy of the original instruction under probe, and
+> enable single stepping from the instruction slot. With this scheme,
+> the instruction is executed with the exact same register context
+> 'except PC' that points to instruction slot.
+> 
+> Debug mask(PSTATE.D) is enabled only when single stepping a recursive
+> kprobes i.e. during kprobes reenter so that probes instruction can be
+> single stepped within the kprobe handler -exception- context.
+> The recursion depth of kprobe is always 2, i.e. upon probe re-entry,
+> any further re-entry is prevented by not calling handlers and the case
+> counted as missed kprobe)
+> 
+> Single stepping from slot has drawback on PC-relative accesses
+> like branching and symbolic literals access as offset from new PC
+> (slot address) may not be ensured to fit in immediate value of
+> opcode, Such instructions needs simulation, so reject
+> probing such instructions.
+> 
+> Instructions generating exceptions or cpu mode change are rejected,
+> and not allowed to insert probe for these instructions.
+> 
+> Instructions using Exclusive Monitor are rejected right too.
+> 
+> System instructions are mostly enabled for stepping, except MSR
+> immediate that update "daif" flags in PSTATE, which are not safe
+> for probing -rejected.
 
-[...]
+One thing I noticed looking through this patch is that we're effectively
+reinventing a bunch of the instruction decoding logic that we already have
+in the kernel (introduced since Sandeepa last sent his patch).
 
-> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-> index d3e782a..24cc048 100644
-> --- a/arch/arm64/include/asm/ptrace.h
-> +++ b/arch/arm64/include/asm/ptrace.h
-> @@ -111,6 +111,8 @@ struct pt_regs {
->  	u64 syscallno;
->  };
->  
-> +#define MAX_REG_OFFSET (offsetof(struct pt_regs, orig_x0))
+Could you take a look at include/asm/insn.h and kernel/insn.c please, and
+see if you can at least consolidate some of this? Some of it should be easy
+(i.e. reusing masks, using existing #defines to construct BRK encodings),
+but I appreciate there may be places where kprobes needs to add extra bits,
+in which case I'd really like to keep this all together if at all possible.
 
-Is orig_x0 actually useful to this API? If not, we could instead operate on
-the user_pt_regs structure, and define the maximum offset in terms of sizeof
-that.
+We're currently in a position where the module loader, BPF jit, ftrace and
+the proposed alternative patching scheme are all using the same instruction
+manipulation functions, so we should try to continue that trend if we can.
 
-> +#define ARM_cpsr	pstate
-> +#define ARM_pc		pc
-> +#define ARM_sp		sp
-> +#define ARM_lr		regs[30]
-> +#define ARM_fp		regs[29]
-> +#define ARM_x28		regs[28]
-> +#define ARM_x27		regs[27]
-
-[...]
-
-I don't think we need these #defines.
+Thanks,
 
 Will
