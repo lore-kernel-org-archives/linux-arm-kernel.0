@@ -1,70 +1,55 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 18 Nov 2014 16:49:21 +0000
-Subject: [PATCH v9 05/13] arm: introduce is_device_dma_coherent
-In-Reply-To: <alpine.DEB.2.02.1411141158560.26318@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1411121130020.26318@kaball.uk.xensource.com>
- <1415792454-23161-5-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1411141158560.26318@kaball.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1411181649000.27247@kaball.uk.xensource.com>
+From: k.khlebnikov@samsung.com (Konstantin Khlebnikov)
+Date: Tue, 18 Nov 2014 19:50:29 +0400
+Subject: [PATCH] ARM: enable stack trace dumping for all tasks
+Message-ID: <20141118165029.9812.96216.stgit@buzz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping?
+This patch enables CONFIG_STACKTRACE dumper for non-current tasks.
+Both version of function unwind_frame() now check stack boundaries:
+frame-pointer based after commit 3abb6671a9c04479c4bd026798a05f857393b7e2
+("ARM: 7913/1: fix framepointer check in unwind_frame"),
+unwind-table based after a51345770e519552e749ff457a2a9f83171a67b5
+("ARM: 7987/1: ARM : unwinder : Prevent data abort due to stack overflow").
 
-On Fri, 14 Nov 2014, Stefano Stabellini wrote:
-> Russell,
-> this patch needs your feedback.
-> 
-> - Stefano
-> 
-> On Wed, 12 Nov 2014, Stefano Stabellini wrote:
-> > Introduce a boolean flag and an accessor function to check whether a
-> > device is dma_coherent. Set the flag from set_arch_dma_coherent_ops.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> > CC: linux at arm.linux.org.uk
-> > ---
-> >  arch/arm/include/asm/device.h      |    1 +
-> >  arch/arm/include/asm/dma-mapping.h |    6 ++++++
-> >  2 files changed, 7 insertions(+)
-> > 
-> > diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
-> > index dc662fc..4111592 100644
-> > --- a/arch/arm/include/asm/device.h
-> > +++ b/arch/arm/include/asm/device.h
-> > @@ -17,6 +17,7 @@ struct dev_archdata {
-> >  #ifdef CONFIG_ARM_DMA_USE_IOMMU
-> >  	struct dma_iommu_mapping	*mapping;
-> >  #endif
-> > +	bool dma_coherent;
-> >  };
-> >  
-> >  struct omap_device;
-> > diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> > index 85738b2..8c3b616 100644
-> > --- a/arch/arm/include/asm/dma-mapping.h
-> > +++ b/arch/arm/include/asm/dma-mapping.h
-> > @@ -123,11 +123,17 @@ static inline unsigned long dma_max_pfn(struct device *dev)
-> >  
-> >  static inline int set_arch_dma_coherent_ops(struct device *dev)
-> >  {
-> > +	dev->archdata.dma_coherent = true;
-> >  	set_dma_ops(dev, &arm_coherent_dma_ops);
-> >  	return 0;
-> >  }
-> >  #define set_arch_dma_coherent_ops(dev)	set_arch_dma_coherent_ops(dev)
-> >  
-> > +static inline bool is_device_dma_coherent(struct device *dev)
-> > +{
-> > +	return dev->archdata.dma_coherent;
-> > +}
-> > +
-> >  static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
-> >  {
-> >  	unsigned int offset = paddr & ~PAGE_MASK;
-> > -- 
-> > 1.7.10.4
-> > 
-> 
+Now it's safe to dump stack trace for any task, not only for current.
+If that task is running we could get garbage but kernel will not explode.
+Actually, get_wchan() uses this code path for ages without any problems:
+it calls unwind_frame() after racy check "task->state != TASK_RUNNING".
+
+This feature already exposed into userspace via /proc/$PID/stack,
+it's very useful for finding where task is stuck in the kernel.
+
+Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
+Cc: Anurag Aggarwal <a.anurag@samsung.com>
+Cc: Dave Martin <Dave.Martin@arm.com>
+---
+ arch/arm/kernel/stacktrace.c |   11 -----------
+ 1 file changed, 11 deletions(-)
+
+diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
+index f065eb0..904070f 100644
+--- a/arch/arm/kernel/stacktrace.c
++++ b/arch/arm/kernel/stacktrace.c
+@@ -118,21 +118,10 @@ static noinline void __save_stack_trace(struct task_struct *tsk,
+ 	data.no_sched_functions = nosched;
+ 
+ 	if (tsk != current) {
+-#ifdef CONFIG_SMP
+-		/*
+-		 * What guarantees do we have here that 'tsk' is not
+-		 * running on another CPU?  For now, ignore it as we
+-		 * can't guarantee we won't explode.
+-		 */
+-		if (trace->nr_entries < trace->max_entries)
+-			trace->entries[trace->nr_entries++] = ULONG_MAX;
+-		return;
+-#else
+ 		frame.fp = thread_saved_fp(tsk);
+ 		frame.sp = thread_saved_sp(tsk);
+ 		frame.lr = 0;		/* recovered from the stack */
+ 		frame.pc = thread_saved_pc(tsk);
+-#endif
+ 	} else {
+ 		register unsigned long current_sp asm ("sp");
+ 
