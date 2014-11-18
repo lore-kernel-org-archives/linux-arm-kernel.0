@@ -1,31 +1,47 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 18 Nov 2014 19:32:55 +0100
-Subject: [PATCHv3 01/12] of: add "micron" vendor prefix for Micron
-In-Reply-To: <CAL_JsqKrEoRvt97k+7UHBsNFU739w7BeQbXf5V2TZ2OrmS1Afg@mail.gmail.com>
- (Rob Herring's message of "Tue, 18 Nov 2014 11:00:21 -0600")
-References: <cover.1416266432.git.arno@natisbad.org>
- <9cfc5635b14f36e68c499015c6a722804b407f29.1416266432.git.arno@natisbad.org>
- <CAL_JsqKrEoRvt97k+7UHBsNFU739w7BeQbXf5V2TZ2OrmS1Afg@mail.gmail.com>
-Message-ID: <87vbmcbbqg.fsf@natisbad.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 18 Nov 2014 19:35:45 +0100
+Subject: [RFC] adp1653: Add device tree bindings for LED controller
+In-Reply-To: <20141117150617.GD7046@atomide.com>
+References: <20141116075928.GA9763@amd> <20141117101553.GA21151@amd>
+ <20141117145545.GC7046@atomide.com> <201411171601.32311@pali>
+ <20141117150617.GD7046@atomide.com>
+Message-ID: <20141118183545.GA16999@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon 2014-11-17 07:06:17, Tony Lindgren wrote:
+> * Pali Roh?r <pali.rohar@gmail.com> [141117 07:03]:
+> > On Monday 17 November 2014 15:55:46 Tony Lindgren wrote:
+> > > 
+> > > There's nothing stopping us from initializing the camera code
+> > > from pdata-quirks.c for now to keep it working. Certainly the
+> > > binding should be added to the driver, but that removes a
+> > > dependency to the legacy booting mode if things are otherwise
+> > > working.
+> > 
+> > Tony, legacy board code for n900 is not in mainline tree. And 
+> > that omap3 camera subsystem for n900 is broken since 3.5 
+> > kernel... (both Front and Back camera on n900 show only green 
+> > picture).
+> 
+> I'm still seeing the legacy board code for n900 in mainline tree :)
+> It's deprecated, but still there.
+> 
+> Are you maybe talking about some other piece of platform_data that's
+> no longer in the mainline kernel?
+> 
+> No idea what might be wrong with the camera though.
 
-Rob Herring <robherring2@gmail.com> writes:
+Camera support for main and secondary cameras was never mainline, AFAICT.
 
-> On Mon, Nov 17, 2014 at 5:26 PM, Arnaud Ebalard <arno@natisbad.org> wrote:
->>
->> Micron vendor prefix is not listed yet in vendor-prefixes.txt file. Even
->> if the expected vendor prefix should be the NASDAQ symbol ("mu" in that
->> case), it seems reasonable to use "micron" here because it is what is
->> already found at various locations (e.g. under arch/arm/boot/dts/ for
->> instance).
->
-> Already have the same patch queued up.
+Merging it will not be easy, as it lacks DT support... and was broken
+for long time.
 
-Perfect, I'll drop mine.
+Anyway, flash is kind of important for me, since it makes phone useful
+as backup light; and it is simple piece of hw, so I intend to keep it
+useful.
 
-Cheers,
-
-a+
+       	       	   	    	      	      	  		     Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
