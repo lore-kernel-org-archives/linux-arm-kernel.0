@@ -1,310 +1,197 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 18 Nov 2014 15:42:43 +0000
-Subject: [RFC PATCH 08/16] PCI: Introduce pci_scan_host_bridge() and
- pci_host_info
-In-Reply-To: <1416219710-26088-9-git-send-email-wangyijing@huawei.com>
-References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
- <1416219710-26088-9-git-send-email-wangyijing@huawei.com>
-Message-ID: <20141118154243.GM12037@e106497-lin.cambridge.arm.com>
+From: wcohen@redhat.com (William Cohen)
+Date: Tue, 18 Nov 2014 09:50:03 -0500
+Subject: [PATCH v3 3/5] arm64: Add kernel return probes support(kretprobes)
+In-Reply-To: <1416292375-29560-4-git-send-email-dave.long@linaro.org>
+References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
+ <1416292375-29560-4-git-send-email-dave.long@linaro.org>
+Message-ID: <546B5C9B.5040101@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 10:21:42AM +0000, Yijing Wang wrote:
-> From: Yijing Wang <wangyijing0307@gmail.com>
+On 11/18/2014 01:32 AM, David Long wrote:
+> From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
 > 
-> Now pci_host_bridge has been ripped out from pci root
-> bus creation. Currently pci_scan_root_bus() lacks
-> scalability, so platform host drivers have no proper
-> way to configure pci_host_bridge. E.g we should assign
-> msi_controller to pci_host_bridge, add argument for
-> pci_scan_root_bus() is not a good idea, it has already
-> five, so introudce struct pci_host_info to make
-> pci scan interfaces more scalable. Because almost
-> all host drivers need to configure host resources,
-> so we put .init_res() in it first, and add other
-> hooks when need.
+> AArch64 ISA does not instructions to pop PC register value
+> from stack(like ARM v7 has ldmia {...,pc}) without using
+> one of the general purpose registers. This means return probes
+> cannot return to the actual return address directly without
+> modifying register context, and without trapping into debug exception.
+
+The first might read better with something like:
+
+Unlike the ARMv7 (ldmia {...,pc}) the AArch64 ISA cannot directly pop the PC register value from the stack without using one of the general purpose registers.
+
+-Will
 > 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> So like many other architectures, we prepare a global routine
+> with NOPs, which serve as trampoline to hack away the
+> function return address, by placing an extra kprobe on the
+> trampoline entry.
+> 
+> The pre-handler of this special trampoline' kprobe execute return
+> probe handler functions and restore original return address in ELR_EL1,
+> this way, saved pt_regs still hold the original register context to be
+> carried back to the probed kernel function.
+> 
+> Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+> Signed-off-by: David A. Long <dave.long@linaro.org>
 > ---
->  drivers/pci/host-bridge.c |   27 +++++++++-------
->  drivers/pci/probe.c       |   73 ++++++++++++++++++++++++++++++++++++++++++--
->  include/linux/pci.h       |   20 ++++++++++++-
->  3 files changed, 103 insertions(+), 17 deletions(-)
+>  arch/arm64/Kconfig               |   1 +
+>  arch/arm64/include/asm/kprobes.h |   1 +
+>  arch/arm64/kernel/kprobes.c      | 114 ++++++++++++++++++++++++++++++++++++++-
+>  3 files changed, 115 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-> index e31604f..49b6c21 100644
-> --- a/drivers/pci/host-bridge.c
-> +++ b/drivers/pci/host-bridge.c
-> @@ -8,9 +8,6 @@
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 256ef90..02f31b7 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -61,6 +61,7 @@ config ARM64
+>  	select HAVE_RCU_TABLE_FREE
+>  	select HAVE_SYSCALL_TRACEPOINTS
+>  	select HAVE_KPROBES if !XIP_KERNEL
+> +	select HAVE_KRETPROBES if HAVE_KPROBES
+>  	select IRQ_DOMAIN
+>  	select MODULES_USE_ELF_RELA
+>  	select NO_BOOTMEM
+> diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
+> index b35d3b9..a2de3b8 100644
+> --- a/arch/arm64/include/asm/kprobes.h
+> +++ b/arch/arm64/include/asm/kprobes.h
+> @@ -56,5 +56,6 @@ void arch_remove_kprobe(struct kprobe *);
+>  int kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr);
+>  int kprobe_exceptions_notify(struct notifier_block *self,
+>  			     unsigned long val, void *data);
+> +void kretprobe_trampoline(void);
 >  
->  #include "pci.h"
->  
-> -LIST_HEAD(pci_host_bridge_list);
-> -DECLARE_RWSEM(pci_host_bridge_sem);
-> -
->  static struct resource busn_resource = {
->  	.name	= "PCI busn",
->  	.start	= 0,
-> @@ -18,6 +15,9 @@ static struct resource busn_resource = {
->  	.flags	= IORESOURCE_BUS,
->  };
->  
-> +LIST_HEAD(pci_host_bridge_list);
-> +DECLARE_RWSEM(pci_host_bridge_sem);
-> +
->  static void pci_release_host_bridge_dev(struct device *dev)
->  {
->  	struct pci_host_bridge *bridge = to_pci_host_bridge(dev);
-> @@ -29,14 +29,12 @@ static void pci_release_host_bridge_dev(struct device *dev)
+>  #endif /* _ARM_KPROBES_H */
+> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
+> index 789ab61..be7c330 100644
+> --- a/arch/arm64/kernel/kprobes.c
+> +++ b/arch/arm64/kernel/kprobes.c
+> @@ -569,6 +569,117 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+>  	return 0;
 >  }
 >  
->  struct pci_host_bridge *pci_create_host_bridge(
-> -		struct device *parent, u32 db, 
-> -		struct pci_ops *ops, void *sysdata, 
-> -		struct list_head *resources)
-> +		struct device *parent, u32 db, struct pci_ops *ops, 
-> +		struct pci_host_info *info)
->  {
->  	int error;
->  	struct pci_bus *b;
->  	struct pci_host_bridge *host, *h;
-> -	struct pci_host_bridge_window *window, *n;
->  
->  	down_read(&pci_host_bridge_sem);
->  	list_for_each_entry(h, &pci_host_bridge_list, list) {
-> @@ -53,7 +51,7 @@ struct pci_host_bridge *pci_create_host_bridge(
->  	if (!host)
->  		return NULL;
->  
-> -	host->sysdata = sysdata;
-> +	host->sysdata = info->arg;
->  	host->busnum = PCI_BUSNUM(db);
->  	host->domain = PCI_DOMAIN(db);
->  	host->ops = ops;
-> @@ -63,18 +61,23 @@ struct pci_host_bridge *pci_create_host_bridge(
->  
->  	/* this is hack, just for build, will be removed later*/
-
-Why do you need this hack? Just for calling pci_domain_nr() ?
-
->  	b = kzalloc(sizeof(*b), GFP_KERNEL);
-> -	b->sysdata = sysdata;
-> +	b->sysdata = host->sysdata;
->  	pci_bus_assign_domain_nr(b, parent);
->  	host->domain = pci_domain_nr(b);
-> +	kfree(b);
->  
-> -	if (!resources) {
-> +	if (info->res_type == PCI_HOST_RES_DEFAULT) {
->  		/* Use default IO/MEM/BUS resources*/
->  		pci_add_resource(&host->windows, &ioport_resource);
->  		pci_add_resource(&host->windows, &iomem_resource);
->  		pci_add_resource(&host->windows, &busn_resource);
->  	} else {
-> -		list_for_each_entry_safe(window, n, resources, list)
-> -			list_move_tail(&window->list, &host->windows);
-> +		if (!info->init_res || info->init_res(host, info)) {
-> +			pr_err("pci host %04x:%02x init resources fail\n",
-> +					host->domain, host->busnum);
-> +			kfree(host);
-> +			return NULL;
-> +		}
->  	}
->  
->  	dev_set_name(&host->dev, "pci%04x:%02x", host->domain, 
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index d472da4..42158fd 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -1863,6 +1863,21 @@ void __weak pcibios_remove_bus(struct pci_bus *bus)
->  {
->  }
->  
-> +static int pci_default_init_res(struct pci_host_bridge *host,
-> +		struct pci_host_info *info)
+> +/*
+> + * Kretprobes: kernel return probes handling
+> + *
+> + * AArch64 mode does not support popping the PC value from the
+> + * stack like on ARM 32-bit (ldmia {..,pc}), so atleast one
+> + * register need to be used to achieve branching/return.
+> + * It means return probes cannot return back to the original
+> + * return address directly without modifying the register context.
+> + *
+> + * So like other architectures, we prepare a global routine
+> + * with NOPs, which serve as trampoline address that hack away the
+> + * function return, with the exact register context.
+> + * Placing a kprobe on trampoline routine entry will trap again to
+> + * execute return probe handlers and restore original return address
+> + * in ELR_EL1, this way saved pt_regs still hold the original
+> + * register values to be carried back to the caller.
+> + */
+> +static void __used kretprobe_trampoline_holder(void)
 > +{
-> +	struct pci_host_bridge_window *window, *n;
-> +
-> +	if (info->res_type != PCI_HOST_RES_DEFAULT) 
-> +		list_for_each_entry_safe(window, n, info->resources,
-> +				list)
-> +			list_move_tail(&window->list, &host->windows);
-> +	else
-> +		info->res_type = PCI_HOST_RES_DEFAULT;
-
-I'm confused about this assignment. Isn't this a nop as the else part
-means info->res_type *is* PCI_HOST_RES_DEFAULT?
-
-> +
-> +	return 0;
+> +	asm volatile (".global kretprobe_trampoline\n"
+> +			"kretprobe_trampoline:\n"
+> +			"NOP\n\t"
+> +			"NOP\n\t");
 > +}
 > +
->  struct pci_bus *__pci_create_root_bus(struct pci_host_bridge *bridge)
->  {
->  	int error;
-> @@ -1949,13 +1964,17 @@ err_out:
->  	return NULL;
->  }
->  
-> -struct pci_bus *pci_create_root_bus(struct device *parent, u32 bus,
-> +struct pci_bus *pci_create_root_bus(struct device *parent, u32 db,
->  		struct pci_ops *ops, void *sysdata, struct list_head *resources)
->  {
->  	struct pci_host_bridge *host;
-> +	struct pci_host_info info;
-> +	
-> +	info.arg= sysdata;
-> +	info.resources = resources;
-> +	info.init_res = pci_default_init_res;
->  
-> -	host = pci_create_host_bridge(parent, bus, ops, 
-> -			sysdata ,resources);
-> +	host = pci_create_host_bridge(parent, db, ops, &info);
->  	if (!host)
->  		return NULL;
->  
-> @@ -2038,8 +2057,13 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, u32 db,
->  	bool found = false;
->  	struct pci_host_bridge *host;
->  	int max;
-> +	struct pci_host_info info;
-> +	
-> +	info.arg = sysdata;
-> +	info.resources = resources;
-> +	info.init_res = pci_default_init_res;
-
-I have mixed feelings about this patch. While it is heading in the right direction
-of moving pci_host_bridge relevant information towards the right user, I don't think
-you picked up the right set to move. The resource list is going to be copied into
-internal pci_host_bridge list anyway, keeping another copy is not helpful *and*
-you have increased the code size.
-
-I think for now we should aim to get the *missing* data into pci_host_bridge: MSI
-controllers and PCI domain/segment. Then we can do more cleanup.
-
->  
-> -	host = pci_create_host_bridge(parent, db, ops, sysdata, resources);
-> +	host = pci_create_host_bridge(parent, db, ops, &info);
->  	if (!host)
->  		return NULL;
->  
-> @@ -2070,6 +2094,47 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, u32 db,
->  }
->  EXPORT_SYMBOL(pci_scan_root_bus);
->  
-> +struct pci_host_bridge *pci_scan_host_bridge(
-> +		struct device *parent, u32 db, struct pci_ops *ops,
-> +		struct pci_host_info *info)
+> +static int __kprobes
+> +trampoline_probe_handler(struct kprobe *p, struct pt_regs *regs)
 > +{
-> +	struct pci_host_bridge_window *window;
-> +	bool found = false;
-> +	struct pci_host_bridge *host;
-> +	int max;
+> +	struct kretprobe_instance *ri = NULL;
+> +	struct hlist_head *head, empty_rp;
+> +	struct hlist_node *tmp;
+> +	unsigned long flags, orig_ret_addr = 0;
+> +	unsigned long trampoline_address =
+> +		(unsigned long)&kretprobe_trampoline;
 > +
-> +	host = pci_create_host_bridge(parent, db, ops, info);
-> +	if (!host)
-> +		return NULL;
+> +	INIT_HLIST_HEAD(&empty_rp);
+> +	kretprobe_hash_lock(current, &head, &flags);
 > +
-> +	list_for_each_entry(window, &host->windows, list)
-> +		if (window->res->flags & IORESOURCE_BUS) {
-> +			found = true;
+> +	/*
+> +	 * It is possible to have multiple instances associated with a given
+> +	 * task either because multiple functions in the call path have
+> +	 * a return probe installed on them, and/or more than one return
+> +	 * probe was registered for a target function.
+> +	 *
+> +	 * We can handle this because:
+> +	 *     - instances are always inserted at the head of the list
+> +	 *     - when multiple return probes are registered for the same
+> +	 *       function, the first instance's ret_addr will point to the
+> +	 *       real return address, and all the rest will point to
+> +	 *       kretprobe_trampoline
+> +	 */
+> +	hlist_for_each_entry_safe(ri, tmp, head, hlist) {
+> +		if (ri->task != current)
+> +			/* another task is sharing our hash bucket */
+> +			continue;
+> +
+> +		if (ri->rp && ri->rp->handler) {
+> +			__this_cpu_write(current_kprobe, &ri->rp->kp);
+> +			get_kprobe_ctlblk()->kprobe_status = KPROBE_HIT_ACTIVE;
+> +			ri->rp->handler(ri, regs);
+> +			__this_cpu_write(current_kprobe, NULL);
+> +		}
+> +
+> +		orig_ret_addr = (unsigned long)ri->ret_addr;
+> +		recycle_rp_inst(ri, &empty_rp);
+> +
+> +		if (orig_ret_addr != trampoline_address)
+> +			/*
+> +			 * This is the real return address. Any other
+> +			 * instances associated with this task are for
+> +			 * other calls deeper on the call stack
+> +			 */
 > +			break;
-> +		}
-> +
-> +	host->bus = __pci_create_root_bus(host);
-> +	if (!host->bus) {
-> +		pci_free_host_bridge(host);
-> +		return NULL;
 > +	}
 > +
-> +	if (!found) {
-> +		dev_info(&host->bus->dev,
-> +		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
-> +			host->busnum);
-> +		pci_bus_insert_busn_res(host->bus, host->busnum, 255);
+> +	kretprobe_assert(ri, orig_ret_addr, trampoline_address);
+> +	/* restore the original return address */
+> +	instruction_pointer(regs) = orig_ret_addr;
+> +	reset_current_kprobe();
+> +	kretprobe_hash_unlock(current, &flags);
+> +
+> +	hlist_for_each_entry_safe(ri, tmp, &empty_rp, hlist) {
+> +		hlist_del(&ri->hlist);
+> +		kfree(ri);
 > +	}
 > +
-> +	max = pci_scan_child_bus(host->bus);
-> +	if (!found)
-> +		pci_bus_update_busn_res_end(host->bus, max);
+> +	kprobes_restore_local_irqflag(regs);
 > +
-> +	return host;
-> +
+> +	/* return 1 so that post handlers not called */
+> +	return 1;
 > +}
-> +EXPORT_SYMBOL(pci_scan_host_bridge);
 > +
->  /**
->   * pci_rescan_bus_bridge_resize - scan a PCI bus for devices.
->   * @bridge: PCI bridge for the bus to scan
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index daa7f40..a51f5f5 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -412,6 +412,21 @@ struct pci_host_bridge {
->  	void *release_data;
->  };
->  
-> +struct pci_host_info {
-> +	u8 res_type;
-> +	void *arg;
-> +	struct list_head *resources; /*just for build, will clean up later */
-> +	int (*init_res)(struct pci_host_bridge *host, 
-> +			struct pci_host_info *info);
+> +void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
+> +				      struct pt_regs *regs)
+> +{
+> +	ri->ret_addr = (kprobe_opcode_t *)regs->regs[30];
+> +
+> +	/* replace return addr (x30) with trampoline */
+> +	regs->regs[30] = (long)&kretprobe_trampoline;
+> +}
+> +
+> +static struct kprobe trampoline = {
+> +	.addr = (kprobe_opcode_t *) &kretprobe_trampoline,
+> +	.pre_handler = trampoline_probe_handler
 > +};
 > +
-> +static inline void init_pci_host_info(struct pci_host_info *info)
+> +int __kprobes arch_trampoline_kprobe(struct kprobe *p)
 > +{
-> +	memset(info, 0 , sizeof(*info));
+> +	return p->addr == (kprobe_opcode_t *) &kretprobe_trampoline;
 > +}
-
-Where is this used?
-
 > +
-> +#define PCI_HOST_RES_DEFAULT	0x2
-> +
-
-Magic number?
-
-Best regards,
-Liviu
-
->  #define	to_pci_host_bridge(n) container_of(n, struct pci_host_bridge, dev)
->  void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
->  		     void (*release_fn)(struct pci_host_bridge *),
-> @@ -420,7 +435,7 @@ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
->  int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge);
->  struct pci_host_bridge *pci_create_host_bridge(
->  		struct device *parent, u32 db, struct pci_ops *ops, 
-> -		void *sys, struct list_head *resources);
-> +		struct pci_host_info *info);
->  /*
->   * The first PCI_BRIDGE_RESOURCE_NUM PCI bus resources (those that correspond
->   * to P2P or CardBus bridge windows) go in a table.  Additional ones (for
-> @@ -785,6 +800,9 @@ void pci_bus_release_busn_res(struct pci_bus *b);
->  struct pci_bus *pci_scan_root_bus(struct device *parent, u32 bus,
->  					     struct pci_ops *ops, void *sysdata,
->  					     struct list_head *resources);
-> +struct pci_host_bridge *pci_scan_host_bridge(struct device *parent,
-> +		u32 db, struct pci_ops *ops,
-> +		struct pci_host_info *info);
->  struct pci_bus *pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev,
->  				int busnr);
->  void pcie_update_link_speed(struct pci_bus *bus, u16 link_status);
-> -- 
-> 1.7.1
+>  /* Break Handler hook */
+>  static struct break_hook kprobes_break_hook = {
+>  	.esr_mask = BRK64_ESR_MASK,
+> @@ -586,5 +697,6 @@ int __init arch_init_kprobes(void)
+>  	register_break_hook(&kprobes_break_hook);
+>  	register_step_hook(&kprobes_step_hook);
+>  
+> -	return 0;
+> +	/* register trampoline for kret probe */
+> +	return register_kprobe(&trampoline);
+>  }
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
