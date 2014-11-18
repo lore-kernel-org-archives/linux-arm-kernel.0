@@ -1,57 +1,100 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 18 Nov 2014 19:19:36 +0000
-Subject: ARM atomics overhaul for musl
-In-Reply-To: <20141118181425.GY18842@arm.com>
-References: <20141116055656.GA13940@brightrain.aerifal.cx>
- <20141116163355.GK4042@n2100.arm.linux.org.uk>
- <20141116165017.GT22465@brightrain.aerifal.cx>
- <20141116171055.GM4042@n2100.arm.linux.org.uk>
- <20141117135412.GC29595@e104818-lin.cambridge.arm.com>
- <20141117143905.GQ4042@n2100.arm.linux.org.uk>
- <CALCETrUAtAJ1CmuxOFiiu53kAWwofUpFaBeFAZF7Th2VXPbHZg@mail.gmail.com>
- <20141118105611.GC28279@e104818-lin.cambridge.arm.com>
- <20141118181425.GY18842@arm.com>
-Message-ID: <20141118191936.GE4042@n2100.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 18 Nov 2014 13:21:12 -0600
+Subject: [PATCH 06/10] input: touchscreen: edt-ft5x06: fix driver
+ autoprobing
+In-Reply-To: <20141118190922.GL6179@saruman>
+References: <1416334028-7766-1-git-send-email-balbi@ti.com>
+ <1416334028-7766-6-git-send-email-balbi@ti.com>
+ <20141118183847.GE3003@dtor-ws> <20141118190922.GL6179@saruman>
+Message-ID: <20141118192112.GM6179@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 06:14:25PM +0000, Will Deacon wrote:
-> The only way I can see hwcap working is if we follow what the architecture
-> allows for in ARMv8, which is 4 bits per feature over (currently) around
-> 10 32-bit registers. That would mean potentially exposing 1280 hwcaps,
-> which is clearly insane.
+Hi,
 
-Exactly my argument, which got called "rediculous" !  I'm glad that
-someone with a similar visibility of the problem has come to the
-same conclusion that I did.
+On Tue, Nov 18, 2014 at 01:09:22PM -0600, Felipe Balbi wrote:
+> On Tue, Nov 18, 2014 at 10:38:47AM -0800, Dmitry Torokhov wrote:
+> > Hi Felipe,
+> > 
+> > On Tue, Nov 18, 2014 at 12:07:04PM -0600, Felipe Balbi wrote:
+> > > i2c devices match against struct i2c_device_id
+> > > even for CONFIG_OF case, so adding a struct of_device_id
+> > > doesn't change anything. As a result, currently, edt-ft5x06
+> > > will not autoprobe if built as a module.
+> > 
+> > Why doe snot it autoprobe? We properly declare MODULE_DEVICE_TABLE for
+> > OF, is it because we are missing some data in device uevent?
+> 
+> because of of_i2c_register_devices(). Maybe Wolfram can give a better
+> explanation here, but it just doesn't match through of_device_id.
+> 
+> Apply this:
+> 
+> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> index 2f90ac6..f0dc16e 100644
+> --- a/drivers/i2c/i2c-core.c
+> +++ b/drivers/i2c/i2c-core.c
+> @@ -449,8 +449,10 @@ static const struct i2c_device_id *i2c_match_id(const struct i2c_device_id *id,
+>  						const struct i2c_client *client)
+>  {
+>  	while (id->name[0]) {
+> -		if (strcmp(client->name, id->name) == 0)
+> +		if (strcmp(client->name, id->name) == 0) {
+> +			dev_info(&client->dev, "i2c_device_id match\n");
+>  			return id;
+> +		}
+>  		id++;
+>  	}
+>  	return NULL;
+> @@ -465,8 +467,10 @@ static int i2c_device_match(struct device *dev, struct device_driver *drv)
+>  		return 0;
+>  
+>  	/* Attempt an OF style match */
+> -	if (of_driver_match_device(dev, drv))
+> +	if (of_driver_match_device(dev, drv)) {
+> +		dev_info(dev, "of driver match\n");
+>  		return 1;
+> +	}
+>  
+>  	/* Then ACPI style match */
+>  	if (acpi_driver_match_device(dev, drv))
+> @@ -1081,6 +1085,7 @@ i2c_new_device(struct i2c_adapter *adap, struct i2c_board_info const *info)
+>  	client->dev.bus = &i2c_bus_type;
+>  	client->dev.type = &i2c_client_type;
+>  	client->dev.of_node = info->of_node;
+> +	dev_info(&adap->dev, "%s: of_node %p\n", __func__, info->of_node);
+>  	ACPI_COMPANION_SET(&client->dev, info->acpi_node.companion);
+>  
+>  	i2c_dev_set_name(adap, client);
+> @@ -1411,6 +1416,7 @@ static void of_i2c_register_devices(struct i2c_adapter *adap)
+>  
+>  		info.irq = irq_of_parse_and_map(node, 0);
+>  		info.of_node = of_node_get(node);
+> +		dev_info(&adap->dev, "%s: of_node %p\n", __func__, info.of_node);
+>  		info.archdata = &dev_ad;
+>  
+>  		if (of_get_property(node, "wakeup-source", NULL))
+> 
+> then boot the board and you get http://hastebin.com/oqemezajez
+> 
+> Interesting, it's matching against of but only when I modprobe.
+> 
+> Let me debug this one a little more.
 
-> We've done a bit better with the crypto extensions, where we provide
-> fine-grained sha1, sha2 etc hwcaps, but this is based on the relavant 4-bit
-> fields in ISAR5 being positive values. I can't find any architectural
-> guarantees that this will work on future cores (e.g. bumping the 4-bit
-> field to indicate a subset of previous functionality).
+this is a simpler patch:
 
-This is the big problem.  An example of this is the barrier bits, which
-indicate whether dmb & dsb are present or not.  It's not a single bit,
-but a group of four.  If we provide a single bit for dmb, and another
-for dsb (to cater for a future possibility that dmb or dsb may be
-separately indicated by a future 4-bit binary pattern), that's fine,
-but should we then list every instruction which is conditional on any
-ISAR bit pattern?  That becomes a /very/ big space indeed.
++MODULE_ALIAS("i2c:edt-ft5206");
++MODULE_ALIAS("i2c:edt-ft5306");
++MODULE_ALIAS("i2c:edt-ft5406");
 
-If we don't do this, and (eg) we use a single bit for both dmb and dsb,
-what if a future bit pattern indicates that (eg) dmb is obsolete, but
-dsb hasn't.
-
-Contary to what others assert, this is not a trivial problem, and it's
-not trivial to just add additional hwcap bits to solve it.
-
-There's also the problem in /knowing/ what information to export to
-userspace, before userspace knows that they need it... which is exactly
-what's happened with DMB (and this is not the first time it's happened.)
-
-I suspect this won't be the last time either.
+I'll send it in a bit.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141118/0b3f18f4/attachment.sig>
