@@ -1,10 +1,10 @@
 From: wcohen@redhat.com (William Cohen)
-Date: Tue, 18 Nov 2014 09:38:51 -0500
+Date: Tue, 18 Nov 2014 09:39:32 -0500
 Subject: [PATCH v3 1/5] arm64: Kprobes with single stepping support
 In-Reply-To: <1416292375-29560-2-git-send-email-dave.long@linaro.org>
 References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
  <1416292375-29560-2-git-send-email-dave.long@linaro.org>
-Message-ID: <546B59FB.7050307@redhat.com>
+Message-ID: <546B5A24.7090902@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -42,6 +42,8 @@ On 11/18/2014 01:32 AM, David Long wrote:
 > probing such instructions.
 
 The above paragraph doesn't seem correct. arm64 kprobes does allow probing instructions that can't be single stepped XOL. kprobes will use simulation in those cases.  It might be simpler describe the three possible methods of handling a potential probe point: single step instruction xol, instruction simulation, and reject probe point, then for each describe why it would be used.
+
+-Will
 
 > 
 > Instructions generating exceptions or cpu mode change are rejected,
