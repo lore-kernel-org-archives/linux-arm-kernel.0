@@ -1,112 +1,102 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Tue, 18 Nov 2014 08:47:18 +0000
-Subject: [PATCH 2/2] dt-bindings: simplefb-sunxi: Add sunxi simplefb
- extensions
-In-Reply-To: <546B0026.2010107@redhat.com>
-References: <1416224086-5698-1-git-send-email-hdegoede@redhat.com>
- <1416224086-5698-3-git-send-email-hdegoede@redhat.com>
- <20141117124721.GQ6414@lukather>
- <CACxGe6vqiC08sP+o3bduGfvUdwRtHm8+_7EdZccJjS86qVKvxQ@mail.gmail.com>
- <20141117155514.GU6414@lukather> <546B0026.2010107@redhat.com>
-Message-ID: <1416300438.25454.40.camel@hellion.org.uk>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 18 Nov 2014 09:47:57 +0100
+Subject: [PATCH v3 00/11] Add stih410 SoC/board and USB2/1.1 support for
+ stih416
+In-Reply-To: <1416242884-5261-1-git-send-email-peter.griffin@linaro.org>
+References: <1416242884-5261-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <546B07BD.4030400@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-11-18 at 09:15 +0100, Hans de Goede wrote:
-> Hi,
-> 
-> On 11/17/2014 04:55 PM, Maxime Ripard wrote:
-> > On Mon, Nov 17, 2014 at 01:39:18PM +0000, Grant Likely wrote:
-> >> On Mon, Nov 17, 2014 at 12:47 PM, Maxime Ripard
-> >> <maxime.ripard@free-electrons.com> wrote:
-> >>> On Mon, Nov 17, 2014 at 12:34:46PM +0100, Hans de Goede wrote:
-> >>>> If pre-filled framebuffer nodes are used, the firmware may need extra
-> >>>> properties to find the right node. This documents the properties to use
-> >>>> for this on sunxi platforms.
-> >>>>
-> >>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>>> ---
-> >>>>  .../bindings/video/simple-framebuffer-sunxi.txt    | 33 ++++++++++++++++++++++
-> >>>>  1 file changed, 33 insertions(+)
-> >>>>  create mode 100644 Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
-> >>>>
-> >>>> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
-> >>>> new file mode 100644
-> >>>> index 0000000..84ca264
-> >>>> --- /dev/null
-> >>>> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
-> >>>> @@ -0,0 +1,33 @@
-> >>>> +Sunxi specific Simple Framebuffer bindings
-> >>>> +
-> >>>> +This binding documents sunxi specific extensions to the simple-framebuffer
-> >>>> +bindings. The sunxi simplefb u-boot code relies on the devicetree containing
-> >>>> +pre-populated simplefb nodes.
-> >>>> +
-> >>>> +These extensions are intended so that u-boot can select the right node based
-> >>>> +on which pipeline and output is being used. As such they are solely intended
-> >>>> +for firmware / bootloader use, and the OS should ignore them.
-> >>>> +
-> >>>> +Required properties:
-> >>>> +- compatible: "sunxi,framebuffer"
-> >>>> +- sunxi,pipeline:
-> >>>> +  <0> for the de_be0 -> lcdc0 -> output pipeline
-> >>>> +  <1> for the de_be1 -> lcdc1 -> output pipeline
-> >>>> +- sunxi,output: One of: "hdmi", "lcd", "vga", and "composite"
-> >>>> +
-> >>>> +Example:
-> >>>> +
-> >>>> +chosen {
-> >>>> +     #address-cells = <1>;
-> >>>> +     #size-cells = <1>;
-> >>>> +     ranges;
-> >>>> +
-> >>>> +     framebuffer at 0 {
-> >>>> +             compatible = "sunxi,framebuffer", "simple-framebuffer";
-> >>>> +             sunxi,pipeline = <0>;
-> >>>> +             sunxi,output = "hdmi";
-> >>>> +             clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
-> >>>> +                      <&ahb_gates 44>;
-> >>>
-> >>> If we're going that way, then maybe having to specify clock-names
-> >>> would be better in order to know which clock is what?
-> >>
-> >> I wouldn't go that way with this binding since the driver has no need
-> >> to differentiate between the clocks, and driver authors shouldn't be
-> >> encouraged to do so. The purpose of the clocks in this node is only
-> >> for itemizing dependencies, not for how to configure the clocks.
-> >> Firmware shouldn't care at all about the clocks list, it only needs to
-> >> find the correct pre-populated node to fill in and enable.
-> > 
-> > Well, if we want to play the "DT as an ABI" stuff, you have no
-> > guarantee that in the future, simplefb will still be the driver bound
-> > to "sunxi,framebuffer"
-> 
-> Huh? We do have that guarantee, or at least that a simplefb bindings
-> compatible driver is, the "sunxi,framebuffer" bindings live in:
-> 
-> Documentation/devicetree/bindings/video/simple-framebuffer-sunxi.txt
-> 
-> With the filename already being a big hint, further more it states that:
-> 
-> "This binding documents sunxi specific extensions to the simple-framebuffer
-> bindings. The sunxi simplefb u-boot code relies on the devicetree containing
-> pre-populated simplefb nodes.
-> 
-> These extensions are intended so that u-boot can select the right node based
-> on which pipeline is being used. As such they are solely intended for
-> firmware / bootloader use, and the OS should ignore them."
 
-There may be an argument here for using the slightly redundant compat
-string "allwinner,simple-framebuffer" in order to reinforce that this is
-an extension to simple-framebuffer, as opposed to a binding for a
-completely separate "non-simple" sunxi framebuffer driver which I think
-is what Maxime may be imagining.
 
-Alternatively (or as well) perhaps these extension should be a series of
-extensions (one per platform) described in "appendices" of the main
-simple-framebuffer.txt. I know Grant expressed a preference for a
-separate document though and I think just using the more expressive name
-above would be sufficient, but thought I'd mention it as a possible
-option.
+On 11/17/2014 05:47 PM, Peter Griffin wrote:
+> Hi folks,
+>
+> This series adds the required device tree nodes to enable the usb2/1.1 phy
+> and usb2/1.1 controllers on the stih416-b2120 board.
+>
+> It additionally re-works and adds support for the new stih410 SoC which is
+> very similar to the stih407 SoC, by abstracting out the common parts
+> into common dt files.
+>
+> After Arnds feedback regarding mixing address spaces in the stih407-picophy
+> dt nodes, I've tempoarily removed these patches from the series until the
+> underlying driver has been fixed, as ideally I would like to get the rest
+> of this series into 3.19
+>
+> As well as adding dt nodes it also enables the relevant drivers in the
+> multi_v7_defconfig.
+>
+> Finally we update the default bootargs for stih407-b2120 and stih410-b2120
+> to boot with the clk_ignore_unused kernel parameter so as not to hang
+> the SoC when the (as yet) unreferenced interconnect clocks get disabled
+> by CCF (this is a tempoary solution).
+>
+> This series has been tested on stih416-b2020 and stih410-b2120 SoC/boards.
+>
+> Changes since v1:
+> - Leave bootargs & memory dt nodes in board files (Arnd)
+> - Remove '0x' from the unit address in all instances. (Arnd)
+> - Remove 'status="okay"' from some nodes (Arnd)
+> - Remove some legacy extra nodes which only contain status property (Arnd)
+> - Fix stih410 commit description (Maxime)
+> - Add a stih410.dtsi and stih410-pinctrl.dtsi files (Maxime)
+> - Remove superflous '\n' (Lee)
+> - Add a '\n' between the sentries and #include (Lee)
+>
+> Changes since v2:
+> - Remove picophy and ehci/ohci dt nodes for stih407 / stih410 until reg binding is fixed
+> - Update miphy365 over to common convention of phy@ (Arnd)
+>
+> Peter Griffin (11):
+>    ARM: STi: DT: STiH416: Add pinctl setup for usb controllers.
+>    ARM: STi: DT: STiH416: Add DT node for the stih415/6 usb2 phy
+>    ARM: STi: DT: STiH416: Add DT nodes for the ehci and ohci usb
+>      controllers.
+>    ARM: multi_v7_defconfig: Enable st ohci and ehci HCD drivers.
+>    ARM: multi_v7_defconfig: Enable stih415/6 usb2 phy driver.
+>    ARM: STi: DT: STiH410: Add defines for STiH410 DT clocks
+>    ARM: STi: DT: STiH410:  Add pinctl config for usb controllers.
+>    ARM: STi: DT: STih407: Abstract common dt nodes into shared files.
+>    ARM: STi: DT: STiH410: Add STiH410 SoC and b2120 board support.
+>    ARM: STi: DT: STih407: STih410: Add clk_ignore_unused to kernel
+>      bootargs
+>    ARM: STi: DT: STiH416: Change miphy356 node name to phy at fe382000
 
-Ian.
+For the series,
+
+     Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+
+     If Arnd is fine with the series, these patches will be part of my 
+next pull request.
+
+Regards,
+Maxime
+
+>
+>   arch/arm/boot/dts/Makefile               |   1 +
+>   arch/arm/boot/dts/stih407-b2120.dts      |  55 +----
+>   arch/arm/boot/dts/stih407-family.dtsi    | 278 +++++++++++++++++++++++++
+>   arch/arm/boot/dts/stih407.dtsi           | 279 -------------------------
+>   arch/arm/boot/dts/stih410-b2120.dts      |  29 +++
+>   arch/arm/boot/dts/stih410-clock.dtsi     | 338 +++++++++++++++++++++++++++++++
+>   arch/arm/boot/dts/stih410-pinctrl.dtsi   |  34 ++++
+>   arch/arm/boot/dts/stih410.dtsi           |  14 ++
+>   arch/arm/boot/dts/stih416-b2020.dts      |   2 +-
+>   arch/arm/boot/dts/stih416-b2020e.dts     |   2 +-
+>   arch/arm/boot/dts/stih416-pinctrl.dtsi   |  34 ++++
+>   arch/arm/boot/dts/stih416.dtsi           | 131 +++++++++++-
+>   arch/arm/boot/dts/stihxxx-b2120.dtsi     |  59 ++++++
+>   arch/arm/configs/multi_v7_defconfig      |   3 +
+>   include/dt-bindings/clock/stih410-clks.h |  25 +++
+>   15 files changed, 951 insertions(+), 333 deletions(-)
+>   create mode 100644 arch/arm/boot/dts/stih407-family.dtsi
+>   delete mode 100644 arch/arm/boot/dts/stih407.dtsi
+>   create mode 100644 arch/arm/boot/dts/stih410-b2120.dts
+>   create mode 100644 arch/arm/boot/dts/stih410-clock.dtsi
+>   create mode 100644 arch/arm/boot/dts/stih410-pinctrl.dtsi
+>   create mode 100644 arch/arm/boot/dts/stih410.dtsi
+>   create mode 100644 arch/arm/boot/dts/stihxxx-b2120.dtsi
+>   create mode 100644 include/dt-bindings/clock/stih410-clks.h
+>
