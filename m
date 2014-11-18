@@ -1,62 +1,91 @@
 From: Andrew.Jackson@arm.com (Andrew Jackson)
-Date: Tue, 18 Nov 2014 17:39:30 +0000
-Subject: [PATCH] drm/i2c: tda998x: Allow for different audio sample rates
-Message-ID: <546B8452.6030701@arm.com>
+Date: Tue, 18 Nov 2014 17:41:26 +0000
+Subject: [PATCH] drm: i2c: tda998x: Retry fetching the EDID if it fails first
+ time.
+Message-ID: <546B84C6.3090809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On HDMI, the audio data are carried across the HDMI link which is
-driven by the TDMS clock. The TDMS clock is dependent on the video pixel
-rate.
+Fetching the EDID from a connected monitor is an automated thing
+with NXP TDA19988. But on some boards the fetching fails for the
+first time silently without any indication that an error has occured.
+More than that, subsequent fetches of the EDID succeed until the
+monitor(s) are unplugged.
 
-This patch sets the denominator (Cycle Time Stamp) appropriately
-allowing the driver to send audio to a wider range of HDMI sinks
-(i.e. monitors).
+Add a function to validate the read EDID and retry if the block
+retrieved is not valid.
 
 Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c |   22 ++++++++++++++++++----
- 1 files changed, 18 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/i2c/tda998x_drv.c |   36 ++++++++++++++++++++++++++++--------
+ 1 files changed, 28 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index d476279..da0d504 100644
+index d476279..025adc0 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -640,7 +640,7 @@ tda998x_configure_audio(struct tda998x_priv *priv,
- 		struct drm_display_mode *mode, struct tda998x_encoder_params *p)
+@@ -1066,11 +1066,36 @@ static int read_edid_block(struct tda998x_priv *priv, uint8_t *buf, int blk)
+ 	return 0;
+ }
+ 
++static int
++read_validate_edid_block(struct tda998x_priv *priv, uint8_t *buf, int blk)
++{
++	bool print_bad_edid = drm_debug & DRM_UT_KMS;
++	int ret;
++	int retries = 1;
++
++	do
++	{
++		bool print_bad = print_bad_edid && (retries == 0);
++
++		ret = read_edid_block(priv, buf, blk);
++		/* Fail on I2C error */
++		if (ret)
++			break;
++
++		/* But retry checksum errored blocks */
++		if (drm_edid_block_valid(buf, blk, print_bad))
++			break;
++		else
++			ret = -EINVAL;
++	} while (retries-- > 0);
++
++	return ret;
++}
++
+ static uint8_t *do_get_edid(struct tda998x_priv *priv)
  {
- 	uint8_t buf[6], clksel_aip, clksel_fs, cts_n, adiv;
--	uint32_t n;
-+	uint32_t n, cts;
+ 	int j, valid_extensions = 0;
+ 	uint8_t *block, *new;
+-	bool print_bad_edid = drm_debug & DRM_UT_KMS;
  
- 	/* Enable audio ports */
- 	reg_write(priv, REG_ENA_AP, p->audio_cfg);
-@@ -696,9 +696,23 @@ tda998x_configure_audio(struct tda998x_priv *priv,
- 	n = 128 * p->audio_sample_rate / 1000;
+ 	if ((block = kmalloc(EDID_LENGTH, GFP_KERNEL)) == NULL)
+ 		return NULL;
+@@ -1079,10 +1104,7 @@ static uint8_t *do_get_edid(struct tda998x_priv *priv)
+ 		reg_clear(priv, REG_TX4, TX4_PD_RAM);
  
- 	/* Write the CTS and N values */
--	buf[0] = 0x44;
--	buf[1] = 0x42;
--	buf[2] = 0x01;
-+	if ((n > 0) && (mode->clock > 0)) {
-+		/*
-+		 * For non-coherent clocks, the average CTS value is
-+		 * calculated as:
-+		 *      fTMDS * n / (128 * fs)
-+		 * which simplifies to:
-+		 * 	fTMDS / 1000
-+		 * (See sections 7.2.2 and 7.2.3 of the HDMI specification.)
-+		 * NB mode->clock is in kHz.
-+		 */
-+		cts = mode->clock;
-+	} else {
-+		cts = 82500;
-+	}
-+	buf[0] = cts;
-+	buf[1] = cts >> 8;
-+	buf[2] = cts >> 16;
- 	buf[3] = n;
- 	buf[4] = n >> 8;
- 	buf[5] = n >> 16;
+ 	/* base block fetch */
+-	if (read_edid_block(priv, block, 0))
+-		goto fail;
+-
+-	if (!drm_edid_block_valid(block, 0, print_bad_edid))
++	if (read_validate_edid_block(priv, block, 0))
+ 		goto fail;
+ 
+ 	/* if there's no extensions, we're done */
+@@ -1096,10 +1118,8 @@ static uint8_t *do_get_edid(struct tda998x_priv *priv)
+ 
+ 	for (j = 1; j <= block[0x7e]; j++) {
+ 		uint8_t *ext_block = block + (valid_extensions + 1) * EDID_LENGTH;
+-		if (read_edid_block(priv, ext_block, j))
+-			goto fail;
+ 
+-		if (!drm_edid_block_valid(ext_block, j, print_bad_edid))
++		if (read_validate_edid_block(priv, ext_block, j))
+ 			goto fail;
+ 
+ 		valid_extensions++;
 -- 
 1.7.1
