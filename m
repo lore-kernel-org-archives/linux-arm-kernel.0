@@ -1,78 +1,61 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Tue, 18 Nov 2014 10:24:25 -0800
-Subject: ARM atomics overhaul for musl
-In-Reply-To: <20141118181425.GY18842@arm.com>
-References: <20141116055656.GA13940@brightrain.aerifal.cx>
- <20141116163355.GK4042@n2100.arm.linux.org.uk>
- <20141116165017.GT22465@brightrain.aerifal.cx>
- <20141116171055.GM4042@n2100.arm.linux.org.uk>
- <20141117135412.GC29595@e104818-lin.cambridge.arm.com>
- <20141117143905.GQ4042@n2100.arm.linux.org.uk>
- <CALCETrUAtAJ1CmuxOFiiu53kAWwofUpFaBeFAZF7Th2VXPbHZg@mail.gmail.com>
- <20141118105611.GC28279@e104818-lin.cambridge.arm.com>
- <20141118181425.GY18842@arm.com>
-Message-ID: <CALCETrX5_3qE0Jmiio6XMKgJ8e7hPnou1+RKGQOgKo5XYruqsQ@mail.gmail.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Tue, 18 Nov 2014 19:30:28 +0100
+Subject: [PATCHv3 00/12] arm: mvebu: add Synology DS213j and DS414 .dts
+ files
+In-Reply-To: <546B22E1.4020507@gmail.com> (Sebastian Hesselbarth's message of
+ "Tue, 18 Nov 2014 11:43:45 +0100")
+References: <cover.1416266432.git.arno@natisbad.org>
+ <546B22E1.4020507@gmail.com>
+Message-ID: <87zjbobbuj.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 10:14 AM, Will Deacon <will.deacon@arm.com> wrote:
-> I was really hoping to avoid this thread, but I wanted to comment on the
-> suitability of hwcap as a discovery mechanism.
->
-> On Tue, Nov 18, 2014 at 10:56:12AM +0000, Catalin Marinas wrote:
->> On Mon, Nov 17, 2014 at 05:38:46PM +0000, Andy Lutomirski wrote:
->> > On Nov 17, 2014 6:39 AM, "Russell King - ARM Linux"
->> > > Given that even cocked these up (just as what happened with the cache
->> > > type register) decoding of the feature type registers depends on the
->> > > underlying CPU architecture.
->> > >
->> > > So, even _if_ we exported the feature registers to userspace, you still
->> > > need to know the CPU architecture to decode them properly, so you still
->> > > need to parse the AT_PLATFORM string to get that information.
->> >
->> > There's no need to expose the hardware feature registers as is.
->> > Define your own sensible feature bits just for Linux.
+Hi Sebastian,
+
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> writes:
+
+> On 11/18/2014 12:26 AM, Arnaud Ebalard wrote:
+>> This series adds .dts files for Synology DS213j (armada 370 2-bay NAS) and
+>> DS414 (armada XP 4-bay NAS) devices. It is based on comments received on
+>> a v0 submission of DS213j .dts file [1] and Andrew's comments on a v1 (
+>> for both DS213j and DS414 .dts files) [2] and Andrew/Sebastian' comments
+>> on v2 regarding pinctrl improvements [3].
 >>
->> We get regular questions about direct access to the hardware feature
->> bits, many using the x86 cpuid instruction as argument. So far we
->> couldn't see good enough reasons, otherwise we would have pushed such
->> instruction in the ARMv8 architecture. It's also not a simple direct
->> hardware access since the kernel may want to mask some features it does
->> not support, which pretty much requires HWCAP or some banked CPUID
->> registers in hardware.
+>> Cheers,
+>>
+>> a+
+>>
+>> [1]: http://thread.gmane.org/gmane.linux.drivers.devicetree/95401
+>> [2]: http://thread.gmane.org/gmane.linux.drivers.devicetree/98830
+>> [3]: http://thread.gmane.org/gmane.linux.drivers.devicetree/98892
+>>
+>> Changes since v2:
+>>
+>> - Added various patches to improve/refactor Armada 370/XP pinctrl
+>>    nodes/properties and use sensible defaults when possible.
 >
-> Or trapping the undef exception from EL0 and emulating it in the kernel,
-> which doesn't require any extra hardware, allows the kernel to mask out
-> things it can't support and gives userspace the information it needs
-> under any scenario.
+> Arnaud,
 >
-
-This only sounds reasonable to me if non-Linux architectures do it,
-too.  Otherwise using a syscall sounds more sensible.
-
-FWIW, I personally don't like the fact that x86 allows unprivileged
-code to use CPUID.  This can sort of be disabled on some recent Intel
-hardware, but last I checked that ability was explicitly not
-guaranteed to exist going forward.
-
->> Another class are dynamic loaders that don't yet have a C library
->> loaded. However, as such loaders are the first entry point, I don't see
->> why they couldn't access auxv directly. One particular scenario here is
->> finding out which CPU micro-architecture (implementation) it is so that
->> the dynamic loader could choose a more optimised library. CPUID would
->> help partially here (get the actual MIDR identifying the CPU
->> implementation rather than just features) but not on heterogeneous
->> systems like big.LITTLE. Which means that we would still be better off
->> with some extra features in auxv, maybe even listing the individual MIDR
->> for all the CPUs in the system.
+> sorry I didn't remember earlier, but there has been a similar patch
+> set that already deals with Armada-XP pinctrl and ethernet settings
+> [1].
 >
-> The only way I can see hwcap working is if we follow what the architecture
-> allows for in ARMv8, which is 4 bits per feature over (currently) around
-> 10 32-bit registers. That would mean potentially exposing 1280 hwcaps,
-> which is clearly insane.
+> [1]
+> https://lkml.kernel.org/g/1411157684-6991-1-git-send-email-sebastian.hesselbarth at gmail.com
+>
+> It has already been merged by Jason into mvebu/dt for v3.19, so it
+> seems you'll have to rebase your patches on top of it. AFAIKS, you
+> can drop pinctrl node consolidation for the SoCs (XP at least) and
+> RGMII consolidation. The other changes you did for common 370/XP
+> dtsi, UART, and SPI are valuable and you should keep them.
 
-Stick it in the vdso?  /me snickers
+I'll rebase the whole series and send a v4.
 
-Out of curiosity, why are there 4 bits per feature?
+> If I find some time, I'll have a closer look at both patch sets.
+> Sorry again for not remembering earlier!
 
---Andy
+no problem.
+
+Cheers,
+
+a+
