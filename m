@@ -1,31 +1,70 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 18 Nov 2014 12:51:31 +0100
-Subject: [PATCH v5 4/8] ARM: DT: STi: STiH407: Add DT node for MiPHY28lp
-In-Reply-To: <1415098284-11182-5-git-send-email-gabriel.fernandez@linaro.org>
-References: <1415098284-11182-1-git-send-email-gabriel.fernandez@linaro.org>
- <1415098284-11182-5-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <546B32C3.8000602@st.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 18 Nov 2014 19:22:03 +0800
+Subject: [PATCH V4 2/3] can: m_can: update to support CAN FD features
+In-Reply-To: <5465CA47.4020802@pengutronix.de>
+References: <1415349914-9145-1-git-send-email-b29396@freescale.com>
+ <1415349914-9145-2-git-send-email-b29396@freescale.com>
+ <54648382.9080105@pengutronix.de> <5464E2D7.7010906@hartkopp.net>
+ <5465CA47.4020802@pengutronix.de>
+Message-ID: <20141118112201.GA28032@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabriel,
-On 11/04/2014 11:51 AM, Gabriel FERNANDEZ wrote:
-> The MiPHY28lp is a Generic PHY which can serve various SATA, PCIe or
-> USB3 devices. The two first ports can be use for either; both SATA, both
-> PCIe or one of each in any configuration.
-> The Third port is only for USB3.
->
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-> ---
->   arch/arm/boot/dts/stih407-b2120.dts | 11 +++++++
->   arch/arm/boot/dts/stih407.dtsi      | 65 +++++++++++++++++++++++++++++++++++++
->   2 files changed, 76 insertions(+)
+On Fri, Nov 14, 2014 at 10:24:23AM +0100, Marc Kleine-Budde wrote:
+> On 11/13/2014 05:56 PM, Oliver Hartkopp wrote:
+> > On 11/13/2014 11:10 AM, Marc Kleine-Budde wrote:
+> >> On 11/07/2014 09:45 AM, Dong Aisheng wrote:
+> > 
+> >>>  
+> >>> -	if (id & RX_BUF_RTR) {
+> >>> +	if (id & RX_BUF_ESI) {
+> >>> +		cf->flags |= CANFD_ESI;
+> >>> +		netdev_dbg(dev, "ESI Error\n");
+> >>> +	}
+> >>> +
+> >>> +	if (!(dlc & RX_BUF_EDL) && (id & RX_BUF_RTR)) {
+> >>>  		cf->can_id |= CAN_RTR_FLAG;
+> >>
+> >> I just noticed, that you don't set the cf->dlc (or cf->len) in the RTR
+> >> case. Please create a separate patch that fixes this problem.
+> >>
+> >>>  	} else {
+> >>>  		id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DLC);
+> >>> -		cf->can_dlc = get_can_dlc((id >> 16) & 0x0F);
+> >>> -		*(u32 *)(cf->data + 0) = m_can_fifo_read(priv, fgi,
+> >>> -							 M_CAN_FIFO_DATA(0));
+> >>> -		*(u32 *)(cf->data + 4) = m_can_fifo_read(priv, fgi,
+> >>> -							 M_CAN_FIFO_DATA(1));
+> >>> +		if (dlc & RX_BUF_EDL)
+> >>> +			cf->len = can_dlc2len((id >> 16) & 0x0F);
+> >>> +		else
+> >>> +			cf->len = get_can_dlc((id >> 16) & 0x0F);
+> >>> +
+> > 
+> > Grr. I missed that one too :-(
+> > 
+> > Thanks for catching it.
+> > 
+> > As you committed patch 1 & 3 you expect a new single patch containing the
+> > (fixed) content of this patch 2, right?
+> 
+> No, please make it two patches:
+> 
+> First the Bugfix: One setting the cf->dlc in the RTR case, too.
+> Then the new feature: The other one adding CAN-FD support.
+> 
 
-Finally, I won't apply this  patch in its current form.
+Thanks for finding this.
+Will do a patch soon as you said.
 
-Indeed, you should follow Arnd recommendations on Syscfg registers 
-handling in DT.
-See https://lkml.org/lkml/2014/11/13/161
+Regards
+Dong Aisheng
 
-Regards,
-Maxime
+> Marc
+> 
+> -- 
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> 
