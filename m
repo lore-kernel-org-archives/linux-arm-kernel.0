@@ -1,106 +1,60 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 18 Nov 2014 18:53:03 +0000
-Subject: [PATCH v2 08/13] irqchip: GICv3: ITS: device allocation and
- configuration
+Date: Tue, 18 Nov 2014 18:53:07 +0000
+Subject: [PATCH v2 12/13] irqchip: GICv3: ITS: enable compilation of the ITS
+ driver
 In-Reply-To: <1416336788-22634-1-git-send-email-marc.zyngier@arm.com>
 References: <1416336788-22634-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1416336788-22634-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1416336788-22634-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ITS has a notion of "device" that can write to it in order to
-generate an interrupt.
-
-Conversly, the driver maintains a per-ITS list of devices, together
-with their configuration information, and uses this to configure
-the HW.
+Get the show on the road...
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 74 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 74 insertions(+)
+ arch/arm64/Kconfig       | 1 +
+ drivers/irqchip/Kconfig  | 4 ++++
+ drivers/irqchip/Makefile | 1 +
+ 3 files changed, 6 insertions(+)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 03f9831..d687fd4 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -981,3 +981,77 @@ static void its_cpu_init_collection(void)
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 9532f8d..242948d 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -14,6 +14,7 @@ config ARM64
+ 	select ARM_GIC
+ 	select AUDIT_ARCH_COMPAT_GENERIC
+ 	select ARM_GIC_V3
++	select ARM_GIC_V3_ITS if PCI_MSI
+ 	select BUILDTIME_EXTABLE_SORT
+ 	select CLONE_BACKWARDS
+ 	select COMMON_CLK
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index 4631685..aaa260b 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -16,6 +16,10 @@ config ARM_GIC_V3
+ 	select MULTI_IRQ_HANDLER
+ 	select IRQ_DOMAIN_HIERARCHY
  
- 	spin_unlock(&its_lock);
- }
++config ARM_GIC_V3_ITS
++	bool
++	select PCI_MSI_IRQ_DOMAIN
 +
-+static struct its_device *its_find_device(struct its_node *its, u32 dev_id)
-+{
-+	struct its_device *its_dev = NULL, *tmp;
-+
-+	raw_spin_lock(&its->lock);
-+
-+	list_for_each_entry(tmp, &its->its_device_list, entry) {
-+		if (tmp->device_id == dev_id) {
-+			its_dev = tmp;
-+			break;
-+		}
-+	}
-+
-+	raw_spin_unlock(&its->lock);
-+
-+	return its_dev;
-+}
-+
-+static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
-+					    int nvecs)
-+{
-+	struct its_device *dev;
-+	unsigned long *lpi_map;
-+	void *itt;
-+	int lpi_base;
-+	int nr_lpis;
-+	int cpu;
-+	int sz;
-+
-+	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
-+	sz = nvecs * its->ite_size;
-+	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
-+	itt = kmalloc(sz, GFP_KERNEL);
-+	lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
-+
-+	if (!dev || !itt || !lpi_map) {
-+		kfree(dev);
-+		kfree(itt);
-+		kfree(lpi_map);
-+		return NULL;
-+	}
-+
-+	dev->its = its;
-+	dev->itt = itt;
-+	dev->nr_ites = nvecs;
-+	dev->lpi_map = lpi_map;
-+	dev->lpi_base = lpi_base;
-+	dev->nr_lpis = nr_lpis;
-+	dev->device_id = dev_id;
-+	INIT_LIST_HEAD(&dev->entry);
-+
-+	raw_spin_lock(&its->lock);
-+	list_add(&dev->entry, &its->its_device_list);
-+	raw_spin_unlock(&its->lock);
-+
-+	/* Bind the device to the first possible CPU */
-+	cpu = cpumask_first(cpu_online_mask);
-+	dev->collection = &its->collections[cpu];
-+
-+	/* Map device to its ITT */
-+	its_send_mapd(dev, 1);
-+
-+	return dev;
-+}
-+
-+static void its_free_device(struct its_device *its_dev)
-+{
-+	raw_spin_lock(&its_dev->its->lock);
-+	list_del(&its_dev->entry);
-+	raw_spin_unlock(&its_dev->its->lock);
-+	kfree(its_dev->itt);
-+	kfree(its_dev);
-+}
+ config ARM_NVIC
+ 	bool
+ 	select IRQ_DOMAIN
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 173bb5f..ec3621d 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -20,6 +20,7 @@ obj-$(CONFIG_ARCH_SUNXI)		+= irq-sunxi-nmi.o
+ obj-$(CONFIG_ARCH_SPEAR3XX)		+= spear-shirq.o
+ obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
+ obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
++obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o
+ obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
+ obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
+ obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
 -- 
 2.1.3
