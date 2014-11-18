@@ -1,114 +1,97 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 18 Nov 2014 16:32:26 +0800
-Subject: [RFC PATCH 07/16] PCI: Separate pci_host_bridge creation out
- of pci_create_root_bus()
-In-Reply-To: <2507218.mHliopJb05@wuerfel>
-References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
- <1416219710-26088-8-git-send-email-wangyijing@huawei.com>
- <2507218.mHliopJb05@wuerfel>
-Message-ID: <546B041A.4060403@huawei.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 18 Nov 2014 09:46:03 +0100
+Subject: [RFC] adp1653: Add device tree bindings for LED controller
+In-Reply-To: <546AFEA5.9020000@samsung.com>
+References: <20141116075928.GA9763@amd>
+ <20141117145857.GO8907@valkosipuli.retiisi.org.uk>
+ <546AFEA5.9020000@samsung.com>
+Message-ID: <20141118084603.GC4059@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
->> +LIST_HEAD(pci_host_bridge_list);
->> +DECLARE_RWSEM(pci_host_bridge_sem);
+On Tue 2014-11-18 09:09:09, Jacek Anaszewski wrote:
+> Hi Pavel, Sakari,
 > 
-> Unless the pci_host_bridge_sem is accessed thousands of times per second,
-> it's normally better to use a simple mutex instead.
-
-OK, I will use simple mutex instead.
-
+> On 11/17/2014 03:58 PM, Sakari Ailus wrote:
+> >Hi Pavel,
+> >
+> >On Sun, Nov 16, 2014 at 08:59:28AM +0100, Pavel Machek wrote:
+> >>For device tree people: Yes, I know I'll have to create file in
+> >>documentation, but does the binding below look acceptable?
+> >>
+> >>I'll clean up driver code a bit more, remove the printks. Anything
+> >>else obviously wrong?
+> >
+> >Jacek Anaszewski is working on flash support for LED devices. I think it'd
+> >be good to sync the DT bindings for the two, as the types of devices
+> >supported by the LED API and the V4L2 flash API are quite similar.
+> >
+> >Cc Jacek.
 > 
->> +static struct resource busn_resource = {
->> +	.name	= "PCI busn",
->> +	.start	= 0,
->> +	.end	= 255,
->> +	.flags	= IORESOURCE_BUS,
->> +};
+> I've already submitted a patch [1] that updates leds common bindings.
+> I hasn't been merged yet, as the related LED Flash class patch [2]
+> still needs some indicator leds related discussion [3].
 > 
-> I think it would be better to require callers to pass the bus resource
-> down to the function.
+> I think this is a good moment to discuss the flash related led common
+> bindings.
 
-Hmm, I think most of caller will provide the bus resource, but some others
-will not give any bus resource, extremely, no any resources :(. But we still
-need properly configure their resources for compatibility.
+Part of problem is that adp1653 is not regarded as "LED" device by
+current kernel driver.
 
-> 
->> +struct pci_host_bridge *pci_create_host_bridge(
->> +		struct device *parent, u32 db, 
->> +		struct pci_ops *ops, void *sysdata, 
->> +		struct list_head *resources)
->> +{
-> 
-> Do we still need to pass the 'sysdata' in here? If we are guaranteed to
-> have a device pointer, we should always be able to get the driver
-> private data from dev_get_drvdata(host->dev->parent).
+> [1] http://www.spinics.net/lists/linux-leds/msg02121.html
 
-We need, some platforms pass NULL pointer as host bridge parent.
+@@ -3,6 +3,17 @@ Common leds properties.
+ Optional properties for child nodes:
+ - label : The label for this LED.  If omitted, the label is
+   taken from the node name (excluding the unit address).
++- iout-torch : Array of maximum intensities in microamperes of the
+ torch
++	led currents in order from sub-led 0 to N-1, where N is the
+ number
++	of torch sub-leds exposed by the device
++- iout-flash : Array of maximum intensities in microamperes of the
+ flash
++	led currents in order from sub-led 0 to N-1, where N is the
+ number
++	of flash sub-leds exposed by the device
++- iout-indicator : Array of maximum intensities in microamperes of
++  the indicator led currents in order from sub-led 0 to N-1,
++  where N is the number of indicator sub-leds exposed by the device
++- flash-timeout : timeout in microseconds after which flash led
++  is turned off
+ 
+ - linux,default-trigger :  This parameter, if present, is a
+     string defining the trigger assigned to the LED.  Current
+     triggers are:
+@@ -19,5 +30,10 @@ Examples:
+ system-status {
+ 	       label = "Status";
+ 	       linux,default-trigger = "heartbeat";
++	       iout-torch = <500 500>;
++	       iout-flash = <1000 1000>;
++	       iout-indicator = <100 100>;
++	       flash-timeout = <1000>;
++
+	...
+ };
 
-> 
->> +	host = kzalloc(sizeof(*host), GFP_KERNEL);
->> +	if (!host)
->> +		return NULL;
-> 
-> devm_kzalloc maybe?
+I don't get it; system-status describes single LED, why are iout-torch
+(and friends) arrays of two?
 
-I don't know much detail about devm_kzalloc(), but we have no pci host driver
-here, and I found no devm_kzalloc() uses in core PCI code before.
+Also, at least on adp1653, these are actually two leds -- white and
+red. Torch and flash is white led, indicator is red led.
 
-> 
->> +	if (!resources) {
->> +		/* Use default IO/MEM/BUS resources*/
->> +		pci_add_resource(&host->windows, &ioport_resource);
->> +		pci_add_resource(&host->windows, &iomem_resource);
->> +		pci_add_resource(&host->windows, &busn_resource);
->> +	} else {
->> +		list_for_each_entry_safe(window, n, resources, list)
->> +			list_move_tail(&window->list, &host->windows);
->> +	}
-> 
-> I think we should assume that the correct resources are passed. You
-> could add a wrapper around this function to convert old platforms
-> though.
+> [2] http://www.spinics.net/lists/linux-media/msg83100.html
+> [3] http://www.spinics.net/lists/linux-leds/msg02472.html
 
-OK, I will move these code out of pci_create_host_bridge, and add a wrapper
-to setup the default resources.
+What device are you using for testing? Can you cc me on future
+patches?
 
-> 
->> +EXPORT_SYMBOL(pci_create_host_bridge);
-> 
-> EXPORT_SYMBOL_GPL() maybe?
+Why do we need complex "flash LED class" support, and where is the
+V4L2 glue?
 
-OK, will update it.
-
-> 
->> diff --git a/include/linux/pci.h b/include/linux/pci.h
->> index 8b11b38..daa7f40 100644
->> --- a/include/linux/pci.h
->> +++ b/include/linux/pci.h
->> @@ -402,7 +402,12 @@ struct pci_host_bridge_window {
->>  struct pci_host_bridge {
->>  	struct device dev;
->>  	struct pci_bus *bus;		/* root bus */
->> +	struct list_head list;
->>  	struct list_head windows;	/* pci_host_bridge_windows */
->> +	int busnum;
-> 
-> The busnum should already be implied through the bus resource.
-
-Yes, I will consider remove it and introduce a helper function to get the root bus number, thanks!
-
-Thanks!
-Yijing.
-
-> 
-> 	Arnd
-> 
-> .
-> 
-
-
+Best regards,
+									Pavel
 -- 
-Thanks!
-Yijing
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
