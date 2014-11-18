@@ -1,49 +1,87 @@
-From: yadi.brar@samsung.com (Yadwinder Singh Brar)
-Date: Tue, 18 Nov 2014 17:38:29 +0530
-Subject: [PATCH 2/2] ARM: dts: Add missing irq pinctrl for max77686 on smdk5250
-In-Reply-To: <1416312509-11530-1-git-send-email-yadi.brar@samsung.com>
-References: <1416312509-11530-1-git-send-email-yadi.brar@samsung.com>
-Message-ID: <1416312509-11530-2-git-send-email-yadi.brar@samsung.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Tue, 18 Nov 2014 20:14:33 +0800
+Subject: [RFC PATCH 00/16] Refine PCI host bridge scan interfaces
+In-Reply-To: <20141118114518.GA3514@red-moon>
+References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
+ <1463511.o4kE8TX3Bd@wuerfel> <546B2ACC.90304@huawei.com>
+ <20535707.3sA6NjSINh@wuerfel> <20141118114518.GA3514@red-moon>
+Message-ID: <546B3829.9040209@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds pinctrl configuration for using configuring gpx3-2 as an
-external interrupt from max77686. Though max77686 RTC is enabled and gets
-probed by default, it doesnt work as its unable to get interrupt.
+On 2014/11/18 19:45, Lorenzo Pieralisi wrote:
+> On Tue, Nov 18, 2014 at 11:30:11AM +0000, Arnd Bergmann wrote:
+>> On Tuesday 18 November 2014 19:17:32 Yijing Wang wrote:
+>>> On 2014/11/17 22:13, Arnd Bergmann wrote:
+>>>> On Monday 17 November 2014 18:21:34 Yijing Wang wrote:
+>>>>> This series is based Linux 3.18-rc1 and Lorenzo Pieralisi's
+>>>>> arm PCI domain cleanup patches, link: 
+>>>>> https://patchwork.ozlabs.org/patch/407585/
+>>>>>
+>>>>> Current pci scan interfaces like pci_scan_root_bus() and directly
+>>>>> call pci_create_root_bus()/pci_scan_child_bus() lack flexiblity.
+>>>>> Some platform infos like PCI domain and msi_chip have to be
+>>>>> associated to PCI bus by some arch specific function.
+>>>>> We want to make a generic pci_host_bridge, and make it hold
+>>>>> the platform infos or hook. Then we could eliminate the lots
+>>>>> of arch pci_domain_nr, also we could associate some platform 
+>>>>> ops something like pci_get_msi_chip(struct pci_dev *dev)
+>>>>> with pci_host_bridge to avoid introduce arch weak functions.
+>>>>>
+>>>>> This RFC version not for all platforms, just applied the new
+>>>>> scan interface in x86/arm/powerpc/ia64, I will refresh other
+>>>>> platforms after the core pci scan interfaces are ok.
+>>>>
+>>>> I think overall this is a good direction to take, in particular
+>>>> moving more things into struct pci_host_bridge so we can
+>>>> slim down the architecture specific code.
+>>>
+>>> Hi Arnd, thanks very much for your review and comments!
+>>>
+>>>>
+>>>> I don't particularly like the way you use the 'pci_host_info'
+>>>> to pass callback pointers and some of the generic information.
+>>>> This duplicates some of the issues we are currently trying
+>>>> to untangle in the arm32 code to make drivers easier to share
+>>>> between architectures.
+>>>
+>>> What arm32 code you are trying to untangle for example ?
+>>
+>> We have a few problems that currently prevent us from using shared
+>> drivers across arm32 and arm64:
+>>
+>> - arm32 has an architecture-defined pci_sys_data structure, but
+>>   we really want to have one that is defined by the host bridge driver
+>>   and that is architecture independent. Some core functions depend
+>>   on this structure at the moment, which Lorenzo is trying to
+>>   undo
+> 
+> Yes, and on this specific point I would like to understand why we
+> are adding yet more pci_sys_data data in the last series that is
+> already in -next:
+> 
+> https://lkml.org/lkml/2014/10/27/85
+> 
+> What does this buy us ? The cover letter says already that there *is*
+> a better solution, why do not we work on that instead of adding more churn
+> to arch specific code ?
 
-This patch makes max77686 RTC work and also configures it as wakeup source.
+In my plan, first save msi_chip in pci_sys_data, so we could remove the lots duplicate
+pcibios_add_bus(), second, make a generic pci_host_bridge, and move the msi_chip in that,
+so we could eliminate all MSI arch weak functions. And in arm I think it's no need to
+associate msi_chip with PCI bus, because all pci devices under the same pci host bridge
+share the same msi_chip.
 
-Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
----
- arch/arm/boot/dts/exynos5250-smdk5250.dts |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index 95b5b51..19cd918 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -131,6 +131,9 @@
- 		reg = <0x09>;
- 		interrupt-parent = <&gpx3>;
- 		interrupts = <2 IRQ_TYPE_NONE>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&max77686_irq>;
-+		wakeup-source;
- 
- 		voltage-regulators {
- 			ldo1_reg: LDO1 {
-@@ -411,3 +414,12 @@
- 		};
- 	};
- };
-+
-+&pinctrl_0 {
-+	max77686_irq: max77686-irq {
-+		samsung,pins = "gpx3-2";
-+		samsung,pin-function = <0xf>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+};
+
+> 
+> Thanks,
+> Lorenzo
+> 
+> .
+> 
+
+
 -- 
-1.7.0.4
+Thanks!
+Yijing
