@@ -1,72 +1,82 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Wed, 19 Nov 2014 00:02:27 +0100
-Subject: [PATCHv4 06/10] arm: mvebu: define and use common Armada 370 UART
- pinctrl settings
+Date: Wed, 19 Nov 2014 00:02:43 +0100
+Subject: [PATCHv4 08/10] arm: mvebu: define and use common Armada XP SPI
+ pinctrl setting
 In-Reply-To: <cover.1416351425.git.arno@natisbad.org>
 References: <cover.1416351425.git.arno@natisbad.org>
-Message-ID: <a3d6d0b3ad77e4bc4526809ed584461504e4cc53.1416351426.git.arno@natisbad.org>
+Message-ID: <3761645880ae430085b041ed2d4287e374ccd300.1416351426.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-This patch defines common Armada 370 pinctrl settings for uart0 and
-uart1 interfaces:
-
- uart0: MPP0-1 as default
- uart1: MPP41-42 as default
+This patch defines common Armada XP pinctrl settings in armada-xp.dtsi
+for the supported SPI interface (MPP36-39) and use it as default
+for Armada XP spi interface. That being done, it removes the now
+redundant definitions in armada-xp-axpwifiap.dts.
 
 Note: this patch has the potential to break out-of-tree users w/o
-specific pinctrl settings for their uart interfaces if the default
-above does not match their config.
+specific pinctrl settings for their spi interfaces if the default
+above does not match their config (i.e. if they do not use CS0).
 
-Suggested-by: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 ---
- arch/arm/boot/dts/armada-370.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/armada-xp-axpwifiap.dts |  7 -------
+ arch/arm/boot/dts/armada-xp.dtsi          | 11 +++++++++++
+ 2 files changed, 11 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index f1284ae0cddd..b8de32b2a265 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -211,6 +211,21 @@
- 				pinctrl-names = "default";
- 			};
+diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+index 0e53fad111de..c9d25bdbe795 100644
+--- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
++++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+@@ -100,8 +100,6 @@
  
-+			/*
-+			 * Default UART pinctrl setting without RTS/CTS, can
-+			 * be overwritten on board level if a different
-+			 * configuration is used.
-+			 */
-+			uart0: serial at 12000 {
-+				pinctrl-0 = <&uart0_pins>;
-+				pinctrl-names = "default";
-+			};
-+
-+			uart1: serial at 12100 {
-+				pinctrl-0 = <&uart1_pins>;
-+				pinctrl-names = "default";
-+			};
-+
- 			usb at 50000 {
- 				clocks = <&coreclk 0>;
- 			};
-@@ -281,6 +296,16 @@
- 		marvell,function = "spi1";
+ 			spi0: spi at 10600 {
+ 				status = "okay";
+-				pinctrl-0 = <&pmx_spi>;
+-				pinctrl-names = "default";
+ 
+ 				spi-flash at 0 {
+ 					#address-cells = <1>;
+@@ -138,11 +136,6 @@
+ 		marvell,function = "gpio";
  	};
  
-+	uart0_pins: uart0-pins {
-+		marvell,pins = "mpp0", "mpp1";
-+		marvell,function = "uart0";
+-	pmx_spi: pmx-spi {
+-		marvell,pins = "mpp36", "mpp37", "mpp38", "mpp39";
+-		marvell,function = "spi";
+-	};
+-
+ 	pmx_phy_int: pmx-phy-int {
+ 		marvell,pins = "mpp32";
+ 		marvell,function = "gpio";
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index acb236909649..d095606466ad 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -53,6 +53,11 @@
+ 				reg = <0x11100 0x100>;
+ 			};
+ 
++			spi0: spi at 10600 {
++				pinctrl-0 = <&spi0_pins>;
++				pinctrl-names = "default";
++			};
++
+ 			uart2: serial at 12200 {
+ 				compatible = "snps,dw-apb-uart";
+ 				pinctrl-0 = <&uart2_pins>;
+@@ -240,6 +245,12 @@
+ 		marvell,function = "sd0";
+ 	};
+ 
++	spi0_pins: spi0-pins {
++		marvell,pins = "mpp36", "mpp37",
++			       "mpp38", "mpp39";
++		marvell,function = "spi";
 +	};
 +
-+	uart1_pins: uart1-pins {
-+		marvell,pins = "mpp41", "mpp42";
-+		marvell,function = "uart1";
-+	};
-+
- 	sdio_pins1: sdio-pins1 {
- 		marvell,pins = "mpp9",  "mpp11", "mpp12",
- 				"mpp13", "mpp14", "mpp15";
+ 	uart2_pins: uart2-pins {
+ 		marvell,pins = "mpp42", "mpp43";
+ 		marvell,function = "uart2";
 -- 
 2.1.1
