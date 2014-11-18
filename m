@@ -1,47 +1,50 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 18 Nov 2014 13:28:15 +0000
-Subject: [PATCH v3 1/5] arm64: Kprobes with single stepping support
-In-Reply-To: <1416292375-29560-2-git-send-email-dave.long@linaro.org>
-References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
- <1416292375-29560-2-git-send-email-dave.long@linaro.org>
-Message-ID: <1416317295.1735.9.camel@linaro.org>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 18 Nov 2014 21:45:49 +0800
+Subject: [PATCH v5 01/18] ARM64: Move the init of cpu_logical_map(0) before
+ unflatten_device_tree()
+In-Reply-To: <1413553034-20956-2-git-send-email-hanjun.guo@linaro.org>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <1413553034-20956-2-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <546B4D8D.2020605@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-11-18 at 01:32 -0500, David Long wrote:
-> From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
-> 
-> Add support for basic kernel probes(kprobes) and jump probes
-> (jprobes) for ARM64.
-> 
-> Kprobes will utilize software breakpoint and single step debug
-> exceptions supported on ARM v8.
-> 
-> software breakpoint is placed at the probe address to trap the
-> kernel execution into kprobe handler.
-> 
-> ARM v8 support single stepping to be enabled while exception return
-> (ERET) with next PC in exception return address (ELR_EL1).
-> kprobe handler prepares a executable memory slot for out-of-line
-> execution with the copy of the original instruction under probe, and
-> enable single stepping from the instruction slot. With this scheme,
-> the instruction is executed with the exact same register context
-> 'except PC' that points to instruction slot.
-> 
-> Debug mask(PSTATE.D) is enabled only when single stepping a recursive
-> kprobes i.e. during kprobes reenter so that probes instruction can be
-> single stepped within the kprobe handler -exception- context.
+Hi Catalin,
 
-Does this mean that at the point the probed instruction is
-single-stepped there is nothing extra that has been pushed on on the
-kernel stack by any kprobes handling code? I just want to check that you
-aren't going to hit the problems that the 32-bit kprobes code is
-currently being fixed for [1]. 
+On 2014?10?17? 21:36, Hanjun Guo wrote:
+> It always make sense to initialize CPU0's logical map entry from the
+> hardware values, so move the initialization of cpu_logical_map(0)
+> before unflatten_device_tree() which is needed by ACPI code later.
+>
+> Acked-by: Olof Johansson <olof@lixom.net>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-The simulated instructions in patch 2 don't access the stack, so they
-are safe from the problem.
+Could you merge this patch first in 3.19? It was acked by Olof and
+Mark, and it will make sense without ACPI too.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/303525.html
+Thanks
+Hanjun
 
--- 
-Tixy
+> ---
+>   arch/arm64/kernel/setup.c |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index edb146d..8f33f72 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -393,11 +393,11 @@ void __init setup_arch(char **cmdline_p)
+>
+>   	efi_idmap_init();
+>
+> +	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+>   	unflatten_device_tree();
+>
+>   	psci_init();
+>
+> -	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+>   	cpu_read_bootcpu_ops();
+>   #ifdef CONFIG_SMP
+>   	smp_init_cpus();
+>
