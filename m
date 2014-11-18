@@ -1,97 +1,182 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Nov 2014 14:04:25 +0000
-Subject: [PATCH v8 2/6] arm64: ptrace: allow tracer to skip a system call
-In-Reply-To: <1416273038-15590-3-git-send-email-takahiro.akashi@linaro.org>
-References: <1416273038-15590-1-git-send-email-takahiro.akashi@linaro.org>
- <1416273038-15590-3-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20141118140425.GM18842@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 18 Nov 2014 15:05:08 +0100
+Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
+ completes
+In-Reply-To: <1787068.2MCH8czsD4@vostro.rjw.lan>
+References: <20141117220238.GE5258@dtor-ws> <20141117232604.GB2049@dtor-ws>
+ <3008804.zFmDfsDlAH@vostro.rjw.lan>
+ <1787068.2MCH8czsD4@vostro.rjw.lan>
+Message-ID: <CAPDyKFoMftvKs8tyBaYCu1zTK_JYiXeXMiq86OrwAAHZoRO_Pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 01:10:34AM +0000, AKASHI Takahiro wrote:
-> If tracer specifies -1 as a syscall number, this traced system call should
-> be skipped with a return value specified in x0.
-> This patch implements this semantics, but there is one restriction here:
-> 
->     syscall(-1) always return ENOSYS whatever value is stored in x0
->     (a return value) at syscall entry.
-> 
-> Normally, with ptrace off, syscall(-1) returns -ENOSYS. With ptrace on,
-> however, if a tracer didn't pay any attention to user-issued syscall(-1)
-> and just let it go, it would return a value in x0 as in other system call
-> cases. This means that this system call might succeed and yet see any bogus
-> return value. This should be definitely avoided.
-> 
-> Please also note:
-> * syscall entry tracing and syscall exit tracing (ftrace tracepoint and
->   audit) are always executed, if enabled, even when skipping a system call
->   (that is, -1).
->   In this way, we can avoid a potential bug where audit_syscall_entry()
->   might be called without audit_syscall_exit() at the previous system call
->   being called, that would cause OOPs in audit_syscall_entry().
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm64/kernel/entry.S  |    3 +++
->  arch/arm64/kernel/ptrace.c |   18 ++++++++++++++++++
->  2 files changed, 21 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 726b910..01118b1 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -670,6 +670,8 @@ ENDPROC(el0_svc)
->  __sys_trace:
->  	mov	x0, sp
->  	bl	syscall_trace_enter
-> +	cmp	w0, #-1				// skip the syscall?
-> +	b.eq	__sys_trace_return_skipped
->  	adr	lr, __sys_trace_return		// return address
->  	uxtw	scno, w0			// syscall number (possibly new)
->  	mov	x1, sp				// pointer to regs
-> @@ -684,6 +686,7 @@ __sys_trace:
->  
->  __sys_trace_return:
->  	str	x0, [sp]			// save returned x0
-> +__sys_trace_return_skipped:
->  	mov	x0, sp
->  	bl	syscall_trace_exit
->  	b	ret_to_user
-> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> index 8b98781..34b1e85 100644
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
-> @@ -1149,6 +1149,8 @@ static void tracehook_report_syscall(struct pt_regs *regs,
->  
->  asmlinkage int syscall_trace_enter(struct pt_regs *regs)
->  {
-> +	int orig_syscallno = regs->syscallno;
-> +
->  	if (test_thread_flag(TIF_SYSCALL_TRACE))
->  		tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
->  
-> @@ -1158,6 +1160,22 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
->  	audit_syscall_entry(regs->syscallno, regs->orig_x0, regs->regs[1],
->  			    regs->regs[2], regs->regs[3]);
->  
-> +	if (((int)regs->syscallno == -1) && (orig_syscallno == -1)) {
-> +		/*
-> +		 * user-issued syscall(-1):
-> +		 * RESTRICTION: We always return ENOSYS whatever value is
-> +		 *   stored in x0 (a return value) at this point.
-> +		 * Normally, with ptrace off, syscall(-1) returns -ENOSYS.
-> +		 * With ptrace on, however, if a tracer didn't pay any
-> +		 * attention to user-issued syscall(-1) and just let it go
-> +		 * without a hack here, it would return a value in x0 as in
-> +		 * other system call cases. This means that this system call
-> +		 * might succeed and see any bogus return value.
-> +		 * This should be definitely avoided.
-> +		 */
-> +		regs->regs[0] = -ENOSYS;
-> +	}
+[...]
 
-I'm still really uncomfortable with this, and it doesn't seem to match what
-arch/arm/ does either. Doesn't it also prevent a tracer from skipping
-syscall(-1)?
+>> > > > >
+>> > > > > It would not be the same for all buses.  Each bus will have its own way
+>> > > > > of recognizing whether or not a driver has been probed (i.e., by
+>> > > > > checking some field in the bus-specific part of the device structure).
+>> > > > >
+>> > > > > > However, is it allowed to call pm_runtime_get_sync() on devices that
+>> > > > > > didn't issue pm_runtime_enable()?
+>> > > > >
+>> > > > > Yes.  But the bus has to issue pm_runtime_enable() before probing the
+>> > > > > driver, because the driver will expect runtime PM to work properly
+>> > > > > while its probe routine runs.  For example, the probe routine might
+>> > > > > want to leave the device in a runtime-suspended state.  It can't do
+>> > > > > that if the device isn't enabled for runtime PM.
+>> > > >
+>> > > > That means that runtime PM will be enabled for all devices on given bus
+>> > > > while up till now drivers were deciding if their devices should be
+>> > > > runtime-pm-managed or not.
+>> > >
+>> > > That's not the case for PCI drivers.
+>> > >
+>> > > > I do not think we are quite ready for this.
+>> > >
+>> > > We have to do that if power domains are in use, however, because if at least
+>> > > one device in a power domain in enabled for runtime PM, that will affect the
+>> > > other devices in that domain.
+>> > >
+>> > > We could make a rule to keep a domail always up if at least one device in it
+>> > > has runtime PM disabled, but that is equivalent to enabling runtime PM for
+>> > > that device, powering the domain up and bumping up the device's usage counter.
+>> >
+>> > What will driver will see if it tries to check pm_runtime_active()?
+>> > Would not it get unexpected result if the driver did not call
+>> > pm_runtime_enable() on it's device?
+>>
+>> Well, that part was supposed to depend on the bus type.  For example, it
+>> won't be unexpected for PCI drivers, because runtime PM is always enabled
+>> for PCI devices (although it may be blocked as I described).
+>>
+>> A problem arises if a power domain is used along with a bus type that doesn't
+>> enable runtime PM for devices by default and drivers are expected to do that.
+>> That could be addressed by powering up a PM domain (and bumping up its usage
+>> counter) when adding a device to it and keeping it up until all of the devices
+>> in it are runtime suspended, but then it also should be turned off eventually
+>> if there are no drivers for any of those devices.
+>
+> In other words, I agree with the Ulf's approach in the $subject patch, although
+> the changelog needs to be updated.
+>
 
-Will
+I am having second thoughts here! The reason to why, are because of
+the scenario 5) below, which I forgot about when writing/testing
+$subject patch.
+
+As you know, I have been thinking over and over about how to address
+the issues $subject patch is trying to solve.
+
+>From the discussions we have had around this topic, I would like to
+summarize the situation describing the current existing scenarios that
+I know about. It would be nice to reach a consensus on how to cope
+with them, especially since we keep forgetting to consider at least
+one of them during our discussions.
+
+Note that some minor variations may exist for each scenario, but let's
+focus on the concepts of how runtime PM is managed during ->probe().
+The scenarios applies to those drivers/buses for which devices may
+have an attached generic PM domain.
+
+Scenario 1), a platform driver without runtime PM callbacks.
+->probe()
+- do some initialization
+- pm_runtime_enable()
+- pm_runtime_get_sync()
+- probe the device
+- pm_runtime_put()
+
+Scenario 2), platform driver with runtime PM callbacks.
+->probe()
+- do some initialization
+- fetch handles to runtime PM resources
+- pm_runtime_enable()
+- pm_runtime_get_sync()
+- enable its runtime PM resources, in some cases it's done by also
+requiring its runtime PM resume callback to be invoked
+- probe the device
+- pm_runtime_put()
+
+Scenario 3), platform driver with runtime PM callbacks.
+->probe()
+- do some initialization
+- fetch handles to runtime PM resources
+- enable its runtime PM resources
+- pm_runtime_get_noresume()
+- pm_runtime_set_active()
+- pm_runtime_enable()
+- probe the device
+- pm_runtime_put()
+
+Scenario 4), amba bus and amba driver, both have runtime PM callbacks.
+->amba bus probe()
+- fetch handles to runtime PM resources
+- enable its runtime PM resources
+- pm_runtime_get_noresume()
+- pm_runtime_set_active()
+- pm_runtime_enable()
+  ->amba driver probe()
+  - do some initialization
+  - fetch handles to runtime PM resources
+  - enable its runtime PM resources
+  - probe the device
+  - pm_runtime_put()
+
+Scenario 5), a platform driver with/without runtime PM callbacks.
+->probe()
+- do some initialization
+- may fetch handles to runtime PM resources
+- pm_runtime_enable()
+
+
+Note 1)
+Scenario 1) and 2), both relies on the approach to power on the PM
+domain by using pm_runtime_get_sync(). That approach didn't work when
+CONFIG_PM_RUNTIME was unset, but we recently decided to fixed that by
+the below patch, so that's good!
+"[PATCH] PM / domains: Kconfig: always enable PM_RUNTIME when genpd enabled"
+
+Note 2)
+Scenario 3) and 4) use the same principles for managing runtime PM.
+These scenarios needs a way to power on the generic PM domain prior
+probing the device. The call to pm_runtime_set_active(), prevents an
+already powered PM domain from power off until after probe, but that's
+not enough.
+
+Note 3)
+The $subject patch, tried to address the issues for scenario 3) and
+4). It does so, but will affect scenario 5) which was working nicely
+before. In scenario 5), the $subject patch will cause the generic PM
+domain to potentially stay powered after ->probe() even if the device
+is runtime PM suspended.
+
+
+I see three options going forward.
+
+Option 1)
+Convert scenario 3) and 4) into using the pm_runtime_get_sync()
+approach. There are no theoretical obstacles to do this, but pure
+practical. There are a lot of drivers that needs to be converted and
+we also need to teach driver authors future wise to not use
+pm_runtime_set_active() in this manner.
+
+Option 2)
+Add some kind of get/put API for PM domains. The buses invokes it to
+control the power to the PM domain. From what I understand, that's
+also what Dmitry think is needed!?
+Anyway, that somehow means to proceed with the approach I took in the
+below patchset.
+[PATCH v3 0/9] PM / Domains: Fix race conditions during boot
+http://marc.info/?t=141320907000003&r=1&w=2
+
+Option 3)
+Live we the limitation this $subject patch introduces for scenario 5).
+
+
+Is there maybe any additional options, that I didn't think of?
+
+Apologize for the long email, I hope I didn't bored you too much.
+
+Kind regards
+Uffe
