@@ -1,81 +1,209 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 17 Nov 2014 18:33:05 -0600
-Subject: [PATCH V5 09/12] usb: xhci: Add NVIDIA Tegra xHCI
- host-controller driver
-In-Reply-To: <CAL1qeaG1=g39gsRHPrmCTBFbn3XQmW_2N7rm7uWa=-xOzDiDHQ@mail.gmail.com>
-References: <1416264102-1323-1-git-send-email-abrestic@chromium.org>
- <1416264102-1323-10-git-send-email-abrestic@chromium.org>
- <20141117231240.GB9716@saruman>
- <CAL1qeaG1=g39gsRHPrmCTBFbn3XQmW_2N7rm7uWa=-xOzDiDHQ@mail.gmail.com>
-Message-ID: <20141118003305.GB11280@saruman>
+From: addy.ke@rock-chips.com (Addy)
+Date: Tue, 18 Nov 2014 08:32:48 +0800
+Subject: [PATCH] mmc: dw_mmc: add quirk for data over interrupt timeout
+In-Reply-To: <54660120.50305@samsung.com>
+References: <1415970338-2637-1-git-send-email-addy.ke@rock-chips.com>
+ <54660120.50305@samsung.com>
+Message-ID: <546A93B0.1040506@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Mon, Nov 17, 2014 at 03:51:29PM -0800, Andrew Bresticker wrote:
-> >> +static const struct {
-> >> +     const char *name;
-> >> +     unsigned int num;
-> >> +} tegra_xhci_phy_types[] = {
-> >> +     {
-> >> +             .name = "usb3",
-> >> +             .num = TEGRA_XUSB_USB3_PHYS,
-> >> +     }, {
-> >> +             .name = "utmi",
-> >> +             .num = TEGRA_XUSB_UTMI_PHYS,
-> >> +     }, {
-> >> +             .name = "hsic",
-> >> +             .num = TEGRA_XUSB_HSIC_PHYS,
-> >> +     },
-> >
-> > these should be using the generic PHY subsystem (drivers/phy).
-> 
-> This driver does use the generic PHY subsystem, see patch 7 in this series :).
+On 2014?11?14? 21:18, Jaehoon Chung wrote:
+> Hi, Addy.
+>
+> Did you use the DW_MCI_QUIRK_IDMAC_DTO?
+> I'm not sure, but i wonder if you get what result when you use above quirk.
 
-true, I got misled by the fact that you added your phy provider to your
-pinctrl. Odd.
+DW_MCI_QUIRK_IDMAC_DTO is only for version2.0 or below.
+         /*
+          * DTO fix - version 2.10a and below, and only if internal DMA
+          * is configured.
+          */
+         if (host->quirks & DW_MCI_QUIRK_IDMAC_DTO) {
+                 if (!pending &&
+                     ((mci_readl(host, STATUS) >> 17) & 0x1fff))
+                         pending |= SDMMC_INT_DATA_OVER;
+         }
 
-> >> +static int tegra_xhci_load_firmware(struct tegra_xhci_hcd *tegra)
-> >> +{
-> >> +     struct device *dev = tegra->dev;
-> >> +     struct tegra_xhci_fw_cfgtbl *cfg_tbl;
-> >> +     struct tm fw_tm;
-> >> +     u32 val, code_tag_blocks, code_size_blocks;
-> >> +     u64 fw_base;
-> >> +     time_t fw_time;
-> >> +     unsigned long timeout;
-> >> +
-> >> +     if (csb_readl(tegra, XUSB_CSB_MP_ILOAD_BASE_LO) != 0) {
-> >> +             dev_info(dev, "Firmware already loaded, Falcon state 0x%x\n",
-> >> +                      csb_readl(tegra, XUSB_FALC_CPUCTL));
-> >> +             return 0;
-> >> +     }
-> >
-> > won't this prevent rmmod && insmod from succeeding ? Maybe not, as you
-> > return 0 anyway, but if the firmware side craps out, it might be useful
-> > to reload the firmware and reset that block. I wonder if this prevents
-> > that.
-> 
-> rmmod && insmod does work with the above since, as you mentioned, we
-> return successfully if the controller is already running.  Attempting
-> to re-load the firmware if the controller is already running won't
-> work - it requires a full power-gate/ungate sequence of the
-> controller.  Unfortunately, that sequence is rather complicated and I
-> haven't had a chance to implement it yet.  it will hopefully be coming
-> later, though.
+It meams that if interrupt comes, but pending = 0 && FIFO_COUNT(bit17-29) !=0,
+then force to set SDMMC_INT_DATA_OVER.
+But in our case, FIFO_COUNT = 0 (STATUS register value is 0xad06). This is
+because that the card does not send data to host. So there is no interrupts come,
+and interrupt handle function(dw_mci_interrupt) will not be called. So we need a
+timer to handle this case.
 
-Alright, could you add a comment on the source code stating that ?
-Perhaps a REVISIT note or FIXME ?
+So I think  SDMMC_INT_DATA_OVER is not suitable for this case, and we need a new
+quirk.
 
-cheers
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141117/64507de2/attachment.sig>
+>
+> And i will check more this patch at next week.
+>
+> Thanks for your efforts.
+>
+> Best Regards,
+> Jaehoon Chung
+>
+> On 11/14/2014 10:05 PM, Addy Ke wrote:
+>> From: Addy <addy.ke@rock-chips.com>
+>>
+>> This patch add a new quirk to notify the driver to teminate
+>> current transfer and report a data timeout to the core,
+>> if data over interrupt does NOT come within the given time.
+>>
+>> dw_mmc call mmc_request_done func to finish transfer depends on
+>> data over interrupt. If data over interrupt does not come in
+>> sending data state, the current transfer will be blocked.
+>>
+>> But this case really exists, when driver reads tuning data from
+>> card on rk3288-pink2 board. I measured waveforms by oscilloscope
+>> and found that card clock was always on and data lines were always
+>> holded high level in sending data state. This is the cause that
+>> card does NOT send data to host.
+>>
+>> According to synopsys designware databook, the timeout counter is
+>> started only after the card clock is stopped.
+>>
+>> So if card clock is always on, data read timeout interrupt will NOT come,
+>> and if data lines are always holded high level, all data-related
+>> interrupt such as start-bit error, data crc error, data over interrupt,
+>> end-bit error, and so on, will NOT come too.
+>>
+>> So driver can't get the current state, it can do nothing but wait for.
+>>
+>> This patch is based on https://patchwork.kernel.org/patch/5227941/
+>>
+>> Signed-off-by: Addy <addy.ke@rock-chips.com>
+>> ---
+>>   drivers/mmc/host/dw_mmc.c  | 47 +++++++++++++++++++++++++++++++++++++++++++++-
+>>   include/linux/mmc/dw_mmc.h |  5 +++++
+>>   2 files changed, 51 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>> index b4c3044..3960fc3 100644
+>> --- a/drivers/mmc/host/dw_mmc.c
+>> +++ b/drivers/mmc/host/dw_mmc.c
+>> @@ -1448,6 +1448,17 @@ static int dw_mci_data_complete(struct dw_mci *host, struct mmc_data *data)
+>>   	return data->error;
+>>   }
+>>   
+>> +static inline void dw_mci_dto_start_monitor(struct dw_mci *host)
+>> +{
+>> +	unsigned int data_tmout_clks;
+>> +	unsigned int data_tmout_ms;
+>> +
+>> +	data_tmout_clks = (mci_readl(host, TMOUT) >> 8);
+>> +	data_tmout_ms = (data_tmout_clks * 1000 / host->bus_hz) + 250;
+>> +
+>> +	mod_timer(&host->dto_timer, jiffies + msecs_to_jiffies(data_tmout_ms));
+>> +}
+>> +
+>>   static void dw_mci_tasklet_func(unsigned long priv)
+>>   {
+>>   	struct dw_mci *host = (struct dw_mci *)priv;
+>> @@ -1522,8 +1533,11 @@ static void dw_mci_tasklet_func(unsigned long priv)
+>>   			}
+>>   
+>>   			if (!test_and_clear_bit(EVENT_XFER_COMPLETE,
+>> -						&host->pending_events))
+>> +						&host->pending_events)) {
+>> +				if (host->quirks & DW_MCI_QUIRK_DTO_TIMER)
+>> +					dw_mci_dto_start_monitor(host);
+>>   				break;
+>> +			}
+>>   
+>>   			set_bit(EVENT_XFER_COMPLETE, &host->completed_events);
+>>   
+>> @@ -2115,6 +2129,9 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
+>>   		}
+>>   
+>>   		if (pending & SDMMC_INT_DATA_OVER) {
+>> +			if (host->quirks & DW_MCI_QUIRK_DTO_TIMER)
+>> +				del_timer(&host->dto_timer);
+>> +
+>>   			mci_writel(host, RINTSTS, SDMMC_INT_DATA_OVER);
+>>   			if (!host->data_status)
+>>   				host->data_status = pending;
+>> @@ -2502,6 +2519,28 @@ ciu_out:
+>>   	return ret;
+>>   }
+>>   
+>> +static void dw_mci_dto_timer(unsigned long arg)
+>> +{
+>> +	struct dw_mci *host = (struct dw_mci *)arg;
+>> +
+>> +	switch (host->state) {
+>> +	case STATE_SENDING_DATA:
+>> +	case STATE_DATA_BUSY:
+>> +		/*
+>> +		* If data over interrupt does NOT come in sending data state,
+>> +		* we should notify the driver to teminate current transfer
+>> +		* and report a data timeout to the core.
+>> +		*/
+>> +		host->data_status = SDMMC_INT_DRTO;
+>> +		set_bit(EVENT_DATA_ERROR, &host->pending_events);
+>> +		set_bit(EVENT_DATA_COMPLETE, &host->pending_events);
+>> +		tasklet_schedule(&host->tasklet);
+>> +		break;
+>> +	default:
+>> +		break;
+>> +	}
+>> +}
+>> +
+>>   #ifdef CONFIG_OF
+>>   static struct dw_mci_of_quirks {
+>>   	char *quirk;
+>> @@ -2513,6 +2552,9 @@ static struct dw_mci_of_quirks {
+>>   	}, {
+>>   		.quirk	= "disable-wp",
+>>   		.id	= DW_MCI_QUIRK_NO_WRITE_PROTECT,
+>> +	}, {
+>> +		.quirk	= "dto-timer",
+>> +		.id	= DW_MCI_QUIRK_DTO_TIMER,
+>>   	},
+>>   };
+>>   
+>> @@ -2654,6 +2696,9 @@ int dw_mci_probe(struct dw_mci *host)
+>>   
+>>   	spin_lock_init(&host->lock);
+>>   	INIT_LIST_HEAD(&host->queue);
+>> +	if (host->quirks & DW_MCI_QUIRK_DTO_TIMER)
+>> +		setup_timer(&host->dto_timer,
+>> +			    dw_mci_dto_timer, (unsigned long)host);
+>>   
+>>   	/*
+>>   	 * Get the host data width - this assumes that HCON has been set with
+>> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+>> index 42b724e..2477813 100644
+>> --- a/include/linux/mmc/dw_mmc.h
+>> +++ b/include/linux/mmc/dw_mmc.h
+>> @@ -98,6 +98,7 @@ struct mmc_data;
+>>    * @irq_flags: The flags to be passed to request_irq.
+>>    * @irq: The irq value to be passed to request_irq.
+>>    * @sdio_id0: Number of slot0 in the SDIO interrupt registers.
+>> + * @dto_timer: Timer for data over interrupt timeout.
+>>    *
+>>    * Locking
+>>    * =======
+>> @@ -196,6 +197,8 @@ struct dw_mci {
+>>   	int			irq;
+>>   
+>>   	int			sdio_id0;
+>> +
+>> +	struct timer_list	dto_timer;
+>>   };
+>>   
+>>   /* DMA ops for Internal/External DMAC interface */
+>> @@ -220,6 +223,8 @@ struct dw_mci_dma_ops {
+>>   #define DW_MCI_QUIRK_BROKEN_CARD_DETECTION	BIT(3)
+>>   /* No write protect */
+>>   #define DW_MCI_QUIRK_NO_WRITE_PROTECT		BIT(4)
+>> +/* Timer for data over interrupt timeout */
+>> +#define DW_MCI_QUIRK_DTO_TIMER			BIT(5)
+>>   
+>>   /* Slot level quirks */
+>>   /* This slot has no write protect */
+>>
+>
+>
+>
