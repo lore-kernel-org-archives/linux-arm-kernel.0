@@ -1,133 +1,30 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 18 Nov 2014 16:32:09 +0000
-Subject: [BUG] blocked task after exynos_drm_init
-In-Reply-To: <CABxcv=k9mTfezmU_a5SoaWuvY5em5QsdeJ01syKv-fScrLCPbg@mail.gmail.com>
-References: <1415264811.27478.4.camel@AMDC1943> <546B228E.6030500@samsung.com>
- <546B2508.8070409@samsung.com>
- <CABxcv=k9mTfezmU_a5SoaWuvY5em5QsdeJ01syKv-fScrLCPbg@mail.gmail.com>
-Message-ID: <CACxGe6sTnJ7i7jf+mPVsM0hunRM+uwzSzeHY0m2qy-i2Uu3NiQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 18 Nov 2014 16:43:13 +0000
+Subject: [PATCH v5 01/18] ARM64: Move the init of cpu_logical_map(0)
+ before unflatten_device_tree()
+In-Reply-To: <546B4D8D.2020605@linaro.org>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <1413553034-20956-2-git-send-email-hanjun.guo@linaro.org>
+ <546B4D8D.2020605@linaro.org>
+Message-ID: <20141118164312.GL28279@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 12:29 PM, Javier Martinez Canillas
-<javier@dowhile0.org> wrote:
-> [adding Kevin to cc list]
->
-> Hello Inki,
->
-> On Tue, Nov 18, 2014 at 11:52 AM, Inki Dae <inki.dae@samsung.com> wrote:
->> On 2014? 11? 18? 19:42, Andrzej Hajda wrote:
->>> On 11/06/2014 10:06 AM, Krzysztof Kozlowski wrote:
->>>> Hi,
->>>>
->>>> On last next (next-20141104, next-20141105) booting locks after
->>>> initializing Exynos DRM (Trats2 board):
->>>>
->>>> [    2.028283] [drm] Initialized drm 1.1.0 20060810
->>>> [  240.505795] INFO: task swapper/0:1 blocked for more than 120 seconds.
->>>> [  240.510825]       Not tainted 3.18.0-rc3-next-20141105 #794
->>>> [  240.516418] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
->>>> [  240.524173] swapper/0       D c052534c     0     1      0 0x00000000
->>>> [  240.530527] [<c052534c>] (__schedule) from [<c0525b34>] (schedule_preempt_disabled+0x14/0x20)
->>>> [  240.539030] [<c0525b34>] (schedule_preempt_disabled) from [<c0526d44>] (mutex_lock_nested+0x1c4/0x464)
->>>> [  240.548320] [<c0526d44>] (mutex_lock_nested) from [<c02be908>] (__driver_attach+0x48/0x98)
->>>> [  240.556562] [<c02be908>] (__driver_attach) from [<c02bcc00>] (bus_for_each_dev+0x54/0x88)
->>>> [  240.564717] [<c02bcc00>] (bus_for_each_dev) from [<c02bdce0>] (bus_add_driver+0xe4/0x200)
->>>> [  240.572876] [<c02bdce0>] (bus_add_driver) from [<c02bef94>] (driver_register+0x78/0xf4)
->>>> [  240.580864] [<c02bef94>] (driver_register) from [<c029e99c>] (exynos_drm_platform_probe+0x34/0x234)
->>>> [  240.589890] [<c029e99c>] (exynos_drm_platform_probe) from [<c02bfcf0>] (platform_drv_probe+0x48/0xa4)
->>>> [  240.599090] [<c02bfcf0>] (platform_drv_probe) from [<c02be680>] (driver_probe_device+0x13c/0x37c)
->>>> [  240.607940] [<c02be680>] (driver_probe_device) from [<c02be954>] (__driver_attach+0x94/0x98)
->>>> [  240.616360] [<c02be954>] (__driver_attach) from [<c02bcc00>] (bus_for_each_dev+0x54/0x88)
->>>> [  240.624517] [<c02bcc00>] (bus_for_each_dev) from [<c02bdce0>] (bus_add_driver+0xe4/0x200)
->>>> [  240.632679] [<c02bdce0>] (bus_add_driver) from [<c02bef94>] (driver_register+0x78/0xf4)
->>>> [  240.640667] [<c02bef94>] (driver_register) from [<c029e938>] (exynos_drm_init+0x70/0xa0)
->>>> [  240.648739] [<c029e938>] (exynos_drm_init) from [<c00089b0>] (do_one_initcall+0xac/0x1f0)
->>>> [  240.656914] [<c00089b0>] (do_one_initcall) from [<c074bd90>] (kernel_init_freeable+0x10c/0x1d8)
->>>> [  240.665591] [<c074bd90>] (kernel_init_freeable) from [<c051eabc>] (kernel_init+0x8/0xec)
->>>> [  240.673661] [<c051eabc>] (kernel_init) from [<c000f268>] (ret_from_fork+0x14/0x2c)
->>>> [  240.681196] 3 locks held by swapper/0/1:
->>>> [  240.685091]  #0:  (&dev->mutex){......}, at: [<c02be908>] __driver_attach+0x48/0x98
->>>> [  240.692732]  #1:  (&dev->mutex){......}, at: [<c02be918>] __driver_attach+0x58/0x98
->>>> [  240.700367]  #2:  (&dev->mutex){......}, at: [<c02be908>] __driver_attach+0x48/0x98
->>>
->>>
->>> This is caused by patch moving platform devices to
->>> /sys/devices/platform[1]. Since this patch registering platform
->>> drivers/devices in probe of platform device causes deadlocks. I guess
->>> now all driver registration should be moved to exynos_drm_init and it
->>> seems better location for it IMHO.
->>
->> Thanks. It might be a chance that we could separate sub drivers of
->> Exynos drm into independent modules so that they can be called
->> independently because if we move them to exynos_drm_init then the
->> deferred probe wouldn't work correctly.
->>
->
-> I don't understand why registering the platform drivers in the
-> exynos_drm_init() will make deferred probing to not work correctly?
-> AFAICT it does not matter where the driver is registered since if the
-> driver probe function is called when the driver is attached and fails
-> with -EPROBE_DEFER, it will be added to the deferred list and the
-> probe function will be retried when other drivers are registered due
-> devices being added (e.g: by OF when matching a compatible string). Or
-> maybe I'm missing something here?
+On Tue, Nov 18, 2014 at 01:45:49PM +0000, Hanjun Guo wrote:
+> On 2014?10?17? 21:36, Hanjun Guo wrote:
+> > It always make sense to initialize CPU0's logical map entry from the
+> > hardware values, so move the initialization of cpu_logical_map(0)
+> > before unflatten_device_tree() which is needed by ACPI code later.
+> >
+> > Acked-by: Olof Johansson <olof@lixom.net>
+> > Acked-by: Mark Rutland <mark.rutland@arm.com>
+> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> 
+> Could you merge this patch first in 3.19? It was acked by Olof and
+> Mark, and it will make sense without ACPI too.
 
-It's only by luck that it even worked before.
+I think it can go in for 3.19 (it's Will's turn this time ;)).
 
-I think the problem is that exynos_drm_init() is registering a normal
-(non-OF) platform device, so the parent will be /sys/devices/platform.
-It immediately gets bound against exynos_drm_platform_driver which
-calls the exynos drm_platform_probe() hook. The driver core obtains
-device_lock() on the device *and on the device parent*.
+FWIW:
 
-Inside the probe hook, additional platform_drivers get registered.
-Each time one does, it tries to bind against every platform device in
-the system, which includes the ones created by OF. When it attempts to
-bind, it obtains device_lock() on the device *and on the device
-parent*.
-
-Before the change to move of-generated platform devices into
-/sys/devices/platform, the devices had different parents. Now both
-devices have /sys/devices/platform as the parent, so yes they are
-going to deadlock.
-
-The real problem is registering drivers from within a probe hook. That
-is completely wrong for the above deadlock reason. __driver_attach()
-will deadlock. Those registrations must be pulled out of .probe().
-
-Registering devices in .probe() is okay because __device_attach()
-doesn't try to obtain device_lock() on the parent.
-
-g.
-
->
-> By the way, I tried moving the platform driver registration to
-> exynos_drm_init() as suggested by Andrzej and it fixed both the issue
-> reported in $subject (which is the same reported by Kevin) and the
-> infinite loop you were tried to fix with your "drm/exynos: fix
-> infinite loop issue incurred by no pair" patch.
->
-> I didn't have display working but that is expected since the machine
-> is a Peach Pit that has a eDP/LVDS bridge and needs out-of-tree
-> patches.
->
-> I also reverted a few patches on linux-next that said to be fixing
-> infinite loop issues,  these are:
->
-> 7afbfcc drm/exynos: fix possible infinite loop issue (in fact I had to
-> revert this to move the registration from the probe function)
-> f7c2f36f drm/exynos: resolve infinite loop issue on non multi-platform
-> 06a2f5c drm/exynos: resolve infinite loop issue on multi-platform
->
-> And I didn't have the infinite loop issue, so I wonder if those
-> patches are really necessary or were trying to fix the cause explained
-> by Andrzej.
->
-> Best regards,
-> Javier
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
