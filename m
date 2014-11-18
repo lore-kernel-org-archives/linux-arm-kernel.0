@@ -1,133 +1,83 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 18 Nov 2014 11:41:27 +0000
-Subject: [PATCH v5 6/6] arm64: Trace emulation of AArch32 legacy instructions
-In-Reply-To: <1416310887-14649-1-git-send-email-punit.agrawal@arm.com>
-References: <1416310887-14649-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <1416310887-14649-7-git-send-email-punit.agrawal@arm.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Tue, 18 Nov 2014 19:44:36 +0800
+Subject: [RFC PATCH 07/16] PCI: Separate pci_host_bridge creation out
+ of pci_create_root_bus()
+In-Reply-To: <1936415.emTbbPeHqx@wuerfel>
+References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
+ <2507218.mHliopJb05@wuerfel> <546B041A.4060403@huawei.com>
+ <1936415.emTbbPeHqx@wuerfel>
+Message-ID: <546B3124.7070206@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce an event to trace the usage of emulated instructions. The
-trace event is intended to help identify and encourage the migration
-of legacy software using the emulation features.
+On 2014/11/18 17:30, Arnd Bergmann wrote:
+> On Tuesday 18 November 2014 16:32:26 Yijing Wang wrote:
+> 
+>>>> +static struct resource busn_resource = {
+>>>> +	.name	= "PCI busn",
+>>>> +	.start	= 0,
+>>>> +	.end	= 255,
+>>>> +	.flags	= IORESOURCE_BUS,
+>>>> +};
+>>>
+>>> I think it would be better to require callers to pass the bus resource
+>>> down to the function.
+>>
+>> Hmm, I think most of caller will provide the bus resource, but some others
+>> will not give any bus resource, extremely, no any resources :(. But we still
+>> need properly configure their resources for compatibility.
+> 
+> I think that is what the conversion to pci_scan_bus_parented() is about:
+> The idea is that we add the correct bus resource to callers of
+> pci_scan_bus_parented or pci_scan_bus and then change them to call
+> pci_scan_root_bus instead.
 
-Use this event to trace usage of swp and CP15 barrier emulation.
+It looks good to me, but for simplification, or I will try to use a wrapper to
+process the drivers don't pass the busnr resources, and make sure the generic
+pci_create_host_bridge() always get the valid resources.
 
-Cc: Steven Rostedt <rostedt@goodmis.org>
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/kernel/Makefile                 |  1 +
- arch/arm64/kernel/armv8_deprecated.c       | 19 ++++++++++++++--
- arch/arm64/kernel/trace-events-emulation.h | 35 ++++++++++++++++++++++++++++++
- 3 files changed, 53 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm64/kernel/trace-events-emulation.h
+> 
+>>>> +struct pci_host_bridge *pci_create_host_bridge(
+>>>> +		struct device *parent, u32 db, 
+>>>> +		struct pci_ops *ops, void *sysdata, 
+>>>> +		struct list_head *resources)
+>>>> +{
+>>>
+>>> Do we still need to pass the 'sysdata' in here? If we are guaranteed to
+>>> have a device pointer, we should always be able to get the driver
+>>> private data from dev_get_drvdata(host->dev->parent).
+>>
+>> We need, some platforms pass NULL pointer as host bridge parent.
+> 
+> But those don't have to use the new pci_create_host_bridge() function,
+> right?
 
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 84e9e51..b36ebd0 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -5,6 +5,7 @@
- CPPFLAGS_vmlinux.lds	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
- AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
- CFLAGS_efi-stub.o 	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
-+CFLAGS_armv8_deprecated.o := -I$(src)
- 
- CFLAGS_REMOVE_ftrace.o = -pg
- CFLAGS_REMOVE_insn.o = -pg
-diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-index 401c2e5..529aad9 100644
---- a/arch/arm64/kernel/armv8_deprecated.c
-+++ b/arch/arm64/kernel/armv8_deprecated.c
-@@ -20,6 +20,9 @@
- #include <asm/traps.h>
- #include <asm/uaccess.h>
- 
-+#define CREATE_TRACE_POINTS
-+#include "trace-events-emulation.h"
-+
- /*
-  * The runtime support for deprecated instruction support can be in one of
-  * following three states -
-@@ -358,6 +361,11 @@ static int swp_handler(struct pt_regs *regs, u32 instr)
- 		regs->user_regs.regs[destreg] = data;
- 
- ret:
-+	if (type == TYPE_SWPB)
-+		trace_instruction_emulation("swpb", regs->pc);
-+	else
-+		trace_instruction_emulation("swp", regs->pc);
-+
- 	pr_warn_ratelimited("\"%s\" (%ld) uses obsolete SWP{B} instruction at 0x%llx\n",
- 			current->comm, (unsigned long)current->pid, regs->pc);
- 
-@@ -415,10 +423,15 @@ static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
- 		 * dmb - mcr p15, 0, Rt, c7, c10, 5
- 		 * dsb - mcr p15, 0, Rt, c7, c10, 4
- 		 */
--		if (aarch32_insn_mcr_extract_opc2(instr) == 5)
-+		if (aarch32_insn_mcr_extract_opc2(instr) == 5) {
- 			dmb(sy);
--		else
-+			trace_instruction_emulation(
-+				"mcr p15, 0, Rt, c7, c10, 5 ; dmb", regs->pc);
-+		} else {
- 			dsb(sy);
-+			trace_instruction_emulation(
-+				"mcr p15, 0, Rt, c7, c10, 4 ; dsb", regs->pc);
-+		}
- 		break;
- 	case 5:
- 		/*
-@@ -427,6 +440,8 @@ static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
- 		 * Taking an exception or returning from one acts as an
- 		 * instruction barrier. So no explicit barrier needed here.
- 		 */
-+		trace_instruction_emulation(
-+			"mcr p15, 0, Rt, c7, c5, 4 ; isb", regs->pc);
- 		break;
- 	}
- 
-diff --git a/arch/arm64/kernel/trace-events-emulation.h b/arch/arm64/kernel/trace-events-emulation.h
-new file mode 100644
-index 0000000..ae1dd59
---- /dev/null
-+++ b/arch/arm64/kernel/trace-events-emulation.h
-@@ -0,0 +1,35 @@
-+#undef TRACE_SYSTEM
-+#define TRACE_SYSTEM emulation
-+
-+#if !defined(_TRACE_EMULATION_H) || defined(TRACE_HEADER_MULTI_READ)
-+#define _TRACE_EMULATION_H
-+
-+#include <linux/tracepoint.h>
-+
-+TRACE_EVENT(instruction_emulation,
-+
-+	TP_PROTO(const char *instr, u64 addr),
-+	TP_ARGS(instr, addr),
-+
-+	TP_STRUCT__entry(
-+		__string(instr, instr)
-+		__field(u64, addr)
-+	),
-+
-+	TP_fast_assign(
-+		__assign_str(instr, instr);
-+		__entry->addr = addr;
-+	),
-+
-+	TP_printk("instr=\"%s\" addr=0x%llx", __get_str(instr), __entry->addr)
-+);
-+
-+#endif /* _TRACE_EMULATION_H */
-+
-+/* This part must be outside protection */
-+#undef TRACE_INCLUDE_PATH
-+#undef TRACE_INCLUDE_FILE
-+#define TRACE_INCLUDE_PATH .
-+
-+#define TRACE_INCLUDE_FILE trace-events-emulation
-+#include <trace/define_trace.h>
+As I mentioned in another reply, I hope all pci host drivers could use
+pci_create_host_bridge(), keep different PCI scan interfaces in PCI core
+make things become complex.
+
+
+> 
+>>>> +	host = kzalloc(sizeof(*host), GFP_KERNEL);
+>>>> +	if (!host)
+>>>> +		return NULL;
+>>>
+>>> devm_kzalloc maybe?
+>>
+>> I don't know much detail about devm_kzalloc(), but we have no pci host driver
+>> here, and I found no devm_kzalloc() uses in core PCI code before.
+> 
+> It also depends on having a valid device pointer. The idea is that the memory
+> is automatically freed if the probe() function returns with an error, or
+> the device driver gets unloaded. For the classic PCI hosts that are not
+> connected to a device, that wouldn't work of course.
+> 
+> 	Arnd
+> 
+> .
+> 
+
+
 -- 
-2.1.1
+Thanks!
+Yijing
