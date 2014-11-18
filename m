@@ -1,77 +1,135 @@
-From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
-Date: Tue, 18 Nov 2014 10:59:03 +0100
-Subject: [PATCH] gpio: mxs: implement get_direction callback
-In-Reply-To: <20141117222127.GN27002@pengutronix.de>
-References: <20141114232601.GW27002@pengutronix.de>
- <5467A980.5090204@elproma.com.pl> <20141116214239.GX27002@pengutronix.de>
- <54693A51.5080907@elproma.com.pl> <54695654.3070209@elproma.com.pl>
- <20141117082848.GZ27002@pengutronix.de> <546A29B9.5030104@elproma.com.pl>
- <546A2B69.4010409@elproma.com.pl> <20141117184229.GM27002@pengutronix.de>
- <546A465E.5080904@elproma.com.pl> <20141117222127.GN27002@pengutronix.de>
-Message-ID: <546B1867.30308@elproma.com.pl>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Tue, 18 Nov 2014 11:04:56 +0100
+Subject: [RFC] adp1653: Add device tree bindings for LED controller
+In-Reply-To: <20141118084603.GC4059@amd>
+References: <20141116075928.GA9763@amd>
+ <20141117145857.GO8907@valkosipuli.retiisi.org.uk>
+ <546AFEA5.9020000@samsung.com> <20141118084603.GC4059@amd>
+Message-ID: <546B19C8.2090008@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Uwe,
+On 11/18/2014 09:46 AM, Pavel Machek wrote:
+> On Tue 2014-11-18 09:09:09, Jacek Anaszewski wrote:
+>> Hi Pavel, Sakari,
+>>
+>> On 11/17/2014 03:58 PM, Sakari Ailus wrote:
+>>> Hi Pavel,
+>>>
+>>> On Sun, Nov 16, 2014 at 08:59:28AM +0100, Pavel Machek wrote:
+>>>> For device tree people: Yes, I know I'll have to create file in
+>>>> documentation, but does the binding below look acceptable?
+>>>>
+>>>> I'll clean up driver code a bit more, remove the printks. Anything
+>>>> else obviously wrong?
+>>>
+>>> Jacek Anaszewski is working on flash support for LED devices. I think it'd
+>>> be good to sync the DT bindings for the two, as the types of devices
+>>> supported by the LED API and the V4L2 flash API are quite similar.
+>>>
+>>> Cc Jacek.
+>>
+>> I've already submitted a patch [1] that updates leds common bindings.
+>> I hasn't been merged yet, as the related LED Flash class patch [2]
+>> still needs some indicator leds related discussion [3].
+>>
+>> I think this is a good moment to discuss the flash related led common
+>> bindings.
+>
+> Part of problem is that adp1653 is not regarded as "LED" device by
+> current kernel driver.
 
-W dniu 2014-11-17 o 23:21, Uwe Kleine-K?nig pisze:
-> Hello Janusz,
->
-> On Mon, Nov 17, 2014 at 08:02:54PM +0100, Janusz U?ycki wrote:
->> W dniu 2014-11-17 o 19:42, Uwe Kleine-K?nig pisze:
->>> On Mon, Nov 17, 2014 at 06:07:53PM +0100, Janusz U?ycki wrote:
->>>>> It looks there could be one more helper useful.
->>>>> Both atmel_serial.c and mxs-auart.c checks if the line is
->>>>> supported by mctrl_gpio.
->>>>> One time it is eg.:
->>>>> (s->gpio_irq[UART_GPIO_DCD] > 0)
->>>>> another time it is eg.:
->>>>> IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(s->gpios, UART_GPIO_RTS))
->>>>>
->>>>> The first one is no possible now. The second seems rude.
->>>>> bool mctrl_gpio_is_gpio((struct mctrl_gpios *gpios, enum
->>>>> mctrl_gpio_idx gidx);
->>>>> The name is hard. Moreover the implementation could be very similar
->>>>> to mctrl_gpio_to_gpiod(). Any ideas?
->>>> The differences:
->>>> - faster
->>>> - not exported
->>>> - used mainly in uart's interrupt
->>>> - assumes that struct mctrl_gpios *gpios exists
->>> I wonder why you need it at all?!
->> If the line is not supported by gpio it could be supported by native
->> uart's hardware
->> if possible. There are different configurations. One port has the
->> lines, other
->> which uses the same driver doesn't have.
->> Let's look at disable/enable_ms() in atmet_serial.c.
->> In mxs-auart DMA is not used if CTS or RTS is gpio line (timming).
-> For the atmel driver I would expect that it doesn't hurt to set
-> ATMEL_US_CTSIC if CTS is realized using a gpio. But maybe I'm too
-> optimistic here. So atmel_enable_ms could look as follows:
->
-> 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
->
-> 	/*
-> 	 * Interrupt should not be enabled twice
-> 	 * ukl: is this check really needed?
-> 	 */
-> 	if (atmel_port->ms_irq_enabled)
-> 		return;
->
-> 	atmel_port->ms_irq_enabled = true;
->
-> 	mctrl_gpio_enable_ms(...);
-> 	UART_PUT_IER(port, ATMEL_US_CTSIC | ATMEL_US_DSRIC | ATMEL_US_RIIC | ATMEL_US_DCDIC);
+It doesn't prevent us from keeping the flash devices related
+DT bindings unified across kernel subsystems. The DT bindings
+docs for the adp1653 could just provide a reference to the
+led/common.txt bindings. In the future, when LED Flash
+class will be merged, all the V4L2 Flash drivers might be
+moved to the LED subsystem to gain the LED subsystem support.
 
-It is too optimistic I think. We shouldn't assume that internal lines 
-are biased if not selected by pinmux.
-They should be but it is not ensured in most datasheets. Moreover today 
-time to market makes erratas longer
-and too often not complete. Sadly but true.
-
-best regards
-Janusz
-> Best regards
-> Uwe
+>> [1] http://www.spinics.net/lists/linux-leds/msg02121.html
 >
+> @@ -3,6 +3,17 @@ Common leds properties.
+>   Optional properties for child nodes:
+>   - label : The label for this LED.  If omitted, the label is
+>     taken from the node name (excluding the unit address).
+> +- iout-torch : Array of maximum intensities in microamperes of the
+>   torch
+> +	led currents in order from sub-led 0 to N-1, where N is the
+>   number
+> +	of torch sub-leds exposed by the device
+> +- iout-flash : Array of maximum intensities in microamperes of the
+>   flash
+> +	led currents in order from sub-led 0 to N-1, where N is the
+>   number
+> +	of flash sub-leds exposed by the device
+> +- iout-indicator : Array of maximum intensities in microamperes of
+> +  the indicator led currents in order from sub-led 0 to N-1,
+> +  where N is the number of indicator sub-leds exposed by the device
+> +- flash-timeout : timeout in microseconds after which flash led
+> +  is turned off
+>
+>   - linux,default-trigger :  This parameter, if present, is a
+>       string defining the trigger assigned to the LED.  Current
+>       triggers are:
+> @@ -19,5 +30,10 @@ Examples:
+>   system-status {
+>   	       label = "Status";
+>   	       linux,default-trigger = "heartbeat";
+> +	       iout-torch = <500 500>;
+> +	       iout-flash = <1000 1000>;
+> +	       iout-indicator = <100 100>;
+> +	       flash-timeout = <1000>;
+> +
+> 	...
+>   };
+>
+> I don't get it; system-status describes single LED, why are iout-torch
+> (and friends) arrays of two?
+
+Some devices can control more than one led. The array is for such
+purposes. The system-status should be probably renamed to
+something more generic for both common leds and flash leds,
+e.g. system-led.
+
+> Also, at least on adp1653, these are actually two leds -- white and
+> red. Torch and flash is white led, indicator is red led.
+
+Then you should define three properties:
+
+iout-torch = <[uA]>;
+iout-flash = <[uA]>;
+iout-indicator = <[uA]>;
+
+iout-torch and iout-flash properties would determine the current
+for the white led in the torch and flash modes respectively and
+the iout-indicator property would determine the current for
+the indicator led.
+
+>> [2] http://www.spinics.net/lists/linux-media/msg83100.html
+>> [3] http://www.spinics.net/lists/linux-leds/msg02472.html
+>
+> What device are you using for testing? Can you cc me on future
+> patches?
+
+I am using max77693 [1] and aat1290 [2]. OK, I will add you on cc.
+
+> Why do we need complex "flash LED class" support, and where is the
+> V4L2 glue?
+
+The rationale for unification of the LED and V4L2 Flash API
+can be found in the discussion [3]. The glue is the v4l2-flash [4]
+module which exposes a sub-device, that controls a LED Flash class
+device with use of LED Flash class API.
+
+The v4l2-flash sub-device registers with v4l2-async API
+in a media device. Exemplary support for v4l2-flash
+sub-devices is added to the exynos4-is driver in the patch [5].
+
+Best Regards,
+Jacek Anaszewski
+
+[1] http://www.spinics.net/lists/linux-leds/msg02326.html
+[2] http://www.spinics.net/lists/linux-media/msg81079.html
+[3] http://www.spinics.net/lists/linux-media/msg69012.html
+[4] http://www.spinics.net/lists/linux-leds/msg02322.html
+[5] http://www.spinics.net/lists/linux-leds/msg02323.html
