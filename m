@@ -1,70 +1,229 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 18 Nov 2014 11:59:39 +0100 (CET)
-Subject: [PATCH] asm-generic: Add msi.h
-In-Reply-To: <1703620.E5bhVDQPHc@wuerfel>
-References: <alpine.DEB.2.11.1411181133080.3909@nanos>
- <1703620.E5bhVDQPHc@wuerfel>
-Message-ID: <alpine.DEB.2.11.1411181149350.3909@nanos>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 18 Nov 2014 12:00:11 +0100
+Subject: [PATCH v8 03/10] sched: move cfs task on a CPU with higher
+ capacity
+In-Reply-To: <546B23DD.4080804@gmail.com>
+References: <1414745252-4895-1-git-send-email-vincent.guittot@linaro.org>
+ <1414745252-4895-4-git-send-email-vincent.guittot@linaro.org>
+ <546B23DD.4080804@gmail.com>
+Message-ID: <CAKfTPtBrMURRrv2R4UGGUObOYbVHo0kG3d2U9Dz45t9XYG1Hcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Nov 2014, Arnd Bergmann wrote:
+On 18 November 2014 11:47, Wanpeng Li <kernellwp@gmail.com> wrote:
+> Hi Vincent,
+> On 10/31/14, 4:47 PM, Vincent Guittot wrote:
+>>
+>> When a CPU is used to handle a lot of IRQs or some RT tasks, the remaining
+>> capacity for CFS tasks can be significantly reduced. Once we detect such
+>
+>
+> I see the cpu capacity will be reduced if RT tasks are running in
+> scale_rt_capacity(), could you point out where cpu capacity reduced due to
+> IRQs?
 
-> On Tuesday 18 November 2014 11:34:37 Thomas Gleixner wrote:
-> > To support MSI irq domains we want a generic data structure for
-> > allocation, but we need the option to provide an architecture specific
-> > version of it. So instead of playing #ifdef games in linux/msi.h we
-> > add a generic header file and let architectures decide whether to
-> > include it or to provide their own implementation and provide the
-> > required typedef.
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> for merging the asm-generic file
-> 
-> > I know that typedefs are not really nice, but in this case there are no
-> > forward declarations required and it's the simplest solution.
-> 
-> I must be missing the obvious: what problem does the typedef solve
-> that you would have with just a struct?
+with CONFIG_IRQ_TIME_ACCOUNTING, the time spent in interrupt context
+will be added in rq->rt_avg
 
-It's not obvious. :)
+Regards,
+Vincent
 
-The irqdomain stuff is pretty device tree centric, but the new stacked
-irqdomains are to be used by x86 as well. So we made some of the
-interfaces opaque, i.e. void *allocation_arg.
-
-Now MSI is a bit differnet as it cannot be decribed by DT, so we want
-a proper generic data structure for it and of course we want to have a
-type for it.
-
-Now x86 has a bit more convoluted requirements where we prefer for
-simplicity reasons to reuse the allocation data structure which we
-have alredy for the non MSI cases, so it can be handed down to the
-opaque interfaces as well.
-
-So we have the generic:
- 
-struct msi_alloc_info {
-       ....
-};
-
-and 
-
-struct x86_alloc_info {
-       ...
-};
-
-So we either can do in x86:
-
-struct msi_alloc_info {
-       struct x86_alloc_info info;
-};
-
-or use a typedef which maps x86_alloc_info to msi_alloc_info_t.
-
-I think the typedef is more sane in that case.
-
-Thanks,
-
-	tglx
+>
+> Regards,
+> Wanpeng Li
+>
+>
+>> situation by comparing cpu_capacity_orig and cpu_capacity, we trig an idle
+>> load balance to check if it's worth moving its tasks on an idle CPU.
+>>
+>> Once the idle load_balance has selected the busiest CPU, it will look for
+>> an
+>> active load balance for only two cases :
+>> - there is only 1 task on the busiest CPU.
+>> - we haven't been able to move a task of the busiest rq.
+>>
+>> A CPU with a reduced capacity is included in the 1st case, and it's worth
+>> to
+>> actively migrate its task if the idle CPU has got full capacity. This test
+>> has
+>> been added in need_active_balance.
+>>
+>> As a sidenote, this will note generate more spurious ilb because we
+>> already
+>> trig an ilb if there is more than 1 busy cpu. If this cpu is the only one
+>> that
+>> has a task, we will trig the ilb once for migrating the task.
+>>
+>> The nohz_kick_needed function has been cleaned up a bit while adding the
+>> new
+>> test
+>>
+>> env.src_cpu and env.src_rq must be set unconditionnally because they are
+>> used
+>> in need_active_balance which is called even if busiest->nr_running equals
+>> 1
+>>
+>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>> ---
+>>   kernel/sched/fair.c | 86
+>> ++++++++++++++++++++++++++++++++++++++++-------------
+>>   1 file changed, 65 insertions(+), 21 deletions(-)
+>>
+>> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+>> index bd214d2..54468f3 100644
+>> --- a/kernel/sched/fair.c
+>> +++ b/kernel/sched/fair.c
+>> @@ -5889,6 +5889,18 @@ fix_small_capacity(struct sched_domain *sd, struct
+>> sched_group *group)
+>>   }
+>>     /*
+>> + * Check whether the capacity of the rq has been noticeably reduced by
+>> side
+>> + * activity. The imbalance_pct is used for the threshold.
+>> + * Return true is the capacity is reduced
+>> + */
+>> +static inline int
+>> +check_cpu_capacity(struct rq *rq, struct sched_domain *sd)
+>> +{
+>> +       return ((rq->cpu_capacity * sd->imbalance_pct) <
+>> +                               (rq->cpu_capacity_orig * 100));
+>> +}
+>> +
+>> +/*
+>>    * Group imbalance indicates (and tries to solve) the problem where
+>> balancing
+>>    * groups is inadequate due to tsk_cpus_allowed() constraints.
+>>    *
+>> @@ -6562,6 +6574,28 @@ static int need_active_balance(struct lb_env *env)
+>>                         return 1;
+>>         }
+>>   +     /*
+>> +        * The dst_cpu is idle and the src_cpu CPU has only 1 CFS task.
+>> +        * It's worth migrating the task if the src_cpu's capacity is
+>> reduced
+>> +        * because of other sched_class or IRQs whereas capacity stays
+>> +        * available on dst_cpu.
+>> +        */
+>> +       if ((env->idle != CPU_NOT_IDLE) &&
+>> +                       (env->src_rq->cfs.h_nr_running == 1)) {
+>> +               unsigned long src_eff_capacity, dst_eff_capacity;
+>> +
+>> +               dst_eff_capacity = 100;
+>> +               dst_eff_capacity *= capacity_of(env->dst_cpu);
+>> +               dst_eff_capacity *= capacity_orig_of(env->src_cpu);
+>> +
+>> +               src_eff_capacity = sd->imbalance_pct;
+>> +               src_eff_capacity *= capacity_of(env->src_cpu);
+>> +               src_eff_capacity *= capacity_orig_of(env->dst_cpu);
+>> +
+>> +               if (src_eff_capacity < dst_eff_capacity)
+>> +                       return 1;
+>> +       }
+>> +
+>>         return unlikely(sd->nr_balance_failed > sd->cache_nice_tries+2);
+>>   }
+>>   @@ -6661,6 +6695,9 @@ static int load_balance(int this_cpu, struct rq
+>> *this_rq,
+>>         schedstat_add(sd, lb_imbalance[idle], env.imbalance);
+>>   +     env.src_cpu = busiest->cpu;
+>> +       env.src_rq = busiest;
+>> +
+>>         ld_moved = 0;
+>>         if (busiest->nr_running > 1) {
+>>                 /*
+>> @@ -6670,8 +6707,6 @@ static int load_balance(int this_cpu, struct rq
+>> *this_rq,
+>>                  * correctly treated as an imbalance.
+>>                  */
+>>                 env.flags |= LBF_ALL_PINNED;
+>> -               env.src_cpu   = busiest->cpu;
+>> -               env.src_rq    = busiest;
+>>                 env.loop_max  = min(sysctl_sched_nr_migrate,
+>> busiest->nr_running);
+>>     more_balance:
+>> @@ -7371,22 +7406,25 @@ static void nohz_idle_balance(struct rq *this_rq,
+>> enum cpu_idle_type idle)
+>>     /*
+>>    * Current heuristic for kicking the idle load balancer in the presence
+>> - * of an idle cpu is the system.
+>> + * of an idle cpu in the system.
+>>    *   - This rq has more than one task.
+>> - *   - At any scheduler domain level, this cpu's scheduler group has
+>> multiple
+>> - *     busy cpu's exceeding the group's capacity.
+>> + *   - This rq has at least one CFS task and the capacity of the CPU is
+>> + *     significantly reduced because of RT tasks or IRQs.
+>> + *   - At parent of LLC scheduler domain level, this cpu's scheduler
+>> group has
+>> + *     multiple busy cpu.
+>>    *   - For SD_ASYM_PACKING, if the lower numbered cpu's in the scheduler
+>>    *     domain span are idle.
+>>    */
+>> -static inline int nohz_kick_needed(struct rq *rq)
+>> +static inline bool nohz_kick_needed(struct rq *rq)
+>>   {
+>>         unsigned long now = jiffies;
+>>         struct sched_domain *sd;
+>>         struct sched_group_capacity *sgc;
+>>         int nr_busy, cpu = rq->cpu;
+>> +       bool kick = false;
+>>         if (unlikely(rq->idle_balance))
+>> -               return 0;
+>> +               return false;
+>>            /*
+>>         * We may be recently in ticked or tickless idle mode. At the first
+>> @@ -7400,38 +7438,44 @@ static inline int nohz_kick_needed(struct rq *rq)
+>>          * balancing.
+>>          */
+>>         if (likely(!atomic_read(&nohz.nr_cpus)))
+>> -               return 0;
+>> +               return false;
+>>         if (time_before(now, nohz.next_balance))
+>> -               return 0;
+>> +               return false;
+>>         if (rq->nr_running >= 2)
+>> -               goto need_kick;
+>> +               return true;
+>>         rcu_read_lock();
+>>         sd = rcu_dereference(per_cpu(sd_busy, cpu));
+>> -
+>>         if (sd) {
+>>                 sgc = sd->groups->sgc;
+>>                 nr_busy = atomic_read(&sgc->nr_busy_cpus);
+>>   -             if (nr_busy > 1)
+>> -                       goto need_kick_unlock;
+>> +               if (nr_busy > 1) {
+>> +                       kick = true;
+>> +                       goto unlock;
+>> +               }
+>> +
+>>         }
+>>   -     sd = rcu_dereference(per_cpu(sd_asym, cpu));
+>> +       sd = rcu_dereference(rq->sd);
+>> +       if (sd) {
+>> +               if ((rq->cfs.h_nr_running >= 1) &&
+>> +                               check_cpu_capacity(rq, sd)) {
+>> +                       kick = true;
+>> +                       goto unlock;
+>> +               }
+>> +       }
+>>   +     sd = rcu_dereference(per_cpu(sd_asym, cpu));
+>>         if (sd && (cpumask_first_and(nohz.idle_cpus_mask,
+>>                                   sched_domain_span(sd)) < cpu))
+>> -               goto need_kick_unlock;
+>> +               kick = true;
+>>   +unlock:
+>>         rcu_read_unlock();
+>> -       return 0;
+>> -
+>> -need_kick_unlock:
+>> -       rcu_read_unlock();
+>> -need_kick:
+>> -       return 1;
+>> +       return kick;
+>>   }
+>>   #else
+>>   static void nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type
+>> idle) { }
+>
+>
