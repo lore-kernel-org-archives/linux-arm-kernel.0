@@ -1,82 +1,123 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Nov 2014 13:57:05 +0100
-Subject: [PATCH v3 06/13] efi: register iomem resources for UEFI reserved
- regions
+Date: Tue, 18 Nov 2014 13:57:03 +0100
+Subject: [PATCH v3 04/13] efi: split off remapping code from efi_config_init()
 In-Reply-To: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1416315432-8534-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1416315432-8534-5-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register memory regions reserved by UEFI as IORESOURCE_MEM resources,
-so that they are reserved for other uses, and also makes them turn up
-in /proc/iomem.
+Split of the remapping code from efi_config_init() so that the caller
+can perform its own remapping. This is necessary to correctly handle
+virtually remapped UEFI memory regions under kexec, as efi.systab will
+have been updated to a virtual address.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/firmware/efi/virtmap.c | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ drivers/firmware/efi/efi.c | 49 +++++++++++++++++++++++++++++-----------------
+ include/linux/efi.h        |  2 ++
+ 2 files changed, 33 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/firmware/efi/virtmap.c b/drivers/firmware/efi/virtmap.c
-index d1f1d416944f..98735fb43581 100644
---- a/drivers/firmware/efi/virtmap.c
-+++ b/drivers/firmware/efi/virtmap.c
-@@ -13,6 +13,7 @@
- #include <linux/rwsem.h>
- #include <linux/spinlock.h>
- #include <linux/atomic.h>
-+#include <linux/bootmem.h>
- 
- #include <asm/efi.h>
- #include <asm/pgtable.h>
-@@ -52,6 +53,39 @@ static pgprot_t efi_md_access_prot(efi_memory_desc_t *md, pgprot_t prot)
- 	return pgprot_device(prot);
+diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+index 9035c1b74d58..0de77db4fb88 100644
+--- a/drivers/firmware/efi/efi.c
++++ b/drivers/firmware/efi/efi.c
+@@ -293,9 +293,10 @@ static __init int match_config_table(efi_guid_t *guid,
+ 	return 0;
  }
  
-+static __init void efi_register_mem_resource(efi_memory_desc_t *md)
+-int __init efi_config_init(efi_config_table_type_t *arch_tables)
++int __init efi_config_parse_tables(void *config_tables, int count,
++				   efi_config_table_type_t *arch_tables)
+ {
+-	void *config_tables, *tablep;
++	void *tablep;
+ 	int i, sz;
+ 
+ 	if (efi_enabled(EFI_64BIT))
+@@ -303,19 +304,9 @@ int __init efi_config_init(efi_config_table_type_t *arch_tables)
+ 	else
+ 		sz = sizeof(efi_config_table_32_t);
+ 
+-	/*
+-	 * Let's see what config tables the firmware passed to us.
+-	 */
+-	config_tables = early_memremap(efi.systab->tables,
+-				       efi.systab->nr_tables * sz);
+-	if (config_tables == NULL) {
+-		pr_err("Could not map Configuration table!\n");
+-		return -ENOMEM;
+-	}
+-
+ 	tablep = config_tables;
+ 	pr_info("");
+-	for (i = 0; i < efi.systab->nr_tables; i++) {
++	for (i = 0; i < count; i++) {
+ 		efi_guid_t guid;
+ 		unsigned long table;
+ 
+@@ -328,8 +319,6 @@ int __init efi_config_init(efi_config_table_type_t *arch_tables)
+ 			if (table64 >> 32) {
+ 				pr_cont("\n");
+ 				pr_err("Table located above 4GB, disabling EFI.\n");
+-				early_memunmap(config_tables,
+-					       efi.systab->nr_tables * sz);
+ 				return -EINVAL;
+ 			}
+ #endif
+@@ -344,13 +333,37 @@ int __init efi_config_init(efi_config_table_type_t *arch_tables)
+ 		tablep += sz;
+ 	}
+ 	pr_cont("\n");
+-	early_memunmap(config_tables, efi.systab->nr_tables * sz);
+-
+ 	set_bit(EFI_CONFIG_TABLES, &efi.flags);
+-
+ 	return 0;
+ }
+ 
++int __init efi_config_init(efi_config_table_type_t *arch_tables)
 +{
-+	struct resource *res, *parent;
++	void *config_tables;
++	int sz, ret;
 +
-+	res = alloc_bootmem_low(sizeof(*res));
-+	res->start = md->phys_addr;
-+	res->end = res->start + (md->num_pages << EFI_PAGE_SHIFT) - 1;
-+	res->flags = IORESOURCE_MEM;
-+
-+	if (md->type == EFI_MEMORY_MAPPED_IO &&
-+	    (md->attribute & EFI_MEMORY_RUNTIME)) {
-+		/*
-+		 * Device regions with the EFI_MEMORY_RUNTIME attribute
-+		 * are owned by the UEFI firmware, so make sure they are
-+		 * tagged as exclusive: this will also prevent access
-+		 * via /dev/mem if CONFIG_STRICT_DEVMEM is in effect.
-+		 */
-+		res->name = "UEFI Runtime I/O";
-+		res->flags |= IORESOURCE_EXCLUSIVE;
-+	} else {
-+		res->name  = "UEFI Reserved";
-+	}
++	if (efi_enabled(EFI_64BIT))
++		sz = sizeof(efi_config_table_64_t);
++	else
++		sz = sizeof(efi_config_table_32_t);
 +
 +	/*
-+	 * Try to register this resource at the top level. If it conflicts with
-+	 * an existing entry ('System RAM', most likely), register it as its
-+	 * child instead.
++	 * Let's see what config tables the firmware passed to us.
 +	 */
-+	parent = request_resource_conflict(&iomem_resource, res);
-+	if (parent)
-+		request_resource(parent, res);
++	config_tables = early_memremap(efi.systab->tables,
++				       efi.systab->nr_tables * sz);
++	if (config_tables == NULL) {
++		pr_err("Could not map Configuration table!\n");
++		return -ENOMEM;
++	}
++
++	ret = efi_config_parse_tables(config_tables, efi.systab->nr_tables,
++				      arch_tables);
++
++	early_memunmap(config_tables, efi.systab->nr_tables * sz);
++	return ret;
 +}
 +
- void __init efi_virtmap_init(void)
+ #ifdef CONFIG_EFI_VARS_MODULE
+ static int __init efi_load_efivars(void)
  {
- 	efi_memory_desc_t *md;
-@@ -63,6 +97,8 @@ void __init efi_virtmap_init(void)
- 		u64 paddr, npages, size;
- 		pgprot_t prot;
- 
-+		if (!efi_mem_is_usable_region(md))
-+			efi_register_mem_resource(md);
- 		if (!(md->attribute & EFI_MEMORY_RUNTIME))
- 			continue;
- 		if (WARN(md->virt_addr == 0,
+diff --git a/include/linux/efi.h b/include/linux/efi.h
+index 0238d612750e..2dc8577032b3 100644
+--- a/include/linux/efi.h
++++ b/include/linux/efi.h
+@@ -875,6 +875,8 @@ static inline efi_status_t efi_query_variable_store(u32 attributes, unsigned lon
+ #endif
+ extern void __iomem *efi_lookup_mapped_addr(u64 phys_addr);
+ extern int efi_config_init(efi_config_table_type_t *arch_tables);
++extern int efi_config_parse_tables(void *config_tables, int count,
++				   efi_config_table_type_t *arch_tables);
+ extern u64 efi_get_iobase (void);
+ extern u32 efi_mem_type (unsigned long phys_addr);
+ extern u64 efi_mem_attributes (unsigned long phys_addr);
 -- 
 1.8.3.2
