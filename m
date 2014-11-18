@@ -1,94 +1,83 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 18 Nov 2014 17:19:50 +0100
-Subject: [RFC] pinctrl: Provide a generic device tree binding for per-pin
- pin controllers
-In-Reply-To: <5451B914.6020300@wwwdotorg.org>
-References: <20141023132305.GG14443@pengutronix.de>
- <5451B914.6020300@wwwdotorg.org>
-Message-ID: <20141118161950.GG30369@pengutronix.de>
+Date: Tue, 18 Nov 2014 17:24:22 +0100
+Subject: [PATCH v3 0/3] Add Mediatek SoC Pinctrl/GPIO driver for MT8135.
+In-Reply-To: <1415709535-31515-1-git-send-email-hongzhou.yang@mediatek.com>
+References: <1415709535-31515-1-git-send-email-hongzhou.yang@mediatek.com>
+Message-ID: <20141118162422.GI14482@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Linus,
 
-On Wed, Oct 29, 2014 at 10:05:40PM -0600, Stephen Warren wrote:
-> On 10/23/2014 07:23 AM, Sascha Hauer wrote:
-> > Most iomux controllers allow a configuration per pin. These currently
-> > have no common device tree binding. There are many different SoC
-> > specific bindings for this class of iomux controllers. Some controllers
-> > artificially group pins together where in hardware no groups exist (for
-> > example lantiq). Other controllers just put each pin into a separate
-> > group which explodes to many many strings to parse (Tegra30).
-> > 
-> > 
-> > A pin controller has n pins, each muxable to m different positions.
-> 
-> I assume that sentence is meant to say something more specific:
-> 
-> This binding is intended to apply to pin controllers where each pin has
-> an independently selectable mux function.
-
-Yes.
-
-> 
-> "A pin controller ..." sounds like a general statement that is intended
-> to apply to any pin controller. If that were intended, the statement you
-> made certainly wouldn't be true.
-
-Right.
-
-> 
-> > There exists a logical numbering for all pins, for most SoCs this will
-> > be defined by the register ordering so that the pin number can directly
-> > be translated to a register offset without the need of tables in the
-> > driver. The register usually takes m different numbers to specify the
-> > function the pin should have. Both the pin and its function can be
-> > described as a single 32bit number:
-> > 
-> > #define PINMUX_PIN(no, fn) (((no) & 0xffffff) << 8) | (fn) & 0xff)
-> > 
-> > This allows to put multiple pins into a single device tree property
-> > which is very efficiently parsable by the driver (or the pinmux core).
-> > We suggest to name this property 'pins' and to put it next to the
-> > generic pinconf binding.  This allows to describe multiple pins with the
-> > same pinconf settings in a single device tree node. Multiple of these
-> > nodes can be grouped under a pinctrl state node. This allows to put pins
-> > with different pinconf settings to a single state.
-> > 
-> > Example:
-> > 
-> > 	uart2 {
-> > 		uart2_default_mode: uart2_default {
-> > 			pins1 {
-> > 				pins = <PINMUX_PIN(127, 3), PINMUX_PIN(128, 3)>;
-> 
-> Within each of the nodes, the binding for pinmux is defined
-> independently by each pin controller. I don't have any /strong/
-> objection to any particular pin controller using this binding, or even
-> it being re-used across many similar pin controllers, or even being
-> the/a default binding style for new pin controllers.
-> 
-> I'm not totally sure whether blending the pin ID and mux function ID
-> into the same value is a good idea. That said, it does have advantages
-> as you state, and shouldn't cause any significant issues. In any case
-> where it would be a bad idea, the binding for the pin controller in
-> question can still choose to use some more appropriate binding, so
-> allowing this binding for some controllers won't force issues onto other
-> controllers. So, it seems fine.
-> 
-> Note however that we can't change existing bindings. Well, I suppose
-> certain bindings could be enhanced to support either a string-based or
-> an integer-base binding, but I don't think that'd be a good idea.
-
-I'm only talking about new bindings, no need to change existing
-bindings. For new bindings it surely has benefits when we can just point
-to a well established binding. Right now the existing bindings for the
-pin controllers which independently control each pin differ a lot.
-
-The next step should be to integrate the above into the pinctrl
-documentation.
+Is this driver generally ok? It basically implements the binding
+suggested as RFC (except that mediatek,pins should only be pins).
+Are you Ok with this approach? Anything else missing?
 
 Sascha
+
+On Tue, Nov 11, 2014 at 08:38:52PM +0800, Hongzhou Yang wrote:
+> This is v3 of add Mediatek SoC Pinctrl/GPIO drvier for MT8135.
+> It is based on Joe.C' basic device tree support.
+> See http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296093.html
+> 
+> This driver include common and MT8135 part, other Mediatek SoCs will share the common part,
+> and MT8135 part only support MT8135. MT8135 has GPIO controller, it includes 203 pins.
+> 
+> Changes in v3:
+>   - Rebase on 3.18-rc1.
+>   - Follow '[RFC] pinctrl: Provide a generic device tree binding for per-pin pin controllers', modify mediatek,pins format,
+>     add config setting for each pin, the reason is that each pin may have different config.
+>     The RFC link: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296491.html
+>   - Switch to use syscon regmap.
+>   - Add CLR_ADDR() and SET_ADDR() macros.
+>   - Add mtk_pconf_set_ies() and mtk_pconf_set_smt() functions to deal with input-enable and input-schmitt-enable.
+>   - Rename mt_gpio_devdata to mtk_pinctrl_devdata.
+>   - Rename all mt_prefix to mtk_prefix.
+>   - Rename mt_pconf_pull_conf() to mtk_pconf_parse_conf, add mtk_pconf_set_pull_select() to deal with pull enable and pull up/down.
+>     And we will add PIN_CONFIG_DRIVE_STRENGTH to mtk_pconf_parse_conf().
+> 
+> According to Linus' suggestion, make some following changes:
+>   - Add port_shf, port_mask and port_align members to mtk_pinctrl_devdata struct.
+>   - Use BIT(x) instead of 1 << (x).
+>   - Remove mt_pctrl_write_reg() and mt_pctrl_read_reg().
+>   - Remove mt_gpio_of_xlate().
+>   - Use .set_mux() instead of .enable().
+>   - Add some comments.
+> 
+> Hongzhou Yang (3):
+>   ARM: mediatek: Add Pinctrl/GPIO driver for mt8135.
+>   dt-bindings: Add pinctrl bindings for mt65xx/mt81xx.
+>   ARM: dts: mt8135: Add pinctrl/GPIO node for mt8135.
+> 
+>   .../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt |  123 +
+>   arch/arm/boot/dts/mt8135-pinfunc.h                 | 1304 +++++++++++
+>   arch/arm/boot/dts/mt8135.dtsi                      |   19 +
+>   arch/arm/mach-mediatek/Kconfig                     |    1 +
+>   drivers/pinctrl/Kconfig                            |    1 +
+>   drivers/pinctrl/Makefile                           |    1 +
+>   drivers/pinctrl/mediatek/Kconfig                   |   12 +
+>   drivers/pinctrl/mediatek/Makefile                  |    5 +
+>   drivers/pinctrl/mediatek/pinctrl-mt8135.c          |   87 +
+>   drivers/pinctrl/mediatek/pinctrl-mtk-common.c      |  861 +++++++
+>   drivers/pinctrl/mediatek/pinctrl-mtk-common.h      |  123 +
+>   drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h      | 2460 ++++++++++++++++++++
+>   include/dt-bindings/pinctrl/mt65xx.h               |   23 +
+>   13 files changed, 5020 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
+>   create mode 100644 arch/arm/boot/dts/mt8135-pinfunc.h
+>   create mode 100644 drivers/pinctrl/mediatek/Kconfig
+>   create mode 100644 drivers/pinctrl/mediatek/Makefile
+>   create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt8135.c
+>   create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+>   create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+>   create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
+>   create mode 100644 include/dt-bindings/pinctrl/mt65xx.h
+> 
+> --
+> 1.8.1.1.dirty
+> 
+> 
+> 
 
 -- 
 Pengutronix e.K.                           |                             |
