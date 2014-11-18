@@ -1,48 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 18 Nov 2014 17:43:11 +0000
-Subject: [RFC/PATCH] ARM: Expose cpuid registers to userspace
-In-Reply-To: <1414459152-32425-1-git-send-email-sboyd@codeaurora.org>
-References: <1414459152-32425-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20141118174310.GM28279@e104818-lin.cambridge.arm.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 18 Nov 2014 12:44:22 -0500 (EST)
+Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
+ completes
+In-Reply-To: <20141118171831.GC3003@dtor-ws>
+Message-ID: <Pine.LNX.4.44L0.1411181234210.892-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen,
+On Tue, 18 Nov 2014, Dmitry Torokhov wrote:
 
-On Tue, Oct 28, 2014 at 01:19:12AM +0000, Stephen Boyd wrote:
-> Exporting all the different possible configurations of CPUID
-> registers to userspace via hwcaps is going to explode the hwcaps.
-> Emulate userspace cpuid register accesses and export a new
-> "cpuid" hwcap instead so that userspace can know to try to
-> read the cpuid registers itself.
+> OK. Another question then: pm_runtime_get_noresume() does literally this:
+> 
+> 	atomic_inc(&dev->power.usage_count);
+> 
+> So who is responsible for actually waking up parent device and/or power
+> domain? Is it simply missing because we did not really have PM domains
+> before?
 
-Since there is a parallel thread with the musl guys around CPU feature
-detection, I thought I would reply to your patch as well (I missed it
-when it first posted as I was on holiday).
+Ths bus is responsible for making sure that all the standard resources
+are available -- that is, all the resources that would be needed by a
+normal device on that bus.  Anything beyond that (such as
+special-purpose clocks) has to be set up by the driver.
 
-First of all, not all the features are relevant to user space, so we
-need to make sure the hwcap bits explosion is actually real. If it is
-real (I personally doubt it), we should only expose those fields which
-are relevant to user space - ID_ISAR*, part of ID_PFR*.
+Thus the bus would insure that the device was powered, its parent was
+resumed, and the usual clock inputs were enabled.  And of course, one
+mechanism for doing this is to runtime-resume the power domain.
 
-The second issue is that you don't want to expose features which the
-kernel does not support (e.g. Neon disabled, crypto would also not be
-supported; debug/PMU is another example). So masking or downgrading bit
-fields is necessary.
+Often the bus doesn't have to do anything special to resume the
+device's parent.  This is because the device gets probed when it is
+registered, which happens when it is discovered, and the discovery is
+done by the parent's driver as part of its normal activity.  Since the
+parent has to be powered up to carry out this normal activity, nothing 
+more is needed.
 
-Thirdly, there are reserved bits in the CPUID registers which we don't
-want to expose. What if you run an older kernel on a newer hardware
-which actually has something to those bits but the kernel doesn't
-support them?
+(Of course, devices can get probed at other times too, not just when
+they are discovered.  For example, a device might get probed when a
+driver module is loaded, and that can occur at any time.  So in general
+it might indeed be necessary for the bus to wake up the parent before
+calling the driver's probe routine.)
 
-Fourthly, there is an auxiliary feature register (ID_AFR0) which is
-implementation defined. I'm not sure what user space could do with this.
-It needs to be read in combination with MIDR to make any sense but even
-though you can't tell before whether the kernel should expose such
-information to users.
-
-And lastly, there are big.LITTLE systems, so the kernel needs to provide
-a common set of features.
-
--- 
-Catalin
+Alan Stern
