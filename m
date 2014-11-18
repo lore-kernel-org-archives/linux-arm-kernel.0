@@ -1,65 +1,51 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 17 Nov 2014 21:51:24 -0800
-Subject: [PATCH] clk: sunxi: gmac-tx-clk mux is not a CLK_MUX_INDEX_BIT mux
-In-Reply-To: <1416142617-4094-1-git-send-email-hdegoede@redhat.com>
-References: <1416142617-4094-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGb2v66hvvyT-_v6zVe28t_GBVrs0HgKtx5CNjdwgSToJKRsMw@mail.gmail.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Tue, 18 Nov 2014 12:47:28 +0800
+Subject: [PATCH v8 07/13] usb: chipidea: fix phy handling
+In-Reply-To: <1416231347-27193-8-git-send-email-antoine.tenart@free-electrons.com>
+References: <1416231347-27193-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1416231347-27193-8-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20141118044727.GB15650@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, Nov 16, 2014 at 4:56 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> A CLK_MUX_INDEX_BIT mux has one bit per parent, but the sun7i-a20-gmac-clk
-> has 2 bits selecting between 3 possible parents using values of 0, 1, 2,
-> which makes it a regular mux which should not have CLK_MUX_INDEX_BIT set in
-> its flag.
->
-> However we do not support parent 1 (an external clock), so use a table to
-> select parent 0 or 2, which are the 2 parents we support.
->
-> Note this has not been causing any issues sofar, because we start with a
-> parent setting of parent 0, and only ever re-parent to parent 2 (for which
-> we use an index of 1 as we skip parent 1) and with CLK_MUX_INDEX_BIT set
-> we write a value of 2 for index 1.
-
-We never use parent 1, and some hardware doesn't even have it. So back
-then I went for CLK_MUX_INDEX_BIT to simplify it. Guess it's not the best
-way to do it.
-
-> Tested on both a cubietruck (which uses rgmii mode) as well as a cs908
-> (an a31s board which uses mii mode).
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On Mon, Nov 17, 2014 at 02:35:41PM +0100, Antoine Tenart wrote:
+> The generic plaftorm device for ChipIdea drivers is probed by calling
+> ci_hdrc_probe. The device structure used is not the one of the specific
+> ChipIdea driver but the one of the generic ChipIdea platform device.
+> 
+> This results in not being able to probe the PHYs as we're not using the
+> right device structure. Since all ChipIdea drivers are retrieving their
+> PHYs in their specific driver code, this didn't impact any of them yet.
+> 
+> Fixes it using the right device structure (dev->parent).
+> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 > ---
->  drivers/clk/sunxi/clk-a20-gmac.c | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/sunxi/clk-a20-gmac.c b/drivers/clk/sunxi/clk-a20-gmac.c
-> index 5296fd6..0dcf4f2 100644
-> --- a/drivers/clk/sunxi/clk-a20-gmac.c
-> +++ b/drivers/clk/sunxi/clk-a20-gmac.c
-> @@ -53,6 +53,11 @@ static DEFINE_SPINLOCK(gmac_lock);
->  #define SUN7I_A20_GMAC_MASK    0x3
->  #define SUN7I_A20_GMAC_PARENTS 2
->
-> +static u32 sun7i_a20_gmac_mux_table[SUN7I_A20_GMAC_PARENTS] = {
-> +       0x00, /* Select mii_phy_tx_clk */
-> +       0x02, /* Select gmac_int_tx_clk */
-> +};
-> +
->  static void __init sun7i_a20_gmac_clk_setup(struct device_node *node)
->  {
->         struct clk *clk;
-> @@ -90,7 +95,7 @@ static void __init sun7i_a20_gmac_clk_setup(struct device_node *node)
->         gate->lock = &gmac_lock;
->         mux->reg = reg;
->         mux->mask = SUN7I_A20_GMAC_MASK;
-> -       mux->flags = CLK_MUX_INDEX_BIT;
-> +       mux->table = sun7i_a20_gmac_mux_table;
->         mux->lock = &gmac_lock;
->
->         clk = clk_register_composite(NULL, clk_name,
-> --
+>  drivers/usb/chipidea/core.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> index de1e4a84aa93..068e0c6acc3f 100644
+> --- a/drivers/usb/chipidea/core.c
+> +++ b/drivers/usb/chipidea/core.c
+> @@ -686,8 +686,8 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+>  	} else if (ci->platdata->usb_phy) {
+>  		ci->usb_phy = ci->platdata->usb_phy;
+>  	} else {
+> -		ci->phy = devm_phy_get(dev, "usb-phy");
+> -		ci->usb_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
+> +		ci->phy = devm_phy_get(dev->parent, "usb-phy");
+> +		ci->usb_phy = devm_usb_get_phy(dev->parent, USB_PHY_TYPE_USB2);
+>  
+>  		/* if both generic PHY and USB PHY layers aren't enabled */
+>  		if (PTR_ERR(ci->phy) == -ENOSYS &&
+> -- 
 > 2.1.0
->
+> 
+
+Acked-by: Peter Chen <peter.chen@freescale.com>
+
+-- 
+
+Best Regards,
+Peter Chen
