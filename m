@@ -1,63 +1,31 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 18 Nov 2014 19:46:06 +0800
-Subject: [RFC PATCH 01/16] PCI: Enhance pci_scan_root_bus() to support
- default IO/MEM resources
-In-Reply-To: <2447172.ADYWdCTnMP@wuerfel>
-References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
- <2732970.7HG94QvVBv@wuerfel> <546AF8D7.9010103@huawei.com>
- <2447172.ADYWdCTnMP@wuerfel>
-Message-ID: <546B317E.4090800@huawei.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 18 Nov 2014 12:51:31 +0100
+Subject: [PATCH v5 4/8] ARM: DT: STi: STiH407: Add DT node for MiPHY28lp
+In-Reply-To: <1415098284-11182-5-git-send-email-gabriel.fernandez@linaro.org>
+References: <1415098284-11182-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1415098284-11182-5-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <546B32C3.8000602@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/18 17:36, Arnd Bergmann wrote:
-> On Tuesday 18 November 2014 15:44:23 Yijing Wang wrote:
->> On 2014/11/17 18:08, Arnd Bergmann wrote:
->>> On Monday 17 November 2014 18:21:35 Yijing Wang wrote:
->>>> -       list_for_each_entry(window, resources, list)
->>>> -               if (window->res->flags & IORESOURCE_BUS) {
->>>> -                       found = true;
->>>> -                       break;
->>>> -               }
->>>> +       if (!resources) {
->>>> +               pci_add_resource(&default_res, &ioport_resource);
->>>> +               pci_add_resource(&default_res, &iomem_resource);
->>>> +               pci_add_resource(&default_res, &busn_resource);
->>>> +       } else {
->>>>
->>>
->>> Isn't it almost always wrong to do this? You are adding all of the
->>> I/O ports and memory to the host bridge, which will prevent you from
->>> adding another host bridge, and the iomem_resource normally
->>> includes a lot of addresses that are not accessible by the PCI host.
->>
->> Hi Arnd, pci host bridge windows are the ranges allow child devices to setup
->> from. Add all of IO/MEM here just a limit to child devices, no request for these
->> resources, so it won't hurt another host bridge. Some platforms have no dts or ACPI
->> report host bridge resources, in this case, we directly assign ioport/iomem_resources
->> as the root resources of PCI devices.
-> 
-> But it would be wrong to allow hosts to allocate a device BAR that is not
-> visible through the host bridge. I think we need to keep these separate
-> from the general case: if you call any of the modern interfaces you have
-> to provide the resources and a device. I notice that there is only one
-> caller of pci_scan_bus_parented(), we should probably change that over to
-> pci_scan_root_bus() or your new interface and remove the old one, but
-> keep pci_scan_bus() as the only entry point for all of the legacy users
-> that do not know about the resources.
+Hi Gabriel,
+On 11/04/2014 11:51 AM, Gabriel FERNANDEZ wrote:
+> The MiPHY28lp is a Generic PHY which can serve various SATA, PCIe or
+> USB3 devices. The two first ports can be use for either; both SATA, both
+> PCIe or one of each in any configuration.
+> The Third port is only for USB3.
+>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> ---
+>   arch/arm/boot/dts/stih407-b2120.dts | 11 +++++++
+>   arch/arm/boot/dts/stih407.dtsi      | 65 +++++++++++++++++++++++++++++++++++++
+>   2 files changed, 76 insertions(+)
 
-Ok, I will move this out of the generic interface.
+Finally, I won't apply this  patch in its current form.
 
-Thanks!
-Yijing.
+Indeed, you should follow Arnd recommendations on Syscfg registers 
+handling in DT.
+See https://lkml.org/lkml/2014/11/13/161
 
-> 
-> 	Arnd
-> 
-> .
-> 
-
-
--- 
-Thanks!
-Yijing
+Regards,
+Maxime
