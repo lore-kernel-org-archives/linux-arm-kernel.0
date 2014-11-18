@@ -1,61 +1,65 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Tue, 18 Nov 2014 13:08:38 +0800
-Subject: [Patch V3 0/9] Refine generic/PCI MSI irqodmian interfaces
-In-Reply-To: <alpine.DEB.2.11.1411180133130.3909@nanos>
-References: <1416222202-28002-1-git-send-email-jiang.liu@linux.intel.com>
- <alpine.DEB.2.11.1411180133130.3909@nanos>
-Message-ID: <546AD456.3030000@linux.intel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 17 Nov 2014 21:51:24 -0800
+Subject: [PATCH] clk: sunxi: gmac-tx-clk mux is not a CLK_MUX_INDEX_BIT mux
+In-Reply-To: <1416142617-4094-1-git-send-email-hdegoede@redhat.com>
+References: <1416142617-4094-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAGb2v66hvvyT-_v6zVe28t_GBVrs0HgKtx5CNjdwgSToJKRsMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/18 8:59, Thomas Gleixner wrote:
-> On Mon, 17 Nov 2014, Jiang Liu wrote:
->> This patch set is based on tip/irq/irqdomain and tries to refine
->> interfaces to support irqdomain for generic MSI and PCI MSI.
-> 
-> So to make progress on that matter I picked that up along with a few
-> other patches which affect the core code (more stacked irq callbacks
-> and Marcs workaround for the handler assignment issue).
-> 
-> I rebased the whole lot on Bjorns pci/msi branch as discussed in this
-> thread: https://lkml.org/lkml/2014/11/16/292
-> 
-> After that I spent quite some time to reorder and fold back patches so
-> we have no obvious wreckage, but at the same time preserve at least
-> some of the development process for this.
-> 
-> Finally I added docbook comments where missing (please provide them
-> next time yourself).
-Sure, need improvements on docs.
+Hi,
 
-> 
-> Marc ran an initial smoketest on an early iteration which did not fall
-> into bits and pieces right away.
-> 
-> The only major change is that I got rid of the ugly
-> 
-> #ifndef msi_alloc_info_t
-> 
-> trickery by moving the generic version into include/asm-generic/msi.h
-> 
-> So if you want to use the generic version, you need to create your
-> arch/xxx/include/asm/msi.h file which includes asm-generic/msi.h.
-> 
-> For the ones who want to override it, create
-> arch/xxx/include/asm/msi.h, include whatever it takes and provide the
-> proper typedef.
-Two issues are solved by adding new header files, a good technique to
-improve code quality:)
+On Sun, Nov 16, 2014 at 4:56 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> A CLK_MUX_INDEX_BIT mux has one bit per parent, but the sun7i-a20-gmac-clk
+> has 2 bits selecting between 3 possible parents using values of 0, 1, 2,
+> which makes it a regular mux which should not have CLK_MUX_INDEX_BIT set in
+> its flag.
+>
+> However we do not support parent 1 (an external clock), so use a table to
+> select parent 0 or 2, which are the 2 parents we support.
+>
+> Note this has not been causing any issues sofar, because we start with a
+> parent setting of parent 0, and only ever re-parent to parent 2 (for which
+> we use an index of 1 as we skip parent 1) and with CLK_MUX_INDEX_BIT set
+> we write a value of 2 for index 1.
 
-> 
-> I'll send that patch (7bde31a7969f) out tomorrow morning as I want to
-> have Arnds blessing for that.
-> 
-<snip>
-> I really rely on your cooperation here, as I don't want to end up with
-> an unexplainable mess when the stuff hits Linus tree and he starts
-> rumaging for his diving harpune ....
-I have rebased x86 changes onto tip/irq/irqdomain, it works perfectly:)
+We never use parent 1, and some hardware doesn't even have it. So back
+then I went for CLK_MUX_INDEX_BIT to simplify it. Guess it's not the best
+way to do it.
 
-Regards!
-Gerry
+> Tested on both a cubietruck (which uses rgmii mode) as well as a cs908
+> (an a31s board which uses mii mode).
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  drivers/clk/sunxi/clk-a20-gmac.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/sunxi/clk-a20-gmac.c b/drivers/clk/sunxi/clk-a20-gmac.c
+> index 5296fd6..0dcf4f2 100644
+> --- a/drivers/clk/sunxi/clk-a20-gmac.c
+> +++ b/drivers/clk/sunxi/clk-a20-gmac.c
+> @@ -53,6 +53,11 @@ static DEFINE_SPINLOCK(gmac_lock);
+>  #define SUN7I_A20_GMAC_MASK    0x3
+>  #define SUN7I_A20_GMAC_PARENTS 2
+>
+> +static u32 sun7i_a20_gmac_mux_table[SUN7I_A20_GMAC_PARENTS] = {
+> +       0x00, /* Select mii_phy_tx_clk */
+> +       0x02, /* Select gmac_int_tx_clk */
+> +};
+> +
+>  static void __init sun7i_a20_gmac_clk_setup(struct device_node *node)
+>  {
+>         struct clk *clk;
+> @@ -90,7 +95,7 @@ static void __init sun7i_a20_gmac_clk_setup(struct device_node *node)
+>         gate->lock = &gmac_lock;
+>         mux->reg = reg;
+>         mux->mask = SUN7I_A20_GMAC_MASK;
+> -       mux->flags = CLK_MUX_INDEX_BIT;
+> +       mux->table = sun7i_a20_gmac_mux_table;
+>         mux->lock = &gmac_lock;
+>
+>         clk = clk_register_composite(NULL, clk_name,
+> --
+> 2.1.0
+>
