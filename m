@@ -1,57 +1,56 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Tue, 18 Nov 2014 11:13:21 +0200
-Subject: [PATCH 6/9] ARM: dts: cm-t3x: add TV out support
+Date: Tue, 18 Nov 2014 11:13:22 +0200
+Subject: [PATCH 7/9] ARM: dts: sbc-t3x: add TV out display alias
 In-Reply-To: <1416302004-22199-1-git-send-email-lifshitz@compulab.co.il>
 References: <1416302004-22199-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1416302004-22199-7-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1416302004-22199-8-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add TV out support.
+Add display alias for TV out.
 
 Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
 ---
- arch/arm/boot/dts/omap3-cm-t3x.dtsi |   24 ++++++++++++++++++++++++
- 1 files changed, 24 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/omap3-sbc-t3517.dts |    1 +
+ arch/arm/boot/dts/omap3-sbc-t3530.dts |    1 +
+ arch/arm/boot/dts/omap3-sbc-t3730.dts |    1 +
+ 3 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap3-cm-t3x.dtsi b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-index 58205f0..1a8262c 100644
---- a/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-+++ b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-@@ -56,6 +56,17 @@
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
+diff --git a/arch/arm/boot/dts/omap3-sbc-t3517.dts b/arch/arm/boot/dts/omap3-sbc-t3517.dts
+index 4ec5d86..1798653 100644
+--- a/arch/arm/boot/dts/omap3-sbc-t3517.dts
++++ b/arch/arm/boot/dts/omap3-sbc-t3517.dts
+@@ -11,6 +11,7 @@
+ 
+ 	aliases {
+ 		display0 = &dvi0;
++		display1 = &tv0;
  	};
-+
-+	tv0: connector at 1 {
-+		compatible = "svideo-connector";
-+		label = "tv";
-+
-+		port {
-+			tv_connector_in: endpoint {
-+				remote-endpoint = <&venc_out>;
-+			};
-+		};
-+	};
+ 
+ 	/* Only one GPMC smsc9220 on SBC-T3517, CM-T3517 uses am35x Ethernet */
+diff --git a/arch/arm/boot/dts/omap3-sbc-t3530.dts b/arch/arm/boot/dts/omap3-sbc-t3530.dts
+index 8dfc1df..c994f0f 100644
+--- a/arch/arm/boot/dts/omap3-sbc-t3530.dts
++++ b/arch/arm/boot/dts/omap3-sbc-t3530.dts
+@@ -11,6 +11,7 @@
+ 
+ 	aliases {
+ 		display0 = &dvi0;
++		display1 = &tv0;
+ 	};
  };
  
- &omap3_pmx_core {
-@@ -214,3 +225,16 @@
- 		linux,wakeup;
+diff --git a/arch/arm/boot/dts/omap3-sbc-t3730.dts b/arch/arm/boot/dts/omap3-sbc-t3730.dts
+index 6b69864..5bdddf2 100644
+--- a/arch/arm/boot/dts/omap3-sbc-t3730.dts
++++ b/arch/arm/boot/dts/omap3-sbc-t3730.dts
+@@ -11,6 +11,7 @@
+ 
+ 	aliases {
+ 		display0 = &dvi0;
++		display1 = &tv0;
  	};
  };
-+
-+&venc {
-+	status = "ok";
-+
-+	vdda-supply = <&vdac>;
-+
-+	port {
-+		venc_out: endpoint {
-+			remote-endpoint = <&tv_connector_in>;
-+			ti,channels = <2>;
-+		};
-+	};
-+};
+ 
 -- 
 1.7.5.4
