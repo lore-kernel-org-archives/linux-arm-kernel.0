@@ -1,24 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 18 Nov 2014 19:11:04 +0000
-Subject: [PATCH RFC 3/3] ARM: reduce size of page table directory for
- short mode
-In-Reply-To: <20141118181412.GO28279@e104818-lin.cambridge.arm.com>
-References: <20141118165313.9958.1242.stgit@buzz>
- <20141118165325.9958.84370.stgit@buzz>
- <20141118181412.GO28279@e104818-lin.cambridge.arm.com>
-Message-ID: <20141118191104.GD4042@n2100.arm.linux.org.uk>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Tue, 18 Nov 2014 11:10:53 -0800
+Subject: [PATCH] ARM: multi_v7_defconfig: fix failure setting CPU voltage by
+ enabling dependent I2C controller
+Message-ID: <1416337853-1558-1-git-send-email-tyler.baker@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 06:14:12PM +0000, Catalin Marinas wrote:
-> Actually, with LPAE you can save a pmd and pte allocated for the vectors
-> page at 0xffff0000. So you can save 8K per task here. Similarly with the
-> classic MMU, you can save another 4K for the vectors page pte.
+This patch fixes a long standing issue introduced during the 3.16 merge window.
+Shortly after the merge, exynos5250-based arndale boards began to produce the 
+following errors:
 
-No.  For any CPU which has high vectors (approximately ARMv5 and up),
-there is no "vectors page pte".  The vectors page PTE is only allocated
-when we need low vectors.
+kern.err kernel:  exynos-cpufreq exynos-cpufreq: failed to set cpu voltage
+kern.err kernel:  cpufreq: __target_index: Failed to change cpu frequency: -22
 
+Further analysis revealed that the S5M8767 voltage regulator used on the 
+exynos5250-based arndale board utilizes the S3C2410 I2C controller. If the 
+S3C2410 I2C controller driver is not enabled, the S5M8767 voltage regulator 
+fails to probe. Therefore a dependency exists between these two drivers. 
+In the exynos_defconfig both CONFIG_REGULATOR_S5M8767 and CONFIG_I2C_S3C2410 
+options are enabled, and no errors are produced. However, in the 
+multi_v7_defconfig only the CONFIG_REGULATOR_S5M8767 option is enabled and the 
+errors are present. So let's enable the CONFIG_I2C_S3C2410 option in the 
+multi_v7_defconfig to allow the S5M8767 voltage regulator to probe.
+
+Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+---
+This issue was reported [1]. I've also confirmed this fix on two different 
+arndale boards.
+
+[1] https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg38765.html
+
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 3487046..9d7a32f 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -217,6 +217,7 @@ CONFIG_I2C_CADENCE=y
+ CONFIG_I2C_DESIGNWARE_PLATFORM=y
+ CONFIG_I2C_EXYNOS5=y
+ CONFIG_I2C_MV64XXX=y
++CONFIG_I2C_S3C2410=y
+ CONFIG_I2C_SIRF=y
+ CONFIG_I2C_TEGRA=y
+ CONFIG_I2C_ST=y
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.3
