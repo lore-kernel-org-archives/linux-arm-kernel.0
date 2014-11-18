@@ -1,42 +1,34 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 18 Nov 2014 12:44:22 -0500 (EST)
-Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
- completes
-In-Reply-To: <20141118171831.GC3003@dtor-ws>
-Message-ID: <Pine.LNX.4.44L0.1411181234210.892-100000@iolanthe.rowland.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 18 Nov 2014 09:50:04 -0800
+Subject: [PATCH 1/3] ARM: dts: Add SPI flash node for Peach boards
+In-Reply-To: <1416246184-29071-2-git-send-email-javier.martinez@collabora.co.uk>
+References: <1416246184-29071-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1416246184-29071-2-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <CAD=FV=Xkei_wxa3jWb8bPvuynbSyq4o=ezjVD0+e04aOPCAM+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Nov 2014, Dmitry Torokhov wrote:
+Javier,
 
-> OK. Another question then: pm_runtime_get_noresume() does literally this:
-> 
-> 	atomic_inc(&dev->power.usage_count);
-> 
-> So who is responsible for actually waking up parent device and/or power
-> domain? Is it simply missing because we did not really have PM domains
-> before?
+On Mon, Nov 17, 2014 at 9:43 AM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> +&spi_1 {
+> +       status = "okay";
+> +       samsung,spi-src-clk = <0>;
+> +       num-cs = <1>;
+> +       cs-gpios = <&gpa2 5 0>;
+> +
+> +       spidev at 0 {
+> +               compatible = "spidev";
 
-Ths bus is responsible for making sure that all the standard resources
-are available -- that is, all the resources that would be needed by a
-normal device on that bus.  Anything beyond that (such as
-special-purpose clocks) has to be set up by the driver.
+This is common practice in the Chrome OS tree, but we've gotten
+pushback from upstream questioning about whether "spidev" is really a
+physical device.  See:
 
-Thus the bus would insure that the device was powered, its parent was
-resumed, and the usual clock inputs were enabled.  And of course, one
-mechanism for doing this is to runtime-resume the power domain.
+http://www.spinics.net/lists/linux-samsung-soc/msg29563.html
 
-Often the bus doesn't have to do anything special to resume the
-device's parent.  This is because the device gets probed when it is
-registered, which happens when it is discovered, and the discovery is
-done by the parent's driver as part of its normal activity.  Since the
-parent has to be powered up to carry out this normal activity, nothing 
-more is needed.
 
-(Of course, devices can get probed at other times too, not just when
-they are discovered.  For example, a device might get probed when a
-driver module is loaded, and that can occur at any time.  So in general
-it might indeed be necessary for the bus to wake up the parent before
-calling the driver's probe routine.)
+I don't really have an answer for something better to do here but I
+figured I'd at least bring up the point.
 
-Alan Stern
+-Doug
