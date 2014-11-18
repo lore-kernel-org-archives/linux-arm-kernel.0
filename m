@@ -1,119 +1,104 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 18 Nov 2014 11:03:19 +0000
-Subject: [PATCH v4 06/19] arm/arm64: KVM: move kvm_register_device_ops()
- into vGIC probing
-In-Reply-To: <546B2646.7060103@linaro.org>
-References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
- <1415959683-26027-7-git-send-email-andre.przywara@arm.com>
- <546B22C0.7030701@linaro.org> <546B2646.7060103@linaro.org>
-Message-ID: <546B2777.1090706@arm.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Tue, 18 Nov 2014 12:04:20 +0100
+Subject: [BUG] blocked task after exynos_drm_init
+In-Reply-To: <546B2508.8070409@samsung.com>
+References: <1415264811.27478.4.camel@AMDC1943> <546B228E.6030500@samsung.com>
+ <546B2508.8070409@samsung.com>
+Message-ID: <546B27B4.4040808@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-thanks for the review! Much appreciated.
-
-On 18/11/14 10:58, Eric Auger wrote:
-> On 11/18/2014 11:43 AM, Eric Auger wrote:
->> On 11/14/2014 11:07 AM, Andre Przywara wrote:
->>> Currently we unconditionally register the GICv2 emulation device
->>> during the host's KVM initialization. Since with GICv3 support we
->>> may end up with only v2 or only v3 or both supported, we move the
->>> registration into the GIC probing function, where we will later know
->>> which combination is valid.
+On 11/18/2014 11:52 AM, Inki Dae wrote:
+> On 2014? 11? 18? 19:42, Andrzej Hajda wrote:
+>> On 11/06/2014 10:06 AM, Krzysztof Kozlowski wrote:
+>>> Hi,
 >>>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
->>> ---
->>> Changelog v3...v4:
->>> - add Acked-by
+>>> On last next (next-20141104, next-20141105) booting locks after
+>>> initializing Exynos DRM (Trats2 board):
 >>>
->>>  include/linux/kvm_host.h |    1 +
->>>  virt/kvm/arm/vgic-v2.c   |    2 ++
->>>  virt/kvm/arm/vgic-v3.c   |    1 +
->>>  virt/kvm/arm/vgic.c      |    5 ++---
->>>  4 files changed, 6 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
->>> index ea53b04..326ba7a 100644
->>> --- a/include/linux/kvm_host.h
->>> +++ b/include/linux/kvm_host.h
->>> @@ -1084,6 +1084,7 @@ void kvm_unregister_device_ops(u32 type);
->>>  
->>>  extern struct kvm_device_ops kvm_mpic_ops;
->>>  extern struct kvm_device_ops kvm_xics_ops;
->>> +extern struct kvm_device_ops kvm_arm_vgic_v2_ops;
->>>  
->>>  #ifdef CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT
->>>  
->>> diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
->>> index 2935405..e1cd3cb 100644
->>> --- a/virt/kvm/arm/vgic-v2.c
->>> +++ b/virt/kvm/arm/vgic-v2.c
->>> @@ -229,6 +229,8 @@ int vgic_v2_probe(struct device_node *vgic_node,
->>>  		goto out_unmap;
->>>  	}
->>>  
->>> +	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
->>> +
->>>  	vgic->vcpu_base = vcpu_res.start;
->>>  
->>>  	kvm_info("%s@%llx IRQ%d\n", vgic_node->name,
->>> diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
->>> index 1c2c8ee..d14c75f 100644
->>> --- a/virt/kvm/arm/vgic-v3.c
->>> +++ b/virt/kvm/arm/vgic-v3.c
->>> @@ -230,6 +230,7 @@ int vgic_v3_probe(struct device_node *vgic_node,
->>>  		ret = -ENXIO;
->>>  		goto out;
->>>  	}
->>> +	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
->> I did not find any unregistration? I am wrong or isn't it relevant? If
->> confirmed might be added in kvm_arch_exit. Saw KVM-VFIO device ops
->> unregistration is done in kvm_exit/kvm_vfio_ops_exit.
-> 
-> well forget that one. I guess it is not relevant for that device which
-> is not going to be released.
-
-Yeah, I think that's due to the fact that we cannot remove KVM from the
-kernel on ARM (no modprobe -r).
-
-Cheers,
-Andre.
-
-> BR
-> 
-> Eric
+>>> [    2.028283] [drm] Initialized drm 1.1.0 20060810
+>>> [  240.505795] INFO: task swapper/0:1 blocked for more than 120 seconds.
+>>> [  240.510825]       Not tainted 3.18.0-rc3-next-20141105 #794
+>>> [  240.516418] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+>>> [  240.524173] swapper/0       D c052534c     0     1      0 0x00000000
+>>> [  240.530527] [<c052534c>] (__schedule) from [<c0525b34>] (schedule_preempt_disabled+0x14/0x20)
+>>> [  240.539030] [<c0525b34>] (schedule_preempt_disabled) from [<c0526d44>] (mutex_lock_nested+0x1c4/0x464)
+>>> [  240.548320] [<c0526d44>] (mutex_lock_nested) from [<c02be908>] (__driver_attach+0x48/0x98)
+>>> [  240.556562] [<c02be908>] (__driver_attach) from [<c02bcc00>] (bus_for_each_dev+0x54/0x88)
+>>> [  240.564717] [<c02bcc00>] (bus_for_each_dev) from [<c02bdce0>] (bus_add_driver+0xe4/0x200)
+>>> [  240.572876] [<c02bdce0>] (bus_add_driver) from [<c02bef94>] (driver_register+0x78/0xf4)
+>>> [  240.580864] [<c02bef94>] (driver_register) from [<c029e99c>] (exynos_drm_platform_probe+0x34/0x234)
+>>> [  240.589890] [<c029e99c>] (exynos_drm_platform_probe) from [<c02bfcf0>] (platform_drv_probe+0x48/0xa4)
+>>> [  240.599090] [<c02bfcf0>] (platform_drv_probe) from [<c02be680>] (driver_probe_device+0x13c/0x37c)
+>>> [  240.607940] [<c02be680>] (driver_probe_device) from [<c02be954>] (__driver_attach+0x94/0x98)
+>>> [  240.616360] [<c02be954>] (__driver_attach) from [<c02bcc00>] (bus_for_each_dev+0x54/0x88)
+>>> [  240.624517] [<c02bcc00>] (bus_for_each_dev) from [<c02bdce0>] (bus_add_driver+0xe4/0x200)
+>>> [  240.632679] [<c02bdce0>] (bus_add_driver) from [<c02bef94>] (driver_register+0x78/0xf4)
+>>> [  240.640667] [<c02bef94>] (driver_register) from [<c029e938>] (exynos_drm_init+0x70/0xa0)
+>>> [  240.648739] [<c029e938>] (exynos_drm_init) from [<c00089b0>] (do_one_initcall+0xac/0x1f0)
+>>> [  240.656914] [<c00089b0>] (do_one_initcall) from [<c074bd90>] (kernel_init_freeable+0x10c/0x1d8)
+>>> [  240.665591] [<c074bd90>] (kernel_init_freeable) from [<c051eabc>] (kernel_init+0x8/0xec)
+>>> [  240.673661] [<c051eabc>] (kernel_init) from [<c000f268>] (ret_from_fork+0x14/0x2c)
+>>> [  240.681196] 3 locks held by swapper/0/1:
+>>> [  240.685091]  #0:  (&dev->mutex){......}, at: [<c02be908>] __driver_attach+0x48/0x98
+>>> [  240.692732]  #1:  (&dev->mutex){......}, at: [<c02be918>] __driver_attach+0x58/0x98
+>>> [  240.700367]  #2:  (&dev->mutex){......}, at: [<c02be908>] __driver_attach+0x48/0x98
 >>
->> Eric
->>>  
->>>  	vgic->vcpu_base = vcpu_res.start;
->>>  	vgic->vctrl_base = NULL;
->>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->>> index 963b84e..e8003ca 100644
->>> --- a/virt/kvm/arm/vgic.c
->>> +++ b/virt/kvm/arm/vgic.c
->>> @@ -2540,7 +2540,7 @@ static int vgic_create(struct kvm_device *dev, u32 type)
->>>  	return kvm_vgic_create(dev->kvm, type);
->>>  }
->>>  
->>> -static struct kvm_device_ops kvm_arm_vgic_v2_ops = {
->>> +struct kvm_device_ops kvm_arm_vgic_v2_ops = {
->>>  	.name = "kvm-arm-vgic",
->>>  	.create = vgic_create,
->>>  	.destroy = vgic_destroy,
->>> @@ -2619,8 +2619,7 @@ int kvm_vgic_hyp_init(void)
->>>  
->>>  	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
->>>  
->>> -	return kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
->>> -				       KVM_DEV_TYPE_ARM_VGIC_V2);
->>> +	return 0;
->>>  
->>>  out_free_irq:
->>>  	free_percpu_irq(vgic->maint_irq, kvm_get_running_vcpus());
+>>
+>> This is caused by patch moving platform devices to
+>> /sys/devices/platform[1]. Since this patch registering platform
+>> drivers/devices in probe of platform device causes deadlocks. I guess
+>> now all driver registration should be moved to exynos_drm_init and it
+>> seems better location for it IMHO.
+> 
+> Thanks. It might be a chance that we could separate sub drivers of
+> Exynos drm into independent modules so that they can be called
+> independently because if we move them to exynos_drm_init then the
+> deferred probe wouldn't work correctly.
+
+For full separation of sub-drivers component matching code should be
+fixed first. Now it usually works because components are probed before
+exynos_drm_match_add and this is because components are probed during
+sub-driver registrations.
+
+Regards
+Andrzej
+
+> 
+> Thanks,
+> Inki Dae
+> 
+>>
+>> Regards
+>> Andrzej
+>>
+>> [1]: http://www.spinics.net/lists/devicetree/msg56101.html
+>>
+>>
+>>
+>>>
+>>> Full dmesg and config attached.
+>>>
+>>> Best regards,
+>>> Krzysztof
+>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> dri-devel mailing list
+>>> dri-devel at lists.freedesktop.org
+>>> http://lists.freedesktop.org/mailman/listinfo/dri-devel
 >>>
 >>
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
 > 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
 > 
