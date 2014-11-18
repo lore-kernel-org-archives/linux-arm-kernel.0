@@ -1,36 +1,40 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 18 Nov 2014 08:46:18 +0100
-Subject: [PATCH v8 0/7] Enable L2 cache support on Exynos4210/4x12 SoCs
-In-Reply-To: <2593372.vOeyyAKq5M@wuerfel>
-References: <1415884694-5868-1-git-send-email-m.szyprowski@samsung.com>
- <54660DAE.9090601@samsung.com> <2593372.vOeyyAKq5M@wuerfel>
-Message-ID: <546AF94A.8040502@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 18 Nov 2014 08:55:45 +0100
+Subject: [PATCH v2] gpio: mxs: implement get_direction callback
+In-Reply-To: <1416221256-11671-1-git-send-email-j.uzycki@elproma.com.pl>
+References: <1416221256-11671-1-git-send-email-j.uzycki@elproma.com.pl>
+Message-ID: <20141118075545.GO27002@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On 2014-11-14 15:51, Arnd Bergmann wrote:
-> On Friday 14 November 2014 15:11:58 Marek Szyprowski wrote:
->> I assume that after all comments from previous versions, no more changes
->> are needed
->> to this patchset and I would really like to have it queued to v3.19.
->>
->> Arnd, Olof: could you take this patchset thought arm-soc tree? It already
->> contains all dependencies.
->>
->> Kukjin: could you ack this patchset?
-> I'd rather see this merged through Russell's tree, as most of the patches
-> are for core code, and only three are for the platform.
+On Mon, Nov 17, 2014 at 11:47:36AM +0100, Janusz Uzycki wrote:
+> gpiolib's gpiod_get_direction() function returns the EINVAL error
+> if .get_direction callback is not defined.
+> The patch implements the callback for mxs chip what is useful
+s/what/which/
 
-Ok, I will upload v9 posted yesterday to Russell's patch system when
-http://www.arm.linux.org.uk/ gets back to life.
+> for debugging.
+> 
+> Commit f9e42397d79b
+> ("serial: mxs-auart: add interrupts for modem control lines")
+> as based on commit ab5e4e4108ca
+> ("tty/serial: at91: add interrupts for modem control lines")
+> uses the gpiod_get_direction() function.
+This paragraph is obsolete now that we agreed that .get_direction has
+nothing to do with mctrl_gpio, right?
+> 
+> Inspired from arch/arm/mach-at91/gpio.c
+s/from/by/ I think
 
-> For the exynos patches:
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+Other than that:
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Best regards
+Thanks
+Uwe
+
+
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
