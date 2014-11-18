@@ -1,132 +1,52 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Tue, 18 Nov 2014 13:52:10 +0100
-Subject: [RFC] adp1653: Add device tree bindings for LED controller
-In-Reply-To: <20141118113256.GA10022@amd>
-References: <20141116075928.GA9763@amd>
- <20141117145857.GO8907@valkosipuli.retiisi.org.uk>
- <546AFEA5.9020000@samsung.com> <20141118084603.GC4059@amd>
- <546B19C8.2090008@samsung.com> <20141118113256.GA10022@amd>
-Message-ID: <546B40FA.2070409@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Nov 2014 13:54:12 +0100
+Subject: [PATCH 08/25] ARM: shmobile: r8a7790: sound enables Audio DMAC
+ peri peri entry on DTSI
+In-Reply-To: <87a93pxtlr.wl%kuninori.morimoto.gx@renesas.com>
+References: <cover.1415755881.git.horms+renesas@verge.net.au>
+ <1877842.49FtTfL2eK@wuerfel> <87a93pxtlr.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <15076656.0HaaBPou9k@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2014 12:32 PM, Pavel Machek wrote:
->
->>>> I've already submitted a patch [1] that updates leds common bindings.
->>>> I hasn't been merged yet, as the related LED Flash class patch [2]
->>>> still needs some indicator leds related discussion [3].
->>>>
->>>> I think this is a good moment to discuss the flash related led common
->>>> bindings.
->>>
->>> Part of problem is that adp1653 is not regarded as "LED" device by
->>> current kernel driver.
->>
->> It doesn't prevent us from keeping the flash devices related
->> DT bindings unified across kernel subsystems. The DT bindings
->> docs for the adp1653 could just provide a reference to the
->> led/common.txt bindings. In the future, when LED Flash
->> class will be merged, all the V4L2 Flash drivers might be
->> moved to the LED subsystem to gain the LED subsystem support.
->
-> Yeah, that makses sense.
->
->>> @@ -19,5 +30,10 @@ Examples:
->>>   system-status {
->>>   	       label = "Status";
->>>   	       linux,default-trigger = "heartbeat";
->>> +	       iout-torch = <500 500>;
->>> +	       iout-flash = <1000 1000>;
->>> +	       iout-indicator = <100 100>;
->>> +	       flash-timeout = <1000>;
->>> +
->>> 	...
->>>   };
->>>
->>> I don't get it; system-status describes single LED, why are iout-torch
->>> (and friends) arrays of two?
->>
->> Some devices can control more than one led. The array is for such
->> purposes. The system-status should be probably renamed to
->> something more generic for both common leds and flash leds,
->> e.g. system-led.
->
-> No, sorry. The Documentation/devicetree/bindings/leds/common.txt
-> describes binding for _one LED_. Yes, your device can have two leds,
-> so your devices should have two such blocks in the device tree... Each
-> led should have its own label and default trigger, for example. And I
-> guess flash-timeout be per-LED, too.
+On Tuesday 18 November 2014 00:03:50 Kuninori Morimoto wrote:
+> Hi Arnd
+> 
+> > >                                 "mem_src6",     "src6_mem",
+> > >                                 "mem_src7",     "src7_mem",
+> > >                                 "mem_src8",     "src8_mem",
+> > > -                               "mem_src9",     "src9_mem";
+> > > +                               "mem_src9",     "src9_mem",
+> > > +
+> > > +                               "src0_ssiu0",           "src1_ssiu0",           "src2_ssiu0",           "src3_ssiu0",           "src4_ssiu0",
+> > > +                               "src0_ssiu1",           "src1_ssiu1",           "src2_ssiu1",           "src3_ssiu1",           "src4_ssiu1",
+> > > +                               "src0_ssiu2",           "src1_ssiu2",           "src2_ssiu2",           "src3_ssiu2",           "src4_ssiu2",
+> > > 
+> > 
+> > I have to note that this looks rather weird and that none of the names
+> > are documented in the binding.
+> > 
+> > Can you explain why this device uses over 100 DMA channels and put the
+> > exact naming rules into the binding?
+> > Do you expect all channels to be in use simultaneously?
+> 
+> This device has 10 sound channels, and using 3 kind of IPs.
+> Then, data input/output needs DMA channel which needs specific ID to using.
+> Above name has ID pair for it, so there is much combination. 
+> These specific ID is based on SoC, not board.
+> Sound driver / DMAEngine can get specific ID from above.
+> 
+> Indeed binding itself was not documented yet.
+> I will add it ASAP.
 
-I think that a device tree binding describes a single physical device.
-No matter how many sub-leds a device controls, it is still one
-piece of hardware.
-default-trigger property should also be an array of strings.
-I agree that flash-timeout should be per led - an array, similarly
-as in case of iout's.
+It sounds like you have some device-to-device DMAs here, which isn't
+supported by the generic dmaengine binding at all, and I don't think
+the driver currently attempts to use them.
 
-> Would it make sense to include "-uA" and "-usec" suffixes in the dt
-> property names?
+Is that correct? Could you try to remove those from the binding and
+just leave the device-to-memory and memory-to-device channels there?
+If we ever want to support those, we probably have to extend the
+dmaengine binding first, and then the driver binding would also look
+different.
 
-I don't see this type of naming anywhere. The documentation should
-contain the information about units. Nonetheless I am not a device tree
-specialist, so an opinion of the relevant maintainer will be welcome.
-
->>> Also, at least on adp1653, these are actually two leds -- white and
->>> red. Torch and flash is white led, indicator is red led.
->>
->> Then you should define three properties:
->>
->> iout-torch = <[uA]>;
->> iout-flash = <[uA]>;
->> iout-indicator = <[uA]>;
->>
->> iout-torch and iout-flash properties would determine the current
->> for the white led in the torch and flash modes respectively and
->> the iout-indicator property would determine the current for
->> the indicator led.
->
-> Yes, that would work. I have used
->
-> +               max-flash-timeout-usec = <500000>;
-> +               max-flash-intensity-uA     = <320000>;
-> +               max-torch-intensity-uA     =  <50000>;
-> +               max-indicator-intensity-uA =  <17500>;
->
-> . Which is pretty similar. (Actually, maybe the longer property names
-> are easier to understand for more people?) (And yes, I should probably
-> separate red and white led into separate groups).
-
-Documentation of a binding should provide sufficient explanation
-for the people to understand what a property is for.
-And I would stay by arrays as argued above.
-
->>>> [2] http://www.spinics.net/lists/linux-media/msg83100.html
->>>> [3] http://www.spinics.net/lists/linux-leds/msg02472.html
->>>
->>> What device are you using for testing? Can you cc me on future
->>> patches?
->>
->> I am using max77693 [1] and aat1290 [2]. OK, I will add you on cc.
->
-> Thanks for cc and thanks for links!
->
-> I see max77693 has two different "white" leds, aat1290 has one "white"
-> led, and neither of them has secondary red led for indication?
-
-You're right.
-
->> The v4l2-flash sub-device registers with v4l2-async API
->> in a media device. Exemplary support for v4l2-flash
->> sub-devices is added to the exynos4-is driver in the patch [5].
->
-> Thanks for the links. It seems that aside from moving adp1653 driver
-> to device tree, it should be moved to the LED framework, but that's a
-> topic for another patch.
-
-Like I mentioned in the previous message the LED Flash class patch
-isn't in its final shape yet. Nonetheless I think that we should
-agree on the leds/common.txt documentation improvements and
-define DT documentation for adp1653 accordingly.
-
-Regards,
-Jacek
+	Arnd
