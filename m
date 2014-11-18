@@ -1,90 +1,153 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Tue, 18 Nov 2014 11:36:19 +0100
-Subject: [PATCH] of/platform: Move platform devices under
- /sys/devices/platform
-In-Reply-To: <1415097920-30014-1-git-send-email-grant.likely@linaro.org>
-References: <1415097920-30014-1-git-send-email-grant.likely@linaro.org>
-Message-ID: <546B2123.7060406@samsung.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Tue, 18 Nov 2014 11:35:55 +0100
+Subject: [PATCH v4 03/19] arm/arm64: KVM: refactor vgic_handle_mmio()
+ function
+In-Reply-To: <1415959683-26027-4-git-send-email-andre.przywara@arm.com>
+References: <1415959683-26027-1-git-send-email-andre.przywara@arm.com>
+ <1415959683-26027-4-git-send-email-andre.przywara@arm.com>
+Message-ID: <546B210B.4080406@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2014 11:45 AM, Grant Likely wrote:
-> Currently the devices created by drivers/of/platform.c get created at
-> the root of /sys/devices. This goes against the typical pattern for
-> sysfs where the top level /sys/devices structure contains categories of
-> devices, and the structure of devices is placed below that. To fix this,
-> make the code in drivers/of/platform.c follow the drivers/base/platform.c
-> behaviour, and use &platform_bus as the default parent for all new
-> platform_devices and amba_devices.
+Andre,
+
+On 11/14/2014 11:07 AM, Andre Przywara wrote:
+> Currently we only need to deal with one MMIO region for the GIC
+> emulation
+might be worth mentioning it is the dist one?
+, but we soon need to extend this. Refactor the existing
+> code to allow easier addition of different ranges without code
+> duplication.
 > 
-> This change has been discussed for a long time, but nobody has actually
-> acted on it. Userspace code that expects to find devices under a fixed
-> /sys/devices/... path will be affected. It isn't /supposed/ to do that,
-> but if anyone complains then I'll add a default-off workaround option to
-> put them back into the root.
-
-One of side effects of this change is that platform drivers registering
-other platform drivers or devices in their probe callback can deadlock
-due to double device_lock on platform device. This is for example case
-of exynos_drm driver[1]. I guess it could/should be fixed in exynos_drm.
-Anyway it can affect other drivers as well. At least grep shows few
-possible candidates:
-
-$ git grep -p platform_driver_register | grep -A1 -P '_probe\(struct
-platform_device'
-
-drivers/gpu/drm/exynos/exynos_drm_drv.c=static int
-exynos_drm_platform_probe(struct platform_device *pdev)
-drivers/gpu/drm/exynos/exynos_drm_drv.c:	ret =
-platform_driver_register(&fimd_driver);
---
-drivers/gpu/drm/sti/sti_drm_drv.c=static int
-sti_drm_platform_probe(struct platform_device *pdev)
-drivers/gpu/drm/sti/sti_drm_drv.c:
-platform_driver_register(&sti_drm_master_driver);
---
-drivers/mtd/nand/atmel_nand.c=static int atmel_nand_probe(struct
-platform_device *pdev)
-drivers/mtd/nand/atmel_nand.c:	res =
-platform_driver_register(&atmel_nand_nfc_driver);
-
-
-[1]: http://permalink.gmane.org/gmane.comp.video.dri.devel/117727
-
-Regards
-Andrzej
-
-
-> 
-> Signed-off-by: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 > ---
->  drivers/of/platform.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> Changelog v3...v4:
+> - simplify is_in_range()
+> - added Reviewed-by:
 > 
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 3b64d0bf5bba..7c6771986c06 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -138,7 +138,7 @@ struct platform_device *of_device_alloc(struct device_node *np,
+>  virt/kvm/arm/vgic.c |   75 ++++++++++++++++++++++++++++++++++++---------------
+>  1 file changed, 54 insertions(+), 21 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 2403d72..5eee3de 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1032,37 +1032,28 @@ static bool vgic_validate_access(const struct vgic_dist *dist,
+>  	return true;
+>  }
+>  
+> -/**
+restore /**?
+> - * vgic_handle_mmio - handle an in-kernel MMIO access
+> +/*
+> + * vgic_handle_mmio_range - handle an in-kernel MMIO access
+>   * @vcpu:	pointer to the vcpu performing the access
+>   * @run:	pointer to the kvm_run structure
+>   * @mmio:	pointer to the data describing the access
+> + * @ranges:	pointer to the register defining structure
+array of MMIO ranges in a given region?
+> + * @mmio_base:	base address for this mapping
+base address of the region?
+>   *
+> - * returns true if the MMIO access has been performed in kernel space,
+> - * and false if it needs to be emulated in user space.
+> + * returns true if the MMIO access could be performed
+>   */
+> -bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+> -		      struct kvm_exit_mmio *mmio)
+> +static bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
+> +			    struct kvm_exit_mmio *mmio,
+> +			    const struct mmio_range *ranges,
+> +			    unsigned long mmio_base)
+>  {
+>  	const struct mmio_range *range;
+>  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+> -	unsigned long base = dist->vgic_dist_base;
+>  	bool updated_state;
+>  	unsigned long offset;
+>  
+> -	if (!irqchip_in_kernel(vcpu->kvm) ||
+> -	    mmio->phys_addr < base ||
+> -	    (mmio->phys_addr + mmio->len) > (base + KVM_VGIC_V2_DIST_SIZE))
+> -		return false;
+> -
+> -	/* We don't support ldrd / strd or ldm / stm to the emulated vgic */
+> -	if (mmio->len > 4) {
+> -		kvm_inject_dabt(vcpu, mmio->phys_addr);
+> -		return true;
+> -	}
+> -
+> -	offset = mmio->phys_addr - base;
+> -	range = find_matching_range(vgic_dist_ranges, mmio, offset);
+> +	offset = mmio->phys_addr - mmio_base;
+> +	range = find_matching_range(ranges, mmio, offset);
+>  	if (unlikely(!range || !range->handle_mmio)) {
+>  		pr_warn("Unhandled access %d %08llx %d\n",
+>  			mmio->is_write, mmio->phys_addr, mmio->len);
+> @@ -1070,7 +1061,7 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
 >  	}
 >  
->  	dev->dev.of_node = of_node_get(np);
-> -	dev->dev.parent = parent;
-> +	dev->dev.parent = parent ? : &platform_bus;
+>  	spin_lock(&vcpu->kvm->arch.vgic.lock);
+> -	offset = mmio->phys_addr - range->base - base;
+> +	offset -= range->base;
+I think I would prefer having 2 variables since the semantic changes:
+offset wrt region base, offset wrt range base but that's a detail.
+>  	if (vgic_validate_access(dist, range, offset)) {
+>  		updated_state = range->handle_mmio(vcpu, mmio, offset);
+>  	} else {
+> @@ -1088,6 +1079,48 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  	return true;
+>  }
 >  
->  	if (bus_id)
->  		dev_set_name(&dev->dev, "%s", bus_id);
-> @@ -291,7 +291,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
->  
->  	/* setup generic device info */
->  	dev->dev.of_node = of_node_get(node);
-> -	dev->dev.parent = parent;
-> +	dev->dev.parent = parent ? : &platform_bus;
->  	dev->dev.platform_data = platform_data;
->  	if (bus_id)
->  		dev_set_name(&dev->dev, "%s", bus_id);
+> +static inline bool is_in_range(phys_addr_t addr, unsigned long len,
+> +			       phys_addr_t baseaddr, unsigned long size)
+> +{
+> +	return (addr >= baseaddr) && (addr + len <= baseaddr + size);
+> +}
+> +
+> +static bool vgic_v2_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+> +				struct kvm_exit_mmio *mmio)
+> +{
+> +	unsigned long base = vcpu->kvm->arch.vgic.vgic_dist_base;
+dist_base?
+
+Best Regards
+
+Eric
+> +
+> +	if (!is_in_range(mmio->phys_addr, mmio->len, base,
+> +			 KVM_VGIC_V2_DIST_SIZE))
+> +		return false;
+> +
+> +	/* GICv2 does not support accesses wider than 32 bits */
+> +	if (mmio->len > 4) {
+> +		kvm_inject_dabt(vcpu, mmio->phys_addr);
+> +		return true;
+> +	}
+> +
+> +	return vgic_handle_mmio_range(vcpu, run, mmio, vgic_dist_ranges, base);
+> +}
+> +
+> +/**
+> + * vgic_handle_mmio - handle an in-kernel MMIO access for the GIC emulation
+> + * @vcpu:      pointer to the vcpu performing the access
+> + * @run:       pointer to the kvm_run structure
+> + * @mmio:      pointer to the data describing the access
+> + *
+> + * returns true if the MMIO access has been performed in kernel space,
+> + * and false if it needs to be emulated in user space.
+> + */
+> +bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+> +		      struct kvm_exit_mmio *mmio)
+> +{
+> +	if (!irqchip_in_kernel(vcpu->kvm))
+> +		return false;
+> +
+> +	return vgic_v2_handle_mmio(vcpu, run, mmio);
+> +}
+> +
+>  static u8 *vgic_get_sgi_sources(struct vgic_dist *dist, int vcpu_id, int sgi)
+>  {
+>  	return dist->irq_sgi_sources + vcpu_id * VGIC_NR_SGIS + sgi;
 > 
