@@ -1,123 +1,82 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Nov 2014 13:57:00 +0100
-Subject: [PATCH v3 01/13] arm64/mm: add explicit struct_mm argument to
- __create_mapping()
+Date: Tue, 18 Nov 2014 13:57:05 +0100
+Subject: [PATCH v3 06/13] efi: register iomem resources for UEFI reserved
+ regions
 In-Reply-To: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1416315432-8534-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1416315432-8534-7-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, swapper_pg_dir and idmap_pg_dir share the init_mm mm_struct
-instance. To allow the introduction of other pg_dir instances, for instance,
-for UEFI's mapping of Runtime Services, make the struct_mm instance an
-explicit argument that gets passed down to the pmd and pte instantiation
-functions. Note that the consumers (pmd_populate/pgd_populate) of the
-mm_struct argument don't actually inspect it, but let's fix it for
-correctness' sake.
+Register memory regions reserved by UEFI as IORESOURCE_MEM resources,
+so that they are reserved for other uses, and also makes them turn up
+in /proc/iomem.
 
-Acked-by: Steve Capper <steve.capper@linaro.org>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/mm/mmu.c | 31 ++++++++++++++++---------------
- 1 file changed, 16 insertions(+), 15 deletions(-)
+ drivers/firmware/efi/virtmap.c | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 0bf90d26e745..83e6713143a3 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -155,9 +155,9 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 	} while (pte++, addr += PAGE_SIZE, addr != end);
+diff --git a/drivers/firmware/efi/virtmap.c b/drivers/firmware/efi/virtmap.c
+index d1f1d416944f..98735fb43581 100644
+--- a/drivers/firmware/efi/virtmap.c
++++ b/drivers/firmware/efi/virtmap.c
+@@ -13,6 +13,7 @@
+ #include <linux/rwsem.h>
+ #include <linux/spinlock.h>
+ #include <linux/atomic.h>
++#include <linux/bootmem.h>
+ 
+ #include <asm/efi.h>
+ #include <asm/pgtable.h>
+@@ -52,6 +53,39 @@ static pgprot_t efi_md_access_prot(efi_memory_desc_t *md, pgprot_t prot)
+ 	return pgprot_device(prot);
  }
  
--static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
--				  unsigned long end, phys_addr_t phys,
--				  int map_io)
-+static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
-+				  unsigned long addr, unsigned long end,
-+				  phys_addr_t phys, int map_io)
++static __init void efi_register_mem_resource(efi_memory_desc_t *md)
++{
++	struct resource *res, *parent;
++
++	res = alloc_bootmem_low(sizeof(*res));
++	res->start = md->phys_addr;
++	res->end = res->start + (md->num_pages << EFI_PAGE_SHIFT) - 1;
++	res->flags = IORESOURCE_MEM;
++
++	if (md->type == EFI_MEMORY_MAPPED_IO &&
++	    (md->attribute & EFI_MEMORY_RUNTIME)) {
++		/*
++		 * Device regions with the EFI_MEMORY_RUNTIME attribute
++		 * are owned by the UEFI firmware, so make sure they are
++		 * tagged as exclusive: this will also prevent access
++		 * via /dev/mem if CONFIG_STRICT_DEVMEM is in effect.
++		 */
++		res->name = "UEFI Runtime I/O";
++		res->flags |= IORESOURCE_EXCLUSIVE;
++	} else {
++		res->name  = "UEFI Reserved";
++	}
++
++	/*
++	 * Try to register this resource at the top level. If it conflicts with
++	 * an existing entry ('System RAM', most likely), register it as its
++	 * child instead.
++	 */
++	parent = request_resource_conflict(&iomem_resource, res);
++	if (parent)
++		request_resource(parent, res);
++}
++
+ void __init efi_virtmap_init(void)
  {
- 	pmd_t *pmd;
- 	unsigned long next;
-@@ -177,7 +177,7 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
- 	 */
- 	if (pud_none(*pud) || pud_bad(*pud)) {
- 		pmd = early_alloc(PTRS_PER_PMD * sizeof(pmd_t));
--		pud_populate(&init_mm, pud, pmd);
-+		pud_populate(mm, pud, pmd);
- 	}
+ 	efi_memory_desc_t *md;
+@@ -63,6 +97,8 @@ void __init efi_virtmap_init(void)
+ 		u64 paddr, npages, size;
+ 		pgprot_t prot;
  
- 	pmd = pmd_offset(pud, addr);
-@@ -201,16 +201,16 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
- 	} while (pmd++, addr = next, addr != end);
- }
- 
--static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
--				  unsigned long end, unsigned long phys,
--				  int map_io)
-+static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
-+				  unsigned long addr, unsigned long end,
-+				  unsigned long phys, int map_io)
- {
- 	pud_t *pud;
- 	unsigned long next;
- 
- 	if (pgd_none(*pgd)) {
- 		pud = early_alloc(PTRS_PER_PUD * sizeof(pud_t));
--		pgd_populate(&init_mm, pgd, pud);
-+		pgd_populate(mm, pgd, pud);
- 	}
- 	BUG_ON(pgd_bad(*pgd));
- 
-@@ -239,7 +239,7 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
- 				flush_tlb_all();
- 			}
- 		} else {
--			alloc_init_pmd(pud, addr, next, phys, map_io);
-+			alloc_init_pmd(mm, pud, addr, next, phys, map_io);
- 		}
- 		phys += next - addr;
- 	} while (pud++, addr = next, addr != end);
-@@ -249,9 +249,9 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
-  * Create the page directory entries and any necessary page tables for the
-  * mapping specified by 'md'.
-  */
--static void __init __create_mapping(pgd_t *pgd, phys_addr_t phys,
--				    unsigned long virt, phys_addr_t size,
--				    int map_io)
-+static void __init __create_mapping(struct mm_struct *mm, pgd_t *pgd,
-+				    phys_addr_t phys, unsigned long virt,
-+				    phys_addr_t size, int map_io)
- {
- 	unsigned long addr, length, end, next;
- 
-@@ -261,7 +261,7 @@ static void __init __create_mapping(pgd_t *pgd, phys_addr_t phys,
- 	end = addr + length;
- 	do {
- 		next = pgd_addr_end(addr, end);
--		alloc_init_pud(pgd, addr, next, phys, map_io);
-+		alloc_init_pud(mm, pgd, addr, next, phys, map_io);
- 		phys += next - addr;
- 	} while (pgd++, addr = next, addr != end);
- }
-@@ -274,7 +274,8 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
- 			&phys, virt);
- 		return;
- 	}
--	__create_mapping(pgd_offset_k(virt & PAGE_MASK), phys, virt, size, 0);
-+	__create_mapping(&init_mm, pgd_offset_k(virt & PAGE_MASK), phys, virt,
-+			 size, 0);
- }
- 
- void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
-@@ -283,7 +284,7 @@ void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
- 		pr_warn("BUG: not creating id mapping for %pa\n", &addr);
- 		return;
- 	}
--	__create_mapping(&idmap_pg_dir[pgd_index(addr)],
-+	__create_mapping(&init_mm, &idmap_pg_dir[pgd_index(addr)],
- 			 addr, addr, size, map_io);
- }
- 
++		if (!efi_mem_is_usable_region(md))
++			efi_register_mem_resource(md);
+ 		if (!(md->attribute & EFI_MEMORY_RUNTIME))
+ 			continue;
+ 		if (WARN(md->virt_addr == 0,
 -- 
 1.8.3.2
