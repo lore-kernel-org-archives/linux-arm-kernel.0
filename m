@@ -1,232 +1,168 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Nov 2014 13:57:04 +0100
-Subject: [PATCH v3 05/13] efi: add common infrastructure for stub-installed
- virtual mapping
+Date: Tue, 18 Nov 2014 13:57:07 +0100
+Subject: [PATCH v3 08/13] arm64/efi: remove free_boot_services() and friends
 In-Reply-To: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1416315432-8534-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1416315432-8534-9-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This introduces the common infrastructure to be shared between arm64
-and ARM that wires up the UEFI memory map into system RAM discovery,
-virtual mappings for Runtime Services and aligning cache attributes
-between kernel and userland (/dev/mem) mappings for regions owned
-by UEFI.
+Now that we are calling SetVirtualAddressMap() from the stub, there is no
+need to reserve boot-only memory regions, which implies that there is also
+no reason to free them again later.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/firmware/efi/Kconfig   |   3 +
- drivers/firmware/efi/Makefile  |   1 +
- drivers/firmware/efi/virtmap.c | 134 +++++++++++++++++++++++++++++++++++++++++
- include/linux/efi.h            |  12 +++-
- 4 files changed, 149 insertions(+), 1 deletion(-)
- create mode 100644 drivers/firmware/efi/virtmap.c
+ arch/arm64/kernel/efi.c | 123 +-----------------------------------------------
+ 1 file changed, 1 insertion(+), 122 deletions(-)
 
-diff --git a/drivers/firmware/efi/Kconfig b/drivers/firmware/efi/Kconfig
-index f712d47f30d8..c71498180e67 100644
---- a/drivers/firmware/efi/Kconfig
-+++ b/drivers/firmware/efi/Kconfig
-@@ -60,6 +60,9 @@ config EFI_RUNTIME_WRAPPERS
- config EFI_ARMSTUB
- 	bool
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index beb5a79d32c3..9f05b4fe9fd5 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -170,9 +170,7 @@ static __init void reserve_regions(void)
+ 		if (is_normal_ram(md))
+ 			early_init_dt_add_memory_arch(paddr, size);
  
-+config EFI_VIRTMAP
-+	bool
-+
- endmenu
- 
- config UEFI_CPER
-diff --git a/drivers/firmware/efi/Makefile b/drivers/firmware/efi/Makefile
-index aef6a95adef5..3fd26c0ad40b 100644
---- a/drivers/firmware/efi/Makefile
-+++ b/drivers/firmware/efi/Makefile
-@@ -8,3 +8,4 @@ obj-$(CONFIG_UEFI_CPER)			+= cper.o
- obj-$(CONFIG_EFI_RUNTIME_MAP)		+= runtime-map.o
- obj-$(CONFIG_EFI_RUNTIME_WRAPPERS)	+= runtime-wrappers.o
- obj-$(CONFIG_EFI_ARM_STUB)		+= libstub/
-+obj-$(CONFIG_EFI_VIRTMAP)		+= virtmap.o
-diff --git a/drivers/firmware/efi/virtmap.c b/drivers/firmware/efi/virtmap.c
-new file mode 100644
-index 000000000000..d1f1d416944f
---- /dev/null
-+++ b/drivers/firmware/efi/virtmap.c
-@@ -0,0 +1,134 @@
-+/*
-+ * Copyright (C) 2014 Linaro Ltd.
-+ * Author: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/efi.h>
-+#include <linux/mm_types.h>
-+#include <linux/rbtree.h>
-+#include <linux/rwsem.h>
-+#include <linux/spinlock.h>
-+#include <linux/atomic.h>
-+
-+#include <asm/efi.h>
-+#include <asm/pgtable.h>
-+#include <asm/mmu_context.h>
-+#include <asm/mmu.h>
-+
-+static pgd_t efi_pgd[PTRS_PER_PGD] __page_aligned_bss;
-+
-+static struct mm_struct efi_mm = {
-+	.mm_rb			= RB_ROOT,
-+	.pgd			= efi_pgd,
-+	.mm_users		= ATOMIC_INIT(2),
-+	.mm_count		= ATOMIC_INIT(1),
-+	.mmap_sem		= __RWSEM_INITIALIZER(efi_mm.mmap_sem),
-+	.page_table_lock	= __SPIN_LOCK_UNLOCKED(efi_mm.page_table_lock),
-+	.mmlist			= LIST_HEAD_INIT(efi_mm.mmlist),
-+	INIT_MM_CONTEXT(efi_mm)
-+};
-+
-+void efi_virtmap_load(void)
-+{
-+	WARN_ON(preemptible());
-+	efi_set_pgd(&efi_mm);
-+}
-+
-+void efi_virtmap_unload(void)
-+{
-+	efi_set_pgd(current->active_mm);
-+}
-+
-+static pgprot_t efi_md_access_prot(efi_memory_desc_t *md, pgprot_t prot)
-+{
-+	if (md->attribute & EFI_MEMORY_WB)
-+		return prot;
-+	if (md->attribute & (EFI_MEMORY_WT|EFI_MEMORY_WC))
-+		return pgprot_writecombine(prot);
-+	return pgprot_device(prot);
-+}
-+
-+void __init efi_virtmap_init(void)
-+{
-+	efi_memory_desc_t *md;
-+
-+	if (!efi_enabled(EFI_BOOT))
-+		return;
-+
-+	for_each_efi_memory_desc(&memmap, md) {
-+		u64 paddr, npages, size;
-+		pgprot_t prot;
-+
-+		if (!(md->attribute & EFI_MEMORY_RUNTIME))
-+			continue;
-+		if (WARN(md->virt_addr == 0,
-+			 "UEFI virtual mapping incomplete or missing -- no entry found for 0x%llx\n",
-+			 md->phys_addr))
-+			return;
-+
-+		paddr = md->phys_addr;
-+		npages = md->num_pages;
-+		memrange_efi_to_native(&paddr, &npages);
-+		size = npages << PAGE_SHIFT;
-+
-+		pr_info("  EFI remap 0x%012llx => %p\n",
-+			md->phys_addr, (void *)md->virt_addr);
-+
-+		/*
-+		 * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
-+		 * executable, everything else can be mapped with the XN bits
-+		 * set.
-+		 */
-+		if (md->type == EFI_RUNTIME_SERVICES_CODE)
-+			prot = efi_md_access_prot(md, PAGE_KERNEL_EXEC);
-+		else
-+			prot = efi_md_access_prot(md, PAGE_KERNEL);
-+
-+		create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size, prot);
-+	}
-+	set_bit(EFI_VIRTMAP, &efi.flags);
-+}
-+
-+/*
-+ * Return true for RAM regions that are available for general use.
-+ */
-+bool efi_mem_is_usable_region(efi_memory_desc_t *md)
-+{
-+	switch (md->type) {
-+	case EFI_LOADER_CODE:
-+	case EFI_LOADER_DATA:
-+	case EFI_BOOT_SERVICES_CODE:
-+	case EFI_BOOT_SERVICES_DATA:
-+	case EFI_CONVENTIONAL_MEMORY:
-+		return md->attribute & EFI_MEMORY_WB;
-+	default:
-+		break;
-+	}
-+	return false;
-+}
-+
-+/*
-+ * Translate a EFI virtual address into a physical address: this is necessary,
-+ * as some data members of the EFI system table are virtually remapped after
-+ * SetVirtualAddressMap() has been called.
-+ */
-+phys_addr_t efi_to_phys(unsigned long addr)
-+{
-+	efi_memory_desc_t *md;
-+
-+	for_each_efi_memory_desc(&memmap, md) {
-+		if (!(md->attribute & EFI_MEMORY_RUNTIME))
-+			continue;
-+		if (md->virt_addr == 0)
-+			/* no virtual mapping has been installed by the stub */
-+			break;
-+		if (md->virt_addr <= addr &&
-+		    (addr - md->virt_addr) < (md->num_pages << EFI_PAGE_SHIFT))
-+			return md->phys_addr + addr - md->virt_addr;
-+	}
-+	return addr;
-+}
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index 2dc8577032b3..2adef3e9bf35 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -941,7 +941,8 @@ extern int __init efi_setup_pcdp_console(char *);
- #define EFI_MEMMAP		4	/* Can we use EFI memory map? */
- #define EFI_64BIT		5	/* Is the firmware 64-bit? */
- #define EFI_PARAVIRT		6	/* Access is via a paravirt interface */
--#define EFI_ARCH_1		7	/* First arch-specific bit */
-+#define EFI_VIRTMAP		7	/* Use virtmap installed by the stub */
-+#define EFI_ARCH_1		8	/* First arch-specific bit */
- 
- #ifdef CONFIG_EFI
- /*
-@@ -952,6 +953,7 @@ static inline bool efi_enabled(int feature)
- 	return test_bit(feature, &efi.flags) != 0;
+-		if (is_reserve_region(md) ||
+-		    md->type == EFI_BOOT_SERVICES_CODE ||
+-		    md->type == EFI_BOOT_SERVICES_DATA) {
++		if (is_reserve_region(md)) {
+ 			memblock_reserve(paddr, size);
+ 			if (uefi_debug)
+ 				pr_cont("*");
+@@ -185,123 +183,6 @@ static __init void reserve_regions(void)
+ 	set_bit(EFI_MEMMAP, &efi.flags);
  }
- extern void efi_reboot(enum reboot_mode reboot_mode, const char *__unused);
-+extern void efi_virtmap_init(void);
- #else
- static inline bool efi_enabled(int feature)
+ 
+-
+-static u64 __init free_one_region(u64 start, u64 end)
+-{
+-	u64 size = end - start;
+-
+-	if (uefi_debug)
+-		pr_info("  EFI freeing: 0x%012llx-0x%012llx\n",	start, end - 1);
+-
+-	free_bootmem_late(start, size);
+-	return size;
+-}
+-
+-static u64 __init free_region(u64 start, u64 end)
+-{
+-	u64 map_start, map_end, total = 0;
+-
+-	if (end <= start)
+-		return total;
+-
+-	map_start = (u64)memmap.phys_map;
+-	map_end = PAGE_ALIGN(map_start + (memmap.map_end - memmap.map));
+-	map_start &= PAGE_MASK;
+-
+-	if (start < map_end && end > map_start) {
+-		/* region overlaps UEFI memmap */
+-		if (start < map_start)
+-			total += free_one_region(start, map_start);
+-
+-		if (map_end < end)
+-			total += free_one_region(map_end, end);
+-	} else
+-		total += free_one_region(start, end);
+-
+-	return total;
+-}
+-
+-static void __init free_boot_services(void)
+-{
+-	u64 total_freed = 0;
+-	u64 keep_end, free_start, free_end;
+-	efi_memory_desc_t *md;
+-
+-	/*
+-	 * If kernel uses larger pages than UEFI, we have to be careful
+-	 * not to inadvertantly free memory we want to keep if there is
+-	 * overlap@the kernel page size alignment. We do not want to
+-	 * free is_reserve_region() memory nor the UEFI memmap itself.
+-	 *
+-	 * The memory map is sorted, so we keep track of the end of
+-	 * any previous region we want to keep, remember any region
+-	 * we want to free and defer freeing it until we encounter
+-	 * the next region we want to keep. This way, before freeing
+-	 * it, we can clip it as needed to avoid freeing memory we
+-	 * want to keep for UEFI.
+-	 */
+-
+-	keep_end = 0;
+-	free_start = 0;
+-
+-	for_each_efi_memory_desc(&memmap, md) {
+-		u64 paddr, npages, size;
+-
+-		if (is_reserve_region(md)) {
+-			/*
+-			 * We don't want to free any memory from this region.
+-			 */
+-			if (free_start) {
+-				/* adjust free_end then free region */
+-				if (free_end > md->phys_addr)
+-					free_end -= PAGE_SIZE;
+-				total_freed += free_region(free_start, free_end);
+-				free_start = 0;
+-			}
+-			keep_end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
+-			continue;
+-		}
+-
+-		if (md->type != EFI_BOOT_SERVICES_CODE &&
+-		    md->type != EFI_BOOT_SERVICES_DATA) {
+-			/* no need to free this region */
+-			continue;
+-		}
+-
+-		/*
+-		 * We want to free memory from this region.
+-		 */
+-		paddr = md->phys_addr;
+-		npages = md->num_pages;
+-		memrange_efi_to_native(&paddr, &npages);
+-		size = npages << PAGE_SHIFT;
+-
+-		if (free_start) {
+-			if (paddr <= free_end)
+-				free_end = paddr + size;
+-			else {
+-				total_freed += free_region(free_start, free_end);
+-				free_start = paddr;
+-				free_end = paddr + size;
+-			}
+-		} else {
+-			free_start = paddr;
+-			free_end = paddr + size;
+-		}
+-		if (free_start < keep_end) {
+-			free_start += PAGE_SIZE;
+-			if (free_start >= free_end)
+-				free_start = 0;
+-		}
+-	}
+-	if (free_start)
+-		total_freed += free_region(free_start, free_end);
+-
+-	if (total_freed)
+-		pr_info("Freed 0x%llx bytes of EFI boot services memory",
+-			total_freed);
+-}
+-
+ void __init efi_init(void)
  {
-@@ -959,6 +961,7 @@ static inline bool efi_enabled(int feature)
- }
- static inline void
- efi_reboot(enum reboot_mode reboot_mode, const char *__unused) {}
-+static inline void efi_virtmap_init(void) {}
- #endif
+ 	struct efi_fdt_params params;
+@@ -368,8 +249,6 @@ static int __init arm64_enter_virtual_mode(void)
+ 	}
+ 	set_bit(EFI_SYSTEM_TABLES, &efi.flags);
  
- /*
-@@ -1250,4 +1253,11 @@ efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
- efi_status_t efi_parse_options(char *cmdline);
- 
- bool efi_runtime_disabled(void);
-+
-+phys_addr_t efi_to_phys(unsigned long addr);
-+bool efi_mem_is_usable_region(efi_memory_desc_t *md);
-+
-+void efi_virtmap_load(void);
-+void efi_virtmap_unload(void);
-+
- #endif /* _LINUX_EFI_H */
+-	free_boot_services();
+-
+ 	if (!efi_enabled(EFI_VIRTMAP)) {
+ 		pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
+ 		return -1;
 -- 
 1.8.3.2
