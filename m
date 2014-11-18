@@ -1,63 +1,119 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 18 Nov 2014 13:55:05 +0300
-Subject: [PATCH] ARM: dts: DRA7: Add node for RTC
-In-Reply-To: <546AD290.8080303@ti.com>
-References: <1416199509-3977-1-git-send-email-lokeshvutla@ti.com>
- <5469E76A.7020105@cogentembedded.com> <5469F271.9080102@ti.com>
- <546A1E5E.1040909@cogentembedded.com> <546AD290.8080303@ti.com>
-Message-ID: <546B2589.1090504@cogentembedded.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 18 Nov 2014 16:17:29 +0530
+Subject: [PATCH v5 1/2] clk: samsung: exynos5440: move restart code into clock
+ driver
+In-Reply-To: <1416307650-15162-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1416307650-15162-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1416307650-15162-2-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Let's register restart handler for Exynos5440 from it's clock driver
+for restart functionality. So that we can cleanup restart hooks from
+machine specific file.
 
-On 11/18/2014 8:01 AM, Lokesh Vutla wrote:
+CC: Sylwester Nawrocki <s.nawrocki@samsung.com>
+CC: Tomasz Figa <tomasz.figa@gmail.com>
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Acked-by: Guenter Roeck <linux@roeck-us.net>
+---
+ arch/arm/mach-exynos/exynos.c        |   19 +------------------
+ drivers/clk/samsung/clk-exynos5440.c |   29 ++++++++++++++++++++++++++++-
+ 2 files changed, 29 insertions(+), 19 deletions(-)
 
->>>>> Add node for RTC.
-
->>>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->>>>> [nm at ti.com: update with rtc crossbar number]
->>>>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>>>> ---
->>>>>     arch/arm/boot/dts/dra7.dtsi | 9 +++++++++
->>>>>     1 file changed, 9 insertions(+)
-
->>>>> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
->>>>> index 9cc9843..f98f9f0 100644
->>>>> --- a/arch/arm/boot/dts/dra7.dtsi
->>>>> +++ b/arch/arm/boot/dts/dra7.dtsi
->>>>> @@ -1075,6 +1075,15 @@
->>>>>                 status = "disabled";
->>>>>             };
->>>>>
->>>>> +        rtc: rtcss at 48838000 {
-
->>>>      Please just name the node "rtc at 48838000", in accordance with ePAPR.
-
->>> Okay. will update it.
-
->>>>> +            compatible = "ti,am3352-rtc";
->>>>> +            reg = <0x48838000 0x100>;
->>>>> +            interrupts = <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>,
->>>>> +                     <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>;
-
->>>>      2 similar interrupts?
-
->>> both rtc timer and rtc alarm uses same interrupt on DRA7 Soc.
->>> Driver handles it accordingly.
->>> So passing the same interrupt.
-
->>     I think it would have been better if the driver just handled a single interrupt.
-
-> There are certain SoCs with RTC IP where timer and alarm uses different interrupts.
-
-    I understood.
-
-> Driver has to take care of that scenario also. So it expects two interrupts from dt.
-
-    You could also handle the missing second interrupt. I don't insist though...
-
-> Thanks and regards,
-> Lokesh
-
-WBR, Sergei
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index 8f638ad..8f995b7 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -89,24 +89,7 @@ static struct map_desc exynos5_iodesc[] __initdata = {
+ 
+ static void exynos_restart(enum reboot_mode mode, const char *cmd)
+ {
+-	struct device_node *np;
+-	u32 val = 0x1;
+-	void __iomem *addr = pmu_base_addr + EXYNOS_SWRESET;
+-
+-	if (of_machine_is_compatible("samsung,exynos5440")) {
+-		u32 status;
+-		np = of_find_compatible_node(NULL, NULL, "samsung,exynos5440-clock");
+-
+-		addr = of_iomap(np, 0) + 0xbc;
+-		status = __raw_readl(addr);
+-
+-		addr = of_iomap(np, 0) + 0xcc;
+-		val = __raw_readl(addr);
+-
+-		val = (val & 0xffff0000) | (status & 0xffff);
+-	}
+-
+-	__raw_writel(val, addr);
++	__raw_writel(0x1, pmu_base_addr + EXYNOS_SWRESET);
+ }
+ 
+ static struct platform_device exynos_cpuidle = {
+diff --git a/drivers/clk/samsung/clk-exynos5440.c b/drivers/clk/samsung/clk-exynos5440.c
+index 00d1d00..979e813 100644
+--- a/drivers/clk/samsung/clk-exynos5440.c
++++ b/drivers/clk/samsung/clk-exynos5440.c
+@@ -15,6 +15,8 @@
+ #include <linux/clk-provider.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/notifier.h>
++#include <linux/reboot.h>
+ 
+ #include "clk.h"
+ #include "clk-pll.h"
+@@ -23,6 +25,8 @@
+ #define CPU_CLK_STATUS		0xfc
+ #define MISC_DOUT1		0x558
+ 
++static void __iomem *reg_base;
++
+ /* parent clock name list */
+ PNAME(mout_armclk_p)	= { "cplla", "cpllb" };
+ PNAME(mout_spi_p)	= { "div125", "div200" };
+@@ -89,10 +93,30 @@ static const struct of_device_id ext_clk_match[] __initconst = {
+ 	{},
+ };
+ 
++static int exynos5440_clk_restart_notify(struct notifier_block *this,
++		unsigned long code, void *unused)
++{
++	u32 val, status;
++
++	status = readl_relaxed(reg_base + 0xbc);
++	val = readl_relaxed(reg_base + 0xcc);
++	val = (val & 0xffff0000) | (status & 0xffff);
++	writel_relaxed(val, reg_base + 0xcc);
++
++	return NOTIFY_DONE;
++}
++
++/*
++ * Exynos5440 Clock restart notifier, handles restart functionality
++ */
++static struct notifier_block exynos5440_clk_restart_handler = {
++	.notifier_call = exynos5440_clk_restart_notify,
++	.priority = 128,
++};
++
+ /* register exynos5440 clocks */
+ static void __init exynos5440_clk_init(struct device_node *np)
+ {
+-	void __iomem *reg_base;
+ 	struct samsung_clk_provider *ctx;
+ 
+ 	reg_base = of_iomap(np, 0);
+@@ -125,6 +149,9 @@ static void __init exynos5440_clk_init(struct device_node *np)
+ 
+ 	samsung_clk_of_add_provider(np, ctx);
+ 
++	if (register_restart_handler(&exynos5440_clk_restart_handler))
++		pr_warn("exynos5440 clock can't register restart handler\n");
++
+ 	pr_info("Exynos5440: arm_clk = %ldHz\n", _get_rate("arm_clk"));
+ 	pr_info("exynos5440 clock initialization complete\n");
+ }
+-- 
+1.7.9.5
