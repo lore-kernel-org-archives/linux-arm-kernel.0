@@ -1,117 +1,274 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 17 Nov 2014 16:55:01 -0800
-Subject: [PATCHv5 3/7] arm64: Move cpu_resume into the text section
+Date: Mon, 17 Nov 2014 16:55:03 -0800
+Subject: [PATCHv5 5/7] arm64: Factor out fixmap initialiation from ioremap
 In-Reply-To: <1416272105-14787-1-git-send-email-lauraa@codeaurora.org>
 References: <1416272105-14787-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1416272105-14787-4-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1416272105-14787-6-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function cpu_resume currently lives in the .data section.
-There's no reason for it to be there since we can use relative
-instructions without a problem. Move a few cpu_resume data
-structures out of the assembly file so the .data annotation
-can be dropped completely and cpu_resume ends up in the read
-only text section.
+The fixmap API was originally added for arm64 for
+early_ioremap purposes. It can be used for other purposes too
+so move the initialization from ioremap to somewhere more
+generic. This makes it obvious where the fixmap is being set
+up and allows for a cleaner implementation of __set_fixmap.
 
 Reviewed-by: Kees Cook <keescook@chromium.org>
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
-v5: Dropped the .data annoation completely per suggestion of
-Lorenzo. Dropped mpidr_hash_ptr per suggestion of Ard.
-Moved sleep_save_sp and sleep_idmap_phys from assembly per
-suggestion of Mark.
+ arch/arm64/include/asm/fixmap.h |  7 +--
+ arch/arm64/kernel/setup.c       |  1 +
+ arch/arm64/mm/ioremap.c         | 93 ++--------------------------------------
+ arch/arm64/mm/mmu.c             | 94 +++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 102 insertions(+), 93 deletions(-)
 
-Please let me know if your Tested-by/Reviewed-by/Acked-by
-still stands.
----
- arch/arm64/kernel/sleep.S   | 29 ++++++-----------------------
- arch/arm64/kernel/suspend.c |  4 ++--
- 2 files changed, 8 insertions(+), 25 deletions(-)
-
-diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-index a564b44..3f836b2 100644
---- a/arch/arm64/kernel/sleep.S
-+++ b/arch/arm64/kernel/sleep.S
-@@ -147,14 +147,12 @@ cpu_resume_after_mmu:
- 	ret
- ENDPROC(cpu_resume_after_mmu)
+diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+index 5f7bfe6..db26a2f2 100644
+--- a/arch/arm64/include/asm/fixmap.h
++++ b/arch/arm64/include/asm/fixmap.h
+@@ -56,10 +56,11 @@ enum fixed_addresses {
  
--	.data
- ENTRY(cpu_resume)
- 	bl	el2_setup		// if in EL2 drop to EL1 cleanly
- #ifdef CONFIG_SMP
- 	mrs	x1, mpidr_el1
--	adr	x4, mpidr_hash_ptr
--	ldr	x5, [x4]
--	add	x8, x4, x5		// x8 = struct mpidr_hash phys address
-+	adrp	x8, mpidr_hash
-+	add x8, x8, #:lo12:mpidr_hash // x8 = struct mpidr_hash phys address
-         /* retrieve mpidr_hash members to compute the hash */
- 	ldr	x2, [x8, #MPIDR_HASH_MASK]
- 	ldp	w3, w4, [x8, #MPIDR_HASH_SHIFTS]
-@@ -164,14 +162,15 @@ ENTRY(cpu_resume)
- #else
- 	mov	x7, xzr
- #endif
--	adr	x0, sleep_save_sp
-+	adrp	x0, sleep_save_sp
-+	add	x0, x0, #:lo12:sleep_save_sp
- 	ldr	x0, [x0, #SLEEP_SAVE_SP_PHYS]
- 	ldr	x0, [x0, x7, lsl #3]
- 	/* load sp from context */
- 	ldr	x2, [x0, #CPU_CTX_SP]
--	adr	x1, sleep_idmap_phys
-+	adrp	x1, sleep_idmap_phys
- 	/* load physical address of identity map page table in x1 */
--	ldr	x1, [x1]
-+	ldr	x1, [x1, #:lo12:sleep_idmap_phys]
- 	mov	sp, x2
- 	/*
- 	 * cpu_do_resume expects x0 to contain context physical address
-@@ -182,24 +181,8 @@ ENTRY(cpu_resume)
- ENDPROC(cpu_resume)
+ #define FIXMAP_PAGE_IO     __pgprot(PROT_DEVICE_nGnRE)
  
- 	.align 3
--mpidr_hash_ptr:
- 	/*
- 	 * offset of mpidr_hash symbol from current location
- 	 * used to obtain run-time mpidr_hash address with MMU off
-          */
- 	.quad	mpidr_hash - .
--/*
-- * physical address of identity mapped page tables
-- */
--	.type	sleep_idmap_phys, #object
--ENTRY(sleep_idmap_phys)
--	.quad	0
--/*
-- * struct sleep_save_sp {
-- *	phys_addr_t *save_ptr_stash;
-- *	phys_addr_t save_ptr_stash_phys;
-- * };
-- */
--	.type	sleep_save_sp, #object
--ENTRY(sleep_save_sp)
--	.space	SLEEP_SAVE_SP_SZ	// struct sleep_save_sp
-diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
-index 13ad4db..3771b72 100644
---- a/arch/arm64/kernel/suspend.c
-+++ b/arch/arm64/kernel/suspend.c
-@@ -126,8 +126,8 @@ int __cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
- 	return ret;
+-extern void __early_set_fixmap(enum fixed_addresses idx,
+-			       phys_addr_t phys, pgprot_t flags);
++void __init early_fixmap_init(void);
+ 
+-#define __set_fixmap __early_set_fixmap
++#define __early_set_fixmap __set_fixmap
++
++extern void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
+ 
+ #include <asm-generic/fixmap.h>
+ 
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 2437196..fb457cb 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -376,6 +376,7 @@ void __init setup_arch(char **cmdline_p)
+ 
+ 	*cmdline_p = boot_command_line;
+ 
++	early_fixmap_init();
+ 	early_ioremap_init();
+ 
+ 	parse_early_param();
+diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
+index 4a07630..cbb99c8 100644
+--- a/arch/arm64/mm/ioremap.c
++++ b/arch/arm64/mm/ioremap.c
+@@ -103,97 +103,10 @@ void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
  }
+ EXPORT_SYMBOL(ioremap_cache);
  
--extern struct sleep_save_sp sleep_save_sp;
--extern phys_addr_t sleep_idmap_phys;
-+struct sleep_save_sp sleep_save_sp;
-+phys_addr_t sleep_idmap_phys;
- 
- static int __init cpu_suspend_init(void)
+-static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
+-#if CONFIG_ARM64_PGTABLE_LEVELS > 2
+-static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
+-#endif
+-#if CONFIG_ARM64_PGTABLE_LEVELS > 3
+-static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
+-#endif
+-
+-static inline pud_t * __init early_ioremap_pud(unsigned long addr)
+-{
+-	pgd_t *pgd;
+-
+-	pgd = pgd_offset_k(addr);
+-	BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
+-
+-	return pud_offset(pgd, addr);
+-}
+-
+-static inline pmd_t * __init early_ioremap_pmd(unsigned long addr)
+-{
+-	pud_t *pud = early_ioremap_pud(addr);
+-
+-	BUG_ON(pud_none(*pud) || pud_bad(*pud));
+-
+-	return pmd_offset(pud, addr);
+-}
+-
+-static inline pte_t * __init early_ioremap_pte(unsigned long addr)
+-{
+-	pmd_t *pmd = early_ioremap_pmd(addr);
+-
+-	BUG_ON(pmd_none(*pmd) || pmd_bad(*pmd));
+-
+-	return pte_offset_kernel(pmd, addr);
+-}
+-
++/*
++ * Must be called after early_fixmap_init
++ */
+ void __init early_ioremap_init(void)
  {
+-	pgd_t *pgd;
+-	pud_t *pud;
+-	pmd_t *pmd;
+-	unsigned long addr = fix_to_virt(FIX_BTMAP_BEGIN);
+-
+-	pgd = pgd_offset_k(addr);
+-	pgd_populate(&init_mm, pgd, bm_pud);
+-	pud = pud_offset(pgd, addr);
+-	pud_populate(&init_mm, pud, bm_pmd);
+-	pmd = pmd_offset(pud, addr);
+-	pmd_populate_kernel(&init_mm, pmd, bm_pte);
+-
+-	/*
+-	 * The boot-ioremap range spans multiple pmds, for which
+-	 * we are not prepared:
+-	 */
+-	BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
+-		     != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
+-
+-	if (pmd != early_ioremap_pmd(fix_to_virt(FIX_BTMAP_END))) {
+-		WARN_ON(1);
+-		pr_warn("pmd %p != %p\n",
+-			pmd, early_ioremap_pmd(fix_to_virt(FIX_BTMAP_END)));
+-		pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %08lx\n",
+-			fix_to_virt(FIX_BTMAP_BEGIN));
+-		pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
+-			fix_to_virt(FIX_BTMAP_END));
+-
+-		pr_warn("FIX_BTMAP_END:       %d\n", FIX_BTMAP_END);
+-		pr_warn("FIX_BTMAP_BEGIN:     %d\n",
+-			FIX_BTMAP_BEGIN);
+-	}
+-
+ 	early_ioremap_setup();
+ }
+-
+-void __init __early_set_fixmap(enum fixed_addresses idx,
+-			       phys_addr_t phys, pgprot_t flags)
+-{
+-	unsigned long addr = __fix_to_virt(idx);
+-	pte_t *pte;
+-
+-	if (idx >= __end_of_fixed_addresses) {
+-		BUG();
+-		return;
+-	}
+-
+-	pte = early_ioremap_pte(addr);
+-
+-	if (pgprot_val(flags))
+-		set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
+-	else {
+-		pte_clear(&init_mm, addr, pte);
+-		flush_tlb_kernel_range(addr, addr+PAGE_SIZE);
+-	}
+-}
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index f4f8b50..6032f3e 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -28,6 +28,7 @@
+ #include <linux/io.h>
+ 
+ #include <asm/cputype.h>
++#include <asm/fixmap.h>
+ #include <asm/sections.h>
+ #include <asm/setup.h>
+ #include <asm/sizes.h>
+@@ -463,3 +464,96 @@ void vmemmap_free(unsigned long start, unsigned long end)
+ {
+ }
+ #endif	/* CONFIG_SPARSEMEM_VMEMMAP */
++
++static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
++#if CONFIG_ARM64_PGTABLE_LEVELS > 2
++static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
++#endif
++#if CONFIG_ARM64_PGTABLE_LEVELS > 3
++static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
++#endif
++
++static inline pud_t * fixmap_pud(unsigned long addr)
++{
++	pgd_t *pgd = pgd_offset_k(addr);
++
++	BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
++
++	return pud_offset(pgd, addr);
++}
++
++static inline pmd_t * fixmap_pmd(unsigned long addr)
++{
++	pud_t *pud = fixmap_pud(addr);
++
++	BUG_ON(pud_none(*pud) || pud_bad(*pud));
++
++	return pmd_offset(pud, addr);
++}
++
++static inline pte_t * fixmap_pte(unsigned long addr)
++{
++	pmd_t *pmd = fixmap_pmd(addr);
++
++	BUG_ON(pmd_none(*pmd) || pmd_bad(*pmd));
++
++	return pte_offset_kernel(pmd, addr);
++}
++
++void __init early_fixmap_init(void)
++{
++	pgd_t *pgd;
++	pud_t *pud;
++	pmd_t *pmd;
++	unsigned long addr = FIXADDR_START;
++
++	pgd = pgd_offset_k(addr);
++	pgd_populate(&init_mm, pgd, bm_pud);
++	pud = pud_offset(pgd, addr);
++	pud_populate(&init_mm, pud, bm_pmd);
++	pmd = pmd_offset(pud, addr);
++	pmd_populate_kernel(&init_mm, pmd, bm_pte);
++
++	/*
++	 * The boot-ioremap range spans multiple pmds, for which
++	 * we are not preparted:
++	 */
++	BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
++		     != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
++
++	if ((pmd != fixmap_pmd(fix_to_virt(FIX_BTMAP_BEGIN)))
++	     || pmd != fixmap_pmd(fix_to_virt(FIX_BTMAP_END))) {
++		WARN_ON(1);
++		pr_warn("pmd %p != %p, %p\n",
++			pmd, fixmap_pmd(fix_to_virt(FIX_BTMAP_BEGIN)),
++			fixmap_pmd(fix_to_virt(FIX_BTMAP_END)));
++		pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %08lx\n",
++			fix_to_virt(FIX_BTMAP_BEGIN));
++		pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
++			fix_to_virt(FIX_BTMAP_END));
++
++		pr_warn("FIX_BTMAP_END:       %d\n", FIX_BTMAP_END);
++		pr_warn("FIX_BTMAP_BEGIN:     %d\n", FIX_BTMAP_BEGIN);
++	}
++}
++
++void __set_fixmap(enum fixed_addresses idx,
++			       phys_addr_t phys, pgprot_t flags)
++{
++	unsigned long addr = __fix_to_virt(idx);
++	pte_t *pte;
++
++	if (idx >= __end_of_fixed_addresses) {
++		BUG();
++		return;
++	}
++
++	pte = fixmap_pte(addr);
++
++	if (pgprot_val(flags)) {
++		set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
++	} else {
++		pte_clear(&init_mm, addr, pte);
++		flush_tlb_kernel_range(addr, addr+PAGE_SIZE);
++	}
++}
 -- 
 Qualcomm Innovation Center, Inc.
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
