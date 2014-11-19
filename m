@@ -1,14 +1,16 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Nov 2014 22:33:50 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC DT DU Updates for v3.19
-In-Reply-To: <cover.1415058552.git.horms+renesas@verge.net.au>
-References: <cover.1415058552.git.horms+renesas@verge.net.au>
-Message-ID: <201411192233.50732.arnd@arndb.de>
+Date: Wed, 19 Nov 2014 22:39:45 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v3.19
+In-Reply-To: <cover.1415582943.git.horms+renesas@verge.net.au>
+References: <cover.1415582943.git.horms+renesas@verge.net.au>
+Message-ID: <201411192239.45853.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 November 2014, Simon Horman wrote:
-> Please consider these Renesas ARM based SoC DT DU updates for v3.19.
+On Monday 10 November 2014, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these Renesas ARM based SoC defconfig updates for v3.19.
 > 
 > 
 > The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
@@ -17,13 +19,18 @@ On Tuesday 04 November 2014, Simon Horman wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-du-for-v3.19
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v3.19
 > 
-> for you to fetch changes up to 0ee56d403549fd97d8acac6b7ba3a17f6999c30a:
+> for you to fetch changes up to ccde0fbd4fe88151c8d3a93a3e3a939a0a1753b2:
 > 
->   ARM: shmobile: koelsch: Enable DU device in DT (2014-10-30 09:47:13 +0900)
+>   ARM: shmobile: multiplatform: add AK4642 support on defconfig (2014-11-05 14:47:56 +0900)
 > 
+> ----------------------------------------------------------------
+> Renesas ARM Based SoC Defconfig Updates for v3.19
+> 
+> * Enable AK4642, Audo DMAC peri peri and R-Car DMAC in shmobile defconrig
+> * Enable PM Runtime in ape6evm defconfig
 
-Pulled into next/cleanup, to simplify the dependency chain, thanks!
+Pulled into next/defconfig, thanks!
 
 	Arnd
