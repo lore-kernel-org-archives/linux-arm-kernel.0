@@ -1,86 +1,59 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 19 Nov 2014 11:17:56 +0100
-Subject: [PATCH v2 2/2] ASoC: rockchip: i2s: add support for grabbing
- output clock to codec
-In-Reply-To: <1416384567-29476-1-git-send-email-jay.xu@rock-chips.com>
-References: <1416366468-4744-1-git-send-email-jay.xu@rock-chips.com>
- <1416384567-29476-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <3448679.qPaq5DHST3@diego>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 19 Nov 2014 11:16:11 +0100
+Subject: [GIT PULL] cpuidle: A few improvements for ARM cpuidle via DT
+Message-ID: <546C6DEB.8060204@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jianqun,
+
+Hi Rafael,
+
+this pull request, based on 3.18-rc5, contains a set of changes from 
+Lorenzo Pieralisi.
+
+  * Added a 'status' definition flag in the DT to specify the 
+unsupported firmware idle states and ignore those states in the parsing 
+code when initializing the cpuidle driver
+
+  * Added an idle state description in the DT. As the idle states are 
+not standardized on ARM, the description gives information about the 
+idle state
+
+  * Removed duplicate error message in the arm64 cpuidle drivers
+
+Thanks !
+
+   -- Daniel
 
 
-Am Mittwoch, 19. November 2014, 16:09:27 schrieb Jianqun Xu:
-> Patch is from Sonny Rao <sonnyrao@chromium.org>
-that line above should read exactly:
-From: Sonny Rao <sonnyrao@chromium.org>
+The following changes since commit fc14f9c1272f62c3e8d01300f52467c0d9af50f9:
 
-that way git will also set the author correctly when importing the patch mbox.
+   Linux 3.18-rc5 (2014-11-16 16:36:20 -0800)
 
-> 
-> We need to claim the clock which is driving the codec so that when we enable
-> clock gating, we continue to clock the codec when needed.  I make this an
-> optional clock since there might be some applications where we don't need
-> it but can still use the I2S block.
-> 
-> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+are available in the git repository at:
 
-I think we you're submitting someone elses patch you'll need a Signed-off-by 
-line for yourself too [which marks that you were allowed to submit it etc], so 
-it should read something like
+   http://git.linaro.org/git-ro/people/daniel.lezcano/linux.git cpuidle/3.19
 
-Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+for you to fetch changes up to 18f95a3640dbf421ab9532e517070a0c1cd4d582:
 
+   drivers: cpuidle: Remove cpuidle-arm64 duplicate error messages 
+(2014-11-19 10:16:28 +0100)
 
-> ---
-> changes since v1:
-> - modify commit message
-> 
->  sound/soc/rockchip/rockchip_i2s.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/sound/soc/rockchip/rockchip_i2s.c
-> b/sound/soc/rockchip/rockchip_i2s.c index c74ba37..2820ade 100644
-> --- a/sound/soc/rockchip/rockchip_i2s.c
-> +++ b/sound/soc/rockchip/rockchip_i2s.c
-> @@ -28,6 +28,7 @@ struct rk_i2s_dev {
-> 
->  	struct clk *hclk;
->  	struct clk *mclk;
-> +	struct clk *oclk;
-> 
->  	struct snd_dmaengine_dai_dma_data capture_dma_data;
->  	struct snd_dmaengine_dai_dma_data playback_dma_data;
-> @@ -439,6 +440,14 @@ static int rockchip_i2s_probe(struct platform_device
-> *pdev) return PTR_ERR(i2s->mclk);
->  	}
-> 
-> +	i2s->oclk = devm_clk_get(&pdev->dev, "i2s_clk_out");
-> +	if (IS_ERR(i2s->oclk)) {
-> +		dev_dbg(&pdev->dev, "Didn't find output clock\n");
-> +		i2s->oclk = NULL;
-> +	}
+----------------------------------------------------------------
+Lorenzo Pieralisi (3):
+       drivers: cpuidle: Add status property to ARM idle states
+       drivers: cpuidle: Add idle-state-name description to ARM idle states
+       drivers: cpuidle: Remove cpuidle-arm64 duplicate error messages
 
-blank line here?
+  Documentation/devicetree/bindings/arm/idle-states.txt | 20 
+++++++++++++++++++++
+  drivers/cpuidle/cpuidle-arm64.c                       | 13 ++-----------
+  drivers/cpuidle/dt_idle_states.c                      | 10 +++++++++-
+  3 files changed, 31 insertions(+), 12 deletions(-)
 
-> +	if (i2s->oclk)
-> +		ret = clk_prepare_enable(i2s->oclk);
-> +
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	regs = devm_ioremap_resource(&pdev->dev, res);
->  	if (IS_ERR(regs))
-> @@ -505,6 +514,8 @@ static int rockchip_i2s_remove(struct platform_device
-> *pdev) if (!pm_runtime_status_suspended(&pdev->dev))
->  		i2s_runtime_suspend(&pdev->dev);
-> 
-> +	if (i2s->oclk)
-> +		clk_disable_unprepare(i2s->oclk);
->  	clk_disable_unprepare(i2s->mclk);
->  	clk_disable_unprepare(i2s->hclk);
->  	snd_dmaengine_pcm_unregister(&pdev->dev);
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-
-Heiko
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
