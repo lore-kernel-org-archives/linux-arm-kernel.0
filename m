@@ -1,38 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 19 Nov 2014 16:59:48 +0000
-Subject: [PATCH RFC] ARM: option for loading modules into vmalloc area
-In-Reply-To: <alpine.LFD.2.11.1411191152340.11690@knanqh.ubzr>
-References: <20141118173413.GB4042@n2100.arm.linux.org.uk>
- <546B8C64.3010904@samsung.com> <2041617.Kxhx5O4MMr@wuerfel>
- <CAKv+Gu-8qhHYOry+LsDzp+LDZqYxVZ5G7cj48E3G2Unp2+=_yg@mail.gmail.com>
- <CALYGNiMt2A3DP02cOtxqu4RrnmhojrDxkRG7bkHMByUnzG+PeA@mail.gmail.com>
- <CAKv+Gu-rYWutr-45MsZH6KOhhUyNCVLfkO9JQrqCm1L6ms_DUg@mail.gmail.com>
- <20141119160747.GH4042@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1411191130480.11690@knanqh.ubzr>
- <20141119164902.GK4042@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1411191152340.11690@knanqh.ubzr>
-Message-ID: <20141119165948.GM4042@n2100.arm.linux.org.uk>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 19 Nov 2014 17:59:53 +0100
+Subject: [PATCH 1/4] ARM: dts: Add usb3503 pinctrl to exynos5250-spring
+In-Reply-To: <1416412585-10809-2-git-send-email-afaerber@suse.de>
+References: <1416412585-10809-1-git-send-email-afaerber@suse.de>
+ <1416412585-10809-2-git-send-email-afaerber@suse.de>
+Message-ID: <546CCC89.1040502@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 11:57:15AM -0500, Nicolas Pitre wrote:
-> On Wed, 19 Nov 2014, Russell King - ARM Linux wrote:
-> > I don't think I ever did, because its pretty much impossible to do as I
-> > explained in a follow up to this thread.
-> > 
-> > We _used_ to do this with the userspace insmod methods, but since we got
-> > this kernel-side linker, it's been pretty much impossible to do without
-> > rewriting the module code.  That's not going to happen on account of one
-> > quirky architecture which Linus doesn't particularly like.
-> 
-> Still... We could try adding a hook in the generic module linker code 
-> for a pre-relocation pass.  Maybe only ARM would use it, but if the need 
-> to load big modules is real then I imagine Linus could be amenable to a 
-> compromise.
+Hello Andreas,
 
-So, how big a table would you allocate for the trampolines, based upon
-not knowing anything about the module being loaded?  4K?  8K?  64K?
+On 11/19/2014 04:56 PM, Andreas F?rber wrote:
+> Reported-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Even though the patch is simple and is true that the subject explains
+the change, I think that is always good to have a commit message anyways.
+
+Patch looks good to me though:
+
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+
+Best regards,
+Javier
