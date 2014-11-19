@@ -1,39 +1,155 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 19 Nov 2014 17:28:54 +0100
-Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
- support
-In-Reply-To: <20141119162224.GB5396@luxor.wired.org>
-References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
- <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
- <546C646C.4060303@collabora.co.uk> <20141119105527.GA5396@luxor.wired.org>
- <546C7D15.10605@collabora.co.uk> <20141119162224.GB5396@luxor.wired.org>
-Message-ID: <546CC546.5090900@collabora.co.uk>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Wed, 19 Nov 2014 16:29:14 +0000
+Subject: [RFC PATCH 07/16] PCI: Separate pci_host_bridge creation out of
+ pci_create_root_bus()
+In-Reply-To: <546BFF74.4030101@huawei.com>
+References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
+ <1416219710-26088-8-git-send-email-wangyijing@huawei.com>
+ <2507218.mHliopJb05@wuerfel> <546B041A.4060403@huawei.com>
+ <20141118144819.GK12037@e106497-lin.cambridge.arm.com>
+ <546BFF74.4030101@huawei.com>
+Message-ID: <20141119162914.GB9162@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Paolo,
-
-On 11/19/2014 05:22 PM, Paolo Pisati wrote:
-> On Wed, Nov 19, 2014 at 12:20:53PM +0100, Javier Martinez Canillas wrote:
->> 
->> If someone else is interested, I've pushed a branch [0] with 3.18-rc5 + all
->> the needed patches.
->> 
->> Ajay, feel free to add to your series:
->> 
->> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> 
->> Best regards,
->> Javier
->> 
->> [0]: git://git.collabora.co.uk/git/user/javier/linux.git wip/exynos/dp-integ
+On Wed, Nov 19, 2014 at 10:24:52AM +0800, Yijing Wang wrote:
+> >> We need, some platforms pass NULL pointer as host bridge parent.
+> > 
+> > Yijing,
+> > 
+> > May I suggest a different approach here? Rather than having to pass an opaque
+> > pointer that gets converted by the host bridge driver back to the private
+> > structure, what about promoting a new style of usage, that is similar to the
+> > way device drivers work? Lets try to promote the embedding of the generic
+> > pci_host_bridge structure in the host bridge specific structure! Then we can
+> > access the private data doing container_of().
+> > 
+> > Something like this:
+> > 
+> > struct pci_controller {
+> > 	struct pci_host_bridge bridge;
+> > 	/* private host bridge data here */
+> > 	.....
+> > };
+> > 
+> > #define PCI_CONTROLLER(bus)	({
+> > 	struct pci_host_bridge *hb = to_pci_host_bridge(bus->bridge); \
+> > 	container_of(hb, struct pci_controller, bridge); })
+> > 
+> > 
+> > Then we can retrieve the host bridge structure from everywhere we have a device.
 > 
-> doesn't peach pi require the same dts modification as peach pit/snow?
-> 
+> Hi Liviu, it looks good to me, because this change will involve lots platforms,
+> I would think more about it. Thanks for your suggestion very much! :)
 
-No, because the Peach Pit and Snow have an eDP to LVDS bridge chip but the
-Peach Pi does not have a bridge. Ajay's series is to add DRM bridge support
-to Exynos Display Port driver and so is only relevant to Snow and Pit.
+Given that I also look at this area maybe we should join forces and divide the problem?
 
 Best regards,
-Javier
+Liviu
+
+> 
+> 
+> Thanks!
+> Yijing.
+> 
+> > 
+> > Best regards,
+> > Liviu
+> > 
+> >>
+> >>>
+> >>>> +	host = kzalloc(sizeof(*host), GFP_KERNEL);
+> >>>> +	if (!host)
+> >>>> +		return NULL;
+> >>>
+> >>> devm_kzalloc maybe?
+> >>
+> >> I don't know much detail about devm_kzalloc(), but we have no pci host driver
+> >> here, and I found no devm_kzalloc() uses in core PCI code before.
+> >>
+> >>>
+> >>>> +	if (!resources) {
+> >>>> +		/* Use default IO/MEM/BUS resources*/
+> >>>> +		pci_add_resource(&host->windows, &ioport_resource);
+> >>>> +		pci_add_resource(&host->windows, &iomem_resource);
+> >>>> +		pci_add_resource(&host->windows, &busn_resource);
+> >>>> +	} else {
+> >>>> +		list_for_each_entry_safe(window, n, resources, list)
+> >>>> +			list_move_tail(&window->list, &host->windows);
+> >>>> +	}
+> >>>
+> >>> I think we should assume that the correct resources are passed. You
+> >>> could add a wrapper around this function to convert old platforms
+> >>> though.
+> >>
+> >> OK, I will move these code out of pci_create_host_bridge, and add a wrapper
+> >> to setup the default resources.
+> >>
+> >>>
+> >>>> +EXPORT_SYMBOL(pci_create_host_bridge);
+> >>>
+> >>> EXPORT_SYMBOL_GPL() maybe?
+> >>
+> >> OK, will update it.
+> >>
+> >>>
+> >>>> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> >>>> index 8b11b38..daa7f40 100644
+> >>>> --- a/include/linux/pci.h
+> >>>> +++ b/include/linux/pci.h
+> >>>> @@ -402,7 +402,12 @@ struct pci_host_bridge_window {
+> >>>>  struct pci_host_bridge {
+> >>>>  	struct device dev;
+> >>>>  	struct pci_bus *bus;		/* root bus */
+> >>>> +	struct list_head list;
+> >>>>  	struct list_head windows;	/* pci_host_bridge_windows */
+> >>>> +	int busnum;
+> >>>
+> >>> The busnum should already be implied through the bus resource.
+> >>
+> >> Yes, I will consider remove it and introduce a helper function to get the root bus number, thanks!
+> >>
+> >> Thanks!
+> >> Yijing.
+> >>
+> >>>
+> >>> 	Arnd
+> >>>
+> >>> .
+> >>>
+> >>
+> >>
+> >> -- 
+> >> Thanks!
+> >> Yijing
+> >>
+> >> --
+> >> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> >> the body of a message to majordomo at vger.kernel.org
+> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >>
+> > 
+> 
+> 
+> -- 
+> Thanks!
+> Yijing
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
+
+-- 
+-------------------
+   .oooO
+   (   )
+    \ (  Oooo.
+     \_) (   )
+          ) /
+         (_/
+
+ One small step
+   for me ...
