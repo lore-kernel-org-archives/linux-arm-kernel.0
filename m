@@ -1,70 +1,120 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Wed, 19 Nov 2014 10:19:40 +0530
-Subject: [[PATCHv2] 3/3] drivers/rtc/rtc-snvs: Add clock support
-In-Reply-To: <20141119011721.GA24042@dragon>
-References: <cover.1415364391.git.maitysanchayan@gmail.com>
- <30e496ce2d6521e608df3b68b73b3e05caa1daef.1415364391.git.maitysanchayan@gmail.com>
- <7807253ec0fd349b5bb1489e0d3b1347@agner.ch> <546320D3.2030501@gmail.com>
- <20141112104735.GK2704@dragon> <54644295.2050003@gmail.com>
- <20141119011721.GA24042@dragon>
-Message-ID: <546C2164.3040708@gmail.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Wed, 19 Nov 2014 13:14:27 +0800
+Subject: [PATCH] ARM/ARM64: support KVM_IOEVENTFD
+In-Reply-To: <1416324255-30116-1-git-send-email-ming.lei@canonical.com>
+References: <1416324255-30116-1-git-send-email-ming.lei@canonical.com>
+Message-ID: <CACVXFVPfeUpwobFrN466NbG2hmJqKqvEnj2dCGkL==L4s6fGKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 November 2014 06:47 AM, Shawn Guo wrote:
-> On Thu, Nov 13, 2014 at 11:03:09AM +0530, Sanchayan Maity wrote:
->> On Wednesday 12 November 2014 04:17 PM, Shawn Guo wrote:
->>> On Wed, Nov 12, 2014 at 02:26:51PM +0530, Sanchayan Maity wrote:
->>>> On Wednesday 12 November 2014 02:57 AM, Stefan Agner wrote:
->>>>> On 2014-11-07 14:04, Sanchayan Maity wrote:
->>>>>> This patch adds clock enable and disable support for
->>>>>> the SNVS peripheral, which is required for using the
->>>>>> RTC within the SNVS block.
->>>>>
->>>>> What happens if the device tree node is there while this patch is not
->>>>> applied? I guess the driver would load, but since the clocks of the
->>>>> peripheral are not enabled the first register access would lead to bus
->>>>> error or similar. If this is the case, this would break bisectability.
->>>>> You should move the device tree patch to the end.
->>>>>
->>>>
->>>> If the DT node was present with this patch not applied, the driver would 
->>>> still crash with a bus error, since the clocks for SNVS are not explicitly 
->>>> enabled anywhere else. I had not thought about any problems which might 
->>>> occur later with git bisect. Will move this to the end with v3.
->>>
->>> Since changes on rtc-snvs.c will need to go through RTC subsystem tree,
->>> that means I cannot apply DTS changes until the driver patch gets
->>> mainlined and appears on my tree.
->>>
->>> Shawn
->>
->> Shawn
->>
->> So the approach in this patch is OK and acceptable? 
-> 
-> Yes, I'm fine with it.
-> 
-> Shawn
+On Tue, Nov 18, 2014 at 11:24 PM, Ming Lei <ming.lei@canonical.com> wrote:
+> From Documentation/virtual/kvm/api.txt, all ARCHs should support
+> ioeventfd.
+>
+> Also ARM VM has supported PCI bus already, and ARM64 will do too,
+> ioeventfd is required for some popular devices, like virtio-blk
+> and virtio-scsi dataplane in QEMU.
+>
+> Without this patch, virtio-blk-pci dataplane can't work in QEMU.
 
+Please ignore this one because eventfd.o is missed to build in arm64.
 
-Hello Alessandro, 
-
-Sorry I missed adding you while sending this patch set.
-
-Can you take this third patch, in this series through your RTC subsytem
-tree? Or should I resend this third patch separately?
-
-Regards,
-Sanchayan.
-
-> 
->>
->> Since the DT changes cannot be applied by you, till this goes through the 
->> RTC subsystem tree, gets mainlined and appears on your tree, I will send out 
->> this patch by itself then and send the DT changes later once this gets
->> mainlined?
->>
->> I did not CC Alessandro Zummo, the maintainer of RTC subsystem by mistake.
->> Once you ACK/OK this i will send out this patch in isolation then or just 
->> CC Alessandro Zummo.
+>
+> Signed-off-by: Ming Lei <ming.lei@canonical.com>
+> ---
+>  arch/arm/kvm/Kconfig   |    1 +
+>  arch/arm/kvm/Makefile  |    2 +-
+>  arch/arm/kvm/arm.c     |    1 +
+>  arch/arm/kvm/mmio.c    |   19 +++++++++++++++++++
+>  arch/arm64/kvm/Kconfig |    1 +
+>  5 files changed, 23 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+> index 466bd29..25bd83a 100644
+> --- a/arch/arm/kvm/Kconfig
+> +++ b/arch/arm/kvm/Kconfig
+> @@ -23,6 +23,7 @@ config KVM
+>         select HAVE_KVM_CPU_RELAX_INTERCEPT
+>         select KVM_MMIO
+>         select KVM_ARM_HOST
+> +       select HAVE_KVM_EVENTFD
+>         depends on ARM_VIRT_EXT && ARM_LPAE
+>         ---help---
+>           Support hosting virtualized guest machines. You will also
+> diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+> index f7057ed..859db09 100644
+> --- a/arch/arm/kvm/Makefile
+> +++ b/arch/arm/kvm/Makefile
+> @@ -15,7 +15,7 @@ AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
+>  AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
+>
+>  KVM := ../../../virt/kvm
+> -kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o
+> +kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
+>
+>  obj-y += kvm-arm.o init.o interrupts.o
+>  obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 9e193c8..d90d989 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -172,6 +172,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+>         case KVM_CAP_IRQCHIP:
+>                 r = vgic_present;
+>                 break;
+> +       case KVM_CAP_IOEVENTFD:
+>         case KVM_CAP_DEVICE_CTRL:
+>         case KVM_CAP_USER_MEMORY:
+>         case KVM_CAP_SYNC_MMU:
+> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+> index 4cb5a93..ee332a7 100644
+> --- a/arch/arm/kvm/mmio.c
+> +++ b/arch/arm/kvm/mmio.c
+> @@ -162,6 +162,21 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>         return 0;
+>  }
+>
+> +static int handle_io_bus_rw(struct kvm_vcpu *vcpu, gpa_t addr,
+> +                           int len, void *val, bool write)
+> +{
+> +       int idx, ret;
+> +
+> +       idx = srcu_read_lock(&vcpu->kvm->srcu);
+> +       if (write)
+> +               ret = kvm_io_bus_write(vcpu->kvm, KVM_MMIO_BUS, addr, len, val);
+> +       else
+> +               ret = kvm_io_bus_read(vcpu->kvm, KVM_MMIO_BUS, addr, len, val);
+> +       srcu_read_unlock(&vcpu->kvm->srcu, idx);
+> +
+> +       return ret;
+> +}
+> +
+>  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>                  phys_addr_t fault_ipa)
+>  {
+> @@ -200,6 +215,10 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>         if (vgic_handle_mmio(vcpu, run, &mmio))
+>                 return 1;
+>
+> +       if (!handle_io_bus_rw(vcpu, fault_ipa, mmio.len, &mmio.data,
+> +           mmio.is_write))
+> +               return 1;
+> +
+>         kvm_prepare_mmio(run, &mmio);
+>         return 0;
+>  }
+> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+> index 8ba85e9..642f57c 100644
+> --- a/arch/arm64/kvm/Kconfig
+> +++ b/arch/arm64/kvm/Kconfig
+> @@ -26,6 +26,7 @@ config KVM
+>         select KVM_ARM_HOST
+>         select KVM_ARM_VGIC
+>         select KVM_ARM_TIMER
+> +       select HAVE_KVM_EVENTFD
+>         ---help---
+>           Support hosting virtualized guest machines.
+>
+> --
+> 1.7.9.5
+>
