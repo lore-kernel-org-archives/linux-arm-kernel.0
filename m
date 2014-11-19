@@ -1,41 +1,320 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 19 Nov 2014 11:36:56 +0000
-Subject: [PATCH] arm/arm64: KVM: Handle traps of ICC_SRE_EL1 as RAZ/WI
-In-Reply-To: <1416396234-6887-1-git-send-email-ard.biesheuvel@linaro.org> (Ard
- Biesheuvel's message of "Wed, 19 Nov 2014 11:23:54 +0000")
-References: <1416396234-6887-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <87oas3bew7.fsf@approximate.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 19 Nov 2014 11:41:50 +0000
+Subject: [RFC PATCH v4 0/8] Introduce automatic DMA configuration for
+ IOMMU masters
+In-Reply-To: <546C7D36.7030400@samsung.com>
+References: <1415991397-9618-1-git-send-email-will.deacon@arm.com>
+ <546C7D36.7030400@samsung.com>
+Message-ID: <20141119114150.GD15985@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19 2014 at 11:23:54 am GMT, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> From: Christoffer Dall <christoffer.dall@linaro.org>
->
-> When running on a system with a GICv3, we currenly don't allow the guest
-> to access the system register interface of the GICv3.  We do this by
-> clearing the ICC_SRE_EL2.Enable, which causes all guest accesses to
-> ICC_SRE_EL1 to trap to EL2 and causes all guest accesses to other ICC_
-> registers to cause an undefined exception in the guest.
->
-> However, we currently don't handle the trap of guest accesses to
-> ICC_SRE_EL1 and will spill out a warning.  The trap just needs to handle
-> the access as RAZ/WI, and a guest that tries to prod this register and
-> set ICC_SRE_EL1.SRE=1, must read back the value (which Linux already
-> does) to see if it succeeded, and will thus observe that ICC_SRE_EL1.SRE
-> was not set.
->
-> Add the simple trap handler in the sorted table of the system registers.
->
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> [ardb: added cp15 handling]
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> v3: add handling for 32-bit *guests* not 32-bit hosts
+Hi Marek,
 
-Looks good to me. I'll queue it up as a fix for the next RC.
+On Wed, Nov 19, 2014 at 11:21:26AM +0000, Marek Szyprowski wrote:
+> On 2014-11-14 19:56, Will Deacon wrote:
+> > Hello everybody,
+> >
+> > Here is the fourth iteration of the RFC I've previously posted here:
+> >
+> >    RFCv1: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/283023.html
+> >    RFCv2: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/283752.html
+> >    RFCv3: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/287031.html
+> >
+> > Changes since RFCv3 include:
+> >
+> >    - Drastic simplification of the data structures, so that we no longer
+> >      pass around lists of domains. Instead, dma-mapping is expected to
+> >      allocate the domain (Joerg talked about adding a get_default_domain
+> >      operation to iommu_ops).
+> >
+> >    - iommu_ops is used to hold the per-instance IOMMU data
+> >
+> >    - Configuration of DMA segments added to of_dma_configure
+> >
+> > All feedback welcome.
+> 
+> I've rebased my Exynos SYSMMU patches on top of this patchset and it 
+> works fine,
+> You can find them in the "[PATCH v3 00/19] Exynos SYSMMU (IOMMU) 
+> integration with DT
+> and DMA-mapping subsystem" thread.
 
-Thanks,
+I just saw that and it looks great, thanks! FWIW, I'll take the first 3
+patches you have into my series in some shape or another.
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+> You can add to all your patches:
+> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+
+Cheers.
+
+> I'm also interested in adding get_default_domain() callback, but I 
+> assume that this
+> can be done once the basic patchset get merged. Do you plan to work on 
+> it, do you want
+> me to implement it?
+
+If Joerg isn't working on it already (I don't think he is), then please
+do have a go if you have time. You'll probably want to avoid adding devices
+with addressing restrictions (i.e. non-zero dma_pfn_offset, weird dma masks)
+to the default domain, otherwise you'll run into issues initialising the
+iova allocator.
+
+I had a go at getting ARM dma-mapping to use a hypothetical
+get_default_domain function, so I've included the diff I ended up with below,
+in case it's at all useful.
+
+Will
+
+--->8
+
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index f3c0d953f6a2..5071553bf6b8 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -121,14 +121,9 @@ static inline unsigned long dma_max_pfn(struct device *dev)
+ }
+ #define dma_max_pfn(dev) dma_max_pfn(dev)
+ 
+-static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base,
+-				      u64 size, struct iommu_ops *iommu,
+-				      bool coherent)
+-{
+-	if (coherent)
+-		set_dma_ops(dev, &arm_coherent_dma_ops);
+-}
+ #define arch_setup_dma_ops arch_setup_dma_ops
++extern void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
++			       struct iommu_ops *iommu, bool coherent);
+ 
+ static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+ {
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index c245d903927f..da2c2667bbb1 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1849,7 +1849,8 @@ struct dma_map_ops iommu_coherent_ops = {
+  * arm_iommu_attach_device function.
+  */
+ struct dma_iommu_mapping *
+-arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
++__arm_iommu_create_mapping(struct iommu_domain *domain, dma_addr_t base,
++			   size_t size)
+ {
+ 	unsigned int bits = size >> PAGE_SHIFT;
+ 	unsigned int bitmap_size = BITS_TO_LONGS(bits) * sizeof(long);
+@@ -1883,17 +1884,12 @@ arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
+ 	mapping->extensions = extensions;
+ 	mapping->base = base;
+ 	mapping->bits = BITS_PER_BYTE * bitmap_size;
++	mapping->domain = domain;
+ 
+ 	spin_lock_init(&mapping->lock);
+ 
+-	mapping->domain = iommu_domain_alloc(bus);
+-	if (!mapping->domain)
+-		goto err4;
+-
+ 	kref_init(&mapping->kref);
+ 	return mapping;
+-err4:
+-	kfree(mapping->bitmaps[0]);
+ err3:
+ 	kfree(mapping->bitmaps);
+ err2:
+@@ -1901,6 +1897,23 @@ err2:
+ err:
+ 	return ERR_PTR(err);
+ }
++
++struct dma_iommu_mapping *
++arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
++{
++	struct dma_iommu_mapping *mapping;
++	struct iommu_domain *domain;
++
++	domain = iommu_domain_alloc(bus);
++	if (!domain)
++		return ERR_PTR(-ENOMEM);
++
++	mapping = __arm_iommu_create_mapping(domain, base, size);
++	if (IS_ERR(mapping))
++		iommu_domain_free(domain);
++
++	return mapping;
++}
+ EXPORT_SYMBOL_GPL(arm_iommu_create_mapping);
+ 
+ static void release_iommu_mapping(struct kref *kref)
+@@ -1948,9 +1961,8 @@ EXPORT_SYMBOL_GPL(arm_iommu_release_mapping);
+  *	arm_iommu_create_mapping)
+  *
+  * Attaches specified io address space mapping to the provided device,
+- * this replaces the dma operations (dma_map_ops pointer) with the
+- * IOMMU aware version. More than one client might be attached to
+- * the same io address space mapping.
++ * More than one client might be attached to the same io address space
++ * mapping.
+  */
+ int arm_iommu_attach_device(struct device *dev,
+ 			    struct dma_iommu_mapping *mapping)
+@@ -1963,7 +1975,6 @@ int arm_iommu_attach_device(struct device *dev,
+ 
+ 	kref_get(&mapping->kref);
+ 	dev->archdata.mapping = mapping;
+-	set_dma_ops(dev, &iommu_ops);
+ 
+ 	pr_debug("Attached IOMMU controller to %s device.\n", dev_name(dev));
+ 	return 0;
+@@ -1975,7 +1986,6 @@ EXPORT_SYMBOL_GPL(arm_iommu_attach_device);
+  * @dev: valid struct device pointer
+  *
+  * Detaches the provided device from a previously attached map.
+- * This voids the dma operations (dma_map_ops pointer)
+  */
+ void arm_iommu_detach_device(struct device *dev)
+ {
+@@ -1990,10 +2000,141 @@ void arm_iommu_detach_device(struct device *dev)
+ 	iommu_detach_device(mapping->domain, dev);
+ 	kref_put(&mapping->kref, release_iommu_mapping);
+ 	dev->archdata.mapping = NULL;
+-	set_dma_ops(dev, NULL);
+ 
+ 	pr_debug("Detached IOMMU controller from %s device.\n", dev_name(dev));
+ }
+ EXPORT_SYMBOL_GPL(arm_iommu_detach_device);
+ 
+-#endif
++static struct dma_map_ops *arm_get_iommu_dma_map_ops(bool coherent)
++{
++	return coherent ? &iommu_coherent_ops : &iommu_ops;
++}
++
++struct dma_iommu_mapping_entry {
++	struct list_head		list;
++	struct dma_iommu_mapping	*mapping;
++	struct iommu_domain		*domain;
++	u64				dma_base;
++	u64				size;
++	struct kref			kref;
++};
++
++static DEFINE_SPINLOCK(dma_iommu_mapping_lock);
++static LIST_HEAD(dma_iommu_mapping_table);
++
++static void __remove_iommu_mapping_entry(struct kref *kref)
++{
++	struct dma_iommu_mapping_entry *entry;
++
++	entry = container_of(kref, struct dma_iommu_mapping_entry, kref);
++	list_del(&entry->list);
++}
++
++static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
++				    struct iommu_ops *iommu)
++{
++	struct iommu_domain *domain;
++	struct dma_iommu_mapping_entry *entry = NULL;
++
++	if (!iommu->get_default_domain)
++		return false;
++
++	domain = iommu->get_default_domain(dev);
++	if (!domain)
++		return false;
++
++	spin_lock(&dma_iommu_mapping_lock);
++
++	list_for_each_entry(entry, &dma_iommu_mapping_table, list) {
++		if (entry->domain == domain)
++			break;
++	}
++
++	/* Load entry->mapping after entry  -- not strictly necessary for ARM */
++	smp_read_barrier_depends();
++
++	if (!entry) {
++		struct dma_iommu_mapping *mapping;
++
++		entry = kzalloc(sizeof(*entry), GFP_ATOMIC);
++		if (!entry)
++			goto err_unlock;
++
++		entry->domain	= domain;
++		entry->dma_base	= dma_base;
++		entry->size	= size;
++		kref_init(&entry->kref);
++		list_add(&entry->list, &dma_iommu_mapping_table);
++		spin_unlock(&dma_iommu_mapping_lock);
++
++		mapping = __arm_iommu_create_mapping(domain, dma_base, size);
++		if (!IS_ERR(mapping))
++			return false;
++
++		smp_wmb();
++		entry->mapping = mapping;
++	} else if (entry->mapping) {
++		if (entry->dma_base > dma_base || entry->size > size)
++			goto err_unlock;
++
++		kref_get(&entry->kref);
++		spin_unlock(&dma_iommu_mapping_lock);
++	} else {
++		/* Racing on the same IOMMU */
++		goto err_unlock;
++	}
++
++	if (arm_iommu_attach_device(dev, entry->mapping)) {
++		int entry_dead;
++
++		pr_warn("Failed to attached device %s to IOMMU mapping\n",
++				dev_name(dev));
++		spin_lock(&dma_iommu_mapping_lock);
++		entry_dead = kref_put(&entry->kref,
++				      __remove_iommu_mapping_entry);
++		spin_unlock(&dma_iommu_mapping_lock);
++
++		if (entry_dead) {
++			entry->mapping->domain = NULL;
++			arm_iommu_release_mapping(entry->mapping);
++		}
++
++		return false;
++	}
++
++	return true;
++
++err_unlock:
++	spin_unlock(&dma_iommu_mapping_lock);
++	return false;
++}
++
++#else
++
++static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
++				    struct iommu_ops *iommu)
++{
++	return false;
++}
++
++#define arm_get_iommu_dma_map_ops arm_get_dma_map_ops
++
++#endif	/* CONFIG_ARM_DMA_USE_IOMMU */
++
++static struct dma_map_ops *arm_get_dma_map_ops(bool coherent)
++{
++	return coherent ? &arm_coherent_dma_ops : &arm_dma_ops;
++}
++
++void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
++			struct iommu_ops *iommu, bool coherent)
++{
++	struct dma_map_ops *dma_ops;
++
++	if (arm_setup_iommu_dma_ops(dev, dma_base, size, iommu))
++		dma_ops = arm_get_iommu_dma_map_ops(coherent);
++	else
++		dma_ops = arm_get_dma_map_ops(coherent);
++
++	set_dma_ops(dev, dma_ops);
++}
