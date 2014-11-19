@@ -1,131 +1,72 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Wed, 19 Nov 2014 13:16:21 +0800
-Subject: [PATCH v1] ARM/ARM64: support KVM_IOEVENTFD
-Message-ID: <1416374181-28415-1-git-send-email-ming.lei@canonical.com>
+From: smoch@web.de (Soeren Moch)
+Date: Wed, 19 Nov 2014 06:26:43 +0100
+Subject: [PATCH 1/3] ARM: dts: imx6: add pm_power_off support for i.mx6
+ chips
+In-Reply-To: <20141119031823.GC27759@dragon>
+References: <1415780439-29728-1-git-send-email-b38343@freescale.com>
+ <1415780439-29728-2-git-send-email-b38343@freescale.com>
+ <20141119031823.GC27759@dragon>
+Message-ID: <546C2A13.3010307@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From Documentation/virtual/kvm/api.txt, all ARCHs should support
-ioeventfd.
 
-Also ARM VM has supported PCI bus already, and ARM64 will do too,
-ioeventfd is required for some popular devices, like virtio-blk
-and virtio-scsi dataplane in QEMU.
+On 19.11.2014 04:18, Shawn Guo wrote:
+> On Wed, Nov 12, 2014 at 04:20:37PM +0800, Robin Gong wrote:
+>> All chips of i.mx6 can be powered off by programming SNVS.
+>> For example :
+>> On i.mx6q-sabresd board, PMIC_ON_REQ connect with external
+>> pmic ON/OFF pin, that will cause the whole PMIC powered off
+>> except VSNVS. And system can restart once PMIC_ON_REQ goes
+>> high by push POWRER key.
+>>
+>> Signed-off-by: Robin Gong <b38343@freescale.com>
+>> ---
+>>  arch/arm/boot/dts/imx6qdl-sabresd.dtsi |    4 ++++
+>>  arch/arm/boot/dts/imx6qdl.dtsi         |    6 ++++++
+>>  arch/arm/boot/dts/imx6sl-evk.dts       |    4 ++++
+>>  arch/arm/boot/dts/imx6sl.dtsi          |    6 ++++++
+>>  arch/arm/boot/dts/imx6sx-sdb.dts       |    4 ++++
+>>  arch/arm/boot/dts/imx6sx.dtsi          |    6 ++++++
+>>  6 files changed, 30 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+>> index 07fb302..ba12cc6 100644
+>> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+>> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+>> @@ -531,6 +531,10 @@
+>>  	status = "okay";
+>>  };
+>>  
+>> +&snvs-poweroff {
+>> +	status = "okay";
+>> +};"
+>> +
+>>  &ssi2 {
+>>  	status = "okay";
+>>  };
+>> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+>> index c701af9..3a032d1 100644
+>> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+>> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+>> @@ -645,6 +645,12 @@
+>>  					interrupts = <0 19 IRQ_TYPE_LEVEL_HIGH>,
+>>  						     <0 20 IRQ_TYPE_LEVEL_HIGH>;
+>>  				};
+>> +
+>> +				snvs-poweroff: snvs-poweroff at 38 {
+> 
+> I'm not sure if it's because my DTC version is too low or you didn't
+> test, the DTC reports error in label name 'snvs-poweroff'.  IIRC, hyphen
+> '-' cannot be used in label name, but underscore '_' can.
+> 
+> Shawn
 
-Without this patch, virtio-blk-pci dataplane can't work in QEMU.
+In the patch series "[PATCH v4 0/3] add power off driver for i.mx6" from
+Sep 26 (what I have tested) snvs_poweroff was used. This worked as expected.
 
-This patch has been tested on both ARM and ARM64.
+So this series "[PATCH v4 0/3] add power off driver for i.mx6" (sent on
+Nov 12) apparently contains old patches and is not simply resent as
+stated in the cover letter.
 
-Signed-off-by: Ming Lei <ming.lei@canonical.com>
----
-v1:
-	- make eventfd.o built in ARM64
- arch/arm/kvm/Kconfig    |    1 +
- arch/arm/kvm/Makefile   |    2 +-
- arch/arm/kvm/arm.c      |    1 +
- arch/arm/kvm/mmio.c     |   19 +++++++++++++++++++
- arch/arm64/kvm/Kconfig  |    1 +
- arch/arm64/kvm/Makefile |    2 +-
- 6 files changed, 24 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index 466bd29..25bd83a 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -23,6 +23,7 @@ config KVM
- 	select HAVE_KVM_CPU_RELAX_INTERCEPT
- 	select KVM_MMIO
- 	select KVM_ARM_HOST
-+	select HAVE_KVM_EVENTFD
- 	depends on ARM_VIRT_EXT && ARM_LPAE
- 	---help---
- 	  Support hosting virtualized guest machines. You will also
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index f7057ed..859db09 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -15,7 +15,7 @@ AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
- AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
- 
- KVM := ../../../virt/kvm
--kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o
-+kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
- 
- obj-y += kvm-arm.o init.o interrupts.o
- obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 9e193c8..d90d989 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -172,6 +172,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- 	case KVM_CAP_IRQCHIP:
- 		r = vgic_present;
- 		break;
-+	case KVM_CAP_IOEVENTFD:
- 	case KVM_CAP_DEVICE_CTRL:
- 	case KVM_CAP_USER_MEMORY:
- 	case KVM_CAP_SYNC_MMU:
-diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-index 4cb5a93..ee332a7 100644
---- a/arch/arm/kvm/mmio.c
-+++ b/arch/arm/kvm/mmio.c
-@@ -162,6 +162,21 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	return 0;
- }
- 
-+static int handle_io_bus_rw(struct kvm_vcpu *vcpu, gpa_t addr,
-+			    int len, void *val, bool write)
-+{
-+	int idx, ret;
-+
-+	idx = srcu_read_lock(&vcpu->kvm->srcu);
-+	if (write)
-+		ret = kvm_io_bus_write(vcpu->kvm, KVM_MMIO_BUS, addr, len, val);
-+	else
-+		ret = kvm_io_bus_read(vcpu->kvm, KVM_MMIO_BUS, addr, len, val);
-+	srcu_read_unlock(&vcpu->kvm->srcu, idx);
-+
-+	return ret;
-+}
-+
- int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		 phys_addr_t fault_ipa)
- {
-@@ -200,6 +215,10 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	if (vgic_handle_mmio(vcpu, run, &mmio))
- 		return 1;
- 
-+	if (!handle_io_bus_rw(vcpu, fault_ipa, mmio.len, &mmio.data,
-+	    mmio.is_write))
-+		return 1;
-+
- 	kvm_prepare_mmio(run, &mmio);
- 	return 0;
- }
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index 8ba85e9..642f57c 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -26,6 +26,7 @@ config KVM
- 	select KVM_ARM_HOST
- 	select KVM_ARM_VGIC
- 	select KVM_ARM_TIMER
-+	select HAVE_KVM_EVENTFD
- 	---help---
- 	  Support hosting virtualized guest machines.
- 
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index 32a0961..2e6b827 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -11,7 +11,7 @@ ARM=../../../arch/arm/kvm
- 
- obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
- 
--kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/arm.o $(ARM)/mmu.o $(ARM)/mmio.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
- 
--- 
-1.7.9.5
+Soeren
