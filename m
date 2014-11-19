@@ -1,128 +1,66 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Wed, 19 Nov 2014 10:24:52 +0800
-Subject: [RFC PATCH 07/16] PCI: Separate pci_host_bridge creation out
- of pci_create_root_bus()
-In-Reply-To: <20141118144819.GK12037@e106497-lin.cambridge.arm.com>
-References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
- <1416219710-26088-8-git-send-email-wangyijing@huawei.com>
- <2507218.mHliopJb05@wuerfel> <546B041A.4060403@huawei.com>
- <20141118144819.GK12037@e106497-lin.cambridge.arm.com>
-Message-ID: <546BFF74.4030101@huawei.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 18 Nov 2014 18:29:08 -0800
+Subject: [PATCH 6/8] ARM: add machine name to stack dump output
+In-Reply-To: <E1XqSw6-0002EZ-Kc@rmk-PC.arm.linux.org.uk>
+References: <20141117202911.GZ4042@n2100.arm.linux.org.uk>
+ <E1XqSw6-0002EZ-Kc@rmk-PC.arm.linux.org.uk>
+Message-ID: <546C0074.4040101@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> We need, some platforms pass NULL pointer as host bridge parent.
-> 
-> Yijing,
-> 
-> May I suggest a different approach here? Rather than having to pass an opaque
-> pointer that gets converted by the host bridge driver back to the private
-> structure, what about promoting a new style of usage, that is similar to the
-> way device drivers work? Lets try to promote the embedding of the generic
-> pci_host_bridge structure in the host bridge specific structure! Then we can
-> access the private data doing container_of().
-> 
-> Something like this:
-> 
-> struct pci_controller {
-> 	struct pci_host_bridge bridge;
-> 	/* private host bridge data here */
-> 	.....
-> };
-> 
-> #define PCI_CONTROLLER(bus)	({
-> 	struct pci_host_bridge *hb = to_pci_host_bridge(bus->bridge); \
-> 	container_of(hb, struct pci_controller, bridge); })
-> 
-> 
-> Then we can retrieve the host bridge structure from everywhere we have a device.
+On 11/17/2014 12:30 PM, Russell King wrote:
+> The generic dump_stack() code provides the facility to include the
+> machine name in the stack dump, which can be useful information.  Add
+> a call to dump_stack_set_arch_desc() for the generic code to print
+> this information.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/kernel/setup.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index c03106378b49..8361652b6dab 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -900,6 +900,7 @@ void __init setup_arch(char **cmdline_p)
+>  		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
+>  	machine_desc = mdesc;
+>  	machine_name = mdesc->name;
+> +	dump_stack_set_arch_desc("%s", mdesc->name);
+>  
 
-Hi Liviu, it looks good to me, because this change will involve lots platforms,
-I would think more about it. Thanks for your suggestion very much! :)
+Would it be possible to use the DT machine name here if we're on a DT
+platform? If we're using the generic DT machine descriptor this won't
+show much of anything besides "Generic DT based system".
 
+---8<----
 
-Thanks!
-Yijing.
-
-> 
-> Best regards,
-> Liviu
-> 
->>
->>>
->>>> +	host = kzalloc(sizeof(*host), GFP_KERNEL);
->>>> +	if (!host)
->>>> +		return NULL;
->>>
->>> devm_kzalloc maybe?
->>
->> I don't know much detail about devm_kzalloc(), but we have no pci host driver
->> here, and I found no devm_kzalloc() uses in core PCI code before.
->>
->>>
->>>> +	if (!resources) {
->>>> +		/* Use default IO/MEM/BUS resources*/
->>>> +		pci_add_resource(&host->windows, &ioport_resource);
->>>> +		pci_add_resource(&host->windows, &iomem_resource);
->>>> +		pci_add_resource(&host->windows, &busn_resource);
->>>> +	} else {
->>>> +		list_for_each_entry_safe(window, n, resources, list)
->>>> +			list_move_tail(&window->list, &host->windows);
->>>> +	}
->>>
->>> I think we should assume that the correct resources are passed. You
->>> could add a wrapper around this function to convert old platforms
->>> though.
->>
->> OK, I will move these code out of pci_create_host_bridge, and add a wrapper
->> to setup the default resources.
->>
->>>
->>>> +EXPORT_SYMBOL(pci_create_host_bridge);
->>>
->>> EXPORT_SYMBOL_GPL() maybe?
->>
->> OK, will update it.
->>
->>>
->>>> diff --git a/include/linux/pci.h b/include/linux/pci.h
->>>> index 8b11b38..daa7f40 100644
->>>> --- a/include/linux/pci.h
->>>> +++ b/include/linux/pci.h
->>>> @@ -402,7 +402,12 @@ struct pci_host_bridge_window {
->>>>  struct pci_host_bridge {
->>>>  	struct device dev;
->>>>  	struct pci_bus *bus;		/* root bus */
->>>> +	struct list_head list;
->>>>  	struct list_head windows;	/* pci_host_bridge_windows */
->>>> +	int busnum;
->>>
->>> The busnum should already be implied through the bus resource.
->>
->> Yes, I will consider remove it and introduce a helper function to get the root bus number, thanks!
->>
->> Thanks!
->> Yijing.
->>
->>>
->>> 	Arnd
->>>
->>> .
->>>
->>
->>
->> -- 
->> Thanks!
->> Yijing
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
-> 
-
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index c03106378b49..3a49baf4f54c 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -893,6 +893,7 @@ void __init hyp_mode_check(void)
+ void __init setup_arch(char **cmdline_p)
+ {
+ 	const struct machine_desc *mdesc;
++	const char *name;
+ 
+ 	setup_processor();
+ 	mdesc = setup_machine_fdt(__atags_pointer);
+@@ -900,6 +901,11 @@ void __init setup_arch(char **cmdline_p)
+ 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
+ 	machine_desc = mdesc;
+ 	machine_name = mdesc->name;
++	if (mdesc->nr == ~0)
++		name = of_flat_dt_get_machine_name();
++	else
++		name = mdesc->name;
++	dump_stack_set_arch_desc("%s", name);
+ 
+ 	if (mdesc->reboot_mode != REBOOT_HARD)
+ 		reboot_mode = mdesc->reboot_mode;
 
 -- 
-Thanks!
-Yijing
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
