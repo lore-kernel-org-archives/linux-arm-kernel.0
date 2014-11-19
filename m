@@ -1,39 +1,117 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Nov 2014 14:40:49 +0100
-Subject: [PATCH RFC] ARM: option for loading modules into vmalloc area
-In-Reply-To: <546B8C64.3010904@samsung.com>
-References: <20141118172146.3784.81151.stgit@buzz>
- <20141118173413.GB4042@n2100.arm.linux.org.uk> <546B8C64.3010904@samsung.com>
-Message-ID: <2041617.Kxhx5O4MMr@wuerfel>
+Date: Wed, 19 Nov 2014 14:47:25 +0100
+Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
+In-Reply-To: <546C7FDD.7030906@ti.com>
+References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
+ <1709760.E0jX3Myv0h@wuerfel> <546C7FDD.7030906@ti.com>
+Message-ID: <2900095.WIocOu7ue2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 November 2014 21:13:56 Konstantin Khlebnikov wrote:
-> On 2014-11-18 20:34, Russell King - ARM Linux wrote:
-> > On Tue, Nov 18, 2014 at 08:21:46PM +0400, Konstantin Khlebnikov wrote:
-> >> Usually modules are loaded into small area prior to the kernel
-> >> text because they are linked with the kernel using short calls.
-> >> Compile-time instrumentation like GCOV or KASAN bloats code a lot,
-> >> and as a result huge modules no longer fit into reserved area.
-> >>
-> >> This patch adds option CONFIG_MODULES_USE_VMALLOC which lifts
-> >> limitation on amount of loaded modules. It links modules using
-> >> long-calls (option -mlong-calls) and loads them into vmalloc area.
-> >>
-> >> In few places exported symbols are called from inline assembly.
-> >> This patch adds macro for such call sites: __asmbl and __asmbl_clobber.
-> >> Call turns into single 'bl' or sequence 'movw; movt; blx' depending on
-> >> context and state of config option.
-> >>
-> >> Unfortunately this option isn't compatible with CONFIG_FUNCTION_TRACER.
-> >> Compiler emits short calls to profiling function despite of -mlong-calls.
-> >> This is a bug in GCC, but ftrace anyway needs an update to handle this.
-> > It also isn't compatible with the older architectures which don't have
-> > "blx".
+On Wednesday 19 November 2014 13:32:45 Grygorii Strashko wrote:
+> On 11/18/2014 09:32 PM, Arnd Bergmann wrote:
+> > On Tuesday 18 November 2014 20:54:36 Grygorii Strashko wrote:
+> > 
+> > Have one pmdomain driver in the generic code that knows about clocks,
+> > possibly also regulators and pins and just turns them on when needed.
+> > You can have a "simple-pmdomain" or "generic-pmdomain" compatible
+> > string.
+> > 
+> > I'm a bit surprised that your pmdomain code looks up the clocks from the
+> > respective device, rather than know about the clocks itself. There is
+> > probably a good reason for this, but I don't see it yet.
 > 
-> Ok, I'll add "depends on CPU_V6 || CPU_V7" I don't think that it is 
-> necessary for older cpus.
+> The keystone 2 uses simple PM schema based on clocks only:
+> - clocks enabled -> dev is active
+> - clocks disabled -> dev is suspended
+> 
+> To achieve explained above the Generic clock manipulation PM callbacks framework (pm_clk) is used.
+> - list of managed clocks is filled for each device (for non-DT case the con_id list
+>   is specified by platform code like:
+> 	.con_ids = { "fck", "master", "slave", NULL }, 
+>         - or - 
+> 	.con_ids = { }, <-- in this case only first clock will be added to pm_clk
+>   )
+> - dev.pm_domain is assigned to pm_clk_domain
+> - pm_clk_domain has .runtime_resume/runtime_suspend callbacks set and implemented like:
+>   static int keystone_pm_runtime_suspend(struct device *dev)
+>   {
+> 	ret = pm_generic_runtime_suspend(dev);
+> 	if (ret)
+> 		return ret;
+> 
+> 	ret = pm_clk_suspend(dev);
+> 	if (ret) {
+> 		pm_generic_runtime_resume(dev);
+> 		return ret;
+> 	}
+> 
+> 	return 0;
+>   }
+>   static int keystone_pm_runtime_resume(struct device *dev)
+>   {
+> 	pm_clk_resume(dev);
+> 
+> 	return pm_generic_runtime_resume(dev);
+>   }
+> Now this configuration can be done from Platform Bus notifier (clock_ops.c) only and It'll
+> be done for ALL Platform devices and, once above steps have been done, the Runtime PM
+> starts working for device.
+> 
+> As was described early in this thread, Keystone 2 PM domain is glue layer which
+> allows:
+>  - configure pm_clk for devices from DT and get rid of .con_ids
+>  - configure only selected devices
+>  - get rid of using Platform Bus notifier
+>  - enable suspend/resume for devices as side effect :)
+> and which manages state of its devices through dev_ops->start()/stop() callbacks. 
 
-Why not just use a different branch instruction for the older CPUs?
+Right, that makes a lot more sense now, thanks for the detailed explanation!
+
+> > Another option would be to have a special case for an empty
+> > "power-domains" property if this is the most common case: if that
+> > property exists but is empty, the pmdomain core could interpret
+> > it as an indication to control all the clocks/regulators/pins
+> > of a device.
+> 
+> I can try to do the following:
+> - move Keystone PM domain code in drivers/base/power/simple_domain.c
+> - add DT bindings like:
+> +	clk_pmdomain: simple-clk-pmdomain {
+> +		compatible = "simple-clk-pmdomain", "simple-pmdomain";
+> +		#power-domain-cells = <0>;
+> +	};
+> - in case if compatible == "simple-clk-pmdomain" it will do the same sings as in this patch
+> 
+> In the future, additional support for regulators/clocks/gpios can be added and these resources
+> can be managed in .power_on/power_off.
+> 
+> Is it ok for you?
+
+Yes, it would definitely solve the problem that I see with the infrastructure
+code that the current version adds into the platform directory.
+
+The exact binding of course should be reviewed by the pmdomain and
+DT maintainers, to ensure that it is done the best possible way, because
+I assume we will end up using it a lot, and it would be a shame to get
+it slightly wrong.
+
+One possible variation I can think of would be to just use "simple-pmdomain"
+as the compatible string, and use properties in the node itself to decide
+what the domain should control, e.g.
+
+	clk_pmdomain: pmdomain {
+		compatible = "simple-pmdomain";
+		pmdomain-enable-clocks;
+		#power-domain-cells = <0>;
+	};
+	clk_regulator_pmdomain: pmdomain {
+		compatible = "simple-pmdomain";
+		pmdomain-enable-clocks;
+		pmdomain-enable-regulators;
+		#power-domain-cells = <0>;
+	};
+
+and then have each device link to one of the nodes as the pmdomain.
 
 	Arnd
