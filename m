@@ -1,40 +1,71 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 19 Nov 2014 10:45:15 +0000
-Subject: [PATCH] MAINTAINERS: Add ahci_st.c to ARCH/STI architecture
-In-Reply-To: <1416386694-7402-1-git-send-email-peter.griffin@linaro.org>
-References: <1416386694-7402-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20141119104515.GJ13959@x1>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 19 Nov 2014 11:45:37 +0100
+Subject: [RESEND PATCH 1/2] mmc: atmel-mci: remove compat for non DT board
+ when requesting dma chan
+In-Reply-To: <1415975785-30303-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1415975785-30303-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <CAPDyKFp6O-OzmpBkddexXYM5=7hq-4pn5ASu68mmvGU=HmyLeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Nov 2014, Peter Griffin wrote:
+On 14 November 2014 15:36, Ludovic Desroches
+<ludovic.desroches@atmel.com> wrote:
+> All boards with a dma controller have DT support so using
+> dma_request_slave_channel_compat is no more needed.
+>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-> This patch adds the ahci_st.c driver found on STMicroelectronics
-> stih41x consumer electronics SoC's into the STI arch section
-> of the maintainers file.
-> 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Thanks! Applied for next.
+
+Kind regards
+Uffe
+
+
 > ---
->  MAINTAINERS | 1 +
->  1 file changed, 1 insertion(+)
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index a20df9b..2b0a53e 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1430,6 +1430,7 @@ F:	drivers/tty/serial/st-asc.c
->  F:	drivers/usb/dwc3/dwc3-st.c
->  F:	drivers/usb/host/ehci-st.c
->  F:	drivers/usb/host/ohci-st.c
-> +F:	drivers/ata/ahci_st.c
->  
->  ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
->  M:	Lennert Buytenhek <kernel@wantstofly.org>
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>
+> Sorry for the noise, typo in cc list.
+>
+>  drivers/mmc/host/atmel-mci.c | 20 +-------------------
+>  1 file changed, 1 insertion(+), 19 deletions(-)
+>
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index a7b59ba..de2287c 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -2272,23 +2272,6 @@ static void atmci_cleanup_slot(struct atmel_mci_slot *slot,
+>         mmc_free_host(slot->mmc);
+>  }
+>
+> -static bool atmci_filter(struct dma_chan *chan, void *pdata)
+> -{
+> -       struct mci_platform_data *sl_pdata = pdata;
+> -       struct mci_dma_data *sl;
+> -
+> -       if (!sl_pdata)
+> -               return false;
+> -
+> -       sl = sl_pdata->dma_slave;
+> -       if (sl && find_slave_dev(sl) == chan->device->dev) {
+> -               chan->private = slave_data_ptr(sl);
+> -               return true;
+> -       } else {
+> -               return false;
+> -       }
+> -}
+> -
+>  static bool atmci_configure_dma(struct atmel_mci *host)
+>  {
+>         struct mci_platform_data        *pdata;
+> @@ -2302,8 +2285,7 @@ static bool atmci_configure_dma(struct atmel_mci *host)
+>         dma_cap_zero(mask);
+>         dma_cap_set(DMA_SLAVE, mask);
+>
+> -       host->dma.chan = dma_request_slave_channel_compat(mask, atmci_filter, pdata,
+> -                                                         &host->pdev->dev, "rxtx");
+> +       host->dma.chan = dma_request_slave_channel(&host->pdev->dev, "rxtx");
+>         if (!host->dma.chan) {
+>                 dev_warn(&host->pdev->dev, "no DMA channel available\n");
+>                 return false;
+> --
+> 2.0.3
+>
