@@ -1,40 +1,54 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 19 Nov 2014 17:07:58 +0100
-Subject: [PATCH RESEND 4/4] ARM: at91/dt: add trng node
-In-Reply-To: <1416413278-10197-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1416413278-10197-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1416413278-10197-5-git-send-email-boris.brezillon@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Nov 2014 16:07:47 +0000
+Subject: [PATCH RFC] ARM: option for loading modules into vmalloc area
+In-Reply-To: <CAKv+Gu-rYWutr-45MsZH6KOhhUyNCVLfkO9JQrqCm1L6ms_DUg@mail.gmail.com>
+References: <20141118172146.3784.81151.stgit@buzz>
+ <20141118173413.GB4042@n2100.arm.linux.org.uk>
+ <546B8C64.3010904@samsung.com> <2041617.Kxhx5O4MMr@wuerfel>
+ <CAKv+Gu-8qhHYOry+LsDzp+LDZqYxVZ5G7cj48E3G2Unp2+=_yg@mail.gmail.com>
+ <CALYGNiMt2A3DP02cOtxqu4RrnmhojrDxkRG7bkHMByUnzG+PeA@mail.gmail.com>
+ <CAKv+Gu-rYWutr-45MsZH6KOhhUyNCVLfkO9JQrqCm1L6ms_DUg@mail.gmail.com>
+Message-ID: <20141119160747.GH4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a DT node for the TRNG (True Random Number Generator) block.
+On Wed, Nov 19, 2014 at 05:02:40PM +0100, Ard Biesheuvel wrote:
+> On 19 November 2014 16:52, Konstantin Khlebnikov <koct9i@gmail.com> wrote:
+> > Do you mean ldr pc, =symbol ?
+> >
+> > In this case I get this error:
+> >
+> > /tmp/ccAHtONU.s: Assembler messages:
+> > /tmp/ccAHtONU.s:220: Error: invalid literal constant: pool needs to be closer
+> >
+> > Probably constant pool doesn't work well in inline assembly.
+> >
+> >
+> > Something like this seems work:
+> >
+> > add     lr, pc, #4
+> > ldr       pc, [pc, #-4]
+> > .long symbol
+> >
+> 
+> You can add a '.ltorg' instruction which tells the assembler to dump
+> the literal pool, but you still need to jump over it, i.e.,
+> 
+> adr lr, 0f
+> ldr pc, =symbol
+> .ltorg
+> 0:
 
-Keep this block enabled as it does not depend on any external connection,
-and thus should be available on all boards.
+Which is not a good idea either, because the compiler needs to know how
+far away its own manually generated literal pool is from the instructions
+which reference it.  The .ltorg statement can end up emitting any number
+of literals at that point, which makes it indeterminant how many words
+are contained within the asm() statement.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/at91sam9g45.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+Yes, it isn't desirable to waste an entire data cache line per indirect
+call like the original quote above, but I don't see a practical
+alternative.
 
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 932a669..790c890 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -934,6 +934,13 @@
- 				status = "disabled";
- 			};
- 
-+			trng at fffcc000 {
-+				compatible = "atmel,at91sam9g45-trng";
-+				reg = <0xfffcc000 0x4000>;
-+				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 0>;
-+				clocks = <&trng_clk>;
-+			};
-+
- 			i2c0: i2c at fff84000 {
- 				compatible = "atmel,at91sam9g10-i2c";
- 				reg = <0xfff84000 0x100>;
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
