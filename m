@@ -1,72 +1,278 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 19 Nov 2014 10:25:58 +0100
-Subject: [PATCH v3 0/3] Make Armada 375 use the reference clock when
- possible
-In-Reply-To: <1415107293-19258-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1415107293-19258-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <546C6226.5000900@linaro.org>
+Date: Wed, 19 Nov 2014 10:31:08 +0100
+Subject: [PATCH v7 06/10] ARM: clocksource: add asm9260_timer driver
+In-Reply-To: <1413875672-7894-7-git-send-email-linux@rempel-privat.de>
+References: <1413875672-7894-1-git-send-email-linux@rempel-privat.de>
+ <1413875672-7894-7-git-send-email-linux@rempel-privat.de>
+Message-ID: <546C635C.50900@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2014 02:21 PM, Ezequiel Garcia wrote:
-> Hi Daniel, Wim:
+On 10/21/2014 09:14 AM, Oleksij Rempel wrote:
+> In some cases asm9260 looks similar to iMX2x. One of exceptions is
+> timer controller. So this patch introduces new driver for this special case.
 >
-> Seems we are ready to merge these, unless some objection raises. Do you think
-> you can take the patches through your trees?
+> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
 
-Hi Wim,
+Looks good to me.
 
-I can take through my tree the entire patchset if you want but I need 
-your blessing for the watchdog part.
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Thanks
-   -- Daniel
-
-> Changes from v2:
+> ---
+>   drivers/clocksource/Kconfig         |   4 +
+>   drivers/clocksource/Makefile        |   1 +
+>   drivers/clocksource/asm9260_timer.c | 220 ++++++++++++++++++++++++++++++++++++
+>   3 files changed, 225 insertions(+)
+>   create mode 100644 drivers/clocksource/asm9260_timer.c
 >
->    * Fix messed up empty lines, as suggested by Thomas Petazzoni.
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index cfd6519..6a03d34 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -216,4 +216,8 @@ config CLKSRC_VERSATILE
+>   	  ARM Versatile, RealView and Versatile Express reference
+>   	  platforms.
 >
-> Changes from v1:
->
->    * Make the A375 timer and watchdog devicetree binding match the hardware
->      and require the two available clocks: core and reference clock.
->
-> This series adds support for the 25 MHz reference clock available on
-> Armada 375 SoC to be used on the timer and watchdog drivers. It is
-> similar to the one present in Armada XP SoC.
->
-> Given we initially had access to only a very early SoC revision (A375 Z1)
-> and due to a hardware issue, the timer and watchdog support was originally
-> submitted to use the core clock.
->
-> Now that the A0 SoC revision is out, we can fix this and use the reference
-> clock. The reason for this change is that the core clock is subject to the
-> SSCG (Spread Spectrum Clock Generator), so boards where SSCG is enabled
-> exhibit a very large timer drift.
->
-> Notice that this change will produce unpleseant results on A375 Z1, given the
-> reference 25 MHz clock doesn't work properly on that SoC revision.
->
-> But since the Z1 revision is not supported by the recently submitted A375
-> network driver (mvpp2), and therefore nobody is expected to run mainline
-> (if there are users at all of this early revision), the support will be
-> dropped entirely in a near future.
->
-> To prevent any compatibility issues when booting with an older devicetree,
-> this series provides proper fall backs in each case.
->
-> The series applies on v3.18-rc2.
->
-> Ezequiel Garcia (3):
->    clocksource: armada-370-xp: Add missing clock enable
->    watchdog: orion: Use the reference clock on Armada 375 SoC
->    clocksource: armada-370-xp: Use the reference clock on A375 SoC
->
->   .../bindings/timer/marvell,armada-370-xp-timer.txt |  9 +++--
->   .../devicetree/bindings/watchdog/marvel.txt        | 13 +++++++
->   drivers/clocksource/time-armada-370-xp.c           | 30 ++++++++++++++++
->   drivers/watchdog/orion_wdt.c                       | 42 +++++++++++++++++++++-
->   4 files changed, 90 insertions(+), 4 deletions(-)
+> +config ASM9260_TIMER
+> +	select CLKSRC_MMIO
+> +	bool
+> +
+>   endmenu
+> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> index 7fd9fd1..fc93854 100644
+> --- a/drivers/clocksource/Makefile
+> +++ b/drivers/clocksource/Makefile
+> @@ -44,3 +44,4 @@ obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
+>   obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
+>   obj-$(CONFIG_ARCH_KEYSTONE)		+= timer-keystone.o
+>   obj-$(CONFIG_CLKSRC_VERSATILE)		+= versatile.o
+> +obj-$(CONFIG_ASM9260_TIMER)		+= asm9260_timer.o
+> diff --git a/drivers/clocksource/asm9260_timer.c b/drivers/clocksource/asm9260_timer.c
+> new file mode 100644
+> index 0000000..12cab34
+> --- /dev/null
+> +++ b/drivers/clocksource/asm9260_timer.c
+> @@ -0,0 +1,220 @@
+> +/*
+> + * Copyright (C) 2014 Oleksij Rempel <linux@rempel-privat.de>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version 2
+> + * of the License, or (at your option) any later version.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/sched.h>
+> +#include <linux/clk.h>
+> +#include <linux/clocksource.h>
+> +#include <linux/clockchips.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/bitops.h>
+> +
+> +#define DRIVER_NAME	"asm9260-timer"
+> +
+> +/*
+> + * this device provide 4 offsets for each register:
+> + * 0x0 - plain read write mode
+> + * 0x4 - set mode, OR logic.
+> + * 0x8 - clr mode, XOR logic.
+> + * 0xc - togle mode.
+> + */
+> +#define SET_REG 4
+> +#define CLR_REG 8
+> +
+> +#define HW_IR           0x0000 /* RW. Interrupt */
+> +#define BM_IR_CR0	BIT(4)
+> +#define BM_IR_MR3	BIT(3)
+> +#define BM_IR_MR2	BIT(2)
+> +#define BM_IR_MR1	BIT(1)
+> +#define BM_IR_MR0	BIT(0)
+> +
+> +#define HW_TCR		0x0010 /* RW. Timer controller */
+> +/* BM_C*_RST
+> + * Timer Counter and the Prescale Counter are synchronously reset on the
+> + * next positive edge of PCLK. The counters remain reset until TCR[1] is
+> + * returned to zero. */
+> +#define BM_C3_RST	BIT(7)
+> +#define BM_C2_RST	BIT(6)
+> +#define BM_C1_RST	BIT(5)
+> +#define BM_C0_RST	BIT(4)
+> +/* BM_C*_EN
+> + * 1 - Timer Counter and Prescale Counter are enabled for counting
+> + * 0 - counters are disabled */
+> +#define BM_C3_EN	BIT(3)
+> +#define BM_C2_EN	BIT(2)
+> +#define BM_C1_EN	BIT(1)
+> +#define BM_C0_EN	BIT(0)
+> +
+> +#define HW_DIR		0x0020 /* RW. Direction? */
+> +/* 00 - count up
+> + * 01 - count down
+> + * 10 - ?? 2^n/2 */
+> +#define BM_DIR_COUNT_UP		0
+> +#define BM_DIR_COUNT_DOWN	1
+> +#define BM_DIR0_SHIFT	0
+> +#define BM_DIR1_SHIFT	4
+> +#define BM_DIR2_SHIFT	8
+> +#define BM_DIR3_SHIFT	12
+> +#define BM_DIR_DEFAULT		(BM_DIR_COUNT_UP << BM_DIR0_SHIFT | \
+> +				 BM_DIR_COUNT_UP << BM_DIR1_SHIFT | \
+> +				 BM_DIR_COUNT_UP << BM_DIR2_SHIFT | \
+> +				 BM_DIR_COUNT_UP << BM_DIR3_SHIFT)
+> +
+> +#define HW_TC0		0x0030 /* RO. Timer counter 0 */
+> +/* HW_TC*. Timer counter owerflow (0xffff.ffff to 0x0000.0000) do not generate
+> + * interrupt. This registers can be used to detect overflow */
+> +#define HW_TC1          0x0040
+> +#define HW_TC2		0x0050
+> +#define HW_TC3		0x0060
+> +
+> +#define HW_PR		0x0070 /* RW. prescaler */
+> +#define BM_PR_DISABLE	0
+> +#define HW_PC		0x0080 /* RO. Prescaler counter */
+> +#define HW_MCR		0x0090 /* RW. Match control */
+> +/* enable interrupt on match */
+> +#define BM_MCR_INT_EN(n)	(1 << (n * 3 + 0))
+> +/* enable TC reset on match */
+> +#define BM_MCR_RES_EN(n)	(1 << (n * 3 + 1))
+> +/* enable stop TC on match */
+> +#define BM_MCR_STOP_EN(n)	(1 << (n * 3 + 2))
+> +
+> +#define HW_MR0		0x00a0 /* RW. Match reg */
+> +#define HW_MR1		0x00b0
+> +#define HW_MR2		0x00C0
+> +#define HW_MR3		0x00D0
+> +
+> +#define HW_CTCR		0x0180 /* Counter control */
+> +#define BM_CTCR0_SHIFT	0
+> +#define BM_CTCR1_SHIFT	2
+> +#define BM_CTCR2_SHIFT	4
+> +#define BM_CTCR3_SHIFT	6
+> +#define BM_CTCR_TM	0	/* Timer mode. Every rising PCLK edge. */
+> +#define BM_CTCR_DEFAULT	(BM_CTCR_TM << BM_CTCR0_SHIFT | \
+> +			 BM_CTCR_TM << BM_CTCR1_SHIFT | \
+> +			 BM_CTCR_TM << BM_CTCR2_SHIFT | \
+> +			 BM_CTCR_TM << BM_CTCR3_SHIFT)
+> +
+> +static struct asm9260_timer_priv {
+> +	void __iomem *base;
+> +	unsigned long ticks_per_jiffy;
+> +} priv;
+> +
+> +static int asm9260_timer_set_next_event(unsigned long delta,
+> +					 struct clock_event_device *evt)
+> +{
+> +	/* configure match count for TC0 */
+> +	writel_relaxed(delta, priv.base + HW_MR0);
+> +	/* enable TC0 */
+> +	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + SET_REG);
+> +	return 0;
+> +}
+> +
+> +static void asm9260_timer_set_mode(enum clock_event_mode mode,
+> +				    struct clock_event_device *evt)
+> +{
+> +	/* stop timer0 */
+> +	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + CLR_REG);
+> +
+> +	switch (mode) {
+> +	case CLOCK_EVT_MODE_PERIODIC:
+> +		/* disable reset and stop on match */
+> +		writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
+> +				priv.base + HW_MCR + CLR_REG);
+> +		/* configure match count for TC0 */
+> +		writel_relaxed(priv.ticks_per_jiffy, priv.base + HW_MR0);
+> +		/* enable TC0 */
+> +		writel_relaxed(BM_C0_EN, priv.base + HW_TCR + SET_REG);
+> +		break;
+> +	case CLOCK_EVT_MODE_ONESHOT:
+> +		/* enable reset and stop on match */
+> +		writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
+> +				priv.base + HW_MCR + SET_REG);
+> +		break;
+> +	default:
+> +		break;
+> +	}
+> +}
+> +
+> +static struct clock_event_device event_dev = {
+> +	.name		= DRIVER_NAME,
+> +	.rating		= 200,
+> +	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+> +	.set_next_event	= asm9260_timer_set_next_event,
+> +	.set_mode	= asm9260_timer_set_mode,
+> +};
+> +
+> +static irqreturn_t asm9260_timer_interrupt(int irq, void *dev_id)
+> +{
+> +	struct clock_event_device *evt = dev_id;
+> +
+> +	evt->event_handler(evt);
+> +
+> +	writel_relaxed(BM_IR_MR0, priv.base + HW_IR);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +/*
+> + * ---------------------------------------------------------------------------
+> + * Timer initialization
+> + * ---------------------------------------------------------------------------
+> + */
+> +static void __init asm9260_timer_init(struct device_node *np)
+> +{
+> +	int irq;
+> +	struct clk *clk;
+> +	int ret;
+> +	unsigned long rate;
+> +
+> +	priv.base = of_io_request_and_map(np, 0, DRIVER_NAME);
+> +	if (!priv.base)
+> +		panic("%s: unable to map resource", DRIVER_NAME);
+> +
+> +	clk = of_clk_get(np, 0);
+> +
+> +	ret = clk_prepare_enable(clk);
+> +	if (ret)
+> +		panic("Failed to enable clk!\n");
+> +
+> +	irq = irq_of_parse_and_map(np, 0);
+> +	ret = request_irq(irq, asm9260_timer_interrupt, IRQF_TIMER,
+> +			DRIVER_NAME, &event_dev);
+> +	if (ret)
+> +		panic("Failed to setup irq!\n");
+> +
+> +	/* set all timers for count-up */
+> +	writel_relaxed(BM_DIR_DEFAULT, priv.base + HW_DIR);
+> +	/* disable divider */
+> +	writel_relaxed(BM_PR_DISABLE, priv.base + HW_PR);
+> +	/* make sure all timers use every rising PCLK edge. */
+> +	writel_relaxed(BM_CTCR_DEFAULT, priv.base + HW_CTCR);
+> +	/* enable interrupt for TC0 and clean setting for all other lines */
+> +	writel_relaxed(BM_MCR_INT_EN(0) , priv.base + HW_MCR);
+> +
+> +	rate = clk_get_rate(clk);
+> +	clocksource_mmio_init(priv.base + HW_TC1, DRIVER_NAME, rate,
+> +			200, 32, clocksource_mmio_readl_up);
+> +
+> +	/* Seems like we can't use counter without match register even if
+> +	 * actions for MR are disabled. So, set MR to max value. */
+> +	writel_relaxed(0xffffffff, priv.base + HW_MR1);
+> +	/* enable TC1 */
+> +	writel_relaxed(BM_C1_EN, priv.base + HW_TCR + SET_REG);
+> +
+> +	priv.ticks_per_jiffy = DIV_ROUND_CLOSEST(rate, HZ);
+> +	event_dev.cpumask = cpumask_of(0);
+> +	clockevents_config_and_register(&event_dev, rate, 0x2c00, 0xfffffffe);
+> +}
+> +CLOCKSOURCE_OF_DECLARE(asm9260_timer, "alphascale,asm9260-timer",
+> +		asm9260_timer_init);
 >
 
 
