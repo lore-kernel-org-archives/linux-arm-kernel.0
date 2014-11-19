@@ -1,64 +1,37 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 19 Nov 2014 10:42:55 +0000
-Subject: [PATCH 2/7] phy: miphy365x: Pass sysconfig register offsets via
- syscfg dt property.
-In-Reply-To: <1416385632-5832-3-git-send-email-peter.griffin@linaro.org>
-References: <1416385632-5832-1-git-send-email-peter.griffin@linaro.org>
- <1416385632-5832-3-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20141119104255.GI13959@x1>
+Date: Wed, 19 Nov 2014 10:45:15 +0000
+Subject: [PATCH] MAINTAINERS: Add ahci_st.c to ARCH/STI architecture
+In-Reply-To: <1416386694-7402-1-git-send-email-peter.griffin@linaro.org>
+References: <1416386694-7402-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20141119104515.GJ13959@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, 19 Nov 2014, Peter Griffin wrote:
 
-> Based on Arnds review comments here https://lkml.org/lkml/2014/11/13/161, update
-> the miphy365 phy driver to access sysconfig register offsets via syscfg dt property.
+> This patch adds the ahci_st.c driver found on STMicroelectronics
+> stih41x consumer electronics SoC's into the STI arch section
+> of the maintainers file.
 > 
-> This is because the reg property should not be mixing address spaces like it does
-> currently for miphy365. This change then also aligns us to how other platforms such
-> as keystone and bcm7445 pass there syscon offsets via DT.
-> 
-> This patch breaks DT compatibility, but this platform is considered WIP, and is only
-> used by a few developers who are upstreaming support for it. This change has been done
-> as a single atomic commit to ensure it is bisectable.
-
-You should wrap your lines sooner (70-75 chars).
-
 > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 > ---
->  .../devicetree/bindings/phy/phy-miphy365x.txt      | 15 +++++------
->  arch/arm/boot/dts/stih416.dtsi                     | 10 ++++----
->  drivers/phy/phy-miphy365x.c                        | 29 ++++++++--------------
->  3 files changed, 23 insertions(+), 31 deletions(-)
+>  MAINTAINERS | 1 +
+>  1 file changed, 1 insertion(+)
 
-[...]
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-> diff --git a/drivers/phy/phy-miphy365x.c b/drivers/phy/phy-miphy365x.c
-> index 801afaf..7308afe 100644
-> --- a/drivers/phy/phy-miphy365x.c
-> +++ b/drivers/phy/phy-miphy365x.c
-
-[...]
-
->  		phy_set_drvdata(phy, miphy_dev->phys[port]);
-> +
->  		port++;
-> +		/*sysconfig offsets are not indexed from zero */
-
-You're missing a ' ' afrer '/*'.
-
-Probably better do say what they _are_ indexed from, rather than what
-they're not.
-
-> +		ret = of_property_read_u32_index(np, "st,syscfg", port,
-> +					&miphy_phy->ctrlreg);
-> +		if (ret) {
-> +			dev_err(&pdev->dev, "No sysconfig offset found\n");
-> +			return ret;
-> +		}
->  	}
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index a20df9b..2b0a53e 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1430,6 +1430,7 @@ F:	drivers/tty/serial/st-asc.c
+>  F:	drivers/usb/dwc3/dwc3-st.c
+>  F:	drivers/usb/host/ehci-st.c
+>  F:	drivers/usb/host/ohci-st.c
+> +F:	drivers/ata/ahci_st.c
 >  
->  	provider = devm_of_phy_provider_register(&pdev->dev, miphy365x_xlate);
+>  ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
+>  M:	Lennert Buytenhek <kernel@wantstofly.org>
 
 -- 
 Lee Jones
