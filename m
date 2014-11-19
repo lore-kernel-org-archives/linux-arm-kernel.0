@@ -1,43 +1,163 @@
 From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Wed, 19 Nov 2014 17:04:45 +0100
-Subject: [PATCH 0/6] PCI: MMCONFIG clean up
-Message-ID: <1416413091-13452-1-git-send-email-tomasz.nowicki@linaro.org>
+Date: Wed, 19 Nov 2014 17:04:46 +0100
+Subject: [PATCH 1/6] x86, acpi,
+ pci: Reorder logic of pci_mmconfig_insert() function
+In-Reply-To: <1416413091-13452-1-git-send-email-tomasz.nowicki@linaro.org>
+References: <1416413091-13452-1-git-send-email-tomasz.nowicki@linaro.org>
+Message-ID: <1416413091-13452-2-git-send-email-tomasz.nowicki@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MMCFG ACPI table has no arch dependencies so it can be used across all
-architectures. Currently MMCONFIG related code resides in arch/x86 directories.
-This patch set is goint to isolate non-architecure specific code and make
-it accessible from drivers/pci/ directory.
+This patch is the first step of MMCONFIG refactoring process.
 
-Tomasz Nowicki (6):
-  x86, acpi, pci: Reorder logic of pci_mmconfig_insert() function
-  x86, acpi, pci: Move arch-agnostic MMCFG code out of arch/x86/
-    directory
-  x86, acpi, pci: Move PCI config space accessors.
-  x86, acpi, pci: mmconfig_{32,64}.c code refactoring - remove code
-    duplication.
-  x86, acpi, pci: mmconfig_64.c becomes default implementation for arch
-    agnostic low-level direct PCI config space accessors via MMCONFIG.
-  pci, acpi: Share ACPI PCI config space accessors.
+Code that uses pci_mmcfg_lock will be moved to common file and become
+accessible for all architectures. pci_mmconfig_insert() cannot be moved
+so easily since it is mixing generic mmcfg code with x86 specific logic
+inside of mutual exclusive block guarded by pci_mmcfg_lock.
 
- arch/x86/include/asm/pci.h     |  42 +++++
- arch/x86/include/asm/pci_x86.h |  72 --------
- arch/x86/pci/Makefile          |   5 +-
- arch/x86/pci/acpi.c            |   1 +
- arch/x86/pci/init.c            |   1 +
- arch/x86/pci/mmconfig-shared.c | 242 ++++---------------------
- arch/x86/pci/mmconfig_32.c     |  11 +-
- arch/x86/pci/mmconfig_64.c     | 153 ----------------
- drivers/acpi/Makefile          |   1 +
- drivers/acpi/bus.c             |   1 +
- drivers/acpi/mmconfig.c        | 396 +++++++++++++++++++++++++++++++++++++++++
- include/linux/mmconfig.h       |  62 +++++++
- include/linux/pci.h            |   8 -
- 13 files changed, 541 insertions(+), 454 deletions(-)
- delete mode 100644 arch/x86/pci/mmconfig_64.c
- create mode 100644 drivers/acpi/mmconfig.c
- create mode 100644 include/linux/mmconfig.h
+To get rid of that constraint we reorder actions as fallow:
+1. mmconfig entry allocation can be done at first, does not need lock
+2. insertion to iomem_resource has its own lock, no need to wrap it into mutex
+3. insertion to mmconfig list can be done as the final stage in separate
+function (candidate for further factoring)
 
+Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+---
+ arch/x86/pci/mmconfig-shared.c | 100 ++++++++++++++++++++++-------------------
+ 1 file changed, 54 insertions(+), 46 deletions(-)
+
+diff --git a/arch/x86/pci/mmconfig-shared.c b/arch/x86/pci/mmconfig-shared.c
+index 326198a..ac24e1c 100644
+--- a/arch/x86/pci/mmconfig-shared.c
++++ b/arch/x86/pci/mmconfig-shared.c
+@@ -692,6 +692,39 @@ static int __init pci_mmcfg_late_insert_resources(void)
+  */
+ late_initcall(pci_mmcfg_late_insert_resources);
+ 
++static int __init pci_mmconfig_inject(struct pci_mmcfg_region *cfg)
++{
++	struct pci_mmcfg_region *cfg_conflict;
++	int err = 0;
++
++	mutex_lock(&pci_mmcfg_lock);
++	cfg_conflict = pci_mmconfig_lookup(cfg->segment, cfg->start_bus);
++	if (cfg_conflict) {
++		if (cfg_conflict->end_bus < cfg->end_bus)
++			pr_info(FW_INFO "MMCONFIG for "
++				"domain %04x [bus %02x-%02x] "
++				"only partially covers this bridge\n",
++				cfg_conflict->segment, cfg_conflict->start_bus,
++				cfg_conflict->end_bus);
++		err = -EEXIST;
++		goto out;
++	}
++
++	if (pci_mmcfg_arch_map(cfg)) {
++		pr_warn("fail to map MMCONFIG %pR.\n", &cfg->res);
++		err = -ENOMEM;
++		goto out;
++	} else {
++		list_add_sorted(cfg);
++		pr_info("MMCONFIG at %pR (base %#lx)\n",
++			&cfg->res, (unsigned long)cfg->address);
++
++	}
++out:
++	mutex_unlock(&pci_mmcfg_lock);
++	return err;
++}
++
+ /* Add MMCFG information for host bridges */
+ int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
+ 			phys_addr_t addr)
+@@ -703,66 +736,41 @@ int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
+ 	if (!(pci_probe & PCI_PROBE_MMCONF) || pci_mmcfg_arch_init_failed)
+ 		return -ENODEV;
+ 
+-	if (start > end)
++	if (start > end || !addr)
+ 		return -EINVAL;
+ 
+-	mutex_lock(&pci_mmcfg_lock);
+-	cfg = pci_mmconfig_lookup(seg, start);
+-	if (cfg) {
+-		if (cfg->end_bus < end)
+-			dev_info(dev, FW_INFO
+-				 "MMCONFIG for "
+-				 "domain %04x [bus %02x-%02x] "
+-				 "only partially covers this bridge\n",
+-				  cfg->segment, cfg->start_bus, cfg->end_bus);
+-		mutex_unlock(&pci_mmcfg_lock);
+-		return -EEXIST;
+-	}
+-
+-	if (!addr) {
+-		mutex_unlock(&pci_mmcfg_lock);
+-		return -EINVAL;
+-	}
+-
+ 	rc = -EBUSY;
+ 	cfg = pci_mmconfig_alloc(seg, start, end, addr);
+ 	if (cfg == NULL) {
+ 		dev_warn(dev, "fail to add MMCONFIG (out of memory)\n");
+-		rc = -ENOMEM;
++		return -ENOMEM;
+ 	} else if (!pci_mmcfg_check_reserved(dev, cfg, 0)) {
+ 		dev_warn(dev, FW_BUG "MMCONFIG %pR isn't reserved\n",
+ 			 &cfg->res);
+-	} else {
+-		/* Insert resource if it's not in boot stage */
+-		if (pci_mmcfg_running_state)
+-			tmp = insert_resource_conflict(&iomem_resource,
+-						       &cfg->res);
+-
+-		if (tmp) {
+-			dev_warn(dev,
+-				 "MMCONFIG %pR conflicts with "
+-				 "%s %pR\n",
+-				 &cfg->res, tmp->name, tmp);
+-		} else if (pci_mmcfg_arch_map(cfg)) {
+-			dev_warn(dev, "fail to map MMCONFIG %pR.\n",
+-				 &cfg->res);
+-		} else {
+-			list_add_sorted(cfg);
+-			dev_info(dev, "MMCONFIG at %pR (base %#lx)\n",
+-				 &cfg->res, (unsigned long)addr);
+-			cfg = NULL;
+-			rc = 0;
+-		}
++		goto error;
+ 	}
+ 
+-	if (cfg) {
+-		if (cfg->res.parent)
+-			release_resource(&cfg->res);
+-		kfree(cfg);
++	/* Insert resource if it's not in boot stage */
++	if (pci_mmcfg_running_state)
++		tmp = insert_resource_conflict(&iomem_resource, &cfg->res);
++
++	if (tmp) {
++		dev_warn(dev,
++			 "MMCONFIG %pR conflicts with %s %pR\n",
++			 &cfg->res, tmp->name, tmp);
++		goto error;
+ 	}
+ 
+-	mutex_unlock(&pci_mmcfg_lock);
++	rc = pci_mmconfig_inject(cfg);
++	if (rc)
++		goto error;
++
++	return 0;
+ 
++error:
++	if (cfg->res.parent)
++		release_resource(&cfg->res);
++	kfree(cfg);
+ 	return rc;
+ }
+ 
 -- 
 1.9.1
