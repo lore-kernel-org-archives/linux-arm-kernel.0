@@ -1,64 +1,80 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 19 Nov 2014 18:11:58 +0000
-Subject: [PATCH] arm: perf: Prevent wraparound during overflow
-In-Reply-To: <1416412346-8759-1-git-send-email-daniel.thompson@linaro.org>
-References: <1416412346-8759-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20141119181158.GJ15985@arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 19 Nov 2014 13:22:46 -0500 (EST)
+Subject: [PATCH RFC] ARM: option for loading modules into vmalloc area
+In-Reply-To: <CAKv+Gu-q7Vdd=Buaz2x=8HASCpeY5D-RsOm-120bkOqmgtUeTw@mail.gmail.com>
+References: <20141118173413.GB4042@n2100.arm.linux.org.uk>
+ <546B8C64.3010904@samsung.com> <2041617.Kxhx5O4MMr@wuerfel>
+ <CAKv+Gu-8qhHYOry+LsDzp+LDZqYxVZ5G7cj48E3G2Unp2+=_yg@mail.gmail.com>
+ <CALYGNiMt2A3DP02cOtxqu4RrnmhojrDxkRG7bkHMByUnzG+PeA@mail.gmail.com>
+ <CAKv+Gu-rYWutr-45MsZH6KOhhUyNCVLfkO9JQrqCm1L6ms_DUg@mail.gmail.com>
+ <20141119160747.GH4042@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1411191130480.11690@knanqh.ubzr>
+ <20141119164902.GK4042@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1411191152340.11690@knanqh.ubzr>
+ <20141119165948.GM4042@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1411191205530.11690@knanqh.ubzr>
+ <CAKv+Gu-q7Vdd=Buaz2x=8HASCpeY5D-RsOm-120bkOqmgtUeTw@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1411191312110.11690@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 03:52:26PM +0000, Daniel Thompson wrote:
-> If the overflow threshold for a counter is set above or near the
-> 0xffffffff boundary then the kernel may lose track of the overflow
-> causing only events that occur *after* the overflow to be recorded.
-> Specifically the problem occurs when the value of the performance counter
-> overtakes its original programmed value due to wrap around.
-> 
-> Typical solutions to this problem are either to avoid programming in
-> values likely to be overtaken or to treat the overflow bit as the 33rd
-> bit of the counter.
-> 
-> Its somewhat fiddly to refactor the code to correctly handle the 33rd bit
-> during irqsave sections (context switches for example) so instead we take
-> the simpler approach of avoiding values likely to be overtaken.
-> 
-> We set the limit to half of max_period because this matches the limit
-> imposed in __hw_perf_event_init(). This causes a doubling of the interrupt
-> rate for large threshold values, however even with a very fast counter
-> ticking at 4GHz the interrupt rate would only be ~1Hz.
-> 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> ---
-> 
-> Notes:
->     There is similar code in the arm64 tree which retains the assumptions of
->     the original arm code regarding 32-bit wide performance counters. If
->     this patch doesn't get beaten up during review I'll also share a similar
->     patch for arm64.
->     
-> 
->  arch/arm/kernel/perf_event.c | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> index 266cba46db3e..b50a770f8c99 100644
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -115,8 +115,14 @@ int armpmu_event_set_period(struct perf_event *event)
->  		ret = 1;
->  	}
-> 
-> -	if (left > (s64)armpmu->max_period)
-> -		left = armpmu->max_period;
-> +	/*
-> +	 * Limit the maximum period to prevent the counter value
-> +	 * from overtaking the one we are about to program. In
-> +	 * effect we are reducing max_period to account for
-> +	 * interrupt latency (and we are being very conservative).
-> +	 */
-> +	if (left > (s64)(armpmu->max_period >> 1))
-> +		left = armpmu->max_period >> 1;
+On Wed, 19 Nov 2014, Ard Biesheuvel wrote:
 
-The s64 cast looks off here, can we just drop it entirely?
+> On 19 November 2014 18:12, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Wed, 19 Nov 2014, Russell King - ARM Linux wrote:
+> >
+> >> On Wed, Nov 19, 2014 at 11:57:15AM -0500, Nicolas Pitre wrote:
+> >> > On Wed, 19 Nov 2014, Russell King - ARM Linux wrote:
+> >> > > I don't think I ever did, because its pretty much impossible to do as I
+> >> > > explained in a follow up to this thread.
+> >> > >
+> >> > > We _used_ to do this with the userspace insmod methods, but since we got
+> >> > > this kernel-side linker, it's been pretty much impossible to do without
+> >> > > rewriting the module code.  That's not going to happen on account of one
+> >> > > quirky architecture which Linus doesn't particularly like.
+> >> >
+> >> > Still... We could try adding a hook in the generic module linker code
+> >> > for a pre-relocation pass.  Maybe only ARM would use it, but if the need
+> >> > to load big modules is real then I imagine Linus could be amenable to a
+> >> > compromise.
+> >>
+> >> So, how big a table would you allocate for the trampolines, based upon
+> >> not knowing anything about the module being loaded?  4K?  8K?  64K?
+> >
+> > The idea of a pre-relocation pass is to determine that.  That could be
+> > something similar to calling apply_relocate() twice: once to determine
+> > the number of trampoline entries, and a second time to perform the
+> > actual relocation.
+> >
+> 
+> Well, the veneers shouldn't take more than 3 words each, right?
+> 
+> ldr ip, [pc]
+> bx ip
+> .long symbol
 
-Will
+You could possibly do:
+
+ ldr pc, [pc, #-4]
+ .long symbol
+
+Or, as RMK suggested a while ago:
+
+.rep 8
+ldr pc, [pc, #(32 - 8)]
+.endr
+.long sym1, sym2, sym3, sym4, sym5, sym6, sym7, sym8
+
+The later is much nicer on the i and d caches.
+
+> and you would need at most one veneer per unique external symbol
+> referenced by one or more R_ARM_CALL relocations. Is there no way to
+> just add that to the static mem footprint as padding, and let the
+> loader populate it as needed at module relocation time?
+
+That's the actual question: how much padding do you need?  Everything 
+converge to that very problem.  We need to determine it without too much 
+impact on the generic module loader code.
+
+
+Nicolas
