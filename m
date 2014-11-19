@@ -1,64 +1,58 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Nov 2014 13:28:50 +0100
-Subject: [PATCH 3/5] PCI: Use pci_scan_bus_simple() in simple scene.
-In-Reply-To: <1416382369-13587-4-git-send-email-wangyijing@huawei.com>
-References: <1416382369-13587-1-git-send-email-wangyijing@huawei.com>
- <1416382369-13587-4-git-send-email-wangyijing@huawei.com>
-Message-ID: <3577231.2krnYe8yCU@wuerfel>
+Date: Wed, 19 Nov 2014 13:48:58 +0100
+Subject: For the problem when using swiotlb
+In-Reply-To: <20141119112910.GD7156@e104818-lin.cambridge.arm.com>
+References: <5469E26B.2010905@huawei.com> <1535751.CcvIi3DN4F@wuerfel>
+ <20141119112910.GD7156@e104818-lin.cambridge.arm.com>
+Message-ID: <1497289.TPKf3qDiKk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 November 2014 15:32:47 Yijing Wang wrote:
-> Use pci_scan_bus_simple() to scan pci buses with
-> the default IO/MEM/BUS resources. Use it instead
-> of pci_scan_bus() and pci_scan_bus_parented().
+On Wednesday 19 November 2014 11:29:10 Catalin Marinas wrote:
+> > The driver should call 'dma_set_mask_and_coherent()' with the appropriate
+> > dma mask, and check whether that succeeded. However, the code implementing
+> > dma_set_mask_and_coherent on arm64 also needs to be changed to look up
+> > the dma-ranges property (see of_dma_configure()), and check if the mask
+> > is possible.
 > 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> dma_set_mask_and_coherent() is a generic function. I think the
+> of_dma_configure() should start with a coherent_dma_mask based on
+> dma-ranges if given rather than defaulting to DMA_BIT_MASK(32). The
+> comment in of_dma_configure() says that devices should set up the
+> supported mask but it's not always up to them but the bus they are
+> connected to.
+> 
+> Something like below, untested:
+> 
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index 3b64d0bf5bba..dff34883db45 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -200,6 +200,10 @@ static void of_dma_configure(struct device *dev)
+>         /* DMA ranges found. Calculate and set dma_pfn_offset */
+>         dev->dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
+>         dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
+> +
+> +       /* Set the coherent_dma_mask based on the dma-ranges property */
+> +       if (size)
+> +               dev->coherent_dma_mask = DMA_BIT_MASK(ilog2(size));
+>  }
+>  
 > 
 
-I think we should replace pci_scan_bus_parented() with something better
-by making the xen code use pci_scan_root_bus() (see below for a draft
-patch). After that we no longer need the 'parent' argument here and we
-can just keep using the pci_scan_bus() function for the legacy users,
-or rename it if that helps.
+We have discussed this in the past, and the problem with this is
+that the actual mask depends both on the capabilities of the
+device and the bus. In particular, if the device can only do
+32-bit DMA, we must not set the mask to something higher.
+
+The normal rule here is that a driver that wants to do 64-bit
+DMA must call dma_set_mask_and_coherent() with the higher mask,
+while a device that can not access all of the 32-bit address space
+must call dma_set_mask_and_coherent() with the smaller mask
+before doing calling any of the other DMA interfaces.
+
+However, if the bus is not capable of addressing the entire
+32-bit range (as on some modern shmobile machines, or some of the
+really old machines), we need to limit the mask here already.
 
 	Arnd
-
-
-8<---
-
-diff --git a/drivers/pci/xen-pcifront.c b/drivers/pci/xen-pcifront.c
-index 116ca3746adb..45a4843a608a 100644
---- a/drivers/pci/xen-pcifront.c
-+++ b/drivers/pci/xen-pcifront.c
-@@ -448,6 +448,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
- 	struct pci_bus *b;
- 	struct pcifront_sd *sd = NULL;
- 	struct pci_bus_entry *bus_entry = NULL;
-+	LIST_HEAD(resources);
- 	int err = 0;
- 
- #ifndef CONFIG_PCI_DOMAINS
-@@ -470,17 +471,20 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
- 		err = -ENOMEM;
- 		goto err_out;
- 	}
-+	pci_add_resource(&resources, &ioport_resource);
-+	pci_add_resource(&resources, &iomem_resource);
- 	pcifront_init_sd(sd, domain, bus, pdev);
- 
- 	pci_lock_rescan_remove();
- 
--	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
--				  &pcifront_bus_ops, sd);
-+	b = pci_scan_root_bus(&pdev->xdev->dev, bus, &pcifront_bus_ops, sd,
-+			      &resources);
- 	if (!b) {
- 		dev_err(&pdev->xdev->dev,
- 			"Error creating PCI Frontend Bus!\n");
- 		err = -ENOMEM;
- 		pci_unlock_rescan_remove();
-+		pci_free_resource_list(&resources);
- 		goto err_out;
- 	}
- 
