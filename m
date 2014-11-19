@@ -1,51 +1,43 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 19 Nov 2014 15:43:30 +0100
-Subject: [STLinux Kernel] [PATCH] thermal: sti: Ignore suspend/resume
- functions when !PM
-In-Reply-To: <1416404939-365-1-git-send-email-lee.jones@linaro.org>
-References: <1416404939-365-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <546CAC92.3020504@st.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Nov 2014 14:50:15 +0000
+Subject: [PATCH 1/2] ARM: cache-l2x0: clean up aurora cache handling
+In-Reply-To: <1547660.4MUNEQsfAo@wuerfel>
+References: <1547660.4MUNEQsfAo@wuerfel>
+Message-ID: <20141119145015.GG4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Nov 19, 2014 at 03:40:12PM +0100, Arnd Bergmann wrote:
+> The aurora cache controller is the only remaining user of a couple
+> of functions in this file and are completely unused when that is
+> disabled, leading to build warnings:
+> 
+> arch/arm/mm/cache-l2x0.c:167:13: warning: 'l2x0_cache_sync' defined but not used [-Wunused-function]
+> arch/arm/mm/cache-l2x0.c:184:13: warning: 'l2x0_flush_all' defined but not used [-Wunused-function]
+> arch/arm/mm/cache-l2x0.c:194:13: warning: 'l2x0_disable' defined but not used [-Wunused-function]
+> 
+> With the knowledge that the code is now aurora-specific, we can
+> simplify it noticeably:
+> 
+> - The pl310 errata workarounds are not needed on aurora and can be removed
+> - The cache_wait() macro is never needed since this is not an l210/l220
 
-On 11/19/2014 02:48 PM, Lee Jones wrote:
-> Prevents build warning:
->
-> st_thermal.c:278:12:
->      warning: ?st_thermal_suspend? defined but not used [-Wunused-function]
-> st_thermal.c:286:12:
->      warning: ?st_thermal_resume? defined but not used [-Wunused-function]
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-You can add my:
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+How do we know?  You claim it's "not a L210/L220" but how do we actually
+know that we don't have to wait for the cache operation to complete?
 
-Thanks,
-Maxime
+When this is built without L310 support, Aurora will wait for the cache
+operations to complete, but when built with L310 support, it won't.
 
-> ---
->   drivers/thermal/st/st_thermal.c | 3 +++
->   1 file changed, 3 insertions(+)
->
-> diff --git a/drivers/thermal/st/st_thermal.c b/drivers/thermal/st/st_thermal.c
-> index 90163b3..9841488 100644
-> --- a/drivers/thermal/st/st_thermal.c
-> +++ b/drivers/thermal/st/st_thermal.c
-> @@ -275,6 +275,7 @@ int st_thermal_unregister(struct platform_device *pdev)
->   }
->   EXPORT_SYMBOL_GPL(st_thermal_unregister);
->   
-> +#ifdef CONFIG_PM
->   static int st_thermal_suspend(struct device *dev)
->   {
->   	struct platform_device *pdev = to_platform_device(dev);
-> @@ -305,6 +306,8 @@ static int st_thermal_resume(struct device *dev)
->   
->   	return 0;
->   }
-> +#endif
-> +
->   SIMPLE_DEV_PM_OPS(st_thermal_pm_ops, st_thermal_suspend, st_thermal_resume);
->   EXPORT_SYMBOL_GPL(st_thermal_pm_ops);
->   
+> - aurora_pa_range can keep the spinlock while syncing the cache
+
+If the operations complete synchronously (in other words, the L2 cache
+doesn't accept another transaction until the cache operation has completed)
+the spinlocks should not be necessary.
+
+They're necessary for some of the ARM caches which allow cache operations
+to run asynchronously (hence the wait stuff) but if you don't have the
+wait stuff as you imply above, they can't be asynchronous.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
