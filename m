@@ -1,88 +1,89 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 19 Nov 2014 12:15:45 +0100
-Subject: [PATCH v3 16/19] iommu: exynos: document internal structures
+Date: Wed, 19 Nov 2014 12:15:47 +0100
+Subject: [PATCH v3 18/19] iommu: exynos: init from dt-specific callback instead
+ of initcall
 In-Reply-To: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
 References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1416395748-10731-17-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1416395748-10731-19-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a few words of comment to all internal structures used by the driver.
+This patch introduces IOMMU_OF_DECLARE-based initialization to the
+driver, which replaces subsys_initcall-based procedure.
+exynos_iommu_of_setup ensures that each sysmmu controller is probed
+before its master device.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 49 +++++++++++++++++++++++++++++---------------
- 1 file changed, 33 insertions(+), 16 deletions(-)
+ drivers/iommu/exynos-iommu.c | 28 +++++++++++++++++++++++++++-
+ 1 file changed, 27 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 4c9b9b9e099f..a5b32cdeec2d 100644
+index cd28dc09db39..88f9afe641a0 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -184,32 +184,49 @@ static char *sysmmu_fault_name[SYSMMU_FAULTS_NUM] = {
- 	"UNKNOWN FAULT"
+@@ -13,16 +13,21 @@
+ #endif
+ 
+ #include <linux/clk.h>
++#include <linux/dma-mapping.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
+ #include <linux/iommu.h>
+ #include <linux/interrupt.h>
+ #include <linux/list.h>
++#include <linux/of.h>
++#include <linux/of_iommu.h>
++#include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/slab.h>
+ 
+ #include <asm/cacheflush.h>
++#include <asm/dma-iommu.h>
+ #include <asm/pgtable.h>
+ 
+ typedef u32 sysmmu_iova_t;
+@@ -1084,6 +1089,8 @@ static const struct iommu_ops exynos_iommu_ops = {
+ 	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
  };
  
--/* attached to dev.archdata.iommu of the master device */
-+/*
-+ * This structure is attached to dev.archdata.iommu of the master device
-+ * on device add, contains a list of SYSMMU controllers defined by device tree,
-+ * which are bound to given master device. It is usually referenced by 'owner'
-+ * pointer.
-+ */
- struct exynos_iommu_owner {
--	struct list_head clients;
-+	struct list_head clients; /* list of sysmmu_drvdata.owner_node */
- };
++static int init_done;
++
+ static int __init exynos_iommu_init(void)
+ {
+ 	int ret;
+@@ -1116,6 +1123,8 @@ static int __init exynos_iommu_init(void)
+ 		goto err_set_iommu;
+ 	}
  
-+/*
-+ * This structure is stored in ->priv field of generic struct iommu_domain,
-+ * contains list of SYSMMU controllers from all master devices, which has been
-+ * attached to this domain and page tables of IO address space defined by this
-+ * domain. It is usually referenced by 'domain' pointer.
-+ */
- struct exynos_iommu_domain {
--	struct list_head clients; /* list of sysmmu_drvdata.node */
-+	struct list_head clients; /* list of sysmmu_drvdata.domain_node */
- 	sysmmu_pte_t *pgtable; /* lv1 page table, 16KB */
- 	short *lv2entcnt; /* free lv2 entry counter for each section */
--	spinlock_t lock; /* lock for this structure */
-+	spinlock_t lock; /* lock for modyfying list of clients */
- 	spinlock_t pgtablelock; /* lock for modifying page table @ pgtable */
- };
- 
-+/*
-+ * This structure hold all data of a single SYSMMU controller, this includes
-+ * hw resources like registers and clocks, pointers and list nodes to connect
-+ * it to all other structures, internal state and parameters read from device
-+ * tree. It is usually referenced by 'data' pointer.
-+ */
- struct sysmmu_drvdata {
--	struct device *sysmmu;	/* System MMU's device descriptor */
--	struct device *master;	/* Owner of system MMU */
--	void __iomem *sfrbase;
--	struct clk *clk;
--	struct clk *clk_master;
--	int activations;
--	spinlock_t lock;
--	struct iommu_domain *domain;
--	struct list_head domain_node;
--	struct list_head owner_node;
--	phys_addr_t pgtable;
--	int version;
-+	struct device *sysmmu; /* SYSMMU controller device */
-+	struct device *master; /* master device (owner of given SYSMMU) */
-+	void __iomem *sfrbase; /* our registers */
-+	struct clk *clk; /* SYSMMU's clock */
-+	struct clk *clk_master; /* master's device clock */
-+	int activations; /* number of calls to sysmmu_enable */
-+	spinlock_t lock; /* lock for modyfying enable/disable state */
-+	struct iommu_domain *domain; /* domain we belong to */
-+	struct list_head domain_node; /* node for domain clients list */
-+	struct list_head owner_node; /* node for owner clients list */
-+	phys_addr_t pgtable; /* assigned page table structure */
-+	int version; /* our version */
- };
- 
- static bool set_sysmmu_active(struct sysmmu_drvdata *data)
++	init_done = true;
++
+ 	return 0;
+ err_set_iommu:
+ 	kmem_cache_free(lv2table_kmem_cache, zero_lv2_table);
+@@ -1125,4 +1134,21 @@ err_reg_driver:
+ 	kmem_cache_destroy(lv2table_kmem_cache);
+ 	return ret;
+ }
+-subsys_initcall(exynos_iommu_init);
++
++static int __init exynos_iommu_of_setup(struct device_node *np)
++{
++	struct platform_device *pdev;
++
++	if (!init_done)
++		exynos_iommu_init();
++
++	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
++	if (IS_ERR(pdev))
++		return PTR_ERR(pdev);
++
++	of_iommu_set_ops(np, &exynos_iommu_ops);
++	return 0;
++}
++
++IOMMU_OF_DECLARE(exynos_iommu_of, "samsung,exynos-sysmmu",
++		 exynos_iommu_of_setup);
 -- 
 1.9.2
