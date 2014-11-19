@@ -1,88 +1,57 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Wed, 19 Nov 2014 09:15:44 +0800
-Subject: [RFC PATCH 01/16] PCI: Enhance pci_scan_root_bus() to support
- default IO/MEM resources
-In-Reply-To: <20141118142354.GH12037@e106497-lin.cambridge.arm.com>
-References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
- <2732970.7HG94QvVBv@wuerfel> <546AF8D7.9010103@huawei.com>
- <2447172.ADYWdCTnMP@wuerfel> <546B317E.4090800@huawei.com>
- <20141118142354.GH12037@e106497-lin.cambridge.arm.com>
-Message-ID: <546BEF40.70109@huawei.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 19 Nov 2014 09:17:31 +0800
+Subject: [[PATCHv2] 3/3] drivers/rtc/rtc-snvs: Add clock support
+In-Reply-To: <54644295.2050003@gmail.com>
+References: <cover.1415364391.git.maitysanchayan@gmail.com>
+ <30e496ce2d6521e608df3b68b73b3e05caa1daef.1415364391.git.maitysanchayan@gmail.com>
+ <7807253ec0fd349b5bb1489e0d3b1347@agner.ch>
+ <546320D3.2030501@gmail.com> <20141112104735.GK2704@dragon>
+ <54644295.2050003@gmail.com>
+Message-ID: <20141119011721.GA24042@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/18 22:23, Liviu Dudau wrote:
-> On Tue, Nov 18, 2014 at 11:46:06AM +0000, Yijing Wang wrote:
->> On 2014/11/18 17:36, Arnd Bergmann wrote:
->>> On Tuesday 18 November 2014 15:44:23 Yijing Wang wrote:
->>>> On 2014/11/17 18:08, Arnd Bergmann wrote:
->>>>> On Monday 17 November 2014 18:21:35 Yijing Wang wrote:
->>>>>> -       list_for_each_entry(window, resources, list)
->>>>>> -               if (window->res->flags & IORESOURCE_BUS) {
->>>>>> -                       found = true;
->>>>>> -                       break;
->>>>>> -               }
->>>>>> +       if (!resources) {
->>>>>> +               pci_add_resource(&default_res, &ioport_resource);
->>>>>> +               pci_add_resource(&default_res, &iomem_resource);
->>>>>> +               pci_add_resource(&default_res, &busn_resource);
->>>>>> +       } else {
->>>>>>
->>>>>
->>>>> Isn't it almost always wrong to do this? You are adding all of the
->>>>> I/O ports and memory to the host bridge, which will prevent you from
->>>>> adding another host bridge, and the iomem_resource normally
->>>>> includes a lot of addresses that are not accessible by the PCI host.
->>>>
->>>> Hi Arnd, pci host bridge windows are the ranges allow child devices to setup
->>>> from. Add all of IO/MEM here just a limit to child devices, no request for these
->>>> resources, so it won't hurt another host bridge. Some platforms have no dts or ACPI
->>>> report host bridge resources, in this case, we directly assign ioport/iomem_resources
->>>> as the root resources of PCI devices.
->>>
->>> But it would be wrong to allow hosts to allocate a device BAR that is not
->>> visible through the host bridge. I think we need to keep these separate
->>> from the general case: if you call any of the modern interfaces you have
->>> to provide the resources and a device. I notice that there is only one
->>> caller of pci_scan_bus_parented(), we should probably change that over to
->>> pci_scan_root_bus() or your new interface and remove the old one, but
->>> keep pci_scan_bus() as the only entry point for all of the legacy users
->>> that do not know about the resources.
->>
->> Ok, I will move this out of the generic interface.
+On Thu, Nov 13, 2014 at 11:03:09AM +0530, Sanchayan Maity wrote:
+> On Wednesday 12 November 2014 04:17 PM, Shawn Guo wrote:
+> > On Wed, Nov 12, 2014 at 02:26:51PM +0530, Sanchayan Maity wrote:
+> >> On Wednesday 12 November 2014 02:57 AM, Stefan Agner wrote:
+> >>> On 2014-11-07 14:04, Sanchayan Maity wrote:
+> >>>> This patch adds clock enable and disable support for
+> >>>> the SNVS peripheral, which is required for using the
+> >>>> RTC within the SNVS block.
+> >>>
+> >>> What happens if the device tree node is there while this patch is not
+> >>> applied? I guess the driver would load, but since the clocks of the
+> >>> peripheral are not enabled the first register access would lead to bus
+> >>> error or similar. If this is the case, this would break bisectability.
+> >>> You should move the device tree patch to the end.
+> >>>
+> >>
+> >> If the DT node was present with this patch not applied, the driver would 
+> >> still crash with a bus error, since the clocks for SNVS are not explicitly 
+> >> enabled anywhere else. I had not thought about any problems which might 
+> >> occur later with git bisect. Will move this to the end with v3.
+> > 
+> > Since changes on rtc-snvs.c will need to go through RTC subsystem tree,
+> > that means I cannot apply DTS changes until the driver patch gets
+> > mainlined and appears on my tree.
+> > 
+> > Shawn
 > 
-> My suggestion would actually be to trigger a warning/error if you detect that the resources
-> are missing. That way we can force the drivers to clean up.
+> Shawn
+> 
+> So the approach in this patch is OK and acceptable? 
 
-It make sense to me, thanks.
+Yes, I'm fine with it.
+
+Shawn
 
 > 
-> Best regards,
-> Liviu
+> Since the DT changes cannot be applied by you, till this goes through the 
+> RTC subsystem tree, gets mainlined and appears on your tree, I will send out 
+> this patch by itself then and send the DT changes later once this gets
+> mainlined?
 > 
->>
->> Thanks!
->> Yijing.
->>
->>>
->>> 	Arnd
->>>
->>> .
->>>
->>
->>
->> -- 
->> Thanks!
->> Yijing
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
-> 
-
-
--- 
-Thanks!
-Yijing
+> I did not CC Alessandro Zummo, the maintainer of RTC subsystem by mistake.
+> Once you ACK/OK this i will send out this patch in isolation then or just 
+> CC Alessandro Zummo.
