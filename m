@@ -1,22 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 19 Nov 2014 14:04:43 +0800
-Subject: [PATCH 1/3] ARM: dts: imx6: add pm_power_off support for i.mx6
- chips
-In-Reply-To: <20141119055006.GA27258@Robin-OptiPlex-780>
-References: <1415780439-29728-1-git-send-email-b38343@freescale.com>
- <1415780439-29728-2-git-send-email-b38343@freescale.com>
- <20141119031823.GC27759@dragon> <546C2A13.3010307@web.de>
- <20141119055006.GA27258@Robin-OptiPlex-780>
-Message-ID: <20141119060442.GD27759@dragon>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 19 Nov 2014 11:39:18 +0530
+Subject: [PATCH 1/2] phy: berlin_usb: depends on RESET_CONTROLLER
+In-Reply-To: <546BA05E.4090605@gmail.com>
+References: <1416231192-27056-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1416231192-27056-2-git-send-email-antoine.tenart@free-electrons.com>
+ <546BA05E.4090605@gmail.com>
+Message-ID: <546C340E.8000209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 01:50:07PM +0800, Robin Gong wrote:
-> Sorry, the patch resent wrongly...
-> Hi Shawn, Can you apply the first v4 patches on Sep 26, or I resend it again? 
+Hi,
 
-I fixed it up and tested the series on my imx6q-sabresd board.
+On Wednesday 19 November 2014 01:09 AM, Sebastian Hesselbarth wrote:
+> On 17.11.2014 14:33, Antoine Tenart wrote:
+>> The Berlin USB PHY driver uses the Berlin reset controller
+>> unconditionally. Make it depending on RESET_CONTROLLER.
+>>
+>> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> 
+> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> 
+>> ---
+>>   drivers/phy/Kconfig | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>> index b6da75f563e7..38ca6ff00aef 100644
+>> --- a/drivers/phy/Kconfig
+>> +++ b/drivers/phy/Kconfig
+>> @@ -17,7 +17,7 @@ config GENERIC_PHY
+>>
+>>   config PHY_BERLIN_USB
 
-Applied the series.
+phy-berlin-usb is not in my phy tree and I don't seem to find anywhere in my
+inbox. Care to send them to me?
 
-Shawn
+Thanks
+Kishon
