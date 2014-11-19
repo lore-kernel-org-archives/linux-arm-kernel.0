@@ -1,56 +1,28 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 19 Nov 2014 15:13:55 +0100
-Subject: [PATCH 3/3] clk: rockchip: add ROCKCHIP_PLL_SYNC_RATE flag to some
- plls
-In-Reply-To: <1694711.2HxVABHk0T@diego>
-References: <1694711.2HxVABHk0T@diego>
-Message-ID: <5134377.6uXtnKPDhF@diego>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Nov 2014 15:11:03 +0100
+Subject: arm64 pci_iomap,
+ was: Re: next build: 258 warnings 9 failures (next/next-20141119)
+In-Reply-To: <20141119135641.GD26258@ulmo.nvidia.com>
+References: <546c75d7.6336460a.14b5.474d@mx.google.com>
+ <16479190.7SIDaKWfdW@wuerfel> <20141119135641.GD26258@ulmo.nvidia.com>
+Message-ID: <3897871.0i8K9av6A3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the new flag to gpll and cpll on rk3188 and similar and to
-gpll, cpll and npll on rk3288.
+On Wednesday 19 November 2014 14:56:42 Thierry Reding wrote:
+> 
+> Oops, I just looked at that file on my system and I already have the
+> select GENERIC_PCI_IOMAP exactly where you have it. Turns out I have
+> that same patch, albeit with a somewhat obfuscated name in my tree
+> but never got around to clean up the commit message or sending it out.
+> 
+> Do you want to apply that patch on top or shall I redo the pull request
+> with that patch folded in so we can keep bisectability across the
+> series?
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/clk/rockchip/clk-rk3188.c | 4 ++--
- drivers/clk/rockchip/clk-rk3288.c | 6 +++---
- 2 files changed, 5 insertions(+), 5 deletions(-)
+I would prefer to have my patch applied on top so I don't have to redo
+the merge between your patches and Will's patches.
 
-diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-index 6af5d7f..37a1988 100644
---- a/drivers/clk/rockchip/clk-rk3188.c
-+++ b/drivers/clk/rockchip/clk-rk3188.c
-@@ -216,9 +216,9 @@ static struct rockchip_pll_clock rk3188_pll_clks[] __initdata = {
- 	[dpll] = PLL(pll_rk3066, PLL_DPLL, "dpll", mux_pll_p, 0, RK2928_PLL_CON(4),
- 		     RK2928_MODE_CON, 4, 5, 0, NULL),
- 	[cpll] = PLL(pll_rk3066, PLL_CPLL, "cpll", mux_pll_p, 0, RK2928_PLL_CON(8),
--		     RK2928_MODE_CON, 8, 7, 0, rk3188_pll_rates),
-+		     RK2928_MODE_CON, 8, 7, ROCKCHIP_PLL_SYNC_RATE, rk3188_pll_rates),
- 	[gpll] = PLL(pll_rk3066, PLL_GPLL, "gpll", mux_pll_p, 0, RK2928_PLL_CON(12),
--		     RK2928_MODE_CON, 12, 8, 0, rk3188_pll_rates),
-+		     RK2928_MODE_CON, 12, 8, ROCKCHIP_PLL_SYNC_RATE, rk3188_pll_rates),
- };
- 
- #define MFLAGS CLK_MUX_HIWORD_MASK
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index 2d31a22..ad8a27a 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -206,11 +206,11 @@ static struct rockchip_pll_clock rk3288_pll_clks[] __initdata = {
- 	[dpll] = PLL(pll_rk3066, PLL_DPLL, "dpll", mux_pll_p, 0, RK3288_PLL_CON(4),
- 		     RK3288_MODE_CON, 4, 5, 0, NULL),
- 	[cpll] = PLL(pll_rk3066, PLL_CPLL, "cpll", mux_pll_p, 0, RK3288_PLL_CON(8),
--		     RK3288_MODE_CON, 8, 7, 0, rk3288_pll_rates),
-+		     RK3288_MODE_CON, 8, 7, ROCKCHIP_PLL_SYNC_RATE, rk3288_pll_rates),
- 	[gpll] = PLL(pll_rk3066, PLL_GPLL, "gpll", mux_pll_p, 0, RK3288_PLL_CON(12),
--		     RK3288_MODE_CON, 12, 8, 0, rk3288_pll_rates),
-+		     RK3288_MODE_CON, 12, 8, ROCKCHIP_PLL_SYNC_RATE, rk3288_pll_rates),
- 	[npll] = PLL(pll_rk3066, PLL_NPLL, "npll",  mux_pll_p, 0, RK3288_PLL_CON(16),
--		     RK3288_MODE_CON, 14, 9, 0, rk3288_pll_rates),
-+		     RK3288_MODE_CON, 14, 9, ROCKCHIP_PLL_SYNC_RATE, rk3288_pll_rates),
- };
- 
- static struct clk_div_table div_hclk_cpu_t[] = {
--- 
-2.1.1
+Can you confirm that you have no further patches that I might need?
+
+	Arnd
