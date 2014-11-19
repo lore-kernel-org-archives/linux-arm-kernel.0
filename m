@@ -1,53 +1,39 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 19 Nov 2014 15:35:32 +0200
-Subject: [PATCH] i2c: designware: prevent early stop on TX FIFO empty
-In-Reply-To: <20141119092122.GC1439@katana>
-References: <545CB6C4.8010201@arm.com>
- <20141119092122.GC1439@katana>
-Message-ID: <20141119133531.GD2374@sapphire.tkos.co.il>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Nov 2014 14:40:49 +0100
+Subject: [PATCH RFC] ARM: option for loading modules into vmalloc area
+In-Reply-To: <546B8C64.3010904@samsung.com>
+References: <20141118172146.3784.81151.stgit@buzz>
+ <20141118173413.GB4042@n2100.arm.linux.org.uk> <546B8C64.3010904@samsung.com>
+Message-ID: <2041617.Kxhx5O4MMr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
-
-On Wed, Nov 19, 2014 at 10:21:22AM +0100, Wolfram Sang wrote:
-> On Fri, Nov 07, 2014 at 12:10:44PM +0000, Andrew Jackson wrote:
-> > If the Designware core is configured with IC_EMPTYFIFO_HOLD_MASTER_EN
-> > set to zero, allowing the TX FIFO to become empty causes a STOP
-> > condition to be generated on the I2C bus. If the transmit FIFO
-> > threshold is set too high, an erroneous STOP condition can be
-> > generated on long transfers - particularly where the interrupt
-> > latency is extended.
-> > 
-> > Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+On Tuesday 18 November 2014 21:13:56 Konstantin Khlebnikov wrote:
+> On 2014-11-18 20:34, Russell King - ARM Linux wrote:
+> > On Tue, Nov 18, 2014 at 08:21:46PM +0400, Konstantin Khlebnikov wrote:
+> >> Usually modules are loaded into small area prior to the kernel
+> >> text because they are linked with the kernel using short calls.
+> >> Compile-time instrumentation like GCOV or KASAN bloats code a lot,
+> >> and as a result huge modules no longer fit into reserved area.
+> >>
+> >> This patch adds option CONFIG_MODULES_USE_VMALLOC which lifts
+> >> limitation on amount of loaded modules. It links modules using
+> >> long-calls (option -mlong-calls) and loads them into vmalloc area.
+> >>
+> >> In few places exported symbols are called from inline assembly.
+> >> This patch adds macro for such call sites: __asmbl and __asmbl_clobber.
+> >> Call turns into single 'bl' or sequence 'movw; movt; blx' depending on
+> >> context and state of config option.
+> >>
+> >> Unfortunately this option isn't compatible with CONFIG_FUNCTION_TRACER.
+> >> Compiler emits short calls to profiling function despite of -mlong-calls.
+> >> This is a bug in GCC, but ftrace anyway needs an update to handle this.
+> > It also isn't compatible with the older architectures which don't have
+> > "blx".
 > 
-> So, what do other designware users think of this change (nice CC list
-> BTW, Andrew). Adding Mika, too.
+> Ok, I'll add "depends on CPU_V6 || CPU_V7" I don't think that it is 
+> necessary for older cpus.
 
-I don't have access to this hardware anymore so I can't test. As far as I 
-remember the spec this change should be OK.
+Why not just use a different branch instruction for the older CPUs?
 
-baruch
-
-> >  drivers/i2c/busses/i2c-designware-core.c |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/drivers/i2c/busses/i2c-designware-core.c b/drivers/i2c/busses/i2c-designware-core.c
-> > index 3c20e4b..e070edd 100644
-> > --- a/drivers/i2c/busses/i2c-designware-core.c
-> > +++ b/drivers/i2c/busses/i2c-designware-core.c
-> > @@ -363,7 +363,7 @@ int i2c_dw_init(struct dw_i2c_dev *dev)
-> >  	}
-> >  
-> >  	/* Configure Tx/Rx FIFO threshold levels */
-> > -	dw_writel(dev, dev->tx_fifo_depth - 1, DW_IC_TX_TL);
-> > +	dw_writel(dev, dev->tx_fifo_depth / 2, DW_IC_TX_TL);
-> >  	dw_writel(dev, 0, DW_IC_RX_TL);
-> >  
-> >  	/* configure the i2c master */
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+	Arnd
