@@ -1,106 +1,78 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 19 Nov 2014 09:55:10 -0800
-Subject: [PATCH 1/2] pinctrl: rockchip: Handle wakeup pins
-In-Reply-To: <1416354596-15013-2-git-send-email-dianders@chromium.org>
-References: <1416354596-15013-1-git-send-email-dianders@chromium.org>
- <1416354596-15013-2-git-send-email-dianders@chromium.org>
-Message-ID: <20141119175510.GB37989@dtor-ws>
+From: subaparts@yandex.ru (Alexander Sverdlin)
+Date: Wed, 19 Nov 2014 18:55:20 +0100
+Subject: [PATCH] arm: ep93xx: add dma_masks for the M2P and M2M DMA
+ controllers
+In-Reply-To: <1416415519-4903-1-git-send-email-hsweeten@visionengravers.com>
+References: <1416415519-4903-1-git-send-email-hsweeten@visionengravers.com>
+Message-ID: <546CD988.8010202@yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 03:49:55PM -0800, Doug Anderson wrote:
-> The rockchip pinctrl driver was using irq_gc_set_wake() as its
-> implementation of irq_set_wake() but was totally ignoring everything
-> that irq_gc_set_wake() did (which is to upkeep gc->wake_active).
-> 
-> Let's fix that by setting gc->wake_active as GPIO_INTEN at suspend
-> time and restoring GPIO_INTEN at resume time.
-> 
-> NOTE a few quirks when thinking about this patch:
-> - Rockchip pinctrl hardware supports both "disable/enable" and
->   "mask/unmask".  Right now we only use "disable/enable" and present
->   those to Linux as "mask/unmask".  This should be OK because
->   enable/disable is optional and Linux will implement it in terms of
->   mask/unmask.  At the moment we always tell hardware all interrupts
->   are unmasked (the boot default).
-> - At suspend time Linux tries to call "disable" on all interrupts and
->   also enables wakeup on all wakeup interrupts.  One would think that
->   since "disable" is implemented as "mask" when "disable" isn't
->   provided and that since we were ignoring gc->wake_active that
->   nothing would have woken us up.  That's not the case since Linux
->   "optimizes" things and just leaves interrutps unmasked, assuming it
->   could mask them later when they go off.  That meant that at suspend
->   time all interrupts were actually being left enabled.
-> 
-> With this patch random non-wakeup interrupts no longer wake the system
-> up.  Wakeup interrupts still wake the system up.
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+Hi!
 
-Seems reasonable to me.
+On 19/11/14 17:45, H Hartley Sweeten wrote:
+> The dma_mask and coherent_dma_mask need to be set or DMA memory allocations
+> will fail with error messages like this:
+>
+>    ep93xx-dma ep93xx-dma-m2p: coherent DMA mask is unset
+>
+>    ep93xx-dma ep93xx-dma-m2m: coherent DMA mask is unset
+>
+> Add the missing information to the ep93xx-dma-m2p and ep93xx-dma-m2m
+> devices.
+>
+> This fixes a problem with the sound/soc/edb93xx.c driver not loading
+> that was reported by Jeremy Moles.
 
-Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+This repaired the sound on EDB9302-like board for me, so:
 
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Reported-by: Jeremy Moles <cubicool@gmail.com>
+
+Tested-by: Alexander Sverdlin <subaparts@yandex.ru>
+
+> Cc: Alexander Sverdlin <subaparts@yandex.ru>
+> Cc: Ryan Mallon <rmallon@gmail.com>
 > ---
->  drivers/pinctrl/pinctrl-rockchip.c | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-> index ba74f0a..e91e845 100644
-> --- a/drivers/pinctrl/pinctrl-rockchip.c
-> +++ b/drivers/pinctrl/pinctrl-rockchip.c
-> @@ -89,6 +89,7 @@ struct rockchip_iomux {
->   * @reg_pull: optional separate register for additional pull settings
->   * @clk: clock of the gpio bank
->   * @irq: interrupt of the gpio bank
-> + * @saved_enables: Saved content of GPIO_INTEN at suspend time.
->   * @pin_base: first pin number
->   * @nr_pins: number of pins in this bank
->   * @name: name of the bank
-> @@ -107,6 +108,7 @@ struct rockchip_pin_bank {
->  	struct regmap			*regmap_pull;
->  	struct clk			*clk;
->  	int				irq;
-> +	u32				saved_enables;
->  	u32				pin_base;
->  	u8				nr_pins;
->  	char				*name;
-> @@ -1543,6 +1545,23 @@ static int rockchip_irq_set_type(struct irq_data *d, unsigned int type)
->  	return 0;
->  }
->  
-> +static void rockchip_irq_suspend(struct irq_data *d)
-> +{
-> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> +	struct rockchip_pin_bank *bank = gc->private;
+>   arch/arm/mach-ep93xx/dma.c | 12 ++++++++++--
+>   1 file changed, 10 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-ep93xx/dma.c b/arch/arm/mach-ep93xx/dma.c
+> index d8bfd02..88a4c9b 100644
+> --- a/arch/arm/mach-ep93xx/dma.c
+> +++ b/arch/arm/mach-ep93xx/dma.c
+> @@ -66,11 +66,15 @@ static struct ep93xx_dma_platform_data ep93xx_dma_m2p_data = {
+>   	.num_channels		= ARRAY_SIZE(ep93xx_dma_m2p_channels),
+>   };
+>
+> +static u64 ep93xx_dma_m2p_mask = DMA_BIT_MASK(32);
 > +
-> +	bank->saved_enables = irq_reg_readl(gc, GPIO_INTEN);
-> +	irq_reg_writel(gc, gc->wake_active, GPIO_INTEN);
-> +}
+>   static struct platform_device ep93xx_dma_m2p_device = {
+>   	.name			= "ep93xx-dma-m2p",
+>   	.id			= -1,
+>   	.dev			= {
+> -		.platform_data	= &ep93xx_dma_m2p_data,
+> +		.platform_data		= &ep93xx_dma_m2p_data,
+> +		.dma_mask		= &ep93xx_dma_m2p_mask,
+> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
+>   	},
+>   };
+>
+> @@ -93,11 +97,15 @@ static struct ep93xx_dma_platform_data ep93xx_dma_m2m_data = {
+>   	.num_channels		= ARRAY_SIZE(ep93xx_dma_m2m_channels),
+>   };
+>
+> +static u64 ep93xx_dma_m2m_mask = DMA_BIT_MASK(32);
 > +
-> +static void rockchip_irq_resume(struct irq_data *d)
-> +{
-> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> +	struct rockchip_pin_bank *bank = gc->private;
-> +
-> +	irq_reg_writel(gc, bank->saved_enables, GPIO_INTEN);
-> +}
-> +
->  static int rockchip_interrupts_register(struct platform_device *pdev,
->  						struct rockchip_pinctrl *info)
->  {
-> @@ -1587,6 +1606,8 @@ static int rockchip_interrupts_register(struct platform_device *pdev,
->  		gc->chip_types[0].chip.irq_mask = irq_gc_mask_clr_bit;
->  		gc->chip_types[0].chip.irq_unmask = irq_gc_mask_set_bit;
->  		gc->chip_types[0].chip.irq_set_wake = irq_gc_set_wake;
-> +		gc->chip_types[0].chip.irq_suspend = rockchip_irq_suspend;
-> +		gc->chip_types[0].chip.irq_resume = rockchip_irq_resume;
->  		gc->chip_types[0].chip.irq_set_type = rockchip_irq_set_type;
->  		gc->wake_enabled = IRQ_MSK(bank->nr_pins);
->  
-> -- 
-> 2.1.0.rc2.206.gedb03e5
-> 
-
--- 
-Dmitry
+>   static struct platform_device ep93xx_dma_m2m_device = {
+>   	.name			= "ep93xx-dma-m2m",
+>   	.id			= -1,
+>   	.dev			= {
+> -		.platform_data	= &ep93xx_dma_m2m_data,
+> +		.platform_data		= &ep93xx_dma_m2m_data,
+> +		.dma_mask		= &ep93xx_dma_m2m_mask,
+> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
+>   	},
+>   };
+>
+>
