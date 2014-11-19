@@ -1,58 +1,72 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Wed, 19 Nov 2014 23:51:01 +0100
-Subject: [PATCH 1/4] ARM: meson: add basic infrastructure for clocks
-In-Reply-To: <20141119224224.25314.58901@quantum>
-References: <1416393143-20434-1-git-send-email-carlo@caione.org>
- <1416393143-20434-2-git-send-email-carlo@caione.org>
- <20141119224224.25314.58901@quantum>
-Message-ID: <CAOQ7t2ZZ7W2PjkAMhPYhNEmH2+JtUL4td3xV-VbCcL3V-_37Vw@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 19 Nov 2014 23:59:55 +0100
+Subject: [GIT PULL] arm: pxa: pxa for v3.19
+In-Reply-To: <4686660.cI7P5U9Kgy@wuerfel> (Arnd Bergmann's message of "Wed, 19
+ Nov 2014 23:42:23 +0100")
+References: <87bnoevq1b.fsf@free.fr> <201411192333.32448.arnd@arndb.de>
+ <878uj67r2a.fsf@free.fr> <4686660.cI7P5U9Kgy@wuerfel>
+Message-ID: <874mtu7q50.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 11:42 PM, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Carlo Caione (2014-11-19 02:32:20)
->> diff --git a/drivers/clk/meson/clk-pll.c b/drivers/clk/meson/clk-pll.c
->> new file mode 100644
->> index 0000000..5b6d064
->> --- /dev/null
->> +++ b/drivers/clk/meson/clk-pll.c
->> @@ -0,0 +1,298 @@
->> +/*
->> + * Copyright (c) 2014 Carlo Caione <carlo@caione.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms and conditions of the GNU General Public License,
->> + * version 2, as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope it will be useful, but WITHOUT
->> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->> + * more details.
->> + *
->> + * You should have received a copy of the GNU General Public License along with
->> + * this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#include <linux/clk-provider.h>
->> +#include <linux/clkdev.h>
->> +#include <linux/delay.h>
->> +#include <linux/err.h>
+Arnd Bergmann <arnd@arndb.de> writes:
+
+> We are running a bit short on time though, and I'd like to have it
+> merged earlier. If nobody else is using your branch, I can just do
+> the rebase myself, since there are only a few patches in it.
 >
-> All of the headers below are unnecessary. Copy/paste? I didn't bother to
-> check the ones above.
+> 	Arnd
 
-No prob. I'll fix them also.
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
->> +#include <linux/io.h>
->> +#include <linux/module.h>
->> +#include <linux/of_address.h>
->> +#include <linux/slab.h>
->> +#include <linux/string.h>
->
-> Regards,
-> Mike
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
 
-Thanks,
+are available in the git repository at:
 
--- 
-Carlo Caione
+  https://github.com/rjarzmik/linux.git tags/pxa-for-3.19
+
+for you to fetch changes up to 03ec7fe70c5ce850a20aabe66c88e1a39111f9dd:
+
+  arm: pxa: add pxa27x device-tree support (2014-11-19 23:53:14 +0100)
+
+----------------------------------------------------------------
+arm: pxa: pxa for v3.19
+
+Hello Arnd, Kevin, Olof,
+
+This is a very quiet release, featuring a small cleanup, a tosa change
+on its charger driver, and support for pxa device-tree based pxa27x
+boards.
+
+The device-tree part will only be fully activated once clocks support
+is fully operation in the common clock framework.
+
+----------------------------------------------------------------
+Dmitry Eremin-Solenikov (1):
+      ARM: pxa: tosa: switch to gpio-charger
+
+Joe Perches (1):
+      arm: mach-pxa: Convert pr_warning to pr_warn
+
+Robert Jarzmik (4):
+      arm: pxa: add device-tree irq init for pxa27x
+      arm: pxa: move init functions into generic.h
+      arm: pxa: remove unnecessary includes from pxa-dt
+      arm: pxa: add pxa27x device-tree support
+
+ arch/arm/mach-pxa/Kconfig               | 11 ++++++
+ arch/arm/mach-pxa/Makefile              |  1 +
+ arch/arm/mach-pxa/em-x270.c             |  4 +-
+ arch/arm/mach-pxa/generic.h             | 65 +++++++++++++++++++++------------
+ arch/arm/mach-pxa/gumstix.c             |  3 +-
+ arch/arm/mach-pxa/include/mach/pxa25x.h |  8 ----
+ arch/arm/mach-pxa/include/mach/pxa27x.h |  4 --
+ arch/arm/mach-pxa/include/mach/pxa3xx.h |  5 ---
+ arch/arm/mach-pxa/mfp-pxa2xx.c          | 12 +++---
+ arch/arm/mach-pxa/poodle.c              |  2 +-
+ arch/arm/mach-pxa/pxa-dt.c              | 18 +++++++--
+ arch/arm/mach-pxa/pxa27x.c              |  6 +++
+ arch/arm/mach-pxa/pxa3xx-ulpi.c         |  6 +--
+ arch/arm/mach-pxa/raumfeld.c            | 26 ++++++-------
+ arch/arm/mach-pxa/tosa.c                | 41 ++++-----------------
+ 15 files changed, 107 insertions(+), 105 deletions(-)
