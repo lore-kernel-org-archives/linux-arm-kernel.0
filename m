@@ -1,57 +1,24 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Wed, 19 Nov 2014 16:07:03 -0500
-Subject: [PATCH v9 12/13] swiotlb-xen: pass dev_addr to
- xen_dma_unmap_page and xen_dma_sync_single_for_cpu
-In-Reply-To: <1415792454-23161-12-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1411121130020.26318@kaball.uk.xensource.com>
- <1415792454-23161-12-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20141119210703.GE20440@laptop.dumpdata.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Nov 2014 22:10:03 +0100
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Soc Updates for
+ v3.19
+In-Reply-To: <cover.1415581286.git.horms+renesas@verge.net.au>
+References: <cover.1415581286.git.horms+renesas@verge.net.au>
+Message-ID: <201411192210.03535.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 12, 2014 at 11:40:53AM +0000, Stefano Stabellini wrote:
-> xen_dma_unmap_page and xen_dma_sync_single_for_cpu take a dma_addr_t
-> handle as argument, not a physical address.
+On Monday 10 November 2014, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these second round of Renesas ARM based SoC soc updates for v3.19.
+> 
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-soc-for-v3.19,
+> which I have already sent a pull-request for.
+> 
+> 
 
-Ouch. Should this also go on stable tree?
+Pulled into next/soc, thanks!
 
-> 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  drivers/xen/swiotlb-xen.c |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-> index 3725ee4..498b654 100644
-> --- a/drivers/xen/swiotlb-xen.c
-> +++ b/drivers/xen/swiotlb-xen.c
-> @@ -449,7 +449,7 @@ static void xen_unmap_single(struct device *hwdev, dma_addr_t dev_addr,
->  
->  	BUG_ON(dir == DMA_NONE);
->  
-> -	xen_dma_unmap_page(hwdev, paddr, size, dir, attrs);
-> +	xen_dma_unmap_page(hwdev, dev_addr, size, dir, attrs);
->  
->  	/* NOTE: We use dev_addr here, not paddr! */
->  	if (is_xen_swiotlb_buffer(dev_addr)) {
-> @@ -497,14 +497,14 @@ xen_swiotlb_sync_single(struct device *hwdev, dma_addr_t dev_addr,
->  	BUG_ON(dir == DMA_NONE);
->  
->  	if (target == SYNC_FOR_CPU)
-> -		xen_dma_sync_single_for_cpu(hwdev, paddr, size, dir);
-> +		xen_dma_sync_single_for_cpu(hwdev, dev_addr, size, dir);
->  
->  	/* NOTE: We use dev_addr here, not paddr! */
->  	if (is_xen_swiotlb_buffer(dev_addr))
->  		swiotlb_tbl_sync_single(hwdev, paddr, size, dir, target);
->  
->  	if (target == SYNC_FOR_DEVICE)
-> -		xen_dma_sync_single_for_cpu(hwdev, paddr, size, dir);
-> +		xen_dma_sync_single_for_cpu(hwdev, dev_addr, size, dir);
->  
->  	if (dir != DMA_FROM_DEVICE)
->  		return;
-> -- 
-> 1.7.10.4
-> 
+	Arnd
