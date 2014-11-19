@@ -1,56 +1,82 @@
-From: francesco@dolcini.it (Francesco Dolcini)
-Date: Wed, 19 Nov 2014 17:01:08 +0100
-Subject: ARM: mvebu: ethernet packets corruption and I/O coherency
-In-Reply-To: <20141118153035.757fe0fc@free-electrons.com>
-References: <20141118142520.GD24819@dev0.local>
- <20141118153035.757fe0fc@free-electrons.com>
-Message-ID: <20141119160108.GJ24819@dev0.local>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 19 Nov 2014 17:02:40 +0100
+Subject: [PATCH RFC] ARM: option for loading modules into vmalloc area
+In-Reply-To: <CALYGNiMt2A3DP02cOtxqu4RrnmhojrDxkRG7bkHMByUnzG+PeA@mail.gmail.com>
+References: <20141118172146.3784.81151.stgit@buzz>
+ <20141118173413.GB4042@n2100.arm.linux.org.uk>
+ <546B8C64.3010904@samsung.com> <2041617.Kxhx5O4MMr@wuerfel>
+ <CAKv+Gu-8qhHYOry+LsDzp+LDZqYxVZ5G7cj48E3G2Unp2+=_yg@mail.gmail.com>
+ <CALYGNiMt2A3DP02cOtxqu4RrnmhojrDxkRG7bkHMByUnzG+PeA@mail.gmail.com>
+Message-ID: <CAKv+Gu-rYWutr-45MsZH6KOhhUyNCVLfkO9JQrqCm1L6ms_DUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas and all
+On 19 November 2014 16:52, Konstantin Khlebnikov <koct9i@gmail.com> wrote:
+> On Wed, Nov 19, 2014 at 5:54 PM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> On 19 November 2014 14:40, Arnd Bergmann <arnd@arndb.de> wrote:
+>>> On Tuesday 18 November 2014 21:13:56 Konstantin Khlebnikov wrote:
+>>>> On 2014-11-18 20:34, Russell King - ARM Linux wrote:
+>>>> > On Tue, Nov 18, 2014 at 08:21:46PM +0400, Konstantin Khlebnikov wrote:
+>>>> >> Usually modules are loaded into small area prior to the kernel
+>>>> >> text because they are linked with the kernel using short calls.
+>>>> >> Compile-time instrumentation like GCOV or KASAN bloats code a lot,
+>>>> >> and as a result huge modules no longer fit into reserved area.
+>>>> >>
+>>>> >> This patch adds option CONFIG_MODULES_USE_VMALLOC which lifts
+>>>> >> limitation on amount of loaded modules. It links modules using
+>>>> >> long-calls (option -mlong-calls) and loads them into vmalloc area.
+>>>> >>
+>>>> >> In few places exported symbols are called from inline assembly.
+>>>> >> This patch adds macro for such call sites: __asmbl and __asmbl_clobber.
+>>>> >> Call turns into single 'bl' or sequence 'movw; movt; blx' depending on
+>>>> >> context and state of config option.
+>>>> >>
+>>>> >> Unfortunately this option isn't compatible with CONFIG_FUNCTION_TRACER.
+>>>> >> Compiler emits short calls to profiling function despite of -mlong-calls.
+>>>> >> This is a bug in GCC, but ftrace anyway needs an update to handle this.
+>>>> > It also isn't compatible with the older architectures which don't have
+>>>> > "blx".
+>>>>
+>>>> Ok, I'll add "depends on CPU_V6 || CPU_V7" I don't think that it is
+>>>> necessary for older cpus.
+>>>
+>>> Why not just use a different branch instruction for the older CPUs?
+>>>
+>>
+>> ARMv6 doesn't support movw/movt so this will only work on v7.
+>>
+>> What about doing 'mov lr, pc; ldr pc,=symbol' instead? You clearly
+>> don't care about performance in this case, so the performance hit (due
+>> to the dcache access and interfering with the return stack predictors)
+>> should be tolerable. The only thing to be careful about is thumb2
+>> kernels: you would need to set the thumb bit in lr manually but only
+>> if the call is made /from/ thumb. You would probably be better off
+>> just depending on !THUMB2_KERNEL.
+>
+> Do you mean ldr pc, =symbol ?
+>
+> In this case I get this error:
+>
+> /tmp/ccAHtONU.s: Assembler messages:
+> /tmp/ccAHtONU.s:220: Error: invalid literal constant: pool needs to be closer
+>
+> Probably constant pool doesn't work well in inline assembly.
+>
+>
+> Something like this seems work:
+>
+> add     lr, pc, #4
+> ldr       pc, [pc, #-4]
+> .long symbol
+>
 
-On Tue, Nov 18, 2014 at 03:30:35PM +0100, Thomas Petazzoni wrote:
-> It could indeed be related. I have marked the relevant patches in the 
-> "ARM: mvebu: no I/O coherency on non-SMP and related updates" series as
-> to be backported to stable up to v3.8, so when they get accepted, I'll
-> take care of backporting them.
+You can add a '.ltorg' instruction which tells the assembler to dump
+the literal pool, but you still need to jump over it, i.e.,
 
-I prepared and tested this small patch to fix the problem on kernel
-3.13.11 and it seems to fix my ethernet packet corruption problem.
-Do you think it is fine?
-
-Do you think that this bug on I/O cache coherency could also trigger some
-sporadic random OOPS and kernel panic? I got an OOPS with a broken LR in
-skb_segment() and a kernel panic in put_page(), but I was never able to
-reproduce any of them.
-
-Thanks,
-Francesco
-
-
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -124,6 +124,12 @@
- {
- 	struct device_node *np;
- 
-+	if (!is_smp())
-+	{
-+	    pr_info("Coherency fabric disabled\n");
-+	    return 0;
-+	}
-+
- 	np = of_find_matching_node(NULL, of_coherency_table);
- 	if (np) {
- 		struct resource res;
-@@ -150,6 +156,9 @@
- {
- 	struct device_node *np;
- 
-+	if (!is_smp())
-+	    return 0;
-+
- 	np = of_find_matching_node(NULL, of_coherency_table);
- 	if (np) {
- 		bus_register_notifier(&platform_bus_type,
+adr lr, 0f
+ldr pc, =symbol
+.ltorg
+0:
+-- 
+Ard.
