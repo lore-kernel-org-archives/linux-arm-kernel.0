@@ -1,51 +1,48 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 19 Nov 2014 11:49:59 +0000
-Subject: [PATCH 5/6] arm: shmobile: specify PMUs are for ARMv7 CPUs
+Date: Wed, 19 Nov 2014 11:50:00 +0000
+Subject: [PATCH 6/6] arm: omap: specify PMUs are for ARMv7 CPUs
 In-Reply-To: <1416397800-12457-1-git-send-email-mark.rutland@arm.com>
 References: <1416397800-12457-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1416397800-12457-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <1416397800-12457-7-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Now that we can specify which PMU variant we're likely to deal with, do
-so in the shmobile board code. This will allow us to split the ARMv6,
-ARMv7, and XScale PMU drivers
+so in the omap board code. This will allow us to split the ARMv6, ARMv7,
+and XScale PMU drivers.
+
+The unnecessary include of asm/pmu.h is also removed.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Simon Horman <horms@verge.net.au>
-Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: Tony Lindgren <tony@atomide.com>
 Cc: Olof Johansson <olof@lixom.net>
 Cc: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-shmobile/setup-r8a7740.c | 2 +-
- arch/arm/mach-shmobile/setup-sh73a0.c  | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/pmu.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 8894e1b..f3abc9e 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -659,7 +659,7 @@ static struct resource pmu_resources[] = {
- };
+diff --git a/arch/arm/mach-omap2/pmu.c b/arch/arm/mach-omap2/pmu.c
+index 33c8846..a69e9a3 100644
+--- a/arch/arm/mach-omap2/pmu.c
++++ b/arch/arm/mach-omap2/pmu.c
+@@ -13,7 +13,7 @@
+  */
+ #include <linux/of.h>
  
- static struct platform_device pmu_device = {
--	.name	= "arm-pmu",
-+	.name	= "armv7-pmu",
- 	.id	= -1,
- 	.num_resources = ARRAY_SIZE(pmu_resources),
- 	.resource = pmu_resources,
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index b7bd8e5..23aa1c1 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -546,7 +546,7 @@ static struct resource pmu_resources[] = {
- };
+-#include <asm/pmu.h>
++#include <asm/system_info.h>
  
- static struct platform_device pmu_device = {
--	.name		= "arm-pmu",
-+	.name		= "armv7-pmu",
- 	.id		= -1,
- 	.num_resources	= ARRAY_SIZE(pmu_resources),
- 	.resource	= pmu_resources,
+ #include "soc.h"
+ #include "omap_hwmod.h"
+@@ -37,7 +37,8 @@ static int __init omap2_init_pmu(unsigned oh_num, char *oh_names[])
+ {
+ 	int i;
+ 	struct omap_hwmod *oh[3];
+-	char *dev_name = "arm-pmu";
++	char *dev_name = cpu_architecture() == CPU_ARCH_ARMv6 ?
++			 "armv6-pmu" : "armv7-pmu";
+ 
+ 	if ((!oh_num) || (oh_num > 3))
+ 		return -EINVAL;
 -- 
 1.9.1
