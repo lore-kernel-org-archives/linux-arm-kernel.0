@@ -1,40 +1,53 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 19 Nov 2014 12:51:10 -0200
-Subject: [PATCH] ARM: vfp: Fix build warning when CONFIG_CONFIG_VFPv3=n
-Message-ID: <1416408670-25500-1-git-send-email-fabio.estevam@freescale.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 19 Nov 2014 15:54:38 +0100
+Subject: [PATCH RFC] ARM: option for loading modules into vmalloc area
+In-Reply-To: <2041617.Kxhx5O4MMr@wuerfel>
+References: <20141118172146.3784.81151.stgit@buzz>
+ <20141118173413.GB4042@n2100.arm.linux.org.uk>
+ <546B8C64.3010904@samsung.com> <2041617.Kxhx5O4MMr@wuerfel>
+Message-ID: <CAKv+Gu-8qhHYOry+LsDzp+LDZqYxVZ5G7cj48E3G2Unp2+=_yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building bcm2835_defconfig, which has CONFIG_CONFIG_VFPv3=n causes the following
-build warning:
+On 19 November 2014 14:40, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 18 November 2014 21:13:56 Konstantin Khlebnikov wrote:
+>> On 2014-11-18 20:34, Russell King - ARM Linux wrote:
+>> > On Tue, Nov 18, 2014 at 08:21:46PM +0400, Konstantin Khlebnikov wrote:
+>> >> Usually modules are loaded into small area prior to the kernel
+>> >> text because they are linked with the kernel using short calls.
+>> >> Compile-time instrumentation like GCOV or KASAN bloats code a lot,
+>> >> and as a result huge modules no longer fit into reserved area.
+>> >>
+>> >> This patch adds option CONFIG_MODULES_USE_VMALLOC which lifts
+>> >> limitation on amount of loaded modules. It links modules using
+>> >> long-calls (option -mlong-calls) and loads them into vmalloc area.
+>> >>
+>> >> In few places exported symbols are called from inline assembly.
+>> >> This patch adds macro for such call sites: __asmbl and __asmbl_clobber.
+>> >> Call turns into single 'bl' or sequence 'movw; movt; blx' depending on
+>> >> context and state of config option.
+>> >>
+>> >> Unfortunately this option isn't compatible with CONFIG_FUNCTION_TRACER.
+>> >> Compiler emits short calls to profiling function despite of -mlong-calls.
+>> >> This is a bug in GCC, but ftrace anyway needs an update to handle this.
+>> > It also isn't compatible with the older architectures which don't have
+>> > "blx".
+>>
+>> Ok, I'll add "depends on CPU_V6 || CPU_V7" I don't think that it is
+>> necessary for older cpus.
+>
+> Why not just use a different branch instruction for the older CPUs?
+>
 
-arch/arm/vfp/vfpmodule.c: In function 'vfp_init':
-arch/arm/vfp/vfpmodule.c:725:6: warning: unused variable 'mvfr0' [-Wunused-variable]
-  u32 mvfr0;
-      ^
+ARMv6 doesn't support movw/movt so this will only work on v7.
 
-As mvfr0 is only used inside a '#ifdef CONFIG_VFPv3' code block, protect its 
-definition accordingly to avoid the warning.
+What about doing 'mov lr, pc; ldr pc,=symbol' instead? You clearly
+don't care about performance in this case, so the performance hit (due
+to the dcache access and interfering with the return stack predictors)
+should be tolerable. The only thing to be careful about is thumb2
+kernels: you would need to set the thumb bit in lr manually but only
+if the call is made /from/ thumb. You would probably be better off
+just depending on !THUMB2_KERNEL.
 
-Reported-by: Olof's autobuilder <build@lixom.net>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/vfp/vfpmodule.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 5002d00..19a9338 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -722,7 +722,9 @@ static int __init vfp_init(void)
- {
- 	unsigned int vfpsid;
- 	unsigned int cpu_arch = cpu_architecture();
-+#ifdef CONFIG_VFPv3
- 	u32 mvfr0;
-+#endif
- 
- 	if (cpu_arch >= CPU_ARCH_ARMv6)
- 		on_each_cpu(vfp_enable, NULL, 1);
 -- 
-1.9.1
+Ard.
