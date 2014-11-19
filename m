@@ -1,145 +1,40 @@
-From: victorascroft@gmail.com (Victor Ascroft)
-Date: Wed, 19 Nov 2014 22:27:26 +0530
-Subject: Looking for good references for ARM driver development
-In-Reply-To: <546C920A.7060800@free.fr>
-References: <546C920A.7060800@free.fr>
-Message-ID: <546CCBF6.7070607@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 19 Nov 2014 11:59:18 -0500 (EST)
+Subject: [PATCH RFC] ARM: option for loading modules into vmalloc area
+In-Reply-To: <20141119165517.GL4042@n2100.arm.linux.org.uk>
+References: <20141118173413.GB4042@n2100.arm.linux.org.uk>
+ <546B8C64.3010904@samsung.com> <2041617.Kxhx5O4MMr@wuerfel>
+ <CAKv+Gu-8qhHYOry+LsDzp+LDZqYxVZ5G7cj48E3G2Unp2+=_yg@mail.gmail.com>
+ <CALYGNiMt2A3DP02cOtxqu4RrnmhojrDxkRG7bkHMByUnzG+PeA@mail.gmail.com>
+ <CAKv+Gu-rYWutr-45MsZH6KOhhUyNCVLfkO9JQrqCm1L6ms_DUg@mail.gmail.com>
+ <20141119160747.GH4042@n2100.arm.linux.org.uk>
+ <CAKv+Gu-kvmkhrptmaN0miM3c0K3ZOh4maTFXL=NpYTMi9Q83kA@mail.gmail.com>
+ <CALYGNiN5XC_4MhRbxZmFW5Jmc1N1H32tSZr3kKf_UBFriG71nA@mail.gmail.com>
+ <CAKv+Gu8o_-Q5PeFqdQXW=mcHNYxFcLLnvxjq94y-iG8+JUp=9w@mail.gmail.com>
+ <20141119165517.GL4042@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.11.1411191158010.11690@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2014 06:20 PM, Mason wrote:
-> Hello everyone,
-> 
-> I've been using several Linux distributions, and writing user-space programs, for 15 years.
-> I recently seized an opportunity to move into kernel development, mainly writing drivers
-> for an ARM SoC, and I'm finding the transition harder than I expected.
-> 
-> I'm having a hard time finding good reference material to bring me up to speed on the ins
-> and outs of driver development. Sure, I found Documentation/driver-model (eventually) but
-> I'm still missing the high-level overview that ties everything together, and makes my
-> brain click and "get it".
-> 
-> Many years ago, I read LDD2 and it was an eye-opener. We do have LDD3 at work, but it is
-> now almost 10 years old, and it doesn't document things like the platform bus, or the "new"
-> driver model, or hwmon, or cpufreq, or device tree, to name a few things on my plate.
-> (I'm writing drivers for the 3.14 kernel.)
-> 
-> http://www.xml.com/ldd/chapter/book/
-> http://www.makelinux.net/ldd3/
-> 
-> Are there more recent technical references, as good as LDD3, that cover "modern" aspects
-> of kernel development?
+On Wed, 19 Nov 2014, Russell King - ARM Linux wrote:
 
-The LDD3 is one of the best there is. A fourth edition is suppose to come out sometime
-next year. 
-http://www.amazon.com/Linux-Device-Drivers-Jessica-McKellar/dp/1449371612
+> On Wed, Nov 19, 2014 at 05:38:57PM +0100, Ard Biesheuvel wrote:
+> > Numbers are disambiguated by the f and b suffixes, so they can be
+> > reused in the same .s file. So as long as you use a strictly numerical
+> > prefix, you can deal correctly with the case where, for instance,
+> > do_div() is called twice in the same compilation unit, and still not
+> > clash with other inline asm
+> 
+> What's not particularly nice though is to hide these in a macro,
+> which itself may be part of a larger macro or code fragment also
+> using small numbers.
+> 
+> We probably ought to be a bit more inteligent about how we choose
+> these numbers inside macros, rather than just randomly picking some
+> and hoping that they don't clash.
 
-> 
-> I've read good things about:
-> 
-> "Writing Linux Device Drivers: a guide with exercises"
-> by Jerry Cooperstein (2009)
-> originally written for 2.6.31, updated for 3.3
-> http://www.coopj.com/
-> 
-> What do kernel devs recommend as the worthy successor to LDD3?
-> 
-> 
-> To wrap up this (long) message, I'd like to post some of my questions, to highlight some
-> of my confusion. I'm writing a driver for a temperature sensor, which is supposed to work
-> within the hwmon/lm-sensors framework.
-> 
-> The sensor's API consists of 3 memory-mapped registers, which are accessible over the
-> SoC's memory bus. I first wrote a user-space proof-of-concept to interact with the
-> sensors, accessing them through /dev/mem O_SYNC + mmap. That works as expected, and
-> I now have the code to read the temperature when needed.
-> 
-> Next, I looked at the driver glue required to use these sensors from lm-sensors.
-> That's where my troubles started.
-> 
-> 1) Which bus should I be using for this driver? Is the platform bus appropriate?
-> 
-> 2) platform.txt states
-> 
->> Some drivers are not fully converted to the driver model, because they take
->> on a non-driver role:  the driver registers its platform device, rather than
->> leaving that for system infrastructure.  Such drivers can't be hotplugged
->> or coldplugged, since those mechanisms require device creation to be in a
->> different system component than the driver.
-> 
-> How do I "leave device registration for the system infrastructure"?
-> Where should I put that code?
-> Is it a good idea to separate device registration and driver registration
-> in the case of a SoC, where the device is embedded in the SoC and is not
-> "hot-plugged" (or anything-plugged for that matter, it's just "there").
+Maybe in this case, the macro content is so simple that labels are not 
+warranted?  Getting away without them certainly solves the issue.
 
-For understanding this you need to understand how the platform infrastructure
-works and why is it used.
-http://lwn.net/Articles/448499/
-http://lwn.net/Articles/448502/
-and go through some of the relevant drivers. 
-> 
-> 3) Why is the function used to "destroy a platform device" named
-> platform_device_put? Why put?
-> Put on a list of things to destroy at a later time?
 
-This should be more clear once you go through LDD3.
-
-> 
-> 4) Can I use platform_driver_probe, instead of platform_driver_register?
-> The comments in platform.c state:
->> /**
->>  * platform_driver_probe - register driver for non-hotpluggable device
->>  * @drv: platform driver structure
->>  * @probe: the driver probe routine, probably from an __init section
->>  *
->>  * Use this instead of platform_driver_register() when you know the device
->>  * is not hotpluggable and has already been registered, and you want to
->>  * remove its run-once probe() infrastructure from memory after the driver
->>  * has bound to the device.
->>  *
->>  * One typical use for this would be with drivers for controllers integrated
->>  * into system-on-chip processors, where the controller devices have been
->>  * configured as part of board setup.
->>  *
->>  * Note that this is incompatible with deferred probing.
->>  *
->>  * Returns zero if the driver registered and bound to a device, else returns
->>  * a negative error code and with the driver not registered.
->>  */
-> 
-> AFAICT, I need to answer question 2 before I can answer this one.
-> How do I get "devices have been configured as part of board setup."?
-
-This actually depends on the kernel you are using. Do you have relatively
-new kernel or an old one? Depending on that, either you will get that
-information in a board file or else in the device tree in arch/arm/boot/dts.
-> 
-> 5) Very hwmon-specific, how often are temperature sensors probed?
-> Does the frequency vary? (Through /sys knobs? Or something else?)
-> 
-> 
-> That's all I have on my mind at the moment (well, aside from some ARM TLB
-> shenanigans, but that's another story for another time).
-> 
-> I shall be eternally grateful to anyone who can enlighten me through advice,
-> pointers, references, documentation, voodoo, etc.
-
-This depends. If you have driver compiled in with the kernel this will happen
-on kernel boot up. If you have the driver as a loadable module, the probe hook
-will be called on modprobe or insmod.
-
-My blog: http://coherentmusings.wordpress.com/
-
-Some practical stuff on there which might be useful to you.
-
---Regards,
-Sanchayan.
-
-> 
-> Regards.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Nicolas
