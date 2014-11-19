@@ -1,61 +1,62 @@
-From: ajaynumb@gmail.com (Ajay kumar)
-Date: Wed, 19 Nov 2014 15:08:59 +0530
-Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
- support
-In-Reply-To: <546C646C.4060303@collabora.co.uk>
-References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
- <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
- <546C646C.4060303@collabora.co.uk>
-Message-ID: <CAEC9eQPz_7QeL7EDorb-OxiTjcb1tVUDbEbzbER4Yu2wSNNaxQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 19 Nov 2014 09:39:24 +0000
+Subject: [PATCH] arm/arm64: KVM: Handle traps of ICC_SRE_EL1 as RAZ/WI
+In-Reply-To: <1415822474-17398-1-git-send-email-christoffer.dall@linaro.org>
+ (Christoffer Dall's message of "Wed, 12 Nov 2014 20:01:14 +0000")
+References: <1415822474-17398-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <8761ebcywj.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+On Wed, Nov 12 2014 at  8:01:14 pm GMT, Christoffer Dall <christoffer.dall@linaro.org> wrote:
 
-In the cover letter, I have mentioned that it is tested on Linus tree:
+Hi Christoffer,
 
-"This series is based on master branch of Linus tree at:
-git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git"
+> When running on a system with a GICv3, we currenly don't allow the guest
+> to access the system register interface of the GICv3.  We do this by
+> clearing the ICC_SRE_EL2.Enable, which causes all guest accesses to
+> ICC_SRE_EL1 to trap to EL2 and causes all guest accesses to other ICC_
+> registers to cause an undefined exception in the guest.
+>
+> However, we currently don't handle the trap of guest accesses to
+> ICC_SRE_EL1 and will spill out a warning.  The trap just needs to handle
+> the access as RAZ/WI, and a guest that tries to prod this register and
+> set ICC_SRE_EL1.SRE=1, must read back the value (which Linux already
+> does) to see if it succeeded, and will thus observe that ICC_SRE_EL1.SRE
+> was not set.
+>
+> Add the simple trap handler in the sorted table of the system registers.
+>
+> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 4cc3b71..8f81945 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -424,6 +424,11 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  	/* VBAR_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
+>  	  NULL, reset_val, VBAR_EL1, 0 },
+> +
+> +	/* ICC_SRE_EL1 */
+> +	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1100), Op2(0b101),
+> +	  trap_raz_wi },
+> +
+>  	/* CONTEXTIDR_EL1 */
+>  	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b001),
+>  	  access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
 
-Kindly test the patches with that.
+For completeness, can you please add the equivalent trap handler for its
+32bit counterpart while you're at it?
 
-Ajay
+Otherwise, looks good to me.
 
-On Wed, Nov 19, 2014 at 3:05 PM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> Hello Ajay,
->
-> On 11/18/2014 07:20 AM, Ajay kumar wrote:
->> On Sat, Nov 15, 2014 at 3:24 PM, Ajay Kumar <ajaykumar.rs@samsung.com> wrote:
->>> This series is based on master branch of Linus tree at:
->>> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
->
-> I applied your series on top of 3.18-rc5 + linux-next's commit:
->
-> 0ef76ae ("ARM: exynos_defconfig: Enable options for display panel support").
->
-> I think you should had mentioned what other patches are needed as a
-> dependency since I spent quite a bit of time figuring out why the
-> ps8622 bridge driver probe was always deferred due of_drm_find_panel()
-> failing and then I noticed that a patch from linux-next was needed:
->
-> e35e305 ("drm/panel: simple: Add AUO B116XW03 panel support")
->
-> With that commit the ps8622 drm bridge driver probe succeed but I still
-> don't have display working on an Exynos5240 Peach Pit, the kernel log shows:
->
-> platform 145b0000.dp-controller: Driver exynos-dp requests probe deferral
-> exynos-drm exynos-drm: bound 14400000.fimd (ops fimd_component_ops)
-> exynos-drm exynos-drm: failed to bind 145b0000.dp-controller (ops exynos_dp_ops): -517
-> exynos-drm exynos-drm: master bind failed: -517
-> platform 145b0000.dp-controller: Driver exynos-dp requests probe deferral
->
-> Any idea what else I could be missing here?
->
-> Your patches don't apply cleanly in linux-next btw, although the are many
-> issues with the Exynos DRM currently in linux-next anyways so probably using
-> 3.18-rc as a base makes more sense for now until all those things get fixed
-> but you should rebase so they can be picked.
->
-> Best regards,
-> Javier
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
