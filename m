@@ -1,130 +1,351 @@
 From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Wed, 19 Nov 2014 17:04:48 +0100
-Subject: [PATCH 3/6] x86, acpi, pci: Move PCI config space accessors.
+Date: Wed, 19 Nov 2014 17:04:50 +0100
+Subject: [PATCH 5/6] x86, acpi,
+ pci: mmconfig_64.c becomes default implementation for arch agnostic
+ low-level direct PCI config space accessors via MMCONFIG.
 In-Reply-To: <1416413091-13452-1-git-send-email-tomasz.nowicki@linaro.org>
 References: <1416413091-13452-1-git-send-email-tomasz.nowicki@linaro.org>
-Message-ID: <1416413091-13452-4-git-send-email-tomasz.nowicki@linaro.org>
+Message-ID: <1416413091-13452-6-git-send-email-tomasz.nowicki@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are going to use mmio_config_{} name convention across all architectures.
-Currently it belongs to asm/pci_x86.h header which should be included
-only for x86 specific files. From now on, those accessors are in asm/pci.h
-header which can be included in non-architecture code much easier.
+Note that x86 32bits machines still have its own low-level direct
+PCI config space accessors.
 
 Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/x86/include/asm/pci.h     | 42 +++++++++++++++++++++++++++++++++++++++++
- arch/x86/include/asm/pci_x86.h | 43 ------------------------------------------
- 2 files changed, 42 insertions(+), 43 deletions(-)
+ arch/x86/pci/Makefile      |   5 +-
+ arch/x86/pci/mmconfig_64.c | 152 ---------------------------------------------
+ drivers/acpi/mmconfig.c    | 134 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 138 insertions(+), 153 deletions(-)
+ delete mode 100644 arch/x86/pci/mmconfig_64.c
 
-diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
-index 0892ea0..5ba3720 100644
---- a/arch/x86/include/asm/pci.h
-+++ b/arch/x86/include/asm/pci.h
-@@ -71,6 +71,48 @@ void pcibios_set_master(struct pci_dev *dev);
- struct irq_routing_table *pcibios_get_irq_routing_table(void);
- int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq);
+diff --git a/arch/x86/pci/Makefile b/arch/x86/pci/Makefile
+index 5c6fc35..35c765b 100644
+--- a/arch/x86/pci/Makefile
++++ b/arch/x86/pci/Makefile
+@@ -1,7 +1,10 @@
+ obj-y				:= i386.o init.o
  
-+/*
-+ * AMD Fam10h CPUs are buggy, and cannot access MMIO config space
-+ * on their northbrige except through the * %eax register. As such, you MUST
-+ * NOT use normal IOMEM accesses, you need to only use the magic mmio-config
-+ * accessor functions.
-+ * In fact just use pci_config_*, nothing else please.
-+ */
-+static inline unsigned char mmio_config_readb(void __iomem *pos)
-+{
-+	u8 val;
-+	asm volatile("movb (%1),%%al" : "=a" (val) : "r" (pos));
-+	return val;
-+}
-+
-+static inline unsigned short mmio_config_readw(void __iomem *pos)
-+{
-+	u16 val;
-+	asm volatile("movw (%1),%%ax" : "=a" (val) : "r" (pos));
-+	return val;
-+}
-+
-+static inline unsigned int mmio_config_readl(void __iomem *pos)
-+{
-+	u32 val;
-+	asm volatile("movl (%1),%%eax" : "=a" (val) : "r" (pos));
-+	return val;
-+}
-+
-+static inline void mmio_config_writeb(void __iomem *pos, u8 val)
-+{
-+	asm volatile("movb %%al,(%1)" : : "a" (val), "r" (pos) : "memory");
-+}
-+
-+static inline void mmio_config_writew(void __iomem *pos, u16 val)
-+{
-+	asm volatile("movw %%ax,(%1)" : : "a" (val), "r" (pos) : "memory");
-+}
-+
-+static inline void mmio_config_writel(void __iomem *pos, u32 val)
-+{
-+	asm volatile("movl %%eax,(%1)" : : "a" (val), "r" (pos) : "memory");
-+}
- 
- #define HAVE_PCI_MMAP
- extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
-diff --git a/arch/x86/include/asm/pci_x86.h b/arch/x86/include/asm/pci_x86.h
-index caba141..42e7332 100644
---- a/arch/x86/include/asm/pci_x86.h
-+++ b/arch/x86/include/asm/pci_x86.h
-@@ -121,49 +121,6 @@ extern int __init pcibios_init(void);
- extern int pci_legacy_init(void);
- extern void pcibios_fixup_irqs(void);
- 
+ obj-$(CONFIG_PCI_BIOS)		+= pcbios.o
+-obj-$(CONFIG_PCI_MMCONFIG)	+= mmconfig_$(BITS).o direct.o mmconfig-shared.o
++obj-$(CONFIG_PCI_MMCONFIG)	+= direct.o mmconfig-shared.o
++ifeq ($(BITS),32)
++obj-$(CONFIG_PCI_MMCONFIG)	+= mmconfig_32.o
++endif
+ obj-$(CONFIG_PCI_DIRECT)	+= direct.o
+ obj-$(CONFIG_PCI_OLPC)		+= olpc.o
+ obj-$(CONFIG_PCI_XEN)		+= xen.o
+diff --git a/arch/x86/pci/mmconfig_64.c b/arch/x86/pci/mmconfig_64.c
+deleted file mode 100644
+index ff2c50c..0000000
+--- a/arch/x86/pci/mmconfig_64.c
++++ /dev/null
+@@ -1,152 +0,0 @@
 -/*
-- * AMD Fam10h CPUs are buggy, and cannot access MMIO config space
-- * on their northbrige except through the * %eax register. As such, you MUST
-- * NOT use normal IOMEM accesses, you need to only use the magic mmio-config
-- * accessor functions.
-- * In fact just use pci_config_*, nothing else please.
+- * mmconfig.c - Low-level direct PCI config space access via MMCONFIG
+- *
+- * This is an 64bit optimized version that always keeps the full mmconfig
+- * space mapped. This allows lockless config space operation.
 - */
--static inline unsigned char mmio_config_readb(void __iomem *pos)
+-
+-#include <linux/pci.h>
+-#include <linux/init.h>
+-#include <linux/acpi.h>
+-#include <linux/bitmap.h>
+-#include <linux/rcupdate.h>
+-#include <linux/mmconfig.h>
+-#include <asm/e820.h>
+-#include <asm/pci_x86.h>
+-
+-#define PREFIX "PCI: "
+-
+-static char __iomem *pci_dev_base(unsigned int seg, unsigned int bus, unsigned int devfn)
 -{
--	u8 val;
--	asm volatile("movb (%1),%%al" : "=a" (val) : "r" (pos));
--	return val;
+-	struct pci_mmcfg_region *cfg = pci_mmconfig_lookup(seg, bus);
+-
+-	if (cfg && cfg->virt)
+-		return cfg->virt + (PCI_MMCFG_BUS_OFFSET(bus) | (devfn << 12));
+-	return NULL;
 -}
 -
--static inline unsigned short mmio_config_readw(void __iomem *pos)
+-int pci_mmcfg_read(unsigned int seg, unsigned int bus,
+-			  unsigned int devfn, int reg, int len, u32 *value)
 -{
--	u16 val;
--	asm volatile("movw (%1),%%ax" : "=a" (val) : "r" (pos));
--	return val;
+-	char __iomem *addr;
+-
+-	/* Why do we have this when nobody checks it. How about a BUG()!? -AK */
+-	if (unlikely((bus > 255) || (devfn > 255) || (reg > 4095))) {
+-err:		*value = -1;
+-		return -EINVAL;
+-	}
+-
+-	rcu_read_lock();
+-	addr = pci_dev_base(seg, bus, devfn);
+-	if (!addr) {
+-		rcu_read_unlock();
+-		goto err;
+-	}
+-
+-	switch (len) {
+-	case 1:
+-		*value = mmio_config_readb(addr + reg);
+-		break;
+-	case 2:
+-		*value = mmio_config_readw(addr + reg);
+-		break;
+-	case 4:
+-		*value = mmio_config_readl(addr + reg);
+-		break;
+-	}
+-	rcu_read_unlock();
+-
+-	return 0;
 -}
 -
--static inline unsigned int mmio_config_readl(void __iomem *pos)
+-int pci_mmcfg_write(unsigned int seg, unsigned int bus,
+-			   unsigned int devfn, int reg, int len, u32 value)
 -{
--	u32 val;
--	asm volatile("movl (%1),%%eax" : "=a" (val) : "r" (pos));
--	return val;
+-	char __iomem *addr;
+-
+-	/* Why do we have this when nobody checks it. How about a BUG()!? -AK */
+-	if (unlikely((bus > 255) || (devfn > 255) || (reg > 4095)))
+-		return -EINVAL;
+-
+-	rcu_read_lock();
+-	addr = pci_dev_base(seg, bus, devfn);
+-	if (!addr) {
+-		rcu_read_unlock();
+-		return -EINVAL;
+-	}
+-
+-	switch (len) {
+-	case 1:
+-		mmio_config_writeb(addr + reg, value);
+-		break;
+-	case 2:
+-		mmio_config_writew(addr + reg, value);
+-		break;
+-	case 4:
+-		mmio_config_writel(addr + reg, value);
+-		break;
+-	}
+-	rcu_read_unlock();
+-
+-	return 0;
 -}
 -
--static inline void mmio_config_writeb(void __iomem *pos, u8 val)
+-const struct pci_raw_ops pci_mmcfg = {
+-	.read =		pci_mmcfg_read,
+-	.write =	pci_mmcfg_write,
+-};
+-
+-static void __iomem *mcfg_ioremap(struct pci_mmcfg_region *cfg)
 -{
--	asm volatile("movb %%al,(%1)" : : "a" (val), "r" (pos) : "memory");
+-	void __iomem *addr;
+-	u64 start, size;
+-	int num_buses;
+-
+-	start = cfg->address + PCI_MMCFG_BUS_OFFSET(cfg->start_bus);
+-	num_buses = cfg->end_bus - cfg->start_bus + 1;
+-	size = PCI_MMCFG_BUS_OFFSET(num_buses);
+-	addr = ioremap_nocache(start, size);
+-	if (addr)
+-		addr -= PCI_MMCFG_BUS_OFFSET(cfg->start_bus);
+-	return addr;
 -}
 -
--static inline void mmio_config_writew(void __iomem *pos, u16 val)
+-int __init pci_mmcfg_arch_init(void)
 -{
--	asm volatile("movw %%ax,(%1)" : : "a" (val), "r" (pos) : "memory");
+-	struct pci_mmcfg_region *cfg;
+-
+-	list_for_each_entry(cfg, &pci_mmcfg_list, list)
+-		if (pci_mmcfg_arch_map(cfg)) {
+-			pci_mmcfg_arch_free();
+-			return 0;
+-		}
+-
+-	return 1;
 -}
 -
--static inline void mmio_config_writel(void __iomem *pos, u32 val)
+-void __init pci_mmcfg_arch_free(void)
 -{
--	asm volatile("movl %%eax,(%1)" : : "a" (val), "r" (pos) : "memory");
+-	struct pci_mmcfg_region *cfg;
+-
+-	list_for_each_entry(cfg, &pci_mmcfg_list, list)
+-		pci_mmcfg_arch_unmap(cfg);
 -}
 -
- #ifdef CONFIG_PCI
- # ifdef CONFIG_ACPI
- #  define x86_default_pci_init		pci_acpi_init
+-int pci_mmcfg_arch_map(struct pci_mmcfg_region *cfg)
+-{
+-	cfg->virt = mcfg_ioremap(cfg);
+-	if (!cfg->virt) {
+-		pr_err(PREFIX "can't map MMCONFIG at %pR\n", &cfg->res);
+-		return -ENOMEM;
+-	}
+-
+-	return 0;
+-}
+-
+-void pci_mmcfg_arch_unmap(struct pci_mmcfg_region *cfg)
+-{
+-	if (cfg && cfg->virt) {
+-		iounmap(cfg->virt + PCI_MMCFG_BUS_OFFSET(cfg->start_bus));
+-		cfg->virt = NULL;
+-	}
+-}
+diff --git a/drivers/acpi/mmconfig.c b/drivers/acpi/mmconfig.c
+index d62dccda..c0ad05f 100644
+--- a/drivers/acpi/mmconfig.c
++++ b/drivers/acpi/mmconfig.c
+@@ -12,14 +12,148 @@
+ 
+ #include <linux/mutex.h>
+ #include <linux/rculist.h>
++#include <linux/pci.h>
+ #include <linux/mmconfig.h>
+ 
++#include <asm/pci.h>
++
+ #define PREFIX "PCI: "
+ 
+ static DEFINE_MUTEX(pci_mmcfg_lock);
+ 
+ LIST_HEAD(pci_mmcfg_list);
+ 
++static char __iomem *pci_dev_base(unsigned int seg, unsigned int bus,
++				  unsigned int devfn)
++{
++	struct pci_mmcfg_region *cfg = pci_mmconfig_lookup(seg, bus);
++
++	if (cfg && cfg->virt)
++		return cfg->virt + (PCI_MMCFG_BUS_OFFSET(bus) | (devfn << 12));
++	return NULL;
++}
++
++int __weak pci_mmcfg_read(unsigned int seg, unsigned int bus,
++			  unsigned int devfn, int reg, int len, u32 *value)
++{
++	char __iomem *addr;
++
++	/* Why do we have this when nobody checks it. How about a BUG()!? -AK */
++	if (unlikely((bus > 255) || (devfn > 255) || (reg > 4095))) {
++err:		*value = -1;
++		return -EINVAL;
++	}
++
++	rcu_read_lock();
++	addr = pci_dev_base(seg, bus, devfn);
++	if (!addr) {
++		rcu_read_unlock();
++		goto err;
++	}
++
++	switch (len) {
++	case 1:
++		*value = mmio_config_readb(addr + reg);
++		break;
++	case 2:
++		*value = mmio_config_readw(addr + reg);
++		break;
++	case 4:
++		*value = mmio_config_readl(addr + reg);
++		break;
++	}
++	rcu_read_unlock();
++
++	return 0;
++}
++
++int __weak pci_mmcfg_write(unsigned int seg, unsigned int bus,
++			   unsigned int devfn, int reg, int len, u32 value)
++{
++	char __iomem *addr;
++
++	/* Why do we have this when nobody checks it. How about a BUG()!? -AK */
++	if (unlikely((bus > 255) || (devfn > 255) || (reg > 4095)))
++		return -EINVAL;
++
++	rcu_read_lock();
++	addr = pci_dev_base(seg, bus, devfn);
++	if (!addr) {
++		rcu_read_unlock();
++		return -EINVAL;
++	}
++
++	switch (len) {
++	case 1:
++		mmio_config_writeb(addr + reg, value);
++		break;
++	case 2:
++		mmio_config_writew(addr + reg, value);
++		break;
++	case 4:
++		mmio_config_writel(addr + reg, value);
++		break;
++	}
++	rcu_read_unlock();
++
++	return 0;
++}
++
++static void __iomem *mcfg_ioremap(struct pci_mmcfg_region *cfg)
++{
++	void __iomem *addr;
++	u64 start, size;
++	int num_buses;
++
++	start = cfg->address + PCI_MMCFG_BUS_OFFSET(cfg->start_bus);
++	num_buses = cfg->end_bus - cfg->start_bus + 1;
++	size = PCI_MMCFG_BUS_OFFSET(num_buses);
++	addr = ioremap_nocache(start, size);
++	if (addr)
++		addr -= PCI_MMCFG_BUS_OFFSET(cfg->start_bus);
++	return addr;
++}
++
++int __init __weak pci_mmcfg_arch_init(void)
++{
++	struct pci_mmcfg_region *cfg;
++
++	list_for_each_entry(cfg, &pci_mmcfg_list, list)
++		if (pci_mmcfg_arch_map(cfg)) {
++			pci_mmcfg_arch_free();
++			return 0;
++		}
++
++	return 1;
++}
++
++void __init __weak pci_mmcfg_arch_free(void)
++{
++	struct pci_mmcfg_region *cfg;
++
++	list_for_each_entry(cfg, &pci_mmcfg_list, list)
++		pci_mmcfg_arch_unmap(cfg);
++}
++
++int __weak pci_mmcfg_arch_map(struct pci_mmcfg_region *cfg)
++{
++	cfg->virt = mcfg_ioremap(cfg);
++	if (!cfg->virt) {
++		pr_err(PREFIX "can't map MMCONFIG at %pR\n", &cfg->res);
++		return -ENOMEM;
++	}
++
++	return 0;
++}
++
++void __weak pci_mmcfg_arch_unmap(struct pci_mmcfg_region *cfg)
++{
++	if (cfg && cfg->virt) {
++		iounmap(cfg->virt + PCI_MMCFG_BUS_OFFSET(cfg->start_bus));
++		cfg->virt = NULL;
++	}
++}
++
+ static void __init pci_mmconfig_remove(struct pci_mmcfg_region *cfg)
+ {
+ 	if (cfg->res.parent)
 -- 
 1.9.1
