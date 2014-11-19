@@ -1,40 +1,38 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 19 Nov 2014 11:59:18 -0500 (EST)
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Nov 2014 16:59:48 +0000
 Subject: [PATCH RFC] ARM: option for loading modules into vmalloc area
-In-Reply-To: <20141119165517.GL4042@n2100.arm.linux.org.uk>
+In-Reply-To: <alpine.LFD.2.11.1411191152340.11690@knanqh.ubzr>
 References: <20141118173413.GB4042@n2100.arm.linux.org.uk>
  <546B8C64.3010904@samsung.com> <2041617.Kxhx5O4MMr@wuerfel>
  <CAKv+Gu-8qhHYOry+LsDzp+LDZqYxVZ5G7cj48E3G2Unp2+=_yg@mail.gmail.com>
  <CALYGNiMt2A3DP02cOtxqu4RrnmhojrDxkRG7bkHMByUnzG+PeA@mail.gmail.com>
  <CAKv+Gu-rYWutr-45MsZH6KOhhUyNCVLfkO9JQrqCm1L6ms_DUg@mail.gmail.com>
  <20141119160747.GH4042@n2100.arm.linux.org.uk>
- <CAKv+Gu-kvmkhrptmaN0miM3c0K3ZOh4maTFXL=NpYTMi9Q83kA@mail.gmail.com>
- <CALYGNiN5XC_4MhRbxZmFW5Jmc1N1H32tSZr3kKf_UBFriG71nA@mail.gmail.com>
- <CAKv+Gu8o_-Q5PeFqdQXW=mcHNYxFcLLnvxjq94y-iG8+JUp=9w@mail.gmail.com>
- <20141119165517.GL4042@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.11.1411191158010.11690@knanqh.ubzr>
+ <alpine.LFD.2.11.1411191130480.11690@knanqh.ubzr>
+ <20141119164902.GK4042@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1411191152340.11690@knanqh.ubzr>
+Message-ID: <20141119165948.GM4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Nov 2014, Russell King - ARM Linux wrote:
-
-> On Wed, Nov 19, 2014 at 05:38:57PM +0100, Ard Biesheuvel wrote:
-> > Numbers are disambiguated by the f and b suffixes, so they can be
-> > reused in the same .s file. So as long as you use a strictly numerical
-> > prefix, you can deal correctly with the case where, for instance,
-> > do_div() is called twice in the same compilation unit, and still not
-> > clash with other inline asm
+On Wed, Nov 19, 2014 at 11:57:15AM -0500, Nicolas Pitre wrote:
+> On Wed, 19 Nov 2014, Russell King - ARM Linux wrote:
+> > I don't think I ever did, because its pretty much impossible to do as I
+> > explained in a follow up to this thread.
+> > 
+> > We _used_ to do this with the userspace insmod methods, but since we got
+> > this kernel-side linker, it's been pretty much impossible to do without
+> > rewriting the module code.  That's not going to happen on account of one
+> > quirky architecture which Linus doesn't particularly like.
 > 
-> What's not particularly nice though is to hide these in a macro,
-> which itself may be part of a larger macro or code fragment also
-> using small numbers.
-> 
-> We probably ought to be a bit more inteligent about how we choose
-> these numbers inside macros, rather than just randomly picking some
-> and hoping that they don't clash.
+> Still... We could try adding a hook in the generic module linker code 
+> for a pre-relocation pass.  Maybe only ARM would use it, but if the need 
+> to load big modules is real then I imagine Linus could be amenable to a 
+> compromise.
 
-Maybe in this case, the macro content is so simple that labels are not 
-warranted?  Getting away without them certainly solves the issue.
+So, how big a table would you allocate for the trampolines, based upon
+not knowing anything about the module being loaded?  4K?  8K?  64K?
 
-
-Nicolas
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
