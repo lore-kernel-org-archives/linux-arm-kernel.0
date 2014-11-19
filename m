@@ -1,39 +1,83 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 19 Nov 2014 16:40:57 +0100
-Subject: [PATCH] ARM: dts: Specify Odroid X2/U3 audio clock parents and
- rates
-In-Reply-To: <007701cfe1d1$3f4c1940$bde44bc0$@kernel.org>
-References: <1410360223-18363-1-git-send-email-s.nawrocki@samsung.com>
- <5432C5C5.7020206@samsung.com> <007701cfe1d1$3f4c1940$bde44bc0$@kernel.org>
-Message-ID: <546CBA09.8070308@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 19 Nov 2014 15:46:35 +0000
+Subject: For the problem when using swiotlb
+In-Reply-To: <1497289.TPKf3qDiKk@wuerfel>
+References: <5469E26B.2010905@huawei.com> <1535751.CcvIi3DN4F@wuerfel>
+ <20141119112910.GD7156@e104818-lin.cambridge.arm.com>
+ <1497289.TPKf3qDiKk@wuerfel>
+Message-ID: <20141119154634.GE7156@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/14 03:51, Kukjin Kim wrote:
->> > On 10/09/14 16:43, Sylwester Nawrocki wrote:
->>> > > This ensures the core and the audio subsystem clocks are configured
->>> > > properly, as expected by the sound machine driver. These bits are
->>> > > missing to obtain proper audio sample rates in kernel v3.17, where
->>> > > audio support for Odroid X2/U3 was first added.
->>> > >
->>> > > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->>> > > ---
->>> > > It would be good to have it applied as a fix for v3.17.
->> > 
->> > Anything happened to this patch ? I can't see it neither in Linus' nor
->> > -next tree. And we are already at 3.18 merge window.
->> > 
-> Hi Sylwester,
+On Wed, Nov 19, 2014 at 12:48:58PM +0000, Arnd Bergmann wrote:
+> On Wednesday 19 November 2014 11:29:10 Catalin Marinas wrote:
+> > > The driver should call 'dma_set_mask_and_coherent()' with the appropriate
+> > > dma mask, and check whether that succeeded. However, the code implementing
+> > > dma_set_mask_and_coherent on arm64 also needs to be changed to look up
+> > > the dma-ranges property (see of_dma_configure()), and check if the mask
+> > > is possible.
+> > 
+> > dma_set_mask_and_coherent() is a generic function. I think the
+> > of_dma_configure() should start with a coherent_dma_mask based on
+> > dma-ranges if given rather than defaulting to DMA_BIT_MASK(32). The
+> > comment in of_dma_configure() says that devices should set up the
+> > supported mask but it's not always up to them but the bus they are
+> > connected to.
+> > 
+> > Something like below, untested:
+> > 
+> > diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> > index 3b64d0bf5bba..dff34883db45 100644
+> > --- a/drivers/of/platform.c
+> > +++ b/drivers/of/platform.c
+> > @@ -200,6 +200,10 @@ static void of_dma_configure(struct device *dev)
+> >         /* DMA ranges found. Calculate and set dma_pfn_offset */
+> >         dev->dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
+> >         dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
+> > +
+> > +       /* Set the coherent_dma_mask based on the dma-ranges property */
+> > +       if (size)
+> > +               dev->coherent_dma_mask = DMA_BIT_MASK(ilog2(size));
+> >  }
 > 
-> Sorry about that. I'll queue this one into fixes for -3.18 and stable maybe
-> +3.17 only if stable-3.17 is available...
+> We have discussed this in the past, and the problem with this is
+> that the actual mask depends both on the capabilities of the
+> device and the bus. In particular, if the device can only do
+> 32-bit DMA, we must not set the mask to something higher.
 
-Kukjin,
+So is the dma-ranges property allowed to specify a size bigger than what
+the device supports?
 
-You didn't forget about this patch, did you ?
-It's been over 2 months since I've sent it and sound on Odroid X2/U3
-is still broken as it was then. Please send the patch upstream.
+> The normal rule here is that a driver that wants to do 64-bit
+> DMA must call dma_set_mask_and_coherent() with the higher mask,
+> while a device that can not access all of the 32-bit address space
+> must call dma_set_mask_and_coherent() with the smaller mask
+> before doing calling any of the other DMA interfaces.
 
---
-Thanks,
-Sylwester
+OK, looking at the DMA API docs, it looks like the default mask is
+32-bit and any other value should be explicitly set by the driver.
+
+What we don't have on arm64 yet is taking dma_pfn_offset into account
+when generating the dma address (but so far I haven't seen any request
+for this from hardware vendors; it can easily be fixed). So if that's
+not the case for Ding, I'm not sure dma-ranges property would help.
+
+> However, if the bus is not capable of addressing the entire
+> 32-bit range (as on some modern shmobile machines, or some of the
+> really old machines), we need to limit the mask here already.
+
+Would the limiting be based on the dma-ranges size property? Such
+information is not easily available after of_dma_configure(), maybe we
+could store it somewhere in struct device.
+
+Going back to original topic, the dma_supported() function on arm64
+calls swiotlb_dma_supported() which actually checks whether the swiotlb
+bounce buffer is within the dma mask. This transparent bouncing (unlike
+arm32 where it needs to be explicit) is not always optimal, though
+required for 32-bit only devices on a 64-bit system. The problem is when
+the driver is 64-bit capable but forgets to call
+dma_set_mask_and_coherent() (that's not the only question I got about
+running out of swiotlb buffers).
+
+-- 
+Catalin
