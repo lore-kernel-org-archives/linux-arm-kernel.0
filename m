@@ -1,101 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Nov 2014 16:56:42 +0100
-Subject: For the problem when using swiotlb
-In-Reply-To: <20141119154634.GE7156@e104818-lin.cambridge.arm.com>
-References: <5469E26B.2010905@huawei.com> <1497289.TPKf3qDiKk@wuerfel>
- <20141119154634.GE7156@e104818-lin.cambridge.arm.com>
-Message-ID: <3918100.vD6471iH9k@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 19 Nov 2014 15:50:31 +0000
+Subject: [PATCH] thermal: sti: Ignore suspend/resume functions when !PM
+Message-ID: <1416412231-2752-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 November 2014 15:46:35 Catalin Marinas wrote:
-> On Wed, Nov 19, 2014 at 12:48:58PM +0000, Arnd Bergmann wrote:
-> > On Wednesday 19 November 2014 11:29:10 Catalin Marinas wrote:
-> > > > The driver should call 'dma_set_mask_and_coherent()' with the appropriate
-> > > > dma mask, and check whether that succeeded. However, the code implementing
-> > > > dma_set_mask_and_coherent on arm64 also needs to be changed to look up
-> > > > the dma-ranges property (see of_dma_configure()), and check if the mask
-> > > > is possible.
-> > > 
-> > > dma_set_mask_and_coherent() is a generic function. I think the
-> > > of_dma_configure() should start with a coherent_dma_mask based on
-> > > dma-ranges if given rather than defaulting to DMA_BIT_MASK(32). The
-> > > comment in of_dma_configure() says that devices should set up the
-> > > supported mask but it's not always up to them but the bus they are
-> > > connected to.
-> > > 
-> > > Something like below, untested:
-> > > 
-> > > diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> > > index 3b64d0bf5bba..dff34883db45 100644
-> > > --- a/drivers/of/platform.c
-> > > +++ b/drivers/of/platform.c
-> > > @@ -200,6 +200,10 @@ static void of_dma_configure(struct device *dev)
-> > >         /* DMA ranges found. Calculate and set dma_pfn_offset */
-> > >         dev->dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
-> > >         dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
-> > > +
-> > > +       /* Set the coherent_dma_mask based on the dma-ranges property */
-> > > +       if (size)
-> > > +               dev->coherent_dma_mask = DMA_BIT_MASK(ilog2(size));
-> > >  }
-> > 
-> > We have discussed this in the past, and the problem with this is
-> > that the actual mask depends both on the capabilities of the
-> > device and the bus. In particular, if the device can only do
-> > 32-bit DMA, we must not set the mask to something higher.
-> 
-> So is the dma-ranges property allowed to specify a size bigger than what
-> the device supports?
+Prevents build warning:
 
-dma-ranges is a property that describes the bus, but you can have
-devices with different capabilities on the same bus. In particular
-on PCI, you will have 32-bit and 64-bit masters on the same host
-controller.
+st_thermal.c:278:12:
+    warning: ?st_thermal_suspend? defined but not used [-Wunused-function]
+st_thermal.c:286:12:
+    warning: ?st_thermal_resume? defined but not used [-Wunused-function]
 
-> > The normal rule here is that a driver that wants to do 64-bit
-> > DMA must call dma_set_mask_and_coherent() with the higher mask,
-> > while a device that can not access all of the 32-bit address space
-> > must call dma_set_mask_and_coherent() with the smaller mask
-> > before doing calling any of the other DMA interfaces.
-> 
-> OK, looking at the DMA API docs, it looks like the default mask is
-> 32-bit and any other value should be explicitly set by the driver.
-> 
-> What we don't have on arm64 yet is taking dma_pfn_offset into account
-> when generating the dma address (but so far I haven't seen any request
-> for this from hardware vendors; it can easily be fixed). So if that's
-> not the case for Ding, I'm not sure dma-ranges property would help.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
 
-You can ignore dma_pfn_offset for now, until someone needs it. What
-we definitely need is the size of the range.
+v1 => v2:
+ - CONFIG_PM => CONFIG_PM_SLEEP suggested by David Paris.
 
-> > However, if the bus is not capable of addressing the entire
-> > 32-bit range (as on some modern shmobile machines, or some of the
-> > really old machines), we need to limit the mask here already.
-> 
-> Would the limiting be based on the dma-ranges size property?
+ drivers/thermal/st/st_thermal.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Yes.
-
-> Such information is not easily available after of_dma_configure(),
-> maybe we could store it somewhere in struct device.
-
-I don't think it's necessary. Setting the dma mask is a rare operation,
-and we only need to check again if the new mask is larger than the
-old one.
-
-> Going back to original topic, the dma_supported() function on arm64
-> calls swiotlb_dma_supported() which actually checks whether the swiotlb
-> bounce buffer is within the dma mask. This transparent bouncing (unlike
-> arm32 where it needs to be explicit) is not always optimal, though
-> required for 32-bit only devices on a 64-bit system. The problem is when
-> the driver is 64-bit capable but forgets to call
-> dma_set_mask_and_coherent() (that's not the only question I got about
-> running out of swiotlb buffers).
-
-I think it would be nice to warn once per device that starts using the
-swiotlb. Really all 32-bit DMA masters should have a proper IOMMU
-attached.
-
-	Arnd
+diff --git a/drivers/thermal/st/st_thermal.c b/drivers/thermal/st/st_thermal.c
+index 90163b3..d1ec580 100644
+--- a/drivers/thermal/st/st_thermal.c
++++ b/drivers/thermal/st/st_thermal.c
+@@ -275,6 +275,7 @@ int st_thermal_unregister(struct platform_device *pdev)
+ }
+ EXPORT_SYMBOL_GPL(st_thermal_unregister);
+ 
++#ifdef CONFIG_PM_SLEEP
+ static int st_thermal_suspend(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+@@ -305,6 +306,8 @@ static int st_thermal_resume(struct device *dev)
+ 
+ 	return 0;
+ }
++#endif
++
+ SIMPLE_DEV_PM_OPS(st_thermal_pm_ops, st_thermal_suspend, st_thermal_resume);
+ EXPORT_SYMBOL_GPL(st_thermal_pm_ops);
+ 
+-- 
+1.9.1
