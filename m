@@ -1,66 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 19 Nov 2014 18:07:25 +0000
-Subject: [PATCH v7 4/4] dt-bindings: add bindings for mediatek sysirq
-In-Reply-To: <1416406451-4578-5-git-send-email-yingjoe.chen@mediatek.com>
-References: <1416406451-4578-1-git-send-email-yingjoe.chen@mediatek.com>
- <1416406451-4578-5-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <20141119180724.GE12851@leverpostej>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 19 Nov 2014 19:11:04 +0100
+Subject: [PATCH] ASoC: samsung: Fix IISMOD setting in i2s_set_sysclk()
+Message-ID: <1416420664-20952-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 02:14:11PM +0000, Yingjoe Chen wrote:
-> Add binding documentation for Mediatek SoC SYSIRQ.
-> 
-> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> ---
->  .../bindings/arm/mediatek/mediatek,sysirq.txt      | 26 ++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
-> new file mode 100644
-> index 0000000..8669536
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
-> @@ -0,0 +1,26 @@
-> +Mediatek 65xx/81xx sysirq
-> +
-> +Mediatek SOCs sysirq support controllable irq inverter for each GIC SPI
-> +interrupt.
-> +
-> +Required properties:
-> +- compatible: should be one of:
-> +	"mediatek,mt8135-sysirq"
-> +	"mediatek,mt8127-sysirq"
-> +	"mediatek,mt6589-sysirq"
-> +	"mediatek,mt6582-sysirq"
-> +	"mediatek,mt6577-sysirq"
-> +- interrupt-controller : Identifies the node as an interrupt controller
-> +- #interrupt-cells : Must use the same cells/format as parent controller.
-> +- interrupt-parent: phandle of irq domain parent for sysirq.
+In the i2s_set_sysclk() callback we are currently clearing all bits
+of the IISMOD register when clk_id is SAMSUNG_I2S_CDCLK and dir
+is SND_SOC_CLOCK_OUT. It's due to an incorrect mask used for the AND
+operation and breaks the I2S interface operation when we attempt to
+use the CDCLK output clock.
 
-I'm concerned that this sounds very general while the binding assumes
-the GICv2 interrupt-specifier format. Either the driver needs to become
-more general, or this needs to be tightened up.
+It fixes commit a5a56871f804edac93a53b5e871c0e9818fb9033
+("ASoC: samsung: add support for exynos7 I2S controller") and restores
+sound support for Odroid X2/U3.
 
-It's also odd to say "irq domain parent", as that's purely a Linux
-construct and has nothing to do with the HW.
+Cc: Padmavathi Venna <padma.v@samsung.com>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+ sound/soc/samsung/i2s.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-Mark.
-
-> +- reg: Physical base address of the intpol registers and length of memory
-> +  mapped region.
-> +
-> +Example:
-> +	sysirq: interrupt-controller at 10200100 {
-> +		compatible = "mediatek,mt6589-sysirq", "mediatek,mt6577-sysirq";
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +		interrupt-parent = <&gic>;
-> +		reg = <0 0x10200100 0 0x1c>;
-> +	};
-> -- 
-> 1.8.1.1.dirty
-> 
-> 
+diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+index 947352d..8db8c66 100644
+--- a/sound/soc/samsung/i2s.c
++++ b/sound/soc/samsung/i2s.c
+@@ -494,7 +494,7 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
+ 		if (dir == SND_SOC_CLOCK_IN)
+ 			mod |= 1 << i2s_regs->cdclkcon_off;
+ 		else
+-			mod &= 0 << i2s_regs->cdclkcon_off;
++			mod &= ~(1 << i2s_regs->cdclkcon_off);
+ 
+ 		i2s->rfs = rfs;
+ 		break;
+-- 
+1.7.9.5
