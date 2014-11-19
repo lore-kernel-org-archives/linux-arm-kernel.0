@@ -1,27 +1,67 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 19 Nov 2014 11:17:37 +0100
-Subject: [PATCH 1/1] ARM: exynos_defconfig: Enable max77802 rtc and clock
- drivers
-In-Reply-To: <546C5039.10107@samsung.com>
-References: <1414401440-10972-1-git-send-email-javier.martinez@collabora.co.uk>
- <04e101cff29f$4021ea00$c065be00$@kernel.org>
- <CABxcv=kaOa1+6a1n_+GjoH=PgG=LzAnXLU7U_E5NvYYP-0WedA@mail.gmail.com>
- <546C5039.10107@samsung.com>
-Message-ID: <546C6E41.7040401@collabora.co.uk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 19 Nov 2014 11:17:56 +0100
+Subject: [PATCH 1/3] drivers: cpuidle: Add status property to ARM idle states
+In-Reply-To: <546C6DEB.8060204@linaro.org>
+References: <546C6DEB.8060204@linaro.org>
+Message-ID: <1416392278-18397-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kukjin,
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-On 11/19/2014 09:09 AM, Kukjin Kim wrote:
->> You say that you will apply this patch but I can't find it in any of
->> your branches.
->> 
-> Sorry for missing the patch in my tree. You can see it in a couple of
-> mins ;)
-> 
+On some platforms the device tree bindings must provide the kernel
+with a status flag for idle states, that defines whether the idle
+state is operational or not in the current configuration.
 
-Great, thanks a lot!
+This patch adds a status property to the ARM idle states compliant
+with ePAPR v1.1 and updates the DT parsing code accordingly.
 
-Best regards,
-Javier
+Acked-by: Kevin Hilman <khilman@linaro.org>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ Documentation/devicetree/bindings/arm/idle-states.txt | 14 ++++++++++++++
+ drivers/cpuidle/dt_idle_states.c                      |  3 +++
+ 2 files changed, 17 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/idle-states.txt b/Documentation/devicetree/bindings/arm/idle-states.txt
+index 37375c7..5e51511 100644
+--- a/Documentation/devicetree/bindings/arm/idle-states.txt
++++ b/Documentation/devicetree/bindings/arm/idle-states.txt
+@@ -317,6 +317,20 @@ follows:
+ 			    In such systems entry-latency-us + exit-latency-us
+ 			    will exceed wakeup-latency-us by this duration.
+ 
++	- status:
++		Usage: Optional
++		Value type: <string>
++		Definition: A standard device tree property [5] that indicates
++			    the operational status of an idle-state.
++			    If present, it shall be:
++			    "okay": to indicate that the idle state is
++				    operational.
++			    "disabled": to indicate that the idle state has
++					been disabled in firmware so it is not
++					operational.
++			    If the property is not present the idle-state must
++			    be considered operational.
++
+ 	In addition to the properties listed above, a state node may require
+ 	additional properties specifics to the entry-method defined in the
+ 	idle-states node, please refer to the entry-method bindings
+diff --git a/drivers/cpuidle/dt_idle_states.c b/drivers/cpuidle/dt_idle_states.c
+index 52f4d11..22840f4 100644
+--- a/drivers/cpuidle/dt_idle_states.c
++++ b/drivers/cpuidle/dt_idle_states.c
+@@ -169,6 +169,9 @@ int dt_init_idle_driver(struct cpuidle_driver *drv,
+ 		if (!state_node)
+ 			break;
+ 
++		if (!of_device_is_available(state_node))
++			continue;
++
+ 		if (!idle_state_valid(state_node, i, cpumask)) {
+ 			pr_warn("%s idle state not valid, bailing out\n",
+ 				state_node->full_name);
+-- 
+1.9.1
