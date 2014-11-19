@@ -1,102 +1,58 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Wed, 19 Nov 2014 19:03:17 +0000
-Subject: [PATCH 5/5] PCI: Rip out pci_bus_add_devices() from
- pci_scan_root_bus()
-In-Reply-To: <1645037.uypArjN50l@wuerfel>
-References: <1416382369-13587-1-git-send-email-wangyijing@huawei.com>
- <1416382369-13587-6-git-send-email-wangyijing@huawei.com>
- <1645037.uypArjN50l@wuerfel>
-Message-ID: <20141119190317.GC9162@bart.dudau.co.uk>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Wed, 19 Nov 2014 11:03:43 -0800
+Subject: [PATCH] mmc: dw_mmc: Turn the card clock off at suspend time
+In-Reply-To: <1416423073-8105-1-git-send-email-dianders@chromium.org>
+References: <1416423073-8105-1-git-send-email-dianders@chromium.org>
+Message-ID: <CAL1qeaGkQVimrFNtGgfTJEHNemG_QUTecQwH4=nXu1_u1rWwhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 01:11:41PM +0100, Arnd Bergmann wrote:
-> On Wednesday 19 November 2014 15:32:49 Yijing Wang wrote:
-> > Just like pci_scan_bus(), we also should rip out
-> > pci_bus_add_devices() from pci_scan_root_bus().
-> > Lots platforms first call pci_scan_root_bus(), but
-> > after that, they call pci_bus_size_bridges() and
-> > pci_bus_assign_resources(). Place pci_bus_add_devices()
-> > in pci_scan_root_bus() hurts PCI scan logic.
-> 
-> I think we really need to wait for Bjorn to comment on this patch,
-> as I mentioned the idea behind pci_scan_root_bus() was to integrate
-> the scanning part, which you now undo, though I can still see this
-> working out in the long run.
-> 
-> > Should no functional change.
-> 
-> But you are moving the pci_bus_add_devices() later in a couple of
-> places. While this seems entirely reasonable, I would consider
-> it a functional change.
-> 
-> > diff --git a/arch/alpha/kernel/pci.c b/arch/alpha/kernel/pci.c
-> > index 076c35c..97f9730 100644
-> > --- a/arch/alpha/kernel/pci.c
-> > +++ b/arch/alpha/kernel/pci.c
-> > @@ -334,6 +334,8 @@ common_init_pci(void)
-> >  
-> >  		bus = pci_scan_root_bus(NULL, next_busno, alpha_mv.pci_ops,
-> >  					hose, &resources);
-> > +		if (bus)
-> > +			pci_bus_add_devices(bus);
-> >  		hose->bus = bus;
-> >  		hose->need_domain_info = need_domain_info;
-> >  		next_busno = bus->busn_res.end + 1;
-> 
-> How about making pci_bus_add_devices() handle a NULL argument to save
-> the if() here and elsewhere?
+Doug,
 
-Actually, I would stop there if the bus is NULL and start cleaning up. If not,
-things are going to blow up three lines down when next_busno is calculated.
+On Wed, Nov 19, 2014 at 10:51 AM, Doug Anderson <dianders@chromium.org> wrote:
+> Since the dw_mmc driver was first added to Linux it's had a TODO in it
+> that we should turn off the card clock during suspend.  I have no idea
+> for sure why it wasn't done originally, but if I had to guess I'd
+> guess it was related to the lack of a common clock framework.  Let's
+> do it now.
+>
+> There is no reason for the card clock to be left on during suspend and
+> most systems will eventually turn it off anyway (when whole clock
+> trees are disabled).  However, it's good to be explicit that it's
+> disabled at the time that the MMC subsystem is disabled.
 
-Best regards,
-Liviu
+Should the bus clock (biu) be disabled as well?
 
+> This actually fixes a bug on Rockchip rk3288 where an SDIO card wakes
+> the system back up during suspend.
+>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+>  drivers/mmc/host/dw_mmc.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 5a37c33..c448159 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -2825,11 +2825,10 @@ EXPORT_SYMBOL(dw_mci_remove);
+>
+>
+>  #ifdef CONFIG_PM_SLEEP
+> -/*
+> - * TODO: we should probably disable the clock to the card in the suspend path.
+> - */
+>  int dw_mci_suspend(struct dw_mci *host)
+>  {
+> +       clk_disable(host->ciu_clk);
 
-> > diff --git a/arch/mips/pci/pci.c b/arch/mips/pci/pci.c
-> > index 1bf60b1..f083688 100644
-> > --- a/arch/mips/pci/pci.c
-> > +++ b/arch/mips/pci/pci.c
-> > @@ -113,6 +113,7 @@ static void pcibios_scanbus(struct pci_controller *hose)
-> >  		if (!pci_has_flag(PCI_PROBE_ONLY)) {
-> >  			pci_bus_size_bridges(bus);
-> >  			pci_bus_assign_resources(bus);
-> > +			pci_bus_add_devices(bus);
-> >  		}
-> >  	}
-> >  }
-> 
-> This one looks wrong, I think you still want to call pci_bus_add_devices()
-> even with PCI_PROBE_ONLY set.
-> 
-> > diff --git a/arch/tile/kernel/pci.c b/arch/tile/kernel/pci.c
-> > index 1f80a88..007466e 100644
-> > --- a/arch/tile/kernel/pci.c
-> > +++ b/arch/tile/kernel/pci.c
-> > @@ -308,6 +308,8 @@ int __init pcibios_init(void)
-> >  			pci_add_resource(&resources, &iomem_resource);
-> >  			bus = pci_scan_root_bus(NULL, 0, controller->ops,
-> >  						controller, &resources);
-> > +			if (bus)
-> > +				pci_bus_add_devices(bus);
-> >  			controller->root_bus = bus;
-> >  			controller->last_busno = bus->busn_res.end;
-> >  		}
-> 
-> Should the pci_bus_add_devices come after setting the bus numbers here?
-> 
-> 	Arnd
-> 
+I think you need to check for IS_ERR(host->ciu_clk) since the clock is
+optional.  Also, maybe disable_unprepare instead of just disable?
 
--- 
--------------------
-   .oooO
-   (   )
-    \ (  Oooo.
-     \_) (   )
-          ) /
-         (_/
+> @@ -2838,6 +2837,8 @@ int dw_mci_resume(struct dw_mci *host)
+>  {
+>         int i, ret;
+>
+> +       clk_enable(host->ciu_clk);
 
- One small step
-   for me ...
+Check return value?
