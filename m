@@ -1,43 +1,40 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 19 Nov 2014 17:07:52 +0100
-Subject: [PATCH 0/3] PM / Domains: Add initial PM clock support to genpd
-In-Reply-To: <1416405638-18812-1-git-send-email-ulf.hansson@linaro.org>
-References: <1416405638-18812-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAMuHMdUKWNSTYCAcusOpk31=Y6g5-SqKck5HaHZvgBOaYQrK3w@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 19 Nov 2014 17:07:58 +0100
+Subject: [PATCH RESEND 4/4] ARM: at91/dt: add trng node
+In-Reply-To: <1416413278-10197-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1416413278-10197-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1416413278-10197-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Add a DT node for the TRNG (True Random Number Generator) block.
 
-On Wed, Nov 19, 2014 at 3:00 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> It's quite common for PM domains to use PM clocks. Typically from SOC specific
-> code, the per device PM clock list is created and pm_clk_suspend|resume() are
-> invoked to handle clock gating/ungating.
->
-> A step towards consolidation is to integrate PM clock support into genpd, which
-> is what this patchset does.
+Keep this block enabled as it does not depend on any external connection,
+and thus should be available on all boards.
 
-Thanks, this sounds like a good idea.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/at91sam9g45.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-> In this initial step, the calls to the pm_clk_suspend|resume() are handled
-> within genpd, but the per device PM clock list still needs to be created from
-> SOC specific code. It seems reasonable to have gendp to handle that as well, but
-
-s/gendp/genpd/
-
-> that left to future patchsets to address.
-
-If/when genpd will handle the clock creation, perhaps the flag can just
-be replaced by a pointer to a list of clocks?
-Or do you have other uses in mind for adding the flags field now?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index 932a669..790c890 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -934,6 +934,13 @@
+ 				status = "disabled";
+ 			};
+ 
++			trng at fffcc000 {
++				compatible = "atmel,at91sam9g45-trng";
++				reg = <0xfffcc000 0x4000>;
++				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 0>;
++				clocks = <&trng_clk>;
++			};
++
+ 			i2c0: i2c at fff84000 {
+ 				compatible = "atmel,at91sam9g10-i2c";
+ 				reg = <0xfff84000 0x100>;
+-- 
+1.9.1
