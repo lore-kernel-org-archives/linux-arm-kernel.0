@@ -1,140 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Nov 2014 17:00:21 +0100
-Subject: [PATCH v4 2/2] ARM: cache-l2x0: optimize aurora range operations
-In-Reply-To: <2352238.Gx0LiZB7JR@wuerfel>
-References: <2352238.Gx0LiZB7JR@wuerfel>
-Message-ID: <3013076.29gu0Opyzs@wuerfel>
+From: francesco@dolcini.it (Francesco Dolcini)
+Date: Wed, 19 Nov 2014 17:01:08 +0100
+Subject: ARM: mvebu: ethernet packets corruption and I/O coherency
+In-Reply-To: <20141118153035.757fe0fc@free-electrons.com>
+References: <20141118142520.GD24819@dev0.local>
+ <20141118153035.757fe0fc@free-electrons.com>
+Message-ID: <20141119160108.GJ24819@dev0.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The aurora_inv_range(), aurora_clean_range() and aurora_flush_range()
-functions are highly redundant, both in source and in object code, and
-they are harder to understand than necessary.
+Hi Thomas and all
 
-By moving the range loop into the aurora_pa_range() function, they
-become trivial wrappers, and the object code start looking like what
-one would expect for an optimal implementation.
+On Tue, Nov 18, 2014 at 03:30:35PM +0100, Thomas Petazzoni wrote:
+> It could indeed be related. I have marked the relevant patches in the 
+> "ARM: mvebu: no I/O coherency on non-SMP and related updates" series as
+> to be backported to stable up to v3.8, so when they get accepted, I'll
+> take care of backporting them.
 
-Further optimization may be possible by using the per-CPU "virtual"
-registers to avoid the spinlocks in most cases.
+I prepared and tested this small patch to fix the problem on kernel
+3.13.11 and it seems to fix my ethernet packet corruption problem.
+Do you think it is fine?
 
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
- (on Armada 370 RD and Armada XP GP, boot tested, plus a little bit of
- DMA traffic by reading data from a SD card)
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Do you think that this bug on I/O cache coherency could also trigger some
+sporadic random OOPS and kernel panic? I got an OOPS with a broken LR in
+skb_segment() and a kernel panic in put_page(), but I was never able to
+reproduce any of them.
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 341ba8aaca42..e2013b9c4362 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -1164,7 +1164,7 @@ static const struct l2c_init_data of_l2c310_coherent_data __initconst = {
-  * noninclusive, while the hardware cache range operations use
-  * inclusive start and end addresses.
-  */
--static unsigned long calc_range_end(unsigned long start, unsigned long end)
-+static unsigned long aurora_range_end(unsigned long start, unsigned long end)
+Thanks,
+Francesco
+
+
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -124,6 +124,12 @@
  {
- 	/*
- 	 * Limit the number of cache lines processed at once,
-@@ -1183,26 +1183,13 @@ static unsigned long calc_range_end(unsigned long start, unsigned long end)
- 	return end;
- }
+ 	struct device_node *np;
  
--/*
-- * Make sure 'start' and 'end' reference the same page, as L2 is PIPT
-- * and range operations only do a TLB lookup on the start address.
-- */
- static void aurora_pa_range(unsigned long start, unsigned long end,
--			unsigned long offset)
-+			    unsigned long offset)
- {
- 	void __iomem *base = l2x0_base;
-+	unsigned long range_end;
- 	unsigned long flags;
- 
--	raw_spin_lock_irqsave(&l2x0_lock, flags);
--	writel_relaxed(start, base + AURORA_RANGE_BASE_ADDR_REG);
--	writel_relaxed(end, base + offset);
--	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
--
--	writel_relaxed(0, base + AURORA_SYNC_REG);
--}
--
--static void aurora_inv_range(unsigned long start, unsigned long end)
--{
- 	/*
- 	 * round start and end adresses up to cache line size
- 	 */
-@@ -1210,15 +1197,24 @@ static void aurora_inv_range(unsigned long start, unsigned long end)
- 	end = ALIGN(end, CACHE_LINE_SIZE);
- 
- 	/*
--	 * Invalidate all full cache lines between 'start' and 'end'.
-+	 * perform operation on all full cache lines between 'start' and 'end'
- 	 */
- 	while (start < end) {
--		unsigned long range_end = calc_range_end(start, end);
--		aurora_pa_range(start, range_end - CACHE_LINE_SIZE,
--				AURORA_INVAL_RANGE_REG);
-+		range_end = aurora_range_end(start, end);
++	if (!is_smp())
++	{
++	    pr_info("Coherency fabric disabled\n");
++	    return 0;
++	}
 +
-+		raw_spin_lock_irqsave(&l2x0_lock, flags);
-+		writel_relaxed(start, base + AURORA_RANGE_BASE_ADDR_REG);
-+		writel_relaxed(range_end - CACHE_LINE_SIZE, base + offset);
-+		raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+ 	np = of_find_matching_node(NULL, of_coherency_table);
+ 	if (np) {
+ 		struct resource res;
+@@ -150,6 +156,9 @@
+ {
+ 	struct device_node *np;
+ 
++	if (!is_smp())
++	    return 0;
 +
-+		writel_relaxed(0, base + AURORA_SYNC_REG);
- 		start = range_end;
- 	}
- }
-+static void aurora_inv_range(unsigned long start, unsigned long end)
-+{
-+	aurora_pa_range(start, end, AURORA_INVAL_RANGE_REG);
-+}
- 
- static void aurora_clean_range(unsigned long start, unsigned long end)
- {
-@@ -1226,36 +1222,16 @@ static void aurora_clean_range(unsigned long start, unsigned long end)
- 	 * If L2 is forced to WT, the L2 will always be clean and we
- 	 * don't need to do anything here.
- 	 */
--	if (!l2_wt_override) {
--		start &= ~(CACHE_LINE_SIZE - 1);
--		end = ALIGN(end, CACHE_LINE_SIZE);
--		while (start != end) {
--			unsigned long range_end = calc_range_end(start, end);
--			aurora_pa_range(start, range_end - CACHE_LINE_SIZE,
--					AURORA_CLEAN_RANGE_REG);
--			start = range_end;
--		}
--	}
-+	if (!l2_wt_override)
-+		aurora_pa_range(start, end, AURORA_CLEAN_RANGE_REG);
- }
- 
- static void aurora_flush_range(unsigned long start, unsigned long end)
- {
--	start &= ~(CACHE_LINE_SIZE - 1);
--	end = ALIGN(end, CACHE_LINE_SIZE);
--	while (start != end) {
--		unsigned long range_end = calc_range_end(start, end);
--		/*
--		 * If L2 is forced to WT, the L2 will always be clean and we
--		 * just need to invalidate.
--		 */
--		if (l2_wt_override)
--			aurora_pa_range(start, range_end - CACHE_LINE_SIZE,
--							AURORA_INVAL_RANGE_REG);
--		else
--			aurora_pa_range(start, range_end - CACHE_LINE_SIZE,
--							AURORA_FLUSH_RANGE_REG);
--		start = range_end;
--	}
-+	if (l2_wt_override)
-+		aurora_pa_range(start, end, AURORA_INVAL_RANGE_REG);
-+	else
-+		aurora_pa_range(start, end, AURORA_FLUSH_RANGE_REG);
- }
- 
- static void aurora_flush_all(void)
+ 	np = of_find_matching_node(NULL, of_coherency_table);
+ 	if (np) {
+ 		bus_register_notifier(&platform_bus_type,
