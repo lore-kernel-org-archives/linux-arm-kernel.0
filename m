@@ -1,71 +1,69 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 19 Nov 2014 11:31:13 +0100
-Subject: [PATCH] mmc: mvsdio: Work around broken TX DMA
-In-Reply-To: <1415830208-1888-1-git-send-email-andrew@lunn.ch>
-References: <1415830208-1888-1-git-send-email-andrew@lunn.ch>
-Message-ID: <CAPDyKFos__44CdPUxAT1R=+81ohuZWHAN83HCv6-BD6QWksF0w@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 19 Nov 2014 11:31:10 +0100
+Subject: [PATCH 0/4] ARM: at91: remove !DT support for at91sam9260/9g20 and
+ at91sam9263
+Message-ID: <cover.1416392687.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 November 2014 23:10, Andrew Lunn <andrew@lunn.ch> wrote:
-> In order to use the mvsdio driver for sdio, it has been necessary to
-> use a module parameter to disable DMA so to force PIO is used. It is
-> then possible to use wireless LAN devices like mwifiex found on
-> topkick and mirabox. However, accessing an MMC SD card does work with
-> DMA.
->
-> Investigation has shown that MMC block device accesses are always
-> aligned to 64 byte boundaries, where as transfers from mwifiex are
-> rarely more than word aligned. It has also been determined that card
-> to host transfers work with DMA for SDIO devices, but host to card
-> transfers with DMA have problems.
->
-> This patch extends the current checks for buffers which are not word
-> aligned or multiple of words. All host to card transfers which are not
-> 64 byte aligned are now also performed via PIO. This should not affect
-> the performance of SD cards, but allow sdio devices to work out of the
-> box, and they are likely to be more efficient since DMA will be used
-> for card to host transfers.
->
-> Tested on mirabox for wifi via mwifiex
-> Tested on 370 RD for file systems on an SD card.
->
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+As announced here https://lkml.org/lkml/2014/9/10/293 ([ANNOUNCE] ARM: at91:
+removal of board files) two months ago, we are continuing the work to remove
+the non-Device-Tree board support for older Atmel SoCs.
+This series is for at91sam9260/9g20 and at91sam9263. The DT must be used for
+these SoCs.
 
-Thanks! Applied for next.
+The diffstat is pretty big this time.
 
-Kind regards
-Uffe
+Bye,
 
-> ---
->  drivers/mmc/host/mvsdio.c | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
-> index 6b4c5ad3b393..4f8618f4522d 100644
-> --- a/drivers/mmc/host/mvsdio.c
-> +++ b/drivers/mmc/host/mvsdio.c
-> @@ -111,10 +111,15 @@ static int mvsd_setup_data(struct mvsd_host *host, struct mmc_data *data)
->         mvsd_write(MVSD_BLK_COUNT, data->blocks);
->         mvsd_write(MVSD_BLK_SIZE, data->blksz);
->
-> -       if (nodma || (data->blksz | data->sg->offset) & 3) {
-> +       if (nodma || (data->blksz | data->sg->offset) & 3 ||
-> +           ((!(data->flags & MMC_DATA_READ) && data->sg->offset & 0x3f))) {
->                 /*
->                  * We cannot do DMA on a buffer which offset or size
->                  * is not aligned on a 4-byte boundary.
-> +                *
-> +                * It also appears the host to card DMA can corrupt
-> +                * data when the buffer is not aligned on a 64 byte
-> +                * boundary.
->                  */
->                 host->pio_size = data->blocks * data->blksz;
->                 host->pio_ptr = sg_virt(data->sg);
-> --
-> 2.1.3
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Nicolas Ferre (4):
+  ARM: at91: remove at91sam9263 legacy board support
+  ARM: at91: remove at91sam9260/at91sam9g20 legacy boards files
+  ARM: at91: remove at91sam9260/at91sam9g20 legacy board support
+  ARM: at91/Kconfig: remove unused config options
+
+ arch/arm/configs/at91sam9260_9g20_defconfig |  145 ---
+ arch/arm/configs/at91sam9263_defconfig      |  151 ---
+ arch/arm/mach-at91/Kconfig.non_dt           |  138 ---
+ arch/arm/mach-at91/Makefile                 |   24 -
+ arch/arm/mach-at91/at91sam9260.c            |  397 -------
+ arch/arm/mach-at91/at91sam9260_devices.c    | 1364 ------------------------
+ arch/arm/mach-at91/at91sam9263.c            |  399 -------
+ arch/arm/mach-at91/at91sam9263_devices.c    | 1538 ---------------------------
+ arch/arm/mach-at91/board-afeb-9260v1.c      |  223 ----
+ arch/arm/mach-at91/board-cam60.c            |  199 ----
+ arch/arm/mach-at91/board-cpu9krea.c         |  386 -------
+ arch/arm/mach-at91/board-flexibity.c        |  171 ---
+ arch/arm/mach-at91/board-gsia18s.c          |  585 ----------
+ arch/arm/mach-at91/board-pcontrol-g20.c     |  228 ----
+ arch/arm/mach-at91/board-sam9-l9260.c       |  230 ----
+ arch/arm/mach-at91/board-sam9260ek.c        |  354 ------
+ arch/arm/mach-at91/board-sam9263ek.c        |  493 ---------
+ arch/arm/mach-at91/board-sam9g20ek.c        |  429 --------
+ arch/arm/mach-at91/board-snapper9260.c      |  191 ----
+ arch/arm/mach-at91/board-stamp9g20.c        |  294 -----
+ arch/arm/mach-at91/stamp9g20.h              |    7 -
+ drivers/misc/Kconfig                        |    2 +-
+ drivers/rtc/Kconfig                         |    4 +-
+ drivers/video/backlight/Kconfig             |    1 -
+ 24 files changed, 2 insertions(+), 7951 deletions(-)
+ delete mode 100644 arch/arm/configs/at91sam9260_9g20_defconfig
+ delete mode 100644 arch/arm/configs/at91sam9263_defconfig
+ delete mode 100644 arch/arm/mach-at91/at91sam9260_devices.c
+ delete mode 100644 arch/arm/mach-at91/at91sam9263_devices.c
+ delete mode 100644 arch/arm/mach-at91/board-afeb-9260v1.c
+ delete mode 100644 arch/arm/mach-at91/board-cam60.c
+ delete mode 100644 arch/arm/mach-at91/board-cpu9krea.c
+ delete mode 100644 arch/arm/mach-at91/board-flexibity.c
+ delete mode 100644 arch/arm/mach-at91/board-gsia18s.c
+ delete mode 100644 arch/arm/mach-at91/board-pcontrol-g20.c
+ delete mode 100644 arch/arm/mach-at91/board-sam9-l9260.c
+ delete mode 100644 arch/arm/mach-at91/board-sam9260ek.c
+ delete mode 100644 arch/arm/mach-at91/board-sam9263ek.c
+ delete mode 100644 arch/arm/mach-at91/board-sam9g20ek.c
+ delete mode 100644 arch/arm/mach-at91/board-snapper9260.c
+ delete mode 100644 arch/arm/mach-at91/board-stamp9g20.c
+ delete mode 100644 arch/arm/mach-at91/stamp9g20.h
+
+-- 
+2.1.3
