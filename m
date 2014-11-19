@@ -1,132 +1,152 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 19 Nov 2014 15:33:09 +0100
-Subject: [PATCH v2] pwm: atmel-hlcdc: add at91sam9x5 and sama5d3 errata
- handling
-Message-ID: <1416407589-8157-1-git-send-email-boris.brezillon@free-electrons.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 19 Nov 2014 06:39:30 -0800
+Subject: [PATCH 3/3] arm/arm64: Enable Dirty Page logging for ARMv8 move
+ log read, tlb flush to generic code
+In-Reply-To: <545D30DB.9020309@samsung.com>
+References: <1412908447-28247-1-git-send-email-m.smarduch@samsung.com>
+ <1412908447-28247-4-git-send-email-m.smarduch@samsung.com>
+ <20141107202041.GH22848@cbox> <545D30DB.9020309@samsung.com>
+Message-ID: <20141119143930.GA9776@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-at91sam9x5 has an errata forbidding the use of slow clk as a clk source and
-sama5d3 SoCs has another errata forbidding the use of div1 prescaler.
+Hi Mario,
 
-Take both of these erratas into account.
+On Fri, Nov 07, 2014 at 12:51:39PM -0800, Mario Smarduch wrote:
+> On 11/07/2014 12:20 PM, Christoffer Dall wrote:
+> > On Thu, Oct 09, 2014 at 07:34:07PM -0700, Mario Smarduch wrote:
+> >> This patch enables ARMv8 dirty page logging and unifies ARMv7/ARMv8 code.
+> >>
+> >> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> >> ---
+> >>  arch/arm/include/asm/kvm_host.h | 12 ------------
+> >>  arch/arm/kvm/arm.c              |  9 ---------
+> >>  arch/arm/kvm/mmu.c              | 17 +++++++++++------
+> >>  arch/arm64/kvm/Kconfig          |  2 +-
+> >>  4 files changed, 12 insertions(+), 28 deletions(-)
+> >>
+> >> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> >> index 12311a5..59565f5 100644
+> >> --- a/arch/arm/include/asm/kvm_host.h
+> >> +++ b/arch/arm/include/asm/kvm_host.h
+> >> @@ -220,18 +220,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+> >>  	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
+> >>  }
+> >>  
+> >> -/**
+> >> - * kvm_arch_flush_remote_tlbs() - flush all VM TLB entries
+> >> - * @kvm:       pointer to kvm structure.
+> >> - *
+> >> - * Interface to HYP function to flush all VM TLB entries without address
+> >> - * parameter.
+> >> - */
+> >> -static inline void kvm_arch_flush_remote_tlbs(struct kvm *kvm)
+> >> -{
+> >> -	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
+> >> -}
+> >> -
+> >>  static inline int kvm_arch_dev_ioctl_check_extension(long ext)
+> >>  {
+> >>  	return 0;
+> >> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> >> index 0546fa3..6a6fd6b 100644
+> >> --- a/arch/arm/kvm/arm.c
+> >> +++ b/arch/arm/kvm/arm.c
+> >> @@ -242,7 +242,6 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
+> >>  				   const struct kvm_memory_slot *old,
+> >>  				   enum kvm_mr_change change)
+> >>  {
+> >> -#ifdef CONFIG_ARM
+> >>  	/*
+> >>  	 * At this point memslot has been committed and there is an
+> >>  	 * allocated dirty_bitmap[], dirty pages will be be tracked while the
+> >> @@ -250,7 +249,6 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
+> >>  	 */
+> >>  	if ((change != KVM_MR_DELETE) && (mem->flags & KVM_MEM_LOG_DIRTY_PAGES))
+> >>  		kvm_mmu_wp_memory_region(kvm, mem->slot);
+> >> -#endif
+> >>  }
+> >>  
+> >>  void kvm_arch_flush_shadow_all(struct kvm *kvm)
+> >> @@ -783,13 +781,6 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+> >>  	}
+> >>  }
+> >>  
+> >> -#ifdef CONFIG_ARM64
+> >> -int kvm_arch_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
+> >> -{
+> >> -	return -EINVAL;
+> >> -}
+> >> -#endif
+> >> -
+> >>  static int kvm_vm_ioctl_set_device_addr(struct kvm *kvm,
+> >>  					struct kvm_arm_device_addr *dev_addr)
+> >>  {
+> >> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> >> index df1a5a3..8c0f9f2 100644
+> >> --- a/arch/arm/kvm/mmu.c
+> >> +++ b/arch/arm/kvm/mmu.c
+> >> @@ -49,11 +49,18 @@ static phys_addr_t hyp_idmap_vector;
+> >>  
+> >>  static bool kvm_get_logging_state(struct kvm_memory_slot *memslot)
+> >>  {
+> >> -#ifdef CONFIG_ARM
+> >>  	return !!memslot->dirty_bitmap;
+> >> -#else
+> >> -	return false;
+> >> -#endif
+> >> +}
+> >> +
+> >> +/**
+> >> + * kvm_arch_flush_remote_tlbs() - flush all VM TLB entries for ARMv7/8
+> >> + * @kvm:	pointer to kvm structure.
+> >> + *
+> >> + * Interface to HYP function to flush all VM TLB entries
+> >> + */
+> >> +inline void kvm_arch_flush_remote_tlbs(struct kvm *kvm)
+> >> +{
+> >> +	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
+> >>  }
+> >>  
+> >>  static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+> >> @@ -769,7 +776,6 @@ static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
+> >>  	return false;
+> >>  }
+> >>  
+> >> -#ifdef CONFIG_ARM
+> >>  /**
+> >>   * stage2_wp_ptes - write protect PMD range
+> >>   * @pmd:	pointer to pmd entry
+> >> @@ -917,7 +923,6 @@ void kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
+> >>  
+> >>  	stage2_wp_range(kvm, start, end);
+> >>  }
+> >> -#endif
+> >>  
+> >>  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>  			  struct kvm_memory_slot *memslot,
+> >> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+> >> index 40a8d19..a1a35809 100644
+> >> --- a/arch/arm64/kvm/Kconfig
+> >> +++ b/arch/arm64/kvm/Kconfig
+> >> @@ -26,7 +26,7 @@ config KVM
+> >>  	select KVM_ARM_HOST
+> >>  	select KVM_ARM_VGIC
+> >>  	select KVM_ARM_TIMER
+> >> -	select HAVE_KVM_ARCH_DIRTY_LOG
+> >> +	select HAVE_KVM_ARCH_TLB_FLUSH_ALL
+> >>  	---help---
+> >>  	  Support hosting virtualized guest machines.
+> >>  
+> >> -- 
+> >> 1.9.1
+> >>
+> > 
+> > this patch needs to be rebased onto the newest version of your v7 patch,
+> > but otherwise it looks roughly ok.
+> 
+Just discussed with Marc, that we'll try to merge the v7 patches asap,
+but when you send out the rebased series for v8, you need to handle the
+pud_huge case in the write-protect patch.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
-Hi Thierry,
-
-I've addressed the "erratas stored in of_device_id data" part, but still
-haven't modified the compatible strings of the HLCDC subdevices.
-
-Please let me know if you really want to handle erratas through pwm
-compatibles instead of parent device compatibles.
-
-Regards,
-
-Boris
-
-Changes since v1:
-- use data field in of_device_id to attach erratas to an IP revision
-
- drivers/pwm/pwm-atmel-hlcdc.c | 50 ++++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 45 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/pwm/pwm-atmel-hlcdc.c b/drivers/pwm/pwm-atmel-hlcdc.c
-index eaf8b12..e7c4400 100644
---- a/drivers/pwm/pwm-atmel-hlcdc.c
-+++ b/drivers/pwm/pwm-atmel-hlcdc.c
-@@ -32,10 +32,16 @@
- #define ATMEL_HLCDC_PWMPS_MAX		0x6
- #define ATMEL_HLCDC_PWMPS(x)		((x) & ATMEL_HLCDC_PWMPS_MASK)
- 
-+struct atmel_hlcdc_pwm_erratas {
-+	bool slow_clk_errata;
-+	bool div1_clk_errata;
-+};
-+
- struct atmel_hlcdc_pwm {
- 	struct pwm_chip chip;
- 	struct atmel_hlcdc *hlcdc;
- 	struct clk *cur_clk;
-+	const struct atmel_hlcdc_pwm_erratas *erratas;
- };
- 
- static inline struct atmel_hlcdc_pwm *to_atmel_hlcdc_pwm(struct pwm_chip *chip)
-@@ -56,20 +62,29 @@ static int atmel_hlcdc_pwm_config(struct pwm_chip *c,
- 	u32 pwmcfg;
- 	int pres;
- 
--	clk_freq = clk_get_rate(new_clk);
--	clk_period_ns = (u64)NSEC_PER_SEC * 256;
--	do_div(clk_period_ns, clk_freq);
-+	if (!chip->erratas || !chip->erratas->slow_clk_errata) {
-+		clk_freq = clk_get_rate(new_clk);
-+		clk_period_ns = (u64)NSEC_PER_SEC * 256;
-+		do_div(clk_period_ns, clk_freq);
-+	}
- 
--	if (clk_period_ns > period_ns) {
-+	/* Errata: cannot use slow clk on some IP revisions */
-+	if ((chip->erratas && chip->erratas->slow_clk_errata) ||
-+	    clk_period_ns > period_ns) {
- 		new_clk = hlcdc->sys_clk;
- 		clk_freq = clk_get_rate(new_clk);
- 		clk_period_ns = (u64)NSEC_PER_SEC * 256;
- 		do_div(clk_period_ns, clk_freq);
- 	}
- 
--	for (pres = 0; pres <= ATMEL_HLCDC_PWMPS_MAX; pres++)
-+	for (pres = 0; pres <= ATMEL_HLCDC_PWMPS_MAX; pres++) {
-+		/* Errata: cannot divide by 1 on some IP revisions */
-+		if (!pres && chip->erratas && chip->erratas->div1_clk_errata)
-+			continue;
-+
- 		if ((clk_period_ns << pres) >= period_ns)
- 			break;
-+	}
- 
- 	if (pres > ATMEL_HLCDC_PWMPS_MAX)
- 		return -EINVAL;
-@@ -187,8 +202,29 @@ static const struct pwm_ops atmel_hlcdc_pwm_ops = {
- 	.owner = THIS_MODULE,
- };
- 
-+const struct atmel_hlcdc_pwm_erratas atmel_hlcdc_pwm_at91sam9x5_erratas = {
-+	.slow_clk_errata = true,
-+};
-+
-+const struct atmel_hlcdc_pwm_erratas atmel_hlcdc_pwm_sama5d3_erratas = {
-+	.div1_clk_errata = true,
-+};
-+
-+static const struct of_device_id atmel_hlcdc_dt_ids[] = {
-+	{
-+		.compatible = "atmel,at91sam9x5-hlcdc",
-+		.data = &atmel_hlcdc_pwm_at91sam9x5_erratas,
-+	},
-+	{
-+		.compatible = "atmel,sama5d3-hlcdc",
-+		.data = &atmel_hlcdc_pwm_sama5d3_erratas,
-+	},
-+	{ /* sentinel */ },
-+};
-+
- static int atmel_hlcdc_pwm_probe(struct platform_device *pdev)
- {
-+	const struct of_device_id *match;
- 	struct device *dev = &pdev->dev;
- 	struct atmel_hlcdc_pwm *chip;
- 	struct atmel_hlcdc *hlcdc;
-@@ -204,6 +240,10 @@ static int atmel_hlcdc_pwm_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
-+	match = of_match_node(atmel_hlcdc_dt_ids, dev->parent->of_node);
-+	if (match)
-+		chip->erratas = match->data;
-+
- 	chip->hlcdc = hlcdc;
- 	chip->chip.ops = &atmel_hlcdc_pwm_ops;
- 	chip->chip.dev = dev;
--- 
-1.9.1
+-Christoffer
