@@ -1,144 +1,209 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Wed, 19 Nov 2014 10:45:09 +0100
-Subject: [RFC] adp1653: Add device tree bindings for LED controller
-In-Reply-To: <20141118165148.GA11711@amd>
-References: <20141116075928.GA9763@amd>
- <20141117145857.GO8907@valkosipuli.retiisi.org.uk>
- <546AFEA5.9020000@samsung.com> <20141118084603.GC4059@amd>
- <546B19C8.2090008@samsung.com> <20141118113256.GA10022@amd>
- <546B40FA.2070409@samsung.com> <20141118132159.GA21089@amd>
- <546B6D86.8090701@samsung.com> <20141118165148.GA11711@amd>
-Message-ID: <546C66A5.6060201@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Nov 2014 10:47:15 +0100
+Subject: [PATCH] i2c: at91: introduce probe deferring
+In-Reply-To: <20141119091647.GB1439@katana>
+References: <1415972879-26509-1-git-send-email-ludovic.desroches@atmel.com>
+ <20141119091647.GB1439@katana>
+Message-ID: <5216790.dAh2H6iKq8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel, Sakari,
+On Wednesday 19 November 2014 10:16:47 Wolfram Sang wrote:
+> On Fri, Nov 14, 2014 at 02:47:59PM +0100, Ludovic Desroches wrote:
+> > Return probe defer if requesting a dma channel without a dma controller probed.
+> > 
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > ---
+> >  drivers/i2c/busses/i2c-at91.c | 22 ++++++++++++++++------
+> >  1 file changed, 16 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+> > index 77fb647..df3f4c4 100644
+> > --- a/drivers/i2c/busses/i2c-at91.c
+> > +++ b/drivers/i2c/busses/i2c-at91.c
+> > @@ -679,14 +679,21 @@ static int at91_twi_configure_dma(struct at91_twi_dev *dev, u32 phy_addr)
+> >  	dma_cap_zero(mask);
+> >  	dma_cap_set(DMA_SLAVE, mask);
+> >  
+> > -	dma->chan_tx = dma_request_slave_channel_compat(mask, filter, pdata,
+> > -							dev->dev, "tx");
+> > -	if (!dma->chan_tx) {
+> > +	dma->chan_tx = dma_request_slave_channel_reason(dev->dev, "tx");
+> 
+> Will it cause regressions if you drop the compat-version of requesting
+> a channel?
 
-On 11/18/2014 05:51 PM, Pavel Machek wrote:
-> Hi!
->
->>> If the hardware LED changes with one that needs different current, the
->>> block for the adp1653 stays the same, but white LED block should be
->>> updated with different value.
->>
->> I think that you are talking about sub nodes. Indeed I am leaning
->> towards this type of design.
->
-> I think I am :-).
->
->>>> I agree that flash-timeout should be per led - an array, similarly
->>>> as in case of iout's.
->>>
->>> Agreed about per-led, disagreed about the array. As all the fields
->>> would need arrays, and as LED system currently does not use arrays for
->>> label and linux,default-trigger, I believe we should follow existing
->>> design and model it as three devices. (It _is_ physically three devices.)
->>
->> Right, I missed that the leds/common.txt describes child node.
->>
->> I propose following modifications to the binding:
->>
->> Optional properties for child nodes:
->> - iout-mode-led : 	maximum intensity in microamperes of the LED
->> 		  	(torch LED for flash devices)
->> - iout-mode-flash : 	initial intensity in microamperes of the
->> 			flash LED; it is required to enable support
->> 			for the flash led
->> - iout-mode-indicator : initial intensity in microamperes of the
->> 			indicator LED; it is required to enable support
->> 			for the indicator led
->> - max-iout-mode-led : 	maximum intensity in microamperes of the LED
->> 		  	(torch LED for flash devices)
->> - max-iout-mode-flash : maximum intensity in microamperes of the
->> 			flash LED
->> - max-iout-mode-indicator : maximum intensity in microamperes of the
->> 			indicator LED
->> - flash-timeout :	timeout in microseconds after which flash
->> 			led is turned off
->
-> Ok, I took a look, and "iout" is notation I understand, but people may
-> have trouble with and I don't see it used anywhere else.
->
-> Also... do we need both "current" and "max-current" properties?
->
-> But regulators already have "regulator-max-microamp" property. So what
-> about:
->
-> max-microamp : 	maximum intensity in microamperes of the LED
->   		  	(torch LED for flash devices)
-> max-flash-microamp : 	initial intensity in microamperes of the
->   			flash LED; it is required to enable support
->   			for the flash led
-> flash-timeout-microseconds : timeout in microseconds after which flash
->   			led is turned off
->
-> If you had indicator on the same led, I guess
->
-> indicator-microamp : recommended intensity in microamperes of the LED
-> 		         for indication
->
-> ...would do?
+I got curious about this, since the patch looks obviously wrong, but
+actually it's ok. However the entire DMA support for non-DT platforms
+can be dropped in this driver, see patch below
 
+> > +	if (IS_ERR(dma->chan_tx)) {
+> > +		ret = PTR_ERR(dma->chan_tx);
+> > +		if (ret == -EPROBE_DEFER) {
+> > +			dev_warn(dev->dev, "no DMA channel available at the moment\n");
+> 
+> I'd say drop this warning. The core usually prints when deferred probing
+> takes place.
 
-Ongoing discussion allowed me for taking a look at the indicator issue
-from different perspective. This is also vital for the issue of
-whether a v4l2-flash sub-device should be created per device or
-per sub-led [1].
+Definitely yes.
 
-Currently each sub-led is represented as a separate device tree
-sub node and the led drivers create separate LED class device for the
-sub nodes. What this implies is that indicator led also must be
-represented by the separate LED class device.
+	Arnd
+8<---
+[PATCH] i2c: at91: remove legacy DMA supoprt
 
-This is contrary to the way how V4L2 Flash API approaches this issue,
-as it considers a flash device as a regulator chip driven through
-a bus. The API allows to set the led in torch or flash mode and
-implicitly assumes that there can be additional indicator led
-supported, which can't be turned on separately, but the drivers apply
-the indicator current to the indicator led when the torch or flash led
-is activated.
+Since at91sam9g45 is now DT-only, all DMA capable users of this driver are
+using the DT case, and the legacy support can be removed. While at it, fix
+the deferred probe case.
 
-I propose to create separate v4l2-flash device for the indicator led,
-and treat it as a regular sub-led similarly like it is done in the
-LED subsystem. LED Flash class driver would only add a flag
-LED_DEV_CAP_INDICATOR and basing on it the v4l2-flash sub-device
-would create only V4L2_CID_FLASH_INDICATOR_INTENSITY control for it.
-There could ba also additional control added:
-V4L2_CID_FLASH_INDICATOR_PATTERN to support the feature
-supported by some LED class drivers.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
- From the media device perspective such an approach would
-be harmful, as the indicator led could be turned on right
-before strobing the flash or turning the torch on, by
-separate calls to different v4l2-flash sub-devices.
-
-The design described above would allow for avoiding issues I touched
-in the message [1].
-
-Regarding DT documentation:
-
-I would also swap the segments of a property name to follow the 
-convention as in case of "regulator-max-microamp".
-
-Updated version:
-
-==========================================================
-
-Optional properties for child nodes:
-- max-microamp : maximum intensity in microamperes of the LED
-		 (torch LED for flash devices)
-- flash-max-microamp : maximum intensity in microamperes of the
-		       flash LED; it is mandatory if the led should
-		       support the flash mode
-- flash-timeout-microsec : timeout in microseconds after which the flash
-		           led is turned off
-- indicator-pattern : identifier of the blinking pattern for the
-		      indicator led
-
-==========================================================
-
-Regards,
-Jacek
-
-[1] 
-http://permalink.gmane.org/gmane.linux.drivers.video-input-infrastructure/84643
+diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+index 917d54588d95..534f4c07bfb6 100644
+--- a/drivers/i2c/busses/i2c-at91.c
++++ b/drivers/i2c/busses/i2c-at91.c
+@@ -72,8 +72,6 @@ struct at91_twi_pdata {
+ 	unsigned clk_max_div;
+ 	unsigned clk_offset;
+ 	bool has_unre_flag;
+-	bool has_dma_support;
+-	struct at_dma_slave dma_slave;
+ };
+ 
+ struct at91_twi_dma {
+@@ -541,35 +539,30 @@ static struct at91_twi_pdata at91rm9200_config = {
+ 	.clk_max_div = 5,
+ 	.clk_offset = 3,
+ 	.has_unre_flag = true,
+-	.has_dma_support = false,
+ };
+ 
+ static struct at91_twi_pdata at91sam9261_config = {
+ 	.clk_max_div = 5,
+ 	.clk_offset = 4,
+ 	.has_unre_flag = false,
+-	.has_dma_support = false,
+ };
+ 
+ static struct at91_twi_pdata at91sam9260_config = {
+ 	.clk_max_div = 7,
+ 	.clk_offset = 4,
+ 	.has_unre_flag = false,
+-	.has_dma_support = false,
+ };
+ 
+ static struct at91_twi_pdata at91sam9g20_config = {
+ 	.clk_max_div = 7,
+ 	.clk_offset = 4,
+ 	.has_unre_flag = false,
+-	.has_dma_support = false,
+ };
+ 
+ static struct at91_twi_pdata at91sam9g10_config = {
+ 	.clk_max_div = 7,
+ 	.clk_offset = 4,
+ 	.has_unre_flag = false,
+-	.has_dma_support = false,
+ };
+ 
+ static const struct platform_device_id at91_twi_devtypes[] = {
+@@ -598,7 +591,6 @@ static struct at91_twi_pdata at91sam9x5_config = {
+ 	.clk_max_div = 7,
+ 	.clk_offset = 4,
+ 	.has_unre_flag = false,
+-	.has_dma_support = true,
+ };
+ 
+ static const struct of_device_id atmel_twi_dt_ids[] = {
+@@ -627,30 +619,11 @@ static const struct of_device_id atmel_twi_dt_ids[] = {
+ MODULE_DEVICE_TABLE(of, atmel_twi_dt_ids);
+ #endif
+ 
+-static bool filter(struct dma_chan *chan, void *pdata)
+-{
+-	struct at91_twi_pdata *sl_pdata = pdata;
+-	struct at_dma_slave *sl;
+-
+-	if (!sl_pdata)
+-		return false;
+-
+-	sl = &sl_pdata->dma_slave;
+-	if (sl && (sl->dma_dev == chan->device->dev)) {
+-		chan->private = sl;
+-		return true;
+-	} else {
+-		return false;
+-	}
+-}
+-
+ static int at91_twi_configure_dma(struct at91_twi_dev *dev, u32 phy_addr)
+ {
+ 	int ret = 0;
+-	struct at91_twi_pdata *pdata = dev->pdata;
+ 	struct dma_slave_config slave_config;
+ 	struct at91_twi_dma *dma = &dev->dma;
+-	dma_cap_mask_t mask;
+ 
+ 	memset(&slave_config, 0, sizeof(slave_config));
+ 	slave_config.src_addr = (dma_addr_t)phy_addr + AT91_TWI_RHR;
+@@ -661,22 +634,17 @@ static int at91_twi_configure_dma(struct at91_twi_dev *dev, u32 phy_addr)
+ 	slave_config.dst_maxburst = 1;
+ 	slave_config.device_fc = false;
+ 
+-	dma_cap_zero(mask);
+-	dma_cap_set(DMA_SLAVE, mask);
+-
+-	dma->chan_tx = dma_request_slave_channel_compat(mask, filter, pdata,
+-							dev->dev, "tx");
+-	if (!dma->chan_tx) {
+-		dev_err(dev->dev, "can't get a DMA channel for tx\n");
+-		ret = -EBUSY;
++	dma->chan_tx = dma_request_slave_channel_reason(dev->dev, "tx");
++	if (IS_ERR(dma->chan_tx)) {
++		ret = PTR_ERR(dma->chan_tx);
++		dma->chan_tx = NULL;
+ 		goto error;
+ 	}
+ 
+-	dma->chan_rx = dma_request_slave_channel_compat(mask, filter, pdata,
+-							dev->dev, "rx");
+-	if (!dma->chan_rx) {
+-		dev_err(dev->dev, "can't get a DMA channel for rx\n");
+-		ret = -EBUSY;
++	dma->chan_rx = dma_request_slave_channel_reason(dev->dev, "rx");
++	if (IS_ERR(dma->chan_rx)) {
++		ret = PTR_ERR(dma->chan_rx);
++		dma->chan_rx = NULL;
+ 		goto error;
+ 	}
+ 
+@@ -697,6 +665,7 @@ static int at91_twi_configure_dma(struct at91_twi_dev *dev, u32 phy_addr)
+ 	sg_init_table(&dma->sg, 1);
+ 	dma->buf_mapped = false;
+ 	dma->xfer_in_progress = false;
++	dev->use_dma = true;
+ 
+ 	dev_info(dev->dev, "using %s (tx) and %s (rx) for DMA transfers\n",
+ 		 dma_chan_name(dma->chan_tx), dma_chan_name(dma->chan_rx));
+@@ -704,7 +673,8 @@ static int at91_twi_configure_dma(struct at91_twi_dev *dev, u32 phy_addr)
+ 	return ret;
+ 
+ error:
+-	dev_info(dev->dev, "can't use DMA\n");
++	if (ret != -EPROBE_DEFER)
++		dev_info(dev->dev, "can't use DMA, error %d\n", ret);
+ 	if (dma->chan_rx)
+ 		dma_release_channel(dma->chan_rx);
+ 	if (dma->chan_tx)
+@@ -772,10 +742,8 @@ static int at91_twi_probe(struct platform_device *pdev)
+ 	}
+ 	clk_prepare_enable(dev->clk);
+ 
+-	if (dev->pdata->has_dma_support) {
+-		if (at91_twi_configure_dma(dev, phy_addr) == 0)
+-			dev->use_dma = true;
+-	}
++	if (dev->of_node)
++		at91_twi_configure_dma(dev, phy_addr);
+ 
+ 	rc = of_property_read_u32(dev->dev->of_node, "clock-frequency",
+ 			&bus_clk_rate);
