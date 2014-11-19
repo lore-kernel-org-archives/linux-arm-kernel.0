@@ -1,62 +1,170 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 19 Nov 2014 09:39:24 +0000
-Subject: [PATCH] arm/arm64: KVM: Handle traps of ICC_SRE_EL1 as RAZ/WI
-In-Reply-To: <1415822474-17398-1-git-send-email-christoffer.dall@linaro.org>
- (Christoffer Dall's message of "Wed, 12 Nov 2014 20:01:14 +0000")
-References: <1415822474-17398-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <8761ebcywj.fsf@approximate.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 19 Nov 2014 09:39:48 +0000
+Subject: [RFC PATCH v2] drivers: pci: move PCI domain assignment to
+ generic PCI code
+In-Reply-To: <546C5FF2.5090903@huawei.com>
+References: <1415637706-2195-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <546C5FF2.5090903@huawei.com>
+Message-ID: <20141119093948.GA8751@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 12 2014 at  8:01:14 pm GMT, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+On Wed, Nov 19, 2014 at 09:16:34AM +0000, Yijing Wang wrote:
+> Hi Lorenzo,
+>    You should send this to Bjorn instead of cc. Other, why put the OF related
+> function in PCI core. Why not move it in drivers/of/of_pci.c ?
 
-Hi Christoffer,
+I did, you missed v1, and the problem is that with ACPI forthcoming we
+do not want to have domain assignment scattered in different places,
+but part of core code (ie a single function that prevents mixed
+initialization from DT/counter and so on).
 
-> When running on a system with a GICv3, we currenly don't allow the guest
-> to access the system register interface of the GICv3.  We do this by
-> clearing the ICC_SRE_EL2.Enable, which causes all guest accesses to
-> ICC_SRE_EL1 to trap to EL2 and causes all guest accesses to other ICC_
-> registers to cause an undefined exception in the guest.
->
-> However, we currently don't handle the trap of guest accesses to
-> ICC_SRE_EL1 and will spill out a warning.  The trap just needs to handle
-> the access as RAZ/WI, and a guest that tries to prod this register and
-> set ICC_SRE_EL1.SRE=1, must read back the value (which Linux already
-> does) to see if it succeeded, and will thus observe that ICC_SRE_EL1.SRE
-> was not set.
->
-> Add the simple trap handler in the sorted table of the system registers.
->
-> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm64/kvm/sys_regs.c | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 4cc3b71..8f81945 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -424,6 +424,11 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  	/* VBAR_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
->  	  NULL, reset_val, VBAR_EL1, 0 },
-> +
-> +	/* ICC_SRE_EL1 */
-> +	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1100), Op2(0b101),
-> +	  trap_raz_wi },
-> +
->  	/* CONTEXTIDR_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b001),
->  	  access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
-
-For completeness, can you please add the equivalent trap handler for its
-32bit counterpart while you're at it?
-
-Otherwise, looks good to me.
+Bjorn, are you fine with this patch ? Do you want me to resend it as
+part of the ARM 32 PCI domain refactoring [1] ? [1] depends on this
+patch going in first.
 
 Thanks,
+Lorenzo
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+[1] http://www.spinics.net/lists/arm-kernel/msg375423.html
+
+> On 2014/11/11 0:41, Lorenzo Pieralisi wrote:
+> > The current logic used for PCI domain assignment in arm64
+> > pci_bus_assign_domain_nr() is flawed in that, depending on the host
+> > controllers configuration for a platform and the respective initialization
+> > sequence, core code may end up allocating PCI domain numbers from both DT and
+> > the core code generic domain counter, which would result in PCI domain
+> > allocation aliases/errors.
+> > 
+> > This patch fixes the logic behind the PCI domain number assignment and
+> > moves the resulting code to generic PCI core code so that the same domain
+> > allocation logic is used on all platforms selecting
+> > 
+> > CONFIG_PCI_DOMAINS_GENERIC
+> > 
+> > instead of resorting to an arch specific implementation that might end up
+> > duplicating the PCI domain assignment logic wrongly.
+> > 
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Liviu Dudau <liviu.dudau@arm.com>
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > ---
+> > v1 => v2:
+> > 
+> > - Moved generic pci_bus_assign_domain_nr() code to PCI core instead of
+> >   adding an OF layer API
+> > - Updated commit log and code comments
+> > 
+> >  arch/arm64/kernel/pci.c | 22 ----------------------
+> >  drivers/pci/pci.c       | 50 +++++++++++++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 50 insertions(+), 22 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> > index ce5836c..6f93c24 100644
+> > --- a/arch/arm64/kernel/pci.c
+> > +++ b/arch/arm64/kernel/pci.c
+> > @@ -46,25 +46,3 @@ int pcibios_add_device(struct pci_dev *dev)
+> >  
+> >  	return 0;
+> >  }
+> > -
+> > -
+> > -#ifdef CONFIG_PCI_DOMAINS_GENERIC
+> > -static bool dt_domain_found = false;
+> > -
+> > -void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+> > -{
+> > -	int domain = of_get_pci_domain_nr(parent->of_node);
+> > -
+> > -	if (domain >= 0) {
+> > -		dt_domain_found = true;
+> > -	} else if (dt_domain_found == true) {
+> > -		dev_err(parent, "Node %s is missing \"linux,pci-domain\" property in DT\n",
+> > -			parent->of_node->full_name);
+> > -		return;
+> > -	} else {
+> > -		domain = pci_get_new_domain_nr();
+> > -	}
+> > -
+> > -	bus->domain_nr = domain;
+> > -}
+> > -#endif
+> > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> > index 625a4ac..2279414 100644
+> > --- a/drivers/pci/pci.c
+> > +++ b/drivers/pci/pci.c
+> > @@ -10,6 +10,8 @@
+> >  #include <linux/kernel.h>
+> >  #include <linux/delay.h>
+> >  #include <linux/init.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_pci.h>
+> >  #include <linux/pci.h>
+> >  #include <linux/pm.h>
+> >  #include <linux/slab.h>
+> > @@ -4447,6 +4449,54 @@ int pci_get_new_domain_nr(void)
+> >  {
+> >  	return atomic_inc_return(&__domain_nr);
+> >  }
+> > +
+> > +#ifdef CONFIG_PCI_DOMAINS_GENERIC
+> > +
+> > +void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+> > +{
+> > +	static int use_dt_domains = -1;
+> > +	int domain = of_get_pci_domain_nr(parent->of_node);
+> > +
+> > +	/*
+> > +	 * Check DT domain and use_dt_domains values.
+> > +	 *
+> > +	 * If DT domain property is valid (domain >= 0) and
+> > +	 * use_dt_domains != 0, the DT assignment is valid since this means
+> > +	 * we have not previously allocated a domain number by using
+> > +	 * pci_get_new_domain_nr(); we should also update use_dt_domains to
+> > +	 * 1, to indicate that we have just assigned a domain number from
+> > +	 * DT.
+> > +	 *
+> > +	 * If DT domain property value is not valid (ie domain < 0), and we
+> > +	 * have not previously assigned a domain number from DT
+> > +	 * (use_dt_domains != 1) we should assign a domain number by
+> > +	 * using the:
+> > +	 *
+> > +	 * pci_get_new_domain_nr()
+> > +	 *
+> > +	 * API and update the use_dt_domains value to keep track of method we
+> > +	 * are using to assign domain numbers (use_dt_domains = 0).
+> > +	 *
+> > +	 * All other combinations imply we have a platform that is trying
+> > +	 * to mix domain numbers obtained from DT and pci_get_new_domain_nr(),
+> > +	 * which is a recipe for domain mishandling and it is prevented by
+> > +	 * invalidating the domain value (domain = -1) and printing a
+> > +	 * corresponding error.
+> > +	 */
+> > +	if (domain >= 0 && use_dt_domains) {
+> > +		use_dt_domains = 1;
+> > +	} else if (domain < 0 && use_dt_domains != 1) {
+> > +		use_dt_domains = 0;
+> > +		domain = pci_get_new_domain_nr();
+> > +	} else {
+> > +		dev_err(parent, "Node %s has inconsistent \"linux,pci-domain\" property in DT\n",
+> > +			parent->of_node->full_name);
+> > +		domain = -1;
+> > +	}
+> > +
+> > +	bus->domain_nr = domain;
+> > +}
+> > +#endif
+> >  #endif
+> >  
+> >  /**
+> > 
+> 
+> 
+> -- 
+> Thanks!
+> Yijing
+> 
+> 
