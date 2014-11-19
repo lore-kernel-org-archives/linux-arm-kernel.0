@@ -1,49 +1,35 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 19 Nov 2014 14:42:24 -0800
-Subject: [PATCH 1/4] ARM: meson: add basic infrastructure for clocks
-In-Reply-To: <1416393143-20434-2-git-send-email-carlo@caione.org>
-References: <1416393143-20434-1-git-send-email-carlo@caione.org>
- <1416393143-20434-2-git-send-email-carlo@caione.org>
-Message-ID: <20141119224224.25314.58901@quantum>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Nov 2014 23:42:23 +0100
+Subject: [GIT PULL] arm: pxa: pxa for v3.19
+In-Reply-To: <878uj67r2a.fsf@free.fr>
+References: <87bnoevq1b.fsf@free.fr> <201411192333.32448.arnd@arndb.de>
+ <878uj67r2a.fsf@free.fr>
+Message-ID: <4686660.cI7P5U9Kgy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Carlo Caione (2014-11-19 02:32:20)
-> diff --git a/drivers/clk/meson/clk-pll.c b/drivers/clk/meson/clk-pll.c
-> new file mode 100644
-> index 0000000..5b6d064
-> --- /dev/null
-> +++ b/drivers/clk/meson/clk-pll.c
-> @@ -0,0 +1,298 @@
-> +/*
-> + * Copyright (c) 2014 Carlo Caione <carlo@caione.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/clkdev.h>
-> +#include <linux/delay.h>
-> +#include <linux/err.h>
+On Wednesday 19 November 2014 23:39:57 Robert Jarzmik wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> 
+> > Hi Robert,
+> >
+> > Sorry for the delay in replying. I noticed that you have based your
+> > patches on top of v3.18-rc4. If you don't have a strong reason for
+> > doing so, could you send everything based on an -rc1 in the future?
+> 
+> Ah no, no strong reason. I was waiting for v3.18-rc4 to have all the pxa fixes
+> merged before doing my pull request. But there is no dependency between the
+> fixes and this pull request, so the rebase will come for free.
 
-All of the headers below are unnecessary. Copy/paste? I didn't bother to
-check the ones above.
+FWIW, if a case like this comes up again, just base the changes for
+the next kernel on top of the bug fixes you are sending for the same
+platform.
 
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/slab.h>
-> +#include <linux/string.h>
+> > If you don't mind, please rebase and send again.
+> Of course, I will, this week-end.
 
-Regards,
-Mike
+We are running a bit short on time though, and I'd like to have it
+merged earlier. If nobody else is using your branch, I can just do
+the rebase myself, since there are only a few patches in it.
+
+	Arnd
