@@ -1,17 +1,25 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 19 Nov 2014 10:34:18 +0800
-Subject: [PATCH v2] ARM: dts: vf-colibri: add USB regulators
-In-Reply-To: <1416160828-18168-1-git-send-email-stefan@agner.ch>
-References: <1416160828-18168-1-git-send-email-stefan@agner.ch>
-Message-ID: <20141119023416.GB27759@dragon>
+From: jay.xu@rock-chips.com (Jianqun Xu)
+Date: Wed, 19 Nov 2014 11:06:03 +0800
+Subject: [PATCH 0/2] ASoC: rockchip: i2s: add support for grabbing output
+ clock to codec
+Message-ID: <1416366365-4632-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 16, 2014 at 07:00:28PM +0100, Stefan Agner wrote:
-> Add structure of USB supply logic. The USB hosts power enable
-> regulator is needed to control VBUS supply on the Colibri carrier
-> board.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+Reference to Chapter 3 Clock & Reset Unit (CRU) of RK3288 TRM, i2s0_clkout has
+two source clock, XIN24M_DIV2 for 12M and clk_i2s0 for more kinds of
+frequencies, I2S0(i2s_clk) has only single source clock clk_i2s0.
 
-Applied, thanks.
+i2s0_clkout: generate to output to outside of chip, generally for codec
+I2S0(i2s_clk): generate for i2s controller inside of chip
+
+Jianqun Xu (2):
+  ASoC: rockchip-i2s: dt: add i2s_clkout to list of clocks
+  ASoC: rockchip: i2s: add support for grabbing output clock to codec
+
+ Documentation/devicetree/bindings/sound/rockchip-i2s.txt |  5 +++--
+ sound/soc/rockchip/rockchip_i2s.c                        | 11 +++++++++++
+ 2 files changed, 14 insertions(+), 2 deletions(-)
+
+-- 
+1.9.1
