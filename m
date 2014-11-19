@@ -1,125 +1,56 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 19 Nov 2014 15:13:05 +0100
-Subject: [PATCH 2/3] clk: rockchip: add optional sync to pll rate parameters
+Date: Wed, 19 Nov 2014 15:13:55 +0100
+Subject: [PATCH 3/3] clk: rockchip: add ROCKCHIP_PLL_SYNC_RATE flag to some
+ plls
 In-Reply-To: <1694711.2HxVABHk0T@diego>
 References: <1694711.2HxVABHk0T@diego>
-Message-ID: <1571026.EAHMGnSMkf@diego>
+Message-ID: <5134377.6uXtnKPDhF@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some cases firmware brings up plls with different parameters than the ones
-noted in the rate table for the specific frequency. These firmware-selected
-parameters are worse than the tested ones in the pll rate tables but cannot
-be changed by a simple clk_set_rate call when the rate stays the same.
-
-Therefore add a ROCKCHIP_PLL_SYNC_RATE flag and implement an init callback
-that checks the runtime-parameters against the matching rate table entry
-and adjusts them to the table-ones if necessary.
-
-If no rate table is set or the current rate does not match any rate-table
-entry no changes are made.
-
-Being able to limit this adjustment to specific plls is necessary to not
-touch the ones supplying core components like the apll and dpll supplying
-the armcores and dram.
+Add the new flag to gpll and cpll on rk3188 and similar and to
+gpll, cpll and npll on rk3288.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/clk/rockchip/clk-pll.c | 50 ++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/rockchip/clk.h     |  6 +++++
- 2 files changed, 56 insertions(+)
+ drivers/clk/rockchip/clk-rk3188.c | 4 ++--
+ drivers/clk/rockchip/clk-rk3288.c | 6 +++---
+ 2 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/clk/rockchip/clk-pll.c b/drivers/clk/rockchip/clk-pll.c
-index feb9cad..e583cae 100644
---- a/drivers/clk/rockchip/clk-pll.c
-+++ b/drivers/clk/rockchip/clk-pll.c
-@@ -258,6 +258,55 @@ static int rockchip_rk3066_pll_is_enabled(struct clk_hw *hw)
- 	return !(pllcon & RK3066_PLLCON3_PWRDOWN);
- }
- 
-+static void rockchip_rk3066_pll_init(struct clk_hw *hw)
-+{
-+	struct rockchip_clk_pll *pll = to_rockchip_clk_pll(hw);
-+	const struct rockchip_pll_rate_table *rate;
-+	unsigned int nf, nr, no, bwadj;
-+	unsigned long drate;
-+	u32 pllcon;
-+
-+	if (!(pll->flags & ROCKCHIP_PLL_SYNC_RATE))
-+		return;
-+
-+	drate = __clk_get_rate(hw->clk);
-+	rate = rockchip_get_pll_settings(pll, drate);
-+
-+	/* when no rate setting for the current rate, rely on clk_set_rate */
-+	if (!rate)
-+		return;
-+
-+	pllcon = readl_relaxed(pll->reg_base + RK3066_PLLCON(0));
-+	nr = ((pllcon >> RK3066_PLLCON0_NR_SHIFT) & RK3066_PLLCON0_NR_MASK) + 1;
-+	no = ((pllcon >> RK3066_PLLCON0_OD_SHIFT) & RK3066_PLLCON0_OD_MASK) + 1;
-+
-+	pllcon = readl_relaxed(pll->reg_base + RK3066_PLLCON(1));
-+	nf = ((pllcon >> RK3066_PLLCON1_NF_SHIFT) & RK3066_PLLCON1_NF_MASK) + 1;
-+
-+	pllcon = readl_relaxed(pll->reg_base + RK3066_PLLCON(2));
-+	bwadj = (pllcon >> RK3066_PLLCON2_BWADJ_SHIFT) & RK3066_PLLCON2_BWADJ_MASK;
-+
-+	pr_debug("%s: pll %s@%lu: nr (%d,%d); no (%d, %d); nf(%d, %d), bwadj(%d,%d)\n",
-+		 __func__, __clk_get_name(hw->clk), drate, rate->nr, nr,
-+		rate->no, no, rate->nf, nf, rate->bwadj, bwadj);
-+	if (rate->nr != nr || rate->no != no || rate->nf != nf
-+					     || rate->bwadj != bwadj) {
-+		struct clk *parent = __clk_get_parent(hw->clk);
-+		unsigned long prate;
-+
-+		if (!parent) {
-+			pr_warn("%s: parent of %s not available\n",
-+				__func__, __clk_get_name(hw->clk));
-+			return;
-+		}
-+
-+		pr_debug("%s: pll %s: rate params do not match rate table, adjusting\n",
-+			 __func__, __clk_get_name(hw->clk));
-+		prate = __clk_get_rate(parent);
-+		rockchip_rk3066_pll_set_rate(hw, drate, prate);
-+	}
-+}
-+
- static const struct clk_ops rockchip_rk3066_pll_clk_norate_ops = {
- 	.recalc_rate = rockchip_rk3066_pll_recalc_rate,
- 	.enable = rockchip_rk3066_pll_enable,
-@@ -272,6 +321,7 @@ static const struct clk_ops rockchip_rk3066_pll_clk_ops = {
- 	.enable = rockchip_rk3066_pll_enable,
- 	.disable = rockchip_rk3066_pll_disable,
- 	.is_enabled = rockchip_rk3066_pll_is_enabled,
-+	.init = rockchip_rk3066_pll_init,
+diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
+index 6af5d7f..37a1988 100644
+--- a/drivers/clk/rockchip/clk-rk3188.c
++++ b/drivers/clk/rockchip/clk-rk3188.c
+@@ -216,9 +216,9 @@ static struct rockchip_pll_clock rk3188_pll_clks[] __initdata = {
+ 	[dpll] = PLL(pll_rk3066, PLL_DPLL, "dpll", mux_pll_p, 0, RK2928_PLL_CON(4),
+ 		     RK2928_MODE_CON, 4, 5, 0, NULL),
+ 	[cpll] = PLL(pll_rk3066, PLL_CPLL, "cpll", mux_pll_p, 0, RK2928_PLL_CON(8),
+-		     RK2928_MODE_CON, 8, 7, 0, rk3188_pll_rates),
++		     RK2928_MODE_CON, 8, 7, ROCKCHIP_PLL_SYNC_RATE, rk3188_pll_rates),
+ 	[gpll] = PLL(pll_rk3066, PLL_GPLL, "gpll", mux_pll_p, 0, RK2928_PLL_CON(12),
+-		     RK2928_MODE_CON, 12, 8, 0, rk3188_pll_rates),
++		     RK2928_MODE_CON, 12, 8, ROCKCHIP_PLL_SYNC_RATE, rk3188_pll_rates),
  };
  
- /*
-diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-index eefd39a..dc94681 100644
---- a/drivers/clk/rockchip/clk.h
-+++ b/drivers/clk/rockchip/clk.h
-@@ -92,6 +92,10 @@ struct rockchip_pll_rate_table {
-  * @type: Type of PLL to be registered.
-  * @pll_flags: hardware-specific flags
-  * @rate_table: Table of usable pll rates
-+ *
-+ * Flags:
-+ * ROCKCHIP_PLL_SYNC_RATE - check rate parameters to match against the
-+ *	rate_table parameters and ajust them if necessary.
-  */
- struct rockchip_pll_clock {
- 	unsigned int		id;
-@@ -108,6 +112,8 @@ struct rockchip_pll_clock {
- 	struct rockchip_pll_rate_table *rate_table;
+ #define MFLAGS CLK_MUX_HIWORD_MASK
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index 2d31a22..ad8a27a 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -206,11 +206,11 @@ static struct rockchip_pll_clock rk3288_pll_clks[] __initdata = {
+ 	[dpll] = PLL(pll_rk3066, PLL_DPLL, "dpll", mux_pll_p, 0, RK3288_PLL_CON(4),
+ 		     RK3288_MODE_CON, 4, 5, 0, NULL),
+ 	[cpll] = PLL(pll_rk3066, PLL_CPLL, "cpll", mux_pll_p, 0, RK3288_PLL_CON(8),
+-		     RK3288_MODE_CON, 8, 7, 0, rk3288_pll_rates),
++		     RK3288_MODE_CON, 8, 7, ROCKCHIP_PLL_SYNC_RATE, rk3288_pll_rates),
+ 	[gpll] = PLL(pll_rk3066, PLL_GPLL, "gpll", mux_pll_p, 0, RK3288_PLL_CON(12),
+-		     RK3288_MODE_CON, 12, 8, 0, rk3288_pll_rates),
++		     RK3288_MODE_CON, 12, 8, ROCKCHIP_PLL_SYNC_RATE, rk3288_pll_rates),
+ 	[npll] = PLL(pll_rk3066, PLL_NPLL, "npll",  mux_pll_p, 0, RK3288_PLL_CON(16),
+-		     RK3288_MODE_CON, 14, 9, 0, rk3288_pll_rates),
++		     RK3288_MODE_CON, 14, 9, ROCKCHIP_PLL_SYNC_RATE, rk3288_pll_rates),
  };
  
-+#define ROCKCHIP_PLL_SYNC_RATE		BIT(0)
-+
- #define PLL(_type, _id, _name, _pnames, _flags, _con, _mode, _mshift,	\
- 		_lshift, _pflags, _rtable)				\
- 	{								\
+ static struct clk_div_table div_hclk_cpu_t[] = {
 -- 
 2.1.1
