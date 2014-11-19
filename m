@@ -1,68 +1,46 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 19 Nov 2014 11:31:14 +0100
-Subject: [PATCH 4/4] ARM: at91/Kconfig: remove unused config options
-In-Reply-To: <cover.1416392687.git.nicolas.ferre@atmel.com>
-References: <cover.1416392687.git.nicolas.ferre@atmel.com>
-Message-ID: <acbf0ad912a51c1508b7dab0d840604dbeb00109.1416392687.git.nicolas.ferre@atmel.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Wed, 19 Nov 2014 11:32:19 +0100
+Subject: [PATCH 0/4] ARM: meson: add clock/reset controller
+Message-ID: <1416393143-20434-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When removing old board !DT support, several Kconfig options were deleted.
-Propagate this removal to drivers Kconfig files.
+This patchset introduces preliminary support for the clock/reset controller
+found on Amlogic MesonX SoCs and enables it for the Meson6.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/misc/Kconfig            | 2 +-
- drivers/rtc/Kconfig             | 4 +---
- drivers/video/backlight/Kconfig | 1 -
- 3 files changed, 2 insertions(+), 5 deletions(-)
+The reset controller is in charge of shutting off the clock to disable modules
+and submodules within the chip. Unfortunately the documentation we have does
+not explicit which clock is gated but only which peripheral is reset so the
+clocks introduced are not gated but the peripherals are reset using the
+reset controller.
 
-diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
-index bbeb4516facf..006242c8bca0 100644
---- a/drivers/misc/Kconfig
-+++ b/drivers/misc/Kconfig
-@@ -75,7 +75,7 @@ config ATMEL_TCB_CLKSRC
- config ATMEL_TCB_CLKSRC_BLOCK
- 	int
- 	depends on ATMEL_TCB_CLKSRC
--	prompt "TC Block" if ARCH_AT91RM9200 || ARCH_AT91SAM9260 || CPU_AT32AP700X
-+	prompt "TC Block" if CPU_AT32AP700X
- 	default 0
- 	range 0 1
- 	help
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 7e024f1344c6..aa96e375915d 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -1124,7 +1124,6 @@ config RTC_DRV_AT91SAM9_RTT
- 	int
- 	range 0 1
- 	default 0
--	prompt "RTT module Number" if ARCH_AT91SAM9263
- 	depends on RTC_DRV_AT91SAM9
- 	help
- 	  More than one RTT module is available. You can choose which
-@@ -1133,8 +1132,7 @@ config RTC_DRV_AT91SAM9_RTT
- 
- config RTC_DRV_AT91SAM9_GPBR
- 	int
--	range 0 3 if !ARCH_AT91SAM9263
--	range 0 15 if ARCH_AT91SAM9263
-+	range 0 3
- 	default 0
- 	prompt "Backup Register Number"
- 	depends on RTC_DRV_AT91SAM9
-diff --git a/drivers/video/backlight/Kconfig b/drivers/video/backlight/Kconfig
-index 8d03924749b8..efb09046a8cf 100644
---- a/drivers/video/backlight/Kconfig
-+++ b/drivers/video/backlight/Kconfig
-@@ -168,7 +168,6 @@ if BACKLIGHT_CLASS_DEVICE
- config BACKLIGHT_ATMEL_LCDC
- 	bool "Atmel LCDC Contrast-as-Backlight control"
- 	depends on FB_ATMEL
--	default y if MACH_AT91SAM9261EK || MACH_AT91SAM9G10EK || MACH_AT91SAM9263EK
- 	help
- 	  This provides a backlight control internal to the Atmel LCDC
- 	  driver.  If the LCD "contrast control" on your board is wired
+DTS patches will follow.
+
+Carlo Caione (4):
+  ARM: meson: add basic infrastructure for clocks
+  ARM: meson: add reset controller
+  ARM: meson: enable reset controller in kconfig
+  ARM: meson: add documentation for reset/clock controller
+
+ .../bindings/clock/amlogic,meson6-clkc.txt         |  45 ++++
+ arch/arm/mach-meson/Kconfig                        |   2 +
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/meson/Makefile                         |   8 +
+ drivers/clk/meson/clk-pll.c                        | 298 +++++++++++++++++++++
+ drivers/clk/meson/clkc.c                           | 151 +++++++++++
+ drivers/clk/meson/clkc.h                           | 174 ++++++++++++
+ drivers/clk/meson/meson6-clkc.c                    | 178 ++++++++++++
+ drivers/clk/meson/rstc.c                           | 152 +++++++++++
+ include/dt-bindings/clock/meson6-clkc.h            |  18 ++
+ 10 files changed, 1027 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/amlogic,meson6-clkc.txt
+ create mode 100644 drivers/clk/meson/Makefile
+ create mode 100644 drivers/clk/meson/clk-pll.c
+ create mode 100644 drivers/clk/meson/clkc.c
+ create mode 100644 drivers/clk/meson/clkc.h
+ create mode 100644 drivers/clk/meson/meson6-clkc.c
+ create mode 100644 drivers/clk/meson/rstc.c
+ create mode 100644 include/dt-bindings/clock/meson6-clkc.h
+
 -- 
-2.1.3
+1.9.1
