@@ -1,69 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 19 Nov 2014 16:41:38 +0000
-Subject: [PATCH RFC] ARM: option for loading modules into vmalloc area
-In-Reply-To: <CAKv+Gu-kvmkhrptmaN0miM3c0K3ZOh4maTFXL=NpYTMi9Q83kA@mail.gmail.com>
-References: <20141118172146.3784.81151.stgit@buzz>
- <20141118173413.GB4042@n2100.arm.linux.org.uk>
- <546B8C64.3010904@samsung.com> <2041617.Kxhx5O4MMr@wuerfel>
- <CAKv+Gu-8qhHYOry+LsDzp+LDZqYxVZ5G7cj48E3G2Unp2+=_yg@mail.gmail.com>
- <CALYGNiMt2A3DP02cOtxqu4RrnmhojrDxkRG7bkHMByUnzG+PeA@mail.gmail.com>
- <CAKv+Gu-rYWutr-45MsZH6KOhhUyNCVLfkO9JQrqCm1L6ms_DUg@mail.gmail.com>
- <20141119160747.GH4042@n2100.arm.linux.org.uk>
- <CAKv+Gu-kvmkhrptmaN0miM3c0K3ZOh4maTFXL=NpYTMi9Q83kA@mail.gmail.com>
-Message-ID: <20141119164138.GI4042@n2100.arm.linux.org.uk>
+From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
+Date: Wed, 19 Nov 2014 17:44:14 +0100
+Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
+ support
+In-Reply-To: <546CC546.5090900@collabora.co.uk>
+References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
+ <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
+ <546C646C.4060303@collabora.co.uk> <20141119105527.GA5396@luxor.wired.org>
+ <546C7D15.10605@collabora.co.uk> <20141119162224.GB5396@luxor.wired.org>
+ <546CC546.5090900@collabora.co.uk>
+Message-ID: <546CC8DE.3050208@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 05:25:41PM +0100, Ard Biesheuvel wrote:
-> On 19 November 2014 17:07, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Wed, Nov 19, 2014 at 05:02:40PM +0100, Ard Biesheuvel wrote:
-> > Which is not a good idea either, because the compiler needs to know how
-> > far away its own manually generated literal pool is from the instructions
-> > which reference it.  The .ltorg statement can end up emitting any number
-> > of literals at that point, which makes it indeterminant how many words
-> > are contained within the asm() statement.
-> >
+Am 19.11.2014 um 17:28 schrieb Javier Martinez Canillas:
+> On 11/19/2014 05:22 PM, Paolo Pisati wrote:
+>> On Wed, Nov 19, 2014 at 12:20:53PM +0100, Javier Martinez Canillas wrote:
+>>>
+>>> If someone else is interested, I've pushed a branch [0] with 3.18-rc5 + all
+>>> the needed patches.
+>>>
+>>> Ajay, feel free to add to your series:
+>>>
+>>> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>>>
+>>> Best regards,
+>>> Javier
+>>>
+>>> [0]: git://git.collabora.co.uk/git/user/javier/linux.git wip/exynos/dp-integ
+>>
+>> doesn't peach pi require the same dts modification as peach pit/snow?
+>>
 > 
-> That applies to any inline asm statement in general: the compiler
-> assumes that the expanded size will not interfere with its ability to
-> emit literals after the function's return instruction.
-> Sometimes it will put a literal pool in the middle of the function if
-> it is very large, and I am not sure if an inline asm by itself would
-> ever trigger that heuristic to kick in.
+> No, because the Peach Pit and Snow have an eDP to LVDS bridge chip but the
+> Peach Pi does not have a bridge. Ajay's series is to add DRM bridge support
+> to Exynos Display Port driver and so is only relevant to Snow and Pit.
 
-The compiler works it out by counting the number of assembler delimiters
-(iow, semicolons or newlines) in the asm() statement, and using that to
-track how many instructions are present.
+... and to Spring.
 
-> > Yes, it isn't desirable to waste an entire data cache line per indirect
-> > call like the original quote above, but I don't see a practical
-> > alternative.
-> 
-> We could at least add some labels instead of doing explicit pc arithmetic, i.e.,
-> 
-> adr lr, 1f
-> ldr pc, 0f
-> 0: .long symbol
-> 1:
+So, what's the timing here - is this series headed for 3.20 now or 3.19?
 
-Yes, but this doesn't get away from the performance impact of having one
-word used in a D-cache line scattered throughout the code.  This is the
-reason why I never looked at this as a serious option for kernel modules,
-and decided to put the kernel modules below the kernel itself instead.
-
-In older kernels, when we had the linking done by userspace insmod, I was
-able to be much more clever in this regard - I was able to detect which
-relocations were out of range, and I generated trampolines for each such
-symbol.  What this relied upon was being able to parse the relocations
-before allocating module space, so we knew what the maximum size of
-trampolines needed for a particular module would be.
-
-We don't have that luxury with the current approach - the earliest we get
-to see the module is after the module space has been allocated, and the
-module has been copied to that module.  That leaves no room to extend the
-allocation for the trampolines.
+Regards,
+Andreas
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 21284 AG N?rnberg
