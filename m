@@ -1,31 +1,42 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 19 Nov 2014 13:16:38 +0100
-Subject: [PATCHv4 03/10] arm: mvebu: use recently introduced uart label
- for stdout-path
-In-Reply-To: <206fa4769a1e02f3e6b139160cd5dd9d25c90837.1416351426.git.arno@natisbad.org>
-References: <cover.1416351425.git.arno@natisbad.org>
- <206fa4769a1e02f3e6b139160cd5dd9d25c90837.1416351426.git.arno@natisbad.org>
-Message-ID: <20141119131638.5e9735a9@free-electrons.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Wed, 19 Nov 2014 17:53:08 +0530
+Subject: [PATCH V2] ARM: dts: DRA7: Add node for RTC
+In-Reply-To: <1416199509-3977-1-git-send-email-lokeshvutla@ti.com>
+References: <1416199509-3977-1-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1416399788-27557-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnaud Ebalard,
+Add node for RTC.
 
-On Wed, 19 Nov 2014 00:01:59 +0100, Arnaud Ebalard wrote:
-> 
-> Now that labels for uartX are available in Marvell Armada .dtsi files,
-> this patch replaces the "/soc/internal-regs/serial at 12000" found in
-> armada-xp-lenovo-ix4-300d.dts file for stdout-path property by the more
-> concise &uart0.
-> 
-> Suggested-by: Andrew Lunn <andrew@lunn.ch>
-> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
-> ---
->  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+[nm at ti.com: update with rtc crossbar number]
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+Changes since v1:
+- Fixed rtc dt node label.
+ arch/arm/boot/dts/dra7.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 9cc9843..5d92562 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -1075,6 +1075,15 @@
+ 			status = "disabled";
+ 		};
+ 
++		rtc at 48838000 {
++			compatible = "ti,am3352-rtc";
++			reg = <0x48838000 0x100>;
++			interrupts = <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>;
++			ti,hwmods = "rtcss";
++			clocks = <&sys_32k_ck>;
++		};
++
+ 		omap_control_usb2phy1: control-phy at 4a002300 {
+ 			compatible = "ti,control-phy-usb2";
+ 			reg = <0x4a002300 0x4>;
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.9.1
