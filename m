@@ -1,57 +1,57 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Wed, 19 Nov 2014 13:26:52 +0530
-Subject: [PATCH v2] serial: samsung: Fix serial config dependencies for exynos7
-In-Reply-To: <1416199491-4841-1-git-send-email-a.kesavan@samsung.com>
-References: <1416199491-4841-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1416383812-714-1-git-send-email-a.kesavan@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 19 Nov 2014 13:16:24 +0530
+Subject: [PATCH] opp: convert dev_warn() to dev_dbg() for duplicate OPPs
+In-Reply-To: <1714555.tu97zMrOn0@vostro.rjw.lan>
+References: <7017fa592bdaf73c260ad001a2b7abdc8d14f08a.1416211616.git.viresh.kumar@linaro.org>
+ <2808463.UGmrrQ79Aq@vostro.rjw.lan>
+ <CAKohpomgci3S+PZUhm3svuxX+V+pNvHxQqX4m=QmPzd00sxPwg@mail.gmail.com>
+ <1714555.tu97zMrOn0@vostro.rjw.lan>
+Message-ID: <CAKohpoknu=V_wscVPWLdZO8xEGY6CVMNXuP4F76GNABnm9K4dQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pankaj Dubey <pankaj.dubey@samsung.com>
+On 19 November 2014 02:21, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Tuesday, November 18, 2014 08:38:14 AM Viresh Kumar wrote:
 
-Exynos7 has a similar serial controller to that present in older Samsung
-SoCs. To re-use the existing serial driver on Exynos7 we need to have
-SERIAL_SAMSUNG_UARTS_4 and SERIAL_SAMSUNG_UARTS selected. This is not
-possible because these symbols are dependent on PLAT_SAMSUNG which is
-not present for the ARMv8 based exynos7.
+>> We are allowing addition of duplicate OPPs as a standard thing right now
+>> as cpufreq drivers don't get rid of the OPPs they create with DT. So, that
+>> shouldn't complain, isn't it ?
+>
+> Is cpufreq the only user of OPP?  I thought there were other users, so what
+> about them?
 
-Change the dependency of these symbols from PLAT_SAMSUNG to the serial
-driver thus making it available on exynos7. As the existing platform
-specific code making use of these symbols is related to uart driver this
-change in dependency should not cause any issues.
+Probably of CPU OPPs, but I am not sure. Obviously dev OPPs can be used
+by others.
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
----
-Changes in v2:
-	- Added Greg's ack and Kukjin Kim as a recepient
+> I'm not sure about that.  If they aren't useful for anything after
+> that, what's the benefit of keeping them around?
 
- drivers/tty/serial/Kconfig |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I don't think they are of any use once the driver is gone, unless the driver is
+inserted again.
 
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index e71a28b..d0ce88c 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -249,14 +249,14 @@ config SERIAL_SAMSUNG
- 
- config SERIAL_SAMSUNG_UARTS_4
- 	bool
--	depends on PLAT_SAMSUNG
-+	depends on SERIAL_SAMSUNG
- 	default y if !(CPU_S3C2410 || CPU_S3C2412 || CPU_S3C2440 || CPU_S3C2442)
- 	help
- 	  Internal node for the common case of 4 Samsung compatible UARTs
- 
- config SERIAL_SAMSUNG_UARTS
- 	int
--	depends on PLAT_SAMSUNG
-+	depends on SERIAL_SAMSUNG
- 	default 4 if SERIAL_SAMSUNG_UARTS_4 || CPU_S3C2416
- 	default 3
- 	help
--- 
-1.7.9.5
+So, this is what we can do to distinguish DT OPPs with other dynamic ones:
+
+diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
+index 490e9db..7e25f01 100644
+--- a/drivers/base/power/opp.c
++++ b/drivers/base/power/opp.c
+@@ -49,6 +49,7 @@
+  *             are protected by the dev_opp_list_lock for integrity.
+  *             IMPORTANT: the opp nodes should be maintained in increasing
+  *             order.
++ * @from_dt:   created from static DT entries.
+  * @available: true/false - marks if this OPP as available or not
+  * @rate:      Frequency in hertz
+  * @u_volt:    Nominal voltage in microvolts corresponding to this OPP
+@@ -61,6 +62,7 @@ struct dev_pm_opp {
+        struct list_head node;
+
+        bool available;
++       bool from_dt;
+        unsigned long rate;
+        unsigned long u_volt;
+
+
+
+Does this look fine? I can then write of_free_opp_table(), opposite of
+of_init_opp_table().
