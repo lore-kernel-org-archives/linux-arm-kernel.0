@@ -1,43 +1,137 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 19 Nov 2014 14:50:15 +0000
-Subject: [PATCH 1/2] ARM: cache-l2x0: clean up aurora cache handling
-In-Reply-To: <1547660.4MUNEQsfAo@wuerfel>
-References: <1547660.4MUNEQsfAo@wuerfel>
-Message-ID: <20141119145015.GG4042@n2100.arm.linux.org.uk>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 19 Nov 2014 15:51:07 +0100
+Subject: [PATCH v2] mmc: atmel-mci: use probe deferring if dma controller is
+ not ready yet
+Message-ID: <1416408667-4666-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 03:40:12PM +0100, Arnd Bergmann wrote:
-> The aurora cache controller is the only remaining user of a couple
-> of functions in this file and are completely unused when that is
-> disabled, leading to build warnings:
-> 
-> arch/arm/mm/cache-l2x0.c:167:13: warning: 'l2x0_cache_sync' defined but not used [-Wunused-function]
-> arch/arm/mm/cache-l2x0.c:184:13: warning: 'l2x0_flush_all' defined but not used [-Wunused-function]
-> arch/arm/mm/cache-l2x0.c:194:13: warning: 'l2x0_disable' defined but not used [-Wunused-function]
-> 
-> With the knowledge that the code is now aurora-specific, we can
-> simplify it noticeably:
-> 
-> - The pl310 errata workarounds are not needed on aurora and can be removed
-> - The cache_wait() macro is never needed since this is not an l210/l220
+Return probe defer if requesting a dma channel without a dma controller
+probed. Using late_initcall is no more needing.
 
-How do we know?  You claim it's "not a L210/L220" but how do we actually
-know that we don't have to wait for the cache operation to complete?
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
 
-When this is built without L310 support, Aurora will wait for the cache
-operations to complete, but when built with L310 support, it won't.
+patch based on
+mmc: atmel-mci: remove compat for non DT board when requesting dma chan
 
-> - aurora_pa_range can keep the spinlock while syncing the cache
+v2 changes:
+- use module_platform_driver
+- remove warning message when asking for probe deferring
 
-If the operations complete synchronously (in other words, the L2 cache
-doesn't accept another transaction until the cache operation has completed)
-the spinlocks should not be necessary.
+ drivers/mmc/host/atmel-mci.c | 61 ++++++++++++++++++++------------------------
+ 1 file changed, 28 insertions(+), 33 deletions(-)
 
-They're necessary for some of the ARM caches which allow cache operations
-to run asynchronously (hence the wait stuff) but if you don't have the
-wait stuff as you imply above, they can't be asynchronous.
-
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index ba38f94..72f6501 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -2265,37 +2265,39 @@ static void atmci_cleanup_slot(struct atmel_mci_slot *slot,
+ 	mmc_free_host(slot->mmc);
+ }
+ 
+-static bool atmci_configure_dma(struct atmel_mci *host)
++static int atmci_configure_dma(struct atmel_mci *host)
+ {
+ 	struct mci_platform_data	*pdata;
+ 	dma_cap_mask_t mask;
++	int ret = 0;
+ 
+ 	if (host == NULL)
+-		return false;
++		return -EINVAL;
+ 
+ 	pdata = host->pdev->dev.platform_data;
+ 
+ 	dma_cap_zero(mask);
+ 	dma_cap_set(DMA_SLAVE, mask);
+ 
+-	host->dma.chan = dma_request_slave_channel(&host->pdev->dev, "rxtx");
+-	if (!host->dma.chan) {
+-		dev_warn(&host->pdev->dev, "no DMA channel available\n");
+-		return false;
+-	} else {
+-		dev_info(&host->pdev->dev,
+-					"using %s for DMA transfers\n",
+-					dma_chan_name(host->dma.chan));
+-
+-		host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
+-		host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+-		host->dma_conf.src_maxburst = 1;
+-		host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
+-		host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+-		host->dma_conf.dst_maxburst = 1;
+-		host->dma_conf.device_fc = false;
+-		return true;
++	host->dma.chan = dma_request_slave_channel_reason(&host->pdev->dev, "rxtx");
++	if (IS_ERR(host->dma.chan)) {
++		ret = PTR_ERR(host->dma.chan);
++		host->dma.chan = NULL;
++		return ret;
+ 	}
++
++	dev_info(&host->pdev->dev,
++			"using %s for DMA transfers\n",
++			dma_chan_name(host->dma.chan));
++
++	host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
++	host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
++	host->dma_conf.src_maxburst = 1;
++	host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
++	host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
++	host->dma_conf.dst_maxburst = 1;
++	host->dma_conf.device_fc = false;
++	return ret;
+ }
+ 
+ /*
+@@ -2411,7 +2413,10 @@ static int __init atmci_probe(struct platform_device *pdev)
+ 
+ 	/* Get MCI capabilities and set operations according to it */
+ 	atmci_get_cap(host);
+-	if (atmci_configure_dma(host)) {
++	ret = atmci_configure_dma(host);
++	if (ret == -EPROBE_DEFER)
++		goto err_dma_probe_defer;
++	if (ret == 0) {
+ 		host->prepare_data = &atmci_prepare_data_dma;
+ 		host->submit_data = &atmci_submit_data_dma;
+ 		host->stop_transfer = &atmci_stop_transfer_dma;
+@@ -2484,6 +2489,7 @@ err_init_slot:
+ 	del_timer_sync(&host->timer);
+ 	if (host->dma.chan)
+ 		dma_release_channel(host->dma.chan);
++err_dma_probe_defer:
+ 	free_irq(irq, host);
+ 	return ret;
+ }
+@@ -2518,25 +2524,14 @@ static int __exit atmci_remove(struct platform_device *pdev)
+ }
+ 
+ static struct platform_driver atmci_driver = {
++	.probe		= atmci_probe,
+ 	.remove		= __exit_p(atmci_remove),
+ 	.driver		= {
+ 		.name		= "atmel_mci",
+ 		.of_match_table	= of_match_ptr(atmci_dt_ids),
+ 	},
+ };
+-
+-static int __init atmci_init(void)
+-{
+-	return platform_driver_probe(&atmci_driver, atmci_probe);
+-}
+-
+-static void __exit atmci_exit(void)
+-{
+-	platform_driver_unregister(&atmci_driver);
+-}
+-
+-late_initcall(atmci_init); /* try to load after dma driver when built-in */
+-module_exit(atmci_exit);
++module_platform_driver(atmci_driver);
+ 
+ MODULE_DESCRIPTION("Atmel Multimedia Card Interface driver");
+ MODULE_AUTHOR("Haavard Skinnemoen (Atmel)");
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+2.0.3
