@@ -1,33 +1,65 @@
-From: p.pisati@gmail.com (Paolo Pisati)
-Date: Wed, 19 Nov 2014 17:22:24 +0100
-Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
- support
-In-Reply-To: <546C7D15.10605@collabora.co.uk>
-References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
- <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
- <546C646C.4060303@collabora.co.uk>
- <20141119105527.GA5396@luxor.wired.org>
- <546C7D15.10605@collabora.co.uk>
-Message-ID: <20141119162224.GB5396@luxor.wired.org>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Wed, 19 Nov 2014 17:24:22 +0100
+Subject: [PATCH 6/6] pci, acpi: Share ACPI PCI config space accessors.
+In-Reply-To: <2360791.Aj7tQ0nCJ3@wuerfel>
+References: <1416413091-13452-1-git-send-email-tomasz.nowicki@linaro.org>
+ <1416413091-13452-7-git-send-email-tomasz.nowicki@linaro.org>
+ <2360791.Aj7tQ0nCJ3@wuerfel>
+Message-ID: <546CC436.4000902@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 12:20:53PM +0100, Javier Martinez Canillas wrote:
-> 
-> If someone else is interested, I've pushed a branch [0] with 3.18-rc5 + all
-> the needed patches.
-> 
-> Ajay, feel free to add to your series:
-> 
-> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> 
-> Best regards,
-> Javier
-> 
-> [0]: git://git.collabora.co.uk/git/user/javier/linux.git wip/exynos/dp-integ
+On 19.11.2014 17:19, Arnd Bergmann wrote:
+> On Wednesday 19 November 2014 17:04:51 Tomasz Nowicki wrote:
+>> +/*
+>> + * raw_pci_read/write - ACPI PCI config space accessors.
+>> + *
+>> + * ACPI spec defines MMCFG as the way we can access PCI config space,
+>> + * so let MMCFG be default (__weak).
+>> + *
+>> + * If platform needs more fancy stuff, should provides its own implementation.
+>> + */
+>> +int __weak raw_pci_read(unsigned int domain, unsigned int bus,
+>> +                       unsigned int devfn, int reg, int len, u32 *val)
+>> +{
+>> +       return pci_mmcfg_read(domain, bus, devfn, reg, len, val);
+>> +}
+>> +
+>> +int __weak raw_pci_write(unsigned int domain, unsigned int bus,
+>> +                        unsigned int devfn, int reg, int len, u32 val)
+>> +{
+>> +       return pci_mmcfg_write(domain, bus, devfn, reg, len, val);
+>> +}
+>> +
+>>
+>
+> I think it would be better to avoid __weak functions here, as they tend
+> to be hard to follow when trying to understand the code.
+>
+> How about using a Kconfig symbol like this:
+>
+> #ifdef CONFIG_ARCH_RAW_PCI_READWRITE
+> int raw_pci_read(unsigned int domain, unsigned int bus, unsigned int devfn,
+>                   int reg, int len, u32 *val);
+> int raw_pci_write(unsigned int domain, unsigned int bus, unsigned int devfn,
+>                    int reg, int len, u32 val);
+> #else
+> static inline int raw_pci_read(unsigned int domain, unsigned int bus,
+> 	                       unsigned int devfn, int reg, int len, u32 *val)
+> {
+> 	return pci_mmcfg_read(domain, bus, devfn, reg, len, val);
+> }
+>
+> static inline int raw_pci_write(unsigned int domain, unsigned int bus,
+>               		                unsigned int devfn, int reg, int len, u32 val)
+> {
+>         return pci_mmcfg_write(domain, bus, devfn, reg, len, val);
+> }
+> #endif
+>
+> Same thing for the weak symbols in patch 5.
+>
 
-doesn't peach pi require the same dts modification as peach pit/snow?
+It makes sense to me, thanks!
 
--- 
-bye,
-p.
+Tomasz
