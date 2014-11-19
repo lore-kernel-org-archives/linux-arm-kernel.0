@@ -1,463 +1,86 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 19 Nov 2014 15:01:10 -0800
-Subject: [PATCHv2] arm64: add support to dump the kernel page tables
-In-Reply-To: <1416262710-7798-1-git-send-email-lauraa@codeaurora.org>
-References: <1416262710-7798-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <CAGXu5jK7FWs2v52T2RBdKhdYcV5wGm3F4H4km9h-B15Z6S0A2Q@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 19 Nov 2014 15:01:35 -0800
+Subject: [PATCH v4] clocksource: arch_timer: Allow the device tree to
+ specify uninitialized timer registers
+In-Reply-To: <1412753627-28287-1-git-send-email-sonnyrao@chromium.org>
+References: <1412753627-28287-1-git-send-email-sonnyrao@chromium.org>
+Message-ID: <CAD=FV=VhaMo4fNide3a2S6jdLiq2pyOqY3hmx7ai0iDTPxCsPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 2:18 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
-> In a similar manner to arm, it's useful to be able to dump the page
-> tables to verify permissions and memory types. Add a debugfs file
-> to check the page tables.
+Daniel,
+
+On Wed, Oct 8, 2014 at 12:33 AM, Sonny Rao <sonnyrao@chromium.org> wrote:
+> From: Doug Anderson <dianders@chromium.org>
 >
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-
-This seems to behave well for me. Thanks!
-
-Tested-by: Kees Cook <keescook@chromium.org>
-
-In my configuration, though, with CONFIG_DEBUG_SET_MODULE_RONX=y, I'm
-only seeing RO, and no NX changes. I haven't constructed a test for
-the module memory behavior directly (to see if this is a page table
-issue or a PTDUMP reporting issue). This series I'm testing has gone
-through some backporting on my end, so I wanted to just double-check
-and see if you saw this too, or if it's specific to my environment:
-
----[ Modules ]---
-0xffffffbffc000000-0xffffffbffc005000          20K     ro x  SHD AF
-UXN MEM/NORMAL
-0xffffffbffc005000-0xffffffbffc007000           8K     RW x  SHD AF
-UXN MEM/NORMAL
-0xffffffbffc00c000-0xffffffbffc00e000           8K     ro x  SHD AF
-UXN MEM/NORMAL
-0xffffffbffc00e000-0xffffffbffc010000           8K     RW x  SHD AF
-UXN MEM/NORMAL
-...
-
-Thanks,
-
--Kees
-
+> Some 32-bit (ARMv7) systems are architected like this:
+>
+> * The firmware doesn't know and doesn't care about hypervisor mode and
+>   we don't want to add the complexity of hypervisor there.
+>
+> * The firmware isn't involved in SMP bringup or resume.
+>
+> * The ARCH timer come up with an uninitialized offset (CNTVOFF)
+>   between the virtual and physical counters.  Each core gets a
+>   different random offset.
+>
+> * The device boots in "Secure SVC" mode.
+>
+> * Nothing has touched the reset value of CNTHCTL.PL1PCEN or
+>   CNTHCTL.PL1PCTEN (both default to 1 at reset)
+>
+> On systems like the above, it doesn't make sense to use the virtual
+> counter.  There's nobody managing the offset and each time a core goes
+> down and comes back up it will get reinitialized to some other random
+> value.
+>
+> This adds an optional property which can inform the kernel of this
+> situation, and firmware is free to remove the property if it is going
+> to initialize the CNTVOFF registers when each CPU comes out of reset.
+>
+> Currently, the best course of action in this case is to use the
+> physical timer, which is why it is important that CNTHCTL hasn't been
+> changed from its reset value and it's a reasonable assumption given
+> that the firmware has never entered HYP mode.
+>
+> Note that it's been said that on ARMv8 systems the firmware and
+> kernel really can't be architected as described above.  That means
+> using the physical timer like this really only makes sense for ARMv7
+> systems.
+>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 > ---
-> v2: Addressed comments from Mark Rutland. Made the logic a bit more
-> consistent between functions. Now tested on 4K and 64K pages.
+> Changes in v2:
+> - Add "#ifdef CONFIG_ARM" as per Will Deacon
+>
+> Changes in v3:
+> - change property name to arm,cntvoff-not-fw-configured and specify
+>   that the value of CNTHCTL.PL1PC(T)EN must still be the reset value
+>   of 1 as per Mark Rutland
+>
+> Changes in v4:
+> - change property name to arm,cpu-registers-not-fw-configured and
+>   specify that all cpu registers must have architected reset values
+>   per Mark Rutland
+> - change from "#ifdef CONFIG_ARM" to "if (IS_ENABLED(CONFIG_ARM))" per
+>   Arnd Bergmann
 > ---
->  arch/arm64/Kconfig.debug |  12 ++
->  arch/arm64/mm/Makefile   |   1 +
->  arch/arm64/mm/dump.c     | 358 +++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 371 insertions(+)
->  create mode 100644 arch/arm64/mm/dump.c
->
-> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-> index 0a12933..5fdd6dc 100644
-> --- a/arch/arm64/Kconfig.debug
-> +++ b/arch/arm64/Kconfig.debug
-> @@ -6,6 +6,18 @@ config FRAME_POINTER
->         bool
->         default y
->
-> +config ARM64_PTDUMP
-> +       bool "Export kernel pagetable layout to userspace via debugfs"
-> +       depends on DEBUG_KERNEL
-> +       select DEBUG_FS
-> +        help
-> +         Say Y here if you want to show the kernel pagetable layout in a
-> +         debugfs file. This information is only useful for kernel developers
-> +         who are working in architecture specific areas of the kernel.
-> +         It is probably not a good idea to enable this feature in a production
-> +         kernel.
-> +         If in doubt, say "N"
-> +
->  config STRICT_DEVMEM
->         bool "Filter access to /dev/mem"
->         depends on MMU
-> diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
-> index c56179e..773d37a 100644
-> --- a/arch/arm64/mm/Makefile
-> +++ b/arch/arm64/mm/Makefile
-> @@ -3,3 +3,4 @@ obj-y                           := dma-mapping.o extable.o fault.o init.o \
->                                    ioremap.o mmap.o pgd.o mmu.o \
->                                    context.o proc.o pageattr.o
->  obj-$(CONFIG_HUGETLB_PAGE)     += hugetlbpage.o
-> +obj-$(CONFIG_ARM64_PTDUMP)     += dump.o
-> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-> new file mode 100644
-> index 0000000..57dcee4
-> --- /dev/null
-> +++ b/arch/arm64/mm/dump.c
-> @@ -0,0 +1,358 @@
-> +/*
-> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
-> + * Debug helper to dump the current kernel pagetables of the system
-> + * so that we can see what the various memory ranges are set to.
-> + *
-> + * Derived from x86 and arm implementation:
-> + * (C) Copyright 2008 Intel Corporation
-> + *
-> + * Author: Arjan van de Ven <arjan@linux.intel.com>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; version 2
-> + * of the License.
-> + */
-> +#include <linux/debugfs.h>
-> +#include <linux/fs.h>
-> +#include <linux/mm.h>
-> +#include <linux/seq_file.h>
-> +
-> +#include <asm/pgtable.h>
-> +
-> +#define LOWEST_ADDR    (UL(0xffffffffffffffff) << VA_BITS)
-> +
-> +struct addr_marker {
-> +       unsigned long start_address;
-> +       const char *name;
-> +};
-> +
-> +static struct addr_marker address_markers[] = {
-> +       { 0,                    "vmalloc() Area" },
-> +       { VMALLOC_END,          "vmalloc() End" },
-> +       { MODULES_VADDR,        "Modules" },
-> +       { PAGE_OFFSET,          "Kernel Mapping" },
-> +       { -1,                   NULL },
-> +};
-> +
-> +struct pg_state {
-> +       struct seq_file *seq;
-> +       const struct addr_marker *marker;
-> +       unsigned long start_address;
-> +       unsigned level;
-> +       u64 current_prot;
-> +};
-> +
-> +struct prot_bits {
-> +       u64             mask;
-> +       u64             val;
-> +       const char      *set;
-> +       const char      *clear;
-> +};
-> +
-> +static const struct prot_bits pte_bits[] = {
-> +       {
-> +               .mask   = PTE_USER,
-> +               .val    = PTE_USER,
-> +               .set    = "USR",
-> +               .clear  = "   ",
-> +       }, {
-> +               .mask   = PTE_RDONLY,
-> +               .val    = PTE_RDONLY,
-> +               .set    = "ro",
-> +               .clear  = "RW",
-> +       }, {
-> +               .mask   = PTE_PXN,
-> +               .val    = PTE_PXN,
-> +               .set    = "NX",
-> +               .clear  = "x ",
-> +       }, {
-> +               .mask   = PTE_SHARED,
-> +               .val    = PTE_SHARED,
-> +               .set    = "SHD",
-> +               .clear  = "   ",
-> +       }, {
-> +               .mask   = PTE_AF,
-> +               .val    = PTE_AF,
-> +               .set    = "AF",
-> +               .clear  = "  ",
-> +       }, {
-> +               .mask   = PTE_NG,
-> +               .val    = PTE_NG,
-> +               .set    = "NG",
-> +               .clear  = "  ",
-> +       }, {
-> +               .mask   = PTE_UXN,
-> +               .val    = PTE_UXN,
-> +               .set    = "UXN",
-> +       }, {
-> +               .mask   = PTE_ATTRINDX_MASK,
-> +               .val    = PTE_ATTRINDX(MT_DEVICE_nGnRnE),
-> +               .set    = "DEVICE/nGnRnE",
-> +       }, {
-> +               .mask   = PTE_ATTRINDX_MASK,
-> +               .val    = PTE_ATTRINDX(MT_DEVICE_nGnRE),
-> +               .set    = "DEVICE/nGnRE",
-> +       }, {
-> +               .mask   = PTE_ATTRINDX_MASK,
-> +               .val    = PTE_ATTRINDX(MT_DEVICE_GRE),
-> +               .set    = "DEVICE/GRE",
-> +       }, {
-> +               .mask   = PTE_ATTRINDX_MASK,
-> +               .val    = PTE_ATTRINDX(MT_NORMAL_NC),
-> +               .set    = "MEM/BUFFERABLE",
-> +       }, {
-> +               .mask   = PTE_ATTRINDX_MASK,
-> +               .val    = PTE_ATTRINDX(MT_NORMAL),
-> +               .set    = "MEM/NORMAL",
-> +       }
-> +};
-> +
-> +static const struct prot_bits section_bits[] = {
-> +       {
-> +               .mask   = PMD_SECT_USER,
-> +               .val    = PMD_SECT_USER,
-> +               .set    = "USR",
-> +               .clear  = "   ",
-> +       }, {
-> +               .mask   = PMD_SECT_RDONLY,
-> +               .val    = PMD_SECT_RDONLY,
-> +               .set    = "ro",
-> +               .clear  = "RW",
-> +       }, {
-> +               .mask   = PMD_SECT_PXN,
-> +               .val    = PMD_SECT_PXN,
-> +               .set    = "NX",
-> +               .clear  = "x ",
-> +       }, {
-> +               .mask   = PMD_SECT_S,
-> +               .val    = PMD_SECT_S,
-> +               .set    = "SHD",
-> +               .clear  = "   ",
-> +       }, {
-> +               .mask   = PMD_SECT_AF,
-> +               .val    = PMD_SECT_AF,
-> +               .set    = "AF",
-> +               .clear  = "  ",
-> +       }, {
-> +               .mask   = PMD_SECT_NG,
-> +               .val    = PMD_SECT_NG,
-> +               .set    = "NG",
-> +               .clear  = "  ",
-> +       }, {
-> +               .mask   = PMD_SECT_UXN,
-> +               .val    = PMD_SECT_UXN,
-> +               .set    = "UXN",
-> +       }, {
-> +               .mask   = PTE_ATTRINDX_MASK,
-> +               .val    = PTE_ATTRINDX(MT_DEVICE_nGnRnE),
-> +               .set    = "DEVICE/nGnRnE",
-> +       }, {
-> +               .mask   = PTE_ATTRINDX_MASK,
-> +               .val    = PTE_ATTRINDX(MT_DEVICE_nGnRE),
-> +               .set    = "DEVICE/nGnRE",
-> +       }, {
-> +               .mask   = PTE_ATTRINDX_MASK,
-> +               .val    = PTE_ATTRINDX(MT_DEVICE_GRE),
-> +               .set    = "DEVICE/GRE",
-> +       }, {
-> +               .mask   = PTE_ATTRINDX_MASK,
-> +               .val    = PTE_ATTRINDX(MT_NORMAL_NC),
-> +               .set    = "MEM/BUFFERABLE",
-> +       }, {
-> +               .mask   = PTE_ATTRINDX_MASK,
-> +               .val    = PTE_ATTRINDX(MT_NORMAL),
-> +               .set    = "MEM/NORMAL",
-> +       }
-> +};
-> +
-> +struct pg_level {
-> +       const struct prot_bits *bits;
-> +       size_t num;
-> +       u64 mask;
-> +};
-> +
-> +static struct pg_level pg_level[] = {
-> +       {
-> +       }, { /* pgd */
-> +               .bits   = pte_bits,
-> +               .num    = ARRAY_SIZE(pte_bits),
-> +       }, { /* pud */
-> +               .bits   = pte_bits,
-> +               .num    = ARRAY_SIZE(pte_bits),
-> +       }, { /* pmd */
-> +               .bits   = section_bits,
-> +               .num    = ARRAY_SIZE(section_bits),
-> +       }, { /* pte */
-> +               .bits   = pte_bits,
-> +               .num    = ARRAY_SIZE(pte_bits),
-> +       },
-> +};
-> +
-> +static void dump_prot(struct pg_state *st, const struct prot_bits *bits,
-> +                       size_t num)
-> +{
-> +       unsigned i;
-> +
-> +       for (i = 0; i < num; i++, bits++) {
-> +               const char *s;
-> +
-> +               if ((st->current_prot & bits->mask) == bits->val)
-> +                       s = bits->set;
-> +               else
-> +                       s = bits->clear;
-> +
-> +               if (s)
-> +                       seq_printf(st->seq, " %s", s);
-> +       }
-> +}
-> +
-> +static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
-> +                               u64 val)
-> +{
-> +       static const char units[] = "KMGTPE";
-> +       u64 prot = val & pg_level[level].mask;
-> +
-> +       if (addr < LOWEST_ADDR)
-> +               return;
-> +
-> +       if (!st->level) {
-> +               st->level = level;
-> +               st->current_prot = prot;
-> +               st->start_address = addr;
-> +               seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
-> +       } else if (prot != st->current_prot || level != st->level ||
-> +                  addr >= st->marker[1].start_address) {
-> +               const char *unit = units;
-> +               unsigned long delta;
-> +
-> +               if (st->current_prot) {
-> +                       seq_printf(st->seq, "0x%16lx-0x%16lx   ",
-> +                                  st->start_address, addr);
-> +
-> +                       delta = (addr - st->start_address) >> 10;
-> +                       while (!(delta & 1023) && unit[1]) {
-> +                               delta >>= 10;
-> +                               unit++;
-> +                       }
-> +                       seq_printf(st->seq, "%9lu%c", delta, *unit);
-> +                       if (pg_level[st->level].bits)
-> +                               dump_prot(st, pg_level[st->level].bits,
-> +                                         pg_level[st->level].num);
-> +                       seq_puts(st->seq, "\n");
-> +               }
-> +
-> +               if (addr >= st->marker[1].start_address) {
-> +                       st->marker++;
-> +                       seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
-> +               }
-> +               st->start_address = addr;
-> +               st->current_prot = prot;
-> +               st->level = level;
-> +       }
-> +}
-> +
-> +static void walk_pte(struct pg_state *st, pmd_t *pmd, unsigned long start)
-> +{
-> +       pte_t *pte = pte_offset_kernel(pmd, 0);
-> +       unsigned long addr;
-> +       unsigned i;
-> +
-> +       for (i = 0; i < PTRS_PER_PTE; i++, pte++) {
-> +               addr = start + i * PAGE_SIZE;
-> +               note_page(st, addr, 4, pte_val(*pte));
-> +       }
-> +}
-> +
-> +static void walk_pmd(struct pg_state *st, pud_t *pud, unsigned long start)
-> +{
-> +       pmd_t *pmd = pmd_offset(pud, 0);
-> +       unsigned long addr;
-> +       unsigned i;
-> +
-> +       for (i = 0; i < PTRS_PER_PMD; i++, pmd++) {
-> +               addr = start + i * PMD_SIZE;
-> +               if (pmd_none(*pmd) || pmd_sect(*pmd) || pmd_bad(*pmd))
-> +                       note_page(st, addr, 3, pmd_val(*pmd));
-> +               else
-> +                       walk_pte(st, pmd, addr);
-> +       }
-> +}
-> +
-> +static void walk_pud(struct pg_state *st, pgd_t *pgd, unsigned long start)
-> +{
-> +       pud_t *pud = pud_offset(pgd, 0);
-> +       unsigned long addr;
-> +       unsigned i;
-> +
-> +       for (i = 0; i < PTRS_PER_PUD; i++, pud++) {
-> +               addr = start + i * PUD_SIZE;
-> +               if (pud_none(*pud) || pud_sect(*pud) || pud_bad(*pud))
-> +                       note_page(st, addr, 2, pud_val(*pud));
-> +               else
-> +                       walk_pmd(st, pud, addr);
-> +       }
-> +}
-> +
-> +static unsigned long normalize_addr(unsigned long u)
-> +{
-> +       return u | LOWEST_ADDR;
-> +}
-> +
-> +static void walk_pgd(struct pg_state *st, pgd_t *pgd, unsigned long start)
-> +{
-> +       unsigned i;
-> +       unsigned long addr;
-> +
-> +       for (i = 0; i < PTRS_PER_PGD; i++, pgd++) {
-> +               addr = normalize_addr(start + i * PGDIR_SIZE);
-> +               if (pgd_none(*pgd) || pgd_bad(*pgd))
-> +                       note_page(st, addr, 1, pgd_val(*pgd));
-> +               else
-> +                       walk_pud(st, pgd, addr);
-> +       }
-> +}
-> +
-> +static int ptdump_show(struct seq_file *m, void *v)
-> +{
-> +       struct pg_state st;
-> +
-> +       memset(&st, 0, sizeof(st));
-> +       st.seq = m;
-> +       st.marker = address_markers;
-> +
-> +       walk_pgd(&st, swapper_pg_dir, 0);
-> +
-> +       note_page(&st, 0, 0, 0);
-> +       return 0;
-> +}
-> +
-> +static int ptdump_open(struct inode *inode, struct file *file)
-> +{
-> +       return single_open(file, ptdump_show, NULL);
-> +}
-> +
-> +static const struct file_operations ptdump_fops = {
-> +       .open           = ptdump_open,
-> +       .read           = seq_read,
-> +       .llseek         = seq_lseek,
-> +       .release        = single_release,
-> +};
-> +
-> +static int ptdump_init(void)
-> +{
-> +       struct dentry *pe;
-> +       unsigned i, j;
-> +
-> +       for (i = 0; i < ARRAY_SIZE(pg_level); i++)
-> +               if (pg_level[i].bits)
-> +                       for (j = 0; j < pg_level[i].num; j++)
-> +                               pg_level[i].mask |= pg_level[i].bits[j].mask;
-> +
-> +       address_markers[0].start_address = VMALLOC_START;
-> +
-> +       pe = debugfs_create_file("kernel_page_tables", 0400, NULL, NULL,
-> +                                &ptdump_fops);
-> +       return pe ? 0 : -ENOMEM;
-> +}
-> +device_initcall(ptdump_init);
-> --
-> Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>  Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++++++
+>  drivers/clocksource/arm_arch_timer.c                 | 8 ++++++++
+>  2 files changed, 16 insertions(+)
 
+Do you know what the status of this patch is?  This patch and Sonny's
+patch at <https://patchwork.kernel.org/patch/5051901/> are needed on
+Rockchip rk3288 for some specific things:
 
+1. To make SMP happy with coreboot.
 
--- 
-Kees Cook
-Chrome OS Security
+2. To (I assume) make SMP happy after S2R (no matter which firmware is
+used since I don't think anyone has PSCI for rk3288).
+
+...we still need a DTS entry atop these patches, but that's trivial to
+add once these land.
+
+Thanks!
