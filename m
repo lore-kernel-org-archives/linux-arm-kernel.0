@@ -1,52 +1,47 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 19 Nov 2014 08:05:37 +0000
-Subject: [PATCH 08/25] ARM: shmobile: r8a7790: sound enables Audio DMAC
- peri peri entry on DTSI
-In-Reply-To: <871tp09h9g.wl%kuninori.morimoto.gx@renesas.com>
-References: <cover.1415755881.git.horms+renesas@verge.net.au>
- <1877842.49FtTfL2eK@wuerfel>
- <87a93pxtlr.wl%kuninori.morimoto.gx@renesas.com>
- <15076656.0HaaBPou9k@wuerfel>
- <871tp09h9g.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <87d28jk434.wl%kuninori.morimoto.gx@renesas.com>
+From: jay.xu@rock-chips.com (Jianqun Xu)
+Date: Wed, 19 Nov 2014 16:07:27 +0800
+Subject: [PATCH v2 1/2] ASoC: rockchip-i2s: dt: add an optional property
+ "i2s_clk_out"
+In-Reply-To: <1416366365-4632-2-git-send-email-jay.xu@rock-chips.com>
+References: <1416366365-4632-2-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1416384447-29391-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add an property "i2s_clk_out", which enables to output clock to outside
+of rockchip SoCs. Let's make it optional since not each board needs it.
 
-Hi Arnd, again
-
-> > > This device has 10 sound channels, and using 3 kind of IPs.
-> > > Then, data input/output needs DMA channel which needs specific ID to using.
-> > > Above name has ID pair for it, so there is much combination. 
-> > > These specific ID is based on SoC, not board.
-> > > Sound driver / DMAEngine can get specific ID from above.
-> > > 
-> > > Indeed binding itself was not documented yet.
-> > > I will add it ASAP.
-> > 
-> > It sounds like you have some device-to-device DMAs here, which isn't
-> > supported by the generic dmaengine binding at all, and I don't think
-> > the driver currently attempts to use them.
-> > 
-> > Is that correct? Could you try to remove those from the binding and
-> > just leave the device-to-memory and memory-to-device channels there?
-> > If we ever want to support those, we probably have to extend the
-> > dmaengine binding first, and then the driver binding would also look
-> > different.
-> 
-> It depends sound data path. basically, sound data goes memory-to-device
-> or device-to-memory. but, it needs special IP if you want to use special effect.
-> In such case, sound data path will be memory-to-device-to-device, or device-to-device-to-memory.
-> This path based on board, and, our reference board is using above path.
-
-memory-to-device-to-device case, it is indeed using memory-to-device and device-to-device.
-But, DMAEngine point of view, above device-to-device interface/style is same as memory-to-device.
-memory-to-device case needs ID + "memory address"   + "register address".
-device-to-device case needs ID + "register address" + "register address".
-It is implemented in ${LINUX}/drivers/dma/sh/rcar-audmapp.c,
-and used from ${LINUX}/sound/soc/sh/rcar/core.c with generic dmaengine interface/binding.
-
-
-Best regards
+Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
 ---
-Kuninori Morimoto
+changes since v1:
+- make "i2s_clk_out" optional, suggested by Sonny
+
+ Documentation/devicetree/bindings/sound/rockchip-i2s.txt | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+index 9b82c20..6dedd0d 100644
+--- a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
++++ b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+@@ -22,6 +22,10 @@ Required properties:
+    - "i2s_hclk": clock for I2S BUS
+    - "i2s_clk" : clock for I2S controller
+ 
++Optional property:
++   - "i2s_clk_out" : clock output to outside of chip, usally as master clock for audio
++   codec chip
++
+ Example for rk3288 I2S controller:
+ 
+ i2s at ff890000 {
+@@ -32,6 +36,6 @@ i2s at ff890000 {
+ 	#size-cells = <0>;
+ 	dmas = <&pdma1 0>, <&pdma1 1>;
+ 	dma-names = "tx", "rx";
+-	clock-names = "i2s_hclk", "i2s_clk";
+-	clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>;
++	clock-names = "i2s_hclk", "i2s_clk", "i2s_clk_out";
++	clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>, <&cru SCLK_I2S0_CLKOUT>;
+ };
+-- 
+1.9.1
