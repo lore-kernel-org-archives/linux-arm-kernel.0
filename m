@@ -1,81 +1,82 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Nov 2014 15:11:24 +0100
-Subject: [PATCH] isofs: avoid unused function warning
-Message-ID: <1744765.FITJHBjs5L@wuerfel>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Wed, 19 Nov 2014 22:14:07 +0800
+Subject: [PATCH v7 0/4] ARM: mediatek: Add support for interrupt polarity
+Message-ID: <1416406451-4578-1-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the isofs_hash() function removed, isofs_hash_ms() is the only user
-of isofs_hash_common(), but it's defined inside of an #ifdef, which triggers
-this gcc warning in ARM axm55xx_defconfig starting with v3.18-rc3:
+This series is 7th version of interrupt polarity support for MediaTek SoCs.
 
-fs/isofs/inode.c:177:1: warning: 'isofs_hash_common' defined but not used [-Wunused-function]
+I rebased previous version on latest tip/irq/irqdomain and use newly added
+helper function irq_domain_add_hierarchy(). I also changed according to
+Marc's suggestion.
 
-This patch moves the function inside of the same #ifdef section to avoid that
-warning, which seems the best compromise of a relatively harmless patch for
-a late -rc.
+Simplified block diagram for interrupt on my system:
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: b0afd8e5db7b ("isofs: don't bother with ->d_op for normal case")
----
+    +-------+      +-------+
+ ---| SYSIRQ|------|ARM GIC|
+ ---|       |------|       |
+ ---|       |------|       |
+ ---|       |------|       |
+ ---|       |------|       |
+    +-------+      +-------+
 
-diff --git a/fs/isofs/inode.c b/fs/isofs/inode.c
-index fe839b915116..d67a16f2a45d 100644
---- a/fs/isofs/inode.c
-+++ b/fs/isofs/inode.c
-@@ -174,27 +174,6 @@ struct iso9660_options{
-  * Compute the hash for the isofs name corresponding to the dentry.
-  */
- static int
--isofs_hash_common(struct qstr *qstr, int ms)
--{
--	const char *name;
--	int len;
--
--	len = qstr->len;
--	name = qstr->name;
--	if (ms) {
--		while (len && name[len-1] == '.')
--			len--;
--	}
--
--	qstr->hash = full_name_hash(name, len);
--
--	return 0;
--}
--
--/*
-- * Compute the hash for the isofs name corresponding to the dentry.
-- */
--static int
- isofs_hashi_common(struct qstr *qstr, int ms)
- {
- 	const char *name;
-@@ -263,6 +242,27 @@ isofs_dentry_cmpi(const struct dentry *parent, const struct dentry *dentry,
- }
- 
- #ifdef CONFIG_JOLIET
-+/*
-+ * Compute the hash for the isofs name corresponding to the dentry.
-+ */
-+static int
-+isofs_hash_common(struct qstr *qstr, int ms)
-+{
-+	const char *name;
-+	int len;
-+
-+	len = qstr->len;
-+	name = qstr->name;
-+	if (ms) {
-+		while (len && name[len-1] == '.')
-+			len--;
-+	}
-+
-+	qstr->hash = full_name_hash(name, len);
-+
-+	return 0;
-+}
-+
- static int
- isofs_hash_ms(const struct dentry *dentry, struct qstr *qstr)
- {
+In device tree, interrupt-parent for other devices is sysirq, child of gic.
+This describe HW better and allow device to specify polarity as it is sent
+by the device.
+
+When using hierarchy irq domain, gic will use irq_domain_add_linear to
+create irqdomain and all interrupt numbers must come from device tree. My
+/proc/interrupts looks like this now:
+
+# cat /proc/interrupts
+           CPU0
+ 16:     149578  MT_SYSIRQ 113  mtk_timer
+ 20:       1082  MT_SYSIRQ  54  serial
+
+Changes in v7:
+ - Rebased to tip/irq/irqdomain
+ - In mtk_sysirq_domain_alloc, use copy of irq_data to workaound of_node
+   check in gic_irq_domain_xlate.
+
+Changes in v6:
+ - Discussed in [1]
+ - Rebased to tip/irq/irqdomain
+
+Changes in v5:
+ - Discussed in [2]
+ - Fix bug on mt6589 reported by Matthias
+ - Fix bug for irq_find_mapping in irq_create_of_mapping
+ - Merge Marc's change to proper handle non-DT case in gic_init_bases
+
+Changes in v4:
+ - Discussed in [3]
+ - Remove arm,hierarchy-irq-domain. When GIC is probed by DT, it will
+support hierarchy irqdomain.
+
+Changes in v3:
+ - Discussed in [4]
+ - First implementation using hierarchy irqdomain
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/302221.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/298161.html
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296911.html
+[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/293766.html
+
+Yingjoe Chen (4):
+  irqchip: gic: Support hierarchy irq domain.
+  ARM: mediatek: Add sysirq interrupt polarity support
+  ARM: mediatek: Add sysirq in mt6589/mt8135/mt8127 dtsi
+  dt-bindings: add bindings for mediatek sysirq
+
+ .../bindings/arm/mediatek/mediatek,sysirq.txt      |  26 ++++
+ arch/arm/boot/dts/mt6589.dtsi                      |  14 +-
+ arch/arm/boot/dts/mt8127.dtsi                      |  14 +-
+ arch/arm/boot/dts/mt8135.dtsi                      |  14 +-
+ drivers/irqchip/Kconfig                            |   1 +
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-gic.c                          |  78 ++++++----
+ drivers/irqchip/irq-mtk-sysirq.c                   | 158 +++++++++++++++++++++
+ 8 files changed, 276 insertions(+), 30 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
+ create mode 100644 drivers/irqchip/irq-mtk-sysirq.c
