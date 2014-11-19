@@ -1,49 +1,135 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 19 Nov 2014 08:46:20 +0530
-Subject: [PATCH v5 2/2] ARM: EXYNOS: PMU: move restart code into pmu driver
-In-Reply-To: <546B6395.8020403@samsung.com>
-References: <1416307650-15162-1-git-send-email-pankaj.dubey@samsung.com>
- <1416307650-15162-3-git-send-email-pankaj.dubey@samsung.com>
- <546B6395.8020403@samsung.com>
-Message-ID: <000801d003a7$404882a0$c0d987e0$@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 19 Nov 2014 11:18:24 +0800
+Subject: [PATCH 1/3] ARM: dts: imx6: add pm_power_off support for i.mx6
+ chips
+In-Reply-To: <1415780439-29728-2-git-send-email-b38343@freescale.com>
+References: <1415780439-29728-1-git-send-email-b38343@freescale.com>
+ <1415780439-29728-2-git-send-email-b38343@freescale.com>
+Message-ID: <20141119031823.GC27759@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 18, 2014 8:50 PM, Sylwester Nawrocki Wrote:
-> On 18/11/14 11:47, Pankaj Dubey wrote:
-> > diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-> > index 6c8a76d..e4c3512 100644
-> > --- a/arch/arm/mach-exynos/pmu.c
-> > +++ b/arch/arm/mach-exynos/pmu.c
-> > @@ -11,8 +11,11 @@
+On Wed, Nov 12, 2014 at 04:20:37PM +0800, Robin Gong wrote:
+> All chips of i.mx6 can be powered off by programming SNVS.
+> For example :
+> On i.mx6q-sabresd board, PMIC_ON_REQ connect with external
+> pmic ON/OFF pin, that will cause the whole PMIC powered off
+> except VSNVS. And system can restart once PMIC_ON_REQ goes
+> high by push POWRER key.
 > 
-> > @@ -716,6 +719,13 @@ static void exynos5420_pmu_init(void)
-> >  	pr_info("EXYNOS5420 PMU initialized\n");  }
-> >
-> > +static int pmu_restart_notify(struct notifier_block *this,
-> > +		unsigned long code, void *unused)
-> > +{
-> > +	pmu_raw_writel(0x1, EXYNOS_SWRESET);
+> Signed-off-by: Robin Gong <b38343@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl-sabresd.dtsi |    4 ++++
+>  arch/arm/boot/dts/imx6qdl.dtsi         |    6 ++++++
+>  arch/arm/boot/dts/imx6sl-evk.dts       |    4 ++++
+>  arch/arm/boot/dts/imx6sl.dtsi          |    6 ++++++
+>  arch/arm/boot/dts/imx6sx-sdb.dts       |    4 ++++
+>  arch/arm/boot/dts/imx6sx.dtsi          |    6 ++++++
+>  6 files changed, 30 insertions(+)
 > 
-> Is it also valid on exynos5440 ? Doesn't it cause any harm there ?
-> Perhaps we could add a comment saying it has not effect on that SoC ?
-> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> index 07fb302..ba12cc6 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> @@ -531,6 +531,10 @@
+>  	status = "okay";
+>  };
+>  
+> +&snvs-poweroff {
+> +	status = "okay";
+> +};
+> +
+>  &ssi2 {
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index c701af9..3a032d1 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -645,6 +645,12 @@
+>  					interrupts = <0 19 IRQ_TYPE_LEVEL_HIGH>,
+>  						     <0 20 IRQ_TYPE_LEVEL_HIGH>;
+>  				};
+> +
+> +				snvs-poweroff: snvs-poweroff at 38 {
 
-Seeing original code from exynos.c (restart hook) I can say it's not valid
-for exynos5440.
-But it should not cause any harm as of now, because for exynos54440 PMU will
-not be probed.
-If in future support for exynos5440 PMU gets added, that time one may need
-to consider this
-point. This will be applicable for any SoC which does not have same register
-for restart.
+I'm not sure if it's because my DTC version is too low or you didn't
+test, the DTC reports error in label name 'snvs-poweroff'.  IIRC, hyphen
+'-' cannot be used in label name, but underscore '_' can.
 
-Thanks,
-Pankaj Dubey
+Shawn
 
-> > +	return NOTIFY_DONE;
-> > +}
+> +					compatible = "fsl,sec-v4.0-poweroff";
+> +					reg = <0x38 0x4>;
+> +					status = "disabled";
+> +				};
+>  			};
+>  
+>  			epit1: epit at 020d0000 { /* EPIT1 */
+> diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
+> index 3f9e041..dab588f 100644
+> --- a/arch/arm/boot/dts/imx6sl-evk.dts
+> +++ b/arch/arm/boot/dts/imx6sl-evk.dts
+> @@ -488,6 +488,10 @@
+>  	status = "okay";
+>  };
+>  
+> +&snvs-poweroff {
+> +	status = "okay";
+> +};
+> +
+>  &ssi2 {
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+> index 505da9e..5e5ed07 100644
+> --- a/arch/arm/boot/dts/imx6sl.dtsi
+> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> @@ -565,6 +565,12 @@
+>  					interrupts = <0 19 IRQ_TYPE_LEVEL_HIGH>,
+>  						     <0 20 IRQ_TYPE_LEVEL_HIGH>;
+>  				};
+> +
+> +				snvs-poweroff: snvs-poweroff at 38 {
+> +					compatible = "fsl,sec-v4.0-poweroff";
+> +					reg = <0x38 0x4>;
+> +					status = "disabled";
+> +				};
+>  			};
+>  
+>  			epit1: epit at 020d0000 {
+> diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
+> index a3980d9..78dc031 100644
+> --- a/arch/arm/boot/dts/imx6sx-sdb.dts
+> +++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+> @@ -251,6 +251,10 @@
+>  	};
+>  };
+>  
+> +&snvs-poweroff {
+> +	status = "okay";
+> +};
+> +
+>  &ssi2 {
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+> index f4b9da6..652be9f 100644
+> --- a/arch/arm/boot/dts/imx6sx.dtsi
+> +++ b/arch/arm/boot/dts/imx6sx.dtsi
+> @@ -668,6 +668,12 @@
+>  					reg = <0x34 0x58>;
+>  					interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>, <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+>  				};
+> +
+> +				snvs-poweroff: snvs-poweroff at 38 {
+> +					compatible = "fsl,sec-v4.0-poweroff";
+> +					reg = <0x38 0x4>;
+> +					status = "disabled";
+> +				};
+>  			};
+>  
+>  			epit1: epit at 020d0000 {
+> -- 
+> 1.7.9.5
 > 
-> --
-> Thanks,
-> Sylwester
