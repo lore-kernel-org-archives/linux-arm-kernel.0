@@ -1,78 +1,76 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 19 Nov 2014 16:51:07 +0100
-Subject: [PATCH 6/6] ARM: at91/dt: add ISI node
-In-Reply-To: <1412093987-30241-7-git-send-email-boris.brezillon@free-electrons.com>
-References: <1412093987-30241-1-git-send-email-boris.brezillon@free-electrons.com>
- <1412093987-30241-7-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <546CBC6B.2040408@atmel.com>
+From: koct9i@gmail.com (Konstantin Khlebnikov)
+Date: Wed, 19 Nov 2014 19:52:39 +0400
+Subject: [PATCH RFC] ARM: option for loading modules into vmalloc area
+In-Reply-To: <CAKv+Gu-8qhHYOry+LsDzp+LDZqYxVZ5G7cj48E3G2Unp2+=_yg@mail.gmail.com>
+References: <20141118172146.3784.81151.stgit@buzz>
+ <20141118173413.GB4042@n2100.arm.linux.org.uk>
+ <546B8C64.3010904@samsung.com> <2041617.Kxhx5O4MMr@wuerfel>
+ <CAKv+Gu-8qhHYOry+LsDzp+LDZqYxVZ5G7cj48E3G2Unp2+=_yg@mail.gmail.com>
+Message-ID: <CALYGNiMt2A3DP02cOtxqu4RrnmhojrDxkRG7bkHMByUnzG+PeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/09/2014 18:19, Boris Brezillon :
-> Add ISI (Image Sensor Interface) DT node.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+On Wed, Nov 19, 2014 at 5:54 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 19 November 2014 14:40, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Tuesday 18 November 2014 21:13:56 Konstantin Khlebnikov wrote:
+>>> On 2014-11-18 20:34, Russell King - ARM Linux wrote:
+>>> > On Tue, Nov 18, 2014 at 08:21:46PM +0400, Konstantin Khlebnikov wrote:
+>>> >> Usually modules are loaded into small area prior to the kernel
+>>> >> text because they are linked with the kernel using short calls.
+>>> >> Compile-time instrumentation like GCOV or KASAN bloats code a lot,
+>>> >> and as a result huge modules no longer fit into reserved area.
+>>> >>
+>>> >> This patch adds option CONFIG_MODULES_USE_VMALLOC which lifts
+>>> >> limitation on amount of loaded modules. It links modules using
+>>> >> long-calls (option -mlong-calls) and loads them into vmalloc area.
+>>> >>
+>>> >> In few places exported symbols are called from inline assembly.
+>>> >> This patch adds macro for such call sites: __asmbl and __asmbl_clobber.
+>>> >> Call turns into single 'bl' or sequence 'movw; movt; blx' depending on
+>>> >> context and state of config option.
+>>> >>
+>>> >> Unfortunately this option isn't compatible with CONFIG_FUNCTION_TRACER.
+>>> >> Compiler emits short calls to profiling function despite of -mlong-calls.
+>>> >> This is a bug in GCC, but ftrace anyway needs an update to handle this.
+>>> > It also isn't compatible with the older architectures which don't have
+>>> > "blx".
+>>>
+>>> Ok, I'll add "depends on CPU_V6 || CPU_V7" I don't think that it is
+>>> necessary for older cpus.
+>>
+>> Why not just use a different branch instruction for the older CPUs?
+>>
+>
+> ARMv6 doesn't support movw/movt so this will only work on v7.
+>
+> What about doing 'mov lr, pc; ldr pc,=symbol' instead? You clearly
+> don't care about performance in this case, so the performance hit (due
+> to the dcache access and interfering with the return stack predictors)
+> should be tolerable. The only thing to be careful about is thumb2
+> kernels: you would need to set the thumb bit in lr manually but only
+> if the call is made /from/ thumb. You would probably be better off
+> just depending on !THUMB2_KERNEL.
 
-I take this one for at91-3.19-dt2
+Do you mean ldr pc, =symbol ?
 
-Thanks, best regards.
+In this case I get this error:
 
-> ---
->  arch/arm/boot/dts/at91sam9g45.dtsi | 32 ++++++++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> index 790c890..5d8746a 100644
-> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> @@ -804,6 +804,27 @@
->  					};
->  				};
->  
-> +				isi {
-> +					pinctrl_isi: isi-0 {
-> +						atmel,pins = <AT91_PIOB 8 AT91_PERIPH_B AT91_PINCTRL_NONE /* D8 */
-> +							      AT91_PIOB 9 AT91_PERIPH_B AT91_PINCTRL_NONE /* D9 */
-> +							      AT91_PIOB 10 AT91_PERIPH_B AT91_PINCTRL_NONE /* D10 */
-> +							      AT91_PIOB 11 AT91_PERIPH_B AT91_PINCTRL_NONE /* D11 */
-> +							      AT91_PIOB 20 AT91_PERIPH_A AT91_PINCTRL_NONE /* D0 */
-> +							      AT91_PIOB 21 AT91_PERIPH_A AT91_PINCTRL_NONE /* D1 */
-> +							      AT91_PIOB 22 AT91_PERIPH_A AT91_PINCTRL_NONE /* D2 */
-> +							      AT91_PIOB 23 AT91_PERIPH_A AT91_PINCTRL_NONE /* D3 */
-> +							      AT91_PIOB 24 AT91_PERIPH_A AT91_PINCTRL_NONE /* D4 */
-> +							      AT91_PIOB 25 AT91_PERIPH_A AT91_PINCTRL_NONE /* D5 */
-> +							      AT91_PIOB 26 AT91_PERIPH_A AT91_PINCTRL_NONE /* D6 */
-> +							      AT91_PIOB 27 AT91_PERIPH_A AT91_PINCTRL_NONE /* D7 */
-> +							      AT91_PIOB 28 AT91_PERIPH_A AT91_PINCTRL_NONE /* PCK */
-> +							      AT91_PIOB 29 AT91_PERIPH_A AT91_PINCTRL_NONE /* VSYNC */
-> +							      AT91_PIOB 30 AT91_PERIPH_A AT91_PINCTRL_NONE /* HSYNC */
-> +							      AT91_PIOB 31 AT91_PERIPH_A AT91_PINCTRL_NONE /* MCK */>;
-> +					};
-> +				};
-> +
->  				pioA: gpio at fffff200 {
->  					compatible = "atmel,at91rm9200-gpio";
->  					reg = <0xfffff200 0x200>;
-> @@ -1029,6 +1050,17 @@
->  				};
->  			};
->  
-> +			isi at fffb4000 {
-> +				compatible = "atmel,at91sam9g45-isi";
-> +				reg = <0xfffb4000 0x4000>;
-> +				interrupts = <26 IRQ_TYPE_LEVEL_HIGH 5>;
-> +				clocks = <&isi_clk>;
-> +				clock-names = "isi_clk";
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_isi>;
-> +				status = "disabled";
-> +			};
-> +
->  			pwm0: pwm at fffb8000 {
->  				compatible = "atmel,at91sam9rl-pwm";
->  				reg = <0xfffb8000 0x300>;
-> 
+/tmp/ccAHtONU.s: Assembler messages:
+/tmp/ccAHtONU.s:220: Error: invalid literal constant: pool needs to be closer
+
+Probably constant pool doesn't work well in inline assembly.
 
 
--- 
-Nicolas Ferre
+Something like this seems work:
+
+add     lr, pc, #4
+ldr       pc, [pc, #-4]
+.long symbol
+
+> Ard.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
