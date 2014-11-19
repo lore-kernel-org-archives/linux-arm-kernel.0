@@ -1,77 +1,71 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 19 Nov 2014 11:30:19 +0100
-Subject: [GIT PULL] Xilinx Zynq fix for v3.18
-In-Reply-To: <20141116230927.GB14929@quad.lixom.net>
-References: <5459E081.8000903@monstr.eu>
- <20141109005655.GD13855@quad.lixom.net> <546087F4.3090600@monstr.eu>
- <20141116230927.GB14929@quad.lixom.net>
-Message-ID: <546C713B.9080902@monstr.eu>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 19 Nov 2014 11:31:13 +0100
+Subject: [PATCH] mmc: mvsdio: Work around broken TX DMA
+In-Reply-To: <1415830208-1888-1-git-send-email-andrew@lunn.ch>
+References: <1415830208-1888-1-git-send-email-andrew@lunn.ch>
+Message-ID: <CAPDyKFos__44CdPUxAT1R=+81ohuZWHAN83HCv6-BD6QWksF0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/17/2014 12:09 AM, Olof Johansson wrote:
-> On Mon, Nov 10, 2014 at 10:40:04AM +0100, Michal Simek wrote:
->> Hi,
->>
->> On 11/09/2014 01:56 AM, Olof Johansson wrote:
->>> Hi,
->>>
->>> On Wed, Nov 05, 2014 at 09:32:01AM +0100, Michal Simek wrote:
->>>> Hi guys,
->>>>
->>>> please add this fix to your tree.
->>>>
->>>> Thanks,
->>>> Michal
->>>>
->>>>
->>>> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
->>>>
->>>>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
->>>>
->>>> are available in the git repository at:
->>>>
->>>>   https://github.com/Xilinx/linux-xlnx.git tags/zynq-fixes-for-3.18
->>>>
->>>> for you to fetch changes up to 2de4752d6923d7dcc6e68c23be6a52d5f0896f9d:
->>>>
->>>>   ARM: zynq: Actually remove hotplug.c (2014-10-20 20:53:26 +0200)
->>>
->>> Did you forget to push this tag out? I can't find it in that repo.
->>
->> Unfortunately yes. I forgot to push this tag out.
->> Interesting is that git didn't tell me that.
->>
->> Anyway tag is out there and please consider to pull it.
-> 
-> 
-> Hmm, still not seeing it there.
+On 12 November 2014 23:10, Andrew Lunn <andrew@lunn.ch> wrote:
+> In order to use the mvsdio driver for sdio, it has been necessary to
+> use a module parameter to disable DMA so to force PIO is used. It is
+> then possible to use wireless LAN devices like mwifiex found on
+> topkick and mirabox. However, accessing an MMC SD card does work with
+> DMA.
+>
+> Investigation has shown that MMC block device accesses are always
+> aligned to 64 byte boundaries, where as transfers from mwifiex are
+> rarely more than word aligned. It has also been determined that card
+> to host transfers work with DMA for SDIO devices, but host to card
+> transfers with DMA have problems.
+>
+> This patch extends the current checks for buffers which are not word
+> aligned or multiple of words. All host to card transfers which are not
+> 64 byte aligned are now also performed via PIO. This should not affect
+> the performance of SD cards, but allow sdio devices to work out of the
+> box, and they are likely to be more efficient since DMA will be used
+> for card to host transfers.
+>
+> Tested on mirabox for wifi via mwifiex
+> Tested on 370 RD for file systems on an SD card.
+>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 
-I found where the problem was. Automation script was deleting it after some time.
-Anyway it is pretty late for getting this to 3.18.
-I will queue this for v3.19 with others patches.
+Thanks! Applied for next.
 
-Will be good if you can take a look at this OCM support.
-https://lkml.org/lkml/2014/11/14/183
+Kind regards
+Uffe
 
-There are some ways how to do it in connection to slcr (syscon/regmap)
-and allocating trampoline size.
-
-Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141119/ff2f0bab/attachment.sig>
+> ---
+>  drivers/mmc/host/mvsdio.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
+> index 6b4c5ad3b393..4f8618f4522d 100644
+> --- a/drivers/mmc/host/mvsdio.c
+> +++ b/drivers/mmc/host/mvsdio.c
+> @@ -111,10 +111,15 @@ static int mvsd_setup_data(struct mvsd_host *host, struct mmc_data *data)
+>         mvsd_write(MVSD_BLK_COUNT, data->blocks);
+>         mvsd_write(MVSD_BLK_SIZE, data->blksz);
+>
+> -       if (nodma || (data->blksz | data->sg->offset) & 3) {
+> +       if (nodma || (data->blksz | data->sg->offset) & 3 ||
+> +           ((!(data->flags & MMC_DATA_READ) && data->sg->offset & 0x3f))) {
+>                 /*
+>                  * We cannot do DMA on a buffer which offset or size
+>                  * is not aligned on a 4-byte boundary.
+> +                *
+> +                * It also appears the host to card DMA can corrupt
+> +                * data when the buffer is not aligned on a 64 byte
+> +                * boundary.
+>                  */
+>                 host->pio_size = data->blocks * data->blksz;
+>                 host->pio_ptr = sg_virt(data->sg);
+> --
+> 2.1.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
