@@ -1,46 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 19 Nov 2014 16:49:02 +0000
-Subject: [PATCH RFC] ARM: option for loading modules into vmalloc area
-In-Reply-To: <alpine.LFD.2.11.1411191130480.11690@knanqh.ubzr>
-References: <20141118172146.3784.81151.stgit@buzz>
- <20141118173413.GB4042@n2100.arm.linux.org.uk>
- <546B8C64.3010904@samsung.com> <2041617.Kxhx5O4MMr@wuerfel>
- <CAKv+Gu-8qhHYOry+LsDzp+LDZqYxVZ5G7cj48E3G2Unp2+=_yg@mail.gmail.com>
- <CALYGNiMt2A3DP02cOtxqu4RrnmhojrDxkRG7bkHMByUnzG+PeA@mail.gmail.com>
- <CAKv+Gu-rYWutr-45MsZH6KOhhUyNCVLfkO9JQrqCm1L6ms_DUg@mail.gmail.com>
- <20141119160747.GH4042@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1411191130480.11690@knanqh.ubzr>
-Message-ID: <20141119164902.GK4042@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 19 Nov 2014 17:52:33 +0100
+Subject: [GIT PULL] at91: dt for 3.19 #2
+Message-ID: <1416415953-31966-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 11:37:47AM -0500, Nicolas Pitre wrote:
-> On Wed, 19 Nov 2014, Russell King - ARM Linux wrote:
-> > Which is not a good idea either, because the compiler needs to know how
-> > far away its own manually generated literal pool is from the instructions
-> > which reference it.  The .ltorg statement can end up emitting any number
-> > of literals at that point, which makes it indeterminant how many words
-> > are contained within the asm() statement.
-> > 
-> > Yes, it isn't desirable to waste an entire data cache line per indirect
-> > call like the original quote above, but I don't see a practical
-> > alternative.
-> 
-> Modules could be built without far calls by default, and then the module 
-> linker would only have to redirect those calls whose destination is too 
-> far away to a dynamically created trampoline table.
-> 
-> If I remember correctly you even posted some patches to that effect a 
-> couple years ago.  Maybe those could be salvaged?
+Arnd, Olof, Kevin,
 
-I don't think I ever did, because its pretty much impossible to do as I
-explained in a follow up to this thread.
+Another DT pull-request for 3.19. For this one, I had to pull one Vinod's topic
+branch to be able to include the XDMA DT properties. This branch is stable and
+based on 3.18-rc3 (Cf. http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/304041.html).
+Note that my previous DT pull-request for 3.19 was based on 3.18-rc2.
+So, this is what I did:
+- took a v3.18-rc3 tag
+- merged the at91-3.19-dt branch that you already have in at91/dt (you'd taken the at91-dt tag)
+- merged the topic/at_xdmac from Vinod
+- stacked the new material described above on top of this.
+Tell me if it's okay for you or if I have to arrange things differently.
 
-We _used_ to do this with the userspace insmod methods, but since we got
-this kernel-side linker, it's been pretty much impossible to do without
-rewriting the module code.  That's not going to happen on account of one
-quirky architecture which Linus doesn't particularly like.
+The content itself is pretty straightforward.
+
+Thanks, best regards,
+
+The following changes since commit 51f46e5bc326972f623cad7ac9dadc3cf8159203:
+
+  Merge branch 'topic/at_xdmac' of git://git.infradead.org/users/vkoul/slave-dma into at91-3.19-dt2 (2014-11-19 12:11:30 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-dt2
+
+for you to fetch changes up to accda2736fcab10fc3eb35da935e0e049188f6d5:
+
+  ARM: at91/dt: at91sam9g45: add ISI node (2014-11-19 15:55:17 +0100)
+
+----------------------------------------------------------------
+Second DT batch for 3.19:
+- some trivial fixes: macro for IRQ, license wording
+- DMA description for sama5d4
+- RTT as RTC driver definition plus associated GPBR for several SoCs
+- addition of missing nodes: rtc for at91sam9rl, isi for at91sam9g45
+
+----------------------------------------------------------------
+Alexandre Belloni (1):
+      ARM: at91/dt: at91sam9rl: add rtc
+
+Boris Brezillon (5):
+      ARM: at91/dt: add RTT nodes to at91 dtsis
+      ARM: at91/dt: add GPBR nodes
+      ARM: at91/dt: enable the RTT block on the sam9g20ek board
+      ARM: at91/dt: enable the RTT block on the at91sam9m10g45ek board
+      ARM: at91/dt: at91sam9g45: add ISI node
+
+Ludovic Desroches (2):
+      ARM: at91/dt: sama5d4: use macro instead of numeric value
+      ARM: at91/dt: sama5d4: add DMA support
+
+Nicolas Ferre (1):
+      ARM: at91: fix GPLv2 wording
+
+ arch/arm/boot/dts/at91-sama5d4ek.dts        |  4 +-
+ arch/arm/boot/dts/at91sam9260.dtsi          | 14 ++++++
+ arch/arm/boot/dts/at91sam9261.dtsi          | 14 ++++++
+ arch/arm/boot/dts/at91sam9263.dtsi          | 21 ++++++++
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi | 14 ++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi          | 46 ++++++++++++++++++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts      |  9 ++++
+ arch/arm/boot/dts/at91sam9rl.dtsi           | 21 ++++++++
+ arch/arm/boot/dts/sama5d4.dtsi              | 75 +++++++++++++++++++++++++++--
+ 9 files changed, 213 insertions(+), 5 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Nicolas Ferre
