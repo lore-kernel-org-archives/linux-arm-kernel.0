@@ -1,152 +1,188 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 19 Nov 2014 06:39:30 -0800
-Subject: [PATCH 3/3] arm/arm64: Enable Dirty Page logging for ARMv8 move
- log read, tlb flush to generic code
-In-Reply-To: <545D30DB.9020309@samsung.com>
-References: <1412908447-28247-1-git-send-email-m.smarduch@samsung.com>
- <1412908447-28247-4-git-send-email-m.smarduch@samsung.com>
- <20141107202041.GH22848@cbox> <545D30DB.9020309@samsung.com>
-Message-ID: <20141119143930.GA9776@lvm>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Nov 2014 15:40:12 +0100
+Subject: [PATCH 1/2] ARM: cache-l2x0: clean up aurora cache handling
+Message-ID: <1547660.4MUNEQsfAo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mario,
+The aurora cache controller is the only remaining user of a couple
+of functions in this file and are completely unused when that is
+disabled, leading to build warnings:
 
-On Fri, Nov 07, 2014 at 12:51:39PM -0800, Mario Smarduch wrote:
-> On 11/07/2014 12:20 PM, Christoffer Dall wrote:
-> > On Thu, Oct 09, 2014 at 07:34:07PM -0700, Mario Smarduch wrote:
-> >> This patch enables ARMv8 dirty page logging and unifies ARMv7/ARMv8 code.
-> >>
-> >> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> >> ---
-> >>  arch/arm/include/asm/kvm_host.h | 12 ------------
-> >>  arch/arm/kvm/arm.c              |  9 ---------
-> >>  arch/arm/kvm/mmu.c              | 17 +++++++++++------
-> >>  arch/arm64/kvm/Kconfig          |  2 +-
-> >>  4 files changed, 12 insertions(+), 28 deletions(-)
-> >>
-> >> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> >> index 12311a5..59565f5 100644
-> >> --- a/arch/arm/include/asm/kvm_host.h
-> >> +++ b/arch/arm/include/asm/kvm_host.h
-> >> @@ -220,18 +220,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
-> >>  	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
-> >>  }
-> >>  
-> >> -/**
-> >> - * kvm_arch_flush_remote_tlbs() - flush all VM TLB entries
-> >> - * @kvm:       pointer to kvm structure.
-> >> - *
-> >> - * Interface to HYP function to flush all VM TLB entries without address
-> >> - * parameter.
-> >> - */
-> >> -static inline void kvm_arch_flush_remote_tlbs(struct kvm *kvm)
-> >> -{
-> >> -	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
-> >> -}
-> >> -
-> >>  static inline int kvm_arch_dev_ioctl_check_extension(long ext)
-> >>  {
-> >>  	return 0;
-> >> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> >> index 0546fa3..6a6fd6b 100644
-> >> --- a/arch/arm/kvm/arm.c
-> >> +++ b/arch/arm/kvm/arm.c
-> >> @@ -242,7 +242,6 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
-> >>  				   const struct kvm_memory_slot *old,
-> >>  				   enum kvm_mr_change change)
-> >>  {
-> >> -#ifdef CONFIG_ARM
-> >>  	/*
-> >>  	 * At this point memslot has been committed and there is an
-> >>  	 * allocated dirty_bitmap[], dirty pages will be be tracked while the
-> >> @@ -250,7 +249,6 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
-> >>  	 */
-> >>  	if ((change != KVM_MR_DELETE) && (mem->flags & KVM_MEM_LOG_DIRTY_PAGES))
-> >>  		kvm_mmu_wp_memory_region(kvm, mem->slot);
-> >> -#endif
-> >>  }
-> >>  
-> >>  void kvm_arch_flush_shadow_all(struct kvm *kvm)
-> >> @@ -783,13 +781,6 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
-> >>  	}
-> >>  }
-> >>  
-> >> -#ifdef CONFIG_ARM64
-> >> -int kvm_arch_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
-> >> -{
-> >> -	return -EINVAL;
-> >> -}
-> >> -#endif
-> >> -
-> >>  static int kvm_vm_ioctl_set_device_addr(struct kvm *kvm,
-> >>  					struct kvm_arm_device_addr *dev_addr)
-> >>  {
-> >> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> >> index df1a5a3..8c0f9f2 100644
-> >> --- a/arch/arm/kvm/mmu.c
-> >> +++ b/arch/arm/kvm/mmu.c
-> >> @@ -49,11 +49,18 @@ static phys_addr_t hyp_idmap_vector;
-> >>  
-> >>  static bool kvm_get_logging_state(struct kvm_memory_slot *memslot)
-> >>  {
-> >> -#ifdef CONFIG_ARM
-> >>  	return !!memslot->dirty_bitmap;
-> >> -#else
-> >> -	return false;
-> >> -#endif
-> >> +}
-> >> +
-> >> +/**
-> >> + * kvm_arch_flush_remote_tlbs() - flush all VM TLB entries for ARMv7/8
-> >> + * @kvm:	pointer to kvm structure.
-> >> + *
-> >> + * Interface to HYP function to flush all VM TLB entries
-> >> + */
-> >> +inline void kvm_arch_flush_remote_tlbs(struct kvm *kvm)
-> >> +{
-> >> +	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
-> >>  }
-> >>  
-> >>  static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
-> >> @@ -769,7 +776,6 @@ static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
-> >>  	return false;
-> >>  }
-> >>  
-> >> -#ifdef CONFIG_ARM
-> >>  /**
-> >>   * stage2_wp_ptes - write protect PMD range
-> >>   * @pmd:	pointer to pmd entry
-> >> @@ -917,7 +923,6 @@ void kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
-> >>  
-> >>  	stage2_wp_range(kvm, start, end);
-> >>  }
-> >> -#endif
-> >>  
-> >>  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-> >>  			  struct kvm_memory_slot *memslot,
-> >> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-> >> index 40a8d19..a1a35809 100644
-> >> --- a/arch/arm64/kvm/Kconfig
-> >> +++ b/arch/arm64/kvm/Kconfig
-> >> @@ -26,7 +26,7 @@ config KVM
-> >>  	select KVM_ARM_HOST
-> >>  	select KVM_ARM_VGIC
-> >>  	select KVM_ARM_TIMER
-> >> -	select HAVE_KVM_ARCH_DIRTY_LOG
-> >> +	select HAVE_KVM_ARCH_TLB_FLUSH_ALL
-> >>  	---help---
-> >>  	  Support hosting virtualized guest machines.
-> >>  
-> >> -- 
-> >> 1.9.1
-> >>
-> > 
-> > this patch needs to be rebased onto the newest version of your v7 patch,
-> > but otherwise it looks roughly ok.
-> 
-Just discussed with Marc, that we'll try to merge the v7 patches asap,
-but when you send out the rebased series for v8, you need to handle the
-pud_huge case in the write-protect patch.
+arch/arm/mm/cache-l2x0.c:167:13: warning: 'l2x0_cache_sync' defined but not used [-Wunused-function]
+arch/arm/mm/cache-l2x0.c:184:13: warning: 'l2x0_flush_all' defined but not used [-Wunused-function]
+arch/arm/mm/cache-l2x0.c:194:13: warning: 'l2x0_disable' defined but not used [-Wunused-function]
 
--Christoffer
+With the knowledge that the code is now aurora-specific, we can
+simplify it noticeably:
+
+- The pl310 errata workarounds are not needed on aurora and can be removed
+- The cache_wait() macro is never needed since this is not an l210/l220
+- aurora_pa_range can keep the spinlock while syncing the cache
+- We can load the l2x0_base into a local variable across operations
+
+There should be no functional change in this patch, but readability
+and the generated object code improves, along with avoiding the
+warnings.
+
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+ (on Armada 370 RD and Armada XP GP, boot tested, plus a little bit of
+ DMA traffic by reading data from a SD card)
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+---
+I still had this in my old patch queue, will add it to the patch tracker
+unless there are any other concerns.
+
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 5e65ca8dea62..c61f4151162f 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -136,73 +136,6 @@ static void l2c_disable(void)
+ 	dsb(st);
+ }
+ 
+-#ifdef CONFIG_CACHE_PL310
+-static inline void cache_wait(void __iomem *reg, unsigned long mask)
+-{
+-	/* cache operations by line are atomic on PL310 */
+-}
+-#else
+-#define cache_wait	l2c_wait_mask
+-#endif
+-
+-static inline void cache_sync(void)
+-{
+-	void __iomem *base = l2x0_base;
+-
+-	writel_relaxed(0, base + sync_reg_offset);
+-	cache_wait(base + L2X0_CACHE_SYNC, 1);
+-}
+-
+-#if defined(CONFIG_PL310_ERRATA_588369) || defined(CONFIG_PL310_ERRATA_727915)
+-static inline void debug_writel(unsigned long val)
+-{
+-	l2c_set_debug(l2x0_base, val);
+-}
+-#else
+-/* Optimised out for non-errata case */
+-static inline void debug_writel(unsigned long val)
+-{
+-}
+-#endif
+-
+-static void l2x0_cache_sync(void)
+-{
+-	unsigned long flags;
+-
+-	raw_spin_lock_irqsave(&l2x0_lock, flags);
+-	cache_sync();
+-	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-}
+-
+-static void __l2x0_flush_all(void)
+-{
+-	debug_writel(0x03);
+-	__l2c_op_way(l2x0_base + L2X0_CLEAN_INV_WAY);
+-	cache_sync();
+-	debug_writel(0x00);
+-}
+-
+-static void l2x0_flush_all(void)
+-{
+-	unsigned long flags;
+-
+-	/* clean all ways */
+-	raw_spin_lock_irqsave(&l2x0_lock, flags);
+-	__l2x0_flush_all();
+-	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-}
+-
+-static void l2x0_disable(void)
+-{
+-	unsigned long flags;
+-
+-	raw_spin_lock_irqsave(&l2x0_lock, flags);
+-	__l2x0_flush_all();
+-	l2c_write_sec(0, l2x0_base, L2X0_CTRL);
+-	dsb(st);
+-	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-}
+-
+ static void l2c_save(void __iomem *base)
+ {
+ 	l2x0_saved_regs.aux_ctrl = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+@@ -1257,14 +1190,14 @@ static unsigned long calc_range_end(unsigned long start, unsigned long end)
+ static void aurora_pa_range(unsigned long start, unsigned long end,
+ 			unsigned long offset)
+ {
++	void __iomem *base = l2x0_base;
+ 	unsigned long flags;
+ 
+ 	raw_spin_lock_irqsave(&l2x0_lock, flags);
+-	writel_relaxed(start, l2x0_base + AURORA_RANGE_BASE_ADDR_REG);
+-	writel_relaxed(end, l2x0_base + offset);
++	writel_relaxed(start, base + AURORA_RANGE_BASE_ADDR_REG);
++	writel_relaxed(end, base + offset);
++	writel_relaxed(0, base + AURORA_SYNC_REG);
+ 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-
+-	cache_sync();
+ }
+ 
+ static void aurora_inv_range(unsigned long start, unsigned long end)
+@@ -1324,6 +1257,40 @@ static void aurora_flush_range(unsigned long start, unsigned long end)
+ 	}
+ }
+ 
++static void aurora_flush_all(void)
++{
++	void __iomem *base = l2x0_base;
++	unsigned long flags;
++
++	/* clean all ways */
++	raw_spin_lock_irqsave(&l2x0_lock, flags);
++	__l2c_op_way(base + L2X0_CLEAN_INV_WAY);
++	writel_relaxed(0, base + AURORA_SYNC_REG);
++	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++}
++
++static void aurora_cache_sync(void)
++{
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&l2x0_lock, flags);
++	writel_relaxed(0, l2x0_base + AURORA_SYNC_REG);
++	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++}
++
++static void aurora_disable(void)
++{
++	void __iomem *base = l2x0_base;
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&l2x0_lock, flags);
++	__l2c_op_way(base + L2X0_CLEAN_INV_WAY);
++	writel_relaxed(0, base + AURORA_SYNC_REG);
++	l2c_write_sec(0, base, L2X0_CTRL);
++	dsb(st);
++	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++}
++
+ static void aurora_save(void __iomem *base)
+ {
+ 	l2x0_saved_regs.ctrl = readl_relaxed(base + L2X0_CTRL);
+@@ -1398,9 +1365,9 @@ static const struct l2c_init_data of_aurora_with_outer_data __initconst = {
+ 		.inv_range   = aurora_inv_range,
+ 		.clean_range = aurora_clean_range,
+ 		.flush_range = aurora_flush_range,
+-		.flush_all   = l2x0_flush_all,
+-		.disable     = l2x0_disable,
+-		.sync        = l2x0_cache_sync,
++		.flush_all   = aurora_flush_all,
++		.disable     = aurora_disable,
++		.sync        = aurora_cache_sync,
+ 		.resume      = aurora_resume,
+ 	},
+ };
