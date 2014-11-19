@@ -1,60 +1,63 @@
-From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
-Date: Wed, 19 Nov 2014 16:02:03 +0100
-Subject: Looking for good references for ARM driver development
-In-Reply-To: <546C920A.7060800@free.fr>
-References: <546C920A.7060800@free.fr>
-Message-ID: <546CB0EB.9080005@suse.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Nov 2014 16:06:31 +0100
+Subject: [PATCH 1/2] ARM: cache-l2x0: clean up aurora cache handling
+In-Reply-To: <20141119145015.GG4042@n2100.arm.linux.org.uk>
+References: <1547660.4MUNEQsfAo@wuerfel>
+ <20141119145015.GG4042@n2100.arm.linux.org.uk>
+Message-ID: <4475865.jdxZMh688N@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am 19.11.2014 um 13:50 schrieb Mason:
-> [...] I'm writing a driver for a temperature sensor, which is
-> supposed to work
-> within the hwmon/lm-sensors framework.
+On Wednesday 19 November 2014 14:50:15 Russell King - ARM Linux wrote:
+> On Wed, Nov 19, 2014 at 03:40:12PM +0100, Arnd Bergmann wrote:
+> > The aurora cache controller is the only remaining user of a couple
+> > of functions in this file and are completely unused when that is
+> > disabled, leading to build warnings:
+> > 
+> > arch/arm/mm/cache-l2x0.c:167:13: warning: 'l2x0_cache_sync' defined but not used [-Wunused-function]
+> > arch/arm/mm/cache-l2x0.c:184:13: warning: 'l2x0_flush_all' defined but not used [-Wunused-function]
+> > arch/arm/mm/cache-l2x0.c:194:13: warning: 'l2x0_disable' defined but not used [-Wunused-function]
+> > 
+> > With the knowledge that the code is now aurora-specific, we can
+> > simplify it noticeably:
+> > 
+> > - The pl310 errata workarounds are not needed on aurora and can be removed
+> > - The cache_wait() macro is never needed since this is not an l210/l220
 > 
-> The sensor's API consists of 3 memory-mapped registers, which are
-> accessible over the
-> SoC's memory bus. [...]
+> How do we know?  You claim it's "not a L210/L220" but how do we actually
+> know that we don't have to wait for the cache operation to complete?
+>
+> When this is built without L310 support, Aurora will wait for the cache
+> operations to complete, but when built with L310 support, it won't.
+
+I'll update the description to say:
+
+- As confirmed by Thomas Petazzoni from the data sheet, the cache_wait()
+  macro is never needed.
+
+based on the previous email exchange. Thanks for pointing out that the
+description doesn't reflect what we had discussed already.
+
+> > - aurora_pa_range can keep the spinlock while syncing the cache
 > 
-> 1) Which bus should I be using for this driver? Is the platform bus
-> appropriate?
-
-Probably.
-
-> 2) platform.txt states
+> If the operations complete synchronously (in other words, the L2 cache
+> doesn't accept another transaction until the cache operation has completed)
+> the spinlocks should not be necessary.
 > 
->> Some drivers are not fully converted to the driver model, because they
->> take
->> on a non-driver role:  the driver registers its platform device,
->> rather than
->> leaving that for system infrastructure.  Such drivers can't be hotplugged
->> or coldplugged, since those mechanisms require device creation to be in a
->> different system component than the driver.
-> 
-> How do I "leave device registration for the system infrastructure"?
-> Where should I put that code?
-> Is it a good idea to separate device registration and driver registration
-> in the case of a SoC, where the device is embedded in the SoC and is not
-> "hot-plugged" (or anything-plugged for that matter, it's just "there").
+> They're necessary for some of the ARM caches which allow cache operations
+> to run asynchronously (hence the wait stuff) but if you don't have the
+> wait stuff as you imply above, they can't be asynchronous.
 
-Since this appears to be about an ARM SoC according to your To list, in
-general, you create a device tree binding, that binding is registered
-within your platform/... driver code and referenced in the device tree
-for SoC or board, and then your driver will automatically be probed.
+I think the spinlock is still needed, it now only protects this sequence:
 
-> 4) Can I use platform_driver_probe, instead of platform_driver_register?
+                raw_spin_lock_irqsave(&l2x0_lock, flags);
+                writel_relaxed(start, base + AURORA_RANGE_BASE_ADDR_REG);
+                writel_relaxed(range_end - CACHE_LINE_SIZE, base + offset);
+                writel_relaxed(0, base + AURORA_SYNC_REG);
+                raw_spin_unlock_irqrestore(&l2x0_lock, flags);
 
-Most likely you do not need to call either yourself.
+without the lock, two concurrent processes might start writing into
+AURORA_RANGE_BASE_ADDR_REG before the first one writes the operation
+register.
 
-Just compare other platform drivers on the one hand, and temparature
-sensor drivers on the other (such as I2C based gmt,g781 / LM90).
-Did you already check whether there is a driver that is both?
-
-Regards,
-Andreas
-
--- 
-SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 21284 AG N?rnberg
+	Arnd
