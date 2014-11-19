@@ -1,14 +1,18 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Nov 2014 23:13:55 +0100
-Subject: [GIT PULL]Hisilicon HiX5HD2 soc DT udaptes for v3.19
-In-Reply-To: <545CBD40.7060003@hisilicon.com>
-References: <545CBD40.7060003@hisilicon.com>
-Message-ID: <201411192313.55636.arnd@arndb.de>
+Date: Wed, 19 Nov 2014 23:16:51 +0100
+Subject: [GIT PULL]Hisilicon HiX5HD2 soc defconfig udaptes for v3.19
+In-Reply-To: <545CBE10.2070502@hisilicon.com>
+References: <545CBE10.2070502@hisilicon.com>
+Message-ID: <201411192316.52226.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Friday 07 November 2014, Wei Xu wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+> Please help to merge pull request for hisilicon hix5hd2 soc config updates for 3.19. 
+> Thanks!
+> 
+> Best Regards,
+> Wei
 > 
 > The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 > 
@@ -16,25 +20,23 @@ On Friday 07 November 2014, Wei Xu wrote:
 > 
 > are available in the git repository at:
 > 
->   git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-dt-for-3.19
+>   git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-config-for-3.19
 > 
-> for you to fetch changes up to 92cfcb26fca45aafa7eb9b8a4401a361caa88dec:
+> for you to fetch changes up to c56a3fbb811d51a810f97a1aca00d37840509b68:
 > 
->   ARM: dts: hix5hd2: add reboot node (2014-11-07 19:29:53 +0800)
+>   ARM: hisi_defconfig: add driver support for hix5hd2 (2014-11-07 19:59:58 +0800)
 > 
 > ----------------------------------------------------------------
-> ARM: DT:  Hisilicon terminal SoC HiX5HD2 DT updates for 3.19
+> ARM: HiX5HD2: config update for 3.19
 > 
-> - Add reboot node, reusing syscon-reboot
-> - Add I2C nodes Hisilicon IP
-> - Add IR node based on Hisilicon IP
-> - Add Watchdog node based on ARM IP
-> - Add GPIO nodes based on ARM GPIO IP
-> - Add SATA node based on Hisilicon IP
-> - Add USB nodes
-> - Add MMC nodes based on Synopsys IP
-> - Add GMAC nodes based on Hisilicon IP
+> - Enable GMAC, GPIO, Reset, USB, MMC and SATA on HiX5HD2
+> 
 
-Pulled into next/dt, sorry for the delay,
+Pulled into next/defconfig.
+
+I notice that at least some of the drivers are only enabled in hisi_defconfig
+but not in multi_v7_defconfig. Please enable all of them in the generic
+multi_v7_defconfig as well, check that it works on your hardware and
+send another patch for that. Thanks,
 
 	Arnd
