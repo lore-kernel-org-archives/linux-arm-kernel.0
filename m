@@ -1,91 +1,73 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 19 Nov 2014 14:56:22 +0100
-Subject: [PATCH v8 2/2] drm: add DT bindings documentation for atmel-hlcdc-dc
- driver
-In-Reply-To: <1416405382-24692-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1416405382-24692-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1416405382-24692-3-git-send-email-boris.brezillon@free-electrons.com>
+From: treding@nvidia.com (Thierry Reding)
+Date: Wed, 19 Nov 2014 14:56:42 +0100
+Subject: arm64 pci_iomap, was: Re: next build: 258 warnings 9 failures
+ (next/next-20141119)
+In-Reply-To: <16479190.7SIDaKWfdW@wuerfel>
+References: <546c75d7.6336460a.14b5.474d@mx.google.com>
+ <16479190.7SIDaKWfdW@wuerfel>
+Message-ID: <20141119135641.GD26258@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Atmel HLCDC (HLCD Controller) IP available on some Atmel SoCs (i.e.
-at91sam9n12, at91sam9x5 family or sama5d3 family) provides a display
-controller device.
+On Wed, Nov 19, 2014 at 12:15:45PM +0100, Arnd Bergmann wrote:
+> On Wednesday 19 November 2014 02:49:59 Olof's autobuilder wrote:
+> > 
+> >         arm64.allmodconfig:
+> > drivers/net/ethernet/dec/tulip/winbond-840.c:910:2: warning: #warning Processor architecture undefined [-Wcpp]
+> >  #warning Processor architecture undefined
+> > drivers/net/ethernet/dec/tulip/tulip_core.c:101:2: warning: #warning Processor architecture undefined! [-Wcpp]
+> >  #warning Processor architecture undefined!
+> > :(.text+0x42344): undefined reference to `pci_iomap'
+> > :(.text+0x42ca0): undefined reference to `pci_iomap'
+> > :(.text+0x11c10): undefined reference to `pci_iomap'
+> > 
+> >         arm64.defconfig:
+> > drivers/pci/quirks.c:2965: undefined reference to `pci_iomap'
+> > drivers/pci/quirks.c:3328: undefined reference to `pci_iomap'
+> > drivers/tty/serial/8250/8250_pci.c:1044: undefined reference to `pci_iomap'
+> > drivers/tty/serial/8250/8250_pci.c:1012: undefined reference to `pci_iomap'
+> > lib/devres.c:273: undefined reference to `pci_iomap'
+> > 
+> 
+> Hi Thierry,
+> 
+> This is another regression from your asm-generic change in arm64. We
+> are now lacking a working pci_iomap function after you removed the
+> 'select GENERIC_IOMAP' statement.
+> 
+> For all I can tell, this is the correct solution (note GENERIC_PCI_IOMAP
+> instead of GENERIC_IOMAP):
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 37cd23625708..bc8879c283b9 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -25,6 +25,7 @@ config ARM64
+>         select GENERIC_EARLY_IOREMAP
+>         select GENERIC_IRQ_PROBE
+>         select GENERIC_IRQ_SHOW
+> +       select GENERIC_PCI_IOMAP
+>         select GENERIC_SCHED_CLOCK
+>         select GENERIC_SMP_IDLE_THREAD
+>         select GENERIC_STRNCPY_FROM_USER
+> 
+> 
+> Any comments?
 
-The HLCDC block provides a single RGB output port, and only supports LCD
-panels connection to LCD panels for now.
+Oops, I just looked at that file on my system and I already have the
+select GENERIC_PCI_IOMAP exactly where you have it. Turns out I have
+that same patch, albeit with a somewhat obfuscated name in my tree
+but never got around to clean up the commit message or sending it out.
 
-The atmel,panel property link the HLCDC RGB output with the LCD panel
-connected on this port (note that the HLCDC RGB connector implementation
-makes use of the DRM panel framework).
+Do you want to apply that patch on top or shall I redo the pull request
+with that patch folded in so we can keep bisectability across the
+series?
 
-Connection to other external devices (DRM bridges) might be added later by
-mean of a new atmel,xxx (atmel,bridge) property.
-
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- .../devicetree/bindings/drm/atmel/hlcdc-dc.txt     | 53 ++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/drm/atmel/hlcdc-dc.txt
-
-diff --git a/Documentation/devicetree/bindings/drm/atmel/hlcdc-dc.txt b/Documentation/devicetree/bindings/drm/atmel/hlcdc-dc.txt
-new file mode 100644
-index 0000000..ebc1a91
---- /dev/null
-+++ b/Documentation/devicetree/bindings/drm/atmel/hlcdc-dc.txt
-@@ -0,0 +1,53 @@
-+Device-Tree bindings for Atmel's HLCDC (High LCD Controller) DRM driver
-+
-+The Atmel HLCDC Display Controller is subdevice of the HLCDC MFD device.
-+See ../mfd/atmel-hlcdc.txt for more details.
-+
-+Required properties:
-+ - compatible: value should be "atmel,hlcdc-display-controller"
-+ - pinctrl-names: the pin control state names. Should contain "default".
-+ - pinctrl-0: should contain the default pinctrl states.
-+ - #address-cells: should be set to 1.
-+ - #size-cells: should be set to 0.
-+
-+Required children nodes:
-+ Children nodes are encoding available output ports and their connections
-+ to external devices using the OF graph reprensentation (see ../graph.txt).
-+ At least one port node is required.
-+
-+Example:
-+
-+	hlcdc: hlcdc at f0030000 {
-+		compatible = "atmel,sama5d3-hlcdc";
-+		reg = <0xf0030000 0x2000>;
-+		interrupts = <36 IRQ_TYPE_LEVEL_HIGH 0>;
-+		clocks = <&lcdc_clk>, <&lcdck>, <&clk32k>;
-+		clock-names = "periph_clk","sys_clk", "slow_clk";
-+		status = "disabled";
-+
-+		hlcdc-display-controller {
-+			compatible = "atmel,hlcdc-display-controller";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_rgb888>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <0>;
-+
-+				hlcdc_panel_output: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&panel_input>;
-+				};
-+			};
-+		};
-+
-+		hlcdc_pwm: hlcdc-pwm {
-+			compatible = "atmel,hlcdc-pwm";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_lcd_pwm>;
-+			#pwm-cells = <3>;
-+		};
-+	};
--- 
-1.9.1
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141119/fa6d8060/attachment-0001.sig>
