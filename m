@@ -1,48 +1,82 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 19 Nov 2014 08:27:09 +0000
-Subject: [PATCH 4/7] ARM: STi: DT: STiH410: Add usb2 picophy dt nodes
+Date: Wed, 19 Nov 2014 08:27:10 +0000
+Subject: [PATCH 5/7] ARM: STi: DT: STiH410: Add DT nodes for the ehci and ohci
+ usb controllers.
 In-Reply-To: <1416385632-5832-1-git-send-email-peter.griffin@linaro.org>
 References: <1416385632-5832-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1416385632-5832-5-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1416385632-5832-6-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the dt nodes for the extra usb2 picophys found on the stih410.
-These two picophys are used in conjunction with the extra ehci/ohci usb
-controllers also found on the stih410.
+This patch adds the DT nodes for the extra ehci and ohci usb controllers
+on the stih410 SoC.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- arch/arm/boot/dts/stih410.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/boot/dts/stih410.dtsi | 52 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
 
 diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
-index c05627e..7fd9d57 100644
+index 7fd9d57..e929d36 100644
 --- a/arch/arm/boot/dts/stih410.dtsi
 +++ b/arch/arm/boot/dts/stih410.dtsi
-@@ -10,5 +10,23 @@
- #include "stih407-family.dtsi"
- #include "stih410-pinctrl.dtsi"
- / {
-+	soc {
-+		usb2_picophy1: phy at 1 {
-+			compatible = "st,stih407-usb2-phy";
-+			#phy-cells = <0>;
-+			st,syscfg = <&syscfg_core 0xf8 0xf4>;
-+			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
-+				 <&picophyreset STIH407_PICOPHY0_RESET>;
-+			reset-names = "global", "port";
+@@ -28,5 +28,57 @@
+ 				 <&picophyreset STIH407_PICOPHY1_RESET>;
+ 			reset-names = "global", "port";
+ 		};
++
++		ohci0: usb at 9a03c00 {
++			compatible = "st,st-ohci-300x";
++			reg = <0x9a03c00 0x100>;
++			interrupts = <GIC_SPI 180 IRQ_TYPE_NONE>;
++			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>;
++			resets = <&powerdown STIH407_USB2_PORT0_POWERDOWN>,
++				 <&softreset STIH407_USB2_PORT0_SOFTRESET>;
++			reset-names = "power", "softreset";
++			phys = <&usb2_picophy1>;
++			phy-names = "usb";
 +		};
- 
-+		usb2_picophy2: phy at 2 {
-+			compatible = "st,stih407-usb2-phy";
-+			#phy-cells = <0>;
-+			st,syscfg = <&syscfg_core 0xfc 0xf4>;
-+			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
-+				 <&picophyreset STIH407_PICOPHY1_RESET>;
-+			reset-names = "global", "port";
++
++		ehci0: usb at 9a03e00 {
++			compatible = "st,st-ehci-300x";
++			reg = <0x9a03e00 0x100>;
++			interrupts = <GIC_SPI 151 IRQ_TYPE_NONE>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_usb0>;
++			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>;
++			resets = <&powerdown STIH407_USB2_PORT0_POWERDOWN>,
++				 <&softreset STIH407_USB2_PORT0_SOFTRESET>;
++			reset-names = "power", "softreset";
++			phys = <&usb2_picophy1>;
++			phy-names = "usb";
 +		};
-+	};
++
++		ohci1: usb at 9a83c00 {
++			compatible = "st,st-ohci-300x";
++			reg = <0x9a83c00 0x100>;
++			interrupts = <GIC_SPI 181 IRQ_TYPE_NONE>;
++			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>;
++			resets = <&powerdown STIH407_USB2_PORT1_POWERDOWN>,
++				 <&softreset STIH407_USB2_PORT1_SOFTRESET>;
++			reset-names = "power", "softreset";
++			phys = <&usb2_picophy2>;
++			phy-names = "usb";
++		};
++
++		ehci1: usb at 9a83e00 {
++			compatible = "st,st-ehci-300x";
++			reg = <0x9a83e00 0x100>;
++			interrupts = <GIC_SPI 153 IRQ_TYPE_NONE>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_usb1>;
++			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>;
++			resets = <&powerdown STIH407_USB2_PORT1_POWERDOWN>,
++				 <&softreset STIH407_USB2_PORT1_SOFTRESET>;
++			reset-names = "power", "softreset";
++			phys = <&usb2_picophy2>;
++			phy-names = "usb";
++		};
+ 	};
  };
 -- 
 1.9.1
