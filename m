@@ -1,50 +1,47 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 19 Nov 2014 09:01:21 -0800
-Subject: exynos boot falures in linux-next
-In-Reply-To: <7hfvdhyxqi.fsf@deeprootsystems.com>
-References: <E1XqKYI-0000pQ-4b@ip-10-35-177-41.ec2.internal>
- <7hoas54y7k.fsf@deeprootsystems.com>
- <7hlhn9zcse.fsf@deeprootsystems.com>
- <546A83D6.9060504@collabora.co.uk>
- <7hfvdhyxqi.fsf@deeprootsystems.com>
-Message-ID: <CAMAWPa8D-oRp2yC=n+Rgw_wtwV4+Go0OQi62y3iGRYxi0sow+g@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 19 Nov 2014 17:04:54 +0000
+Subject: [PATCH 2/7] mfd: MT6397: Add regmap for MT8135 and MT6397 SoC
+In-Reply-To: <20141118134618.GF30369@pengutronix.de>
+References: <1416210027-5562-1-git-send-email-flora.fu@mediatek.com>
+ <1416210027-5562-3-git-send-email-flora.fu@mediatek.com>
+ <20141118114645.GX24004@x1> <20141118134618.GF30369@pengutronix.de>
+Message-ID: <20141119170454.GJ1875@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 17, 2014 at 7:49 PM, Kevin Hilman <khilman@kernel.org> wrote:
-> Javier Martinez Canillas <javier.martinez@collabora.co.uk> writes:
->
->> Hello Kevin,
->>
->> On 11/17/2014 11:24 PM, Kevin Hilman wrote:
->>>
->>> As might have been expected, reverting the change that enables the
->>> DRM/display options in exynos_defconfig fixes the problem.
->>>
->>> Kevin
->>>
->>
->> I'm sorry for causing a boot failure but when I first posted that patch,
->> the Exynos DRM driver was working correctly (at least on the Exynos boards
->> I've access to)
->
-> Yeah, I tested it at the time as well, so I know it was working.
->
->> so it seems the regression was introduced while the patch
->> was posted but not yet picked.
->>
->> I'm not sure what is the correct step in this case but I'm OK with
->> reverting the patch until the Exynos DRM driver bug is fixed.
->
-> I didn't have time to dig, but I'd rather someone track down the DRM
-> problem and fix that, since it was known to be working. I'm guessing
-> it's something simple that can be fixed before the merge window opens.
+On Tue, 18 Nov 2014, Sascha Hauer wrote:
 
-OK, so this DRM problem is turning out to be non-trivial, so I think
-the defconfig patch should be reverted until the DRM issue is sorted
-out.
+> On Tue, Nov 18, 2014 at 11:46:45AM +0000, Lee Jones wrote:
+> > On Mon, 17 Nov 2014, Flora Fu wrote:
+> > 
+> > > Add PMIC wrapper of MT8135 to access MFD MT6397.
+> > > This is regmap of MT6397 MFD.
+> > > 
+> > > Signed-off-by: Flora Fu <flora.fu@mediatek.com>
+> > > ---
+> > >  drivers/mfd/Kconfig            |   8 +
+> > >  drivers/mfd/Makefile           |   1 +
+> > >  drivers/mfd/mt8135-pmic-wrap.c | 847 +++++++++++++++++++++++++++++++++++++++++
+> > 
+> > All of the PMIC functionality needs removing from MFD and placed
+> > somewhere else.  I suggest either drivers/power or drivers/regulator.
+> 
+> This is no PMIC functionality. The MT8135 has a unit which is is used to
+> access the PMIC (which is not only a PMIC, but also Touchscreen
+> interface and other stuff). This unit is called pmic-wrapper in the
+> docs. See the introductory mail for a nice picture.
 
-Otherwise, we risk having boot failures in linux-next which may be
-hiding other problems.
+I saw the picture, it's very nice.  Whatever this is, it's not an
+MFD.  It's a device which is located on an MFD.  There is far too much
+functional (the operative word here) code contained in this patch.
 
-Kevin
+I'm not sure where this device should live, but I'm keen for MFD not
+to become a dumping ground for ill-fitting devices.  Happy for you to
+create resources and register it from here, but the bulk for the
+functional driver needs to live somewhere else. 
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
