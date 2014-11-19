@@ -1,47 +1,89 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 19 Nov 2014 17:04:54 +0000
-Subject: [PATCH 2/7] mfd: MT6397: Add regmap for MT8135 and MT6397 SoC
-In-Reply-To: <20141118134618.GF30369@pengutronix.de>
-References: <1416210027-5562-1-git-send-email-flora.fu@mediatek.com>
- <1416210027-5562-3-git-send-email-flora.fu@mediatek.com>
- <20141118114645.GX24004@x1> <20141118134618.GF30369@pengutronix.de>
-Message-ID: <20141119170454.GJ1875@x1>
+From: linyongting@gmail.com (Lin Yongting)
+Date: Thu, 20 Nov 2014 01:06:05 +0800
+Subject: [PATCH] ARM: Add unwinding support for __memzero function
+Message-ID: <1416416765-10217-1-git-send-email-linyongting@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Nov 2014, Sascha Hauer wrote:
+The __memzero function never had unwinding annotations added.
+Currently, when accessing invalid pointer by __memzero occurs the
+backtrace shown will stop at __memzero or some completely unrelated
+function. Add unwinding annotations in hopes of getting a more
+useful backtrace in following cases:
+1. die on accessing invalid pointer by __memzero
+2. kprobe trapped at any instruction within __memzero
+3. interrupted at any instruction within __memzero
 
-> On Tue, Nov 18, 2014 at 11:46:45AM +0000, Lee Jones wrote:
-> > On Mon, 17 Nov 2014, Flora Fu wrote:
-> > 
-> > > Add PMIC wrapper of MT8135 to access MFD MT6397.
-> > > This is regmap of MT6397 MFD.
-> > > 
-> > > Signed-off-by: Flora Fu <flora.fu@mediatek.com>
-> > > ---
-> > >  drivers/mfd/Kconfig            |   8 +
-> > >  drivers/mfd/Makefile           |   1 +
-> > >  drivers/mfd/mt8135-pmic-wrap.c | 847 +++++++++++++++++++++++++++++++++++++++++
-> > 
-> > All of the PMIC functionality needs removing from MFD and placed
-> > somewhere else.  I suggest either drivers/power or drivers/regulator.
-> 
-> This is no PMIC functionality. The MT8135 has a unit which is is used to
-> access the PMIC (which is not only a PMIC, but also Touchscreen
-> interface and other stuff). This unit is called pmic-wrapper in the
-> docs. See the introductory mail for a nice picture.
+Signed-off-by: Lin Yongting <linyongting@gmail.com>
+---
+ arch/arm/lib/memzero.S |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-I saw the picture, it's very nice.  Whatever this is, it's not an
-MFD.  It's a device which is located on an MFD.  There is far too much
-functional (the operative word here) code contained in this patch.
-
-I'm not sure where this device should live, but I'm keen for MFD not
-to become a dumping ground for ill-fitting devices.  Happy for you to
-create resources and register it from here, but the bulk for the
-functional driver needs to live somewhere else. 
-
+diff --git a/arch/arm/lib/memzero.S b/arch/arm/lib/memzero.S
+index 385ccb3..0eded95 100644
+--- a/arch/arm/lib/memzero.S
++++ b/arch/arm/lib/memzero.S
+@@ -9,6 +9,7 @@
+  */
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
++#include <asm/unwind.h>
+ 
+ 	.text
+ 	.align	5
+@@ -18,6 +19,7 @@
+  * mis-aligned by, and r1 is the number of bytes.  If r1 < 4, then we
+  * don't bother; we use byte stores instead.
+  */
++UNWIND(	.fnstart			)
+ 1:	subs	r1, r1, #4		@ 1 do we have enough
+ 	blt	5f			@ 1 bytes to align with?
+ 	cmp	r3, #2			@ 1
+@@ -47,6 +49,9 @@ ENTRY(__memzero)
+  * use the LR
+  */
+ 	str	lr, [sp, #-4]!		@ 1
++UNWIND(	.fnend				)
++UNWIND(	.fnstart			)
++UNWIND(	.save 	{lr}			)
+ 	mov	ip, r2			@ 1
+ 	mov	lr, r2			@ 1
+ 
+@@ -66,6 +71,7 @@ ENTRY(__memzero)
+ 	tst	r1, #16			@ 1 16 bytes or more?
+ 	stmneia	r0!, {r2, r3, ip, lr}	@ 4
+ 	ldr	lr, [sp], #4		@ 1
++UNWIND(	.fnend				)
+ 
+ #else
+ 
+@@ -75,6 +81,9 @@ ENTRY(__memzero)
+  */
+ 
+ 	stmfd	sp!, {r4-r7, lr}
++UNWIND(	.fnend		       )
++UNWIND(	.fnstart	       )
++UNWIND(	.save 	{r4-r7, lr}    )
+ 	mov	r4, r2
+ 	mov	r5, r2
+ 	mov	r6, r2
+@@ -105,9 +114,11 @@ ENTRY(__memzero)
+ 	tst	r1, #16
+ 	stmneia	r0!, {r4-r7}
+ 	ldmfd	sp!, {r4-r7, lr}
++UNWIND(	.fnend		       )
+ 
+ #endif
+ 
++UNWIND(	.fnstart			)
+ 4:	tst	r1, #8			@ 1 8 bytes or more?
+ 	stmneia	r0!, {r2, r3}		@ 2
+ 	tst	r1, #4			@ 1 4 bytes or more?
+@@ -122,4 +133,5 @@ ENTRY(__memzero)
+ 	tst	r1, #1			@ 1 a byte left over
+ 	strneb	r2, [r0], #1		@ 1
+ 	ret	lr			@ 1
++UNWIND(	.fnend				)
+ ENDPROC(__memzero)
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.9.5
