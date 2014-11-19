@@ -1,50 +1,34 @@
-From: victorascroft@gmail.com (Victor Ascroft)
-Date: Wed, 19 Nov 2014 23:00:08 +0530
-Subject: Looking for good references for ARM driver development
-In-Reply-To: <546CD11F.6050502@free.fr>
-References: <546C920A.7060800@free.fr> <546CCBF6.7070607@gmail.com>
- <546CD11F.6050502@free.fr>
-Message-ID: <546CD3A0.6000307@gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 19 Nov 2014 09:30:32 -0800
+Subject: [PATCH v11 4/6] ARM: Exynos: switch to using generic cpufreq
+ driver for Exynos4210/5250/5420
+In-Reply-To: <1413805281-6269-5-git-send-email-thomas.ab@samsung.com>
+References: <1413805281-6269-1-git-send-email-thomas.ab@samsung.com>
+ <1413805281-6269-2-git-send-email-thomas.ab@samsung.com>
+ <1413805281-6269-3-git-send-email-thomas.ab@samsung.com>
+ <1413805281-6269-4-git-send-email-thomas.ab@samsung.com>
+ <1413805281-6269-5-git-send-email-thomas.ab@samsung.com>
+Message-ID: <CAMAWPa_V2rO9Ymezf0xPqeQNykCFq9QwLsNOG3EgPZfP-8MRBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Thomas,
 
-On 11/19/2014 10:49 PM, Mason wrote:
-> On 19/11/2014 17:57, Victor Ascroft wrote:
-> 
->> This actually depends on the kernel you are using. Do you have relatively
->> new kernel or an old one? Depending on that, either you will get that
->> information in a board file or else in the device tree in arch/arm/boot/dts.
-> 
-> I'll reply more thoroughly later, but I wanted to address this question.
-> We're targeting kernel 3.14.x
+On Mon, Oct 20, 2014 at 4:41 AM, Thomas Abraham <thomas.ab@samsung.com> wrote:
+> The new CPU clock type allows the use of generic CPUfreq drivers. So for
+> Exynos4210/5250, switch to using generic cpufreq driver. For Exynos5420,
+> which did not have CPUfreq driver support, enable the use of generic
+> CPUfreq driver.
+>
+> Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
+> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Tested-by: Chander Kashyap <k.chander@samsung.com>
 
-OK. Has to be a device tree then.
+What's the status of the exynos5 CPUfreq support for upstream?  This
+was pretty broadly reviewed and tested, but I still don't see this
+either in linux-next or Kukjin's for-next.
 
-> 
->> This depends. If you have driver compiled in with the kernel this will happen
->> on kernel boot up. If you have the driver as a loadable module, the probe hook
->> will be called on modprobe or insmod.
-> 
-> Is this an answer to question 5?
-> I think there is some confusion with the "probe" terminology.
-> 
-> I meant "probe" as in "read the current value".
-> I think you mean "probe" as in "the driver probes for the device through
-> the probe method."
-> 
-> I meant to ask how often the hwmon framework "polls" the temperature sensor.
-
-Oh. My understanding was you meant the "probe" of the driver. The hwmon
-will be exposing the functionality of reading the temperature sensor through
-a sysfs interface. I am not sure as to whether a "poll" functionality is
-provided by hwmon (probably not), but, when you cat or read the sysfs path 
-you will have the temperature readout. The lm75.c is good place to start.
-
-http://lxr.free-electrons.com/source/Documentation/hwmon/
-http://lxr.free-electrons.com/source/Documentation/hwmon/sysfs-interface
-
--- Sanchayan
-> 
-> Regards.
-> 
+Kevin
