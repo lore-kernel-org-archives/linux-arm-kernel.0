@@ -1,35 +1,49 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 19 Nov 2014 16:37:18 +0530
-Subject: [PATCH v7 0/3] new Atmel DMA controller
-In-Reply-To: <546C7903.8090901@atmel.com>
-References: <1413991340-11617-1-git-send-email-ludovic.desroches@atmel.com>
- <20141106052748.GR1870@intel.com> <546C7903.8090901@atmel.com>
-Message-ID: <20141119110718.GC2074@intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 19 Nov 2014 11:13:07 +0000
+Subject: [PATCH] arm/arm64: KVM: Handle traps of ICC_SRE_EL1 as RAZ/WI
+In-Reply-To: <1416394949-23496-1-git-send-email-ard.biesheuvel@linaro.org>
+ (Ard Biesheuvel's message of "Wed, 19 Nov 2014 11:02:29 +0000")
+References: <1416394949-23496-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <87sihfbfzw.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 12:03:31PM +0100, Nicolas Ferre wrote:
-> On 06/11/2014 06:27, Vinod Koul :
-> > On Wed, Oct 22, 2014 at 05:22:17PM +0200, Ludovic Desroches wrote:
-> >> Hi,
-> >>
-> >> This set of patches introduces support for the new Atmel DMA controller know as
-> >> XDMAC and available on SAMA5D4.
-> > 
-> > Applied all, thanks
-> 
-> Vinod,
-> 
-> I saw that you had created a topic branch for this driver: topic/at_xdmac.
-> 
-> If this branch is stable, can I use it for my work on at91 support and
-> merge it in my at91-3.19-dt branch before sending it to the arm-soc tree?
-> In fact I need the binding definitions that are created by the
-> patch:(dmaengine: at_xdmac: creation of the atmel eXtended DMA
-> Controller driver).
-Yup please pull this, this wont be rebased
+On Wed, Nov 19 2014 at 11:02:29 am GMT, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
+>
+> When running on a system with a GICv3, we currenly don't allow the guest
+> to access the system register interface of the GICv3.  We do this by
+> clearing the ICC_SRE_EL2.Enable, which causes all guest accesses to
+> ICC_SRE_EL1 to trap to EL2 and causes all guest accesses to other ICC_
+> registers to cause an undefined exception in the guest.
+>
+> However, we currently don't handle the trap of guest accesses to
+> ICC_SRE_EL1 and will spill out a warning.  The trap just needs to handle
+> the access as RAZ/WI, and a guest that tries to prod this register and
+> set ICC_SRE_EL1.SRE=1, must read back the value (which Linux already
+> does) to see if it succeeded, and will thus observe that ICC_SRE_EL1.SRE
+> was not set.
+>
+> Add the simple trap handler in the sorted table of the system registers.
+>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> [ardb: added 32-bit counterpart]
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> --
+> v2: added 32-bit counterpart, renaming pm_fake to trap_raz_wi in the process,
+>     hence the additional changes on that side
+> ---
+>  arch/arm/kvm/coproc.c     | 49 +++++++++++++++++++++++++----------------------
+>  arch/arm64/kvm/sys_regs.c |  5 +++++
+>  2 files changed, 31 insertions(+), 23 deletions(-)
+>
 
-Thanks
+Err... Not really. What I meant was to update the cp15_regs array in
+arch/arm64/kvm/sys_regs.c. The 32bit port of KVM is unlikely to ever
+grow support for GICv3, as these registers are *not* defined for ARMv7.
 
+Thanks,
+
+	M.
 -- 
-~Vinod
+Jazz is not dead. It just smells funny.
