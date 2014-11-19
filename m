@@ -1,42 +1,64 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Wed, 19 Nov 2014 17:53:08 +0530
-Subject: [PATCH V2] ARM: dts: DRA7: Add node for RTC
-In-Reply-To: <1416199509-3977-1-git-send-email-lokeshvutla@ti.com>
-References: <1416199509-3977-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1416399788-27557-1-git-send-email-lokeshvutla@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Nov 2014 13:28:50 +0100
+Subject: [PATCH 3/5] PCI: Use pci_scan_bus_simple() in simple scene.
+In-Reply-To: <1416382369-13587-4-git-send-email-wangyijing@huawei.com>
+References: <1416382369-13587-1-git-send-email-wangyijing@huawei.com>
+ <1416382369-13587-4-git-send-email-wangyijing@huawei.com>
+Message-ID: <3577231.2krnYe8yCU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add node for RTC.
+On Wednesday 19 November 2014 15:32:47 Yijing Wang wrote:
+> Use pci_scan_bus_simple() to scan pci buses with
+> the default IO/MEM/BUS resources. Use it instead
+> of pci_scan_bus() and pci_scan_bus_parented().
+> 
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> 
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-[nm at ti.com: update with rtc crossbar number]
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-Changes since v1:
-- Fixed rtc dt node label.
- arch/arm/boot/dts/dra7.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+I think we should replace pci_scan_bus_parented() with something better
+by making the xen code use pci_scan_root_bus() (see below for a draft
+patch). After that we no longer need the 'parent' argument here and we
+can just keep using the pci_scan_bus() function for the legacy users,
+or rename it if that helps.
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 9cc9843..5d92562 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1075,6 +1075,15 @@
- 			status = "disabled";
- 		};
+	Arnd
+
+
+8<---
+
+diff --git a/drivers/pci/xen-pcifront.c b/drivers/pci/xen-pcifront.c
+index 116ca3746adb..45a4843a608a 100644
+--- a/drivers/pci/xen-pcifront.c
++++ b/drivers/pci/xen-pcifront.c
+@@ -448,6 +448,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+ 	struct pci_bus *b;
+ 	struct pcifront_sd *sd = NULL;
+ 	struct pci_bus_entry *bus_entry = NULL;
++	LIST_HEAD(resources);
+ 	int err = 0;
  
-+		rtc at 48838000 {
-+			compatible = "ti,am3352-rtc";
-+			reg = <0x48838000 0x100>;
-+			interrupts = <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH>;
-+			ti,hwmods = "rtcss";
-+			clocks = <&sys_32k_ck>;
-+		};
-+
- 		omap_control_usb2phy1: control-phy at 4a002300 {
- 			compatible = "ti,control-phy-usb2";
- 			reg = <0x4a002300 0x4>;
--- 
-1.9.1
+ #ifndef CONFIG_PCI_DOMAINS
+@@ -470,17 +471,20 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+ 		err = -ENOMEM;
+ 		goto err_out;
+ 	}
++	pci_add_resource(&resources, &ioport_resource);
++	pci_add_resource(&resources, &iomem_resource);
+ 	pcifront_init_sd(sd, domain, bus, pdev);
+ 
+ 	pci_lock_rescan_remove();
+ 
+-	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
+-				  &pcifront_bus_ops, sd);
++	b = pci_scan_root_bus(&pdev->xdev->dev, bus, &pcifront_bus_ops, sd,
++			      &resources);
+ 	if (!b) {
+ 		dev_err(&pdev->xdev->dev,
+ 			"Error creating PCI Frontend Bus!\n");
+ 		err = -ENOMEM;
+ 		pci_unlock_rescan_remove();
++		pci_free_resource_list(&resources);
+ 		goto err_out;
+ 	}
+ 
