@@ -1,45 +1,57 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 19 Nov 2014 16:56:44 +0900
-Subject: [PATCH] ARM: exynos_defconfig: Use 16 minors per MMC block device
-In-Reply-To: <1415966317-11170-1-git-send-email-k.kozlowski@samsung.com>
-References: <1415966317-11170-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <546C4D3C.2010007@samsung.com>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Wed, 19 Nov 2014 13:26:52 +0530
+Subject: [PATCH v2] serial: samsung: Fix serial config dependencies for exynos7
+In-Reply-To: <1416199491-4841-1-git-send-email-a.kesavan@samsung.com>
+References: <1416199491-4841-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1416383812-714-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/14 20:58, Krzysztof Kozlowski wrote:
-> 16 minors per MMC block device are required to boot Rinato (Gear 2)
-> board because up to 15 partitions are used.
-> 
-> With default 8 minors booting failed with:
-> [    1.329092] mmcblk0: mmc0:0001 F5X5MA 3.64 GiB
-> [    1.329448] mmcblk0boot0: mmc0:0001 F5X5MA partition 1 4.00 MiB
-> [    1.329627] mmcblk0boot1: mmc0:0001 F5X5MA partition 2 4.00 MiB
-> [    1.329808] mmcblk0rpmb: mmc0:0001 F5X5MA partition 3 512 KiB
-> [    1.335717]  mmcblk0: p1 p2 p3 p4 p5 p6 p7
-> [    1.436553] Waiting for root device /dev/mmcblk0p15...
-> 
-> while the correct list of partitions on mmcblk0 for Gear 2 is:
-> [    1.436651]  mmcblk0: p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  arch/arm/configs/exynos_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 72058b8a6f4d..aa32931bdd30 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -134,6 +134,7 @@ CONFIG_USB_STORAGE=y
->  CONFIG_USB_DWC3=y
->  CONFIG_USB_HSIC_USB3503=y
->  CONFIG_MMC=y
-> +CONFIG_MMC_BLOCK_MINORS=16
->  CONFIG_MMC_SDHCI=y
->  CONFIG_MMC_SDHCI_S3C=y
->  CONFIG_MMC_SDHCI_S3C_DMA=y
+From: Pankaj Dubey <pankaj.dubey@samsung.com>
 
-Applied, thanks.
+Exynos7 has a similar serial controller to that present in older Samsung
+SoCs. To re-use the existing serial driver on Exynos7 we need to have
+SERIAL_SAMSUNG_UARTS_4 and SERIAL_SAMSUNG_UARTS selected. This is not
+possible because these symbols are dependent on PLAT_SAMSUNG which is
+not present for the ARMv8 based exynos7.
 
-- Kukjin
+Change the dependency of these symbols from PLAT_SAMSUNG to the serial
+driver thus making it available on exynos7. As the existing platform
+specific code making use of these symbols is related to uart driver this
+change in dependency should not cause any issues.
+
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+---
+Changes in v2:
+	- Added Greg's ack and Kukjin Kim as a recepient
+
+ drivers/tty/serial/Kconfig |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index e71a28b..d0ce88c 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -249,14 +249,14 @@ config SERIAL_SAMSUNG
+ 
+ config SERIAL_SAMSUNG_UARTS_4
+ 	bool
+-	depends on PLAT_SAMSUNG
++	depends on SERIAL_SAMSUNG
+ 	default y if !(CPU_S3C2410 || CPU_S3C2412 || CPU_S3C2440 || CPU_S3C2442)
+ 	help
+ 	  Internal node for the common case of 4 Samsung compatible UARTs
+ 
+ config SERIAL_SAMSUNG_UARTS
+ 	int
+-	depends on PLAT_SAMSUNG
++	depends on SERIAL_SAMSUNG
+ 	default 4 if SERIAL_SAMSUNG_UARTS_4 || CPU_S3C2416
+ 	default 3
+ 	help
+-- 
+1.7.9.5
