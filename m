@@ -1,38 +1,62 @@
-From: Andrew.Jackson@arm.com (Andrew Jackson)
-Date: Wed, 19 Nov 2014 11:21:38 +0000
-Subject: [PATCH] drm/i2c: tda998x: Allow for different audio sample rates
-In-Reply-To: <20141118180036.GC4042@n2100.arm.linux.org.uk>
-References: <546B8452.6030701@arm.com>
- <20141118180036.GC4042@n2100.arm.linux.org.uk>
-Message-ID: <546C7D42.6000103@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 19 Nov 2014 12:23:54 +0100
+Subject: [PATCH] arm/arm64: KVM: Handle traps of ICC_SRE_EL1 as RAZ/WI
+Message-ID: <1416396234-6887-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/14 18:00, Russell King - ARM Linux wrote:
-> On Tue, Nov 18, 2014 at 05:39:30PM +0000, Andrew Jackson wrote:
->> On HDMI, the audio data are carried across the HDMI link which is
->> driven by the TDMS clock. The TDMS clock is dependent on the video pixel
->> rate.
->>
->> This patch sets the denominator (Cycle Time Stamp) appropriately
->> allowing the driver to send audio to a wider range of HDMI sinks
->> (i.e. monitors).
-> 
-> This is actually pointless, because we don't use "manual" CTS mode.
-> 
-> If the clocks for the video and audio are coherent, then you can program
-> both the N and CTS values to allow the sink to properly recover the
-> synchronous audio clock.
-> 
-> However, in most cases, the audio and video clocks are not coherent, and
-> since the recovered audio clock has to match the source audio clock, the
-> only way this can be done is by the TDA998x (or in fact other HDMI
-> encoder) to measure the audio clock rate and generate the CTS value
-> itself.
-> 
-> This is the mode we drive the TDA998x - so the programmed CTS value is
-> irrelevant.
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-My apologies for the noise: I originally created the patch when one of the monitors with which I was working wouldn't play sound as expected.  However, I now find that the monitor plays sound with or without the patch so it must have been something else.  I'd missed the significance of the "auto CTS" comment a few lines earlier (partly because I've no datasheet on the TDA998x).
+When running on a system with a GICv3, we currenly don't allow the guest
+to access the system register interface of the GICv3.  We do this by
+clearing the ICC_SRE_EL2.Enable, which causes all guest accesses to
+ICC_SRE_EL1 to trap to EL2 and causes all guest accesses to other ICC_
+registers to cause an undefined exception in the guest.
 
-   Andrew
+However, we currently don't handle the trap of guest accesses to
+ICC_SRE_EL1 and will spill out a warning.  The trap just needs to handle
+the access as RAZ/WI, and a guest that tries to prod this register and
+set ICC_SRE_EL1.SRE=1, must read back the value (which Linux already
+does) to see if it succeeded, and will thus observe that ICC_SRE_EL1.SRE
+was not set.
+
+Add the simple trap handler in the sorted table of the system registers.
+
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+[ardb: added cp15 handling]
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+v3: add handling for 32-bit *guests* not 32-bit hosts
+---
+ arch/arm64/kvm/sys_regs.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 4cc3b719208e..3d7c2df89946 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -424,6 +424,11 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	/* VBAR_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
+ 	  NULL, reset_val, VBAR_EL1, 0 },
++
++	/* ICC_SRE_EL1 */
++	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1100), Op2(0b101),
++	  trap_raz_wi },
++
+ 	/* CONTEXTIDR_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b001),
+ 	  access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
+@@ -690,6 +695,10 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 	{ Op1( 0), CRn(10), CRm( 2), Op2( 1), access_vm_reg, NULL, c10_NMRR },
+ 	{ Op1( 0), CRn(10), CRm( 3), Op2( 0), access_vm_reg, NULL, c10_AMAIR0 },
+ 	{ Op1( 0), CRn(10), CRm( 3), Op2( 1), access_vm_reg, NULL, c10_AMAIR1 },
++
++	/* ICC_SRE */
++	{ Op1( 0), CRn(12), CRm(12), Op2( 5), trap_raz_wi },
++
+ 	{ Op1( 0), CRn(13), CRm( 0), Op2( 1), access_vm_reg, NULL, c13_CID },
+ };
+ 
+-- 
+1.8.3.2
