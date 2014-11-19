@@ -1,39 +1,34 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 19 Nov 2014 12:15:43 +0100
-Subject: [PATCH v3 14/19] iommu: exynos: add support for runtime_pm
+Date: Wed, 19 Nov 2014 12:15:33 +0100
+Subject: [PATCH v3 04/19] drm: exynos: detach from default dma-mapping domain
+ on init
 In-Reply-To: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
 References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1416395748-10731-15-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1416395748-10731-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes support for runtime power management for SYSMMU
-controllers, so they are enabled when master device is attached.
+This patch adds code, which detach sub-device nodes from default iommu
+domain if such has been configured.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/gpu/drm/exynos/exynos_drm_iommu.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 77dec32c59ef..27742c4d5a76 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -696,6 +696,7 @@ static int exynos_iommu_attach_device(struct iommu_domain *domain,
- 		return -ENODEV;
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_iommu.c b/drivers/gpu/drm/exynos/exynos_drm_iommu.c
+index b32b291f88ff..323601a52a25 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_iommu.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_iommu.c
+@@ -100,6 +100,9 @@ int drm_iommu_attach_device(struct drm_device *drm_dev,
  
- 	list_for_each_entry(data, &owner->clients, owner_node) {
-+		pm_runtime_get_sync(data->sysmmu);
- 		ret = __sysmmu_enable(data, pagetable, domain);
- 		if (ret >= 0) {
- 			data->master = dev;
-@@ -737,6 +738,7 @@ static void exynos_iommu_detach_device(struct iommu_domain *domain,
- 				data->master = NULL;
- 				list_del_init(&data->domain_node);
- 			}
-+			pm_runtime_put(data->sysmmu);
- 			found = true;
- 		}
- 	}
+ 	dma_set_max_seg_size(subdrv_dev, 0xffffffffu);
+ 
++	if (subdrv_dev->archdata.mapping)
++		arm_iommu_detach_device(subdrv_dev);
++
+ 	ret = arm_iommu_attach_device(subdrv_dev, dev->archdata.mapping);
+ 	if (ret < 0) {
+ 		DRM_DEBUG_KMS("failed iommu attach.\n");
 -- 
 1.9.2
