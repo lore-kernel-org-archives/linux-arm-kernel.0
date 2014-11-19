@@ -1,37 +1,28 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 20 Nov 2014 07:52:41 +1100
-Subject: linux-next: Please update RPi repo location
-In-Reply-To: <546CCEEF.7040604@wwwdotorg.org>
-References: <546CCEEF.7040604@wwwdotorg.org>
-Message-ID: <20141120075241.64e07a90@canb.auug.org.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Nov 2014 22:02:25 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC Runtime PM Updates for v3.19
+In-Reply-To: <cover.1415058794.git.horms+renesas@verge.net.au>
+References: <cover.1415058794.git.horms+renesas@verge.net.au>
+Message-ID: <201411192202.25641.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Tuesday 04 November 2014, Simon Horman wrote:
+> Please consider these Renesas ARM based SoC runtime PM updates for v3.19.
+> 
+> 
+> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+> 
+>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-runtime-pm-for-v3.19
+> 
+> for you to fetch changes up to dc4470e177973feedd82596969d86468a1695b1e:
+> 
+>   ARM: shmobile: r8a7740: Add A3SM pm domain support (2014-10-28 08:40:18 +0900)
 
-On Wed, 19 Nov 2014 10:10:07 -0700 Stephen Warren <swarren@wwwdotorg.org> wrote:
->
-> linux-rpi.git has moved from:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git#for-next
-> 
-> to
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git#for-next
-> 
-> The old location still works due to a symlink/... on kernel.org, but if 
-> you could update linux-next to pull from the new canonical location, 
-> that'd be great.
+Pulled into soc branch now, sorry for the delay.
 
-Done.
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141120/7f6fa7b5/attachment.sig>
+	Arnd
