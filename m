@@ -1,78 +1,61 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Wed, 19 Nov 2014 09:49:39 +0200
-Subject: [PATCH 3/7] pinctrl: pinconf-generic: Allow driver to specify
- DT params
-In-Reply-To: <995406b8e0244c63a3ef8e58314e81f6@BL2FFO11FD037.protection.gbl>
-References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
- <1415041531-15520-4-git-send-email-soren.brinkmann@xilinx.com>
- <CACRpkdYfj2ydLQ4q_FKwXo73jzNsvj9u2Aem9EiuEw-OCvurrg@mail.gmail.com>
- <1416300621.30131.6.camel@mm-sol.com>
- <995406b8e0244c63a3ef8e58314e81f6@BL2FFO11FD037.protection.gbl>
-Message-ID: <1416383379.30131.14.camel@mm-sol.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 19 Nov 2014 16:49:53 +0900
+Subject: [PATCH] ARM: multi_v7_defconfig: fix failure setting CPU voltage
+ by enabling dependent I2C controller
+In-Reply-To: <1416337853-1558-1-git-send-email-tyler.baker@linaro.org>
+References: <1416337853-1558-1-git-send-email-tyler.baker@linaro.org>
+Message-ID: <546C4BA1.6090701@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 11/19/14 04:10, Tyler Baker wrote:
 
-On Tue, 2014-11-18 at 09:25 -0800, S?ren Brinkmann wrote:
-> On Tue, 2014-11-18 at 10:50AM +0200, Ivan T. Ivanov wrote:
-> > 
-> > On Tue, 2014-11-11 at 15:53 +0100, Linus Walleij wrote:
-> > > On Mon, Nov 3, 2014 at 8:05 PM, Soren Brinkmann
-> > > brinkmann at xilinx.com> wrote:
-> > > 
-> > > > Additionally to the generic DT parameters, allow drivers to 
-> > > > provide driver-specific DT parameters to be used with the 
-> > > > generic parser infrastructure.
-> > > > 
-> > > > Signed-off-by: Soren Brinkmann brinkmann at xilinx.com>
-> > > 
-> > > I like the looks of this, but the patch description is a bit 
-> > > terse. I'd like it to describe some of the refactorings being 
-> > > done
-> > > to the intrinsics, because I have a hard time following the 
-> > > patch.
-> > > 
-> > > First please rebase onto the "devel" branch in the pin control 
-> > > tree, and notice that drivers/pinctrl/qcom/pinctrl-spmi-gpio.c 
-> > > which is merged there is actually doing this already:
-> > > 
-> > > 
-> > >         for_each_child_of_node(np_config, np) {
-> > >                 ret = pinconf_generic_dt_subnode_to_map(pctldev, 
-> > > np, map,
-> > >                                                         &reserv, 
-> > > nmaps, type);
-> > >                 if (ret)
-> > >                         break;
-> > > 
-> > >                 ret = pmic_gpio_dt_subnode_to_map(pctldev, np, 
-> > > map, &reserv,
-> > >                                                   nmaps, type);
-> > >                 if (ret)
-> > >                         break;
-> > >         }
-> > > 
-> > > So it should be patched to illustrate the point of this code.
-> > > 
-> > 
-> > I like the idea, but have issues with implementations :-).
-> >  
-> > It is supposed that additional parameters are not generic,
-> > otherwise they will be part of enum pin_config_param, right?
-> > 
-> > Probably it will be better if clients could pass array with
-> > driver specific dt bindings to pinconf_generic_dt_node_to_map()?
+Hi,
+
++ Arnd, Olof and Kevin
+
+> This patch fixes a long standing issue introduced during the 3.16 merge window.
+> Shortly after the merge, exynos5250-based arndale boards began to produce the 
+> following errors:
 > 
-> My idea was to hide that API from the driver. You just pass those 
-> parameters as part of the struct pctldev and the parser - whether 
-> this generic one or anything else - would do the right thing. I 
-> don't think calling the parser from the driver is the right approach.
+> kern.err kernel:  exynos-cpufreq exynos-cpufreq: failed to set cpu voltage
+> kern.err kernel:  cpufreq: __target_index: Failed to change cpu frequency: -22
+> 
+> Further analysis revealed that the S5M8767 voltage regulator used on the 
+> exynos5250-based arndale board utilizes the S3C2410 I2C controller. If the 
+> S3C2410 I2C controller driver is not enabled, the S5M8767 voltage regulator 
+> fails to probe. Therefore a dependency exists between these two drivers. 
+> In the exynos_defconfig both CONFIG_REGULATOR_S5M8767 and CONFIG_I2C_S3C2410 
+> options are enabled, and no errors are produced. However, in the 
+> multi_v7_defconfig only the CONFIG_REGULATOR_S5M8767 option is enabled and the 
+> errors are present. So let's enable the CONFIG_I2C_S3C2410 option in the 
+> multi_v7_defconfig to allow the S5M8767 voltage regulator to probe.
+> 
+> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
 
-Drivers already know about dt_node_to_map(). My proposal will make
-drivers, which register non-standard bindings, little bit simpler.
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-With your approach probably we can remove dt_node_to_map() and
-dt_free_map() callbacks?
+Thanks,
+Kukjin
 
-Regards,
-Ivan
+> ---
+> This issue was reported [1]. I've also confirmed this fix on two different 
+> arndale boards.
+> 
+> [1] https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg38765.html
+> 
+>  arch/arm/configs/multi_v7_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 3487046..9d7a32f 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -217,6 +217,7 @@ CONFIG_I2C_CADENCE=y
+>  CONFIG_I2C_DESIGNWARE_PLATFORM=y
+>  CONFIG_I2C_EXYNOS5=y
+>  CONFIG_I2C_MV64XXX=y
+> +CONFIG_I2C_S3C2410=y
+>  CONFIG_I2C_SIRF=y
+>  CONFIG_I2C_TEGRA=y
+>  CONFIG_I2C_ST=y
