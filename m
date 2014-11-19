@@ -1,50 +1,74 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 19 Nov 2014 10:21:22 +0100
-Subject: [PATCH] i2c: designware: prevent early stop on TX FIFO empty
-In-Reply-To: <545CB6C4.8010201@arm.com>
-References: <545CB6C4.8010201@arm.com>
-Message-ID: <20141119092122.GC1439@katana>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 19 Nov 2014 10:21:57 +0100
+Subject: [PATCH] clockevent: sun4i: Fix race condition in the probe code
+In-Reply-To: <1416351573-5815-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1416351573-5815-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <546C6135.90201@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 07, 2014 at 12:10:44PM +0000, Andrew Jackson wrote:
-> If the Designware core is configured with IC_EMPTYFIFO_HOLD_MASTER_EN
-> set to zero, allowing the TX FIFO to become empty causes a STOP
-> condition to be generated on the I2C bus. If the transmit FIFO
-> threshold is set too high, an erroneous STOP condition can be
-> generated on long transfers - particularly where the interrupt
-> latency is extended.
-> 
-> Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+On 11/18/2014 11:59 PM, Maxime Ripard wrote:
+> The interrupts were activated and the handler registered before the clockevent
+> was registered in the probe function.
+>
+> The interrupt handler, however, was making the assumption that the clockevent
+> device was registered.
+>
+> That could cause a null pointer dereferenc if the timer interrupt was firing
+> during this narrow window.
+>
+> Fix that by moving the clockevent registration before the interrupt is enabled.
+>
+> Reported-by: Roman Byshko <rbyshko@gmail.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: stable at vger.kernel.org
 
-So, what do other designware users think of this change (nice CC list
-BTW, Andrew). Adding Mika, too.
+Applied to my tree as 3.18 fix.
+
+Thanks !
+
+   -- Daniel
 
 > ---
->  drivers/i2c/busses/i2c-designware-core.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-designware-core.c b/drivers/i2c/busses/i2c-designware-core.c
-> index 3c20e4b..e070edd 100644
-> --- a/drivers/i2c/busses/i2c-designware-core.c
-> +++ b/drivers/i2c/busses/i2c-designware-core.c
-> @@ -363,7 +363,7 @@ int i2c_dw_init(struct dw_i2c_dev *dev)
->  	}
->  
->  	/* Configure Tx/Rx FIFO threshold levels */
-> -	dw_writel(dev, dev->tx_fifo_depth - 1, DW_IC_TX_TL);
-> +	dw_writel(dev, dev->tx_fifo_depth / 2, DW_IC_TX_TL);
->  	dw_writel(dev, 0, DW_IC_RX_TL);
->  
->  	/* configure the i2c master */
-> -- 
-> 1.7.1
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141119/e8e4c032/attachment.sig>
+>   drivers/clocksource/sun4i_timer.c | 12 ++++++------
+>   1 file changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
+> index efb17c3ee120..f4a9c0058b4d 100644
+> --- a/drivers/clocksource/sun4i_timer.c
+> +++ b/drivers/clocksource/sun4i_timer.c
+> @@ -182,6 +182,12 @@ static void __init sun4i_timer_init(struct device_node *node)
+>   	/* Make sure timer is stopped before playing with interrupts */
+>   	sun4i_clkevt_time_stop(0);
+>
+> +	sun4i_clockevent.cpumask = cpu_possible_mask;
+> +	sun4i_clockevent.irq = irq;
+> +
+> +	clockevents_config_and_register(&sun4i_clockevent, rate,
+> +					TIMER_SYNC_TICKS, 0xffffffff);
+> +
+>   	ret = setup_irq(irq, &sun4i_timer_irq);
+>   	if (ret)
+>   		pr_warn("failed to setup irq %d\n", irq);
+> @@ -189,12 +195,6 @@ static void __init sun4i_timer_init(struct device_node *node)
+>   	/* Enable timer0 interrupt */
+>   	val = readl(timer_base + TIMER_IRQ_EN_REG);
+>   	writel(val | TIMER_IRQ_EN(0), timer_base + TIMER_IRQ_EN_REG);
+> -
+> -	sun4i_clockevent.cpumask = cpu_possible_mask;
+> -	sun4i_clockevent.irq = irq;
+> -
+> -	clockevents_config_and_register(&sun4i_clockevent, rate,
+> -					TIMER_SYNC_TICKS, 0xffffffff);
+>   }
+>   CLOCKSOURCE_OF_DECLARE(sun4i, "allwinner,sun4i-a10-timer",
+>   		       sun4i_timer_init);
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
