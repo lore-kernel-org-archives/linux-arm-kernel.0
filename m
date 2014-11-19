@@ -1,134 +1,77 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 19 Nov 2014 17:16:13 +0900
-Subject: [PATCH v2] ARM: dts: add board dts file for Exynos3250-based
- Monk board
-In-Reply-To: <546C4AF9.2060306@samsung.com>
-References: <20141002112233.GI5788@leverpostej>
- <1412734265-6259-1-git-send-email-yj44.cho@samsung.com>
- <546AE8EC.9010708@samsung.com> <546C4AF9.2060306@samsung.com>
-Message-ID: <546C51CD.5010108@samsung.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 19 Nov 2014 09:24:41 +0100
+Subject: [PATCH v5.5] of/fdt: export fdt blob as /sys/firmware/fdt
+In-Reply-To: <CABGGiswNc1jHWiCraKmEVWRn-aMndt8AfYA3GtmaDBVpZBd+aA@mail.gmail.com>
+References: <1415984735-32388-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20141118165145.4F6A8C40966@trevor.secretlab.ca>
+ <20141118172545.GC14323@leverpostej>
+ <20141118221103.4ECB3C40966@trevor.secretlab.ca>
+ <CABGGiswNc1jHWiCraKmEVWRn-aMndt8AfYA3GtmaDBVpZBd+aA@mail.gmail.com>
+Message-ID: <CAKv+Gu8fAG5jGAFovSJ_jKz52M2xbuyyAHvGi=tH+vmLL6Q00Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/14 16:47, Kukjin Kim wrote:
-> On 11/18/14 15:36, Chanwoo Choi wrote:
->> Dear Kukjin,
+On 19 November 2014 00:11, Rob Herring <rob.herring@linaro.org> wrote:
+> On Tue, Nov 18, 2014 at 4:11 PM, Grant Likely <grant.likely@linaro.org> wrote:
+>> On Tue, 18 Nov 2014 17:25:45 +0000
+>> , Mark Rutland <mark.rutland@arm.com>
+>>  wrote:
+>>> On Tue, Nov 18, 2014 at 04:51:45PM +0000, Grant Likely wrote:
+>>> > On Fri, 14 Nov 2014 18:05:35 +0100
+>>> > , Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>> >  wrote:
+>>> > > Create a new /sys entry '/sys/firmware/fdt' to export the FDT blob
+>>> > > that was passed to the kernel by the bootloader. This allows userland
+>>> > > applications such as kexec to access the raw binary.
+>
+> [...]
+>
+>>> > * It also helps with exposing the reserved map to userspace, but kexec
+>>> >   has done without that feature for years, and it is in the process of
+>>> >   being deprecated in favour of /reserved-memory anyway.
+>>>
+>>> This is the first I'd heard of the reserve map being deprecated, and
+>>> we're going to have DTs with reserved map entries for a long time going
+>>> forwards.
 >>
-> Hi,
-> 
->> Could you please review or pick this patchset?
+>> Deprecated, not removed or disabled. It will still work pretty much
+>> forever, but users should be encouraged to move to the reserve-memory
+>> tree.
+>
+> I thought you had said reserve map was still the right way for memory
+> the kernel should never touch.
+>
+>>> Can't we expose the header fields under something like
+>>> /sys/firmware/devicetree/dtb-header/, parallel to the usual
+>>> /sys/firmware/devicetree/base for nodes?
 >>
->> Best Regards,
->> Chanwoo Choi
+>> We could do that too.
 >>
->> On 10/08/2014 11:11 AM, YoungJun Cho wrote:
->>> From: Youngjun Cho <yj44.cho@samsung.com>
->>>
->>> This patch adds new board dts file to support Samsung Monk board which is
->>> based on Exynos3250 SoC and has different H/W configuration from Rinato.
->>>
->>> This patch is based on linux-samsung.git for-next branch and depends on
->>> [PATCHv2 0/2] ARM: dts: Add new board dts file for Exynos3250-based Rinato board
->>>
->>> Changes from v1:
->>> - The 'memory' entries coalesce into one entry
->>> - Removes useless space
->>> - Puts voltage-regulator-0 under the root node
->>>
->>> This dts file support following features:
->>> - eMMC
->>> - Main PMIC (Samsung S2MPS14)
->>> - Interface PMIC (Maxim MAX77836, MUIC, fuel-gauge, charger)
->>> - RTC of Exynos3250
->>> - ADC of Exynos3250 with NTC thermistor
->>> - I2S of Exynos3250
->>> - TMU of Exynos3250
->>> - Secure firmware for Exynos3250 secondary cpu boot
->>> - Serial ports of Exynos3250
->>> - gpio-key for power key
->>>
->>> Signed-off-by: Youngjun Cho <yj44.cho@samsung.com>
->>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>> Signed-off-by: Inki Dae <inki.dae@samsung.com>
->>> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
->>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
->>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->>> ---
->>>  arch/arm/boot/dts/Makefile            |   3 +-
->>>  arch/arm/boot/dts/exynos3250-monk.dts | 583 ++++++++++++++++++++++++++++++++++
->>>  2 files changed, 585 insertions(+), 1 deletion(-)
->>>  create mode 100644 arch/arm/boot/dts/exynos3250-monk.dts
->>>
->>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>> index 5728918..0c8ae64 100644
->>> --- a/arch/arm/boot/dts/Makefile
->>> +++ b/arch/arm/boot/dts/Makefile
->>> @@ -64,7 +64,8 @@ dtb-$(CONFIG_ARCH_BRCMSTB) += \
->>>  dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
->>>  	da850-evm.dtb
->>>  dtb-$(CONFIG_ARCH_EFM32) += efm32gg-dk3750.dtb
->>> -dtb-$(CONFIG_ARCH_EXYNOS) += exynos3250-rinato.dtb \
->>> +dtb-$(CONFIG_ARCH_EXYNOS) += exynos3250-monk.dtb \
->>> +	exynos3250-rinato.dtb \
->>>  	exynos4210-origen.dtb \
->>>  	exynos4210-smdkv310.dtb \
->>>  	exynos4210-trats.dtb \
->>> diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
->>> new file mode 100644
->>> index 0000000..615672f
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/exynos3250-monk.dts
->>> @@ -0,0 +1,583 @@
->>> +/*
->>> + * Samsung's Exynos3250 based Monk board device tree source
->>> + *
->>> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
->>> + *		http://www.samsung.com
->>> + *
->>> + * Device tree source file for Samsung's Monk board which is based on
->>> + * Samsung Exynos3250 SoC.
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + */
->>> +
->>> +/dts-v1/;
->>> +#include "exynos3250.dtsi"
->>> +#include <dt-bindings/input/input.h>
->>> +
->>> +/ {
->>> +	model = "Samsung Monk board";
->>> +	compatible = "samsung,monk", "samsung,exynos3250", "samsung,exynos3";
->>> +
->>> +	aliases {
->>> +		i2c7 = &i2c_max77836;
->>> +	};
->>> +
->>> +	memory {
->>> +		reg =  <0x40000000 0x1ff00000>;
->>> +	};
->>> +
->>> +	chosen {
->>> +		bootargs = "console=ttySAC1,115200N8 root=/dev/mmcblk0p15 rootwait earlyprintk panic=5";
-> 
-> Actually, the bootargs can be supplied from bootloader and can be
-> removed from here and it's a recent requirement from mailinglist. But
-> I've already applied similar one in rinato.dts. So please cleanup them
-> together later...? :)
-> 
-> [snip]
-> 
-> Will apply, thanks.
-> 
-> - Kukjin
+>> Honestly though, I'm just unsure of what the best thing to do is. If you
+>> and a few others tell me that, "no, exporting the raw dtb is the right
+>> thing to do", then I'll be okay, merge the patch and sleep properly.
+>
+> I always sleep better when others can take the blame.
+>
+> What happens when we rev the dtb format? Is the ABI the blob or the
+> format of the blob?
+>
+> I lean towards we should add this. This is providing what is "in the
+> firmware" while /proc/devicetree provides the live tree state
+> including overlays.
+>
 
-I think, you need adding board file description in the Doc?
+Well, my pov is that FDT != devicetree ever since we started (ab)using
+the FDT container format to pass just the UEFI entry points to the
+kernel.
+The boot protocol describes what should be passed in x0, and /that/ is
+what we expose in /sys/firmware/fdt, regardless of how the kernel
+decided to configure itself.
+(perhaps we need to fix the wording in the document to refer to FDT not dtb)
 
-WARNING: DT compatible string "samsung,monk" appears un-documented --
-check ./Documentation/devicetree/bindings/
-#79: FILE: arch/arm/boot/dts/exynos3250-monk.dts:21:
-+	compatible = "samsung,monk", "samsung,exynos3250", "samsung,exynos3";
+So that also means I don't care about memreserve vs reserved-memory or
+other DT specific details: as long as x0 points to something libfdt
+understands at boot, we expose it and not interpret it any further.
 
-Thanks,
-Kukjin
+-- 
+Ard.
