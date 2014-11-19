@@ -1,52 +1,41 @@
-From: dave.long@linaro.org (David Long)
-Date: Wed, 19 Nov 2014 09:55:22 -0500
-Subject: [PATCH v3 1/5] arm64: Kprobes with single stepping support
-In-Reply-To: <20141119112553.GC15985@arm.com>
-References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
- <1416292375-29560-2-git-send-email-dave.long@linaro.org>
- <20141118145643.GO18842@arm.com>
- <CA+b37P337jcTCPTg4Ydxh6TKwqmyMngt-eEowzfsTNBDZ7-NEg@mail.gmail.com>
- <20141119112553.GC15985@arm.com>
-Message-ID: <546CAF5A.4060901@linaro.org>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed, 19 Nov 2014 15:55:53 +0100
+Subject: [PATCH v5 6/7] clk: Make clk API return per-user struct clk
+ instances
+In-Reply-To: <20141114070646.GA11808@codeaurora.org>
+References: <1414666135-14313-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1414666135-14313-7-git-send-email-tomeu.vizoso@collabora.com>
+ <20141114070646.GA11808@codeaurora.org>
+Message-ID: <CAAObsKAZAe6QqmtB8JKyGxJ=yH9XUuhN+NjTRFTEMM=y00XOvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/14 06:25, Will Deacon wrote:
-> On Wed, Nov 19, 2014 at 11:21:24AM +0000, Sandeepa Prabhu wrote:
->> On 18 November 2014 20:26, Will Deacon <will.deacon@arm.com> wrote:
+On 14 November 2014 08:06, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 10/30, Tomeu Vizoso wrote:
+>> Moves clock state to struct clk_core, but takes care to change as little API as
+>> possible.
 >>
->>> One thing I noticed looking through this patch is that we're effectively
->>> reinventing a bunch of the instruction decoding logic that we already have
->>> in the kernel (introduced since Sandeepa last sent his patch).
->>>
->>> Could you take a look at include/asm/insn.h and kernel/insn.c please, and
->>> see if you can at least consolidate some of this? Some of it should be easy
->>> (i.e. reusing masks, using existing #defines to construct BRK encodings),
->>> but I appreciate there may be places where kprobes needs to add extra bits,
->>> in which case I'd really like to keep this all together if at all possible.
->>>
->>> We're currently in a position where the module loader, BPF jit, ftrace and
->>> the proposed alternative patching scheme are all using the same instruction
->>> manipulation functions, so we should try to continue that trend if we can.
->> Will,
+>> struct clk_hw still has a pointer to a struct clk, which is the
+>> implementation's per-user clk instance, for backwards compatibility.
 >>
->> kernel/insn.c support generating instruction encodings(forming opcodes
->> with given specifications), so for kprobes, only BRK encoding can use
->> this mechanism.
->> For instruction simulation, the instruction behavior should be
->> simulated on saved pt_regs, which is not supported on insn.c routines,
->> so still need probes-simulate-insn.c. Please point me if I am missing
->> something here.
+>> The struct clk that clk_get_parent() returns isn't owned by the caller, but by
+>> the clock implementation, so the former shouldn't call clk_put() on it.
+>>
+>> Because some boards in mach-omap2 still register clocks statically, their clock
+>> registration had to be updated to take into account that the clock information
+>> is stored in struct clk_core now.
+>>
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 >
-> I was thinking of the magic hex numbers in the kprobes decode tables, which
-> seem to correspond directly to the instruction classes described in insn.c
+> It would be good to have Russell at least ack the clkdev bits.
+> There's still more work to do in the future here, but
 >
-> Keeping the actual emulation code separate makes sense.
->
-> Will
+> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Of course that follows the model of the much more complex arm32 
-kprobes/uprobes decoding.  I can have a go at replacing it with insn.c 
-calls.
+Thanks, Stephen.
 
--dl
+Russell, do you think we could have your ack?
+
+Regards,
+
+Tomeu
