@@ -1,40 +1,35 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Wed, 19 Nov 2014 13:09:36 +0000
-Subject: [PATCH v5.5] of/fdt: export fdt blob as /sys/firmware/fdt
-In-Reply-To: <20141118221103.4ECB3C40966@trevor.secretlab.ca>
-References: <1415984735-32388-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141118165145.4F6A8C40966@trevor.secretlab.ca>
- <20141118172545.GC14323@leverpostej>
- <20141118221103.4ECB3C40966@trevor.secretlab.ca>
-Message-ID: <1416402576.29243.35.camel@citrix.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 19 Nov 2014 14:17:10 +0100
+Subject: [PATCH 1/2] ARM: imx: Remove unneeded .map_io initialization
+In-Reply-To: <20141114160205.GH4042@n2100.arm.linux.org.uk>
+References: <1415980438-12939-1-git-send-email-geert+renesas@glider.be>
+ <20141114160205.GH4042@n2100.arm.linux.org.uk>
+Message-ID: <CAMuHMdXM_Td8Pz3zTvMXPTJSAzZ0mjDuq4n2cG7fuUO2Wzj65A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-11-18 at 22:11 +0000, Grant Likely wrote:
-> > > * It also helps with exposing the reserved map to userspace, but kexec
-> > >   has done without that feature for years, and it is in the process of
-> > >   being deprecated in favour of /reserved-memory anyway.
-> > 
-> > This is the first I'd heard of the reserve map being deprecated, and
-> > we're going to have DTs with reserved map entries for a long time going
-> > forwards.
-> 
-> Deprecated, not removed or disabled. It will still work pretty much
-> forever, but users should be encouraged to move to the reserve-memory
-> tree.
+On Fri, Nov 14, 2014 at 5:02 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Nov 14, 2014 at 04:53:57PM +0100, Geert Uytterhoeven wrote:
+>> If machine_desc.map_io is not set, devicemaps_init() in the common ARM
+>> code will call debug_ll_io_init().
+>
+> How about a WARN_ON(mdesc->map_io == debug_ll_io_init) ?  This can only
+> really be done when CONFIG_DEBUG_LL is defined because otherwise it's an
+> inline function, but it may help to stop these from appearing in the
+> first place.
 
-I'm curious why that should be for the "OS should never touch this, here
-be dragons" type memory, what are the benefits of the new scheme in that
-case?
+I'd rather have a BUILD_BUG_ON(). Unfortunately MACHINE_END doesn't
+know about the machine type, else we could probably add a check to that
+macro.
 
-I can see it for e.g. framebuffer or cma which the OS might actually use
-under special circumstances and therefore need more info than just
-"don't use this".
+Gr{oetje,eeting}s,
 
-It looks like as well as observing the requested reservations Xen might
-also need to somehow reflect them to dom0, I need to think on this. If
-there are any useful references over and above
-Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-then I'd be glad to see them.
+                        Geert
 
-Ian.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
