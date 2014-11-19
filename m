@@ -1,69 +1,41 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Wed, 19 Nov 2014 20:01:01 +0200
-Subject: [RFC] adp1653: Add device tree bindings for LED controller
-In-Reply-To: <20141118183545.GA16999@amd>
-References: <20141116075928.GA9763@amd> <20141117101553.GA21151@amd>
- <20141117145545.GC7046@atomide.com> <201411171601.32311@pali>
- <20141117150617.GD7046@atomide.com> <20141118183545.GA16999@amd>
-Message-ID: <546CDADD.3080003@iki.fi>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 19 Nov 2014 13:02:14 -0500
+Subject: [PATCH] PCI: keystone: fix error handling of irq_of_parse_and_map
+In-Reply-To: <20141114221903.GA38539@dtor-ws>
+References: <20141114221903.GA38539@dtor-ws>
+Message-ID: <546CDB26.9030609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On 11/14/2014 05:19 PM, Dmitry Torokhov wrote:
+> Return value of irq_of_parse_and_map() is unsigned int, with 0
+> indicating failure, so testing for negative result never works.
+>
+> Signed-off-by: Dmitry Torokhov<dtor@chromium.org>
+> ---
+>
+> Not tested, found by casual code inspection.
+>
+>   drivers/pci/host/pci-keystone.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+> index 8a27078..f2bd48d 100644
+> --- a/drivers/pci/host/pci-keystone.c
+> +++ b/drivers/pci/host/pci-keystone.c
+> @@ -197,7 +197,7 @@ static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
+>   	 */
+>   	for (temp = 0; temp<  max_host_irqs; temp++) {
+>   		host_irqs[temp] = irq_of_parse_and_map(*np_temp, temp);
+> -		if (host_irqs[temp]<  0)
+> +		if (!host_irqs[temp])
+>   			break;
+>   	}
+>   	if (temp) {
+Good catch!
 
-Pavel Machek wrote:
-> On Mon 2014-11-17 07:06:17, Tony Lindgren wrote:
->> * Pali Roh?r <pali.rohar@gmail.com> [141117 07:03]:
->>> On Monday 17 November 2014 15:55:46 Tony Lindgren wrote:
->>>>
->>>> There's nothing stopping us from initializing the camera code
->>>> from pdata-quirks.c for now to keep it working. Certainly the
->>>> binding should be added to the driver, but that removes a
->>>> dependency to the legacy booting mode if things are otherwise
->>>> working.
->>>
->>> Tony, legacy board code for n900 is not in mainline tree. And 
->>> that omap3 camera subsystem for n900 is broken since 3.5 
->>> kernel... (both Front and Back camera on n900 show only green 
->>> picture).
->>
->> I'm still seeing the legacy board code for n900 in mainline tree :)
->> It's deprecated, but still there.
->>
->> Are you maybe talking about some other piece of platform_data that's
->> no longer in the mainline kernel?
->>
->> No idea what might be wrong with the camera though.
-> 
-> Camera support for main and secondary cameras was never mainline, AFAICT.
-> 
-> Merging it will not be easy, as it lacks DT support... and was broken
-> for long time.
-
-I have a smiapp patchset for DT support that I posted a while ago, here:
-
-<URL:http://www.spinics.net/lists/linux-media/msg83285.html>
-
-What's missing on top of that is the omap3isp support, plus something to
-toggle the sysctl registers based on the chosen receiver. I have a
-preliminary, not RFC yet but functional set here:
-
-<URL:http://vihersipuli.retiisi.org.uk/cgi-bin/gitweb.cgi?p=~sailus/linux.git;a=shortlog;h=refs/heads/rm696-045-dt>
-
-The main camera support requires et8ek8 driver as well, and resolving
-the breakage with the image capture on 3430.
-
-N9/N950 will be first, though. Lens controllers are another matter, but
-nothing too difficult on that side either.
-
-> Anyway, flash is kind of important for me, since it makes phone useful
-> as backup light; and it is simple piece of hw, so I intend to keep it
-> useful.
-
-Me, too. :-)
+Acked-By: Murali Karicheri <m-karicheri2@ti.com>
 
 -- 
-Kind regards,
-
-Sakari Ailus
-sakari.ailus at iki.fi
+Murali Karicheri
+Linux Kernel, Texas Instruments
