@@ -1,227 +1,383 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 19 Nov 2014 10:22:26 +0900
-Subject: [PATCH] mmc: dw_mmc: add quirk for data over interrupt timeout
-In-Reply-To: <546A93B0.1040506@rock-chips.com>
-References: <1415970338-2637-1-git-send-email-addy.ke@rock-chips.com>
- <54660120.50305@samsung.com> <546A93B0.1040506@rock-chips.com>
-Message-ID: <546BF0D2.3000600@samsung.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Wed, 19 Nov 2014 09:21:32 +0800
+Subject: [RFC PATCH 04/16] PCI: Rip out pci_bus_add_devices() from
+ pci_scan_root_bus()
+In-Reply-To: <20141118143402.GJ12037@e106497-lin.cambridge.arm.com>
+References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
+ <1416219710-26088-5-git-send-email-wangyijing@huawei.com>
+ <20141118143402.GJ12037@e106497-lin.cambridge.arm.com>
+Message-ID: <546BF09C.4030209@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Addy.
+On 2014/11/18 22:34, Liviu Dudau wrote:
+> On Mon, Nov 17, 2014 at 10:21:38AM +0000, Yijing Wang wrote:
+>> Rip out pci_bus_add_devices() from pci_scan_root_bus()
+>> for following reasons.
+>> 1. pci_scan_root_bus() means we only do the scan, we should
+>> not add pci busses.
+>> 2. A lots of drviers which use pci_scan_root_bus() call
+>> pci_bus_size_bridges(), pci_bus_assign_resources() after
+>> pci_scan_root_bus(). But strictly speaking pci_bus_add_devices()
+>> should be called after the resources assignment.
+> 
+> This looks like a nice cleanup! Can we split this patch out
+> of the series and start the ball running on getting ACKs
+> for it? You are touching a lot of drivers here, you probably
+> don't want the whole series to wait on approvals for this.
 
-On 11/18/2014 09:32 AM, Addy wrote:
+OK, I will separately this one out of this series.
+
 > 
-> On 2014?11?14? 21:18, Jaehoon Chung wrote:
->> Hi, Addy.
->>
->> Did you use the DW_MCI_QUIRK_IDMAC_DTO?
->> I'm not sure, but i wonder if you get what result when you use above quirk.
-> 
-> DW_MCI_QUIRK_IDMAC_DTO is only for version2.0 or below.
->         /*
->          * DTO fix - version 2.10a and below, and only if internal DMA
->          * is configured.
->          */
->         if (host->quirks & DW_MCI_QUIRK_IDMAC_DTO) {
->                 if (!pending &&
->                     ((mci_readl(host, STATUS) >> 17) & 0x1fff))
->                         pending |= SDMMC_INT_DATA_OVER;
->         }
-> 
-> It meams that if interrupt comes, but pending = 0 && FIFO_COUNT(bit17-29) !=0,
-> then force to set SDMMC_INT_DATA_OVER.
-> But in our case, FIFO_COUNT = 0 (STATUS register value is 0xad06). This is
-> because that the card does not send data to host. So there is no interrupts come,
-> and interrupt handle function(dw_mci_interrupt) will not be called. So we need a
-> timer to handle this case.
-> 
-> So I think  SDMMC_INT_DATA_OVER is not suitable for this case, and we need a new
-> quirk.
+> Best regards,
+> Liviu
 > 
 >>
->> And i will check more this patch at next week.
+>> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+>> ---
+>>  arch/alpha/kernel/pci.c           |    1 +
+>>  arch/alpha/kernel/sys_nautilus.c  |    1 +
+>>  arch/frv/mb93090-mb00/pci-vdk.c   |    8 +++++---
+>>  arch/ia64/sn/kernel/io_init.c     |    2 ++
+>>  arch/m68k/coldfire/pci.c          |    1 +
+>>  arch/microblaze/pci/pci-common.c  |    2 +-
+>>  arch/mips/pci/pci.c               |    1 +
+>>  arch/mn10300/unit-asb2305/pci.c   |    7 +++++--
+>>  arch/s390/pci/pci.c               |    2 +-
+>>  arch/sh/drivers/pci/pci.c         |    1 +
+>>  arch/sparc/kernel/leon_pci.c      |    1 +
+>>  arch/sparc/kernel/pcic.c          |    2 ++
+>>  arch/tile/kernel/pci.c            |    3 ++-
+>>  arch/tile/kernel/pci_gx.c         |    3 ++-
+>>  arch/unicore32/kernel/pci.c       |    2 +-
+>>  arch/x86/pci/common.c             |   10 ++++++----
+>>  arch/xtensa/kernel/pci.c          |    1 +
+>>  drivers/pci/host/pci-xgene.c      |    2 +-
+>>  drivers/pci/hotplug/ibmphp_core.c |    6 ++++--
+>>  drivers/pci/probe.c               |    1 -
+>>  20 files changed, 39 insertions(+), 18 deletions(-)
 >>
->> Thanks for your efforts.
+>> diff --git a/arch/alpha/kernel/pci.c b/arch/alpha/kernel/pci.c
+>> index 076c35c..81251a5 100644
+>> --- a/arch/alpha/kernel/pci.c
+>> +++ b/arch/alpha/kernel/pci.c
+>> @@ -349,6 +349,7 @@ common_init_pci(void)
 >>
->> Best Regards,
->> Jaehoon Chung
->>
->> On 11/14/2014 10:05 PM, Addy Ke wrote:
->>> From: Addy <addy.ke@rock-chips.com>
->>>
->>> This patch add a new quirk to notify the driver to teminate
->>> current transfer and report a data timeout to the core,
->>> if data over interrupt does NOT come within the given time.
->>>
->>> dw_mmc call mmc_request_done func to finish transfer depends on
->>> data over interrupt. If data over interrupt does not come in
->>> sending data state, the current transfer will be blocked.
->>>
->>> But this case really exists, when driver reads tuning data from
->>> card on rk3288-pink2 board. I measured waveforms by oscilloscope
->>> and found that card clock was always on and data lines were always
->>> holded high level in sending data state. This is the cause that
->>> card does NOT send data to host.
->>>
->>> According to synopsys designware databook, the timeout counter is
->>> started only after the card clock is stopped.
->>>
->>> So if card clock is always on, data read timeout interrupt will NOT come,
->>> and if data lines are always holded high level, all data-related
->>> interrupt such as start-bit error, data crc error, data over interrupt,
->>> end-bit error, and so on, will NOT come too.
->>>
->>> So driver can't get the current state, it can do nothing but wait for.
->>>
->>> This patch is based on https://patchwork.kernel.org/patch/5227941/
->>>
->>> Signed-off-by: Addy <addy.ke@rock-chips.com>
->>> ---
->>>   drivers/mmc/host/dw_mmc.c  | 47 +++++++++++++++++++++++++++++++++++++++++++++-
->>>   include/linux/mmc/dw_mmc.h |  5 +++++
->>>   2 files changed, 51 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->>> index b4c3044..3960fc3 100644
->>> --- a/drivers/mmc/host/dw_mmc.c
->>> +++ b/drivers/mmc/host/dw_mmc.c
->>> @@ -1448,6 +1448,17 @@ static int dw_mci_data_complete(struct dw_mci *host, struct mmc_data *data)
->>>       return data->error;
->>>   }
->>>   +static inline void dw_mci_dto_start_monitor(struct dw_mci *host)
->>> +{
->>> +    unsigned int data_tmout_clks;
->>> +    unsigned int data_tmout_ms;
->>> +
->>> +    data_tmout_clks = (mci_readl(host, TMOUT) >> 8);
->>> +    data_tmout_ms = (data_tmout_clks * 1000 / host->bus_hz) + 250;
-
-What's 250? And how about using the DIV_ROUND_UP? 
-
->>> +
->>> +    mod_timer(&host->dto_timer, jiffies + msecs_to_jiffies(data_tmout_ms));
->>> +}
->>> +
->>>   static void dw_mci_tasklet_func(unsigned long priv)
->>>   {
->>>       struct dw_mci *host = (struct dw_mci *)priv;
->>> @@ -1522,8 +1533,11 @@ static void dw_mci_tasklet_func(unsigned long priv)
->>>               }
->>>                 if (!test_and_clear_bit(EVENT_XFER_COMPLETE,
->>> -                        &host->pending_events))
->>> +                        &host->pending_events)) {
->>> +                if (host->quirks & DW_MCI_QUIRK_DTO_TIMER)
->>> +                    dw_mci_dto_start_monitor(host);
-
-if timer is starting at only here, dw_mci_dto_start_monitor() doesn't need.
-
->>>                   break;
->>> +            }
->>>                 set_bit(EVENT_XFER_COMPLETE, &host->completed_events);
->>>   @@ -2115,6 +2129,9 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
->>>           }
->>>             if (pending & SDMMC_INT_DATA_OVER) {
->>> +            if (host->quirks & DW_MCI_QUIRK_DTO_TIMER)
->>> +                del_timer(&host->dto_timer);
->>> +
->>>               mci_writel(host, RINTSTS, SDMMC_INT_DATA_OVER);
->>>               if (!host->data_status)
->>>                   host->data_status = pending;
->>> @@ -2502,6 +2519,28 @@ ciu_out:
->>>       return ret;
->>>   }
->>>   +static void dw_mci_dto_timer(unsigned long arg)
->>> +{
->>> +    struct dw_mci *host = (struct dw_mci *)arg;
-
-I prefer to use the "data" instead of "arg"
-
->>> +
->>> +    switch (host->state) {
->>> +    case STATE_SENDING_DATA:
->>> +    case STATE_DATA_BUSY:
->>> +        /*
->>> +        * If data over interrupt does NOT come in sending data state,
->>> +        * we should notify the driver to teminate current transfer
-teminate/terminate?
-
->>> +        * and report a data timeout to the core.
->>> +        */
->>> +        host->data_status = SDMMC_INT_DRTO;
->>> +        set_bit(EVENT_DATA_ERROR, &host->pending_events);
->>> +        set_bit(EVENT_DATA_COMPLETE, &host->pending_events);
-
-Dose it need to set EVENT_DATA_COMPLETE?
-
->>> +        tasklet_schedule(&host->tasklet);
->>> +        break;
->>> +    default:
->>> +        break;
->>> +    }
->>> +}
->>> +
->>>   #ifdef CONFIG_OF
->>>   static struct dw_mci_of_quirks {
->>>       char *quirk;
->>> @@ -2513,6 +2552,9 @@ static struct dw_mci_of_quirks {
->>>       }, {
->>>           .quirk    = "disable-wp",
->>>           .id    = DW_MCI_QUIRK_NO_WRITE_PROTECT,
->>> +    }, {
->>> +        .quirk    = "dto-timer",
->>> +        .id    = DW_MCI_QUIRK_DTO_TIMER,
->>>       },
-
-Well, this is s/w timer, so i'm not sure this can be merged into dt-file.
-If this is generic solution, we can add s/w timer by default. how about?
-
-Best Regards,
-Jaehoon Chung
-
->>>   };
->>>   @@ -2654,6 +2696,9 @@ int dw_mci_probe(struct dw_mci *host)
->>>         spin_lock_init(&host->lock);
->>>       INIT_LIST_HEAD(&host->queue);
->>> +    if (host->quirks & DW_MCI_QUIRK_DTO_TIMER)
->>> +        setup_timer(&host->dto_timer,
->>> +                dw_mci_dto_timer, (unsigned long)host);
->>>         /*
->>>        * Get the host data width - this assumes that HCON has been set with
->>> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
->>> index 42b724e..2477813 100644
->>> --- a/include/linux/mmc/dw_mmc.h
->>> +++ b/include/linux/mmc/dw_mmc.h
->>> @@ -98,6 +98,7 @@ struct mmc_data;
->>>    * @irq_flags: The flags to be passed to request_irq.
->>>    * @irq: The irq value to be passed to request_irq.
->>>    * @sdio_id0: Number of slot0 in the SDIO interrupt registers.
->>> + * @dto_timer: Timer for data over interrupt timeout.
->>>    *
->>>    * Locking
->>>    * =======
->>> @@ -196,6 +197,8 @@ struct dw_mci {
->>>       int            irq;
->>>         int            sdio_id0;
->>> +
->>> +    struct timer_list    dto_timer;
->>>   };
->>>     /* DMA ops for Internal/External DMAC interface */
->>> @@ -220,6 +223,8 @@ struct dw_mci_dma_ops {
->>>   #define DW_MCI_QUIRK_BROKEN_CARD_DETECTION    BIT(3)
->>>   /* No write protect */
->>>   #define DW_MCI_QUIRK_NO_WRITE_PROTECT        BIT(4)
->>> +/* Timer for data over interrupt timeout */
->>> +#define DW_MCI_QUIRK_DTO_TIMER            BIT(5)
->>>     /* Slot level quirks */
->>>   /* This slot has no write protect */
->>>
+>>         pci_assign_unassigned_resources();
+>>         pci_fixup_irqs(alpha_mv.pci_swizzle, alpha_mv.pci_map_irq);
+>> +       pci_bus_add_devices(bus);
+>>  }
 >>
 >>
+>> diff --git a/arch/alpha/kernel/sys_nautilus.c b/arch/alpha/kernel/sys_nautilus.c
+>> index 1047ab3..60fbd77 100644
+>> --- a/arch/alpha/kernel/sys_nautilus.c
+>> +++ b/arch/alpha/kernel/sys_nautilus.c
+>> @@ -253,6 +253,7 @@ nautilus_init_pci(void)
+>>            for the root bus, so just clear it. */
+>>         bus->self = NULL;
+>>         pci_fixup_irqs(alpha_mv.pci_swizzle, alpha_mv.pci_map_irq);
+>> +       pci_bus_add_devices(bus);
+>>  }
+>>
+>>  /*
+>> diff --git a/arch/frv/mb93090-mb00/pci-vdk.c b/arch/frv/mb93090-mb00/pci-vdk.c
+>> index efa5d65..85f87dc 100644
+>> --- a/arch/frv/mb93090-mb00/pci-vdk.c
+>> +++ b/arch/frv/mb93090-mb00/pci-vdk.c
+>> @@ -316,6 +316,7 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+>>
+>>  int __init pcibios_init(void)
+>>  {
+>> +       struct pci_bus *bus = NULL;
+>>         struct pci_ops *dir = NULL;
+>>         LIST_HEAD(resources);
+>>
+>> @@ -383,12 +384,13 @@ int __init pcibios_init(void)
+>>         printk("PCI: Probing PCI hardware\n");
+>>         pci_add_resource(&resources, &pci_ioport_resource);
+>>         pci_add_resource(&resources, &pci_iomem_resource);
+>> -       pci_scan_root_bus(NULL, 0, pci_root_ops, NULL, &resources);
+>> -
+>> +       bus = pci_scan_root_bus(NULL, 0, pci_root_ops, NULL, &resources);
+>> +       if (!bus)
+>> +               return -ENXIO;
+>>         pcibios_irq_init();
+>>         pcibios_fixup_irqs();
+>>         pcibios_resource_survey();
+>> -
+>> +       pci_bus_add_devices(bus);
+>>         return 0;
+>>  }
+>>
+>> diff --git a/arch/ia64/sn/kernel/io_init.c b/arch/ia64/sn/kernel/io_init.c
+>> index 0b5ce82..1be65eb 100644
+>> --- a/arch/ia64/sn/kernel/io_init.c
+>> +++ b/arch/ia64/sn/kernel/io_init.c
+>> @@ -271,7 +271,9 @@ sn_pci_controller_fixup(int segment, int busnum, struct pci_bus *bus)
+>>         if (bus == NULL) {
+>>                 kfree(res);
+>>                 kfree(controller);
+>> +               return;
+>>         }
+>> +       pci_bus_add_devices(bus);
+>>  }
+>>
+>>  /*
+>> diff --git a/arch/m68k/coldfire/pci.c b/arch/m68k/coldfire/pci.c
+>> index 4d242fb..840a431 100644
+>> --- a/arch/m68k/coldfire/pci.c
+>> +++ b/arch/m68k/coldfire/pci.c
+>> @@ -319,6 +319,7 @@ static int __init mcf_pci_init(void)
+>>         pci_fixup_irqs(pci_common_swizzle, mcf_pci_map_irq);
+>>         pci_bus_size_bridges(rootbus);
+>>         pci_bus_assign_resources(rootbus);
+>> +       pci_bus_add_devices(rootbus);
+>>         return 0;
+>>  }
+>>
+>> diff --git a/arch/microblaze/pci/pci-common.c b/arch/microblaze/pci/pci-common.c
+>> index 9037914..9ca7e3f 100644
+>> --- a/arch/microblaze/pci/pci-common.c
+>> +++ b/arch/microblaze/pci/pci-common.c
+>> @@ -1344,8 +1344,8 @@ static void pcibios_scan_phb(struct pci_controller *hose)
+>>         }
+>>         bus->busn_res.start = hose->first_busno;
+>>         hose->bus = bus;
+>> -
+>>         hose->last_busno = bus->busn_res.end;
+>> +       pci_bus_add_devices(bus);
+>>  }
+>>
+>>  static int __init pcibios_init(void)
+>> diff --git a/arch/mips/pci/pci.c b/arch/mips/pci/pci.c
+>> index 1bf60b1..f083688 100644
+>> --- a/arch/mips/pci/pci.c
+>> +++ b/arch/mips/pci/pci.c
+>> @@ -113,6 +113,7 @@ static void pcibios_scanbus(struct pci_controller *hose)
+>>                 if (!pci_has_flag(PCI_PROBE_ONLY)) {
+>>                         pci_bus_size_bridges(bus);
+>>                         pci_bus_assign_resources(bus);
+>> +                       pci_bus_add_devices(bus);
+>>                 }
+>>         }
+>>  }
+>> diff --git a/arch/mn10300/unit-asb2305/pci.c b/arch/mn10300/unit-asb2305/pci.c
+>> index 6b4339f..011af54 100644
+>> --- a/arch/mn10300/unit-asb2305/pci.c
+>> +++ b/arch/mn10300/unit-asb2305/pci.c
+>> @@ -345,6 +345,7 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+>>   */
+>>  static int __init pcibios_init(void)
+>>  {
+>> +       struct pci_bus *bus;
+>>         resource_size_t io_offset, mem_offset;
+>>         LIST_HEAD(resources);
+>>
+>> @@ -376,11 +377,13 @@ static int __init pcibios_init(void)
+>>
+>>         pci_add_resource_offset(&resources, &pci_ioport_resource, io_offset);
+>>         pci_add_resource_offset(&resources, &pci_iomem_resource, mem_offset);
+>> -       pci_scan_root_bus(NULL, 0, &pci_direct_ampci, NULL, &resources);
+>> -
+>> +       bus = pci_scan_root_bus(NULL, 0, &pci_direct_ampci, NULL, &resources);
+>> +       if (!bus)
+>> +               return 0;
+>>         pcibios_irq_init();
+>>         pcibios_fixup_irqs();
+>>         pcibios_resource_survey();
+>> +       pci_bus_add_devices(bus);
+>>         return 0;
+>>  }
+>>
+>> diff --git a/arch/s390/pci/pci.c b/arch/s390/pci/pci.c
+>> index 2fa7b14..016ea48 100644
+>> --- a/arch/s390/pci/pci.c
+>> +++ b/arch/s390/pci/pci.c
+>> @@ -755,7 +755,7 @@ static int zpci_scan_bus(struct zpci_dev *zdev)
+>>                 zpci_cleanup_bus_resources(zdev);
+>>                 return -EIO;
+>>         }
+>> -
+>> +       pci_bus_add_devices(zdev->bus);
+>>         zdev->bus->max_bus_speed = zdev->max_bus_speed;
+>>         return 0;
+>>  }
+>> diff --git a/arch/sh/drivers/pci/pci.c b/arch/sh/drivers/pci/pci.c
+>> index 1bc09ee..efc1051 100644
+>> --- a/arch/sh/drivers/pci/pci.c
+>> +++ b/arch/sh/drivers/pci/pci.c
+>> @@ -69,6 +69,7 @@ static void pcibios_scanbus(struct pci_channel *hose)
+>>
+>>                 pci_bus_size_bridges(bus);
+>>                 pci_bus_assign_resources(bus);
+>> +               pci_bus_add_devices(bus);
+>>         } else {
+>>                 pci_free_resource_list(&resources);
+>>         }
+>> diff --git a/arch/sparc/kernel/leon_pci.c b/arch/sparc/kernel/leon_pci.c
+>> index 899b720..2971076 100644
+>> --- a/arch/sparc/kernel/leon_pci.c
+>> +++ b/arch/sparc/kernel/leon_pci.c
+>> @@ -40,6 +40,7 @@ void leon_pci_init(struct platform_device *ofdev, struct leon_pci_info *info)
+>>
+>>                 /* Assign devices with resources */
+>>                 pci_assign_unassigned_resources();
+>> +               pci_bus_add_devices(root_bus);
+>>         } else {
+>>                 pci_free_resource_list(&resources);
+>>         }
+>> diff --git a/arch/sparc/kernel/pcic.c b/arch/sparc/kernel/pcic.c
+>> index 64aafac..5457814 100644
+>> --- a/arch/sparc/kernel/pcic.c
+>> +++ b/arch/sparc/kernel/pcic.c
+>> @@ -392,6 +392,8 @@ static void __init pcic_pbm_scan_bus(struct linux_pcic *pcic)
+>>
+>>         pbm->pci_bus = pci_scan_root_bus(NULL, pbm->pci_first_busno,
+>>                         &pcic_ops, pbm, NULL);
+>> +       if (pbm->pci_bus)
+>> +               pci_bus_add_devices(pbm->pci_bus);
+>>  #if 0 /* deadwood transplanted from sparc64 */
+>>         pci_fill_in_pbm_cookies(pbm->pci_bus, pbm, pbm->prom_node);
+>>         pci_record_assignments(pbm, pbm->pci_bus);
+>> diff --git a/arch/tile/kernel/pci.c b/arch/tile/kernel/pci.c
+>> index 1f80a88..268423e 100644
+>> --- a/arch/tile/kernel/pci.c
+>> +++ b/arch/tile/kernel/pci.c
+>> @@ -326,7 +326,8 @@ int __init pcibios_init(void)
+>>
+>>         /* Configure the max_read_size and max_payload_size values. */
+>>         fixup_read_and_payload_sizes();
+>> -
+>> +       if (bus)
+>> +               pci_bus_add_devices(bus);
+>>         /* Record the I/O resources in the PCI controller structure. */
+>>         for (i = 0; i < TILE_NUM_PCIE; i++) {
+>>                 /*
+>> diff --git a/arch/tile/kernel/pci_gx.c b/arch/tile/kernel/pci_gx.c
+>> index e39f9c5..5f05a9a 100644
+>> --- a/arch/tile/kernel/pci_gx.c
+>> +++ b/arch/tile/kernel/pci_gx.c
+>> @@ -903,7 +903,8 @@ int __init pcibios_init(void)
+>>          * associated with the devices read in above.
+>>          */
+>>         pci_assign_unassigned_resources();
+>> -
+>> +       if (bus)
+>> +               pci_bus_add_devices(bus);
+>>         /* Record the I/O resources in the PCI controller structure. */
+>>         for (i = 0; i < num_rc_controllers; i++) {
+>>                 struct pci_controller *controller = &pci_controllers[i];
+>> diff --git a/arch/unicore32/kernel/pci.c b/arch/unicore32/kernel/pci.c
+>> index be0f261..0d4c563 100644
+>> --- a/arch/unicore32/kernel/pci.c
+>> +++ b/arch/unicore32/kernel/pci.c
+>> @@ -270,11 +270,11 @@ static int __init pci_common_init(void)
+>>                  * Size the bridge windows.
+>>                  */
+>>                 pci_bus_size_bridges(puv3_bus);
+>> -
+>>                 /*
+>>                  * Assign resources.
+>>                  */
+>>                 pci_bus_assign_resources(puv3_bus);
+>> +               pci_bus_add_devices(puv3_bus);
+>>         }
+>>
+>>         return 0;
+>> diff --git a/arch/x86/pci/common.c b/arch/x86/pci/common.c
+>> index 7b20bcc..b16632b 100644
+>> --- a/arch/x86/pci/common.c
+>> +++ b/arch/x86/pci/common.c
+>> @@ -471,10 +471,12 @@ void pcibios_scan_root(int busnum)
+>>         x86_pci_root_bus_resources(busnum, &resources);
+>>         printk(KERN_DEBUG "PCI: Probing PCI hardware (bus %02x)\n", busnum);
+>>         bus = pci_scan_root_bus(NULL, busnum, &pci_root_ops, sd, &resources);
+>> -       if (!bus) {
+>> -               pci_free_resource_list(&resources);
+>> -               kfree(sd);
+>> -       }
+>> +       if (bus) {
+>> +               pci_bus_add_devices(bus);
+>> +               return;
+>> +       }
+>> +       pci_free_resource_list(&resources);
+>> +       kfree(sd);
+>>  }
+>>
+>>  void __init pcibios_set_cache_line_size(void)
+>> diff --git a/arch/xtensa/kernel/pci.c b/arch/xtensa/kernel/pci.c
+>> index 5b34033..c4b5b5d 100644
+>> --- a/arch/xtensa/kernel/pci.c
+>> +++ b/arch/xtensa/kernel/pci.c
+>> @@ -185,6 +185,7 @@ static int __init pcibios_init(void)
+>>                 pci_controller_apertures(pci_ctrl, &resources);
+>>                 bus = pci_scan_root_bus(NULL, pci_ctrl->first_busno,
+>>                                         pci_ctrl->ops, pci_ctrl, &resources);
+>> +               pci_bus_add_devices(bus);
+>>                 pci_ctrl->bus = bus;
+>>                 pci_ctrl->last_busno = bus->busn_res.end;
+>>                 if (next_busno <= pci_ctrl->last_busno)
+>> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+>> index 9ecabfa..e7a4f66 100644
+>> --- a/drivers/pci/host/pci-xgene.c
+>> +++ b/drivers/pci/host/pci-xgene.c
+>> @@ -634,7 +634,7 @@ static int xgene_pcie_probe_bridge(struct platform_device *pdev)
+>>         bus = pci_scan_root_bus(&pdev->dev, 0, &xgene_pcie_ops, port, &res);
+>>         if (!bus)
+>>                 return -ENOMEM;
+>> -
+>> +       pci_bus_add_devices(bus);
+>>         platform_set_drvdata(pdev, port);
+>>         return 0;
+>>  }
+>> diff --git a/drivers/pci/hotplug/ibmphp_core.c b/drivers/pci/hotplug/ibmphp_core.c
+>> index b486432..76ce157 100644
+>> --- a/drivers/pci/hotplug/ibmphp_core.c
+>> +++ b/drivers/pci/hotplug/ibmphp_core.c
+>> @@ -740,7 +740,7 @@ static void ibm_unconfigure_device(struct pci_func *func)
+>>   */
+>>  static u8 bus_structure_fixup(u8 busno)
+>>  {
+>> -       struct pci_bus *bus;
+>> +       struct pci_bus *bus, *b;
+>>         struct pci_dev *dev;
+>>         u16 l;
+>>
+>> @@ -767,7 +767,9 @@ static u8 bus_structure_fixup(u8 busno)
+>>                                         (l != 0x0000) && (l != 0xffff)) {
+>>                         debug("%s - Inside bus_structure_fixup()\n",
+>>                                                         __func__);
+>> -                       pci_scan_root_bus(NULL, busno, ibmphp_pci_bus->ops, NULL, NULL);
+>> +                       b = pci_scan_root_bus(NULL, busno, ibmphp_pci_bus->ops, NULL, NULL);
+>> +                       if (b)
+>> +                               pci_bus_add_devices(b);
+>>                         break;
+>>                 }
+>>         }
+>> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+>> index 0a02fc2..97711f3 100644
+>> --- a/drivers/pci/probe.c
+>> +++ b/drivers/pci/probe.c
+>> @@ -2101,7 +2101,6 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
+>>         if (!found)
+>>                 pci_bus_update_busn_res_end(b, max);
+>>
+>> -       pci_bus_add_devices(b);
+>>         return b;
+>>  }
+>>  EXPORT_SYMBOL(pci_scan_root_bus);
+>> --
+>> 1.7.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >>
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+-- 
+Thanks!
+Yijing
