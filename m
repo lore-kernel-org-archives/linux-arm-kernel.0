@@ -1,61 +1,55 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 19 Nov 2014 16:49:53 +0900
-Subject: [PATCH] ARM: multi_v7_defconfig: fix failure setting CPU voltage
- by enabling dependent I2C controller
-In-Reply-To: <1416337853-1558-1-git-send-email-tyler.baker@linaro.org>
-References: <1416337853-1558-1-git-send-email-tyler.baker@linaro.org>
-Message-ID: <546C4BA1.6090701@samsung.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Wed, 19 Nov 2014 13:21:52 +0530
+Subject: [PATCH RESEND] serial: samsung: Fix serial config dependencies
+ for exynos7
+In-Reply-To: <546C4696.70101@samsung.com>
+References: <1416199491-4841-1-git-send-email-a.kesavan@samsung.com>
+ <20141117185925.GB14558@kroah.com> <546C4696.70101@samsung.com>
+Message-ID: <CAM4voan2t8inEtwJs9amQUBnT7eS5FUW=Z+a-5abQuFLjGi0sA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/14 04:10, Tyler Baker wrote:
+Hi Kukjin,
 
-Hi,
+On Wed, Nov 19, 2014 at 12:58 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On 11/18/14 03:59, Greg KH wrote:
+>> On Mon, Nov 17, 2014 at 10:14:51AM +0530, Abhilash Kesavan wrote:
+>>> From: Pankaj Dubey <pankaj.dubey@samsung.com>
+>>>
+>>> Exynos7 has a similar serial controller to that present in older Samsung
+>>> SoCs. To re-use the existing serial driver on Exynos7 we need to have
+>>> SERIAL_SAMSUNG_UARTS_4 and SERIAL_SAMSUNG_UARTS selected. This is not
+>>> possible because these symbols are dependent on PLAT_SAMSUNG which is
+>>> not present for the ARMv8 based exynos7.
+>>>
+>>> Change the dependency of these symbols from PLAT_SAMSUNG to the serial
+>>> driver thus making it available on exynos7. As the existing platform
+>>> specific code making use of these symbols is related to uart driver this
+>>> change in dependency should not cause any issues.
+>>>
+>>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>>> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+>>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>> ---
+>> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>
+> Greg, thanks for your ack on this.
+>
+> Abhilash,
+>
+> I can't find the original patch in my mailbox, can you please re-send to
+> me with adding Greg's ack?
 
-+ Arnd, Olof and Kevin
-
-> This patch fixes a long standing issue introduced during the 3.16 merge window.
-> Shortly after the merge, exynos5250-based arndale boards began to produce the 
-> following errors:
-> 
-> kern.err kernel:  exynos-cpufreq exynos-cpufreq: failed to set cpu voltage
-> kern.err kernel:  cpufreq: __target_index: Failed to change cpu frequency: -22
-> 
-> Further analysis revealed that the S5M8767 voltage regulator used on the 
-> exynos5250-based arndale board utilizes the S3C2410 I2C controller. If the 
-> S3C2410 I2C controller driver is not enabled, the S5M8767 voltage regulator 
-> fails to probe. Therefore a dependency exists between these two drivers. 
-> In the exynos_defconfig both CONFIG_REGULATOR_S5M8767 and CONFIG_I2C_S3C2410 
-> options are enabled, and no errors are produced. However, in the 
-> multi_v7_defconfig only the CONFIG_REGULATOR_S5M8767 option is enabled and the 
-> errors are present. So let's enable the CONFIG_I2C_S3C2410 option in the 
-> multi_v7_defconfig to allow the S5M8767 voltage regulator to probe.
-> 
-> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
-
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+Will send it you with Greg's Ack.
 
 Thanks,
-Kukjin
-
-> ---
-> This issue was reported [1]. I've also confirmed this fix on two different 
-> arndale boards.
-> 
-> [1] https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg38765.html
-> 
->  arch/arm/configs/multi_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 3487046..9d7a32f 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -217,6 +217,7 @@ CONFIG_I2C_CADENCE=y
->  CONFIG_I2C_DESIGNWARE_PLATFORM=y
->  CONFIG_I2C_EXYNOS5=y
->  CONFIG_I2C_MV64XXX=y
-> +CONFIG_I2C_S3C2410=y
->  CONFIG_I2C_SIRF=y
->  CONFIG_I2C_TEGRA=y
->  CONFIG_I2C_ST=y
+Abhilash
+>
+> Thanks,
+> Kukjin
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
