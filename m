@@ -1,58 +1,49 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Wed, 19 Nov 2014 11:03:43 -0800
-Subject: [PATCH] mmc: dw_mmc: Turn the card clock off at suspend time
-In-Reply-To: <1416423073-8105-1-git-send-email-dianders@chromium.org>
-References: <1416423073-8105-1-git-send-email-dianders@chromium.org>
-Message-ID: <CAL1qeaGkQVimrFNtGgfTJEHNemG_QUTecQwH4=nXu1_u1rWwhg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 19 Nov 2014 19:06:01 +0000
+Subject: [PATCH v8 2/6] arm64: ptrace: allow tracer to skip a system call
+In-Reply-To: <546C58DB.5080204@linaro.org>
+References: <1416273038-15590-1-git-send-email-takahiro.akashi@linaro.org>
+ <1416273038-15590-3-git-send-email-takahiro.akashi@linaro.org>
+ <20141118140425.GM18842@arm.com> <546C58DB.5080204@linaro.org>
+Message-ID: <20141119190601.GM15985@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug,
+On Wed, Nov 19, 2014 at 08:46:19AM +0000, AKASHI Takahiro wrote:
+> On 11/18/2014 11:04 PM, Will Deacon wrote:
+> > On Tue, Nov 18, 2014 at 01:10:34AM +0000, AKASHI Takahiro wrote:
+> >>
+> >> +	if (((int)regs->syscallno == -1) && (orig_syscallno == -1)) {
+> >> +		/*
+> >> +		 * user-issued syscall(-1):
+> >> +		 * RESTRICTION: We always return ENOSYS whatever value is
+> >> +		 *   stored in x0 (a return value) at this point.
+> >> +		 * Normally, with ptrace off, syscall(-1) returns -ENOSYS.
+> >> +		 * With ptrace on, however, if a tracer didn't pay any
+> >> +		 * attention to user-issued syscall(-1) and just let it go
+> >> +		 * without a hack here, it would return a value in x0 as in
+> >> +		 * other system call cases. This means that this system call
+> >> +		 * might succeed and see any bogus return value.
+> >> +		 * This should be definitely avoided.
+> >> +		 */
+> >> +		regs->regs[0] = -ENOSYS;
+> >> +	}
+> >
+> > I'm still really uncomfortable with this, and it doesn't seem to match what
+> > arch/arm/ does either.
+> 
+> Yeah, I know but
+> as I mentioned before, syscall(-1) will be signaled on arm, and so we don't
+> have to care about a return value :)
 
-On Wed, Nov 19, 2014 at 10:51 AM, Doug Anderson <dianders@chromium.org> wrote:
-> Since the dw_mmc driver was first added to Linux it's had a TODO in it
-> that we should turn off the card clock during suspend.  I have no idea
-> for sure why it wasn't done originally, but if I had to guess I'd
-> guess it was related to the lack of a common clock framework.  Let's
-> do it now.
->
-> There is no reason for the card clock to be left on during suspend and
-> most systems will eventually turn it off anyway (when whole clock
-> trees are disabled).  However, it's good to be explicit that it's
-> disabled at the time that the MMC subsystem is disabled.
+What does x86 do?
 
-Should the bus clock (biu) be disabled as well?
+> > Doesn't it also prevent a tracer from skipping syscall(-1)?
+> 
+> Syscall(-1) will return -ENOSYS whether or not a syscallno is explicitly
+> replaced with -1 by a tracer, and, in this sense, it is *skipped*.
 
-> This actually fixes a bug on Rockchip rk3288 where an SDIO card wakes
-> the system back up during suspend.
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
->  drivers/mmc/host/dw_mmc.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 5a37c33..c448159 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -2825,11 +2825,10 @@ EXPORT_SYMBOL(dw_mci_remove);
->
->
->  #ifdef CONFIG_PM_SLEEP
-> -/*
-> - * TODO: we should probably disable the clock to the card in the suspend path.
-> - */
->  int dw_mci_suspend(struct dw_mci *host)
->  {
-> +       clk_disable(host->ciu_clk);
+Ok, but now userspace sees -ENOSYS for a skipped system call in that case,
+whereas it would usually see whatever the trace put in x0, right?
 
-I think you need to check for IS_ERR(host->ciu_clk) since the clock is
-optional.  Also, maybe disable_unprepare instead of just disable?
-
-> @@ -2838,6 +2837,8 @@ int dw_mci_resume(struct dw_mci *host)
->  {
->         int i, ret;
->
-> +       clk_enable(host->ciu_clk);
-
-Check return value?
+Will
