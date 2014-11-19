@@ -1,27 +1,27 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 19 Nov 2014 09:26:48 +0800
-Subject: [RESEND PATCH V2 0/2] Add I2C and enable M41T0M6 RTC
-In-Reply-To: <cover.1415852424.git.bhuvanchandra.dv@toradex.com>
-References: <cover.1415852424.git.bhuvanchandra.dv@toradex.com>
-Message-ID: <20141119012647.GB24042@dragon>
+Date: Wed, 19 Nov 2014 09:32:39 +0800
+Subject: [PATCH 0/5] ARM:dts:imx6:phyflex: dt update
+In-Reply-To: <1415971946-48975-1-git-send-email-c.hemp@phytec.de>
+References: <1415971946-48975-1-git-send-email-c.hemp@phytec.de>
+Message-ID: <20141119013237.GC24042@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 13, 2014 at 10:05:30AM +0530, Bhuvanchandra DV wrote:
-> Add I2C support on Colibri VFxx moduels and enable M41T0M6 RTC
-> available on Colibri carrier boards.
+On Fri, Nov 14, 2014 at 02:32:21PM +0100, Christian Hemp wrote:
+> This series updates the PHYTEC phyFLEX-i.MX6 board.
+>  - set nodes in correct order
+>  - enables gpmi in pfla02
+>  - sets the correct PMIC interrupt
+>  - add support for PCIe and CAN
 > 
-> Bhuvanchandra DV (2):
->   ARM: dts: vf-colibri: Add I2C support
->   ARM: dts: vf-colibri-eval-v3.dts: Enable ST-M41T0M6 RTC
+> Based on branch for-next from Shawn Guo:
+> git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
+> 
+> Christian Hemp (5):
+>   ARM:dts:imx6:phyFLEX: set nodes in alphabetical order
+>   ARM:dts:imx6:phyFLEX: Enable gpmi in module file
+>   ARM:dts:imx6:phyFLEX: Set correct interrupt for pmic
+>   ARM:dts:imx6:phyFLEX: Add PCIe
+>   ARM:dts:imx6:phyFLEX: Add CAN support
 
-Applied both, thanks.
-
-> 
->  arch/arm/boot/dts/vf-colibri-eval-v3.dtsi |   12 +++++++++++-
->  arch/arm/boot/dts/vf-colibri.dtsi         |   13 +++++++++++++
->  2 files changed, 24 insertions(+), 1 deletion(-)
-> 
-> -- 
-> 1.7.9.5
-> 
+Applied all, thanks.
