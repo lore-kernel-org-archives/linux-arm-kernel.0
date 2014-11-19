@@ -1,39 +1,53 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 19 Nov 2014 10:51:49 +0100
-Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
- support
-In-Reply-To: <CAEC9eQPz_7QeL7EDorb-OxiTjcb1tVUDbEbzbER4Yu2wSNNaxQ@mail.gmail.com>
-References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>	<CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>	<546C646C.4060303@collabora.co.uk>
- <CAEC9eQPz_7QeL7EDorb-OxiTjcb1tVUDbEbzbER4Yu2wSNNaxQ@mail.gmail.com>
-Message-ID: <546C6835.7040802@collabora.co.uk>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 19 Nov 2014 10:55:50 +0100
+Subject: [PATCH] i2c: at91: introduce probe deferring
+In-Reply-To: <20141119091647.GB1439@katana>
+References: <1415972879-26509-1-git-send-email-ludovic.desroches@atmel.com>
+ <20141119091647.GB1439@katana>
+Message-ID: <20141119095550.GD3639@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Ajay,
-
-On 11/19/2014 10:38 AM, Ajay kumar wrote:
-> Hi Javier,
+On Wed, Nov 19, 2014 at 10:16:47AM +0100, Wolfram Sang wrote:
+> On Fri, Nov 14, 2014 at 02:47:59PM +0100, Ludovic Desroches wrote:
+> > Return probe defer if requesting a dma channel without a dma controller probed.
+> > 
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > ---
+> >  drivers/i2c/busses/i2c-at91.c | 22 ++++++++++++++++------
+> >  1 file changed, 16 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+> > index 77fb647..df3f4c4 100644
+> > --- a/drivers/i2c/busses/i2c-at91.c
+> > +++ b/drivers/i2c/busses/i2c-at91.c
+> > @@ -679,14 +679,21 @@ static int at91_twi_configure_dma(struct at91_twi_dev *dev, u32 phy_addr)
+> >  	dma_cap_zero(mask);
+> >  	dma_cap_set(DMA_SLAVE, mask);
+> >  
+> > -	dma->chan_tx = dma_request_slave_channel_compat(mask, filter, pdata,
+> > -							dev->dev, "tx");
+> > -	if (!dma->chan_tx) {
+> > +	dma->chan_tx = dma_request_slave_channel_reason(dev->dev, "tx");
 > 
-> In the cover letter, I have mentioned that it is tested on Linus tree:
+> Will it cause regressions if you drop the compat-version of requesting
+> a channel?
+
+All our devices with a DMA controller have been converted to device tree
+and the legacy board support will be removed in 3.19 so it won't cause
+regression.
+
 > 
-> "This series is based on master branch of Linus tree at:
-> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git"
+> > +	if (IS_ERR(dma->chan_tx)) {
+> > +		ret = PTR_ERR(dma->chan_tx);
+> > +		if (ret == -EPROBE_DEFER) {
+> > +			dev_warn(dev->dev, "no DMA channel available at the moment\n");
 > 
-> Kindly test the patches with that.
-> 
+> I'd say drop this warning. The core usually prints when deferred probing
+> takes place.
+>
+ 
+Ok, I'll remove it.
 
-That's what I did... Linus' master branch is a moving target and if you
-look at his current HEAD, it is commit fc14f9c1 ("Linux 3.18-rc5") but
-as I said before, at least two patches that are needed didn't land in
-Linus' tree yet. These are:
 
-0ef76ae ("ARM: exynos_defconfig: Enable options for display panel support")
-e35e305 ("drm/panel: simple: Add AUO B116XW03 panel support")
-
-IOW, linux.git master branch + this series is not enough to have display
-working AFAICT so I was wondering if I'm missing something else.
-
-Do you have a public tree somewhere with the branch you are using to test?
-
-Best regards,
-Javier
+Ludovic
