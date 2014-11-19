@@ -1,49 +1,55 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 19 Nov 2014 11:13:07 +0000
-Subject: [PATCH] arm/arm64: KVM: Handle traps of ICC_SRE_EL1 as RAZ/WI
-In-Reply-To: <1416394949-23496-1-git-send-email-ard.biesheuvel@linaro.org>
- (Ard Biesheuvel's message of "Wed, 19 Nov 2014 11:02:29 +0000")
-References: <1416394949-23496-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <87sihfbfzw.fsf@approximate.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Nov 2014 12:15:45 +0100
+Subject: arm64 pci_iomap,
+ was: Re: next build: 258 warnings 9 failures (next/next-20141119)
+In-Reply-To: <546c75d7.6336460a.14b5.474d@mx.google.com>
+References: <546c75d7.6336460a.14b5.474d@mx.google.com>
+Message-ID: <16479190.7SIDaKWfdW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19 2014 at 11:02:29 am GMT, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> From: Christoffer Dall <christoffer.dall@linaro.org>
->
-> When running on a system with a GICv3, we currenly don't allow the guest
-> to access the system register interface of the GICv3.  We do this by
-> clearing the ICC_SRE_EL2.Enable, which causes all guest accesses to
-> ICC_SRE_EL1 to trap to EL2 and causes all guest accesses to other ICC_
-> registers to cause an undefined exception in the guest.
->
-> However, we currently don't handle the trap of guest accesses to
-> ICC_SRE_EL1 and will spill out a warning.  The trap just needs to handle
-> the access as RAZ/WI, and a guest that tries to prod this register and
-> set ICC_SRE_EL1.SRE=1, must read back the value (which Linux already
-> does) to see if it succeeded, and will thus observe that ICC_SRE_EL1.SRE
-> was not set.
->
-> Add the simple trap handler in the sorted table of the system registers.
->
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> [ardb: added 32-bit counterpart]
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> --
-> v2: added 32-bit counterpart, renaming pm_fake to trap_raz_wi in the process,
->     hence the additional changes on that side
-> ---
->  arch/arm/kvm/coproc.c     | 49 +++++++++++++++++++++++++----------------------
->  arch/arm64/kvm/sys_regs.c |  5 +++++
->  2 files changed, 31 insertions(+), 23 deletions(-)
->
+On Wednesday 19 November 2014 02:49:59 Olof's autobuilder wrote:
+> 
+>         arm64.allmodconfig:
+> drivers/net/ethernet/dec/tulip/winbond-840.c:910:2: warning: #warning Processor architecture undefined [-Wcpp]
+>  #warning Processor architecture undefined
+> drivers/net/ethernet/dec/tulip/tulip_core.c:101:2: warning: #warning Processor architecture undefined! [-Wcpp]
+>  #warning Processor architecture undefined!
+> :(.text+0x42344): undefined reference to `pci_iomap'
+> :(.text+0x42ca0): undefined reference to `pci_iomap'
+> :(.text+0x11c10): undefined reference to `pci_iomap'
+> 
+>         arm64.defconfig:
+> drivers/pci/quirks.c:2965: undefined reference to `pci_iomap'
+> drivers/pci/quirks.c:3328: undefined reference to `pci_iomap'
+> drivers/tty/serial/8250/8250_pci.c:1044: undefined reference to `pci_iomap'
+> drivers/tty/serial/8250/8250_pci.c:1012: undefined reference to `pci_iomap'
+> lib/devres.c:273: undefined reference to `pci_iomap'
+> 
 
-Err... Not really. What I meant was to update the cp15_regs array in
-arch/arm64/kvm/sys_regs.c. The 32bit port of KVM is unlikely to ever
-grow support for GICv3, as these registers are *not* defined for ARMv7.
+Hi Thierry,
 
-Thanks,
+This is another regression from your asm-generic change in arm64. We
+are now lacking a working pci_iomap function after you removed the
+'select GENERIC_IOMAP' statement.
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+For all I can tell, this is the correct solution (note GENERIC_PCI_IOMAP
+instead of GENERIC_IOMAP):
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 37cd23625708..bc8879c283b9 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -25,6 +25,7 @@ config ARM64
+        select GENERIC_EARLY_IOREMAP
+        select GENERIC_IRQ_PROBE
+        select GENERIC_IRQ_SHOW
++       select GENERIC_PCI_IOMAP
+        select GENERIC_SCHED_CLOCK
+        select GENERIC_SMP_IDLE_THREAD
+        select GENERIC_STRNCPY_FROM_USER
+
+
+Any comments?
+
+	Arnd
