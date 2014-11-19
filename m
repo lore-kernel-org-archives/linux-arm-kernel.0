@@ -1,32 +1,37 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Wed, 19 Nov 2014 09:35:49 +0100
-Subject: [PATCHv4 04/10] arm: mvebu: move Armada 370/XP pinctrl node
- definition armada-370-xp.dtsi
-In-Reply-To: <20141119080323.GS27002@pengutronix.de> ("Uwe
- \=\?utf-8\?Q\?Klein\?\= \=\?utf-8\?Q\?e-K\=C3\=B6nig\=22's\?\=
- message of "Wed, 19 Nov 2014 09:03:23 +0100")
-References: <cover.1416351425.git.arno@natisbad.org>
- <f4b15c942f543b0c0becd7c82bce07e9e0b603cf.1416351426.git.arno@natisbad.org>
- <20141119080323.GS27002@pengutronix.de>
-Message-ID: <87lhn7vb8a.fsf@natisbad.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 19 Nov 2014 09:34:06 +0100
+Subject: [PATCH v2] ARM: dts: sunxi: Update simplfb nodes so that u-boot
+ can find them
+In-Reply-To: <1416308833-26739-1-git-send-email-hdegoede@redhat.com>
+References: <1416308833-26739-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20141119083406.GM6414@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Tue, Nov 18, 2014 at 12:07:13PM +0100, Hans de Goede wrote:
+> Review of the u-boot sunxi simplefb patches has led to the decision that
+> u-boot should not use a specific path to find the nodes as this goes contrary
+> to how devicetree usually works.
+> 
+> Instead a platform specific compatible + properties should be used for this.
+> 
+> The simplefb bindings have already been updated to reflect this, this patch
+> brings the sunxi devicetree files in line with the new binding, and the
+> actual u-boot implementation as it is going upstream.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> writes:
+Applied, thanks!
+Maxime
 
-> On Wed, Nov 19, 2014 at 12:02:11AM +0100, Arnaud Ebalard wrote:
->> +
->> +	sdio_pins: sdio-pins {
->> +		marvell,pins = "mpp30", "mpp31", "mpp32",
->> +			       "mpp33", "mpp34", "mpp35";
->> +		marvell,function = "sd0";
->> +	};
->> +};
->> \ No newline at end of file
-> IMHO you should add this \n at the end.
-
-Ack. I'll fix that in v5.
-
-a+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141119/4cbe023f/attachment.sig>
