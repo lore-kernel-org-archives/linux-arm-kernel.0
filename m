@@ -1,44 +1,81 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Tue, 18 Nov 2014 23:15:19 -0800
-Subject: [PATCH] clk: rockchip: rk3288 export i2s0_clkout for use in DT
-Message-ID: <1416381319-31117-1-git-send-email-sonnyrao@chromium.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 19 Nov 2014 16:23:40 +0900
+Subject: [GIT PULL] Samsung clock changes for 3.19
+In-Reply-To: <5453C8A7.6080502@samsung.com>
+References: <5453C8A7.6080502@samsung.com>
+Message-ID: <546C457C.6030901@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This exposes the clock that comes out of the i2s block which generally
-goes to the audio codec.
+On 11/01/14 02:36, Sylwester Nawrocki wrote:
+> Hi Mike,
+> 
+Hi Mike,
 
-Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
----
- drivers/clk/rockchip/clk-rk3288.c      | 3 ++-
- include/dt-bindings/clock/rk3288-cru.h | 1 +
- 2 files changed, 3 insertions(+), 1 deletion(-)
+> I've collected Exynos clk patches in this pull request, as Tomasz has
+> been busy recently. 
+> This includes addition of clock controller drivers for Exynos4415 and 
+> Exynos7 SoCs and related refactoring of the Samsung common clk API. 
+> 
+> As I mentioned in my other e-mail, it might be sensible to put these 
+> patches into a separate topic branch, so Kukjin can pull it as 
+> a dependency for the related dts changes.
+> 
+As Sylwester suggested, can you please provide a topic branch for
+samsung tree so that I can apply regarding DT changes such as exynos
+4415 and exynos7...
 
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index 2327829..8777737 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -305,7 +305,8 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
- 			RK3288_CLKGATE_CON(4), 2, GFLAGS),
- 	MUX(0, "i2s_pre", mux_i2s_pre_p, CLK_SET_RATE_PARENT,
- 			RK3288_CLKSEL_CON(4), 8, 2, MFLAGS),
--	COMPOSITE_NODIV(0, "i2s0_clkout", mux_i2s_clkout_p, CLK_SET_RATE_PARENT,
-+	COMPOSITE_NODIV(SCLK_I2S0_OUT, "i2s0_clkout", mux_i2s_clkout_p,
-+			CLK_SET_RATE_PARENT,
- 			RK3288_CLKSEL_CON(4), 12, 1, MFLAGS,
- 			RK3288_CLKGATE_CON(4), 0, GFLAGS),
- 	GATE(SCLK_I2S0, "sclk_i2s0", "i2s_pre", CLK_SET_RATE_PARENT,
-diff --git a/include/dt-bindings/clock/rk3288-cru.h b/include/dt-bindings/clock/rk3288-cru.h
-index 100a08c..4acc730 100644
---- a/include/dt-bindings/clock/rk3288-cru.h
-+++ b/include/dt-bindings/clock/rk3288-cru.h
-@@ -71,6 +71,7 @@
- #define SCLK_HDMI_CEC		110
- #define SCLK_HEVC_CABAC		111
- #define SCLK_HEVC_CORE		112
-+#define SCLK_I2S0_OUT           113
- 
- #define DCLK_VOP0		190
- #define DCLK_VOP1		191
--- 
-2.1.0.rc2.206.gedb03e5
+- Kukjin
+
+> There are also few Samsung clk cleanup patches not included here,
+> I thought I'd send them separately.
+> 
+> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+> 
+>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://linuxtv.org/snawrocki/samsung.git for-v3.19/exynos-clk
+> 
+> for you to fetch changes up to 932e98224d5602be17ed61d0e057e9326f12b59d:
+> 
+>   clk: samsung: exynos7: add gate clock for ADC block (2014-10-31 10:45:54 +0100)
+> 
+> ----------------------------------------------------------------
+> Abhilash Kesavan (1):
+>       clk: samsung: exynos7: add gate clock for ADC block
+> 
+> Chanwoo Choi (2):
+>       clk: samsung: Document binding for Exynos4415 clock controller
+>       clk: samsung: exynos4415: Add clocks using common clock framework
+> 
+> Naveen Krishna Ch (8):
+>       clk: samsung: add support for 145xx and 1460x PLLs
+>       clk: samsung: Factor out the common code to clk.c
+>       clk: samsung: Add fixed_factor_clocks field to struct exynos_cmu_info
+>       clk: samsung: add initial clock support for Exynos7 SoC
+>       clk: samsung: exynos7: add clocks for I2C block
+>       clk: samsung: exynos7: add clocks for MMC block
+>       clk: samsung: exynos7: add clocks for RTC block
+>       clk: samsung: exynos7: add gate clocks for WDT, TMU and PWM blocks
+> 
+>  .../devicetree/bindings/clock/exynos4415-clock.txt |   38 +
+>  .../devicetree/bindings/clock/exynos7-clock.txt    |   93 ++
+>  drivers/clk/samsung/Makefile                       |    2 +
+>  drivers/clk/samsung/clk-exynos4415.c               | 1142 ++++++++++++++++++++
+>  drivers/clk/samsung/clk-exynos5260.c               |  185 +---
+>  drivers/clk/samsung/clk-exynos7.c                  |  743 +++++++++++++
+>  drivers/clk/samsung/clk-pll.c                      |   25 +-
+>  drivers/clk/samsung/clk-pll.h                      |    4 +
+>  drivers/clk/samsung/clk.c                          |   98 ++
+>  drivers/clk/samsung/clk.h                          |   37 +
+>  include/dt-bindings/clock/exynos4415.h             |  360 ++++++
+>  include/dt-bindings/clock/exynos7-clk.h            |   92 ++
+>  12 files changed, 2655 insertions(+), 164 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/exynos4415-clock.txt
+>  create mode 100644 Documentation/devicetree/bindings/clock/exynos7-clock.txt
+>  create mode 100644 drivers/clk/samsung/clk-exynos4415.c
+>  create mode 100644 drivers/clk/samsung/clk-exynos7.c
+>  create mode 100644 include/dt-bindings/clock/exynos4415.h
+>  create mode 100644 include/dt-bindings/clock/exynos7-clk.h
