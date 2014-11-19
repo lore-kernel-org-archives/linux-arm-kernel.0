@@ -1,34 +1,35 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 19 Nov 2014 12:15:31 +0100
-Subject: [PATCH v3 02/19] iommu: fix initialization without 'add_device'
- callback
+Date: Wed, 19 Nov 2014 12:15:30 +0100
+Subject: [PATCH v3 01/19] iommu: fix const qualifier in of_iommu_set_ops
 In-Reply-To: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
 References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1416395748-10731-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1416395748-10731-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IOMMU drivers can be initialized from of_iommu helpers. Such drivers don't
-need to provide device_add callbacks to operate properly, so there is no
-need to fail initialization if the callback is missing.
+Make of_iommu_set_ops() parameter attribute consistent with
+bus_set_iommu().
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/iommu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ include/linux/of_iommu.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index ed8b04867b1f..02f798b7e295 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -737,7 +737,7 @@ static int add_iommu_group(struct device *dev, void *data)
- 	const struct iommu_ops *ops = cb->ops;
+diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+index 7ded21c0ccdf..d03abbb11c34 100644
+--- a/include/linux/of_iommu.h
++++ b/include/linux/of_iommu.h
+@@ -32,9 +32,9 @@ static inline struct iommu_ops *of_iommu_configure(struct device *dev)
+ #endif	/* CONFIG_OF_IOMMU */
  
- 	if (!ops->add_device)
--		return -ENODEV;
-+		return 0;
+ static inline void of_iommu_set_ops(struct device_node *np,
+-				    struct iommu_ops *ops)
++				    const struct iommu_ops *ops)
+ {
+-	np->data = ops;
++	np->data = (struct iommu_ops *)ops;
+ }
  
- 	WARN_ON(dev->iommu_group);
- 
+ static inline struct iommu_ops *of_iommu_get_ops(struct device_node *np)
 -- 
 1.9.2
