@@ -1,42 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Nov 2014 22:50:25 +0100
-Subject: [GIT PULL] Third Round of Renesas ARM Based SoC DT Cleanups for
- v3.19
-In-Reply-To: <cover.1416271777.git.horms+renesas@verge.net.au>
-References: <cover.1416271777.git.horms+renesas@verge.net.au>
-Message-ID: <201411192250.25624.arnd@arndb.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 19 Nov 2014 14:04:49 -0800
+Subject: [PATCH v3] clk_mux: Fix set_parent doing the wrong thing when
+ INDEX_BIT && index >= 3
+In-Reply-To: <1416404939-609-1-git-send-email-hdegoede@redhat.com>
+References: <1416404939-609-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20141119220449.25314.56163@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 November 2014, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+Quoting Hans de Goede (2014-11-19 05:48:59)
+> If CLK_MUX_INDEX_BIT is set, then each bit turns on / off a single parent,
+> so theoretically multiple parents could be enabled at the same time, but in
+> practice only one bit should ever be 1. So to select parent 0, set
+> the register (*) to 0x01, to select parent 1 set it 0x02, parent 2, 0x04,
+> parent 3, 0x08, etc.
 > 
-> Please consider these third round of Renesas ARM based SoC DT cleanups for
-> v3.19.
+> But the current code does:
 > 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-dt-cleanups2-for-v3.19,
-> which I have already sent a pull-request for.
+>                 if (mux->flags & CLK_MUX_INDEX_BIT)
+>                         index = (1 << ffs(index));
 > 
+> Which means that:
 > 
-> The following changes since commit 89aeff9989e87bb2d9d652994010bc18c68675d9:
+> For an input index of 0, ffs returns 0, so we set the register
+> to 0x01, ok.
 > 
->   ARM: shmobile: alt dts: Drop console= bootargs parameter (2014-11-05 14:54:10 +0900)
+> For an input index of 1, ffs returns 1, so we set the register
+> to 0x02, ok.
 > 
-> are available in the git repository at:
+> For an input index of 2, ffs returns 2, so we set the register
+> to 0x04, ok.
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-cleanups3-for-v3.19
+> For an input index of 3, ffs returns 1, so we set the register
+> to 0x02, not good!
 > 
-> for you to fetch changes up to 61f1fb47bdbcf145dd539d29cfa7f3294bd5e958:
+> The code should simply be:
 > 
->   ARM: shmobile: kzm9g-reference: Use keyboard as gpio-keys node name (2014-11-14 09:39:47 +0900)
+>                 if (mux->flags & CLK_MUX_INDEX_BIT)
+>                         index = 1 << index;
 > 
-> ----------------------------------------------------------------
-> Third Round of Renesas ARM Based SoC DT Cleanups for v3.19
+> Which always does the right thing, this commit fixes this.
 > 
-> * Use keyboard as gpio-keys node name
-> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Pulled into next/dt, thanks!
+Applied to clk-next towards 3.19. I don't think any merged platforms are
+hitting this bug in the field so I've not put it into -fixes.
 
-	Arnd
+Thanks,
+Mike
+
+> ---
+>  drivers/clk/clk-mux.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+> index 4f96ff3..6e1ecf9 100644
+> --- a/drivers/clk/clk-mux.c
+> +++ b/drivers/clk/clk-mux.c
+> @@ -77,7 +77,7 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
+>  
+>         else {
+>                 if (mux->flags & CLK_MUX_INDEX_BIT)
+> -                       index = (1 << ffs(index));
+> +                       index = 1 << index;
+>  
+>                 if (mux->flags & CLK_MUX_INDEX_ONE)
+>                         index++;
+> -- 
+> 2.1.0
+> 
