@@ -1,47 +1,32 @@
-From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
-Date: Wed, 19 Nov 2014 17:44:14 +0100
-Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
- support
-In-Reply-To: <546CC546.5090900@collabora.co.uk>
-References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
- <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
- <546C646C.4060303@collabora.co.uk> <20141119105527.GA5396@luxor.wired.org>
- <546C7D15.10605@collabora.co.uk> <20141119162224.GB5396@luxor.wired.org>
- <546CC546.5090900@collabora.co.uk>
-Message-ID: <546CC8DE.3050208@suse.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Nov 2014 16:47:13 +0000
+Subject: [PATCH] ARM: dts: dove: add DT LCD controllers
+In-Reply-To: <20141119174050.122a0cc0@armhf>
+References: <E1Xr3Ur-0005Qx-Fx@rmk-PC.arm.linux.org.uk>
+ <20141119174050.122a0cc0@armhf>
+Message-ID: <20141119164713.GJ4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 19.11.2014 um 17:28 schrieb Javier Martinez Canillas:
-> On 11/19/2014 05:22 PM, Paolo Pisati wrote:
->> On Wed, Nov 19, 2014 at 12:20:53PM +0100, Javier Martinez Canillas wrote:
->>>
->>> If someone else is interested, I've pushed a branch [0] with 3.18-rc5 + all
->>> the needed patches.
->>>
->>> Ajay, feel free to add to your series:
->>>
->>> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>>
->>> Best regards,
->>> Javier
->>>
->>> [0]: git://git.collabora.co.uk/git/user/javier/linux.git wip/exynos/dp-integ
->>
->> doesn't peach pi require the same dts modification as peach pit/snow?
->>
+On Wed, Nov 19, 2014 at 05:40:50PM +0100, Jean-Francois Moine wrote:
+> On Wed, 19 Nov 2014 11:32:29 +0000
+> Russell King <rmk+kernel@arm.linux.org.uk> wrote:
 > 
-> No, because the Peach Pit and Snow have an eDP to LVDS bridge chip but the
-> Peach Pi does not have a bridge. Ajay's series is to add DRM bridge support
-> to Exynos Display Port driver and so is only relevant to Snow and Pit.
+> > +			lcd1: lcd-controller at 810000 {
+> > +				compatible = "marvell,dove-lcd";
+> > +				reg = <0x810000 0x1000>;
+> > +				interrupts = <46>;
+> > +				status = "disabled";
+> > +			};
+> 
+> The I/O range of the LCDs is only 0x1c8. Why do you set it 0x1000?
 
-... and to Spring.
-
-So, what's the timing here - is this series headed for 3.20 now or 3.19?
-
-Regards,
-Andreas
+Actually, a more correct value would be 0x10000, if you read table 145.
+Yes, the device may onlny have documented registers from 0x84 to 0x1c8,
+but that isn't to say that we should say that the device resources
+start at 0x810084 and have a size of 0x144, when the bus level decodes
+a 64K chunk of memory.
 
 -- 
-SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 21284 AG N?rnberg
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
