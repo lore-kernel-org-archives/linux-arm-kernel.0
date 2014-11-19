@@ -1,104 +1,88 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Wed, 19 Nov 2014 09:07:04 +0800
-Subject: [PATCH v2 02/13] irqchip: GICv3: Convert to domain hierarchy
-In-Reply-To: <1416336788-22634-3-git-send-email-marc.zyngier@arm.com>
-References: <1416336788-22634-1-git-send-email-marc.zyngier@arm.com>
- <1416336788-22634-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <546BED38.9030707@linux.intel.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Wed, 19 Nov 2014 09:15:44 +0800
+Subject: [RFC PATCH 01/16] PCI: Enhance pci_scan_root_bus() to support
+ default IO/MEM resources
+In-Reply-To: <20141118142354.GH12037@e106497-lin.cambridge.arm.com>
+References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
+ <2732970.7HG94QvVBv@wuerfel> <546AF8D7.9010103@huawei.com>
+ <2447172.ADYWdCTnMP@wuerfel> <546B317E.4090800@huawei.com>
+ <20141118142354.GH12037@e106497-lin.cambridge.arm.com>
+Message-ID: <546BEF40.70109@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2014/11/18 22:23, Liviu Dudau wrote:
+> On Tue, Nov 18, 2014 at 11:46:06AM +0000, Yijing Wang wrote:
+>> On 2014/11/18 17:36, Arnd Bergmann wrote:
+>>> On Tuesday 18 November 2014 15:44:23 Yijing Wang wrote:
+>>>> On 2014/11/17 18:08, Arnd Bergmann wrote:
+>>>>> On Monday 17 November 2014 18:21:35 Yijing Wang wrote:
+>>>>>> -       list_for_each_entry(window, resources, list)
+>>>>>> -               if (window->res->flags & IORESOURCE_BUS) {
+>>>>>> -                       found = true;
+>>>>>> -                       break;
+>>>>>> -               }
+>>>>>> +       if (!resources) {
+>>>>>> +               pci_add_resource(&default_res, &ioport_resource);
+>>>>>> +               pci_add_resource(&default_res, &iomem_resource);
+>>>>>> +               pci_add_resource(&default_res, &busn_resource);
+>>>>>> +       } else {
+>>>>>>
+>>>>>
+>>>>> Isn't it almost always wrong to do this? You are adding all of the
+>>>>> I/O ports and memory to the host bridge, which will prevent you from
+>>>>> adding another host bridge, and the iomem_resource normally
+>>>>> includes a lot of addresses that are not accessible by the PCI host.
+>>>>
+>>>> Hi Arnd, pci host bridge windows are the ranges allow child devices to setup
+>>>> from. Add all of IO/MEM here just a limit to child devices, no request for these
+>>>> resources, so it won't hurt another host bridge. Some platforms have no dts or ACPI
+>>>> report host bridge resources, in this case, we directly assign ioport/iomem_resources
+>>>> as the root resources of PCI devices.
+>>>
+>>> But it would be wrong to allow hosts to allocate a device BAR that is not
+>>> visible through the host bridge. I think we need to keep these separate
+>>> from the general case: if you call any of the modern interfaces you have
+>>> to provide the resources and a device. I notice that there is only one
+>>> caller of pci_scan_bus_parented(), we should probably change that over to
+>>> pci_scan_root_bus() or your new interface and remove the old one, but
+>>> keep pci_scan_bus() as the only entry point for all of the legacy users
+>>> that do not know about the resources.
+>>
+>> Ok, I will move this out of the generic interface.
+> 
+> My suggestion would actually be to trigger a warning/error if you detect that the resources
+> are missing. That way we can force the drivers to clean up.
+
+It make sense to me, thanks.
+
+> 
+> Best regards,
+> Liviu
+> 
+>>
+>> Thanks!
+>> Yijing.
+>>
+>>>
+>>> 	Arnd
+>>>
+>>> .
+>>>
+>>
+>>
+>> -- 
+>> Thanks!
+>> Yijing
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+> 
 
 
-On 2014/11/19 2:52, Marc Zyngier wrote:
-> In order to start supporting stacked domains, convert the GICv3
-> code base to the new domain hierarchy framework, which mostly
-> amounts to supporting the new alloc/free callbacks.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/irqchip/Kconfig      |  1 +
->  drivers/irqchip/irq-gic-v3.c | 42 +++++++++++++++++++++++++++++++++++++-----
->  2 files changed, 38 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> index b21f12f..4631685 100644
-> --- a/drivers/irqchip/Kconfig
-> +++ b/drivers/irqchip/Kconfig
-> @@ -14,6 +14,7 @@ config ARM_GIC_V3
->  	bool
->  	select IRQ_DOMAIN
->  	select MULTI_IRQ_HANDLER
-> +	select IRQ_DOMAIN_HIERARCHY
->  
->  config ARM_NVIC
->  	bool
-> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> index aa17ae8..aef4b9e 100644
-> --- a/drivers/irqchip/irq-gic-v3.c
-> +++ b/drivers/irqchip/irq-gic-v3.c
-> @@ -594,14 +594,14 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
->  	/* PPIs */
->  	if (hw < 32) {
->  		irq_set_percpu_devid(irq);
-> -		irq_set_chip_and_handler(irq, &gic_chip,
-> -					 handle_percpu_devid_irq);
-> +		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
-> +				    handle_percpu_devid_irq, NULL, NULL);
->  		set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
->  	}
->  	/* SPIs */
->  	if (hw >= 32 && hw < gic_data.irq_nr) {
-> -		irq_set_chip_and_handler(irq, &gic_chip,
-> -					 handle_fasteoi_irq);
-> +		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
-> +				    handle_fasteoi_irq, NULL, NULL);
->  		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
->  	}
->  	irq_set_chip_data(irq, d->host_data);
-> @@ -633,9 +633,41 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
->  	return 0;
->  }
->  
-> +static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-> +				unsigned int nr_irqs, void *arg)
-> +{
-> +	int i, ret;
-> +	irq_hw_number_t hwirq;
-> +	unsigned int type = IRQ_TYPE_NONE;
-> +	struct of_phandle_args *irq_data = arg;
-> +
-> +	ret = gic_irq_domain_xlate(domain, irq_data->np, irq_data->args,
-> +				   irq_data->args_count, &hwirq, &type);
-> +	if (ret)
-> +		return ret;
-> +
-> +	for (i = 0; i < nr_irqs; i++)
-> +		gic_irq_domain_map(domain, virq + i, hwirq + i);
-> +
-> +	return 0;
-> +}
-> +
-> +static void gic_irq_domain_free(struct irq_domain *domain, unsigned int virq,
-> +				unsigned int nr_irqs)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < nr_irqs; i++) {
-> +		irq_set_handler(virq + i, NULL);
-> +		irq_domain_set_hwirq_and_chip(domain, virq + i, 0, NULL, NULL);
-Please try irq_domain_reset_irq_data() :)
-
-> +	}
-> +}
-> +
-> +
->  static const struct irq_domain_ops gic_irq_domain_ops = {
-> -	.map = gic_irq_domain_map,
->  	.xlate = gic_irq_domain_xlate,
-> +	.alloc = gic_irq_domain_alloc,
-> +	.free = gic_irq_domain_free,
->  };
->  
->  static int __init gic_of_init(struct device_node *node, struct device_node *parent)
-> 
+-- 
+Thanks!
+Yijing
