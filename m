@@ -1,53 +1,52 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 19 Nov 2014 15:54:38 +0100
-Subject: [PATCH RFC] ARM: option for loading modules into vmalloc area
-In-Reply-To: <2041617.Kxhx5O4MMr@wuerfel>
-References: <20141118172146.3784.81151.stgit@buzz>
- <20141118173413.GB4042@n2100.arm.linux.org.uk>
- <546B8C64.3010904@samsung.com> <2041617.Kxhx5O4MMr@wuerfel>
-Message-ID: <CAKv+Gu-8qhHYOry+LsDzp+LDZqYxVZ5G7cj48E3G2Unp2+=_yg@mail.gmail.com>
+From: dave.long@linaro.org (David Long)
+Date: Wed, 19 Nov 2014 09:55:22 -0500
+Subject: [PATCH v3 1/5] arm64: Kprobes with single stepping support
+In-Reply-To: <20141119112553.GC15985@arm.com>
+References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
+ <1416292375-29560-2-git-send-email-dave.long@linaro.org>
+ <20141118145643.GO18842@arm.com>
+ <CA+b37P337jcTCPTg4Ydxh6TKwqmyMngt-eEowzfsTNBDZ7-NEg@mail.gmail.com>
+ <20141119112553.GC15985@arm.com>
+Message-ID: <546CAF5A.4060901@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 November 2014 14:40, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 18 November 2014 21:13:56 Konstantin Khlebnikov wrote:
->> On 2014-11-18 20:34, Russell King - ARM Linux wrote:
->> > On Tue, Nov 18, 2014 at 08:21:46PM +0400, Konstantin Khlebnikov wrote:
->> >> Usually modules are loaded into small area prior to the kernel
->> >> text because they are linked with the kernel using short calls.
->> >> Compile-time instrumentation like GCOV or KASAN bloats code a lot,
->> >> and as a result huge modules no longer fit into reserved area.
->> >>
->> >> This patch adds option CONFIG_MODULES_USE_VMALLOC which lifts
->> >> limitation on amount of loaded modules. It links modules using
->> >> long-calls (option -mlong-calls) and loads them into vmalloc area.
->> >>
->> >> In few places exported symbols are called from inline assembly.
->> >> This patch adds macro for such call sites: __asmbl and __asmbl_clobber.
->> >> Call turns into single 'bl' or sequence 'movw; movt; blx' depending on
->> >> context and state of config option.
->> >>
->> >> Unfortunately this option isn't compatible with CONFIG_FUNCTION_TRACER.
->> >> Compiler emits short calls to profiling function despite of -mlong-calls.
->> >> This is a bug in GCC, but ftrace anyway needs an update to handle this.
->> > It also isn't compatible with the older architectures which don't have
->> > "blx".
+On 11/19/14 06:25, Will Deacon wrote:
+> On Wed, Nov 19, 2014 at 11:21:24AM +0000, Sandeepa Prabhu wrote:
+>> On 18 November 2014 20:26, Will Deacon <will.deacon@arm.com> wrote:
 >>
->> Ok, I'll add "depends on CPU_V6 || CPU_V7" I don't think that it is
->> necessary for older cpus.
+>>> One thing I noticed looking through this patch is that we're effectively
+>>> reinventing a bunch of the instruction decoding logic that we already have
+>>> in the kernel (introduced since Sandeepa last sent his patch).
+>>>
+>>> Could you take a look at include/asm/insn.h and kernel/insn.c please, and
+>>> see if you can at least consolidate some of this? Some of it should be easy
+>>> (i.e. reusing masks, using existing #defines to construct BRK encodings),
+>>> but I appreciate there may be places where kprobes needs to add extra bits,
+>>> in which case I'd really like to keep this all together if at all possible.
+>>>
+>>> We're currently in a position where the module loader, BPF jit, ftrace and
+>>> the proposed alternative patching scheme are all using the same instruction
+>>> manipulation functions, so we should try to continue that trend if we can.
+>> Will,
+>>
+>> kernel/insn.c support generating instruction encodings(forming opcodes
+>> with given specifications), so for kprobes, only BRK encoding can use
+>> this mechanism.
+>> For instruction simulation, the instruction behavior should be
+>> simulated on saved pt_regs, which is not supported on insn.c routines,
+>> so still need probes-simulate-insn.c. Please point me if I am missing
+>> something here.
 >
-> Why not just use a different branch instruction for the older CPUs?
+> I was thinking of the magic hex numbers in the kprobes decode tables, which
+> seem to correspond directly to the instruction classes described in insn.c
 >
+> Keeping the actual emulation code separate makes sense.
+>
+> Will
 
-ARMv6 doesn't support movw/movt so this will only work on v7.
+Of course that follows the model of the much more complex arm32 
+kprobes/uprobes decoding.  I can have a go at replacing it with insn.c 
+calls.
 
-What about doing 'mov lr, pc; ldr pc,=symbol' instead? You clearly
-don't care about performance in this case, so the performance hit (due
-to the dcache access and interfering with the return stack predictors)
-should be tolerable. The only thing to be careful about is thumb2
-kernels: you would need to set the thumb bit in lr manually but only
-if the call is made /from/ thumb. You would probably be better off
-just depending on !THUMB2_KERNEL.
-
--- 
-Ard.
+-dl
