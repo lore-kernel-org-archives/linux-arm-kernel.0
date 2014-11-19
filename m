@@ -1,83 +1,46 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 19 Nov 2014 11:37:21 -0800
-Subject: [PATCH v2] mmc: dw_mmc: Turn the card clock off at suspend time
-Message-ID: <1416425841-12681-1-git-send-email-dianders@chromium.org>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Wed, 19 Nov 2014 11:49:32 -0800
+Subject: [PATCH] mmc: dw_mmc: Turn the card clock off at suspend time
+In-Reply-To: <CAD=FV=UjvQ5Sgfv_-WzvZpOvofA=7Vpzh36LavCwqGV1-0_aHQ@mail.gmail.com>
+References: <1416423073-8105-1-git-send-email-dianders@chromium.org>
+ <CAL1qeaGkQVimrFNtGgfTJEHNemG_QUTecQwH4=nXu1_u1rWwhg@mail.gmail.com>
+ <CAD=FV=UjvQ5Sgfv_-WzvZpOvofA=7Vpzh36LavCwqGV1-0_aHQ@mail.gmail.com>
+Message-ID: <CAL1qeaFcdaxLYQu5y4pz-d29SdRA79TpkrRA9VjUYaMfnoSeVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the dw_mmc driver was first added to Linux it's had a TODO in it
-that we should turn off the card clock during suspend.  I have no idea
-for sure why it wasn't done originally, but if I had to guess I'd
-guess it was related to the lack of a common clock framework.  Let's
-do it now.
+Doug,
 
-There is no reason for the card clock to be left on during suspend and
-most systems will eventually turn it off anyway (when whole clock
-trees are disabled).  However, it's good to be explicit that it's
-disabled at the time that the MMC subsystem is disabled.
+On Wed, Nov 19, 2014 at 11:30 AM, Doug Anderson <dianders@chromium.org> wrote:
+> Andrew,
+>
+> On Wed, Nov 19, 2014 at 11:03 AM, Andrew Bresticker
+> <abrestic@chromium.org> wrote:
+>> Doug,
+>>
+>> On Wed, Nov 19, 2014 at 10:51 AM, Doug Anderson <dianders@chromium.org> wrote:
+>>> Since the dw_mmc driver was first added to Linux it's had a TODO in it
+>>> that we should turn off the card clock during suspend.  I have no idea
+>>> for sure why it wasn't done originally, but if I had to guess I'd
+>>> guess it was related to the lack of a common clock framework.  Let's
+>>> do it now.
+>>>
+>>> There is no reason for the card clock to be left on during suspend and
+>>> most systems will eventually turn it off anyway (when whole clock
+>>> trees are disabled).  However, it's good to be explicit that it's
+>>> disabled at the time that the MMC subsystem is disabled.
+>>
+>> Should the bus clock (biu) be disabled as well?
+>
+> Good question.  I'm slightly hesitant to turn biu_clk off in this
+> patch, though.  Specifically interrupts are still enabled at this
+> point in suspend.  I  guess most interrupts shouldn't be going off
+> right now (nobody is accessing storage, right?), but I could imagine
+> that a card detect or an SDIO interrupt at just the wrong time could
+> cause our ISR to go off _after_ this function is called.  The
+> interrupt handling function doesn't know to turn the BIU clock back on
+> so you'd get a hang.
 
-This actually fixes a bug on Rockchip rk3288 where an SDIO card wakes
-the system back up during suspend.
-
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
-Changes in v2:
-- Handle fact that ciu_clk is optional (abrestic)
-- Check for errors enabling ciu_clk (abrestic)
-
- drivers/mmc/host/dw_mmc.c | 21 +++++++++++++++++----
- 1 file changed, 17 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 5a37c33..49f4013 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -2825,11 +2825,11 @@ EXPORT_SYMBOL(dw_mci_remove);
- 
- 
- #ifdef CONFIG_PM_SLEEP
--/*
-- * TODO: we should probably disable the clock to the card in the suspend path.
-- */
- int dw_mci_suspend(struct dw_mci *host)
- {
-+	if (!IS_ERR(host->ciu_clk))
-+		clk_disable(host->ciu_clk);
-+
- 	return 0;
- }
- EXPORT_SYMBOL(dw_mci_suspend);
-@@ -2838,9 +2838,15 @@ int dw_mci_resume(struct dw_mci *host)
- {
- 	int i, ret;
- 
-+	if (!IS_ERR(host->ciu_clk)) {
-+		ret = clk_enable(host->ciu_clk);
-+		if (ret)
-+			return ret;
-+	}
-+
- 	if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS)) {
- 		ret = -ENODEV;
--		return ret;
-+		goto exit_ciu_enabled;
- 	}
- 
- 	if (host->use_dma && host->dma_ops->init)
-@@ -2871,7 +2877,14 @@ int dw_mci_resume(struct dw_mci *host)
- 			dw_mci_setup_bus(slot, true);
- 		}
- 	}
-+
- 	return 0;
-+
-+exit_ciu_enabled:
-+	if (!IS_ERR(host->ciu_clk))
-+		clk_disable(host->ciu_clk);
-+
-+	return ret;
- }
- EXPORT_SYMBOL(dw_mci_resume);
- #endif /* CONFIG_PM_SLEEP */
--- 
-2.1.0.rc2.206.gedb03e5
+Perhaps interrupts should be disabled as well across suspend/resume,
+like the sdhci-based hosts do?  Would would happen if we tried to
+service an interrupt with the ciu clock disabled?
