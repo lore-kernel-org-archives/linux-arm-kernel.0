@@ -1,45 +1,24 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 19 Nov 2014 12:12:18 -0500 (EST)
-Subject: [PATCH RFC] ARM: option for loading modules into vmalloc area
-In-Reply-To: <20141119165948.GM4042@n2100.arm.linux.org.uk>
-References: <20141118173413.GB4042@n2100.arm.linux.org.uk>
- <546B8C64.3010904@samsung.com> <2041617.Kxhx5O4MMr@wuerfel>
- <CAKv+Gu-8qhHYOry+LsDzp+LDZqYxVZ5G7cj48E3G2Unp2+=_yg@mail.gmail.com>
- <CALYGNiMt2A3DP02cOtxqu4RrnmhojrDxkRG7bkHMByUnzG+PeA@mail.gmail.com>
- <CAKv+Gu-rYWutr-45MsZH6KOhhUyNCVLfkO9JQrqCm1L6ms_DUg@mail.gmail.com>
- <20141119160747.GH4042@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1411191130480.11690@knanqh.ubzr>
- <20141119164902.GK4042@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1411191152340.11690@knanqh.ubzr>
- <20141119165948.GM4042@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.11.1411191205530.11690@knanqh.ubzr>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 19 Nov 2014 18:13:45 +0100
+Subject: [PATCH 4/4] ARM: dts: Add trackpad to exynos5250-spring
+In-Reply-To: <1416412585-10809-5-git-send-email-afaerber@suse.de>
+References: <1416412585-10809-1-git-send-email-afaerber@suse.de>
+ <1416412585-10809-5-git-send-email-afaerber@suse.de>
+Message-ID: <546CCFC9.2070709@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Nov 2014, Russell King - ARM Linux wrote:
+Hello Andreas,
 
-> On Wed, Nov 19, 2014 at 11:57:15AM -0500, Nicolas Pitre wrote:
-> > On Wed, 19 Nov 2014, Russell King - ARM Linux wrote:
-> > > I don't think I ever did, because its pretty much impossible to do as I
-> > > explained in a follow up to this thread.
-> > > 
-> > > We _used_ to do this with the userspace insmod methods, but since we got
-> > > this kernel-side linker, it's been pretty much impossible to do without
-> > > rewriting the module code.  That's not going to happen on account of one
-> > > quirky architecture which Linus doesn't particularly like.
-> > 
-> > Still... We could try adding a hook in the generic module linker code 
-> > for a pre-relocation pass.  Maybe only ARM would use it, but if the need 
-> > to load big modules is real then I imagine Linus could be amenable to a 
-> > compromise.
+On 11/19/2014 04:56 PM, Andreas F?rber wrote:
+> The HP Chromebook 11 uses an Atmel maXTouch as trackpad.
+> The keymap was found by trial-and-error.
 > 
-> So, how big a table would you allocate for the trampolines, based upon
-> not knowing anything about the module being loaded?  4K?  8K?  64K?
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 
-The idea of a pre-relocation pass is to determine that.  That could be 
-something similar to calling apply_relocate() twice: once to determine 
-the number of trampoline entries, and a second time to perform the 
-actual relocation.
+Patch looks good to me.
 
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-Nicolas
+Best regards,
+Javier
