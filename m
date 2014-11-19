@@ -1,22 +1,22 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 19 Nov 2014 10:10:07 -0700
-Subject: linux-next: Please update RPi repo location
-Message-ID: <546CCEEF.7040604@wwwdotorg.org>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 19 Nov 2014 18:11:15 +0100
+Subject: [PATCH 2/4] ARM: dts: Add temperature sensor to exynos5250-spring
+In-Reply-To: <1416412585-10809-3-git-send-email-afaerber@suse.de>
+References: <1416412585-10809-1-git-send-email-afaerber@suse.de>
+ <1416412585-10809-3-git-send-email-afaerber@suse.de>
+Message-ID: <546CCF33.9040503@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen,
+Hello Andreas,
 
-linux-rpi.git has moved from:
+On 11/19/2014 04:56 PM, Andreas F?rber wrote:
+> Spotted in the Chrome OS 3.8 based device tree.
+> Needs CONFIG_SENSORS_LM90.
+> 
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 
-git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git#for-next
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-to
-
-git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git#for-next
-
-The old location still works due to a symlink/... on kernel.org, but if 
-you could update linux-next to pull from the new canonical location, 
-that'd be great.
-
-Thanks.
+Best regards,
+Javier
