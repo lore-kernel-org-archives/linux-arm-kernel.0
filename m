@@ -1,46 +1,70 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 19 Nov 2014 15:50:31 +0000
-Subject: [PATCH] thermal: sti: Ignore suspend/resume functions when !PM
-Message-ID: <1416412231-2752-1-git-send-email-lee.jones@linaro.org>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed, 19 Nov 2014 16:57:27 +0100
+Subject: [PATCH RFC 0/7] ARM: shmobile: sh73a0: DT PM domain support
+Message-ID: <1416412654-6508-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prevents build warning:
+	Hi Simon, Magnus,
 
-st_thermal.c:278:12:
-    warning: ?st_thermal_suspend? defined but not used [-Wunused-function]
-st_thermal.c:286:12:
-    warning: ?st_thermal_resume? defined but not used [-Wunused-function]
+This patch series enables DT support for PM domains on the Renesas SH-Mobile
+AG5 (sh73a0) SoC.  It is marked "RFC" due to the addition of memory-controllers
+nodes without bindings in patch [5/7] and [7/7].
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
+This series builds further on the series "[PATCH v5 0/8] ARM: shmobile:
+R-Mobile: DT PM domain support", which added similar support for R-Mobile A1
+(r8a7740).  Due to the similarity of the SYSC System-Controller on the various
+SH-Mobile/R-Mobile SoCs, and the abstraction of PM domains in DT, the same
+driver can handle sh73a0 after some small modifications, without changing the
+DT bindings.
 
-v1 => v2:
- - CONFIG_PM => CONFIG_PM_SLEEP suggested by David Paris.
+Compared to r8a7740, the only significant change is the move of the
+memory-controller(s) to separate PM domains on sh73a0 (and also on R-Mobile
+APE6 (r8a73a4)). Hence a provision must be made to not turn off these PM
+domains inadvertently. Please see patch [5/7] ("[RFC] ARM: shmobile: sh73a0
+dtsi: Add PM domain support"), and the follow-up patch for r8a7740 [7/7]
+("[RFC] ARM: shmobile: r8a7740 dtsi: Add missing memory-controller node") for
+more details.
 
- drivers/thermal/st/st_thermal.c | 3 +++
- 1 file changed, 3 insertions(+)
+This was tested on kzm9g-multiplatform.
+Functionality-wise, it behaves the same as the legacy (non-DT) version (modulo
+missing DT support in some device drivers).
 
-diff --git a/drivers/thermal/st/st_thermal.c b/drivers/thermal/st/st_thermal.c
-index 90163b3..d1ec580 100644
---- a/drivers/thermal/st/st_thermal.c
-+++ b/drivers/thermal/st/st_thermal.c
-@@ -275,6 +275,7 @@ int st_thermal_unregister(struct platform_device *pdev)
- }
- EXPORT_SYMBOL_GPL(st_thermal_unregister);
- 
-+#ifdef CONFIG_PM_SLEEP
- static int st_thermal_suspend(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
-@@ -305,6 +306,8 @@ static int st_thermal_resume(struct device *dev)
- 
- 	return 0;
- }
-+#endif
-+
- SIMPLE_DEV_PM_OPS(st_thermal_pm_ops, st_thermal_suspend, st_thermal_resume);
- EXPORT_SYMBOL_GPL(st_thermal_pm_ops);
- 
+Thanks for your comments!
+
+Dependencies:
+  - [PATCH v5 0/8] ARM: shmobile: R-Mobile: DT PM domain support,
+  - [[PATCH v5 0/6] sh73a0 common clock framework implementation,
+  - [PATCH 2/2] ARM: shmobile: sh73a0 dtsi: Add missing INTCA0 clock for
+    irqpin module.
+
+Geert Uytterhoeven (7):
+  PM / Domains: Document SH-Mobile AG5 (sh73a0) binding
+  ARM: shmobile: R-Mobile: Consolidate rmobile_pd_suspend_*()
+  ARM: shmobile: R-Mobile: Generalize adding/looking up special PM
+    domains
+  ARM: shmobile: R-Mobile: Special-case PM domains containing SBSCs
+  [RFC] ARM: shmobile: sh73a0 dtsi: Add PM domain support
+  drivers: sh: Disable PM runtime for multi-platform sh73a0 with genpd
+  [RFC] ARM: shmobile: r8a7740 dtsi: Add missing memory-controller node
+
+ .../bindings/power/renesas,sysc-rmobile.txt        |   1 +
+ arch/arm/boot/dts/r8a7740.dtsi                     |   6 +
+ arch/arm/boot/dts/sh73a0.dtsi                      | 159 ++++++++++++++++++++-
+ arch/arm/mach-shmobile/pm-rmobile.c                | 159 +++++++++++++--------
+ drivers/sh/pm_runtime.c                            |   4 +-
+ 5 files changed, 268 insertions(+), 61 deletions(-)
+
 -- 
 1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
