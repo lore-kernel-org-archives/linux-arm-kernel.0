@@ -1,34 +1,67 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 19 Nov 2014 12:15:33 +0100
-Subject: [PATCH v3 04/19] drm: exynos: detach from default dma-mapping domain
- on init
+Date: Wed, 19 Nov 2014 12:15:48 +0100
+Subject: [PATCH v3 19/19] iommu: exynos: add callback for initializing devices
+ from device tree
 In-Reply-To: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
 References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1416395748-10731-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1416395748-10731-20-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds code, which detach sub-device nodes from default iommu
-domain if such has been configured.
+This patch adds implementation of of_xlate callback, which prepares
+masters device for attaching to IOMMU. This callback is called during
+creating devices from device tree.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/gpu/drm/exynos/exynos_drm_iommu.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/iommu/exynos-iommu.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_iommu.c b/drivers/gpu/drm/exynos/exynos_drm_iommu.c
-index b32b291f88ff..323601a52a25 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_iommu.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_iommu.c
-@@ -100,6 +100,9 @@ int drm_iommu_attach_device(struct drm_device *drm_dev,
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 88f9afe641a0..213db88ca52c 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -1078,6 +1078,33 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *iommu_domain,
+ 	return phys;
+ }
  
- 	dma_set_max_seg_size(subdrv_dev, 0xffffffffu);
- 
-+	if (subdrv_dev->archdata.mapping)
-+		arm_iommu_detach_device(subdrv_dev);
++static int exynos_iommu_of_xlate(struct device *dev,
++				 struct of_phandle_args *spec)
++{
++	struct exynos_iommu_owner *owner = dev->archdata.iommu;
++	struct platform_device *sysmmu = of_find_device_by_node(spec->np);
++	struct sysmmu_drvdata *data;
 +
- 	ret = arm_iommu_attach_device(subdrv_dev, dev->archdata.mapping);
- 	if (ret < 0) {
- 		DRM_DEBUG_KMS("failed iommu attach.\n");
++	if (!sysmmu)
++		return -ENODEV;
++
++	data = platform_get_drvdata(sysmmu);
++	if (!data)
++		return -ENODEV;
++
++	if (!owner) {
++		owner = kzalloc(sizeof(*owner), GFP_KERNEL);
++		if (!owner)
++			return -ENOMEM;
++
++		INIT_LIST_HEAD(&owner->clients);
++		dev->archdata.iommu = owner;
++	}
++
++	list_add_tail(&data->owner_node, &owner->clients);
++	return 0;
++}
++
+ static const struct iommu_ops exynos_iommu_ops = {
+ 	.domain_init = exynos_iommu_domain_init,
+ 	.domain_destroy = exynos_iommu_domain_destroy,
+@@ -1087,6 +1114,7 @@ static const struct iommu_ops exynos_iommu_ops = {
+ 	.unmap = exynos_iommu_unmap,
+ 	.iova_to_phys = exynos_iommu_iova_to_phys,
+ 	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
++	.of_xlate = exynos_iommu_of_xlate,
+ };
+ 
+ static int init_done;
 -- 
 1.9.2
