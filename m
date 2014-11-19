@@ -1,89 +1,33 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 19 Nov 2014 12:15:47 +0100
-Subject: [PATCH v3 18/19] iommu: exynos: init from dt-specific callback instead
- of initcall
-In-Reply-To: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
-References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1416395748-10731-19-git-send-email-m.szyprowski@samsung.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 19 Nov 2014 12:20:53 +0100
+Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
+ support
+In-Reply-To: <20141119105527.GA5396@luxor.wired.org>
+References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
+ <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
+ <546C646C.4060303@collabora.co.uk> <20141119105527.GA5396@luxor.wired.org>
+Message-ID: <546C7D15.10605@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces IOMMU_OF_DECLARE-based initialization to the
-driver, which replaces subsys_initcall-based procedure.
-exynos_iommu_of_setup ensures that each sysmmu controller is probed
-before its master device.
+Hello Paolo,
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- drivers/iommu/exynos-iommu.c | 28 +++++++++++++++++++++++++++-
- 1 file changed, 27 insertions(+), 1 deletion(-)
+On 11/19/2014 11:55 AM, Paolo Pisati wrote:
+> to get a working framebuffer out of linus 318rc4 on my peach pi, i had
+> to cherry pick these 3 patches:
+> 
+> arm: dts: Exynos5: Use pmu_system_controller phandle for dp phy
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index cd28dc09db39..88f9afe641a0 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -13,16 +13,21 @@
- #endif
- 
- #include <linux/clk.h>
-+#include <linux/dma-mapping.h>
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/iommu.h>
- #include <linux/interrupt.h>
- #include <linux/list.h>
-+#include <linux/of.h>
-+#include <linux/of_iommu.h>
-+#include <linux/of_platform.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
- #include <linux/slab.h>
- 
- #include <asm/cacheflush.h>
-+#include <asm/dma-iommu.h>
- #include <asm/pgtable.h>
- 
- typedef u32 sysmmu_iova_t;
-@@ -1084,6 +1089,8 @@ static const struct iommu_ops exynos_iommu_ops = {
- 	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
- };
- 
-+static int init_done;
-+
- static int __init exynos_iommu_init(void)
- {
- 	int ret;
-@@ -1116,6 +1123,8 @@ static int __init exynos_iommu_init(void)
- 		goto err_set_iommu;
- 	}
- 
-+	init_done = true;
-+
- 	return 0;
- err_set_iommu:
- 	kmem_cache_free(lv2table_kmem_cache, zero_lv2_table);
-@@ -1125,4 +1134,21 @@ err_reg_driver:
- 	kmem_cache_destroy(lv2table_kmem_cache);
- 	return ret;
- }
--subsys_initcall(exynos_iommu_init);
-+
-+static int __init exynos_iommu_of_setup(struct device_node *np)
-+{
-+	struct platform_device *pdev;
-+
-+	if (!init_done)
-+		exynos_iommu_init();
-+
-+	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
-+	if (IS_ERR(pdev))
-+		return PTR_ERR(pdev);
-+
-+	of_iommu_set_ops(np, &exynos_iommu_ops);
-+	return 0;
-+}
-+
-+IOMMU_OF_DECLARE(exynos_iommu_of, "samsung,exynos-sysmmu",
-+		 exynos_iommu_of_setup);
--- 
-1.9.2
+I was missing this patch, I've display working now. Thanks for the pointer!
+
+If someone else is interested, I've pushed a branch [0] with 3.18-rc5 + all
+the needed patches.
+
+Ajay, feel free to add to your series:
+
+Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+
+Best regards,
+Javier
+
+[0]: git://git.collabora.co.uk/git/user/javier/linux.git wip/exynos/dp-integ
