@@ -1,46 +1,59 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 19 Nov 2014 17:46:19 +0900
-Subject: [PATCH v8 2/6] arm64: ptrace: allow tracer to skip a system call
-In-Reply-To: <20141118140425.GM18842@arm.com>
-References: <1416273038-15590-1-git-send-email-takahiro.akashi@linaro.org>
- <1416273038-15590-3-git-send-email-takahiro.akashi@linaro.org>
- <20141118140425.GM18842@arm.com>
-Message-ID: <546C58DB.5080204@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 19 Nov 2014 09:47:14 +0100
+Subject: [PATCH] arm/arm64: KVM: Handle traps of ICC_SRE_EL1 as RAZ/WI
+In-Reply-To: <1415822474-17398-1-git-send-email-christoffer.dall@linaro.org>
+References: <1415822474-17398-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <CAKv+Gu8C7KuUpv_UdMvnitb16KhoCHceTuLObrmR7GtQ-a5JDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2014 11:04 PM, Will Deacon wrote:
-> On Tue, Nov 18, 2014 at 01:10:34AM +0000, AKASHI Takahiro wrote:
->>
->> +	if (((int)regs->syscallno == -1) && (orig_syscallno == -1)) {
->> +		/*
->> +		 * user-issued syscall(-1):
->> +		 * RESTRICTION: We always return ENOSYS whatever value is
->> +		 *   stored in x0 (a return value) at this point.
->> +		 * Normally, with ptrace off, syscall(-1) returns -ENOSYS.
->> +		 * With ptrace on, however, if a tracer didn't pay any
->> +		 * attention to user-issued syscall(-1) and just let it go
->> +		 * without a hack here, it would return a value in x0 as in
->> +		 * other system call cases. This means that this system call
->> +		 * might succeed and see any bogus return value.
->> +		 * This should be definitely avoided.
->> +		 */
->> +		regs->regs[0] = -ENOSYS;
->> +	}
+On 12 November 2014 21:01, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> When running on a system with a GICv3, we currenly don't allow the guest
+> to access the system register interface of the GICv3.  We do this by
+> clearing the ICC_SRE_EL2.Enable, which causes all guest accesses to
+> ICC_SRE_EL1 to trap to EL2 and causes all guest accesses to other ICC_
+> registers to cause an undefined exception in the guest.
 >
-> I'm still really uncomfortable with this, and it doesn't seem to match what
-> arch/arm/ does either.
+> However, we currently don't handle the trap of guest accesses to
+> ICC_SRE_EL1 and will spill out a warning.  The trap just needs to handle
+> the access as RAZ/WI, and a guest that tries to prod this register and
+> set ICC_SRE_EL1.SRE=1, must read back the value (which Linux already
+> does) to see if it succeeded, and will thus observe that ICC_SRE_EL1.SRE
+> was not set.
+>
+> Add the simple trap handler in the sorted table of the system registers.
+>
+> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
 
-Yeah, I know but
-as I mentioned before, syscall(-1) will be signaled on arm, and so we don't
-have to care about a return value :)
+Hi,
 
-> Doesn't it also prevent a tracer from skipping syscall(-1)?
+What is the status of this patch? Will you try to merge it as a bug fix?
 
-Syscall(-1) will return -ENOSYS whether or not a syscallno is explicitly replaced with -1
-by a tracer, and, in this sense, it is *skipped*.
+-- 
+Ard.
 
--Takahiro AKASHI
 
-> Will
+>  arch/arm64/kvm/sys_regs.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 4cc3b71..8f81945 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -424,6 +424,11 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>         /* VBAR_EL1 */
+>         { Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
+>           NULL, reset_val, VBAR_EL1, 0 },
+> +
+> +       /* ICC_SRE_EL1 */
+> +       { Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1100), Op2(0b101),
+> +         trap_raz_wi },
+> +
+>         /* CONTEXTIDR_EL1 */
+>         { Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b001),
+>           access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
+> --
+> 2.1.2.330.g565301e.dirty
 >
