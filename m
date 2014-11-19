@@ -1,38 +1,64 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 19 Nov 2014 19:11:04 +0100
-Subject: [PATCH] ASoC: samsung: Fix IISMOD setting in i2s_set_sysclk()
-Message-ID: <1416420664-20952-1-git-send-email-s.nawrocki@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 19 Nov 2014 18:11:58 +0000
+Subject: [PATCH] arm: perf: Prevent wraparound during overflow
+In-Reply-To: <1416412346-8759-1-git-send-email-daniel.thompson@linaro.org>
+References: <1416412346-8759-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <20141119181158.GJ15985@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the i2s_set_sysclk() callback we are currently clearing all bits
-of the IISMOD register when clk_id is SAMSUNG_I2S_CDCLK and dir
-is SND_SOC_CLOCK_OUT. It's due to an incorrect mask used for the AND
-operation and breaks the I2S interface operation when we attempt to
-use the CDCLK output clock.
+On Wed, Nov 19, 2014 at 03:52:26PM +0000, Daniel Thompson wrote:
+> If the overflow threshold for a counter is set above or near the
+> 0xffffffff boundary then the kernel may lose track of the overflow
+> causing only events that occur *after* the overflow to be recorded.
+> Specifically the problem occurs when the value of the performance counter
+> overtakes its original programmed value due to wrap around.
+> 
+> Typical solutions to this problem are either to avoid programming in
+> values likely to be overtaken or to treat the overflow bit as the 33rd
+> bit of the counter.
+> 
+> Its somewhat fiddly to refactor the code to correctly handle the 33rd bit
+> during irqsave sections (context switches for example) so instead we take
+> the simpler approach of avoiding values likely to be overtaken.
+> 
+> We set the limit to half of max_period because this matches the limit
+> imposed in __hw_perf_event_init(). This causes a doubling of the interrupt
+> rate for large threshold values, however even with a very fast counter
+> ticking at 4GHz the interrupt rate would only be ~1Hz.
+> 
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> ---
+> 
+> Notes:
+>     There is similar code in the arm64 tree which retains the assumptions of
+>     the original arm code regarding 32-bit wide performance counters. If
+>     this patch doesn't get beaten up during review I'll also share a similar
+>     patch for arm64.
+>     
+> 
+>  arch/arm/kernel/perf_event.c | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> index 266cba46db3e..b50a770f8c99 100644
+> --- a/arch/arm/kernel/perf_event.c
+> +++ b/arch/arm/kernel/perf_event.c
+> @@ -115,8 +115,14 @@ int armpmu_event_set_period(struct perf_event *event)
+>  		ret = 1;
+>  	}
+> 
+> -	if (left > (s64)armpmu->max_period)
+> -		left = armpmu->max_period;
+> +	/*
+> +	 * Limit the maximum period to prevent the counter value
+> +	 * from overtaking the one we are about to program. In
+> +	 * effect we are reducing max_period to account for
+> +	 * interrupt latency (and we are being very conservative).
+> +	 */
+> +	if (left > (s64)(armpmu->max_period >> 1))
+> +		left = armpmu->max_period >> 1;
 
-It fixes commit a5a56871f804edac93a53b5e871c0e9818fb9033
-("ASoC: samsung: add support for exynos7 I2S controller") and restores
-sound support for Odroid X2/U3.
+The s64 cast looks off here, can we just drop it entirely?
 
-Cc: Padmavathi Venna <padma.v@samsung.com>
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
- sound/soc/samsung/i2s.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index 947352d..8db8c66 100644
---- a/sound/soc/samsung/i2s.c
-+++ b/sound/soc/samsung/i2s.c
-@@ -494,7 +494,7 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
- 		if (dir == SND_SOC_CLOCK_IN)
- 			mod |= 1 << i2s_regs->cdclkcon_off;
- 		else
--			mod &= 0 << i2s_regs->cdclkcon_off;
-+			mod &= ~(1 << i2s_regs->cdclkcon_off);
- 
- 		i2s->rfs = rfs;
- 		break;
--- 
-1.7.9.5
+Will
