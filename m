@@ -1,29 +1,28 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 19 Nov 2014 13:16:01 +0100
-Subject: [PATCHv4 02/10] arm: mvebu: add uartX labels for Armada SoC
- serial nodes
-In-Reply-To: <8c622c408d74d5e9fc36b7c00f9e8aeb3f290683.1416351426.git.arno@natisbad.org>
+Date: Wed, 19 Nov 2014 13:16:38 +0100
+Subject: [PATCHv4 03/10] arm: mvebu: use recently introduced uart label
+ for stdout-path
+In-Reply-To: <206fa4769a1e02f3e6b139160cd5dd9d25c90837.1416351426.git.arno@natisbad.org>
 References: <cover.1416351425.git.arno@natisbad.org>
- <8c622c408d74d5e9fc36b7c00f9e8aeb3f290683.1416351426.git.arno@natisbad.org>
-Message-ID: <20141119131601.606bdad8@free-electrons.com>
+ <206fa4769a1e02f3e6b139160cd5dd9d25c90837.1416351426.git.arno@natisbad.org>
+Message-ID: <20141119131638.5e9735a9@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Arnaud Ebalard,
 
-On Wed, 19 Nov 2014 00:01:47 +0100, Arnaud Ebalard wrote:
+On Wed, 19 Nov 2014 00:01:59 +0100, Arnaud Ebalard wrote:
 > 
-> This patch adds uartX labels for Armada SoC serial nodes. This is
-> a preliminary work to be able to easily reference the serial lines
-> in Device Tree files. One expected use is when providing stdout-path
-> property for barebox.
+> Now that labels for uartX are available in Marvell Armada .dtsi files,
+> this patch replaces the "/soc/internal-regs/serial at 12000" found in
+> armada-xp-lenovo-ix4-300d.dts file for stdout-path property by the more
+> concise &uart0.
 > 
-> Acked-by: Andrew Lunn <andrew@lunn.ch>
+> Suggested-by: Andrew Lunn <andrew@lunn.ch>
 > Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 > ---
->  arch/arm/boot/dts/armada-370-xp.dtsi | 5 +++--
->  arch/arm/boot/dts/armada-xp.dtsi     | 5 +++--
->  2 files changed, 6 insertions(+), 4 deletions(-)
+>  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
 Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 -- 
