@@ -1,33 +1,47 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 19 Nov 2014 09:34:45 +0000
-Subject: [PATCH v2 1/4] spi: Add 'last' flag to spi_transfer structure
-In-Reply-To: <20141118225546.GA27182@gmail.com>
-References: <1416264471-774-1-git-send-email-b.galvani@gmail.com>
- <1416264471-774-2-git-send-email-b.galvani@gmail.com>
- <20141118140658.GI22111@sirena.org.uk>
- <20141118225546.GA27182@gmail.com>
-Message-ID: <20141119093445.GV22111@sirena.org.uk>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 19 Nov 2014 10:35:40 +0100
+Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
+ support
+In-Reply-To: <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
+References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
+ <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
+Message-ID: <546C646C.4060303@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 11:55:46PM +0100, Beniamino Galvani wrote:
+Hello Ajay,
 
-> Would it be better to introduce something like:
+On 11/18/2014 07:20 AM, Ajay kumar wrote:
+> On Sat, Nov 15, 2014 at 3:24 PM, Ajay Kumar <ajaykumar.rs@samsung.com> wrote:
+>> This series is based on master branch of Linus tree at:
+>> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
 
-> static inline bool
-> spi_transfer_is_last(struct spi_master *master, struct spi_transfer *xfer)
-> {
->         return list_is_last(&xfer->transfer_list, &master->cur_msg->transfers);
-> }
+I applied your series on top of 3.18-rc5 + linux-next's commit:
 
-> or open code it in the driver?
+0ef76ae ("ARM: exynos_defconfig: Enable options for display panel support").
 
-Adding the helper function seems better, it means we can change the
-implementation later.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141119/c10e4109/attachment-0001.sig>
+I think you should had mentioned what other patches are needed as a
+dependency since I spent quite a bit of time figuring out why the
+ps8622 bridge driver probe was always deferred due of_drm_find_panel()
+failing and then I noticed that a patch from linux-next was needed:
+
+e35e305 ("drm/panel: simple: Add AUO B116XW03 panel support")
+
+With that commit the ps8622 drm bridge driver probe succeed but I still
+don't have display working on an Exynos5240 Peach Pit, the kernel log shows:
+
+platform 145b0000.dp-controller: Driver exynos-dp requests probe deferral
+exynos-drm exynos-drm: bound 14400000.fimd (ops fimd_component_ops)
+exynos-drm exynos-drm: failed to bind 145b0000.dp-controller (ops exynos_dp_ops): -517
+exynos-drm exynos-drm: master bind failed: -517
+platform 145b0000.dp-controller: Driver exynos-dp requests probe deferral
+
+Any idea what else I could be missing here?
+
+Your patches don't apply cleanly in linux-next btw, although the are many
+issues with the Exynos DRM currently in linux-next anyways so probably using
+3.18-rc as a base makes more sense for now until all those things get fixed
+but you should rebase so they can be picked.
+
+Best regards,
+Javier
