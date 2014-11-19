@@ -1,28 +1,59 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 19 Nov 2014 11:18:58 +0100
-Subject: [PATCH] ARM: at91/at91sam9g45: remove useless header file
-Message-ID: <1416392338-30665-1-git-send-email-nicolas.ferre@atmel.com>
+From: caesar.wang@rock-chips.com (Caesar Wang)
+Date: Wed, 19 Nov 2014 18:27:45 +0800
+Subject: [PATCH] ARM: dts: fix PWM clock found on RK3288 Socs
+In-Reply-To: <CAD=FV=W+WU3j7OWKTxtGUv1Jt7qPesGXSOsoM=bsD5C15jttvA@mail.gmail.com>
+References: <1416367554-15185-1-git-send-email-caesar.wang@rock-chips.com>
+ <CAD=FV=W+WU3j7OWKTxtGUv1Jt7qPesGXSOsoM=bsD5C15jttvA@mail.gmail.com>
+Message-ID: <546C70A1.9090707@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove this useless cpu.h header file forgotten during the !DT support removal.
+Doug,
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/at91sam9g45.c | 1 -
- 1 file changed, 1 deletion(-)
+? 2014/11/19 13:14, Doug Anderson ??:
+> Caesar,
+>
+> On Tue, Nov 18, 2014 at 7:25 PM, Caesar Wang <caesar.wang@rock-chips.com> wrote:
+>> We use the new PWM IP on RK3288,but the PWM's clock indeed incorrect.
+>>
+>> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+>> ---
+>>   arch/arm/boot/dts/rk3288.dtsi | 8 ++++----
+>>   1 file changed, 4 insertions(+), 4 deletions(-)
+> Right, I reported this when Kever was doing his "unused clocks" patch.
+> That's why this clock is currently "ignore unused".
+>
+> ...but though your change is right, I'd rather your change doesn't
+> land quite yet.  It totally wrecks havoc with the PWM regulator used
+> on many rk3288 boards and will glitch the main "logic" voltage at
+> bootup.  I have some patches that are MASSIVELY WIP:
+>
+> https://chromium-review.googlesource.com/230640
+> WIP: regulator: pwm: Tell regulator framework that we can't turn off
+>
+> https://chromium-review.googlesource.com/230641
+> WIP: PWM: handle the fact that firmware might have left us enabled
+>
+> https://chromium-review.googlesource.com/230642
+> WIP: pwm-regulator stuff
+>
+> I think that last one might blow up into several patches.  We need to
+> solve the problems from those patches before yours can really land.
+>
+>
+> It's pretty high on my list to finish the above patches, but right now
+> suspend/resume issues are higher priority so it's a bit stalled...  If
+> someone wants to hijack any of the above patches please let me know--I
+> won't be offended.
 
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 2ad0db4caa9b..3d225105e0d1 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -11,7 +11,6 @@
-  */
- 
- #include <asm/system_misc.h>
--#include <mach/cpu.h>
- #include <mach/hardware.h>
- 
- #include "soc.h"
+OK,I see.
+
+
+> -Doug
+>
+>
+>
+
 -- 
-2.1.3
+Best regards,
+Caesar
