@@ -1,72 +1,463 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 19 Nov 2014 23:59:55 +0100
-Subject: [GIT PULL] arm: pxa: pxa for v3.19
-In-Reply-To: <4686660.cI7P5U9Kgy@wuerfel> (Arnd Bergmann's message of "Wed, 19
- Nov 2014 23:42:23 +0100")
-References: <87bnoevq1b.fsf@free.fr> <201411192333.32448.arnd@arndb.de>
- <878uj67r2a.fsf@free.fr> <4686660.cI7P5U9Kgy@wuerfel>
-Message-ID: <874mtu7q50.fsf@free.fr>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 19 Nov 2014 15:01:10 -0800
+Subject: [PATCHv2] arm64: add support to dump the kernel page tables
+In-Reply-To: <1416262710-7798-1-git-send-email-lauraa@codeaurora.org>
+References: <1416262710-7798-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <CAGXu5jK7FWs2v52T2RBdKhdYcV5wGm3F4H4km9h-B15Z6S0A2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
-
-> We are running a bit short on time though, and I'd like to have it
-> merged earlier. If nobody else is using your branch, I can just do
-> the rebase myself, since there are only a few patches in it.
+On Mon, Nov 17, 2014 at 2:18 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+> In a similar manner to arm, it's useful to be able to dump the page
+> tables to verify permissions and memory types. Add a debugfs file
+> to check the page tables.
 >
-> 	Arnd
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+This seems to behave well for me. Thanks!
 
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+Tested-by: Kees Cook <keescook@chromium.org>
 
-are available in the git repository at:
+In my configuration, though, with CONFIG_DEBUG_SET_MODULE_RONX=y, I'm
+only seeing RO, and no NX changes. I haven't constructed a test for
+the module memory behavior directly (to see if this is a page table
+issue or a PTDUMP reporting issue). This series I'm testing has gone
+through some backporting on my end, so I wanted to just double-check
+and see if you saw this too, or if it's specific to my environment:
 
-  https://github.com/rjarzmik/linux.git tags/pxa-for-3.19
+---[ Modules ]---
+0xffffffbffc000000-0xffffffbffc005000          20K     ro x  SHD AF
+UXN MEM/NORMAL
+0xffffffbffc005000-0xffffffbffc007000           8K     RW x  SHD AF
+UXN MEM/NORMAL
+0xffffffbffc00c000-0xffffffbffc00e000           8K     ro x  SHD AF
+UXN MEM/NORMAL
+0xffffffbffc00e000-0xffffffbffc010000           8K     RW x  SHD AF
+UXN MEM/NORMAL
+...
 
-for you to fetch changes up to 03ec7fe70c5ce850a20aabe66c88e1a39111f9dd:
+Thanks,
 
-  arm: pxa: add pxa27x device-tree support (2014-11-19 23:53:14 +0100)
+-Kees
 
-----------------------------------------------------------------
-arm: pxa: pxa for v3.19
+> ---
+> v2: Addressed comments from Mark Rutland. Made the logic a bit more
+> consistent between functions. Now tested on 4K and 64K pages.
+> ---
+>  arch/arm64/Kconfig.debug |  12 ++
+>  arch/arm64/mm/Makefile   |   1 +
+>  arch/arm64/mm/dump.c     | 358 +++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 371 insertions(+)
+>  create mode 100644 arch/arm64/mm/dump.c
+>
+> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+> index 0a12933..5fdd6dc 100644
+> --- a/arch/arm64/Kconfig.debug
+> +++ b/arch/arm64/Kconfig.debug
+> @@ -6,6 +6,18 @@ config FRAME_POINTER
+>         bool
+>         default y
+>
+> +config ARM64_PTDUMP
+> +       bool "Export kernel pagetable layout to userspace via debugfs"
+> +       depends on DEBUG_KERNEL
+> +       select DEBUG_FS
+> +        help
+> +         Say Y here if you want to show the kernel pagetable layout in a
+> +         debugfs file. This information is only useful for kernel developers
+> +         who are working in architecture specific areas of the kernel.
+> +         It is probably not a good idea to enable this feature in a production
+> +         kernel.
+> +         If in doubt, say "N"
+> +
+>  config STRICT_DEVMEM
+>         bool "Filter access to /dev/mem"
+>         depends on MMU
+> diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
+> index c56179e..773d37a 100644
+> --- a/arch/arm64/mm/Makefile
+> +++ b/arch/arm64/mm/Makefile
+> @@ -3,3 +3,4 @@ obj-y                           := dma-mapping.o extable.o fault.o init.o \
+>                                    ioremap.o mmap.o pgd.o mmu.o \
+>                                    context.o proc.o pageattr.o
+>  obj-$(CONFIG_HUGETLB_PAGE)     += hugetlbpage.o
+> +obj-$(CONFIG_ARM64_PTDUMP)     += dump.o
+> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+> new file mode 100644
+> index 0000000..57dcee4
+> --- /dev/null
+> +++ b/arch/arm64/mm/dump.c
+> @@ -0,0 +1,358 @@
+> +/*
+> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+> + * Debug helper to dump the current kernel pagetables of the system
+> + * so that we can see what the various memory ranges are set to.
+> + *
+> + * Derived from x86 and arm implementation:
+> + * (C) Copyright 2008 Intel Corporation
+> + *
+> + * Author: Arjan van de Ven <arjan@linux.intel.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; version 2
+> + * of the License.
+> + */
+> +#include <linux/debugfs.h>
+> +#include <linux/fs.h>
+> +#include <linux/mm.h>
+> +#include <linux/seq_file.h>
+> +
+> +#include <asm/pgtable.h>
+> +
+> +#define LOWEST_ADDR    (UL(0xffffffffffffffff) << VA_BITS)
+> +
+> +struct addr_marker {
+> +       unsigned long start_address;
+> +       const char *name;
+> +};
+> +
+> +static struct addr_marker address_markers[] = {
+> +       { 0,                    "vmalloc() Area" },
+> +       { VMALLOC_END,          "vmalloc() End" },
+> +       { MODULES_VADDR,        "Modules" },
+> +       { PAGE_OFFSET,          "Kernel Mapping" },
+> +       { -1,                   NULL },
+> +};
+> +
+> +struct pg_state {
+> +       struct seq_file *seq;
+> +       const struct addr_marker *marker;
+> +       unsigned long start_address;
+> +       unsigned level;
+> +       u64 current_prot;
+> +};
+> +
+> +struct prot_bits {
+> +       u64             mask;
+> +       u64             val;
+> +       const char      *set;
+> +       const char      *clear;
+> +};
+> +
+> +static const struct prot_bits pte_bits[] = {
+> +       {
+> +               .mask   = PTE_USER,
+> +               .val    = PTE_USER,
+> +               .set    = "USR",
+> +               .clear  = "   ",
+> +       }, {
+> +               .mask   = PTE_RDONLY,
+> +               .val    = PTE_RDONLY,
+> +               .set    = "ro",
+> +               .clear  = "RW",
+> +       }, {
+> +               .mask   = PTE_PXN,
+> +               .val    = PTE_PXN,
+> +               .set    = "NX",
+> +               .clear  = "x ",
+> +       }, {
+> +               .mask   = PTE_SHARED,
+> +               .val    = PTE_SHARED,
+> +               .set    = "SHD",
+> +               .clear  = "   ",
+> +       }, {
+> +               .mask   = PTE_AF,
+> +               .val    = PTE_AF,
+> +               .set    = "AF",
+> +               .clear  = "  ",
+> +       }, {
+> +               .mask   = PTE_NG,
+> +               .val    = PTE_NG,
+> +               .set    = "NG",
+> +               .clear  = "  ",
+> +       }, {
+> +               .mask   = PTE_UXN,
+> +               .val    = PTE_UXN,
+> +               .set    = "UXN",
+> +       }, {
+> +               .mask   = PTE_ATTRINDX_MASK,
+> +               .val    = PTE_ATTRINDX(MT_DEVICE_nGnRnE),
+> +               .set    = "DEVICE/nGnRnE",
+> +       }, {
+> +               .mask   = PTE_ATTRINDX_MASK,
+> +               .val    = PTE_ATTRINDX(MT_DEVICE_nGnRE),
+> +               .set    = "DEVICE/nGnRE",
+> +       }, {
+> +               .mask   = PTE_ATTRINDX_MASK,
+> +               .val    = PTE_ATTRINDX(MT_DEVICE_GRE),
+> +               .set    = "DEVICE/GRE",
+> +       }, {
+> +               .mask   = PTE_ATTRINDX_MASK,
+> +               .val    = PTE_ATTRINDX(MT_NORMAL_NC),
+> +               .set    = "MEM/BUFFERABLE",
+> +       }, {
+> +               .mask   = PTE_ATTRINDX_MASK,
+> +               .val    = PTE_ATTRINDX(MT_NORMAL),
+> +               .set    = "MEM/NORMAL",
+> +       }
+> +};
+> +
+> +static const struct prot_bits section_bits[] = {
+> +       {
+> +               .mask   = PMD_SECT_USER,
+> +               .val    = PMD_SECT_USER,
+> +               .set    = "USR",
+> +               .clear  = "   ",
+> +       }, {
+> +               .mask   = PMD_SECT_RDONLY,
+> +               .val    = PMD_SECT_RDONLY,
+> +               .set    = "ro",
+> +               .clear  = "RW",
+> +       }, {
+> +               .mask   = PMD_SECT_PXN,
+> +               .val    = PMD_SECT_PXN,
+> +               .set    = "NX",
+> +               .clear  = "x ",
+> +       }, {
+> +               .mask   = PMD_SECT_S,
+> +               .val    = PMD_SECT_S,
+> +               .set    = "SHD",
+> +               .clear  = "   ",
+> +       }, {
+> +               .mask   = PMD_SECT_AF,
+> +               .val    = PMD_SECT_AF,
+> +               .set    = "AF",
+> +               .clear  = "  ",
+> +       }, {
+> +               .mask   = PMD_SECT_NG,
+> +               .val    = PMD_SECT_NG,
+> +               .set    = "NG",
+> +               .clear  = "  ",
+> +       }, {
+> +               .mask   = PMD_SECT_UXN,
+> +               .val    = PMD_SECT_UXN,
+> +               .set    = "UXN",
+> +       }, {
+> +               .mask   = PTE_ATTRINDX_MASK,
+> +               .val    = PTE_ATTRINDX(MT_DEVICE_nGnRnE),
+> +               .set    = "DEVICE/nGnRnE",
+> +       }, {
+> +               .mask   = PTE_ATTRINDX_MASK,
+> +               .val    = PTE_ATTRINDX(MT_DEVICE_nGnRE),
+> +               .set    = "DEVICE/nGnRE",
+> +       }, {
+> +               .mask   = PTE_ATTRINDX_MASK,
+> +               .val    = PTE_ATTRINDX(MT_DEVICE_GRE),
+> +               .set    = "DEVICE/GRE",
+> +       }, {
+> +               .mask   = PTE_ATTRINDX_MASK,
+> +               .val    = PTE_ATTRINDX(MT_NORMAL_NC),
+> +               .set    = "MEM/BUFFERABLE",
+> +       }, {
+> +               .mask   = PTE_ATTRINDX_MASK,
+> +               .val    = PTE_ATTRINDX(MT_NORMAL),
+> +               .set    = "MEM/NORMAL",
+> +       }
+> +};
+> +
+> +struct pg_level {
+> +       const struct prot_bits *bits;
+> +       size_t num;
+> +       u64 mask;
+> +};
+> +
+> +static struct pg_level pg_level[] = {
+> +       {
+> +       }, { /* pgd */
+> +               .bits   = pte_bits,
+> +               .num    = ARRAY_SIZE(pte_bits),
+> +       }, { /* pud */
+> +               .bits   = pte_bits,
+> +               .num    = ARRAY_SIZE(pte_bits),
+> +       }, { /* pmd */
+> +               .bits   = section_bits,
+> +               .num    = ARRAY_SIZE(section_bits),
+> +       }, { /* pte */
+> +               .bits   = pte_bits,
+> +               .num    = ARRAY_SIZE(pte_bits),
+> +       },
+> +};
+> +
+> +static void dump_prot(struct pg_state *st, const struct prot_bits *bits,
+> +                       size_t num)
+> +{
+> +       unsigned i;
+> +
+> +       for (i = 0; i < num; i++, bits++) {
+> +               const char *s;
+> +
+> +               if ((st->current_prot & bits->mask) == bits->val)
+> +                       s = bits->set;
+> +               else
+> +                       s = bits->clear;
+> +
+> +               if (s)
+> +                       seq_printf(st->seq, " %s", s);
+> +       }
+> +}
+> +
+> +static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
+> +                               u64 val)
+> +{
+> +       static const char units[] = "KMGTPE";
+> +       u64 prot = val & pg_level[level].mask;
+> +
+> +       if (addr < LOWEST_ADDR)
+> +               return;
+> +
+> +       if (!st->level) {
+> +               st->level = level;
+> +               st->current_prot = prot;
+> +               st->start_address = addr;
+> +               seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
+> +       } else if (prot != st->current_prot || level != st->level ||
+> +                  addr >= st->marker[1].start_address) {
+> +               const char *unit = units;
+> +               unsigned long delta;
+> +
+> +               if (st->current_prot) {
+> +                       seq_printf(st->seq, "0x%16lx-0x%16lx   ",
+> +                                  st->start_address, addr);
+> +
+> +                       delta = (addr - st->start_address) >> 10;
+> +                       while (!(delta & 1023) && unit[1]) {
+> +                               delta >>= 10;
+> +                               unit++;
+> +                       }
+> +                       seq_printf(st->seq, "%9lu%c", delta, *unit);
+> +                       if (pg_level[st->level].bits)
+> +                               dump_prot(st, pg_level[st->level].bits,
+> +                                         pg_level[st->level].num);
+> +                       seq_puts(st->seq, "\n");
+> +               }
+> +
+> +               if (addr >= st->marker[1].start_address) {
+> +                       st->marker++;
+> +                       seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
+> +               }
+> +               st->start_address = addr;
+> +               st->current_prot = prot;
+> +               st->level = level;
+> +       }
+> +}
+> +
+> +static void walk_pte(struct pg_state *st, pmd_t *pmd, unsigned long start)
+> +{
+> +       pte_t *pte = pte_offset_kernel(pmd, 0);
+> +       unsigned long addr;
+> +       unsigned i;
+> +
+> +       for (i = 0; i < PTRS_PER_PTE; i++, pte++) {
+> +               addr = start + i * PAGE_SIZE;
+> +               note_page(st, addr, 4, pte_val(*pte));
+> +       }
+> +}
+> +
+> +static void walk_pmd(struct pg_state *st, pud_t *pud, unsigned long start)
+> +{
+> +       pmd_t *pmd = pmd_offset(pud, 0);
+> +       unsigned long addr;
+> +       unsigned i;
+> +
+> +       for (i = 0; i < PTRS_PER_PMD; i++, pmd++) {
+> +               addr = start + i * PMD_SIZE;
+> +               if (pmd_none(*pmd) || pmd_sect(*pmd) || pmd_bad(*pmd))
+> +                       note_page(st, addr, 3, pmd_val(*pmd));
+> +               else
+> +                       walk_pte(st, pmd, addr);
+> +       }
+> +}
+> +
+> +static void walk_pud(struct pg_state *st, pgd_t *pgd, unsigned long start)
+> +{
+> +       pud_t *pud = pud_offset(pgd, 0);
+> +       unsigned long addr;
+> +       unsigned i;
+> +
+> +       for (i = 0; i < PTRS_PER_PUD; i++, pud++) {
+> +               addr = start + i * PUD_SIZE;
+> +               if (pud_none(*pud) || pud_sect(*pud) || pud_bad(*pud))
+> +                       note_page(st, addr, 2, pud_val(*pud));
+> +               else
+> +                       walk_pmd(st, pud, addr);
+> +       }
+> +}
+> +
+> +static unsigned long normalize_addr(unsigned long u)
+> +{
+> +       return u | LOWEST_ADDR;
+> +}
+> +
+> +static void walk_pgd(struct pg_state *st, pgd_t *pgd, unsigned long start)
+> +{
+> +       unsigned i;
+> +       unsigned long addr;
+> +
+> +       for (i = 0; i < PTRS_PER_PGD; i++, pgd++) {
+> +               addr = normalize_addr(start + i * PGDIR_SIZE);
+> +               if (pgd_none(*pgd) || pgd_bad(*pgd))
+> +                       note_page(st, addr, 1, pgd_val(*pgd));
+> +               else
+> +                       walk_pud(st, pgd, addr);
+> +       }
+> +}
+> +
+> +static int ptdump_show(struct seq_file *m, void *v)
+> +{
+> +       struct pg_state st;
+> +
+> +       memset(&st, 0, sizeof(st));
+> +       st.seq = m;
+> +       st.marker = address_markers;
+> +
+> +       walk_pgd(&st, swapper_pg_dir, 0);
+> +
+> +       note_page(&st, 0, 0, 0);
+> +       return 0;
+> +}
+> +
+> +static int ptdump_open(struct inode *inode, struct file *file)
+> +{
+> +       return single_open(file, ptdump_show, NULL);
+> +}
+> +
+> +static const struct file_operations ptdump_fops = {
+> +       .open           = ptdump_open,
+> +       .read           = seq_read,
+> +       .llseek         = seq_lseek,
+> +       .release        = single_release,
+> +};
+> +
+> +static int ptdump_init(void)
+> +{
+> +       struct dentry *pe;
+> +       unsigned i, j;
+> +
+> +       for (i = 0; i < ARRAY_SIZE(pg_level); i++)
+> +               if (pg_level[i].bits)
+> +                       for (j = 0; j < pg_level[i].num; j++)
+> +                               pg_level[i].mask |= pg_level[i].bits[j].mask;
+> +
+> +       address_markers[0].start_address = VMALLOC_START;
+> +
+> +       pe = debugfs_create_file("kernel_page_tables", 0400, NULL, NULL,
+> +                                &ptdump_fops);
+> +       return pe ? 0 : -ENOMEM;
+> +}
+> +device_initcall(ptdump_init);
+> --
+> Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Hello Arnd, Kevin, Olof,
 
-This is a very quiet release, featuring a small cleanup, a tosa change
-on its charger driver, and support for pxa device-tree based pxa27x
-boards.
 
-The device-tree part will only be fully activated once clocks support
-is fully operation in the common clock framework.
-
-----------------------------------------------------------------
-Dmitry Eremin-Solenikov (1):
-      ARM: pxa: tosa: switch to gpio-charger
-
-Joe Perches (1):
-      arm: mach-pxa: Convert pr_warning to pr_warn
-
-Robert Jarzmik (4):
-      arm: pxa: add device-tree irq init for pxa27x
-      arm: pxa: move init functions into generic.h
-      arm: pxa: remove unnecessary includes from pxa-dt
-      arm: pxa: add pxa27x device-tree support
-
- arch/arm/mach-pxa/Kconfig               | 11 ++++++
- arch/arm/mach-pxa/Makefile              |  1 +
- arch/arm/mach-pxa/em-x270.c             |  4 +-
- arch/arm/mach-pxa/generic.h             | 65 +++++++++++++++++++++------------
- arch/arm/mach-pxa/gumstix.c             |  3 +-
- arch/arm/mach-pxa/include/mach/pxa25x.h |  8 ----
- arch/arm/mach-pxa/include/mach/pxa27x.h |  4 --
- arch/arm/mach-pxa/include/mach/pxa3xx.h |  5 ---
- arch/arm/mach-pxa/mfp-pxa2xx.c          | 12 +++---
- arch/arm/mach-pxa/poodle.c              |  2 +-
- arch/arm/mach-pxa/pxa-dt.c              | 18 +++++++--
- arch/arm/mach-pxa/pxa27x.c              |  6 +++
- arch/arm/mach-pxa/pxa3xx-ulpi.c         |  6 +--
- arch/arm/mach-pxa/raumfeld.c            | 26 ++++++-------
- arch/arm/mach-pxa/tosa.c                | 41 ++++-----------------
- 15 files changed, 107 insertions(+), 105 deletions(-)
+-- 
+Kees Cook
+Chrome OS Security
