@@ -1,49 +1,43 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Thu, 20 Nov 2014 00:24:30 +0100
-Subject: How many frequencies would cpufreq optimally like to manage?
-Message-ID: <546D26AE.50601@free.fr>
+From: stuart.yoder@freescale.com (Stuart Yoder)
+Date: Wed, 19 Nov 2014 23:29:44 +0000
+Subject: 48-bit VA support in the SMMU
+Message-ID: <deb48cfb93d94515b6531be02f697e04@CY1PR0301MB0748.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everyone,
+Hi Will,
 
-I'm running kernel 3.14 on an ARM Cortex-A9 based SoC.
-The baseline frequency for the ARM CPU is 999 MHz.
+Regarding 48-bit support at the SMMU, this patch is currently in the kernel:
 
-The SoC provides a way to dynamically change the CPU frequency,
-dividing it by N/16 (N=32..4095) [Actually, I think there are
-also ways to divide by 1.x, but I need to read the docs again.]
+commit 04f905a9569ca2b6964a35563f135fabbb2470bc
+Author: Christoffer Dall <christoffer.dall@linaro.org>
+Date:   Fri Oct 10 11:14:30 2014 +0100
 
-I'm writing the platform-specific cpufreq driver.
-I could expose hundreds of frequencies to cpufreq, but I don't
-think that would be very productive. Correct?
-(Note: I can't offer ANY frequency.)
+    arm64: Allow 48-bits VA space without ARM_SMMU
 
-My question is: how many frequencies should I expose for "optimal"
-behavior of cpufreq?
+    Now when KVM has been reworked to support 48-bits host VA space, we can
+    allow systems to be configured with this option.  However, the ARM SMMU
+    driver also needs to be tweaked for 48-bit support so only allow the
+    config option to be set when not including support for theSMMU.
 
-I'm thinking I would only expose div={2,3,5} meaning the available
-scaled frequencies would be {500,333,200} MHz. Are these enough?
-Should there be more? Should I go lower than 200 MHz?
+    Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+    Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 
-I'm also wondering about the cpuinfo_transition_latency variable.
-It seems to be a constant. On my SoC, the latency depends on the
-"width" of the frequency jump. Specifically, the CPU will change
-frequency at 15 MHz/us. So if we're jumping from 1000 to 500 MHz,
-it will take 33 us. From 500 to 333 will take 11 us.
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index ac9afde..b8053be 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -232,7 +232,7 @@ config ARM64_VA_BITS_42
 
-Should I document the max latency? (i.e. for the "widest" jump)
-Can the governor request to jump from cpuinfo_min_freq to
-cpuinfo_max_freq directly, skipping intermediate frequencies?
-If so, should I just program
+ config ARM64_VA_BITS_48
+        bool "48-bit"
+-       depends on BROKEN
++       depends on !ARM_SMMU
 
-cpuinfo_transition_latency =
-  (((cpuinfo_max_freq - cpuinfo_min_freq) / 1000) / 15) * 1000
+ endchoice
 
-= (cpuinfo_max_freq - cpuinfo_min_freq) / 15 (in ns)
-= 53280 ns in my example
 
-Since governors.txt suggests a sampling rate of 10 ms, I suppose
-a transition_latency of 50 us is acceptable?
+Do you know the status of any work to remove this limitation?
 
-Regards.
+Thanks,
+Stuart
