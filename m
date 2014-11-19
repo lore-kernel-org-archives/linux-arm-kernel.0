@@ -1,28 +1,81 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Nov 2014 15:11:03 +0100
-Subject: arm64 pci_iomap,
- was: Re: next build: 258 warnings 9 failures (next/next-20141119)
-In-Reply-To: <20141119135641.GD26258@ulmo.nvidia.com>
-References: <546c75d7.6336460a.14b5.474d@mx.google.com>
- <16479190.7SIDaKWfdW@wuerfel> <20141119135641.GD26258@ulmo.nvidia.com>
-Message-ID: <3897871.0i8K9av6A3@wuerfel>
+Date: Wed, 19 Nov 2014 15:11:24 +0100
+Subject: [PATCH] isofs: avoid unused function warning
+Message-ID: <1744765.FITJHBjs5L@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 November 2014 14:56:42 Thierry Reding wrote:
-> 
-> Oops, I just looked at that file on my system and I already have the
-> select GENERIC_PCI_IOMAP exactly where you have it. Turns out I have
-> that same patch, albeit with a somewhat obfuscated name in my tree
-> but never got around to clean up the commit message or sending it out.
-> 
-> Do you want to apply that patch on top or shall I redo the pull request
-> with that patch folded in so we can keep bisectability across the
-> series?
+With the isofs_hash() function removed, isofs_hash_ms() is the only user
+of isofs_hash_common(), but it's defined inside of an #ifdef, which triggers
+this gcc warning in ARM axm55xx_defconfig starting with v3.18-rc3:
 
-I would prefer to have my patch applied on top so I don't have to redo
-the merge between your patches and Will's patches.
+fs/isofs/inode.c:177:1: warning: 'isofs_hash_common' defined but not used [-Wunused-function]
 
-Can you confirm that you have no further patches that I might need?
+This patch moves the function inside of the same #ifdef section to avoid that
+warning, which seems the best compromise of a relatively harmless patch for
+a late -rc.
 
-	Arnd
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: b0afd8e5db7b ("isofs: don't bother with ->d_op for normal case")
+---
+
+diff --git a/fs/isofs/inode.c b/fs/isofs/inode.c
+index fe839b915116..d67a16f2a45d 100644
+--- a/fs/isofs/inode.c
++++ b/fs/isofs/inode.c
+@@ -174,27 +174,6 @@ struct iso9660_options{
+  * Compute the hash for the isofs name corresponding to the dentry.
+  */
+ static int
+-isofs_hash_common(struct qstr *qstr, int ms)
+-{
+-	const char *name;
+-	int len;
+-
+-	len = qstr->len;
+-	name = qstr->name;
+-	if (ms) {
+-		while (len && name[len-1] == '.')
+-			len--;
+-	}
+-
+-	qstr->hash = full_name_hash(name, len);
+-
+-	return 0;
+-}
+-
+-/*
+- * Compute the hash for the isofs name corresponding to the dentry.
+- */
+-static int
+ isofs_hashi_common(struct qstr *qstr, int ms)
+ {
+ 	const char *name;
+@@ -263,6 +242,27 @@ isofs_dentry_cmpi(const struct dentry *parent, const struct dentry *dentry,
+ }
+ 
+ #ifdef CONFIG_JOLIET
++/*
++ * Compute the hash for the isofs name corresponding to the dentry.
++ */
++static int
++isofs_hash_common(struct qstr *qstr, int ms)
++{
++	const char *name;
++	int len;
++
++	len = qstr->len;
++	name = qstr->name;
++	if (ms) {
++		while (len && name[len-1] == '.')
++			len--;
++	}
++
++	qstr->hash = full_name_hash(name, len);
++
++	return 0;
++}
++
+ static int
+ isofs_hash_ms(const struct dentry *dentry, struct qstr *qstr)
+ {
