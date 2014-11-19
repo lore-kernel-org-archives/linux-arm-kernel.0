@@ -1,67 +1,79 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 19 Nov 2014 12:15:48 +0100
-Subject: [PATCH v3 19/19] iommu: exynos: add callback for initializing devices
- from device tree
+Date: Wed, 19 Nov 2014 12:15:36 +0100
+Subject: [PATCH v3 07/19] iommu: exynos: don't read version register on every
+ tlb operation
 In-Reply-To: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
 References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1416395748-10731-20-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1416395748-10731-8-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds implementation of of_xlate callback, which prepares
-masters device for attaching to IOMMU. This callback is called during
-creating devices from device tree.
+This patch removes reading of REG_MMU_VERSION register on every tlb
+operation and caches SYSMMU version in driver's internal data.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ drivers/iommu/exynos-iommu.c | 13 +++++--------
+ 1 file changed, 5 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 88f9afe641a0..213db88ca52c 100644
+index 74233186f6f7..2912c4f9a8ad 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -1078,6 +1078,33 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *iommu_domain,
- 	return phys;
- }
- 
-+static int exynos_iommu_of_xlate(struct device *dev,
-+				 struct of_phandle_args *spec)
-+{
-+	struct exynos_iommu_owner *owner = dev->archdata.iommu;
-+	struct platform_device *sysmmu = of_find_device_by_node(spec->np);
-+	struct sysmmu_drvdata *data;
-+
-+	if (!sysmmu)
-+		return -ENODEV;
-+
-+	data = platform_get_drvdata(sysmmu);
-+	if (!data)
-+		return -ENODEV;
-+
-+	if (!owner) {
-+		owner = kzalloc(sizeof(*owner), GFP_KERNEL);
-+		if (!owner)
-+			return -ENOMEM;
-+
-+		INIT_LIST_HEAD(&owner->clients);
-+		dev->archdata.iommu = owner;
-+	}
-+
-+	list_add_tail(&data->owner_node, &owner->clients);
-+	return 0;
-+}
-+
- static const struct iommu_ops exynos_iommu_ops = {
- 	.domain_init = exynos_iommu_domain_init,
- 	.domain_destroy = exynos_iommu_domain_destroy,
-@@ -1087,6 +1114,7 @@ static const struct iommu_ops exynos_iommu_ops = {
- 	.unmap = exynos_iommu_unmap,
- 	.iova_to_phys = exynos_iommu_iova_to_phys,
- 	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
-+	.of_xlate = exynos_iommu_of_xlate,
+@@ -212,6 +212,7 @@ struct sysmmu_drvdata {
+ 	spinlock_t lock;
+ 	struct iommu_domain *domain;
+ 	phys_addr_t pgtable;
++	int version;
  };
  
- static int init_done;
+ static bool set_sysmmu_active(struct sysmmu_drvdata *data)
+@@ -238,11 +239,6 @@ static void sysmmu_unblock(void __iomem *sfrbase)
+ 	__raw_writel(CTRL_ENABLE, sfrbase + REG_MMU_CTRL);
+ }
+ 
+-static unsigned int __raw_sysmmu_version(struct sysmmu_drvdata *data)
+-{
+-	return MMU_RAW_VER(__raw_readl(data->sfrbase + REG_MMU_VERSION));
+-}
+-
+ static bool sysmmu_block(void __iomem *sfrbase)
+ {
+ 	int i = 120;
+@@ -402,7 +398,7 @@ static void __sysmmu_init_config(struct sysmmu_drvdata *data)
+ 	unsigned int cfg = CFG_LRU | CFG_QOS(15);
+ 	unsigned int ver;
+ 
+-	ver = __raw_sysmmu_version(data);
++	ver = MMU_RAW_VER(__raw_readl(data->sfrbase + REG_MMU_VERSION));
+ 	if (MMU_MAJ_VER(ver) == 3) {
+ 		if (MMU_MIN_VER(ver) >= 2) {
+ 			cfg |= CFG_FLPDCACHE;
+@@ -416,6 +412,7 @@ static void __sysmmu_init_config(struct sysmmu_drvdata *data)
+ 	}
+ 
+ 	__raw_writel(cfg, data->sfrbase + REG_MMU_CFG);
++	data->version = ver;
+ }
+ 
+ static void __sysmmu_enable_nocount(struct sysmmu_drvdata *data)
+@@ -525,7 +522,7 @@ static bool exynos_sysmmu_disable(struct device *dev)
+ static void __sysmmu_tlb_invalidate_flpdcache(struct sysmmu_drvdata *data,
+ 					      sysmmu_iova_t iova)
+ {
+-	if (__raw_sysmmu_version(data) == MAKE_MMU_VER(3, 3))
++	if (data->version == MAKE_MMU_VER(3, 3))
+ 		__raw_writel(iova | 0x1, data->sfrbase + REG_MMU_FLUSH_ENTRY);
+ }
+ 
+@@ -574,7 +571,7 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, sysmmu_iova_t iova,
+ 		 * 1MB page can be cached in one of all sets.
+ 		 * 64KB page can be one of 16 consecutive sets.
+ 		 */
+-		if (MMU_MAJ_VER(__raw_sysmmu_version(data)) == 2)
++		if (MMU_MAJ_VER(data->version) == 2)
+ 			num_inv = min_t(unsigned int, size / PAGE_SIZE, 64);
+ 
+ 		if (sysmmu_block(data->sfrbase)) {
 -- 
 1.9.2
