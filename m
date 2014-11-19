@@ -1,35 +1,59 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 19 Nov 2014 15:00:38 +0100
-Subject: [PATCH 3/3] ARM: shmobile: Convert to genpd flags for PM clocks for
- R-mobile
-In-Reply-To: <1416405638-18812-1-git-send-email-ulf.hansson@linaro.org>
-References: <1416405638-18812-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1416405638-18812-4-git-send-email-ulf.hansson@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 19 Nov 2014 15:01:26 +0100
+Subject: [PATCH] ARM: at91: fix GPLv2 wording
+Message-ID: <1416405686-25287-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of using the dev_ops ->stop|start() callbacks for genpd, let's
-convert to use genpd's flag field and set it to PM_DOMAIN_PM_CLK.
+During the submission of these new sama5d4 files, the GPL notice mentioned the
+device tree as a library, which is not really accurate.
+Fix all these library mentions to reflect the fact that it's actually just a
+file.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Reported-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-shmobile/pm-rmobile.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/boot/dts/at91-sama5d4ek.dts | 4 ++--
+ arch/arm/boot/dts/sama5d4.dtsi       | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
-index 717e641..42af9bd 100644
---- a/arch/arm/mach-shmobile/pm-rmobile.c
-+++ b/arch/arm/mach-shmobile/pm-rmobile.c
-@@ -106,9 +106,8 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
- 	struct generic_pm_domain *genpd = &rmobile_pd->genpd;
- 	struct dev_power_governor *gov = rmobile_pd->gov;
- 
-+	genpd->flags = PM_DOMAIN_PM_CLK;
- 	pm_genpd_init(genpd, gov ? : &simple_qos_governor, false);
--	genpd->dev_ops.stop		= pm_clk_suspend;
--	genpd->dev_ops.start		= pm_clk_resume;
- 	genpd->dev_ops.active_wakeup	= rmobile_pd_active_wakeup;
- 	genpd->power_off		= rmobile_pd_power_down;
- 	genpd->power_on			= rmobile_pd_power_up;
+diff --git a/arch/arm/boot/dts/at91-sama5d4ek.dts b/arch/arm/boot/dts/at91-sama5d4ek.dts
+index b5b84006469e..9198b719d0ef 100644
+--- a/arch/arm/boot/dts/at91-sama5d4ek.dts
++++ b/arch/arm/boot/dts/at91-sama5d4ek.dts
+@@ -9,12 +9,12 @@
+  * licensing only applies to this file, and not this project as a
+  * whole.
+  *
+- *  a) This library is free software; you can redistribute it and/or
++ *  a) This file is free software; you can redistribute it and/or
+  *     modify it under the terms of the GNU General Public License as
+  *     published by the Free Software Foundation; either version 2 of the
+  *     License, or (at your option) any later version.
+  *
+- *     This library is distributed in the hope that it will be useful,
++ *     This file is distributed in the hope that it will be useful,
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  *     GNU General Public License for more details.
+diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+index 05e0526a82d2..1b0f30c2c4a5 100644
+--- a/arch/arm/boot/dts/sama5d4.dtsi
++++ b/arch/arm/boot/dts/sama5d4.dtsi
+@@ -9,12 +9,12 @@
+  * licensing only applies to this file, and not this project as a
+  * whole.
+  *
+- *  a) This library is free software; you can redistribute it and/or
++ *  a) This file is free software; you can redistribute it and/or
+  *     modify it under the terms of the GNU General Public License as
+  *     published by the Free Software Foundation; either version 2 of the
+  *     License, or (at your option) any later version.
+  *
+- *     This library is distributed in the hope that it will be useful,
++ *     This file is distributed in the hope that it will be useful,
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  *     GNU General Public License for more details.
 -- 
-1.9.1
+2.1.3
