@@ -1,182 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Nov 2014 16:59:39 +0100
-Subject: [PATCH v4 1/2] ARM: cache-l2x0: clean up aurora cache handling
-Message-ID: <2352238.Gx0LiZB7JR@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 19 Nov 2014 15:52:01 +0000
+Subject: [STLinux Kernel] [PATCH] thermal: sti: Ignore suspend/resume
+ functions when !PM
+In-Reply-To: <546CAC92.3020504@st.com>
+References: <1416404939-365-1-git-send-email-lee.jones@linaro.org>
+ <546CAC92.3020504@st.com>
+Message-ID: <20141119155201.GC1875@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The aurora cache controller is the only remaining user of a couple
-of functions in this file and are completely unused when that is
-disabled, leading to build warnings:
+On Wed, 19 Nov 2014, Maxime Coquelin wrote:
 
-arch/arm/mm/cache-l2x0.c:167:13: warning: 'l2x0_cache_sync' defined but not used [-Wunused-function]
-arch/arm/mm/cache-l2x0.c:184:13: warning: 'l2x0_flush_all' defined but not used [-Wunused-function]
-arch/arm/mm/cache-l2x0.c:194:13: warning: 'l2x0_disable' defined but not used [-Wunused-function]
+> 
+> On 11/19/2014 02:48 PM, Lee Jones wrote:
+> >Prevents build warning:
+> >
+> >st_thermal.c:278:12:
+> >     warning: ?st_thermal_suspend? defined but not used [-Wunused-function]
+> >st_thermal.c:286:12:
+> >     warning: ?st_thermal_resume? defined but not used [-Wunused-function]
+> >
+> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> You can add my:
+> Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
-With the knowledge that the code is now aurora-specific, we can
-simplify it noticeably:
+Sorry Maxime, I made a booboo!
 
-- The pl310 errata workarounds are not needed on aurora and can be removed
-- As confirmed by Thomas Petazzoni from the data sheet, the cache_wait()
-  macro is never needed.
-- No need to hold the lock across atomic cache sync
-- We can load the l2x0_base into a local variable across operations
+Resubmitted.
 
-There should be no functional change in this patch, but readability
-and the generated object code improves, along with avoiding the
-warnings.
+> >---
+> >  drivers/thermal/st/st_thermal.c | 3 +++
+> >  1 file changed, 3 insertions(+)
+> >
+> >diff --git a/drivers/thermal/st/st_thermal.c b/drivers/thermal/st/st_thermal.c
+> >index 90163b3..9841488 100644
+> >--- a/drivers/thermal/st/st_thermal.c
+> >+++ b/drivers/thermal/st/st_thermal.c
+> >@@ -275,6 +275,7 @@ int st_thermal_unregister(struct platform_device *pdev)
+> >  }
+> >  EXPORT_SYMBOL_GPL(st_thermal_unregister);
+> >+#ifdef CONFIG_PM
+> >  static int st_thermal_suspend(struct device *dev)
+> >  {
+> >  	struct platform_device *pdev = to_platform_device(dev);
+> >@@ -305,6 +306,8 @@ static int st_thermal_resume(struct device *dev)
+> >  	return 0;
+> >  }
+> >+#endif
+> >+
+> >  SIMPLE_DEV_PM_OPS(st_thermal_pm_ops, st_thermal_suspend, st_thermal_resume);
+> >  EXPORT_SYMBOL_GPL(st_thermal_pm_ops);
+> 
 
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
- (on Armada 370 RD and Armada XP GP, boot tested, plus a little bit of
- DMA traffic by reading data from a SD card)
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 5e65ca8dea62..341ba8aaca42 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -136,73 +136,6 @@ static void l2c_disable(void)
- 	dsb(st);
- }
- 
--#ifdef CONFIG_CACHE_PL310
--static inline void cache_wait(void __iomem *reg, unsigned long mask)
--{
--	/* cache operations by line are atomic on PL310 */
--}
--#else
--#define cache_wait	l2c_wait_mask
--#endif
--
--static inline void cache_sync(void)
--{
--	void __iomem *base = l2x0_base;
--
--	writel_relaxed(0, base + sync_reg_offset);
--	cache_wait(base + L2X0_CACHE_SYNC, 1);
--}
--
--#if defined(CONFIG_PL310_ERRATA_588369) || defined(CONFIG_PL310_ERRATA_727915)
--static inline void debug_writel(unsigned long val)
--{
--	l2c_set_debug(l2x0_base, val);
--}
--#else
--/* Optimised out for non-errata case */
--static inline void debug_writel(unsigned long val)
--{
--}
--#endif
--
--static void l2x0_cache_sync(void)
--{
--	unsigned long flags;
--
--	raw_spin_lock_irqsave(&l2x0_lock, flags);
--	cache_sync();
--	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
--}
--
--static void __l2x0_flush_all(void)
--{
--	debug_writel(0x03);
--	__l2c_op_way(l2x0_base + L2X0_CLEAN_INV_WAY);
--	cache_sync();
--	debug_writel(0x00);
--}
--
--static void l2x0_flush_all(void)
--{
--	unsigned long flags;
--
--	/* clean all ways */
--	raw_spin_lock_irqsave(&l2x0_lock, flags);
--	__l2x0_flush_all();
--	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
--}
--
--static void l2x0_disable(void)
--{
--	unsigned long flags;
--
--	raw_spin_lock_irqsave(&l2x0_lock, flags);
--	__l2x0_flush_all();
--	l2c_write_sec(0, l2x0_base, L2X0_CTRL);
--	dsb(st);
--	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
--}
--
- static void l2c_save(void __iomem *base)
- {
- 	l2x0_saved_regs.aux_ctrl = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
-@@ -1257,14 +1190,15 @@ static unsigned long calc_range_end(unsigned long start, unsigned long end)
- static void aurora_pa_range(unsigned long start, unsigned long end,
- 			unsigned long offset)
- {
-+	void __iomem *base = l2x0_base;
- 	unsigned long flags;
- 
- 	raw_spin_lock_irqsave(&l2x0_lock, flags);
--	writel_relaxed(start, l2x0_base + AURORA_RANGE_BASE_ADDR_REG);
--	writel_relaxed(end, l2x0_base + offset);
-+	writel_relaxed(start, base + AURORA_RANGE_BASE_ADDR_REG);
-+	writel_relaxed(end, base + offset);
- 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
- 
--	cache_sync();
-+	writel_relaxed(0, base + AURORA_SYNC_REG);
- }
- 
- static void aurora_inv_range(unsigned long start, unsigned long end)
-@@ -1324,6 +1258,37 @@ static void aurora_flush_range(unsigned long start, unsigned long end)
- 	}
- }
- 
-+static void aurora_flush_all(void)
-+{
-+	void __iomem *base = l2x0_base;
-+	unsigned long flags;
-+
-+	/* clean all ways */
-+	raw_spin_lock_irqsave(&l2x0_lock, flags);
-+	__l2c_op_way(base + L2X0_CLEAN_INV_WAY);
-+	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
-+
-+	writel_relaxed(0, base + AURORA_SYNC_REG);
-+}
-+
-+static void aurora_cache_sync(void)
-+{
-+	writel_relaxed(0, l2x0_base + AURORA_SYNC_REG);
-+}
-+
-+static void aurora_disable(void)
-+{
-+	void __iomem *base = l2x0_base;
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&l2x0_lock, flags);
-+	__l2c_op_way(base + L2X0_CLEAN_INV_WAY);
-+	writel_relaxed(0, base + AURORA_SYNC_REG);
-+	l2c_write_sec(0, base, L2X0_CTRL);
-+	dsb(st);
-+	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
-+}
-+
- static void aurora_save(void __iomem *base)
- {
- 	l2x0_saved_regs.ctrl = readl_relaxed(base + L2X0_CTRL);
-@@ -1398,9 +1363,9 @@ static const struct l2c_init_data of_aurora_with_outer_data __initconst = {
- 		.inv_range   = aurora_inv_range,
- 		.clean_range = aurora_clean_range,
- 		.flush_range = aurora_flush_range,
--		.flush_all   = l2x0_flush_all,
--		.disable     = l2x0_disable,
--		.sync        = l2x0_cache_sync,
-+		.flush_all   = aurora_flush_all,
-+		.disable     = aurora_disable,
-+		.sync        = aurora_cache_sync,
- 		.resume      = aurora_resume,
- 	},
- };
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
