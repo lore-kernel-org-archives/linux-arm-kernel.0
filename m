@@ -1,33 +1,35 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Wed, 19 Nov 2014 16:56:23 +0100
-Subject: [PATCH 3/4] ARM: exynos_defconfig: Enable LM90 driver
+Date: Wed, 19 Nov 2014 16:56:22 +0100
+Subject: [PATCH 2/4] ARM: dts: Add temperature sensor to exynos5250-spring
 In-Reply-To: <1416412585-10809-1-git-send-email-afaerber@suse.de>
 References: <1416412585-10809-1-git-send-email-afaerber@suse.de>
-Message-ID: <1416412585-10809-4-git-send-email-afaerber@suse.de>
+Message-ID: <1416412585-10809-3-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-multi_v7_defconfig has it as Y already, so build it in here, too, for
-consistency, and therefore build in HWMON as well.
+Spotted in the Chrome OS 3.8 based device tree.
+Needs CONFIG_SENSORS_LM90.
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- arch/arm/configs/exynos_defconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos5250-spring.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index 8dfa7d312f51..2d7d2027aeb9 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -84,7 +84,8 @@ CONFIG_DEBUG_GPIO=y
- CONFIG_POWER_SUPPLY=y
- CONFIG_BATTERY_SBS=y
- CONFIG_CHARGER_TPS65090=y
--# CONFIG_HWMON is not set
-+CONFIG_HWMON=y
-+CONFIG_SENSORS_LM90=y
- CONFIG_THERMAL=y
- CONFIG_EXYNOS_THERMAL=y
- CONFIG_EXYNOS_THERMAL_CORE=y
+diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
+index 310764b6e28d..cc3361afba49 100644
+--- a/arch/arm/boot/dts/exynos5250-spring.dts
++++ b/arch/arm/boot/dts/exynos5250-spring.dts
+@@ -383,6 +383,11 @@
+ 	status = "okay";
+ 	samsung,i2c-sda-delay = <100>;
+ 	samsung,i2c-max-bus-freq = <66000>;
++
++	temperature-sensor at 4c {
++		compatible = "gmt,g781";
++		reg = <0x4c>;
++	};
+ };
+ 
+ &i2c_8 {
 -- 
 2.1.2
