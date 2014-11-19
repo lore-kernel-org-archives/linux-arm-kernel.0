@@ -1,71 +1,57 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 19 Nov 2014 11:45:37 +0100
-Subject: [RESEND PATCH 1/2] mmc: atmel-mci: remove compat for non DT board
- when requesting dma chan
-In-Reply-To: <1415975785-30303-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1415975785-30303-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <CAPDyKFp6O-OzmpBkddexXYM5=7hq-4pn5ASu68mmvGU=HmyLeA@mail.gmail.com>
+From: p.pisati@gmail.com (Paolo Pisati)
+Date: Wed, 19 Nov 2014 11:55:27 +0100
+Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
+ support
+In-Reply-To: <546C646C.4060303@collabora.co.uk>
+References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
+ <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
+ <546C646C.4060303@collabora.co.uk>
+Message-ID: <20141119105527.GA5396@luxor.wired.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 November 2014 15:36, Ludovic Desroches
-<ludovic.desroches@atmel.com> wrote:
-> All boards with a dma controller have DT support so using
-> dma_request_slave_channel_compat is no more needed.
->
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Wed, Nov 19, 2014 at 10:35:40AM +0100, Javier Martinez Canillas wrote:
+> Hello Ajay,
+> 
+> On 11/18/2014 07:20 AM, Ajay kumar wrote:
+> > On Sat, Nov 15, 2014 at 3:24 PM, Ajay Kumar <ajaykumar.rs@samsung.com> wrote:
+> >> This series is based on master branch of Linus tree at:
+> >> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+> 
+> I applied your series on top of 3.18-rc5 + linux-next's commit:
+> 
+> 0ef76ae ("ARM: exynos_defconfig: Enable options for display panel support").
+> 
+> I think you should had mentioned what other patches are needed as a
+> dependency since I spent quite a bit of time figuring out why the
+> ps8622 bridge driver probe was always deferred due of_drm_find_panel()
+> failing and then I noticed that a patch from linux-next was needed:
+> 
+> e35e305 ("drm/panel: simple: Add AUO B116XW03 panel support")
+> 
+> With that commit the ps8622 drm bridge driver probe succeed but I still
+> don't have display working on an Exynos5240 Peach Pit, the kernel log shows:
+> 
+> platform 145b0000.dp-controller: Driver exynos-dp requests probe deferral
+> exynos-drm exynos-drm: bound 14400000.fimd (ops fimd_component_ops)
+> exynos-drm exynos-drm: failed to bind 145b0000.dp-controller (ops exynos_dp_ops): -517
+> exynos-drm exynos-drm: master bind failed: -517
+> platform 145b0000.dp-controller: Driver exynos-dp requests probe deferral
 
-Thanks! Applied for next.
+do you have this in your dmesg?
 
-Kind regards
-Uffe
+...
+exynos-dp-video-phy 10040728.video-phy: Failed to lookup PMU regmap
+...
 
+to get a working framebuffer out of linus 318rc4 on my peach pi, i had
+to cherry pick these 3 patches:
 
-> ---
->
-> Sorry for the noise, typo in cc list.
->
->  drivers/mmc/host/atmel-mci.c | 20 +-------------------
->  1 file changed, 1 insertion(+), 19 deletions(-)
->
-> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-> index a7b59ba..de2287c 100644
-> --- a/drivers/mmc/host/atmel-mci.c
-> +++ b/drivers/mmc/host/atmel-mci.c
-> @@ -2272,23 +2272,6 @@ static void atmci_cleanup_slot(struct atmel_mci_slot *slot,
->         mmc_free_host(slot->mmc);
->  }
->
-> -static bool atmci_filter(struct dma_chan *chan, void *pdata)
-> -{
-> -       struct mci_platform_data *sl_pdata = pdata;
-> -       struct mci_dma_data *sl;
-> -
-> -       if (!sl_pdata)
-> -               return false;
-> -
-> -       sl = sl_pdata->dma_slave;
-> -       if (sl && find_slave_dev(sl) == chan->device->dev) {
-> -               chan->private = slave_data_ptr(sl);
-> -               return true;
-> -       } else {
-> -               return false;
-> -       }
-> -}
-> -
->  static bool atmci_configure_dma(struct atmel_mci *host)
->  {
->         struct mci_platform_data        *pdata;
-> @@ -2302,8 +2285,7 @@ static bool atmci_configure_dma(struct atmel_mci *host)
->         dma_cap_zero(mask);
->         dma_cap_set(DMA_SLAVE, mask);
->
-> -       host->dma.chan = dma_request_slave_channel_compat(mask, atmci_filter, pdata,
-> -                                                         &host->pdev->dev, "rxtx");
-> +       host->dma.chan = dma_request_slave_channel(&host->pdev->dev, "rxtx");
->         if (!host->dma.chan) {
->                 dev_warn(&host->pdev->dev, "no DMA channel available\n");
->                 return false;
-> --
-> 2.0.3
->
+arm: dts: Exynos5: Use pmu_system_controller phandle for dp phy
+drm/exynos: dp: Remove support for unused dptx-phy
+ARM: exynos_defconfig: Enable options for display panel support
+
+Check if you have those.
+-- 
+bye,
+p.
