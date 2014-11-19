@@ -1,57 +1,127 @@
-From: p.pisati@gmail.com (Paolo Pisati)
-Date: Wed, 19 Nov 2014 11:55:27 +0100
-Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
- support
-In-Reply-To: <546C646C.4060303@collabora.co.uk>
-References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
- <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
- <546C646C.4060303@collabora.co.uk>
-Message-ID: <20141119105527.GA5396@luxor.wired.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 19 Nov 2014 12:02:29 +0100
+Subject: [PATCH] arm/arm64: KVM: Handle traps of ICC_SRE_EL1 as RAZ/WI
+Message-ID: <1416394949-23496-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 10:35:40AM +0100, Javier Martinez Canillas wrote:
-> Hello Ajay,
-> 
-> On 11/18/2014 07:20 AM, Ajay kumar wrote:
-> > On Sat, Nov 15, 2014 at 3:24 PM, Ajay Kumar <ajaykumar.rs@samsung.com> wrote:
-> >> This series is based on master branch of Linus tree at:
-> >> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
-> 
-> I applied your series on top of 3.18-rc5 + linux-next's commit:
-> 
-> 0ef76ae ("ARM: exynos_defconfig: Enable options for display panel support").
-> 
-> I think you should had mentioned what other patches are needed as a
-> dependency since I spent quite a bit of time figuring out why the
-> ps8622 bridge driver probe was always deferred due of_drm_find_panel()
-> failing and then I noticed that a patch from linux-next was needed:
-> 
-> e35e305 ("drm/panel: simple: Add AUO B116XW03 panel support")
-> 
-> With that commit the ps8622 drm bridge driver probe succeed but I still
-> don't have display working on an Exynos5240 Peach Pit, the kernel log shows:
-> 
-> platform 145b0000.dp-controller: Driver exynos-dp requests probe deferral
-> exynos-drm exynos-drm: bound 14400000.fimd (ops fimd_component_ops)
-> exynos-drm exynos-drm: failed to bind 145b0000.dp-controller (ops exynos_dp_ops): -517
-> exynos-drm exynos-drm: master bind failed: -517
-> platform 145b0000.dp-controller: Driver exynos-dp requests probe deferral
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-do you have this in your dmesg?
+When running on a system with a GICv3, we currenly don't allow the guest
+to access the system register interface of the GICv3.  We do this by
+clearing the ICC_SRE_EL2.Enable, which causes all guest accesses to
+ICC_SRE_EL1 to trap to EL2 and causes all guest accesses to other ICC_
+registers to cause an undefined exception in the guest.
 
-...
-exynos-dp-video-phy 10040728.video-phy: Failed to lookup PMU regmap
-...
+However, we currently don't handle the trap of guest accesses to
+ICC_SRE_EL1 and will spill out a warning.  The trap just needs to handle
+the access as RAZ/WI, and a guest that tries to prod this register and
+set ICC_SRE_EL1.SRE=1, must read back the value (which Linux already
+does) to see if it succeeded, and will thus observe that ICC_SRE_EL1.SRE
+was not set.
 
-to get a working framebuffer out of linus 318rc4 on my peach pi, i had
-to cherry pick these 3 patches:
+Add the simple trap handler in the sorted table of the system registers.
 
-arm: dts: Exynos5: Use pmu_system_controller phandle for dp phy
-drm/exynos: dp: Remove support for unused dptx-phy
-ARM: exynos_defconfig: Enable options for display panel support
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+[ardb: added 32-bit counterpart]
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+--
+v2: added 32-bit counterpart, renaming pm_fake to trap_raz_wi in the process,
+    hence the additional changes on that side
+---
+ arch/arm/kvm/coproc.c     | 49 +++++++++++++++++++++++++----------------------
+ arch/arm64/kvm/sys_regs.c |  5 +++++
+ 2 files changed, 31 insertions(+), 23 deletions(-)
 
-Check if you have those.
+diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+index 7928dbdf2102..a7cf90dd51ff 100644
+--- a/arch/arm/kvm/coproc.c
++++ b/arch/arm/kvm/coproc.c
+@@ -268,6 +268,16 @@ bool access_sctlr(struct kvm_vcpu *vcpu,
+ 	return true;
+ }
+ 
++static bool trap_raz_wi(struct kvm_vcpu *vcpu,
++			const struct coproc_params *p,
++			const struct coproc_reg *r)
++{
++	if (p->is_write)
++		return ignore_write(vcpu, p);
++	else
++		return read_zero(vcpu, p);
++}
++
+ /*
+  * We could trap ID_DFR0 and tell the guest we don't support performance
+  * monitoring.  Unfortunately the patch to make the kernel check ID_DFR0 was
+@@ -277,29 +287,19 @@ bool access_sctlr(struct kvm_vcpu *vcpu,
+  * must always support PMCCNTR (the cycle counter): we just RAZ/WI for
+  * all PM registers, which doesn't crash the guest kernel at least.
+  */
+-static bool pm_fake(struct kvm_vcpu *vcpu,
+-		    const struct coproc_params *p,
+-		    const struct coproc_reg *r)
+-{
+-	if (p->is_write)
+-		return ignore_write(vcpu, p);
+-	else
+-		return read_zero(vcpu, p);
+-}
+-
+-#define access_pmcr pm_fake
+-#define access_pmcntenset pm_fake
+-#define access_pmcntenclr pm_fake
+-#define access_pmovsr pm_fake
+-#define access_pmselr pm_fake
+-#define access_pmceid0 pm_fake
+-#define access_pmceid1 pm_fake
+-#define access_pmccntr pm_fake
+-#define access_pmxevtyper pm_fake
+-#define access_pmxevcntr pm_fake
+-#define access_pmuserenr pm_fake
+-#define access_pmintenset pm_fake
+-#define access_pmintenclr pm_fake
++#define access_pmcr		trap_raz_wi
++#define access_pmcntenset	trap_raz_wi
++#define access_pmcntenclr	trap_raz_wi
++#define access_pmovsr		trap_raz_wi
++#define access_pmselr		trap_raz_wi
++#define access_pmceid0		trap_raz_wi
++#define access_pmceid1		trap_raz_wi
++#define access_pmccntr		trap_raz_wi
++#define access_pmxevtyper	trap_raz_wi
++#define access_pmxevcntr	trap_raz_wi
++#define access_pmuserenr	trap_raz_wi
++#define access_pmintenset	trap_raz_wi
++#define access_pmintenclr	trap_raz_wi
+ 
+ /* Architected CP15 registers.
+  * CRn denotes the primary register number, but is copied to the CRm in the
+@@ -405,6 +405,9 @@ static const struct coproc_reg cp15_regs[] = {
+ 	{ CRn(12), CRm( 0), Op1( 0), Op2( 0), is32,
+ 			NULL, reset_val, c12_VBAR, 0x00000000 },
+ 
++	/* ICC_SRE */
++	{ CRn(12), CRm(12), Op1( 0), Op2( 5), is32, trap_raz_wi },
++
+ 	/* CONTEXTIDR/TPIDRURW/TPIDRURO/TPIDRPRW: swapped by interrupt.S. */
+ 	{ CRn(13), CRm( 0), Op1( 0), Op2( 1), is32,
+ 			access_vm_reg, reset_val, c13_CID, 0x00000000 },
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 4cc3b719208e..8f81945c4365 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -424,6 +424,11 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	/* VBAR_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
+ 	  NULL, reset_val, VBAR_EL1, 0 },
++
++	/* ICC_SRE_EL1 */
++	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1100), Op2(0b101),
++	  trap_raz_wi },
++
+ 	/* CONTEXTIDR_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b001),
+ 	  access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
 -- 
-bye,
-p.
+1.8.3.2
