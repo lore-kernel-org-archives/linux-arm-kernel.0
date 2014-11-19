@@ -1,59 +1,140 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 19 Nov 2014 15:52:01 +0000
-Subject: [STLinux Kernel] [PATCH] thermal: sti: Ignore suspend/resume
- functions when !PM
-In-Reply-To: <546CAC92.3020504@st.com>
-References: <1416404939-365-1-git-send-email-lee.jones@linaro.org>
- <546CAC92.3020504@st.com>
-Message-ID: <20141119155201.GC1875@x1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Nov 2014 17:00:21 +0100
+Subject: [PATCH v4 2/2] ARM: cache-l2x0: optimize aurora range operations
+In-Reply-To: <2352238.Gx0LiZB7JR@wuerfel>
+References: <2352238.Gx0LiZB7JR@wuerfel>
+Message-ID: <3013076.29gu0Opyzs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Nov 2014, Maxime Coquelin wrote:
+The aurora_inv_range(), aurora_clean_range() and aurora_flush_range()
+functions are highly redundant, both in source and in object code, and
+they are harder to understand than necessary.
 
-> 
-> On 11/19/2014 02:48 PM, Lee Jones wrote:
-> >Prevents build warning:
-> >
-> >st_thermal.c:278:12:
-> >     warning: ?st_thermal_suspend? defined but not used [-Wunused-function]
-> >st_thermal.c:286:12:
-> >     warning: ?st_thermal_resume? defined but not used [-Wunused-function]
-> >
-> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> You can add my:
-> Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+By moving the range loop into the aurora_pa_range() function, they
+become trivial wrappers, and the object code start looking like what
+one would expect for an optimal implementation.
 
-Sorry Maxime, I made a booboo!
+Further optimization may be possible by using the per-CPU "virtual"
+registers to avoid the spinlocks in most cases.
 
-Resubmitted.
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+ (on Armada 370 RD and Armada XP GP, boot tested, plus a little bit of
+ DMA traffic by reading data from a SD card)
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-> >---
-> >  drivers/thermal/st/st_thermal.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> >
-> >diff --git a/drivers/thermal/st/st_thermal.c b/drivers/thermal/st/st_thermal.c
-> >index 90163b3..9841488 100644
-> >--- a/drivers/thermal/st/st_thermal.c
-> >+++ b/drivers/thermal/st/st_thermal.c
-> >@@ -275,6 +275,7 @@ int st_thermal_unregister(struct platform_device *pdev)
-> >  }
-> >  EXPORT_SYMBOL_GPL(st_thermal_unregister);
-> >+#ifdef CONFIG_PM
-> >  static int st_thermal_suspend(struct device *dev)
-> >  {
-> >  	struct platform_device *pdev = to_platform_device(dev);
-> >@@ -305,6 +306,8 @@ static int st_thermal_resume(struct device *dev)
-> >  	return 0;
-> >  }
-> >+#endif
-> >+
-> >  SIMPLE_DEV_PM_OPS(st_thermal_pm_ops, st_thermal_suspend, st_thermal_resume);
-> >  EXPORT_SYMBOL_GPL(st_thermal_pm_ops);
-> 
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 341ba8aaca42..e2013b9c4362 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1164,7 +1164,7 @@ static const struct l2c_init_data of_l2c310_coherent_data __initconst = {
+  * noninclusive, while the hardware cache range operations use
+  * inclusive start and end addresses.
+  */
+-static unsigned long calc_range_end(unsigned long start, unsigned long end)
++static unsigned long aurora_range_end(unsigned long start, unsigned long end)
+ {
+ 	/*
+ 	 * Limit the number of cache lines processed at once,
+@@ -1183,26 +1183,13 @@ static unsigned long calc_range_end(unsigned long start, unsigned long end)
+ 	return end;
+ }
+ 
+-/*
+- * Make sure 'start' and 'end' reference the same page, as L2 is PIPT
+- * and range operations only do a TLB lookup on the start address.
+- */
+ static void aurora_pa_range(unsigned long start, unsigned long end,
+-			unsigned long offset)
++			    unsigned long offset)
+ {
+ 	void __iomem *base = l2x0_base;
++	unsigned long range_end;
+ 	unsigned long flags;
+ 
+-	raw_spin_lock_irqsave(&l2x0_lock, flags);
+-	writel_relaxed(start, base + AURORA_RANGE_BASE_ADDR_REG);
+-	writel_relaxed(end, base + offset);
+-	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-
+-	writel_relaxed(0, base + AURORA_SYNC_REG);
+-}
+-
+-static void aurora_inv_range(unsigned long start, unsigned long end)
+-{
+ 	/*
+ 	 * round start and end adresses up to cache line size
+ 	 */
+@@ -1210,15 +1197,24 @@ static void aurora_inv_range(unsigned long start, unsigned long end)
+ 	end = ALIGN(end, CACHE_LINE_SIZE);
+ 
+ 	/*
+-	 * Invalidate all full cache lines between 'start' and 'end'.
++	 * perform operation on all full cache lines between 'start' and 'end'
+ 	 */
+ 	while (start < end) {
+-		unsigned long range_end = calc_range_end(start, end);
+-		aurora_pa_range(start, range_end - CACHE_LINE_SIZE,
+-				AURORA_INVAL_RANGE_REG);
++		range_end = aurora_range_end(start, end);
++
++		raw_spin_lock_irqsave(&l2x0_lock, flags);
++		writel_relaxed(start, base + AURORA_RANGE_BASE_ADDR_REG);
++		writel_relaxed(range_end - CACHE_LINE_SIZE, base + offset);
++		raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++
++		writel_relaxed(0, base + AURORA_SYNC_REG);
+ 		start = range_end;
+ 	}
+ }
++static void aurora_inv_range(unsigned long start, unsigned long end)
++{
++	aurora_pa_range(start, end, AURORA_INVAL_RANGE_REG);
++}
+ 
+ static void aurora_clean_range(unsigned long start, unsigned long end)
+ {
+@@ -1226,36 +1222,16 @@ static void aurora_clean_range(unsigned long start, unsigned long end)
+ 	 * If L2 is forced to WT, the L2 will always be clean and we
+ 	 * don't need to do anything here.
+ 	 */
+-	if (!l2_wt_override) {
+-		start &= ~(CACHE_LINE_SIZE - 1);
+-		end = ALIGN(end, CACHE_LINE_SIZE);
+-		while (start != end) {
+-			unsigned long range_end = calc_range_end(start, end);
+-			aurora_pa_range(start, range_end - CACHE_LINE_SIZE,
+-					AURORA_CLEAN_RANGE_REG);
+-			start = range_end;
+-		}
+-	}
++	if (!l2_wt_override)
++		aurora_pa_range(start, end, AURORA_CLEAN_RANGE_REG);
+ }
+ 
+ static void aurora_flush_range(unsigned long start, unsigned long end)
+ {
+-	start &= ~(CACHE_LINE_SIZE - 1);
+-	end = ALIGN(end, CACHE_LINE_SIZE);
+-	while (start != end) {
+-		unsigned long range_end = calc_range_end(start, end);
+-		/*
+-		 * If L2 is forced to WT, the L2 will always be clean and we
+-		 * just need to invalidate.
+-		 */
+-		if (l2_wt_override)
+-			aurora_pa_range(start, range_end - CACHE_LINE_SIZE,
+-							AURORA_INVAL_RANGE_REG);
+-		else
+-			aurora_pa_range(start, range_end - CACHE_LINE_SIZE,
+-							AURORA_FLUSH_RANGE_REG);
+-		start = range_end;
+-	}
++	if (l2_wt_override)
++		aurora_pa_range(start, end, AURORA_INVAL_RANGE_REG);
++	else
++		aurora_pa_range(start, end, AURORA_FLUSH_RANGE_REG);
+ }
+ 
+ static void aurora_flush_all(void)
