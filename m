@@ -1,37 +1,38 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 19 Nov 2014 15:07:28 +0000
-Subject: [PATCH v5.5] of/fdt: export fdt blob as /sys/firmware/fdt
-In-Reply-To: <1416402576.29243.35.camel@citrix.com>
-References: <1415984735-32388-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141118165145.4F6A8C40966@trevor.secretlab.ca>
- <20141118172545.GC14323@leverpostej>
- <20141118221103.4ECB3C40966@trevor.secretlab.ca>
- <1416402576.29243.35.camel@citrix.com>
-Message-ID: <20141119150728.9B083C40D73@trevor.secretlab.ca>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Nov 2014 16:10:16 +0100
+Subject: [PATCH 1/2] ARM: cache-l2x0: clean up aurora cache handling
+In-Reply-To: <4475865.jdxZMh688N@wuerfel>
+References: <1547660.4MUNEQsfAo@wuerfel>
+ <20141119145015.GG4042@n2100.arm.linux.org.uk> <4475865.jdxZMh688N@wuerfel>
+Message-ID: <12419854.Yj2kZEItoO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Nov 2014 13:09:36 +0000
-, Ian Campbell <Ian.Campbell@citrix.com>
- wrote:
-> On Tue, 2014-11-18 at 22:11 +0000, Grant Likely wrote:
-> > > > * It also helps with exposing the reserved map to userspace, but kexec
-> > > >   has done without that feature for years, and it is in the process of
-> > > >   being deprecated in favour of /reserved-memory anyway.
-> > > 
-> > > This is the first I'd heard of the reserve map being deprecated, and
-> > > we're going to have DTs with reserved map entries for a long time going
-> > > forwards.
+On Wednesday 19 November 2014 16:06:31 Arnd Bergmann wrote:
+> On Wednesday 19 November 2014 14:50:15 Russell King - ARM Linux wrote:
 > > 
-> > Deprecated, not removed or disabled. It will still work pretty much
-> > forever, but users should be encouraged to move to the reserve-memory
-> > tree.
+> > If the operations complete synchronously (in other words, the L2 cache
+> > doesn't accept another transaction until the cache operation has completed)
+> > the spinlocks should not be necessary.
+> > 
+> > They're necessary for some of the ARM caches which allow cache operations
+> > to run asynchronously (hence the wait stuff) but if you don't have the
+> > wait stuff as you imply above, they can't be asynchronous.
 > 
-> I'm curious why that should be for the "OS should never touch this, here
-> be dragons" type memory, what are the benefits of the new scheme in that
-> case?
+> I think the spinlock is still needed, it now only protects this sequence:
+> 
+>                 raw_spin_lock_irqsave(&l2x0_lock, flags);
+>                 writel_relaxed(start, base + AURORA_RANGE_BASE_ADDR_REG);
+>                 writel_relaxed(range_end - CACHE_LINE_SIZE, base + offset);
+>                 writel_relaxed(0, base + AURORA_SYNC_REG);
+>                 raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+> 
+> without the lock, two concurrent processes might start writing into
+> AURORA_RANGE_BASE_ADDR_REG before the first one writes the operation
+> register.
 
-Merely for the reason of it makes the data available in exactly the same
-manner as all the rest of the data in the tree.
+After taking another look, I do get your point. Yes, we only need the lock
+across the first two operations, not for the third one, which can be done
+outside of the lock. I'll change the patch accordingly.
 
-g.
+	Arnd
