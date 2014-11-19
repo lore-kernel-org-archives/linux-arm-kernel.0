@@ -1,46 +1,53 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 19 Nov 2014 16:57:34 +0100
-Subject: [PATCH 7/7] [RFC] ARM: shmobile: r8a7740 dtsi: Add missing
- memory-controller node
-In-Reply-To: <1416412654-6508-1-git-send-email-geert+renesas@glider.be>
-References: <1416412654-6508-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1416412654-6508-8-git-send-email-geert+renesas@glider.be>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 19 Nov 2014 16:57:56 +0100
+Subject: [PATCH 5/6] ARM: at91/dt: add trng node
+In-Reply-To: <1412093987-30241-6-git-send-email-boris.brezillon@free-electrons.com>
+References: <1412093987-30241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1412093987-30241-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <546CBE04.1000705@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a memory-controller node for the DDR3 Bus State Controller (DBSC3),
-which lies in the A4S PM domain.
-There are no documented bindings for the DBSC3 yet (so far there's still
-no need for a driver), but all of its properties follow the standard
-conventions.
+On 30/09/2014 18:19, Boris Brezillon :
+> Add a DT node for the TRNG (True Random Number Generator) block.
+> 
+> Keep this block enabled as it does not depend on any external connection,
+> and thus should be available on all boards.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-This has no visible effect for now, as A4S is never turned off because
-its child domain A3SM contains the CPU core.
+For patches 2 to 5, you can add my:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-Question: Should I make dbsc3 a minimal node for now, i.e. retain only
-	  its "compatible" and "power-domains" properties?
----
- arch/arm/boot/dts/r8a7740.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+while re-sending a series. Maybe add linux-crypto and the "HARDWARE
+RANDOM NUMBER GENERATOR CORE" guys to the CC list.
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 95723764431a3e5d..173d4340bba1c4fa 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -37,6 +37,12 @@
- 		      <0xc2000000 0x1000>;
- 	};
- 
-+	dbsc3: memory-controller at fe400000 {
-+		compatible = "renesas,dbsc3-r8a7740";
-+		reg = <0xfe400000 0x400>;
-+		power-domains = <&pd_a4s>;
-+	};
-+
- 	pmu {
- 		compatible = "arm,cortex-a9-pmu";
- 		interrupts = <0 83 IRQ_TYPE_LEVEL_HIGH>;
+Bye,
+
+> ---
+>  arch/arm/boot/dts/at91sam9g45.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+> index 932a669..790c890 100644
+> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+> @@ -934,6 +934,13 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			trng at fffcc000 {
+> +				compatible = "atmel,at91sam9g45-trng";
+> +				reg = <0xfffcc000 0x4000>;
+> +				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 0>;
+> +				clocks = <&trng_clk>;
+> +			};
+> +
+>  			i2c0: i2c at fff84000 {
+>  				compatible = "atmel,at91sam9g10-i2c";
+>  				reg = <0xfff84000 0x100>;
+> 
+
+
 -- 
-1.9.1
+Nicolas Ferre
