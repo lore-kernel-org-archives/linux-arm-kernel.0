@@ -1,53 +1,60 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 19 Nov 2014 17:18:24 +0100
-Subject: [PATCH RESEND 0/4] hrng: atmel: add DT support
-In-Reply-To: <546CC233.6090605@atmel.com>
-References: <1416413278-10197-1-git-send-email-boris.brezillon@free-electrons.com>
- <546CC233.6090605@atmel.com>
-Message-ID: <20141119171824.1e8dc40d@bbrezillon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Nov 2014 17:19:20 +0100
+Subject: [PATCH 6/6] pci, acpi: Share ACPI PCI config space accessors.
+In-Reply-To: <1416413091-13452-7-git-send-email-tomasz.nowicki@linaro.org>
+References: <1416413091-13452-1-git-send-email-tomasz.nowicki@linaro.org>
+ <1416413091-13452-7-git-send-email-tomasz.nowicki@linaro.org>
+Message-ID: <2360791.Aj7tQ0nCJ3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Nov 2014 17:15:47 +0100
-Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-
-> On 19/11/2014 17:07, Boris Brezillon :
-> > Hello,
-> > 
-> > This series adds DT support for the TRNG (True Random Generator) block and
-> > adds missing trng nodes to dtsi files.
-> 
-> Nitpicking: subject of this cover letter seems not good ;-)
-
-Sorry, you should read:
-
-"hrng: atmel: add DT support"
-
-> 
-> Herbert, do you think you can take this series yourself or do I have to
-> take it?
-> 
-> Bye,
-> 
-> > Boris Brezillon (4):
-> >   hwrng: atmel: use clk_prepapre_enable/_disable_unprepare
-> >   hwrng: atmel: add DT support
-> >   hwrng: atmel: Add TRNG DT binding doc
-> >   ARM: at91/dt: add trng node
-> > 
-> >  Documentation/devicetree/bindings/hwrng/atmel-trng.txt | 16 ++++++++++++++++
-> >  arch/arm/boot/dts/at91sam9g45.dtsi                     |  7 +++++++
-> >  drivers/char/hw_random/Kconfig                         |  2 +-
-> >  drivers/char/hw_random/atmel-rng.c                     | 15 +++++++++++----
-> >  4 files changed, 35 insertions(+), 5 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/hwrng/atmel-trng.txt
-> > 
-> 
+On Wednesday 19 November 2014 17:04:51 Tomasz Nowicki wrote:
+> +/*
+> + * raw_pci_read/write - ACPI PCI config space accessors.
+> + *
+> + * ACPI spec defines MMCFG as the way we can access PCI config space,
+> + * so let MMCFG be default (__weak).
+> + *
+> + * If platform needs more fancy stuff, should provides its own implementation.
+> + */
+> +int __weak raw_pci_read(unsigned int domain, unsigned int bus,
+> +                       unsigned int devfn, int reg, int len, u32 *val)
+> +{
+> +       return pci_mmcfg_read(domain, bus, devfn, reg, len, val);
+> +}
+> +
+> +int __weak raw_pci_write(unsigned int domain, unsigned int bus,
+> +                        unsigned int devfn, int reg, int len, u32 val)
+> +{
+> +       return pci_mmcfg_write(domain, bus, devfn, reg, len, val);
+> +}
+> +
 > 
 
+I think it would be better to avoid __weak functions here, as they tend
+to be hard to follow when trying to understand the code.
 
+How about using a Kconfig symbol like this:
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+#ifdef CONFIG_ARCH_RAW_PCI_READWRITE
+int raw_pci_read(unsigned int domain, unsigned int bus, unsigned int devfn,
+                 int reg, int len, u32 *val);
+int raw_pci_write(unsigned int domain, unsigned int bus, unsigned int devfn,
+                  int reg, int len, u32 val);
+#else
+static inline int raw_pci_read(unsigned int domain, unsigned int bus,
+	                       unsigned int devfn, int reg, int len, u32 *val)
+{
+	return pci_mmcfg_read(domain, bus, devfn, reg, len, val);
+}
+
+static inline int raw_pci_write(unsigned int domain, unsigned int bus,
+             		                unsigned int devfn, int reg, int len, u32 val)
+{
+       return pci_mmcfg_write(domain, bus, devfn, reg, len, val);
+}
+#endif
+
+Same thing for the weak symbols in patch 5.
+
+	Arnd
