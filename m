@@ -1,53 +1,182 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 19 Nov 2014 16:57:56 +0100
-Subject: [PATCH 5/6] ARM: at91/dt: add trng node
-In-Reply-To: <1412093987-30241-6-git-send-email-boris.brezillon@free-electrons.com>
-References: <1412093987-30241-1-git-send-email-boris.brezillon@free-electrons.com>
- <1412093987-30241-6-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <546CBE04.1000705@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Nov 2014 16:59:39 +0100
+Subject: [PATCH v4 1/2] ARM: cache-l2x0: clean up aurora cache handling
+Message-ID: <2352238.Gx0LiZB7JR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/09/2014 18:19, Boris Brezillon :
-> Add a DT node for the TRNG (True Random Number Generator) block.
-> 
-> Keep this block enabled as it does not depend on any external connection,
-> and thus should be available on all boards.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+The aurora cache controller is the only remaining user of a couple
+of functions in this file and are completely unused when that is
+disabled, leading to build warnings:
 
-For patches 2 to 5, you can add my:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+arch/arm/mm/cache-l2x0.c:167:13: warning: 'l2x0_cache_sync' defined but not used [-Wunused-function]
+arch/arm/mm/cache-l2x0.c:184:13: warning: 'l2x0_flush_all' defined but not used [-Wunused-function]
+arch/arm/mm/cache-l2x0.c:194:13: warning: 'l2x0_disable' defined but not used [-Wunused-function]
 
-while re-sending a series. Maybe add linux-crypto and the "HARDWARE
-RANDOM NUMBER GENERATOR CORE" guys to the CC list.
+With the knowledge that the code is now aurora-specific, we can
+simplify it noticeably:
 
-Bye,
+- The pl310 errata workarounds are not needed on aurora and can be removed
+- As confirmed by Thomas Petazzoni from the data sheet, the cache_wait()
+  macro is never needed.
+- No need to hold the lock across atomic cache sync
+- We can load the l2x0_base into a local variable across operations
 
-> ---
->  arch/arm/boot/dts/at91sam9g45.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> index 932a669..790c890 100644
-> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> @@ -934,6 +934,13 @@
->  				status = "disabled";
->  			};
->  
-> +			trng at fffcc000 {
-> +				compatible = "atmel,at91sam9g45-trng";
-> +				reg = <0xfffcc000 0x4000>;
-> +				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 0>;
-> +				clocks = <&trng_clk>;
-> +			};
-> +
->  			i2c0: i2c at fff84000 {
->  				compatible = "atmel,at91sam9g10-i2c";
->  				reg = <0xfff84000 0x100>;
-> 
+There should be no functional change in this patch, but readability
+and the generated object code improves, along with avoiding the
+warnings.
 
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+ (on Armada 370 RD and Armada XP GP, boot tested, plus a little bit of
+ DMA traffic by reading data from a SD card)
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
--- 
-Nicolas Ferre
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 5e65ca8dea62..341ba8aaca42 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -136,73 +136,6 @@ static void l2c_disable(void)
+ 	dsb(st);
+ }
+ 
+-#ifdef CONFIG_CACHE_PL310
+-static inline void cache_wait(void __iomem *reg, unsigned long mask)
+-{
+-	/* cache operations by line are atomic on PL310 */
+-}
+-#else
+-#define cache_wait	l2c_wait_mask
+-#endif
+-
+-static inline void cache_sync(void)
+-{
+-	void __iomem *base = l2x0_base;
+-
+-	writel_relaxed(0, base + sync_reg_offset);
+-	cache_wait(base + L2X0_CACHE_SYNC, 1);
+-}
+-
+-#if defined(CONFIG_PL310_ERRATA_588369) || defined(CONFIG_PL310_ERRATA_727915)
+-static inline void debug_writel(unsigned long val)
+-{
+-	l2c_set_debug(l2x0_base, val);
+-}
+-#else
+-/* Optimised out for non-errata case */
+-static inline void debug_writel(unsigned long val)
+-{
+-}
+-#endif
+-
+-static void l2x0_cache_sync(void)
+-{
+-	unsigned long flags;
+-
+-	raw_spin_lock_irqsave(&l2x0_lock, flags);
+-	cache_sync();
+-	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-}
+-
+-static void __l2x0_flush_all(void)
+-{
+-	debug_writel(0x03);
+-	__l2c_op_way(l2x0_base + L2X0_CLEAN_INV_WAY);
+-	cache_sync();
+-	debug_writel(0x00);
+-}
+-
+-static void l2x0_flush_all(void)
+-{
+-	unsigned long flags;
+-
+-	/* clean all ways */
+-	raw_spin_lock_irqsave(&l2x0_lock, flags);
+-	__l2x0_flush_all();
+-	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-}
+-
+-static void l2x0_disable(void)
+-{
+-	unsigned long flags;
+-
+-	raw_spin_lock_irqsave(&l2x0_lock, flags);
+-	__l2x0_flush_all();
+-	l2c_write_sec(0, l2x0_base, L2X0_CTRL);
+-	dsb(st);
+-	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-}
+-
+ static void l2c_save(void __iomem *base)
+ {
+ 	l2x0_saved_regs.aux_ctrl = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+@@ -1257,14 +1190,15 @@ static unsigned long calc_range_end(unsigned long start, unsigned long end)
+ static void aurora_pa_range(unsigned long start, unsigned long end,
+ 			unsigned long offset)
+ {
++	void __iomem *base = l2x0_base;
+ 	unsigned long flags;
+ 
+ 	raw_spin_lock_irqsave(&l2x0_lock, flags);
+-	writel_relaxed(start, l2x0_base + AURORA_RANGE_BASE_ADDR_REG);
+-	writel_relaxed(end, l2x0_base + offset);
++	writel_relaxed(start, base + AURORA_RANGE_BASE_ADDR_REG);
++	writel_relaxed(end, base + offset);
+ 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+ 
+-	cache_sync();
++	writel_relaxed(0, base + AURORA_SYNC_REG);
+ }
+ 
+ static void aurora_inv_range(unsigned long start, unsigned long end)
+@@ -1324,6 +1258,37 @@ static void aurora_flush_range(unsigned long start, unsigned long end)
+ 	}
+ }
+ 
++static void aurora_flush_all(void)
++{
++	void __iomem *base = l2x0_base;
++	unsigned long flags;
++
++	/* clean all ways */
++	raw_spin_lock_irqsave(&l2x0_lock, flags);
++	__l2c_op_way(base + L2X0_CLEAN_INV_WAY);
++	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++
++	writel_relaxed(0, base + AURORA_SYNC_REG);
++}
++
++static void aurora_cache_sync(void)
++{
++	writel_relaxed(0, l2x0_base + AURORA_SYNC_REG);
++}
++
++static void aurora_disable(void)
++{
++	void __iomem *base = l2x0_base;
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&l2x0_lock, flags);
++	__l2c_op_way(base + L2X0_CLEAN_INV_WAY);
++	writel_relaxed(0, base + AURORA_SYNC_REG);
++	l2c_write_sec(0, base, L2X0_CTRL);
++	dsb(st);
++	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++}
++
+ static void aurora_save(void __iomem *base)
+ {
+ 	l2x0_saved_regs.ctrl = readl_relaxed(base + L2X0_CTRL);
+@@ -1398,9 +1363,9 @@ static const struct l2c_init_data of_aurora_with_outer_data __initconst = {
+ 		.inv_range   = aurora_inv_range,
+ 		.clean_range = aurora_clean_range,
+ 		.flush_range = aurora_flush_range,
+-		.flush_all   = l2x0_flush_all,
+-		.disable     = l2x0_disable,
+-		.sync        = l2x0_cache_sync,
++		.flush_all   = aurora_flush_all,
++		.disable     = aurora_disable,
++		.sync        = aurora_cache_sync,
+ 		.resume      = aurora_resume,
+ 	},
+ };
