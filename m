@@ -1,59 +1,27 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 19 Nov 2014 11:16:11 +0100
-Subject: [GIT PULL] cpuidle: A few improvements for ARM cpuidle via DT
-Message-ID: <546C6DEB.8060204@linaro.org>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 19 Nov 2014 11:17:37 +0100
+Subject: [PATCH 1/1] ARM: exynos_defconfig: Enable max77802 rtc and clock
+ drivers
+In-Reply-To: <546C5039.10107@samsung.com>
+References: <1414401440-10972-1-git-send-email-javier.martinez@collabora.co.uk>
+ <04e101cff29f$4021ea00$c065be00$@kernel.org>
+ <CABxcv=kaOa1+6a1n_+GjoH=PgG=LzAnXLU7U_E5NvYYP-0WedA@mail.gmail.com>
+ <546C5039.10107@samsung.com>
+Message-ID: <546C6E41.7040401@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Kukjin,
 
-Hi Rafael,
+On 11/19/2014 09:09 AM, Kukjin Kim wrote:
+>> You say that you will apply this patch but I can't find it in any of
+>> your branches.
+>> 
+> Sorry for missing the patch in my tree. You can see it in a couple of
+> mins ;)
+> 
 
-this pull request, based on 3.18-rc5, contains a set of changes from 
-Lorenzo Pieralisi.
+Great, thanks a lot!
 
-  * Added a 'status' definition flag in the DT to specify the 
-unsupported firmware idle states and ignore those states in the parsing 
-code when initializing the cpuidle driver
-
-  * Added an idle state description in the DT. As the idle states are 
-not standardized on ARM, the description gives information about the 
-idle state
-
-  * Removed duplicate error message in the arm64 cpuidle drivers
-
-Thanks !
-
-   -- Daniel
-
-
-The following changes since commit fc14f9c1272f62c3e8d01300f52467c0d9af50f9:
-
-   Linux 3.18-rc5 (2014-11-16 16:36:20 -0800)
-
-are available in the git repository at:
-
-   http://git.linaro.org/git-ro/people/daniel.lezcano/linux.git cpuidle/3.19
-
-for you to fetch changes up to 18f95a3640dbf421ab9532e517070a0c1cd4d582:
-
-   drivers: cpuidle: Remove cpuidle-arm64 duplicate error messages 
-(2014-11-19 10:16:28 +0100)
-
-----------------------------------------------------------------
-Lorenzo Pieralisi (3):
-       drivers: cpuidle: Add status property to ARM idle states
-       drivers: cpuidle: Add idle-state-name description to ARM idle states
-       drivers: cpuidle: Remove cpuidle-arm64 duplicate error messages
-
-  Documentation/devicetree/bindings/arm/idle-states.txt | 20 
-++++++++++++++++++++
-  drivers/cpuidle/cpuidle-arm64.c                       | 13 ++-----------
-  drivers/cpuidle/dt_idle_states.c                      | 10 +++++++++-
-  3 files changed, 31 insertions(+), 12 deletions(-)
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Best regards,
+Javier
