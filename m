@@ -1,59 +1,101 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 19 Nov 2014 09:47:14 +0100
-Subject: [PATCH] arm/arm64: KVM: Handle traps of ICC_SRE_EL1 as RAZ/WI
-In-Reply-To: <1415822474-17398-1-git-send-email-christoffer.dall@linaro.org>
-References: <1415822474-17398-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <CAKv+Gu8C7KuUpv_UdMvnitb16KhoCHceTuLObrmR7GtQ-a5JDA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 19 Nov 2014 08:51:02 +0000
+Subject: [PATCH 7/7] stmmac: dwmac-sti: Pass sysconfig register offset
+ via syscon dt property.
+In-Reply-To: <1416385632-5832-8-git-send-email-peter.griffin@linaro.org>
+References: <1416385632-5832-1-git-send-email-peter.griffin@linaro.org>
+ <1416385632-5832-8-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20141119085102.GH13959@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 November 2014 21:01, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> When running on a system with a GICv3, we currenly don't allow the guest
-> to access the system register interface of the GICv3.  We do this by
-> clearing the ICC_SRE_EL2.Enable, which causes all guest accesses to
-> ICC_SRE_EL1 to trap to EL2 and causes all guest accesses to other ICC_
-> registers to cause an undefined exception in the guest.
->
-> However, we currently don't handle the trap of guest accesses to
-> ICC_SRE_EL1 and will spill out a warning.  The trap just needs to handle
-> the access as RAZ/WI, and a guest that tries to prod this register and
-> set ICC_SRE_EL1.SRE=1, must read back the value (which Linux already
-> does) to see if it succeeded, and will thus observe that ICC_SRE_EL1.SRE
-> was not set.
->
-> Add the simple trap handler in the sorted table of the system registers.
->
-> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+On Wed, 19 Nov 2014, Peter Griffin wrote:
+
+> Based on Arnds review comments here https://lkml.org/lkml/2014/11/13/161,
+> we should not be mixing address spaces in the reg property like this driver
+> currently does. This patch updates the driver, dt docs and also the existing
+> dt nodes to pass the sysconfig offset in the syscon dt property.
+> 
+> This patch breaks DT compatibility! But this platform is considered WIP, and is only
+> used by a few developers who are upstreaming support for it. This change has been done
+> as a single atomic commit to ensure it is bisectable.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 > ---
+>  Documentation/devicetree/bindings/net/sti-dwmac.txt | 14 +++++---------
+>  arch/arm/boot/dts/stih415.dtsi                      | 12 ++++++------
+>  arch/arm/boot/dts/stih416.dtsi                      | 12 ++++++------
+>  drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c     | 13 +++++++------
+>  4 files changed, 24 insertions(+), 27 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/net/sti-dwmac.txt b/Documentation/devicetree/bindings/net/sti-dwmac.txt
+> index 6762a6b..d05c1e1 100644
+> --- a/Documentation/devicetree/bindings/net/sti-dwmac.txt
+> +++ b/Documentation/devicetree/bindings/net/sti-dwmac.txt
+> @@ -9,14 +9,10 @@ The device node has following properties.
+>  Required properties:
+>   - compatible	: Can be "st,stih415-dwmac", "st,stih416-dwmac",
+>     "st,stih407-dwmac", "st,stid127-dwmac".
+> - - reg : Offset of the glue configuration register map in system
+> -   configuration regmap pointed by st,syscon property and size.
 
-Hi,
+Looks like you are removing the reg property description completely?
 
-What is the status of this patch? Will you try to merge it as a bug fix?
+> - - st,syscon : Should be phandle to system configuration node which
+> -   encompases this glue registers.
+> + - st,syscon : Should be phandle/offset pair. The phandle to the syscon node which
+> +   encompases the glue register, and the offset of the control register.
+>   - st,gmac_en: this is to enable the gmac into a dedicated sysctl control
+>     register available on STiH407 SoC.
+> - - sti-ethconf: this is the gmac glue logic register to enable the GMAC,
+> -   select among the different modes and program the clk retiming.
+>   - pinctrl-0: pin-control for all the MII mode supported.
+
+[...]
+
+> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c
+> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c
+> @@ -123,7 +123,7 @@ struct sti_dwmac {
+>  	bool ext_phyclk;	/* Clock from external PHY */
+>  	u32 tx_retime_src;	/* TXCLK Retiming*/
+>  	struct clk *clk;	/* PHY clock */
+> -	int ctrl_reg;		/* GMAC glue-logic control register */
+> +	u32 ctrl_reg;		/* GMAC glue-logic control register */
+>  	int clk_sel_reg;	/* GMAC ext clk selection register */
+>  	struct device *dev;
+>  	struct regmap *regmap;
+> @@ -286,11 +286,6 @@ static int sti_dwmac_parse_data(struct sti_dwmac *dwmac,
+>  	if (!np)
+>  		return -EINVAL;
+>  
+> -	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "sti-ethconf");
+> -	if (!res)
+> -		return -ENODATA;
+> -	dwmac->ctrl_reg = res->start;
+> -
+>  	/* clk selection from extra syscfg register */
+>  	dwmac->clk_sel_reg = -ENXIO;
+>  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "sti-clkconf");
+> @@ -301,6 +296,12 @@ static int sti_dwmac_parse_data(struct sti_dwmac *dwmac,
+>  	if (IS_ERR(regmap))
+>  		return PTR_ERR(regmap);
+>  
+> +	err = of_property_read_u32_index(np, "st,syscon", 1, &dwmac->ctrl_reg);
+
+A few platforms have this format for sysconn now.  We should toy with
+the idea of either making this a standard call, and/or defining '1'.
+
+> +	if (err) {
+> +		dev_err(dev, "Can't get sysconfig ctrl offset (%d)\n", err);
+> +		return err;
+> +	}
+> +
+>  	dwmac->dev = dev;
+>  	dwmac->interface = of_get_phy_mode(np);
+>  	dwmac->regmap = regmap;
 
 -- 
-Ard.
-
-
->  arch/arm64/kvm/sys_regs.c | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 4cc3b71..8f81945 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -424,6 +424,11 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->         /* VBAR_EL1 */
->         { Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
->           NULL, reset_val, VBAR_EL1, 0 },
-> +
-> +       /* ICC_SRE_EL1 */
-> +       { Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1100), Op2(0b101),
-> +         trap_raz_wi },
-> +
->         /* CONTEXTIDR_EL1 */
->         { Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b001),
->           access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
-> --
-> 2.1.2.330.g565301e.dirty
->
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
