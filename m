@@ -1,68 +1,72 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 19 Nov 2014 10:21:57 +0100
-Subject: [PATCH] clockevent: sun4i: Fix race condition in the probe code
-In-Reply-To: <1416351573-5815-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1416351573-5815-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <546C6135.90201@linaro.org>
+Date: Wed, 19 Nov 2014 10:25:58 +0100
+Subject: [PATCH v3 0/3] Make Armada 375 use the reference clock when
+ possible
+In-Reply-To: <1415107293-19258-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1415107293-19258-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <546C6226.5000900@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2014 11:59 PM, Maxime Ripard wrote:
-> The interrupts were activated and the handler registered before the clockevent
-> was registered in the probe function.
+On 11/04/2014 02:21 PM, Ezequiel Garcia wrote:
+> Hi Daniel, Wim:
 >
-> The interrupt handler, however, was making the assumption that the clockevent
-> device was registered.
->
-> That could cause a null pointer dereferenc if the timer interrupt was firing
-> during this narrow window.
->
-> Fix that by moving the clockevent registration before the interrupt is enabled.
->
-> Reported-by: Roman Byshko <rbyshko@gmail.com>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: stable at vger.kernel.org
+> Seems we are ready to merge these, unless some objection raises. Do you think
+> you can take the patches through your trees?
 
-Applied to my tree as 3.18 fix.
+Hi Wim,
 
-Thanks !
+I can take through my tree the entire patchset if you want but I need 
+your blessing for the watchdog part.
 
+Thanks
    -- Daniel
 
-> ---
->   drivers/clocksource/sun4i_timer.c | 12 ++++++------
->   1 file changed, 6 insertions(+), 6 deletions(-)
+> Changes from v2:
 >
-> diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-> index efb17c3ee120..f4a9c0058b4d 100644
-> --- a/drivers/clocksource/sun4i_timer.c
-> +++ b/drivers/clocksource/sun4i_timer.c
-> @@ -182,6 +182,12 @@ static void __init sun4i_timer_init(struct device_node *node)
->   	/* Make sure timer is stopped before playing with interrupts */
->   	sun4i_clkevt_time_stop(0);
+>    * Fix messed up empty lines, as suggested by Thomas Petazzoni.
 >
-> +	sun4i_clockevent.cpumask = cpu_possible_mask;
-> +	sun4i_clockevent.irq = irq;
-> +
-> +	clockevents_config_and_register(&sun4i_clockevent, rate,
-> +					TIMER_SYNC_TICKS, 0xffffffff);
-> +
->   	ret = setup_irq(irq, &sun4i_timer_irq);
->   	if (ret)
->   		pr_warn("failed to setup irq %d\n", irq);
-> @@ -189,12 +195,6 @@ static void __init sun4i_timer_init(struct device_node *node)
->   	/* Enable timer0 interrupt */
->   	val = readl(timer_base + TIMER_IRQ_EN_REG);
->   	writel(val | TIMER_IRQ_EN(0), timer_base + TIMER_IRQ_EN_REG);
-> -
-> -	sun4i_clockevent.cpumask = cpu_possible_mask;
-> -	sun4i_clockevent.irq = irq;
-> -
-> -	clockevents_config_and_register(&sun4i_clockevent, rate,
-> -					TIMER_SYNC_TICKS, 0xffffffff);
->   }
->   CLOCKSOURCE_OF_DECLARE(sun4i, "allwinner,sun4i-a10-timer",
->   		       sun4i_timer_init);
+> Changes from v1:
+>
+>    * Make the A375 timer and watchdog devicetree binding match the hardware
+>      and require the two available clocks: core and reference clock.
+>
+> This series adds support for the 25 MHz reference clock available on
+> Armada 375 SoC to be used on the timer and watchdog drivers. It is
+> similar to the one present in Armada XP SoC.
+>
+> Given we initially had access to only a very early SoC revision (A375 Z1)
+> and due to a hardware issue, the timer and watchdog support was originally
+> submitted to use the core clock.
+>
+> Now that the A0 SoC revision is out, we can fix this and use the reference
+> clock. The reason for this change is that the core clock is subject to the
+> SSCG (Spread Spectrum Clock Generator), so boards where SSCG is enabled
+> exhibit a very large timer drift.
+>
+> Notice that this change will produce unpleseant results on A375 Z1, given the
+> reference 25 MHz clock doesn't work properly on that SoC revision.
+>
+> But since the Z1 revision is not supported by the recently submitted A375
+> network driver (mvpp2), and therefore nobody is expected to run mainline
+> (if there are users at all of this early revision), the support will be
+> dropped entirely in a near future.
+>
+> To prevent any compatibility issues when booting with an older devicetree,
+> this series provides proper fall backs in each case.
+>
+> The series applies on v3.18-rc2.
+>
+> Ezequiel Garcia (3):
+>    clocksource: armada-370-xp: Add missing clock enable
+>    watchdog: orion: Use the reference clock on Armada 375 SoC
+>    clocksource: armada-370-xp: Use the reference clock on A375 SoC
+>
+>   .../bindings/timer/marvell,armada-370-xp-timer.txt |  9 +++--
+>   .../devicetree/bindings/watchdog/marvel.txt        | 13 +++++++
+>   drivers/clocksource/time-armada-370-xp.c           | 30 ++++++++++++++++
+>   drivers/watchdog/orion_wdt.c                       | 42 +++++++++++++++++++++-
+>   4 files changed, 90 insertions(+), 4 deletions(-)
 >
 
 
