@@ -1,46 +1,134 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 19 Nov 2014 09:40:07 -0800
-Subject: [PATCH] ARM: multi_v7_defconfig: fix failure setting CPU voltage
- by enabling dependent I2C controller
-In-Reply-To: <546C4BA1.6090701@samsung.com> (Kukjin Kim's message of "Wed, 19
- Nov 2014 16:49:53 +0900")
-References: <1416337853-1558-1-git-send-email-tyler.baker@linaro.org>
- <546C4BA1.6090701@samsung.com>
-Message-ID: <7hbno3w0lk.fsf@deeprootsystems.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Wed, 19 Nov 2014 10:43:39 -0700
+Subject: [PATCH v9 2/9] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <54662622.2020307@linaro.org>
+References: <1414194024-55547-1-git-send-email-lina.iyer@linaro.org>
+ <1414194024-55547-3-git-send-email-lina.iyer@linaro.org>
+ <54662622.2020307@linaro.org>
+Message-ID: <20141119174339.GA891@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim <kgene.kim@samsung.com> writes:
+On Fri, Nov 14 2014 at 08:56 -0700, Daniel Lezcano wrote:
+>On 10/25/2014 01:40 AM, Lina Iyer wrote:
 
-> On 11/19/14 04:10, Tyler Baker wrote:
+>>+/**
+>>+ * spm_set_low_power_mode() - Configure SPM start address for low power mode
+>>+ * @mode: SPM LPM mode to enter
+>>+ */
+>>+int qcom_spm_set_low_power_mode(enum pm_sleep_mode mode)
+>>+{
+>>+	struct spm_driver_data *drv = this_cpu_ptr(&cpu_spm_drv);
+>>+	u32 start_index;
+>>+	u32 ctl_val;
+>>+
+>>+	if (!drv->available)
+>>+		return -ENXIO;
 >
-> Hi,
+>really weird how this was initialized.
 >
-> + Arnd, Olof and Kevin
+>Are you sure 'drv' is not NULL if it is not available ? (see below)
 >
->> This patch fixes a long standing issue introduced during the 3.16 merge window.
->> Shortly after the merge, exynos5250-based arndale boards began to produce the 
->> following errors:
->> 
->> kern.err kernel:  exynos-cpufreq exynos-cpufreq: failed to set cpu voltage
->> kern.err kernel:  cpufreq: __target_index: Failed to change cpu frequency: -22
->> 
->> Further analysis revealed that the S5M8767 voltage regulator used on the 
->> exynos5250-based arndale board utilizes the S3C2410 I2C controller. If the 
->> S3C2410 I2C controller driver is not enabled, the S5M8767 voltage regulator 
->> fails to probe. Therefore a dependency exists between these two drivers. 
->> In the exynos_defconfig both CONFIG_REGULATOR_S5M8767 and CONFIG_I2C_S3C2410 
->> options are enabled, and no errors are produced. However, in the 
->> multi_v7_defconfig only the CONFIG_REGULATOR_S5M8767 option is enabled and the 
->> errors are present. So let's enable the CONFIG_I2C_S3C2410 option in the 
->> multi_v7_defconfig to allow the S5M8767 voltage regulator to probe.
->> 
->> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
->
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+'drv' has some data that I need to decode the register address. Hence
+cant have that NULL. Therefore, the available flag.
 
-Applied to arm-soc/fixes, which is merged into arm-soc/for-next.
+...
+
+>+static int spm_dev_probe(struct platform_device *pdev)
+>>+{
+>>+	struct spm_driver_data *drv;
+>>+	struct resource *res;
+>>+	const struct of_device_id *match_id;
+>>+	void __iomem *addr;
+>>+	const u32 *seq_data;
+>>+	int cpu = -EINVAL;
+>>+	static bool cpuidle_drv_init;
+>>+
+>>+	drv = spm_get_drv(pdev, &cpu);
+>>+	if (!drv)
+>>+		return -EINVAL;
+>>+
+>>+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>+	drv->reg_base = devm_ioremap_resource(&pdev->dev, res);
+>>+	if (IS_ERR(drv->reg_base))
+>>+		return PTR_ERR(drv->reg_base);
+>>+
+>>+	match_id = of_match_node(spm_match_table, pdev->dev.of_node);
+>>+	if (!match_id)
+>>+		return -ENODEV;
+>>+
+>>+	drv->reg_data = match_id->data;
+>>+	if (!drv->reg_data)
+>>+		return -EINVAL;
+>>+
+>>+	/* Write the SPM sequences, first.. */
+>>+	addr = drv->reg_base + drv->reg_data->reg_offset[SPM_REG_SEQ_ENTRY];
+>>+	seq_data = (const u32 *)drv->reg_data->seq;
+>>+	__iowrite32_copy(addr, seq_data, ARRAY_SIZE(drv->reg_data->seq)/4);
+>>+
+>>+	/* ..and then, the control registers.
+>>+	 * On some SoC's if the control registers are written first and if the
+>>+	 * CPU was held in reset, the reset signal could trigger the SPM state
+>>+	 * machine, before the sequences are completely written.
+>>+	 */
+>>+	spm_register_write(drv, SPM_REG_CFG, drv->reg_data->spm_cfg);
+>>+	spm_register_write(drv, SPM_REG_DLY, drv->reg_data->spm_dly);
+>>+	spm_register_write(drv, SPM_REG_PMIC_DLY, drv->reg_data->pmic_dly);
+>>+
+>>+	spm_register_write(drv, SPM_REG_PMIC_DATA_0,
+>>+				drv->reg_data->pmic_data[0]);
+>>+	spm_register_write(drv, SPM_REG_PMIC_DATA_1,
+>>+				drv->reg_data->pmic_data[1]);
+>>+
+>>+	/**
+>>+	 * Ensure all observers see the above register writes before the
+>>+	 * cpuidle driver is allowed to use the SPM.
+>>+	 */
+>>+	wmb();
+>>+	drv->available = true;
+>
+>IMO if you have to do that, that means there is something wrong with 
+>how is initialized the driver.
+>
+>It should be drv == NULL => not available
+>
+drv has the register base that I dont want to pass seprately.
+
+>>+
+>>+	if ((cpu > -1) && !cpuidle_drv_init) {
+>>+		platform_device_register(&qcom_cpuidle_device);
+>>+		cpuidle_drv_init = true;
+>>+	}
+>
+>'cpu' is always > -1.
+>
+OK. I was hoping to use -1 for not a cpu (i.e, L2) SPM. For now, I will
+change.
+
+
+>If the 'spm_get_drv' succeed, cpu is no longer equal to -EINVAL. 
+>Otherwise we do not reach this point because we return right after 
+>spm_get_drv with an error.
+>
+>Adding the platform_device_register depending in a static variable is 
+>not very nice. Why not add it explicitely in a separate init routine 
+>we know it will be called one time (eg. at the same place than cpufreq 
+>is) ?
+>
+We want to register the cpuidle device only if any of the SPM devices
+have been probed.
+
+Ideally, Stephen and I would like to register cpuidle device separately
+for each CPU SPM, when it is probed, so we would invoke cpuidle driver
+and thereby the low power modes only for those cpus. However, the
+complexity to do that, AFAICS, is very complex. I would need to change
+quite a bit of the framework and in the cpuidle driver, I may have to
+stray from the recommended format.
+
+Here I set up cpuidle device, when I know atleast 1 cpu is ready to
+allow low power modes.
+
+Do you have any better ideas?
 
 Thanks,
-
-Kevin
+Lina
