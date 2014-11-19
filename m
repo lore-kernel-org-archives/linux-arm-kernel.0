@@ -1,35 +1,132 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 19 Nov 2014 15:26:23 +0100
-Subject: [PATCH v5 2/2] ARM: EXYNOS: PMU: move restart code into pmu driver
-In-Reply-To: <000801d003a7$404882a0$c0d987e0$@samsung.com>
-References: <1416307650-15162-1-git-send-email-pankaj.dubey@samsung.com>
- <1416307650-15162-3-git-send-email-pankaj.dubey@samsung.com>
- <546B6395.8020403@samsung.com> <000801d003a7$404882a0$c0d987e0$@samsung.com>
-Message-ID: <546CA88F.5010406@samsung.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 19 Nov 2014 15:33:09 +0100
+Subject: [PATCH v2] pwm: atmel-hlcdc: add at91sam9x5 and sama5d3 errata
+ handling
+Message-ID: <1416407589-8157-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/11/14 04:16, Pankaj Dubey wrote:
->>> > > +static int pmu_restart_notify(struct notifier_block *this,
->>> > > +		unsigned long code, void *unused)
->>> > > +{
->>> > > +	pmu_raw_writel(0x1, EXYNOS_SWRESET);
->> > 
->> > Is it also valid on exynos5440 ? Doesn't it cause any harm there ?
->> > Perhaps we could add a comment saying it has not effect on that SoC ?
->> > 
-> Seeing original code from exynos.c (restart hook) I can say it's not valid
-> for exynos5440.
-> But it should not cause any harm as of now, because for exynos54440 PMU will
-> not be probed.
-> If in future support for exynos5440 PMU gets added, that time one may need
-> to consider this
-> point. This will be applicable for any SoC which does not have same register
-> for restart.
+at91sam9x5 has an errata forbidding the use of slow clk as a clk source and
+sama5d3 SoCs has another errata forbidding the use of div1 prescaler.
 
-OK, I wasn't aware PMU driver won't be probed for exynos5440 at all.
-Anyway, I hope we can get someone testing the patch set on exynos5440.
+Take both of these erratas into account.
 
---
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+Hi Thierry,
+
+I've addressed the "erratas stored in of_device_id data" part, but still
+haven't modified the compatible strings of the HLCDC subdevices.
+
+Please let me know if you really want to handle erratas through pwm
+compatibles instead of parent device compatibles.
+
 Regards,
-Sylwester
+
+Boris
+
+Changes since v1:
+- use data field in of_device_id to attach erratas to an IP revision
+
+ drivers/pwm/pwm-atmel-hlcdc.c | 50 ++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 45 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/pwm/pwm-atmel-hlcdc.c b/drivers/pwm/pwm-atmel-hlcdc.c
+index eaf8b12..e7c4400 100644
+--- a/drivers/pwm/pwm-atmel-hlcdc.c
++++ b/drivers/pwm/pwm-atmel-hlcdc.c
+@@ -32,10 +32,16 @@
+ #define ATMEL_HLCDC_PWMPS_MAX		0x6
+ #define ATMEL_HLCDC_PWMPS(x)		((x) & ATMEL_HLCDC_PWMPS_MASK)
+ 
++struct atmel_hlcdc_pwm_erratas {
++	bool slow_clk_errata;
++	bool div1_clk_errata;
++};
++
+ struct atmel_hlcdc_pwm {
+ 	struct pwm_chip chip;
+ 	struct atmel_hlcdc *hlcdc;
+ 	struct clk *cur_clk;
++	const struct atmel_hlcdc_pwm_erratas *erratas;
+ };
+ 
+ static inline struct atmel_hlcdc_pwm *to_atmel_hlcdc_pwm(struct pwm_chip *chip)
+@@ -56,20 +62,29 @@ static int atmel_hlcdc_pwm_config(struct pwm_chip *c,
+ 	u32 pwmcfg;
+ 	int pres;
+ 
+-	clk_freq = clk_get_rate(new_clk);
+-	clk_period_ns = (u64)NSEC_PER_SEC * 256;
+-	do_div(clk_period_ns, clk_freq);
++	if (!chip->erratas || !chip->erratas->slow_clk_errata) {
++		clk_freq = clk_get_rate(new_clk);
++		clk_period_ns = (u64)NSEC_PER_SEC * 256;
++		do_div(clk_period_ns, clk_freq);
++	}
+ 
+-	if (clk_period_ns > period_ns) {
++	/* Errata: cannot use slow clk on some IP revisions */
++	if ((chip->erratas && chip->erratas->slow_clk_errata) ||
++	    clk_period_ns > period_ns) {
+ 		new_clk = hlcdc->sys_clk;
+ 		clk_freq = clk_get_rate(new_clk);
+ 		clk_period_ns = (u64)NSEC_PER_SEC * 256;
+ 		do_div(clk_period_ns, clk_freq);
+ 	}
+ 
+-	for (pres = 0; pres <= ATMEL_HLCDC_PWMPS_MAX; pres++)
++	for (pres = 0; pres <= ATMEL_HLCDC_PWMPS_MAX; pres++) {
++		/* Errata: cannot divide by 1 on some IP revisions */
++		if (!pres && chip->erratas && chip->erratas->div1_clk_errata)
++			continue;
++
+ 		if ((clk_period_ns << pres) >= period_ns)
+ 			break;
++	}
+ 
+ 	if (pres > ATMEL_HLCDC_PWMPS_MAX)
+ 		return -EINVAL;
+@@ -187,8 +202,29 @@ static const struct pwm_ops atmel_hlcdc_pwm_ops = {
+ 	.owner = THIS_MODULE,
+ };
+ 
++const struct atmel_hlcdc_pwm_erratas atmel_hlcdc_pwm_at91sam9x5_erratas = {
++	.slow_clk_errata = true,
++};
++
++const struct atmel_hlcdc_pwm_erratas atmel_hlcdc_pwm_sama5d3_erratas = {
++	.div1_clk_errata = true,
++};
++
++static const struct of_device_id atmel_hlcdc_dt_ids[] = {
++	{
++		.compatible = "atmel,at91sam9x5-hlcdc",
++		.data = &atmel_hlcdc_pwm_at91sam9x5_erratas,
++	},
++	{
++		.compatible = "atmel,sama5d3-hlcdc",
++		.data = &atmel_hlcdc_pwm_sama5d3_erratas,
++	},
++	{ /* sentinel */ },
++};
++
+ static int atmel_hlcdc_pwm_probe(struct platform_device *pdev)
+ {
++	const struct of_device_id *match;
+ 	struct device *dev = &pdev->dev;
+ 	struct atmel_hlcdc_pwm *chip;
+ 	struct atmel_hlcdc *hlcdc;
+@@ -204,6 +240,10 @@ static int atmel_hlcdc_pwm_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
++	match = of_match_node(atmel_hlcdc_dt_ids, dev->parent->of_node);
++	if (match)
++		chip->erratas = match->data;
++
+ 	chip->hlcdc = hlcdc;
+ 	chip->chip.ops = &atmel_hlcdc_pwm_ops;
+ 	chip->chip.dev = dev;
+-- 
+1.9.1
