@@ -1,78 +1,35 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 19 Nov 2014 16:24:09 +0200
-Subject: Bug in clk_mux_set_parent for CLK_MUX_INDEX_BIT muxes ?
-In-Reply-To: <546C9FF6.3070506@redhat.com>
-References: <546899E6.6040306@redhat.com> <20141117185709.25314.61477@quantum>
- <546B3BEA.90002@ti.com> <546C9FF6.3070506@redhat.com>
-Message-ID: <546CA809.2000207@ti.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 19 Nov 2014 15:26:23 +0100
+Subject: [PATCH v5 2/2] ARM: EXYNOS: PMU: move restart code into pmu driver
+In-Reply-To: <000801d003a7$404882a0$c0d987e0$@samsung.com>
+References: <1416307650-15162-1-git-send-email-pankaj.dubey@samsung.com>
+ <1416307650-15162-3-git-send-email-pankaj.dubey@samsung.com>
+ <546B6395.8020403@samsung.com> <000801d003a7$404882a0$c0d987e0$@samsung.com>
+Message-ID: <546CA88F.5010406@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2014 03:49 PM, Hans de Goede wrote:
-> Hi,
->
-> On 11/18/2014 01:30 PM, Tero Kristo wrote:
->> On 11/17/2014 08:57 PM, Mike Turquette wrote:
->>> Quoting Hans de Goede (2014-11-16 04:34:46)
->>>> Hi,
->>>>
->>>> While looking at what I believe is a bug in the sunxi gmac clk code
->>>> (more on that later), I believe I've also found a bug in
->>>>
->>>> clk_mux_set_parent for the CLK_MUX_INDEX_BIT case.
->>>>
->>>> AFAIK if CLK_MUX_INDEX_BIT is set, then each bit turns
->>>> on / off a single parent, so theoretically multiple
->>>> parents could be enabled at the same time, but in practice
->>>> only one bit should ever be 1. So to select parent 0, set
->>>> the register (*) to 0x01, to select parent 1 set it 0x02,
->>>> parent 2, 0x04, parent 3, 0x08, etc.
->>>>
->>>> Correct ?
->>>>
->>>> Assuming I got that right, then this bit of code in
->>>> clk_mux_set_parent is wrong:
->>>>
->>>>                   if (mux->flags & CLK_MUX_INDEX_BIT)
->>>>                           index = (1 << ffs(index));
->>>>
->>>> For an input index of 0, ffs returns 0, so we set the register
->>>> to 0x01, ok.
->>>>
->>>> For an input index of 1, ffs returns 1, so we set the register
->>>> to 0x02, ok.
->>>>
->>>> For an input index of 2, ffs returns 2, so we set the register
->>>> to 0x04, ok.
->>>>
->>>> For an input index of 3, ffs returns 1, so we set the register
->>>> to 0x02, not good!
->>>>
->>>> I believe this code should simply be:
->>>>
->>>>                   if (mux->flags & CLK_MUX_INDEX_BIT)
->>>>                           index = 1 << index;
->>>>
->>>> I guess we've been getting away by this because the input index
->>>> so far has never gotten above 2.
->>>
->>> Good catch. I've Cc'd Tero Kristo from TI as the TI SoCs are the only
->>> other user of CLK_MUX_INDEX_BIT.
->>>
->>>>
->>>> If I'm right about this, I can whip up a patch to fix this. Note
->>>> I don't really have hardware to properly exercise this code-path
->>>> AFAIK.
->>>
->>> Please do. I think your change is reasonable and Tero can scream if
->>> something breaks for him.
->>
->> TI SoC:s use a copy pasted version of the mux clock (with some additional tweaks), but we never set the CLK_MUX_INDEX_BIT flag, so we have been safe from this bug. Feel free to send a patch against the TI clock driver also if you want, I can ack that one. If not, I can craft a quick patch for this myself.
->
-> I've just send a fix for the generic version of this code, I'm sorry
-> but I do not have the time to also fix the TI code.
+On 19/11/14 04:16, Pankaj Dubey wrote:
+>>> > > +static int pmu_restart_notify(struct notifier_block *this,
+>>> > > +		unsigned long code, void *unused)
+>>> > > +{
+>>> > > +	pmu_raw_writel(0x1, EXYNOS_SWRESET);
+>> > 
+>> > Is it also valid on exynos5440 ? Doesn't it cause any harm there ?
+>> > Perhaps we could add a comment saying it has not effect on that SoC ?
+>> > 
+> Seeing original code from exynos.c (restart hook) I can say it's not valid
+> for exynos5440.
+> But it should not cause any harm as of now, because for exynos54440 PMU will
+> not be probed.
+> If in future support for exynos5440 PMU gets added, that time one may need
+> to consider this
+> point. This will be applicable for any SoC which does not have same register
+> for restart.
 
-Yep thats fine, I was mainly thinking if you want easy credit for that, 
-I'll post a patch against that separately.
+OK, I wasn't aware PMU driver won't be probed for exynos5440 at all.
+Anyway, I hope we can get someone testing the patch set on exynos5440.
 
-Thanks, Tero.
+--
+Regards,
+Sylwester
