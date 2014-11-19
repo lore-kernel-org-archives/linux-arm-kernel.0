@@ -1,47 +1,27 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 19 Nov 2014 17:49:49 +0000
-Subject: [PATCH v7 3/4] ARM: mediatek: Add sysirq in mt6589/mt8135/mt8127
- dtsi
-In-Reply-To: <1416406451-4578-4-git-send-email-yingjoe.chen@mediatek.com>
- (Yingjoe Chen's message of "Wed, 19 Nov 2014 14:14:10 +0000")
-References: <1416406451-4578-1-git-send-email-yingjoe.chen@mediatek.com>
- <1416406451-4578-4-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <87d28jaxmq.fsf@approximate.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 19 Nov 2014 17:51:54 +0000
+Subject: [PATCH 2/4 V3] ASoC: Samsung: Add arndale_rt5631 machine driver
+In-Reply-To: <1415880864-2246-3-git-send-email-krishna.md@samsung.com>
+References: <1415880864-2246-1-git-send-email-krishna.md@samsung.com>
+ <1415880864-2246-3-git-send-email-krishna.md@samsung.com>
+Message-ID: <20141119175154.GI22111@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19 2014 at  2:14:10 pm GMT, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
-> Add sysirq settings for mt6589/mt8135/mt8127
-> This also correct timer interrupt flag. The old setting works
-> because boot loader already set polarity for timer interrupt.
-> Without intpol support, the setting was not changed so gic
-> can get the irq correctly.
->
-> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+On Thu, Nov 13, 2014 at 05:44:22PM +0530, Krishna Mohan Dani wrote:
+
+> Signed-off-by: Krishna Mohan Dani <krishna.md@samsung.com>
 > ---
->  arch/arm/boot/dts/mt6589.dtsi | 14 ++++++++++++--
->  arch/arm/boot/dts/mt8127.dtsi | 14 ++++++++++++--
->  arch/arm/boot/dts/mt8135.dtsi | 14 ++++++++++++--
->  3 files changed, 36 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/mt6589.dtsi b/arch/arm/boot/dts/mt6589.dtsi
-> index e3c7600..c91b2a9 100644
-> --- a/arch/arm/boot/dts/mt6589.dtsi
-> +++ b/arch/arm/boot/dts/mt6589.dtsi
-> @@ -19,7 +19,7 @@
->  
->  / {
->  	compatible = "mediatek,mt6589";
-> -	interrupt-parent = <&gic>;
-> +	interrupt-parent = <&sysirq>;
+>  sound/soc/samsung/Kconfig          |    6 ++
+>  sound/soc/samsung/Makefile         |    2 +
+>  sound/soc/samsung/arndale_rt5631.c |  150 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 158 insertions(+)
 
-This worries me a bit. Your sysirq cannot handle PPIs, and yet you make
-it the top-level interrupt controller, without amending any PPI.
-
-Does it mean you do not use *any* PPI? No per-cpu timer, nothing?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+This is fine but it is missing a binding document, please add one.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141119/f98b75c5/attachment.sig>
