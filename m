@@ -1,28 +1,60 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Wed, 19 Nov 2014 16:56:20 +0100
-Subject: [PATCH 0/4] ARM: dts: exynos: Second round of Spring support
-Message-ID: <1416412585-10809-1-git-send-email-afaerber@suse.de>
+Date: Wed, 19 Nov 2014 16:56:24 +0100
+Subject: [PATCH 4/4] ARM: dts: Add trackpad to exynos5250-spring
+In-Reply-To: <1416412585-10809-1-git-send-email-afaerber@suse.de>
+References: <1416412585-10809-1-git-send-email-afaerber@suse.de>
+Message-ID: <1416412585-10809-5-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The HP Chromebook 11 uses an Atmel maXTouch as trackpad.
+The keymap was found by trial-and-error.
 
-Following the initial merge of the HP Chromebook 11 device tree,
-here's a few follow-ups. A sound series is prepared separately.
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ arch/arm/boot/dts/exynos5250-spring.dts | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-Regards,
-Andreas
-
-
-Andreas F?rber (4):
-  ARM: dts: Add usb3503 pinctrl to exynos5250-spring
-  ARM: dts: Add temperature sensor to exynos5250-spring
-  ARM: exynos_defconfig: Enable LM90 driver
-  ARM: dts: Add trackpad to exynos5250-spring
-
- arch/arm/boot/dts/exynos5250-spring.dts | 30 ++++++++++++++++++++++++++++++
- arch/arm/configs/exynos_defconfig       |  3 ++-
- 2 files changed, 32 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
+index cc3361afba49..2fa207c9e5e2 100644
+--- a/arch/arm/boot/dts/exynos5250-spring.dts
++++ b/arch/arm/boot/dts/exynos5250-spring.dts
+@@ -330,6 +330,22 @@
+ 	status = "okay";
+ 	samsung,i2c-sda-delay = <100>;
+ 	samsung,i2c-max-bus-freq = <378000>;
++
++	trackpad at 4b {
++		compatible = "atmel,maxtouch";
++		reg = <0x4b>;
++		interrupt-parent = <&gpx1>;
++		interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&trackpad_irq>;
++		linux,gpio-keymap = <KEY_RESERVED
++		                     KEY_RESERVED
++		                     KEY_RESERVED
++		                     KEY_RESERVED
++		                     KEY_RESERVED
++		                     BTN_LEFT>;
++		wakeup-source;
++	};
+ };
+ 
+ /*
+@@ -465,6 +481,13 @@
+ 		samsung,pin-drv = <0>;
+ 	};
+ 
++	trackpad_irq: trackpad-irq {
++		samsung,pins = "gpx1-2";
++		samsung,pin-function = <0xf>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
+ 	power_key_irq: power-key-irq {
+ 		samsung,pins = "gpx1-3";
+ 		samsung,pin-function = <0>;
 -- 
 2.1.2
