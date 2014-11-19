@@ -1,86 +1,49 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 19 Nov 2014 15:01:35 -0800
-Subject: [PATCH v4] clocksource: arch_timer: Allow the device tree to
- specify uninitialized timer registers
-In-Reply-To: <1412753627-28287-1-git-send-email-sonnyrao@chromium.org>
-References: <1412753627-28287-1-git-send-email-sonnyrao@chromium.org>
-Message-ID: <CAD=FV=VhaMo4fNide3a2S6jdLiq2pyOqY3hmx7ai0iDTPxCsPA@mail.gmail.com>
+From: mpeg.blue@free.fr (Mason)
+Date: Thu, 20 Nov 2014 00:24:30 +0100
+Subject: How many frequencies would cpufreq optimally like to manage?
+Message-ID: <546D26AE.50601@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel,
+Hello everyone,
 
-On Wed, Oct 8, 2014 at 12:33 AM, Sonny Rao <sonnyrao@chromium.org> wrote:
-> From: Doug Anderson <dianders@chromium.org>
->
-> Some 32-bit (ARMv7) systems are architected like this:
->
-> * The firmware doesn't know and doesn't care about hypervisor mode and
->   we don't want to add the complexity of hypervisor there.
->
-> * The firmware isn't involved in SMP bringup or resume.
->
-> * The ARCH timer come up with an uninitialized offset (CNTVOFF)
->   between the virtual and physical counters.  Each core gets a
->   different random offset.
->
-> * The device boots in "Secure SVC" mode.
->
-> * Nothing has touched the reset value of CNTHCTL.PL1PCEN or
->   CNTHCTL.PL1PCTEN (both default to 1 at reset)
->
-> On systems like the above, it doesn't make sense to use the virtual
-> counter.  There's nobody managing the offset and each time a core goes
-> down and comes back up it will get reinitialized to some other random
-> value.
->
-> This adds an optional property which can inform the kernel of this
-> situation, and firmware is free to remove the property if it is going
-> to initialize the CNTVOFF registers when each CPU comes out of reset.
->
-> Currently, the best course of action in this case is to use the
-> physical timer, which is why it is important that CNTHCTL hasn't been
-> changed from its reset value and it's a reasonable assumption given
-> that the firmware has never entered HYP mode.
->
-> Note that it's been said that on ARMv8 systems the firmware and
-> kernel really can't be architected as described above.  That means
-> using the physical timer like this really only makes sense for ARMv7
-> systems.
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> ---
-> Changes in v2:
-> - Add "#ifdef CONFIG_ARM" as per Will Deacon
->
-> Changes in v3:
-> - change property name to arm,cntvoff-not-fw-configured and specify
->   that the value of CNTHCTL.PL1PC(T)EN must still be the reset value
->   of 1 as per Mark Rutland
->
-> Changes in v4:
-> - change property name to arm,cpu-registers-not-fw-configured and
->   specify that all cpu registers must have architected reset values
->   per Mark Rutland
-> - change from "#ifdef CONFIG_ARM" to "if (IS_ENABLED(CONFIG_ARM))" per
->   Arnd Bergmann
-> ---
->  Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++++++
->  drivers/clocksource/arm_arch_timer.c                 | 8 ++++++++
->  2 files changed, 16 insertions(+)
+I'm running kernel 3.14 on an ARM Cortex-A9 based SoC.
+The baseline frequency for the ARM CPU is 999 MHz.
 
-Do you know what the status of this patch is?  This patch and Sonny's
-patch at <https://patchwork.kernel.org/patch/5051901/> are needed on
-Rockchip rk3288 for some specific things:
+The SoC provides a way to dynamically change the CPU frequency,
+dividing it by N/16 (N=32..4095) [Actually, I think there are
+also ways to divide by 1.x, but I need to read the docs again.]
 
-1. To make SMP happy with coreboot.
+I'm writing the platform-specific cpufreq driver.
+I could expose hundreds of frequencies to cpufreq, but I don't
+think that would be very productive. Correct?
+(Note: I can't offer ANY frequency.)
 
-2. To (I assume) make SMP happy after S2R (no matter which firmware is
-used since I don't think anyone has PSCI for rk3288).
+My question is: how many frequencies should I expose for "optimal"
+behavior of cpufreq?
 
-...we still need a DTS entry atop these patches, but that's trivial to
-add once these land.
+I'm thinking I would only expose div={2,3,5} meaning the available
+scaled frequencies would be {500,333,200} MHz. Are these enough?
+Should there be more? Should I go lower than 200 MHz?
 
-Thanks!
+I'm also wondering about the cpuinfo_transition_latency variable.
+It seems to be a constant. On my SoC, the latency depends on the
+"width" of the frequency jump. Specifically, the CPU will change
+frequency at 15 MHz/us. So if we're jumping from 1000 to 500 MHz,
+it will take 33 us. From 500 to 333 will take 11 us.
+
+Should I document the max latency? (i.e. for the "widest" jump)
+Can the governor request to jump from cpuinfo_min_freq to
+cpuinfo_max_freq directly, skipping intermediate frequencies?
+If so, should I just program
+
+cpuinfo_transition_latency =
+  (((cpuinfo_max_freq - cpuinfo_min_freq) / 1000) / 15) * 1000
+
+= (cpuinfo_max_freq - cpuinfo_min_freq) / 15 (in ns)
+= 53280 ns in my example
+
+Since governors.txt suggests a sampling rate of 10 ms, I suppose
+a transition_latency of 50 us is acceptable?
+
+Regards.
