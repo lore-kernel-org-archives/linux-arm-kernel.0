@@ -1,123 +1,78 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 19 Nov 2014 16:47:05 +0900
-Subject: [PATCH v2] ARM: dts: add board dts file for Exynos3250-based
- Monk board
-In-Reply-To: <546AE8EC.9010708@samsung.com>
-References: <20141002112233.GI5788@leverpostej>
- <1412734265-6259-1-git-send-email-yj44.cho@samsung.com>
- <546AE8EC.9010708@samsung.com>
-Message-ID: <546C4AF9.2060306@samsung.com>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Wed, 19 Nov 2014 09:49:39 +0200
+Subject: [PATCH 3/7] pinctrl: pinconf-generic: Allow driver to specify
+ DT params
+In-Reply-To: <995406b8e0244c63a3ef8e58314e81f6@BL2FFO11FD037.protection.gbl>
+References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1415041531-15520-4-git-send-email-soren.brinkmann@xilinx.com>
+ <CACRpkdYfj2ydLQ4q_FKwXo73jzNsvj9u2Aem9EiuEw-OCvurrg@mail.gmail.com>
+ <1416300621.30131.6.camel@mm-sol.com>
+ <995406b8e0244c63a3ef8e58314e81f6@BL2FFO11FD037.protection.gbl>
+Message-ID: <1416383379.30131.14.camel@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/14 15:36, Chanwoo Choi wrote:
-> Dear Kukjin,
+
+On Tue, 2014-11-18 at 09:25 -0800, S?ren Brinkmann wrote:
+> On Tue, 2014-11-18 at 10:50AM +0200, Ivan T. Ivanov wrote:
+> > 
+> > On Tue, 2014-11-11 at 15:53 +0100, Linus Walleij wrote:
+> > > On Mon, Nov 3, 2014 at 8:05 PM, Soren Brinkmann
+> > > brinkmann at xilinx.com> wrote:
+> > > 
+> > > > Additionally to the generic DT parameters, allow drivers to 
+> > > > provide driver-specific DT parameters to be used with the 
+> > > > generic parser infrastructure.
+> > > > 
+> > > > Signed-off-by: Soren Brinkmann brinkmann at xilinx.com>
+> > > 
+> > > I like the looks of this, but the patch description is a bit 
+> > > terse. I'd like it to describe some of the refactorings being 
+> > > done
+> > > to the intrinsics, because I have a hard time following the 
+> > > patch.
+> > > 
+> > > First please rebase onto the "devel" branch in the pin control 
+> > > tree, and notice that drivers/pinctrl/qcom/pinctrl-spmi-gpio.c 
+> > > which is merged there is actually doing this already:
+> > > 
+> > > 
+> > >         for_each_child_of_node(np_config, np) {
+> > >                 ret = pinconf_generic_dt_subnode_to_map(pctldev, 
+> > > np, map,
+> > >                                                         &reserv, 
+> > > nmaps, type);
+> > >                 if (ret)
+> > >                         break;
+> > > 
+> > >                 ret = pmic_gpio_dt_subnode_to_map(pctldev, np, 
+> > > map, &reserv,
+> > >                                                   nmaps, type);
+> > >                 if (ret)
+> > >                         break;
+> > >         }
+> > > 
+> > > So it should be patched to illustrate the point of this code.
+> > > 
+> > 
+> > I like the idea, but have issues with implementations :-).
+> >  
+> > It is supposed that additional parameters are not generic,
+> > otherwise they will be part of enum pin_config_param, right?
+> > 
+> > Probably it will be better if clients could pass array with
+> > driver specific dt bindings to pinconf_generic_dt_node_to_map()?
 > 
-Hi,
+> My idea was to hide that API from the driver. You just pass those 
+> parameters as part of the struct pctldev and the parser - whether 
+> this generic one or anything else - would do the right thing. I 
+> don't think calling the parser from the driver is the right approach.
 
-> Could you please review or pick this patchset?
-> 
-> Best Regards,
-> Chanwoo Choi
-> 
-> On 10/08/2014 11:11 AM, YoungJun Cho wrote:
->> From: Youngjun Cho <yj44.cho@samsung.com>
->>
->> This patch adds new board dts file to support Samsung Monk board which is
->> based on Exynos3250 SoC and has different H/W configuration from Rinato.
->>
->> This patch is based on linux-samsung.git for-next branch and depends on
->> [PATCHv2 0/2] ARM: dts: Add new board dts file for Exynos3250-based Rinato board
->>
->> Changes from v1:
->> - The 'memory' entries coalesce into one entry
->> - Removes useless space
->> - Puts voltage-regulator-0 under the root node
->>
->> This dts file support following features:
->> - eMMC
->> - Main PMIC (Samsung S2MPS14)
->> - Interface PMIC (Maxim MAX77836, MUIC, fuel-gauge, charger)
->> - RTC of Exynos3250
->> - ADC of Exynos3250 with NTC thermistor
->> - I2S of Exynos3250
->> - TMU of Exynos3250
->> - Secure firmware for Exynos3250 secondary cpu boot
->> - Serial ports of Exynos3250
->> - gpio-key for power key
->>
->> Signed-off-by: Youngjun Cho <yj44.cho@samsung.com>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Signed-off-by: Inki Dae <inki.dae@samsung.com>
->> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
->> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>  arch/arm/boot/dts/Makefile            |   3 +-
->>  arch/arm/boot/dts/exynos3250-monk.dts | 583 ++++++++++++++++++++++++++++++++++
->>  2 files changed, 585 insertions(+), 1 deletion(-)
->>  create mode 100644 arch/arm/boot/dts/exynos3250-monk.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 5728918..0c8ae64 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -64,7 +64,8 @@ dtb-$(CONFIG_ARCH_BRCMSTB) += \
->>  dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
->>  	da850-evm.dtb
->>  dtb-$(CONFIG_ARCH_EFM32) += efm32gg-dk3750.dtb
->> -dtb-$(CONFIG_ARCH_EXYNOS) += exynos3250-rinato.dtb \
->> +dtb-$(CONFIG_ARCH_EXYNOS) += exynos3250-monk.dtb \
->> +	exynos3250-rinato.dtb \
->>  	exynos4210-origen.dtb \
->>  	exynos4210-smdkv310.dtb \
->>  	exynos4210-trats.dtb \
->> diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
->> new file mode 100644
->> index 0000000..615672f
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/exynos3250-monk.dts
->> @@ -0,0 +1,583 @@
->> +/*
->> + * Samsung's Exynos3250 based Monk board device tree source
->> + *
->> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
->> + *		http://www.samsung.com
->> + *
->> + * Device tree source file for Samsung's Monk board which is based on
->> + * Samsung Exynos3250 SoC.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +/dts-v1/;
->> +#include "exynos3250.dtsi"
->> +#include <dt-bindings/input/input.h>
->> +
->> +/ {
->> +	model = "Samsung Monk board";
->> +	compatible = "samsung,monk", "samsung,exynos3250", "samsung,exynos3";
->> +
->> +	aliases {
->> +		i2c7 = &i2c_max77836;
->> +	};
->> +
->> +	memory {
->> +		reg =  <0x40000000 0x1ff00000>;
->> +	};
->> +
->> +	chosen {
->> +		bootargs = "console=ttySAC1,115200N8 root=/dev/mmcblk0p15 rootwait earlyprintk panic=5";
+Drivers already know about dt_node_to_map(). My proposal will make
+drivers, which register non-standard bindings, little bit simpler.
 
-Actually, the bootargs can be supplied from bootloader and can be
-removed from here and it's a recent requirement from mailinglist. But
-I've already applied similar one in rinato.dts. So please cleanup them
-together later...? :)
+With your approach probably we can remove dt_node_to_map() and
+dt_free_map() callbacks?
 
-[snip]
-
-Will apply, thanks.
-
-- Kukjin
+Regards,
+Ivan
