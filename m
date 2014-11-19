@@ -1,34 +1,39 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 19 Nov 2014 15:29:19 -0200
-Subject: [PATCH] dma: imx-sdma: clarify about firmware not found error
-In-Reply-To: <20141117075456.GD30369@pengutronix.de>
-References: <1415829869-6661-1-git-send-email-festevam@gmail.com>
- <20141117075456.GD30369@pengutronix.de>
-Message-ID: <CAOMZO5A98yvSEUEEEEEN=eacXpjFvoLcs2xhdW9dabH3S=FB3Q@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 19 Nov 2014 18:29:47 +0100
+Subject: [PATCH 1/3] ARM: dts: Add SPI flash node for Peach boards
+In-Reply-To: <CAD=FV=XpweHvcTsVTMBkv9g4+GxoO8WdngGhfVj0QnOwq3ASdQ@mail.gmail.com>
+References: <1416246184-29071-1-git-send-email-javier.martinez@collabora.co.uk>	<1416246184-29071-2-git-send-email-javier.martinez@collabora.co.uk>	<CAD=FV=Xkei_wxa3jWb8bPvuynbSyq4o=ezjVD0+e04aOPCAM+Q@mail.gmail.com>	<546C6BD2.4020802@collabora.co.uk>
+ <CAD=FV=XpweHvcTsVTMBkv9g4+GxoO8WdngGhfVj0QnOwq3ASdQ@mail.gmail.com>
+Message-ID: <546CD38B.3050700@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Hello Doug,
 
-On Mon, Nov 17, 2014 at 5:54 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Wed, Nov 12, 2014 at 08:04:29PM -0200, Fabio Estevam wrote:
->> From: Sascha Hauer <s.hauer@pengutronix.de>
+On 11/19/2014 06:19 PM, Doug Anderson wrote:
 >>
->> When a firmware cannot be found for the SDMA engine then we can
->> continue with the internal ROM firmware.
->>
->> The meaning of this message is frequently asked for, so make clear
->> that the driver still works with the internal ROM firmware and reduce
->> the loglevel from err to info.
->>
->> Cc: Vinod Koul <vinod.koul@intel.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: Shawn Guo <shawn.guo@linaro.org>
->> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
->> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>> I wonder how the spidev user-space interface is supposed to be used
+>> when booting with Device Trees.
+> 
+> OK.  Please don't take my comments as a NAK on this patch.  I should
+> have done the same grep myself before sending--sorry.  I just
+> remembered the old conversation and looked for that instead.
 >
-> I still think we should have this.
->
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Could this one be applied?
+Ok, let's see what others say. At the very least documentation about the
+spidev DT binding should be added to Documentation/devicetree/bindings/
+ 
+> If the convention is to use "spidev" like this then I guess we're OK.
+> I do wish it was a little more like "i2c" myself where you could get a
+> direct access interface no matter what driver was bound underneath
+> (and also if no drivers were bound underneath).  ...but I could just
+> be naive.  ;)
+> 
+
++1
+
+> -Doug
+> 
+
+Best regards,
+Javier
