@@ -1,19 +1,21 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Nov 2014 23:20:08 +0100
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.19
-In-Reply-To: <20141109070703.GY3698@titan.lakedaemon.net>
-References: <20141109070703.GY3698@titan.lakedaemon.net>
-Message-ID: <201411192320.08536.arnd@arndb.de>
+Date: Wed, 19 Nov 2014 23:23:34 +0100
+Subject: [PATCH] ARM: at91: remove useless init_time for DT-only SoCs
+In-Reply-To: <1415604709-24185-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1415604709-24185-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <201411192323.34609.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 09 November 2014, Jason Cooper wrote:
-> Here's a round of DT changes that have been in -next for at least 4
-> cycles.
+On Monday 10 November 2014, Boris Brezillon wrote:
+> Hi Olof,
 > 
-> Please pull.
+> You recently pulled some changes on Nicolas' at91-cleanup tag and two of
+> those commits (see above for commit hashes) are actually introducing
+> compilation errors.
+> This patch fixes those compilation errors.
+> 
 
-
-Pulled into next/dt, thanks!
+Applied on next/cleanup, thanks!
 
 	Arnd
