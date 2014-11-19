@@ -1,83 +1,34 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 19 Nov 2014 12:15:29 +0100
-Subject: [PATCH v3 00/19] Exynos SYSMMU (IOMMU) integration with DT and
- DMA-mapping subsystem
-Message-ID: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+Date: Wed, 19 Nov 2014 12:15:31 +0100
+Subject: [PATCH v3 02/19] iommu: fix initialization without 'add_device'
+ callback
+In-Reply-To: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1416395748-10731-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Everyone,
+IOMMU drivers can be initialized from of_iommu helpers. Such drivers don't
+need to provide device_add callbacks to operate properly, so there is no
+need to fail initialization if the callback is missing.
 
-This is another attempt to finally make Exynos SYSMMU driver fully
-integrated with DMA-mapping subsystem. The main change from previous
-version is a rebase onto latest "automatic DMA configuration for IOMMU
-masters" patches from Will Deacon.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ drivers/iommu/iommu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This patchset demonstrates that Will's proposal works fine and
-significantly simplifies the driver code.
-
-Best regards
-Marek Szyprowski
-Samsung R&D Institute Poland
-
-
-Changelog:
-v3:
-- rebased onto "[RFC PATCH v4 0/8] Introduce automatic DMA
-  configuration for IOMMU masters"
-- added some minor fixes for iommu and dma-mapping frameworks
-
-v2: http://thread.gmane.org/gmane.linux.kernel.iommu/6472/
-- rebased onto "[RFC PATCH v3 0/7] Introduce automatic DMA
-  configuration for IOMMU masters" patches:
-  http://www.spinics.net/lists/arm-kernel/msg362076.html
-- changed initialization from bus notifiers to DT related callbacks
-- removed support for separate IO address spaces - this will be
-  discussed separately after the basic support gets merged
-- removed support for power domain notifier-based runtime power
-  management - this also will be discussed separately later
-
-v1: https://lkml.org/lkml/2014/8/5/183
-- initial version, feature complete, completely rewrote integration
-  approach
-
-
-Patch summary:
-
-Marek Szyprowski (19):
-  iommu: fix const qualifier in of_iommu_set_ops
-  iommu: fix initialization without 'add_device' callback
-  arm: dma-mapping: add missing check for iommu
-  drm: exynos: detach from default dma-mapping domain on init
-  arm: exynos: pm_domains: add support for devices registered before
-    arch_initcall
-  ARM: dts: exynos4: add sysmmu nodes
-  iommu: exynos: don't read version register on every tlb operation
-  iommu: exynos: remove unused functions
-  iommu: exynos: remove useless spinlock
-  iommu: exynos: refactor function parameters to simplify code
-  iommu: exynos: remove unused functions, part 2
-  iommu: exynos: remove useless device_add/remove callbacks
-  iommu: exynos: add support for binding more than one sysmmu to master
-    device
-  iommu: exynos: add support for runtime_pm
-  iommu: exynos: rename variables to reflect their purpose
-  iommu: exynos: document internal structures
-  iommu: exynos: remove excessive includes and sort others
-    alphabetically
-  iommu: exynos: init from dt-specific callback instead of initcall
-  iommu: exynos: add callback for initializing devices from device tree
-
- arch/arm/boot/dts/exynos4.dtsi            | 117 +++++++
- arch/arm/boot/dts/exynos4210.dtsi         |  23 ++
- arch/arm/boot/dts/exynos4x12.dtsi         |  82 +++++
- arch/arm/mach-exynos/pm_domains.c         |   9 +-
- arch/arm/mm/dma-mapping.c                 |   2 +-
- drivers/gpu/drm/exynos/exynos_drm_iommu.c |   3 +
- drivers/iommu/exynos-iommu.c              | 490 ++++++++++++++----------------
- drivers/iommu/iommu.c                     |   2 +-
- include/linux/of_iommu.h                  |   4 +-
- 9 files changed, 459 insertions(+), 273 deletions(-)
-
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index ed8b04867b1f..02f798b7e295 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -737,7 +737,7 @@ static int add_iommu_group(struct device *dev, void *data)
+ 	const struct iommu_ops *ops = cb->ops;
+ 
+ 	if (!ops->add_device)
+-		return -ENODEV;
++		return 0;
+ 
+ 	WARN_ON(dev->iommu_group);
+ 
 -- 
 1.9.2
