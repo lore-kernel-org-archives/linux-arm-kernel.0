@@ -1,144 +1,477 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 19 Nov 2014 15:07:53 +0800
-Subject: [GIT PULL] ARM: imx: device tree changes for 3.19
-Message-ID: <20141119070752.GG27759@dragon>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Wed, 19 Nov 2014 15:08:05 +0800
+Subject: [PATCH v8 2/2] ARM: kprobes: enable OPTPROBES for ARM 32
+In-Reply-To: <1416292359-75893-3-git-send-email-wangnan0@huawei.com>
+References: <1416292359-75893-1-git-send-email-wangnan0@huawei.com>
+ <1416292359-75893-3-git-send-email-wangnan0@huawei.com>
+Message-ID: <546C41D5.6020108@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd,
+On 2014/11/18 14:32, Wang Nan wrote:
+> This patch introduce kprobeopt for ARM 32.
+> 
+> Limitations:
+>  - Currently only kernel compiled with ARM ISA is supported.
+> 
+>  - Offset between probe point and optinsn slot must not larger than
+>    32MiB. Masami Hiramatsu suggests replacing 2 words, it will make
+>    things complex. Futher patch can make such optimization.
+> 
+> Kprobe opt on ARM is relatively simpler than kprobe opt on x86 because
+> ARM instruction is always 4 bytes aligned and 4 bytes long. This patch
+> replace probed instruction by a 'b', branch to trampoline code and then
+> calls optimized_callback(). optimized_callback() calls opt_pre_handler()
+> to execute kprobe handler. It also emulate/simulate replaced instruction.
+> 
+> When unregistering kprobe, the deferred manner of unoptimizer may leave
+> branch instruction before optimizer is called. Different from x86_64,
+> which only copy the probed insn after optprobe_template_end and
+> reexecute them, this patch call singlestep to emulate/simulate the insn
+> directly. Futher patch can optimize this behavior.
+> 
+> v1 -> v2:
+> 
+>  - Improvement: if replaced instruction is conditional, generate a
+>    conditional branch instruction for it;
+> 
+>  - Introduces RELATIVEJUMP_OPCODES due to ARM kprobe_opcode_t is 4
+>    bytes;
+> 
+>  - Removes size field in struct arch_optimized_insn;
+> 
+>  - Use arm_gen_branch() to generate branch instruction;
+> 
+>  - Remove all recover logic: ARM doesn't use tail buffer, no need
+>    recover replaced instructions like x86;
+> 
+>  - Remove incorrect CONFIG_THUMB checking;
+> 
+>  - can_optimize() always returns true if address is well aligned;
+> 
+>  - Improve optimized_callback: using opt_pre_handler();
+> 
+>  - Bugfix: correct range checking code and improve comments;
+> 
+>  - Fix commit message.
+> 
+> v2 -> v3:
+> 
+>  - Rename RELATIVEJUMP_OPCODES to MAX_COPIED_INSNS;
+> 
+>  - Remove unneeded checking:
+>       arch_check_optimized_kprobe(), can_optimize();
+> 
+>  - Add missing flush_icache_range() in arch_prepare_optimized_kprobe();
+> 
+>  - Remove unneeded 'return;'.
+> 
+> v3 -> v4:
+> 
+>  - Use __mem_to_opcode_arm() to translate copied_insn to ensure it
+>    works in big endian kernel;
+> 
+>  - Replace 'nop' placeholder in trampoline code template with
+>    '.long 0' to avoid confusion: reader may regard 'nop' as an
+>    instruction, but it is value in fact.
+> 
+> v4 -> v5:
+> 
+>  - Don't optimize stack store operations.
+> 
+>  - Introduce prepared field to arch_optimized_insn to indicate whether
+>    it is prepared. Similar to size field with x86. See v1 -> v2.
+> 
+> v5 -> v6:
+> 
+>  - Dynamically reserve stack according to instruction.
+> 
+>  - Rename: kprobes-opt.c -> kprobes-opt-arm.c.
+> 
+>  - Set op->optinsn.insn after all works are done.
+> 
+> v6 -> v7:
+> 
+>  - Using checker to check stack consumption.
+> 
+> v7 -> v8:
+> 
+>  - Small code adjustments.
+> 
+> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+> Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+> Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
+> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/Kconfig                  |   1 +
+>  arch/arm/include/asm/kprobes.h    |  26 ++++
+>  arch/arm/kernel/Makefile          |   3 +-
+>  arch/arm/kernel/kprobes-opt-arm.c | 285 ++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 314 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/kernel/kprobes-opt-arm.c
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 89c4b5c..8281cea 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -59,6 +59,7 @@ config ARM
+>  	select HAVE_MEMBLOCK
+>  	select HAVE_MOD_ARCH_SPECIFIC if ARM_UNWIND
+>  	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
+> +	select HAVE_OPTPROBES if (!THUMB2_KERNEL)
+>  	select HAVE_PERF_EVENTS
+>  	select HAVE_PERF_REGS
+>  	select HAVE_PERF_USER_STACK_DUMP
+> diff --git a/arch/arm/include/asm/kprobes.h b/arch/arm/include/asm/kprobes.h
+> index 56f9ac6..c1016cb 100644
+> --- a/arch/arm/include/asm/kprobes.h
+> +++ b/arch/arm/include/asm/kprobes.h
+> @@ -50,5 +50,31 @@ int kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr);
+>  int kprobe_exceptions_notify(struct notifier_block *self,
+>  			     unsigned long val, void *data);
+>  
+> +/* optinsn template addresses */
+> +extern __visible kprobe_opcode_t optprobe_template_entry;
+> +extern __visible kprobe_opcode_t optprobe_template_val;
+> +extern __visible kprobe_opcode_t optprobe_template_call;
+> +extern __visible kprobe_opcode_t optprobe_template_end;
+> +
+> +#define MAX_OPTIMIZED_LENGTH	(4)
+> +#define MAX_OPTINSN_SIZE				\
+> +	(((unsigned long)&optprobe_template_end -	\
+> +	  (unsigned long)&optprobe_template_entry))
+> +#define RELATIVEJUMP_SIZE	(4)
+> +
+> +struct arch_optimized_insn {
+> +	/*
+> +	 * copy of the original instructions.
+> +	 * Different from x86, ARM kprobe_opcode_t is u32.
+> +	 */
+> +#define MAX_COPIED_INSN	((RELATIVEJUMP_SIZE) / sizeof(kprobe_opcode_t))
+> +	kprobe_opcode_t copied_insn[MAX_COPIED_INSN];
+> +	/* detour code buffer */
+> +	kprobe_opcode_t *insn;
+> +	/*
+> +	 *  we always copies one instruction on arm32,
+> +	 *  size always be 4, so no size field.
+> +	 */
+> +};
+>  
+>  #endif /* _ARM_KPROBES_H */
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index 45aed4b..8a16fcf 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -52,11 +52,12 @@ obj-$(CONFIG_FUNCTION_GRAPH_TRACER)	+= ftrace.o insn.o
+>  obj-$(CONFIG_JUMP_LABEL)	+= jump_label.o insn.o patch.o
+>  obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o
+>  obj-$(CONFIG_UPROBES)		+= probes.o probes-arm.o uprobes.o uprobes-arm.o
+> -obj-$(CONFIG_KPROBES)		+= probes.o kprobes.o kprobes-common.o patch.o probes-checkers-common.o
+> +obj-$(CONFIG_KPROBES)		+= probes.o kprobes.o kprobes-common.o patch.o probes-checkers-common.o insn.o
+>  ifdef CONFIG_THUMB2_KERNEL
+>  obj-$(CONFIG_KPROBES)		+= kprobes-thumb.o probes-thumb.o probes-checkers-thumb.o
+>  else
+>  obj-$(CONFIG_KPROBES)		+= kprobes-arm.o probes-arm.o probes-checkers-arm.o
+> +obj-$(CONFIG_OPTPROBES)		+= kprobes-opt-arm.o
+>  endif
+>  obj-$(CONFIG_ARM_KPROBES_TEST)	+= test-kprobes.o
+>  test-kprobes-objs		:= kprobes-test.o
+> diff --git a/arch/arm/kernel/kprobes-opt-arm.c b/arch/arm/kernel/kprobes-opt-arm.c
+> new file mode 100644
+> index 0000000..55eb3ea
+> --- /dev/null
+> +++ b/arch/arm/kernel/kprobes-opt-arm.c
+> @@ -0,0 +1,285 @@
+> +/*
+> + *  Kernel Probes Jump Optimization (Optprobes)
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+> + *
+> + * Copyright (C) IBM Corporation, 2002, 2004
+> + * Copyright (C) Hitachi Ltd., 2012
+> + * Copyright (C) Huawei Inc., 2014
+> + */
+> +
+> +#include <linux/kprobes.h>
+> +#include <linux/jump_label.h>
+> +#include <asm/kprobes.h>
+> +#include <asm/cacheflush.h>
+> +/* for arm_gen_branch */
+> +#include "insn.h"
+> +/* for patch_text */
+> +#include "patch.h"
+> +
+> +/*
+> + * NOTE: the first sub and add instruction will be modified according
+> + * to the stack cost of the instruction.
+> + */
+> +asm (
+> +			".global optprobe_template_entry\n"
+> +			"optprobe_template_entry:\n"
+> +			"	sub	sp, sp, #0xff\n"
+> +			"	stmia	sp, {r0 - r14} \n"
+> +			"	add	r3, sp, #0xff\n"
+> +			"	str	r3, [sp, #52]\n"
+> +			"	mrs	r4, cpsr\n"
+> +			"	str	r4, [sp, #64]\n"
+> +			"	mov	r1, sp\n"
+> +			"	ldr	r0, 1f\n"
+> +			"	ldr	r2, 2f\n"
+> +			"	blx	r2\n"
+> +			"	ldr	r1, [sp, #64]\n"
+> +			"	msr	cpsr_fs, r1\n"
+> +			"	ldmia	sp, {r0 - r15}\n"
+> +			".global optprobe_template_val\n"
+> +			"optprobe_template_val:\n"
+> +			"1:	.long 0\n"
+> +			".global optprobe_template_call\n"
+> +			"optprobe_template_call:\n"
+> +			"2:	.long 0\n"
+> +			".global optprobe_template_end\n"
+> +			"optprobe_template_end:\n");
+> +
+> +#define TMPL_VAL_IDX \
+> +	((long)&optprobe_template_val - (long)&optprobe_template_entry)
+> +#define TMPL_CALL_IDX \
+> +	((long)&optprobe_template_call - (long)&optprobe_template_entry)
+> +#define TMPL_END_IDX \
+> +	((long)&optprobe_template_end - (long)&optprobe_template_entry)
+> +
+> +/*
+> + * ARM can always optimize an instruction when using ARM ISA, except
+> + * instructions like 'str r0, [sp, r1]' which store to stack and unable
+> + * to determine stack space consumption statically.
+> + */
+> +int arch_prepared_optinsn(struct arch_optimized_insn *optinsn)
+> +{
+> +	return optinsn->insn != NULL;
+> +}
+> +
+> +/*
+> + * In ARM ISA, kprobe opt always replace one instruction (4 bytes
+> + * aligned and 4 bytes long). It is impossiable to encounter another
+> + * kprobe in the address range. So always return 0.
+> + */
+> +int arch_check_optimized_kprobe(struct optimized_kprobe *op)
+> +{
+> +	return 0;
+> +}
+> +
+> +/* Caller must ensure addr & 3 == 0 */
+> +static int can_optimize(struct optimized_kprobe *op)
+> +{
+> +	if (op->kp.ainsn.stack_space < 0)
+> +		return 0;
+> +	/*
+> +	 * 255 is the biggest imm can be used in 'sub r0, r0, #<imm>'.
+> +	 * Number larger than 255 needs special encoding.
+> +	 */
+> +	if (op->kp.ainsn.stack_space > 255 - sizeof(struct pt_regs))
+> +		return 0;
+> +	return 1;
+> +}
+> +
+> +/* Free optimized instruction slot */
+> +static void
+> +__arch_remove_optimized_kprobe(struct optimized_kprobe *op, int dirty)
+> +{
+> +	if (op->optinsn.insn) {
+> +		free_optinsn_slot(op->optinsn.insn, dirty);
+> +		op->optinsn.insn = NULL;
+> +	}
+> +}
+> +
+> +extern void kprobe_handler(struct pt_regs *regs);
+> +
+> +static void
+> +optimized_callback(struct optimized_kprobe *op, struct pt_regs *regs)
+> +{
+> +	unsigned long flags;
+> +	struct kprobe *p = &op->kp;
+> +	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
+> +
+> +	/* Save skipped registers */
+> +	regs->ARM_pc = (unsigned long)op->kp.addr;
+> +	regs->ARM_ORIG_r0 = ~0UL;
+> +
+> +	local_irq_save(flags);
+> +
+> +	if (kprobe_running()) {
+> +		kprobes_inc_nmissed_count(&op->kp);
+> +	} else {
+> +		__this_cpu_write(current_kprobe, &op->kp);
+> +		kcb->kprobe_status = KPROBE_HIT_ACTIVE;
+> +		opt_pre_handler(&op->kp, regs);
+> +		__this_cpu_write(current_kprobe, NULL);
+> +	}
+> +
+> +	/* In each case, we must singlestep the replaced instruction. */
+> +	op->kp.ainsn.insn_singlestep(p->opcode, &p->ainsn, regs);
+> +
+> +	local_irq_restore(flags);
+> +}
+> +
+> +int arch_prepare_optimized_kprobe(struct optimized_kprobe *op)
+> +{
+> +	u8 *buf;
+> +	unsigned long *code;
+> +	unsigned long rel_chk;
+> +	unsigned long val;
+> +	unsigned long stack_protect = sizeof(struct pt_regs);
+> +
+> +	if (!can_optimize(op))
+> +		return -EILSEQ;
+> +
+> +	buf = (u8 *)get_optinsn_slot();
+> +	if (!buf)
+> +		return -ENOMEM;
+> +
+> +	/*
+> +	 * Verify if the address gap is in 32MiB range, because this uses
+> +	 * a relative jump.
+> +	 *
+> +	 * kprobe opt use a 'b' instruction to branch to optinsn.insn.
+> +	 * According to ARM manual, branch instruction is:
+> +	 *
+> +	 *   31  28 27           24 23             0
+> +	 *  +------+---+---+---+---+----------------+
+> +	 *  | cond | 1 | 0 | 1 | 0 |      imm24     |
+> +	 *  +------+---+---+---+---+----------------+
+> +	 *
+> +	 * imm24 is a signed 24 bits integer. The real branch offset is computed
+> +	 * by: imm32 = SignExtend(imm24:'00', 32);
+> +	 *
+> +	 * So the maximum forward branch should be:
+> +	 *   (0x007fffff << 2) = 0x01fffffc =  0x1fffffc
+> +	 * The maximum backword branch should be:
+> +	 *   (0xff800000 << 2) = 0xfe000000 = -0x2000000
+> +	 *
+> +	 * We can simply check (rel & 0xfe000003):
+> +	 *  if rel is positive, (rel & 0xfe000000) shoule be 0
+> +	 *  if rel is negitive, (rel & 0xfe000000) should be 0xfe000000
+> +	 *  the last '3' is used for alignment checking.
+> +	 */
+> +	rel_chk = (unsigned long)((long)buf -
+> +			(long)op->kp.addr + 8) & 0xfe000003;
+> +
+> +	if ((rel_chk != 0) && (rel_chk != 0xfe000000)) {
+> +		__arch_remove_optimized_kprobe(op, 0);
 
-This pull request is based on the SoC pull request which tagged as
-imx-soc-3.19.  Please pull, thanks.
+Here is a bug. Different from x86_64, ARM code doesn't set op->optinsn.insn
+here, so __arch_remove_optimized_kprobe won't do anything. In version 9 patch
+series I fix this problem by calling free_optinsn_slot(buf, 0) directly.
+However, I forgot to mention it in its commit message.
 
-Shawn
-
-The following changes since commit dc7aaa041842eb40be7ad7bde0a7e37ac1efd79c:
-
-  ARM: configs: imx_v6_v7_defconfig: add power off driver (2014-11-19 11:51:55 +0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt-3.19
-
-for you to fetch changes up to c95e259674da685152eb093263478c7ada0aa904:
-
-  ARM: dts: imx6: add pm_power_off support for i.mx6 chips (2014-11-19 11:59:38 +0800)
-
-----------------------------------------------------------------
-The i.MX device tree changes for 3.19:
- - Device additions for board vf610-colibri, pwm, backlight, I2C, RTC,
-   ADC etc.
- - Update i.MX6 phyFLEX board to include PCIe, CAN and audio support
- - Improve SSI clocks description for i.MX5 platforms
- - Add ENET2 support for imx6sx-sdb board
- - Add device tree source for LS1021A SoC, board QDS and TWR
- - Enable cpufreq support for i.MX53
- - Enable VPU device support for i.MX6QDL
- - Enable poweroff support for i.MX6 SoCs
- - Add support for TBS2910 Matrix ARM mini PC which is built on i.MX6Q
- - Create generic base device trees for Vybrid and add support for
-   Colibri VF50
-
-----------------------------------------------------------------
-Bhuvanchandra DV (5):
-      ARM: dts: vf610: Add PWM second instance
-      ARM: dts: vf610-colibri: Add PWM support
-      ARM: dts: vf610-colibri: Add backlight support
-      ARM: dts: vf-colibri: Add I2C support
-      ARM: dts: vf-colibri-eval-v3.dts: Enable ST-M41T0M6 RTC
-
-Christian Hemp (5):
-      ARM: dts: imx6: phyFLEX: set nodes in alphabetical order
-      ARM: dts: imx6: phyFLEX: Enable gpmi in module file
-      ARM: dts: imx6: phyFLEX: Set correct interrupt for pmic
-      ARM: dts: imx6: phyFLEX: Add PCIe
-      ARM: dts: imx6: phyFLEX: Add CAN support
-
-Dmitry Lavnikevich (2):
-      ARM: dts: pbab01: move i2c pins and frequency configuration into pfla02
-      ARM: dts: pbab01: enable I2S audio on phyFLEX-i.MX6 boards
-
-Fabio Estevam (3):
-      ARM: dts: imx53: Improve SSI clocks description
-      ARM: dts: imx51: Improve SSI clocks description
-      ARM: dts: imx6q-tbs2910: Remove unneeded 'fsl,mode' property
-
-Fugang Duan (1):
-      ARM: dts: imx6x: Add enet2 support for imx6sx-sdb board
-
-Jingchang Lu (4):
-      ARM: dts: Add SoC level device tree support for LS1021A
-      ARM: dts: Add initial LS1021A QDS board dts support
-      ARM: dts: Add initial LS1021A TWR board dts support
-      dt-bindings: arm: add Freescale LS1021A SoC device tree binding
-
-Lucas Stach (1):
-      ARM: dts: imx53: add cpufreq-dt support
-
-Philipp Zabel (1):
-      ARM: dts: imx6qdl: Enable CODA960 VPU
-
-Robin Gong (1):
-      ARM: dts: imx6: add pm_power_off support for i.mx6 chips
-
-Sanchayan Maity (1):
-      ARM: dts: vf610-colibri: Add ADC support
-
-Soeren Moch (2):
-      devicetree: bindings: Add vendor prefix for TBS Technologies
-      ARM: dts: add initial support for TBS2910 Matrix ARM mini PC
-
-Stefan Agner (7):
-      ARM: dts: vf610: Add ARM Global Timer
-      ARM: dts: vf610: assign oscillator to clock module
-      ARM: dts: vf610: create generic base device trees
-      ARM: dts: vf500-colibri: add Colibri VF50 support
-      ARM: dts: vf610: use new GPIO support
-      ARM: dts: vf610: enable USB misc/phy nodes where necessary
-      ARM: dts: vf-colibri: add USB regulators
-
-Vladimir Zapolskiy (1):
-      ARM: dts: imx6dl: add alias for I2C4 bus
-
- Documentation/devicetree/bindings/arm/fsl.txt      |  38 ++
- .../devicetree/bindings/clock/vf610-clock.txt      |  15 +
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/boot/dts/Makefile                         |   4 +
- arch/arm/boot/dts/imx51.dtsi                       |  12 +-
- arch/arm/boot/dts/imx53.dtsi                       |  25 +-
- arch/arm/boot/dts/imx6dl.dtsi                      |   8 +
- arch/arm/boot/dts/imx6q-tbs2910.dts                | 428 ++++++++++++++++++
- arch/arm/boot/dts/imx6q.dtsi                       |   4 +
- arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi       | 131 ++++--
- arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi       |  97 +++-
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |   4 +
- arch/arm/boot/dts/imx6qdl.dtsi                     |  14 +
- arch/arm/boot/dts/imx6sl-evk.dts                   |   4 +
- arch/arm/boot/dts/imx6sl.dtsi                      |   6 +
- arch/arm/boot/dts/imx6sx-sdb.dts                   |  66 +++
- arch/arm/boot/dts/imx6sx.dtsi                      |   8 +-
- arch/arm/boot/dts/ls1021a-qds.dts                  | 240 ++++++++++
- arch/arm/boot/dts/ls1021a-twr.dts                  | 127 ++++++
- arch/arm/boot/dts/ls1021a.dtsi                     | 408 +++++++++++++++++
- arch/arm/boot/dts/vf-colibri-eval-v3.dtsi          |  96 ++++
- arch/arm/boot/dts/vf-colibri.dtsi                  | 186 ++++++++
- arch/arm/boot/dts/vf500-colibri-eval-v3.dts        |  17 +
- arch/arm/boot/dts/vf500-colibri.dtsi               |  20 +
- arch/arm/boot/dts/vf500.dtsi                       | 171 ++++++++
- arch/arm/boot/dts/vf610-colibri-eval-v3.dts        |  33 +-
- arch/arm/boot/dts/vf610-colibri.dtsi               | 100 +----
- arch/arm/boot/dts/vf610-cosmic.dts                 |  14 +-
- arch/arm/boot/dts/vf610-twr.dts                    |  46 +-
- arch/arm/boot/dts/vf610.dtsi                       | 486 +--------------------
- arch/arm/boot/dts/vfxxx.dtsi                       | 437 ++++++++++++++++++
- 31 files changed, 2575 insertions(+), 671 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx6q-tbs2910.dts
- create mode 100644 arch/arm/boot/dts/ls1021a-qds.dts
- create mode 100644 arch/arm/boot/dts/ls1021a-twr.dts
- create mode 100644 arch/arm/boot/dts/ls1021a.dtsi
- create mode 100644 arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
- create mode 100644 arch/arm/boot/dts/vf-colibri.dtsi
- create mode 100644 arch/arm/boot/dts/vf500-colibri-eval-v3.dts
- create mode 100644 arch/arm/boot/dts/vf500-colibri.dtsi
- create mode 100644 arch/arm/boot/dts/vf500.dtsi
- create mode 100644 arch/arm/boot/dts/vfxxx.dtsi
+> +		return -ERANGE;
+> +	}
+> +
+> +	/* Copy arch-dep-instance from template. */
+> +	memcpy(buf, &optprobe_template_entry, TMPL_END_IDX);
+> +
+> +	/* Adjust buffer according to instruction. */
+> +	BUG_ON(op->kp.ainsn.stack_space < 0);
+> +	stack_protect += op->kp.ainsn.stack_space;
+> +
+> +	/* Should have been filtered by can_optimize(). */
+> +	BUG_ON(stack_protect > 255);
+> +
+> +	/* Create a 'sub sp, sp, #<stack_protect>' */
+> +	code = (unsigned long *)(buf);
+> +	code[0] = __opcode_to_mem_arm(0xe24dd000 | stack_protect);
+> +	/* Create a 'add r3, sp, #<stack_protect>' */
+> +	code[2] = __opcode_to_mem_arm(0xe28d3000 | stack_protect);
+> +
+> +	/* Set probe information */
+> +	val = (unsigned long)op;
+> +	memcpy(buf + TMPL_VAL_IDX, &val, sizeof(val));
+> +
+> +	/* Set probe function call */
+> +	val = (unsigned long)optimized_callback;
+> +	memcpy(buf + TMPL_CALL_IDX, &val, sizeof(val));
+> +
+> +	flush_icache_range((unsigned long)buf,
+> +			   (unsigned long)buf + TMPL_END_IDX);
+> +
+> +	/* Set op->optinsn.insn means prepared */
+> +	op->optinsn.insn = (kprobe_opcode_t *)buf;
+> +	return 0;
+> +}
+> +
+> +void arch_optimize_kprobes(struct list_head *oplist)
+> +{
+> +	struct optimized_kprobe *op, *tmp;
+> +
+> +	list_for_each_entry_safe(op, tmp, oplist, list) {
+> +		unsigned long insn;
+> +		WARN_ON(kprobe_disabled(&op->kp));
+> +
+> +		/*
+> +		 * Backup instructions which will be replaced
+> +		 * by jump address
+> +		 */
+> +		memcpy(op->optinsn.copied_insn, op->kp.addr,
+> +				RELATIVEJUMP_SIZE);
+> +
+> +		insn = arm_gen_branch((unsigned long)op->kp.addr,
+> +				(unsigned long)op->optinsn.insn);
+> +		BUG_ON(insn == 0);
+> +
+> +		/*
+> +		 * Make it a conditional branch if replaced insn
+> +		 * is consitional
+> +		 */
+> +		insn = (__mem_to_opcode_arm(
+> +			  op->optinsn.copied_insn[0]) & 0xf0000000) |
+> +			(insn & 0x0fffffff);
+> +
+> +		patch_text(op->kp.addr, insn);
+> +
+> +		list_del_init(&op->list);
+> +	}
+> +}
+> +
+> +void arch_unoptimize_kprobe(struct optimized_kprobe *op)
+> +{
+> +	arch_arm_kprobe(&op->kp);
+> +}
+> +
+> +/*
+> + * Recover original instructions and breakpoints from relative jumps.
+> + * Caller must call with locking kprobe_mutex.
+> + */
+> +void arch_unoptimize_kprobes(struct list_head *oplist,
+> + 			    struct list_head *done_list)
+> +{
+> +	struct optimized_kprobe *op, *tmp;
+> +
+> +	list_for_each_entry_safe(op, tmp, oplist, list) {
+> +		arch_unoptimize_kprobe(op);
+> +		list_move(&op->list, done_list);
+> +	}
+> +}
+> +
+> +int arch_within_optimized_kprobe(struct optimized_kprobe *op,
+> + 				unsigned long addr)
+> +{
+> +	return ((unsigned long)op->kp.addr <= addr &&
+> +		(unsigned long)op->kp.addr + RELATIVEJUMP_SIZE > addr);
+> +}
+> +
+> +void arch_remove_optimized_kprobe(struct optimized_kprobe *op)
+> +{
+> +	__arch_remove_optimized_kprobe(op, 1);
+> +}
+> 
