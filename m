@@ -1,92 +1,74 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 19 Nov 2014 16:27:00 +0100
-Subject: [PATCH 2/2] ARM: shmobile: sh73a0 dtsi: Add missing INTCA0 clock for
- irqpin module
-In-Reply-To: <1416410820-30020-1-git-send-email-geert+renesas@glider.be>
-References: <1416410820-30020-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1416410820-30020-3-git-send-email-geert+renesas@glider.be>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 19 Nov 2014 07:29:52 -0800
+Subject: [RFC PATCH 0/6] ARM64: KVM: PMU infrastructure support
+In-Reply-To: <CAAhSdy3iyMpXLh1Qq-TqZ-1W368kG0Oz9iE2McnJkYbA9ZaNPg@mail.gmail.com>
+References: <1407230655-28864-1-git-send-email-anup.patel@linaro.org>
+ <20141107202502.GJ22848@cbox>
+ <CAAhSdy3CPMdK9+_FesKuJaPt9=VVHsnw=DQO5UQUVNm1aPuZNg@mail.gmail.com>
+ <CAMJs5B8VqS2-3dhSX+PBaQruzyXiYwaYRQ7vvWEMrHbvbjn+9A@mail.gmail.com>
+ <CAAhSdy3iyMpXLh1Qq-TqZ-1W368kG0Oz9iE2McnJkYbA9ZaNPg@mail.gmail.com>
+Message-ID: <20141119152952.GB9776@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This clock drives the irqpin controller modules.
-Before, it was assumed enabled by the bootloader or reset state.
-By making it available to the driver, we make sure it gets enabled when
-needed, and allow it to be managed by system or runtime PM.
+On Tue, Nov 11, 2014 at 02:48:25PM +0530, Anup Patel wrote:
+> Hi All,
+> 
+> I have second thoughts about rebasing KVM PMU patches
+> to Marc's irq-forwarding patches.
+> 
+> The PMU IRQs (when virtualized by KVM) are not exactly
+> forwarded IRQs because they are shared between Host
+> and Guest.
+> 
+> Scenario1
+> -------------
+> 
+> We might have perf running on Host and no KVM guest
+> running. In this scenario, we wont get interrupts on Host
+> because the kvm_pmu_hyp_init() (similar to the function
+> kvm_timer_hyp_init() of Marc's IRQ-forwarding
+> implementation) has put all host PMU IRQs in forwarding
+> mode.
+> 
+> The only way solve this problem is to not set forwarding
+> mode for PMU IRQs in kvm_pmu_hyp_init() and instead
+> have special routines to turn on and turn off the forwarding
+> mode of PMU IRQs. These routines will be called from
+> kvm_arch_vcpu_ioctl_run() for toggling the PMU IRQ
+> forwarding state.
+> 
+> Scenario2
+> -------------
+> 
+> We might have perf running on Host and Guest simultaneously
+> which means it is quite likely that PMU HW trigger IRQ meant
+> for Host between "ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);"
+> and "kvm_pmu_sync_hwstate(vcpu);" (similar to timer sync routine
+> of Marc's patchset which is called before local_irq_enable()).
+> 
+> In this scenario, the updated kvm_pmu_sync_hwstate(vcpu)
+> will accidentally forward IRQ meant for Host to Guest unless
+> we put additional checks to inspect VCPU PMU state.
+> 
+> Am I missing any detail about IRQ forwarding for above
+> scenarios?
+> 
+Hi Anup,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: devicetree at vger.kernel.org
----
-This depends on the series "[PATCH v5 0/6] sh73a0 common clock framework
-implementation".
----
- arch/arm/boot/dts/sh73a0.dtsi            | 15 +++++++++++++++
- include/dt-bindings/clock/sh73a0-clock.h |  3 +++
- 2 files changed, 18 insertions(+)
+I briefly discussed this with Marc.  What I don't understand is how it
+would be possible to get an interrupt for the host while running the
+guest?
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index 0853a6fe2209a48a..c7ab55e55e23f8cb 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -78,6 +78,7 @@
- 			      0 6 IRQ_TYPE_LEVEL_HIGH
- 			      0 7 IRQ_TYPE_LEVEL_HIGH
- 			      0 8 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp5_clks SH73A0_CLK_INTCA0>;
- 	};
- 
- 	irqpin1: irqpin at e6900004 {
-@@ -97,6 +98,7 @@
- 			      0 14 IRQ_TYPE_LEVEL_HIGH
- 			      0 15 IRQ_TYPE_LEVEL_HIGH
- 			      0 16 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp5_clks SH73A0_CLK_INTCA0>;
- 		control-parent;
- 	};
- 
-@@ -117,6 +119,7 @@
- 			      0 22 IRQ_TYPE_LEVEL_HIGH
- 			      0 23 IRQ_TYPE_LEVEL_HIGH
- 			      0 24 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp5_clks SH73A0_CLK_INTCA0>;
- 	};
- 
- 	irqpin3: irqpin at e690000c {
-@@ -136,6 +139,7 @@
- 			      0 30 IRQ_TYPE_LEVEL_HIGH
- 			      0 31 IRQ_TYPE_LEVEL_HIGH
- 			      0 32 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp5_clks SH73A0_CLK_INTCA0>;
- 	};
- 
- 	i2c0: i2c at e6820000 {
-@@ -705,5 +709,16 @@
- 			clock-output-names =
- 				"iic3", "iic4", "keysc";
- 		};
-+		mstp5_clks: mstp5_clks at e6150144 {
-+			compatible = "renesas,sh73a0-mstp-clocks", "renesas,cpg-mstp-clocks";
-+			reg = <0xe6150144 4>, <0xe615003c 4>;
-+			clocks = <&cpg_clocks SH73A0_CLK_HP>;
-+			#clock-cells = <1>;
-+			clock-indices = <
-+				SH73A0_CLK_INTCA0
-+			>;
-+			clock-output-names =
-+				"intca0";
-+		};
- 	};
- };
-diff --git a/include/dt-bindings/clock/sh73a0-clock.h b/include/dt-bindings/clock/sh73a0-clock.h
-index 1dd3eb2b7d902afd..53369568c24c5dc6 100644
---- a/include/dt-bindings/clock/sh73a0-clock.h
-+++ b/include/dt-bindings/clock/sh73a0-clock.h
-@@ -76,4 +76,7 @@
- #define SH73A0_CLK_IIC4		10
- #define SH73A0_CLK_KEYSC	3
- 
-+/* MSTP5 */
-+#define SH73A0_CLK_INTCA0	8
-+
- #endif
--- 
-1.9.1
+The rationale behind my question is that whenever you're running the
+guest, the PMU should be programmed exclusively with guest state, and
+since the PMU is per core, any interrupts should be for the guest, where
+it would always be pending.
+
+When migrating a VM with a pending PMU interrupt away for a CPU core, we
+also capture the active state (the forwarding patches already handle
+this), and obviously the PMU state along with it.
+
+Does this address your concern?
+
+-Christoffer
