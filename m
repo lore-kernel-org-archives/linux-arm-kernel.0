@@ -1,35 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 19 Nov 2014 16:55:17 +0000
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 19 Nov 2014 11:57:15 -0500 (EST)
 Subject: [PATCH RFC] ARM: option for loading modules into vmalloc area
-In-Reply-To: <CAKv+Gu8o_-Q5PeFqdQXW=mcHNYxFcLLnvxjq94y-iG8+JUp=9w@mail.gmail.com>
-References: <20141118173413.GB4042@n2100.arm.linux.org.uk>
- <546B8C64.3010904@samsung.com> <2041617.Kxhx5O4MMr@wuerfel>
+In-Reply-To: <20141119164902.GK4042@n2100.arm.linux.org.uk>
+References: <20141118172146.3784.81151.stgit@buzz>
+ <20141118173413.GB4042@n2100.arm.linux.org.uk> <546B8C64.3010904@samsung.com>
+ <2041617.Kxhx5O4MMr@wuerfel>
  <CAKv+Gu-8qhHYOry+LsDzp+LDZqYxVZ5G7cj48E3G2Unp2+=_yg@mail.gmail.com>
  <CALYGNiMt2A3DP02cOtxqu4RrnmhojrDxkRG7bkHMByUnzG+PeA@mail.gmail.com>
  <CAKv+Gu-rYWutr-45MsZH6KOhhUyNCVLfkO9JQrqCm1L6ms_DUg@mail.gmail.com>
  <20141119160747.GH4042@n2100.arm.linux.org.uk>
- <CAKv+Gu-kvmkhrptmaN0miM3c0K3ZOh4maTFXL=NpYTMi9Q83kA@mail.gmail.com>
- <CALYGNiN5XC_4MhRbxZmFW5Jmc1N1H32tSZr3kKf_UBFriG71nA@mail.gmail.com>
- <CAKv+Gu8o_-Q5PeFqdQXW=mcHNYxFcLLnvxjq94y-iG8+JUp=9w@mail.gmail.com>
-Message-ID: <20141119165517.GL4042@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1411191130480.11690@knanqh.ubzr>
+ <20141119164902.GK4042@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.11.1411191152340.11690@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 05:38:57PM +0100, Ard Biesheuvel wrote:
-> Numbers are disambiguated by the f and b suffixes, so they can be
-> reused in the same .s file. So as long as you use a strictly numerical
-> prefix, you can deal correctly with the case where, for instance,
-> do_div() is called twice in the same compilation unit, and still not
-> clash with other inline asm
+On Wed, 19 Nov 2014, Russell King - ARM Linux wrote:
 
-What's not particularly nice though is to hide these in a macro,
-which itself may be part of a larger macro or code fragment also
-using small numbers.
+> On Wed, Nov 19, 2014 at 11:37:47AM -0500, Nicolas Pitre wrote:
+> > On Wed, 19 Nov 2014, Russell King - ARM Linux wrote:
+> > > Which is not a good idea either, because the compiler needs to know how
+> > > far away its own manually generated literal pool is from the instructions
+> > > which reference it.  The .ltorg statement can end up emitting any number
+> > > of literals at that point, which makes it indeterminant how many words
+> > > are contained within the asm() statement.
+> > > 
+> > > Yes, it isn't desirable to waste an entire data cache line per indirect
+> > > call like the original quote above, but I don't see a practical
+> > > alternative.
+> > 
+> > Modules could be built without far calls by default, and then the module 
+> > linker would only have to redirect those calls whose destination is too 
+> > far away to a dynamically created trampoline table.
+> > 
+> > If I remember correctly you even posted some patches to that effect a 
+> > couple years ago.  Maybe those could be salvaged?
+> 
+> I don't think I ever did, because its pretty much impossible to do as I
+> explained in a follow up to this thread.
+> 
+> We _used_ to do this with the userspace insmod methods, but since we got
+> this kernel-side linker, it's been pretty much impossible to do without
+> rewriting the module code.  That's not going to happen on account of one
+> quirky architecture which Linus doesn't particularly like.
 
-We probably ought to be a bit more inteligent about how we choose
-these numbers inside macros, rather than just randomly picking some
-and hoping that they don't clash.
+Still... We could try adding a hook in the generic module linker code 
+for a pre-relocation pass.  Maybe only ARM would use it, but if the need 
+to load big modules is real then I imagine Linus could be amenable to a 
+compromise.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+
+Nicolas
