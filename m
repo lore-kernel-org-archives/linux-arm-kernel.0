@@ -1,30 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Nov 2014 14:16:58 +0100
-Subject: [GIT PULL] Allwinner fixes for 3.18
-In-Reply-To: <20141118221257.GA19248@lukather>
-References: <20141118221257.GA19248@lukather>
-Message-ID: <10199422.Ujlxr2d8Dq@wuerfel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 19 Nov 2014 14:17:27 +0100
+Subject: [PATCH] ARM: at91/dt: at91sam9rl: add rtc
+In-Reply-To: <1412181692-21138-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1412181692-21138-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <546C9867.70005@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 November 2014 23:12:57 Maxime Ripard wrote:
-> Hi Arnd, Kevin, Olof,
+On 01/10/2014 18:41, Alexandre Belloni :
+> Add rtc support to the at91sam9rl dtsi file.
 > 
-> Here is a patch for the 3.18 that fixes the DMA controller operations
-> on the A31.
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+And stacked on top of at91-3.19-dt2
+
+Thanks, bye.
+
+> ---
+>  arch/arm/boot/dts/at91sam9rl.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> Thanks!
-> Maxime
-> 
-> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-> 
->   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-fixes-for-3.18
+> diff --git a/arch/arm/boot/dts/at91sam9rl.dtsi b/arch/arm/boot/dts/at91sam9rl.dtsi
+> index ab56c8b81dfa..984468a56fa4 100644
+> --- a/arch/arm/boot/dts/at91sam9rl.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9rl.dtsi
+> @@ -1059,6 +1059,13 @@
+>  					clocks = <&slow_rc_osc &slow_osc>;
+>  				};
+>  			};
+> +
+> +			rtc at fffffeb0 {
+> +				compatible = "atmel,at91rm9200-rtc";
+> +				reg = <0xfffffeb0 0x40>;
+> +				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+> +				status = "disabled";
+> +			};
+>  		};
+>  	};
+>  
 > 
 
-Pulled into fixes branch, thanks!
 
-	Arnd
+-- 
+Nicolas Ferre
