@@ -1,47 +1,68 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 19 Nov 2014 12:15:34 +0100
-Subject: [PATCH v3 05/19] arm: exynos: pm_domains: add support for devices
- registered before arch_initcall
+Date: Wed, 19 Nov 2014 12:15:37 +0100
+Subject: [PATCH v3 08/19] iommu: exynos: remove unused functions
 In-Reply-To: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
 References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1416395748-10731-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1416395748-10731-9-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SYSMMU devices will be registered early before any other devices and
-before calling arch_initcall. To add them to respective power domains,
-additional scan of all platform devices is needed.
+This patch removes two unneeded functions, which are not a part of
+generic IOMMU API and were never used by any other driver.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/mach-exynos/pm_domains.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ drivers/iommu/exynos-iommu.c | 31 -------------------------------
+ 1 file changed, 31 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index 20f267121b3e..8f1f239ee424 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -105,6 +105,12 @@ static int exynos_pd_power_off(struct generic_pm_domain *domain)
- 	return exynos_pd_power(domain, false);
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 2912c4f9a8ad..c0262ed1a31e 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -490,13 +490,6 @@ static int __exynos_sysmmu_enable(struct device *dev, phys_addr_t pgtable,
+ 	return ret;
  }
  
-+static __init int exynos_pd_init_platform_dev(struct device *dev, void *data)
-+{
-+	dev_pm_domain_attach(dev, true);
-+	return 0;
-+}
-+
- static __init int exynos4_pm_init_power_domain(void)
+-int exynos_sysmmu_enable(struct device *dev, phys_addr_t pgtable)
+-{
+-	BUG_ON(!memblock_is_memory(pgtable));
+-
+-	return __exynos_sysmmu_enable(dev, pgtable, NULL);
+-}
+-
+ static bool exynos_sysmmu_disable(struct device *dev)
  {
- 	struct platform_device *pdev;
-@@ -161,6 +167,7 @@ no_clk:
- 		of_genpd_add_provider_simple(np, &pd->pd);
- 	}
- 
--	return 0;
-+	return bus_for_each_dev(&platform_bus_type, NULL, NULL,
-+				exynos_pd_init_platform_dev);
+ 	unsigned long flags;
+@@ -588,30 +581,6 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, sysmmu_iova_t iova,
+ 	spin_unlock_irqrestore(&data->lock, flags);
  }
- arch_initcall(exynos4_pm_init_power_domain);
+ 
+-void exynos_sysmmu_tlb_invalidate(struct device *dev)
+-{
+-	struct exynos_iommu_owner *owner = dev->archdata.iommu;
+-	unsigned long flags;
+-	struct sysmmu_drvdata *data;
+-
+-	data = dev_get_drvdata(owner->sysmmu);
+-
+-	spin_lock_irqsave(&data->lock, flags);
+-	if (is_sysmmu_active(data)) {
+-		if (!IS_ERR(data->clk_master))
+-			clk_enable(data->clk_master);
+-		if (sysmmu_block(data->sfrbase)) {
+-			__sysmmu_tlb_invalidate(data->sfrbase);
+-			sysmmu_unblock(data->sfrbase);
+-		}
+-		if (!IS_ERR(data->clk_master))
+-			clk_disable(data->clk_master);
+-	} else {
+-		dev_dbg(dev, "disabled. Skipping TLB invalidation\n");
+-	}
+-	spin_unlock_irqrestore(&data->lock, flags);
+-}
+-
+ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+ {
+ 	int irq, ret;
 -- 
 1.9.2
