@@ -1,55 +1,69 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 19 Nov 2014 10:51:13 -0800
-Subject: [PATCH] mmc: dw_mmc: Turn the card clock off at suspend time
-Message-ID: <1416423073-8105-1-git-send-email-dianders@chromium.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 19 Nov 2014 19:55:35 +0100
+Subject: [PATCH] ARM: xscale: correct auxiliary register in suspend/resume
+In-Reply-To: <1416053153-27491-1-git-send-email-dbaryshkov@gmail.com> (Dmitry
+ Eremin-Solenikov's message of "Sat, 15 Nov 2014 15:05:53 +0300")
+References: <1416053153-27491-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <87r3wz6mvs.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the dw_mmc driver was first added to Linux it's had a TODO in it
-that we should turn off the card clock during suspend.  I have no idea
-for sure why it wasn't done originally, but if I had to guess I'd
-guess it was related to the lack of a common clock framework.  Let's
-do it now.
+Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
+...zip...
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-There is no reason for the card clock to be left on during suspend and
-most systems will eventually turn it off anyway (when whole clock
-trees are disabled).  However, it's good to be explicit that it's
-disabled at the time that the MMC subsystem is disabled.
+Hi Russell,
 
-This actually fixes a bug on Rockchip rk3288 where an SDIO card wakes
-the system back up during suspend.
+Is this patch in [1] fine by you so that Dmitry can submit it to your patch system ?
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
+Cheers.
+
+--
+Robert
+
+[1] The patch
+
+---8>---
+According to the manuals I have, XScale auxiliary register should be
+reached with opc_2 = 1 instead of crn = 1. cpu_xscale_proc_init
+correctly uses c1, c0, 1 arguments, but cpu_xscale_do_suspend and
+cpu_xscale_do_resume use c1, c1, 0. Correct suspend/resume functions to
+also use c1, c0, 1.
+
+The issue was primarily noticed thanks to qemu reporing "unsupported
+instruction" on the pxa suspend path. Confirmed in PXA210/250 and PXA255
+XScale Core manuals and in PXA270 and PXA320 Developers Guides.
+
+Harware tested by me on tosa (pxa255). Robert confirmed on pxa270 board.
+
+Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- drivers/mmc/host/dw_mmc.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/mm/proc-xscale.S | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 5a37c33..c448159 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -2825,11 +2825,10 @@ EXPORT_SYMBOL(dw_mci_remove);
- 
- 
- #ifdef CONFIG_PM_SLEEP
--/*
-- * TODO: we should probably disable the clock to the card in the suspend path.
-- */
- int dw_mci_suspend(struct dw_mci *host)
- {
-+	clk_disable(host->ciu_clk);
-+
- 	return 0;
- }
- EXPORT_SYMBOL(dw_mci_suspend);
-@@ -2838,6 +2837,8 @@ int dw_mci_resume(struct dw_mci *host)
- {
- 	int i, ret;
- 
-+	clk_enable(host->ciu_clk);
-+
- 	if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS)) {
- 		ret = -ENODEV;
- 		return ret;
+diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
+index 23259f1..afa2b3c 100644
+--- a/arch/arm/mm/proc-xscale.S
++++ b/arch/arm/mm/proc-xscale.S
+@@ -535,7 +535,7 @@ ENTRY(cpu_xscale_do_suspend)
+ 	mrc	p15, 0, r5, c15, c1, 0	@ CP access reg
+ 	mrc	p15, 0, r6, c13, c0, 0	@ PID
+ 	mrc	p15, 0, r7, c3, c0, 0	@ domain ID
+-	mrc	p15, 0, r8, c1, c1, 0	@ auxiliary control reg
++	mrc	p15, 0, r8, c1, c0, 1	@ auxiliary control reg
+ 	mrc	p15, 0, r9, c1, c0, 0	@ control reg
+ 	bic	r4, r4, #2		@ clear frequency change bit
+ 	stmia	r0, {r4 - r9}		@ store cp regs
+@@ -552,7 +552,7 @@ ENTRY(cpu_xscale_do_resume)
+ 	mcr	p15, 0, r6, c13, c0, 0	@ PID
+ 	mcr	p15, 0, r7, c3, c0, 0	@ domain ID
+ 	mcr	p15, 0, r1, c2, c0, 0	@ translation table base addr
+-	mcr	p15, 0, r8, c1, c1, 0	@ auxiliary control reg
++	mcr	p15, 0, r8, c1, c0, 1	@ auxiliary control reg
+ 	mov	r0, r9			@ control register
+ 	b	cpu_resume_mmu
+ ENDPROC(cpu_xscale_do_resume)
+
 -- 
-2.1.0.rc2.206.gedb03e5
+Robert
