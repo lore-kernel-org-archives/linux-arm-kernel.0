@@ -1,78 +1,93 @@
-From: subaparts@yandex.ru (Alexander Sverdlin)
-Date: Wed, 19 Nov 2014 18:55:20 +0100
-Subject: [PATCH] arm: ep93xx: add dma_masks for the M2P and M2M DMA
- controllers
-In-Reply-To: <1416415519-4903-1-git-send-email-hsweeten@visionengravers.com>
-References: <1416415519-4903-1-git-send-email-hsweeten@visionengravers.com>
-Message-ID: <546CD988.8010202@yandex.ru>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 19 Nov 2014 09:56:39 -0800
+Subject: [PATCH 2/2] pinctrl: rockchip: Fix enable/disable/mask/unmask
+In-Reply-To: <1416354596-15013-3-git-send-email-dianders@chromium.org>
+References: <1416354596-15013-1-git-send-email-dianders@chromium.org>
+ <1416354596-15013-3-git-send-email-dianders@chromium.org>
+Message-ID: <20141119175639.GC37989@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Tue, Nov 18, 2014 at 03:49:56PM -0800, Doug Anderson wrote:
+> The Rockchip pinctrl driver was only implementing the "mask" and
+> "unmask" operations though the hardware actually has two distinct
+> things: enable/disable and mask/unmask.  It was implementing the
+> "mask" operations as a hardware enable/disable and always leaving all
+> interrupts unmasked.
+> 
+> I believe that the old system had some downsides, specifically:
+> - (Untested) if an interrupt went off while interrupts were "masked"
+>   it would be lost.  Now it will be kept track of.
+> - If someone wanted to change an interrupt back into a GPIO (is such a
+>   thing sensible?) by calling irq_disable() it wouldn't actually take
+>   effect.  That's because Linux does some extra optimizations when
+>   there's no true "disable" function: it does a lazy mask.
+> 
+> Let's actually implement enable/disable/mask/unmask properly.
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
 
-On 19/11/14 17:45, H Hartley Sweeten wrote:
-> The dma_mask and coherent_dma_mask need to be set or DMA memory allocations
-> will fail with error messages like this:
->
->    ep93xx-dma ep93xx-dma-m2p: coherent DMA mask is unset
->
->    ep93xx-dma ep93xx-dma-m2m: coherent DMA mask is unset
->
-> Add the missing information to the ep93xx-dma-m2p and ep93xx-dma-m2m
-> devices.
->
-> This fixes a problem with the sound/soc/edb93xx.c driver not loading
-> that was reported by Jeremy Moles.
+After chatting a bit with Doug offline:
 
-This repaired the sound on EDB9302-like board for me, so:
+Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Reported-by: Jeremy Moles <cubicool@gmail.com>
-
-Tested-by: Alexander Sverdlin <subaparts@yandex.ru>
-
-> Cc: Alexander Sverdlin <subaparts@yandex.ru>
-> Cc: Ryan Mallon <rmallon@gmail.com>
 > ---
->   arch/arm/mach-ep93xx/dma.c | 12 ++++++++++--
->   1 file changed, 10 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-ep93xx/dma.c b/arch/arm/mach-ep93xx/dma.c
-> index d8bfd02..88a4c9b 100644
-> --- a/arch/arm/mach-ep93xx/dma.c
-> +++ b/arch/arm/mach-ep93xx/dma.c
-> @@ -66,11 +66,15 @@ static struct ep93xx_dma_platform_data ep93xx_dma_m2p_data = {
->   	.num_channels		= ARRAY_SIZE(ep93xx_dma_m2p_channels),
->   };
->
-> +static u64 ep93xx_dma_m2p_mask = DMA_BIT_MASK(32);
+>  drivers/pinctrl/pinctrl-rockchip.c | 30 +++++++++++++++++++++++++++---
+>  1 file changed, 27 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+> index e91e845..60d1a49 100644
+> --- a/drivers/pinctrl/pinctrl-rockchip.c
+> +++ b/drivers/pinctrl/pinctrl-rockchip.c
+> @@ -1562,6 +1562,28 @@ static void rockchip_irq_resume(struct irq_data *d)
+>  	irq_reg_writel(gc, bank->saved_enables, GPIO_INTEN);
+>  }
+>  
+> +static void rockchip_irq_disable(struct irq_data *d)
+> +{
+> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+> +	u32 val;
 > +
->   static struct platform_device ep93xx_dma_m2p_device = {
->   	.name			= "ep93xx-dma-m2p",
->   	.id			= -1,
->   	.dev			= {
-> -		.platform_data	= &ep93xx_dma_m2p_data,
-> +		.platform_data		= &ep93xx_dma_m2p_data,
-> +		.dma_mask		= &ep93xx_dma_m2p_mask,
-> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
->   	},
->   };
->
-> @@ -93,11 +97,15 @@ static struct ep93xx_dma_platform_data ep93xx_dma_m2m_data = {
->   	.num_channels		= ARRAY_SIZE(ep93xx_dma_m2m_channels),
->   };
->
-> +static u64 ep93xx_dma_m2m_mask = DMA_BIT_MASK(32);
+> +	irq_gc_lock(gc);
+> +	val = irq_reg_readl(gc, GPIO_INTEN);
+> +	irq_reg_writel(gc, val & ~d->mask, GPIO_INTEN);
+> +	irq_gc_unlock(gc);
+> +}
 > +
->   static struct platform_device ep93xx_dma_m2m_device = {
->   	.name			= "ep93xx-dma-m2m",
->   	.id			= -1,
->   	.dev			= {
-> -		.platform_data	= &ep93xx_dma_m2m_data,
-> +		.platform_data		= &ep93xx_dma_m2m_data,
-> +		.dma_mask		= &ep93xx_dma_m2m_mask,
-> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
->   	},
->   };
->
->
+> +static void rockchip_irq_enable(struct irq_data *d)
+> +{
+> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+> +	u32 val;
+> +
+> +	irq_gc_lock(gc);
+> +	val = irq_reg_readl(gc, GPIO_INTEN);
+> +	irq_reg_writel(gc, val | d->mask, GPIO_INTEN);
+> +	irq_gc_unlock(gc);
+> +}
+> +
+>  static int rockchip_interrupts_register(struct platform_device *pdev,
+>  						struct rockchip_pinctrl *info)
+>  {
+> @@ -1600,11 +1622,13 @@ static int rockchip_interrupts_register(struct platform_device *pdev,
+>  		gc = irq_get_domain_generic_chip(bank->domain, 0);
+>  		gc->reg_base = bank->reg_base;
+>  		gc->private = bank;
+> -		gc->chip_types[0].regs.mask = GPIO_INTEN;
+> +		gc->chip_types[0].regs.mask = GPIO_INTMASK;
+>  		gc->chip_types[0].regs.ack = GPIO_PORTS_EOI;
+>  		gc->chip_types[0].chip.irq_ack = irq_gc_ack_set_bit;
+> -		gc->chip_types[0].chip.irq_mask = irq_gc_mask_clr_bit;
+> -		gc->chip_types[0].chip.irq_unmask = irq_gc_mask_set_bit;
+> +		gc->chip_types[0].chip.irq_mask = irq_gc_mask_set_bit;
+> +		gc->chip_types[0].chip.irq_unmask = irq_gc_mask_clr_bit;
+> +		gc->chip_types[0].chip.irq_enable = rockchip_irq_enable;
+> +		gc->chip_types[0].chip.irq_disable = rockchip_irq_disable;
+>  		gc->chip_types[0].chip.irq_set_wake = irq_gc_set_wake;
+>  		gc->chip_types[0].chip.irq_suspend = rockchip_irq_suspend;
+>  		gc->chip_types[0].chip.irq_resume = rockchip_irq_resume;
+> -- 
+> 2.1.0.rc2.206.gedb03e5
+> 
+
+-- 
+Dmitry
