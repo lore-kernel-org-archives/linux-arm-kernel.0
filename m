@@ -1,107 +1,69 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 19 Nov 2014 20:17:34 +0100
-Subject: [PATCH 2/2] pinctrl: rockchip: Fix enable/disable/mask/unmask
-In-Reply-To: <1416354596-15013-3-git-send-email-dianders@chromium.org>
-References: <1416354596-15013-1-git-send-email-dianders@chromium.org>
- <1416354596-15013-3-git-send-email-dianders@chromium.org>
-Message-ID: <1768585.5TrMbB8pvA@diego>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 19 Nov 2014 11:19:33 -0800
+Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
+ support
+In-Reply-To: <20141119105527.GA5396@luxor.wired.org> (Paolo Pisati's message
+ of "Wed, 19 Nov 2014 11:55:27 +0100")
+References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
+ <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
+ <546C646C.4060303@collabora.co.uk>
+ <20141119105527.GA5396@luxor.wired.org>
+Message-ID: <7hwq6ruhfe.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 18. November 2014, 15:49:56 schrieb Doug Anderson:
-> The Rockchip pinctrl driver was only implementing the "mask" and
-> "unmask" operations though the hardware actually has two distinct
-> things: enable/disable and mask/unmask.  It was implementing the
-> "mask" operations as a hardware enable/disable and always leaving all
-> interrupts unmasked.
-> 
-> I believe that the old system had some downsides, specifically:
-> - (Untested) if an interrupt went off while interrupts were "masked"
->   it would be lost.  Now it will be kept track of.
-> - If someone wanted to change an interrupt back into a GPIO (is such a
->   thing sensible?) by calling irq_disable() it wouldn't actually take
->   effect.  That's because Linux does some extra optimizations when
->   there's no true "disable" function: it does a lazy mask.
-> 
-> Let's actually implement enable/disable/mask/unmask properly.
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+Paolo Pisati <p.pisati@gmail.com> writes:
 
-There is one small issue concerning a personal style-preference below. 
-Otherwise
+> On Wed, Nov 19, 2014 at 10:35:40AM +0100, Javier Martinez Canillas wrote:
+>> Hello Ajay,
+>> 
+>> On 11/18/2014 07:20 AM, Ajay kumar wrote:
+>> > On Sat, Nov 15, 2014 at 3:24 PM, Ajay Kumar <ajaykumar.rs@samsung.com> wrote:
+>> >> This series is based on master branch of Linus tree at:
+>> >> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+>> 
+>> I applied your series on top of 3.18-rc5 + linux-next's commit:
+>> 
+>> 0ef76ae ("ARM: exynos_defconfig: Enable options for display panel support").
+>> 
+>> I think you should had mentioned what other patches are needed as a
+>> dependency since I spent quite a bit of time figuring out why the
+>> ps8622 bridge driver probe was always deferred due of_drm_find_panel()
+>> failing and then I noticed that a patch from linux-next was needed:
+>> 
+>> e35e305 ("drm/panel: simple: Add AUO B116XW03 panel support")
+>> 
+>> With that commit the ps8622 drm bridge driver probe succeed but I still
+>> don't have display working on an Exynos5240 Peach Pit, the kernel log shows:
+>> 
+>> platform 145b0000.dp-controller: Driver exynos-dp requests probe deferral
+>> exynos-drm exynos-drm: bound 14400000.fimd (ops fimd_component_ops)
+>> exynos-drm exynos-drm: failed to bind 145b0000.dp-controller (ops exynos_dp_ops): -517
+>> exynos-drm exynos-drm: master bind failed: -517
+>> platform 145b0000.dp-controller: Driver exynos-dp requests probe deferral
+>
+> do you have this in your dmesg?
+>
+> ...
+> exynos-dp-video-phy 10040728.video-phy: Failed to lookup PMU regmap
+> ...
+>
+> to get a working framebuffer out of linus 318rc4 on my peach pi, i had
+> to cherry pick these 3 patches:
+>
+> arm: dts: Exynos5: Use pmu_system_controller phandle for dp phy
+> drm/exynos: dp: Remove support for unused dptx-phy
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Excellent, thank you for pointing these out.  I've been struggling to
+get the display working on v3.18-rc and had missed these.
 
+> ARM: exynos_defconfig: Enable options for display panel support
+>
+> Check if you have those.
 
-@LinusW: any preference on how to handle these follow up changes - like 
-another pull on top of the last, or do you simply want to apply these two 
-yourself?
+With the 3 patches you mention, the display is working on my peach-pi as
+well.
 
-> ---
->  drivers/pinctrl/pinctrl-rockchip.c | 30 +++++++++++++++++++++++++++---
->  1 file changed, 27 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-rockchip.c
-> b/drivers/pinctrl/pinctrl-rockchip.c index e91e845..60d1a49 100644
-> --- a/drivers/pinctrl/pinctrl-rockchip.c
-> +++ b/drivers/pinctrl/pinctrl-rockchip.c
-> @@ -1562,6 +1562,28 @@ static void rockchip_irq_resume(struct irq_data *d)
->  	irq_reg_writel(gc, bank->saved_enables, GPIO_INTEN);
->  }
-> 
-> +static void rockchip_irq_disable(struct irq_data *d)
-> +{
-> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> +	u32 val;
-> +
-> +	irq_gc_lock(gc);
-> +	val = irq_reg_readl(gc, GPIO_INTEN);
-> +	irq_reg_writel(gc, val & ~d->mask, GPIO_INTEN);
+Thanks,
 
-personally I'd prefer this to be a bit more spread out, i.e.
-
-val = irq_reg_readl(gc, GPIO_INTEN);
-val &= ~d->mask;
-irq_reg_writel(gc, val, GPIO_INTEN);
-
-makes reading a bit easier
-
-
-> +	irq_gc_unlock(gc);
-> +}
-> +
-> +static void rockchip_irq_enable(struct irq_data *d)
-> +{
-> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> +	u32 val;
-> +
-> +	irq_gc_lock(gc);
-> +	val = irq_reg_readl(gc, GPIO_INTEN);
-> +	irq_reg_writel(gc, val | d->mask, GPIO_INTEN);
-
-same here
-
-
-> +	irq_gc_unlock(gc);
-> +}
-> +
->  static int rockchip_interrupts_register(struct platform_device *pdev,
->  						struct rockchip_pinctrl *info)
->  {
-> @@ -1600,11 +1622,13 @@ static int rockchip_interrupts_register(struct
-> platform_device *pdev, gc = irq_get_domain_generic_chip(bank->domain, 0);
->  		gc->reg_base = bank->reg_base;
->  		gc->private = bank;
-> -		gc->chip_types[0].regs.mask = GPIO_INTEN;
-> +		gc->chip_types[0].regs.mask = GPIO_INTMASK;
->  		gc->chip_types[0].regs.ack = GPIO_PORTS_EOI;
->  		gc->chip_types[0].chip.irq_ack = irq_gc_ack_set_bit;
-> -		gc->chip_types[0].chip.irq_mask = irq_gc_mask_clr_bit;
-> -		gc->chip_types[0].chip.irq_unmask = irq_gc_mask_set_bit;
-> +		gc->chip_types[0].chip.irq_mask = irq_gc_mask_set_bit;
-> +		gc->chip_types[0].chip.irq_unmask = irq_gc_mask_clr_bit;
-> +		gc->chip_types[0].chip.irq_enable = rockchip_irq_enable;
-> +		gc->chip_types[0].chip.irq_disable = rockchip_irq_disable;
->  		gc->chip_types[0].chip.irq_set_wake = irq_gc_set_wake;
->  		gc->chip_types[0].chip.irq_suspend = rockchip_irq_suspend;
->  		gc->chip_types[0].chip.irq_resume = rockchip_irq_resume;
+Kevin
