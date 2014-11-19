@@ -1,50 +1,42 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 19 Nov 2014 15:19:08 +0100
-Subject: [PATCH] ARM: at91: sama5: update defconfig
-In-Reply-To: <1413982758-3579-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1413982758-3579-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <546CA6DC.50201@atmel.com>
+From: treding@nvidia.com (Thierry Reding)
+Date: Wed, 19 Nov 2014 15:20:10 +0100
+Subject: arm64 pci_iomap, was: Re: next build: 258 warnings 9 failures
+ (next/next-20141119)
+In-Reply-To: <3897871.0i8K9av6A3@wuerfel>
+References: <546c75d7.6336460a.14b5.474d@mx.google.com>
+ <16479190.7SIDaKWfdW@wuerfel>
+ <20141119135641.GD26258@ulmo.nvidia.com>
+ <3897871.0i8K9av6A3@wuerfel>
+Message-ID: <20141119142009.GA3488@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/10/2014 14:59, Ludovic Desroches :
-> Add neon support for sama5d4 and large blocks/files support.
+On Wed, Nov 19, 2014 at 03:11:03PM +0100, Arnd Bergmann wrote:
+> On Wednesday 19 November 2014 14:56:42 Thierry Reding wrote:
+> > 
+> > Oops, I just looked at that file on my system and I already have the
+> > select GENERIC_PCI_IOMAP exactly where you have it. Turns out I have
+> > that same patch, albeit with a somewhat obfuscated name in my tree
+> > but never got around to clean up the commit message or sending it out.
+> > 
+> > Do you want to apply that patch on top or shall I redo the pull request
+> > with that patch folded in so we can keep bisectability across the
+> > series?
 > 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> I would prefer to have my patch applied on top so I don't have to redo
+> the merge between your patches and Will's patches.
 
-and stacked with Alexandre's Ack on top of at91-3.19-defconfig
+Okay.
 
-Thanks, bye,
+> Can you confirm that you have no further patches that I might need?
 
-> ---
->  arch/arm/configs/sama5_defconfig | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-> index c9089c9..69b6700 100644
-> --- a/arch/arm/configs/sama5_defconfig
-> +++ b/arch/arm/configs/sama5_defconfig
-> @@ -12,7 +12,7 @@ CONFIG_MODULES=y
->  CONFIG_MODULE_FORCE_LOAD=y
->  CONFIG_MODULE_UNLOAD=y
->  CONFIG_MODULE_FORCE_UNLOAD=y
-> -# CONFIG_LBDAF is not set
-> +CONFIG_LBDAF=y
->  # CONFIG_BLK_DEV_BSG is not set
->  # CONFIG_IOSCHED_DEADLINE is not set
->  # CONFIG_IOSCHED_CFQ is not set
-> @@ -30,6 +30,8 @@ CONFIG_CMDLINE="console=ttyS0,115200 initrd=0x21100000,25165824 root=/dev/ram0 r
->  CONFIG_KEXEC=y
->  CONFIG_AUTO_ZRELADDR=y
->  CONFIG_VFP=y
-> +CONFIG_NEON=y
-> +CONFIG_KERNEL_MODE_NEON=y
->  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
->  CONFIG_PM_RUNTIME=y
->  CONFIG_PM_DEBUG=y
-> 
+Yes, I have no other patches asm-generic related patches.
 
-
--- 
-Nicolas Ferre
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141119/422f7251/attachment.sig>
