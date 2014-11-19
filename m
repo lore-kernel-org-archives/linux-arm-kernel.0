@@ -1,39 +1,50 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 19 Nov 2014 18:29:47 +0100
-Subject: [PATCH 1/3] ARM: dts: Add SPI flash node for Peach boards
-In-Reply-To: <CAD=FV=XpweHvcTsVTMBkv9g4+GxoO8WdngGhfVj0QnOwq3ASdQ@mail.gmail.com>
-References: <1416246184-29071-1-git-send-email-javier.martinez@collabora.co.uk>	<1416246184-29071-2-git-send-email-javier.martinez@collabora.co.uk>	<CAD=FV=Xkei_wxa3jWb8bPvuynbSyq4o=ezjVD0+e04aOPCAM+Q@mail.gmail.com>	<546C6BD2.4020802@collabora.co.uk>
- <CAD=FV=XpweHvcTsVTMBkv9g4+GxoO8WdngGhfVj0QnOwq3ASdQ@mail.gmail.com>
-Message-ID: <546CD38B.3050700@collabora.co.uk>
+From: victorascroft@gmail.com (Victor Ascroft)
+Date: Wed, 19 Nov 2014 23:00:08 +0530
+Subject: Looking for good references for ARM driver development
+In-Reply-To: <546CD11F.6050502@free.fr>
+References: <546C920A.7060800@free.fr> <546CCBF6.7070607@gmail.com>
+ <546CD11F.6050502@free.fr>
+Message-ID: <546CD3A0.6000307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Doug,
 
-On 11/19/2014 06:19 PM, Doug Anderson wrote:
->>
->> I wonder how the spidev user-space interface is supposed to be used
->> when booting with Device Trees.
+On 11/19/2014 10:49 PM, Mason wrote:
+> On 19/11/2014 17:57, Victor Ascroft wrote:
 > 
-> OK.  Please don't take my comments as a NAK on this patch.  I should
-> have done the same grep myself before sending--sorry.  I just
-> remembered the old conversation and looked for that instead.
->
-
-Ok, let's see what others say. At the very least documentation about the
-spidev DT binding should be added to Documentation/devicetree/bindings/
- 
-> If the convention is to use "spidev" like this then I guess we're OK.
-> I do wish it was a little more like "i2c" myself where you could get a
-> direct access interface no matter what driver was bound underneath
-> (and also if no drivers were bound underneath).  ...but I could just
-> be naive.  ;)
+>> This actually depends on the kernel you are using. Do you have relatively
+>> new kernel or an old one? Depending on that, either you will get that
+>> information in a board file or else in the device tree in arch/arm/boot/dts.
 > 
+> I'll reply more thoroughly later, but I wanted to address this question.
+> We're targeting kernel 3.14.x
 
-+1
+OK. Has to be a device tree then.
 
-> -Doug
 > 
+>> This depends. If you have driver compiled in with the kernel this will happen
+>> on kernel boot up. If you have the driver as a loadable module, the probe hook
+>> will be called on modprobe or insmod.
+> 
+> Is this an answer to question 5?
+> I think there is some confusion with the "probe" terminology.
+> 
+> I meant "probe" as in "read the current value".
+> I think you mean "probe" as in "the driver probes for the device through
+> the probe method."
+> 
+> I meant to ask how often the hwmon framework "polls" the temperature sensor.
 
-Best regards,
-Javier
+Oh. My understanding was you meant the "probe" of the driver. The hwmon
+will be exposing the functionality of reading the temperature sensor through
+a sysfs interface. I am not sure as to whether a "poll" functionality is
+provided by hwmon (probably not), but, when you cat or read the sysfs path 
+you will have the temperature readout. The lm75.c is good place to start.
+
+http://lxr.free-electrons.com/source/Documentation/hwmon/
+http://lxr.free-electrons.com/source/Documentation/hwmon/sysfs-interface
+
+-- Sanchayan
+> 
+> Regards.
+> 
