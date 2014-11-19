@@ -1,31 +1,45 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 19 Nov 2014 16:47:13 +0000
-Subject: [PATCH] ARM: dts: dove: add DT LCD controllers
-In-Reply-To: <20141119174050.122a0cc0@armhf>
-References: <E1Xr3Ur-0005Qx-Fx@rmk-PC.arm.linux.org.uk>
- <20141119174050.122a0cc0@armhf>
-Message-ID: <20141119164713.GJ4042@n2100.arm.linux.org.uk>
+Date: Wed, 19 Nov 2014 16:49:02 +0000
+Subject: [PATCH RFC] ARM: option for loading modules into vmalloc area
+In-Reply-To: <alpine.LFD.2.11.1411191130480.11690@knanqh.ubzr>
+References: <20141118172146.3784.81151.stgit@buzz>
+ <20141118173413.GB4042@n2100.arm.linux.org.uk>
+ <546B8C64.3010904@samsung.com> <2041617.Kxhx5O4MMr@wuerfel>
+ <CAKv+Gu-8qhHYOry+LsDzp+LDZqYxVZ5G7cj48E3G2Unp2+=_yg@mail.gmail.com>
+ <CALYGNiMt2A3DP02cOtxqu4RrnmhojrDxkRG7bkHMByUnzG+PeA@mail.gmail.com>
+ <CAKv+Gu-rYWutr-45MsZH6KOhhUyNCVLfkO9JQrqCm1L6ms_DUg@mail.gmail.com>
+ <20141119160747.GH4042@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1411191130480.11690@knanqh.ubzr>
+Message-ID: <20141119164902.GK4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 05:40:50PM +0100, Jean-Francois Moine wrote:
-> On Wed, 19 Nov 2014 11:32:29 +0000
-> Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+On Wed, Nov 19, 2014 at 11:37:47AM -0500, Nicolas Pitre wrote:
+> On Wed, 19 Nov 2014, Russell King - ARM Linux wrote:
+> > Which is not a good idea either, because the compiler needs to know how
+> > far away its own manually generated literal pool is from the instructions
+> > which reference it.  The .ltorg statement can end up emitting any number
+> > of literals at that point, which makes it indeterminant how many words
+> > are contained within the asm() statement.
+> > 
+> > Yes, it isn't desirable to waste an entire data cache line per indirect
+> > call like the original quote above, but I don't see a practical
+> > alternative.
 > 
-> > +			lcd1: lcd-controller at 810000 {
-> > +				compatible = "marvell,dove-lcd";
-> > +				reg = <0x810000 0x1000>;
-> > +				interrupts = <46>;
-> > +				status = "disabled";
-> > +			};
+> Modules could be built without far calls by default, and then the module 
+> linker would only have to redirect those calls whose destination is too 
+> far away to a dynamically created trampoline table.
 > 
-> The I/O range of the LCDs is only 0x1c8. Why do you set it 0x1000?
+> If I remember correctly you even posted some patches to that effect a 
+> couple years ago.  Maybe those could be salvaged?
 
-Actually, a more correct value would be 0x10000, if you read table 145.
-Yes, the device may onlny have documented registers from 0x84 to 0x1c8,
-but that isn't to say that we should say that the device resources
-start at 0x810084 and have a size of 0x144, when the bus level decodes
-a 64K chunk of memory.
+I don't think I ever did, because its pretty much impossible to do as I
+explained in a follow up to this thread.
+
+We _used_ to do this with the userspace insmod methods, but since we got
+this kernel-side linker, it's been pretty much impossible to do without
+rewriting the module code.  That's not going to happen on account of one
+quirky architecture which Linus doesn't particularly like.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
