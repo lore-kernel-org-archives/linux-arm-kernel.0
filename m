@@ -1,71 +1,66 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 19 Nov 2014 14:04:49 -0800
-Subject: [PATCH v3] clk_mux: Fix set_parent doing the wrong thing when
- INDEX_BIT && index >= 3
-In-Reply-To: <1416404939-609-1-git-send-email-hdegoede@redhat.com>
-References: <1416404939-609-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141119220449.25314.56163@quantum>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Nov 2014 23:06:43 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC Koelsch Board Removal Updates
+ for v3.19
+In-Reply-To: <cover.1415059146.git.horms+renesas@verge.net.au>
+References: <cover.1415059146.git.horms+renesas@verge.net.au>
+Message-ID: <201411192306.43386.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Hans de Goede (2014-11-19 05:48:59)
-> If CLK_MUX_INDEX_BIT is set, then each bit turns on / off a single parent,
-> so theoretically multiple parents could be enabled at the same time, but in
-> practice only one bit should ever be 1. So to select parent 0, set
-> the register (*) to 0x01, to select parent 1 set it 0x02, parent 2, 0x04,
-> parent 3, 0x08, etc.
+On Tuesday 04 November 2014, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> But the current code does:
+> Please consider these Renesas ARM based SoC koelsch board removal updates for v3.19.
 > 
->                 if (mux->flags & CLK_MUX_INDEX_BIT)
->                         index = (1 << ffs(index));
+> This pull request is based on a merge of:
 > 
-> Which means that:
+> * "Renesas ARM Based SoC DT DU Updates for v3.19",
+>   tagged as renesas-dt-du-for-v3.19.
 > 
-> For an input index of 0, ffs returns 0, so we set the register
-> to 0x01, ok.
+> * "Renesas ARM Based SoC DT Cleanups Updates for v3.19",
+>   tagged as renesas-dt-cleanups-for-v3.19.
 > 
-> For an input index of 1, ffs returns 1, so we set the register
-> to 0x02, ok.
+> Both of which I have also sent a pull-request for.
 > 
-> For an input index of 2, ffs returns 2, so we set the register
-> to 0x04, ok.
 > 
-> For an input index of 3, ffs returns 1, so we set the register
-> to 0x02, not good!
+> The following changes since commit 11886d1158e0dc123283891b662381f629ab47a0:
 > 
-> The code should simply be:
+>   Merge tag 'renesas-dt-cleanups-for-v3.19' into koelsch-board-removal-for-v3.19.base (2014-10-30 10:14:38 +0900)
 > 
->                 if (mux->flags & CLK_MUX_INDEX_BIT)
->                         index = 1 << index;
+> are available in the git repository at:
+> 	
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-koelsch-board-removal-for-v3.19
 > 
-> Which always does the right thing, this commit fixes this.
+> for you to fetch changes up to 79e69d179cb3391040a3693fca8bc12ec03c05fc:
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>   ARM: shmobile: koelsch dts: Drop console= bootargs parameter (2014-10-30 10:18:31 +0900)
+> 
+> ----------------------------------------------------------------
+> Renesas ARM Based SoC Koelsch Board Removal Updates for v3.19
+> 
+> * Remove lecacy C koelsh board support
 
-Applied to clk-next towards 3.19. I don't think any merged platforms are
-hitting this bug in the field so I've not put it into -fixes.
+I've tried merging this one in two ways, but I'm not too happy about either one:
 
-Thanks,
-Mike
+- we could put it into next/boards, but I don't think there will be anything
+  else in that branch and I was considering not to have one at all.
 
-> ---
->  drivers/clk/clk-mux.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-> index 4f96ff3..6e1ecf9 100644
-> --- a/drivers/clk/clk-mux.c
-> +++ b/drivers/clk/clk-mux.c
-> @@ -77,7 +77,7 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
->  
->         else {
->                 if (mux->flags & CLK_MUX_INDEX_BIT)
-> -                       index = (1 << ffs(index));
-> +                       index = 1 << index;
->  
->                 if (mux->flags & CLK_MUX_INDEX_ONE)
->                         index++;
-> -- 
-> 2.1.0
-> 
+- it would also fit into next/cleanup, but then we already have
+  renesas-dt-cleanups-for-v3.19 categorized as "next/dt" rather than
+  "next/cleanup". Moving that one into cleanups solves the problem
+  nicely, but it's rather large and my feeling is that Olof's decision
+  to put it into next/dt was better.
+
+I think you are trying too hard to avoid merge conflicts, as I can't see any
+true dependency on renesas-dt-cleanups-for-v3.19, and I'd be happier if
+you could rebase it onto renesas-dt-du-for-v3.19 by itself. There is
+a trivial merge conflict that I have to resolve, but it seems more
+sensible that way.
+
+Any other thoughts?
+
+Clearly the changes in this branch are great and I definitely want to have
+them in 3.19.
+
+	Arnd
