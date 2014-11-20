@@ -1,34 +1,58 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 20 Nov 2014 10:16:32 -0800
-Subject: [arm-soc:next/soc 1/1] WARNING: vmlinux.o(.text+0x730e38): Section
- mismatch in reference from the function brcmstb_gisb_arb_probe() to the
- function .init.text:hook_fault_code()
-In-Reply-To: <70798892.n4gYya0yuK@wuerfel>
-References: <22844091.DkblDJL9Ph@wuerfel>
- <CACRpkdZ6AovXUVvvdyeUczVpGfkexLHMOaA+F3eiBG=W8gtBGg@mail.gmail.com>
- <70798892.n4gYya0yuK@wuerfel>
-Message-ID: <546E3000.4040309@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 20 Nov 2014 12:18:17 -0600
+Subject: [PATCH 6/9] mmc: sdhci: host: add new f_sdh30
+In-Reply-To: <CAOEd-H0_YGHobKu08pMr3A4EpqBdtpBcCZu5PoVY_SZ=GBg-3w@mail.gmail.com>
+References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <1416487081-25467-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <CAL_JsqKDVgpBBW7j1skOU4moF0tvh1j6Fm6jaE5JoP04OU07uw@mail.gmail.com>
+ <CAOEd-H0_YGHobKu08pMr3A4EpqBdtpBcCZu5PoVY_SZ=GBg-3w@mail.gmail.com>
+Message-ID: <CAL_JsqKe_NA_mQ1MVMntXMjFGP6nGvnpWb8gvBEzRZuZ+aMf1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2014 02:33 AM, Arnd Bergmann wrote:
-> On Wednesday 12 November 2014 11:27:20 Linus Walleij wrote:
->> On Tue, Nov 11, 2014 at 11:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Thu, Nov 20, 2014 at 10:59 AM, Vincent Yang
+<vincent.yang.fujitsu@gmail.com> wrote:
+> 2014-11-20 23:22 GMT+08:00 Rob Herring <robherring2@gmail.com>:
+>> On Thu, Nov 20, 2014 at 6:38 AM, Vincent Yang
+>> <vincent.yang.fujitsu@gmail.com> wrote:
+>>> This patch adds new host controller driver for
+>>> Fujitsu SDHCI controller f_sdh30.
+>>>
+>>> Signed-off-by: Andy Green <andy.green@linaro.org>
+>>> Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+>>> Signed-off-by: Tetsuya Takinishi <t.takinishi@jp.fujitsu.com>
+>>> ---
+>>>  .../devicetree/bindings/mmc/sdhci-fujitsu.txt      |  35 +++
+>>>  drivers/mmc/host/Kconfig                           |   9 +
+>>>  drivers/mmc/host/Makefile                          |   1 +
+>>>  drivers/mmc/host/sdhci_f_sdh30.c                   | 319 +++++++++++++++++++++
+>>>  4 files changed, 364 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt
+>>>  create mode 100644 drivers/mmc/host/sdhci_f_sdh30.c
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt b/Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt
+>>> new file mode 100644
+>>> index 0000000..a1e0b64
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt
+>>> @@ -0,0 +1,35 @@
+>>> +* Fujitsu SDHCI controller
+>>> +
+>>> +This file documents differences between the core properties in mmc.txt
+>>> +and the properties used by the sdhci_f_sdh30 driver.
+>>> +
+>>> +Required properties:
+>>> +- compatible: "fujitsu,mb86s70-sdh30"
 >>
->>> The problem was introduced by f1bee783dd37 "bus: brcmstb_gisb: register the
->>> fault code hook", as hook_fault_code is an __init function and is now
->>> called from a probe function.
->>
->> I hope it's not my fault, it doesn't seem to have my name on it 
-> 
-> No, it's not. The reason that the build bot sent it to you is that you
-> fixed another problem that prevented the kernel from getting built, so
-> now it builds again and we see the new warning that was introduced while
-> the kernel didn't build.
+>> It would be nice to have sdhci in the name to indicate it is an SDHCI
+>> controller.
+>
+> Yes, we will update it to "fujitsu,sdhci-f-sdh30"
+> Thanks for your review!
 
-I just sent a fix for this as
-1416507286-14083-1-git-send-email-f.fainelli at gmail.com
+Not really what I had in mind as you are then dropping the chip name.
+Perhaps "fujitsu,mb86s70-sdhci-3.0". Is 3.0 the SD spec version or IP
+version? If the former, I think I'd drop it as IIRC that is available
+in a register.
 
-Thanks!
---
-Florian
+Rob
