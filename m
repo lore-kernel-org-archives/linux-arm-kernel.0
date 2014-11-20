@@ -1,20 +1,20 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 20 Nov 2014 16:33:14 +0000
-Subject: [PATCH v5 0/6] Legacy instruction emulation for arm64
-In-Reply-To: <1416310887-14649-1-git-send-email-punit.agrawal@arm.com>
-References: <1416310887-14649-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <20141120163314.GE5447@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Nov 2014 17:34:16 +0100
+Subject: [GIT PULL] ARM: imx: cleanup for 3.19
+In-Reply-To: <20141119070152.GE27759@dragon>
+References: <20141119070152.GE27759@dragon>
+Message-ID: <201411201734.16505.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 11:41:21AM +0000, Punit Agrawal wrote:
-> This is the fifth posting of the legacy instruction support for
-> arm64. Previous postings can be found at [1][2][3][4].
+On Wednesday 19 November 2014, Shawn Guo wrote:
+> The i.MX cleanup for 3.19:
+>  - Clean up reset handler for DT machines, since reset has been handled
+>    in watchdog driver
+>  - Remove unneeded .map_io hook for a couple of i.MX6 machines
+>  - A few small i.MX6 device tree source cleanups
+>  - Some random iomuxc and pllv3 code cleanup
 
-The series looks good to me, I added my reviewed-by. I guess Will can
-pick them up.
+Same comment as for the other branches, please rebase on -rc1.
 
-Thanks.
-
--- 
-Catalin
+	Arnd
