@@ -1,236 +1,81 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu, 20 Nov 2014 12:26:10 +0800
-Subject: [PATCH v7 1/4] irqchip: gic: Support hierarchy irq domain.
-In-Reply-To: <87h9xvaz2p.fsf@approximate.cambridge.arm.com>
-References: <1416406451-4578-1-git-send-email-yingjoe.chen@mediatek.com>	<1416406451-4578-2-git-send-email-yingjoe.chen@mediatek.com>
- <87h9xvaz2p.fsf@approximate.cambridge.arm.com>
-Message-ID: <546D6D62.4030005@linux.intel.com>
+From: chris.packham@alliedtelesis.co.nz (Chris Packham)
+Date: Thu, 20 Nov 2014 18:01:19 +1300
+Subject: [RFC PATCH] clk: mvebu: armada-xp: Support for MSYS SoC
+Message-ID: <1416459679-30944-1-git-send-email-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/20 1:18, Marc Zyngier wrote:
-> Hi Yingjoe,
-> 
-> On Wed, Nov 19 2014 at  2:14:08 pm GMT, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
->> Add support to use gic as a parent for stacked irq domain.
->>
->> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
->> ---
->>  drivers/irqchip/Kconfig   |  1 +
->>  drivers/irqchip/irq-gic.c | 78 ++++++++++++++++++++++++++++++++---------------
->>  2 files changed, 55 insertions(+), 24 deletions(-)
->>
->> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
->> index b21f12f..7f34138 100644
->> --- a/drivers/irqchip/Kconfig
->> +++ b/drivers/irqchip/Kconfig
->> @@ -5,6 +5,7 @@ config IRQCHIP
->>  config ARM_GIC
->>  	bool
->>  	select IRQ_DOMAIN
->> +	select IRQ_DOMAIN_HIERARCHY
->>  	select MULTI_IRQ_HANDLER
->>  
->>  config GIC_NON_BANKED
->> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->> index 38493ff..464dd53 100644
->> --- a/drivers/irqchip/irq-gic.c
->> +++ b/drivers/irqchip/irq-gic.c
->> @@ -788,17 +788,16 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
->>  {
->>  	if (hw < 32) {
->>  		irq_set_percpu_devid(irq);
->> -		irq_set_chip_and_handler(irq, &gic_chip,
->> -					 handle_percpu_devid_irq);
->> +		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
->> +				    handle_percpu_devid_irq, NULL, NULL);
->>  		set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
->>  	} else {
->> -		irq_set_chip_and_handler(irq, &gic_chip,
->> -					 handle_fasteoi_irq);
->> +		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
->> +				    handle_fasteoi_irq, NULL, NULL);
->>  		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
->>  
->>  		gic_routable_irq_domain_ops->map(d, irq, hw);
->>  	}
->> -	irq_set_chip_data(irq, d->host_data);
->>  	return 0;
->>  }
->>  
->> @@ -858,6 +857,31 @@ static struct notifier_block gic_cpu_notifier = {
->>  };
->>  #endif
->>  
->> +static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
->> +				unsigned int nr_irqs, void *arg)
->> +{
->> +	int i, ret;
->> +	irq_hw_number_t hwirq;
->> +	unsigned int type = IRQ_TYPE_NONE;
->> +	struct of_phandle_args *irq_data = arg;
->> +
->> +	ret = gic_irq_domain_xlate(domain, irq_data->np, irq_data->args,
->> +				   irq_data->args_count, &hwirq, &type);
->> +	if (ret)
->> +		return ret;
->> +
->> +	for (i = 0; i < nr_irqs; i++)
->> +		gic_irq_domain_map(domain, virq+i, hwirq+i);
-> 
-> nit: spacing around '+'.
-> 
->> +
->> +	return 0;
->> +}
->> +
->> +static const struct irq_domain_ops gic_irq_domain_hierarchy_ops = {
->> +	.xlate = gic_irq_domain_xlate,
->> +	.alloc = gic_irq_domain_alloc,
->> +	.free = irq_domain_free_irqs_top,
-> 
-> I'm convinced that irq_domain_free_irqs_top is the wrong function to
-> call here, because you're calling it from the bottom, not the top-level
-> (it has no parent).
-> 
-> I cannot verify this with your code as I don't a working platform with
-> GICv2m, but if I enable something similar on GICv3, it dies a very
-> painful way:
-> 
-> Unable to handle kernel NULL pointer dereference at virtual address 00000018
-> pgd = ffffffc03d059000
-> [00000018] *pgd=0000000081356003, *pud=0000000081356003, *pmd=0000000000000000
-> Internal error: Oops: 96000006 [#1] SMP
-> Modules linked in:
-> CPU: 4 PID: 1052 Comm: sh Not tainted 3.18.0-rc4+ #3311
-> task: ffffffc03e320000 ti: ffffffc001390000 task.ti: ffffffc001390000
-> PC is at irq_domain_free_irqs_recursive+0x1c/0x80
-> LR is at irq_domain_free_irqs_common+0x88/0x9c
-> pc : [<ffffffc0000ed790>] lr : [<ffffffc0000ede20>] pstate: 60000145
-> [...]
-> [<ffffffc0000ed790>] irq_domain_free_irqs_recursive+0x1c/0x80
-> [<ffffffc0000ede1c>] irq_domain_free_irqs_common+0x84/0x9c
-> [<ffffffc0000ede98>] irq_domain_free_irqs_top+0x64/0x7c  <-- gic_domain.free()
-> [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
-> [<ffffffc0000ee468>] irq_domain_free_irqs_parent+0x14/0x20
-> [<ffffffc0003500b8>] its_irq_domain_free+0xc8/0x250
-> [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
-> [<ffffffc0000ede1c>] irq_domain_free_irqs_common+0x84/0x9c
-> [<ffffffc0000ede98>] irq_domain_free_irqs_top+0x64/0x7c
-> [<ffffffc0000ef518>] msi_domain_free+0x70/0x88
-> [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
-> [<ffffffc0000ee3ac>] irq_domain_free_irqs+0x108/0x17c
-> [<ffffffc0000efb68>] msi_domain_free_irqs+0x28/0x4c
-> [<ffffffc000369cac>] free_msi_irqs+0xb4/0x1c0
-> [<ffffffc00036adec>] pci_disable_msix+0x3c/0x4c
-> [...]
-> 
-> and I cannot see how this could work on the standard GIC either.
-> 
-> Thomas, Jiang: could you please confirm or infirm my suspicions? My
-> understanding is that irq_domain_free_irqs_top can only be called from
-> the top-level domain.
-Hi Marc,
-	It indicates that irq_domain_free_irqs_top() is not a good name.
-We have:
-1) irq_domain_set_hwirq_and_chip() to set irq_chip and chip_data
-2) irq_domain_set_info() to set irq_chip, chip_data, flow_handler and
-   handler_data;
-3) irq_domain_reset_irq_data() resets irq_chip and chip_data.
-4) irq_domain_free_irqs_common() resets irq_chip, chip_data and calls
-   parent domain's domain_ops.free() callback.
-5) irq_domain_free_irqs_top() resets irq_chip, chip_data, flow handler,
-   handler_data and call parent domain's domain_ops.free() callback.
+The MSYS SoCs are a range of packet processors with integrated CPUs based
+on armada-xp. One difference is that the TCLK frequency is fixed at 200MHz
+as opposed to the fixed 250MHz used on armada-xp. The clock-gating options
+are a subset of what's available on the armada-xp so this code should be
+compatible.
 
-So there two possible improvements here:
-1) Rename irq_domain_free_irqs_top() with better name, any suggestions?
-   It's named as is because it's always called by the outer-most
-   irqdomains on x86.
-2) Change irq_domain_free_irqs_common() and irq_domain_free_irqs_top()
-   to call parent domain's domain_ops.free() callback only if parent
-   exists. By this way, they could be used for inner-most irqdomains.
-If OK, I will respin a version 4 patch set based on tip/irq/irqdomain.
-Thoughts?
-Regards!
-Gerry
-> 
->> +};
->> +
->>  static const struct irq_domain_ops gic_irq_domain_ops = {
->>  	.map = gic_irq_domain_map,
->>  	.unmap = gic_irq_domain_unmap,
->> @@ -948,18 +972,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>  		gic_cpu_map[i] = 0xff;
->>  
->>  	/*
->> -	 * For primary GICs, skip over SGIs.
->> -	 * For secondary GICs, skip over PPIs, too.
->> -	 */
->> -	if (gic_nr == 0 && (irq_start & 31) > 0) {
->> -		hwirq_base = 16;
->> -		if (irq_start != -1)
->> -			irq_start = (irq_start & ~31) + 16;
->> -	} else {
->> -		hwirq_base = 32;
->> -	}
->> -
->> -	/*
->>  	 * Find out how many interrupts are supported.
->>  	 * The GIC only supports up to 1020 interrupt sources.
->>  	 */
->> @@ -969,10 +981,32 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>  		gic_irqs = 1020;
->>  	gic->gic_irqs = gic_irqs;
->>  
->> -	gic_irqs -= hwirq_base; /* calculate # of irqs to allocate */
->> +	if (node) {		/* DT case */
->> +		const struct irq_domain_ops *ops =
->> +					&gic_irq_domain_hierarchy_ops;
-> 
-> nit: please put this on the same line, even if it is longer than 80
-> characters.
-> 
->> +
->> +		if (!of_property_read_u32(node, "arm,routable-irqs",
->> +					  &nr_routable_irqs)) {
->> +			ops = &gic_irq_domain_ops;
->> +			gic_irqs = nr_routable_irqs;
->> +		}
->> +
->> +		gic->domain = irq_domain_add_linear(node, gic_irqs, ops, gic);
->> +	} else {		/* Non-DT case */
->> +		/*
->> +		 * For primary GICs, skip over SGIs.
->> +		 * For secondary GICs, skip over PPIs, too.
->> +		 */
->> +		if (gic_nr == 0 && (irq_start & 31) > 0) {
->> +			hwirq_base = 16;
->> +			if (irq_start != -1)
->> +				irq_start = (irq_start & ~31) + 16;
->> +		} else {
->> +			hwirq_base = 32;
->> +		}
->> +
->> +		gic_irqs -= hwirq_base; /* calculate # of irqs to allocate */
->>  
->> -	if (of_property_read_u32(node, "arm,routable-irqs",
->> -				 &nr_routable_irqs)) {
->>  		irq_base = irq_alloc_descs(irq_start, 16, gic_irqs,
->>  					   numa_node_id());
->>  		if (IS_ERR_VALUE(irq_base)) {
->> @@ -983,10 +1017,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>  
->>  		gic->domain = irq_domain_add_legacy(node, gic_irqs, irq_base,
->>  					hwirq_base, &gic_irq_domain_ops, gic);
->> -	} else {
->> -		gic->domain = irq_domain_add_linear(node, nr_routable_irqs,
->> -						    &gic_irq_domain_ops,
->> -						    gic);
->>  	}
->>  
->>  	if (WARN_ON(!gic->domain))
-> 
-> Thanks,
-> 
-> 	M.
-> 
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+---
+Hi,
+
+This patch is enough to get the uart clock dividers correct so I get some
+output. As far as I've been able to tell there is no way of dynamically
+detecting the TCLK frequency.
+
+The core clock frequency and ratio calculations are probably not correct but
+for these CPU inside a packet processor systems I'm not sure how much that
+actually matter since these systems aren't likely to do any kind of dynamic
+frequency scaling.
+
+Thansk,
+Chris
+
+ drivers/clk/mvebu/armada-xp.c | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clk/mvebu/armada-xp.c b/drivers/clk/mvebu/armada-xp.c
+index b309431..9f852f8 100644
+--- a/drivers/clk/mvebu/armada-xp.c
++++ b/drivers/clk/mvebu/armada-xp.c
+@@ -52,6 +52,12 @@ static u32 __init axp_get_tclk_freq(void __iomem *sar)
+ 	return 250000000;
+ }
+ 
++/* MSYS TCLK frequency is fixed to 200MHz */
++static u32 __init msys_get_tclk_freq(void __iomem *sar)
++{
++	return 200000000;
++}
++
+ static const u32 axp_cpu_freqs[] __initconst = {
+ 	1000000000,
+ 	1066000000,
+@@ -158,6 +164,14 @@ static const struct coreclk_soc_desc axp_coreclks = {
+ 	.num_ratios = ARRAY_SIZE(axp_coreclk_ratios),
+ };
+ 
++static const struct coreclk_soc_desc msys_coreclks = {
++	.get_tclk_freq = msys_get_tclk_freq,
++	.get_cpu_freq = axp_get_cpu_freq,
++	.get_clk_ratio = axp_get_clk_ratio,
++	.ratios = axp_coreclk_ratios,
++	.num_ratios = ARRAY_SIZE(axp_coreclk_ratios),
++};
++
+ /*
+  * Clock Gating Control
+  */
+@@ -200,9 +214,13 @@ static void __init axp_clk_init(struct device_node *np)
+ 	struct device_node *cgnp =
+ 		of_find_compatible_node(NULL, NULL, "marvell,armada-xp-gating-clock");
+ 
+-	mvebu_coreclk_setup(np, &axp_coreclks);
++	if (of_device_is_compatible(np, "marvell,msys-core-clock"))
++		mvebu_coreclk_setup(np, &msys_coreclks);
++	else
++		mvebu_coreclk_setup(np, &axp_coreclks);
+ 
+ 	if (cgnp)
+ 		mvebu_clk_gating_setup(cgnp, axp_gating_desc);
+ }
+ CLK_OF_DECLARE(axp_clk, "marvell,armada-xp-core-clock", axp_clk_init);
++CLK_OF_DECLARE(msys_clk, "marvell,msys-core-clock", axp_clk_init);
+-- 
+2.2.0.rc0
