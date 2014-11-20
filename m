@@ -1,55 +1,62 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 20 Nov 2014 07:09:51 +0000 (UTC)
-Subject: [PATCH v2 2/3] ARM: OMAP2+: hwmod: AM335x/AM43x: add hwmod
- support for tscadc on am43x-evm
-In-Reply-To: <1415099728-10959-3-git-send-email-vigneshr@ti.com>
-References: <1415099728-10959-1-git-send-email-vigneshr@ti.com>
- <1415099728-10959-3-git-send-email-vigneshr@ti.com>
-Message-ID: <alpine.DEB.2.02.1411200706441.9204@utopia.booyaka.com>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Thu, 20 Nov 2014 16:20:15 +0900
+Subject: [PATCH v3 5/5] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
+In-Reply-To: <20141118145228.GN18842@arm.com>
+References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
+ <1416292375-29560-6-git-send-email-dave.long@linaro.org>
+ <20141118145228.GN18842@arm.com>
+Message-ID: <546D962F.3080309@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Nov 2014, Vignesh R wrote:
-
-> This patch adds hwmod support for tscadc to work on am43xx-evm. The am33xx
-> hwmod structures of tscadc has been moved to ipblock_data so that it can
-> be reused in am43xx. The clock domain names are separately set for am33xx
-> and am43xx. Thus tscadc dt entries can now be added to am43xx board
-> dt files.
+(2014/11/18 23:52), Will Deacon wrote:
+> Hi David,
 > 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> On Tue, Nov 18, 2014 at 06:32:55AM +0000, David Long wrote:
+>> From: "David A. Long" <dave.long@linaro.org>
+>>
+>> Add HAVE_REGS_AND_STACK_ACCESS_API feature for arm64.
+> 
+> [...]
+> 
+>> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+>> index d3e782a..24cc048 100644
+>> --- a/arch/arm64/include/asm/ptrace.h
+>> +++ b/arch/arm64/include/asm/ptrace.h
+>> @@ -111,6 +111,8 @@ struct pt_regs {
+>>  	u64 syscallno;
+>>  };
+>>  
+>> +#define MAX_REG_OFFSET (offsetof(struct pt_regs, orig_x0))
+> 
+> Is orig_x0 actually useful to this API? If not, we could instead operate on
+> the user_pt_regs structure, and define the maximum offset in terms of sizeof
+> that.
 
-...
+It depends on the architecture, but this patch provides the common interface
+for kprobe-tracer. I think this code looks OK, since kprobe-tracer doesn't
+use user_pt_regs.
 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
-> index 6e57b8ad0db5..b92a7c7825fa 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
-> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
+> 
+>> +#define ARM_cpsr	pstate
+>> +#define ARM_pc		pc
+>> +#define ARM_sp		sp
+>> +#define ARM_lr		regs[30]
+>> +#define ARM_fp		regs[29]
+>> +#define ARM_x28		regs[28]
+>> +#define ARM_x27		regs[27]
+> 
+> [...]
+> 
+> I don't think we need these #defines.
 
-...
+Agreed.
 
-> +static void am33xx_hwmod_clockdomain(void)
-> +{
-> +	CLKDMNAME(am33xx_l4_hs_hwmod, "l4hs_clkdm");
-> +	CLKDMNAME(am33xx_adc_tsc_hwmod, "l4_wkup_clkdm");
-> +}
-> +
-> +static void am43xx_hwmod_clockdomain(void)
-> +{
-> +	CLKDMNAME(am33xx_l4_hs_hwmod, "l3_clkdm");
-> +	CLKDMNAME(am33xx_adc_tsc_hwmod, "l3s_tsc_clkdm");
-> +}
-> +
-
-...
-
-> +	am33xx_hwmod_clockdomain();
-
-I looked at this patch and the one before it.  Is there some reason why we 
-need to share these two hwmods between AM33xx and AM43xx?  It seems 
-cleaner just to add the ADC data directly to the AM43xx hwmod data file, 
-not touch the AM33xx data, and not add another runtime data update for the 
-clockdomains.  Unless there's something that I'm missing?
+Thank you,
 
 
-- Paul
+-- 
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
