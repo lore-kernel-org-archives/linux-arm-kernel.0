@@ -1,58 +1,42 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+From: arnd@arndb.de (Arnd Bergmann)
 Date: Thu, 20 Nov 2014 12:54:48 +0100
-Subject: [RFC PATCH 00/16] Refine PCI host bridge scan interfaces
-In-Reply-To: <1463511.o4kE8TX3Bd@wuerfel>
-References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
- <1463511.o4kE8TX3Bd@wuerfel>
-Message-ID: <546DD688.60705@linaro.org>
+Subject: [GIT PULL 3.19] Broadcom Cygnus SoC Device Tree changes
+In-Reply-To: <1415826266-6867-2-git-send-email-f.fainelli@gmail.com>
+References: <1415826266-6867-1-git-send-email-f.fainelli@gmail.com>
+ <1415826266-6867-2-git-send-email-f.fainelli@gmail.com>
+Message-ID: <201411201254.48494.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.11.2014 15:13, Arnd Bergmann wrote:
-> On Monday 17 November 2014 18:21:34 Yijing Wang wrote:
->> This series is based Linux 3.18-rc1 and Lorenzo Pieralisi's
->> arm PCI domain cleanup patches, link:
->> https://patchwork.ozlabs.org/patch/407585/
->>
->> Current pci scan interfaces like pci_scan_root_bus() and directly
->> call pci_create_root_bus()/pci_scan_child_bus() lack flexiblity.
->> Some platform infos like PCI domain and msi_chip have to be
->> associated to PCI bus by some arch specific function.
->> We want to make a generic pci_host_bridge, and make it hold
->> the platform infos or hook. Then we could eliminate the lots
->> of arch pci_domain_nr, also we could associate some platform
->> ops something like pci_get_msi_chip(struct pci_dev *dev)
->> with pci_host_bridge to avoid introduce arch weak functions.
->>
->> This RFC version not for all platforms, just applied the new
->> scan interface in x86/arm/powerpc/ia64, I will refresh other
->> platforms after the core pci scan interfaces are ok.
->
-> I think overall this is a good direction to take, in particular
-> moving more things into struct pci_host_bridge so we can
-> slim down the architecture specific code.
->
-> I don't particularly like the way you use the 'pci_host_info'
-> to pass callback pointers and some of the generic information.
-> This duplicates some of the issues we are currently trying
-> to untangle in the arm32 code to make drivers easier to share
-> between architectures.
->
-> As a general approach, I'd rather see generic helper functions
-> being exported by the PCI core that a driver may or may not
-> call.
-> The way you split the interface between things that happen
-> before scanning the buses (pci_create_host_bridge) and
-> the actual scanning (__pci_create_root_bus, pci_scan_child_bus)
-> seems very helpful and I think we can expand that concept further:
->
-> - The normal pci_create_host_bridge() function can contain
->    all of the DT scanning functions (finding bus/mem/io resources,
->    finding the msi-parent), while drivers that don't depend on DT
->    for this information can call the same function and fill the
->    same things after they have the pci_host_bridge pointer.
+On Wednesday 12 November 2014, Florian Fainelli wrote:
+> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+> 
+>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+> 
+> are available in the git repository at:
+> 
+>   http://github.com/brcm/linux.git tags/arm-soc/for-3.19/cygnus-dts-v2
+> 
+> for you to fetch changes up to c9ad7bc5fe3c57c8c817fcb1bd264a02176a40c4:
+> 
+>   ARM: dts: Enable Broadcom Cygnus SoC (2014-11-11 22:30:42 -0800)
+> 
+> ----------------------------------------------------------------
+> This pull request contains the Broadcom Cygnus Device Tree changes:
+> 
+> - binding documentation for the SoC and clock
+> - cygnus SoC and clock dtsi files
+> - DTS for Cygnus Entreprise phone, BCM911360K and BCM958300K
 
-How about finding PCI domain number (in the DT way) within 
-pci_create_host_bridge() too ?
+Something went wrong here: This branch contains the updated license
+statements, but Olof had already merged the branch with the original
+license statements that we didn't like, so all three patches conflict
+with the ones we already have.
 
-Tomasz
+I've done an merge of the new branch over the old one, which was
+literally the first thing in the next/dt branch. This isn't ideal,
+but I think it's the best way out of the mess.
+
+I hope we can avoid this in the future.
+
+	Arnd
