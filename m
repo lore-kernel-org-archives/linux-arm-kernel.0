@@ -1,54 +1,36 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 20 Nov 2014 09:42:36 +0900
-Subject: [GIT PULL] Third Round of Renesas ARM Based Soc Updates for v3.19
-In-Reply-To: <201411192216.27740.arnd@arndb.de>
-References: <cover.1415841454.git.horms+renesas@verge.net.au>
- <201411192216.27740.arnd@arndb.de>
-Message-ID: <20141120004236.GC5065@verge.net.au>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Wed, 19 Nov 2014 16:43:46 -0800
+Subject: [PATCHv6 5/5] hwspinlock/omap: add support for dt nodes
+In-Reply-To: <CAK=WgbZE7_WrsNz5E+MDX7j2tAGEjv91zeCgqhB=Jsiu0+d8vw@mail.gmail.com>
+References: <1410553499-55951-1-git-send-email-s-anna@ti.com>
+ <1410553499-55951-6-git-send-email-s-anna@ti.com>
+ <CAK=WgbZE7_WrsNz5E+MDX7j2tAGEjv91zeCgqhB=Jsiu0+d8vw@mail.gmail.com>
+Message-ID: <CAJAp7OisV3UrL45UgRb0tMudyCJHe-xsmsRYV0uGG3P4PReHnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ CC Geert ]
+On Wed, Nov 12, 2014 at 11:14 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> Hi Suman,
+[..]
+>
+> Does this mean you allow nodes not to have the base_id property? How
+> do we protect against multiple nodes not having a base_id property
+> then?
+>
+> Implicitly assuming a base_id value (zero in this case) may not be always safe.
+>
 
-On Wed, Nov 19, 2014 at 10:16:27PM +0100, Arnd Bergmann wrote:
-> On Thursday 13 November 2014, Simon Horman wrote:
-> > ----------------------------------------------------------------
-> > Third Round of Renesas ARM Based Soc Updates for v3.19
-> > 
-> > * Always build rcar setup for armv7
-> >   - Fixes allmodconfig build fauilre caused by
-> >     "ARM: shmobile: always build rcar setup for armv7"
-> > * Add restart callback to sh73a0
-> 
-> Pulled into next/soc, thanks!
-> 
-> > ----------------------------------------------------------------
-> > Arnd Bergmann (1):
-> >       ARM: shmobile: always build rcar setup for armv7
-> > 
-> > Geert Uytterhoeven (1):
-> >       ARM: shmobile: sh73a0: Add restart callback
-> 
-> I'm not too happy about the restart handler here: 
-> 
-> +#define RESCNT2 IOMEM(0xe6188020)
-> +static void sh73a0_restart(enum reboot_mode mode, const char *cmd)
-> +{
-> +       /* Do soft power on reset */
-> +       writel((1 << 31), RESCNT2);
-> +}
-> 
-> I see that you have the same thing in other SoCs, but I'd really want to
-> see this done properly at some point and likely won't take future patches
-> doing the same thing.
-> 
-> Please have a look at drivers/power/restart for how other platforms do
-> this. You probably need to add a device node for whatever IP block
-> holds the reset register and then have a driver. What exactly this
-> driver should look like depends of course on what other registers are
-> part of this block.
+Hi Ohad,
 
-Hi Arnd,
+I still have a huge problem understanding the awesomeness with the
+"base_id". If you have a SoC with 2 hwlock blocks; say 8+8 locks, used
+for interaction with e.g. a modem and a video core respectively.
+Why would you in either remote system offset the locks with 8?
+Wouldn't e.g the modem use locks hwlock0:0-7 and video core use locks
+hwlock1:0-7?
 
-thanks for your feedback and likewise for the kzm9g.
-I will follow this up.
+What systems use more than one hwlock block and do you know of any
+reasons why these hwlocks are globally numbered?
+
+Regards,
+Bjorn
