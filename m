@@ -1,228 +1,69 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 20 Nov 2014 10:54:16 +0800
-Subject: [RFC PATCH 08/16] PCI: Introduce pci_scan_host_bridge() and
- pci_host_info
-In-Reply-To: <20141119164128.GX12037@e106497-lin.cambridge.arm.com>
-References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
- <1416219710-26088-9-git-send-email-wangyijing@huawei.com>
- <20141118154243.GM12037@e106497-lin.cambridge.arm.com>
- <546BFBC8.4030104@huawei.com>
- <20141119164128.GX12037@e106497-lin.cambridge.arm.com>
-Message-ID: <546D57D8.4060708@huawei.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Thu, 20 Nov 2014 10:57:53 +0800
+Subject: For the problem when using swiotlb
+In-Reply-To: <1535751.CcvIi3DN4F@wuerfel>
+References: <5469E26B.2010905@huawei.com>
+ <20141117180947.GI29595@e104818-lin.cambridge.arm.com>
+ <546C0BBB.9070000@huawei.com> <1535751.CcvIi3DN4F@wuerfel>
+Message-ID: <546D58B1.60108@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> No, in this patch, host drivers pass a pci host bridge resources init hook
->> in pci_host_info *info, and we call this info->init_res() in pci_create_host_bridge().
->>
->> +struct pci_host_info {
->> +	u8 res_type;
->> +	void *arg;
->> +	struct list_head *resources; /*just for build, will clean up later */
->> +	int (*init_res)(struct pci_host_bridge *host,
->> +			struct pci_host_info *info);
->> +};
->> +
-> 
-> That's not what I've asked! Your code does:
-> 
-> 	if (info->res_type != PCI_HOST_RES_DEFAULT)
-> 		....
-> 	else /* info->res_type == PCI_HOST_RES_DEFAULT)
-> 		info->res_type = PCI_HOST_RES_DEFAULT;
-> 
-> info->res_type is already == PCI_HOST_RES_DEFAULT in the else side, assignment is a NOP?
-
-Hmmm, I wanted pci_create_host_bridge() to process the default res later(add default res),
-It's ugly code, I will rework it.
-
-> 
-> 
->>
->>>
->>>> +
->>>> +	return 0;
->>>> +}
->> ...
->>>> @@ -2038,8 +2057,13 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, u32 db,
->>>>  	bool found = false;
->>>>  	struct pci_host_bridge *host;
->>>>  	int max;
->>>> +	struct pci_host_info info;
->>>> +	
->>>> +	info.arg = sysdata;
->>>> +	info.resources = resources;
->>>> +	info.init_res = pci_default_init_res;
->>>
->>> I have mixed feelings about this patch. While it is heading in the right direction
->>> of moving pci_host_bridge relevant information towards the right user, I don't think
->>> you picked up the right set to move. The resource list is going to be copied into
->>> internal pci_host_bridge list anyway, keeping another copy is not helpful *and*
->>> you have increased the code size.
->>>
->>> I think for now we should aim to get the *missing* data into pci_host_bridge: MSI
->>> controllers and PCI domain/segment. Then we can do more cleanup.
->>
->> Hi Liviu, I agree with you here, the changes to resources stuff seems not a perfect
->> solution. In my patch 6, we could pass pci domain nr by u32 PCI_DOMBUS(domain, bus) argument,
->> and store it in pci_host_bridge. For msi controller, we couldn't save the msi_controller
->> in pci_host_bridge. Before we assume one pci host bridge only had one msi_controller,
->> but now something changes, Jiang introduce hierarchy irq domain in x86, and now
->> one pci host bridge may has more than one msi_controller. So I prefer to add a
->> function to pci_host_bridge something like
->>
->> struct msi_controller *pci_get_msi_controller(struct pci_dev *dev)
-> 
-> Yes, good idea.
-> 
->>
->>>
->>>>  
->>>> -	host = pci_create_host_bridge(parent, db, ops, sysdata, resources);
->>>> +	host = pci_create_host_bridge(parent, db, ops, &info);
->>>>  	if (!host)
->>>>  		return NULL;
->>>>  
->>>> @@ -2070,6 +2094,47 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, u32 db,
->>>>  }
->>>>  EXPORT_SYMBOL(pci_scan_root_bus);
->>>>  
->>>> +struct pci_host_bridge *pci_scan_host_bridge(
->>>> +		struct device *parent, u32 db, struct pci_ops *ops,
->>>> +		struct pci_host_info *info)
->>>> +{
->>>> +	struct pci_host_bridge_window *window;
->>>> +	bool found = false;
->>>> +	struct pci_host_bridge *host;
->>>> +	int max;
->>>> +
->>>> +	host = pci_create_host_bridge(parent, db, ops, info);
->>>> +	if (!host)
->>>> +		return NULL;
->>>> +
->>>> +	list_for_each_entry(window, &host->windows, list)
->>>> +		if (window->res->flags & IORESOURCE_BUS) {
->>>> +			found = true;
->>>> +			break;
->>>> +		}
->>>> +
->>>> +	host->bus = __pci_create_root_bus(host);
->>>> +	if (!host->bus) {
->>>> +		pci_free_host_bridge(host);
->>>> +		return NULL;
->>>> +	}
->>>> +
->>>> +	if (!found) {
->>>> +		dev_info(&host->bus->dev,
->>>> +		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
->>>> +			host->busnum);
->>>> +		pci_bus_insert_busn_res(host->bus, host->busnum, 255);
->>>> +	}
->>>> +
->>>> +	max = pci_scan_child_bus(host->bus);
->>>> +	if (!found)
->>>> +		pci_bus_update_busn_res_end(host->bus, max);
->>>> +
->>>> +	return host;
->>>> +
->>>> +}
->>>> +EXPORT_SYMBOL(pci_scan_host_bridge);
->>>> +
->>>>  /**
->>>>   * pci_rescan_bus_bridge_resize - scan a PCI bus for devices.
->>>>   * @bridge: PCI bridge for the bus to scan
->>>> diff --git a/include/linux/pci.h b/include/linux/pci.h
->>>> index daa7f40..a51f5f5 100644
->>>> --- a/include/linux/pci.h
->>>> +++ b/include/linux/pci.h
->>>> @@ -412,6 +412,21 @@ struct pci_host_bridge {
->>>>  	void *release_data;
->>>>  };
->>>>  
->>>> +struct pci_host_info {
->>>> +	u8 res_type;
->>>> +	void *arg;
->>>> +	struct list_head *resources; /*just for build, will clean up later */
->>>> +	int (*init_res)(struct pci_host_bridge *host, 
->>>> +			struct pci_host_info *info);
->>>> +};
->>>> +
->>>> +static inline void init_pci_host_info(struct pci_host_info *info)
->>>> +{
->>>> +	memset(info, 0 , sizeof(*info));
->>>> +}
->>>
->>> Where is this used?
->>
->> Host driver uses it to init pci_host_info.
-> 
-> Might be worth adding it that patch rather than here.
-
-OK
-
-> 
-> Best regards,
-> Liviu
-> 
->>
->>>
->>>> +
->>>> +#define PCI_HOST_RES_DEFAULT	0x2
->>>> +
->>>
->>> Magic number?
->>
->> Hmmm, I will rework pci host bridge resources stuff.
->>
->>>
->>> Best regards,
->>> Liviu
->>>
->>>>  #define	to_pci_host_bridge(n) container_of(n, struct pci_host_bridge, dev)
->>>>  void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
->>>>  		     void (*release_fn)(struct pci_host_bridge *),
->>>> @@ -420,7 +435,7 @@ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
->>>>  int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge);
->>>>  struct pci_host_bridge *pci_create_host_bridge(
->>>>  		struct device *parent, u32 db, struct pci_ops *ops, 
->>>> -		void *sys, struct list_head *resources);
->>>> +		struct pci_host_info *info);
->>>>  /*
->>>>   * The first PCI_BRIDGE_RESOURCE_NUM PCI bus resources (those that correspond
->>>>   * to P2P or CardBus bridge windows) go in a table.  Additional ones (for
->>>> @@ -785,6 +800,9 @@ void pci_bus_release_busn_res(struct pci_bus *b);
->>>>  struct pci_bus *pci_scan_root_bus(struct device *parent, u32 bus,
->>>>  					     struct pci_ops *ops, void *sysdata,
->>>>  					     struct list_head *resources);
->>>> +struct pci_host_bridge *pci_scan_host_bridge(struct device *parent,
->>>> +		u32 db, struct pci_ops *ops,
->>>> +		struct pci_host_info *info);
->>>>  struct pci_bus *pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev,
->>>>  				int busnr);
->>>>  void pcie_update_link_speed(struct pci_bus *bus, u16 link_status);
->>>> -- 
->>>> 1.7.1
+On 2014/11/19 16:45, Arnd Bergmann wrote:
+> On Wednesday 19 November 2014 11:17:15 Ding Tianhong wrote:
+>> On 2014/11/18 2:09, Catalin Marinas wrote:
+>>> On Mon, Nov 17, 2014 at 12:18:42PM +0000, Arnd Bergmann wrote:
+>>>> On Monday 17 November 2014 19:56:27 Ding Tianhong wrote:
+>>>>>         The commit 3690951fc6d42f3a0903987677d0e592c49dd8db(arm64: Use swiotlb late initialisation)
+>>>>> switches the DMA mapping code to swiotlb_tlb_late_init_with_default_size(), this will occur a problem
+>>>>> when I run the scsi stress tests, the message as below:
+>>>>>
+>>>>>         sas_controller b1000000.sas: swiotlb buffer is full (sz: 65536 bytes)..
+>>>>>         DMA: Out of SW-IOMMU space for 65536 bytes at device b1000000.sas
+>>>>>
+>>>>> The reason is that the swiotlb_tlb_late_init_with_default_size() could only alloc 16M memory for DMA-mapping,
+>>>>> and the param in cmdline "swiotlb=xxx" is useless because the get_free_pages() only use the buddy to assigned a
+>>>>> maximum memory of 16M(The MAX_ORDER is 13 for 4k pages), obviously 16M is too small in many scenes, but
+>>>>> the swiotlb_init() which could reserved a bigger memory as wished could work well for most drivers.
+>>>>>
+>>>>> I could not get a better way to fix this problem except to revert this patch, so could you please give me some
+>>>>> advise and help me, thanks very much.
 >>>>
->>>> --
->>>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->>>> the body of a message to majordomo at vger.kernel.org
->>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>> In general, you should not need to use swiotlb for most devices, in
+>>>> particular for high-performance devices like network or block.
 >>>>
+>>>> Please make sure that you have set up the dma-ranges properties in
+>>>> your DT properly to allow 64-bit DMA if the device supports it.
+>>>
+>>> That's the problem indeed, the DMA API ends up using swiotlb bounce
+>>> buffers because the physical address of the pages passed to (or
+>>> allocated by) the driver are beyond 32-bit limit (which is the default
+>>> dma mask).
 >>>
 >>
+>> Thanks everyone, I think I found the way to fix it, need to enable DMA_CMA, to reserve a big memory
+>> for CMA and set coherent mask for dev, then dma_alloc and dma_mapping will not use the swiotlb until
+>> the memory out of mask or swiotlb_force is enabled.
 >>
->> -- 
->> Thanks!
->> Yijing
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> If I still understand uncorrectly, please inform me.
 >>
 > 
+> Please do not use CMA to work around the problem, but fix the underlying bug
+> instead.
+> 
+> The driver should call 'dma_set_mask_and_coherent()' with the appropriate
+> dma mask, and check whether that succeeded. However, the code implementing
+> dma_set_mask_and_coherent on arm64 also needs to be changed to look up
+> the dma-ranges property (see of_dma_configure()), and check if the mask
+> is possible.
+> 
+> 	Arnd
+> 
 
+The dma_pfn_offset looks only support arm32, but my platform is aarch64 and I check the latest kernel version, 
+I think the dma-rangs still could not work for aarch64, so maybe we should add dma_pfn_offset for aarch64 first.
 
--- 
-Thanks!
-Yijing
+Ding
+
+> .
+> 
