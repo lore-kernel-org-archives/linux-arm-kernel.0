@@ -1,46 +1,33 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Thu, 20 Nov 2014 22:17:11 +0100
-Subject: [GIT PULL] ARM: BCM5301X: DT changes for v3.19
-In-Reply-To: <201411201038.07191.arnd@arndb.de>
-References: <546299BC.4060704@hauke-m.de> <201411201038.07191.arnd@arndb.de>
-Message-ID: <546E5A57.4030709@hauke-m.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 20 Nov 2014 19:32:02 -0200
+Subject: [PATCH RFC 3/3] ARM: dts: enable power subsystem for i.MX28
+In-Reply-To: <1416514477-19190-4-git-send-email-stefan.wahren@i2se.com>
+References: <1416514477-19190-1-git-send-email-stefan.wahren@i2se.com>
+ <1416514477-19190-4-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <CAOMZO5AWOs8ODsru+ySsLb=R4ezDL19nK_z0zAXdbrDfPT8KhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2014 10:38 AM, Arnd Bergmann wrote:
-> On Wednesday 12 November 2014, Hauke Mehrtens wrote:
->> ARM: BCM5301X: Add some more devices to device tree
->>
->> The most important part is adding the axi bus to the SoC dtsi file,
->> this is the main bus on the SoC.
->>
->> These patches were all send to the arm list and I haven't got any
->> negative responses.
->>
->> ----------------------------------------------------------------
->> Hauke Mehrtens (1):
->>       ARM: BCM5301X: activate early printk for Netgear R6250
->>
->> Rafa? Mi?ecki (2):
->>       ARM: BCM5301X: Add Broadcom's bus-axi to the DTS file
->>       ARM: BCM5301X: Add LEDs for Netgear R6250 V1
->>
-> 
-> Same comments as for the SoC changes. Note that in general, enabling
-> 'earlyprintk' in the dts is a bad idea because it breaks booting a
-> kernel that has an incompatible debug_ll setting enabled, I'd rather
-> see you drop that patch.
+Hi Stefan,
 
-Ok, I will drop that patch and resend a pull request, this time based on
--rc1.
+On Thu, Nov 20, 2014 at 6:14 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> This patch enables the power subsystem for all i.MX28 boards.
+>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> ---
+>  arch/arm/boot/dts/imx28.dtsi |    6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index 47f68ac..5c163a5 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -1022,8 +1022,12 @@
+>                         };
+>
+>                         power: power at 80044000 {
+> +                               compatible = "fsl,imx28-power";
 
-> Starting with 3.19, the shiny new 'earlycon' support should work, so
-> I'd prefer you to set the 'stdout-path' property in the /chosen
-> node. Unfortunately enabling earlycon at the command line is still
-> broken on 3.18-rc because the fixmap patches are only in Russell's
-> 'ronx-next' branch. We could think about pulling that into arm-soc
-> if we want to start enabling earlycon drivers.
+Should we have 'fsl,imx23-power' and 'fsl,imx28-power' as compatible strings?
 
-Nice, I will try this feature.
-
-Hauke
+Or  ''fsl,mxs-power' could be used for both?
