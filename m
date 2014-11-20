@@ -1,49 +1,45 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 20 Nov 2014 20:14:35 +0000
-Subject: [PATCH RFC 1/3] DT: add binding for mxs power subsystem
-In-Reply-To: <1416514477-19190-1-git-send-email-stefan.wahren@i2se.com>
-References: <1416514477-19190-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1416514477-19190-2-git-send-email-stefan.wahren@i2se.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 20 Nov 2014 12:22:19 -0800
+Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
+In-Reply-To: <546E0970.5090301@ti.com> (Grygorii Strashko's message of "Thu,
+ 20 Nov 2014 17:32:00 +0200")
+References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
+ <1709760.E0jX3Myv0h@wuerfel> <546C7FDD.7030906@ti.com>
+ <2900095.WIocOu7ue2@wuerfel>
+ <CAPDyKFqeZ3YU2OEN4tCOdcQ0pAho67Q8U_eCEOroG9aS0mp+-Q@mail.gmail.com>
+ <546DD87B.3080806@ti.com>
+ <CAPDyKFrBhZyqozM98_4pPdW0EMFt5W6VX1X7cz6Z=yNhW4vYTA@mail.gmail.com>
+ <CAMuHMdWtHT7QX3Kpa-GCLa49ToGODwjnNVgfxDzJzcM-FU1ffg@mail.gmail.com>
+ <546E0970.5090301@ti.com>
+Message-ID: <7hh9xtr5ac.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the device tree bindings for the Freescale MXS
-power subsystem.
+Grygorii Strashko <grygorii.strashko@ti.com> writes:
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- .../devicetree/bindings/power/mxs_power.txt        |   23 ++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/mxs_power.txt
+> On 11/20/2014 03:32 PM, Geert Uytterhoeven wrote:
+>> On Thu, Nov 20, 2014 at 2:12 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
 
-diff --git a/Documentation/devicetree/bindings/power/mxs_power.txt b/Documentation/devicetree/bindings/power/mxs_power.txt
-new file mode 100644
-index 0000000..0817841
---- /dev/null
-+++ b/Documentation/devicetree/bindings/power/mxs_power.txt
-@@ -0,0 +1,23 @@
-+Power subsystem for Freescale MX23/MX28
-+
-+Required properties:
-+- compatible:
-+  - "fsl,imx23-power" for MX23
-+  - "fsl,imx28-power" for MX28
-+- address-cells, size-cells, ranges: must be present as appropriate to
-+  map children
-+- reg: Address and length of the register set for the power subsystem.
-+
-+Optional properties;
-+- interrupts: Interrupts used by the power subsystem
-+
-+Example for imx28:
-+
-+	power: power at 80044000 {
-+				compatible = "fsl,imx28-power";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <0x80044000 0x2000>;
-+				interrupts = <6>;
-+				ranges;
-+	}
---
-1.7.9.5
+[...]
+
+>>> So I really think we need to decide on how to address the split of the
+>>> device clocks. Before that's done, I don't think it make sense to add
+>>> a "simple-pmdomain" compatible, since it will likely not be that many
+>>> SoC that can use it.
+>>>
+>>> So, does anyone have a suggestion on how to deal with the split of the
+>>> device clocks into "functional" clocks and into "PM" clocks?
+>
+> Would it be better to say "functional" and "optional"? In my opinion
+> "PM" == "functional". Also, such clock's separation is used in TRM/DM/UMs on HW.
+
+Yes!  I really don't like the name "PM" clock, since it's not at all
+obvious what that means.  To me, "PM" == "functional" as well.
+
+So what exactly are we talking about with "PM" clocks, and why are they
+"special" when it comes to PM domains?  IOW, why are the clocks to be
+managed during PM domain transitions for a given device any different
+than the clocks that need to be managed for a runtime suspend/resume (or
+system suspend/resume) sequence for the same device?
+
+Kevin
