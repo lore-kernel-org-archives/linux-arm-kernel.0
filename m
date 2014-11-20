@@ -1,39 +1,44 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 20 Nov 2014 22:15:52 +0800
-Subject: [PATCH] ARM: dts: atlas6: add resets property for SPI nodes
-Message-ID: <1416492952-5496-1-git-send-email-21cnbao@gmail.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 20 Nov 2014 15:18:55 +0100
+Subject: [PATCH 2/3] mmc: atmel-mci: stop using specific initcall
+In-Reply-To: <2872000.LCAfuO7RlQ@wuerfel>
+References: <1416478075-17059-1-git-send-email-ludovic.desroches@atmel.com>
+ <2176441.d1sGy4JguN@wuerfel>
+ <20141120140125.GI3639@ldesroches-Latitude-E6320>
+ <2872000.LCAfuO7RlQ@wuerfel>
+Message-ID: <20141120141855.GJ3639@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Qipan Li <Qipan.Li@csr.com>
+On Thu, Nov 20, 2014 at 03:13:30PM +0100, Arnd Bergmann wrote:
+> On Thursday 20 November 2014 15:01:25 Ludovic Desroches wrote:
+> > On Thu, Nov 20, 2014 at 12:10:25PM +0100, Arnd Bergmann wrote:
+> > > On Thursday 20 November 2014 11:07:54 Ludovic Desroches wrote:
+> > > > No more use late initcall to manage probing order. Use probe deferring
+> > > > if needed. Then use module_platform_driver and clean init/exit
+> > > > attributes.
+> > > > 
+> > > > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > > > 
+> > > 
+> > > Do we need this backported into stable kernels? It seems that
+> > > the __init/__exit annotations will break things if you ever
+> > > tried to unbind the device or run into deferred probing on
+> > > earlier kernels.
+> > 
+> > Well, it is a bit complicated, if we backport it, then the mci driver
+> > could be probed before the dma controller. Requesting dma chan will fail
+> > and it will switch to pio mode.
+> > 
+> > So it has to be backported with the probe deferring. The issue is
+> > that probe deferring patch is based on other patches removing non-dt
+> > support which become useless only ine 3.19.
+> > 
+> 
+> Should we just have the __init/__exit removal in backports then?
 
-this patch adds missed resets property for CSR SiRFatlasVI SPI nodes.
+Yes. Do you want me to split this patch in order to have ony one for
+__init/__exit removal and another one for late_initcall removal?
 
-Signed-off-by: Qipan Li <Qipan.Li@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/boot/dts/atlas6.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/atlas6.dtsi b/arch/arm/boot/dts/atlas6.dtsi
-index 9dce23f..10f10b4 100644
---- a/arch/arm/boot/dts/atlas6.dtsi
-+++ b/arch/arm/boot/dts/atlas6.dtsi
-@@ -313,6 +313,7 @@
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				clocks = <&clks 19>;
-+				resets = <&rstc 26>;
- 				status = "disabled";
- 			};
- 
-@@ -328,6 +329,7 @@
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				clocks = <&clks 20>;
-+				resets = <&rstc 27>;
- 				status = "disabled";
- 			};
- 
--- 
-2.1.1
+Ludovic
