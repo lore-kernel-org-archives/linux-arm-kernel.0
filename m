@@ -1,17 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Nov 2014 12:04:39 +0100
-Subject: [GIT PULL 2/2] omap driver changes for v3.19
-In-Reply-To: <pull-1415999057-591605-2>
-References: <pull-1415999057-591605> <pull-1415999057-591605-2>
-Message-ID: <201411201204.39908.arnd@arndb.de>
+From: js07.lee@gmail.com (Jungseung Lee)
+Date: Thu, 20 Nov 2014 20:06:41 +0900
+Subject: [PATCH RESEND] arm: mm: fix discard_old_kernel_data
+Message-ID: <1416481601-23659-1-git-send-email-js07.lee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 November 2014, Tony Lindgren wrote:
-> Few omap driver changes to add minimal device tree support
-> for the omap 1w driver, and to fix resume and interrupt issues
-> on the l3-noc driver.
+L1_CACHE_BYTES could be larger value than real L1 cache line size.
+In that case, discard_old_kernel_data function would omit to invalidate 
+last bytes as much as L1_CACHE_BYTES - real cache line size.
 
-Pulled into next/drivers, thanks!
+So fix end address to "to + PAGE_SIZE -1". The bottom bits
+of the address is LINELEN. that is ignored by mcrr.
 
-	Arnd
+Signed-off-by: Jungseung Lee <js07.lee@gmail.com>
+---
+ arch/arm/mm/copypage-v6.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
+index b9bcc9d..7042334 100644
+--- a/arch/arm/mm/copypage-v6.c
++++ b/arch/arm/mm/copypage-v6.c
+@@ -62,7 +62,7 @@ static void discard_old_kernel_data(void *kto)
+ 	__asm__("mcrr	p15, 0, %1, %0, c6	@ 0xec401f06"
+ 	   :
+ 	   : "r" (kto),
+-	     "r" ((unsigned long)kto + PAGE_SIZE - L1_CACHE_BYTES)
++	     "r" ((unsigned long)kto + PAGE_SIZE - 1)
+ 	   : "cc");
+ }
+ 
+-- 
+1.9.1
