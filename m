@@ -1,24 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 20 Nov 2014 16:31:07 +0000
-Subject: [PATCH v5 4/6] arm64: Port SWP/SWPB emulation support from arm
-In-Reply-To: <1416310887-14649-5-git-send-email-punit.agrawal@arm.com>
-References: <1416310887-14649-1-git-send-email-punit.agrawal@arm.com>
- <1416310887-14649-5-git-send-email-punit.agrawal@arm.com>
-Message-ID: <20141120163107.GD5447@e104818-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 20 Nov 2014 16:31:45 +0000
+Subject: Removal of bus->msi assignment breaks MSI with stacked domains
+Message-ID: <546E1771.4030201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 18, 2014 at 11:41:25AM +0000, Punit Agrawal wrote:
-> The SWP instruction was deprecated in the ARMv6 architecture. The
-> ARMv7 multiprocessing extensions mandate that SWP/SWPB instructions
-> are treated as undefined from reset, with the ability to enable them
-> through the System Control Register SW bit. With ARMv8, the option to
-> enable these instructions through System Control Register was dropped
-> as well.
-> 
-> To support legacy applications using these instructions, port the
-> emulation of the SWP and SWPB instructions from the arm port to arm64.
-> 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Bjorn, Yijing,
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+I've just realized that patch c167caf8d174 (PCI/MSI: Remove useless
+bus->msi assignment) completely breaks MSI on arm64 when using the new
+MSI stacked domain:
+
+This patch relies on architectures to implement either
+pcibios_msi_controller() or arch_setup_msi_irq(). It turns out that with
+stacked domains, none of this is actually necessary, as long as you can
+access to the msi_controller.
+
+And everything was fine until this patch came around (and managed to
+test on a system where the PCI devices are not directly attached to the
+root bus). Of course, everything now breaks, as we cannot get to the MSI
+controller (which contains the domain we allocate the MSIs from).
+
+In short, this patch breaks an important feature on which arm64 relies,
+and I believe this patch should be reverted ASAP.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
