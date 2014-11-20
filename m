@@ -1,60 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 20 Nov 2014 13:53:39 +0000
-Subject: [PATCH 1/1] iommu/arm-smmu: forbid userspace IO devices access
- memory through SMMU by default
-In-Reply-To: <546DE3A5.4030500@huawei.com>
-References: <1416477421-1288-1-git-send-email-thunder.leizhen@huawei.com>
- <20141120101340.GC19126@arm.com> <546DE3A5.4030500@huawei.com>
-Message-ID: <20141120135339.GM19126@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 20 Nov 2014 19:26:00 +0530
+Subject: [PATCH v4 3/6] mfd: ti_am335x_tscadc: Remove unwanted reg_se_cache
+ save
+In-Reply-To: <20141118171240.GB3003@dtor-ws>
+References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
+ <1415941651-28962-4-git-send-email-vigneshr@ti.com>
+ <20141118143005.GF24004@x1> <20141118171240.GB3003@dtor-ws>
+Message-ID: <546DF2F0.9080405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 20, 2014 at 12:50:45PM +0000, leizhen wrote:
-> On 2014/11/20 18:13, Will Deacon wrote:
-> > On Thu, Nov 20, 2014 at 09:57:01AM +0000, Zhen Lei wrote:
-> >> It's dangerous to set pte with ARM_SMMU_PTE_AP_UNPRIV. A hacker can use any
-> >> devices running at userspace to access the memory which originally mapped for
-> >> kernel devices, suppose they have the same StreamID. The userspace devices
-> >> should through vfio to dynamic create mapping.
-> > 
-> > I don't fully understand the problem here. vfio will create a set of private
-> > page tables for the container, so I can't see why the privilege really
-> > matters, given that the whole thing is sandboxed anyway.
+On Tuesday 18 November 2014 10:42 PM, Dmitry Torokhov wrote:
+> On Tue, Nov 18, 2014 at 02:30:05PM +0000, Lee Jones wrote:
+>> On Fri, 14 Nov 2014, Vignesh R wrote:
+>>
+>>> In one shot mode, sequencer automatically disables all enabled steps at
+>>> the end of each cycle. (both ADC steps and TSC steps) Hence these steps
+>>> need not be saved in reg_se_cache for clearing these steps at a later
+>>> stage.
+>>> Also, when ADC wakes up Sequencer should not be busy executing any of the
+>>> config steps except for the charge step. Previously charge step was 1 ADC
+>>> clock cycle and hence it was ignored.
+>>>
+>>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>>> ---
+>>>  drivers/mfd/ti_am335x_tscadc.c       | 7 +++++--
+>>>  include/linux/mfd/ti_am335x_tscadc.h | 1 +
+>>>  2 files changed, 6 insertions(+), 2 deletions(-)
+>>
+>> Code looks better now.
+>>
+>> Acked-by: Lee Jones <lee.jones@linaro.org>
+>>
+>> What's the plan for this series?
 > 
-> Suppose DMA-0 can be running both at kernel space and user space. And kernel
-> APP use DMA-0 to access the lowest 4G(physical memory address range: 0~4G,
-> because some old DMA devices can only output 32bit address, and phys_to_dma() in
-> arch/arm64/include/asm/dma-mapping.h take iova and pa as the same). We can use
-> bypass mode or create mapping iova=pa for the lowest 4G. Now, the user APP can
-> use DMA-0 to access all the lowest 4G(may contain kernel information and user APP
-> originally access prohibitted).
+> I am waiting for the interested parties to provide more feedback. So far
+> I have seen a few reports saying that they see issues with the series
+> applied.
 
-What's a kernel APP? Is DMA-0 some sort of device? How is it running at both
-kernel and userspace?
+I tested this using lcd7 cape connected to beaglebone black. The latest
+kernel I could find on this board was a TI BSP based v3.14 kernel. So I
+had to port these patches to that kernel. Cc Robert Nelson to see if he
+knows about a more recent kernel supporting that cape.
 
-> Through vfio, the user APP can only create mapping for the physical memory which
-> it can access through cpu. That's the memory which belong to the user APP, vfio
-> should check this.
+I did not see any breakage with these patches applied although I did not
+see any noticeable performance improvement as well.
 
-Yes, so there is no issue when using VFIO.
+I also tested along with continuous loop reading from
+/sys/bus/iio/devices/iio:device0/in_voltage5_raw
 
-> And now, arm64 have not support vfio. I don't know how to deal with: a iommu_group
-> used by both user devices(through vfio) and kernel devices. They may specify the same
-> iova but different pa or diffrent attributes. Maybe we should not support this scene.
-> But if all(iova,pa,attr) is the same, we can simply add ARM_SMMU_PTE_AP_UNPRIV in PTE to
-> satisfy vfio requirment.
+I have pushed the kernel I used here in case anyone wants to take a look
+at my porting.
 
-arm64 does support VFIO. Please check the patches queued for 3.19.
+http://git.ti.com/cgit/cgit.cgi/~nsekhar/ti-linux-kernel/nsekhar-ti-linux-kernel.git/log/?h=am335x-tsc-test
 
-> > Furthermore, if we change the default to PRIV, then it will break for any
-> > devices wired to emit unprivileged transactions only.
-> 
-> if so, it's the problem of hardware. I think.
+I also tested this series on AM335x EVM using the v3.18-rc5 kernel.
+Again, no breakage but no improvement as well.
 
-If you have a device that emits the same streamid for privileged and
-unprivileged transactions, then I think you have the problem of hardware :)
+All testing was done using ts_test
 
-The right way to solve this would be to add a new IOMMU_PRIV flag (I think
-this was discussed in the past) which can be passed to iommu_map.
+FWIW, you can add:
 
-Will
+Tested-by: Sekhar Nori <nsekhar@ti.com>
+
+Thanks,
+Sekhar
