@@ -1,11 +1,11 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 20 Nov 2014 22:55:04 +0100
+Date: Thu, 20 Nov 2014 22:59:01 +0100
 Subject: [PATCH 1/2] phy: berlin_usb: depends on RESET_CONTROLLER
 In-Reply-To: <546C340E.8000209@ti.com>
 References: <1416231192-27056-1-git-send-email-antoine.tenart@free-electrons.com>
  <1416231192-27056-2-git-send-email-antoine.tenart@free-electrons.com>
  <546BA05E.4090605@gmail.com> <546C340E.8000209@ti.com>
-Message-ID: <546E6338.4030002@gmail.com>
+Message-ID: <546E6425.9040605@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -38,12 +38,12 @@ On 11/19/2014 07:09 AM, Kishon Vijay Abraham I wrote:
 
 Kishon,
 
-phy-berlin-usb has been part of chipidea generic phy patch set for
-a while now. It looks like Antoine simply forgot to put you on Cc
-at least for v8 of it.
+phy-berlin-usb is part of a larger patch set moving chipidea usb to
+generic phy. As all other patches of that set have already been taken,
+I squashed this into one of the two remaining patches from the said
+set. I just sent out the now two remaining patches.
 
-As all other patches of that patch set have already been taken,
-I'll squash this patch into the two remaining ones from Antoine
-and send phy-berlin-usb patches in a second.
+Looks like Antoine simply forgot to put you on Cc, at least for v8
+of the patches.
 
 Sebastian
