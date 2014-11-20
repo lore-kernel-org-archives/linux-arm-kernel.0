@@ -1,32 +1,110 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 20 Nov 2014 09:56:55 +0900
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for
- v3.19
-In-Reply-To: <201411192309.48890.arnd@arndb.de>
-References: <cover.1415755881.git.horms+renesas@verge.net.au>
- <201411192309.48890.arnd@arndb.de>
-Message-ID: <20141120005655.GF5065@verge.net.au>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 19 Nov 2014 17:05:34 -0800
+Subject: [PATCH v9 2/8] dt-bindings: Document Broadcom Cygnus SoC and
+ clocks
+In-Reply-To: <1414538111-11668-3-git-send-email-sbranden@broadcom.com>
+References: <Scott Branden <sbranden@broadcom.com>
+ <1414538111-11668-1-git-send-email-sbranden@broadcom.com>
+ <1414538111-11668-3-git-send-email-sbranden@broadcom.com>
+Message-ID: <20141120010534.12298.10042@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 11:09:48PM +0100, Arnd Bergmann wrote:
-> On Thursday 13 November 2014, Simon Horman wrote:
-> > Hi Olof, Hi Kevin, Hi Arnd,
-> > 
-> > Please consider these second round of Renesas ARM based SoC DT updates for
-> > v3.19.
-> > 
-> > This pull request is based on the previous round of
-> > such requests, tagged as renesas-dt-for-v3.19,
-> > which I have already sent a pull-request for.
+Quoting Scott Branden (2014-10-28 16:15:05)
+> From: Jonathan Richardson <jonathar@broadcom.com>
 > 
-> As discussed, I'm deferring this one and hope we can figure out a better
-> binding for the asoc DMA channels.
+> Reviewed-by: Arun Parameswaran <aparames@broadcom.com>
+> Tested-by: Jonathan Richardson <jonathar@broadcom.com>
+> Reviewed-by: JD (Jiandong) Zheng <jdzheng@broadcom.com>
+> Reviewed-by: Ray Jui <rjui@broadcom.com>
+> Signed-off-by: Scott Branden <sbranden@broadcom.com>
 
-Thanks, I plan to repost this pull-request with
-the patches that are under discussion omitted.
+Acked-by: Michael Turquette <mturquette@linaro.org>
 
-> I think I've addressed all your pull requests, please check that I haven't
-> missed any and they show up in for-next.
-
-Thanks! Will do.
+> ---
+>  .../devicetree/bindings/arm/bcm/cygnus.txt         |   31 ++++++++++++++++++
+>  .../devicetree/bindings/clock/bcm-cygnus-clock.txt |   34 ++++++++++++++++++++
+>  2 files changed, 65 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/bcm/cygnus.txt
+>  create mode 100644 Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/bcm/cygnus.txt b/Documentation/devicetree/bindings/arm/bcm/cygnus.txt
+> new file mode 100644
+> index 0000000..4c77169
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/bcm/cygnus.txt
+> @@ -0,0 +1,31 @@
+> +Broadcom Cygnus device tree bindings
+> +------------------------------------
+> +
+> +
+> +Boards with Cygnus SoCs shall have the following properties:
+> +
+> +Required root node property:
+> +
+> +BCM11300
+> +compatible = "brcm,bcm11300", "brcm,cygnus";
+> +
+> +BCM11320
+> +compatible = "brcm,bcm11320", "brcm,cygnus";
+> +
+> +BCM11350
+> +compatible = "brcm,bcm11350", "brcm,cygnus";
+> +
+> +BCM11360
+> +compatible = "brcm,bcm11360", "brcm,cygnus";
+> +
+> +BCM58300
+> +compatible = "brcm,bcm58300", "brcm,cygnus";
+> +
+> +BCM58302
+> +compatible = "brcm,bcm58302", "brcm,cygnus";
+> +
+> +BCM58303
+> +compatible = "brcm,bcm58303", "brcm,cygnus";
+> +
+> +BCM58305
+> +compatible = "brcm,bcm58305", "brcm,cygnus";
+> diff --git a/Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt b/Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt
+> new file mode 100644
+> index 0000000..00d26ed
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt
+> @@ -0,0 +1,34 @@
+> +Broadcom Cygnus Clocks
+> +
+> +This binding uses the common clock binding:
+> +Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +
+> +Currently various "fixed" clocks are declared for peripheral drivers that use
+> +the common clock framework to reference their core clocks. Proper support of
+> +these clocks will be added later
+> +
+> +Device tree example:
+> +
+> +       clocks {
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               ranges;
+> +
+> +               osc: oscillator {
+> +                       compatible = "fixed-clock";
+> +                       #clock-cells = <1>;
+> +                       clock-frequency = <25000000>;
+> +               };
+> +
+> +               apb_clk: apb_clk {
+> +                       compatible = "fixed-clock";
+> +                       #clock-cells = <0>;
+> +                       clock-frequency = <1000000000>;
+> +               };
+> +
+> +               periph_clk: periph_clk {
+> +                       compatible = "fixed-clock";
+> +                       #clock-cells = <0>;
+> +                       clock-frequency = <500000000>;
+> +               };
+> +       };
+> -- 
+> 1.7.9.5
+> 
