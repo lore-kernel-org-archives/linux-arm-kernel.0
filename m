@@ -1,31 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Nov 2014 13:44:37 +0100
-Subject: [PATCH] MAINTAINERS: update email address and cleanup for exynos
- entry
-In-Reply-To: <5469F0B1.6010907@codethink.co.uk>
-References: <1415951697-5991-1-git-send-email-kgene@kernel.org>
- <5469F0B1.6010907@codethink.co.uk>
-Message-ID: <201411201344.38087.arnd@arndb.de>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 20 Nov 2014 13:46:15 +0100
+Subject: [PATCH] ARM: at91: remove useless init_time for DT-only SoCs
+In-Reply-To: <201411192323.34609.arnd@arndb.de>
+References: <1415604709-24185-1-git-send-email-boris.brezillon@free-electrons.com>
+ <201411192323.34609.arnd@arndb.de>
+Message-ID: <20141120134615.0ebb3b83@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 November 2014, Ben Dooks wrote:
-> On 14/11/14 07:54, Kukjin Kim wrote:
-> > Use kernel.org account instead of samsung.com and cleanup for Samsung
-> > s3c, s5p and exynos SoCs.
+Hi Arnd,
+
+On Wed, 19 Nov 2014 23:23:34 +0100
+Arnd Bergmann <arnd@arndb.de> wrote:
+
+> On Monday 10 November 2014, Boris Brezillon wrote:
+> > Hi Olof,
 > > 
-> > Cc: Ben Dooks <ben.dooks@codethink.co.uk>
+> > You recently pulled some changes on Nicolas' at91-cleanup tag and two of
+> > those commits (see above for commit hashes) are actually introducing
+> > compilation errors.
+> > This patch fixes those compilation errors.
+> > 
 > 
-> I do wish these would be sent to the mail address I use for
-> Linux related issues. I only want to see work related Linux
-> issues to my <ben.dooks@codethink.co.uk> address.
-> 
-> It is sad to see my entries removed, but I no longer have time
-> to maintain these.
-> 
-> > Signed-off-by: Kukjin Kim <kgene@kernel.org>
-> Acked-by: Ben Dooks <ben-linux@fluff.org>
+> Applied on next/cleanup, thanks!
 
-Applied to next/fixes-non-critical, thanks!
+Actually, I've made a v2 of this patch (see [1]) after realizing Olof
+had already fixed the initial compilation error.
+This is pretty much the same patch, except it removes asm/irq.h
+inclusion.
 
-	Arnd
+[1]http://thread.gmane.org/gmane.linux.ports.arm.kernel/370398
+
+Best Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
