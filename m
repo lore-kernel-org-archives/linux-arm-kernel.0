@@ -1,45 +1,52 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 20 Nov 2014 10:19:15 +0100
-Subject: [GIT PULL] Third Round of Renesas ARM Based Soc Updates for v3.19
-In-Reply-To: <3299155.X2xrgWZ6OL@wuerfel>
-References: <cover.1415841454.git.horms+renesas@verge.net.au>
- <201411192216.27740.arnd@arndb.de>
- <CAMuHMdWGnx9D4BJR3C0b=iuEKP_AN+JORiOHX+c-MkqcURAjtg@mail.gmail.com>
- <3299155.X2xrgWZ6OL@wuerfel>
-Message-ID: <CAMuHMdXr7QgaGFg8tiDNTLnsTero2_RGZ-Vv4czALmN82aBzRA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 20 Nov 2014 10:19:43 +0100
+Subject: [PATCH 2/7] mfd: MT6397: Add regmap for MT8135 and MT6397 SoC
+In-Reply-To: <20141119170454.GJ1875@x1>
+References: <1416210027-5562-1-git-send-email-flora.fu@mediatek.com>
+ <1416210027-5562-3-git-send-email-flora.fu@mediatek.com>
+ <20141118114645.GX24004@x1> <20141118134618.GF30369@pengutronix.de>
+ <20141119170454.GJ1875@x1>
+Message-ID: <20141120091943.GJ30369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Wed, Nov 19, 2014 at 05:04:54PM +0000, Lee Jones wrote:
+> On Tue, 18 Nov 2014, Sascha Hauer wrote:
+> 
+> > On Tue, Nov 18, 2014 at 11:46:45AM +0000, Lee Jones wrote:
+> > > On Mon, 17 Nov 2014, Flora Fu wrote:
+> > > 
+> > > > Add PMIC wrapper of MT8135 to access MFD MT6397.
+> > > > This is regmap of MT6397 MFD.
+> > > > 
+> > > > Signed-off-by: Flora Fu <flora.fu@mediatek.com>
+> > > > ---
+> > > >  drivers/mfd/Kconfig            |   8 +
+> > > >  drivers/mfd/Makefile           |   1 +
+> > > >  drivers/mfd/mt8135-pmic-wrap.c | 847 +++++++++++++++++++++++++++++++++++++++++
+> > > 
+> > > All of the PMIC functionality needs removing from MFD and placed
+> > > somewhere else.  I suggest either drivers/power or drivers/regulator.
+> > 
+> > This is no PMIC functionality. The MT8135 has a unit which is is used to
+> > access the PMIC (which is not only a PMIC, but also Touchscreen
+> > interface and other stuff). This unit is called pmic-wrapper in the
+> > docs. See the introductory mail for a nice picture.
+> 
+> I saw the picture, it's very nice.  Whatever this is, it's not an
+> MFD.  It's a device which is located on an MFD.  There is far too much
+> functional (the operative word here) code contained in this patch.
 
-On Thu, Nov 20, 2014 at 10:04 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 20 November 2014 08:56:10 Geert Uytterhoeven wrote:
->> > Please have a look at drivers/power/restart for how other platforms do
->> > this. You probably need to add a device node for whatever IP block
->> > holds the reset register and then have a driver. What exactly this
->> > driver should look like depends of course on what other registers are
->> > part of this block.
->>
->> I agree. Thanks for reminding us.
->>
->> The IP block is the system-controller, which is also used for PM domain
->> control. So I'll take care of it.
->
-> Is it just the pm-domain driver and the system reset that needs to
-> access this block? If yes, then the best option would be to register
-> the reset handler from the pm-domain driver, otherwise I think you
-> should have a syscon device node that gets shared between all drivers
-> using this device.
+The MT6397 is a classical MFD device. It has a PMIC, an audio amp and a
+RTC. It is very tightly coupled to the SoC via SPI, but the SPI itself
+is not directly visible on the SoC. It's accessible indirectly via the
+PMIC-wrapper. Indeed the PMIC-wrapper is not MFD. Another dumping ground
+that comes to my mind is drivers/soc/. We could move over there.
 
-Just PM domains, reset, and wake-up factors.
+Sascha
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
