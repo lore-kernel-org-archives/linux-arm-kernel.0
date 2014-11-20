@@ -1,41 +1,39 @@
-From: lee@kernel.org (Lee Jones)
-Date: Thu, 20 Nov 2014 11:22:55 +0000
-Subject: [PATCH] ARM: bcm2835: Add device tree for Raspberry Pi model B+
-In-Reply-To: <2041471.8rvf0EmQUU@wuerfel>
-References: <1416480765-13449-1-git-send-email-lee@kernel.org>
- <2041471.8rvf0EmQUU@wuerfel>
-Message-ID: <20141120112255.GB13269@x1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Nov 2014 12:27:11 +0100
+Subject: [PATCH RESEND V2] ARM: debug: move StrongARM debug include to
+ arch/arm/include/debug
+In-Reply-To: <CALT56yOEtt4G-_CzbDMXtWPoZL3ErnY8VrfEV+DyBJGPp_r8YA@mail.gmail.com>
+References: <1415258423-17022-1-git-send-email-dbaryshkov@gmail.com>
+ <CALT56yOEtt4G-_CzbDMXtWPoZL3ErnY8VrfEV+DyBJGPp_r8YA@mail.gmail.com>
+Message-ID: <201411201227.11419.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Nov 2014, Arnd Bergmann wrote:
-
-> On Thursday 20 November 2014 10:52:45 Lee Jones wrote:
-> > From: Matthias Klein <matthias.klein@linux.com>
-> > 
-> > The model B and B+ differ in the GPIO lines for ACT and PWR leds, and the
-> > I2S interface.
-> > 
-> > Signed-off-by: Matthias Klein <matthias.klein@linux.com>
-> > Tested-by: Stephen Warren <swarren@nvidia.com>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On Friday 14 November 2014, Dmitry Eremin-Solenikov wrote:
+> 
+> 2014-11-06 10:20 GMT+03:00 Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>:
+> > StrongARM debug-macro.S is quite standalone thing, depending only on
+> > register mappings. Move it to proper place and add Kconfig entry.
+> >
+> > Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 > > ---
-> > 
-> > As requested by Arnd.
-> > 
-> >  arch/arm/boot/dts/Makefile               |  1 +
-> >  arch/arm/boot/dts/bcm2835-rpi-b-plus.dts | 30 +++++++++++++++++++
-> >  arch/arm/boot/dts/bcm2835-rpi-b.dts      | 46 ++--------------------------
-> >  arch/arm/boot/dts/bcm2835-rpi.dtsi       | 51 ++++++++++++++++++++++++++++++++
-> >  4 files changed, 85 insertions(+), 43 deletions(-)
-> >  create mode 100644 arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-> >  create mode 100644 arch/arm/boot/dts/bcm2835-rpi.dtsi
-> > 
+> > [Changes since V1: keep Kconfig.debug sorted alphabetically]
+> >
+> >  arch/arm/Kconfig.debug                                         |  9 +++++++++
+> >  .../include/mach/debug-macro.S => include/debug/sa1100.S}      | 10 ++++++++--
+> >  2 files changed, 17 insertions(+), 2 deletions(-)
+> >  rename arch/arm/{mach-sa1100/include/mach/debug-macro.S => include/debug/sa1100.S} (83%)
 > 
-> Applied to next/dt.
+> Dear Russell,
 > 
-> When you send a patch for inclusion the next time, better
-> be explicit and ask for it to be picked up into arm-soc, so we
-> know it's not just for review.
+> Is it ok to merge this patch? Would you like to pick it on your own?
+> Would you like
+> for Arnd to take it through arm-soc? Would you like for me to throw it
+> out (and why)?
 
-Sounds reasonable.  Thanks Arnd.
+I've merged it into the next/soc branch of arm-soc now. Russell,
+let me know if you have any objections.
+
+There was a trivial merge conflict that I resolved.
+
+	Arnd
