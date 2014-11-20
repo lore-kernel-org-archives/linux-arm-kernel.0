@@ -1,57 +1,49 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Thu, 20 Nov 2014 22:41:35 +0100
-Subject: Looking for good references for ARM driver development
-In-Reply-To: <546CCBF6.7070607@gmail.com>
-References: <546C920A.7060800@free.fr> <546CCBF6.7070607@gmail.com>
-Message-ID: <546E600F.8020704@free.fr>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 20 Nov 2014 22:46:30 +0100
+Subject: [PATCH 1/2] phy: berlin_usb: depends on RESET_CONTROLLER
+In-Reply-To: <546C340E.8000209@ti.com>
+References: <1416231192-27056-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1416231192-27056-2-git-send-email-antoine.tenart@free-electrons.com>
+ <546BA05E.4090605@gmail.com> <546C340E.8000209@ti.com>
+Message-ID: <546E6136.6050003@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/11/2014 17:57, Victor Ascroft wrote:
+On 11/19/2014 07:09 AM, Kishon Vijay Abraham I wrote:
+> Hi,
+>
+> On Wednesday 19 November 2014 01:09 AM, Sebastian Hesselbarth wrote:
+>> On 17.11.2014 14:33, Antoine Tenart wrote:
+>>> The Berlin USB PHY driver uses the Berlin reset controller
+>>> unconditionally. Make it depending on RESET_CONTROLLER.
+>>>
+>>> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+>>
+>> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>
+>>> ---
+>>>    drivers/phy/Kconfig | 2 +-
+>>>    1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>>> index b6da75f563e7..38ca6ff00aef 100644
+>>> --- a/drivers/phy/Kconfig
+>>> +++ b/drivers/phy/Kconfig
+>>> @@ -17,7 +17,7 @@ config GENERIC_PHY
+>>>
+>>>    config PHY_BERLIN_USB
+>
+> phy-berlin-usb is not in my phy tree and I don't seem to find anywhere in my
+> inbox. Care to send them to me?
 
-> On 11/19/2014 06:20 PM, Mason wrote:
-> 
->> Are there more recent technical references, as good as LDD3, that
->> cover "modern" aspects of kernel development?
-> 
-> The LDD3 is one of the best there is. A fourth edition is supposed
-> to come out sometime next year.
-> http://www.amazon.com/Linux-Device-Drivers-Jessica-McKellar/dp/1449371612
+Kishon,
 
-That's the best news I've heard this week!
-Hope Jonathan gets well and lives happily ever after.
+phy-berlin-usb has been part of chipidea generic phy patch set for
+a while now. It looks like Antoine simply forgot to put you on Cc
+at least for v8 of it.
 
->> How do I "leave device registration for the system infrastructure"?
->> Where should I put that code?
->> Is it a good idea to separate device registration and driver registration
->> in the case of a SoC, where the device is embedded in the SoC and is not
->> "hot-plugged" (or anything-plugged for that matter, it's just "there").
-> 
-> For understanding this you need to understand how the platform infrastructure
-> works and why is it used.
-> http://lwn.net/Articles/448499/
-> http://lwn.net/Articles/448502/
-> and go through some of the relevant drivers.
+As all other patches of that patch set have already been taken,
+I'll squash this patch into the two remaining ones from Antoine
+and send phy-berlin-usb patches in a second.
 
-More of Jon's (great) work ;-)
-Will definitely read these articles carefully.
-
->> 3) Why is the function used to "destroy a platform device" named
->> platform_device_put? Why put?
->> Put on a list of things to destroy at a later time?
-> 
-> This should be more clear once you go through LDD3.
-
-I'm coming up empty.
-AFAICT, it's unrelated to the _put_user* family of functions.
-I see that it has something to do with ref count decrement.
-[more reading...]
-Something about kref.
-https://lwn.net/Articles/336224/
-
-They mention "put" but not *why* it's called "put".
-Is it related to Dijkstra's P and V for semaphores?
-https://cs.nyu.edu/~yap/classes/os/resources/origin_of_PV.html
-Still confused...
-
-Regards.
+Sebastian
