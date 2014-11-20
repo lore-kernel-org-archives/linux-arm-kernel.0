@@ -1,81 +1,110 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 20 Nov 2014 12:34:00 +0100
-Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
-In-Reply-To: <2900095.WIocOu7ue2@wuerfel>
-References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
- <1709760.E0jX3Myv0h@wuerfel> <546C7FDD.7030906@ti.com>
- <2900095.WIocOu7ue2@wuerfel>
-Message-ID: <CAPDyKFqeZ3YU2OEN4tCOdcQ0pAho67Q8U_eCEOroG9aS0mp+-Q@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 20 Nov 2014 11:42:37 +0000
+Subject: [RFC PATCH] arm: imx: Workaround i.MX6 PMU interrupts muxed to one SPI
+Message-ID: <1416483757-24165-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 November 2014 14:47, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 19 November 2014 13:32:45 Grygorii Strashko wrote:
->> On 11/18/2014 09:32 PM, Arnd Bergmann wrote:
->> > On Tuesday 18 November 2014 20:54:36 Grygorii Strashko wrote:
->> >
->> > Have one pmdomain driver in the generic code that knows about clocks,
->> > possibly also regulators and pins and just turns them on when needed.
->> > You can have a "simple-pmdomain" or "generic-pmdomain" compatible
->> > string.
->> >
->> > I'm a bit surprised that your pmdomain code looks up the clocks from the
->> > respective device, rather than know about the clocks itself. There is
->> > probably a good reason for this, but I don't see it yet.
->>
->> The keystone 2 uses simple PM schema based on clocks only:
->> - clocks enabled -> dev is active
->> - clocks disabled -> dev is suspended
->>
->> To achieve explained above the Generic clock manipulation PM callbacks framework (pm_clk) is used.
->> - list of managed clocks is filled for each device (for non-DT case the con_id list
->>   is specified by platform code like:
->>       .con_ids = { "fck", "master", "slave", NULL },
->>         - or -
->>       .con_ids = { }, <-- in this case only first clock will be added to pm_clk
->>   )
+All PMU interrupts on multi-core i.MX6 devices are muxed onto a single SPI.
+Should the PMU of any core except 0 (the default affinity for the
+interrupt) trigger the interrupt then it cannot be serviced and,
+eventually, the spurious irq detection will forcefully disable the
+interrupt.
 
-According to earlier comments in this thread, device's clocks are
-split into "functional" and "PM" clocks.
+This can be worked around by getting the interrupt handler to change its
+own affinity if it cannot figure out why it has been triggered. This patch
+adds logic to rotate the affinity to i.MX6.
 
-If I understand correctly, a typical platform driver will enable it's
-"functional" clocks during ->probe() and you want the PM domain to
-take care of the "PM" clocks, when the device changes runtime PM
-status.
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+---
 
-How will you describe these different set of device clocks in DT?
+Notes:
+    This patch adopts the approach used on the u8500 (db8500_pmu_handler)
+    but the logic has been generalized for any number of CPUs, mostly
+    because the i.MX6 has a both dual and quad core variants.
+    
+    However it might be better to include the generalized logic in the main
+    armpmu code. I think the logic could be deployed automatically on SMP
+    systems with only a single not-percpu IRQ, replacing the
+    plat->handle_irq dance we currently do to hook up this code.
+    
+    Thoughts? (or is there already shared logic to do this that I
+    overlooked)
+    
 
-[...]
+ arch/arm/mach-imx/mach-imx6q.c | 39 ++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 38 insertions(+), 1 deletion(-)
 
->
-> Yes, it would definitely solve the problem that I see with the infrastructure
-> code that the current version adds into the platform directory.
->
-> The exact binding of course should be reviewed by the pmdomain and
-> DT maintainers, to ensure that it is done the best possible way, because
-> I assume we will end up using it a lot, and it would be a shame to get
-> it slightly wrong.
->
-> One possible variation I can think of would be to just use "simple-pmdomain"
-> as the compatible string, and use properties in the node itself to decide
-> what the domain should control, e.g.
->
->         clk_pmdomain: pmdomain {
->                 compatible = "simple-pmdomain";
->                 pmdomain-enable-clocks;
->                 #power-domain-cells = <0>;
->         };
->         clk_regulator_pmdomain: pmdomain {
->                 compatible = "simple-pmdomain";
->                 pmdomain-enable-clocks;
->                 pmdomain-enable-regulators;
->                 #power-domain-cells = <0>;
->         };
->
-> and then have each device link to one of the nodes as the pmdomain.
->
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index d51c6e99a2e9..c056b7b97eaa 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -16,6 +16,7 @@
+ #include <linux/delay.h>
+ #include <linux/export.h>
+ #include <linux/init.h>
++#include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/irqchip.h>
+@@ -33,6 +34,7 @@
+ #include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
++#include <asm/pmu.h>
+ #include <asm/system_misc.h>
 
-That's seems like a good approach to me.
+ #include "common.h"
+@@ -261,6 +263,40 @@ static void __init imx6q_axi_init(void)
+ 	}
+ }
 
-Kind regards
-Uffe
++/*
++ * The PMU IRQ lines of all cores are muxed onto a single interrupt.
++ * Rotate the interrupt around the cores if the current CPU cannot
++ * figure out why the interrupt has been triggered.
++ */
++static irqreturn_t imx6q_pmu_handler(int irq, void *dev, irq_handler_t handler)
++{
++	irqreturn_t ret = handler(irq, dev);
++	int next;
++
++	if (ret == IRQ_NONE && num_online_cpus() > 1) {
++		next = cpumask_next(smp_processor_id(), cpu_online_mask);
++		if (next > nr_cpu_ids)
++			next = cpumask_next(-1, cpu_online_mask);
++		irq_set_affinity(irq, cpumask_of(next));
++	}
++
++	/*
++	 * We should be able to get away with the amount of IRQ_NONEs we give,
++	 * while still having the spurious IRQ detection code kick in if the
++	 * interrupt really starts hitting spuriously.
++	 */
++	return ret;
++}
++
++static struct arm_pmu_platdata imx6q_pmu_platdata = {
++	.handle_irq = imx6q_pmu_handler,
++};
++
++static struct of_dev_auxdata imx6q_auxdata_lookup[] __initdata = {
++	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &imx6q_pmu_platdata),
++	{},
++};
++
+ static void __init imx6q_init_machine(void)
+ {
+ 	struct device *parent;
+@@ -276,7 +312,8 @@ static void __init imx6q_init_machine(void)
+
+ 	imx6q_enet_phy_init();
+
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, parent);
++	of_platform_populate(NULL, of_default_bus_match_table,
++			     imx6q_auxdata_lookup, parent);
+
+ 	imx_anatop_init();
+ 	cpu_is_imx6q() ?  imx6q_pm_init() : imx6dl_pm_init();
+--
+1.9.3
