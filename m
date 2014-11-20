@@ -1,80 +1,76 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 20 Nov 2014 10:54:11 +0000
-Subject: [PATCH v3 0/2] arm64: Add support for Juno development board
-In-Reply-To: <1415727131-4572-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1415727131-4572-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <20141120105410.GD17214@e106497-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 20 Nov 2014 10:56:14 +0000
+Subject: [GIT PULL] ARM: perf: updates for 3.19
+In-Reply-To: <20141114191637.GA9291@arm.com>
+References: <20141114191637.GA9291@arm.com>
+Message-ID: <20141120105614.GD19126@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 11, 2014 at 05:32:09PM +0000, Liviu Dudau wrote:
-> Hi,
+On Fri, Nov 14, 2014 at 07:16:37PM +0000, Will Deacon wrote:
+> Hi Arnd, Olof, Russell,
 > 
-> This patchset adds device tree support for ARM's AArch64 Juno development
-> board. It enables use of various peripherals on the board, from USB and
-> networking to I2C and PL011 UART.
+> Please can you pull the following ARM perf updates into arm-soc?
 > 
-> The patches can also be found in the repository at:
+> I usually send these via rmk's tree, but there's a bunch of CCI PMU
+> rework in here which is then relied upon by other patches in the series,
+> so it would be easiest to keep it all together.
 > 
->    git://github.com/ARM-software/linux.git juno/dts-for-armsoc
-> 
-> for you to fetch.
+> These have been in -next for a few weeks, so please let me know when
+> you've pulled and I'll drop my branch from there.
 
-Gentle ping!
+Ping? Anything else you need from me to get this into arm-soc?
 
-Olof, Arnd, Kevin: are you OK with this patchset?
+Will
 
-Best regards,
-Liviu
-
+> --->8
 > 
+> The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
 > 
-> Changes vs v2:
->   - rebased on top of arm-soc/next/cleanup
->   - Split the flat device tree into several files. Although some
->     commonality still remains in the main .dts file with other
->     devices trees (see psci node) it is not clear what benefits can
->     be gained from moving such a small node into its own file.
->   - Ordered nodes according to their address space
->   - Removed ulpi_phy node as it was redundant and the bindings non-standard.
+>   Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
 > 
-> v2 version: http://lkml.org/lkml/2014/11/10/242
+> are available in the git repository at:
 > 
-> Best regards,
-> Liviu
+>   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git tags/arm-perf-3.19
 > 
-> Liviu Dudau (2):
->   arm64: Create link to include/dt-bindings to enable C preprocessor
->     use.
->   arm64: Add Juno board device tree.
+> for you to fetch changes up to af66abfe2ec8bd82211e9e4f036a64c902ff4cdb:
 > 
->  arch/arm64/boot/dts/arm/Makefile              |   1 +
->  arch/arm64/boot/dts/arm/juno-clocks.dtsi      |  45 ++++++
->  arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 129 +++++++++++++++
->  arch/arm64/boot/dts/arm/juno.dts              | 218 ++++++++++++++++++++++++++
->  arch/arm64/boot/dts/include/dt-bindings       |   1 +
->  5 files changed, 394 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/arm/juno-clocks.dtsi
->  create mode 100644 arch/arm64/boot/dts/arm/juno-motherboard.dtsi
->  create mode 100644 arch/arm64/boot/dts/arm/juno.dts
->  create mode 120000 arch/arm64/boot/dts/include/dt-bindings
+>   arm: perf: fold hotplug notifier into arm_pmu (2014-10-30 12:17:01 +0000)
 > 
-> -- 
-> 2.1.3
+> ----------------------------------------------------------------
+> This patch series takes us slightly further on the road to big.LITTLE
+> support in perf. The main change enabling this is moving the CCI PMU
+> driver away from the arm-pmu abstraction, allowing the arch code to
+> focus specifically on support for CPU PMUs.
 > 
+> ----------------------------------------------------------------
+> Mark Rutland (10):
+>       bus: cci: move away from arm_pmu framework
+>       arm: perf: factor out callchain code
+>       arm: perf: add missing pr_info newlines
+>       arm: perf: make PMU probing data-driven
+>       arm: perf: use IDR types for CPU PMUs
+>       arm: perf: limit size of accounting data
+>       arm: perf: kill get_hw_events()
+>       arm: perf: fold percpu_pmu into pmu_hw_events
+>       arm: perf: dynamically allocate cpu hardware data
+>       arm: perf: fold hotplug notifier into arm_pmu
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Will Deacon (1):
+>       ARM: perf: use pr_* instead of printk
 > 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+> chai wen (1):
+>       ARM: perf: remove useless return and check of idx in counter handling
+> 
+>  arch/arm/include/asm/perf_event.h   |   2 +-
+>  arch/arm/include/asm/pmu.h          |  36 ++-
+>  arch/arm/kernel/Makefile            |   2 +-
+>  arch/arm/kernel/perf_callchain.c    | 136 +++++++++
+>  arch/arm/kernel/perf_event.c        | 162 ++---------
+>  arch/arm/kernel/perf_event_cpu.c    | 181 ++++++------
+>  arch/arm/kernel/perf_event_v6.c     |  12 +-
+>  arch/arm/kernel/perf_event_v7.c     |  72 +++--
+>  arch/arm/kernel/perf_event_xscale.c |  20 +-
+>  drivers/bus/arm-cci.c               | 552 +++++++++++++++++++++++++++++-------
+>  10 files changed, 772 insertions(+), 403 deletions(-)
+>  create mode 100644 arch/arm/kernel/perf_callchain.c
