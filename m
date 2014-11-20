@@ -1,39 +1,40 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Thu, 20 Nov 2014 11:44:55 +0100
-Subject: [PATCH v4 1/2] of: Rename "poweroff-source" property to
- "system-power-controller"
-In-Reply-To: <CABgxDoK=Maxzw-=+pHZ4gdgBSJbdkgx_Q7rHNcwEBywBE3btCQ@mail.gmail.com>
-References: <1415885699-1465-1-git-send-email-user@radxa>
- <1415885699-1465-2-git-send-email-user@radxa>
- <20141113205528.77414C40BC2@trevor.secretlab.ca>
- <CABgxDoL-N9bitxTU0=pD_69DLBovXPSKhHjmArVOHFdokvnEJA@mail.gmail.com>
- <CABgxDoK=Maxzw-=+pHZ4gdgBSJbdkgx_Q7rHNcwEBywBE3btCQ@mail.gmail.com>
-Message-ID: <CABgxDo+Pgaw_XJX8BkwuDaqfiybBF2hLwDxNczPwEH_-C9aEeQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Nov 2014 11:47:03 +0100
+Subject: [GIT PULL 1/3] omap device tree changes for v3.19
+In-Reply-To: <pull-1415814409-868361>
+References: <pull-1415814409-868361>
+Message-ID: <201411201147.04064.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping
+On Wednesday 12 November 2014, Tony Lindgren wrote:
+> The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
+> 
+>   Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.19/dt-part1
+> 
+> for you to fetch changes up to 065bd7fe50de5e6d0fd5034cbc87120a558a1219:
+> 
+>   ARM: dts: DRA7: Add aliases for all serial ports (2014-11-12 07:04:37 -0800)
+> 
+> ----------------------------------------------------------------
+> Device tree related changes for omaps:
+> 
+> - Fix currently harmless but wrong sizes for various GPMC connected
+>   devices
+> 
+> - Set up timings for several GPMC connected devices to get rid of
+>   bootloader dependencies in later patches
+> 
+> - Enable various drivers for dra7xx
+> 
+> - Prepare Igep boards to support new variants
+> 
+> - Add intial support for BeagleBoard-X15
 
-2014-11-17 11:51 GMT+01:00 Romain Perier <romain.perier@gmail.com>:
-> @Most of the people who were ranting about this serie:  could you send
-> feedbacks please ?
->
-> 2014-11-14 8:22 GMT+01:00 Romain Perier <romain.perier@gmail.com>:
->> Hi,
->>
->> Who should merge this serie ? as Mark merged the previous one it would
->> probably make sense to do the same here (at least, in my opinion)
->>
->> Thanks for your feedbacks.
->>
->> Have a nice day,
->> Romain
->>
->> 2014-11-13 21:55 GMT+01:00 Grant Likely <grant.likely@linaro.org>:
->> igned-off-by: Romain Perier <romain.perier@gmail.com>
->>>
->>> Acked-by: Grant Likely <grant.likely@linaro.org>
->>>
->>> Please merge via whichever tree needs this change.
->>>
->>> g.
+pulled into next/dt, thanks!
+
+	Arnd
