@@ -1,106 +1,35 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 20 Nov 2014 14:01:53 +0100
-Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
- completes
-In-Reply-To: <546DDBCF.205@ti.com>
-References: <20141117220238.GE5258@dtor-ws> <1787068.2MCH8czsD4@vostro.rjw.lan>
- <CAPDyKFoMftvKs8tyBaYCu1zTK_JYiXeXMiq86OrwAAHZoRO_Pw@mail.gmail.com>
- <3492523.qBADTmdTqo@vostro.rjw.lan>
- <CAPDyKFoiEMO5E3nMJDZkFkuio-5sh99m55k-yM=fuqrHUXbhZw@mail.gmail.com>
- <546DDBCF.205@ti.com>
-Message-ID: <CAPDyKFrssg8wTr7e+EDrrgvHCndq8hcoNJb8TQGc_tt4ePpdEw@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 20 Nov 2014 14:02:46 +0100
+Subject: [GIT PULL] ARM: mediatek: Add support for mt6592,
+ mt8127 and mt8135
+In-Reply-To: <201411201346.40129.arnd@arndb.de>
+References: <CABuKBeLBdAaKyiOhVOUcvE9_ATYeMtccNP3zv_tdFvpgtxoMNw@mail.gmail.com>
+ <201411201346.40129.arnd@arndb.de>
+Message-ID: <CABuKBeLL26c37yq9-_fsWBJAYJfUDFxdhQNBXy-NmjJ=5he1OQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 November 2014 13:17, Grygorii Strashko <grygorii.strashko@ti.com> wrote:
-> On 11/19/2014 10:54 AM, Ulf Hansson wrote:
->> [...]
+2014-11-20 13:46 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
+> On Friday 14 November 2014, Matthias Brugger wrote:
+>> Here comes the pull request which introduces basic support for
+>> Mediatek SoCs mt6592, mt8127 and mt8135.
 >>
->>>>
->>>> Scenario 5), a platform driver with/without runtime PM callbacks.
->>>> ->probe()
->>>> - do some initialization
->>>> - may fetch handles to runtime PM resources
->>>> - pm_runtime_enable()
->>>
->>> Well, and now how the driver knows if the device is "on" before accessing it?
->>
->> In this case the driver don't need to access the device during
->> ->probe(). That's postponed until sometime later.
->>
->>>
->>>> Note 1)
->>>> Scenario 1) and 2), both relies on the approach to power on the PM
->>>> domain by using pm_runtime_get_sync(). That approach didn't work when
->>>> CONFIG_PM_RUNTIME was unset, but we recently decided to fixed that by
->>>> the below patch, so that's good!
->>>> "[PATCH] PM / domains: Kconfig: always enable PM_RUNTIME when genpd enabled"
->>>>
->>>> Note 2)
->>>> Scenario 3) and 4) use the same principles for managing runtime PM.
->>>> These scenarios needs a way to power on the generic PM domain prior
->>>> probing the device. The call to pm_runtime_set_active(), prevents an
->>>> already powered PM domain from power off until after probe, but that's
->>>> not enough.
->>>>
->>>> Note 3)
->>>> The $subject patch, tried to address the issues for scenario 3) and
->>>> 4). It does so, but will affect scenario 5) which was working nicely
->>>> before. In scenario 5), the $subject patch will cause the generic PM
->>>> domain to potentially stay powered after ->probe() even if the device
->>>> is runtime PM suspended.
->>>
->>> Why would it?  If the device is runtime-suspended, the domain will know
->>> that, because its callbacks will be used for that.  At least, that's
->>> what I'd expect to happen, so is there a problem here?
->>
->> Genpd do knows about the device but it doesn?t get a "notification" to
->> power off. There are no issues whatsoever for driver.
->>
->> This is a somewhat special case. Let's go through an example.
->>
->> 1. The PM domain is initially in powered off state.
->> 2. The bus ->probe() invokes dev_pm_domain_attach() and then the PM
->> domain gets attached to the device.
->> 3. $subject patch causes the PM domain to power on.
->> 4. A driver ->probe() sequence start, following the Scenario 5).
->> 5. The device is initially in runtime PM suspended state and it will
->> remain so during ->probe().
->> 6. The pm_request_idle() invoked after really_probe() in driver core,
->> won't trigger a runtime PM suspend callback to be invoked. In other
->> words, genpd don't get a "notification" that it may power off.
->>
->> In this state, genpd will either power off from the late_initcall,
->> genpd_poweroff_unused() (depending on when the driver was probed) or
->> wait until some device's runtime PM suspend callback is invoked at any
->> later point.
+>> The patches for the mt81xx got merged in the late tree for v3.18 but
+>> were not be merged at the end. They got a small fix regarding the
+>> compatible and model string in the dts files.
 >
-> if I understand things right (thanks to Russell), the Power domain may not
->  be powered off not only in above case, but also in some cases when
-> driver is unloaded.
->
-> AMBA bus for example:
-> static int amba_remove(struct device *dev)
-> {
->         pm_runtime_get_sync(dev); <---------- GPD=on, dev is active, usage_count >= 1
->         ret = drv->remove(pcdev); <----------- GPD=on, should do balancing put() to compensate all get() made by driver, usage_count == 1
->                                   <----------- GPD=on, should do balancing get() to compensate put() in probe, usage_count == 2
->         pm_runtime_put_noidle(dev); <---------- GPD=on, dev is active, usage_count == 1
->
->         /* Undo the runtime PM settings in amba_probe() */
->         pm_runtime_disable(dev);  <---------- GPD=on, dev is active, usage_count == 1
->         pm_runtime_set_suspended(dev); <---------- GPD=on, dev is suspended, usage_count == 1
->         pm_runtime_put_noidle(dev); <---------- GPD=on, dev is suspended, usage_count == 0
->
->         amba_put_disable_pclk(pcdev);
->         dev_pm_domain_detach(dev, true); <---------- GPD=on, dev is suspended, usage_count == 0
+> Pulled into next/dt. I've put the text above into the merge changeset
+> description, since you didn't have much text in the tag.
 
-For the generic OF-based PM domain look-up case:
-->dev_pm_domain_detach()
-    ->genpd_dev_pm_detach() - to remove the device from the PM domain.
-       ->genpd_queue_power_off_work() - to power off unused PM domains.
+Ok, thank you. I will take this into account for the next pull request.
 
-That does the trick, right!?
+Regards,
+Matthias
 
-Kind regards
-Uffe
+>
+>         Arnd
+
+
+
+-- 
+motzblog.wordpress.com
