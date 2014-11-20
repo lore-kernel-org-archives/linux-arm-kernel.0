@@ -1,91 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Nov 2014 10:29:23 +0000
-Subject: [PATCH v7 1/4] irqchip: gic: Support hierarchy irq domain.
-In-Reply-To: <1416476511.12869.24.camel@mtksdaap41> (Yingjoe Chen's message of
- "Thu, 20 Nov 2014 09:41:51 +0000")
-References: <1416406451-4578-1-git-send-email-yingjoe.chen@mediatek.com>
- <1416406451-4578-2-git-send-email-yingjoe.chen@mediatek.com>
- <87h9xvaz2p.fsf@approximate.cambridge.arm.com>
- <1416455840.12869.17.camel@mtksdaap41>
- <1416476511.12869.24.camel@mtksdaap41>
-Message-ID: <87sihe9ncs.fsf@approximate.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 20 Nov 2014 10:38:44 +0000
+Subject: [PATCH 2/7] mfd: MT6397: Add regmap for MT8135 and MT6397 SoC
+In-Reply-To: <20141120091943.GJ30369@pengutronix.de>
+References: <1416210027-5562-1-git-send-email-flora.fu@mediatek.com>
+ <1416210027-5562-3-git-send-email-flora.fu@mediatek.com>
+ <20141118114645.GX24004@x1> <20141118134618.GF30369@pengutronix.de>
+ <20141119170454.GJ1875@x1> <20141120091943.GJ30369@pengutronix.de>
+Message-ID: <20141120103844.GA13269@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joe,
+On Thu, 20 Nov 2014, Sascha Hauer wrote:
 
-On Thu, Nov 20 2014 at  9:41:51 am GMT, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
-> Hi Marc,
->
-> On Thu, 2014-11-20 at 11:57 +0800, Yingjoe Chen wrote:
->> On Wed, 2014-11-19 at 17:18 +0000, Marc Zyngier wrote:
->> > > +
->> > > +	return 0;
->> > > +}
->> > > +
->> > > +static const struct irq_domain_ops gic_irq_domain_hierarchy_ops = {
->> > > +	.xlate = gic_irq_domain_xlate,
->> > > +	.alloc = gic_irq_domain_alloc,
->> > > +	.free = irq_domain_free_irqs_top,
->> > 
->> > I'm convinced that irq_domain_free_irqs_top is the wrong function to
->> > call here, because you're calling it from the bottom, not the top-level
->> > (it has no parent).
->> 
->> Base on the name, I though this is helper function for top level
->> irq_domain?
->> 
->> > I cannot verify this with your code as I don't a working platform with
->> > GICv2m, but if I enable something similar on GICv3, it dies a very
->> > painful way:
->> > 
->> > Unable to handle kernel NULL pointer dereference at virtual address 00000018
->> > pgd = ffffffc03d059000
->> > [00000018] *pgd=0000000081356003, *pud=0000000081356003,
->> > *pmd=0000000000000000
->> > Internal error: Oops: 96000006 [#1] SMP
->> > Modules linked in:
->> > CPU: 4 PID: 1052 Comm: sh Not tainted 3.18.0-rc4+ #3311
->> > task: ffffffc03e320000 ti: ffffffc001390000 task.ti: ffffffc001390000
->> > PC is at irq_domain_free_irqs_recursive+0x1c/0x80
->> > LR is at irq_domain_free_irqs_common+0x88/0x9c
->> > pc : [<ffffffc0000ed790>] lr : [<ffffffc0000ede20>] pstate: 60000145
->> > [...]
->> > [<ffffffc0000ed790>] irq_domain_free_irqs_recursive+0x1c/0x80
->> > [<ffffffc0000ede1c>] irq_domain_free_irqs_common+0x84/0x9c
->> > [<ffffffc0000ede98>] irq_domain_free_irqs_top+0x64/0x7c <--
->> > gic_domain.free()
->> > [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
->> > [<ffffffc0000ee468>] irq_domain_free_irqs_parent+0x14/0x20
->> > [<ffffffc0003500b8>] its_irq_domain_free+0xc8/0x250
->> > [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
->> > [<ffffffc0000ede1c>] irq_domain_free_irqs_common+0x84/0x9c
->> > [<ffffffc0000ede98>] irq_domain_free_irqs_top+0x64/0x7c
->> > [<ffffffc0000ef518>] msi_domain_free+0x70/0x88
->> > [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
->> > [<ffffffc0000ee3ac>] irq_domain_free_irqs+0x108/0x17c
->> > [<ffffffc0000efb68>] msi_domain_free_irqs+0x28/0x4c
->> > [<ffffffc000369cac>] free_msi_irqs+0xb4/0x1c0
->> > [<ffffffc00036adec>] pci_disable_msix+0x3c/0x4c
->> > [...]
->> > 
->> > and I cannot see how this could work on the standard GIC either.
->> 
->> I'm sorry, I just realize my testcase was too simple, irqs are populated
->> by device tree and never got freed. I'll add that and test it again.
->
-> On a second thoughts, unlike the MSI cases, gic_irq_domain_hierarchy_ops
-> is only used when we use DT, so we probably will never use the free
-> function. Is it OK to remove the free support here?
+> On Wed, Nov 19, 2014 at 05:04:54PM +0000, Lee Jones wrote:
+> > On Tue, 18 Nov 2014, Sascha Hauer wrote:
+> > 
+> > > On Tue, Nov 18, 2014 at 11:46:45AM +0000, Lee Jones wrote:
+> > > > On Mon, 17 Nov 2014, Flora Fu wrote:
+> > > > 
+> > > > > Add PMIC wrapper of MT8135 to access MFD MT6397.
+> > > > > This is regmap of MT6397 MFD.
+> > > > > 
+> > > > > Signed-off-by: Flora Fu <flora.fu@mediatek.com>
+> > > > > ---
+> > > > >  drivers/mfd/Kconfig            |   8 +
+> > > > >  drivers/mfd/Makefile           |   1 +
+> > > > >  drivers/mfd/mt8135-pmic-wrap.c | 847 +++++++++++++++++++++++++++++++++++++++++
+> > > > 
+> > > > All of the PMIC functionality needs removing from MFD and placed
+> > > > somewhere else.  I suggest either drivers/power or drivers/regulator.
+> > > 
+> > > This is no PMIC functionality. The MT8135 has a unit which is is used to
+> > > access the PMIC (which is not only a PMIC, but also Touchscreen
+> > > interface and other stuff). This unit is called pmic-wrapper in the
+> > > docs. See the introductory mail for a nice picture.
+> > 
+> > I saw the picture, it's very nice.  Whatever this is, it's not an
+> > MFD.  It's a device which is located on an MFD.  There is far too much
+> > functional (the operative word here) code contained in this patch.
+> 
+> The MT6397 is a classical MFD device. It has a PMIC, an audio amp and a
+> RTC. It is very tightly coupled to the SoC via SPI, but the SPI itself
+> is not directly visible on the SoC. It's accessible indirectly via the
+> PMIC-wrapper. Indeed the PMIC-wrapper is not MFD. Another dumping ground
+> that comes to my mind is drivers/soc/. We could move over there.
 
-Well, such thing is coming with GICv2m (SPIs are allocated out of
-DT). You can drop it if you want, but I will then have to add it back
-(which seems like a waste of time).
+Thanks for understanding my point-of-view.  Hopefully there is a
+suitable "dumping ground", or even better a proper place to move the
+PMIC-wrapper to.
 
-I'd prefer if you kept it in with the rest of the conversion.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny.
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
