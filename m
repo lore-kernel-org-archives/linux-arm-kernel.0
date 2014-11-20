@@ -1,19 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Nov 2014 13:48:52 +0100
-Subject: [GIT PULL] ARM: mediatek: SoC updates for 3.19
-In-Reply-To: <CABuKBe+6hvfKGXSp1uRrbVwUoiCdwEGD1Lin951B6jUgr4_rQw@mail.gmail.com>
-References: <CABuKBe+6hvfKGXSp1uRrbVwUoiCdwEGD1Lin951B6jUgr4_rQw@mail.gmail.com>
-Message-ID: <201411201348.52255.arnd@arndb.de>
+Date: Thu, 20 Nov 2014 13:50:45 +0100
+Subject: [GIT PULL] ARM: perf: updates for 3.19
+In-Reply-To: <20141114191637.GA9291@arm.com>
+References: <20141114191637.GA9291@arm.com>
+Message-ID: <201411201350.45478.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 November 2014, Matthias Brugger wrote:
-> Hi Arnd and Olof,
+On Friday 14 November 2014, Will Deacon wrote:
+> Hi Arnd, Olof, Russell,
 > 
-> Here comes the pull request which add earlyprintk support for mt8127 and mt8135.
-> Apart from that the Kconfig entry for the Mediatek architecture was fixed.
+> Please can you pull the following ARM perf updates into arm-soc?
+> 
+> I usually send these via rmk's tree, but there's a bunch of CCI PMU
+> rework in here which is then relied upon by other patches in the series,
+> so it would be easiest to keep it all together.
+> 
+> These have been in -next for a few weeks, so please let me know when
+> you've pulled and I'll drop my branch from there.
+> 
 
-
-Pulled into next/soc, with the tag description extended, thanks!
+Pulled into next/drivers. Russell, please yell if you have any objections.
 
 	Arnd
