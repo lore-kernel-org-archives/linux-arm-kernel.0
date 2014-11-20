@@ -1,185 +1,103 @@
 From: js07.lee@gmail.com (Jungseung Lee)
-Date: Thu, 20 Nov 2014 20:08:37 +0900
-Subject: [PATCH RESEND 2/2] arm: mm: Refine set_memory_* functions
-In-Reply-To: <1416481717-23814-1-git-send-email-js07.lee@gmail.com>
-References: <1416481717-23814-1-git-send-email-js07.lee@gmail.com>
-Message-ID: <1416481717-23814-2-git-send-email-js07.lee@gmail.com>
+Date: Thu, 20 Nov 2014 20:09:02 +0900
+Subject: [PATCH RESEND] arm: Support for the PXN CPU feature on ARMv7
+Message-ID: <1416481742-23868-1-git-send-email-js07.lee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-set_memory_* functions have same implementation
-except memory attribute.
+Modern ARMv7-A/R cores can optionally implement below new
+hardware feature:
 
-This patch makes to use common function for these, and pull out
-the functions into arch/arm/mm/pageattr.c like arm64 did.
-It will reduce code size and enhance the readability.
+- PXN:
+Privileged execute-never(PXN) is a security feature. PXN bit
+determines whether the processor can execute software from
+the region. This is effective solution against ret2usr attack.
+On an implementation that does not include the LPAE, PXN is
+optionally supported.
+
+This patch set PXN bit on user page table for preventing
+user code execution with privilege mode.
 
 Signed-off-by: Jungseung Lee <js07.lee@gmail.com>
 ---
- arch/arm/mm/Makefile   |  2 +-
- arch/arm/mm/mmu.c      | 38 ---------------------
- arch/arm/mm/pageattr.c | 91 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 92 insertions(+), 39 deletions(-)
- create mode 100644 arch/arm/mm/pageattr.c
+ arch/arm/include/asm/pgalloc.h              | 12 +++++++++++-
+ arch/arm/include/asm/pgtable-2level-hwdef.h |  2 ++
+ arch/arm/kernel/setup.c                     |  7 +++++++
+ 3 files changed, 20 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-index 91da64d..d3afdf9 100644
---- a/arch/arm/mm/Makefile
-+++ b/arch/arm/mm/Makefile
-@@ -6,7 +6,7 @@ obj-y				:= dma-mapping.o extable.o fault.o init.o \
- 				   iomap.o
+diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
+index 78a7793..a931544 100644
+--- a/arch/arm/include/asm/pgalloc.h
++++ b/arch/arm/include/asm/pgalloc.h
+@@ -25,6 +25,10 @@
+ #define _PAGE_USER_TABLE	(PMD_TYPE_TABLE | PMD_BIT4 | PMD_DOMAIN(DOMAIN_USER))
+ #define _PAGE_KERNEL_TABLE	(PMD_TYPE_TABLE | PMD_BIT4 | PMD_DOMAIN(DOMAIN_KERNEL))
  
- obj-$(CONFIG_MMU)		+= fault-armv.o flush.o idmap.o ioremap.o \
--				   mmap.o pgd.o mmu.o
-+				   mmap.o pgd.o mmu.o pageattr.o
++#ifdef CONFIG_CPU_V7
++extern bool cpu_has_pxn;
++#endif
++
+ #ifdef CONFIG_ARM_LPAE
  
- ifneq ($(CONFIG_MMU),y)
- obj-y				+= nommu.o
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 9f98cec..06817e1 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -354,44 +354,6 @@ const struct mem_type *get_mem_type(unsigned int type)
+ static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
+@@ -157,7 +161,13 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
+ static inline void
+ pmd_populate(struct mm_struct *mm, pmd_t *pmdp, pgtable_t ptep)
+ {
+-	__pmd_populate(pmdp, page_to_phys(ptep), _PAGE_USER_TABLE);
++#ifdef CONFIG_CPU_V7
++	if (cpu_has_pxn)
++		__pmd_populate(pmdp, page_to_phys(ptep),
++				_PAGE_USER_TABLE | PMD_PXNTABLE);
++	else
++#endif
++		__pmd_populate(pmdp, page_to_phys(ptep), _PAGE_USER_TABLE);
  }
- EXPORT_SYMBOL(get_mem_type);
+ #define pmd_pgtable(pmd) pmd_page(pmd)
  
--#define PTE_SET_FN(_name, pteop) \
--static int pte_set_##_name(pte_t *ptep, pgtable_t token, unsigned long addr, \
--			void *data) \
--{ \
--	pte_t pte = pteop(*ptep); \
--\
--	set_pte_ext(ptep, pte, 0); \
--	return 0; \
--} \
--
--#define SET_MEMORY_FN(_name, callback) \
--int set_memory_##_name(unsigned long addr, int numpages) \
--{ \
--	unsigned long start = addr; \
--	unsigned long size = PAGE_SIZE*numpages; \
--	unsigned end = start + size; \
--\
--	if (start < MODULES_VADDR || start >= MODULES_END) \
--		return -EINVAL;\
--\
--	if (end < MODULES_VADDR || end >= MODULES_END) \
--		return -EINVAL; \
--\
--	apply_to_page_range(&init_mm, start, size, callback, NULL); \
--	flush_tlb_kernel_range(start, end); \
--	return 0;\
--}
--
--PTE_SET_FN(ro, pte_wrprotect)
--PTE_SET_FN(rw, pte_mkwrite)
--PTE_SET_FN(x, pte_mkexec)
--PTE_SET_FN(nx, pte_mknexec)
--
--SET_MEMORY_FN(ro, pte_set_ro)
--SET_MEMORY_FN(rw, pte_set_rw)
--SET_MEMORY_FN(x, pte_set_x)
--SET_MEMORY_FN(nx, pte_set_nx)
--
+diff --git a/arch/arm/include/asm/pgtable-2level-hwdef.h b/arch/arm/include/asm/pgtable-2level-hwdef.h
+index 5cfba15..5e68278 100644
+--- a/arch/arm/include/asm/pgtable-2level-hwdef.h
++++ b/arch/arm/include/asm/pgtable-2level-hwdef.h
+@@ -20,12 +20,14 @@
+ #define PMD_TYPE_FAULT		(_AT(pmdval_t, 0) << 0)
+ #define PMD_TYPE_TABLE		(_AT(pmdval_t, 1) << 0)
+ #define PMD_TYPE_SECT		(_AT(pmdval_t, 2) << 0)
++#define PMD_PXNTABLE		(_AT(pmdval_t, 1) << 2)     /* v7 */
+ #define PMD_BIT4		(_AT(pmdval_t, 1) << 4)
+ #define PMD_DOMAIN(x)		(_AT(pmdval_t, (x)) << 5)
+ #define PMD_PROTECTION		(_AT(pmdval_t, 1) << 9)		/* v5 */
  /*
-  * Adjust the PMD section entries according to the CPU in use.
+  *   - section
   */
-diff --git a/arch/arm/mm/pageattr.c b/arch/arm/mm/pageattr.c
-new file mode 100644
-index 0000000..004e35c
---- /dev/null
-+++ b/arch/arm/mm/pageattr.c
-@@ -0,0 +1,91 @@
-+/*
-+ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#include <linux/mm.h>
-+#include <linux/module.h>
-+
-+#include <asm/pgtable.h>
-+#include <asm/tlbflush.h>
-+
-+struct page_change_data {
-+	pgprot_t set_mask;
-+	pgprot_t clear_mask;
-+};
-+
-+static int change_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
-+			void *data)
-+{
-+	struct page_change_data *cdata = data;
-+	pte_t pte = *ptep;
-+
-+	pte = clear_pte_bit(pte, cdata->clear_mask);
-+	pte = set_pte_bit(pte, cdata->set_mask);
-+
-+	set_pte_ext(ptep, pte, 0);
-+	return 0;
-+}
-+
-+static int change_memory_common(unsigned long addr, int numpages,
-+				pgprot_t set_mask, pgprot_t clear_mask)
-+{
-+	unsigned long start = addr;
-+	unsigned long size = PAGE_SIZE*numpages;
-+	unsigned long end = start + size;
-+	int ret;
-+	struct page_change_data data;
-+
-+	if (!IS_ALIGNED(addr, PAGE_SIZE)) {
-+		start &= PAGE_MASK;
-+		end = start + size;
-+		WARN_ON_ONCE(1);
-+	}
-+
-+	if (!is_module_address(start) || !is_module_address(end - 1))
-+		return -EINVAL;
-+
-+	data.set_mask = set_mask;
-+	data.clear_mask = clear_mask;
-+
-+	ret = apply_to_page_range(&init_mm, start, size, change_page_range,
-+					&data);
-+
-+	flush_tlb_kernel_range(start, end);
-+	return ret;
-+}
-+
-+int set_memory_ro(unsigned long addr, int numpages)
-+{
-+	return change_memory_common(addr, numpages,
-+					__pgprot(L_PTE_RDONLY),
-+					__pgprot(0));
-+}
-+
-+int set_memory_rw(unsigned long addr, int numpages)
-+{
-+	return change_memory_common(addr, numpages,
-+					__pgprot(0),
-+					__pgprot(L_PTE_RDONLY));
-+}
-+
-+int set_memory_nx(unsigned long addr, int numpages)
-+{
-+	return change_memory_common(addr, numpages,
-+					__pgprot(L_PTE_XN),
-+					__pgprot(0));
-+}
-+
-+int set_memory_x(unsigned long addr, int numpages)
-+{
-+	return change_memory_common(addr, numpages,
-+					__pgprot(0),
-+					__pgprot(L_PTE_XN));
-+}
++#define PMD_SECT_PXN    (_AT(pmdval_t, 1) << 0)     /* v7 */
+ #define PMD_SECT_BUFFERABLE	(_AT(pmdval_t, 1) << 2)
+ #define PMD_SECT_CACHEABLE	(_AT(pmdval_t, 1) << 3)
+ #define PMD_SECT_XN		(_AT(pmdval_t, 1) << 4)		/* v6 */
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index c031063..8556044 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -104,6 +104,9 @@ EXPORT_SYMBOL(elf_hwcap);
+ unsigned int elf_hwcap2 __read_mostly;
+ EXPORT_SYMBOL(elf_hwcap2);
+ 
++#ifdef CONFIG_CPU_V7
++bool cpu_has_pxn;
++#endif
+ 
+ #ifdef MULTI_CPU
+ struct processor processor __read_mostly;
+@@ -390,6 +393,10 @@ static void __init cpuid_init_hwcaps(void)
+ 
+ 	/* LPAE implies atomic ldrd/strd instructions */
+ 	vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
++#ifdef CONFIG_CPU_V7
++	if (vmsa >= 4)
++		cpu_has_pxn = 1;
++#endif
+ 	if (vmsa >= 5)
+ 		elf_hwcap |= HWCAP_LPAE;
+ }
 -- 
 1.9.1
