@@ -1,40 +1,42 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Nov 2014 10:03:29 +0000
-Subject: [PATCH v3 2/5] drivers: soc: Add support for Exynos PMU driver
-In-Reply-To: <1416461968-2057-3-git-send-email-amit.daniel@samsung.com>
-References: <1416461968-2057-1-git-send-email-amit.daniel@samsung.com>
- <1416461968-2057-3-git-send-email-amit.daniel@samsung.com>
-Message-ID: <20141120100328.GO4042@n2100.arm.linux.org.uk>
+Date: Thu, 20 Nov 2014 10:06:33 +0000
+Subject: [PATCH v2] clk: Propagate prepare and enable when reparenting
+ orphans
+In-Reply-To: <20141120074514.GB30434@dtor-ws>
+References: <1415408818-28028-1-git-send-email-dianders@chromium.org>
+ <20141120023050.12298.26964@quantum>
+ <CAD=FV=VZJ_iSFoW39kbahFSZ_Ta4Qf7zxaCnJMWFVWhXzsLrWw@mail.gmail.com>
+ <20141120074514.GB30434@dtor-ws>
+Message-ID: <20141120100633.GP4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 20, 2014 at 11:09:25AM +0530, Amit Daniel Kachhap wrote:
-> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-> index 063113d..44d220d 100644
-> --- a/drivers/soc/Makefile
-> +++ b/drivers/soc/Makefile
-> @@ -6,3 +6,4 @@ obj-$(CONFIG_ARCH_QCOM)		+= qcom/
->  obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
->  obj-$(CONFIG_SOC_TI)		+= ti/
->  obj-$(CONFIG_PLAT_VERSATILE)	+= versatile/
-> +obj-$(CONFIG_ARCH_EXYNOS)	+= samsung/
+On Wed, Nov 19, 2014 at 11:45:14PM -0800, Dmitry Torokhov wrote:
+> On Wed, Nov 19, 2014 at 09:15:41PM -0800, Doug Anderson wrote:
+> > I will defer to your wisdom here.  I agree that these are the two
+> > primary solutions and I've picked one, but I have no idea which will
+> > be more of a PITA in the long run.
+> > 
+> > Note: I'm not sure that anyone expects EPROBE_DEFER to be returned
+> > from a clk_enable() (do they?).  It almost seems like the right answer
+> > is to fail to allow anyone to clk_get() any clock that doesn't have a
+> > path to root.
+> 
+> EPROBE_DEFER only makes sense in driver's probe paths and so I would be
+> very against adding it to clk_enable() which is called from many places
+> in the kernel. If we decide to go with EPROBE_DEFER then returning it
+> from clk_get() seems like a much better choice since it is normally
+> called during probing.
 
-Is ARCH_EXYNOS appropriate here, or is your new SOC_SAMSUNG better?
+Absolutely correct.  EINVAL would be better for clk_prepare() since it
+isn't something that can be recovered from by just retrying a bit later.
 
-> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
-> new file mode 100644
-> index 0000000..a424ebc
-> --- /dev/null
-> +++ b/drivers/soc/samsung/Kconfig
-> @@ -0,0 +1,20 @@
-> +#
-> +# SAMSUNG SOC drivers
-> +#
-> +menuconfig SOC_SAMSUNG
-> +	bool "Samsung SOC drivers support"
-
-If you intend to select SOC_SAMSUNG, is there any point in making this
-a user-visible symbol?
+You're absolutely correct that EPROBE_DEFER has no business being returned
+in any path other than a driver's probe function; it is not a user visible
+error code, it is a special internal Linux error code which only the driver
+model understands to mean "add this device to the deferred probe list and
+try again a while later."  Userspace, especially, should never see this
+error code.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
