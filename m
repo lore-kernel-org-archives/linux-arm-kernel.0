@@ -1,192 +1,88 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 20 Nov 2014 11:13:01 +0100
-Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
- completes
-In-Reply-To: <4182833.JTef00bpdk@vostro.rjw.lan>
-References: <20141117220238.GE5258@dtor-ws> <3492523.qBADTmdTqo@vostro.rjw.lan>
- <CAPDyKFoiEMO5E3nMJDZkFkuio-5sh99m55k-yM=fuqrHUXbhZw@mail.gmail.com>
- <4182833.JTef00bpdk@vostro.rjw.lan>
-Message-ID: <CAPDyKFo-b7wB7DJifwX0ARu8GJYQmSn6W5NDs4++BvO5LTVGEA@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 20 Nov 2014 11:13:21 +0100
+Subject: voice calls on N900 working (off-line) was Re: N900 modem support in
+ 3.18-rc1
+In-Reply-To: <20141114215749.GA19023@earth.universe>
+References: <20141104205117.GA17606@amd>
+ <20141106180335.GA21513@earth.universe>
+ <20141106225005.GA14002@amd> <201411070001.46481@pali>
+ <545C6F14.8050303@gmail.com>
+ <20141113162420.GB8512@xo-6d-61-c0.localdomain>
+ <5465A977.4030605@gmail.com>
+ <20141114172008.GB12250@earth.universe>
+ <54665E02.8050108@gmail.com>
+ <20141114215749.GA19023@earth.universe>
+Message-ID: <20141120101320.GA6356@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 November 2014 01:35, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Wednesday, November 19, 2014 09:54:00 AM Ulf Hansson wrote:
->> [...]
->>
->> >>
->> >> Scenario 5), a platform driver with/without runtime PM callbacks.
->> >> ->probe()
->> >> - do some initialization
->> >> - may fetch handles to runtime PM resources
->> >> - pm_runtime_enable()
->> >
->> > Well, and now how the driver knows if the device is "on" before accessing it?
->>
->> In this case the driver don't need to access the device during
->> ->probe(). That's postponed until sometime later.
->
-> If this is a platform driver, it rather does need to access the device,
-> precisely because it doesn't know what power state the device is in otherwise.
-> See below.
->
->> >> Note 1)
->> >> Scenario 1) and 2), both relies on the approach to power on the PM
->> >> domain by using pm_runtime_get_sync(). That approach didn't work when
->> >> CONFIG_PM_RUNTIME was unset, but we recently decided to fixed that by
->> >> the below patch, so that's good!
->> >> "[PATCH] PM / domains: Kconfig: always enable PM_RUNTIME when genpd enabled"
->> >>
->> >> Note 2)
->> >> Scenario 3) and 4) use the same principles for managing runtime PM.
->> >> These scenarios needs a way to power on the generic PM domain prior
->> >> probing the device. The call to pm_runtime_set_active(), prevents an
->> >> already powered PM domain from power off until after probe, but that's
->> >> not enough.
->> >>
->> >> Note 3)
->> >> The $subject patch, tried to address the issues for scenario 3) and
->> >> 4). It does so, but will affect scenario 5) which was working nicely
->> >> before. In scenario 5), the $subject patch will cause the generic PM
->> >> domain to potentially stay powered after ->probe() even if the device
->> >> is runtime PM suspended.
->> >
->> > Why would it?  If the device is runtime-suspended, the domain will know
->> > that, because its callbacks will be used for that.  At least, that's
->> > what I'd expect to happen, so is there a problem here?
->>
->> Genpd do knows about the device but it doesn?t get a "notification" to
->> power off. There are no issues whatsoever for driver.
->
-> Except that the driver is arguably buggy.
->
->> This is a somewhat special case. Let's go through an example.
->>
->> 1. The PM domain is initially in powered off state.
->> 2. The bus ->probe() invokes dev_pm_domain_attach() and then the PM
->> domain gets attached to the device.
->> 3. $subject patch causes the PM domain to power on.
->> 4. A driver ->probe() sequence start, following the Scenario 5).
->> 5. The device is initially in runtime PM suspended state and it will
->> remain so during ->probe().
->
-> But is it physically suspended?
->
-> The runtime PM status of the device after ->probe is required to reflect its
-> real state if runtime PM is enabled.  If that's not the case, it is a bug.
+Hi!
 
-Agree.
+> > REed pulseaudio modules that use cmtspeech will be ready sooner than later
+> > (I believe in 2-3 monts from now), see on gitorious how fast we progressed
+> > with -record and -music modules. Sure, -voice module is way more
+> > complicated, but lots of it is already opensourced, we just need to figure
+> > out a couple of DSP algorithms(drc, agc, aec, etc) related to call quality.
+> > But I don't think the driver should wait for those modules to be REed, they
+> > can be used as is even now, in their closed form for testing.
+> 
+> https://gitorious.org/pulseaudio-modules-nemo/jusas-tanuk2-mer-packaging/source/6ed34611b49c99b007f614d9dff4d58369876345:
+> https://github.com/nemomobile/pulseaudio-module-cmtspeech-n9xx/commits/master
+> 
+> It seems there is already cmtspeech code for pulseaudio?
 
-While I was searching for drivers that behave as in scenario 5), they
-tend to register some subsystem specific callbacks and don't access
-the device until some of those callbacks are invoked.
+Yes, and it works; but see below.
 
-At least that was my interpretation of their ->probe() methods, but
-it's not always easy to tell how those callbacks are being used for
-each subsystem.
+> > Unfortunately all my spare time is dedicated to that PA stuff, so
+> > I simply can't cleanup cmtspeech driver and send a patch for
+> > upstreaming. (Pavel, what about you?)
+> 
+> If somebody gets audio working with your driver and documents the
+> steps needed in userland I will take care of upstreaming the driver.
 
->
-> Now, for platform drivers, the driver can't really assume anything in
-> particular about the current power state of the device at ->probe time,
-> because different platforms including devices handled by that driver may
-> behave differently.
->
-> A good example would be two platforms A and B where the same device X is in a
-> power domain such that A boots with the domain (physically) "on", while B boots
-> with the domain "off".  If the driver for X assumes anything about the initial
-> power state of the device, it may not work on either A or B.
+I got it to work.
 
-I get your point and agree!
+Ok, so realtime audio does not work due to some pulseaudio problems,
+but I was able to record a (silent) call and then replay it with 
 
->
->> 6. The pm_request_idle() invoked after really_probe() in driver core,
->> won't trigger a runtime PM suspend callback to be invoked. In other
->> words, genpd don't get a "notification" that it may power off.
->>
->> In this state, genpd will either power off from the late_initcall,
->> genpd_poweroff_unused() (depending on when the driver was probed) or
->> wait until some device's runtime PM suspend callback is invoked at any
->> later point.
->
-> Which sounds OK to me, so why is it a problem?
+pacat --rate 4000 ../../../pulseaudio2.raw
 
-The late_initcall doesn't work for modules.
+on my PC. I have yet to do some testing on the microphone side.
 
-Also, suppose the PM domain only holds this "inactive device" that was
-probed as in scenario 5). Then, you could end up having the PM domain
-powered, even if it isn't needed.
+I'm using Debian 7 as a a base, and I suggest nfsroot.
 
-Anyway, I can live with this. It's likely the driver that behave as in
-scenario 5) that should be fixed as you stated.
+It seems that libcmtspeechdata + pulseaudio-module-cmtspeech-n9xx is
+enough to get calls to work. Now. I could not get configure on these
+packages to work, so I hard-coded build scripts (mkit). You'll need to
+symlink resulting .so to pulseaudio directory (see
+/my/pulseaudio-module-cmtspeech-n9xx/src/cmtspeech/mkit). I leave binaries in,
+since this is non-trivial to compile. Some memory allocation stuff was
+missing. I faked it; it seems it is not needed in the first call.
 
->
->> >> I see three options going forward.
->> >>
->> >> Option 1)
->> >> Convert scenario 3) and 4) into using the pm_runtime_get_sync()
->> >> approach. There are no theoretical obstacles to do this, but pure
->> >> practical. There are a lot of drivers that needs to be converted and
->> >> we also need to teach driver authors future wise to not use
->> >> pm_runtime_set_active() in this manner.
->> >
->> > I'd say we need to do something like this anyway.  That is, standardize on
->> > *one* approach.  I'm actually not sure what approach is the most useful,
->> > but the pm_runtime_get_sync() one seems to be the most popular to me.
->> >
->> >> Option 2)
->> >> Add some kind of get/put API for PM domains. The buses invokes it to
->> >> control the power to the PM domain. From what I understand, that's
->> >> also what Dmitry think is needed!?
->> >> Anyway, that somehow means to proceed with the approach I took in the
->> >> below patchset.
->> >> [PATCH v3 0/9] PM / Domains: Fix race conditions during boot
->> >> http://marc.info/?t=141320907000003&r=1&w=2
->> >
->> > I don't like that.  The API is already quite complicated in my view and
->> > adding even more complexity to it is not going to help in the long run.
->>
->> I absolutely agree that we shouldn't add unnecessary APIs and keep
->> APIs as simple as possible.
->>
->> In that context, I think the effect from proceeding with Option 2)
->> also means there are no need for the below APIs any more.
->> pm_genpd_poweron()
->> pm_genpd_name_poweron() (requires some additional work though)
->> pm_genpd_poweroff_unused()
->> pm_genpd_dev_need_restore()
->>
->> I guess you figured out that I am in favour of Option 2). :-)
->> Especially since it cover all scenarios and we don't have to go a fix
->> a vast amount of drivers.
->
-> Adding more callbacks to struct dev_pm_domain just in order to handle some
-> genpd-specific use case is out of the question.  If you find a way within
-> genpd to address this the way you like, I'm open for ideas.  Otherwise,
-> let's just do what I said.
->
->> >
->> >> Option 3)
->> >> Live we the limitation this $subject patch introduces for scenario 5).
->> >
->> > I'd say, 3) for now and 1) going forward.
->>
->> This could work!
->>
->> The hardest part is to know when we should revert $subject patch, to
->> fix the regression introduced for scenario 5).
->
-> Well, I don't think so.
->
-> First of all, there is a (very) limited number of platforms using genpd today
-> and it should be perfectly possible to go through the platform drivers used
-> by them and see which of those drivers are affected.  Fixing them should not
-> be too hard either.
+untar in the root directory of n900. Reset n900, no need to log in
+into console, connect using ssh -X root at n900.
 
-Considering that scenario 5) probably exists because of buggy drivers
-and that the related issues is very limited, I am perfectly fine with
-your proposal!
+Then go to /my/tui/ofone. Run "./run" -- that should start
+pulseaudio. Run "./ofone", hit "lowlevel: online", hit "contacts",
+enter phone number you want to call, hit the number, it should start
+dialing.
 
-Will you queue this patch then?
+Wait a while, hit "lowlevel: hangup".
 
-Kind regards
-Uffe
+Now you should have:
+
+/my/pulseaudio2.raw
+
+you can play with pacat above, and /my/pulseaudio.log.*, which
+contains stuff that needs to be fixed.
+
+I've put the archive at
+
+http://atrey.karlin.mff.cuni.cz/~pavel/outgoing/n900-my.tgz
+
+Have fun!
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
