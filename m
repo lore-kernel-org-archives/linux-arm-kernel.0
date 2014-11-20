@@ -1,30 +1,45 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 20 Nov 2014 07:10:35 -0800
-Subject: [PATCH] tty: serial: msm_serial: Don't require DT aliases
-In-Reply-To: <1415990361-8897-1-git-send-email-sboyd@codeaurora.org>
-References: <1415990361-8897-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CAMAWPa8m5Ey6ee8tK8n8g7T6XL7=ZfLzrQgbW9-2iPVWnUfigw@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 20 Nov 2014 16:11:45 +0100
+Subject: [PATCH 0/4] ARM: EXYNOS: cpuidle: add AFTR mode support for Exynos3250
+Message-ID: <1416496309-27602-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
+Hi,
 
-On Fri, Nov 14, 2014 at 10:39 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> If there isn't a DT alias then of_alias_get_id() will return
-> -ENODEV. This will cause the msm_serial driver to fail probe,
-> when we want to keep the previous behavior where we generated a
-> dynamic line number at probe time. Restore this behavior by
-> generating a dynamic id if the line number is still negative
-> after checking for an alias or in the non-DT case looking at the
-> .id field of the platform device.
->
-> Reported-by: Kevin Hilman <khilman@kernel.org>
-> Tested-by: Kevin Hilman <khilman@linaro.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+This patch series adds support for AFTR idle mode on boards with
+Exynos3250 SoC and allows EXYNOS cpuidle driver usage on these
+boards.
 
-Can you add this to tty-next.  Without this, all the ARM/qcom boards
-do not boot in linux-next.
+It has been tested on Samsung Rinato board (Gear 2).
 
-Thanks,
+Depends on:
+- for-next branch of linux-samsung.git kernel tree
+  (or next-20141114 branch of linux-next kernel tree)
+- [PATCH v5] ARM: EXYNOS: add Exynos3250 PMU support
+  (https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg39109.html)
 
-Kevin
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+
+Bartlomiej Zolnierkiewicz (4):
+  ARM: EXYNOS: fix CPU1 hotplug for AFTR mode on Exynos3250
+  ARM: EXYNOS: add code for setting/clearing boot flag
+  ARM: EXYNOS: cpuidle: add AFTR mode support for Exynos3250
+  ARM: EXYNOS: cpuidle: allow driver usage on Exynos3250 SoC
+
+ arch/arm/mach-exynos/common.h   |  6 ++++++
+ arch/arm/mach-exynos/exynos.c   | 26 ++++++++++++++++++++++++++
+ arch/arm/mach-exynos/firmware.c |  8 +++++++-
+ arch/arm/mach-exynos/platsmp.c  | 19 +++++++++++++++++--
+ arch/arm/mach-exynos/pm.c       | 12 +++++++++++-
+ arch/arm/mach-exynos/regs-pmu.h |  2 ++
+ arch/arm/mach-exynos/smc.h      |  9 +++++++++
+ 7 files changed, 78 insertions(+), 4 deletions(-)
+
+-- 
+1.8.2.3
