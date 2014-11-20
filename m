@@ -1,40 +1,125 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Nov 2014 17:53:57 +0100
-Subject: [GIT PULL] ARM: STi: defconfig changes for v3.19, round 1
-In-Reply-To: <546B52A3.7020908@st.com>
-References: <546B52A3.7020908@st.com>
-Message-ID: <201411201753.57620.arnd@arndb.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 20 Nov 2014 16:56:59 +0000 (UTC)
+Subject: [RFC PATCH] ARM: DRA: hwmod: RTC: Add reset function for RTC
+In-Reply-To: <546DB513.6000104@ti.com>
+References: <1416199402-3865-1-git-send-email-lokeshvutla@ti.com>
+ <546DB513.6000104@ti.com>
+Message-ID: <alpine.DEB.2.02.1411201644470.9204@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 November 2014, Maxime Coquelin wrote:
-> Hi Olof, Arnd and Kevin,
-> 
-> Please consider this first round of STi defconfig updates for v3.19 :
-> 
-> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-> 
->    Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-> 
-> are available in the git repository at:
-> 
->    git://git.stlinux.com/devel/kernel/linux-sti.git 
-> tags/sti-defconfig-for-v3.19-1
-> 
-> for you to fetch changes up to 1d5b8b621e31e46f82ed9254af9cd1faa5b81dbb:
-> 
->    ARM: multi_v7_defconfig: Enable stih415/6 usb2 phy driver. 
-> (2014-11-18 13:38:16 +0100)
-> 
-> ----------------------------------------------------------------
-> STi defconfig updates for v3.19
-> 
-> Highlights:
-> -----------
->   - Enable ST EHCI and OHCI USB drivers
->   - Enable STiH416 and STiH415 USB2 PHY driver
-> 
->
-Pulled into next/defconfig, thanks!
+On Thu, 20 Nov 2014, Lokesh Vutla wrote:
 
-	Arnd
+> On Monday 17 November 2014 10:13 AM, Lokesh Vutla wrote:
+> > RTC IP have kicker feature which prevents spurious writes to its registers.
+> > In order to write into any of the RTC registers, KICK values has te be
+> > written to KICK registers. Currently hwmod is updating the IDLEMODE in rtc
+> > sysconfig register without writing into any kick register which is a noop.
+> > When autoidle is allowed for rtc, interruts are not received until IDLEMODE
+> > is set to SIDLE_SMART_WKUP.
+> > Adding a reset function to unlock RTC registers so that IDLEMODE is
+> > updated.
+> Ping..!!
+> Is this patch acceptable?
+
+Lokesh
+
+1. This looks like a fix.  Is this intended to go in as a v3.18-rc patch, 
+or against v3.19?  If so it would be very helpful for the maintainers if 
+you were to state that somewhere.
+
+2. Your patch unlocks the RTC registers, but never relocks it.  This seems 
+to defeat the point of the spurious write protection.  Shouldn't your 
+patch only unlock the RTC immediately before the hwmod code touches the 
+RTC registers, and then relock it immediately afterwards, per SPRUHZ6 
+section 23.4.3.3?  If so then the .reset function pointer is the wrong 
+place for this; I would suggest adding some .lock and .unlock function 
+pointers that are to be called before and after any register write to the 
+IP block.
+
+3. Your macros don't mention DRA7xx specifically.  Does this sequence 
+apply to some other TI chips, or just DRA7xx?  Please document this in a 
+comment above the macros, and possibly change the name of the macros to 
+refer to DRA7XX.
+
+
+- Paul
+
+> 
+> Thanks and regards,
+> Lokesh
+> > 
+> > Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/omap_hwmod.h          |  1 +
+> >  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  1 +
+> >  arch/arm/mach-omap2/omap_hwmod_reset.c    | 23 +++++++++++++++++++++++
+> >  3 files changed, 25 insertions(+)
+> > 
+> > diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
+> > index 512f809..3703f99 100644
+> > --- a/arch/arm/mach-omap2/omap_hwmod.h
+> > +++ b/arch/arm/mach-omap2/omap_hwmod.h
+> > @@ -744,6 +744,7 @@ const char *omap_hwmod_get_main_clk(struct omap_hwmod *oh);
+> >   */
+> >  
+> >  extern int omap_hwmod_aess_preprogram(struct omap_hwmod *oh);
+> > +int omap_hwmod_rtc_unlock(struct omap_hwmod *oh);
+> >  
+> >  /*
+> >   * Chip variant-specific hwmod init routines - XXX should be converted
+> > diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> > index 5684f11..90e1df4 100644
+> > --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> > +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> > @@ -1584,6 +1584,7 @@ static struct omap_hwmod_class_sysconfig dra7xx_rtcss_sysc = {
+> >  static struct omap_hwmod_class dra7xx_rtcss_hwmod_class = {
+> >  	.name	= "rtcss",
+> >  	.sysc	= &dra7xx_rtcss_sysc,
+> > +	.reset	= &omap_hwmod_rtc_unlock,
+> >  };
+> >  
+> >  /* rtcss */
+> > diff --git a/arch/arm/mach-omap2/omap_hwmod_reset.c b/arch/arm/mach-omap2/omap_hwmod_reset.c
+> > index 65e186c..b825a28 100644
+> > --- a/arch/arm/mach-omap2/omap_hwmod_reset.c
+> > +++ b/arch/arm/mach-omap2/omap_hwmod_reset.c
+> > @@ -30,6 +30,12 @@
+> >  
+> >  #include "omap_hwmod.h"
+> >  
+> > +#define RTC_KICK0_REG_OFFSET	0x6c
+> > +#define RTC_KICK1_REG_OFFSET	0x70
+> > +
+> > +#define RTC_KICK0_VALUE		0x83E70B13
+> > +#define RTC_KICK1_VALUE		0x95A4F1E0
+> > +
+> >  /**
+> >   * omap_hwmod_aess_preprogram - enable AESS internal autogating
+> >   * @oh: struct omap_hwmod *
+> > @@ -51,3 +57,20 @@ int omap_hwmod_aess_preprogram(struct omap_hwmod *oh)
+> >  
+> >  	return 0;
+> >  }
+> > +
+> > +/**
+> > + * omap_hwmod_rtc_unlock - Reset and unlock the Kicker mechanism.
+> > + * @oh: struct omap_hwmod *
+> > + *
+> > + * RTC IP have kicker feature.  This prevents spurious writes to its registers.
+> > + * In order to write into any of the RTC registers, KICK values has te be
+> > + * written in respective KICK registers. This is needed for hwmod to write into
+> > + * sysconfig register.
+> > + */
+> > +int omap_hwmod_rtc_unlock(struct omap_hwmod *oh)
+> > +{
+> > +	omap_hwmod_write(RTC_KICK0_VALUE, oh, RTC_KICK0_REG_OFFSET);
+> > +	omap_hwmod_write(RTC_KICK1_VALUE, oh, RTC_KICK1_REG_OFFSET);
+> > +
+> > +	return 0;
+> > +}
+> > 
+> 
+
+
+- Paul
