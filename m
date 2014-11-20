@@ -1,88 +1,58 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 20 Nov 2014 11:13:21 +0100
-Subject: voice calls on N900 working (off-line) was Re: N900 modem support in
- 3.18-rc1
-In-Reply-To: <20141114215749.GA19023@earth.universe>
-References: <20141104205117.GA17606@amd>
- <20141106180335.GA21513@earth.universe>
- <20141106225005.GA14002@amd> <201411070001.46481@pali>
- <545C6F14.8050303@gmail.com>
- <20141113162420.GB8512@xo-6d-61-c0.localdomain>
- <5465A977.4030605@gmail.com>
- <20141114172008.GB12250@earth.universe>
- <54665E02.8050108@gmail.com>
- <20141114215749.GA19023@earth.universe>
-Message-ID: <20141120101320.GA6356@amd>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 20 Nov 2014 10:13:41 +0000
+Subject: [PATCH 1/1] iommu/arm-smmu: forbid userspace IO devices access
+ memory through SMMU by default
+In-Reply-To: <1416477421-1288-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1416477421-1288-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <20141120101340.GC19126@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Thu, Nov 20, 2014 at 09:57:01AM +0000, Zhen Lei wrote:
+> It's dangerous to set pte with ARM_SMMU_PTE_AP_UNPRIV. A hacker can use any
+> devices running at userspace to access the memory which originally mapped for
+> kernel devices, suppose they have the same StreamID. The userspace devices
+> should through vfio to dynamic create mapping.
 
-> > REed pulseaudio modules that use cmtspeech will be ready sooner than later
-> > (I believe in 2-3 monts from now), see on gitorious how fast we progressed
-> > with -record and -music modules. Sure, -voice module is way more
-> > complicated, but lots of it is already opensourced, we just need to figure
-> > out a couple of DSP algorithms(drc, agc, aec, etc) related to call quality.
-> > But I don't think the driver should wait for those modules to be REed, they
-> > can be used as is even now, in their closed form for testing.
+I don't fully understand the problem here. vfio will create a set of private
+page tables for the container, so I can't see why the privilege really
+matters, given that the whole thing is sandboxed anyway.
+
+Furthermore, if we change the default to PRIV, then it will break for any
+devices wired to emit unprivileged transactions only.
+
+Will
+
 > 
-> https://gitorious.org/pulseaudio-modules-nemo/jusas-tanuk2-mer-packaging/source/6ed34611b49c99b007f614d9dff4d58369876345:
-> https://github.com/nemomobile/pulseaudio-module-cmtspeech-n9xx/commits/master
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>  drivers/iommu/arm-smmu.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> It seems there is already cmtspeech code for pulseaudio?
-
-Yes, and it works; but see below.
-
-> > Unfortunately all my spare time is dedicated to that PA stuff, so
-> > I simply can't cleanup cmtspeech driver and send a patch for
-> > upstreaming. (Pavel, what about you?)
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 60558f7..e31517b 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -92,7 +92,7 @@
+>  #define ARM_SMMU_PTE_CONT_MASK		(~(ARM_SMMU_PTE_CONT_SIZE - 1))
 > 
-> If somebody gets audio working with your driver and documents the
-> steps needed in userland I will take care of upstreaming the driver.
-
-I got it to work.
-
-Ok, so realtime audio does not work due to some pulseaudio problems,
-but I was able to record a (silent) call and then replay it with 
-
-pacat --rate 4000 ../../../pulseaudio2.raw
-
-on my PC. I have yet to do some testing on the microphone side.
-
-I'm using Debian 7 as a a base, and I suggest nfsroot.
-
-It seems that libcmtspeechdata + pulseaudio-module-cmtspeech-n9xx is
-enough to get calls to work. Now. I could not get configure on these
-packages to work, so I hard-coded build scripts (mkit). You'll need to
-symlink resulting .so to pulseaudio directory (see
-/my/pulseaudio-module-cmtspeech-n9xx/src/cmtspeech/mkit). I leave binaries in,
-since this is non-trivial to compile. Some memory allocation stuff was
-missing. I faked it; it seems it is not needed in the first call.
-
-untar in the root directory of n900. Reset n900, no need to log in
-into console, connect using ssh -X root at n900.
-
-Then go to /my/tui/ofone. Run "./run" -- that should start
-pulseaudio. Run "./ofone", hit "lowlevel: online", hit "contacts",
-enter phone number you want to call, hit the number, it should start
-dialing.
-
-Wait a while, hit "lowlevel: hangup".
-
-Now you should have:
-
-/my/pulseaudio2.raw
-
-you can play with pacat above, and /my/pulseaudio.log.*, which
-contains stuff that needs to be fixed.
-
-I've put the archive at
-
-http://atrey.karlin.mff.cuni.cz/~pavel/outgoing/n900-my.tgz
-
-Have fun!
-
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+>  /* Stage-1 PTE */
+> -#define ARM_SMMU_PTE_AP_UNPRIV		(((pteval_t)1) << 6)
+> +#define ARM_SMMU_PTE_AP_PRIV		(((pteval_t)0) << 6)
+>  #define ARM_SMMU_PTE_AP_RDONLY		(((pteval_t)2) << 6)
+>  #define ARM_SMMU_PTE_ATTRINDX_SHIFT	2
+>  #define ARM_SMMU_PTE_nG			(((pteval_t)1) << 11)
+> @@ -1296,7 +1296,7 @@ static int arm_smmu_alloc_init_pte(struct arm_smmu_device *smmu, pmd_t *pmd,
+>  	}
+> 
+>  	if (stage == 1) {
+> -		pteval |= ARM_SMMU_PTE_AP_UNPRIV | ARM_SMMU_PTE_nG;
+> +		pteval |= ARM_SMMU_PTE_AP_PRIV | ARM_SMMU_PTE_nG;
+>  		if (!(prot & IOMMU_WRITE) && (prot & IOMMU_READ))
+>  			pteval |= ARM_SMMU_PTE_AP_RDONLY;
+> 
+> --
+> 1.8.0
+> 
+> 
+> 
