@@ -1,28 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 20 Nov 2014 13:41:22 +0000
-Subject: [GIT PULL] ARM: perf: updates for 3.19
-In-Reply-To: <201411201350.45478.arnd@arndb.de>
-References: <20141114191637.GA9291@arm.com> <201411201350.45478.arnd@arndb.de>
-Message-ID: <20141120134122.GL19126@arm.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 20 Nov 2014 21:47:30 +0800
+Subject: [PATCH] ARM: dts: prima2: add resets property for VPP nodes
+Message-ID: <1416491250-4623-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 20, 2014 at 12:50:45PM +0000, Arnd Bergmann wrote:
-> On Friday 14 November 2014, Will Deacon wrote:
-> > Hi Arnd, Olof, Russell,
-> > 
-> > Please can you pull the following ARM perf updates into arm-soc?
-> > 
-> > I usually send these via rmk's tree, but there's a bunch of CCI PMU
-> > rework in here which is then relied upon by other patches in the series,
-> > so it would be easiest to keep it all together.
-> > 
-> > These have been in -next for a few weeks, so please let me know when
-> > you've pulled and I'll drop my branch from there.
-> > 
-> 
-> Pulled into next/drivers. Russell, please yell if you have any objections.
+From: Renwei Wu <Renwei.Wu@csr.com>
 
-Thanks Arnd, I'll drop my branch from -next. Sorry for pestering!
+this patch adds missed resets property for CSR SiRFprimaII Video Post
+Processor(VPP) node.
 
-Will
+Signed-off-by: Renwei Wu <renwei.wu@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ arch/arm/boot/dts/prima2.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/prima2.dtsi b/arch/arm/boot/dts/prima2.dtsi
+index dd4b644..b598b2c 100644
+--- a/arch/arm/boot/dts/prima2.dtsi
++++ b/arch/arm/boot/dts/prima2.dtsi
+@@ -137,6 +137,7 @@
+ 				reg = <0x90020000 0x10000>;
+ 				interrupts = <31>;
+ 				clocks = <&clks 35>;
++				resets = <&rstc 6>;
+ 			};
+ 		};
+ 
+-- 
+2.1.1
