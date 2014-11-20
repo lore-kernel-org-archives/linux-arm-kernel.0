@@ -1,29 +1,64 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 20 Nov 2014 14:05:32 -0800
-Subject: [PATCH v3 00/13] arm64: stable UEFI mappings for kexec
-In-Reply-To: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1416521132.23886.108.camel@smoke>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 20 Nov 2014 15:26:50 -0700
+Subject: [PATCH 6/6] pci, acpi: Share ACPI PCI config space accessors.
+In-Reply-To: <2360791.Aj7tQ0nCJ3@wuerfel>
+References: <1416413091-13452-1-git-send-email-tomasz.nowicki@linaro.org>
+ <1416413091-13452-7-git-send-email-tomasz.nowicki@linaro.org>
+ <2360791.Aj7tQ0nCJ3@wuerfel>
+Message-ID: <20141120222650.GC7987@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Wed, Nov 19, 2014 at 05:19:20PM +0100, Arnd Bergmann wrote:
+> On Wednesday 19 November 2014 17:04:51 Tomasz Nowicki wrote:
+> > +/*
+> > + * raw_pci_read/write - ACPI PCI config space accessors.
+> > + *
+> > + * ACPI spec defines MMCFG as the way we can access PCI config space,
+> > + * so let MMCFG be default (__weak).
+> > + *
+> > + * If platform needs more fancy stuff, should provides its own implementation.
+> > + */
+> > +int __weak raw_pci_read(unsigned int domain, unsigned int bus,
+> > +                       unsigned int devfn, int reg, int len, u32 *val)
+> > +{
+> > +       return pci_mmcfg_read(domain, bus, devfn, reg, len, val);
+> > +}
+> > +
+> > +int __weak raw_pci_write(unsigned int domain, unsigned int bus,
+> > +                        unsigned int devfn, int reg, int len, u32 val)
+> > +{
+> > +       return pci_mmcfg_write(domain, bus, devfn, reg, len, val);
+> > +}
+> > +
+> > 
+> 
+> I think it would be better to avoid __weak functions here, as they tend
+> to be hard to follow when trying to understand the code.
 
-On Tue, 2014-11-18 at 13:56 +0100, Ard Biesheuvel wrote:
-> This is v3 of the series to update the UEFI memory map handling for the arm64
-> architecture so that:
+That's interesting.  I would have said exactly the opposite -- I think the
+extra Kconfiggery is harder to follow than weak/strong functions :)
 
-I merged in your EFI patches into my master branch [1] and was able
-to do a successful chain of (four) kexec re-boots of the same kernel
-image on the ARM base model running LEG 14.10 EFI binaries [2].  EFI
-showed:
+But consistency is better than my personal opinion.  Is there a consensus
+that we should use the Kconfig strategy instead of __weak?
 
-  UEFI v2.40 (ARM Fixed Virtual Platform EFI Oct 23 2014 15:53:09, 0x00000000)
-
-I only verified that all CPU's came up and that /proc/meminfo and the
-/proc/iomem 'System RAM' entries looked ok. 
-
-[1] https://git.linaro.org/people/geoff.levand/linux-kexec.git
-[2] https://releases.linaro.org/14.10/components/kernel/uefi-linaro/release/fvp_minimal
-
--Geoff
+> How about using a Kconfig symbol like this:
+> 
+> #ifdef CONFIG_ARCH_RAW_PCI_READWRITE
+> int raw_pci_read(unsigned int domain, unsigned int bus, unsigned int devfn,
+>                  int reg, int len, u32 *val);
+> int raw_pci_write(unsigned int domain, unsigned int bus, unsigned int devfn,
+>                   int reg, int len, u32 val);
+> #else
+> static inline int raw_pci_read(unsigned int domain, unsigned int bus,
+> 	                       unsigned int devfn, int reg, int len, u32 *val)
+> {
+> 	return pci_mmcfg_read(domain, bus, devfn, reg, len, val);
+> }
+> 
+> static inline int raw_pci_write(unsigned int domain, unsigned int bus,
+>              		                unsigned int devfn, int reg, int len, u32 val)
+> {
+>        return pci_mmcfg_write(domain, bus, devfn, reg, len, val);
+> }
+> #endif
