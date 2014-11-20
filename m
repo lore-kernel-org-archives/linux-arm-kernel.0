@@ -1,30 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Nov 2014 12:14:10 +0100
-Subject: [GIT PULL] ARM: perf: updates for 3.19
-In-Reply-To: <20141120105614.GD19126@arm.com>
-References: <20141114191637.GA9291@arm.com> <20141120105614.GD19126@arm.com>
-Message-ID: <3495467.RDAX3vWgdk@wuerfel>
+Date: Thu, 20 Nov 2014 12:18:28 +0100
+Subject: [PATCH] ARM: bcm2835: Add device tree for Raspberry Pi model B+
+In-Reply-To: <1416480765-13449-1-git-send-email-lee@kernel.org>
+References: <1416480765-13449-1-git-send-email-lee@kernel.org>
+Message-ID: <2041471.8rvf0EmQUU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 November 2014 10:56:14 Will Deacon wrote:
-> On Fri, Nov 14, 2014 at 07:16:37PM +0000, Will Deacon wrote:
-> > Hi Arnd, Olof, Russell,
-> > 
-> > Please can you pull the following ARM perf updates into arm-soc?
-> > 
-> > I usually send these via rmk's tree, but there's a bunch of CCI PMU
-> > rework in here which is then relied upon by other patches in the series,
-> > so it would be easiest to keep it all together.
-> > 
-> > These have been in -next for a few weeks, so please let me know when
-> > you've pulled and I'll drop my branch from there.
+On Thursday 20 November 2014 10:52:45 Lee Jones wrote:
+> From: Matthias Klein <matthias.klein@linux.com>
 > 
-> Ping? Anything else you need from me to get this into arm-soc?
+> The model B and B+ differ in the GPIO lines for ACT and PWR leds, and the
+> I2S interface.
+> 
+> Signed-off-by: Matthias Klein <matthias.klein@linux.com>
+> Tested-by: Stephen Warren <swarren@nvidia.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+> 
+> As requested by Arnd.
+> 
+>  arch/arm/boot/dts/Makefile               |  1 +
+>  arch/arm/boot/dts/bcm2835-rpi-b-plus.dts | 30 +++++++++++++++++++
+>  arch/arm/boot/dts/bcm2835-rpi-b.dts      | 46 ++--------------------------
+>  arch/arm/boot/dts/bcm2835-rpi.dtsi       | 51 ++++++++++++++++++++++++++++++++
+>  4 files changed, 85 insertions(+), 43 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
+>  create mode 100644 arch/arm/boot/dts/bcm2835-rpi.dtsi
 > 
 
-I'm still working through the backlog, it's on the list.
+Applied to next/dt.
 
-Thanks for following up.
+When you send a patch for inclusion the next time, better
+be explicit and ask for it to be picked up into arm-soc, so we
+know it's not just for review.
+
+Thanks,
 
 	Arnd
