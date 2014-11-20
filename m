@@ -1,39 +1,57 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 19 Nov 2014 16:33:32 -0800
-Subject: [PATCH 0/3] PM / Domains: Add initial PM clock support to genpd
-In-Reply-To: <1416405638-18812-1-git-send-email-ulf.hansson@linaro.org> (Ulf
- Hansson's message of "Wed, 19 Nov 2014 15:00:35 +0100")
-References: <1416405638-18812-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <7hk32qu2w3.fsf@deeprootsystems.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Thu, 20 Nov 2014 08:32:58 +0800
+Subject: [GIT PULL]Hisilicon HiX5HD2 soc defconfig udaptes for v3.19
+In-Reply-To: <201411192316.52226.arnd@arndb.de>
+References: <545CBE10.2070502@hisilicon.com> <201411192316.52226.arnd@arndb.de>
+Message-ID: <546D36BA.1050809@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf Hansson <ulf.hansson@linaro.org> writes:
 
-> It's quite common for PM domains to use PM clocks. Typically from SOC specific
-> code, the per device PM clock list is created and pm_clk_suspend|resume() are
-> invoked to handle clock gating/ungating.
->
-> A step towards consolidation is to integrate PM clock support into genpd, which
-> is what this patchset does.
->
-> In this initial step, the calls to the pm_clk_suspend|resume() are handled
-> within genpd, but the per device PM clock list still needs to be created from
-> SOC specific code. It seems reasonable to have gendp to handle that as well, but
-> that left to future patchsets to address.
 
-I think we need to get rid of the SoC specific code already.  For
-example, we're already seeing SoCs where the arm32 core is being
-replaced by an arm64 core but the other IPs, and power-domain logic is
-staying more or less the same.  
+On 2014/11/20 6:16, Arnd Bergmann wrote:
+> On Friday 07 November 2014, Wei Xu wrote:
+>> Please help to merge pull request for hisilicon hix5hd2 soc config updates for 3.19. 
+>> Thanks!
+>>
+>> Best Regards,
+>> Wei
+>>
+>> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+>>
+>>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-config-for-3.19
+>>
+>> for you to fetch changes up to c56a3fbb811d51a810f97a1aca00d37840509b68:
+>>
+>>   ARM: hisi_defconfig: add driver support for hix5hd2 (2014-11-07 19:59:58 +0800)
+>>
+>> ----------------------------------------------------------------
+>> ARM: HiX5HD2: config update for 3.19
+>>
+>> - Enable GMAC, GPIO, Reset, USB, MMC and SATA on HiX5HD2
+>>
 
-> It's not every users of genpd that are keen on using PM clocks thus we need
-> to provide this a configuration option for genpd.
+Hi Arnd,
 
-Or more likely, probably some compatible string, or property in the
-domain node.  Grygorii, Arnd and myself were discussing this elsewhere
-in the context of the TI Keystone2 PM domain support[1].
+> Pulled into next/defconfig.
 
-Kevin
+Thank you very much!
+ 
+> I notice that at least some of the drivers are only enabled in hisi_defconfig
+> but not in multi_v7_defconfig. Please enable all of them in the generic
+> multi_v7_defconfig as well, check that it works on your hardware and
+> send another patch for that. Thanks,
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/304099.html
+I will.
+
+Best Regards,
+Wei
+
+> 	Arnd
+> 
+> .
+> 
