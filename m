@@ -1,34 +1,23 @@
-From: js07.lee@gmail.com (Jungseung Lee)
-Date: Thu, 20 Nov 2014 20:06:41 +0900
-Subject: [PATCH RESEND] arm: mm: fix discard_old_kernel_data
-Message-ID: <1416481601-23659-1-git-send-email-js07.lee@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Nov 2014 12:08:02 +0100
+Subject: [GIT PULL 2/2] omap prcm clean-up for v3.19
+In-Reply-To: <pull-1415725783-562282-2>
+References: <pull-1415725783-562282> <pull-1415725783-562282-2>
+Message-ID: <201411201208.02398.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-L1_CACHE_BYTES could be larger value than real L1 cache line size.
-In that case, discard_old_kernel_data function would omit to invalidate 
-last bytes as much as L1_CACHE_BYTES - real cache line size.
+On Tuesday 11 November 2014, Tony Lindgren wrote:
+> Clean-up series for omap PRCM (Power Reset Clock Module) from
+> Tero Kristo to move things a bit closer to becoming a proper
+> device driver.
 
-So fix end address to "to + PAGE_SIZE -1". The bottom bits
-of the address is LINELEN. that is ignored by mcrr.
+Pulled into next/soc, as some of the changes seem slightly more invasive
+than what I'd expect from a pure cleanup branch.
 
-Signed-off-by: Jungseung Lee <js07.lee@gmail.com>
----
- arch/arm/mm/copypage-v6.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Please let me know if this needs to be put into cleanup instead because
+some other patches are based on top.
 
-diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
-index b9bcc9d..7042334 100644
---- a/arch/arm/mm/copypage-v6.c
-+++ b/arch/arm/mm/copypage-v6.c
-@@ -62,7 +62,7 @@ static void discard_old_kernel_data(void *kto)
- 	__asm__("mcrr	p15, 0, %1, %0, c6	@ 0xec401f06"
- 	   :
- 	   : "r" (kto),
--	     "r" ((unsigned long)kto + PAGE_SIZE - L1_CACHE_BYTES)
-+	     "r" ((unsigned long)kto + PAGE_SIZE - 1)
- 	   : "cc");
- }
- 
--- 
-1.9.1
+Thanks,
+
+	Arnd
