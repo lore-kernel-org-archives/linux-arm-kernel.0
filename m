@@ -1,43 +1,26 @@
-From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Wed, 19 Nov 2014 23:29:44 +0000
-Subject: 48-bit VA support in the SMMU
-Message-ID: <deb48cfb93d94515b6531be02f697e04@CY1PR0301MB0748.namprd03.prod.outlook.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Nov 2014 00:07:36 +0000
+Subject: [PATCH v9 05/13] arm: introduce is_device_dma_coherent
+In-Reply-To: <alpine.DEB.2.02.1411181649000.27247@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1411121130020.26318@kaball.uk.xensource.com>
+ <1415792454-23161-5-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1411141158560.26318@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1411181649000.27247@kaball.uk.xensource.com>
+Message-ID: <20141120000736.GN4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Tue, Nov 18, 2014 at 04:49:21PM +0000, Stefano Stabellini wrote:
+> ping?
 
-Regarding 48-bit support at the SMMU, this patch is currently in the kernel:
+Sending something which wants my attention _To:_ me is always a good idea :)
 
-commit 04f905a9569ca2b6964a35563f135fabbb2470bc
-Author: Christoffer Dall <christoffer.dall@linaro.org>
-Date:   Fri Oct 10 11:14:30 2014 +0100
+The patch is fine in itself, but I have a niggle about the
+is_device_dma_coherent() - provided this is only used in architecture
+specific code, that should be fine.  It could probably do with a comment
+to that effect in an attempt to discourage drivers using it (thereby
+becoming less portable to other architectures.)
 
-    arm64: Allow 48-bits VA space without ARM_SMMU
-
-    Now when KVM has been reworked to support 48-bits host VA space, we can
-    allow systems to be configured with this option.  However, the ARM SMMU
-    driver also needs to be tweaked for 48-bit support so only allow the
-    config option to be set when not including support for theSMMU.
-
-    Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-    Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index ac9afde..b8053be 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -232,7 +232,7 @@ config ARM64_VA_BITS_42
-
- config ARM64_VA_BITS_48
-        bool "48-bit"
--       depends on BROKEN
-+       depends on !ARM_SMMU
-
- endchoice
-
-
-Do you know the status of any work to remove this limitation?
-
-Thanks,
-Stuart
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
