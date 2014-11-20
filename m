@@ -1,31 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Nov 2014 11:43:08 +0100
-Subject: [GIT PULL 1/2] omap soc changes for v3.19
-In-Reply-To: <pull-1415999057-591605>
-References: <pull-1415999057-591605>
-Message-ID: <201411201143.08649.arnd@arndb.de>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 20 Nov 2014 11:44:33 +0100
+Subject: [alsa-devel] [PATCH] ASoC: samsung: ASoC: samsung: Fix IISMOD
+ setting in i2s_set_sysclk()
+In-Reply-To: <1416477797-27332-1-git-send-email-padma.v@samsung.com>
+References: <1416477797-27332-1-git-send-email-padma.v@samsung.com>
+Message-ID: <546DC611.8090806@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 November 2014, Tony Lindgren wrote:
-> The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
-> 
->   Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.19/clocks-and-pm
-> 
-> for you to fetch changes up to 9889278181bcdbae882664d8cee5bb0e064397e4:
-> 
->   Merge tag 'for-v3.19/omap-a' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.19/soc (2014-11-14 10:25:12 -0800)
-> 
-> ----------------------------------------------------------------
-> SoC related changes for omaps. Mostly to make PM easier to use for
-> omap4 and later, and to fix clock DPLL fixes by adding determine_rate
-> and set_rate_and_parent.
-> 
+On 20/11/14 11:03, Padmavathi Venna wrote:
+> In the i2s_set_sysclk() callback we are currently clearing all bits
+> of the IISMOD register in i2s_set_sysclk. It's due to an incorrect
+> mask used for the AND operation which is introduced in commit
+> a5a56871f804edac93a53b5e871c0e9818fb9033 (ASoC: samsung:
+> add support for exynos7 I2S controller) and also adds the missing
 
-pulled into next/soc, thanks!
+The patch looks good to me, I'd just write about the missing break
+in a separate sentence, i.e. s/and also adds/. Also add/
 
-	Arnd
+> break statement.
+> 
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> ---
+>  sound/soc/samsung/i2s.c |    5 +++--
+>  1 files changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+> index 0df6547..e1ace52 100644
+> --- a/sound/soc/samsung/i2s.c
+> +++ b/sound/soc/samsung/i2s.c
+> @@ -494,7 +494,7 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
+>  		if (dir == SND_SOC_CLOCK_IN)
+>  			mod |= 1 << i2s_regs->cdclkcon_off;
+>  		else
+> -			mod &= 0 << i2s_regs->cdclkcon_off;
+> +			mod &= ~(1 << i2s_regs->cdclkcon_off);
+>  
+>  		i2s->rfs = rfs;
+>  		break;
+> @@ -551,10 +551,11 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
+>  		}
+>  
+>  		if (clk_id == 0)
+> -			mod &= 0 << i2s_regs->rclksrc_off;
+> +			mod &= ~(1 << i2s_regs->rclksrc_off);
+>  		else
+>  			mod |= 1 << i2s_regs->rclksrc_off;
+>  
+> +		break;
+>  	default:
+>  		dev_err(&i2s->pdev->dev, "We don't serve that!\n");
+>  		return -EINVAL;
+
+--
+Regards,
+Sylwester
