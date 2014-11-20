@@ -1,20 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 20 Nov 2014 10:08:22 +0000
-Subject: 48-bit VA support in the SMMU
-In-Reply-To: <decb25f05ca84d439e071f6ad8cf0086@BN3PR0301MB1219.namprd03.prod.outlook.com>
-References: <deb48cfb93d94515b6531be02f697e04@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <decb25f05ca84d439e071f6ad8cf0086@BN3PR0301MB1219.namprd03.prod.outlook.com>
-Message-ID: <20141120100822.GA19126@arm.com>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Thu, 20 Nov 2014 15:38:51 +0530
+Subject: [alsa-devel] [PATCH] ASoC: samsung: In the i2s_set_sysclk()
+ callback we are currently clearing all bits of the IISMOD register in
+ i2s_set_sysclk. It's due to an incorrect mask used for the AND operation
+ which is introduced in commit a5a56871f804edac93a53b5e871c0e9818fb9033 (ASoC:
+ samsung: add support for exynos7 I2S controller) and also adds the missing
+ break statement.
+In-Reply-To: <1416476977-20118-1-git-send-email-padma.v@samsung.com>
+References: <1416476977-20118-1-git-send-email-padma.v@samsung.com>
+Message-ID: <CAAgF-BfwGsn6HbJWH8uE48F2VWAYnAkv8=kGPkqCEWKaBM6=GQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 20, 2014 at 01:25:18AM +0000, Varun Sethi wrote:
-> What specific tweaks are required in the arm-smmu driver? I thought that
-> the upstream arm-smmu (3.18-rc3) driver does support 48 bit input address
-> (depended on the ARM64 kernel 48 bit support). Isn't this dependent on the
-> VA_BITS?  
+Hi,
 
-Yeah, but it won't work for stage-2 mappings. I'm currently rewriting the
-page table code to allow this (see my iommu/pgtbl branch).
+On 11/20/14, Padmavathi Venna <padma.v@samsung.com> wrote:
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> ---
+>  sound/soc/samsung/i2s.c |    5 +++--
+>  1 files changed, 3 insertions(+), 2 deletions(-)
+>
+> diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+> index 0df6547..e1ace52 100644
+> --- a/sound/soc/samsung/i2s.c
+> +++ b/sound/soc/samsung/i2s.c
+> @@ -494,7 +494,7 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
+>  		if (dir == SND_SOC_CLOCK_IN)
+>  			mod |= 1 << i2s_regs->cdclkcon_off;
+>  		else
+> -			mod &= 0 << i2s_regs->cdclkcon_off;
+> +			mod &= ~(1 << i2s_regs->cdclkcon_off);
+>
+>  		i2s->rfs = rfs;
+>  		break;
+> @@ -551,10 +551,11 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
+>  		}
+>
+>  		if (clk_id == 0)
+> -			mod &= 0 << i2s_regs->rclksrc_off;
+> +			mod &= ~(1 << i2s_regs->rclksrc_off);
+>  		else
+>  			mod |= 1 << i2s_regs->rclksrc_off;
+>
+> +		break;
+>  	default:
+>  		dev_err(&i2s->pdev->dev, "We don't serve that!\n");
+>  		return -EINVAL;
+> --
+> 1.7.4.4
+>
 
-Will
+Please ignore this patch as subject line is not proper.
+
+Thanks
+Padma
+> _______________________________________________
+> Alsa-devel mailing list
+> Alsa-devel at alsa-project.org
+> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+>
