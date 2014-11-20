@@ -1,58 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 20 Nov 2014 10:13:41 +0000
-Subject: [PATCH 1/1] iommu/arm-smmu: forbid userspace IO devices access
- memory through SMMU by default
-In-Reply-To: <1416477421-1288-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1416477421-1288-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <20141120101340.GC19126@arm.com>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Thu, 20 Nov 2014 15:45:26 +0530
+Subject: [alsa-devel] [PATCH] ASoC: samsung: Fix IISMOD setting in
+ i2s_set_sysclk()
+In-Reply-To: <546DBE3D.90206@samsung.com>
+References: <1416420664-20952-1-git-send-email-s.nawrocki@samsung.com>
+ <CAAgF-BemHSdcmzkqOUX+JNMLu0-GXs0EGm8YWHt+CBRP8Wa5DA@mail.gmail.com>
+ <546DBE3D.90206@samsung.com>
+Message-ID: <CAAgF-BebN=ro8Pmig1xpchzGULd=KcO+3eVgCku3nky4CimgBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 20, 2014 at 09:57:01AM +0000, Zhen Lei wrote:
-> It's dangerous to set pte with ARM_SMMU_PTE_AP_UNPRIV. A hacker can use any
-> devices running at userspace to access the memory which originally mapped for
-> kernel devices, suppose they have the same StreamID. The userspace devices
-> should through vfio to dynamic create mapping.
+Hi Sylwester,
 
-I don't fully understand the problem here. vfio will create a set of private
-page tables for the container, so I can't see why the privilege really
-matters, given that the whole thing is sandboxed anyway.
+On 11/20/14, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
+> Hi,
+>
+> On 20/11/14 08:04, Padma Venkat wrote:
+>>> diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+>>> > index 947352d..8db8c66 100644
+>>> > --- a/sound/soc/samsung/i2s.c
+>>> > +++ b/sound/soc/samsung/i2s.c
+>>> > @@ -494,7 +494,7 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
+>>> >  		if (dir == SND_SOC_CLOCK_IN)
+>>> >  			mod |= 1 << i2s_regs->cdclkcon_off;
+>>> >  		else
+>>> > -			mod &= 0 << i2s_regs->cdclkcon_off;
+>>> > +			mod &= ~(1 << i2s_regs->cdclkcon_off);
+>>
+>> Thanks for pointing this. In my local machine it was properly done but
+>> while rebasing on linux-next I did some mistake. There is one more
+>> place in set_sysclk which need to be corrected here
+>> mod &= 0 << i2s_regs->rclksrc_off
+>> can you include this change also in your patch or should I post a new
+>> patch for all?
+>
+> OK, I'll also correct this and resend the patch.
 
-Furthermore, if we change the default to PRIV, then it will break for any
-devices wired to emit unprivileged transactions only.
+As I found one more break statement missing. So posted a new patch
+with all corrected code with your signed-off. Please do review of the
+same.
 
-Will
+Thanks for you support.
+Padma
 
-> 
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> ---
->  drivers/iommu/arm-smmu.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 60558f7..e31517b 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -92,7 +92,7 @@
->  #define ARM_SMMU_PTE_CONT_MASK		(~(ARM_SMMU_PTE_CONT_SIZE - 1))
-> 
->  /* Stage-1 PTE */
-> -#define ARM_SMMU_PTE_AP_UNPRIV		(((pteval_t)1) << 6)
-> +#define ARM_SMMU_PTE_AP_PRIV		(((pteval_t)0) << 6)
->  #define ARM_SMMU_PTE_AP_RDONLY		(((pteval_t)2) << 6)
->  #define ARM_SMMU_PTE_ATTRINDX_SHIFT	2
->  #define ARM_SMMU_PTE_nG			(((pteval_t)1) << 11)
-> @@ -1296,7 +1296,7 @@ static int arm_smmu_alloc_init_pte(struct arm_smmu_device *smmu, pmd_t *pmd,
->  	}
-> 
->  	if (stage == 1) {
-> -		pteval |= ARM_SMMU_PTE_AP_UNPRIV | ARM_SMMU_PTE_nG;
-> +		pteval |= ARM_SMMU_PTE_AP_PRIV | ARM_SMMU_PTE_nG;
->  		if (!(prot & IOMMU_WRITE) && (prot & IOMMU_READ))
->  			pteval |= ARM_SMMU_PTE_AP_RDONLY;
-> 
+>
 > --
-> 1.8.0
-> 
-> 
-> 
+> Regards,
+> Sylwester
+>
