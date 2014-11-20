@@ -1,56 +1,68 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 20 Nov 2014 16:34:29 +0800
-Subject: For the problem when using swiotlb
-In-Reply-To: <2522857.bNQToYpBNt@wuerfel>
-References: <5469E26B.2010905@huawei.com> <1535751.CcvIi3DN4F@wuerfel>
- <546D58B1.60108@huawei.com> <2522857.bNQToYpBNt@wuerfel>
-Message-ID: <546DA795.9080209@huawei.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Nov 2014 09:49:00 +0100
+Subject: [PATCH v4] clocksource: arch_timer: Fix code to use physical
+ timers when requested
+In-Reply-To: <1412753937-29343-1-git-send-email-sonnyrao@chromium.org>
+References: <1412753937-29343-1-git-send-email-sonnyrao@chromium.org>
+Message-ID: <20141120084900.GC24143@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/20 15:40, Arnd Bergmann wrote:
-> On Thursday 20 November 2014 10:57:53 Ding Tianhong wrote:
->> On 2014/11/19 16:45, Arnd Bergmann wrote:
->>> On Wednesday 19 November 2014 11:17:15 Ding Tianhong wrote:
->>>> On 2014/11/18 2:09, Catalin Marinas wrote:
->>>>> On Mon, Nov 17, 2014 at 12:18:42PM +0000, Arnd Bergmann wrote:
->>>> Thanks everyone, I think I found the way to fix it, need to enable DMA_CMA, to reserve a big memory
->>>> for CMA and set coherent mask for dev, then dma_alloc and dma_mapping will not use the swiotlb until
->>>> the memory out of mask or swiotlb_force is enabled.
->>>>
->>>> If I still understand uncorrectly, please inform me.
->>>>
->>>
->>> Please do not use CMA to work around the problem, but fix the underlying bug
->>> instead.
->>>
->>> The driver should call 'dma_set_mask_and_coherent()' with the appropriate
->>> dma mask, and check whether that succeeded. However, the code implementing
->>> dma_set_mask_and_coherent on arm64 also needs to be changed to look up
->>> the dma-ranges property (see of_dma_configure()), and check if the mask
->>> is possible.
->>>
->> The dma_pfn_offset looks only support arm32, but my platform is aarch64 and I check the latest kernel version, 
->> I think the dma-rangs still could not work for aarch64, so maybe we should add dma_pfn_offset for aarch64 first.
->>
-> 
-> I didn't mean the dma_pfn_offset. The problem is that the of_dma_configure
-> code currently doesn't look at the mask. As I explained in my reply to
-> Catalin, it should set the mask to the size of the dma-ranges if that is
-> 32-bit or smaller, and dma_set_mask should look at the same dma-ranges
-> property to decide what to set the mask to when a driver asks for a
-> mask larger than 64-bit.
-> 
-> 	Arnd
-> 
-ok, I think the your reply to catalin is clear, I got it, add a appropriate mask for the dev is
-reasonable, I think it should be fixed later.
+Hi,
 
-But in my case, if I don't use the DMA_CMA, the dma_alloc_coherent should use the swiotlb directly which maximum is 16M,
-so unless I use the kmalloc otherwise I have no better idea for that.
-
-Regards
-Ding 
-
-> .
+On Wed, Oct 08, 2014 at 12:38:57AM -0700, Sonny Rao wrote:
+> This is a bug fix for using physical arch timers when
+> the arch_timer_use_virtual boolean is false.  It restores the
+> arch_counter_get_cntpct() function after removal in
 > 
+> 0d651e4e "clocksource: arch_timer: use virtual counters"
+> 
+> We need this on certain ARMv7 systems which are architected like this:
+> 
+> * The firmware doesn't know and doesn't care about hypervisor mode and
+>   we don't want to add the complexity of hypervisor there.
+> 
+> * The firmware isn't involved in SMP bringup or resume.
+> 
+> * The ARCH timer come up with an uninitialized offset between the
+>   virtual and physical counters.  Each core gets a different random
+>   offset.
+> 
+> * The device boots in "Secure SVC" mode.
+> 
+> * Nothing has touched the reset value of CNTHCTL.PL1PCEN or
+>   CNTHCTL.PL1PCTEN (both default to 1 at reset)
+> 
+> One example of such as system is RK3288 where it is much simpler to
+> use the physical counter since there's nobody managing the offset and
+> each time a core goes down and comes back up it will get reinitialized
+> to some other random value.
+> 
+> Fixes: 0d651e4e65e9 ("clocksource: arch_timer: use virtual counters")
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+> Acked-by: Olof Johansson <olof@lixom.net>
+
+Has this been merged yet?
+
+If not, you can add my Tested-by, it makes the Allwinner A31 boot
+flawlessly with the arch timers (together with the patch "clocksource:
+arch_timer: Allow the device tree to specify uninitialized timer
+registers")
+
+Thanks!
+Maxime
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141120/1344830f/attachment.sig>
