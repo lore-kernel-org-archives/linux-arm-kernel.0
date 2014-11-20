@@ -1,34 +1,64 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 20 Nov 2014 10:43:21 +0100
-Subject: [PATCH RESEND v2 0/4] hwrng: atmel: add DT support
-Message-ID: <cover.1416475860.git.nicolas.ferre@atmel.com>
+Date: Thu, 20 Nov 2014 10:43:22 +0100
+Subject: [PATCH RESEND v2 1/4] hwrng: atmel: use
+ clk_prepapre_enable/_disable_unprepare
+In-Reply-To: <cover.1416475860.git.nicolas.ferre@atmel.com>
+References: <cover.1416475860.git.nicolas.ferre@atmel.com>
+Message-ID: <691ea59c733142d240b7ec7c6deb1607ff150744.1416475860.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the patch series that Boris sent yesterday. I've just collected
-"Acked-by" tags and resend it with updated cover letter.
+From: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-This series adds DT support for the TRNG (True Random Generator) block and adds
-missing trng nodes to at91sam9g45 dtsi files.
+Use clk_prepare_enable/_disable_unprepare instead of clk_enable/disable
+to work properly with the CCF.
 
-Herbert,
-As you said that you can take this series, here is the latest vertion ready for you to
-pick it up. Thanks for your help.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Peter Korsgaard <peter@korsgaard.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/char/hw_random/atmel-rng.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Bye,
-
-Boris Brezillon (4):
-  hwrng: atmel: use clk_prepapre_enable/_disable_unprepare
-  hwrng: atmel: add DT support
-  hwrng: atmel: Add TRNG DT binding doc
-  ARM: at91/dt: add trng node to at91sam9g45
-
- Documentation/devicetree/bindings/hwrng/atmel-trng.txt | 16 ++++++++++++++++
- arch/arm/boot/dts/at91sam9g45.dtsi                     |  7 +++++++
- drivers/char/hw_random/Kconfig                         |  2 +-
- drivers/char/hw_random/atmel-rng.c                     | 15 +++++++++++----
- 4 files changed, 35 insertions(+), 5 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/hwrng/atmel-trng.txt
-
+diff --git a/drivers/char/hw_random/atmel-rng.c b/drivers/char/hw_random/atmel-rng.c
+index 851bc7e20ad2..644ec4882206 100644
+--- a/drivers/char/hw_random/atmel-rng.c
++++ b/drivers/char/hw_random/atmel-rng.c
+@@ -67,7 +67,7 @@ static int atmel_trng_probe(struct platform_device *pdev)
+ 	if (IS_ERR(trng->clk))
+ 		return PTR_ERR(trng->clk);
+ 
+-	ret = clk_enable(trng->clk);
++	ret = clk_prepare_enable(trng->clk);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -95,7 +95,7 @@ static int atmel_trng_remove(struct platform_device *pdev)
+ 	hwrng_unregister(&trng->rng);
+ 
+ 	writel(TRNG_KEY, trng->base + TRNG_CR);
+-	clk_disable(trng->clk);
++	clk_disable_unprepare(trng->clk);
+ 
+ 	return 0;
+ }
+@@ -105,7 +105,7 @@ static int atmel_trng_suspend(struct device *dev)
+ {
+ 	struct atmel_trng *trng = dev_get_drvdata(dev);
+ 
+-	clk_disable(trng->clk);
++	clk_disable_unprepare(trng->clk);
+ 
+ 	return 0;
+ }
+@@ -114,7 +114,7 @@ static int atmel_trng_resume(struct device *dev)
+ {
+ 	struct atmel_trng *trng = dev_get_drvdata(dev);
+ 
+-	return clk_enable(trng->clk);
++	return clk_prepare_enable(trng->clk);
+ }
+ 
+ static const struct dev_pm_ops atmel_trng_pm_ops = {
 -- 
 2.1.3
