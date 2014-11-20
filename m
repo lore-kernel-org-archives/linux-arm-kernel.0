@@ -1,69 +1,65 @@
 From: joshc@codeaurora.org (Josh Cartwright)
-Date: Thu, 20 Nov 2014 13:41:23 -0600
-Subject: [PATCH 1/3] mfd: devicetree: qcom_rpm: document IPQ8064 resources
+Date: Thu, 20 Nov 2014 13:41:25 -0600
+Subject: [PATCH 3/3] regulator: rpm: add support for RPM-controller SMB208
 In-Reply-To: <1416512485-7292-1-git-send-email-joshc@codeaurora.org>
 References: <1416512485-7292-1-git-send-email-joshc@codeaurora.org>
-Message-ID: <1416512485-7292-2-git-send-email-joshc@codeaurora.org>
+Message-ID: <1416512485-7292-4-git-send-email-joshc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IPQ8064 SoC has several RPM-controlled resources, an NSS fabrick
-clock and four regulator resources.  Provide definitions for them.
+The IPQ8064 reference boards make use of SMB208 regulators which are
+controlled by RPM.  Implement support for these regulators in the RPM
+regulator driver.
 
 Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
 ---
- Documentation/devicetree/bindings/mfd/qcom-rpm.txt | 6 +++++-
- include/dt-bindings/mfd/qcom-rpm.h                 | 6 ++++++
- 2 files changed, 11 insertions(+), 1 deletion(-)
+ drivers/regulator/qcom_rpm-regulator.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
-index 4264021..6d4e3ec 100644
---- a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
-+++ b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
-@@ -12,6 +12,7 @@ frequencies.
- 		    "qcom,rpm-apq8064"
- 		    "qcom,rpm-msm8660"
- 		    "qcom,rpm-msm8960"
-+		    "qcom,rpm-ipq8064"
+diff --git a/drivers/regulator/qcom_rpm-regulator.c b/drivers/regulator/qcom_rpm-regulator.c
+index b869254..36c39e9 100644
+--- a/drivers/regulator/qcom_rpm-regulator.c
++++ b/drivers/regulator/qcom_rpm-regulator.c
+@@ -183,6 +183,13 @@ static const struct regulator_linear_range ftsmps_ranges[] = {
+ 	REGULATOR_LINEAR_RANGE(1500000,  64, 100, 50000),
+ };
  
- - reg:
- 	Usage: required
-@@ -67,6 +68,7 @@ of valid subnodes that can operate on these resources.
- 		    "qcom,rpm-pm8901-ftsmps"
- 		    "qcom,rpm-pm8921-smps"
- 		    "qcom,rpm-pm8921-ftsmps"
-+		    "qcom,rpm-smb208"
++static const struct regulator_linear_range smb208_ranges[] = {
++	REGULATOR_LINEAR_RANGE( 375000,   0,  29, 12500),
++	REGULATOR_LINEAR_RANGE( 750000,  30,  89, 12500),
++	REGULATOR_LINEAR_RANGE(1500000,  90, 153, 25000),
++	REGULATOR_LINEAR_RANGE(3100000, 154, 234, 25000),
++};
++
+ static const struct regulator_linear_range ncp_ranges[] = {
+ 	REGULATOR_LINEAR_RANGE(1500000,   0,  31, 50000),
+ };
+@@ -559,6 +566,16 @@ static const struct qcom_rpm_reg pm8921_switch = {
+ 	.parts = &rpm8960_switch_parts,
+ };
  
- - reg:
- 	Usage: required
-@@ -76,7 +78,9 @@ of valid subnodes that can operate on these resources.
- 		    QCOM_RPM_PM8058_SMPS0 - QCOM_RPM_PM8058_SMPS4,
- 		    QCOM_RPM_PM8821_SMPS1 - QCOM_RPM_PM8821_SMPS2,
- 		    QCOM_RPM_PM8901_SMPS0 - QCOM_RPM_PM8901_SMPS4,
--		    QCOM_RPM_PM8921_SMPS1 - QCOM_RPM_PM8921_SMPS8
-+		    QCOM_RPM_PM8921_SMPS1 - QCOM_RPM_PM8921_SMPS8,
-+		    QCOM_RPM_SMB208_S1a, QCOM_RPM_SMB208_S1b,
-+		    QCOM_RPM_SMB208_S2a, QCOM_RPM_SMB208_S2b
- 
- - bias-pull-down:
- 	Usage: optional
-diff --git a/include/dt-bindings/mfd/qcom-rpm.h b/include/dt-bindings/mfd/qcom-rpm.h
-index 388a6f3..13a9d4b 100644
---- a/include/dt-bindings/mfd/qcom-rpm.h
-+++ b/include/dt-bindings/mfd/qcom-rpm.h
-@@ -141,6 +141,12 @@
- #define QCOM_RPM_SYS_FABRIC_MODE		131
- #define QCOM_RPM_USB_OTG_SWITCH			132
- #define QCOM_RPM_VDDMIN_GPIO			133
-+#define QCOM_RPM_NSS_FABRIC_0_CLK		134
-+#define QCOM_RPM_NSS_FABRIC_1_CLK		135
-+#define QCOM_RPM_SMB208_S1a			136
-+#define QCOM_RPM_SMB208_S1b			137
-+#define QCOM_RPM_SMB208_S2a			138
-+#define QCOM_RPM_SMB208_S2b			139
- 
- /*
-  * Constants used to select force mode for regulators.
++static const struct qcom_rpm_reg smb208_smps = {
++	.desc.linear_ranges = smb208_ranges,
++	.desc.n_linear_ranges = ARRAY_SIZE(smb208_ranges),
++	.desc.n_voltages = 235,
++	.desc.ops = &uV_ops,
++	.parts = &rpm8960_smps_parts,
++	.supports_force_mode_auto = false,
++	.supports_force_mode_bypass = false,
++};
++
+ static const struct of_device_id rpm_of_match[] = {
+ 	{ .compatible = "qcom,rpm-pm8058-pldo",     .data = &pm8058_pldo },
+ 	{ .compatible = "qcom,rpm-pm8058-nldo",     .data = &pm8058_nldo },
+@@ -578,6 +595,8 @@ static const struct of_device_id rpm_of_match[] = {
+ 	{ .compatible = "qcom,rpm-pm8921-ftsmps",   .data = &pm8921_ftsmps },
+ 	{ .compatible = "qcom,rpm-pm8921-ncp",      .data = &pm8921_ncp },
+ 	{ .compatible = "qcom,rpm-pm8921-switch",   .data = &pm8921_switch },
++
++	{ .compatible = "qcom,rpm-smb208", .data = &smb208_smps },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, rpm_of_match);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
