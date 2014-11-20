@@ -1,35 +1,35 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 20 Nov 2014 14:02:46 +0100
-Subject: [GIT PULL] ARM: mediatek: Add support for mt6592,
- mt8127 and mt8135
-In-Reply-To: <201411201346.40129.arnd@arndb.de>
-References: <CABuKBeLBdAaKyiOhVOUcvE9_ATYeMtccNP3zv_tdFvpgtxoMNw@mail.gmail.com>
- <201411201346.40129.arnd@arndb.de>
-Message-ID: <CABuKBeLL26c37yq9-_fsWBJAYJfUDFxdhQNBXy-NmjJ=5he1OQ@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 20 Nov 2014 21:04:54 +0800
+Subject: [PATCH] ARM: dts: prima2: add node for Performance Monitor Unit
+Message-ID: <1416488694-3387-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-20 13:46 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
-> On Friday 14 November 2014, Matthias Brugger wrote:
->> Here comes the pull request which introduces basic support for
->> Mediatek SoCs mt6592, mt8127 and mt8135.
->>
->> The patches for the mt81xx got merged in the late tree for v3.18 but
->> were not be merged at the end. They got a small fix regarding the
->> compatible and model string in the dts files.
->
-> Pulled into next/dt. I've put the text above into the merge changeset
-> description, since you didn't have much text in the tag.
+From: Ye He <ye.he@csr.com>
 
-Ok, thank you. I will take this into account for the next pull request.
+It enables Performance Monitor Unit on CSR SiRFprimaII.
 
-Regards,
-Matthias
+Signed-off-by: Ye He <ye.he@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ arch/arm/boot/dts/prima2.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
->
->         Arnd
-
-
-
+diff --git a/arch/arm/boot/dts/prima2.dtsi b/arch/arm/boot/dts/prima2.dtsi
+index 963b7e5..86dcb46 100644
+--- a/arch/arm/boot/dts/prima2.dtsi
++++ b/arch/arm/boot/dts/prima2.dtsi
+@@ -41,6 +41,11 @@
+ 		};
+ 	};
+ 
++	arm-pmu {
++		compatible = "arm,cortex-a9-pmu";
++		interrupts = <29>;
++	};
++
+ 	axi {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
 -- 
-motzblog.wordpress.com
+2.1.1
