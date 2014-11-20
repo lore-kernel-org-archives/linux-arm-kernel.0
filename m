@@ -1,30 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Nov 2014 17:17:24 +0100
-Subject: [GIT PULL] ARM SoC Integrator updates for v3.19
-In-Reply-To: <CACRpkdaNEoVVzcPs9apjBTP0P2z1hQ4btFfiBGt=-JzsuTOqfQ@mail.gmail.com>
-References: <CACRpkdaNEoVVzcPs9apjBTP0P2z1hQ4btFfiBGt=-JzsuTOqfQ@mail.gmail.com>
-Message-ID: <201411201717.25173.arnd@arndb.de>
+Date: Thu, 20 Nov 2014 17:20:08 +0100
+Subject: [GIT PULL 1/2] ARM: rockchip: second batch of soc related changes
+In-Reply-To: <11809616.LUBsxGXhAZ@diego>
+References: <11809616.LUBsxGXhAZ@diego>
+Message-ID: <201411201720.08800.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 November 2014, Linus Walleij wrote:
-> Hi ARM SoC folks,
+On Tuesday 18 November 2014, Heiko St?bner wrote:
+> here is the second batch of soc related changes, consisting only
+> of the smp support for rk3288.
 > 
-> this pull request for the Integrator is supposed to land on
-> top of the multiplatform pull request merged earlier, wherever
-> that was merged.
-> 
-> It needs to be merged on top of those patches since
-> multiplatform moves around in arch/arm/mach-integrator/Kconfig
-> and these features hit that file a lot.
-> 
-> By just looking at the diffstat you can see that this patchset
-> does GoodStuff(TM).
+> Due to the slight misheap of the v3.18 cpuclk pull being merge, it is based
+> on exactly this merge commit from Olof to next/soc.
 
-Yes, very nice.
 
-> Please pull this in for v3.19!
-
-Pulled into next/soc, thanks!
+Pulled into next/soc. The tag comment contained only "code part of the
+rk3288 smp support", so I've added your text above for the changeset
+description. Thanks,
 
 	Arnd
