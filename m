@@ -1,99 +1,34 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 20 Nov 2014 20:32:17 +0100
-Subject: [linux-sunxi] [PATCH 3/9] clk: sunxi: Add prcm mod0 clock driver
-In-Reply-To: <CAGb2v66zoAy93mjZn+yf8zvCmkQ8AVWH92jKL-gyu90E5HLuuw@mail.gmail.com>
-References: <1416498928-1300-1-git-send-email-hdegoede@redhat.com>
- <1416498928-1300-4-git-send-email-hdegoede@redhat.com>
- <CAGb2v66zoAy93mjZn+yf8zvCmkQ8AVWH92jKL-gyu90E5HLuuw@mail.gmail.com>
-Message-ID: <546E41C1.1070800@redhat.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 20 Nov 2014 20:38:49 +0100
+Subject: [PATCH v2 0/4] clk: rockchip: allow adjusting pll rates on init
+Message-ID: <1416512333-15438-1-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+It was found that some firmware versions initialized the pll rates using
+suboptimal parameters to achieve frequencies the actual rate table contained
+better parameters for.
 
-On 11/20/2014 07:24 PM, Chen-Yu Tsai wrote:
-> Hi,
-> 
-> On Thu, Nov 20, 2014 at 7:55 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Add a driver for mod0 clocks found in the prcm. Currently there is only
->> one mod0 clocks in the prcm, the ir clock.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
->>  drivers/clk/sunxi/Makefile                        |  2 +-
->>  drivers/clk/sunxi/clk-sun6i-prcm-mod0.c           | 63 +++++++++++++++++++++++
->>  drivers/mfd/sun6i-prcm.c                          | 14 +++++
->>  4 files changed, 79 insertions(+), 1 deletion(-)
->>  create mode 100644 drivers/clk/sunxi/clk-sun6i-prcm-mod0.c
->>
->> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
->> index ed116df..342c75a 100644
->> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
->> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
->> @@ -56,6 +56,7 @@ Required properties:
->>         "allwinner,sun4i-a10-usb-clk" - for usb gates + resets on A10 / A20
->>         "allwinner,sun5i-a13-usb-clk" - for usb gates + resets on A13
->>         "allwinner,sun6i-a31-usb-clk" - for usb gates + resets on A31
->> +       "allwinner,sun6i-a31-ir-clk" - for the ir clock on A31
->>
->>  Required properties for all clocks:
->>  - reg : shall be the control register address for the clock.
->> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
->> index 7ddc2b5..daf8b1c 100644
->> --- a/drivers/clk/sunxi/Makefile
->> +++ b/drivers/clk/sunxi/Makefile
->> @@ -10,4 +10,4 @@ obj-y += clk-sun8i-mbus.o
->>
->>  obj-$(CONFIG_MFD_SUN6I_PRCM) += \
->>         clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o \
->> -       clk-sun8i-apb0.o
->> +       clk-sun8i-apb0.o clk-sun6i-prcm-mod0.o
->> diff --git a/drivers/clk/sunxi/clk-sun6i-prcm-mod0.c b/drivers/clk/sunxi/clk-sun6i-prcm-mod0.c
->> new file mode 100644
->> index 0000000..e80f18e
->> --- /dev/null
->> +++ b/drivers/clk/sunxi/clk-sun6i-prcm-mod0.c
->> @@ -0,0 +1,63 @@
->> +/*
->> + * Allwinner A31 PRCM mod0 clock driver
->> + *
->> + * Copyright (C) 2014 Hans de Goede <hdegoede@redhat.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/clk-provider.h>
->> +#include <linux/clkdev.h>
->> +#include <linux/module.h>
->> +#include <linux/of_address.h>
->> +#include <linux/platform_device.h>
->> +
->> +#include "clk-factors.h"
->> +#include "clk-mod0.h"
->> +
->> +static const struct of_device_id sun6i_a31_prcm_mod0_clk_dt_ids[] = {
->> +       { .compatible = "allwinner,sun6i-a31-ir-clk" },
-> 
-> Could we use a generic name, like "sun6i-a31-prcm-mod0-clk"?
-> IIRC, there is another one, the module clock for the 1-wire interface.
+Therefore this series first adds the possibility to create pll-specific flags
+and then adds a flag to adjust the pll rate on init to the parameters from
+the rate table.
 
-I wish we could use a generic name, but that does not work for mfd device
-subnodes, as the mfd framework attaches resources (such as registers) to
-the subnodes based on the compatible.
+changes since v1:
+- move population of pll_mux before registering the core pll clock
+  null pointer exception in the _set_rate callback when called from init
 
-BTW it seems that that the 1-wire clock is not 100% mod0 clock compatible,
-at least the ccmu.h in the allwinner SDK uses a different struct definition
-for it.
+Heiko Stuebner (4):
+  clk: rockchip: add ability to specify pll-specific flags
+  clk: rockchip: setup pll_mux data earlier
+  clk: rockchip: add optional sync to pll rate parameters
+  clk: rockchip: add ROCKCHIP_PLL_SYNC_RATE flag to some plls
 
-Regards,
+ drivers/clk/rockchip/clk-pll.c    | 81 +++++++++++++++++++++++++++++++--------
+ drivers/clk/rockchip/clk-rk3188.c |  8 ++--
+ drivers/clk/rockchip/clk-rk3288.c | 10 ++---
+ drivers/clk/rockchip/clk.c        |  3 +-
+ drivers/clk/rockchip/clk.h        | 13 ++++++-
+ 5 files changed, 88 insertions(+), 27 deletions(-)
 
-Hans
+-- 
+2.1.1
