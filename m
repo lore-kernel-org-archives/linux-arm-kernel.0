@@ -1,47 +1,34 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 20 Nov 2014 06:02:13 +0100
-Subject: [PATCHv4 01/10] arm: mvebu: fix vendor prefix typo in
- kirkwood-synology.dtsi
-In-Reply-To: <20141120015519.GA22670@titan.lakedaemon.net>
-References: <cover.1416351425.git.arno@natisbad.org>
- <e1c3f3fbd9f494fa228de3ee5928c771d33b072e.1416351426.git.arno@natisbad.org>
- <20141120015519.GA22670@titan.lakedaemon.net>
-Message-ID: <20141120050213.GB2596@lunn.ch>
+From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
+Date: Thu, 20 Nov 2014 10:40:08 +0530
+Subject: [PATCH v3 1/5] arm64: Kprobes with single stepping support
+In-Reply-To: <546CAF5A.4060901@linaro.org>
+References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
+ <1416292375-29560-2-git-send-email-dave.long@linaro.org>
+ <20141118145643.GO18842@arm.com>
+ <CA+b37P337jcTCPTg4Ydxh6TKwqmyMngt-eEowzfsTNBDZ7-NEg@mail.gmail.com>
+ <20141119112553.GC15985@arm.com> <546CAF5A.4060901@linaro.org>
+Message-ID: <CA+b37P1UGDvVsCr_Y5p+N3MZF6fb-w09hb2woHmuy2ZDO84aWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 08:55:19PM -0500, Jason Cooper wrote:
-> Andrew,
-> 
-> On Wed, Nov 19, 2014 at 12:01:36AM +0100, Arnaud Ebalard wrote:
-> > 
-> > As reported by Andrew, the vendor prefix for Seiko Instruments, Inc.
-> > S-35390A I2C RTC chip in kirkwood-synology.dtsi has a typo (ssi
-> > instead of sii). This patches fixes it.
-> > 
-> > Reported-by: Andrew Lunn <andrew@lunn.ch>
-> > Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
-> > ---
-> >  arch/arm/boot/dts/kirkwood-synology.dtsi | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/kirkwood-synology.dtsi b/arch/arm/boot/dts/kirkwood-synology.dtsi
-> > index 811e0971fc58..8be5b2e4626e 100644
-> > --- a/arch/arm/boot/dts/kirkwood-synology.dtsi
-> > +++ b/arch/arm/boot/dts/kirkwood-synology.dtsi
-> > @@ -266,7 +266,7 @@
-> >  
-> >  			s35390a: s35390a at 30 {
-> >  				status = "disabled";
-> > -				compatible = "ssi,s35390a";
-> > +				compatible = "sii,s35390a";
-> 
-> Should the driver now support both variants for backward compatibility?
-
-Hi Jason
-
-This is an i2c device. i2c totally ignores the vendor. It is optional.
-So there is no backward compatibility issues.
-
-   Andrew
-     
+On 19 November 2014 20:25, David Long <dave.long@linaro.org> wrote:
+>> I was thinking of the magic hex numbers in the kprobes decode tables,
+>> which
+>> seem to correspond directly to the instruction classes described in insn.c
+>>
+>> Keeping the actual emulation code separate makes sense.
+>>
+>> Will
+>
+>
+> Of course that follows the model of the much more complex arm32
+> kprobes/uprobes decoding.  I can have a go at replacing it with insn.c
+> calls.
+well, the magic hex numbers were derived directly from ARMv8 ARM
+Tabled C4.1 thru C4.6 and bit-masking would be faster search, but
+surely you can give a try with insn.c (this would consume lot of
+function calls to arrive at same decision).
+~Sandeepa
+>
+> -dl
+>
