@@ -1,88 +1,49 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Thu, 20 Nov 2014 12:08:51 +0000
-Subject: [RFC PATCH 00/16] Refine PCI host bridge scan interfaces
-In-Reply-To: <546DD688.60705@linaro.org>
-References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
- <1463511.o4kE8TX3Bd@wuerfel> <546DD688.60705@linaro.org>
-Message-ID: <20141120120850.GD9162@bart.dudau.co.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Nov 2014 13:11:14 +0100
+Subject: [GIT PULL 3.19] Broadcom Cygnus SoC platform support
+In-Reply-To: <1415826266-6867-4-git-send-email-f.fainelli@gmail.com>
+References: <1415826266-6867-1-git-send-email-f.fainelli@gmail.com>
+ <1415826266-6867-4-git-send-email-f.fainelli@gmail.com>
+Message-ID: <201411201311.14549.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 20, 2014 at 12:54:48PM +0100, Tomasz Nowicki wrote:
-> On 17.11.2014 15:13, Arnd Bergmann wrote:
-> >On Monday 17 November 2014 18:21:34 Yijing Wang wrote:
-> >>This series is based Linux 3.18-rc1 and Lorenzo Pieralisi's
-> >>arm PCI domain cleanup patches, link:
-> >>https://patchwork.ozlabs.org/patch/407585/
-> >>
-> >>Current pci scan interfaces like pci_scan_root_bus() and directly
-> >>call pci_create_root_bus()/pci_scan_child_bus() lack flexiblity.
-> >>Some platform infos like PCI domain and msi_chip have to be
-> >>associated to PCI bus by some arch specific function.
-> >>We want to make a generic pci_host_bridge, and make it hold
-> >>the platform infos or hook. Then we could eliminate the lots
-> >>of arch pci_domain_nr, also we could associate some platform
-> >>ops something like pci_get_msi_chip(struct pci_dev *dev)
-> >>with pci_host_bridge to avoid introduce arch weak functions.
-> >>
-> >>This RFC version not for all platforms, just applied the new
-> >>scan interface in x86/arm/powerpc/ia64, I will refresh other
-> >>platforms after the core pci scan interfaces are ok.
-> >
-> >I think overall this is a good direction to take, in particular
-> >moving more things into struct pci_host_bridge so we can
-> >slim down the architecture specific code.
-> >
-> >I don't particularly like the way you use the 'pci_host_info'
-> >to pass callback pointers and some of the generic information.
-> >This duplicates some of the issues we are currently trying
-> >to untangle in the arm32 code to make drivers easier to share
-> >between architectures.
-> >
-> >As a general approach, I'd rather see generic helper functions
-> >being exported by the PCI core that a driver may or may not
-> >call.
-> >The way you split the interface between things that happen
-> >before scanning the buses (pci_create_host_bridge) and
-> >the actual scanning (__pci_create_root_bus, pci_scan_child_bus)
-> >seems very helpful and I think we can expand that concept further:
-> >
-> >- The normal pci_create_host_bridge() function can contain
-> >   all of the DT scanning functions (finding bus/mem/io resources,
-> >   finding the msi-parent), while drivers that don't depend on DT
-> >   for this information can call the same function and fill the
-> >   same things after they have the pci_host_bridge pointer.
+On Wednesday 12 November 2014, Florian Fainelli wrote:
+> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 > 
-> How about finding PCI domain number (in the DT way) within
-> pci_create_host_bridge() too ?
-
-It is an idea worth pursuing for the 99% of the cases. I would like
-to understand the 1% of the time when we want a domain number to be
-shared between two host bridges or the time when we want more than
-one domain per bridge.
-
-Is that possible? Is it useful? Is it already in practice?
-
-Best regards,
-Liviu
-
+>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
 > 
-> Tomasz
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> are available in the git repository at:
+> 
+>   http://github.com/brcm/linux.git tags/arm-soc/for-3.19/cygnus-platform-v2
+> 
+> for you to fetch changes up to 64e74aa788f996cd0e328a1c4223e9d438b78e9c:
+> 
+>   ARM: mach-bcm: ARCH_BCM_MOBILE: remove one level of menu from Kconfig (2014-11-11 22:35:45 -0800)
+> 
+> ----------------------------------------------------------------
+> This pull request contains the platform code to support the Broadcom Cygnus SoC
+> using the iProc architecture:
+> 
+> - add support for the Broadcom Cygnus SoC
+> - consolidate the BCM5301X Kconfig options under the iProc menuconfig entry
+> - remove one level of menu in menuconfig
+> 
+> ----------------------------------------------------------------
+> Jonathan Richardson (1):
+>       ARM: cygnus: Initial support for Broadcom Cygnus SoC
+> 
+> Scott Branden (2):
+>       ARM: mach-bcm: Consolidate currently supported IPROC SoCs
+>       ARM: mach-bcm: ARCH_BCM_MOBILE: remove one level of menu from Kconfig
+> 
+>  arch/arm/mach-bcm/Kconfig      | 93 ++++++++++++++++++++++++++----------------
+>  arch/arm/mach-bcm/Makefile     |  3 ++
+>  arch/arm/mach-bcm/bcm_cygnus.c | 25 ++++++++++++
+>  3 files changed, 85 insertions(+), 36 deletions(-)
+>  create mode 100644 arch/arm/mach-bcm/bcm_cygnus.c
 > 
 
--- 
--------------------
-   .oooO
-   (   )
-    \ (  Oooo.
-     \_) (   )
-          ) /
-         (_/
+Pulled into next/soc, thanks!
 
- One small step
-   for me ...
+	Arnd
