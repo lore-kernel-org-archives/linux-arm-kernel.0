@@ -1,31 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Nov 2014 13:41:29 +0100
-Subject: [GIT PULL] at91: dt for 3.19 #2
-In-Reply-To: <1416415953-31966-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1416415953-31966-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <201411201341.30112.arnd@arndb.de>
+Date: Thu, 20 Nov 2014 13:43:10 +0100
+Subject: [GIT PULL] at91: drivers for 3.19 #1
+In-Reply-To: <1415976210-3665-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1415976210-3665-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <201411201343.11011.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 November 2014, Nicolas Ferre wrote:
-> Another DT pull-request for 3.19. For this one, I had to pull one Vinod's topic
-> branch to be able to include the XDMA DT properties. This branch is stable and
-> based on 3.18-rc3 (Cf. http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/304041.html).
-> Note that my previous DT pull-request for 3.19 was based on 3.18-rc2.
-> So, this is what I did:
-> - took a v3.18-rc3 tag
-> - merged the at91-3.19-dt branch that you already have in at91/dt (you'd taken the at91-dt tag)
-> - merged the topic/at_xdmac from Vinod
-> - stacked the new material described above on top of this.
-> Tell me if it's okay for you or if I have to arrange things differently.
+On Friday 14 November 2014, Nicolas Ferre wrote:
+> Arnd, Olof, Kevin,
 > 
-> The content itself is pretty straightforward.
+> This is a pull-request about AT91-related drivers that are easier to take via
+> arm-soc.
 > 
+> There is a little merge conflict with the "cleanup" branch because of removal
+> of at91sam9g45 and at91sam9rl legacy code. The resolution is pretty simple but
+> you can have a look at the resolution example here:
+> https://git.kernel.org/cgit/linux/kernel/git/nferre/linux-at91.git/log/?h=at91-next
+> 
+> Thanks, best regards,
+> 
+> The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
+> 
+>   Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-drivers
+> 
+> for you to fetch changes up to 2c91e61dc97cce57ffd9dd654a6ee284e1f45a1f:
+> 
+>   rtc: at91sam9: add DT bindings documentation (2014-11-13 16:08:48 +0100)
+> 
+> ----------------------------------------------------------------
+> First batch of drivers for 3.19:
+> It is only about a not so recent driver for old platforms: RTT as RTC driver:
+> - RTT as RTC driver enhancements and machine specific include files removal
+> - RTT as RTC driver conversion to device tree
 
-I've pulled it into a new next/dt2 branch, so we don't have to coordinate the merging
-with Vinod. If he sends the slave-dma tree first, this will be part of the normal
-next/dt submission to Linus, otherwise it will come a few days later.
-
-Thanks,
+Pulled into next/drivers, thanks!
 
 	Arnd
