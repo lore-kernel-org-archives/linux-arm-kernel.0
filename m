@@ -1,44 +1,39 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 20 Nov 2014 13:12:02 +0100
-Subject: [RFC] adp1653: Add device tree bindings for LED controller
-In-Reply-To: <546C66A5.6060201@samsung.com>
-References: <20141117145857.GO8907@valkosipuli.retiisi.org.uk>
- <546AFEA5.9020000@samsung.com> <20141118084603.GC4059@amd>
- <546B19C8.2090008@samsung.com> <20141118113256.GA10022@amd>
- <546B40FA.2070409@samsung.com> <20141118132159.GA21089@amd>
- <546B6D86.8090701@samsung.com> <20141118165148.GA11711@amd>
- <546C66A5.6060201@samsung.com>
-Message-ID: <20141120121202.GA27527@amd>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Nov 2014 13:12:00 +0100
+Subject: [GIT PULL 3.19] Broadcom Cygnus SoC defconfig
+In-Reply-To: <1415826266-6867-1-git-send-email-f.fainelli@gmail.com>
+References: <1415826266-6867-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <201411201312.00243.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> I would also swap the segments of a property name to follow the convention
-> as in case of "regulator-max-microamp".
+On Wednesday 12 November 2014, Florian Fainelli wrote:
+> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 > 
-> Updated version:
+>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
 > 
-> ==========================================================
+> are available in the git repository at:
 > 
-> Optional properties for child nodes:
-> - max-microamp : maximum intensity in microamperes of the LED
-> 		 (torch LED for flash devices)
-> - flash-max-microamp : maximum intensity in microamperes of the
-> 		       flash LED; it is mandatory if the led should
-> 		       support the flash mode
-> - flash-timeout-microsec : timeout in microseconds after which the flash
-> 		           led is turned off
-
-Works for me. Do you want to submit a patch or should I do it?
-
-> - indicator-pattern : identifier of the blinking pattern for the
-> 		      indicator led
+>   http://github.com/brcm/linux.git tags/arm-soc/for-3.19/cygnus-defconfig-v2
+> 
+> for you to fetch changes up to b316a9f98a2e328d10f5ed3c341fa28880152af3:
+> 
+>   ARM: bcm_defconfig: remove one level of menu from Kconfig (2014-11-11 22:42:05 -0800)
+> 
+> ----------------------------------------------------------------
+> This pull requests removes one level in menuconfig for the BCM SoCs for the
+> bcm_defconfig file.
+> 
+> ----------------------------------------------------------------
+> Scott Branden (1):
+>       ARM: bcm_defconfig: remove one level of menu from Kconfig
+> 
+>  arch/arm/configs/bcm_defconfig | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
 
-This would need a bit more documentation, no?
+After taking a closer look, I ended up putting this into next/soc as well,
+not next/defconfig, since the change has a mutual dependency on the Kconfig
+change in that branch.
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+	Arnd
