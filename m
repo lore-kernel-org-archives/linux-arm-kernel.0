@@ -1,56 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Nov 2014 14:15:19 +0100
-Subject: [RFC PATCH 00/16] Refine PCI host bridge scan interfaces
-In-Reply-To: <546DD804.4010105@linaro.org>
-References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
- <1534030.bkpIToWlHq@wuerfel> <546DD804.4010105@linaro.org>
-Message-ID: <2756150.eOnxg6jMdK@wuerfel>
+Date: Thu, 20 Nov 2014 14:17:52 +0100
+Subject: [PATCH] ARM: at91: remove useless init_time for DT-only SoCs
+In-Reply-To: <20141120134615.0ebb3b83@bbrezillon>
+References: <1415604709-24185-1-git-send-email-boris.brezillon@free-electrons.com>
+ <201411192323.34609.arnd@arndb.de> <20141120134615.0ebb3b83@bbrezillon>
+Message-ID: <3067112.uVqLBI6L6W@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 November 2014 13:01:08 Tomasz Nowicki wrote:
-> On 18.11.2014 13:27, Arnd Bergmann wrote:
-> > On Tuesday 18 November 2014 20:17:57 Yijing Wang wrote:
-> >>
-> >>>>
-> >>>> I hope platforms with ACPI or DT could both use pci_create_host_bridge().
-> >>>> Why we need to use two different ways to process it ?
-> >>>
-> >>> These are completely different use cases:
-> >>>
-> >>> a) For DT, we want loadable device drivers that start by probing a host
-> >>>     bridge device which was added through the DT platform code. The
-> >>>     driver is self-contained, and eventually we want to be able to unload
-> >>>     it. We have lots of different per-soc drivers that require different
-> >>>     quirks
-> >>>
-> >>> b) For ACPI, the interface is defined in the ACPI spec across architectures
-> >>>     and SoCs, we don't have host bridge drivers and the code that initializes
-> >>>     the PCI is required early during boot and called from architecture
-> >>>     code. There is no parent device, as ACPI sees PCI as a fundamental building
-> >>>     block by itself, and there are no drivers because the firmware does
-> >>>     the initial hardware setup, so we only have to access the config space.
-> >>
-> >> Hmmm, I'm a little confused, so why you think ACPI host driver should not use
-> >> pci_create_host_bridge(), because ACPI PCI driver has no parent device ?
-> >
-> > It's one of the difference. Having a parent device can certainly make your
-> > life simpler, since you have devm_kzalloc(), dev_info(), etc. Coming from
-> > the other end, I think ACPI needs PCI to be available during early boot,
-> > at a time where we might not want pci_create_host_bridge() to do the
-> > right thing.
+On Thursday 20 November 2014 13:46:15 Boris Brezillon wrote:
+> Actually, I've made a v2 of this patch (see [1]) after realizing Olof
+> had already fixed the initial compilation error.
+> This is pretty much the same patch, except it removes asm/irq.h
+> inclusion.
 > 
-> Device pointer is not required for ACPI, struct acpi_device is all we 
-> need to get all that info. If pci_create_host_bridge() would be DT 
-> specific, it would be nice to have sth similar for ACPI but that is out 
-> of this patch set scope.
+> [1]http://thread.gmane.org/gmane.linux.ports.arm.kernel/370398
+> 
 
-My point was more that we don't need to have something like it for ACPI,
-since we don't get random drivers that need to be probed that way,
-just one common implementation that calls into the PCI core. We should
-of course share the common bits with pci_create_host_bridge() in some
-form, but that can be done by moving the x86 pci_acpi_scan_root
-function and/or acpi_pci_root_add() to a common place in drivers/pci
-and then refactoring the internals.
+Sorry about this. Do you want to send an add-on patch to change that one
+line, or should we just keep the current version?
 
 	Arnd
