@@ -1,36 +1,34 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Thu, 20 Nov 2014 15:40:28 +0100
-Subject: [PATCH v4 3/6] mfd: ti_am335x_tscadc: Remove unwanted
- reg_se_cache save
-In-Reply-To: <546DF2F0.9080405@ti.com>
-References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
- <1415941651-28962-4-git-send-email-vigneshr@ti.com>
- <20141118143005.GF24004@x1> <20141118171240.GB3003@dtor-ws>
- <546DF2F0.9080405@ti.com>
-Message-ID: <20141120144028.GB5809@localhost.localdomain>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 20 Nov 2014 22:43:15 +0800
+Subject: [PATCH] arm64: crypto: Add ARM64 CRC32 hw accelerated module
+In-Reply-To: <CA+dbMpuXC58d_CPYfzYEOjKkP04ZgcxBj6qtfxFfDJK95BxD3Q@mail.gmail.com>
+References: <1416417577-27495-1-git-send-email-yazen.ghannam@linaro.org>
+ <CA+dbMpuXC58d_CPYfzYEOjKkP04ZgcxBj6qtfxFfDJK95BxD3Q@mail.gmail.com>
+Message-ID: <20141120144315.GA32061@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 20, 2014 at 07:26:00PM +0530, Sekhar Nori wrote:
-> I tested this using lcd7 cape connected to beaglebone black. The latest
-> kernel I could find on this board was a TI BSP based v3.14 kernel. So I
-> had to port these patches to that kernel. Cc Robert Nelson to see if he
-> knows about a more recent kernel supporting that cape.
+On Thu, Nov 20, 2014 at 07:42:23AM -0600, Yazen Ghannam wrote:
+> +linux-arm-kernel at lists.infradead.org
+> 
+> On Wed, Nov 19, 2014 at 11:19 AM, Yazen Ghannam <yazen.ghannam@linaro.org>
+> wrote:
+> 
+> > This module registers a crc32 algorithm and a crc32c algorithm
+> > that use the optional CRC32 and CRC32C instructions in ARMv8.
+> >
+> > Tested on AMD Seattle.
+> >
+> > Improvement compared to crc32c-generic algorithm:
+> > TCRYPT CRC32C speed test shows ~450% speedup.
+> > Simple dd write tests to btrfs filesystem show ~30% speedup.
+> >
+> > Signed-off-by: Yazen Ghannam <yazen.ghannam@linaro.org>
+> > Acked-by: Steve Capper <steve.capper@linaro.org>
+> > Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-What is missing from mainline for the black?
-
-(I thought it was fully supported by now.)
- 
-> I did not see any breakage with these patches applied although I did not
-> see any noticeable performance improvement as well.
-
-So, the jumping on pen-up persists, right?  That means the patch
-series does not provide a general fix for that issue.
- 
-> I also tested this series on AM335x EVM using the v3.18-rc5 kernel.
-> Again, no breakage but no improvement as well.
-
-You still have jumps on a pen up event?
-
-Thanks,
-Richard
+Patch applied.  Thanks!
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
