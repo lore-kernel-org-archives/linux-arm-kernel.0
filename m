@@ -1,48 +1,44 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 20 Nov 2014 09:56:23 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC Clock Fixes for v3.18
-In-Reply-To: <201411192220.20365.arnd@arndb.de>
-References: <cover.1415757100.git.horms+renesas@verge.net.au>
- <201411192220.20365.arnd@arndb.de>
-Message-ID: <CAMuHMdXf2ndhmnx1c2jXp_QOrgibJPFvwVoxqndn=GFw=HV2aA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Nov 2014 10:02:38 +0100
+Subject: For the problem when using swiotlb
+In-Reply-To: <546DA795.9080209@huawei.com>
+References: <5469E26B.2010905@huawei.com> <2522857.bNQToYpBNt@wuerfel>
+ <546DA795.9080209@huawei.com>
+Message-ID: <2121725.INdNoXW7GO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Thursday 20 November 2014 16:34:29 Ding Tianhong wrote:
+> > 
+> > I didn't mean the dma_pfn_offset. The problem is that the of_dma_configure
+> > code currently doesn't look at the mask. As I explained in my reply to
+> > Catalin, it should set the mask to the size of the dma-ranges if that is
+> > 32-bit or smaller, and dma_set_mask should look at the same dma-ranges
+> > property to decide what to set the mask to when a driver asks for a
+> > mask larger than 64-bit.
+> > 
+> ok, I think the your reply to catalin is clear, I got it, add a
+> appropriate mask for the dev is
+> reasonable, I think it should be fixed later.
+> 
+> But in my case, if I don't use the DMA_CMA, the dma_alloc_coherent
+> should use the swiotlb directly which maximum is 16M,
+> so unless I use the kmalloc otherwise I have no better idea for that.
 
-On Wed, Nov 19, 2014 at 10:20 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 13 November 2014, Simon Horman wrote:
->> Please consider these Renesas ARM based SoC clock fixes for v3.18.
->> Or alternatively for v3.19 if you feel they are too late for v3.18.
->
-> I've merged all three 'fixes' pull requests you had into the fixes
-> branch:
->
-> Renesas ARM Based SoC Clock Fixes for v3.18
-> Renesas ARM Based SoC DT Fixes for v3.18
-> Renesas ARM Based SoC Fixes for v3.18
->
-> I'm still waiting for a reply from Olof, since he seems to have
-> skipped them last week when he sent the fixes pull request to Linus.
-> If he had already decided to postpone the branches for 3.19, I'll
-> just undo the merge here and put it into next/fixes-non-critical
-> instead, I'm fine with it either way.
+But if you just change your driver to set the 64-bit DMA mask,
+it will no longer use the swiotlb and work much faster without
+that. You have to do it anyway, even once we fix the architecture
+code.
 
-I agree the first two are non-critical.
+The fix in the architecture code is just required so things don't
+break if you have a 64-bit DMA capable device on a 32-bit bus.
 
-The third, "Renesas ARM Based SoC Fixes for v3.18" may fix a regression
-introduced in v3.16. While the original problem with the i2c timings was
-indeed present in v2.6.37, the i2c bys most probably "just worked" (albeit with
-wrong timings), until the i2c-sh_mobile driver got more picky in commit
-7663ebefca8079ef ("i2c: sh_mobile: check timing parameters for valid range").
+On a related note, we should really fix the network and scsi core
+code not lot just look at PCI_DMA_BUS_IS_PHYS but check the presence
+of an IOMMU for devices that are limited to 32-bit DMA, so we fall
+back to block bounce and lowmem SKB instead of swiotlb for IOMMU-less
+devices.
 
-Gr{oetje,eeting}s,
+Which driver are you using BTW?
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	Arnd
