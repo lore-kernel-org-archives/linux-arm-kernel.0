@@ -1,130 +1,138 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 19 Nov 2014 16:10:39 -0800
-Subject: [PATCH 1/7] clk: Add __clk_mux_determine_rate_closest
+Date: Wed, 19 Nov 2014 16:10:42 -0800
+Subject: [PATCH 4/7] clk: qcom: Add simple regmap based muxes
 In-Reply-To: <1416442245-21967-1-git-send-email-sboyd@codeaurora.org>
 References: <1416442245-21967-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1416442245-21967-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1416442245-21967-5-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clock drivers want to find the closest rate on the input of
-a mux instead of a rate that's less than or equal to the desired
-rate. Add a generic mux function to support this.
+Add support for muxes that use regmap instead of readl/writel
+directly. We don't support as many features as clk-mux.c, but
+this is good enough to support getting and setting parents.
+Adding a table based lookup can be added in the future if needed.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/clk.c            | 47 +++++++++++++++++++++++++++++++++++---------
- include/linux/clk-provider.h |  9 +++++++--
- 2 files changed, 45 insertions(+), 11 deletions(-)
+ drivers/clk/qcom/Makefile         |  1 +
+ drivers/clk/qcom/clk-regmap-mux.c | 59 +++++++++++++++++++++++++++++++++++++++
+ drivers/clk/qcom/clk-regmap-mux.h | 29 +++++++++++++++++++
+ 3 files changed, 89 insertions(+)
+ create mode 100644 drivers/clk/qcom/clk-regmap-mux.c
+ create mode 100644 drivers/clk/qcom/clk-regmap-mux.h
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 4896ae9e23da..675f37a7329f 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -700,14 +700,20 @@ struct clk *__clk_lookup(const char *name)
- 	return NULL;
- }
+diff --git a/drivers/clk/qcom/Makefile b/drivers/clk/qcom/Makefile
+index f26917c6bfd7..e7f2d0f225ba 100644
+--- a/drivers/clk/qcom/Makefile
++++ b/drivers/clk/qcom/Makefile
+@@ -7,6 +7,7 @@ clk-qcom-y += clk-rcg.o
+ clk-qcom-y += clk-rcg2.o
+ clk-qcom-y += clk-branch.o
+ clk-qcom-y += clk-cdiv.o
++clk-qcom-y += clk-regmap-mux.o
+ clk-qcom-y += reset.o
  
--/*
-- * Helper for finding best parent to provide a given frequency. This can be used
-- * directly as a determine_rate callback (e.g. for a mux), or from a more
-- * complex clock that may combine a mux with other operations.
-- */
--long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
--			      unsigned long *best_parent_rate,
--			      struct clk **best_parent_p)
-+static bool mux_is_better_rate(unsigned long rate, unsigned long now,
-+			   unsigned long best, unsigned long flags)
-+{
-+	if (flags & CLK_MUX_ROUND_CLOSEST)
-+		return abs(now - rate) < abs(best - rate);
-+
-+	return now <= rate && now > best;
-+}
-+
-+static long
-+clk_mux_determine_rate_flags(struct clk_hw *hw, unsigned long rate,
-+			     unsigned long *best_parent_rate,
-+			     struct clk **best_parent_p,
-+			     unsigned long flags)
- {
- 	struct clk *clk = hw->clk, *parent, *best_parent = NULL;
- 	int i, num_parents;
-@@ -735,7 +741,7 @@ long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
- 			parent_rate = __clk_round_rate(parent, rate);
- 		else
- 			parent_rate = __clk_get_rate(parent);
--		if (parent_rate <= rate && parent_rate > best) {
-+		if (mux_is_better_rate(rate, parent_rate, best, flags)) {
- 			best_parent = parent;
- 			best = parent_rate;
- 		}
-@@ -748,8 +754,31 @@ out:
- 
- 	return best;
- }
-+
+ obj-$(CONFIG_APQ_GCC_8084) += gcc-apq8084.o
+diff --git a/drivers/clk/qcom/clk-regmap-mux.c b/drivers/clk/qcom/clk-regmap-mux.c
+new file mode 100644
+index 000000000000..cae3071f384c
+--- /dev/null
++++ b/drivers/clk/qcom/clk-regmap-mux.c
+@@ -0,0 +1,59 @@
 +/*
-+ * Helper for finding best parent to provide a given frequency. This can be used
-+ * directly as a determine_rate callback (e.g. for a mux), or from a more
-+ * complex clock that may combine a mux with other operations.
++ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
-+long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
-+			      unsigned long *best_parent_rate,
-+			      struct clk **best_parent_p)
-+{
-+	return clk_mux_determine_rate_flags(hw, rate, best_parent_rate,
-+					    best_parent_p, 0);
-+}
- EXPORT_SYMBOL_GPL(__clk_mux_determine_rate);
- 
-+long __clk_mux_determine_rate_closest(struct clk_hw *hw, unsigned long rate,
-+			      unsigned long *best_parent_rate,
-+			      struct clk **best_parent_p)
-+{
-+	return clk_mux_determine_rate_flags(hw, rate, best_parent_rate,
-+					    best_parent_p,
-+					    CLK_MUX_ROUND_CLOSEST);
-+}
-+EXPORT_SYMBOL_GPL(__clk_mux_determine_rate_closest);
 +
- /***        clk api        ***/
- 
- void __clk_unprepare(struct clk *clk)
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index be21af149f11..446faed3f79f 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -383,6 +383,8 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
-  *	register, and mask of mux bits are in higher 16-bit of this register.
-  *	While setting the mux bits, higher 16-bit should also be updated to
-  *	indicate changing mux bits.
-+ * CLK_MUX_ROUND_CLOSEST - Use the parent rate that is closest to the desired
-+ *	frequency.
-  */
- struct clk_mux {
- 	struct clk_hw	hw;
-@@ -397,7 +399,8 @@ struct clk_mux {
- #define CLK_MUX_INDEX_ONE		BIT(0)
- #define CLK_MUX_INDEX_BIT		BIT(1)
- #define CLK_MUX_HIWORD_MASK		BIT(2)
--#define CLK_MUX_READ_ONLY	BIT(3) /* mux setting cannot be changed */
-+#define CLK_MUX_READ_ONLY		BIT(3) /* mux can't be changed */
-+#define CLK_MUX_ROUND_CLOSEST		BIT(4)
- 
- extern const struct clk_ops clk_mux_ops;
- extern const struct clk_ops clk_mux_ro_ops;
-@@ -555,7 +558,9 @@ struct clk *__clk_lookup(const char *name);
- long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
- 			      unsigned long *best_parent_rate,
- 			      struct clk **best_parent_p);
--
-+long __clk_mux_determine_rate_closest(struct clk_hw *hw, unsigned long rate,
-+			      unsigned long *best_parent_rate,
-+			      struct clk **best_parent_p);
- /*
-  * FIXME clock api without lock protection
-  */
++#include <linux/kernel.h>
++#include <linux/bitops.h>
++#include <linux/regmap.h>
++#include <linux/export.h>
++
++#include "clk-regmap-mux.h"
++
++static inline struct clk_regmap_mux *to_clk_regmap_mux(struct clk_hw *hw)
++{
++	return container_of(to_clk_regmap(hw), struct clk_regmap_mux, clkr);
++}
++
++static u8 mux_get_parent(struct clk_hw *hw)
++{
++	struct clk_regmap_mux *mux = to_clk_regmap_mux(hw);
++	struct clk_regmap *clkr = to_clk_regmap(hw);
++	unsigned int mask = GENMASK(mux->width - 1, 0);
++	unsigned int val;
++
++	regmap_read(clkr->regmap, mux->reg, &val);
++
++	val >>= mux->shift;
++	val &= mask;
++
++	return val;
++}
++
++static int mux_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct clk_regmap_mux *mux = to_clk_regmap_mux(hw);
++	struct clk_regmap *clkr = to_clk_regmap(hw);
++	unsigned int mask = GENMASK(mux->width + mux->shift - 1, mux->shift);
++	unsigned int val;
++
++	val = index;
++	val <<= mux->shift;
++
++	return regmap_update_bits(clkr->regmap, mux->reg, mask, val);
++}
++
++const struct clk_ops clk_regmap_mux_closest_ops = {
++	.get_parent = mux_get_parent,
++	.set_parent = mux_set_parent,
++	.determine_rate = __clk_mux_determine_rate_closest,
++};
++EXPORT_SYMBOL_GPL(clk_regmap_mux_closest_ops);
+diff --git a/drivers/clk/qcom/clk-regmap-mux.h b/drivers/clk/qcom/clk-regmap-mux.h
+new file mode 100644
+index 000000000000..5cec76154fda
+--- /dev/null
++++ b/drivers/clk/qcom/clk-regmap-mux.h
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __QCOM_CLK_REGMAP_MUX_H__
++#define __QCOM_CLK_REGMAP_MUX_H__
++
++#include <linux/clk-provider.h>
++#include "clk-regmap.h"
++
++struct clk_regmap_mux {
++	u32			reg;
++	u32			shift;
++	u32			width;
++	struct clk_regmap	clkr;
++};
++
++extern const struct clk_ops clk_regmap_mux_closest_ops;
++
++#endif
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
