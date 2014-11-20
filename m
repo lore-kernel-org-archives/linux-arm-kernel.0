@@ -1,23 +1,21 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Nov 2014 14:17:52 +0100
-Subject: [PATCH] ARM: at91: remove useless init_time for DT-only SoCs
-In-Reply-To: <20141120134615.0ebb3b83@bbrezillon>
-References: <1415604709-24185-1-git-send-email-boris.brezillon@free-electrons.com>
- <201411192323.34609.arnd@arndb.de> <20141120134615.0ebb3b83@bbrezillon>
-Message-ID: <3067112.uVqLBI6L6W@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 20 Nov 2014 13:25:59 +0000
+Subject: 48-bit VA support in the SMMU
+In-Reply-To: <7a9f17b997db458b9f15893837df04eb@BN3PR0301MB1219.namprd03.prod.outlook.com>
+References: <deb48cfb93d94515b6531be02f697e04@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <decb25f05ca84d439e071f6ad8cf0086@BN3PR0301MB1219.namprd03.prod.outlook.com>
+ <20141120100822.GA19126@arm.com>
+ <7a9f17b997db458b9f15893837df04eb@BN3PR0301MB1219.namprd03.prod.outlook.com>
+Message-ID: <20141120132558.GK19126@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 November 2014 13:46:15 Boris Brezillon wrote:
-> Actually, I've made a v2 of this patch (see [1]) after realizing Olof
-> had already fixed the initial compilation error.
-> This is pretty much the same patch, except it removes asm/irq.h
-> inclusion.
-> 
-> [1]http://thread.gmane.org/gmane.linux.ports.arm.kernel/370398
-> 
+On Thu, Nov 20, 2014 at 01:05:51PM +0000, Varun Sethi wrote:
+> Thanks Will. But still, if things work for the stage 1 case why disable 48
+> bit support for the SMMU driver. Wouldn't stage-2 be relevant in case of
+> virtual SMMU?
 
-Sorry about this. Do you want to send an add-on patch to change that one
-line, or should we just keep the current version?
+Well, VFIO installs at stage-2 and the host kernel needs to be able to
+handle that. The virtual SMMU interface always installs at stage-1.
 
-	Arnd
+Will
