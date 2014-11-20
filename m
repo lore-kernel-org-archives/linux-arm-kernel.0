@@ -1,95 +1,58 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 20 Nov 2014 12:53:31 +0100
-Subject: [PATCH 1/3] PM / Domains: Initial PM clock support for genpd
-In-Reply-To: <20141119172501.GA37989@dtor-ws>
-References: <1416405638-18812-1-git-send-email-ulf.hansson@linaro.org>
- <1416405638-18812-2-git-send-email-ulf.hansson@linaro.org>
- <20141119172501.GA37989@dtor-ws>
-Message-ID: <CAPDyKFoL-bv1+xon-BK9yt_QMp2tdBNQME-4iaaUff=a2U5oSw@mail.gmail.com>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Thu, 20 Nov 2014 12:54:48 +0100
+Subject: [RFC PATCH 00/16] Refine PCI host bridge scan interfaces
+In-Reply-To: <1463511.o4kE8TX3Bd@wuerfel>
+References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
+ <1463511.o4kE8TX3Bd@wuerfel>
+Message-ID: <546DD688.60705@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 November 2014 18:25, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
-> On Wed, Nov 19, 2014 at 03:00:36PM +0100, Ulf Hansson wrote:
->> It's quite common for PM domains to use PM clocks. Typically from SOC
->> specific code, the per device PM clock list is created and
->> pm_clk_suspend|resume() are invoked to handle clock gating/ungating.
+On 17.11.2014 15:13, Arnd Bergmann wrote:
+> On Monday 17 November 2014 18:21:34 Yijing Wang wrote:
+>> This series is based Linux 3.18-rc1 and Lorenzo Pieralisi's
+>> arm PCI domain cleanup patches, link:
+>> https://patchwork.ozlabs.org/patch/407585/
 >>
->> A step towards consolidation is to integrate PM clock support into
->> genpd, which is what this patch does.
+>> Current pci scan interfaces like pci_scan_root_bus() and directly
+>> call pci_create_root_bus()/pci_scan_child_bus() lack flexiblity.
+>> Some platform infos like PCI domain and msi_chip have to be
+>> associated to PCI bus by some arch specific function.
+>> We want to make a generic pci_host_bridge, and make it hold
+>> the platform infos or hook. Then we could eliminate the lots
+>> of arch pci_domain_nr, also we could associate some platform
+>> ops something like pci_get_msi_chip(struct pci_dev *dev)
+>> with pci_host_bridge to avoid introduce arch weak functions.
 >>
->> In this initial step, the calls to the pm_clk_suspend|resume() are
->> handled within genpd, but the per device PM clock list still needs to
->> be created from SOC specific code. It seems reasonable to have gendp to
->> handle that as well, but that left to future patches to address.
->>
->> It's not every users of genpd that are keen on using PM clocks thus we
->> need to provide this a configuration option for genpd. Therefore let's
->> add flag field in the genpd struct to keep this information and define
->> a new PM_DOMAIN_PM_CLK bit can then be set at initialization.
->>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> ---
->>  drivers/base/power/domain.c | 7 +++++++
->>  include/linux/pm_domain.h   | 3 +++
->>  2 files changed, 10 insertions(+)
->>
->> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
->> index 3989eb6..42e328c 100644
->> --- a/drivers/base/power/domain.c
->> +++ b/drivers/base/power/domain.c
->> @@ -12,6 +12,7 @@
->>  #include <linux/pm_runtime.h>
->>  #include <linux/pm_domain.h>
->>  #include <linux/pm_qos.h>
->> +#include <linux/pm_clock.h>
->>  #include <linux/slab.h>
->>  #include <linux/err.h>
->>  #include <linux/sched.h>
->> @@ -1948,6 +1949,12 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
->>       genpd->domain.ops.complete = pm_genpd_complete;
->>       genpd->dev_ops.save_state = pm_genpd_default_save_state;
->>       genpd->dev_ops.restore_state = pm_genpd_default_restore_state;
->> +
->> +     if (genpd->flags & PM_DOMAIN_PM_CLK) {
->> +             genpd->dev_ops.stop = pm_clk_suspend;
->> +             genpd->dev_ops.start = pm_clk_suspend;
+>> This RFC version not for all platforms, just applied the new
+>> scan interface in x86/arm/powerpc/ia64, I will refresh other
+>> platforms after the core pci scan interfaces are ok.
 >
-> The 2nd one is wrong.
-
-Huh, thanks for spotting this.
-
+> I think overall this is a good direction to take, in particular
+> moving more things into struct pci_host_bridge so we can
+> slim down the architecture specific code.
 >
->> +     }
->> +
->>       mutex_lock(&gpd_list_lock);
->>       list_add(&genpd->gpd_list_node, &gpd_list);
->>       mutex_unlock(&gpd_list_lock);
->> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
->> index 9d254e2..44c6931 100644
->> --- a/include/linux/pm_domain.h
->> +++ b/include/linux/pm_domain.h
->> @@ -14,6 +14,7 @@
->>  #include <linux/pm.h>
->>  #include <linux/err.h>
->>  #include <linux/of.h>
->> +#include <linux/bitops.h>
->>  #include <linux/notifier.h>
->>  #include <linux/cpuidle.h>
->>
->> @@ -76,6 +77,8 @@ struct generic_pm_domain {
->>                         struct device *dev);
->>       void (*detach_dev)(struct generic_pm_domain *domain,
->>                          struct device *dev);
->> +     unsigned int flags;             /* Bit field of configs for genpd */
->> +#define PM_DOMAIN_PM_CLK     BIT(0)  /* PM domain use PM clk */
+> I don't particularly like the way you use the 'pci_host_info'
+> to pass callback pointers and some of the generic information.
+> This duplicates some of the issues we are currently trying
+> to untangle in the arm32 code to make drivers easier to share
+> between architectures.
 >
-> s/use/uses ?
+> As a general approach, I'd rather see generic helper functions
+> being exported by the PCI core that a driver may or may not
+> call.
+> The way you split the interface between things that happen
+> before scanning the buses (pci_create_host_bridge) and
+> the actual scanning (__pci_create_root_bus, pci_scan_child_bus)
+> seems very helpful and I think we can expand that concept further:
 >
-> Are you planning on adding a separate flag for collecting clocks from OF
-> on attach/detach?
+> - The normal pci_create_host_bridge() function can contain
+>    all of the DT scanning functions (finding bus/mem/io resources,
+>    finding the msi-parent), while drivers that don't depend on DT
+>    for this information can call the same function and fill the
+>    same things after they have the pci_host_bridge pointer.
 
-Yes, I am thinking on that approach. Do you have any suggestions around this?
+How about finding PCI domain number (in the DT way) within 
+pci_create_host_bridge() too ?
 
-Kind regards
-Uffe
+Tomasz
