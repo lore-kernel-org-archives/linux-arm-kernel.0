@@ -1,69 +1,138 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 20 Nov 2014 10:57:53 +0800
-Subject: For the problem when using swiotlb
-In-Reply-To: <1535751.CcvIi3DN4F@wuerfel>
-References: <5469E26B.2010905@huawei.com>
- <20141117180947.GI29595@e104818-lin.cambridge.arm.com>
- <546C0BBB.9070000@huawei.com> <1535751.CcvIi3DN4F@wuerfel>
-Message-ID: <546D58B1.60108@huawei.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 20 Nov 2014 03:29:17 +0000 (UTC)
+Subject: OMAP baseline test results for v3.18-rc5
+Message-ID: <alpine.DEB.2.02.1411200322120.9204@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/19 16:45, Arnd Bergmann wrote:
-> On Wednesday 19 November 2014 11:17:15 Ding Tianhong wrote:
->> On 2014/11/18 2:09, Catalin Marinas wrote:
->>> On Mon, Nov 17, 2014 at 12:18:42PM +0000, Arnd Bergmann wrote:
->>>> On Monday 17 November 2014 19:56:27 Ding Tianhong wrote:
->>>>>         The commit 3690951fc6d42f3a0903987677d0e592c49dd8db(arm64: Use swiotlb late initialisation)
->>>>> switches the DMA mapping code to swiotlb_tlb_late_init_with_default_size(), this will occur a problem
->>>>> when I run the scsi stress tests, the message as below:
->>>>>
->>>>>         sas_controller b1000000.sas: swiotlb buffer is full (sz: 65536 bytes)..
->>>>>         DMA: Out of SW-IOMMU space for 65536 bytes at device b1000000.sas
->>>>>
->>>>> The reason is that the swiotlb_tlb_late_init_with_default_size() could only alloc 16M memory for DMA-mapping,
->>>>> and the param in cmdline "swiotlb=xxx" is useless because the get_free_pages() only use the buddy to assigned a
->>>>> maximum memory of 16M(The MAX_ORDER is 13 for 4k pages), obviously 16M is too small in many scenes, but
->>>>> the swiotlb_init() which could reserved a bigger memory as wished could work well for most drivers.
->>>>>
->>>>> I could not get a better way to fix this problem except to revert this patch, so could you please give me some
->>>>> advise and help me, thanks very much.
->>>>
->>>> In general, you should not need to use swiotlb for most devices, in
->>>> particular for high-performance devices like network or block.
->>>>
->>>> Please make sure that you have set up the dma-ranges properties in
->>>> your DT properly to allow 64-bit DMA if the device supports it.
->>>
->>> That's the problem indeed, the DMA API ends up using swiotlb bounce
->>> buffers because the physical address of the pages passed to (or
->>> allocated by) the driver are beyond 32-bit limit (which is the default
->>> dma mask).
->>>
->>
->> Thanks everyone, I think I found the way to fix it, need to enable DMA_CMA, to reserve a big memory
->> for CMA and set coherent mask for dev, then dma_alloc and dma_mapping will not use the swiotlb until
->> the memory out of mask or swiotlb_force is enabled.
->>
->> If I still understand uncorrectly, please inform me.
->>
-> 
-> Please do not use CMA to work around the problem, but fix the underlying bug
-> instead.
-> 
-> The driver should call 'dma_set_mask_and_coherent()' with the appropriate
-> dma mask, and check whether that succeeded. However, the code implementing
-> dma_set_mask_and_coherent on arm64 also needs to be changed to look up
-> the dma-ranges property (see of_dma_configure()), and check if the mask
-> is possible.
-> 
-> 	Arnd
-> 
 
-The dma_pfn_offset looks only support arm32, but my platform is aarch64 and I check the latest kernel version, 
-I think the dma-rangs still could not work for aarch64, so maybe we should add dma_pfn_offset for aarch64 first.
+Here are some basic OMAP test results for Linux v3.18-rc5.
+Logs and other details at:
 
-Ding
+    http://www.pwsan.com/omap/testlogs/test_v3.18-rc5/20141119185802/
 
-> .
-> 
+
+Test summary
+------------
+
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-som,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
+
+Build: zImage:
+    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
+
+Boot to userspace:
+    FAIL ( 1/17): 2430sdp
+    skip ( 2/17): 5912osk, 3517evm
+    Pass (14/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
+		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm, cmt3517, 5430es2uevm,
+		  5430es2sbct54, 2420n800
+
+PM: chip retention via suspend:
+    FAIL ( 6/12): am335xbonelt, 4430es2panda, 4460varsomom, 2430sdp,
+		  5430es2uevm, 5430es2sbct54
+    Pass ( 6/12): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 7/12): am335xbonelt, 4430es2panda, 4460pandaes,
+		  4460varsomom, 2430sdp, 5430es2uevm, 5430es2sbct54
+    Pass ( 5/12): 37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
+		  3730es12beaglexm
+
+PM: chip off (except CORE, due to errata) via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off (except CORE, due to errata) via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
+
+PM: chip off via dynamic idle:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
+
+
+vmlinux object size
+(delta in bytes from test_v3.18-rc4 (206c5f60a3d902bc4b56dab2de3e88de5eb06108)):
+   text     data      bss    total  kernel
+   +736      -40        0     +696  omap1_defconfig
+   +736      +24        0     +760  omap1_defconfig_1510innovator_only
+   +736      -32        0     +704  omap1_defconfig_5912osk_only
+ +37585   +30632        0   +68217  multi_v7_defconfig
+-313260    -8928   -38696  -360884  omap2plus_defconfig
+-288752    -8672   -38600  -336024  omap2plus_defconfig_2430sdp_only
+-303324    -9000   -38696  -351020  omap2plus_defconfig_am33xx_only
+-307484    -8936   -38696  -355116  omap2plus_defconfig_am43xx_only
+-309164    -8912   -38696  -356772  omap2plus_defconfig_cpupm
+-303324    -8936   -38696  -350956  omap2plus_defconfig_dra7xx_only
+ -10219     -152      -64   -10435  omap2plus_defconfig_n800_multi_omap2xxx
+  -6123     -152      -64    -6339  omap2plus_defconfig_n800_only_a
+-309132    -8904   -38696  -356732  omap2plus_defconfig_no_pm
+-317356    -8912   -38696  -364964  omap2plus_defconfig_omap2_4_only
+-307420    -8936   -38696  -355052  omap2plus_defconfig_omap3_4_only
+-307484    -8944   -38696  -355124  omap2plus_defconfig_omap5_only
+   +692       +8     -104     +596  rmk_omap3430_ldp_allnoconfig
+   +968       -8        0     +960  rmk_omap3430_ldp_oldconfig
+   +724      +12     -136     +600  rmk_omap4430_sdp_allnoconfig
+   +644       -8        0     +636  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.18-rc4 (206c5f60a3d902bc4b56dab2de3e88de5eb06108))
+  avail  rsrvd   high  freed  board          kconfig
+      .      .      .     4k  2420n800       omap2plus_defconfig_n800_only_a
+   352k  -352k      .      .  2430sdp        omap2plus_defconfig
+   352k  -352k      .    -4k  3530es31beagle omap2plus_defconfig
+   352k  -352k      .    -4k  3530es3beagle  omap2plus_defconfig
+   352k  -352k      .    -4k  3730beaglexm   omap2plus_defconfig
+   352k  -352k      .    -4k  3730es12beaglexmomap2plus_defconfig
+   348k  -348k      .    -4k  37xxevm        omap2plus_defconfig
+   352k  -352k      .    -4k  4460pandaes    omap2plus_defconfig
+   352k  -352k      .    -4k  4460varsomom   omap2plus_defconfig
+   352k  -352k      .    -4k  5430es2sbct54  omap2plus_defconfig
+   348k  -348k      .    -4k  5430es2uevm    omap2plus_defconfig
+   340k  -340k      .    -4k  am335xbone     omap2plus_defconfig_am33xx_only
+    -4k     4k      .      .  am335xbonelt   omap2plus_defconfig
+   348k  -348k      .    -4k  cmt3517        omap2plus_defconfig
+
+A 4430ES2 Panda is back in the tests.  This one is slightly newer than the 
+older one; it's an ES2.2 rather than an ES2.0.  The old one may come back 
+in if it turns out to be easy to determine what happened to it - I'd say 
+it's kind of unlikely at this point.  The boot-time memory diff doesn't 
+show up due a limitation of the reporting scripts here.
+
+The huge memory diff comes from IPv6 support being built as a module.
+
+  
