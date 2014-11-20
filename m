@@ -1,31 +1,29 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 20 Nov 2014 14:48:42 +0530
-Subject: Looking for good references for ARM driver development
-In-Reply-To: <546CBFAC.9040906@free.fr>
-References: <546C920A.7060800@free.fr> <546CB0EB.9080005@suse.de>
- <546CBFAC.9040906@free.fr>
-Message-ID: <CAOh2x=n9zHiyoqOJuh2PzuS1_GYCQhYWB5LPL7MW8hUPQ1yTsg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Nov 2014 10:18:11 +0100
+Subject: [GIT PULL] arm: pxa: pxa for v3.19
+In-Reply-To: <874mtu7q50.fsf@free.fr>
+References: <87bnoevq1b.fsf@free.fr> <4686660.cI7P5U9Kgy@wuerfel>
+ <874mtu7q50.fsf@free.fr>
+Message-ID: <201411201018.11773.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 9:35 PM, Mason <mpeg.blue@free.fr> wrote:
-> Is there an exhaustive list of available buses (on the ARM platform)
-> and an overview of when/where each one is appropriate?
+On Wednesday 19 November 2014, Robert Jarzmik wrote:
+> arm: pxa: pxa for v3.19
+> 
+> Hello Arnd, Kevin, Olof,
+> 
+> This is a very quiet release, featuring a small cleanup, a tosa change
+> on its charger driver, and support for pxa device-tree based pxa27x
+> boards.
+> 
+> The device-tree part will only be fully activated once clocks support
+> is fully operation in the common clock framework.
 
-Not sure if its mentioned that clearly anywhere. BUT bus is normally
-bound by the way you need to access registers of a device.
 
-For example, if a device's registers are accessible via SPI, then it has
-to register on SPI. Similarly for I2C, USB, UART, PCI, etc..
+Pulled into next/soc, thanks for your quick update!
 
-The only special cases are Platform and AMBA. Both these are for
-the devices which are directly accessible from Soc bus.
+On a minor note, the text from the tag is what ends up in the merge commit
+log, I've edited it slightly to remove the 'Hello Arnd, Kevin, Olof,'.
 
-AMBA is specifically for the IPs designed by ARM. All these IPs have
-their vendor/version information at a predefined offset and so the AMBA
-bus core reads that value to make device/driver bindings. i.e. It doesn't
-depend on matching .name string in device/driver structures.
-
-Whereas platform is for all other devices accessible over Soc bus. Device
-and drivers are matches here based on the .name string as their is no
-ID to read from hardware.
+	Arnd
