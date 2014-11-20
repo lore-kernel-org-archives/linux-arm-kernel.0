@@ -1,205 +1,80 @@
-From: lee@kernel.org (Lee Jones)
-Date: Thu, 20 Nov 2014 10:52:45 +0000
-Subject: [PATCH] ARM: bcm2835: Add device tree for Raspberry Pi model B+
-Message-ID: <1416480765-13449-1-git-send-email-lee@kernel.org>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 20 Nov 2014 10:54:11 +0000
+Subject: [PATCH v3 0/2] arm64: Add support for Juno development board
+In-Reply-To: <1415727131-4572-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1415727131-4572-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20141120105410.GD17214@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthias Klein <matthias.klein@linux.com>
+On Tue, Nov 11, 2014 at 05:32:09PM +0000, Liviu Dudau wrote:
+> Hi,
+> 
+> This patchset adds device tree support for ARM's AArch64 Juno development
+> board. It enables use of various peripherals on the board, from USB and
+> networking to I2C and PL011 UART.
+> 
+> The patches can also be found in the repository at:
+> 
+>    git://github.com/ARM-software/linux.git juno/dts-for-armsoc
+> 
+> for you to fetch.
 
-The model B and B+ differ in the GPIO lines for ACT and PWR leds, and the
-I2S interface.
+Gentle ping!
 
-Signed-off-by: Matthias Klein <matthias.klein@linux.com>
-Tested-by: Stephen Warren <swarren@nvidia.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
+Olof, Arnd, Kevin: are you OK with this patchset?
 
-As requested by Arnd.
+Best regards,
+Liviu
 
- arch/arm/boot/dts/Makefile               |  1 +
- arch/arm/boot/dts/bcm2835-rpi-b-plus.dts | 30 +++++++++++++++++++
- arch/arm/boot/dts/bcm2835-rpi-b.dts      | 46 ++--------------------------
- arch/arm/boot/dts/bcm2835-rpi.dtsi       | 51 ++++++++++++++++++++++++++++++++
- 4 files changed, 85 insertions(+), 43 deletions(-)
- create mode 100644 arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
- create mode 100644 arch/arm/boot/dts/bcm2835-rpi.dtsi
+> 
+> 
+> Changes vs v2:
+>   - rebased on top of arm-soc/next/cleanup
+>   - Split the flat device tree into several files. Although some
+>     commonality still remains in the main .dts file with other
+>     devices trees (see psci node) it is not clear what benefits can
+>     be gained from moving such a small node into its own file.
+>   - Ordered nodes according to their address space
+>   - Removed ulpi_phy node as it was redundant and the bindings non-standard.
+> 
+> v2 version: http://lkml.org/lkml/2014/11/10/242
+> 
+> Best regards,
+> Liviu
+> 
+> Liviu Dudau (2):
+>   arm64: Create link to include/dt-bindings to enable C preprocessor
+>     use.
+>   arm64: Add Juno board device tree.
+> 
+>  arch/arm64/boot/dts/arm/Makefile              |   1 +
+>  arch/arm64/boot/dts/arm/juno-clocks.dtsi      |  45 ++++++
+>  arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 129 +++++++++++++++
+>  arch/arm64/boot/dts/arm/juno.dts              | 218 ++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/include/dt-bindings       |   1 +
+>  5 files changed, 394 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/arm/juno-clocks.dtsi
+>  create mode 100644 arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+>  create mode 100644 arch/arm64/boot/dts/arm/juno.dts
+>  create mode 120000 arch/arm64/boot/dts/include/dt-bindings
+> 
+> -- 
+> 2.1.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 38c89ca..cbf7db6 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -54,6 +54,7 @@ dtb-$(CONFIG_ARCH_AT91)	+= at91-sama5d4ek.dtb
- dtb-$(CONFIG_ARCH_ATLAS6) += atlas6-evb.dtb
- dtb-$(CONFIG_ARCH_AXXIA) += axm5516-amarillo.dtb
- dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
-+dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b-plus.dtb
- dtb-$(CONFIG_ARCH_BCM_5301X) += bcm4708-netgear-r6250.dtb
- dtb-$(CONFIG_ARCH_BCM_63XX) += bcm963138dvt.dtb
- dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm28155-ap.dtb \
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-new file mode 100644
-index 0000000..e479515
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-@@ -0,0 +1,30 @@
-+/dts-v1/;
-+/include/ "bcm2835-rpi.dtsi"
-+
-+/ {
-+	compatible = "raspberrypi,model-b-plus", "brcm,bcm2835";
-+	model = "Raspberry Pi Model B+";
-+
-+	leds {
-+		act {
-+			gpios = <&gpio 47 0>;
-+		};
-+
-+		pwr {
-+			label = "PWR";
-+			gpios = <&gpio 35 0>;
-+			default-state = "keep";
-+			linux,default-trigger = "default-on";
-+		};
-+	};
-+};
-+
-+&gpio {
-+	pinctrl-0 = <&gpioout &alt0 &i2s_alt0 &alt3>;
-+
-+	/* I2S interface */
-+	i2s_alt0: i2s_alt0 {
-+		brcm,pins = <18 19 20 21>;
-+		brcm,function = <4>; /* alt0 */
-+	};
-+};
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-index 58a0d60..bafa46f 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-@@ -1,63 +1,23 @@
- /dts-v1/;
--/include/ "bcm2835.dtsi"
-+/include/ "bcm2835-rpi.dtsi"
- 
- / {
- 	compatible = "raspberrypi,model-b", "brcm,bcm2835";
- 	model = "Raspberry Pi Model B";
- 
--	memory {
--		reg = <0 0x10000000>;
--	};
--
- 	leds {
--		compatible = "gpio-leds";
--
- 		act {
--			label = "ACT";
- 			gpios = <&gpio 16 1>;
--			default-state = "keep";
--			linux,default-trigger = "heartbeat";
- 		};
- 	};
- };
- 
- &gpio {
--	pinctrl-names = "default";
--	pinctrl-0 = <&gpioout &alt0 &alt2 &alt3>;
--
--	gpioout: gpioout {
--		brcm,pins = <6>;
--		brcm,function = <1>; /* GPIO out */
--	};
--
--	alt0: alt0 {
--		brcm,pins = <0 1 2 3 4 5 7 8 9 10 11 14 15 40 45>;
--		brcm,function = <4>; /* alt0 */
--	};
--
--	alt3: alt3 {
--		brcm,pins = <48 49 50 51 52 53>;
--		brcm,function = <7>; /* alt3 */
--	};
-+	pinctrl-0 = <&gpioout &alt0 &i2s_alt2 &alt3>;
- 
- 	/* I2S interface */
--	alt2: alt2 {
-+	i2s_alt2: i2s_alt2 {
- 		brcm,pins = <28 29 30 31>;
- 		brcm,function = <6>; /* alt2 */
- 	};
- };
--
--&i2c0 {
--	status = "okay";
--	clock-frequency = <100000>;
--};
--
--&i2c1 {
--	status = "okay";
--	clock-frequency = <100000>;
--};
--
--&sdhci {
--	status = "okay";
--	bus-width = <4>;
--};
-diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-new file mode 100644
-index 0000000..c706448
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -0,0 +1,51 @@
-+/include/ "bcm2835.dtsi"
-+
-+/ {
-+	memory {
-+		reg = <0 0x10000000>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		act {
-+			label = "ACT";
-+			default-state = "keep";
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+};
-+
-+&gpio {
-+	pinctrl-names = "default";
-+
-+	gpioout: gpioout {
-+		brcm,pins = <6>;
-+		brcm,function = <1>; /* GPIO out */
-+	};
-+
-+	alt0: alt0 {
-+		brcm,pins = <0 1 2 3 4 5 7 8 9 10 11 14 15 40 45>;
-+		brcm,function = <4>; /* alt0 */
-+	};
-+
-+	alt3: alt3 {
-+		brcm,pins = <48 49 50 51 52 53>;
-+		brcm,function = <7>; /* alt3 */
-+	};
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	clock-frequency = <100000>;
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+	clock-frequency = <100000>;
-+};
-+
-+&sdhci {
-+	status = "okay";
-+	bus-width = <4>;
-+};
 -- 
-1.9.1
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
