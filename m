@@ -1,54 +1,37 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 20 Nov 2014 22:53:26 +0100
-Subject: [PATCH 2/2] Documentation: bindings: add doc for the Berlin USB PHY
-In-Reply-To: <1416520406-1852-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1416520406-1852-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1416520406-1852-2-git-send-email-sebastian.hesselbarth@gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 20 Nov 2014 14:53:53 -0700
+Subject: Removal of bus->msi assignment breaks MSI with stacked domains
+In-Reply-To: <546E1771.4030201@arm.com>
+References: <546E1771.4030201@arm.com>
+Message-ID: <20141120215353.GA7987@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Antoine Tenart <antoine.tenart@free-electrons.com>
+On Thu, Nov 20, 2014 at 04:31:45PM +0000, Marc Zyngier wrote:
+> Bjorn, Yijing,
+> 
+> I've just realized that patch c167caf8d174 (PCI/MSI: Remove useless
+> bus->msi assignment) completely breaks MSI on arm64 when using the new
+> MSI stacked domain:
+> 
+> This patch relies on architectures to implement either
+> pcibios_msi_controller() or arch_setup_msi_irq(). It turns out that with
+> stacked domains, none of this is actually necessary, as long as you can
+> access to the msi_controller.
+> 
+> And everything was fine until this patch came around (and managed to
+> test on a system where the PCI devices are not directly attached to the
+> root bus). Of course, everything now breaks, as we cannot get to the MSI
+> controller (which contains the domain we allocate the MSIs from).
+> 
+> In short, this patch breaks an important feature on which arm64 relies,
+> and I believe this patch should be reverted ASAP.
 
-Document the bindings of the Marvell Berlin USB PHY driver.
+I'm happy to revert it from pci/msi, but I think Thomas has already pulled
+it into his branch, so he'd have to drop it, too.
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
-Split-off patches from latest Berlin USB PHY patches
-  https://lkml.kernel.org/g/1416231347-27193-1-git-send-email-antoine.tenart at free-electrons.com
+Thomas, let me know if you want to do that.  I suppose we could add a new
+patch to add it back, but that would leave bisection broken for the
+interval between c167caf8d174 and the patch that adds it back.
 
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Antoine Tenart <antoine.tenart@free-electrons.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- .../devicetree/bindings/phy/berlin-usb-phy.txt     |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/phy/berlin-usb-phy.txt
-
-diff --git a/Documentation/devicetree/bindings/phy/berlin-usb-phy.txt b/Documentation/devicetree/bindings/phy/berlin-usb-phy.txt
-new file mode 100644
-index 0000000..be33780
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/berlin-usb-phy.txt
-@@ -0,0 +1,16 @@
-+* Marvell Berlin USB PHY
-+
-+Required properties:
-+- compatible: "marvell,berlin2-usb-phy" or "marvell,berlin2cd-usb-phy"
-+- reg: base address and length of the registers
-+- #phys-cells: should be 0
-+- resets: reference to the reset controller
-+
-+Example:
-+
-+	usb-phy at f774000 {
-+		compatible = "marvell,berlin2-usb-phy";
-+		reg = <0xf774000 0x128>;
-+		#phy-cells = <0>;
-+		resets = <&chip 0x104 14>;
-+	};
--- 
-1.7.2.5
+Bjorn
