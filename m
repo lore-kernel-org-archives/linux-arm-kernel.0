@@ -1,49 +1,29 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 20 Nov 2014 14:04:01 -0800
-Subject: [PATCH resend 2/4] ARM: dts: sunxi: unify APB1 clock
-In-Reply-To: <1415245232-20585-3-git-send-email-wens@csie.org> (Chen-Yu Tsai's
- message of "Thu, 6 Nov 2014 11:40:30 +0800")
-References: <1415245232-20585-1-git-send-email-wens@csie.org>
- <1415245232-20585-3-git-send-email-wens@csie.org>
-Message-ID: <7h1toxr0ku.fsf@deeprootsystems.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Thu, 20 Nov 2014 14:05:32 -0800
+Subject: [PATCH v3 00/13] arm64: stable UEFI mappings for kexec
+In-Reply-To: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1416521132.23886.108.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chen-Yu Tsai <wens@csie.org> writes:
+Hi Ard,
 
-> From: Emilio L?pez <emilio@elopez.com.ar>
->
-> With the new factors infrastructure in place, we can unify apb1 and
-> apb1_mux as a single clock now.
->
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> [wens at csie.org: Change apb1 node label to "apb1"; reword commit title]
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On Tue, 2014-11-18 at 13:56 +0100, Ard Biesheuvel wrote:
+> This is v3 of the series to update the UEFI memory map handling for the arm64
+> architecture so that:
 
-Boot breakage in arm-soc/for-next on sun4i-a10-cubieboard and
-sun7i-a20-cubieboard2[1] was bisected down to this patch[1].
+I merged in your EFI patches into my master branch [1] and was able
+to do a successful chain of (four) kexec re-boots of the same kernel
+image on the ARM base model running LEG 14.10 EFI binaries [2].  EFI
+showed:
 
-Reverting $SUBJECT on top of arm-soc gets things booting again.
+  UEFI v2.40 (ARM Fixed Virtual Platform EFI Oct 23 2014 15:53:09, 0x00000000)
 
-Kevin
+I only verified that all CPU's came up and that /proc/meminfo and the
+/proc/iomem 'System RAM' entries looked ok. 
 
-[1] http://status.armcloud.us/boot/?cubie
-[2]
-e883d67285e9267c73f8d2b9d32aa9e712ad00a4 is the first bad commit
-commit e883d67285e9267c73f8d2b9d32aa9e712ad00a4
-Author: Emilio L?pez <emilio@elopez.com.ar>
-Date:   Thu Nov 6 11:40:30 2014 +0800
+[1] https://git.linaro.org/people/geoff.levand/linux-kexec.git
+[2] https://releases.linaro.org/14.10/components/kernel/uefi-linaro/release/fvp_minimal
 
-    ARM: dts: sunxi: unify APB1 clock
-
-    With the new factors infrastructure in place, we can unify apb1 and
-    apb1_mux as a single clock now.
-
-    Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-    [wens at csie.org: Change apb1 node label to "apb1"; reword commit
-    title]
-    Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-    Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-:040000 040000 ab2fd24827d8610215cfd517106f38f359e39f86 1d836ee4f4a2ff442d7d38829f87b72c32152bcc M      arch
-bisect run success
+-Geoff
