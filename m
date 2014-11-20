@@ -1,22 +1,80 @@
-From: geoff.levand@linaro.org (Geoff Levand)
-Date: Wed, 19 Nov 2014 17:27:07 -0800
-Subject: [PATCH v3 00/13] arm64: stable UEFI mappings for kexec
-In-Reply-To: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1416446827.23886.95.camel@smoke>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Thu, 20 Nov 2014 09:53:48 +0800
+Subject: [PATCH 3/5] PCI: Use pci_scan_bus_simple() in simple scene.
+In-Reply-To: <3577231.2krnYe8yCU@wuerfel>
+References: <1416382369-13587-1-git-send-email-wangyijing@huawei.com>
+ <1416382369-13587-4-git-send-email-wangyijing@huawei.com>
+ <3577231.2krnYe8yCU@wuerfel>
+Message-ID: <546D49AC.4020207@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On 2014/11/19 20:28, Arnd Bergmann wrote:
+> On Wednesday 19 November 2014 15:32:47 Yijing Wang wrote:
+>> Use pci_scan_bus_simple() to scan pci buses with
+>> the default IO/MEM/BUS resources. Use it instead
+>> of pci_scan_bus() and pci_scan_bus_parented().
+>>
+>> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+>>
+> 
+> I think we should replace pci_scan_bus_parented() with something better
+> by making the xen code use pci_scan_root_bus() (see below for a draft
+> patch). After that we no longer need the 'parent' argument here and we
+> can just keep using the pci_scan_bus() function for the legacy users,
+> or rename it if that helps.
 
-On Tue, 2014-11-18 at 13:56 +0100, Ard Biesheuvel wrote:
-> This is v3 of the series to update the UEFI memory map handling for the arm64
-> architecture so that:
+It make sense to me, and we could rename pci_scan_bus() to pci_scan_bus_legacy().
+Thanks, I will add this to my series,
 
-Just to let you know, I merged these into my kexec master branch [1] and
-could do a kexec re-boot on a non-EFI system (VE fast model).  I'll try
-with EFI enabled firmware next.
 
-[1] https://git.linaro.org/people/geoff.levand/linux-kexec.git
+> 
+> 	Arnd
+> 
+> 
+> 8<---
+> 
+> diff --git a/drivers/pci/xen-pcifront.c b/drivers/pci/xen-pcifront.c
+> index 116ca3746adb..45a4843a608a 100644
+> --- a/drivers/pci/xen-pcifront.c
+> +++ b/drivers/pci/xen-pcifront.c
+> @@ -448,6 +448,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+>  	struct pci_bus *b;
+>  	struct pcifront_sd *sd = NULL;
+>  	struct pci_bus_entry *bus_entry = NULL;
+> +	LIST_HEAD(resources);
+>  	int err = 0;
+>  
+>  #ifndef CONFIG_PCI_DOMAINS
+> @@ -470,17 +471,20 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+>  		err = -ENOMEM;
+>  		goto err_out;
+>  	}
+> +	pci_add_resource(&resources, &ioport_resource);
+> +	pci_add_resource(&resources, &iomem_resource);
+>  	pcifront_init_sd(sd, domain, bus, pdev);
+>  
+>  	pci_lock_rescan_remove();
+>  
+> -	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
+> -				  &pcifront_bus_ops, sd);
+> +	b = pci_scan_root_bus(&pdev->xdev->dev, bus, &pcifront_bus_ops, sd,
+> +			      &resources);
+>  	if (!b) {
+>  		dev_err(&pdev->xdev->dev,
+>  			"Error creating PCI Frontend Bus!\n");
+>  		err = -ENOMEM;
+>  		pci_unlock_rescan_remove();
+> +		pci_free_resource_list(&resources);
+>  		goto err_out;
+>  	}
+>  
+> 
+> 
+> .
+> 
 
--Geoff
+
+-- 
+Thanks!
+Yijing
