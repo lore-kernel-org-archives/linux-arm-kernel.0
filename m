@@ -1,60 +1,55 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Thu, 20 Nov 2014 12:34:51 +0530
-Subject: [alsa-devel] [PATCH] ASoC: samsung: Fix IISMOD setting in
- i2s_set_sysclk()
-In-Reply-To: <1416420664-20952-1-git-send-email-s.nawrocki@samsung.com>
-References: <1416420664-20952-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <CAAgF-BemHSdcmzkqOUX+JNMLu0-GXs0EGm8YWHt+CBRP8Wa5DA@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 20 Nov 2014 07:09:51 +0000 (UTC)
+Subject: [PATCH v2 2/3] ARM: OMAP2+: hwmod: AM335x/AM43x: add hwmod
+ support for tscadc on am43x-evm
+In-Reply-To: <1415099728-10959-3-git-send-email-vigneshr@ti.com>
+References: <1415099728-10959-1-git-send-email-vigneshr@ti.com>
+ <1415099728-10959-3-git-send-email-vigneshr@ti.com>
+Message-ID: <alpine.DEB.2.02.1411200706441.9204@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+On Tue, 4 Nov 2014, Vignesh R wrote:
 
-On 11/19/14, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
-> In the i2s_set_sysclk() callback we are currently clearing all bits
-> of the IISMOD register when clk_id is SAMSUNG_I2S_CDCLK and dir
-> is SND_SOC_CLOCK_OUT. It's due to an incorrect mask used for the AND
-> operation and breaks the I2S interface operation when we attempt to
-> use the CDCLK output clock.
->
-> It fixes commit a5a56871f804edac93a53b5e871c0e9818fb9033
-> ("ASoC: samsung: add support for exynos7 I2S controller") and restores
-> sound support for Odroid X2/U3.
->
-> Cc: Padmavathi Venna <padma.v@samsung.com>
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
->  sound/soc/samsung/i2s.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-> index 947352d..8db8c66 100644
-> --- a/sound/soc/samsung/i2s.c
-> +++ b/sound/soc/samsung/i2s.c
-> @@ -494,7 +494,7 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
->  		if (dir == SND_SOC_CLOCK_IN)
->  			mod |= 1 << i2s_regs->cdclkcon_off;
->  		else
-> -			mod &= 0 << i2s_regs->cdclkcon_off;
-> +			mod &= ~(1 << i2s_regs->cdclkcon_off);
+> This patch adds hwmod support for tscadc to work on am43xx-evm. The am33xx
+> hwmod structures of tscadc has been moved to ipblock_data so that it can
+> be reused in am43xx. The clock domain names are separately set for am33xx
+> and am43xx. Thus tscadc dt entries can now be added to am43xx board
+> dt files.
+> 
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
 
-Thanks for pointing this. In my local machine it was properly done but
-while rebasing on linux-next I did some mistake. There is one more
-place in set_sysclk which need to be corrected here
-mod &= 0 << i2s_regs->rclksrc_off
-can you include this change also in your patch or should I post a new
-patch for all?
+...
 
-Thanks
-Padma
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
+> index 6e57b8ad0db5..b92a7c7825fa 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
+> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
 
->  		i2s->rfs = rfs;
->  		break;
-> --
-> 1.7.9.5
->
-> _______________________________________________
-> Alsa-devel mailing list
-> Alsa-devel at alsa-project.org
-> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
->
+...
+
+> +static void am33xx_hwmod_clockdomain(void)
+> +{
+> +	CLKDMNAME(am33xx_l4_hs_hwmod, "l4hs_clkdm");
+> +	CLKDMNAME(am33xx_adc_tsc_hwmod, "l4_wkup_clkdm");
+> +}
+> +
+> +static void am43xx_hwmod_clockdomain(void)
+> +{
+> +	CLKDMNAME(am33xx_l4_hs_hwmod, "l3_clkdm");
+> +	CLKDMNAME(am33xx_adc_tsc_hwmod, "l3s_tsc_clkdm");
+> +}
+> +
+
+...
+
+> +	am33xx_hwmod_clockdomain();
+
+I looked at this patch and the one before it.  Is there some reason why we 
+need to share these two hwmods between AM33xx and AM43xx?  It seems 
+cleaner just to add the ADC data directly to the AM43xx hwmod data file, 
+not touch the AM33xx data, and not add another runtime data update for the 
+clockdomains.  Unless there's something that I'm missing?
+
+
+- Paul
