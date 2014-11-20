@@ -1,33 +1,67 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 20 Nov 2014 16:11:49 +0100
-Subject: [PATCH 4/4] ARM: EXYNOS: cpuidle: allow driver usage on Exynos3250 SoC
-In-Reply-To: <1416496309-27602-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1416496309-27602-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1416496309-27602-5-git-send-email-b.zolnierkie@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 20 Nov 2014 09:16:31 -0600
+Subject: [PATCH V3] arm64: amd-seattle: Adding device tree for AMD Seattle
+ platform
+In-Reply-To: <8642876.4lpJWZTuhf@wuerfel>
+References: <1414503414-3863-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <8642876.4lpJWZTuhf@wuerfel>
+Message-ID: <CAL_Jsq+J3izFDepJ04Lb=caUOKJ4eNja0NrhqowyCOEPBVAPdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register cpuidle platform device on Exynos3250 SoC allowing EXYNOS
-cpuidle driver usage on this SoC.
+On Thu, Nov 13, 2014 at 5:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 28 October 2014 08:36:54 suravee.suthikulpanit at amd.com wrote:
+>> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>>
+>> Initial revision of device tree for AMD Seattle platform
+>
+> Sorry for not looking at this earlier in enough detail.
+>
+>> +     dma0: dma at 0500000 {
+>> +             compatible = "arm,pl330", "arm,primecell";
+>> +             reg = <0 0x0500000 0 0x1000>;
+>> +             interrupts =
+>> +                     <0 368 4>,
+>> +                     <0 369 4>,
+>> +                     <0 370 4>,
+>> +                     <0 371 4>,
+>> +                     <0 372 4>,
+>> +                     <0 373 4>,
+>> +                     <0 374 4>,
+>> +                     <0 375 4>;
+>> +             clocks = <&dmaclk_500mhz>;
+>> +             clock-names = "apb_pclk";
+>> +             #dma-cells = <1>;
+>> +     };
+>
+> Is this device cache-coherent?
+>
+> Does it support larger than 32-bit DMA addresses?
 
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-exynos/exynos.c | 1 +
- 1 file changed, 1 insertion(+)
+No.
 
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index 847cd0a..6efdbbe 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -297,6 +297,7 @@ static void __init exynos_dt_machine_init(void)
- 	    of_machine_is_compatible("samsung,exynos4212") ||
- 	    (of_machine_is_compatible("samsung,exynos4412") &&
- 	     of_machine_is_compatible("samsung,trats2")) ||
-+	    of_machine_is_compatible("samsung,exynos3250") ||
- 	    of_machine_is_compatible("samsung,exynos5250"))
- 		platform_device_register(&exynos_cpuidle);
- 
--- 
-1.8.2.3
+>
+>> +     sata0: sata at 00300000 {
+>> +             compatible = "snps,dwc-ahci";
+
+This should have an AMD specific compatible string in addition in case
+you have AMD specific configuration or bugs.
+
+>> +             reg = <0 0x300000 0 0x800>;
+>> +             interrupts = <0 355 4>;
+>> +             clocks = <&sataclk_333mhz>;
+>> +             clock-names = "apb_pclk";
+
+This name is obviously wrong and copied from other (ARM Primecell)
+bindings as this IP does not have an APB PCLK. You can drop the name
+as it is optional.
+
+>> +             dma-coherent;
+>> +     };
+>
+> Same here: you list it as coherent, but not 64-bit DMA capable.
+> Is that intentional?
+
+AHCI controllers are probeable as to whether they support 64-bit DMA or not.
+
+Rob
