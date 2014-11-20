@@ -1,52 +1,59 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 20 Nov 2014 10:19:43 +0100
-Subject: [PATCH 2/7] mfd: MT6397: Add regmap for MT8135 and MT6397 SoC
-In-Reply-To: <20141119170454.GJ1875@x1>
-References: <1416210027-5562-1-git-send-email-flora.fu@mediatek.com>
- <1416210027-5562-3-git-send-email-flora.fu@mediatek.com>
- <20141118114645.GX24004@x1> <20141118134618.GF30369@pengutronix.de>
- <20141119170454.GJ1875@x1>
-Message-ID: <20141120091943.GJ30369@pengutronix.de>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Thu, 20 Nov 2014 17:21:23 +0800
+Subject: For the problem when using swiotlb
+In-Reply-To: <2121725.INdNoXW7GO@wuerfel>
+References: <5469E26B.2010905@huawei.com> <2522857.bNQToYpBNt@wuerfel>
+ <546DA795.9080209@huawei.com> <2121725.INdNoXW7GO@wuerfel>
+Message-ID: <546DB293.1040500@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 05:04:54PM +0000, Lee Jones wrote:
-> On Tue, 18 Nov 2014, Sascha Hauer wrote:
+On 2014/11/20 17:02, Arnd Bergmann wrote:
+> On Thursday 20 November 2014 16:34:29 Ding Tianhong wrote:
+>>>
+>>> I didn't mean the dma_pfn_offset. The problem is that the of_dma_configure
+>>> code currently doesn't look at the mask. As I explained in my reply to
+>>> Catalin, it should set the mask to the size of the dma-ranges if that is
+>>> 32-bit or smaller, and dma_set_mask should look at the same dma-ranges
+>>> property to decide what to set the mask to when a driver asks for a
+>>> mask larger than 64-bit.
+>>>
+>> ok, I think the your reply to catalin is clear, I got it, add a
+>> appropriate mask for the dev is
+>> reasonable, I think it should be fixed later.
+>>
+>> But in my case, if I don't use the DMA_CMA, the dma_alloc_coherent
+>> should use the swiotlb directly which maximum is 16M,
+>> so unless I use the kmalloc otherwise I have no better idea for that.
 > 
-> > On Tue, Nov 18, 2014 at 11:46:45AM +0000, Lee Jones wrote:
-> > > On Mon, 17 Nov 2014, Flora Fu wrote:
-> > > 
-> > > > Add PMIC wrapper of MT8135 to access MFD MT6397.
-> > > > This is regmap of MT6397 MFD.
-> > > > 
-> > > > Signed-off-by: Flora Fu <flora.fu@mediatek.com>
-> > > > ---
-> > > >  drivers/mfd/Kconfig            |   8 +
-> > > >  drivers/mfd/Makefile           |   1 +
-> > > >  drivers/mfd/mt8135-pmic-wrap.c | 847 +++++++++++++++++++++++++++++++++++++++++
-> > > 
-> > > All of the PMIC functionality needs removing from MFD and placed
-> > > somewhere else.  I suggest either drivers/power or drivers/regulator.
-> > 
-> > This is no PMIC functionality. The MT8135 has a unit which is is used to
-> > access the PMIC (which is not only a PMIC, but also Touchscreen
-> > interface and other stuff). This unit is called pmic-wrapper in the
-> > docs. See the introductory mail for a nice picture.
+> But if you just change your driver to set the 64-bit DMA mask,
+> it will no longer use the swiotlb and work much faster without
+> that. You have to do it anyway, even once we fix the architecture
+> code.
 > 
-> I saw the picture, it's very nice.  Whatever this is, it's not an
-> MFD.  It's a device which is located on an MFD.  There is far too much
-> functional (the operative word here) code contained in this patch.
 
-The MT6397 is a classical MFD device. It has a PMIC, an audio amp and a
-RTC. It is very tightly coupled to the SoC via SPI, but the SPI itself
-is not directly visible on the SoC. It's accessible indirectly via the
-PMIC-wrapper. Indeed the PMIC-wrapper is not MFD. Another dumping ground
-that comes to my mind is drivers/soc/. We could move over there.
+Yes, I did, it is useful, thanks.
 
-Sascha
+> The fix in the architecture code is just required so things don't
+> break if you have a 64-bit DMA capable device on a 32-bit bus.
+> 
+> On a related note, we should really fix the network and scsi core
+> code not lot just look at PCI_DMA_BUS_IS_PHYS but check the presence
+> of an IOMMU for devices that are limited to 32-bit DMA, so we fall
+> back to block bounce and lowmem SKB instead of swiotlb for IOMMU-less
+> devices.
+> 
+agree.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> Which driver are you using BTW?
+> 
+soc ppe drivers which is not upstream yet, and sas drivers.
+
+> 	Arnd
+
+Regards
+Ding
+
+> 
+> .
+> 
