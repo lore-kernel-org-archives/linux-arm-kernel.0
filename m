@@ -1,152 +1,49 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 20 Nov 2014 15:54:49 -0700
-Subject: [RFC PATCH v2] drivers: pci: move PCI domain assignment to
- generic PCI code
-In-Reply-To: <1415637706-2195-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1415637706-2195-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20141120225449.GD7987@google.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 20 Nov 2014 23:57:03 +0100 (CET)
+Subject: [PATCH RFC 3/3] ARM: dts: enable power subsystem for i.MX28
+In-Reply-To: <CAOMZO5AWOs8ODsru+ySsLb=R4ezDL19nK_z0zAXdbrDfPT8KhA@mail.gmail.com>
+References: <1416514477-19190-1-git-send-email-stefan.wahren@i2se.com>
+ <1416514477-19190-4-git-send-email-stefan.wahren@i2se.com>
+ <CAOMZO5AWOs8ODsru+ySsLb=R4ezDL19nK_z0zAXdbrDfPT8KhA@mail.gmail.com>
+Message-ID: <1167895673.64469.1416524223868.JavaMail.open-xchange@oxbaltgw04.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 10, 2014 at 04:41:46PM +0000, Lorenzo Pieralisi wrote:
-> The current logic used for PCI domain assignment in arm64
-> pci_bus_assign_domain_nr() is flawed in that, depending on the host
-> controllers configuration for a platform and the respective initialization
-> sequence, core code may end up allocating PCI domain numbers from both DT and
-> the core code generic domain counter, which would result in PCI domain
-> allocation aliases/errors.
-> 
-> This patch fixes the logic behind the PCI domain number assignment and
-> moves the resulting code to generic PCI core code so that the same domain
-> allocation logic is used on all platforms selecting
-> 
-> CONFIG_PCI_DOMAINS_GENERIC
-> 
-> instead of resorting to an arch specific implementation that might end up
-> duplicating the PCI domain assignment logic wrongly.
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Hi Fabio,
 
-Applied with Liviu and Arnd's acks to pci/domain for v3.19, thanks.
+> Fabio Estevam <festevam@gmail.com> hat am 20. November 2014 um 22:32
+> geschrieben:
+>
+>
+> Hi Stefan,
+>
+> On Thu, Nov 20, 2014 at 6:14 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> > This patch enables the power subsystem for all i.MX28 boards.
+> >
+> > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> > ---
+> > arch/arm/boot/dts/imx28.dtsi | 6 +++++-
+> > 1 file changed, 5 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> > index 47f68ac..5c163a5 100644
+> > --- a/arch/arm/boot/dts/imx28.dtsi
+> > +++ b/arch/arm/boot/dts/imx28.dtsi
+> > @@ -1022,8 +1022,12 @@
+> > };
+> >
+> > power: power at 80044000 {
+> > + compatible = "fsl,imx28-power";
+>
+> Should we have 'fsl,imx23-power' and 'fsl,imx28-power' as compatible strings?
 
-It doesn't matter whether I'm in the to: or cc: list.  The important thing
-is that it appears on the linux-pci list, because I use patchwork as my
-to-do list, and patchwork only vacuums up stuff from linux-pci.
+yes, of course.
 
-> ---
-> v1 => v2:
-> 
-> - Moved generic pci_bus_assign_domain_nr() code to PCI core instead of
->   adding an OF layer API
-> - Updated commit log and code comments
-> 
->  arch/arm64/kernel/pci.c | 22 ----------------------
->  drivers/pci/pci.c       | 50 +++++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 50 insertions(+), 22 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index ce5836c..6f93c24 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -46,25 +46,3 @@ int pcibios_add_device(struct pci_dev *dev)
->  
->  	return 0;
->  }
-> -
-> -
-> -#ifdef CONFIG_PCI_DOMAINS_GENERIC
-> -static bool dt_domain_found = false;
-> -
-> -void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> -{
-> -	int domain = of_get_pci_domain_nr(parent->of_node);
-> -
-> -	if (domain >= 0) {
-> -		dt_domain_found = true;
-> -	} else if (dt_domain_found == true) {
-> -		dev_err(parent, "Node %s is missing \"linux,pci-domain\" property in DT\n",
-> -			parent->of_node->full_name);
-> -		return;
-> -	} else {
-> -		domain = pci_get_new_domain_nr();
-> -	}
-> -
-> -	bus->domain_nr = domain;
-> -}
-> -#endif
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index 625a4ac..2279414 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -10,6 +10,8 @@
->  #include <linux/kernel.h>
->  #include <linux/delay.h>
->  #include <linux/init.h>
-> +#include <linux/of.h>
-> +#include <linux/of_pci.h>
->  #include <linux/pci.h>
->  #include <linux/pm.h>
->  #include <linux/slab.h>
-> @@ -4447,6 +4449,54 @@ int pci_get_new_domain_nr(void)
->  {
->  	return atomic_inc_return(&__domain_nr);
->  }
-> +
-> +#ifdef CONFIG_PCI_DOMAINS_GENERIC
-> +
-> +void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> +{
-> +	static int use_dt_domains = -1;
-> +	int domain = of_get_pci_domain_nr(parent->of_node);
-> +
-> +	/*
-> +	 * Check DT domain and use_dt_domains values.
-> +	 *
-> +	 * If DT domain property is valid (domain >= 0) and
-> +	 * use_dt_domains != 0, the DT assignment is valid since this means
-> +	 * we have not previously allocated a domain number by using
-> +	 * pci_get_new_domain_nr(); we should also update use_dt_domains to
-> +	 * 1, to indicate that we have just assigned a domain number from
-> +	 * DT.
-> +	 *
-> +	 * If DT domain property value is not valid (ie domain < 0), and we
-> +	 * have not previously assigned a domain number from DT
-> +	 * (use_dt_domains != 1) we should assign a domain number by
-> +	 * using the:
-> +	 *
-> +	 * pci_get_new_domain_nr()
-> +	 *
-> +	 * API and update the use_dt_domains value to keep track of method we
-> +	 * are using to assign domain numbers (use_dt_domains = 0).
-> +	 *
-> +	 * All other combinations imply we have a platform that is trying
-> +	 * to mix domain numbers obtained from DT and pci_get_new_domain_nr(),
-> +	 * which is a recipe for domain mishandling and it is prevented by
-> +	 * invalidating the domain value (domain = -1) and printing a
-> +	 * corresponding error.
-> +	 */
-> +	if (domain >= 0 && use_dt_domains) {
-> +		use_dt_domains = 1;
-> +	} else if (domain < 0 && use_dt_domains != 1) {
-> +		use_dt_domains = 0;
-> +		domain = pci_get_new_domain_nr();
-> +	} else {
-> +		dev_err(parent, "Node %s has inconsistent \"linux,pci-domain\" property in DT\n",
-> +			parent->of_node->full_name);
-> +		domain = -1;
-> +	}
-> +
-> +	bus->domain_nr = domain;
-> +}
-> +#endif
->  #endif
->  
->  /**
-> -- 
-> 2.1.2
-> 
+>
+> Or ''fsl,mxs-power' could be used for both?
+
+I think that would be a bad idea. I can't believe that all PMU register of
+i.MX23 and i.MX28 are identical. So in the future we will have to distinguish
+between them. It's better to do it now like most of the mxs driver does.
+
+Stefan
