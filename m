@@ -1,106 +1,66 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 20 Nov 2014 06:17:22 +0100
-Subject: [RFC PATCH] clk: mvebu: armada-xp: Support for MSYS SoC
-In-Reply-To: <1416459679-30944-1-git-send-email-chris.packham@alliedtelesis.co.nz>
-References: <1416459679-30944-1-git-send-email-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20141120051722.GC2596@lunn.ch>
+From: amit.daniel@samsung.com (Amit Daniel Kachhap)
+Date: Thu, 20 Nov 2014 11:09:23 +0530
+Subject: [PATCH v3 0/5] exynos: Move pmu driver to driver/soc folder and add
+ exynos7 support
+Message-ID: <1416461968-2057-1-git-send-email-amit.daniel@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 20, 2014 at 06:01:19PM +1300, Chris Packham wrote:
-> The MSYS SoCs are a range of packet processors with integrated CPUs based
-> on armada-xp. One difference is that the TCLK frequency is fixed at 200MHz
-> as opposed to the fixed 250MHz used on armada-xp. The clock-gating options
-> are a subset of what's available on the armada-xp so this code should be
-> compatible.
+This patch series [1 - 5] performs,
 
-Hi Chris
+1) Moves pmu driver to driver/soc/samsung folder. This is needed as exynos7 is
+   an arm64 based platform and hence PMU driver should be in driver folder.
+   Some discussion happened about this in the v1 version. Finally adding it in
+   driver/soc folder as it too SoC specific and not a general driver.
+   Entire discussion can be found here (A).
+2) Add exynos7 PMU support.
+3) Enables the driver for 32bit arm exynos platforms.
 
-How generic/specific is the name msys? We need to be careful here,
-because there could be other packet processors with embedded Armada-XP
-cores with different tclk speeds. Rather than using msys, it might be
-better to use the specific packet processor product ID.
+Changes from V2:
+* Added review comment changes suggested by Pankaj.
+* Removed mfd client support in this patch series. This will be added later in
+  the power domain patch series.
+* Link to V2 can be found here (B)
 
-Whatever we call it, this new compatibility string also needs adding
-to the device tree binding document in 
+Changes from V1:
+* Move pmu driver in driver/soc/samsung folder
+* Removed the power domain features. They will posted as a separate series.
+* Added exynos7 PMU support.
+* Link to v1 can be found here (A)
 
-Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+This complete patch series is rebased on Kukjin for-next tree.
 
-> 
-> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-> ---
-> Hi,
-> 
-> This patch is enough to get the uart clock dividers correct so I get some
-> output. As far as I've been able to tell there is no way of dynamically
-> detecting the TCLK frequency.
-> 
-> The core clock frequency and ratio calculations are probably not correct but
-> for these CPU inside a packet processor systems I'm not sure how much that
-> actually matter since these systems aren't likely to do any kind of dynamic
-> frequency scaling.
+(A) - http://www.spinics.net/lists/linux-samsung-soc/msg38442.html
+(B) - http://www.spinics.net/lists/arm-kernel/msg375910.html
 
-Do you have u-boot running? It generally prints out these frequencies.
-You can at least verify if they are {in}consistent with Linux. If you
-have the u-boot sources, you might also be able to use it get these
-clocks right in Linux.
+Amit Daniel Kachhap (5):
+  ARM: EXYNOS: Move pmu specific header files under "linux/soc/samsung"
+  drivers: soc: Add support for Exynos PMU driver
+  driver: soc: exynos-pmu: Add an API to be called after wakeup
+  drivers: soc: exynos-pmu: Add support for Exynos7
+  arm: exynos: Select SOC_SAMSUNG config option
 
-       Andrew
+ .../devicetree/bindings/arm/samsung/pmu.txt        |    1 +
+ arch/arm/mach-exynos/Kconfig                       |    1 +
+ arch/arm/mach-exynos/Makefile                      |    2 +-
+ arch/arm/mach-exynos/exynos.c                      |    2 +-
+ arch/arm/mach-exynos/mcpm-exynos.c                 |    2 +-
+ arch/arm/mach-exynos/platsmp.c                     |    2 +-
+ arch/arm/mach-exynos/pm.c                          |    4 +-
+ arch/arm/mach-exynos/suspend.c                     |    4 +-
+ drivers/soc/Kconfig                                |    1 +
+ drivers/soc/Makefile                               |    1 +
+ drivers/soc/samsung/Kconfig                        |   20 +
+ drivers/soc/samsung/Makefile                       |    1 +
+ .../pmu.c => drivers/soc/samsung/exynos-pmu.c      |  445 +++++++++++++++++++-
+ .../linux/soc/samsung}/exynos-pmu.h                |    1 +
+ .../linux/soc/samsung/exynos-regs-pmu.h            |  273 ++++++++++++
+ 15 files changed, 745 insertions(+), 15 deletions(-)
+ create mode 100644 drivers/soc/samsung/Kconfig
+ create mode 100644 drivers/soc/samsung/Makefile
+ rename arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c (63%)
+ rename {arch/arm/mach-exynos => include/linux/soc/samsung}/exynos-pmu.h (89%)
+ rename arch/arm/mach-exynos/regs-pmu.h => include/linux/soc/samsung/exynos-regs-pmu.h (63%)
 
-> 
-> Thansk,
-> Chris
-> 
->  drivers/clk/mvebu/armada-xp.c | 20 +++++++++++++++++++-
->  1 file changed, 19 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/mvebu/armada-xp.c b/drivers/clk/mvebu/armada-xp.c
-> index b309431..9f852f8 100644
-> --- a/drivers/clk/mvebu/armada-xp.c
-> +++ b/drivers/clk/mvebu/armada-xp.c
-> @@ -52,6 +52,12 @@ static u32 __init axp_get_tclk_freq(void __iomem *sar)
->  	return 250000000;
->  }
->  
-> +/* MSYS TCLK frequency is fixed to 200MHz */
-> +static u32 __init msys_get_tclk_freq(void __iomem *sar)
-> +{
-> +	return 200000000;
-> +}
-> +
->  static const u32 axp_cpu_freqs[] __initconst = {
->  	1000000000,
->  	1066000000,
-> @@ -158,6 +164,14 @@ static const struct coreclk_soc_desc axp_coreclks = {
->  	.num_ratios = ARRAY_SIZE(axp_coreclk_ratios),
->  };
->  
-> +static const struct coreclk_soc_desc msys_coreclks = {
-> +	.get_tclk_freq = msys_get_tclk_freq,
-> +	.get_cpu_freq = axp_get_cpu_freq,
-> +	.get_clk_ratio = axp_get_clk_ratio,
-> +	.ratios = axp_coreclk_ratios,
-> +	.num_ratios = ARRAY_SIZE(axp_coreclk_ratios),
-> +};
-> +
->  /*
->   * Clock Gating Control
->   */
-> @@ -200,9 +214,13 @@ static void __init axp_clk_init(struct device_node *np)
->  	struct device_node *cgnp =
->  		of_find_compatible_node(NULL, NULL, "marvell,armada-xp-gating-clock");
->  
-> -	mvebu_coreclk_setup(np, &axp_coreclks);
-> +	if (of_device_is_compatible(np, "marvell,msys-core-clock"))
-> +		mvebu_coreclk_setup(np, &msys_coreclks);
-> +	else
-> +		mvebu_coreclk_setup(np, &axp_coreclks);
->  
->  	if (cgnp)
->  		mvebu_clk_gating_setup(cgnp, axp_gating_desc);
->  }
->  CLK_OF_DECLARE(axp_clk, "marvell,armada-xp-core-clock", axp_clk_init);
-> +CLK_OF_DECLARE(msys_clk, "marvell,msys-core-clock", axp_clk_init);
-> -- 
-> 2.2.0.rc0
-> 
+-- 
+1.7.9.5
