@@ -1,82 +1,194 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Thu, 20 Nov 2014 15:30:21 -0500
-Subject: [PATCH v9 12/13] swiotlb-xen: pass dev_addr to
- xen_dma_unmap_page and xen_dma_sync_single_for_cpu
-In-Reply-To: <alpine.DEB.2.02.1411201046110.12596@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1411121130020.26318@kaball.uk.xensource.com>
- <1415792454-23161-12-git-send-email-stefano.stabellini@eu.citrix.com>
- <20141119210703.GE20440@laptop.dumpdata.com>
- <alpine.DEB.2.02.1411201033460.12596@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1411201046110.12596@kaball.uk.xensource.com>
-Message-ID: <20141120203020.GJ31889@laptop.dumpdata.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 20 Nov 2014 21:56:28 +0100
+Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
+ completes
+In-Reply-To: <CAPDyKFo-b7wB7DJifwX0ARu8GJYQmSn6W5NDs4++BvO5LTVGEA@mail.gmail.com>
+References: <20141117220238.GE5258@dtor-ws> <4182833.JTef00bpdk@vostro.rjw.lan>
+ <CAPDyKFo-b7wB7DJifwX0ARu8GJYQmSn6W5NDs4++BvO5LTVGEA@mail.gmail.com>
+Message-ID: <5824227.jcJU6stFvy@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 20, 2014 at 10:47:51AM +0000, Stefano Stabellini wrote:
-> On Thu, 20 Nov 2014, Stefano Stabellini wrote:
-> > On Wed, 19 Nov 2014, Konrad Rzeszutek Wilk wrote:
-> > > On Wed, Nov 12, 2014 at 11:40:53AM +0000, Stefano Stabellini wrote:
-> > > > xen_dma_unmap_page and xen_dma_sync_single_for_cpu take a dma_addr_t
-> > > > handle as argument, not a physical address.
-> > > 
-> > > Ouch. Should this also go on stable tree?
-> > 
-> > Good idea
+On Thursday, November 20, 2014 11:13:01 AM Ulf Hansson wrote:
+> On 20 November 2014 01:35, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Wednesday, November 19, 2014 09:54:00 AM Ulf Hansson wrote:
+> >> [...]
+> >>
+> >> >>
+> >> >> Scenario 5), a platform driver with/without runtime PM callbacks.
+> >> >> ->probe()
+> >> >> - do some initialization
+> >> >> - may fetch handles to runtime PM resources
+> >> >> - pm_runtime_enable()
+> >> >
+> >> > Well, and now how the driver knows if the device is "on" before accessing it?
+> >>
+> >> In this case the driver don't need to access the device during
+> >> ->probe(). That's postponed until sometime later.
+> >
+> > If this is a platform driver, it rather does need to access the device,
+> > precisely because it doesn't know what power state the device is in otherwise.
+> > See below.
+> >
+> >> >> Note 1)
+> >> >> Scenario 1) and 2), both relies on the approach to power on the PM
+> >> >> domain by using pm_runtime_get_sync(). That approach didn't work when
+> >> >> CONFIG_PM_RUNTIME was unset, but we recently decided to fixed that by
+> >> >> the below patch, so that's good!
+> >> >> "[PATCH] PM / domains: Kconfig: always enable PM_RUNTIME when genpd enabled"
+> >> >>
+> >> >> Note 2)
+> >> >> Scenario 3) and 4) use the same principles for managing runtime PM.
+> >> >> These scenarios needs a way to power on the generic PM domain prior
+> >> >> probing the device. The call to pm_runtime_set_active(), prevents an
+> >> >> already powered PM domain from power off until after probe, but that's
+> >> >> not enough.
+> >> >>
+> >> >> Note 3)
+> >> >> The $subject patch, tried to address the issues for scenario 3) and
+> >> >> 4). It does so, but will affect scenario 5) which was working nicely
+> >> >> before. In scenario 5), the $subject patch will cause the generic PM
+> >> >> domain to potentially stay powered after ->probe() even if the device
+> >> >> is runtime PM suspended.
+> >> >
+> >> > Why would it?  If the device is runtime-suspended, the domain will know
+> >> > that, because its callbacks will be used for that.  At least, that's
+> >> > what I'd expect to happen, so is there a problem here?
+> >>
+> >> Genpd do knows about the device but it doesn?t get a "notification" to
+> >> power off. There are no issues whatsoever for driver.
+> >
+> > Except that the driver is arguably buggy.
+> >
+> >> This is a somewhat special case. Let's go through an example.
+> >>
+> >> 1. The PM domain is initially in powered off state.
+> >> 2. The bus ->probe() invokes dev_pm_domain_attach() and then the PM
+> >> domain gets attached to the device.
+> >> 3. $subject patch causes the PM domain to power on.
+> >> 4. A driver ->probe() sequence start, following the Scenario 5).
+> >> 5. The device is initially in runtime PM suspended state and it will
+> >> remain so during ->probe().
+> >
+> > But is it physically suspended?
+> >
+> > The runtime PM status of the device after ->probe is required to reflect its
+> > real state if runtime PM is enabled.  If that's not the case, it is a bug.
 > 
-> Also can I take that as an Acked-by for this patch?
+> Agree.
+> 
+> While I was searching for drivers that behave as in scenario 5), they
+> tend to register some subsystem specific callbacks and don't access
+> the device until some of those callbacks are invoked.
+> 
+> At least that was my interpretation of their ->probe() methods, but
+> it's not always easy to tell how those callbacks are being used for
+> each subsystem.
+> 
+> >
+> > Now, for platform drivers, the driver can't really assume anything in
+> > particular about the current power state of the device at ->probe time,
+> > because different platforms including devices handled by that driver may
+> > behave differently.
+> >
+> > A good example would be two platforms A and B where the same device X is in a
+> > power domain such that A boots with the domain (physically) "on", while B boots
+> > with the domain "off".  If the driver for X assumes anything about the initial
+> > power state of the device, it may not work on either A or B.
+> 
+> I get your point and agree!
+> 
+> >
+> >> 6. The pm_request_idle() invoked after really_probe() in driver core,
+> >> won't trigger a runtime PM suspend callback to be invoked. In other
+> >> words, genpd don't get a "notification" that it may power off.
+> >>
+> >> In this state, genpd will either power off from the late_initcall,
+> >> genpd_poweroff_unused() (depending on when the driver was probed) or
+> >> wait until some device's runtime PM suspend callback is invoked at any
+> >> later point.
+> >
+> > Which sounds OK to me, so why is it a problem?
+> 
+> The late_initcall doesn't work for modules.
+> 
+> Also, suppose the PM domain only holds this "inactive device" that was
+> probed as in scenario 5). Then, you could end up having the PM domain
+> powered, even if it isn't needed.
+> 
+> Anyway, I can live with this. It's likely the driver that behave as in
+> scenario 5) that should be fixed as you stated.
+> 
+> >
+> >> >> I see three options going forward.
+> >> >>
+> >> >> Option 1)
+> >> >> Convert scenario 3) and 4) into using the pm_runtime_get_sync()
+> >> >> approach. There are no theoretical obstacles to do this, but pure
+> >> >> practical. There are a lot of drivers that needs to be converted and
+> >> >> we also need to teach driver authors future wise to not use
+> >> >> pm_runtime_set_active() in this manner.
+> >> >
+> >> > I'd say we need to do something like this anyway.  That is, standardize on
+> >> > *one* approach.  I'm actually not sure what approach is the most useful,
+> >> > but the pm_runtime_get_sync() one seems to be the most popular to me.
+> >> >
+> >> >> Option 2)
+> >> >> Add some kind of get/put API for PM domains. The buses invokes it to
+> >> >> control the power to the PM domain. From what I understand, that's
+> >> >> also what Dmitry think is needed!?
+> >> >> Anyway, that somehow means to proceed with the approach I took in the
+> >> >> below patchset.
+> >> >> [PATCH v3 0/9] PM / Domains: Fix race conditions during boot
+> >> >> http://marc.info/?t=141320907000003&r=1&w=2
+> >> >
+> >> > I don't like that.  The API is already quite complicated in my view and
+> >> > adding even more complexity to it is not going to help in the long run.
+> >>
+> >> I absolutely agree that we shouldn't add unnecessary APIs and keep
+> >> APIs as simple as possible.
+> >>
+> >> In that context, I think the effect from proceeding with Option 2)
+> >> also means there are no need for the below APIs any more.
+> >> pm_genpd_poweron()
+> >> pm_genpd_name_poweron() (requires some additional work though)
+> >> pm_genpd_poweroff_unused()
+> >> pm_genpd_dev_need_restore()
+> >>
+> >> I guess you figured out that I am in favour of Option 2). :-)
+> >> Especially since it cover all scenarios and we don't have to go a fix
+> >> a vast amount of drivers.
+> >
+> > Adding more callbacks to struct dev_pm_domain just in order to handle some
+> > genpd-specific use case is out of the question.  If you find a way within
+> > genpd to address this the way you like, I'm open for ideas.  Otherwise,
+> > let's just do what I said.
+> >
+> >> >
+> >> >> Option 3)
+> >> >> Live we the limitation this $subject patch introduces for scenario 5).
+> >> >
+> >> > I'd say, 3) for now and 1) going forward.
+> >>
+> >> This could work!
+> >>
+> >> The hardest part is to know when we should revert $subject patch, to
+> >> fix the regression introduced for scenario 5).
+> >
+> > Well, I don't think so.
+> >
+> > First of all, there is a (very) limited number of platforms using genpd today
+> > and it should be perfectly possible to go through the platform drivers used
+> > by them and see which of those drivers are affected.  Fixing them should not
+> > be too hard either.
+> 
+> Considering that scenario 5) probably exists because of buggy drivers
+> and that the related issues is very limited, I am perfectly fine with
+> your proposal!
+> 
+> Will you queue this patch then?
 
-Yes.
-> 
-> 
-> There is one last bit of common and x86 changes in this series:
-> patch #7 adds a paramter to xen_dma_map_page, even though the x86
-> implementation is empty:
-> 
-> http://marc.info/?l=xen-devel&m=141579253829808&w=2
-> 
-> is that OK for you?
+I will, but I'll change the first line of the changelog to read: "Vast amount
+of platform drivers enables runtime PM, [...]" (ie. leave out AMBA from there).
 
-Yes.
->  
->  
-> > > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > > > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> > > > ---
-> > > >  drivers/xen/swiotlb-xen.c |    6 +++---
-> > > >  1 file changed, 3 insertions(+), 3 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-> > > > index 3725ee4..498b654 100644
-> > > > --- a/drivers/xen/swiotlb-xen.c
-> > > > +++ b/drivers/xen/swiotlb-xen.c
-> > > > @@ -449,7 +449,7 @@ static void xen_unmap_single(struct device *hwdev, dma_addr_t dev_addr,
-> > > >  
-> > > >  	BUG_ON(dir == DMA_NONE);
-> > > >  
-> > > > -	xen_dma_unmap_page(hwdev, paddr, size, dir, attrs);
-> > > > +	xen_dma_unmap_page(hwdev, dev_addr, size, dir, attrs);
-> > > >  
-> > > >  	/* NOTE: We use dev_addr here, not paddr! */
-> > > >  	if (is_xen_swiotlb_buffer(dev_addr)) {
-> > > > @@ -497,14 +497,14 @@ xen_swiotlb_sync_single(struct device *hwdev, dma_addr_t dev_addr,
-> > > >  	BUG_ON(dir == DMA_NONE);
-> > > >  
-> > > >  	if (target == SYNC_FOR_CPU)
-> > > > -		xen_dma_sync_single_for_cpu(hwdev, paddr, size, dir);
-> > > > +		xen_dma_sync_single_for_cpu(hwdev, dev_addr, size, dir);
-> > > >  
-> > > >  	/* NOTE: We use dev_addr here, not paddr! */
-> > > >  	if (is_xen_swiotlb_buffer(dev_addr))
-> > > >  		swiotlb_tbl_sync_single(hwdev, paddr, size, dir, target);
-> > > >  
-> > > >  	if (target == SYNC_FOR_DEVICE)
-> > > > -		xen_dma_sync_single_for_cpu(hwdev, paddr, size, dir);
-> > > > +		xen_dma_sync_single_for_cpu(hwdev, dev_addr, size, dir);
-> > > >  
-> > > >  	if (dir != DMA_FROM_DEVICE)
-> > > >  		return;
-> > > > -- 
-> > > > 1.7.10.4
-> > > > 
-> > > 
-> > 
+Rafael
