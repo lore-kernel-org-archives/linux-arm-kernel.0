@@ -1,131 +1,46 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Thu, 20 Nov 2014 11:57:20 +0800
-Subject: [PATCH v7 1/4] irqchip: gic: Support hierarchy irq domain.
-In-Reply-To: <87h9xvaz2p.fsf@approximate.cambridge.arm.com>
-References: <1416406451-4578-1-git-send-email-yingjoe.chen@mediatek.com>
- <1416406451-4578-2-git-send-email-yingjoe.chen@mediatek.com>
- <87h9xvaz2p.fsf@approximate.cambridge.arm.com>
-Message-ID: <1416455840.12869.17.camel@mtksdaap41>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Thu, 20 Nov 2014 09:31:37 +0530
+Subject: [1/2] ARM: dts: Fix bootup issue on smdk5250
+In-Reply-To: <1416312509-11530-1-git-send-email-yadi.brar@samsung.com>
+References: <1416312509-11530-1-git-send-email-yadi.brar@samsung.com>
+Message-ID: <546D67A1.1080804@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-Hi Marc,
+On Tuesday 18 November 2014 05:38 PM, Yadwinder Singh Brar wrote:
+> With default config on smdk5250 latest tree throws below message :
+>
+> [    2.226049] thermal thermal_zone0: critical temperature reached(224 C),shutting down
+> [    2.227840] reboot: Failed to start orderly shutdown: forcing the issue
+>
+> and hangs randomly because it reads wrong temperature value.
+>
+> I can't figure out any direct relation between LDO10 and TMU from board
+> schematics which I have. So making LDO10 always-on to fix issue for now.
+>
+> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+>
 
-On Wed, 2014-11-19 at 17:18 +0000, Marc Zyngier wrote:
-> > +static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-> > +				unsigned int nr_irqs, void *arg)
-> > +{
-> > +	int i, ret;
-> > +	irq_hw_number_t hwirq;
-> > +	unsigned int type = IRQ_TYPE_NONE;
-> > +	struct of_phandle_args *irq_data = arg;
-> > +
-> > +	ret = gic_irq_domain_xlate(domain, irq_data->np, irq_data->args,
-> > +				   irq_data->args_count, &hwirq, &type);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	for (i = 0; i < nr_irqs; i++)
-> > +		gic_irq_domain_map(domain, virq+i, hwirq+i);
-> 
-> nit: spacing around '+'.
+Tested this on SMDK5250 board, system boot is fine now, hence
 
-OK.
+Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct irq_domain_ops gic_irq_domain_hierarchy_ops = {
-> > +	.xlate = gic_irq_domain_xlate,
-> > +	.alloc = gic_irq_domain_alloc,
-> > +	.free = irq_domain_free_irqs_top,
-> 
-> I'm convinced that irq_domain_free_irqs_top is the wrong function to
-> call here, because you're calling it from the bottom, not the top-level
-> (it has no parent).
-
-Base on the name, I though this is helper function for top level
-irq_domain?
-
-> I cannot verify this with your code as I don't a working platform with
-> GICv2m, but if I enable something similar on GICv3, it dies a very
-> painful way:
-> 
-> Unable to handle kernel NULL pointer dereference at virtual address 00000018
-> pgd = ffffffc03d059000
-> [00000018] *pgd=0000000081356003, *pud=0000000081356003, *pmd=0000000000000000
-> Internal error: Oops: 96000006 [#1] SMP
-> Modules linked in:
-> CPU: 4 PID: 1052 Comm: sh Not tainted 3.18.0-rc4+ #3311
-> task: ffffffc03e320000 ti: ffffffc001390000 task.ti: ffffffc001390000
-> PC is at irq_domain_free_irqs_recursive+0x1c/0x80
-> LR is at irq_domain_free_irqs_common+0x88/0x9c
-> pc : [<ffffffc0000ed790>] lr : [<ffffffc0000ede20>] pstate: 60000145
-> [...]
-> [<ffffffc0000ed790>] irq_domain_free_irqs_recursive+0x1c/0x80
-> [<ffffffc0000ede1c>] irq_domain_free_irqs_common+0x84/0x9c
-> [<ffffffc0000ede98>] irq_domain_free_irqs_top+0x64/0x7c  <-- gic_domain.free()
-> [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
-> [<ffffffc0000ee468>] irq_domain_free_irqs_parent+0x14/0x20
-> [<ffffffc0003500b8>] its_irq_domain_free+0xc8/0x250
-> [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
-> [<ffffffc0000ede1c>] irq_domain_free_irqs_common+0x84/0x9c
-> [<ffffffc0000ede98>] irq_domain_free_irqs_top+0x64/0x7c
-> [<ffffffc0000ef518>] msi_domain_free+0x70/0x88
-> [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
-> [<ffffffc0000ee3ac>] irq_domain_free_irqs+0x108/0x17c
-> [<ffffffc0000efb68>] msi_domain_free_irqs+0x28/0x4c
-> [<ffffffc000369cac>] free_msi_irqs+0xb4/0x1c0
-> [<ffffffc00036adec>] pci_disable_msix+0x3c/0x4c
-> [...]
-> 
-> and I cannot see how this could work on the standard GIC either.
-
-I'm sorry, I just realize my testcase was too simple, irqs are populated
-by device tree and never got freed. I'll add that and test it again.
-
-> Thomas, Jiang: could you please confirm or infirm my suspicions? My
-> understanding is that irq_domain_free_irqs_top can only be called from
-> the top-level domain.
-> 
-> > +};
-> > +
-> >  static const struct irq_domain_ops gic_irq_domain_ops = {
-> >  	.map = gic_irq_domain_map,
-> >  	.unmap = gic_irq_domain_unmap,
-> > @@ -948,18 +972,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
-> >  		gic_cpu_map[i] = 0xff;
-> >  
-> >  	/*
-> > -	 * For primary GICs, skip over SGIs.
-> > -	 * For secondary GICs, skip over PPIs, too.
-> > -	 */
-> > -	if (gic_nr == 0 && (irq_start & 31) > 0) {
-> > -		hwirq_base = 16;
-> > -		if (irq_start != -1)
-> > -			irq_start = (irq_start & ~31) + 16;
-> > -	} else {
-> > -		hwirq_base = 32;
-> > -	}
-> > -
-> > -	/*
-> >  	 * Find out how many interrupts are supported.
-> >  	 * The GIC only supports up to 1020 interrupt sources.
-> >  	 */
-> > @@ -969,10 +981,32 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
-> >  		gic_irqs = 1020;
-> >  	gic->gic_irqs = gic_irqs;
-> >  
-> > -	gic_irqs -= hwirq_base; /* calculate # of irqs to allocate */
-> > +	if (node) {		/* DT case */
-> > +		const struct irq_domain_ops *ops =
-> > +					&gic_irq_domain_hierarchy_ops;
-> 
-> nit: please put this on the same line, even if it is longer than 80
-> characters.
-
-ok.
-
-Joe.C
+> ---
+> arch/arm/boot/dts/exynos5250-smdk5250.dts |    1 +
+>   1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> index bc27cc2..95b5b51 100644
+> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> @@ -190,6 +190,7 @@
+>   				regulator-name = "P1.8V_LDO_OUT10";
+>   				regulator-min-microvolt = <1800000>;
+>   				regulator-max-microvolt = <1800000>;
+> +				regulator-always-on;
+>   			};
+>
+>   			ldo11_reg: LDO11 {
+>
