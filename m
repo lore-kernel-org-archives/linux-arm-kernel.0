@@ -1,30 +1,106 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 20 Nov 2014 12:57:28 +0000
-Subject: [PATCH] mfd: axp20x: Constify axp20x_acpi_match and rid unused warning
-Message-ID: <1416488248-24246-1-git-send-email-lee.jones@linaro.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 20 Nov 2014 14:01:53 +0100
+Subject: [PATCH] PM / Domains: Power on the PM domain right after attach
+ completes
+In-Reply-To: <546DDBCF.205@ti.com>
+References: <20141117220238.GE5258@dtor-ws> <1787068.2MCH8czsD4@vostro.rjw.lan>
+ <CAPDyKFoMftvKs8tyBaYCu1zTK_JYiXeXMiq86OrwAAHZoRO_Pw@mail.gmail.com>
+ <3492523.qBADTmdTqo@vostro.rjw.lan>
+ <CAPDyKFoiEMO5E3nMJDZkFkuio-5sh99m55k-yM=fuqrHUXbhZw@mail.gmail.com>
+ <546DDBCF.205@ti.com>
+Message-ID: <CAPDyKFrssg8wTr7e+EDrrgvHCndq8hcoNJb8TQGc_tt4ePpdEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-axp20x.c:239:30:
-  warning: ?axp20x_acpi_match? defined but not used [-Wunused-variable]
+On 20 November 2014 13:17, Grygorii Strashko <grygorii.strashko@ti.com> wrote:
+> On 11/19/2014 10:54 AM, Ulf Hansson wrote:
+>> [...]
+>>
+>>>>
+>>>> Scenario 5), a platform driver with/without runtime PM callbacks.
+>>>> ->probe()
+>>>> - do some initialization
+>>>> - may fetch handles to runtime PM resources
+>>>> - pm_runtime_enable()
+>>>
+>>> Well, and now how the driver knows if the device is "on" before accessing it?
+>>
+>> In this case the driver don't need to access the device during
+>> ->probe(). That's postponed until sometime later.
+>>
+>>>
+>>>> Note 1)
+>>>> Scenario 1) and 2), both relies on the approach to power on the PM
+>>>> domain by using pm_runtime_get_sync(). That approach didn't work when
+>>>> CONFIG_PM_RUNTIME was unset, but we recently decided to fixed that by
+>>>> the below patch, so that's good!
+>>>> "[PATCH] PM / domains: Kconfig: always enable PM_RUNTIME when genpd enabled"
+>>>>
+>>>> Note 2)
+>>>> Scenario 3) and 4) use the same principles for managing runtime PM.
+>>>> These scenarios needs a way to power on the generic PM domain prior
+>>>> probing the device. The call to pm_runtime_set_active(), prevents an
+>>>> already powered PM domain from power off until after probe, but that's
+>>>> not enough.
+>>>>
+>>>> Note 3)
+>>>> The $subject patch, tried to address the issues for scenario 3) and
+>>>> 4). It does so, but will affect scenario 5) which was working nicely
+>>>> before. In scenario 5), the $subject patch will cause the generic PM
+>>>> domain to potentially stay powered after ->probe() even if the device
+>>>> is runtime PM suspended.
+>>>
+>>> Why would it?  If the device is runtime-suspended, the domain will know
+>>> that, because its callbacks will be used for that.  At least, that's
+>>> what I'd expect to happen, so is there a problem here?
+>>
+>> Genpd do knows about the device but it doesn?t get a "notification" to
+>> power off. There are no issues whatsoever for driver.
+>>
+>> This is a somewhat special case. Let's go through an example.
+>>
+>> 1. The PM domain is initially in powered off state.
+>> 2. The bus ->probe() invokes dev_pm_domain_attach() and then the PM
+>> domain gets attached to the device.
+>> 3. $subject patch causes the PM domain to power on.
+>> 4. A driver ->probe() sequence start, following the Scenario 5).
+>> 5. The device is initially in runtime PM suspended state and it will
+>> remain so during ->probe().
+>> 6. The pm_request_idle() invoked after really_probe() in driver core,
+>> won't trigger a runtime PM suspend callback to be invoked. In other
+>> words, genpd don't get a "notification" that it may power off.
+>>
+>> In this state, genpd will either power off from the late_initcall,
+>> genpd_poweroff_unused() (depending on when the driver was probed) or
+>> wait until some device's runtime PM suspend callback is invoked at any
+>> later point.
+>
+> if I understand things right (thanks to Russell), the Power domain may not
+>  be powered off not only in above case, but also in some cases when
+> driver is unloaded.
+>
+> AMBA bus for example:
+> static int amba_remove(struct device *dev)
+> {
+>         pm_runtime_get_sync(dev); <---------- GPD=on, dev is active, usage_count >= 1
+>         ret = drv->remove(pcdev); <----------- GPD=on, should do balancing put() to compensate all get() made by driver, usage_count == 1
+>                                   <----------- GPD=on, should do balancing get() to compensate put() in probe, usage_count == 2
+>         pm_runtime_put_noidle(dev); <---------- GPD=on, dev is active, usage_count == 1
+>
+>         /* Undo the runtime PM settings in amba_probe() */
+>         pm_runtime_disable(dev);  <---------- GPD=on, dev is active, usage_count == 1
+>         pm_runtime_set_suspended(dev); <---------- GPD=on, dev is suspended, usage_count == 1
+>         pm_runtime_put_noidle(dev); <---------- GPD=on, dev is suspended, usage_count == 0
+>
+>         amba_put_disable_pclk(pcdev);
+>         dev_pm_domain_detach(dev, true); <---------- GPD=on, dev is suspended, usage_count == 0
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mfd/axp20x.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+For the generic OF-based PM domain look-up case:
+->dev_pm_domain_detach()
+    ->genpd_dev_pm_detach() - to remove the device from the PM domain.
+       ->genpd_queue_power_off_work() - to power off unused PM domains.
 
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index 971b0eb..c522ee2 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -236,7 +236,7 @@ static const struct i2c_device_id axp20x_i2c_id[] = {
- };
- MODULE_DEVICE_TABLE(i2c, axp20x_i2c_id);
- 
--static struct acpi_device_id axp20x_acpi_match[] = {
-+static const struct acpi_device_id axp20x_acpi_match[] = {
- 	{
- 		.id = "INT33F4",
- 		.driver_data = AXP288_ID,
--- 
-1.9.1
+That does the trick, right!?
+
+Kind regards
+Uffe
