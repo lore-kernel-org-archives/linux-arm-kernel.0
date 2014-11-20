@@ -1,49 +1,104 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 20 Nov 2014 14:32:29 +0100
-Subject: [PATCH] ARM: at91: remove useless init_time for DT-only SoCs
-In-Reply-To: <20141120134615.0ebb3b83@bbrezillon>
-References: <1415604709-24185-1-git-send-email-boris.brezillon@free-electrons.com>	<201411192323.34609.arnd@arndb.de>
- <20141120134615.0ebb3b83@bbrezillon>
-Message-ID: <546DED6D.1000701@atmel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 20 Nov 2014 14:32:41 +0100
+Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
+In-Reply-To: <CAPDyKFrBhZyqozM98_4pPdW0EMFt5W6VX1X7cz6Z=yNhW4vYTA@mail.gmail.com>
+References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
+ <1709760.E0jX3Myv0h@wuerfel> <546C7FDD.7030906@ti.com>
+ <2900095.WIocOu7ue2@wuerfel>
+ <CAPDyKFqeZ3YU2OEN4tCOdcQ0pAho67Q8U_eCEOroG9aS0mp+-Q@mail.gmail.com>
+ <546DD87B.3080806@ti.com>
+ <CAPDyKFrBhZyqozM98_4pPdW0EMFt5W6VX1X7cz6Z=yNhW4vYTA@mail.gmail.com>
+Message-ID: <CAMuHMdWtHT7QX3Kpa-GCLa49ToGODwjnNVgfxDzJzcM-FU1ffg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/11/2014 13:46, Boris Brezillon :
-> Hi Arnd,
-> 
-> On Wed, 19 Nov 2014 23:23:34 +0100
-> Arnd Bergmann <arnd@arndb.de> wrote:
-> 
->> On Monday 10 November 2014, Boris Brezillon wrote:
->>> Hi Olof,
+On Thu, Nov 20, 2014 at 2:12 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>> According to earlier comments in this thread, device's clocks are
+>>> split into "functional" and "PM" clocks.
 >>>
->>> You recently pulled some changes on Nicolas' at91-cleanup tag and two of
->>> those commits (see above for commit hashes) are actually introducing
->>> compilation errors.
->>> This patch fixes those compilation errors.
+>>> If I understand correctly, a typical platform driver will enable it's
+>>> "functional" clocks during ->probe() and you want the PM domain to
+>>> take care of the "PM" clocks, when the device changes runtime PM
+>>> status.
 >>>
+>>> How will you describe these different set of device clocks in DT?
 >>
->> Applied on next/cleanup, thanks!
-> 
-> Actually, I've made a v2 of this patch (see [1]) after realizing Olof
-> had already fixed the initial compilation error.
-> This is pretty much the same patch, except it removes asm/irq.h
-> inclusion.
-> 
-> [1]http://thread.gmane.org/gmane.linux.ports.arm.kernel/370398
+>> True :(  You can dig deeper in the history of this series if you wish.
+>> - first Geert Uytterhoeven proposed to use CLK_RUNTIME_PM there
+>>   https://lkml.org/lkml/2014/11/6/319
+>> - second I proposed to introduce smth. like "clkops-clocks", "pm-clocks" there
+>>   https://lkml.org/lkml/2014/6/12/436
+>>  or "fck-clocks"/"opt-clocks" later.
+>>
+>> ^failed.
+>>
+>> So, this implementation picks up all clocks for each device, which is ok for
+>> Keystone 2 and, because it's platform specific.
+>>
+>>>>
+>>>> Yes, it would definitely solve the problem that I see with the infrastructure
+>>>> code that the current version adds into the platform directory.
+>>>>
+>>>> The exact binding of course should be reviewed by the pmdomain and
+>>>> DT maintainers, to ensure that it is done the best possible way, because
+>>>> I assume we will end up using it a lot, and it would be a shame to get
+>>>> it slightly wrong.
+>>>>
+>>>> One possible variation I can think of would be to just use "simple-pmdomain"
+>>>> as the compatible string, and use properties in the node itself to decide
+>>>> what the domain should control, e.g.
+>>>>
+>>>>          clk_pmdomain: pmdomain {
+>>>>                  compatible = "simple-pmdomain";
+>>>>                  pmdomain-enable-clocks;
+>>>>                  #power-domain-cells = <0>;
+>>>>          };
+>>>>          clk_regulator_pmdomain: pmdomain {
+>>>>                  compatible = "simple-pmdomain";
+>>>>                  pmdomain-enable-clocks;
+>>>>                  pmdomain-enable-regulators;
+>>>>                  #power-domain-cells = <0>;
+>>>>          };
+>>>>
+>>>> and then have each device link to one of the nodes as the pmdomain.
+>>>>
+>>>
+>>> That's seems like a good approach to me.
+>>
+>> Yes, but your previous comment is still actual :(
+>
+> Agree!
+>
+> So I really think we need to decide on how to address the split of the
+> device clocks. Before that's done, I don't think it make sense to add
+> a "simple-pmdomain" compatible, since it will likely not be that many
+> SoC that can use it.
+>
+> So, does anyone have a suggestion on how to deal with the split of the
+> device clocks into "functional" clocks and into "PM" clocks?
 
-And this v2 was included in the pull-request I made and that Arnd have
-just taken (at91-cleanup2 tag).
+That's indeed the tricky part.
 
-It seems that the files still have the "#include <asm/irq.h>" in the
-result branch.
+On shmobile, we just use the "NULL" clock, i.e. the first clock, for historical
+reasons.
 
-So, Arnd can whether remove the following commit (in next/cleanup):
-440ae45119e9 (ARM: at91: remove useless init_time for DT-only SoCs)
-or we can add another patch just to remove these additional lines.
+Using clock-names (e.g. "fck" and "pm") will conflict with existing bindings
+for devices that already mandate specific clock names.
 
-Arnd, what do you prefer?
+As the clock being a "PM" clock is a property of the clock provider
+(at last on shmobile), I originally came up with not handling it in DT,
+but advertising it in the clock provider driver:
 
-Bye,
--- 
-Nicolas Ferre
+> > - first Geert Uytterhoeven proposed to use CLK_RUNTIME_PM there
+> >   https://lkml.org/lkml/2014/11/6/319
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
