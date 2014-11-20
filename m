@@ -1,44 +1,60 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 20 Nov 2014 08:36:55 +0200
-Subject: [PATCHv6 5/5] hwspinlock/omap: add support for dt nodes
-In-Reply-To: <CAJAp7OisV3UrL45UgRb0tMudyCJHe-xsmsRYV0uGG3P4PReHnA@mail.gmail.com>
-References: <1410553499-55951-1-git-send-email-s-anna@ti.com>
- <1410553499-55951-6-git-send-email-s-anna@ti.com>
- <CAK=WgbZE7_WrsNz5E+MDX7j2tAGEjv91zeCgqhB=Jsiu0+d8vw@mail.gmail.com>
- <CAJAp7OisV3UrL45UgRb0tMudyCJHe-xsmsRYV0uGG3P4PReHnA@mail.gmail.com>
-Message-ID: <CAK=WgbZMY5WyE9aVT3XTDnC3YJyBNXj1QoYBEdUMjwTbYAKA3g@mail.gmail.com>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Thu, 20 Nov 2014 12:34:51 +0530
+Subject: [alsa-devel] [PATCH] ASoC: samsung: Fix IISMOD setting in
+ i2s_set_sysclk()
+In-Reply-To: <1416420664-20952-1-git-send-email-s.nawrocki@samsung.com>
+References: <1416420664-20952-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <CAAgF-BemHSdcmzkqOUX+JNMLu0-GXs0EGm8YWHt+CBRP8Wa5DA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hi Sylwester,
 
-On Thu, Nov 20, 2014 at 2:43 AM, Bjorn Andersson <bjorn@kryo.se> wrote:
-> I still have a huge problem understanding the awesomeness with the
-> "base_id". If you have a SoC with 2 hwlock blocks; say 8+8 locks, used
-> for interaction with e.g. a modem and a video core respectively.
-> Why would you in either remote system offset the locks with 8?
-> Wouldn't e.g the modem use locks hwlock0:0-7 and video core use locks
-> hwlock1:0-7?
+On 11/19/14, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
+> In the i2s_set_sysclk() callback we are currently clearing all bits
+> of the IISMOD register when clk_id is SAMSUNG_I2S_CDCLK and dir
+> is SND_SOC_CLOCK_OUT. It's due to an incorrect mask used for the AND
+> operation and breaks the I2S interface operation when we attempt to
+> use the CDCLK output clock.
+>
+> It fixes commit a5a56871f804edac93a53b5e871c0e9818fb9033
+> ("ASoC: samsung: add support for exynos7 I2S controller") and restores
+> sound support for Odroid X2/U3.
+>
+> Cc: Padmavathi Venna <padma.v@samsung.com>
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+>  sound/soc/samsung/i2s.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+> index 947352d..8db8c66 100644
+> --- a/sound/soc/samsung/i2s.c
+> +++ b/sound/soc/samsung/i2s.c
+> @@ -494,7 +494,7 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
+>  		if (dir == SND_SOC_CLOCK_IN)
+>  			mod |= 1 << i2s_regs->cdclkcon_off;
+>  		else
+> -			mod &= 0 << i2s_regs->cdclkcon_off;
+> +			mod &= ~(1 << i2s_regs->cdclkcon_off);
 
-Please see below
+Thanks for pointing this. In my local machine it was properly done but
+while rebasing on linux-next I did some mistake. There is one more
+place in set_sysclk which need to be corrected here
+mod &= 0 << i2s_regs->rclksrc_off
+can you include this change also in your patch or should I post a new
+patch for all?
 
-> What systems use more than one hwlock block
+Thanks
+Padma
 
-None that we know of. This concern was raised some time ago by Arnd
-and since it was easy to deal with we added the 'base_id' notion.
-
-> and do you know of any reasons why these hwlocks are globally numbered?
-
-Because on an heterogeneous asymmetric multiprocessing systems you
-sometimes have use cases where hwlocks are dynamically allocated and
-their id numbers need to be synchronized between user space
-applications, the Linux kernel, and entities running on remote
-processors (which are likely not running Linux).
-
-For this to work we have to have some system-wide global hwlocks
-naming that is predefined and known to all processors. A mere number
-seems like the simplest naming method. A dynamic hwlock request API
-could return "hwlock1:0" but a mere 8 seems easier to deal with.
-
-Thanks,
-Ohad.
+>  		i2s->rfs = rfs;
+>  		break;
+> --
+> 1.7.9.5
+>
+> _______________________________________________
+> Alsa-devel mailing list
+> Alsa-devel at alsa-project.org
+> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+>
