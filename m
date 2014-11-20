@@ -1,50 +1,41 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 20 Nov 2014 10:55:31 +0900
-Subject: exynos boot falures in linux-next
-In-Reply-To: <546CCE2F.8030108@collabora.co.uk>
-References: <E1XqKYI-0000pQ-4b@ip-10-35-177-41.ec2.internal>
- <7hoas54y7k.fsf@deeprootsystems.com> <7hlhn9zcse.fsf@deeprootsystems.com>
- <546A83D6.9060504@collabora.co.uk> <7hfvdhyxqi.fsf@deeprootsystems.com>
- <CAMAWPa8D-oRp2yC=n+Rgw_wtwV4+Go0OQi62y3iGRYxi0sow+g@mail.gmail.com>
- <546CCE2F.8030108@collabora.co.uk>
-Message-ID: <00ae01d00465$10d9edb0$328dc910$@kernel.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 19 Nov 2014 20:55:19 -0500
+Subject: [PATCHv4 01/10] arm: mvebu: fix vendor prefix typo in
+ kirkwood-synology.dtsi
+In-Reply-To: <e1c3f3fbd9f494fa228de3ee5928c771d33b072e.1416351426.git.arno@natisbad.org>
+References: <cover.1416351425.git.arno@natisbad.org>
+ <e1c3f3fbd9f494fa228de3ee5928c771d33b072e.1416351426.git.arno@natisbad.org>
+Message-ID: <20141120015519.GA22670@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier Martinez Canillas wrote:
+Andrew,
 
-+ Olof,
-
-> Hello Kevin,
+On Wed, Nov 19, 2014 at 12:01:36AM +0100, Arnaud Ebalard wrote:
 > 
-Hi,
-
-> On 11/19/2014 06:01 PM, Kevin Hilman wrote:
->>>>
->>>> I'm not sure what is the correct step in this case but I'm OK with
->>>> reverting the patch until the Exynos DRM driver bug is fixed.
->>>
->>> I didn't have time to dig, but I'd rather someone track down the DRM
->>> problem and fix that, since it was known to be working. I'm guessing
->>> it's something simple that can be fixed before the merge window opens.
->> 
->> OK, so this DRM problem is turning out to be non-trivial, so I think
->> the defconfig patch should be reverted until the DRM issue is sorted
->> out.
->> 
->> Otherwise, we risk having boot failures in linux-next which may be
->> hiding other problems.
->> 
->> Kevin
->> 
+> As reported by Andrew, the vendor prefix for Seiko Instruments, Inc.
+> S-35390A I2C RTC chip in kirkwood-synology.dtsi has a typo (ssi
+> instead of sii). This patches fixes it.
 > 
-> Agreed with the config revert, so many issues with Exynos DRM in
-linux-next :(
->
-Yeah, it could be a best solution at this moment. Let me revert the commit
-0ef76aea7a34 ("ARM: exynos_defconfig: Enable options for display panel
-support")
-from -next in samsung tree.
+> Reported-by: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+> ---
+>  arch/arm/boot/dts/kirkwood-synology.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/kirkwood-synology.dtsi b/arch/arm/boot/dts/kirkwood-synology.dtsi
+> index 811e0971fc58..8be5b2e4626e 100644
+> --- a/arch/arm/boot/dts/kirkwood-synology.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood-synology.dtsi
+> @@ -266,7 +266,7 @@
+>  
+>  			s35390a: s35390a at 30 {
+>  				status = "disabled";
+> -				compatible = "ssi,s35390a";
+> +				compatible = "sii,s35390a";
 
-Thanks,
-Kukjin
+Should the driver now support both variants for backward compatibility?
+
+thx,
+
+Jason.
