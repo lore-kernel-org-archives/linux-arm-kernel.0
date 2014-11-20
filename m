@@ -1,74 +1,37 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 20 Nov 2014 12:14:29 +0000
-Subject: [PATCH] arm: perf: Prevent wraparound during overflow
-In-Reply-To: <20141119181158.GJ15985@arm.com>
-References: <1416412346-8759-1-git-send-email-daniel.thompson@linaro.org>
- <20141119181158.GJ15985@arm.com>
-Message-ID: <546DDB25.4050408@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Nov 2014 13:14:48 +0100
+Subject: [GIT PULL 2/3] ARM: keystone: config updates for 3.19
+In-Reply-To: <1415843982-5739-2-git-send-email-ssantosh@kernel.org>
+References: <1415843982-5739-1-git-send-email-ssantosh@kernel.org>
+ <1415843982-5739-2-git-send-email-ssantosh@kernel.org>
+Message-ID: <201411201314.49184.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/11/14 18:11, Will Deacon wrote:
-> On Wed, Nov 19, 2014 at 03:52:26PM +0000, Daniel Thompson wrote:
->> If the overflow threshold for a counter is set above or near the
->> 0xffffffff boundary then the kernel may lose track of the overflow
->> causing only events that occur *after* the overflow to be recorded.
->> Specifically the problem occurs when the value of the performance counter
->> overtakes its original programmed value due to wrap around.
->>
->> Typical solutions to this problem are either to avoid programming in
->> values likely to be overtaken or to treat the overflow bit as the 33rd
->> bit of the counter.
->>
->> Its somewhat fiddly to refactor the code to correctly handle the 33rd bit
->> during irqsave sections (context switches for example) so instead we take
->> the simpler approach of avoiding values likely to be overtaken.
->>
->> We set the limit to half of max_period because this matches the limit
->> imposed in __hw_perf_event_init(). This causes a doubling of the interrupt
->> rate for large threshold values, however even with a very fast counter
->> ticking at 4GHz the interrupt rate would only be ~1Hz.
->>
->> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
->> ---
->>
->> Notes:
->>     There is similar code in the arm64 tree which retains the assumptions of
->>     the original arm code regarding 32-bit wide performance counters. If
->>     this patch doesn't get beaten up during review I'll also share a similar
->>     patch for arm64.
->>     
->>
->>  arch/arm/kernel/perf_event.c | 10 ++++++++--
->>  1 file changed, 8 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
->> index 266cba46db3e..b50a770f8c99 100644
->> --- a/arch/arm/kernel/perf_event.c
->> +++ b/arch/arm/kernel/perf_event.c
->> @@ -115,8 +115,14 @@ int armpmu_event_set_period(struct perf_event *event)
->>  		ret = 1;
->>  	}
->>
->> -	if (left > (s64)armpmu->max_period)
->> -		left = armpmu->max_period;
->> +	/*
->> +	 * Limit the maximum period to prevent the counter value
->> +	 * from overtaking the one we are about to program. In
->> +	 * effect we are reducing max_period to account for
->> +	 * interrupt latency (and we are being very conservative).
->> +	 */
->> +	if (left > (s64)(armpmu->max_period >> 1))
->> +		left = armpmu->max_period >> 1;
+On Thursday 13 November 2014, Santosh Shilimkar wrote:
+> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 > 
-> The s64 cast looks off here, can we just drop it entirely?
+>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-soc
+> 
+> for you to fetch changes up to 97ef1af9b275924406556bfaec528a3e9e2980c7:
+> 
+>   ARM: keystone: defconfig: add options to enable PCI controller (2014-11-04 10:29:39 -0800)
+> 
+> ----------------------------------------------------------------
+> Keystone config updates for 3.19
+> 
+>         - Enable PCIE controller and related options
+>         - Enable MDIO and ethernet phy options
+>         - Enable DSP IRQCHIP option
 
-Yes.
+Pulled into next/defconfig.
 
-left will always be positive at this point in the code and therefore can
-be safely promoted within this expression (and generated no extra
-warnings for me).
+Can you send an update so we also enable all of this in multi_v7_defconfig?
 
-I'll change this (although I might just keep the redundant braces
-because > and >> are composed of the same characters making it hard to
-read without the braces).
+Thanks,
+
+	Arnd
