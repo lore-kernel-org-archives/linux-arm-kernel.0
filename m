@@ -1,44 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Nov 2014 17:02:06 +0100
-Subject: [GIT PULL 1/2] SOCFPGA update for v3.19
-In-Reply-To: <1416283415-6563-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1416283415-6563-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <201411201702.07092.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Nov 2014 08:03:52 -0800
+Subject: [GIT PULL 1/2] omap non-urgent fixes for v3.19
+In-Reply-To: <201411201046.44262.arnd@arndb.de>
+References: <pull-1415725783-562282>
+ <201411201046.44262.arnd@arndb.de>
+Message-ID: <20141120160352.GN7046@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 November 2014, dinguyen at opensource.altera.com wrote:
-> Hi Arnd, Kevin and Olof,
+* Arnd Bergmann <arnd@arndb.de> [141120 01:48]:
+> On Tuesday 11 November 2014, Tony Lindgren wrote:
+> > ----------------------------------------------------------------
+> > Fixes for omap3 that are not urgent. Mostly to remove unnecessary
+> > noise during the boot with pointless errors and warnings.
+> > 
 > 
-> Please consider pulling in this one patch for v3.19. The SOCFPGA chip has
-> a quirk that causes it to consume more power when CPU1 is put in reset
-> instead of WFI when it is hot-unplugged. This patch fixes this issue.
 > 
-> Thanks,
-> 
-> The following changes since commit 206c5f60a3d902bc4b56dab2de3e88de5eb06108:
-> 
->   Linux 3.18-rc4 (2014-11-09 14:55:29 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_update_for_v3.19
-> 
-> for you to fetch changes up to e15a11e885423aff12ed841677108fde4de40319:
-> 
->   socfpga: hotplug: put cpu1 in wfi (2014-11-17 15:23:42 -0600)
-> 
-> ----------------------------------------------------------------
-> SoCFPGA update for v3.19
-> 
-> Use WFI instead of putting CPU1 into reset will fix problem of increased
-> power when unplugging CPU1.
-> 
+> Pulled into next/fixes-non-critical. We didn't have any other patches in there,
+> so I started out with -rc3 to avoid the back-merge problem. Any reason why
+> you didn't base this on -rc1 like the other branches?
 
-Since this is just one patch, I cherry-picked it on next/soc.
+I was probably originally planning to have the dmesg warning
+and error fixes merged into omap-for-v3.18/fixes branch and
+have that automatically fast forward to -rc3 without rebasing.
 
-I was going to pull it, but it would force me to pull in 3.18-rc4, and
-that doesn't seem worth it. Please just send pull requests based on -rc1
-in the future.
+No other dependency that I can think of.
 
-	Arnd
+Regards,
+
+Tony
