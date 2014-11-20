@@ -1,52 +1,131 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 20 Nov 2014 09:18:14 +0530
-Subject: [PATCH v11 4/6] ARM: Exynos: switch to using generic cpufreq
- driver for Exynos4210/5250/5420
-In-Reply-To: <546CEF61.4050105@arm.com>
-References: <1413805281-6269-1-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-2-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-3-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-4-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-5-git-send-email-thomas.ab@samsung.com>
- <546CEF61.4050105@arm.com>
-Message-ID: <CAKohponEHqHYCLibVc8OHN49+4YW5qw89ny4ycTBL1xN-p9qtA@mail.gmail.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Thu, 20 Nov 2014 11:57:20 +0800
+Subject: [PATCH v7 1/4] irqchip: gic: Support hierarchy irq domain.
+In-Reply-To: <87h9xvaz2p.fsf@approximate.cambridge.arm.com>
+References: <1416406451-4578-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1416406451-4578-2-git-send-email-yingjoe.chen@mediatek.com>
+ <87h9xvaz2p.fsf@approximate.cambridge.arm.com>
+Message-ID: <1416455840.12869.17.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oh, you are still alive? I thought you were about to get married :)
-Just kidding !!
 
-On 20 November 2014 00:58, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> Sorry for raising this issue always with Exynos cpufreq drivers. IMO the
-> bindings for "arm-bL-cpufreq-dt" is broken. Currently no one is using it
-> and it's better to fix it before we have a real user of it.
+Hi Marc,
 
-Hmm, yeah if we can. I haven't found a easy way to go ahead and then
-got caught in other activities.
+On Wed, 2014-11-19 at 17:18 +0000, Marc Zyngier wrote:
+> > +static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+> > +				unsigned int nr_irqs, void *arg)
+> > +{
+> > +	int i, ret;
+> > +	irq_hw_number_t hwirq;
+> > +	unsigned int type = IRQ_TYPE_NONE;
+> > +	struct of_phandle_args *irq_data = arg;
+> > +
+> > +	ret = gic_irq_domain_xlate(domain, irq_data->np, irq_data->args,
+> > +				   irq_data->args_count, &hwirq, &type);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	for (i = 0; i < nr_irqs; i++)
+> > +		gic_irq_domain_map(domain, virq+i, hwirq+i);
+> 
+> nit: spacing around '+'.
 
-> If you look at the binding document for it[1], it has a fixme which
-> shouldn't have been there at first place. It assumes the ordering of
-> CPU's specified in the DT and the logical index allocation to them.
+OK.
 
-Ok, I believe the FIXME is a bit outdated. From the code I can see only
-this limitation.
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct irq_domain_ops gic_irq_domain_hierarchy_ops = {
+> > +	.xlate = gic_irq_domain_xlate,
+> > +	.alloc = gic_irq_domain_alloc,
+> > +	.free = irq_domain_free_irqs_top,
+> 
+> I'm convinced that irq_domain_free_irqs_top is the wrong function to
+> call here, because you're calling it from the bottom, not the top-level
+> (it has no parent).
 
-- For every cluster, the cpu which boots up first should carry the OPPs.
-Otherwise there is no restriction on ordering of CPUs.
+Base on the name, I though this is helper function for top level
+irq_domain?
 
-- I believe CPUs boot in the order they are present in DT except for the
-boot CPU. So, the first node for every cluster should have it.
+> I cannot verify this with your code as I don't a working platform with
+> GICv2m, but if I enable something similar on GICv3, it dies a very
+> painful way:
+> 
+> Unable to handle kernel NULL pointer dereference at virtual address 00000018
+> pgd = ffffffc03d059000
+> [00000018] *pgd=0000000081356003, *pud=0000000081356003, *pmd=0000000000000000
+> Internal error: Oops: 96000006 [#1] SMP
+> Modules linked in:
+> CPU: 4 PID: 1052 Comm: sh Not tainted 3.18.0-rc4+ #3311
+> task: ffffffc03e320000 ti: ffffffc001390000 task.ti: ffffffc001390000
+> PC is at irq_domain_free_irqs_recursive+0x1c/0x80
+> LR is at irq_domain_free_irqs_common+0x88/0x9c
+> pc : [<ffffffc0000ed790>] lr : [<ffffffc0000ede20>] pstate: 60000145
+> [...]
+> [<ffffffc0000ed790>] irq_domain_free_irqs_recursive+0x1c/0x80
+> [<ffffffc0000ede1c>] irq_domain_free_irqs_common+0x84/0x9c
+> [<ffffffc0000ede98>] irq_domain_free_irqs_top+0x64/0x7c  <-- gic_domain.free()
+> [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
+> [<ffffffc0000ee468>] irq_domain_free_irqs_parent+0x14/0x20
+> [<ffffffc0003500b8>] its_irq_domain_free+0xc8/0x250
+> [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
+> [<ffffffc0000ede1c>] irq_domain_free_irqs_common+0x84/0x9c
+> [<ffffffc0000ede98>] irq_domain_free_irqs_top+0x64/0x7c
+> [<ffffffc0000ef518>] msi_domain_free+0x70/0x88
+> [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
+> [<ffffffc0000ee3ac>] irq_domain_free_irqs+0x108/0x17c
+> [<ffffffc0000efb68>] msi_domain_free_irqs+0x28/0x4c
+> [<ffffffc000369cac>] free_msi_irqs+0xb4/0x1c0
+> [<ffffffc00036adec>] pci_disable_msix+0x3c/0x4c
+> [...]
+> 
+> and I cannot see how this could work on the standard GIC either.
 
-Correct ? Then we can update the fixme.
+I'm sorry, I just realize my testcase was too simple, irqs are populated
+by device tree and never got freed. I'll add that and test it again.
 
-> It even breaks for hotplug especially if you hotplug-in back in
-> different order.
+> Thomas, Jiang: could you please confirm or infirm my suspicions? My
+> understanding is that irq_domain_free_irqs_top can only be called from
+> the top-level domain.
+> 
+> > +};
+> > +
+> >  static const struct irq_domain_ops gic_irq_domain_ops = {
+> >  	.map = gic_irq_domain_map,
+> >  	.unmap = gic_irq_domain_unmap,
+> > @@ -948,18 +972,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+> >  		gic_cpu_map[i] = 0xff;
+> >  
+> >  	/*
+> > -	 * For primary GICs, skip over SGIs.
+> > -	 * For secondary GICs, skip over PPIs, too.
+> > -	 */
+> > -	if (gic_nr == 0 && (irq_start & 31) > 0) {
+> > -		hwirq_base = 16;
+> > -		if (irq_start != -1)
+> > -			irq_start = (irq_start & ~31) + 16;
+> > -	} else {
+> > -		hwirq_base = 32;
+> > -	}
+> > -
+> > -	/*
+> >  	 * Find out how many interrupts are supported.
+> >  	 * The GIC only supports up to 1020 interrupt sources.
+> >  	 */
+> > @@ -969,10 +981,32 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+> >  		gic_irqs = 1020;
+> >  	gic->gic_irqs = gic_irqs;
+> >  
+> > -	gic_irqs -= hwirq_base; /* calculate # of irqs to allocate */
+> > +	if (node) {		/* DT case */
+> > +		const struct irq_domain_ops *ops =
+> > +					&gic_irq_domain_hierarchy_ops;
+> 
+> nit: please put this on the same line, even if it is longer than 80
+> characters.
 
-Hmm, I never thought about it. But yes the CPU with the OPPs should
-be the first one to come back.
+ok.
 
-> We can work around that probably, but it's better to
-> fix the binding. I failed to grab much attention in my previous attempts
-> to address this[2]. Viresh also started a discussion more recently[3].
-
-They are just stuck and went nowhere :(
+Joe.C
