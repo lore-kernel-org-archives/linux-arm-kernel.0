@@ -1,80 +1,50 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 20 Nov 2014 09:53:48 +0800
-Subject: [PATCH 3/5] PCI: Use pci_scan_bus_simple() in simple scene.
-In-Reply-To: <3577231.2krnYe8yCU@wuerfel>
-References: <1416382369-13587-1-git-send-email-wangyijing@huawei.com>
- <1416382369-13587-4-git-send-email-wangyijing@huawei.com>
- <3577231.2krnYe8yCU@wuerfel>
-Message-ID: <546D49AC.4020207@huawei.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Thu, 20 Nov 2014 10:55:31 +0900
+Subject: exynos boot falures in linux-next
+In-Reply-To: <546CCE2F.8030108@collabora.co.uk>
+References: <E1XqKYI-0000pQ-4b@ip-10-35-177-41.ec2.internal>
+ <7hoas54y7k.fsf@deeprootsystems.com> <7hlhn9zcse.fsf@deeprootsystems.com>
+ <546A83D6.9060504@collabora.co.uk> <7hfvdhyxqi.fsf@deeprootsystems.com>
+ <CAMAWPa8D-oRp2yC=n+Rgw_wtwV4+Go0OQi62y3iGRYxi0sow+g@mail.gmail.com>
+ <546CCE2F.8030108@collabora.co.uk>
+Message-ID: <00ae01d00465$10d9edb0$328dc910$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/19 20:28, Arnd Bergmann wrote:
-> On Wednesday 19 November 2014 15:32:47 Yijing Wang wrote:
->> Use pci_scan_bus_simple() to scan pci buses with
->> the default IO/MEM/BUS resources. Use it instead
->> of pci_scan_bus() and pci_scan_bus_parented().
->>
->> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
->>
-> 
-> I think we should replace pci_scan_bus_parented() with something better
-> by making the xen code use pci_scan_root_bus() (see below for a draft
-> patch). After that we no longer need the 'parent' argument here and we
-> can just keep using the pci_scan_bus() function for the legacy users,
-> or rename it if that helps.
+Javier Martinez Canillas wrote:
 
-It make sense to me, and we could rename pci_scan_bus() to pci_scan_bus_legacy().
-Thanks, I will add this to my series,
++ Olof,
 
+> Hello Kevin,
+> 
+Hi,
 
+> On 11/19/2014 06:01 PM, Kevin Hilman wrote:
+>>>>
+>>>> I'm not sure what is the correct step in this case but I'm OK with
+>>>> reverting the patch until the Exynos DRM driver bug is fixed.
+>>>
+>>> I didn't have time to dig, but I'd rather someone track down the DRM
+>>> problem and fix that, since it was known to be working. I'm guessing
+>>> it's something simple that can be fixed before the merge window opens.
+>> 
+>> OK, so this DRM problem is turning out to be non-trivial, so I think
+>> the defconfig patch should be reverted until the DRM issue is sorted
+>> out.
+>> 
+>> Otherwise, we risk having boot failures in linux-next which may be
+>> hiding other problems.
+>> 
+>> Kevin
+>> 
 > 
-> 	Arnd
-> 
-> 
-> 8<---
-> 
-> diff --git a/drivers/pci/xen-pcifront.c b/drivers/pci/xen-pcifront.c
-> index 116ca3746adb..45a4843a608a 100644
-> --- a/drivers/pci/xen-pcifront.c
-> +++ b/drivers/pci/xen-pcifront.c
-> @@ -448,6 +448,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
->  	struct pci_bus *b;
->  	struct pcifront_sd *sd = NULL;
->  	struct pci_bus_entry *bus_entry = NULL;
-> +	LIST_HEAD(resources);
->  	int err = 0;
->  
->  #ifndef CONFIG_PCI_DOMAINS
-> @@ -470,17 +471,20 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
->  		err = -ENOMEM;
->  		goto err_out;
->  	}
-> +	pci_add_resource(&resources, &ioport_resource);
-> +	pci_add_resource(&resources, &iomem_resource);
->  	pcifront_init_sd(sd, domain, bus, pdev);
->  
->  	pci_lock_rescan_remove();
->  
-> -	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
-> -				  &pcifront_bus_ops, sd);
-> +	b = pci_scan_root_bus(&pdev->xdev->dev, bus, &pcifront_bus_ops, sd,
-> +			      &resources);
->  	if (!b) {
->  		dev_err(&pdev->xdev->dev,
->  			"Error creating PCI Frontend Bus!\n");
->  		err = -ENOMEM;
->  		pci_unlock_rescan_remove();
-> +		pci_free_resource_list(&resources);
->  		goto err_out;
->  	}
->  
-> 
-> 
-> .
-> 
+> Agreed with the config revert, so many issues with Exynos DRM in
+linux-next :(
+>
+Yeah, it could be a best solution at this moment. Let me revert the commit
+0ef76aea7a34 ("ARM: exynos_defconfig: Enable options for display panel
+support")
+from -next in samsung tree.
 
-
--- 
-Thanks!
-Yijing
+Thanks,
+Kukjin
