@@ -1,32 +1,56 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Thu, 20 Nov 2014 09:28:49 +0100
-Subject: [PATCHv4 01/10] arm: mvebu: fix vendor prefix typo in
- kirkwood-synology.dtsi
-In-Reply-To: <7770322.bXz9M2IL1d@wuerfel> (Arnd Bergmann's message of "Thu, 20
- Nov 2014 08:35:43 +0100")
-References: <cover.1416351425.git.arno@natisbad.org>
- <20141120015519.GA22670@titan.lakedaemon.net>
- <20141120050213.GB2596@lunn.ch> <7770322.bXz9M2IL1d@wuerfel>
-Message-ID: <871toytgvy.fsf@natisbad.org>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Thu, 20 Nov 2014 16:34:29 +0800
+Subject: For the problem when using swiotlb
+In-Reply-To: <2522857.bNQToYpBNt@wuerfel>
+References: <5469E26B.2010905@huawei.com> <1535751.CcvIi3DN4F@wuerfel>
+ <546D58B1.60108@huawei.com> <2522857.bNQToYpBNt@wuerfel>
+Message-ID: <546DA795.9080209@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2014/11/20 15:40, Arnd Bergmann wrote:
+> On Thursday 20 November 2014 10:57:53 Ding Tianhong wrote:
+>> On 2014/11/19 16:45, Arnd Bergmann wrote:
+>>> On Wednesday 19 November 2014 11:17:15 Ding Tianhong wrote:
+>>>> On 2014/11/18 2:09, Catalin Marinas wrote:
+>>>>> On Mon, Nov 17, 2014 at 12:18:42PM +0000, Arnd Bergmann wrote:
+>>>> Thanks everyone, I think I found the way to fix it, need to enable DMA_CMA, to reserve a big memory
+>>>> for CMA and set coherent mask for dev, then dma_alloc and dma_mapping will not use the swiotlb until
+>>>> the memory out of mask or swiotlb_force is enabled.
+>>>>
+>>>> If I still understand uncorrectly, please inform me.
+>>>>
+>>>
+>>> Please do not use CMA to work around the problem, but fix the underlying bug
+>>> instead.
+>>>
+>>> The driver should call 'dma_set_mask_and_coherent()' with the appropriate
+>>> dma mask, and check whether that succeeded. However, the code implementing
+>>> dma_set_mask_and_coherent on arm64 also needs to be changed to look up
+>>> the dma-ranges property (see of_dma_configure()), and check if the mask
+>>> is possible.
+>>>
+>> The dma_pfn_offset looks only support arm32, but my platform is aarch64 and I check the latest kernel version, 
+>> I think the dma-rangs still could not work for aarch64, so maybe we should add dma_pfn_offset for aarch64 first.
+>>
+> 
+> I didn't mean the dma_pfn_offset. The problem is that the of_dma_configure
+> code currently doesn't look at the mask. As I explained in my reply to
+> Catalin, it should set the mask to the size of the dma-ranges if that is
+> 32-bit or smaller, and dma_set_mask should look at the same dma-ranges
+> property to decide what to set the mask to when a driver asks for a
+> mask larger than 64-bit.
+> 
+> 	Arnd
+> 
+ok, I think the your reply to catalin is clear, I got it, add a appropriate mask for the dev is
+reasonable, I think it should be fixed later.
 
-Arnd Bergmann <arnd@arndb.de> writes:
+But in my case, if I don't use the DMA_CMA, the dma_alloc_coherent should use the swiotlb directly which maximum is 16M,
+so unless I use the kmalloc otherwise I have no better idea for that.
 
->> > Should the driver now support both variants for backward compatibility?
->> 
->> Hi Jason
->> 
->> This is an i2c device. i2c totally ignores the vendor. It is optional.
->> So there is no backward compatibility issues.
->> 
->
-> This question keeps coming up, so I'd suggest explaining it in the
-> patch changelog.
+Regards
+Ding 
 
-Granted ;-)
-
-Cheers,
-
-a+
+> .
+> 
