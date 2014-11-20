@@ -1,50 +1,49 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 20 Nov 2014 22:54:07 +0100
-Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
-In-Reply-To: <7hbno1r1af.fsf@deeprootsystems.com>
-References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
- <1709760.E0jX3Myv0h@wuerfel> <546C7FDD.7030906@ti.com>
- <2900095.WIocOu7ue2@wuerfel>
- <CAPDyKFqeZ3YU2OEN4tCOdcQ0pAho67Q8U_eCEOroG9aS0mp+-Q@mail.gmail.com>
- <546DD87B.3080806@ti.com>
- <CAPDyKFrBhZyqozM98_4pPdW0EMFt5W6VX1X7cz6Z=yNhW4vYTA@mail.gmail.com>
- <CAMuHMdWtHT7QX3Kpa-GCLa49ToGODwjnNVgfxDzJzcM-FU1ffg@mail.gmail.com>
- <546E0970.5090301@ti.com> <7hh9xtr5ac.fsf@deeprootsystems.com>
- <CAMuHMdV7zASj8_NtLRir1VubXEKTkq0vBGMXeYXDACu8UC2tZA@mail.gmail.com>
- <7hbno1r1af.fsf@deeprootsystems.com>
-Message-ID: <CAMuHMdVXGPu7x706NxqO3rn3KuRbPbD_ZQsJtDH4Hf31AaRR+Q@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 20 Nov 2014 22:55:04 +0100
+Subject: [PATCH 1/2] phy: berlin_usb: depends on RESET_CONTROLLER
+In-Reply-To: <546C340E.8000209@ti.com>
+References: <1416231192-27056-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1416231192-27056-2-git-send-email-antoine.tenart@free-electrons.com>
+ <546BA05E.4090605@gmail.com> <546C340E.8000209@ti.com>
+Message-ID: <546E6338.4030002@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 20, 2014 at 10:48 PM, Kevin Hilman <khilman@kernel.org> wrote:
->>> So what exactly are we talking about with "PM" clocks, and why are they
->>> "special" when it comes to PM domains?  IOW, why are the clocks to be
->>> managed during PM domain transitions for a given device any different
->>> than the clocks that need to be managed for a runtime suspend/resume (or
->>> system suspend/resume) sequence for the same device?
->>
->> (Speaking for my case, shmobile)
->>
->> They're not. The clocks to be managed during PM domain transitions are the
->> same as the clocks that need to be managed for a runtime suspend/resume
->> (or system suspend/resume) sequence.
->>
->> The special thing is that this is more a platform than a driver thing: the same
->> module may have a "PM/functional" clock (that is documented to enable/disable
->> the module) on one Soc, but noet on another.
+On 11/19/2014 07:09 AM, Kishon Vijay Abraham I wrote:
+> Hi,
 >
-> So why isn't the presence or absence of the clock described in the .dtsi
-> for the SoC instead of being handled by special PM domain logic?
+> On Wednesday 19 November 2014 01:09 AM, Sebastian Hesselbarth wrote:
+>> On 17.11.2014 14:33, Antoine Tenart wrote:
+>>> The Berlin USB PHY driver uses the Berlin reset controller
+>>> unconditionally. Make it depending on RESET_CONTROLLER.
+>>>
+>>> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+>>
+>> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>
+>>> ---
+>>>    drivers/phy/Kconfig | 2 +-
+>>>    1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>>> index b6da75f563e7..38ca6ff00aef 100644
+>>> --- a/drivers/phy/Kconfig
+>>> +++ b/drivers/phy/Kconfig
+>>> @@ -17,7 +17,7 @@ config GENERIC_PHY
+>>>
+>>>    config PHY_BERLIN_USB
+>
+> phy-berlin-usb is not in my phy tree and I don't seem to find anywhere in my
+> inbox. Care to send them to me?
 
-It is. Cfr. the presence/absence of clocks for renesas,rcar-gpio nodes.
+Kishon,
 
-Gr{oetje,eeting}s,
+phy-berlin-usb has been part of chipidea generic phy patch set for
+a while now. It looks like Antoine simply forgot to put you on Cc
+at least for v8 of it.
 
-                        Geert
+As all other patches of that patch set have already been taken,
+I'll squash this patch into the two remaining ones from Antoine
+and send phy-berlin-usb patches in a second.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Sebastian
