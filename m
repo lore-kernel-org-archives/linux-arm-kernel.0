@@ -1,94 +1,20 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 20 Nov 2014 11:07:55 +0100
-Subject: [PATCH 3/3] mmc: atmel-mci: use probe deferring if dma controller is
- not ready yet
-In-Reply-To: <1416478075-17059-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1416478075-17059-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1416478075-17059-3-git-send-email-ludovic.desroches@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 20 Nov 2014 10:08:22 +0000
+Subject: 48-bit VA support in the SMMU
+In-Reply-To: <decb25f05ca84d439e071f6ad8cf0086@BN3PR0301MB1219.namprd03.prod.outlook.com>
+References: <deb48cfb93d94515b6531be02f697e04@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <decb25f05ca84d439e071f6ad8cf0086@BN3PR0301MB1219.namprd03.prod.outlook.com>
+Message-ID: <20141120100822.GA19126@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Return probe defer if requesting a dma channel without a dma controller
-probed.
+On Thu, Nov 20, 2014 at 01:25:18AM +0000, Varun Sethi wrote:
+> What specific tweaks are required in the arm-smmu driver? I thought that
+> the upstream arm-smmu (3.18-rc3) driver does support 48 bit input address
+> (depended on the ARM64 kernel 48 bit support). Isn't this dependent on the
+> VA_BITS?  
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/mmc/host/atmel-mci.c | 46 ++++++++++++++++++++++++--------------------
- 1 file changed, 25 insertions(+), 21 deletions(-)
+Yeah, but it won't work for stage-2 mappings. I'm currently rewriting the
+page table code to allow this (see my iommu/pgtbl branch).
 
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index 9b85c4e..29bfd5e 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -2265,29 +2265,29 @@ static void atmci_cleanup_slot(struct atmel_mci_slot *slot,
- 	mmc_free_host(slot->mmc);
- }
- 
--static bool atmci_configure_dma(struct atmel_mci *host)
-+static int atmci_configure_dma(struct atmel_mci *host)
- {
--	if (host == NULL)
--		return false;
-+	int ret = 0;
- 
--	host->dma.chan = dma_request_slave_channel(&host->pdev->dev, "rxtx");
--	if (!host->dma.chan) {
--		dev_warn(&host->pdev->dev, "no DMA channel available\n");
--		return false;
--	} else {
--		dev_info(&host->pdev->dev,
--					"using %s for DMA transfers\n",
--					dma_chan_name(host->dma.chan));
--
--		host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
--		host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
--		host->dma_conf.src_maxburst = 1;
--		host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
--		host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
--		host->dma_conf.dst_maxburst = 1;
--		host->dma_conf.device_fc = false;
--		return true;
-+	host->dma.chan = dma_request_slave_channel_reason(&host->pdev->dev, "rxtx");
-+	if (IS_ERR(host->dma.chan)) {
-+		ret = PTR_ERR(host->dma.chan);
-+		host->dma.chan = NULL;
-+		return ret;
- 	}
-+
-+	dev_info(&host->pdev->dev, "using %s for DMA transfers\n",
-+		 dma_chan_name(host->dma.chan));
-+
-+	host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
-+	host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	host->dma_conf.src_maxburst = 1;
-+	host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
-+	host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	host->dma_conf.dst_maxburst = 1;
-+	host->dma_conf.device_fc = false;
-+
-+	return ret;
- }
- 
- /*
-@@ -2403,7 +2403,10 @@ static int atmci_probe(struct platform_device *pdev)
- 
- 	/* Get MCI capabilities and set operations according to it */
- 	atmci_get_cap(host);
--	if (atmci_configure_dma(host)) {
-+	ret = atmci_configure_dma(host);
-+	if (ret == -EPROBE_DEFER)
-+		goto err_dma_probe_defer;
-+	if (ret == 0) {
- 		host->prepare_data = &atmci_prepare_data_dma;
- 		host->submit_data = &atmci_submit_data_dma;
- 		host->stop_transfer = &atmci_stop_transfer_dma;
-@@ -2476,6 +2479,7 @@ err_init_slot:
- 	del_timer_sync(&host->timer);
- 	if (host->dma.chan)
- 		dma_release_channel(host->dma.chan);
-+err_dma_probe_defer:
- 	free_irq(irq, host);
- 	return ret;
- }
--- 
-2.0.3
+Will
