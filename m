@@ -1,75 +1,137 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 20 Nov 2014 09:49:05 +0800
-Subject: [PATCH 5/5] PCI: Rip out pci_bus_add_devices() from
- pci_scan_root_bus()
-In-Reply-To: <1645037.uypArjN50l@wuerfel>
-References: <1416382369-13587-1-git-send-email-wangyijing@huawei.com>
- <1416382369-13587-6-git-send-email-wangyijing@huawei.com>
- <1645037.uypArjN50l@wuerfel>
-Message-ID: <546D4891.80503@huawei.com>
+Date: Thu, 20 Nov 2014 10:00:41 +0800
+Subject: [RFC PATCH 07/16] PCI: Separate pci_host_bridge creation out
+ of pci_create_root_bus()
+In-Reply-To: <20141119162914.GB9162@bart.dudau.co.uk>
+References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
+ <1416219710-26088-8-git-send-email-wangyijing@huawei.com>
+ <2507218.mHliopJb05@wuerfel> <546B041A.4060403@huawei.com>
+ <20141118144819.GK12037@e106497-lin.cambridge.arm.com>
+ <546BFF74.4030101@huawei.com> <20141119162914.GB9162@bart.dudau.co.uk>
+Message-ID: <546D4B49.6020408@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> diff --git a/arch/alpha/kernel/pci.c b/arch/alpha/kernel/pci.c
->> index 076c35c..97f9730 100644
->> --- a/arch/alpha/kernel/pci.c
->> +++ b/arch/alpha/kernel/pci.c
->> @@ -334,6 +334,8 @@ common_init_pci(void)
->>  
->>  		bus = pci_scan_root_bus(NULL, next_busno, alpha_mv.pci_ops,
->>  					hose, &resources);
->> +		if (bus)
->> +			pci_bus_add_devices(bus);
->>  		hose->bus = bus;
->>  		hose->need_domain_info = need_domain_info;
->>  		next_busno = bus->busn_res.end + 1;
+>>> Something like this:
+>>>
+>>> struct pci_controller {
+>>> 	struct pci_host_bridge bridge;
+>>> 	/* private host bridge data here */
+>>> 	.....
+>>> };
+>>>
+>>> #define PCI_CONTROLLER(bus)	({
+>>> 	struct pci_host_bridge *hb = to_pci_host_bridge(bus->bridge); \
+>>> 	container_of(hb, struct pci_controller, bridge); })
+>>>
+>>>
+>>> Then we can retrieve the host bridge structure from everywhere we have a device.
+>>
+>> Hi Liviu, it looks good to me, because this change will involve lots platforms,
+>> I would think more about it. Thanks for your suggestion very much! :)
 > 
-> How about making pci_bus_add_devices() handle a NULL argument to save
-> the if() here and elsewhere?
+> Given that I also look at this area maybe we should join forces and divide the problem?
 
-This make sense, will update it, thanks!
-
->> diff --git a/arch/mips/pci/pci.c b/arch/mips/pci/pci.c
->> index 1bf60b1..f083688 100644
->> --- a/arch/mips/pci/pci.c
->> +++ b/arch/mips/pci/pci.c
->> @@ -113,6 +113,7 @@ static void pcibios_scanbus(struct pci_controller *hose)
->>  		if (!pci_has_flag(PCI_PROBE_ONLY)) {
->>  			pci_bus_size_bridges(bus);
->>  			pci_bus_assign_resources(bus);
->> +			pci_bus_add_devices(bus);
->>  		}
->>  	}
->>  }
-> 
-> This one looks wrong, I think you still want to call pci_bus_add_devices()
-> even with PCI_PROBE_ONLY set.
-
-Yes, this is my mistake, :(
+That's better, we could cooperate to do this. :)
 
 > 
->> diff --git a/arch/tile/kernel/pci.c b/arch/tile/kernel/pci.c
->> index 1f80a88..007466e 100644
->> --- a/arch/tile/kernel/pci.c
->> +++ b/arch/tile/kernel/pci.c
->> @@ -308,6 +308,8 @@ int __init pcibios_init(void)
->>  			pci_add_resource(&resources, &iomem_resource);
->>  			bus = pci_scan_root_bus(NULL, 0, controller->ops,
->>  						controller, &resources);
->> +			if (bus)
->> +				pci_bus_add_devices(bus);
->>  			controller->root_bus = bus;
->>  			controller->last_busno = bus->busn_res.end;
->>  		}
+> Best regards,
+> Liviu
 > 
-> Should the pci_bus_add_devices come after setting the bus numbers here?
-
-I think it's doesn't matter, but move it backward is ok to me.
-
-> 
-> 	Arnd
-> 
-> .
+>>
+>>
+>> Thanks!
+>> Yijing.
+>>
+>>>
+>>> Best regards,
+>>> Liviu
+>>>
+>>>>
+>>>>>
+>>>>>> +	host = kzalloc(sizeof(*host), GFP_KERNEL);
+>>>>>> +	if (!host)
+>>>>>> +		return NULL;
+>>>>>
+>>>>> devm_kzalloc maybe?
+>>>>
+>>>> I don't know much detail about devm_kzalloc(), but we have no pci host driver
+>>>> here, and I found no devm_kzalloc() uses in core PCI code before.
+>>>>
+>>>>>
+>>>>>> +	if (!resources) {
+>>>>>> +		/* Use default IO/MEM/BUS resources*/
+>>>>>> +		pci_add_resource(&host->windows, &ioport_resource);
+>>>>>> +		pci_add_resource(&host->windows, &iomem_resource);
+>>>>>> +		pci_add_resource(&host->windows, &busn_resource);
+>>>>>> +	} else {
+>>>>>> +		list_for_each_entry_safe(window, n, resources, list)
+>>>>>> +			list_move_tail(&window->list, &host->windows);
+>>>>>> +	}
+>>>>>
+>>>>> I think we should assume that the correct resources are passed. You
+>>>>> could add a wrapper around this function to convert old platforms
+>>>>> though.
+>>>>
+>>>> OK, I will move these code out of pci_create_host_bridge, and add a wrapper
+>>>> to setup the default resources.
+>>>>
+>>>>>
+>>>>>> +EXPORT_SYMBOL(pci_create_host_bridge);
+>>>>>
+>>>>> EXPORT_SYMBOL_GPL() maybe?
+>>>>
+>>>> OK, will update it.
+>>>>
+>>>>>
+>>>>>> diff --git a/include/linux/pci.h b/include/linux/pci.h
+>>>>>> index 8b11b38..daa7f40 100644
+>>>>>> --- a/include/linux/pci.h
+>>>>>> +++ b/include/linux/pci.h
+>>>>>> @@ -402,7 +402,12 @@ struct pci_host_bridge_window {
+>>>>>>  struct pci_host_bridge {
+>>>>>>  	struct device dev;
+>>>>>>  	struct pci_bus *bus;		/* root bus */
+>>>>>> +	struct list_head list;
+>>>>>>  	struct list_head windows;	/* pci_host_bridge_windows */
+>>>>>> +	int busnum;
+>>>>>
+>>>>> The busnum should already be implied through the bus resource.
+>>>>
+>>>> Yes, I will consider remove it and introduce a helper function to get the root bus number, thanks!
+>>>>
+>>>> Thanks!
+>>>> Yijing.
+>>>>
+>>>>>
+>>>>> 	Arnd
+>>>>>
+>>>>> .
+>>>>>
+>>>>
+>>>>
+>>>> -- 
+>>>> Thanks!
+>>>> Yijing
+>>>>
+>>>> --
+>>>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>>>> the body of a message to majordomo at vger.kernel.org
+>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>>
+>>>
+>>
+>>
+>> -- 
+>> Thanks!
+>> Yijing
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
+>>
 > 
 
 
