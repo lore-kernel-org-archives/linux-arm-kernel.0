@@ -1,44 +1,31 @@
-From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
-Date: Thu, 20 Nov 2014 20:46:59 +0100
-Subject: Bad page state when running Linux on CSB637
-Message-ID: <20141120194659.GE4545@sisyphus.hd.free.fr>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Thu, 20 Nov 2014 13:41:22 -0600
+Subject: [PATCH 0/3] qcom_rpm: add support for IPQ8064 resources
+Message-ID: <1416512485-7292-1-git-send-email-joshc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+The IPQ8064 SoC has several Resource Power Manager (RPM) controlled resources:
+four regulators (two SMB208s, each controlling two regulators) and two fabric
+clocks for the Network Subsystem (NSS).  This patchset adds the appropriate
+definitions for these resources, and extends the existing RPM regulator driver
+to support the SMB208.
 
-as I already mentioned on the list (but could not find the mail to
-reply to it), I get "BUG: Bad page state" messages when running
-Linux on a CSB637 board (using an AT91RM9200). I have reproduced the
-issue with the stock 3.18.0-rc4.
+This patchset is based ontop of v7 of Bjorne Andersson's RPM patchset [1].
 
-Some more details about what I could find out:
-- I observed different behaviours with exactly the same kernel
-configuration, but the network driver compiled as module instead of
-being built-in, or when booting with an initramfs vs booting using
-NFS;
-- the same configuration (whether network driver is compiled as a
-module or built-in, initramfs vs NFS) consistently has or does not
-have the message during execution of the init scripts;
-- even if I do not observe the message during the execution of the
-init scripts, I may have it later when using the board (I mean, when
-it is not idle);
-- I am using a version of u-boot which is a snapshot from 2009, so,
-u-boot doing something wrong or that it should no longer do, or that
-was later fixed before the next release, is not out of the question;
-- when I first noticed this problem and did a bisection, I arrived
-at at a commit concerning the use of memblock on ARM, though I could
-not confirm that it really was culprit of anything by checking out
-the previous and next commits. If the bug depends on the memory
-layout of the system, changing revision changes the memory layout
-and even the config variables so generate different results, and the
-chain of decisions of the bisection simply does not mean anything.
+1: http://lkml.kernel.org/r/1411428329-23172-1-git-send-email-bjorn.andersson at sonymobile.com
 
-Could you tell me what quantitative information I could give you to
-help me fix this issue ?
+Josh Cartwright (3):
+  mfd: devicetree: qcom_rpm: document IPQ8064 resources
+  mfd: qcom_rpm: add support for IPQ8064
+  regulator: rpm: add support for RPM-controller SMB208
 
-Thanks in advance.
-Regards.
+ Documentation/devicetree/bindings/mfd/qcom-rpm.txt |  6 +++-
+ drivers/mfd/qcom_rpm.c                             | 41 ++++++++++++++++++++++
+ drivers/regulator/qcom_rpm-regulator.c             | 19 ++++++++++
+ include/dt-bindings/mfd/qcom-rpm.h                 |  6 ++++
+ 4 files changed, 71 insertions(+), 1 deletion(-)
 
 -- 
-					    Gilles.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
