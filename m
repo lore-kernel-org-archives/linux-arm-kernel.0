@@ -1,67 +1,63 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 20 Nov 2014 10:14:33 -0800
-Subject: [PATCH v4 2/4] mtd: nand: gpmi: add gpmi_move_bits function
-In-Reply-To: <20141120104253.23b543d8@bbrezillon>
-References: <1413794777-32220-1-git-send-email-boris.brezillon@free-electrons.com>
- <1413794777-32220-3-git-send-email-boris.brezillon@free-electrons.com>
- <20141120092209.GD3212@norris-Latitude-E6410>
- <20141120104253.23b543d8@bbrezillon>
-Message-ID: <20141120181433.GF24364@ld-irv-0074>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 20 Nov 2014 10:14:46 -0800
+Subject: [PATCH arm-soc/next/soc] bus: brcmstb_gisb: resolve section mismatch
+Message-ID: <1416507286-14083-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 20, 2014 at 10:42:53AM +0100, Boris Brezillon wrote:
-> On Thu, 20 Nov 2014 01:22:09 -0800 Brian Norris <computersforpeace@gmail.com> wrote:
-> > On Mon, Oct 20, 2014 at 10:46:15AM +0200, Boris Brezillon wrote:
-> > > Add a new function to move bits (not bytes) from a memory region to
-> > > another one.
-> > > This function is similar to memmove except it acts at bit level.
-> > > This function is needed to implement GPMI raw access functions, given the
-> > > fact that ECC engine does not pad ECC bits to the next byte boundary.
-> > > 
-> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > ---
-> > >  drivers/mtd/nand/gpmi-nand/gpmi-lib.c  | 129 +++++++++++++++++++++++++++++++++
-> > >  drivers/mtd/nand/gpmi-nand/gpmi-nand.h |   4 +
-> > >  2 files changed, 133 insertions(+)
-> > > 
-> > > diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> > > index 87e658c..5d4f140 100644
-> > > --- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> > > +++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> > > @@ -1353,3 +1353,132 @@ int gpmi_read_page(struct gpmi_nand_data *this,
-> > >  	set_dma_type(this, DMA_FOR_READ_ECC_PAGE);
-> > >  	return start_dma_with_bch_irq(this, desc);
-> > >  }
-> > > +
-> > > +void gpmi_move_bits(u8 *dst, size_t dst_bit_off,
-> > > +		    const u8 *src, size_t src_bit_off,
-> > > +		    size_t nbits)
-> > 
-> > Two things:
-> > 
-> >  1) Yikes! This function is a little hairy.
-> 
-> Yes I know, and if you see a much simpler algorithm to do that, I'm
-> really interested :-).
+Commit f1bee783dd37 moved the call to hook_fault_code in
+brcmstb_gisb_arb_probe() which now calls a function annotated with __init, so
+this one must also be annotated with __init.
 
-No ideas at the moment :)
+In order to avoid introducing another section mismatch, call
+platform_driver_probe() manually and remove the .probe assignment from
+brcmstb_gisb_arb_driver, this is very similar to what
+drivers/pci/host/pci-imx6.c does since we basically have the same constraints
+here.
 
-> >  2) This function really deserves a full comment header (kerneldoc?); it
-> >  needs to have clearly-documented high-level semantics.
-> 
-> I'll add a kernel doc header.
-> 
-> > 
-> > I'm not sure how to address #1, as the complexity is necessary. Did you
-> > run this through some unit tests, at least?
-> 
-> No, but I did test it with several ECC configs.
-> Anyway, if I develop such unit tests, do you want me to put them in the
-> driver code (under an #ifdef section) ?
+Fixes: f1bee783dd37 ("bus: brcmstb_gisb: register the fault code hook")
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+Arnd, Olof,
 
-I dunno, that seems like it might just clutter the file more, and I'm
-not sure if anyone is likely to run them. I was mostly curious how you've
-verified it.
+This patch resolves a section mismatch found in the arm-soc tree in the
+next/soc branch which merged my two previous GISB patches.
 
-Brian
+Thanks!
+
+ drivers/bus/brcmstb_gisb.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
+index e7ccd21..27c319d 100644
+--- a/drivers/bus/brcmstb_gisb.c
++++ b/drivers/bus/brcmstb_gisb.c
+@@ -188,7 +188,7 @@ static struct attribute_group gisb_arb_sysfs_attr_group = {
+ 	.attrs = gisb_arb_sysfs_attrs,
+ };
+ 
+-static int brcmstb_gisb_arb_probe(struct platform_device *pdev)
++static int __init brcmstb_gisb_arb_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *dn = pdev->dev.of_node;
+ 	struct brcmstb_gisb_arb_device *gdev;
+@@ -305,7 +305,6 @@ static const struct of_device_id brcmstb_gisb_arb_of_match[] = {
+ };
+ 
+ static struct platform_driver brcmstb_gisb_arb_driver = {
+-	.probe	= brcmstb_gisb_arb_probe,
+ 	.driver = {
+ 		.name	= "brcm-gisb-arb",
+ 		.owner	= THIS_MODULE,
+@@ -316,7 +315,8 @@ static struct platform_driver brcmstb_gisb_arb_driver = {
+ 
+ static int __init brcm_gisb_driver_init(void)
+ {
+-	return platform_driver_register(&brcmstb_gisb_arb_driver);
++	return platform_driver_probe(&brcmstb_gisb_arb_driver,
++				     brcmstb_gisb_arb_probe);
+ }
+ 
+ module_init(brcm_gisb_driver_init);
+-- 
+1.7.1
