@@ -1,68 +1,48 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Nov 2014 09:49:00 +0100
-Subject: [PATCH v4] clocksource: arch_timer: Fix code to use physical
- timers when requested
-In-Reply-To: <1412753937-29343-1-git-send-email-sonnyrao@chromium.org>
-References: <1412753937-29343-1-git-send-email-sonnyrao@chromium.org>
-Message-ID: <20141120084900.GC24143@lukather>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 20 Nov 2014 09:56:23 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC Clock Fixes for v3.18
+In-Reply-To: <201411192220.20365.arnd@arndb.de>
+References: <cover.1415757100.git.horms+renesas@verge.net.au>
+ <201411192220.20365.arnd@arndb.de>
+Message-ID: <CAMuHMdXf2ndhmnx1c2jXp_QOrgibJPFvwVoxqndn=GFw=HV2aA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd,
 
-On Wed, Oct 08, 2014 at 12:38:57AM -0700, Sonny Rao wrote:
-> This is a bug fix for using physical arch timers when
-> the arch_timer_use_virtual boolean is false.  It restores the
-> arch_counter_get_cntpct() function after removal in
-> 
-> 0d651e4e "clocksource: arch_timer: use virtual counters"
-> 
-> We need this on certain ARMv7 systems which are architected like this:
-> 
-> * The firmware doesn't know and doesn't care about hypervisor mode and
->   we don't want to add the complexity of hypervisor there.
-> 
-> * The firmware isn't involved in SMP bringup or resume.
-> 
-> * The ARCH timer come up with an uninitialized offset between the
->   virtual and physical counters.  Each core gets a different random
->   offset.
-> 
-> * The device boots in "Secure SVC" mode.
-> 
-> * Nothing has touched the reset value of CNTHCTL.PL1PCEN or
->   CNTHCTL.PL1PCTEN (both default to 1 at reset)
-> 
-> One example of such as system is RK3288 where it is much simpler to
-> use the physical counter since there's nobody managing the offset and
-> each time a core goes down and comes back up it will get reinitialized
-> to some other random value.
-> 
-> Fixes: 0d651e4e65e9 ("clocksource: arch_timer: use virtual counters")
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-> Acked-by: Olof Johansson <olof@lixom.net>
+On Wed, Nov 19, 2014 at 10:20 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 13 November 2014, Simon Horman wrote:
+>> Please consider these Renesas ARM based SoC clock fixes for v3.18.
+>> Or alternatively for v3.19 if you feel they are too late for v3.18.
+>
+> I've merged all three 'fixes' pull requests you had into the fixes
+> branch:
+>
+> Renesas ARM Based SoC Clock Fixes for v3.18
+> Renesas ARM Based SoC DT Fixes for v3.18
+> Renesas ARM Based SoC Fixes for v3.18
+>
+> I'm still waiting for a reply from Olof, since he seems to have
+> skipped them last week when he sent the fixes pull request to Linus.
+> If he had already decided to postpone the branches for 3.19, I'll
+> just undo the merge here and put it into next/fixes-non-critical
+> instead, I'm fine with it either way.
 
-Has this been merged yet?
+I agree the first two are non-critical.
 
-If not, you can add my Tested-by, it makes the Allwinner A31 boot
-flawlessly with the arch timers (together with the patch "clocksource:
-arch_timer: Allow the device tree to specify uninitialized timer
-registers")
+The third, "Renesas ARM Based SoC Fixes for v3.18" may fix a regression
+introduced in v3.16. While the original problem with the i2c timings was
+indeed present in v2.6.37, the i2c bys most probably "just worked" (albeit with
+wrong timings), until the i2c-sh_mobile driver got more picky in commit
+7663ebefca8079ef ("i2c: sh_mobile: check timing parameters for valid range").
 
-Thanks!
-Maxime
+Gr{oetje,eeting}s,
 
-Maxime
+                        Geert
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141120/1344830f/attachment.sig>
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
