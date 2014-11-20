@@ -1,49 +1,49 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 20 Nov 2014 21:30:19 +0800
-Subject: [PATCH] ARM: dts: prima2: add resets property for GPS nodes
-Message-ID: <1416490219-4185-1-git-send-email-21cnbao@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 20 Nov 2014 14:32:29 +0100
+Subject: [PATCH] ARM: at91: remove useless init_time for DT-only SoCs
+In-Reply-To: <20141120134615.0ebb3b83@bbrezillon>
+References: <1415604709-24185-1-git-send-email-boris.brezillon@free-electrons.com>	<201411192323.34609.arnd@arndb.de>
+ <20141120134615.0ebb3b83@bbrezillon>
+Message-ID: <546DED6D.1000701@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tao Huang <Tao.Huang@csr.com>
+On 20/11/2014 13:46, Boris Brezillon :
+> Hi Arnd,
+> 
+> On Wed, 19 Nov 2014 23:23:34 +0100
+> Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+>> On Monday 10 November 2014, Boris Brezillon wrote:
+>>> Hi Olof,
+>>>
+>>> You recently pulled some changes on Nicolas' at91-cleanup tag and two of
+>>> those commits (see above for commit hashes) are actually introducing
+>>> compilation errors.
+>>> This patch fixes those compilation errors.
+>>>
+>>
+>> Applied on next/cleanup, thanks!
+> 
+> Actually, I've made a v2 of this patch (see [1]) after realizing Olof
+> had already fixed the initial compilation error.
+> This is pretty much the same patch, except it removes asm/irq.h
+> inclusion.
+> 
+> [1]http://thread.gmane.org/gmane.linux.ports.arm.kernel/370398
 
-this patch adds missed resets property for CSR SiRFprimaII GPS
-related nodes.
+And this v2 was included in the pull-request I made and that Arnd have
+just taken (at91-cleanup2 tag).
 
-Change-Id: I5a08ae3e617b1e5066beb800bbd37e8b6cb77a9e
-Signed-off-by: Tao Huang <Tao.Huang@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/boot/dts/prima2.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+It seems that the files still have the "#include <asm/irq.h>" in the
+result branch.
 
-diff --git a/arch/arm/boot/dts/prima2.dtsi b/arch/arm/boot/dts/prima2.dtsi
-index 86dcb46..dd4b644 100644
---- a/arch/arm/boot/dts/prima2.dtsi
-+++ b/arch/arm/boot/dts/prima2.dtsi
-@@ -178,6 +178,7 @@
- 				compatible = "sirf,prima2-dspif";
- 				reg = <0xa8000000 0x10000>;
- 				interrupts = <9>;
-+				resets = <&rstc 1>;
- 			};
- 
- 			gps at a8010000 {
-@@ -185,6 +186,7 @@
- 				reg = <0xa8010000 0x10000>;
- 				interrupts = <7>;
- 				clocks = <&clks 9>;
-+				resets = <&rstc 2>;
- 			};
- 
- 			dsp at a9000000 {
-@@ -192,6 +194,7 @@
- 				reg = <0xa9000000 0x1000000>;
- 				interrupts = <8>;
- 				clocks = <&clks 8>;
-+				resets = <&rstc 0>;
- 			};
- 		};
- 
+So, Arnd can whether remove the following commit (in next/cleanup):
+440ae45119e9 (ARM: at91: remove useless init_time for DT-only SoCs)
+or we can add another patch just to remove these additional lines.
+
+Arnd, what do you prefer?
+
+Bye,
 -- 
-2.1.1
+Nicolas Ferre
