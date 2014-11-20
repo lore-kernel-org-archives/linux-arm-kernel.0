@@ -1,67 +1,35 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 20 Nov 2014 19:26:00 +0530
-Subject: [PATCH v4 3/6] mfd: ti_am335x_tscadc: Remove unwanted reg_se_cache
- save
-In-Reply-To: <20141118171240.GB3003@dtor-ws>
-References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
- <1415941651-28962-4-git-send-email-vigneshr@ti.com>
- <20141118143005.GF24004@x1> <20141118171240.GB3003@dtor-ws>
-Message-ID: <546DF2F0.9080405@ti.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 20 Nov 2014 15:01:25 +0100
+Subject: [PATCH 2/3] mmc: atmel-mci: stop using specific initcall
+In-Reply-To: <2176441.d1sGy4JguN@wuerfel>
+References: <1416478075-17059-1-git-send-email-ludovic.desroches@atmel.com>
+ <1416478075-17059-2-git-send-email-ludovic.desroches@atmel.com>
+ <2176441.d1sGy4JguN@wuerfel>
+Message-ID: <20141120140125.GI3639@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 November 2014 10:42 PM, Dmitry Torokhov wrote:
-> On Tue, Nov 18, 2014 at 02:30:05PM +0000, Lee Jones wrote:
->> On Fri, 14 Nov 2014, Vignesh R wrote:
->>
->>> In one shot mode, sequencer automatically disables all enabled steps at
->>> the end of each cycle. (both ADC steps and TSC steps) Hence these steps
->>> need not be saved in reg_se_cache for clearing these steps at a later
->>> stage.
->>> Also, when ADC wakes up Sequencer should not be busy executing any of the
->>> config steps except for the charge step. Previously charge step was 1 ADC
->>> clock cycle and hence it was ignored.
->>>
->>> Signed-off-by: Vignesh R <vigneshr@ti.com>
->>> ---
->>>  drivers/mfd/ti_am335x_tscadc.c       | 7 +++++--
->>>  include/linux/mfd/ti_am335x_tscadc.h | 1 +
->>>  2 files changed, 6 insertions(+), 2 deletions(-)
->>
->> Code looks better now.
->>
->> Acked-by: Lee Jones <lee.jones@linaro.org>
->>
->> What's the plan for this series?
+On Thu, Nov 20, 2014 at 12:10:25PM +0100, Arnd Bergmann wrote:
+> On Thursday 20 November 2014 11:07:54 Ludovic Desroches wrote:
+> > No more use late initcall to manage probing order. Use probe deferring
+> > if needed. Then use module_platform_driver and clean init/exit
+> > attributes.
+> > 
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > 
 > 
-> I am waiting for the interested parties to provide more feedback. So far
-> I have seen a few reports saying that they see issues with the series
-> applied.
+> Do we need this backported into stable kernels? It seems that
+> the __init/__exit annotations will break things if you ever
+> tried to unbind the device or run into deferred probing on
+> earlier kernels.
 
-I tested this using lcd7 cape connected to beaglebone black. The latest
-kernel I could find on this board was a TI BSP based v3.14 kernel. So I
-had to port these patches to that kernel. Cc Robert Nelson to see if he
-knows about a more recent kernel supporting that cape.
+Well, it is a bit complicated, if we backport it, then the mci driver
+could be probed before the dma controller. Requesting dma chan will fail
+and it will switch to pio mode.
 
-I did not see any breakage with these patches applied although I did not
-see any noticeable performance improvement as well.
+So it has to be backported with the probe deferring. The issue is
+that probe deferring patch is based on other patches removing non-dt
+support which become useless only ine 3.19.
 
-I also tested along with continuous loop reading from
-/sys/bus/iio/devices/iio:device0/in_voltage5_raw
 
-I have pushed the kernel I used here in case anyone wants to take a look
-at my porting.
-
-http://git.ti.com/cgit/cgit.cgi/~nsekhar/ti-linux-kernel/nsekhar-ti-linux-kernel.git/log/?h=am335x-tsc-test
-
-I also tested this series on AM335x EVM using the v3.18-rc5 kernel.
-Again, no breakage but no improvement as well.
-
-All testing was done using ts_test
-
-FWIW, you can add:
-
-Tested-by: Sekhar Nori <nsekhar@ti.com>
-
-Thanks,
-Sekhar
+Ludovic
