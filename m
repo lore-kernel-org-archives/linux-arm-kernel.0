@@ -1,45 +1,91 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 20 Nov 2014 11:23:28 +0100
-Subject: [PATCH 0/3] PM / Domains: Add initial PM clock support to genpd
-In-Reply-To: <7hk32qu2w3.fsf@deeprootsystems.com>
-References: <1416405638-18812-1-git-send-email-ulf.hansson@linaro.org>
- <7hk32qu2w3.fsf@deeprootsystems.com>
-Message-ID: <CAPDyKFp=+e_C8c_9-syYEw7wNom3KgdOaNnGSUk+f52xSohqNg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 20 Nov 2014 10:29:23 +0000
+Subject: [PATCH v7 1/4] irqchip: gic: Support hierarchy irq domain.
+In-Reply-To: <1416476511.12869.24.camel@mtksdaap41> (Yingjoe Chen's message of
+ "Thu, 20 Nov 2014 09:41:51 +0000")
+References: <1416406451-4578-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1416406451-4578-2-git-send-email-yingjoe.chen@mediatek.com>
+ <87h9xvaz2p.fsf@approximate.cambridge.arm.com>
+ <1416455840.12869.17.camel@mtksdaap41>
+ <1416476511.12869.24.camel@mtksdaap41>
+Message-ID: <87sihe9ncs.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 November 2014 01:33, Kevin Hilman <khilman@kernel.org> wrote:
-> Ulf Hansson <ulf.hansson@linaro.org> writes:
->
->> It's quite common for PM domains to use PM clocks. Typically from SOC specific
->> code, the per device PM clock list is created and pm_clk_suspend|resume() are
->> invoked to handle clock gating/ungating.
->>
->> A step towards consolidation is to integrate PM clock support into genpd, which
->> is what this patchset does.
->>
->> In this initial step, the calls to the pm_clk_suspend|resume() are handled
->> within genpd, but the per device PM clock list still needs to be created from
->> SOC specific code. It seems reasonable to have gendp to handle that as well, but
->> that left to future patchsets to address.
->
-> I think we need to get rid of the SoC specific code already.  For
-> example, we're already seeing SoCs where the arm32 core is being
-> replaced by an arm64 core but the other IPs, and power-domain logic is
-> staying more or less the same.
->
->> It's not every users of genpd that are keen on using PM clocks thus we need
->> to provide this a configuration option for genpd.
->
-> Or more likely, probably some compatible string, or property in the
-> domain node.  Grygorii, Arnd and myself were discussing this elsewhere
-> in the context of the TI Keystone2 PM domain support[1].
+Hi Joe,
 
-Thanks for pointing that out. It was actually the reason to why I
-posted this patchset now, I have been keeping the patches locally in
-my tree for too long. :-)
+On Thu, Nov 20 2014 at  9:41:51 am GMT, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
+> Hi Marc,
+>
+> On Thu, 2014-11-20 at 11:57 +0800, Yingjoe Chen wrote:
+>> On Wed, 2014-11-19 at 17:18 +0000, Marc Zyngier wrote:
+>> > > +
+>> > > +	return 0;
+>> > > +}
+>> > > +
+>> > > +static const struct irq_domain_ops gic_irq_domain_hierarchy_ops = {
+>> > > +	.xlate = gic_irq_domain_xlate,
+>> > > +	.alloc = gic_irq_domain_alloc,
+>> > > +	.free = irq_domain_free_irqs_top,
+>> > 
+>> > I'm convinced that irq_domain_free_irqs_top is the wrong function to
+>> > call here, because you're calling it from the bottom, not the top-level
+>> > (it has no parent).
+>> 
+>> Base on the name, I though this is helper function for top level
+>> irq_domain?
+>> 
+>> > I cannot verify this with your code as I don't a working platform with
+>> > GICv2m, but if I enable something similar on GICv3, it dies a very
+>> > painful way:
+>> > 
+>> > Unable to handle kernel NULL pointer dereference at virtual address 00000018
+>> > pgd = ffffffc03d059000
+>> > [00000018] *pgd=0000000081356003, *pud=0000000081356003,
+>> > *pmd=0000000000000000
+>> > Internal error: Oops: 96000006 [#1] SMP
+>> > Modules linked in:
+>> > CPU: 4 PID: 1052 Comm: sh Not tainted 3.18.0-rc4+ #3311
+>> > task: ffffffc03e320000 ti: ffffffc001390000 task.ti: ffffffc001390000
+>> > PC is at irq_domain_free_irqs_recursive+0x1c/0x80
+>> > LR is at irq_domain_free_irqs_common+0x88/0x9c
+>> > pc : [<ffffffc0000ed790>] lr : [<ffffffc0000ede20>] pstate: 60000145
+>> > [...]
+>> > [<ffffffc0000ed790>] irq_domain_free_irqs_recursive+0x1c/0x80
+>> > [<ffffffc0000ede1c>] irq_domain_free_irqs_common+0x84/0x9c
+>> > [<ffffffc0000ede98>] irq_domain_free_irqs_top+0x64/0x7c <--
+>> > gic_domain.free()
+>> > [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
+>> > [<ffffffc0000ee468>] irq_domain_free_irqs_parent+0x14/0x20
+>> > [<ffffffc0003500b8>] its_irq_domain_free+0xc8/0x250
+>> > [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
+>> > [<ffffffc0000ede1c>] irq_domain_free_irqs_common+0x84/0x9c
+>> > [<ffffffc0000ede98>] irq_domain_free_irqs_top+0x64/0x7c
+>> > [<ffffffc0000ef518>] msi_domain_free+0x70/0x88
+>> > [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
+>> > [<ffffffc0000ee3ac>] irq_domain_free_irqs+0x108/0x17c
+>> > [<ffffffc0000efb68>] msi_domain_free_irqs+0x28/0x4c
+>> > [<ffffffc000369cac>] free_msi_irqs+0xb4/0x1c0
+>> > [<ffffffc00036adec>] pci_disable_msix+0x3c/0x4c
+>> > [...]
+>> > 
+>> > and I cannot see how this could work on the standard GIC either.
+>> 
+>> I'm sorry, I just realize my testcase was too simple, irqs are populated
+>> by device tree and never got freed. I'll add that and test it again.
+>
+> On a second thoughts, unlike the MSI cases, gic_irq_domain_hierarchy_ops
+> is only used when we use DT, so we probably will never use the free
+> function. Is it OK to remove the free support here?
 
-Let me comment of that thread, instead of here.
+Well, such thing is coming with GICv2m (SPIs are allocated out of
+DT). You can drop it if you want, but I will then have to add it back
+(which seems like a waste of time).
 
-Kind regards
-Uffe
+I'd prefer if you kept it in with the rest of the conversion.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
