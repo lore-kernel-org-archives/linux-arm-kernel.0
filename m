@@ -1,66 +1,97 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 21 Nov 2014 00:10:13 +0100 (CET)
-Subject: Removal of bus->msi assignment breaks MSI with stacked domains
-In-Reply-To: <20141120215353.GA7987@google.com>
-References: <546E1771.4030201@arm.com> <20141120215353.GA7987@google.com>
-Message-ID: <alpine.DEB.2.11.1411202355060.6439@nanos>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 20 Nov 2014 15:20:40 -0800
+Subject: CONFIG_DEBUG_SET_MODULE_RONX broken (was Re: [PATCHv2] arm64: add
+ support to dump the kernel page tables)
+In-Reply-To: <CAGXu5jK7FWs2v52T2RBdKhdYcV5wGm3F4H4km9h-B15Z6S0A2Q@mail.gmail.com>
+References: <1416262710-7798-1-git-send-email-lauraa@codeaurora.org>
+ <CAGXu5jK7FWs2v52T2RBdKhdYcV5wGm3F4H4km9h-B15Z6S0A2Q@mail.gmail.com>
+Message-ID: <546E7748.4000603@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Nov 2014, Bjorn Helgaas wrote:
-> On Thu, Nov 20, 2014 at 04:31:45PM +0000, Marc Zyngier wrote:
-> > Bjorn, Yijing,
-> > 
-> > I've just realized that patch c167caf8d174 (PCI/MSI: Remove useless
-> > bus->msi assignment) completely breaks MSI on arm64 when using the new
-> > MSI stacked domain:
-> > 
-> > This patch relies on architectures to implement either
-> > pcibios_msi_controller() or arch_setup_msi_irq(). It turns out that with
-> > stacked domains, none of this is actually necessary, as long as you can
-> > access to the msi_controller.
-> > 
-> > And everything was fine until this patch came around (and managed to
-> > test on a system where the PCI devices are not directly attached to the
-> > root bus). Of course, everything now breaks, as we cannot get to the MSI
-> > controller (which contains the domain we allocate the MSIs from).
-> > 
-> > In short, this patch breaks an important feature on which arm64 relies,
-> > and I believe this patch should be reverted ASAP.
-> 
-> I'm happy to revert it from pci/msi, but I think Thomas has already pulled
-> it into his branch, so he'd have to drop it, too.
-> 
-> Thomas, let me know if you want to do that.  I suppose we could add a new
-> patch to add it back, but that would leave bisection broken for the
-> interval between c167caf8d174 and the patch that adds it back.
+(cc Rusty Russell for reference)
 
-Fortunately my irq/irqdomain branch is not immutable yet. So we have
-no problem at that point. I can rebase on your branch until tomorrow
-night. Or just rebase on mainline and we sort out the merge conflicts
-later, i.e. delegate them to Linus so his job of pulling stuff gets
-not completely boring.
+On 11/19/2014 3:01 PM, Kees Cook wrote:
+> On Mon, Nov 17, 2014 at 2:18 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+>> In a similar manner to arm, it's useful to be able to dump the page
+>> tables to verify permissions and memory types. Add a debugfs file
+>> to check the page tables.
+>>
+>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>
+> This seems to behave well for me. Thanks!
+>
+> Tested-by: Kees Cook <keescook@chromium.org>
+>
+> In my configuration, though, with CONFIG_DEBUG_SET_MODULE_RONX=y, I'm
+> only seeing RO, and no NX changes. I haven't constructed a test for
+> the module memory behavior directly (to see if this is a page table
+> issue or a PTDUMP reporting issue). This series I'm testing has gone
+> through some backporting on my end, so I wanted to just double-check
+> and see if you saw this too, or if it's specific to my environment:
+>
+> ---[ Modules ]---
+> 0xffffffbffc000000-0xffffffbffc005000          20K     ro x  SHD AF
+> UXN MEM/NORMAL
+> 0xffffffbffc005000-0xffffffbffc007000           8K     RW x  SHD AF
+> UXN MEM/NORMAL
+> 0xffffffbffc00c000-0xffffffbffc00e000           8K     ro x  SHD AF
+> UXN MEM/NORMAL
+> 0xffffffbffc00e000-0xffffffbffc010000           8K     RW x  SHD AF
+> UXN MEM/NORMAL
+> ...
+>
+> Thanks,
+>
+> -Kees
+>
 
-What I'm more worried about is whether this intended change is going
-to inflict a problem on Jiangs intention to deduce the MSI irq domain
-from the device, which we really need for making DMAR work w/o going
-through loops and hoops.
+Yep, I'm seeing the same thing. We're failing the bounds check:
 
-I have limited knowledge about the actual scope of iommu (DMAR) units
-versus device/bus/host-controllers, so I would appreciate a proper
-explanation for that from you or Jiang or both.
+if (!is_module_address(start) || !is_module_address(end - 1))
+                 return -EINVAL;
 
-My guts feeling tells me that anything less granular than the bus
-level is wrong and according to my limited knowledge Intel even has
-DMARs which are assigned to a single device it's even more wrong. So
-the proper change would be not to push it from bus to something above
-the bus, but instead make it a per device property.
+There are now two problems with this check
 
-But my knowledge there is limited, so I rely on the PCI/architecture
-experts to sort that out.
+1) 4982223e51e8 module: set nx before marking module MODULE_STATE_COMING
+moved around the order of when nx was set. Now we hit the mod->state ==
+MODULE_STATE_UNFORMED in __module_address so module_address on anything
+always returns false. I think my previous testing must have been done
+on a branch without that patch.
 
-Let me know ASAP.
+2) It's possible for the end of the region we are trying to set as nx
+to not be fully page size aligned. This seems to be caused by things
+getting aligned in layout_section but becoming unaligned in layout_symtab
+
+diff --git a/kernel/module.c b/kernel/module.c
+index 972151b..3791330 100644
+--- a/kernel/module.c
++++ b/kernel/module.c
+@@ -2316,10 +2316,14 @@ static void layout_symtab(struct module *mod, struct load_info *info)
+         info->stroffs = mod->core_size = info->symoffs + ndst * sizeof(Elf_Sym);
+         mod->core_size += strtab_size;
+  
++       mod->core_size = debug_align(mod->core_size);
++
+         /* Put string table section at end of init part of module. */
+         strsect->sh_flags |= SHF_ALLOC;
+         strsect->sh_entsize = get_offset(mod, &mod->init_size, strsect,
+                                          info->index.str) | INIT_OFFSET_MASK;
++
++       mod->init_size = debug_align(mod->init_size);
+         pr_debug("\t%s\n", info->secstrings + strsect->sh_name);
+  }
+  
+I haven't tried a bisect to see if this is new.
+
+I'm kind of tempted to switch the bounds check back to
+(addr >= MODULES_VADDR && addr < MODULES_END) unless there is a clean way to
+fixup module.c
 
 Thanks,
+Laura
 
-	tglx
+-- 
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
