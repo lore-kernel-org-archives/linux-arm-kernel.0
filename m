@@ -1,59 +1,122 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 20 Nov 2014 17:20:18 +0100
-Subject: [PATCH] ARM: at91: remove useless init_time for DT-only SoCs
-In-Reply-To: <3210756.yBHEtAhqN7@wuerfel>
-References: <1415604709-24185-1-git-send-email-boris.brezillon@free-electrons.com>
- <20141120134615.0ebb3b83@bbrezillon> <546DED6D.1000701@atmel.com>
- <3210756.yBHEtAhqN7@wuerfel>
-Message-ID: <546E14C2.8090003@atmel.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 20 Nov 2014 08:22:15 -0800
+Subject: [PATCH 3/7] pinctrl: pinconf-generic: Allow driver to specify DT
+ params
+In-Reply-To: <1416470777.28873.1.camel@mm-sol.com>
+References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1415041531-15520-4-git-send-email-soren.brinkmann@xilinx.com>
+ <CACRpkdYfj2ydLQ4q_FKwXo73jzNsvj9u2Aem9EiuEw-OCvurrg@mail.gmail.com>
+ <1416300621.30131.6.camel@mm-sol.com>
+ <995406b8e0244c63a3ef8e58314e81f6@BL2FFO11FD037.protection.gbl>
+ <1416383379.30131.14.camel@mm-sol.com>
+ <84517404cda34124930ec838a639f538@BL2FFO11FD030.protection.gbl>
+ <1416470777.28873.1.camel@mm-sol.com>
+Message-ID: <7e2f4984733343fdb4ea51cf7eb4c339@BY2FFO11FD046.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/11/2014 16:26, Arnd Bergmann :
-> On Thursday 20 November 2014 14:32:29 Nicolas Ferre wrote:
->> On 20/11/2014 13:46, Boris Brezillon :
->>> Hi Arnd,
->>>
->>> On Wed, 19 Nov 2014 23:23:34 +0100
->>> Arnd Bergmann <arnd@arndb.de> wrote:
->>>
->>>> On Monday 10 November 2014, Boris Brezillon wrote:
->>>>> Hi Olof,
->>>>>
->>>>> You recently pulled some changes on Nicolas' at91-cleanup tag and two of
->>>>> those commits (see above for commit hashes) are actually introducing
->>>>> compilation errors.
->>>>> This patch fixes those compilation errors.
->>>>>
->>>>
->>>> Applied on next/cleanup, thanks!
->>>
->>> Actually, I've made a v2 of this patch (see [1]) after realizing Olof
->>> had already fixed the initial compilation error.
->>> This is pretty much the same patch, except it removes asm/irq.h
->>> inclusion.
->>>
->>> [1]http://thread.gmane.org/gmane.linux.ports.arm.kernel/370398
->>
->> And this v2 was included in the pull-request I made and that Arnd have
->> just taken (at91-cleanup2 tag).
->>
->> It seems that the files still have the "#include <asm/irq.h>" in the
->> result branch.
->>
->> So, Arnd can whether remove the following commit (in next/cleanup):
->> 440ae45119e9 (ARM: at91: remove useless init_time for DT-only SoCs)
->> or we can add another patch just to remove these additional lines.
->>
->> Arnd, what do you prefer?
+On Thu, 2014-11-20 at 10:06AM +0200, Ivan T. Ivanov wrote:
 > 
-> I don't want to change the merge I already did, so just send a patch
-> that I can apply on top.
+> On Wed, 2014-11-19 at 07:35 -0800, S?ren Brinkmann wrote:
+> > Hi Ivan,
+> > 
+> > On Wed, 2014-11-19 at 09:49AM +0200, Ivan T. Ivanov wrote:
+> > > On Tue, 2014-11-18 at 09:25 -0800, S?ren Brinkmann wrote:
+> > > > On Tue, 2014-11-18 at 10:50AM +0200, Ivan T. Ivanov wrote:
+> > > > > On Tue, 2014-11-11 at 15:53 +0100, Linus Walleij wrote:
+> > > > > > On Mon, Nov 3, 2014 at 8:05 PM, Soren Brinkmann
+> > > > > > brinkmann at xilinx.com> wrote:
+> > > > > > 
+> > > > > > > Additionally to the generic DT parameters, allow drivers to
+> > > > > > > provide driver-specific DT parameters to be used with the
+> > > > > > > generic parser infrastructure.
+> > > > > > > 
+> > > > > > > Signed-off-by: Soren Brinkmann brinkmann at xilinx.com>
+> > > > > > 
+> > > > > > I like the looks of this, but the patch description is a bit
+> > > > > > terse. I'd like it to describe some of the refactorings being
+> > > > > > done
+> > > > > > to the intrinsics, because I have a hard time following the
+> > > > > > patch.
+> > > > > > 
+> > > > > > First please rebase onto the "devel" branch in the pin control
+> > > > > > tree, and notice that drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
+> > > > > > which is merged there is actually doing this already:
+> > > > > > 
+> > > > > > 
+> > > > > >         for_each_child_of_node(np_config, np) {
+> > > > > >                 ret = pinconf_generic_dt_subnode_to_map(pctldev,
+> > > > > > np, map,
+> > > > > >                                                         &reserv,
+> > > > > > nmaps, type);
+> > > > > >                 if (ret)
+> > > > > >                         break;
+> > > > > > 
+> > > > > >                 ret = pmic_gpio_dt_subnode_to_map(pctldev, np,
+> > > > > > map, &reserv,
+> > > > > >                                                   nmaps, type);
+> > > > > >                 if (ret)
+> > > > > >                         break;
+> > > > > >         }
+> > > > > > 
+> > > > > > So it should be patched to illustrate the point of this code.
+> > > > > > 
+> > > > > 
+> > > > > I like the idea, but have issues with implementations :-).
+> > > > > 
+> > > > > It is supposed that additional parameters are not generic,
+> > > > > otherwise they will be part of enum pin_config_param, right?
+> > > > > 
+> > > > > Probably it will be better if clients could pass array with
+> > > > > driver specific dt bindings to pinconf_generic_dt_node_to_map()?
+> > > > 
+> > > > My idea was to hide that API from the driver. You just pass those
+> > > > parameters as part of the struct pctldev and the parser - whether
+> > > > this generic one or anything else - would do the right thing. I
+> > > > don't think calling the parser from the driver is the right approach.
+> > > 
+> > > Drivers already know about dt_node_to_map(). My proposal will make
+> > > drivers, which register non-standard bindings, little bit simpler.
+> > 
+> > And I think this is not the best solution. Those drivers essentially
+> > still do the DT parsing themselves, 
+> 
+> Yes, and this could be avoided if there API which allow them to pass 
+> non-standard configuration maps.
+> 
+> > just call some common helpers. I
+> > think that should be well separated. 
+> 
+> Around 27 of 30 drivers are using custom dt_node_to_map(). And this is
+> because most of them are using custom "x,pins", "x,functions" and 'x,groups"
+> properties and I think that this is bigger issue, how this is addressed
+> in this patch?
 
-Sure I will.
+Not really in this patch, but Linus recently added the 'groups'
+property. Somewhere in this thread he explained how he'd like to see
+things used. With mux nodes that contain 'groups' and 'function' and
+conf nodes that can contain 'groups' or 'pins' and the pinconf options.
+And pins/groups would actually refer to only pins or groups
+respectively.
 
-I will then add it to my next "cleanup" pull-request to you.
+Also, I hope all my changes here don't break the current behavior. So,
+those 27 driver should still be able to do what they currently do. But I
+hope they could migrated over to use the generic bindings only in the
+longer term, so that these custom properties disappear.
 
-Thanks for your help, bye.
--- 
-Nicolas Ferre
+> 
+> > The pinctrl driver just assembles
+> > some data structure that has the information regarding custom properties
+> > and the core handles the rest. 
+> 
+> Yup, that is nice. What will be really nice if it also handle custom, 
+> "function", "groups" and "pins" properties. Otherwise most of the drivers
+> will not be able to benefit from this. 
+
+Why would you still need those? I think the idea is to get rid of custom
+pins, groups and function properties. Could you explain why those are
+needed and why that couldn't be migrated to the amended bindings as outlined by
+Linus, please?
+
+	Thanks,
+	S?ren
