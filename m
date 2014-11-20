@@ -1,49 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Nov 2014 13:11:14 +0100
-Subject: [GIT PULL 3.19] Broadcom Cygnus SoC platform support
-In-Reply-To: <1415826266-6867-4-git-send-email-f.fainelli@gmail.com>
-References: <1415826266-6867-1-git-send-email-f.fainelli@gmail.com>
- <1415826266-6867-4-git-send-email-f.fainelli@gmail.com>
-Message-ID: <201411201311.14549.arnd@arndb.de>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 20 Nov 2014 13:12:02 +0100
+Subject: [RFC] adp1653: Add device tree bindings for LED controller
+In-Reply-To: <546C66A5.6060201@samsung.com>
+References: <20141117145857.GO8907@valkosipuli.retiisi.org.uk>
+ <546AFEA5.9020000@samsung.com> <20141118084603.GC4059@amd>
+ <546B19C8.2090008@samsung.com> <20141118113256.GA10022@amd>
+ <546B40FA.2070409@samsung.com> <20141118132159.GA21089@amd>
+ <546B6D86.8090701@samsung.com> <20141118165148.GA11711@amd>
+ <546C66A5.6060201@samsung.com>
+Message-ID: <20141120121202.GA27527@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 November 2014, Florian Fainelli wrote:
-> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+Hi!
+
+> I would also swap the segments of a property name to follow the convention
+> as in case of "regulator-max-microamp".
 > 
->   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+> Updated version:
 > 
-> are available in the git repository at:
+> ==========================================================
 > 
->   http://github.com/brcm/linux.git tags/arm-soc/for-3.19/cygnus-platform-v2
-> 
-> for you to fetch changes up to 64e74aa788f996cd0e328a1c4223e9d438b78e9c:
-> 
->   ARM: mach-bcm: ARCH_BCM_MOBILE: remove one level of menu from Kconfig (2014-11-11 22:35:45 -0800)
-> 
-> ----------------------------------------------------------------
-> This pull request contains the platform code to support the Broadcom Cygnus SoC
-> using the iProc architecture:
-> 
-> - add support for the Broadcom Cygnus SoC
-> - consolidate the BCM5301X Kconfig options under the iProc menuconfig entry
-> - remove one level of menu in menuconfig
-> 
-> ----------------------------------------------------------------
-> Jonathan Richardson (1):
->       ARM: cygnus: Initial support for Broadcom Cygnus SoC
-> 
-> Scott Branden (2):
->       ARM: mach-bcm: Consolidate currently supported IPROC SoCs
->       ARM: mach-bcm: ARCH_BCM_MOBILE: remove one level of menu from Kconfig
-> 
->  arch/arm/mach-bcm/Kconfig      | 93 ++++++++++++++++++++++++++----------------
->  arch/arm/mach-bcm/Makefile     |  3 ++
->  arch/arm/mach-bcm/bcm_cygnus.c | 25 ++++++++++++
->  3 files changed, 85 insertions(+), 36 deletions(-)
->  create mode 100644 arch/arm/mach-bcm/bcm_cygnus.c
+> Optional properties for child nodes:
+> - max-microamp : maximum intensity in microamperes of the LED
+> 		 (torch LED for flash devices)
+> - flash-max-microamp : maximum intensity in microamperes of the
+> 		       flash LED; it is mandatory if the led should
+> 		       support the flash mode
+> - flash-timeout-microsec : timeout in microseconds after which the flash
+> 		           led is turned off
+
+Works for me. Do you want to submit a patch or should I do it?
+
+> - indicator-pattern : identifier of the blinking pattern for the
+> 		      indicator led
 > 
 
-Pulled into next/soc, thanks!
+This would need a bit more documentation, no?
 
-	Arnd
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
