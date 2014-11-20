@@ -1,81 +1,47 @@
-From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 20 Nov 2014 18:01:19 +1300
-Subject: [RFC PATCH] clk: mvebu: armada-xp: Support for MSYS SoC
-Message-ID: <1416459679-30944-1-git-send-email-chris.packham@alliedtelesis.co.nz>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 20 Nov 2014 06:02:13 +0100
+Subject: [PATCHv4 01/10] arm: mvebu: fix vendor prefix typo in
+ kirkwood-synology.dtsi
+In-Reply-To: <20141120015519.GA22670@titan.lakedaemon.net>
+References: <cover.1416351425.git.arno@natisbad.org>
+ <e1c3f3fbd9f494fa228de3ee5928c771d33b072e.1416351426.git.arno@natisbad.org>
+ <20141120015519.GA22670@titan.lakedaemon.net>
+Message-ID: <20141120050213.GB2596@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MSYS SoCs are a range of packet processors with integrated CPUs based
-on armada-xp. One difference is that the TCLK frequency is fixed at 200MHz
-as opposed to the fixed 250MHz used on armada-xp. The clock-gating options
-are a subset of what's available on the armada-xp so this code should be
-compatible.
+On Wed, Nov 19, 2014 at 08:55:19PM -0500, Jason Cooper wrote:
+> Andrew,
+> 
+> On Wed, Nov 19, 2014 at 12:01:36AM +0100, Arnaud Ebalard wrote:
+> > 
+> > As reported by Andrew, the vendor prefix for Seiko Instruments, Inc.
+> > S-35390A I2C RTC chip in kirkwood-synology.dtsi has a typo (ssi
+> > instead of sii). This patches fixes it.
+> > 
+> > Reported-by: Andrew Lunn <andrew@lunn.ch>
+> > Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+> > ---
+> >  arch/arm/boot/dts/kirkwood-synology.dtsi | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/kirkwood-synology.dtsi b/arch/arm/boot/dts/kirkwood-synology.dtsi
+> > index 811e0971fc58..8be5b2e4626e 100644
+> > --- a/arch/arm/boot/dts/kirkwood-synology.dtsi
+> > +++ b/arch/arm/boot/dts/kirkwood-synology.dtsi
+> > @@ -266,7 +266,7 @@
+> >  
+> >  			s35390a: s35390a at 30 {
+> >  				status = "disabled";
+> > -				compatible = "ssi,s35390a";
+> > +				compatible = "sii,s35390a";
+> 
+> Should the driver now support both variants for backward compatibility?
 
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
----
-Hi,
+Hi Jason
 
-This patch is enough to get the uart clock dividers correct so I get some
-output. As far as I've been able to tell there is no way of dynamically
-detecting the TCLK frequency.
+This is an i2c device. i2c totally ignores the vendor. It is optional.
+So there is no backward compatibility issues.
 
-The core clock frequency and ratio calculations are probably not correct but
-for these CPU inside a packet processor systems I'm not sure how much that
-actually matter since these systems aren't likely to do any kind of dynamic
-frequency scaling.
-
-Thansk,
-Chris
-
- drivers/clk/mvebu/armada-xp.c | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/clk/mvebu/armada-xp.c b/drivers/clk/mvebu/armada-xp.c
-index b309431..9f852f8 100644
---- a/drivers/clk/mvebu/armada-xp.c
-+++ b/drivers/clk/mvebu/armada-xp.c
-@@ -52,6 +52,12 @@ static u32 __init axp_get_tclk_freq(void __iomem *sar)
- 	return 250000000;
- }
- 
-+/* MSYS TCLK frequency is fixed to 200MHz */
-+static u32 __init msys_get_tclk_freq(void __iomem *sar)
-+{
-+	return 200000000;
-+}
-+
- static const u32 axp_cpu_freqs[] __initconst = {
- 	1000000000,
- 	1066000000,
-@@ -158,6 +164,14 @@ static const struct coreclk_soc_desc axp_coreclks = {
- 	.num_ratios = ARRAY_SIZE(axp_coreclk_ratios),
- };
- 
-+static const struct coreclk_soc_desc msys_coreclks = {
-+	.get_tclk_freq = msys_get_tclk_freq,
-+	.get_cpu_freq = axp_get_cpu_freq,
-+	.get_clk_ratio = axp_get_clk_ratio,
-+	.ratios = axp_coreclk_ratios,
-+	.num_ratios = ARRAY_SIZE(axp_coreclk_ratios),
-+};
-+
- /*
-  * Clock Gating Control
-  */
-@@ -200,9 +214,13 @@ static void __init axp_clk_init(struct device_node *np)
- 	struct device_node *cgnp =
- 		of_find_compatible_node(NULL, NULL, "marvell,armada-xp-gating-clock");
- 
--	mvebu_coreclk_setup(np, &axp_coreclks);
-+	if (of_device_is_compatible(np, "marvell,msys-core-clock"))
-+		mvebu_coreclk_setup(np, &msys_coreclks);
-+	else
-+		mvebu_coreclk_setup(np, &axp_coreclks);
- 
- 	if (cgnp)
- 		mvebu_clk_gating_setup(cgnp, axp_gating_desc);
- }
- CLK_OF_DECLARE(axp_clk, "marvell,armada-xp-core-clock", axp_clk_init);
-+CLK_OF_DECLARE(msys_clk, "marvell,msys-core-clock", axp_clk_init);
--- 
-2.2.0.rc0
+   Andrew
+     
