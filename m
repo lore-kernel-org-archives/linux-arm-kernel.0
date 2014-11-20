@@ -1,289 +1,160 @@
-From: addy.ke@rock-chips.com (addy ke)
-Date: Thu, 20 Nov 2014 17:33:17 +0800
-Subject: [PATCH] mmc: dw_mmc: add quirk for data over interrupt timeout
-In-Reply-To: <546C310D.5040702@rock-chips.com>
-References: <1415970338-2637-1-git-send-email-addy.ke@rock-chips.com>
- <54660120.50305@samsung.com> <546A93B0.1040506@rock-chips.com>
- <546BF0D2.3000600@samsung.com> <546C310D.5040702@rock-chips.com>
-Message-ID: <546DB55D.90503@rock-chips.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 20 Nov 2014 10:35:30 +0100
+Subject: [PATCH v4 3/4] mtd: nand: gpmi: add proper raw access support
+In-Reply-To: <20141120090807.GC3212@norris-Latitude-E6410>
+References: <1413794777-32220-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1413794777-32220-4-git-send-email-boris.brezillon@free-electrons.com>
+ <20141120090807.GC3212@norris-Latitude-E6410>
+Message-ID: <20141120103530.4c40daf9@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Jaehoon
+Hi Brian,
 
-On 2014/11/19 13:56, addy ke wrote:
-> Hi Jaehoon
-> 
-> On 2014/11/19 09:22, Jaehoon Chung Wrote:
->> Hi, Addy.
->>
->> On 11/18/2014 09:32 AM, Addy wrote:
->>>
->>> On 2014?11?14? 21:18, Jaehoon Chung wrote:
->>>> Hi, Addy.
->>>>
->>>> Did you use the DW_MCI_QUIRK_IDMAC_DTO?
->>>> I'm not sure, but i wonder if you get what result when you use above quirk.
->>>
->>> DW_MCI_QUIRK_IDMAC_DTO is only for version2.0 or below.
->>>         /*
->>>          * DTO fix - version 2.10a and below, and only if internal DMA
->>>          * is configured.
->>>          */
->>>         if (host->quirks & DW_MCI_QUIRK_IDMAC_DTO) {
->>>                 if (!pending &&
->>>                     ((mci_readl(host, STATUS) >> 17) & 0x1fff))
->>>                         pending |= SDMMC_INT_DATA_OVER;
->>>         }
->>>
->>> It meams that if interrupt comes, but pending = 0 && FIFO_COUNT(bit17-29) !=0,
->>> then force to set SDMMC_INT_DATA_OVER.
->>> But in our case, FIFO_COUNT = 0 (STATUS register value is 0xad06). This is
->>> because that the card does not send data to host. So there is no interrupts come,
->>> and interrupt handle function(dw_mci_interrupt) will not be called. So we need a
->>> timer to handle this case.
->>>
->>> So I think  SDMMC_INT_DATA_OVER is not suitable for this case, and we need a new
->>> quirk.
->>>
->>>>
->>>> And i will check more this patch at next week.
->>>>
->>>> Thanks for your efforts.
->>>>
->>>> Best Regards,
->>>> Jaehoon Chung
->>>>
->>>> On 11/14/2014 10:05 PM, Addy Ke wrote:
->>>>> From: Addy <addy.ke@rock-chips.com>
->>>>>
->>>>> This patch add a new quirk to notify the driver to teminate
->>>>> current transfer and report a data timeout to the core,
->>>>> if data over interrupt does NOT come within the given time.
->>>>>
->>>>> dw_mmc call mmc_request_done func to finish transfer depends on
->>>>> data over interrupt. If data over interrupt does not come in
->>>>> sending data state, the current transfer will be blocked.
->>>>>
->>>>> But this case really exists, when driver reads tuning data from
->>>>> card on rk3288-pink2 board. I measured waveforms by oscilloscope
->>>>> and found that card clock was always on and data lines were always
->>>>> holded high level in sending data state. This is the cause that
->>>>> card does NOT send data to host.
->>>>>
->>>>> According to synopsys designware databook, the timeout counter is
->>>>> started only after the card clock is stopped.
->>>>>
->>>>> So if card clock is always on, data read timeout interrupt will NOT come,
->>>>> and if data lines are always holded high level, all data-related
->>>>> interrupt such as start-bit error, data crc error, data over interrupt,
->>>>> end-bit error, and so on, will NOT come too.
->>>>>
->>>>> So driver can't get the current state, it can do nothing but wait for.
->>>>>
->>>>> This patch is based on https://patchwork.kernel.org/patch/5227941/
->>>>>
->>>>> Signed-off-by: Addy <addy.ke@rock-chips.com>
->>>>> ---
->>>>>   drivers/mmc/host/dw_mmc.c  | 47 +++++++++++++++++++++++++++++++++++++++++++++-
->>>>>   include/linux/mmc/dw_mmc.h |  5 +++++
->>>>>   2 files changed, 51 insertions(+), 1 deletion(-)
->>>>>
->>>>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->>>>> index b4c3044..3960fc3 100644
->>>>> --- a/drivers/mmc/host/dw_mmc.c
->>>>> +++ b/drivers/mmc/host/dw_mmc.c
->>>>> @@ -1448,6 +1448,17 @@ static int dw_mci_data_complete(struct dw_mci *host, struct mmc_data *data)
->>>>>       return data->error;
->>>>>   }
->>>>>   +static inline void dw_mci_dto_start_monitor(struct dw_mci *host)
->>>>> +{
->>>>> +    unsigned int data_tmout_clks;
->>>>> +    unsigned int data_tmout_ms;
->>>>> +
->>>>> +    data_tmout_clks = (mci_readl(host, TMOUT) >> 8);
->>>>> +    data_tmout_ms = (data_tmout_clks * 1000 / host->bus_hz) + 250;
->>
->> What's 250? And how about using the DIV_ROUND_UP? 
->>
-> 250ms is only for more timeout.
-> maybe data timeout read from TMOUT register is enough.
-> So, I will remove 250.
-> new code:
-> data_tmout_clks = (mci_readl(host, TMOUT) >> 8);
-> data_tmout_ms = DIV_ROUND_UP(data_tmout_clks * 100, host->bus_hz);
-> Is right?
-> 
->>>>> +
->>>>> +    mod_timer(&host->dto_timer, jiffies + msecs_to_jiffies(data_tmout_ms));
->>>>> +}
->>>>> +
->>>>>   static void dw_mci_tasklet_func(unsigned long priv)
->>>>>   {
->>>>>       struct dw_mci *host = (struct dw_mci *)priv;
->>>>> @@ -1522,8 +1533,11 @@ static void dw_mci_tasklet_func(unsigned long priv)
->>>>>               }
->>>>>                 if (!test_and_clear_bit(EVENT_XFER_COMPLETE,
->>>>> -                        &host->pending_events))
->>>>> +                        &host->pending_events)) {
->>>>> +                if (host->quirks & DW_MCI_QUIRK_DTO_TIMER)
->>>>> +                    dw_mci_dto_start_monitor(host);
->>
->> if timer is starting at only here, dw_mci_dto_start_monitor() doesn't need.
->>
-> Ok, I will change it in the next patch.
->>>>>                   break;
->>>>> +            }
->>>>>                 set_bit(EVENT_XFER_COMPLETE, &host->completed_events);
->>>>>   @@ -2115,6 +2129,9 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
->>>>>           }
->>>>>             if (pending & SDMMC_INT_DATA_OVER) {
->>>>> +            if (host->quirks & DW_MCI_QUIRK_DTO_TIMER)
->>>>> +                del_timer(&host->dto_timer);
->>>>> +
->>>>>               mci_writel(host, RINTSTS, SDMMC_INT_DATA_OVER);
->>>>>               if (!host->data_status)
->>>>>                   host->data_status = pending;
->>>>> @@ -2502,6 +2519,28 @@ ciu_out:
->>>>>       return ret;
->>>>>   }
->>>>>   +static void dw_mci_dto_timer(unsigned long arg)
->>>>> +{
->>>>> +    struct dw_mci *host = (struct dw_mci *)arg;
->>
->> I prefer to use the "data" instead of "arg"
->>
-> Ok, I will change it in the next patch.
->>>>> +
->>>>> +    switch (host->state) {
->>>>> +    case STATE_SENDING_DATA:
->>>>> +    case STATE_DATA_BUSY:
->>>>> +        /*
->>>>> +        * If data over interrupt does NOT come in sending data state,
->>>>> +        * we should notify the driver to teminate current transfer
->> teminate/terminate?
->>
-> Am, I will change it in the next patch.
->>>>> +        * and report a data timeout to the core.
->>>>> +        */
->>>>> +        host->data_status = SDMMC_INT_DRTO;
->>>>> +        set_bit(EVENT_DATA_ERROR, &host->pending_events);
->>>>> +        set_bit(EVENT_DATA_COMPLETE, &host->pending_events);
->>
->> Dose it need to set EVENT_DATA_COMPLETE?
->>
-> Yes, it is nessarry!
-> If not, dw_mci_data_complete function will not be called in my test.
-> Analysis as follows:
-> After host recevied command response, driver call tasklet_schedule to
-> set EVENT_CMD_COMPLETE, change state to STATE_SENDING_DATA, and call
-> mod_timer. Because there is no any interrupts come in this case,
-> tasklet_schedule function will not be called until dw_mci_timer is called.
-> 
-> dw_mci_timer-->
-> tasklet_schedule-->
-> dw_mci_tasklet_func-->
-> state == STATE_SENDING_DATA  and EVENT_DATA_ERROR-->
-> dw_mci_stop_dma, set EVENT_XFER_COMPLETE, send_stop_abort, state = STATE_DATA_ERROR, and then break;-->
-> check state again -->
-> state == STATE_DATA_ERROR, if it NOT set EVENT_DATA_COMPLETE in dw_mci_timer goto 1), else goto 2) -->
-> 
-> 
-> 1) in case STATE_DATA_BUSY, there does nothing but break, and dw_mci_data_complete and dw_mci_request_end
->    will not be called. then mmc blocks.
-> 
-> 2) in case STATE_DATA_BUSY, becase EVENT_DATA_COMPLETE is set, dw_mci_data_complete and dw_mci_request_end
->    will be called to report error to the core.
-> 
-> 
-> 
->>>>> +        tasklet_schedule(&host->tasklet);
->>>>> +        break;
->>>>> +    default:
->>>>> +        break;
->>>>> +    }
->>>>> +}
->>>>> +
->>>>>   #ifdef CONFIG_OF
->>>>>   static struct dw_mci_of_quirks {
->>>>>       char *quirk;
->>>>> @@ -2513,6 +2552,9 @@ static struct dw_mci_of_quirks {
->>>>>       }, {
->>>>>           .quirk    = "disable-wp",
->>>>>           .id    = DW_MCI_QUIRK_NO_WRITE_PROTECT,
->>>>> +    }, {
->>>>> +        .quirk    = "dto-timer",
->>>>> +        .id    = DW_MCI_QUIRK_DTO_TIMER,
->>>>>       },
->>
->> Well, this is s/w timer, so i'm not sure this can be merged into dt-file.
->> If this is generic solution, we can add s/w timer by default. how about?
-> ok, I will change it in the next patch.
-> 
-We got the reply from synopsys today:
- There are two counters but both use the same value of [31:8] bits.
- Data timeout counter doesn?t wait for stop clock and you should get DRTO even when the clock is not stopped.
- Host Starvation timeout counter is triggered with stop clock condition.
+On Thu, 20 Nov 2014 01:08:07 -0800
+Brian Norris <computersforpeace@gmail.com> wrote:
 
-It seems that if card does not send data to host, DRTO interrupt will come.
-But I really have NOT gotten DRTO interrupt and DTO interrupt in RK3X soc.
-Is there other SOC which have the same problem?
+> On Mon, Oct 20, 2014 at 10:46:16AM +0200, Boris Brezillon wrote:
+> > Several MTD users (either in user or kernel space) expect a valid raw
+> > access support to NAND chip devices.
+> > This is particularly true for testing tools which are often touching the
+> > data stored in a NAND chip in raw mode to artificially generate errors.
+> > 
+> > The GPMI drivers do not implemenent raw access functions, and thus rely on
+> > default HW_ECC scheme implementation.
+> > The default implementation consider the data and OOB area as properly
+> > separated in their respective NAND section, which is not true for the GPMI
+> > controller.
+> > In this driver/controller some OOB data are stored at the beginning of the
+> > NAND data area (these data are called metadata in the driver), then ECC
+> > bytes are interleaved with data chunk (which is similar to the
+> > HW_ECC_SYNDROME scheme), and eventually the remaining bytes are used as
+> > OOB data.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 128 +++++++++++++++++++++++++++++++++
+> >  drivers/mtd/nand/gpmi-nand/gpmi-nand.h |   2 +
+> >  2 files changed, 130 insertions(+)
+> > 
+> > diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> > index 959cb9b..bd4dedc 100644
+> > --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> > +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> > @@ -791,6 +791,7 @@ static void gpmi_free_dma_buffer(struct gpmi_nand_data *this)
+> >  					this->page_buffer_phys);
+> >  	kfree(this->cmd_buffer);
+> >  	kfree(this->data_buffer_dma);
+> > +	kfree(this->raw_buffer);
+> >  
+> >  	this->cmd_buffer	= NULL;
+> >  	this->data_buffer_dma	= NULL;
+> > @@ -837,6 +838,9 @@ static int gpmi_alloc_dma_buffer(struct gpmi_nand_data *this)
+> >  	if (!this->page_buffer_virt)
+> >  		goto error_alloc;
+> >  
+> > +	this->raw_buffer = kzalloc(mtd->writesize + mtd->oobsize, GFP_KERNEL);
+> > +	if (!this->raw_buffer)
+> > +		goto error_alloc;
+> >  
+> >  	/* Slice up the page buffer. */
+> >  	this->payload_virt = this->page_buffer_virt;
+> > @@ -1347,6 +1351,128 @@ gpmi_ecc_write_oob(struct mtd_info *mtd, struct nand_chip *chip, int page)
+> >  	return status & NAND_STATUS_FAIL ? -EIO : 0;
+> >  }
+> >  
+> > +static int gpmi_ecc_read_page_raw(struct mtd_info *mtd,
+> > +				  struct nand_chip *chip, uint8_t *buf,
+> > +				  int oob_required, int page)
+> 
+> I think I follow what this function is doing, and gpmi-nand notes the
+> ECC layout elsewhere in the driver, but can you put a few comments at
+> above this function to describe what it's doing? Refer to existing
+> comments as needed. And maybe note the tricky parts inline with the
+> code.
 
-If not, I think we need a quirk for it.
+Sure, I'll add some comments.
+
+> 
+> > +{
+> > +	struct gpmi_nand_data *this = chip->priv;
+> > +	struct bch_geometry *nfc_geo = &this->bch_geometry;
+> > +	int eccsize = nfc_geo->ecc_chunk_size;
+> > +	int eccbits = nfc_geo->ecc_strength * nfc_geo->gf_len;
+> > +	u8 *tmp_buf = this->raw_buffer;
+> > +	size_t src_bit_off;
+> > +	size_t oob_bit_off;
+> > +	size_t oob_byte_off;
+> > +	uint8_t *oob = chip->oob_poi;
+> > +	int step;
+> > +
+> > +	chip->read_buf(mtd, tmp_buf,
+> > +		       mtd->writesize + mtd->oobsize);
+> > +
+> > +	if (this->swap_block_mark) {
+> > +		u8 swap = tmp_buf[0];
+> > +
+> > +		tmp_buf[0] = tmp_buf[mtd->writesize];
+> > +		tmp_buf[mtd->writesize] = swap;
+> > +	}
+> > +
+> > +	if (oob_required)
+> > +		memcpy(oob, tmp_buf, nfc_geo->metadata_size);
+> > +
+> > +	oob_bit_off = nfc_geo->metadata_size * 8;
+> > +	src_bit_off = oob_bit_off;
+> > +
+> > +	for (step = 0; step < nfc_geo->ecc_chunk_count; step++) {
+> > +		if (buf)
+> 
+> Can buf ever be zero here?
+
+Actually, I call this function with a NULL buf in my 4th patch (to dump
+the oob area).
+
+> 
+> > +			gpmi_move_bits(buf, step * eccsize * 8,
+> > +				       tmp_buf, src_bit_off,
+> > +				       eccsize * 8);
+> > +		src_bit_off += eccsize * 8;
+> > +
+> > +		if (oob_required)
+> > +			gpmi_move_bits(oob, oob_bit_off,
+> > +				       tmp_buf, src_bit_off,
+> > +				       eccbits);
+> > +
+> > +		src_bit_off += eccbits;
+> > +		oob_bit_off += eccbits;
+> > +	}
+> > +
+> > +	if (oob_required) {
+> > +		if (oob_bit_off % 8)
+> > +			oob[oob_bit_off / 8] &= GENMASK(oob_bit_off - 1, 0);
+> 
+> So you're manufacturing a few 0 bits here, right? Is that safe? Would we
+> prefer to manufacture 1 bits, as if they are "erased"?
+
+AFAIR this is what the controller is doing (but I'll have to re-check
+that one).
+
+> 
+> > +
+> > +		oob_byte_off = DIV_ROUND_UP(oob_bit_off, 8);
+> > +
+> > +		if (oob_byte_off  < mtd->oobsize)
+> 
+> Extra whitespace before '<'.
+
+I'll Fix that.
+
+Thanks for the review.
+
+Regards,
+
+Boris
 
 
-> And is there somewhere need to call del_timer?
->>
->> Best Regards,
->> Jaehoon Chung
->>
->>>>>   };
->>>>>   @@ -2654,6 +2696,9 @@ int dw_mci_probe(struct dw_mci *host)
->>>>>         spin_lock_init(&host->lock);
->>>>>       INIT_LIST_HEAD(&host->queue);
->>>>> +    if (host->quirks & DW_MCI_QUIRK_DTO_TIMER)
->>>>> +        setup_timer(&host->dto_timer,
->>>>> +                dw_mci_dto_timer, (unsigned long)host);
->>>>>         /*
->>>>>        * Get the host data width - this assumes that HCON has been set with
->>>>> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
->>>>> index 42b724e..2477813 100644
->>>>> --- a/include/linux/mmc/dw_mmc.h
->>>>> +++ b/include/linux/mmc/dw_mmc.h
->>>>> @@ -98,6 +98,7 @@ struct mmc_data;
->>>>>    * @irq_flags: The flags to be passed to request_irq.
->>>>>    * @irq: The irq value to be passed to request_irq.
->>>>>    * @sdio_id0: Number of slot0 in the SDIO interrupt registers.
->>>>> + * @dto_timer: Timer for data over interrupt timeout.
->>>>>    *
->>>>>    * Locking
->>>>>    * =======
->>>>> @@ -196,6 +197,8 @@ struct dw_mci {
->>>>>       int            irq;
->>>>>         int            sdio_id0;
->>>>> +
->>>>> +    struct timer_list    dto_timer;
->>>>>   };
->>>>>     /* DMA ops for Internal/External DMAC interface */
->>>>> @@ -220,6 +223,8 @@ struct dw_mci_dma_ops {
->>>>>   #define DW_MCI_QUIRK_BROKEN_CARD_DETECTION    BIT(3)
->>>>>   /* No write protect */
->>>>>   #define DW_MCI_QUIRK_NO_WRITE_PROTECT        BIT(4)
->>>>> +/* Timer for data over interrupt timeout */
->>>>> +#define DW_MCI_QUIRK_DTO_TIMER            BIT(5)
->>>>>     /* Slot level quirks */
->>>>>   /* This slot has no write protect */
->>>>>
->>>>
->>>>
->>>>
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->>
->>
->>
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
