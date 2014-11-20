@@ -1,63 +1,52 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Thu, 20 Nov 2014 11:29:21 +0800
-Subject: [PATCH v7 3/4] ARM: mediatek: Add sysirq in
- mt6589/mt8135/mt8127 dtsi
-In-Reply-To: <87d28jaxmq.fsf@approximate.cambridge.arm.com>
-References: <1416406451-4578-1-git-send-email-yingjoe.chen@mediatek.com>
- <1416406451-4578-4-git-send-email-yingjoe.chen@mediatek.com>
- <87d28jaxmq.fsf@approximate.cambridge.arm.com>
-Message-ID: <1416454161.12869.10.camel@mtksdaap41>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 20 Nov 2014 09:18:14 +0530
+Subject: [PATCH v11 4/6] ARM: Exynos: switch to using generic cpufreq
+ driver for Exynos4210/5250/5420
+In-Reply-To: <546CEF61.4050105@arm.com>
+References: <1413805281-6269-1-git-send-email-thomas.ab@samsung.com>
+ <1413805281-6269-2-git-send-email-thomas.ab@samsung.com>
+ <1413805281-6269-3-git-send-email-thomas.ab@samsung.com>
+ <1413805281-6269-4-git-send-email-thomas.ab@samsung.com>
+ <1413805281-6269-5-git-send-email-thomas.ab@samsung.com>
+ <546CEF61.4050105@arm.com>
+Message-ID: <CAKohponEHqHYCLibVc8OHN49+4YW5qw89ny4ycTBL1xN-p9qtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-11-19 at 17:49 +0000, Marc Zyngier wrote:
-> On Wed, Nov 19 2014 at  2:14:10 pm GMT, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
-> > Add sysirq settings for mt6589/mt8135/mt8127
-> > This also correct timer interrupt flag. The old setting works
-> > because boot loader already set polarity for timer interrupt.
-> > Without intpol support, the setting was not changed so gic
-> > can get the irq correctly.
-> >
-> > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> > ---
-> >  arch/arm/boot/dts/mt6589.dtsi | 14 ++++++++++++--
-> >  arch/arm/boot/dts/mt8127.dtsi | 14 ++++++++++++--
-> >  arch/arm/boot/dts/mt8135.dtsi | 14 ++++++++++++--
-> >  3 files changed, 36 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/mt6589.dtsi b/arch/arm/boot/dts/mt6589.dtsi
-> > index e3c7600..c91b2a9 100644
-> > --- a/arch/arm/boot/dts/mt6589.dtsi
-> > +++ b/arch/arm/boot/dts/mt6589.dtsi
-> > @@ -19,7 +19,7 @@
-> >  
-> >  / {
-> >  	compatible = "mediatek,mt6589";
-> > -	interrupt-parent = <&gic>;
-> > +	interrupt-parent = <&sysirq>;
-> 
-> This worries me a bit. Your sysirq cannot handle PPIs, and yet you make
-> it the top-level interrupt controller, without amending any PPI.
-> 
-> Does it mean you do not use *any* PPI? No per-cpu timer, nothing?
+Oh, you are still alive? I thought you were about to get married :)
+Just kidding !!
 
-Matthias had a patch to enable arch timer[1], but that is not merged
-yet. Node using PPI interrupts must add their own interrupt-parent. This
-works if we don't have node that use both PPI & SPI interrupts. For
-timer, we could do this:
+On 20 November 2014 00:58, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> Sorry for raising this issue always with Exynos cpufreq drivers. IMO the
+> bindings for "arm-bL-cpufreq-dt" is broken. Currently no one is using it
+> and it's better to fix it before we have a real user of it.
 
-+		timer2: timer {
-+			compatible = "arm,armv7-timer";
-+			interrupt-parent = <&gic>;
-+			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) |
-IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+			clock-frequency = <13000000>;
-+		};
+Hmm, yeah if we can. I haven't found a easy way to go ahead and then
+got caught in other activities.
 
-[1]
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/277017.html
+> If you look at the binding document for it[1], it has a fixme which
+> shouldn't have been there at first place. It assumes the ordering of
+> CPU's specified in the DT and the logical index allocation to them.
 
-Joe.C
+Ok, I believe the FIXME is a bit outdated. From the code I can see only
+this limitation.
+
+- For every cluster, the cpu which boots up first should carry the OPPs.
+Otherwise there is no restriction on ordering of CPUs.
+
+- I believe CPUs boot in the order they are present in DT except for the
+boot CPU. So, the first node for every cluster should have it.
+
+Correct ? Then we can update the fixme.
+
+> It even breaks for hotplug especially if you hotplug-in back in
+> different order.
+
+Hmm, I never thought about it. But yes the CPU with the OPPs should
+be the first one to come back.
+
+> We can work around that probably, but it's better to
+> fix the binding. I failed to grab much attention in my previous attempts
+> to address this[2]. Viresh also started a discussion more recently[3].
+
+They are just stuck and went nowhere :(
