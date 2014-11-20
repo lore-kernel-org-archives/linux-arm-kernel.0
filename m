@@ -1,50 +1,53 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Thu, 20 Nov 2014 15:45:26 +0530
-Subject: [alsa-devel] [PATCH] ASoC: samsung: Fix IISMOD setting in
- i2s_set_sysclk()
-In-Reply-To: <546DBE3D.90206@samsung.com>
-References: <1416420664-20952-1-git-send-email-s.nawrocki@samsung.com>
- <CAAgF-BemHSdcmzkqOUX+JNMLu0-GXs0EGm8YWHt+CBRP8Wa5DA@mail.gmail.com>
- <546DBE3D.90206@samsung.com>
-Message-ID: <CAAgF-BebN=ro8Pmig1xpchzGULd=KcO+3eVgCku3nky4CimgBg@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 20 Nov 2014 11:17:18 +0100
+Subject: voice calls on N900 working (off-line) was Re: N900 modem
+ support in 3.18-rc1
+In-Reply-To: <20141120101320.GA6356@amd>
+References: <20141106180335.GA21513@earth.universe>
+ <20141106225005.GA14002@amd> <201411070001.46481@pali>
+ <545C6F14.8050303@gmail.com>
+ <20141113162420.GB8512@xo-6d-61-c0.localdomain>
+ <5465A977.4030605@gmail.com>
+ <20141114172008.GB12250@earth.universe>
+ <54665E02.8050108@gmail.com>
+ <20141114215749.GA19023@earth.universe> <20141120101320.GA6356@amd>
+Message-ID: <20141120101718.GA8128@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+Hi!
 
-On 11/20/14, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
-> Hi,
->
-> On 20/11/14 08:04, Padma Venkat wrote:
->>> diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
->>> > index 947352d..8db8c66 100644
->>> > --- a/sound/soc/samsung/i2s.c
->>> > +++ b/sound/soc/samsung/i2s.c
->>> > @@ -494,7 +494,7 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
->>> >  		if (dir == SND_SOC_CLOCK_IN)
->>> >  			mod |= 1 << i2s_regs->cdclkcon_off;
->>> >  		else
->>> > -			mod &= 0 << i2s_regs->cdclkcon_off;
->>> > +			mod &= ~(1 << i2s_regs->cdclkcon_off);
->>
->> Thanks for pointing this. In my local machine it was properly done but
->> while rebasing on linux-next I did some mistake. There is one more
->> place in set_sysclk which need to be corrected here
->> mod &= 0 << i2s_regs->rclksrc_off
->> can you include this change also in your patch or should I post a new
->> patch for all?
->
-> OK, I'll also correct this and resend the patch.
+> Ok, so realtime audio does not work due to some pulseaudio problems,
+> but I was able to record a (silent) call and then replay it with 
+> 
+> pacat --rate 4000 ../../../pulseaudio2.raw
+> 
+> on my PC. I have yet to do some testing on the microphone side.
 
-As I found one more break statement missing. So posted a new patch
-with all corrected code with your signed-off. Please do review of the
-same.
+Did someone get pulseaudio to work on n900?
 
-Thanks for you support.
-Padma
+It somehow works for me, but not enough to actually produce sound.
 
->
-> --
-> Regards,
-> Sylwester
->
+root at n900:/my# pacat /my/pulseaudio2.raw 
+Connection failure: Connection refused
+pa_context_connect() failed: Connection refused
+root at n900:/my# pacmd
+Welcome to PulseAudio! Use "help" for usage information.
+>>> list-modules
+22 module(s) loaded.
+    index: 0
+    name: <module-device-restore>
+    argument: <>
+    used: -1
+    load once: yes
+...
+
+mpg123 actually works ok after adjusting the mixers.
+
+Any ideas?
+
+								Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
