@@ -1,50 +1,57 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 20 Nov 2014 22:36:57 +0100
-Subject: [RFC PATCH] clk: mvebu: armada-xp: Support for MSYS SoC
-In-Reply-To: <546E5938.7060501@alliedtelesis.co.nz>
-References: <1416459679-30944-1-git-send-email-chris.packham@alliedtelesis.co.nz>
- <20141120051722.GC2596@lunn.ch>
- <546E5938.7060501@alliedtelesis.co.nz>
-Message-ID: <20141120213657.GO31782@lunn.ch>
+From: mpeg.blue@free.fr (Mason)
+Date: Thu, 20 Nov 2014 22:41:35 +0100
+Subject: Looking for good references for ARM driver development
+In-Reply-To: <546CCBF6.7070607@gmail.com>
+References: <546C920A.7060800@free.fr> <546CCBF6.7070607@gmail.com>
+Message-ID: <546E600F.8020704@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> msys is the name Marvell use for the embedded dual core CPU across 
-> several product lines. I believe the CPU core is the same on all of 
-> them. It's also the name used in the LSP Marvell provide. This was the 
-> main reason I went with "msys" despite the possible confusion with 
-> MSYS/MINGW.
+On 19/11/2014 17:57, Victor Ascroft wrote:
+
+> On 11/19/2014 06:20 PM, Mason wrote:
 > 
-> > We need to be careful here,
-> > because there could be other packet processors with embedded Armada-XP
-> > cores with different tclk speeds. Rather than using msys, it might be
-> > better to use the specific packet processor product ID.
+>> Are there more recent technical references, as good as LDD3, that
+>> cover "modern" aspects of kernel development?
 > 
-> The specific chip I'm working with is the 98DX4251 but there are at 
-> least 4 variants in that product line. I could probably go with 98DX42xx 
-> to cover all those variants but there is a whole other product line 
-> (sorry don't know the model numbers) with the same embedded core.
+> The LDD3 is one of the best there is. A fourth edition is supposed
+> to come out sometime next year.
+> http://www.amazon.com/Linux-Device-Drivers-Jessica-McKellar/dp/1449371612
 
-In the DT world, you generally base the compatibility string on the
-first device which gets added. So i would go with 98DX4251. The other
-products in the family just need to say they are compatible with the
-98DX4251.
+That's the best news I've heard this week!
+Hope Jonathan gets well and lives happily ever after.
 
-> On a side note would people prefer I send my entire work in progress 
-> get-linux-working-on-this-board series or drip feed individual patches 
-> as I have been doing?
+>> How do I "leave device registration for the system infrastructure"?
+>> Where should I put that code?
+>> Is it a good idea to separate device registration and driver registration
+>> in the case of a SoC, where the device is embedded in the SoC and is not
+>> "hot-plugged" (or anything-plugged for that matter, it's just "there").
+> 
+> For understanding this you need to understand how the platform infrastructure
+> works and why is it used.
+> http://lwn.net/Articles/448499/
+> http://lwn.net/Articles/448502/
+> and go through some of the relevant drivers.
 
-Release early, release often. It makes no sense to spend a lot of time
-on polishing something, if we are going to rip it to shreds and tell
-you to do it another way. Post something when it works, so that we can
-review it and let you know if you are going in the right direction.
+More of Jon's (great) work ;-)
+Will definitely read these articles carefully.
 
-There is an interesting presentation by Thomas from ELC 2014
+>> 3) Why is the function used to "destroy a platform device" named
+>> platform_device_put? Why put?
+>> Put on a list of things to destroy at a later time?
+> 
+> This should be more clear once you go through LDD3.
 
-http://free-electrons.com/pub/conferences/2014/elc/petazzoni-soc-mainlining-lessons-learned/petazzoni-soc-mainlining-lessons-learned.pdf
+I'm coming up empty.
+AFAICT, it's unrelated to the _put_user* family of functions.
+I see that it has something to do with ref count decrement.
+[more reading...]
+Something about kref.
+https://lwn.net/Articles/336224/
 
-See Lesson #0.
+They mention "put" but not *why* it's called "put".
+Is it related to Dijkstra's P and V for semaphores?
+https://cs.nyu.edu/~yap/classes/os/resources/origin_of_PV.html
+Still confused...
 
-I also like Lesson #13 :-)
-
-    Andrew
+Regards.
