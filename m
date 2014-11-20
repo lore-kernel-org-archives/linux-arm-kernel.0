@@ -1,77 +1,102 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 20 Nov 2014 17:27:46 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP2+: some more hwmod & clock patches for v3.19
-Message-ID: <alpine.DEB.2.02.1411201726290.9204@utopia.booyaka.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 20 Nov 2014 12:28:56 -0500
+Subject: [PATCH v3 11/13] arm64/efi: use plain memblock API for adding
+ and removing reserved RAM
+In-Reply-To: <1416315432-8534-12-git-send-email-ard.biesheuvel@linaro.org>
+References: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1416315432-8534-12-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1416504536.6398.58.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+On Tue, 2014-11-18 at 13:57 +0100, Ard Biesheuvel wrote:
+> diff --git a/drivers/firmware/efi/virtmap.c
+> b/drivers/firmware/efi/virtmap.c
+> index 98735fb43581..4b6a5c31629f 100644
+> --- a/drivers/firmware/efi/virtmap.c
+> +++ b/drivers/firmware/efi/virtmap.c
+> @@ -8,6 +8,7 @@
+>   */
+>  
+>  #include <linux/efi.h>
+> +#include <linux/memblock.h>
+>  #include <linux/mm_types.h>
+>  #include <linux/rbtree.h>
+>  #include <linux/rwsem.h>
+> @@ -97,8 +98,15 @@ void __init efi_virtmap_init(void)
+>                 u64 paddr, npages, size;
+>                 pgprot_t prot;
+>  
+> -               if (!efi_mem_is_usable_region(md))
+> +               paddr = md->phys_addr;
+> +               npages = md->num_pages;
+> +               memrange_efi_to_native(&paddr, &npages);
+> +               size = npages << PAGE_SHIFT;
+> +
+> +               if (!efi_mem_is_usable_region(md)) {
+>                         efi_register_mem_resource(md);
+> +                       memblock_remove(paddr, size);
+> +               }
 
-Hi Tony,
+What exactly is the memblock_remove trying to accomplish? With it, I
+get:
 
-The following changes since commit 79005fbd3e1d671d08c45c9140ee9826efdc367c:
-
-  ARM: OMAP2+: hwmod: drop unnecessary list initialization (2014-11-13 09:36:55 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.19/omap-b
-
-for you to fetch changes up to eb039a175163ebc2df4612c4a5393143017ce473:
-
-  Merge branch 'dra7xx-uart-hwmod-v3.19' into omap-b-for-v3.19 (2014-11-20 01:50:32 -0700)
-
-- ----------------------------------------------------------------
-Several more OMAP patches targeted for v3.19.  They include:
-
-- - OMAP4/5: DSS hwmod cleanup patches from Tomi Valkeinen.
-- - DRA7xx: hwmod data support for UARTs 7 through 10.
-
-Basic build, boot, and PM test reports are here:
-
-http://www.pwsan.com/omap/testlogs/omap-b-for-v3.19/20141120015256/
-
-Note that I cannot test the DRA7xx patches in any way, since I do not have
-a DRA7xx board.
-
-- ----------------------------------------------------------------
-Ambresh K (1):
-      ARM: DRA7: hwmod data: Add missing UART hwmod data
-
-Paul Walmsley (1):
-      Merge branch 'dra7xx-uart-hwmod-v3.19' into omap-b-for-v3.19
-
-Tomi Valkeinen (6):
-      ARM: OMAP2+: hwmod: add parent_hwmod support
-      ARM: OMAP5: hwmod: set DSS submodule parent hwmods
-      ARM: OMAP4: hwmod: set DSS submodule parent hwmods
-      ARM: OMAP4: hwmod: use MODULEMODE properly
-      ARM: OMAP4: fix RFBI iclk
-      ARM: dts: omap4.dtsi: remove dss_fck
-
- arch/arm/boot/dts/omap4.dtsi               |   2 +-
- arch/arm/boot/dts/omap44xx-clocks.dtsi     |   8 ---
- arch/arm/mach-omap2/omap_hwmod.c           |  22 +++++++
- arch/arm/mach-omap2/omap_hwmod.h           |   8 +++
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  25 +++++---
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c |   5 ++
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c  | 100 +++++++++++++++++++++++++++++
- 7 files changed, 152 insertions(+), 18 deletions(-)
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iQIcBAEBAgAGBQJUbiQwAAoJEMePsQ0LvSpL1ScP/AsalZD18RBF9M9KKbdmbBLj
-hyeapk+7jkBS3ZOIinbOqJkK2hPQahf7tA8GHsgmlaU/EQJNzaTmXEN+ka9Om0nJ
-pZXpo87rsmJCqZaamxk66PXOStZXw2P+fDZSkxJFXK7rZrXH19BEvpxbwKtaEYMx
-Xv2TdaUvcgOJR2Sh4s2C9fxLYmuUzbMsdTYyPyKO/UL5WUteTk1UpR0dkEbYYOS3
-HBBX4kpxwijfi8SMI+A/+EYwUw8lc7qvMeOk3vC14xn6IitB0dH6ZNCmTm5IJK6+
-kn7AJnYlMcPVwEvK0bbUVMhjtxx2foceTb5rkhIBGfW1GWx22r75wD+Kv+bekwrQ
-XCPcImj8PfKstKZqmnHP82i2sJxpiE5nwiqQNoGgRz9YE/x6MTu/xGR4uUoTOg86
-LSVm+HM/dLd99+DyWIgDwj9zwluZYGcLrBSYjiUAnxhOVtb6MaGVQSQ819gv75ep
-l1eINopMGYnLHq/GwEPzsJ0zA4gEWylLJJ+JB0cc7RpL9M9c5R+1sxwn4Sv80bly
-+StV0fKBtEo8f/FEonhbc3Du8iVKN297fsM4TFp2hCYnghCGVLyTrEfKpwlZb3YK
-I7LSLpJFq7rCkFqt0de2T5jKx2C1LNaZ+7rLfjpQejWTj9wRenGKE3hwV11UQj/q
-ng7oGIaPepOB2Z78FXex
-=cDw/
------END PGP SIGNATURE-----
+ Unable to handle kernel NULL pointer dereference at virtual address 00000008
+ pgd = fffffe03d5890000
+ [00000008] *pgd=00000043d5ae0003, *pud=00000043d5ae0003, *pmd=00000043d5ae0003, *pte=0000000000000000
+ Internal error: Oops: 96000007 [#1] SMP
+ Modules linked in:
+ CPU: 0 PID: 107 Comm: modprobe Not tainted 3.18.0-rc5+ #8
+ Hardware name: APM X-Gene Mustang board (DT)
+ task: fffffe03d5770000 ti: fffffe03dd300000 task.ti: fffffe03dd300000
+ PC is at mem_cgroup_begin_page_stat+0x40/0x110
+ LR is at mem_cgroup_begin_page_stat+0x40/0x110
+ pc : [<fffffe00001ec34c>] lr : [<fffffe00001ec34c>] pstate: 60000145
+ sp : fffffe03dd303a80
+ x29: fffffe03dd303a80 x28: 000000000000ffe0 
+ x27: fffffdfef0f56bc0 x26: 0000000000000000 
+ x25: 000003ff89b80000 x24: 0000000000000000 
+ x23: fffffe03dd303ae8 x22: fffffe03dd303ae7 
+ x21: 0000000000000000 x20: fffffe03d58a0420 
+ x19: fffffdfef0004500 x18: 0000000000000000 
+ x17: 000003ff89ba40dc x16: 000003ff89bbff90 
+ x15: 000003ff89ba3b44 x14: 31313030343d6e66 
+ x13: 7020303035343030 x12: 0000000000000006 
+ x11: 0000000000000000 x10: 0000000000000186 
+ x9 : 0000000000000187 x8 : 3030306665666466 
+ x7 : fffffe0001041c18 x6 : 00000000000000ff 
+ x5 : fffffe00004aaf20 x4 : fffffe00004b209c 
+ x3 : 0000000000000000 x2 : 0000000000000000 
+ x1 : fffffe0000f6a5d0 x0 : 0000000000000000 
+ 
+ Process modprobe (pid: 107, stack limit = 0xfffffe03dd300058)
+ Stack: (0xfffffe03dd303a80 to 0xfffffe03dd304000)
+ 3a80: dd303ac0 fffffe03 001c3e20 fffffe00 f0004500 fffffdfe d58a0420 fffffe03
+ 3aa0: f0004500 fffffdfe d58f4dc0 fffffe03 00000000 00000000 001b62d4 fffffe00
+ 3ac0: dd303af0 fffffe03 001b9984 fffffe00 01140f53 00200040 d58a0420 fffffe03
+ 3ae0: d5880000 fffffe03 d58a0420 fffffe03 dd303b40 fffffe03 001b9c4c fffffe00
+ 3b00: d58a0420 fffffe03 89b80000 000003ff f0f56bf0 fffffdfe 00000000 00000000
+ ...
+ 3fa0: 89b907b7 000003ff 89bbf000 000003ff 89bc16e8 000003ff eb753490 000003ff
+ 3fc0: 89b91f9c 000003ff eb753490 000003ff 89b91fac 000003ff 20000000 00000000
+ 3fe0: 00000000 00000000 ffffffff ffffffff aaaaaaaa aaaaaaaa aaaaaaaa aaaaaaaa
+ Call trace:
+ [<fffffe00001ec34c>] mem_cgroup_begin_page_stat+0x40/0x110
+ [<fffffe00001c3e1c>] page_add_file_rmap+0x24/0x80
+ [<fffffe00001b9980>] do_set_pte+0x108/0x19c
+ [<fffffe00001b9c48>] do_read_fault.isra.93+0x234/0x28c
+ [<fffffe00001ba57c>] handle_mm_fault+0x488/0xd64
+ [<fffffe00000a0ea0>] do_page_fault+0x224/0x358
+ [<fffffe0000090128>] do_mem_abort+0x4c/0xb0
+ Exception stack(0xfffffe03dd303e30 to 0xfffffe03dd303f50)
+ 3e20:                                     00000000 00000000 89bbf000 000003ff
+ 3e40: ffffffff ffffffff 89b91fac 000003ff 01043280 fffffe00 00000002 00000000
+ 3e60: dd303e70 fffffe03 008ce3a0 fffffe00 dd303e90 fffffe03 001c0400 fffffe00
+ 3e80: d5880000 fffffe03 000cbc60 fffffe00 eb753610 000003ff 00092fdc fffffe00
+ 3ea0: 00000000 00000000 89bbf000 000003ff ffffffff ffffffff 89ba4654 000003ff
+ 3ec0: 80000000 00000000 d5521480 fffffe03 89bc16e8 000003ff 89bc1a40 000003ff
+ 3ee0: 00000004 00000000 89b80000 000003ff fefefeff fefefefe 00000000 00000000
+ 3f00: 0000000f 00000000 89bc1028 000003ff 89ba7000 000003ff 0000079c 00000000
+ 3f20: 00400000 00000000 ffff0000 ffffffff 004038a0 00000000 00010000 00000000
+ 3f40: 89ba3c1c 000003ff 89ba3b44 000003ff
+ Code: b9405835 35000275 aa1303e0 9400065c (f9400413) 
