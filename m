@@ -1,44 +1,79 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 20 Nov 2014 15:18:55 +0100
-Subject: [PATCH 2/3] mmc: atmel-mci: stop using specific initcall
-In-Reply-To: <2872000.LCAfuO7RlQ@wuerfel>
-References: <1416478075-17059-1-git-send-email-ludovic.desroches@atmel.com>
- <2176441.d1sGy4JguN@wuerfel>
- <20141120140125.GI3639@ldesroches-Latitude-E6320>
- <2872000.LCAfuO7RlQ@wuerfel>
-Message-ID: <20141120141855.GJ3639@ldesroches-Latitude-E6320>
+From: mpeg.blue@free.fr (Mason)
+Date: Thu, 20 Nov 2014 15:20:01 +0100
+Subject: How many frequencies would cpufreq optimally like to manage?
+In-Reply-To: <CAOh2x==KZzq1wbQxGwsJjZW+=fBJDzcnmRoaZMh0UYH-=yBJ=g@mail.gmail.com>
+References: <546D26AE.50601@free.fr>
+ <CAOh2x==KZzq1wbQxGwsJjZW+=fBJDzcnmRoaZMh0UYH-=yBJ=g@mail.gmail.com>
+Message-ID: <546DF891.2050401@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 20, 2014 at 03:13:30PM +0100, Arnd Bergmann wrote:
-> On Thursday 20 November 2014 15:01:25 Ludovic Desroches wrote:
-> > On Thu, Nov 20, 2014 at 12:10:25PM +0100, Arnd Bergmann wrote:
-> > > On Thursday 20 November 2014 11:07:54 Ludovic Desroches wrote:
-> > > > No more use late initcall to manage probing order. Use probe deferring
-> > > > if needed. Then use module_platform_driver and clean init/exit
-> > > > attributes.
-> > > > 
-> > > > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> > > > 
-> > > 
-> > > Do we need this backported into stable kernels? It seems that
-> > > the __init/__exit annotations will break things if you ever
-> > > tried to unbind the device or run into deferred probing on
-> > > earlier kernels.
-> > 
-> > Well, it is a bit complicated, if we backport it, then the mci driver
-> > could be probed before the dma controller. Requesting dma chan will fail
-> > and it will switch to pio mode.
-> > 
-> > So it has to be backported with the probe deferring. The issue is
-> > that probe deferring patch is based on other patches removing non-dt
-> > support which become useless only ine 3.19.
-> > 
-> 
-> Should we just have the __init/__exit removal in backports then?
+On 20/11/2014 10:13, Viresh Kumar wrote:
 
-Yes. Do you want me to split this patch in order to have ony one for
-__init/__exit removal and another one for late_initcall removal?
+> On Thu, Nov 20, 2014 at 4:54 AM, Mason <mpeg.blue@free.fr> wrote:
+>
+>> Hello everyone,
+>
+> The right list is linux-pm and try to cc maintainers from MAINTAINERS
+> file as they can respond quickly then.
 
+Sorry about that. I wasn't even aware that an index like MAINTAINERS
+existed AND was kept up-to-date.
 
-Ludovic
+>> I'm running kernel 3.14 on an ARM Cortex-A9 based SoC.
+>> The baseline frequency for the ARM CPU is 999 MHz.
+>>
+>> The SoC provides a way to dynamically change the CPU frequency,
+>> dividing it by N/16 (N=32..4095) [Actually, I think there are
+>> also ways to divide by 1.x, but I need to read the docs again.]
+>>
+>> I'm writing the platform-specific cpufreq driver.
+>> I could expose hundreds of frequencies to cpufreq, but I don't
+>> think that would be very productive. Correct?
+>> (Note: I can't offer ANY frequency.)
+>>
+>> My question is: how many frequencies should I expose for "optimal"
+>> behavior of cpufreq?
+>
+> You can specify as many number of frequencies as you want. The framework
+> doesn't have any upper cap on that. But there is no point specifying
+> 500 MHz and 510 MHz, you wouldn't save much power with 500 :)
+
+Suppose I expose 100 frequencies. Aside from wasting memory, isn't
+there also a risk that cpufreq will take time, ramping up/down
+through similar frequencies? (Or does it just say "jump to THAT
+frequency" skipping useless intermediate frequencies?)
+
+> So, just gap them smartly. Normally people gap them to 100 MHz. But
+> if there is a voltage change required at some specific freq, suppose 550 MHz,
+> then its better you specific that as well..
+
+Point taken.
+
+>> I'm thinking I would only expose div={2,3,5} meaning the available
+>> scaled frequencies would be {500,333,200} MHz. Are these enough?
+>
+> I thought you can goto 1 GHz.. Why not the upper ones then?
+
+The actual formula for dividers is
+div(I,F) = if I > 1 then I+F/16 else I+F/(32-F)
+I=1..255 F=0..15
+
+So, I can use (for example) div={1, 1.33, 2, 4, 8}
+to offer freq={999,750,500,250,125}
+
+>> Should there be more? Should I go lower than 200 MHz?
+>
+> If that really saves power.
+
+There is a trade-off, tough.
+
+My concern is this: suppose the CPU cores are set to e.g. 54 MHz.
+Suddenly, the driver for an important subsystem needs to speak with
+the corresponding device, with hard deadlines in the comms protocol.
+Will the CPU ramp up fast enough (assuming ondemand governor).
+
+And the end of this message is as good a place as any to thank you
+for having answered my many questions.
+
+Regards.
