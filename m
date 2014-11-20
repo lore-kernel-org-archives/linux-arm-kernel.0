@@ -1,110 +1,65 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 19 Nov 2014 17:05:34 -0800
-Subject: [PATCH v9 2/8] dt-bindings: Document Broadcom Cygnus SoC and
- clocks
-In-Reply-To: <1414538111-11668-3-git-send-email-sbranden@broadcom.com>
-References: <Scott Branden <sbranden@broadcom.com>
- <1414538111-11668-1-git-send-email-sbranden@broadcom.com>
- <1414538111-11668-3-git-send-email-sbranden@broadcom.com>
-Message-ID: <20141120010534.12298.10042@quantum>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 20 Nov 2014 10:12:08 +0900
+Subject: [PATCH 5/6] arm: shmobile: specify PMUs are for ARMv7 CPUs
+In-Reply-To: <1416397800-12457-6-git-send-email-mark.rutland@arm.com>
+References: <1416397800-12457-1-git-send-email-mark.rutland@arm.com>
+ <1416397800-12457-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <20141120011208.GI5065@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Scott Branden (2014-10-28 16:15:05)
-> From: Jonathan Richardson <jonathar@broadcom.com>
+On Wed, Nov 19, 2014 at 11:49:59AM +0000, Mark Rutland wrote:
+> Now that we can specify which PMU variant we're likely to deal with, do
+> so in the shmobile board code. This will allow us to split the ARMv6,
+> ARMv7, and XScale PMU drivers
 > 
-> Reviewed-by: Arun Parameswaran <aparames@broadcom.com>
-> Tested-by: Jonathan Richardson <jonathar@broadcom.com>
-> Reviewed-by: JD (Jiandong) Zheng <jdzheng@broadcom.com>
-> Reviewed-by: Ray Jui <rjui@broadcom.com>
-> Signed-off-by: Scott Branden <sbranden@broadcom.com>
-
-Acked-by: Michael Turquette <mturquette@linaro.org>
-
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Simon Horman <horms@verge.net.au>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Arnd Bergmann <arnd@arndb.de>
 > ---
->  .../devicetree/bindings/arm/bcm/cygnus.txt         |   31 ++++++++++++++++++
->  .../devicetree/bindings/clock/bcm-cygnus-clock.txt |   34 ++++++++++++++++++++
->  2 files changed, 65 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/bcm/cygnus.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt
+>  arch/arm/mach-shmobile/setup-r8a7740.c | 2 +-
+>  arch/arm/mach-shmobile/setup-sh73a0.c  | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+
+Hi Mark,
+
+I'm happy to take this through my tree for v3.20.
+
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/bcm/cygnus.txt b/Documentation/devicetree/bindings/arm/bcm/cygnus.txt
-> new file mode 100644
-> index 0000000..4c77169
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/bcm/cygnus.txt
-> @@ -0,0 +1,31 @@
-> +Broadcom Cygnus device tree bindings
-> +------------------------------------
-> +
-> +
-> +Boards with Cygnus SoCs shall have the following properties:
-> +
-> +Required root node property:
-> +
-> +BCM11300
-> +compatible = "brcm,bcm11300", "brcm,cygnus";
-> +
-> +BCM11320
-> +compatible = "brcm,bcm11320", "brcm,cygnus";
-> +
-> +BCM11350
-> +compatible = "brcm,bcm11350", "brcm,cygnus";
-> +
-> +BCM11360
-> +compatible = "brcm,bcm11360", "brcm,cygnus";
-> +
-> +BCM58300
-> +compatible = "brcm,bcm58300", "brcm,cygnus";
-> +
-> +BCM58302
-> +compatible = "brcm,bcm58302", "brcm,cygnus";
-> +
-> +BCM58303
-> +compatible = "brcm,bcm58303", "brcm,cygnus";
-> +
-> +BCM58305
-> +compatible = "brcm,bcm58305", "brcm,cygnus";
-> diff --git a/Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt b/Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt
-> new file mode 100644
-> index 0000000..00d26ed
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt
-> @@ -0,0 +1,34 @@
-> +Broadcom Cygnus Clocks
-> +
-> +This binding uses the common clock binding:
-> +Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +
-> +Currently various "fixed" clocks are declared for peripheral drivers that use
-> +the common clock framework to reference their core clocks. Proper support of
-> +these clocks will be added later
-> +
-> +Device tree example:
-> +
-> +       clocks {
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               ranges;
-> +
-> +               osc: oscillator {
-> +                       compatible = "fixed-clock";
-> +                       #clock-cells = <1>;
-> +                       clock-frequency = <25000000>;
-> +               };
-> +
-> +               apb_clk: apb_clk {
-> +                       compatible = "fixed-clock";
-> +                       #clock-cells = <0>;
-> +                       clock-frequency = <1000000000>;
-> +               };
-> +
-> +               periph_clk: periph_clk {
-> +                       compatible = "fixed-clock";
-> +                       #clock-cells = <0>;
-> +                       clock-frequency = <500000000>;
-> +               };
-> +       };
+> diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+> index 8894e1b..f3abc9e 100644
+> --- a/arch/arm/mach-shmobile/setup-r8a7740.c
+> +++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+> @@ -659,7 +659,7 @@ static struct resource pmu_resources[] = {
+>  };
+>  
+>  static struct platform_device pmu_device = {
+> -	.name	= "arm-pmu",
+> +	.name	= "armv7-pmu",
+>  	.id	= -1,
+>  	.num_resources = ARRAY_SIZE(pmu_resources),
+>  	.resource = pmu_resources,
+> diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+> index b7bd8e5..23aa1c1 100644
+> --- a/arch/arm/mach-shmobile/setup-sh73a0.c
+> +++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+> @@ -546,7 +546,7 @@ static struct resource pmu_resources[] = {
+>  };
+>  
+>  static struct platform_device pmu_device = {
+> -	.name		= "arm-pmu",
+> +	.name		= "armv7-pmu",
+>  	.id		= -1,
+>  	.num_resources	= ARRAY_SIZE(pmu_resources),
+>  	.resource	= pmu_resources,
 > -- 
-> 1.7.9.5
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
