@@ -1,53 +1,28 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 20 Nov 2014 08:56:10 +0100
-Subject: [GIT PULL] Third Round of Renesas ARM Based Soc Updates for v3.19
-In-Reply-To: <201411192216.27740.arnd@arndb.de>
-References: <cover.1415841454.git.horms+renesas@verge.net.au>
- <201411192216.27740.arnd@arndb.de>
-Message-ID: <CAMuHMdWGnx9D4BJR3C0b=iuEKP_AN+JORiOHX+c-MkqcURAjtg@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 20 Nov 2014 00:06:27 -0800
+Subject: [PATCH v4 1/4] mtd: nand: provide detailed description for raw
+ read/write page methods
+In-Reply-To: <1413794777-32220-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1413794777-32220-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1413794777-32220-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20141120080627.GB3212@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Mon, Oct 20, 2014 at 10:46:14AM +0200, Boris Brezillon wrote:
+> read_page_raw and write_page_raw method description is not clear enough.
+> It clearly specifies that ECC correction should not be involved but does
+> not talk about specific layout (by layout I mean where in-band and
+> out-of-band data are stored on the NAND media) used by NAND/ECC
+> controllers.
+> 
+> Those specific layouts might impact MTD users and thus should be hidden (as
+> already done in the standard NAND_ECC_HW_SYNDROME implementation).
+> 
+> Clearly state this constraint in the nand_ecc_ctrl struct documentation.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-On Wed, Nov 19, 2014 at 10:16 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> Geert Uytterhoeven (1):
->>       ARM: shmobile: sh73a0: Add restart callback
->
-> I'm not too happy about the restart handler here:
->
-> +#define RESCNT2 IOMEM(0xe6188020)
-> +static void sh73a0_restart(enum reboot_mode mode, const char *cmd)
-> +{
-> +       /* Do soft power on reset */
-> +       writel((1 << 31), RESCNT2);
-> +}
->
-> I see that you have the same thing in other SoCs, but I'd really want to
-> see this done properly at some point and likely won't take future patches
-> doing the same thing.
+Pushed this patch to l2-mtd.git. Thanks!
 
-This is basically just moving/copying code from a board file to an SoC
-file.
-
-> Please have a look at drivers/power/restart for how other platforms do
-> this. You probably need to add a device node for whatever IP block
-> holds the reset register and then have a driver. What exactly this
-> driver should look like depends of course on what other registers are
-> part of this block.
-
-I agree. Thanks for reminding us.
-
-The IP block is the system-controller, which is also used for PM domain
-control. So I'll take care of it.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Brian
