@@ -1,58 +1,45 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 20 Nov 2014 12:18:17 -0600
-Subject: [PATCH 6/9] mmc: sdhci: host: add new f_sdh30
-In-Reply-To: <CAOEd-H0_YGHobKu08pMr3A4EpqBdtpBcCZu5PoVY_SZ=GBg-3w@mail.gmail.com>
-References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <1416487081-25467-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <CAL_JsqKDVgpBBW7j1skOU4moF0tvh1j6Fm6jaE5JoP04OU07uw@mail.gmail.com>
- <CAOEd-H0_YGHobKu08pMr3A4EpqBdtpBcCZu5PoVY_SZ=GBg-3w@mail.gmail.com>
-Message-ID: <CAL_JsqKe_NA_mQ1MVMntXMjFGP6nGvnpWb8gvBEzRZuZ+aMf1g@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 20 Nov 2014 18:23:04 +0000 (UTC)
+Subject: [PATCH v2 0/3] Add support for ADC on am437x-gp and am43x-epos-evm
+In-Reply-To: <20141114185049.GB7046@atomide.com>
+References: <1415099728-10959-1-git-send-email-vigneshr@ti.com>
+ <54657FFA.1070200@ti.com> <20141114185049.GB7046@atomide.com>
+Message-ID: <alpine.DEB.2.02.1411201821300.9204@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 20, 2014 at 10:59 AM, Vincent Yang
-<vincent.yang.fujitsu@gmail.com> wrote:
-> 2014-11-20 23:22 GMT+08:00 Rob Herring <robherring2@gmail.com>:
->> On Thu, Nov 20, 2014 at 6:38 AM, Vincent Yang
->> <vincent.yang.fujitsu@gmail.com> wrote:
->>> This patch adds new host controller driver for
->>> Fujitsu SDHCI controller f_sdh30.
->>>
->>> Signed-off-by: Andy Green <andy.green@linaro.org>
->>> Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
->>> Signed-off-by: Tetsuya Takinishi <t.takinishi@jp.fujitsu.com>
->>> ---
->>>  .../devicetree/bindings/mmc/sdhci-fujitsu.txt      |  35 +++
->>>  drivers/mmc/host/Kconfig                           |   9 +
->>>  drivers/mmc/host/Makefile                          |   1 +
->>>  drivers/mmc/host/sdhci_f_sdh30.c                   | 319 +++++++++++++++++++++
->>>  4 files changed, 364 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt
->>>  create mode 100644 drivers/mmc/host/sdhci_f_sdh30.c
->>>
->>> diff --git a/Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt b/Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt
->>> new file mode 100644
->>> index 0000000..a1e0b64
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt
->>> @@ -0,0 +1,35 @@
->>> +* Fujitsu SDHCI controller
->>> +
->>> +This file documents differences between the core properties in mmc.txt
->>> +and the properties used by the sdhci_f_sdh30 driver.
->>> +
->>> +Required properties:
->>> +- compatible: "fujitsu,mb86s70-sdh30"
->>
->> It would be nice to have sdhci in the name to indicate it is an SDHCI
->> controller.
->
-> Yes, we will update it to "fujitsu,sdhci-f-sdh30"
-> Thanks for your review!
+On Fri, 14 Nov 2014, Tony Lindgren wrote:
 
-Not really what I had in mind as you are then dropping the chip name.
-Perhaps "fujitsu,mb86s70-sdhci-3.0". Is 3.0 the SD spec version or IP
-version? If the former, I think I'd drop it as IIRC that is available
-in a register.
+> * Vignesh R <vigneshr@ti.com> [141113 20:09]:
+> > 
+> > On Tuesday 04 November 2014 04:45 PM, Vignesh R wrote:
+> > > This series of patches enable ADC on am437x-gp-evm and am43x-epos-evm.
+> > > The ADC clock hwmod data of am33xx has been moved to commom place so that
+> > > both am43xx and am33xx can reuse them.
+> > > tscadc DT node has been adided to am437x-gp and am43x-epos dt files.
+> > > With these patches, ADC functionalities are now available on am43xx.
+> > > 
+> > > Changelog:
+> > > 
+> > > v2:
+> > > Removed phy addresses in hwmod. Using DT instead.
+> > > Removed unused "ti,am4372" compatible string.
+> > > Use macro to set clk domain name.
+> > > Fixed subject format of all patches
+> > > 
+> > 
+> > Please accept these patches.
+> 
+> Adding Paul to Cc, I don't think Paul has seen these, probably because
+> get_maintainer.pl did not catch these hwmod files?
 
-Rob
+Yeah we didn't have top-level coverage for the data files and my 
+attempts to find other in-depth reviewers has so far failed.  So just sent 
+this:
+
+http://marc.info/?l=linux-omap&m=141650684712440&w=2
+
+Want to take it upstream?
+
+
+- Paul
