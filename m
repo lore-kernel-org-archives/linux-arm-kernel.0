@@ -1,117 +1,97 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Thu, 20 Nov 2014 20:17:32 +0530
-Subject: [RFC PATCH 0/6] ARM64: KVM: PMU infrastructure support
-In-Reply-To: <20141119152952.GB9776@lvm>
-References: <1407230655-28864-1-git-send-email-anup.patel@linaro.org>
- <20141107202502.GJ22848@cbox>
- <CAAhSdy3CPMdK9+_FesKuJaPt9=VVHsnw=DQO5UQUVNm1aPuZNg@mail.gmail.com>
- <CAMJs5B8VqS2-3dhSX+PBaQruzyXiYwaYRQ7vvWEMrHbvbjn+9A@mail.gmail.com>
- <CAAhSdy3iyMpXLh1Qq-TqZ-1W368kG0Oz9iE2McnJkYbA9ZaNPg@mail.gmail.com>
- <20141119152952.GB9776@lvm>
-Message-ID: <CAAhSdy2rQf-26SjeEspcc+LgwmhDr+QeYOOSyOUApF+0-8WdeA@mail.gmail.com>
+From: lautriv@coldplug.net (lautriv)
+Date: Thu, 20 Nov 2014 15:45:23 +0100
+Subject: [PATCH] mmc: wmt-sdmmc: fix unmatched release_mem_region
+In-Reply-To: <CABjd4YxyUJi6RaGWicFeoJ7C27qhUFsAbq-nJTreACrt-voeYA@mail.gmail.com>
+References: <1415567571-6144-1-git-send-email-alchark@gmail.com>	<CAOMZO5C+O4h=f=vtLTdBZktnfVWzfeLjOQG-oecxh_c9u-QMqA@mail.gmail.com>	<545FE821.5060107@coldplug.net>
+ <CABjd4YxyUJi6RaGWicFeoJ7C27qhUFsAbq-nJTreACrt-voeYA@mail.gmail.com>
+Message-ID: <546DFE83.8060900@coldplug.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 8:59 PM, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> On Tue, Nov 11, 2014 at 02:48:25PM +0530, Anup Patel wrote:
->> Hi All,
->>
->> I have second thoughts about rebasing KVM PMU patches
->> to Marc's irq-forwarding patches.
->>
->> The PMU IRQs (when virtualized by KVM) are not exactly
->> forwarded IRQs because they are shared between Host
->> and Guest.
->>
->> Scenario1
->> -------------
->>
->> We might have perf running on Host and no KVM guest
->> running. In this scenario, we wont get interrupts on Host
->> because the kvm_pmu_hyp_init() (similar to the function
->> kvm_timer_hyp_init() of Marc's IRQ-forwarding
->> implementation) has put all host PMU IRQs in forwarding
->> mode.
->>
->> The only way solve this problem is to not set forwarding
->> mode for PMU IRQs in kvm_pmu_hyp_init() and instead
->> have special routines to turn on and turn off the forwarding
->> mode of PMU IRQs. These routines will be called from
->> kvm_arch_vcpu_ioctl_run() for toggling the PMU IRQ
->> forwarding state.
->>
->> Scenario2
->> -------------
->>
->> We might have perf running on Host and Guest simultaneously
->> which means it is quite likely that PMU HW trigger IRQ meant
->> for Host between "ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);"
->> and "kvm_pmu_sync_hwstate(vcpu);" (similar to timer sync routine
->> of Marc's patchset which is called before local_irq_enable()).
->>
->> In this scenario, the updated kvm_pmu_sync_hwstate(vcpu)
->> will accidentally forward IRQ meant for Host to Guest unless
->> we put additional checks to inspect VCPU PMU state.
->>
->> Am I missing any detail about IRQ forwarding for above
->> scenarios?
->>
-> Hi Anup,
+ From b0509e27e33326e6dccd67d8ebe67e2bdb0cfdde Mon Sep 17 00:00:00 2001
+From: Helmut Stengele <lautriv@coldplug.net>
+Date: Thu, 20 Nov 2014 15:27:40 +0100
+Subject: [PATCH] mmc: wmt-sdmmc: fix unmatched release_mem_region
 
-Hi Christoffer,
+Current code calls release_mem_region upon module unload
+without requesting the region first. This patch fixes it
+by moving to a devres-based ioremap implementation, which
+handles requesting and releasing memory region internally.
 
->
-> I briefly discussed this with Marc.  What I don't understand is how it
-> would be possible to get an interrupt for the host while running the
-> guest?
->
-> The rationale behind my question is that whenever you're running the
-> guest, the PMU should be programmed exclusively with guest state, and
-> since the PMU is per core, any interrupts should be for the guest, where
-> it would always be pending.
+This also makes the error/unload paths a bit simpler.
 
-Yes, thats right PMU is programmed exclusively for guest when
-guest is running and for host when host is running.
+Signed-off-by: Helmut Stengele <lautriv@coldplug.net>
+---
 
-Let us assume a situation (Scenario2 mentioned previously)
-where both host and guest are using PMU. When the guest is
-running we come back to host mode due to variety of reasons
-(stage2 fault, guest IO, regular host interrupt, host interrupt
-meant for guest, ....) which means we will return from the
-"ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);" statement in the
-kvm_arch_vcpu_ioctl_run() function with local IRQs disabled.
-At this point we would have restored back host PMU context and
-any PMU counter used by host can trigger PMU overflow interrup
-for host. Now we will be having "kvm_pmu_sync_hwstate(vcpu);"
-in the kvm_arch_vcpu_ioctl_run() function (similar to the
-kvm_timer_sync_hwstate() of Marc's IRQ forwarding patchset)
-which will try to detect PMU irq forwarding state in GIC hence it
-can accidentally discover PMU irq pending for guest while this
-PMU irq is actually meant for host.
+This is a corrected patch based on the one Alexey sent for me.
+I sent it already but since i'm not used to send something upstream
+it was an attached file and obviously rejected.
+Patch is tested on bare-metal ( wm8850 ) and works like suspected.
 
-This above mentioned situation does not happen for timer
-because virtual timer interrupts are exclusively used for guest.
-The exclusive use of virtual timer interrupt for guest ensures that
-the function kvm_timer_sync_hwstate() will always see correct
-state of virtual timer IRQ from GIC.
+  drivers/mmc/host/wmt-sdmmc.c | 14 +++++---------
+  1 file changed, 5 insertions(+), 9 deletions(-)
 
->
-> When migrating a VM with a pending PMU interrupt away for a CPU core, we
-> also capture the active state (the forwarding patches already handle
-> this), and obviously the PMU state along with it.
+diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
+index 54181b4..bcaa0cc 100644
+--- a/drivers/mmc/host/wmt-sdmmc.c
++++ b/drivers/mmc/host/wmt-sdmmc.c
+@@ -759,6 +759,7 @@ static int wmt_mci_probe(struct platform_device *pdev)
+      const struct wmt_mci_caps *wmt_caps;
+      int ret;
+      int regular_irq, dma_irq;
++    struct resource *res;
 
-Yes, the migration of PMU state and PMU interrupt state is
-quite clear.
+      if (!of_id || !of_id->data) {
+          dev_err(&pdev->dev, "Controller capabilities data missing\n");
+@@ -813,10 +814,11 @@ static int wmt_mci_probe(struct platform_device *pdev)
+      if (of_get_property(np, "cd-inverted", NULL))
+          priv->cd_inverted = 1;
 
->
-> Does this address your concern?
+-    priv->sdmmc_base = of_iomap(np, 0);
++    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++    priv->sdmmc_base = devm_ioremap_resource(&pdev->dev, res);
+      if (!priv->sdmmc_base) {
+          dev_err(&pdev->dev, "Failed to map IO space\n");
+-        ret = -ENOMEM;
++        ret = PTR_ERR(priv->sdmmc_base);
+          goto fail2;
+      }
 
-I hope above description give you idea about the concern
-raised by me.
+@@ -826,7 +828,7 @@ static int wmt_mci_probe(struct platform_device *pdev)
+      ret = request_irq(regular_irq, wmt_mci_regular_isr, 0, "sdmmc", priv);
+      if (ret) {
+          dev_err(&pdev->dev, "Register regular IRQ fail\n");
+-        goto fail3;
++        goto fail2;
+      }
 
->
-> -Christoffer
+      ret = request_irq(dma_irq, wmt_mci_dma_isr, 0, "sdmmc", priv);
+@@ -869,8 +871,6 @@ fail5:
+      free_irq(dma_irq, priv);
+  fail4:
+      free_irq(regular_irq, priv);
+-fail3:
+-    iounmap(priv->sdmmc_base);
+  fail2:
+      mmc_free_host(mmc);
+  fail1:
+@@ -881,7 +881,6 @@ static int wmt_mci_remove(struct platform_device *pdev)
+  {
+      struct mmc_host *mmc;
+      struct wmt_mci_priv *priv;
+-    struct resource *res;
+      u32 reg_tmp;
 
-Regards,
-Anup
+      mmc = platform_get_drvdata(pdev);
+@@ -909,9 +908,6 @@ static int wmt_mci_remove(struct platform_device *pdev)
+      clk_disable_unprepare(priv->clk_sdmmc);
+      clk_put(priv->clk_sdmmc);
+
+-    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-    release_mem_region(res->start, resource_size(res));
+-
+      mmc_free_host(mmc);
+
+      dev_info(&pdev->dev, "WMT MCI device removed\n");
+-- 
+2.1.3
