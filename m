@@ -1,21 +1,298 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Nov 2014 13:33:43 +0100
-Subject: [PATCH V3] arm64: amd-seattle: Adding device tree for AMD Seattle
- platform
-In-Reply-To: <20141113110002.GE20652@localhost>
-References: <1414503414-3863-1-git-send-email-suravee.suthikulpanit@amd.com>
- <54616557.1010403@amd.com> <20141113110002.GE20652@localhost>
-Message-ID: <201411201333.44180.arnd@arndb.de>
+From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
+Date: Thu, 20 Nov 2014 20:34:32 +0800
+Subject: [PATCH 2/9] mailbox: arm_mhu: add driver for ARM MHU controller
+In-Reply-To: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Message-ID: <1416486872-25301-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 November 2014, Catalin Marinas wrote:
-> On Tue, Nov 11, 2014 at 01:24:39AM +0000, Suravee Suthikulpanit wrote:
-> > Are there any other concerns about this patch?
-> 
-> Let's cc the arm-soc guys, they are now handling SoC code for arm64.
+Add driver for the ARM Message-Handling-Unit (MHU).
 
-Any update on the submission? I had some comments, am now waiting for a new
-version to put into 3.19.
+Signed-off-by: Andy Green <andy.green@linaro.org>
+Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
+---
+ .../devicetree/bindings/mailbox/arm-mhu.txt        |  33 ++++
+ drivers/mailbox/Kconfig                            |   7 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/arm_mhu.c                          | 196 +++++++++++++++++++++
+ 4 files changed, 238 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/arm-mhu.txt
+ create mode 100644 drivers/mailbox/arm_mhu.c
 
-	Arnd
+diff --git a/Documentation/devicetree/bindings/mailbox/arm-mhu.txt b/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
+new file mode 100644
+index 0000000..b1b9888
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
+@@ -0,0 +1,33 @@
++ARM MHU Mailbox Driver
++======================
++
++The ARM's Message-Handling-Unit (MHU) is a mailbox controller that has
++3 independent channels/links to communicate with remote processor(s).
++ MHU links are hardwired on a platform. A link raises interrupt for any
++received data. However, there is no specified way of knowing if the sent
++data has been read by the remote. This driver assumes the sender polls
++STAT register and the remote clears it after having read the data.
++
++Mailbox Device Node:
++====================
++
++Required properties:
++--------------------
++- compatible:		Shall be "arm,mbox-mhu"
++- reg:			Contains the mailbox register address range (base
++			address and length)
++- #mbox-cells		Shall be 1
++- interrupts:		Contains the interrupt information corresponding to
++			each of the 3 links of MHU.
++
++Example:
++--------
++
++	mhu: mailbox at 2b1f0000 {
++		#mbox-cells = <1>;
++		compatible = "arm,mbox-mhu";
++		reg = <0 0x2b1f0000 0x1000>;
++		interrupts = <0 36 4>,
++			     <0 35 4>,
++			     <0 37 4>;
++	};
+diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
+index 9fd9c67..da4cb9a 100644
+--- a/drivers/mailbox/Kconfig
++++ b/drivers/mailbox/Kconfig
+@@ -6,6 +6,13 @@ menuconfig MAILBOX
+ 	  signals. Say Y if your platform supports hardware mailboxes.
+ 
+ if MAILBOX
++
++config ARM_MHU
++	tristate "ARM MHU Mailbox"
++	depends on ARM
++	help
++	  Say Y here if you want to build the ARM MHU controller driver
++
+ config PL320_MBOX
+ 	bool "ARM PL320 Mailbox"
+ 	depends on ARM_AMBA
+diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
+index 94ed7ce..43fd931 100644
+--- a/drivers/mailbox/Makefile
++++ b/drivers/mailbox/Makefile
+@@ -2,6 +2,8 @@
+ 
+ obj-$(CONFIG_MAILBOX)		+= mailbox.o
+ 
++obj-$(CONFIG_ARM_MHU)	+= arm_mhu.o
++
+ obj-$(CONFIG_PL320_MBOX)	+= pl320-ipc.o
+ 
+ obj-$(CONFIG_OMAP2PLUS_MBOX)	+= omap-mailbox.o
+diff --git a/drivers/mailbox/arm_mhu.c b/drivers/mailbox/arm_mhu.c
+new file mode 100644
+index 0000000..7c6b3cb
+--- /dev/null
++++ b/drivers/mailbox/arm_mhu.c
+@@ -0,0 +1,196 @@
++/*
++ * Copyright (C) 2013-2014 Fujitsu Semiconductor Ltd.
++ * Copyright (C) 2014 Linaro Ltd.
++ * Author: Jassi Brar <jaswinder.singh@linaro.org>
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/interrupt.h>
++#include <linux/spinlock.h>
++#include <linux/mutex.h>
++#include <linux/delay.h>
++#include <linux/slab.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/clk.h>
++#include <linux/module.h>
++#include <linux/mailbox_controller.h>
++#include <linux/platform_device.h>
++
++#define INTR_STAT_OFS	0x0
++#define INTR_SET_OFS	0x8
++#define INTR_CLR_OFS	0x10
++
++struct mhu_link {
++	unsigned irq;
++	void __iomem *tx_reg;
++	void __iomem *rx_reg;
++};
++
++struct arm_mhu {
++	void __iomem *base;
++	struct clk *clk;
++	struct mhu_link mlink[3];
++	struct mbox_chan chan[3];
++	struct mbox_controller mbox;
++};
++
++static irqreturn_t mhu_rx_interrupt(int irq, void *p)
++{
++	struct mbox_chan *chan = p;
++	struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
++	u32 val;
++
++	pr_debug("%s:%d\n", __func__, __LINE__);
++	val = readl_relaxed(mlink->rx_reg + INTR_STAT_OFS);
++	mbox_chan_received_data(chan, (void *)val);
++
++	writel_relaxed(val, mlink->rx_reg + INTR_CLR_OFS);
++
++	return IRQ_HANDLED;
++}
++
++static bool mhu_last_tx_done(struct mbox_chan *chan)
++{
++	struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
++	u32 val;
++
++	pr_debug("%s:%d\n", __func__, __LINE__);
++	val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
++
++	return (val == 0);
++}
++
++static int mhu_send_data(struct mbox_chan *chan, void *data)
++{
++	struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
++
++	pr_debug("%s:%d\n", __func__, __LINE__);
++	if (!mhu_last_tx_done(chan)) {
++		pr_err("%s:%d Shouldn't have seen the day!\n",
++		       __func__, __LINE__);
++		return -EBUSY;
++	}
++
++	writel_relaxed((u32)data, mlink->tx_reg + INTR_SET_OFS);
++
++	return 0;
++}
++
++static int mhu_startup(struct mbox_chan *chan)
++{
++	struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
++	u32 val;
++	int ret;
++
++	pr_debug("%s:%d\n", __func__, __LINE__);
++	val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
++	writel_relaxed(val, mlink->tx_reg + INTR_CLR_OFS);
++
++	ret = request_irq(mlink->irq, mhu_rx_interrupt,
++			  IRQF_SHARED, "mhu_link", chan);
++	if (unlikely(ret)) {
++		pr_err("Unable to aquire IRQ\n");
++		return ret;
++	}
++
++	return 0;
++}
++
++static void mhu_shutdown(struct mbox_chan *chan)
++{
++	struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
++
++	pr_debug("%s:%d\n", __func__, __LINE__);
++	free_irq(mlink->irq, chan);
++}
++
++static struct mbox_chan_ops mhu_ops = {
++	.send_data = mhu_send_data,
++	.startup = mhu_startup,
++	.shutdown = mhu_shutdown,
++	.last_tx_done = mhu_last_tx_done,
++};
++
++static int arm_mhu_probe(struct platform_device *pdev)
++{
++	int i, err;
++	struct arm_mhu *mhu;
++	struct resource *res;
++	int mhu_reg[3] = {0x0, 0x20, 0x200};
++
++	/* Allocate memory for device */
++	mhu = kzalloc(sizeof(*mhu), GFP_KERNEL);
++	if (!mhu)
++		return -ENOMEM;
++
++	mhu->clk = clk_get(&pdev->dev, "clk");
++	if (unlikely(IS_ERR(mhu->clk)))
++		dev_info(&pdev->dev, "unable to init clock\n");
++	else
++		clk_prepare_enable(mhu->clk);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	mhu->base = ioremap(res->start, resource_size(res));
++	if (!mhu->base) {
++		dev_err(&pdev->dev, "ioremap failed.\n");
++		kfree(mhu);
++		return -EBUSY;
++	}
++
++	for (i = 0; i < 3; i++) {
++		mhu->chan[i].con_priv = &mhu->mlink[i];
++		res = platform_get_resource(pdev, IORESOURCE_IRQ, i);
++		mhu->mlink[i].irq = res->start;
++		mhu->mlink[i].rx_reg = mhu->base + mhu_reg[i];
++		mhu->mlink[i].tx_reg = mhu->mlink[i].rx_reg + 0x100;
++	}
++
++	mhu->mbox.dev = &pdev->dev;
++	mhu->mbox.chans = &mhu->chan[0];
++	mhu->mbox.num_chans = 3;
++	mhu->mbox.ops = &mhu_ops;
++	mhu->mbox.txdone_irq = false;
++	mhu->mbox.txdone_poll = true;
++	mhu->mbox.txpoll_period = 10;
++
++	platform_set_drvdata(pdev, mhu);
++
++	err = mbox_controller_register(&mhu->mbox);
++	if (err) {
++		dev_err(&pdev->dev, "Failed to register mailboxes %d\n", err);
++		iounmap(mhu->base);
++		kfree(mhu);
++	} else {
++		dev_info(&pdev->dev, "ARM MHU Mailbox registered\n");
++	}
++
++	return 0;
++}
++
++static const struct of_device_id arm_mhu_dt_ids[] = {
++	{ .compatible = "arm,mbox-mhu" },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, arm_mhu_dt_ids);
++
++static struct platform_driver arm_mhu_driver = {
++	.driver		= {
++		.name	= "arm_mhu",
++		.of_match_table = arm_mhu_dt_ids,
++	},
++	.probe		= arm_mhu_probe,
++};
++module_platform_driver(arm_mhu_driver);
++
++MODULE_LICENSE("GPL v2");
++MODULE_DESCRIPTION("ARM MHU Driver");
++MODULE_AUTHOR("Jassi Brar <jassisinghbrar@gmail.com>");
+-- 
+1.9.0
