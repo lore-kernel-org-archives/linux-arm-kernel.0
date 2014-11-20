@@ -1,66 +1,159 @@
 From: amit.daniel@samsung.com (Amit Daniel Kachhap)
-Date: Thu, 20 Nov 2014 11:09:23 +0530
-Subject: [PATCH v3 0/5] exynos: Move pmu driver to driver/soc folder and add
- exynos7 support
-Message-ID: <1416461968-2057-1-git-send-email-amit.daniel@samsung.com>
+Date: Thu, 20 Nov 2014 11:09:24 +0530
+Subject: [PATCH v3 1/5] ARM: EXYNOS: Move pmu specific header files under
+ "linux/soc/samsung"
+In-Reply-To: <1416461968-2057-1-git-send-email-amit.daniel@samsung.com>
+References: <1416461968-2057-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <1416461968-2057-2-git-send-email-amit.daniel@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series [1 - 5] performs,
+Moving Exynos PMU specific header file into "include/linux/soc/samsung"
+thus updated affected files under "mach-exynos" to use new location of
+these header files.
 
-1) Moves pmu driver to driver/soc/samsung folder. This is needed as exynos7 is
-   an arm64 based platform and hence PMU driver should be in driver folder.
-   Some discussion happened about this in the v1 version. Finally adding it in
-   driver/soc folder as it too SoC specific and not a general driver.
-   Entire discussion can be found here (A).
-2) Add exynos7 PMU support.
-3) Enables the driver for 32bit arm exynos platforms.
-
-Changes from V2:
-* Added review comment changes suggested by Pankaj.
-* Removed mfd client support in this patch series. This will be added later in
-  the power domain patch series.
-* Link to V2 can be found here (B)
-
-Changes from V1:
-* Move pmu driver in driver/soc/samsung folder
-* Removed the power domain features. They will posted as a separate series.
-* Added exynos7 PMU support.
-* Link to v1 can be found here (A)
-
-This complete patch series is rebased on Kukjin for-next tree.
-
-(A) - http://www.spinics.net/lists/linux-samsung-soc/msg38442.html
-(B) - http://www.spinics.net/lists/arm-kernel/msg375910.html
-
-Amit Daniel Kachhap (5):
-  ARM: EXYNOS: Move pmu specific header files under "linux/soc/samsung"
-  drivers: soc: Add support for Exynos PMU driver
-  driver: soc: exynos-pmu: Add an API to be called after wakeup
-  drivers: soc: exynos-pmu: Add support for Exynos7
-  arm: exynos: Select SOC_SAMSUNG config option
-
- .../devicetree/bindings/arm/samsung/pmu.txt        |    1 +
- arch/arm/mach-exynos/Kconfig                       |    1 +
- arch/arm/mach-exynos/Makefile                      |    2 +-
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+---
  arch/arm/mach-exynos/exynos.c                      |    2 +-
  arch/arm/mach-exynos/mcpm-exynos.c                 |    2 +-
  arch/arm/mach-exynos/platsmp.c                     |    2 +-
- arch/arm/mach-exynos/pm.c                          |    4 +-
- arch/arm/mach-exynos/suspend.c                     |    4 +-
- drivers/soc/Kconfig                                |    1 +
- drivers/soc/Makefile                               |    1 +
- drivers/soc/samsung/Kconfig                        |   20 +
- drivers/soc/samsung/Makefile                       |    1 +
- .../pmu.c => drivers/soc/samsung/exynos-pmu.c      |  445 +++++++++++++++++++-
- .../linux/soc/samsung}/exynos-pmu.h                |    1 +
- .../linux/soc/samsung/exynos-regs-pmu.h            |  273 ++++++++++++
- 15 files changed, 745 insertions(+), 15 deletions(-)
- create mode 100644 drivers/soc/samsung/Kconfig
- create mode 100644 drivers/soc/samsung/Makefile
- rename arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c (63%)
- rename {arch/arm/mach-exynos => include/linux/soc/samsung}/exynos-pmu.h (89%)
- rename arch/arm/mach-exynos/regs-pmu.h => include/linux/soc/samsung/exynos-regs-pmu.h (63%)
+ arch/arm/mach-exynos/pm.c                          |    4 ++--
+ arch/arm/mach-exynos/pmu.c                         |    6 ++----
+ arch/arm/mach-exynos/suspend.c                     |    4 ++--
+ .../linux/soc/samsung}/exynos-pmu.h                |    0
+ .../linux/soc/samsung/exynos-regs-pmu.h            |    0
+ 8 files changed, 9 insertions(+), 11 deletions(-)
+ rename {arch/arm/mach-exynos => include/linux/soc/samsung}/exynos-pmu.h (100%)
+ rename arch/arm/mach-exynos/regs-pmu.h => include/linux/soc/samsung/exynos-regs-pmu.h (100%)
 
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index 8f638ad..63d0450 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -20,6 +20,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/pm_domain.h>
+ #include <linux/irqchip.h>
++#include <linux/soc/samsung/exynos-regs-pmu.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/hardware/cache-l2x0.h>
+@@ -29,7 +30,6 @@
+ 
+ #include "common.h"
+ #include "mfc.h"
+-#include "regs-pmu.h"
+ #include "regs-sys.h"
+ 
+ void __iomem *pmu_base_addr;
+diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+index b0d3c2e..c5e17b0 100644
+--- a/arch/arm/mach-exynos/mcpm-exynos.c
++++ b/arch/arm/mach-exynos/mcpm-exynos.c
+@@ -16,12 +16,12 @@
+ #include <linux/io.h>
+ #include <linux/of_address.h>
+ #include <linux/syscore_ops.h>
++#include <linux/soc/samsung/exynos-regs-pmu.h>
+ 
+ #include <asm/cputype.h>
+ #include <asm/cp15.h>
+ #include <asm/mcpm.h>
+ 
+-#include "regs-pmu.h"
+ #include "common.h"
+ 
+ #define EXYNOS5420_CPUS_PER_CLUSTER	4
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 7a1ebfe..d6e7f49 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -20,6 +20,7 @@
+ #include <linux/smp.h>
+ #include <linux/io.h>
+ #include <linux/of_address.h>
++#include <linux/soc/samsung/exynos-regs-pmu.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/cp15.h>
+@@ -30,7 +31,6 @@
+ #include <mach/map.h>
+ 
+ #include "common.h"
+-#include "regs-pmu.h"
+ 
+ extern void exynos4_secondary_startup(void);
+ 
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 86f3ecd..1a981e0 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -18,6 +18,8 @@
+ #include <linux/cpu_pm.h>
+ #include <linux/io.h>
+ #include <linux/err.h>
++#include <linux/soc/samsung/exynos-regs-pmu.h>
++#include <linux/soc/samsung/exynos-pmu.h>
+ 
+ #include <asm/firmware.h>
+ #include <asm/smp_scu.h>
+@@ -26,8 +28,6 @@
+ #include <plat/pm-common.h>
+ 
+ #include "common.h"
+-#include "exynos-pmu.h"
+-#include "regs-pmu.h"
+ #include "regs-sys.h"
+ 
+ static inline void __iomem *exynos_boot_vector_addr(void)
+diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+index 6c8a76d..aa43e04 100644
+--- a/arch/arm/mach-exynos/pmu.c
++++ b/arch/arm/mach-exynos/pmu.c
+@@ -13,10 +13,8 @@
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
+-
+-
+-#include "exynos-pmu.h"
+-#include "regs-pmu.h"
++#include <linux/soc/samsung/exynos-regs-pmu.h>
++#include <linux/soc/samsung/exynos-pmu.h>
+ 
+ #define PMU_TABLE_END	(-1U)
+ 
+diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+index f8e7dcd..80cf7ac 100644
+--- a/arch/arm/mach-exynos/suspend.c
++++ b/arch/arm/mach-exynos/suspend.c
+@@ -21,6 +21,8 @@
+ #include <linux/irqchip/arm-gic.h>
+ #include <linux/err.h>
+ #include <linux/regulator/machine.h>
++#include <linux/soc/samsung/exynos-pmu.h>
++#include <linux/soc/samsung/exynos-regs-pmu.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/hardware/cache-l2x0.h>
+@@ -33,9 +35,7 @@
+ #include <plat/regs-srom.h>
+ 
+ #include "common.h"
+-#include "regs-pmu.h"
+ #include "regs-sys.h"
+-#include "exynos-pmu.h"
+ 
+ #define S5P_CHECK_SLEEP 0x00000BAD
+ 
+diff --git a/arch/arm/mach-exynos/exynos-pmu.h b/include/linux/soc/samsung/exynos-pmu.h
+similarity index 100%
+rename from arch/arm/mach-exynos/exynos-pmu.h
+rename to include/linux/soc/samsung/exynos-pmu.h
+diff --git a/arch/arm/mach-exynos/regs-pmu.h b/include/linux/soc/samsung/exynos-regs-pmu.h
+similarity index 100%
+rename from arch/arm/mach-exynos/regs-pmu.h
+rename to include/linux/soc/samsung/exynos-regs-pmu.h
 -- 
 1.7.9.5
