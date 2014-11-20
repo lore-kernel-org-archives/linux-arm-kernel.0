@@ -1,46 +1,42 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 20 Nov 2014 13:50:49 -0600
-Subject: [RESEND PATCH] usb: gadget: at91_udc: move prepare clk into
- process context
-In-Reply-To: <1416411447-31112-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1416411447-31112-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20141120195049.GF23217@saruman>
+From: smoch@web.de (Soeren Moch)
+Date: Thu, 20 Nov 2014 21:14:30 +0100
+Subject: [PATCH] ARM: dts: imx6q-tbs2910: Enable snvs-poweroff
+In-Reply-To: <1416380089-6317-1-git-send-email-smoch@web.de>
+References: <1416380089-6317-1-git-send-email-smoch@web.de>
+Message-ID: <546E4BA6.5020606@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 04:37:27PM +0100, Nicolas Ferre wrote:
-> From: Ronald Wahl <ronald.wahl@raritan.com>
-> 
-> Commit 7628083227b6bc4a7e33d7c381d7a4e558424b6b (usb: gadget: at91_udc:
-> prepare clk before calling enable) added clock preparation in interrupt
-> context. This is not allowed as it might sleep. Also setting the clock
-> rate is unsafe to call from there for the same reason. Move clock
-> preparation and setting clock rate into process context (at91udc_probe).
-> 
-> Signed-off-by: Ronald Wahl <ronald.wahl@raritan.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: <stable@vger.kernel.org> # v3.17+
+On 11/19/14 07:54, Soeren Moch wrote:
+> This patch enables snvs-poweroff for TBS2910 boards.
+>
+> Signed-off-by: Soeren Moch <smoch@web.de>
+> --
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: linux-kernel at vger.kernel.org
 > ---
-> Hi Felipe,
-> 
-> I forgot to answer you on this patch. So I resend it now with the proper
-> "stable" tag. You can also queue it during this -rc phase if you feel it is
-> still possible.
+>   arch/arm/boot/dts/imx6q-tbs2910.dts | 4 ++++
+>   1 file changed, 4 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/imx6q-tbs2910.dts b/arch/arm/boot/dts/imx6q-tbs2910.dts
+> index d2a5743..7e7496c 100644
+> --- a/arch/arm/boot/dts/imx6q-tbs2910.dts
+> +++ b/arch/arm/boot/dts/imx6q-tbs2910.dts
+> @@ -208,6 +208,10 @@
+>   	status = "okay";
+>   };
+>   
+> +&snvs_poweroff {
+> +	status = "okay";
+> +};
+> +
+>   &spdif {
+>   	pinctrl-names = "default";
+>   	pinctrl-0 = <&pinctrl_spdif>;
+Shawn,
 
-I think it's late for v3.18, so it'll go on v3.19 and get backported to
-3.17 and 3.18. Sorry :-s
+since snvs_poweroffis applied now, can you take this patch for 3.19?
 
-cheers
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141120/4cbb24bd/attachment.sig>
+Thanks,
+Soeren
