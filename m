@@ -1,46 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Nov 2014 17:30:04 +0100
-Subject: [GIT PULL] ARM: imx: SoC updates for 3.19
-In-Reply-To: <20141119070306.GF27759@dragon>
-References: <20141119070306.GF27759@dragon>
-Message-ID: <201411201730.04562.arnd@arndb.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 20 Nov 2014 16:30:38 +0000
+Subject: [PATCH v5 3/6] arm64: Add framework for legacy instruction
+ emulation
+In-Reply-To: <1416310887-14649-4-git-send-email-punit.agrawal@arm.com>
+References: <1416310887-14649-1-git-send-email-punit.agrawal@arm.com>
+ <1416310887-14649-4-git-send-email-punit.agrawal@arm.com>
+Message-ID: <20141120163037.GC5447@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 November 2014, Shawn Guo wrote:
-> The following changes since commit fc14f9c1272f62c3e8d01300f52467c0d9af50f9:
+On Tue, Nov 18, 2014 at 11:41:24AM +0000, Punit Agrawal wrote:
+> Typically, providing support for legacy instructions requires
+> emulating the behaviour of instructions whose encodings have become
+> undefined. If the instructions haven't been removed from the
+> architecture, there maybe an option in the implementation to turn
+> on/off the support for these instructions.
 > 
->   Linux 3.18-rc5 (2014-11-16 16:36:20 -0800)
+> Create common infrastructure to support legacy instruction
+> emulation. In addition to emulation, also provide an option to support
+> hardware execution when supported. The default execution mode (one of
+> undef, emulate, hw exeuction) is dependent on the state of the
+> instruction (deprecated or obsolete) in the architecture and
+> can specified at the time of registering the instruction handlers. The
+> runtime state of the emulation can be controlled by writing to
+> individual nodes in sysctl. The expected default behaviour is
+> documented as part of this patch.
 > 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-soc-3.19
-> 
-> for you to fetch changes up to dc7aaa041842eb40be7ad7bde0a7e37ac1efd79c:
-> 
->   ARM: configs: imx_v6_v7_defconfig: add power off driver (2014-11-19 11:51:55 +0800)
-> 
-> ----------------------------------------------------------------
-> The i.MX SoC update for 3.19:
->  - Update i.MX6 suspend code to check DDR instead of CPU type, as the
->    difference we need to handle is between LPDDR2 and DDR3, not SoCs.
->  - Set anatop properly for LPDDR2 in DSM mode
->  - Add support for new SoC LS1021A which integrates dual Cortex-A7
->  - Add ENET initialization for i.MX6SX platform
->  - Add cpufreq support for i.MX53 platform
->  - Add a SNVS based poweroff driver for i.MX6 platforms
->  - Use ARM  Global Timer as clocksource on VF610
->  - Some defconfig updates
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 
-Hi Shawn,
-
-The changes all look good, but could you please send them again based on
-v3.18-rc1? I'm trying to avoid back-merges from upstream into the next
-branches.
-
-Also, note that we've started splitting out defconfig changes into
-a separate topic branch. Since you are rebasing anyway, please send
-the defconfig change as a separate patch or pull request and also
-update multi_v7_defconfig in the same way.
-
-	Arnd
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
