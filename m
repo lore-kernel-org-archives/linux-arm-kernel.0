@@ -1,46 +1,42 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Thu, 20 Nov 2014 15:19:37 +0530
-Subject: [PATCH] ASoC: samsung: In the i2s_set_sysclk() callback we are
- currently clearing all bits of the IISMOD register in i2s_set_sysclk. It's due
- to an incorrect mask used for the AND operation which is introduced in commit
- a5a56871f804edac93a53b5e871c0e9818fb9033 (ASoC: samsung: add support for
- exynos7 I2S controller) and also adds the missing break statement.
-Message-ID: <1416476977-20118-1-git-send-email-padma.v@samsung.com>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Thu, 20 Nov 2014 17:57:01 +0800
+Subject: [PATCH 1/1] iommu/arm-smmu: forbid userspace IO devices access memory
+ through SMMU by default
+Message-ID: <1416477421-1288-1-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
----
- sound/soc/samsung/i2s.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+It's dangerous to set pte with ARM_SMMU_PTE_AP_UNPRIV. A hacker can use any
+devices running at userspace to access the memory which originally mapped for
+kernel devices, suppose they have the same StreamID. The userspace devices
+should through vfio to dynamic create mapping.
 
-diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index 0df6547..e1ace52 100644
---- a/sound/soc/samsung/i2s.c
-+++ b/sound/soc/samsung/i2s.c
-@@ -494,7 +494,7 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
- 		if (dir == SND_SOC_CLOCK_IN)
- 			mod |= 1 << i2s_regs->cdclkcon_off;
- 		else
--			mod &= 0 << i2s_regs->cdclkcon_off;
-+			mod &= ~(1 << i2s_regs->cdclkcon_off);
- 
- 		i2s->rfs = rfs;
- 		break;
-@@ -551,10 +551,11 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
- 		}
- 
- 		if (clk_id == 0)
--			mod &= 0 << i2s_regs->rclksrc_off;
-+			mod &= ~(1 << i2s_regs->rclksrc_off);
- 		else
- 			mod |= 1 << i2s_regs->rclksrc_off;
- 
-+		break;
- 	default:
- 		dev_err(&i2s->pdev->dev, "We don't serve that!\n");
- 		return -EINVAL;
--- 
-1.7.4.4
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+---
+ drivers/iommu/arm-smmu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 60558f7..e31517b 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -92,7 +92,7 @@
+ #define ARM_SMMU_PTE_CONT_MASK		(~(ARM_SMMU_PTE_CONT_SIZE - 1))
+
+ /* Stage-1 PTE */
+-#define ARM_SMMU_PTE_AP_UNPRIV		(((pteval_t)1) << 6)
++#define ARM_SMMU_PTE_AP_PRIV		(((pteval_t)0) << 6)
+ #define ARM_SMMU_PTE_AP_RDONLY		(((pteval_t)2) << 6)
+ #define ARM_SMMU_PTE_ATTRINDX_SHIFT	2
+ #define ARM_SMMU_PTE_nG			(((pteval_t)1) << 11)
+@@ -1296,7 +1296,7 @@ static int arm_smmu_alloc_init_pte(struct arm_smmu_device *smmu, pmd_t *pmd,
+ 	}
+
+ 	if (stage == 1) {
+-		pteval |= ARM_SMMU_PTE_AP_UNPRIV | ARM_SMMU_PTE_nG;
++		pteval |= ARM_SMMU_PTE_AP_PRIV | ARM_SMMU_PTE_nG;
+ 		if (!(prot & IOMMU_WRITE) && (prot & IOMMU_READ))
+ 			pteval |= ARM_SMMU_PTE_AP_RDONLY;
+
+--
+1.8.0
