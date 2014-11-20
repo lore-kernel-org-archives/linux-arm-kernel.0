@@ -1,131 +1,46 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Thu, 20 Nov 2014 14:28:56 -0200
-Subject: [PATCH 5/9] rc: sunxi-cir: Add support for the larger fifo
- found on sun5i and sun6i
-In-Reply-To: <1416498928-1300-6-git-send-email-hdegoede@redhat.com>
-References: <1416498928-1300-1-git-send-email-hdegoede@redhat.com>
- <1416498928-1300-6-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141120142856.16b6562d@recife.lan>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Nov 2014 17:30:04 +0100
+Subject: [GIT PULL] ARM: imx: SoC updates for 3.19
+In-Reply-To: <20141119070306.GF27759@dragon>
+References: <20141119070306.GF27759@dragon>
+Message-ID: <201411201730.04562.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Thu, 20 Nov 2014 16:55:24 +0100
-Hans de Goede <hdegoede@redhat.com> escreveu:
-
-> Add support for the larger fifo found on sun5i and sun6i, having a separate
-> compatible for the ir found on sun5i & sun6i also is useful if we ever want
-> to add ir transmit support, because the sun5i & sun6i version do not have
-> transmit support.
+On Wednesday 19 November 2014, Shawn Guo wrote:
+> The following changes since commit fc14f9c1272f62c3e8d01300f52467c0d9af50f9:
 > 
-> Note this commits also adds checking for the end-of-packet interrupt flag
-> (which was already enabled), as the fifo-data-available interrupt flag only
-> gets set when the trigger-level is exceeded. So far we've been getting away
-> with not doing this because of the low trigger-level, but this is something
-> which we should have done since day one.
+>   Linux 3.18-rc5 (2014-11-16 16:36:20 -0800)
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-
-As this is meant to be merged via some other tree:
-
-Acked-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-
-
-> ---
->  .../devicetree/bindings/media/sunxi-ir.txt          |  2 +-
->  drivers/media/rc/sunxi-cir.c                        | 21 ++++++++++++---------
->  2 files changed, 13 insertions(+), 10 deletions(-)
+> are available in the git repository at:
 > 
-> diff --git a/Documentation/devicetree/bindings/media/sunxi-ir.txt b/Documentation/devicetree/bindings/media/sunxi-ir.txt
-> index 23dd5ad..5767128 100644
-> --- a/Documentation/devicetree/bindings/media/sunxi-ir.txt
-> +++ b/Documentation/devicetree/bindings/media/sunxi-ir.txt
-> @@ -1,7 +1,7 @@
->  Device-Tree bindings for SUNXI IR controller found in sunXi SoC family
->  
->  Required properties:
-> -- compatible	    : should be "allwinner,sun4i-a10-ir";
-> +- compatible	    : "allwinner,sun4i-a10-ir" or "allwinner,sun5i-a13-ir"
->  - clocks	    : list of clock specifiers, corresponding to
->  		      entries in clock-names property;
->  - clock-names	    : should contain "apb" and "ir" entries;
-> diff --git a/drivers/media/rc/sunxi-cir.c b/drivers/media/rc/sunxi-cir.c
-> index 895fb65..559b0e3 100644
-> --- a/drivers/media/rc/sunxi-cir.c
-> +++ b/drivers/media/rc/sunxi-cir.c
-> @@ -56,12 +56,12 @@
->  #define REG_RXINT_RAI_EN		BIT(4)
->  
->  /* Rx FIFO available byte level */
-> -#define REG_RXINT_RAL(val)    (((val) << 8) & (GENMASK(11, 8)))
-> +#define REG_RXINT_RAL(val)    ((val) << 8)
->  
->  /* Rx Interrupt Status */
->  #define SUNXI_IR_RXSTA_REG    0x30
->  /* RX FIFO Get Available Counter */
-> -#define REG_RXSTA_GET_AC(val) (((val) >> 8) & (GENMASK(5, 0)))
-> +#define REG_RXSTA_GET_AC(val) (((val) >> 8) & (ir->fifo_size * 2 - 1))
->  /* Clear all interrupt status value */
->  #define REG_RXSTA_CLEARALL    0xff
->  
-> @@ -72,10 +72,6 @@
->  /* CIR_REG register idle threshold */
->  #define REG_CIR_ITHR(val)    (((val) << 8) & (GENMASK(15, 8)))
->  
-> -/* Hardware supported fifo size */
-> -#define SUNXI_IR_FIFO_SIZE    16
-> -/* How many messages in FIFO trigger IRQ */
-> -#define TRIGGER_LEVEL         8
->  /* Required frequency for IR0 or IR1 clock in CIR mode */
->  #define SUNXI_IR_BASE_CLK     8000000
->  /* Frequency after IR internal divider  */
-> @@ -94,6 +90,7 @@ struct sunxi_ir {
->  	struct rc_dev   *rc;
->  	void __iomem    *base;
->  	int             irq;
-> +	int		fifo_size;
->  	struct clk      *clk;
->  	struct clk      *apb_clk;
->  	struct reset_control *rst;
-> @@ -115,11 +112,11 @@ static irqreturn_t sunxi_ir_irq(int irqno, void *dev_id)
->  	/* clean all pending statuses */
->  	writel(status | REG_RXSTA_CLEARALL, ir->base + SUNXI_IR_RXSTA_REG);
->  
-> -	if (status & REG_RXINT_RAI_EN) {
-> +	if (status & (REG_RXINT_RAI_EN | REG_RXINT_RPEI_EN)) {
->  		/* How many messages in fifo */
->  		rc  = REG_RXSTA_GET_AC(status);
->  		/* Sanity check */
-> -		rc = rc > SUNXI_IR_FIFO_SIZE ? SUNXI_IR_FIFO_SIZE : rc;
-> +		rc = rc > ir->fifo_size ? ir->fifo_size : rc;
->  		/* If we have data */
->  		for (cnt = 0; cnt < rc; cnt++) {
->  			/* for each bit in fifo */
-> @@ -156,6 +153,11 @@ static int sunxi_ir_probe(struct platform_device *pdev)
->  	if (!ir)
->  		return -ENOMEM;
->  
-> +	if (of_device_is_compatible(dn, "allwinner,sun5i-a13-ir"))
-> +		ir->fifo_size = 64;
-> +	else
-> +		ir->fifo_size = 16;
-> +
->  	/* Clock */
->  	ir->apb_clk = devm_clk_get(dev, "apb");
->  	if (IS_ERR(ir->apb_clk)) {
-> @@ -271,7 +273,7 @@ static int sunxi_ir_probe(struct platform_device *pdev)
->  	 * level
->  	 */
->  	writel(REG_RXINT_ROI_EN | REG_RXINT_RPEI_EN |
-> -	       REG_RXINT_RAI_EN | REG_RXINT_RAL(TRIGGER_LEVEL - 1),
-> +	       REG_RXINT_RAI_EN | REG_RXINT_RAL(ir->fifo_size / 2 - 1),
->  	       ir->base + SUNXI_IR_RXINT_REG);
->  
->  	/* Enable IR Module */
-> @@ -319,6 +321,7 @@ static int sunxi_ir_remove(struct platform_device *pdev)
->  
->  static const struct of_device_id sunxi_ir_match[] = {
->  	{ .compatible = "allwinner,sun4i-a10-ir", },
-> +	{ .compatible = "allwinner,sun5i-a13-ir", },
->  	{},
->  };
->  
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-soc-3.19
+> 
+> for you to fetch changes up to dc7aaa041842eb40be7ad7bde0a7e37ac1efd79c:
+> 
+>   ARM: configs: imx_v6_v7_defconfig: add power off driver (2014-11-19 11:51:55 +0800)
+> 
+> ----------------------------------------------------------------
+> The i.MX SoC update for 3.19:
+>  - Update i.MX6 suspend code to check DDR instead of CPU type, as the
+>    difference we need to handle is between LPDDR2 and DDR3, not SoCs.
+>  - Set anatop properly for LPDDR2 in DSM mode
+>  - Add support for new SoC LS1021A which integrates dual Cortex-A7
+>  - Add ENET initialization for i.MX6SX platform
+>  - Add cpufreq support for i.MX53 platform
+>  - Add a SNVS based poweroff driver for i.MX6 platforms
+>  - Use ARM  Global Timer as clocksource on VF610
+>  - Some defconfig updates
+
+Hi Shawn,
+
+The changes all look good, but could you please send them again based on
+v3.18-rc1? I'm trying to avoid back-merges from upstream into the next
+branches.
+
+Also, note that we've started splitting out defconfig changes into
+a separate topic branch. Since you are rebasing anyway, please send
+the defconfig change as a separate patch or pull request and also
+update multi_v7_defconfig in the same way.
+
+	Arnd
