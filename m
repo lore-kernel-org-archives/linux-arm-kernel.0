@@ -1,60 +1,30 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 20 Nov 2014 09:36:39 +0530
-Subject: [2/2] ARM: dts: Add missing irq pinctrl for max77686 on smdk5250
-In-Reply-To: <1416312509-11530-2-git-send-email-yadi.brar@samsung.com>
-References: <1416312509-11530-2-git-send-email-yadi.brar@samsung.com>
-Message-ID: <546D68CF.1080103@samsung.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 20 Nov 2014 12:05:55 +0800
+Subject: [PATCH RESEND 0/4] ARM: at91: remove at91sam9g45/9m10 legacy
+ board support
+In-Reply-To: <546CC233.6090605@atmel.com>
+References: <1416413278-10197-1-git-send-email-boris.brezillon@free-electrons.com>
+ <546CC233.6090605@atmel.com>
+Message-ID: <20141120040555.GA28420@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Nov 19, 2014 at 05:15:47PM +0100, Nicolas Ferre wrote:
+> On 19/11/2014 17:07, Boris Brezillon :
+> > Hello,
+> > 
+> > This series adds DT support for the TRNG (True Random Generator) block and
+> > adds missing trng nodes to dtsi files.
+> 
+> Nitpicking: subject of this cover letter seems not good ;-)
+> 
+> Herbert, do you think you can take this series yourself or do I have to
+> take it?
 
-On Tuesday 18 November 2014 05:38 PM, Yadwinder Singh Brar wrote:
-> This patch adds pinctrl configuration for using configuring gpx3-2 as an
-> external interrupt from max77686. Though max77686 RTC is enabled and gets
-> probed by default, it doesnt work as its unable to get interrupt.
->
-> This patch makes max77686 RTC work and also configures it as wakeup source.
->
-> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
-> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->
+Sure I can take this.
 
-Tested this on SMDK5250, and with this PMIC RTC is working fine.
-
-Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-
-Thanks,
-Pankaj Dubey
-> ---
-> arch/arm/boot/dts/exynos5250-smdk5250.dts |   12 ++++++++++++
->   1 files changed, 12 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> index 95b5b51..19cd918 100644
-> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> @@ -131,6 +131,9 @@
->   		reg = <0x09>;
->   		interrupt-parent = <&gpx3>;
->   		interrupts = <2 IRQ_TYPE_NONE>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&max77686_irq>;
-> +		wakeup-source;
->
->   		voltage-regulators {
->   			ldo1_reg: LDO1 {
-> @@ -411,3 +414,12 @@
->   		};
->   	};
->   };
-> +
-> +&pinctrl_0 {
-> +	max77686_irq: max77686-irq {
-> +		samsung,pins = "gpx3-2";
-> +		samsung,pin-function = <0xf>;
-> +		samsung,pin-pud = <0>;
-> +		samsung,pin-drv = <0>;
-> +	};
-> +};
->
+Cheers,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
