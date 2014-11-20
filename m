@@ -1,59 +1,39 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 20 Nov 2014 11:44:33 +0100
-Subject: [alsa-devel] [PATCH] ASoC: samsung: ASoC: samsung: Fix IISMOD
- setting in i2s_set_sysclk()
-In-Reply-To: <1416477797-27332-1-git-send-email-padma.v@samsung.com>
-References: <1416477797-27332-1-git-send-email-padma.v@samsung.com>
-Message-ID: <546DC611.8090806@samsung.com>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Thu, 20 Nov 2014 11:44:55 +0100
+Subject: [PATCH v4 1/2] of: Rename "poweroff-source" property to
+ "system-power-controller"
+In-Reply-To: <CABgxDoK=Maxzw-=+pHZ4gdgBSJbdkgx_Q7rHNcwEBywBE3btCQ@mail.gmail.com>
+References: <1415885699-1465-1-git-send-email-user@radxa>
+ <1415885699-1465-2-git-send-email-user@radxa>
+ <20141113205528.77414C40BC2@trevor.secretlab.ca>
+ <CABgxDoL-N9bitxTU0=pD_69DLBovXPSKhHjmArVOHFdokvnEJA@mail.gmail.com>
+ <CABgxDoK=Maxzw-=+pHZ4gdgBSJbdkgx_Q7rHNcwEBywBE3btCQ@mail.gmail.com>
+Message-ID: <CABgxDo+Pgaw_XJX8BkwuDaqfiybBF2hLwDxNczPwEH_-C9aEeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/11/14 11:03, Padmavathi Venna wrote:
-> In the i2s_set_sysclk() callback we are currently clearing all bits
-> of the IISMOD register in i2s_set_sysclk. It's due to an incorrect
-> mask used for the AND operation which is introduced in commit
-> a5a56871f804edac93a53b5e871c0e9818fb9033 (ASoC: samsung:
-> add support for exynos7 I2S controller) and also adds the missing
+ping
 
-The patch looks good to me, I'd just write about the missing break
-in a separate sentence, i.e. s/and also adds/. Also add/
-
-> break statement.
-> 
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> ---
->  sound/soc/samsung/i2s.c |    5 +++--
->  1 files changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-> index 0df6547..e1ace52 100644
-> --- a/sound/soc/samsung/i2s.c
-> +++ b/sound/soc/samsung/i2s.c
-> @@ -494,7 +494,7 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
->  		if (dir == SND_SOC_CLOCK_IN)
->  			mod |= 1 << i2s_regs->cdclkcon_off;
->  		else
-> -			mod &= 0 << i2s_regs->cdclkcon_off;
-> +			mod &= ~(1 << i2s_regs->cdclkcon_off);
->  
->  		i2s->rfs = rfs;
->  		break;
-> @@ -551,10 +551,11 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
->  		}
->  
->  		if (clk_id == 0)
-> -			mod &= 0 << i2s_regs->rclksrc_off;
-> +			mod &= ~(1 << i2s_regs->rclksrc_off);
->  		else
->  			mod |= 1 << i2s_regs->rclksrc_off;
->  
-> +		break;
->  	default:
->  		dev_err(&i2s->pdev->dev, "We don't serve that!\n");
->  		return -EINVAL;
-
---
-Regards,
-Sylwester
+2014-11-17 11:51 GMT+01:00 Romain Perier <romain.perier@gmail.com>:
+> @Most of the people who were ranting about this serie:  could you send
+> feedbacks please ?
+>
+> 2014-11-14 8:22 GMT+01:00 Romain Perier <romain.perier@gmail.com>:
+>> Hi,
+>>
+>> Who should merge this serie ? as Mark merged the previous one it would
+>> probably make sense to do the same here (at least, in my opinion)
+>>
+>> Thanks for your feedbacks.
+>>
+>> Have a nice day,
+>> Romain
+>>
+>> 2014-11-13 21:55 GMT+01:00 Grant Likely <grant.likely@linaro.org>:
+>> igned-off-by: Romain Perier <romain.perier@gmail.com>
+>>>
+>>> Acked-by: Grant Likely <grant.likely@linaro.org>
+>>>
+>>> Please merge via whichever tree needs this change.
+>>>
+>>> g.
