@@ -1,27 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Nov 2014 13:54:52 +0100
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable cgroups
-In-Reply-To: <1416254107-29326-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1416254107-29326-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <201411201354.52679.arnd@arndb.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 20 Nov 2014 12:57:28 +0000
+Subject: [PATCH] mfd: axp20x: Constify axp20x_acpi_match and rid unused warning
+Message-ID: <1416488248-24246-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 November 2014, Soren Brinkmann wrote:
-> This allows booting the kernel with systemd-based root file systems.
-> 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
-> Hi,
-> 
-> I don't know whether I'm the only one, but I use a initramfs with
-> systemd as init, which requires cgroup support in the kernel to fully
-> boot.
-> 
+axp20x.c:239:30:
+  warning: ?axp20x_acpi_match? defined but not used [-Wunused-variable]
 
-You probably are at this time, but I expect it to get more common
-in the future, I don't think enabling this is controversial at all.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mfd/axp20x.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Applied to next/defconfig, thanks!
-
-	Arnd
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index 971b0eb..c522ee2 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -236,7 +236,7 @@ static const struct i2c_device_id axp20x_i2c_id[] = {
+ };
+ MODULE_DEVICE_TABLE(i2c, axp20x_i2c_id);
+ 
+-static struct acpi_device_id axp20x_acpi_match[] = {
++static const struct acpi_device_id axp20x_acpi_match[] = {
+ 	{
+ 		.id = "INT33F4",
+ 		.driver_data = AXP288_ID,
+-- 
+1.9.1
