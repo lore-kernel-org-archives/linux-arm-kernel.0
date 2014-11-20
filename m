@@ -1,42 +1,21 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 20 Nov 2014 10:43:25 +0100
-Subject: [PATCH RESEND v2 4/4] ARM: at91/dt: add trng node to at91sam9g45
-In-Reply-To: <cover.1416475860.git.nicolas.ferre@atmel.com>
-References: <cover.1416475860.git.nicolas.ferre@atmel.com>
-Message-ID: <575b40c1f59408602161bb459ba5c90e5a1c19c3.1416475860.git.nicolas.ferre@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Nov 2014 10:46:44 +0100
+Subject: [GIT PULL 1/2] omap non-urgent fixes for v3.19
+In-Reply-To: <pull-1415725783-562282>
+References: <pull-1415725783-562282>
+Message-ID: <201411201046.44262.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris Brezillon <boris.brezillon@free-electrons.com>
+On Tuesday 11 November 2014, Tony Lindgren wrote:
+> ----------------------------------------------------------------
+> Fixes for omap3 that are not urgent. Mostly to remove unnecessary
+> noise during the boot with pointless errors and warnings.
+> 
 
-Add a DT node for the TRNG (True Random Number Generator) block.
 
-Keep this block enabled as it does not depend on any external connection,
-and thus should be available on all boards.
+Pulled into next/fixes-non-critical. We didn't have any other patches in there,
+so I started out with -rc3 to avoid the back-merge problem. Any reason why
+you didn't base this on -rc1 like the other branches?
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/at91sam9g45.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index d3f65130a1f8..6c0637a4bda5 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -940,6 +940,13 @@
- 				status = "disabled";
- 			};
- 
-+			trng at fffcc000 {
-+				compatible = "atmel,at91sam9g45-trng";
-+				reg = <0xfffcc000 0x4000>;
-+				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 0>;
-+				clocks = <&trng_clk>;
-+			};
-+
- 			i2c0: i2c at fff84000 {
- 				compatible = "atmel,at91sam9g10-i2c";
- 				reg = <0xfff84000 0x100>;
--- 
-2.1.3
+	Arnd
