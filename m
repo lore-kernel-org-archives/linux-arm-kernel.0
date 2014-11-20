@@ -1,140 +1,122 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 20 Nov 2014 10:00:41 +0800
-Subject: [RFC PATCH 07/16] PCI: Separate pci_host_bridge creation out
- of pci_create_root_bus()
-In-Reply-To: <20141119162914.GB9162@bart.dudau.co.uk>
-References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
- <1416219710-26088-8-git-send-email-wangyijing@huawei.com>
- <2507218.mHliopJb05@wuerfel> <546B041A.4060403@huawei.com>
- <20141118144819.GK12037@e106497-lin.cambridge.arm.com>
- <546BFF74.4030101@huawei.com> <20141119162914.GB9162@bart.dudau.co.uk>
-Message-ID: <546D4B49.6020408@huawei.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 19 Nov 2014 18:30:50 -0800
+Subject: [PATCH v2] clk: Propagate prepare and enable when reparenting
+ orphans
+In-Reply-To: <1415408818-28028-1-git-send-email-dianders@chromium.org>
+References: <1415408818-28028-1-git-send-email-dianders@chromium.org>
+Message-ID: <20141120023050.12298.26964@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> Something like this:
->>>
->>> struct pci_controller {
->>> 	struct pci_host_bridge bridge;
->>> 	/* private host bridge data here */
->>> 	.....
->>> };
->>>
->>> #define PCI_CONTROLLER(bus)	({
->>> 	struct pci_host_bridge *hb = to_pci_host_bridge(bus->bridge); \
->>> 	container_of(hb, struct pci_controller, bridge); })
->>>
->>>
->>> Then we can retrieve the host bridge structure from everywhere we have a device.
->>
->> Hi Liviu, it looks good to me, because this change will involve lots platforms,
->> I would think more about it. Thanks for your suggestion very much! :)
+Quoting Doug Anderson (2014-11-07 17:06:58)
+> With the existing code, if you find a parent for an orhpan that has
+> already been prepared / enabled, you won't enable the parent.  That
+> can cause later problems since the clock tree isn't in a consistent
+> state.  Fix by propagating the prepare and enable.
 > 
-> Given that I also look at this area maybe we should join forces and divide the problem?
+> NOTE: this does bring up the question about whether the enable of the
+> orphan actually made sense.  If the orphan's parent wasn't enabled by
+> default (by the bootloader or the default state of the hardware) then
+> the original enable of the orphan probably didn't do what the caller
+> though it would.  Some users of the orphan might have preferred an
+> EPROBE_DEFER be returned until we had a full path to a root clock.
+> This patch doesn't address those concerns and really just syncs up the
+> state.
 
-That's better, we could cooperate to do this. :)
+-ECANOFWORMS
+
+I'm thinking about this patch but I haven't quite made up my mind. It is
+reasonable, but also some nice kind of error might be preferable when
+preparing/enabling an orphaned clock.
+
+Under what conditions might a clock be orphaned? An obvious example is
+just bad luck during the thundering herd of clock registrations from a
+driver. In this case deferring the probe might be a good idea.
+
+However what about the case where a loadable module provides the parent
+clock? It might be a long time before the orphan clocks gets picked up
+from the orphanage. Is deferring probe the right thing here as well?
+
+Regards,
+Mike
 
 > 
-> Best regards,
-> Liviu
+> Tested on rk3288-evb-rk808 by temporarily considering "sclk_tsadc" as
+> a critical clock (to simulate a driver enabling it at bootup).
 > 
->>
->>
->> Thanks!
->> Yijing.
->>
->>>
->>> Best regards,
->>> Liviu
->>>
->>>>
->>>>>
->>>>>> +	host = kzalloc(sizeof(*host), GFP_KERNEL);
->>>>>> +	if (!host)
->>>>>> +		return NULL;
->>>>>
->>>>> devm_kzalloc maybe?
->>>>
->>>> I don't know much detail about devm_kzalloc(), but we have no pci host driver
->>>> here, and I found no devm_kzalloc() uses in core PCI code before.
->>>>
->>>>>
->>>>>> +	if (!resources) {
->>>>>> +		/* Use default IO/MEM/BUS resources*/
->>>>>> +		pci_add_resource(&host->windows, &ioport_resource);
->>>>>> +		pci_add_resource(&host->windows, &iomem_resource);
->>>>>> +		pci_add_resource(&host->windows, &busn_resource);
->>>>>> +	} else {
->>>>>> +		list_for_each_entry_safe(window, n, resources, list)
->>>>>> +			list_move_tail(&window->list, &host->windows);
->>>>>> +	}
->>>>>
->>>>> I think we should assume that the correct resources are passed. You
->>>>> could add a wrapper around this function to convert old platforms
->>>>> though.
->>>>
->>>> OK, I will move these code out of pci_create_host_bridge, and add a wrapper
->>>> to setup the default resources.
->>>>
->>>>>
->>>>>> +EXPORT_SYMBOL(pci_create_host_bridge);
->>>>>
->>>>> EXPORT_SYMBOL_GPL() maybe?
->>>>
->>>> OK, will update it.
->>>>
->>>>>
->>>>>> diff --git a/include/linux/pci.h b/include/linux/pci.h
->>>>>> index 8b11b38..daa7f40 100644
->>>>>> --- a/include/linux/pci.h
->>>>>> +++ b/include/linux/pci.h
->>>>>> @@ -402,7 +402,12 @@ struct pci_host_bridge_window {
->>>>>>  struct pci_host_bridge {
->>>>>>  	struct device dev;
->>>>>>  	struct pci_bus *bus;		/* root bus */
->>>>>> +	struct list_head list;
->>>>>>  	struct list_head windows;	/* pci_host_bridge_windows */
->>>>>> +	int busnum;
->>>>>
->>>>> The busnum should already be implied through the bus resource.
->>>>
->>>> Yes, I will consider remove it and introduce a helper function to get the root bus number, thanks!
->>>>
->>>> Thanks!
->>>> Yijing.
->>>>
->>>>>
->>>>> 	Arnd
->>>>>
->>>>> .
->>>>>
->>>>
->>>>
->>>> -- 
->>>> Thanks!
->>>> Yijing
->>>>
->>>> --
->>>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->>>> the body of a message to majordomo at vger.kernel.org
->>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>>
->>>
->>
->>
->> -- 
->> Thanks!
->> Yijing
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
->>
+> Before:
 > 
-
-
--- 
-Thanks!
-Yijing
+>    clock                         enable_cnt  prepare_cnt        rate   accuracy   phase
+> ----------------------------------------------------------------------------------------
+>  xin32k                                   0            0       32768          0 0
+>     sclk_hdmi_cec                         0            0       32768          0 0
+>     sclk_otg_adp                          0            0       32768          0 0
+>     sclk_tsadc                            1            1         993          0 0
+> 
+> After:
+> 
+>    clock                         enable_cnt  prepare_cnt        rate   accuracy   phase
+> ----------------------------------------------------------------------------------------
+>  xin32k                                   1            1       32768          0 0
+>     sclk_hdmi_cec                         0            0       32768          0 0
+>     sclk_otg_adp                          0            0       32768          0 0
+>     sclk_tsadc                            1            1         993          0 0
+> 
+> Note that xin32k on rk808 is a clock that cannot be disabled in
+> hardware (it's an always on clock), so really all we needed to do was
+> to sync up the state.
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+> Changes in v2:
+> - Only do the work for orphans, not for other users of __clk_reparent().
+> 
+>  drivers/clk/clk.c | 20 ++++++++++++++++++--
+>  1 file changed, 18 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 4896ae9..0f04b7c 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1652,6 +1652,22 @@ void __clk_reparent(struct clk *clk, struct clk *new_parent)
+>         __clk_recalc_rates(clk, POST_RATE_CHANGE);
+>  }
+>  
+> +static void __clk_reparent_orphan(struct clk *clk, struct clk *new_parent)
+> +{
+> +       __clk_reparent(clk, new_parent);
+> +
+> +       if (clk->prepare_count) {
+> +               unsigned long flags;
+> +
+> +               __clk_prepare(new_parent);
+> +
+> +               flags = clk_enable_lock();
+> +               if (clk->enable_count)
+> +                       __clk_enable(new_parent);
+> +               clk_enable_unlock(flags);
+> +       }
+> +}
+> +
+>  /**
+>   * clk_set_parent - switch the parent of a mux clk
+>   * @clk: the mux clk whose input we are switching
+> @@ -1953,13 +1969,13 @@ int __clk_init(struct device *dev, struct clk *clk)
+>                 if (orphan->num_parents && orphan->ops->get_parent) {
+>                         i = orphan->ops->get_parent(orphan->hw);
+>                         if (!strcmp(clk->name, orphan->parent_names[i]))
+> -                               __clk_reparent(orphan, clk);
+> +                               __clk_reparent_orphan(orphan, clk);
+>                         continue;
+>                 }
+>  
+>                 for (i = 0; i < orphan->num_parents; i++)
+>                         if (!strcmp(clk->name, orphan->parent_names[i])) {
+> -                               __clk_reparent(orphan, clk);
+> +                               __clk_reparent_orphan(orphan, clk);
+>                                 break;
+>                         }
+>          }
+> -- 
+> 2.1.0.rc2.206.gedb03e5
+> 
