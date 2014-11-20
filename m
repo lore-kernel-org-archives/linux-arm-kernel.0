@@ -1,432 +1,473 @@
 From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
-Date: Thu, 20 Nov 2014 20:35:20 +0800
-Subject: [PATCH 3/9] ARM: MB86S7X: Add MCPM support
+Date: Thu, 20 Nov 2014 20:36:15 +0800
+Subject: [PATCH 4/9] clk: Add clock driver for mb86s7x
 In-Reply-To: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
 References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-Message-ID: <1416486920-25343-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Message-ID: <1416486975-25385-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The remote firmware(SCB) owns the SMP control. This MCPM driver gets
-CPU/CLUSTER power up/down done by SCB over mailbox.
+ The CRG11 clock controller is managed by remote f/w.
+This driver simply maps Linux CLK ops onto mailbox api.
 
 Signed-off-by: Andy Green <andy.green@linaro.org>
 Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
 Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
 Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
 ---
- arch/arm/mach-mb86s7x/Makefile |   2 +-
- arch/arm/mach-mb86s7x/mcpm.c   | 360 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-mb86s7x/smc.S    |  27 ++++
- 3 files changed, 388 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-mb86s7x/mcpm.c
- create mode 100644 arch/arm/mach-mb86s7x/smc.S
+ .../bindings/clock/fujitsu,mb86s70-clk.txt         |  34 ++
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-mb86s7x.c                          | 359 +++++++++++++++++++++
+ include/dt-bindings/clock/mb86s70-clk.h            |  22 ++
+ 4 files changed, 416 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/fujitsu,mb86s70-clk.txt
+ create mode 100644 drivers/clk/clk-mb86s7x.c
+ create mode 100644 include/dt-bindings/clock/mb86s70-clk.h
 
-diff --git a/arch/arm/mach-mb86s7x/Makefile b/arch/arm/mach-mb86s7x/Makefile
-index 97640b6..b0fa34b 100644
---- a/arch/arm/mach-mb86s7x/Makefile
-+++ b/arch/arm/mach-mb86s7x/Makefile
-@@ -1 +1 @@
--obj-$(CONFIG_ARCH_MB86S7X)	+= board.o
-+obj-$(CONFIG_ARCH_MB86S7X)	+= board.o mcpm.o smc.o
-diff --git a/arch/arm/mach-mb86s7x/mcpm.c b/arch/arm/mach-mb86s7x/mcpm.c
+diff --git a/Documentation/devicetree/bindings/clock/fujitsu,mb86s70-clk.txt b/Documentation/devicetree/bindings/clock/fujitsu,mb86s70-clk.txt
 new file mode 100644
-index 0000000..bf1b50a
+index 0000000..7aeb1ea
 --- /dev/null
-+++ b/arch/arm/mach-mb86s7x/mcpm.c
-@@ -0,0 +1,360 @@
++++ b/Documentation/devicetree/bindings/clock/fujitsu,mb86s70-clk.txt
+@@ -0,0 +1,34 @@
++Fujitsu CRG11 clock driver bindings
++-----------------------------------
++
++Required properties :
++- compatible : Shall contain "fujitsu,mb86s70-clk"
++- #clock-cells : Shall be 0
++- cntrlr : 0->ALW, 1->DDR3, 2->MAIN, 3->CA15, 4->HDMI, 5->DPHY
++- domain : [0, 15]
++- port : [0,7] -> Gateable Clock Ports.  [8]->UngatedCLK
++	  The UngatedCLK is the source of 8 maskable clock ports
++	  as well as having its own output port which can't be masked.
++
++The consumer specifies the desired clock pointing to its phandle.
++
++Example:
++
++	clk_alw_2_1: clk_alw_2_1 {
++		compatible = "fujitsu,mb86s70-clk";
++		#clock-cells = <0>;
++		cntrlr = <0>;
++		domain = <2>;
++		port = <1>;
++	};
++
++	mhu: mhu0 at 2b1f0000 {
++		#mbox-cells = <1>;
++		compatible = "arm,mbox-mhu";
++		reg = <0 0x2B1F0000 0x1000>;
++		interrupts = <0 36 4>, /* LP Non-Sec */
++			     <0 35 4>, /* HP Non-Sec */
++			     <0 37 4>; /* Secure */
++		clocks = <&clk_alw_2_1>;
++		clock-names = "clk";
++	};
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index d5fba5b..19d73a1 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -26,6 +26,7 @@ obj-$(CONFIG_MACH_LOONGSON1)		+= clk-ls1x.o
+ obj-$(CONFIG_COMMON_CLK_MAX_GEN)	+= clk-max-gen.o
+ obj-$(CONFIG_COMMON_CLK_MAX77686)	+= clk-max77686.o
+ obj-$(CONFIG_COMMON_CLK_MAX77802)	+= clk-max77802.o
++obj-$(CONFIG_ARCH_MB86S7X)		+= clk-mb86s7x.o
+ obj-$(CONFIG_ARCH_MOXART)		+= clk-moxart.o
+ obj-$(CONFIG_ARCH_NOMADIK)		+= clk-nomadik.o
+ obj-$(CONFIG_ARCH_NSPIRE)		+= clk-nspire.o
+diff --git a/drivers/clk/clk-mb86s7x.c b/drivers/clk/clk-mb86s7x.c
+new file mode 100644
+index 0000000..e585fb3
+--- /dev/null
++++ b/drivers/clk/clk-mb86s7x.c
+@@ -0,0 +1,359 @@
 +/*
-+ * arch/arm/mach-mb86s7x/mcpm.c
-+ * Copyright:	(C) 2013-2014 Fujitsu Semiconductor Limited
-+ * Copyright:	(C) 2014 Linaro Ltd.
++ * Copyright (C) 2013-2014 FUJITSU SEMICONDUCTOR LIMITED
++ * Copyright (C) 2014 Linaro Ltd.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
 +
++#include <linux/clkdev.h>
++#include <linux/err.h>
 +#include <linux/io.h>
-+#include <linux/pm.h>
-+#include <linux/delay.h>
-+#include <linux/cpu_pm.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/arm-cci.h>
++#include <linux/of.h>
++#include <linux/cpu.h>
++#include <linux/clk-provider.h>
 +#include <linux/spinlock.h>
-+#include <linux/suspend.h>
-+#include <linux/of_device.h>
-+#include <linux/irqchip/arm-gic.h>
++#include <linux/module.h>
++#include <linux/topology.h>
++#include <linux/mailbox_client.h>
 +#include <linux/platform_device.h>
 +
 +#include <soc/mb86s7x/scb_mhu.h>
 +
-+#include <asm/mcpm.h>
-+#include <asm/cp15.h>
-+#include <asm/cputype.h>
-+#include <asm/suspend.h>
-+#include <asm/idmap.h>
++#include <dt-bindings/clock/mb86s70-clk.h>
 +
-+#define S7X_MAX_CLUSTER	2
-+#define S7X_MAX_CPU	2
++#define to_crg_clk(p) container_of(p, struct crg_clk, hw)
++#define to_clc_clk(p) container_of(p, struct cl_clk, hw)
 +
-+#define MHU_SHM_OFFSET		0x3800
-+#define WFI_COLOR_OFFSET	0x3f00
-+#define TRAMPOLINE_OFFSET	0x3c00
-+#define RESET_OFFSET		(TRAMPOLINE_OFFSET + 0x3fc)
++struct mb86s7x_peri_clk {
++	u32 payload_size;
++	u32 cntrlr;
++	u32 domain;
++	u32 port;
++	u32 en;
++	u64 freqency;
++} __packed __attribute__((aligned(4)));
 +
-+static arch_spinlock_t mb86s7x_pm_lock = __ARCH_SPIN_LOCK_UNLOCKED;
-+static int mb86s7x_pm_use_count[S7X_MAX_CLUSTER][S7X_MAX_CPU];
-+extern void __iomem *mb86s7x_shm_base;
++struct hack_rate {
++	unsigned clk_id;
++	unsigned long rate;
++	int gated;
++};
 +
-+#define AT_WFI_DO_NOTHING	0x0
-+#define AT_WFI_DO_SUSPEND	0x1
-+#define AT_WFI_DO_POWEROFF	0x2
-+#define AT_WFI_COLOR_MASK	0x3
++struct crg_clk {
++	struct clk_hw hw;
++	u8 cntrlr, domain, port;
++};
 +
-+struct mb86s7x_cpu_gate {
++static int crg_gate_control(struct clk_hw *hw, int en)
++{
++	struct crg_clk *crgclk = to_crg_clk(hw);
++	struct mb86s7x_peri_clk cmd;
++	int ret;
++
++	cmd.payload_size = sizeof(cmd);
++	cmd.cntrlr = crgclk->cntrlr;
++	cmd.domain = crgclk->domain;
++	cmd.port = crgclk->port;
++	cmd.en = en;
++
++	/* Port is UngatedCLK */
++	if (cmd.port == MB86S70_CRG11_UNGPRT)
++		return en ? 0 : -EINVAL;
++
++	pr_debug("%s:%d CMD Cntrlr-%u Dom-%u Port-%u En-%u}\n",
++		 __func__, __LINE__, cmd.cntrlr,
++		 cmd.domain, cmd.port, cmd.en);
++
++	ret = mb86s7x_send_packet(CMD_PERI_CLOCK_GATE_SET_REQ,
++				  &cmd, sizeof(cmd));
++	if (ret < 0) {
++		pr_err("%s:%d failed!\n", __func__, __LINE__);
++		return ret;
++	}
++
++	pr_debug("%s:%d REP Cntrlr-%u Dom-%u Port-%u En-%u}\n",
++		 __func__, __LINE__, cmd.cntrlr,
++		 cmd.domain, cmd.port, cmd.en);
++
++	/* If the request was rejected */
++	if (cmd.en != en)
++		ret = -EINVAL;
++	else
++		ret = 0;
++
++	return ret;
++}
++
++static int crg_port_prepare(struct clk_hw *hw)
++{
++	return crg_gate_control(hw, 1);
++}
++
++static void crg_port_unprepare(struct clk_hw *hw)
++{
++	crg_gate_control(hw, 0);
++}
++
++static int
++crg_rate_control(struct clk_hw *hw, int set, unsigned long *rate)
++{
++	struct crg_clk *crgclk = to_crg_clk(hw);
++	struct mb86s7x_peri_clk cmd;
++	int code, ret;
++
++	cmd.payload_size = sizeof(cmd);
++	cmd.cntrlr = crgclk->cntrlr;
++	cmd.domain = crgclk->domain;
++	cmd.port = crgclk->port;
++	cmd.freqency = *rate;
++
++	if (set) {
++		code = CMD_PERI_CLOCK_RATE_SET_REQ;
++		pr_debug("%s:%d CMD Cntrlr-%u Dom-%u Port-%u Rate-SET %lluHz}\n",
++			 __func__, __LINE__, cmd.cntrlr,
++			 cmd.domain, cmd.port, cmd.freqency);
++	} else {
++		code = CMD_PERI_CLOCK_RATE_GET_REQ;
++		pr_debug("%s:%d CMD Cntrlr-%u Dom-%u Port-%u Rate-GET}\n",
++			 __func__, __LINE__, cmd.cntrlr,
++			 cmd.domain, cmd.port);
++	}
++
++	ret = mb86s7x_send_packet(code, &cmd, sizeof(cmd));
++	if (ret < 0) {
++		pr_err("%s:%d failed!\n", __func__, __LINE__);
++		return ret;
++	}
++
++	if (set)
++		pr_debug("%s:%d REP Cntrlr-%u Dom-%u Port-%u Rate-SET %lluHz}\n",
++			 __func__, __LINE__, cmd.cntrlr,
++			 cmd.domain, cmd.port, cmd.freqency);
++	else
++		pr_debug("%s:%d REP Cntrlr-%u Dom-%u Port-%u Rate-GOT %lluHz}\n",
++			 __func__, __LINE__, cmd.cntrlr,
++			 cmd.domain, cmd.port, cmd.freqency);
++
++	*rate = cmd.freqency;
++	return 0;
++}
++
++static unsigned long
++crg_port_recalc_rate(struct clk_hw *hw,	unsigned long parent_rate)
++{
++	unsigned long rate;
++
++	crg_rate_control(hw, 0, &rate);
++
++	return rate;
++}
++
++static long
++crg_port_round_rate(struct clk_hw *hw,
++		    unsigned long rate, unsigned long *pr)
++{
++	return rate;
++}
++
++static int
++crg_port_set_rate(struct clk_hw *hw,
++		  unsigned long rate, unsigned long parent_rate)
++{
++	return crg_rate_control(hw, 1, &rate);
++}
++
++const struct clk_ops crg_port_ops = {
++	.prepare = crg_port_prepare,
++	.unprepare = crg_port_unprepare,
++	.recalc_rate = crg_port_recalc_rate,
++	.round_rate = crg_port_round_rate,
++	.set_rate = crg_port_set_rate,
++};
++
++static void __init crg_port_init(struct device_node *node)
++{
++	struct clk_init_data init;
++	u32 cntrlr, domain, port;
++	struct crg_clk *crgclk;
++	struct clk *clk;
++	char clkp[20];
++	int rc;
++
++	rc = of_property_read_u32(node, "cntrlr", &cntrlr);
++	if (WARN_ON(rc))
++		return;
++	rc = of_property_read_u32(node, "domain", &domain);
++	if (WARN_ON(rc))
++		return;
++	rc = of_property_read_u32(node, "port", &port);
++	if (WARN_ON(rc))
++		return;
++
++	if (port > 7)
++		snprintf(clkp, 20, "UngatedCLK%d_%X", cntrlr, domain);
++	else
++		snprintf(clkp, 20, "CLK%d_%X_%d", cntrlr, domain, port);
++
++	clk = __clk_lookup(clkp);
++	if (clk)
++		return;
++
++	crgclk = kzalloc(sizeof(*crgclk), GFP_KERNEL);
++	if (!crgclk)
++		return;
++	init.name = clkp;
++	init.num_parents = 0;
++	init.ops = &crg_port_ops;
++	init.flags = CLK_IS_ROOT;
++	crgclk->hw.init = &init;
++	crgclk->cntrlr = cntrlr;
++	crgclk->domain = domain;
++	crgclk->port = port;
++	clk = clk_register(NULL, &crgclk->hw);
++	if (IS_ERR(clk))
++		pr_err("%s:%d Error!\n", __func__, __LINE__);
++	else
++		pr_debug("Registered %s\n", clkp);
++
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++	clk_register_clkdev(clk, clkp, NULL);
++}
++CLK_OF_DECLARE(crg11_gate, "fujitsu,mb86s70-clk", crg_port_init);
++
++struct cl_clk {
++	struct clk_hw hw;
++	int cluster;
++};
++
++struct mb86s7x_cpu_freq {
 +	u32 payload_size;
 +	u32 cluster_class;
 +	u32 cluster_id;
 +	u32 cpu_id;
-+#define SCB_CPU_STATE_OFF	0x0
-+#define SCB_CPU_STATE_ON	0x1
-+#define SCB_CPU_STATE_SUSP	0x2
-+	u32 cpu_state;
++	u64 freqency;
 +};
 +
-+asmlinkage void mb86s70evb_outer_flush_all(void)
++static void mhu_cluster_rate(struct clk_hw *hw, unsigned long *rate, int get)
 +{
-+	outer_flush_all();
-+}
-+
-+#define mb86s70evb_exit_coherency_flush(level) { \
-+	asm volatile( \
-+	"stmfd	sp!, {fp, ip}\n\t" \
-+	"mrc	p15, 0, r0, c1, c0, 0   @ get SCTLR\n\t" \
-+	"bic	r0, r0, #"__stringify(CR_C)"\n\t" \
-+	"mcr	p15, 0, r0, c1, c0, 0   @ set SCTLR\n\t" \
-+	"isb\n\t" \
-+	"bl	v7_flush_dcache_"__stringify(level)"\n\t" \
-+	"bl	mb86s70evb_outer_flush_all\n\t" \
-+	"mrc	p15, 0, r0, c1, c0, 1   @ get ACTLR\n\t" \
-+	"bic	r0, r0, #(1 << 6)       @ disable local coherency\n\t" \
-+	"mcr	p15, 0, r0, c1, c0, 1   @ set ACTLR\n\t" \
-+	"isb\n\t" \
-+	"dsb\n\t" \
-+	"ldmfd	sp!, {fp, ip}" \
-+		: : : "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", \
-+		"r9", "r10", "lr", "memory"); \
-+	}
-+
-+static void
-+mb86s7x_set_wficolor(unsigned clstr, unsigned cpu, unsigned clr)
-+{
-+	u8 val;
-+
-+	if (clr & ~AT_WFI_COLOR_MASK)
-+		return;
-+
-+	val = readb_relaxed(mb86s7x_shm_base
-+			    + WFI_COLOR_OFFSET + clstr * 2 + cpu);
-+	val &= ~AT_WFI_COLOR_MASK;
-+	val |= clr;
-+	writeb_relaxed(val, mb86s7x_shm_base
-+		       + WFI_COLOR_OFFSET + clstr * 2 + cpu);
-+}
-+
-+static int mb86s7x_pm_power_up(unsigned int cpu, unsigned int cluster)
-+{
-+	int ret = 0;
-+
-+	if (cluster >= S7X_MAX_CLUSTER || cpu >= S7X_MAX_CPU)
-+		return -EINVAL;
-+
-+	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-+
-+	local_irq_disable();
-+	arch_spin_lock(&mb86s7x_pm_lock);
-+
-+	mb86s7x_pm_use_count[cluster][cpu]++;
-+
-+	if (mb86s7x_pm_use_count[cluster][cpu] == 1) {
-+		struct mb86s7x_cpu_gate cmd;
-+
-+		arch_spin_unlock(&mb86s7x_pm_lock);
-+		local_irq_enable();
-+		cmd.payload_size = sizeof(cmd);
-+		cmd.cluster_class = 0;
-+		cmd.cluster_id = cluster;
-+		cmd.cpu_id = cpu;
-+		cmd.cpu_state = SCB_CPU_STATE_ON;
-+
-+		pr_debug("%s:%d CMD Cl_Class-%u CL_ID-%u CPU_ID-%u STATE-%u}\n",
-+			 __func__, __LINE__, cmd.cluster_class,
-+			 cmd.cluster_id, cmd.cpu_id, cmd.cpu_state);
-+
-+		mb86s7x_set_wficolor(cluster, cpu, AT_WFI_DO_NOTHING);
-+		ret = mb86s7x_send_packet(CMD_CPU_CLOCK_GATE_SET_REQ,
-+					  &cmd, sizeof(cmd));
-+		if (ret < 0) {
-+			pr_err("%s:%d failed!\n", __func__, __LINE__);
-+			return ret;
-+		}
-+
-+		pr_debug("%s:%d REP Cl_Class-%u CL_ID-%u CPU_ID-%u STATE-%u}\n",
-+			 __func__, __LINE__, cmd.cluster_class,
-+			 cmd.cluster_id, cmd.cpu_id, cmd.cpu_state);
-+
-+		if (cmd.cpu_state != SCB_CPU_STATE_ON)
-+			return -ENODEV;
-+	} else if (mb86s7x_pm_use_count[cluster][cpu] != 2) {
-+		/*
-+		 * The only possible values are:
-+		 * 0 = CPU down
-+		 * 1 = CPU (still) up
-+		 * 2 = CPU requested to be up before it had a chance
-+		 *     to actually make itself down.
-+		 * Any other value is a bug.
-+		 */
-+		BUG();
-+	}
-+
-+	return 0;
-+}
-+
-+static void mb86s7x_pm_suspend(u64 ignored)
-+{
-+	unsigned int mpidr, cpu, cluster;
-+	bool last_man = false, skip_wfi = false;
-+
-+	mpidr = read_cpuid_mpidr();
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+
-+	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-+	__mcpm_cpu_going_down(cpu, cluster);
-+
-+	arch_spin_lock(&mb86s7x_pm_lock);
-+	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
-+
-+	mb86s7x_pm_use_count[cluster][cpu]--;
-+
-+	if (mb86s7x_pm_use_count[cluster][cpu] == 0) {
-+		if (!mb86s7x_pm_use_count[cluster][0] &&
-+		    !mb86s7x_pm_use_count[cluster][1])
-+			last_man = true;
-+		mb86s7x_set_wficolor(cluster, cpu, AT_WFI_DO_POWEROFF);
-+	} else if (mb86s7x_pm_use_count[cluster][cpu] == 1) {
-+		skip_wfi = true; /* Overtaken by a power up */
-+	} else {
-+		BUG();
-+	}
-+
-+	if (!skip_wfi)
-+		gic_cpu_if_down();
-+
-+	if (last_man && __mcpm_outbound_enter_critical(cpu, cluster)) {
-+		arch_spin_unlock(&mb86s7x_pm_lock);
-+
-+		if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A15) {
-+			/*
-+			 * On the Cortex-A15 we need to disable
-+			 * L2 prefetching before flushing the cache.
-+			 */
-+			asm volatile(
-+			"mcr p15, 1, %0, c15, c0, 3\n\t"
-+			"isb\n\t"
-+			"dsb"
-+			: : "r" (0x400));
-+		}
-+
-+		mb86s70evb_exit_coherency_flush(all);
-+
-+		cci_disable_port_by_cpu(mpidr);
-+
-+		__mcpm_outbound_leave_critical(cluster, CLUSTER_DOWN);
-+	} else {
-+		arch_spin_unlock(&mb86s7x_pm_lock);
-+		mb86s70evb_exit_coherency_flush(louis);
-+	}
-+
-+	__mcpm_cpu_down(cpu, cluster);
-+
-+	/* Now we are prepared for power-down, do it: */
-+	if (!skip_wfi)
-+		wfi();
-+}
-+
-+static void mb86s7x_pm_power_down(void)
-+{
-+	mb86s7x_pm_suspend(0);
-+}
-+
-+static int mb86s7x_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
-+{
-+	struct mb86s7x_cpu_gate cmd;
-+	int i, ret;
-+
-+	if (cluster >= S7X_MAX_CLUSTER || cpu >= S7X_MAX_CPU)
-+		return 0;
++	struct cl_clk *clc = to_clc_clk(hw);
++	struct mb86s7x_cpu_freq cmd;
++	int code, ret;
 +
 +	cmd.payload_size = sizeof(cmd);
 +	cmd.cluster_class = 0;
-+	cmd.cluster_id = cluster;
-+	cmd.cpu_id = cpu;
-+	cmd.cpu_state = SCB_CPU_STATE_ON;
++	cmd.cluster_id = clc->cluster;
++	cmd.cpu_id = 0;
++	cmd.freqency = *rate;
 +
-+	for (i = 0; i < 50; i++) {
-+		ret = mb86s7x_send_packet(CMD_CPU_CLOCK_GATE_GET_REQ,
-+					  &cmd, sizeof(cmd));
-+		if (ret < 0) {
-+			pr_err("%s:%d failed to get CPU status\n",
-+			       __func__, __LINE__);
-+			return ret;
++	if (get)
++		code = CMD_CPU_CLOCK_RATE_GET_REQ;
++	else
++		code = CMD_CPU_CLOCK_RATE_SET_REQ;
++
++	pr_debug("%s:%d CMD Cl_Class-%u CL_ID-%u CPU_ID-%u Freq-%llu}\n",
++		 __func__, __LINE__, cmd.cluster_class,
++		 cmd.cluster_id, cmd.cpu_id, cmd.freqency);
++
++	ret = mb86s7x_send_packet(code, &cmd, sizeof(cmd));
++	if (ret < 0) {
++		pr_err("%s:%d failed!\n", __func__, __LINE__);
++		return;
++	}
++
++	pr_debug("%s:%d REP Cl_Class-%u CL_ID-%u CPU_ID-%u Freq-%llu}\n",
++		 __func__, __LINE__, cmd.cluster_class,
++		 cmd.cluster_id, cmd.cpu_id, cmd.freqency);
++
++	*rate = cmd.freqency;
++}
++
++static unsigned long
++clc_recalc_rate(struct clk_hw *hw, unsigned long unused)
++{
++	unsigned long rate;
++
++	mhu_cluster_rate(hw, &rate, 1);
++	return rate;
++}
++
++static long
++clc_round_rate(struct clk_hw *hw, unsigned long rate,
++	       unsigned long *unused)
++{
++	return rate;
++}
++
++static int
++clc_set_rate(struct clk_hw *hw, unsigned long rate,
++	     unsigned long unused)
++{
++	unsigned long res = rate;
++
++	mhu_cluster_rate(hw, &res, 0);
++
++	return (res == rate) ? 0 : -EINVAL;
++}
++
++static struct clk_ops clk_clc_ops = {
++	.recalc_rate = clc_recalc_rate,
++	.round_rate = clc_round_rate,
++	.set_rate = clc_set_rate,
++};
++
++struct clk *mb86s7x_clclk_register(struct device *cpu_dev)
++{
++	struct clk_init_data init;
++	struct cl_clk *clc;
++
++	clc = kzalloc(sizeof(*clc), GFP_KERNEL);
++	if (!clc)
++		return ERR_PTR(-ENOMEM);
++
++	clc->hw.init = &init;
++	clc->cluster = topology_physical_package_id(cpu_dev->id);
++
++	init.name = dev_name(cpu_dev);
++	init.ops = &clk_clc_ops;
++	init.flags = CLK_IS_ROOT | CLK_GET_RATE_NOCACHE;
++	init.num_parents = 0;
++
++	return devm_clk_register(cpu_dev, &clc->hw);
++}
++
++static int mb86s7x_clclk_of_init(void)
++{
++	int cpu;
++	struct clk *clk;
++
++	for_each_possible_cpu(cpu) {
++		struct device *cpu_dev = get_cpu_device(cpu);
++
++		if (!cpu_dev) {
++			pr_err("failed to get cpu%d device\n", cpu);
++			continue;
 +		}
 +
-+		pr_debug("%s:%d Cl_Class-%u CL_ID-%u CPU_ID-%u STATE-%u\n",
-+			 __func__, __LINE__,
-+			 cmd.cluster_class, cmd.cluster_id,
-+			 cmd.cpu_id, cmd.cpu_state);
-+
-+		if (cmd.cpu_state == SCB_CPU_STATE_OFF)
-+			return 0;
-+
-+		msleep(20);
++		clk = mb86s7x_clclk_register(cpu_dev);
++		if (IS_ERR(clk)) {
++			pr_err("failed to register cpu%d clock\n", cpu);
++			continue;
++		}
++		if (clk_register_clkdev(clk, NULL, dev_name(cpu_dev))) {
++			pr_err("failed to register cpu%d clock lookup\n", cpu);
++			continue;
++		}
++		pr_debug("registered clk for %s\n", dev_name(cpu_dev));
 +	}
 +
-+	return -ETIMEDOUT;
++	platform_device_register_simple("arm-bL-cpufreq-dt", -1, NULL, 0);
++
++	return 0;
 +}
-+
-+static void mb86s7x_pm_powered_up(void)
-+{
-+	unsigned int mpidr, cpu, cluster;
-+
-+	mpidr = read_cpuid_mpidr();
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+
-+	arch_spin_lock(&mb86s7x_pm_lock);
-+	if (!mb86s7x_pm_use_count[cluster][cpu])
-+		mb86s7x_pm_use_count[cluster][cpu] = 1;
-+	arch_spin_unlock(&mb86s7x_pm_lock);
-+}
-+
-+static const struct mcpm_platform_ops mb86s7x_pm_power_ops = {
-+	.power_up		= mb86s7x_pm_power_up,
-+	.power_down		= mb86s7x_pm_power_down,
-+	.wait_for_powerdown	= mb86s7x_wait_for_powerdown,
-+	.suspend		= mb86s7x_pm_suspend,
-+	.powered_up		= mb86s7x_pm_powered_up,
-+};
-+
-+/*
-+ * Enable cluster-level coherency, in preparation for turning on the MMU.
-+ */
-+static void __naked mb86s7x_pm_power_up_setup(unsigned int affinity_level)
-+{
-+	asm volatile ("\n"
-+"	cmp	r0, #1\n"
-+"	bxne	lr\n"
-+"	b	cci_enable_port_for_self");
-+}
-+
-+static void __init mb86s7x_cache_off(void)
-+{
-+	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A15) {
-+		/* disable L2 prefetching on the Cortex-A15 */
-+		asm volatile(
-+		"mcr	p15, 1, %0, c15, c0, 3\n\t"
-+		"isb\n\t"
-+		"dsb"
-+		: : "r" (0x400));
-+	}
-+	mb86s70evb_exit_coherency_flush(all);
-+}
-+
-+struct mb86s7x_scb_version {
-+	u32 payload_size;
-+	u32 version;
-+	u32 config_version;
-+};
-+
-+extern void mb86s7x_cpu_entry(unsigned long secondary_entry);
-+
-+static int __init mb86s7x_mcpm_init(void)
-+{
-+	unsigned int mpidr, cpu, cluster;
-+	struct mb86s7x_scb_version cmd;
-+	int ret;
-+
-+	if (!cci_probed())
-+		return -ENODEV;
-+
-+	mpidr = read_cpuid_mpidr();
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+
-+	pr_info("Booting on cpu_%u cluster_%u\n", cpu, cluster);
-+	mb86s7x_pm_use_count[cluster][cpu] = 1;
-+
-+	/* reset the wfi 'color' for primary cpu */
-+	mb86s7x_set_wficolor(cluster, cpu, AT_WFI_DO_NOTHING);
-+
-+	/* Do SMC to set entry address for CPUs coming online */
-+	mb86s7x_cpu_entry(virt_to_phys(mcpm_entry_point));
-+
-+	cmd.payload_size = sizeof(cmd);
-+	cmd.version = 0;
-+	cmd.config_version = 0;
-+	ret = mb86s7x_send_packet(CMD_SCB_CAPABILITY_GET_REQ,
-+				  &cmd, sizeof(cmd));
-+	if (ret < 0)
-+		pr_err("%s:%d failed to get SCB version\n",
-+		       __func__, __LINE__);
-+
-+	pr_info("MB86S7x MCPM initialized: SCB version 0x%x:0x%x\n",
-+		cmd.version, cmd.config_version);
-+
-+	ret = mcpm_platform_register(&mb86s7x_pm_power_ops);
-+	if (!ret)
-+		ret = mcpm_sync_init(mb86s7x_pm_power_up_setup);
-+	if (!ret)
-+		ret = mcpm_loopback(mb86s7x_cache_off); /* turn on the CCI */
-+	mcpm_smp_set_ops();
-+
-+	return ret;
-+}
-+early_initcall(mb86s7x_mcpm_init);
-diff --git a/arch/arm/mach-mb86s7x/smc.S b/arch/arm/mach-mb86s7x/smc.S
++module_init(mb86s7x_clclk_of_init);
+diff --git a/include/dt-bindings/clock/mb86s70-clk.h b/include/dt-bindings/clock/mb86s70-clk.h
 new file mode 100644
-index 0000000..a14330b
+index 0000000..d6f370b
 --- /dev/null
-+++ b/arch/arm/mach-mb86s7x/smc.S
-@@ -0,0 +1,27 @@
++++ b/include/dt-bindings/clock/mb86s70-clk.h
+@@ -0,0 +1,22 @@
 +/*
-+ * SMC command interface to set secondary entry point
-+ * Copyright: (C) 2013-2014 Fujitsu Semiconductor Limited
-+ * Copyright: (C) 2014 Linaro Ltd.
++ * Copyright (C) 2013-2014 FUJITSU SEMICONDUCTOR LIMITED
++ * Copyright (C) 2014 Linaro Ltd.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, version 2 of the License.
 + */
 +
-+#include <linux/linkage.h>
++#ifndef	__DTS_MB86S70_CLK_H
++#define __DTS_MB86S70_CLK_H
 +
-+.arch_extension sec
++#define MB86S70_CRG11_ALW	0
++#define MB86S70_CRG11_DDR3	1
++#define MB86S70_CRG11_MAIN	2
++#define MB86S70_CRG11_CA15	3
++#define MB86S70_CRG11_HDMI	4
++#define MB86S70_CRG11_DPHY	5
 +
-+/* void mb86s7x_cpu_entry(unsigned long secondary_entry); */
-+ENTRY(mb86s7x_cpu_entry)
-+	stmfd   sp!, {r1-r11, lr}
-+	mov r1, r0
-+	ldr r0, =1
-+	mrc p15, 0, r3, c1, c0, 0
-+	mov r4, r3
-+	and r3, #0xbfffffff
-+	mcr p15, 0, r3, c1, c0, 0
-+	smc #0
-+	mcr p15, 0, r4, c1, c0, 0
-+	ldmfd   sp!, {r1-r11, pc}
-+ENDPROC(mb86s7x_cpu_entry)
++#define MB86S70_CRG11_UNGPRT	8
++
++#endif
 -- 
 1.9.0
