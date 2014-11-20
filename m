@@ -1,43 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Nov 2014 16:48:36 +0000
-Subject: [RFC PATCH] arm: imx: Workaround i.MX6 PMU interrupts muxed to
- one SPI
-In-Reply-To: <546DF9AB.3080300@linaro.org>
-References: <1416483757-24165-1-git-send-email-daniel.thompson@linaro.org>
- <1416484332.2769.1.camel@pengutronix.de>
- <546DF9AB.3080300@linaro.org>
-Message-ID: <20141120164835.GQ4042@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Nov 2014 17:52:47 +0100
+Subject: [PATCH v3 0/2] arm64: Add support for Juno development board
+In-Reply-To: <1415727131-4572-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1415727131-4572-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <201411201752.47955.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 20, 2014 at 02:24:43PM +0000, Daniel Thompson wrote:
-> On 20/11/14 11:52, Lucas Stach wrote:
-> > I've sent almost the same patch a while ago. At this time it was shot
-> > down due to fears of the measurements being too flaky to be useful with
-> > all that IRQ dance. While I don't think this is true (I did some
-> > measurements on a SOLO and a QUAD variants of the i.MX6 with the same
-> > workload, that were only minimally apart), I believe the IRQ affinity
-> > dance isn't the best way to handle this.
+On Tuesday 11 November 2014, Liviu Dudau wrote:
+> Hi,
 > 
-> Cumulative statistics and time based sampling profilers should be fine
-> either way since a delay before the interrupt the asserted on the
-> affected core should have a low impact here.
+> This patchset adds device tree support for ARM's AArch64 Juno development
+> board. It enables use of various peripherals on the board, from USB and
+> networking to I2C and PL011 UART.
+> 
+> The patches can also be found in the repository at:
+> 
+>    git://github.com/ARM-software/linux.git juno/dts-for-armsoc
 
-One thing you're missing is that the interrupt latency for this can be
-horrific.
+Applied both on the arm64 tree, on top of the directory cleanup branch.
 
-Firstly, remember that Linux processes one interrupt (per core) at a time.
-What this means is that if we have two cores running interrupts (eg, CPU 2
-and CPU 3), and we raise a PMU interrupt on CPU 1 which is supposed to be
-for CPU 0, then we'll process the interrupt on CPU 1, and forward it to
-CPU 2.  CPU 2 will then have it pending, but has to wait for the interrupt
-handler to complete before it can service it, where upon it forwards it to
-CPU 3.  CPU 3 then goes through the same before forwarding it to CPU 0.
+Thanks,
 
-I also wonder how this works when you use perf record -a (from all CPUs.)
-If the sampling rate is high enough, will the interrupt be forwarded to
-the other CPUs?  Has perf record -a been tested?
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
