@@ -1,36 +1,32 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Wed, 19 Nov 2014 16:43:46 -0800
-Subject: [PATCHv6 5/5] hwspinlock/omap: add support for dt nodes
-In-Reply-To: <CAK=WgbZE7_WrsNz5E+MDX7j2tAGEjv91zeCgqhB=Jsiu0+d8vw@mail.gmail.com>
-References: <1410553499-55951-1-git-send-email-s-anna@ti.com>
- <1410553499-55951-6-git-send-email-s-anna@ti.com>
- <CAK=WgbZE7_WrsNz5E+MDX7j2tAGEjv91zeCgqhB=Jsiu0+d8vw@mail.gmail.com>
-Message-ID: <CAJAp7OisV3UrL45UgRb0tMudyCJHe-xsmsRYV0uGG3P4PReHnA@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 20 Nov 2014 09:56:55 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for
+ v3.19
+In-Reply-To: <201411192309.48890.arnd@arndb.de>
+References: <cover.1415755881.git.horms+renesas@verge.net.au>
+ <201411192309.48890.arnd@arndb.de>
+Message-ID: <20141120005655.GF5065@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 12, 2014 at 11:14 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> Hi Suman,
-[..]
->
-> Does this mean you allow nodes not to have the base_id property? How
-> do we protect against multiple nodes not having a base_id property
-> then?
->
-> Implicitly assuming a base_id value (zero in this case) may not be always safe.
->
+On Wed, Nov 19, 2014 at 11:09:48PM +0100, Arnd Bergmann wrote:
+> On Thursday 13 November 2014, Simon Horman wrote:
+> > Hi Olof, Hi Kevin, Hi Arnd,
+> > 
+> > Please consider these second round of Renesas ARM based SoC DT updates for
+> > v3.19.
+> > 
+> > This pull request is based on the previous round of
+> > such requests, tagged as renesas-dt-for-v3.19,
+> > which I have already sent a pull-request for.
+> 
+> As discussed, I'm deferring this one and hope we can figure out a better
+> binding for the asoc DMA channels.
 
-Hi Ohad,
+Thanks, I plan to repost this pull-request with
+the patches that are under discussion omitted.
 
-I still have a huge problem understanding the awesomeness with the
-"base_id". If you have a SoC with 2 hwlock blocks; say 8+8 locks, used
-for interaction with e.g. a modem and a video core respectively.
-Why would you in either remote system offset the locks with 8?
-Wouldn't e.g the modem use locks hwlock0:0-7 and video core use locks
-hwlock1:0-7?
+> I think I've addressed all your pull requests, please check that I haven't
+> missed any and they show up in for-next.
 
-What systems use more than one hwlock block and do you know of any
-reasons why these hwlocks are globally numbered?
-
-Regards,
-Bjorn
+Thanks! Will do.
