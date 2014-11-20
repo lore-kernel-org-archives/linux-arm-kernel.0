@@ -1,105 +1,28 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 20 Nov 2014 17:32:00 +0200
-Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
-In-Reply-To: <CAMuHMdWtHT7QX3Kpa-GCLa49ToGODwjnNVgfxDzJzcM-FU1ffg@mail.gmail.com>
-References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>	<1709760.E0jX3Myv0h@wuerfel>	<546C7FDD.7030906@ti.com>	<2900095.WIocOu7ue2@wuerfel>	<CAPDyKFqeZ3YU2OEN4tCOdcQ0pAho67Q8U_eCEOroG9aS0mp+-Q@mail.gmail.com>	<546DD87B.3080806@ti.com>	<CAPDyKFrBhZyqozM98_4pPdW0EMFt5W6VX1X7cz6Z=yNhW4vYTA@mail.gmail.com>
- <CAMuHMdWtHT7QX3Kpa-GCLa49ToGODwjnNVgfxDzJzcM-FU1ffg@mail.gmail.com>
-Message-ID: <546E0970.5090301@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 20 Nov 2014 21:13:00 +0530
+Subject: [GIT PULL] DaVinci updates for v3.19 - edma
+Message-ID: <1416498181-15988-1-git-send-email-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2014 03:32 PM, Geert Uytterhoeven wrote:
-> On Thu, Nov 20, 2014 at 2:12 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>>> According to earlier comments in this thread, device's clocks are
->>>> split into "functional" and "PM" clocks.
->>>>
->>>> If I understand correctly, a typical platform driver will enable it's
->>>> "functional" clocks during ->probe() and you want the PM domain to
->>>> take care of the "PM" clocks, when the device changes runtime PM
->>>> status.
->>>>
->>>> How will you describe these different set of device clocks in DT?
->>>
->>> True :(  You can dig deeper in the history of this series if you wish.
->>> - first Geert Uytterhoeven proposed to use CLK_RUNTIME_PM there
->>>    https://lkml.org/lkml/2014/11/6/319
->>> - second I proposed to introduce smth. like "clkops-clocks", "pm-clocks" there
->>>    https://lkml.org/lkml/2014/6/12/436
->>>   or "fck-clocks"/"opt-clocks" later.
->>>
->>> ^failed.
->>>
->>> So, this implementation picks up all clocks for each device, which is ok for
->>> Keystone 2 and, because it's platform specific.
->>>
->>>>>
->>>>> Yes, it would definitely solve the problem that I see with the infrastructure
->>>>> code that the current version adds into the platform directory.
->>>>>
->>>>> The exact binding of course should be reviewed by the pmdomain and
->>>>> DT maintainers, to ensure that it is done the best possible way, because
->>>>> I assume we will end up using it a lot, and it would be a shame to get
->>>>> it slightly wrong.
->>>>>
->>>>> One possible variation I can think of would be to just use "simple-pmdomain"
->>>>> as the compatible string, and use properties in the node itself to decide
->>>>> what the domain should control, e.g.
->>>>>
->>>>>           clk_pmdomain: pmdomain {
->>>>>                   compatible = "simple-pmdomain";
->>>>>                   pmdomain-enable-clocks;
->>>>>                   #power-domain-cells = <0>;
->>>>>           };
->>>>>           clk_regulator_pmdomain: pmdomain {
->>>>>                   compatible = "simple-pmdomain";
->>>>>                   pmdomain-enable-clocks;
->>>>>                   pmdomain-enable-regulators;
->>>>>                   #power-domain-cells = <0>;
->>>>>           };
->>>>>
->>>>> and then have each device link to one of the nodes as the pmdomain.
->>>>>
->>>>
->>>> That's seems like a good approach to me.
->>>
->>> Yes, but your previous comment is still actual :(
->>
->> Agree!
->>
->> So I really think we need to decide on how to address the split of the
->> device clocks. Before that's done, I don't think it make sense to add
->> a "simple-pmdomain" compatible, since it will likely not be that many
->> SoC that can use it.
->>
->> So, does anyone have a suggestion on how to deal with the split of the
->> device clocks into "functional" clocks and into "PM" clocks?
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-Would it be better to say "functional" and "optional"? In my opinion
-"PM" == "functional". Also, such clock's separation is used in TRM/DM/UMs on HW.
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
 
-> 
-> That's indeed the tricky part.
-> 
-> On shmobile, we just use the "NULL" clock, i.e. the first clock, for historical
-> reasons.
-> 
-> Using clock-names (e.g. "fck" and "pm") will conflict with existing bindings
-> for devices that already mandate specific clock names.
-> 
-> As the clock being a "PM" clock is a property of the clock provider
-> (at last on shmobile), I originally came up with not handling it in DT,
-> but advertising it in the clock provider driver:
-> 
->>> - first Geert Uytterhoeven proposed to use CLK_RUNTIME_PM there
->>>    https://lkml.org/lkml/2014/11/6/319
+are available in the git repository at:
 
-As I mentioned previously I don't like it, because in many cases one driver is used for
-all/set_of clocks which support gating function. As result, some sort of tables will
-need to be created and maintained in code by these drivers per each SoC
-(or even per each SoC revision) for identification that clock is "PM clock".
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.19/edma
 
-Additional points are : both parent and child clock can be gated; one clock
-can be used by two devices and be "functional" and "optional" at once :)
+for you to fetch changes up to a2b1175131ccb5d4a15456f4f31836356abbce09:
 
-regards,
--grygorii
+  ARM: common: edma: add suspend resume hook (2014-11-18 21:26:02 +0530)
+
+----------------------------------------------------------------
+Adds suspend/resume support to EDMA driver.
+
+----------------------------------------------------------------
+Daniel Mack (1):
+      ARM: common: edma: add suspend resume hook
+
+ arch/arm/common/edma.c |   52 ++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 50 insertions(+), 2 deletions(-)
