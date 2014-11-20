@@ -1,119 +1,100 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 20 Nov 2014 14:52:34 +0900
-Subject: [PATCH v8 2/6] arm64: ptrace: allow tracer to skip a system call
-In-Reply-To: <546D7860.2010300@linaro.org>
-References: <1416273038-15590-1-git-send-email-takahiro.akashi@linaro.org>
- <1416273038-15590-3-git-send-email-takahiro.akashi@linaro.org>
- <20141118140425.GM18842@arm.com> <546C58DB.5080204@linaro.org>
- <20141119190601.GM15985@arm.com> <546D7860.2010300@linaro.org>
-Message-ID: <546D81A2.4040405@linaro.org>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Thu, 20 Nov 2014 11:29:01 +0530
+Subject: [PATCH v2 0/6] exynos: Move pmu driver to driver/soc folder and
+ add exynos7 support
+In-Reply-To: <546C4EFD.5030604@samsung.com>
+References: <1415452601-13078-1-git-send-email-amit.daniel@samsung.com>
+ <CADGdYn46=X1FS7TWp=qCDsm3J9Xg=pEZb945X8tfwc0k6thfvQ@mail.gmail.com>
+ <546C4EFD.5030604@samsung.com>
+Message-ID: <CADGdYn5pMaiPi7rwd8006fc9sKhn56d9r8hzLwkLAjMhGBPxZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2014 02:13 PM, AKASHI Takahiro wrote:
-> On 11/20/2014 04:06 AM, Will Deacon wrote:
->> On Wed, Nov 19, 2014 at 08:46:19AM +0000, AKASHI Takahiro wrote:
->>> On 11/18/2014 11:04 PM, Will Deacon wrote:
->>>> On Tue, Nov 18, 2014 at 01:10:34AM +0000, AKASHI Takahiro wrote:
->>>>>
->>>>> +    if (((int)regs->syscallno == -1) && (orig_syscallno == -1)) {
->>>>> +        /*
->>>>> +         * user-issued syscall(-1):
->>>>> +         * RESTRICTION: We always return ENOSYS whatever value is
->>>>> +         *   stored in x0 (a return value) at this point.
->>>>> +         * Normally, with ptrace off, syscall(-1) returns -ENOSYS.
->>>>> +         * With ptrace on, however, if a tracer didn't pay any
->>>>> +         * attention to user-issued syscall(-1) and just let it go
->>>>> +         * without a hack here, it would return a value in x0 as in
->>>>> +         * other system call cases. This means that this system call
->>>>> +         * might succeed and see any bogus return value.
->>>>> +         * This should be definitely avoided.
->>>>> +         */
->>>>> +        regs->regs[0] = -ENOSYS;
->>>>> +    }
->>>>
->>>> I'm still really uncomfortable with this, and it doesn't seem to match what
->>>> arch/arm/ does either.
+On Wed, Nov 19, 2014 at 1:34 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On 11/13/14 17:56, amit daniel kachhap wrote:
+>> On Sat, Nov 8, 2014 at 6:46 PM, Amit Daniel Kachhap
+>> <amit.daniel@samsung.com> wrote:
+>>> This patch series[1 - 6] performs,
 >>>
->>> Yeah, I know but
->>> as I mentioned before, syscall(-1) will be signaled on arm, and so we don't
->>> have to care about a return value :)
->>
->> What does x86 do?
->
-> On x86, syscall(-1) returns -ENOSYS if not traced, and we can change a return
-> value if traced.
->
->>>> Doesn't it also prevent a tracer from skipping syscall(-1)?
+>>> 1) Moves pmu driver to driver/soc/samsung folder. Some discussion happened about
+>>>    this in the v1 version. Finally adding it in driver/soc folder as it too SoC
+>>>    specific and not a general driver. Entire discussion can be found here (A).
+>>> 2) Registers this driver as MFD client driver. This will be used by clients like exynos pm
+>>>    sleep and pm domain driver.
+>>> 3) Add exynos7 PMU support.
 >>>
->>> Syscall(-1) will return -ENOSYS whether or not a syscallno is explicitly
->>> replaced with -1 by a tracer, and, in this sense, it is *skipped*.
+>>> Changes from V1:
+>>> * Move pmu driver in driver/soc/samsung folder
+>>> * Removed the power domain features. They will posted as a separate series.
+>>> * Added exynos7 PMU support.
+>>> * Link to v1 can be found here (B)
+>>>
+>>> This patch has dependency on following patches posted earlier by Pankaj (C),
+>>> which is accepted by maintainer.
+>>>
+>>> Patch 6 was earlier posted by Abhilash (D) which has been reposted here with some
+>>> extra changes.
+>>>
+>>> This complete patch series is rebased on linux-next.
+>>>
+>>> (A) - http://www.spinics.net/lists/linux-samsung-soc/msg38444.html
+>>> (B) - http://www.spinics.net/lists/linux-samsung-soc/msg38442.html
+>>> (C) - https://lkml.org/lkml/2014/10/6/581
+>>> (D) - http://www.spinics.net/lists/arm-kernel/msg358230.html
+>>>
+>>> Amit Daniel Kachhap (6):
+>>>   ARM: EXYNOS: Move pmu specific header files under "linux/soc/samsung"
+>>>   drivers: soc: Add support for Exynos PMU driver
+>>>   drivers: soc: samsung: Fix a spelling mistake
+>>>   soc: samsung: exynos-pmu: Register exynos-pmu driver as a mfd driver
+>>>   driver: soc: exynos-pmu: Add an API to be called after wakeup
+>>>   drivers: soc: samsung: Add support for Exynos7 pmu
+>>>
+>>>  .../devicetree/bindings/arm/samsung/pmu.txt        |    1 +
+>>>  arch/arm/mach-exynos/Makefile                      |    2 +-
+>>>  arch/arm/mach-exynos/exynos.c                      |    2 +-
+>>>  arch/arm/mach-exynos/mcpm-exynos.c                 |    2 +-
+>>>  arch/arm/mach-exynos/platsmp.c                     |    2 +-
+>>>  arch/arm/mach-exynos/pm.c                          |    4 +-
+>>>  arch/arm/mach-exynos/regs-pmu.h                    |  335 -----------
+>>>  arch/arm/mach-exynos/suspend.c                     |    3 +-
+>>>  drivers/soc/Kconfig                                |    1 +
+>>>  drivers/soc/Makefile                               |    1 +
+>>>  drivers/soc/samsung/Kconfig                        |   19 +
+>>>  drivers/soc/samsung/Makefile                       |    1 +
+>>>  .../pmu.c => drivers/soc/samsung/exynos-pmu.c      |  471 ++++++++++++++-
 >>
->> Ok, but now userspace sees -ENOSYS for a skipped system call in that case,
->> whereas it would usually see whatever the trace put in x0, right?
->
-> Yes.
-> If you don't really like this behavior, how about this patch instead of my [2/6] patch?
->
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 726b910..1ef57d0 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -668,8 +668,15 @@ ENDPROC(el0_svc)
->           * switches, and waiting for our parent to respond.
->           */
->   __sys_trace:
-> +       cmp     w8, #-1                         // default errno for invalid
-
-I needed to correct the code here:
-w8 should be w26, thinking of compat syscalls.
-
-> +       b.ne    1f                              // system call
-> +       mov     x0, #-ENOSYS
-> +       str     x0, [sp, #S_X0]
-> +1:
-
-and this part might better be generalized like the following:
-
-__sys_trace:
-	cmp	w26, w25	// cannot use x26 and x25 here
-	b.hs	1f		// scno > sc_nr || scno < 0
-	b	2f
-1:
-	mov	x0, #-ENOSYS
-	str	x0, [sp, #S_X0]
-2:
-
-If you will be comfortable, I will submit a new patch soon.
-
--Takahiro AKASHI
-
-
->          mov     x0, sp
->          bl      syscall_trace_enter
-> +       cmp     w0, #-1                         // skip the syscall?
-> +       b.eq    __sys_trace_return_skipped
->          adr     lr, __sys_trace_return          // return address
->          uxtw    scno, w0                        // syscall number (possibly new)
->          mov     x1, sp                          // pointer to regs
-> @@ -684,6 +691,7 @@ __sys_trace:
->
->   __sys_trace_return:
->          str     x0, [sp]                        // save returned x0
-> +__sys_trace_return_skipped:
->          mov     x0, sp
->          bl      syscall_trace_exit
->          b       ret_to_user
->
-> With this change, I believe, syscall(-1) returns -ENOSYS by default whether traced
-> or not, and still you can change a return value when tracing.
-> (But a drawback here is that a tracer will see -ENOSYS in x0 even at syscall entry
-> for syscall(-1).)
->
->
-> -Takahiro AKASHI
->
->
->
->> Will
+>> Hi Olof/Kukjin,
 >>
+>> I am not sure that driver/soc/samsung/* shall go in whose tree.
+>> I am preparing the next version so if any comment from your side
+>> please let me know.
+>>
+> In my opinion, it should be sent out via samsung tree because some PM
+> related changes are in samsung tree and I'd like to apply exynos7 stuff
+> in samsung tree as well... Please make sure your patches are based on
+> top of samsung tree.
+Thanks for clarification, Just posted the v3 version on top Samsung
+for-next tree.
+
+Regards,
+Amit
+>
+> - Kukjin
+>
+>> Regards,
+>> Amit
+>>
+>>>  .../linux/soc/samsung}/exynos-pmu.h                |    6 +
+>>>  include/linux/soc/samsung/exynos-regs-pmu.h        |  608 ++++++++++++++++++++
+>>>  15 files changed, 1109 insertions(+), 349 deletions(-)
+>>>  delete mode 100644 arch/arm/mach-exynos/regs-pmu.h
+>>>  create mode 100644 drivers/soc/samsung/Kconfig
+>>>  create mode 100644 drivers/soc/samsung/Makefile
+>>>  rename arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c (50%)
+>>>  rename {arch/arm/mach-exynos => include/linux/soc/samsung}/exynos-pmu.h (78%)
+>>>  create mode 100644 include/linux/soc/samsung/exynos-regs-pmu.h
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
