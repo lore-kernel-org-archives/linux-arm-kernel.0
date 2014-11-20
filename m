@@ -1,32 +1,107 @@
-From: Varun.Sethi@freescale.com (Varun Sethi)
-Date: Thu, 20 Nov 2014 13:05:51 +0000
-Subject: 48-bit VA support in the SMMU
-In-Reply-To: <20141120100822.GA19126@arm.com>
-References: <deb48cfb93d94515b6531be02f697e04@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <decb25f05ca84d439e071f6ad8cf0086@BN3PR0301MB1219.namprd03.prod.outlook.com>
- <20141120100822.GA19126@arm.com>
-Message-ID: <7a9f17b997db458b9f15893837df04eb@BN3PR0301MB1219.namprd03.prod.outlook.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 20 Nov 2014 14:12:41 +0100
+Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
+In-Reply-To: <546DD87B.3080806@ti.com>
+References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
+ <1709760.E0jX3Myv0h@wuerfel> <546C7FDD.7030906@ti.com>
+ <2900095.WIocOu7ue2@wuerfel>
+ <CAPDyKFqeZ3YU2OEN4tCOdcQ0pAho67Q8U_eCEOroG9aS0mp+-Q@mail.gmail.com>
+ <546DD87B.3080806@ti.com>
+Message-ID: <CAPDyKFrBhZyqozM98_4pPdW0EMFt5W6VX1X7cz6Z=yNhW4vYTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Will. But still, if things work for the stage 1 case why disable 48 bit support for the SMMU driver. Wouldn't stage-2 be relevant in case of virtual SMMU?
+On 20 November 2014 13:03, Grygorii Strashko <grygorii.strashko@ti.com> wrote:
+> On 11/20/2014 01:34 PM, Ulf Hansson wrote:
+>> On 19 November 2014 14:47, Arnd Bergmann <arnd@arndb.de> wrote:
+>>> On Wednesday 19 November 2014 13:32:45 Grygorii Strashko wrote:
+>>>> On 11/18/2014 09:32 PM, Arnd Bergmann wrote:
+>>>>> On Tuesday 18 November 2014 20:54:36 Grygorii Strashko wrote:
+>>>>>
+>>>>> Have one pmdomain driver in the generic code that knows about clocks,
+>>>>> possibly also regulators and pins and just turns them on when needed.
+>>>>> You can have a "simple-pmdomain" or "generic-pmdomain" compatible
+>>>>> string.
+>>>>>
+>>>>> I'm a bit surprised that your pmdomain code looks up the clocks from the
+>>>>> respective device, rather than know about the clocks itself. There is
+>>>>> probably a good reason for this, but I don't see it yet.
+>>>>
+>>>> The keystone 2 uses simple PM schema based on clocks only:
+>>>> - clocks enabled -> dev is active
+>>>> - clocks disabled -> dev is suspended
+>>>>
+>>>> To achieve explained above the Generic clock manipulation PM callbacks framework (pm_clk) is used.
+>>>> - list of managed clocks is filled for each device (for non-DT case the con_id list
+>>>>    is specified by platform code like:
+>>>>        .con_ids = { "fck", "master", "slave", NULL },
+>>>>          - or -
+>>>>        .con_ids = { }, <-- in this case only first clock will be added to pm_clk
+>>>>    )
+>>
+>> According to earlier comments in this thread, device's clocks are
+>> split into "functional" and "PM" clocks.
+>>
+>> If I understand correctly, a typical platform driver will enable it's
+>> "functional" clocks during ->probe() and you want the PM domain to
+>> take care of the "PM" clocks, when the device changes runtime PM
+>> status.
+>>
+>> How will you describe these different set of device clocks in DT?
+>
+> True :(  You can dig deeper in the history of this series if you wish.
+> - first Geert Uytterhoeven proposed to use CLK_RUNTIME_PM there
+>   https://lkml.org/lkml/2014/11/6/319
+> - second I proposed to introduce smth. like "clkops-clocks", "pm-clocks" there
+>   https://lkml.org/lkml/2014/6/12/436
+>  or "fck-clocks"/"opt-clocks" later.
+>
+> ^failed.
+>
+> So, this implementation picks up all clocks for each device, which is ok for
+> Keystone 2 and, because it's platform specific.
+>
+>>>
+>>> Yes, it would definitely solve the problem that I see with the infrastructure
+>>> code that the current version adds into the platform directory.
+>>>
+>>> The exact binding of course should be reviewed by the pmdomain and
+>>> DT maintainers, to ensure that it is done the best possible way, because
+>>> I assume we will end up using it a lot, and it would be a shame to get
+>>> it slightly wrong.
+>>>
+>>> One possible variation I can think of would be to just use "simple-pmdomain"
+>>> as the compatible string, and use properties in the node itself to decide
+>>> what the domain should control, e.g.
+>>>
+>>>          clk_pmdomain: pmdomain {
+>>>                  compatible = "simple-pmdomain";
+>>>                  pmdomain-enable-clocks;
+>>>                  #power-domain-cells = <0>;
+>>>          };
+>>>          clk_regulator_pmdomain: pmdomain {
+>>>                  compatible = "simple-pmdomain";
+>>>                  pmdomain-enable-clocks;
+>>>                  pmdomain-enable-regulators;
+>>>                  #power-domain-cells = <0>;
+>>>          };
+>>>
+>>> and then have each device link to one of the nodes as the pmdomain.
+>>>
+>>
+>> That's seems like a good approach to me.
+>
+> Yes, but your previous comment is still actual :(
 
-Regards
-Varun
+Agree!
 
------Original Message-----
-From: Will Deacon [mailto:will.deacon at arm.com] 
-Sent: Thursday, November 20, 2014 3:38 PM
-To: Sethi Varun-B16395
-Cc: Yoder Stuart-B08248; linux-arm-kernel at lists.infradead.org; Christoffer Dall
-Subject: Re: 48-bit VA support in the SMMU
+So I really think we need to decide on how to address the split of the
+device clocks. Before that's done, I don't think it make sense to add
+a "simple-pmdomain" compatible, since it will likely not be that many
+SoC that can use it.
 
-On Thu, Nov 20, 2014 at 01:25:18AM +0000, Varun Sethi wrote:
-> What specific tweaks are required in the arm-smmu driver? I thought 
-> that the upstream arm-smmu (3.18-rc3) driver does support 48 bit input 
-> address (depended on the ARM64 kernel 48 bit support). Isn't this 
-> dependent on the VA_BITS?
+So, does anyone have a suggestion on how to deal with the split of the
+device clocks into "functional" clocks and into "PM" clocks?
 
-Yeah, but it won't work for stage-2 mappings. I'm currently rewriting the page table code to allow this (see my iommu/pgtbl branch).
-
-Will
+Kind regards
+Uffe
