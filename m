@@ -1,33 +1,50 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 20 Nov 2014 19:32:02 -0200
-Subject: [PATCH RFC 3/3] ARM: dts: enable power subsystem for i.MX28
-In-Reply-To: <1416514477-19190-4-git-send-email-stefan.wahren@i2se.com>
-References: <1416514477-19190-1-git-send-email-stefan.wahren@i2se.com>
- <1416514477-19190-4-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <CAOMZO5AWOs8ODsru+ySsLb=R4ezDL19nK_z0zAXdbrDfPT8KhA@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 20 Nov 2014 22:36:57 +0100
+Subject: [RFC PATCH] clk: mvebu: armada-xp: Support for MSYS SoC
+In-Reply-To: <546E5938.7060501@alliedtelesis.co.nz>
+References: <1416459679-30944-1-git-send-email-chris.packham@alliedtelesis.co.nz>
+ <20141120051722.GC2596@lunn.ch>
+ <546E5938.7060501@alliedtelesis.co.nz>
+Message-ID: <20141120213657.GO31782@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+> msys is the name Marvell use for the embedded dual core CPU across 
+> several product lines. I believe the CPU core is the same on all of 
+> them. It's also the name used in the LSP Marvell provide. This was the 
+> main reason I went with "msys" despite the possible confusion with 
+> MSYS/MINGW.
+> 
+> > We need to be careful here,
+> > because there could be other packet processors with embedded Armada-XP
+> > cores with different tclk speeds. Rather than using msys, it might be
+> > better to use the specific packet processor product ID.
+> 
+> The specific chip I'm working with is the 98DX4251 but there are at 
+> least 4 variants in that product line. I could probably go with 98DX42xx 
+> to cover all those variants but there is a whole other product line 
+> (sorry don't know the model numbers) with the same embedded core.
 
-On Thu, Nov 20, 2014 at 6:14 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> This patch enables the power subsystem for all i.MX28 boards.
->
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> ---
->  arch/arm/boot/dts/imx28.dtsi |    6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 47f68ac..5c163a5 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -1022,8 +1022,12 @@
->                         };
->
->                         power: power at 80044000 {
-> +                               compatible = "fsl,imx28-power";
+In the DT world, you generally base the compatibility string on the
+first device which gets added. So i would go with 98DX4251. The other
+products in the family just need to say they are compatible with the
+98DX4251.
 
-Should we have 'fsl,imx23-power' and 'fsl,imx28-power' as compatible strings?
+> On a side note would people prefer I send my entire work in progress 
+> get-linux-working-on-this-board series or drip feed individual patches 
+> as I have been doing?
 
-Or  ''fsl,mxs-power' could be used for both?
+Release early, release often. It makes no sense to spend a lot of time
+on polishing something, if we are going to rip it to shreds and tell
+you to do it another way. Post something when it works, so that we can
+review it and let you know if you are going in the right direction.
+
+There is an interesting presentation by Thomas from ELC 2014
+
+http://free-electrons.com/pub/conferences/2014/elc/petazzoni-soc-mainlining-lessons-learned/petazzoni-soc-mainlining-lessons-learned.pdf
+
+See Lesson #0.
+
+I also like Lesson #13 :-)
+
+    Andrew
