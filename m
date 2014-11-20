@@ -1,285 +1,62 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 20 Nov 2014 14:14:28 -0500 (EST)
-Subject: [PoC PATCH] arm: allow modules outside of bl range
-In-Reply-To: <1416503299-17418-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1416503299-17418-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <alpine.LFD.2.11.1411201359310.11690@knanqh.ubzr>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 20 Nov 2014 19:17:38 +0000
+Subject: [PATCH v8 2/6] arm64: ptrace: allow tracer to skip a system call
+In-Reply-To: <546D7860.2010300@linaro.org>
+References: <1416273038-15590-1-git-send-email-takahiro.akashi@linaro.org>
+ <1416273038-15590-3-git-send-email-takahiro.akashi@linaro.org>
+ <20141118140425.GM18842@arm.com> <546C58DB.5080204@linaro.org>
+ <20141119190601.GM15985@arm.com> <546D7860.2010300@linaro.org>
+Message-ID: <20141120191738.GV19126@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Nov 2014, Ard Biesheuvel wrote:
+On Thu, Nov 20, 2014 at 05:13:04AM +0000, AKASHI Takahiro wrote:
+> On 11/20/2014 04:06 AM, Will Deacon wrote:
+> > On Wed, Nov 19, 2014 at 08:46:19AM +0000, AKASHI Takahiro wrote:
+> >> Syscall(-1) will return -ENOSYS whether or not a syscallno is explicitly
+> >> replaced with -1 by a tracer, and, in this sense, it is *skipped*.
+> >
+> > Ok, but now userspace sees -ENOSYS for a skipped system call in that case,
+> > whereas it would usually see whatever the trace put in x0, right?
+> 
+> If you don't really like this behavior, how about this patch instead of my [2/6] patch?
+> 
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 726b910..1ef57d0 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -668,8 +668,15 @@ ENDPROC(el0_svc)
+>           * switches, and waiting for our parent to respond.
+>           */
+>   __sys_trace:
+> +       cmp     w8, #-1                         // default errno for invalid
+> +       b.ne    1f                              // system call
+> +       mov     x0, #-ENOSYS
+> +       str     x0, [sp, #S_X0]
+> +1:
+>          mov     x0, sp
+>          bl      syscall_trace_enter
+> +       cmp     w0, #-1                         // skip the syscall?
+> +       b.eq    __sys_trace_return_skipped
+>          adr     lr, __sys_trace_return          // return address
+>          uxtw    scno, w0                        // syscall number (possibly new)
+>          mov     x1, sp                          // pointer to regs
+> @@ -684,6 +691,7 @@ __sys_trace:
+> 
+>   __sys_trace_return:
+>          str     x0, [sp]                        // save returned x0
+> +__sys_trace_return_skipped:
+>          mov     x0, sp
+>          bl      syscall_trace_exit
+>          b       ret_to_user
+> 
+> With this change, I believe, syscall(-1) returns -ENOSYS by default whether traced
+> or not, and still you can change a return value when tracing.
+> (But a drawback here is that a tracer will see -ENOSYS in x0 even at syscall entry
+> for syscall(-1).)
 
-> Loading modules far away from the kernel in memory is problematic because
-> the 'bl' instruction only has limited reach, and modules are not built
-> with PLTs. Instead of using the -mlong-calls option (which affects *all*
-> emitted bl instructions), this patch allocates some additional space at
-> module load time, and populates it with PLT like entries when encountering
-> relocations that are out of reach.
-> 
-> Note that this patch is a proof of concept, and thus removes the implementation
-> of module_alloc() so that all modules are relocated using PLT entries.
-> Ideally, we would switch into PLT mode and start using the vmalloc area only
-> after we have exhausted the ordinary module space.
-> 
-> This should work with all relocation against symbols exported by the kernel,
-> including those resulting from GCC generated function calls for ftrace etc.
-> 
-> This is largely based on the ia64 implementation.
-> Thumb-2 kernels currently unsupported.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+But it's exactly these drawbacks that I'm objected to. syscall(-1) shouldn't
+be treated any differently to syscall(42) with respect to restarting,
+exactly like x86.
 
-Looks on the right track to me.
-
-BTW it might be necessary to use PLT mode even from the primary module 
-area if e.g. the kernel gets too big to be reachable (we've seen that 
-already), or a module from the primary area wants to branch to a symbol 
-located in a larger module that ended up in the vmalloc area.  So you 
-might need to estimate the worst case for the number of PLTs and end up 
-not using all of them or even none at all. Would be good to free the 
-unused pages in that case (only for the non init section obviously). 
-Looks like the module_finalize() hook might be used for that.
-
-
->  arch/arm/Makefile             |   1 +
->  arch/arm/include/asm/module.h |   2 +
->  arch/arm/kernel/module.c      | 172 ++++++++++++++++++++++++++++++++++++++++--
->  arch/arm/kernel/module.lds    |   4 +
->  4 files changed, 173 insertions(+), 6 deletions(-)
->  create mode 100644 arch/arm/kernel/module.lds
-> 
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 034a94904d69..dfb7ef1f2cc5 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -12,6 +12,7 @@
->  
->  # Ensure linker flags are correct
->  LDFLAGS		:=
-> +LDFLAGS_MODULE	+= -T $(srctree)/arch/arm/kernel/module.lds
->  
->  LDFLAGS_vmlinux	:=-p --no-undefined -X
->  ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
-> diff --git a/arch/arm/include/asm/module.h b/arch/arm/include/asm/module.h
-> index ed690c49ef93..4c6927976469 100644
-> --- a/arch/arm/include/asm/module.h
-> +++ b/arch/arm/include/asm/module.h
-> @@ -19,6 +19,8 @@ enum {
->  
->  struct mod_arch_specific {
->  	struct unwind_table *unwind[ARM_SEC_MAX];
-> +	struct elf32_shdr   *core_plt;
-> +	struct elf32_shdr   *init_plt;
->  };
->  #endif
->  
-> diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-> index 6a4dffefd357..5ec70c15a881 100644
-> --- a/arch/arm/kernel/module.c
-> +++ b/arch/arm/kernel/module.c
-> @@ -37,14 +37,62 @@
->  #define MODULES_VADDR	(((unsigned long)_etext + ~PMD_MASK) & PMD_MASK)
->  #endif
->  
-> -#ifdef CONFIG_MMU
-> -void *module_alloc(unsigned long size)
-> +#define PLT_ENTRY_STRIDE	L1_CACHE_BYTES
-> +#define PLT_ENTRY_COUNT		(PLT_ENTRY_STRIDE / sizeof(u32))
-> +#define PLT_ENTRY_SIZE		(sizeof(struct plt_entries) / PLT_ENTRY_COUNT)
-> +#define PLT_ENTRY_LDR		__opcode_to_mem_arm(0xe59ff000 | (PLT_ENTRY_STRIDE - 8))
-> +
-> +struct plt_entries {
-> +	u32	ldr[PLT_ENTRY_COUNT];
-> +	u32	lit[PLT_ENTRY_COUNT];
-> +};
-> +
-> +static inline int in_init (const struct module *mod, u32 addr)
->  {
-> -	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
-> -				GFP_KERNEL, PAGE_KERNEL_EXEC, NUMA_NO_NODE,
-> -				__builtin_return_address(0));
-> +	return addr - (u32)mod->module_init < mod->init_size;
-> +}
-> +
-> +static inline int in_core (const struct module *mod, u32 addr)
-> +{
-> +	return addr - (u32)mod->module_core < mod->core_size;
-> +}
-> +
-> +static u32 get_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
-> +{
-> +	struct plt_entries *plt, *plt_end;
-> +
-> +	if (in_init(mod, loc)) {
-> +		plt = (void *)mod->arch.init_plt->sh_addr;
-> +		plt_end = (void *)plt + mod->arch.init_plt->sh_size;
-> +	} else {
-> +		plt = (void *)mod->arch.core_plt->sh_addr;
-> +		plt_end = (void *)plt + mod->arch.core_plt->sh_size;
-> +	}
-> +
-> +	/* Look for an existing entry pointing to 'val' */
-> +	while (plt < plt_end) {
-> +		int i;
-> +
-> +		if (*plt->ldr != PLT_ENTRY_LDR) {
-> +			/* Populate a new set of entries */
-> +			*plt = (struct plt_entries){
-> +				{ [0 ... PLT_ENTRY_COUNT-1] = PLT_ENTRY_LDR, },
-> +				{ val, }
-> +			};
-> +			return (u32)plt->ldr;
-> +		}
-> +		for (i = 0; i < PLT_ENTRY_COUNT; i++) {
-> +			if (!plt->lit[i])
-> +				plt->lit[i] = val;
-> +			else if (plt->lit[i] != val)
-> +				continue;
-> +			return (u32)&plt->ldr[i];
-> +		}
-> +		plt++;
-> +	}
-> +	BUG();
-> +	return 0;
->  }
-> -#endif
->  
->  int
->  apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
-> @@ -107,6 +155,22 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
->  			if (offset & 3 ||
->  			    offset <= (s32)0xfe000000 ||
->  			    offset >= (s32)0x02000000) {
-> +
-> +				/*
-> +				 * Route this call through a PLT entry that we
-> +				 * populate on the fly in the PLT section that
-> +				 * is part of the module memory area.
-> +				 * Note that 'offset + loc + 8' contains the
-> +				 * absolute jump target, i.e., @sym + addend,
-> +				 * corrected for the -8 PC bias.
-> +				 */
-> +				offset = get_plt(module, loc, offset + loc + 8)
-> +					 - loc - 8;
-> +			}
-> +
-> +			if (offset & 3 ||
-> +			    offset <= (s32)0xfe000000 ||
-> +			    offset >= (s32)0x02000000) {
->  				pr_err("%s: section %u reloc %u sym '%s': relocation %u out of range (%#lx -> %#x)\n",
->  				       module->name, relindex, i, symname,
->  				       ELF32_R_TYPE(rel->r_info), loc,
-> @@ -354,3 +418,99 @@ module_arch_cleanup(struct module *mod)
->  			unwind_table_del(mod->arch.unwind[i]);
->  #endif
->  }
-> +
-> +static int duplicate_reloc(Elf32_Addr base, const Elf32_Rel *rel, int num,
-> +			   u32 mask)
-> +{
-> +	u32 *loc1, *loc2;
-> +	int i;
-> +
-> +	for (i = 0; i < num; i++) {
-> +		if (rel[i].r_info != rel[num].r_info)
-> +			continue;
-> +
-> +		/*
-> +		 * Identical relocation types against identical symbols can
-> +		 * still result in different PLT entries if the addend in the
-> +		 * place is different. So resolve the target of the relocation
-> +		 * to compare the values.
-> +		 */
-> +		loc1 = (u32 *)(base + rel[i].r_offset);
-> +		loc2 = (u32 *)(base + rel[num].r_offset);
-> +		if (((*loc1 ^ *loc2) & mask) == 0)
-> +			return 1;
-> +	}
-> +	return 0;
-> +}
-> +
-> +/* Count how many PLT entries we may need */
-> +static unsigned int count_plts(Elf32_Addr base, const Elf32_Rel *rel, int num)
-> +{
-> +	unsigned int ret = 0;
-> +	int i;
-> +
-> +	/*
-> +	 * Sure, this is order(n^2), but it's usually short, and not
-> +	 * time critical
-> +	 */
-> +	for (i = 0; i < num; i++)
-> +		switch (ELF32_R_TYPE(rel[i].r_info))
-> +		case R_ARM_CALL:
-> +		case R_ARM_PC24:
-> +		case R_ARM_JUMP24:
-> +		case R_ARM_THM_CALL:
-> +		case R_ARM_THM_JUMP24:
-> +			if (!duplicate_reloc(base, rel, i, 0x00ffffff))
-> +				ret++;
-> +	return ret;
-> +}
-> +
-> +int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
-> +			      char *secstrings, struct module *mod)
-> +{
-> +	unsigned long core_plts = 0, init_plts = 0;
-> +	Elf32_Shdr *s, *sechdrs_end = sechdrs + ehdr->e_shnum;
-> +
-> +	/*
-> +	 * To store the PLTs, we expand the .text section for core module code
-> +	 * and the .init.text section for initialization code.
-> +	 */
-> +	for (s = sechdrs; s < sechdrs_end; ++s)
-> +		if (strcmp(".core.plt", secstrings + s->sh_name) == 0)
-> +			mod->arch.core_plt = s;
-> +		else if (strcmp(".init.plt", secstrings + s->sh_name) == 0)
-> +			mod->arch.init_plt = s;
-> +
-> +	if (!mod->arch.core_plt || !mod->arch.init_plt) {
-> +		printk(KERN_ERR "%s: sections missing\n", mod->name);
-> +		return -ENOEXEC;
-> +	}
-> +
-> +	for (s = sechdrs + 1; s < sechdrs_end; ++s) {
-> +		const Elf32_Rel *rels = (void *)ehdr + s->sh_offset;
-> +		int numrels = s->sh_size / sizeof(Elf32_Rel);
-> +		Elf32_Shdr *dstsec = sechdrs + s->sh_info;
-> +
-> +		if (s->sh_type != SHT_REL)
-> +			continue;
-> +
-> +		if (strstr(secstrings + s->sh_name, ".init"))
-> +			init_plts += count_plts(dstsec->sh_addr, rels, numrels);
-> +		else
-> +			core_plts += count_plts(dstsec->sh_addr, rels, numrels);
-> +	}
-> +
-> +	mod->arch.core_plt->sh_type = SHT_NOBITS;
-> +	mod->arch.core_plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-> +	mod->arch.core_plt->sh_addralign = L1_CACHE_BYTES;
-> +	mod->arch.core_plt->sh_size = round_up(core_plts * PLT_ENTRY_SIZE,
-> +					       sizeof(struct plt_entries));
-> +	mod->arch.init_plt->sh_type = SHT_NOBITS;
-> +	mod->arch.init_plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-> +	mod->arch.init_plt->sh_addralign = L1_CACHE_BYTES;
-> +	mod->arch.init_plt->sh_size = round_up(init_plts * PLT_ENTRY_SIZE,
-> +					       sizeof(struct plt_entries));
-> +	pr_debug("%s: core.plt=%x, init.plt=%x\n", __func__,
-> +		 mod->arch.core_plt->sh_size, mod->arch.init_plt->sh_size);
-> +	return 0;
-> +}
-> diff --git a/arch/arm/kernel/module.lds b/arch/arm/kernel/module.lds
-> new file mode 100644
-> index 000000000000..3682fa107918
-> --- /dev/null
-> +++ b/arch/arm/kernel/module.lds
-> @@ -0,0 +1,4 @@
-> +SECTIONS {
-> +        .core.plt : { BYTE(0) }
-> +        .init.plt : { BYTE(0) }
-> +}
-> -- 
-> 1.8.3.2
-> 
-> 
+Will
