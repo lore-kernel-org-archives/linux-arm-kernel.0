@@ -1,37 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Nov 2014 13:14:48 +0100
-Subject: [GIT PULL 2/3] ARM: keystone: config updates for 3.19
-In-Reply-To: <1415843982-5739-2-git-send-email-ssantosh@kernel.org>
-References: <1415843982-5739-1-git-send-email-ssantosh@kernel.org>
- <1415843982-5739-2-git-send-email-ssantosh@kernel.org>
-Message-ID: <201411201314.49184.arnd@arndb.de>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Thu, 20 Nov 2014 21:14:56 +0900
+Subject: [PATCH v2 1/3] ARM: kprobes: introduces checker
+In-Reply-To: <1416291582-74982-2-git-send-email-wangnan0@huawei.com>
+References: <1416291582-74982-1-git-send-email-wangnan0@huawei.com>
+ <1416291582-74982-2-git-send-email-wangnan0@huawei.com>
+Message-ID: <546DDB40.6040604@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 November 2014, Santosh Shilimkar wrote:
-> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-> 
->   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-soc
-> 
-> for you to fetch changes up to 97ef1af9b275924406556bfaec528a3e9e2980c7:
-> 
->   ARM: keystone: defconfig: add options to enable PCI controller (2014-11-04 10:29:39 -0800)
-> 
-> ----------------------------------------------------------------
-> Keystone config updates for 3.19
-> 
->         - Enable PCIE controller and related options
->         - Enable MDIO and ethernet phy options
->         - Enable DSP IRQCHIP option
+(2014/11/18 15:19), Wang Nan wrote:
+> diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
+> index 6d64420..f114a3f 100644
+> --- a/arch/arm/kernel/kprobes.c
+> +++ b/arch/arm/kernel/kprobes.c
+> @@ -61,6 +61,7 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+>  	kprobe_decode_insn_t *decode_insn;
+>  	const union decode_action *actions;
+>  	int is;
+> +	const struct decode_checker **checkers;
+>  
+>  	if (in_exception_text(addr))
+>  		return -EINVAL;
+> @@ -74,9 +75,11 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+>  		insn = __opcode_thumb32_compose(insn, inst2);
+>  		decode_insn = thumb32_probes_decode_insn;
+>  		actions = kprobes_t32_actions;
+> +		checkers = kprobes_t32_checkers;
+>  	} else {
+>  		decode_insn = thumb16_probes_decode_insn;
+>  		actions = kprobes_t16_actions;
+> +		checkers = kprobes_t16_checkers;
+>  	}
+>  #else /* !CONFIG_THUMB2_KERNEL */
+>  	thumb = false;
+> @@ -85,12 +88,13 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+>  	insn = __mem_to_opcode_arm(*p->addr);
+>  	decode_insn = arm_probes_decode_insn;
+>  	actions = kprobes_arm_actions;
+> +	checkers = kprobes_arm_checkers;
+>  #endif
+>  
+>  	p->opcode = insn;
+>  	p->ainsn.insn = tmp_insn;
+>  
+> -	switch ((*decode_insn)(insn, &p->ainsn, true, actions)) {
+> +	switch ((*decode_insn)(insn, &p->ainsn, true, actions, NULL)) {
 
-Pulled into next/defconfig.
+BTW, even if checkers always empty at this point, we should pass the checkers to this function.
 
-Can you send an update so we also enable all of this in multi_v7_defconfig?
+Thank you,
 
-Thanks,
 
-	Arnd
+-- 
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
