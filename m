@@ -1,59 +1,167 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 20 Nov 2014 17:21:23 +0800
-Subject: For the problem when using swiotlb
-In-Reply-To: <2121725.INdNoXW7GO@wuerfel>
-References: <5469E26B.2010905@huawei.com> <2522857.bNQToYpBNt@wuerfel>
- <546DA795.9080209@huawei.com> <2121725.INdNoXW7GO@wuerfel>
-Message-ID: <546DB293.1040500@huawei.com>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Thu, 20 Nov 2014 10:21:56 +0100
+Subject: [RFC] adp1653: Add device tree bindings for LED controller
+In-Reply-To: <546CD90B.8060903@iki.fi>
+References: <20141116075928.GA9763@amd>
+ <20141117145857.GO8907@valkosipuli.retiisi.org.uk>
+ <546AFEA5.9020000@samsung.com> <20141118084603.GC4059@amd>
+ <546B19C8.2090008@samsung.com> <20141118113256.GA10022@amd>
+ <546B40FA.2070409@samsung.com> <20141118132159.GA21089@amd>
+ <546B6D86.8090701@samsung.com> <20141118165148.GA11711@amd>
+ <546C66A5.6060201@samsung.com> <546CD90B.8060903@iki.fi>
+Message-ID: <546DB2B4.1070909@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/20 17:02, Arnd Bergmann wrote:
-> On Thursday 20 November 2014 16:34:29 Ding Tianhong wrote:
->>>
->>> I didn't mean the dma_pfn_offset. The problem is that the of_dma_configure
->>> code currently doesn't look at the mask. As I explained in my reply to
->>> Catalin, it should set the mask to the size of the dma-ranges if that is
->>> 32-bit or smaller, and dma_set_mask should look at the same dma-ranges
->>> property to decide what to set the mask to when a driver asks for a
->>> mask larger than 64-bit.
->>>
->> ok, I think the your reply to catalin is clear, I got it, add a
->> appropriate mask for the dev is
->> reasonable, I think it should be fixed later.
+Hi Pavel, Sakari,
+
+On 11/19/2014 06:53 PM, Sakari Ailus wrote:
+> Hi Jacek and Pavel,
+>
+> Jacek Anaszewski wrote:
+>> Hi Pavel, Sakari,
 >>
->> But in my case, if I don't use the DMA_CMA, the dma_alloc_coherent
->> should use the swiotlb directly which maximum is 16M,
->> so unless I use the kmalloc otherwise I have no better idea for that.
-> 
-> But if you just change your driver to set the 64-bit DMA mask,
-> it will no longer use the swiotlb and work much faster without
-> that. You have to do it anyway, even once we fix the architecture
-> code.
-> 
+>> On 11/18/2014 05:51 PM, Pavel Machek wrote:
+>>> Hi!
+>>>
+>>>>> If the hardware LED changes with one that needs different current, the
+>>>>> block for the adp1653 stays the same, but white LED block should be
+>>>>> updated with different value.
+>>>>
+>>>> I think that you are talking about sub nodes. Indeed I am leaning
+>>>> towards this type of design.
+>>>
+>>> I think I am :-).
+>>>
+>>>>>> I agree that flash-timeout should be per led - an array, similarly
+>>>>>> as in case of iout's.
+>>>>>
+>>>>> Agreed about per-led, disagreed about the array. As all the fields
+>>>>> would need arrays, and as LED system currently does not use arrays for
+>>>>> label and linux,default-trigger, I believe we should follow existing
+>>>>> design and model it as three devices. (It _is_ physically three
+>>>>> devices.)
+>>>>
+>>>> Right, I missed that the leds/common.txt describes child node.
+>>>>
+>>>> I propose following modifications to the binding:
+>>>>
+>>>> Optional properties for child nodes:
+>>>> - iout-mode-led :     maximum intensity in microamperes of the LED
+>>>>                (torch LED for flash devices)
+>>>> - iout-mode-flash :     initial intensity in microamperes of the
+>>>>              flash LED; it is required to enable support
+>>>>              for the flash led
+>>>> - iout-mode-indicator : initial intensity in microamperes of the
+>>>>              indicator LED; it is required to enable support
+>>>>              for the indicator led
+>>>> - max-iout-mode-led :     maximum intensity in microamperes of the LED
+>>>>                (torch LED for flash devices)
+>>>> - max-iout-mode-flash : maximum intensity in microamperes of the
+>>>>              flash LED
+>>>> - max-iout-mode-indicator : maximum intensity in microamperes of the
+>>>>              indicator LED
+>>>> - flash-timeout :    timeout in microseconds after which flash
+>>>>              led is turned off
+>>>
+>>> Ok, I took a look, and "iout" is notation I understand, but people may
+>>> have trouble with and I don't see it used anywhere else.
+>>>
+>>> Also... do we need both "current" and "max-current" properties?
+>>>
+>>> But regulators already have "regulator-max-microamp" property. So what
+>>> about:
+>>>
+>>> max-microamp :     maximum intensity in microamperes of the LED
+>>>                  (torch LED for flash devices)
+>>> max-flash-microamp :     initial intensity in microamperes of the
+>>>                flash LED; it is required to enable support
+>>>                for the flash led
+>>> flash-timeout-microseconds : timeout in microseconds after which flash
+>>>                led is turned off
+>>>
+>>> If you had indicator on the same led, I guess
+>>>
+>>> indicator-microamp : recommended intensity in microamperes of the LED
+>>>                   for indication
+>
+> The value for the indicator is maximum as well, not just a recommendation.
+>
+>>>
+>>> ...would do?
+>>
+>>
+>> Ongoing discussion allowed me for taking a look at the indicator issue
+>> from different perspective. This is also vital for the issue of
+>> whether a v4l2-flash sub-device should be created per device or
+>> per sub-led [1].
+>>
+>> Currently each sub-led is represented as a separate device tree
+>> sub node and the led drivers create separate LED class device for the
+>> sub nodes. What this implies is that indicator led also must be
+>> represented by the separate LED class device.
+>>
+>> This is contrary to the way how V4L2 Flash API approaches this issue,
+>> as it considers a flash device as a regulator chip driven through
+>> a bus. The API allows to set the led in torch or flash mode and
+>> implicitly assumes that there can be additional indicator led
+>> supported, which can't be turned on separately, but the drivers apply
+>> the indicator current to the indicator led when the torch or flash led
+>> is activated.
+>
+> The indicator is independent of the flash LED in V4L2 flash API. At
+> least that's how it should be, and in adp1653 the two are independent,
+> but the as3645a can't use indicator with the flash AFAIR.
 
-Yes, I did, it is useful, thanks.
+Right.
 
-> The fix in the architecture code is just required so things don't
-> break if you have a 64-bit DMA capable device on a 32-bit bus.
-> 
-> On a related note, we should really fix the network and scsi core
-> code not lot just look at PCI_DMA_BUS_IS_PHYS but check the presence
-> of an IOMMU for devices that are limited to 32-bit DMA, so we fall
-> back to block bounce and lowmem SKB instead of swiotlb for IOMMU-less
-> devices.
-> 
-agree.
+>> I propose to create separate v4l2-flash device for the indicator led,
+>> and treat it as a regular sub-led similarly like it is done in the
+>> LED subsystem. LED Flash class driver would only add a flag
+>> LED_DEV_CAP_INDICATOR and basing on it the v4l2-flash sub-device
+>> would create only V4L2_CID_FLASH_INDICATOR_INTENSITY control for it.
+>> There could ba also additional control added:
+>> V4L2_CID_FLASH_INDICATOR_PATTERN to support the feature
+>> supported by some LED class drivers.
+>
+> Interesting idea.
+>
+> The flash controller is still a single I2C device with common set of
+> faults, for instance. Some devices refuse to work again in case of
+> faults until they are cleared (= read).
 
-> Which driver are you using BTW?
-> 
-soc ppe drivers which is not upstream yet, and sas drivers.
+The V4L2_CID_FLASH_FAULT control should be also supported by the
+indicator v4l2-flash sub-device then.
 
-> 	Arnd
+> Could the indicator pattern control be present in the same sub-device?
 
-Regards
-Ding
+Yes, this was my intention. To conclude - the indicator v4l2-flash 
+sub-device should support up to three controls:
+- V4L2_CID_FLASH_TORCH_INTENSITY
+- V4L2_CID_FLASH_FAULT
+- V4L2_CID_FLASH_INDICATOR_PATTERN (if supported by the LED Flash
+				    class driver)
 
-> 
-> .
-> 
+V4L2_CID_FLASH_INDICATOR_PATTERN would be a menu control with
+custom menu items.
+
+> Are there any flash LED controllers that support such functionality?
+
+There is: lm3556. LED subsystem leds-lm355x.c driver supports it.
+The driver exposes dedicated sysfs attribute for setting the blinking
+pattern (four possible options).
+
+>>  From the media device perspective such an approach would
+>> be harmful, as the indicator led could be turned on right
+>> before strobing the flash or turning the torch on, by
+>> separate calls to different v4l2-flash sub-devices.
+>>
+>> The design described above would allow for avoiding issues I touched
+>> in the message [1].
+>
+> Let me reply this separately. Feel free to ping me if I obviously appear
+> to miss something.
+>
+
+Best Regards,
+Jacek Anaszewski
