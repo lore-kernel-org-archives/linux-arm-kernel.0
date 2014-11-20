@@ -1,39 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Nov 2014 13:12:00 +0100
-Subject: [GIT PULL 3.19] Broadcom Cygnus SoC defconfig
-In-Reply-To: <1415826266-6867-1-git-send-email-f.fainelli@gmail.com>
-References: <1415826266-6867-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <201411201312.00243.arnd@arndb.de>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 20 Nov 2014 13:13:48 +0100
+Subject: [RFC] adp1653: Add device tree bindings for LED controller
+In-Reply-To: <546CD90B.8060903@iki.fi>
+References: <546AFEA5.9020000@samsung.com> <20141118084603.GC4059@amd>
+ <546B19C8.2090008@samsung.com> <20141118113256.GA10022@amd>
+ <546B40FA.2070409@samsung.com> <20141118132159.GA21089@amd>
+ <546B6D86.8090701@samsung.com> <20141118165148.GA11711@amd>
+ <546C66A5.6060201@samsung.com> <546CD90B.8060903@iki.fi>
+Message-ID: <20141120121348.GB27527@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 November 2014, Florian Fainelli wrote:
-> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-> 
->   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-> 
-> are available in the git repository at:
-> 
->   http://github.com/brcm/linux.git tags/arm-soc/for-3.19/cygnus-defconfig-v2
-> 
-> for you to fetch changes up to b316a9f98a2e328d10f5ed3c341fa28880152af3:
-> 
->   ARM: bcm_defconfig: remove one level of menu from Kconfig (2014-11-11 22:42:05 -0800)
-> 
-> ----------------------------------------------------------------
-> This pull requests removes one level in menuconfig for the BCM SoCs for the
-> bcm_defconfig file.
-> 
-> ----------------------------------------------------------------
-> Scott Branden (1):
->       ARM: bcm_defconfig: remove one level of menu from Kconfig
-> 
->  arch/arm/configs/bcm_defconfig | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
+Hi!
 
-After taking a closer look, I ended up putting this into next/soc as well,
-not next/defconfig, since the change has a mutual dependency on the Kconfig
-change in that branch.
+> >> But regulators already have "regulator-max-microamp" property. So what
+> >> about:
+> >>
+> >> max-microamp :     maximum intensity in microamperes of the LED
+> >>                 (torch LED for flash devices)
+> >> max-flash-microamp :     initial intensity in microamperes of the
+> >>               flash LED; it is required to enable support
+> >>               for the flash led
+> >> flash-timeout-microseconds : timeout in microseconds after which flash
+> >>               led is turned off
+> >>
+> >> If you had indicator on the same led, I guess
+> >>
+> >> indicator-microamp : recommended intensity in microamperes of the LED
+> >>                  for indication
+> 
+> The value for the indicator is maximum as well, not just a
+> recommendation.
 
-	Arnd
+Actually, no.
+
+This is all for one LED, if you want to use it as a flash, torch and
+indicator. You already know the maximum value with max-microamp.
+
+Best regards,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
