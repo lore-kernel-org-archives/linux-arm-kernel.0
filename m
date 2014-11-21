@@ -1,50 +1,66 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Fri, 21 Nov 2014 08:11:01 -0800
-Subject: [GIT PULL 3.19] Broadcom Cygnus SoC Device Tree changes
-In-Reply-To: <3132550.UOyhmffLBV@wuerfel>
-References: <1415826266-6867-1-git-send-email-f.fainelli@gmail.com>
- <201411201254.48494.arnd@arndb.de> <546E5547.2070302@broadcom.com>
- <3132550.UOyhmffLBV@wuerfel>
-Message-ID: <546F6415.5000004@broadcom.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 21 Nov 2014 17:13:45 +0100
+Subject: [GIT PULL] cpuidle: A few improvements for ARM cpuidle via DT
+In-Reply-To: <17509116.2bjC4d8bef@vostro.rjw.lan>
+References: <546C6DEB.8060204@linaro.org> <17509116.2bjC4d8bef@vostro.rjw.lan>
+Message-ID: <546F64B9.8060300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14-11-21 03:55 AM, Arnd Bergmann wrote:
-> On Thursday 20 November 2014 12:55:35 Scott Branden wrote:
->> On 14-11-20 03:54 AM, Arnd Bergmann wrote:
->>> On Wednesday 12 November 2014, Florian Fainelli wrote:
->>>> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
->>>>
->>>>     Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
->>>>
->>>> are available in the git repository at:
->>>>
->>>>     http://github.com/brcm/linux.git tags/arm-soc/for-3.19/cygnus-dts-v2
->>>>
->>>> for you to fetch changes up to c9ad7bc5fe3c57c8c817fcb1bd264a02176a40c4:
->>>>
->>>>     ARM: dts: Enable Broadcom Cygnus SoC (2014-11-11 22:30:42 -0800)
->>>>
->>>> ----------------------------------------------------------------
->>>> This pull request contains the Broadcom Cygnus Device Tree changes:
->>>>
->>>> - binding documentation for the SoC and clock
->>>> - cygnus SoC and clock dtsi files
->>>> - DTS for Cygnus Entreprise phone, BCM911360K and BCM958300K
->>>
->>> Something went wrong here: This branch contains the updated license
->>> statements, but Olof had already merged the branch with the original
->>> license statements that we didn't like, so all three patches conflict
->>> with the ones we already have.
->> Hi Arnd,
+On 11/21/2014 04:56 PM, Rafael J. Wysocki wrote:
+> On Wednesday, November 19, 2014 11:16:11 AM Daniel Lezcano wrote:
 >>
->> It seems like the devicetree/bindings patch from this tag was not merged
->> in to next/dt ?
+>> Hi Rafael,
+>>
+>> this pull request, based on 3.18-rc5, contains a set of changes from
+>> Lorenzo Pieralisi.
+>>
+>>    * Added a 'status' definition flag in the DT to specify the
+>> unsupported firmware idle states and ignore those states in the parsing
+>> code when initializing the cpuidle driver
+>>
+>>    * Added an idle state description in the DT. As the idle states are
+>> not standardized on ARM, the description gives information about the
+>> idle state
+>>
+>>    * Removed duplicate error message in the arm64 cpuidle drivers
+>>
+>> Thanks !
+>>
+>>     -- Daniel
+>>
+>>
+>> The following changes since commit fc14f9c1272f62c3e8d01300f52467c0d9af50f9:
+>>
+>>     Linux 3.18-rc5 (2014-11-16 16:36:20 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>     http://git.linaro.org/git-ro/people/daniel.lezcano/linux.git cpuidle/3.19
+>>
+>> for you to fetch changes up to 18f95a3640dbf421ab9532e517070a0c1cd4d582:
+>>
+>>     drivers: cpuidle: Remove cpuidle-arm64 duplicate error messages
+>> (2014-11-19 10:16:28 +0100)
 >
-> I definitely see them here, can you pull our tree again and have a second
-> look? Do you see them in linux-next?
-I see them now.  Sorry, must have been doing something wrong yesterday.
+> Pulled, but I had a conflict with one patch from you I'd already queued up for
+> 3.19-rc1.
+>
+> Can you please have a look at my bleeding-edge branch and check if I resolved
+> the conflict correctly?
 
->
-> 	Arnd
->
+Hi Rafael,
+
+yes the conflict is correctly resolved.
+
+Thanks
+   -- Daniel
+
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
