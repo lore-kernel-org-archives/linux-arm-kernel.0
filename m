@@ -1,77 +1,45 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 21 Nov 2014 16:27:35 -0600
-Subject: IRQ #0 broken on ARM
-In-Reply-To: <87egsw5jen.fsf@free.fr>
-References: <CALT56yPs-SSssff1waj81CRQfER4ZKKR=B1jOXVL-aBChicSjg@mail.gmail.com>
- <87zjbk966i.fsf@approximate.cambridge.arm.com>
- <20141121110135.GS4042@n2100.arm.linux.org.uk>
- <546F1F45.7080103@arm.com> <87egsw5jen.fsf@free.fr>
-Message-ID: <CAL_JsqL50EAmcrM=mcLRwa0OwnhnnXx6ZFzkgfybfQ49ROn7zA@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 21 Nov 2014 23:31:39 +0100
+Subject: [PATCH 1/2] thermal: armada: Remove support for A375-Z1 SoC
+In-Reply-To: <20141121220503.GJ22670@titan.lakedaemon.net>
+References: <1415116839-4323-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1415116839-4323-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20141120193804.GA7252@developer>
+ <20141121201858.GB22670@titan.lakedaemon.net>
+ <20141121225122.1165b466@free-electrons.com>
+ <20141121220503.GJ22670@titan.lakedaemon.net>
+Message-ID: <20141121233139.3a117e1c@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 3:32 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Marc Zyngier <marc.zyngier@arm.com> writes:
->>> Linus has decreed it to not be a valid IRQ number, and that's basically
->>> the end of the discussion.  Generic code, and drivers, will increasingly
->>> decide that IRQ0 is not valid, and objecting to it has, and will continue
->>> to elicit a response of "fix ARM".
->>
->> I'm fine with that.
-> For pxa, why not do something like that [1] ?
->
-> Cheers.
->
-> --
-> Robert
->
-> [1]
-> ---8>---
->
-> From 551eaf75934bd84939a40781470ed3c04d17507a Mon Sep 17 00:00:00 2001
-> From: Robert Jarzmik <robert.jarzmik@free.fr>
-> Date: Fri, 21 Nov 2014 22:11:42 +0100
-> Subject: [PATCH] ARM: pxa: arbitrarily set first interrupt number
->
-> As IRQ0, the legacy timer interrupt should not be used as an interrupt
-> number, shift the interrupts by a fixed number.
->
-> As we had in a special case a shift of 16 when ISA bus was used on a
-> PXA, use that value as the first interrupt number, regardless of ISA or
-> not.
->
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> ---
->  arch/arm/mach-pxa/include/mach/irqs.h | 5 +----
->  1 file changed, 1 insertion(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/include/mach/irqs.h b/arch/arm/mach-pxa/include/mach/irqs.h
-> index 48c2fd8..9d8983f 100644
-> --- a/arch/arm/mach-pxa/include/mach/irqs.h
-> +++ b/arch/arm/mach-pxa/include/mach/irqs.h
-> @@ -14,12 +14,9 @@
->
->  #ifdef CONFIG_PXA_HAVE_ISA_IRQS
+Hello,
 
-You can get rid of this ifdef and kconfig symbol. It is only used here.
+On Fri, 21 Nov 2014 17:05:03 -0500, Jason Cooper wrote:
 
->  #define PXA_ISA_IRQ(x) (x)
-> -#define PXA_ISA_IRQ_NUM        (16)
-> -#else
-> -#define PXA_ISA_IRQ_NUM        (0)
->  #endif
->
-> -#define PXA_IRQ(x)     (PXA_ISA_IRQ_NUM + (x))
-> +#define PXA_IRQ(x)     (16 + (x))
+> > So the suggestion would be to not document the DT bindings at all,
+> > until we reach a "stable" hardware that is distributed externally?
+> 
+> No, I think it's better to document.  However, we should also document
+> the fact that the binding is for an early version of the SoC and subject
+> to incompatible change once the production version of the SoC is
+> released.  ie, an un-stable binding.
 
-Perhaps use NR_IRQS_LEGACY here.
+Sounds good.
 
->  #define IRQ_SSP3       PXA_IRQ(0)      /* SSP3 service request */
->  #define IRQ_MSL                PXA_IRQ(1)      /* MSL Interface interrupt */
-> --
-> 2.1.0
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > I don't mind adjusting how DT bindings are documented for such early
+> > SoCs stepping. But I really believe it's important to have a way to
+> > handle this situation nicely: we've been asking for years SoC vendors
+> > to start upstreaming their code early. Now that they start to do it, we
+> > shouldn't complain and instead adapt to this situation :-)
+> 
+> Does the above proposal meet your expectations?
+
+Absolutely!
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
