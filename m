@@ -1,60 +1,64 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Fri, 21 Nov 2014 20:46:12 +0100
-Subject: [PATCHv5 09/10] arm: mvebu: add .dts file for Synology DS213j
+Date: Fri, 21 Nov 2014 20:46:19 +0100
+Subject: [PATCHv5 10/10] arm: mvebu: add .dts file for Synology DS414
 In-Reply-To: <cover.1416598536.git.arno@natisbad.org>
 References: <cover.1416598536.git.arno@natisbad.org>
-Message-ID: <36a07bdc70a826e26867eba4755be82e39b35450.1416598537.git.arno@natisbad.org>
+Message-ID: <10106f019945e19417d9c43f2f13d9b84186a242.1416598537.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Synology DS213j is a 2-bay NAS powered by a Marvell Armada 370
-(88F6710 @1.2Ghz). It is very similar on many aspects to previous
-2-bay synology models based on Marvell kirkwood SoC. Here is a
-short summary of the device:
+Synology DS414 is a 4-bay NAS powered by a Marvell Armada XP
+(mv78230 dual-core @1.33Ghz). It is very similar on many aspects
+to previous 4-bay synology models based on Marvell kirkwood SoC.
+Here is a short summary of the device:
 
- - 512MB RAM
- - boot on SPI flash (64Mbit Micron N25Q064)
- - 1 GbE interface (Armada MAC connected to a Marvell 88E1512
-   PHY via SGMII)
- - 2 rear USB 2.0 ports (directly handled by the Armada 370)
- - 2 internal SATA ports handled by the Armada 370: 2 GPIO for
-   presence, 2 for powering them
- - two front amber LED (disk1, disk2) controlled by the SoC
+ - 1GB RAM
+ - Boot on SPI flash (64Mbit Micron N25Q064)
+ - 2 GbE interfaces (Armada MAC connected to two Marvell 88E1512
+   PHY via RGMII)
+ - 1 front USB 2.0 ports (directly handled by the Armada 370)
+ - 2 rear USB 3.0 ports (handled by an EtronTech EJ168A XHCI
+   controller on the PCIe bus)
+ - 4 internal SATA ports handled by a Marvell 88SX7042 SATA-II
+   controller on the PCIe bus)
  - Seiko S-35390A I2C RTC chip
  - UART0 providing serial console
- - UART1 used for poweroff (connected to a TI MSP430F2111)
- - Fan handled via 4 GPIO (3 for speed, 1 for alarm)
+ - UART1 used for poweroff (connected to a Microchip PIC16F883)
+
+Additional note: the front LEDs the and the two fans are not directly
+connected to the SoC and under its control. The former are presumably
+driven by the SATA controller, the latter by the PIC.
 
 Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 ---
- arch/arm/boot/dts/Makefile                       |   3 +-
- arch/arm/boot/dts/armada-370-synology-ds213j.dts | 321 +++++++++++++++++++++++
- 2 files changed, 323 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/armada-370-synology-ds213j.dts
+ arch/arm/boot/dts/Makefile                     |   3 +-
+ arch/arm/boot/dts/armada-xp-synology-ds414.dts | 330 +++++++++++++++++++++++++
+ 2 files changed, 332 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/armada-xp-synology-ds414.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 31529ccc67a0..cfcf400a3a6c 100644
+index cfcf400a3a6c..88346b317d76 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -496,7 +496,8 @@ dtb-$(CONFIG_MACH_ARMADA_370) += \
- 	armada-370-mirabox.dtb \
- 	armada-370-netgear-rn102.dtb \
- 	armada-370-netgear-rn104.dtb \
--	armada-370-rd.dtb
-+	armada-370-rd.dtb \
-+	armada-370-synology-ds213j.dtb
- dtb-$(CONFIG_MACH_ARMADA_375) += \
- 	armada-375-db.dtb
- dtb-$(CONFIG_MACH_ARMADA_38X) += \
-diff --git a/arch/arm/boot/dts/armada-370-synology-ds213j.dts b/arch/arm/boot/dts/armada-370-synology-ds213j.dts
+@@ -510,7 +510,8 @@ dtb-$(CONFIG_MACH_ARMADA_XP) += \
+ 	armada-xp-lenovo-ix4-300d.dtb \
+ 	armada-xp-matrix.dtb \
+ 	armada-xp-netgear-rn2120.dtb \
+-	armada-xp-openblocks-ax3-4.dtb
++	armada-xp-openblocks-ax3-4.dtb \
++	armada-xp-synology-ds414.dtb
+ dtb-$(CONFIG_MACH_DOVE) += dove-cm-a510.dtb \
+ 	dove-cubox.dtb \
+ 	dove-cubox-es.dtb \
+diff --git a/arch/arm/boot/dts/armada-xp-synology-ds414.dts b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
 new file mode 100644
-index 000000000000..6922f13135d2
+index 000000000000..468c754f0066
 --- /dev/null
-+++ b/arch/arm/boot/dts/armada-370-synology-ds213j.dts
-@@ -0,0 +1,321 @@
++++ b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
+@@ -0,0 +1,330 @@
 +/*
-+ * Device Tree file for Synology DS213j
++ * Device Tree file for Synology DS414
 + *
 + * Copyright (C) 2014, Arnaud EBALARD <arno@natisbad.org>
 + *
@@ -81,12 +85,12 @@ index 000000000000..6922f13135d2
 +
 +#include <dt-bindings/input/input.h>
 +#include <dt-bindings/gpio/gpio.h>
-+#include "armada-370.dtsi"
++#include "armada-xp-mv78230.dtsi"
 +
 +/ {
-+	model = "Synology DS213j";
-+	compatible = "synology,ds213j", "marvell,armada370",
-+		     "marvell,armada-370-xp";
++	model = "Synology DS414";
++	compatible = "synology,ds414", "marvell,armadaxp-mv78230",
++		     "marvell,armadaxp", "marvell,armada-370-xp";
 +
 +	chosen {
 +		bootargs = "console=ttyS0,115200 earlyprintk";
@@ -95,30 +99,60 @@ index 000000000000..6922f13135d2
 +
 +	memory {
 +		device_type = "memory";
-+		reg = <0x00000000 0x20000000>; /* 512 MB */
++		reg = <0 0x00000000 0 0x40000000>; /* 1GB */
 +	};
 +
 +	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
-+			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
 +
-+		internal-regs {
++		pcie-controller {
++			status = "okay";
 +
-+			sata at a0000 {
-+				nr-ports = <2>;
++			/*
++			 * Connected to Marvell 88SX7042 SATA-II controller
++			 * handling the four disks.
++			 */
++			pcie at 1,0 {
++				/* Port 0, Lane 0 */
 +				status = "okay";
 +			};
 +
++			/*
++			 * Connected to EtronTech EJ168A XHCI controller
++			 * providing the two rear USB 3.0 ports.
++			 */
++			pcie at 5,0 {
++				/* Port 1, Lane 0 */
++				status = "okay";
++			};
++		};
++
++		internal-regs {
 +			mdio {
++				phy0: ethernet-phy at 0 { /* Marvell 88E1512 */
++					reg = <0>;
++				};
++
 +				phy1: ethernet-phy at 1 { /* Marvell 88E1512 */
 +					reg = <1>;
 +				};
 +			};
 +
 +			ethernet at 70000 {
-+			       status = "okay";
-+			       phy = <&phy1>;
-+			       phy-mode = "sgmii";
++				status = "okay";
++				pinctrl-0 = <&ge0_rgmii_pins>;
++				pinctrl-names = "default";
++				phy = <&phy1>;
++				phy-mode = "rgmii-id";
++			};
++
++			ethernet at 74000 {
++				pinctrl-0 = <&ge1_rgmii_pins>;
++				pinctrl-names = "default";
++				status = "okay";
++				phy = <&phy0>;
++				phy-mode = "rgmii-id";
 +			};
 +
 +			spi0: spi at 10600 {
@@ -147,17 +181,17 @@ index 000000000000..6922f13135d2
 +					 */
 +					partition at 00000000 { /* u-boot */
 +						label = "RedBoot";
-+						reg = <0x00000000 0x000c0000>; /* 768KB */
++						reg = <0x00000000 0x000d0000>; /* 832KB */
 +					};
 +
 +					partition at 000c0000 { /* uImage */
 +						label = "zImage";
-+						reg = <0x000c0000 0x002d0000>; /* 2880KB */
++						reg = <0x000d0000 0x002d0000>; /* 2880KB */
 +					};
 +
-+					partition at 00390000 { /* uInitramfs */
++					partition at 003a0000 { /* uInitramfs */
 +						label = "rd.gz";
-+						reg = <0x00390000 0x00440000>; /* 4250KB */
++						reg = <0x003a0000 0x00430000>; /* 4250KB */
 +					};
 +
 +					partition at 007d0000 { /* MAC address and serial number */
@@ -177,41 +211,41 @@ index 000000000000..6922f13135d2
 +				};
 +			};
 +
-+			/* rear USB port, near reset button */
++			/* Front USB 2.0 port */
 +			usb at 50000 {
 +				status = "okay";
 +			};
 +
-+			/* rear USB port, near RJ45 port */
-+			usb at 51000 {
-+				status = "okay";
-+			};
-+
 +			i2c at 11000 {
-+				compatible = "marvell,mv64xxx-i2c";
-+				pinctrl-0 = <&i2c0_pins>;
-+				pinctrl-names = "default";
 +				clock-frequency = <400000>;
 +				status = "okay";
 +
-+				/* Main device RTC chip */
 +				s35390a: s35390a at 30 {
 +					 compatible = "sii,s35390a";
 +					 reg = <0x30>;
 +				};
 +			};
 +
-+			/* RTC provided by Seiko S-35390A above */
++			/* RTC is provided by Seiko S-35390A above */
 +			rtc at 10300 {
 +				status = "disabled";
 +			};
 +
-+			/* Connected to a header on device's PCB */
++			/* Connected to a header on device's PCB. This
++			 * provides the main console for the device.
++			 *
++			 * Warning: the device may not boot with a 3.3V
++			 * USB-serial converter connected when the power
++			 * button is pressed. The converter needs to be
++			 * connected a few seconds after pressing the
++			 * power button. This is possibly due to UART0_TXD
++			 * pin being sampled at reset (bit 0 of SAR).
++			 */
 +			serial at 12000 {
 +				status = "okay";
 +			};
 +
-+			/* Connected to a TI MSP430F2111 for power control */
++			/* Connected to a Microchip PIC16F883 for power control */
 +			serial at 12100 {
 +				status = "okay";
 +			};
@@ -224,50 +258,12 @@ index 000000000000..6922f13135d2
 +		};
 +	};
 +
-+	gpio-fan-32-38 {
-+		status = "okay";
-+		compatible = "gpio-fan";
-+		pinctrl-0 = <&fan_ctrl_low_pin &fan_ctrl_mid_pin
-+			     &fan_ctrl_high_pin &fan_alarm_pin>;
-+		pinctrl-names = "default";
-+		gpios = <&gpio1 31 GPIO_ACTIVE_HIGH
-+			 &gpio2  0 GPIO_ACTIVE_HIGH
-+			 &gpio2  1 GPIO_ACTIVE_HIGH>;
-+		alarm-gpios = <&gpio1 6 GPIO_ACTIVE_HIGH>;
-+		gpio-fan,speed-map = <    0 0
-+				       1000 1
-+				       1150 2
-+				       1350 4
-+				       1500 3
-+				       1650 5
-+				       1750 6
-+				       1900 7 >;
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <&disk1_led_pin
-+			     &disk2_led_pin>;
-+		pinctrl-names = "default";
-+
-+		disk1-led-amber {
-+			label = "synology:amber:disk1";
-+			gpios = <&gpio0 31 GPIO_ACTIVE_LOW>;
-+			default-state = "keep";
-+		};
-+
-+		disk2-led-amber {
-+			label = "synology:amber:disk2";
-+			gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
-+			default-state = "keep";
-+		};
-+	};
-+
 +	regulators {
 +		compatible = "simple-bus";
 +		#address-cells = <1>;
 +		#size-cells = <0>;
-+		pinctrl-0 = <&sata1_pwr_pin &sata2_pwr_pin>;
++		pinctrl-0 = <&sata1_pwr_pin &sata2_pwr_pin
++			     &sata3_pwr_pin &sata4_pwr_pin>;
 +		pinctrl-names = "default";
 +
 +		sata1_regulator: sata1-regulator {
@@ -280,7 +276,7 @@ index 000000000000..6922f13135d2
 +			enable-active-high;
 +			regulator-always-on;
 +			regulator-boot-on;
-+			gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
++			gpio = <&gpio1 10 GPIO_ACTIVE_HIGH>;
 +		};
 +
 +		sata2_regulator: sata2-regulator {
@@ -293,86 +289,103 @@ index 000000000000..6922f13135d2
 +			enable-active-high;
 +			regulator-always-on;
 +			regulator-boot-on;
-+			gpio = <&gpio1 30 GPIO_ACTIVE_HIGH>;
++			gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
++		};
++
++		sata3_regulator: sata3-regulator {
++			compatible = "regulator-fixed";
++			reg = <3>;
++			regulator-name = "SATA3 Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			startup-delay-us = <6000000>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio1 13 GPIO_ACTIVE_HIGH>;
++		};
++
++		sata4_regulator: sata4-regulator {
++			compatible = "regulator-fixed";
++			reg = <4>;
++			regulator-name = "SATA4 Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			startup-delay-us = <8000000>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio1 14 GPIO_ACTIVE_HIGH>;
 +		};
 +	};
 +};
 +
 +&pinctrl {
-+	disk1_led_pin: disk1-led-pin {
-+		marvell,pins = "mpp31";
-+		marvell,function = "gpio";
-+	};
-+
-+	disk2_led_pin: disk2-led-pin {
-+		marvell,pins = "mpp32";
-+		marvell,function = "gpio";
-+	};
-+
 +	sata1_pwr_pin: sata1-pwr-pin {
-+		marvell,pins = "mpp37";
++		marvell,pins = "mpp42";
 +		marvell,function = "gpio";
 +	};
 +
 +	sata2_pwr_pin: sata2-pwr-pin {
-+		marvell,pins = "mpp62";
++		marvell,pins = "mpp44";
++		marvell,function = "gpio";
++	};
++
++	sata3_pwr_pin: sata3-pwr-pin {
++		marvell,pins = "mpp45";
++		marvell,function = "gpio";
++	};
++
++	sata4_pwr_pin: sata4-pwr-pin {
++		marvell,pins = "mpp46";
 +		marvell,function = "gpio";
 +	};
 +
 +	sata1_pres_pin: sata1-pres-pin {
-+		marvell,pins = "mpp60";
++		marvell,pins = "mpp34";
 +		marvell,function = "gpio";
 +	};
 +
 +	sata2_pres_pin: sata2-pres-pin {
-+		marvell,pins = "mpp48";
++		marvell,pins = "mpp35";
++		marvell,function = "gpio";
++	};
++
++	sata3_pres_pin: sata3-pres-pin {
++		marvell,pins = "mpp40";
++		marvell,function = "gpio";
++	};
++
++	sata4_pres_pin: sata4-pres-pin {
++		marvell,pins = "mpp41";
 +		marvell,function = "gpio";
 +	};
 +
 +	syno_id_bit0_pin: syno-id-bit0-pin {
-+		marvell,pins = "mpp55";
++		marvell,pins = "mpp26";
 +		marvell,function = "gpio";
 +	};
 +
-+	syno_id_bit1_pin: syno-id-bit1-pin {
-+		marvell,pins = "mpp56";
++	pmx_syno_id_bit1: syno-id-bit1-pin {
++		marvell,pins = "mpp28";
 +		marvell,function = "gpio";
 +	};
 +
-+	syno_id_bit2_pin: syno-id-bit2-pin {
-+		marvell,pins = "mpp57";
++	pmx_syno_id_bit2: syno-id-bit2-pin {
++		marvell,pins = "mpp29";
 +		marvell,function = "gpio";
 +	};
 +
-+	syno_id_bit3_pin: syno-id-bit3-pin {
-+		marvell,pins = "mpp58";
++	pmx_fan1_alarm: fan1-alarm-pin {
++		marvell,pins = "mpp33";
 +		marvell,function = "gpio";
 +	};
 +
-+	fan_ctrl_low_pin: fan-ctrl-low-pin {
-+		marvell,pins = "mpp65";
-+		marvell,function = "gpio";
-+	};
-+
-+	fan_ctrl_mid_pin: fan-ctrl-mid-pin {
-+		marvell,pins = "mpp64";
-+		marvell,function = "gpio";
-+	};
-+
-+	fan_ctrl_high_pin: fan-ctrl-high-pin {
-+		marvell,pins = "mpp63";
-+		marvell,function = "gpo";
-+	};
-+
-+	fan_alarm_pin: fan-alarm-pin {
-+		marvell,pins = "mpp38";
-+		marvell,function = "gpio";
-+	};
-+
-+	poweroff_pin: poweroff-pin {
-+		marvell,pins = "mpp4";
++	fan2_alarm_pin: fan2-alarm-pin {
++		marvell,pins = "mpp32";
 +		marvell,function = "gpio";
 +	};
 +};
++
 -- 
 2.1.1
