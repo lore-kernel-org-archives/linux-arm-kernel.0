@@ -1,45 +1,31 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 21 Nov 2014 14:58:47 +0000
-Subject: [PATCH v5.5] of/fdt: export fdt blob as /sys/firmware/fdt
-In-Reply-To: <1416421971.23886.71.camel@smoke>
-References: <1415984735-32388-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141118165145.4F6A8C40966@trevor.secretlab.ca>
- <20141118172545.GC14323@leverpostej>
- <20141118221103.4ECB3C40966@trevor.secretlab.ca>
- <1416402576.29243.35.camel@citrix.com>
- <1416421971.23886.71.camel@smoke>
-Message-ID: <CACxGe6tGdJOop8m3zVU4DKginT=BxpLFjfV35QX_8JLiUhtZ3Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Nov 2014 16:03:34 +0100
+Subject: [PATCH 2/2] i2c: at91: enable probe deferring on dma channel
+ request
+In-Reply-To: <1416577472-24542-2-git-send-email-ludovic.desroches@atmel.com>
+References: <1416577472-24542-1-git-send-email-ludovic.desroches@atmel.com>
+ <1416577472-24542-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <2530739.DkVu7IemRV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 19, 2014 at 6:32 PM, Geoff Levand <geoff.levand@linaro.org> wrote:
-> Hi Ian,
->
-> On Wed, 2014-11-19 at 13:09 +0000, Ian Campbell wrote:
->> On Tue, 2014-11-18 at 22:11 +0000, Grant Likely wrote:
->> > > > * It also helps with exposing the reserved map to userspace, but kexec
->> > > >   has done without that feature for years, and it is in the process of
->> > > >   being deprecated in favour of /reserved-memory anyway.
->> > >
->> > > This is the first I'd heard of the reserve map being deprecated, and
->> > > we're going to have DTs with reserved map entries for a long time going
->> > > forwards.
->> >
->> > Deprecated, not removed or disabled. It will still work pretty much
->> > forever, but users should be encouraged to move to the reserve-memory
->> > tree.
->>
->> I'm curious why that should be for the "OS should never touch this, here
->> be dragons" type memory, what are the benefits of the new scheme in that
->> case?
->
-> /memreserve/ device tree entries are not available in /proc/device-tree,
-> but reserved-memory nodes are.  Some solution is needed to get all
-> reserved memory info into the dtb passed to the second stage kernel
-> during a kexec re-boot.
+On Friday 21 November 2014 14:44:32 Ludovic Desroches wrote:
+> If dma controller is not probed, defer i2c probe.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
 
-We could also add a file to export the memreserve sections, but now
-that we've got the whole DTB exported, I think it should be fine for
-that also to be the interface for obtaining memreserve.
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 
-g.
+
+> 
+> Arnd,
+> 
+> It's a combination of the first patch I sent and yours. As you said that my
+> patch "looks wrong but actually it's ok" I didn't dare to add your
+> signed-off-by.
+
+I think a good way to deal with this is to explain in the patch description
+who wrote what part.
+
+	Arnd
