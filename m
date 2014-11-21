@@ -1,68 +1,128 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 21 Nov 2014 11:29:24 +0000
-Subject: [PATCH v3 0/2] arm: pcibios: remove pci_sys_data domain
-Message-ID: <1416569367-29409-1-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Fri, 21 Nov 2014 11:29:25 +0000
+Subject: [PATCH v3 1/2] arm: cns3xxx: pci: remove artificial dependency on
+ pci_sys_data domain
+In-Reply-To: <1416569367-29409-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1416569367-29409-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1416569367-29409-2-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset is a v3 of a previous posting:
+On cns3xxx platforms the PCI controller probing code relies on an
+artificial dependency on the domain number to look-up the internal
+data structures.
 
-http://www.spinics.net/lists/linux-pci/msg36502.html
+This patch reworks the host controller control data structure and
+adds a domain equivalent field named port in it so that the dependency on
+pci_sys_data domain field can be eventually removed.
 
-v2 => v3
+Acked-by: Krzysztof Ha?asa <khalasa@piap.pl>
+Cc: Krzysztof Halasa <khalasa@piap.pl>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+[lp: added commit log, removed pci_sys_data domain references]
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ arch/arm/mach-cns3xxx/pcie.c | 40 +++++++++++++++++-----------------------
+ 1 file changed, 17 insertions(+), 23 deletions(-)
 
-- Rebased on top of this patch dependency
-  http://www.spinics.net/lists/linux-pci/msg36631.html
-
-v1 => v2 changelog
-
-- Removed stale hw_pci domain member
-- Reworked pci-mvebu domain handling according to review
-- Rebased against 3.18-rc3 and updated the logs
-- Dropped RFC status
-
-Original cover letter:
-----
-This patchset is a first RFC stab at removing the dependency on pci_sys_data
-domain field on ARM platforms and by replacing it with generic code that
-stashes the domain value in the pci_bus control structure, introduced in
-
-commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
-("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
-
-commit 670ba0c8883b576d0aec28bd7a838358a4be1
-("PCI: Add generic domain handling")
-
-All the drivers converted (apart from PCIe designware, tested on iMX6SL)
-were only compile tested for lack of HW, so along some comments, testing
-and verifying that patchset does not break any existing platform are
-very appreciated.
-
-Code in drivers/pci/pci-mvebu.c has been changed to add a domain
-number to PCI resources by using the nr value coming from the setup
-pcibios32 callback, which may not be correct and should be considered
-a temporary solution waiting for review comments.
-
-The patchset removes entirely the pci_sys_data.domain field, since its
-usage is removed at the same time in the respective host controllers
-and ARM is made to select the configuration option
-CONFIG_PCI_DOMAINS_GENERIC by default, which compiles a domain_nr in the
-pci_bus structure so that the pci_domain_nr() look-up can rely on it.
-
-
-Lorenzo Pieralisi (2):
-  arm: cns3xxx: pci: remove artificial dependency on pci_sys_data domain
-  arm: pcibios: move to generic PCI domains
-
- arch/arm/Kconfig                   |  3 +++
- arch/arm/include/asm/mach/pci.h    |  6 ------
- arch/arm/include/asm/pci.h         |  7 -------
- arch/arm/kernel/bios32.c           |  3 ---
- arch/arm/mach-cns3xxx/pcie.c       | 40 ++++++++++++++++----------------------
- drivers/pci/host/pci-mvebu.c       | 15 ++------------
- drivers/pci/host/pcie-designware.c |  3 ---
- drivers/pci/host/pcie-rcar.c       |  3 ---
- 8 files changed, 22 insertions(+), 58 deletions(-)
-
+diff --git a/arch/arm/mach-cns3xxx/pcie.c b/arch/arm/mach-cns3xxx/pcie.c
+index 45d6bd0..f6bf9f6 100644
+--- a/arch/arm/mach-cns3xxx/pcie.c
++++ b/arch/arm/mach-cns3xxx/pcie.c
+@@ -30,18 +30,15 @@ struct cns3xxx_pcie {
+ 	unsigned int irqs[2];
+ 	struct resource res_io;
+ 	struct resource res_mem;
+-	struct hw_pci hw_pci;
+-
++	int port;
+ 	bool linked;
+ };
+ 
+-static struct cns3xxx_pcie cns3xxx_pcie[]; /* forward decl. */
+-
+ static struct cns3xxx_pcie *sysdata_to_cnspci(void *sysdata)
+ {
+ 	struct pci_sys_data *root = sysdata;
+ 
+-	return &cns3xxx_pcie[root->domain];
++	return root->private_data;
+ }
+ 
+ static struct cns3xxx_pcie *pdev_to_cnspci(const struct pci_dev *dev)
+@@ -192,13 +189,7 @@ static struct cns3xxx_pcie cns3xxx_pcie[] = {
+ 			.flags = IORESOURCE_MEM,
+ 		},
+ 		.irqs = { IRQ_CNS3XXX_PCIE0_RC, IRQ_CNS3XXX_PCIE0_DEVICE, },
+-		.hw_pci = {
+-			.domain = 0,
+-			.nr_controllers = 1,
+-			.ops = &cns3xxx_pcie_ops,
+-			.setup = cns3xxx_pci_setup,
+-			.map_irq = cns3xxx_pcie_map_irq,
+-		},
++		.port = 0,
+ 	},
+ 	[1] = {
+ 		.host_regs = (void __iomem *)CNS3XXX_PCIE1_HOST_BASE_VIRT,
+@@ -217,19 +208,13 @@ static struct cns3xxx_pcie cns3xxx_pcie[] = {
+ 			.flags = IORESOURCE_MEM,
+ 		},
+ 		.irqs = { IRQ_CNS3XXX_PCIE1_RC, IRQ_CNS3XXX_PCIE1_DEVICE, },
+-		.hw_pci = {
+-			.domain = 1,
+-			.nr_controllers = 1,
+-			.ops = &cns3xxx_pcie_ops,
+-			.setup = cns3xxx_pci_setup,
+-			.map_irq = cns3xxx_pcie_map_irq,
+-		},
++		.port = 1,
+ 	},
+ };
+ 
+ static void __init cns3xxx_pcie_check_link(struct cns3xxx_pcie *cnspci)
+ {
+-	int port = cnspci->hw_pci.domain;
++	int port = cnspci->port;
+ 	u32 reg;
+ 	unsigned long time;
+ 
+@@ -260,9 +245,9 @@ static void __init cns3xxx_pcie_check_link(struct cns3xxx_pcie *cnspci)
+ 
+ static void __init cns3xxx_pcie_hw_init(struct cns3xxx_pcie *cnspci)
+ {
+-	int port = cnspci->hw_pci.domain;
++	int port = cnspci->port;
+ 	struct pci_sys_data sd = {
+-		.domain = port,
++		.private_data = cnspci,
+ 	};
+ 	struct pci_bus bus = {
+ 		.number = 0,
+@@ -323,6 +308,14 @@ static int cns3xxx_pcie_abort_handler(unsigned long addr, unsigned int fsr,
+ void __init cns3xxx_pcie_init_late(void)
+ {
+ 	int i;
++	void *private_data;
++	struct hw_pci hw_pci = {
++	       .nr_controllers = 1,
++	       .ops = &cns3xxx_pcie_ops,
++	       .setup = cns3xxx_pci_setup,
++	       .map_irq = cns3xxx_pcie_map_irq,
++	       .private_data = &private_data,
++	};
+ 
+ 	pcibios_min_io = 0;
+ 	pcibios_min_mem = 0;
+@@ -335,7 +328,8 @@ void __init cns3xxx_pcie_init_late(void)
+ 		cns3xxx_pwr_soft_rst(0x1 << PM_SOFT_RST_REG_OFFST_PCIE(i));
+ 		cns3xxx_pcie_check_link(&cns3xxx_pcie[i]);
+ 		cns3xxx_pcie_hw_init(&cns3xxx_pcie[i]);
+-		pci_common_init(&cns3xxx_pcie[i].hw_pci);
++		private_data = &cns3xxx_pcie[i];
++		pci_common_init(&hw_pci);
+ 	}
+ 
+ 	pci_assign_unassigned_resources();
 -- 
 2.1.2
