@@ -1,27 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Nov 2014 14:03:52 +0100
-Subject: [PATCH 4/9] clk: Add clock driver for mb86s7x
-In-Reply-To: <1416486975-25385-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <1416486975-25385-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-Message-ID: <2396055.pBuh1YtUHT@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 21 Nov 2014 13:06:20 +0000
+Subject: [PATCH] ARM: warn if bad IRQ was scheduled
+In-Reply-To: <1416574366-27182-1-git-send-email-dbaryshkov@gmail.com>
+References: <1416574366-27182-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <20141121130619.GT4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 November 2014 20:36:15 Vincent Yang wrote:
-> +#define __DTS_MB86S70_CLK_H
-> +
-> +#define MB86S70_CRG11_ALW      0
-> +#define MB86S70_CRG11_DDR3     1
-> +#define MB86S70_CRG11_MAIN     2
-> +#define MB86S70_CRG11_CA15     3
-> +#define MB86S70_CRG11_HDMI     4
-> +#define MB86S70_CRG11_DPHY     5
-> +
-> +#define MB86S70_CRG11_UNGPRT   8
+On Fri, Nov 21, 2014 at 03:52:46PM +0300, Dmitry Eremin-Solenikov wrote:
+> If somebody causes an unexpected bad IRQ, this even will be unnoticed in
+> both dmesg and system logs. If the "bad" IRQ is stuck, the device will
+> just hang silently w/o reporting anything. Compare this to the generic
+> behaviour (from include/asm-generic/hardirq.h) which prints a message
+> with critical level. So to help everybody, include the same message into
+> ARM-specific ack_bad_irq().
 > 
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> ---
+>  arch/arm/include/asm/hw_irq.h | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/include/asm/hw_irq.h b/arch/arm/include/asm/hw_irq.h
+> index a71b417..b1fa129 100644
+> --- a/arch/arm/include/asm/hw_irq.h
+> +++ b/arch/arm/include/asm/hw_irq.h
+> @@ -8,6 +8,7 @@ static inline void ack_bad_irq(int irq)
+>  {
+>  	extern unsigned long irq_err_count;
+>  	irq_err_count++;
+> +	printk(KERN_CRIT "unexpected IRQ trap at vector %02x\n", irq);
 
-The clock driver doesn't seem to use those macros at all, how does the
-driver know which clock you are referring to?
+pr_crit please.
 
-	Arnd
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
