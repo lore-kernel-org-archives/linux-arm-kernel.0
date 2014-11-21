@@ -1,72 +1,27 @@
 From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Fri, 21 Nov 2014 12:35:09 +0000
-Subject: [PATCH v9 02/10] sched: Track group sched_entity usage
- contributions
-In-Reply-To: <1415033687-23294-3-git-send-email-vincent.guittot@linaro.org>
+Date: Fri, 21 Nov 2014 12:35:26 +0000
+Subject: [PATCH v9 03/10] sched: remove frequency scaling from cpu_capacity
+In-Reply-To: <1415033687-23294-4-git-send-email-vincent.guittot@linaro.org>
 References: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
- <1415033687-23294-3-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20141121123509.GC23177@e105550-lin.cambridge.arm.com>
+ <1415033687-23294-4-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <20141121123526.GD23177@e105550-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-s/usage/utilization/ in subject.
+On Mon, Nov 03, 2014 at 04:54:40PM +0000, Vincent Guittot wrote:
+> Now that arch_scale_cpu_capacity has been introduced to scale the original
+> capacity, the arch_scale_freq_capacity is no longer used (it was
+> previously used by ARM arch). Remove arch_scale_freq_capacity from the
+> computation of cpu_capacity. The frequency invariance will be handled in the
+> load tracking and not in the CPU capacity. 
 
-On Mon, Nov 03, 2014 at 04:54:39PM +0000, Vincent Guittot wrote:
-> From: Morten Rasmussen <morten.rasmussen@arm.com>
-> 
-> Adds usage contribution tracking for group entities. Unlike
+Just a note:
 
-s/usage contribution/utilization/
-
-> se->avg.load_avg_contrib, se->avg.utilization_avg_contrib for group
-> entities is the sum of se->avg.utilization_avg_contrib for all entities on the
-> group runqueue. It is _not_ influenced in any way by the task group
-> h_load. Hence it is representing the actual cpu usage of the group, not
-
-s/usage/utilization/
-
-> its intended load contribution which may differ significantly from the
-> utilization on lightly utilized systems.
-> 
-> cc: Paul Turner <pjt@google.com>
-> cc: Ben Segall <bsegall@google.com>
-> 
-> Signed-off-by: Morten Rasmussen <morten.rasmussen@arm.com>
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> ---
->  kernel/sched/debug.c | 2 ++
->  kernel/sched/fair.c  | 3 +++
->  2 files changed, 5 insertions(+)
-> 
-> diff --git a/kernel/sched/debug.c b/kernel/sched/debug.c
-> index f384452..efb47ed 100644
-> --- a/kernel/sched/debug.c
-> +++ b/kernel/sched/debug.c
-> @@ -94,8 +94,10 @@ static void print_cfs_group_stats(struct seq_file *m, int cpu, struct task_group
->  	P(se->load.weight);
->  #ifdef CONFIG_SMP
->  	P(se->avg.runnable_avg_sum);
-> +	P(se->avg.running_avg_sum);
->  	P(se->avg.avg_period);
->  	P(se->avg.load_avg_contrib);
-> +	P(se->avg.utilization_avg_contrib);
->  	P(se->avg.decay_count);
->  #endif
->  #undef PN
-> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-> index 3a91ae6..a171e1b 100644
-> --- a/kernel/sched/fair.c
-> +++ b/kernel/sched/fair.c
-> @@ -2529,6 +2529,9 @@ static long __update_entity_utilization_avg_contrib(struct sched_entity *se)
->  
->  	if (entity_is_task(se))
->  		__update_task_entity_utilization(se);
-> +	else
-> +		se->avg.utilization_avg_contrib =
-> +					group_cfs_rq(se)->utilization_load_avg;
->  
->  	return se->avg.utilization_avg_contrib - old_contrib;
->  }
-
-What happened to the update of se->avg.utilization_avg_contrib in
-__synchronize_entity_decay()? It seems to have disapperead after v7.
+Yes, we are scaling the load tracking of each task to compensate for
+frequency scaling. I think that is all fine. Later we will have to feed
+the current frequency into the energy model as well to figure out if
+putting more tasks on a cpu will/should cause the frequency to increase
+or not. We don't need it for now and don't need to add it in the commit
+message. It is just a reminder that we may actually want to use
+arch_scale_freq_capacity() combined with cpu_capacity to provide this
+input to the energy model later.
