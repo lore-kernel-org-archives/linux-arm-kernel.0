@@ -1,45 +1,51 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Fri, 21 Nov 2014 22:40:05 +0100
-Subject: [PATCH v4 3/6] mfd: ti_am335x_tscadc: Remove unwanted
- reg_se_cache save
-In-Reply-To: <CAJKbBDD=eYmU=LuViwLPNV=kYCziDQgKjL07bT7og4vsj0Ee7A@mail.gmail.com>
-References: <1415941651-28962-4-git-send-email-vigneshr@ti.com>
- <20141118143005.GF24004@x1> <20141118171240.GB3003@dtor-ws>
- <546DF2F0.9080405@ti.com>
- <20141120144028.GB5809@localhost.localdomain>
- <546F2BA4.4000808@ti.com>
- <20141121131036.GA18931@localhost.localdomain>
- <CAJKbBDDVTA+=priRu7sCD=vHrC8AUg4DM3kycuGrqbpF-5FGAA@mail.gmail.com>
- <546F5C27.7040004@ti.com>
- <CAJKbBDD=eYmU=LuViwLPNV=kYCziDQgKjL07bT7og4vsj0Ee7A@mail.gmail.com>
-Message-ID: <20141121214005.GA4020@localhost.localdomain>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Fri, 21 Nov 2014 13:50:37 -0800
+Subject: [PATCHv6 0/8] Better page protections for arm64
+Message-ID: <1416606645-25633-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 07:17:18PM +0100, Johannes Pointner wrote:
-> Before the patches were also jumps but I thought it is something
-> Vignesh should know. Maybe there is some fix for that too?
-> As Richard also noted, it would be nice if ti could let us know how to
-> get the delay values right. By trial and error is IMHO not the best
-> way.
+Hi,
 
-That is not only an opinion, it is a matter of fact. TI really dropped
-the ball on this one. I thought the patch series was a sign they
-finally were going to properly address this issue. Wrong again.
+This is v6 of the series to add stricter page protections for arm64.
+The goal is to have text be RO/NX and everything else be RW/NX.
+The biggest change here is the addition of ioremap_exec for EFI
+services. The series did its job and caught EFI services trying to
+use regular RAM for code purposes.
 
-The data sheet for the TI part used to have a reference to an app-note
-for the touch controller.
+Laura Abbott (8):
+  arm64: Treat handle_arch_irq as a function pointer
+  arm64: Switch to adrp for loading the stub vectors
+  arm64: Move cpu_resume into the text section
+  arm64: Move some head.text functions to executable section
+  arm64: Factor out fixmap initialiation from ioremap
+  arm64: use fixmap for text patching when text is RO
+  arm64: efi: Use ioremap_exec for code sections
+  arm64: add better page protections to arm64
 
-      spruh73f page 1154
+ arch/arm64/Kconfig.debug            |  23 ++
+ arch/arm64/include/asm/cacheflush.h |   7 +
+ arch/arm64/include/asm/fixmap.h     |   8 +-
+ arch/arm64/include/asm/insn.h       |   2 +
+ arch/arm64/include/asm/io.h         |   1 +
+ arch/arm64/include/asm/irq.h        |   1 -
+ arch/arm64/include/asm/pgtable.h    |   1 +
+ arch/arm64/kernel/efi.c             |  12 +-
+ arch/arm64/kernel/entry.S           |   6 +-
+ arch/arm64/kernel/head.S            | 410 +++++++++++++++++++-----------------
+ arch/arm64/kernel/insn.c            |  72 ++++++-
+ arch/arm64/kernel/irq.c             |   2 +
+ arch/arm64/kernel/jump_label.c      |   2 +-
+ arch/arm64/kernel/setup.c           |   1 +
+ arch/arm64/kernel/sleep.S           |  36 +---
+ arch/arm64/kernel/suspend.c         |   4 +-
+ arch/arm64/kernel/vmlinux.lds.S     |  18 +-
+ arch/arm64/mm/init.c                |   1 +
+ arch/arm64/mm/ioremap.c             |  99 ++-------
+ arch/arm64/mm/mm.h                  |   2 +
+ arch/arm64/mm/mmu.c                 | 405 +++++++++++++++++++++++++++++++----
+ 21 files changed, 740 insertions(+), 373 deletions(-)
 
-      The Pen IRQ can only occur if the correct Pen Ctrl bits are high
-      (AFE Pen Ctrl bits 6:5 in the TSC_ADC control register) and if
-      the correct ground transistor biasing is set in the StepConfig
-      [N] Register. Refer to the application notes for the correct
-      settings.
-
-I searched high and low for this application note. Then, the data
-sheet got revised.
-
-Thanks,
-Richard
+-- 
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
