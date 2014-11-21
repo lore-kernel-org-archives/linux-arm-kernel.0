@@ -1,23 +1,27 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 21 Nov 2014 19:21:09 +0000
-Subject: [PATCH 3/3] regulator: rpm: add support for RPM-controller SMB208
-In-Reply-To: <1416512485-7292-4-git-send-email-joshc@codeaurora.org>
-References: <1416512485-7292-1-git-send-email-joshc@codeaurora.org>
- <1416512485-7292-4-git-send-email-joshc@codeaurora.org>
-Message-ID: <20141121192109.GK3815@sirena.org.uk>
+From: arjun024@gmail.com (Arjun Sreedharan)
+Date: Sat, 22 Nov 2014 00:58:36 +0530
+Subject: [PATCH] arm: early_printk: do bound check independent of @n
+Message-ID: <1416598116-2461-1-git-send-email-arjun024@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 20, 2014 at 01:41:25PM -0600, Josh Cartwright wrote:
-> The IPQ8064 reference boards make use of SMB208 regulators which are
-> controlled by RPM.  Implement support for these regulators in the RPM
-> regulator driver.
+Signed-off-by: Arjun Sreedharan <arjun024@gmail.com>
+---
+ arch/arm/kernel/early_printk.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141121/8e941cd4/attachment.sig>
+diff --git a/arch/arm/kernel/early_printk.c b/arch/arm/kernel/early_printk.c
+index 4307653..9e05f8a 100644
+--- a/arch/arm/kernel/early_printk.c
++++ b/arch/arm/kernel/early_printk.c
+@@ -16,7 +16,7 @@ extern void printch(int);
+ 
+ static void early_write(const char *s, unsigned n)
+ {
+-	while (n-- > 0) {
++	while (*s && n-- > 0) {
+ 		if (*s == '\n')
+ 			printch('\r');
+ 		printch(*s);
+-- 
+1.7.11.7
