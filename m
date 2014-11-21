@@ -1,83 +1,50 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Fri, 21 Nov 2014 12:18:32 -0800
-Subject: [RFC] add a struct page* parameter to dma_map_ops.unmap_page
-In-Reply-To: <alpine.DEB.2.02.1411211147450.12596@kaball.uk.xensource.com>
- (Stefano Stabellini's message of "Fri, 21 Nov 2014 11:48:33 +0000")
-References: <alpine.DEB.2.02.1411111644490.26318@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1411211147450.12596@kaball.uk.xensource.com>
-Message-ID: <vnkwh9xs2tpj.fsf@mitchelh-linux.qualcomm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 21 Nov 2014 15:18:58 -0500
+Subject: [PATCH 1/2] thermal: armada: Remove support for A375-Z1 SoC
+In-Reply-To: <20141120193804.GA7252@developer>
+References: <1415116839-4323-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1415116839-4323-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20141120193804.GA7252@developer>
+Message-ID: <20141121201858.GB22670@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21 2014 at 03:48:33 AM, Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
-> On Mon, 17 Nov 2014, Stefano Stabellini wrote:
->> Hi all,
->> I am writing this email to ask for your advice.
->> 
->> On architectures where dma addresses are different from physical
->> addresses, it can be difficult to retrieve the physical address of a
->> page from its dma address.
->> 
->> Specifically this is the case for Xen on arm and arm64 but I think that
->> other architectures might have the same issue.
->> 
->> Knowing the physical address is necessary to be able to issue any
->> required cache maintenance operations when unmap_page,
->> sync_single_for_cpu and sync_single_for_device are called.
->> 
->> Adding a struct page* parameter to unmap_page, sync_single_for_cpu and
->> sync_single_for_device would make Linux dma handling on Xen on arm and
->> arm64 much easier and quicker.
->> 
->> I think that other drivers have similar problems, such as the Intel
->> IOMMU driver having to call find_iova and walking down an rbtree to get
->> the physical address in its implementation of unmap_page.
->> 
->> Callers have the struct page* in their hands already from the previous
->> map_page call so it shouldn't be an issue for them.  A problem does
->> exist however: there are about 280 callers of dma_unmap_page and
->> pci_unmap_page. We have even more callers of the dma_sync_single_for_*
->> functions.
->> 
->> 
->> 
->> Is such a change even conceivable? How would one go about it?
->> 
->> I think that Xen would not be the only one to gain from it, but I would
->> like to have a confirmation from others: given the magnitude of the
->> changes involved I would actually prefer to avoid them unless multiple
->> drivers/archs/subsystems could really benefit from them.
->
-> Given the lack of interest from the community, I am going to drop this
-> idea.
+On Thu, Nov 20, 2014 at 03:38:06PM -0400, Eduardo Valentin wrote:
+> Ezequiel and Jason,
+> 
+> On Sat, Nov 08, 2014 at 10:16:46PM -0500, Jason Cooper wrote:
+> > On Tue, Nov 04, 2014 at 01:00:38PM -0300, Ezequiel Garcia wrote:
+> > > The Armada 375 Z1 SoC revision is no longer supported. This commit
+> > > removes the quirk needed for the thermal sensor.
+> > > 
+> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > > ---
+> > >  .../devicetree/bindings/thermal/armada-thermal.txt   |  8 --------
+> > >  drivers/thermal/armada_thermal.c                     | 20 --------------------
+> > >  2 files changed, 28 deletions(-)
+> > 
+> > As Thomas and Ezequiel rightfully mentioned, the compatible string below
+> > has never been in a dts file.  Our arch code detected the Z1, and
+> > changed the compatible on the fly.  As a result, there shouldn't be any
+> > dtbs in the wild with this compatible string.  If there are, it will be
+> > held by the few developers (Marvell, partners) that know what they are
+> > doing.
+> 
+> First of, I would like to mention that best thing to avoid such
+> situation is to be careful when documenting dt entries that represent hw
+> that no one has access to (except internal people).
 
-Actually it sounds like the right API design to me.  As a bonus it
-should help performance a bit as well.  For example, the current
-implementations of dma_sync_single_for_{cpu,device} and dma_unmap_page
-on ARM while using the IOMMU mapper
-(arm_iommu_sync_single_for_{cpu,device}, arm_iommu_unmap_page) all call
-iommu_iova_to_phys which generally results in a page table walk or a
-hardware register write/poll/read.
+Agreed, mainline support for an SoC so early in it's lifetime was new
+for all of us.  Lesson learned.
 
-The problem, as you mentioned, is that there are a ton of callers of the
-existing APIs.  I think David Vrabel had a good suggestion for dealing
-with this:
+> > 
+> > Acked-by: Jason Cooper <jason@lakedaemon.net>
+> > 
+> 
+> OK Jason. I saw you picked patch 2. Does it mean I can queue this one? 
 
-On Mon, Nov 17 2014 at 06:43:46 AM, David Vrabel <david.vrabel@citrix.com> wrote:
-> You may need to consider a parallel set of map/unmap API calls that
-> return/accept a handle, and then converting drivers one-by-one as
-> required, instead of trying to convert every single driver at once.
+Yep.  Take it away.
 
-However, I'm not sure whether the costs of having a parallel set of APIs
-outweigh the benefits of a cleaner API and a slight performance boost...
-But I hope the idea isn't completely abandoned without some profiling or
-other evidence of its benefits (e.g. patches showing how drivers could
-be simplified with the new APIs).
+thx,
 
-
--Mitch
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Jason.
