@@ -1,37 +1,100 @@
-From: rupran@einserver.de (Andreas Ruprecht)
-Date: Fri, 21 Nov 2014 19:35:13 +0100
-Subject: [PATCH] ASoC: rockchip: i2s: Add dependency to I2S device driver
-Message-ID: <1416594913-30187-1-git-send-email-rupran@einserver.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 21 Nov 2014 12:39:11 -0600
+Subject: [PATCH 3/3] memory: gpmc: Move omap gpmc code to live under
+ drivers
+In-Reply-To: <1416594856-15201-4-git-send-email-tony@atomide.com>
+References: <1416594856-15201-1-git-send-email-tony@atomide.com>
+ <1416594856-15201-4-git-send-email-tony@atomide.com>
+Message-ID: <20141121183911.GA7508@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, CONFIG_SND_SOC_ROCKCHIP_I2S could also be selected
-without having CONFIG_SND_SOC_ROCKCHIP enabled.
+On Fri, Nov 21, 2014 at 10:34:16AM -0800, Tony Lindgren wrote:
+> Just move to drivers as further clean-up can now happen there
+> finally.
+> 
+> Let's also add Roger and me to the MAINTAINERS so we get
+> notified for any patches related to GPMC.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  MAINTAINERS                                              | 8 ++++++++
+>  arch/arm/mach-omap2/Kconfig                              | 2 ++
+>  arch/arm/mach-omap2/Makefile                             | 2 +-
+>  drivers/memory/Kconfig                                   | 8 ++++++++
+>  drivers/memory/Makefile                                  | 1 +
+>  arch/arm/mach-omap2/gpmc.c => drivers/memory/omap-gpmc.c | 0
+>  6 files changed, 20 insertions(+), 1 deletion(-)
+>  rename arch/arm/mach-omap2/gpmc.c => drivers/memory/omap-gpmc.c (100%)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index dab92a7..78cc059 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -6629,6 +6629,14 @@ L:	linux-omap at vger.kernel.org
+>  S:	Maintained
+>  F:	sound/soc/omap/
+>  
+> +OMAP GENERAL PURPOSE MEMORY CONTROLLER SUPPORT
+> +M:	Roger Quadros <rogerq@ti.com>
+> +M:	Tony Lindgren <tony@atomide.com>
+> +L:	linux-omap at vger.kernel.org
+> +S:	Maintained
+> +F:	drivers/memory/omap-gpmc.c
+> +F:	arch/arm/mach-omap2/*gpmc*
+> +
+>  OMAP FRAMEBUFFER SUPPORT
+>  M:	Tomi Valkeinen <tomi.valkeinen@ti.com>
+>  L:	linux-fbdev at vger.kernel.org
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index f4d06ae..0ea218e 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -79,7 +79,9 @@ config ARCH_OMAP2PLUS
+>  	select CLKSRC_MMIO
+>  	select GENERIC_IRQ_CHIP
+>  	select MACH_OMAP_GENERIC
+> +	select MEMORY
+>  	select OMAP_DM_TIMER
+> +	select OMAP_GPMC
+>  	select PINCTRL
+>  	select SOC_BUS
+>  	select TI_PRIV_EDMA
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index 3e824f8..bd85741 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -6,7 +6,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+>  	-I$(srctree)/arch/arm/plat-omap/include
+>  
+>  # Common support
+> -obj-y := id.o io.o control.o mux.o devices.o fb.o serial.o gpmc.o timer.o pm.o \
+> +obj-y := id.o io.o control.o mux.o devices.o fb.o serial.o timer.o pm.o \
+>  	 common.o gpio.o dma.o wd_timer.o display.o i2c.o hdq1w.o omap_hwmod.o \
+>  	 omap_device.o sram.o drm.o
+>  
+> diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
+> index 6d91c27..6759de7 100644
+> --- a/drivers/memory/Kconfig
+> +++ b/drivers/memory/Kconfig
+> @@ -41,6 +41,14 @@ config TI_EMIF
+>  	  parameters and other settings during frequency, voltage and
+>  	  temperature changes
+>  
+> +config OMAP_GPMC
+> +	bool
 
-As this makes no sense (and breaks the build, when the option
-CONFIG_SND_SOC_GENERIC_DMAENGINE_PCM - which would be selected by
-CONFIG_SND_SOC_ROCKCHIP - is not enabled), a Kconfig dependency
-is added to CONFIG_SND_SOC_ROCKCHIP_I2S. This will make the item
-visible only if CONFIG_SND_SOC_ROCKCHIP is enabled.
+shouldn't you make this selectable ? I might want to build a kernel
+without GPMC support because my board just doesn't use GPMC :-)
 
-Signed-off-by: Andreas Ruprecht <rupran@einserver.de>
-Reported-by: Jim Davis <jim.epost@gmail.com>
----
- sound/soc/rockchip/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/sound/soc/rockchip/Kconfig b/sound/soc/rockchip/Kconfig
-index b1fc0ca..74380b4 100644
---- a/sound/soc/rockchip/Kconfig
-+++ b/sound/soc/rockchip/Kconfig
-@@ -9,7 +9,7 @@ config SND_SOC_ROCKCHIP
- 
- config SND_SOC_ROCKCHIP_I2S
- 	tristate "Rockchip I2S Device Driver"
--	depends on CLKDEV_LOOKUP
-+	depends on CLKDEV_LOOKUP && SND_SOC_ROCKCHIP
- 	help
- 	  Say Y or M if you want to add support for I2S driver for
- 	  Rockchip I2S device. The device supports upto maximum of
 -- 
-1.9.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141121/ea451d7f/attachment.sig>
