@@ -1,61 +1,68 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Fri, 21 Nov 2014 11:12:39 +0100
-Subject: [PATCH 1/1] thermal: Exynos: Deletion of unnecessary checks before
- two function calls
-In-Reply-To: <5317A59D.4@users.sourceforge.net>
-References: <5307CAA2.8060406@users.sourceforge.net>
- <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
- <530A086E.8010901@users.sourceforge.net>
- <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
- <530A72AA.3000601@users.sourceforge.net>
- <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
- <530B5FB6.6010207@users.sourceforge.net>
- <alpine.DEB.2.10.1402241710370.2074@hadrien>
- <530C5E18.1020800@users.sourceforge.net>
- <alpine.DEB.2.10.1402251014170.2080@hadrien>
- <530CD2C4.4050903@users.sourceforge.net>
- <alpine.DEB.2.10.1402251840450.7035@hadrien>
- <530CF8FF.8080600@users.sourceforge.net>
- <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
- <530DD06F.4090703@users.sourceforge.net>
- <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net>
-Message-ID: <546F1017.5080403@users.sourceforge.net>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 21 Nov 2014 11:13:17 +0100
+Subject: [PATCH 5/9] rc: sunxi-cir: Add support for the larger fifo found
+ on sun5i and sun6i
+In-Reply-To: <20141121095934.GA4752@lukather>
+References: <1416498928-1300-1-git-send-email-hdegoede@redhat.com>
+ <1416498928-1300-6-git-send-email-hdegoede@redhat.com>
+ <20141120142856.16b6562d@recife.lan> <20141121082620.GJ24143@lukather>
+ <546EFAE1.9050506@redhat.com> <20141121095934.GA4752@lukather>
+Message-ID: <546F103D.6050004@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Fri, 21 Nov 2014 11:06:33 +0100
+Hi,
 
-The functions cpufreq_cooling_unregister() and thermal_zone_device_unregister()
-test whether their argument is NULL and then return immediately.
-Thus the test around the call is not needed.
+On 11/21/2014 10:59 AM, Maxime Ripard wrote:
+> On Fri, Nov 21, 2014 at 09:42:09AM +0100, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 11/21/2014 09:26 AM, Maxime Ripard wrote:
+>>> Hi Mauro,
+>>>
+>>> On Thu, Nov 20, 2014 at 02:28:56PM -0200, Mauro Carvalho Chehab wrote:
+>>>> Em Thu, 20 Nov 2014 16:55:24 +0100
+>>>> Hans de Goede <hdegoede@redhat.com> escreveu:
+>>>>
+>>>>> Add support for the larger fifo found on sun5i and sun6i, having a separate
+>>>>> compatible for the ir found on sun5i & sun6i also is useful if we ever want
+>>>>> to add ir transmit support, because the sun5i & sun6i version do not have
+>>>>> transmit support.
+>>>>>
+>>>>> Note this commits also adds checking for the end-of-packet interrupt flag
+>>>>> (which was already enabled), as the fifo-data-available interrupt flag only
+>>>>> gets set when the trigger-level is exceeded. So far we've been getting away
+>>>>> with not doing this because of the low trigger-level, but this is something
+>>>>> which we should have done since day one.
+>>>>>
+>>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>>
+>>>> As this is meant to be merged via some other tree:
+>>>>
+>>>> Acked-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+>>>
+>>> I think merging it through your tree would be just fine.
+>>>
+>>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>
+>> Heh, I was thinking it would be best if it went through Maxime's tree because
+>> it also has some deps on new clk stuff (well the dts have deps on that), but either
+>> way works for me.
+>>
+>> Maxime if you want this go through Mauro's tree, I can send a pull-req to Mauro
+>> (I'm a linux-media sub-maintainer), so if that is the case let me know and I'll
+>> prepare a pull-req (after fixing the missing reset documentation in the bindings).
+> 
+> So much for not reading the cover letter... Sorry.
+> 
+> We're getting quite close to the end of the ARM merge window, and I
+> got a couple comments, Lee hasn't commented yet, so I'd say it's a bit
+> too late for this to come in.
 
-This issue was detected by using the Coccinelle software.
+Oh, but this was not intended for 3.19, this can wait till 3.20 from my pov,
+sorry if that was not clear. I was assuming that the merge window was more
+or less closed already, so that this going into 3.20 was expected.
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/thermal/samsung/exynos_thermal_common.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+Regrrds,
 
-diff --git a/drivers/thermal/samsung/exynos_thermal_common.c b/drivers/thermal/samsung/exynos_thermal_common.c
-index 3f5ad25..1cbb9d0 100644
---- a/drivers/thermal/samsung/exynos_thermal_common.c
-+++ b/drivers/thermal/samsung/exynos_thermal_common.c
-@@ -417,12 +417,10 @@ void exynos_unregister_thermal(struct thermal_sensor_conf *sensor_conf)
- 
- 	th_zone = sensor_conf->pzone_data;
- 
--	if (th_zone->therm_dev)
--		thermal_zone_device_unregister(th_zone->therm_dev);
-+	thermal_zone_device_unregister(th_zone->therm_dev);
- 
- 	for (i = 0; i < th_zone->cool_dev_size; i++) {
--		if (th_zone->cool_dev[i])
--			cpufreq_cooling_unregister(th_zone->cool_dev[i]);
-+		cpufreq_cooling_unregister(th_zone->cool_dev[i]);
- 	}
- 
- 	dev_info(sensor_conf->dev,
--- 
-2.1.3
+Hans
