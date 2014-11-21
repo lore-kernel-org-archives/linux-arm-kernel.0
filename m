@@ -1,46 +1,61 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 21 Nov 2014 09:51:07 +0100
-Subject: [PATCH 4/9] rc: sunxi-cir: Add support for an optional reset
- controller
-In-Reply-To: <20141120142831.003fb63e@recife.lan>
-References: <1416498928-1300-1-git-send-email-hdegoede@redhat.com>
- <1416498928-1300-5-git-send-email-hdegoede@redhat.com>
- <20141120142831.003fb63e@recife.lan>
-Message-ID: <20141121085107.GM24143@lukather>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 21 Nov 2014 09:59:54 +0100
+Subject: [PATCHv2 08/16] clk: mvebu: add suspend/resume for gatable clocks
+In-Reply-To: <20141117224604.25314.96198@quantum>
+References: <1415978496-9334-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1415978496-9334-9-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20141117224604.25314.96198@quantum>
+Message-ID: <20141121095954.5f708f54@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro,
+Dear Mike Turquette,
 
-On Thu, Nov 20, 2014 at 02:28:31PM -0200, Mauro Carvalho Chehab wrote:
-> Em Thu, 20 Nov 2014 16:55:23 +0100
-> Hans de Goede <hdegoede@redhat.com> escreveu:
-> 
-> > On sun6i the cir block is attached to the reset controller, add support
-> > for de-asserting the reset if a reset controller is specified in dt.
+On Mon, 17 Nov 2014 14:46:04 -0800, Mike Turquette wrote:
+> Quoting Thomas Petazzoni (2014-11-14 07:21:28)
+> > This commit adds suspend/resume support for the gatable clock driver
+> > used on Marvell EBU platforms. When getting out of suspend, the
+> > Marvell EBU platforms go through the bootloader, which re-enables all
+> > gatable clocks. However, upon resume, the clock framework will not
+> > disable again all gatable clocks that are not used.
 > > 
-> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> > Therefore, if the clock driver does not save/restore the state of the
+> > gatable clocks, all gatable clocks that are not claimed by any device
+> > driver will remain enabled after a resume. This is why this driver
+> > saves and restores the state of those clocks.
 > 
-> As this is meant to be merged via some other tree:
+> It might be a good idea to call clk_disable_unused() from the clk core
+> after resuming from suspend.
+
+Yes, this might be an interesting clk core improvement.
+
+> > @@ -177,14 +178,18 @@ struct clk_gating_ctrl {
+> >         spinlock_t *lock;
+> >         struct clk **gates;
+> >         int num_gates;
+> > +       struct syscore_ops syscore_ops;
 > 
-> Acked-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+> You are registering suspend/resume ops per clock. Have you considered
+> registering a single set of ops for your clock controller driver? See
+> drivers/clk/samsung/clk-exynos5420.c for an example.
+> 
+> Combined with a table of clocks registered by your driver, centralized
+> suspend/resume methods might be a cleaner solution.
 
-Again, I think it'll be perfectly fine in your tree :)
+Ok, I've changed. To be honest, I don't think it makes much change: if
+we had two instances of a gatable clock controller, then we would have
+two calls to mvebu_clk_gating_setup(), which would register twice the
+same syscore_ops. But we were anyway already assuming that we have
+already one instance of a gatable clock controller, since the
+syscore_ops operation implementation already used a global pointer to
+the gatable clock controller.
 
-Once the documentation is updated,
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Will be part of the upcoming v3.
 
-Thanks,
-Maxime
+Thanks for the review!
 
+Thomas
 -- 
-Maxime Ripard, Free Electrons
+Thomas Petazzoni, CTO, Free Electrons
 Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141121/addae619/attachment.sig>
