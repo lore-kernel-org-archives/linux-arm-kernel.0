@@ -1,318 +1,109 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 21 Nov 2014 16:46:22 +0100
-Subject: [PoC PATCH] arm: allow modules outside of bl range
-In-Reply-To: <CAKv+Gu-3Uq0p2u3R=s5U9dHQgWMrJhbS5aytz8jdVEC6JscKvA@mail.gmail.com>
-References: <1416503299-17418-1-git-send-email-ard.biesheuvel@linaro.org>
- <alpine.LFD.2.11.1411201359310.11690@knanqh.ubzr>
- <CAKv+Gu-3Uq0p2u3R=s5U9dHQgWMrJhbS5aytz8jdVEC6JscKvA@mail.gmail.com>
-Message-ID: <CAKv+Gu9a1EyD3k3zW4=+ahZopGfjy-QdLgd-3U2ORH0Tb+GGOA@mail.gmail.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Fri, 21 Nov 2014 23:51:21 +0800
+Subject: [PATCH v7 1/4] irqchip: gic: Support hierarchy irq domain.
+In-Reply-To: <87wq6q9odi.fsf@approximate.cambridge.arm.com>
+References: <1416406451-4578-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1416406451-4578-2-git-send-email-yingjoe.chen@mediatek.com>
+ <87h9xvaz2p.fsf@approximate.cambridge.arm.com>
+ <546D6D62.4030005@linux.intel.com>
+ <87wq6q9odi.fsf@approximate.cambridge.arm.com>
+Message-ID: <1416585081.24971.15.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 November 2014 11:34, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 20 November 2014 20:14, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
->> On Thu, 20 Nov 2014, Ard Biesheuvel wrote:
->>
->>> Loading modules far away from the kernel in memory is problematic because
->>> the 'bl' instruction only has limited reach, and modules are not built
->>> with PLTs. Instead of using the -mlong-calls option (which affects *all*
->>> emitted bl instructions), this patch allocates some additional space at
->>> module load time, and populates it with PLT like entries when encountering
->>> relocations that are out of reach.
->>>
->>> Note that this patch is a proof of concept, and thus removes the implementation
->>> of module_alloc() so that all modules are relocated using PLT entries.
->>> Ideally, we would switch into PLT mode and start using the vmalloc area only
->>> after we have exhausted the ordinary module space.
->>>
->>> This should work with all relocation against symbols exported by the kernel,
->>> including those resulting from GCC generated function calls for ftrace etc.
->>>
->>> This is largely based on the ia64 implementation.
->>> Thumb-2 kernels currently unsupported.
->>>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>
->> Looks on the right track to me.
->>
->> BTW it might be necessary to use PLT mode even from the primary module
->> area if e.g. the kernel gets too big to be reachable (we've seen that
->> already), or a module from the primary area wants to branch to a symbol
->> located in a larger module that ended up in the vmalloc area.  So you
->
-> Indeed.
->
->> might need to estimate the worst case for the number of PLTs and end up
->> not using all of them or even none at all. Would be good to free the
->> unused pages in that case (only for the non init section obviously).
->> Looks like the module_finalize() hook might be used for that.
->>
->
-> This code already establishes an upper bound for the number of
-> required PLT entries, but allocates the memory unconditionally, which
-> is indeed somewhat of a waste as 'no PLT entries' is obviously the
-> general case as long as the primary module area has not been
-> exhausted.
->
-> I can easily round up the core PLT section to PAGE_SIZE size and
-> alignment, but I haven't figured out how to punch a hole into an area
-> returned by vmalloc(), and it is desirable to have the PLT region and
-> the module region itself be part of the same allocation to begin with,
-> or the PLT region may end up out of range itself, which kind of
-> defeats the purpose. Or perhaps, some way to at least release the
-> physical pages while retaining the single vmap_area.
->
 
-It turns out, looking at the actual numbers (random sample of 46
-modules), that the typical size overhead of the core PLT is about 5%,
-and rarely results in the number of needed pages to increase.
+Hi,
 
--- 
-Ard.
+On Thu, 2014-11-20 at 10:07 +0000, Marc Zyngier wrote:
+> On Thu, Nov 20 2014 at  4:26:10 am GMT, Jiang Liu <jiang.liu@linux.intel.com> wrote:
+> 
+> Hi Jiang,
+> 
+> > On 2014/11/20 1:18, Marc Zyngier wrote:
+> >> Hi Yingjoe,
+> >> 
+> >> On Wed, Nov 19 2014 at 2:14:08 pm GMT, Yingjoe Chen
+> >> <yingjoe.chen@mediatek.com> wrote:
+> >>> +
+> >>> +static const struct irq_domain_ops gic_irq_domain_hierarchy_ops = {
+> >>> +	.xlate = gic_irq_domain_xlate,
+> >>> +	.alloc = gic_irq_domain_alloc,
+> >>> +	.free = irq_domain_free_irqs_top,
+> >> 
+> >> I'm convinced that irq_domain_free_irqs_top is the wrong function to
+> >> call here, because you're calling it from the bottom, not the top-level
+> >> (it has no parent).
+> >> 
+> >> I cannot verify this with your code as I don't a working platform with
+> >> GICv2m, but if I enable something similar on GICv3, it dies a very
+> >> painful way:
+> >> 
+> >> Unable to handle kernel NULL pointer dereference at virtual address 00000018
+> >> pgd = ffffffc03d059000
+> >> [00000018] *pgd=0000000081356003, *pud=0000000081356003, *pmd=0000000000000000
+> >> Internal error: Oops: 96000006 [#1] SMP
+> >> Modules linked in:
+> >> CPU: 4 PID: 1052 Comm: sh Not tainted 3.18.0-rc4+ #3311
+> >> task: ffffffc03e320000 ti: ffffffc001390000 task.ti: ffffffc001390000
+> >> PC is at irq_domain_free_irqs_recursive+0x1c/0x80
+> >> LR is at irq_domain_free_irqs_common+0x88/0x9c
+> >> pc : [<ffffffc0000ed790>] lr : [<ffffffc0000ede20>] pstate: 60000145
+> >> [...]
+> >> [<ffffffc0000ed790>] irq_domain_free_irqs_recursive+0x1c/0x80
+> >> [<ffffffc0000ede1c>] irq_domain_free_irqs_common+0x84/0x9c
+> >> [<ffffffc0000ede98>] irq_domain_free_irqs_top+0x64/0x7c  <-- gic_domain.free()
+> >> [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
+> >> [<ffffffc0000ee468>] irq_domain_free_irqs_parent+0x14/0x20
+> >> [<ffffffc0003500b8>] its_irq_domain_free+0xc8/0x250
+> >> [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
+> >> [<ffffffc0000ede1c>] irq_domain_free_irqs_common+0x84/0x9c
+> >> [<ffffffc0000ede98>] irq_domain_free_irqs_top+0x64/0x7c
+> >> [<ffffffc0000ef518>] msi_domain_free+0x70/0x88
+> >> [<ffffffc0000ed798>] irq_domain_free_irqs_recursive+0x24/0x80
+> >> [<ffffffc0000ee3ac>] irq_domain_free_irqs+0x108/0x17c
+> >> [<ffffffc0000efb68>] msi_domain_free_irqs+0x28/0x4c
+> >> [<ffffffc000369cac>] free_msi_irqs+0xb4/0x1c0
+> >> [<ffffffc00036adec>] pci_disable_msix+0x3c/0x4c
+> >> [...]
+> >> 
+> >> and I cannot see how this could work on the standard GIC either.
+> >> 
+> >> Thomas, Jiang: could you please confirm or infirm my suspicions? My
+> >> understanding is that irq_domain_free_irqs_top can only be called from
+> >> the top-level domain.
+> > Hi Marc,
+> > 	It indicates that irq_domain_free_irqs_top() is not a good name.
+> > We have:
+> > 1) irq_domain_set_hwirq_and_chip() to set irq_chip and chip_data
+> > 2) irq_domain_set_info() to set irq_chip, chip_data, flow_handler and
+> >    handler_data;
+> > 3) irq_domain_reset_irq_data() resets irq_chip and chip_data.
+> > 4) irq_domain_free_irqs_common() resets irq_chip, chip_data and calls
+> >    parent domain's domain_ops.free() callback.
+> > 5) irq_domain_free_irqs_top() resets irq_chip, chip_data, flow handler,
+> >    handler_data and call parent domain's domain_ops.free() callback.
+> 
+> Yes, and this "call parent domain's free callback" is where the problem
+> lies. Here, it is called from the innermost domain, with no parent.
+> 
+> > So there two possible improvements here:
+> > 1) Rename irq_domain_free_irqs_top() with better name, any suggestions?
+> >    It's named as is because it's always called by the outer-most
+> >    irqdomains on x86.
+> > 2) Change irq_domain_free_irqs_common() and irq_domain_free_irqs_top()
+> >    to call parent domain's domain_ops.free() callback only if parent
+> >    exists. By this way, they could be used for inner-most irqdomains.
+> > If OK, I will respin a version 4 patch set based on tip/irq/irqdomain.
+> > Thoughts?
+> 
+> Checking the parent is probably a safe solution (this is not a hot path
+> anyway). I don't care much about the name though, and I the only thing I
+> can think of is irq_domain_free_irqs_reset_flow, which looks so bad it's
+> not even funny. I'll let the matter rest in your capable hands! ;-)
 
+I've applied Jiang's "irqdomain: Enhance irq_domain_free_irqs_common()
+to support parentless irqdomain" patch and it did fix the crash.
 
+Thanks Jiang, Marc
 
-
->>
->>>  arch/arm/Makefile             |   1 +
->>>  arch/arm/include/asm/module.h |   2 +
->>>  arch/arm/kernel/module.c      | 172 ++++++++++++++++++++++++++++++++++++++++--
->>>  arch/arm/kernel/module.lds    |   4 +
->>>  4 files changed, 173 insertions(+), 6 deletions(-)
->>>  create mode 100644 arch/arm/kernel/module.lds
->>>
->>> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
->>> index 034a94904d69..dfb7ef1f2cc5 100644
->>> --- a/arch/arm/Makefile
->>> +++ b/arch/arm/Makefile
->>> @@ -12,6 +12,7 @@
->>>
->>>  # Ensure linker flags are correct
->>>  LDFLAGS              :=
->>> +LDFLAGS_MODULE       += -T $(srctree)/arch/arm/kernel/module.lds
->>>
->>>  LDFLAGS_vmlinux      :=-p --no-undefined -X
->>>  ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
->>> diff --git a/arch/arm/include/asm/module.h b/arch/arm/include/asm/module.h
->>> index ed690c49ef93..4c6927976469 100644
->>> --- a/arch/arm/include/asm/module.h
->>> +++ b/arch/arm/include/asm/module.h
->>> @@ -19,6 +19,8 @@ enum {
->>>
->>>  struct mod_arch_specific {
->>>       struct unwind_table *unwind[ARM_SEC_MAX];
->>> +     struct elf32_shdr   *core_plt;
->>> +     struct elf32_shdr   *init_plt;
->>>  };
->>>  #endif
->>>
->>> diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
->>> index 6a4dffefd357..5ec70c15a881 100644
->>> --- a/arch/arm/kernel/module.c
->>> +++ b/arch/arm/kernel/module.c
->>> @@ -37,14 +37,62 @@
->>>  #define MODULES_VADDR        (((unsigned long)_etext + ~PMD_MASK) & PMD_MASK)
->>>  #endif
->>>
->>> -#ifdef CONFIG_MMU
->>> -void *module_alloc(unsigned long size)
->>> +#define PLT_ENTRY_STRIDE     L1_CACHE_BYTES
->>> +#define PLT_ENTRY_COUNT              (PLT_ENTRY_STRIDE / sizeof(u32))
->>> +#define PLT_ENTRY_SIZE               (sizeof(struct plt_entries) / PLT_ENTRY_COUNT)
->>> +#define PLT_ENTRY_LDR                __opcode_to_mem_arm(0xe59ff000 | (PLT_ENTRY_STRIDE - 8))
->>> +
->>> +struct plt_entries {
->>> +     u32     ldr[PLT_ENTRY_COUNT];
->>> +     u32     lit[PLT_ENTRY_COUNT];
->>> +};
->>> +
->>> +static inline int in_init (const struct module *mod, u32 addr)
->>>  {
->>> -     return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
->>> -                             GFP_KERNEL, PAGE_KERNEL_EXEC, NUMA_NO_NODE,
->>> -                             __builtin_return_address(0));
->>> +     return addr - (u32)mod->module_init < mod->init_size;
->>> +}
->>> +
->>> +static inline int in_core (const struct module *mod, u32 addr)
->>> +{
->>> +     return addr - (u32)mod->module_core < mod->core_size;
->>> +}
->>> +
->>> +static u32 get_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
->>> +{
->>> +     struct plt_entries *plt, *plt_end;
->>> +
->>> +     if (in_init(mod, loc)) {
->>> +             plt = (void *)mod->arch.init_plt->sh_addr;
->>> +             plt_end = (void *)plt + mod->arch.init_plt->sh_size;
->>> +     } else {
->>> +             plt = (void *)mod->arch.core_plt->sh_addr;
->>> +             plt_end = (void *)plt + mod->arch.core_plt->sh_size;
->>> +     }
->>> +
->>> +     /* Look for an existing entry pointing to 'val' */
->>> +     while (plt < plt_end) {
->>> +             int i;
->>> +
->>> +             if (*plt->ldr != PLT_ENTRY_LDR) {
->>> +                     /* Populate a new set of entries */
->>> +                     *plt = (struct plt_entries){
->>> +                             { [0 ... PLT_ENTRY_COUNT-1] = PLT_ENTRY_LDR, },
->>> +                             { val, }
->>> +                     };
->>> +                     return (u32)plt->ldr;
->>> +             }
->>> +             for (i = 0; i < PLT_ENTRY_COUNT; i++) {
->>> +                     if (!plt->lit[i])
->>> +                             plt->lit[i] = val;
->>> +                     else if (plt->lit[i] != val)
->>> +                             continue;
->>> +                     return (u32)&plt->ldr[i];
->>> +             }
->>> +             plt++;
->>> +     }
->>> +     BUG();
->>> +     return 0;
->>>  }
->>> -#endif
->>>
->>>  int
->>>  apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
->>> @@ -107,6 +155,22 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
->>>                       if (offset & 3 ||
->>>                           offset <= (s32)0xfe000000 ||
->>>                           offset >= (s32)0x02000000) {
->>> +
->>> +                             /*
->>> +                              * Route this call through a PLT entry that we
->>> +                              * populate on the fly in the PLT section that
->>> +                              * is part of the module memory area.
->>> +                              * Note that 'offset + loc + 8' contains the
->>> +                              * absolute jump target, i.e., @sym + addend,
->>> +                              * corrected for the -8 PC bias.
->>> +                              */
->>> +                             offset = get_plt(module, loc, offset + loc + 8)
->>> +                                      - loc - 8;
->>> +                     }
->>> +
->>> +                     if (offset & 3 ||
->>> +                         offset <= (s32)0xfe000000 ||
->>> +                         offset >= (s32)0x02000000) {
->>>                               pr_err("%s: section %u reloc %u sym '%s': relocation %u out of range (%#lx -> %#x)\n",
->>>                                      module->name, relindex, i, symname,
->>>                                      ELF32_R_TYPE(rel->r_info), loc,
->>> @@ -354,3 +418,99 @@ module_arch_cleanup(struct module *mod)
->>>                       unwind_table_del(mod->arch.unwind[i]);
->>>  #endif
->>>  }
->>> +
->>> +static int duplicate_reloc(Elf32_Addr base, const Elf32_Rel *rel, int num,
->>> +                        u32 mask)
->>> +{
->>> +     u32 *loc1, *loc2;
->>> +     int i;
->>> +
->>> +     for (i = 0; i < num; i++) {
->>> +             if (rel[i].r_info != rel[num].r_info)
->>> +                     continue;
->>> +
->>> +             /*
->>> +              * Identical relocation types against identical symbols can
->>> +              * still result in different PLT entries if the addend in the
->>> +              * place is different. So resolve the target of the relocation
->>> +              * to compare the values.
->>> +              */
->>> +             loc1 = (u32 *)(base + rel[i].r_offset);
->>> +             loc2 = (u32 *)(base + rel[num].r_offset);
->>> +             if (((*loc1 ^ *loc2) & mask) == 0)
->>> +                     return 1;
->>> +     }
->>> +     return 0;
->>> +}
->>> +
->>> +/* Count how many PLT entries we may need */
->>> +static unsigned int count_plts(Elf32_Addr base, const Elf32_Rel *rel, int num)
->>> +{
->>> +     unsigned int ret = 0;
->>> +     int i;
->>> +
->>> +     /*
->>> +      * Sure, this is order(n^2), but it's usually short, and not
->>> +      * time critical
->>> +      */
->>> +     for (i = 0; i < num; i++)
->>> +             switch (ELF32_R_TYPE(rel[i].r_info))
->>> +             case R_ARM_CALL:
->>> +             case R_ARM_PC24:
->>> +             case R_ARM_JUMP24:
->>> +             case R_ARM_THM_CALL:
->>> +             case R_ARM_THM_JUMP24:
->>> +                     if (!duplicate_reloc(base, rel, i, 0x00ffffff))
->>> +                             ret++;
->>> +     return ret;
->>> +}
->>> +
->>> +int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
->>> +                           char *secstrings, struct module *mod)
->>> +{
->>> +     unsigned long core_plts = 0, init_plts = 0;
->>> +     Elf32_Shdr *s, *sechdrs_end = sechdrs + ehdr->e_shnum;
->>> +
->>> +     /*
->>> +      * To store the PLTs, we expand the .text section for core module code
->>> +      * and the .init.text section for initialization code.
->>> +      */
->>> +     for (s = sechdrs; s < sechdrs_end; ++s)
->>> +             if (strcmp(".core.plt", secstrings + s->sh_name) == 0)
->>> +                     mod->arch.core_plt = s;
->>> +             else if (strcmp(".init.plt", secstrings + s->sh_name) == 0)
->>> +                     mod->arch.init_plt = s;
->>> +
->>> +     if (!mod->arch.core_plt || !mod->arch.init_plt) {
->>> +             printk(KERN_ERR "%s: sections missing\n", mod->name);
->>> +             return -ENOEXEC;
->>> +     }
->>> +
->>> +     for (s = sechdrs + 1; s < sechdrs_end; ++s) {
->>> +             const Elf32_Rel *rels = (void *)ehdr + s->sh_offset;
->>> +             int numrels = s->sh_size / sizeof(Elf32_Rel);
->>> +             Elf32_Shdr *dstsec = sechdrs + s->sh_info;
->>> +
->>> +             if (s->sh_type != SHT_REL)
->>> +                     continue;
->>> +
->>> +             if (strstr(secstrings + s->sh_name, ".init"))
->>> +                     init_plts += count_plts(dstsec->sh_addr, rels, numrels);
->>> +             else
->>> +                     core_plts += count_plts(dstsec->sh_addr, rels, numrels);
->>> +     }
->>> +
->>> +     mod->arch.core_plt->sh_type = SHT_NOBITS;
->>> +     mod->arch.core_plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
->>> +     mod->arch.core_plt->sh_addralign = L1_CACHE_BYTES;
->>> +     mod->arch.core_plt->sh_size = round_up(core_plts * PLT_ENTRY_SIZE,
->>> +                                            sizeof(struct plt_entries));
->>> +     mod->arch.init_plt->sh_type = SHT_NOBITS;
->>> +     mod->arch.init_plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
->>> +     mod->arch.init_plt->sh_addralign = L1_CACHE_BYTES;
->>> +     mod->arch.init_plt->sh_size = round_up(init_plts * PLT_ENTRY_SIZE,
->>> +                                            sizeof(struct plt_entries));
->>> +     pr_debug("%s: core.plt=%x, init.plt=%x\n", __func__,
->>> +              mod->arch.core_plt->sh_size, mod->arch.init_plt->sh_size);
->>> +     return 0;
->>> +}
->>> diff --git a/arch/arm/kernel/module.lds b/arch/arm/kernel/module.lds
->>> new file mode 100644
->>> index 000000000000..3682fa107918
->>> --- /dev/null
->>> +++ b/arch/arm/kernel/module.lds
->>> @@ -0,0 +1,4 @@
->>> +SECTIONS {
->>> +        .core.plt : { BYTE(0) }
->>> +        .init.plt : { BYTE(0) }
->>> +}
->>> --
->>> 1.8.3.2
->>>
->>>
+Joe.C
