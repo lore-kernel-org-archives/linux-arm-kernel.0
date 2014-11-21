@@ -1,56 +1,41 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 21 Nov 2014 09:54:43 +0900
-Subject: [PATCH 17/29] ARM: shmobile: koelsch: Sound DMA support via DVC on DTS
+Date: Fri, 21 Nov 2014 09:54:46 +0900
+Subject: [PATCH 20/29] ARM: shmobile: koelsch dts: Add labels for the LEDs
 In-Reply-To: <cover.1416476366.git.horms+renesas@verge.net.au>
 References: <cover.1416476366.git.horms+renesas@verge.net.au>
-Message-ID: <5c6d4b947aeca23e10f7d4ddf2041eda51b0ded2.1416476366.git.horms+renesas@verge.net.au>
+Message-ID: <352faa5fedbc9f84faa849ce612ab2633c4db0ec.1416476366.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-DMA transfer uses DVC
+The LEDs on the koelsch board are labeled using upper-case characters.
 
-     DMA               DMApp
-[MEM] -> [SRC] -> [DVC] -> [SSIU] -> [SSI]
-
-     DMA               DMApp
-[MEM] <- [DVC] <- [SRC] <- [SSIU] <- [SSI]
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index d2fe677..f056e64 100644
+index f056e64..a10f534 100644
 --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
 +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -20,6 +20,13 @@
-  * This command is required when Playback/Capture
-  *
-  *	amixer set "LINEOUT Mixer DACL" on
-+ *	amixer set "DVC Out" 100%
-+ *	amixer set "DVC In" 100%
-+ *
-+ * You can use Mute
-+ *
-+ *	amixer set "DVC Out Mute" on
-+ *	amixer set "DVC In Mute" on
-  */
- 
- /dts-v1/;
-@@ -569,8 +576,8 @@
- 
- 	rcar_sound,dai {
- 		dai0 {
--			playback = <&ssi0 &src2>;
--			capture  = <&ssi1 &src3>;
-+			playback = <&ssi0 &src2 &dvc0>;
-+			capture  = <&ssi1 &src3 &dvc1>;
+@@ -149,12 +149,15 @@
+ 		compatible = "gpio-leds";
+ 		led6 {
+ 			gpios = <&gpio2 19 GPIO_ACTIVE_HIGH>;
++			label = "LED6";
+ 		};
+ 		led7 {
+ 			gpios = <&gpio2 20 GPIO_ACTIVE_HIGH>;
++			label = "LED7";
+ 		};
+ 		led8 {
+ 			gpios = <&gpio2 21 GPIO_ACTIVE_HIGH>;
++			label = "LED8";
  		};
  	};
- };
+ 
 -- 
 2.1.1
