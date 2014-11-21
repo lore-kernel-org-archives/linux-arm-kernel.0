@@ -1,99 +1,86 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 21 Nov 2014 10:58:24 +0800
-Subject: [RFC PATCH 00/16] Refine PCI host bridge scan interfaces
-In-Reply-To: <20141120163918.GE9162@bart.dudau.co.uk>
-References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
- <1463511.o4kE8TX3Bd@wuerfel> <546DD688.60705@linaro.org>
- <20141120120850.GD9162@bart.dudau.co.uk> <546DE45C.6010306@linaro.org>
- <20141120163918.GE9162@bart.dudau.co.uk>
-Message-ID: <546EAA50.8000601@huawei.com>
+From: thunder.leizhen@huawei.com (leizhen)
+Date: Fri, 21 Nov 2014 10:59:21 +0800
+Subject: [PATCH 1/1] iommu/arm-smmu: forbid userspace IO devices access
+ memory through SMMU by default
+In-Reply-To: <20141120135339.GM19126@arm.com>
+References: <1416477421-1288-1-git-send-email-thunder.leizhen@huawei.com>
+ <20141120101340.GC19126@arm.com> <546DE3A5.4030500@huawei.com>
+ <20141120135339.GM19126@arm.com>
+Message-ID: <546EAA89.4000704@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/21 0:39, Liviu Dudau wrote:
-> On Thu, Nov 20, 2014 at 01:53:48PM +0100, Tomasz Nowicki wrote:
->> On 20.11.2014 13:08, Liviu Dudau wrote:
->>> On Thu, Nov 20, 2014 at 12:54:48PM +0100, Tomasz Nowicki wrote:
->>>> On 17.11.2014 15:13, Arnd Bergmann wrote:
->>>>> On Monday 17 November 2014 18:21:34 Yijing Wang wrote:
->>>>>> This series is based Linux 3.18-rc1 and Lorenzo Pieralisi's
->>>>>> arm PCI domain cleanup patches, link:
->>>>>> https://patchwork.ozlabs.org/patch/407585/
->>>>>>
->>>>>> Current pci scan interfaces like pci_scan_root_bus() and directly
->>>>>> call pci_create_root_bus()/pci_scan_child_bus() lack flexiblity.
->>>>>> Some platform infos like PCI domain and msi_chip have to be
->>>>>> associated to PCI bus by some arch specific function.
->>>>>> We want to make a generic pci_host_bridge, and make it hold
->>>>>> the platform infos or hook. Then we could eliminate the lots
->>>>>> of arch pci_domain_nr, also we could associate some platform
->>>>>> ops something like pci_get_msi_chip(struct pci_dev *dev)
->>>>>> with pci_host_bridge to avoid introduce arch weak functions.
->>>>>>
->>>>>> This RFC version not for all platforms, just applied the new
->>>>>> scan interface in x86/arm/powerpc/ia64, I will refresh other
->>>>>> platforms after the core pci scan interfaces are ok.
->>>>>
->>>>> I think overall this is a good direction to take, in particular
->>>>> moving more things into struct pci_host_bridge so we can
->>>>> slim down the architecture specific code.
->>>>>
->>>>> I don't particularly like the way you use the 'pci_host_info'
->>>>> to pass callback pointers and some of the generic information.
->>>>> This duplicates some of the issues we are currently trying
->>>>> to untangle in the arm32 code to make drivers easier to share
->>>>> between architectures.
->>>>>
->>>>> As a general approach, I'd rather see generic helper functions
->>>>> being exported by the PCI core that a driver may or may not
->>>>> call.
->>>>> The way you split the interface between things that happen
->>>>> before scanning the buses (pci_create_host_bridge) and
->>>>> the actual scanning (__pci_create_root_bus, pci_scan_child_bus)
->>>>> seems very helpful and I think we can expand that concept further:
->>>>>
->>>>> - The normal pci_create_host_bridge() function can contain
->>>>>   all of the DT scanning functions (finding bus/mem/io resources,
->>>>>   finding the msi-parent), while drivers that don't depend on DT
->>>>>   for this information can call the same function and fill the
->>>>>   same things after they have the pci_host_bridge pointer.
->>>>
->>>> How about finding PCI domain number (in the DT way) within
->>>> pci_create_host_bridge() too ?
+On 2014/11/20 21:53, Will Deacon wrote:
+> On Thu, Nov 20, 2014 at 12:50:45PM +0000, leizhen wrote:
+>> On 2014/11/20 18:13, Will Deacon wrote:
+>>> On Thu, Nov 20, 2014 at 09:57:01AM +0000, Zhen Lei wrote:
+>>>> It's dangerous to set pte with ARM_SMMU_PTE_AP_UNPRIV. A hacker can use any
+>>>> devices running at userspace to access the memory which originally mapped for
+>>>> kernel devices, suppose they have the same StreamID. The userspace devices
+>>>> should through vfio to dynamic create mapping.
 >>>
->>> It is an idea worth pursuing for the 99% of the cases. I would like
->>> to understand the 1% of the time when we want a domain number to be
->>> shared between two host bridges or the time when we want more than
->>> one domain per bridge.
->> Even though we have shared domain, this should be resolved via DT calls, do
->> I miss something ?
-> 
-> If we only going to hold one domain number per host bridge, then no, you're
-> not missing anything.
-> 
+>>> I don't fully understand the problem here. vfio will create a set of private
+>>> page tables for the container, so I can't see why the privilege really
+>>> matters, given that the whole thing is sandboxed anyway.
 >>
->>>
->>> Is that possible? Is it useful? Is it already in practice?
->> This is good question... IMO:
->> 1. Two host bridges can shared domain number if they are children of the
->> same parent host bridge.
->> 2. But I can not find good explanation for more than one domain per bridge.
+>> Suppose DMA-0 can be running both at kernel space and user space. And kernel
+>> APP use DMA-0 to access the lowest 4G(physical memory address range: 0~4G,
+>> because some old DMA devices can only output 32bit address, and phys_to_dma() in
+>> arch/arm64/include/asm/dma-mapping.h take iova and pa as the same). We can use
+>> bypass mode or create mapping iova=pa for the lowest 4G. Now, the user APP can
+>> use DMA-0 to access all the lowest 4G(may contain kernel information and user APP
+>> originally access prohibitted).
 > 
-> Splitting a root bus into two or more "segments" ?
+> What's a kernel APP? Is DMA-0 some sort of device? How is it running at both
+> kernel and userspace?
 
-It seems impossible.
+The APP running at kernel mode, like a driver. DMA-0 is not a really device, just for
+easier to communicate. Yes, a device can not running at both kernel and userspace. It
+emits either PRIV or UNPRIV attribute. But if there two devices with the same StreamID,
+one running at kernel and the other running at userspace, that's possible.
 
 > 
-> Best regards,
-> Liviu
+>> Through vfio, the user APP can only create mapping for the physical memory which
+>> it can access through cpu. That's the memory which belong to the user APP, vfio
+>> should check this.
 > 
+> Yes, so there is no issue when using VFIO.
+> 
+>> And now, arm64 have not support vfio. I don't know how to deal with: a iommu_group
+>> used by both user devices(through vfio) and kernel devices. They may specify the same
+>> iova but different pa or diffrent attributes. Maybe we should not support this scene.
+>> But if all(iova,pa,attr) is the same, we can simply add ARM_SMMU_PTE_AP_UNPRIV in PTE to
+>> satisfy vfio requirment.
+> 
+> arm64 does support VFIO. Please check the patches queued for 3.19.
+
+Ok, thank you for your imformation.
+
+> 
+>>> Furthermore, if we change the default to PRIV, then it will break for any
+>>> devices wired to emit unprivileged transactions only.
 >>
->> Tomasz
->>
->>
+>> if so, it's the problem of hardware. I think.
+> 
+> If you have a device that emits the same streamid for privileged and
+> unprivileged transactions, then I think you have the problem of hardware :)
 > 
 
+As I mentioned above. There maybe two devices: one emits PRIV and the other emits UNPRIV.
 
--- 
-Thanks!
-Yijing
+My originally meaning: If a device selected running at kernel, it should only emits PRIV.
+But if a device selected running at kernel and emits UNPRIV, that's a hardware problem.
+Because now arm-smmu driver are only support device running at kernel, so we only need set PRIV.
+If user APP through vfio to create mapping, the PTE is set at UNPRIV. Otherwise, PRIV/UNPRIV in
+smmu have no meaning.
+
+Now, many devices are mem-mapped, the register space of devices(running at kernel) should user
+access prohibitted. I will check whether it ensured by hardware or OS later.
+
+> The right way to solve this would be to add a new IOMMU_PRIV flag (I think
+> this was discussed in the past) which can be passed to iommu_map.
+> 
+> Will
+> 
+> .
+> 
