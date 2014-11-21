@@ -1,44 +1,85 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 22 Nov 2014 00:19:16 +0900
-Subject: [GIT PULL] Samsung clock changes for 3.19
-In-Reply-To: <20141119192725.25314.53729@quantum>
-References: <5453C8A7.6080502@samsung.com> <546C457C.6030901@samsung.com>
- <20141119192725.25314.53729@quantum>
-Message-ID: <546F57F4.7070400@kernel.org>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri, 21 Nov 2014 10:21:13 -0500
+Subject: [PATCH v3 11/13] arm64/efi: use plain memblock API for adding
+ and removing reserved RAM
+In-Reply-To: <CAKv+Gu_2kn10dh7LMbhVVYu8+LkMoN_Vxi-tnmCEcBTJ7qs_Jg@mail.gmail.com>
+References: <1416315432-8534-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1416315432-8534-12-git-send-email-ard.biesheuvel@linaro.org>
+ <1416504536.6398.58.camel@deneb.redhat.com>
+ <CAKv+Gu9XQWrQyPi+8=vhXWkJXtnJ+8=evNC-Z_MkWR8Wuk6Awg@mail.gmail.com>
+ <1416506069.6398.64.camel@deneb.redhat.com>
+ <CAKv+Gu_2kn10dh7LMbhVVYu8+LkMoN_Vxi-tnmCEcBTJ7qs_Jg@mail.gmail.com>
+Message-ID: <1416583273.6398.71.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/14 04:27, Mike Turquette wrote:
-> Quoting Kukjin Kim (2014-11-18 23:23:40)
->> On 11/01/14 02:36, Sylwester Nawrocki wrote:
->>> Hi Mike,
->>>
->> Hi Mike,
->>
->>> I've collected Exynos clk patches in this pull request, as Tomasz has
->>> been busy recently. 
->>> This includes addition of clock controller drivers for Exynos4415 and 
->>> Exynos7 SoCs and related refactoring of the Samsung common clk API. 
->>>
->>> As I mentioned in my other e-mail, it might be sensible to put these 
->>> patches into a separate topic branch, so Kukjin can pull it as 
->>> a dependency for the related dts changes.
->>>
->> As Sylwester suggested, can you please provide a topic branch for
->> samsung tree so that I can apply regarding DT changes such as exynos
->> 4415 and exynos7...
+On Fri, 2014-11-21 at 13:07 +0100, Ard Biesheuvel wrote:
+> On 20 November 2014 18:54, Mark Salter <msalter@redhat.com> wrote:
+> > On Thu, 2014-11-20 at 18:38 +0100, Ard Biesheuvel wrote:
+> >> On 20 November 2014 18:28, Mark Salter <msalter@redhat.com> wrote:
+> >> > On Tue, 2014-11-18 at 13:57 +0100, Ard Biesheuvel wrote:
+> >> >> diff --git a/drivers/firmware/efi/virtmap.c
+> >> >> b/drivers/firmware/efi/virtmap.c
+> >> >> index 98735fb43581..4b6a5c31629f 100644
+> >> >> --- a/drivers/firmware/efi/virtmap.c
+> >> >> +++ b/drivers/firmware/efi/virtmap.c
+> >> >> @@ -8,6 +8,7 @@
+> >> >>   */
+> >> >>
+> >> >>  #include <linux/efi.h>
+> >> >> +#include <linux/memblock.h>
+> >> >>  #include <linux/mm_types.h>
+> >> >>  #include <linux/rbtree.h>
+> >> >>  #include <linux/rwsem.h>
+> >> >> @@ -97,8 +98,15 @@ void __init efi_virtmap_init(void)
+> >> >>                 u64 paddr, npages, size;
+> >> >>                 pgprot_t prot;
+> >> >>
+> >> >> -               if (!efi_mem_is_usable_region(md))
+> >> >> +               paddr = md->phys_addr;
+> >> >> +               npages = md->num_pages;
+> >> >> +               memrange_efi_to_native(&paddr, &npages);
+> >> >> +               size = npages << PAGE_SHIFT;
+> >> >> +
+> >> >> +               if (!efi_mem_is_usable_region(md)) {
+> >> >>                         efi_register_mem_resource(md);
+> >> >> +                       memblock_remove(paddr, size);
+> >> >> +               }
+> >> >
+> >> > What exactly is the memblock_remove trying to accomplish? With it, I
+> >> > get:
+> >> >
+> >>
+> >> The idea was pfn_valid() will then return false for those pfns,
+> >> allowing us to distinguish them from memory that the kernel may be
+> >> using, primarily for /dev/mem filtering. But apparently it is causing
+> >> problems for you, so I will have to figure out if there is a better
+> >> way of addressing this.
+> >>
+> > Okay. Well I think that works for pfn_valid, but it is confusing the
+> > mem_cgroup code. I think because you end up with multiple memory regions
+> > after creating the holes. Earlier memory management code saw one memory
+> > region. And because this comes after paging_init(), all of the memory
+> > ends up in the kernel linear mapping which is something we were trying
+> > to avoid.
+> >
 > 
-> A topic branch already exists:
+> I will drop the memblock_remove() then. I guess I could make the test
+> in devmem_is_allowed() do
 > 
-> git://linuxtv.org/snawrocki/samsung.git for-v3.19/exynos-clk
+> if (!memblock_is_memory() || memblock_is_reserved())
 > 
-> ;-)
+> instead of 'if (!pfn_valid())' so that reserved regions become
+> accessible with having to remove them.
+
+Maybe we should add a new memblock to keep track of uefi tables.
+The memblock_is_reserved() seems overly permissive to me.
+
 > 
-> I've pulled that into clk-next towards 3.19. Please pull the same branch
-> into the samsung tree as a dependency.
+> Are you happy with the other change in this patch, i.e., using
+> memblock_add() directly so that we don't have to deal with the
+> rounding?
 > 
 
-Thanks, I've merged the branch into samsung tree. Please make sure the
-branch will not be rebased :)
-
-- Kukjin
+Yeah, I think that's okay. Everything else seems to be working fine
+in my testing.
