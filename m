@@ -1,44 +1,99 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Fri, 21 Nov 2014 10:56:39 +0800
-Subject: [PATCH v2 0/4] clk: rockchip: allow adjusting pll rates on init
-In-Reply-To: <1416512333-15438-1-git-send-email-heiko@sntech.de>
-References: <1416512333-15438-1-git-send-email-heiko@sntech.de>
-Message-ID: <546EA9E7.6090104@rock-chips.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Fri, 21 Nov 2014 10:58:24 +0800
+Subject: [RFC PATCH 00/16] Refine PCI host bridge scan interfaces
+In-Reply-To: <20141120163918.GE9162@bart.dudau.co.uk>
+References: <1416219710-26088-1-git-send-email-wangyijing@huawei.com>
+ <1463511.o4kE8TX3Bd@wuerfel> <546DD688.60705@linaro.org>
+ <20141120120850.GD9162@bart.dudau.co.uk> <546DE45C.6010306@linaro.org>
+ <20141120163918.GE9162@bart.dudau.co.uk>
+Message-ID: <546EAA50.8000601@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On 2014/11/21 0:39, Liviu Dudau wrote:
+> On Thu, Nov 20, 2014 at 01:53:48PM +0100, Tomasz Nowicki wrote:
+>> On 20.11.2014 13:08, Liviu Dudau wrote:
+>>> On Thu, Nov 20, 2014 at 12:54:48PM +0100, Tomasz Nowicki wrote:
+>>>> On 17.11.2014 15:13, Arnd Bergmann wrote:
+>>>>> On Monday 17 November 2014 18:21:34 Yijing Wang wrote:
+>>>>>> This series is based Linux 3.18-rc1 and Lorenzo Pieralisi's
+>>>>>> arm PCI domain cleanup patches, link:
+>>>>>> https://patchwork.ozlabs.org/patch/407585/
+>>>>>>
+>>>>>> Current pci scan interfaces like pci_scan_root_bus() and directly
+>>>>>> call pci_create_root_bus()/pci_scan_child_bus() lack flexiblity.
+>>>>>> Some platform infos like PCI domain and msi_chip have to be
+>>>>>> associated to PCI bus by some arch specific function.
+>>>>>> We want to make a generic pci_host_bridge, and make it hold
+>>>>>> the platform infos or hook. Then we could eliminate the lots
+>>>>>> of arch pci_domain_nr, also we could associate some platform
+>>>>>> ops something like pci_get_msi_chip(struct pci_dev *dev)
+>>>>>> with pci_host_bridge to avoid introduce arch weak functions.
+>>>>>>
+>>>>>> This RFC version not for all platforms, just applied the new
+>>>>>> scan interface in x86/arm/powerpc/ia64, I will refresh other
+>>>>>> platforms after the core pci scan interfaces are ok.
+>>>>>
+>>>>> I think overall this is a good direction to take, in particular
+>>>>> moving more things into struct pci_host_bridge so we can
+>>>>> slim down the architecture specific code.
+>>>>>
+>>>>> I don't particularly like the way you use the 'pci_host_info'
+>>>>> to pass callback pointers and some of the generic information.
+>>>>> This duplicates some of the issues we are currently trying
+>>>>> to untangle in the arm32 code to make drivers easier to share
+>>>>> between architectures.
+>>>>>
+>>>>> As a general approach, I'd rather see generic helper functions
+>>>>> being exported by the PCI core that a driver may or may not
+>>>>> call.
+>>>>> The way you split the interface between things that happen
+>>>>> before scanning the buses (pci_create_host_bridge) and
+>>>>> the actual scanning (__pci_create_root_bus, pci_scan_child_bus)
+>>>>> seems very helpful and I think we can expand that concept further:
+>>>>>
+>>>>> - The normal pci_create_host_bridge() function can contain
+>>>>>   all of the DT scanning functions (finding bus/mem/io resources,
+>>>>>   finding the msi-parent), while drivers that don't depend on DT
+>>>>>   for this information can call the same function and fill the
+>>>>>   same things after they have the pci_host_bridge pointer.
+>>>>
+>>>> How about finding PCI domain number (in the DT way) within
+>>>> pci_create_host_bridge() too ?
+>>>
+>>> It is an idea worth pursuing for the 99% of the cases. I would like
+>>> to understand the 1% of the time when we want a domain number to be
+>>> shared between two host bridges or the time when we want more than
+>>> one domain per bridge.
+>> Even though we have shared domain, this should be resolved via DT calls, do
+>> I miss something ?
+> 
+> If we only going to hold one domain number per host bridge, then no, you're
+> not missing anything.
+> 
+>>
+>>>
+>>> Is that possible? Is it useful? Is it already in practice?
+>> This is good question... IMO:
+>> 1. Two host bridges can shared domain number if they are children of the
+>> same parent host bridge.
+>> 2. But I can not find good explanation for more than one domain per bridge.
+> 
+> Splitting a root bus into two or more "segments" ?
 
-On 11/21/2014 03:38 AM, Heiko Stuebner wrote:
-> It was found that some firmware versions initialized the pll rates using
-> suboptimal parameters to achieve frequencies the actual rate table contained
-> better parameters for.
->
-> Therefore this series first adds the possibility to create pll-specific flags
-> and then adds a flag to adjust the pll rate on init to the parameters from
-> the rate table.
->
-> changes since v1:
-> - move population of pll_mux before registering the core pll clock
->    null pointer exception in the _set_rate callback when called from init
->
-> Heiko Stuebner (4):
->    clk: rockchip: add ability to specify pll-specific flags
->    clk: rockchip: setup pll_mux data earlier
->    clk: rockchip: add optional sync to pll rate parameters
->    clk: rockchip: add ROCKCHIP_PLL_SYNC_RATE flag to some plls
->
->   drivers/clk/rockchip/clk-pll.c    | 81 +++++++++++++++++++++++++++++++--------
->   drivers/clk/rockchip/clk-rk3188.c |  8 ++--
->   drivers/clk/rockchip/clk-rk3288.c | 10 ++---
->   drivers/clk/rockchip/clk.c        |  3 +-
->   drivers/clk/rockchip/clk.h        | 13 ++++++-
->   5 files changed, 88 insertions(+), 27 deletions(-)
->
-The PLLs may have different usage, so add the pll-specific flag make sense.
+It seems impossible.
 
-I have test this patch set on both rk3288 evb and rk3288 pinky.
+> 
+> Best regards,
+> Liviu
+> 
+>>
+>> Tomasz
+>>
+>>
+> 
 
-For this series:
-Reviewed-by: Kever Yang <kever.yang@rock-chips.com>
-Tested-by: Kever Yang <kever.yang@rock-chips.com>
+
+-- 
+Thanks!
+Yijing
