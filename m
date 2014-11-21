@@ -1,51 +1,63 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 21 Nov 2014 00:30:31 +0100 (CET)
-Subject: [RFC PATCH] arm: imx: Workaround i.MX6 PMU interrupts muxed to
- one SPI
-In-Reply-To: <1416483757-24165-1-git-send-email-daniel.thompson@linaro.org>
-References: <1416483757-24165-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <alpine.DEB.2.11.1411210016360.6439@nanos>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 21 Nov 2014 00:36:49 +0000
+Subject: [PATCH] arm64: topology: Fix handling of multi-level cluster
+ MPIDR-based detection
+Message-ID: <1416530209-16016-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Nov 2014, Daniel Thompson wrote:
-> +/*
-> + * The PMU IRQ lines of all cores are muxed onto a single interrupt.
-> + * Rotate the interrupt around the cores if the current CPU cannot
-> + * figure out why the interrupt has been triggered.
-> + */
-> +static irqreturn_t imx6q_pmu_handler(int irq, void *dev, irq_handler_t handler)
-> +{
-> +	irqreturn_t ret = handler(irq, dev);
-> +	int next;
-> +
-> +	if (ret == IRQ_NONE && num_online_cpus() > 1) {
+From: Mark Brown <broonie@linaro.org>
 
-What guarantees that ret == IRQ_HANDLED is a sign for 'this is only
-for this particular core' interrupt ?
+The only requirement the scheduler has on cluster IDs is that they must
+be unique.  When enumerating the topology based on MPIDR information the
+kernel currently generates cluster IDs by using the first level of
+affinity above the core ID (either level one or two depending on if the
+core has multiple threads) however the ARMv8 architecture allows for up
+to three levels of affinity.  This means that an ARMv8 system may
+contain cores which have MPIDRs identical other than affinity level
+three which with current code will cause us to report multiple cores
+with the same identification to the scheduler in violation of its
+uniqueness requirement.
 
-> +		next = cpumask_next(smp_processor_id(), cpu_online_mask);
-> +		if (next > nr_cpu_ids)
-> +			next = cpumask_next(-1, cpu_online_mask);
-> +		irq_set_affinity(irq, cpumask_of(next));
-> +	}
+Ensure that we do not violate the scheduler requirements on systems that
+uses all the affinity levels by incorporating both affinity levels two
+and three into the cluser ID when the cores are not threaded.
 
-Aside of the fact, that the hardware designers who came up with such a
-brainfart should be put on sane drugs, this is just silly.
+While no currently known hardware uses multi-level clusters it is better
+to program defensively, this will help ease bringup of systems that have
+them and will ensure that things like distribution install media do not
+need to be respun to replace kernels in order to deploy such systems.
+In the worst case the system will work but perform suboptimally until a
+kernel modified to handle the new topology better is installed, in the
+best case this will be an adequate description of such topologies for
+the scheduler to perform well.
 
-Rotating that thing around will introduce arbitrary latencies and
-dependencies on other interrupts to be handled.
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm64/kernel/topology.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-So if there is really no way to figure out which of the cores is the
-actual target of the PMU interrupt then you should simply broadcast
-that interrupt to a designated per cpu vector async from the one which
-handles it in the first place and be done with it. That's the only
-sane option you have.
-
-Until now I assumed that on the core components side only timers and
-interrupt controllers are supposed to be designed by janitors, but
-there seems to be some more evil efforts underway.
-
-Thanks,
-
-	tglx
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index b6ee26b..fcb8f7b 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -255,12 +255,15 @@ void store_cpu_topology(unsigned int cpuid)
+ 		/* Multiprocessor system : Multi-threads per core */
+ 		cpuid_topo->thread_id  = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+ 		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+-		cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 2);
++		cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 2) |
++					 MPIDR_AFFINITY_LEVEL(mpidr, 3) << 8;
+ 	} else {
+ 		/* Multiprocessor system : Single-thread per core */
+ 		cpuid_topo->thread_id  = -1;
+ 		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+-		cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++		cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 1) |
++					 MPIDR_AFFINITY_LEVEL(mpidr, 2) << 8 |
++					 MPIDR_AFFINITY_LEVEL(mpidr, 3) << 16;
+ 	}
+ 
+ 	pr_debug("CPU%u: cluster %d core %d thread %d mpidr %#016llx\n",
+-- 
+2.1.1
