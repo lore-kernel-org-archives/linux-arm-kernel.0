@@ -1,64 +1,39 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Fri, 21 Nov 2014 17:17:26 +0100
-Subject: [PATCH v2] thermal: Exynos: Deletion of unnecessary checks before
- two function calls
-In-Reply-To: <alpine.DEB.2.10.1411211116580.2554@hadrien>
-References: <5307CAA2.8060406@users.sourceforge.net>
- <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
- <530A086E.8010901@users.sourceforge.net>
- <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
- <530A72AA.3000601@users.sourceforge.net>
- <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
- <530B5FB6.6010207@users.sourceforge.net>
- <alpine.DEB.2.10.1402241710370.2074@hadrien>
- <530C5E18.1020800@users.sourceforge.net>
- <alpine.DEB.2.10.1402251014170.2080@hadrien>
- <530CD2C4.4050903@users.sourceforge.net>
- <alpine.DEB.2.10.1402251840450.7035@hadrien>
- <530CF8FF.8080600@users.sourceforge.net>
- <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
- <530DD06F.4090703@users.sourceforge.net>
- <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net> <546F1017.5080403@users.sourceforge.net>
- <alpine.DEB.2.10.1411211116580.2554@hadrien>
-Message-ID: <546F6596.6010103@users.sourceforge.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 21 Nov 2014 08:18:22 -0800
+Subject: [PATCH 3/3] drivers: bus: Move omap gpmc code to live under
+ drivers
+In-Reply-To: <3449576.YFhSXUYQOn@wuerfel>
+References: <1416522501-14999-1-git-send-email-tony@atomide.com>
+ <1416522501-14999-4-git-send-email-tony@atomide.com>
+ <546F0299.1070508@ti.com> <3449576.YFhSXUYQOn@wuerfel>
+Message-ID: <20141121161821.GS7046@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Fri, 21 Nov 2014 17:11:49 +0100
+* Arnd Bergmann <arnd@arndb.de> [141121 03:17]:
+> On Friday 21 November 2014 11:15:05 Roger Quadros wrote:
+> > On 11/21/2014 12:28 AM, Tony Lindgren wrote:
+> > > Just move to drivers as further clean-up can now happen there
+> > > finally.
+> 
+> Awesome!
+> 
+> > >  arch/arm/mach-omap2/Kconfig                           | 1 +
+> > >  arch/arm/mach-omap2/Makefile                          | 2 +-
+> > >  drivers/bus/Kconfig                                   | 3 +++
+> > >  drivers/bus/Makefile                                  | 3 ++-
+> > >  arch/arm/mach-omap2/gpmc.c => drivers/bus/omap-gpmc.c | 0
+> > >  5 files changed, 7 insertions(+), 2 deletions(-)
+> > >  rename arch/arm/mach-omap2/gpmc.c => drivers/bus/omap-gpmc.c (100%)
+> > 
+> > Should we move it to drivers/memory/ instead?
+> > TI_AEMIF driver lives there. This is similar to OMAP-GPMC for but for
+> > Davinci and Keystone platforms.
+> 
+> Agreed, using drivers/memory sounds better.
 
-The functions cpufreq_cooling_unregister() and thermal_zone_device_unregister()
-test whether their argument is NULL and then return immediately.
-Thus the test around the call is not needed.
+Good point, I forgot we have separate drivers/memory and drivers/bus.
 
-This issue was detected by using the Coccinelle software.
+Regards,
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/thermal/samsung/exynos_thermal_common.c | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/thermal/samsung/exynos_thermal_common.c b/drivers/thermal/samsung/exynos_thermal_common.c
-index 3f5ad25..b6be572 100644
---- a/drivers/thermal/samsung/exynos_thermal_common.c
-+++ b/drivers/thermal/samsung/exynos_thermal_common.c
-@@ -417,13 +417,10 @@ void exynos_unregister_thermal(struct thermal_sensor_conf *sensor_conf)
- 
- 	th_zone = sensor_conf->pzone_data;
- 
--	if (th_zone->therm_dev)
--		thermal_zone_device_unregister(th_zone->therm_dev);
-+	thermal_zone_device_unregister(th_zone->therm_dev);
- 
--	for (i = 0; i < th_zone->cool_dev_size; i++) {
--		if (th_zone->cool_dev[i])
--			cpufreq_cooling_unregister(th_zone->cool_dev[i]);
--	}
-+	for (i = 0; i < th_zone->cool_dev_size; ++i)
-+		cpufreq_cooling_unregister(th_zone->cool_dev[i]);
- 
- 	dev_info(sensor_conf->dev,
- 		"Exynos: Kernel Thermal management unregistered\n");
--- 
-2.1.3
+Tony
