@@ -1,37 +1,23 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 21 Nov 2014 13:06:18 +0100
-Subject: [PATCH] mmc: dw_mmc: try pick the exact same voltage as vmmc for
- vqmmc
-In-Reply-To: <5464152E.7040209@rock-chips.com>
-References: <1415109789-7046-1-git-send-email-addy.ke@rock-chips.com>
- <1415678573-6093-1-git-send-email-addy.ke@rock-chips.com>
- <CAPDyKFqUoBjhsbz8rkLa9PY_dpgMxnimz3k7OoA5WVhi7MacPQ@mail.gmail.com>
- <CAD=FV=VQHZ6YmcoeAb1OEVLYRrYBnc_dM5Kjt1TZX_CQJC=EfA@mail.gmail.com>
- <5464152E.7040209@rock-chips.com>
-Message-ID: <CAPDyKFrzGfDew0eLLEcA+_iS_mo-O2bFU58fjirfXXA8AJ9UYQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Nov 2014 13:06:30 +0100
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Cleanups for
+ v3.19
+In-Reply-To: <cover.1416530979.git.horms+renesas@verge.net.au>
+References: <cover.1416530979.git.horms+renesas@verge.net.au>
+Message-ID: <2564955.afktPI8I4q@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+On Friday 21 November 2014 09:55:08 Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these second round of Renesas ARM based SoC cleanups for v3.19.
+> 
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-soc-cleanups-for-v3.19,
+> which I have already sent a pull-request for.
+> 
 
-> Sure
-> If the first card is sd2.0 since startup, dw_mci_switch_voltage will not be called,
+Pulled into next/cleanup, thanks!
 
-That can't be right. mmc_power_up() should trigger
-dw_mci_switch_voltage() to be invoked.
-
-> and card can be identified. But if UHS card is pulgged in first, the vqmmc will be down to 1.8v.
->
-> when sd2.0 card is pulgged in, mmc core will call dw_mci_switch_voltage to change vqmmc to 3.3v
-> (MMC_SINGLE_VOTAGE_330). So vqmmc will be set 2.7v, if we request 2.7-3.6v.
->
-> But vmmc is always 3.3v,becuase it be set min_volt = max_volt = 3.3v in dt tables.
->
-> So the result:
-> vmmc = 3.3v and vqmmc = 2.7v, and sd2.0 card is failed to identify in my test.
-
-Hmm. I wonder why it works the first time? Could it be that your
-regulator have voltage ramp up time that isn't properly considered?
-
-Kind regards
-Uffe
+	Arnd
