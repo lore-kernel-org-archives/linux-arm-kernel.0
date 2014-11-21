@@ -1,58 +1,28 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Fri, 21 Nov 2014 16:00:14 +0530
-Subject: [PATCH v5 1/2] clk: samsung: exynos5440: move restart code into
- clock driver
-In-Reply-To: <546E2968.1070800@samsung.com>
-References: <1416307650-15162-1-git-send-email-pankaj.dubey@samsung.com>
- <1416307650-15162-2-git-send-email-pankaj.dubey@samsung.com>
- <546B62F3.3030807@samsung.com> <000901d003aa$3490e8a0$9db2b9e0$@samsung.com>
- <546E2968.1070800@samsung.com>
-Message-ID: <546F1436.4020101@samsung.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Fri, 21 Nov 2014 14:31:05 +0400
+Subject: IRQ #0 broken on ARM
+Message-ID: <CALT56yPs-SSssff1waj81CRQfER4ZKKR=B1jOXVL-aBChicSjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Hello,
 
-On Thursday 20 November 2014 11:18 PM, Sylwester Nawrocki wrote:
-> On 19/11/14 04:37, Pankaj Dubey wrote:
->>>>
->>>>>> +static int exynos5440_clk_restart_notify(struct notifier_block *this,
->>>>>> +		unsigned long code, void *unused)
->>>>>> +{
->>>>>> +	u32 val, status;
->>>>>> +
->>>>>> +	status = readl_relaxed(reg_base + 0xbc);
->>>>>> +	val = readl_relaxed(reg_base + 0xcc);
->>>>>> +	val = (val & 0xffff0000) | (status & 0xffff);
->>>>>> +	writel_relaxed(val, reg_base + 0xcc);
->>>>
->>>> Can we have macro definitions for these 0xcc, 0xbc address offsets ?
->>>> I must say I couldn't find them documented in any Exynos datasheet I've
->> got though.
->>>>
->>
->> I also wished this, but I could not find them documented.
->> So I tried to keep logic of original code as it is, just changed location.
->> I would also like to mention that I have not tested this on exynos5440 as I
->> do not have
->> one with me. I believe if it was working at its original place in
->> exynos_restart it should work
->> here also. Other patch (2/2) I have verified on Exynos3250 board and its
->> working well.
->
-> I think it's best to merge both patches in that series through
-> the arm-soc tree, since applying them not in order may cause some
-> breakage. Thus I'd let Kukjin take this patch set into his tree.
->
-> For both patches:
-> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->
+After the commit a71b092a9c68685a270ebdde7b5986ba8787e575
+(ARM: Convert handle_IRQ to use __handle_domain_irq) IRQ #0 is broken
+on ARM. It is a valid IRQ and it is quite imporant (on sa1100 it's a GPIO0).
 
-Will you please take this series into your tree.
+The worst thing is that the CPU will be stuck busy-looping around this IRQ
+w/o printing anything to the console or masking the irq. How should we cope
+with that? I'd like to propose to either revert the offending commit or to add
+the following patch.
 
-Thanks,
-Pankaj Dubey
-> --
-> Thanks,
-> Sylwester
->
+-- 
+With best wishes
+Dmitry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-genirq-handle-IRQ-0-in-__handle_domain_irq.patch
+Type: text/x-patch
+Size: 1159 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141121/4738271e/attachment.bin>
