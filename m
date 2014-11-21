@@ -1,85 +1,67 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 21 Nov 2014 08:46:42 +0100
-Subject: [PATCH/RFC] ARM: shmobile: dts: Add common file for MSIOF1
-In-Reply-To: <CANqRtoR2d=tAU=hPQNgnNz4A1k4NzRD0g4qyv3kH7gWJ6jvCiw@mail.gmail.com>
-References: <1416544027-5680-1-git-send-email-horms+renesas@verge.net.au>
- <CANqRtoRxd64yoXQaPbR-euRtT6MX9AnasF32sK6B_EKoE30fJA@mail.gmail.com>
- <20141121045920.GB9888@verge.net.au>
- <CANqRtoR2d=tAU=hPQNgnNz4A1k4NzRD0g4qyv3kH7gWJ6jvCiw@mail.gmail.com>
-Message-ID: <CAMuHMdVcYw4TvHf+eKUQcMm55Ya4Lwm7_qyEUPkwiUA8xboXGA@mail.gmail.com>
+Date: Fri, 21 Nov 2014 09:06:09 +0100
+Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
+In-Reply-To: <7hppchpcfm.fsf@deeprootsystems.com>
+References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
+ <1709760.E0jX3Myv0h@wuerfel> <546C7FDD.7030906@ti.com>
+ <2900095.WIocOu7ue2@wuerfel>
+ <CAPDyKFqeZ3YU2OEN4tCOdcQ0pAho67Q8U_eCEOroG9aS0mp+-Q@mail.gmail.com>
+ <546DD87B.3080806@ti.com>
+ <CAPDyKFrBhZyqozM98_4pPdW0EMFt5W6VX1X7cz6Z=yNhW4vYTA@mail.gmail.com>
+ <CAMuHMdWtHT7QX3Kpa-GCLa49ToGODwjnNVgfxDzJzcM-FU1ffg@mail.gmail.com>
+ <546E0970.5090301@ti.com> <7hh9xtr5ac.fsf@deeprootsystems.com>
+ <CAMuHMdV7zASj8_NtLRir1VubXEKTkq0vBGMXeYXDACu8UC2tZA@mail.gmail.com>
+ <7hbno1r1af.fsf@deeprootsystems.com>
+ <CAMuHMdVXGPu7x706NxqO3rn3KuRbPbD_ZQsJtDH4Hf31AaRR+Q@mail.gmail.com>
+ <7hppchpcfm.fsf@deeprootsystems.com>
+Message-ID: <CAMuHMdU6G35SP-P7bt6RJQk59CrGcKE2XM4N3o8Dv3qxZU7gxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 6:14 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> On Fri, Nov 21, 2014 at 1:59 PM, Simon Horman <horms@verge.net.au> wrote:
->> On Fri, Nov 21, 2014 at 01:45:32PM +0900, Magnus Damm wrote:
->>> On Fri, Nov 21, 2014 at 1:27 PM, Simon Horman
->>> <horms+renesas@verge.net.au> wrote:
->>> > From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
->>> >
->>> > The R-Car Gen 2 SoCs have MSIOF1 interfaces however they
->>> > are not exposed on any boards currently supported in mainline.
+Hi Kevin,
+
+On Fri, Nov 21, 2014 at 2:30 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> Geert Uytterhoeven <geert@linux-m68k.org> writes:
+>> On Thu, Nov 20, 2014 at 10:48 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>>>>> So what exactly are we talking about with "PM" clocks, and why are they
+>>>>> "special" when it comes to PM domains?  IOW, why are the clocks to be
+>>>>> managed during PM domain transitions for a given device any different
+>>>>> than the clocks that need to be managed for a runtime suspend/resume (or
+>>>>> system suspend/resume) sequence for the same device?
+>>>>
+>>>> (Speaking for my case, shmobile)
+>>>>
+>>>> They're not. The clocks to be managed during PM domain transitions are the
+>>>> same as the clocks that need to be managed for a runtime suspend/resume
+>>>> (or system suspend/resume) sequence.
+>>>>
+>>>> The special thing is that this is more a platform than a driver thing: the same
+>>>> module may have a "PM/functional" clock (that is documented to enable/disable
+>>>> the module) on one Soc, but noet on another.
 >>>
->>> Ok, but that's the same as many other devices on R-Car Gen2 SoCs no?
->>> Basically the SoC contains a hardware block but it is not used on the
->>> actual board. I wonder what made MSIOF1 a target for sudden code
->>> consolidation?
->>>
->>> > The purpose of r8a77xx-msiof1.dtsi is to be included
->>> > in a dts file if MSIOF1 is exposed by some means.
->>>
->>> Judging by the file name this seems to be a board specific property
->>> made generic somehow.
+>>> So why isn't the presence or absence of the clock described in the .dtsi
+>>> for the SoC instead of being handled by special PM domain logic?
 >>
->> Yes, it is board stuff not SoC stuff.
->>
->>> > Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
->>> > [horms: Reworked into a separate dtsi file]
->>> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->>>
->>> [snip]
->>>
->>> > +&pfc {
->>> > +       msiof1_pins: spi2 {
->>> > +               renesas,groups = "msiof1_clk_c", "msiof1_sync_c", "msiof1_rx_c",
->>> > +                                "msiof1_tx_c";
->>> > +               renesas,function = "msiof1";
->>> > +       };
->>> > +};
->>> > +
->>> > +&msiof1 {
->>> > +       pinctrl-0 = <&msiof1_pins>;
->>> > +       pinctrl-names = "default";
->>> > +
->>> > +       status = "okay";
->>> > +};
->>>
->>> The DTS above only works on boards that are using the "C" set of pins
->>> for the MSIOF1. Other configurations will not work. It also assumes
->>> that all SoC code is using the same strings for the PFC which may or
->>> may not be true.
->>>
->>> Does some common policy for the Linux kernel exist about how to break
->>> out board specific device support in DTS? If so we should follow it.
->>>
->>> If not, from my conservative view point this patch looks like over
->>> doing code sharing with increased overhead and no apparent upside
->>> except more complex dependencies.
->>
->> Perhaps it would be best just to drop it.
->>
->> The patch that this code was based on illustrates how to enable
->> MSIOF1 on the koelsch. People can find that and use it if they
->> wish to use MSIOF1.
+>> It is. Cfr. the presence/absence of clocks for renesas,rcar-gpio nodes.
 >
-> Thanks, that sounds like a good plan to me.
+> Hmm, OK, Good.
+>
+> So now I'm confused about why the PM domain has to do anything special
+> if the presence/absence of the clocks is already handled by the DT.
 
-If it's just meant to serve as an example...
+Just adding a clock property to a device node in DT doesn't enable the clock
+automatically, nor make it runtime-managed automatically.
+Compare this to e.g. pinctrl, where adding pinctrl properties to DT does enable
+them automatically, without the driver for the device having to care about it.
 
-There is already an example in e.g. r8a7791-koelsch.dts, for MSIOF0.
-Given the implementer may have to change the "C" set of pins to the set of
-pins he wants to use, I think it's a minor hassle to also have to change the
-MSIOF instance number. And he may want to use MSIOF2 or 3, too.
+Drivers interfacing external hardware typically do care about clocks, as they
+have to program clock generators for the external hardware interface (e.g.
+driving spi or i2c buses at specific frequencies).
+
+Other random drivers don't care about clocks, so they don't handle them.
+But as long as they make basic pm_runtime_{enable,get_sync,put}() calls,
+the (optional) clocks (and hardware PM domains) will "work" fine, if handled
+by the PM (clock) domain.
 
 Gr{oetje,eeting}s,
 
