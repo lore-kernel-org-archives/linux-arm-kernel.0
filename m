@@ -1,75 +1,91 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 21 Nov 2014 09:06:09 +0100
-Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
-In-Reply-To: <7hppchpcfm.fsf@deeprootsystems.com>
-References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
- <1709760.E0jX3Myv0h@wuerfel> <546C7FDD.7030906@ti.com>
- <2900095.WIocOu7ue2@wuerfel>
- <CAPDyKFqeZ3YU2OEN4tCOdcQ0pAho67Q8U_eCEOroG9aS0mp+-Q@mail.gmail.com>
- <546DD87B.3080806@ti.com>
- <CAPDyKFrBhZyqozM98_4pPdW0EMFt5W6VX1X7cz6Z=yNhW4vYTA@mail.gmail.com>
- <CAMuHMdWtHT7QX3Kpa-GCLa49ToGODwjnNVgfxDzJzcM-FU1ffg@mail.gmail.com>
- <546E0970.5090301@ti.com> <7hh9xtr5ac.fsf@deeprootsystems.com>
- <CAMuHMdV7zASj8_NtLRir1VubXEKTkq0vBGMXeYXDACu8UC2tZA@mail.gmail.com>
- <7hbno1r1af.fsf@deeprootsystems.com>
- <CAMuHMdVXGPu7x706NxqO3rn3KuRbPbD_ZQsJtDH4Hf31AaRR+Q@mail.gmail.com>
- <7hppchpcfm.fsf@deeprootsystems.com>
-Message-ID: <CAMuHMdU6G35SP-P7bt6RJQk59CrGcKE2XM4N3o8Dv3qxZU7gxA@mail.gmail.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Fri, 21 Nov 2014 13:35:58 +0530
+Subject: [PATCH 3/3] drivers: bus: Move omap gpmc code to live under
+ drivers
+In-Reply-To: <1416522501-14999-4-git-send-email-tony@atomide.com>
+References: <1416522501-14999-1-git-send-email-tony@atomide.com>
+ <1416522501-14999-4-git-send-email-tony@atomide.com>
+Message-ID: <546EF266.1010901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Hi Tony,
 
-On Fri, Nov 21, 2014 at 2:30 AM, Kevin Hilman <khilman@kernel.org> wrote:
-> Geert Uytterhoeven <geert@linux-m68k.org> writes:
->> On Thu, Nov 20, 2014 at 10:48 PM, Kevin Hilman <khilman@kernel.org> wrote:
->>>>> So what exactly are we talking about with "PM" clocks, and why are they
->>>>> "special" when it comes to PM domains?  IOW, why are the clocks to be
->>>>> managed during PM domain transitions for a given device any different
->>>>> than the clocks that need to be managed for a runtime suspend/resume (or
->>>>> system suspend/resume) sequence for the same device?
->>>>
->>>> (Speaking for my case, shmobile)
->>>>
->>>> They're not. The clocks to be managed during PM domain transitions are the
->>>> same as the clocks that need to be managed for a runtime suspend/resume
->>>> (or system suspend/resume) sequence.
->>>>
->>>> The special thing is that this is more a platform than a driver thing: the same
->>>> module may have a "PM/functional" clock (that is documented to enable/disable
->>>> the module) on one Soc, but noet on another.
->>>
->>> So why isn't the presence or absence of the clock described in the .dtsi
->>> for the SoC instead of being handled by special PM domain logic?
->>
->> It is. Cfr. the presence/absence of clocks for renesas,rcar-gpio nodes.
->
-> Hmm, OK, Good.
->
-> So now I'm confused about why the PM domain has to do anything special
-> if the presence/absence of the clocks is already handled by the DT.
+On Friday 21 November 2014 03:58 AM, Tony Lindgren wrote:
+> Just move to drivers as further clean-up can now happen there
+> finally.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/Kconfig                           | 1 +
+>  arch/arm/mach-omap2/Makefile                          | 2 +-
+>  drivers/bus/Kconfig                                   | 3 +++
+>  drivers/bus/Makefile                                  | 3 ++-
+>  arch/arm/mach-omap2/gpmc.c => drivers/bus/omap-gpmc.c | 0
+>  5 files changed, 7 insertions(+), 2 deletions(-)
+>  rename arch/arm/mach-omap2/gpmc.c => drivers/bus/omap-gpmc.c (100%)
+> 
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index f4d06ae..3021901 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -80,6 +80,7 @@ config ARCH_OMAP2PLUS
+>  	select GENERIC_IRQ_CHIP
+>  	select MACH_OMAP_GENERIC
+>  	select OMAP_DM_TIMER
+> +	select OMAP_GPMC
+>  	select PINCTRL
+>  	select SOC_BUS
+>  	select TI_PRIV_EDMA
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index 3e824f8..bd85741 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -6,7 +6,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+>  	-I$(srctree)/arch/arm/plat-omap/include
+>  
+>  # Common support
+> -obj-y := id.o io.o control.o mux.o devices.o fb.o serial.o gpmc.o timer.o pm.o \
+> +obj-y := id.o io.o control.o mux.o devices.o fb.o serial.o timer.o pm.o \
+>  	 common.o gpio.o dma.o wd_timer.o display.o i2c.o hdq1w.o omap_hwmod.o \
+>  	 omap_device.o sram.o drm.o
+>  
+> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+> index 603eb1b..09aacc8 100644
+> --- a/drivers/bus/Kconfig
+> +++ b/drivers/bus/Kconfig
+> @@ -27,6 +27,9 @@ config MVEBU_MBUS
+>  	  Driver needed for the MBus configuration on Marvell EBU SoCs
+>  	  (Kirkwood, Dove, Orion5x, MV78XX0 and Armada 370/XP).
+>  
+> +config OMAP_GPMC
+> +	bool
+> +
+>  config OMAP_OCP2SCP
+>  	tristate "OMAP OCP2SCP DRIVER"
+>  	depends on ARCH_OMAP2PLUS
+> diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
+> index 2973c18..96e77dd 100644
+> --- a/drivers/bus/Makefile
+> +++ b/drivers/bus/Makefile
+> @@ -5,7 +5,8 @@
+>  obj-$(CONFIG_BRCMSTB_GISB_ARB)	+= brcmstb_gisb.o
+>  obj-$(CONFIG_IMX_WEIM)	+= imx-weim.o
+>  obj-$(CONFIG_MVEBU_MBUS) += mvebu-mbus.o
+> -obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
+I guess this is unrelated to $subject. Shouldn't this be dropped?
 
-Just adding a clock property to a device node in DT doesn't enable the clock
-automatically, nor make it runtime-managed automatically.
-Compare this to e.g. pinctrl, where adding pinctrl properties to DT does enable
-them automatically, without the driver for the device having to care about it.
-
-Drivers interfacing external hardware typically do care about clocks, as they
-have to program clock generators for the external hardware interface (e.g.
-driving spi or i2c buses at specific frequencies).
-
-Other random drivers don't care about clocks, so they don't handle them.
-But as long as they make basic pm_runtime_{enable,get_sync,put}() calls,
-the (optional) clocks (and hardware PM domains) will "work" fine, if handled
-by the PM (clock) domain.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks and regards,
+Lokesh
+> +
+> +obj-$(CONFIG_OMAP_GPMC)		+= omap-gpmc.o
+>  
+>  # Interconnect bus driver for OMAP SoCs.
+>  obj-$(CONFIG_OMAP_INTERCONNECT)	+= omap_l3_smx.o omap_l3_noc.o
+> diff --git a/arch/arm/mach-omap2/gpmc.c b/drivers/bus/omap-gpmc.c
+> similarity index 100%
+> rename from arch/arm/mach-omap2/gpmc.c
+> rename to drivers/bus/omap-gpmc.c
+> 
