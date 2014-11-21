@@ -1,32 +1,46 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 21 Nov 2014 02:32:44 +0100 (CET)
-Subject: [PATCH] irqdomain: Fix NULL pointer dererence in
- irq_domain_free_irqs_parent
-In-Reply-To: <1416531745-24661-1-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1416531745-24661-1-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <alpine.DEB.2.11.1411210219370.6439@nanos>
+Date: Fri, 21 Nov 2014 02:46:06 +0100 (CET)
+Subject: Removal of bus->msi assignment breaks MSI with stacked domains
+In-Reply-To: <546E93DC.8010902@huawei.com>
+References: <546E1771.4030201@arm.com> <546E93DC.8010902@huawei.com>
+Message-ID: <alpine.DEB.2.11.1411210233250.6439@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Nov 2014, suravee.suthikulpanit at amd.com wrote:
-> This patch checks if the parent domain is NULL before recursively freeing
-> irqs in the parent domains.
+On Fri, 21 Nov 2014, Yijing Wang wrote:
+> On 2014/11/21 0:31, Marc Zyngier wrote:
+> > Bjorn, Yijing,
+> > 
+> > I've just realized that patch c167caf8d174 (PCI/MSI: Remove useless
+> > bus->msi assignment) completely breaks MSI on arm64 when using the new
+> > MSI stacked domain:
+> 
+> Sorry, this is my first part to refactor MSI related code, now how
+> to get pci msi_controller depends arch
+> functions(pcibios_msi_controller() or arch_setup_msi_irq()), we are
+> working on generic pci_host_bridge, after that, we could eventually
+> eliminate MSI arch functions and find pci dev 's msi controller by
+> pci_host_bridge->get_msi_controller().
 
-Which is nonsense, because if the thing has not been allocated in the
-first place, then it cannot explode in the free path magically, except
-there is a missing check in the allocation path error handling.
- 
-And that's obviously not the case simply because this originates from:
-> [<fffffe0000449278>] pci_disable_msix+0x40/0x50
- 
-Suravee, this is the last warning. I'm tired of your half baken
-patches which lack any explanation. Read back on my previous replies
-to your mails for further explanation.
+The main question is why you think that pci_host_bridge is the proper
+place to store that information.
 
-This is not a 'try and error and hack enough nonsensical checks into
-the code' commercial project.
+On x86 we have DMAR units associated to a single device. Each DMAR
+unit is a seperate MSI irq domain. 
 
-This is core kernel code and requires proper explanation.
+Can you guarantee that the pci_host_bridge is the right point to
+provide the association of the device to the irq domain?
+
+So the real question is:
+
+   What is the association level requirement to properly identify the
+   irqdomain for a specific device on any given architecture with and
+   without IOMMU, interrupt redirection etc.
+
+To be honest: I don't know.
+
+My gut feeling tells me that it's at the device level, but I really
+leave that decision to the experts in that field.
 
 Thanks,
 
