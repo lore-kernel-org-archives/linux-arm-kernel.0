@@ -1,39 +1,107 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Nov 2014 12:42:12 +0100
-Subject: [GIT PULL] ARM: BCM5301X: SoC changes for v3.19
-In-Reply-To: <546E52E9.3040301@hauke-m.de>
-References: <546298D9.7080800@hauke-m.de> <201411201027.22360.arnd@arndb.de>
- <546E52E9.3040301@hauke-m.de>
-Message-ID: <2449000.zVL0dbsxYm@wuerfel>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 21 Nov 2014 11:45:51 +0000
+Subject: [RFC PATCH] arm: imx: Workaround i.MX6 PMU interrupts muxed to
+ one SPI
+In-Reply-To: <alpine.DEB.2.11.1411211138050.6439@nanos>
+References: <1416483757-24165-1-git-send-email-daniel.thompson@linaro.org>
+ <alpine.DEB.2.11.1411210016360.6439@nanos> <546F0ACA.7010007@linaro.org>
+ <alpine.DEB.2.11.1411211138050.6439@nanos>
+Message-ID: <546F25EF.5080309@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 November 2014 21:45:29 Hauke Mehrtens wrote:
-> On 11/20/2014 10:27 AM, Arnd Bergmann wrote:
-> > - The pull request is based on -rc4, but I see no strong reason why you did
-> >   that. It helps us a lot of all pull requests in a branch are based off
-> >   the same -rc, so please have them based on -rc1 by default or explain why
-> >   you picked something else in the tag description.
+On 21/11/14 10:41, Thomas Gleixner wrote:
+> On Fri, 21 Nov 2014, Daniel Thompson wrote:
+>> On 20/11/14 23:30, Thomas Gleixner wrote:
+>>> On Thu, 20 Nov 2014, Daniel Thompson wrote:
+>>>> +/*
+>>>> + * The PMU IRQ lines of all cores are muxed onto a single interrupt.
+>>>> + * Rotate the interrupt around the cores if the current CPU cannot
+>>>> + * figure out why the interrupt has been triggered.
+>>>> + */
+>>>> +static irqreturn_t imx6q_pmu_handler(int irq, void *dev, irq_handler_t handler)
+>>>> +{
+>>>> +	irqreturn_t ret = handler(irq, dev);
+>>>> +	int next;
+>>>> +
+>>>> +	if (ret == IRQ_NONE && num_online_cpus() > 1) {
+>>>
+>>> What guarantees that ret == IRQ_HANDLED is a sign for 'this is only
+>>> for this particular core' interrupt ?
+>>
+>> It isn't guaranteed. We rely on re-entering the interrupt handler if
+>> more than one PMU is raising the interrupt simultaneously.
+>>
+>>>
+>>>> +		next = cpumask_next(smp_processor_id(), cpu_online_mask);
+>>>> +		if (next > nr_cpu_ids)
+>>>> +			next = cpumask_next(-1, cpu_online_mask);
+>>>> +		irq_set_affinity(irq, cpumask_of(next));
+>>>> +	}
+>>>
+>>> Aside of the fact, that the hardware designers who came up with such a
+>>> brainfart should be put on sane drugs, this is just silly.
+>>>
+>>> Rotating that thing around will introduce arbitrary latencies and
+>>> dependencies on other interrupts to be handled.
+>>
+>> To be honest I viewed the only real merits of the rotation workaround to
+>> be that it is simple and minimally invasive. I am in total agreement
+>> that there are profiling use cases that it will handle badly (although
+>> there are a useful set which this workaround is sufficient to support).
+>>
+>>> So if there is really no way to figure out which of the cores is the
+>>> actual target of the PMU interrupt
+>>
+>> PMU is only accessible via the bus if you are a external debugger
+>> (signals external to the cluster control the register windowing). From
+>> the kernel we have to use the co-processor interface and can only see
+>> our own PMU.
+>>
+>>> then you should simply broadcast
+>>> that interrupt to a designated per cpu vector async from the one which
+>>> handles it in the first place and be done with it. That's the only
+>>> sane option you have.
+>>
+>> As it happens I was planning to do some work on rebroadcasting next
+>> anyway regardless of this discussion because I can't call
+>> irq_set_affinity() from a FIQ handler...
+>>
+>> Options I considered to rebroadcast are either direct use of an (new and
+>> ARM specific?) IPI or use of smp_call_function() from a tasklet. I was
 > 
-> I just thought that I should base it on a recent -rc, so I took -rc4, I
-> can rebase it on rc1 if you like, I do not depend on any new stuff.
-
-No, you should base on the oldest -rc that works for you to avoid backmerges.
-When I start the next/soc branch from -rc1 and I pull in a branch that
-is based on -rc4, 'git request-pull' can no longer figure out what the
-base changeset was and I have to manually edit the pull request.
-
-> > If you want, I can just cherry-pick the two patches from your branch into
-> > the next/soc branch so you don't have to rebase it this time.
+>> inclined to rule out the tasklet because it has the potential for far
+>> greater timing jitter than rotating the affinity (doesn't it?).
 > 
-> That would be nice.
+> You cannot schedule a tasklet from FIQ.
+
+Indeed, that was another black mark against it. However I would prefer
+to be able to convince people to rule out for performance reasons.
+My FIQ work for perf isn't mainlined at this point so using FIQ to show
+why I prefer one solution (for mainline) over another isn't entirely
+reasonable.
+
+> The only options you have are:
 > 
+>     - Async IPI (direct call into the architecture code). I have no
+>       idea whether thats possible on ARM
 
-I've cherry-picked the first one, but the "BCM5301X: select GPIOLIB as
-optional" change no longer applies: as part of Scott's "ARM: mach-bcm:
-Consolidate currently supported IPROC SoCs", bcm5301x now selects
-ARCH_IPROC, which already uses ARCH_REQUIRE_GPIOLIB.
+I think this may be where I have to go eventually (sigh). If I can get
+to the stage where we can deliver PMU events via FIQ then ideally the
+workaround would also have to broadcast via FIQ.
 
-Let me know if that is a problem.
+Its a real shame that one of the best chips to do FIQ work suffers has
+such an annoying hardware bug.
 
-	Arnd
+>     - irq_work
+
+I'm currently trying this approach. It makes sense today without FIQ
+and, fortunately for me, the workaround should mostly still work if it
+were deployed from a FIQ handler.
+
+BTW thanks very much for the listing options here; I was a little
+worried I might have overlooked some really obvious way to deploy the
+workaround.
+
+
+Daniel.
