@@ -1,91 +1,36 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Fri, 21 Nov 2014 13:35:58 +0530
-Subject: [PATCH 3/3] drivers: bus: Move omap gpmc code to live under
- drivers
-In-Reply-To: <1416522501-14999-4-git-send-email-tony@atomide.com>
-References: <1416522501-14999-1-git-send-email-tony@atomide.com>
- <1416522501-14999-4-git-send-email-tony@atomide.com>
-Message-ID: <546EF266.1010901@ti.com>
+From: zhichang.yuan@linaro.org (zhichang.yuan at linaro.org)
+Date: Fri, 21 Nov 2014 16:27:40 +0800
+Subject: [PATCH] arm64:mm: free the useless initial page table
+Message-ID: <1416558460-7257-1-git-send-email-zhichang.yuan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+From: "zhichang.yuan" <zhichang.yuan@linaro.org>
 
-On Friday 21 November 2014 03:58 AM, Tony Lindgren wrote:
-> Just move to drivers as further clean-up can now happen there
-> finally.
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Roger Quadros <rogerq@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap2/Kconfig                           | 1 +
->  arch/arm/mach-omap2/Makefile                          | 2 +-
->  drivers/bus/Kconfig                                   | 3 +++
->  drivers/bus/Makefile                                  | 3 ++-
->  arch/arm/mach-omap2/gpmc.c => drivers/bus/omap-gpmc.c | 0
->  5 files changed, 7 insertions(+), 2 deletions(-)
->  rename arch/arm/mach-omap2/gpmc.c => drivers/bus/omap-gpmc.c (100%)
-> 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index f4d06ae..3021901 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -80,6 +80,7 @@ config ARCH_OMAP2PLUS
->  	select GENERIC_IRQ_CHIP
->  	select MACH_OMAP_GENERIC
->  	select OMAP_DM_TIMER
-> +	select OMAP_GPMC
->  	select PINCTRL
->  	select SOC_BUS
->  	select TI_PRIV_EDMA
-> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-> index 3e824f8..bd85741 100644
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -6,7 +6,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
->  	-I$(srctree)/arch/arm/plat-omap/include
->  
->  # Common support
-> -obj-y := id.o io.o control.o mux.o devices.o fb.o serial.o gpmc.o timer.o pm.o \
-> +obj-y := id.o io.o control.o mux.o devices.o fb.o serial.o timer.o pm.o \
->  	 common.o gpio.o dma.o wd_timer.o display.o i2c.o hdq1w.o omap_hwmod.o \
->  	 omap_device.o sram.o drm.o
->  
-> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-> index 603eb1b..09aacc8 100644
-> --- a/drivers/bus/Kconfig
-> +++ b/drivers/bus/Kconfig
-> @@ -27,6 +27,9 @@ config MVEBU_MBUS
->  	  Driver needed for the MBus configuration on Marvell EBU SoCs
->  	  (Kirkwood, Dove, Orion5x, MV78XX0 and Armada 370/XP).
->  
-> +config OMAP_GPMC
-> +	bool
-> +
->  config OMAP_OCP2SCP
->  	tristate "OMAP OCP2SCP DRIVER"
->  	depends on ARCH_OMAP2PLUS
-> diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
-> index 2973c18..96e77dd 100644
-> --- a/drivers/bus/Makefile
-> +++ b/drivers/bus/Makefile
-> @@ -5,7 +5,8 @@
->  obj-$(CONFIG_BRCMSTB_GISB_ARB)	+= brcmstb_gisb.o
->  obj-$(CONFIG_IMX_WEIM)	+= imx-weim.o
->  obj-$(CONFIG_MVEBU_MBUS) += mvebu-mbus.o
-> -obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
-I guess this is unrelated to $subject. Shouldn't this be dropped?
+For 64K page system, after mapping a PMD section, the corresponding initial
+page table is not needed any more. That page can be freed.
 
-Thanks and regards,
-Lokesh
-> +
-> +obj-$(CONFIG_OMAP_GPMC)		+= omap-gpmc.o
->  
->  # Interconnect bus driver for OMAP SoCs.
->  obj-$(CONFIG_OMAP_INTERCONNECT)	+= omap_l3_smx.o omap_l3_noc.o
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/drivers/bus/omap-gpmc.c
-> similarity index 100%
-> rename from arch/arm/mach-omap2/gpmc.c
-> rename to drivers/bus/omap-gpmc.c
-> 
+Signed-off-by: Zhichang Yuan <zhichang.yuan@linaro.org>
+---
+ arch/arm64/mm/mmu.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index f4f8b50..12a336b 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -191,8 +191,11 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+ 			 * Check for previous table entries created during
+ 			 * boot (__create_page_tables) and flush them.
+ 			 */
+-			if (!pmd_none(old_pmd))
++			if (!pmd_none(old_pmd)) {
+ 				flush_tlb_all();
++				if (pmd_table(old_pmd))
++					memblock_free(pte_pfn(pmd_pte(old_pmd)) << PAGE_SHIFT, PAGE_SIZE);
++			}
+ 		} else {
+ 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
+ 				       prot_pte);
+-- 
+1.7.9.5
