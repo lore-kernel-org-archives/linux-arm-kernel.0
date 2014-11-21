@@ -1,73 +1,40 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Thu, 20 Nov 2014 21:06:54 -0600
-Subject: [PATCH] irqdomain: Fix NULL pointer dererence in
- irq_domain_free_irqs_parent
-In-Reply-To: <546EA823.8030401@linux.intel.com>
-References: <1416531745-24661-1-git-send-email-suravee.suthikulpanit@amd.com>
- <alpine.DEB.2.11.1411210219370.6439@nanos> <546E9E8E.5000303@amd.com>
- <546EA823.8030401@linux.intel.com>
-Message-ID: <546EAC4E.9050808@amd.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Fri, 21 Nov 2014 11:23:26 +0800
+Subject: [Patch irqdomain: Enhance irq_domain_free_irqs_common() to support
+ parentless irqdomain
+Message-ID: <1416540206-18103-1-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Originally irq_domain_free_irqs_common() is designed to be used by
+irqdomains with parent. But there are desires to reuse for parentless
+irqdomains for code reduction.
+So check domain->parent before invoking irq_domain_free_irqs_parent().
 
+Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+---
+Hi Thomas,
+	This patch applies to tip/irq/irqdomain, it helps to reduce code
+size on ARM. Seems we still have chance to merge it into tip/irq/irqdomain:)
+Regards!
+Gerry
+---
+ kernel/irq/irqdomain.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-On 11/20/2014 08:49 PM, Jiang Liu wrote:
->
->
-> On 2014/11/21 10:08, Suravee Suthikulpanit wrote:
->> On 11/20/2014 07:32 PM, Thomas Gleixner wrote:
->>> On Thu, 20 Nov 2014, suravee.suthikulpanit at amd.com wrote:
->>>> This patch checks if the parent domain is NULL before recursively
->>>> freeing
->>>> irqs in the parent domains.
->>>
->>> Which is nonsense, because if the thing has not been allocated in the
->>> first place, then it cannot explode in the free path magically, except
->>> there is a missing check in the allocation path error handling.
->>>
->>> And that's obviously not the case simply because this originates from:
->>>> [<fffffe0000449278>] pci_disable_msix+0x40/0x50
->>>
->>
->> Thomas,
->>
->> In this case, I have the following irq domain hierarchy:
->>
->> [GIC] -- [GICv2m] -- [MSI]
->>
->> which recursively calling the freeing function:
->>
->> In GIC domain, it currently defines the struct irq_domain_ops.free() with :
->>    --> irq_domain_free_irqs_top()
->>      |--> irq_domain_free_irqs_common()
->>        |--> irq_domain_free_irq_parent()
->>          |--> irq_domain_free_irqs_recursive()
->>
->> and there is no check before passing the NULL domain->parent into the
->> irq_domain_free_irqs_recursive(), which causes the error.
->>
->> Since the GIC is the top most domain, it does not have parent domain.
->> So, I'm not sure what is missing from the allocation path error
->> handling, as you mentioned.
-> Hi Thomas,
-> 	We have had a discussion about this issue in another thread.
-> Originally irq_domain_free_irqs_common() is designed to be used by
-> irqdomains with parent. But there are desires to reuse it to support
-> irqdomains without parent too for code reduction.
-> So I suggest to change irq_domain_free_irqs_common() instead of
-> irq_domain_free_irqs_parent() because caller of
-> irq_domain_free_irqs_parent() should guarantee current domain do have
-> a parent.
-> I'm preparing a patch for this:)
-> Regards!
-> Gerry
-
-Thanks Gerry and Thomas.
-
-Suravee
-
->>
->> Thanks,
->>
->> Suravee
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index 029acf11efed..0449d2869e17 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -975,7 +975,8 @@ void irq_domain_free_irqs_common(struct irq_domain *domain, unsigned int virq,
+ 		if (irq_data)
+ 			irq_domain_reset_irq_data(irq_data);
+ 	}
+-	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
++	if (domain->parent)
++		irq_domain_free_irqs_parent(domain, virq, nr_irqs);
+ }
+ 
+ /**
+-- 
+1.7.10.4
