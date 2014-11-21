@@ -1,45 +1,89 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 21 Nov 2014 23:31:39 +0100
-Subject: [PATCH 1/2] thermal: armada: Remove support for A375-Z1 SoC
-In-Reply-To: <20141121220503.GJ22670@titan.lakedaemon.net>
-References: <1415116839-4323-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1415116839-4323-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20141120193804.GA7252@developer>
- <20141121201858.GB22670@titan.lakedaemon.net>
- <20141121225122.1165b466@free-electrons.com>
- <20141121220503.GJ22670@titan.lakedaemon.net>
-Message-ID: <20141121233139.3a117e1c@free-electrons.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 21 Nov 2014 22:31:49 +0000
+Subject: IRQ #0 broken on ARM
+In-Reply-To: <87zjbk966i.fsf@approximate.cambridge.arm.com>
+References: <CALT56yPs-SSssff1waj81CRQfER4ZKKR=B1jOXVL-aBChicSjg@mail.gmail.com>
+ <87zjbk966i.fsf@approximate.cambridge.arm.com>
+Message-ID: <CACxGe6vBQnwcLUQ-sFOuNP6JjzPNfnEPAm=mq0Gne5pCbwjUUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Nov 21, 2014 at 10:52 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On Fri, Nov 21 2014 at 10:31:05 am GMT, Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> wrote:
+>> Hello,
+>>
+>> After the commit a71b092a9c68685a270ebdde7b5986ba8787e575
+>> (ARM: Convert handle_IRQ to use __handle_domain_irq) IRQ #0 is broken
+>> on ARM. It is a valid IRQ and it is quite imporant (on sa1100 it's a GPIO0).
+>
+> Well, this is a valid IRQ number if you're not using irq domains. I may
+> be a bit pedantic here, but I thing this is an important distinction.
+>
+>> The worst thing is that the CPU will be stuck busy-looping around this
+>> IRQ w/o printing anything to the console or masking the irq. How
+>> should we cope with that? I'd like to propose to either revert the
+>> offending commit or to add the following patch.
+>
+> Well, said commit fixes a rather important bug, so I suggest we keep
+> around. Now, as for your suggestion:
+>
+>> --
+>> With best wishes
+>> Dmitry
+>>
+>> From e87f86497b796ed55fff644bbc75bf1890941829 Mon Sep 17 00:00:00 2001
+>> From: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+>> Date: Fri, 21 Nov 2014 13:27:11 +0300
+>> Subject: [PATCH] genirq: handle IRQ 0 in __handle_domain_irq
+>>
+>> __handle_domain_irq() function will ignore (well, report as bad) the IRQ
+>> number 0. On some platforms IRQ0 is bad IRQ. On others it is not. And
+>> while platforms are still in the process of converging to not using
+>> IRQ number 0 as a valid IRQ, I'd like to propose to use IRQ0 as a valid
+>> one in __handle_domain_irq().
+>>
+>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+>> ---
+>>  kernel/irq/irqdesc.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/kernel/irq/irqdesc.c b/kernel/irq/irqdesc.c
+>> index a1782f8..bfbeeb6 100644
+>> --- a/kernel/irq/irqdesc.c
+>> +++ b/kernel/irq/irqdesc.c
+>> @@ -365,7 +365,7 @@ int __handle_domain_irq(struct irq_domain *domain, unsigned int hwirq,
+>>        * Some hardware gives randomly wrong interrupts.  Rather
+>>        * than crashing, do something sensible.
+>>        */
+>> -     if (unlikely(!irq || irq >= nr_irqs)) {
+>> +     if (unlikely(irq >= nr_irqs)) {
+>>               ack_bad_irq(irq);
+>>               ret = -EINVAL;
+>>       } else {
+>
+> As I mentioned above, IRQ0 is not valid when using irq domains. As an
+> alternative, how about this:
+>
+> diff --git a/kernel/irq/irqdesc.c b/kernel/irq/irqdesc.c
+> index a1782f8..9f5bc92 100644
+> --- a/kernel/irq/irqdesc.c
+> +++ b/kernel/irq/irqdesc.c
+> @@ -365,7 +365,7 @@ int __handle_domain_irq(struct irq_domain *domain, unsigned int hwirq,
+>          * Some hardware gives randomly wrong interrupts.  Rather
+>          * than crashing, do something sensible.
+>          */
+> -       if (unlikely(!irq || irq >= nr_irqs)) {
+> +       if (unlikely((lookup && !irq) || irq >= nr_irqs)) {
+>                 ack_bad_irq(irq);
+>                 ret = -EINVAL;
+>         } else {
+>
+> I don't have a platform to test this on, but maybe you could give it a
+> go and let me know if that helps?
 
-On Fri, 21 Nov 2014 17:05:03 -0500, Jason Cooper wrote:
+I have to nak this. It isn't just when using domains that virq 0 is
+invalid. It is always invalid. As suggested elsewhere in this thread,
+platform code should use a hard offset from the hwirq to the virq to
+get off of irq0.
 
-> > So the suggestion would be to not document the DT bindings at all,
-> > until we reach a "stable" hardware that is distributed externally?
-> 
-> No, I think it's better to document.  However, we should also document
-> the fact that the binding is for an early version of the SoC and subject
-> to incompatible change once the production version of the SoC is
-> released.  ie, an un-stable binding.
-
-Sounds good.
-
-> > I don't mind adjusting how DT bindings are documented for such early
-> > SoCs stepping. But I really believe it's important to have a way to
-> > handle this situation nicely: we've been asking for years SoC vendors
-> > to start upstreaming their code early. Now that they start to do it, we
-> > shouldn't complain and instead adapt to this situation :-)
-> 
-> Does the above proposal meet your expectations?
-
-Absolutely!
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+g.
