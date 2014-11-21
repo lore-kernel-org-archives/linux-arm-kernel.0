@@ -1,69 +1,87 @@
-From: julien.chauveau@neo-technologies.fr (Julien CHAUVEAU)
-Date: Fri, 21 Nov 2014 10:27:41 +0100
-Subject: [PATCH] clk: rockchip: fix clock gate for rk3188 spdif_pre
-Message-ID: <1416562062-14286-1-git-send-email-julien.chauveau@neo-technologies.fr>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 21 Nov 2014 09:33:05 +0000
+Subject: Removal of bus->msi assignment breaks MSI with stacked domains
+In-Reply-To: <CAErSpo5UOUnPbsvAJX4kCeuKnPVLyRfq6k0FJPpS2W-5ALwisQ@mail.gmail.com>
+References: <546E1771.4030201@arm.com> <20141120215353.GA7987@google.com>
+ <alpine.DEB.2.11.1411202355060.6439@nanos>
+ <CAErSpo5UOUnPbsvAJX4kCeuKnPVLyRfq6k0FJPpS2W-5ALwisQ@mail.gmail.com>
+Message-ID: <546F06D1.30308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In rk3188 clock branches, spdif_pre gate was set to RK2928_CLKGATE_CON(13) bit 13.
-This appears to be a copy-paste error because such a register does not exist.
-We correct it to RK2928_CLKGATE_CON(0) and find out that the rk3188 spdif clock
-is the same as the rk3066 spdif clock, so we move it to the common clock branches.
+Hi Bjorn,
 
-Signed-off-by: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
----
- drivers/clk/rockchip/clk-rk3188.c | 25 +++++++++----------------
- 1 file changed, 9 insertions(+), 16 deletions(-)
+On 20/11/14 23:30, Bjorn Helgaas wrote:
+> On Thu, Nov 20, 2014 at 4:10 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
+>> On Thu, 20 Nov 2014, Bjorn Helgaas wrote:
+>>> On Thu, Nov 20, 2014 at 04:31:45PM +0000, Marc Zyngier wrote:
+>>>> Bjorn, Yijing,
+>>>>
+>>>> I've just realized that patch c167caf8d174 (PCI/MSI: Remove useless
+>>>> bus->msi assignment) completely breaks MSI on arm64 when using the new
+>>>> MSI stacked domain:
+>>>>
+>>>> This patch relies on architectures to implement either
+>>>> pcibios_msi_controller() or arch_setup_msi_irq(). It turns out that with
+>>>> stacked domains, none of this is actually necessary, as long as you can
+>>>> access to the msi_controller.
+>>>>
+>>>> And everything was fine until this patch came around (and managed to
+>>>> test on a system where the PCI devices are not directly attached to the
+>>>> root bus). Of course, everything now breaks, as we cannot get to the MSI
+>>>> controller (which contains the domain we allocate the MSIs from).
+>>>>
+>>>> In short, this patch breaks an important feature on which arm64 relies,
+>>>> and I believe this patch should be reverted ASAP.
+>>>
+>>> I'm happy to revert it from pci/msi, but I think Thomas has already pulled
+>>> it into his branch, so he'd have to drop it, too.
+>>>
+>>> Thomas, let me know if you want to do that.  I suppose we could add a new
+>>> patch to add it back, but that would leave bisection broken for the
+>>> interval between c167caf8d174 and the patch that adds it back.
+>>
+>> Fortunately my irq/irqdomain branch is not immutable yet. So we have
+>> no problem at that point. I can rebase on your branch until tomorrow
+>> night. Or just rebase on mainline and we sort out the merge conflicts
+>> later, i.e. delegate them to Linus so his job of pulling stuff gets
+>> not completely boring.
+>>
+>> What I'm more worried about is whether this intended change is going
+>> to inflict a problem on Jiangs intention to deduce the MSI irq domain
+>> from the device, which we really need for making DMAR work w/o going
+>> through loops and hoops.
+>>
+>> I have limited knowledge about the actual scope of iommu (DMAR) units
+>> versus device/bus/host-controllers, so I would appreciate a proper
+>> explanation for that from you or Jiang or both.
+>>
+>> My guts feeling tells me that anything less granular than the bus
+>> level is wrong and according to my limited knowledge Intel even has
+>> DMARs which are assigned to a single device it's even more wrong. So
+>> the proper change would be not to push it from bus to something above
+>> the bus, but instead make it a per device property.
+> 
+> I'm not an expert, so hopefully Jiang and Marc will clarify this.
+> 
+> My understanding is that Intel VT-d can do MSI remapping on a
+> per-function basis, so I agree that pci_msi_controller() should
+> probably take a pci_dev instead of a pci_bus.  I think Yijing's series
+> only has one caller, which has the pci_dev, so that should be an easy
+> change.
+> 
+> Marc, does c167caf8d174 break arm64 by itself?  Or does the breakage
+> happen later on, after adding more stacked domain stuff?  If the
+> former, we should definitely revert c167caf8d174 to preserve
+> bisectability, independent of how we fix the pci_msi_controller()
+> interface.
 
-diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-index b0293c4..725d841 100644
---- a/drivers/clk/rockchip/clk-rk3188.c
-+++ b/drivers/clk/rockchip/clk-rk3188.c
-@@ -330,6 +330,15 @@ static struct rockchip_clk_branch common_clk_branches[] __initdata = {
- 			RK2928_CLKSEL_CON(24), 8, 8, DFLAGS,
- 			RK2928_CLKGATE_CON(2), 8, GFLAGS),
- 
-+	COMPOSITE_NOMUX(0, "spdif_pre", "i2s_src", 0,
-+			RK2928_CLKSEL_CON(5), 0, 7, DFLAGS,
-+			RK2928_CLKGATE_CON(0), 13, GFLAGS),
-+	COMPOSITE_FRAC(0, "spdif_frac", "spdif_pll", 0,
-+			RK2928_CLKSEL_CON(9), 0,
-+			RK2928_CLKGATE_CON(0), 14, GFLAGS),
-+	MUX(SCLK_SPDIF, "sclk_spdif", mux_sclk_spdif_p, 0,
-+			RK2928_CLKSEL_CON(5), 8, 2, MFLAGS),
-+
- 	/*
- 	 * Clock-Architecture Diagram 4
- 	 */
-@@ -577,14 +586,6 @@ static struct rockchip_clk_branch rk3066a_clk_branches[] __initdata = {
- 			RK2928_CLKGATE_CON(0), 12, GFLAGS),
- 	MUX(SCLK_I2S2, "sclk_i2s2", mux_sclk_i2s2_p, 0,
- 			RK2928_CLKSEL_CON(4), 8, 2, MFLAGS),
--	COMPOSITE_NOMUX(0, "spdif_pre", "i2s_src", 0,
--			RK2928_CLKSEL_CON(5), 0, 7, DFLAGS,
--			RK2928_CLKGATE_CON(0), 13, GFLAGS),
--	COMPOSITE_FRAC(0, "spdif_frac", "spdif_pll", 0,
--			RK2928_CLKSEL_CON(9), 0,
--			RK2928_CLKGATE_CON(0), 14, GFLAGS),
--	MUX(SCLK_SPDIF, "sclk_spdif", mux_sclk_spdif_p, 0,
--			RK2928_CLKSEL_CON(5), 8, 2, MFLAGS),
- 
- 	GATE(HCLK_I2S1, "hclk_i2s1", "hclk_cpu", 0, RK2928_CLKGATE_CON(7), 3, GFLAGS),
- 	GATE(HCLK_I2S2, "hclk_i2s2", "hclk_cpu", 0, RK2928_CLKGATE_CON(7), 4, GFLAGS),
-@@ -675,14 +676,6 @@ static struct rockchip_clk_branch rk3188_clk_branches[] __initdata = {
- 			RK2928_CLKGATE_CON(0), 10, GFLAGS),
- 	MUX(SCLK_I2S0, "sclk_i2s0", mux_sclk_i2s0_p, 0,
- 			RK2928_CLKSEL_CON(3), 8, 2, MFLAGS),
--	COMPOSITE_NOMUX(0, "spdif_pre", "i2s_src", 0,
--			RK2928_CLKSEL_CON(5), 0, 7, DFLAGS,
--			RK2928_CLKGATE_CON(13), 13, GFLAGS),
--	COMPOSITE_FRAC(0, "spdif_frac", "spdif_pll", 0,
--			RK2928_CLKSEL_CON(9), 0,
--			RK2928_CLKGATE_CON(0), 14, GFLAGS),
--	MUX(SCLK_SPDIF, "sclk_spdif", mux_sclk_spdif_p, 0,
--			RK2928_CLKSEL_CON(5), 8, 2, MFLAGS),
- 
- 	GATE(0, "hclk_imem0", "hclk_cpu", 0, RK2928_CLKGATE_CON(4), 14, GFLAGS),
- 	GATE(0, "hclk_imem1", "hclk_cpu", 0, RK2928_CLKGATE_CON(4), 15, GFLAGS),
+The breakage only happens once we'll add the MSI controller drivers that
+are actively using the stacked domain code (GICv2m and GICv3 ITS). That
+should give us some flexibility to tweak things.
+
+Thanks,
+
+	M.
 -- 
-2.1.0
+Jazz is not dead. It just smells funny...
