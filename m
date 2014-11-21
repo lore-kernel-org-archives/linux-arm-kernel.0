@@ -1,74 +1,85 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 21 Nov 2014 10:59:35 +0100
-Subject: [PATCH 5/9] rc: sunxi-cir: Add support for the larger fifo found
- on sun5i and sun6i
-In-Reply-To: <546EFAE1.9050506@redhat.com>
-References: <1416498928-1300-1-git-send-email-hdegoede@redhat.com>
- <1416498928-1300-6-git-send-email-hdegoede@redhat.com>
- <20141120142856.16b6562d@recife.lan>
- <20141121082620.GJ24143@lukather> <546EFAE1.9050506@redhat.com>
-Message-ID: <20141121095934.GA4752@lukather>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 21 Nov 2014 10:00:35 +0000
+Subject: Removal of bus->msi assignment breaks MSI with stacked domains
+In-Reply-To: <546E9B60.9070706@huawei.com>
+References: <546E1771.4030201@arm.com> <20141120215353.GA7987@google.com>
+ <alpine.DEB.2.11.1411202355060.6439@nanos> <546E9B60.9070706@huawei.com>
+Message-ID: <546F0D43.4020307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 09:42:09AM +0100, Hans de Goede wrote:
-> Hi,
+Yijing,
+
+On 21/11/14 01:54, Yijing Wang wrote:
+>>> Thomas, let me know if you want to do that.  I suppose we could add a new
+>>> patch to add it back, but that would leave bisection broken for the
+>>> interval between c167caf8d174 and the patch that adds it back.
+>>
+>> Fortunately my irq/irqdomain branch is not immutable yet. So we have
+>> no problem at that point. I can rebase on your branch until tomorrow
+>> night. Or just rebase on mainline and we sort out the merge conflicts
+>> later, i.e. delegate them to Linus so his job of pulling stuff gets
+>> not completely boring.
 > 
-> On 11/21/2014 09:26 AM, Maxime Ripard wrote:
-> > Hi Mauro,
-> > 
-> > On Thu, Nov 20, 2014 at 02:28:56PM -0200, Mauro Carvalho Chehab wrote:
-> >> Em Thu, 20 Nov 2014 16:55:24 +0100
-> >> Hans de Goede <hdegoede@redhat.com> escreveu:
-> >>
-> >>> Add support for the larger fifo found on sun5i and sun6i, having a separate
-> >>> compatible for the ir found on sun5i & sun6i also is useful if we ever want
-> >>> to add ir transmit support, because the sun5i & sun6i version do not have
-> >>> transmit support.
-> >>>
-> >>> Note this commits also adds checking for the end-of-packet interrupt flag
-> >>> (which was already enabled), as the fifo-data-available interrupt flag only
-> >>> gets set when the trigger-level is exceeded. So far we've been getting away
-> >>> with not doing this because of the low trigger-level, but this is something
-> >>> which we should have done since day one.
-> >>>
-> >>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>
-> >> As this is meant to be merged via some other tree:
-> >>
-> >> Acked-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-> > 
-> > I think merging it through your tree would be just fine.
-> > 
-> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Hi Thomas, sorry for my introducing the broken.
 > 
-> Heh, I was thinking it would be best if it went through Maxime's tree because
-> it also has some deps on new clk stuff (well the dts have deps on that), but either
-> way works for me.
+>>
+>> What I'm more worried about is whether this intended change is going
+>> to inflict a problem on Jiangs intention to deduce the MSI irq domain
+>> from the device, which we really need for making DMAR work w/o going
+>> through loops and hoops.
+>>
+>> I have limited knowledge about the actual scope of iommu (DMAR) units
+>> versus device/bus/host-controllers, so I would appreciate a proper
+>> explanation for that from you or Jiang or both.
 > 
-> Maxime if you want this go through Mauro's tree, I can send a pull-req to Mauro
-> (I'm a linux-media sub-maintainer), so if that is the case let me know and I'll
-> prepare a pull-req (after fixing the missing reset documentation in the bindings).
+> In my personal opinion, if it's not necessary, we should not put stuff
+> into pci_dev or pci_bus. If we plan to save msi_controller in pci_bus or
+> pci_dev.
+> I have a proposal, I would be appreciated if you could give some comments.
+> First we refactor pci_host_bridge to make a generic
+> pci_host_bridge, then we could save pci domain in it to eliminate
+> arch specific functions. I aslo wanted to save msi_controller as
+> pci domain, but now Jiang refactor hierarchy irq domain, and
+> pci devices under the same pci host bridge may need to associate
+> to different msi_controllers.
+> 
+> So I want to associate a msi_controller finding ops with generic pci_host_bridge,
+> then every pci device could find its msi_controller/irq_domain by a
+> common function
+> 
+> E.g
+> 
+> struct msi_controller *pci_msi_controller(struct pci_dev *pdev)
+> {
+> 	struct msi_controller *ctrl;
+> 	struct pci_host_bridge *host = find_pci_host_bridge(pdev->bus);
+> 	if (host && host->pci_get_msi_controller)
+> 		ctrl = pci_host_bridge->pci_get_msi_controller(struct pci_dev *pdev);
+> 
+> 	return ctrl;	
+> }
+> 
+> If I miss something, please let me know, thanks.
 
-So much for not reading the cover letter... Sorry.
+That feels slightly convoluted for something that should be a very
+simple operation. Does this mean you're trying to represent a situation
+where:
+- a single host bridge has multiple MSI controllers,
+- this bridge serves multiple busses,
+- devices on the same bus can talk to different MSI controllers?
 
-We're getting quite close to the end of the ARM merge window, and I
-got a couple comments, Lee hasn't commented yet, so I'd say it's a bit
-too late for this to come in.
+That would be the only case where the current way we pass the
+msi_controller around wouldn't work.
 
-If Mauro is happy with the current patches for him, it's completely
-fine to merge it through his tree. The DTS can wait.
+If that's what you're trying to do, I can see how this work, but I'd
+suggest you put that infrastructure in place before tearing down the
+existing one. This means being having support at the host-bridge level
+and reasonable defaults for the non-complicated case where bus->msi is
+exactly what you want.
 
-Maxime
+Thanks,
 
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141121/0de8ed36/attachment-0001.sig>
+Jazz is not dead. It just smells funny...
