@@ -1,41 +1,60 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Fri, 21 Nov 2014 12:00:16 +0100
-Subject: [PATCH] Revert "mfd: tps65910: Convert ti,
- system-power-controller DT property to poweroff-source"
-In-Reply-To: <20141121105951.GA20679@localhost>
-References: <20141121105951.GA20679@localhost>
-Message-ID: <1416567616-10582-1-git-send-email-johan@kernel.org>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Fri, 21 Nov 2014 15:01:17 +0400
+Subject: IRQ #0 broken on ARM
+In-Reply-To: <87zjbk966i.fsf@approximate.cambridge.arm.com>
+References: <CALT56yPs-SSssff1waj81CRQfER4ZKKR=B1jOXVL-aBChicSjg@mail.gmail.com>
+ <87zjbk966i.fsf@approximate.cambridge.arm.com>
+Message-ID: <CALT56yNnYGGtgb6e6=2O2jJaP1v2rwYVVK4Rtr-6vc0JzWca5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 25f833c1171d ("mfd: tps65910: Convert
-ti,system-power-controller DT property to poweroff-source"), which
-switched to a new device-tree property name for configuring the device
-as a power-off controller, but failed to update the affected device-tree
-sources and neither provided backward compatibility with the old
-property name.
+2014-11-21 13:52 GMT+03:00 Marc Zyngier <marc.zyngier@arm.com>:
+> On Fri, Nov 21 2014 at 10:31:05 am GMT, Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> wrote:
+>> Hello,
+>>
+>> After the commit a71b092a9c68685a270ebdde7b5986ba8787e575
+>> (ARM: Convert handle_IRQ to use __handle_domain_irq) IRQ #0 is broken
+>> on ARM. It is a valid IRQ and it is quite imporant (on sa1100 it's a GPIO0).
+>
+> Well, this is a valid IRQ number if you're not using irq domains. I may
+> be a bit pedantic here, but I thing this is an important distinction.
+>
+>> The worst thing is that the CPU will be stuck busy-looping around this
+>> IRQ w/o printing anything to the console or masking the irq. How
+>> should we cope with that? I'd like to propose to either revert the
+>> offending commit or to add the following patch.
+>
+> Well, said commit fixes a rather important bug, so I suggest we keep
+> around. Now, as for your suggestion:
 
-This fixes broken power-off functionality for all boards relying on
-tps65910 to power off the system.
+>From the commit message it was not clear, that there was a bug fixed
+(it talks only about code duplication).
 
-Signed-off-by: Johan Hovold <johan@kernel.org>
----
- drivers/mfd/tps65910.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+[skipped]
 
-diff --git a/drivers/mfd/tps65910.c b/drivers/mfd/tps65910.c
-index b8dca8a0db41..7612d89850dd 100644
---- a/drivers/mfd/tps65910.c
-+++ b/drivers/mfd/tps65910.c
-@@ -423,7 +423,8 @@ static struct tps65910_board *tps65910_parse_dt(struct i2c_client *client,
- 
- 	board_info->irq = client->irq;
- 	board_info->irq_base = -1;
--	board_info->pm_off = of_system_has_poweroff_source(np);
-+	board_info->pm_off = of_property_read_bool(np,
-+			"ti,system-power-controller");
- 
- 	return board_info;
- }
+> As I mentioned above, IRQ0 is not valid when using irq domains. As an
+> alternative, how about this:
+>
+> diff --git a/kernel/irq/irqdesc.c b/kernel/irq/irqdesc.c
+> index a1782f8..9f5bc92 100644
+> --- a/kernel/irq/irqdesc.c
+> +++ b/kernel/irq/irqdesc.c
+> @@ -365,7 +365,7 @@ int __handle_domain_irq(struct irq_domain *domain, unsigned int hwirq,
+>          * Some hardware gives randomly wrong interrupts.  Rather
+>          * than crashing, do something sensible.
+>          */
+> -       if (unlikely(!irq || irq >= nr_irqs)) {
+> +       if (unlikely((lookup && !irq) || irq >= nr_irqs)) {
+>                 ack_bad_irq(irq);
+>                 ret = -EINVAL;
+>         } else {
+>
+> I don't have a platform to test this on, but maybe you could give it a
+> go and let me know if that helps?
+
+It helps in my case. Thank you. Please add me to Cc if you submit
+this patch.
+
 -- 
-2.0.4
+With best wishes
+Dmitry
