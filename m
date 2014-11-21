@@ -1,147 +1,52 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 21 Nov 2014 20:11:40 +0000
-Subject: [PATCH] ARM: kprobes: Add test cases for stack consuming instructions
-In-Reply-To: <1416592797.1827.8.camel@linaro.org>
-References: <1416551731-50777-1-git-send-email-wangnan0@huawei.com>
- <1416551731-50777-4-git-send-email-wangnan0@huawei.com>
- <1416592797.1827.8.camel@linaro.org>
-Message-ID: <1416600700.1827.10.camel@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Nov 2014 21:12:29 +0100
+Subject: [PATCH 4/9] clk: Add clock driver for mb86s7x
+In-Reply-To: <CAJe_Zhc2UePxy-Y2LsU1Pn18OOknDKZw-8rjJ06DEWOhvs6CMw@mail.gmail.com>
+References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <5451217.D7Cssxh5Uh@wuerfel>
+ <CAJe_Zhc2UePxy-Y2LsU1Pn18OOknDKZw-8rjJ06DEWOhvs6CMw@mail.gmail.com>
+Message-ID: <4948551.vhPsR9enmp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Medhurst <tixy@linaro.org>
+On Friday 21 November 2014 23:28:38 Jassi Brar wrote:
+> On 21 November 2014 22:45, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 21 November 2014 22:06:51 Jassi Brar wrote:
+> 
+> >> >> Only MB86S70_CRG11_UNGPRT is marked to mean one special (non-maskable)
+> >> >> port on the controller, which the clock driver does make use of.
+> >> >
+> >> > Is this the actual port number that is known to be non-maskable?
+> >> >
+> >> Yes the clock comes out of the controller and is also the parent of
+> >> other 8 independently maskable clock ports of the domain.
+> >
+> > I'm getting confused by the terminology here. Is MB86S70_CRG11_ALW
+> > a port or a controller?
+> >
+> Sorry, bad symbols. ALW..DPHY are controllers. UNGPRT is the ninth
+> parent clock (port) of a domain that can't be masked.
+> FYKI, there are 6 instances, of some CRG11 clock controller, under
+> control of the remote f/w. The Mailbox protocol between remote f/w and
+> Linux assigned indices [0-5] to these controllers.
 
-These have extra 'checker' functions associated with them so
-lets make sure those get covered by testing.
+Ok, not it makes sense, thanks for clearing that up!
 
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
----
+> >>  The firmware on remote master, lets say, don't wanna be bothered by
+> >> the clock topology. Even for set-rate the onus is on Linux to request
+> >> only appropriate rates at appropriate times so that other devices are
+> >> not messed up.
+> >
+> > Is there any code to validate that, or does Linux just treat all
+> > clocks transparently?
+> >
+> The remote does not expose the clock topology and only accepts
+> requests on port-basis. The remote f/w is supposed to keep track of
+> which ports are used by Linux and then work out inter-dependencies
+> upon receiving a request from Linux. So for Linux there are N
+> independent 'root' clocks, ops on which may or may not succeed at any
+> given time.
 
-Wang Nan, as I promised in my reply to your patch, here are the
-additional test cases for the stack store instructions. Would be good to
-add this patch to the series. Let me know if you think I've missed
-something...
+Ok.
 
-
- arch/arm/kernel/kprobes-test-arm.c   | 17 +++++++++++++++--
- arch/arm/kernel/kprobes-test-thumb.c | 12 ++++++++++++
- 2 files changed, 27 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/kprobes-test-arm.c b/arch/arm/kernel/kprobes-test-arm.c
-index d8ad5bb..7aa96b6 100644
---- a/arch/arm/kernel/kprobes-test-arm.c
-+++ b/arch/arm/kernel/kprobes-test-arm.c
-@@ -12,6 +12,7 @@
- #include <linux/module.h>
- #include <asm/system_info.h>
- #include <asm/opcodes.h>
-+#include <asm/probes.h>
- 
- #include "kprobes-test.h"
- 
-@@ -478,6 +479,7 @@ void kprobe_arm_test_cases(void)
- 	TEST_RPR(  "strh	r",0, VAL1,", [r",1, 48,", -r",2, 24,"]")
- 	TEST_RPR(  "streqh	r",14,VAL2,", [r",11,0, ", r",12, 48,"]")
- 	TEST_UNSUPPORTED(  "streqh	r14, [r13, r12]")
-+	TEST_UNSUPPORTED(  "streqh	r14, [r12, r13]")
- 	TEST_RPR(  "strh	r",1, VAL1,", [r",2, 24,", r",3,  48,"]!")
- 	TEST_RPR(  "strneh	r",12,VAL2,", [r",11,48,", -r",10,24,"]!")
- 	TEST_RPR(  "strh	r",2, VAL1,", [r",3, 24,"], r",4, 48,"")
-@@ -502,6 +504,9 @@ void kprobe_arm_test_cases(void)
- 	TEST_RP(   "strplh	r",12,VAL2,", [r",11,24,", #-4]!")
- 	TEST_RP(   "strh	r",2, VAL1,", [r",3, 24,"], #48")
- 	TEST_RP(   "strh	r",10,VAL2,", [r",9, 64,"], #-48")
-+	TEST_RP(   "strh	r",3, VAL1,", [r",13,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!")
-+	TEST_UNSUPPORTED("strh r3, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")
-+	TEST_RP(   "strh	r",4, VAL1,", [r",14,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!")
- 	TEST_UNSUPPORTED(__inst_arm(0xe1efc3b0) "	@ strh r12, [pc, #48]!")
- 	TEST_UNSUPPORTED(__inst_arm(0xe0c9f3b0) "	@ strh pc, [r9], #48")
- 
-@@ -568,6 +573,7 @@ void kprobe_arm_test_cases(void)
- 	TEST_RPR(  "strd	r",0, VAL1,", [r",1, 48,", -r",2,24,"]")
- 	TEST_RPR(  "strccd	r",8, VAL2,", [r",11,0, ", r",12,48,"]")
- 	TEST_UNSUPPORTED(  "strccd r8, [r13, r12]")
-+	TEST_UNSUPPORTED(  "strccd r8, [r12, r13]")
- 	TEST_RPR(  "strd	r",4, VAL1,", [r",2, 24,", r",3, 48,"]!")
- 	TEST_RPR(  "strcsd	r",12,VAL2,", [r",11,48,", -r",10,24,"]!")
- 	TEST_RPR(  "strd	r",2, VAL1,", [r",5, 24,"], r",4,48,"")
-@@ -591,6 +597,9 @@ void kprobe_arm_test_cases(void)
- 	TEST_RP(   "strvcd	r",12,VAL2,", [r",11,24,", #-16]!")
- 	TEST_RP(   "strd	r",2, VAL1,", [r",4, 24,"], #48")
- 	TEST_RP(   "strd	r",10,VAL2,", [r",9, 64,"], #-48")
-+	TEST_RP(   "strd	r",6, VAL1,", [r",13,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!")
-+	TEST_UNSUPPORTED("strd r6, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")
-+	TEST_RP(   "strd	r",4, VAL1,", [r",12,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!")
- 	TEST_UNSUPPORTED(__inst_arm(0xe1efc3f0) "	@ strd r12, [pc, #48]!")
- 
- 	TEST_P(	   "ldrd	r0, [r",0, 24,", #-8]")
-@@ -639,16 +648,20 @@ void kprobe_arm_test_cases(void)
- 	TEST_RP( "str"byte"	r",12,VAL2,", [r",11,24,", #-4]!")		\
- 	TEST_RP( "str"byte"	r",2, VAL1,", [r",3, 24,"], #48")		\
- 	TEST_RP( "str"byte"	r",10,VAL2,", [r",9, 64,"], #-48")		\
-+	TEST_RP( "str"byte"	r",3, VAL1,", [r",13,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!") \
-+	TEST_UNSUPPORTED("str"byte" r3, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")				\
-+	TEST_RP( "str"byte"	r",4, VAL1,", [r",10,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!") \
- 	TEST_RPR("str"byte"	r",0, VAL1,", [r",1, 48,", -r",2, 24,"]")	\
- 	TEST_RPR("str"byte"	r",14,VAL2,", [r",11,0, ", r",12, 48,"]")	\
--	TEST_UNSUPPORTED("str"byte" r14, [r13, r12]")	\
-+	TEST_UNSUPPORTED("str"byte" r14, [r13, r12]")				\
-+	TEST_UNSUPPORTED("str"byte" r14, [r12, r13]")				\
- 	TEST_RPR("str"byte"	r",1, VAL1,", [r",2, 24,", r",3,  48,"]!")	\
- 	TEST_RPR("str"byte"	r",12,VAL2,", [r",11,48,", -r",10,24,"]!")	\
- 	TEST_RPR("str"byte"	r",2, VAL1,", [r",3, 24,"], r",4, 48,"")	\
- 	TEST_RPR("str"byte"	r",10,VAL2,", [r",9, 48,"], -r",11,24,"")	\
- 	TEST_RPR("str"byte"	r",0, VAL1,", [r",1, 24,", r",2,  32,", asl #1]")\
- 	TEST_RPR("str"byte"	r",14,VAL2,", [r",11,0, ", r",12, 32,", lsr #2]")\
--	TEST_UNSUPPORTED("str"byte"	r14, [r13, r12, lsr #2]")\
-+	TEST_UNSUPPORTED("str"byte"	r14, [r13, r12, lsr #2]")		\
- 	TEST_RPR("str"byte"	r",1, VAL1,", [r",2, 24,", r",3,  32,", asr #3]!")\
- 	TEST_RPR("str"byte"	r",12,VAL2,", [r",11,24,", r",10, 4,", ror #31]!")\
- 	TEST_P(  "ldr"byte"	r0, [r",0,  24,", #-2]")			\
-diff --git a/arch/arm/kernel/kprobes-test-thumb.c b/arch/arm/kernel/kprobes-test-thumb.c
-index 844dd10..45b19d2 100644
---- a/arch/arm/kernel/kprobes-test-thumb.c
-+++ b/arch/arm/kernel/kprobes-test-thumb.c
-@@ -11,6 +11,7 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <asm/opcodes.h>
-+#include <asm/probes.h>
- 
- #include "kprobes-test.h"
- 
-@@ -416,6 +417,9 @@ void kprobe_thumb32_test_cases(void)
- 	TEST_RR( "strd	r",14,VAL2,", r",12,VAL1,", [sp, #16]!")
- 	TEST_RRP("strd	r",1, VAL1,", r",0, VAL2,", [r",7, 24,"], #16")
- 	TEST_RR( "strd	r",7, VAL2,", r",8, VAL1,", [sp], #-16")
-+	TEST_RRP("strd	r",6, VAL1,", r",7, VAL2,", [r",13, TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!")
-+	TEST_UNSUPPORTED("strd r6, r7, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")
-+	TEST_RRP("strd	r",4, VAL1,", r",5, VAL2,", [r",14, TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!")
- 	TEST_UNSUPPORTED(__inst_thumb32(0xe9efec04) "	@ strd	r14, r12, [pc, #16]!")
- 	TEST_UNSUPPORTED(__inst_thumb32(0xe8efec04) "	@ strd	r14, r12, [pc], #16")
- 
-@@ -821,14 +825,22 @@ CONDITION_INSTRUCTIONS(22,
- 	TEST_RP( "str"size"	r",14,VAL2,", [r",1, 256,  ", #-128]!")		\
- 	TEST_RPR("str"size".w	r",0, VAL1,", [r",1, 0,", r",2, 4,"]")		\
- 	TEST_RPR("str"size"	r",14,VAL2,", [r",10,0,", r",11,4,", lsl #1]")	\
-+	TEST_UNSUPPORTED("str"size"	r0, [r13, r1]")				\
- 	TEST_R(  "str"size".w	r",7, VAL1,", [sp, #24]")			\
- 	TEST_RP( "str"size".w	r",0, VAL2,", [r",0,0, "]")			\
-+	TEST_RP( "str"size"	r",6, VAL1,", [r",13, TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!") \
-+	TEST_UNSUPPORTED("str"size"	r6, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")			\
-+	TEST_RP( "str"size"	r",4, VAL2,", [r",12, TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!") \
- 	TEST_UNSUPPORTED("str"size"t	r0, [r1, #4]")
- 
- 	SINGLE_STORE("b")
- 	SINGLE_STORE("h")
- 	SINGLE_STORE("")
- 
-+	TEST_UNSUPPORTED(__inst_thumb32(0xf801000d) "	@ strb	r0, [r1, r13]")	
-+	TEST_UNSUPPORTED(__inst_thumb32(0xf821000d) "	@ strh	r0, [r1, r13]")	
-+	TEST_UNSUPPORTED(__inst_thumb32(0xf841000d) "	@ str	r0, [r1, r13]")	
-+
- 	TEST("str	sp, [sp]")
- 	TEST_UNSUPPORTED(__inst_thumb32(0xf8cfe000) "	@ str	r14, [pc]")
- 	TEST_UNSUPPORTED(__inst_thumb32(0xf8cef000) "	@ str	pc, [r14]")
--- 
-2.1.3
+	Arnd
