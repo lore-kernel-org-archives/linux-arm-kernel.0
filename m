@@ -1,76 +1,69 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Fri, 21 Nov 2014 14:35:50 +0800
-Subject: [PATCH v10 1/2] kprobes: Pass the original kprobe for preparing
- optimized kprobe
-In-Reply-To: <1416551751-50846-1-git-send-email-wangnan0@huawei.com>
-References: <1416551751-50846-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1416551751-50846-2-git-send-email-wangnan0@huawei.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 21 Nov 2014 14:39:10 +0800
+Subject: [PATCH] mmc: dw_mmc: fix card read threshold for PIO mode
+Message-ID: <1416551950-8277-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+Commit f1d2736c8156 ("mmc: dw_mmc: control card read threshold")
+introduces a regression for use case where PIO mode is used, i.e.
+CONFIG_MMC_DW_IDMAC is not disabled.  It stops kernel from booting
+like below.
 
-Pass the original kprobe for preparing an optimized kprobe arch-dep
-part, since for some architecture (e.g. ARM32) requires the information
-in original kprobe.
+dw_mmc 9408000.dwmmc: fifo-depth property not found, using value of FIFOTH register as default
+dw_mmc 9408000.dwmmc: Using PIO mode.
+dw_mmc 9408000.dwmmc: Version ID is 210a
+dw_mmc 9408000.dwmmc: DW MMC controller at irq 72, 32 bit host data width, 32 deep fifo
+dw_mmc 9408000.dwmmc: 1 slots initialized
+...
+Waiting for root device /dev/mmcblk0p2...
+mmc_host mmc0: Bus speed (slot 0) = 52000000Hz (slot req 50000000Hz, actual 26000000HZ div = 1)
+mmc0: new high speed SDHC card at address b368
+mmcblk0: mmc0:b368 AF UD 3.84 GiB
 
-Signed-off-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-Cc: Wang Nan <wangnan0@huawei.com>
+Rather than clearing read threshold bits, the best thing that function
+dw_mci_ctrl_rd_thld() should do is leaving the bits untouched, in case
+that card read threshold setup is not needed.
+
+The patch fixes the regression by changing dw_mci_ctrl_rd_thld() a bit
+to do nothing in case card read threshold bits setup is not needed.
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Fixes: f1d2736c8156 ("mmc: dw_mmc: control card read threshold")
+Cc: <stable@vger.kernel.org> # 3.13+
 ---
- arch/x86/kernel/kprobes/opt.c | 3 ++-
- include/linux/kprobes.h       | 3 ++-
- kernel/kprobes.c              | 4 ++--
- 3 files changed, 6 insertions(+), 4 deletions(-)
+ drivers/mmc/host/dw_mmc.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
-diff --git a/arch/x86/kernel/kprobes/opt.c b/arch/x86/kernel/kprobes/opt.c
-index f1314d0..7028296 100644
---- a/arch/x86/kernel/kprobes/opt.c
-+++ b/arch/x86/kernel/kprobes/opt.c
-@@ -320,7 +320,8 @@ void arch_remove_optimized_kprobe(struct optimized_kprobe *op)
-  * Target instructions MUST be relocatable (checked inside)
-  * This is called when new aggr(opt)probe is allocated or reused.
-  */
--int arch_prepare_optimized_kprobe(struct optimized_kprobe *op)
-+int arch_prepare_optimized_kprobe(struct optimized_kprobe *op,
-+				  struct kprobe *__unused)
- {
- 	u8 *buf;
- 	int ret;
-diff --git a/include/linux/kprobes.h b/include/linux/kprobes.h
-index f7296e5..7ab2c93 100644
---- a/include/linux/kprobes.h
-+++ b/include/linux/kprobes.h
-@@ -308,7 +308,8 @@ struct optimized_kprobe {
- /* Architecture dependent functions for direct jump optimization */
- extern int arch_prepared_optinsn(struct arch_optimized_insn *optinsn);
- extern int arch_check_optimized_kprobe(struct optimized_kprobe *op);
--extern int arch_prepare_optimized_kprobe(struct optimized_kprobe *op);
-+extern int arch_prepare_optimized_kprobe(struct optimized_kprobe *op,
-+					 struct kprobe *orig);
- extern void arch_remove_optimized_kprobe(struct optimized_kprobe *op);
- extern void arch_optimize_kprobes(struct list_head *oplist);
- extern void arch_unoptimize_kprobes(struct list_head *oplist,
-diff --git a/kernel/kprobes.c b/kernel/kprobes.c
-index 3995f54..9f28aa7 100644
---- a/kernel/kprobes.c
-+++ b/kernel/kprobes.c
-@@ -717,7 +717,7 @@ static void prepare_optimized_kprobe(struct kprobe *p)
- 	struct optimized_kprobe *op;
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index 69f0cc68d5b2..52c04ba69970 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -628,13 +628,13 @@ static void dw_mci_ctrl_rd_thld(struct dw_mci *host, struct mmc_data *data)
  
- 	op = container_of(p, struct optimized_kprobe, kp);
--	arch_prepare_optimized_kprobe(op);
-+	arch_prepare_optimized_kprobe(op, p);
+ 	if (host->timing != MMC_TIMING_MMC_HS200 &&
+ 	    host->timing != MMC_TIMING_UHS_SDR104)
+-		goto disable;
++		return;
+ 
+ 	blksz_depth = blksz / (1 << host->data_shift);
+ 	fifo_depth = host->fifo_depth;
+ 
+ 	if (blksz_depth > fifo_depth)
+-		goto disable;
++		return;
+ 
+ 	/*
+ 	 * If (blksz_depth) >= (fifo_depth >> 1), should be 'thld_size <= blksz'
+@@ -644,9 +644,6 @@ static void dw_mci_ctrl_rd_thld(struct dw_mci *host, struct mmc_data *data)
+ 	thld_size = blksz;
+ 	mci_writel(host, CDTHRCTL, SDMMC_SET_RD_THLD(thld_size, 1));
+ 	return;
+-
+-disable:
+-	mci_writel(host, CDTHRCTL, SDMMC_SET_RD_THLD(0, 0));
  }
  
- /* Allocate new optimized_kprobe and try to prepare optimized instructions */
-@@ -731,7 +731,7 @@ static struct kprobe *alloc_aggr_kprobe(struct kprobe *p)
- 
- 	INIT_LIST_HEAD(&op->list);
- 	op->kp.addr = p->addr;
--	arch_prepare_optimized_kprobe(op);
-+	arch_prepare_optimized_kprobe(op, p);
- 
- 	return &op->kp;
- }
+ static int dw_mci_submit_data_dma(struct dw_mci *host, struct mmc_data *data)
 -- 
-1.8.4
+1.9.1
