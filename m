@@ -1,84 +1,58 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Fri, 21 Nov 2014 19:30:50 +0900
-Subject: [PATCH] mmc: dw_mmc: fix card read threshold for PIO mode
-In-Reply-To: <1416551950-8277-1-git-send-email-shawn.guo@linaro.org>
-References: <1416551950-8277-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <546F145A.9050900@samsung.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Fri, 21 Nov 2014 16:00:14 +0530
+Subject: [PATCH v5 1/2] clk: samsung: exynos5440: move restart code into
+ clock driver
+In-Reply-To: <546E2968.1070800@samsung.com>
+References: <1416307650-15162-1-git-send-email-pankaj.dubey@samsung.com>
+ <1416307650-15162-2-git-send-email-pankaj.dubey@samsung.com>
+ <546B62F3.3030807@samsung.com> <000901d003aa$3490e8a0$9db2b9e0$@samsung.com>
+ <546E2968.1070800@samsung.com>
+Message-ID: <546F1436.4020101@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Shawn.
+Hi Kukjin,
 
-On 11/21/2014 03:39 PM, Shawn Guo wrote:
-> Commit f1d2736c8156 ("mmc: dw_mmc: control card read threshold")
-> introduces a regression for use case where PIO mode is used, i.e.
-> CONFIG_MMC_DW_IDMAC is not disabled.  It stops kernel from booting
-> like below.
-> 
-> dw_mmc 9408000.dwmmc: fifo-depth property not found, using value of FIFOTH register as default
-> dw_mmc 9408000.dwmmc: Using PIO mode.
-> dw_mmc 9408000.dwmmc: Version ID is 210a
-> dw_mmc 9408000.dwmmc: DW MMC controller at irq 72, 32 bit host data width, 32 deep fifo
-> dw_mmc 9408000.dwmmc: 1 slots initialized
-> ...
-> Waiting for root device /dev/mmcblk0p2...
-> mmc_host mmc0: Bus speed (slot 0) = 52000000Hz (slot req 50000000Hz, actual 26000000HZ div = 1)
-> mmc0: new high speed SDHC card at address b368
-> mmcblk0: mmc0:b368 AF UD 3.84 GiB
+On Thursday 20 November 2014 11:18 PM, Sylwester Nawrocki wrote:
+> On 19/11/14 04:37, Pankaj Dubey wrote:
+>>>>
+>>>>>> +static int exynos5440_clk_restart_notify(struct notifier_block *this,
+>>>>>> +		unsigned long code, void *unused)
+>>>>>> +{
+>>>>>> +	u32 val, status;
+>>>>>> +
+>>>>>> +	status = readl_relaxed(reg_base + 0xbc);
+>>>>>> +	val = readl_relaxed(reg_base + 0xcc);
+>>>>>> +	val = (val & 0xffff0000) | (status & 0xffff);
+>>>>>> +	writel_relaxed(val, reg_base + 0xcc);
+>>>>
+>>>> Can we have macro definitions for these 0xcc, 0xbc address offsets ?
+>>>> I must say I couldn't find them documented in any Exynos datasheet I've
+>> got though.
+>>>>
+>>
+>> I also wished this, but I could not find them documented.
+>> So I tried to keep logic of original code as it is, just changed location.
+>> I would also like to mention that I have not tested this on exynos5440 as I
+>> do not have
+>> one with me. I believe if it was working at its original place in
+>> exynos_restart it should work
+>> here also. Other patch (2/2) I have verified on Exynos3250 board and its
+>> working well.
+>
+> I think it's best to merge both patches in that series through
+> the arm-soc tree, since applying them not in order may cause some
+> breakage. Thus I'd let Kukjin take this patch set into his tree.
+>
+> For both patches:
+> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>
 
-Stopping at here? I didn't know what's difference before applied your patch.
-Clearing Card-read threshold value at every time would be caused that stop kernel?
-Just wonder it.
+Will you please take this series into your tree.
 
-> 
-> Rather than clearing read threshold bits, the best thing that function
-> dw_mci_ctrl_rd_thld() should do is leaving the bits untouched, in case
-> that card read threshold setup is not needed.
-> 
-> The patch fixes the regression by changing dw_mci_ctrl_rd_thld() a bit
-> to do nothing in case card read threshold bits setup is not needed.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Fixes: f1d2736c8156 ("mmc: dw_mmc: control card read threshold")
-> Cc: <stable@vger.kernel.org> # 3.13+
-> ---
->  drivers/mmc/host/dw_mmc.c | 7 ++-----
->  1 file changed, 2 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 69f0cc68d5b2..52c04ba69970 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -628,13 +628,13 @@ static void dw_mci_ctrl_rd_thld(struct dw_mci *host, struct mmc_data *data)
->  
->  	if (host->timing != MMC_TIMING_MMC_HS200 &&
->  	    host->timing != MMC_TIMING_UHS_SDR104)
-> -		goto disable;
-> +		return;
->  
->  	blksz_depth = blksz / (1 << host->data_shift);
->  	fifo_depth = host->fifo_depth;
->  
->  	if (blksz_depth > fifo_depth)
-> -		goto disable;
-> +		return;
->  
->  	/*
->  	 * If (blksz_depth) >= (fifo_depth >> 1), should be 'thld_size <= blksz'
-> @@ -644,9 +644,6 @@ static void dw_mci_ctrl_rd_thld(struct dw_mci *host, struct mmc_data *data)
->  	thld_size = blksz;
->  	mci_writel(host, CDTHRCTL, SDMMC_SET_RD_THLD(thld_size, 1));
->  	return;
-
-Then "return" could be also removed.
-
-Best Regards,
-Jaehoon Chung
-
-> -
-> -disable:
-> -	mci_writel(host, CDTHRCTL, SDMMC_SET_RD_THLD(0, 0));
->  }
->  
->  static int dw_mci_submit_data_dma(struct dw_mci *host, struct mmc_data *data)
-> 
+Thanks,
+Pankaj Dubey
+> --
+> Thanks,
+> Sylwester
+>
