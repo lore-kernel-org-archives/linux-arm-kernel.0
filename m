@@ -1,20 +1,46 @@
-From: wangyufen@huawei.com (wangyufen)
-Date: Fri, 21 Nov 2014 15:27:02 +0800
-Subject: arm64:  dose arm64 support the sysfs system call?
-Message-ID: <546EE946.1020905@huawei.com>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Fri, 21 Nov 2014 09:35:31 +0200
+Subject: [PATCH 3/7] pinctrl: pinconf-generic: Allow driver to specify
+ DT params
+In-Reply-To: <7e2f4984733343fdb4ea51cf7eb4c339@BY2FFO11FD046.protection.gbl>
+References: <1415041531-15520-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1415041531-15520-4-git-send-email-soren.brinkmann@xilinx.com>
+ <CACRpkdYfj2ydLQ4q_FKwXo73jzNsvj9u2Aem9EiuEw-OCvurrg@mail.gmail.com>
+ <1416300621.30131.6.camel@mm-sol.com>
+ <995406b8e0244c63a3ef8e58314e81f6@BL2FFO11FD037.protection.gbl>
+ <1416383379.30131.14.camel@mm-sol.com>
+ <84517404cda34124930ec838a639f538@BL2FFO11FD030.protection.gbl>
+ <1416470777.28873.1.camel@mm-sol.com>
+ <7e2f4984733343fdb4ea51cf7eb4c339@BY2FFO11FD046.protection.gbl>
+Message-ID: <1416555331.28873.8.camel@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-I did ltp test on arm64, the sysfs testcases failed:
+On Thu, 2014-11-20 at 08:22 -0800, S?ren Brinkmann wrote:
+> 
+> 
+> Also, I hope all my changes here don't break the current behavior. So,
+> those 27 driver should still be able to do what they currently do. But I
+> hope they could migrated over to use the generic bindings only in the
+> longer term, so that these custom properties disappear.
+> 
+> > > The pinctrl driver just assembles
+> > > some data structure that has the information regarding custom properties
+> > > and the core handles the rest.
+> > 
+> > Yup, that is nice. What will be really nice if it also handle custom,
+> > "function", "groups" and "pins" properties. Otherwise most of the drivers
+> > will not be able to benefit from this.
+> 
+> Why would you still need those? 
 
-    sysfs01     0  TWARN  :  This test can only run on kernels that support the sysfs system call
+I don't need them :-). The point was that still majority of the drivers
+will have custom parsing functions. It would be nice if we could fix
+that too. I do understand that using custom "pins", "functions"... is
+something which is deprecated, but if core parsing functions allow
+passing custom strings for above purposes, in a similar way as your
+proposal, it will be easier for those drivers to migrate, I believe.
 
-because the __NR_sysfs didn't define in aarch64
-
-Dose anyone know what number the sysfs system call is in aarch64?
-
-
-Thanks,
-Wang
+Regards,
+Ivan
