@@ -1,50 +1,79 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 21 Nov 2014 09:42:08 -0800
-Subject: [PATCH] mmc: dw_mmc: try pick the exact same voltage as vmmc for
- vqmmc
-In-Reply-To: <CAPDyKFrzGfDew0eLLEcA+_iS_mo-O2bFU58fjirfXXA8AJ9UYQ@mail.gmail.com>
-References: <1415109789-7046-1-git-send-email-addy.ke@rock-chips.com>
- <1415678573-6093-1-git-send-email-addy.ke@rock-chips.com>
- <CAPDyKFqUoBjhsbz8rkLa9PY_dpgMxnimz3k7OoA5WVhi7MacPQ@mail.gmail.com>
- <CAD=FV=VQHZ6YmcoeAb1OEVLYRrYBnc_dM5Kjt1TZX_CQJC=EfA@mail.gmail.com>
- <5464152E.7040209@rock-chips.com>
- <CAPDyKFrzGfDew0eLLEcA+_iS_mo-O2bFU58fjirfXXA8AJ9UYQ@mail.gmail.com>
-Message-ID: <CAD=FV=Ve1TY4+8quq1=18A1YOFvOWuFGrBmHLwMCwdWBSqzxOw@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 21 Nov 2014 12:42:30 -0500 (EST)
+Subject: [PoC PATCH] arm: allow modules outside of bl range
+In-Reply-To: <CAKv+Gu9a1EyD3k3zW4=+ahZopGfjy-QdLgd-3U2ORH0Tb+GGOA@mail.gmail.com>
+References: <1416503299-17418-1-git-send-email-ard.biesheuvel@linaro.org>
+ <alpine.LFD.2.11.1411201359310.11690@knanqh.ubzr>
+ <CAKv+Gu-3Uq0p2u3R=s5U9dHQgWMrJhbS5aytz8jdVEC6JscKvA@mail.gmail.com>
+ <CAKv+Gu9a1EyD3k3zW4=+ahZopGfjy-QdLgd-3U2ORH0Tb+GGOA@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1411211235580.11690@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf,
+On Fri, 21 Nov 2014, Ard Biesheuvel wrote:
 
-On Fri, Nov 21, 2014 at 4:06 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> [...]
->
->> Sure
->> If the first card is sd2.0 since startup, dw_mci_switch_voltage will not be called,
->
-> That can't be right. mmc_power_up() should trigger
-> dw_mci_switch_voltage() to be invoked.
+> On 21 November 2014 11:34, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > On 20 November 2014 20:14, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> >> On Thu, 20 Nov 2014, Ard Biesheuvel wrote:
+> >>
+> >>> Loading modules far away from the kernel in memory is problematic because
+> >>> the 'bl' instruction only has limited reach, and modules are not built
+> >>> with PLTs. Instead of using the -mlong-calls option (which affects *all*
+> >>> emitted bl instructions), this patch allocates some additional space at
+> >>> module load time, and populates it with PLT like entries when encountering
+> >>> relocations that are out of reach.
+> >>>
+> >>> Note that this patch is a proof of concept, and thus removes the implementation
+> >>> of module_alloc() so that all modules are relocated using PLT entries.
+> >>> Ideally, we would switch into PLT mode and start using the vmalloc area only
+> >>> after we have exhausted the ordinary module space.
+> >>>
+> >>> This should work with all relocation against symbols exported by the kernel,
+> >>> including those resulting from GCC generated function calls for ftrace etc.
+> >>>
+> >>> This is largely based on the ia64 implementation.
+> >>> Thumb-2 kernels currently unsupported.
+> >>>
+> >>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >>
+> >> Looks on the right track to me.
+> >>
+> >> BTW it might be necessary to use PLT mode even from the primary module
+> >> area if e.g. the kernel gets too big to be reachable (we've seen that
+> >> already), or a module from the primary area wants to branch to a symbol
+> >> located in a larger module that ended up in the vmalloc area.  So you
+> >
+> > Indeed.
+> >
+> >> might need to estimate the worst case for the number of PLTs and end up
+> >> not using all of them or even none at all. Would be good to free the
+> >> unused pages in that case (only for the non init section obviously).
+> >> Looks like the module_finalize() hook might be used for that.
+> >>
+> >
+> > This code already establishes an upper bound for the number of
+> > required PLT entries, but allocates the memory unconditionally, which
+> > is indeed somewhat of a waste as 'no PLT entries' is obviously the
+> > general case as long as the primary module area has not been
+> > exhausted.
+> >
+> > I can easily round up the core PLT section to PAGE_SIZE size and
+> > alignment, but I haven't figured out how to punch a hole into an area
+> > returned by vmalloc(), and it is desirable to have the PLT region and
+> > the module region itself be part of the same allocation to begin with,
+> > or the PLT region may end up out of range itself, which kind of
+> > defeats the purpose. Or perhaps, some way to at least release the
+> > physical pages while retaining the single vmap_area.
+> >
+> 
+> It turns out, looking at the actual numbers (random sample of 46
+> modules), that the typical size overhead of the core PLT is about 5%,
+> and rarely results in the number of needed pages to increase.
 
-Hmmm, I think you're right.  Addy: can you double check if it's only
-the 2nd card for you?  I was thinking that if a regulator is currently
-3.3V and you request 2.7 - 3.3V the regulator framework will treat
-that as a noop.  ...but that definitely doesn't appear to be the case.
-When I boot up the first time even with no SD card plugged in, I see
-this at bootup:
-
-[    3.042234] vccio_sd: 1800 <--> 3300 mV at 3300 mV
-
-...showing that it started at 3.3V.  Then I see:
-
-$ grep "" /sys/class/regulator/regulator.16/{name,microvolts}
-/sys/class/regulator/regulator.16/name:vccio_sd
-/sys/class/regulator/regulator.16/microvolts:2700000
-
-...so it is certainly getting changed even with no card plugged in.
+That's what I was thinking too.  If for example a single extra page is 
+allocated, that means 4096/8 = 512 unique symbols that can be redirected 
+through it.  That's a _lot_ of external symbols for a module.  So maybe 
+we shouldn't bother too much.
 
 
-BTW: I don't actually have one of these failing cards--all of mine
-work.  Addy, do you know the make and model of the card you have that
-fails?
-
-
--Doug
+Nicolas
