@@ -1,61 +1,34 @@
-From: julien.chauveau@neo-technologies.fr (Julien CHAUVEAU)
-Date: Fri, 21 Nov 2014 11:57:16 +0100
-Subject: [PATCH] ARM: dts: rockchip: enable I2C0, SPI and SARADC on Radxa Rock
-Message-ID: <1416567436-26706-1-git-send-email-julien.chauveau@neo-technologies.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Nov 2014 12:15:09 +0100
+Subject: [PATCH 3/3] drivers: bus: Move omap gpmc code to live under
+ drivers
+In-Reply-To: <546F0299.1070508@ti.com>
+References: <1416522501-14999-1-git-send-email-tony@atomide.com>
+ <1416522501-14999-4-git-send-email-tony@atomide.com>
+ <546F0299.1070508@ti.com>
+Message-ID: <3449576.YFhSXUYQOn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables user space access to the I2C0 bus, SPI0 bus, SPI1 bus
-and the 3 Analog-to-digital inputs available on the Radxa Rock headers.
+On Friday 21 November 2014 11:15:05 Roger Quadros wrote:
+> On 11/21/2014 12:28 AM, Tony Lindgren wrote:
+> > Just move to drivers as further clean-up can now happen there
+> > finally.
 
-We have to disable UART1 because SPI0 and UART1 are multiplexed together.
+Awesome!
 
-Signed-off-by: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
----
- arch/arm/boot/dts/rk3188-radxarock.dts | 20 ++++++++++++++++----
- 1 file changed, 16 insertions(+), 4 deletions(-)
+> >  arch/arm/mach-omap2/Kconfig                           | 1 +
+> >  arch/arm/mach-omap2/Makefile                          | 2 +-
+> >  drivers/bus/Kconfig                                   | 3 +++
+> >  drivers/bus/Makefile                                  | 3 ++-
+> >  arch/arm/mach-omap2/gpmc.c => drivers/bus/omap-gpmc.c | 0
+> >  5 files changed, 7 insertions(+), 2 deletions(-)
+> >  rename arch/arm/mach-omap2/gpmc.c => drivers/bus/omap-gpmc.c (100%)
+> 
+> Should we move it to drivers/memory/ instead?
+> TI_AEMIF driver lives there. This is similar to OMAP-GPMC for but for
+> Davinci and Keystone platforms.
 
-diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
-index 6eb62c0..06b2256 100644
---- a/arch/arm/boot/dts/rk3188-radxarock.dts
-+++ b/arch/arm/boot/dts/rk3188-radxarock.dts
-@@ -122,6 +122,10 @@
- 	cpu0-supply = <&vdd_arm>;
- };
- 
-+&i2c0 {
-+	status = "okay";
-+};
-+
- &i2c1 {
- 	status = "okay";
- 	clock-frequency = <400000>;
-@@ -294,14 +298,22 @@
- 	};
- };
- 
-+&saradc {
-+	status = "okay";
-+};
-+
-+&spi0 {
-+	status = "okay";
-+};
-+
-+&spi1 {
-+	status = "okay";
-+};
-+
- &uart0 {
- 	status = "okay";
- };
- 
--&uart1 {
--	status = "okay";
--};
--
- &uart2 {
- 	status = "okay";
- };
--- 
-2.1.0
+Agreed, using drivers/memory sounds better.
+
+	Arnd
