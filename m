@@ -1,73 +1,37 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 21 Nov 2014 08:15:30 -0800
-Subject: [PATCH 1/3] ARM: OMAP2+: Prepare to move GPMC to drivers by
- platform data header
-In-Reply-To: <546F05C3.6090508@ti.com>
+Date: Fri, 21 Nov 2014 08:17:05 -0800
+Subject: [PATCH 2/3] ARM: OMAP2+: Move GPMC initcall to devices.c
+In-Reply-To: <546F08C2.4090903@ti.com>
 References: <1416522501-14999-1-git-send-email-tony@atomide.com>
- <1416522501-14999-2-git-send-email-tony@atomide.com>
- <546F05C3.6090508@ti.com>
-Message-ID: <20141121161529.GQ7046@atomide.com>
+ <1416522501-14999-3-git-send-email-tony@atomide.com>
+ <546F08C2.4090903@ti.com>
+Message-ID: <20141121161705.GR7046@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roger Quadros <rogerq@ti.com> [141121 01:30]:
+* Roger Quadros <rogerq@ti.com> [141121 01:43]:
 > On 11/21/2014 12:28 AM, Tony Lindgren wrote:
-> > +#include <linux/omap-gpmc.h>
-> > +#include <linux/platform_data/omap-gpmc.h>
+> > This will us allow to just move gpmc.c to live under drivers
+> > in the next patch.
+> > 
+> > Note that we now also remove the omap specific check for the
+> > initcall. That's OK as gpmc_probe() checks for the pdata
+> > and bails out for other platforms compiled in.
+> > 
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Roger Quadros <rogerq@ti.com>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
 > 
-> I think we should get rid for mach-omap2/gpmc.h and include the above two
-> headers wherever needed.
-
-Well I'm trying to keep the churn on patching all board-*.c files
-down to minimum until they just get dropped.
-
-So let's keep gpmc.h around still for a little while for all the
-board-*.c files.
- 
-> > diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> > index 175564c..88721df 100644
-> > --- a/arch/arm/mach-omap2/pm34xx.c
-> > +++ b/arch/arm/mach-omap2/pm34xx.c
-> > @@ -29,6 +29,7 @@
-> >  #include <linux/delay.h>
-> >  #include <linux/slab.h>
-> >  #include <linux/omap-dma.h>
-> > +#include <linux/omap-gpmc.h>
-> >  #include <linux/platform_data/gpio-omap.h>
-> >  
-> >  #include <trace/events/power.h>
-> > @@ -43,7 +44,6 @@
-> >  #include "common.h"
-> >  #include "cm3xxx.h"
-> >  #include "cm-regbits-34xx.h"
-> > -#include "gpmc.h"
-> >  #include "prm-regbits-34xx.h"
-> >  #include "prm3xxx.h"
-> >  #include "pm.h"
-
-And for the files that will stay around, let's not include gpmc.h.
-
-> > --- /dev/null
-> > +++ b/include/linux/platform_data/omap-gpmc.h
-> > @@ -0,0 +1,177 @@
-> > +/*
-> > + * General-Purpose Memory Controller for OMAP2
-> > + *
-> > + * Copyright (C) 2005-2006 Nokia Corporation
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#ifndef __OMAP2_GPMC_H
-> > +#define __OMAP2_GPMC_H
-> > +
-> > +#include <linux/platform_data/mtd-nand-omap2.h>
+> I guess gpmc_init can't still be put under module_init() till we have fixed up
+> some more issues in the GPMC driver. But it shouldn't prevent us from making
+> the move to drivers/, so
 > 
-> Why do need to include this header here?
+> Acked-by: Roger Quadros <rogerq@ti.com>
 
-Probably left over from the old code, that looks unnecessary.
+Yeah I figured it's too close to the merge cycle to start playing
+with the initcall levels. It may already be possible to make it
+just module_init() but let's do that as separate patches after
+the move.
 
 Regards,
 
