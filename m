@@ -1,80 +1,26 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 21 Nov 2014 10:12:28 +0800
-Subject: Removal of bus->msi assignment breaks MSI with stacked domains
-In-Reply-To: <546E9D80.3090405@linux.intel.com>
-References: <546E1771.4030201@arm.com> <546E93DC.8010902@huawei.com>
- <alpine.DEB.2.11.1411210233250.6439@nanos> <546E9D80.3090405@linux.intel.com>
-Message-ID: <546E9F8C.4050307@huawei.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 20 Nov 2014 18:18:28 -0800
+Subject: [PATCH 6/7] clk: qcom: ipq: Add lpass clock controller driver
+In-Reply-To: <1416442245-21967-7-git-send-email-sboyd@codeaurora.org>
+References: <1416442245-21967-1-git-send-email-sboyd@codeaurora.org>
+ <1416442245-21967-7-git-send-email-sboyd@codeaurora.org>
+Message-ID: <546EA0F4.10006@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/21 10:03, Jiang Liu wrote:
-> On 2014/11/21 9:46, Thomas Gleixner wrote:
->> On Fri, 21 Nov 2014, Yijing Wang wrote:
->>> On 2014/11/21 0:31, Marc Zyngier wrote:
->>>> Bjorn, Yijing,
->>>>
->>>> I've just realized that patch c167caf8d174 (PCI/MSI: Remove useless
->>>> bus->msi assignment) completely breaks MSI on arm64 when using the new
->>>> MSI stacked domain:
->>>
->>> Sorry, this is my first part to refactor MSI related code, now how
->>> to get pci msi_controller depends arch
->>> functions(pcibios_msi_controller() or arch_setup_msi_irq()), we are
->>> working on generic pci_host_bridge, after that, we could eventually
->>> eliminate MSI arch functions and find pci dev 's msi controller by
->>> pci_host_bridge->get_msi_controller().
->>
->> The main question is why you think that pci_host_bridge is the proper
->> place to store that information.
->>
->> On x86 we have DMAR units associated to a single device. Each DMAR
->> unit is a seperate MSI irq domain. 
->>
->> Can you guarantee that the pci_host_bridge is the right point to
->> provide the association of the device to the irq domain?
->>
->> So the real question is:
->>
->>    What is the association level requirement to properly identify the
->>    irqdomain for a specific device on any given architecture with and
->>    without IOMMU, interrupt redirection etc.
->>
->> To be honest: I don't know.
->>
->> My gut feeling tells me that it's at the device level, but I really
->> leave that decision to the experts in that field.
-> Hi Thomas and Yijing,
-> 	Since we are allocating interrupts for a PCI device, it's
-> natural to get irqdomain from the PCI device itself. If we try to
-> get irqdomain from a PCI bus or host bridge like
-> pci_get_msi_irqdomain(bus or hostbridge), it may fail for x86
-> because x86 may build per-device irqdomain theoretically.
-> So the preferred interface prototype is:
-> 	pci_get_msi_irqdomain(pci_dev) or
-> 	pcibios_msi_controller(pci_dev)
-> It's flexible enough. For architectures on which irqdomain is
-> associated with PCI bus or host bridge, you could get the bus
-> or host bridge from pci_dev. And it won't cause extra computation
-> because you always need to get bus or host bridge from the pci_dev.
+On 11/19/2014 04:10 PM, Stephen Boyd wrote:
+> +
+> +static struct clk_regmap_div mi2s_bit_div_clk = {
+> +	.reg = 0x48,
+> +	.shift = 10,
+> +	.width = 4,
+> +	.clkr = {
+> +		.enable_reg = 0x48,
+> +		.enable_mask = BIT(15),
 
-Hi Gerry, I mean we could find msi_controller by calling
-pci_host_bridge->pci_get_msi_irqdomain/msi_controller(struct pci_dev *pdev)
-to avoid arch weak function like pcibios_get_msi_controller(struct pci_dev *pdev). :)
-
-
-> Regards!
-> Gerry
->>
->> Thanks,
->>
->> 	tglx
->>
-> 
-> .
-> 
-
+This also has a halt bit so I'll add that in the next version by
+splitting this down further into a divider and a branch.
 
 -- 
-Thanks!
-Yijing
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
