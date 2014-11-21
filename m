@@ -1,31 +1,36 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 21 Nov 2014 15:33:25 -0800
-Subject: [PATCH v2 2/2] ARM: dts: Add devicetree for NovaTech OrionLXm
-In-Reply-To: <20141117190847.GA4857@saruman>
-References: <1416250957-11065-1-git-send-email-george.mccollister@gmail.com>
- <1416250957-11065-2-git-send-email-george.mccollister@gmail.com>
- <20141117190847.GA4857@saruman>
-Message-ID: <20141121233325.GZ7046@atomide.com>
+Date: Fri, 21 Nov 2014 15:39:59 -0800
+Subject: [PATCH v13 5/9] arm: omap1: Migrate debug_ll macros to use 8250.S
+In-Reply-To: <1416235750-4766-6-git-send-email-daniel.thompson@linaro.org>
+References: <1416235750-4766-1-git-send-email-daniel.thompson@linaro.org>
+ <1416235750-4766-6-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <20141121233958.GB7046@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [141117 11:10]:
-> On Mon, Nov 17, 2014 at 01:02:35PM -0600, George McCollister wrote:
-> > This adds the NovaTech OrionLXm which is based on the AM335x SoC
-> > http://www.novatechweb.com/substation-automation/orionlxm/
-> > 
-> > RAM: 512MiB
-> > Flash: 4GB eMMC
-> > Ethernet PHYs: 2x Micrel KSZ8041FTLI
-> > USB ports are used internally by the expansion cards.
-> > Internal micro SD slot is available.
-> > 
-> > Signed-off-by: George McCollister <george.mccollister@gmail.com>
+* Daniel Thompson <daniel.thompson@linaro.org> [141117 06:53]:
+> The omap1's debug-macro.S is similar to the generic 8250 code. Compared to
+> the 8520 code the omap1 macro automatically determines what UART to use
+> based on breadcrumbs left by the bootloader and automatically copes with
+> the eccentric register layout on OMAP7XX.
 > 
-> this looks might better to my eyes:
+> This patch drops both these features and relies instead on the generic
+> 8250 macros:
 > 
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
+> 1. Dropping support for the bootloader breadcrumbs is identical to the
+>    way the migration was handled for OMAP2 (see 808b7e07464d...).
+> 
+> 2. Support for OMAP7XX still exists but it must be configured by hand
+>    (DEBUG_OMAP7XXUART1/2/3) rather than handled at runtime.
+> 
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Arnd Bergmann <arnd.bergmann@linaro.org>
+> Cc: linux-omap at vger.kernel.org
+> Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
 
-Applying into omap-for-v3.19/dt-v2 thanks.
+Looks OK to me, probably best that these are queued all together so:
 
-Tony
+Acked-by: Tony Lindgren <tony@atomide.com>
