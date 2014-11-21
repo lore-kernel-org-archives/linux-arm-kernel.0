@@ -1,29 +1,37 @@
-From: julien.chauveau@neo-technologies.fr (Julien CHAUVEAU)
-Date: Fri, 21 Nov 2014 11:08:47 +0100
-Subject: [PATCH] clk: rockchip: fix rk3188 USB HSIC PHY clock divider
-Message-ID: <1416564527-21327-1-git-send-email-julien.chauveau@neo-technologies.fr>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 21 Nov 2014 10:11:02 +0000
+Subject: Removal of bus->msi assignment breaks MSI with stacked domains
+In-Reply-To: <546E93DC.8010902@huawei.com>
+References: <546E1771.4030201@arm.com> <546E93DC.8010902@huawei.com>
+Message-ID: <546F0FB6.3050404@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USB HSIC PHY clock divider is set in the register RK2928_CLKSEL_CON(11).
+On 21/11/14 01:22, Yijing Wang wrote:
+> On 2014/11/21 0:31, Marc Zyngier wrote:
+>> Bjorn, Yijing,
+>>
+>> I've just realized that patch c167caf8d174 (PCI/MSI: Remove useless
+>> bus->msi assignment) completely breaks MSI on arm64 when using the new
+>> MSI stacked domain:
+> 
+> Sorry, this is my first part to refactor MSI related code, now
+> how to get pci msi_controller depends arch functions(pcibios_msi_controller() or
+> arch_setup_msi_irq()), we are working on generic pci_host_bridge, after that,
+> we could eventually eliminate MSI arch functions and find pci dev 's msi controller
+> by pci_host_bridge->get_msi_controller().
+> 
+> Marc, could you tell me what pci host driver in your test platform ?
 
-Signed-off-by: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
----
- drivers/clk/rockchip/clk-rk3188.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I'm using pci-host-generic (with a couple of patches to help it fit the
+new "generic pci" infrastructure).
 
-diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-index 725d841..f27ea47 100644
---- a/drivers/clk/rockchip/clk-rk3188.c
-+++ b/drivers/clk/rockchip/clk-rk3188.c
-@@ -664,7 +664,7 @@ static struct rockchip_clk_branch rk3188_clk_branches[] __initdata = {
- 			RK2928_CLKSEL_CON(30), 0, 2, DFLAGS,
- 			RK2928_CLKGATE_CON(3), 6, GFLAGS),
- 	DIV(0, "sclk_hsicphy_12m", "sclk_hsicphy_480m", 0,
--			RK2928_CLKGATE_CON(11), 8, 6, DFLAGS),
-+			RK2928_CLKSEL_CON(11), 8, 6, DFLAGS),
- 
- 	MUX(0, "i2s_src", mux_pll_src_gpll_cpll_p, 0,
- 			RK2928_CLKSEL_CON(2), 15, 1, MFLAGS),
+This lives at:
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+irq/arm64-pci
+
+Thanks,
+
+	M.
 -- 
-2.1.0
+Jazz is not dead. It just smells funny...
