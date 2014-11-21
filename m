@@ -1,94 +1,44 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 21 Nov 2014 10:31:10 -0700
-Subject: Removal of bus->msi assignment breaks MSI with stacked domains
-In-Reply-To: <546E9B60.9070706@huawei.com>
-References: <546E1771.4030201@arm.com> <20141120215353.GA7987@google.com>
- <alpine.DEB.2.11.1411202355060.6439@nanos>
- <546E9B60.9070706@huawei.com>
-Message-ID: <20141121173110.GB6578@google.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Fri, 21 Nov 2014 23:05:28 +0530
+Subject: [PATCH 7/9] dt: mb86s7x: add dt files for MB86S7x evbs
+In-Reply-To: <6351620.x1OFSWlVbH@wuerfel>
+References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <2581182.ZW92kSfUJp@wuerfel>
+ <CAJe_ZhfJBftYd7oYNqUsgZsVZS8ccRA5XngJ=msRnt7RSE+C2Q@mail.gmail.com>
+ <6351620.x1OFSWlVbH@wuerfel>
+Message-ID: <CAJe_Zhee6XG5=izSccDDmL4cTyXLeYO3EdaUA=inmrV5MdF12Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 09:54:40AM +0800, Yijing Wang wrote:
-> >> Thomas, let me know if you want to do that.  I suppose we could add a new
-> >> patch to add it back, but that would leave bisection broken for the
-> >> interval between c167caf8d174 and the patch that adds it back.
-> > 
-> > Fortunately my irq/irqdomain branch is not immutable yet. So we have
-> > no problem at that point. I can rebase on your branch until tomorrow
-> > night. Or just rebase on mainline and we sort out the merge conflicts
-> > later, i.e. delegate them to Linus so his job of pulling stuff gets
-> > not completely boring.
-> 
-> Hi Thomas, sorry for my introducing the broken.
-> 
-> > 
-> > What I'm more worried about is whether this intended change is going
-> > to inflict a problem on Jiangs intention to deduce the MSI irq domain
-> > from the device, which we really need for making DMAR work w/o going
-> > through loops and hoops.
-> > 
-> > I have limited knowledge about the actual scope of iommu (DMAR) units
-> > versus device/bus/host-controllers, so I would appreciate a proper
-> > explanation for that from you or Jiang or both.
-> 
-> In my personal opinion, if it's not necessary, we should not put stuff
-> into pci_dev or pci_bus. If we plan to save msi_controller in pci_bus or
-> pci_dev.
-> I have a proposal, I would be appreciated if you could give some comments.
-> First we refactor pci_host_bridge to make a generic
-> pci_host_bridge, then we could save pci domain in it to eliminate
-> arch specific functions. I aslo wanted to save msi_controller as
-> pci domain, but now Jiang refactor hierarchy irq domain, and
-> pci devices under the same pci host bridge may need to associate
-> to different msi_controllers.
+On 21 November 2014 22:39, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 21 November 2014 22:19:43 Jassi Brar wrote:
+>> >
+>> > This seems weird: rather than have one clock controller node per
+>> > clock source, why not just have one node with #clock-cells = >?
+>> >
+>> > Your controller seems perfectly capable of this, and you even
+>> > put the numbers in the label. It would be much more straightforward
+>> > to do
+>> >
+>> >         clocks = <&clk_alw 0 1>;
+>> >
+>> > than
+>> >
+>> >         clocks = <&clk_alw_0_1>;
+>> >
+>> > here. Possibly even
+>> >
+>> >         clocks = <&clk MB86S70_CRG11_ALW 0 1>;
+>> >
+>> > with #clock-cells = >
+>> >
+>> Is there a way to compact the dtsi and yet populate only clocks that
+>> are actually ever used (instead of 6x16x9)?
+>
+> I believe the clock driver just wouldn't create the clocks until
+> a device driver requests them.
+>
+Seems like the chicken-egg problem. Let me check.
 
-I think this is getting ahead of ourselves.  Let's make small steps.
-
-We currently have the msi_controller pointer in struct pci_bus.  That was
-there even before your series.  Your series added pci_msi_controller(),
-and I reworked it so it looks like this:
-
-    static struct msi_controller *pci_msi_controller(struct pci_dev *dev)
-    {
-	   struct msi_controller *msi_ctrl = dev->bus->msi;
-
-	   if (msi_ctrl)
-		   return msi_ctrl;
-
-	   return pcibios_msi_controller(dev);
-    }
-
-So now your series basically just removes the ARM add_bus() and
-remove_bus() methods and gets the MSI controller info from the ARM
-pci_sys_data struct instead of from pci_bus.  Of course, that assumes that
-on ARM, all devices under a host bridge have the same MSI controller.  That
-seems like an unwarranted assumption, but if you want to do it for ARM,
-that's fine with me.
-
-> So I want to associate a msi_controller finding ops with generic pci_host_bridge,
-> then every pci device could find its msi_controller/irq_domain by a
-> common function
-> 
-> E.g
-> 
-> struct msi_controller *pci_msi_controller(struct pci_dev *pdev)
-> {
-> 	struct msi_controller *ctrl;
-> 	struct pci_host_bridge *host = find_pci_host_bridge(pdev->bus);
-> 	if (host && host->pci_get_msi_controller)
-> 		ctrl = pci_host_bridge->pci_get_msi_controller(struct pci_dev *pdev);
-> 
-> 	return ctrl;	
-> }
-
-You can do this for ARM if you want (and your series already accomplishes
-the same effect, though implemented differently).  But I don't think this
-is appropriate for the PCI core.
-
-For anybody who is on this thread but not the original, I reworked the
-series slightly, see [1].
-
-Bjorn
-
-[1] http://lkml.kernel.org/r/20141121172018.GA6578 at google.com
+Thanks
+Jassi
