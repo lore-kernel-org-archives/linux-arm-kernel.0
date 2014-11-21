@@ -1,24 +1,23 @@
-From: marcel@ziswiler.com (Marcel Ziswiler)
-Date: Fri, 21 Nov 2014 12:57:52 +0100
-Subject: [PATCH] ARM: tegra: colibri t30: fix on-module ethernet
-In-Reply-To: <b1cdc96ce8bb15059d7eea282f6586a826bee124.1416566157.git.marcel@ziswiler.com>
-References: <b1cdc96ce8bb15059d7eea282f6586a826bee124.1416566157.git.marcel@ziswiler.com>
-Message-ID: <1416571072.2744.4.camel@localhost.localdomain>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Nov 2014 12:58:52 +0100
+Subject: [GIT PULL 2/2] ARM: berlin: DT changes for v3.19 (round 2)
+In-Reply-To: <1416523736-13504-2-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1416523736-13504-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1416523736-13504-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <4393962.lM2EijkGal@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-11-21 at 11:41 +0100, Marcel Ziswiler wrote:
-> Looks like Ethernet only ever worked if U-Boot properly brought it up
-> as both the reset as well as the VBUS lines were not actively handled
-> in-kernel.
-> This patch fixes this by just pulling up the reset GPIO
-
-Doing automatic power-cycle tests revealed that this is still not enough
-and a proper reset-cycle might be required. However I don't know as of
-yet how one can easily do that in mainline with a USB device otherwise
-not mentioned anywhere in the device tree. Any ideas?
-
-> and properly
-> enabling VBUS via a GPIO enabled fixed regulator VBUS supply.
+On Thursday 20 November 2014 23:48:56 Sebastian Hesselbarth wrote:
+> this is incremental Berlin DT changes for v3.19 round 2. Finally,
+> after almost two cycles, Antoine succeeded in getting Acked-bys
+> for his chipidea usb to generic PHY patches, which also allows us
+> to reuse that very driver on all Berlin SoCs.
 > 
-> Signed-off-by: Marcel Ziswiler <marcel@ziswiler.com>
+> Again this PR is between tags/berlin-dt-3.19-1 and tags/berlin-dt-3.19-2.
+> 
+> 
+
+Pulled into next/dt, thanks!
+	
+	Arnd
