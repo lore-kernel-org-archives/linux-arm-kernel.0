@@ -1,29 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Nov 2014 11:01:35 +0000
-Subject: IRQ #0 broken on ARM
-In-Reply-To: <87zjbk966i.fsf@approximate.cambridge.arm.com>
-References: <CALT56yPs-SSssff1waj81CRQfER4ZKKR=B1jOXVL-aBChicSjg@mail.gmail.com>
- <87zjbk966i.fsf@approximate.cambridge.arm.com>
-Message-ID: <20141121110135.GS4042@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Nov 2014 12:04:43 +0100
+Subject: [PATCH 2/2] arm: socfpga: Set share override bit of the l2 cache
+ controller
+In-Reply-To: <1416546280-12068-2-git-send-email-dinguyen@opensource.altera.com>
+References: <1416546280-12068-1-git-send-email-dinguyen@opensource.altera.com>
+ <1416546280-12068-2-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <2156186.zs80uXCLAf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 10:52:37AM +0000, Marc Zyngier wrote:
-> On Fri, Nov 21 2014 at 10:31:05 am GMT, Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> wrote:
-> > Hello,
-> >
-> > After the commit a71b092a9c68685a270ebdde7b5986ba8787e575
-> > (ARM: Convert handle_IRQ to use __handle_domain_irq) IRQ #0 is broken
-> > on ARM. It is a valid IRQ and it is quite imporant (on sa1100 it's a GPIO0).
+On Thursday 20 November 2014 23:04:40 dinguyen at opensource.altera.com wrote:
 > 
-> Well, this is a valid IRQ number if you're not using irq domains. I may
-> be a bit pedantic here, but I thing this is an important distinction.
+> ---
+>  arch/arm/mach-socfpga/socfpga.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+> index 13b1858..afc009f 100644
+> --- a/arch/arm/mach-socfpga/socfpga.c
+> +++ b/arch/arm/mach-socfpga/socfpga.c
+> @@ -105,7 +105,8 @@ static const char *altera_dt_match[] = {
+>  
+>  DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
+>         .l2c_aux_val    = L310_AUX_CTRL_DATA_PREFETCH |
+> -                         L310_AUX_CTRL_INSTR_PREFETCH,
+> +                         L310_AUX_CTRL_INSTR_PREFETCH |
+> +                         L2C_AUX_CTRL_SHARED_OVERRIDE,
+>         .l2c_aux_mask   = ~0,
+>         .smp            = smp_ops(socfpga_smp_ops),
+>         .map_io         = socfpga_map_io,
 
-Linus has decreed it to not be a valid IRQ number, and that's basically
-the end of the discussion.  Generic code, and drivers, will increasingly
-decide that IRQ0 is not valid, and objecting to it has, and will continue
-to elicit a response of "fix ARM".
+Hi Dinh,
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Please do this by putting the appropriate proterties into the
+l2x0 DT node instead.
+
+	Arnd
