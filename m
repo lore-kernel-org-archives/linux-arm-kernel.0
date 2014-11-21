@@ -1,48 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 21 Nov 2014 17:51:19 +0000
-Subject: For the problem when using swiotlb
-In-Reply-To: <2530749.roRsteyaXx@wuerfel>
-References: <5469E26B.2010905@huawei.com> <5029442.vhLMp7Ns7F@wuerfel>
- <20141121165708.GF19783@e104818-lin.cambridge.arm.com>
- <2530749.roRsteyaXx@wuerfel>
-Message-ID: <20141121175118.GA10451@localhost>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Fri, 21 Nov 2014 23:28:38 +0530
+Subject: [PATCH 4/9] clk: Add clock driver for mb86s7x
+In-Reply-To: <5451217.D7Cssxh5Uh@wuerfel>
+References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <2147877.AXJukoovHQ@wuerfel>
+ <CAJe_Zhdg0tRx1SiACpCci3B2XaCxECGvkE7D=fne6vch4Bhk-w@mail.gmail.com>
+ <5451217.D7Cssxh5Uh@wuerfel>
+Message-ID: <CAJe_Zhc2UePxy-Y2LsU1Pn18OOknDKZw-8rjJ06DEWOhvs6CMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 05:04:28PM +0000, Arnd Bergmann wrote:
-> On Friday 21 November 2014 16:57:09 Catalin Marinas wrote:
-> > There is a scenario where smaller mask would work on arm64. For example
-> > Juno, you can have 2GB of RAM in the 32-bit phys range (starting at
-> > 0x80000000). A device with 31-bit mask and a dma_pfn_offset of
-> > 0x80000000 would still work (there isn't any but just as an example). So
-> > the check in dma_alloc_coherent() would be something like:
-> > 
-> > 	phys_to_dma(top of ZONE_DMA) - dma_pfn_offset <= coherent_dma_mask
-> > 
-> > (or assuming RAM starts at 0 and ignoring dma_pfn_offset for now)
-> > 
-> > If the condition above fails, dma_alloc_coherent() would no longer fall
-> > back to swiotlb but issue a dev_warn() and return NULL.
-> 
-> Ah, that looks like it should work on all architectures, very nice.
-> How about checking this condition, and then printing a small warning
-> (dev_warn, not WARN_ON) and setting the dma_mask pointer to NULL?
+On 21 November 2014 22:45, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 21 November 2014 22:06:51 Jassi Brar wrote:
 
-I would not add the above ZONE_DMA check to of_dma_configure(). For
-example on arm64, we may not support a small coherent_dma_mask but the
-same value for dma_mask could be fine via swiotlb bouncing (or IOMMU).
-However, that's an arch-specific decision. Maybe after the above setting
-of dev->coherent_dma_mask in of_dma_configure(), we could add:
+>> >> Only MB86S70_CRG11_UNGPRT is marked to mean one special (non-maskable)
+>> >> port on the controller, which the clock driver does make use of.
+>> >
+>> > Is this the actual port number that is known to be non-maskable?
+>> >
+>> Yes the clock comes out of the controller and is also the parent of
+>> other 8 independently maskable clock ports of the domain.
+>
+> I'm getting confused by the terminology here. Is MB86S70_CRG11_ALW
+> a port or a controller?
+>
+Sorry, bad symbols. ALW..DPHY are controllers. UNGPRT is the ninth
+parent clock (port) of a domain that can't be masked.
+FYKI, there are 6 instances, of some CRG11 clock controller, under
+control of the remote f/w. The Mailbox protocol between remote f/w and
+Linux assigned indices [0-5] to these controllers.
 
-	if (!dma_supported(dev, dev->coherent_dma_mask))
-		dev->dma_mask = NULL;
+>>  The firmware on remote master, lets say, don't wanna be bothered by
+>> the clock topology. Even for set-rate the onus is on Linux to request
+>> only appropriate rates at appropriate times so that other devices are
+>> not messed up.
+>
+> Is there any code to validate that, or does Linux just treat all
+> clocks transparently?
+>
+The remote does not expose the clock topology and only accepts
+requests on port-basis. The remote f/w is supposed to keep track of
+which ports are used by Linux and then work out inter-dependencies
+upon receiving a request from Linux. So for Linux there are N
+independent 'root' clocks, ops on which may or may not succeed at any
+given time.
 
-The arch dma_supported() can check the swiotlb bouncing or ZONE_DMA
-limits.
-
-Strangely, we don't have a coherent_dma_supported() but we can defer
-such check to dma_alloc_coherent() and that's where we would check the
-top of ZONE_DMA.
-
--- 
-Catalin
+thanks
+jassi
