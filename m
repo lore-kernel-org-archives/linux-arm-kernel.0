@@ -1,71 +1,51 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Fri, 21 Nov 2014 23:32:54 +0900
-Subject: [PATCH v11 4/6] ARM: Exynos: switch to using generic cpufreq
- driver for Exynos4210/5250/5420
-In-Reply-To: <CAHLCerPKv=NsLNZvwo-vhDwkved5+O4a40LvrP_7j30KjeKqUQ@mail.gmail.com>
-References: <1413805281-6269-1-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-2-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-3-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-4-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-5-git-send-email-thomas.ab@samsung.com>
- <CAHLCerPKv=NsLNZvwo-vhDwkved5+O4a40LvrP_7j30KjeKqUQ@mail.gmail.com>
-Message-ID: <CAJuA9agU6A4OZ2_9ER2d5oxLAmEr=zq2c-Z3ij8AvPZYNafJRw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Nov 2014 15:34:05 +0100
+Subject: [PATCH 4/9] clk: Add clock driver for mb86s7x
+In-Reply-To: <CAJe_ZhcxHnoUeBUk3w=_xyk5oMAuena9RjDnyRvzLtV2=LpQxw@mail.gmail.com>
+References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <2396055.pBuh1YtUHT@wuerfel>
+ <CAJe_ZhcxHnoUeBUk3w=_xyk5oMAuena9RjDnyRvzLtV2=LpQxw@mail.gmail.com>
+Message-ID: <2147877.AXJukoovHQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Amit,
+On Friday 21 November 2014 18:52:47 Jassi Brar wrote:
+> On 21 November 2014 18:33, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 20 November 2014 20:36:15 Vincent Yang wrote:
+> >> +#define __DTS_MB86S70_CLK_H
+> >> +
+> >> +#define MB86S70_CRG11_ALW      0
+> >> +#define MB86S70_CRG11_DDR3     1
+> >> +#define MB86S70_CRG11_MAIN     2
+> >> +#define MB86S70_CRG11_CA15     3
+> >> +#define MB86S70_CRG11_HDMI     4
+> >> +#define MB86S70_CRG11_DPHY     5
+> >> +
+> >> +#define MB86S70_CRG11_UNGPRT   8
+> >>
+> >
+> > The clock driver doesn't seem to use those macros at all, how does the
+> > driver know which clock you are referring to?
+> >
+> That was just an attempt to make a bit verbose the controller
+> instance. Instead of specifying controller:=4, it reads better
+> controller:=MB86S70_CRG11_HDMI in the clock DT nodes. The clock driver
+> simply fills in controller+domain+port of the given clock into mailbox
+> payload.
 
-On Wed, Nov 12, 2014 at 3:03 PM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
-> Hi Thomas,
->
-> On Mon, Oct 20, 2014 at 5:11 PM, Thomas Abraham <thomas.ab@samsung.com> wrote:
->> The new CPU clock type allows the use of generic CPUfreq drivers. So for
->> Exynos4210/5250, switch to using generic cpufreq driver. For Exynos5420,
->> which did not have CPUfreq driver support, enable the use of generic
->> CPUfreq driver.
->>
->> Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
->> Cc: Kukjin Kim <kgene.kim@samsung.com>
->> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->> Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
->> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Tested-by: Chander Kashyap <k.chander@samsung.com>
->> ---
->>  arch/arm/mach-exynos/exynos.c |   24 +++++++++++++++++++++++-
->>  1 files changed, 23 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
->> index 6b283eb..a1be294 100644
->> --- a/arch/arm/mach-exynos/exynos.c
->> +++ b/arch/arm/mach-exynos/exynos.c
->> @@ -282,6 +282,28 @@ static void __init exynos_init_irq(void)
->>         exynos_map_pmu();
->>  }
->>
->> +static const struct of_device_id exynos_cpufreq_matches[] = {
->> +       { .compatible = "samsung,exynos5420", .data = "arm-bL-cpufreq-dt" },
->
-> While you're at it, can you add this to so we don't have to patch
-> kernels for the Chromebook2 and Odroid-XU3?
->
->       { .compatible = "samsung,exynos5422", .data = "arm-bL-cpufreq-dt" },
->       { .compatible = "samsung,exynos5800", .data = "arm-bL-cpufreq-dt" },
->
+See my other comments on the clock nodes. If these are hardware properties,
+just leave them as numbers in the DT, the header files are only used to
+establish an interface between the binding and the driver in case there
+is no sensible way to express which one you have.
+ 
+> Only MB86S70_CRG11_UNGPRT is marked to mean one special (non-maskable)
+> port on the controller, which the clock driver does make use of.
 
-Okay, I this has been included in the updated patches [1]
+Is this the actual port number that is known to be non-maskable?
+How about adding a property to the clock node to mark the logical
+controller nonmaskable (in case you go for #clock-cells=2)?
 
-[1] http://www.spinics.net/lists/arm-kernel/msg380011.html
+For the #clock-cells=3 case, you should probably just hardcode this
+in the driver based on the compatible string.
 
-Thanks,
-Thomas.
-
->
->> +       { .compatible = "samsung,exynos5250", .data = "cpufreq-dt" },
->> +       { .compatible = "samsung,exynos4210", .data = "cpufreq-dt" },
->> +       { .compatible = "samsung,exynos5440", .data = "exynos5440-cpufreq" },
->> +       { /* sentinel */ }
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+	Arnd
