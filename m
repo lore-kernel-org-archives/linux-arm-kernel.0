@@ -1,72 +1,63 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 21 Nov 2014 13:59:21 +0900
-Subject: [PATCH/RFC] ARM: shmobile: dts: Add common file for MSIOF1
-In-Reply-To: <CANqRtoRxd64yoXQaPbR-euRtT6MX9AnasF32sK6B_EKoE30fJA@mail.gmail.com>
-References: <1416544027-5680-1-git-send-email-horms+renesas@verge.net.au>
- <CANqRtoRxd64yoXQaPbR-euRtT6MX9AnasF32sK6B_EKoE30fJA@mail.gmail.com>
-Message-ID: <20141121045920.GB9888@verge.net.au>
+From: vigneshr@ti.com (Vignesh R)
+Date: Fri, 21 Nov 2014 10:30:04 +0530
+Subject: [PATCH v2 2/3] ARM: OMAP2+: hwmod: AM335x/AM43x: add hwmod support
+ for tscadc on am43x-evm
+In-Reply-To: <alpine.DEB.2.02.1411200706441.9204@utopia.booyaka.com>
+References: <1415099728-10959-1-git-send-email-vigneshr@ti.com>
+ <1415099728-10959-3-git-send-email-vigneshr@ti.com>
+ <alpine.DEB.2.02.1411200706441.9204@utopia.booyaka.com>
+Message-ID: <546EC6D4.7080906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 01:45:32PM +0900, Magnus Damm wrote:
-> Hi Simon,
-> 
-> On Fri, Nov 21, 2014 at 1:27 PM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
-> >
-> > The R-Car Gen 2 SoCs have MSIOF1 interfaces however they
-> > are not exposed on any boards currently supported in mainline.
-> 
-> Ok, but that's the same as many other devices on R-Car Gen2 SoCs no?
-> Basically the SoC contains a hardware block but it is not used on the
-> actual board. I wonder what made MSIOF1 a target for sudden code
-> consolidation?
-> 
-> > The purpose of r8a77xx-msiof1.dtsi is to be included
-> > in a dts file if MSIOF1 is exposed by some means.
-> 
-> Judging by the file name this seems to be a board specific property
-> made generic somehow.
 
-Yes, it is board stuff not SoC stuff.
+On 11/20/2014 12:39 PM, Paul Walmsley wrote:
+> On Tue, 4 Nov 2014, Vignesh R wrote:
+>
+>> This patch adds hwmod support for tscadc to work on am43xx-evm. The am33xx
+>> hwmod structures of tscadc has been moved to ipblock_data so that it can
+>> be reused in am43xx. The clock domain names are separately set for am33xx
+>> and am43xx. Thus tscadc dt entries can now be added to am43xx board
+>> dt files.
+>>
+>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ...
+>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
+>> index 6e57b8ad0db5..b92a7c7825fa 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
+>> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
+> ...
+>
+>> +static void am33xx_hwmod_clockdomain(void)
+>> +{
+>> +	CLKDMNAME(am33xx_l4_hs_hwmod, "l4hs_clkdm");
+>> +	CLKDMNAME(am33xx_adc_tsc_hwmod, "l4_wkup_clkdm");
+>> +}
+>> +
+>> +static void am43xx_hwmod_clockdomain(void)
+>> +{
+>> +	CLKDMNAME(am33xx_l4_hs_hwmod, "l3_clkdm");
+>> +	CLKDMNAME(am33xx_adc_tsc_hwmod, "l3s_tsc_clkdm");
+>> +}
+>> +
+> ...
+>
+>> +	am33xx_hwmod_clockdomain();
+> I looked at this patch and the one before it.  Is there some reason why we 
+> need to share these two hwmods between AM33xx and AM43xx?  It seems 
+> cleaner just to add the ADC data directly to the AM43xx hwmod data file, 
+> not touch the AM33xx data, and not add another runtime data update for the 
+> clockdomains.  Unless there's something that I'm missing?
 
-> 
-> > Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
-> > [horms: Reworked into a separate dtsi file]
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> [snip]
-> 
-> > +&pfc {
-> > +       msiof1_pins: spi2 {
-> > +               renesas,groups = "msiof1_clk_c", "msiof1_sync_c", "msiof1_rx_c",
-> > +                                "msiof1_tx_c";
-> > +               renesas,function = "msiof1";
-> > +       };
-> > +};
-> > +
-> > +&msiof1 {
-> > +       pinctrl-0 = <&msiof1_pins>;
-> > +       pinctrl-names = "default";
-> > +
-> > +       status = "okay";
-> > +};
-> 
-> The DTS above only works on boards that are using the "C" set of pins
-> for the MSIOF1. Other configurations will not work. It also assumes
-> that all SoC code is using the same strings for the PFC which may or
-> may not be true.
-> 
-> Does some common policy for the Linux kernel exist about how to break
-> out board specific device support in DTS? If so we should follow it.
-> 
-> If not, from my conservative view point this patch looks like over
-> doing code sharing with increased overhead and no apparent upside
-> except more complex dependencies.
 
-Perhaps it would be best just to drop it.
+I wanted to reuse hwmod structures. Except for clockdomain and offset,
+rest of the hwmod data are same for AM33xx and AM43xx. Adding data to AM43xx
+hwmod file just duplicates these structures. Do you still want me to move them
+to AM43xx file?
 
-The patch that this code was based on illustrates how to enable
-MSIOF1 on the koelsch. People can find that and use it if they
-wish to use MSIOF1.
+Regards
+Vignesh
+
+
+> - Paul
