@@ -1,79 +1,77 @@
-From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Fri, 21 Nov 2014 14:23:30 +0200
-Subject: [PATCH] at91sam9_wdt: Allow watchdog to reset device at early boot
-In-Reply-To: <5465C00E.4030808@offcode.fi>
-References: <5465C00E.4030808@offcode.fi>
-Message-ID: <1416572610-1770-1-git-send-email-timo.kokkonen@offcode.fi>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Nov 2014 13:24:52 +0100
+Subject: [PATCH 6/6] pci, acpi: Share ACPI PCI config space accessors.
+In-Reply-To: <CAL-B5D3MqUa-=bzebo12DbZfczss2-MdGwQ8WKTbFH8H2AENXg@mail.gmail.com>
+References: <1416413091-13452-1-git-send-email-tomasz.nowicki@linaro.org>
+ <20141120222650.GC7987@google.com>
+ <CAL-B5D3MqUa-=bzebo12DbZfczss2-MdGwQ8WKTbFH8H2AENXg@mail.gmail.com>
+Message-ID: <3957412.IooRKpIXjW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By default the driver will start a kernel timer which keeps on kicking
-the watchdog HW until user space has opened the watchdog
-device. Usually this is desirable as the watchdog HW is running by
-default and the user space may not have any watchdog daemon running at
-all.
+On Thursday 20 November 2014 21:00:17 Myron Stowe wrote:
+> On Thu, Nov 20, 2014 at 3:26 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> > On Wed, Nov 19, 2014 at 05:19:20PM +0100, Arnd Bergmann wrote:
+> >> On Wednesday 19 November 2014 17:04:51 Tomasz Nowicki wrote:
+> >> > +/*
+> >> > + * raw_pci_read/write - ACPI PCI config space accessors.
+> >> > + *
+> >> > + * ACPI spec defines MMCFG as the way we can access PCI config space,
+> >> > + * so let MMCFG be default (__weak).
+> >> > + *
+> >> > + * If platform needs more fancy stuff, should provides its own implementation.
+> >> > + */
+> >> > +int __weak raw_pci_read(unsigned int domain, unsigned int bus,
+> >> > +                       unsigned int devfn, int reg, int len, u32 *val)
+> >> > +{
+> >> > +       return pci_mmcfg_read(domain, bus, devfn, reg, len, val);
+> >> > +}
+> >> > +
+> >> > +int __weak raw_pci_write(unsigned int domain, unsigned int bus,
+> >> > +                        unsigned int devfn, int reg, int len, u32 val)
+> >> > +{
+> >> > +       return pci_mmcfg_write(domain, bus, devfn, reg, len, val);
+> >> > +}
+> >> > +
+> >> >
+> >>
+> >> I think it would be better to avoid __weak functions here, as they tend
+> >> to be hard to follow when trying to understand the code.
+> >
+> > That's interesting.  I would have said exactly the opposite -- I think the
+> > extra Kconfiggery is harder to follow than weak/strong functions 
+> >
+> > But consistency is better than my personal opinion.  Is there a consensus
+> > that we should use the Kconfig strategy instead of __weak?
+> 
+> I too find weak/strong functions easier to follow than "Kconfiggery" (nice term
+> invention there).
 
-However, on production systems it may be mandatory that also early
-crashes and lockups will lead to a watchdog reset, even if they happen
-before the user space has opened the watchdog device.
+I don't think there is a universal consensus, but the majority of
+maintainers seems to avoid them for the same reasons that I think
+__weak is problematic.
 
-To resolve the issue, add a new device tree property
-"enable-early-reset" which will prevent the kernel timer from pinging
-the watchdog HW on behalf of user space. The default is still to use
-kernel timer, but more strict behavior can be enabled via the device
-tree property.
+We have some uses of __weak in the core kernel, but there is
+basically none in drivers outside of PCI, and the most common
+uses are all providing an empty __weak function that can be
+overridden with a function that actually does something, unlike
+the code above.
 
-Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
----
- Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 4 ++++
- drivers/watchdog/at91sam9_wdt.c                          | 6 +++++-
- 2 files changed, 9 insertions(+), 1 deletion(-)
+My pragmatic approach so far has been to advocate __weak for
+drivers/pci patches but discourage it elsewhere when I review
+patches, in order to maintain consistency. I also think it
+would be nice to change the way that PCI handles architecture
+specific overrides in the process of unifying the host bridge
+handling.
 
-diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-index f90e294..a0b7b75 100644
---- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-@@ -28,6 +28,10 @@ Optional properties:
- 	entering idle state.
- - atmel,dbg-halt : Should be present if you want to stop the watchdog when
- 	entering debug state.
-+- enable-early-reset : Should be present if you want to let the
-+	watchdog timer to expire even before user space has opened the
-+	device. If not set, a kernel timer will keep on pinging the
-+	watchdog until it is opened.
- 
- Example:
- 	watchdog at fffffd40 {
-diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-index 489729b..78b1977 100644
---- a/drivers/watchdog/at91sam9_wdt.c
-+++ b/drivers/watchdog/at91sam9_wdt.c
-@@ -89,6 +89,7 @@ struct at91wdt {
- 	u32 mr_mask;
- 	unsigned long heartbeat;	/* WDT heartbeat in jiffies */
- 	bool nowayout;
-+	bool no_early_timer;
- 	unsigned int irq;
- };
- 
-@@ -122,7 +123,7 @@ static void at91_ping(unsigned long data)
- {
- 	struct at91wdt *wdt = (struct at91wdt *)data;
- 	if (time_before(jiffies, wdt->next_heartbeat) ||
--	    !watchdog_active(&wdt->wdd)) {
-+		(!watchdog_active(&wdt->wdd) && !wdt->no_early_timer)) {
- 		at91_wdt_reset(wdt);
- 		mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
- 	} else {
-@@ -316,6 +317,9 @@ static int of_at91wdt_init(struct device_node *np, struct at91wdt *wdt)
- 
- 	wdt->mr |= max | ((max - min) << 16);
- 
-+	if (of_property_read_bool(np, "enable-early-reset"))
-+		wdt->no_early_timer = 1;
-+
- 	return 0;
- }
- #else
--- 
-2.1.0
+I wouldn't use Kconfig symbols in most cases though. My preferred
+choice would be to turn a lot of the __weak symbols into function
+pointers within a per-hostbridge structure. As an example, we could
+replace pcibios_add_device() with a pointer in pci_host_bridge->ops
+that gets set by all the architectures and host drivers that currently
+override it, and replace the one caller with
+
+	if (pci_host_bridge->ops->add_device)
+		pci_host_bridge->ops->add_device(dev);
+
+	Arnd
