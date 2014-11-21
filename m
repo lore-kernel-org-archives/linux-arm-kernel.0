@@ -1,54 +1,120 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 21 Nov 2014 09:54:27 +0900
-Subject: [PATCH 01/29] ARM: shmobile: r8a7794: Add VIN clock to device tree
+Date: Fri, 21 Nov 2014 09:54:28 +0900
+Subject: [PATCH 02/29] ARM: shmobile: r8a7790: Add Audio DMAC devices to DT
 In-Reply-To: <cover.1416476366.git.horms+renesas@verge.net.au>
 References: <cover.1416476366.git.horms+renesas@verge.net.au>
-Message-ID: <148ebf479aa207406f8208466b3e446f9cd25f4b.1416476366.git.horms+renesas@verge.net.au>
+Message-ID: <ba3240beae340bc84dad16f2b67590f32d25d5a6.1416476366.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Koji Matsuoka <koji.matsuoka.xm@renesas.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Signed-off-by: Koji Matsuoka <koji.matsuoka.xm@renesas.com>
+Instantiate the two Audio DMA controllers in the r8a7790 device tree.
+
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+[geert: corrected spelling of audmac1]
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794.dtsi            | 6 +++---
- include/dt-bindings/clock/r8a7794-clock.h | 2 ++
- 2 files changed, 5 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7790.dtsi            | 64 +++++++++++++++++++++++++++++--
+ include/dt-bindings/clock/r8a7790-clock.h |  2 +
+ 2 files changed, 63 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 088e79c..95f656d 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -517,13 +517,13 @@
- 		mstp8_clks: mstp8_clks at e6150990 {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150990 0 4>, <0 0xe61509a0 0 4>;
--			clocks = <&p_clk>;
-+			clocks = <&zg_clk>, <&zg_clk>, <&p_clk>;
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 52c2156..2e01d49 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -312,6 +312,63 @@
+ 		#dma-cells = <1>;
+ 		dma-channels = <15>;
+ 	};
++
++	audma0: dma-controller at ec700000 {
++		compatible = "renesas,rcar-dmac";
++		reg = <0 0xec700000 0 0x10000>;
++		interrupts =	<0 346 IRQ_TYPE_LEVEL_HIGH
++				 0 320 IRQ_TYPE_LEVEL_HIGH
++				 0 321 IRQ_TYPE_LEVEL_HIGH
++				 0 322 IRQ_TYPE_LEVEL_HIGH
++				 0 323 IRQ_TYPE_LEVEL_HIGH
++				 0 324 IRQ_TYPE_LEVEL_HIGH
++				 0 325 IRQ_TYPE_LEVEL_HIGH
++				 0 326 IRQ_TYPE_LEVEL_HIGH
++				 0 327 IRQ_TYPE_LEVEL_HIGH
++				 0 328 IRQ_TYPE_LEVEL_HIGH
++				 0 329 IRQ_TYPE_LEVEL_HIGH
++				 0 330 IRQ_TYPE_LEVEL_HIGH
++				 0 331 IRQ_TYPE_LEVEL_HIGH
++				 0 332 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "error",
++				"ch0", "ch1", "ch2", "ch3",
++				"ch4", "ch5", "ch6", "ch7",
++				"ch8", "ch9", "ch10", "ch11",
++				"ch12";
++		clocks = <&mstp5_clks R8A7790_CLK_AUDIO_DMAC0>;
++		clock-names = "fck";
++		#dma-cells = <1>;
++		dma-channels = <13>;
++	};
++
++	audma1: dma-controller at ec720000 {
++		compatible = "renesas,rcar-dmac";
++		reg = <0 0xec720000 0 0x10000>;
++		interrupts =	<0 347 IRQ_TYPE_LEVEL_HIGH
++				 0 333 IRQ_TYPE_LEVEL_HIGH
++				 0 334 IRQ_TYPE_LEVEL_HIGH
++				 0 335 IRQ_TYPE_LEVEL_HIGH
++				 0 336 IRQ_TYPE_LEVEL_HIGH
++				 0 337 IRQ_TYPE_LEVEL_HIGH
++				 0 338 IRQ_TYPE_LEVEL_HIGH
++				 0 339 IRQ_TYPE_LEVEL_HIGH
++				 0 340 IRQ_TYPE_LEVEL_HIGH
++				 0 341 IRQ_TYPE_LEVEL_HIGH
++				 0 342 IRQ_TYPE_LEVEL_HIGH
++				 0 343 IRQ_TYPE_LEVEL_HIGH
++				 0 344 IRQ_TYPE_LEVEL_HIGH
++				 0 345 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "error",
++				"ch0", "ch1", "ch2", "ch3",
++				"ch4", "ch5", "ch6", "ch7",
++				"ch8", "ch9", "ch10", "ch11",
++				"ch12";
++		clocks = <&mstp5_clks R8A7790_CLK_AUDIO_DMAC1>;
++		clock-names = "fck";
++		#dma-cells = <1>;
++		dma-channels = <13>;
++	};
++
+ 	i2c0: i2c at e6508000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -1050,10 +1107,11 @@
+ 		mstp5_clks: mstp5_clks at e6150144 {
+ 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
+-			clocks = <&extal_clk>, <&p_clk>;
++			clocks = <&hp_clk>, <&hp_clk>, <&extal_clk>, <&p_clk>;
  			#clock-cells = <1>;
- 			renesas,clock-indices = <
--				R8A7794_CLK_ETHER
-+				R8A7794_CLK_VIN1 R8A7794_CLK_VIN0 R8A7794_CLK_ETHER
- 			>;
- 			clock-output-names =
--				"ether";
-+				"vin1", "vin0", "ether";
+-			renesas,clock-indices = <R8A7790_CLK_THERMAL R8A7790_CLK_PWM>;
+-			clock-output-names = "thermal", "pwm";
++			renesas,clock-indices = <R8A7790_CLK_AUDIO_DMAC0 R8A7790_CLK_AUDIO_DMAC1
++						 R8A7790_CLK_THERMAL R8A7790_CLK_PWM>;
++			clock-output-names = "audmac0", "audmac1", "thermal", "pwm";
  		};
- 		mstp11_clks: mstp11_clks at e615099c {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
-diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
-index 9ac1043..fd7cdee 100644
---- a/include/dt-bindings/clock/r8a7794-clock.h
-+++ b/include/dt-bindings/clock/r8a7794-clock.h
-@@ -61,6 +61,8 @@
- #define R8A7794_CLK_SCIF0		21
+ 		mstp7_clks: mstp7_clks at e615014c {
+ 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
+diff --git a/include/dt-bindings/clock/r8a7790-clock.h b/include/dt-bindings/clock/r8a7790-clock.h
+index e3a3fb8..c27b3b5 100644
+--- a/include/dt-bindings/clock/r8a7790-clock.h
++++ b/include/dt-bindings/clock/r8a7790-clock.h
+@@ -78,6 +78,8 @@
+ #define R8A7790_CLK_USBDMAC1		31
  
- /* MSTP8 */
-+#define R8A7794_CLK_VIN1		10
-+#define R8A7794_CLK_VIN0		11
- #define R8A7794_CLK_ETHER		13
+ /* MSTP5 */
++#define R8A7790_CLK_AUDIO_DMAC1		1
++#define R8A7790_CLK_AUDIO_DMAC0		2
+ #define R8A7790_CLK_THERMAL		22
+ #define R8A7790_CLK_PWM			23
  
- /* MSTP9 */
 -- 
 2.1.1
