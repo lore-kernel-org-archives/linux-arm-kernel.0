@@ -1,52 +1,147 @@
-From: dave.long@linaro.org (David Long)
-Date: Thu, 20 Nov 2014 23:28:32 -0500
-Subject: [PATCH v3 1/5] arm64: Kprobes with single stepping support
-In-Reply-To: <1416317295.1735.9.camel@linaro.org>
-References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>	
- <1416292375-29560-2-git-send-email-dave.long@linaro.org>
- <1416317295.1735.9.camel@linaro.org>
-Message-ID: <546EBF70.9020706@linaro.org>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Fri, 21 Nov 2014 09:58:51 +0530
+Subject: [PATCH v5 2/2] ARM: EXYNOS: PMU: move restart code into pmu driver
+In-Reply-To: <1416307650-15162-3-git-send-email-pankaj.dubey@samsung.com>
+References: <1416307650-15162-1-git-send-email-pankaj.dubey@samsung.com>
+ <1416307650-15162-3-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <CAFp+6iHz=1Jug7F_LgohcVLfXzsG2FGvck7_jPx+txZkOpLbqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/14 08:28, Jon Medhurst (Tixy) wrote:
-> On Tue, 2014-11-18 at 01:32 -0500, David Long wrote:
->> From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
->>
->> Add support for basic kernel probes(kprobes) and jump probes
->> (jprobes) for ARM64.
->>
->> Kprobes will utilize software breakpoint and single step debug
->> exceptions supported on ARM v8.
->>
->> software breakpoint is placed at the probe address to trap the
->> kernel execution into kprobe handler.
->>
->> ARM v8 support single stepping to be enabled while exception return
->> (ERET) with next PC in exception return address (ELR_EL1).
->> kprobe handler prepares a executable memory slot for out-of-line
->> execution with the copy of the original instruction under probe, and
->> enable single stepping from the instruction slot. With this scheme,
->> the instruction is executed with the exact same register context
->> 'except PC' that points to instruction slot.
->>
->> Debug mask(PSTATE.D) is enabled only when single stepping a recursive
->> kprobes i.e. during kprobes reenter so that probes instruction can be
->> single stepped within the kprobe handler -exception- context.
->
-> Does this mean that at the point the probed instruction is
-> single-stepped there is nothing extra that has been pushed on on the
-> kernel stack by any kprobes handling code? I just want to check that you
-> aren't going to hit the problems that the 32-bit kprobes code is
-> currently being fixed for [1].
->
-> The simulated instructions in patch 2 don't access the stack, so they
-> are safe from the problem.
->
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/303525.html
->
+Hi Pankaj,
 
-Took me a while to read through the background on this.  I believe it is 
-true nothing extra is put on the stack in the single-step case.
 
--dl
+On Tue, Nov 18, 2014 at 4:17 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+> Let's register restart handler from PMU driver for restart
+> functionality. So that we can remove restart hooks from
+> machine specific file, and thus moving ahead when PMU moved
+> to driver folder, this functionality can be reused for ARM64
+> based Exynos SoC's.
+>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Acked-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+
+Tested on Exynos5800 peach-pi board with linux-samsung/for-next.
+Reboot works as expected mutiple times.
+
+Tested-by: Vivek Gautam <gautam.vivek@samsung.com>
+
+>  arch/arm/mach-exynos/common.h |    1 -
+>  arch/arm/mach-exynos/exynos.c |    6 ------
+>  arch/arm/mach-exynos/pmu.c    |   23 +++++++++++++++++++++++
+>  3 files changed, 23 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+> index 431be1b..865f878 100644
+> --- a/arch/arm/mach-exynos/common.h
+> +++ b/arch/arm/mach-exynos/common.h
+> @@ -12,7 +12,6 @@
+>  #ifndef __ARCH_ARM_MACH_EXYNOS_COMMON_H
+>  #define __ARCH_ARM_MACH_EXYNOS_COMMON_H
+>
+> -#include <linux/reboot.h>
+>  #include <linux/of.h>
+>
+>  #define EXYNOS3250_SOC_ID      0xE3472000
+> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+> index 8f995b7..c13d083 100644
+> --- a/arch/arm/mach-exynos/exynos.c
+> +++ b/arch/arm/mach-exynos/exynos.c
+> @@ -87,11 +87,6 @@ static struct map_desc exynos5_iodesc[] __initdata = {
+>         },
+>  };
+>
+> -static void exynos_restart(enum reboot_mode mode, const char *cmd)
+> -{
+> -       __raw_writel(0x1, pmu_base_addr + EXYNOS_SWRESET);
+> -}
+> -
+>  static struct platform_device exynos_cpuidle = {
+>         .name              = "exynos_cpuidle",
+>  #ifdef CONFIG_ARM_EXYNOS_CPUIDLE
+> @@ -316,7 +311,6 @@ DT_MACHINE_START(EXYNOS_DT, "SAMSUNG EXYNOS (Flattened Device Tree)")
+>         .init_machine   = exynos_dt_machine_init,
+>         .init_late      = exynos_init_late,
+>         .dt_compat      = exynos_dt_compat,
+> -       .restart        = exynos_restart,
+>         .reserve        = exynos_reserve,
+>         .dt_fixup       = exynos_dt_fixup,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+> index 6c8a76d..e4c3512 100644
+> --- a/arch/arm/mach-exynos/pmu.c
+> +++ b/arch/arm/mach-exynos/pmu.c
+> @@ -11,8 +11,11 @@
+>
+>  #include <linux/io.h>
+>  #include <linux/of.h>
+> +#include <linux/of_address.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/delay.h>
+> +#include <linux/notifier.h>
+> +#include <linux/reboot.h>
+>
+>
+>  #include "exynos-pmu.h"
+> @@ -716,6 +719,13 @@ static void exynos5420_pmu_init(void)
+>         pr_info("EXYNOS5420 PMU initialized\n");
+>  }
+>
+> +static int pmu_restart_notify(struct notifier_block *this,
+> +               unsigned long code, void *unused)
+> +{
+> +       pmu_raw_writel(0x1, EXYNOS_SWRESET);
+> +
+> +       return NOTIFY_DONE;
+> +}
+>
+>  static const struct exynos_pmu_data exynos4210_pmu_data = {
+>         .pmu_config     = exynos4210_pmu_config,
+> @@ -765,11 +775,20 @@ static const struct of_device_id exynos_pmu_of_device_ids[] = {
+>         { /*sentinel*/ },
+>  };
+>
+> +/*
+> + * Exynos PMU restart notifier, handles restart functionality
+> + */
+> +static struct notifier_block pmu_restart_handler = {
+> +       .notifier_call = pmu_restart_notify,
+> +       .priority = 128,
+> +};
+> +
+>  static int exynos_pmu_probe(struct platform_device *pdev)
+>  {
+>         const struct of_device_id *match;
+>         struct device *dev = &pdev->dev;
+>         struct resource *res;
+> +       int ret;
+>
+>         res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>         pmu_base_addr = devm_ioremap_resource(dev, res);
+> @@ -794,6 +813,10 @@ static int exynos_pmu_probe(struct platform_device *pdev)
+>
+>         platform_set_drvdata(pdev, pmu_context);
+>
+> +       ret = register_restart_handler(&pmu_restart_handler);
+> +       if (ret)
+> +               dev_warn(dev, "can't register restart handler err=%d\n", ret);
+> +
+>         dev_dbg(dev, "Exynos PMU Driver probe done\n");
+>         return 0;
+>  }
+> --
+> 1.7.9.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+-- 
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
