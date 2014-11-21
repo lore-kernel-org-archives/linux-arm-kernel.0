@@ -1,34 +1,67 @@
-From: ganapatrao.kulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
-Date: Sat, 22 Nov 2014 02:53:27 +0530
-Subject: [RFC PATCH v2 1/4] arm64: defconfig: increase NR_CPUS range to 2-128
-In-Reply-To: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
-References: <1416605010-10442-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
-Message-ID: <1416605010-10442-2-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 21 Nov 2014 22:32:48 +0100
+Subject: IRQ #0 broken on ARM
+In-Reply-To: <546F1F45.7080103@arm.com> (Marc Zyngier's message of "Fri, 21
+ Nov 2014 11:17:25 +0000")
+References: <CALT56yPs-SSssff1waj81CRQfER4ZKKR=B1jOXVL-aBChicSjg@mail.gmail.com>
+ <87zjbk966i.fsf@approximate.cambridge.arm.com>
+ <20141121110135.GS4042@n2100.arm.linux.org.uk>
+ <546F1F45.7080103@arm.com>
+Message-ID: <87egsw5jen.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Raising the maximum limit to 128. This is needed for Cavium's
-Thunder system that will have 96 cores on Multi-node system.
+Marc Zyngier <marc.zyngier@arm.com> writes:
+>> Linus has decreed it to not be a valid IRQ number, and that's basically
+>> the end of the discussion.  Generic code, and drivers, will increasingly
+>> decide that IRQ0 is not valid, and objecting to it has, and will continue
+>> to elicit a response of "fix ARM".
+>
+> I'm fine with that.
+For pxa, why not do something like that [1] ?
 
-Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
+Cheers.
+
+--
+Robert
+
+[1]
+---8>---
+
+>From 551eaf75934bd84939a40781470ed3c04d17507a Mon Sep 17 00:00:00 2001
+From: Robert Jarzmik <robert.jarzmik@free.fr>
+Date: Fri, 21 Nov 2014 22:11:42 +0100
+Subject: [PATCH] ARM: pxa: arbitrarily set first interrupt number
+
+As IRQ0, the legacy timer interrupt should not be used as an interrupt
+number, shift the interrupts by a fixed number.
+
+As we had in a special case a shift of 16 when ISA bus was used on a
+PXA, use that value as the first interrupt number, regardless of ISA or
+not.
+
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- arch/arm64/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-pxa/include/mach/irqs.h | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index c1ad0df..f272926 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -302,8 +302,8 @@ config SCHED_SMT
- 	  places. If unsure say N here.
+diff --git a/arch/arm/mach-pxa/include/mach/irqs.h b/arch/arm/mach-pxa/include/mach/irqs.h
+index 48c2fd8..9d8983f 100644
+--- a/arch/arm/mach-pxa/include/mach/irqs.h
++++ b/arch/arm/mach-pxa/include/mach/irqs.h
+@@ -14,12 +14,9 @@
  
- config NR_CPUS
--	int "Maximum number of CPUs (2-64)"
--	range 2 64
-+	int "Maximum number of CPUs (2-128)"
-+	range 2 128
- 	depends on SMP
- 	# These have to remain sorted largest to smallest
- 	default "64"
+ #ifdef CONFIG_PXA_HAVE_ISA_IRQS
+ #define PXA_ISA_IRQ(x)	(x)
+-#define PXA_ISA_IRQ_NUM	(16)
+-#else
+-#define PXA_ISA_IRQ_NUM	(0)
+ #endif
+ 
+-#define PXA_IRQ(x)	(PXA_ISA_IRQ_NUM + (x))
++#define PXA_IRQ(x)	(16 + (x))
+ 
+ #define IRQ_SSP3	PXA_IRQ(0)	/* SSP3 service request */
+ #define IRQ_MSL		PXA_IRQ(1)	/* MSL Interface interrupt */
 -- 
-1.8.1.4
+2.1.0
