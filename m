@@ -1,72 +1,35 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Fri, 21 Nov 2014 22:06:51 +0530
-Subject: [PATCH 4/9] clk: Add clock driver for mb86s7x
-In-Reply-To: <2147877.AXJukoovHQ@wuerfel>
-References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <2396055.pBuh1YtUHT@wuerfel>
- <CAJe_ZhcxHnoUeBUk3w=_xyk5oMAuena9RjDnyRvzLtV2=LpQxw@mail.gmail.com>
- <2147877.AXJukoovHQ@wuerfel>
-Message-ID: <CAJe_Zhdg0tRx1SiACpCci3B2XaCxECGvkE7D=fne6vch4Bhk-w@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 21 Nov 2014 17:41:42 +0100
+Subject: [PATCHv3 09/16] ARM: mvebu: implement suspend/resume support for
+ Armada XP
+In-Reply-To: <1416585613-2113-10-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1416585613-2113-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1416585613-2113-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20141121164142.GB20238@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 November 2014 20:04, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 21 November 2014 18:52:47 Jassi Brar wrote:
->> On 21 November 2014 18:33, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Thursday 20 November 2014 20:36:15 Vincent Yang wrote:
->> >> +#define __DTS_MB86S70_CLK_H
->> >> +
->> >> +#define MB86S70_CRG11_ALW      0
->> >> +#define MB86S70_CRG11_DDR3     1
->> >> +#define MB86S70_CRG11_MAIN     2
->> >> +#define MB86S70_CRG11_CA15     3
->> >> +#define MB86S70_CRG11_HDMI     4
->> >> +#define MB86S70_CRG11_DPHY     5
->> >> +
->> >> +#define MB86S70_CRG11_UNGPRT   8
->> >>
->> >
->> > The clock driver doesn't seem to use those macros at all, how does the
->> > driver know which clock you are referring to?
->> >
->> That was just an attempt to make a bit verbose the controller
->> instance. Instead of specifying controller:=4, it reads better
->> controller:=MB86S70_CRG11_HDMI in the clock DT nodes. The clock driver
->> simply fills in controller+domain+port of the given clock into mailbox
->> payload.
->
-> See my other comments on the clock nodes. If these are hardware properties,
-> just leave them as numbers in the DT, the header files are only used to
-> establish an interface between the binding and the driver in case there
-> is no sensible way to express which one you have.
->
-OK, I'll hardcode numbers there.
+> +static void mvebu_pm_store_bootinfo(void)
+> +{
+> +	u32 *store_addr;
+> +	phys_addr_t resume_pc;
+> +
+> +	store_addr = phys_to_virt(BOOT_INFO_ADDR);
+> +	resume_pc = virt_to_phys(armada_370_xp_cpu_resume);
+> +
+> +	/*
+> +	 * The bootloader expects the first two words to be a magic
+> +	 * value (BOOT_MAGIC_WORD), followed by the address of the
+> +	 * resume code to jump to. Then, it expects a sequence of
+> +	 * (address, value) pairs, which can be used to restore the
+> +	 * value of certain registers. This sequence must end with the
+> +	 * BOOT_MAGIC_LIST_END magic value.
+> +	 */
 
->> Only MB86S70_CRG11_UNGPRT is marked to mean one special (non-maskable)
->> port on the controller, which the clock driver does make use of.
->
-> Is this the actual port number that is known to be non-maskable?
->
-Yes the clock comes out of the controller and is also the parent of
-other 8 independently maskable clock ports of the domain.
- The firmware on remote master, lets say, don't wanna be bothered by
-the clock topology. Even for set-rate the onus is on Linux to request
-only appropriate rates at appropriate times so that other devices are
-not messed up.
+Hi Thomas
 
-> How about adding a property to the clock node to mark the logical
-> controller nonmaskable (in case you go for #clock-cells=2)?
->
-> For the #clock-cells=3 case, you should probably just hardcode this
-> in the driver based on the compatible string.
->
-The SoC has 6 controllers, each controller has 16domains and each
-domain has 8+1 ports. Instead of 864 clocks, we wanted to populate
-only clocks that some device actually use (some clocks seem unused in
-this patchset but we have users that will be upstreamed later).
-The remote f/w can't manage inter-dependencies and expect Linux to
-send only appropriate requests on port basis, so we populate ports as
-tiny independent clock controllers with single clock output.
+Is this a well defined mechanism supported by mainline uboot, barebox
+etc. Or is it some Marvell extension to their uboot?
 
-Thanks
-Jassi
+     Thanks
+	Andrew
