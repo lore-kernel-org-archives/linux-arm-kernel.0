@@ -1,57 +1,57 @@
-From: dave.long@linaro.org (David Long)
-Date: Fri, 21 Nov 2014 01:16:38 -0500
-Subject: [PATCH v3 5/5] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
-In-Reply-To: <20141118145228.GN18842@arm.com>
-References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
- <1416292375-29560-6-git-send-email-dave.long@linaro.org>
- <20141118145228.GN18842@arm.com>
-Message-ID: <546ED8C6.8050003@linaro.org>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 21 Nov 2014 17:24:12 +1100
+Subject: linux-next: manual merge of the char-misc tree with the arm-soc tree
+Message-ID: <20141121172412.4caf89cc@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/14 09:52, Will Deacon wrote:
-> Hi David,
->
-> On Tue, Nov 18, 2014 at 06:32:55AM +0000, David Long wrote:
->> From: "David A. Long" <dave.long@linaro.org>
->>
->> Add HAVE_REGS_AND_STACK_ACCESS_API feature for arm64.
->
-> [...]
->
->> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
->> index d3e782a..24cc048 100644
->> --- a/arch/arm64/include/asm/ptrace.h
->> +++ b/arch/arm64/include/asm/ptrace.h
->> @@ -111,6 +111,8 @@ struct pt_regs {
->>   	u64 syscallno;
->>   };
->>
->> +#define MAX_REG_OFFSET (offsetof(struct pt_regs, orig_x0))
->
-> Is orig_x0 actually useful to this API? If not, we could instead operate on
-> the user_pt_regs structure, and define the maximum offset in terms of sizeof
-> that.
->
+Hi all,
 
-I agree.  I don't think the orig_x0 field should be exposed through this 
-API.
+Today's linux-next merge of the char-misc tree got a conflict in
+arch/arm/mach-omap2/Kconfig between commit 9e1e632c4846 ("ARM: OMAP2+:
+Drop board file for ti8168evm") from the arm-soc tree and commit
+184901a06a36 ("ARM: removing support for etb/etm in
+"arch/arm/kernel/"") from the char-misc tree.
 
->> +#define ARM_cpsr	pstate
->> +#define ARM_pc		pc
->> +#define ARM_sp		sp
->> +#define ARM_lr		regs[30]
->> +#define ARM_fp		regs[29]
->> +#define ARM_x28		regs[28]
->> +#define ARM_x27		regs[27]
->
-> [...]
->
-> I don't think we need these #defines.
->
-> Will
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-These are used in the REG_OFFSET_NAME macro.  This is all borrowed from 
-arch/arm/ code.  I didn't see a need to redesign it.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
--dl
+diff --cc arch/arm/mach-omap2/Kconfig
+index 27ec8923ddf6,06020fe77e57..000000000000
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@@ -276,14 -282,16 +276,6 @@@ config MACH_SBC353
+  	default y
+  	select OMAP_PACKAGE_CUS
+  
+- config OMAP3_EMU
+- 	bool "OMAP3 debugging peripherals"
+- 	depends on ARCH_OMAP3
+- 	select ARM_AMBA
+- 	select OC_ETM
+- 	help
+- 	  Say Y here to enable debugging hardware of omap3
+ -config MACH_TI8168EVM
+ -	bool "TI8168 Evaluation Module"
+ -	depends on SOC_TI81XX
+ -	default y
+ -
+ -config MACH_TI8148EVM
+ -	bool "TI8148 Evaluation Module"
+ -	depends on SOC_TI81XX
+ -	default y
+--
+  config OMAP3_SDRC_AC_TIMING
+  	bool "Enable SDRC AC timing register changes"
+  	depends on ARCH_OMAP3
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141121/7123b8d7/attachment.sig>
