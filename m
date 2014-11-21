@@ -1,116 +1,102 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Fri, 21 Nov 2014 13:50:40 -0800
-Subject: [PATCHv6 3/8] arm64: Move cpu_resume into the text section
+Date: Fri, 21 Nov 2014 13:50:44 -0800
+Subject: [PATCHv6 7/8] arm64: efi: Use ioremap_exec for code sections
 In-Reply-To: <1416606645-25633-1-git-send-email-lauraa@codeaurora.org>
 References: <1416606645-25633-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1416606645-25633-4-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1416606645-25633-8-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function cpu_resume currently lives in the .data section.
-There's no reason for it to be there since we can use relative
-instructions without a problem. Move a few cpu_resume data
-structures out of the assembly file so the .data annotation
-can be dropped completely and cpu_resume ends up in the read
-only text section.
+ioremap is not guaranteed to return memory with proper
+execution permissions. Introduce ioremap_exec which will
+ensure that permission bits are set as expected for EFI
+code sections.
 
-Reviewed-by: Kees Cook <keescook@chromium.org>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Tested-by: Kees Cook <keescook@chromium.org>
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
-v6: Dropped the last bit of cruft after cpu_resume
----
- arch/arm64/kernel/sleep.S   | 36 ++++++------------------------------
- arch/arm64/kernel/suspend.c |  4 ++--
- 2 files changed, 8 insertions(+), 32 deletions(-)
+ arch/arm64/include/asm/io.h      |  1 +
+ arch/arm64/include/asm/pgtable.h |  1 +
+ arch/arm64/kernel/efi.c          | 12 +++++++++++-
+ arch/arm64/mm/ioremap.c          | 11 +++++++++++
+ 4 files changed, 24 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-index a564b44..ede186c 100644
---- a/arch/arm64/kernel/sleep.S
-+++ b/arch/arm64/kernel/sleep.S
-@@ -147,14 +147,12 @@ cpu_resume_after_mmu:
- 	ret
- ENDPROC(cpu_resume_after_mmu)
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 79f1d519..7dd8465 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -230,6 +230,7 @@ extern void __memset_io(volatile void __iomem *, int, size_t);
+ extern void __iomem *__ioremap(phys_addr_t phys_addr, size_t size, pgprot_t prot);
+ extern void __iounmap(volatile void __iomem *addr);
+ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
++extern void __iomem *ioremap_exec(phys_addr_t phys_addr, size_t size);
  
--	.data
- ENTRY(cpu_resume)
- 	bl	el2_setup		// if in EL2 drop to EL1 cleanly
- #ifdef CONFIG_SMP
- 	mrs	x1, mpidr_el1
--	adr	x4, mpidr_hash_ptr
--	ldr	x5, [x4]
--	add	x8, x4, x5		// x8 = struct mpidr_hash phys address
-+	adrp	x8, mpidr_hash
-+	add x8, x8, #:lo12:mpidr_hash // x8 = struct mpidr_hash phys address
-         /* retrieve mpidr_hash members to compute the hash */
- 	ldr	x2, [x8, #MPIDR_HASH_MASK]
- 	ldp	w3, w4, [x8, #MPIDR_HASH_SHIFTS]
-@@ -164,14 +162,15 @@ ENTRY(cpu_resume)
- #else
- 	mov	x7, xzr
- #endif
--	adr	x0, sleep_save_sp
-+	adrp	x0, sleep_save_sp
-+	add	x0, x0, #:lo12:sleep_save_sp
- 	ldr	x0, [x0, #SLEEP_SAVE_SP_PHYS]
- 	ldr	x0, [x0, x7, lsl #3]
- 	/* load sp from context */
- 	ldr	x2, [x0, #CPU_CTX_SP]
--	adr	x1, sleep_idmap_phys
-+	adrp	x1, sleep_idmap_phys
- 	/* load physical address of identity map page table in x1 */
--	ldr	x1, [x1]
-+	ldr	x1, [x1, #:lo12:sleep_idmap_phys]
- 	mov	sp, x2
- 	/*
- 	 * cpu_do_resume expects x0 to contain context physical address
-@@ -180,26 +179,3 @@ ENTRY(cpu_resume)
- 	bl	cpu_do_resume		// PC relative jump, MMU off
- 	b	cpu_resume_mmu		// Resume MMU, never returns
- ENDPROC(cpu_resume)
--
--	.align 3
--mpidr_hash_ptr:
--	/*
--	 * offset of mpidr_hash symbol from current location
--	 * used to obtain run-time mpidr_hash address with MMU off
--         */
--	.quad	mpidr_hash - .
--/*
-- * physical address of identity mapped page tables
-- */
--	.type	sleep_idmap_phys, #object
--ENTRY(sleep_idmap_phys)
--	.quad	0
--/*
-- * struct sleep_save_sp {
-- *	phys_addr_t *save_ptr_stash;
-- *	phys_addr_t save_ptr_stash_phys;
-- * };
-- */
--	.type	sleep_save_sp, #object
--ENTRY(sleep_save_sp)
--	.space	SLEEP_SAVE_SP_SZ	// struct sleep_save_sp
-diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
-index 13ad4db..3771b72 100644
---- a/arch/arm64/kernel/suspend.c
-+++ b/arch/arm64/kernel/suspend.c
-@@ -126,8 +126,8 @@ int __cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
- 	return ret;
+ #define ioremap(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
+ #define ioremap_nocache(addr, size)	__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 41a43bf..9b1d9d0 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -65,6 +65,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
+ #define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_DEVICE_nGnRE))
+ #define PROT_NORMAL_NC		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_NORMAL_NC))
+ #define PROT_NORMAL		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_NORMAL))
++#define PROT_NORMAL_EXEC	(PROT_DEFAULT | PTE_UXN | PTE_ATTRINDX(MT_NORMAL))
+ 
+ #define PROT_SECT_DEVICE_nGnRE	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_DEVICE_nGnRE))
+ #define PROT_SECT_NORMAL	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 95c49eb..9e41f95 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -47,6 +47,14 @@ static int __init is_normal_ram(efi_memory_desc_t *md)
+ 	return 0;
  }
  
--extern struct sleep_save_sp sleep_save_sp;
--extern phys_addr_t sleep_idmap_phys;
-+struct sleep_save_sp sleep_save_sp;
-+phys_addr_t sleep_idmap_phys;
- 
- static int __init cpu_suspend_init(void)
++static int __init is_code(efi_memory_desc_t *md)
++{
++	if (md->attribute & EFI_RUNTIME_SERVICES_CODE)
++		return 1;
++	return 0;
++}
++
++
+ static void __init efi_setup_idmap(void)
  {
+ 	struct memblock_region *r;
+@@ -338,7 +346,9 @@ static int __init remap_region(efi_memory_desc_t *md, void **new)
+ 	memrange_efi_to_native(&paddr, &npages);
+ 	size = npages << PAGE_SHIFT;
+ 
+-	if (is_normal_ram(md))
++	if (is_code(md))
++		vaddr = (__force u64)ioremap_exec(paddr, size);
++	else if (is_normal_ram(md))
+ 		vaddr = (__force u64)ioremap_cache(paddr, size);
+ 	else
+ 		vaddr = (__force u64)ioremap(paddr, size);
+diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
+index cbb99c8..b998441 100644
+--- a/arch/arm64/mm/ioremap.c
++++ b/arch/arm64/mm/ioremap.c
+@@ -103,6 +103,17 @@ void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
+ }
+ EXPORT_SYMBOL(ioremap_cache);
+ 
++void __iomem *ioremap_exec(phys_addr_t phys_addr, size_t size)
++{
++	/* For normal memory we already have a cacheable mapping. */
++	if (pfn_valid(__phys_to_pfn(phys_addr)))
++		return (void __iomem *)__phys_to_virt(phys_addr);
++
++	return __ioremap_caller(phys_addr, size, __pgprot(PROT_NORMAL_EXEC),
++				__builtin_return_address(0));
++}
++EXPORT_SYMBOL(ioremap_exec);
++
+ /*
+  * Must be called after early_fixmap_init
+  */
 -- 
 Qualcomm Innovation Center, Inc.
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
