@@ -1,92 +1,58 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 21 Nov 2014 16:57:09 +0000
-Subject: For the problem when using swiotlb
-In-Reply-To: <5029442.vhLMp7Ns7F@wuerfel>
-References: <5469E26B.2010905@huawei.com> <2522857.bNQToYpBNt@wuerfel>
- <20141121093509.GA19783@e104818-lin.cambridge.arm.com>
- <5029442.vhLMp7Ns7F@wuerfel>
-Message-ID: <20141121165708.GF19783@e104818-lin.cambridge.arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 21 Nov 2014 17:59:57 +0100
+Subject: [PATCHv3 09/16] ARM: mvebu: implement suspend/resume support
+ for Armada XP
+In-Reply-To: <20141121164142.GB20238@lunn.ch>
+References: <1416585613-2113-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1416585613-2113-10-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20141121164142.GB20238@lunn.ch>
+Message-ID: <20141121175957.6ef4f26d@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 12:48:09PM +0000, Arnd Bergmann wrote:
-> On Friday 21 November 2014 09:35:10 Catalin Marinas wrote:
-> > +static inline int dma_set_coherent_mask(struct device *dev, u64 mask)
+Dear Andrew Lunn,
+
+On Fri, 21 Nov 2014 17:41:42 +0100, Andrew Lunn wrote:
+> > +static void mvebu_pm_store_bootinfo(void)
 > > +{
-> > +	if (!dma_supported(dev, mask))
-> > +		return -EIO;
-> > +	if (mask > dev->coherent_dma_mask)
-> > +		mask &= of_dma_get_range_mask(dev);
-> > +	dev->coherent_dma_mask = mask;
-> > +	return 0;
-> > +}
-> 
-> There is an interesting side problem here: the dma mask points to
-> coherent_dma_mask for all devices probed from DT, so this breaks
-> if we have any driver that sets them to different values. It is a
-> preexisting problem them.
-
-Such drivers would have to set both masks separately (or call
-dma_set_mask_and_coherent). What we assume though is that dma-ranges
-refers to both dma_mask and coherent_dma_mask. I don't think that would
-be a problem for ARM systems.
-
-> >  EXPORT_SYMBOL_GPL(of_dma_get_range);
-> >  
-> > +u64 of_dma_get_range_mask(struct device *dev)
-> > +{
-> > +	u64 dma_addr, paddr, size;
+> > +	u32 *store_addr;
+> > +	phys_addr_t resume_pc;
 > > +
-> > +	/* no dma mask limiting if no of_node or no dma-ranges property */
-> > +	if (!dev->of_node ||
-> > +	    of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size) < 0)
-> > +		return DMA_BIT_MASK(64);
-> 
-> If no dma-ranges are present, we should assume that the bus only supports
-> 32-bit DMA, or we could make it architecture specific. It would probably
-> be best for arm64 to require a dma-ranges property for doing any DMA
-> at all, but we can't do that on arm32 any more now.
-
-I thought about this but it could break some existing arm64 DT files if
-we mandate dma-ranges property (we could try though). The mask limiting
-is arch-specific anyway.
-
-> > diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> > index 3b64d0bf5bba..50d1ac4739e6 100644
-> > --- a/drivers/of/platform.c
-> > +++ b/drivers/of/platform.c
-> > @@ -200,6 +200,10 @@ static void of_dma_configure(struct device *dev)
-> >  	/* DMA ranges found. Calculate and set dma_pfn_offset */
-> >  	dev->dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
-> >  	dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
+> > +	store_addr = phys_to_virt(BOOT_INFO_ADDR);
+> > +	resume_pc = virt_to_phys(armada_370_xp_cpu_resume);
 > > +
-> > +	/* limit the coherent_dma_mask to the dma-ranges size property */
+> > +	/*
+> > +	 * The bootloader expects the first two words to be a magic
+> > +	 * value (BOOT_MAGIC_WORD), followed by the address of the
+> > +	 * resume code to jump to. Then, it expects a sequence of
+> > +	 * (address, value) pairs, which can be used to restore the
+> > +	 * value of certain registers. This sequence must end with the
+> > +	 * BOOT_MAGIC_LIST_END magic value.
+> > +	 */
 > 
-> I would change the comment to clarify that we are actually changing
-> the dma_mask here as well.
+> Hi Thomas
 > 
-> > +	if (size < (1ULL << 32))
-> > +		dev->coherent_dma_mask = DMA_BIT_MASK(ilog2(size));
-> >  }
-> 
-> As you mentioned in another mail in this thread, we wouldn't be
-> able to suuport this case on arm64.
+> Is this a well defined mechanism supported by mainline uboot, barebox
+> etc. Or is it some Marvell extension to their uboot?
 
-The mask would still be valid and even usable if an IOMMU is present. Do
-you mean we should not limit it at all here?
+As far as I know, it is a Marvell extension to their "binary header",
+so it's done even before U-Boot starts. Since the hardware needs
+assistance from the bootloader to do suspend/resume, there is
+necessarily a certain amount of cooperation/agreement needed by what
+the kernel does and what the bootloader expects. I'm not sure there's
+any "standard" mechanism here. Do you know of any?
 
-There is a scenario where smaller mask would work on arm64. For example
-Juno, you can have 2GB of RAM in the 32-bit phys range (starting at
-0x80000000). A device with 31-bit mask and a dma_pfn_offset of
-0x80000000 would still work (there isn't any but just as an example). So
-the check in dma_alloc_coherent() would be something like:
+I know the suspend/resume on the Blackfin architecture works the same
+way (at least it used to work that way years ago when I did a bit of
+Blackfin stuff). And here as well, there was some cooperation between
+the kernel and the bootloader. See
+arch/blackfin/mach-common/dpmc_modes.S, function do_hibernate() at the
+end.
 
-	phys_to_dma(top of ZONE_DMA) - dma_pfn_offset <= coherent_dma_mask
+Best regards,
 
-(or assuming RAM starts@0 and ignoring dma_pfn_offset for now)
-
-If the condition above fails, dma_alloc_coherent() would no longer fall
-back to swiotlb but issue a dev_warn() and return NULL.
-
+Thomas
 -- 
-Catalin
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
