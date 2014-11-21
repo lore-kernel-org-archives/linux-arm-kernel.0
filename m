@@ -1,55 +1,56 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sat, 22 Nov 2014 02:20:35 +0400
-Subject: IRQ #0 broken on ARM
-In-Reply-To: <87egsw5jen.fsf@free.fr>
-References: <CALT56yPs-SSssff1waj81CRQfER4ZKKR=B1jOXVL-aBChicSjg@mail.gmail.com>
- <87zjbk966i.fsf@approximate.cambridge.arm.com>
- <20141121110135.GS4042@n2100.arm.linux.org.uk>
- <546F1F45.7080103@arm.com> <87egsw5jen.fsf@free.fr>
-Message-ID: <CALT56yM3Dh-gBZPPa+cETX6W50iPudZUMW8r_64ES6U7kBBhNQ@mail.gmail.com>
+From: bgriffis@ti.com (Griffis, Brad)
+Date: Fri, 21 Nov 2014 22:25:50 +0000
+Subject: [PATCH v4 3/6] mfd: ti_am335x_tscadc: Remove unwanted
+ reg_se_cache save
+In-Reply-To: <20141121214005.GA4020@localhost.localdomain>
+References: <1415941651-28962-4-git-send-email-vigneshr@ti.com>
+ <20141118143005.GF24004@x1> <20141118171240.GB3003@dtor-ws>
+ <546DF2F0.9080405@ti.com> <20141120144028.GB5809@localhost.localdomain>
+ <546F2BA4.4000808@ti.com> <20141121131036.GA18931@localhost.localdomain>
+ <CAJKbBDDVTA+=priRu7sCD=vHrC8AUg4DM3kycuGrqbpF-5FGAA@mail.gmail.com>
+ <546F5C27.7040004@ti.com>
+ <CAJKbBDD=eYmU=LuViwLPNV=kYCziDQgKjL07bT7og4vsj0Ee7A@mail.gmail.com>
+ <20141121214005.GA4020@localhost.localdomain>
+Message-ID: <912A29987EAE174BA6CF187D7CDFA9CE26F6D664@DLEE08.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-22 0:32 GMT+03:00 Robert Jarzmik <robert.jarzmik@free.fr>:
-> Marc Zyngier <marc.zyngier@arm.com> writes:
->>> Linus has decreed it to not be a valid IRQ number, and that's basically
->>> the end of the discussion.  Generic code, and drivers, will increasingly
->>> decide that IRQ0 is not valid, and objecting to it has, and will continue
->>> to elicit a response of "fix ARM".
->>
->> I'm fine with that.
-> For pxa, why not do something like that [1] ?
->
-> Cheers.
->
-> --
-> Robert
->
-> [1]
-> ---8>---
->
-> From 551eaf75934bd84939a40781470ed3c04d17507a Mon Sep 17 00:00:00 2001
-> From: Robert Jarzmik <robert.jarzmik@free.fr>
-> Date: Fri, 21 Nov 2014 22:11:42 +0100
-> Subject: [PATCH] ARM: pxa: arbitrarily set first interrupt number
->
-> As IRQ0, the legacy timer interrupt should not be used as an interrupt
-> number, shift the interrupts by a fixed number.
->
-> As we had in a special case a shift of 16 when ISA bus was used on a
-> PXA, use that value as the first interrupt number, regardless of ISA or
-> not.
 
-This will shift the issue from PXA_SSP3 interrupt to ISA IRQ0.
-On the other hand ISA IRQs are used only on viper and zeus boards.
-And those boards explicitly mark IRQ0 as unused (because it is not
-routed through CPLD).
+> -----Original Message-----
+> From: Richard Cochran [mailto:richardcochran at gmail.com]
+> 
+> On Fri, Nov 21, 2014 at 07:17:18PM +0100, Johannes Pointner wrote:
+> > Before the patches were also jumps but I thought it is something
+> > Vignesh should know. Maybe there is some fix for that too?
 
-I have another question. As for me, those "ISA" interrupts being placed
-in front of PXA interrupts look like some kind of legacy stuff. Do we
-still require for "ISA" (well, PC/104) interrupts to be the first ones?
+I believe I've seen the "jumping" behavior pop up at a couple random times in my testing.  I think it relates to the hardware not properly registering a pen-up interrupt.  When that's happening can you try running ts_calibrate?  If you're not registering a pen-up event then you won't be able to advance through those touch points.  Is this behavior related to capturing ADC samples, or do you see this behavior even without capturing ADC samples?
 
+> > As Richard also noted, it would be nice if ti could let us know how to
+> > get the delay values right. By trial and error is IMHO not the best
+> > way.
+> 
+> That is not only an opinion, it is a matter of fact. TI really dropped the ball on
+> this one. I thought the patch series was a sign they finally were going to
+> properly address this issue. Wrong again.
 
--- 
-With best wishes
-Dmitry
+These patches originate from work I did on TI's SDK 7.00 (3.12 kernel).  The touchscreen is working beautifully in that environment and we are putting forth significant effort to bring those improvements to the community. 
+
+Things do not seem to be working as well with the current mainline kernel.  I've been reviewing various patches between 3.12 and the mainline to understand why it's different.  I believe I have figured this out, and I have discussions going separately with individuals that contributed those patches in order to come up with the best possible solution, i.e. we likely need a few additional changes to this patch set.
+
+The CHARGECONFIG delay serves precisely the same purpose as the udelay in the original code base.  How did you determine the udelay value in the first place?  I went through the effort of figuring out a way to make the delay into a HARDWARE delay instead of a software delay so that it could be removed from the ISR.  That delay time relates to "settling time" and so it's going to be dependent on your PCB.  You could hook up an oscilloscope and attempt to capture this parameter from the signals themselves.  Personally I think that's a lot more difficult than just doing a few iterations of testing.
+
+> The data sheet for the TI part used to have a reference to an app-note for
+> the touch controller.
+> 
+>       spruh73f page 1154
+> 
+>       The Pen IRQ can only occur if the correct Pen Ctrl bits are high
+>       (AFE Pen Ctrl bits 6:5 in the TSC_ADC control register) and if
+>       the correct ground transistor biasing is set in the StepConfig
+>       [N] Register. Refer to the application notes for the correct
+>       settings.
+> 
+> I searched high and low for this application note. Then, the data sheet got
+> revised.
+
+Such an application note does not exist, which explains why you didn't find it and why we have removed that reference from the TRM.  Sorry for your trouble.  We always strive for accurate documentation.
