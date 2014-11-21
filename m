@@ -1,28 +1,32 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 21 Nov 2014 14:31:05 +0400
-Subject: IRQ #0 broken on ARM
-Message-ID: <CALT56yPs-SSssff1waj81CRQfER4ZKKR=B1jOXVL-aBChicSjg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 21 Nov 2014 10:32:14 +0000
+Subject: For the problem when using swiotlb
+In-Reply-To: <20141121093509.GA19783@e104818-lin.cambridge.arm.com>
+References: <5469E26B.2010905@huawei.com> <1535751.CcvIi3DN4F@wuerfel>
+ <546D58B1.60108@huawei.com> <2522857.bNQToYpBNt@wuerfel>
+ <20141121093509.GA19783@e104818-lin.cambridge.arm.com>
+Message-ID: <20141121103213.GB19783@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Nov 21, 2014 at 09:35:10AM +0000, Catalin Marinas wrote:
+> @@ -88,11 +89,24 @@ static inline int dma_set_mask(struct device *dev, u64 mask)
+>  {
+>  	if (!dev->dma_mask || !dma_supported(dev, mask))
+>  		return -EIO;
+> +	/* if asking for bigger dma mask, limit it to the bus dma ranges */
+> +	if (mask > *dev->dma_mask)
+> +		mask &= of_dma_get_range_mask(dev);
+>  	*dev->dma_mask = mask;
+>  
+>  	return 0;
+>  }
 
-After the commit a71b092a9c68685a270ebdde7b5986ba8787e575
-(ARM: Convert handle_IRQ to use __handle_domain_irq) IRQ #0 is broken
-on ARM. It is a valid IRQ and it is quite imporant (on sa1100 it's a GPIO0).
-
-The worst thing is that the CPU will be stuck busy-looping around this IRQ
-w/o printing anything to the console or masking the irq. How should we cope
-with that? I'd like to propose to either revert the offending commit or to add
-the following patch.
+I wonder whether mask &= of_dma_get_range_mask(dev) limiting should
+actually be done before actually checking dma_supported(). That's
+because a device may try to set a 64-bit mask but being connected to a
+more limiting bus, we should check the dma_supported() on the resulting
+mask.
 
 -- 
-With best wishes
-Dmitry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-genirq-handle-IRQ-0-in-__handle_domain_irq.patch
-Type: text/x-patch
-Size: 1159 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141121/4738271e/attachment.bin>
+Catalin
