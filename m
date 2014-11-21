@@ -1,79 +1,48 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 21 Nov 2014 12:42:30 -0500 (EST)
-Subject: [PoC PATCH] arm: allow modules outside of bl range
-In-Reply-To: <CAKv+Gu9a1EyD3k3zW4=+ahZopGfjy-QdLgd-3U2ORH0Tb+GGOA@mail.gmail.com>
-References: <1416503299-17418-1-git-send-email-ard.biesheuvel@linaro.org>
- <alpine.LFD.2.11.1411201359310.11690@knanqh.ubzr>
- <CAKv+Gu-3Uq0p2u3R=s5U9dHQgWMrJhbS5aytz8jdVEC6JscKvA@mail.gmail.com>
- <CAKv+Gu9a1EyD3k3zW4=+ahZopGfjy-QdLgd-3U2ORH0Tb+GGOA@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1411211235580.11690@knanqh.ubzr>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 21 Nov 2014 17:51:19 +0000
+Subject: For the problem when using swiotlb
+In-Reply-To: <2530749.roRsteyaXx@wuerfel>
+References: <5469E26B.2010905@huawei.com> <5029442.vhLMp7Ns7F@wuerfel>
+ <20141121165708.GF19783@e104818-lin.cambridge.arm.com>
+ <2530749.roRsteyaXx@wuerfel>
+Message-ID: <20141121175118.GA10451@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Nov 2014, Ard Biesheuvel wrote:
-
-> On 21 November 2014 11:34, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > On 20 November 2014 20:14, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> >> On Thu, 20 Nov 2014, Ard Biesheuvel wrote:
-> >>
-> >>> Loading modules far away from the kernel in memory is problematic because
-> >>> the 'bl' instruction only has limited reach, and modules are not built
-> >>> with PLTs. Instead of using the -mlong-calls option (which affects *all*
-> >>> emitted bl instructions), this patch allocates some additional space at
-> >>> module load time, and populates it with PLT like entries when encountering
-> >>> relocations that are out of reach.
-> >>>
-> >>> Note that this patch is a proof of concept, and thus removes the implementation
-> >>> of module_alloc() so that all modules are relocated using PLT entries.
-> >>> Ideally, we would switch into PLT mode and start using the vmalloc area only
-> >>> after we have exhausted the ordinary module space.
-> >>>
-> >>> This should work with all relocation against symbols exported by the kernel,
-> >>> including those resulting from GCC generated function calls for ftrace etc.
-> >>>
-> >>> This is largely based on the ia64 implementation.
-> >>> Thumb-2 kernels currently unsupported.
-> >>>
-> >>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >>
-> >> Looks on the right track to me.
-> >>
-> >> BTW it might be necessary to use PLT mode even from the primary module
-> >> area if e.g. the kernel gets too big to be reachable (we've seen that
-> >> already), or a module from the primary area wants to branch to a symbol
-> >> located in a larger module that ended up in the vmalloc area.  So you
-> >
-> > Indeed.
-> >
-> >> might need to estimate the worst case for the number of PLTs and end up
-> >> not using all of them or even none at all. Would be good to free the
-> >> unused pages in that case (only for the non init section obviously).
-> >> Looks like the module_finalize() hook might be used for that.
-> >>
-> >
-> > This code already establishes an upper bound for the number of
-> > required PLT entries, but allocates the memory unconditionally, which
-> > is indeed somewhat of a waste as 'no PLT entries' is obviously the
-> > general case as long as the primary module area has not been
-> > exhausted.
-> >
-> > I can easily round up the core PLT section to PAGE_SIZE size and
-> > alignment, but I haven't figured out how to punch a hole into an area
-> > returned by vmalloc(), and it is desirable to have the PLT region and
-> > the module region itself be part of the same allocation to begin with,
-> > or the PLT region may end up out of range itself, which kind of
-> > defeats the purpose. Or perhaps, some way to at least release the
-> > physical pages while retaining the single vmap_area.
-> >
+On Fri, Nov 21, 2014 at 05:04:28PM +0000, Arnd Bergmann wrote:
+> On Friday 21 November 2014 16:57:09 Catalin Marinas wrote:
+> > There is a scenario where smaller mask would work on arm64. For example
+> > Juno, you can have 2GB of RAM in the 32-bit phys range (starting at
+> > 0x80000000). A device with 31-bit mask and a dma_pfn_offset of
+> > 0x80000000 would still work (there isn't any but just as an example). So
+> > the check in dma_alloc_coherent() would be something like:
+> > 
+> > 	phys_to_dma(top of ZONE_DMA) - dma_pfn_offset <= coherent_dma_mask
+> > 
+> > (or assuming RAM starts at 0 and ignoring dma_pfn_offset for now)
+> > 
+> > If the condition above fails, dma_alloc_coherent() would no longer fall
+> > back to swiotlb but issue a dev_warn() and return NULL.
 > 
-> It turns out, looking at the actual numbers (random sample of 46
-> modules), that the typical size overhead of the core PLT is about 5%,
-> and rarely results in the number of needed pages to increase.
+> Ah, that looks like it should work on all architectures, very nice.
+> How about checking this condition, and then printing a small warning
+> (dev_warn, not WARN_ON) and setting the dma_mask pointer to NULL?
 
-That's what I was thinking too.  If for example a single extra page is 
-allocated, that means 4096/8 = 512 unique symbols that can be redirected 
-through it.  That's a _lot_ of external symbols for a module.  So maybe 
-we shouldn't bother too much.
+I would not add the above ZONE_DMA check to of_dma_configure(). For
+example on arm64, we may not support a small coherent_dma_mask but the
+same value for dma_mask could be fine via swiotlb bouncing (or IOMMU).
+However, that's an arch-specific decision. Maybe after the above setting
+of dev->coherent_dma_mask in of_dma_configure(), we could add:
 
+	if (!dma_supported(dev, dev->coherent_dma_mask))
+		dev->dma_mask = NULL;
 
-Nicolas
+The arch dma_supported() can check the swiotlb bouncing or ZONE_DMA
+limits.
+
+Strangely, we don't have a coherent_dma_supported() but we can defer
+such check to dma_alloc_coherent() and that's where we would check the
+top of ZONE_DMA.
+
+-- 
+Catalin
