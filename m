@@ -1,75 +1,20 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 21 Nov 2014 08:25:45 +0100
-Subject: [PATCH v4 1/2] i2c: s3c2410: Handle i2c sys_cfg register in i2c
- driver
-In-Reply-To: <1414656270-8048-2-git-send-email-pankaj.dubey@samsung.com>
-References: <1414656270-8048-1-git-send-email-pankaj.dubey@samsung.com>
- <1414656270-8048-2-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <20141121072545.GG1480@katana>
+From: wangyufen@huawei.com (wangyufen)
+Date: Fri, 21 Nov 2014 15:27:02 +0800
+Subject: arm64:  dose arm64 support the sysfs system call?
+Message-ID: <546EE946.1020905@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 01:34:29PM +0530, Pankaj Dubey wrote:
-> Let's handle i2c interrupt re-configuration in i2c driver. This will
-> help us in removing some soc specific checks from machine files and
-> will help in removing static iomapping of SYS register in exynos.c
-> 
-> Since only Exynos5250, and Exynos5420 has i2c nodes in DT, added syscon
-> based phandle to i2c device nodes of respective SoC DT files.
-> 
-> Also handle saving and restoring of SYS_I2C_CFG register during
-> suspend and resume of i2c driver.
-> 
-> CC: Rob Herring <robh+dt@kernel.org>
-> CC: Randy Dunlap <rdunlap@infradead.org>
-> CC: Wolfram Sang <wsa@the-dreams.de>
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: devicetree at vger.kernel.org
-> CC: linux-doc at vger.kernel.org
-> CC: linux-i2c at vger.kernel.org
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  .../devicetree/bindings/i2c/i2c-s3c2410.txt        |    1 +
->  arch/arm/boot/dts/exynos5250.dtsi                  |    4 +++
->  arch/arm/boot/dts/exynos5420.dtsi                  |    4 +++
+Hi,
 
-I usually don't take DTS patches. They should go via arm-soc. Please say
-so if there are reasons I should take them.
+I did ltp test on arm64, the sysfs testcases failed:
 
-> @@ -1084,6 +1092,23 @@ s3c24xx_i2c_parse_dt(struct device_node *np, struct s3c24xx_i2c *i2c)
->  	of_property_read_u32(np, "samsung,i2c-slave-addr", &pdata->slave_addr);
->  	of_property_read_u32(np, "samsung,i2c-max-bus-freq",
->  				(u32 *)&pdata->frequency);
-> +	/*
-> +	 * Exynos5's legacy i2c controller and new high speed i2c
-> +	 * controller have muxed interrupt sources. By default the
-> +	 * interrupts for 4-channel HS-I2C controller are enabled.
-> +	 * If node for first four channels of legacy i2c controller
+    sysfs01     0  TWARN  :  This test can only run on kernels that support the sysfs system call
 
-s/node/nodes/
+because the __NR_sysfs didn't define in aarch64
 
-> +	 * are available then re-configure the interrupts via the
-> +	 * system register.
-> +	 */
-> +	id = of_alias_get_id(np, "i2c");
-> +	i2c->sysreg = syscon_regmap_lookup_by_phandle(np,
-> +			"samsung,sysreg-phandle");
-> +	if (IS_ERR(i2c->sysreg)) {
-> +		/* As this is not compulsory do not return error */
-> +		pr_info("i2c-%d skipping re-configuration of interrutps\n", id);
+Dose anyone know what number the sysfs system call is in aarch64?
 
-I'd say drop this message. If you want to keep it, it should be dev_dbg.
 
-> +		return;
-> +	}
-> +	regmap_update_bits(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, BIT(id), 0);
->  }
-
-Rest looks good, thanks!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141121/a9b5fa9e/attachment.sig>
+Thanks,
+Wang
