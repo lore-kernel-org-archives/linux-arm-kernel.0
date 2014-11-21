@@ -1,83 +1,94 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 21 Nov 2014 19:18:06 +0000 (UTC)
-Subject: [GIT PULL v2] ARM: OMAP2+: some more hwmod & clock patches for v3.19
-Message-ID: <alpine.DEB.2.02.1411211917280.9204@utopia.booyaka.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 21 Nov 2014 11:20:05 -0800
+Subject: [PATCH v4 1/2] ARM: keystone: pm: switch to use generic pm domains
+In-Reply-To: <CAMuHMdU6G35SP-P7bt6RJQk59CrGcKE2XM4N3o8Dv3qxZU7gxA@mail.gmail.com>
+ (Geert Uytterhoeven's message of "Fri, 21 Nov 2014 09:06:09 +0100")
+References: <1415631557-22897-1-git-send-email-grygorii.strashko@ti.com>
+ <1709760.E0jX3Myv0h@wuerfel> <546C7FDD.7030906@ti.com>
+ <2900095.WIocOu7ue2@wuerfel>
+ <CAPDyKFqeZ3YU2OEN4tCOdcQ0pAho67Q8U_eCEOroG9aS0mp+-Q@mail.gmail.com>
+ <546DD87B.3080806@ti.com>
+ <CAPDyKFrBhZyqozM98_4pPdW0EMFt5W6VX1X7cz6Z=yNhW4vYTA@mail.gmail.com>
+ <CAMuHMdWtHT7QX3Kpa-GCLa49ToGODwjnNVgfxDzJzcM-FU1ffg@mail.gmail.com>
+ <546E0970.5090301@ti.com> <7hh9xtr5ac.fsf@deeprootsystems.com>
+ <CAMuHMdV7zASj8_NtLRir1VubXEKTkq0vBGMXeYXDACu8UC2tZA@mail.gmail.com>
+ <7hbno1r1af.fsf@deeprootsystems.com>
+ <CAMuHMdVXGPu7x706NxqO3rn3KuRbPbD_ZQsJtDH4Hf31AaRR+Q@mail.gmail.com>
+ <7hppchpcfm.fsf@deeprootsystems.com>
+ <CAMuHMdU6G35SP-P7bt6RJQk59CrGcKE2XM4N3o8Dv3qxZU7gxA@mail.gmail.com>
+Message-ID: <7h8uj4nyxm.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+Geert Uytterhoeven <geert@linux-m68k.org> writes:
 
-Hi Tony
+> Hi Kevin,
+>
+> On Fri, Nov 21, 2014 at 2:30 AM, Kevin Hilman <khilman@kernel.org> wrote:
+>> Geert Uytterhoeven <geert@linux-m68k.org> writes:
+>>> On Thu, Nov 20, 2014 at 10:48 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>>>>>> So what exactly are we talking about with "PM" clocks, and why are they
+>>>>>> "special" when it comes to PM domains?  IOW, why are the clocks to be
+>>>>>> managed during PM domain transitions for a given device any different
+>>>>>> than the clocks that need to be managed for a runtime suspend/resume (or
+>>>>>> system suspend/resume) sequence for the same device?
+>>>>>
+>>>>> (Speaking for my case, shmobile)
+>>>>>
+>>>>> They're not. The clocks to be managed during PM domain transitions are the
+>>>>> same as the clocks that need to be managed for a runtime suspend/resume
+>>>>> (or system suspend/resume) sequence.
+>>>>>
+>>>>> The special thing is that this is more a platform than a driver thing: the same
+>>>>> module may have a "PM/functional" clock (that is documented to enable/disable
+>>>>> the module) on one Soc, but noet on another.
+>>>>
+>>>> So why isn't the presence or absence of the clock described in the .dtsi
+>>>> for the SoC instead of being handled by special PM domain logic?
+>>>
+>>> It is. Cfr. the presence/absence of clocks for renesas,rcar-gpio nodes.
+>>
+>> Hmm, OK, Good.
+>>
+>> So now I'm confused about why the PM domain has to do anything special
+>> if the presence/absence of the clocks is already handled by the DT.
+>
+> Just adding a clock property to a device node in DT doesn't enable the clock
+> automatically, nor make it runtime-managed automatically.
 
-The following changes since commit 79005fbd3e1d671d08c45c9140ee9826efdc367c:
+In general, that's true.  But I thought you're PM domain was written to
+look for clock properties, and if present would manage them.  The
+proposed genpd support for TI Keystone2 would make it so these clocks
+would definitely be automatically managed by the PM domain.
 
-  ARM: OMAP2+: hwmod: drop unnecessary list initialization (2014-11-13 09:36:55 -0700)
+> Compare this to e.g. pinctrl, where adding pinctrl properties to DT does enable
+> them automatically, without the driver for the device having to care about it.
 
-are available in the git repository at:
+Well, we're headed down the same path with genpd (if given the right
+properties in genpd.)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.19/omap-b2
+> Drivers interfacing external hardware typically do care about clocks, as they
+> have to program clock generators for the external hardware interface (e.g.
+> driving spi or i2c buses at specific frequencies).
 
-for you to fetch changes up to 1f074f996482220f90fbe3dcfafeb3db46ec748a:
+Yes, but IMO, these should be handled by the driver, not by the PM
+domain.  More specifically, if a device is generating a clock for
+external hardware, presumably it cannot be runtime suspended, so the
+enclosing PM domain can be powered off.  If it's not generating a clock,
+then it can be runtime suspended and presumably would gate it's
+externally facing clocks when it runtime suspends.
 
-  Merge branch 'adc-support-v3.19' into omap-b-for-v3.19 (2014-11-21 11:05:05 -0700)
+> Other random drivers don't care about clocks, so they don't handle them.
+> But as long as they make basic pm_runtime_{enable,get_sync,put}() calls,
+> the (optional) clocks (and hardware PM domains) will "work" fine, if handled
+> by the PM (clock) domain.
 
-- ----------------------------------------------------------------
-Several more OMAP patches targeted for v3.19. They include:
+Yes, I understand that.  But this still isn't helping me understand why
+your PM domain has to distinguish between different types of clocks
+(e.g. why it only manages the first clock.) 
 
-- - OMAP4/5: DSS hwmod cleanup patches from Tomi Valkeinen.
-- - DRA7xx: hwmod data support for UARTs 7 through 10.
-- - AM43xx: hwmod data support for the onboard ADC.
+Did you set up the properties so that the first clock was the functional
+clock and any additional ones were for devices that generate external
+clocks?
 
-Basic build, boot, and PM test reports are here:
-
-http://www.pwsan.com/omap/testlogs/omap-b-for-v3.19/20141121110550/
-
-Note that I cannot test the DRA7xx or AM43xx patches, since I do not have
-these boards.
-
-- ----------------------------------------------------------------
-Ambresh K (1):
-      ARM: DRA7: hwmod data: Add missing UART hwmod data
-
-Paul Walmsley (2):
-      Merge branch 'dra7xx-uart-hwmod-v3.19' into omap-b-for-v3.19
-      Merge branch 'adc-support-v3.19' into omap-b-for-v3.19
-
-Tomi Valkeinen (6):
-      ARM: OMAP2+: hwmod: add parent_hwmod support
-      ARM: OMAP5: hwmod: set DSS submodule parent hwmods
-      ARM: OMAP4: hwmod: set DSS submodule parent hwmods
-      ARM: OMAP4: hwmod: use MODULEMODE properly
-      ARM: OMAP4: fix RFBI iclk
-      ARM: dts: omap4.dtsi: remove dss_fck
-
-Vignesh R (1):
-      ARM: OMAP2+: hwmod: AM43x: add hwmod support for ADC on AM43xx
-
- arch/arm/boot/dts/omap4.dtsi               |   2 +-
- arch/arm/boot/dts/omap44xx-clocks.dtsi     |   8 ---
- arch/arm/mach-omap2/omap_hwmod.c           |  22 +++++++
- arch/arm/mach-omap2/omap_hwmod.h           |   8 +++
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c |  39 +++++++++++
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  25 +++++---
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c |   5 ++
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c  | 100 +++++++++++++++++++++++++++++
- 8 files changed, 191 insertions(+), 18 deletions(-)
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iQIcBAEBAgAGBQJUb4+tAAoJEMePsQ0LvSpL1a8P+gI4wOY+CbUF77ya5r40nVsR
-zkfYpzEZUaNXWXxB2muPuJIEbv3GEU/ytiyDzApKfnILbIuOnHtUPl+du6mivr88
-v5SeRSOUDPldvv0pEzB+QM9u0ugheWbBTTYwIRoUPvy2Ns2wj7lr6rRmu56aRhSe
-+a4uryYUidSeVNS7ssw5n6L2eTLe2dQZvrn6TF/LewRQ8TbmjCNPESfvsEPBGyW6
-mNNbO4dT0fLHQqki+lHDiEMe3LD+vrzYJpyrluDXLw9eJdVLKqg08klPUEFGiNRU
-zKcaqebrqqQRwrjrr3MygxgtXDQ9rgBSiW6jRXMe9bXdXnnQeEga0yOLd37pWMIz
-JXh9AhBW+lLCWqydr+/z/KlnEY/1VyXa6u8tIAX4Egzv2oIMnwzrZfjNtMGykFk3
-2pczwb5Ftync/D/80QsR/iwqiNd6rzfDMz+1ALNO5ywuhFrYlCVFgPRfxayLfsbl
-FSIv8QzJ6vPiRebIfZGoGWddnKnnSBItJgqJuk1lqHbSjrB+o+ODRUGuaKRO1ZYJ
-ZM7Ar9AMuhw8Zwv23RZfgvsgqG4PGc2gnACy1B9iW7xzVHAdQ/b4rG9DI9whfpQ0
-BewTTEvRmVx9xXJnyAPnsQIK8wodG7i0M7j3eWUSnGmYVR3SOYwssJspwzSIzhMC
-JwqOODpI8W9/oMyd+RUB
-=GlT7
------END PGP SIGNATURE-----
+Kevin
