@@ -1,102 +1,198 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Fri, 21 Nov 2014 13:50:44 -0800
-Subject: [PATCHv6 7/8] arm64: efi: Use ioremap_exec for code sections
+Date: Fri, 21 Nov 2014 13:50:43 -0800
+Subject: [PATCHv6 6/8] arm64: use fixmap for text patching when text is RO
 In-Reply-To: <1416606645-25633-1-git-send-email-lauraa@codeaurora.org>
 References: <1416606645-25633-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1416606645-25633-8-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1416606645-25633-7-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ioremap is not guaranteed to return memory with proper
-execution permissions. Introduce ioremap_exec which will
-ensure that permission bits are set as expected for EFI
-code sections.
+When kernel text is marked as read only, it cannot be modified directly.
+Use a fixmap to modify the text instead in a similar manner to
+x86 and arm.
 
+Reviewed-by: Kees Cook <keescook@chromium.org>
 Tested-by: Kees Cook <keescook@chromium.org>
 Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
- arch/arm64/include/asm/io.h      |  1 +
- arch/arm64/include/asm/pgtable.h |  1 +
- arch/arm64/kernel/efi.c          | 12 +++++++++++-
- arch/arm64/mm/ioremap.c          | 11 +++++++++++
- 4 files changed, 24 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/fixmap.h |  1 +
+ arch/arm64/include/asm/insn.h   |  2 ++
+ arch/arm64/kernel/insn.c        | 72 +++++++++++++++++++++++++++++++++++++++--
+ arch/arm64/kernel/jump_label.c  |  2 +-
+ 4 files changed, 73 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 79f1d519..7dd8465 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -230,6 +230,7 @@ extern void __memset_io(volatile void __iomem *, int, size_t);
- extern void __iomem *__ioremap(phys_addr_t phys_addr, size_t size, pgprot_t prot);
- extern void __iounmap(volatile void __iomem *addr);
- extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
-+extern void __iomem *ioremap_exec(phys_addr_t phys_addr, size_t size);
+diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+index db26a2f2..2cd4b0d 100644
+--- a/arch/arm64/include/asm/fixmap.h
++++ b/arch/arm64/include/asm/fixmap.h
+@@ -48,6 +48,7 @@ enum fixed_addresses {
  
- #define ioremap(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
- #define ioremap_nocache(addr, size)	__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 41a43bf..9b1d9d0 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -65,6 +65,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
- #define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_DEVICE_nGnRE))
- #define PROT_NORMAL_NC		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_NORMAL_NC))
- #define PROT_NORMAL		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_NORMAL))
-+#define PROT_NORMAL_EXEC	(PROT_DEFAULT | PTE_UXN | PTE_ATTRINDX(MT_NORMAL))
+ 	FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
+ 	FIX_BTMAP_BEGIN = FIX_BTMAP_END + TOTAL_FIX_BTMAPS - 1,
++	FIX_TEXT_POKE0,
+ 	__end_of_fixed_addresses
+ };
  
- #define PROT_SECT_DEVICE_nGnRE	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_DEVICE_nGnRE))
- #define PROT_SECT_NORMAL	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 95c49eb..9e41f95 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -47,6 +47,14 @@ static int __init is_normal_ram(efi_memory_desc_t *md)
- 	return 0;
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index 56a9e63..f66853b 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -282,6 +282,7 @@ bool aarch64_insn_is_nop(u32 insn);
+ 
+ int aarch64_insn_read(void *addr, u32 *insnp);
+ int aarch64_insn_write(void *addr, u32 insn);
++int aarch64_insn_write_early(void *addr, u32 insn);
+ enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
+ u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+ 				  u32 insn, u64 imm);
+@@ -352,6 +353,7 @@ u32 aarch64_insn_gen_logical_shifted_reg(enum aarch64_insn_register dst,
+ bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+ 
+ int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
++int __aarch64_insn_patch_text_nosync(void *addr, u32 insn, bool early);
+ int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
+ int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
+ #endif /* __ASSEMBLY__ */
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index 8cd27fe..b2cad38 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -19,12 +19,15 @@
+ #include <linux/bitops.h>
+ #include <linux/compiler.h>
+ #include <linux/kernel.h>
++#include <linux/mm.h>
+ #include <linux/smp.h>
++#include <linux/spinlock.h>
+ #include <linux/stop_machine.h>
+ #include <linux/uaccess.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/debug-monitors.h>
++#include <asm/fixmap.h>
+ #include <asm/insn.h>
+ 
+ #define AARCH64_INSN_SF_BIT	BIT(31)
+@@ -72,6 +75,36 @@ bool __kprobes aarch64_insn_is_nop(u32 insn)
+ 	}
  }
  
-+static int __init is_code(efi_memory_desc_t *md)
++static DEFINE_SPINLOCK(patch_lock);
++
++static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
 +{
-+	if (md->attribute & EFI_RUNTIME_SERVICES_CODE)
-+		return 1;
-+	return 0;
++	unsigned long uintaddr = (uintptr_t) addr;
++	bool module = !core_kernel_text(uintaddr);
++	struct page *page;
++
++	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
++		page = vmalloc_to_page(addr);
++	else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
++		page = virt_to_page(addr);
++	else
++		return addr;
++
++	if (flags)
++		spin_lock_irqsave(&patch_lock, *flags);
++
++	set_fixmap(fixmap, page_to_phys(page));
++
++	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
 +}
 +
-+
- static void __init efi_setup_idmap(void)
- {
- 	struct memblock_region *r;
-@@ -338,7 +346,9 @@ static int __init remap_region(efi_memory_desc_t *md, void **new)
- 	memrange_efi_to_native(&paddr, &npages);
- 	size = npages << PAGE_SHIFT;
- 
--	if (is_normal_ram(md))
-+	if (is_code(md))
-+		vaddr = (__force u64)ioremap_exec(paddr, size);
-+	else if (is_normal_ram(md))
- 		vaddr = (__force u64)ioremap_cache(paddr, size);
- 	else
- 		vaddr = (__force u64)ioremap(paddr, size);
-diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
-index cbb99c8..b998441 100644
---- a/arch/arm64/mm/ioremap.c
-+++ b/arch/arm64/mm/ioremap.c
-@@ -103,6 +103,17 @@ void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
- }
- EXPORT_SYMBOL(ioremap_cache);
- 
-+void __iomem *ioremap_exec(phys_addr_t phys_addr, size_t size)
++static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
 +{
-+	/* For normal memory we already have a cacheable mapping. */
-+	if (pfn_valid(__phys_to_pfn(phys_addr)))
-+		return (void __iomem *)__phys_to_virt(phys_addr);
++	clear_fixmap(fixmap);
 +
-+	return __ioremap_caller(phys_addr, size, __pgprot(PROT_NORMAL_EXEC),
-+				__builtin_return_address(0));
++	if (flags)
++		spin_unlock_irqrestore(&patch_lock, *flags);
 +}
-+EXPORT_SYMBOL(ioremap_exec);
-+
  /*
-  * Must be called after early_fixmap_init
-  */
+  * In ARMv8-A, A64 instructions have a fixed length of 32 bits and are always
+  * little-endian.
+@@ -88,10 +121,34 @@ int __kprobes aarch64_insn_read(void *addr, u32 *insnp)
+ 	return ret;
+ }
+ 
++static int __kprobes __aarch64_insn_write(void *addr, u32 insn, bool patch)
++{
++	void *waddr = addr;
++	unsigned long flags;
++	int ret;
++
++	if (patch)
++		waddr = patch_map(addr, FIX_TEXT_POKE0, &flags);
++
++	ret = probe_kernel_write(waddr, &insn, AARCH64_INSN_SIZE);
++
++	if (waddr != addr)
++		patch_unmap(FIX_TEXT_POKE0, &flags);
++
++	return ret;
++}
++
+ int __kprobes aarch64_insn_write(void *addr, u32 insn)
+ {
+ 	insn = cpu_to_le32(insn);
+-	return probe_kernel_write(addr, &insn, AARCH64_INSN_SIZE);
++	return __aarch64_insn_write(addr, insn, true);
++}
++
++int __kprobes aarch64_insn_write_early(void *addr, u32 insn)
++{
++	insn = cpu_to_le32(insn);
++	return __aarch64_insn_write(addr, insn, false);
++
+ }
+ 
+ static bool __kprobes __aarch64_insn_hotpatch_safe(u32 insn)
+@@ -124,7 +181,7 @@ bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
+ 	       __aarch64_insn_hotpatch_safe(new_insn);
+ }
+ 
+-int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
++int __kprobes __aarch64_insn_patch_text_nosync(void *addr, u32 insn, bool early)
+ {
+ 	u32 *tp = addr;
+ 	int ret;
+@@ -133,7 +190,11 @@ int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
+ 	if ((uintptr_t)tp & 0x3)
+ 		return -EINVAL;
+ 
+-	ret = aarch64_insn_write(tp, insn);
++	if (early)
++		ret = aarch64_insn_write_early(tp, insn);
++	else
++		ret = aarch64_insn_write(tp, insn);
++
+ 	if (ret == 0)
+ 		flush_icache_range((uintptr_t)tp,
+ 				   (uintptr_t)tp + AARCH64_INSN_SIZE);
+@@ -141,6 +202,11 @@ int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
+ 	return ret;
+ }
+ 
++int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
++{
++	return __aarch64_insn_patch_text_nosync(addr, insn, false);
++}
++
+ struct aarch64_insn_patch {
+ 	void		**text_addrs;
+ 	u32		*new_insns;
+diff --git a/arch/arm64/kernel/jump_label.c b/arch/arm64/kernel/jump_label.c
+index 263a166..9ac30bb 100644
+--- a/arch/arm64/kernel/jump_label.c
++++ b/arch/arm64/kernel/jump_label.c
+@@ -38,7 +38,7 @@ static void __arch_jump_label_transform(struct jump_entry *entry,
+ 	}
+ 
+ 	if (is_static)
+-		aarch64_insn_patch_text_nosync(addr, insn);
++		__aarch64_insn_patch_text_nosync(addr, insn, true);
+ 	else
+ 		aarch64_insn_patch_text(&addr, &insn, 1);
+ }
 -- 
 Qualcomm Innovation Center, Inc.
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
