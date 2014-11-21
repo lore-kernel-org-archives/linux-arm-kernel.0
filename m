@@ -1,52 +1,156 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 21 Nov 2014 17:00:09 +0100
-Subject: [PATCHv3 12/16] ARM: mvebu: make sure MMU is disabled in
- armada_370_xp_cpu_resume
+Date: Fri, 21 Nov 2014 17:00:02 +0100
+Subject: [PATCHv3 05/16] gpio: mvebu: add suspend/resume support
 In-Reply-To: <1416585613-2113-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1416585613-2113-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1416585613-2113-13-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1416585613-2113-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The armada_370_xp_cpu_resume() until now was used only as the function
-called by the SoC when returning from a deep idle state (as used in
-cpuidle, or when the CPU is brought offline using CPU hotplug).
-
-However, it is now also used when exiting the suspend to RAM state. In
-this case, it is the bootloader that calls back into this function,
-with the MMU left enabled by the BootROM. Having the MMU enabled when
-entering this function confuses the kerrnel because we are not using
-the kernel page tables at this point, but in other mvebu functions we
-use the information on whether the MMU is enabled or not to find out
-whether we should talk to the coherency fabric using a physical
-address or a virtual address. To fix that, we simply disable the MMU
-when entering this function, so that the kernel is in an expected
-situation.
+This commit adds the implementation of ->suspend() and ->resume()
+platform_driver hooks in order to save and restore the state of the
+GPIO configuration. In order to achieve that, additional fields are
+added to the mvebu_gpio_chip structure.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Alexandre Courbot <gnurou@gmail.com>
+Cc: linux-gpio at vger.kernel.org
+Acked-by: Alexandre Courbot <acourbot@nvidia.com>
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pmsu_ll.S | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/gpio/gpio-mvebu.c | 99 +++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 99 insertions(+)
 
-diff --git a/arch/arm/mach-mvebu/pmsu_ll.S b/arch/arm/mach-mvebu/pmsu_ll.S
-index a945756..ae7e6b0 100644
---- a/arch/arm/mach-mvebu/pmsu_ll.S
-+++ b/arch/arm/mach-mvebu/pmsu_ll.S
-@@ -18,6 +18,14 @@
-  */
- ENTRY(armada_370_xp_cpu_resume)
- ARM_BE8(setend	be )			@ go BE8 if entered LE
-+	/*
-+	 * Disable the MMU that might have been enabled in BootROM if
-+	 * this code is used in the resume path of a suspend/resume
-+	 * cycle.
-+	 */
-+	mrc	p15, 0, r1, c1, c0, 0
-+	bic	r1, #1
-+	mcr	p15, 0, r1, c1, c0, 0
- 	bl	ll_add_cpu_to_smp_group
- 	bl	ll_enable_coherency
- 	b	cpu_resume
+diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
+index 418e386..dd5545c 100644
+--- a/drivers/gpio/gpio-mvebu.c
++++ b/drivers/gpio/gpio-mvebu.c
+@@ -83,6 +83,14 @@ struct mvebu_gpio_chip {
+ 	int		   irqbase;
+ 	struct irq_domain *domain;
+ 	int                soc_variant;
++
++	/* Used to preserve GPIO registers accross suspend/resume */
++	u32                out_reg;
++	u32                io_conf_reg;
++	u32                blink_en_reg;
++	u32                in_pol_reg;
++	u32                edge_mask_regs[4];
++	u32                level_mask_regs[4];
+ };
+ 
+ /*
+@@ -554,6 +562,93 @@ static const struct of_device_id mvebu_gpio_of_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, mvebu_gpio_of_match);
+ 
++static int mvebu_gpio_suspend(struct platform_device *pdev, pm_message_t state)
++{
++	struct mvebu_gpio_chip *mvchip = platform_get_drvdata(pdev);
++	int i;
++
++	mvchip->out_reg = readl(mvebu_gpioreg_out(mvchip));
++	mvchip->io_conf_reg = readl(mvebu_gpioreg_io_conf(mvchip));
++	mvchip->blink_en_reg = readl(mvebu_gpioreg_blink(mvchip));
++	mvchip->in_pol_reg = readl(mvebu_gpioreg_in_pol(mvchip));
++
++	switch (mvchip->soc_variant) {
++	case MVEBU_GPIO_SOC_VARIANT_ORION:
++		mvchip->edge_mask_regs[0] =
++			readl(mvchip->membase + GPIO_EDGE_MASK_OFF);
++		mvchip->level_mask_regs[0] =
++			readl(mvchip->membase + GPIO_LEVEL_MASK_OFF);
++		break;
++	case MVEBU_GPIO_SOC_VARIANT_MV78200:
++		for (i = 0; i < 2; i++) {
++			mvchip->edge_mask_regs[i] =
++				readl(mvchip->membase +
++				      GPIO_EDGE_MASK_MV78200_OFF(i));
++			mvchip->level_mask_regs[i] =
++				readl(mvchip->membase +
++				      GPIO_LEVEL_MASK_MV78200_OFF(i));
++		}
++		break;
++	case MVEBU_GPIO_SOC_VARIANT_ARMADAXP:
++		for (i = 0; i < 4; i++) {
++			mvchip->edge_mask_regs[i] =
++				readl(mvchip->membase +
++				      GPIO_EDGE_MASK_ARMADAXP_OFF(i));
++			mvchip->level_mask_regs[i] =
++				readl(mvchip->membase +
++				      GPIO_LEVEL_MASK_ARMADAXP_OFF(i));
++		}
++		break;
++	default:
++		BUG();
++	}
++
++	return 0;
++}
++
++static int mvebu_gpio_resume(struct platform_device *pdev)
++{
++	struct mvebu_gpio_chip *mvchip = platform_get_drvdata(pdev);
++	int i;
++
++	writel(mvchip->out_reg, mvebu_gpioreg_out(mvchip));
++	writel(mvchip->io_conf_reg, mvebu_gpioreg_io_conf(mvchip));
++	writel(mvchip->blink_en_reg, mvebu_gpioreg_blink(mvchip));
++	writel(mvchip->in_pol_reg, mvebu_gpioreg_in_pol(mvchip));
++
++	switch (mvchip->soc_variant) {
++	case MVEBU_GPIO_SOC_VARIANT_ORION:
++		writel(mvchip->edge_mask_regs[0],
++		       mvchip->membase + GPIO_EDGE_MASK_OFF);
++		writel(mvchip->level_mask_regs[0],
++		       mvchip->membase + GPIO_LEVEL_MASK_OFF);
++		break;
++	case MVEBU_GPIO_SOC_VARIANT_MV78200:
++		for (i = 0; i < 2; i++) {
++			writel(mvchip->edge_mask_regs[i],
++			       mvchip->membase + GPIO_EDGE_MASK_MV78200_OFF(i));
++			writel(mvchip->level_mask_regs[i],
++			       mvchip->membase +
++			       GPIO_LEVEL_MASK_MV78200_OFF(i));
++		}
++		break;
++	case MVEBU_GPIO_SOC_VARIANT_ARMADAXP:
++		for (i = 0; i < 4; i++) {
++			writel(mvchip->edge_mask_regs[i],
++			       mvchip->membase +
++			       GPIO_EDGE_MASK_ARMADAXP_OFF(i));
++			writel(mvchip->level_mask_regs[i],
++			       mvchip->membase +
++			       GPIO_LEVEL_MASK_ARMADAXP_OFF(i));
++		}
++		break;
++	default:
++		BUG();
++	}
++
++	return 0;
++}
++
+ static int mvebu_gpio_probe(struct platform_device *pdev)
+ {
+ 	struct mvebu_gpio_chip *mvchip;
+@@ -577,6 +672,8 @@ static int mvebu_gpio_probe(struct platform_device *pdev)
+ 	if (!mvchip)
+ 		return -ENOMEM;
+ 
++	platform_set_drvdata(pdev, mvchip);
++
+ 	if (of_property_read_u32(pdev->dev.of_node, "ngpios", &ngpios)) {
+ 		dev_err(&pdev->dev, "Missing ngpios OF property\n");
+ 		return -ENODEV;
+@@ -735,5 +832,7 @@ static struct platform_driver mvebu_gpio_driver = {
+ 		.of_match_table = mvebu_gpio_of_match,
+ 	},
+ 	.probe		= mvebu_gpio_probe,
++	.suspend        = mvebu_gpio_suspend,
++	.resume         = mvebu_gpio_resume,
+ };
+ module_platform_driver(mvebu_gpio_driver);
 -- 
 2.1.0
