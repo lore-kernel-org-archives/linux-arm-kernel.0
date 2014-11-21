@@ -1,47 +1,75 @@
-From: jrudholm@gmail.com (Johan Rudholm)
-Date: Fri, 21 Nov 2014 08:23:09 +0100
-Subject: [PATCH 4/4] mmc: core: hold SD Clock before CMD11 during Signal
-In-Reply-To: <1416531100-26707-5-git-send-email-Vincent.Yang@tw.fujitsu.com>
-References: <1416531100-26707-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <1416531100-26707-5-git-send-email-Vincent.Yang@tw.fujitsu.com>
-Message-ID: <CA+20K0ArDkdVypRGNeMce8rCOUwGP9x_bOrpSkL8Jh7WV=t4mQ@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 21 Nov 2014 08:25:45 +0100
+Subject: [PATCH v4 1/2] i2c: s3c2410: Handle i2c sys_cfg register in i2c
+ driver
+In-Reply-To: <1414656270-8048-2-git-send-email-pankaj.dubey@samsung.com>
+References: <1414656270-8048-1-git-send-email-pankaj.dubey@samsung.com>
+ <1414656270-8048-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <20141121072545.GG1480@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Oct 30, 2014 at 01:34:29PM +0530, Pankaj Dubey wrote:
+> Let's handle i2c interrupt re-configuration in i2c driver. This will
+> help us in removing some soc specific checks from machine files and
+> will help in removing static iomapping of SYS register in exynos.c
+> 
+> Since only Exynos5250, and Exynos5420 has i2c nodes in DT, added syscon
+> based phandle to i2c device nodes of respective SoC DT files.
+> 
+> Also handle saving and restoring of SYS_I2C_CFG register during
+> suspend and resume of i2c driver.
+> 
+> CC: Rob Herring <robh+dt@kernel.org>
+> CC: Randy Dunlap <rdunlap@infradead.org>
+> CC: Wolfram Sang <wsa@the-dreams.de>
+> CC: Russell King <linux@arm.linux.org.uk>
+> CC: devicetree at vger.kernel.org
+> CC: linux-doc at vger.kernel.org
+> CC: linux-i2c at vger.kernel.org
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  .../devicetree/bindings/i2c/i2c-s3c2410.txt        |    1 +
+>  arch/arm/boot/dts/exynos5250.dtsi                  |    4 +++
+>  arch/arm/boot/dts/exynos5420.dtsi                  |    4 +++
 
-2014-11-21 1:51 GMT+01:00 Vincent Yang <vincent.yang.fujitsu@gmail.com>:
-> Voltage Switch Procedure
->
-> This patch is to fix an issue found on mb86s7x platforms.
->
-> [symptom]
-> There are some UHS-1 SD memory cards sometimes cannot be detected correctly,
-> e.g., Transcend 600x SDXC 64GB UHS-1 memory card.
-> During Signal Voltage Switch Procedure, failure to switch is indicated
-> by the card holding DAT[3:0] low.
->
-> [analysis]
-> According to SD Host Controller Simplified Specification Version 3.00
-> chapter 3.6.1, the Signal Voltage Switch Procedure should be:
-> (1) Check S18A; (2) Issue CMD11; (3) Check CMD 11 response;
-> (4) Stop providing SD clock; (5) Check DAT[3:0] should be 0000b;
-> (6) Set 1.8V Signal Enable; (7) Wait 5ms; (8) Check 1.8V Signal Enable;
-> (9) Provide SD Clock; (10) Wait 1ms; (11) Check DAT[3:0] should be 1111b;
-> (12) error handling
->
-> With CONFIG_MMC_CLKGATE=y, sometimes there is one more gating/un-gating
-> SD clock between (2) and (3). In this case, some UHS-1 SD cards will hold
-> DAT[3:0] 0000b at (11) and thus fails Signal Voltage Switch Procedure.
->
-> [solution]
-> By mmc_host_clk_hold() before CMD11, the additional gating/un-gating
-> SD clock between (2) and (3) can be prevented and thus no failure at (11).
-> It has been verified with many UHS-1 SD cards on mb86s7x platforms and
-> works correctly.
->
-> Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+I usually don't take DTS patches. They should go via arm-soc. Please say
+so if there are reasons I should take them.
 
-Reviewed-by: Johan Rudholm <jrudholm@gmail.com>
+> @@ -1084,6 +1092,23 @@ s3c24xx_i2c_parse_dt(struct device_node *np, struct s3c24xx_i2c *i2c)
+>  	of_property_read_u32(np, "samsung,i2c-slave-addr", &pdata->slave_addr);
+>  	of_property_read_u32(np, "samsung,i2c-max-bus-freq",
+>  				(u32 *)&pdata->frequency);
+> +	/*
+> +	 * Exynos5's legacy i2c controller and new high speed i2c
+> +	 * controller have muxed interrupt sources. By default the
+> +	 * interrupts for 4-channel HS-I2C controller are enabled.
+> +	 * If node for first four channels of legacy i2c controller
 
-BR, Johan
+s/node/nodes/
+
+> +	 * are available then re-configure the interrupts via the
+> +	 * system register.
+> +	 */
+> +	id = of_alias_get_id(np, "i2c");
+> +	i2c->sysreg = syscon_regmap_lookup_by_phandle(np,
+> +			"samsung,sysreg-phandle");
+> +	if (IS_ERR(i2c->sysreg)) {
+> +		/* As this is not compulsory do not return error */
+> +		pr_info("i2c-%d skipping re-configuration of interrutps\n", id);
+
+I'd say drop this message. If you want to keep it, it should be dev_dbg.
+
+> +		return;
+> +	}
+> +	regmap_update_bits(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, BIT(id), 0);
+>  }
+
+Rest looks good, thanks!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141121/a9b5fa9e/attachment.sig>
