@@ -1,20 +1,51 @@
-From: marcel@ziswiler.com (Marcel Ziswiler)
-Date: Fri, 21 Nov 2014 14:30:01 +0100
-Subject: [PATCH] ARM: tegra: colibri t30: fix on-module ethernet
-In-Reply-To: <1416571072.2744.4.camel@localhost.localdomain>
-References: <b1cdc96ce8bb15059d7eea282f6586a826bee124.1416566157.git.marcel@ziswiler.com>
- <1416571072.2744.4.camel@localhost.localdomain>
-Message-ID: <1416576601.2744.11.camel@localhost.localdomain>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 21 Nov 2014 14:33:50 +0100
+Subject: [PATCH] ARM: common: edma: edma_pm_resume may be unused
+In-Reply-To: <4363971.teBOlf16kG@wuerfel>
+References: <4363971.teBOlf16kG@wuerfel>
+Message-ID: <20141121133350.GR27002@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-11-21 at 12:57 +0100, Marcel Ziswiler wrote:
-> Doing automatic power-cycle tests revealed that this is still not enough
-> and a proper reset-cycle might be required. However I don't know as of
-> yet how one can easily do that in mainline with a USB device otherwise
-> not mentioned anywhere in the device tree. Any ideas?
+Hello Arnd,
 
-OK, looks like I need something as follows just wondering how far it can
-go (e.g. not even in -next as of yet):
+On Fri, Nov 21, 2014 at 11:52:51AM +0100, Arnd Bergmann wrote:
+> The recently introduced resume hook in the edma driver
+> is not referenced when CONFIG_PM_SLEEP is not set, which
+> results in a compile warning in keystone_defconfig builds.
+> 
+> This adds an appropriate #ifdef.
+> 
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Daniel Mack <zonque@gmail.com>
+> Cc: Joel Fernandes <joelf@ti.com>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Fixes: a2b1175131: ("ARM: common: edma: add suspend resume hook")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> I'm applying this as the obvious fixup on top of the next/drivers
+> branch.
+> 
+> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+> index 24a2857f2285..5662a872689b 100644
+> --- a/arch/arm/common/edma.c
+> +++ b/arch/arm/common/edma.c
+> @@ -1810,6 +1810,7 @@ static int edma_probe(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_PM_SLEEP
+>  static int edma_pm_resume(struct device *dev)
+What about
 
-http://thread.gmane.org/gmane.linux.kernel/1682436
+-static int edma_pm_resume(struct device *dev)
++static int __maybe_unused edma_pm_resume(struct device *dev)
+
+instead?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
