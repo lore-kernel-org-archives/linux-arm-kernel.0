@@ -1,27 +1,75 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Fri, 21 Nov 2014 14:10:36 +0100
-Subject: [PATCH v4 3/6] mfd: ti_am335x_tscadc: Remove unwanted
- reg_se_cache save
-In-Reply-To: <546F2BA4.4000808@ti.com>
-References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
- <1415941651-28962-4-git-send-email-vigneshr@ti.com>
- <20141118143005.GF24004@x1> <20141118171240.GB3003@dtor-ws>
- <546DF2F0.9080405@ti.com>
- <20141120144028.GB5809@localhost.localdomain>
- <546F2BA4.4000808@ti.com>
-Message-ID: <20141121131036.GA18931@localhost.localdomain>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Fri, 21 Nov 2014 14:18:21 +0100
+Subject: [PATCH v4 1/2] of: Rename "poweroff-source" property to
+ "system-power-controller"
+In-Reply-To: <20141121105951.GA20679@localhost>
+References: <1415885699-1465-1-git-send-email-user@radxa>
+ <1415885699-1465-2-git-send-email-user@radxa>
+ <20141121105951.GA20679@localhost>
+Message-ID: <CABgxDoLy-+a7TAm7VWo5pYF7xZv4SM9=Zjcd1V6khnRqZbsFAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 05:40:12PM +0530, Sekhar Nori wrote:
-> Not sure how to reproduce the jumping on pen-up.
+2014-11-21 11:59 GMT+01:00 Johan Hovold <johan@kernel.org>:
+> On Thu, Nov 13, 2014 at 01:34:58PM +0000, Auto Configured wrote:
+>> From: Romain Perier <romain.perier@gmail.com>
+>>
+>> It reverts commit a4b4e0461ec5 ("of: Add standard property for poweroff capability").
+>> As discussed on the mailing list, it makes more sense to rename back to the
+>> old established property name, without the vendor prefix. Problem being that
+>> the word "source" usually tends to be used for inputs and that is out of control
+>> of the OS. The poweroff capability is an output which simply turns the
+>> system-power off. Also, this property might be used by drivers which power-off
+>> the system and power back on subsequent RTC alarms. This seems to suggest to
+>> remove "poweroff" from the property name and to choose "system-power-controller"
+>> as the more generic name. This patchs adds the required renaming changes and
+>> defines an helper function which is compatible with both properties, the old one
+>> which was only used by tps65910 and the new one without vendor-prefix.
+>
+> Now this is a bit of a mess.
+>
+> There's a commit in the mfd tree, 25f833c1171d ("mfd: tps65910: Convert
+> ti,system-power-controller DT property to poweroff-source"), which
+> breaks all dts using tps65910 since these are never updated to the now
+> retracted property name ("poweroff-source").
 
-Does the cursor stay in exactly the same spot when you lift up the
-stylus? Then you don't have the issue.
+No seriously ? yes, this is why I ask for feedbacks since 3 weeks... ^^
 
-On the BB white using the LCD4 cape and the shipped debian kernel, the
-cursor *does* jump away, but not as often or as far as on the custom
-design I was working with.
+>
+> This one should simply be reverted ASAP.
+>
+>> Signed-off-by: Romain Perier <romain.perier@gmail.com>
+>> ---
+>>  .../bindings/power/{poweroff.txt => power-controller.txt}        | 0
+>>  .../devicetree/bindings/regulator/act8865-regulator.txt          | 4 ++--
+>>  drivers/mfd/tps65910.c                                           | 9 ++++++++-
+>>  drivers/regulator/act8865-regulator.c                            | 2 +-
+>>  include/linux/of.h                                               | 6 +++---
+>>  5 files changed, 14 insertions(+), 7 deletions(-)
+>
+> Romain, what tree is this patch against? The changes to the tps65910
+> driver appears not to even be in the regulator tree, yet you asked Mark
+> to merge this. And the MFD maintainer is not even on CC.
+
+
+I work with linux-next, this patch is present in that tree. If I
+remember correctly, it was merged by Lee Jones (so it was merged onto
+the mfd tree)
+
+>
+> Let's fix the breakage by reverting the offending commit in mfd. Then the
+> new standard name can be introduced in regulator alone (e.g. this patch
+> without the tps65910 bits) as nothing outside of regulator should be
+> using the new power-off feature (or binding) for act8865. Then other
+> drivers and dts can be converted to use the new property name (while
+> retaining backwards compatibility) for 3.20.
+>
+> [ We should probably also consider adding an "of_device_is_" prefix to
+> the helper name for consistency. ]
+>
+> Johan
+
+Maintainers, Mark, Grant, Lee, what do you think ?
 
 Thanks,
-Richard
+Romain
