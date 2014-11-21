@@ -1,57 +1,57 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 21 Nov 2014 16:24:27 +0000
-Subject: [PATCH v2 2/2] arm64: perf: Prevent wraparound during overflow
-In-Reply-To: <1416587067-3220-1-git-send-email-daniel.thompson@linaro.org>
-References: <1416412346-8759-1-git-send-email-daniel.thompson@linaro.org>
- <1416587067-3220-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1416587067-3220-3-git-send-email-daniel.thompson@linaro.org>
+From: Suravee.Suthikulpanit@amd.com (Suthikulpanit, Suravee)
+Date: Fri, 21 Nov 2014 16:25:55 +0000
+Subject: [PATCH V3] arm64: amd-seattle: Adding device tree for AMD
+ Seattle platform
+In-Reply-To: <546F50BD.8070501@arm.com>
+Message-ID: <D09577B0.9B9B%suravee.suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the overflow threshold for a counter is set above or near the
-0xffffffff boundary then the kernel may lose track of the overflow
-causing only events that occur *after* the overflow to be recorded.
-Specifically the problem occurs when the value of the performance counter
-overtakes its original programmed value due to wrap around.
 
-Typical solutions to this problem are either to avoid programming in
-values likely to be overtaken or to treat the overflow bit as the 33rd
-bit of the counter.
 
-Its somewhat fiddly to refactor the code to correctly handle the 33rd bit
-during irqsave sections (context switches for example) so instead we take
-the simpler approach of avoiding values likely to be overtaken.
+On 11/21/14, 21:48, "Marc Zyngier" <marc.zyngier@arm.com> wrote:
 
-We set the limit to half of max_period because this matches the limit
-imposed in __hw_perf_event_init(). This causes a doubling of the interrupt
-rate for large threshold values, however even with a very fast counter
-ticking at 4GHz the interrupt rate would only be ~1Hz.
+>On 21/11/14 14:40, Suthikulpanit, Suravee wrote:
+>> 
+>> 
+>> On 11/21/14, 19:57, "Marc Zyngier" <marc.zyngier@arm.com> wrote:
+>> 
+>>>> +	gic: interrupt-controller at e1101000 {
+>>>> +		compatible = "arm,gic-400", "arm,cortex-a15-gic";
+>>>> +		interrupt-controller;
+>>>> +		#interrupt-cells = <3>;
+>>>> +		#address-cells = <2>;
+>>>> +		#size-cells = <2>;
+>>>> +		reg = <0x0 0xe1110000 0 0x1000>,
+>>>> +		      <0x0 0xe112f000 0 0x2000>,
+>>>> +		      <0x0 0xe1140000 0 0x10000>,
+>>>> +		      <0x0 0xe1160000 0 0x10000>;
+>>>> +		interrupts = <1 8 0xf04>;
+>>>
+>>> Are you sure about this one? ARM systems usually have this wired on
+>>>PPI9
+>>> (interrupt 25)...
+>>>
+>>> Thanks,
+>>>
+>>> 	M.
+>> 
+>> I think you might be right. GIC-400 TRM says that this is should be
+>> 25, and used for virtual maintenance interrupts. How can I verify
+>> this in Linux? KVM?
+>
+>KVM is one way, but you'll never see the interrupt firing (we kill the
+>interrupt while in HYP, before the kernel gets a chance to see it).
+>
+>If you effectively have GIC400 on this system, then I know for sure this
+>is interrupt 25.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm64/kernel/perf_event.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+I?ll make the change. Thanks for clarification.
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index aa29ecb4f800..25a5308744b1 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -169,8 +169,14 @@ armpmu_event_set_period(struct perf_event *event,
- 		ret = 1;
- 	}
- 
--	if (left > (s64)armpmu->max_period)
--		left = armpmu->max_period;
-+	/*
-+	 * Limit the maximum period to prevent the counter value
-+	 * from overtaking the one we are about to program. In
-+	 * effect we are reducing max_period to account for
-+	 * interrupt latency (and we are being very conservative).
-+	 */
-+	if (left > (armpmu->max_period >> 1))
-+		left = armpmu->max_period >> 1;
- 
- 	local64_set(&hwc->prev_count, (u64)-left);
- 
--- 
-1.9.3
+Suravee
+>
+>Thanks,
+>
+>	M.
+>-- 
+>Jazz is not dead. It just smells funny...
