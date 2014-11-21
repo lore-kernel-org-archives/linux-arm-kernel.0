@@ -1,284 +1,45 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 21 Nov 2014 14:53:23 +0000
-Subject: [PATCH] arm: perf: Directly handle SMP platforms with one SPI
-Message-ID: <1416581603-30557-1-git-send-email-daniel.thompson@linaro.org>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Fri, 21 Nov 2014 14:58:47 +0000
+Subject: [PATCH v5.5] of/fdt: export fdt blob as /sys/firmware/fdt
+In-Reply-To: <1416421971.23886.71.camel@smoke>
+References: <1415984735-32388-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20141118165145.4F6A8C40966@trevor.secretlab.ca>
+ <20141118172545.GC14323@leverpostej>
+ <20141118221103.4ECB3C40966@trevor.secretlab.ca>
+ <1416402576.29243.35.camel@citrix.com>
+ <1416421971.23886.71.camel@smoke>
+Message-ID: <CACxGe6tGdJOop8m3zVU4DKginT=BxpLFjfV35QX_8JLiUhtZ3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some ARM platforms mux the PMU interrupt of every core into a single
-SPI. On such platforms if the PMU of any core except 0 raises an interrupt
-then it cannot be serviced and eventually, if you are lucky, the spurious
-irq detection might forcefully disable the interrupt.
+On Wed, Nov 19, 2014 at 6:32 PM, Geoff Levand <geoff.levand@linaro.org> wrote:
+> Hi Ian,
+>
+> On Wed, 2014-11-19 at 13:09 +0000, Ian Campbell wrote:
+>> On Tue, 2014-11-18 at 22:11 +0000, Grant Likely wrote:
+>> > > > * It also helps with exposing the reserved map to userspace, but kexec
+>> > > >   has done without that feature for years, and it is in the process of
+>> > > >   being deprecated in favour of /reserved-memory anyway.
+>> > >
+>> > > This is the first I'd heard of the reserve map being deprecated, and
+>> > > we're going to have DTs with reserved map entries for a long time going
+>> > > forwards.
+>> >
+>> > Deprecated, not removed or disabled. It will still work pretty much
+>> > forever, but users should be encouraged to move to the reserve-memory
+>> > tree.
+>>
+>> I'm curious why that should be for the "OS should never touch this, here
+>> be dragons" type memory, what are the benefits of the new scheme in that
+>> case?
+>
+> /memreserve/ device tree entries are not available in /proc/device-tree,
+> but reserved-memory nodes are.  Some solution is needed to get all
+> reserved memory info into the dtb passed to the second stage kernel
+> during a kexec re-boot.
 
-On these SoCs it is not possible to determine which core raised the
-interrupt so workaround this issue by queuing irqwork on the other
-cores whenever the primary interrupt handler is unable to service the
-interrupt.
+We could also add a file to export the memreserve sections, but now
+that we've got the whole DTB exported, I think it should be fine for
+that also to be the interface for obtaining memreserve.
 
-The u8500 platform has an alternative workaround that dynamically alters
-the affinity of the PMU interrupt. This workaround logic is no longer
-required so the original code is removed as is the hook it relied upon.
-
-Tested on imx6q (which has fours cores/PMUs all muxed to a single SPI).
-
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
-
-Notes:
-    Thanks to Lucas Stach, Russell King and Thomas Gleixner for critiquing
-    an older, completely different way to tackle the same problem.
-    
-
- arch/arm/include/asm/pmu.h       | 10 +++++
- arch/arm/kernel/perf_event.c     | 11 ++---
- arch/arm/kernel/perf_event_cpu.c | 94 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-ux500/cpu-db8500.c | 29 -------------
- 4 files changed, 107 insertions(+), 37 deletions(-)
-
-diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-index 0b648c541293..36472c3cc283 100644
---- a/arch/arm/include/asm/pmu.h
-+++ b/arch/arm/include/asm/pmu.h
-@@ -81,6 +81,12 @@ struct pmu_hw_events {
- 	raw_spinlock_t		pmu_lock;
- };
-
-+struct arm_pmu_work {
-+	struct irq_work work;
-+	struct arm_pmu *arm_pmu;
-+	atomic_t ret;
-+};
-+
- struct arm_pmu {
- 	struct pmu	pmu;
- 	cpumask_t	active_irqs;
-@@ -101,6 +107,7 @@ struct arm_pmu {
- 	void		(*reset)(void *);
- 	int		(*request_irq)(struct arm_pmu *, irq_handler_t handler);
- 	void		(*free_irq)(struct arm_pmu *);
-+	irqreturn_t	(*handle_irq_none)(struct arm_pmu *);
- 	int		(*map_event)(struct perf_event *event);
- 	int		num_events;
- 	atomic_t	active_events;
-@@ -108,6 +115,9 @@ struct arm_pmu {
- 	u64		max_period;
- 	struct platform_device	*plat_device;
- 	struct pmu_hw_events	*(*get_hw_events)(void);
-+	int             single_irq;
-+	struct arm_pmu_work __percpu *work;
-+	atomic_t        remaining_work;
- };
-
- #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index b50a770f8c99..0792c913b9bb 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -306,22 +306,17 @@ validate_group(struct perf_event *event)
- static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
- {
- 	struct arm_pmu *armpmu;
--	struct platform_device *plat_device;
--	struct arm_pmu_platdata *plat;
- 	int ret;
- 	u64 start_clock, finish_clock;
-
- 	if (irq_is_percpu(irq))
- 		dev = *(void **)dev;
- 	armpmu = dev;
--	plat_device = armpmu->plat_device;
--	plat = dev_get_platdata(&plat_device->dev);
-
- 	start_clock = sched_clock();
--	if (plat && plat->handle_irq)
--		ret = plat->handle_irq(irq, dev, armpmu->handle_irq);
--	else
--		ret = armpmu->handle_irq(irq, dev);
-+	ret = armpmu->handle_irq(irq, dev);
-+	if (ret == IRQ_NONE && armpmu->handle_irq_none)
-+		ret = armpmu->handle_irq_none(dev);
- 	finish_clock = sched_clock();
-
- 	perf_sample_event_took(finish_clock - start_clock);
-diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index eb2c4d55666b..e7153dc3b489 100644
---- a/arch/arm/kernel/perf_event_cpu.c
-+++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -88,6 +88,75 @@ static void cpu_pmu_disable_percpu_irq(void *data)
- 	disable_percpu_irq(irq);
- }
-
-+/*
-+ * Workaround logic that is distributed to all cores if the PMU has only
-+ * a single IRQ and the CPU receiving that IRQ cannot handle it. Its
-+ * job is to try to service the interrupt on the current CPU. It will
-+ * also enable the IRQ again if all the other CPUs have already tried to
-+ * service it.
-+ */
-+static void cpu_pmu_do_percpu_work(struct irq_work *w)
-+{
-+	struct arm_pmu_work *work = container_of(w, struct arm_pmu_work, work);
-+	struct arm_pmu *cpu_pmu = work->arm_pmu;
-+
-+	atomic_set(&work->ret,
-+		   cpu_pmu->handle_irq(cpu_pmu->single_irq, cpu_pmu));
-+
-+	if (atomic_dec_and_test(&cpu_pmu->remaining_work))
-+		enable_irq(cpu_pmu->single_irq);
-+}
-+
-+/*
-+ * This callback, which is enabled only on SMP platforms that are
-+ * running with a single IRQ, is called when the PMU handler running in
-+ * the current CPU cannot service the interrupt.
-+ *
-+ * It will disable the interrupt and distribute irqwork to all other
-+ * processors in the system. Hopefully one of them will clear the
-+ * interrupt...
-+ */
-+static irqreturn_t cpu_pmu_handle_irq_none(struct arm_pmu *cpu_pmu)
-+{
-+	int num_online = num_online_cpus();
-+	irqreturn_t ret = IRQ_NONE;
-+	int cpu, cret;
-+
-+	if (num_online <= 1)
-+		return IRQ_NONE;
-+
-+	disable_irq_nosync(cpu_pmu->single_irq);
-+	atomic_add(num_online, &cpu_pmu->remaining_work);
-+	smp_mb__after_atomic();
-+
-+	for_each_online_cpu(cpu) {
-+		struct arm_pmu_work *work = per_cpu_ptr(cpu_pmu->work, cpu);
-+
-+		if (cpu == smp_processor_id())
-+			continue;
-+
-+		/*
-+		 * We can be extremely relaxed about memory ordering
-+		 * here. All we are doing is gathering information
-+		 * about the past to help us give a return value that
-+		 * will keep the spurious interrupt detector both happy
-+		 * *and* functional. We are not shared so we can
-+		 * tolerate the occasional spurious IRQ_HANDLED.
-+		 */
-+		cret = atomic_read(&work->ret);
-+		if (cret != IRQ_NONE)
-+			ret = cret;
-+
-+		if (!irq_work_queue_on(&work->work, cpu))
-+			atomic_dec(&cpu_pmu->remaining_work);
-+	}
-+
-+	if (atomic_dec_and_test(&cpu_pmu->remaining_work))
-+		enable_irq(cpu_pmu->single_irq);
-+
-+	return ret;
-+}
-+
- static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
- {
- 	int i, irq, irqs;
-@@ -107,6 +176,9 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
- 			if (irq >= 0)
- 				free_irq(irq, cpu_pmu);
- 		}
-+
-+		cpu_pmu->handle_irq_none = cpu_pmu_handle_irq_none;
-+		free_percpu(cpu_pmu->work);
- 	}
- }
-
-@@ -162,6 +234,28 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
-
- 			cpumask_set_cpu(i, &cpu_pmu->active_irqs);
- 		}
-+
-+		/*
-+		 * If we are running SMP and have only one interrupt source
-+		 * then get ready to share that single irq among the cores.
-+		 */
-+		if (nr_cpu_ids > 1 && irqs == 1) {
-+			cpu_pmu->single_irq = platform_get_irq(pmu_device, 0);
-+			cpu_pmu->work = alloc_percpu(struct arm_pmu_work);
-+			if (!cpu_pmu->work) {
-+				pr_err("no memory for shared IRQ workaround\n");
-+				return -ENOMEM;
-+			}
-+
-+			for_each_possible_cpu(i) {
-+				struct arm_pmu_work *w =
-+				    per_cpu_ptr(cpu_pmu->work, i);
-+				init_irq_work(&w->work, cpu_pmu_do_percpu_work);
-+				w->arm_pmu = cpu_pmu;
-+			}
-+
-+			cpu_pmu->handle_irq_none = cpu_pmu_handle_irq_none;
-+		}
- 	}
-
- 	return 0;
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 6f63954c8bde..917774999c5c 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -12,8 +12,6 @@
- #include <linux/init.h>
- #include <linux/device.h>
- #include <linux/amba/bus.h>
--#include <linux/interrupt.h>
--#include <linux/irq.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/mfd/abx500/ab8500.h>
-@@ -23,7 +21,6 @@
- #include <linux/regulator/machine.h>
- #include <linux/random.h>
-
--#include <asm/pmu.h>
- #include <asm/mach/map.h>
-
- #include "setup.h"
-@@ -99,30 +96,6 @@ static void __init u8500_map_io(void)
- 		iotable_init(u8500_io_desc, ARRAY_SIZE(u8500_io_desc));
- }
-
--/*
-- * The PMU IRQ lines of two cores are wired together into a single interrupt.
-- * Bounce the interrupt to the other core if it's not ours.
-- */
--static irqreturn_t db8500_pmu_handler(int irq, void *dev, irq_handler_t handler)
--{
--	irqreturn_t ret = handler(irq, dev);
--	int other = !smp_processor_id();
--
--	if (ret == IRQ_NONE && cpu_online(other))
--		irq_set_affinity(irq, cpumask_of(other));
--
--	/*
--	 * We should be able to get away with the amount of IRQ_NONEs we give,
--	 * while still having the spurious IRQ detection code kick in if the
--	 * interrupt really starts hitting spuriously.
--	 */
--	return ret;
--}
--
--static struct arm_pmu_platdata db8500_pmu_platdata = {
--	.handle_irq		= db8500_pmu_handler,
--};
--
- static const char *db8500_read_soc_id(void)
- {
- 	void __iomem *uid = __io_address(U8500_BB_UID_BASE);
-@@ -143,8 +116,6 @@ static struct device * __init db8500_soc_device_init(void)
- }
-
- static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
--	/* Requires call-back bindings. */
--	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
- 	/* Requires DMA bindings. */
- 	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80123000,
- 		       "ux500-msp-i2s.0", &msp0_platform_data),
---
-1.9.3
+g.
