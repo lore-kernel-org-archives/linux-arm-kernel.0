@@ -1,53 +1,92 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Fri, 21 Nov 2014 12:34:31 +0000
-Subject: [PATCH v9 00/10] sched: consolidation of CPU capacity and usage
-In-Reply-To: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
-References: <1415033687-23294-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20141121123430.GA23177@e105550-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Nov 2014 13:48:09 +0100
+Subject: For the problem when using swiotlb
+In-Reply-To: <20141121093509.GA19783@e104818-lin.cambridge.arm.com>
+References: <5469E26B.2010905@huawei.com> <2522857.bNQToYpBNt@wuerfel>
+ <20141121093509.GA19783@e104818-lin.cambridge.arm.com>
+Message-ID: <5029442.vhLMp7Ns7F@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 03, 2014 at 04:54:37PM +0000, Vincent Guittot wrote:
-> This patchset consolidates several changes in the capacity and the usage
-> tracking of the CPU. It provides a frequency invariant metric of the usage of
-> CPUs and generally improves the accuracy of load/usage tracking in the
-> scheduler. The frequency invariant metric is the foundation required for the
-> consolidation of cpufreq and implementation of a fully invariant load tracking.
-> These are currently WIP and require several changes to the load balancer
-> (including how it will use and interprets load and capacity metrics) and
-> extensive validation. The frequency invariance is done with
-> arch_scale_freq_capacity and this patchset doesn't provide the backends of
-> the function which are architecture dependent.
+On Friday 21 November 2014 09:35:10 Catalin Marinas wrote:
+> On Thu, Nov 20, 2014 at 07:40:00AM +0000, Arnd Bergmann wrote:
+> > On Thursday 20 November 2014 10:57:53 Ding Tianhong wrote:
 > 
-> As discussed at LPC14, Morten and I have consolidated our changes into a single
-> patchset to make it easier to review and merge.
+> But this wouldn't help Ding's case, here the driver needs to set the
+> wider DMA mask.
 > 
-> During load balance, the scheduler evaluates the number of tasks that a group
-> of CPUs can handle. The current method assumes that tasks have a fix load of
-> SCHED_LOAD_SCALE and CPUs have a default capacity of SCHED_CAPACITY_SCALE.
-> This assumption generates wrong decision by creating ghost cores or by
-> removing real ones when the original capacity of CPUs is different from the
-> default SCHED_CAPACITY_SCALE. With this patch set, we don't try anymore to
-> evaluate the number of available cores based on the group_capacity but instead
-> we evaluate the usage of a group and compare it with its capacity.
-> 
-> This patchset mainly replaces the old capacity_factor method by a new one and
-> keeps the general policy almost unchanged. These new metrics will be also used
-> in later patches.
-> 
-> The CPU usage is based on a running time tracking version of the current
-> implementation of the load average tracking. I also have a version that is
-> based on the new implementation proposal [1] but I haven't provide the patches
-> and results as [1] is still under review. I can provide change above [1] to
-> change how CPU usage is computed and to adapt to new mecanism.
-> 
-> Change since V8
->  - reorder patches
+> Anyway, back to your point, to make sure I understand what you meant (I
+> can send a proper patch with log afterwards):
 
-I think the patch set is in a good shape. I have got few comments and
-suggestions mostly minor things and things related to naming to the
-first 7 patches. I haven't found any problems with the code itself. I
-haven't tested it yet though. The last three patches I have a few
-questions for.
+Thanks for putting this into code!
 
-Morten
+> @@ -88,11 +89,24 @@ static inline int dma_set_mask(struct device *dev, u64 mask)
+>  {
+>  	if (!dev->dma_mask || !dma_supported(dev, mask))
+>  		return -EIO;
+> +	/* if asking for bigger dma mask, limit it to the bus dma ranges */
+> +	if (mask > *dev->dma_mask)
+> +		mask &= of_dma_get_range_mask(dev);
+>  	*dev->dma_mask = mask;
+>  
+>  	return 0;
+>  }
+
+As you commented later, the dma_supported check indeed needs to happen
+after the masking.
+
+> +static inline int dma_set_coherent_mask(struct device *dev, u64 mask)
+> +{
+> +	if (!dma_supported(dev, mask))
+> +		return -EIO;
+> +	if (mask > dev->coherent_dma_mask)
+> +		mask &= of_dma_get_range_mask(dev);
+> +	dev->coherent_dma_mask = mask;
+> +	return 0;
+> +}
+
+There is an interesting side problem here: the dma mask points to
+coherent_dma_mask for all devices probed from DT, so this breaks
+if we have any driver that sets them to different values. It is a
+preexisting problem them.
+
+>  EXPORT_SYMBOL_GPL(of_dma_get_range);
+>  
+> +u64 of_dma_get_range_mask(struct device *dev)
+> +{
+> +	u64 dma_addr, paddr, size;
+> +
+> +	/* no dma mask limiting if no of_node or no dma-ranges property */
+> +	if (!dev->of_node ||
+> +	    of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size) < 0)
+> +		return DMA_BIT_MASK(64);
+
+If no dma-ranges are present, we should assume that the bus only supports
+32-bit DMA, or we could make it architecture specific. It would probably
+be best for arm64 to require a dma-ranges property for doing any DMA
+at all, but we can't do that on arm32 any more now.
+
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index 3b64d0bf5bba..50d1ac4739e6 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -200,6 +200,10 @@ static void of_dma_configure(struct device *dev)
+>  	/* DMA ranges found. Calculate and set dma_pfn_offset */
+>  	dev->dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
+>  	dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
+> +
+> +	/* limit the coherent_dma_mask to the dma-ranges size property */
+
+I would change the comment to clarify that we are actually changing
+the dma_mask here as well.
+
+> +	if (size < (1ULL << 32))
+> +		dev->coherent_dma_mask = DMA_BIT_MASK(ilog2(size));
+>  }
+>  
+
+
+As you mentioned in another mail in this thread, we wouldn't be
+able to suuport this case on arm64.
+
+	Arnd
