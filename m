@@ -1,107 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Nov 2014 18:04:28 +0100
-Subject: For the problem when using swiotlb
-In-Reply-To: <20141121165708.GF19783@e104818-lin.cambridge.arm.com>
-References: <5469E26B.2010905@huawei.com> <5029442.vhLMp7Ns7F@wuerfel>
- <20141121165708.GF19783@e104818-lin.cambridge.arm.com>
-Message-ID: <2530749.roRsteyaXx@wuerfel>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 21 Nov 2014 18:09:27 +0100
+Subject: arm: pxa: CPU_PXA27x?
+In-Reply-To: <87vbm85wjs.fsf@free.fr>
+References: <1416566627.6958.16.camel@x220> <87vbm85wjs.fsf@free.fr>
+Message-ID: <1416589767.1114.9.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 November 2014 16:57:09 Catalin Marinas wrote:
-> On Fri, Nov 21, 2014 at 12:48:09PM +0000, Arnd Bergmann wrote:
-> > On Friday 21 November 2014 09:35:10 Catalin Marinas wrote:
-> > > +static inline int dma_set_coherent_mask(struct device *dev, u64 mask)
-> > > +{
-> > > +	if (!dma_supported(dev, mask))
-> > > +		return -EIO;
-> > > +	if (mask > dev->coherent_dma_mask)
-> > > +		mask &= of_dma_get_range_mask(dev);
-> > > +	dev->coherent_dma_mask = mask;
-> > > +	return 0;
-> > > +}
-> > 
-> > There is an interesting side problem here: the dma mask points to
-> > coherent_dma_mask for all devices probed from DT, so this breaks
-> > if we have any driver that sets them to different values. It is a
-> > preexisting problem them.
+On Fri, 2014-11-21 at 17:48 +0100, Robert Jarzmik wrote:
+> Paul Bolle <pebolle@tiscali.nl> writes:
+> > Your commit 03ec7fe70c5c ("arm: pxa: add pxa27x device-tree support") is
+> > included in today's linux-next (ie, next-20141121). It adds a select
+> > statement for CPU_PXA27x. But there's no Kconfig symbol CPU_PXA27x.
+> Ah yes, you're perfectly right, CPU_PXA27x was not the one, it was PXA27x, sic
+> ..
 > 
-> Such drivers would have to set both masks separately (or call
-> dma_set_mask_and_coherent). What we assume though is that dma-ranges
-> refers to both dma_mask and coherent_dma_mask. I don't think that would
-> be a problem for ARM systems.
+> >
+> > Why is that select needed? For what it's worth: __cpu_is_pxa27x()
+> > compiles to something interesting if CONFIG_PXA27x is defined.
+> You mean "is not defined", right ?
 
-Right, I'm just saying that we don't have a way to detect drivers that
-break this assumption, not that we have a serious problem already.
+Perhaps I was ambiguous. This referred to these lines in
+arch/arm/mach-pxa/include/mach/hardware.h:
+    #ifdef CONFIG_PXA27x
+    #define __cpu_is_pxa27x(id)                             \
+            ({                                              \
+                    unsigned int _id = (id) >> 4 & 0xfff;   \
+                    _id == 0x411;                           \
+            })
+    #else
+    #define __cpu_is_pxa27x(id)     (0)
+    #endif
 
-> > >  EXPORT_SYMBOL_GPL(of_dma_get_range);
-> > >  
-> > > +u64 of_dma_get_range_mask(struct device *dev)
-> > > +{
-> > > +	u64 dma_addr, paddr, size;
-> > > +
-> > > +	/* no dma mask limiting if no of_node or no dma-ranges property */
-> > > +	if (!dev->of_node ||
-> > > +	    of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size) < 0)
-> > > +		return DMA_BIT_MASK(64);
-> > 
-> > If no dma-ranges are present, we should assume that the bus only supports
-> > 32-bit DMA, or we could make it architecture specific. It would probably
-> > be best for arm64 to require a dma-ranges property for doing any DMA
-> > at all, but we can't do that on arm32 any more now.
+But you needed PXA27x anyway, so this seems moot now.
+
+> That (CONFIG_PXA27x) select is needed because without it the arm cpu
+> architecture is not selected, ie. CONFIG_CPU_XSCALE is not set. And this in turn
+> is needed to choose the basic arm operations like TLB handling, cache handling,
+> etc ... You cannot compile a single platform kernel without this.
 > 
-> I thought about this but it could break some existing arm64 DT files if
-> we mandate dma-ranges property (we could try though). The mask limiting
-> is arch-specific anyway.
+> As a poor excuse, I hadn't seen this because this resulted from a poor merge
+> resolution which brought in both "select PXA27x" and "select CPU_PXA27x".
 
-Yes, this has taken far too long to get addressed, we should have added
-the properties right from the start. If we have a function in architecture
-specific code, maybe we can just check for the short list of already
-supported platforms that need backwards compatibility and require the
-mask for everything else?
+Stuff happens. Would my patch have been included you might have seen the
+warning and this thread wouldn't exist.
 
-> > > diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> > > index 3b64d0bf5bba..50d1ac4739e6 100644
-> > > --- a/drivers/of/platform.c
-> > > +++ b/drivers/of/platform.c
-> > > @@ -200,6 +200,10 @@ static void of_dma_configure(struct device *dev)
-> > >  	/* DMA ranges found. Calculate and set dma_pfn_offset */
-> > >  	dev->dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
-> > >  	dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
-> > > +
-> > > +	/* limit the coherent_dma_mask to the dma-ranges size property */
-> > 
-> > I would change the comment to clarify that we are actually changing
-> > the dma_mask here as well.
-> > 
-> > > +	if (size < (1ULL << 32))
-> > > +		dev->coherent_dma_mask = DMA_BIT_MASK(ilog2(size));
-> > >  }
-> > 
-> > As you mentioned in another mail in this thread, we wouldn't be
-> > able to suuport this case on arm64.
-> 
-> The mask would still be valid and even usable if an IOMMU is present. Do
-> you mean we should not limit it at all here?
+> > In https://lkml.org/lkml/2014/9/30/578 I proposed a patch that emits a
+> > warning in cases like this. Like _all_ Kconfig related patches I've seen
+> > flying by lately it appears to be dropped in /dev/null. What's going on?
+> For that one I don't know.
 
-The code is certainly correct on arm32, as long as we have an appropriate
-DMA zone.
+Here I'm dragging you into a discussion about something that's been
+bugging me for a while now. Hence the addresses that have nothing to do
+with pxa in Cc:.
 
-> There is a scenario where smaller mask would work on arm64. For example
-> Juno, you can have 2GB of RAM in the 32-bit phys range (starting at
-> 0x80000000). A device with 31-bit mask and a dma_pfn_offset of
-> 0x80000000 would still work (there isn't any but just as an example). So
-> the check in dma_alloc_coherent() would be something like:
-> 
-> 	phys_to_dma(top of ZONE_DMA) - dma_pfn_offset <= coherent_dma_mask
-> 
-> (or assuming RAM starts at 0 and ignoring dma_pfn_offset for now)
-> 
-> If the condition above fails, dma_alloc_coherent() would no longer fall
-> back to swiotlb but issue a dev_warn() and return NULL.
+> Ah, and yes I'll send an update patch to remove the "select CPU_PXA27x", thanks
+> for noticing this.
 
-Ah, that looks like it should work on all architectures, very nice.
-How about checking this condition, and then printing a small warning
-(dev_warn, not WARN_ON) and setting the dma_mask pointer to NULL?
+Great!
 
-	Arnd
+
+Paul Bolle
