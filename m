@@ -1,65 +1,48 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Fri, 21 Nov 2014 10:03:44 +0800
-Subject: Removal of bus->msi assignment breaks MSI with stacked domains
-In-Reply-To: <alpine.DEB.2.11.1411210233250.6439@nanos>
-References: <546E1771.4030201@arm.com> <546E93DC.8010902@huawei.com>
- <alpine.DEB.2.11.1411210233250.6439@nanos>
-Message-ID: <546E9D80.3090405@linux.intel.com>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Thu, 20 Nov 2014 20:08:14 -0600
+Subject: [PATCH] irqdomain: Fix NULL pointer dererence in
+ irq_domain_free_irqs_parent
+In-Reply-To: <alpine.DEB.2.11.1411210219370.6439@nanos>
+References: <1416531745-24661-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <alpine.DEB.2.11.1411210219370.6439@nanos>
+Message-ID: <546E9E8E.5000303@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/11/21 9:46, Thomas Gleixner wrote:
-> On Fri, 21 Nov 2014, Yijing Wang wrote:
->> On 2014/11/21 0:31, Marc Zyngier wrote:
->>> Bjorn, Yijing,
->>>
->>> I've just realized that patch c167caf8d174 (PCI/MSI: Remove useless
->>> bus->msi assignment) completely breaks MSI on arm64 when using the new
->>> MSI stacked domain:
->>
->> Sorry, this is my first part to refactor MSI related code, now how
->> to get pci msi_controller depends arch
->> functions(pcibios_msi_controller() or arch_setup_msi_irq()), we are
->> working on generic pci_host_bridge, after that, we could eventually
->> eliminate MSI arch functions and find pci dev 's msi controller by
->> pci_host_bridge->get_msi_controller().
-> 
-> The main question is why you think that pci_host_bridge is the proper
-> place to store that information.
-> 
-> On x86 we have DMAR units associated to a single device. Each DMAR
-> unit is a seperate MSI irq domain. 
-> 
-> Can you guarantee that the pci_host_bridge is the right point to
-> provide the association of the device to the irq domain?
-> 
-> So the real question is:
-> 
->    What is the association level requirement to properly identify the
->    irqdomain for a specific device on any given architecture with and
->    without IOMMU, interrupt redirection etc.
-> 
-> To be honest: I don't know.
-> 
-> My gut feeling tells me that it's at the device level, but I really
-> leave that decision to the experts in that field.
-Hi Thomas and Yijing,
-	Since we are allocating interrupts for a PCI device, it's
-natural to get irqdomain from the PCI device itself. If we try to
-get irqdomain from a PCI bus or host bridge like
-pci_get_msi_irqdomain(bus or hostbridge), it may fail for x86
-because x86 may build per-device irqdomain theoretically.
-So the preferred interface prototype is:
-	pci_get_msi_irqdomain(pci_dev) or
-	pcibios_msi_controller(pci_dev)
-It's flexible enough. For architectures on which irqdomain is
-associated with PCI bus or host bridge, you could get the bus
-or host bridge from pci_dev. And it won't cause extra computation
-because you always need to get bus or host bridge from the pci_dev.
-Regards!
-Gerry
-> 
-> Thanks,
-> 
-> 	tglx
-> 
+On 11/20/2014 07:32 PM, Thomas Gleixner wrote:
+> On Thu, 20 Nov 2014, suravee.suthikulpanit at amd.com wrote:
+>> This patch checks if the parent domain is NULL before recursively freeing
+>> irqs in the parent domains.
+>
+> Which is nonsense, because if the thing has not been allocated in the
+> first place, then it cannot explode in the free path magically, except
+> there is a missing check in the allocation path error handling.
+>
+> And that's obviously not the case simply because this originates from:
+>> [<fffffe0000449278>] pci_disable_msix+0x40/0x50
+>
+
+Thomas,
+
+In this case, I have the following irq domain hierarchy:
+
+[GIC] -- [GICv2m] -- [MSI]
+
+which recursively calling the freeing function:
+
+In GIC domain, it currently defines the struct irq_domain_ops.free() with :
+   --> irq_domain_free_irqs_top()
+     |--> irq_domain_free_irqs_common()
+       |--> irq_domain_free_irq_parent()
+         |--> irq_domain_free_irqs_recursive()
+
+and there is no check before passing the NULL domain->parent into the 
+irq_domain_free_irqs_recursive(), which causes the error.
+
+Since the GIC is the top most domain, it does not have parent domain.
+So, I'm not sure what is missing from the allocation path error 
+handling, as you mentioned.
+
+Thanks,
+
+Suravee
