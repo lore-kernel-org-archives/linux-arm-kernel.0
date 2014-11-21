@@ -1,55 +1,52 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 21 Nov 2014 13:27:07 +0900
-Subject: [PATCH/RFC] ARM: shmobile: dts: Add common file for MSIOF1
-Message-ID: <1416544027-5680-1-git-send-email-horms+renesas@verge.net.au>
+From: dave.long@linaro.org (David Long)
+Date: Thu, 20 Nov 2014 23:28:32 -0500
+Subject: [PATCH v3 1/5] arm64: Kprobes with single stepping support
+In-Reply-To: <1416317295.1735.9.camel@linaro.org>
+References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>	
+ <1416292375-29560-2-git-send-email-dave.long@linaro.org>
+ <1416317295.1735.9.camel@linaro.org>
+Message-ID: <546EBF70.9020706@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+On 11/18/14 08:28, Jon Medhurst (Tixy) wrote:
+> On Tue, 2014-11-18 at 01:32 -0500, David Long wrote:
+>> From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+>>
+>> Add support for basic kernel probes(kprobes) and jump probes
+>> (jprobes) for ARM64.
+>>
+>> Kprobes will utilize software breakpoint and single step debug
+>> exceptions supported on ARM v8.
+>>
+>> software breakpoint is placed at the probe address to trap the
+>> kernel execution into kprobe handler.
+>>
+>> ARM v8 support single stepping to be enabled while exception return
+>> (ERET) with next PC in exception return address (ELR_EL1).
+>> kprobe handler prepares a executable memory slot for out-of-line
+>> execution with the copy of the original instruction under probe, and
+>> enable single stepping from the instruction slot. With this scheme,
+>> the instruction is executed with the exact same register context
+>> 'except PC' that points to instruction slot.
+>>
+>> Debug mask(PSTATE.D) is enabled only when single stepping a recursive
+>> kprobes i.e. during kprobes reenter so that probes instruction can be
+>> single stepped within the kprobe handler -exception- context.
+>
+> Does this mean that at the point the probed instruction is
+> single-stepped there is nothing extra that has been pushed on on the
+> kernel stack by any kprobes handling code? I just want to check that you
+> aren't going to hit the problems that the 32-bit kprobes code is
+> currently being fixed for [1].
+>
+> The simulated instructions in patch 2 don't access the stack, so they
+> are safe from the problem.
+>
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/303525.html
+>
 
-The R-Car Gen 2 SoCs have MSIOF1 interfaces however they
-are not exposed on any boards currently supported in mainline.
+Took me a while to read through the background on this.  I believe it is 
+true nothing extra is put on the stack in the single-step case.
 
-The purpose of r8a77xx-msiof1.dtsi is to be included
-in a dts file if MSIOF1 is exposed by some means.
-
-Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
-[horms: Reworked into a separate dtsi file]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a77xx-msiof1.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
- create mode 100644 arch/arm/boot/dts/r8a77xx-msiof1.dtsi
-
-diff --git a/arch/arm/boot/dts/r8a77xx-msiof1.dtsi b/arch/arm/boot/dts/r8a77xx-msiof1.dtsi
-new file mode 100644
-index 0000000..04f91b8
---- /dev/null
-+++ b/arch/arm/boot/dts/r8a77xx-msiof1.dtsi
-@@ -0,0 +1,24 @@
-+/*
-+ * Common file enabling MMSIOF1 on Renesas R-Car boards
-+ *
-+ * Copyright (C) 2014 Renesas Electronics Corp.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+&pfc {
-+	msiof1_pins: spi2 {
-+		renesas,groups = "msiof1_clk_c", "msiof1_sync_c", "msiof1_rx_c",
-+				 "msiof1_tx_c";
-+		renesas,function = "msiof1";
-+	};
-+};
-+
-+&msiof1 {
-+	pinctrl-0 = <&msiof1_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
--- 
-2.1.1
+-dl
