@@ -1,107 +1,96 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 21 Nov 2014 11:45:51 +0000
-Subject: [RFC PATCH] arm: imx: Workaround i.MX6 PMU interrupts muxed to
- one SPI
-In-Reply-To: <alpine.DEB.2.11.1411211138050.6439@nanos>
-References: <1416483757-24165-1-git-send-email-daniel.thompson@linaro.org>
- <alpine.DEB.2.11.1411210016360.6439@nanos> <546F0ACA.7010007@linaro.org>
- <alpine.DEB.2.11.1411211138050.6439@nanos>
-Message-ID: <546F25EF.5080309@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 21 Nov 2014 19:48:16 +0800
+Subject: [PATCH] mmc: dw_mmc: fix card read threshold for PIO mode
+In-Reply-To: <546F145A.9050900@samsung.com>
+References: <1416551950-8277-1-git-send-email-shawn.guo@linaro.org>
+ <546F145A.9050900@samsung.com>
+Message-ID: <20141121114813.GA11253@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/11/14 10:41, Thomas Gleixner wrote:
-> On Fri, 21 Nov 2014, Daniel Thompson wrote:
->> On 20/11/14 23:30, Thomas Gleixner wrote:
->>> On Thu, 20 Nov 2014, Daniel Thompson wrote:
->>>> +/*
->>>> + * The PMU IRQ lines of all cores are muxed onto a single interrupt.
->>>> + * Rotate the interrupt around the cores if the current CPU cannot
->>>> + * figure out why the interrupt has been triggered.
->>>> + */
->>>> +static irqreturn_t imx6q_pmu_handler(int irq, void *dev, irq_handler_t handler)
->>>> +{
->>>> +	irqreturn_t ret = handler(irq, dev);
->>>> +	int next;
->>>> +
->>>> +	if (ret == IRQ_NONE && num_online_cpus() > 1) {
->>>
->>> What guarantees that ret == IRQ_HANDLED is a sign for 'this is only
->>> for this particular core' interrupt ?
->>
->> It isn't guaranteed. We rely on re-entering the interrupt handler if
->> more than one PMU is raising the interrupt simultaneously.
->>
->>>
->>>> +		next = cpumask_next(smp_processor_id(), cpu_online_mask);
->>>> +		if (next > nr_cpu_ids)
->>>> +			next = cpumask_next(-1, cpu_online_mask);
->>>> +		irq_set_affinity(irq, cpumask_of(next));
->>>> +	}
->>>
->>> Aside of the fact, that the hardware designers who came up with such a
->>> brainfart should be put on sane drugs, this is just silly.
->>>
->>> Rotating that thing around will introduce arbitrary latencies and
->>> dependencies on other interrupts to be handled.
->>
->> To be honest I viewed the only real merits of the rotation workaround to
->> be that it is simple and minimally invasive. I am in total agreement
->> that there are profiling use cases that it will handle badly (although
->> there are a useful set which this workaround is sufficient to support).
->>
->>> So if there is really no way to figure out which of the cores is the
->>> actual target of the PMU interrupt
->>
->> PMU is only accessible via the bus if you are a external debugger
->> (signals external to the cluster control the register windowing). From
->> the kernel we have to use the co-processor interface and can only see
->> our own PMU.
->>
->>> then you should simply broadcast
->>> that interrupt to a designated per cpu vector async from the one which
->>> handles it in the first place and be done with it. That's the only
->>> sane option you have.
->>
->> As it happens I was planning to do some work on rebroadcasting next
->> anyway regardless of this discussion because I can't call
->> irq_set_affinity() from a FIQ handler...
->>
->> Options I considered to rebroadcast are either direct use of an (new and
->> ARM specific?) IPI or use of smp_call_function() from a tasklet. I was
+Hi Jaehoon,
+
+On Fri, Nov 21, 2014 at 07:30:50PM +0900, Jaehoon Chung wrote:
+> Hi, Shawn.
 > 
->> inclined to rule out the tasklet because it has the potential for far
->> greater timing jitter than rotating the affinity (doesn't it?).
+> On 11/21/2014 03:39 PM, Shawn Guo wrote:
+> > Commit f1d2736c8156 ("mmc: dw_mmc: control card read threshold")
+> > introduces a regression for use case where PIO mode is used, i.e.
+> > CONFIG_MMC_DW_IDMAC is not disabled.  It stops kernel from booting
+> > like below.
+> > 
+> > dw_mmc 9408000.dwmmc: fifo-depth property not found, using value of FIFOTH register as default
+> > dw_mmc 9408000.dwmmc: Using PIO mode.
+> > dw_mmc 9408000.dwmmc: Version ID is 210a
+> > dw_mmc 9408000.dwmmc: DW MMC controller at irq 72, 32 bit host data width, 32 deep fifo
+> > dw_mmc 9408000.dwmmc: 1 slots initialized
+> > ...
+> > Waiting for root device /dev/mmcblk0p2...
+> > mmc_host mmc0: Bus speed (slot 0) = 52000000Hz (slot req 50000000Hz, actual 26000000HZ div = 1)
+> > mmc0: new high speed SDHC card at address b368
+> > mmcblk0: mmc0:b368 AF UD 3.84 GiB
 > 
-> You cannot schedule a tasklet from FIQ.
+> Stopping at here? I didn't know what's difference before applied your patch.
+> Clearing Card-read threshold value at every time would be caused that stop kernel?
+> Just wonder it.
 
-Indeed, that was another black mark against it. However I would prefer
-to be able to convince people to rule out for performance reasons.
-My FIQ work for perf isn't mainlined at this point so using FIQ to show
-why I prefer one solution (for mainline) over another isn't entirely
-reasonable.
+With my patch, the kernel will continue to mount the rootfs on SD card
+as below.
 
-> The only options you have are:
+mmcblk0: mmc0:b368 AF UD 3.84 GiB 
+ mmcblk0: p1 p2
+EXT4-fs (mmcblk0p2): couldn't mount as ext3 due to feature incompatibilities
+EXT4-fs (mmcblk0p2): couldn't mount as ext2 due to feature incompatibilities
+EXT4-fs (mmcblk0p2): INFO: recovery required on readonly filesystem
+EXT4-fs (mmcblk0p2): write access will be enabled during recovery
+random: nonblocking pool is initialized
+EXT4-fs (mmcblk0p2): recovery complete
+EXT4-fs (mmcblk0p2): mounted filesystem with ordered data mode. Opts: (null)
+VFS: Mounted root (ext4 filesystem) readonly on device 179:2.
+
 > 
->     - Async IPI (direct call into the architecture code). I have no
->       idea whether thats possible on ARM
+> > 
+> > Rather than clearing read threshold bits, the best thing that function
+> > dw_mci_ctrl_rd_thld() should do is leaving the bits untouched, in case
+> > that card read threshold setup is not needed.
+> > 
+> > The patch fixes the regression by changing dw_mci_ctrl_rd_thld() a bit
+> > to do nothing in case card read threshold bits setup is not needed.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Fixes: f1d2736c8156 ("mmc: dw_mmc: control card read threshold")
+> > Cc: <stable@vger.kernel.org> # 3.13+
+> > ---
+> >  drivers/mmc/host/dw_mmc.c | 7 ++-----
+> >  1 file changed, 2 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> > index 69f0cc68d5b2..52c04ba69970 100644
+> > --- a/drivers/mmc/host/dw_mmc.c
+> > +++ b/drivers/mmc/host/dw_mmc.c
+> > @@ -628,13 +628,13 @@ static void dw_mci_ctrl_rd_thld(struct dw_mci *host, struct mmc_data *data)
+> >  
+> >  	if (host->timing != MMC_TIMING_MMC_HS200 &&
+> >  	    host->timing != MMC_TIMING_UHS_SDR104)
+> > -		goto disable;
+> > +		return;
+> >  
+> >  	blksz_depth = blksz / (1 << host->data_shift);
+> >  	fifo_depth = host->fifo_depth;
+> >  
+> >  	if (blksz_depth > fifo_depth)
+> > -		goto disable;
+> > +		return;
+> >  
+> >  	/*
+> >  	 * If (blksz_depth) >= (fifo_depth >> 1), should be 'thld_size <= blksz'
+> > @@ -644,9 +644,6 @@ static void dw_mci_ctrl_rd_thld(struct dw_mci *host, struct mmc_data *data)
+> >  	thld_size = blksz;
+> >  	mci_writel(host, CDTHRCTL, SDMMC_SET_RD_THLD(thld_size, 1));
+> >  	return;
+> 
+> Then "return" could be also removed.
 
-I think this may be where I have to go eventually (sigh). If I can get
-to the stage where we can deliver PMU events via FIQ then ideally the
-workaround would also have to broadcast via FIQ.
+You're right.  Will remove it in v2.
 
-Its a real shame that one of the best chips to do FIQ work suffers has
-such an annoying hardware bug.
-
->     - irq_work
-
-I'm currently trying this approach. It makes sense today without FIQ
-and, fortunately for me, the workaround should mostly still work if it
-were deployed from a FIQ handler.
-
-BTW thanks very much for the listing options here; I was a little
-worried I might have overlooked some really obvious way to deploy the
-workaround.
-
-
-Daniel.
+Shawn
