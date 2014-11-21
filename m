@@ -1,42 +1,83 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 21 Nov 2014 16:33:35 +0100
-Subject: [PATCH v2 1/4] mmc: atmel-mci: remove useless DMA stuff for non-dt
- devices
+Date: Fri, 21 Nov 2014 16:33:36 +0100
+Subject: [PATCH v2 2/4] mmc: atmel-mci: remove __init/__exit attributes
 In-Reply-To: <1416584018-8561-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1416584018-8561-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1416584018-8561-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1416584018-8561-3-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All devices with a DMA controller are DT compliant and legacy support
-has been removed. For those reasons, some DMA stuff is useless.
+Using __init/__exit attributes can cause several breakages so remove
+them.
 
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Cc: <stable@vger.kernel.org> # 3.2.x
 ---
- drivers/mmc/host/atmel-mci.c | 8 --------
- 1 file changed, 8 deletions(-)
+ drivers/mmc/host/atmel-mci.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index ba38f94..b9226b3 100644
+index b9226b3..169b4eb 100644
 --- a/drivers/mmc/host/atmel-mci.c
 +++ b/drivers/mmc/host/atmel-mci.c
-@@ -2267,17 +2267,9 @@ static void atmci_cleanup_slot(struct atmel_mci_slot *slot,
+@@ -2137,7 +2137,7 @@ static irqreturn_t atmci_detect_interrupt(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
  
- static bool atmci_configure_dma(struct atmel_mci *host)
+-static int __init atmci_init_slot(struct atmel_mci *host,
++static int atmci_init_slot(struct atmel_mci *host,
+ 		struct mci_slot_pdata *slot_data, unsigned int id,
+ 		u32 sdc_reg, u32 sdio_irq)
  {
--	struct mci_platform_data	*pdata;
--	dma_cap_mask_t mask;
--
- 	if (host == NULL)
- 		return false;
+@@ -2295,7 +2295,7 @@ static bool atmci_configure_dma(struct atmel_mci *host)
+  * HSMCI provides DMA support and a new config register but no more supports
+  * PDC.
+  */
+-static void __init atmci_get_cap(struct atmel_mci *host)
++static void atmci_get_cap(struct atmel_mci *host)
+ {
+ 	unsigned int version;
  
--	pdata = host->pdev->dev.platform_data;
--
--	dma_cap_zero(mask);
--	dma_cap_set(DMA_SLAVE, mask);
--
- 	host->dma.chan = dma_request_slave_channel(&host->pdev->dev, "rxtx");
- 	if (!host->dma.chan) {
- 		dev_warn(&host->pdev->dev, "no DMA channel available\n");
+@@ -2344,7 +2344,7 @@ static void __init atmci_get_cap(struct atmel_mci *host)
+ 	}
+ }
+ 
+-static int __init atmci_probe(struct platform_device *pdev)
++static int atmci_probe(struct platform_device *pdev)
+ {
+ 	struct mci_platform_data	*pdata;
+ 	struct atmel_mci		*host;
+@@ -2480,7 +2480,7 @@ err_init_slot:
+ 	return ret;
+ }
+ 
+-static int __exit atmci_remove(struct platform_device *pdev)
++static int atmci_remove(struct platform_device *pdev)
+ {
+ 	struct atmel_mci	*host = platform_get_drvdata(pdev);
+ 	unsigned int		i;
+@@ -2510,19 +2510,19 @@ static int __exit atmci_remove(struct platform_device *pdev)
+ }
+ 
+ static struct platform_driver atmci_driver = {
+-	.remove		= __exit_p(atmci_remove),
++	.remove		= atmci_remove,
+ 	.driver		= {
+ 		.name		= "atmel_mci",
+ 		.of_match_table	= of_match_ptr(atmci_dt_ids),
+ 	},
+ };
+ 
+-static int __init atmci_init(void)
++static int atmci_init(void)
+ {
+ 	return platform_driver_probe(&atmci_driver, atmci_probe);
+ }
+ 
+-static void __exit atmci_exit(void)
++static void atmci_exit(void)
+ {
+ 	platform_driver_unregister(&atmci_driver);
+ }
 -- 
 2.0.3
