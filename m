@@ -1,39 +1,54 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 21 Nov 2014 21:22:53 +0100
-Subject: [PATCHv5 05/10] arm: mvebu: define and use common Armada 370 SPI
- pinctrl settings
-In-Reply-To: <a0eb580b7cc0f7cf39f1a69f0cc5747bded66300.1416598537.git.arno@natisbad.org>
-References: <cover.1416598536.git.arno@natisbad.org>
- <a0eb580b7cc0f7cf39f1a69f0cc5747bded66300.1416598537.git.arno@natisbad.org>
-Message-ID: <20141121202253.GE20238@lunn.ch>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 21 Nov 2014 15:24:06 -0500
+Subject: [PATCHv4 01/10] arm: mvebu: fix vendor prefix typo in
+ kirkwood-synology.dtsi
+In-Reply-To: <20141120050213.GB2596@lunn.ch>
+References: <cover.1416351425.git.arno@natisbad.org>
+ <e1c3f3fbd9f494fa228de3ee5928c771d33b072e.1416351426.git.arno@natisbad.org>
+ <20141120015519.GA22670@titan.lakedaemon.net>
+ <20141120050213.GB2596@lunn.ch>
+Message-ID: <20141121202406.GC22670@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud
+On Thu, Nov 20, 2014 at 06:02:13AM +0100, Andrew Lunn wrote:
+> On Wed, Nov 19, 2014 at 08:55:19PM -0500, Jason Cooper wrote:
+> > Andrew,
+> > 
+> > On Wed, Nov 19, 2014 at 12:01:36AM +0100, Arnaud Ebalard wrote:
+> > > 
+> > > As reported by Andrew, the vendor prefix for Seiko Instruments, Inc.
+> > > S-35390A I2C RTC chip in kirkwood-synology.dtsi has a typo (ssi
+> > > instead of sii). This patches fixes it.
+> > > 
+> > > Reported-by: Andrew Lunn <andrew@lunn.ch>
+> > > Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+> > > ---
+> > >  arch/arm/boot/dts/kirkwood-synology.dtsi | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/kirkwood-synology.dtsi b/arch/arm/boot/dts/kirkwood-synology.dtsi
+> > > index 811e0971fc58..8be5b2e4626e 100644
+> > > --- a/arch/arm/boot/dts/kirkwood-synology.dtsi
+> > > +++ b/arch/arm/boot/dts/kirkwood-synology.dtsi
+> > > @@ -266,7 +266,7 @@
+> > >  
+> > >  			s35390a: s35390a at 30 {
+> > >  				status = "disabled";
+> > > -				compatible = "ssi,s35390a";
+> > > +				compatible = "sii,s35390a";
+> > 
+> > Should the driver now support both variants for backward compatibility?
+> 
+> Hi Jason
+> 
+> This is an i2c device. i2c totally ignores the vendor. It is optional.
+> So there is no backward compatibility issues.
 
-> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-> index 90e1286d414f..f1284ae0cddd 100644
-> --- a/arch/arm/boot/dts/armada-370.dtsi
-> +++ b/arch/arm/boot/dts/armada-370.dtsi
-> @@ -197,6 +197,20 @@
->  				status = "disabled";
->  			};
->  
-> +			/*
-> +			 * Default SPI pinctrl setting, can be overwritten on
-> +			 * board level if a different configuration is used.
-> +			 */
-> +			spi0: spi at 10600 {
-> +				pinctrl-0 = <&spi0_pins1>;
-> +				pinctrl-names = "default";
-> +			};
-> +
-> +			spi1: spi at 10680 {
-> +				pinctrl-0 = <&spi1_pins>;
-> +				pinctrl-names = "default";
-> +			};
-> +
+In this case I think we're probably fine changing it, but your argument
+is a Linux implementation choice.  The BSDs and bootloaders may work
+differently.  Just something to keep in mind with these things.
 
-Again, ordering. It looks like these should be between l2-cache and i2c0.
+thx,
 
-       Andrew
+Jason.
