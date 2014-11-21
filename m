@@ -1,74 +1,178 @@
-From: flora.fu@mediatek.com (Flora Fu)
-Date: Fri, 21 Nov 2014 15:09:31 +0800
-Subject: [PATCH 3/7] regulator: MT6397: Add support for MT6397 regulator
-In-Reply-To: <20141117234012.GE22111@sirena.org.uk>
-References: <1416210027-5562-1-git-send-email-flora.fu@mediatek.com>
- <1416210027-5562-4-git-send-email-flora.fu@mediatek.com>
- <20141117234012.GE22111@sirena.org.uk>
-Message-ID: <1416553771.19764.51.camel@mtksdaap41>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 21 Nov 2014 08:19:41 +0100
+Subject: [PATCH 2/3] i2c: slave-eeprom: add eeprom simulator driver
+In-Reply-To: <1416326695-13083-3-git-send-email-wsa@the-dreams.de>
+References: <1416326695-13083-1-git-send-email-wsa@the-dreams.de>
+ <1416326695-13083-3-git-send-email-wsa@the-dreams.de>
+Message-ID: <20141121071941.GK27002@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Mark, 
+Hello Wolfram,
 
-On Mon, 2014-11-17 at 23:40 +0000, Mark Brown wrote:
-> On Mon, Nov 17, 2014 at 03:40:23PM +0800, Flora Fu wrote:
+this mail is thematically more a reply to patch 1 and maybe just serves
+my understanding of the slave support.
 
-> > +static int mt6397_buck_set_voltage_sel(struct regulator_dev *rdev, unsigned sel)
-> > +{
+On Tue, Nov 18, 2014 at 05:04:54PM +0100, Wolfram Sang wrote:
+> From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 > 
+> The first user of the i2c-slave interface is an eeprom simulator. It is
+> a shared memory which can be accessed by the remote master via I2C and
+> locally via sysfs.
 > 
-> > +	vosel = info->buck_conf.vosel_reg;
-> > +	voselon = info->buck_conf.voselon_reg;
-> > +	vosel_mask = info->buck_conf.vosel_mask;
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> ---
 > 
-> Please use the standard way of specifying data even if you can't use the
-> standard function.
+> Changes since RFC:
+> * fix build error for modules
+> * don't hardcode size
+> * add boundary checks for sysfs access
+> * use a spinlock
+> * s/at24s/eeprom/g
+> * add some docs
+> * clean up exit paths
+> * use size-variable instead of driver_data
 > 
-
-Could you specify the standard way of specification data? Thanks. 
-
-> > +
-> > +	ret = regmap_update_bits(rdev->regmap, vosel, vosel_mask, sel);
-> > +	if (ret != 0) {
-> > +		dev_err(&rdev->dev, "Failed to update vosel: %d\n", ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	ret = regmap_update_bits(rdev->regmap, voselon, vosel_mask, sel);
-> > +	if (ret != 0) {
-> > +		dev_err(&rdev->dev, "Failed to update vosel_on: %d\n", ret);
-> > +		return ret;
-> > +	}
-> > +	return 0;
+>  drivers/i2c/Kconfig            |  10 +++
+>  drivers/i2c/Makefile           |   1 +
+>  drivers/i2c/i2c-slave-eeprom.c | 170 +++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 181 insertions(+)
+>  create mode 100644 drivers/i2c/i2c-slave-eeprom.c
 > 
-> You should add comments here explaining what's going on - it's very
-> strange to have to write the same value to two different registers and
-> the names of the registers look suspiciously like this is something to do
-> with a suspend mode...
-> 
+> diff --git a/drivers/i2c/Kconfig b/drivers/i2c/Kconfig
+> index b51a402752c4..8c9e619f3026 100644
+> --- a/drivers/i2c/Kconfig
+> +++ b/drivers/i2c/Kconfig
+> @@ -110,6 +110,16 @@ config I2C_STUB
+>  
+>  	  If you don't know what to do here, definitely say N.
+>  
+> +config I2C_SLAVE
+> +	bool "I2C slave support"
+> +
+> +if I2C_SLAVE
+> +
+> +config I2C_SLAVE_EEPROM
+> +	tristate "I2C eeprom slave driver"
+> +
+> +endif
+> +
+>  config I2C_DEBUG_CORE
+>  	bool "I2C Core debugging messages"
+>  	help
+> diff --git a/drivers/i2c/Makefile b/drivers/i2c/Makefile
+> index 1722f50f2473..45095b3d16a9 100644
+> --- a/drivers/i2c/Makefile
+> +++ b/drivers/i2c/Makefile
+> @@ -9,6 +9,7 @@ obj-$(CONFIG_I2C_CHARDEV)	+= i2c-dev.o
+>  obj-$(CONFIG_I2C_MUX)		+= i2c-mux.o
+>  obj-y				+= algos/ busses/ muxes/
+>  obj-$(CONFIG_I2C_STUB)		+= i2c-stub.o
+> +obj-$(CONFIG_I2C_SLAVE_EEPROM)	+= i2c-slave-eeprom.o
+>  
+>  ccflags-$(CONFIG_I2C_DEBUG_CORE) := -DDEBUG
+>  CFLAGS_i2c-core.o := -Wno-deprecated-declarations
+> diff --git a/drivers/i2c/i2c-slave-eeprom.c b/drivers/i2c/i2c-slave-eeprom.c
+> new file mode 100644
+> index 000000000000..6631400b5f02
+> --- /dev/null
+> +++ b/drivers/i2c/i2c-slave-eeprom.c
+> @@ -0,0 +1,170 @@
+> +/*
+> + * I2C slave mode EEPROM simulator
+> + *
+> + * Copyright (C) 2014 by Wolfram Sang, Sang Engineering <wsa@sang-engineering.com>
+> + * Copyright (C) 2014 by Renesas Electronics Corporation
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License as published by the
+> + * Free Software Foundation; version 2 of the License.
+> + *
+> + * Because most IP blocks can only detect one I2C slave address anyhow, this
+> + * driver does not support simulating EEPROM types which take more than one
+> + * address. It is prepared to simulate bigger EEPROMs with an internal 16 bit
+> + * pointer, yet implementation is deferred until the need actually arises.
+> + */
+> +
+> +#include <linux/i2c.h>
+> +#include <linux/init.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/slab.h>
+> +#include <linux/spinlock.h>
+> +#include <linux/sysfs.h>
+> +
+> +struct eeprom_data {
+> +	struct bin_attribute bin;
+> +	bool first_write;
+> +	spinlock_t buffer_lock;
+> +	u8 buffer_idx;
+> +	u8 buffer[];
+> +};
+> +
+> +static int i2c_slave_eeprom_slave_cb(struct i2c_client *client,
+> +				     enum i2c_slave_event event, u8 *val)
+> +{
+> +	struct eeprom_data *eeprom = i2c_get_clientdata(client);
+> +
+> +	switch (event) {
+> +	case I2C_SLAVE_REQ_WRITE_END:
+> +		if (eeprom->first_write) {
+> +			eeprom->buffer_idx = *val;
+> +			eeprom->first_write = false;
+> +		} else {
+> +			spin_lock(&eeprom->buffer_lock);
+> +			eeprom->buffer[eeprom->buffer_idx++] = *val;
+> +			spin_unlock(&eeprom->buffer_lock);
+> +		}
+> +		break;
+> +
+> +	case I2C_SLAVE_REQ_READ_START:
+> +		spin_lock(&eeprom->buffer_lock);
+> +		*val = eeprom->buffer[eeprom->buffer_idx];
+> +		spin_unlock(&eeprom->buffer_lock);
+> +		break;
+> +
+> +	case I2C_SLAVE_REQ_READ_END:
+> +		eeprom->buffer_idx++;
+You don't check here for buffer_idx >= ARRAY_SIZE(buffer)?
+Ditto in the I2C_SLAVE_REQ_WRITE_END case.
+> +		break;
+> +
+> +	case I2C_SLAVE_STOP:
+> +		eeprom->first_write = true;
+> +		break;
+> +
+> +	default:
+> +		break;
+> +	}
+> +
+> +	return 0;
+> +}
+This is the most interesting function here because it uses the new
+interface, the functions below are only to update and show the simulated
+eeprom contents and driver boilerplate, right?
 
-Yes, its is for suspend mode control usage.
-For registers "vosel", "voselon", they is called register mode or
-hardware control mode voltage settings. Register mode is a default mode
-on the buck control. For quickly normal/sleep mode switch, hardware
-control can be enabled by controlling buck output by a CTRL_PIN. In the
-following diagram, there is a static settings on vosel_sleep for suspend
-mode output. According to CTRL_PIN's level, Vout can have different
-output (voselon or vosel_sleep). 
+When the eeprom driver is probed and the adapter driver notices a read
+request for the respective i2c address, this callback is called with
+event=I2C_SLAVE_REQ_READ_START. Returning 0 here and provide the first
+byte to send make the adapter ack the read request and send the data
+provided. If something != 0 is returned a NAK is sent?
 
-           +------------------------------------------------------+
-           |    MT6397                                            |
-           |                              -vosel     -            |
-CTRL_PIN   |     +-----------------+                  \ + nivosel-|-Vout
------------|-----| hardware control|---+  -voselon   -            |
-           |     +-----------------+    \ -vosel_sleep -          |
-           |                                                      |
-           +------------------------------------------------------+
+How is the next byte requested from the slave driver? I assume with two
+additional calls to the callback, first with
+event=I2C_SLAVE_REQ_READ_END, then event=I2C_SLAVE_REQ_READ_START once
+more. Would it make sense to reduce this to a single call? Does the
+driver at READ_END time already know if its write got acked? If so, how?
 
-In the design, voltage change on bucks are set both on registers vosel
-and voselon. I will add more comments on the function to clarify the
-implementation. 
+This means that for each byte the callback is called. Would it make
+sense to make the API more flexible and allow the slave driver to return
+a buffer? This would remove some callback overhead and might allow to
+let the adapter driver make use of its DMA mechanism.
 
-Thanks, 
-Flora
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
