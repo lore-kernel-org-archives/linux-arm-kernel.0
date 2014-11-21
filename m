@@ -1,83 +1,98 @@
-From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
-Date: Fri, 21 Nov 2014 08:51:40 +0800
-Subject: [PATCH 4/4] mmc: core: hold SD Clock before CMD11 during Signal
-In-Reply-To: <1416531100-26707-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-References: <1416531100-26707-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-Message-ID: <1416531100-26707-5-git-send-email-Vincent.Yang@tw.fujitsu.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 21 Nov 2014 09:54:37 +0900
+Subject: [GIT PULL v2] Second Round of Renesas ARM Based SoC DT Updates for
+ v3.19
+Message-ID: <cover.1416476366.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Voltage Switch Procedure
+Hi Olof, Hi Kevin, Hi Arnd,
 
-This patch is to fix an issue found on mb86s7x platforms.
+Please consider these second round of Renesas ARM based SoC DT updates for
+v3.19.
 
-[symptom]
-There are some UHS-1 SD memory cards sometimes cannot be detected correctly,
-e.g., Transcend 600x SDXC 64GB UHS-1 memory card.
-During Signal Voltage Switch Procedure, failure to switch is indicated
-by the card holding DAT[3:0] low.
+This pull request is based on the previous round of
+such requests, tagged as renesas-dt-for-v3.19,
+which I have already sent a pull-request for.
 
-[analysis]
-According to SD Host Controller Simplified Specification Version 3.00
-chapter 3.6.1, the Signal Voltage Switch Procedure should be:
-(1) Check S18A; (2) Issue CMD11; (3) Check CMD 11 response;
-(4) Stop providing SD clock; (5) Check DAT[3:0] should be 0000b;
-(6) Set 1.8V Signal Enable; (7) Wait 5ms; (8) Check 1.8V Signal Enable;
-(9) Provide SD Clock; (10) Wait 1ms; (11) Check DAT[3:0] should be 1111b;
-(12) error handling
+As requested by Arnd v2 of this pull request does not include some
+Audio DMAC patches that were included in v1.
 
-With CONFIG_MMC_CLKGATE=y, sometimes there is one more gating/un-gating
-SD clock between (2) and (3). In this case, some UHS-1 SD cards will hold
-DAT[3:0] 0000b at (11) and thus fails Signal Voltage Switch Procedure.
+The following changes since commit 25af9c83151822eb6d413b4d15d5f89804606ac7:
 
-[solution]
-By mmc_host_clk_hold() before CMD11, the additional gating/un-gating
-SD clock between (2) and (3) can be prevented and thus no failure at (11).
-It has been verified with many UHS-1 SD cards on mb86s7x platforms and
-works correctly.
+  ARM: shmobile: r8a7779 dtsi: Add SoC-specific SATA compatible property (2014-10-30 10:01:37 +0900)
 
-Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
----
- drivers/mmc/core/core.c | 13 ++++++++-----
- 1 file changed, 8 insertions(+), 5 deletions(-)
+are available in the git repository at:
 
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index f26a5f1..8b9e2cfd 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -1420,18 +1420,20 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage, u32 ocr)
- 		pr_warn("%s: cannot verify signal voltage switch\n",
- 			mmc_hostname(host));
- 
-+	mmc_host_clk_hold(host);
-+
- 	cmd.opcode = SD_SWITCH_VOLTAGE;
- 	cmd.arg = 0;
- 	cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
- 
- 	err = mmc_wait_for_cmd(host, &cmd, 0);
- 	if (err)
--		return err;
--
--	if (!mmc_host_is_spi(host) && (cmd.resp[0] & R1_ERROR))
--		return -EIO;
-+		goto err_command;
- 
--	mmc_host_clk_hold(host);
-+	if (!mmc_host_is_spi(host) && (cmd.resp[0] & R1_ERROR)) {
-+		err = -EIO;
-+		goto err_command;
-+	}
- 	/*
- 	 * The card should drive cmd and dat[0:3] low immediately
- 	 * after the response of cmd11, but wait 1 ms to be sure
-@@ -1480,6 +1482,7 @@ power_cycle:
- 		mmc_power_cycle(host, ocr);
- 	}
- 
-+err_command:
- 	mmc_host_clk_release(host);
- 
- 	return err;
--- 
-1.9.0
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v3.19
+
+for you to fetch changes up to b9473d9f621b68327776b66d4b9a8ba5e0b8b4cb:
+
+  ARM: shmobile: r8a7791: add USBDMAC{0,1} clocks to device tree (2014-11-19 09:22:13 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC DT Updates for v3.19
+
+* Add labels for LEDs on kzm9g-reference and koelsch
+* Add Sound support to r8a7790/lager and r8a7791/koelsch
+* Add IIC DMA nodes to r8a7790 and r8a7791
+* Use SoC-specific IIC compatible properties on sh73a0 and r8a73a4
+* Add SGX, MMP and VSP1 clocks to r8a7794
+* Add USBDMAC{0,1} clocks to r8a7790 and r8a7791
+
+----------------------------------------------------------------
+Geert Uytterhoeven (4):
+      ARM: shmobile: r8a73a4 dtsi: Add SoC-specific IIC compatible properties
+      ARM: shmobile: sh73a0 dtsi: Add SoC-specific IIC compatible properties
+      ARM: shmobile: koelsch dts: Add labels for the LEDs
+      ARM: shmobile: kzm9g-reference dts: Add labels for the LEDs
+
+Koji Matsuoka (1):
+      ARM: shmobile: r8a7794: Add VIN clock to device tree
+
+Kouei Abe (1):
+      ARM: shmobile: r8a7794: Add SGX clock to device tree
+
+Kuninori Morimoto (18):
+      ARM: shmobile: r8a7790: Add Audio DMAC devices to DT
+      ARM: shmobile: r8a7791: Add Audio DMAC devices to DT
+      ARM: shmobile: r8a7790: Add Audio DMAC peri peri devices to DT
+      ARM: shmobile: r8a7791: Add Audio DMAC peri peri devices to DT
+      ARM: shmobile: lager: fixup IIC2 clock frequency
+      ARM: shmobile: lager: Sound PIO support on DTS
+      ARM: shmobile: lager: Sound DMA support on DTS
+      ARM: shmobile: lager: Sound DMA support via BUSIF on DTS
+      ARM: shmobile: lager: Sound DMA support via SRC on DTS
+      ARM: shmobile: lager: Sound DMA support via DVC on DTS
+      ARM: shmobile: koelsch: fixup I2C2 clock frequency
+      ARM: shmobile: koelsch: Sound PIO support on DTS
+      ARM: shmobile: koelsch: Sound DMA support on DTS
+      ARM: shmobile: koelsch: Sound DMA support via BUSIF on DTS
+      ARM: shmobile: koelsch: Sound DMA support via SRC on DTS
+      ARM: shmobile: koelsch: Sound DMA support via DVC on DTS
+      ARM: shmobile: lager: add Volume Ramp usage on comment
+      ARM: shmobile: koelsch: add Volume Ramp usage on comment
+
+Wolfram Sang (2):
+      ARM: shmobile: r8a7790: add DMA nodes for IIC
+      ARM: shmobile: r8a7791: add DMA nodes for IIC
+
+Yoshifumi Hosoya (1):
+      ARM: shmobile: r8a7794: Add MMP and VSP1 clocks to device tree
+
+Yoshihiro Shimoda (2):
+      ARM: shmobile: r8a7790: add USBDMAC{0,1} clocks to device tree
+      ARM: shmobile: r8a7791: add USBDMAC{0,1} clocks to device tree
+
+ arch/arm/boot/dts/r8a73a4.dtsi               | 18 +++---
+ arch/arm/boot/dts/r8a7790-lager.dts          | 83 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/r8a7790.dtsi               | 86 ++++++++++++++++++++++++++--
+ arch/arm/boot/dts/r8a7791-koelsch.dts        | 86 +++++++++++++++++++++++++++-
+ arch/arm/boot/dts/r8a7791.dtsi               | 83 +++++++++++++++++++++++++--
+ arch/arm/boot/dts/r8a7794.dtsi               | 21 ++++---
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts |  4 ++
+ arch/arm/boot/dts/sh73a0.dtsi                | 10 ++--
+ include/dt-bindings/clock/r8a7790-clock.h    |  2 +
+ include/dt-bindings/clock/r8a7791-clock.h    |  2 +
+ include/dt-bindings/clock/r8a7794-clock.h    |  9 +++
+ 11 files changed, 370 insertions(+), 34 deletions(-)
