@@ -1,26 +1,27 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 21 Nov 2014 21:34:36 +0100
-Subject: [PATCHv5 09/10] arm: mvebu: add .dts file for Synology DS213j
-In-Reply-To: <36a07bdc70a826e26867eba4755be82e39b35450.1416598537.git.arno@natisbad.org>
+Date: Fri, 21 Nov 2014 21:38:23 +0100
+Subject: [PATCHv5 00/10] arm: mvebu: add Synology DS213j and DS414 .dts
+ files
+In-Reply-To: <cover.1416598536.git.arno@natisbad.org>
 References: <cover.1416598536.git.arno@natisbad.org>
- <36a07bdc70a826e26867eba4755be82e39b35450.1416598537.git.arno@natisbad.org>
-Message-ID: <20141121203436.GH20238@lunn.ch>
+Message-ID: <20141121203823.GI20238@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +			poweroff at 12100 {
-> +				compatible = "synology,power-off";
-> +				reg = <0x12100 0x100>;
-> +				clocks = <&coreclk 0>;
-> +			};
+On Fri, Nov 21, 2014 at 08:45:08PM +0100, Arnaud Ebalard wrote:
+> Hi,
+> 
+> This series adds .dts files for Synology DS213j (armada 370 2-bay NAS) and
+> DS414 (armada XP 4-bay NAS) devices.
 
-So we have power off using the PIC.
+Hi Arnaud
 
-> +	poweroff_pin: poweroff-pin {
-> +		marvell,pins = "mpp4";
-> +		marvell,function = "gpio";
-> +	};
+Apart from the minor comments i made about ordering:
 
-Do you know what this pin is used for?
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-   Andrew
+for the whole series.
+
+Thanks for doing the extra pinctrl work.
+
+       Andrew
