@@ -1,32 +1,34 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 21 Nov 2014 11:53:33 +0100
-Subject: IRQ #0 broken on ARM
-In-Reply-To: <20141121103456.GR4042@n2100.arm.linux.org.uk>
-References: <CALT56yPs-SSssff1waj81CRQfER4ZKKR=B1jOXVL-aBChicSjg@mail.gmail.com>
- <20141121103456.GR4042@n2100.arm.linux.org.uk>
-Message-ID: <20141121105333.GP27002@pengutronix.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 21 Nov 2014 16:25:06 +0530
+Subject: [PATCH] ARM: common: edma: edma_pm_resume may be unused
+In-Reply-To: <4363971.teBOlf16kG@wuerfel>
+References: <4363971.teBOlf16kG@wuerfel>
+Message-ID: <546F1A0A.3060203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 10:34:56AM +0000, Russell King - ARM Linux wrote:
-> On Fri, Nov 21, 2014 at 02:31:05PM +0400, Dmitry Eremin-Solenikov wrote:
-> > Hello,
-> > 
-> > After the commit a71b092a9c68685a270ebdde7b5986ba8787e575
-> > (ARM: Convert handle_IRQ to use __handle_domain_irq) IRQ #0 is broken
-> > on ARM. It is a valid IRQ and it is quite imporant (on sa1100 it's a GPIO0).
+On Friday 21 November 2014 04:22 PM, Arnd Bergmann wrote:
+> The recently introduced resume hook in the edma driver
+> is not referenced when CONFIG_PM_SLEEP is not set, which
+> results in a compile warning in keystone_defconfig builds.
 > 
-> No, it is not a valid IRQ.  (It was a mistake to think it was.)
-> Generic code will always assume IRQ0 is not valid, and the fix is to
-> fix the places in ARM where we try to use it.
-To make this more understandable: Linux uses virtual irq numbers. The
-virtual irq 0 is invalid. For a given irq domain the (hardware) irq 0 is
-of course useful and can be supported. Still for a device driver (which
-uses the virtual irq space) 0 should always be invalid.
+> This adds an appropriate #ifdef.
+> 
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Daniel Mack <zonque@gmail.com>
+> Cc: Joel Fernandes <joelf@ti.com>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Fixes: a2b1175131: ("ARM: common: edma: add suspend resume hook")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> I'm applying this as the obvious fixup on top of the next/drivers
+> branch.
 
-Best regards
-Uwe
+Thanks Arnd!
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+FWIW,
+
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+
+Thanks,
+Sekhar
