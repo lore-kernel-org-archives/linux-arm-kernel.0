@@ -1,85 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 22 Nov 2014 07:31:56 +0800
-Subject: [PATCH] mmc: dw_mmc: fix card read threshold for PIO mode
-In-Reply-To: <1416551950-8277-1-git-send-email-shawn.guo@linaro.org>
-References: <1416551950-8277-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20141121233155.GC11253@dragon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 21 Nov 2014 15:33:25 -0800
+Subject: [PATCH v2 2/2] ARM: dts: Add devicetree for NovaTech OrionLXm
+In-Reply-To: <20141117190847.GA4857@saruman>
+References: <1416250957-11065-1-git-send-email-george.mccollister@gmail.com>
+ <1416250957-11065-2-git-send-email-george.mccollister@gmail.com>
+ <20141117190847.GA4857@saruman>
+Message-ID: <20141121233325.GZ7046@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Seungwon, Jaehoon,
-
-On Fri, Nov 21, 2014 at 02:39:10PM +0800, Shawn Guo wrote:
-> Commit f1d2736c8156 ("mmc: dw_mmc: control card read threshold")
-> introduces a regression for use case where PIO mode is used, i.e.
-> CONFIG_MMC_DW_IDMAC is not disabled.  It stops kernel from booting
-
-s/not disabled/disabled
-
-> like below.
-
-For understanding the problem better, can you guys please to test the
-dw_mmc driver on Samsung platforms with CONFIG_MMC_DW_IDMAC disabled.
-I'm wondering this is a problem specific to my platform or a common one.
-
-Shawn
-
+* Felipe Balbi <balbi@ti.com> [141117 11:10]:
+> On Mon, Nov 17, 2014 at 01:02:35PM -0600, George McCollister wrote:
+> > This adds the NovaTech OrionLXm which is based on the AM335x SoC
+> > http://www.novatechweb.com/substation-automation/orionlxm/
+> > 
+> > RAM: 512MiB
+> > Flash: 4GB eMMC
+> > Ethernet PHYs: 2x Micrel KSZ8041FTLI
+> > USB ports are used internally by the expansion cards.
+> > Internal micro SD slot is available.
+> > 
+> > Signed-off-by: George McCollister <george.mccollister@gmail.com>
 > 
-> dw_mmc 9408000.dwmmc: fifo-depth property not found, using value of FIFOTH register as default
-> dw_mmc 9408000.dwmmc: Using PIO mode.
-> dw_mmc 9408000.dwmmc: Version ID is 210a
-> dw_mmc 9408000.dwmmc: DW MMC controller at irq 72, 32 bit host data width, 32 deep fifo
-> dw_mmc 9408000.dwmmc: 1 slots initialized
-> ...
-> Waiting for root device /dev/mmcblk0p2...
-> mmc_host mmc0: Bus speed (slot 0) = 52000000Hz (slot req 50000000Hz, actual 26000000HZ div = 1)
-> mmc0: new high speed SDHC card at address b368
-> mmcblk0: mmc0:b368 AF UD 3.84 GiB
+> this looks might better to my eyes:
 > 
-> Rather than clearing read threshold bits, the best thing that function
-> dw_mci_ctrl_rd_thld() should do is leaving the bits untouched, in case
-> that card read threshold setup is not needed.
-> 
-> The patch fixes the regression by changing dw_mci_ctrl_rd_thld() a bit
-> to do nothing in case card read threshold bits setup is not needed.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Fixes: f1d2736c8156 ("mmc: dw_mmc: control card read threshold")
-> Cc: <stable@vger.kernel.org> # 3.13+
-> ---
->  drivers/mmc/host/dw_mmc.c | 7 ++-----
->  1 file changed, 2 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 69f0cc68d5b2..52c04ba69970 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -628,13 +628,13 @@ static void dw_mci_ctrl_rd_thld(struct dw_mci *host, struct mmc_data *data)
->  
->  	if (host->timing != MMC_TIMING_MMC_HS200 &&
->  	    host->timing != MMC_TIMING_UHS_SDR104)
-> -		goto disable;
-> +		return;
->  
->  	blksz_depth = blksz / (1 << host->data_shift);
->  	fifo_depth = host->fifo_depth;
->  
->  	if (blksz_depth > fifo_depth)
-> -		goto disable;
-> +		return;
->  
->  	/*
->  	 * If (blksz_depth) >= (fifo_depth >> 1), should be 'thld_size <= blksz'
-> @@ -644,9 +644,6 @@ static void dw_mci_ctrl_rd_thld(struct dw_mci *host, struct mmc_data *data)
->  	thld_size = blksz;
->  	mci_writel(host, CDTHRCTL, SDMMC_SET_RD_THLD(thld_size, 1));
->  	return;
-> -
-> -disable:
-> -	mci_writel(host, CDTHRCTL, SDMMC_SET_RD_THLD(0, 0));
->  }
->  
->  static int dw_mci_submit_data_dma(struct dw_mci *host, struct mmc_data *data)
-> -- 
-> 1.9.1
-> 
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
+
+Applying into omap-for-v3.19/dt-v2 thanks.
+
+Tony
