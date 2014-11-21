@@ -1,96 +1,88 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 21 Nov 2014 19:48:16 +0800
-Subject: [PATCH] mmc: dw_mmc: fix card read threshold for PIO mode
-In-Reply-To: <546F145A.9050900@samsung.com>
-References: <1416551950-8277-1-git-send-email-shawn.guo@linaro.org>
- <546F145A.9050900@samsung.com>
-Message-ID: <20141121114813.GA11253@dragon>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 21 Nov 2014 11:48:33 +0000
+Subject: [RFC] add a struct page* parameter to dma_map_ops.unmap_page
+In-Reply-To: <alpine.DEB.2.02.1411111644490.26318@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1411111644490.26318@kaball.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1411211147450.12596@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jaehoon,
-
-On Fri, Nov 21, 2014 at 07:30:50PM +0900, Jaehoon Chung wrote:
-> Hi, Shawn.
+On Mon, 17 Nov 2014, Stefano Stabellini wrote:
+> Hi all,
+> I am writing this email to ask for your advice.
 > 
-> On 11/21/2014 03:39 PM, Shawn Guo wrote:
-> > Commit f1d2736c8156 ("mmc: dw_mmc: control card read threshold")
-> > introduces a regression for use case where PIO mode is used, i.e.
-> > CONFIG_MMC_DW_IDMAC is not disabled.  It stops kernel from booting
-> > like below.
-> > 
-> > dw_mmc 9408000.dwmmc: fifo-depth property not found, using value of FIFOTH register as default
-> > dw_mmc 9408000.dwmmc: Using PIO mode.
-> > dw_mmc 9408000.dwmmc: Version ID is 210a
-> > dw_mmc 9408000.dwmmc: DW MMC controller at irq 72, 32 bit host data width, 32 deep fifo
-> > dw_mmc 9408000.dwmmc: 1 slots initialized
-> > ...
-> > Waiting for root device /dev/mmcblk0p2...
-> > mmc_host mmc0: Bus speed (slot 0) = 52000000Hz (slot req 50000000Hz, actual 26000000HZ div = 1)
-> > mmc0: new high speed SDHC card at address b368
-> > mmcblk0: mmc0:b368 AF UD 3.84 GiB
+> On architectures where dma addresses are different from physical
+> addresses, it can be difficult to retrieve the physical address of a
+> page from its dma address.
 > 
-> Stopping at here? I didn't know what's difference before applied your patch.
-> Clearing Card-read threshold value at every time would be caused that stop kernel?
-> Just wonder it.
-
-With my patch, the kernel will continue to mount the rootfs on SD card
-as below.
-
-mmcblk0: mmc0:b368 AF UD 3.84 GiB 
- mmcblk0: p1 p2
-EXT4-fs (mmcblk0p2): couldn't mount as ext3 due to feature incompatibilities
-EXT4-fs (mmcblk0p2): couldn't mount as ext2 due to feature incompatibilities
-EXT4-fs (mmcblk0p2): INFO: recovery required on readonly filesystem
-EXT4-fs (mmcblk0p2): write access will be enabled during recovery
-random: nonblocking pool is initialized
-EXT4-fs (mmcblk0p2): recovery complete
-EXT4-fs (mmcblk0p2): mounted filesystem with ordered data mode. Opts: (null)
-VFS: Mounted root (ext4 filesystem) readonly on device 179:2.
-
+> Specifically this is the case for Xen on arm and arm64 but I think that
+> other architectures might have the same issue.
 > 
-> > 
-> > Rather than clearing read threshold bits, the best thing that function
-> > dw_mci_ctrl_rd_thld() should do is leaving the bits untouched, in case
-> > that card read threshold setup is not needed.
-> > 
-> > The patch fixes the regression by changing dw_mci_ctrl_rd_thld() a bit
-> > to do nothing in case card read threshold bits setup is not needed.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Fixes: f1d2736c8156 ("mmc: dw_mmc: control card read threshold")
-> > Cc: <stable@vger.kernel.org> # 3.13+
-> > ---
-> >  drivers/mmc/host/dw_mmc.c | 7 ++-----
-> >  1 file changed, 2 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> > index 69f0cc68d5b2..52c04ba69970 100644
-> > --- a/drivers/mmc/host/dw_mmc.c
-> > +++ b/drivers/mmc/host/dw_mmc.c
-> > @@ -628,13 +628,13 @@ static void dw_mci_ctrl_rd_thld(struct dw_mci *host, struct mmc_data *data)
-> >  
-> >  	if (host->timing != MMC_TIMING_MMC_HS200 &&
-> >  	    host->timing != MMC_TIMING_UHS_SDR104)
-> > -		goto disable;
-> > +		return;
-> >  
-> >  	blksz_depth = blksz / (1 << host->data_shift);
-> >  	fifo_depth = host->fifo_depth;
-> >  
-> >  	if (blksz_depth > fifo_depth)
-> > -		goto disable;
-> > +		return;
-> >  
-> >  	/*
-> >  	 * If (blksz_depth) >= (fifo_depth >> 1), should be 'thld_size <= blksz'
-> > @@ -644,9 +644,6 @@ static void dw_mci_ctrl_rd_thld(struct dw_mci *host, struct mmc_data *data)
-> >  	thld_size = blksz;
-> >  	mci_writel(host, CDTHRCTL, SDMMC_SET_RD_THLD(thld_size, 1));
-> >  	return;
+> Knowing the physical address is necessary to be able to issue any
+> required cache maintenance operations when unmap_page,
+> sync_single_for_cpu and sync_single_for_device are called.
 > 
-> Then "return" could be also removed.
+> Adding a struct page* parameter to unmap_page, sync_single_for_cpu and
+> sync_single_for_device would make Linux dma handling on Xen on arm and
+> arm64 much easier and quicker.
+> 
+> I think that other drivers have similar problems, such as the Intel
+> IOMMU driver having to call find_iova and walking down an rbtree to get
+> the physical address in its implementation of unmap_page.
+> 
+> Callers have the struct page* in their hands already from the previous
+> map_page call so it shouldn't be an issue for them.  A problem does
+> exist however: there are about 280 callers of dma_unmap_page and
+> pci_unmap_page. We have even more callers of the dma_sync_single_for_*
+> functions.
+> 
+> 
+> 
+> Is such a change even conceivable? How would one go about it?
+> 
+> I think that Xen would not be the only one to gain from it, but I would
+> like to have a confirmation from others: given the magnitude of the
+> changes involved I would actually prefer to avoid them unless multiple
+> drivers/archs/subsystems could really benefit from them.
 
-You're right.  Will remove it in v2.
+Given the lack of interest from the community, I am going to drop this
+idea.
 
-Shawn
+
+
+
+> Cheers,
+> 
+> Stefano
+> 
+> 
+> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> index d5d3881..158a765 100644
+> --- a/include/linux/dma-mapping.h
+> +++ b/include/linux/dma-mapping.h
+> @@ -31,8 +31,9 @@ struct dma_map_ops {
+>  			       unsigned long offset, size_t size,
+>  			       enum dma_data_direction dir,
+>  			       struct dma_attrs *attrs);
+> -	void (*unmap_page)(struct device *dev, dma_addr_t dma_handle,
+> -			   size_t size, enum dma_data_direction dir,
+> +	void (*unmap_page)(struct device *dev, struct page *page,
+> +			   dma_addr_t dma_handle, size_t size,
+> +			   enum dma_data_direction dir,
+>  			   struct dma_attrs *attrs);
+>  	int (*map_sg)(struct device *dev, struct scatterlist *sg,
+>  		      int nents, enum dma_data_direction dir,
+> @@ -41,10 +42,10 @@ struct dma_map_ops {
+>  			 struct scatterlist *sg, int nents,
+>  			 enum dma_data_direction dir,
+>  			 struct dma_attrs *attrs);
+> -	void (*sync_single_for_cpu)(struct device *dev,
+> +	void (*sync_single_for_cpu)(struct device *dev, struct page *page,
+>  				    dma_addr_t dma_handle, size_t size,
+>  				    enum dma_data_direction dir);
+> -	void (*sync_single_for_device)(struct device *dev,
+> +	void (*sync_single_for_device)(struct device *dev, struct page *page,
+>  				       dma_addr_t dma_handle, size_t size,
+>  				       enum dma_data_direction dir);
+>  	void (*sync_sg_for_cpu)(struct device *dev,
+> 
