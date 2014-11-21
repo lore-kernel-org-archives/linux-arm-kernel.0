@@ -1,56 +1,42 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 21 Nov 2014 15:15:09 -0800
-Subject: [PATCH 6/6] arm: omap: specify PMUs are for ARMv7 CPUs
-In-Reply-To: <1416397800-12457-7-git-send-email-mark.rutland@arm.com>
-References: <1416397800-12457-1-git-send-email-mark.rutland@arm.com>
- <1416397800-12457-7-git-send-email-mark.rutland@arm.com>
-Message-ID: <20141121231508.GX7046@atomide.com>
+Date: Fri, 21 Nov 2014 15:23:07 -0800
+Subject: [GIT PULL v2] ARM: OMAP2+: some more hwmod & clock patches for
+ v3.19
+In-Reply-To: <alpine.DEB.2.02.1411211917280.9204@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1411211917280.9204@utopia.booyaka.com>
+Message-ID: <20141121232307.GY7046@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Rutland <mark.rutland@arm.com> [141119 03:53]:
-> Now that we can specify which PMU variant we're likely to deal with, do
-> so in the omap board code. This will allow us to split the ARMv6, ARMv7,
-> and XScale PMU drivers.
+* Paul Walmsley <paul@pwsan.com> [141121 11:19]:
+> Hi Tony
 > 
-> The unnecessary include of asm/pmu.h is also removed.
+> The following changes since commit 79005fbd3e1d671d08c45c9140ee9826efdc367c:
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Arnd Bergmann <arnd@arndb.de>
+>   ARM: OMAP2+: hwmod: drop unnecessary list initialization (2014-11-13 09:36:55 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.19/omap-b2
+> 
+> for you to fetch changes up to 1f074f996482220f90fbe3dcfafeb3db46ec748a:
+> 
+>   Merge branch 'adc-support-v3.19' into omap-b-for-v3.19 (2014-11-21 11:05:05 -0700)
+> 
+> ----------------------------------------------------------------
+> Several more OMAP patches targeted for v3.19. They include:
+> 
+> - OMAP4/5: DSS hwmod cleanup patches from Tomi Valkeinen.
+> - DRA7xx: hwmod data support for UARTs 7 through 10.
+> - AM43xx: hwmod data support for the onboard ADC.
+> 
+> Basic build, boot, and PM test reports are here:
+> 
+> http://www.pwsan.com/omap/testlogs/omap-b-for-v3.19/20141121110550/
+> 
+> Note that I cannot test the DRA7xx or AM43xx patches, since I do not have
+> these boards.
 
-Looks OK to me:
+Pulling into omap-for-v3.19/soc thanks.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
-
-> ---
->  arch/arm/mach-omap2/pmu.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/pmu.c b/arch/arm/mach-omap2/pmu.c
-> index 33c8846..a69e9a3 100644
-> --- a/arch/arm/mach-omap2/pmu.c
-> +++ b/arch/arm/mach-omap2/pmu.c
-> @@ -13,7 +13,7 @@
->   */
->  #include <linux/of.h>
->  
-> -#include <asm/pmu.h>
-> +#include <asm/system_info.h>
->  
->  #include "soc.h"
->  #include "omap_hwmod.h"
-> @@ -37,7 +37,8 @@ static int __init omap2_init_pmu(unsigned oh_num, char *oh_names[])
->  {
->  	int i;
->  	struct omap_hwmod *oh[3];
-> -	char *dev_name = "arm-pmu";
-> +	char *dev_name = cpu_architecture() == CPU_ARCH_ARMv6 ?
-> +			 "armv6-pmu" : "armv7-pmu";
->  
->  	if ((!oh_num) || (oh_num > 3))
->  		return -EINVAL;
-> -- 
-> 1.9.1
-> 
+Tony
