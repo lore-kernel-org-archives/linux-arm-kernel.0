@@ -1,54 +1,56 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 21 Nov 2014 15:14:12 -0800
-Subject: linux-next: manual merge of the char-misc tree with the arm-soc
- tree
-In-Reply-To: <20141121172412.4caf89cc@canb.auug.org.au>
-References: <20141121172412.4caf89cc@canb.auug.org.au>
-Message-ID: <20141121231411.GW7046@atomide.com>
+Date: Fri, 21 Nov 2014 15:15:09 -0800
+Subject: [PATCH 6/6] arm: omap: specify PMUs are for ARMv7 CPUs
+In-Reply-To: <1416397800-12457-7-git-send-email-mark.rutland@arm.com>
+References: <1416397800-12457-1-git-send-email-mark.rutland@arm.com>
+ <1416397800-12457-7-git-send-email-mark.rutland@arm.com>
+Message-ID: <20141121231508.GX7046@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Rothwell <sfr@canb.auug.org.au> [141120 22:26]:
-> Hi all,
+* Mark Rutland <mark.rutland@arm.com> [141119 03:53]:
+> Now that we can specify which PMU variant we're likely to deal with, do
+> so in the omap board code. This will allow us to split the ARMv6, ARMv7,
+> and XScale PMU drivers.
 > 
-> Today's linux-next merge of the char-misc tree got a conflict in
-> arch/arm/mach-omap2/Kconfig between commit 9e1e632c4846 ("ARM: OMAP2+:
-> Drop board file for ti8168evm") from the arm-soc tree and commit
-> 184901a06a36 ("ARM: removing support for etb/etm in
-> "arch/arm/kernel/"") from the char-misc tree.
+> The unnecessary include of asm/pmu.h is also removed.
 > 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Arnd Bergmann <arnd@arndb.de>
 
-Looks right to me thanks.
+Looks OK to me:
 
-Tony 
- 
-> diff --cc arch/arm/mach-omap2/Kconfig
-> index 27ec8923ddf6,06020fe77e57..000000000000
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@@ -276,14 -282,16 +276,6 @@@ config MACH_SBC353
->   	default y
->   	select OMAP_PACKAGE_CUS
->   
-> - config OMAP3_EMU
-> - 	bool "OMAP3 debugging peripherals"
-> - 	depends on ARCH_OMAP3
-> - 	select ARM_AMBA
-> - 	select OC_ETM
-> - 	help
-> - 	  Say Y here to enable debugging hardware of omap3
->  -config MACH_TI8168EVM
->  -	bool "TI8168 Evaluation Module"
->  -	depends on SOC_TI81XX
->  -	default y
->  -
->  -config MACH_TI8148EVM
->  -	bool "TI8148 Evaluation Module"
->  -	depends on SOC_TI81XX
->  -	default y
-> --
->   config OMAP3_SDRC_AC_TIMING
->   	bool "Enable SDRC AC timing register changes"
->   	depends on ARCH_OMAP3
+Acked-by: Tony Lindgren <tony@atomide.com>
+
+> ---
+>  arch/arm/mach-omap2/pmu.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/pmu.c b/arch/arm/mach-omap2/pmu.c
+> index 33c8846..a69e9a3 100644
+> --- a/arch/arm/mach-omap2/pmu.c
+> +++ b/arch/arm/mach-omap2/pmu.c
+> @@ -13,7 +13,7 @@
+>   */
+>  #include <linux/of.h>
+>  
+> -#include <asm/pmu.h>
+> +#include <asm/system_info.h>
+>  
+>  #include "soc.h"
+>  #include "omap_hwmod.h"
+> @@ -37,7 +37,8 @@ static int __init omap2_init_pmu(unsigned oh_num, char *oh_names[])
+>  {
+>  	int i;
+>  	struct omap_hwmod *oh[3];
+> -	char *dev_name = "arm-pmu";
+> +	char *dev_name = cpu_architecture() == CPU_ARCH_ARMv6 ?
+> +			 "armv6-pmu" : "armv7-pmu";
+>  
+>  	if ((!oh_num) || (oh_num > 3))
+>  		return -EINVAL;
+> -- 
+> 1.9.1
+> 
