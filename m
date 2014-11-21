@@ -1,43 +1,83 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 21 Nov 2014 21:17:09 +0100
-Subject: [PATCH v2 8/8] MAINTAINERS: add at91 power and memory entries
-In-Reply-To: <1414451837.18896.14.camel@perches.com>
-References: <1414451377-11053-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1414451377-11053-9-git-send-email-alexandre.belloni@free-electrons.com>
- <1414451837.18896.14.camel@perches.com>
-Message-ID: <20141121201709.GC26833@amd>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Fri, 21 Nov 2014 12:18:32 -0800
+Subject: [RFC] add a struct page* parameter to dma_map_ops.unmap_page
+In-Reply-To: <alpine.DEB.2.02.1411211147450.12596@kaball.uk.xensource.com>
+ (Stefano Stabellini's message of "Fri, 21 Nov 2014 11:48:33 +0000")
+References: <alpine.DEB.2.02.1411111644490.26318@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1411211147450.12596@kaball.uk.xensource.com>
+Message-ID: <vnkwh9xs2tpj.fsf@mitchelh-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2014-10-27 16:17:17, Joe Perches wrote:
-> On Tue, 2014-10-28 at 00:09 +0100, Alexandre Belloni wrote:
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> []
-> > diff --git a/MAINTAINERS b/MAINTAINERS
-> []
-> > @@ -871,6 +871,25 @@ M:	Boris Brezillon <boris.brezillon@free-electrons.com>
-> >  S:	Maintained
-> >  F:	drivers/clk/at91
-> >  
-> > +ARM/ATMEL AT91 Poweroff driver
-> > +M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> > +S:	Maintained
-> > +F:	drivers/power/reset/at91-poweroff.c
-> > +
-> > +ARM/ATMEL AT91 Reset driver
-> > +M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> > +S:	Maintained
-> > +F:	drivers/power/reset/at91-reset.c
-> 
-> It's traditional to use upper case section descriptions.
+On Fri, Nov 21 2014 at 03:48:33 AM, Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
+> On Mon, 17 Nov 2014, Stefano Stabellini wrote:
+>> Hi all,
+>> I am writing this email to ask for your advice.
+>> 
+>> On architectures where dma addresses are different from physical
+>> addresses, it can be difficult to retrieve the physical address of a
+>> page from its dma address.
+>> 
+>> Specifically this is the case for Xen on arm and arm64 but I think that
+>> other architectures might have the same issue.
+>> 
+>> Knowing the physical address is necessary to be able to issue any
+>> required cache maintenance operations when unmap_page,
+>> sync_single_for_cpu and sync_single_for_device are called.
+>> 
+>> Adding a struct page* parameter to unmap_page, sync_single_for_cpu and
+>> sync_single_for_device would make Linux dma handling on Xen on arm and
+>> arm64 much easier and quicker.
+>> 
+>> I think that other drivers have similar problems, such as the Intel
+>> IOMMU driver having to call find_iova and walking down an rbtree to get
+>> the physical address in its implementation of unmap_page.
+>> 
+>> Callers have the struct page* in their hands already from the previous
+>> map_page call so it shouldn't be an issue for them.  A problem does
+>> exist however: there are about 280 callers of dma_unmap_page and
+>> pci_unmap_page. We have even more callers of the dma_sync_single_for_*
+>> functions.
+>> 
+>> 
+>> 
+>> Is such a change even conceivable? How would one go about it?
+>> 
+>> I think that Xen would not be the only one to gain from it, but I would
+>> like to have a confirmation from others: given the magnitude of the
+>> changes involved I would actually prefer to avoid them unless multiple
+>> drivers/archs/subsystems could really benefit from them.
+>
+> Given the lack of interest from the community, I am going to drop this
+> idea.
 
-Actually, it might be nice to switch to normal case
-descriptions. Easier to search for...
+Actually it sounds like the right API design to me.  As a bonus it
+should help performance a bit as well.  For example, the current
+implementations of dma_sync_single_for_{cpu,device} and dma_unmap_page
+on ARM while using the IOMMU mapper
+(arm_iommu_sync_single_for_{cpu,device}, arm_iommu_unmap_page) all call
+iommu_iova_to_phys which generally results in a page table walk or a
+hardware register write/poll/read.
+
+The problem, as you mentioned, is that there are a ton of callers of the
+existing APIs.  I think David Vrabel had a good suggestion for dealing
+with this:
+
+On Mon, Nov 17 2014 at 06:43:46 AM, David Vrabel <david.vrabel@citrix.com> wrote:
+> You may need to consider a parallel set of map/unmap API calls that
+> return/accept a handle, and then converting drivers one-by-one as
+> required, instead of trying to convert every single driver at once.
+
+However, I'm not sure whether the costs of having a parallel set of APIs
+outweigh the benefits of a cleaner API and a slight performance boost...
+But I hope the idea isn't completely abandoned without some profiling or
+other evidence of its benefits (e.g. patches showing how drivers could
+be simplified with the new APIs).
 
 
-								Pavel
+-Mitch
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
