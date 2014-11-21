@@ -1,123 +1,74 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 21 Nov 2014 10:59:22 +0100
-Subject: [RFC PATCH 0/6] ARM64: KVM: PMU infrastructure support
-In-Reply-To: <CAAhSdy2rQf-26SjeEspcc+LgwmhDr+QeYOOSyOUApF+0-8WdeA@mail.gmail.com>
-References: <1407230655-28864-1-git-send-email-anup.patel@linaro.org>
- <20141107202502.GJ22848@cbox>
- <CAAhSdy3CPMdK9+_FesKuJaPt9=VVHsnw=DQO5UQUVNm1aPuZNg@mail.gmail.com>
- <CAMJs5B8VqS2-3dhSX+PBaQruzyXiYwaYRQ7vvWEMrHbvbjn+9A@mail.gmail.com>
- <CAAhSdy3iyMpXLh1Qq-TqZ-1W368kG0Oz9iE2McnJkYbA9ZaNPg@mail.gmail.com>
- <20141119152952.GB9776@lvm>
- <CAAhSdy2rQf-26SjeEspcc+LgwmhDr+QeYOOSyOUApF+0-8WdeA@mail.gmail.com>
-Message-ID: <20141121095922.GR19598@cbox>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 21 Nov 2014 10:59:35 +0100
+Subject: [PATCH 5/9] rc: sunxi-cir: Add support for the larger fifo found
+ on sun5i and sun6i
+In-Reply-To: <546EFAE1.9050506@redhat.com>
+References: <1416498928-1300-1-git-send-email-hdegoede@redhat.com>
+ <1416498928-1300-6-git-send-email-hdegoede@redhat.com>
+ <20141120142856.16b6562d@recife.lan>
+ <20141121082620.GJ24143@lukather> <546EFAE1.9050506@redhat.com>
+Message-ID: <20141121095934.GA4752@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 20, 2014 at 08:17:32PM +0530, Anup Patel wrote:
-> On Wed, Nov 19, 2014 at 8:59 PM, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
-> > On Tue, Nov 11, 2014 at 02:48:25PM +0530, Anup Patel wrote:
-> >> Hi All,
-> >>
-> >> I have second thoughts about rebasing KVM PMU patches
-> >> to Marc's irq-forwarding patches.
-> >>
-> >> The PMU IRQs (when virtualized by KVM) are not exactly
-> >> forwarded IRQs because they are shared between Host
-> >> and Guest.
-> >>
-> >> Scenario1
-> >> -------------
-> >>
-> >> We might have perf running on Host and no KVM guest
-> >> running. In this scenario, we wont get interrupts on Host
-> >> because the kvm_pmu_hyp_init() (similar to the function
-> >> kvm_timer_hyp_init() of Marc's IRQ-forwarding
-> >> implementation) has put all host PMU IRQs in forwarding
-> >> mode.
-> >>
-> >> The only way solve this problem is to not set forwarding
-> >> mode for PMU IRQs in kvm_pmu_hyp_init() and instead
-> >> have special routines to turn on and turn off the forwarding
-> >> mode of PMU IRQs. These routines will be called from
-> >> kvm_arch_vcpu_ioctl_run() for toggling the PMU IRQ
-> >> forwarding state.
-> >>
-> >> Scenario2
-> >> -------------
-> >>
-> >> We might have perf running on Host and Guest simultaneously
-> >> which means it is quite likely that PMU HW trigger IRQ meant
-> >> for Host between "ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);"
-> >> and "kvm_pmu_sync_hwstate(vcpu);" (similar to timer sync routine
-> >> of Marc's patchset which is called before local_irq_enable()).
-> >>
-> >> In this scenario, the updated kvm_pmu_sync_hwstate(vcpu)
-> >> will accidentally forward IRQ meant for Host to Guest unless
-> >> we put additional checks to inspect VCPU PMU state.
-> >>
-> >> Am I missing any detail about IRQ forwarding for above
-> >> scenarios?
-> >>
-> > Hi Anup,
+On Fri, Nov 21, 2014 at 09:42:09AM +0100, Hans de Goede wrote:
+> Hi,
 > 
-> Hi Christoffer,
+> On 11/21/2014 09:26 AM, Maxime Ripard wrote:
+> > Hi Mauro,
+> > 
+> > On Thu, Nov 20, 2014 at 02:28:56PM -0200, Mauro Carvalho Chehab wrote:
+> >> Em Thu, 20 Nov 2014 16:55:24 +0100
+> >> Hans de Goede <hdegoede@redhat.com> escreveu:
+> >>
+> >>> Add support for the larger fifo found on sun5i and sun6i, having a separate
+> >>> compatible for the ir found on sun5i & sun6i also is useful if we ever want
+> >>> to add ir transmit support, because the sun5i & sun6i version do not have
+> >>> transmit support.
+> >>>
+> >>> Note this commits also adds checking for the end-of-packet interrupt flag
+> >>> (which was already enabled), as the fifo-data-available interrupt flag only
+> >>> gets set when the trigger-level is exceeded. So far we've been getting away
+> >>> with not doing this because of the low trigger-level, but this is something
+> >>> which we should have done since day one.
+> >>>
+> >>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>
+> >> As this is meant to be merged via some other tree:
+> >>
+> >> Acked-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+> > 
+> > I think merging it through your tree would be just fine.
+> > 
+> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
-> >
-> > I briefly discussed this with Marc.  What I don't understand is how it
-> > would be possible to get an interrupt for the host while running the
-> > guest?
-> >
-> > The rationale behind my question is that whenever you're running the
-> > guest, the PMU should be programmed exclusively with guest state, and
-> > since the PMU is per core, any interrupts should be for the guest, where
-> > it would always be pending.
+> Heh, I was thinking it would be best if it went through Maxime's tree because
+> it also has some deps on new clk stuff (well the dts have deps on that), but either
+> way works for me.
 > 
-> Yes, thats right PMU is programmed exclusively for guest when
-> guest is running and for host when host is running.
-> 
-> Let us assume a situation (Scenario2 mentioned previously)
-> where both host and guest are using PMU. When the guest is
-> running we come back to host mode due to variety of reasons
-> (stage2 fault, guest IO, regular host interrupt, host interrupt
-> meant for guest, ....) which means we will return from the
-> "ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);" statement in the
-> kvm_arch_vcpu_ioctl_run() function with local IRQs disabled.
-> At this point we would have restored back host PMU context and
-> any PMU counter used by host can trigger PMU overflow interrup
-> for host. Now we will be having "kvm_pmu_sync_hwstate(vcpu);"
-> in the kvm_arch_vcpu_ioctl_run() function (similar to the
-> kvm_timer_sync_hwstate() of Marc's IRQ forwarding patchset)
-> which will try to detect PMU irq forwarding state in GIC hence it
-> can accidentally discover PMU irq pending for guest while this
-> PMU irq is actually meant for host.
-> 
-> This above mentioned situation does not happen for timer
-> because virtual timer interrupts are exclusively used for guest.
-> The exclusive use of virtual timer interrupt for guest ensures that
-> the function kvm_timer_sync_hwstate() will always see correct
-> state of virtual timer IRQ from GIC.
-> 
-I'm not quite following.
+> Maxime if you want this go through Mauro's tree, I can send a pull-req to Mauro
+> (I'm a linux-media sub-maintainer), so if that is the case let me know and I'll
+> prepare a pull-req (after fixing the missing reset documentation in the bindings).
 
-When you call kvm_pmu_sync_hwstate(vcpu) in the non-preemtible section,
-you would (1) capture the active state of the IRQ pertaining to the
-guest and (2) deactive the IRQ on the host, then (3) switch the state of
-the PMU to the host state, and finally (4) re-enable IRQs on the CPU
-you're running on.
+So much for not reading the cover letter... Sorry.
 
-If the host PMU state restored in (3) causes the PMU to raise an
-interrupt, you'll take an interrupt after (4), which is for the host,
-and you'll handle it on the host.
+We're getting quite close to the end of the ARM merge window, and I
+got a couple comments, Lee hasn't commented yet, so I'd say it's a bit
+too late for this to come in.
 
-Whenever you schedule the guest VCPU again, you'll (a) disable
-interrupts on the CPU, (b) restore the active state of the IRQ for the
-guest, (c) restore the guest PMU state, (d) switch to the guest with
-IRQs enabled on the CPU (potentially).
+If Mauro is happy with the current patches for him, it's completely
+fine to merge it through his tree. The DTS can wait.
 
-If the state in (c) causes an IRQ it will not fire on the host, because
-it is marked as active in (b).
+Maxime
 
-Where does this break?
-
--Christoffer
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141121/0de8ed36/attachment-0001.sig>
