@@ -1,70 +1,87 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Fri, 21 Nov 2014 11:17:15 +0100 (CET)
-Subject: [PATCH 1/1] thermal: Exynos: Deletion of unnecessary checks
- before two function calls
-In-Reply-To: <546F1017.5080403@users.sourceforge.net>
-References: <5307CAA2.8060406@users.sourceforge.net>
- <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
- <530A086E.8010901@users.sourceforge.net>
- <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
- <530A72AA.3000601@users.sourceforge.net>
- <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
- <530B5FB6.6010207@users.sourceforge.net>
- <alpine.DEB.2.10.1402241710370.2074@hadrien>
- <530C5E18.1020800@users.sourceforge.net>
- <alpine.DEB.2.10.1402251014170.2080@hadrien>
- <530CD2C4.4050903@users.sourceforge.net>
- <alpine.DEB.2.10.1402251840450.7035@hadrien>
- <530CF8FF.8080600@users.sourceforge.net>
- <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
- <530DD06F.4090703@users.sourceforge.net>
- <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net> <546F1017.5080403@users.sourceforge.net>
-Message-ID: <alpine.DEB.2.10.1411211116580.2554@hadrien>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Fri, 21 Nov 2014 15:47:36 +0530
+Subject: [PATCH v4 1/2] i2c: s3c2410: Handle i2c sys_cfg register in i2c
+ driver
+In-Reply-To: <20141121072545.GG1480@katana>
+References: <1414656270-8048-1-git-send-email-pankaj.dubey@samsung.com>
+ <1414656270-8048-2-git-send-email-pankaj.dubey@samsung.com>
+ <20141121072545.GG1480@katana>
+Message-ID: <546F1140.4050709@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Nov 2014, SF Markus Elfring wrote:
+On Friday 21 November 2014 12:55 PM, Wolfram Sang wrote:
+> On Thu, Oct 30, 2014 at 01:34:29PM +0530, Pankaj Dubey wrote:
+>> Let's handle i2c interrupt re-configuration in i2c driver. This will
+>> help us in removing some soc specific checks from machine files and
+>> will help in removing static iomapping of SYS register in exynos.c
+>>
+>> Since only Exynos5250, and Exynos5420 has i2c nodes in DT, added syscon
+>> based phandle to i2c device nodes of respective SoC DT files.
+>>
+>> Also handle saving and restoring of SYS_I2C_CFG register during
+>> suspend and resume of i2c driver.
+>>
+>> CC: Rob Herring <robh+dt@kernel.org>
+>> CC: Randy Dunlap <rdunlap@infradead.org>
+>> CC: Wolfram Sang <wsa@the-dreams.de>
+>> CC: Russell King <linux@arm.linux.org.uk>
+>> CC: devicetree at vger.kernel.org
+>> CC: linux-doc at vger.kernel.org
+>> CC: linux-i2c at vger.kernel.org
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> ---
+>>   .../devicetree/bindings/i2c/i2c-s3c2410.txt        |    1 +
+>>   arch/arm/boot/dts/exynos5250.dtsi                  |    4 +++
+>>   arch/arm/boot/dts/exynos5420.dtsi                  |    4 +++
+>
+> I usually don't take DTS patches. They should go via arm-soc. Please say
+> so if there are reasons I should take them.
 
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Fri, 21 Nov 2014 11:06:33 +0100
->
-> The functions cpufreq_cooling_unregister() and thermal_zone_device_unregister()
-> test whether their argument is NULL and then return immediately.
-> Thus the test around the call is not needed.
->
-> This issue was detected by using the Coccinelle software.
->
-> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
-> ---
->  drivers/thermal/samsung/exynos_thermal_common.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/thermal/samsung/exynos_thermal_common.c b/drivers/thermal/samsung/exynos_thermal_common.c
-> index 3f5ad25..1cbb9d0 100644
-> --- a/drivers/thermal/samsung/exynos_thermal_common.c
-> +++ b/drivers/thermal/samsung/exynos_thermal_common.c
-> @@ -417,12 +417,10 @@ void exynos_unregister_thermal(struct thermal_sensor_conf *sensor_conf)
->
->  	th_zone = sensor_conf->pzone_data;
->
-> -	if (th_zone->therm_dev)
-> -		thermal_zone_device_unregister(th_zone->therm_dev);
-> +	thermal_zone_device_unregister(th_zone->therm_dev);
->
->  	for (i = 0; i < th_zone->cool_dev_size; i++) {
-> -		if (th_zone->cool_dev[i])
-> -			cpufreq_cooling_unregister(th_zone->cool_dev[i]);
-> +		cpufreq_cooling_unregister(th_zone->cool_dev[i]);
->  	}
-
-Now you have unnecessary {}
-
-julia
+I CC'ed to you because same patch contains changes in i2c driver.
+I am not very sure via which tree this should go. May be I can ask 
+samsung SoC maintainer Kukjin to look into this, as patch 2/2 has 
+changes in mach-exynos which should go via Kukjin's tree.
 
 >
->  	dev_info(sensor_conf->dev,
-> --
-> 2.1.3
+>> @@ -1084,6 +1092,23 @@ s3c24xx_i2c_parse_dt(struct device_node *np, struct s3c24xx_i2c *i2c)
+>>   	of_property_read_u32(np, "samsung,i2c-slave-addr", &pdata->slave_addr);
+>>   	of_property_read_u32(np, "samsung,i2c-max-bus-freq",
+>>   				(u32 *)&pdata->frequency);
+>> +	/*
+>> +	 * Exynos5's legacy i2c controller and new high speed i2c
+>> +	 * controller have muxed interrupt sources. By default the
+>> +	 * interrupts for 4-channel HS-I2C controller are enabled.
+>> +	 * If node for first four channels of legacy i2c controller
 >
+> s/node/nodes/
+
+OK.
+
+>
+>> +	 * are available then re-configure the interrupts via the
+>> +	 * system register.
+>> +	 */
+>> +	id = of_alias_get_id(np, "i2c");
+>> +	i2c->sysreg = syscon_regmap_lookup_by_phandle(np,
+>> +			"samsung,sysreg-phandle");
+>> +	if (IS_ERR(i2c->sysreg)) {
+>> +		/* As this is not compulsory do not return error */
+>> +		pr_info("i2c-%d skipping re-configuration of interrutps\n", id);
+>
+> I'd say drop this message. If you want to keep it, it should be dev_dbg.
+
+OK.
+
+>
+>> +		return;
+>> +	}
+>> +	regmap_update_bits(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, BIT(id), 0);
+>>   }
+>
+> Rest looks good, thanks!
+
+Thanks for review.
+
+Pankaj Dubey
 >
