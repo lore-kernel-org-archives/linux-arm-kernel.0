@@ -1,23 +1,39 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Fri, 21 Nov 2014 14:22:42 +0100
-Subject: [PATCH v4 1/2] of: Rename "poweroff-source" property to
- "system-power-controller"
-In-Reply-To: <CABgxDoLy-+a7TAm7VWo5pYF7xZv4SM9=Zjcd1V6khnRqZbsFAw@mail.gmail.com>
-References: <1415885699-1465-1-git-send-email-user@radxa>
- <1415885699-1465-2-git-send-email-user@radxa>
- <20141121105951.GA20679@localhost>
- <CABgxDoLy-+a7TAm7VWo5pYF7xZv4SM9=Zjcd1V6khnRqZbsFAw@mail.gmail.com>
-Message-ID: <CABgxDoJkprh7GgXbjAQjvbYUanVQWxZo1M4TiiWDQr_TG40UCQ@mail.gmail.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Fri, 21 Nov 2014 18:52:47 +0530
+Subject: [PATCH 4/9] clk: Add clock driver for mb86s7x
+In-Reply-To: <2396055.pBuh1YtUHT@wuerfel>
+References: <1416486442-25200-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <1416486975-25385-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <2396055.pBuh1YtUHT@wuerfel>
+Message-ID: <CAJe_ZhcxHnoUeBUk3w=_xyk5oMAuena9RjDnyRvzLtV2=LpQxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-11-21 14:18 GMT+01:00 Romain Perier <romain.perier@gmail.com>:
+On 21 November 2014 18:33, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 20 November 2014 20:36:15 Vincent Yang wrote:
+>> +#define __DTS_MB86S70_CLK_H
+>> +
+>> +#define MB86S70_CRG11_ALW      0
+>> +#define MB86S70_CRG11_DDR3     1
+>> +#define MB86S70_CRG11_MAIN     2
+>> +#define MB86S70_CRG11_CA15     3
+>> +#define MB86S70_CRG11_HDMI     4
+>> +#define MB86S70_CRG11_DPHY     5
+>> +
+>> +#define MB86S70_CRG11_UNGPRT   8
+>>
+>
+> The clock driver doesn't seem to use those macros at all, how does the
+> driver know which clock you are referring to?
+>
+That was just an attempt to make a bit verbose the controller
+instance. Instead of specifying controller:=4, it reads better
+controller:=MB86S70_CRG11_HDMI in the clock DT nodes. The clock driver
+simply fills in controller+domain+port of the given clock into mailbox
+payload.
 
-> it was merged by Lee Jones (so it was merged onto
-> the mfd tree)
+Only MB86S70_CRG11_UNGPRT is marked to mean one special (non-maskable)
+port on the controller, which the clock driver does make use of.
 
-It was done, for a previous serie, not this one . This is  when I
-proposed to update the dts too (for all boards using the custom
-property) until the discussion turned into a troll.
-
-Romain
+Thanks
+Jassi
