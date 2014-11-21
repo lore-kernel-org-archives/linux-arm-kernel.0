@@ -1,53 +1,65 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 21 Nov 2014 10:16:15 +0000
-Subject: [PATCH 3/7] regulator: MT6397: Add support for MT6397 regulator
-In-Reply-To: <1416553771.19764.51.camel@mtksdaap41>
-References: <1416210027-5562-1-git-send-email-flora.fu@mediatek.com>
- <1416210027-5562-4-git-send-email-flora.fu@mediatek.com>
- <20141117234012.GE22111@sirena.org.uk>
- <1416553771.19764.51.camel@mtksdaap41>
-Message-ID: <20141121101615.GP3815@sirena.org.uk>
+From: wangyufen@huawei.com (wangyufen)
+Date: Fri, 21 Nov 2014 18:23:06 +0800
+Subject: arm64:  dose arm64 support the sysfs system call?
+In-Reply-To: <546EEFB8.10509@hisilicon.com>
+References: <546EE946.1020905@huawei.com> <546EEFB8.10509@hisilicon.com>
+Message-ID: <546F128A.5080705@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 03:09:31PM +0800, Flora Fu wrote:
-> On Mon, 2014-11-17 at 23:40 +0000, Mark Brown wrote:
+On 2014/11/21 15:54, Wei Xu wrote:
+> 
+> 
+> On 2014/11/21 15:27, wangyufen wrote:
+>> Hi,
+> 
+> Hi Yufen,
+> 
+>> I did ltp test on arm64, the sysfs testcases failed:
+>>
+>>     sysfs01     0  TWARN  :  This test can only run on kernels that support the sysfs system call
+>>
+>> because the __NR_sysfs didn't define in aarch64
+> 
+> Have you been enabled the *CONFIG_COMPAT* in your .config?
+> 
+*CONFIG_COMPAT* already enabled
+CONFIG_COMPAT_BRK=y
+CONFIG_COMPAT_BINFMT_ELF=y
+CONFIG_COMPAT=y
 
-> > > +	vosel = info->buck_conf.vosel_reg;
-> > > +	voselon = info->buck_conf.voselon_reg;
-> > > +	vosel_mask = info->buck_conf.vosel_mask;
+> The __NR_sysfs is defined at arch/arm64/include/asm/unistd32.h
+> and arch/arm64/kernel/sys32.S is including it.
+> 
+in arch/arm64/include/asm/unistd32.h  defined :
+__SYSCALL(135, sys_sysfs)
 
-> > Please use the standard way of specifying data even if you can't use the
-> > standard function.
+So I used 135 to test sysfs, I straced sysfs01, 
 
-> Could you specify the standard way of specification data? Thanks. 
+the syscall called rt_sigprocmask not sysfs:
+rt_sigprocmask(SIG_UNBLOCK, [], 0x8, 0) = -1 EINVAL (Invalid argument)
 
-Using the fields in the regulator_desc as you can see from the standard
-helpers.
-
-> > You should add comments here explaining what's going on - it's very
-> > strange to have to write the same value to two different registers and
-> > the names of the registers look suspiciously like this is something to do
-> > with a suspend mode...
-
-> Yes, its is for suspend mode control usage.
-> For registers "vosel", "voselon", they is called register mode or
-> hardware control mode voltage settings. Register mode is a default mode
-> on the buck control. For quickly normal/sleep mode switch, hardware
-> control can be enabled by controlling buck output by a CTRL_PIN. In the
-> following diagram, there is a static settings on vosel_sleep for suspend
-> mode output. According to CTRL_PIN's level, Vout can have different
-> output (voselon or vosel_sleep). 
-
-You need to represent this in your driver, the sleep mode controls
-should either be controlled using the suspend API or the GPIO control
-needs to be visible in the driver.  It's also OK to ignore the GPIO
-control for now and do it later if complex work is needed to represent
-it in the driver.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141121/7832427b/attachment.sig>
+> Hope it will fix your issues.
+> 
+> Best Regards,
+> Wei
+> 
+>> Dose anyone know what number the sysfs system call is in aarch64?
+>>
+>>
+>> Thanks,
+>> Wang
+>>
+>> _______________________________________________
+>> linuxarm mailing list
+>> linuxarm at huawei.com
+>> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
+>>
+>>
+> 
+> _______________________________________________
+> linuxarm mailing list
+> linuxarm at huawei.com
+> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
+> 
+> 
