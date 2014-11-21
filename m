@@ -1,47 +1,40 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Fri, 21 Nov 2014 09:27:25 -0600
-Subject: [PATCH 2/2] arm: socfpga: Set share override bit of the l2 cache
- controller
-In-Reply-To: <2156186.zs80uXCLAf@wuerfel>
-References: <1416546280-12068-1-git-send-email-dinguyen@opensource.altera.com>
- <1416546280-12068-2-git-send-email-dinguyen@opensource.altera.com>
- <2156186.zs80uXCLAf@wuerfel>
-Message-ID: <546F59DD.5040809@opensource.altera.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 21 Nov 2014 15:29:09 +0000
+Subject: [PATCH v9 05/13] arm: introduce is_device_dma_coherent
+In-Reply-To: <alpine.DEB.2.02.1411201036400.12596@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1411121130020.26318@kaball.uk.xensource.com>
+ <1415792454-23161-5-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1411141158560.26318@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1411181649000.27247@kaball.uk.xensource.com>
+ <20141120000736.GN4042@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1411201036400.12596@kaball.uk.xensource.com>
+Message-ID: <20141121152908.GU4042@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 11/21/14, 5:04 AM, Arnd Bergmann wrote:
-> On Thursday 20 November 2014 23:04:40 dinguyen at opensource.altera.com wrote:
->>
->> ---
->>  arch/arm/mach-socfpga/socfpga.c | 3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
->> index 13b1858..afc009f 100644
->> --- a/arch/arm/mach-socfpga/socfpga.c
->> +++ b/arch/arm/mach-socfpga/socfpga.c
->> @@ -105,7 +105,8 @@ static const char *altera_dt_match[] = {
->>  
->>  DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
->>         .l2c_aux_val    = L310_AUX_CTRL_DATA_PREFETCH |
->> -                         L310_AUX_CTRL_INSTR_PREFETCH,
->> +                         L310_AUX_CTRL_INSTR_PREFETCH |
->> +                         L2C_AUX_CTRL_SHARED_OVERRIDE,
->>         .l2c_aux_mask   = ~0,
->>         .smp            = smp_ops(socfpga_smp_ops),
->>         .map_io         = socfpga_map_io,
+On Thu, Nov 20, 2014 at 10:39:32AM +0000, Stefano Stabellini wrote:
+> On Thu, 20 Nov 2014, Russell King - ARM Linux wrote:
+> > On Tue, Nov 18, 2014 at 04:49:21PM +0000, Stefano Stabellini wrote:
+> > > ping?
+> > 
+> > Sending something which wants my attention _To:_ me is always a good idea :)
 > 
-> Hi Dinh,
+> I'll keep that in mind :-)
 > 
-> Please do this by putting the appropriate proterties into the
-> l2x0 DT node instead.
 > 
+> > The patch is fine in itself, but I have a niggle about the
+> > is_device_dma_coherent() - provided this is only used in architecture
+> > specific code, that should be fine.  It could probably do with a comment
+> > to that effect in an attempt to discourage drivers using it (thereby
+> > becoming less portable to other architectures.)
+> 
+> Can I take this as an Acked-by?
+> Good point regarding the comment. Maybe I can add:
+> 
+> /* do not use this function in a driver */
 
-I don't see a way to do this yet in DT. Perhaps I'm missing a patchset
-to allow this?
+Provided it gets such a comment, yes.  Thanks.
 
-Thanks,
-Dinh
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
