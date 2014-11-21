@@ -1,123 +1,112 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 21 Nov 2014 17:00:05 +0100
-Subject: [PATCHv3 08/16] clk: mvebu: add suspend/resume for gatable clocks
+Date: Fri, 21 Nov 2014 17:00:07 +0100
+Subject: [PATCHv3 10/16] ARM: mvebu: reserve the first 10 KB of each memory
+ bank for suspend/resume
 In-Reply-To: <1416585613-2113-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1416585613-2113-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1416585613-2113-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1416585613-2113-11-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds suspend/resume support for the gatable clock driver
-used on Marvell EBU platforms. When getting out of suspend, the
-Marvell EBU platforms go through the bootloader, which re-enables all
-gatable clocks. However, upon resume, the clock framework will not
-disable again all gatable clocks that are not used.
+When going out of suspend to RAM, the Marvell EBU platforms go through
+the bootloader, which re-configures the DRAM controller. To achieve
+this, the bootloader executes a piece of code called the "DDR3
+training code". It does some reads/writes to the memory to find out
+the optimal timings for the memory chip being used.
 
-Therefore, if the clock driver does not save/restore the state of the
-gatable clocks, all gatable clocks that are not claimed by any device
-driver will remain enabled after a resume. This is why this driver
-saves and restores the state of those clocks.
+This has the nasty side effect that the first 10 KB of each DRAM
+chip-select are overwritten by the bootloader when exiting the suspend
+to RAM state.
 
-Since clocks aren't real devices, we don't have the normal ->suspend()
-and ->resume() of the device model, and have to use the ->suspend()
-and ->resume() hooks of the syscore_ops mechanism. This mechanism has
-the unfortunate idea of not providing a way of passing private data,
-which requires us to change the driver to make the assumption that
-there is only once instance of the gatable clock control structure.
+Therefore, this commit implements the ->reserve() hook for the 'struct
+machine_desc' used on Armada XP, to reserve the 10 KB of each DRAM
+chip-select using the memblock API.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: linux-kernel at vger.kernel.org
 Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/clk/mvebu/common.c | 32 ++++++++++++++++++++++++++++++--
- 1 file changed, 30 insertions(+), 2 deletions(-)
+ arch/arm/mach-mvebu/board-v7.c | 51 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
 
-diff --git a/drivers/clk/mvebu/common.c b/drivers/clk/mvebu/common.c
-index b7fcb46..0d4d121 100644
---- a/drivers/clk/mvebu/common.c
-+++ b/drivers/clk/mvebu/common.c
-@@ -19,6 +19,7 @@
- #include <linux/io.h>
- #include <linux/of.h>
+diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+index 6478626..bc52231 100644
+--- a/arch/arm/mach-mvebu/board-v7.c
++++ b/arch/arm/mach-mvebu/board-v7.c
+@@ -16,10 +16,12 @@
+ #include <linux/init.h>
+ #include <linux/clk-provider.h>
  #include <linux/of_address.h>
-+#include <linux/syscore_ops.h>
- 
- #include "common.h"
- 
-@@ -177,14 +178,17 @@ struct clk_gating_ctrl {
- 	spinlock_t *lock;
- 	struct clk **gates;
- 	int num_gates;
-+	void __iomem *base;
-+	u32 saved_reg;
- };
- 
- #define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
- 
-+static struct clk_gating_ctrl *ctrl;
-+
- static struct clk *clk_gating_get_src(
- 	struct of_phandle_args *clkspec, void *data)
- {
--	struct clk_gating_ctrl *ctrl = (struct clk_gating_ctrl *)data;
- 	int n;
- 
- 	if (clkspec->args_count < 1)
-@@ -199,15 +203,35 @@ static struct clk *clk_gating_get_src(
- 	return ERR_PTR(-ENODEV);
++#include <linux/of_fdt.h>
+ #include <linux/of_platform.h>
+ #include <linux/io.h>
+ #include <linux/clocksource.h>
+ #include <linux/dma-mapping.h>
++#include <linux/memblock.h>
+ #include <linux/mbus.h>
+ #include <linux/signal.h>
+ #include <linux/slab.h>
+@@ -57,6 +59,54 @@ void __iomem *mvebu_get_scu_base(void)
  }
  
-+static int mvebu_clk_gating_suspend(void)
+ /*
++ * When returning from suspend, the platform goes through the
++ * bootloader, which executes its DDR3 training code. This code has
++ * the unfortunate idea of using the first 10 KB of each DRAM bank to
++ * exercise the RAM and calculate the optimal timings. Therefore, this
++ * area of RAM is overwritten, and shouldn't be used by the kernel if
++ * suspend/resume is supported.
++ */
++
++#ifdef CONFIG_SUSPEND
++#define MVEBU_DDR_TRAINING_AREA_SZ (10 * SZ_1K)
++static int __init mvebu_scan_mem(unsigned long node, const char *uname,
++				 int depth, void *data)
 +{
-+	ctrl->saved_reg = readl(ctrl->base);
++	const char *type = of_get_flat_dt_prop(node, "device_type", NULL);
++	const __be32 *reg, *endp;
++	int l;
++
++	if (type == NULL || strcmp(type, "memory"))
++		return 0;
++
++	reg = of_get_flat_dt_prop(node, "linux,usable-memory", &l);
++	if (reg == NULL)
++		reg = of_get_flat_dt_prop(node, "reg", &l);
++	if (reg == NULL)
++		return 0;
++
++	endp = reg + (l / sizeof(__be32));
++	while ((endp - reg) >= (dt_root_addr_cells + dt_root_size_cells)) {
++		u64 base, size;
++
++		base = dt_mem_next_cell(dt_root_addr_cells, &reg);
++		size = dt_mem_next_cell(dt_root_size_cells, &reg);
++
++		memblock_reserve(base, MVEBU_DDR_TRAINING_AREA_SZ);
++	}
++
 +	return 0;
 +}
 +
-+static void mvebu_clk_gating_resume(void)
++static void __init mvebu_memblock_reserve(void)
 +{
-+	writel(ctrl->saved_reg, ctrl->base);
++	of_scan_flat_dt(mvebu_scan_mem, NULL);
 +}
++#else
++static void __init mvebu_memblock_reserve(void) {}
++#endif
 +
-+static struct syscore_ops clk_gate_syscore_ops = {
-+	.suspend = mvebu_clk_gating_suspend,
-+	.resume = mvebu_clk_gating_resume,
-+};
-+
- void __init mvebu_clk_gating_setup(struct device_node *np,
- 				   const struct clk_gating_soc_desc *desc)
- {
--	struct clk_gating_ctrl *ctrl;
- 	struct clk *clk;
- 	void __iomem *base;
- 	const char *default_parent = NULL;
- 	int n;
++/*
+  * Early versions of Armada 375 SoC have a bug where the BootROM
+  * leaves an external data abort pending. The kernel is hit by this
+  * data abort as soon as it enters userspace, because it unmasks the
+@@ -210,6 +260,7 @@ DT_MACHINE_START(ARMADA_370_XP_DT, "Marvell Armada 370/XP (Device Tree)")
+ 	.init_machine	= mvebu_dt_init,
+ 	.init_irq       = mvebu_init_irq,
+ 	.restart	= mvebu_restart,
++	.reserve        = mvebu_memblock_reserve,
+ 	.dt_compat	= armada_370_xp_dt_compat,
+ MACHINE_END
  
-+	if (ctrl) {
-+		pr_err("mvebu-clk-gating: cannot instantiate more than one gatable clock device\n");
-+		return;
-+	}
-+
- 	base = of_iomap(np, 0);
- 	if (WARN_ON(!base))
- 		return;
-@@ -225,6 +249,8 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
- 	/* lock must already be initialized */
- 	ctrl->lock = &ctrl_gating_lock;
- 
-+	ctrl->base = base;
-+
- 	/* Count, allocate, and register clock gates */
- 	for (n = 0; desc[n].name;)
- 		n++;
-@@ -246,6 +272,8 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
- 
- 	of_clk_add_provider(np, clk_gating_get_src, ctrl);
- 
-+	register_syscore_ops(&clk_gate_syscore_ops);
-+
- 	return;
- gates_out:
- 	kfree(ctrl);
 -- 
 2.1.0
