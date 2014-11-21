@@ -1,94 +1,53 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 21 Nov 2014 16:33:38 +0100
-Subject: [PATCH v2 4/4] mmc: atmel-mci: use probe deferring if dma controller
- is not ready yet
-In-Reply-To: <1416584018-8561-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1416584018-8561-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1416584018-8561-5-git-send-email-ludovic.desroches@atmel.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 21 Nov 2014 16:56:22 +0100
+Subject: [GIT PULL] cpuidle: A few improvements for ARM cpuidle via DT
+In-Reply-To: <546C6DEB.8060204@linaro.org>
+References: <546C6DEB.8060204@linaro.org>
+Message-ID: <17509116.2bjC4d8bef@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Return probe defer if requesting a dma channel without a dma controller
-probed.
+On Wednesday, November 19, 2014 11:16:11 AM Daniel Lezcano wrote:
+> 
+> Hi Rafael,
+> 
+> this pull request, based on 3.18-rc5, contains a set of changes from 
+> Lorenzo Pieralisi.
+> 
+>   * Added a 'status' definition flag in the DT to specify the 
+> unsupported firmware idle states and ignore those states in the parsing 
+> code when initializing the cpuidle driver
+> 
+>   * Added an idle state description in the DT. As the idle states are 
+> not standardized on ARM, the description gives information about the 
+> idle state
+> 
+>   * Removed duplicate error message in the arm64 cpuidle drivers
+> 
+> Thanks !
+> 
+>    -- Daniel
+> 
+> 
+> The following changes since commit fc14f9c1272f62c3e8d01300f52467c0d9af50f9:
+> 
+>    Linux 3.18-rc5 (2014-11-16 16:36:20 -0800)
+> 
+> are available in the git repository at:
+> 
+>    http://git.linaro.org/git-ro/people/daniel.lezcano/linux.git cpuidle/3.19
+> 
+> for you to fetch changes up to 18f95a3640dbf421ab9532e517070a0c1cd4d582:
+> 
+>    drivers: cpuidle: Remove cpuidle-arm64 duplicate error messages 
+> (2014-11-19 10:16:28 +0100)
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/mmc/host/atmel-mci.c | 46 ++++++++++++++++++++++++--------------------
- 1 file changed, 25 insertions(+), 21 deletions(-)
+Pulled, but I had a conflict with one patch from you I'd already queued up for
+3.19-rc1.
 
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index 28546c3..d3c269e 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -2265,29 +2265,29 @@ static void atmci_cleanup_slot(struct atmel_mci_slot *slot,
- 	mmc_free_host(slot->mmc);
- }
- 
--static bool atmci_configure_dma(struct atmel_mci *host)
-+static int atmci_configure_dma(struct atmel_mci *host)
- {
--	if (host == NULL)
--		return false;
-+	int ret = 0;
- 
--	host->dma.chan = dma_request_slave_channel(&host->pdev->dev, "rxtx");
--	if (!host->dma.chan) {
--		dev_warn(&host->pdev->dev, "no DMA channel available\n");
--		return false;
--	} else {
--		dev_info(&host->pdev->dev,
--					"using %s for DMA transfers\n",
--					dma_chan_name(host->dma.chan));
--
--		host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
--		host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
--		host->dma_conf.src_maxburst = 1;
--		host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
--		host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
--		host->dma_conf.dst_maxburst = 1;
--		host->dma_conf.device_fc = false;
--		return true;
-+	host->dma.chan = dma_request_slave_channel_reason(&host->pdev->dev, "rxtx");
-+	if (IS_ERR(host->dma.chan)) {
-+		ret = PTR_ERR(host->dma.chan);
-+		host->dma.chan = NULL;
-+		return ret;
- 	}
-+
-+	dev_info(&host->pdev->dev, "using %s for DMA transfers\n",
-+		 dma_chan_name(host->dma.chan));
-+
-+	host->dma_conf.src_addr = host->mapbase + ATMCI_RDR;
-+	host->dma_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	host->dma_conf.src_maxburst = 1;
-+	host->dma_conf.dst_addr = host->mapbase + ATMCI_TDR;
-+	host->dma_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	host->dma_conf.dst_maxburst = 1;
-+	host->dma_conf.device_fc = false;
-+
-+	return ret;
- }
- 
- /*
-@@ -2403,7 +2403,10 @@ static int atmci_probe(struct platform_device *pdev)
- 
- 	/* Get MCI capabilities and set operations according to it */
- 	atmci_get_cap(host);
--	if (atmci_configure_dma(host)) {
-+	ret = atmci_configure_dma(host);
-+	if (ret == -EPROBE_DEFER)
-+		goto err_dma_probe_defer;
-+	if (ret == 0) {
- 		host->prepare_data = &atmci_prepare_data_dma;
- 		host->submit_data = &atmci_submit_data_dma;
- 		host->stop_transfer = &atmci_stop_transfer_dma;
-@@ -2476,6 +2479,7 @@ err_init_slot:
- 	del_timer_sync(&host->timer);
- 	if (host->dma.chan)
- 		dma_release_channel(host->dma.chan);
-+err_dma_probe_defer:
- 	free_irq(irq, host);
- 	return ret;
- }
+Can you please have a look at my bleeding-edge branch and check if I resolved
+the conflict correctly?
+
 -- 
-2.0.3
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
