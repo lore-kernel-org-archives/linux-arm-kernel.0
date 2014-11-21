@@ -1,39 +1,24 @@
-From: wangyijing0307@gmail.com (Yijing Wang)
-Date: Fri, 21 Nov 2014 19:57:01 +0800
-Subject: Removal of bus->msi assignment breaks MSI with stacked domains
-In-Reply-To: <546F0FB6.3050404@arm.com>
-References: <546E1771.4030201@arm.com> <546E93DC.8010902@huawei.com>
- <546F0FB6.3050404@arm.com>
-Message-ID: <546F288D.2040705@gmail.com>
+From: marcel@ziswiler.com (Marcel Ziswiler)
+Date: Fri, 21 Nov 2014 12:57:52 +0100
+Subject: [PATCH] ARM: tegra: colibri t30: fix on-module ethernet
+In-Reply-To: <b1cdc96ce8bb15059d7eea282f6586a826bee124.1416566157.git.marcel@ziswiler.com>
+References: <b1cdc96ce8bb15059d7eea282f6586a826bee124.1416566157.git.marcel@ziswiler.com>
+Message-ID: <1416571072.2744.4.camel@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 2014-11-21 at 11:41 +0100, Marcel Ziswiler wrote:
+> Looks like Ethernet only ever worked if U-Boot properly brought it up
+> as both the reset as well as the VBUS lines were not actively handled
+> in-kernel.
+> This patch fixes this by just pulling up the reset GPIO
 
-? 2014/11/21 18:11, Marc Zyngier ??:
-> On 21/11/14 01:22, Yijing Wang wrote:
->> On 2014/11/21 0:31, Marc Zyngier wrote:
->>> Bjorn, Yijing,
->>>
->>> I've just realized that patch c167caf8d174 (PCI/MSI: Remove useless
->>> bus->msi assignment) completely breaks MSI on arm64 when using the new
->>> MSI stacked domain:
->> Sorry, this is my first part to refactor MSI related code, now
->> how to get pci msi_controller depends arch functions(pcibios_msi_controller() or
->> arch_setup_msi_irq()), we are working on generic pci_host_bridge, after that,
->> we could eventually eliminate MSI arch functions and find pci dev 's msi controller
->> by pci_host_bridge->get_msi_controller().
->>
->> Marc, could you tell me what pci host driver in your test platform ?
-> I'm using pci-host-generic (with a couple of patches to help it fit the
-> new "generic pci" infrastructure).
->
-> This lives at:
-> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
-> irq/arm64-pci
+Doing automatic power-cycle tests revealed that this is still not enough
+and a proper reset-cycle might be required. However I don't know as of
+yet how one can easily do that in mainline with a USB device otherwise
+not mentioned anywhere in the device tree. Any ideas?
 
-Thanks, I would have a look at it.
-
->
-> Thanks,
->
-> 	M.
+> and properly
+> enabling VBUS via a GPIO enabled fixed regulator VBUS supply.
+> 
+> Signed-off-by: Marcel Ziswiler <marcel@ziswiler.com>
